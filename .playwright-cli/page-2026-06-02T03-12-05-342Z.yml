@@ -1,0 +1,22 @@
+- generic [ref=e6]:
+  - img [ref=e8]
+  - generic [ref=e9]:
+    - img [ref=e10]
+    - generic [ref=e11]:
+      - generic [ref=e15]:
+        - textbox "请选择法人" [ref=e16] [cursor=pointer]
+        - generic [ref=e19] [cursor=pointer]: 
+      - textbox "请输入您的用户名" [ref=e23]
+      - generic [ref=e27]:
+        - textbox "请输入您的密码" [ref=e28]
+        - img [ref=e32] [cursor=pointer]
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - textbox "请输入图形中的字符" [ref=e38]
+          - img [ref=e40]
+        - img "验证码" [ref=e41]
+      - generic [ref=e42]:
+        - button "登 录" [ref=e43] [cursor=pointer]:  登 录
+        - generic [ref=e44]:
+          - button "用户转授权编码" [ref=e45] [cursor=pointer]
+          - button "灰度版本" [ref=e46] [cursor=pointer]

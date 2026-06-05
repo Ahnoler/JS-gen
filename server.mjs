@@ -1,0 +1,102 @@
+﻿import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { PORT, HOST, TMP_DIR, DASHBOARD_DIR } from './src/config.js';
+import { startOpencode } from './src/opencode.js';
+import { state } from './src/state.js';
+import registerHealthRoutes from './src/routes/health.js';
+import registerAgentRoutes from './src/routes/agent.js';
+import registerTestGenRoutes from './src/routes/test-gen.js';
+import registerTestHistoryRoutes from './src/routes/test-history.js';
+import registerTestRunRoutes from './src/routes/test-run.js';
+import registerLLMProxyRoutes from './src/routes/llm-proxy.js';
+import registerBrowserUseExploreRoutes from './src/routes/browser-use-explore.js';
+import registerTrajectoryRoutes from './src/routes/trajectory.js';
+import registerSSERoutes from './src/routes/sse.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const app = express();
+app.use(express.json({ limit: '10mb' }));
+app.use('/api/test/screenshots', express.static(TMP_DIR));
+app.use(express.static(DASHBOARD_DIR, { maxAge: 0 }));
+
+// Register all route modules
+registerLLMProxyRoutes(app);
+registerBrowserUseExploreRoutes(app);
+registerTrajectoryRoutes(app);
+registerHealthRoutes(app);
+registerAgentRoutes(app);
+registerTestGenRoutes(app);
+registerTestHistoryRoutes(app);
+registerTestRunRoutes(app);
+registerSSERoutes(app);
+
+// Redirect root to test dashboard
+app.get('/', (req, res) => res.redirect('/api/test'));
+
+app.get('/api/test', (req, res) => {
+  res.sendFile(path.join(__dirname, 'test-dashboard.html'));
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('[server] Unhandled error:', err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: err.message || 'Internal server error' });
+});
+
+async function main() {
+  await startOpencode();
+
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`[server] Agent API listening on http://${HOST}:${PORT}`);
+    console.log(`[server] Endpoints:`);
+    console.log(`  GET  /v1/models (OpenAI compatible)`);
+    console.log(`  POST /v1/chat/completions (OpenAI compatible)`);
+    console.log(`  POST /api/browser-use/explore (SSE - Browser Use exploration, saves trajectory)`);
+    console.log(`  GET  /api/trajectory`);
+    console.log(`  GET  /api/trajectory/:id`);
+    console.log(`  DELETE /api/trajectory/:id`);
+    console.log(`  GET  /api/health`);
+    console.log(`  GET  /api/agents`);
+    console.log(`  GET  /api/skills`);
+    console.log(`  POST /api/agent/execute`);
+    console.log(`  SSE  /api/agent/execute-stream`);
+    console.log(`  POST /api/agent/execute-async`);
+    console.log(`  POST /api/agent/session`);
+    console.log(`  GET  /api/agent/session/:id/messages`);
+    console.log(`  POST /api/agent/session/:id/message`);
+    console.log(`  DELETE /api/agent/session/:id`);
+    console.log(`  POST /api/test/generate (script generation)`);
+    console.log(`  POST /api/test/refine (refine script)`);
+    console.log(`  GET  /api/test/history`);
+    console.log(`  GET  /api/test/history/:id`);
+    console.log(`  DELETE /api/test/history/:id`);
+    console.log(`  POST /api/test/run (SSE streaming)`);
+    console.log(`  POST /api/test/run-sync (JSON)`);
+    console.log(`  GET  /api/test/screenshots/* (static)`);
+    console.log(`  GET  /api/test (dashboard)`);
+  });
+  server.timeout = 0;
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 0;
+  server.requestTimeout = 0;
+}
+
+main().catch(err => {
+  console.error('[server] Failed to start:', err);
+  process.exit(1);
+});
+
+process.on('SIGINT', () => {
+  console.log('\n[server] Shutting down...');
+  if (state.ocServer) state.ocServer.close();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n[server] Shutting down...');
+  if (state.ocServer) state.ocServer.close();
+  process.exit(0);
+});

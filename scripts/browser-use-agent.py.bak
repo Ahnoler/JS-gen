@@ -1,0 +1,1378 @@
+"""
+Browser Use Agent — runs browser automation with opencode as LLM backend.
+Supports --task (single task) and --workflow (multi-phase workflow) modes.
+Outputs JSON Lines on stdout for progress reporting.
+"""
+import argparse
+import json
+import sys
+import os
+import io
+import tempfile
+import time
+import re
+import asyncio
+from datetime import datetime
+from pathlib import Path
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace')
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Browser Use Agent")
+    parser.add_argument("--task", help="Task description")
+    parser.add_argument("--workflow", help="Path to workflow JSON file (array of {name, task, maxSteps})")
+    parser.add_argument("--model", required=True, help="Model ID")
+    parser.add_argument("--base-url", default="http://localhost:4097/v1")
+    parser.add_argument("--output", default=None)
+    parser.add_argument("--playwright-output", default=None, help="Path to save generated Playwright script (.py)")
+    parser.add_argument("--session", action="store_true", help="Run in session mode (stdin/stdout interactive)")
+    parser.add_argument("--session-id", default=None, help="Session ID (for trajectory file naming)")
+    return parser.parse_args()
+
+def emit_json(data):
+    sys.stdout.write(json.dumps(data, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+def extract_first_url(task):
+    urls = re.findall(r'https?://[^\s\n]+', task)
+    return urls[0] if urls else None
+
+async def do_navigate(page, url):
+    emit_json({"event": "nav_step", "data": {"step": 0, "label": "Navigating to target URL"}})
+    try:
+        await page.goto(url, wait_until='networkidle', timeout=60000)
+    except:
+        try:
+            await page.goto(url, wait_until='load', timeout=30000)
+        except:
+            await page.goto(url, timeout=30000)
+    await page.wait_for_timeout(2000)
+    emit_json({"event": "nav_step", "data": {"step": 1, "label": "Page loaded"}})
+
+# ========== Override system prompt (replaces browser_use default) ==========
+OVERRIDE_SYSTEM_MESSAGE = """You are an AI agent controlling a browser on Element UI (Vue) applications.
+
+# Input
+Task, Previous steps, Current URL, Open Tabs, Interactive Elements
+Elements: [index]<type>text</type> — only [] indexed elements are interactive. * means new.
+
+# Response Format
+{"current_state": {"evaluation_previous_goal": "Success|Failed|Unknown", "memory": "What's done, what remains. Count progress.", "next_goal": "Next immediate action"}, "action":[{"action_name": {params}}]}
+
+Max 1 action per response.
+
+# Action Selection
+- el-select dropdown / any select: use select_option(label, option_text). Use "first" as option_text to pick first.
+- text/password input: use fill_form_field(label, value). Matches by label, placeholder, or type.
+- el-radio: use click_radio(label, option).
+- el-dialog/drawer close: use close_dialog().
+- el-tree: expand_all_el_tree() then click leaf.
+- el-tabs: switch_tab(name).
+- el-table rows: click_table_row_action(row_text, button).
+- buttons, menus, links: click_element_by_index.
+- loading: wait_for_loading().
+- diagnostic: get_page_state().
+
+# Form sequence
+select_option → fill_form_field → click_element_by_index(save) → wait_for_loading
+
+# Rules
+- **Login page rule**: If URL contains "login" and the page has form fields (dropdown, input, password, button), you MUST fill ALL visible form fields AND click the login/submit button before calling done(). Login is complete only when the URL CHANGES away from the login page. The typical login sequence: select_option(dropdown) → fill_form_field(username) → fill_form_field(password) → click_element_by_index(login button) → wait_for_loading → check URL changed.
+- If same action fails 2x, take screenshot and try different approach
+- After menu click or submit: wait_for_loading() then verify content
+- done() only when ALL task steps complete"""
+
+# ========== Planner system prompt (used for all modes) ==========
+PLANNER_SYSTEM_PROMPT = """CRITICAL:
+1. Multi-step task tracker: count how many steps are needed vs completed. Only suggest done() when ALL steps are done.
+2. Login = 4+ steps: select institution → username → password → click login → wait redirect.
+3. Form filling = N fields + 1 submit + 1 wait. Track each field's completion status.
+4. If progress < 100%, list remaining steps. Do NOT suggest done().
+5. For multi-instruction phases, track each numbered instruction's completion separately.
+6. Alert if the agent calls done() prematurely — explicitly list what remains incomplete."""
+
+# ========== Generator implementations (Python, actionable) ==========
+import random as _random
+
+def _gen_mobile():
+    return '1' + str(_random.choice([3,4,5,6,7,8,9])) + ''.join(str(_random.randint(0,9)) for _ in range(9))
+
+def _gen_idcard():
+    prefix = '430101'
+    birth = f"{1950+_random.randint(0,55)}{_random.randint(1,12):02d}{_random.randint(1,28):02d}"
+    seq = f"{_random.randint(0,999):03d}"
+    base = prefix + birth + seq
+    weights = [7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2]
+    check = '10X98765432'[sum(int(base[i])*weights[i] for i in range(17)) % 11]
+    return base + check
+
+def _gen_landline():
+    return _random.choice(['010','021','0731','0755','0571','028']) + ''.join(str(_random.randint(0,9)) for _ in range(8))
+
+def _gen_email():
+    return f"test{_random.randint(100,999)}@{_random.choice(['example.com','company.cn'])}"
+
+def _gen_credit_code():
+    return f"91{_random.randint(10,99)}{_random.randint(10,99)}" + ''.join(_random.choice('ABCDEFGHJKLMNPQRTUWXY0123456789') for _ in range(9)) + _random.choice('0123456789ABCDEFGHJKLMNPQRTUWXY')
+
+def _gen_bankcard():
+    return '62' + ''.join(str(_random.randint(0,9)) for _ in range(17))
+
+def _gen_amount():
+    return f"{_random.randint(100000,9999999)}.{_random.randint(0,99):02d}"
+
+def _gen_name():
+    return _random.choice(['张','李','王','刘','陈','杨','赵','黄','周','吴']) + _random.choice(['伟','芳','敏','静','丽','强','磊','洋','涛','明']) + _random.choice(['华','平','刚','杰','峰','玲','超','文','林','军'])
+
+def _gen_address():
+    return _random.choice(['北京市朝阳区','上海市浦东新区','广州市天河区','深圳市南山区','长沙市岳麓区']) + _random.choice(['中山路','人民路','解放路','五一路','芙蓉路']) + f"{_random.randint(1,200)}号"
+
+_GEN_MAP = {
+    'genIdCard': _gen_idcard, 'genMobile': _gen_mobile, 'genLandline': _gen_landline,
+    'genEmail': _gen_email, 'genCreditCode': _gen_credit_code, 'genBankcard': _gen_bankcard,
+    'genAmount': _gen_amount, 'genName': _gen_name, 'genAddress': _gen_address,
+}
+
+_FALLBACK_RULES = [
+    (['身份证','身份证号','证件号码','居民身份证'], _gen_idcard),
+    (['单位电话','固定电话','座机'], _gen_landline),
+    (['手机','电话','联系方式'], _gen_mobile),
+    (['邮箱','Email','电子邮箱'], _gen_email),
+    (['信用代码','统一社会信用代码'], _gen_credit_code),
+    (['银行卡','银行卡号','银行账号'], _gen_bankcard),
+    (['金额','价格','费用','工资','收入'], _gen_amount),
+    (['姓名','用户名','联系人'], _gen_name),
+    (['地址','详细地址','联系地址'], _gen_address),
+    (['QQ','QQ号','QQ号码'], lambda: ''.join(str(_random.randint(0,9)) for _ in range(_random.randint(5,11)))),
+    (['年龄'], lambda: str(_random.randint(18,65))),
+    (['邮编','邮政编码'], lambda: '100000'),
+    (['案例类型','类型'], lambda: 'SELECT: 功能测试 / 性能测试 / 安全测试 / 兼容性测试 / 回归测试. Choose based on test context.'),
+    (['案例性质','性质'], lambda: 'SELECT: 正向案例 / 反向案例. Choose based on test context.'),
+    (['预期结果','预期'], lambda: 'FORMAT: Each line starts with ^^N^^ (N=1,2,3...). Example:\n^^1^^ 交易状态，[成功/失败]\n^^2^^ 系统提示[具体描述]\nPositive case → describe success. Negative case → describe rejection/error.'),
+    (['操作步骤'], lambda: 'FORMAT: Numbered lines "N、操作描述". Reference elements with <<name>>, fields with 「name」.'),
+    (['案例名称','名称'], lambda: 'FORMAT: 正向: "验证[功能]正向流程". 反向: "反向验证：[场景]"'),
+    (['案例描述','描述'], lambda: 'FORMAT: 1-3 sentences. Example: "1. 系统应正确处理正常输入\\n2. 提交后出现操作成功提示"'),
+    (['前置条件','前置'], lambda: 'FORMAT: Pre-condition state. Example: "已登录系统，进入XX页面"'),
+    (['测试数据','数据'], lambda: 'FORMAT: Key-value pairs. Example: 客户名称：空值\\n证件号码：110101199001011234'),
+    (['测试意图','意图','检查点'], lambda: 'FORMAT: 1-2 sentences. Example: "验证新增潜客时输入非法数据，系统应拦截并提示错误"'),
+]
+
+def _load_rules():
+    skill_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.opencode', 'skills', 'atp-rule', 'SKILL.md')
+    if not os.path.exists(skill_path):
+        sys.stderr.write(f"[rules] SKILL.md not found at {skill_path}, using fallback\n")
+        sys.stderr.flush()
+        return _FALLBACK_RULES
+    try:
+        with open(skill_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except:
+        return _FALLBACK_RULES
+    rules = []
+    gen_table = re.findall(r'\| `([^`]+)`.*?\| `(\w+)\(\)`', content)
+    for keywords_str, func_name in gen_table:
+        kws = [k.strip() for k in keywords_str.replace('`', '').split('、')]
+        gen = _GEN_MAP.get(func_name)
+        if gen:
+            rules.append((kws, gen))
+    sel_rows = re.findall(r'码值选择[\s\S]*?\| `([^`]+)`.*?\| `([^`]+)`[^|]*?\|', content)
+    for keywords_str, options_str in sel_rows:
+        kws = [k.strip() for k in keywords_str.split('、')]
+        opts = options_str.replace('`', '').replace(' / ', ' / ').strip()
+        rules.append((kws, lambda o=opts: f'SELECT: {o}. Choose based on test context.'))
+    fmt_rows = re.findall(r'格式模板[\s\S]*?\| `([^`]+)`.*?\|([^|]+?)\|', content)
+    for keywords_str, spec in fmt_rows:
+        kws = [k.strip() for k in keywords_str.split('、')]
+        spec_text = spec.strip()
+        rules.append((kws, lambda s=spec_text: s))
+    rules.append((['QQ','QQ号','QQ号码'], lambda: ''.join(str(_random.randint(0,9)) for _ in range(_random.randint(5,11)))))
+    rules.append((['年龄'], lambda: str(_random.randint(18,65))))
+    rules.append((['邮编','邮政编码'], lambda: '100000'))
+    sys.stderr.write(f"[rules] Loaded {len(rules)} rule groups\n")
+    sys.stderr.flush()
+    return rules
+
+def _match_rule(label_text, form_rules):
+    t = label_text.replace(' ','').replace('\t','')
+    for keywords, gen in form_rules:
+        for kw in keywords:
+            if kw in t:
+                return gen()
+    return None
+
+def build_controller(browser_context, form_rules, case_data_ref=None, exclude_actions=None):
+    from browser_use import Controller
+    if exclude_actions is None:
+        exclude_actions = ['input_text', 'select_dropdown_option']  # replaced by fill_form_field / select_option
+    controller = Controller(exclude_actions=exclude_actions)
+
+    if case_data_ref is not None:
+        @controller.action('Save data to the shared case data store for cross-phase data sharing. Use this when you want to record a value (customer ID, name, etc.) that a later phase will need.')
+        async def save_case_data(key: str, value: str):
+            cdp = case_data_ref.get('path')
+            if cdp is None:
+                return 'no-case-data-path'
+            try:
+                if cdp.exists():
+                    with open(cdp, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                else:
+                    data = {}
+                data[key] = value
+                cdp.parent.mkdir(parents=True, exist_ok=True)
+                with open(cdp, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                return f'saved:{key}={value}'
+            except Exception as e:
+                return f'save-error:{e}'
+
+        @controller.action('Read data from the shared case data store. Use this when a later phase needs a value saved by an earlier phase (e.g., a customer ID or name).')
+        async def read_case_data(key: str):
+            cdp = case_data_ref.get('path')
+            if cdp is None or not cdp.exists():
+                return f'NO-DATA:{key}'
+            try:
+                with open(cdp, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return data.get(key, f'NO-DATA:{key}')
+            except Exception as e:
+                return f'read-error:{e}'
+
+    @controller.action('Expand ALL el-tree nodes...')
+    async def expand_all_el_tree():
+        page = await browser_context.get_current_page()
+        total = 0
+        for _ in range(10):
+            clicked = await page.evaluate('''() => {
+                const tree = document.querySelector('.el-tree');
+                if (!tree) return -1;
+                let n = 0;
+                tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node => {
+                    const icon = node.querySelector(':scope > .el-tree-node__content > .el-tree-node__expand-icon');
+                    if (icon) { icon.click(); n++; }
+                });
+                return n;
+            }''')
+            if clicked == -1: return 'no-el-tree-found'
+            if clicked == 0: break
+            total += clicked
+            await page.wait_for_timeout(500)
+        return f'expanded-{total}-nodes'
+
+    @controller.action('Get a value for a form field by its label. Call this once per field BEFORE filling. Returns NO-RULE if no rule matches.')
+    async def match_form_rule(label_text: str):
+        val = _match_rule(label_text, form_rules)
+        return val if val else 'NO-RULE'
+
+    @controller.action('Fill a form field using Element UI native DOM setter. Use THIS instead of input_text or click+type for ALL form inputs. Handles dialog/drawer context, loading state, and label/placeholder/type matching. Returns OK-SKIP:[value] if field already has content — proceed to next unfilled field.')
+    async def fill_form_field(label_text: str, value: str):
+        page = await browser_context.get_current_page()
+        loading = await page.evaluate('''() => {
+            const mask = document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)');
+            return mask && mask.offsetParent !== null;
+        }''')
+        if loading:
+            await page.evaluate('''() => new Promise(resolve => {
+                let elapsed = 0;
+                const check = () => {
+                    if (elapsed >= 30000) { resolve('timeout'); return; }
+                    const mask = document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)');
+                    if (!mask || mask.offsetParent === null) resolve();
+                    else { elapsed += 200; setTimeout(check, 200); }
+                };
+                check();
+            })''')
+        result = await page.evaluate('''
+            ([label, val]) => {
+                // Find active container: dialog or drawer
+                let container = document;
+                const topOverlay = (() => {
+                    for (const d of document.querySelectorAll('.el-dialog'))
+                        if (d.offsetParent !== null) return d;
+                    for (const d of document.querySelectorAll('.el-drawer'))
+                        if (d.offsetParent !== null) return d;
+                    return null;
+                })();
+                if (topOverlay) container = topOverlay;
+
+                // Helper: check if a target already has the requested value
+                const alreadyFilled = (target, wanted) => {
+                    const cur = (target.value || '').trim();
+                    if (cur && cur === wanted) return true;
+                    if (cur && cur.length > 0) return true; // has any value
+                    return false;
+                };
+
+                const items = container.querySelectorAll('.el-form-item');
+                // First pass: match by label text
+                for (const item of items) {
+                    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                    if (!lbl.includes(label)) continue;
+                    const input = item.querySelector('input:not([type="hidden"])');
+                    const textarea = item.querySelector('textarea');
+                    const target = input || textarea;
+                    if (!target) return 'no-input-found';
+                    if (target.disabled || target.readOnly) return 'field-disabled';
+                    if (alreadyFilled(target, val)) return 'OK-SKIP:' + (target.value || '').trim() + ' (already filled). Proceed to next unfilled field.';
+                    const proto = input ? HTMLInputElement : HTMLTextAreaElement;
+                    const setter = Object.getOwnPropertyDescriptor(proto.prototype, 'value').set;
+                    setter.call(target, val);
+                    target.dispatchEvent(new Event('input', {bubbles:true}));
+                    target.dispatchEvent(new Event('change', {bubbles:true}));
+                    target.dispatchEvent(new Event('blur', {bubbles:true}));
+                    return 'ok';
+                }
+                // Second pass: match by placeholder (login forms often have no labels)
+                const allInputs = container.querySelectorAll('input:not([type="hidden"]), textarea');
+                for (const inp of allInputs) {
+                    const ph = inp.getAttribute('placeholder') || '';
+                    if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent !== null) {
+                        if (alreadyFilled(inp, val)) return 'OK-SKIP:' + (inp.value || '').trim() + ' (already filled). Proceed to next unfilled field.';
+                        const proto = inp.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+                        const setter = Object.getOwnPropertyDescriptor(proto.prototype, 'value').set;
+                        setter.call(inp, val);
+                        inp.dispatchEvent(new Event('input', {bubbles:true}));
+                        inp.dispatchEvent(new Event('change', {bubbles:true}));
+                        inp.dispatchEvent(new Event('blur', {bubbles:true}));
+                        return 'ok-placeholder';
+                    }
+                }
+                // Third pass: match by type attribute (e.g. 'password', 'text')
+                for (const inp of allInputs) {
+                    const type = inp.getAttribute('type') || 'text';
+                    if (type.toLowerCase() === label.toLowerCase() && !inp.disabled && !inp.readOnly && inp.offsetParent !== null) {
+                        if (alreadyFilled(inp, val)) return 'OK-SKIP:' + (inp.value || '').trim() + ' (already filled). Proceed to next unfilled field.';
+                        const proto = inp.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+                        const setter = Object.getOwnPropertyDescriptor(proto.prototype, 'value').set;
+                        setter.call(inp, val);
+                        inp.dispatchEvent(new Event('input', {bubbles:true}));
+                        inp.dispatchEvent(new Event('change', {bubbles:true}));
+                        inp.dispatchEvent(new Event('blur', {bubbles:true}));
+                        return 'ok-type';
+                    }
+                }
+                return 'label-not-found';
+            }
+        ''', [label_text, value])
+        return result
+
+    @controller.action('Select an option in an el-select dropdown. Use THIS instead of click_element_by_index for ALL dropdowns. Finds by label, placeholder, or first visible select. Returns OK-SKIP:[value] if already selected. Supports "first" keyword to pick first option.')
+    async def select_option(label_text: str, option_text: str):
+        page = await browser_context.get_current_page()
+        loading = await page.evaluate('''() => {
+            const mask = document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)');
+            return mask && mask.offsetParent !== null;
+        }''')
+        if loading:
+            await page.evaluate('''() => new Promise(resolve => {
+                let elapsed = 0;
+                const check = () => {
+                    if (elapsed >= 30000) { resolve('timeout'); return; }
+                    const mask = document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)');
+                    if (!mask || mask.offsetParent === null) resolve();
+                    else { elapsed += 200; setTimeout(check, 200); }
+                };
+                check();
+            })''')
+        # Pre-check: is the select already showing a value?
+        already_check = await page.evaluate('''
+            ([label]) => {
+                let container = document;
+                const _topOvl = (() => {
+                    for (const d of document.querySelectorAll('.el-dialog'))
+                        if (d.offsetParent !== null) return d;
+                    for (const d of document.querySelectorAll('.el-drawer'))
+                        if (d.offsetParent !== null) return d;
+                    return null;
+                })();
+                if (_topOvl) container = _topOvl;
+                // Check by label
+                const items = container.querySelectorAll('.el-form-item');
+                for (const item of items) {
+                    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                    if (!lbl.includes(label)) continue;
+                    const trigger = item.querySelector('.el-select .el-input__inner');
+                    if (!trigger) continue;
+                    const curVal = (trigger.value || '').trim();
+                    const curText = (trigger.textContent || '').trim();
+                    if (curVal && curVal.length > 0) return 'OK-SKIP:' + curVal + ' (already selected). Proceed to next unfilled field.';
+                    if (curText && curText.length > 0 && !curText.includes('请选择')) return 'OK-SKIP:' + curText + ' (already selected). Proceed to next unfilled field.';
+                }
+                // Check by placeholder
+                const allSelects = container.querySelectorAll('.el-select .el-input__inner');
+                for (const sel of allSelects) {
+                    const ph = sel.getAttribute('placeholder') || '';
+                    if (ph.includes(label) && sel.offsetParent !== null) {
+                        const curVal = (sel.value || '').trim();
+                        const curText = (sel.textContent || '').trim();
+                        if (curVal && curVal.length > 0) return 'OK-SKIP:' + curVal + ' (already selected). Proceed to next unfilled field.';
+                        if (curText && curText.length > 0 && !curText.includes('请选择')) return 'OK-SKIP:' + curText + ' (already selected). Proceed to next unfilled field.';
+                    }
+                }
+                // Fallback: check the first el-select
+                for (const sel of allSelects) {
+                    if (sel.offsetParent !== null) {
+                        const curVal = (sel.value || '').trim();
+                        const curText = (sel.textContent || '').trim();
+                        if (curVal && curVal.length > 0) return 'OK-SKIP:' + curVal + ' (already selected). Proceed to next unfilled field.';
+                        if (curText && curText.length > 0 && !curText.includes('请选择')) return 'OK-SKIP:' + curText + ' (already selected). Proceed to next unfilled field.';
+                        break;
+                    }
+                }
+                return 'not-filled';
+            }
+        ''', [label_text])
+        if already_check.startswith('ALREADY-SELECTED'):
+            return already_check
+        trigger_result = await page.evaluate('''
+            ([label]) => {
+                // IMPORTANT: el-select triggers are ALWAYS readonly (Element UI design).
+                // Only check disabled, never readonly!
+                let container = document;
+                const _topOvl = (() => {
+                    for (const d of document.querySelectorAll('.el-dialog'))
+                        if (d.offsetParent !== null) return d;
+                    for (const d of document.querySelectorAll('.el-drawer'))
+                        if (d.offsetParent !== null) return d;
+                    return null;
+                })();
+                if (_topOvl) container = _topOvl;
+                // First, try to find by label text in el-form-item
+                const items = container.querySelectorAll('.el-form-item');
+                for (const item of items) {
+                    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                    if (!lbl.includes(label)) continue;
+                    const trigger = item.querySelector('.el-select .el-input__inner');
+                    if (!trigger) return 'no-select-found';
+                    if (trigger.disabled) return 'select-disabled';
+                    trigger.click();
+                    return 'triggered';
+                }
+                // Second pass: try by placeholder text (common on login pages)
+                const allSelects = container.querySelectorAll('.el-select .el-input__inner');
+                for (const sel of allSelects) {
+                    const ph = sel.getAttribute('placeholder') || '';
+                    if (ph.includes(label) && !sel.disabled && sel.offsetParent !== null) {
+                        sel.click();
+                        return 'triggered';
+                    }
+                }
+                // Fallback: click the first enabled el-select trigger on the page
+                for (const sel of allSelects) {
+                    if (!sel.disabled && sel.offsetParent !== null) {
+                        sel.click();
+                        return 'triggered';
+                    }
+                }
+                return 'label-not-found';
+            }
+        ''', [label_text])
+        if trigger_result == 'label-not-found' or trigger_result == 'no-select-found' or trigger_result == 'select-disabled':
+            return trigger_result
+        await page.wait_for_timeout(800)
+        select_result = await page.evaluate('''
+            (option) => {
+                const dropdowns = document.querySelectorAll('.el-select-dropdown');
+                let dropdown = null;
+                for (const dd of dropdowns) {
+                    if (dd.offsetParent !== null && !dd.classList.contains('is-hidden')) {
+                        dropdown = dd;
+                    }
+                }
+                if (!dropdown) dropdown = document;
+                const items = dropdown.querySelectorAll('.el-select-dropdown__item');
+                // Support "first"/"1st" to select by index
+                const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
+                if (FIRST_ALIASES.includes(option.toLowerCase().trim())) {
+                    for (const item of items) {
+                        if (item.offsetParent !== null) { item.click(); return 'ok-first'; }
+                    }
+                    if (items.length > 0) { items[0].click(); return 'ok-first-hidden'; }
+                    return 'no-items';
+                }
+                for (const item of items) {
+                    if (item.textContent.trim() === option) {
+                        item.click();
+                        return 'ok';
+                    }
+                }
+                for (const item of items) {
+                    if (item.textContent.trim().includes(option)) {
+                        item.click();
+                        return 'ok-partial';
+                    }
+                }
+                return 'option-not-found:' + [...items].map(i => i.textContent.trim()).join(', ');
+            }
+        ''', option_text)
+        await page.wait_for_timeout(300)
+        return select_result
+
+    @controller.action('Wait for Element UI loading mask to disappear. Call this after submissions, navigation, or any action that triggers a loading spinner. Times out after 30s to prevent hanging.')
+    async def wait_for_loading():
+        page = await browser_context.get_current_page()
+        await page.evaluate('''() => new Promise(resolve => {
+            let elapsed = 0;
+            const check = () => {
+                if (elapsed >= 30000) { resolve('timeout'); return; }
+                const mask = document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)');
+                const spinner = document.querySelector('.el-loading-spinner');
+                const spinnerVisible = spinner && spinner.offsetParent !== null;
+                if ((!mask || mask.offsetParent === null) && !spinnerVisible) resolve('done');
+                else { elapsed += 200; setTimeout(check, 200); }
+            };
+            check();
+        })''')
+        return 'loading-done'
+
+    @controller.action('Get current page state: visible dialogs count, loading mask, form errors, toast messages, active tab, open dropdowns, and URL. Call this when unsure what to do next or to diagnose issues.')
+    async def get_page_state():
+        page = await browser_context.get_current_page()
+        state = await page.evaluate('''() => {
+            const dialogs = document.querySelectorAll('.el-dialog');
+            const visibleDialogs = [...dialogs].filter(d => d.offsetParent !== null);
+            const drawers = document.querySelectorAll('.el-drawer');
+            const visibleDrawers = [...drawers].filter(d => d.offsetParent !== null);
+            return {
+                dialogCount: dialogs.length,
+                visibleDialogCount: visibleDialogs.length,
+                visibleDialogTitles: visibleDialogs.map(d => d.querySelector('.el-dialog__title')?.textContent?.trim() || ''),
+                drawerCount: visibleDrawers.length,
+                loading: !!document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'),
+                openDropdown: !!document.querySelector('.el-select-dropdown:not(.is-hidden)'),
+                formErrors: [...document.querySelectorAll('.el-form-item__error')].map(e => e.textContent.trim()).filter(Boolean),
+                messages: [...document.querySelectorAll('.el-message')].map(e => e.textContent.trim()).filter(Boolean),
+                notifications: [...document.querySelectorAll('.el-notification')].map(e => e.textContent.trim()).filter(Boolean),
+                activeTab: document.querySelector('.el-tabs__item.is-active')?.textContent?.trim() || null,
+                treeNodes: document.querySelectorAll('.el-tree-node').length || 0,
+                tableRows: document.querySelectorAll('.el-table__body-wrapper .el-table__row').length || 0,
+                url: location.href,
+            };
+        }''')
+        return json.dumps(state, ensure_ascii=False)
+
+    @controller.action('Click a row action button in el-table by row text and button identifier. Finds the row by text content, then clicks the specified button within that row.')
+    async def click_table_row_action(row_text: str, button_text: str):
+        page = await browser_context.get_current_page()
+        result = await page.evaluate('''
+            ([rowText, btnText]) => {
+                const rows = document.querySelectorAll('.el-table__body-wrapper .el-table__row');
+                for (const row of rows) {
+                    if (!row.textContent.includes(rowText)) continue;
+                    const buttons = row.querySelectorAll('button, .el-button, i[class*="icon"]');
+                    for (const btn of buttons) {
+                        const text = btn.textContent?.trim() || '';
+                        const cls = btn.className || '';
+                        if (text.includes(btnText) || cls.includes(btnText.toLowerCase())) {
+                            if (btn.offsetParent !== null) { btn.click(); return 'ok'; }
+                        }
+                    }
+                    if (btnText === 'edit' || btnText === '编辑') {
+                        const editIcon = row.querySelector('i.el-icon-edit, i[class*="bianji"], i[class*="edit"], i[class*="xiugai"]');
+                        if (editIcon && editIcon.offsetParent !== null) { editIcon.click(); return 'ok-icon'; }
+                    }
+                    if (btnText === 'delete' || btnText === '删除') {
+                        const delIcon = row.querySelector('i.el-icon-delete, i[class*="shanchu"], i[class*="delete"]');
+                        if (delIcon && delIcon.offsetParent !== null) { delIcon.click(); return 'ok-icon'; }
+                    }
+                    return 'button-not-found-in-row';
+                }
+                return 'row-not-found';
+            }
+        ''', [row_text, button_text])
+        await page.wait_for_timeout(500)
+        return result
+
+    @controller.action('Switch to a tab by tab name in el-tabs component.')
+    async def switch_tab(tab_name: str):
+        page = await browser_context.get_current_page()
+        result = await page.evaluate('''
+            (name) => {
+                const tabs = document.querySelectorAll('.el-tabs__item');
+                for (const tab of tabs) {
+                    if (tab.textContent.trim() === name && tab.offsetParent !== null) {
+                        tab.click();
+                        return 'ok';
+                    }
+                }
+                return 'tab-not-found';
+            }
+        ''', tab_name)
+        await page.wait_for_timeout(800)
+        return result
+
+    @controller.action('Click a menu item by its text. Handles expanding parent submenu if needed.')
+    async def click_menu_item(menu_text: str):
+        page = await browser_context.get_current_page()
+        result = await page.evaluate('''
+            (text) => {
+                const directItem = [...document.querySelectorAll('.el-menu-item')]
+                    .find(el => el.textContent.trim() === text && el.offsetParent !== null);
+                if (directItem) { directItem.click(); return 'ok'; }
+                const submenus = document.querySelectorAll('.el-submenu');
+                for (const sm of submenus) {
+                    const title = sm.querySelector('.el-submenu__title');
+                    const items = sm.querySelectorAll('.el-menu-item');
+                    const hasTarget = [...items].some(i => i.textContent.trim() === text);
+                    if (hasTarget) {
+                        if (!sm.classList.contains('is-opened') && title) title.click();
+                        const target = [...items].find(i => i.textContent.trim() === text);
+                        if (target) { setTimeout(() => target.click(), 300); return 'ok-expanded'; }
+                    }
+                }
+                return 'not-found';
+            }
+        ''', menu_text)
+        await page.wait_for_timeout(500)
+        return result
+
+    @controller.action('Close the topmost el-dialog or el-drawer. Call this when you need to dismiss a dialog/drawer before proceeding.')
+    async def close_dialog():
+        page = await browser_context.get_current_page()
+        result = await page.evaluate('''() => {
+            // Try dialog first, then drawer
+            let top = null;
+            for (const sel of ['.el-dialog', '.el-drawer']) {
+                for (const d of document.querySelectorAll(sel)) {
+                    if (d.offsetParent !== null) { top = d; break; }
+                }
+                if (top) break;
+            }
+            if (!top) return 'no-overlay-open';
+            const closeBtn = top.querySelector('.el-dialog__headerbtn .el-dialog__close, .el-drawer__close-btn, .el-drawer__header .el-icon-close');
+            if (closeBtn) { closeBtn.click(); return 'ok'; }
+            const cancelBtn = top.querySelector('.el-dialog__footer .el-button--default');
+            if (cancelBtn) { cancelBtn.click(); return 'ok-cancel'; }
+            return 'no-close-button';
+        }''')
+        await page.wait_for_timeout(500)
+        return result
+
+    @controller.action('Click a radio option by label text and radio option text.')
+    async def click_radio(label_text: str, option_text: str):
+        page = await browser_context.get_current_page()
+        result = await page.evaluate('''
+            ([label, option]) => {
+                let container = document;
+                const _topOvl = (() => {
+                    for (const d of document.querySelectorAll('.el-dialog'))
+                        if (d.offsetParent !== null) return d;
+                    for (const d of document.querySelectorAll('.el-drawer'))
+                        if (d.offsetParent !== null) return d;
+                    return null;
+                })();
+                if (_topOvl) container = _topOvl;
+                const items = container.querySelectorAll('.el-form-item');
+                for (const item of items) {
+                    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                    if (!lbl.includes(label)) continue;
+                    const radios = item.querySelectorAll('.el-radio');
+                    for (const radio of radios) {
+                        if (radio.textContent.trim() === option && radio.offsetParent !== null) {
+                            radio.click();
+                            return 'ok';
+                        }
+                    }
+                    return 'option-not-found';
+                }
+                return 'label-not-found';
+            }
+        ''', [label_text, option_text])
+        return result
+
+    @controller.action('Take a screenshot and save it to the snapshots directory. Returns the file path. Use this when you need to visually verify the current page state.')
+    async def take_screenshot():
+        page = await browser_context.get_current_page()
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        snapshot_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapshots')
+        os.makedirs(snapshot_dir, exist_ok=True)
+        path = os.path.join(snapshot_dir, f"screenshot_{ts}.png")
+        await page.screenshot(path=path, full_page=False)
+        return f'screenshot-saved:{path}'
+
+    return controller
+
+def _patch_playwright_script_generator():
+    from browser_use.agent.playwright_script_generator import PlaywrightScriptGenerator
+    from browser_use.agent.views import AgentHistoryList
+
+    custom_handlers = {}
+
+    def _map_fill_form_field(history_list, params, step_info_str, **kwargs):
+        label = params.get('label_text', '')
+        value = params.get('value', '')
+        return [
+            f'            # Action: fill_form_field (Element UI native setter)',
+            f'            print(f"Filling form field \'{label}\" with value ({step_info_str})")',
+            f'            await page.evaluate("""',
+            f'                ([label, val]) => {{',
+            f'                    let container = document;',
+            f'                    const dialogs = document.querySelectorAll(\'.el-dialog\');',
+            f'                    if (dialogs.length > 0) {{',
+            f'                        let topDialog = null;',
+            f'                        for (const d of dialogs) {{ if (d.offsetParent !== null) topDialog = d; }}',
+            f'                        if (topDialog) container = topDialog;',
+            f'                    }}',
+            f'                    const items = container.querySelectorAll(\'.el-form-item\');',
+            f'                    for (const item of items) {{',
+            f'                        const lbl = item.querySelector(\'.el-form-item__label\')?.textContent?.trim() || \'\';',
+            f'                        if (!lbl.includes(label)) continue;',
+            f'                        const input = item.querySelector(\'input:not([type="hidden"])\');',
+            f'                        const textarea = item.querySelector(\'textarea\');',
+            f'                        const target = input || textarea;',
+            f'                        if (!target) return \'no-input-found\';',
+            f'                        const proto = input ? HTMLInputElement : HTMLTextAreaElement;',
+            f'                        const setter = Object.getOwnPropertyDescriptor(proto.prototype, \'value\').set;',
+            f'                        setter.call(target, val);',
+            f'                        target.dispatchEvent(new Event(\'input\', {{bubbles:true}}));',
+            f'                        target.dispatchEvent(new Event(\'change\', {{bubbles:true}}));',
+            f'                        target.dispatchEvent(new Event(\'blur\', {{bubbles:true}}));',
+            f'                        return \'ok\';',
+            f'                    }}',
+            f'                    return \'label-not-found\';',
+            f'                }}',
+            f'            """, [{repr(label)}, {repr(value)}])',
+            f'            await page.wait_for_timeout(500)',
+        ]
+
+    def _map_select_option(history_list, params, step_info_str, **kwargs):
+        label = params.get('label_text', '')
+        option = params.get('option_text', '')
+        return [
+            f'            # Action: select_option (Element UI el-select)',
+            f'            print(f"Selecting option \'{option}\' in \'{label}\" ({step_info_str})")',
+            f'            await page.evaluate("""',
+            f'                (label) => {{',
+            f'                    const items = document.querySelectorAll(\'.el-form-item\');',
+            f'                    for (const item of items) {{',
+            f'                        const lbl = item.querySelector(\'.el-form-item__label\')?.textContent?.trim() || \'\';',
+            f'                        if (!lbl.includes(label)) continue;',
+            f'                        const trigger = item.querySelector(\'.el-select .el-input__inner\');',
+            f'                        if (trigger) {{ trigger.click(); return \'triggered\'; }}',
+            f'                    }}',
+            f'                    return \'not-found\';',
+            f'                }}',
+            f'            """, {repr(label)})',
+            f'            await page.wait_for_timeout(800)',
+            f'            await page.evaluate("""',
+            f'                (option) => {{',
+            f'                    const items = document.querySelectorAll(\'.el-select-dropdown__item\');',
+            f'                    for (const item of items) {{',
+            f'                        if (item.textContent.trim() === option) {{ item.click(); return \'ok\'; }}',
+            f'                    }}',
+            f'                    for (const item of items) {{',
+            f'                        if (item.textContent.trim().includes(option)) {{ item.click(); return \'ok-partial\'; }}',
+            f'                    }}',
+            f'                    return \'option-not-found\';',
+            f'                }}',
+            f'            """, {repr(option)})',
+            f'            await page.wait_for_timeout(300)',
+        ]
+
+    def _map_click_radio(history_list, params, step_info_str, **kwargs):
+        label = params.get('label_text', '')
+        option = params.get('option_text', '')
+        return [
+            f'            # Action: click_radio (Element UI el-radio)',
+            f'            print(f"Clicking radio \'{option}\' in \'{label}\" ({step_info_str})")',
+            f'            await page.evaluate("""',
+            f'                ([label, option]) => {{',
+            f'                    const items = document.querySelectorAll(\'.el-form-item\');',
+            f'                    for (const item of items) {{',
+            f'                        const lbl = item.querySelector(\'.el-form-item__label\')?.textContent?.trim() || \'\';',
+            f'                        if (!lbl.includes(label)) continue;',
+            f'                        const radios = item.querySelectorAll(\'.el-radio\');',
+            f'                        for (const radio of radios) {{',
+            f'                            if (radio.textContent.trim() === option && radio.offsetParent !== null) {{ radio.click(); return \'ok\'; }}',
+            f'                        }}',
+            f'                    }}',
+            f'                }}',
+            f'            """, [{repr(label)}, {repr(option)}])',
+            f'            await page.wait_for_timeout(300)',
+        ]
+
+    def _map_take_screenshot(history_list, params, step_info_str, **kwargs):
+        return [
+            f'            # Action: take_screenshot',
+            f'            print(f"Taking screenshot ({step_info_str})")',
+            f'            await page.screenshot(path="screenshot_step.png")',
+        ]
+
+    def _make_simple_mapper(comment, js_code, wait_ms=500):
+        def _mapper(history_list, params, step_info_str, **kwargs):
+            return [
+                f'            # Action: {comment}',
+                f'            print(f"Executing {comment} ({step_info_str})")',
+                f'            await page.evaluate({repr(js_code)})',
+                f'            await page.wait_for_timeout({wait_ms})',
+            ]
+        return _mapper
+
+    custom_handlers['fill_form_field'] = _map_fill_form_field
+    custom_handlers['select_option'] = _map_select_option
+    custom_handlers['click_radio'] = _map_click_radio
+    custom_handlers['take_screenshot'] = _map_take_screenshot
+    custom_handlers['expand_all_el_tree'] = _make_simple_mapper(
+        'expand_all_el_tree',
+        '''() => { for(let i=0;i<10;i++){ const tree=document.querySelector('.el-tree'); if(!tree)return; let n=0; tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node=>{ const icon=node.querySelector(':scope > .el-tree-node__content > .el-tree-node__expand-icon'); if(icon){icon.click();n++;} }); if(n===0)break; } }'''
+    )
+    custom_handlers['wait_for_loading'] = _make_simple_mapper(
+        'wait_for_loading',
+        '''() => new Promise(resolve => { const check = () => { const m = document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'); if (!m || m.offsetParent === null) resolve(); else setTimeout(check, 200); }; check(); })'''
+    )
+    custom_handlers['close_dialog'] = _make_simple_mapper(
+        'close_dialog',
+        '''() => { const dialogs = document.querySelectorAll('.el-dialog'); let top = null; for (const d of dialogs) { if (d.offsetParent !== null) { top = d; break; } } if (!top) return; const c = top.querySelector('.el-dialog__headerbtn .el-dialog__close'); if (c) c.click(); else { const b = top.querySelector('.el-dialog__footer .el-button--default'); if (b) b.click(); } }''',
+        wait_ms=500
+    )
+    custom_handlers['click_menu_item'] = _make_simple_mapper(
+        'click_menu_item',
+        '''(text) => { const item = [...document.querySelectorAll('.el-menu-item')].find(el => el.textContent.trim() === text && el.offsetParent !== null); if (item) { item.click(); return; } const sms = document.querySelectorAll('.el-submenu'); for (const sm of sms) { if ([...sm.querySelectorAll('.el-menu-item')].some(i => i.textContent.trim() === text)) { if (!sm.classList.contains('is-opened')) sm.querySelector('.el-submenu__title')?.click(); setTimeout(() => { [...sm.querySelectorAll('.el-menu-item')].find(i => i.textContent.trim() === text)?.click(); }, 300); break; } } }''',
+        wait_ms=800
+    )
+    custom_handlers['switch_tab'] = _make_simple_mapper(
+        'switch_tab',
+        '''(name) => { const tab = [...document.querySelectorAll('.el-tabs__item')].find(t => t.textContent.trim() === name && t.offsetParent !== null); if (tab) tab.click(); }''',
+        wait_ms=800
+    )
+    custom_handlers['click_table_row_action'] = _make_simple_mapper(
+        'click_table_row_action',
+        '''([rowText, btnText]) => { const rows = document.querySelectorAll('.el-table__body-wrapper .el-table__row'); for (const row of rows) { if (!row.textContent.includes(rowText)) continue; const btns = row.querySelectorAll('button, .el-button'); for (const b of btns) { if ((b.textContent?.trim()?.includes(btnText) || b.className?.includes(btnText)) && b.offsetParent !== null) { b.click(); return; } } if (btnText==='edit'||btnText==='编辑') { const icon = row.querySelector('i.el-icon-edit,i[class*=\"bianji\"],i[class*=\"edit\"]'); if (icon && icon.offsetParent !== null) { icon.click(); return; } } if (btnText==='delete'||btnText==='删除') { const icon = row.querySelector('i.el-icon-delete,i[class*=\"shanchu\"],i[class*=\"delete\"]'); if (icon && icon.offsetParent !== null) { icon.click(); return; } } } }''',
+        wait_ms=500
+    )
+    custom_handlers['get_page_state'] = _make_simple_mapper(
+        'get_page_state',
+        '''() => ({ dialogs: document.querySelectorAll('.el-dialog').length, loading: !!document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)') })''',
+        wait_ms=0
+    )
+    custom_handlers['match_form_rule'] = _make_simple_mapper(
+        'match_form_rule',
+        '''() => {}''',
+        wait_ms=0
+    )
+
+    # Monkey-patch save_as_playwright_script to inject custom handlers
+    _original_save = AgentHistoryList.save_as_playwright_script
+
+    def patched_save(self, output_path, sensitive_data_keys=None, browser_config=None, context_config=None):
+        serialized_history = self.model_dump()['history']
+        gen = PlaywrightScriptGenerator(serialized_history, sensitive_data_keys, browser_config, context_config)
+        for action_type, handler in custom_handlers.items():
+            from functools import partial
+            gen._action_handlers[action_type] = partial(handler, serialized_history)
+        script_content = gen.generate_script_content()
+        path_obj = Path(output_path)
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+        with open(path_obj, 'w', encoding='utf-8') as f:
+            f.write(script_content)
+
+    AgentHistoryList.save_as_playwright_script = patched_save
+
+_patch_playwright_script_generator()
+
+def build_recording_hooks(goal_tracker=None, cancel_flag_path=None):
+    """Build hooks with goal dedup detection and cancel signal."""
+    if goal_tracker is None:
+        goal_tracker = {'goals': [], 'stopped': False}
+
+    async def on_step_start(agent):
+        sys.stderr.write(f"[recorder] on_step_start n_steps={agent.state.n_steps}\n"); sys.stderr.flush()
+
+    async def on_step_end(agent):
+        _done = agent.state.history.is_done() if agent.state.history else False
+        _stopped = agent.state.stopped
+        _last_result = agent.state.last_result
+        _last_result_str = str(_last_result)[:300] if _last_result else 'None'
+        _model_out = agent.state.history.history[-1].model_output if agent.state.history and agent.state.history.history else None
+        _next_goal = getattr(getattr(_model_out, 'current_state', None), 'next_goal', '') if _model_out else ''
+        _actions = [str(a)[:100] for a in (getattr(_model_out, 'action', []) or [])] if _model_out else []
+        sys.stderr.write(f"[recorder] on_step_end n_steps={agent.state.n_steps} is_done={_done} stopped={_stopped}\n")
+        sys.stderr.write(f"[recorder]   next_goal={_next_goal[:150]}\n")
+        sys.stderr.write(f"[recorder]   actions={_actions}\n")
+        sys.stderr.write(f"[recorder]   last_result={_last_result_str}\n")
+        sys.stderr.flush()
+        # Check cancel signal before any processing
+        if cancel_flag_path is not None and cancel_flag_path.exists():
+            sys.stderr.write("[recorder] Cancel signal received, stopping agent\n")
+            sys.stderr.flush()
+            agent.state.stopped = True
+            try: cancel_flag_path.unlink(missing_ok=True)
+            except: pass
+            return
+
+        if goal_tracker['stopped']:
+            return
+        try:
+            step_num = agent.state.n_steps
+            if step_num % 5 == 0:
+                sys.stderr.write(f"[recorder] step {step_num} done\n")
+                sys.stderr.flush()
+
+            # Goal dedup detection
+            try:
+                history = agent.state.history.history
+                if len(history) >= 2:
+                    last = history[-1]
+                    prev = history[-2]
+                    last_goal = (getattr(getattr(last.model_output, 'current_state', None), 'next_goal', '') or '')
+                    prev_goal = (getattr(getattr(prev.model_output, 'current_state', None), 'next_goal', '') or '')
+                    if last_goal and last_goal == prev_goal:
+                        goal_tracker['goals'].append(last_goal)
+                    else:
+                        goal_tracker['goals'] = []
+                    # If same goal 3+ times in a row → stop
+                    if len(goal_tracker['goals']) >= 3:
+                        goal_tracker['stopped'] = True
+                        sys.stderr.write(f"[recorder] Repeated goal detected ({len(goal_tracker['goals'])}x): {last_goal[:80]}...\n")
+                        sys.stderr.write(f"[recorder] Stopping agent at step {step_num}\n")
+                        sys.stderr.flush()
+                        agent.state.stopped = True
+                        return
+            except Exception:
+                pass
+
+        except Exception as e:
+            sys.stderr.write(f"[recorder] on_step_end error: {e}\n")
+            sys.stderr.flush()
+
+    return on_step_start, on_step_end
+
+async def run_session(args):
+    from langchain_openai import ChatOpenAI
+    from browser_use import Agent, Browser
+    from browser_use.browser.context import BrowserContextConfig
+    from browser_use.agent.message_manager.service import MessageManager
+
+    _original_get_messages = MessageManager.get_messages
+    MAX_RECENT = 12
+    def _patched_get_messages(self):
+        msgs = _original_get_messages(self)
+        total = len(msgs)
+        if total <= MAX_RECENT + 2:
+            return msgs
+        trimmed = msgs[:2] + msgs[-(MAX_RECENT):]
+        return trimmed
+    MessageManager.get_messages = _patched_get_messages
+
+    llm = ChatOpenAI(model=args.model, base_url=args.base_url, api_key="sk-opencode", temperature=0.2)
+    form_rules = _load_rules()
+
+    _el_knowledge_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'element-ui-knowledge.md')
+    extend_system_message = None
+    if os.path.exists(_el_knowledge_path):
+        try:
+            with open(_el_knowledge_path, 'r', encoding='utf-8') as _f:
+                extend_system_message = _f.read()
+            sys.stderr.write(f"[el-knowledge] Loaded ({len(extend_system_message)} chars)\n")
+            sys.stderr.flush()
+        except Exception as _e:
+            sys.stderr.write(f"[el-knowledge] Error loading: {_e}\n")
+            sys.stderr.flush()
+
+    browser = Browser()
+
+    def make_step_callback(phase_offset=0):
+        def on_step_end(browser_state, agent_output, step_num):
+            try:
+                if agent_output is None: return
+                thinking = getattr(agent_output, 'current_state', None) or {}
+                next_goal = getattr(thinking, 'next_goal', '') if hasattr(thinking, 'next_goal') else ''
+                if not next_goal:
+                    next_goal = getattr(agent_output, 'next_goal', None) or ''
+                actions = getattr(agent_output, 'action', None) or []
+                action_names = [list(a.keys())[0] if isinstance(a, dict) else str(a) for a in actions]
+                emit_json({
+                    "event": "step",
+                    "data": {
+                        "step": phase_offset + step_num,
+                        "url": getattr(browser_state, 'url', '') if browser_state else '',
+                        "next_goal": next_goal[:200],
+                        "actions": action_names,
+                    },
+                })
+            except Exception as e:
+                sys.stderr.write(f"[callback] step {step_num}: {e}\n")
+                sys.stderr.flush()
+        return on_step_end
+
+    def make_done_callback(output_path):
+        def on_done(history_list):
+            try:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                history_list.save_to_file(str(output_path))
+                emit_json({
+                    "event": "done",
+                    "data": {
+                        "output_file": str(output_path),
+                        "steps": len(history_list.history),
+                        "is_done": history_list.is_done(),
+                        "is_successful": history_list.is_successful(),
+                        "final_result": history_list.final_result(),
+                        "errors": history_list.errors(),
+                    },
+                })
+            except Exception as e:
+                sys.stderr.write(f"[done error] {e}\n")
+                emit_json({"event": "error", "data": {"message": f"done callback error: {e}"}})
+        return on_done
+
+    config = BrowserContextConfig(viewport_width=1920, viewport_height=1080, wait_for_network_idle_page_load_time=3.0)
+    browser_context = await browser.new_context(config)
+    controller = build_controller(browser_context, form_rules)
+
+    session_id = args.session_id or "unknown"
+    step_index = 0
+    last_agent = None
+    cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_cumulative.json"
+    cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
+    goal_tracker = {'goals': [], 'stopped': False}
+    case_data_ref = {'path': Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_data.json"}
+
+    on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path)
+    controller = build_controller(browser_context, form_rules, case_data_ref)
+
+    emit_json({"event": "ready", "session_id": session_id})
+    sys.stderr.write(f"[session] Ready, session_id={session_id}\n")
+    sys.stderr.flush()
+
+    loop = asyncio.get_event_loop()
+    stdin_queue = asyncio.Queue()
+    agent_running = False
+
+    async def stdin_reader():
+        while True:
+            try:
+                line = await loop.run_in_executor(None, sys.stdin.readline)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                await asyncio.sleep(0.1)
+                continue
+            if not line:
+                await stdin_queue.put(None)
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                msg = json.loads(line)
+            except json.JSONDecodeError:
+                sys.stderr.write(f"[session] Invalid JSON: {line[:100]}\n")
+                sys.stderr.flush()
+                continue
+            event = msg.get("event")
+            if event == "close":
+                await stdin_queue.put(None)
+                break
+            if agent_running and event == "reset_trajectory":
+                nonlocal cumulative_path
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"
+                case_data_ref['path'] = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_data_{ts}.json"
+                sys.stderr.write(f"[session] Trajectory + case data reset (async) -> {cumulative_path}\n")
+                sys.stderr.flush()
+                emit_json({"event": "reset_trajectory_ready", "data": {"cumulative_file": str(cumulative_path)}})
+                continue
+            if agent_running and event == "cancel_step":
+                continue
+            await stdin_queue.put(msg)
+
+    reader_task = asyncio.create_task(stdin_reader())
+
+    while True:
+        msg = await stdin_queue.get()
+        if msg is None:
+            break
+
+        try:
+            event = msg.get("event")
+
+            if event == "save_trajectory":
+                if not cumulative_path.exists():
+                    emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": "No trajectory data available — execute a step first"}})
+                    continue
+                try:
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    trajectory_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_ondemand_{ts}.json"
+                    import shutil
+                    shutil.copy(str(cumulative_path), trajectory_path)
+                    with open(trajectory_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        steps_count = len(data.get('history', []))
+                    emit_json({
+                        "event": "save_trajectory_result",
+                        "data": {"success": True, "trajectory_file": str(trajectory_path), "steps": steps_count, "is_done": True, "is_successful": True},
+                    })
+                    sys.stderr.write(f"[session] Trajectory saved on demand: {trajectory_path}\n")
+                    sys.stderr.flush()
+                except Exception as e:
+                    emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
+                    sys.stderr.write(f"[session] save_trajectory error: {e}\n")
+                    sys.stderr.flush()
+                continue
+
+            if event == "reset_trajectory":
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"
+                case_data_ref['path'] = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_data_{ts}.json"
+                sys.stderr.write(f"[session] Trajectory + case data reset -> {cumulative_path}\n")
+                sys.stderr.flush()
+                emit_json({"event": "reset_trajectory_ready", "data": {"cumulative_file": str(cumulative_path)}})
+                continue
+
+            if event != "step":
+                sys.stderr.write(f"[session] Unknown event: {event}\n")
+                sys.stderr.flush()
+                continue
+
+            instruction = msg.get("data", {}).get("instruction", "")
+            max_steps = msg.get("data", {}).get("max_steps", 40)
+            if not instruction:
+                emit_json({"event": "error", "data": {"message": "instruction is required"}})
+                continue
+
+            step_index += 1
+
+            # Clear stale cancel flag before starting a new step
+            if cancel_flag_path.exists():
+                try:
+                    cancel_flag_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+            emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": instruction[:60]}})
+            sys.stderr.write(f"[session] Step {step_index}: {instruction[:80]} (max_steps={max_steps})\n")
+            sys.stderr.flush()
+
+            nav_url = extract_first_url(instruction)
+            if nav_url:
+                try:
+                    page = await browser_context.get_current_page()
+                    sys.stderr.write(f"[session] Navigating to {nav_url}\n"); sys.stderr.flush()
+                    await do_navigate(page, nav_url)
+                    sys.stderr.write(f"[session] Navigation done\n"); sys.stderr.flush()
+                except Exception as e:
+                    sys.stderr.write(f"[session navigate] Error: {e}\n")
+                    sys.stderr.flush()
+
+            agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', instruction, count=1).strip() or instruction
+
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_step{step_index}_{ts}.json"
+            goal_tracker['goals'] = []
+            goal_tracker['stopped'] = False
+
+            sys.stderr.write(f"[session] Creating Agent...\n"); sys.stderr.flush()
+            agent = Agent(
+                task=agent_task, llm=llm, controller=controller, browser_context=browser_context,
+                override_system_message=OVERRIDE_SYSTEM_MESSAGE,
+                extend_system_message=extend_system_message,
+                use_vision=False, enable_memory=False,
+                max_failures=2, retry_delay=5, max_actions_per_step=1, tool_calling_method="raw",
+                planner_llm=llm, planner_interval=1,
+                extend_planner_system_message=PLANNER_SYSTEM_PROMPT,
+                register_new_step_callback=make_step_callback(step_index * 100),
+                register_done_callback=make_done_callback(output_path),
+            )
+            sys.stderr.write(f"[session] Agent created, starting run...\n"); sys.stderr.flush()
+
+            try:
+                agent_running = True
+                sys.stderr.write(f"[session] Calling agent.run() with max_steps={max_steps}\n"); sys.stderr.flush()
+                await agent.run(max_steps=max_steps, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
+                sys.stderr.write(f"[session] Agent run completed\n"); sys.stderr.flush()
+                if not hasattr(agent, '_done_fired') and hasattr(agent, 'history'):
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    agent.history.save_to_file(str(output_path))
+            except asyncio.CancelledError:
+                sys.stderr.write("[session] Agent run cancelled\n"); sys.stderr.flush()
+                emit_json({"event": "phase_error", "data": {"phase": step_index, "name": instruction[:60], "message": "Agent run cancelled"}})
+            except Exception as e:
+                emit_json({"event": "phase_error", "data": {"phase": step_index, "name": instruction[:60], "message": str(e)}})
+            finally:
+                agent_running = False
+
+            last_agent = agent
+            if output_path.exists():
+                try:
+                    with open(output_path, 'r', encoding='utf-8') as _f:
+                        _step = json.load(_f)
+                    _step_history = _step.get('history', [])
+                    if _step_history:
+                        if cumulative_path.exists():
+                            with open(cumulative_path, 'r', encoding='utf-8') as _f:
+                                _cum = json.load(_f)
+                        else:
+                            _cum = {'history': []}
+                        _cum['history'].extend(_step_history)
+                        cumulative_path.parent.mkdir(parents=True, exist_ok=True)
+                        with open(cumulative_path, 'w', encoding='utf-8') as _f:
+                            json.dump(_cum, _f, ensure_ascii=False, indent=2)
+                        sys.stderr.write(f"[session] Accumulated {len(_step_history)} actions to case trajectory ({len(_cum['history'])} total)\n")
+                        sys.stderr.flush()
+                except Exception as _e:
+                    sys.stderr.write(f"[session] Accumulate error: {_e}\n")
+                    sys.stderr.flush()
+
+            emit_json({
+                "event": "phase_done",
+                "data": {"phase": step_index, "total": -1, "name": instruction[:60], "trajectory_file": str(output_path), "cumulative_file": str(cumulative_path), "step_index": step_index},
+            })
+            sys.stderr.write(f"[session] Step {step_index} done\n")
+            sys.stderr.flush()
+
+        except asyncio.CancelledError:
+            sys.stderr.write("[session] Main loop cancelled, exiting\n"); sys.stderr.flush()
+            break
+        except SystemExit:
+            sys.stderr.write("[session] SystemExit received, exiting\n"); sys.stderr.flush()
+            break
+        except BaseException as e:
+            sys.stderr.write(f"[session] Unexpected error in main loop: {type(e).__name__}: {e}\n"); sys.stderr.flush()
+            emit_json({"event": "error", "data": {"message": f"Unexpected error: {type(e).__name__}: {e}"}})
+            # Continue the loop instead of crashing
+
+    reader_task.cancel()
+    try:
+        await browser_context.close()
+    except:
+        pass
+    sys.stderr.write("[session] Browser closed, exiting\n")
+    sys.stderr.flush()
+
+def main():
+    args = parse_args()
+    if not args.task and not args.workflow and not args.session:
+        print("Either --task, --workflow, or --session is required", file=sys.stderr)
+        sys.exit(1)
+
+    if args.session:
+        asyncio.run(run_session(args))
+        return
+
+    # ====== Workflow / Single task mode (backward compatible) ======
+    from langchain_openai import ChatOpenAI
+    from browser_use import Agent, Browser
+    from browser_use.browser.context import BrowserContextConfig
+    from browser_use.agent.message_manager.service import MessageManager
+
+    _original_get_messages = MessageManager.get_messages
+    MAX_RECENT = 12
+    def _patched_get_messages(self):
+        msgs = _original_get_messages(self)
+        total = len(msgs)
+        if total <= MAX_RECENT + 2:
+            return msgs
+        trimmed = msgs[:2] + msgs[-(MAX_RECENT):]
+        return trimmed
+    MessageManager.get_messages = _patched_get_messages
+
+    llm = ChatOpenAI(model=args.model, base_url=args.base_url, api_key="sk-opencode", temperature=0.2)
+    form_rules = _load_rules()
+
+    _el_knowledge_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'element-ui-knowledge.md')
+    extend_system_message = None
+    if os.path.exists(_el_knowledge_path):
+        try:
+            with open(_el_knowledge_path, 'r', encoding='utf-8') as f:
+                extend_system_message = f.read()
+        except:
+            pass
+
+    def make_step_callback(phase_offset=0):
+        def on_step_end(browser_state, agent_output, step_num):
+            try:
+                if agent_output is None: return
+                thinking = getattr(agent_output, 'current_state', None) or {}
+                next_goal = getattr(thinking, 'next_goal', '') if hasattr(thinking, 'next_goal') else ''
+                if not next_goal:
+                    next_goal = getattr(agent_output, 'next_goal', None) or ''
+                actions = getattr(agent_output, 'action', None) or []
+                action_names = [list(a.keys())[0] if isinstance(a, dict) else str(a) for a in actions]
+                emit_json({"event": "step", "data": {"step": phase_offset + step_num, "url": getattr(browser_state, 'url', '') if browser_state else '', "next_goal": next_goal[:200], "actions": action_names}})
+            except:
+                pass
+        return on_step_end
+
+    def make_done_callback(output_path):
+        def on_done(history_list):
+            try:
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                history_list.save_to_file(str(output_path))
+                emit_json({"event": "done", "data": {"output_file": str(output_path), "steps": len(history_list.history), "is_done": history_list.is_done(), "is_successful": history_list.is_successful(), "final_result": history_list.final_result(), "errors": history_list.errors()}})
+            except:
+                pass
+        return on_done
+
+    async def run():
+        browser = Browser()
+        config = BrowserContextConfig(viewport_width=1920, viewport_height=1080, wait_for_network_idle_page_load_time=3.0)
+        browser_context = await browser.new_context(config)
+        controller = build_controller(browser_context, form_rules)
+
+        on_step_start_hook, on_step_end_hook = build_recording_hooks()
+
+        if args.playwright_output:
+            pw_path_base = Path(args.playwright_output)
+            pw_path_base.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            pw_path_base = None
+
+        if args.workflow:
+            with open(args.workflow, 'r', encoding='utf-8') as f:
+                phases = json.load(f)
+            total = len(phases)
+            all_trajectories = []
+            for idx, phase in enumerate(phases):
+                phase_num = idx + 1
+                phase_name = phase.get('name', f'Phase {phase_num}')
+                phase_task = phase.get('task', '')
+                max_steps = phase.get('maxSteps', 40)
+                emit_json({"event": "phase_start", "data": {"phase": phase_num, "total": total, "name": phase_name}})
+                if idx == 0:
+                    nav_url = extract_first_url(phase_task)
+                    if nav_url:
+                        try:
+                            page = await browser_context.get_current_page()
+                            await do_navigate(page, nav_url)
+                        except:
+                            pass
+                phase_output = Path(tempfile.gettempdir()) / f"browser_use_phase{phase_num}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                step_offset = idx * 100
+                agent = Agent(task=phase_task, llm=llm, controller=controller, browser_context=browser_context, override_system_message=OVERRIDE_SYSTEM_MESSAGE, extend_system_message=extend_system_message, use_vision=False, enable_memory=False, max_failures=2, retry_delay=5, max_actions_per_step=1, tool_calling_method="raw", planner_llm=llm, planner_interval=1, extend_planner_system_message=PLANNER_SYSTEM_PROMPT, register_new_step_callback=make_step_callback(step_offset), register_done_callback=make_done_callback(phase_output), save_playwright_script_path=str(pw_path_base.parent / f"phase{phase_num}_script.py") if pw_path_base else None)
+                try:
+                    await agent.run(max_steps=max_steps, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
+                except Exception as e:
+                    emit_json({"event": "phase_error", "data": {"phase": phase_num, "name": phase_name, "message": str(e)}})
+                all_trajectories.append(str(phase_output))
+                emit_json({"event": "phase_done", "data": {"phase": phase_num, "total": total, "name": phase_name}})
+            emit_json({"event": "workflow_done", "data": {"total_phases": total, "trajectories": all_trajectories, "message": "All phases completed"}})
+        else:
+            nav_url = extract_first_url(args.task)
+            if nav_url:
+                try:
+                    page = await browser_context.get_current_page()
+                    await do_navigate(page, nav_url)
+                except:
+                    pass
+            output_path = Path(args.output or Path(tempfile.gettempdir()) / f"browser_use_trajectory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+            agent = Agent(task=args.task, llm=llm, controller=controller, browser_context=browser_context, override_system_message=OVERRIDE_SYSTEM_MESSAGE, extend_system_message=extend_system_message, use_vision=False, enable_memory=False, max_failures=2, retry_delay=5, max_actions_per_step=1, tool_calling_method="raw", planner_llm=llm, planner_interval=1, extend_planner_system_message=PLANNER_SYSTEM_PROMPT, register_new_step_callback=make_step_callback(10), register_done_callback=make_done_callback(output_path), save_playwright_script_path=str(pw_path_base) if pw_path_base else None)
+            try:
+                await agent.run(max_steps=100, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
+            except:
+                pass
+
+        try:
+            await browser_context.close()
+        except:
+            pass
+        sys.stdout.flush()
+        sys.stderr.flush()
+        time.sleep(0.5)
+
+    asyncio.run(run())
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,25 @@
+[opencode] Starting server...
+[opencode] API key applied from OPENCODE_API_KEY env var
+[opencode] Server listening at http://127.0.0.1:58959
+[opencode] Available models: myprovider/GLM-5, tansun/GLM-5
+[server] Agent API listening on http://0.0.0.0:4097
+[server] Endpoints:
+  GET  /api/health
+  GET  /api/agents
+  GET  /api/skills
+  POST /api/agent/execute
+  SSE  /api/agent/execute-stream
+  POST /api/agent/execute-async
+  POST /api/agent/session
+  GET  /api/agent/session/:id/messages
+  POST /api/agent/session/:id/message
+  DELETE /api/agent/session/:id
+  POST /api/test/generate (script generation)
+  POST /api/test/refine (refine script)
+  GET  /api/test/history
+  GET  /api/test/history/:id
+  DELETE /api/test/history/:id
+  POST /api/test/run (SSE streaming)
+  POST /api/test/run-sync (JSON)
+  GET  /api/test/screenshots/* (static)
+  GET  /api/test (dashboard)

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent API Test Dashboard</title>
+<link rel="stylesheet" href="/test-dashboard.css">
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+
+<nav class="navbar">
+  <h1>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+    Agent API Test Dashboard
+  </h1>
+  <div style="display:flex;align-items:center;gap:16px">
+    <span class="badge" id="serverStatus"><span class="status-dot offline"></span>Connecting...</span>
+    <span class="badge" id="agentBadge">0 agents</span>
+    <span class="badge" id="skillBadge">0 skills</span>
+  </div>
+</nav>
+
+<div class="container">
+  <!-- API Reference -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-header" id="apiDocHeader" style="cursor:pointer">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        API Reference
+      </div>
+      <span id="apiDocToggle" style="font-size:12px;color:var(--slate-400)">Show</span>
+    </div>
+    <div id="apiDocContent" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <span class="badge" style="background:var(--indigo-100);color:var(--indigo-700);padding:2px 10px;border-radius:10px;font-size:11px">Base URL: <code id="baseUrlDisplay">http://127.0.0.1:4097</code></span>
+      </div>
+      <div id="apiEndpointsContainer"></div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-nav">
+    <button class="tab-btn btn btn-sm active" data-tab="gen">Script Generation</button>
+    <button class="tab-btn btn btn-sm" data-tab="explore">AI Explore</button>
+    <button class="tab-btn btn btn-sm" data-tab="history">Playwright Scripts</button>
+    <button class="tab-btn btn btn-sm" data-tab="trajectories">Trajectories</button>
+    <button class="tab-btn btn btn-sm" data-tab="execRecords">Execution Records</button>
+  </div>
+
+  <!-- Tab: Script Generation -->
+  <div id="tabGen" class="tab-panel">
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Script Generation
+          </div>
+          <span id="genStatus" style="font-size:12px;color:var(--slate-400)">Ready</span>
+        </div>
+        <div class="form-group">
+          <label>Test Scenario Description</label>
+          <textarea id="genDesc" rows="4" placeholder="Describe the test scenario in detail..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Target URL <span style="font-weight:400;color:var(--slate-400)">(optional)</span></label>
+          <input id="genUrl" type="text" placeholder="http://example.com/login">
+        </div>
+        <div class="form-group">
+          <label>Login Credentials <span style="font-weight:400;color:var(--slate-400)">(optional)</span></label>
+          <div style="display:flex;gap:8px">
+            <input id="genUser" type="text" placeholder="Username" style="flex:1">
+            <input id="genPass" type="password" placeholder="Password" style="flex:1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Reference Script <span style="font-weight:400;color:var(--slate-400)">(optional, max 100KB)</span></label>
+          <div id="genRefDropZone" style="border:2px dashed var(--slate-200);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;background:var(--slate-50);font-size:13px;color:var(--slate-400)">Drop a .js file here or click to upload</div>
+          <input id="genRefFile" type="file" accept=".js" style="display:none">
+          <div id="genRefFileName" style="display:none;align-items:center;gap:8px;padding:8px 12px;background:var(--indigo-50);border-radius:var(--radius-sm)">
+            <span id="genRefFileLabel" style="flex:1;font-size:13px;color:var(--indigo-700)"></span>
+            <button id="genRefFileClear" class="btn btn-sm btn-outline">Clear</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="genModel"><option value="">&mdash; Default &mdash;</option></select>
+        </div>
+        <button id="genBtn" class="btn btn-primary">Generate &amp; Auto-Test</button>
+      </div>
+
+      <div class="card" id="trajPromptCard" style="display:none;margin-bottom:24px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Trajectory-to-Script Prompt
+          </div>
+          <button id="trajPromptClearBtn" class="btn btn-sm btn-outline">Clear</button>
+        </div>
+        <div id="trajPromptContent" style="font-size:13px;color:var(--slate-600);padding:12px;background:var(--slate-50);border-radius:var(--radius-sm);white-space:pre-wrap;font-family:var(--font-mono);line-height:1.6;max-height:400px;overflow:auto"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Generated Script
+          </div>
+          <div style="display:flex;gap:6px">
+            <button id="genCopyBtn" class="btn btn-sm btn-outline">Copy Code</button>
+            <button id="genDownloadBtn" class="btn btn-sm btn-outline">Download</button>
+          </div>
+        </div>
+        <div id="genSteps" style="display:none;margin-bottom:12px">
+          <div class="section-title" style="font-size:13px">Test Steps</div>
+          <div id="genStepsList" style="font-size:13px;color:var(--slate-600);padding:8px 12px;background:var(--slate-50);border-radius:var(--radius-sm)"></div>
+        </div>
+        <div id="genScriptArea" style="display:none">
+          <pre id="genScriptPre" style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:var(--radius-sm);font-size:12px;line-height:1.6;overflow:auto;max-height:360px;font-family:var(--font-mono)"></pre>
+        </div>
+        <div id="genInfo" style="display:none;margin-top:8px;font-size:11px;color:var(--slate-400);padding:4px 0"></div>
+        <div id="genRunArea" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--slate-100)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span id="genRunDot" style="width:8px;height:8px;border-radius:50%;background:var(--slate-300);display:inline-block"></span>
+            <span id="genRunStatus" style="font-size:12px;color:var(--slate-400)">Worker not checked</span>
+          </div>
+          <button id="genRunBtn" class="btn btn-sm btn-primary" disabled>Run on Server</button>
+          <div id="genRunLog" style="display:none;margin-top:8px">
+            <div id="genRunTerminal" class="log-terminal" style="max-height:200px"></div>
+          </div>
+          <div id="genRunScreenshots" style="display:none;margin-top:8px">
+            <div class="section-title" style="font-size:12px">Screenshots</div>
+            <div id="genRunScreenshotList" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+          </div>
+          <div id="genRunResult" style="display:none;margin-top:8px;padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-weight:500"></div>
+        </div>
+        <div id="genRefineArea" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--slate-100)">
+          <div class="form-group">
+            <label>Refine Script</label>
+            <textarea id="genFeedback" rows="2" placeholder="Describe what to change..."></textarea>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="genRefineBtn" class="btn btn-sm btn-primary">Refine</button>
+            <span id="genRefineStatus" style="font-size:12px;color:var(--slate-400)"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:24px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Pipeline Execution Log
+          </div>
+          <button id="clearPipelineBtn" class="btn btn-outline btn-sm">Clear</button>
+        </div>
+        <div id="pipelineLogTerminal" class="log-terminal" style="max-height:480px">
+          <div class="log-line system"><span class="ts">&#9889;</span>Pipeline ready</div>
+        </div>
+      </div>
+  </div>
+
+  <!-- Tab: AI Explore -->
+  <div id="tabExplore" class="tab-panel" style="display:none">
+    <!-- Mode Toggle -->
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      <button class="btn btn-sm explore-mode-btn active" data-mode="oneshot">One-Shot Workflow</button>
+      <button class="btn btn-sm explore-mode-btn" data-mode="session">Multi-Turn Session</button>
+    </div>
+
+    <!-- One-Shot Mode -->
+    <div id="exploreOneShot">
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            AI Browser Exploration — One-Shot
+          </div>
+          <span id="exploreStatus" style="font-size:12px;color:var(--slate-400)">Ready</span>
+        </div>
+        <div class="form-group">
+          <label>Model</label>
+          <select id="exploreModel"><option value="">Loading models...</option></select>
+        </div>
+        <div class="form-group">
+          <label>Task <span style="font-weight:400;color:var(--slate-400)">(natural language, e.g. "Open XX system, login, create a customer")</span></label>
+          <textarea id="exploreTask" rows="5" placeholder="Describe the task for the AI agent to perform in the browser..."></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+          <button id="exploreStartBtn" class="btn btn-primary" disabled>&#9654; Start Exploration</button>
+          <button id="exploreCancelBtn" class="btn btn-outline" disabled>&#10005; Cancel</button>
+          <span id="exploreTrajectoryId" style="font-size:12px;color:var(--slate-400)"></span>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Progress
+          </div>
+        </div>
+        <div id="exploreTimeline" class="timeline">
+          <div class="empty-state" style="padding:20px"><p>Waiting for exploration to start...</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi-Turn Session Mode -->
+    <div id="exploreSession" style="display:none">
+      <!-- Session Management -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Session
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button id="sessNewBtn" class="btn btn-sm btn-primary">New Session</button>
+            <button id="sessLoadBtn" class="btn btn-sm btn-primary" disabled title="Parse test case into phases for the active session">Load</button>
+            <button id="sessCloseBrowserBtn" class="btn btn-sm btn-outline" style="color:var(--red-500);border-color:var(--red-200);font-size:11px;display:none" title="Close global browser (all sessions)">Close Browser</button>
+            <span id="sessStatus" style="font-size:12px;color:var(--slate-400)">No active session</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--slate-100);flex-wrap:wrap">
+          <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">Model:</label>
+          <select id="sessModel" style="flex:1;min-width:180px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">Loading...</option></select>
+          <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">Max Steps:</label>
+          <input id="sessMaxSteps" type="number" value="40" min="5" max="200" style="width:70px;padding:3px 6px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px">
+          <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">Active:</label>
+          <select id="sessActive" style="flex:1;min-width:140px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">(none)</option></select>
+        </div>
+        <div class="form-group" style="padding:12px">
+          <label>Test Case / Step Instruction <span style="font-weight:400;color:var(--slate-400)">(paste full scenario with &#12300;阶段N&#12301; markers to auto-split)</span></label>
+          <textarea id="sessTask" rows="5" placeholder="Paste test case scenario here or describe a single step..."></textarea>
+        </div>
+        <div style="display:flex;gap:8px;padding:0 12px 12px;flex-wrap:wrap;align-items:center">
+          <button id="sessStepBtn" class="btn btn-primary" disabled>&#9654; Execute Step</button>
+          <button id="sessTrajBtn" class="btn btn-outline" disabled title="Save trajectory to trajectory store">Save Trajectory</button>
+          <button id="sessResetTrajBtn" class="btn btn-outline" disabled title="Reset cumulative trajectory file (start a fresh recording)" style="font-size:11px">Reset Traj</button>
+          <button id="sessCancelBtn" class="btn btn-outline" disabled>&#10005; Cancel</button>
+          <button id="sessArchiveBtn" class="btn btn-outline" disabled title="Archive session to execution records">Archive</button>
+          <span id="sessTrajectoryId" style="font-size:12px;color:var(--slate-400)"></span>
+        </div>
+        <div id="sessTrajPath" style="display:none;padding:0 12px 6px;font-size:11px;font-family:var(--font-mono);color:var(--slate-400);word-break:break-all"></div>
+      </div>
+
+      <!-- Phase Plan (auto-parsed from test case) -->
+      <div class="card" id="sessPhasePlan" style="display:none;margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
+            Phase Plan
+          </div>
+          <span id="sessPhaseCount" style="font-size:12px;color:var(--slate-400)"></span>
+        </div>
+        <div id="sessPhaseList" style="padding:8px 12px"></div>
+      </div>
+
+      <!-- Step Progress -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Step Progress
+          </div>
+          <span id="sessStepCount" style="font-size:12px;color:var(--slate-400)">0 steps</span>
+        </div>
+        <div id="sessTimeline" class="timeline">
+          <div class="empty-state" style="padding:20px"><p>Send a step instruction to begin</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared: Log Terminal -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Logs
+        </div>
+        <button id="exploreClearLogBtn" class="btn btn-outline btn-sm">Clear</button>
+      </div>
+      <div id="exploreLogTerminal" class="log-terminal">
+        <div class="log-line system"><span class="ts">&#9889;</span>Ready</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: History -->
+  <div id="tabHistory" class="tab-panel" style="display:none">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Generation History — Playwright Scripts
+        </div>
+      </div>
+      <div id="historyLoading" style="display:none;text-align:center;padding:20px;color:var(--slate-400)">Loading...</div>
+      <div id="historyEmpty" class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        <p>No generated scripts yet</p>
+      </div>
+      <div id="historyList" style="display:none">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="border-bottom:2px solid var(--slate-200)"><th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">File</th><th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Description</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Steps</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Created</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Actions</th></tr></thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Trajectories -->
+  <div id="tabTrajectories" class="tab-panel" style="display:none">
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Trajectory History
+        </div>
+        <button id="trajRefreshBtn" class="btn btn-outline btn-sm">Refresh</button>
+      </div>
+      <div id="trajLoading" style="display:none;text-align:center;padding:20px;color:var(--slate-400)">Loading...</div>
+      <div id="trajEmpty" class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        <p>No saved trajectories yet</p>
+      </div>
+      <div id="trajList" style="display:none">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="border-bottom:2px solid var(--slate-200)"><th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Trajectory ID</th><th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Task</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Steps / Actions</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Status</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Created</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Actions</th></tr></thead>
+          <tbody id="trajBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Detail panel -->
+    <div class="card" id="trajDetailPanel" style="display:none">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Trajectory Detail — <span id="trajDetailId" style="font-family:var(--font-mono);font-size:12px;color:var(--indigo-600)"></span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="trajDetailModel" style="padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">Default</option></select>
+          <button id="trajSendToGenBtn" class="btn btn-sm btn-primary">Send to Script Gen</button>
+          <button id="trajDetailCloseBtn" class="btn btn-sm btn-outline">Close</button>
+        </div>
+      </div>
+      <div id="trajDetailInfo" style="font-size:13px;color:var(--slate-600);margin-bottom:12px">Loading...</div>
+      <div class="section-title" style="font-size:13px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Steps
+      </div>
+      <div id="trajDetailSummary" style="font-size:13px;color:var(--slate-400);padding:8px 12px;background:var(--slate-50);border-radius:var(--radius-sm);margin-bottom:12px">Loading...</div>
+      <div class="section-title" style="font-size:13px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Full Trajectory JSON
+      </div>
+      <pre id="trajDetailJson" style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:var(--radius-sm);font-size:12px;line-height:1.6;overflow:auto;max-height:500px;font-family:var(--font-mono)"></pre>
+    </div>
+  </div>
+
+  <!-- Tab: Execution Records -->
+  <div id="tabExecRecords" class="tab-panel" style="display:none">
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Execution Records
+        </div>
+        <button id="execRecordsRefreshBtn" class="btn btn-outline btn-sm">Refresh</button>
+      </div>
+      <div id="execRecordsLoading" style="display:none;text-align:center;padding:20px;color:var(--slate-400)">Loading...</div>
+      <div id="execRecordsEmpty" class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        <p>No archived execution records yet</p>
+      </div>
+      <div id="execRecordsList" style="display:none">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="border-bottom:2px solid var(--slate-200)"><th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Session ID</th><th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Model</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Steps</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Created</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Archived</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Actions</th></tr></thead>
+          <tbody id="execRecordsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Review detail panel -->
+    <div class="card" id="execRecordDetailPanel" style="display:none">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Execution Record Detail — <span id="execRecordDetailId" style="font-family:var(--font-mono);font-size:12px;color:var(--indigo-600)"></span>
+        </div>
+        <button id="execRecordDetailCloseBtn" class="btn btn-outline btn-sm">Close</button>
+      </div>
+      <div id="execRecordDetailInfo" style="font-size:13px;color:var(--slate-600);margin-bottom:12px">Loading...</div>
+      <div class="section-title" style="font-size:13px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Step History
+      </div>
+      <div id="execRecordSteps" style="font-size:13px;color:var(--slate-400);padding:8px 12px;background:var(--slate-50);border-radius:var(--radius-sm)"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="imageOverlay">
+  <button class="overlay-close" id="overlayClose">&times;</button>
+  <img id="overlayImage" src="" alt="Screenshot">
+</div>
+
+<script type="module" src="/src/dashboard/index.js"></script>
+</body>
+</html>

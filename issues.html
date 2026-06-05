@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>opencode-skill-use · 问题清单与解决方案</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #0f172a; color: #e2e8f0;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px;
+  }
+  .container { max-width: 900px; width: 100%; }
+
+  h1 {
+    font-size: 24px; font-weight: 600; margin-bottom: 6px;
+    background: linear-gradient(135deg, #f87171, #fbbf24);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    text-align: center;
+  }
+  .sub {
+    color: #64748b; font-size: 13px; text-align: center; margin-bottom: 32px;
+  }
+
+  /* Section */
+  .section-title {
+    font-size: 16px; font-weight: 700; margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 2px solid #334155;
+  }
+
+  /* Current problems */
+  .problem-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 40px; }
+
+  .problem-card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    overflow: hidden;
+  }
+  .problem-card .header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px; cursor: default;
+  }
+  .problem-card .num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .problem-card .header .title { font-size: 15px; font-weight: 600; flex: 1; }
+  .problem-card .header .tag {
+    font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500;
+  }
+
+  .problem-card .body {
+    padding: 0 20px 16px;
+  }
+  .problem-card .desc {
+    font-size: 13px; color: #94a3b8; line-height: 1.7; margin-bottom: 12px;
+    padding-left: 12px; border-left: 3px solid;
+  }
+  .problem-card .soln {
+    font-size: 13px; color: #6ee7b7; line-height: 1.7;
+    padding-left: 12px; border-left: 3px solid #34d399;
+  }
+  .problem-card .soln::before {
+    content: "→ 方案："; font-weight: 600; color: #34d399;
+  }
+
+  /* Future issues table */
+  .table-wrap {
+    background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; padding: 14px 18px; font-size: 12px; font-weight: 600;
+    color: #94a3b8; border-bottom: 2px solid #334155;
+  }
+  tbody td {
+    padding: 14px 18px; font-size: 13px; color: #cbd5e1;
+    border-bottom: 1px solid #1e293b; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #0f172a; }
+
+  .td-icon { font-size: 16px; }
+
+  .footer { margin-top: 40px; font-size: 11px; color: #334155; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📋 opencode-skill-use · 问题清单与解决方案</h1>
+  <div class="sub">当前问题 3 项 · 潜在风险 5 项</div>
+
+  <!-- ===== 当前问题 ===== -->
+  <div class="section-title" style="color:#f87171;">🔥 当前问题</div>
+
+  <div class="problem-list">
+
+    <!-- Problem 1 -->
+    <div class="problem-card" style="border-color:#ef4444;">
+      <div class="header" style="background:#0f172a;">
+        <div class="num" style="background:#7f1d1d;color:#fca5a5;">1</div>
+        <div class="title" style="color:#f87171;">AI 探索时 Element UI 组件无法操作</div>
+        <span class="tag" style="background:#7f1d1d;color:#fca5a5;">Browser Use</span>
+      </div>
+      <div class="body">
+        <div class="desc" style="border-color:#f87171;">
+          面对 Element UI 组件（下拉框、级联选择、日期选择器等），Agent 时常无法正确操作。<br>
+          已重写 Browser Use 默认操作，大部分场景可以识别，但完整测试尚未完成。<br>
+          <strong>阶段任务断言</strong>：当前会导致阶段任务错误终止，已暂时移除。
+        </div>
+        <div class="soln">
+          完成 Browser Use 新操作的完整测试，验证 system prompt 正确注入、新操作列表注册、以及是否满足 Element 组件需求。<br>
+          完善阶段任务断言逻辑，保证阶段任务状态根据任务结果正确设定。
+        </div>
+      </div>
+    </div>
+
+    <!-- Problem 2 -->
+    <div class="problem-card" style="border-color:#f59e0b;">
+      <div class="header" style="background:#0f172a;">
+        <div class="num" style="background:#78350f;color:#fdba74;">2</div>
+        <div class="title" style="color:#fbbf24;">表单特殊规则输入正确率低（~50%）</div>
+        <span class="tag" style="background:#78350f;color:#fdba74;">知识库 / LLM</span>
+      </div>
+      <div class="body">
+        <div class="desc" style="border-color:#fbbf24;">
+          身份证（18位）、手机号等特殊格式输入框，Agent 无法根据 Element 知识库正确填写。<br>
+          保存后有纠错能力（有时能自行修正），但整体正确率仅约 50%。
+        </div>
+        <div class="soln">
+          完善 Element 知识库，提供级联操作选择树，实时引导 Agent 操作。<br>
+          提取技能内置 Python 代码为独立 Python 程序，Agent 自行运行生成标准规范数据（身份证、手机号等）。
+        </div>
+      </div>
+    </div>
+
+    <!-- Problem 3 -->
+    <div class="problem-card" style="border-color:#3b82f6;">
+      <div class="header" style="background:#0f172a;">
+        <div class="num" style="background:#1e3a5f;color:#93c5fd;">3</div>
+        <div class="title" style="color:#60a5fa;">脚本生成定位精度不足（locator 模糊定位）</div>
+        <span class="tag" style="background:#1e3a5f;color:#93c5fd;">Playwright-skill</span>
+      </div>
+      <div class="body">
+        <div class="desc" style="border-color:#60a5fa;">
+          Playwright-skill 使用 <code>locator</code> 或 <code>text</code> 进行模糊定位，而非操作历史文件中的 XPath 精确定位。<br>
+          脚本质量层次不齐，需二次修正。
+        </div>
+        <div class="soln">
+          解决特殊规则技能注入未生效的问题，重新精简技能结构，建立索引和查询机制。<br>
+          确保技能中的定位策略覆盖 XPath 精确定位方式。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== 潜在风险 ===== -->
+  <div class="section-title" style="color:#fbbf24;">⚠️ 潜在风险与预期开发</div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:20%;">问题</th>
+          <th style="width:30%;">根因</th>
+          <th style="width:30%;">当前状态</th>
+          <th style="width:20%;">预期方案</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="td-icon">📐 长案例上下文溢出</td>
+          <td>Agent 单轮对话窗口有限，Browser Use 多步探索后易失忆</td>
+          <td>多轮 Session 机制已实现</td>
+          <td>验证极限场景下的上下文截断策略</td>
+        </tr>
+        <tr>
+          <td class="td-icon">🔄 页面结构变化后脚本失效</td>
+          <td>Playwright 选择器硬编码（CSS/XPath）</td>
+          <td>暂无处理</td>
+          <td>AI 选择器推荐 / 自动修复失效选择器 / 视觉定位兜底</td>
+        </tr>
+        <tr>
+          <td class="td-icon">🧠 多 provider 模型输出不一致</td>
+          <td>不同 LLM 对浏览器操作的理解和指令格式差异大</td>
+          <td>暂无处理</td>
+          <td>标准化 Agent 输出格式，增加 provider 适配层</td>
+        </tr>
+        <tr>
+          <td class="td-icon">💀 Chrome/CDP 进程残留</td>
+          <td>异常退出时未正常清理</td>
+          <td>已有自动清理机制</td>
+          <td>增加进程健康心跳 + 超时强杀</td>
+        </tr>
+        <tr>
+          <td class="td-icon">📦 大规模轨迹存储性能</td>
+          <td>当前基于 JSON 文件的轻量索引</td>
+          <td>暂无处理</td>
+          <td>评估是否切换为 SQLite 或嵌入式数据库</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">D:\dev\opencode-skill-use\issues.html</div>
+</div>
+</body>
+</html>

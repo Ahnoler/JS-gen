@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+opencode.json
+agent-api.config.json
+*.log
+snapshots/
+tmp/
+.DS_Store
+Thumbs.db
+scripts/generated/
+report/

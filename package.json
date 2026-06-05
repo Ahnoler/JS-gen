@@ -1,0 +1,16 @@
+{
+  "name": "opencode-agent-api",
+  "version": "1.0.0",
+  "description": "Agent API service - exposes opencode agent capabilities via HTTP/JSON",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.14.40",
+    "express": "^4.21.0",
+    "playwright-core": "^1.60.0",
+    "undici": "^8.3.0"
+  }
+}
