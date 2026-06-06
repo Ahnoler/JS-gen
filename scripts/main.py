@@ -32,7 +32,7 @@ def main():
 
     # Shared setup for workflow / single-task modes
     patch_message_manager()
-    llm = create_llm(args.model, args.base_url)
+    llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
     form_rules = load_rules()
     extend_system_message = get_element_ui_knowledge()
 

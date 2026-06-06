@@ -1,225 +1,379 @@
-# Element UI / Vue Component Interaction Guide
+# Element UI Action Reference
 
-This document describes how to interact with Element UI (Vue 2/3) components via `page.evaluate()` JavaScript. The Planner tracks task progress — this guide focuses purely on component mechanics.
+## Overview
 
-## General Principles
+You have two sets of actions available:
 
-1. **Vue v-model bypass**: Setting `.value = X` directly does NOT update Vue components. Use the native setter + dispatchEvent pattern:
-   ```javascript
-   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-   setter.call(input, 'value');
-   input.dispatchEvent(new Event('input', {bubbles:true}));
-   input.dispatchEvent(new Event('change', {bubbles:true}));
-   ```
+1. **Default browser actions** — built-in browser_use actions for standard web interactions
+2. **Custom actions** — Element UI specific, registered via `@controller.action`
 
-2. **DOM is rebuilt**: Element UI destroys and re-creates DOM nodes when dialogs open/close, tabs switch, or data refreshes. Never cache element references across actions. Re-query every time.
+Use **custom actions** for Element UI form fields (el-select, el-input inside el-form-item, el-radio, etc.).
+Use **default actions** for everything else (generic buttons, links, navigation, native `<select>`, etc.).
 
-3. **bubbles:true**: All dispatched events must have `{bubbles: true}` or Vue won't detect them.
+---
 
-4. **Readonly on el-select triggers is NORMAL**: `el-select .el-input__inner` is always `readonly="true"` by design. Only check `disabled`, ignore `readonly`.
+## Default Browser Actions
 
-5. **Custom wrappers (tsscInput / tssc-multi-select)**: Some systems wrap elements in custom divs. The native `<input>` or `.el-input__inner` still exists inside. Standard selectors like `input:not([type="hidden"])` and `.el-select .el-input__inner` penetrate wrappers automatically.
+| Action | Parameters | When to Use |
+|--------|-----------|-------------|
+| `click_element_by_index(index)` | index: element [] number | Click any visible element by its index. Use for buttons, links, menu items not covered by custom actions. |
+| `input_text(index, text)` | index, text | Type into a standard `<input>` field (NOT el-input inside el-form-item — use `fill_form_field`). |
+| `select_dropdown_option(index, option)` | index, option | Select from a native HTML `<select>`. NOT for el-select — use `select_option`. |
+| `go_to_url(url)` | url string | Navigate to a URL. |
+| `go_back()` | none | Go back one page. |
+| `scroll(down\|up)` | direction | Scroll the page. |
+| `send_keys(keys)` | keys | Send keyboard keys. |
+| `wait(seconds)` | seconds | Wait for a fixed duration. Use sparingly — prefer `wait_for_loading()`. |
+| `extract_content(goal)` | goal string | Extract page content matching a description. |
+| `done(text, success)` | text, success | Call ONLY when the ENTIRE task is finished. |
+| `search_google(query)` | query | Search Google (opens a new tab). |
 
-6. **Pre-filled fields**: Use `fill_form_field` and `select_option` — they auto-detect existing values and return `OK-SKIP:[value]` if the field is already done. Move to the next field.
+---
 
-## CRITICAL: Form Fields Must Use Custom Actions
+## Custom Actions
 
-**For ALL Element UI form fields, use the dedicated custom actions — NOT `click_element_by_index`.**
+### `select_option(label_text, option_text)`
 
-| Field Type | WRONG (built-in) | RIGHT (custom action) |
-|------------|----------|-----------|
-| el-select dropdown | `click_element_by_index` | `select_option("label", "option")` |
-| el-input / textarea | `input_text` or `click`+`type` | `fill_form_field("label", "value")` |
-| el-radio | `click_element_by_index` | `click_radio("label", "option")` |
-| el-dialog close | `click_element_by_index` | `close_dialog()` |
+Select an option in an **el-select** dropdown by its form label.
 
-**Using `click_element_by_index` on an el-select trigger only opens the dropdown — it does NOT select a value.** Always use `select_option` which handles the full open→select→close flow.
+**Parameters:**
+- `label_text`: The text of the `.el-form-item__label` next to the select. Also searched by placeholder of the trigger input (`.el-input__inner`).
+- `option_text`: The exact text of the dropdown item to click. Use `"first"` to pick the first visible option.
 
-## CRITICAL: Credit System Login — Exact Procedure
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| `"ok \| confirm=SELECTED:XXX"` | Success. Option XXX was selected and confirmed. |
+| `"ok \| confirm=SELECTED:..."` | Success. The dropdown shows the selected value. |
+| `"triggered"` | Dropdown was opened. If you see this without a confirm, reopen next step. |
+| `"already:XXX"` | Field already has value XXX. No action needed. |
+| `"label-not-found"` | No el-form-item with matching label text. |
+| `"no-select-found"` | Label found but no el-select trigger inside. |
+| `"select-disabled"` | The el-select is disabled. |
+| `"option-not-found:..."` | Option text didn't match any visible item. List of available options follows. |
+| `"no-items"` | Dropdown is open but has no visible items. |
 
-The login page at `test.creditv5p2.tansun.com.cn` requires THESE actions in THIS order. Execute them one by one:
-
+**Examples:**
 ```
-Step A: select_option("法人", "first")       ← selects first option in 法人机构 dropdown
-Step B: fill_form_field("用户名", "701994")  ← fills username via placeholder "请输入您的用户名"
-Step C: fill_form_field("密码", "1")         ← fills password via type="password" matching
-Step D: Click the login button                ← use includes("登") to find button text
-Step E: wait_for_loading()                   ← wait for redirect, ~15s
-```
-
-These 5 steps are the COMPLETE login flow. Do NOT call done() until all 5 are complete. The planner will track your progress through them.
-
----
-
-## el-select (Dropdown)
-
-**Always use the `select_option` custom action:**
-```
-select_option("字段标签", "选项文本")
-select_option("法人", "first")       ← selects first visible option
-```
-
-The action handles: find by label → find by placeholder → fallback to first visible el-select → open dropdown → click option → close.
-
-**Troubleshooting dropdown failures:**
-1. Check `trigger.disabled`, NOT `trigger.readOnly`
-2. Call `wait_for_loading()` — loading mask blocks clicks
-3. Call `get_page_state()` — check for open dialogs/drawers
-4. If label not found → try placeholder text or first-item fallback
-5. After 2 failures → skip field, note as failed
-
----
-
-## el-dialog / el-drawer (Overlays)
-
-**Before ANY action, verify the active overlay.** All custom actions detect `.el-dialog` and `.el-drawer` automatically.
-
-- `el-dialog` — modal with header, body, footer
-- `el-drawer` — slide-in panel, common in wizards
-- Multiple overlays can stack — call `get_page_state()` for counts
-- Close with `close_dialog()` if wrong overlay is open, wait 500ms for Vue to destroy old DOM
-
----
-
-## el-form Field Location
-
-Locate fields by priority:
-1. **Label text**: `fill_form_field("客户名称", "value")`
-2. **Placeholder**: `fill_form_field("请输入用户名", "value")` — common on login pages with empty labels
-3. **Type attribute**: `fill_form_field("password", "value")` — fallback for unlabeled fields
-
-**3-scroll rule**: If you scroll 3 times without finding a field, STOP. The field is likely in a collapsed section, different tab, or closed dialog.
-
-**Cascading fields**: After filling a field that may trigger linkage, wait 800ms and re-query DOM.
-
----
-
-## el-table (Data Table)
-
-- Table body: `.el-table__body-wrapper .el-table__row`
-- Wait for `.el-table__body` or `.el-table__empty-text` before interacting
-- Loading state: `.el-loading-mask` visible → call `wait_for_loading()`
-- Row actions: `click_table_row_action("row_text", "button_text")`
-- Pagination: click `.el-pagination .btn-next`, wait 800ms for reload
-
----
-
-## el-tabs (Tab Switching)
-
-```
-switch_tab("目标标签名称")
-```
-Wait 800ms after switching for tab content to render.
-
----
-
-## el-tree (Tree Navigation)
-
-Call `expand_all_el_tree()` to expand all nodes, then click the leaf by text. Wait 500ms after each expand.
-
----
-
-## el-menu (Navigation Menu)
-
-- Top-level: `.el-menu-item`
-- Submenu: expand `.el-submenu__title` first, then click child `.el-menu-item`
-- After clicking a menu item, call `wait_for_loading()` and wait for page content
-
-**Note**: Some apps use custom menus (`<LI class="menu-item">` inside `<NAV>`), NOT `el-menu`. Check structure first with `get_page_state()`.
-
----
-
-## el-date-picker
-
-Use native setter (same as text inputs) — do NOT click the calendar icon:
-```javascript
-setter.call(input, '2025-01-15');
-input.dispatchEvent(new Event('change', {bubbles:true}));
-input.dispatchEvent(new Event('blur', {bubbles:true}));
+select_option("法人", "first")
+select_option("请选择法人", "横州市农村信用合作联社")
+select_option("客户类型", "个人客户")
 ```
 
 ---
 
-## Other Components (Quick Reference)
+### `fill_form_field(label_text, value)`
 
-- **el-radio**: `click_radio("字段标签", "选项文本")`
-- **el-checkbox**: Click `.el-checkbox__input .el-checkbox__inner`
-- **el-switch**: Check `.is-active` class first — skip if already in desired state
-- **el-cascader**: Click trigger → wait 800ms → select level-1 → wait 500ms → select level-2
-- **el-upload**: Cannot automate file chooser — skip or note as manual step
-- **el-autocomplete**: Type text → wait 500ms → click `.el-autocomplete-suggestion li`
-- **el-transfer**: Select items in left panel → click transfer button
-- **el-message / el-notification**: Auto-disappear after 3-5s. Capture immediately.
+Fill a text/password/textarea input inside an **el-form-item** using Vue-compatible native DOM setter.
 
----
+**Parameters:**
+- `label_text`: Matched against `.el-form-item__label` text, then input `placeholder`, then input `type` attribute.
+- `value`: The string value to set.
 
-## Post-Navigation Wait Pattern
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| `"ok"` | Found by label text and filled. |
+| `"ok-placeholder"` | Label not found, matched by placeholder text and filled. |
+| `"ok-type"` | Neither label nor placeholder matched, filled by input `type` attribute. |
+| `"no-input-found"` | Label found, but no `<input>` or `<textarea>` inside the form item. |
+| `"field-disabled"` | Input is disabled or read-only. |
+| `"label-not-found"` | No matching label, placeholder, or type found in any visible container. |
 
-After clicking menu items, login, or any action that triggers page navigation:
+**Notes:**
+- Uses native property setter + dispatches `input`, `change`, `blur` events with `bubbles:true` so Vue v-model picks it up.
+- Automatically detects the active dialog/drawer and restricts search to that container.
+- Cascading fields: after filling a field that may trigger linkage, add a `wait(0.8)` before next action.
 
-1. `wait_for_loading()` — handles loading mask with 30s timeout
-2. Scan DOM for expected element (table body, form, page title)
-3. If NOT found → wait 15s, scan again, repeat up to 90s
-4. If still not found → report failure
-
----
-
-## Common Failure Modes
-
-| Symptom | Likely Cause | Fix |
-|---------|-------------|-----|
-| Dropdown click does nothing | Loading mask or disabled | `wait_for_loading()`, check `disabled` |
-| Text disappears after typing | Vue v-model not triggered | Use `fill_form_field` / native setter + dispatchEvent |
-| Field not found after scrolling | Field in different tab/dialog | `get_page_state()`, check overlay/tabs |
-| Action had no effect | Element obscured, loading, or Vue swallowed it | `get_page_state()`, scroll into view, try different approach |
-| Dialog appeared unexpectedly | Previous action triggered it | `get_page_state()` to identify, confirm/cancel/close |
-| Button click intercepted | Submenu overlay remains | `wait_for_loading()` then retry |
+**Examples:**
+```
+fill_form_field("用户名", "701994")
+fill_form_field("请输入您的密码", "1")
+fill_form_field("客户名称", "测试客户")
+```
 
 ---
 
-## Application Reference: 信贷系统对公客户管理 (test.creditv5p2.tansun.com.cn)
+### `click_radio(label_text, option_text)`
 
-### Login Page Structure
+Click an **el-radio** option within an el-form-item.
 
-URL: `http://test.creditv5p2.tansun.com.cn/#/login?redirect=%2Fhome`
-All login fields have EMPTY labels — locate by placeholder ONLY.
+**Parameters:**
+- `label_text`: The `.el-form-item__label` text to identify the radio group.
+- `option_text`: The exact text of the radio option label (`.el-radio` text content).
 
-| # | Type | Placeholder | Notes |
-|---|------|------------|-------|
-| 0 | el-select | "请选择法人" | readonly is NORMAL |
-| 1 | el-input | "请输入您的用户名" | type=text |
-| 2 | el-input | "请输入您的密码" | type=password |
-| 3 | el-input | "请输入图形中的字符" | Captcha — NOT REQUIRED |
-| 4 | el-input | "用户转授权编码" | Optional |
-| 5 | el-input | "灰度版本" | Optional |
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| `"ok"` | Radio option found and clicked. |
+| `"option-not-found"` | Label matched but no radio with that option text. |
+| `"label-not-found"` | No el-form-item with matching label. |
 
-**Login button**: text "登 录" (has SPACE), use `includes("登")`
-**Dropdown options**: 横州市农村信用合作联社, 南宁市武鸣区农村信用合作联社, 柳州市区农村信用合作联社, etc.
+**Example:**
+```
+click_radio("性别", "男")
+```
 
-**Login flow** (3-4 steps): select institution → fill username → fill password → click login → wait redirect
-**Captcha NOT required.** `username=701994, password=1`
+---
 
-### Post-Login Home Page
+### `close_dialog()`
 
-URL: `/#/home?part=home`
+Close the topmost visible **el-dialog** or **el-drawer**.
 
-Navigation uses CUSTOM `<LI class="menu-item">` inside `<NAV class="navbar">` — NOT `el-menu`. The `click_menu_item` action is ineffective here. Use `click_element_by_index` instead.
+**Parameters:** none
 
-**Top-level menu items**: 工作台, 任务事项, 客户管理, 评级管理, 授信管理, ...
-**Submenu items** (under 客户管理): 对公客户管理, 个人客户管理, ...
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| `"ok"` | Dialog close button (× in header) clicked. |
+| `"ok-cancel"` | Close button not found, clicked default cancel button in footer. |
+| `"no-overlay-open"` | No visible dialog or drawer found. |
 
-10 pre-loaded hidden el-dialogs exist (修改密码, 营业日期切换, etc.) — they may intercept clicks.
+**Example:**
+```
+close_dialog()
+```
 
-### Form Wizard (新增对公客户)
+---
 
-Wizard opens in `el-dialog` or `el-drawer`. Fields: 客户状态, 对公客户类型, 证件类型, 客户名称, 证件号码. Click 保存 to submit.
+### `switch_tab(tab_name)`
 
-Main form page has tabs: 客户基本信息, 财务信息, 业务信息, 影像资料, 其他信息. Each tab has dozens of fields.
+Switch to a tab in **el-tabs**.
 
-### Known Timeouts
-- Login → home: wait 15s+
-- Menu click → list: wait 10-15s
-- Form save → message: wait 5-10s
-- Query → results: wait 5-8s
+**Parameters:**
+- `tab_name`: The exact text of the tab item (`.el-tabs__item` text content).
 
-Always use `wait_for_loading()` (30s timeout) rather than fixed sleeps.
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| `"ok"` | Tab found and clicked. |
+| `"tab-not-found"` | No visible tab with that name. |
+
+**Example:**
+```
+switch_tab("客户基本信息")
+```
+
+---
+
+### `click_menu_item(menu_text)`
+
+Click a menu item in **el-menu**, auto-expanding parent submenus.
+
+**Parameters:**
+- `menu_text`: The text of the `.el-menu-item` to click.
+
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| `"ok"` | Top-level menu item clicked. |
+| `"ok-expanded"` | Submenu expanded, then child item clicked. |
+| `"not-found"` | No menu item with that text found. |
+
+**Example:**
+```
+click_menu_item("对公客户管理")
+```
+
+---
+
+### `click_table_row_action(row_text, button_text)`
+
+Click an action button inside a specific **el-table** row.
+
+**Parameters:**
+- `row_text`: Text that identifies the row (searched in row's text content).
+- `button_text`: Text or icon class to identify the button (`button`, `.el-button`, or icon `<i>` element).
+
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| `"ok"` | Button found and clicked. |
+| `"ok-icon"` | Button matched by icon class (edit/delete icons). |
+| `"button-not-found-in-row"` | Row found but no matching button. |
+| `"row-not-found"` | No row contains the row_text. |
+
+**Shortcut aliases:** `"edit"` / `"编辑"` matches `el-icon-edit` class icons. `"delete"` / `"删除"` matches `el-icon-delete` class icons.
+
+**Example:**
+```
+click_table_row_action("测试客户", "编辑")
+click_table_row_action("张三", "删除")
+```
+
+---
+
+### `expand_all_el_tree()`
+
+Recursively expand all nodes in an **el-tree** (up to 10 rounds).
+
+**Parameters:** none
+
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| `"expanded-N-nodes"` | N nodes were expanded. |
+| `"no-el-tree-found"` | No `.el-tree` element on the page. |
+
+**Example:**
+```
+expand_all_el_tree()
+```
+
+---
+
+### `wait_for_loading()`
+
+Wait until all Element UI loading masks (`.el-loading-mask`) and spinners (`.el-loading-spinner`) disappear. Timeout after 30 seconds.
+
+**Parameters:** none
+
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| `"loading-done"` | Loading finished (or timeout reached). |
+| `"timeout"` | 30s timeout reached, loading was still visible. |
+
+**When to call:** After menu click, form submit, login button, tab switch — any action that triggers a loading state.
+
+**Example:**
+```
+wait_for_loading()
+```
+
+---
+
+### `get_page_state()`
+
+Diagnostic: returns a JSON string with the current page state.
+
+**Parameters:** none
+
+**Returns:** JSON string with:
+- `dialogCount`, `visibleDialogCount`, `visibleDialogTitles`
+- `drawerCount`
+- `loading` — boolean
+- `openDropdown` — boolean
+- `formErrors` — array of visible error messages
+- `messages`, `notifications` — arrays
+- `activeTab` — current el-tabs active tab
+- `treeNodes` — count
+- `tableRows` — count
+- `url` — current URL
+
+**When to call:** When stuck, after an action had no effect, or before deciding the next action.
+
+**Example:**
+```
+get_page_state()
+```
+
+---
+
+### `take_screenshot()`
+
+Take a screenshot of the current viewport and save to the `snapshots/` directory.
+
+**Parameters:** none
+
+**Return value:** `"screenshot-saved:PATH"`
+
+**Example:**
+```
+take_screenshot()
+```
+
+---
+
+### `save_case_data(key, value)` / `read_case_data(key)`
+
+Cross-phase data sharing. Save and retrieve arbitrary key-value data across multiple phases of a session.
+
+**Parameters:**
+- `key`: String key.
+- `value` (save only): String value.
+
+**Return values (save):**
+| Value | Meaning |
+|-------|---------|
+| `"saved:KEY=VAL"` | Saved successfully. |
+| `"no-case-data-path"` | No data store configured. |
+| `"save-error:..."` | Error message. |
+
+**Return values (read):**
+| Value | Meaning |
+|-------|---------|
+| The stored value string | Found. |
+| `"NO-DATA:KEY"` | Key not found. |
+| `"read-error:..."` | Error message. |
+
+**Examples:**
+```
+save_case_data("case_name", "新增对公客户")
+read_case_data("case_name")
+```
+
+---
+
+### `match_form_rule(label_text)`
+
+Generate a test data value for a form field based on its label, using pre-loaded form rules. Knows common fields like ID numbers, phone numbers, bank card numbers, names, addresses, etc.
+
+**Parameters:**
+- `label_text`: The form field label to match against the rule table.
+
+**Return values:**
+| Value | Meaning |
+|-------|---------|
+| Generated value string | A realistic test value (e.g. `"430101199001011234"` for ID card). |
+| `"SELECT: ..."` | A selection-type field. Pick one of the listed options based on context. |
+| `"FORMAT: ..."` | A format instruction for the field (e.g. expected result format). |
+| `"NO-RULE"` | No matching rule found for this label. |
+
+**Known patterns:**
+| Label Keywords | Generated Value |
+|---------------|-----------------|
+| 身份证、证件号码 | 18-digit Chinese ID |
+| 手机、电话、联系方式 | 11-digit mobile |
+| 邮箱、Email | testxxx@example.com |
+| 姓名、用户名、联系人 | Chinese 3-char name |
+| 地址、详细地址 | Chinese address |
+| 金额、价格、费用 | Random amount |
+| 银行卡、银行账号 | 19-digit bank card |
+| 信用代码、统一社会信用代码 | 18-char credit code |
+| 年龄 | 18-65 |
+| 邮编、邮政编码 | 100000 |
+| 案例类型、类型 | `SELECT: 功能测试 / 性能测试 / ...` |
+| 预期结果、预期 | `FORMAT: ^^1^^ ...` |
+| 案例名称、名称 | `FORMAT: 正向: 验证...` |
+| 操作步骤 | `FORMAT: Numbered lines` |
+
+**Example:**
+```
+match_form_rule("身份证号码")
+```
+
+---
+
+## Action Selection Cheat Sheet
+
+| Scenario | Action |
+|----------|--------|
+| Navigate to URL | `go_to_url(url)` |
+| Standard button/link | `click_element_by_index(index)` |
+| Native `<select>` | `select_dropdown_option(index, option)` |
+| Standard text input | `input_text(index, text)` |
+| el-select dropdown | `select_option(label_text, option_text)` |
+| el-input inside el-form-item | `fill_form_field(label_text, value)` |
+| el-radio group | `click_radio(label_text, option_text)` |
+| el-dialog / el-drawer close | `close_dialog()` |
+| el-tabs switch | `switch_tab(tab_name)` |
+| el-menu navigation | `click_menu_item(menu_text)` |
+| el-table row action | `click_table_row_action(row_text, button_text)` |
+| el-tree expand all | `expand_all_el_tree()` |
+| el-date-picker | `fill_form_field(label_text, value)` (same as text) |
+| Loading mask visible | `wait_for_loading()` |
+| Need diagnostics | `get_page_state()` |
+| Generate test data | `match_form_rule(label_text)` |
+| Take screenshot | `take_screenshot()` |
+| Task fully complete | `done(text, success)` |

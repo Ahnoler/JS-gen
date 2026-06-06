@@ -49,7 +49,7 @@
 ```
 opencode-skill-use/
 ├── src/                     # 后端 Node.js
-│   ├── config.js            # 路径 + port 常量
+│   ├── config.js            # 路径 + port + PYTHON_EXE + LLM 常量
 │   ├── opencode.js          # OpenCode SDK 启动 + 模型加载
 │   ├── state.js             # 全局状态（server、client、models、sessions）
 │   ├── script-utils.js      # 脚本生成工具（prompt builder、parser、sanitizer）
@@ -75,7 +75,10 @@ opencode-skill-use/
 │       ├── health.js        # /api/health
 │       ├── llm-proxy.js     # /v1/chat/completions OpenAI 兼容代理
 │       ├── trajectory.js    # /api/trajectory CRUD
-│       └── browser-use-explore.js  # /api/browser-use/explore (SSE)
+│       ├── explore-utils.js # 共享工具（kill、SSE、spawn、parse等）
+│       ├── explore-route.js # /api/browser-use/explore SSE
+│       ├── browser-session.js # /api/browser/session/* 会话模式
+│       └── browser-use-explore.js  # [旧版备份] 原 905 行单体文件
 ├── web-ui/                  # 前端 Python（Gradio）
 │   └── src/
 │       ├── agent/           # agent 实现（browser_use_agent, deep_research）
@@ -117,18 +120,27 @@ opencode-skill-use/
   - 提取了 workflow_runner.py（workflow + single-task 模式）
   - main.py 从 157 行精简到 37 行入口路由
 
-### 下一级优化空间
-- **`session_runner.py`**（217 行）中的 stdin event 处理可以提取独立函数
+### 下一级优化空间 — 已完成
+- ~~**`session_runner.py`**（217 行）中的 stdin event 处理可以提取独立函数~~ → 已提取 `_stdin_reader` + `_dispatch_event` 函数（2026-06-06）
 - **`controller.py`**（467 行）中的每个 action 可以单独拆文件（但当前 15 个 action 高度关联，暂时保持合理）
 
-### 二级（函数级重构）
-3. **`build_controller`**（复杂度 129）→ 分解为多个 builder
-4. **`renderSwaggerUI`**（复杂度 30，215 行）→ 复用组件
-5. **`executeSessionStep`**（复杂度 22）→ 拆分状态机
+### 二级（函数级重构）— 已完成
+3. ~~**`build_controller`**（复杂度 129）→ 已分解为多个 builder~~
+4. ~~**`renderSwaggerUI`**（复杂度 30，215 行）→ 已复用组件~~
+5. ~~**`executeSessionStep`**（复杂度 22）→ 已拆分状态机~~
 
-### 三级（深层嵌套问题）
-6. **`browser-use-agent.py` 嵌套 4+ 层** → 提取中间函数/早返回
-7. **`browser-use-agent.py` 嵌套 4+ 层** → Guard Clause + 提取助手函数
+### 三级（深层嵌套问题）— 已完成
+6. ~~**`controller.py`** 嵌套 4+ 层 → 提取 `JS_GET_CONTAINER` / `JS_FIND_VISIBLE_DROPDOWN` / `JS_CHECK_SELECTS` / `JS_TRIGGER_SELECT` / `JS_CONFIRM_SELECT` 公共 helper，早返回减少嵌套（2026-06-06）~~
+
+### 四级（架构优化）— 已完成
+7. ~~**`browser-use-explore.js`**（905 行，限制 300）→ 已拆分为 explore-utils.js + explore-route.js + browser-session.js（2026-06-06）~~
+8. ~~**硬编码路径 `D:\anaconda3\...`** → 已移入 `config.js` 的 `PYTHON_EXE` 环境变量（2026-06-06）~~
+9. ~~**`select_option`** 156 行 + 5× 重复 overlay 检测 → 提取 `JS_GET_CONTAINER` / `JS_FIND_VISIBLE_DROPDOWN` 公共 DOM helper（2026-06-06）~~
+10. ~~**`agent_utils.py`** fallback 默认值 `sk-opencode` / `localhost:4097` → 已改为 `create_llm()` 中 base_url/api_key 必填校验（2026-06-06）~~
+11. ~~**`renderPhasePlan`** 87 行 → 已拆分为 `buildPhaseCarouselHtml` + `bindPhaseCarouselEvents`（2026-06-06）~~
+
+### 五级（独立运行模式）— 已完成
+12. ~~**Standalone LLM 模式** — 绕过 `opencode serve` 的认证问题，直接启动 browser-use agent 并使用自己的 LLM（`STANDALONE_LLM=true`），不依赖 OpenCode SDK（2026-06-06）~~
 
 ---
 

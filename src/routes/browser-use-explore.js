@@ -3,7 +3,7 @@ import { writeFileSync, existsSync, unlinkSync, readdirSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { PROJECT_DIR } from '../config.js';
+import { PROJECT_DIR, STANDALONE_LLM, LLM_BASE_URL, LLM_API_KEY } from '../config.js';
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
 
@@ -122,7 +122,7 @@ export default function (app) {
     const { task, model } = req.body || {};
 
     if (!task) return res.status(400).json({ error: 'task is required' });
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!STANDALONE_LLM && !state.client) return res.status(503).json({ error: 'opencode server not ready' });
     if (!existsSync(PYTHON_EXE)) return res.status(500).json({ error: `Python not found at ${PYTHON_EXE}` });
     if (!existsSync(AGENT_SCRIPT)) return res.status(500).json({ error: `Agent script not found at ${AGENT_SCRIPT}` });
 
@@ -185,8 +185,8 @@ export default function (app) {
 
     // Build args
     const pythonArgs = isMultiPhase
-      ? ['--workflow', workflowPath, '--model', modelId, '--base-url', 'http://localhost:4097/v1', '--output', outputPath]
-      : ['--task', task, '--model', modelId, '--base-url', 'http://localhost:4097/v1', '--output', outputPath];
+      ? ['--workflow', workflowPath, '--model', modelId, '--base-url', LLM_BASE_URL, '--api-key', LLM_API_KEY, '--output', outputPath]
+      : ['--task', task, '--model', modelId, '--base-url', LLM_BASE_URL, '--api-key', LLM_API_KEY, '--output', outputPath];
 
     child = spawn(PYTHON_EXE, [AGENT_SCRIPT, ...pythonArgs], {
       cwd: PROJECT_DIR,
@@ -195,7 +195,7 @@ export default function (app) {
         ...process.env,
         PYTHONIOENCODING: 'utf-8',
         PYTHONUNBUFFERED: '1',
-        OPENAI_API_KEY: 'sk-opencode',
+        OPENAI_API_KEY: LLM_API_KEY,
       },
     });
 
@@ -462,7 +462,8 @@ export default function (app) {
       '--session',
       '--session-id', 'global',
       '--model', modelId,
-      '--base-url', 'http://localhost:4097/v1',
+      '--base-url', LLM_BASE_URL,
+      '--api-key', LLM_API_KEY,
     ], {
       cwd: PROJECT_DIR,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -470,7 +471,7 @@ export default function (app) {
         ...process.env,
         PYTHONIOENCODING: 'utf-8',
         PYTHONUNBUFFERED: '1',
-        OPENAI_API_KEY: 'sk-opencode',
+        OPENAI_API_KEY: LLM_API_KEY,
       },
     });
 
@@ -517,7 +518,7 @@ export default function (app) {
   app.post('/api/browser/session', async (req, res) => {
     const { model } = req.body || {};
 
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!STANDALONE_LLM && !state.client) return res.status(503).json({ error: 'opencode server not ready' });
     if (!existsSync(PYTHON_EXE)) return res.status(500).json({ error: `Python not found at ${PYTHON_EXE}` });
     if (!existsSync(AGENT_SCRIPT)) return res.status(500).json({ error: `Agent script not found at ${AGENT_SCRIPT}` });
 

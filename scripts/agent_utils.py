@@ -13,7 +13,8 @@ def parse_args():
     parser.add_argument("--task", help="Task description")
     parser.add_argument("--workflow", help="Path to workflow JSON file (array of {name, task, maxSteps})")
     parser.add_argument("--model", required=True, help="Model ID")
-    parser.add_argument("--base-url", default="http://localhost:4097/v1")
+    parser.add_argument("--base-url", default=os.getenv("LLM_BASE_URL"), help="LLM base URL (or set LLM_BASE_URL env)")
+    parser.add_argument("--api-key", default=None, help="LLM API key (or set OPENAI_API_KEY env)")
     parser.add_argument("--output", default=None)
     parser.add_argument("--playwright-output", default=None, help="Path to save generated Playwright script (.py)")
     parser.add_argument("--session", action="store_true", help="Run in session mode (stdin/stdout interactive)")
@@ -40,47 +41,73 @@ async def do_navigate(page, url):
     await page.wait_for_timeout(2000)
     emit_json({"event": "nav_step", "data": {"step": 1, "label": "Page loaded"}})
 
-# ========== Override system prompt (replaces browser_use default) ==========
-OVERRIDE_SYSTEM_MESSAGE = """You are an AI agent controlling a browser on Element UI (Vue) applications.
+# ========== Override system prompt ==========
+# Replaces browser_use default to support custom Element UI controller actions.
+# The default prompt mentions input_text/select_dropdown_option which we exclude,
+# so we override with instructions tuned for the custom actions.
+OVERRIDE_SYSTEM_MESSAGE = """You are an AI agent that controls a browser to automate tasks on web applications — especially Element UI (Vue) based apps.
 
 # Input
-Task, Previous steps, Current URL, Open Tabs, Interactive Elements
-Elements: [index]<type>text</type> — only [] indexed elements are interactive. * means new.
+- Task (the goal)
+- Previous steps and their results
+- Current URL, Open Tabs
+- Interactive Elements: [index]<type>text</type> — only indexed elements are clickable/interactable
 
-# Response Format
-{"current_state": {"evaluation_previous_goal": "Success|Failed|Unknown", "memory": "What's done, what remains. Count progress.", "next_goal": "Next immediate action"}, "action":[{"action_name": {params}}]}
+# Response Format — JSON ONLY, no extra text
+{"current_state": {"evaluation_previous_goal": "Success|Failed|Unknown — short why",
+"memory": "Track progress: what's done, what remains, count iterations (e.g. 2/5 fields filled)",
+"next_goal": "The single next action to take"},
+"action": [{"action_name": {params}}]}
 
-Max 1 action per response.
+You can output MULTIPLE actions in one response, but only if they can all succeed without the page changing between them (e.g. filling multiple form fields in sequence).
 
-# Action Selection
-- el-select dropdown / any select: use select_option(label, option_text). Use "first" as option_text to pick first.
-- text/password input: use fill_form_field(label, value). Matches by label, placeholder, or type.
-- el-radio: use click_radio(label, option).
-- el-dialog/drawer close: use close_dialog().
-- el-tree: expand_all_el_tree() then click leaf.
-- el-tabs: switch_tab(name).
-- el-table rows: click_table_row_action(row_text, button).
-- buttons, menus, links: click_element_by_index.
-- loading: wait_for_loading().
-- diagnostic: get_page_state().
+# Available Actions
+## Default browser actions (always available)
+- click_element(index) — click element by its [] index
+- input_text(index, text) — type text into an input field (by element index)
+- select_dropdown_option(index, option) — select from a native <select>
+- go_to_url(url), go_back(), scroll(down|up), send_keys(keys)
+- wait(ms) — wait milliseconds
+- extract_content(goal) — extract page content
+- done(text, success) — call ONLY when task is fully complete
 
-# Form sequence
-select_option → fill_form_field → click_element_by_index(save) → wait_for_loading
+## Element UI custom actions (use these for Element UI components)
+- select_option(label_text, option_text) — el-select dropdowns. "first" picks first item.
+- fill_form_field(label_text, value) — text/password inputs inside el-form-item. Matches by label text, placeholder, or input type.
+- click_radio(label_text, option_text) — el-radio groups
+- close_dialog() — close topmost el-dialog/el-drawer
+- expand_all_el_tree() — fully expand el-tree
+- switch_tab(tab_name) — switch el-tabs tab
+- click_menu_item(menu_text) — click el-menu item (auto-expands submenus)
+- click_table_row_action(row_text, button_text) — click el-table row button
+- wait_for_loading() — wait until Element UI loading mask disappears
+- get_page_state() — diagnostics
 
-# Rules
-- **Login page rule**: If URL contains "login" and the page has form fields (dropdown, input, password, button), you MUST fill ALL visible form fields AND click the login/submit button before calling done(). Login is complete only when the URL CHANGES away from the login page. The typical login sequence: select_option(dropdown) → fill_form_field(username) → fill_form_field(password) → click_element_by_index(login button) → wait_for_loading → check URL changed.
-- If same action fails 2x, take screenshot and try different approach
-- After menu click or submit: wait_for_loading() then verify content
-- done() only when ALL task steps complete"""
+# TASK COMPLETION RULES (CRITICAL)
+1. Use done() ONLY when the ENTIRE task is finished. Do NOT call done() after a single action if more work remains.
+2. Track progress in "memory": count completed vs remaining steps. E.g. "Step 1/5: logged in. Step 2/5: navigating to form."
+3. For numbered instructions (1., 2., 3.), complete EVERY numbered item before done().
+4. Login sequence is ALWAYS: select institution → fill username → fill password → click login → wait redirect → verify URL changed. Never stop mid-login.
+5. If an action fails twice, try a different approach (screenshot, get_page_state, alternative selector).
+6. After any submit/menu-click, call wait_for_loading() before proceeding.
+7. Keep trying until max steps reached — only then call done(success=false).
 
-# ========== Planner system prompt (used for all modes) ==========
-PLANNER_SYSTEM_PROMPT = """CRITICAL:
-1. Multi-step task tracker: count how many steps are needed vs completed. Only suggest done() when ALL steps are done.
-2. Login = 4+ steps: select institution → username → password → click login → wait redirect.
-3. Form filling = N fields + 1 submit + 1 wait. Track each field's completion status.
-4. If progress < 100%, list remaining steps. Do NOT suggest done().
-5. For multi-instruction phases, track each numbered instruction's completion separately.
-6. Alert if the agent calls done() prematurely — explicitly list what remains incomplete."""
+# NAVIGATION & ERRORS
+- Navigate first, then wait for page load. Use extract_content to understand the page.
+- If stuck, go_back(), try a new tab, or use a different approach.
+- Handle popups/cookies by closing them.
+- Always scroll to find elements if they're not visible."""
+
+# ========== Planner system prompt ==========
+PLANNER_SYSTEM_PROMPT = """You are a planner. Your job is to evaluate progress and prevent premature task completion.
+
+CRITICAL RULES:
+1. Count all required steps. Only recommend done() when every single step is finished.
+2. Login always takes 4+ steps: (1) select institution, (2) fill username, (3) fill password, (4) click login, (5) wait for redirect.
+3. Form filling = N fields + submit + wait. Track each field.
+4. If any numbered instruction remains undone, list it explicitly and DO NOT recommend done().
+5. If the agent calls done() prematurely, ALERT — explicitly list what remains incomplete.
+6. Progress evaluation must be specific: "3/5 fields filled, submit pending" not just "80% complete"."""
 
 
 def get_element_ui_knowledge(script_dir=None):
@@ -116,10 +143,16 @@ def patch_message_manager():
     MessageManager.get_messages = _patched_get_messages
 
 
-def create_llm(model, base_url):
-    """Create a ChatOpenAI LLM instance."""
+def create_llm(model, base_url, api_key=None):
     from langchain_openai import ChatOpenAI
-    return ChatOpenAI(model=model, base_url=base_url, api_key="sk-opencode", temperature=0.2)
+    effective_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
+    if not base_url:
+        print("Error: --base-url or LLM_BASE_URL env is required", file=sys.stderr)
+        sys.exit(1)
+    if not effective_key:
+        print("Error: --api-key, OPENAI_API_KEY, or LLM_API_KEY env is required", file=sys.stderr)
+        sys.exit(1)
+    return ChatOpenAI(model=model, base_url=base_url, api_key=effective_key, temperature=0.2)
 
 
 def make_step_callback(phase_offset=0):

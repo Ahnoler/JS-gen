@@ -12,4 +12,8 @@ export const GENERATED_DIR = path.join(PROJECT_DIR, 'scripts', 'generated');
 export const TRAJECTORIES_DIR = path.join(PROJECT_DIR, 'scripts', 'trajectories');
 export const SKILL_DIR = path.join(PROJECT_ROOT, '.opencode', 'skills', 'playwright-skill');
 export const TMP_DIR = process.env.TMPDIR || process.env.TMP || process.env.TEMP || os.tmpdir();
+export const STANDALONE_LLM = process.env.STANDALONE_LLM === 'true';
+export const PYTHON_EXE = process.env.PYTHON_EXE || 'D:\\anaconda3\\envs\\browser_use\\python.exe';
+export const LLM_BASE_URL = process.env.LLM_BASE_URL;
+export const LLM_API_KEY = process.env.LLM_API_KEY;
 export const DASHBOARD_DIR = PROJECT_ROOT;

@@ -1,0 +1,6 @@
+Config providers: [ 'myprovider' ]
+Server URL: http://127.0.0.1:53015
+Agents: ERROR: Error: opencode server GET http://127.0.0.1:53015/agent?directory=D%3A%5Cdev%5Copencode-skill-use → 401 Unauthorized: (empty response body)
+Skills: ERROR: Error: opencode server GET http://127.0.0.1:53015/skill?directory=D%3A%5Cdev%5Copencode-skill-use → 401 Unauthorized: (empty response body)
+Providers: ERROR: Error: opencode server GET http://127.0.0.1:53015/config/providers?directory=D%3A%5Cdev%5Copencode-skill-use → 401 Unauthorized: (empty response body)
+Prompt test failed: Cannot read properties of undefined (reading 'id')

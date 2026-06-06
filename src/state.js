@@ -1,6 +1,7 @@
 export const state = {
   ocServer: null,
   client: null,
+  standalone: false,
   cachedAgents: [],
   cachedSkills: [],
   cachedModels: [],

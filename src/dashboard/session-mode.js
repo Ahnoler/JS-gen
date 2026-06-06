@@ -141,20 +141,8 @@ export function initSessionMode() {
     return phases;
   }
 
-  function renderPhasePlan(phases) {
-    const plan = document.getElementById('sessPhasePlan');
-    const list = document.getElementById('sessPhaseList');
-    const countEl = document.getElementById('sessPhaseCount');
-    if (!plan || !list) return;
-    if (!phases || phases.length === 0) { plan.style.display = 'none'; sessionPhases = []; return; }
-    plan.style.display = 'block';
-    sessionPhases = phases;
-    countEl.textContent = phases.length + ' phases';
-
-    // Build carousel HTML
-    let html = '';
-    if (phases.length === 0) return;
-    html += '<div class="sess-phase-carousel" style="position:relative;overflow:hidden;padding:0 40px">';
+  function buildPhaseCarouselHtml(phases) {
+    let html = '<div class="sess-phase-carousel" style="position:relative;overflow:hidden;padding:0 40px">';
     html += '<div class="sess-phase-track" style="display:flex;transition:transform 0.35s cubic-bezier(.4,0,.2,1)">';
     phases.forEach((p, i) => {
       const shortTask = p.task.length > 150 ? p.task.slice(0, 150) + '...' : p.task;
@@ -170,22 +158,18 @@ export function initSessionMode() {
       html += '<div style="font-size:11px;color:var(--slate-400)">Max steps: ' + p.maxSteps + '</div>';
       html += '</div></div>';
     });
-    html += '</div>'; // track
-
-    // Nav buttons
+    html += '</div>';
     html += '<button class="sess-phase-prev" style="position:absolute;left:0;top:50%;transform:translateY(-50%);background:var(--indigo-600);color:#fff;border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:2">‹</button>';
     html += '<button class="sess-phase-next" style="position:absolute;right:0;top:50%;transform:translateY(-50%);background:var(--indigo-600);color:#fff;border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:2">›</button>';
-
-    // Dot indicators
     html += '<div class="sess-phase-dots" style="display:flex;justify-content:center;gap:8px;margin-top:12px">';
     for (let i = 0; i < phases.length; i++) {
       html += '<button class="sess-phase-dot" data-index="' + i + '" style="width:10px;height:10px;border-radius:50%;background:' + (i === 0 ? 'var(--indigo-500)' : 'var(--slate-300)') + ';border:none;cursor:pointer;padding:0;transition:background 0.2s"></button>';
     }
     html += '</div></div>';
+    return html;
+  }
 
-    list.innerHTML = html;
-
-    // Carousel state
+  function bindPhaseCarouselEvents(list, phases) {
     let currentSlide = 0;
 
     function showSlide(idx) {
@@ -194,7 +178,6 @@ export function initSessionMode() {
       currentSlide = idx;
       const track = list.querySelector('.sess-phase-track');
       if (track) track.style.transform = 'translateX(-' + (idx * 100) + '%)';
-      // Update dots
       list.querySelectorAll('.sess-phase-dot').forEach((dot, i) => {
         dot.style.background = i === idx ? 'var(--indigo-500)' : 'var(--slate-300)';
       });
@@ -206,7 +189,6 @@ export function initSessionMode() {
       dot.addEventListener('click', () => showSlide(parseInt(dot.dataset.index)));
     });
 
-    // Wire execute buttons
     list.querySelectorAll('.sess-phase-exec').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.index);
@@ -217,7 +199,6 @@ export function initSessionMode() {
       });
     });
 
-    // Keyboard nav
     const handleKey = (e) => {
       if (e.key === 'ArrowLeft') { showSlide(currentSlide - 1); e.preventDefault(); }
       if (e.key === 'ArrowRight') { showSlide(currentSlide + 1); e.preventDefault(); }
@@ -225,8 +206,21 @@ export function initSessionMode() {
     list.addEventListener('keydown', handleKey);
     list.tabIndex = 0;
 
-    // Init dots
     showSlide(0);
+  }
+
+  function renderPhasePlan(phases) {
+    const plan = document.getElementById('sessPhasePlan');
+    const list = document.getElementById('sessPhaseList');
+    const countEl = document.getElementById('sessPhaseCount');
+    if (!plan || !list) return;
+    if (!phases || phases.length === 0) { plan.style.display = 'none'; sessionPhases = []; return; }
+    plan.style.display = 'block';
+    sessionPhases = phases;
+    countEl.textContent = phases.length + ' phases';
+
+    list.innerHTML = buildPhaseCarouselHtml(phases);
+    bindPhaseCarouselEvents(list, phases);
   }
 
   function sessPhaseUpdateStatus(idx, status) {
@@ -241,12 +235,68 @@ export function initSessionMode() {
     if (execBtn && (status === 'success' || status === 'failed')) execBtn.textContent = status === 'success' ? 'Re-run' : 'Retry';
   }
 
-  async function executeSessionStep(sessionId, task, maxSteps, label, phaseIdx) {
-    sessRunning = true;
-    window.__execLock__.running = true;
-    const lockBtns = document.querySelectorAll('#genBtn, #exploreStartBtn, #sessStepBtn, #genRunBtn');
-    lockBtns.forEach(b => { if (b) b.disabled = true; });
+  function createSSEEventHandler(stepNum, label, phaseIdx) {
+    return (evt, d) => {
+      switch (evt) {
+        case 'step': sessLog('info', 'Step ' + d.step + ': ' + (d.next_goal || (d.actions || []).join(', '))); break;
+        case 'phase_start': sessLog('system', 'Started: ' + d.name); break;
+        case 'phase_done':
+          sessLog('success', 'Completed: ' + label);
+          sessTimelineStep('step-' + stepNum, 'success', label, 'Done');
+          if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'success');
+          if (sessTrajPath && d.cumulative_file) {
+            sessTrajPath.style.display = 'block';
+            sessTrajPath.textContent = 'Trajectory: ' + d.cumulative_file;
+          }
+          setTimeout(() => loadActiveSessions(), 300);
+          break;
+        case 'phase_error': case 'error':
+          sessLog('error', d.message || 'Error');
+          sessTimelineStep('step-' + stepNum, 'failed', label, d.message || '');
+          if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'failed');
+          break;
+        case 'nav_step': sessLog('info', 'Nav: ' + d.label); break;
+        case 'done': sessLog('system', 'Finished'); break;
+      }
+    };
+  }
+
+  function parseSSEStream(text, handler) {
+    const lines = text.split('\n');
+    let evt = '';
+    for (const line of lines) {
+      if (line.startsWith('event: ')) evt = line.slice(7).trim();
+      else if (line.startsWith('data: ') && evt) {
+        try { handler(evt, JSON.parse(line.slice(6))); } catch (e) {}
+        evt = '';
+      }
+    }
+  }
+
+  async function readSSEStream(reader, handler) {
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!sessRunning) { reader.cancel(); break; }
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) { if (part.trim()) parseSSEStream(part + '\n', handler); }
+    }
+  }
+
+  function setUILocked(locked) {
+    const btns = document.querySelectorAll('#genBtn, #exploreStartBtn, #sessStepBtn, #genRunBtn');
+    btns.forEach(b => { if (b) b.disabled = locked; });
+    sessRunning = locked;
+    window.__execLock__.running = locked;
     updateButtons();
+  }
+
+  async function executeSessionStep(sessionId, task, maxSteps, label, phaseIdx) {
+    setUILocked(true);
     sessStatus.textContent = 'Executing...';
     const stepNum = (parseInt(sessStepCount.textContent) || 0) + 1;
     sessStepCount.textContent = stepNum + ' steps';
@@ -258,73 +308,21 @@ export function initSessionMode() {
     try {
       const resp = await fetch('/api/browser/session/' + sessionId + '/step', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task: task, maxSteps }),
+        body: JSON.stringify({ task, maxSteps }),
         signal: sessAbortController.signal,
       });
       if (!resp.ok) { const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status })); throw new Error(err.error || 'Request failed'); }
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
-      const parseSSE = (text) => {
-        const lines = text.split('\n');
-        let evt = '';
-        for (const line of lines) {
-          if (line.startsWith('event: ')) evt = line.slice(7).trim();
-          else if (line.startsWith('data: ') && evt) {
-            try {
-              const d = JSON.parse(line.slice(6));
-              switch (evt) {
-                case 'step': sessLog('info', 'Step ' + d.step + ': ' + (d.next_goal || (d.actions || []).join(', '))); break;
-                case 'phase_start': sessLog('system', 'Started: ' + d.name); break;
-                case 'phase_done':
-                  sessLog('success', 'Completed: ' + label);
-                  sessTimelineStep('step-' + stepNum, 'success', label, 'Done');
-                  if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'success');
-                  if (sessTrajPath && d.cumulative_file) {
-                    sessTrajPath.style.display = 'block';
-                    sessTrajPath.textContent = 'Trajectory: ' + d.cumulative_file;
-                  }
-                  setTimeout(() => loadActiveSessions(), 300);
-                  break;
-                case 'phase_error': case 'error':
-                  sessLog('error', d.message || 'Error');
-                  sessTimelineStep('step-' + stepNum, 'failed', label, d.message || '');
-                  if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'failed');
-                  break;
-                case 'nav_step': sessLog('info', 'Nav: ' + d.label); break;
-                case 'done': sessLog('system', 'Finished'); break;
-              }
-            } catch (e) {}
-            evt = '';
-          }
-        }
-      };
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!sessRunning) { reader.cancel(); break; }
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split('\n\n');
-        buf = parts.pop();
-        for (const part of parts) { if (part.trim()) parseSSE(part + '\n'); }
-      }
+
+      const handler = createSSEEventHandler(stepNum, label, phaseIdx);
+      await readSSEStream(resp.body.getReader(), handler);
     } catch (err) {
-      if (err.name === 'AbortError') {
-        sessLog('system', 'Cancelled');
-        sessTimelineStep('step-' + stepNum, 'failed', label, 'Cancelled');
-        if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'failed');
-      } else {
-        sessLog('error', err.message);
-        sessTimelineStep('step-' + stepNum, 'failed', label, err.message.slice(0, 100));
-        if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'failed');
-      }
+      const isAbort = err.name === 'AbortError';
+      sessLog(isAbort ? 'system' : 'error', isAbort ? 'Cancelled' : err.message);
+      sessTimelineStep('step-' + stepNum, 'failed', label, isAbort ? 'Cancelled' : err.message.slice(0, 100));
+      if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'failed');
     }
-    sessRunning = false;
     sessAbortController = null;
-    window.__execLock__.running = false;
-    const unlockBtns = document.querySelectorAll('#genBtn, #exploreStartBtn, #sessStepBtn, #genRunBtn');
-    unlockBtns.forEach(b => { if (b) b.disabled = false; });
-    updateButtons();
+    setUILocked(false);
   }
 
   window.loadActiveSessions = async function () {
