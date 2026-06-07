@@ -375,21 +375,24 @@ await page.waitForSelector('.el-message', { state: 'detached', timeout: 5000 });
 
 ### 9.3 el-notification 右侧弹窗：读取错误信息后关闭
 
-表单提交失败时，页面右上角会出现 `.el-notification` 浮动提示。agent 必须先将通知文本记录下来，再手动关闭弹窗。
+表单验证失败时，页面右上角会出现 `.el-notification right` 浮动提示，列出所有未填写的必填项（可点击定位）。agent **必须先记录错误列表，再手动关闭弹窗**，然后根据错误列表填写对应字段。
 
 ```javascript
-// 1. 检测右侧通知是否存在并读取内容
+// 1. 检测右侧通知是否存在并读取所有错误项
 const notifInfo = await page.evaluate(() => {
   const n = document.querySelector('.el-notification');
   if (!n) return null;
-  return {
-    text: n.querySelector('.el-notification__content')?.textContent?.trim() || '',
-    title: n.querySelector('.el-notification__title')?.textContent?.trim() || '',
-  };
+  const title = n.querySelector('.el-notification__title')?.textContent?.trim() || '';
+  const text = n.querySelector('.el-notification__content')?.textContent?.trim() || '';
+  // 提取每条错误（格式: "字段名 - 错误描述"）
+  const errors = [...n.querySelectorAll('.error-clickable')].map(el => el.textContent.trim());
+  return { title, text, errors };
 });
 
 if (notifInfo) {
-  // 通知文本已在 notifInfo 中记录，后续决策可用
+  console.log('错误通知标题:', notifInfo.title);
+  console.log('错误项列表:', notifInfo.errors);
+  // 错误列表可用于确定下一步需填写的字段
 
   // 2. 关闭通知（点 X 按钮）
   await page.evaluate(() => {
@@ -400,7 +403,10 @@ if (notifInfo) {
 }
 ```
 
-**注意**：`el-notification` 不会自动消失，必须手动关闭。它和 `el-message`（居中顶部，几秒后自动消失）是两种不同的组件，两者都要检查。
+**注意**：
+- `el-notification` **不会自动消失**，必须手动关闭。它与 `el-message`（居中顶部，几秒后自动消失）是两种不同的组件，两者都要检查。
+- 通知中的错误项（`.error-clickable`）可点击定位到对应字段，agent 可直接读取文本了解哪些字段需要补充。
+- 关闭通知后，按错误列表中的字段名逐一调用 `fill_form_field` 或 `select_option` 补填。
 
 
 ---
@@ -523,7 +529,7 @@ if (addrState && addrState.placeholder === '请选择') {
 }
 ```
 
-**注意**：地址选择器输入框通常是 `readonly` 的，不能直接 setter 赋值。它常与 §14.10 的"相邻按钮"模式配合——点击输入框的下一个兄弟按钮打开地址树弹窗。
+**注意**：地址选择器输入框通常是 `readonly` 的，不能直接 setter 赋值。它常与 §14.10 的"相邻按钮"模式配合——点击输入框的下一个兄弟按钮打开地址树弹窗。弹窗中的下拉选择按 §14.6 的策略执行。
 
 
 ---
@@ -532,40 +538,56 @@ if (addrState && addrState.placeholder === '请选择') {
 
 > 以下内容继承自原表单填写技能，已整合为脚本生成知识库的一部分。
 
-### 14.0 识别待填字段：跳过已有值的必填项
+### 14.0 前置检查：先读当前值，确认未填再动手
 
-只填写**同时满足以下两个条件**的表单项：
-1. `class` 中包含 `is-required`（必填字段）
-2. 输入框当前**无值**（`value` 为空，或 el-select 未选中）
+agent 在操作任何字段前，**必须先读当前值**。只有确认字段**既为必填又未填**时才执行操作。
 
-**已有值的必填字段跳过不填**，避免重复填写导致无限循环。
+**判断规则**（按字段类型）：
+
+| 字段类型 | 读取方式 | 已填标志 | 未填标志 |
+|---------|---------|---------|---------|
+| 文本输入 `el-input` | `input.value` | 非空字符串 | `""` |
+| 文本域 `el-textarea` | `textarea.value` | 非空字符串 | `""` |
+| 下拉选择 `el-select` | `input.value \|\| input.placeholder` | 非空且非初始值 | `""` 或 `"请选择"` |
+| 相邻按钮选择器（§14.10） | `input.placeholder` | 不是 `"请选择"` | `"请选择"` |
 
 ```javascript
-// 扫描页面上需要填写且尚未填写的表单项
+function isFieldFilled(input) {
+  if (!input) return true; // 不存在则视为已填
+  const v = (input.value || '').trim();
+  const p = (input.placeholder || '').trim();
+  // el-select / 地址选择器：看 placeholder 是否从"请选择"变成了实际内容
+  if (p && p !== '请选择' && p !== '请输入') return true;
+  // 文本输入框：看 value 是否非空
+  if (v) return true;
+  return false;
+}
+
+// 扫描待填字段
 const fieldsToFill = await page.evaluate(() => {
   const items = document.querySelectorAll('.el-form-item.is-required');
   const result = [];
   for (const item of items) {
     const label = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
     const input = item.querySelector('.el-input__inner, .el-textarea__inner');
-    const selectInput = item.querySelector('.el-select .el-input__inner');
-    const actualInput = input || selectInput;
-    if (!actualInput) continue;
-    // 跳过已有值的字段（el-select 取 input.value，有值说明已选中）
-    if (actualInput.value && actualInput.value.trim() !== '') continue;
-    result.push({ label, element: actualInput });
+    if (!input) continue;
+    if (isFieldFilled(input)) continue; // 已有值，跳过
+    const errorText = item.querySelector('.el-form-item__error')?.textContent?.trim() || '';
+    result.push({ label, errorText });
   }
   return result;
 });
 
-console.log('待填写字段:', fieldsToFill.map(f => f.label));
+console.log('待填写字段:', fieldsToFill.map(f =>
+  `${f.label}${f.errorText ? ` (${f.errorText})` : ''}`
+));
 ```
 
 **注意**：
 - 只处理 `class` 中包含 `is-required` 的 `.el-form-item`
-- 已有值的必填字段**跳过**，不再重复填写
-- 不带 `is-required` 的表单项跳过，无需填写
-- class 中可能同时包含 `is-success`、`tssc-form-item` 等其他 class，不影响判断
+- 前置检查**必须**放在每次操作之前，确认字段未填再动手
+- 文本输入框看 `value`，下拉/地址选择器看 `placeholder`——前者存用户输入的值，后者在选中后会被替换为实际内容
+- 跳过条件优先用 `value` 非空；`value` 为空但 `placeholder` 不是初始值的，也视为已选中
 
 
 ### 14.1 核心原因：Vue v-model 劫持
@@ -605,6 +627,10 @@ input.dispatchEvent(new Event('input', { bubbles: true }));
 
 ### 14.4 el-input（文本输入框）
 
+**对于 agent 在线操作**：使用自定义动作 `fill_form_field(label_text, value)`。输入框可能在 `.tsscInput` 等自定义包装内，`fill_form_field` 内部自动处理。
+
+**对于 Playwright 脚本**：使用原生 setter 策略。
+
 ```javascript
 await page.evaluate(() => {
   const el = document.querySelector(
@@ -637,26 +663,55 @@ await page.evaluate(() => {
 
 ### 14.6 el-select（下拉选择）
 
-```javascript
-// 1. 点击触发下拉
-await page.evaluate(() => {
-  const trigger = document.querySelector(
-    '.el-form-item:has(.el-form-item__label:contains("类型")) .el-select .el-input__inner'
-  );
-  if (trigger) trigger.click();
-});
-await page.waitForTimeout(500);
+**🚨 严禁使用 `click_element_by_index` 选择下拉选项**
 
-// 2. 选择选项
-await page.evaluate(() => {
-  const option = [...document.querySelectorAll('.el-select-dropdown__item')]
-    .find(el => el.textContent.trim() === '目标选项');
-  if (option) option.click();
-});
-await page.waitForTimeout(300);
+从日志可知，`click_element_by_index=27` 点击"福建省"时实际点中了 `<span>` 文本元素，而 Element UI 监听的是 `<li class="el-select-dropdown__item">` 上的事件。**点击错了 DOM 层级，Vue 收不到选中事件**。此问题无法通过调整 index 解决。
+
+**只能用 `select_option(label_text, option_text)` 这个自定义动作来选 el-select。**
+
+#### `select_option` 的正确用法
+
+系统已内置 `select_option` 动作，它内部自动完成：
+1. 读取当前值 → 如果已选中则返回 `already:XXX`，直接跳过
+2. 点击触发器打开下拉面板
+3. 在正确的 `<li>` 元素上执行选中操作
+4. 验证选中结果
+
+```python
+# ✅ 正确：用自定义动作选 el-select
+select_option("省份", "福建省")
+
+# 也支持"first"关键字选第一个可见项
+select_option("法人", "first")
+
+# 如果选项文本较长，传入完整文本
+select_option("请选择法人", "横州市农村信用合作联社")
 ```
 
-**注意**：如果多个 el-select 共用一个下拉面板（`el-select-dropdown`），点击第二个 select 前可能需要先关闭前一个下拉。
+**不要自己实现**——`select_option` 已经处理了元素定位、事件触发、前置检查、选中确认等所有逻辑。
+
+#### 特殊情况处理
+
+**如果 `select_option` 返回 `"option-not-found:..."`**：
+- 说明下拉面板中没有匹配的选项
+- 先检查 label_text 是否准确（是否包含完整标签文本）
+- 然后用 `send_keys("ArrowDown")` + `send_keys("Enter")` 通过键盘选择第一项
+
+```python
+# 键盘备选方案
+select_option("省份", "福建省")          # 尝试标准选择
+# 如果返回 option-not-found:
+click_element_by_index(3)                # 打开下拉
+send_keys("ArrowDown")                   # 往下导航
+send_keys("ArrowDown")
+send_keys("Enter")                       # 确认选中
+```
+
+#### 绝对禁止
+
+- ❌ 禁止用 `click_element_by_index` 点击下拉选项（点了也白点）
+- ❌ 禁止用 `select_dropdown_option`（那是原生 `<select>` 用的，不是 el-select）
+- ❌ 禁止在 `select_option` 返回 `already:XXX` 后还重复选择
 
 ### 14.7 el-radio / el-radio-group
 
@@ -692,28 +747,28 @@ await page.evaluate(() => {
 
 ### 14.10 相邻按钮触发的输入填写
 
-当 `el-input__inner` 的下一个兄弟元素（按 DOM 树先后顺序）是 `button.el-button--primary.is-plain` 时，agent **必须点击该按钮**来填写输入框，而不是直接修改 input.value。
+当 `el-input__inner` 所在的 `.el-form-item` 内有一个 `button.el-button--primary.is-plain` 时，agent **必须点击该按钮**来填写输入框，而不是直接修改 input.value。
 
 此模式常见于地址选择器、组织树选择器等场景——点击按钮弹出 el-dialog / el-tree / el-cascader，选择后自动回填 input。
 
+**注意**：按钮不是 `input` 的直接兄弟，它在 `.tsscInput`、`.el-input` 等包装层的外部，与包装层同级。必须从 `.el-form-item` 层面查找按钮。
+
 ```javascript
-// 1. 查找输入框，点击其下一个兄弟按钮打开选择器
+// 1. 查找输入框所在的表单项，点击其中的"选择"按钮打开选择器
 await page.evaluate(() => {
-  const input = document.querySelector(
-    '.el-form-item:has(.el-form-item__label:contains("地址")) .el-input__inner'
+  const item = document.querySelector(
+    '.el-form-item:has(.el-form-item__label:contains("登记注册地址"))'
   );
-  if (!input) return;
-  const nextBtn = input.nextElementSibling;
-  if (nextBtn?.matches('button.el-button--primary.is-plain')) {
-    nextBtn.click();
+  if (!item) return;
+  const btn = item.querySelector('button.el-button--primary.is-plain');
+  if (btn && btn.offsetParent !== null) {
+    btn.click();
   }
 });
 await page.waitForTimeout(800);
-
-// 2. 在弹出的弹窗中完成选择，输入框会自动填充
 ```
 
-**注意**：这类输入框通常为 `readonly`，不可直接 setter 赋值。点击按钮打开选择器是唯一正确的填写方式。
+**注意**：这类输入框通常为 `readonly`，不可直接 setter 赋值。点击按钮打开选择器是唯一正确的填写方式。弹窗内的下拉选择按 §14.6 的策略执行。
 
 
 ---
@@ -822,73 +877,21 @@ await page.evaluate(() => {
 
 ---
 
-## 18. 完整脚本模板
+## 18. 通用脚本结构
 
-```javascript
-// /tmp/playwright-test-elui.js
-const { chromium } = require('playwright');
+一个完整的 Element UI 自动化脚本通常遵循以下流程。各步骤的细节实现参见对应章节：
 
-const TARGET_URL = 'http://localhost:8080';
+1. **启动浏览器** → 打开目标页面
+2. **诊断 UI 框架**（§1）→ 确认页面使用 Element UI
+3. **导航菜单**（§6）→ 通过 `el-menu` 进入目标页面
+4. **等待表格/数据加载**（§10 loading / §15.2 networkidle）
+5. **打开操作弹窗**（§5）→ 点击 `el-button` 打开 `el-dialog`
+6. **填写弹窗表单**（§14）→ 根据字段类型选择对应的填写方式
+7. **提交表单**（§15）→ 检测表单验证错误、接口响应
+8. **验证结果**（§9 / §15）→ 检查 `el-message` / `el-notification`
+9. **关闭通知**（§9.3）→ 手动关闭 `el-notification`
 
-(async () => {
-  const browser = await chromium.launch({ headless: false, slowMo: 50 });
-  const page = await browser.newPage();
-
-  await page.goto(TARGET_URL);
-  await page.waitForLoadState('networkidle');
-
-  // ===== 1. 登录 =====
-  // 略...
-
-  // ===== 2. 导航到目标页面 =====
-  await page.evaluate(() => {
-    const menu = document.querySelector('.el-menu');
-    if (!menu) return;
-    [...menu.querySelectorAll('.el-menu-item')]
-      .find(el => el.textContent.trim() === '目标页面')
-      ?.click();
-  });
-  await page.waitForLoadState('networkidle');
-
-  // ===== 3. 等待表格加载 =====
-  await page.waitForSelector('.el-table__body', { timeout: 10000 });
-
-  // ===== 4. 点击"新增"按钮打开弹窗 =====
-  await page.evaluate(() => {
-    document.querySelector('button:has-text("新增"), .el-button--primary:has-text("新增")')
-      ?.click();
-  });
-  await page.waitForTimeout(800);
-
-  // ===== 5. 填写弹窗表单 =====
-  // 各字段填写...
-  await page.evaluate(() => {
-    const input = document.querySelector('.el-dialog .el-input__inner');
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-    setter.call(input, '测试值');
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    input.dispatchEvent(new Event('blur', { bubbles: true }));
-  });
-  await page.waitForTimeout(500);
-
-  // ===== 6. 提交 =====
-  await page.evaluate(() => {
-    const btn = document.querySelector('.el-dialog__footer .el-button--primary');
-    if (btn) btn.click();
-  });
-
-  // ===== 7. 验证提交结果 =====
-  await page.waitForTimeout(1000);
-  const message = await page.evaluate(() => {
-    const msg = document.querySelector('.el-message');
-    return msg ? msg.textContent.trim() : null;
-  });
-  console.log('提交结果:', message);
-
-  await browser.close();
-})();
-```
+不提供硬编码示例。agent 应根据页面上实际存在的 DOM 元素和文本内容，按上述流程和各章节的模式代码动态生成脚本。
 
 ---
 
@@ -898,7 +901,7 @@ const TARGET_URL = 'http://localhost:8080';
 |------|------|------|
 | `fill()` 后 input 显示空白 | Vue 劫持了 value 属性 | 用原生 setter + 冒泡事件 |
 | 填值后聚焦/点击其他字段就变空 | v-model 没感知到变化 | 确保 `input` + `change` 事件 `bubbles: true` |
-| select 选了但提交值是原值 | 只改了显示文本，未触发选择 | 通过点击 `.el-select-dropdown__item` 触发选择 |
+| select 选了但提交值是原值 | 选项点击未触发 Vue 更新 | 用键盘导航（ArrowDown+Enter）或 evaluate mousedown 触发（§14.6） |
 | el-dialog 中操作后无反应 | Dialog 被异步重建，引用失效 | 每次操作前重新 `querySelector` |
 | 表单验证错误但值已填入 | 验证在 v-model 更新前触发 | 填值后 `waitForTimeout(500)` |
 | 点击菜单项无效 | 父级菜单折叠，子项不可见 | 先展开 `el-submenu` |
@@ -906,6 +909,7 @@ const TARGET_URL = 'http://localhost:8080';
 | 弹窗预填值不会被修改 | 用了"先清空再赋值"模式 | 改为直接赋值 |
 | 来回点菜单形成死循环 | 多个步骤的文本有子串重叠 | 确保各步骤目标文本无子串重叠 |
 | `page.fill()` 不生效 | 按钮或输入在 Shadow DOM 中 | 改用 `page.evaluate()` |
+| el-select 反复打开无法选中 | 选项不在 agent 可点击索引中，click 未触发 Vue | 先读当前值（§14.0），用键盘导航或输入搜索选中（§14.6） |
 
 ---
 

@@ -16,7 +16,7 @@ Use **default actions** for everything else (generic buttons, links, navigation,
 
 | Action | Parameters | When to Use |
 |--------|-----------|-------------|
-| `click_element_by_index(index)` | index: element [] number | Click any visible element by its index. Use for buttons, links, menu items not covered by custom actions. |
+| `click_element_by_index(index)` | index: element [] number | Click any visible element by its index. Use for buttons, links, menu items not covered by custom actions. **🚨 Do NOT use for el-select dropdown options — it clicks the wrong DOM layer. Use `select_option` instead.** |
 | `input_text(index, text)` | index, text | Type into a standard `<input>` field (NOT el-input inside el-form-item — use `fill_form_field`). |
 | `select_dropdown_option(index, option)` | index, option | Select from a native HTML `<select>`. NOT for el-select — use `select_option`. |
 | `go_to_url(url)` | url string | Navigate to a URL. |
@@ -34,6 +34,8 @@ Use **default actions** for everything else (generic buttons, links, navigation,
 
 ### `select_option(label_text, option_text)`
 
+**🚨 这是 el-select 下拉选择的唯一正确动作。严禁使用 `click_element_by_index` 点击下拉选项——它会点到 `<span>` 文本而非 `<li>` 选项，Vue 无法感知，导致无限循环。**
+
 Select an option in an **el-select** dropdown by its form label.
 
 **Parameters:**
@@ -46,12 +48,18 @@ Select an option in an **el-select** dropdown by its form label.
 | `"ok \| confirm=SELECTED:XXX"` | Success. Option XXX was selected and confirmed. |
 | `"ok \| confirm=SELECTED:..."` | Success. The dropdown shows the selected value. |
 | `"triggered"` | Dropdown was opened. If you see this without a confirm, reopen next step. |
-| `"already:XXX"` | Field already has value XXX. No action needed. |
+| `"already:XXX"` | **Field already has value XXX. No action needed. Stop here.** |
 | `"label-not-found"` | No el-form-item with matching label text. |
 | `"no-select-found"` | Label found but no el-select trigger inside. |
 | `"select-disabled"` | The el-select is disabled. |
 | `"option-not-found:..."` | Option text didn't match any visible item. List of available options follows. |
 | `"no-items"` | Dropdown is open but has no visible items. |
+
+**如果返回 `"already:XXX"`，说明已经选中，不要再执行任何选择操作。**
+
+**如果返回 `"option-not-found:..."`：**
+1. 检查 `label_text` 是否准确
+2. 用 `send_keys("ArrowDown")` + `send_keys("Enter")` 键盘选择第一项
 
 **Examples:**
 ```

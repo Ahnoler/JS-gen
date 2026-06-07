@@ -108,6 +108,9 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         }
         if (mode === 'trigger') {
             if (trigger.disabled) return 'select-disabled';
+            // tssc-multi-select needs real mouse events, not just .click()
+            trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
             trigger.click();
             return 'triggered';
         }
@@ -163,23 +166,35 @@ JS_FIND_VISIBLE_DROPDOWN = '''(() => {
 
 JS_SELECT_OPTION = '''(option) => {
     const dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
-    const items = dropdown.querySelectorAll('.el-select-dropdown__item');
+    let items = dropdown.querySelectorAll('.el-select-dropdown__item');
+    // Fallback: if no dropdown is visible (tssc-multi-select renders options outside),
+    // search at document level for all visible items
+    if (items.length === 0 || dropdown === document) {
+        items = document.querySelectorAll('.el-select-dropdown__item');
+    }
     const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
+    const tryClick = (item) => {
+        // mousedown for tssc-multi-select, click for standard el-select
+        item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        item.click();
+        const t = item.textContent.trim();
+        return 'ok:' + t;
+    };
     if (FIRST_ALIASES.includes(option.toLowerCase().trim())) {
         for (const item of items) {
-            if (item.offsetParent !== null) { item.click(); const t = item.textContent.trim(); return 'ok-first:' + t; }
+            if (item.offsetParent !== null) { return tryClick(item); }
         }
-        if (items.length > 0) { const t = items[0].textContent.trim(); items[0].click(); return 'ok-first-hidden:' + t; }
+        if (items.length > 0) { return tryClick(items[0]); }
         return 'no-items';
     }
     for (const item of items) {
         if (item.textContent.trim() === option) {
-            item.click(); const t = item.textContent.trim(); return 'ok:' + t;
+            return tryClick(item);
         }
     }
     for (const item of items) {
         if (item.textContent.trim().includes(option)) {
-            item.click(); const t = item.textContent.trim(); return 'ok-partial:' + t;
+            return tryClick(item);
         }
     }
     return 'option-not-found:' + [...items].map(i => i.textContent.trim()).join(', ');

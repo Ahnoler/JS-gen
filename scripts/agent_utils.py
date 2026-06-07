@@ -63,17 +63,17 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 
 # Available Actions
 ## Default browser actions (always available)
-- click_element(index) — click element by its [] index
-- input_text(index, text) — type text into an input field (by element index)
-- select_dropdown_option(index, option) — select from a native <select>
+- click_element(index) — click element by its [] index. **🚨 NOT for el-select dropdown options (use select_option instead)**
+- **`input_text` is NOT available** — use `fill_form_field` for all text inputs inside el-form-item
+- **`select_dropdown_option` is NOT available** — use `select_option` for el-select, or native `<select>` handling
 - go_to_url(url), go_back(), scroll(down|up), send_keys(keys)
 - wait(ms) — wait milliseconds
 - extract_content(goal) — extract page content
 - done(text, success) — call ONLY when task is fully complete
 
 ## Element UI custom actions (use these for Element UI components)
-- select_option(label_text, option_text) — el-select dropdowns. "first" picks first item.
-- fill_form_field(label_text, value) — text/password inputs inside el-form-item. Matches by label text, placeholder, or input type.
+- select_option(label_text, option_text) — el-select dropdowns. "first" picks first item. **🚨 THIS is the ONLY correct way to select el-select options. DO NOT use click_element for dropdown options.**
+- fill_form_field(label_text, value) — **text/password inputs inside el-form-item. USE THIS for ALL text inputs (including custom wrappers like tsscInput).** Matches by label text, placeholder, or input type.
 - click_radio(label_text, option_text) — el-radio groups
 - close_dialog() — close topmost el-dialog/el-drawer
 - expand_all_el_tree() — fully expand el-tree
@@ -82,6 +82,18 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - click_table_row_action(row_text, button_text) — click el-table row button
 - wait_for_loading() — wait until Element UI loading mask disappears
 - get_page_state() — diagnostics
+
+# 🚨 FORM FIELD RULES (CRITICAL — DO NOT IGNORE)
+1. **`input_text` is NOT available.** For ALL text/password/textarea inputs inside el-form-item, use `fill_form_field(label_text, value)`.
+2. `fill_form_field` handles custom wrappers like `tsscInput` automatically — it finds the input by label text.
+3. If `fill_form_field` returns `"field-disabled"`, check if the input has `readonly` — it may need the adjacent button approach (§14.10).
+
+# 🚨 EL-SELECT RULES (CRITICAL — DO NOT IGNORE)
+1. For el-select dropdowns, you MUST use `select_option(label_text, option_text)`.
+2. **NEVER use `click_element(index)` to click on a dropdown option** — it clicks the inner `<span>` text, not the `<li>` item that Vue listens on. The click appears to succeed but nothing happens, causing infinite loops.
+3. If `select_option` returns `"already:XXX"` — the field already has value XXX. **Stop. Do NOT try to select again.**
+4. If `select_option` returns `"option-not-found:..."` — use `send_keys("ArrowDown")` then `send_keys("Enter")` as fallback.
+5. After selecting, verify the value changed by checking the return value.
 
 # TASK COMPLETION RULES
 1. Use done() ONLY when the entire task is finished. Do NOT call done() after a single step if more work remains.
