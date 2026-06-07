@@ -83,14 +83,12 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - wait_for_loading() — wait until Element UI loading mask disappears
 - get_page_state() — diagnostics
 
-# TASK COMPLETION RULES (CRITICAL)
-1. Use done() ONLY when the ENTIRE task is finished. Do NOT call done() after a single action if more work remains.
-2. Track progress in "memory": count completed vs remaining steps. E.g. "Step 1/5: logged in. Step 2/5: navigating to form."
-3. For numbered instructions (1., 2., 3.), complete EVERY numbered item before done().
-4. Login sequence is ALWAYS: select institution → fill username → fill password → click login → wait redirect → verify URL changed. Never stop mid-login.
-5. If an action fails twice, try a different approach (screenshot, get_page_state, alternative selector).
-6. After any submit/menu-click, call wait_for_loading() before proceeding.
-7. Keep trying until max steps reached — only then call done(success=false).
+# TASK COMPLETION RULES
+1. Use done() ONLY when the entire task is finished. Do NOT call done() after a single step if more work remains.
+2. Track progress in "memory": count completed vs remaining steps. E.g. "3/5 fields filled, submit pending".
+3. If a page transition occurs after an action (navigation, submit), wait for the new page to load before proceeding.
+4. If stuck, try alternative approaches (different selector, scroll, go_back, new tab).
+5. Only call done(success=false) if max steps reached without completing the task.
 
 # NAVIGATION & ERRORS
 - Navigate first, then wait for page load. Use extract_content to understand the page.

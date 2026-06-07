@@ -76,6 +76,23 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
 }'''
 
 JS_FIND_LABELED_SELECT = '''([label, mode]) => {
+    const getSelectedLabel = (formItem) => {
+        const select = formItem.querySelector('.el-select');
+        if (!select) return null;
+        const trigger = select.querySelector('.el-input__inner');
+        if (trigger) {
+            const v = (trigger.value || '').trim();
+            if (v) return v;
+        }
+        const tag = select.querySelector('.el-select__tags-text');
+        if (tag) {
+            const t = tag.textContent.trim();
+            if (t) return t;
+        }
+        const selItem = select.querySelector('.el-select-dropdown__item.is-selected');
+        if (selItem) return selItem.textContent.trim();
+        return null;
+    };
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
     for (const item of items) {
@@ -85,10 +102,8 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         if (!trigger && mode === 'trigger') return 'no-select-found';
         if (!trigger) continue;
         if (mode === 'check') {
-            const curVal = (trigger.value || '').trim();
-            if (curVal.length > 0) return 'already:' + curVal;
-            const curText = (trigger.textContent || '').trim();
-            if (curText.length > 0 && !curText.includes('请选择')) return 'already:' + curText;
+            const cur = getSelectedLabel(item);
+            if (cur) return 'already:' + cur;
             return 'not-filled';
         }
         if (mode === 'trigger') {
@@ -97,10 +112,8 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
             return 'triggered';
         }
         if (mode === 'confirm') {
-            const val = (trigger.value || '').trim();
-            if (val) return 'SELECTED:' + val;
-            const txt = (trigger.textContent || '').trim();
-            if (txt && !txt.includes('请选择')) return 'SELECTED:' + txt;
+            const cur = getSelectedLabel(item);
+            if (cur) return 'SELECTED:' + cur;
             return 'NOT-SELECTED';
         }
         return 'unknown-mode';
@@ -140,13 +153,13 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     return 'unknown-mode';
 }'''
 
-JS_FIND_VISIBLE_DROPDOWN = '''() => {
+JS_FIND_VISIBLE_DROPDOWN = '''(() => {
     const dropdowns = document.querySelectorAll('.el-select-dropdown');
     for (const dd of dropdowns) {
         if (dd.offsetParent !== null && !dd.classList.contains('is-hidden')) return dd;
     }
     return document;
-}'''
+})()'''
 
 JS_SELECT_OPTION = '''(option) => {
     const dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
@@ -154,19 +167,19 @@ JS_SELECT_OPTION = '''(option) => {
     const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
     if (FIRST_ALIASES.includes(option.toLowerCase().trim())) {
         for (const item of items) {
-            if (item.offsetParent !== null) { item.click(); return 'ok-first'; }
+            if (item.offsetParent !== null) { item.click(); const t = item.textContent.trim(); return 'ok-first:' + t; }
         }
-        if (items.length > 0) { items[0].click(); return 'ok-first-hidden'; }
+        if (items.length > 0) { const t = items[0].textContent.trim(); items[0].click(); return 'ok-first-hidden:' + t; }
         return 'no-items';
     }
     for (const item of items) {
         if (item.textContent.trim() === option) {
-            item.click(); return 'ok';
+            item.click(); const t = item.textContent.trim(); return 'ok:' + t;
         }
     }
     for (const item of items) {
         if (item.textContent.trim().includes(option)) {
-            item.click(); return 'ok-partial';
+            item.click(); const t = item.textContent.trim(); return 'ok-partial:' + t;
         }
     }
     return 'option-not-found:' + [...items].map(i => i.textContent.trim()).join(', ');
@@ -282,12 +295,30 @@ def _register_form_actions(controller, browser_context, form_rules):
 
         await page.wait_for_timeout(800)
         select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
-        await page.wait_for_timeout(300)
+        await page.wait_for_timeout(500)
 
-        confirm = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'confirm'])
-        if confirm.startswith('SELECTED:'):
-            return _ok(f'ok | confirm={confirm}')
-        return _err(f'{select_result} | no-confirm')
+        if not select_result.startswith('ok'):
+            confirm = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'confirm'])
+            if confirm.startswith('SELECTED:'):
+                return _ok(f'ok | confirm={confirm}')
+            return _err(f'{select_result} | no-confirm')
+
+        selected_text = select_result.split(':', 1)[1] if ':' in select_result else ''
+        if selected_text:
+            await page.evaluate('''([label, text]) => {
+                const container = ''' + JS_GET_CONTAINER + ''';
+                const items = container.querySelectorAll('.el-form-item');
+                for (const item of items) {
+                    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                    if (!lbl.includes(label)) continue;
+                    const trigger = item.querySelector('.el-select .el-input__inner');
+                    if (!trigger) continue;
+                    trigger.value = text;
+                    trigger.setAttribute('value', text);
+                    return;
+                }
+            }''', [label_text, selected_text])
+        return _ok(f'ok | {select_result}')
 
 
 def _register_navigation_actions(controller, browser_context):
