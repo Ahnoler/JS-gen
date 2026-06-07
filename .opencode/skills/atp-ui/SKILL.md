@@ -373,6 +373,36 @@ console.log('消息:', text);
 await page.waitForSelector('.el-message', { state: 'detached', timeout: 5000 });
 ```
 
+### 9.3 el-notification 右侧弹窗：读取错误信息后关闭
+
+表单提交失败时，页面右上角会出现 `.el-notification` 浮动提示。agent 必须先将通知文本记录下来，再手动关闭弹窗。
+
+```javascript
+// 1. 检测右侧通知是否存在并读取内容
+const notifInfo = await page.evaluate(() => {
+  const n = document.querySelector('.el-notification');
+  if (!n) return null;
+  return {
+    text: n.querySelector('.el-notification__content')?.textContent?.trim() || '',
+    title: n.querySelector('.el-notification__title')?.textContent?.trim() || '',
+  };
+});
+
+if (notifInfo) {
+  // 通知文本已在 notifInfo 中记录，后续决策可用
+
+  // 2. 关闭通知（点 X 按钮）
+  await page.evaluate(() => {
+    const close = document.querySelector('.el-notification .el-notification__closeBtn');
+    if (close) close.click();
+  });
+  await page.waitForTimeout(300);
+}
+```
+
+**注意**：`el-notification` 不会自动消失，必须手动关闭。它和 `el-message`（居中顶部，几秒后自动消失）是两种不同的组件，两者都要检查。
+
+
 ---
 
 ## 10. el-loading / v-loading（加载状态）
@@ -459,11 +489,84 @@ await page.evaluate(() => {
 });
 ```
 
+### 13.1 地址选择器：通过 placeholder 变化判断选中状态
+
+地址选择器（省市区三级联动）的输入框在未选择时：
+
+```html
+<input type="text" autocomplete="off" placeholder="请选择" class="el-input__inner" readonly="readonly">
+```
+
+选择完成后变为（`readonly` 移除，`placeholder` 变成已选省份名）：
+
+```html
+<input type="text" autocomplete="off" placeholder="福建省" class="el-input__inner">
+```
+
+agent **不要检查 value**，而是通过 `placeholder` 推断选中状态：
+- `placeholder === "请选择"` → 未选择，需要打开选择器
+- `placeholder !== "请选择"` → 已选中，无需再操作
+
+```javascript
+const addrState = await page.evaluate(() => {
+  const input = document.querySelector(
+    '.el-form-item:has(.el-form-item__label:contains("地址")) .el-input__inner'
+  );
+  if (!input) return null;
+  return { placeholder: input.placeholder, readonly: input.hasAttribute('readonly') };
+});
+
+if (addrState && addrState.placeholder === '请选择') {
+  // 未选择，需要通过相邻按钮打开地址选择器
+} else {
+  console.log('地址已选中:', addrState?.placeholder);
+}
+```
+
+**注意**：地址选择器输入框通常是 `readonly` 的，不能直接 setter 赋值。它常与 §14.10 的"相邻按钮"模式配合——点击输入框的下一个兄弟按钮打开地址树弹窗。
+
+
 ---
 
 ## 14. 表单填写（详细指南）
 
 > 以下内容继承自原表单填写技能，已整合为脚本生成知识库的一部分。
+
+### 14.0 识别待填字段：跳过已有值的必填项
+
+只填写**同时满足以下两个条件**的表单项：
+1. `class` 中包含 `is-required`（必填字段）
+2. 输入框当前**无值**（`value` 为空，或 el-select 未选中）
+
+**已有值的必填字段跳过不填**，避免重复填写导致无限循环。
+
+```javascript
+// 扫描页面上需要填写且尚未填写的表单项
+const fieldsToFill = await page.evaluate(() => {
+  const items = document.querySelectorAll('.el-form-item.is-required');
+  const result = [];
+  for (const item of items) {
+    const label = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+    const input = item.querySelector('.el-input__inner, .el-textarea__inner');
+    const selectInput = item.querySelector('.el-select .el-input__inner');
+    const actualInput = input || selectInput;
+    if (!actualInput) continue;
+    // 跳过已有值的字段（el-select 取 input.value，有值说明已选中）
+    if (actualInput.value && actualInput.value.trim() !== '') continue;
+    result.push({ label, element: actualInput });
+  }
+  return result;
+});
+
+console.log('待填写字段:', fieldsToFill.map(f => f.label));
+```
+
+**注意**：
+- 只处理 `class` 中包含 `is-required` 的 `.el-form-item`
+- 已有值的必填字段**跳过**，不再重复填写
+- 不带 `is-required` 的表单项跳过，无需填写
+- class 中可能同时包含 `is-success`、`tssc-form-item` 等其他 class，不影响判断
+
 
 ### 14.1 核心原因：Vue v-model 劫持
 
@@ -586,6 +689,32 @@ await page.evaluate(() => {
   if (sw) sw.click();
 });
 ```
+
+### 14.10 相邻按钮触发的输入填写
+
+当 `el-input__inner` 的下一个兄弟元素（按 DOM 树先后顺序）是 `button.el-button--primary.is-plain` 时，agent **必须点击该按钮**来填写输入框，而不是直接修改 input.value。
+
+此模式常见于地址选择器、组织树选择器等场景——点击按钮弹出 el-dialog / el-tree / el-cascader，选择后自动回填 input。
+
+```javascript
+// 1. 查找输入框，点击其下一个兄弟按钮打开选择器
+await page.evaluate(() => {
+  const input = document.querySelector(
+    '.el-form-item:has(.el-form-item__label:contains("地址")) .el-input__inner'
+  );
+  if (!input) return;
+  const nextBtn = input.nextElementSibling;
+  if (nextBtn?.matches('button.el-button--primary.is-plain')) {
+    nextBtn.click();
+  }
+});
+await page.waitForTimeout(800);
+
+// 2. 在弹出的弹窗中完成选择，输入框会自动填充
+```
+
+**注意**：这类输入框通常为 `readonly`，不可直接 setter 赋值。点击按钮打开选择器是唯一正确的填写方式。
+
 
 ---
 
