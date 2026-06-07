@@ -749,12 +749,14 @@ await page.evaluate(() => {
 
 当 `el-input__inner` 所在的 `.el-form-item` 内有一个 `button.el-button--primary.is-plain` 时，agent **必须点击该按钮**来填写输入框，而不是直接修改 input.value。
 
-此模式常见于地址选择器、组织树选择器等场景——点击按钮弹出 el-dialog / el-tree / el-cascader，选择后自动回填 input。
+此模式有两种常见场景：
+- **地址选择器**：按钮文本为"选择"，点击弹出地址选择器弹窗
+- **数据引入**：按钮文本为"引入"，点击自动从系统引入数据，填充多个关联字段（如法定代表人信息的三字段联动）
 
 **注意**：按钮不是 `input` 的直接兄弟，它在 `.tsscInput`、`.el-input` 等包装层的外部，与包装层同级。必须从 `.el-form-item` 层面查找按钮。
 
 ```javascript
-// 1. 查找输入框所在的表单项，点击其中的"选择"按钮打开选择器
+// 1. 查找表单项，点击其中的"选择"或"引入"按钮
 await page.evaluate(() => {
   const item = document.querySelector(
     '.el-form-item:has(.el-form-item__label:contains("登记注册地址"))'
@@ -768,7 +770,11 @@ await page.evaluate(() => {
 await page.waitForTimeout(800);
 ```
 
-**注意**：这类输入框通常为 `readonly`，不可直接 setter 赋值。点击按钮打开选择器是唯一正确的填写方式。弹窗内的下拉选择按 §14.6 的策略执行。
+**注意**：
+- 这类输入框通常为 `disabled` 或 `readonly`，不可直接 setter 赋值
+- 如果 `fill_form_field` 返回 `field-disabled`，检查当前 `.el-form-item` 及其同级相邻表单项内是否有 `button.el-button--primary.is-plain`——按钮可能不在同一个表单项内（如"引入"按钮在 证件号码 上，但影响 姓名、证件类型 三个字段）
+- 按钮文本可能是"选择"（打开弹窗选择）或"引入"（自动导入数据），两种都适用上述查找逻辑
+- 弹窗内的下拉选择按 §14.6 的策略执行
 
 
 ---

@@ -49,11 +49,10 @@ def _handle_save_trajectory(cumulative_path, session_id):
 def _handle_reset_trajectory(session_id):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"
-    case_data_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_data_{ts}.json"
-    sys.stderr.write(f"[session] Trajectory + case data reset -> {cumulative_path}\n")
+    sys.stderr.write(f"[session] Trajectory reset -> {cumulative_path}\n")
     sys.stderr.flush()
-    emit_json({"event": "reset_trajectory_ready", "data": {"cumulative_file": str(cumulative_path), "case_data_file": str(case_data_path)}})
-    return cumulative_path, case_data_path
+    emit_json({"event": "reset_trajectory_ready", "data": {"cumulative_file": str(cumulative_path)}})
+    return cumulative_path
 
 
 def _accumulate_trajectory(output_path, cumulative_path):
@@ -185,9 +184,9 @@ def _dispatch_event(msg, session_state):
         return 'continue'
 
     if event == "reset_trajectory":
-        cum_path, case_path = _handle_reset_trajectory(session_state['session_id'])
+        cum_path = _handle_reset_trajectory(session_state['session_id'])
         session_state['cumulative_path'] = cum_path
-        session_state['case_data_ref']['path'] = case_path
+        session_state['case_data_store'].clear()
         return 'continue'
 
     if event != "step":
@@ -214,12 +213,12 @@ async def run_session(args):
     browser_context = await browser.new_context(config)
 
     session_id = args.session_id or "unknown"
-    case_data_ref = {'path': Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_data.json"}
+    case_data_store = {}  # process-level in-memory store, persists across steps
     cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
     goal_tracker = {'goals': [], 'stopped': False}
 
     on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path)
-    controller = build_controller(browser_context, form_rules, case_data_ref)
+    controller = build_controller(browser_context, form_rules, case_data_store)
 
     emit_json({"event": "ready", "session_id": session_id})
     sys.stderr.write(f"[session] Ready, session_id={session_id}\n")
@@ -237,7 +236,7 @@ async def run_session(args):
     session_state = {
         'session_id': session_id,
         'cumulative_path': cumulative_path,
-        'case_data_ref': case_data_ref,
+        'case_data_store': case_data_store,
     }
 
     while True:
@@ -257,7 +256,7 @@ async def run_session(args):
             output_path, task_text = await _run_agent_step(
                 data, step_index, session_id, args, llm, browser_context,
                 controller, extend_system_message, goal_tracker, cancel_flag_path,
-                on_step_start_hook, on_step_end_hook, case_data_ref, cumulative_path,
+                on_step_start_hook, on_step_end_hook, case_data_store, cumulative_path,
             )
             agent_running_ref['value'] = False
             if output_path is None:

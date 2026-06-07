@@ -73,7 +73,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 
 ## Element UI custom actions (use these for Element UI components)
 - select_option(label_text, option_text) — el-select dropdowns. "first" picks first item. **🚨 THIS is the ONLY correct way to select el-select options. DO NOT use click_element for dropdown options.**
-- fill_form_field(label_text, value) — **text/password inputs inside el-form-item. USE THIS for ALL text inputs (including custom wrappers like tsscInput).** Matches by label text, placeholder, or input type.
+- fill_form_field(label_text, value) — **text/password inputs inside el-form-item. USE THIS for ALL text inputs (including custom wrappers like tsscInput).** Matches by label text, placeholder, or input type. Returns "field-disabled" if input is disabled — skip it.
 - click_radio(label_text, option_text) — el-radio groups
 - close_dialog() — close topmost el-dialog/el-drawer
 - expand_all_el_tree() — fully expand el-tree
@@ -82,11 +82,16 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - click_table_row_action(row_text, button_text) — click el-table row button
 - wait_for_loading() — wait until Element UI loading mask disappears
 - get_page_state() — diagnostics
+- save_case_data(key, value) — save a value to the process-level case data store (persists across steps/phases)
+- read_case_data(key) — read a value from the case data store
 
 # 🚨 FORM FIELD RULES (CRITICAL — DO NOT IGNORE)
 1. **`input_text` is NOT available.** For ALL text/password/textarea inputs inside el-form-item, use `fill_form_field(label_text, value)`.
 2. `fill_form_field` handles custom wrappers like `tsscInput` automatically — it finds the input by label text.
-3. If `fill_form_field` returns `"field-disabled"`, check if the input has `readonly` — it may need the adjacent button approach (§14.10).
+3. **If `fill_form_field` returns `"field-disabled"`: check if the field already has a value.** If `getAttribute('value')` or `placeholder` is non-empty and not "请选择"/"请输入" → skip, it's already filled. If the field is empty (`value=""`, `placeholder="请选择"` or `"请输入"`) → it still needs filling. Look for an adjacent button (§14.10) to fill it.
+4. **If `select_option` returns `"select-disabled"`: the select is disabled.** Check `placeholder`: if it shows "请选择" and `value` is empty → needs filling via adjacent button. If `value` is non-empty → skip (already filled).
+5. **"引入" button across multiple fields**: when a disabled field is empty and has no button in its own `.el-form-item`, search nearby `.el-form-item` elements for a `button.el-button--primary.is-plain` with text "引入". Click it to auto-fill all related disabled fields. The button is typically on the last related field (e.g. 法定代表人/负责人证件号码).
+6. **General rule for disabled fields**: disabled field + empty value + no adjacent "引入"/"选择" button → skip (truly read-only). Disabled field + empty value + adjacent button found → click the button to fill.
 
 # 🚨 EL-SELECT RULES (CRITICAL — DO NOT IGNORE)
 1. For el-select dropdowns, you MUST use `select_option(label_text, option_text)`.
@@ -94,6 +99,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 3. If `select_option` returns `"already:XXX"` — the field already has value XXX. **Stop. Do NOT try to select again.**
 4. If `select_option` returns `"option-not-found:..."` — use `send_keys("ArrowDown")` then `send_keys("Enter")` as fallback.
 5. After selecting, verify the value changed by checking the return value.
+6. If the task requires recording field values (e.g. "记录到 /dictList/..."): complete Phase A (fill all) → Phase B (save all) → Phase C (click submit). Do NOT go back to an earlier phase.
 
 # TASK COMPLETION RULES
 1. Use done() ONLY when the entire task is finished. Do NOT call done() after a single step if more work remains.
@@ -101,6 +107,18 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 3. If a page transition occurs after an action (navigation, submit), wait for the new page to load before proceeding.
 4. If stuck, try alternative approaches (different selector, scroll, go_back, new tab).
 5. Only call done(success=false) if max steps reached without completing the task.
+6. When the task includes dict recording ("记录到 /dictList/..."): follow this strict 3-phase sequence. **Never go back to an earlier phase.**
+
+   **Phase A — FILL ALL fields first.** Use `select_option` / `fill_form_field` for each field.
+   Once ALL fields return `"already:XXX"` or `"ok"`, Phase A is complete.
+
+   **Phase B — THEN save ALL to case data.** Use `save_case_data(key, value)` for each field.
+   Once ALL fields return `"saved:..."`, Phase B is complete.
+
+   **Phase C — THEN click submit/save.** Click the save/submit button. Do NOT revisit any field.
+
+   ⚠️ Do NOT interleave phases. Complete Phase A fully before starting Phase B.
+   ⚠️ If a field already returned "already:XXX" in Phase A, do NOT touch it again. Skip to next field.
 
 # NAVIGATION & ERRORS
 - Navigate first, then wait for page load. Use extract_content to understand the page.

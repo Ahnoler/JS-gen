@@ -40,6 +40,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
         const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
         setter.call(t, v);
+        t.setAttribute('value', v);
         t.dispatchEvent(new Event('input', {bubbles:true}));
         t.dispatchEvent(new Event('change', {bubbles:true}));
         t.dispatchEvent(new Event('blur', {bubbles:true}));
@@ -224,39 +225,22 @@ async def _wait_if_loading(page):
         await page.evaluate(JS_WAIT_LOADING)
 
 
-def _register_case_data_actions(controller, case_data_ref):
+def _register_case_data_actions(controller, case_data_store):
+    # case_data_store is a process-level dict: persists for the lifetime of the Python process
     @controller.action('Save data to the shared case data store for cross-phase data sharing.')
     async def save_case_data(key: str, value: str):
-        cdp = case_data_ref.get('path')
-        if cdp is None:
-            return _err('no-case-data-path')
         try:
-            data = _load_case_data(cdp)
-            data[key] = value
-            cdp.parent.mkdir(parents=True, exist_ok=True)
-            with open(cdp, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            case_data_store[key] = value
             return _ok(f'saved:{key}={value}')
         except Exception as e:
             return _err(f'save-error:{e}')
 
     @controller.action('Read data from the shared case data store.')
     async def read_case_data(key: str):
-        cdp = case_data_ref.get('path')
-        if cdp is None or not cdp.exists():
+        val = case_data_store.get(key)
+        if val is None:
             return _err(f'NO-DATA:{key}')
-        try:
-            data = _load_case_data(cdp)
-            return data.get(key, f'NO-DATA:{key}')
-        except Exception as e:
-            return _err(f'read-error:{e}')
-
-
-def _load_case_data(path):
-    if path.exists():
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
+        return val
 
 
 def _register_form_actions(controller, browser_context, form_rules):
@@ -301,8 +285,7 @@ def _register_form_actions(controller, browser_context, form_rules):
 
         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'check'])
         if already.startswith('already:'):
-            confirm_val = already.split(':', 1)[1]
-            return _ok(f'ok | confirm=SELECTED:{confirm_val}')
+            return _ok(already)
 
         trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'trigger'])
         if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled'):
@@ -503,14 +486,14 @@ def _err(msg):
     """Wrap an error string in ActionResult."""
     return ActionResult(extracted_content=str(msg), is_done=False, success=False)
 
-def build_controller(browser_context, form_rules, case_data_ref=None, exclude_actions=None):
+def build_controller(browser_context, form_rules, case_data_store=None, exclude_actions=None):
     from browser_use import Controller
     if exclude_actions is None:
         exclude_actions = ['input_text', 'select_dropdown_option']
     controller = Controller(exclude_actions=exclude_actions)
 
-    if case_data_ref is not None:
-        _register_case_data_actions(controller, case_data_ref)
+    if case_data_store is not None:
+        _register_case_data_actions(controller, case_data_store)
     _register_form_actions(controller, browser_context, form_rules)
     _register_navigation_actions(controller, browser_context)
     _register_table_actions(controller, browser_context)
