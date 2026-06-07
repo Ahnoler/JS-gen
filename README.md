@@ -255,6 +255,8 @@ Browser Use 执行结束后会生成轨迹 JSON 文件（`AgentHistoryList`）�
 | 模型列表为空 | Go 服务未连接 | 检查 opencode 登录状态 |
 | Agent 重复尝试同一动作 | 上下文溢出或 el-select readonly 误判 | 使用 session 模式分步执行 |
 | el-select 下拉框无法选择 | readonly 属性被误判为不可交互 | 已修复：select_option 不再检查 readonly |
+| select_option 返回成功但 LLM 仍重试下拉框 | Vue 未同步 DOM 的 `<input>.value`，LLM 读取到空值判定"未选中" | 已修复：select_option 成功后强制设 `trigger.value` 同步 DOM 状态，LLM 下次读到非空即判定已选中 |
+| `TypeError: dropdown.querySelectorAll is not a function` | `JS_FIND_VISIBLE_DROPDOWN` 为普通箭头函数而非 IIFE，被字符串拼接后成为函数引用而非执行结果 | 已修复：改为 `(() => { ... })()` IIFE |
 
 ## License
 

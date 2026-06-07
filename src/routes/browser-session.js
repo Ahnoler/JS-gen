@@ -240,7 +240,7 @@ export default function (app) {
           if (msg.event === 'reset_trajectory_ready') {
             clearTimeout(timeout);
             gb.process.stdout.removeListener('data', onData);
-            return res.json({ status: 'reset', cumulative_file: msg.data.cumulative_file });
+            return res.json({ status: 'reset', cumulative_file: msg.data.cumulative_file, case_data_file: msg.data.case_data_file });
           }
         } catch {}
       }

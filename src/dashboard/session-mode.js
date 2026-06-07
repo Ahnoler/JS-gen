@@ -425,6 +425,7 @@ export function initSessionMode() {
     // Reset cumulative trajectory for new test case
     sessLog('system', 'Clearing old trajectory...');
     try {
+      let resetData;
       for (let attempt = 0; attempt < 5; attempt++) {
         const r = await fetch('/api/browser/session/' + sessionId + '/reset-trajectory', { method: 'POST' });
         if (r.status === 409) {
@@ -432,7 +433,15 @@ export function initSessionMode() {
           await new Promise(resolve => setTimeout(resolve, 2000));
           continue;
         }
+        resetData = await r.json();
         break;
+      }
+      if (resetData && sessTrajPath) {
+        sessTrajPath.style.display = 'block';
+        const parts = [];
+        if (resetData.cumulative_file) parts.push('Trajectory: ' + resetData.cumulative_file);
+        if (resetData.case_data_file) parts.push('CaseData: ' + resetData.case_data_file);
+        sessTrajPath.textContent = parts.join(' | ');
       }
     } catch (e) { /* non-critical */ }
 
@@ -524,9 +533,12 @@ export function initSessionMode() {
       }
       if (!res.ok) throw new Error(((await res.json().catch(() => ({}))).error) || 'Server error');
       data = await res.json();
-      if (sessTrajPath && data.cumulative_file) {
+      if (sessTrajPath) {
         sessTrajPath.style.display = 'block';
-        sessTrajPath.textContent = 'Trajectory: ' + data.cumulative_file;
+        const parts = [];
+        if (data.cumulative_file) parts.push('Trajectory: ' + data.cumulative_file);
+        if (data.case_data_file) parts.push('CaseData: ' + data.case_data_file);
+        sessTrajPath.textContent = parts.join(' | ');
       }
       sessLog('success', 'New trajectory file: ' + (data.cumulative_file || 'ready'));
     } catch (err) {

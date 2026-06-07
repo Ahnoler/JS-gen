@@ -52,7 +52,7 @@ def _handle_reset_trajectory(session_id):
     case_data_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_data_{ts}.json"
     sys.stderr.write(f"[session] Trajectory + case data reset -> {cumulative_path}\n")
     sys.stderr.flush()
-    emit_json({"event": "reset_trajectory_ready", "data": {"cumulative_file": str(cumulative_path)}})
+    emit_json({"event": "reset_trajectory_ready", "data": {"cumulative_file": str(cumulative_path), "case_data_file": str(case_data_path)}})
     return cumulative_path, case_data_path
 
 
