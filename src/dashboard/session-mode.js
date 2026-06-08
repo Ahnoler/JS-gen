@@ -10,6 +10,7 @@ export function initSessionMode() {
   const sessStepBtn = document.getElementById('sessStepBtn');
   const sessTrajBtn = document.getElementById('sessTrajBtn');
   const sessResetTrajBtn = document.getElementById('sessResetTrajBtn');
+  const sessCaseDataBtn = document.getElementById('sessCaseDataBtn');
   const sessCancelBtn = document.getElementById('sessCancelBtn');
   const sessArchiveBtn = document.getElementById('sessArchiveBtn');
   const sessTask = document.getElementById('sessTask');
@@ -79,6 +80,7 @@ export function initSessionMode() {
 
     sessStepBtn.disabled = !stepEnabled;
     sessTrajBtn.disabled = !trajEnabled;
+    sessCaseDataBtn.disabled = !trajEnabled;
     if (sessResetTrajBtn) sessResetTrajBtn.disabled = !resetEnabled;
     sessCancelBtn.disabled = !cancelEnabled;
     sessArchiveBtn.disabled = !archiveEnabled;
@@ -320,7 +322,10 @@ export function initSessionMode() {
     try {
       const resp = await fetch('/api/browser/session/' + sessionId + '/step', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task, maxSteps }),
+        body: JSON.stringify({
+          task, maxSteps,
+          caseDataFile: document.getElementById('sessCaseDataFile')?.value?.trim() || undefined,
+        }),
         signal: sessAbortController.signal,
       });
       if (!resp.ok) { const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status })); throw new Error(err.error || 'Request failed'); }
@@ -555,6 +560,26 @@ export function initSessionMode() {
       sessLog('error', 'Save trajectory failed: ' + err.message);
     }
     sessTrajBtn.disabled = false;
+  });
+
+  sessCaseDataBtn.addEventListener('click', async () => {
+    const sessionId = sessActive.value;
+    if (!sessionId) return;
+    if (!confirm('Save case data to a JSON file? This will persist the current case data store.')) return;
+    sessCaseDataBtn.disabled = true;
+    sessLog('system', 'Saving case data...');
+    try {
+      const res = await fetch('/api/browser/session/' + sessionId + '/save-case-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Server error');
+      const data = await res.json();
+      sessLog('success', 'Case data saved: ' + data.caseDataFile + ' (' + data.keys + ' keys)');
+    } catch (err) {
+      sessLog('error', 'Save case data failed: ' + err.message);
+    }
+    sessCaseDataBtn.disabled = false;
   });
 
   sessResetTrajBtn.addEventListener('click', async () => {

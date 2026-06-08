@@ -10,6 +10,7 @@ export const HOST = process.env.HOST || '0.0.0.0';
 export const PROJECT_DIR = process.env.PROJECT_DIR || PROJECT_ROOT;
 export const GENERATED_DIR = path.join(PROJECT_DIR, 'scripts', 'generated');
 export const TRAJECTORIES_DIR = path.join(PROJECT_DIR, 'scripts', 'trajectories');
+export const CASE_DATA_DIR = path.join(PROJECT_DIR, 'scripts', 'case_data');
 export const SKILL_DIR = path.join(PROJECT_ROOT, '.opencode', 'skills', 'playwright-skill');
 export const TMP_DIR = process.env.TMPDIR || process.env.TMP || process.env.TEMP || os.tmpdir();
 export const STANDALONE_LLM = process.env.STANDALONE_LLM === 'true';

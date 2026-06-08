@@ -175,7 +175,11 @@ export function setupSSE(res) {
 }
 
 export function resolveModelId(model) {
-  if (model) return model;
+  if (model) {
+    // Strip providerID prefix if present (e.g. "deepseek/deepseek-v4-flash" -> "deepseek-v4-flash")
+    const parts = model.split('/');
+    return parts.length >= 2 && STANDALONE_LLM ? parts.slice(1).join('/') : model;
+  }
   if (!state.defaultModel) return 'deepseek/deepseek-chat';
   if (STANDALONE_LLM) return state.defaultModel.modelID;
   return `${state.defaultModel.providerID}/${state.defaultModel.modelID}`;

@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { STANDALONE_LLM, LLM_BASE_URL, LLM_API_KEY, PORT } from '../config.js';
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
+import { saveCaseDataRecord } from '../case-data-store.js';
 import {
   PYTHON_EXE, AGENT_SCRIPT, killTree, killOrphans,
   waitForReady, isProcessAlive, spawnAgent, setupSSE, resolveModelId,
@@ -108,14 +109,14 @@ export default function (app) {
     try { await ensureGlobalBrowser(modelId); } catch (err) { return res.status(500).json({ error: err.message }); }
 
     const gb = state.globalBrowser;
-    state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model, lastTask: null, lastMaxSteps: null });
+    state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model, lastTask: null, lastMaxSteps: null, caseDataFile: null });
     console.log(`[browser-session] Created session ${sessionId} (shared browser)`);
     res.json({ sessionId, model: gb.model });
   });
 
   app.post('/api/browser/session/:id/step', async (req, res) => {
     const { id } = req.params;
-    const { task, maxSteps } = req.body || {};
+    const { task, maxSteps, caseDataFile } = req.body || {};
     const gb = state.globalBrowser;
     if (!task) return res.status(400).json({ error: 'task is required' });
 
@@ -123,6 +124,9 @@ export default function (app) {
     if (!session) return res.status(404).json({ error: 'Session not found' });
     if (gb.busy) return res.status(409).json({ error: 'Browser is busy executing a step' });
     if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
+
+    // Store case data paths in session (first step sets them)
+    if (caseDataFile) session.caseDataFile = caseDataFile;
 
     gb.busy = true;
     const send = setupSSE(res);
@@ -146,7 +150,9 @@ export default function (app) {
     try { if (existsSync(cancelFlagPath)) unlinkSync(cancelFlagPath); } catch {}
 
     try {
-      gb.stdin.write(JSON.stringify({ event: 'step', data: { instruction: task, max_steps: maxSteps || 40 } }) + '\n');
+      const stepData = { instruction: task, max_steps: maxSteps || 40 };
+      if (session.caseDataFile) stepData.case_data_file = session.caseDataFile;
+      gb.stdin.write(JSON.stringify({ event: 'step', data: stepData }) + '\n');
     } catch (writeErr) {
       gb.busy = false;
       send('error', { message: `Failed to write step to agent: ${writeErr.message}` });
@@ -294,7 +300,6 @@ export default function (app) {
             try {
               const trajectoryId = createTrajectoryId();
               const { record, flow } = saveTrajectoryRecord({ trajectoryId, task: task || '', model: session.model, sourcePath: trajectoryFile, exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful } });
-              try { unlinkSync(trajectoryFile); } catch {}
               const actionCount = flow.filter(s => s.type !== 'done' && !s.error).length;
               return res.json({ trajectoryId, steps: record.stepCount, actions: actionCount, isSuccessful: record.isSuccessful });
             } catch (err) { return res.status(500).json({ error: `Trajectory save error: ${err.message}` }); }
@@ -304,6 +309,54 @@ export default function (app) {
     };
 
     function cleanupTrajListener() { gb.process.stdout.removeListener('data', onStdout); }
+    gb.process.stdout.on('data', onStdout);
+  });
+
+  app.post('/api/browser/session/:id/save-case-data', async (req, res) => {
+    const { id } = req.params;
+    const session = state.sessions.get(id);
+    const gb = state.globalBrowser;
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
+
+    try {
+      gb.stdin.write(JSON.stringify({ event: 'save_case_data' }) + '\n');
+    } catch (writeErr) {
+      return res.status(500).json({ error: `Failed to send save_case_data: ${writeErr.message}` });
+    }
+
+    const timeout = setTimeout(() => { cleanupListener(); if (!res.writableEnded) res.status(504).json({ error: 'Timeout waiting for case data' }); }, 15000);
+    let pendingBuffer = '';
+
+    const onStdout = (chunk) => {
+      pendingBuffer += chunk.toString();
+      const lines = pendingBuffer.split('\n');
+      pendingBuffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg.event === 'save_case_data_result') {
+            clearTimeout(timeout);
+            cleanupListener();
+            if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save case data' });
+            try {
+              const { record } = saveCaseDataRecord({
+                sourcePath: msg.data.case_data_file,
+                sessionId: id,
+                model: session.model,
+                description: session.lastTask ? session.lastTask.slice(0, 100) : '',
+              });
+              return res.json({ caseDataFile: msg.data.case_data_file, recordId: record.recordId, keys: msg.data.keys });
+            } catch (err) {
+              return res.json({ caseDataFile: msg.data.case_data_file, keys: msg.data.keys });
+            }
+          }
+        } catch {}
+      }
+    };
+
+    function cleanupListener() { gb.process.stdout.removeListener('data', onStdout); }
     gb.process.stdout.on('data', onStdout);
   });
 

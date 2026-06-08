@@ -14,6 +14,7 @@ import registerLLMProxyRoutes from './src/routes/llm-proxy.js';
 import registerExploreRoutes from './src/routes/explore-route.js';
 import registerBrowserSessionRoutes from './src/routes/browser-session.js';
 import registerTrajectoryRoutes from './src/routes/trajectory.js';
+import registerCaseDataRoutes from './src/routes/case-data.js';
 import registerSSERoutes from './src/routes/sse.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -29,6 +30,7 @@ const exploreLockRef = { value: false };
 registerExploreRoutes(app, exploreLockRef);
 registerBrowserSessionRoutes(app);
 registerTrajectoryRoutes(app);
+registerCaseDataRoutes(app);
 registerHealthRoutes(app);
 registerAgentRoutes(app);
 registerTestGenRoutes(app);

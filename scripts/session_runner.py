@@ -60,6 +60,25 @@ def _handle_save_trajectory(cumulative_path, session_id):
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
 
 
+def _handle_save_case_data(case_data_store, session_id):
+    try:
+        data_dir = Path(__file__).parent / 'data'
+        data_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        case_data_path = data_dir / f"case_data_{ts}.json"
+        import json as _json
+        with open(case_data_path, 'w', encoding='utf-8') as f:
+            _json.dump(case_data_store, f, ensure_ascii=False, indent=2)
+        sys.stderr.write(f"[session] Case data saved on demand: {case_data_path}\n")
+        sys.stderr.flush()
+        emit_json({
+            "event": "save_case_data_result",
+            "data": {"success": True, "case_data_file": str(case_data_path), "keys": len(case_data_store)},
+        })
+    except Exception as e:
+        emit_json({"event": "save_case_data_result", "data": {"success": False, "message": str(e)}})
+
+
 def _handle_reset_trajectory(session_id):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"
@@ -202,6 +221,10 @@ def _dispatch_event(msg, session_state):
         _handle_save_trajectory(session_state['cumulative_path'], session_state['session_id'])
         return 'continue'
 
+    if event == "save_case_data":
+        _handle_save_case_data(session_state['case_data_store'], session_state['session_id'])
+        return 'continue'
+
     if event == "reset_trajectory":
         cum_path = _handle_reset_trajectory(session_state['session_id'])
         session_state['cumulative_path'] = cum_path
@@ -258,6 +281,8 @@ async def run_session(args):
         'case_data_store': case_data_store,
     }
 
+    case_data_loaded = False
+
     while True:
         msg = await stdin_queue.get()
         if msg is None:
@@ -271,6 +296,21 @@ async def run_session(args):
 
             step_index += 1
             data = msg.get("data", {})
+
+            # Import case data from file on first step
+            case_data_file = data.get("case_data_file")
+            if case_data_file and not case_data_loaded:
+                try:
+                    with open(case_data_file, 'r', encoding='utf-8') as f:
+                        imported = json.load(f)
+                    case_data_store.update(imported)
+                    case_data_loaded = True
+                    sys.stderr.write(f"[session] Imported case data ({len(imported)} keys) from {case_data_file}\n")
+                    sys.stderr.flush()
+                except Exception as e:
+                    sys.stderr.write(f"[session] Failed to import case data: {e}\n")
+                    sys.stderr.flush()
+
             agent_running_ref['value'] = True
             output_path, task_text = await _run_agent_step(
                 data, step_index, session_id, args, llm, browser_context,

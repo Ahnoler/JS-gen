@@ -47,6 +47,7 @@
     <button class="tab-btn btn btn-sm" data-tab="explore">AI Explore</button>
     <button class="tab-btn btn btn-sm" data-tab="history">Playwright Scripts</button>
     <button class="tab-btn btn btn-sm" data-tab="trajectories">Trajectories</button>
+    <button class="tab-btn btn btn-sm" data-tab="caseData">Case Data</button>
     <button class="tab-btn btn btn-sm" data-tab="execRecords">Execution Records</button>
   </div>
 
@@ -230,6 +231,9 @@
           <input id="sessMaxSteps" type="number" value="40" min="5" max="200" style="width:70px;padding:3px 6px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px">
           <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">Active:</label>
           <select id="sessActive" style="flex:1;min-width:140px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">(none)</option></select>
+          <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">Case Data In:</label>
+          <input id="sessCaseDataFile" type="text" placeholder="D:\path\to\case_data.json" style="flex:1;min-width:100px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;font-family:var(--font-mono)" title="Absolute filesystem path to the case data JSON file">
+          <span style="font-size:10px;color:var(--slate-400);white-space:nowrap">(absolute path)</span>
         </div>
         <div class="form-group" style="padding:12px">
           <label>Test Case / Step Instruction <span style="font-weight:400;color:var(--slate-400)">(paste full scenario with &#12300;阶段N&#12301; markers to auto-split)</span></label>
@@ -238,6 +242,7 @@
         <div style="display:flex;gap:8px;padding:0 12px 12px;flex-wrap:wrap;align-items:center">
           <button id="sessStepBtn" class="btn btn-primary" disabled>&#9654; Execute Step</button>
           <button id="sessTrajBtn" class="btn btn-outline" disabled title="Save trajectory to trajectory store">Save Trajectory</button>
+          <button id="sessCaseDataBtn" class="btn btn-outline" disabled title="Save case data to JSON file" style="font-size:11px">Save Case Data</button>
           <button id="sessResetTrajBtn" class="btn btn-outline" disabled title="Reset cumulative trajectory file (start a fresh recording)" style="font-size:11px">Reset Traj</button>
           <button id="sessCancelBtn" class="btn btn-outline" disabled>&#10005; Cancel</button>
           <button id="sessArchiveBtn" class="btn btn-outline" disabled title="Archive session to execution records">Archive</button>
@@ -358,6 +363,50 @@
         Full Trajectory JSON
       </div>
       <pre id="trajDetailJson" style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:var(--radius-sm);font-size:12px;line-height:1.6;overflow:auto;max-height:500px;font-family:var(--font-mono)"></pre>
+    </div>
+  </div>
+
+  <!-- Tab: Case Data -->
+  <div id="tabCaseData" class="tab-panel" style="display:none">
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+          Case Data History
+        </div>
+        <button id="caseDataRefreshBtn" class="btn btn-outline btn-sm">Refresh</button>
+      </div>
+      <div id="caseDataLoading" style="display:none;text-align:center;padding:20px;color:var(--slate-400)">Loading...</div>
+      <div id="caseDataEmpty" class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p>No saved case data yet — use Save Case Data button in Session mode</p>
+      </div>
+      <div id="caseDataList" style="display:none">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="border-bottom:2px solid var(--slate-200)"><th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Record ID</th><th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Description</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Keys</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Created</th><th style="padding:8px;color:var(--slate-500);font-weight:600">Actions</th></tr></thead>
+          <tbody id="caseDataBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Detail panel -->
+    <div class="card" id="caseDataDetailPanel" style="display:none">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Case Data Detail — <span id="caseDataDetailId" style="font-family:var(--font-mono);font-size:12px;color:var(--indigo-600)"></span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button id="caseDataDetailCloseBtn" class="btn btn-sm btn-outline">Close</button>
+        </div>
+      </div>
+      <div id="caseDataDetailInfo" style="font-size:13px;color:var(--slate-600);margin-bottom:12px">Loading...</div>
+      <div id="caseDataDetailSummary" style="font-size:13px;color:var(--slate-400);padding:8px 12px;background:var(--slate-50);border-radius:var(--radius-sm);margin-bottom:12px"></div>
+      <div class="section-title" style="font-size:13px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Case Data JSON
+      </div>
+      <pre id="caseDataDetailJson" style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:var(--radius-sm);font-size:12px;line-height:1.6;overflow:auto;max-height:500px;font-family:var(--font-mono)"></pre>
     </div>
   </div>
 
