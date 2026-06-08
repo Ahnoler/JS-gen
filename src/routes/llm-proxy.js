@@ -99,7 +99,7 @@ async function handleStandaloneCompletion(req, res) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${LLM_API_KEY}`,
       },
-      body: JSON.stringify({ model: modelId, messages, temperature, tools, tool_choice }),
+      body: JSON.stringify({ model: modelId, messages, temperature, tools, tool_choice, thinking: { type: 'disabled' } }),
     });
 
     if (!resp.ok) {

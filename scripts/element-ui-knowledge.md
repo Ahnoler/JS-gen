@@ -45,8 +45,7 @@ Select an option in an **el-select** dropdown by its form label.
 **Return values:**
 | Value | Meaning |
 |-------|---------|
-| `"ok \| confirm=SELECTED:XXX"` | Success. Option XXX was selected and confirmed. |
-| `"ok \| confirm=SELECTED:..."` | Success. The dropdown shows the selected value. |
+| `"ok \| ok:XXX"` | Success. Option XXX was selected. |
 | `"triggered"` | Dropdown was opened. If you see this without a confirm, reopen next step. |
 | `"already:XXX"` | **Field already has value XXX. No action needed. Stop here.** |
 | `"label-not-found"` | No el-form-item with matching label text. |

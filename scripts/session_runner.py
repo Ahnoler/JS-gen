@@ -24,6 +24,20 @@ from .recorder import build_recording_hooks
 from .form_rules import load_rules
 
 
+_last_agent = None
+
+
+def _close_agent():
+    global _last_agent
+    if _last_agent is not None:
+        try:
+            for t in getattr(_last_agent, '_tasks', []):
+                t.cancel()
+        except Exception:
+            pass
+        _last_agent = None
+
+
 def _handle_save_trajectory(cumulative_path, session_id):
     if not cumulative_path.exists():
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": "No trajectory data available"}})
@@ -83,11 +97,15 @@ def _accumulate_trajectory(output_path, cumulative_path):
 async def _run_agent_step(instruction, step_index, session_id, args, llm, browser_context,
                           controller, extend_system_message, goal_tracker, cancel_flag_path,
                           on_step_start_hook, on_step_end_hook, case_data_ref, cumulative_path):
+    global _last_agent
     max_steps = instruction.get("max_steps", 40)
     task_text = instruction.get("instruction", "")
     if not task_text:
         emit_json({"event": "error", "data": {"message": "instruction is required"}})
         return None, None
+
+    # Close previous agent before creating new one
+    _close_agent()
 
     if cancel_flag_path.exists():
         try:
@@ -128,6 +146,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         register_new_step_callback=make_step_callback(step_index * 100),
         register_done_callback=make_done_callback(output_path),
     )
+    _last_agent = agent
     sys.stderr.write(f"[session] Agent created, starting run...\n"); sys.stderr.flush()
 
     try:

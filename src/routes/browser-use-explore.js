@@ -3,7 +3,7 @@ import { writeFileSync, existsSync, unlinkSync, readdirSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { PROJECT_DIR, STANDALONE_LLM, LLM_BASE_URL, LLM_API_KEY } from '../config.js';
+import { PROJECT_DIR, STANDALONE_LLM, LLM_BASE_URL, LLM_API_KEY, PORT } from '../config.js';
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
 
@@ -185,8 +185,8 @@ export default function (app) {
 
     // Build args
     const pythonArgs = isMultiPhase
-      ? ['--workflow', workflowPath, '--model', modelId, '--base-url', LLM_BASE_URL, '--api-key', LLM_API_KEY, '--output', outputPath]
-      : ['--task', task, '--model', modelId, '--base-url', LLM_BASE_URL, '--api-key', LLM_API_KEY, '--output', outputPath];
+      ? ['--workflow', workflowPath, '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY, '--output', outputPath]
+      : ['--task', task, '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY, '--output', outputPath];
 
     child = spawn(PYTHON_EXE, [AGENT_SCRIPT, ...pythonArgs], {
       cwd: PROJECT_DIR,
@@ -462,7 +462,7 @@ export default function (app) {
       '--session',
       '--session-id', 'global',
       '--model', modelId,
-      '--base-url', LLM_BASE_URL,
+      '--base-url', `http://localhost:${PORT}/v1`,
       '--api-key', LLM_API_KEY,
     ], {
       cwd: PROJECT_DIR,

@@ -93,6 +93,10 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 5. **"引入" button across multiple fields**: when a disabled field is empty and has no button in its own `.el-form-item`, search nearby `.el-form-item` elements for a `button.el-button--primary.is-plain` with text "引入". Click it to auto-fill all related disabled fields. The button is typically on the last related field (e.g. 法定代表人/负责人证件号码).
 6. **General rule for disabled fields**: disabled field + empty value + no adjacent "引入"/"选择" button → skip (truly read-only). Disabled field + empty value + adjacent button found → click the button to fill.
 
+
+# 🚨 CASCADING EMPTY DROPDOWN RULE
+- If `select_option` returns `"no-items"` or `"option-not-found:..."` with items clearly from OTHER fields, the cascading dropdown has no data. **Skip this field** — fill the next required field or click submit. This applies to 乡镇/街道, 行政村/社区 with no data for the selected district.
+
 # 🚨 EL-SELECT RULES (CRITICAL — DO NOT IGNORE)
 1. For el-select dropdowns, you MUST use `select_option(label_text, option_text)`.
 2. **NEVER use `click_element(index)` to click on a dropdown option** — it clicks the inner `<span>` text, not the `<li>` item that Vue listens on. The click appears to succeed but nothing happens, causing infinite loops.
@@ -154,7 +158,7 @@ def get_element_ui_knowledge(script_dir=None):
 
 
 def patch_message_manager():
-    """Monkey-patch MessageManager to limit context size."""
+    """Monkey-patch MessageManager to limit context size while preserving tool/tool_calls pairing."""
     from browser_use.agent.message_manager.service import MessageManager
     
     _original_get_messages = MessageManager.get_messages
@@ -165,7 +169,16 @@ def patch_message_manager():
         total = len(msgs)
         if total <= MAX_RECENT + 2:
             return msgs
-        trimmed = msgs[:2] + msgs[-(MAX_RECENT):]
+        tail = msgs[-(MAX_RECENT):]
+        # Ensure tool/tool_calls pairing: if tail starts with a tool message,
+        # include its preceding assistant message to avoid breaking the pair
+        first = tail[0]
+        role = getattr(first, 'role', '') or getattr(first, 'type', '')
+        if role == 'tool':
+            start = max(2, total - MAX_RECENT - 1)
+        else:
+            start = total - MAX_RECENT
+        trimmed = msgs[:2] + msgs[start:]
         return trimmed
     
     MessageManager.get_messages = _patched_get_messages

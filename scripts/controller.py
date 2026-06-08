@@ -169,12 +169,14 @@ JS_SELECT_OPTION = '''(option) => {
     const dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
     let items = dropdown.querySelectorAll('.el-select-dropdown__item');
     // Fallback: if no dropdown is visible (tssc-multi-select renders options outside),
-    // search at document level for all visible items
+    // search at document level — tssc-multi-select appends options outside the dialog
     if (items.length === 0 || dropdown === document) {
         items = document.querySelectorAll('.el-select-dropdown__item');
     }
     const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
     const tryClick = (item) => {
+        // Scroll item into view before clicking (handles long dropdowns with scroll)
+        item.scrollIntoView({ block: 'nearest' });
         // mousedown for tssc-multi-select, click for standard el-select
         item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
         item.click();
@@ -197,6 +199,11 @@ JS_SELECT_OPTION = '''(option) => {
         if (item.textContent.trim().includes(option)) {
             return tryClick(item);
         }
+    }
+    // Target not found — check if the current dropdown is truly empty (has "无数据")
+    const hasEmpty = document.querySelector('.el-select-dropdown__empty');
+    if (hasEmpty) {
+        return 'no-items';
     }
     return 'option-not-found:' + [...items].map(i => i.textContent.trim()).join(', ');
 }'''
@@ -298,7 +305,8 @@ def _register_form_actions(controller, browser_context, form_rules):
         if not select_result.startswith('ok'):
             confirm = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'confirm'])
             if confirm.startswith('SELECTED:'):
-                return _ok(f'ok | confirm={confirm}')
+                confirm_val = confirm.split(':', 1)[1]
+                return _ok(f'ok | ok:{confirm_val}')
             return _err(f'{select_result} | no-confirm')
 
         selected_text = select_result.split(':', 1)[1] if ':' in select_result else ''
@@ -331,7 +339,7 @@ def _register_navigation_actions(controller, browser_context):
                         tab.click(); return 'ok';
                     }
                 }
-                return _err('tab-not-found';)
+                return _err('tab-not-found');
             }
         ''', tab_name)
         await page.wait_for_timeout(800)
@@ -356,7 +364,7 @@ def _register_navigation_actions(controller, browser_context):
                         if (target) { setTimeout(() => target.click(), 300); return 'ok-expanded'; }
                     }
                 }
-                return _err('not-found';)
+                return _err('not-found');
             }
         ''', menu_text)
         await page.wait_for_timeout(500)
@@ -388,9 +396,9 @@ def _register_table_actions(controller, browser_context):
                         const delIcon = row.querySelector('i.el-icon-delete, i[class*="shanchu"], i[class*="delete"]');
                         if (delIcon && delIcon.offsetParent !== null) { delIcon.click(); return 'ok-icon'; }
                     }
-                    return _err('button-not-found-in-row';)
+                    return _err('button-not-found-in-row');
                 }
-                return _err('row-not-found';)
+                return _err('row-not-found');
             }
         ''', [row_text, button_text])
         await page.wait_for_timeout(500)
@@ -457,7 +465,7 @@ def _register_misc_actions(controller, browser_context):
             if (closeBtn) { closeBtn.click(); return 'ok'; }
             const cancelBtn = top.querySelector('.el-dialog__footer .el-button--default');
             if (cancelBtn) { cancelBtn.click(); return 'ok-cancel'; }
-            return _err('no-close-button';)
+            return _err('no-close-button');
         }''')
         await page.wait_for_timeout(500)
         return result

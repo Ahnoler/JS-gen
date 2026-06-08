@@ -1,7 +1,7 @@
 import { writeFileSync, existsSync, unlinkSync, readdirSync } from 'fs';
 import path from 'path';
 import os from 'os';
-import { STANDALONE_LLM, LLM_BASE_URL, LLM_API_KEY } from '../config.js';
+import { STANDALONE_LLM, LLM_API_KEY, PORT } from '../config.js';
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
 import {
@@ -137,8 +137,8 @@ export default function (app, exploreLockRef) {
     send('status', { phase: isMultiPhase ? 'workflow' : 'exploring', label: 'Browser Use Agent starting...', totalPhases: phases.length });
 
     const pythonArgs = isMultiPhase
-      ? ['--workflow', workflowPath, '--model', modelId, '--base-url', LLM_BASE_URL, '--api-key', LLM_API_KEY, '--output', ctx.outputPath]
-      : ['--task', task, '--model', modelId, '--base-url', LLM_BASE_URL, '--api-key', LLM_API_KEY, '--output', ctx.outputPath];
+      ? ['--workflow', workflowPath, '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY, '--output', ctx.outputPath]
+      : ['--task', task, '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY, '--output', ctx.outputPath];
 
     child = spawnAgent(pythonArgs);
     child.env.OPENAI_API_KEY = LLM_API_KEY;

@@ -2,7 +2,7 @@ import { writeFileSync, existsSync, unlinkSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { STANDALONE_LLM, LLM_BASE_URL, LLM_API_KEY } from '../config.js';
+import { STANDALONE_LLM, LLM_BASE_URL, LLM_API_KEY, PORT } from '../config.js';
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
 import {
@@ -23,7 +23,7 @@ async function ensureGlobalBrowser(modelId) {
   gb.stepIndex = 0;
   killOrphans();
 
-  const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', LLM_BASE_URL, '--api-key', LLM_API_KEY], { OPENAI_API_KEY: LLM_API_KEY });
+  const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY], { OPENAI_API_KEY: LLM_API_KEY });
 
   child.stderr.on('data', (chunk) => { console.log('[browser-global stderr] ' + chunk.toString().trimEnd()); });
   child.on('exit', () => {
@@ -108,7 +108,7 @@ export default function (app) {
     try { await ensureGlobalBrowser(modelId); } catch (err) { return res.status(500).json({ error: err.message }); }
 
     const gb = state.globalBrowser;
-    state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model });
+    state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model, lastTask: null, lastMaxSteps: null });
     console.log(`[browser-session] Created session ${sessionId} (shared browser)`);
     res.json({ sessionId, model: gb.model });
   });
@@ -140,6 +140,8 @@ export default function (app) {
     });
 
     const stepIndex = session.stepIndex + 1;
+    session.lastTask = task;
+    session.lastMaxSteps = maxSteps || 40;
     const cancelFlagPath = path.join(os.tmpdir(), 'browser_use_cancel_global');
     try { if (existsSync(cancelFlagPath)) unlinkSync(cancelFlagPath); } catch {}
 
@@ -181,6 +183,20 @@ export default function (app) {
 
     gb.process.stdout.on('data', onStdout);
     gb.process.on('exit', onProcessExit);
+  });
+
+  app.post('/api/browser/session/:id/continue', async (req, res) => {
+    const { id } = req.params;
+    const session = state.sessions.get(id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!session.lastTask) return res.status(400).json({ error: 'No previous task to continue' });
+    // Re-route to /step with saved task
+    req.body = { task: session.lastTask, maxSteps: session.lastMaxSteps };
+    req.params.id = id;
+    // Find and call the step handler directly
+    const stepRoute = app._router.stack.find(r => r.route && r.route.path === '/api/browser/session/:id/step' && r.route.methods.post);
+    if (stepRoute) stepRoute.handle(req, res);
+    else res.status(500).json({ error: 'Step handler not found' });
   });
 
   app.delete('/api/browser/session/:id', (req, res) => {

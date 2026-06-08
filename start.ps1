@@ -28,8 +28,8 @@ try {
 $env:PORT = $Port
 $env:HOST = "0.0.0.0"
 $env:STANDALONE_LLM = "true"
-$env:LLM_BASE_URL = "http://218.77.58.156:3000/v1"
-$env:LLM_API_KEY = "sk-doztyto0q15adCFi17IVjN4oQ1j6p31fLYVWkqCHgteJkDcP"
+$env:LLM_BASE_URL = "https://api.deepseek.com"
+$env:LLM_API_KEY = "sk-6d59343057ea48b3ac7621705514dca0"
 $env:PYTHON_EXE = "D:\anaconda3\envs\browser_use\python.exe"
 
 Write-Host ""
