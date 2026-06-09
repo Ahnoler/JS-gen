@@ -172,7 +172,7 @@ export function initScriptPipeline() {
     const statusEl = document.getElementById('genStatus');
 
     const trajPromptContent = document.getElementById('trajPromptContent');
-    const trajPrompt = trajPromptContent.textContent.trim();
+    const trajPrompt = (trajPromptContent.value || '').trim();
     if (trajPrompt) {
       description = description ? trajPrompt + '\n\n' + description : trajPrompt;
     }
@@ -318,7 +318,7 @@ export function initScriptPipeline() {
 
   // Trajectory prompt clear button
   document.getElementById('trajPromptClearBtn').addEventListener('click', () => {
-    document.getElementById('trajPromptContent').textContent = '';
+    document.getElementById('trajPromptContent').value = '';
     document.getElementById('trajPromptCard').style.display = 'none';
   });
 

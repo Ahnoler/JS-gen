@@ -524,26 +524,28 @@ def _register_misc_actions(controller, browser_context):
     async def click_element_by_index(index: int):
         """Replacement for default click_element_by_index: detects adjacent buttons and redirects."""
         page = await browser_context.get_current_page()
-        skip = await page.evaluate('''() => {
-            const btns = document.querySelectorAll('button');
-            for (const btn of btns) {
-                if (btn.offsetParent === null) continue;
-                const text = btn.textContent?.trim() || '';
-                if (text !== '选择' && text !== '引入') continue;
-                const fi = btn.closest('.el-form-item');
-                if (!fi) continue;
+        # Get the element being clicked and check its text
+        try:
+            element_node = await browser_context.get_dom_element_by_index(index)
+            btn_text = element_node.get_all_text_till_next_clickable_element(max_depth=2).strip()
+        except Exception:
+            btn_text = ''
+        # Only check if the SPECIFIC clicked element is a 选择/引入 button
+        if btn_text in ('选择', '引入'):
+            skip = await page.evaluate('''() => {
+                const fi = document.querySelector('.el-form-item:has(button)');
+                if (!fi) return false;
                 const inp = fi.querySelector('.el-input__inner');
                 if (inp && inp.value && inp.value.trim() !== '') {
                     const lbl = fi.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                    return { skip: true, label: lbl, btnText: text };
+                    return { skip: true, label: lbl, btnText: '选择' };
                 }
-            }
-            return { skip: false };
-        }''')
-        if skip.get('skip'):
-            return _ok(f'skip: {skip["label"]} already filled — do not re-click "{skip["btnText"]}". Use click_adjacent_button if needed.')
+                return false;
+            }''')
+            if skip:
+                return _ok(f'skip: {skip["label"]} already filled — do not re-click "{skip["btnText"]}". Use click_adjacent_button if needed.')
+        # Perform normal click
         try:
-            element_node = await browser_context.get_dom_element_by_index(index)
             download_path = await browser_context._click_element_node(element_node)
             if download_path:
                 return _ok(f'downloaded:{download_path}')

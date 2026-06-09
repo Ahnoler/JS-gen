@@ -174,7 +174,7 @@ async function sendToScriptGen(trajectoryId) {
     const genTab = document.querySelector('.tab-btn[data-tab="gen"]');
     if (genTab) genTab.click();
 
-    document.getElementById('trajPromptContent').textContent = desc;
+    document.getElementById('trajPromptContent').value = desc;
     document.getElementById('trajPromptCard').style.display = '';
     document.getElementById('genDesc').value = '';
     document.getElementById('genUrl').value = '';

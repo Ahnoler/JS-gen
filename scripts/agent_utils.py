@@ -67,7 +67,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - **`input_text` is NOT available** — use `fill_form_field` for all text inputs inside el-form-item
 - **`select_dropdown_option` is NOT available** — use `select_option` for el-select, or native `<select>` handling
 - go_to_url(url), go_back(), send_keys(keys)
-- **`scroll(down|up)` is NOT available** — use `select_option` or keyboard navigation to find dropdown options
+- **`scroll(down|up)` is NOT available** — use `select_option` to find dropdown options
 - wait(ms) — wait milliseconds
 - extract_content(goal) — extract page content
 - done(text, success) — call ONLY when task is fully complete
@@ -95,6 +95,13 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 5. **"引入" button across multiple fields**: when a disabled field is empty and has no button in its own `.el-form-item`, search nearby `.el-form-item` elements for a `button.el-button--primary.is-plain` with text "引入". Click it to auto-fill all related disabled fields. The button is typically on the last related field (e.g. 法定代表人/负责人证件号码).
 6. **General rule for disabled fields**: disabled field + empty value + no adjacent "引入"/"选择" button → skip (truly read-only). Disabled field + empty value + adjacent button found → click the button to fill.
 7. **Adjacent button pre-check**: use `click_adjacent_button(label_text)` instead of `click_element_by_index` for "选择" and "引入" buttons. This action checks if the field already has a value first — if it does, it returns "already-filled" and does NOT click the button. **Do NOT use `click_element_by_index` for buttons that open dialogs or import data.**
+8. **"引入" button dialog flow**: after clicking "引入", a customer search dialog opens. The dialog requires searching for the personal customer saved in Phase 3.
+   a. Use `read_case_data("personal_customer_name")` to get the saved customer name
+   b. Fill the **客户名称** search field with that name via `fill_form_field`
+   c. Click **查询** button
+   d. Wait for results, then click the **radio button in the first result row** to select it
+   e. Click **确认** button — the three disabled legal person fields will be auto-filled
+   f. If no results found, try searching by **证件号码** instead using `read_case_data("personal_customer_id")`
 
 
 # 🚨 CASCADING EMPTY DROPDOWN RULE
@@ -103,7 +110,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 # 🚨 EL-SELECT RULES (CRITICAL — DO NOT IGNORE)
 1. For el-select dropdowns, you MUST use `select_option(label_text, option_text)`.
 2. **NEVER use `click_element(index)` to click on a dropdown option** — it clicks the inner `<span>` text, not the `<li>` item that Vue listens on. The click appears to succeed but nothing happens, causing infinite loops.
-3. **`scroll(down|up)` is NOT available.** Dropdown popups are fixed-position — page scrolling does NOT move them. Use `select_option` which searches at document level and finds all options regardless of scroll position. If the option exists but is scrolled out of view, `select_option` will still find and click it.
+3. **`scroll(down|up)` is NOT available.** Dropdown popups are fixed-position — page scrolling does NOT move them. **`send_keys("ArrowDown"/"ArrowUp")` also does NOT work** for scrolling within `tssc-multi-select` dropdowns. Use `select_option` which searches at document level and finds all options regardless of scroll position.
 4. If `select_option` returns `"already:XXX"` — the field already has value XXX. **Stop. Do NOT try to select again.**
 5. If `select_option` returns `"option-not-found:..."` — use `send_keys("ArrowDown")` then `send_keys("Enter")` as fallback.
 6. After selecting, verify the value changed by checking the return value.
@@ -113,7 +120,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 # 🚨 VALIDATION & SUBMIT RULES (CRITICAL)
 1. After filling ALL form fields, click the submit/save button. Do NOT keep checking or re-filling fields.
 2. If `.el-form-item__error` red text appears (client-side validation error): use `match_form_rule(label_text)` to generate a valid value, fill it via `fill_form_field` or `select_option`, then click submit/save immediately. **Do not check if the red text disappeared** — just fill, submit, and repeat if the server returns another error.
-3. If an `el-notification` popup appears: read the error text, then call `close_dialog()` to dismiss it, then fix the field mentioned in the error, then click submit/save again.
+3. If an `el-notification` popup appears: read the error text, then call `close_dialog()` to dismiss it (`close_dialog()` returns the notification text). **If the error mentions "证件号码", call `match_form_rule("证件号码")` to generate a valid value, then fill it.** Then click submit/save again. Do NOT manually guess or type values — the format rules are complex and guessing will fail.
 4. Do NOT go back to re-select or re-fill fields that already returned "already:XXX", "ok", or "field-disabled".
 5. The ONLY way to verify if the form is correct is to click submit and check the result.
 
@@ -123,18 +130,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 3. If a page transition occurs after an action (navigation, submit), wait for the new page to load before proceeding.
 4. If stuck, try alternative approaches (different selector, scroll, go_back, new tab).
 5. Only call done(success=false) if max steps reached without completing the task.
-6. When the task includes dict recording ("记录到 /dictList/..."): follow this strict 3-phase sequence. **Never go back to an earlier phase.**
-
-   **Phase A — FILL ALL fields first.** Use `select_option` / `fill_form_field` for each field.
-   Once ALL fields return `"already:XXX"` or `"ok"`, Phase A is complete.
-
-   **Phase B — THEN save ALL to case data.** Use `save_case_data(key, value)` for each field.
-   Once ALL fields return `"saved:..."`, Phase B is complete.
-
-   **Phase C — THEN click submit/save.** Click the save/submit button. Do NOT revisit any field.
-
-   ⚠️ Do NOT interleave phases. Complete Phase A fully before starting Phase B.
-   ⚠️ If a field already returned "already:XXX" in Phase A, do NOT touch it again. Skip to next field.
+6. **When the task says "记录"/"保存"/"带出" data (e.g. "记录客户编号、姓名、证件号码", "保存查询结果", "带出数据"): use `save_case_data(key, value)` to persist each value.** The next phase will need this data via `read_case_data(key)`. If you only see the data on screen without saving it, it will be lost after the page changes. Key naming: use descriptive English keys like `legal_rep_name`, `legal_rep_id`, `customer_no`, etc.
 
 # NAVIGATION & ERRORS
 - Navigate first, then wait for page load. Use extract_content to understand the page.

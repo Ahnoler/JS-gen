@@ -50,62 +50,51 @@ _GEN_MAP = {
     'genEmployeeId': lambda: 'EMP' + f"{_random.randint(100,999)}",
 }
 
-_FALLBACK_RULES = [
-    (['身份证','身份证号','证件号码','居民身份证'], _gen_idcard),
-    (['单位电话','固定电话','座机'], _gen_landline),
-    (['手机','电话','联系方式','联系电话','电话号码'], _gen_mobile),
-    (['邮箱','Email','电子邮箱'], _gen_email),
-    (['信用代码','统一社会信用代码'], _gen_credit_code),
-    (['银行卡','银行卡号','银行账号'], _gen_bankcard),
-    (['金额','价格','费用','工资','收入'], _gen_amount),
-    (['姓名','用户名','联系人'], _gen_name),
-    (['地址','详细地址','联系地址'], _gen_address),
-    (['QQ','QQ号','QQ号码'], lambda: ''.join(str(_random.randint(0,9)) for _ in range(_random.randint(5,11)))),
-    (['年龄'], lambda: str(_random.randint(18,65))),
-    (['工号','员工编号'], lambda: 'EMP' + f"{_random.randint(100,999)}"),
-    (['邮编','邮政编码'], lambda: '100000'),
-    (['案例类型','类型'], lambda: 'SELECT: 功能测试 / 性能测试 / 安全测试 / 兼容性测试 / 回归测试. Choose based on test context.'),
-    (['案例性质','性质'], lambda: 'SELECT: 正向案例 / 反向案例. Choose based on test context.'),
-    (['预期结果','预期'], lambda: 'FORMAT: Each line starts with ^^N^^ (N=1,2,3...). Example:\n^^1^^ 交易状态，[成功/失败]\n^^2^^ 系统提示[具体描述]\nPositive case → describe success. Negative case → describe rejection/error.'),
-    (['操作步骤'], lambda: 'FORMAT: Numbered lines "N、操作描述". Reference elements with <<name>>, fields with 「name」.'),
-    (['案例名称','名称'], lambda: 'FORMAT: 正向: "验证[功能]正向流程". 反向: "反向验证：[场景]"'),
-    (['案例描述','描述'], lambda: 'FORMAT: 1-3 sentences. Example: "1. 系统应正确处理正常输入\\n2. 提交后出现操作成功提示"'),
-    (['前置条件','前置'], lambda: 'FORMAT: Pre-condition state. Example: "已登录系统，进入XX页面"'),
-    (['测试数据','数据'], lambda: 'FORMAT: Key-value pairs. Example: 客户名称：空值\\n证件号码：110101199001011234'),
-    (['测试意图','意图','检查点'], lambda: 'FORMAT: 1-2 sentences. Example: "验证新增潜客时输入非法数据，系统应拦截并提示错误"'),
-]
-
 
 def load_rules(script_dir=None):
-    """Load form rules from ATP skill SKILL.md, falling back to _FALLBACK_RULES."""
+    """Load form rules from ATP skill SKILL.md — single source of truth."""
     if script_dir is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # Start with fallback rules as base
-    rules = _FALLBACK_RULES[:]
-    
-    # Try to load additional rules from atp-rule SKILL.md
     skill_path = os.path.join(script_dir, '..', '.opencode', 'skills', 'atp-rule', 'SKILL.md')
     if not os.path.exists(skill_path):
-        sys.stderr.write(f"[rules] SKILL.md not found at {skill_path}, using fallback rules\n")
+        sys.stderr.write(f"[rules] SKILL.md not found at {skill_path}, no rules loaded\n")
         sys.stderr.flush()
-        return rules
+        return []
     
     try:
         with open(skill_path, 'r', encoding='utf-8') as f:
             content = f.read()
     except:
-        return rules
+        sys.stderr.write(f"[rules] Failed to read SKILL.md\n")
+        sys.stderr.flush()
+        return []
     
-    # Parse generator table from SKILL.md
-    gen_table = re.findall(r'\| `([^`]+)`.*?\| `(\w+)\(\)`', content)
+    rules = []
+    
+    # Parse generator table: | `关键词1`、`关键词2`... | `genFunc()` | ... |
+    gen_table = re.findall(r'\|\s*`([^`]+(?:`、`[^`]+)*)`\s*\|\s*`(\w+)\(\)`', content)
     for keywords_str, func_name in gen_table:
         kws = [k.strip() for k in keywords_str.replace('`', '').split('、')]
         gen = _GEN_MAP.get(func_name)
         if gen:
             rules.append((kws, gen))
     
-    sys.stderr.write(f"[rules] Loaded {len(rules)} rule groups\n")
+    # Parse format templates: | `关键词`... | format spec | example |
+    fmt_rows = re.findall(r'\| `([^`]+)`\s*\|([^|]+?)\s*\|[^|]*\|', content)
+    for keywords_str, spec in fmt_rows:
+        kws = [k.strip().replace('`','') for k in keywords_str.split('、')]
+        spec_text = spec.strip().replace('`', '').strip()
+        rules.append((kws, lambda s=spec_text: s))
+    
+    # Parse code value selects: | `关键词`... | `可选值`... | description |
+    sel_rows = re.findall(r'\| `([^`]+)`\s*\| `([^`]+)`\s*\|', content)
+    for keywords_str, options_str in sel_rows:
+        kws = [k.strip().replace('`','') for k in keywords_str.split('、')]
+        opts_text = options_str.replace('`', '').strip()
+        rules.append((kws, lambda o=opts_text: f'SELECT: {o}. Choose based on context.'))
+    
+    sys.stderr.write(f"[rules] Loaded {len(rules)} rule groups from SKILL.md\n")
     sys.stderr.flush()
     return rules
 

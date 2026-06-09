@@ -1,10 +1,21 @@
 ---
 name: atp-rule
 description: |
-  Smart value generation rules for Playwright test script generation. Contains keyword-to-value mapping tables (random generators for ID card, phone, email, etc.), format templates (expected results, operation steps, etc.), and enum code selectors (case type, case nature, etc.). Used by atp-ui to generate realistic test data in Playwright scripts. Part of the Playwright script generation knowledge base.
+  Smart value generation rules for form field test data. Covers random generators (ID card, phone, email, credit code, etc.), format templates, and enum code selectors. Used by atp-ui for Playwright script generation, and by the browser agent at runtime via match_form_rule(). When form validation fails, call match_form_rule(label_text) to get a valid value.
 ---
 
 # atp-rule — Playwright 脚本测试数据生成规则
+
+> **Agent 操作指南**：表单字段验证失败时（`.el-form-item__error` 红字或 `el-notification` 弹窗提示），直接调用 `match_form_rule(label_text)` 生成合法随机值填入。
+> 
+> `match_form_rule("证件号码")` → 18位统一社会信用代码
+> `match_form_rule("身份证")` → 18位身份证号（含合法校验位）
+> `match_form_rule("手机")` → 11位手机号
+> `match_form_rule("姓名")` → 随机中文姓名
+> `match_form_rule("统一社会信用代码")` → 18位信用代码
+> `match_form_rule("地址")` → 随机地址
+> 
+> **不要手动猜测格式**——使用 `match_form_rule` 保证值合法，然后直接提交。
 
 在编写 Playwright 脚本时，**必须**先扫描页面上所有表单字段的 label 文本，与下方的规则表进行关键词匹配。命中后按类型处理：
 

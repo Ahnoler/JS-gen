@@ -100,7 +100,7 @@
           </div>
           <button id="trajPromptClearBtn" class="btn btn-sm btn-outline">Clear</button>
         </div>
-        <div id="trajPromptContent" style="font-size:13px;color:var(--slate-600);padding:12px;background:var(--slate-50);border-radius:var(--radius-sm);white-space:pre-wrap;font-family:var(--font-mono);line-height:1.6;max-height:400px;overflow:auto"></div>
+        <textarea id="trajPromptContent" style="font-size:13px;color:var(--slate-600);padding:12px;background:var(--slate-50);border-radius:var(--radius-sm);font-family:var(--font-mono);line-height:1.6;min-height:150px;width:100%;border:none;resize:vertical;outline:none;box-sizing:border-box"></textarea>
       </div>
 
       <div class="card">
@@ -210,6 +210,33 @@
 
     <!-- Multi-Turn Session Mode -->
     <div id="exploreSession" style="display:none">
+      <!-- Login & Navigate -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M13 12H3"/></svg>
+            Login &amp; Navigate
+          </div>
+          <button id="sessLoginToggle" class="btn btn-sm btn-outline">Show</button>
+        </div>
+        <div id="sessLoginSection" style="display:none;padding:12px">
+          <div class="form-group">
+            <label>Target URL</label>
+            <input id="sessLoginUrl" type="text" placeholder="http://example.com/login">
+          </div>
+          <div style="display:flex;gap:8px">
+            <div class="form-group" style="flex:1">
+              <label>Username</label>
+              <input id="sessLoginUser" type="text" placeholder="Username">
+            </div>
+            <div class="form-group" style="flex:1">
+              <label>Password</label>
+              <input id="sessLoginPass" type="password" placeholder="Password">
+            </div>
+          </div>
+          <button id="sessLoginBtn" class="btn btn-primary">Login &amp; Navigate</button>
+        </div>
+      </div>
       <!-- Session Management -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-header">
@@ -228,7 +255,7 @@
           <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">Model:</label>
           <select id="sessModel" style="flex:1;min-width:180px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">Loading...</option></select>
           <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">Max Steps:</label>
-          <input id="sessMaxSteps" type="number" value="40" min="5" max="200" style="width:70px;padding:3px 6px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px">
+          <input id="sessMaxSteps" type="number" value="100" min="5" max="200" style="width:70px;padding:3px 6px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px">
           <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">Active:</label>
           <select id="sessActive" style="flex:1;min-width:140px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">(none)</option></select>
           <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">Case Data In:</label>
@@ -236,8 +263,13 @@
           <span style="font-size:10px;color:var(--slate-400);white-space:nowrap">(absolute path)</span>
         </div>
         <div class="form-group" style="padding:12px">
-          <label>Test Case / Step Instruction <span style="font-weight:400;color:var(--slate-400)">(paste full scenario with &#12300;阶段N&#12301; markers to auto-split)</span></label>
-          <textarea id="sessTask" rows="5" placeholder="Paste test case scenario here or describe a single step..."></textarea>
+          <label>Test Case / Step Instruction</label>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <button id="sessUploadBtn" class="btn btn-sm btn-outline">Upload Case File</button>
+            <input id="sessFileInput" type="file" accept=".md" style="display:none">
+            <span id="sessFileName" style="font-size:12px;color:var(--slate-400);flex:1"></span>
+          </div>
+          <textarea id="sessTask" rows="5" placeholder="Paste test case content here or click Upload to load a .md file..."></textarea>
         </div>
         <div style="display:flex;gap:8px;padding:0 12px 12px;flex-wrap:wrap;align-items:center">
           <button id="sessStepBtn" class="btn btn-primary" disabled>&#9654; Execute Step</button>

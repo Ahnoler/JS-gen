@@ -24,6 +24,15 @@ export function initSessionMode() {
   const sessTrajPath = document.getElementById('sessTrajPath');
   const exploreLogTerminal = document.getElementById('exploreLogTerminal');
   const sessCloseBrowserBtn = document.getElementById('sessCloseBrowserBtn');
+  const sessUploadBtn = document.getElementById('sessUploadBtn');
+  const sessFileInput = document.getElementById('sessFileInput');
+  const sessFileName = document.getElementById('sessFileName');
+  const sessLoginToggle = document.getElementById('sessLoginToggle');
+  const sessLoginSection = document.getElementById('sessLoginSection');
+  const sessLoginUrl = document.getElementById('sessLoginUrl');
+  const sessLoginUser = document.getElementById('sessLoginUser');
+  const sessLoginPass = document.getElementById('sessLoginPass');
+  const sessLoginBtn = document.getElementById('sessLoginBtn');
 
   if (!sessNewBtn) return;
 
@@ -89,10 +98,10 @@ export function initSessionMode() {
     // Phase card execute buttons
     document.querySelectorAll('.sess-phase-exec').forEach(btn => { btn.disabled = locked; });
 
-    const hasPhaseMarkers = (sessTask && sessTask.value.trim().includes('【阶段'));
+    const hasPhaseMarkers = (sessTask && (sessTask.value.trim().includes('【阶段') || /^##\s+Phase\s+\d+/m.test(sessTask.value.trim())));
     if (loadEnabled) {
       sessLoadBtn.disabled = !hasPhaseMarkers;
-      sessLoadBtn.title = hasPhaseMarkers ? 'Parse test case into phases' : 'Add 【阶段N：xxx】 markers to the task first';
+      sessLoadBtn.title = hasPhaseMarkers ? 'Parse test case into phases' : 'Add 【阶段N：xxx】 or ## Phase N: markers first';
     } else {
       sessLoadBtn.disabled = true;
       sessLoadBtn.title = locked ? 'Task running...' : 'No active session';
@@ -108,12 +117,17 @@ export function initSessionMode() {
   }
 
   function parseExplorePhases(text) {
-    const phaseRegex = /【阶段(\d+)[：:]\s*(.+?)】/g;
+    const bracketRegex = /【阶段(\d+)[：:]\s*(.+?)】/g;
+    const markdownRegex = /^##\s+Phase\s+(\d+)[：:]\s*(.+)$/gm;
+
+    const usesMarkdown = new RegExp(markdownRegex.source, 'm').test(text);
+    const phaseRegex = usesMarkdown ? markdownRegex : bracketRegex;
+
     const phases = [];
     let prefix = '';
     phaseRegex.lastIndex = 0;
     const firstMatch = phaseRegex.exec(text);
-    if (firstMatch) {
+    if (firstMatch && usesMarkdown) {
       prefix = text.slice(0, firstMatch.index).trim();
     }
     phaseRegex.lastIndex = 0;
@@ -130,13 +144,23 @@ export function initSessionMode() {
       if (i === 0 && prefix) content = prefix + '\n\n' + content;
       content = content.replace(/^\d+[\.\)、]\s*截图[^：:\n]*$/gm, '').trim();
 
+      if (usesMarkdown) {
+        content = content
+          .replace(/^\|.*\|$/gm, '')
+          .replace(/^[-]+$/gm, '')
+          .replace(/^>.*$/gm, '')
+          .replace(/^\*\*截图\*\*.*$/gm, '')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      }
+
       const navPhases = ['登录', '导航'];
       const isNav = navPhases.some(kw => m.name.includes(kw));
       phases.push({
         num: m.num,
         name: 'Phase ' + m.num + ': ' + m.name,
         task: content,
-        maxSteps: isNav ? 50 : 40,
+        maxSteps: isNav ? 50 : 100,
         status: 'pending',
       });
     }
@@ -164,10 +188,9 @@ export function initSessionMode() {
     html += '</div>';
     html += '<button class="sess-phase-prev" style="position:absolute;left:0;top:50%;transform:translateY(-50%);background:var(--indigo-600);color:#fff;border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:2">‹</button>';
     html += '<button class="sess-phase-next" style="position:absolute;right:0;top:50%;transform:translateY(-50%);background:var(--indigo-600);color:#fff;border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:2">›</button>';
-    html += '<div class="sess-phase-dots" style="display:flex;justify-content:center;gap:8px;margin-top:12px">';
-    for (let i = 0; i < phases.length; i++) {
-      html += '<button class="sess-phase-dot" data-index="' + i + '" style="width:10px;height:10px;border-radius:50%;background:' + (i === 0 ? 'var(--indigo-500)' : 'var(--slate-300)') + ';border:none;cursor:pointer;padding:0;transition:background 0.2s"></button>';
-    }
+    html += '<div style="padding:8px 0 0;text-align:center">';
+    html += '<input type="range" class="sess-phase-slider" min="0" max="' + (phases.length - 1) + '" value="0" style="width:80%;height:4px;cursor:pointer;accent-color:var(--indigo-500)">';
+    html += '<span class="sess-phase-slider-label" style="font-size:11px;color:var(--slate-400);margin-left:8px">1 / ' + phases.length + '</span>';
     html += '</div></div>';
     return html;
   }
@@ -181,16 +204,18 @@ export function initSessionMode() {
       currentSlide = idx;
       const track = list.querySelector('.sess-phase-track');
       if (track) track.style.transform = 'translateX(-' + (idx * 100) + '%)';
-      list.querySelectorAll('.sess-phase-dot').forEach((dot, i) => {
-        dot.style.background = i === idx ? 'var(--indigo-500)' : 'var(--slate-300)';
-      });
+      const slider = list.querySelector('.sess-phase-slider');
+      if (slider) { slider.value = idx; }
+      const label = list.querySelector('.sess-phase-slider-label');
+      if (label) label.textContent = (idx + 1) + ' / ' + phases.length;
     }
 
     list.querySelector('.sess-phase-prev').addEventListener('click', () => showSlide(currentSlide - 1));
     list.querySelector('.sess-phase-next').addEventListener('click', () => showSlide(currentSlide + 1));
-    list.querySelectorAll('.sess-phase-dot').forEach(dot => {
-      dot.addEventListener('click', () => showSlide(parseInt(dot.dataset.index)));
-    });
+    const slider = list.querySelector('.sess-phase-slider');
+    if (slider) {
+      slider.addEventListener('input', () => showSlide(parseInt(slider.value)));
+    }
 
     list.querySelectorAll('.sess-phase-exec').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -302,7 +327,7 @@ export function initSessionMode() {
   }
 
   function setUILocked(locked) {
-    const btns = document.querySelectorAll('#genBtn, #exploreStartBtn, #sessStepBtn, #genRunBtn');
+    const btns = document.querySelectorAll('#genBtn, #exploreStartBtn, #sessStepBtn, #genRunBtn, #sessLoginBtn');
     btns.forEach(b => { if (b) b.disabled = locked; });
     sessRunning = locked;
     window.__execLock__.running = locked;
@@ -465,8 +490,8 @@ export function initSessionMode() {
     const sessionId = sessActive.value;
     const caseText = sessTask.value.trim();
     if (!sessionId) { sessLog('error', 'No active session — create one first'); return; }
-    if (!caseText || !caseText.includes('【阶段')) {
-      sessLog('warn', 'No phase markers found. Use 【阶段N：名称】 format in the textarea.');
+    if (!caseText || !(/【阶段|^##\s+Phase\s+\d+/m.test(caseText))) {
+      sessLog('warn', 'No phase markers found. Use 【阶段N：名称】 or ## Phase N: format in the textarea.');
       return;
     }
 
@@ -525,10 +550,86 @@ export function initSessionMode() {
     sessLog('system', 'Loaded: ' + keptCount + ' preserved, ' + Math.max(0, merged.length - keptCount) + ' imported (' + merged.length + ' total)');
   });
 
+  // File upload
+  if (sessUploadBtn && sessFileInput) {
+    sessUploadBtn.addEventListener('click', () => sessFileInput.click());
+    sessFileInput.addEventListener('change', async () => {
+      const file = sessFileInput.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        sessTask.value = text;
+        if (sessFileName) sessFileName.textContent = file.name + ' (' + (text.length / 1024).toFixed(1) + ' KB)';
+        sessLog('system', 'Loaded file: ' + file.name);
+        updateButtons();
+        // Auto-trigger Load if session active and markers present
+        if (sessActive.value && (/【阶段|^##\s+Phase\s+\d+/m.test(text))) {
+          setTimeout(() => sessLoadBtn.click(), 300);
+        }
+      } catch (err) {
+        sessLog('error', 'File read failed: ' + err.message);
+      }
+      sessFileInput.value = '';
+    });
+  }
+
+  // Login & Navigate
+  if (sessLoginToggle && sessLoginSection) {
+    sessLoginToggle.addEventListener('click', () => {
+      const hidden = sessLoginSection.style.display === 'none';
+      sessLoginSection.style.display = hidden ? '' : 'none';
+      sessLoginToggle.textContent = hidden ? 'Hide' : 'Show';
+    });
+  }
+
+  if (sessLoginBtn) {
+    sessLoginBtn.addEventListener('click', async () => {
+      const url = sessLoginUrl?.value.trim();
+      const user = sessLoginUser?.value.trim();
+      const pass = sessLoginPass?.value.trim();
+      if (!url) { sessLog('error', 'Target URL is required'); return; }
+
+      // Create a session if none active
+      let sessionId = sessActive.value;
+      if (!sessionId) {
+        sessNewBtn.disabled = true;
+        sessStatus.textContent = 'Creating...';
+        sessLog('system', 'Creating new session for login...');
+        try {
+          const res = await fetch('/api/browser/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: sessModel?.value || undefined }),
+          });
+          if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+          const data = await res.json();
+          sessionId = data.sessionId;
+          await loadActiveSessions();
+          sessActive.value = data.sessionId;
+          onSessionChange();
+          sessLog('success', 'Session created: ' + data.sessionId);
+        } catch (err) {
+          sessLog('error', 'Create session failed: ' + err.message);
+          sessNewBtn.disabled = false;
+          return;
+        }
+        sessNewBtn.disabled = false;
+      }
+
+      // Build login task
+      let loginTask = 'Navigate to ' + url;
+      if (user) loginTask += '\nEnter username: ' + user;
+      if (pass) loginTask += '\nEnter password: ' + pass;
+      if (user && pass) loginTask += '\nClick the login/submit button\nWait for the page to fully load after login';
+
+      await executeSessionStep(sessionId, loginTask, 30, 'Login: ' + url);
+    });
+  }
+
   sessStepBtn.addEventListener('click', () => {
     const sessionId = sessActive.value;
     const task = sessTask.value.trim();
-    const maxSteps = parseInt(sessMaxSteps.value) || 40;
+    const maxSteps = parseInt(sessMaxSteps.value) || 100;
     if (!sessionId || !task) return;
     executeSessionStep(sessionId, task, maxSteps, task.slice(0, 60));
   });
