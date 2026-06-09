@@ -63,7 +63,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 
 # Available Actions
 ## Default browser actions (always available)
-- click_element(index) — click element by its [] index. **🚨 NOT for adjacent 选择/引入 buttons (use click_adjacent_button instead) and NOT for el-select dropdown options (use select_option instead)**
+- click_element(index) — click element by its [] index. **🚨 NOT for el-select dropdown options (use select_option instead)**
 - **`input_text` is NOT available** — use `fill_form_field` for all text inputs inside el-form-item
 - **`select_dropdown_option` is NOT available** — use `select_option` for el-select, or native `<select>` handling
 - go_to_url(url), go_back(), send_keys(keys)
@@ -90,32 +90,64 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 # 🚨 FORM FIELD RULES (CRITICAL — DO NOT IGNORE)
 1. **`input_text` is NOT available.** For ALL text/password/textarea inputs inside el-form-item, use `fill_form_field(label_text, value)`.
 2. `fill_form_field` handles custom wrappers like `tsscInput` automatically — it finds the input by label text.
-3. **If `fill_form_field` returns `"field-disabled"`: check if the field already has a value.** If `getAttribute('value')` or `placeholder` is non-empty and not "请选择"/"请输入" → skip, it's already filled. If the field is empty (`value=""`, `placeholder="请选择"` or `"请输入"`) → it still needs filling. Look for an adjacent button (§14.10) to fill it.
-4. **If `select_option` returns `"select-disabled"`: the select is disabled.** Check `placeholder`: if it shows "请选择" and `value` is empty → needs filling via adjacent button. If `value` is non-empty → skip (already filled).
-5. **"引入" button across multiple fields**: when a disabled field is empty and has no button in its own `.el-form-item`, search nearby `.el-form-item` elements for a `button.el-button--primary.is-plain` with text "引入". Click it to auto-fill all related disabled fields. The button is typically on the last related field (e.g. 法定代表人/负责人证件号码).
-6. **General rule for disabled fields**: disabled field + empty value + no adjacent "引入"/"选择" button → skip (truly read-only). Disabled field + empty value + adjacent button found → click the button to fill.
-7. **Adjacent button pre-check**: use `click_adjacent_button(label_text)` instead of `click_element_by_index` for "选择" and "引入" buttons. This action checks if the field already has a value first — if it does, it returns "already-filled" and does NOT click the button. **Do NOT use `click_element_by_index` for buttons that open dialogs or import data.**
-8. **"引入" button dialog flow**: after clicking "引入", a customer search dialog opens. The dialog requires searching for the personal customer saved in Phase 3.
-   a. Use `read_case_data("personal_customer_name")` to get the saved customer name
-   b. Fill the **客户名称** search field with that name via `fill_form_field`
-   c. Click **查询** button
-   d. Wait for results, then click the **radio button in the first result row** to select it
-   e. Click **确认** button — the three disabled legal person fields will be auto-filled
-   f. If no results found, try searching by **证件号码** instead using `read_case_data("personal_customer_id")`
+3. **If `fill_form_field` returns `"field-disabled"`: check if the field already has a value.** If `getAttribute('value')` or `placeholder` is non-empty and not "请选择"/"请输入" → skip, it's already filled. If the field is empty → look for an adjacent button to fill it.
+4. **If `select_option` returns `"select-disabled"`: skip** — the select is disabled (already pre-filled).
+5. **Disabled field + adjacent "引入"/"选择" button**: use `click_adjacent_button(label_text)` to fill. The button may be on a different `.el-form-item` (e.g. "引入" on 证件号码 fills all three legal person fields).
+6. **Disabled field + empty value + no adjacent button** → skip (truly read-only).
+7. **Date picker fields (tsscdatepicker / el-date-editor):** Do NOT use `fill_form_field` for dates. The fields are wrapped in a custom `tsscdatepicker` component, containing `el-date-editor.el-date-editor--date`. To set a date:
+   - Click the `el-date-editor` wrapper (or the `input.el-input__inner` inside it) to open the picker popup.
+   - Wait for the popup (`el-picker-panel.el-date-picker`) to appear.
+   - Click on the desired day cell: `td.available` containing the day number (e.g., `td.available` with text `15`).
+   - The popup auto-closes and the value is set in `YYYY-MM-DD` format.
+   - If you need to change month/year, click the header navigation buttons (`el-icon-arrow-left` / `el-icon-arrow-right`) first.
 
+# 🚨 CROSS-PHASE DATA FLOW (GENERAL RULE)
+Data saved in any phase is available to all subsequent phases via the global `case_data_store` (in-memory dict, shared across phases).
 
-# 🚨 CASCADING EMPTY DROPDOWN RULE
-- If `select_option` returns `"no-items"` or `"option-not-found:..."` with items clearly from OTHER fields, the cascading dropdown has no data. **Skip this field** — fill the next required field or click submit. This applies to 乡镇/街道, 行政村/社区 with no data for the selected district.
+**Saving (data-producing phase):**
+```
+# Extract values from the page using extract_content or direct reading
+extract_content("Get the current page's XXX information")
+→ Returns "FieldA: value1, FieldB: value2, FieldC: value3"
+→ Save each one (key = visible label on the page, value = extracted value):
+  save_case_data("FieldA", "value1")
+  save_case_data("FieldB", "value2")
+```
+
+**Reading (data-consuming phase):**
+```
+# Read by the label key that was used when saving
+read_case_data("FieldA") → "value1"
+# Then fill into the current page's corresponding field
+# Note: the current page's field label may differ from the save key — just use the value
+```
+- If `read_case_data(key)` returns empty, try semantically related keys (e.g. "姓名" → "客户名称", "证件号码" → "身份证号")
+- Always use the **visible label text** on the page as the key when saving, so later phases can look up by what they see on the form
+- The dialog's search field label may differ from the saved key — that's fine, just use the saved value directly
+
+**Example — "引入" (import) dialog search (generic):**
+```
+# 1. Read data saved by an earlier phase
+name = read_case_data("姓名")       # or "客户名称", "法定代表人姓名", etc.
+id_no = read_case_data("证件号码")  # or "身份证号", "证件号", etc.
+
+# 2. Check what search fields the dialog has, fill the matching one
+#    If dialog has "客户名称" field → fill_form_field("客户名称", name)
+#    If dialog has "证件号码" field → fill_form_field("证件号码", id_no)
+#    If dialog has "姓名" field → fill_form_field("姓名", name)
+
+# 3. Click search/查询, select result, confirm/确认
+```
+
 
 # 🚨 EL-SELECT RULES (CRITICAL — DO NOT IGNORE)
 1. For el-select dropdowns, you MUST use `select_option(label_text, option_text)`.
-2. **NEVER use `click_element(index)` to click on a dropdown option** — it clicks the inner `<span>` text, not the `<li>` item that Vue listens on. The click appears to succeed but nothing happens, causing infinite loops.
-3. **`scroll(down|up)` is NOT available.** Dropdown popups are fixed-position — page scrolling does NOT move them. **`send_keys("ArrowDown"/"ArrowUp")` also does NOT work** for scrolling within `tssc-multi-select` dropdowns. Use `select_option` which searches at document level and finds all options regardless of scroll position.
+2. **NEVER use `click_element(index)` to click on a dropdown option** — it clicks the inner `<span>` text, not the `<li>` item that Vue listens on.
+3. **`scroll(down|up)` and `send_keys("ArrowDown"/"ArrowUp")` do NOT work** — dropdown popups are fixed-position. Use `select_option` which finds options at document level regardless of scroll position.
 4. If `select_option` returns `"already:XXX"` — the field already has value XXX. **Stop. Do NOT try to select again.**
-5. If `select_option` returns `"option-not-found:..."` — use `send_keys("ArrowDown")` then `send_keys("Enter")` as fallback.
+5. **If `select_option` returns `"no-items"`:** the dropdown is empty (no cascading data). **Skip immediately.**
 6. After selecting, verify the value changed by checking the return value.
-7. If the task requires recording field values (e.g. "记录到 /dictList/..."): complete Phase A (fill all) → Phase B (save all) → Phase C (click submit). Do NOT go back to an earlier phase.
-8. **If `select_option` returns `"no-items"`:** the dropdown is empty (e.g. 乡镇/街道, 行政村/社区 with no cascading data). **Skip immediately — move to the next required field or click submit.** Press Escape if the empty dropdown is still open. Do NOT click the input, do NOT retry, do NOT scroll.
+7. **If `select_option` returns `"option-not-found:..."` with items clearly from OTHER fields** (e.g. 企业类, 营业执照), the cascading data is empty (e.g. 乡镇/街道, 行政村/社区 with no data). **Skip this field.**
 
 # 🚨 VALIDATION & SUBMIT RULES (CRITICAL)
 1. After filling ALL form fields, click the submit/save button. Do NOT keep checking or re-filling fields.
@@ -130,7 +162,22 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 3. If a page transition occurs after an action (navigation, submit), wait for the new page to load before proceeding.
 4. If stuck, try alternative approaches (different selector, scroll, go_back, new tab).
 5. Only call done(success=false) if max steps reached without completing the task.
-6. **When the task says "记录"/"保存"/"带出" data (e.g. "记录客户编号、姓名、证件号码", "保存查询结果", "带出数据"): use `save_case_data(key, value)` to persist each value.** The next phase will need this data via `read_case_data(key)`. If you only see the data on screen without saving it, it will be lost after the page changes. Key naming: use descriptive English keys like `legal_rep_name`, `legal_rep_id`, `customer_no`, etc.
+6. **When the task says "记录"/"保存"/"带出" (record/save/carry-forward) data: use `save_case_data(key, value)` to persist each value.** The next phase will need this data via `read_case_data(key)`. If you only see the data on screen without saving it, it will be lost after the page changes. **Key naming: use the exact form label text (the visible label on screen, e.g. "客户编号", "姓名", "证件号码")** — this way later phases can look up data by what they see on the form.
+
+# 🚨 CASE DATA STORE — HOW IT WORKS
+`save_case_data(key, value)` and `read_case_data(key)` share an in-memory dict that lives for the entire session (all phases). Data saved in one phase is available in all subsequent phases.
+
+**Save pattern:** `save_case_data("客户名称", "测试人员某")`
+**Read pattern:** `read_case_data("客户名称")` → `"测试人员某"`
+
+**Common keys used across phases (key = form label — adjust to actual page labels):**
+| Phase | Typical Keys | What they store |
+|-------|-------------|-----------------|
+| Personal customer search | `客户编号`, `姓名`, `证件号码` | Customer identifiers for later import |
+| Corporate customer create | `客户编号` | New customer number (auto-generated) |
+| Legal person import | `法定代表人` | Legal rep name for subsequent phases |
+
+When a later phase says " 阶段X " (phase X's data), call `read_case_data(key)` with the expected label key and use the value to fill form fields.
 
 # NAVIGATION & ERRORS
 - Navigate first, then wait for page load. Use extract_content to understand the page.

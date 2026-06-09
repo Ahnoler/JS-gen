@@ -55,6 +55,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         const target = input || textarea;
         if (!target) return 'no-input-found';
         if (target.disabled || target.readOnly) return 'field-disabled';
+        if (target.closest('.el-date-editor, .tsscdatepicker')) return 'is-date-picker';
         setFn(target, val);
         return 'ok';
     }
@@ -279,11 +280,14 @@ def _register_form_actions(controller, browser_context, form_rules):
         val = match_rule(label_text, form_rules)
         return val if val else 'NO-RULE'
 
-    @controller.action('Fill a form field using Element UI native DOM setter.')
+    @controller.action('Fill a form field using Element UI native DOM setter. Do NOT use for date fields — use click_element_by_index instead to click the date picker open and select a date.')
     async def fill_form_field(label_text: str, value: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        return await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
+        result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
+        if result == 'is-date-picker':
+            return ActionResult(extracted_content='is-date-picker: This is a date picker field. Do NOT fill with fill_form_field. Click the date input to open the picker popup, then click the desired day in the popup.', is_done=False)
+        return result
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str):
@@ -501,7 +505,8 @@ def _register_misc_actions(controller, browser_context):
                 if (input && input.value && input.value.trim() !== '') {
                     return 'already-filled';
                 }
-                const btn = item.querySelector('button.el-button--primary.is-plain');
+                // Try multiple button class patterns
+                const btn = item.querySelector('button.el-button--primary.is-plain, button.el-button--primary');
                 if (btn && btn.offsetParent !== null) { btn.click(); return 'clicked'; }
                 return 'no-button-found';
             }
@@ -524,32 +529,12 @@ def _register_misc_actions(controller, browser_context):
         await page.screenshot(path=path, full_page=False)
         return _ok(f'screenshot-saved:{path}')
 
-    @controller.action('Click element by its [] index. 🚨 NOT for adjacent 选择/引入 buttons — use click_adjacent_button instead.')
+    @controller.action('Click element by its [] index.')
     async def click_element_by_index(index: int):
-        """Replacement for default click_element_by_index: detects adjacent buttons and redirects."""
+        """Replacement for default click_element_by_index."""
         page = await browser_context.get_current_page()
-        # Get the element being clicked and check its text
         try:
             element_node = await browser_context.get_dom_element_by_index(index)
-            btn_text = element_node.get_all_text_till_next_clickable_element(max_depth=2).strip()
-        except Exception:
-            btn_text = ''
-        # Only check if the SPECIFIC clicked element is a 选择/引入 button
-        if btn_text in ('选择', '引入'):
-            skip = await page.evaluate('''() => {
-                const fi = document.querySelector('.el-form-item:has(button)');
-                if (!fi) return false;
-                const inp = fi.querySelector('.el-input__inner');
-                if (inp && inp.value && inp.value.trim() !== '') {
-                    const lbl = fi.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                    return { skip: true, label: lbl, btnText: '选择' };
-                }
-                return false;
-            }''')
-            if skip:
-                return _ok(f'skip: {skip["label"]} already filled — do not re-click "{skip["btnText"]}". Use click_adjacent_button if needed.')
-        # Perform normal click
-        try:
             download_path = await browser_context._click_element_node(element_node)
             if download_path:
                 return _ok(f'downloaded:{download_path}')
