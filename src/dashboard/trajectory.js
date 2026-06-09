@@ -154,11 +154,17 @@ async function sendToScriptGen(trajectoryId) {
           const type = Object.keys(a)[0];
           const p = a[type] || {};
           const el = (h.state?.interacted_element || [])[ai] || {};
-          const xpath = el.xpath || '';
+          let xpath = el.xpath || '';
           const tag = el.tag_name || '';
           let label = p.label_text || p.label || '';
           let value = p.text || p.value || '';
           if (p.url) value = p.url;
+          // Fallback: extract XPath from action result's | loc:... marker
+          if (!xpath) {
+            const resultContent = (h.result || [])[ai]?.extracted_content || '';
+            const locMatch = resultContent.match(/\| loc:([^\s|]+)/);
+            if (locMatch) xpath = locMatch[1];
+          }
           row++;
           desc += `| ${row} | ${type} | ${goal} | ${tag} | ${xpath || '-'} | ${label} | ${value} |\n`;
         }

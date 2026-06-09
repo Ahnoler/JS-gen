@@ -254,6 +254,13 @@ export function extractFlowFromTrajectory(trajectory) {
         }
       }
 
+      // Fallback: extract XPath from action result's | loc:... marker
+      if (!elInfo.xpath) {
+        const resultContent = (results[j]?.extracted_content || '');
+        const locMatch = resultContent.match(/\| loc:([^\s|]+)/);
+        if (locMatch) elInfo.xpath = locMatch[1];
+      }
+
       flow.push({
         stepNumber: i + 1,
         actionIndex: j,
