@@ -457,11 +457,13 @@ def _register_misc_actions(controller, browser_context):
         if notif:
             visible = await notif.evaluate('el => el.offsetParent !== null')
             if visible:
+                # Read notification text before closing
+                notif_text = await notif.evaluate('el => el.textContent?.trim() || ""')
                 close_btn = await notif.query_selector('.el-notification__closeBtn')
                 if close_btn:
                     await close_btn.click()
                     await page.wait_for_timeout(300)
-                    return _ok('ok-notification')
+                    return _ok(f'ok-notification: {notif_text[:200]}')
         # 2. Close dialog/drawer
         result = await page.evaluate('''() => {
             let top = null;
