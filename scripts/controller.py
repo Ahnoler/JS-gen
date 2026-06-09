@@ -449,9 +449,20 @@ def _register_misc_actions(controller, browser_context):
         }''')
         return json.dumps(state, ensure_ascii=False)
 
-    @controller.action('Close the topmost el-dialog or el-drawer.')
+    @controller.action('Close the topmost el-dialog, el-drawer, or el-notification.')
     async def close_dialog():
         page = await browser_context.get_current_page()
+        # 1. Close notification first (JS click doesn't work, use Playwright native click)
+        notif = await page.query_selector('.el-notification')
+        if notif:
+            visible = await notif.evaluate('el => el.offsetParent !== null')
+            if visible:
+                close_btn = await notif.query_selector('.el-notification__closeBtn')
+                if close_btn:
+                    await close_btn.click()
+                    await page.wait_for_timeout(300)
+                    return _ok('ok-notification')
+        # 2. Close dialog/drawer
         result = await page.evaluate('''() => {
             let top = null;
             for (const sel of ['.el-dialog', '.el-drawer']) {
@@ -465,7 +476,7 @@ def _register_misc_actions(controller, browser_context):
             if (closeBtn) { closeBtn.click(); return 'ok'; }
             const cancelBtn = top.querySelector('.el-dialog__footer .el-button--default');
             if (cancelBtn) { cancelBtn.click(); return 'ok-cancel'; }
-            return _err('no-close-button');
+            return 'no-close-button';
         }''')
         await page.wait_for_timeout(500)
         return result

@@ -20,13 +20,16 @@ from .agent_utils import (
 from .controller import build_controller
 from .recorder import build_recording_hooks
 
+_TRACE_DIR = str(Path(__file__).parent / "trace")
+
 
 async def run_workflow(args, llm, form_rules, extend_system_message):
     """Run a multi-phase workflow from a JSON file."""
     browser = Browser()
     config = BrowserContextConfig(
         viewport_width=1920, viewport_height=1080,
-        wait_for_network_idle_page_load_time=3.0
+        wait_for_network_idle_page_load_time=3.0,
+        trace_path=_TRACE_DIR,
     )
     browser_context = await browser.new_context(config)
     controller = build_controller(browser_context, form_rules)
@@ -111,7 +114,8 @@ async def run_single_task(args, llm, form_rules, extend_system_message):
     browser = Browser()
     config = BrowserContextConfig(
         viewport_width=1920, viewport_height=1080,
-        wait_for_network_idle_page_load_time=3.0
+        wait_for_network_idle_page_load_time=3.0,
+        trace_path=_TRACE_DIR,
     )
     browser_context = await browser.new_context(config)
     controller = build_controller(browser_context, form_rules)

@@ -11,3 +11,6 @@ Thumbs.db
 scripts/generated/
 report/
 /docs/
+/scripts/trace/
+/scripts/data/
+/scripts/case_data/

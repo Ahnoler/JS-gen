@@ -75,7 +75,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - select_option(label_text, option_text) — el-select dropdowns. "first" picks first item. **🚨 THIS is the ONLY correct way to select el-select options. DO NOT use click_element for dropdown options.**
 - fill_form_field(label_text, value) — **text/password inputs inside el-form-item. USE THIS for ALL text inputs (including custom wrappers like tsscInput).** Matches by label text, placeholder, or input type. Returns "field-disabled" if input is disabled — skip it.
 - click_radio(label_text, option_text) — el-radio groups
-- close_dialog() — close topmost el-dialog/el-drawer
+- close_dialog() — close topmost el-dialog/el-drawer/el-notification
 - expand_all_el_tree() — fully expand el-tree
 - switch_tab(tab_name) — switch el-tabs tab
 - click_menu_item(menu_text) — click el-menu item (auto-expands submenus)
@@ -100,10 +100,12 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 # 🚨 EL-SELECT RULES (CRITICAL — DO NOT IGNORE)
 1. For el-select dropdowns, you MUST use `select_option(label_text, option_text)`.
 2. **NEVER use `click_element(index)` to click on a dropdown option** — it clicks the inner `<span>` text, not the `<li>` item that Vue listens on. The click appears to succeed but nothing happens, causing infinite loops.
-3. If `select_option` returns `"already:XXX"` — the field already has value XXX. **Stop. Do NOT try to select again.**
-4. If `select_option` returns `"option-not-found:..."` — use `send_keys("ArrowDown")` then `send_keys("Enter")` as fallback.
-5. After selecting, verify the value changed by checking the return value.
-6. If the task requires recording field values (e.g. "记录到 /dictList/..."): complete Phase A (fill all) → Phase B (save all) → Phase C (click submit). Do NOT go back to an earlier phase.
+3. **NEVER scroll to find dropdown options** — dropdown popups are fixed-position, page scrolling does NOT move them. `select_option` searches at document level and finds all options regardless of scroll position. If the option exists but is scrolled out of view, `select_option` will still find and click it.
+4. If `select_option` returns `"already:XXX"` — the field already has value XXX. **Stop. Do NOT try to select again.**
+5. If `select_option` returns `"option-not-found:..."` — use `send_keys("ArrowDown")` then `send_keys("Enter")` as fallback.
+6. After selecting, verify the value changed by checking the return value.
+7. If the task requires recording field values (e.g. "记录到 /dictList/..."): complete Phase A (fill all) → Phase B (save all) → Phase C (click submit). Do NOT go back to an earlier phase.
+8. **If `select_option` returns `"no-items"`:** the dropdown is empty (e.g. 乡镇/街道, 行政村/社区 with no cascading data). **Skip immediately — move to the next required field or click submit.** Press Escape if the empty dropdown is still open. Do NOT click the input, do NOT retry, do NOT scroll.
 
 # TASK COMPLETION RULES
 1. Use done() ONLY when the entire task is finished. Do NOT call done() after a single step if more work remains.
@@ -128,6 +130,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - Navigate first, then wait for page load. Use extract_content to understand the page.
 - If stuck, go_back(), try a new tab, or use a different approach.
 - Handle popups/cookies by closing them.
+- **After reading validation error notifications (`get_page_state()` shows "notifications"), call `close_dialog()` to dismiss them** so stale errors don't affect subsequent steps.
 - Always scroll to find elements if they're not visible."""
 
 # ========== Planner system prompt ==========
