@@ -61,6 +61,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     }
     const allInputs = container.querySelectorAll('input:not([type="hidden"]), textarea');
     for (const inp of allInputs) {
+        if (inp.closest('.el-date-editor, .tsscdatepicker')) continue;
         const ph = inp.getAttribute('placeholder') || '';
         if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent !== null) {
             setFn(inp, val);
@@ -68,6 +69,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         }
     }
     for (const inp of allInputs) {
+        if (inp.closest('.el-date-editor, .tsscdatepicker')) continue;
         const type = inp.getAttribute('type') || 'text';
         if (type.toLowerCase() === label.toLowerCase() && !inp.disabled && !inp.readOnly && inp.offsetParent !== null) {
             setFn(inp, val);
@@ -76,6 +78,62 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     }
     return 'label-not-found';
 }'''
+
+JS_SELECT_DATE = '''([dateStr]) => new Promise((resolve) => {
+    const [targetYear, targetMonth, targetDay] = dateStr.split('-').map(Number);
+    let maxIters = 60;
+    function step() {
+        if (--maxIters <= 0) { resolve('timeout:' + dateStr); return; }
+        const panel = document.querySelector('.el-picker-panel.el-date-picker');
+        if (!panel || panel.offsetParent === null) { setTimeout(step, 200); return; }
+        const yearTable = panel.querySelector('.el-year-table');
+        const monthTable = panel.querySelector('.el-month-table');
+        const dateTable = panel.querySelector('.el-date-table');
+        if (yearTable && yearTable.offsetParent !== null) {
+            const years = yearTable.querySelectorAll('td.available, td.current');
+            for (const td of years) {
+                if (parseInt(td.textContent.trim()) === targetYear) { td.click(); setTimeout(step, 300); return; }
+            }
+            const dArrow = panel.querySelector('.el-icon-d-arrow-left')?.closest('button');
+            const dArrowR = panel.querySelector('.el-icon-d-arrow-right')?.closest('button');
+            const hdr = panel.querySelector('.el-date-picker__header-label');
+            const start = parseInt(hdr?.textContent?.trim()?.split('-')[0] || '0');
+            if (targetYear < start && dArrow) { dArrow.click(); } else if (dArrowR) { dArrowR.click(); }
+            setTimeout(step, 300); return;
+        }
+        if (monthTable && monthTable.offsetParent !== null) {
+            const months = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+            const cells = monthTable.querySelectorAll('td.available, td.current');
+            for (const td of cells) {
+                const sp = td.querySelector('span');
+                if (sp && sp.textContent.trim() === months[targetMonth - 1]) { td.click(); setTimeout(step, 300); return; }
+            }
+            resolve('month-not-found:' + dateStr); return;
+        }
+        if (dateTable && dateTable.offsetParent !== null) {
+            const labels = panel.querySelectorAll('.el-date-picker__header-label');
+            const curYear = parseInt(labels[0]?.textContent?.trim() || '0');
+            const curMonth = parseInt(labels[1]?.textContent?.trim() || '0');
+            if (curYear === targetYear && curMonth === targetMonth) {
+                const days = dateTable.querySelectorAll('td.available, td.today');
+                for (const td of days) {
+                    const sp = td.querySelector('span');
+                    if (sp && sp.textContent.trim() === String(targetDay)) { td.click(); resolve('selected:' + dateStr); return; }
+                }
+                resolve('day-not-found:' + dateStr); return;
+            }
+            if (curYear === targetYear) {
+                const arrowL = panel.querySelector('.el-icon-arrow-left')?.closest('button');
+                const arrowR = panel.querySelector('.el-icon-arrow-right')?.closest('button');
+                if (curMonth > targetMonth && arrowL) { arrowL.click(); } else if (arrowR) { arrowR.click(); }
+                setTimeout(step, 200); return;
+            }
+            if (labels[0]) { labels[0].click(); setTimeout(step, 300); return; }
+        }
+        setTimeout(step, 200);
+    }
+    setTimeout(step, 300);
+})'''
 
 JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     const getSelectedLabel = (formItem) => {
@@ -280,14 +338,36 @@ def _register_form_actions(controller, browser_context, form_rules):
         val = match_rule(label_text, form_rules)
         return val if val else 'NO-RULE'
 
-    @controller.action('Fill a form field using Element UI native DOM setter. Do NOT use for date fields — use click_element_by_index instead to click the date picker open and select a date.')
+    @controller.action('Fill a form field using Element UI native DOM setter. Do NOT use for date fields — use select_date instead.')
     async def fill_form_field(label_text: str, value: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
         if result == 'is-date-picker':
-            return ActionResult(extracted_content='is-date-picker: This is a date picker field. Do NOT fill with fill_form_field. Click the date input to open the picker popup, then click the desired day in the popup.', is_done=False)
+            return ActionResult(extracted_content='is-date-picker: This is a date picker field. Use select_date(label, "YYYY-MM-DD") instead.', is_done=False)
         return result
+
+    @controller.action('Set a date field by clicking the date picker to open it, then selecting a date from the popup calendar. Format: YYYY-MM-DD. Only for date fields wrapped in tsscdatepicker/el-date-editor. Do NOT use fill_form_field for dates.')
+    async def select_date(label_text: str, date_str: str):
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        r1 = await page.evaluate('''([label]) => {
+            const c = ''' + JS_GET_CONTAINER + ''';
+            const items = c.querySelectorAll('.el-form-item');
+            for (const item of items) {
+                const lbl = item.querySelector('.el-form-item__label');
+                if (lbl && lbl.textContent.trim().includes(label)) {
+                    const ed = item.querySelector('.el-date-editor');
+                    if (ed) { ed.click(); return 'ok'; }
+                    return 'no-editor';
+                }
+            }
+            return 'label-not-found';
+        }''', [label_text])
+        if r1 != 'ok':
+            return r1
+        await page.wait_for_timeout(400)
+        return await page.evaluate(JS_SELECT_DATE, [date_str])
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str):

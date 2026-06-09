@@ -30,11 +30,11 @@ description: |
 
 | 关键词 | 生成器 | 格式约束 | 备注 |
 |--------|--------|----------|------|
-| `身份证`、`身份证号`、`证件号码`、`居民身份证` | `genIdCard()` | 18 位，末位含校验码（可为 X） | 用 `genValidIdCard(prefix)` 生成真校验位 |
+| `身份证`、`身份证号`、`居民身份证` | `genIdCard()` | 18 位，末位含校验码（可为 X） | 用 `genValidIdCard(prefix)` 生成真校验位 |
 | `单位电话`、`固定电话`、`座机` | `genLandline()` | 区号+号码 | 如 `0731` + 8 位随机数字 |
 | `手机`、`电话`、`联系方式` | `genMobile()` | 11 位，`1` 开头，第二位 3-9 | 模糊匹配手机号/联系电话/联系方式等 |
 | `邮箱`、`Email`、`电子邮箱` | `genEmail()` | `xxx@domain.tld` | 随机用户名 + 常见域名 |
-| `统一社会信用代码`、`信用代码` | `genCreditCode()` | 18 位字母+数字 | 注册号前缀 + 随机段 |
+| `统一社会信用代码`、`信用代码`、`营业执照`、`营业执照号`、`证件号码` | `genCreditCode()` | 18 位字母+数字 | 注册号前缀 + 随机段 |
 | `银行卡`、`银行卡号`、`银行账号` | `genBankCard()` | 16-19 位，`62` 开头 | 银联卡号随机 |
 | `金额`、`价格`、`费用`、`工资`、`收入` | `genAmount()` | 数字，可含 2 位小数 | 10000.00 ~ 9999999.99 |
 | `邮编`、`邮政编码` | `'100000'` | 6 位数字 | 静态值 |
@@ -115,13 +115,14 @@ function genEmail() {
   return `${name}_${suffix}@${domain}`;
 }
 
-/** 生成随机统一社会信用代码 */
+/** 生成随机统一社会信用代码（18位，含ISO 7064校验码） */
 function genCreditCode() {
-  const prefix = `91${String(Math.floor(Math.random() * 90) + 10)}${String(Math.floor(Math.random() * 90) + 10)}`;
-  let body = '';
-  for (let i = 0; i < 9; i++) body += 'ABCDEFGHJKLMNPQRTUWXY0123456789'[Math.floor(Math.random() * 33)];
-  const check = '0123456789ABCDEFGHJKLMNPQRTUWXY'[Math.floor(Math.random() * 31)];
-  return `${prefix}${body}${check}`;
+  const CHARS = '0123456789ABCDEFGHJKLMNPQRTUWXY';
+  const WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28];
+  let body = '91' + String(Math.floor(Math.random() * 900000) + 100000);
+  for (let i = 0; i < 9; i++) body += CHARS[Math.floor(Math.random() * CHARS.length)];
+  const total = body.split('').reduce((s, c, i) => s + CHARS.indexOf(c) * WEIGHTS[i], 0);
+  return body + CHARS[(31 - total % 31) % 31];
 }
 
 /** 生成随机银行卡号 */
@@ -247,11 +248,11 @@ function getFormatTemplate(labelText) {
 function matchSpecialRule(labelText) {
   const t = labelText.replace(/\s+/g, '');
   // 随机生成器（12 组）
-  if (t.includes('身份证') || t.includes('身份证号') || t.includes('证件号码') || t.includes('居民身份证')) return [genValidIdCard(), '身份证'];
+  if (t.includes('身份证') || t.includes('身份证号') || t.includes('居民身份证')) return [genValidIdCard(), '身份证'];
   if (t.includes('电话') || t.includes('手机') || t.includes('手机号') || t.includes('联系电话') || t.includes('联系方式') || t.includes('电话号码')) return [genMobile(), '手机号'];
   if (t.includes('单位电话') || t.includes('固定电话') || t.includes('座机')) return [genLandline(), '座机'];
   if (t.includes('邮箱') || t.includes('Email') || t.includes('电子邮箱')) return [genEmail(), '邮箱'];
-  if (t.includes('统一社会信用代码') || t.includes('信用代码')) return [genCreditCode(), '信用代码'];
+  if (t.includes('统一社会信用代码') || t.includes('信用代码') || t.includes('营业执照') || t.includes('证件号码')) return [genCreditCode(), '信用代码'];
   if (t.includes('银行卡') || t.includes('银行卡号') || t.includes('银行账号')) return [genBankCard(), '银行卡'];
   if (t.includes('金额') || t.includes('价格') || t.includes('费用') || t.includes('工资') || t.includes('收入')) return [genAmount(), '金额'];
   if (t.includes('邮编') || t.includes('邮政编码')) return ['100000', '邮编'];

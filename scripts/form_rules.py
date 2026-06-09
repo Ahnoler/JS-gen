@@ -26,7 +26,18 @@ def _gen_email():
     return f"test{_random.randint(100,999)}@{_random.choice(['example.com','company.cn'])}"
 
 def _gen_credit_code():
-    return f"91{_random.randint(10,99)}{_random.randint(10,99)}" + ''.join(_random.choice('ABCDEFGHJKLMNPQRTUWXY0123456789') for _ in range(9)) + _random.choice('0123456789ABCDEFGHJKLMNPQRTUWXY')
+    CHARS = '0123456789ABCDEFGHJKLMNPQRTUWXY'
+    # 前2位：登记管理部门(9=市场监管)+机构类别(1=企业)
+    body = '91'
+    # 第3-8位：6位行政区划代码
+    body += f"{_random.randint(100000, 999999)}"
+    # 第9-17位：9位主体标识码（字母/数字随机）
+    for _ in range(9):
+        body += _random.choice(CHARS)
+    # 第18位：校验码（ISO 7064:1983 MOD 31）
+    WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28]
+    total = sum(CHARS.index(body[i]) * WEIGHTS[i] for i in range(17))
+    return body + CHARS[(31 - total % 31) % 31]
 
 def _gen_bankcard():
     return '62' + ''.join(str(_random.randint(0,9)) for _ in range(17))
