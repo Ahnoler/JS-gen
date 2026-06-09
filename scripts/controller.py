@@ -563,7 +563,7 @@ def _err(msg):
 def build_controller(browser_context, form_rules, case_data_store=None, exclude_actions=None):
     from browser_use import Controller
     if exclude_actions is None:
-        exclude_actions = ['input_text', 'select_dropdown_option']
+        exclude_actions = ['input_text', 'select_dropdown_option', 'scroll_down', 'scroll_up']
     controller = Controller(exclude_actions=exclude_actions)
 
     if case_data_store is not None:

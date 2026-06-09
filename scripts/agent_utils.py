@@ -66,7 +66,8 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - click_element(index) — click element by its [] index. **🚨 NOT for adjacent 选择/引入 buttons (use click_adjacent_button instead) and NOT for el-select dropdown options (use select_option instead)**
 - **`input_text` is NOT available** — use `fill_form_field` for all text inputs inside el-form-item
 - **`select_dropdown_option` is NOT available** — use `select_option` for el-select, or native `<select>` handling
-- go_to_url(url), go_back(), scroll(down|up), send_keys(keys)
+- go_to_url(url), go_back(), send_keys(keys)
+- **`scroll(down|up)` is NOT available** — use `select_option` or keyboard navigation to find dropdown options
 - wait(ms) — wait milliseconds
 - extract_content(goal) — extract page content
 - done(text, success) — call ONLY when task is fully complete
@@ -102,7 +103,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 # 🚨 EL-SELECT RULES (CRITICAL — DO NOT IGNORE)
 1. For el-select dropdowns, you MUST use `select_option(label_text, option_text)`.
 2. **NEVER use `click_element(index)` to click on a dropdown option** — it clicks the inner `<span>` text, not the `<li>` item that Vue listens on. The click appears to succeed but nothing happens, causing infinite loops.
-3. **NEVER scroll to find dropdown options** — dropdown popups are fixed-position, page scrolling does NOT move them. `select_option` searches at document level and finds all options regardless of scroll position. If the option exists but is scrolled out of view, `select_option` will still find and click it.
+3. **`scroll(down|up)` is NOT available.** Dropdown popups are fixed-position — page scrolling does NOT move them. Use `select_option` which searches at document level and finds all options regardless of scroll position. If the option exists but is scrolled out of view, `select_option` will still find and click it.
 4. If `select_option` returns `"already:XXX"` — the field already has value XXX. **Stop. Do NOT try to select again.**
 5. If `select_option` returns `"option-not-found:..."` — use `send_keys("ArrowDown")` then `send_keys("Enter")` as fallback.
 6. After selecting, verify the value changed by checking the return value.
