@@ -423,7 +423,7 @@ def _register_navigation_actions(controller, browser_context):
                         tab.click(); return 'ok';
                     }
                 }
-                return _err('tab-not-found');
+                return 'tab-not-found';
             }
         ''', tab_name)
         await page.wait_for_timeout(800)

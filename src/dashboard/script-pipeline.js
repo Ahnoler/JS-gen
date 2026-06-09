@@ -173,13 +173,21 @@ export function initScriptPipeline() {
 
     const trajPromptContent = document.getElementById('trajPromptContent');
     const trajPrompt = (trajPromptContent.value || '').trim();
+    // Send trajectory table as separate field for structured prompt handling
+    let trajectoryTable = '';
     if (trajPrompt) {
-      description = description ? trajPrompt + '\n\n' + description : trajPrompt;
+      // If trajectory is available but no user description, use trajectory as description
+      if (!description) {
+        description = trajPrompt;
+      } else {
+        trajectoryTable = trajPrompt;
+      }
     }
     if (!description) { alert('请输入测试场景描述'); return; }
 
     const genModel = document.getElementById('genModel').value;
     const body = { description, url: url || undefined, model: genModel || undefined };
+    if (trajectoryTable) body.trajectoryTable = trajectoryTable;
     if (username || password) body.credentials = {};
     if (username) body.credentials.username = username;
     if (password) body.credentials.password = password;

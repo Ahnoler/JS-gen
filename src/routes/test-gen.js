@@ -6,7 +6,8 @@ import { state } from '../state.js';
 import { callLLM } from '../llm-utils.js';
 import {
   buildScriptPrompt, parseScriptFromResponse, extractTestName, generateUniqueFileName,
-  ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex,
+  ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex, parseTrajectoryTable,
+  convertTrajectoryToScript,
 } from '../script-utils.js';
 
 function applyModel(promptParams, model) {
@@ -78,50 +79,120 @@ function extractCode(parts) {
   return allText || '';
 }
 
-async function runGeneration({ description, url, credentials, sessionId, model }) {
-  const genPrompt = buildScriptPrompt({ description, url, credentials });
-
+async function runGeneration({ description, url, credentials, sessionId, model, trajectoryTable }) {
   let code, steps;
 
-  if (STANDALONE_LLM) {
-    const text = await callLLM(genPrompt, model);
-    const parsed = parseScriptFromResponse(text);
-    code = parsed.code;
-    steps = parsed.steps;
-    if (!code) code = text;
-  } else {
-    const promptParams = {
-      sessionID: sessionId,
-      directory: PROJECT_DIR,
-      agent: 'build',
-      parts: [{ type: 'text', text: genPrompt }],
-    };
-    applyModel(promptParams, model);
+  // Parse trajectory table into structured actions (deterministic extraction)
+  let structuredActions = null;
+  if (trajectoryTable) {
+    const parsed = parseTrajectoryTable(trajectoryTable);
+    if (parsed && parsed.length > 0) {
+      structuredActions = parsed;
+      console.log('[generate] Parsed ' + parsed.length + ' raw actions from trajectory');
+    }
+  }
 
-    const { data: result, error: promptErr } = await state.client.session.prompt(promptParams);
-    if (promptErr) throw new Error(promptErr?.message || JSON.stringify(promptErr));
+  // Priority 1: Trajectory → LLM orchestration (dedup + CTRL API calls)
+  // The trajectory provides raw action sequence; LLM cleans it up and outputs script using CTRL.* helpers.
+  if (structuredActions) {
+    const genPrompt = buildScriptPrompt({ description, url, credentials, structuredActions });
 
-    let allText = (result?.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n') || '';
-    let parsed = parseScriptFromResponse(allText);
-    code = parsed.code;
-    steps = parsed.steps;
+    if (STANDALONE_LLM) {
+      const text = await callLLM(genPrompt, model);
+      const parsed = parseScriptFromResponse(text);
+      code = parsed.code;
+      steps = parsed.steps;
+      if (!code) code = text;
+    } else {
+      const promptParams = {
+        sessionID: sessionId,
+        directory: PROJECT_DIR,
+        agent: 'build',
+        parts: [{ type: 'text', text: genPrompt }],
+      };
+      applyModel(promptParams, model);
 
-    try {
-      const { data: messages } = await state.client.session.messages({ sessionID: sessionId, directory: PROJECT_DIR });
-      if (messages && messages.length) {
-        const texts = messages.filter(m => (m.message?.role || m.info?.role) === 'assistant').flatMap(m => (m.parts || []).filter(p => p.type === 'text').map(p => p.text));
-        const longest = texts.sort((a, b) => b.length - a.length)[0] || '';
-        if (longest.length > allText.length) {
-          allText = longest;
-          const parsed2 = parseScriptFromResponse(longest);
-          if (parsed2.code && parsed2.code.split('\n').length > (code?.split('\n').length || 0)) {
-            code = parsed2.code;
-            steps = parsed2.steps;
+      const { data: result, error: promptErr } = await state.client.session.prompt(promptParams);
+      if (promptErr) throw new Error(promptErr?.message || JSON.stringify(promptErr));
+
+      let allText = (result?.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n') || '';
+      let parsed = parseScriptFromResponse(allText);
+      code = parsed.code;
+      steps = parsed.steps;
+
+      try {
+        const { data: messages } = await state.client.session.messages({ sessionID: sessionId, directory: PROJECT_DIR });
+        if (messages && messages.length) {
+          const texts = messages.filter(m => (m.message?.role || m.info?.role) === 'assistant').flatMap(m => (m.parts || []).filter(p => p.type === 'text').map(p => p.text));
+          const longest = texts.sort((a, b) => b.length - a.length)[0] || '';
+          if (longest.length > allText.length) {
+            allText = longest;
+            const parsed2 = parseScriptFromResponse(longest);
+            if (parsed2.code && parsed2.code.split('\n').length > (code?.split('\n').length || 0)) {
+              code = parsed2.code;
+              steps = parsed2.steps;
+            }
           }
         }
+      } catch (e) {
+        console.log('[generate] Fallback messages fetch failed:', e.message);
       }
-    } catch (e) {
-      console.log('[generate] Fallback messages fetch failed:', e.message);
+    }
+
+    // Fallback to direct conversion if LLM output is unusable
+    if (!code || code.split('\n').length < 5) {
+      const draft = convertTrajectoryToScript(trajectoryTable);
+      if (draft) {
+        code = draft;
+        steps = [{ step: 1, action: 'Fallback: direct trajectory replay' }];
+      }
+    }
+  }
+
+  // Priority 2: LLM-based generation from scratch (no trajectory)
+  if (!code) {
+    const genPrompt = buildScriptPrompt({ description, url, credentials });
+
+    if (STANDALONE_LLM) {
+      const text = await callLLM(genPrompt, model);
+      const parsed = parseScriptFromResponse(text);
+      code = parsed.code;
+      steps = parsed.steps;
+      if (!code) code = text;
+    } else {
+      const promptParams = {
+        sessionID: sessionId,
+        directory: PROJECT_DIR,
+        agent: 'build',
+        parts: [{ type: 'text', text: genPrompt }],
+      };
+      applyModel(promptParams, model);
+
+      const { data: result, error: promptErr } = await state.client.session.prompt(promptParams);
+      if (promptErr) throw new Error(promptErr?.message || JSON.stringify(promptErr));
+
+      let allText = (result?.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n') || '';
+      let parsed = parseScriptFromResponse(allText);
+      code = parsed.code;
+      steps = parsed.steps;
+
+      try {
+        const { data: messages } = await state.client.session.messages({ sessionID: sessionId, directory: PROJECT_DIR });
+        if (messages && messages.length) {
+          const texts = messages.filter(m => (m.message?.role || m.info?.role) === 'assistant').flatMap(m => (m.parts || []).filter(p => p.type === 'text').map(p => p.text));
+          const longest = texts.sort((a, b) => b.length - a.length)[0] || '';
+          if (longest.length > allText.length) {
+            allText = longest;
+            const parsed2 = parseScriptFromResponse(longest);
+            if (parsed2.code && parsed2.code.split('\n').length > (code?.split('\n').length || 0)) {
+              code = parsed2.code;
+              steps = parsed2.steps;
+            }
+          }
+        }
+      } catch (e) {
+        console.log('[generate] Fallback messages fetch failed:', e.message);
+      }
     }
   }
 
@@ -148,7 +219,7 @@ async function runGeneration({ description, url, credentials, sessionId, model }
 export default function (app) {
 
   app.post('/api/test/generate', async (req, res) => {
-    const { description, url, credentials, sessionId: existingSessionId, model } = req.body;
+    const { description, url, credentials, sessionId: existingSessionId, model, trajectoryTable } = req.body;
     if (!description) return res.status(400).json({ error: 'description is required' });
     if (!state.client && !STANDALONE_LLM) return res.status(503).json({ error: 'opencode server not ready' });
 
@@ -166,7 +237,7 @@ export default function (app) {
         sessionId = session.id;
       }
 
-      const promise = runGeneration({ description, url, credentials, sessionId, model });
+      const promise = runGeneration({ description, url, credentials, sessionId, model, trajectoryTable });
       jobs.set(sessionId, { promise, ownSession });
       
       promise
@@ -211,7 +282,20 @@ export default function (app) {
     const sessionId = entry.sessionId;
 
     try {
-      const refinePrompt = `请根据以下反馈修改之前的脚本，只输出修改后的完整脚本：\n\n${feedback}`;
+      const refinePrompt = `Modify the previous script based on the feedback below. Output ONLY the complete updated script.
+
+Feedback:
+${feedback}
+
+## Element UI Core Constraints (must follow when modifying)
+1. Never use page.fill() — use native setter + input/change/blur with bubbling events for el-input
+2. el-select dropdown: click trigger to open, then click .el-select-dropdown__item by text (forbid click_element_by_index)
+3. el-dialog: re-querySelector every time, don't cache references
+4. el-menu: check el-submenu expansion before clicking child items
+5. Date fields: use native setter + Escape to close picker panel
+6. XPath exact match: text()='exact text', forbid contains(text(),'text')
+7. Wait 500ms between steps for Vue reactivity
+8. Read back values after filling to confirm write success`;
 
       let code, steps;
 

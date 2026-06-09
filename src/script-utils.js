@@ -2,6 +2,7 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from '
 import path from 'path';
 import crypto from 'crypto';
 import { GENERATED_DIR } from './config.js';
+import { getInjectionCode, CTRL_PROMPT_BLOCK, CTRL_API_TABLE } from './ctrl-actions.js';
 
 export function ensureGeneratedDir() {
   if (!existsSync(GENERATED_DIR)) mkdirSync(GENERATED_DIR, { recursive: true });
@@ -19,94 +20,225 @@ export function saveGeneratedIndex(list) {
   writeFileSync(path.join(GENERATED_DIR, 'index.json'), JSON.stringify(list, null, 2), 'utf-8');
 }
 
-export function buildScriptPrompt({ description, url, credentials, referenceScript, referenceScriptName }) {
-  let prompt = `根据以下描述生成 Playwright 测试脚本。
+export function buildScriptPrompt({ description, url, credentials, referenceScript, referenceScriptName, structuredActions }) {
+  const hasActions = structuredActions && structuredActions.length > 0;
 
-## 测试场景
-${description || '(未提供)'}`;
-  prompt += `\n\n## 规范（按优先级排列）
+  let prompt = `Generate a Playwright test script based on the scenario below.
 
-### 🔴 优先级 1 — 定位策略（直接影响脚本能否运行）
-- 【点击一律用 XPath】所有点击/导航类操作（按钮、图标、标签页、树节点、表格行操作按钮、分页等）必须使用 xpath= 格式定位。示例：
-  ✓ page.locator('xpath=//span[text()="客户管理-新增潜客"]').last().click()
-  ✓ page.locator('xpath=//i[contains(@class,"bianji")]').first().click()
-  ✗ page.evaluate(() => { ... textContent.includes('名称') ... })
-  ✗ page.locator('span:text-is("客户管理-新增潜客")')
-  ✗ page.locator('div:has-text("测试案例")')
-  禁止使用 :text-is()、:has-text()、page.evaluate + textContent 等方式定位点击目标
-- 【XPath 精确匹配】所有 XPath 内文本匹配必须用 text()='精确文本'（如 //span[text()='客户管理-新增潜客']），禁止使用 contains(text(),'文本') 做模糊匹配。禁止在 evaluate 中用 textContent 遍历查找节点
-- 【弹窗定位】用 locator('.el-dialog').last() 限定弹窗内查找，操作前先 waitFor({state:'visible'})。禁止将 .el-dialog 与 [class*="drawer"] 混用
-- 【等待就绪】页面导航或登录后，必须等待目标元素出现再操作（await page.waitForSelector() 或 await locator.waitFor()），不要仅依赖 waitForTimeout。例如登录后等 .el-tree 加载再展开节点
-- 【步骤间等待】每次点击导航后，必须用 waitForSelector() 等待下一步目标元素出现。例如点击树节点后等待表格(.vxe-table/.el-table)加载再查找行
+## Test Scenario
+${description || '(not provided)'}`;
 
-### 🟡 优先级 2 — 特定组件交互（参考 atp-ui 和 atp-rule 技能）
-- 【加载技能】涉及 Element UI 组件交互时，先加载 \`atp-ui\` 技能获取最新操作指南；涉及表单字段值生成时加载 \`atp-rule\` 技能
-- 【树菜单展开】不要逐个点击展开。先调用 page.evaluate 一次性展开所有节点（函数如下，复制到脚本顶部）。展开后用 XPath 定位叶节点
-  async function expandAllTreeNodes(page) {
-    for (let i = 0; i < 10; i++) {
-      const clicked = await page.evaluate(() => {
-        const tree = document.querySelector('.el-tree');
-        if (!tree) return -1;
-        let n = 0;
-        tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node => {
-          const icon = node.querySelector(':scope > .el-tree-node__content > .el-tree-node__expand-icon');
-          if (icon) { icon.click(); n++; }
-        });
-        return n;
-      });
-      if (clicked === -1 || clicked === 0) break;
-      await page.waitForTimeout(500);
+  // ====== Raw trajectory actions (for LLM to deduplicate and orchestrate) ======
+  if (hasActions) {
+    prompt += `\n\n## Browser Exploration Trajectory — Raw Action Sequence (contains exploratory noise)
+Below is the raw action sequence recorded by the AI agent exploring the page. The trajectory includes **noise**: retries, diagnostic reads, redundant operations.
+**Your task**: denoise, merge, orchestrate, and output a clean Playwright script.
+
+### Raw Trajectory
+` + '| # | Action Type | Label | Value | XPath |\n|---|------------|-------|-------|-------|\n';
+    for (let i = 0; i < structuredActions.length; i++) {
+      const a = structuredActions[i];
+      prompt += `| ${i + 1} | ${a.type || ''} | ${a.label || '-'} | ${a.value || '-'} | ${a.xpath || '-'} |\n`;
     }
   }
-  用法：await page.waitForSelector('.el-tree'); await expandAllTreeNodes(page);
-- 【Element UI 表单填充】禁止使用 page.fill()。用原生 setter + dispatchEvent 触发 v-model：
-  function nativeInputSetter(input, val) {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-    setter.call(input, val);
-    input.dispatchEvent(new Event('input',{bubbles:true}));
-    input.dispatchEvent(new Event('change',{bubbles:true}));
-    input.dispatchEvent(new Event('blur',{bubbles:true}));
+
+  // ====== CTRL API — Element UI custom actions (from controller.py) ======
+  if (hasActions) {
+    prompt += `
+### CTRL API — Element UI Custom Actions (copy this code block into your script)
+Inject the complete CTRL object at the top of your script using \`page.evaluate\`. **Copy the code block below verbatim — do not modify it**:
+
+${CTRL_PROMPT_BLOCK}
+
+After injection, all Element UI operations are called via \`await page.evaluate(() => CTRL.xxx(args))\`.
+
+### API Reference
+${CTRL_API_TABLE}
+
+### Orchestration Rules
+1. **Dedup at your discretion**: The trajectory contains exploratory noise (retries, diagnostics, redundant reads). Examine each action's goal description, parameter changes, and context to decide what to keep or discard
+2. **Merge consecutive reads**: If 3+ consecutive \`read_case_data\` calls appear, merge them into a single variable declaration block
+3. **CTRL first**: ALL Element UI interactions MUST use \`await page.evaluate(() => CTRL.xxx())\`. Never use \`page.locator()\`, \`page.fill()\`, or \`querySelector\` for Element UI components
+4. **Don't redefine CTRL**: Copy the injection code block above as-is. Do not re-implement or override CTRL methods
+5. **el-select is NOT native select**: The \`select_option\` action in the trajectory is Element UI \`el-select\` (custom dropdown), NOT a native HTML \`<select>\` element. Always use \`CTRL.selectOption(label, option)\`. Never use \`page.locator('select')\` or \`selectOption({index:N})\`
+6. **Handle return values**: Check return values per the API table (e.g., 'field-disabled' → skip, 'is-date-picker' → use selectDate instead)
+7. **Wait between steps**: Add \`await page.waitForTimeout(500)\` after each CTRL call to let Vue's reactivity settle
+8. **Screenshots**: Add \`await page.screenshot({path: '/tmp/step_N.png'})\` before/after key steps
+9. **Script structure** — Declare \`browser\` and \`page\` at the IIFE top, BEFORE \`try\`:
+   \`\`\`javascript
+   const { chromium } = require('playwright');
+
+   (async () => {
+     const browser = await chromium.launch({ headless: false, slowMo: 100 });
+     const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+     const page = await context.newPage();
+
+     // Paste the CTRL injection code block here
+     await page.evaluate(() => { window.CTRL = { /* ... */ }; });
+
+     try {
+       // Test steps: only use await page.evaluate(() => CTRL.xxx())
+     } catch (err) {
+       console.error('Test failed:', err.message);
+       try { await page.screenshot({ path: '/tmp/error.png' }); } catch {}
+       throw err;
+     } finally {
+       await browser.close();
+     }
+   })().catch(err => { process.exit(1); });
+   \`\`\`
+   Note: \`page\` and \`browser\` are declared before \`try\`, making them accessible in \`catch\`/\`finally\`. The nested try-catch around screenshot prevents screenshot errors from masking the original failure.
+`;
   }
-  注意：直接赋值，**不要先清空(setter+'')再赋值**，否则 Vue 的异步更新会导致预填值被覆盖
-  textarea 类似，用 HTMLTextAreaElement.prototype
-- 【下拉选择(el-select)】先 click 触发器展开，再在 .el-select-dropdown__item 内按文本 click 选项
-- 【弹窗(el-dialog)】每次操作前重新 querySelector，不缓存引用（Vue 可能销毁重建 DOM）
-- 【表格(el-table)】点击行内操作按钮时，先在行上下文中按文字定位，再在行内查找图标按钮
-- 【菜单(el-menu)】点击前先检查父级 el-submenu 是否展开，未展开时先点展开图标
-- 【日期/时间】同样用原生 setter + input/change/blur 事件
-- 【form-data 验证】操作后用 page.evaluate 回读值确认写入成功
-- 【错误检测】提交后扫描 .el-form-item__error / .el-message / .el-notification
 
-### 🟢 优先级 3 — 脚本结构与常规约束
-- 【脚本框架】使用 require('playwright') 引入，headless:false, slowMo:100, viewport 1920x1080, TARGET_URL 常量脚本顶部
-- 【模板代码】整体 try-catch 包裹，错误时截图 + console.error(err.message)，finally 中关闭 browser
-- 【步骤日志】每个步骤前加 // 注释，用 console.log('✓ 步骤描述') 输出状态，截图保存到 /tmp/{步骤名}.png
-- 【去冗余】轨迹中带"重新""修正"前缀的步骤表示覆盖重试，仅保留最后一次成功操作
+  // ====== Element UI component action reference (from element-ui-knowledge.md) ======
+  prompt += `\n\n## Element UI Component Action Reference
 
-### ⚪ 优先级 4 — 技术限制（必须遵守，否则报错）
-- 【选择器合法性】:has-text()、:text()、:visible 等 Playwright 扩展伪选择器只用于 locator()，不能用于 page.evaluate() / querySelector()
-- 【组合选择器】不要将 Playwright 扩展选择器与标准 CSS 混合传给 querySelector/evaluate
-- 【evaluate 作用域】page.evaluate() 内无法访问 Node.js 中定义的函数和变量。如需要用 native setter，必须在 evaluate 的箭头函数体内重新定义或内联`;
+### 1. Quick Reference (Scenario → Playwright Implementation)
+| Scenario | Playwright Implementation |
+|----------|------------------------|
+| Navigate to URL | \`await page.goto(url)\` |
+| Click button/link | \`await page.locator('xpath=//button[text()="button text"]').click()\` (prefer exact XPath) |
+| Click icon-only button | \`page.evaluate\` to locate by class inside el-table__row (atp-ui §16) |
+| el-select dropdown | \`page.evaluate\` click trigger + click .el-select-dropdown__item by text (atp-ui §14.6) |
+| el-input text | \`page.evaluate\` native setter + input/change/blur (atp-ui §14.4) |
+| el-textarea | \`page.evaluate\` HTMLTextAreaElement native setter + events (atp-ui §14.5) |
+| el-radio | \`page.evaluate\` find .el-radio by text and click (atp-ui §14.7) |
+| el-checkbox | \`page.evaluate\` find .el-checkbox by text and click .el-checkbox__inner (atp-ui §14.8) |
+| el-date-picker | \`page.evaluate\` native setter + input/change/blur + Escape to close panel (atp-ui §11) |
+| el-dialog operation | \`page.waitForSelector('.el-dialog', {state:'visible'})\` first, re-query each time (atp-ui §5) |
+| el-dialog close | \`page.evaluate\` click × or cancel button (atp-ui §5.4) |
+| el-menu navigation | \`page.evaluate\` expand el-submenu + click el-menu-item (atp-ui §6) |
+| el-tabs switch | \`page.evaluate\` click .el-tabs__item (atp-ui §8) |
+| el-table row action | \`page.evaluate\` locate row by text inside .el-table__row (atp-ui §4.1) |
+| el-tree expand | \`page.evaluate\` click .el-tree-node__expand-icon (atp-ui §7) |
+| el-loading wait | \`page.evaluate\` poll .el-loading-mask visibility (atp-ui §10) |
+| el-cascader | Click each level .el-cascader-menu__item sequentially (atp-ui §13) |
+| el-message detection | \`page.evaluate\` read .el-message text (atp-ui §9.1) |
+| el-notification close | \`page.evaluate\` click .el-notification__closeBtn (atp-ui §9.3) |
+| Table pagination | \`page.evaluate\` click .el-pagination .btn-next (atp-ui §4.4) |
+| el-switch toggle | \`page.evaluate\` click .el-switch (atp-ui §14.9) |
+| File upload el-upload | \`page.waitForEvent('filechooser')\` + \`fileChooser.setFiles()\` (atp-ui §12) |
+| Adjacent button (选择/引入) | \`page.evaluate\` find button.el-button--primary.is-plain in .el-form-item and click (atp-ui §14.10) |
+| Form error detection | \`page.evaluate\` scan .el-form-item__error / .el-message / .el-notification (atp-ui §15) |
+| Post-operation value check | \`page.evaluate\` read back input.value to verify write (atp-ui §2.4) |
+
+### 2. Core Principles (must follow, otherwise scripts will be invalid)
+1. **Never use page.fill()**: Element UI uses Vue v-model. Always use native setter + bubbling events (input/change/blur with bubbles:true) (atp-ui §2.1)
+2. **Re-query DOM every time**: Don't cache el-dialog/el-table/el-tree references — Vue may destroy and rebuild them asynchronously (atp-ui §2.2)
+3. **Wait between steps**: Add \`await page.waitForTimeout(500)\` after each evaluate to give Vue reactivity time (atp-ui §2.3)
+4. **Verify after writes**: Read back values to confirm, preventing LLM from re-filling the same field (atp-ui §2.4)
+5. **Atomic operations**: Complete "find → check → act" in a single evaluate; don't split into two steps (atp-ui §20)
+6. **Direct assign, don't clear first**: \`setter.call(input, 'X')\` directly. Never \`setter('')\` then \`setter('X')\` — Vue will overwrite (atp-ui §14.3)
+7. **el-select: absolutely forbid click_element_by_index**: Option clicks must go through .el-select-dropdown__item. Wrong DOM layer renders Vue unable to detect selection (atp-ui §14.6)
+8. **Address selector: check placeholder**: Readonly inputs check placeholder ("请选择" = not selected), not value (atp-ui §13.1)`;
+
+  // ====== Data generation rules (from atp-rule skill) ======
+  prompt += `\n\n## Form Field Data Generation Rules (atp-rule)
+Embed the generator functions at the top of your script. Match form field labels by keyword to auto-generate valid random values:
+
+### Generator Functions (copy to top of script)
+\`\`\`javascript
+// === atp-rule form field data generators ===
+function genValidIdCard(prefix = '430101') {
+  const birth = \`\${1950 + Math.floor(Math.random() * 55)}\${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}\${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}\`;
+  const seq = String(Math.floor(Math.random() * 999)).padStart(3, '0');
+  const base = \`\${prefix}\${birth}\${seq}\`;
+  const weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+  const map = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2'];
+  const sum = base.split('').reduce((s, c, i) => s + parseInt(c) * weights[i], 0);
+  return base + map[sum % 11];
+}
+function genMobile() {
+  const second = [3, 4, 5, 6, 7, 8, 9][Math.floor(Math.random() * 7)];
+  let num = '1' + second;
+  for (let i = 0; i < 9; i++) num += Math.floor(Math.random() * 10);
+  return num;
+}
+function genCreditCode() {
+  const CHARS = '0123456789ABCDEFGHJKLMNPQRTUWXY';
+  const WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28];
+  let body = '91' + String(Math.floor(Math.random() * 900000) + 100000);
+  for (let i = 0; i < 9; i++) body += CHARS[Math.floor(Math.random() * CHARS.length)];
+  const total = body.split('').reduce((s, c, i) => s + CHARS.indexOf(c) * WEIGHTS[i], 0);
+  return body + CHARS[(31 - total % 31) % 31];
+}
+function genName() {
+  const surnames = ['张','李','王','刘','陈','杨','赵','黄','周','吴','朱','郑'];
+  const names = ['伟','芳','敏','静','丽','强','磊','洋','涛','明','飞','峰','华','平','刚','杰'];
+  return surnames[Math.floor(Math.random()*surnames.length)] + names[Math.floor(Math.random()*names.length)] + names[Math.floor(Math.random()*names.length)];
+}
+function genEmail() {
+  const names = ['test','admin','user','contact','info','service'];
+  const domains = ['example.com','company.com','test.org','mail.cn'];
+  return names[Math.floor(Math.random()*names.length)] + '_' + Math.random().toString(36).substring(2,6) + '@' + domains[Math.floor(Math.random()*domains.length)];
+}
+function genBankCard() { let n='62'; for(let i=0;i<17;i++) n+=Math.floor(Math.random()*10); return n.slice(0,19); }
+function genAmount() { return Math.floor(Math.random()*9900000+100000)+'.'+String(Math.floor(Math.random()*100)).padStart(2,'0'); }
+function genAddress() { const cities=['北京市朝阳区','上海市浦东新区','广州市天河区','深圳市南山区','杭州市西湖区','长沙市岳麓区']; const roads=['中山路','人民路','解放路','建设路','五一路','芙蓉路']; return cities[Math.floor(Math.random()*cities.length)]+roads[Math.floor(Math.random()*roads.length)]+(Math.floor(Math.random()*200)+1)+'号'; }
+function genAge() { return String(Math.floor(Math.random() * 48) + 18); }
+
+function matchFormRule(label) {
+  const t = label.replace(/\\s+/g, '');
+  if (/身份证|身份证号|居民身份证/.test(t)) return genValidIdCard();
+  if (/手机|电话|联系方式|联系电话|电话号码/.test(t)) return genMobile();
+  if (/邮箱|Email|电子邮箱/.test(t)) return genEmail();
+  if (/统一社会信用代码|信用代码|营业执照|证件号码/.test(t)) return genCreditCode();
+  if (/银行卡|银行卡号|银行账号/.test(t)) return genBankCard();
+  if (/金额|价格|费用|工资|收入/.test(t)) return genAmount();
+  if (/邮编|邮政编码/.test(t)) return '100000';
+  if (/姓名|用户名|联系人/.test(t)) return genName();
+  if (/地址|详细地址|联系地址/.test(t)) return genAddress();
+  if (/年龄/.test(t)) return genAge();
+  return null;
+}
+\`\`\`
+
+**Usage**: Before filling a form field, call \`matchFormRule(label)\` to generate a valid random value. If it returns null, use the value from the test description or a reasonable default. User-specified values in the description take priority over generators.`;
+
+  // ====== Script generation rules ======
+  prompt += `\n\n## Script Generation Rules
+
+### Locator Strategy
+- 【XPath for clicks】ALL clicks (buttons, icons, tabs, table row actions, pagination, etc.) MUST use \`page.locator('xpath=...')\`:
+  ✓ \`await page.locator('xpath=//span[text()="客户管理-新增潜客"]').last().click()\`
+  ✓ \`await page.locator('xpath=//i[contains(@class,"bianji")]').first().click()\`
+  ✗ \`page.locator('span:text-is("xxx")')\` — Do NOT use :text-is / :has-text pseudo-selectors
+  ✗ \`page.evaluate\` with textContent traversal — Do NOT use
+- 【XPath exact match】Text matching must use \`text()='exact text'\`. Do NOT use \`contains(text(),'text')\` fuzzy matching
+- 【Dialog scoping】Use \`locator('.el-dialog').last()\` to scope inside dialogs; \`waitFor({state:'visible'})\` before acting
+- 【Wait for readiness】After navigation, always \`await page.waitForSelector()\` for the target element — do NOT rely on waitForTimeout
+
+### Script Structure
+- 【Framework】\`const { chromium } = require('playwright')\`, headless:false, slowMo:100, viewport 1920x1080
+- 【Template】Wrap in try-catch; screenshot + console.error on error; close browser in finally
+- 【Logging】Prefix each step with // comment + \`console.log('✓ step description')\`; save screenshots to \`/tmp/{step_name}.png\`
+- 【Constants】Define \`TARGET_URL\` at the top of the script
+
+### Technical Constraints
+- 【Selectors】:has-text / :text / :visible are ONLY for \`locator()\` — NOT for \`page.evaluate()\` / \`querySelector()\`
+- 【evaluate scope】Variables defined in Node.js (e.g. \`const\`) are NOT accessible inside \`page.evaluate()\`. If you need native setter, define it inline inside the evaluate callback
+- 【Dedup】Trajectory steps with "重新" or "修正" (retry/redo) prefixes: keep only the last successful attempt`;
 
   if (referenceScript) {
-    prompt += `\n\n## 参考脚本 (${referenceScriptName || 'reference.js'})\n\`\`\`javascript\n${referenceScript}\n\`\`\``;
+    prompt += `\n\n## Reference Script (${referenceScriptName || 'reference.js'})\n\`\`\`javascript\n${referenceScript}\n\`\`\``;
   }
 
   if (credentials?.username || credentials?.password) {
-    prompt += `\n\n## 登录凭据\n- 用户名: ${credentials.username || '(未提供)'}\n- 密码: ${credentials.password || '(未提供)'}`;
+    prompt += `\n\n## Login Credentials\n- Username: ${credentials.username || '(not provided)'}\n- Password: ${credentials.password || '(not provided)'}`;
   }
 	
-  if (url) prompt += `\n\n## 目标系统\nTARGET_URL: ${url}`;
+  if (url) prompt += `\n\n## Target System\nTARGET_URL: ${url}`;
 
-  prompt += `\n\n## 输出格式
-请严格按以下格式输出：
+  prompt += `\n\n## Output Format
+Follow this output structure strictly:
 
-### 测试步骤
-1. 步骤描述
-2. 步骤描述
+### Test Steps
+1. Step description
+2. Step description
 ...
 
-### 脚本代码
+### Script Code
 \`\`\`javascript
 const { chromium } = require('playwright');
 ...
@@ -134,13 +266,28 @@ export function parseScriptFromResponse(text) {
     }
   }
 
-  // Script: from "const { chromium }" to last "})();"
+  // Script: from "const { chromium }" to last "})();" or "})().catch"
   const playwrightIdx = text.search(/(?:const|let|var)\s*\{\s*chromium\s*\}\s*=\s*require\s*\(\s*['"]playwright['"]\s*\)/);
   if (playwrightIdx >= 0) {
     code = text.slice(playwrightIdx);
-    const lastClose = code.lastIndexOf('})();');
-    if (lastClose >= 0) code = code.slice(0, lastClose + 5).trim();
-    else code = code.trim();
+    // Try primary ending: })(); or })().then(...) or })().catch(...)
+    const endMatch = code.match(/\}\)\s*\(\s*\)\s*;(?:\s*\.\w+\s*\([^)]*\)\s*;\s*)?$/);
+    if (endMatch) {
+      code = code.slice(0, endMatch.index + endMatch[0].length);
+    } else {
+      // Try multi-line catch: })().catch(\n  ...\n);
+      const catchMatch = code.match(/\}\)\s*\(\s*\)\s*\.\w+\s*\([\s\S]*?\)\s*;\s*$/);
+      if (catchMatch) {
+        code = code.slice(0, catchMatch.index + catchMatch[0].length);
+      } else {
+        // Fallback: try to find last }); that closes the IIFE
+        const lastClose = code.lastIndexOf('})();');
+        if (lastClose >= 0) code = code.slice(0, lastClose + 5);
+        else code = code.trim();
+      }
+    }
+    // Strip trailing markdown fences or non-code content
+    code = code.replace(/```[\s\S]*$/, '').trim();
   }
 
   // Fallback: grab everything after "脚本代码" line
@@ -149,8 +296,19 @@ export function parseScriptFromResponse(text) {
       if (/脚本代码/.test(lines[i])) {
         code = lines.slice(i + 1).join('\n').trim();
         // Strip trailing markdown/todos/comments
-        const lastClose = code.lastIndexOf('})();');
-        if (lastClose >= 0) code = code.slice(0, lastClose + 5).trim();
+        const endMatch = code.match(/\}\)\s*\(\s*\)\s*;(?:\s*\.\w+\s*\([^)]*\)\s*;\s*)?$/);
+        if (endMatch) {
+          code = code.slice(0, endMatch.index + endMatch[0].length);
+        } else {
+          const catchMatch = code.match(/\}\)\s*\(\s*\)\s*\.\w+\s*\([\s\S]*?\)\s*;\s*$/);
+          if (catchMatch) {
+            code = code.slice(0, catchMatch.index + catchMatch[0].length);
+          } else {
+            const lastClose = code.lastIndexOf('})();');
+            if (lastClose >= 0) code = code.slice(0, lastClose + 5);
+          }
+        }
+        code = code.replace(/```[\s\S]*$/, '').trim();
         break;
       }
     }
@@ -283,4 +441,287 @@ export function extractFlowFromTrajectory(trajectory) {
   }
 
   return flow;
+}
+
+/**
+ * Parse a markdown trajectory table into structured action rows.
+ * Format from sendToScriptGen in trajectory.js:
+ *   | # | 操作 | 目标 | 元素 | XPath | 标签 | 值 |
+ */
+export function parseTrajectoryTable(text) {
+  const rows = [];
+  const lines = text.split('\n');
+  let inTable = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('|') && trimmed.includes('操作') && trimmed.includes('目标')) {
+      inTable = true;
+      continue;
+    }
+    if (trimmed.startsWith('|---')) continue;
+    if (!inTable || !trimmed.startsWith('|')) {
+      if (inTable) break;
+      continue;
+    }
+
+    const cells = trimmed.split('|').map(c => c.trim()).filter(c => c !== '');
+    if (cells.length < 2) continue;
+
+    rows.push({
+      num: parseInt(cells[0]) || 0,
+      type: cells[1] || '',
+      goal: cells[2] || '',
+      tag: cells[3] || '',
+      xpath: cells[4] === '-' ? '' : (cells[4] || ''),
+      label: cells[5] || '',
+      value: cells[6] || '',
+    });
+  }
+  return rows;
+}
+
+
+const SCRIPT_TEMPLATE_HEAD = `const { chromium } = require('playwright');
+
+(async () => {
+  const browser = await chromium.launch({ headless: false, slowMo: 100 });
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  const page = await context.newPage();
+
+${getInjectionCode()}
+
+  try {`;
+
+const SCRIPT_TEMPLATE_TAIL = `
+  } catch (err) {
+    console.error('Test failed:', err.message);
+    await page.screenshot({ path: '/tmp/error.png', fullPage: false });
+    throw err;
+  } finally {
+    await browser.close();
+  }
+})().catch(err => { console.error(err); process.exit(1); });`;
+
+/**
+ * Generate a robust script action line for a single trajectory action.
+ * Each action uses the CTRL helpers (from controller.py) via page.evaluate().
+ */
+function genActionLine(row, idx) {
+  const { type, label, value, xpath, goal } = row;
+  const n = idx + 1;
+  const comment = goal ? ` // ${goal.replace(/`/g, "'").slice(0, 100)}` : '';
+  const esc = (s) => (s || '').replace(/\\/g, '\\\\').replace(/\`/g, '\\`').replace(/\${/g, '\\${');
+
+  switch (type) {
+    case 'fill_form_field':
+      if (!label || !value) return '';
+      return [
+        `    console.log(\`[${n}] Fill "${label}" with "${value}"\`);${comment}`,
+        `    const r${n} = await page.evaluate(() => CTRL.fillFormField('${esc(label)}', '${esc(value)}'));`,
+        `    if (r${n} === 'field-disabled') console.log('  → disabled, already filled');`,
+        `    else if (r${n} === 'is-date-picker') console.log('  → is date picker, use selectDate');`,
+        `    await page.waitForTimeout(500);`,
+      ];
+
+    case 'select_option':
+      if (!label) return '';
+      return [
+        `    console.log(\`[${n}] Select "${esc(value || 'first')}" in "${label}"\`);${comment}`,
+        `    const r${n} = await page.evaluate(() => CTRL.selectOption('${esc(label)}', '${esc(value || 'first')}'));`,
+        `    console.log('  →', r${n});`,
+        `    await page.waitForTimeout(800);`,
+      ];
+
+    case 'select_date':
+      if (!label || !value) return '';
+      return [
+        `    console.log(\`[${n}] Set date "${value}" for "${label}"\`);${comment}`,
+        `    const r${n} = await page.evaluate(() => CTRL.selectDate('${esc(label)}', '${esc(value)}'));`,
+        `    if (r${n}.startsWith('already:')) console.log('  → already set');`,
+        `    await page.waitForTimeout(500);`,
+      ];
+
+    case 'click_radio':
+      if (!label || !value) return '';
+      return [
+        `    console.log(\`[${n}] Click radio "${value}" in "${label}"\`);${comment}`,
+        `    await page.evaluate(() => CTRL.clickRadio('${esc(label)}', '${esc(value)}'));`,
+        `    await page.waitForTimeout(300);`,
+      ];
+
+    case 'click_menu_item': {
+      const param = esc(label || value || '');
+      if (!param) return '';
+      return [
+        `    console.log(\`[${n}] Click menu "${param}"\`);${comment}`,
+        `    await page.evaluate(() => CTRL.clickMenuItem('${param}'));`,
+        `    await page.waitForTimeout(800);`,
+      ];
+    }
+
+    case 'click_table_row_action': {
+      const rText = esc(label || '');
+      const bText = esc(value || '');
+      if (!rText || !bText) return '';
+      return [
+        `    console.log(\`[${n}] Click "${bText}" in row "${rText}"\`);${comment}`,
+        `    await page.evaluate(() => CTRL.clickTableRowAction('${rText}', '${bText}'));`,
+        `    await page.waitForTimeout(500);`,
+      ];
+    }
+
+    case 'close_dialog':
+      return [
+        `    console.log(\`[${n}] Close dialog\`);${comment}`,
+        `    const r${n} = await page.evaluate(() => CTRL.closeDialog());`,
+        `    console.log('  →', r${n});`,
+        `    await page.waitForTimeout(500);`,
+      ];
+
+    case 'wait_for_loading':
+      return [
+        `    console.log(\`[${n}] Wait for loading\`);${comment}`,
+        `    await page.evaluate(() => CTRL.waitForLoading());`,
+      ];
+
+    case 'switch_tab': {
+      const param = esc(label || value || '');
+      if (!param) return '';
+      return [
+        `    console.log(\`[${n}] Switch to tab "${param}"\`);${comment}`,
+        `    await page.evaluate(() => CTRL.switchTab('${param}'));`,
+        `    await page.waitForTimeout(500);`,
+      ];
+    }
+
+    case 'click_adjacent_button':
+      if (!label) return '';
+      return [
+        `    console.log(\`[${n}] Click adjacent button for "${label}"\`);${comment}`,
+        `    const r${n} = await page.evaluate(() => CTRL.clickAdjacentButton('${esc(label)}'));`,
+        `    if (r${n} === 'already-filled') console.log('  → already filled');`,
+        `    await page.waitForTimeout(500);`,
+      ];
+
+    case 'expand_all_el_tree':
+      return [
+        `    console.log(\`[${n}] Expand all tree nodes\`);${comment}`,
+        `    await page.evaluate(() => CTRL.expandAllTreeNodes());`,
+        `    await page.waitForTimeout(500);`,
+      ];
+
+    case 'check_field_value':
+      if (!label) return '';
+      return [
+        `    console.log(\`[${n}] Check field "${label}"\`);${comment}`,
+        `    const val${n} = await page.evaluate(() => CTRL.checkFieldValue('${esc(label)}'));`,
+        `    console.log('  →', val${n});`,
+      ];
+
+    case 'save_case_data': {
+      const k = label || `data_${n}`;
+      const v = value || '';
+      return [
+        `    const ${k.replace(/[^a-zA-Z0-9_]/g, '_')} = '${esc(v)}';${comment}`,
+      ];
+    }
+
+    case 'read_case_data': {
+      const k = label || '';
+      if (!k) return '';
+      return [
+        `    // read_case_data: ${k} (already stored as const)${comment}`,
+      ];
+    }
+
+    case 'take_screenshot':
+      return [
+        `    console.log(\`[${n}] Screenshot\`);${comment}`,
+        `    await page.screenshot({ path: '/tmp/step_${n}.png', fullPage: false });`,
+      ];
+
+    case 'extract_content':
+      return [
+        `    console.log(\`[${n}] Extract page content\`);${comment}`,
+        `    const text${n} = await page.evaluate(() => document.body.innerText);`,
+        `    console.log('  →', text${n}.slice(0, 200));`,
+      ];
+
+    case 'get_page_state':
+      return [
+        `    console.log(\`[${n}] Page state\`);${comment}`,
+        `    const state${n} = await page.evaluate(() => ({ dialogs: document.querySelectorAll('.el-dialog').length, loading: !!document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'), notifs: [...document.querySelectorAll('.el-notification')].filter(e=>e.offsetParent!==null).length }));`,
+        `    console.log('  →', JSON.stringify(state${n}));`,
+      ];
+
+    case 'click_element_by_index':
+    case 'click_element':
+      if (xpath) {
+        return [
+          `    console.log(\`[${n}] Click by XPath\`);${comment}`,
+          `    await page.locator('xpath=${esc(xpath)}').click();`,
+          `    await page.waitForTimeout(500);`,
+        ];
+      }
+      // No XPath — use evaluate with text check as last resort
+      return [
+        `    // [${n}] Click element (no XPath in trajectory)${comment}`,
+        `    console.log(\`[${n}] Click element\`);`,
+        `    // Try to find by text:`,
+        `    const clicked${n} = await page.evaluate(() => {`,
+        `      const btns = document.querySelectorAll('button, .el-button, a, [role="button"]');`,
+        `      for (const b of btns) { if (b.offsetParent !== null && b.textContent.trim()) { b.click(); return b.textContent.trim(); } }`,
+        `      return null;`,
+        `    });`,
+        `    if (clicked${n}) console.log('  → clicked:', clicked${n});`,
+        `    await page.waitForTimeout(500);`,
+      ];
+
+    case 'go_to_url':
+    case 'navigate':
+      return [
+        `    console.log(\`[${n}] Navigate\`);${comment}`,
+        value && value.startsWith('http')
+          ? `    await page.goto('${esc(value)}', { waitUntil: 'networkidle', timeout: 60000 });`
+          : `    await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 60000 });`,
+        `    await page.waitForTimeout(2000);`,
+      ];
+
+    case 'done':
+      return [
+        `    console.log(\`[${n}] Task complete\`);${comment}`,
+      ];
+
+    default:
+      // Unknown action — log it but don't generate broken code
+      return [
+        `    // [${n}] ${type} (unsupported action, skipping)${comment}`,
+      ];
+  }
+}
+
+/**
+ * Convert parsed trajectory actions into a complete, runnable Playwright script.
+ * Embeds controller.py Element UI helpers (CTRL object) for correct Vue interaction.
+ * Returns null if parsing yields no actions.
+ */
+export function convertTrajectoryToScript(trajectoryTable) {
+  const rows = parseTrajectoryTable(trajectoryTable);
+  if (!rows || rows.length === 0) return null;
+
+  const lines = [];
+  lines.push(SCRIPT_TEMPLATE_HEAD);
+
+  for (let i = 0; i < rows.length; i++) {
+    const actionLines = genActionLine(rows[i], i);
+    if (actionLines && actionLines.length > 0) {
+      lines.push('');
+      lines.push(`    // ----- Step ${i + 1}: ${rows[i].type}${rows[i].label ? ' (' + rows[i].label + ')' : ''} -----`);
+      lines.push(...actionLines);
+    }
+  }
+
+  lines.push(SCRIPT_TEMPLATE_TAIL);
+  return lines.join('\n');
 }
