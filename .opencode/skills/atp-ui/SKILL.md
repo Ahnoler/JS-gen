@@ -753,11 +753,19 @@ await page.evaluate(() => {
 - **地址选择器**：按钮文本为"选择"，点击弹出地址选择器弹窗
 - **数据引入**：按钮文本为"引入"，点击自动从系统引入数据，填充多个关联字段（如法定代表人信息的三字段联动）
 
+**重要：点击按钮之前，先检查输入框是否已有值。** 如果输入框的 `value` 非空（已有地址/数据），则**不要点击按钮**，跳过该字段。
+
 **注意**：按钮不是 `input` 的直接兄弟，它在 `.tsscInput`、`.el-input` 等包装层的外部，与包装层同级。必须从 `.el-form-item` 层面查找按钮。
 
 ```javascript
-// 1. 查找表单项，点击其中的"选择"或"引入"按钮
-await page.evaluate(() => {
+// 1. 先检查字段是否已有值
+const addrInput = document.querySelector(
+  '.el-form-item:has(.el-form-item__label:contains("登记注册地址")) .el-input__inner'
+);
+if (addrInput && addrInput.value && addrInput.value.trim() !== '') {
+  // 已有值，跳过
+} else {
+  // 2. 字段为空，点击按钮打开选择器
   const item = document.querySelector(
     '.el-form-item:has(.el-form-item__label:contains("登记注册地址"))'
   );
@@ -766,7 +774,7 @@ await page.evaluate(() => {
   if (btn && btn.offsetParent !== null) {
     btn.click();
   }
-});
+}
 await page.waitForTimeout(800);
 ```
 
@@ -774,6 +782,7 @@ await page.waitForTimeout(800);
 - 这类输入框通常为 `disabled` 或 `readonly`，不可直接 setter 赋值
 - 如果 `fill_form_field` 返回 `field-disabled`，检查当前 `.el-form-item` 及其同级相邻表单项内是否有 `button.el-button--primary.is-plain`——按钮可能不在同一个表单项内（如"引入"按钮在 证件号码 上，但影响 姓名、证件类型 三个字段）
 - 按钮文本可能是"选择"（打开弹窗选择）或"引入"（自动导入数据），两种都适用上述查找逻辑
+- **关键**：点击前必须先检查字段值，避免重复打开已填好的地址选择器
 - 弹窗内的下拉选择按 §14.6 的策略执行
 
 

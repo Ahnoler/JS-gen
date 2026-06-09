@@ -43,13 +43,17 @@ def _gen_address():
 _GEN_MAP = {
     'genIdCard': _gen_idcard, 'genMobile': _gen_mobile, 'genLandline': _gen_landline,
     'genEmail': _gen_email, 'genCreditCode': _gen_credit_code, 'genBankcard': _gen_bankcard,
+    'genBankCard': _gen_bankcard,  # JS naming alias
     'genAmount': _gen_amount, 'genName': _gen_name, 'genAddress': _gen_address,
+    'genQQ': lambda: ''.join(str(_random.randint(0,9)) for _ in range(_random.randint(5,11))),
+    'genAge': lambda: str(_random.randint(18,65)),
+    'genEmployeeId': lambda: 'EMP' + f"{_random.randint(100,999)}",
 }
 
 _FALLBACK_RULES = [
     (['身份证','身份证号','证件号码','居民身份证'], _gen_idcard),
     (['单位电话','固定电话','座机'], _gen_landline),
-    (['手机','电话','联系方式'], _gen_mobile),
+    (['手机','电话','联系方式','联系电话','电话号码'], _gen_mobile),
     (['邮箱','Email','电子邮箱'], _gen_email),
     (['信用代码','统一社会信用代码'], _gen_credit_code),
     (['银行卡','银行卡号','银行账号'], _gen_bankcard),
@@ -58,6 +62,7 @@ _FALLBACK_RULES = [
     (['地址','详细地址','联系地址'], _gen_address),
     (['QQ','QQ号','QQ号码'], lambda: ''.join(str(_random.randint(0,9)) for _ in range(_random.randint(5,11)))),
     (['年龄'], lambda: str(_random.randint(18,65))),
+    (['工号','员工编号'], lambda: 'EMP' + f"{_random.randint(100,999)}"),
     (['邮编','邮政编码'], lambda: '100000'),
     (['案例类型','类型'], lambda: 'SELECT: 功能测试 / 性能测试 / 安全测试 / 兼容性测试 / 回归测试. Choose based on test context.'),
     (['案例性质','性质'], lambda: 'SELECT: 正向案例 / 反向案例. Choose based on test context.'),
@@ -76,46 +81,29 @@ def load_rules(script_dir=None):
     if script_dir is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
     
+    # Start with fallback rules as base
+    rules = _FALLBACK_RULES[:]
+    
+    # Try to load additional rules from atp-rule SKILL.md
     skill_path = os.path.join(script_dir, '..', '.opencode', 'skills', 'atp-rule', 'SKILL.md')
     if not os.path.exists(skill_path):
-        sys.stderr.write(f"[rules] SKILL.md not found at {skill_path}, using fallback\n")
+        sys.stderr.write(f"[rules] SKILL.md not found at {skill_path}, using fallback rules\n")
         sys.stderr.flush()
-        return _FALLBACK_RULES[:]
+        return rules
     
     try:
         with open(skill_path, 'r', encoding='utf-8') as f:
             content = f.read()
     except:
-        return _FALLBACK_RULES[:]
+        return rules
     
-    rules = []
-    
-    # Parse generator table
+    # Parse generator table from SKILL.md
     gen_table = re.findall(r'\| `([^`]+)`.*?\| `(\w+)\(\)`', content)
     for keywords_str, func_name in gen_table:
         kws = [k.strip() for k in keywords_str.replace('`', '').split('、')]
         gen = _GEN_MAP.get(func_name)
         if gen:
             rules.append((kws, gen))
-    
-    # Parse select options
-    sel_rows = re.findall(r'码值选择[\s\S]*?\| `([^`]+)`.*?\| `([^`]+)`[^|]*?\|', content)
-    for keywords_str, options_str in sel_rows:
-        kws = [k.strip() for k in keywords_str.split('、')]
-        opts = options_str.replace('`', '').replace(' / ', ' / ').strip()
-        rules.append((kws, lambda o=opts: f'SELECT: {o}. Choose based on test context.'))
-    
-    # Parse format templates
-    fmt_rows = re.findall(r'格式模板[\s\S]*?\| `([^`]+)`.*?\|([^|]+?)\|', content)
-    for keywords_str, spec in fmt_rows:
-        kws = [k.strip() for k in keywords_str.split('、')]
-        spec_text = spec.strip()
-        rules.append((kws, lambda s=spec_text: s))
-    
-    # Append extra fallback rules
-    rules.append((['QQ','QQ号','QQ号码'], lambda: ''.join(str(_random.randint(0,9)) for _ in range(_random.randint(5,11)))))
-    rules.append((['年龄'], lambda: str(_random.randint(18,65))))
-    rules.append((['邮编','邮政编码'], lambda: '100000'))
     
     sys.stderr.write(f"[rules] Loaded {len(rules)} rule groups\n")
     sys.stderr.flush()

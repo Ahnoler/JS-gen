@@ -63,7 +63,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 
 # Available Actions
 ## Default browser actions (always available)
-- click_element(index) — click element by its [] index. **🚨 NOT for el-select dropdown options (use select_option instead)**
+- click_element(index) — click element by its [] index. **🚨 NOT for adjacent 选择/引入 buttons (use click_adjacent_button instead) and NOT for el-select dropdown options (use select_option instead)**
 - **`input_text` is NOT available** — use `fill_form_field` for all text inputs inside el-form-item
 - **`select_dropdown_option` is NOT available** — use `select_option` for el-select, or native `<select>` handling
 - go_to_url(url), go_back(), scroll(down|up), send_keys(keys)
@@ -84,6 +84,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - get_page_state() — diagnostics
 - save_case_data(key, value) — save a value to the process-level case data store (persists across steps/phases)
 - read_case_data(key) — read a value from the case data store
+- click_adjacent_button(label_text) — click a "选择"/"引入" button next to a field, but ONLY if the field is empty. Returns "already-filled" if the field already has a value — skip it.
 
 # 🚨 FORM FIELD RULES (CRITICAL — DO NOT IGNORE)
 1. **`input_text` is NOT available.** For ALL text/password/textarea inputs inside el-form-item, use `fill_form_field(label_text, value)`.
@@ -92,6 +93,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 4. **If `select_option` returns `"select-disabled"`: the select is disabled.** Check `placeholder`: if it shows "请选择" and `value` is empty → needs filling via adjacent button. If `value` is non-empty → skip (already filled).
 5. **"引入" button across multiple fields**: when a disabled field is empty and has no button in its own `.el-form-item`, search nearby `.el-form-item` elements for a `button.el-button--primary.is-plain` with text "引入". Click it to auto-fill all related disabled fields. The button is typically on the last related field (e.g. 法定代表人/负责人证件号码).
 6. **General rule for disabled fields**: disabled field + empty value + no adjacent "引入"/"选择" button → skip (truly read-only). Disabled field + empty value + adjacent button found → click the button to fill.
+7. **Adjacent button pre-check**: use `click_adjacent_button(label_text)` instead of `click_element_by_index` for "选择" and "引入" buttons. This action checks if the field already has a value first — if it does, it returns "already-filled" and does NOT click the button. **Do NOT use `click_element_by_index` for buttons that open dialogs or import data.**
 
 
 # 🚨 CASCADING EMPTY DROPDOWN RULE
@@ -106,6 +108,13 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 6. After selecting, verify the value changed by checking the return value.
 7. If the task requires recording field values (e.g. "记录到 /dictList/..."): complete Phase A (fill all) → Phase B (save all) → Phase C (click submit). Do NOT go back to an earlier phase.
 8. **If `select_option` returns `"no-items"`:** the dropdown is empty (e.g. 乡镇/街道, 行政村/社区 with no cascading data). **Skip immediately — move to the next required field or click submit.** Press Escape if the empty dropdown is still open. Do NOT click the input, do NOT retry, do NOT scroll.
+
+# 🚨 VALIDATION & SUBMIT RULES (CRITICAL)
+1. After filling ALL form fields, click the submit/save button. Do NOT keep checking or re-filling fields.
+2. If `.el-form-item__error` red text appears (client-side validation error): use `match_form_rule(label_text)` to generate a valid value, fill it via `fill_form_field` or `select_option`, then click submit/save immediately. **Do not check if the red text disappeared** — just fill, submit, and repeat if the server returns another error.
+3. If an `el-notification` popup appears: read the error text, then call `close_dialog()` to dismiss it, then fix the field mentioned in the error, then click submit/save again.
+4. Do NOT go back to re-select or re-fill fields that already returned "already:XXX", "ok", or "field-disabled".
+5. The ONLY way to verify if the form is correct is to click submit and check the result.
 
 # TASK COMPLETION RULES
 1. Use done() ONLY when the entire task is finished. Do NOT call done() after a single step if more work remains.

@@ -223,17 +223,47 @@ export default function (app) {
 
   app.delete('/api/browser/browser', (req, res) => {
     const gb = state.globalBrowser;
+    const proc = gb.process;
+
     if (gb.stdin) {
       try { gb.stdin.write(JSON.stringify({ event: 'close' }) + '\n'); } catch {}
-      setTimeout(() => {
-        if (gb.process && !gb.process.killed) killTree(gb.process.pid);
-        setTimeout(() => killOrphans(), 2000);
-      }, 3000);
     }
-    gb.process = null; gb.stdin = null; gb.ready = false; gb.busy = false; gb.stepIndex = 0;
-    state.sessions.clear();
-    console.log('[browser-global] Browser closed, all sessions cleared');
-    res.json({ status: 'closed' });
+
+    if (proc && !proc.killed) {
+      const forceKillTimer = setTimeout(() => {
+        killTree(proc.pid);
+        setTimeout(() => killOrphans(), 2000);
+        gb.process = null;
+        gb.stdin = null;
+        gb.ready = false;
+        gb.busy = false;
+        gb.stepIndex = 0;
+        state.sessions.clear();
+        console.log('[browser-global] Browser close timeout, force killed');
+        res.json({ status: 'closed (force killed)' });
+      }, 30000);
+
+      proc.on('exit', () => {
+        clearTimeout(forceKillTimer);
+        gb.process = null;
+        gb.stdin = null;
+        gb.ready = false;
+        gb.busy = false;
+        gb.stepIndex = 0;
+        state.sessions.clear();
+        console.log('[browser-global] Browser closed gracefully, trace saved');
+        res.json({ status: 'closed' });
+      });
+    } else {
+      gb.process = null;
+      gb.stdin = null;
+      gb.ready = false;
+      gb.busy = false;
+      gb.stepIndex = 0;
+      state.sessions.clear();
+      console.log('[browser-global] No browser process, cleaned up');
+      res.json({ status: 'closed' });
+    }
   });
 
   app.get('/api/browser/session/:id/trajectories', (req, res) => {

@@ -440,7 +440,7 @@ def _register_misc_actions(controller, browser_context):
                 openDropdown: !!document.querySelector('.el-select-dropdown:not(.is-hidden)'),
                 formErrors: [...document.querySelectorAll('.el-form-item__error')].map(e => e.textContent.trim()).filter(Boolean),
                 messages: [...document.querySelectorAll('.el-message')].map(e => e.textContent.trim()).filter(Boolean),
-                notifications: [...document.querySelectorAll('.el-notification')].map(e => e.textContent.trim()).filter(Boolean),
+                notifications: [...document.querySelectorAll('.el-notification')].filter(e => e.offsetParent !== null).map(e => e.textContent.trim()).filter(Boolean),
                 activeTab: document.querySelector('.el-tabs__item.is-active')?.textContent?.trim() || null,
                 treeNodes: document.querySelectorAll('.el-tree-node').length || 0,
                 tableRows: document.querySelectorAll('.el-table__body-wrapper .el-table__row').length || 0,
@@ -481,6 +481,28 @@ def _register_misc_actions(controller, browser_context):
         await page.wait_for_timeout(500)
         return result
 
+    @controller.action('Click an adjacent button (选择/引入) to fill a field, but only if the field is empty.')
+    async def click_adjacent_button(label_text: str):
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        result = await page.evaluate('''([label]) => {
+            const container = ''' + JS_GET_CONTAINER + ''';
+            const items = container.querySelectorAll('.el-form-item');
+            for (const item of items) {
+                const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                if (!lbl.includes(label)) continue;
+                const input = item.querySelector('.el-input__inner');
+                if (input && input.value && input.value.trim() !== '') {
+                    return 'already-filled';
+                }
+                const btn = item.querySelector('button.el-button--primary.is-plain');
+                if (btn && btn.offsetParent !== null) { btn.click(); return 'clicked'; }
+                return 'no-button-found';
+            }
+            return 'label-not-found';
+        }''', [label_text])
+        return result
+
     @controller.action('Click a radio option by label text and radio option text.')
     async def click_radio(label_text: str, option_text: str):
         page = await browser_context.get_current_page()
@@ -495,6 +517,37 @@ def _register_misc_actions(controller, browser_context):
         path = os.path.join(snapshot_dir, f"screenshot_{ts}.png")
         await page.screenshot(path=path, full_page=False)
         return _ok(f'screenshot-saved:{path}')
+
+    @controller.action('Click element by its [] index. 🚨 NOT for adjacent 选择/引入 buttons — use click_adjacent_button instead.')
+    async def click_element_by_index(index: int):
+        """Replacement for default click_element_by_index: detects adjacent buttons and redirects."""
+        page = await browser_context.get_current_page()
+        skip = await page.evaluate('''() => {
+            const btns = document.querySelectorAll('button');
+            for (const btn of btns) {
+                if (btn.offsetParent === null) continue;
+                const text = btn.textContent?.trim() || '';
+                if (text !== '选择' && text !== '引入') continue;
+                const fi = btn.closest('.el-form-item');
+                if (!fi) continue;
+                const inp = fi.querySelector('.el-input__inner');
+                if (inp && inp.value && inp.value.trim() !== '') {
+                    const lbl = fi.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                    return { skip: true, label: lbl, btnText: text };
+                }
+            }
+            return { skip: false };
+        }''')
+        if skip.get('skip'):
+            return _ok(f'skip: {skip["label"]} already filled — do not re-click "{skip["btnText"]}". Use click_adjacent_button if needed.')
+        try:
+            element_node = await browser_context.get_dom_element_by_index(index)
+            download_path = await browser_context._click_element_node(element_node)
+            if download_path:
+                return _ok(f'downloaded:{download_path}')
+            return _ok(f'clicked-{index}')
+        except Exception as e:
+            return _err(f'click-failed:{e}')
 
 
 def _ok(msg):

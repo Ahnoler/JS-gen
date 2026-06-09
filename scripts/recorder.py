@@ -1,5 +1,6 @@
 """
-Recording hooks for browser-use agent: step callbacks, goal dedup detection, cancel signal.
+Recording hooks for browser-use agent: step callbacks, goal dedup detection, cancel signal,
+and premature done() prevention.
 """
 import sys
 import json
@@ -39,6 +40,47 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None):
 
         if goal_tracker['stopped']:
             return
+
+        # ===== Prevent premature done() =====
+        # If the agent calls done() while a dialog/drawer is still open,
+        # clear the is_done flag so the agent continues working.
+        if _done:
+            try:
+                page = await agent.browser_context.get_current_page()
+                has_open_dialog = await page.evaluate('''() => {
+                    const dialogs = document.querySelectorAll('.el-dialog');
+                    const drawers = document.querySelectorAll('.el-drawer');
+                    return [...dialogs, ...drawers].some(d => d.offsetParent !== null);
+                }''')
+                if has_open_dialog:
+                    sys.stderr.write(f"[recorder] ⚠ Premature done() detected — dialog still open at step {agent.state.n_steps}, forcing continue\n")
+                    sys.stderr.flush()
+                    # Clear is_done and inject error to force continuation
+                    for h in agent.state.history.history:
+                        if h.result:
+                            for r in h.result:
+                                r.is_done = False
+                                r.error = 'Premature done() rejected: dialog still open. Continue filling form and click submit.'
+                    return
+                # Also check if page has visible notifications or form errors
+                has_pending = await page.evaluate('''() => {
+                    const notifs = document.querySelectorAll('.el-notification');
+                    const errors = document.querySelectorAll('.el-form-item__error');
+                    return (notifs.length > 0 || errors.length > 0) ? 'pending' : 'none';
+                }''')
+                if has_pending == 'pending' or _next_goal in ('', 'Task is done - call done()'):
+                    sys.stderr.write(f"[recorder] ⚠ Premature done() detected — pending errors/notifications at step {agent.state.n_steps}, forcing continue\n")
+                    sys.stderr.flush()
+                    for h in agent.state.history.history:
+                        if h.result:
+                            for r in h.result:
+                                r.is_done = False
+                                r.error = 'Premature done() rejected: validation errors remain. Fix fields and click submit.'
+                    return
+            except Exception as e:
+                sys.stderr.write(f"[recorder] done-check error: {e}\n")
+                sys.stderr.flush()
+
         try:
             step_num = agent.state.n_steps
             if step_num % 5 == 0:
