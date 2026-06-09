@@ -1,5 +1,6 @@
-import { PROJECT_DIR } from '../config.js';
+import { PROJECT_DIR, STANDALONE_LLM } from '../config.js';
 import { state } from '../state.js';
+import { callLLM } from '../llm-utils.js';
 
 function parseModel(model) {
   return typeof model === 'string'
@@ -21,7 +22,7 @@ export default function (app) {
 
     if (!agent) return res.status(400).json({ error: 'agent is required' });
     if (!task) return res.status(400).json({ error: 'task is required' });
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!state.client && !STANDALONE_LLM) return res.status(503).json({ error: 'opencode server not ready' });
 
     let sessionId = reqSessionId || null;
     let sessionWarn = null;
@@ -97,7 +98,7 @@ export default function (app) {
 
     if (!agent) return res.status(400).json({ error: 'agent is required' });
     if (!task) return res.status(400).json({ error: 'task is required' });
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!state.client && !STANDALONE_LLM) return res.status(503).json({ error: 'opencode server not ready' });
 
     let sessionId = reqSessionId || null;
     let sessionWarn = null;
@@ -143,7 +144,11 @@ export default function (app) {
 
   app.post('/api/agent/session', async (req, res) => {
     const { title, agent } = req.body;
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!state.client && !STANDALONE_LLM) return res.status(503).json({ error: 'opencode server not ready' });
+
+    if (STANDALONE_LLM) {
+      return res.json({ sessionId: 'standalone-' + Date.now() });
+    }
 
     try {
       const { data: session, error } = await state.client.session.create({
@@ -161,8 +166,12 @@ export default function (app) {
   app.post('/api/agent/session/:id/message', async (req, res) => {
     const { id } = req.params;
     const { agent, task, system } = req.body;
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!state.client && !STANDALONE_LLM) return res.status(503).json({ error: 'opencode server not ready' });
     if (!task) return res.status(400).json({ error: 'task is required' });
+
+    if (STANDALONE_LLM) {
+      return res.json({ sessionId: id, response: '' });
+    }
 
     try {
       const promptParams = {
@@ -186,7 +195,9 @@ export default function (app) {
 
   app.delete('/api/agent/session/:id', async (req, res) => {
     const { id } = req.params;
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!state.client && !STANDALONE_LLM) return res.status(503).json({ error: 'opencode server not ready' });
+
+    if (STANDALONE_LLM) return res.json({ status: 'deleted', sessionId: id });
 
     try {
       await state.client.session.delete({ sessionID: id, directory: PROJECT_DIR });
@@ -198,7 +209,9 @@ export default function (app) {
 
   app.get('/api/agent/session/:id/messages', async (req, res) => {
     const { id } = req.params;
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!state.client && !STANDALONE_LLM) return res.status(503).json({ error: 'opencode server not ready' });
+
+    if (STANDALONE_LLM) return res.json([]);
 
     try {
       const { data, error } = await state.client.session.messages({

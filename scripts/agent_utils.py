@@ -85,7 +85,8 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - get_page_state() — diagnostics
 - save_case_data(key, value) — save a value to the process-level case data store (persists across steps/phases)
 - read_case_data(key) — read a value from the case data store
-- select_date(label_text, date_str) — set a date field by clicking the calendar popup and picking a date. date_str format: "YYYY-MM-DD". **USE THIS for ALL date fields (成立日期, 注册登记日期, 登记注册失效日期, etc.)** — do NOT use fill_form_field or click_element_by_index for dates.
+- select_date(label_text, date_str) — set a date field: clicks picker open, sets value, closes panel. Returns "already:YYYY-MM-DD" if already set — skip it. Format: "YYYY-MM-DD". **USE THIS for ALL date fields** — do NOT use fill_form_field or click_element_by_index for dates.
+- check_field_value(label_text) — returns the current value of any form field. **Use this BEFORE filling to see if the field already has data.** Returns "empty" if blank, "label-not-found" if no such field.
 - click_adjacent_button(label_text) — click a "选择"/"引入" button next to a field, but ONLY if the field is empty. Returns "already-filled" if the field already has a value — skip it.
 
 # 🚨 FORM FIELD RULES (CRITICAL — DO NOT IGNORE)
@@ -95,7 +96,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 4. **If `select_option` returns `"select-disabled"`: skip** — the select is disabled (already pre-filled).
 5. **Disabled field + adjacent "引入"/"选择" button**: use `click_adjacent_button(label_text)` to fill. The button may be on a different `.el-form-item` (e.g. "引入" on 证件号码 fills all three legal person fields).
 6. **Disabled field + empty value + no adjacent button** → skip (truly read-only).
-7. **Date picker fields (tsscdatepicker / el-date-editor):** Use `select_date(label_text, "YYYY-MM-DD")` — this clicks the picker open, navigates to the correct year/month, and clicks the desired day. Do NOT use `fill_form_field` or `click_element_by_index` for dates. The fields are wrapped in `tsscdatepicker` > `el-date-editor.el-date-editor--date`.
+7. **Date picker fields (tsscdatepicker / el-date-editor):** Use `select_date(label_text, "YYYY-MM-DD")` — this clicks the picker open, sets the value, and closes the panel. If the field already has the target value, returns `"already:YYYY-MM-DD"` — skip it, don't re-set. Do NOT use `fill_form_field` or `click_element_by_index` for dates. The fields are wrapped in `tsscdatepicker` > `el-date-editor.el-date-editor--date`.
 
 # 🚨 CROSS-PHASE DATA FLOW (GENERAL RULE)
 Data saved in any phase is available to all subsequent phases via the global `case_data_store` (in-memory dict, shared across phases).
@@ -135,6 +136,15 @@ id_no = read_case_data("证件号码")  # or "身份证号", "证件号", etc.
 # 3. Click search/查询, select result, confirm/确认
 ```
 
+**Specific case — "引入" 法定代表人 (legal person import):**
+The legal person data (法定代表人/负责人) was saved by an EARLIER phase with these exact keys:
+- `read_case_data("客户名称")` → legal person name (e.g. "测试人员某")
+- `read_case_data("证件号码")` → legal person ID/credit code
+- `read_case_data("客户编号")` → legal person number
+
+**Do NOT try `read_case_data("法定代表人")` or `read_case_data("法定代表人姓名")` — those keys were never saved.**
+Always read `"客户名称"` and `"证件号码"` first. The dialog's search field is usually labeled `"客户名称"` — fill it with the saved value, click 查询, select the result, and click 确认.
+
 
 # 🚨 EL-SELECT RULES (CRITICAL — DO NOT IGNORE)
 1. For el-select dropdowns, you MUST use `select_option(label_text, option_text)`.
@@ -152,10 +162,11 @@ id_no = read_case_data("证件号码")  # or "身份证号", "证件号", etc.
    - Call `close_dialog()` FIRST — this both dismisses the notification AND returns its error text (e.g. `ok-notification: 证件号码格式错误`).
    - If the returned text mentions a field (e.g. "证件号码"), call `match_form_rule(label_text)` to get a valid value, then fill it via `fill_form_field` (or `select_date` if the field is a date picker — but note `match_form_rule` has no date generators, so just pick a reasonable date like the current date).
    - **Then click submit/save immediately.** Do NOT call `get_page_state()` or `extract_content()` after closing the notification and before submitting — the notification is already gone, re-checking wastes steps. The only way to verify the fix is to submit and check the result.
-4. **If `close_dialog()` returns `"no-overlay-open"`:** there is no notification/dialog to close. Just proceed with the next action (do NOT keep calling close_dialog).
+4. **If `close_dialog()` returns `"no-overlay-open"`:** there is no notification/dialog to close. **The action succeeded — move on.** Error notifications stay visible until dismissed; if nothing is visible, there was no error. Do NOT re-click submit/save.
 5. Do NOT go back to re-select or re-fill fields that already returned "already:XXX", "ok", or "field-disabled".
 6. The ONLY way to verify if the form is correct is to click submit and check the result.
-7. **After any dialog/drawer interaction** (e.g. legal person import, customer search, etc.), the wizard form may have been refreshed/reset. Re-check ALL fields — especially date fields which are commonly cleared. Use `get_page_state()` to see which fields are empty, then re-fill them. Date fields may look filled in the DOM but their Vue model was cleared — always refill dates using `select_date` after a dialog interaction.
+7. **Success notifications (el-notification with "操作成功") auto-disappear after 2-3 seconds.** After clicking save/submit, call `close_dialog()` ONCE. If nothing is returned (no-overlay-open), assume success and move on. Do NOT call `close_dialog()` repeatedly or re-click save. Error notifications stay visible until dismissed — their absence means success.
+7. **After any dialog/drawer interaction** (e.g. legal person import, customer search, etc.), the wizard form may have been refreshed/reset. Use `check_field_value(label_text)` to check if a field still has a value before filling it. Skip fields that return a non-empty value. For date fields, `select_date` returns `"already:..."` if still set. Do NOT blindly re-fill all fields.
 
 # TASK COMPLETION RULES
 1. Use done() ONLY when the entire task is finished. Do NOT call done() after a single step if more work remains.

@@ -1,8 +1,9 @@
 import { writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import os from 'os';
-import { PROJECT_DIR, GENERATED_DIR } from '../config.js';
+import { PROJECT_DIR, GENERATED_DIR, STANDALONE_LLM } from '../config.js';
 import { state } from '../state.js';
+import { callLLM } from '../llm-utils.js';
 import {
   buildScriptPrompt, parseScriptFromResponse, extractTestName, generateUniqueFileName,
   ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex,
@@ -79,36 +80,49 @@ function extractCode(parts) {
 
 async function runGeneration({ description, url, credentials, sessionId, model }) {
   const genPrompt = buildScriptPrompt({ description, url, credentials });
-  const promptParams = {
-    sessionID: sessionId,
-    directory: PROJECT_DIR,
-    agent: 'build',
-    parts: [{ type: 'text', text: genPrompt }],
-  };
-  applyModel(promptParams, model);
 
-  const { data: result, error: promptErr } = await state.client.session.prompt(promptParams);
-  if (promptErr) throw new Error(promptErr?.message || JSON.stringify(promptErr));
+  let code, steps;
 
-  let allText = (result?.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n') || '';
-  let { code, steps } = parseScriptFromResponse(allText);
+  if (STANDALONE_LLM) {
+    const text = await callLLM(genPrompt, model);
+    const parsed = parseScriptFromResponse(text);
+    code = parsed.code;
+    steps = parsed.steps;
+    if (!code) code = text;
+  } else {
+    const promptParams = {
+      sessionID: sessionId,
+      directory: PROJECT_DIR,
+      agent: 'build',
+      parts: [{ type: 'text', text: genPrompt }],
+    };
+    applyModel(promptParams, model);
 
-  try {
-    const { data: messages } = await state.client.session.messages({ sessionID: sessionId, directory: PROJECT_DIR });
-    if (messages && messages.length) {
-      const texts = messages.filter(m => (m.message?.role || m.info?.role) === 'assistant').flatMap(m => (m.parts || []).filter(p => p.type === 'text').map(p => p.text));
-      const longest = texts.sort((a, b) => b.length - a.length)[0] || '';
-      if (longest.length > allText.length) {
-        allText = longest;
-        const parsed = parseScriptFromResponse(longest);
-        if (parsed.code && parsed.code.split('\n').length > (code?.split('\n').length || 0)) {
-          code = parsed.code;
-          steps = parsed.steps;
+    const { data: result, error: promptErr } = await state.client.session.prompt(promptParams);
+    if (promptErr) throw new Error(promptErr?.message || JSON.stringify(promptErr));
+
+    let allText = (result?.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n') || '';
+    let parsed = parseScriptFromResponse(allText);
+    code = parsed.code;
+    steps = parsed.steps;
+
+    try {
+      const { data: messages } = await state.client.session.messages({ sessionID: sessionId, directory: PROJECT_DIR });
+      if (messages && messages.length) {
+        const texts = messages.filter(m => (m.message?.role || m.info?.role) === 'assistant').flatMap(m => (m.parts || []).filter(p => p.type === 'text').map(p => p.text));
+        const longest = texts.sort((a, b) => b.length - a.length)[0] || '';
+        if (longest.length > allText.length) {
+          allText = longest;
+          const parsed2 = parseScriptFromResponse(longest);
+          if (parsed2.code && parsed2.code.split('\n').length > (code?.split('\n').length || 0)) {
+            code = parsed2.code;
+            steps = parsed2.steps;
+          }
         }
       }
+    } catch (e) {
+      console.log('[generate] Fallback messages fetch failed:', e.message);
     }
-  } catch (e) {
-    console.log('[generate] Fallback messages fetch failed:', e.message);
   }
 
   const now = new Date();
@@ -136,13 +150,13 @@ export default function (app) {
   app.post('/api/test/generate', async (req, res) => {
     const { description, url, credentials, sessionId: existingSessionId, model } = req.body;
     if (!description) return res.status(400).json({ error: 'description is required' });
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!state.client && !STANDALONE_LLM) return res.status(503).json({ error: 'opencode server not ready' });
 
     let sessionId = existingSessionId || null;
     const ownSession = !existingSessionId;
 
     try {
-      if (ownSession) {
+      if (ownSession && !STANDALONE_LLM) {
         const { data: session, error: createErr } = await state.client.session.create({
           directory: PROJECT_DIR,
           title: `Generate: ${description.slice(0, 60)}`,
@@ -172,7 +186,7 @@ export default function (app) {
           const job = jobs.get(sessionId);
           if (job) {
             job.result = { error: err.message };
-            if (job.ownSession) {
+            if (job.ownSession && !STANDALONE_LLM) {
               state.client.session.delete({ sessionID: sessionId, directory: PROJECT_DIR }).catch(() => {});
             }
           }
@@ -180,7 +194,7 @@ export default function (app) {
       
       res.json({ sessionId, status: 'generating' });
     } catch (err) {
-      if (ownSession && sessionId) state.client.session.delete({ sessionID: sessionId, directory: PROJECT_DIR }).catch(() => {});
+      if (ownSession && sessionId && !STANDALONE_LLM) state.client.session.delete({ sessionID: sessionId, directory: PROJECT_DIR }).catch(() => {});
       res.status(500).json({ error: err.message });
     }
   });
@@ -188,7 +202,7 @@ export default function (app) {
   app.post('/api/test/refine', async (req, res) => {
     const { testId, feedback, model } = req.body;
     if (!testId || !feedback) return res.status(400).json({ error: 'testId and feedback are required' });
-    if (!state.client) return res.status(503).json({ error: 'opencode server not ready' });
+    if (!state.client && !STANDALONE_LLM) return res.status(503).json({ error: 'opencode server not ready' });
 
     const list = loadGeneratedIndex();
     const entry = list.find(e => e.testId === testId);
@@ -198,36 +212,49 @@ export default function (app) {
 
     try {
       const refinePrompt = `请根据以下反馈修改之前的脚本，只输出修改后的完整脚本：\n\n${feedback}`;
-      const promptParams = {
-        sessionID: sessionId,
-        directory: PROJECT_DIR,
-        agent: 'build',
-        parts: [{ type: 'text', text: refinePrompt }],
-      };
-      applyModel(promptParams, model);
 
-      const { data: result, error: promptErr } = await state.client.session.prompt(promptParams);
-      if (promptErr) throw new Error(promptErr?.message || JSON.stringify(promptErr));
+      let code, steps;
 
-      let allText = (result?.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n') || '';
-      let { code, steps } = parseScriptFromResponse(allText);
+      if (STANDALONE_LLM) {
+        const text = await callLLM(refinePrompt, model);
+        const parsed = parseScriptFromResponse(text);
+        code = parsed.code;
+        steps = parsed.steps;
+        if (!code) code = text;
+      } else {
+        const promptParams = {
+          sessionID: sessionId,
+          directory: PROJECT_DIR,
+          agent: 'build',
+          parts: [{ type: 'text', text: refinePrompt }],
+        };
+        applyModel(promptParams, model);
 
-      try {
-        const { data: messages } = await state.client.session.messages({ sessionID: sessionId, directory: PROJECT_DIR });
-        if (messages && messages.length) {
-					const texts = messages.filter(m => (m.message?.role || m.info?.role) === 'assistant').flatMap(m => (m.parts || []).filter(p => p.type === 'text').map(p => p.text));
-          const longest = texts.sort((a, b) => b.length - a.length)[0] || '';
-          if (longest.length > allText.length) {
-            allText = longest;
-            const parsed = parseScriptFromResponse(longest);
-            if (parsed.code && parsed.code.split('\n').length > (code?.split('\n').length || 0)) {
-              code = parsed.code;
-              steps = parsed.steps;
+        const { data: result, error: promptErr } = await state.client.session.prompt(promptParams);
+        if (promptErr) throw new Error(promptErr?.message || JSON.stringify(promptErr));
+
+        let allText = (result?.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n') || '';
+        let parsed = parseScriptFromResponse(allText);
+        code = parsed.code;
+        steps = parsed.steps;
+
+        try {
+          const { data: messages } = await state.client.session.messages({ sessionID: sessionId, directory: PROJECT_DIR });
+          if (messages && messages.length) {
+            const texts = messages.filter(m => (m.message?.role || m.info?.role) === 'assistant').flatMap(m => (m.parts || []).filter(p => p.type === 'text').map(p => p.text));
+            const longest = texts.sort((a, b) => b.length - a.length)[0] || '';
+            if (longest.length > allText.length) {
+              allText = longest;
+              const parsed2 = parseScriptFromResponse(longest);
+              if (parsed2.code && parsed2.code.split('\n').length > (code?.split('\n').length || 0)) {
+                code = parsed2.code;
+                steps = parsed2.steps;
+              }
             }
           }
+        } catch (e) {
+          console.log('[refine] Fallback messages fetch failed:', e.message);
         }
-      } catch (e) {
-        console.log('[refine] Fallback messages fetch failed:', e.message);
       }
 
       const oldPath = path.join(GENERATED_DIR, entry.fileName);

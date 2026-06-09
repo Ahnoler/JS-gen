@@ -35,6 +35,27 @@ JS_CHECK_LOADING = '''() => {
     return mask && mask.offsetParent !== null;
 }'''
 
+# Build an XPath for a form field element by its label text
+JS_LOCATOR = '''(label) => {
+    const xpath = (el) => {
+        if (!el || el === document || el.nodeType !== 1) return '';
+        const parent = el.parentNode;
+        const tag = el.tagName.toLowerCase();
+        const idx = 1 + [...parent.children].filter(c => c.tagName === el.tagName).indexOf(el);
+        return xpath(parent) + '/' + tag + '[' + idx + ']';
+    };
+    const container = ''' + JS_GET_CONTAINER + ''';
+    const items = container.querySelectorAll('.el-form-item');
+    for (const item of items) {
+        const lbl = item.querySelector('.el-form-item__label');
+        if (lbl && lbl.textContent.trim().includes(label)) {
+            const target = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
+            if (target) return xpath(target);
+        }
+    }
+    return '';
+}'''
+
 JS_FILL_FORM_FIELD = '''([label, val]) => {
     const setFn = (t, v) => {
         const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
@@ -79,61 +100,29 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     return 'label-not-found';
 }'''
 
-JS_SELECT_DATE = '''([dateStr]) => new Promise((resolve) => {
-    const [targetYear, targetMonth, targetDay] = dateStr.split('-').map(Number);
-    let maxIters = 60;
-    function step() {
-        if (--maxIters <= 0) { resolve('timeout:' + dateStr); return; }
-        const panel = document.querySelector('.el-picker-panel.el-date-picker');
-        if (!panel || panel.offsetParent === null) { setTimeout(step, 200); return; }
-        const yearTable = panel.querySelector('.el-year-table');
-        const monthTable = panel.querySelector('.el-month-table');
-        const dateTable = panel.querySelector('.el-date-table');
-        if (yearTable && yearTable.offsetParent !== null) {
-            const years = yearTable.querySelectorAll('td.available, td.current');
-            for (const td of years) {
-                if (parseInt(td.textContent.trim()) === targetYear) { td.click(); setTimeout(step, 300); return; }
-            }
-            const dArrow = panel.querySelector('.el-icon-d-arrow-left')?.closest('button');
-            const dArrowR = panel.querySelector('.el-icon-d-arrow-right')?.closest('button');
-            const hdr = panel.querySelector('.el-date-picker__header-label');
-            const start = parseInt(hdr?.textContent?.trim()?.split('-')[0] || '0');
-            if (targetYear < start && dArrow) { dArrow.click(); } else if (dArrowR) { dArrowR.click(); }
-            setTimeout(step, 300); return;
-        }
-        if (monthTable && monthTable.offsetParent !== null) {
-            const months = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
-            const cells = monthTable.querySelectorAll('td.available, td.current');
-            for (const td of cells) {
-                const sp = td.querySelector('span');
-                if (sp && sp.textContent.trim() === months[targetMonth - 1]) { td.click(); setTimeout(step, 300); return; }
-            }
-            resolve('month-not-found:' + dateStr); return;
-        }
-        if (dateTable && dateTable.offsetParent !== null) {
-            const labels = panel.querySelectorAll('.el-date-picker__header-label');
-            const curYear = parseInt(labels[0]?.textContent?.trim() || '0');
-            const curMonth = parseInt(labels[1]?.textContent?.trim() || '0');
-            if (curYear === targetYear && curMonth === targetMonth) {
-                const days = dateTable.querySelectorAll('td.available, td.today');
-                for (const td of days) {
-                    const sp = td.querySelector('span');
-                    if (sp && sp.textContent.trim() === String(targetDay)) { td.click(); resolve('selected:' + dateStr); return; }
-                }
-                resolve('day-not-found:' + dateStr); return;
-            }
-            if (curYear === targetYear) {
-                const arrowL = panel.querySelector('.el-icon-arrow-left')?.closest('button');
-                const arrowR = panel.querySelector('.el-icon-arrow-right')?.closest('button');
-                if (curMonth > targetMonth && arrowL) { arrowL.click(); } else if (arrowR) { arrowR.click(); }
-                setTimeout(step, 200); return;
-            }
-            if (labels[0]) { labels[0].click(); setTimeout(step, 300); return; }
-        }
-        setTimeout(step, 200);
+JS_SELECT_DATE = '''async ([label, dateStr]) => {
+    const c = ''' + JS_GET_CONTAINER + ''';
+    const items = c.querySelectorAll('.el-form-item');
+    for (const item of items) {
+        const lbl = item.querySelector('.el-form-item__label');
+        if (!lbl || !lbl.textContent.trim().includes(label)) continue;
+        const input = item.querySelector('input');
+        if (!input) return 'no-input';
+        if (input.value === dateStr) return 'already:' + dateStr;
+        const editor = item.querySelector('.el-date-editor') || input.closest('.el-date-editor');
+        if (!editor) return 'no-editor';
+        editor.click();
+        await new Promise(r => setTimeout(r, 200));
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        setter.call(input, dateStr);
+        input.setAttribute('value', dateStr);
+        input.dispatchEvent(new Event('input', {bubbles:true}));
+        input.dispatchEvent(new Event('change', {bubbles:true}));
+        input.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
+        return 'selected:' + dateStr;
     }
-    setTimeout(step, 300);
-})'''
+    return 'label-not-found';
+}'''
 
 JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     const getSelectedLabel = (formItem) => {
@@ -345,29 +334,37 @@ def _register_form_actions(controller, browser_context, form_rules):
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
         if result == 'is-date-picker':
             return ActionResult(extracted_content='is-date-picker: This is a date picker field. Use select_date(label, "YYYY-MM-DD") instead.', is_done=False)
+        if result == 'ok':
+            loc = await page.evaluate(JS_LOCATOR, [label_text])
+            return _ok('ok' + ' | loc:' + loc) if loc else _ok('ok')
         return result
 
-    @controller.action('Set a date field by clicking the date picker to open it, then selecting a date from the popup calendar. Format: YYYY-MM-DD. Only for date fields wrapped in tsscdatepicker/el-date-editor. Do NOT use fill_form_field for dates.')
+    @controller.action('Set a date field by clicking the date picker to open it, then setting the value. Returns "already:YYYY-MM-DD" if already set. Format: YYYY-MM-DD. Only for date fields wrapped in tsscdatepicker/el-date-editor. Do NOT use fill_form_field for dates.')
     async def select_date(label_text: str, date_str: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        r1 = await page.evaluate('''([label]) => {
+        result = await page.evaluate(JS_SELECT_DATE, [label_text, date_str])
+        if result.startswith('selected:') or result.startswith('already:'):
+            loc = await page.evaluate(JS_LOCATOR, [label_text])
+            return _ok(result + ' | loc:' + loc) if loc else _ok(result)
+        return result
+
+    @controller.action('Check the current value of a form field by its label. Use this BEFORE filling to avoid re-filling already-set fields. Returns the field value, or "empty" if blank, or "label-not-found".')
+    async def check_field_value(label_text: str):
+        page = await browser_context.get_current_page()
+        return await page.evaluate('''([label]) => {
             const c = ''' + JS_GET_CONTAINER + ''';
             const items = c.querySelectorAll('.el-form-item');
             for (const item of items) {
                 const lbl = item.querySelector('.el-form-item__label');
-                if (lbl && lbl.textContent.trim().includes(label)) {
-                    const ed = item.querySelector('.el-date-editor');
-                    if (ed) { ed.click(); return 'ok'; }
-                    return 'no-editor';
-                }
+                if (!lbl || !lbl.textContent.trim().includes(label)) continue;
+                const input = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
+                if (!input) return 'no-input';
+                const v = (input.value || '').trim();
+                return v || 'empty';
             }
             return 'label-not-found';
         }''', [label_text])
-        if r1 != 'ok':
-            return r1
-        await page.wait_for_timeout(400)
-        return await page.evaluate(JS_SELECT_DATE, [date_str])
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str):
@@ -376,7 +373,8 @@ def _register_form_actions(controller, browser_context, form_rules):
 
         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'check'])
         if already.startswith('already:'):
-            return _ok(already)
+            loc = await page.evaluate(JS_LOCATOR, [label_text])
+            return _ok(already + ' | loc:' + loc) if loc else _ok(already)
 
         trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'trigger'])
         if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled'):
@@ -390,7 +388,8 @@ def _register_form_actions(controller, browser_context, form_rules):
             confirm = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'confirm'])
             if confirm.startswith('SELECTED:'):
                 confirm_val = confirm.split(':', 1)[1]
-                return _ok(f'ok | ok:{confirm_val}')
+                loc = await page.evaluate(JS_LOCATOR, [label_text])
+                return _ok(f'ok | ok:{confirm_val}' + ' | loc:' + loc) if loc else _ok(f'ok | ok:{confirm_val}')
             return _err(f'{select_result} | no-confirm')
 
         selected_text = select_result.split(':', 1)[1] if ':' in select_result else ''
@@ -408,7 +407,8 @@ def _register_form_actions(controller, browser_context, form_rules):
                     return;
                 }
             }''', [label_text, selected_text])
-        return _ok(f'ok | {select_result}')
+        loc = await page.evaluate(JS_LOCATOR, [label_text])
+        return _ok(f'ok | {select_result}' + ' | loc:' + loc) if loc else _ok(f'ok | {select_result}')
 
 
 def _register_navigation_actions(controller, browser_context):
@@ -448,10 +448,12 @@ def _register_navigation_actions(controller, browser_context):
                         if (target) { setTimeout(() => target.click(), 300); return 'ok-expanded'; }
                     }
                 }
-                return _err('not-found');
+                return 'not-found';
             }
         ''', menu_text)
         await page.wait_for_timeout(500)
+        if result.startswith('ok'):
+            return _ok(result + ' | loc:.el-menu-item:has-text("' + menu_text + '")')
         return result
 
 
@@ -480,12 +482,14 @@ def _register_table_actions(controller, browser_context):
                         const delIcon = row.querySelector('i.el-icon-delete, i[class*="shanchu"], i[class*="delete"]');
                         if (delIcon && delIcon.offsetParent !== null) { delIcon.click(); return 'ok-icon'; }
                     }
-                    return _err('button-not-found-in-row');
+                    return 'button-not-found-in-row';
                 }
-                return _err('row-not-found');
+                return 'row-not-found';
             }
         ''', [row_text, button_text])
         await page.wait_for_timeout(500)
+        if result.startswith('ok'):
+            return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
         return result
 
 
@@ -519,6 +523,7 @@ def _register_misc_actions(controller, browser_context):
                 dialogCount: dialogs.length,
                 visibleDialogCount: visibleDialogs.length,
                 visibleDialogTitles: visibleDialogs.map(d => d.querySelector('.el-dialog__title')?.textContent?.trim() || ''),
+                msgboxVisible: !!document.querySelector('.el-message-box') && document.querySelector('.el-message-box').offsetParent !== null,
                 drawerCount: visibleDrawers.length,
                 loading: !!document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'),
                 openDropdown: !!document.querySelector('.el-select-dropdown:not(.is-hidden)'),
@@ -533,7 +538,7 @@ def _register_misc_actions(controller, browser_context):
         }''')
         return json.dumps(state, ensure_ascii=False)
 
-    @controller.action('Close the topmost el-dialog, el-drawer, or el-notification.')
+    @controller.action('Close the topmost el-dialog, el-message-box, el-drawer, or el-notification.')
     async def close_dialog():
         page = await browser_context.get_current_page()
         # 1. Close notification first (JS click doesn't work, use Playwright native click)
@@ -547,9 +552,26 @@ def _register_misc_actions(controller, browser_context):
                     await close_btn.click()
                     await page.wait_for_timeout(300)
                     return _ok(f'ok-notification: {notif_text[:200]}')
-        # 2. Close dialog (higher priority than drawer)
+        # 2. Close el-message-box (error alert/confirm popup — highest z-index overlay)
+        msgbox = await page.query_selector('.el-message-box')
+        if msgbox:
+            visible = await msgbox.evaluate('el => el.offsetParent !== null')
+            if visible:
+                text = await msgbox.evaluate('el => el.textContent?.trim() || ""')
+                confirm = await msgbox.query_selector('.el-message-box__btns .el-button--primary, .el-message-box__btns .el-button--default')
+                if confirm:
+                    await confirm.click()
+                    await page.wait_for_timeout(300)
+                    return _ok(f'ok-msgbox: {text[:200]}')
+                close_btn = await msgbox.query_selector('.el-message-box__headerbtn .el-icon-close')
+                if close_btn:
+                    await close_btn.click()
+                    await page.wait_for_timeout(300)
+                    return _ok(f'ok-msgbox-close: {text[:200]}')
+        # 3. Close dialog — iterate in REVERSE order (last visible = topmost)
         result = await page.evaluate('''() => {
-            for (const d of document.querySelectorAll('.el-dialog')) {
+            const dialogs = [...document.querySelectorAll('.el-dialog')].reverse();
+            for (const d of dialogs) {
                 if (d.offsetParent !== null) {
                     const closeBtn = d.querySelector('.el-dialog__headerbtn .el-dialog__close, .el-dialog__headerbtn .el-icon-close');
                     if (closeBtn) { closeBtn.click(); return 'ok'; }
@@ -558,8 +580,8 @@ def _register_misc_actions(controller, browser_context):
                     return 'no-close-button';
                 }
             }
-            // 3. Drawer as last resort (may contain user data)
-            for (const d of document.querySelectorAll('.el-drawer')) {
+            // 4. Drawer as last resort (may contain user data)
+            for (const d of [...document.querySelectorAll('.el-drawer')].reverse()) {
                 if (d.offsetParent !== null) {
                     const closeBtn = d.querySelector('.el-drawer__close-btn, .el-drawer__header .el-icon-close');
                     if (closeBtn) { closeBtn.click(); return 'ok'; }
@@ -585,13 +607,15 @@ def _register_misc_actions(controller, browser_context):
                 if (input && input.value && input.value.trim() !== '') {
                     return 'already-filled';
                 }
-                // Try multiple button class patterns
                 const btn = item.querySelector('button.el-button--primary.is-plain, button.el-button--primary');
                 if (btn && btn.offsetParent !== null) { btn.click(); return 'clicked'; }
                 return 'no-button-found';
             }
             return 'label-not-found';
         }''', [label_text])
+        if result == 'clicked':
+            loc = await page.evaluate(JS_LOCATOR, [label_text])
+            return _ok('clicked | loc:' + loc) if loc else _ok('clicked')
         return result
 
     @controller.action('Click a radio option by label text and radio option text.')
