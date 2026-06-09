@@ -457,28 +457,32 @@ def _register_misc_actions(controller, browser_context):
         if notif:
             visible = await notif.evaluate('el => el.offsetParent !== null')
             if visible:
-                # Read notification text before closing
                 notif_text = await notif.evaluate('el => el.textContent?.trim() || ""')
                 close_btn = await notif.query_selector('.el-notification__closeBtn')
                 if close_btn:
                     await close_btn.click()
                     await page.wait_for_timeout(300)
                     return _ok(f'ok-notification: {notif_text[:200]}')
-        # 2. Close dialog/drawer
+        # 2. Close dialog (higher priority than drawer)
         result = await page.evaluate('''() => {
-            let top = null;
-            for (const sel of ['.el-dialog', '.el-drawer']) {
-                for (const d of document.querySelectorAll(sel)) {
-                    if (d.offsetParent !== null) { top = d; break; }
+            for (const d of document.querySelectorAll('.el-dialog')) {
+                if (d.offsetParent !== null) {
+                    const closeBtn = d.querySelector('.el-dialog__headerbtn .el-dialog__close, .el-dialog__headerbtn .el-icon-close');
+                    if (closeBtn) { closeBtn.click(); return 'ok'; }
+                    const cancelBtn = d.querySelector('.el-dialog__footer .el-button--default');
+                    if (cancelBtn) { cancelBtn.click(); return 'ok-cancel'; }
+                    return 'no-close-button';
                 }
-                if (top) break;
             }
-            if (!top) return 'no-overlay-open';
-            const closeBtn = top.querySelector('.el-dialog__headerbtn .el-dialog__close, .el-drawer__close-btn, .el-drawer__header .el-icon-close');
-            if (closeBtn) { closeBtn.click(); return 'ok'; }
-            const cancelBtn = top.querySelector('.el-dialog__footer .el-button--default');
-            if (cancelBtn) { cancelBtn.click(); return 'ok-cancel'; }
-            return 'no-close-button';
+            // 3. Drawer as last resort (may contain user data)
+            for (const d of document.querySelectorAll('.el-drawer')) {
+                if (d.offsetParent !== null) {
+                    const closeBtn = d.querySelector('.el-drawer__close-btn, .el-drawer__header .el-icon-close');
+                    if (closeBtn) { closeBtn.click(); return 'ok'; }
+                    return 'no-close-button';
+                }
+            }
+            return 'no-overlay-open';
         }''')
         await page.wait_for_timeout(500)
         return result
