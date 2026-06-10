@@ -5,9 +5,9 @@ import { PROJECT_DIR, GENERATED_DIR, STANDALONE_LLM } from '../config.js';
 import { state } from '../state.js';
 import { callLLM } from '../llm-utils.js';
 import {
-  buildScriptPrompt, parseScriptFromResponse, extractTestName, generateUniqueFileName,
+  buildScriptPrompt, parseScriptFromResponse, generateUniqueFileName,
   ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex, parseTrajectoryTable,
-  convertTrajectoryToScript,
+  buildPhasePrompt, splitIntoPhases, assemblePhasedScript,
 } from '../script-utils.js';
 
 function applyModel(promptParams, model) {
@@ -82,69 +82,63 @@ function extractCode(parts) {
 async function runGeneration({ description, url, credentials, sessionId, model, trajectoryTable }) {
   let code, steps;
 
-  // Parse trajectory table into structured actions (deterministic extraction)
-  let structuredActions = null;
+  // Priority 1: Per-phase LLM generation from trajectory (short prompts → focused LLM)
   if (trajectoryTable) {
-    const parsed = parseTrajectoryTable(trajectoryTable);
-    if (parsed && parsed.length > 0) {
-      structuredActions = parsed;
-      console.log('[generate] Parsed ' + parsed.length + ' raw actions from trajectory');
-    }
-  }
+    const rows = parseTrajectoryTable(trajectoryTable);
+    if (rows && rows.length > 0) {
+      const phases = splitIntoPhases(rows);
+      if (phases.length > 0) {
+        console.log('[generate] Split into ' + phases.length + ' phases');
 
-  // Priority 1: Trajectory → LLM orchestration (dedup + CTRL API calls)
-  // The trajectory provides raw action sequence; LLM cleans it up and outputs script using CTRL.* helpers.
-  if (structuredActions) {
-    const genPrompt = buildScriptPrompt({ description, url, credentials, structuredActions });
+        const phaseCodeBlocks = [];
+        let allPhaseSteps = [];
 
-    if (STANDALONE_LLM) {
-      const text = await callLLM(genPrompt, model);
-      const parsed = parseScriptFromResponse(text);
-      code = parsed.code;
-      steps = parsed.steps;
-      if (!code) code = text;
-    } else {
-      const promptParams = {
-        sessionID: sessionId,
-        directory: PROJECT_DIR,
-        agent: 'build',
-        parts: [{ type: 'text', text: genPrompt }],
-      };
-      applyModel(promptParams, model);
+        for (let p = 0; p < phases.length; p++) {
+          const phasePrompt = buildPhasePrompt({
+            phaseIndex: p,
+            totalPhases: phases.length,
+            phaseActions: phases[p],
+            testScenario: description,
+          });
 
-      const { data: result, error: promptErr } = await state.client.session.prompt(promptParams);
-      if (promptErr) throw new Error(promptErr?.message || JSON.stringify(promptErr));
+          console.log(`[generate] Phase ${p + 1}/${phases.length}: sending ${phases[p].length} actions to LLM`);
+          let phaseCode = '';
 
-      let allText = (result?.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n') || '';
-      let parsed = parseScriptFromResponse(allText);
-      code = parsed.code;
-      steps = parsed.steps;
+          if (STANDALONE_LLM) {
+            phaseCode = await callLLM(phasePrompt, model);
+          } else {
+            const { data: phaseSession, error: createErr } = await state.client.session.create({
+              directory: PROJECT_DIR,
+              title: `Phase ${p + 1}/${phases.length}: ${(description || '').slice(0, 60)}`,
+              agent: 'build',
+            });
+            if (createErr) throw new Error(createErr?.message || JSON.stringify(createErr));
 
-      try {
-        const { data: messages } = await state.client.session.messages({ sessionID: sessionId, directory: PROJECT_DIR });
-        if (messages && messages.length) {
-          const texts = messages.filter(m => (m.message?.role || m.info?.role) === 'assistant').flatMap(m => (m.parts || []).filter(p => p.type === 'text').map(p => p.text));
-          const longest = texts.sort((a, b) => b.length - a.length)[0] || '';
-          if (longest.length > allText.length) {
-            allText = longest;
-            const parsed2 = parseScriptFromResponse(longest);
-            if (parsed2.code && parsed2.code.split('\n').length > (code?.split('\n').length || 0)) {
-              code = parsed2.code;
-              steps = parsed2.steps;
-            }
+            const pp = {
+              sessionID: phaseSession.id,
+              directory: PROJECT_DIR,
+              agent: 'build',
+              parts: [{ type: 'text', text: phasePrompt }],
+            };
+            applyModel(pp, model);
+            const { data: result, error: promptErr } = await state.client.session.prompt(pp);
+            if (promptErr) throw new Error(promptErr?.message || JSON.stringify(promptErr));
+            phaseCode = (result?.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n');
+
+            state.client.session.delete({ sessionID: phaseSession.id, directory: PROJECT_DIR }).catch(() => {});
           }
-        }
-      } catch (e) {
-        console.log('[generate] Fallback messages fetch failed:', e.message);
-      }
-    }
 
-    // Fallback to direct conversion if LLM output is unusable
-    if (!code || code.split('\n').length < 5) {
-      const draft = convertTrajectoryToScript(trajectoryTable);
-      if (draft) {
-        code = draft;
-        steps = [{ step: 1, action: 'Fallback: direct trajectory replay' }];
+          // Strip markdown code fences if present
+          const codeMatch = phaseCode.match(/```(?:javascript)?\s*([\s\S]*?)```/);
+          if (codeMatch) phaseCode = codeMatch[1].trim();
+          phaseCodeBlocks.push(phaseCode);
+          allPhaseSteps.push({ phase: p + 1, actions: phases[p].length });
+          console.log(`[generate] Phase ${p + 1} done (${phaseCode.split('\n').length} lines)`);
+        }
+
+        code = assemblePhasedScript(phaseCodeBlocks, url);
+        steps = allPhaseSteps.map(s => ({ step: s.phase, action: `Phase ${s.phase} (${s.actions} actions)` }));
+        console.log('[generate] Assembled ' + phases.length + ' phases (' + code.split('\n').length + ' lines)');
       }
     }
   }
@@ -197,9 +191,7 @@ async function runGeneration({ description, url, credentials, sessionId, model, 
   }
 
   const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const testName = extractTestName(description);
-  const fileName = generateUniqueFileName(dateStr, testName);
+  const fileName = generateUniqueFileName();
   const filePath = path.join(GENERATED_DIR, fileName);
   ensureGeneratedDir();
   writeFileSync(filePath, code, 'utf-8');

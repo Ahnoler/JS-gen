@@ -283,17 +283,7 @@ export function initScriptPipeline() {
       if (data.notes) addPipelineLog('warn', `AI notes: ${data.notes.replace(/\n/g, ' | ').slice(0, 500)}`);
       displayGeneratedScript(data);
 
-      // Step 3: Run test once
-      addPipelineLog('system', '--- Starting test execution ---');
-      const runResult = await runScriptOnce(data.script, data.fileName);
-
-      if (runResult.success) {
-        addPipelineLog('success', '✅ Test completed successfully');
-        statusEl.textContent = '✅ 测试通过';
-      } else {
-        addPipelineLog('error', '❌ Test failed');
-        statusEl.textContent = '❌ 测试失败';
-      }
+      statusEl.textContent = '✅ 脚本已生成，点击 Run on Server 执行测试';
     } catch (err) {
       addPipelineLog('error', err.message);
       statusEl.textContent = '❌ ' + err.message;

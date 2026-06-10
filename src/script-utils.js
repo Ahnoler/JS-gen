@@ -1,8 +1,7 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { GENERATED_DIR } from './config.js';
-import { getInjectionCode, CTRL_PROMPT_BLOCK, CTRL_API_TABLE } from './ctrl-actions.js';
+import { getInjectionCode, CTRL_PROMPT_BLOCK, CTRL_API_TABLE, CTRL_OBJECT } from './ctrl-actions.js';
 
 export function ensureGeneratedDir() {
   if (!existsSync(GENERATED_DIR)) mkdirSync(GENERATED_DIR, { recursive: true });
@@ -56,15 +55,34 @@ After injection, all Element UI operations are called via \`await page.evaluate(
 ${CTRL_API_TABLE}
 
 ### Orchestration Rules
+
+> **⚠️ CRITICAL WARNING — Read This First**:
+> The login page uses **Element UI \`el-select\`** for the legal person dropdown, NOT a native HTML \`<select>\`.
+> If the trajectory says \`select_option\`, you MUST generate:
+> \`\`\`javascript
+> await page.evaluate(() => CTRL.selectOption('请选择法人', 'first'));
+> \`\`\`
+> **Never** use \`page.locator('select')\` or \`selectOption({index:N})\` — those only work on native \`<select>\` elements, not on \`el-select\`.
+
 1. **Dedup at your discretion**: The trajectory contains exploratory noise (retries, diagnostics, redundant reads). Examine each action's goal description, parameter changes, and context to decide what to keep or discard
-2. **Merge consecutive reads**: If 3+ consecutive \`read_case_data\` calls appear, merge them into a single variable declaration block
-3. **CTRL first**: ALL Element UI interactions MUST use \`await page.evaluate(() => CTRL.xxx())\`. Never use \`page.locator()\`, \`page.fill()\`, or \`querySelector\` for Element UI components
-4. **Don't redefine CTRL**: Copy the injection code block above as-is. Do not re-implement or override CTRL methods
-5. **el-select is NOT native select**: The \`select_option\` action in the trajectory is Element UI \`el-select\` (custom dropdown), NOT a native HTML \`<select>\` element. Always use \`CTRL.selectOption(label, option)\`. Never use \`page.locator('select')\` or \`selectOption({index:N})\`
+2. **🚨 el-select is NEVER native \`<select>\`**: Every dropdown in this app is Element UI \`el-select\`. The trajectory\'s \`select_option\` actions MUST become \`await page.evaluate(() => CTRL.selectOption(label, option))\`. \`page.locator('select')\` will ALWAYS fail because there is no native \`<select>\` element on the page. This is the #1 cause of test failures.
+3. **🚨 CTRL is ONLY in browser context — always wrap**: ALL Element UI operations MUST use \`await page.evaluate(() => CTRL.xxx())\`. Never use bare \`await CTRL.xxx()\` — that runs in Node.js where CTRL doesn't exist. Also never use \`page.locator()\`, \`page.fill()\`, or \`querySelector\` for Element UI components.
+4. **🚨 Inject CTRL AFTER page.goto, not before**: Navigate first (\`await page.goto(url)\`), THEN inject CTRL. If you inject CTRL before navigation, the page context is destroyed by navigation and CTRL will be lost. CORRECT:
+   \`\`\`javascript
+   await page.goto(TARGET_URL, { waitUntil: 'networkidle' });
+   await page.evaluate(() => { window.CTRL = { /* ... */ }; });
+   \`\`\`
+   WRONG (CTRL will be lost):
+   \`\`\`javascript
+   await page.evaluate(() => { window.CTRL = { /* ... */ }; }); // WRONG: injected before goto
+   await page.goto(TARGET_URL); // ← this destroys the page where CTRL was set
+   \`\`\`
+5. **Don't redefine CTRL**: Copy the injection code block above as-is. Do not re-implement or override CTRL methods
 6. **Handle return values**: Check return values per the API table (e.g., 'field-disabled' → skip, 'is-date-picker' → use selectDate instead)
 7. **Wait between steps**: Add \`await page.waitForTimeout(500)\` after each CTRL call to let Vue's reactivity settle
 8. **Screenshots**: Add \`await page.screenshot({path: '/tmp/step_N.png'})\` before/after key steps
-9. **Script structure** — Declare \`browser\` and \`page\` at the IIFE top, BEFORE \`try\`:
+9. **Merge consecutive reads**: If 3+ consecutive \`read_case_data\` calls appear, merge them into a single variable declaration block
+10. **Script structure** — Declare \`browser\` and \`page\` at the IIFE top, BEFORE \`try\`:
    \`\`\`javascript
    const { chromium } = require('playwright');
 
@@ -88,50 +106,9 @@ ${CTRL_API_TABLE}
    })().catch(err => { process.exit(1); });
    \`\`\`
    Note: \`page\` and \`browser\` are declared before \`try\`, making them accessible in \`catch\`/\`finally\`. The nested try-catch around screenshot prevents screenshot errors from masking the original failure.
+11. **Do NOT invent CTRL methods**: CTRL only has the 12 methods listed above. \`CTRL.getPageState()\`, \`CTRL.extractContent()\`, and any other non-existent methods will throw errors. Use plain \`page.evaluate\` for operations not covered by CTRL.
 `;
   }
-
-  // ====== Element UI component action reference (from element-ui-knowledge.md) ======
-  prompt += `\n\n## Element UI Component Action Reference
-
-### 1. Quick Reference (Scenario → Playwright Implementation)
-| Scenario | Playwright Implementation |
-|----------|------------------------|
-| Navigate to URL | \`await page.goto(url)\` |
-| Click button/link | \`await page.locator('xpath=//button[text()="button text"]').click()\` (prefer exact XPath) |
-| Click icon-only button | \`page.evaluate\` to locate by class inside el-table__row (atp-ui §16) |
-| el-select dropdown | \`page.evaluate\` click trigger + click .el-select-dropdown__item by text (atp-ui §14.6) |
-| el-input text | \`page.evaluate\` native setter + input/change/blur (atp-ui §14.4) |
-| el-textarea | \`page.evaluate\` HTMLTextAreaElement native setter + events (atp-ui §14.5) |
-| el-radio | \`page.evaluate\` find .el-radio by text and click (atp-ui §14.7) |
-| el-checkbox | \`page.evaluate\` find .el-checkbox by text and click .el-checkbox__inner (atp-ui §14.8) |
-| el-date-picker | \`page.evaluate\` native setter + input/change/blur + Escape to close panel (atp-ui §11) |
-| el-dialog operation | \`page.waitForSelector('.el-dialog', {state:'visible'})\` first, re-query each time (atp-ui §5) |
-| el-dialog close | \`page.evaluate\` click × or cancel button (atp-ui §5.4) |
-| el-menu navigation | \`page.evaluate\` expand el-submenu + click el-menu-item (atp-ui §6) |
-| el-tabs switch | \`page.evaluate\` click .el-tabs__item (atp-ui §8) |
-| el-table row action | \`page.evaluate\` locate row by text inside .el-table__row (atp-ui §4.1) |
-| el-tree expand | \`page.evaluate\` click .el-tree-node__expand-icon (atp-ui §7) |
-| el-loading wait | \`page.evaluate\` poll .el-loading-mask visibility (atp-ui §10) |
-| el-cascader | Click each level .el-cascader-menu__item sequentially (atp-ui §13) |
-| el-message detection | \`page.evaluate\` read .el-message text (atp-ui §9.1) |
-| el-notification close | \`page.evaluate\` click .el-notification__closeBtn (atp-ui §9.3) |
-| Table pagination | \`page.evaluate\` click .el-pagination .btn-next (atp-ui §4.4) |
-| el-switch toggle | \`page.evaluate\` click .el-switch (atp-ui §14.9) |
-| File upload el-upload | \`page.waitForEvent('filechooser')\` + \`fileChooser.setFiles()\` (atp-ui §12) |
-| Adjacent button (选择/引入) | \`page.evaluate\` find button.el-button--primary.is-plain in .el-form-item and click (atp-ui §14.10) |
-| Form error detection | \`page.evaluate\` scan .el-form-item__error / .el-message / .el-notification (atp-ui §15) |
-| Post-operation value check | \`page.evaluate\` read back input.value to verify write (atp-ui §2.4) |
-
-### 2. Core Principles (must follow, otherwise scripts will be invalid)
-1. **Never use page.fill()**: Element UI uses Vue v-model. Always use native setter + bubbling events (input/change/blur with bubbles:true) (atp-ui §2.1)
-2. **Re-query DOM every time**: Don't cache el-dialog/el-table/el-tree references — Vue may destroy and rebuild them asynchronously (atp-ui §2.2)
-3. **Wait between steps**: Add \`await page.waitForTimeout(500)\` after each evaluate to give Vue reactivity time (atp-ui §2.3)
-4. **Verify after writes**: Read back values to confirm, preventing LLM from re-filling the same field (atp-ui §2.4)
-5. **Atomic operations**: Complete "find → check → act" in a single evaluate; don't split into two steps (atp-ui §20)
-6. **Direct assign, don't clear first**: \`setter.call(input, 'X')\` directly. Never \`setter('')\` then \`setter('X')\` — Vue will overwrite (atp-ui §14.3)
-7. **el-select: absolutely forbid click_element_by_index**: Option clicks must go through .el-select-dropdown__item. Wrong DOM layer renders Vue unable to detect selection (atp-ui §14.6)
-8. **Address selector: check placeholder**: Readonly inputs check placeholder ("请选择" = not selected), not value (atp-ui §13.1)`;
 
   // ====== Data generation rules (from atp-rule skill) ======
   prompt += `\n\n## Form Field Data Generation Rules (atp-rule)
@@ -195,6 +172,48 @@ function matchFormRule(label) {
 \`\`\`
 
 **Usage**: Before filling a form field, call \`matchFormRule(label)\` to generate a valid random value. If it returns null, use the value from the test description or a reasonable default. User-specified values in the description take priority over generators.`;
+
+  // ====== Element UI component action reference (from element-ui-knowledge.md) ======
+  prompt += `\n\n## Element UI Component Action Reference
+
+### 1. Quick Reference (Scenario → Playwright Implementation)
+| Scenario | Playwright Implementation |
+|----------|------------------------|
+| Navigate to URL | \`await page.goto(url)\` |
+| Click button/link | \`await page.locator('xpath=//button[text()="button text"]').click()\` (prefer exact XPath) |
+| Click icon-only button | \`page.evaluate\` to locate by class inside el-table__row (atp-ui §16) |
+| el-select dropdown | \`page.evaluate\` click trigger + click .el-select-dropdown__item by text (atp-ui §14.6) |
+| el-input text | \`page.evaluate\` native setter + input/change/blur (atp-ui §14.4) |
+| el-textarea | \`page.evaluate\` HTMLTextAreaElement native setter + events (atp-ui §14.5) |
+| el-radio | \`page.evaluate\` find .el-radio by text and click (atp-ui §14.7) |
+| el-checkbox | \`page.evaluate\` find .el-checkbox by text and click .el-checkbox__inner (atp-ui §14.8) |
+| el-date-picker | \`page.evaluate\` native setter + input/change/blur + Escape to close panel (atp-ui §11) |
+| el-dialog operation | \`page.waitForSelector('.el-dialog', {state:'visible'})\` first, re-query each time (atp-ui §5) |
+| el-dialog close | \`page.evaluate\` click × or cancel button (atp-ui §5.4) |
+| el-menu navigation | \`page.evaluate\` expand el-submenu + click el-menu-item (atp-ui §6) |
+| el-tabs switch | \`page.evaluate\` click .el-tabs__item (atp-ui §8) |
+| el-table row action | \`page.evaluate\` locate row by text inside .el-table__row (atp-ui §4.1) |
+| el-tree expand | \`page.evaluate\` click .el-tree-node__expand-icon (atp-ui §7) |
+| el-loading wait | \`page.evaluate\` poll .el-loading-mask visibility (atp-ui §10) |
+| el-cascader | Click each level .el-cascader-menu__item sequentially (atp-ui §13) |
+| el-message detection | \`page.evaluate\` read .el-message text (atp-ui §9.1) |
+| el-notification close | \`page.evaluate\` click .el-notification__closeBtn (atp-ui §9.3) |
+| Table pagination | \`page.evaluate\` click .el-pagination .btn-next (atp-ui §4.4) |
+| el-switch toggle | \`page.evaluate\` click .el-switch (atp-ui §14.9) |
+| File upload el-upload | \`page.waitForEvent('filechooser')\` + \`fileChooser.setFiles()\` (atp-ui §12) |
+| Adjacent button (选择/引入) | \`page.evaluate\` find button.el-button--primary.is-plain in .el-form-item and click (atp-ui §14.10) |
+| Form error detection | \`page.evaluate\` scan .el-form-item__error / .el-message / .el-notification (atp-ui §15) |
+| Post-operation value check | \`page.evaluate\` read back input.value to verify write (atp-ui §2.4) |
+
+### 2. Core Principles (must follow, otherwise scripts will be invalid)
+1. **Never use page.fill()**: Element UI uses Vue v-model. Always use native setter + bubbling events (input/change/blur with bubbles:true) (atp-ui §2.1)
+2. **Re-query DOM every time**: Don't cache el-dialog/el-table/el-tree references — Vue may destroy and rebuild them asynchronously (atp-ui §2.2)
+3. **Wait between steps**: Add \`await page.waitForTimeout(500)\` after each evaluate to give Vue reactivity time (atp-ui §2.3)
+4. **Verify after writes**: Read back values to confirm, preventing LLM from re-filling the same field (atp-ui §2.4)
+5. **Atomic operations**: Complete "find → check → act" in a single evaluate; don't split into two steps (atp-ui §20)
+6. **Direct assign, don't clear first**: \`setter.call(input, 'X')\` directly. Never \`setter('')\` then \`setter('X')\` — Vue will overwrite (atp-ui §14.3)
+7. **el-select: absolutely forbid click_element_by_index**: Option clicks must go through .el-select-dropdown__item. Wrong DOM layer renders Vue unable to detect selection (atp-ui §14.6)
+8. **Address selector: check placeholder**: Readonly inputs check placeholder ("请选择" = not selected), not value (atp-ui §13.1)`;
 
   // ====== Script generation rules ======
   prompt += `\n\n## Script Generation Rules
@@ -336,9 +355,8 @@ export function extractTestName(description) {
   return sanitizeFileName(name);
 }
 
-export function generateUniqueFileName(dateStr, testName) {
-  const suffix = crypto.randomBytes(3).toString('hex');
-  return `${dateStr}-${testName}-${suffix}.js`;
+export function generateUniqueFileName() {
+  return `playwright_${Date.now()}.js`;
 }
 
 export function cleanupScriptFile(scriptPath) {
@@ -488,8 +506,6 @@ const SCRIPT_TEMPLATE_HEAD = `const { chromium } = require('playwright');
   const browser = await chromium.launch({ headless: false, slowMo: 100 });
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const page = await context.newPage();
-
-${getInjectionCode()}
 
   try {`;
 
@@ -686,6 +702,10 @@ function genActionLine(row, idx) {
           ? `    await page.goto('${esc(value)}', { waitUntil: 'networkidle', timeout: 60000 });`
           : `    await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 60000 });`,
         `    await page.waitForTimeout(2000);`,
+        `    // Inject CTRL after navigation`,
+        `    await page.evaluate(() => {`,
+        `      window.CTRL = ${CTRL_OBJECT.replace(/\n/g, '\n      ')}`,
+        `    });`,
       ];
 
     case 'done':
@@ -723,5 +743,188 @@ export function convertTrajectoryToScript(trajectoryTable) {
   }
 
   lines.push(SCRIPT_TEMPLATE_TAIL);
+  return lines.join('\n');
+}
+
+// ============================================================
+// Phase-based script assembly with per-phase LLM generation
+// ============================================================
+
+const PHASE_RUNNER = `const { chromium } = require('playwright');
+
+(async () => {
+  const browser = await chromium.launch({ headless: false, slowMo: 100 });
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+
+  // Inject CTRL into every page automatically (persists across all navigations)
+  await context.addInitScript(() => {
+    window.CTRL = ${CTRL_OBJECT.replace(/\n/g, '\n    ')};
+  });
+
+  const page = await context.newPage();
+
+  try {
+    // Phase functions are defined below; execute them sequentially
+`;
+
+const PHASE_RUNNER_END = `
+  } catch (err) {
+    console.error('Test failed:', err.message);
+    try { await page.screenshot({ path: '/tmp/error.png' }); } catch {}
+    throw err;
+  } finally {
+    await browser.close();
+  }
+})().catch(err => { process.exit(1); });`;
+
+/**
+ * Build a short, focused prompt for a single phase.
+ * Each phase prompt is small → LLM can stay focused.
+ */
+export function buildPhasePrompt({ phaseIndex, totalPhases, phaseActions, testScenario }) {
+  let prompt = `Generate Playwright action code for Phase ${phaseIndex + 1} of ${totalPhases}.`;
+
+  if (testScenario) {
+    prompt += `\n\nTest scenario:\n${testScenario.slice(0, 300)}`;
+  }
+
+  prompt += `\n\n## Actions for this phase
+` + '| # | Action | Label | Value | XPath |\n|---|--------|-------|-------|-------|\n';
+  for (let i = 0; i < phaseActions.length; i++) {
+    const a = phaseActions[i];
+    prompt += `| ${i + 1} | ${a.type || ''} | ${a.label || '-'} | ${a.value || '-'} | ${a.xpath || '-'} |\n`;
+  }
+
+  prompt += `\n## Rules
+1. Output ONLY the code for this phase's actions — no \`const { chromium }\`, no \`browser.close()\`, no async wrapper
+2. **If phase 1 has no \`page.goto\` as its first action, add \`await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 60000 })\` + \`await page.waitForTimeout(2000)\` before all other actions.**
+
+2. **🚨 CTRL exists ONLY in the browser — WRAP every call**: CTRL is injected inside \`page.evaluate\`, so you MUST always write:
+   \`\`\`javascript
+   await page.evaluate(() => CTRL.selectOption('label', 'option'));
+   await page.evaluate(() => CTRL.fillFormField('label', 'value'));
+   await page.evaluate(() => CTRL.waitForLoading());
+   \`\`\`
+   **NEVER write bare \`CTRL.xxx()\`** — that runs in Node.js context where CTRL doesn't exist. Example of what NOT to do:
+   \`\`\`javascript
+   await CTRL.selectOption('label', 'option');  // ❌ ReferenceError: CTRL is not defined
+   await CTRL.fillFormField('label', 'value');  // ❌ ReferenceError: CTRL is not defined
+   \`\`\`
+
+3. **CTRL already injected** — do NOT redefine CTRL methods
+4. **el-select dropdowns** → \`await page.evaluate(() => CTRL.selectOption(label, option))\`. NEVER use \`page.locator('select')\`
+5. **Text inputs** → \`await page.evaluate(() => CTRL.fillFormField(label, value))\`
+6. **Date fields** → \`await page.evaluate(() => CTRL.selectDate(label, 'YYYY-MM-DD'))\`
+7. **Click menu** → \`await page.evaluate(() => CTRL.clickMenuItem(text))\`
+8. **Close dialog** → \`await page.evaluate(() => CTRL.closeDialog())\`
+9. **Wait for loading** → \`await page.evaluate(() => CTRL.waitForLoading())\`
+10. **Add \`await page.waitForTimeout(500)\`** after each action
+11. **Add \`console.log('✓ ...')\`** before each action
+12. **save_case_data → const**: \`save_case_data(key, value)\` becomes \`const key = 'value';\`. \`read_case_data(key)\` becomes a reference to that variable. Don't skip them — they carry cross-phase data.
+13. **Table rows**: Use \`CTRL.clickTableRowAction(rowText, btnText)\` for el-table row buttons. For selecting a row, use \`page.locator('.el-table__row').first().click()\` — NOT \`(//table/tbody/tr)[1]\` (el-table has a different DOM structure). Always wait for the table with \`await page.waitForSelector('.el-table__row', { timeout: 10000 })\` first.
+14. **Screenshots**: \`await page.screenshot({ path: '/tmp/phase_${phaseIndex + 1}_step_N.png' })\` at key points
+15. **Button locators**: Use \`page.locator('xpath=//button[contains(translate(.," ",""),"登录")]')\` — \`translate()\` removes ALL spaces which Chinese text often has. \`text()\` and \`normalize-space()\` cannot handle this.
+16. **🚨 Do NOT invent CTRL methods**: Only the 12 methods in the API table exist. \`CTRL.getPageState()\`, \`CTRL.extractContent()\`, etc. do NOT exist and will throw errors. For non-CTRL operations, use plain \`page.evaluate\` or \`page.locator\`.`;
+
+  return prompt;
+}
+
+/**
+ * Build a targeted refine prompt from a failed script execution.
+ * Extracts the actionable error and tells the LLM what pattern to fix.
+ */
+export function buildRefinePrompt({ script, error, stderr }) {
+  const errorLine = (error || '').slice(0, 300);
+  const stderrTail = (stderr || '').slice(-800);
+
+  // Classify the error to give targeted fix instructions
+  let fixHint = '';
+  if (errorLine.includes('CTRL is not defined')) {
+    fixHint = '**Fix**: CTRL calls must be wrapped in `page.evaluate(() => ...)`. Change `await CTRL.xxx()` → `await page.evaluate(() => CTRL.xxx())`.';
+  } else if (errorLine.includes('locator.click') || errorLine.includes('locator.waitFor') || errorLine.includes('Timeout')) {
+    fixHint = '**Fix**: The locator/xpath did not match any element. Common causes:\n'
+      + '- Chinese text may contain hidden spaces → use `translate(.," ","")` to strip spaces before matching\n'
+      + '- The element may be inside an el-dialog → scope XPath to `.el-dialog` or use `CTRL.*`\n'
+      + '- The page may not have finished loading → add `waitForSelector` or longer timeout\n'
+      + '- el-table rows use `.el-table__row` class, not `//table/tbody/tr`\n'
+      + '- el-select dropdowns need `CTRL.selectOption()`, never `page.locator(\'select\')`';
+  } else if (errorLine.includes('ReferenceError') || errorLine.includes('is not defined')) {
+    fixHint = '**Fix**: A variable is not defined. Check all CTRL calls use `page.evaluate(() => CTRL.xxx())` and all helper functions are defined.';
+  } else if (errorLine.includes('page.fill') || errorLine.includes('fill(')) {
+    fixHint = '**Fix**: Never use `page.fill()`. Element UI inputs need native setter via `page.evaluate(() => CTRL.fillFormField(label, value))`.';
+  } else if (errorLine.includes('selectOption') || errorLine.includes("locator('select')")) {
+    fixHint = '**Fix**: el-select is NOT a native `<select>`. Use `await page.evaluate(() => CTRL.selectOption(label, option))`.';
+  }
+
+  return `The generated Playwright script failed during execution. Fix the issue and output the COMPLETE fixed script.
+
+## Error
+\`\`\`
+${errorLine}
+${stderrTail}
+\`\`\`
+
+${fixHint || '**Fix**: Review the error and adjust the script accordingly.'}
+
+## Rules
+1. Output the ENTIRE fixed script, not just the changed portion
+2. Keep the \`context.addInitScript\` CTRL injection — do not remove it
+3. All Element UI operations must use \`page.evaluate(() => CTRL.xxx())\`
+4. \`save_case_data\` → \`const\` variables; \`read_case_data\` → reference those variables
+5. Add proper waits before interacting with elements
+6. Use \`translate(.," ","")\` in XPaths for Chinese text
+7. For el-table rows, use \`.el-table__row\` class selector`;
+}
+
+/**
+ * Parse action rows for a given phase, grouping actions between `done` markers.
+ * Returns [{ actions: [...], doneAction: {...} }]
+ */
+export function splitIntoPhases(rows) {
+  if (!rows || rows.length === 0) return [];
+
+  const phases = [];
+  let current = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+
+    if (row.type === 'done' && current.length > 0) {
+      current.push(row);
+      phases.push(current);
+      current = [];
+      continue;
+    }
+
+    current.push(row);
+  }
+
+  if (current.length > 0) phases.push(current);
+  return phases;
+}
+
+/**
+ * Assemble per-phase scripts into a complete runnable script.
+ * Runner uses context.addInitScript() to inject CTRL — persists across ALL navigations.
+ * Phase scripts just call page.evaluate(() => CTRL.xxx()) — CTRL is always available.
+ */
+export function assemblePhasedScript(phaseCodeBlocks, targetUrl) {
+  const lines = [];
+  if (targetUrl) {
+    lines.push(`const TARGET_URL = '${targetUrl.replace(/'/g, "\\'")}';`);
+  }
+  lines.push(PHASE_RUNNER);
+
+  for (let p = 0; p < phaseCodeBlocks.length; p++) {
+    lines.push(`    // ==============================`);
+    lines.push(`    // Phase ${p + 1} of ${phaseCodeBlocks.length}`);
+    lines.push(`    // ==============================`);
+    lines.push(`    console.log('▶ Phase ${p + 1}/${phaseCodeBlocks.length}');`);
+
+    lines.push(phaseCodeBlocks[p]);
+    lines.push(`    console.log('✓ Phase ${p + 1}/${phaseCodeBlocks.length} complete');`);
+  }
+
+  lines.push(PHASE_RUNNER_END);
   return lines.join('\n');
 }
