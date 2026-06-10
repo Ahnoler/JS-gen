@@ -799,32 +799,29 @@ export function buildPhasePrompt({ phaseIndex, totalPhases, phaseActions, testSc
 1. Output ONLY the code for this phase's actions — no \`const { chromium }\`, no \`browser.close()\`, no async wrapper
 2. **If phase 1 has no \`page.goto\` as its first action, add \`await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 60000 })\` + \`await page.waitForTimeout(2000)\` before all other actions.**
 
-2. **🚨 CTRL exists ONLY in the browser — WRAP every call**: CTRL is injected inside \`page.evaluate\`, so you MUST always write:
+3. **🚨 el-select is NEVER native \`<select>\`**: The login page's legal person dropdown is Element UI \`el-select\`, NOT a native HTML \`<select>\`. You MUST generate:
    \`\`\`javascript
-   await page.evaluate(() => CTRL.selectOption('label', 'option'));
-   await page.evaluate(() => CTRL.fillFormField('label', 'value'));
-   await page.evaluate(() => CTRL.waitForLoading());
+   await page.evaluate(() => CTRL.selectOption('请选择法人', 'first'));
    \`\`\`
-   **NEVER write bare \`CTRL.xxx()\`** — that runs in Node.js context where CTRL doesn't exist. Example of what NOT to do:
-   \`\`\`javascript
-   await CTRL.selectOption('label', 'option');  // ❌ ReferenceError: CTRL is not defined
-   await CTRL.fillFormField('label', 'value');  // ❌ ReferenceError: CTRL is not defined
-   \`\`\`
+   **Never** generate \`page.locator('select')\` or \`page.locator('select').first()\` — these will ALWAYS time out because there is no native \`<select>\` element on the page.
 
-3. **CTRL already injected** — do NOT redefine CTRL methods
-4. **el-select dropdowns** → \`await page.evaluate(() => CTRL.selectOption(label, option))\`. NEVER use \`page.locator('select')\`
-5. **Text inputs** → \`await page.evaluate(() => CTRL.fillFormField(label, value))\`
-6. **Date fields** → \`await page.evaluate(() => CTRL.selectDate(label, 'YYYY-MM-DD'))\`
-7. **Click menu** → \`await page.evaluate(() => CTRL.clickMenuItem(text))\`
-8. **Close dialog** → \`await page.evaluate(() => CTRL.closeDialog())\`
-9. **Wait for loading** → \`await page.evaluate(() => CTRL.waitForLoading())\`
-10. **Add \`await page.waitForTimeout(500)\`** after each action
-11. **Add \`console.log('✓ ...')\`** before each action
-12. **save_case_data → const**: \`save_case_data(key, value)\` becomes \`const key = 'value';\`. \`read_case_data(key)\` becomes a reference to that variable. Don't skip them — they carry cross-phase data.
-13. **Table rows**: Use \`CTRL.clickTableRowAction(rowText, btnText)\` for el-table row buttons. For selecting a row, use \`page.locator('.el-table__row').first().click()\` — NOT \`(//table/tbody/tr)[1]\` (el-table has a different DOM structure). Always wait for the table with \`await page.waitForSelector('.el-table__row', { timeout: 10000 })\` first.
-14. **Screenshots**: \`await page.screenshot({ path: '/tmp/phase_${phaseIndex + 1}_step_N.png' })\` at key points
-15. **Button locators**: Use \`page.locator('xpath=//button[contains(translate(.," ",""),"登录")]')\` — \`translate()\` removes ALL spaces which Chinese text often has. \`text()\` and \`normalize-space()\` cannot handle this.
-16. **🚨 Do NOT invent CTRL methods**: Only the 12 methods in the API table exist. \`CTRL.getPageState()\`, \`CTRL.extractContent()\`, etc. do NOT exist and will throw errors. For non-CTRL operations, use plain \`page.evaluate\` or \`page.locator\`.`;
+4. **🚨 CTRL exists ONLY in the browser — WRAP every call**: Use \`await page.evaluate(() => CTRL.xxx())\`. NEVER bare \`CTRL.xxx()\`.
+   ✓ \`await page.evaluate(() => CTRL.selectOption(label, option))\`
+   ✗ \`await CTRL.selectOption(label, option)\` — ReferenceError
+
+5. **CTRL already injected** — do NOT redefine CTRL methods
+6. **Text inputs** → \`await page.evaluate(() => CTRL.fillFormField(label, value))\`
+7. **Date fields** → \`await page.evaluate(() => CTRL.selectDate(label, 'YYYY-MM-DD'))\`
+8. **Click menu** → \`await page.evaluate(() => CTRL.clickMenuItem(text))\`
+9. **Close dialog** → \`await page.evaluate(() => CTRL.closeDialog())\`
+10. **Wait for loading** → \`await page.evaluate(() => CTRL.waitForLoading())\`
+11. **Add \`await page.waitForTimeout(500)\`** after each action
+12. **Add \`console.log('✓ ...')\`** before each action
+13. **save_case_data → const**: \`save_case_data(key, value)\` becomes \`const key = 'value';\`. \`read_case_data(key)\` → reference that variable.
+14. **Table rows**: Use \`.el-table__row\` class selector. Always \`waitForSelector('.el-table__row')\` first.
+15. **Screenshots**: \`await page.screenshot({ path: '/tmp/phase_${phaseIndex + 1}_step_N.png' })\` at key points
+16. **Button locators**: Use \`page.locator('xpath=//button[contains(translate(.," ",""),"登录")]')\` — \`translate()\` handles Chinese spaces.
+17. **🚨 Do NOT invent CTRL methods**: Only the 12 methods in the API table exist. \`CTRL.getPageState()\`, \`CTRL.extractContent()\` do NOT exist. Use \`page.evaluate\` for non-CTRL operations.`;
 
   return prompt;
 }
