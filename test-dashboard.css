@@ -278,6 +278,8 @@ body{
 .timeline{
   position:relative;
   padding-left:36px;
+  max-height:500px;
+  overflow-y:auto;
 }
 .timeline::before{
   content:'';

@@ -53,18 +53,22 @@ export function finishExplore(res, exploreLockRef, send, payload) {
 }
 
 export function parsePhases(task) {
-  const phaseRegex = /【阶段(\d+)[：:]\s*(.+?)】/g;
+  const bracketRegex = /【阶段(\d+)[：:]\s*(.+?)】/g;
+  const markdownRegex = /^##\s+Phase\s+(\d+)[：:]\s*(.+)$/gm;
+
+  const usesMarkdown = /^##\s+Phase\s+\d+/m.test(task);
+  const phaseRegex = usesMarkdown ? markdownRegex : bracketRegex;
+
   const phases = [];
-  let lastEnd = 0;
   let prefix = '';
 
-  const firstMatch = phaseRegex.exec(task);
-  if (firstMatch) {
-    prefix = task.slice(0, firstMatch.index).trim();
-    lastEnd = phaseRegex.lastIndex;
-  }
-
   phaseRegex.lastIndex = 0;
+  const firstMatch = phaseRegex.exec(task);
+  if (firstMatch && usesMarkdown) {
+    prefix = task.slice(0, firstMatch.index).trim();
+  }
+  phaseRegex.lastIndex = 0;
+
   let match;
   const matches = [];
   while ((match = phaseRegex.exec(task)) !== null) {
@@ -82,6 +86,10 @@ export function parsePhases(task) {
     }
 
     content = content.replace(/^\d+[\.\)、]\s*截图[^：:\n]*$/gm, '').trim();
+
+    if (usesMarkdown) {
+      content = content.replace(/\n{3,}/g, '\n\n').trim();
+    }
 
     const navPhases = ['登录', '导航'];
     const isNav = navPhases.some(kw => m.name.includes(kw));

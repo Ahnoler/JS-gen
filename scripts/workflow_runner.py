@@ -23,7 +23,7 @@ from .recorder import build_recording_hooks
 _TRACE_DIR = str(Path(__file__).parent / "trace")
 
 
-async def run_workflow(args, llm, form_rules, extend_system_message):
+async def run_workflow(args, llm, form_rules):
     """Run a multi-phase workflow from a JSON file."""
     browser = Browser()
     config = BrowserContextConfig(
@@ -77,7 +77,6 @@ async def run_workflow(args, llm, form_rules, extend_system_message):
         agent = Agent(
             task=phase_task, llm=llm, controller=controller, browser_context=browser_context,
             override_system_message=OVERRIDE_SYSTEM_MESSAGE,
-            extend_system_message=extend_system_message,
             use_vision=False, enable_memory=False,
             max_failures=5, retry_delay=10,
             planner_llm=llm, planner_interval=3,
@@ -109,7 +108,7 @@ async def run_workflow(args, llm, form_rules, extend_system_message):
     sys.stderr.flush()
 
 
-async def run_single_task(args, llm, form_rules, extend_system_message):
+async def run_single_task(args, llm, form_rules):
     """Run a single task."""
     browser = Browser()
     config = BrowserContextConfig(
@@ -145,7 +144,6 @@ async def run_single_task(args, llm, form_rules, extend_system_message):
     agent = Agent(
         task=args.task, llm=llm, controller=controller, browser_context=browser_context,
         override_system_message=OVERRIDE_SYSTEM_MESSAGE,
-        extend_system_message=extend_system_message,
         use_vision=False, enable_memory=False,
         max_failures=5, retry_delay=10,
         planner_llm=llm, planner_interval=3,

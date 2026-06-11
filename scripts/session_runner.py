@@ -16,7 +16,7 @@ from browser_use.browser.context import BrowserContextConfig
 from .agent_utils import (
     emit_json, extract_first_url, do_navigate,
     OVERRIDE_SYSTEM_MESSAGE, PLANNER_SYSTEM_PROMPT,
-    patch_message_manager, create_llm, get_element_ui_knowledge,
+    patch_message_manager, create_llm,
     make_step_callback, make_done_callback,
 )
 from .controller import build_controller
@@ -116,7 +116,7 @@ def _accumulate_trajectory(output_path, cumulative_path):
 
 
 async def _run_agent_step(instruction, step_index, session_id, args, llm, browser_context,
-                          controller, extend_system_message, goal_tracker, cancel_flag_path,
+                          controller, goal_tracker, cancel_flag_path,
                           on_step_start_hook, on_step_end_hook, case_data_ref, cumulative_path):
     global _last_agent
     max_steps = instruction.get("max_steps", 40)
@@ -159,7 +159,6 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     agent = Agent(
         task=agent_task, llm=llm, controller=controller, browser_context=browser_context,
         override_system_message=OVERRIDE_SYSTEM_MESSAGE,
-        extend_system_message=extend_system_message,
         use_vision=False, enable_memory=False,
         max_failures=5, retry_delay=10,
         planner_llm=llm, planner_interval=3,
@@ -246,7 +245,6 @@ async def run_session(args):
     patch_message_manager()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
     form_rules = load_rules()
-    extend_system_message = get_element_ui_knowledge()
 
     browser = Browser()
 
@@ -317,7 +315,7 @@ async def run_session(args):
             agent_running_ref['value'] = True
             output_path, task_text = await _run_agent_step(
                 data, step_index, session_id, args, llm, browser_context,
-                controller, extend_system_message, goal_tracker, cancel_flag_path,
+                controller, goal_tracker, cancel_flag_path,
                 on_step_start_hook, on_step_end_hook, case_data_store, cumulative_path,
             )
             agent_running_ref['value'] = False

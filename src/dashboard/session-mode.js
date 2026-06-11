@@ -145,13 +145,7 @@ export function initSessionMode() {
       content = content.replace(/^\d+[\.\)、]\s*截图[^：:\n]*$/gm, '').trim();
 
       if (usesMarkdown) {
-        content = content
-          .replace(/^\|.*\|$/gm, '')
-          .replace(/^[-]+$/gm, '')
-          .replace(/^>.*$/gm, '')
-          .replace(/^\*\*截图\*\*.*$/gm, '')
-          .replace(/\n{3,}/g, '\n\n')
-          .trim();
+        content = content.replace(/\n{3,}/g, '\n\n').trim();
       }
 
       const navPhases = ['登录', '导航'];
@@ -171,7 +165,7 @@ export function initSessionMode() {
     let html = '<div class="sess-phase-carousel" style="position:relative;overflow:hidden;padding:0 40px">';
     html += '<div class="sess-phase-track" style="display:flex;transition:transform 0.35s cubic-bezier(.4,0,.2,1)">';
     phases.forEach((p, i) => {
-      const shortTask = p.task.length > 150 ? p.task.slice(0, 150) + '...' : p.task;
+      const shortTask = p.task;
       html += '<div class="sess-phase-slide" data-index="' + i + '" style="flex:0 0 100%;padding:0 8px">';
       html += '<div class="sess-phase-item" style="border:1px solid var(--slate-200);border-radius:var(--radius-sm);padding:14px 16px;background:var(--slate-50)">';
       html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
@@ -181,7 +175,7 @@ export function initSessionMode() {
       html += '<button class="btn btn-sm btn-primary sess-phase-exec" data-index="' + i + '" style="font-size:11px">Execute</button>';
       html += '<button class="btn btn-sm sess-phase-continue" data-index="' + i + '" style="font-size:11px;display:none;color:var(--green-600);border:1px solid var(--green-300);background:#fff">Continue</button>';
       html += '</div></div>';
-      html += '<pre style="font-size:12px;color:var(--slate-500);white-space:pre-wrap;max-height:100px;overflow:auto;margin:0 0 6px;font-family:var(--font-mono)">' + escapeHtml(shortTask) + '</pre>';
+      html += '<pre style="font-size:12px;color:var(--slate-500);white-space:pre-wrap;max-height:500px;overflow-y:auto;margin:0 0 6px;font-family:var(--font-mono)">' + escapeHtml(shortTask) + '</pre>';
       html += '<div style="font-size:11px;color:var(--slate-400)">Max steps: ' + p.maxSteps + '</div>';
       html += '</div></div>';
     });

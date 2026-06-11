@@ -13,7 +13,7 @@ sys.stdin.reconfigure(encoding='utf-8', errors='replace')
 
 from .agent_utils import (
     parse_args,
-    patch_message_manager, create_llm, get_element_ui_knowledge,
+    patch_message_manager, create_llm,
 )
 from .form_rules import load_rules
 from .session_runner import run_session
@@ -34,12 +34,11 @@ def main():
     patch_message_manager()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
     form_rules = load_rules()
-    extend_system_message = get_element_ui_knowledge()
 
     if args.workflow:
-        asyncio.run(run_workflow(args, llm, form_rules, extend_system_message))
+        asyncio.run(run_workflow(args, llm, form_rules))
     else:
-        asyncio.run(run_single_task(args, llm, form_rules, extend_system_message))
+        asyncio.run(run_single_task(args, llm, form_rules))
 
 
 if __name__ == "__main__":
