@@ -196,13 +196,28 @@ export default function (app) {
     const session = state.sessions.get(id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
     if (!session.lastTask) return res.status(400).json({ error: 'No previous task to continue' });
-    // Re-route to /step with saved task
     req.body = { task: session.lastTask, maxSteps: session.lastMaxSteps };
     req.params.id = id;
-    // Find and call the step handler directly
     const stepRoute = app._router.stack.find(r => r.route && r.route.path === '/api/browser/session/:id/step' && r.route.methods.post);
     if (stepRoute) stepRoute.handle(req, res);
     else res.status(500).json({ error: 'Step handler not found' });
+  });
+
+  // Human intervention: inject an instruction into the running session
+  app.post('/api/browser/session/:id/intervene', (req, res) => {
+    const { id } = req.params;
+    const { instruction } = req.body || {};
+    const gb = state.globalBrowser;
+    const session = state.sessions.get(id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
+    if (!instruction) return res.status(400).json({ error: 'instruction is required' });
+    try {
+      gb.stdin.write(JSON.stringify({ event: 'intervene', data: { instruction } }) + '\n');
+      res.json({ status: 'queued', instruction: instruction.slice(0, 200) });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.delete('/api/browser/session/:id', (req, res) => {

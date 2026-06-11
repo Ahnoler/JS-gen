@@ -646,6 +646,46 @@ def _register_misc_actions(controller, browser_context):
         except Exception as e:
             return _err(f'click-failed:{e}')
 
+    @controller.action('Scroll down the page by pixel amount. Scrolls the main content container or window.')
+    async def scroll_down(amount: int = 300):
+        page = await browser_context.get_current_page()
+        await page.evaluate(f'''() => {{
+            const targets = document.querySelectorAll(
+                '.plugin-content-list, .el-scrollbar__wrap, form.el-form, main, [class*="main-content"], .app-main, .app-content, .el-form'
+            );
+            for (const t of targets) {{
+                const cs = getComputedStyle(t);
+                if (cs.overflowY !== 'auto' && cs.overflowY !== 'scroll') continue;
+                const diff = t.scrollHeight - t.clientHeight;
+                if (diff > 10) {{
+                    t.scrollTop = Math.min(t.scrollTop + {amount}, diff);
+                    if (t.scrollTop > 0) return;
+                }}
+            }}
+            window.scrollBy(0, {amount});
+        }}''')
+        return _ok(f'🔍  Scrolled down by {amount} pixels')
+
+    @controller.action('Scroll up the page by pixel amount. Scrolls the main content container or window.')
+    async def scroll_up(amount: int = 300):
+        page = await browser_context.get_current_page()
+        await page.evaluate(f'''() => {{
+            const targets = document.querySelectorAll(
+                '.plugin-content-list, .el-scrollbar__wrap, form.el-form, main, [class*="main-content"], .app-main, .app-content, .el-form'
+            );
+            for (const t of targets) {{
+                const cs = getComputedStyle(t);
+                if (cs.overflowY !== 'auto' && cs.overflowY !== 'scroll') continue;
+                const diff = t.scrollHeight - t.clientHeight;
+                if (diff > 10) {{
+                    t.scrollTop = Math.max(t.scrollTop - {amount}, 0);
+                    if (t.scrollTop > 0 || diff > 0) return;
+                }}
+            }}
+            window.scrollBy(0, -{amount});
+        }}''')
+        return _ok(f'🔍  Scrolled up by {amount} pixels')
+
 
 def _ok(msg):
     """Wrap a success string in ActionResult with is_done=False."""

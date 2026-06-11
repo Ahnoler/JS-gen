@@ -173,7 +173,6 @@ export function initSessionMode() {
       html += '<div style="display:flex;gap:8px;align-items:center">';
       html += '<span class="sess-phase-status" data-index="' + i + '" style="font-size:12px;font-weight:600;color:var(--slate-400)">' + p.status + '</span>';
       html += '<button class="btn btn-sm btn-primary sess-phase-exec" data-index="' + i + '" style="font-size:11px">Execute</button>';
-      html += '<button class="btn btn-sm sess-phase-continue" data-index="' + i + '" style="font-size:11px;display:none;color:var(--green-600);border:1px solid var(--green-300);background:#fff">Continue</button>';
       html += '</div></div>';
       html += '<pre style="font-size:12px;color:var(--slate-500);white-space:pre-wrap;max-height:500px;overflow-y:auto;margin:0 0 6px;font-family:var(--font-mono)">' + escapeHtml(shortTask) + '</pre>';
       html += '<div style="font-size:11px;color:var(--slate-400)">Max steps: ' + p.maxSteps + '</div>';
@@ -185,6 +184,13 @@ export function initSessionMode() {
     html += '<div style="padding:8px 0 0;text-align:center">';
     html += '<input type="range" class="sess-phase-slider" min="0" max="' + (phases.length - 1) + '" value="0" style="width:80%;height:4px;cursor:pointer;accent-color:var(--indigo-500)">';
     html += '<span class="sess-phase-slider-label" style="font-size:11px;color:var(--slate-400);margin-left:8px">1 / ' + phases.length + '</span>';
+    html += '</div>';
+    // Intervention textarea + continue button (below carousel, inside Phase Plan)
+    html += '<div style="margin-top:12px;border-top:1px solid var(--slate-200);padding-top:12px">';
+    html += '<textarea id="sessInterventionInput" placeholder="Human intervention: type instructions here (optional). Leave empty to just continue without changes." style="width:100%;min-height:60px;padding:8px;font-size:12px;font-family:var(--font-mono);border:1px solid var(--slate-300);border-radius:var(--radius-sm);resize:vertical;box-sizing:border-box"></textarea>';
+    html += '<div style="margin-top:8px;display:flex;gap:8px">';
+    html += '<button id="sessPhaseContinueBtn" class="btn btn-sm btn-primary" style="font-size:11px">Continue</button>';
+    html += '<span style="font-size:11px;color:var(--slate-400);align-self:center">Sends intervention instruction (if any) to the running session</span>';
     html += '</div></div>';
     return html;
   }
@@ -221,14 +227,31 @@ export function initSessionMode() {
       });
     });
 
-    list.querySelectorAll('.sess-phase-continue').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.dataset.index);
+    // Continue button with optional intervention text
+    const continueBtn = list.querySelector('#sessPhaseContinueBtn');
+    if (continueBtn) {
+      continueBtn.addEventListener('click', async () => {
         if (!sessActive.value) { sessLog('error', 'No active session'); return; }
-        sessLog('system', 'Continue: re-sending last task...');
-        executeContinueStep(sessActive.value, idx);
+        const intervention = document.getElementById('sessInterventionInput')?.value?.trim() || '';
+        if (intervention) {
+          sessLog('system', 'Sending intervention: ' + intervention.slice(0, 80));
+          try {
+            const resp = await fetch('/api/browser/session/' + sessActive.value + '/intervene', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ instruction: intervention }),
+            });
+            if (!resp.ok) throw new Error((await resp.json()).error || 'Failed');
+            document.getElementById('sessInterventionInput').value = '';
+            sessLog('success', 'Intervention queued — agent will process it in the next step');
+          } catch (err) {
+            sessLog('error', 'Intervention failed: ' + err.message);
+          }
+        } else {
+          sessLog('system', 'No intervention text entered. Type an instruction above to guide the agent, or use Execute to run a new phase.');
+        }
+        // Do NOT re-send the phase task — the agent already has it in context
       });
-    });
+    }
 
     const handleKey = (e) => {
       if (e.key === 'ArrowLeft') { showSlide(currentSlide - 1); e.preventDefault(); }
@@ -264,8 +287,6 @@ export function initSessionMode() {
     el.style.color = colors[status] || 'var(--slate-400)';
     const execBtn = list.querySelector('.sess-phase-exec[data-index="' + idx + '"]');
     if (execBtn && (status === 'success' || status === 'failed')) execBtn.textContent = status === 'success' ? 'Re-run' : 'Retry';
-    const continueBtn = list.querySelector('.sess-phase-continue[data-index="' + idx + '"]');
-    if (continueBtn) continueBtn.style.display = (status === 'success' || status === 'failed') ? '' : 'none';
   }
 
   function createSSEEventHandler(stepNum, label, phaseIdx) {
@@ -345,37 +366,6 @@ export function initSessionMode() {
           task, maxSteps,
           caseDataFile: document.getElementById('sessCaseDataFile')?.value?.trim() || undefined,
         }),
-        signal: sessAbortController.signal,
-      });
-      if (!resp.ok) { const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status })); throw new Error(err.error || 'Request failed'); }
-
-      const handler = createSSEEventHandler(stepNum, label, phaseIdx);
-      await readSSEStream(resp.body.getReader(), handler);
-    } catch (err) {
-      const isAbort = err.name === 'AbortError';
-      sessLog(isAbort ? 'system' : 'error', isAbort ? 'Cancelled' : err.message);
-      sessTimelineStep('step-' + stepNum, 'failed', label, isAbort ? 'Cancelled' : err.message.slice(0, 100));
-      if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'failed');
-    }
-    sessAbortController = null;
-    setUILocked(false);
-  }
-
-  async function executeContinueStep(sessionId, phaseIdx) {
-    setUILocked(true);
-    sessStatus.textContent = 'Continuing...';
-    const stepNum = (parseInt(sessStepCount.textContent) || 0) + 1;
-    sessStepCount.textContent = stepNum + ' steps';
-    const label = sessionPhases[phaseIdx]?.name || 'continue';
-    sessTimelineStep('step-' + stepNum, 'running', label, 'continue');
-    sessLog('system', 'Continue: ' + label);
-    if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'running');
-
-    sessAbortController = new AbortController();
-    try {
-      const resp = await fetch('/api/browser/session/' + sessionId + '/continue', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
         signal: sessAbortController.signal,
       });
       if (!resp.ok) { const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status })); throw new Error(err.error || 'Request failed'); }

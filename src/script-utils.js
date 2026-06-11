@@ -737,7 +737,7 @@ export function convertTrajectoryToScript(trajectoryTable) {
     const actionLines = genActionLine(rows[i], i);
     if (actionLines && actionLines.length > 0) {
       lines.push('');
-      lines.push(`    // ----- Step ${i + 1}: ${rows[i].type}${rows[i].label ? ' (' + rows[i].label + ')' : ''} -----`);
+      lines.push(`    // Step ${i + 1} ----- ${rows[i].type}${rows[i].label ? ' (' + rows[i].label + ')' : ''} -----`);
       lines.push(...actionLines);
     }
   }
@@ -797,7 +797,8 @@ export function buildPhasePrompt({ phaseIndex, totalPhases, phaseActions, testSc
 
   prompt += `\n## Rules
 1. Output ONLY the code for this phase's actions — no \`const { chromium }\`, no \`browser.close()\`, no async wrapper
-2. **If phase 1 has no \`page.goto\` as its first action, add \`await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 60000 })\` + \`await page.waitForTimeout(2000)\` before all other actions.**
+2. **Phase 1**: If the first action is not \`page.goto\`, add \`await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 60000 })\` + \`await page.waitForTimeout(2000)\` before all actions.
+3. **Phase 2+**: Do NOT add \`page.goto\` — the page is already loaded from the previous phase. Only navigate if the trajectory explicitly includes a \`go_to_url\` action.**
 
 3. **🚨 el-select is NEVER native \`<select>\`**: The login page's legal person dropdown is Element UI \`el-select\`, NOT a native HTML \`<select>\`. You MUST generate:
    \`\`\`javascript
@@ -824,53 +825,6 @@ export function buildPhasePrompt({ phaseIndex, totalPhases, phaseActions, testSc
 17. **🚨 Do NOT invent CTRL methods**: Only the 12 methods in the API table exist. \`CTRL.getPageState()\`, \`CTRL.extractContent()\` do NOT exist. Use \`page.evaluate\` for non-CTRL operations.`;
 
   return prompt;
-}
-
-/**
- * Build a targeted refine prompt from a failed script execution.
- * Extracts the actionable error and tells the LLM what pattern to fix.
- */
-export function buildRefinePrompt({ script, error, stderr }) {
-  const errorLine = (error || '').slice(0, 300);
-  const stderrTail = (stderr || '').slice(-800);
-
-  // Classify the error to give targeted fix instructions
-  let fixHint = '';
-  if (errorLine.includes('CTRL is not defined')) {
-    fixHint = '**Fix**: CTRL calls must be wrapped in `page.evaluate(() => ...)`. Change `await CTRL.xxx()` → `await page.evaluate(() => CTRL.xxx())`.';
-  } else if (errorLine.includes('locator.click') || errorLine.includes('locator.waitFor') || errorLine.includes('Timeout')) {
-    fixHint = '**Fix**: The locator/xpath did not match any element. Common causes:\n'
-      + '- Chinese text may contain hidden spaces → use `translate(.," ","")` to strip spaces before matching\n'
-      + '- The element may be inside an el-dialog → scope XPath to `.el-dialog` or use `CTRL.*`\n'
-      + '- The page may not have finished loading → add `waitForSelector` or longer timeout\n'
-      + '- el-table rows use `.el-table__row` class, not `//table/tbody/tr`\n'
-      + '- el-select dropdowns need `CTRL.selectOption()`, never `page.locator(\'select\')`';
-  } else if (errorLine.includes('ReferenceError') || errorLine.includes('is not defined')) {
-    fixHint = '**Fix**: A variable is not defined. Check all CTRL calls use `page.evaluate(() => CTRL.xxx())` and all helper functions are defined.';
-  } else if (errorLine.includes('page.fill') || errorLine.includes('fill(')) {
-    fixHint = '**Fix**: Never use `page.fill()`. Element UI inputs need native setter via `page.evaluate(() => CTRL.fillFormField(label, value))`.';
-  } else if (errorLine.includes('selectOption') || errorLine.includes("locator('select')")) {
-    fixHint = '**Fix**: el-select is NOT a native `<select>`. Use `await page.evaluate(() => CTRL.selectOption(label, option))`.';
-  }
-
-  return `The generated Playwright script failed during execution. Fix the issue and output the COMPLETE fixed script.
-
-## Error
-\`\`\`
-${errorLine}
-${stderrTail}
-\`\`\`
-
-${fixHint || '**Fix**: Review the error and adjust the script accordingly.'}
-
-## Rules
-1. Output the ENTIRE fixed script, not just the changed portion
-2. Keep the \`context.addInitScript\` CTRL injection — do not remove it
-3. All Element UI operations must use \`page.evaluate(() => CTRL.xxx())\`
-4. \`save_case_data\` → \`const\` variables; \`read_case_data\` → reference those variables
-5. Add proper waits before interacting with elements
-6. Use \`translate(.," ","")\` in XPaths for Chinese text
-7. For el-table rows, use \`.el-table__row\` class selector`;
 }
 
 /**

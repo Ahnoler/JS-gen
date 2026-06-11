@@ -215,7 +215,7 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref):
         await stdin_queue.put(msg)
 
 
-def _dispatch_event(msg, session_state):
+def _dispatch_event(msg, session_state, intervention_queue=None):
     event = msg.get("event")
 
     if event == "save_trajectory":
@@ -230,6 +230,14 @@ def _dispatch_event(msg, session_state):
         cum_path = _handle_reset_trajectory(session_state['session_id'])
         session_state['cumulative_path'] = cum_path
         session_state['case_data_store'].clear()
+        return 'continue'
+
+    if event == "intervene":
+        instruction = msg.get("data", {}).get("instruction", "")
+        if instruction and intervention_queue is not None:
+            intervention_queue.put_nowait(instruction)
+            sys.stderr.write(f"[session] Intervention queued: {instruction[:80]}\n")
+            sys.stderr.flush()
         return 'continue'
 
     if event != "step":
@@ -259,8 +267,9 @@ async def run_session(args):
     case_data_store = {}  # process-level in-memory store, persists across steps
     cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
     goal_tracker = {'goals': [], 'stopped': False}
+    intervention_queue = asyncio.Queue()  # human intervention messages
 
-    on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path)
+    on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path, intervention_queue)
     controller = build_controller(browser_context, form_rules, case_data_store)
 
     emit_json({"event": "ready", "session_id": session_id})
@@ -290,7 +299,7 @@ async def run_session(args):
             break
 
         try:
-            action = _dispatch_event(msg, session_state)
+            action = _dispatch_event(msg, session_state, intervention_queue)
             cumulative_path = session_state['cumulative_path']
             if action != 'step':
                 continue

@@ -274,20 +274,24 @@ export default function (app) {
     const sessionId = entry.sessionId;
 
     try {
-      const refinePrompt = `Modify the previous script based on the feedback below. Output ONLY the complete updated script.
+      // Load atp-fix skill content for error fix guidance
+      let atpFixGuide = '';
+      const atpFixPath = path.join(PROJECT_DIR, '.opencode', 'skills', 'atp-fix', 'SKILL.md');
+      try { atpFixGuide = readFileSync(atpFixPath, 'utf-8').slice(0, 3000); } catch {}
+
+      const refinePrompt = `${atpFixGuide ? '## atp-fix Skill (loaded)\n' + atpFixGuide + '\n\n' : ''}Modify the previous script based on the feedback below. Output ONLY the complete updated script.
 
 Feedback:
 ${feedback}
 
-## Element UI Core Constraints (must follow when modifying)
-1. Never use page.fill() — use native setter + input/change/blur with bubbling events for el-input
-2. el-select dropdown: click trigger to open, then click .el-select-dropdown__item by text (forbid click_element_by_index)
-3. el-dialog: re-querySelector every time, don't cache references
-4. el-menu: check el-submenu expansion before clicking child items
-5. Date fields: use native setter + Escape to close picker panel
-6. XPath exact match: text()='exact text', forbid contains(text(),'text')
-7. Wait 500ms between steps for Vue reactivity
-8. Read back values after filling to confirm write success`;
+## Rules
+1. Output the ENTIRE fixed script, not just the changed portion
+2. Keep \`context.addInitScript\` CTRL injection
+3. All Element UI operations must use \`page.evaluate(() => CTRL.xxx())\`
+4. \`save_case_data\` → \`const\`; \`read_case_data\` → reference that variable
+5. Add proper waits before interacting with elements
+6. Use \`translate(.," ","")\` in XPaths for Chinese text
+7. For el-table rows, use \`.el-table__row\` class selector`;
 
       let code, steps;
 

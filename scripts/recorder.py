@@ -1,20 +1,33 @@
 """
 Recording hooks for browser-use agent: step callbacks, goal dedup detection, cancel signal,
-and premature done() prevention.
+premature done() prevention, and human intervention injection.
 """
 import sys
 import json
 from pathlib import Path
+from langchain_core.messages import HumanMessage
 from .agent_utils import emit_json
 
 
-def build_recording_hooks(goal_tracker=None, cancel_flag_path=None):
-    """Build hooks with goal dedup detection and cancel signal."""
+def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention_queue=None):
+    """Build hooks with goal dedup detection, cancel signal, and intervention support."""
     if goal_tracker is None:
         goal_tracker = {'goals': [], 'stopped': False}
 
     async def on_step_start(agent):
         sys.stderr.write(f"[recorder] on_step_start n_steps={agent.state.n_steps}\n"); sys.stderr.flush()
+        # Check for human intervention before proceeding
+        if intervention_queue is not None:
+            try:
+                while not intervention_queue.empty():
+                    instruction = intervention_queue.get_nowait()
+                    msg = HumanMessage(content=f'[HUMAN INTERVENTION] {instruction}\n\nPause your current plan and follow this new instruction first. After completing it, resume the original task.')
+                    agent._message_manager._add_message_with_tokens(msg)
+                    sys.stderr.write(f"[recorder] Injected human intervention: {instruction[:100]}\n")
+                    sys.stderr.flush()
+            except Exception as e:
+                sys.stderr.write(f"[recorder] Intervention error: {e}\n")
+                sys.stderr.flush()
 
     async def on_step_end(agent):
         _done = agent.state.history.is_done() if agent.state.history else False

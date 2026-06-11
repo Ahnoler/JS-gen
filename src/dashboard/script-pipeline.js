@@ -20,6 +20,7 @@ export const pipelineState = {
   currentTestId: null,
   currentFileName: null,
   currentScript: '',
+  lastError: '',  // captured from last run failure
 };
 
 // ====== Helpers ======
@@ -479,12 +480,29 @@ export function initScriptPipeline() {
                   resultDiv.style.color = 'var(--emerald-700)';
                   resultDiv.textContent = `✅ 测试通过 (exit code: ${data.exitCode})`;
                   document.getElementById('genRunDot').style.background = 'var(--emerald-400)';
+                  pipelineState.lastError = '';
                 } else {
                   resultDiv.style.background = 'var(--red-50)';
                   resultDiv.style.color = 'var(--red-600)';
-                  const errMsg = data.error ? ': ' + data.error : '';
-                  resultDiv.textContent = `❌ 测试失败 (exit code: ${data.exitCode})${errMsg}`;
+                  const errMsg = data.error || '';
+                  const stderr = data.stderr || '';
+                  const errorText = (errMsg || stderr || '').slice(0, 1000);
+                  
+                  // Classify error for display
+                  let errorTag = '脚本错误';
+                  if (errorText.includes('CTRL is not defined')) errorTag = 'CTRL 未注入';
+                  else if (errorText.includes('strict mode violation')) errorTag = '定位器歧义';
+                  else if (errorText.includes('Timeout') || errorText.includes('locator.waitFor')) errorTag = '元素超时';
+                  else if (errorText.includes('ReferenceError') || errorText.includes('is not defined')) errorTag = '变量未定义';
+                  else if (errorText.includes('page.fill') || errorText.includes('fill(')) errorTag = '禁止使用 page.fill';
+                  else if (errorText.includes('selectOption') || errorText.includes("locator('select')") || errorText.includes('native select')) errorTag = '原生 select 误用';
+                  else if (errorText.includes('navigating to') && errorText.includes('ERR_')) errorTag = '导航错误';
+                  
+                  resultDiv.innerHTML = `<div>❌ 测试失败 <span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:1px 10px;border-radius:10px;font-size:11px;margin-left:8px">${errorTag}</span></div><div style="font-size:11px;margin-top:4px;color:#dc2626">${escapeHtml(errorText.slice(0, 300))}</div>`;
                   document.getElementById('genRunDot').style.background = 'var(--red-400)';
+                  // Capture error for refine
+                  pipelineState.lastError = errorText;
+                  document.getElementById('genFeedback').value = `Error type: ${errorTag}\n\n${errorText}`;
                 }
                 break;
             }
