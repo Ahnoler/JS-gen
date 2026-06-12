@@ -8,10 +8,11 @@ snapshots/
 tmp/
 .DS_Store
 Thumbs.db
-scripts/generated/
 report/
-/docs/
-/scripts/trace/
-/scripts/data/
-/scripts/case_data/
-/scripts/trajectories/
+atp-record/
+docs/
+scripts/trace/
+scripts/case_data/
+scripts/data/
+scripts/generated/
+scripts/trajectories/

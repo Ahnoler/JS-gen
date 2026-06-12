@@ -1,7 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$" />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/.opencode/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/.opencode/skills/playwright-skill/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/atp-form" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/case_data" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/data" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/generated" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/trace" />
+      <excludeFolder url="file://$MODULE_DIR$/snapshots" />
+      <excludeFolder url="file://$MODULE_DIR$/tmp" />
+      <excludeFolder url="file://$MODULE_DIR$/web-ui/.idea" />
+      <excludeFolder url="file://$MODULE_DIR$/web-ui/tmp" />
+    </content>
     <orderEntry type="jdk" jdkName="Python 3.12" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
