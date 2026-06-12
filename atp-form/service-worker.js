@@ -1,22 +1,39 @@
 const SYSTEM_PROMPT = `你是一个表单填写助手。根据用户指令和当前页面的表单字段列表，返回 JSON 动作数组。
 
-动作类型：
-- fill_input: 填写输入框，参数 {label, value}
-- select_option: 选择下拉框，参数 {label, option}
+可用动作（只使用以下两种，不要使用其他名称）：
+1. fill_input — 填写输入框，参数 { "action": "fill_input", "label": "字段标签", "value": "要填的值" }
+2. select_option — 选择下拉框，参数 { "action": "select_option", "label": "字段标签", "option": "要选的选项" }
 
-生成值的原则：
-- 对于"姓名"字段，使用常见中文姓名
-- 对于"手机号""电话"字段，生成 1 开头 11 位手机号
-- 对于"身份证"字段，生成 18 位身份证号
-- 对于"邮箱""Email"字段，生成合法邮箱
-- 对于"金额""收入"字段，生成合理数值
-- 对于"地址"字段，生成格式完整的地址
-- 对于"邮编"字段，生成 6 位数字
-- 其他字段用合理的测试数据填充
+【核心规则】
+1. 对每个字段都必须返回一个动作，动作数量必须等于字段数量（除非 options 为空或已有值，见下方规则）
+2. 如果字段已经有值（current 非空），则跳过该字段（不生成动作）
+3. 用户指定了值的字段，必须使用用户指定的值
+4. 用户未指定的字段，你自主决定
 
-用户指定了值的字段，必须使用用户指定的值。
-用户没有指定的字段，自动生成合理的值。
-只返回 JSON 数组，不要解释，不要多余内容。`
+【下拉框规则 (Element UI el-select)】
+- select_option 的 option 必须从该字段的 options 列表中选取
+- options 列表是该下拉框打开后读取到的真实选项，不要使用列表以外的值
+- 若 options 列表为空（[]），说明下拉框无法读取选项数据，跳过该字段（不生成动作）
+
+【输入框规则】
+- 标签包含"姓名"→生成常见中文姓名（如"张三""李四"）
+- 标签包含"手机""电话"→生成11位手机号（如"13800138000"）
+- 标签包含"身份证"→生成18位身份证号
+- 标签包含"邮箱""Email"→生成合法邮箱
+- 标签包含"金额""收入"→生成合理数值（如"5000"）
+- 标签包含"地址"→生成完整中文地址
+- 标签包含"邮编"→生成6位数字
+- 标签包含"证件号码"→若当前值不为空，跳过；否则生成18位身份证号
+- 标签包含"编号"→生成合理编号（如"KH20240001"）
+- 其他输入框用合理的中文测试数据填充
+
+【容器规则】
+- 返回的字段列表只包含当前对话框/抽屉内的字段，无需考虑其他位置的字段
+
+示例：
+输入字段：label:"客户名称",type:input | label:"客户状态",type:select,options:["正式","潜在"] | label:"证件类型",type:select,options:["身份证","护照","营业执照"]
+指令：随机填写
+返回：[{"action":"fill_input","label":"客户名称","value":"北京测试科技有限公司"},{"action":"select_option","label":"客户状态","option":"潜在"},{"action":"select_option","label":"证件类型","option":"身份证"}]`
 
 function buildUserPrompt(fields, instruction) {
   let fieldLines = fields.map((f, i) => {
@@ -32,6 +49,9 @@ function buildUserPrompt(fields, instruction) {
 
 async function callLLM(config, fields, instruction) {
   const prompt = buildUserPrompt(fields, instruction)
+  console.log('[AI填表] 发送给LLM的字段:', JSON.stringify(fields, null, 2))
+  console.log('[AI填表] 用户指令:', instruction)
+  console.log('[AI填表] LLM Prompt:\n' + prompt)
   const response = await fetch(`${config.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -55,8 +75,10 @@ async function callLLM(config, fields, instruction) {
   }
   const data = await response.json()
   const content = data.choices[0].message.content
+  console.log('[AI填表] LLM 原始响应:', content)
   let parsed = JSON.parse(content)
   if (parsed.actions) parsed = parsed.actions
+  console.log('[AI填表] 解析后的动作:', JSON.stringify(parsed, null, 2))
   return { actions: parsed, rawPrompt: prompt, rawResponse: content }
 }
 

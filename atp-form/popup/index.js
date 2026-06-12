@@ -2,8 +2,6 @@
 let currentTabId = null
 let isRunning = false
 let currentSession = null
-let sessions = []
-const STORAGE_KEY = 'atpFormSessions'
 
 // ===== DOM refs =====
 const $ = id => document.getElementById(id)
@@ -21,9 +19,6 @@ const consolePrompt = $('consolePrompt')
 const consoleRawResponse = $('consoleRawResponse')
 const consoleActions = $('consoleActions')
 const consoleResults = $('consoleResults')
-const historyPanel = $('historyPanel')
-const historyList = $('historyList')
-const historyEmpty = $('historyEmpty')
 
 // Settings
 const apiKeyInput = $('apiKeyInput')
@@ -73,28 +68,6 @@ function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-// ===== Storage =====
-function loadSessions() {
-  return new Promise(resolve => {
-    chrome.storage.local.get(STORAGE_KEY, res => {
-      sessions = res[STORAGE_KEY] || []
-      resolve(sessions)
-    })
-  })
-}
-
-function saveSessions() {
-  return new Promise(resolve => {
-    chrome.storage.local.set({ [STORAGE_KEY]: sessions }, resolve)
-  })
-}
-
-function addSessionToHistory(session) {
-  sessions.unshift(session)
-  if (sessions.length > 50) sessions = sessions.slice(0, 50)
-  saveSessions()
-}
-
 // ===== Current Session Management =====
 function initSession(instruction) {
   currentSession = {
@@ -107,21 +80,12 @@ function initSession(instruction) {
     llmResponse: '',
     actions: [],
     executionResults: [],
-    logs: [],
     status: 'running'
   }
 }
 
-function addSessionLog(text, type) {
-  if (!currentSession) return
-  currentSession.logs.push({ text, type, time: new Date().toISOString() })
-}
-
-function finalizeSession(status) {
-  if (!currentSession) return
-  currentSession.status = status
-  currentSession.url = window.location.href || ''
-  addSessionToHistory(JSON.parse(JSON.stringify(currentSession)))
+function clearSession() {
+  currentSession = null
 }
 
 // ===== Content Script Communication =====
@@ -183,31 +147,24 @@ async function execute() {
   currentTabId = tab.id
 
   initSession(instruction)
-
   isRunning = true
   executeBtn.disabled = true
   executeBtn.textContent = '执行中...'
   clearLogs()
 
   addLog({ type: 'info', text: '正在扫描表单字段...' })
-  addSessionLog('正在扫描表单字段...', 'info')
 
   const scanResult = await sendToContent(currentTabId, { type: 'scanFields' })
   if (!scanResult) {
-    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'
-    finalizeSession('error')
-    return
+    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'; clearSession(); return
   }
   if (!scanResult.fields || scanResult.fields.length === 0) {
     addLog({ type: 'error', text: '未检测到 Element UI 表单字段' })
-    addSessionLog('未检测到 Element UI 表单字段', 'error')
-    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'
-    finalizeSession('error')
-    return
+    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'; clearSession(); return
   }
 
   currentSession.fields = scanResult.fields
-  currentSession.url = tab.url || window.location.href || ''
+  currentSession.url = tab.url || ''
 
   const fields = scanResult.fields
   const inputCount = fields.filter(f => f.type === 'input').length
@@ -215,59 +172,61 @@ async function execute() {
   fieldSummary.style.display = 'block'
   fieldSummary.textContent = '检测到 ' + fields.length + ' 个字段（输入框 ' + inputCount + ' 个，下拉框 ' + selectCount + ' 个）'
   addLog({ type: 'info', text: '检测到 ' + fields.length + ' 个字段，正在调用 LLM 规划动作...' })
-  addSessionLog('检测到 ' + fields.length + ' 个字段，正在调用 LLM 规划动作...', 'info')
+
+  console.log('[AI填表] ====== 发送给 LLM 的字段列表 ======')
+  console.log(JSON.stringify(fields, null, 2))
+  console.log('[AI填表] 用户指令:', instruction)
+
+  // Forward scan result to main page console (content script)
+  sendToContent(currentTabId, { type: 'logToConsole', tag: '扫描的字段', data: JSON.stringify(fields, null, 2) })
 
   const llmResult = await new Promise(resolve => {
     chrome.runtime.sendMessage({ type: 'callLLM', fields, instruction }, resolve)
   })
   if (!llmResult) {
     addLog({ type: 'error', text: 'LLM 调用无响应' })
-    addSessionLog('LLM 调用无响应', 'error')
-    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'
-    finalizeSession('error')
-    return
+    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'; clearSession(); return
   }
   if (llmResult.error) {
     addLog({ type: 'error', text: 'LLM 错误: ' + llmResult.error })
-    addSessionLog('LLM 错误: ' + llmResult.error, 'error')
-    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'
-    finalizeSession('error')
-    return
+    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'; clearSession(); return
   }
 
   currentSession.llmRequest = llmResult.rawPrompt || ''
   currentSession.llmResponse = llmResult.rawResponse || ''
   const actions = llmResult.actions
   currentSession.actions = actions || []
+  console.log('[AI填表] ====== LLM 返回的动作 ======')
+  console.log(JSON.stringify(actions, null, 2))
+
+  // Forward LLM result to main page console
+  sendToContent(currentTabId, { type: 'logToConsole', tag: 'LLM 返回的动作', data: JSON.stringify(actions, null, 2) })
 
   if (!actions || actions.length === 0) {
     addLog({ type: 'error', text: 'LLM 未返回任何动作' })
-    addSessionLog('LLM 未返回任何动作', 'error')
-    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'
-    finalizeSession('error')
-    return
+    isRunning = false; executeBtn.disabled = false; executeBtn.textContent = '执行'; clearSession(); return
   }
 
   addLog({ type: 'info', text: 'LLM 规划了 ' + actions.length + ' 个动作，开始执行...' })
-  addSessionLog('LLM 规划了 ' + actions.length + ' 个动作', 'info')
 
-  // Listen for progress and completion from content script
   const pl = function(msg) {
     if (!currentSession) return
     if (msg.type === 'actionProgress') {
       currentSession.executionResults.push(msg.data)
       addLog({ type: 'progress', data: msg.data, total: actions.length })
-      addSessionLog(msg.data.action + ' "' + msg.data.label + '": ' + msg.data.result, 'progress')
+      console.log('[AI填表] 执行进度:', msg.data.index + '/' + actions.length, msg.data.action, msg.data.label, '→', msg.data.result)
+      sendToContent(currentTabId, { type: 'logToConsole', tag: '执行进度', data: msg.data.index + '/' + actions.length + ' ' + msg.data.action + ' "' + msg.data.label + '" → ' + msg.data.result })
     }
     if (msg.type === 'actionComplete') {
       chrome.runtime.onMessage.removeListener(pl)
       currentSession.executionResults = msg.data
       addLog({ type: 'success', text: '完成！共执行 ' + msg.data.length + ' 个动作' })
-      addSessionLog('完成！共执行 ' + msg.data.length + ' 个动作', 'success')
+      console.log('[AI填表] ====== 执行完成 ======')
+      console.log(JSON.stringify(msg.data, null, 2))
+      sendToContent(currentTabId, { type: 'logToConsole', tag: '执行完成', data: JSON.stringify(msg.data, null, 2) })
       isRunning = false
       executeBtn.disabled = false
       executeBtn.textContent = '执行'
-      finalizeSession('success')
     }
   }
   chrome.runtime.onMessage.addListener(pl)
@@ -290,7 +249,6 @@ function renderConsole() {
   consoleEmpty.style.display = 'none'
   consoleContent.style.display = 'block'
 
-  // Page info
   consolePageInfo.innerHTML = ''
   const info = [
     { k: '时间', v: currentSession.timestamp },
@@ -305,74 +263,18 @@ function renderConsole() {
     consolePageInfo.appendChild(d)
   })
 
-  // Fields
   consoleFields.textContent = JSON.stringify(currentSession.fields, null, 2)
-
-  // LLM Request
   consolePrompt.textContent = currentSession.llmRequest || '(无)'
-
-  // LLM Response
   consoleRawResponse.textContent = currentSession.llmResponse || '(无)'
-
-  // Actions
   consoleActions.textContent = JSON.stringify(currentSession.actions, null, 2)
-
-  // Results
   consoleResults.textContent = currentSession.executionResults.length > 0
     ? JSON.stringify(currentSession.executionResults, null, 2)
     : '(尚未执行)'
 }
 
-function renderHistory() {
-  loadSessions().then(() => {
-    if (sessions.length === 0) {
-      historyEmpty.style.display = 'block'
-      historyList.innerHTML = ''
-      return
-    }
-    historyEmpty.style.display = 'none'
-    historyList.innerHTML = sessions.map(s => {
-      const statusClass = s.status === 'success' ? 'ok' : 'err'
-      const fieldCount = s.fields ? s.fields.length : 0
-      const actionCount = s.actions ? s.actions.length : 0
-      const time = new Date(s.timestamp).toLocaleString()
-      const instr = escHtml(s.instruction)
-      return '<div class="history-item" data-id="' + s.id + '">' +
-        '<div class="h-time">' + escHtml(time) + '</div>' +
-        '<div class="h-instruction">' + instr + '</div>' +
-        '<div class="h-summary"><span class="tag ' + statusClass + '">' + escHtml(s.status) + '</span> ' + fieldCount + ' 个字段, ' + actionCount + ' 个动作</div>' +
-        '</div>'
-    }).join('')
-
-    historyList.querySelectorAll('.history-item').forEach(el => {
-      el.addEventListener('click', () => {
-        const id = Number(el.dataset.id)
-        const session = sessions.find(s => s.id === id)
-        if (session) {
-          currentSession = JSON.parse(JSON.stringify(session))
-          historyPanel.style.display = 'none'
-          renderConsole()
-        }
-      })
-    })
-  })
-}
-
-$('loadHistoryBtn').addEventListener('click', () => {
-  historyPanel.style.display = 'flex'
-  renderHistory()
-})
-
-$('backFromHistoryBtn').addEventListener('click', () => {
-  historyPanel.style.display = 'none'
-  renderConsole()
-})
-
 $('clearConsoleBtn').addEventListener('click', () => {
-  if (currentSession) {
-    currentSession = null
-    renderConsole()
-  }
+  clearSession()
+  renderConsole()
 })
 
 // ===== Settings Tab =====
@@ -406,5 +308,4 @@ $('saveConfigBtn').addEventListener('click', () => {
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', () => {
   loadConfig()
-  loadSessions()
 })

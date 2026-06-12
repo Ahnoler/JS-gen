@@ -28,11 +28,10 @@
       <div class="console-toolbar">
         <span class="console-title">当前会话</span>
         <div class="console-actions">
-          <button id="loadHistoryBtn" class="small-btn">历史记录</button>
           <button id="clearConsoleBtn" class="small-btn danger">清空</button>
         </div>
       </div>
-      <div id="consoleEmpty" class="console-empty">暂无会话数据。执行填表操作后此处会显示详细信息。</div>
+      <div id="consoleEmpty" class="console-empty">暂无会话数据。执行填表操作后此处会显示详细信息。<br>同时打开 F12 → Console 查看完整日志。</div>
       <div id="consoleContent" style="display:none">
         <div class="console-section">
           <div class="console-section-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
@@ -43,7 +42,7 @@
         </div>
         <div class="console-section">
           <div class="console-section-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
-            <span>🔍 扫描的字段 (click to expand)</span>
+            <span>🔍 扫描的字段</span>
             <span class="collapse-icon">▼</span>
           </div>
           <div class="console-section-body collapsed"><pre id="consoleFields"></pre></div>
@@ -76,16 +75,6 @@
           </div>
           <div class="console-section-body"><pre id="consoleResults"></pre></div>
         </div>
-      </div>
-
-      <!-- 历史记录面板 -->
-      <div id="historyPanel" class="history-panel" style="display:none">
-        <div class="console-toolbar">
-          <span class="console-title">历史记录</span>
-          <button id="backFromHistoryBtn" class="small-btn">← 返回</button>
-        </div>
-        <div id="historyList"></div>
-        <div class="history-empty" id="historyEmpty">暂无历史记录</div>
       </div>
     </div>
 

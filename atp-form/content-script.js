@@ -90,47 +90,84 @@ const CTRL = {
   }
 }
 
-function scanFields() {
-  const fields = []
-  const containers = [document, ...document.querySelectorAll('.el-dialog'), ...document.querySelectorAll('.el-drawer')]
-  const seen = new Set()
-  for (const container of containers) {
-    if (!container.offsetParent && container !== document) continue
-    for (const item of container.querySelectorAll('.el-form-item')) {
-      if (seen.has(item)) continue
-      seen.add(item)
-      const label = item.querySelector('.el-form-item__label')?.textContent?.trim() || ''
-      const input = item.querySelector('input:not([type="hidden"])')
-      const textarea = item.querySelector('textarea')
-      const trigger = item.querySelector('.el-select .el-input__inner')
-      if (!label && !input && !textarea && !trigger) continue
-      let type = 'unknown'
-      if (trigger) type = 'select'
-      else if (input || textarea) type = 'input'
-      const inputEl = input || textarea
-      const currentValue = inputEl?.value || trigger?.value || ''
-      let options = []
-      if (type === 'select') {
-        const allOpts = document.querySelectorAll('.el-select-dropdown__item')
-        const seenOpts = new Set()
-        for (const o of allOpts) {
-          const t = o.textContent.trim()
-          if (t && !seenOpts.has(t)) { seenOpts.add(t); options.push(t) }
-          if (options.length >= 200) break
-        }
-      }
-      const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || ''
-      const required = !!item.querySelector('.el-form-item.is-required, .el-form-item__label .el-form-item__label--required')
-      fields.push({ label, type, currentValue, options, placeholder, required, inDialog: container !== document })
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+function collectDropdownGroups(container) {
+  const groups = []
+  for (const dd of container.querySelectorAll('.el-select-dropdown')) {
+    const list = dd.querySelector('.el-select-dropdown__list')
+    if (!list) continue
+    const items = [...list.querySelectorAll('.el-select-dropdown__item')]
+    const seen = new Set()
+    const opts = []
+    for (const item of items) {
+      const t = item.textContent.trim()
+      if (t && !seen.has(t)) { seen.add(t); opts.push(t) }
     }
+    if (opts.length === 0) continue
+    groups.push(opts)
   }
+  return groups
+}
+
+function scanFields() {
+  // Determine visible overlay container first
+  const container = (() => {
+    for (const d of document.querySelectorAll('.el-dialog'))
+      if (d.offsetParent !== null) return d
+    for (const d of document.querySelectorAll('.el-drawer'))
+      if (d.offsetParent !== null) return d
+    return document
+  })()
+
+  const groups = collectDropdownGroups(container)
+
+  // Scan form items within the overlay
+  const allItems = container.querySelectorAll('.el-form-item')
+  const fields = []
+  const seen = new Set()
+  let selectIdx = 0
+
+  for (const item of allItems) {
+    if (seen.has(item)) continue
+    seen.add(item)
+    const label = item.querySelector('.el-form-item__label')?.textContent?.trim() || ''
+    const input = item.querySelector('input:not([type="hidden"])')
+    const textarea = item.querySelector('textarea')
+    const trigger = item.querySelector('.el-select .el-input__inner')
+    if (!label && !input && !textarea && !trigger) continue
+    let type = 'unknown'
+    if (trigger) type = 'select'
+    else if (input || textarea) type = 'input'
+    const inputEl = input || textarea
+    const currentValue = inputEl?.value || trigger?.value || ''
+    const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || ''
+    const required = !!item.querySelector('.el-form-item.is-required, .el-form-item__label .el-form-item__label--required')
+
+    let options = []
+    if (type === 'select') {
+      options = groups[selectIdx] || []
+      selectIdx++
+    }
+
+    fields.push({ label, type, currentValue, options, placeholder, required })
+  }
+
+  // Sort by depth (for display priority)
   return fields
+}
+
+function normalizeAction(a) {
+  const t = (a.action || '').toLowerCase().replace(/[-\s]/g, '_')
+  if (t === 'fill_input' || t === 'fill' || t === 'input' || t === 'fillinput') return { ...a, action: 'fill_input' }
+  if (t === 'select_option' || t === 'select' || t === 'option' || t === 'selectoption') return { ...a, action: 'select_option' }
+  return a
 }
 
 async function executeActions(actions) {
   const results = []
   for (let i = 0; i < actions.length; i++) {
-    const action = actions[i]
+    let action = normalizeAction(actions[i])
     const { action: type, label, value, option } = action
     let result = 'unknown-action'
     try {
@@ -158,6 +195,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'scanFields') {
     const fields = scanFields()
     sendResponse({ fields })
+    return true
+  }
+  if (message.type === 'logToConsole') {
+    console.log('[AI填表] ' + message.tag + ' ======')
+    try { console.log(JSON.parse(message.data)); } catch (e) { console.log(message.data); }
+    sendResponse({ ok: true })
     return true
   }
   if (message.type === 'executeActions') {
