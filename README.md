@@ -64,6 +64,97 @@ npm start
 
 浏览器打开 `http://localhost:4097/api/test`
 
+## 部署指南
+
+### 有网环境（开发/测试）
+
+```powershell
+git clone <仓库地址>
+cd opencode-skill-use
+npm install
+# 编辑 opencode.json 和 agent-api.config.json 填入 API Key
+.\start.ps1
+```
+
+### 内网环境（离线部署）
+
+需要一台有网的机器制作离线包，将产物拷贝到内网机器部署。
+
+#### 步骤一：制作离线包（有网机器）
+
+```powershell
+# 中国内地用户建议加 -UseMirror 使用国内镜像（解决下载超时/断连问题）
+.\build-offline.ps1 -OutputDir "D:\offline-deploy" -UseMirror
+```
+
+脚本自动下载以下内容到 `D:\offline-deploy\`：
+
+| 文件 | 说明 |
+|------|------|
+| `node-v22.msi` | Node.js 22 安装包 |
+| `python-3.12.10-amd64.exe` | Python 3.12 安装包 |
+| `VC_redist.x64.exe` | VC++ Redistributable（解决 DLL 加载失败） |
+| `node_modules.zip` | npm 依赖（`npm ci` 打包） |
+| `pip-cache\` | Python pip 离线包 |
+| `ms-playwright-node.zip` | Node.js Playwright 浏览器驱动 |
+| `ms-playwright-python.zip` | Python Playwright 浏览器驱动 |
+| `project-source.zip` | 项目源码（排除 node_modules/.git 等） |
+| `deploy-offline.ps1` | 内网部署脚本 |
+
+> **注意**：Node.js 和 Python 的 Playwright 浏览器驱动版本可能不同（如 chromium-1217 vs chromium-1223），两者独立管理、互不干扰，分别打包为独立的 zip 文件。
+
+#### 步骤二：拷贝到内网机器
+
+将整个 `D:\offline-deploy\` 目录通过 U 盘等介质拷贝到目标机器。
+
+#### 步骤三：安装基础环境
+
+1. 双击安装 `node-v22.msi`（**勾选** Add to PATH）
+2. 双击安装 `python-3.12.10-amd64.exe`（**勾选** Add to PATH）
+3. 双击安装 `VC_redist.x64.exe`（解决 DLL 加载失败问题，安装后**重启电脑**）
+
+#### 步骤四：运行部署脚本
+
+在 `offline-deploy` 目录下执行：
+
+```powershell
+.\deploy-offline.ps1 -ProjectRoot "C:\atp-gen"
+```
+
+脚本自动完成：
+- 解压项目源码到 `C:\atp-gen`
+- 解压 `node_modules`
+- 解压 Node.js Playwright 浏览器到 `%USERPROFILE%\AppData\Local\ms-playwright`
+- 解压 Python Playwright 浏览器到同一目录（不同版本文件夹名不同，互不冲突）
+- pip 离线安装 Python 依赖（跳过浏览器下载）
+
+#### 步骤五：配置与启动
+
+```powershell
+cd C:\atp-gen
+# 编辑 start.ps1 中的 LLM_API_KEY 和 PYTHON_EXE
+.\start.ps1
+```
+
+或手动启动：
+
+```powershell
+$env:STANDALONE_LLM = "true"
+$env:LLM_BASE_URL = "https://api.deepseek.com"
+$env:LLM_API_KEY = "sk-your-key"
+npm start
+```
+
+#### 常见部署问题
+
+| 现象 | 原因 | 解决 |
+|------|------|------|
+| `DLL load failed` | VC++ Redistributable 未安装 | 安装 `VC_redist.x64.exe` 并重启 |
+| `Executable doesn't exist at ...\chromium-xxx` | 浏览器驱动缺失或版本不匹配 | 运行 `playwright install` 或重新打包离线包 |
+| `read ECONNRESET` / 下载极慢 | 网络访问外网超时 | 打包时加 `-UseMirror` 使用国内镜像 |
+| `npx playwright install` 警告项目依赖未安装 | 未先执行 `npm install` | 打包脚本已自动处理，无需干预 |
+| `Event loop is closed` / `page is not defined` | 连锁报错，浏览器驱动问题 | 先确保浏览器驱动安装正确，底层报错会自动消失 |
+
 ## 项目结构
 
 ```
@@ -109,12 +200,15 @@ npm start
 │       ├── atp-rule/             # 表单字段值生成规则
 │       ├── atp-fix/              # 脚本修复技能
 │       ├── cdp-agent/            # CDP 浏览器自动化（银行柜面）
-│       └── clarification-protocol/ # 需求澄清协议
+│       ├── clarification-protocol/ # 需求澄清协议
+│       └── atp-step-gen/         # 测试执行案例生成
 ├── test-dashboard.html / .css    # Dashboard 页面
 ├── opencode.json                 # AI 模型与 Skill 权限配置
 ├── opencode.example.json         # 配置模板
 ├── agent-api.config.json         # 默认模型配置
 ├── start.ps1                     # 一键启动脚本（独立模式）
+├── build-offline.ps1             # 离线部署包制作脚本（有网机器使用）
+├── deploy-offline.ps1            # 内网部署脚本（离线机器使用）
 ├── dictList/                     # 词典数据
 ├── docs/                         # 开发文档
 ├── scripts/trajectories/         # 轨迹文件
@@ -175,7 +269,7 @@ Session 模式下支持人工介入：当 agent 卡住时可通过 dashboard 发
 
 ### OpenCode Skills
 
-项目包含 6 个自定义 skill，注入 Agent 提示词增强 Element UI 操控能力：
+项目包含 7 个自定义 skill，注入 Agent 提示词增强 Element UI 操控能力：
 
 | Skill | 用途 |
 |-------|------|
@@ -185,6 +279,7 @@ Session 模式下支持人工介入：当 agent 卡住时可通过 dashboard 发
 | `atp-fix` | 失败脚本错误分类与自动修复 |
 | `cdp-agent` | CDP 连接旧版 Chrome/CEF（银行柜面系统） |
 | `clarification-protocol` | 需求澄清问题生成 |
+| `atp-step-gen` | 测试执行案例生成（根据需求文档生成分阶段测试案例） |
 
 ### 案例数据管理
 
