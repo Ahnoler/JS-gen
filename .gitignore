@@ -9,6 +9,7 @@ tmp/
 .DS_Store
 Thumbs.db
 report/
+report2/
 atp-record/
 docs/
 scripts/trace/
