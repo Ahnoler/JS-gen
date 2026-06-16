@@ -110,6 +110,11 @@ Write-Host "================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Contents:" -ForegroundColor White
 Get-ChildItem $OutputDir | ForEach-Object {
-    $size = if ($_.Length -gt 1MB) { "$([math]::Round($_.Length/1MB,1)) MB" } else { "$([math]::Round($_.Length/1KB,0)) KB" }
+    if ($_.PSIsContainer) {
+        $totalSize = (Get-ChildItem $_.FullName -Recurse | Measure-Object -Property Length -Sum).Sum
+        $size = if ($totalSize -gt 1MB) { "$([math]::Round($totalSize/1MB,1)) MB" } else { "$([math]::Round($totalSize/1KB,0)) KB" }
+    } else {
+        $size = if ($_.Length -gt 1MB) { "$([math]::Round($_.Length/1MB,1)) MB" } else { "$([math]::Round($_.Length/1KB,0)) KB" }
+    }
     Write-Host "  - $($_.Name) (${size})" -ForegroundColor Gray
 }
