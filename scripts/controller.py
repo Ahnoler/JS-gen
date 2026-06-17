@@ -325,6 +325,29 @@ JS_SCAN_FORM_FIELDS = '''() => {
     return json;
 }'''
 
+JS_CHECK_SINGLE_FIELD = '''(label) => {
+    const container = ''' + JS_GET_CONTAINER + ''';
+    for (const item of container.querySelectorAll('.el-form-item')) {
+        const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+        if (!lbl.includes(label)) continue;
+        const input = item.querySelector('input:not([type="hidden"])');
+        const textarea = item.querySelector('textarea');
+        const trigger = item.querySelector('.el-select .el-input__inner');
+        let type = 'unknown';
+        if (trigger) type = 'select';
+        else if (input || textarea) type = 'input';
+        const inputEl = input || textarea;
+        const currentValue = inputEl?.value || trigger?.value || '';
+        const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
+        const disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
+        const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
+        const required = !!item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required');
+        const isDate = !!item.querySelector('.el-date-editor, .tsscdatepicker');
+        return JSON.stringify({ label: lbl, type, currentValue, placeholder, disabled, selected, required, isDate });
+    }
+    return 'label-not-found';
+}'''
+
 
 async def _wait_if_loading(page):
     loading = await page.evaluate(JS_CHECK_LOADING)
@@ -391,22 +414,10 @@ def _register_form_actions(controller, browser_context, form_rules):
             return _ok('ok' + ' | loc:' + loc) if loc else _ok('ok')
         return result
 
-    @controller.action('Check the current value of a form field by its label. Use this BEFORE filling to avoid re-filling already-set fields. Returns the field value, or "empty" if blank, or "label-not-found".')
+    @controller.action('Check the current value of a single form field by its label. Returns JSON with label/type/currentValue/placeholder/disabled/selected/required/isDate. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
         page = await browser_context.get_current_page()
-        return await page.evaluate('''([label]) => {
-            const c = ''' + JS_GET_CONTAINER + ''';
-            const items = c.querySelectorAll('.el-form-item');
-            for (const item of items) {
-                const lbl = item.querySelector('.el-form-item__label');
-                if (!lbl || !lbl.textContent.trim().includes(label)) continue;
-                const input = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
-                if (!input) return 'no-input';
-                const v = (input.value || '').trim();
-                return v || 'empty';
-            }
-            return 'label-not-found';
-        }''', [label_text])
+        return await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text)
 
     @controller.action('Scan all form fields in the current dialog/drawer. Returns a JSON array of all fields with their labels, types (input/select), current values, available dropdown options, placeholders, required status, disabled/selected flags, and date-picker flag. Call this once when a form dialog opens to understand the entire form before filling.')
     async def scan_form_fields():
@@ -542,7 +553,19 @@ def _register_form_actions(controller, browser_context, form_rules):
 
         await page.wait_for_timeout(500)
 
-        # Phase 4: Trust Playwright click — write value to trigger (best effort, may be hidden by wrapper)
+        # Phase 4: Verify by re-scanning the field value (use same code path as check_field_value)
+        current_raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text)
+        if not current_raw or current_raw == 'label-not-found':
+            loc = await page.evaluate(JS_LOCATOR, [label_text])
+            return _ok(f'ok | {matched_text}' + (' | loc:' + loc) if loc else f'ok | {matched_text}')
+
+        try:
+            field_info = json.loads(current_raw)
+        except Exception:
+            field_info = {}
+        current_val = field_info.get('currentValue', '')
+
+        # Write the value to trigger (best effort for wrapped components)
         await page.evaluate('''([label, text]) => {
             const container = ''' + JS_GET_CONTAINER + ''';
             const items = container.querySelectorAll('.el-form-item');
@@ -555,13 +578,12 @@ def _register_form_actions(controller, browser_context, form_rules):
             }
         }''', [label_text, matched_text])
 
-        # Try confirm (informational only — DOM may not reflect wrapped components)
-        confirm = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'confirm'])
-        selected_label = matched_text
-        if confirm.startswith('SELECTED:'):
-            selected_label = confirm.split(':', 1)[1]
-        loc = await page.evaluate(JS_LOCATOR, [label_text])
-        return _ok(f'ok | {selected_label}' + (' | loc:' + loc) if loc else f'ok | {selected_label}')
+        # Verify: current value must contain the matched text
+        if current_val and (current_val == matched_text or matched_text in current_val or current_val in matched_text):
+            loc = await page.evaluate(JS_LOCATOR, [label_text])
+            return _ok(f'ok | {current_val}' + (' | loc:' + loc) if loc else f'ok | {current_val}')
+
+        return _err(f'confirm-failed | current:{current_val} | expected:{matched_text}')
 
 
 def _register_navigation_actions(controller, browser_context):
