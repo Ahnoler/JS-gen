@@ -51,6 +51,49 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 6. **Disabled field + empty value + no adjacent button** → skip (truly read-only).
 7. **Date picker fields (tsscdatepicker / el-date-editor):** Use `click_element(index)` to interact with the calendar — click the input to open the picker, then click year/month/day cells to select the date. **Do NOT use `fill_form_field` for dates.** The fields are wrapped in `tsscdatepicker` > `el-date-editor.el-date-editor--date`.
 
+# 🚨 TASK LIST RULES (CRITICAL — TRACK FORM FILLING PROGRESS)
+When you encounter a form dialog/drawer with multiple fields, use the task list system to track progress and avoid redundant actions.
+
+**Workflow:**
+1. **Scan first:** Call `scan_form_fields()` to get a complete map of all form fields (labels, types, current values, disabled/selected flags, options).
+2. **Init task list:** Call `init_task_list(scan_json)` — it auto-skips fields that already have values or are disabled. Returns the pending list.
+3. **Fill one at a time:** For each pending label, call `fill_form_field(label, value)` or `select_option(label, option)`.
+4. **Mark done:** After each successful fill, call `task_done(label)` to remove it from pending.
+5. **Submit when empty:** When `get_pending_tasks()` shows an empty pending list, submit the form.
+6. **Handle errors:** If submit fails and formErrors appear, call `sync_tasks_from_errors()` — it reads `.el-form-item__error` text, extracts field names, and re-adds them to pending. Then continue filling.
+7. **Before each next action:** Call `get_pending_tasks()` to know what remains. Fill the FIRST pending label.
+
+**Task list actions:**
+- `scan_form_fields()` — full form survey. Returns JSON with label/type/currentValue/options/disabled/selected/isDate.
+- `init_task_list(scan_json)` — create pending/done list from scan. Auto-skips filled/disabled fields.
+- `task_done(label)` — mark a field as completed.
+- `task_retry(label)` — re-add a field to pending (manual override).
+- `get_pending_tasks()` — returns `{"pending": [...], "done": [...]}`.
+- `sync_tasks_from_errors()` — reads page validation errors, auto-retries affected fields.
+
+**Example:**
+```
+# Dialog opens with 5 fields
+scan_form_fields() → [{label:"客户名称",type:"input",currentValue:"",disabled:false}, ...]
+init_task_list(scan_json) → "pending:5 | [...5 labels...]"
+get_pending_tasks() → pending:["客户名称","客户状态",...]
+
+# Fill first field
+fill_form_field("客户名称", "张三") → "ok"
+task_done("客户名称") → "remaining:4"
+
+# Continue filling...
+
+# Submit attempt fails
+sync_tasks_from_errors() → "retried:1 | [行业代码]"
+get_pending_tasks() → pending:["行业代码"]
+
+# Fix and resubmit
+fill_form_field("行业代码", "xx") → "ok"
+task_done("行业代码") → "remaining:0"
+# Submit → success!
+```
+
 # 🚨 CROSS-PHASE DATA FLOW (GENERAL RULE)
 Data saved in any phase is available to all subsequent phases via the global `case_data_store` (in-memory dict, shared across phases).
 

@@ -3,6 +3,8 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/atp-record" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/chrome-devtools-mcp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/playwright-mcp" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/web-ui" vcs="Git" />
   </component>
 </project>

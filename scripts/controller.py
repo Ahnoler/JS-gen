@@ -310,12 +310,14 @@ JS_SCAN_FORM_FIELDS = '''() => {
         const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
         const required = !!item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required');
         const isDate = !!item.querySelector('.el-date-editor, .tsscdatepicker');
+        const disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
+        const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
         let options = [];
         if (type === 'select') {
             options = groups[selectIdx] || [];
             selectIdx++;
         }
-        fields.push({ label, type, currentValue, options, placeholder, required, isDate });
+        fields.push({ label, type, currentValue, options, placeholder, required, isDate, disabled, selected });
     }
     const json = JSON.stringify(fields, null, 2);
     console.log('[AI填表] ====== 扫描的表单字段 ======');
@@ -406,11 +408,98 @@ def _register_form_actions(controller, browser_context, form_rules):
             return 'label-not-found';
         }''', [label_text])
 
-    @controller.action('Scan all form fields in the current dialog/drawer. Returns a JSON array of all fields with their labels, types (input/select), current values, available dropdown options, placeholders, required status, and date-picker flag. Call this once when a form dialog opens to understand the entire form before filling.')
+    @controller.action('Scan all form fields in the current dialog/drawer. Returns a JSON array of all fields with their labels, types (input/select), current values, available dropdown options, placeholders, required status, disabled/selected flags, and date-picker flag. Call this once when a form dialog opens to understand the entire form before filling.')
     async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         return await page.evaluate(JS_SCAN_FORM_FIELDS)
+
+    @controller.action('Initialize a form-filling task list from scan results. Pass the scan_form_fields() JSON result. Fields with non-empty currentValue or disabled=true are auto-skipped. Fields with currentValue=empty and not disabled become pending tasks.')
+    async def init_task_list(fields_json: str):
+        try:
+            fields = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
+        except Exception:
+            return _err('invalid-json')
+        pending = []
+        for f in fields:
+            label = f.get('label', '')
+            if not label:
+                continue
+            has_value = f.get('currentValue', '').strip() != ''
+            is_disabled = f.get('disabled', False)
+            if has_value or is_disabled:
+                continue
+            pending.append(label)
+        case_data_store['task_list'] = {'pending': pending, 'done': []}
+        return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending, ensure_ascii=False))
+
+    @controller.action('Mark a form field as completed in the task list. Use this after successfully filling a field.')
+    async def task_done(label_text: str):
+        tl = case_data_store.get('task_list')
+        if not tl:
+            tl = {'pending': [], 'done': []}
+            case_data_store['task_list'] = tl
+        if label_text in tl.get('pending', []):
+            tl['pending'].remove(label_text)
+            tl['done'].append(label_text)
+            return _ok(f'task-done:{label_text} | remaining:{len(tl["pending"])}')
+        return _ok(f'task-done:already:{label_text} | remaining:{len(tl["pending"])}')
+
+    @controller.action('Re-add a field to the pending task list (e.g., after a validation error). Use this when formErrors mention a specific field.')
+    async def task_retry(label_text: str):
+        tl = case_data_store.get('task_list')
+        if not tl:
+            tl = {'pending': [], 'done': []}
+            case_data_store['task_list'] = tl
+        if label_text in tl.get('done', []):
+            tl['done'].remove(label_text)
+        if label_text not in tl.get('pending', []):
+            tl['pending'].append(label_text)
+        return _ok(f'task-retry:{label_text} | pending:{len(tl["pending"])}')
+
+    @controller.action('Get the current list of pending form fields. Returns a JSON array of labels still to fill. Call this before each fill action to know what remains.')
+    async def get_pending_tasks():
+        tl = case_data_store.get('task_list', {'pending': [], 'done': []})
+        pending = tl.get('pending', [])
+        done = tl.get('done', [])
+        return json.dumps({'pending': pending, 'done': done}, ensure_ascii=False)
+
+    @controller.action('Sync task list from current page validation errors. Reads .el-form-item__error text, extracts field labels (strips 请选择/请输入/请上传 prefix), re-adds them to pending. Call this after a failed submit attempt.')
+    async def sync_tasks_from_errors():
+        page = await browser_context.get_current_page()
+        errors = await page.evaluate('''() => {
+            const container = ''' + JS_GET_CONTAINER + ''';
+            const items = [];
+            for (const el of container.querySelectorAll('.el-form-item__error')) {
+                const raw = el.textContent.trim();
+                if (!raw) continue;
+                const label = raw.replace(/^(请选择|请?输入|请上传|填写|完善)/, '').replace(/[：:]/g, '').trim();
+                if (label && label.length > 1 && label.length < 30) items.push(label);
+            }
+            return JSON.stringify(items);
+        }''')
+        try:
+            error_labels = json.loads(errors) if isinstance(errors, str) else errors
+        except Exception:
+            error_labels = []
+        retried = []
+        for label in error_labels:
+            tl = case_data_store.get('task_list', {'pending': [], 'done': []})
+            matched = False
+            for d_label in list(tl.get('done', [])):
+                if d_label == label or d_label in label or label in d_label:
+                    tl['done'].remove(d_label)
+                    if d_label not in tl.get('pending', []):
+                        tl['pending'].append(d_label)
+                    retried.append(d_label)
+                    matched = True
+                    break
+            if not matched:
+                if label not in tl.get('pending', []):
+                    tl['pending'].append(label)
+                retried.append(label)
+            case_data_store['task_list'] = tl
+        return _ok(f'sync-errors | retried:{len(retried)} | ' + json.dumps(retried, ensure_ascii=False))
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str):
