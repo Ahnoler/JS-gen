@@ -28,7 +28,8 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - select_option(label_text, option_text) — el-select dropdowns. "first" picks first item. **🚨 THIS is the ONLY correct way to select el-select options. DO NOT use click_element for dropdown options.**
 - fill_form_field(label_text, value) — **text/password inputs inside el-form-item. USE THIS for ALL text inputs (including custom wrappers like tsscInput).** Matches by label text, placeholder, or input type. Returns "field-disabled" if input is disabled — skip it.
 - click_radio(label_text, option_text) — el-radio groups
-- close_dialog() — close topmost el-dialog/el-drawer/el-notification
+- close_dialog() — close topmost el-dialog or el-drawer. **Not for notifications — use close_notification() instead.**
+- close_notification() — close visible el-notification popup, reads and returns its text. Returns "no-notification" if none. **Use this for server-side validation errors.**
 - expand_all_el_tree() — fully expand el-tree
 - switch_tab(tab_name) — switch el-tabs tab
 - click_menu_item(menu_text) — click el-menu item (auto-expands submenus)
@@ -37,7 +38,7 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - get_page_state() — diagnostics
 - save_case_data(key, value) — save a value to the process-level case data store (persists across steps/phases)
 - read_case_data(key) — read a value from the case data store
-- select_date(label_text, date_str) — set a date field: clicks picker open, sets value, closes panel. Returns "already:YYYY-MM-DD" if already set — skip it. Format: "YYYY-MM-DD". **USE THIS for ALL date fields** — do NOT use fill_form_field or click_element_by_index for dates.
+- select_date(label_text, date_str) — set a date field: clicks picker open, navigates calendar to year/month, clicks the day cell. Returns "already:YYYY-MM-DD" if already set — skip it. Format: "YYYY-MM-DD". **USE THIS for ALL date fields** — do NOT use fill_form_field or click_element_by_index for dates.
 - check_field_value(label_text) — returns the current value of any form field. **Use this BEFORE filling to see if the field already has data.** Returns "empty" if blank, "label-not-found" if no such field.
 - click_adjacent_button(label_text) — click a "选择"/"引入" button next to a field, but ONLY if the field is empty. Returns "already-filled" if the field already has a value — skip it.
 
@@ -46,9 +47,9 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 2. `fill_form_field` handles custom wrappers like `tsscInput` automatically — it finds the input by label text.
 3. **If `fill_form_field` returns `"field-disabled"`: check if the field already has a value.** If `getAttribute('value')` or `placeholder` is non-empty and not "请选择"/"请输入" → skip, it's already filled. If the field is empty → look for an adjacent button to fill it.
 4. **If `select_option` returns `"select-disabled"`: skip** — the select is disabled (already pre-filled).
-5. **Disabled field + adjacent "引入"/"选择" button**: use `click_adjacent_button(label_text)` to fill. The button may be on a different `.el-form-item` (e.g. "引入" on 证件号码 fills all three legal person fields).
+5. **Disabled field + adjacent "引入"/"选择" button**: use `click_adjacent_button(label_text)` to open the import dialog, then: read case data by `read_case_data("客户名称")`, fill the dialog's search input with `fill_form_field("客户名称", value)`, click 查询, call `click_table_row_action("first", "确认"/"选择")` to pick the first result, confirm.
 6. **Disabled field + empty value + no adjacent button** → skip (truly read-only).
-7. **Date picker fields (tsscdatepicker / el-date-editor):** Use `select_date(label_text, "YYYY-MM-DD")` — this clicks the picker open, sets the value, and closes the panel. If the field already has the target value, returns `"already:YYYY-MM-DD"` — skip it, don't re-set. Do NOT use `fill_form_field` or `click_element_by_index` for dates. The fields are wrapped in `tsscdatepicker` > `el-date-editor.el-date-editor--date`.
+7. **Date picker fields (tsscdatepicker / el-date-editor):** Use `select_date(label_text, "YYYY-MM-DD")` — this clicks the picker open, navigates the calendar UI (year → month → day cells), and clicks the correct day. Returns `"already:YYYY-MM-DD"` if already set — skip it. Do NOT use `fill_form_field` or `click_element_by_index` for dates. The fields are wrapped in `tsscdatepicker` > `el-date-editor.el-date-editor--date`.
 
 # 🚨 CROSS-PHASE DATA FLOW (GENERAL RULE)
 Data saved in any phase is available to all subsequent phases via the global `case_data_store` (in-memory dict, shared across phases).
@@ -110,13 +111,13 @@ Always read `"客户名称"` and `"证件号码"` first. The dialog's search fie
 1. After filling ALL form fields, click the submit/save button. Do NOT keep checking or re-filling fields.
 2. If `.el-form-item__error` red text appears (client-side validation error): use `match_form_rule(label_text)` to generate a valid value, fill it via `fill_form_field` or `select_option` (or `select_date` if the field is a date picker), then click submit/save immediately. **Do not check if the red text disappeared** — just fill, submit, and repeat if the server returns another error.
 3. **If a server-side error occurs (el-notification popup):**
-   - Call `close_dialog()` FIRST — this both dismisses the notification AND returns its error text (e.g. `ok-notification: 证件号码格式错误`).
+   - Call `close_notification()` FIRST — this dismisses the notification AND returns its error text (e.g. `ok-notification: 证件号码格式错误`).
    - If the returned text mentions a field (e.g. "证件号码"), call `match_form_rule(label_text)` to get a valid value, then fill it via `fill_form_field` (or `select_date` if the field is a date picker — but note `match_form_rule` has no date generators, so just pick a reasonable date like the current date).
    - **Then click submit/save immediately.** Do NOT call `get_page_state()` or `extract_content()` after closing the notification and before submitting — the notification is already gone, re-checking wastes steps. The only way to verify the fix is to submit and check the result.
-4. **If `close_dialog()` returns `"no-overlay-open"`:** there is no notification/dialog to close. **The action succeeded — move on.** Error notifications stay visible until dismissed; if nothing is visible, there was no error. Do NOT re-click submit/save.
+4. **If `close_notification()` returns `"no-notification"`:** there is no notification to close. **The action succeeded — move on.** Do NOT re-click submit/save.
 5. Do NOT go back to re-select or re-fill fields that already returned "already:XXX", "ok", or "field-disabled".
 6. The ONLY way to verify if the form is correct is to click submit and check the result.
-7. **Success notifications (el-notification with "操作成功") auto-disappear after 2-3 seconds.** After clicking save/submit, call `close_dialog()` ONCE. If nothing is returned (no-overlay-open), assume success and move on. Do NOT call `close_dialog()` repeatedly or re-click save. Error notifications stay visible until dismissed — their absence means success.
+7. **Success notifications (el-notification with "操作成功") auto-disappear after 2-3 seconds.** After clicking save/submit, call `close_notification()` ONCE. If "no-notification" is returned, assume success and move on. Do NOT call `close_notification()` repeatedly or re-click save. Error notifications stay visible until dismissed — their absence means success.
 7. **After any dialog/drawer interaction** (e.g. legal person import, customer search, etc.), the wizard form may have been refreshed/reset. Use `check_field_value(label_text)` to check if a field still has a value before filling it. Skip fields that return a non-empty value. For date fields, `select_date` returns `"already:..."` if still set. Do NOT blindly re-fill all fields.
 
 # TASK COMPLETION RULES

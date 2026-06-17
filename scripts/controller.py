@@ -101,6 +101,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
 }'''
 
 JS_SELECT_DATE = '''async ([label, dateStr]) => {
+    const MONTH_NAMES = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
     const c = ''' + JS_GET_CONTAINER + ''';
     const items = c.querySelectorAll('.el-form-item');
     for (const item of items) {
@@ -111,15 +112,53 @@ JS_SELECT_DATE = '''async ([label, dateStr]) => {
         if (input.value === dateStr) return 'already:' + dateStr;
         const editor = item.querySelector('.el-date-editor') || input.closest('.el-date-editor');
         if (!editor) return 'no-editor';
+        const [targetYear, targetMonth, targetDay] = dateStr.split('-').map(Number);
         editor.click();
-        await new Promise(r => setTimeout(r, 200));
-        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-        setter.call(input, dateStr);
-        input.setAttribute('value', dateStr);
-        input.dispatchEvent(new Event('input', {bubbles:true}));
-        input.dispatchEvent(new Event('change', {bubbles:true}));
-        input.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
-        return 'selected:' + dateStr;
+        await new Promise(r => setTimeout(r, 400));
+        const panel = document.querySelector('.el-picker-panel.el-date-picker');
+        if (!panel || panel.offsetParent === null) {
+            const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            setter.call(input, dateStr);
+            input.setAttribute('value', dateStr);
+            input.dispatchEvent(new Event('input', {bubbles:true}));
+            input.dispatchEvent(new Event('change', {bubbles:true}));
+            input.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
+            return 'selected-fallback:' + dateStr;
+        }
+        const yearLabel = panel.querySelector('.el-date-picker__header .el-date-picker__header-label:first-child');
+        if (yearLabel && !panel.querySelector('.el-year-table')) yearLabel.click();
+        await new Promise(r => setTimeout(r, 300));
+        const yearTable = panel.querySelector('.el-year-table');
+        if (yearTable) {
+            const cells = yearTable.querySelectorAll('td.available, td.current');
+            for (const cell of cells) {
+                const span = cell.querySelector('.cell');
+                if (span && parseInt(span.textContent) === targetYear) { cell.click(); break; }
+            }
+        }
+        await new Promise(r => setTimeout(r, 300));
+        const monthTable = panel.querySelector('.el-month-table');
+        if (monthTable) {
+            const cells = monthTable.querySelectorAll('td.available, td.current');
+            for (const cell of cells) {
+                if (cell.textContent.trim() === MONTH_NAMES[targetMonth - 1]) { cell.click(); break; }
+            }
+        }
+        await new Promise(r => setTimeout(r, 300));
+        const dayTable = panel.querySelector('.el-date-table');
+        if (dayTable) {
+            const cells = dayTable.querySelectorAll('td.available, td.current');
+            for (const cell of cells) {
+                const span = cell.querySelector('span');
+                if (span && parseInt(span.textContent) === targetDay
+                    && !cell.classList.contains('prev-month') && !cell.classList.contains('next-month')) {
+                    cell.click();
+                    await new Promise(r => setTimeout(r, 300));
+                    return 'selected:' + dateStr;
+                }
+            }
+        }
+        return 'day-not-found:' + dateStr;
     }
     return 'label-not-found';
 }'''
@@ -538,10 +577,9 @@ def _register_misc_actions(controller, browser_context):
         }''')
         return json.dumps(state, ensure_ascii=False)
 
-    @controller.action('Close the topmost el-dialog, el-message-box, el-drawer, or el-notification.')
-    async def close_dialog():
+    @controller.action('Close visible el-notification popup, read its text, and return it. Returns "no-notification" if none found. Use this for server-side validation errors — NOT for dialogs/drawers.')
+    async def close_notification():
         page = await browser_context.get_current_page()
-        # 1. Close notification first (JS click doesn't work, use Playwright native click)
         notif = await page.query_selector('.el-notification')
         if notif:
             visible = await notif.evaluate('el => el.offsetParent !== null')
@@ -552,7 +590,13 @@ def _register_misc_actions(controller, browser_context):
                     await close_btn.click()
                     await page.wait_for_timeout(300)
                     return _ok(f'ok-notification: {notif_text[:200]}')
-        # 2. Close el-message-box (error alert/confirm popup — highest z-index overlay)
+                return _ok(f'ok-notification-noclose: {notif_text[:200]}')
+        return 'no-notification'
+
+    @controller.action('Close the topmost el-dialog, el-message-box, or el-drawer. El-notification has its own close_notification action.')
+    async def close_dialog():
+        page = await browser_context.get_current_page()
+        # 1. Close el-message-box (error alert/confirm popup — highest z-index overlay)
         msgbox = await page.query_selector('.el-message-box')
         if msgbox:
             visible = await msgbox.evaluate('el => el.offsetParent !== null')

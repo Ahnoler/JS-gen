@@ -215,7 +215,7 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref):
         await stdin_queue.put(msg)
 
 
-def _dispatch_event(msg, session_state, intervention_queue=None):
+def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_ref=None):
     event = msg.get("event")
 
     if event == "save_trajectory":
@@ -234,10 +234,15 @@ def _dispatch_event(msg, session_state, intervention_queue=None):
 
     if event == "intervene":
         instruction = msg.get("data", {}).get("instruction", "")
-        if instruction and intervention_queue is not None:
-            intervention_queue.put_nowait(instruction)
-            sys.stderr.write(f"[session] Intervention queued: {instruction[:80]}\n")
-            sys.stderr.flush()
+        if instruction:
+            if agent_running_ref and not agent_running_ref.get('value'):
+                sys.stderr.write(f"[session] Intervention immediate: {instruction[:80]}\n")
+                sys.stderr.flush()
+                return ('intervene', instruction)
+            if intervention_queue is not None:
+                intervention_queue.put_nowait(instruction)
+                sys.stderr.write(f"[session] Intervention queued for running agent: {instruction[:80]}\n")
+                sys.stderr.flush()
         return 'continue'
 
     if event != "step":
@@ -293,14 +298,43 @@ async def run_session(args):
 
     case_data_loaded = False
 
+    async def _run_step(data, step_idx):
+        """Execute one agent step with the given data."""
+        nonlocal cumulative_path
+        agent_running_ref['value'] = True
+        try:
+            output_path, task_text = await _run_agent_step(
+                data, step_idx, session_id, args, llm, browser_context,
+                controller, goal_tracker, cancel_flag_path,
+                on_step_start_hook, on_step_end_hook, case_data_store, cumulative_path,
+            )
+        finally:
+            agent_running_ref['value'] = False
+        if output_path is None:
+            return
+        _accumulate_trajectory(output_path, cumulative_path)
+        emit_json({
+            "event": "phase_done",
+            "data": {"phase": step_idx, "total": -1, "name": task_text[:60], "trajectory_file": str(output_path), "cumulative_file": str(cumulative_path), "step_index": step_idx},
+        })
+        sys.stderr.write(f"[session] Step {step_idx} done\n")
+        sys.stderr.flush()
+
     while True:
         msg = await stdin_queue.get()
         if msg is None:
             break
 
         try:
-            action = _dispatch_event(msg, session_state, intervention_queue)
+            action = _dispatch_event(msg, session_state, intervention_queue, agent_running_ref)
             cumulative_path = session_state['cumulative_path']
+
+            # Handle immediate intervention when agent is idle
+            if isinstance(action, tuple) and action[0] == 'intervene':
+                step_index += 1
+                await _run_step({"instruction": action[1], "max_steps": 20}, step_index)
+                continue
+
             if action != 'step':
                 continue
 
@@ -321,24 +355,7 @@ async def run_session(args):
                     sys.stderr.write(f"[session] Failed to import case data: {e}\n")
                     sys.stderr.flush()
 
-            agent_running_ref['value'] = True
-            output_path, task_text = await _run_agent_step(
-                data, step_index, session_id, args, llm, browser_context,
-                controller, goal_tracker, cancel_flag_path,
-                on_step_start_hook, on_step_end_hook, case_data_store, cumulative_path,
-            )
-            agent_running_ref['value'] = False
-            if output_path is None:
-                continue
-
-            _accumulate_trajectory(output_path, cumulative_path)
-
-            emit_json({
-                "event": "phase_done",
-                "data": {"phase": step_index, "total": -1, "name": task_text[:60], "trajectory_file": str(output_path), "cumulative_file": str(cumulative_path), "step_index": step_index},
-            })
-            sys.stderr.write(f"[session] Step {step_index} done\n")
-            sys.stderr.flush()
+            await _run_step(data, step_index)
 
         except asyncio.CancelledError:
             sys.stderr.write("[session] Main loop cancelled, exiting\n"); sys.stderr.flush()
