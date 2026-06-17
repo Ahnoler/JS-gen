@@ -100,69 +100,6 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     return 'label-not-found';
 }'''
 
-JS_SELECT_DATE = '''async ([label, dateStr]) => {
-    const MONTH_NAMES = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
-    const c = ''' + JS_GET_CONTAINER + ''';
-    const items = c.querySelectorAll('.el-form-item');
-    for (const item of items) {
-        const lbl = item.querySelector('.el-form-item__label');
-        if (!lbl || !lbl.textContent.trim().includes(label)) continue;
-        const input = item.querySelector('input');
-        if (!input) return 'no-input';
-        if (input.value === dateStr) return 'already:' + dateStr;
-        const editor = item.querySelector('.el-date-editor') || input.closest('.el-date-editor');
-        if (!editor) return 'no-editor';
-        const [targetYear, targetMonth, targetDay] = dateStr.split('-').map(Number);
-        editor.click();
-        await new Promise(r => setTimeout(r, 400));
-        const panel = document.querySelector('.el-picker-panel.el-date-picker');
-        if (!panel || panel.offsetParent === null) {
-            const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-            setter.call(input, dateStr);
-            input.setAttribute('value', dateStr);
-            input.dispatchEvent(new Event('input', {bubbles:true}));
-            input.dispatchEvent(new Event('change', {bubbles:true}));
-            input.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
-            return 'selected-fallback:' + dateStr;
-        }
-        const yearLabel = panel.querySelector('.el-date-picker__header .el-date-picker__header-label:first-child');
-        if (yearLabel && !panel.querySelector('.el-year-table')) yearLabel.click();
-        await new Promise(r => setTimeout(r, 300));
-        const yearTable = panel.querySelector('.el-year-table');
-        if (yearTable) {
-            const cells = yearTable.querySelectorAll('td.available, td.current');
-            for (const cell of cells) {
-                const span = cell.querySelector('.cell');
-                if (span && parseInt(span.textContent) === targetYear) { cell.click(); break; }
-            }
-        }
-        await new Promise(r => setTimeout(r, 300));
-        const monthTable = panel.querySelector('.el-month-table');
-        if (monthTable) {
-            const cells = monthTable.querySelectorAll('td.available, td.current');
-            for (const cell of cells) {
-                if (cell.textContent.trim() === MONTH_NAMES[targetMonth - 1]) { cell.click(); break; }
-            }
-        }
-        await new Promise(r => setTimeout(r, 300));
-        const dayTable = panel.querySelector('.el-date-table');
-        if (dayTable) {
-            const cells = dayTable.querySelectorAll('td.available, td.current');
-            for (const cell of cells) {
-                const span = cell.querySelector('span');
-                if (span && parseInt(span.textContent) === targetDay
-                    && !cell.classList.contains('prev-month') && !cell.classList.contains('next-month')) {
-                    cell.click();
-                    await new Promise(r => setTimeout(r, 300));
-                    return 'selected:' + dateStr;
-                }
-            }
-        }
-        return 'day-not-found:' + dateStr;
-    }
-    return 'label-not-found';
-}'''
-
 JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     const getSelectedLabel = (formItem) => {
         const select = formItem.querySelector('.el-select');
@@ -366,26 +303,16 @@ def _register_form_actions(controller, browser_context, form_rules):
         val = match_rule(label_text, form_rules)
         return val if val else 'NO-RULE'
 
-    @controller.action('Fill a form field using Element UI native DOM setter. Do NOT use for date fields — use select_date instead.')
+    @controller.action('Fill a form field using Element UI native DOM setter. Do NOT use for date fields — use click_element instead.')
     async def fill_form_field(label_text: str, value: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
         if result == 'is-date-picker':
-            return ActionResult(extracted_content='is-date-picker: This is a date picker field. Use select_date(label, "YYYY-MM-DD") instead.', is_done=False)
+            return ActionResult(extracted_content='is-date-picker: This is a date picker field. Use click_element to interact with the calendar UI instead.', is_done=False)
         if result == 'ok':
             loc = await page.evaluate(JS_LOCATOR, [label_text])
             return _ok('ok' + ' | loc:' + loc) if loc else _ok('ok')
-        return result
-
-    @controller.action('Set a date field by clicking the date picker to open it, then setting the value. Returns "already:YYYY-MM-DD" if already set. Format: YYYY-MM-DD. Only for date fields wrapped in tsscdatepicker/el-date-editor. Do NOT use fill_form_field for dates.')
-    async def select_date(label_text: str, date_str: str):
-        page = await browser_context.get_current_page()
-        await _wait_if_loading(page)
-        result = await page.evaluate(JS_SELECT_DATE, [label_text, date_str])
-        if result.startswith('selected:') or result.startswith('already:'):
-            loc = await page.evaluate(JS_LOCATOR, [label_text])
-            return _ok(result + ' | loc:' + loc) if loc else _ok(result)
         return result
 
     @controller.action('Check the current value of a form field by its label. Use this BEFORE filling to avoid re-filling already-set fields. Returns the field value, or "empty" if blank, or "label-not-found".')
