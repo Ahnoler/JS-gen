@@ -249,6 +249,53 @@ JS_CLICK_RADIO = '''([label, option]) => {
     return 'label-not-found';
 }'''
 
+JS_SCAN_FORM_FIELDS = '''() => {
+    const container = ''' + JS_GET_CONTAINER + ''';
+    // Collect dropdown option groups from the container
+    const groups = [];
+    for (const dd of container.querySelectorAll('.el-select-dropdown')) {
+        const list = dd.querySelector('.el-select-dropdown__list');
+        if (!list) continue;
+        const items = [...list.querySelectorAll('.el-select-dropdown__item')];
+        const seen = new Set();
+        const opts = [];
+        for (const item of items) {
+            const t = item.textContent.trim();
+            if (t && !seen.has(t)) { seen.add(t); opts.push(t); }
+        }
+        if (opts.length > 0) groups.push(opts);
+    }
+    // Scan form items within the container
+    const allItems = container.querySelectorAll('.el-form-item');
+    const fields = [];
+    let selectIdx = 0;
+    for (const item of allItems) {
+        const label = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+        const input = item.querySelector('input:not([type="hidden"])');
+        const textarea = item.querySelector('textarea');
+        const trigger = item.querySelector('.el-select .el-input__inner');
+        if (!label && !input && !textarea && !trigger) continue;
+        let type = 'unknown';
+        if (trigger) type = 'select';
+        else if (input || textarea) type = 'input';
+        const inputEl = input || textarea;
+        const currentValue = inputEl?.value || trigger?.value || '';
+        const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
+        const required = !!item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required');
+        const isDate = !!item.querySelector('.el-date-editor, .tsscdatepicker');
+        let options = [];
+        if (type === 'select') {
+            options = groups[selectIdx] || [];
+            selectIdx++;
+        }
+        fields.push({ label, type, currentValue, options, placeholder, required, isDate });
+    }
+    const json = JSON.stringify(fields, null, 2);
+    console.log('[AI填表] ====== 扫描的表单字段 ======');
+    console.log(json);
+    return json;
+}'''
+
 
 async def _wait_if_loading(page):
     loading = await page.evaluate(JS_CHECK_LOADING)
@@ -331,6 +378,12 @@ def _register_form_actions(controller, browser_context, form_rules):
             }
             return 'label-not-found';
         }''', [label_text])
+
+    @controller.action('Scan all form fields in the current dialog/drawer. Returns a JSON array of all fields with their labels, types (input/select), current values, available dropdown options, placeholders, required status, and date-picker flag. Call this once when a form dialog opens to understand the entire form before filling.')
+    async def scan_form_fields():
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        return await page.evaluate(JS_SCAN_FORM_FIELDS)
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str):
