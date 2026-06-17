@@ -232,6 +232,33 @@ JS_SELECT_OPTION = '''(option) => {
     return 'option-not-found:' + [...items].map(i => i.textContent.trim()).join(', ');
 }'''
 
+# Find option text only — no dispatchEvent/click. Returns matched text or error string.
+# Caller uses Playwright native click() for the actual interaction.
+JS_FIND_OPTION = '''(option) => {
+    const dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
+    let items = dropdown.querySelectorAll('.el-select-dropdown__item');
+    if (items.length === 0 || dropdown === document) {
+        items = document.querySelectorAll('.el-select-dropdown__item');
+    }
+    const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
+    if (FIRST_ALIASES.includes(option.toLowerCase().trim())) {
+        for (const item of items) {
+            if (item.offsetParent !== null) return item.textContent.trim();
+        }
+        if (items.length > 0) return items[0].textContent.trim();
+        return 'NO_ITEMS';
+    }
+    for (const item of items) {
+        if (item.textContent.trim() === option) return option;
+    }
+    for (const item of items) {
+        if (item.textContent.trim().includes(option)) return item.textContent.trim();
+    }
+    const hasEmpty = document.querySelector('.el-select-dropdown__empty');
+    if (hasEmpty) return 'NO_ITEMS';
+    return 'NOT_FOUND:' + [...items].map(i => i.textContent.trim()).join(', ');
+}'''
+
 JS_CLICK_RADIO = '''([label, option]) => {
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
@@ -400,34 +427,52 @@ def _register_form_actions(controller, browser_context, form_rules):
             return trigger_result
 
         await page.wait_for_timeout(800)
-        select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
+
+        # Phase 3: Find option text via JS, click via Playwright native click (isTrusted=true)
+        matched_text = await page.evaluate(JS_FIND_OPTION, option_text)
+        if matched_text in ('NO_ITEMS',):
+            return _err('no-items')
+        if matched_text.startswith('NOT_FOUND:'):
+            return _err(matched_text)
+
+        try:
+            # Primary: XPath normalize-space exact match
+            opt = page.locator(
+                f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched_text}"]'
+            ).first
+            await opt.wait_for(state='visible', timeout=3000)
+            await opt.click()
+        except Exception:
+            try:
+                # Fallback: filter by text
+                opt = page.locator('.el-select-dropdown__item').filter(has_text=matched_text).first
+                await opt.wait_for(state='attached', timeout=2000)
+                await opt.click()
+            except Exception as e:
+                return _err(f'click-failed:{e}')
+
         await page.wait_for_timeout(500)
 
-        if not select_result.startswith('ok'):
-            confirm = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'confirm'])
-            if confirm.startswith('SELECTED:'):
-                confirm_val = confirm.split(':', 1)[1]
-                loc = await page.evaluate(JS_LOCATOR, [label_text])
-                return _ok(f'ok | ok:{confirm_val}' + ' | loc:' + loc) if loc else _ok(f'ok | ok:{confirm_val}')
-            return _err(f'{select_result} | no-confirm')
+        # Phase 4: Trust Playwright click — write value to trigger (best effort, may be hidden by wrapper)
+        await page.evaluate('''([label, text]) => {
+            const container = ''' + JS_GET_CONTAINER + ''';
+            const items = container.querySelectorAll('.el-form-item');
+            for (const item of items) {
+                const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                if (!lbl.includes(label)) continue;
+                const trigger = item.querySelector('.el-select .el-input__inner');
+                if (trigger) { trigger.value = text; trigger.setAttribute('value', text); }
+                return;
+            }
+        }''', [label_text, matched_text])
 
-        selected_text = select_result.split(':', 1)[1] if ':' in select_result else ''
-        if selected_text:
-            await page.evaluate('''([label, text]) => {
-                const container = ''' + JS_GET_CONTAINER + ''';
-                const items = container.querySelectorAll('.el-form-item');
-                for (const item of items) {
-                    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                    if (!lbl.includes(label)) continue;
-                    const trigger = item.querySelector('.el-select .el-input__inner');
-                    if (!trigger) continue;
-                    trigger.value = text;
-                    trigger.setAttribute('value', text);
-                    return;
-                }
-            }''', [label_text, selected_text])
+        # Try confirm (informational only — DOM may not reflect wrapped components)
+        confirm = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'confirm'])
+        selected_label = matched_text
+        if confirm.startswith('SELECTED:'):
+            selected_label = confirm.split(':', 1)[1]
         loc = await page.evaluate(JS_LOCATOR, [label_text])
-        return _ok(f'ok | {select_result}' + ' | loc:' + loc) if loc else _ok(f'ok | {select_result}')
+        return _ok(f'ok | {selected_label}' + (' | loc:' + loc) if loc else f'ok | {selected_label}')
 
 
 def _register_navigation_actions(controller, browser_context):
