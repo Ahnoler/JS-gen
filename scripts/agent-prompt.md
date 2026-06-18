@@ -44,8 +44,11 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - click_adjacent_button(label_text) — click a "选择"/"引入" button next to a field, but ONLY if the field is empty. Returns "already-filled" if the field already has a value — skip it.
 
 ## Task list actions
-- scan_form_fields() — full form survey. Returns {fields: [{label, kind, currentValue, options, placeholder, disabled, selected, required}], notification: {visible, text}|null}. notification contains error popup text if visible.
-- init_task_list(scan_json) — create pending/done list from scan. Auto-skips filled/disabled fields. Works with scan_result directly.
+- scan_form_fields(quick=false) — full form survey (use quick=false first time, quick=true after). Returns {fields: [...], notification: {visible, text}|null}.
+- scan_form_fields(quick=true) — visible fields only, for subsequent checks.
+- init_task_list(scan_json) — create pending/done list from scan. Auto-skips filled/disabled fields.
+- **fill_pending_batch() — PREFERRED. Fill ALL pending fields at once. Groups by kind (select→input→date→radio→checkbox), fills each group sequentially. Auto-calls task_done. Use this once after init_task_list.**
+- fill_form_fields_batch(fields_json) — Fill up to 10 specific fields: [{"action":"fill_input","label":"...","value":"..."}, ...]. Use when you need specific values.
 - task_done(label) — mark a field as completed.
 - task_retry(label) — re-add a field to pending.
 - get_pending_tasks() — returns {"pending": [...], "done": [...]}.
@@ -68,13 +71,15 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 When you encounter a form dialog/drawer with multiple fields, use the task list system to track progress and avoid redundant actions.
 
 **Workflow:**
-1. **Scan first:** Call `scan_form_fields()` to get fields + notification (errors). Result is `{fields: [{label, kind, currentValue, ...}], notification: {visible, text}|null}`. If notification.visible is true, read its text for error context BEFORE filling.
-2. **Init task list:** Call `init_task_list(scan_json)` — auto-skips fields with currentValue non-empty or disabled=true. Pass the whole scan result directly.
-3. **Fill one at a time:** For each pending label, call `fill_form_field(label, value)` (kind=input) or `select_option(label, option)` (kind=select) or `click_element(index)` (kind=date).
-4. **Verify:** After each fill, call `verify_field_value(label, expected)` to confirm the value stuck. If mismatch, call `task_retry(label)` + re-fill.
-5. **Mark done:** After verification passes, call `task_done(label)`.
-6. **Submit when empty:** When `get_pending_tasks().pending` is empty, submit.
-7. **Handle errors:** If submit fails, call `sync_tasks_from_errors()` to re-queue errored fields. If notification was in scan, its text tells which field needs fixing.
+1. **Full scan first:** Call `scan_form_fields()` (or `scan_form_fields(quick=false)`) ONCE to get ALL fields in the form. Use this to call `init_task_list()` and build the complete task list.
+2. **Visible scan after:** For ALL subsequent scans (after filling, after submit, to check progress), call `scan_form_fields(quick=true)` — this only returns visible fields, saving significant context on large forms.
+3. **Init task list:** Call `init_task_list(scan_json)` — auto-skips fields with currentValue non-empty or disabled=true. Pass the FULL scan result.
+3. **Init task list:** Call `init_task_list(scan_json)` — auto-skips fields with currentValue non-empty or disabled=true. Pass the FULL scan result.
+4. **Fill via batch (PREFERRED):** Call `fill_pending_batch()` — it reads the pending list, groups fields by kind (select→input→date→radio→checkbox), fills same-kind fields together, auto-calls task_done. Select fields use first available option; input/date fields use reasonable test data. Then call `get_pending_tasks()` to verify empty.
+5. **Verify:** After batch fill, call `scan_form_fields(quick=true)` then `verify_field_value(label, expected)` for any uncertain fields.
+6. **Mark done:** After verification passes, call `task_done(label)`.
+7. **Submit when empty:** When `get_pending_tasks().pending` is empty, submit.
+8. **Handle errors:** If submit fails, call `sync_tasks_from_errors()` to re-queue errored fields. If notification was in scan, its text tells which field needs fixing.
 
 **Example:**
 ```

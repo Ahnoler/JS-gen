@@ -281,7 +281,7 @@ JS_CLICK_RADIO = '''([label, option]) => {
     return 'label-not-found';
 }'''
 
-JS_SCAN_FORM_FIELDS = '''() => {
+JS_SCAN_FORM_FIELDS = '''(quick) => {
     const container = ''' + JS_GET_CONTAINER + ''';
     // Collect dropdown option groups from the container
     const groups = [];
@@ -315,6 +315,7 @@ JS_SCAN_FORM_FIELDS = '''() => {
     const fields = [];
     let selectIdx = 0;
     for (const item of allItems) {
+        if (quick && (item.offsetParent === null)) continue;
         const label = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
         const input = item.querySelector('input:not([type="hidden"])');
         const textarea = item.querySelector('textarea');
@@ -558,11 +559,11 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             return _ok(f'verified:{current}')
         return _err(f'mismatch | current:{current} | expected:{expected}')
 
-    @controller.action('Scan all form fields in the current dialog/drawer. Returns {fields: [...], notification: {visible, text}|null}. Each field has label/kind/currentValue/options/placeholder/disabled/selected. Kind: input/select/date/radio/checkbox. Values merged from DOM + accessibility tree (aria_snapshot) for wrapped components.')
-    async def scan_form_fields():
+    @controller.action('Scan form fields. Set quick=false (or omit) for full scan on first call to build task list. Set quick=true for subsequent scans to only return visible fields (saves context).')
+    async def scan_form_fields(quick: bool = False):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS)
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, quick)
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             dom_fields = result.get('fields') if isinstance(result, dict) else result
@@ -599,10 +600,10 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 continue
             pending.append(label)
         case_data_store['task_list'] = {'pending': pending, 'done': []}
+        case_data_store['_scan_fields'] = fields
         return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending, ensure_ascii=False))
 
-    @controller.action('Mark a form field as completed in the task list. Use this after successfully filling a field.')
-    async def task_done(label_text: str):
+    def _task_done_impl(label_text):
         tl = case_data_store.get('task_list')
         if not tl:
             tl = {'pending': [], 'done': []}
@@ -610,8 +611,162 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if label_text in tl.get('pending', []):
             tl['pending'].remove(label_text)
             tl['done'].append(label_text)
-            return _ok(f'task-done:{label_text} | remaining:{len(tl["pending"])}')
-        return _ok(f'task-done:already:{label_text} | remaining:{len(tl["pending"])}')
+
+    @controller.action('Fill multiple form fields in one call (up to 10 recommended). Pass a JSON array: [{"action":"fill_input","label":"客户名称","value":"张三"},{"action":"select_option","label":"证件类型","option":"营业执照"}]. Each success auto-calls task_done. Returns summary with per-field results.')
+    async def fill_form_fields_batch(fields_json: str):
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        try:
+            actions = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
+        except Exception:
+            return _err('invalid-json')
+        results = []
+        for a in actions:
+            label = a.get('label', '')
+            kind = (a.get('action') or '').lower().replace('-', '_')
+            value = a.get('value', '') or a.get('option', '')
+            result = 'skipped'
+            try:
+                if kind in ('fill_input', 'fill', 'input'):
+                    result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                elif kind in ('select_option', 'select', 'option'):
+                    already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
+                    if already.startswith('already:'):
+                        cur_val = already.split(':', 1)[1]
+                        if cur_val == value or value in cur_val or cur_val in value:
+                            result = already
+                        else:
+                            await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+                            await page.wait_for_timeout(800)
+                            matched = await page.evaluate(JS_FIND_OPTION, value)
+                            if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
+                                result = matched
+                            else:
+                                try:
+                                    opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
+                                    await opt.wait_for(state='visible', timeout=3000)
+                                    await opt.click()
+                                    result = 'ok'
+                                except Exception:
+                                    result = 'click-failed'
+                    else:
+                        await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+                        await page.wait_for_timeout(800)
+                        matched = await page.evaluate(JS_FIND_OPTION, value)
+                        if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
+                            result = matched
+                        else:
+                            try:
+                                opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
+                                await opt.wait_for(state='visible', timeout=3000)
+                                await opt.click()
+                                result = 'ok'
+                            except Exception:
+                                result = 'click-failed'
+                else:
+                    result = f'unknown-action:{kind}'
+            except Exception as e:
+                result = f'error:{e}'
+            ok = result.startswith('ok') or result.startswith('already')
+            results.append({'label': label, 'ok': ok, 'result': result})
+            if ok:
+                task_done_impl(label)
+            await page.wait_for_timeout(400)
+        return _ok(f'batch-done | {len(results)} fields | ' + json.dumps(results, ensure_ascii=False))
+
+    @controller.action('Fill ALL pending form fields, intelligently grouped by kind (select→input→date→radio→checkbox). Same-kind fields are filled together for speed. Reads pending list from task_list, looks up kind from scan data. Auto-calls task_done. Returns summary.')
+    async def fill_pending_batch():
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        tl = case_data_store.get('task_list', {'pending': [], 'done': []})
+        scan_fields = case_data_store.get('_scan_fields', [])
+        pending = list(tl.get('pending', []))
+
+        if not pending:
+            return _ok('nothing-pending')
+
+        # Build label→kind lookup from scan
+        label_kind = {}
+        for f in scan_fields:
+            lbl = f.get('label', '').strip()
+            if lbl:
+                label_kind[lbl] = f.get('kind', 'input')
+
+        # Group pending by kind, preserving original pending order within each group
+        KIND_ORDER = {'select': 0, 'input': 1, 'date': 2, 'radio': 3, 'checkbox': 4}
+        groups = {}
+        for label in pending:
+            kind = label_kind.get(label, 'input')
+            idx = KIND_ORDER.get(kind, 99)
+            groups.setdefault(idx, []).append(label)
+
+        all_results = []
+        for idx in sorted(groups.keys()):
+            group = groups[idx]
+            kind_name = list(KIND_ORDER.keys())[list(KIND_ORDER.values()).index(idx)] if idx < 5 else 'other'
+            # Process in sub-batches of 10
+            for i in range(0, len(group), 10):
+                sub = group[i:i+10]
+                for label in sub:
+                    kind = label_kind.get(label, 'input')
+                    # Generate a value: use scan info + smart default
+                    val = '测试数据'
+                    if kind == 'select':
+                        # Use first available option from scan
+                        for f in scan_fields:
+                            if f.get('label', '').strip() == label:
+                                opts = f.get('options', [])
+                                val = opts[0] if opts else '测试'
+                                break
+                        result = None
+                        try:
+                            already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
+                            if already.startswith('already:'):
+                                cur_val = already.split(':', 1)[1]
+                                if cur_val == val or val in cur_val or cur_val in val:
+                                    result = already
+                            if not result:
+                                await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+                                await page.wait_for_timeout(800)
+                                matched = await page.evaluate(JS_FIND_OPTION, val)
+                                if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
+                                    # Try first available
+                                    matched = await page.evaluate(JS_FIND_OPTION, 'first')
+                                    if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
+                                        result = matched
+                                    else:
+                                        try:
+                                            opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
+                                            await opt.wait_for(state='visible', timeout=3000)
+                                            await opt.click()
+                                            result = 'ok-first'
+                                        except Exception as e:
+                                            result = f'click-failed:{e}'
+                                else:
+                                    try:
+                                        opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
+                                        await opt.wait_for(state='visible', timeout=3000)
+                                        await opt.click()
+                                        result = 'ok'
+                                    except Exception as e:
+                                        result = f'click-failed:{e}'
+                        except Exception as e:
+                            result = f'error:{e}'
+                    else:
+                        # input/date/radio/checkbox
+                        result = await page.evaluate(JS_FILL_FORM_FIELD, [label, val])
+                    ok = result.startswith('ok') or result.startswith('already')
+                    all_results.append({'label': label, 'kind': kind, 'ok': ok, 'result': result or 'unknown'})
+                    if ok:
+                        _task_done_impl(label)
+                    await page.wait_for_timeout(400)
+        return _ok(f'pending-batch-done | {len(all_results)} fields | ' + json.dumps(all_results, ensure_ascii=False))
+
+    @controller.action('Mark a form field as completed in the task list. Use this after successfully filling a field.')
+    async def task_done(label_text: str):
+        _task_done_impl(label_text)
+        tl = case_data_store.get('task_list', {'pending': [], 'done': []})
+        return _ok(f'task-done:{label_text} | remaining:{len(tl["pending"])}')
 
     @controller.action('Re-add a field to the pending task list (e.g., after a validation error). Use this when formErrors mention a specific field.')
     async def task_retry(label_text: str):
