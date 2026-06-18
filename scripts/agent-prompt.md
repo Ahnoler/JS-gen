@@ -39,8 +39,17 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - save_case_data(key, value) — save a value to the process-level case data store (persists across steps/phases)
 - read_case_data(key) — read a value from the case data store
 - **select_date is NOT available for date fields** — use `click_element(index)` to manually click through the date picker calendar UI (click input to open, then click year, month, day cells).
-- check_field_value(label_text) — returns the current value of any form field. **Use this BEFORE filling to see if the field already has data.** Returns "empty" if blank, "label-not-found" if no such field.
+- check_field_value(label_text) — returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. **Kind is one of: input/select/date/radio/checkbox.** Use this to verify a field was filled correctly.
+- verify_field_value(label_text, expected) — calls check_field_value and compares currentValue with expected. Returns ok if match, err if mismatch. Use this after filling to confirm the value stuck.
 - click_adjacent_button(label_text) — click a "选择"/"引入" button next to a field, but ONLY if the field is empty. Returns "already-filled" if the field already has a value — skip it.
+
+## Task list actions
+- scan_form_fields() — full form survey. Returns {fields: [{label, kind, currentValue, options, placeholder, disabled, selected, required}], notification: {visible, text}|null}. notification contains error popup text if visible.
+- init_task_list(scan_json) — create pending/done list from scan. Auto-skips filled/disabled fields. Works with scan_result directly.
+- task_done(label) — mark a field as completed.
+- task_retry(label) — re-add a field to pending.
+- get_pending_tasks() — returns {"pending": [...], "done": [...]}.
+- sync_tasks_from_errors() — reads page validation errors, auto-retries affected fields.
 
 # 🚨 FORM FIELD RULES (CRITICAL — DO NOT IGNORE)
 1. **`input_text` is NOT available.** For ALL text/password/textarea inputs inside el-form-item, use `fill_form_field(label_text, value)`.
@@ -55,43 +64,31 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 When you encounter a form dialog/drawer with multiple fields, use the task list system to track progress and avoid redundant actions.
 
 **Workflow:**
-1. **Scan first:** Call `scan_form_fields()` to get a complete map of all form fields (labels, types, current values, disabled/selected flags, options).
-2. **Init task list:** Call `init_task_list(scan_json)` — it auto-skips fields that already have values or are disabled. Returns the pending list.
-3. **Fill one at a time:** For each pending label, call `fill_form_field(label, value)` or `select_option(label, option)`.
-4. **Mark done:** After each successful fill, call `task_done(label)` to remove it from pending.
-5. **Submit when empty:** When `get_pending_tasks()` shows an empty pending list, submit the form.
-6. **Handle errors:** If submit fails and formErrors appear, call `sync_tasks_from_errors()` — it reads `.el-form-item__error` text, extracts field names, and re-adds them to pending. Then continue filling.
-7. **Before each next action:** Call `get_pending_tasks()` to know what remains. Fill the FIRST pending label.
-
-**Task list actions:**
-- `scan_form_fields()` — full form survey. Returns JSON with label/type/currentValue/options/disabled/selected/isDate.
-- `init_task_list(scan_json)` — create pending/done list from scan. Auto-skips filled/disabled fields.
-- `task_done(label)` — mark a field as completed.
-- `task_retry(label)` — re-add a field to pending (manual override).
-- `get_pending_tasks()` — returns `{"pending": [...], "done": [...]}`.
-- `sync_tasks_from_errors()` — reads page validation errors, auto-retries affected fields.
+1. **Scan first:** Call `scan_form_fields()` to get fields + notification (errors). Result is `{fields: [{label, kind, currentValue, ...}], notification: {visible, text}|null}`. If notification.visible is true, read its text for error context BEFORE filling.
+2. **Init task list:** Call `init_task_list(scan_json)` — auto-skips fields with currentValue non-empty or disabled=true. Pass the whole scan result directly.
+3. **Fill one at a time:** For each pending label, call `fill_form_field(label, value)` (kind=input) or `select_option(label, option)` (kind=select) or `click_element(index)` (kind=date).
+4. **Verify:** After each fill, call `verify_field_value(label, expected)` to confirm the value stuck. If mismatch, call `task_retry(label)` + re-fill.
+5. **Mark done:** After verification passes, call `task_done(label)`.
+6. **Submit when empty:** When `get_pending_tasks().pending` is empty, submit.
+7. **Handle errors:** If submit fails, call `sync_tasks_from_errors()` to re-queue errored fields. If notification was in scan, its text tells which field needs fixing.
 
 **Example:**
 ```
-# Dialog opens with 5 fields
-scan_form_fields() → [{label:"客户名称",type:"input",currentValue:"",disabled:false}, ...]
-init_task_list(scan_json) → "pending:5 | [...5 labels...]"
-get_pending_tasks() → pending:["客户名称","客户状态",...]
+# Dialog opens
+scan_form_fields() → {fields: [{label:"客户名称",kind:"input",...},...], notification:null}
+init_task_list(scan_json) → "pending:4"
 
-# Fill first field
 fill_form_field("客户名称", "张三") → "ok"
-task_done("客户名称") → "remaining:4"
+verify_field_value("客户名称", "张三") → "verified:张三"
+task_done("客户名称") → "remaining:3"
 
-# Continue filling...
-
-# Submit attempt fails
-sync_tasks_from_errors() → "retried:1 | [行业代码]"
-get_pending_tasks() → pending:["行业代码"]
-
-# Fix and resubmit
-fill_form_field("行业代码", "xx") → "ok"
-task_done("行业代码") → "remaining:0"
-# Submit → success!
+# Submit fails → scan again
+scan_form_fields() → {fields:[...], notification:{visible:true, text:"证件号码格式错误"}}
+sync_tasks_from_errors() → "retried:1 | [证件号码]"
+fill_form_field("证件号码", "91310000MA1FL1YW9") → "ok"
+verify_field_value("证件号码", "91310000MA1FL1YW9") → "verified:..."
+task_done("证件号码") → "remaining:0"
+# Submit → success
 ```
 
 # 🚨 CROSS-PHASE DATA FLOW (GENERAL RULE)

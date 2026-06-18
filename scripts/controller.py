@@ -3,6 +3,7 @@ Controller: Element UI custom actions for browser_use.
 """
 import json
 import os
+import re
 from datetime import datetime
 
 from browser_use.agent.views import ActionResult
@@ -292,6 +293,15 @@ JS_SCAN_FORM_FIELDS = '''() => {
         }
         if (opts.length > 0) groups.push(opts);
     }
+    // Classify a form-item into kind
+    const classify = (item) => {
+        if (item.querySelector('.el-date-editor, .tsscdatepicker')) return 'date';
+        if (item.querySelector('.el-select')) return 'select';
+        if (item.querySelector('.el-radio')) return 'radio';
+        if (item.querySelector('.el-checkbox')) return 'checkbox';
+        if (item.querySelector('input:not([type="hidden"]), textarea')) return 'input';
+        return 'unknown';
+    };
     // Scan form items within the container
     const allItems = container.querySelectorAll('.el-form-item');
     const fields = [];
@@ -302,24 +312,35 @@ JS_SCAN_FORM_FIELDS = '''() => {
         const textarea = item.querySelector('textarea');
         const trigger = item.querySelector('.el-select .el-input__inner');
         if (!label && !input && !textarea && !trigger) continue;
-        let type = 'unknown';
-        if (trigger) type = 'select';
-        else if (input || textarea) type = 'input';
+        const kind = classify(item);
         const inputEl = input || textarea;
-        const currentValue = inputEl?.value || trigger?.value || '';
+        // Read value: DOM → ARIA (more reliable for wrapped components)
+        let currentValue = inputEl?.value || trigger?.value || '';
+        if (!currentValue) {
+            const ariaInput = item.querySelector('[aria-valuetext]') || item.querySelector('[aria-valuenow]');
+            if (ariaInput) currentValue = ariaInput.getAttribute('aria-valuetext') || ariaInput.getAttribute('aria-valuenow') || '';
+        }
+        if (!currentValue && trigger) currentValue = trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '';
         const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
-        const required = !!item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required');
-        const isDate = !!item.querySelector('.el-date-editor, .tsscdatepicker');
-        const disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
+        // Read disabled: DOM → ARIA
+        let disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
+        if (!disabled) disabled = item.querySelector('[aria-disabled="true"]') !== null;
         const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
         let options = [];
-        if (type === 'select') {
+        if (kind === 'select') {
             options = groups[selectIdx] || [];
             selectIdx++;
         }
-        fields.push({ label, type, currentValue, options, placeholder, required, isDate, disabled, selected });
+        fields.push({ label, kind, currentValue, options, placeholder, required, disabled, selected });
     }
-    const json = JSON.stringify(fields, null, 2);
+    // Check for el-notification error popup
+    let notification = null;
+    const notif = container.querySelector('.el-notification');
+    if (notif && notif.offsetParent !== null) {
+        notification = { visible: true, text: (notif.textContent || '').trim().replace(/\\s+/g, ' ').substring(0, 300) };
+    }
+    const result = { fields, notification };
+    const json = JSON.stringify(result, null, 2);
     console.log('[AI填表] ====== 扫描的表单字段 ======');
     console.log(json);
     return json;
@@ -327,23 +348,34 @@ JS_SCAN_FORM_FIELDS = '''() => {
 
 JS_CHECK_SINGLE_FIELD = '''(label) => {
     const container = ''' + JS_GET_CONTAINER + ''';
+    const classify = (item) => {
+        if (item.querySelector('.el-date-editor, .tsscdatepicker')) return 'date';
+        if (item.querySelector('.el-select')) return 'select';
+        if (item.querySelector('.el-radio')) return 'radio';
+        if (item.querySelector('.el-checkbox')) return 'checkbox';
+        if (item.querySelector('input:not([type="hidden"]), textarea')) return 'input';
+        return 'unknown';
+    };
     for (const item of container.querySelectorAll('.el-form-item')) {
         const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
         if (!lbl.includes(label)) continue;
         const input = item.querySelector('input:not([type="hidden"])');
         const textarea = item.querySelector('textarea');
         const trigger = item.querySelector('.el-select .el-input__inner');
-        let type = 'unknown';
-        if (trigger) type = 'select';
-        else if (input || textarea) type = 'input';
+        const kind = classify(item);
         const inputEl = input || textarea;
-        const currentValue = inputEl?.value || trigger?.value || '';
+        let currentValue = inputEl?.value || trigger?.value || '';
+        if (!currentValue) {
+            const ariaInput = item.querySelector('[aria-valuetext]') || item.querySelector('[aria-valuenow]');
+            if (ariaInput) currentValue = ariaInput.getAttribute('aria-valuetext') || ariaInput.getAttribute('aria-valuenow') || '';
+        }
+        if (!currentValue && trigger) currentValue = trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '';
         const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
-        const disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
+        let disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
+        if (!disabled) disabled = item.querySelector('[aria-disabled="true"]') !== null;
         const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
         const required = !!item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required');
-        const isDate = !!item.querySelector('.el-date-editor, .tsscdatepicker');
-        return JSON.stringify({ label: lbl, type, currentValue, placeholder, disabled, selected, required, isDate });
+        return JSON.stringify({ label: lbl, kind, currentValue, placeholder, disabled, selected, required });
     }
     return 'label-not-found';
 }'''
@@ -353,6 +385,84 @@ async def _wait_if_loading(page):
     loading = await page.evaluate(JS_CHECK_LOADING)
     if loading:
         await page.evaluate(JS_WAIT_LOADING)
+
+
+def _merge_ax_text(dom_fields, snapshot_text):
+    """Parse aria_snapshot(mode='ai') text and merge AX values into DOM fields.
+    Handles both textbox (with value) and combobox (with selected option)."""
+    if not snapshot_text:
+        return
+    # Collect AX entries: label → {value, disabled}
+    ax_map = {}
+    _AX_LINE_RE = re.compile(
+        r'(textbox|combobox|spinbutton|searchbox)\s+"([^"]+)"\s*'
+        r'(?P<attrs>\[(?!ref=)[^\]]*\])*\s*\[ref=[^\]]+\]'
+        r'(?::\s*["\']?(?P<value>[^\n]*?)(?:"\']?)?)?'
+        r'$'
+    )
+    for line in snapshot_text.splitlines():
+        m = _AX_LINE_RE.search(line)
+        if not m:
+            continue
+        role = m.group(1)
+        name = m.group(2).strip()
+        attrs = m.group('attrs') or ''
+        value = (m.group('value') or '').strip().strip('"').strip("'")
+        disabled = '[disabled]' in attrs
+
+        # If no value on this line, check for selected option on next lines (combobox)
+        if not value and role in ('combobox', 'listbox'):
+            # Look for option with [selected] — handled by subsequent lines in the snapshot
+            pass
+
+        ax_map[name] = {'value': value, 'disabled': disabled, 'role': role}
+
+    # Also capture option "[selected]" lines (format: option "{name}" [selected])
+    _OPTION_RE = re.compile(r'option\s+"([^"]+)"\s*\[selected\]')
+    _COMBOS = {}
+    for line in snapshot_text.splitlines():
+        m = _OPTION_RE.search(line)
+        if m:
+            selected_option = m.group(1).strip()
+            # Walk backwards to find the parent combobox name
+            _COMBOS[id(line)] = selected_option
+    # Attach selected options to their combobox parents by scanning previous lines
+    prev_combobox = None
+    for line in snapshot_text.splitlines():
+        cm = _AX_LINE_RE.search(line)
+        if cm and cm.group(1) in ('combobox', 'listbox'):
+            prev_combobox = cm.group(2).strip()
+        om = _OPTION_RE.search(line)
+        if om and prev_combobox:
+            selected = om.group(1).strip()
+            if prev_combobox in ax_map:
+                ax_map[prev_combobox]['value'] = selected
+                ax_map[prev_combobox]['selected_text'] = selected
+
+    # Merge AX data into DOM fields
+    for f in dom_fields:
+        label = f.get('label', '').strip()
+        if not label:
+            continue
+        ax = ax_map.get(label)
+        if not ax:
+            # Partial match: find AX entry whose name contains or is contained by field label
+            for ax_name, ax_data in ax_map.items():
+                if ax_name in label or label in ax_name:
+                    ax = ax_data
+                    break
+        if not ax:
+            continue
+        if not f.get('currentValue', '').strip() and ax['value']:
+            f['currentValue'] = ax['value']
+        if ax.get('disabled') and not f.get('disabled'):
+            f['disabled'] = True
+        # AX role → kind mapping (only override if kind is unknown)
+        if f.get('kind', 'unknown') in ('unknown',):
+            if ax['role'] in ('combobox', 'listbox'):
+                f['kind'] = 'select'
+            elif ax['role'] in ('textbox', 'spinbutton', 'searchbox'):
+                f['kind'] = 'input'
 
 
 def _register_case_data_actions(controller, case_data_store):
@@ -414,23 +524,56 @@ def _register_form_actions(controller, browser_context, form_rules):
             return _ok('ok' + ' | loc:' + loc) if loc else _ok('ok')
         return result
 
-    @controller.action('Check the current value of a single form field by its label. Returns JSON with label/type/currentValue/placeholder/disabled/selected/required/isDate. Use this to verify a field was filled correctly by checking currentValue.')
+    @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
         page = await browser_context.get_current_page()
         return await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text)
 
-    @controller.action('Scan all form fields in the current dialog/drawer. Returns a JSON array of all fields with their labels, types (input/select), current values, available dropdown options, placeholders, required status, disabled/selected flags, and date-picker flag. Call this once when a form dialog opens to understand the entire form before filling.')
+    @controller.action('Verify that a form field has an expected value. Calls check_field_value and compares currentValue with expected. Returns ok if match, err if mismatch. Use this to confirm a field was filled correctly.')
+    async def verify_field_value(label_text: str, expected: str):
+        page = await browser_context.get_current_page()
+        raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text)
+        if raw == 'label-not-found':
+            return _err('label-not-found')
+        try:
+            info = json.loads(raw)
+        except Exception:
+            return raw
+        current = info.get('currentValue', '')
+        if current and (current == expected or expected in current or current in expected):
+            return _ok(f'verified:{current}')
+        return _err(f'mismatch | current:{current} | expected:{expected}')
+
+    @controller.action('Scan all form fields in the current dialog/drawer. Returns {fields: [...], notification: {visible, text}|null}. Each field has label/kind/currentValue/options/placeholder/disabled/selected. Kind: input/select/date/radio/checkbox. Values merged from DOM + accessibility tree (aria_snapshot) for wrapped components.')
     async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        return await page.evaluate(JS_SCAN_FORM_FIELDS)
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS)
+        try:
+            result = json.loads(raw) if isinstance(raw, str) else raw
+            dom_fields = result.get('fields') if isinstance(result, dict) else result
+        except Exception:
+            return raw
 
-    @controller.action('Initialize a form-filling task list from scan results. Pass the scan_form_fields() JSON result. Fields with non-empty currentValue or disabled=true are auto-skipped. Fields with currentValue=empty and not disabled become pending tasks.')
+        # Merge accessibility tree values (bypasses Vue component wrapping)
+        try:
+            ax_text = await page.aria_snapshot(mode='ai')
+            if ax_text:
+                _merge_ax_text(dom_fields, ax_text)
+        except Exception:
+            pass
+
+        result_out = result if isinstance(result, dict) else {'fields': dom_fields, 'notification': None}
+        return json.dumps(result_out, ensure_ascii=False, indent=2)
+
+    @controller.action('Initialize a form-filling task list from scan results. Pass scan_form_fields() result (works with both object {fields:[...]} and array [...]. Notification text from scan is available for error context.)')
     async def init_task_list(fields_json: str):
         try:
-            fields = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
+            data = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
         except Exception:
             return _err('invalid-json')
+        fields = data.get('fields') if isinstance(data, dict) else data
+        notification = data.get('notification') if isinstance(data, dict) else None
         pending = []
         for f in fields:
             label = f.get('label', '')
