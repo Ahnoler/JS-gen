@@ -77,7 +77,11 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         const target = input || textarea;
         if (!target) return 'no-input-found';
         if (target.disabled || target.readOnly) return 'field-disabled';
-        if (target.closest('.el-date-editor, .tsscdatepicker')) return 'is-date-picker';
+        if (target.closest('.el-date-editor, .tsscdatepicker')) {
+            // Date field: fill directly with native setter
+            setFn(target, val);
+            return 'ok-date';
+        }
         setFn(target, val);
         return 'ok';
     }
@@ -295,11 +299,15 @@ JS_SCAN_FORM_FIELDS = '''() => {
     }
     // Classify a form-item into kind
     const classify = (item) => {
-        if (item.querySelector('.el-date-editor, .tsscdatepicker')) return 'date';
+        // Date: check inside item, input's ancestor, or the item itself
+        if (item.querySelector('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]')) return 'date';
+        const el = item.querySelector('input:not([type="hidden"])');
+        if (el && el.closest('.el-date-editor, .tsscdatepicker')) return 'date';
+        if (el && (el.getAttribute('type') === 'date')) return 'date';
         if (item.querySelector('.el-select')) return 'select';
         if (item.querySelector('.el-radio')) return 'radio';
         if (item.querySelector('.el-checkbox')) return 'checkbox';
-        if (item.querySelector('input:not([type="hidden"]), textarea')) return 'input';
+        if (el || item.querySelector('textarea')) return 'input';
         return 'unknown';
     };
     // Scan form items within the container
@@ -354,11 +362,14 @@ JS_SCAN_FORM_FIELDS = '''() => {
 JS_CHECK_SINGLE_FIELD = '''(label) => {
     const container = ''' + JS_GET_CONTAINER + ''';
     const classify = (item) => {
-        if (item.querySelector('.el-date-editor, .tsscdatepicker')) return 'date';
+        if (item.querySelector('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]')) return 'date';
+        const el = item.querySelector('input:not([type="hidden"])');
+        if (el && el.closest('.el-date-editor, .tsscdatepicker')) return 'date';
+        if (el && (el.getAttribute('type') === 'date')) return 'date';
         if (item.querySelector('.el-select')) return 'select';
         if (item.querySelector('.el-radio')) return 'radio';
         if (item.querySelector('.el-checkbox')) return 'checkbox';
-        if (item.querySelector('input:not([type="hidden"]), textarea')) return 'input';
+        if (el || item.querySelector('textarea')) return 'input';
         return 'unknown';
     };
     for (const item of container.querySelectorAll('.el-form-item')) {
@@ -517,16 +528,14 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         val = match_rule(label_text, form_rules)
         return val if val else 'NO-RULE'
 
-    @controller.action('Fill a form field using Element UI native DOM setter. Do NOT use for date fields — use click_element instead.')
+    @controller.action('Fill a form field using Element UI native DOM setter. Works for text inputs AND date fields (sets value directly).')
     async def fill_form_field(label_text: str, value: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
-        if result == 'is-date-picker':
-            return ActionResult(extracted_content='is-date-picker: This is a date picker field. Use click_element to interact with the calendar UI instead.', is_done=False)
-        if result == 'ok':
+        if result == 'ok' or result == 'ok-date' or result == 'ok-placeholder' or result == 'ok-type':
             loc = await page.evaluate(JS_LOCATOR, [label_text])
-            return _ok('ok' + ' | loc:' + loc) if loc else _ok('ok')
+            return _ok(result + (' | loc:' + loc) if loc else result)
         return result
 
     @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
@@ -667,8 +676,11 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'check'])
         if already.startswith('already:'):
-            loc = await page.evaluate(JS_LOCATOR, [label_text])
-            return _ok(already + ' | loc:' + loc) if loc else _ok(already)
+            cur_val = already.split(':', 1)[1]
+            if cur_val == option_text or option_text in cur_val or cur_val in option_text:
+                loc = await page.evaluate(JS_LOCATOR, [label_text])
+                return _ok(already + ' | loc:' + loc) if loc else _ok(already)
+            # Different value — proceed to change it
 
         trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'trigger'])
         if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled'):
@@ -681,7 +693,16 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if matched_text in ('NO_ITEMS',):
             return _err('no-items')
         if matched_text.startswith('NOT_FOUND:'):
-            return _err(matched_text)
+            retry_key = f'_sel_retry_{label_text}'
+            retries = case_data_store.get(retry_key, 0) + 1
+            case_data_store[retry_key] = retries
+            if retries >= 3:
+                # Autonomous: pick first available option
+                matched_text = await page.evaluate(JS_FIND_OPTION, 'first')
+                if matched_text in ('NO_ITEMS',) or matched_text.startswith('NOT_FOUND:'):
+                    return _err(matched_text)
+            else:
+                return _err(matched_text)
 
         try:
             # Primary: XPath normalize-space exact match
@@ -728,6 +749,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         # Verify: current value must contain the matched text
         if current_val and (current_val == matched_text or matched_text in current_val or current_val in matched_text):
+            case_data_store.pop(f'_sel_retry_{label_text}', None)
             loc = await page.evaluate(JS_LOCATOR, [label_text])
             return _ok(f'ok | {current_val}' + (' | loc:' + loc) if loc else f'ok | {current_val}')
 
