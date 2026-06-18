@@ -325,6 +325,7 @@ JS_SCAN_FORM_FIELDS = '''() => {
         // Read disabled: DOM → ARIA
         let disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
         if (!disabled) disabled = item.querySelector('[aria-disabled="true"]') !== null;
+        const required = !!item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required');
         const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
         let options = [];
         if (kind === 'select') {
@@ -333,11 +334,15 @@ JS_SCAN_FORM_FIELDS = '''() => {
         }
         fields.push({ label, kind, currentValue, options, placeholder, required, disabled, selected });
     }
-    // Check for el-notification error popup
+    // Check for el-notification error popup (appended to body level, may have DOM remnants)
     let notification = null;
-    const notif = container.querySelector('.el-notification');
-    if (notif && notif.offsetParent !== null) {
-        notification = { visible: true, text: (notif.textContent || '').trim().replace(/\\s+/g, ' ').substring(0, 300) };
+    for (const notif of document.querySelectorAll('.el-notification')) {
+        const r = notif.getBoundingClientRect();
+        const s = getComputedStyle(notif);
+        if (r.width > 0 && r.height > 0 && s.display !== 'none') {
+            notification = { visible: true, text: (notif.textContent || '').trim().replace(/\\s+/g, ' ').substring(0, 300) };
+            break;
+        }
     }
     const result = { fields, notification };
     const json = JSON.stringify(result, null, 2);
@@ -483,7 +488,7 @@ def _register_case_data_actions(controller, case_data_store):
         return val
 
 
-def _register_form_actions(controller, browser_context, form_rules):
+def _register_form_actions(controller, browser_context, form_rules, case_data_store):
     @controller.action('Expand ALL el-tree nodes recursively (up to 10 rounds).')
     async def expand_all_el_tree():
         page = await browser_context.get_current_page()
@@ -859,17 +864,40 @@ def _register_misc_actions(controller, browser_context):
     @controller.action('Close visible el-notification popup, read its text, and return it. Returns "no-notification" if none found. Use this for server-side validation errors — NOT for dialogs/drawers.')
     async def close_notification():
         page = await browser_context.get_current_page()
-        notif = await page.query_selector('.el-notification')
-        if notif:
-            visible = await notif.evaluate('el => el.offsetParent !== null')
-            if visible:
-                notif_text = await notif.evaluate('el => el.textContent?.trim() || ""')
-                close_btn = await notif.query_selector('.el-notification__closeBtn')
-                if close_btn:
-                    await close_btn.click()
-                    await page.wait_for_timeout(300)
-                    return _ok(f'ok-notification: {notif_text[:200]}')
-                return _ok(f'ok-notification-noclose: {notif_text[:200]}')
+        # Find the VISIBLE notification (may be multiple DOM remnants with display:none)
+        notif = await page.evaluate('''() => {
+            for (const el of document.querySelectorAll('.el-notification')) {
+                const r = el.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) return el.id || el.getAttribute('data-index') || '';
+            }
+            return null;
+        }''')
+        if notif is not None:
+            notif_text = await page.evaluate('''() => {
+                for (const el of document.querySelectorAll('.el-notification')) {
+                    const r = el.getBoundingClientRect();
+                    if (r.width > 0 && r.height > 0) return (el.textContent || '').trim();
+                }
+                return '';
+            }''')
+            try:
+                # Click the close button inside the visible notification
+                close_btn = page.locator('.el-notification__closeBtn').locator('visible=true').first
+                await close_btn.click(timeout=3000)
+            except Exception:
+                # Fallback: iterate and click the visible one
+                await page.evaluate('''() => {
+                    for (const el of document.querySelectorAll('.el-notification')) {
+                        const r = el.getBoundingClientRect();
+                        if (r.width > 0 && r.height > 0) {
+                            const cb = el.querySelector('.el-notification__closeBtn');
+                            if (cb) { cb.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); cb.click(); }
+                            return;
+                        }
+                    }
+                }''')
+            await page.wait_for_timeout(300)
+            return _ok(f'ok-notification: {notif_text[:200]}')
         return 'no-notification'
 
     @controller.action('Close the topmost el-dialog, el-message-box, or el-drawer. El-notification has its own close_notification action.')
@@ -1024,9 +1052,10 @@ def build_controller(browser_context, form_rules, case_data_store=None, exclude_
         exclude_actions = ['input_text', 'select_dropdown_option']
     controller = Controller(exclude_actions=exclude_actions)
 
-    if case_data_store is not None:
-        _register_case_data_actions(controller, case_data_store)
-    _register_form_actions(controller, browser_context, form_rules)
+    if case_data_store is None:
+        case_data_store = {}
+    _register_case_data_actions(controller, case_data_store)
+    _register_form_actions(controller, browser_context, form_rules, case_data_store)
     _register_navigation_actions(controller, browser_context)
     _register_table_actions(controller, browser_context)
     _register_misc_actions(controller, browser_context)

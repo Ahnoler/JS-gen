@@ -15,7 +15,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
         goal_tracker = {'goals': [], 'stopped': False}
 
     async def on_step_start(agent):
-        sys.stderr.write(f"[recorder] on_step_start n_steps={agent.state.n_steps}\n"); sys.stderr.flush()
+        sys.stderr.write(f"[on_step_start]\t n_steps={agent.state.n_steps}\n"); sys.stderr.flush()
         # Check for human intervention before proceeding
         if intervention_queue is not None:
             try:
@@ -37,10 +37,10 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
         _model_out = agent.state.history.history[-1].model_output if agent.state.history and agent.state.history.history else None
         _next_goal = getattr(getattr(_model_out, 'current_state', None), 'next_goal', '') if _model_out else ''
         _actions = [str(a)[:100] for a in (getattr(_model_out, 'action', []) or [])] if _model_out else []
-        sys.stderr.write(f"[recorder] on_step_end n_steps={agent.state.n_steps} is_done={_done} stopped={_stopped}\n")
-        sys.stderr.write(f"[recorder]   next_goal={_next_goal[:150]}\n")
-        sys.stderr.write(f"[recorder]   actions={_actions}\n")
-        sys.stderr.write(f"[recorder]   last_result={_last_result_str}\n")
+        sys.stderr.write(f"[on_step_end]\t n_steps={agent.state.n_steps} is_done={_done} stopped={_stopped}\n")
+        sys.stderr.write(f"[next_goal]\t {_next_goal[:150]}\n")
+        sys.stderr.write(f"[actions]\t {_actions}\n")
+        sys.stderr.write(f"[last_result]\t {_last_result_str}\n")
         sys.stderr.flush()
         # Check cancel signal before any processing
         if cancel_flag_path is not None and cancel_flag_path.exists():
