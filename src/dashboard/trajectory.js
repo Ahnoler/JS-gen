@@ -1,5 +1,6 @@
 // Trajectory Tab — shows action_*.json and log_*.txt from scripts/snapshots/
 import { escapeHtml } from './swagger-api.js';
+import { pipelineState, displayGeneratedScript } from './script-pipeline.js';
 
 export let trajCurrentDetailId = null;
 
@@ -147,13 +148,21 @@ export async function loadSnapshots() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        // Switch to gen tab and show the generated script
+        // Switch to gen tab
         const genTab = document.querySelector('.tab-btn[data-tab="gen"]');
         if (genTab) genTab.click();
-        document.getElementById('genScriptPre').textContent = data.script;
-        document.getElementById('genScriptArea').style.display = '';
-        document.getElementById('genSteps').style.display = 'none';
-        document.getElementById('genInfo').style.display = '';
+        // Set pipeline state so Run button works
+        pipelineState.currentTestId = data.testId;
+        pipelineState.currentFileName = data.fileName;
+        // Use the pipeline's display function — sets currentScript, shows run area, etc.
+        displayGeneratedScript({
+          script: data.script,
+          testId: data.testId,
+          fileName: data.fileName,
+          steps: [],
+          stats: data.stats,
+        });
+        // Add assembly info
         document.getElementById('genInfo').textContent = 'Assembled from ' + filePath.split('/').pop() +
           ' | ' + data.stats.original + ' entries → ' + data.stats.deduped + ' after dedup (removed ' + data.stats.removed + ')';
       } catch (err) {

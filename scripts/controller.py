@@ -12,83 +12,71 @@ from browser_use.agent.views import ActionResult
 from .form_rules import match_rule
 
 
-# ========================== Trajectory Recording ==========================
-# Accumulates atp-record format trajectory entries during browser exploration.
-# Each action appends its entry; on done, the full JSON is saved.
+# ========================== Action Recording ==========================
+# Records every controller action call with its name and parameters.
+# The assembler maps action+params directly to CTRL calls — no XPath guessing needed.
 
-_TRAJECTORY_ENTRIES = []
+_ACTION_LOG = []
 _TRAJECTORY_URL = None
 
 
-def _append_trajectory(command, properties_name, value, xpath, tag_name, attrs):
-    """Append a trajectory entry in atp-record compatible format."""
+# Action → old-format command mapping
+_ACTION_TO_COMMAND = {
+    'fill_form_field': 'input', 'fill_date_field': 'input',
+    'select_option': 'select',
+    'click_element_by_index': 'click', 'click_menu_item': 'click',
+    'click_table_row_action': 'click', 'click_adjacent_button': 'click',
+    'click_radio': 'click',
+    'switch_tab': 'tab', 'close_dialog': 'close',
+    'wait_for_loading': 'wait', 'go_to_url': 'navigate',
+    'expand_all_el_tree': 'expand',
+}
+
+
+def _record_action(action_name, params, result, element=None):
+    """Record a controller action call."""
+    global _TRAJECTORY_URL
+    params_dict = dict(params) if params else {}
+
     entry = {
         'id': str(uuid.uuid4()),
-        'command': command,
-        'target': xpath,
-        'targetType': 'xpath',
-        'tagName': tag_name,
-        'propertiesName': properties_name,
-        'attributes': attrs,
         'timestamp': int(time.time() * 1000),
+        'action': action_name,
+        'params': params_dict,
+        'result': str(result)[:200] if result else '',
+        'command': _ACTION_TO_COMMAND.get(action_name, action_name),
+        'propertiesName': '',
+        'value': '',
+        'target': '',
+        'targetType': 'xpath',
+        'tagName': '',
+        'attributes': {},
         'type': 'ATTRIBUTE',
-        'value': value,
     }
-    _TRAJECTORY_ENTRIES.append(entry)
 
+    # Extract label and value from params
+    for key in ('label_text', 'menu_text', 'tab_name', 'row_text', 'button_text'):
+        if key in params_dict:
+            entry['propertiesName'] = str(params_dict[key])
+            break
+    if not entry['propertiesName']:
+        entry['propertiesName'] = str(params_dict.get('value', params_dict.get('option_text', '')))
 
-async def _capture_and_record_input(page, label, value, case_data_store):
-    """Capture element info for an input action and record trajectory."""
-    try:
-        raw = await page.evaluate(JS_CAPTURE_ELEMENT_BY_LABEL, [label])
-        info = json.loads(raw) if isinstance(raw, str) else raw
-        if info.get('xpath'):
-            _append_trajectory(
-                command='input',
-                properties_name=info.get('propertiesName', label),
-                value=value,
-                xpath=info['xpath'],
-                tag_name=info.get('tagName', 'input'),
-                attrs=info.get('attributes', {}),
-            )
-    except Exception:
-        pass
+    entry['value'] = str(params_dict.get('value', params_dict.get('option_text', params_dict.get('index', ''))))
 
+    if element:
+        elem = dict(element) if isinstance(element, dict) else {}
+        entry['element'] = elem
+        entry['target'] = elem.get('xpath', '') or ''
+        entry['tagName'] = elem.get('tag_name', '') or ''
+        entry['attributes'] = elem.get('attributes', {}) if isinstance(elem.get('attributes'), dict) else {}
+        if not entry['propertiesName'] and elem.get('text'):
+            entry['propertiesName'] = str(elem['text'])
 
-async def _capture_and_record_select(page, label, option, case_data_store):
-    """Capture element info for a select action and record trajectory."""
-    try:
-        raw = await page.evaluate(JS_CAPTURE_ELEMENT_BY_LABEL, [label])
-        info = json.loads(raw) if isinstance(raw, str) else raw
-        if info.get('xpath'):
-            _append_trajectory(
-                command='select',
-                properties_name=info.get('propertiesName', label),
-                value=option,
-                xpath=info['xpath'],
-                tag_name=info.get('tagName', 'input'),
-                attrs=info.get('attributes', {}),
-            )
-    except Exception:
-        pass
-
-
-async def _capture_and_record_click(page, text, case_data_store):
-    """Capture element info for a click action and record trajectory."""
-    try:
-        raw = await page.evaluate(JS_CAPTURE_BUTTON_BY_TEXT, [text])
-        info = json.loads(raw) if isinstance(raw, str) else raw
-        if info.get('xpath'):
-            _append_trajectory(
-                command='click',
-                properties_name=info.get('propertiesName', text),
-                value='',
-                xpath=info['xpath'],
-                tag_name=info.get('tagName', 'button'),
-                attrs=info.get('attributes', {}),
-            )
-    except Exception:
-        pass
+    _ACTION_LOG.append(entry)
+    # Capture URL from go_to_url action
+    if action_name == 'go_to_url' and params_dict.get('url'):
+        _TRAJECTORY_URL = params_dict['url']
 
 
 # ========================== JS Snippets ==========================
@@ -112,67 +100,6 @@ JS_GET_CONTAINER = '''(() => {
         if (d.offsetParent !== null) return d;
     return document;
 })()'''
-
-JS_CAPTURE_ELEMENT_BY_LABEL = '''([label]) => {
-    const container = ''' + JS_GET_CONTAINER + ''' || document;
-    const items = container.querySelectorAll('.el-form-item');
-    for (const item of items) {
-        const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-        if (!lbl.includes(label)) continue;
-        const target = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
-        if (!target) return JSON.stringify({tagName:'', xpath:'', attributes:{}, value:'', propertiesName:lbl});
-        const tag = target.tagName.toLowerCase();
-        const attrs = {};
-        for (const a of target.attributes) {
-            if (a.value && a.value.length > 0) attrs[a.name] = a.value;
-        }
-        let xpath = '';
-        const id = target.id;
-        if (id && !/^\\d{4,}$/.test(id) && !/^el-id-/.test(id)) xpath = `//${tag}[@id="${id}"]`;
-        if (!xpath && target.placeholder) xpath = `//${tag}[@placeholder="${target.placeholder}"]`;
-        if (!xpath && target.name) xpath = `//${tag}[@name="${target.name}"]`;
-        if (!xpath && target.type) xpath = `//${tag}[@type="${target.type}"]`;
-        return JSON.stringify({
-            tagName: tag, xpath, attributes: attrs,
-            value: target.value || '', propertiesName: lbl
-        });
-    }
-    for (const inp of container.querySelectorAll('input:not([type="hidden"]), textarea')) {
-        const ph = inp.placeholder || '';
-        if (ph.includes(label) && inp.offsetParent !== null) {
-            const tag = inp.tagName.toLowerCase();
-            return JSON.stringify({
-                tagName: tag, xpath: `//${tag}[@placeholder="${ph}"]`,
-                attributes: {placeholder: ph}, value: inp.value || '',
-                propertiesName: label
-            });
-        }
-    }
-    return JSON.stringify({tagName:'', xpath:'', attributes:{}, value:'', propertiesName:label});
-}'''
-
-JS_CAPTURE_BUTTON_BY_TEXT = '''([text]) => {
-    const buttons = document.querySelectorAll('button');
-    for (const btn of buttons) {
-        const t = (btn.textContent || '').trim().replace(/\\s+/g,'');
-        const search = text.replace(/\\s+/g,'');
-        if (t.includes(search) && btn.offsetParent !== null) {
-            const attrs = {};
-            for (const a of btn.attributes) {
-                if (a.value && a.value.length > 0) attrs[a.name] = a.value;
-            }
-            let xpath = '';
-            if (btn.id && !/^\\d{4,}$/.test(btn.id)) xpath = `//button[@id="${btn.id}"]`;
-            if (!xpath && t) xpath = `//button[contains(translate(.," ",""),"${t}")]`;
-            if (!xpath) xpath = `//button[@type="${btn.type||'button'}"]`;
-            return JSON.stringify({
-                tagName: 'button', xpath, attributes: attrs,
-                value: '', propertiesName: text
-            });
-        }
-    }
-    return JSON.stringify({tagName:'', xpath:'', attributes:{}, value:'', propertiesName:text});
-}'''
 
 JS_NATIVE_SETTER = ''  # Inlined in JS_FILL_FORM_FIELD
 
@@ -198,7 +125,37 @@ JS_LOCATOR = '''(label) => {
         const t = lbl.textContent.trim();
         if (t !== label && !t.includes(label)) continue;
         const target = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
-        if (target) return xpath(target);
+        if (target) return JSON.stringify({xpath: xpath(target), tag: target.tagName.toLowerCase(), attrs: (()=>{const a={};for(const at of target.attributes) if(at.value&&at.value.length<100) a[at.name]=at.value; return a;})()});
+    }
+    return '';
+}'''
+
+JS_SMART_LOCATOR = '''([label]) => {
+    const container = ''' + JS_GET_CONTAINER + ''';
+    const items = container.querySelectorAll('.el-form-item');
+    for (const item of items) {
+        const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+        if (lbl !== label && !lbl.includes(label)) continue;
+        const target = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
+        if (!target) continue;
+        const tag = target.tagName.toLowerCase();
+        const attrs = {};
+        for (const a of target.attributes) if (a.value && a.value.length > 0) attrs[a.name] = a.value;
+        const id = target.id;
+        let xpath = '';
+        if (id && !/^\\d{4,}$/.test(id) && !/^el-id-/.test(id)) xpath = `//${tag}[@id="${id}"]`;
+        if (!xpath && target.placeholder && !target.closest('.el-select')) xpath = `//${tag}[@placeholder="${target.placeholder}"]`;
+        if (!xpath && target.name) xpath = `//${tag}[@name="${target.name}"]`;
+        if (!xpath && target.type && tag !== 'textarea') xpath = `//${tag}[@type="${target.type}"]`;
+        if (!xpath) xpath = `//${tag}[@class="${(target.getAttribute('class')||'').split(' ').filter(Boolean).join(' ')}"]`;
+        return JSON.stringify({xpath, tag, attrs});
+    }
+    for (const inp of container.querySelectorAll('input:not([type="hidden"]), textarea')) {
+        const ph = inp.placeholder || '';
+        if (ph.includes(label) && inp.offsetParent !== null) {
+            const tag = inp.tagName.toLowerCase();
+            return JSON.stringify({xpath: `//${tag}[@placeholder="${ph}"]`, tag, attrs: {placeholder: ph}});
+        }
     }
     return '';
 }'''
@@ -638,6 +595,19 @@ async def _wait_if_loading(page):
         await page.evaluate(JS_WAIT_LOADING)
 
 
+async def _capture_element(page, label_text):
+    """Capture smart XPath + tag + attributes for a labeled form field."""
+    try:
+        raw = await page.evaluate(JS_SMART_LOCATOR, [label_text])
+        if raw:
+            info = json.loads(raw) if isinstance(raw, str) else raw
+            if info.get('xpath'):
+                return {'xpath': info['xpath'], 'tag_name': info.get('tag', 'input'), 'attributes': info.get('attrs', {})}
+    except Exception:
+        pass
+    return None
+
+
 def _merge_ax_text(dom_fields, snapshot_text):
     """Parse aria_snapshot(mode='ai') text and merge AX values into DOM fields.
     Handles both textbox (with value) and combobox (with selected option)."""
@@ -769,24 +739,22 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         await _wait_if_loading(page)
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
         if result == 'ok' or result == 'ok-date' or result == 'ok-placeholder' or result == 'ok-type':
-            await _capture_and_record_input(page, label_text, value, case_data_store)
-            loc = await page.evaluate(JS_LOCATOR, [label_text])
-            return _ok(result + (' | loc:' + loc) if loc else result)
+            element = await _capture_element(page, label_text)
+            _record_action('fill_form_field', {'label_text': label_text, 'value': value}, result, element=element)
+            return _ok(result)
         return result
 
     @controller.action('Fill an Element UI date picker by label text. Two-step: sets value via native setter + Vue reactivity, then clicks the matching day cell in the picker panel to trigger the full pick event chain. Date value persists after save/re-render.')
     async def fill_date_field(label_text: str, value: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        # Step 1: set value + Vue reactivity + open picker
         s1 = await page.evaluate(JS_FILL_DATE_SET, [label_text, value])
         if not str(s1).startswith('opened'):
             return s1
         await page.wait_for_timeout(500)
-        # Step 2: click the matching day cell to trigger pick event chain
         s2 = await page.evaluate(JS_CLICK_DATE_CELL, [value])
         if s2.startswith('ok-date'):
-            await _capture_and_record_input(page, label_text, value, case_data_store)
+            _record_action('fill_date_field', {'label_text': label_text, 'value': value}, s2)
             return _ok(s2)
         return s2
 
@@ -956,9 +924,9 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             results.append({'label': label, 'ok': ok, 'result': result})
             if ok:
                 if kind in ('fill_input', 'fill', 'input'):
-                    await _capture_and_record_input(page, label, value, case_data_store)
+                    _record_action('fill_form_field', {'label_text': label, 'value': value}, result)
                 elif kind in ('select_option', 'select', 'option'):
-                    await _capture_and_record_select(page, label, value, case_data_store)
+                    _record_action('select_option', {'label_text': label, 'option_text': value}, result)
                 task_done_impl(label)
             await page.wait_for_timeout(400)
         return _ok(f'batch-done | {len(results)} fields | ' + json.dumps(results, ensure_ascii=False))
@@ -1079,9 +1047,9 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     all_results.append({'label': label, 'kind': label_kind.get(label, 'input'), 'ok': ok, 'result': result})
                     if ok:
                         if kind in ('fill_input', 'fill', 'input'):
-                            await _capture_and_record_input(page, label, value, case_data_store)
+                            _record_action('fill_form_field', {'label_text': label, 'value': value}, result)
                         elif kind in ('select_option', 'select', 'option'):
-                            await _capture_and_record_select(page, label, value, case_data_store)
+                            _record_action('select_option', {'label_text': label, 'option_text': value}, result)
                         _task_done_impl(label)
                     await page.wait_for_timeout(400)
         return _ok(f'pending-batch-done | {len(all_results)} fields | ' + json.dumps(all_results, ensure_ascii=False))
@@ -1168,8 +1136,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if already.startswith('already:'):
             cur_val = already.split(':', 1)[1]
             if cur_val == option_text or option_text in cur_val or cur_val in option_text:
-                loc = await page.evaluate(JS_LOCATOR, [label_text])
-                return _ok(already + ' | loc:' + loc) if loc else _ok(already)
+                _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, already)
+                return _ok(already + ' | already-matched')
             # Different value — proceed to change it
 
         trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'trigger'])
@@ -1240,9 +1208,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # Verify: current value must contain the matched text
         if current_val and (current_val == matched_text or matched_text in current_val or current_val in matched_text):
             case_data_store.pop(f'_sel_retry_{label_text}', None)
-            await _capture_and_record_select(page, label_text, matched_text, case_data_store)
-            loc = await page.evaluate(JS_LOCATOR, [label_text])
-            return _ok(f'ok | {current_val}' + (' | loc:' + loc) if loc else f'ok | {current_val}')
+            _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text)
+            return _ok(f'ok | {current_val}')
 
         return _err(f'confirm-failed | current:{current_val} | expected:{matched_text}')
 
@@ -1289,7 +1256,7 @@ def _register_navigation_actions(controller, browser_context):
         ''', menu_text)
         await page.wait_for_timeout(500)
         if result.startswith('ok'):
-            await _capture_and_record_click(page, menu_text, case_data_store)
+            _record_action('click_menu_item', {'menu_text': menu_text}, result)
             return _ok(result + ' | loc:.el-menu-item:has-text("' + menu_text + '")')
         return result
 
@@ -1326,7 +1293,7 @@ def _register_table_actions(controller, browser_context):
         ''', [row_text, button_text])
         await page.wait_for_timeout(500)
         if result.startswith('ok'):
-            await _capture_and_record_click(page, button_text, case_data_store)
+            _record_action('click_table_row_action', {'row_text': row_text, 'button_text': button_text}, result)
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
         return result
 
@@ -1381,30 +1348,26 @@ def _register_misc_actions(controller, browser_context):
     @controller.action('Save the accumulated trajectory in atp-record import-compatible JSON format.')
     async def save_trajectory(output_dir: str = None):
         """Save trajectory entries to a JSON file in atp-record format."""
-        global _TRAJECTORY_ENTRIES, _TRAJECTORY_URL
-        if not _TRAJECTORY_ENTRIES:
+        global _ACTION_LOG, _TRAJECTORY_URL
+        if not _ACTION_LOG:
             return _err('no-trajectory-entries')
         try:
             if not output_dir:
                 output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapshots')
             os.makedirs(output_dir, exist_ok=True)
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filepath = os.path.join(output_dir, f'trajectory_{ts}.json')
-            trajectory_json = {
+            filepath = os.path.join(output_dir, f'action_{ts}.json')
+            action_json = {
                 'id': str(uuid.uuid4()),
                 'name': 'browser-use-exploration',
                 'url': _TRAJECTORY_URL or 'http://unknown',
-                'tests': [{
-                    'id': str(uuid.uuid4()),
-                    'name': 'browser-use-exploration',
-                    'commands': _TRAJECTORY_ENTRIES,
-                }],
+                'actions': list(_ACTION_LOG),
             }
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(trajectory_json, f, ensure_ascii=False, indent=2)
-            count = len(_TRAJECTORY_ENTRIES)
-            _TRAJECTORY_ENTRIES = []
-            return _ok(f'trajectory-saved:{filepath} | entries:{count}')
+                json.dump(action_json, f, ensure_ascii=False, indent=2)
+            count = len(_ACTION_LOG)
+            _ACTION_LOG.clear()
+            return _ok(f'saved:{filepath} | entries:{count}')
         except Exception as e:
             return _err(f'save-error:{e}')
 
@@ -1512,9 +1475,8 @@ def _register_misc_actions(controller, browser_context):
             return 'label-not-found';
         }''', [label_text])
         if result == 'clicked':
-            await _capture_and_record_click(page, label_text, case_data_store)
-            loc = await page.evaluate(JS_LOCATOR, [label_text])
-            return _ok('clicked | loc:' + loc) if loc else _ok('clicked')
+            _record_action('click_adjacent_button', {'label_text': label_text}, result)
+            return _ok('clicked')
         return result
 
     @controller.action('Click a radio option by label text and radio option text.')
@@ -1541,16 +1503,24 @@ def _register_misc_actions(controller, browser_context):
             download_path = await browser_context._click_element_node(element_node)
             if download_path:
                 return _ok(f'downloaded:{download_path}')
-            # Capture element info to curated trajectory
-            if element_node and element_node.xpath:
-                _append_trajectory(
-                    command='click',
-                    properties_name=element_node.tag_name + (f'[{index}]' if element_node.highlight_index != index else ''),
-                    value=str(index),
-                    xpath=element_node.xpath,
-                    tag_name=element_node.tag_name,
-                    attrs=element_node.attributes or {},
-                )
+            # Record element click
+            if element_node:
+                try:
+                    elem_text = element_node.get_all_text_till_next_clickable_element() or ''
+                    elem_text = elem_text.strip()[:80]
+                except Exception:
+                    elem_text = ''
+                element_info = {
+                    'tag_name': element_node.tag_name,
+                    'xpath': element_node.xpath or '',
+                    'attributes': element_node.attributes or {},
+                    'text': elem_text or '',
+                }
+                _record_action('click_element_by_index', {
+                    'index': index,
+                    'tag_name': element_node.tag_name,
+                    'text': elem_text or '',
+                }, f'clicked-{index}', element=element_info)
             return _ok(f'clicked-{index}')
         except Exception as e:
             return _err(f'click-failed:{e}')

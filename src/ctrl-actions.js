@@ -21,34 +21,85 @@ const CTRL_OBJECT = `{
   },
   fillFormField: (label, val) => {
     const c = CTRL.getContainer();
-    for (const item of c.querySelectorAll('.el-form-item')) {
-      const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-      if (!lbl.includes(label)) continue;
-      const input = item.querySelector('input:not([type="hidden"])');
-      const textarea = item.querySelector('textarea');
-      const t = input || textarea;
-      if (!t) return 'no-input-found';
-      if (t.disabled || t.readOnly) return 'field-disabled';
-      if (t.closest('.el-date-editor, .tsscdatepicker')) return 'is-date-picker';
-      const setter = Object.getOwnPropertyDescriptor((t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement).prototype,'value').set;
-      setter.call(t, val);
+    const setFn = (t, v) => {
+      const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
+      setter.call(t, v);
+      t.setAttribute('value', v);
       t.dispatchEvent(new Event('input',{bubbles:true}));
       t.dispatchEvent(new Event('change',{bubbles:true}));
       t.dispatchEvent(new Event('blur',{bubbles:true}));
+    };
+    for (const item of c.querySelectorAll('.el-form-item')) {
+      const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+      if (!lbl.includes(label)) continue;
+      const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
+      if (!t) return 'no-input-found';
+      if (t.disabled || t.readOnly) return 'field-disabled';
+      if (t.closest('.el-date-editor, .tsscdatepicker')) {
+        t.focus();
+        setFn(t, val);
+        try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){}
+        (t.parentNode?.querySelector('input')||t).click();
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const day = new Date(val).getDate();
+            for (const panel of document.querySelectorAll('.el-picker-panel')) {
+              if (!panel.offsetParent || panel.style.display === 'none') continue;
+              for (const td of panel.querySelectorAll('td.available:not(.prev-month):not(.next-month)')) {
+                if (parseInt(td.textContent.trim()) === day && !td.disabled) { td.click(); break; }
+              }
+            }
+            document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
+            resolve('ok-date');
+          }, 200);
+        });
+      }
+      setFn(t, val);
+      return 'ok';
+    }
+    // Pass 2: character-set match (handles word order variations like 登记注册地址 vs 注册登记地址)
+    for (const item of c.querySelectorAll('.el-form-item')) {
+      const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+      const searchChars = [...new Set(label.replace(/[\s,，、]/g, ''))];
+      if (searchChars.length < 2) continue;
+      const allCharsMatch = searchChars.every(ch => lbl.includes(ch));
+      if (!allCharsMatch) continue;
+      const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
+      if (!t) return 'no-input-found';
+      if (t.disabled || t.readOnly) return 'field-disabled';
+      if (t.closest('.el-date-editor, .tsscdatepicker')) {
+        t.focus();
+        setFn(t, val);
+        try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){}
+        (t.parentNode?.querySelector('input')||t).click();
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const day = new Date(val).getDate();
+            for (const panel of document.querySelectorAll('.el-picker-panel')) {
+              if (!panel.offsetParent || panel.style.display === 'none') continue;
+              for (const td of panel.querySelectorAll('td.available:not(.prev-month):not(.next-month)')) {
+                if (parseInt(td.textContent.trim()) === day && !td.disabled) { td.click(); break; }
+              }
+            }
+            document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
+            resolve('ok-date');
+          }, 200);
+        });
+      }
+      setFn(t, val);
       return 'ok';
     }
     for (const inp of c.querySelectorAll('input:not([type="hidden"]),textarea')) {
       if (inp.closest('.el-date-editor,.tsscdatepicker')) continue;
       const ph = inp.getAttribute('placeholder') || '';
       if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent !== null) {
-        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-        setter.call(inp, val);
-        inp.dispatchEvent(new Event('input',{bubbles:true}));
-        inp.dispatchEvent(new Event('change',{bubbles:true}));
-        inp.dispatchEvent(new Event('blur',{bubbles:true}));
+        setFn(inp, val);
         return 'ok-placeholder';
       }
     }
+    const _allLbls = [...c.querySelectorAll('.el-form-item')].map(i => i.querySelector('.el-form-item__label')?.textContent?.trim() || '').filter(Boolean);
+    if (_allLbls.length > 0) console.log('[fillFormField] Available labels:', JSON.stringify(_allLbls));
     return 'label-not-found';
   },
   selectOption: (label, option) => {

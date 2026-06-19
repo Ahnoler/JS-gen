@@ -5,6 +5,7 @@ premature done() prevention, and human intervention injection.
 import sys
 from langchain_core.messages import HumanMessage
 from .agent_utils import emit_json
+from . import controller as ctrl_mod
 
 
 # ========================== Operation Log (plain text, for LLM context) ==========================
@@ -46,6 +47,17 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
         sys.stderr.write(f"[actions]\t {_actions}\n")
         sys.stderr.write(f"[last_result]\t {_last_result_str}\n")
         sys.stderr.flush()
+
+        # ===== Capture page URL from agent state =====
+        try:
+            _last_state = agent.state.history.history[-1].state if agent.state.history and agent.state.history.history else None
+            if _last_state:
+                _url = getattr(_last_state, 'url', '') or (_last_state.get('url') if isinstance(_last_state, dict) else '')
+                if _url and _url != 'about:blank' and not _url.startswith('devtools://'):
+                    ctrl_mod._TRAJECTORY_URL = _url
+        except Exception:
+            pass
+        # ===== End URL capture =====
 
         # Check cancel signal before any processing
         if cancel_flag_path is not None and cancel_flag_path.exists():

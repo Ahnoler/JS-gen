@@ -1,0 +1,127 @@
+import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { deduplicateActionFile } from '../dedup.js';
+
+import { PROJECT_DIR } from '../config.js';
+import { ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex } from '../script-utils.js';
+
+const SCRIPTS_DIR = path.join(PROJECT_DIR, 'scripts');
+const GENERATED_DIR = path.join(SCRIPTS_DIR, 'generated');
+
+export default function (app) {
+
+  /**
+   * POST /api/test/assemble
+   * Body: { actionFile: "scripts/snapshots/action_20260619_183411.json" }
+   * Flow:  read → dedup → Python assembler → return script
+   */
+  app.post('/api/test/assemble', async (req, res) => {
+    try {
+      const { actionFile } = req.body || {};
+      if (!actionFile) {
+        return res.status(400).json({ error: 'actionFile is required' });
+      }
+
+      // Resolve the action file path
+      const absPath = path.resolve(SCRIPTS_DIR, '..', actionFile);
+      if (!existsSync(absPath)) {
+        return res.status(404).json({ error: 'actionFile not found: ' + absPath });
+      }
+
+      // Read and deduplicate
+      const raw = readFileSync(absPath, 'utf-8');
+      const dedupedJson = deduplicateActionFile(raw);
+      const meta = dedupedJson._meta;
+
+      // Write deduplicated file
+      if (!existsSync(GENERATED_DIR)) {
+        mkdirSync(GENERATED_DIR, { recursive: true });
+      }
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const cleanPath = path.join(GENERATED_DIR, `cleaned_${ts}.json`);
+      writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
+
+      // Call Python assembler
+      const scriptPath = path.join(GENERATED_DIR, `script_${ts}.js`);
+      const assemblerPy = path.join(SCRIPTS_DIR, 'script_assembler.py');
+
+      const cmd = `python "${assemblerPy}" "${cleanPath}" "${scriptPath}"`;
+      execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
+
+      // Read the generated script
+      const script = readFileSync(scriptPath, 'utf-8');
+
+      // Register in generated index so Run/History work
+      ensureGeneratedDir();
+      const index = loadGeneratedIndex();
+      const testId = 'assembled_' + ts;
+      const addItem = {
+        testId,
+        fileName: `script_${ts}.js`,
+        description: 'Assembled from ' + path.basename(actionFile),
+        url: '',
+        steps: [],
+        createdAt: new Date().toISOString(),
+        fromAssemble: true,
+      };
+      index.unshift(addItem);
+      saveGeneratedIndex(index);
+
+      res.json({
+        success: true,
+        testId,
+        fileName: `script_${ts}.js`,
+        actionFile,
+        scriptFile: scriptPath,
+        script,
+        stats: {
+          original: meta.originalCount,
+          deduped: meta.dedupedCount,
+          removed: meta.removedCount,
+        },
+      });
+
+    } catch (err) {
+      console.error('Assemble error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * GET /api/test/assemble/files
+   * List available action JSON and log files in snapshots directory
+   */
+  app.get('/api/test/assemble/files', async (req, res) => {
+    try {
+      const snapshotsDir = path.join(SCRIPTS_DIR, 'snapshots');
+      if (!existsSync(snapshotsDir)) {
+        return res.json({ actionFiles: [], logFiles: [] });
+      }
+      const names = readdirSync(snapshotsDir);
+      const actionFiles = names
+        .filter(f => f.startsWith('action_') && f.endsWith('.json'))
+        .sort()
+        .reverse()
+        .slice(0, 30)
+        .map(f => {
+          const p = path.join(snapshotsDir, f);
+          const st = statSync(p);
+          return { name: f, path: path.join('scripts', 'snapshots', f), size: st.size, mtime: st.mtime };
+        });
+      const logFiles = names
+        .filter(f => f.startsWith('log_') && f.endsWith('.txt'))
+        .sort()
+        .reverse()
+        .slice(0, 30)
+        .map(f => {
+          const p = path.join(snapshotsDir, f);
+          const st = statSync(p);
+          return { name: f, path: path.join('scripts', 'snapshots', f), size: st.size, mtime: st.mtime };
+        });
+      res.json({ actionFiles, logFiles });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
