@@ -8,6 +8,8 @@ export function initTrajectory() {
   document.getElementById('trajRefreshBtn').addEventListener('click', loadSnapshots);
   document.getElementById('trajDetailCloseBtn').addEventListener('click', () => {
     document.getElementById('trajDetailPanel').style.display = 'none';
+    const ball = document.getElementById('trajSaveBall');
+    if (ball) ball.style.display = 'none';
   });
 }
 
@@ -113,16 +115,163 @@ export async function loadSnapshots() {
         const detailPanel = document.getElementById('trajDetailPanel');
         document.getElementById('trajDetailId').textContent = filePath.split('/').pop();
         document.getElementById('trajDetailInfo').textContent = fileType === 'action' ? 'Action file — ' + filePath : 'Log file — ' + filePath;
-        // Show steps summary for action files
+
         if (fileType === 'action') {
           try {
             const jsonData = JSON.parse(content);
-            const cmds = jsonData?.tests?.[0]?.commands || [];
-            document.getElementById('trajDetailSummary').innerHTML = cmds.map((c, i) =>
-              `<div style="padding:2px 0;font-size:12px"><span style="color:var(--slate-400);font-family:var(--font-mono);font-size:11px">#${i+1}</span> [${c.command}] ${escapeHtml(c.propertiesName || '')} → ${escapeHtml(c.value || '')}</div>`
-            ).join('');
-            document.getElementById('trajDetailJson').textContent = JSON.stringify(jsonData, null, 2);
+            const commands = jsonData?.tests?.[0]?.commands || [];
+            const url = jsonData?.url || '';
+
+            // Build visual cards for each action
+            const cardsHtml = commands.map((c, i) => {
+              const action = c.action || c.command || 'unknown';
+              const label = c.propertiesName || c.params?.label_text || '';
+              const value = c.value || c.params?.value || c.params?.option_text || '';
+              const id = c.id || '';
+              return `<div class="traj-card" data-index="${i}" style="border:1px solid var(--slate-200);border-radius:8px;margin-bottom:8px;overflow:hidden;background:#fff">
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--slate-50);border-bottom:1px solid var(--slate-200);font-size:12px">
+                  <span style="background:var(--indigo-100);color:var(--indigo-700);padding:1px 8px;border-radius:4px;font-weight:600;font-size:11px">#${i+1}</span>
+                  <span style="color:var(--slate-600);font-weight:600;font-family:var(--font-mono);font-size:11px">${escapeHtml(action)}</span>
+                  <span style="flex:1"></span>
+                </div>
+                <div style="padding:8px 12px;font-size:13px">
+                  ${action === 'go_to_url' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">URL</span><br><span style="word-break:break-all">${escapeHtml(c.params?.url || '')}</span></div>` : ''}
+                  ${action === 'fill_form_field' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Label</span><br><span class="traj-label-${i}" style="font-weight:500">${escapeHtml(label)}</span></div>
+                    <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Value</span><br><span class="traj-value-display-${i}" style="font-weight:500">${escapeHtml(value)}</span>
+                    <input class="traj-value-input-${i}" type="text" value="${escapeHtml(value)}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
+                  ${action === 'select_option' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Label</span><br><span style="font-weight:500">${escapeHtml(label)}</span></div>
+                    <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Option</span><br><span class="traj-value-display-${i}">${escapeHtml(value)}</span>
+                    <input class="traj-value-input-${i}" type="text" value="${escapeHtml(value)}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
+                  ${action === 'click_element_by_index' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Element</span><br><span style="font-weight:500;font-family:var(--font-mono);font-size:12px">${escapeHtml(c.propertiesName || c.params?.text || '')}</span></div>
+                    <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">XPath</span><br><span style="font-size:11px;color:var(--slate-500);word-break:break-all;font-family:var(--font-mono)">${escapeHtml(c.target || '')}</span></div>` : ''}
+                  ${action === 'fill_date_field' || action === 'selectDate' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Label</span><br><span style="font-weight:500">${escapeHtml(label)}</span></div>
+                    <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Date</span><br><span class="traj-value-display-${i}">${escapeHtml(value)}</span>
+                    <input class="traj-value-input-${i}" type="text" value="${escapeHtml(value)}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
+                  ${!['go_to_url','fill_form_field','select_option','click_element_by_index','fill_date_field','selectDate'].includes(action) ? `<div style="color:var(--slate-500);font-size:12px">${escapeHtml(label || value || JSON.stringify(c.params || ''))}</div>` : ''}
+                </div>
+                <div style="display:flex;gap:4px;padding:4px 12px 8px">
+                  <button class="traj-edit-btn btn btn-outline btn-sm" data-index="${i}" style="font-size:11px">Edit</button>
+                  <button class="traj-del-btn btn btn-outline btn-sm" data-index="${i}" style="color:var(--red-500);border-color:var(--red-200);font-size:11px">Delete</button>
+                </div>
+              </div>`;
+            }).join('');
+
+            const summaryEl = document.getElementById('trajDetailSummary');
+            summaryEl.innerHTML = `
+              <div style="margin-bottom:12px;padding:10px 12px;background:var(--slate-50);border-radius:8px;font-size:13px">
+                <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">URL</span></div>
+                <div style="word-break:break-all;font-family:var(--font-mono);font-size:12px;color:var(--indigo-600)">${escapeHtml(url || '(none)')}</div>
+                <div style="margin-top:6px;font-size:11px;color:var(--slate-400)">${commands.length} actions</div>
+              </div>
+              ${cardsHtml}`;
+
+            // Hide raw JSON section and Send to Script Gen button
+            document.getElementById('trajDetailJson').style.display = 'none';
+            document.querySelectorAll('#trajDetailPanel .section-title')[1].style.display = 'none';
+            const sendToGenBtn = document.getElementById('trajSendToGenBtn');
+            if (sendToGenBtn) sendToGenBtn.style.display = 'none';
+
+            // Create floating save ball
+            let saveBall = document.getElementById('trajSaveBall');
+            if (!saveBall) {
+              saveBall = document.createElement('div');
+              saveBall.id = 'trajSaveBall';
+              saveBall.innerHTML = 'Save';
+              Object.assign(saveBall.style, {
+                position: 'fixed', left: '16px', bottom: '120px',
+                width: '56px', height: '56px', borderRadius: '50%',
+                background: 'var(--indigo-500)', color: '#fff',
+                display: 'none', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                boxShadow: '0 4px 14px rgba(99,102,241,.4)',
+                zIndex: '1000', transition: 'transform .15s, opacity .15s',
+                border: 'none', fontFamily: 'inherit',
+              });
+              saveBall.onmouseenter = () => saveBall.style.transform = 'scale(1.08)';
+              saveBall.onmouseleave = () => saveBall.style.transform = '';
+              document.body.appendChild(saveBall);
+            }
+
+            function showSaveBall() { saveBall.style.display = 'flex'; }
+            function hideSaveBall() { saveBall.style.display = 'none'; }
+            hideSaveBall();
+
+            // Store original data for save
+            summaryEl._trajectoryData = jsonData;
+
+            // Wire edit buttons
+            summaryEl.querySelectorAll('.traj-edit-btn').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.index);
+                const display = summaryEl.querySelector(`.traj-value-display-${idx}`);
+                const input = summaryEl.querySelector(`.traj-value-input-${idx}`);
+                if (display && input) {
+                  if (input.style.display === 'none') {
+                    display.style.display = 'none';
+                    input.style.display = 'block';
+                    input.focus();
+                    btn.textContent = 'Confirm';
+                  } else {
+                    const newVal = input.value;
+                    display.textContent = newVal;
+                    display.style.display = '';
+                    input.style.display = 'none';
+                    // Update all four value fields for consistency
+                    const cmd = commands[idx];
+                    if (cmd.value !== undefined) cmd.value = newVal;
+                    if (cmd.params?.value !== undefined) cmd.params.value = newVal;
+                    if (cmd.attributes?.value !== undefined) cmd.attributes.value = newVal;
+                    if (cmd.element?.attributes?.value !== undefined) cmd.element.attributes.value = newVal;
+                    btn.textContent = 'Edit';
+                    showSaveBall();
+                  }
+                }
+              });
+            });
+
+            // Wire delete buttons
+            summaryEl.querySelectorAll('.traj-del-btn').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.index);
+                const card = summaryEl.querySelector(`.traj-card[data-index="${idx}"]`);
+                if (card && confirm('Delete action #' + (idx+1) + '?')) {
+                  card.style.display = 'none';
+                  commands[idx] = null; // Mark as deleted
+                  showSaveBall();
+                }
+              });
+            });
+
+            // Wire save ball
+            saveBall.onclick = async () => {
+              const cleaned = commands.filter(c => c !== null);
+              jsonData.tests[0].commands = cleaned;
+              try {
+                saveBall.textContent = '...';
+                const saveRes = await fetch('/api/test/assemble/save', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ path: filePath, data: jsonData }),
+                });
+                const saveData = await saveRes.json();
+                if (!saveRes.ok) throw new Error(saveData.error);
+                saveBall.textContent = '✓';
+                saveBall.style.background = 'var(--emerald-500)';
+                setTimeout(() => {
+                  hideSaveBall();
+                  saveBall.textContent = 'Save';
+                  saveBall.style.background = 'var(--indigo-500)';
+                }, 1500);
+              } catch (err) {
+                alert('Save failed: ' + err.message);
+                saveBall.textContent = 'Save';
+              }
+            };
+
           } catch {
+            document.getElementById('trajDetailSummary').textContent = 'Failed to parse JSON';
             document.getElementById('trajDetailJson').textContent = content;
           }
         } else {

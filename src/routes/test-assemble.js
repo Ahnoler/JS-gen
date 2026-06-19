@@ -124,4 +124,26 @@ export default function (app) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  /**
+   * POST /api/test/assemble/save
+   * Body: { path, data }
+   * Saves modified action file back to disk.
+   */
+  app.post('/api/test/assemble/save', async (req, res) => {
+    try {
+      const { path: filePath, data } = req.body || {};
+      if (!filePath || !data) {
+        return res.status(400).json({ error: 'path and data are required' });
+      }
+      const absPath = path.resolve(SCRIPTS_DIR, '..', filePath);
+      if (!existsSync(absPath)) {
+        return res.status(404).json({ error: 'File not found: ' + absPath });
+      }
+      writeFileSync(absPath, JSON.stringify(data, null, 2), 'utf-8');
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 }

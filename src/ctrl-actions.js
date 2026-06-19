@@ -26,7 +26,7 @@ const CTRL_OBJECT = `{
       const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
       setter.call(t, v);
       t.setAttribute('value', v);
-      t.dispatchEvent(new Event('input',{bubbles:true}));
+      t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:v}));
       t.dispatchEvent(new Event('change',{bubbles:true}));
       t.dispatchEvent(new Event('blur',{bubbles:true}));
     };
@@ -223,6 +223,24 @@ const CTRL_OBJECT = `{
   waitForLoading: () => new Promise(resolve => { let el=0; const ck=()=>{ if(el>=30000){resolve('timeout');return; } const m=document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'); if(!m||m.offsetParent===null) resolve(); else { el+=200; setTimeout(ck,200); } }; ck(); }),
   switchTab: (name) => { for (const tab of document.querySelectorAll('.el-tabs__item')) { if (tab.textContent.trim()===name && tab.offsetParent!==null) { tab.click(); return 'ok'; } } return 'tab-not-found'; },
   expandAllTreeNodes: () => { let t=0; for(let r=0;r<10;r++){ const tree=document.querySelector('.el-tree'); if(!tree) return -1; let n=0; tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node=>{ const ic=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon'); if(ic){ic.click();n++;} }); if(n===0)break; t+=n; } return t; },
+  fillAddressFields: (addr) => {
+    let count = 0;
+    for (const item of CTRL.getContainer().querySelectorAll('.el-form-item')) {
+      const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+      if (!lbl.includes('地址')) continue;
+      const t = item.querySelector('input:not([type="hidden"]):not([disabled]):not([readOnly]),textarea:not([disabled]):not([readOnly])');
+      if (!t) continue;
+      const TagProto = t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(TagProto.prototype,'value').set;
+      setter.call(t, addr);
+      t.setAttribute('value', addr);
+      t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:addr}));
+      t.dispatchEvent(new Event('change',{bubbles:true}));
+      t.dispatchEvent(new Event('blur',{bubbles:true}));
+      count++;
+    }
+    return count > 0 ? 'ok:' + count : 'no-address-fields';
+  },
   clickTableRowAction: (rowText, btnText) => {
     for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
       if (!row.textContent.includes(rowText)) continue;
@@ -272,6 +290,7 @@ export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 | CTRL.switchTab | (name) | 'ok' / 'tab-not-found' | 切换 el-tabs |
 | CTRL.checkFieldValue | (label) | 值 / 'empty' / 'label-not-found' | 读取表单字段当前值 |
 | CTRL.clickAdjacentButton | (label) | 'clicked' / 'already-filled' / 'no-button-found' | 点击字段旁的选择/引入按钮 |
+| CTRL.fillAddressFields | (addr) | 'ok:N' / 'no-address-fields' | 填充所有标签含"地址"的字段 |
 | CTRL.expandAllTreeNodes | () | 展开节点数 | 展开全部 el-tree 节点 |`;
 
 // Re-export raw CTRL object for template generation

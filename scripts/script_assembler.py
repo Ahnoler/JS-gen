@@ -39,31 +39,34 @@ CTRL_API_CODE = '''const { chromium } = require('playwright');
           const setter = Object.getOwnPropertyDescriptor(TagProto.prototype,'value').set;
           setter.call(t, v);
           t.setAttribute('value', v);
-          t.dispatchEvent(new Event('input',{bubbles:true}));
+          t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:v}));
           t.dispatchEvent(new Event('change',{bubbles:true}));
           t.dispatchEvent(new Event('blur',{bubbles:true}));
         };
+        // Pass 1: label substring match
         for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-          if (lbl === label) { const t = item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea'); if(!t) return 'no-input'; if(t.disabled||t.readOnly) return 'disabled'; if(t.closest('.el-date-editor,.tsscdatepicker')) { t.focus(); setFn(t,val); try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){} (t.parentNode?.querySelector('input')||t).click(); return new Promise(resolve=>{setTimeout(()=>{const d=new Date(val).getDate();for(const p of document.querySelectorAll('.el-picker-panel')){if(!p.offsetParent||p.style.display==='none')continue;for(const c of p.querySelectorAll('td.available:not(.prev-month):not(.next-month)')){if(parseInt(c.textContent.trim())===d&&!c.disabled){c.click();break}}}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});resolve('ok-date')},200)}); } setFn(t,val); return 'ok'; }
-        }
-        for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-          if (lbl.includes(label)) { const t = item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea'); if(!t) return 'no-input'; if(t.disabled||t.readOnly) return 'disabled'; if(t.closest('.el-date-editor,.tsscdatepicker')) { t.focus(); setFn(t,val); try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){} (t.parentNode?.querySelector('input')||t).click(); return new Promise(resolve=>{setTimeout(()=>{const d=new Date(val).getDate();for(const p of document.querySelectorAll('.el-picker-panel')){if(!p.offsetParent||p.style.display==='none')continue;for(const c of p.querySelectorAll('td.available:not(.prev-month):not(.next-month)')){if(parseInt(c.textContent.trim())===d&&!c.disabled){c.click();break}}}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});resolve('ok-date')},200)}); } setFn(t,val); return 'ok'; }
-        }
-        // character-set match (handles word order differences like 登记注册地址 vs 注册登记地址)
+          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
+          if (!lbl.includes(label)) continue;
+          const t = item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea');
+          if (!t) return 'no-input-found';
+          if (t.disabled||t.readOnly) return 'field-disabled';
+          if (t.closest('.el-date-editor,.tsscdatepicker')) { t.focus(); setFn(t,val); try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){} (t.parentNode?.querySelector('input')||t).click(); return new Promise(resolve=>{setTimeout(()=>{const d=new Date(val).getDate();for(const p of document.querySelectorAll('.el-picker-panel')){if(!p.offsetParent||p.style.display==='none')continue;for(const c of p.querySelectorAll('td.available:not(.prev-month):not(.next-month)')){if(parseInt(c.textContent.trim())===d&&!c.disabled){c.click();break}}}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});resolve('ok-date')},200)}); } setFn(t,val); return 'ok'; }
+        // Pass 2: character-set match (handles word order variations like 登记注册地址 vs 注册登记地址)
         const _labelChars = [...new Set(label.replace(/[\\s,，、]/g,''))];
         if (_labelChars.length >= 2) {
           for (const item of c.querySelectorAll('.el-form-item')) {
-            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-            if (!_labelChars.every(ch => lbl.includes(ch))) continue;
-            const t = item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea'); if(!t) return 'no-input'; if(t.disabled||t.readOnly) return 'disabled';
-            if(t.closest('.el-date-editor,.tsscdatepicker')) { t.focus(); setFn(t,val); try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){} (t.parentNode?.querySelector('input')||t).click(); return new Promise(resolve=>{setTimeout(()=>{const d=new Date(val).getDate();for(const p of document.querySelectorAll('.el-picker-panel')){if(!p.offsetParent||p.style.display==='none')continue;for(const c of p.querySelectorAll('td.available:not(.prev-month):not(.next-month)')){if(parseInt(c.textContent.trim())===d&&!c.disabled){c.click();break}}}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});resolve('ok-date')},200)}); } setFn(t,val); return 'ok';
-          }
+            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
+            if (!_labelChars.every(ch=>lbl.includes(ch))) continue;
+            const t = item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea');
+            if (!t) return 'no-input-found';
+            if (t.disabled||t.readOnly) return 'field-disabled';
+            if (t.closest('.el-date-editor,.tsscdatepicker')) { t.focus(); setFn(t,val); try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){} (t.parentNode?.querySelector('input')||t).click(); return new Promise(resolve=>{setTimeout(()=>{const d=new Date(val).getDate();for(const p of document.querySelectorAll('.el-picker-panel')){if(!p.offsetParent||p.style.display==='none')continue;for(const c of p.querySelectorAll('td.available:not(.prev-month):not(.next-month)')){if(parseInt(c.textContent.trim())===d&&!c.disabled){c.click();break}}}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});resolve('ok-date')},200)}); } setFn(t,val); return 'ok'; }
         }
-        for (const inp of c.querySelectorAll('input:not([type="hidden"]), textarea')) {
-          const ph = inp.getAttribute('placeholder') || '';
-          if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent !== null) { setFn(inp,val); return 'ok-placeholder'; }
+        // Pass 3: placeholder match
+        for (const inp of c.querySelectorAll('input:not([type="hidden"]),textarea')) {
+          if (inp.closest('.el-date-editor,.tsscdatepicker')) continue;
+          const ph = inp.getAttribute('placeholder')||'';
+          if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent!==null) { setFn(inp,val); return 'ok-placeholder'; }
         }
         return 'label-not-found';
       },
@@ -116,6 +119,25 @@ CTRL_API_CODE = '''const { chromium } = require('playwright');
           for (const si of sm.querySelectorAll('.el-menu-item')) { if (si.textContent.trim()===text) { setTimeout(()=>si.click(),300); return 'ok-expanded'; } }
         }
         return 'not-found';
+      },
+      fillAddressFields: (addr) => {
+        let count = 0;
+        const items = window.CTRL.getContainer().querySelectorAll('.el-form-item');
+        for (const item of items) {
+          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+          if (!lbl.includes('地址')) continue;
+          const t = item.querySelector('input:not([type="hidden"]):not([disabled]):not([readOnly]),textarea:not([disabled]):not([readOnly])');
+          if (!t) continue;
+          const TagProto = t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
+          const setter = Object.getOwnPropertyDescriptor(TagProto.prototype,'value').set;
+          setter.call(t, addr);
+          t.setAttribute('value', addr);
+          t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:addr}));
+          t.dispatchEvent(new Event('change',{bubbles:true}));
+          t.dispatchEvent(new Event('blur',{bubbles:true}));
+          count++;
+        }
+        return count > 0 ? 'ok:' + count : 'no-address-fields';
       },
       clickTableRowAction: (rowText, btnText) => {
         for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
@@ -191,7 +213,9 @@ def _escape(s):
     return s.replace('\\', '\\\\').replace("'", "\\'") if s else ''
 
 
-def _generate_action_code(entry, step_num, url):
+FILL_RETRY_ACTIONS = {'fill_form_field', 'fill_date_field'}
+
+def _generate_action_code(entry, step_num, url, is_first_fill=False):
     """Generate Playwright JS code from a recorded action entry."""
     action = entry.get('action', '')
     params = entry.get('params', {}) or {}
@@ -213,26 +237,31 @@ def _generate_action_code(entry, step_num, url):
         l, v = p('label_text'), p('value')
         lines.append(f"    console.log('[{step_num}] Fill \"{l}\"');")
         lines.append(pre())
-        lines.append(f"    const _r{step_num} = await page.evaluate(() => CTRL.fillFormField('{_escape(l)}', '{_escape(v)}'));")
-        lines.append(f"    if (_r{step_num} !== 'ok' && _r{step_num} !== 'ok-date' && _r{step_num} !== 'ok-placeholder' && _r{step_num} !== 'ok-type')")
-        lines.append(f"      console.log('[{step_num}] fill result:', _r{step_num});")
-        lines.append('    // Verify value was set; if empty, fall back to Playwright native fill')
-        lines.append('    await page.waitForTimeout(100);')
-        lines.append(f'    const _c{step_num} = await page.evaluate((lbl) => {{')
-        lines.append("      for (const item of document.querySelectorAll('.el-form-item')) {")
-        lines.append("        const l = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';")
-        lines.append("        if (!l.includes(lbl) && ![...new Set(lbl.replace(/[\\s,，、]/g,''))].every(c => l.includes(c))) continue;")
-        lines.append("        const t = item.querySelector('input:not([type=\\\"hidden\\\"])') || item.querySelector('textarea');")
-        lines.append("        return t ? t.value : '';")
-        lines.append('      }')
-        lines.append("      return '';")
-        lines.append(f"    }}, '{_escape(l)}');")
-        lines.append(f"    if (_c{step_num} !== '{_escape(v)}' && _c{step_num}.trim() === '') {{")
-        lines.append('      console.log(`[' + str(step_num) + '] Value empty after CTRL fill, trying Playwright native fill...`);')
-        lines.append(f"      await page.locator('.el-form-item').filter({{ hasText: '{_escape(l)}' }}).locator('input, textarea').first().fill('{_escape(v)}');")
-        lines.append(f"      console.log('[{step_num}] PW fill done');")
-        lines.append('    }')
-        lines.append('    await page.waitForTimeout(200);')
+        # Ensure form DOM is rendered before interacting
+        lines.append("    await page.waitForSelector('.el-form-item', { timeout: 10000 }).catch(() => {});")
+        if '地址' in l or '址' in l or 'address' in l.lower():
+            lines.append(f"    const _r{step_num} = await page.evaluate((addr) => CTRL.fillAddressFields(addr), '{_escape(v)}');")
+            lines.append(f"    if (_r{step_num} === 'no-address-fields') {{")
+            lines.append(f"      console.log('[{step_num}] address fill result:', _r{step_num});")
+            lines.append(f"      const _a{step_num} = await page.locator('.el-form-item:has-text(\"地址\")').locator('input, textarea').all();")
+            lines.append(f"      for (const _el of _a{step_num}) {{ await _el.fill('{_escape(v)}'); }}")
+            lines.append(f"    }}")
+        else:
+            lines.append(f"    const _r{step_num} = await page.evaluate(() => CTRL.fillFormField('{_escape(l)}', '{_escape(v)}'));")
+            lines.append(f"    if (_r{step_num} !== 'ok' && _r{step_num} !== 'ok-date' && _r{step_num} !== 'ok-placeholder') {{")
+            lines.append(f"      console.log('[{step_num}] fill result:', _r{step_num});")
+            lines.append(f"      const _a{step_num} = await page.locator('.el-form-item:has-text(\"{_escape(l)}\")').locator('input, textarea').first();")
+            lines.append(f"      if (await _a{step_num}.count() > 0) await _a{step_num}.fill('{_escape(v)}');")
+            lines.append(f"    }}")
+        lines.append('    await page.waitForTimeout(300);')
+        # First fill in a new block: retry once after 300ms
+        if is_first_fill:
+            lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
+            if '地址' in l or '址' in l or 'address' in l.lower():
+                lines.append(f"    await page.evaluate((addr) => CTRL.fillAddressFields(addr), '{_escape(v)}');")
+            else:
+                lines.append(f"    await page.evaluate(() => CTRL.fillFormField('{_escape(l)}', '{_escape(v)}'));")
+            lines.append('    await page.waitForTimeout(300);')
         return '\n'.join(lines)
 
     if action == 'select_option':
@@ -249,6 +278,11 @@ def _generate_action_code(entry, step_num, url):
         lines.append(pre())
         lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
         lines.append('    await page.waitForTimeout(300);')
+        # First fill in a new block: retry once after 300ms
+        if is_first_fill:
+            lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
+            lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
+            lines.append('    await page.waitForTimeout(300);')
         return '\n'.join(lines)
 
     if action == 'click_menu_item':
@@ -359,16 +393,20 @@ def _generate_action_code(entry, step_num, url):
 
 # ========================== Assembly ==========================
 
+FILL_ACTIONS = {'fill_form_field', 'fill_date_field', 'select_option', 'click_radio'}
+BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'switch_tab', 'close_dialog', 'go_to_url'}
+
 def assemble_script(action_entries, target_url=None):
     """Assemble a complete Playwright script from recorded action entries."""
     body = []
     step = 1
+    in_block = False
 
     url = target_url or ''
     if not url or 'unknown' in url.lower():
         url = 'http://target-url-placeholder'
     body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
-    body.append('    await page.waitForTimeout(2000);')
+    body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
     for entry in action_entries:
         action = entry.get('action', '')
@@ -378,7 +416,17 @@ def assemble_script(action_entries, target_url=None):
                       'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
                       'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch'):
             continue
-        code = _generate_action_code(entry, step, url)
+
+        # Block boundary: exit current fill block
+        if action in BOUNDARY_ACTIONS:
+            in_block = False
+
+        # First fill in a new block: generate twice (300ms apart)
+        is_first_fill = action in FILL_ACTIONS and not in_block
+        if is_first_fill:
+            in_block = True
+
+        code = _generate_action_code(entry, step, url, is_first_fill)
         if code:
             body.append(code)
             step += 1
