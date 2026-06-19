@@ -42,49 +42,67 @@ def _close_agent():
 
 
 def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
-    """Save trajectory in atp-record import-compatible JSON format."""
-    from .recorder import _ATP_TRAJECTORY
+    """Save two files: action_{ts}.json (curated steps) + log_{ts}.txt (full operation log)."""
     from .controller import _TRAJECTORY_ENTRIES, _TRAJECTORY_URL
-    # Use ATP trajectory (all actions) as primary; fallback to controller entries
-    entries = list(_ATP_TRAJECTORY) if _ATP_TRAJECTORY else list(_TRAJECTORY_ENTRIES)
-    if not entries:
+    from .recorder import _ACTION_LOG
+    if not _TRAJECTORY_ENTRIES and not _ACTION_LOG:
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": "No trajectory data available"}})
         return
     try:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         snapshots_dir = Path(__file__).parent / 'snapshots'
         snapshots_dir.mkdir(parents=True, exist_ok=True)
-        trajectory_path = snapshots_dir / f"trajectory_{ts}.json"
         url = _TRAJECTORY_URL or 'http://unknown'
+        action_path = None
+        log_path = None
 
-        trajectory_json = {
-            'id': str(uuid.uuid4()),
-            'name': 'browser-use-session',
-            'url': url,
-            'tests': [{
+        # File 1: action_{ts}.json — curated steps with XPath (script generation source)
+        if _TRAJECTORY_ENTRIES:
+            action_path = snapshots_dir / f"action_{ts}.json"
+            action_json = {
                 'id': str(uuid.uuid4()),
                 'name': 'browser-use-session',
-                'commands': entries,
-            }],
-        }
-        with open(trajectory_path, 'w', encoding='utf-8') as f:
-            json.dump(trajectory_json, f, ensure_ascii=False, indent=2)
-        entries_count = len(entries)
-        _ATP_TRAJECTORY.clear()
+                'url': url,
+                'tests': [{
+                    'id': str(uuid.uuid4()),
+                    'name': 'browser-use-session',
+                    'commands': list(_TRAJECTORY_ENTRIES),
+                }],
+            }
+            with open(action_path, 'w', encoding='utf-8') as f:
+                json.dump(action_json, f, ensure_ascii=False, indent=2)
+
+        # File 2: log_{ts}.txt — plain text operation log (LLM context only)
+        if _ACTION_LOG:
+            log_path = snapshots_dir / f"log_{ts}.txt"
+            with open(log_path, 'w', encoding='utf-8') as f:
+                f.write(f"URL: {url}\n")
+                f.write(f"Total steps: {len(_ACTION_LOG)}\n")
+                f.write("=" * 60 + "\n")
+                for line in _ACTION_LOG:
+                    f.write(line + "\n")
+
+        # Clear both
+        action_count = len(_TRAJECTORY_ENTRIES)
+        log_count = len(_ACTION_LOG)
         _TRAJECTORY_ENTRIES.clear()
+        _ACTION_LOG.clear()
 
         emit_json({
             "event": "save_trajectory_result",
             "data": {
                 "success": True,
-                "trajectory_file": str(trajectory_path),
-                "entries": entries_count,
-                "format": "atp-record",
+                "action_file": str(action_path) if action_path else None,
+                "log_file": str(log_path) if log_path else None,
+                "action_count": action_count,
+                "log_count": log_count,
+                "url": url,
             },
         })
-        sys.stderr.write(f"[session] ATP trajectory saved: {trajectory_path} ({entries_count} entries)\n")
+        sys.stderr.write(f"[session] Saved: action({action_count}) log({log_count})\n")
         sys.stderr.flush()
     except Exception as e:
+        emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
 
 
@@ -109,9 +127,9 @@ def _handle_save_case_data(case_data_store, session_id):
 
 def _handle_reset_trajectory(session_id):
     from .controller import _TRAJECTORY_ENTRIES
-    from .recorder import _ATP_TRAJECTORY
+    from .recorder import _ACTION_LOG
     _TRAJECTORY_ENTRIES.clear()
-    _ATP_TRAJECTORY.clear()
+    _ACTION_LOG.clear()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"
     sys.stderr.write(f"[session] ATP trajectory reset ({ts})\n")

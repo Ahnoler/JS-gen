@@ -4,7 +4,7 @@
 import { renderSwaggerUI } from './swagger-api.js';
 import { initScriptPipeline, checkWorkerHealth } from './script-pipeline.js';
 import { initHistory, loadHistory } from './history.js';
-import { initTrajectory, loadTrajectoryHistory } from './trajectory.js';
+import { initTrajectory, loadSnapshots } from './trajectory.js';
 import { initCaseData, loadCaseDataHistory } from './case-data.js';
 import { initExecutionRecords, loadExecutionRecords } from './execution-records.js';
 import { initAIExplore } from './explore.js';
@@ -39,7 +39,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const target = document.getElementById('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1));
     if (target) target.style.display = 'block';
     if (btn.dataset.tab === 'history') loadHistory();
-    if (btn.dataset.tab === 'trajectories') loadTrajectoryHistory();
+    if (btn.dataset.tab === 'trajectories') loadSnapshots();
     if (btn.dataset.tab === 'caseData') loadCaseDataHistory();
     if (btn.dataset.tab === 'execRecords') loadExecutionRecords();
   });

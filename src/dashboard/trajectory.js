@@ -1,23 +1,16 @@
-// Trajectory History
-// Extracted from test-dashboard.js (loadTrajectoryHistory, viewTrajectoryDetail, sendToScriptGen, deleteTrajectory)
-
-import { formatTime } from './utils.js';
+// Trajectory Tab — shows action_*.json and log_*.txt from scripts/snapshots/
 import { escapeHtml } from './swagger-api.js';
 
 export let trajCurrentDetailId = null;
 
 export function initTrajectory() {
-  document.getElementById('trajRefreshBtn').addEventListener('click', loadTrajectoryHistory);
+  document.getElementById('trajRefreshBtn').addEventListener('click', loadSnapshots);
   document.getElementById('trajDetailCloseBtn').addEventListener('click', () => {
     document.getElementById('trajDetailPanel').style.display = 'none';
-    trajCurrentDetailId = null;
-  });
-  document.getElementById('trajSendToGenBtn').addEventListener('click', () => {
-    if (trajCurrentDetailId) sendToScriptGen(trajCurrentDetailId);
   });
 }
 
-export async function loadTrajectoryHistory() {
+export async function loadSnapshots() {
   const loading = document.getElementById('trajLoading');
   const empty = document.getElementById('trajEmpty');
   const list = document.getElementById('trajList');
@@ -28,188 +21,152 @@ export async function loadTrajectoryHistory() {
   empty.style.display = 'none';
   list.style.display = 'none';
   if (detail) detail.style.display = 'none';
-  trajCurrentDetailId = null;
 
   try {
-    const res = await fetch('/api/trajectory');
+    const res = await fetch('/api/test/assemble/files');
     const data = await res.json();
     loading.style.display = 'none';
 
-    if (!data.length) {
+    const actionFiles = data.actionFiles || [];
+    const logFiles = data.logFiles || [];
+
+    if (!actionFiles.length && !logFiles.length) {
       empty.style.display = 'block';
       return;
     }
 
     list.style.display = 'block';
-    body.innerHTML = data.map(r => {
-      const statusBadge = r.isSuccessful === true
-        ? '<span style="background:#ecfdf5;color:#065f46;padding:1px 8px;border-radius:10px;font-size:11px">Success</span>'
-        : r.isSuccessful === false
-          ? '<span style="background:#fef2f2;color:#991b1b;padding:1px 8px;border-radius:10px;font-size:11px">Failed</span>'
-          : '<span style="color:var(--slate-400);font-size:11px">-</span>';
-      return `
-        <tr style="border-bottom:1px solid var(--slate-100)">
-          <td style="padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--indigo-600)" title="${escapeHtml(r.trajectoryId)}">${escapeHtml(r.trajectoryId.slice(0, 24))}...</td>
-          <td style="padding:8px;color:var(--slate-600);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.task || '')}">${escapeHtml((r.task || '').slice(0, 60))}</td>
-          <td style="padding:8px;color:var(--slate-500);font-size:12px">${r.stepCount || 0} / ${r.actionCount || 0}</td>
-          <td style="padding:8px">${statusBadge}</td>
-          <td style="padding:8px;color:var(--slate-400);font-size:11px">${formatTime(r.createdAt)}</td>
-          <td style="padding:8px;text-align:right;white-space:nowrap">
-            <button class="btn btn-outline btn-sm traj-view" data-id="${escapeHtml(r.trajectoryId)}" style="margin-right:4px">View</button>
-            <button class="btn btn-outline btn-sm traj-sendgen" data-id="${escapeHtml(r.trajectoryId)}" style="margin-right:4px">Send to Script Gen</button>
-            <button class="btn btn-outline btn-sm traj-del" data-id="${escapeHtml(r.trajectoryId)}" style="color:var(--red-500);border-color:var(--red-200)">Delete</button>
+
+    // Build sections
+    let html = '';
+
+    // Action files section
+    html += `<div class="section-title" style="font-size:14px;font-weight:600;padding:8px 0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Action Files (${actionFiles.length})
+    </div>`;
+
+    if (actionFiles.length) {
+      html += `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px">
+        <thead><tr style="border-bottom:2px solid var(--slate-200)">
+          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">File</th>
+          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Size</th>
+          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Modified</th>
+          <th style="padding:8px;color:var(--slate-500);font-weight:600">Actions</th>
+        </tr></thead><tbody>`;
+      for (const f of actionFiles) {
+        const mtime = new Date(f.mtime).toLocaleString();
+        const sizeKb = (f.size / 1024).toFixed(1) + 'KB';
+        html += `<tr style="border-bottom:1px solid var(--slate-100)">
+          <td style="padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--indigo-600)">${escapeHtml(f.name)}</td>
+          <td style="padding:8px;color:var(--slate-400);font-size:12px">${sizeKb}</td>
+          <td style="padding:8px;color:var(--slate-400);font-size:11px">${mtime}</td>
+          <td style="padding:8px;white-space:nowrap">
+            <button class="btn btn-outline btn-sm snap-view" data-path="${escapeHtml(f.path)}" data-type="action" style="margin-right:4px">View</button>
+            <button class="btn btn-outline btn-sm snap-assemble" data-path="${escapeHtml(f.path)}" style="color:var(--emerald-600);border-color:var(--emerald-200)">Assemble</button>
           </td>
         </tr>`;
-    }).join('');
+      }
+      html += '</tbody></table>';
+    }
 
-    body.querySelectorAll('.traj-view').forEach(b => b.addEventListener('click', () => viewTrajectoryDetail(b.dataset.id)));
-    body.querySelectorAll('.traj-sendgen').forEach(b => b.addEventListener('click', () => sendToScriptGen(b.dataset.id)));
-    body.querySelectorAll('.traj-del').forEach(b => b.addEventListener('click', () => deleteTrajectory(b.dataset.id)));
+    // Log files section
+    html += `<div class="section-title" style="font-size:14px;font-weight:600;padding:8px 0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      Log Files (${logFiles.length})
+    </div>`;
+
+    if (logFiles.length) {
+      html += `<table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="border-bottom:2px solid var(--slate-200)">
+          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">File</th>
+          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Size</th>
+          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Modified</th>
+          <th style="padding:8px;color:var(--slate-500);font-weight:600">Actions</th>
+        </tr></thead><tbody>`;
+      for (const f of logFiles) {
+        const mtime = new Date(f.mtime).toLocaleString();
+        const sizeKb = (f.size / 1024).toFixed(1) + 'KB';
+        html += `<tr style="border-bottom:1px solid var(--slate-100)">
+          <td style="padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--slate-600)">${escapeHtml(f.name)}</td>
+          <td style="padding:8px;color:var(--slate-400);font-size:12px">${sizeKb}</td>
+          <td style="padding:8px;color:var(--slate-400);font-size:11px">${mtime}</td>
+          <td style="padding:8px;white-space:nowrap">
+            <button class="btn btn-outline btn-sm snap-view" data-path="${escapeHtml(f.path)}" data-type="log">View</button>
+          </td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+    }
+
+    body.innerHTML = html;
+
+    // Wire view buttons
+    body.querySelectorAll('.snap-view').forEach(b => b.addEventListener('click', async () => {
+      const filePath = b.dataset.path;
+      const fileType = b.dataset.type;
+      try {
+        const res = await fetch('/' + filePath);
+        if (!res.ok) throw new Error('Not found');
+        const content = await res.text();
+        const detailPanel = document.getElementById('trajDetailPanel');
+        document.getElementById('trajDetailId').textContent = filePath.split('/').pop();
+        document.getElementById('trajDetailInfo').textContent = fileType === 'action' ? 'Action file — ' + filePath : 'Log file — ' + filePath;
+        // Show steps summary for action files
+        if (fileType === 'action') {
+          try {
+            const jsonData = JSON.parse(content);
+            const cmds = jsonData?.tests?.[0]?.commands || [];
+            document.getElementById('trajDetailSummary').innerHTML = cmds.map((c, i) =>
+              `<div style="padding:2px 0;font-size:12px"><span style="color:var(--slate-400);font-family:var(--font-mono);font-size:11px">#${i+1}</span> [${c.command}] ${escapeHtml(c.propertiesName || '')} → ${escapeHtml(c.value || '')}</div>`
+            ).join('');
+            document.getElementById('trajDetailJson').textContent = JSON.stringify(jsonData, null, 2);
+          } catch {
+            document.getElementById('trajDetailJson').textContent = content;
+          }
+        } else {
+          document.getElementById('trajDetailSummary').textContent = 'Total lines: ' + content.split('\n').length;
+          document.getElementById('trajDetailJson').textContent = content;
+        }
+        detailPanel.style.display = '';
+      } catch (err) {
+        alert('View failed: ' + err.message);
+      }
+    }));
+
+    // Wire assemble buttons
+    body.querySelectorAll('.snap-assemble').forEach(b => b.addEventListener('click', async () => {
+      const filePath = b.dataset.path;
+      b.disabled = true;
+      b.textContent = 'Assembling...';
+      try {
+        const res = await fetch('/api/test/assemble', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actionFile: filePath }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        // Switch to gen tab and show the generated script
+        const genTab = document.querySelector('.tab-btn[data-tab="gen"]');
+        if (genTab) genTab.click();
+        document.getElementById('genScriptPre').textContent = data.script;
+        document.getElementById('genScriptArea').style.display = '';
+        document.getElementById('genSteps').style.display = 'none';
+        document.getElementById('genInfo').style.display = '';
+        document.getElementById('genInfo').textContent = 'Assembled from ' + filePath.split('/').pop() +
+          ' | ' + data.stats.original + ' entries → ' + data.stats.deduped + ' after dedup (removed ' + data.stats.removed + ')';
+      } catch (err) {
+        alert('Assemble failed: ' + err.message);
+      } finally {
+        b.disabled = false;
+        b.textContent = 'Assemble';
+      }
+    }));
+
   } catch (err) {
     loading.style.display = 'none';
     empty.style.display = 'block';
     empty.innerHTML = '<p style="font-size:13px;color:var(--red-400)">Load failed: ' + err.message + '</p>';
-  }
-}
-
-async function viewTrajectoryDetail(trajectoryId) {
-  const detail = document.getElementById('trajDetailPanel');
-  const idSpan = document.getElementById('trajDetailId');
-  const info = document.getElementById('trajDetailInfo');
-  const summary = document.getElementById('trajDetailSummary');
-  const jsonPre = document.getElementById('trajDetailJson');
-  const modelSelect = document.getElementById('trajDetailModel');
-
-  trajCurrentDetailId = trajectoryId;
-  idSpan.textContent = trajectoryId;
-  detail.style.display = '';
-  jsonPre.textContent = '';
-
-  if (modelSelect.options.length <= 1) {
-    try {
-      const r = await fetch('/api/models');
-      const d = await r.json();
-      const models = d.models || [];
-      modelSelect.innerHTML = '<option value="">Default</option>' +
-        models.map(m => `<option value="${m.id}">${m.provider} / ${m.name}</option>`).join('');
-    } catch {}
-  }
-
-  try {
-    const res = await fetch('/api/trajectory/' + trajectoryId);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-
-    info.innerHTML = '<b>Task:</b> ' + escapeHtml(data.task || '') +
-      ' | <b>Model:</b> ' + escapeHtml(data.model || '-') +
-      ' | <b>Steps:</b> ' + (data.stepCount || 0) +
-      ' | <b>Actions:</b> ' + (data.actionCount || 0) +
-      ' | <b>Created:</b> ' + formatTime(data.createdAt);
-
-    if (data.steps) {
-      summary.innerHTML = data.steps.map(s =>
-        `<div style="padding:2px 0"><span style="color:var(--slate-400);font-family:var(--font-mono);font-size:11px">#${s.step}</span> ${escapeHtml(s.goal)}</div>`
-      ).join('');
-    }
-
-    fetch('/api/trajectory/' + trajectoryId + '?full=1').then(r => r.json()).then(d => {
-      if (d.trajectory) jsonPre.textContent = JSON.stringify(d.trajectory, null, 2);
-      else jsonPre.textContent = '(no trajectory data)';
-    }).catch(() => {
-      jsonPre.textContent = '(failed to load)';
-    });
-  } catch (err) {
-    summary.textContent = 'Error: ' + err.message;
-    console.error(err);
-  }
-}
-
-async function sendToScriptGen(trajectoryId) {
-  const genBtn = document.getElementById('trajSendToGenBtn');
-  genBtn.disabled = true;
-  genBtn.textContent = 'Loading...';
-
-  try {
-    const [basicRes, fullRes] = await Promise.all([
-      fetch('/api/trajectory/' + trajectoryId),
-      fetch('/api/trajectory/' + trajectoryId + '?full=1'),
-    ]);
-    const basic = await basicRes.json();
-    const full = await fullRes.json();
-    if (!basicRes.ok) throw new Error(basic.error);
-
-    // Build compact table from trajectory flow
-    let desc = '根据以下浏览器操作轨迹生成 Playwright 测试脚本。\n\n## 操作轨迹\n| # | 操作 | 目标 | 元素 | XPath | 标签 | 值 |\n|---|------|------|------|-------|------|------|\n';
-    if (full.trajectory) {
-      const history = full.trajectory.history || [];
-      let row = 0;
-      for (const h of history) {
-        const mo = h.model_output;
-        if (!mo) continue;
-        const actions = mo.action || [];
-        const goal = mo.current_state?.next_goal || '';
-        for (let ai = 0; ai < actions.length; ai++) {
-          const a = actions[ai];
-          if (!a || typeof a !== 'object') continue;
-          const type = Object.keys(a)[0];
-          const p = a[type] || {};
-          const el = (h.state?.interacted_element || [])[ai] || {};
-          let xpath = el.xpath || '';
-          const tag = el.tag_name || '';
-          let label = p.label_text || p.label || '';
-          let value = p.text || p.value || '';
-          if (p.url) value = p.url;
-          // Fallback: extract XPath from action result's | loc:... marker
-          if (!xpath) {
-            const resultContent = (h.result || [])[ai]?.extracted_content || '';
-            const locMatch = resultContent.match(/\| loc:([^\s|]+)/);
-            if (locMatch) xpath = locMatch[1];
-          }
-          row++;
-          desc += `| ${row} | ${type} | ${goal} | ${tag} | ${xpath || '-'} | ${label} | ${value} |\n`;
-        }
-      }
-    } else {
-      // Fallback: use basic steps
-      const steps = basic.steps || [];
-      for (const s of steps) {
-        desc += `| ${s.step} | | ${s.goal} | | |\n`;
-      }
-    }
-
-    const genTab = document.querySelector('.tab-btn[data-tab="gen"]');
-    if (genTab) genTab.click();
-
-    document.getElementById('trajPromptContent').value = desc;
-    document.getElementById('trajPromptCard').style.display = '';
-    document.getElementById('genDesc').value = '';
-    document.getElementById('genUrl').value = '';
-    document.getElementById('genScriptArea').style.display = 'none';
-    document.getElementById('genSteps').style.display = 'none';
-    document.getElementById('genInfo').style.display = 'none';
-    document.getElementById('genRefineArea').style.display = 'none';
-    document.getElementById('genRunArea').style.display = 'none';
-    document.getElementById('genStatus').textContent = 'Ready — click Generate';
-  } catch (err) {
-    alert('Failed to load trajectory: ' + err.message);
-  } finally {
-    genBtn.disabled = false;
-    genBtn.textContent = 'Send to Script Gen';
-  }
-}
-
-async function deleteTrajectory(trajectoryId) {
-  if (!confirm('Delete trajectory ' + trajectoryId.slice(0, 20) + '...?')) return;
-  try {
-    const res = await fetch('/api/trajectory/' + trajectoryId, { method: 'DELETE' });
-    if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
-
-    if (trajCurrentDetailId === trajectoryId) {
-      document.getElementById('trajDetailPanel').style.display = 'none';
-      trajCurrentDetailId = null;
-    }
-    loadTrajectoryHistory();
-  } catch (err) {
-    alert('Delete failed: ' + err.message);
   }
 }

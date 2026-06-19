@@ -1541,6 +1541,16 @@ def _register_misc_actions(controller, browser_context):
             download_path = await browser_context._click_element_node(element_node)
             if download_path:
                 return _ok(f'downloaded:{download_path}')
+            # Capture element info to curated trajectory
+            if element_node and element_node.xpath:
+                _append_trajectory(
+                    command='click',
+                    properties_name=element_node.tag_name + (f'[{index}]' if element_node.highlight_index != index else ''),
+                    value=str(index),
+                    xpath=element_node.xpath,
+                    tag_name=element_node.tag_name,
+                    attrs=element_node.attributes or {},
+                )
             return _ok(f'clicked-{index}')
         except Exception as e:
             return _err(f'click-failed:{e}')
