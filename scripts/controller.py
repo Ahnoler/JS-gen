@@ -4,10 +4,94 @@ Controller: Element UI custom actions for browser_use.
 import json
 import os
 import re
+import uuid
+import time
 from datetime import datetime
 
 from browser_use.agent.views import ActionResult
 from .form_rules import match_rule
+
+
+# ========================== Trajectory Recording ==========================
+# Accumulates atp-record format trajectory entries during browser exploration.
+# Each action appends its entry; on done, the full JSON is saved.
+
+_TRAJECTORY_ENTRIES = []
+_TRAJECTORY_URL = None
+
+
+def _append_trajectory(command, properties_name, value, xpath, tag_name, attrs):
+    """Append a trajectory entry in atp-record compatible format."""
+    entry = {
+        'id': str(uuid.uuid4()),
+        'command': command,
+        'target': xpath,
+        'targetType': 'xpath',
+        'tagName': tag_name,
+        'propertiesName': properties_name,
+        'attributes': attrs,
+        'timestamp': int(time.time() * 1000),
+        'type': 'ATTRIBUTE',
+        'value': value,
+    }
+    _TRAJECTORY_ENTRIES.append(entry)
+
+
+async def _capture_and_record_input(page, label, value, case_data_store):
+    """Capture element info for an input action and record trajectory."""
+    try:
+        raw = await page.evaluate(JS_CAPTURE_ELEMENT_BY_LABEL, [label])
+        info = json.loads(raw) if isinstance(raw, str) else raw
+        if info.get('xpath'):
+            _append_trajectory(
+                command='input',
+                properties_name=info.get('propertiesName', label),
+                value=value,
+                xpath=info['xpath'],
+                tag_name=info.get('tagName', 'input'),
+                attrs=info.get('attributes', {}),
+            )
+    except Exception:
+        pass
+
+
+async def _capture_and_record_select(page, label, option, case_data_store):
+    """Capture element info for a select action and record trajectory."""
+    try:
+        raw = await page.evaluate(JS_CAPTURE_ELEMENT_BY_LABEL, [label])
+        info = json.loads(raw) if isinstance(raw, str) else raw
+        if info.get('xpath'):
+            _append_trajectory(
+                command='select',
+                properties_name=info.get('propertiesName', label),
+                value=option,
+                xpath=info['xpath'],
+                tag_name=info.get('tagName', 'input'),
+                attrs=info.get('attributes', {}),
+            )
+    except Exception:
+        pass
+
+
+async def _capture_and_record_click(page, text, case_data_store):
+    """Capture element info for a click action and record trajectory."""
+    try:
+        raw = await page.evaluate(JS_CAPTURE_BUTTON_BY_TEXT, [text])
+        info = json.loads(raw) if isinstance(raw, str) else raw
+        if info.get('xpath'):
+            _append_trajectory(
+                command='click',
+                properties_name=info.get('propertiesName', text),
+                value='',
+                xpath=info['xpath'],
+                tag_name=info.get('tagName', 'button'),
+                attrs=info.get('attributes', {}),
+            )
+    except Exception:
+        pass
+
+
+# ========================== JS Snippets ==========================
 
 
 JS_WAIT_LOADING = '''() => new Promise(resolve => {
@@ -29,6 +113,67 @@ JS_GET_CONTAINER = '''(() => {
     return document;
 })()'''
 
+JS_CAPTURE_ELEMENT_BY_LABEL = '''([label]) => {
+    const container = ''' + JS_GET_CONTAINER + ''' || document;
+    const items = container.querySelectorAll('.el-form-item');
+    for (const item of items) {
+        const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+        if (!lbl.includes(label)) continue;
+        const target = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
+        if (!target) return JSON.stringify({tagName:'', xpath:'', attributes:{}, value:'', propertiesName:lbl});
+        const tag = target.tagName.toLowerCase();
+        const attrs = {};
+        for (const a of target.attributes) {
+            if (a.value && a.value.length > 0) attrs[a.name] = a.value;
+        }
+        let xpath = '';
+        const id = target.id;
+        if (id && !/^\\d{4,}$/.test(id) && !/^el-id-/.test(id)) xpath = `//${tag}[@id="${id}"]`;
+        if (!xpath && target.placeholder) xpath = `//${tag}[@placeholder="${target.placeholder}"]`;
+        if (!xpath && target.name) xpath = `//${tag}[@name="${target.name}"]`;
+        if (!xpath && target.type) xpath = `//${tag}[@type="${target.type}"]`;
+        return JSON.stringify({
+            tagName: tag, xpath, attributes: attrs,
+            value: target.value || '', propertiesName: lbl
+        });
+    }
+    for (const inp of container.querySelectorAll('input:not([type="hidden"]), textarea')) {
+        const ph = inp.placeholder || '';
+        if (ph.includes(label) && inp.offsetParent !== null) {
+            const tag = inp.tagName.toLowerCase();
+            return JSON.stringify({
+                tagName: tag, xpath: `//${tag}[@placeholder="${ph}"]`,
+                attributes: {placeholder: ph}, value: inp.value || '',
+                propertiesName: label
+            });
+        }
+    }
+    return JSON.stringify({tagName:'', xpath:'', attributes:{}, value:'', propertiesName:label});
+}'''
+
+JS_CAPTURE_BUTTON_BY_TEXT = '''([text]) => {
+    const buttons = document.querySelectorAll('button');
+    for (const btn of buttons) {
+        const t = (btn.textContent || '').trim().replace(/\\s+/g,'');
+        const search = text.replace(/\\s+/g,'');
+        if (t.includes(search) && btn.offsetParent !== null) {
+            const attrs = {};
+            for (const a of btn.attributes) {
+                if (a.value && a.value.length > 0) attrs[a.name] = a.value;
+            }
+            let xpath = '';
+            if (btn.id && !/^\\d{4,}$/.test(btn.id)) xpath = `//button[@id="${btn.id}"]`;
+            if (!xpath && t) xpath = `//button[contains(translate(.," ",""),"${t}")]`;
+            if (!xpath) xpath = `//button[@type="${btn.type||'button'}"]`;
+            return JSON.stringify({
+                tagName: 'button', xpath, attributes: attrs,
+                value: '', propertiesName: text
+            });
+        }
+    }
+    return JSON.stringify({tagName:'', xpath:'', attributes:{}, value:'', propertiesName:text});
+}'''
+
 JS_NATIVE_SETTER = ''  # Inlined in JS_FILL_FORM_FIELD
 
 JS_CHECK_LOADING = '''() => {
@@ -49,10 +194,11 @@ JS_LOCATOR = '''(label) => {
     const items = container.querySelectorAll('.el-form-item');
     for (const item of items) {
         const lbl = item.querySelector('.el-form-item__label');
-        if (lbl && lbl.textContent.trim().includes(label)) {
-            const target = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
-            if (target) return xpath(target);
-        }
+        if (!lbl) continue;
+        const t = lbl.textContent.trim();
+        if (t !== label && !t.includes(label)) continue;
+        const target = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
+        if (target) return xpath(target);
     }
     return '';
 }'''
@@ -69,8 +215,30 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     };
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
+    // Pass 1: exact label match
     for (const item of items) {
         const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+        if (lbl !== label) continue;
+        const input = item.querySelector('input:not([type="hidden"])');
+        const textarea = item.querySelector('textarea');
+        const target = input || textarea;
+        if (!target) return 'no-input-found';
+        if (target.disabled || target.readOnly) return 'field-disabled';
+        if (target.closest('.el-date-editor, .tsscdatepicker')) {
+            target.focus();
+            setFn(target, val);
+            target.blur();
+            try{let vm=target.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);}}}catch(e){}
+            document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
+            return 'ok-date';
+        }
+        setFn(target, val);
+        return 'ok';
+    }
+    // Pass 2: partial label match (exclude exact matches already tried)
+    for (const item of items) {
+        const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+        if (lbl === label) continue;
         if (!lbl.includes(label)) continue;
         const input = item.querySelector('input:not([type="hidden"])');
         const textarea = item.querySelector('textarea');
@@ -78,8 +246,11 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         if (!target) return 'no-input-found';
         if (target.disabled || target.readOnly) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
-            // Date field: fill directly with native setter
+            target.focus();
             setFn(target, val);
+            target.blur();
+            try{let vm=target.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);}}}catch(e){}
+            document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
             return 'ok-date';
         }
         setFn(target, val);
@@ -105,6 +276,60 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     return 'label-not-found';
 }'''
 
+JS_FILL_DATE_SET = '''([label, val]) => {
+    const setFn = (t, v) => {
+        const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+        const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
+        setter.call(t, v); t.setAttribute('value', v);
+        t.dispatchEvent(new Event('input', {bubbles:true}));
+        t.dispatchEvent(new Event('change', {bubbles:true}));
+        t.dispatchEvent(new Event('blur', {bubbles:true}));
+    };
+    const container = ''' + JS_GET_CONTAINER + ''';
+    const items = container.querySelectorAll('.el-form-item');
+    for (let pass = 1; pass <= 2; pass++) {
+        const exact = pass === 1;
+        for (const item of items) {
+            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+            if (exact) { if (lbl !== label) continue; }
+            else { if (lbl === label || !lbl.includes(label)) continue; }
+            const target = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
+            if (!target) return 'no-input';
+            if (target.disabled || target.readOnly) return 'disabled';
+            if (target.closest('.el-date-editor, .tsscdatepicker')) {
+                target.focus();
+                setFn(target, val);
+                // Vue reactivity
+                try{let vm=target.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){}
+                // Click input again to ensure picker is open
+                target.parentNode?.querySelector('input')?.click() || target.click();
+                return 'opened';
+            }
+            return 'not-date';
+        }
+    }
+    return 'nf:' + label;
+}'''
+
+JS_CLICK_DATE_CELL = '''([val]) => {
+    const day = new Date(val).getDate();
+    const panels = document.querySelectorAll('.el-picker-panel');
+    for (const panel of panels) {
+        if (!panel.offsetParent || panel.style.display === 'none') continue;
+        const cells = panel.querySelectorAll('td.available:not(.prev-month):not(.next-month)');
+        for (const td of cells) {
+            const text = td.textContent.trim();
+            if (parseInt(text) === day && !td.disabled) {
+                td.click();
+                document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
+                return 'ok-date:' + val;
+            }
+        }
+        return 'cell-not-found:' + day;
+    }
+    return 'panel-not-found';
+}'''
+
 JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     const getSelectedLabel = (formItem) => {
         const select = formItem.querySelector('.el-select');
@@ -125,9 +350,13 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     };
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
-    for (const item of items) {
-        const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-        if (!lbl.includes(label)) continue;
+    // Pass 1: exact label match
+    for (let pass = 1; pass <= 2; pass++) {
+        const exact = pass === 1;
+        for (const item of items) {
+            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+            if (exact) { if (lbl !== label) continue; }
+            else { if (lbl === label || !lbl.includes(label)) continue; }
         const trigger = item.querySelector('.el-select .el-input__inner');
         if (!trigger && mode === 'trigger') return 'no-select-found';
         if (!trigger) continue;
@@ -150,6 +379,7 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
             return 'NOT-SELECTED';
         }
         return 'unknown-mode';
+    }
     }
     const allSelects = container.querySelectorAll('.el-select .el-input__inner');
     if (mode === 'check') {
@@ -373,26 +603,30 @@ JS_CHECK_SINGLE_FIELD = '''(label) => {
         if (el || item.querySelector('textarea')) return 'input';
         return 'unknown';
     };
-    for (const item of container.querySelectorAll('.el-form-item')) {
-        const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-        if (!lbl.includes(label)) continue;
-        const input = item.querySelector('input:not([type="hidden"])');
-        const textarea = item.querySelector('textarea');
-        const trigger = item.querySelector('.el-select .el-input__inner');
-        const kind = classify(item);
-        const inputEl = input || textarea;
-        let currentValue = inputEl?.value || trigger?.value || '';
-        if (!currentValue) {
-            const ariaInput = item.querySelector('[aria-valuetext]') || item.querySelector('[aria-valuenow]');
-            if (ariaInput) currentValue = ariaInput.getAttribute('aria-valuetext') || ariaInput.getAttribute('aria-valuenow') || '';
+    for (let pass = 1; pass <= 2; pass++) {
+        const exact = pass === 1;
+        for (const item of container.querySelectorAll('.el-form-item')) {
+            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+            if (exact) { if (lbl !== label) continue; }
+            else { if (lbl === label || !lbl.includes(label)) continue; }
+            const input = item.querySelector('input:not([type="hidden"])');
+            const textarea = item.querySelector('textarea');
+            const trigger = item.querySelector('.el-select .el-input__inner');
+            const kind = classify(item);
+            const inputEl = input || textarea;
+            let currentValue = inputEl?.value || trigger?.value || '';
+            if (!currentValue) {
+                const ariaInput = item.querySelector('[aria-valuetext]') || item.querySelector('[aria-valuenow]');
+                if (ariaInput) currentValue = ariaInput.getAttribute('aria-valuetext') || ariaInput.getAttribute('aria-valuenow') || '';
+            }
+            if (!currentValue && trigger) currentValue = trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '';
+            const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
+            let disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
+            if (!disabled) disabled = item.querySelector('[aria-disabled="true"]') !== null;
+            const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
+            const required = !!item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required');
+            return JSON.stringify({ label: lbl, kind, currentValue, placeholder, disabled, selected, required });
         }
-        if (!currentValue && trigger) currentValue = trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '';
-        const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
-        let disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
-        if (!disabled) disabled = item.querySelector('[aria-disabled="true"]') !== null;
-        const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
-        const required = !!item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required');
-        return JSON.stringify({ label: lbl, kind, currentValue, placeholder, disabled, selected, required });
     }
     return 'label-not-found';
 }'''
@@ -500,7 +734,7 @@ def _register_case_data_actions(controller, case_data_store):
         return val
 
 
-def _register_form_actions(controller, browser_context, form_rules, case_data_store):
+def _register_form_actions(controller, browser_context, form_rules, case_data_store, llm=None):
     @controller.action('Expand ALL el-tree nodes recursively (up to 10 rounds).')
     async def expand_all_el_tree():
         page = await browser_context.get_current_page()
@@ -535,9 +769,26 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         await _wait_if_loading(page)
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
         if result == 'ok' or result == 'ok-date' or result == 'ok-placeholder' or result == 'ok-type':
+            await _capture_and_record_input(page, label_text, value, case_data_store)
             loc = await page.evaluate(JS_LOCATOR, [label_text])
             return _ok(result + (' | loc:' + loc) if loc else result)
         return result
+
+    @controller.action('Fill an Element UI date picker by label text. Two-step: sets value via native setter + Vue reactivity, then clicks the matching day cell in the picker panel to trigger the full pick event chain. Date value persists after save/re-render.')
+    async def fill_date_field(label_text: str, value: str):
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        # Step 1: set value + Vue reactivity + open picker
+        s1 = await page.evaluate(JS_FILL_DATE_SET, [label_text, value])
+        if not str(s1).startswith('opened'):
+            return s1
+        await page.wait_for_timeout(500)
+        # Step 2: click the matching day cell to trigger pick event chain
+        s2 = await page.evaluate(JS_CLICK_DATE_CELL, [value])
+        if s2.startswith('ok-date'):
+            await _capture_and_record_input(page, label_text, value, case_data_store)
+            return _ok(s2)
+        return s2
 
     @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
@@ -559,48 +810,70 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             return _ok(f'verified:{current}')
         return _err(f'mismatch | current:{current} | expected:{expected}')
 
-    @controller.action('Scan form fields. Set quick=false (or omit) for full scan on first call to build task list. Set quick=true for subsequent scans to only return visible fields (saves context).')
-    async def scan_form_fields(quick: bool = False):
+    @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Use this ONCE at the start to build the task list. Returns {fields: [...], notification: {visible, text}|null}.')
+    async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, quick)
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             dom_fields = result.get('fields') if isinstance(result, dict) else result
         except Exception:
             return raw
-
-        # Merge accessibility tree values (bypasses Vue component wrapping)
         try:
             ax_text = await page.aria_snapshot(mode='ai')
             if ax_text:
                 _merge_ax_text(dom_fields, ax_text)
         except Exception:
             pass
-
         result_out = result if isinstance(result, dict) else {'fields': dom_fields, 'notification': None}
         return json.dumps(result_out, ensure_ascii=False, indent=2)
 
-    @controller.action('Initialize a form-filling task list from scan results. Pass scan_form_fields() result (works with both object {fields:[...]} and array [...]. Notification text from scan is available for error context.)')
+    @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Returns {fields: [...], notification: {visible, text}|null}.')
+    async def scan_visible_fields():
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, True)
+        try:
+            result = json.loads(raw) if isinstance(raw, str) else raw
+            dom_fields = result.get('fields') if isinstance(result, dict) else result
+        except Exception:
+            return raw
+        try:
+            ax_text = await page.aria_snapshot(mode='ai')
+            if ax_text:
+                _merge_ax_text(dom_fields, ax_text)
+        except Exception:
+            pass
+        result_out = result if isinstance(result, dict) else {'fields': dom_fields, 'notification': None}
+        return json.dumps(result_out, ensure_ascii=False, indent=2)
+
+    @controller.action('Initialize a form-filling task list from scan results. Pass scan_form_fields() result. Pending/done store full field objects (label, kind, currentValue, options, placeholder, disabled, required) for LLM planning. Auto-skips filled/disabled fields.')
     async def init_task_list(fields_json: str):
         try:
             data = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
         except Exception:
             return _err('invalid-json')
         fields = data.get('fields') if isinstance(data, dict) else data
-        notification = data.get('notification') if isinstance(data, dict) else None
         pending = []
         for f in fields:
             label = f.get('label', '')
-            if not label:
-                continue
             has_value = f.get('currentValue', '').strip() != ''
             is_disabled = f.get('disabled', False)
             if has_value or is_disabled:
                 continue
-            pending.append(label)
+            pending.append({
+                'label': label,
+                'kind': f.get('kind', 'input'),
+                'currentValue': f.get('currentValue', ''),
+                'options': f.get('options', []),
+                'placeholder': f.get('placeholder', ''),
+                'disabled': f.get('disabled', False),
+                'required': f.get('required', False),
+            })
         case_data_store['task_list'] = {'pending': pending, 'done': []}
         case_data_store['_scan_fields'] = fields
+        return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending[:5], ensure_ascii=False))
         return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending, ensure_ascii=False))
 
     def _task_done_impl(label_text):
@@ -608,9 +881,12 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if not tl:
             tl = {'pending': [], 'done': []}
             case_data_store['task_list'] = tl
-        if label_text in tl.get('pending', []):
-            tl['pending'].remove(label_text)
-            tl['done'].append(label_text)
+        for item in list(tl.get('pending', [])):
+            lbl = item['label'] if isinstance(item, dict) else item
+            if lbl == label_text:
+                tl['pending'].remove(item)
+                tl.setdefault('done', []).append(item)
+                return
 
     @controller.action('Fill multiple form fields in one call (up to 10 recommended). Pass a JSON array: [{"action":"fill_input","label":"客户名称","value":"张三"},{"action":"select_option","label":"证件类型","option":"营业执照"}]. Each success auto-calls task_done. Returns summary with per-field results.')
     async def fill_form_fields_batch(fields_json: str):
@@ -625,10 +901,19 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             label = a.get('label', '')
             kind = (a.get('action') or '').lower().replace('-', '_')
             value = a.get('value', '') or a.get('option', '')
+            field_kind = a.get('kind') or ''  # optional field-level kind hint (e.g., "date")
             result = 'skipped'
             try:
                 if kind in ('fill_input', 'fill', 'input'):
-                    result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                    if field_kind == 'date':
+                        s1 = await page.evaluate(JS_FILL_DATE_SET, [label, value])
+                        if str(s1).startswith('opened'):
+                            await page.wait_for_timeout(500)
+                            result = await page.evaluate(JS_CLICK_DATE_CELL, [value])
+                        else:
+                            result = s1
+                    else:
+                        result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
                 elif kind in ('select_option', 'select', 'option'):
                     already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
                     if already.startswith('already:'):
@@ -670,67 +955,103 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             ok = result.startswith('ok') or result.startswith('already')
             results.append({'label': label, 'ok': ok, 'result': result})
             if ok:
+                if kind in ('fill_input', 'fill', 'input'):
+                    await _capture_and_record_input(page, label, value, case_data_store)
+                elif kind in ('select_option', 'select', 'option'):
+                    await _capture_and_record_select(page, label, value, case_data_store)
                 task_done_impl(label)
             await page.wait_for_timeout(400)
         return _ok(f'batch-done | {len(results)} fields | ' + json.dumps(results, ensure_ascii=False))
 
-    @controller.action('Fill ALL pending form fields, intelligently grouped by kind (select→input→date→radio→checkbox). Same-kind fields are filled together for speed. Reads pending list from task_list, looks up kind from scan data. Auto-calls task_done. Returns summary.')
+    @controller.action('Fill ALL pending form fields, intelligently grouped by kind. Uses LLM to generate smart values based on field labels (not hardcoded test data). Groups by kind (select→input→date→radio→checkbox). Auto-calls task_done.')
     async def fill_pending_batch():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         tl = case_data_store.get('task_list', {'pending': [], 'done': []})
-        scan_fields = case_data_store.get('_scan_fields', [])
         pending = list(tl.get('pending', []))
 
         if not pending:
             return _ok('nothing-pending')
 
-        # Build label→kind lookup from scan
+        # Build label→kind lookup
         label_kind = {}
-        for f in scan_fields:
-            lbl = f.get('label', '').strip()
-            if lbl:
-                label_kind[lbl] = f.get('kind', 'input')
+        for item in pending:
+            lbl = item['label'] if isinstance(item, dict) else item
+            kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
+            label_kind[lbl] = kind
 
-        # Group pending by kind, preserving original pending order within each group
+        # Group pending by kind
         KIND_ORDER = {'select': 0, 'input': 1, 'date': 2, 'radio': 3, 'checkbox': 4}
         groups = {}
-        for label in pending:
-            kind = label_kind.get(label, 'input')
+        for item in pending:
+            lbl = item['label'] if isinstance(item, dict) else item
+            kind = label_kind.get(lbl, 'input')
             idx = KIND_ORDER.get(kind, 99)
-            groups.setdefault(idx, []).append(label)
+            groups.setdefault(idx, []).append(item)
 
         all_results = []
         for idx in sorted(groups.keys()):
             group = groups[idx]
-            kind_name = list(KIND_ORDER.keys())[list(KIND_ORDER.values()).index(idx)] if idx < 5 else 'other'
-            # Process in sub-batches of 10
-            for i in range(0, len(group), 10):
-                sub = group[i:i+10]
-                for label in sub:
-                    kind = label_kind.get(label, 'input')
-                    # Generate a value: use scan info + smart default
-                    val = '测试数据'
-                    if kind == 'select':
-                        # Use first available option from scan
-                        for f in scan_fields:
-                            if f.get('label', '').strip() == label:
-                                opts = f.get('options', [])
-                                val = opts[0] if opts else '测试'
-                                break
-                        result = None
-                        try:
+            # Process in sub-batches of 20 (LLM can handle reasonably)
+            for i in range(0, len(group), 20):
+                sub = group[i:i+20]
+
+                # Phase 1: Let LLM generate values for this sub-batch
+                actions = _llm_generate_values(llm, sub)
+
+                # Phase 2: Execute each action
+                for a in actions:
+                    label = a.get('label', '')
+                    kind = (a.get('action') or '').lower().replace('-', '_')
+                    value = a.get('value', '') or a.get('option', '')
+                    field_kind = label_kind.get(label, kind)  # original field kind from scan
+                    result = 'skipped'
+                    try:
+                        if kind in ('fill_input', 'fill', 'input'):
+                            if field_kind == 'date':
+                                s1 = await page.evaluate(JS_FILL_DATE_SET, [label, value])
+                                if str(s1).startswith('opened'):
+                                    await page.wait_for_timeout(500)
+                                    result = await page.evaluate(JS_CLICK_DATE_CELL, [value])
+                                else:
+                                    result = s1
+                            else:
+                                result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                        elif kind in ('select_option', 'select', 'option'):
                             already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
                             if already.startswith('already:'):
                                 cur_val = already.split(':', 1)[1]
-                                if cur_val == val or val in cur_val or cur_val in val:
+                                if cur_val == value or value in cur_val or cur_val in value:
                                     result = already
-                            if not result:
+                                else:
+                                    await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+                                    await page.wait_for_timeout(800)
+                                    matched = await page.evaluate(JS_FIND_OPTION, value)
+                                    if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
+                                        matched = await page.evaluate(JS_FIND_OPTION, 'first')
+                                        if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
+                                            result = matched
+                                        else:
+                                            try:
+                                                opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
+                                                await opt.wait_for(state='visible', timeout=3000)
+                                                await opt.click()
+                                                result = 'ok-first'
+                                            except Exception as e:
+                                                result = f'click-failed:{e}'
+                                    else:
+                                        try:
+                                            opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
+                                            await opt.wait_for(state='visible', timeout=3000)
+                                            await opt.click()
+                                            result = 'ok'
+                                        except Exception as e:
+                                            result = f'click-failed:{e}'
+                            else:
                                 await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
                                 await page.wait_for_timeout(800)
-                                matched = await page.evaluate(JS_FIND_OPTION, val)
+                                matched = await page.evaluate(JS_FIND_OPTION, value)
                                 if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
-                                    # Try first available
                                     matched = await page.evaluate(JS_FIND_OPTION, 'first')
                                     if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
                                         result = matched
@@ -750,14 +1071,17 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                                         result = 'ok'
                                     except Exception as e:
                                         result = f'click-failed:{e}'
-                        except Exception as e:
-                            result = f'error:{e}'
-                    else:
-                        # input/date/radio/checkbox
-                        result = await page.evaluate(JS_FILL_FORM_FIELD, [label, val])
+                        else:
+                            result = f'unknown-action:{kind}'
+                    except Exception as e:
+                        result = f'error:{e}'
                     ok = result.startswith('ok') or result.startswith('already')
-                    all_results.append({'label': label, 'kind': kind, 'ok': ok, 'result': result or 'unknown'})
+                    all_results.append({'label': label, 'kind': label_kind.get(label, 'input'), 'ok': ok, 'result': result})
                     if ok:
+                        if kind in ('fill_input', 'fill', 'input'):
+                            await _capture_and_record_input(page, label, value, case_data_store)
+                        elif kind in ('select_option', 'select', 'option'):
+                            await _capture_and_record_select(page, label, value, case_data_store)
                         _task_done_impl(label)
                     await page.wait_for_timeout(400)
         return _ok(f'pending-batch-done | {len(all_results)} fields | ' + json.dumps(all_results, ensure_ascii=False))
@@ -768,24 +1092,33 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         tl = case_data_store.get('task_list', {'pending': [], 'done': []})
         return _ok(f'task-done:{label_text} | remaining:{len(tl["pending"])}')
 
-    @controller.action('Re-add a field to the pending task list (e.g., after a validation error). Use this when formErrors mention a specific field.')
+    @controller.action('Re-add a field to the pending task list (e.g., after a validation error).')
     async def task_retry(label_text: str):
         tl = case_data_store.get('task_list')
         if not tl:
             tl = {'pending': [], 'done': []}
             case_data_store['task_list'] = tl
-        if label_text in tl.get('done', []):
-            tl['done'].remove(label_text)
-        if label_text not in tl.get('pending', []):
-            tl['pending'].append(label_text)
+        for item in list(tl.get('done', [])):
+            lbl = item['label'] if isinstance(item, dict) else item
+            if lbl == label_text:
+                tl['done'].remove(item)
+                if item not in tl.get('pending', []):
+                    tl['pending'].append(item)
+                return _ok(f'task-retry:{label_text} | pending:{len(tl["pending"])}')
+        # Not in done — maybe it's a new error label, add as simple dict
+        pending_labels = [p['label'] if isinstance(p, dict) else p for p in tl.get('pending', [])]
+        if label_text not in pending_labels:
+            tl['pending'].append({'label': label_text, 'kind': 'input', 'currentValue': '', 'options': [], 'placeholder': '', 'disabled': False, 'required': False})
         return _ok(f'task-retry:{label_text} | pending:{len(tl["pending"])}')
 
-    @controller.action('Get the current list of pending form fields. Returns a JSON array of labels still to fill. Call this before each fill action to know what remains.')
+    @controller.action('Get the current pending/done task list. Returns {"pending": [{label,kind,options,...}], "done": [...]}. Each entry is a full field object for LLM planning.')
     async def get_pending_tasks():
         tl = case_data_store.get('task_list', {'pending': [], 'done': []})
-        pending = tl.get('pending', [])
-        done = tl.get('done', [])
-        return json.dumps({'pending': pending, 'done': done}, ensure_ascii=False)
+        # Return the full objects, LLM reads kind/options to plan
+        return json.dumps({
+            'pending': tl.get('pending', []),
+            'done': [d['label'] if isinstance(d, dict) else d for d in tl.get('done', [])]
+        }, ensure_ascii=False)
 
     @controller.action('Sync task list from current page validation errors. Reads .el-form-item__error text, extracts field labels (strips 请选择/请输入/请上传 prefix), re-adds them to pending. Call this after a failed submit attempt.')
     async def sync_tasks_from_errors():
@@ -809,17 +1142,19 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         for label in error_labels:
             tl = case_data_store.get('task_list', {'pending': [], 'done': []})
             matched = False
-            for d_label in list(tl.get('done', [])):
+            for d_item in list(tl.get('done', [])):
+                d_label = d_item['label'] if isinstance(d_item, dict) else d_item
                 if d_label == label or d_label in label or label in d_label:
-                    tl['done'].remove(d_label)
-                    if d_label not in tl.get('pending', []):
-                        tl['pending'].append(d_label)
+                    tl['done'].remove(d_item)
+                    if d_item not in tl.get('pending', []):
+                        tl['pending'].append(d_item)
                     retried.append(d_label)
                     matched = True
                     break
             if not matched:
-                if label not in tl.get('pending', []):
-                    tl['pending'].append(label)
+                pending_labels = [p['label'] if isinstance(p, dict) else p for p in tl.get('pending', [])]
+                if label not in pending_labels:
+                    tl['pending'].append({'label': label, 'kind': 'input', 'currentValue': '', 'options': [], 'placeholder': '', 'disabled': False, 'required': False})
                 retried.append(label)
             case_data_store['task_list'] = tl
         return _ok(f'sync-errors | retried:{len(retried)} | ' + json.dumps(retried, ensure_ascii=False))
@@ -905,6 +1240,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # Verify: current value must contain the matched text
         if current_val and (current_val == matched_text or matched_text in current_val or current_val in matched_text):
             case_data_store.pop(f'_sel_retry_{label_text}', None)
+            await _capture_and_record_select(page, label_text, matched_text, case_data_store)
             loc = await page.evaluate(JS_LOCATOR, [label_text])
             return _ok(f'ok | {current_val}' + (' | loc:' + loc) if loc else f'ok | {current_val}')
 
@@ -953,6 +1289,7 @@ def _register_navigation_actions(controller, browser_context):
         ''', menu_text)
         await page.wait_for_timeout(500)
         if result.startswith('ok'):
+            await _capture_and_record_click(page, menu_text, case_data_store)
             return _ok(result + ' | loc:.el-menu-item:has-text("' + menu_text + '")')
         return result
 
@@ -989,6 +1326,7 @@ def _register_table_actions(controller, browser_context):
         ''', [row_text, button_text])
         await page.wait_for_timeout(500)
         if result.startswith('ok'):
+            await _capture_and_record_click(page, button_text, case_data_store)
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
         return result
 
@@ -1036,7 +1374,39 @@ def _register_misc_actions(controller, browser_context):
                 url: location.href,
             };
         }''')
+        global _TRAJECTORY_URL
+        _TRAJECTORY_URL = state.get('url', '')
         return json.dumps(state, ensure_ascii=False)
+
+    @controller.action('Save the accumulated trajectory in atp-record import-compatible JSON format.')
+    async def save_trajectory(output_dir: str = None):
+        """Save trajectory entries to a JSON file in atp-record format."""
+        global _TRAJECTORY_ENTRIES, _TRAJECTORY_URL
+        if not _TRAJECTORY_ENTRIES:
+            return _err('no-trajectory-entries')
+        try:
+            if not output_dir:
+                output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapshots')
+            os.makedirs(output_dir, exist_ok=True)
+            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filepath = os.path.join(output_dir, f'trajectory_{ts}.json')
+            trajectory_json = {
+                'id': str(uuid.uuid4()),
+                'name': 'browser-use-exploration',
+                'url': _TRAJECTORY_URL or 'http://unknown',
+                'tests': [{
+                    'id': str(uuid.uuid4()),
+                    'name': 'browser-use-exploration',
+                    'commands': _TRAJECTORY_ENTRIES,
+                }],
+            }
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(trajectory_json, f, ensure_ascii=False, indent=2)
+            count = len(_TRAJECTORY_ENTRIES)
+            _TRAJECTORY_ENTRIES = []
+            return _ok(f'trajectory-saved:{filepath} | entries:{count}')
+        except Exception as e:
+            return _err(f'save-error:{e}')
 
     @controller.action('Close visible el-notification popup, read its text, and return it. Returns "no-notification" if none found. Use this for server-side validation errors — NOT for dialogs/drawers.')
     async def close_notification():
@@ -1142,6 +1512,7 @@ def _register_misc_actions(controller, browser_context):
             return 'label-not-found';
         }''', [label_text])
         if result == 'clicked':
+            await _capture_and_record_click(page, label_text, case_data_store)
             loc = await page.evaluate(JS_LOCATOR, [label_text])
             return _ok('clicked | loc:' + loc) if loc else _ok('clicked')
         return result
@@ -1223,7 +1594,88 @@ def _err(msg):
     """Wrap an error string in ActionResult."""
     return ActionResult(extracted_content=str(msg), is_done=False, success=False)
 
-def build_controller(browser_context, form_rules, case_data_store=None, exclude_actions=None):
+FILL_FORM_SYSTEM_PROMPT = '''你是一个表单填写助手。根据字段列表，返回 JSON 动作数组。
+
+动作类型：
+- fill_input: 填写输入框，参数 {"action":"fill_input","label":"字段标签","value":"要填的值"}
+- select_option: 选择下拉框，参数 {"action":"select_option","label":"字段标签","option":"要选的选项"}
+
+规则：
+- 每个字段都必须返回一个动作，不要跳过
+- 标签包含"姓名""名称""简称"→常见中文名称（如"测试企业有限公司""张三"）
+- 标签包含"手机""电话"→11位手机号
+- 标签包含"身份证"→18位身份证号
+- 标签包含"邮箱""Email"→合法邮箱
+- 标签包含"金额""收入""资产"→合理数值（如"5000000"）
+- 标签包含"人数"→正整数
+- 标签包含"邮编"→6位数字
+- 标签包含"地址"→完整中文地址
+- 标签包含"日期"→日期格式 YYYY-MM-DD
+- 标签包含"代码"→合理编号
+- 标签包含"账号"→银行账号格式
+- 标签包含"开户行"→银行名称
+- 标签包含"备注"→简短测试备注
+- 下拉框从 options 列表中选值
+- 只返回 JSON 数组，不要解释'''
+
+def _llm_generate_values(llm, items, instruction="生成合理的测试数据"):
+    """Call LLM to generate values for a batch of form fields."""
+    if not llm:
+        # Fallback without LLM — use very basic heuristics
+        actions = []
+        for item in items:
+            label = item['label'] if isinstance(item, dict) else item
+            kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
+            if kind == 'select':
+                opts = item.get('options', []) if isinstance(item, dict) else []
+                actions.append({'action': 'select_option', 'label': label, 'option': opts[0] if opts else '测试'})
+            else:
+                actions.append({'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'})
+        return actions
+
+    field_lines = []
+    for i, item in enumerate(items):
+        label = item['label'] if isinstance(item, dict) else item
+        kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
+        line = f'{i+1}. label: "{label}", kind: {kind}'
+        if isinstance(item, dict):
+            if item.get('options'):
+                target = item['options']
+                opts = target if isinstance(target, list) else json.loads(target) if isinstance(target, str) else []
+                line += f', options: [{", ".join(f'"{o}"' for o in opts)}]'
+            if item.get('placeholder') and item['placeholder'] not in ('请选择', '请输入', ''):
+                line += f', placeholder: "{item["placeholder"]}"'
+        field_lines.append(line)
+
+    prompt = f'''当前表单字段：\n{chr(10).join(field_lines)}\n\n指令：{instruction}'''
+    
+    from langchain_core.messages import SystemMessage, HumanMessage
+    try:
+        response = llm.invoke([
+            SystemMessage(content=FILL_FORM_SYSTEM_PROMPT),
+            HumanMessage(content=prompt)
+        ])
+        text = response.content if hasattr(response, 'content') else str(response)
+        # Parse JSON from response
+        text = text.strip()
+        if text.startswith('```'): text = text.split('\n', 1)[1].rsplit('```', 1)[0]
+        parsed = json.loads(text)
+        if isinstance(parsed, dict) and 'actions' in parsed: parsed = parsed['actions']
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        # Fallback
+        actions = []
+        for item in items:
+            label = item['label'] if isinstance(item, dict) else item
+            kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
+            if kind == 'select':
+                opts = item.get('options', []) if isinstance(item, dict) else []
+                actions.append({'action': 'select_option', 'label': label, 'option': opts[0] if opts else '测试'})
+            else:
+                actions.append({'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'})
+        return actions
+
+def build_controller(browser_context, form_rules, case_data_store=None, llm=None, exclude_actions=None):
     from browser_use import Controller
     if exclude_actions is None:
         exclude_actions = ['input_text', 'select_dropdown_option']
@@ -1232,7 +1684,7 @@ def build_controller(browser_context, form_rules, case_data_store=None, exclude_
     if case_data_store is None:
         case_data_store = {}
     _register_case_data_actions(controller, case_data_store)
-    _register_form_actions(controller, browser_context, form_rules, case_data_store)
+    _register_form_actions(controller, browser_context, form_rules, case_data_store, llm)
     _register_navigation_actions(controller, browser_context)
     _register_table_actions(controller, browser_context)
     _register_misc_actions(controller, browser_context)

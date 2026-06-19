@@ -5,6 +5,7 @@ Reads JSON instructions from stdin, runs agent steps with SSE output.
 import sys
 import asyncio
 import json
+import uuid
 import tempfile
 import re
 from datetime import datetime
@@ -40,23 +41,48 @@ def _close_agent():
         _last_agent = None
 
 
-def _handle_save_trajectory(cumulative_path, session_id):
-    if not cumulative_path.exists():
+def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
+    """Save trajectory in atp-record import-compatible JSON format."""
+    from .recorder import _ATP_TRAJECTORY
+    from .controller import _TRAJECTORY_ENTRIES, _TRAJECTORY_URL
+    # Use ATP trajectory (all actions) as primary; fallback to controller entries
+    entries = list(_ATP_TRAJECTORY) if _ATP_TRAJECTORY else list(_TRAJECTORY_ENTRIES)
+    if not entries:
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": "No trajectory data available"}})
         return
     try:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        trajectory_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_ondemand_{ts}.json"
-        import shutil
-        shutil.copy(str(cumulative_path), trajectory_path)
-        with open(trajectory_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            steps_count = len(data.get('history', []))
+        snapshots_dir = Path(__file__).parent / 'snapshots'
+        snapshots_dir.mkdir(parents=True, exist_ok=True)
+        trajectory_path = snapshots_dir / f"trajectory_{ts}.json"
+        url = _TRAJECTORY_URL or 'http://unknown'
+
+        trajectory_json = {
+            'id': str(uuid.uuid4()),
+            'name': 'browser-use-session',
+            'url': url,
+            'tests': [{
+                'id': str(uuid.uuid4()),
+                'name': 'browser-use-session',
+                'commands': entries,
+            }],
+        }
+        with open(trajectory_path, 'w', encoding='utf-8') as f:
+            json.dump(trajectory_json, f, ensure_ascii=False, indent=2)
+        entries_count = len(entries)
+        _ATP_TRAJECTORY.clear()
+        _TRAJECTORY_ENTRIES.clear()
+
         emit_json({
             "event": "save_trajectory_result",
-            "data": {"success": True, "trajectory_file": str(trajectory_path), "steps": steps_count, "is_done": True, "is_successful": True},
+            "data": {
+                "success": True,
+                "trajectory_file": str(trajectory_path),
+                "entries": entries_count,
+                "format": "atp-record",
+            },
         })
-        sys.stderr.write(f"[session] Trajectory saved on demand: {trajectory_path}\n")
+        sys.stderr.write(f"[session] ATP trajectory saved: {trajectory_path} ({entries_count} entries)\n")
         sys.stderr.flush()
     except Exception as e:
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
@@ -82,11 +108,15 @@ def _handle_save_case_data(case_data_store, session_id):
 
 
 def _handle_reset_trajectory(session_id):
+    from .controller import _TRAJECTORY_ENTRIES
+    from .recorder import _ATP_TRAJECTORY
+    _TRAJECTORY_ENTRIES.clear()
+    _ATP_TRAJECTORY.clear()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"
-    sys.stderr.write(f"[session] Trajectory reset -> {cumulative_path}\n")
+    sys.stderr.write(f"[session] ATP trajectory reset ({ts})\n")
     sys.stderr.flush()
-    emit_json({"event": "reset_trajectory_ready", "data": {"cumulative_file": str(cumulative_path)}})
+    emit_json({"event": "reset_trajectory_ready", "data": {"session_id": session_id, "format": "atp-record", "cumulative_file": str(cumulative_path)}})
     return cumulative_path
 
 
@@ -219,7 +249,7 @@ def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_r
     event = msg.get("event")
 
     if event == "save_trajectory":
-        _handle_save_trajectory(session_state['cumulative_path'], session_state['session_id'])
+        _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'])
         return 'continue'
 
     if event == "save_case_data":
@@ -275,7 +305,7 @@ async def run_session(args):
     intervention_queue = asyncio.Queue()  # human intervention messages
 
     on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path, intervention_queue)
-    controller = build_controller(browser_context, form_rules, case_data_store)
+    controller = build_controller(browser_context, form_rules, case_data_store, llm=llm)
 
     emit_json({"event": "ready", "session_id": session_id})
     sys.stderr.write(f"[session] Ready, session_id={session_id}\n")

@@ -639,8 +639,8 @@ export function initSessionMode() {
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Server error');
       const data = await res.json();
-      sessTrajectoryId.textContent = 'Traj: ' + data.trajectoryId.slice(0, 12) + '...';
-      sessLog('success', 'Trajectory saved: ' + data.trajectoryId + ' (' + data.actions + ' actions)');
+      sessTrajectoryId.textContent = 'Traj: ' + data.trajectory_file.split(/[\\/]/).pop().replace('.json','').slice(0, 16) + '...';
+      sessLog('success', 'ATP trajectory saved: ' + data.entries + ' entries (format: ' + (data.format || 'atp-record') + ')');
     } catch (err) {
       sessLog('error', 'Save trajectory failed: ' + err.message);
     }
