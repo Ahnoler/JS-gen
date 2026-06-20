@@ -68,6 +68,22 @@ CTRL_API_CODE = '''const { chromium } = require('playwright');
           const ph = inp.getAttribute('placeholder')||'';
           if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent!==null) { setFn(inp,val); return 'ok-placeholder'; }
         }
+        // Pass 4: fuzzy match — pick the label with highest character overlap
+        let bestScore = 0, bestItem = null;
+        const _items = c.querySelectorAll('.el-form-item');
+        for (var _i = 0; _i < _items.length; _i++) {
+          const _item = _items[_i], _lbl = _item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
+          if (!_lbl) continue;
+          const _a = [...new Set(label.replace(/[\\s,，、]/g,''))];
+          const _b = [...new Set(_lbl.replace(/[\\s,，、]/g,''))];
+          const _common = _a.filter(ch=>_b.includes(ch)).length;
+          const _score = _common / Math.max(_a.length,_b.length,1);
+          if (_score > bestScore) { bestScore = _score; bestItem = _item; }
+        }
+        if (bestItem && bestScore >= 0.4) {
+          const _t = bestItem.querySelector('input:not([type="hidden"])') || bestItem.querySelector('textarea');
+          if (_t && !_t.disabled && !_t.readOnly) { setFn(_t,val); return 'ok-fuzzy'; }
+        }
         return 'label-not-found';
       },
       selectOption: (label, option) => {
@@ -248,7 +264,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             lines.append(f"    }}")
         else:
             lines.append(f"    const _r{step_num} = await page.evaluate(() => CTRL.fillFormField('{_escape(l)}', '{_escape(v)}'));")
-            lines.append(f"    if (_r{step_num} !== 'ok' && _r{step_num} !== 'ok-date' && _r{step_num} !== 'ok-placeholder') {{")
+            lines.append(f"    if (_r{step_num} !== 'ok' && _r{step_num} !== 'ok-date' && _r{step_num} !== 'ok-placeholder' && _r{step_num} !== 'ok-fuzzy') {{")
             lines.append(f"      console.log('[{step_num}] fill result:', _r{step_num});")
             lines.append(f"      const _a{step_num} = await page.locator('.el-form-item:has-text(\"{_escape(l)}\")').locator('input, textarea').first();")
             lines.append(f"      if (await _a{step_num}.count() > 0) await _a{step_num}.fill('{_escape(v)}');")
@@ -352,6 +368,24 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             lines.append(f"          if (el) el.dispatchEvent(new MouseEvent('click', {{ bubbles: true }}));")
             lines.append(f"        }}, '{_escape(xp)}');")
             lines.append('      }')
+            if txt:
+                lines.append(f"      // Text-fuzzy fallback: search page elements by text similarity")
+                lines.append(f"      try {{")
+                lines.append(f"        await page.evaluate((text) => {{")
+                lines.append(f"          const candidates = [...document.querySelectorAll('button, a, span, li, label, .el-button, .el-menu-item')].filter(el => el.offsetParent !== null);")
+                lines.append(f"          let best = null, bestScore = 0;")
+                lines.append(f"          const t = [...new Set(text.replace(/\\s/g,''))];")
+                lines.append(f"          for (const el of candidates) {{")
+                lines.append(f"            const elText = el.textContent?.trim() || '';")
+                lines.append(f"            if (!elText) continue;")
+                lines.append(f"            const e = [...new Set(elText.replace(/\\s/g,''))];")
+                lines.append(f"            const common = t.filter(ch => e.includes(ch)).length;")
+                lines.append(f"            const score = common / Math.max(t.length, e.length, 1);")
+                lines.append(f"            if (score > bestScore) {{ bestScore = score; best = el; }}")
+                lines.append(f"          }}")
+                lines.append(f"          if (best && bestScore >= 0.4) best.click();")
+                lines.append(f"        }}, '{_escape(txt)}');")
+                lines.append(f"      }} catch (e3) {{}}")
             lines.append('    }')
             lines.append('    await page.waitForTimeout(300);')
             return '\n'.join(lines)

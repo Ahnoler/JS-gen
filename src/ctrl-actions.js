@@ -98,6 +98,21 @@ const CTRL_OBJECT = `{
         return 'ok-placeholder';
       }
     }
+    // Pass 4: fuzzy match — pick the label with highest character overlap
+    let bestMatch = null, bestScore = 0;
+    for (const item of c.querySelectorAll('.el-form-item')) {
+      const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+      if (!lbl) continue;
+      const a = [...new Set(label.replace(/[\s,，、]/g, ''))];
+      const b = [...new Set(lbl.replace(/[\s,，、]/g, ''))];
+      const common = a.filter(ch => b.includes(ch)).length;
+      const score = common / Math.max(a.length, b.length, 1);
+      if (score > bestScore) { bestScore = score; bestMatch = item; }
+    }
+    if (bestMatch && bestScore >= 0.4) {
+      const t = bestMatch.querySelector('input:not([type="hidden"])') || bestMatch.querySelector('textarea');
+      if (t && !t.disabled && !t.readOnly) { setFn(t, val); return 'ok-fuzzy'; }
+    }
     const _allLbls = [...c.querySelectorAll('.el-form-item')].map(i => i.querySelector('.el-form-item__label')?.textContent?.trim() || '').filter(Boolean);
     if (_allLbls.length > 0) console.log('[fillFormField] Available labels:', JSON.stringify(_allLbls));
     return 'label-not-found';

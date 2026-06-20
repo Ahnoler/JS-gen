@@ -827,6 +827,16 @@ table{
   to{opacity:1;transform:translateY(0)}
 }
 
+/* Trajectory toggle */
+.traj-toggle:hover {
+  color: var(--indigo-600);
+}
+.traj-toggle-icon {
+  font-size: 10px;
+  display: inline-block;
+  transition: transform .2s;
+}
+
 /* Refine focus states globally */
 *:focus-visible{
   outline:2px solid var(--indigo-400);
