@@ -32,7 +32,7 @@ async def run_workflow(args, llm, form_rules):
         trace_path=_TRACE_DIR,
     )
     browser_context = await browser.new_context(config)
-    controller = build_controller(browser_context, form_rules)
+    controller = build_controller(browser_context, form_rules, llm=llm)
 
     on_step_start_hook, on_step_end_hook = build_recording_hooks()
 
@@ -117,7 +117,7 @@ async def run_single_task(args, llm, form_rules):
         trace_path=_TRACE_DIR,
     )
     browser_context = await browser.new_context(config)
-    controller = build_controller(browser_context, form_rules)
+    controller = build_controller(browser_context, form_rules, llm=llm)
 
     on_step_start_hook, on_step_end_hook = build_recording_hooks()
 

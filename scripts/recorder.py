@@ -3,10 +3,15 @@ Recording hooks for browser-use agent: step callbacks, goal dedup detection, can
 premature done() prevention, and human intervention injection.
 """
 import sys
-import json
-from pathlib import Path
 from langchain_core.messages import HumanMessage
 from .agent_utils import emit_json
+from . import controller as ctrl_mod
+
+
+# ========================== Operation Log (plain text, for LLM context) ==========================
+# Each line records one agent step: step#, goal, actions, result.
+# NOT used for script generation — only for LLM reference.
+_ACTION_LOG = []
 
 
 def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention_queue=None):
@@ -15,7 +20,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
         goal_tracker = {'goals': [], 'stopped': False}
 
     async def on_step_start(agent):
-        sys.stderr.write(f"[recorder] on_step_start n_steps={agent.state.n_steps}\n"); sys.stderr.flush()
+        sys.stderr.write(f"[on_step_start]\t n_steps={agent.state.n_steps}\n"); sys.stderr.flush()
         # Check for human intervention before proceeding
         if intervention_queue is not None:
             try:
@@ -37,11 +42,23 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
         _model_out = agent.state.history.history[-1].model_output if agent.state.history and agent.state.history.history else None
         _next_goal = getattr(getattr(_model_out, 'current_state', None), 'next_goal', '') if _model_out else ''
         _actions = [str(a)[:100] for a in (getattr(_model_out, 'action', []) or [])] if _model_out else []
-        sys.stderr.write(f"[recorder] on_step_end n_steps={agent.state.n_steps} is_done={_done} stopped={_stopped}\n")
-        sys.stderr.write(f"[recorder]   next_goal={_next_goal[:150]}\n")
-        sys.stderr.write(f"[recorder]   actions={_actions}\n")
-        sys.stderr.write(f"[recorder]   last_result={_last_result_str}\n")
+        sys.stderr.write(f"[on_step_end]\t n_steps={agent.state.n_steps} is_done={_done} stopped={_stopped}\n")
+        sys.stderr.write(f"[next_goal]\t {_next_goal[:150]}\n")
+        sys.stderr.write(f"[actions]\t {_actions}\n")
+        sys.stderr.write(f"[last_result]\t {_last_result_str}\n")
         sys.stderr.flush()
+
+        # ===== Capture page URL from agent state =====
+        try:
+            _last_state = agent.state.history.history[-1].state if agent.state.history and agent.state.history.history else None
+            if _last_state:
+                _url = getattr(_last_state, 'url', '') or (_last_state.get('url') if isinstance(_last_state, dict) else '')
+                if _url and _url != 'about:blank' and not _url.startswith('devtools://'):
+                    ctrl_mod._TRAJECTORY_URL = _url
+        except Exception:
+            pass
+        # ===== End URL capture =====
+
         # Check cancel signal before any processing
         if cancel_flag_path is not None and cancel_flag_path.exists():
             sys.stderr.write("[recorder] Cancel signal received, stopping agent\n")
@@ -99,6 +116,18 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
             if step_num % 5 == 0:
                 sys.stderr.write(f"[recorder] step {step_num} done\n")
                 sys.stderr.flush()
+
+            # Write operation log line (plain text, for LLM context)
+            try:
+                log_line = (
+                    f"[{step_num}] "
+                    f"goal: {_next_goal[:80] if _next_goal else '-'} | "
+                    f"actions: {'; '.join(_actions) if _actions else '-'} | "
+                    f"result: {_last_result_str[:120]}"
+                )
+                _ACTION_LOG.append(log_line)
+            except Exception:
+                pass
 
             # Goal dedup detection
             try:

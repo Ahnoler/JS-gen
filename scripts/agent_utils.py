@@ -30,6 +30,8 @@ def extract_first_url(task):
     return urls[0] if urls else None
 
 async def do_navigate(page, url):
+    from . import controller as ctrl_mod
+    ctrl_mod._TRAJECTORY_URL = url
     emit_json({"event": "nav_step", "data": {"step": 0, "label": "Navigating to target URL"}})
     try:
         await page.goto(url, wait_until='networkidle', timeout=60000)

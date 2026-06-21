@@ -628,9 +628,9 @@ export function initSessionMode() {
   sessTrajBtn.addEventListener('click', async () => {
     const sessionId = sessActive.value;
     if (!sessionId) return;
-    if (!confirm('Save current trajectory to the trajectory store? This will persist the recorded actions.')) return;
+    if (!confirm('Save action file + operation log?')) return;
     sessTrajBtn.disabled = true;
-    sessLog('system', 'Saving trajectory...');
+    sessLog('system', 'Saving...');
     try {
       const res = await fetch('/api/browser/session/' + sessionId + '/trajectory', {
         method: 'POST',
@@ -639,10 +639,12 @@ export function initSessionMode() {
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Server error');
       const data = await res.json();
-      sessTrajectoryId.textContent = 'Traj: ' + data.trajectoryId.slice(0, 12) + '...';
-      sessLog('success', 'Trajectory saved: ' + data.trajectoryId + ' (' + data.actions + ' actions)');
+      const actionName = (data.action_file || '').split(/[\\/]/).pop() || '';
+      const logName = (data.log_file || '').split(/[\\/]/).pop() || '';
+      sessTrajectoryId.textContent = 'A:' + actionName.replace('.json','').slice(0,12) + '... L:' + logName.replace('.txt','').slice(0,12) + '...';
+      sessLog('success', data.action_count + ' actions + ' + data.log_count + ' log lines saved');
     } catch (err) {
-      sessLog('error', 'Save trajectory failed: ' + err.message);
+      sessLog('error', 'Save failed: ' + err.message);
     }
     sessTrajBtn.disabled = false;
   });

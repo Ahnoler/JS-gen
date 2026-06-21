@@ -21,34 +21,100 @@ const CTRL_OBJECT = `{
   },
   fillFormField: (label, val) => {
     const c = CTRL.getContainer();
+    const setFn = (t, v) => {
+      const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
+      setter.call(t, v);
+      t.setAttribute('value', v);
+      t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:v}));
+      t.dispatchEvent(new Event('change',{bubbles:true}));
+      t.dispatchEvent(new Event('blur',{bubbles:true}));
+    };
     for (const item of c.querySelectorAll('.el-form-item')) {
       const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
       if (!lbl.includes(label)) continue;
-      const input = item.querySelector('input:not([type="hidden"])');
-      const textarea = item.querySelector('textarea');
-      const t = input || textarea;
+      const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
       if (!t) return 'no-input-found';
       if (t.disabled || t.readOnly) return 'field-disabled';
-      if (t.closest('.el-date-editor, .tsscdatepicker')) return 'is-date-picker';
-      const setter = Object.getOwnPropertyDescriptor((t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement).prototype,'value').set;
-      setter.call(t, val);
-      t.dispatchEvent(new Event('input',{bubbles:true}));
-      t.dispatchEvent(new Event('change',{bubbles:true}));
-      t.dispatchEvent(new Event('blur',{bubbles:true}));
+      if (t.closest('.el-date-editor, .tsscdatepicker')) {
+        t.focus();
+        setFn(t, val);
+        try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){}
+        (t.parentNode?.querySelector('input')||t).click();
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const day = new Date(val).getDate();
+            for (const panel of document.querySelectorAll('.el-picker-panel')) {
+              if (!panel.offsetParent || panel.style.display === 'none') continue;
+              for (const td of panel.querySelectorAll('td.available:not(.prev-month):not(.next-month)')) {
+                if (parseInt(td.textContent.trim()) === day && !td.disabled) { td.click(); break; }
+              }
+            }
+            document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
+            resolve('ok-date');
+          }, 200);
+        });
+      }
+      setFn(t, val);
+      return 'ok';
+    }
+    // Pass 2: character-set match (handles word order variations like 登记注册地址 vs 注册登记地址)
+    for (const item of c.querySelectorAll('.el-form-item')) {
+      const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+      const searchChars = [...new Set(label.replace(/[\s,，、]/g, ''))];
+      if (searchChars.length < 2) continue;
+      const allCharsMatch = searchChars.every(ch => lbl.includes(ch));
+      if (!allCharsMatch) continue;
+      const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
+      if (!t) return 'no-input-found';
+      if (t.disabled || t.readOnly) return 'field-disabled';
+      if (t.closest('.el-date-editor, .tsscdatepicker')) {
+        t.focus();
+        setFn(t, val);
+        try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){}
+        (t.parentNode?.querySelector('input')||t).click();
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const day = new Date(val).getDate();
+            for (const panel of document.querySelectorAll('.el-picker-panel')) {
+              if (!panel.offsetParent || panel.style.display === 'none') continue;
+              for (const td of panel.querySelectorAll('td.available:not(.prev-month):not(.next-month)')) {
+                if (parseInt(td.textContent.trim()) === day && !td.disabled) { td.click(); break; }
+              }
+            }
+            document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
+            resolve('ok-date');
+          }, 200);
+        });
+      }
+      setFn(t, val);
       return 'ok';
     }
     for (const inp of c.querySelectorAll('input:not([type="hidden"]),textarea')) {
       if (inp.closest('.el-date-editor,.tsscdatepicker')) continue;
       const ph = inp.getAttribute('placeholder') || '';
       if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent !== null) {
-        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-        setter.call(inp, val);
-        inp.dispatchEvent(new Event('input',{bubbles:true}));
-        inp.dispatchEvent(new Event('change',{bubbles:true}));
-        inp.dispatchEvent(new Event('blur',{bubbles:true}));
+        setFn(inp, val);
         return 'ok-placeholder';
       }
     }
+    // Pass 4: fuzzy match — pick the label with highest character overlap
+    let bestMatch = null, bestScore = 0;
+    for (const item of c.querySelectorAll('.el-form-item')) {
+      const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+      if (!lbl) continue;
+      const a = [...new Set(label.replace(/[\s,，、]/g, ''))];
+      const b = [...new Set(lbl.replace(/[\s,，、]/g, ''))];
+      const common = a.filter(ch => b.includes(ch)).length;
+      const score = common / Math.max(a.length, b.length, 1);
+      if (score > bestScore) { bestScore = score; bestMatch = item; }
+    }
+    if (bestMatch && bestScore >= 0.4) {
+      const t = bestMatch.querySelector('input:not([type="hidden"])') || bestMatch.querySelector('textarea');
+      if (t && !t.disabled && !t.readOnly) { setFn(t, val); return 'ok-fuzzy'; }
+    }
+    const _allLbls = [...c.querySelectorAll('.el-form-item')].map(i => i.querySelector('.el-form-item__label')?.textContent?.trim() || '').filter(Boolean);
+    if (_allLbls.length > 0) console.log('[fillFormField] Available labels:', JSON.stringify(_allLbls));
     return 'label-not-found';
   },
   selectOption: (label, option) => {
@@ -172,6 +238,24 @@ const CTRL_OBJECT = `{
   waitForLoading: () => new Promise(resolve => { let el=0; const ck=()=>{ if(el>=30000){resolve('timeout');return; } const m=document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'); if(!m||m.offsetParent===null) resolve(); else { el+=200; setTimeout(ck,200); } }; ck(); }),
   switchTab: (name) => { for (const tab of document.querySelectorAll('.el-tabs__item')) { if (tab.textContent.trim()===name && tab.offsetParent!==null) { tab.click(); return 'ok'; } } return 'tab-not-found'; },
   expandAllTreeNodes: () => { let t=0; for(let r=0;r<10;r++){ const tree=document.querySelector('.el-tree'); if(!tree) return -1; let n=0; tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node=>{ const ic=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon'); if(ic){ic.click();n++;} }); if(n===0)break; t+=n; } return t; },
+  fillAddressFields: (addr) => {
+    let count = 0;
+    for (const item of CTRL.getContainer().querySelectorAll('.el-form-item')) {
+      const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+      if (!lbl.includes('地址')) continue;
+      const t = item.querySelector('input:not([type="hidden"]):not([disabled]):not([readOnly]),textarea:not([disabled]):not([readOnly])');
+      if (!t) continue;
+      const TagProto = t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(TagProto.prototype,'value').set;
+      setter.call(t, addr);
+      t.setAttribute('value', addr);
+      t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:addr}));
+      t.dispatchEvent(new Event('change',{bubbles:true}));
+      t.dispatchEvent(new Event('blur',{bubbles:true}));
+      count++;
+    }
+    return count > 0 ? 'ok:' + count : 'no-address-fields';
+  },
   clickTableRowAction: (rowText, btnText) => {
     for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
       if (!row.textContent.includes(rowText)) continue;
@@ -221,6 +305,7 @@ export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 | CTRL.switchTab | (name) | 'ok' / 'tab-not-found' | 切换 el-tabs |
 | CTRL.checkFieldValue | (label) | 值 / 'empty' / 'label-not-found' | 读取表单字段当前值 |
 | CTRL.clickAdjacentButton | (label) | 'clicked' / 'already-filled' / 'no-button-found' | 点击字段旁的选择/引入按钮 |
+| CTRL.fillAddressFields | (addr) | 'ok:N' / 'no-address-fields' | 填充所有标签含"地址"的字段 |
 | CTRL.expandAllTreeNodes | () | 展开节点数 | 展开全部 el-tree 节点 |`;
 
 // Re-export raw CTRL object for template generation

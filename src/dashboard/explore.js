@@ -215,9 +215,9 @@ export function initAIExplore() {
             break;
 
           case 'trajectory':
-            exploreTrajectoryId.textContent = 'Trajectory: ' + data.trajectoryId;
-            exploreLog('system', 'Trajectory saved: ' + data.trajectoryId + ' (' + data.actions + ' actions)');
-            exploreStep('traj', 'success', 'Trajectory saved', data.trajectoryId + ' | ' + data.actions + ' actions');
+            exploreTrajectoryId.textContent = 'A:' + (data.action_file || '').split(/[\\/]/).pop() || '';
+            exploreLog('system', 'Actions: ' + (data.action_count || '?') + ', Log: ' + (data.log_count || '?') + ' lines');
+            exploreStep('traj', 'success', 'Trajectory saved', data.action_count + ' actions + ' + data.log_count + ' log lines');
             break;
 
           case 'done':
@@ -226,10 +226,10 @@ export function initAIExplore() {
             exploreStartBtn.disabled = false;
             exploreCancelBtn.disabled = true;
 
-            if (data.success && data.trajectoryId) {
-              exploreTrajectoryId.textContent = 'Trajectory: ' + data.trajectoryId;
+            if (data.success && data.action_file) {
+              exploreTrajectoryId.textContent = 'Saved: ' + data.action_file.split(/[\\/]/).pop();
               exploreStatus.textContent = 'Exploration complete';
-              exploreLog('success', 'Trajectory saved: ' + data.trajectoryId);
+              exploreLog('success', 'Actions: ' + data.action_count + ', Log: ' + data.log_count);
             } else if (data.success && data.phase === 'explore_only') {
               exploreStatus.textContent = data.message || 'Complete';
               exploreLog('success', data.message || 'All phases done');

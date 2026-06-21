@@ -346,7 +346,7 @@ export default function (app) {
               const trajectoryId = createTrajectoryId();
               const { record, flow } = saveTrajectoryRecord({ trajectoryId, task: task || '', model: session.model, sourcePath: trajectoryFile, exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful } });
               const actionCount = flow.filter(s => s.type !== 'done' && !s.error).length;
-              return res.json({ trajectoryId, steps: record.stepCount, actions: actionCount, isSuccessful: record.isSuccessful });
+              return res.json({ trajectoryId, steps: record.stepCount, actions: actionCount, isSuccessful: record.isSuccessful, action_file: msg.data.action_file, log_file: msg.data.log_file, action_count: msg.data.action_count, log_count: msg.data.log_count });
             } catch (err) { return res.status(500).json({ error: `Trajectory save error: ${err.message}` }); }
           }
         } catch {}

@@ -15,6 +15,7 @@ import registerExploreRoutes from './src/routes/explore-route.js';
 import registerBrowserSessionRoutes from './src/routes/browser-session.js';
 import registerTrajectoryRoutes from './src/routes/trajectory.js';
 import registerCaseDataRoutes from './src/routes/case-data.js';
+import registerAssembleRoutes from './src/routes/test-assemble.js';
 import registerSSERoutes from './src/routes/sse.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use('/api/test/screenshots', express.static(TMP_DIR));
+app.use('/scripts', express.static(path.join(PROJECT_DIR, 'scripts')));
 app.use(express.static(DASHBOARD_DIR, { maxAge: 0 }));
 
 // Register all route modules
@@ -31,6 +33,7 @@ registerExploreRoutes(app, exploreLockRef);
 registerBrowserSessionRoutes(app);
 registerTrajectoryRoutes(app);
 registerCaseDataRoutes(app);
+registerAssembleRoutes(app);
 registerHealthRoutes(app);
 registerAgentRoutes(app);
 registerTestGenRoutes(app);

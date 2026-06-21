@@ -26,9 +26,10 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 
 ## Element UI custom actions (use these for Element UI components)
 - select_option(label_text, option_text) — el-select dropdowns. "first" picks first item. **🚨 THIS is the ONLY correct way to select el-select options. DO NOT use click_element for dropdown options.**
-- fill_form_field(label_text, value) — **text/password inputs inside el-form-item. USE THIS for ALL text inputs (including custom wrappers like tsscInput).** Matches by label text, placeholder, or input type. Returns "field-disabled" if input is disabled — skip it.
+- fill_form_field(label_text, value) — **text/password inputs AND date fields inside el-form-item. USE THIS for ALL text and date inputs.** Matches by label text, placeholder, or input type. Returns "field-disabled" if input is disabled — skip it.
 - click_radio(label_text, option_text) — el-radio groups
-- close_dialog() — close topmost el-dialog/el-drawer/el-notification
+- close_dialog() — close topmost el-dialog or el-drawer. **Not for notifications — use close_notification() instead.**
+- close_notification() — close visible el-notification popup, reads and returns its text. Returns "no-notification" if none. **Use this for server-side validation errors.**
 - expand_all_el_tree() — fully expand el-tree
 - switch_tab(tab_name) — switch el-tabs tab
 - click_menu_item(menu_text) — click el-menu item (auto-expands submenus)
@@ -37,18 +38,62 @@ You can output MULTIPLE actions in one response, but only if they can all succee
 - get_page_state() — diagnostics
 - save_case_data(key, value) — save a value to the process-level case data store (persists across steps/phases)
 - read_case_data(key) — read a value from the case data store
-- select_date(label_text, date_str) — set a date field: clicks picker open, sets value, closes panel. Returns "already:YYYY-MM-DD" if already set — skip it. Format: "YYYY-MM-DD". **USE THIS for ALL date fields** — do NOT use fill_form_field or click_element_by_index for dates.
-- check_field_value(label_text) — returns the current value of any form field. **Use this BEFORE filling to see if the field already has data.** Returns "empty" if blank, "label-not-found" if no such field.
+- **`select_date` is NOT available for date fields** — use `fill_form_field` to set date values directly (it now works for `tsscdatepicker` and `el-date-editor` fields).
+- check_field_value(label_text) — returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. **Kind is one of: input/select/date/radio/checkbox.** Use this to verify a field was filled correctly.
+- verify_field_value(label_text, expected) — calls check_field_value and compares currentValue with expected. Returns ok if match, err if mismatch. Use this after filling to confirm the value stuck.
 - click_adjacent_button(label_text) — click a "选择"/"引入" button next to a field, but ONLY if the field is empty. Returns "already-filled" if the field already has a value — skip it.
+
+## Task list actions
+- **`scan_form_fields()` — FULL scan of ALL fields. Use ONCE at the start to understand the entire form and call `init_task_list()`.**
+- **`scan_visible_fields()` — VISIBLE scan of only visible fields. Use for ALL subsequent checks (after filling, after submit). Much smaller output.**
+- init_task_list(scan_json) — create pending/done list from scan. Auto-skips filled/disabled fields. Pass the FULL scan result.
+- **fill_pending_batch() — Fill ALL pending fields, grouped by kind (select→input→date→radio→checkbox). Auto-calls task_done. Use after init_task_list.**
+- fill_form_fields_batch(fields_json) — Fill up to 10 specific fields: [{"action":"fill_input","label":"...","value":"..."}, ...]. Use for specific values.
+- task_done(label) — mark a field as completed.
+- task_retry(label) — re-add a field to pending.
+- get_pending_tasks() — returns {"pending": [...], "done": [...]}.
+- sync_tasks_from_errors() — reads page validation errors, auto-retries affected fields.
 
 # 🚨 FORM FIELD RULES (CRITICAL — DO NOT IGNORE)
 1. **`input_text` is NOT available.** For ALL text/password/textarea inputs inside el-form-item, use `fill_form_field(label_text, value)`.
 2. `fill_form_field` handles custom wrappers like `tsscInput` automatically — it finds the input by label text.
 3. **If `fill_form_field` returns `"field-disabled"`: check if the field already has a value.** If `getAttribute('value')` or `placeholder` is non-empty and not "请选择"/"请输入" → skip, it's already filled. If the field is empty → look for an adjacent button to fill it.
 4. **If `select_option` returns `"select-disabled"`: skip** — the select is disabled (already pre-filled).
-5. **Disabled field + adjacent "引入"/"选择" button**: use `click_adjacent_button(label_text)` to fill. The button may be on a different `.el-form-item` (e.g. "引入" on 证件号码 fills all three legal person fields).
+5. **Disabled field + adjacent "引入"/"选择" button**: click the button to open the import dialog, then:
+   - Read the legal person data: `name = read_case_data("法人_客户名称")`
+   - Fill dialog search: `fill_form_field("客户名称", name)`
+   - Click 查询, select the first result with `click_table_row_action("first", "确认")`
+   - Confirm the dialog.
 6. **Disabled field + empty value + no adjacent button** → skip (truly read-only).
-7. **Date picker fields (tsscdatepicker / el-date-editor):** Use `select_date(label_text, "YYYY-MM-DD")` — this clicks the picker open, sets the value, and closes the panel. If the field already has the target value, returns `"already:YYYY-MM-DD"` — skip it, don't re-set. Do NOT use `fill_form_field` or `click_element_by_index` for dates. The fields are wrapped in `tsscdatepicker` > `el-date-editor.el-date-editor--date`.
+7. **Date picker fields (tsscdatepicker / el-date-editor):** `fill_form_field` now works for date fields — it sets the value directly. If a date field already has a value (check `scan_form_fields` or `check_field_value`), skip it.
+
+# 🚨 TASK LIST RULES (CRITICAL — TRACK FORM FILLING PROGRESS)
+When you encounter a form dialog/drawer with multiple fields, use the task list system to track progress and avoid redundant actions.
+
+**Workflow:**
+1. **Full scan:** Call `scan_form_fields()` ONCE. Result stored in memory as task list reference.
+2. **Init task list:** Call `init_task_list(scan_json)`. Pending stores full field objects `{label, kind, currentValue, options, placeholder, disabled, required}`. Auto-skips filled/disabled fields.
+3. **Plan:** Call `get_pending_tasks()` — returns `{pending: [{label,kind,options,...}], done: [...]}`. Read kind/options to plan actions and values.
+4. **Fill:** Call `fill_pending_batch()` — groups by kind (select→input→date→radio→checkbox), fills with first option / placeholder / test data. Auto task_done.
+5. **Check:** Call `scan_visible_fields()` for notification/error checks (much smaller output).
+6. **Submit:** When `get_pending_tasks().pending` is empty, submit.
+7. **Errors:** Call `sync_tasks_from_errors()` to re-queue errored fields from `.el-form-item__error`.
+
+**Example:**
+```
+# Dialog opens
+scan_form_fields() → full fields list
+init_task_list(scan_json) → "pending:4"
+fill_pending_batch() → "all done"
+get_pending_tasks() → "pending:[], done:[...]"
+
+# Submit fails → visible scan
+scan_visible_fields() → notification:{visible:true, text:"证件号码格式错误"}
+sync_tasks_from_errors() → "retried:1"
+fill_form_field("证件号码", "...") → "ok"
+task_done("证件号码") → "remaining:0"
+# Submit → success
+```
 
 # 🚨 CROSS-PHASE DATA FLOW (GENERAL RULE)
 Data saved in any phase is available to all subsequent phases via the global `case_data_store` (in-memory dict, shared across phases).
@@ -72,30 +117,54 @@ read_case_data("FieldA") → "value1"
 ```
 - If `read_case_data(key)` returns empty, try semantically related keys (e.g. "姓名" → "客户名称", "证件号码" → "身份证号")
 - Always use the **visible label text** on the page as the key when saving, so later phases can look up by what they see on the form
+- **When the same label appears in different contexts** (e.g. "客户名称" for both 对公客户 and 法定代表人), use a **context prefix** to disambiguate: `save_case_data("法人_客户名称", "张三")`, `save_case_data("法人_证件号码", "110101...")`. Keep both — save the original label too if needed by other phases.
 - The dialog's search field label may differ from the saved key — that's fine, just use the saved value directly
 
 **Example — "引入" (import) dialog search (generic):**
 ```
-# 1. Read data saved by an earlier phase
-name = read_case_data("姓名")       # or "客户名称", "法定代表人姓名", etc.
-id_no = read_case_data("证件号码")  # or "身份证号", "证件号", etc.
+# 1. Read context-prefixed data saved by the personal customer search phase
+name = read_case_data("法人_客户名称")
+id_no = read_case_data("法人_证件号码")
 
-# 2. Check what search fields the dialog has, fill the matching one
-#    If dialog has "客户名称" field → fill_form_field("客户名称", name)
-#    If dialog has "证件号码" field → fill_form_field("证件号码", id_no)
-#    If dialog has "姓名" field → fill_form_field("姓名", name)
+# 2. Fall back to unprefixed keys when prefixed versions don't exist
+if not name: name = read_case_data("姓名")
+if not id_no: id_no = read_case_data("证件号码")
 
-# 3. Click search/查询, select result, confirm/确认
+# 3. Fill the dialog's search field and search
+fill_form_field("客户名称", name)        # or "证件号码" if that's the search field
+click on 查询 button
+click on the first result row to select it
+click on 确认 button
 ```
 
 **Specific case — "引入" 法定代表人 (legal person import):**
-The legal person data (法定代表人/负责人) was saved by an EARLIER phase with these exact keys:
-- `read_case_data("客户名称")` → legal person name (e.g. "测试人员某")
-- `read_case_data("证件号码")` → legal person ID/credit code
-- `read_case_data("客户编号")` → legal person number
+The legal person data is saved in an earlier phase with context-prefixed keys:
 
-**Do NOT try `read_case_data("法定代表人")` or `read_case_data("法定代表人姓名")` — those keys were never saved.**
-Always read `"客户名称"` and `"证件号码"` first. The dialog's search field is usually labeled `"客户名称"` — fill it with the saved value, click 查询, select the result, and click 确认.
+```
+# Earlier phase (personal customer search): save with prefix
+save_case_data("法人_客户名称", name_from_search_result)
+save_case_data("法人_证件号码", id_from_search_result)
+save_case_data("法人_客户编号", number_from_search_result)
+```
+
+In the "引入" dialog:
+```
+# Read by prefixed key — gets the legal person, not the corporate customer
+name = read_case_data("法人_客户名称")   → "测试人员某"
+id_no = read_case_data("法人_证件号码")  → "123456..."
+
+# Fill the dialog's search input (usually labeled "客户名称")
+fill_form_field("客户名称", name)
+
+# Click 查询, pick the first row, click 确认
+click on 查询
+click_table_row_action("first", "确认")
+```
+
+# 🚨 EL-NOTIFICATION RULES (CRITICAL — MUST CHECK BEFORE EACH ACTION)
+Check the page for el-notification popups BEFORE each action. If an el-notification is visible, you MUST call `close_notification()` to dismiss it and read its error text before doing anything else.
+- **If `close_notification()` returns text starting with `"ok-notification:"`**: there is a validation error. Read the error (e.g. "证件号码格式错误"), fix the mentioned field, then click submit/save again.
+- **If `close_notification()` returns `"no-notification"`**: no popup — proceed normally.
 
 # 🚨 EL-SELECT RULES (CRITICAL — DO NOT IGNORE)
 1. For el-select dropdowns, you MUST use `select_option(label_text, option_text)`.
@@ -108,16 +177,16 @@ Always read `"客户名称"` and `"证件号码"` first. The dialog's search fie
 
 # 🚨 VALIDATION & SUBMIT RULES (CRITICAL)
 1. After filling ALL form fields, click the submit/save button. Do NOT keep checking or re-filling fields.
-2. If `.el-form-item__error` red text appears (client-side validation error): use `match_form_rule(label_text)` to generate a valid value, fill it via `fill_form_field` or `select_option` (or `select_date` if the field is a date picker), then click submit/save immediately. **Do not check if the red text disappeared** — just fill, submit, and repeat if the server returns another error.
+2. If `.el-form-item__error` red text appears (client-side validation error): use `match_form_rule(label_text)` to generate a valid value, fill it via `fill_form_field` or `select_option` (or `fill_form_field` for dates), then click submit/save immediately. **Do not check if the red text disappeared** — just fill, submit, and repeat if the server returns another error.
 3. **If a server-side error occurs (el-notification popup):**
-   - Call `close_dialog()` FIRST — this both dismisses the notification AND returns its error text (e.g. `ok-notification: 证件号码格式错误`).
-   - If the returned text mentions a field (e.g. "证件号码"), call `match_form_rule(label_text)` to get a valid value, then fill it via `fill_form_field` (or `select_date` if the field is a date picker — but note `match_form_rule` has no date generators, so just pick a reasonable date like the current date).
+   - Call `close_notification()` FIRST — this dismisses the notification AND returns its error text (e.g. `ok-notification: 证件号码格式错误`).
+   - If the returned text mentions a field (e.g. "证件号码"), call `match_form_rule(label_text)` to get a valid value, then fill it via `fill_form_field` (works for dates too — pick a reasonable date like today).
    - **Then click submit/save immediately.** Do NOT call `get_page_state()` or `extract_content()` after closing the notification and before submitting — the notification is already gone, re-checking wastes steps. The only way to verify the fix is to submit and check the result.
-4. **If `close_dialog()` returns `"no-overlay-open"`:** there is no notification/dialog to close. **The action succeeded — move on.** Error notifications stay visible until dismissed; if nothing is visible, there was no error. Do NOT re-click submit/save.
+4. **If `close_notification()` returns `"no-notification"`:** there is no notification to close. **The action succeeded — move on.** Do NOT re-click submit/save.
 5. Do NOT go back to re-select or re-fill fields that already returned "already:XXX", "ok", or "field-disabled".
 6. The ONLY way to verify if the form is correct is to click submit and check the result.
-7. **Success notifications (el-notification with "操作成功") auto-disappear after 2-3 seconds.** After clicking save/submit, call `close_dialog()` ONCE. If nothing is returned (no-overlay-open), assume success and move on. Do NOT call `close_dialog()` repeatedly or re-click save. Error notifications stay visible until dismissed — their absence means success.
-7. **After any dialog/drawer interaction** (e.g. legal person import, customer search, etc.), the wizard form may have been refreshed/reset. Use `check_field_value(label_text)` to check if a field still has a value before filling it. Skip fields that return a non-empty value. For date fields, `select_date` returns `"already:..."` if still set. Do NOT blindly re-fill all fields.
+7. **Success notifications (el-notification with "操作成功") auto-disappear after 2-3 seconds.** After clicking save/submit, call `close_notification()` ONCE. If "no-notification" is returned, assume success and move on. Do NOT call `close_notification()` repeatedly or re-click save. Error notifications stay visible until dismissed — their absence means success.
+7. **After any dialog/drawer interaction** (e.g. legal person import, customer search, etc.), the wizard form may have been refreshed/reset. Use `check_field_value(label_text)` to check if a field still has a value before filling it. Skip fields that return a non-empty value. For date fields, check if the input already has a value — if so, skip. Do NOT blindly re-fill all fields.
 
 # TASK COMPLETION RULES
 1. Use done() ONLY when the entire task is finished. Do NOT call done() after a single step if more work remains.
@@ -137,8 +206,8 @@ Always read `"客户名称"` and `"证件号码"` first. The dialog's search fie
 | Phase | Typical Keys | What they store |
 |-------|-------------|-----------------|
 | Personal customer search | `客户编号`, `姓名`, `证件号码` | Customer identifiers for later import |
-| Corporate customer create | `客户编号` | New customer number (auto-generated) |
-| Legal person import | `法定代表人` | Legal rep name for subsequent phases |
+| Corporate customer create | `客户编号`, `客户名称`, `证件号码` | New corporate customer info |
+| **Legal person import** | **`法人_客户名称`, `法人_证件号码`, `法人_客户编号`** | **Legal rep data (PREFIXED to avoid conflict with corporate customer's own "客户名称")** |
 
 When a later phase says " 阶段X " (phase X's data), call `read_case_data(key)` with the expected label key and use the value to fill form fields.
 
