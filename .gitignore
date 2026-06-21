@@ -17,3 +17,5 @@ scripts/case_data/
 scripts/data/
 scripts/generated/
 scripts/trajectories/
+chorme-devtools-mcp/
+playwright-cli/
