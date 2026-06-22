@@ -46,6 +46,7 @@ def _record_action(action_name, params, result, element=None):
         'result': str(result)[:200] if result else '',
         'command': _ACTION_TO_COMMAND.get(action_name, action_name),
         'target': '',
+        'absoluteTarget': '',
         'tagName': '',
         'attributes': {},
     }
@@ -53,6 +54,7 @@ def _record_action(action_name, params, result, element=None):
     if element:
         elem = dict(element) if isinstance(element, dict) else {}
         entry['target'] = elem.get('xpath', '') or ''
+        entry['absoluteTarget'] = elem.get('absolute_xpath', '') or ''
         entry['tagName'] = elem.get('tag_name', '') or ''
         entry['attributes'] = elem.get('attributes', {}) if isinstance(elem.get('attributes'), dict) else {}
 
@@ -579,16 +581,27 @@ async def _wait_if_loading(page):
 
 
 async def _capture_element(page, label_text):
-    """Capture smart XPath + tag + attributes for a labeled form field."""
+    """Capture both attribute XPath (smart) and absolute XPath for a labeled form field."""
+    result = {}
     try:
         raw = await page.evaluate(JS_SMART_LOCATOR, [label_text])
         if raw:
             info = json.loads(raw) if isinstance(raw, str) else raw
             if info.get('xpath'):
-                return {'xpath': info['xpath'], 'tag_name': info.get('tag', 'input'), 'attributes': info.get('attrs', {})}
+                result['xpath'] = info['xpath']
+                result['tag_name'] = info.get('tag', 'input')
+                result['attributes'] = info.get('attrs', {})
     except Exception:
         pass
-    return None
+    try:
+        raw_abs = await page.evaluate(JS_LOCATOR, [label_text])
+        if raw_abs:
+            abs_info = json.loads(raw_abs) if isinstance(raw_abs, str) else raw_abs
+            if abs_info.get('xpath'):
+                result['absolute_xpath'] = abs_info['xpath']
+    except Exception:
+        pass
+    return result if result else None
 
 
 def _merge_ax_text(dom_fields, snapshot_text):
@@ -1119,7 +1132,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if already.startswith('already:'):
             cur_val = already.split(':', 1)[1]
             if cur_val == option_text or option_text in cur_val or cur_val in option_text:
-                _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, already)
+                element = await _capture_element(page, label_text)
+                _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, already, element=element)
                 return _ok(already + ' | already-matched')
             # Different value — proceed to change it
 
@@ -1191,7 +1205,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # Verify: current value must contain the matched text
         if current_val and (current_val == matched_text or matched_text in current_val or current_val in matched_text):
             case_data_store.pop(f'_sel_retry_{label_text}', None)
-            _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text)
+            element = await _capture_element(page, label_text)
+            _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
             return _ok(f'ok | {current_val}')
 
         return _err(f'confirm-failed | current:{current_val} | expected:{matched_text}')
