@@ -6,6 +6,11 @@ Playwright script assembler.
 Reads an action JSON file (with {action, params, element} entries) and generates
 a Playwright JS script with proper CTRL helpers for Element UI components.
 
+Features:
+  - Multi-tier selector degradation (ID → class → XPath → text → fuzzy)
+  - Identity field auto-generation (credit code, mobile, etc.)
+  - Error collection + structured error report for self-healing
+
 Usage:
     python script_assembler.py <action_file.json> [output_path.js]
     python script_assembler.py -  # read from stdin
@@ -20,6 +25,80 @@ from datetime import datetime
 # ========================== CTRL Injection Template ==========================
 
 CTRL_API_CODE = '''const { chromium } = require('playwright');
+const fs = require('fs');
+
+// ===== Identity value generators (from atp-rule) =====
+function genValidIdCard(prefix) {
+  prefix = prefix || '430101';
+  const y = 1950 + Math.floor(Math.random() * 55);
+  const m = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
+  const d = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0');
+  const seq = String(Math.floor(Math.random() * 999)).padStart(3, '0');
+  const base = prefix + y + m + d + seq;
+  const w = [7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2];
+  const map = ['1','0','X','9','8','7','6','5','4','3','2'];
+  const sum = base.split('').reduce((s, c, i) => s + parseInt(c) * w[i], 0);
+  return base + map[sum % 11];
+}
+function genMobile() {
+  const s = [3,4,5,6,7,8,9][Math.floor(Math.random() * 7)];
+  let n = '1' + s;
+  for (let i = 0; i < 9; i++) n += Math.floor(Math.random() * 10);
+  return n;
+}
+function genEmail() {
+  const names = ['test','admin','user','contact','info','service'];
+  const domains = ['example.com','company.com','test.org','mail.cn'];
+  return names[Math.floor(Math.random()*names.length)] + '_' + Math.random().toString(36).substring(2,6) + '@' + domains[Math.floor(Math.random()*domains.length)];
+}
+function genCreditCode() {
+  const CHARS = '0123456789ABCDEFGHJKLMNPQRTUWXY';
+  const W = [1,3,9,27,19,26,16,17,20,29,25,13,8,24,10,30,28];
+  let body = '91' + String(Math.floor(Math.random()*900000)+100000);
+  for (let i=0; i<9; i++) body += CHARS[Math.floor(Math.random()*CHARS.length)];
+  const total = body.split('').reduce((s,c,i)=>s+CHARS.indexOf(c)*W[i],0);
+  return body + CHARS[(31-total%31)%31];
+}
+function genBankCard() {
+  let n = '62';
+  for (let i=0; i<17; i++) n += Math.floor(Math.random()*10);
+  return n.slice(0,19);
+}
+function genName() {
+  const surnames = ['张','李','王','刘','陈','杨','赵','黄','周','吴'];
+  const names = ['伟','芳','敏','静','丽','强','磊','洋','涛','明','飞','峰'];
+  return surnames[Math.floor(Math.random()*surnames.length)] + names[Math.floor(Math.random()*names.length)] + names[Math.floor(Math.random()*names.length)];
+}
+function genAmount() {
+  const base = Math.floor(Math.random()*9900000)+100000;
+  const cent = Math.floor(Math.random()*100);
+  return base + '.' + String(cent).padStart(2,'0');
+}
+function genAddress() {
+  const cities = ['北京市朝阳区','上海市浦东新区','广州市天河区','深圳市南山区','杭州市西湖区','长沙市岳麓区'];
+  const roads = ['中山路','人民路','解放路','建设路','五一路','芙蓉路'];
+  return cities[Math.floor(Math.random()*cities.length)] + roads[Math.floor(Math.random()*roads.length)] + (Math.floor(Math.random()*200)+1) + '号';
+}
+function genIdentityValue(label) {
+  const t = label.replace(/\\s+/g, '');
+  if (t.includes('证件号码')||t.includes('信用代码')||t.includes('营业执照')) return genCreditCode();
+  if (t.includes('身份证')) return genValidIdCard();
+  if (t.includes('手机')||t.includes('电话')||t.includes('联系方式')) return genMobile();
+  if (t.includes('邮箱')||t.includes('Email')||t.includes('电子邮箱')) return genEmail();
+  if (t.includes('银行卡')||t.includes('银行账号')) return genBankCard();
+  if (t.includes('姓名')||t.includes('用户名')||t.includes('联系人')) return genName();
+  if (t.includes('金额')||t.includes('价格')||t.includes('费用')) return genAmount();
+  if (t.includes('地址')||t.includes('详细地址')) return genAddress();
+  return null;
+}
+
+// ===== Error collection =====
+const _errors = [];
+const _TMP = process.env.TMPDIR || process.env.TMP || process.env.TEMP || '/tmp';
+function _recordError(step, action, label, value, error, details) {
+  _errors.push({ step, action, label: label||'', value: value||'', error, details: details||'' });
+  console.log('  [' + step + '] ' + action + ' FAILED: ' + error);
+}
 
 (async () => {
   const browser = await chromium.launch({ headless: false, slowMo: 100, args: ['--window-position=-8,0'] });
@@ -43,7 +122,6 @@ CTRL_API_CODE = '''const { chromium } = require('playwright');
           t.dispatchEvent(new Event('change',{bubbles:true}));
           t.dispatchEvent(new Event('blur',{bubbles:true}));
         };
-        // Pass 1: label substring match
         for (const item of c.querySelectorAll('.el-form-item')) {
           const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
           if (!lbl.includes(label)) continue;
@@ -51,7 +129,6 @@ CTRL_API_CODE = '''const { chromium } = require('playwright');
           if (!t) return 'no-input-found';
           if (t.disabled||t.readOnly) return 'field-disabled';
           if (t.closest('.el-date-editor,.tsscdatepicker')) { t.focus(); setFn(t,val); try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){} (t.parentNode?.querySelector('input')||t).click(); return new Promise(resolve=>{setTimeout(()=>{const d=new Date(val).getDate();for(const p of document.querySelectorAll('.el-picker-panel')){if(!p.offsetParent||p.style.display==='none')continue;for(const c of p.querySelectorAll('td.available:not(.prev-month):not(.next-month)')){if(parseInt(c.textContent.trim())===d&&!c.disabled){c.click();break}}}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});resolve('ok-date')},200)}); } setFn(t,val); return 'ok'; }
-        // Pass 2: character-set match (handles word order variations like 登记注册地址 vs 注册登记地址)
         const _labelChars = [...new Set(label.replace(/[\\s,，、]/g,''))];
         if (_labelChars.length >= 2) {
           for (const item of c.querySelectorAll('.el-form-item')) {
@@ -61,146 +138,78 @@ CTRL_API_CODE = '''const { chromium } = require('playwright');
             if (!t) return 'no-input-found';
             if (t.disabled||t.readOnly) return 'field-disabled';
             if (t.closest('.el-date-editor,.tsscdatepicker')) { t.focus(); setFn(t,val); try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){} (t.parentNode?.querySelector('input')||t).click(); return new Promise(resolve=>{setTimeout(()=>{const d=new Date(val).getDate();for(const p of document.querySelectorAll('.el-picker-panel')){if(!p.offsetParent||p.style.display==='none')continue;for(const c of p.querySelectorAll('td.available:not(.prev-month):not(.next-month)')){if(parseInt(c.textContent.trim())===d&&!c.disabled){c.click();break}}}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});resolve('ok-date')},200)}); } setFn(t,val); return 'ok'; }
-        }
-        // Pass 3: placeholder match
+          }
         for (const inp of c.querySelectorAll('input:not([type="hidden"]),textarea')) {
           if (inp.closest('.el-date-editor,.tsscdatepicker')) continue;
           const ph = inp.getAttribute('placeholder')||'';
           if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent!==null) { setFn(inp,val); return 'ok-placeholder'; }
         }
-        // Pass 4: fuzzy match — pick the label with highest character overlap
-        let bestScore = 0, bestItem = null;
-        const _items = c.querySelectorAll('.el-form-item');
-        for (var _i = 0; _i < _items.length; _i++) {
-          const _item = _items[_i], _lbl = _item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
-          if (!_lbl) continue;
-          const _a = [...new Set(label.replace(/[\\s,，、]/g,''))];
-          const _b = [...new Set(_lbl.replace(/[\\s,，、]/g,''))];
-          const _common = _a.filter(ch=>_b.includes(ch)).length;
-          const _score = _common / Math.max(_a.length,_b.length,1);
-          if (_score > bestScore) { bestScore = _score; bestItem = _item; }
-        }
-        if (bestItem && bestScore >= 0.4) {
-          const _t = bestItem.querySelector('input:not([type="hidden"])') || bestItem.querySelector('textarea');
-          if (_t && !_t.disabled && !_t.readOnly) { setFn(_t,val); return 'ok-fuzzy'; }
-        }
+        let bestScore=0,bestItem=null;
+        const _items=c.querySelectorAll('.el-form-item');
+        for(var _i=0;_i<_items.length;_i++){const _item=_items[_i],_lbl=_item.querySelector('.el-form-item__label')?.textContent?.trim()||'';if(!_lbl)continue;const _a=[...new Set(label.replace(/[\\s,，、]/g,''))];const _b=[...new Set(_lbl.replace(/[\\s,，、]/g,''))];const _common=_a.filter(ch=>_b.includes(ch)).length;const _score=_common/Math.max(_a.length,_b.length,1);if(_score>bestScore){bestScore=_score;bestItem=_item;}}
+        if(bestItem&&bestScore>=0.4){const _t=bestItem.querySelector('input:not([type="hidden"])')||bestItem.querySelector('textarea');if(_t&&!_t.disabled&&!_t.readOnly){setFn(_t,val);return'ok-fuzzy';}}
         return 'label-not-found';
       },
       selectOption: (label, option) => {
         const c = window.CTRL.getContainer();
         for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
           if (!lbl.includes(label)) continue;
           const trigger = item.querySelector('.el-select .el-input__inner');
           if (!trigger) return 'no-select-found';
           trigger.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
           trigger.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
           trigger.click();
-          setTimeout(() => {
-            const opts = document.querySelectorAll('.el-select-dropdown__item');
-            const FIRST = ['first','1st','\u7b2c\u4e00\u4e2a','\u7b2c\u4e00\u9879'];
-            const t = FIRST.includes(option.toLowerCase().trim())
-              ? [...opts].find(it => it.offsetParent !== null) || opts[0]
-              : [...opts].find(it => it.textContent.trim() === option) || [...opts].find(it => it.textContent.trim().includes(option));
-            if (t) { t.scrollIntoView({block:'nearest'}); t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); t.click(); }
-          }, 200);
+          setTimeout(()=>{
+            const opts=document.querySelectorAll('.el-select-dropdown__item');
+            const FIRST=['first','1st','第一个','第一项'];
+            const t=FIRST.includes(option.toLowerCase().trim())?[...opts].find(it=>it.offsetParent!==null)||opts[0]:[...opts].find(it=>it.textContent.trim()===option)||[...opts].find(it=>it.textContent.trim().includes(option));
+            if(t){t.scrollIntoView({block:'nearest'});t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));t.click();}
+          },200);
           return 'triggered';
         }
         return 'label-not-found';
       },
       selectDate: (label, dateStr) => {
-        const c = window.CTRL.getContainer();
-        for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-          if (!lbl.includes(label)) continue;
-          const input = item.querySelector('.el-date-editor input, .tsscdatepicker input');
-          if (!input) continue;
-          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-          setter.call(input, dateStr);
-          input.dispatchEvent(new Event('input',{bubbles:true}));
-          input.dispatchEvent(new Event('change',{bubbles:true}));
-          input.dispatchEvent(new Event('blur',{bubbles:true}));
-          input.blur();
-          try{let vm=input.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=dateStr;p.$emit('input',dateStr);p.$emit('change',dateStr);p.$emit('pick',new Date(dateStr));}}}catch(e){}
-          document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
-          return 'selected';
-        }
-        return 'label-not-found';
+        const c=window.CTRL.getContainer();
+        for(const item of c.querySelectorAll('.el-form-item')){const lbl=item.querySelector('.el-form-item__label')?.textContent?.trim()||'';if(!lbl.includes(label))continue;const input=item.querySelector('.el-date-editor input,.tsscdatepicker input');if(!input)continue;const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,dateStr);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));input.dispatchEvent(new Event('blur',{bubbles:true}));input.blur();try{let vm=input.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=dateStr;p.$emit('input',dateStr);p.$emit('change',dateStr);p.$emit('pick',new Date(dateStr));}}}catch(e){}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});return'selected';}
+        return'label-not-found';
       },
       clickMenuItem: (text) => {
-        for (const item of [...document.querySelectorAll('.el-menu-item')].filter(i=>i.textContent.trim()===text&&i.offsetParent)) { item.click(); return 'ok'; }
-        for (const sm of document.querySelectorAll('.el-submenu')) {
-          const title = sm.querySelector('.el-submenu__title');
-          if (title) title.click();
-          for (const si of sm.querySelectorAll('.el-menu-item')) { if (si.textContent.trim()===text) { setTimeout(()=>si.click(),300); return 'ok-expanded'; } }
-        }
-        return 'not-found';
+        for(const item of[...document.querySelectorAll('.el-menu-item')].filter(i=>i.textContent.trim()===text&&i.offsetParent)){item.click();return'ok';}
+        for(const sm of document.querySelectorAll('.el-submenu')){const title=sm.querySelector('.el-submenu__title');if(title)title.click();for(const si of sm.querySelectorAll('.el-menu-item')){if(si.textContent.trim()===text){setTimeout(()=>si.click(),300);return'ok-expanded';}}}
+        return'not-found';
       },
       fillAddressFields: (addr) => {
-        let count = 0;
-        const items = window.CTRL.getContainer().querySelectorAll('.el-form-item');
-        for (const item of items) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-          if (!lbl.includes('地址')) continue;
-          const t = item.querySelector('input:not([type="hidden"]):not([disabled]):not([readOnly]),textarea:not([disabled]):not([readOnly])');
-          if (!t) continue;
-          const TagProto = t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
-          const setter = Object.getOwnPropertyDescriptor(TagProto.prototype,'value').set;
-          setter.call(t, addr);
-          t.setAttribute('value', addr);
-          t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:addr}));
-          t.dispatchEvent(new Event('change',{bubbles:true}));
-          t.dispatchEvent(new Event('blur',{bubbles:true}));
-          count++;
-        }
-        return count > 0 ? 'ok:' + count : 'no-address-fields';
+        let count=0;const items=window.CTRL.getContainer().querySelectorAll('.el-form-item');for(const item of items){const lbl=item.querySelector('.el-form-item__label')?.textContent?.trim()||'';if(!lbl.includes('地址'))continue;const t=item.querySelector('input:not([type="hidden"]):not([disabled]):not([readOnly]),textarea:not([disabled]):not([readOnly])');if(!t)continue;const TagProto=t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;const setter=Object.getOwnPropertyDescriptor(TagProto.prototype,'value').set;setter.call(t,addr);t.setAttribute('value',addr);t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:addr}));t.dispatchEvent(new Event('change',{bubbles:true}));t.dispatchEvent(new Event('blur',{bubbles:true}));count++;}
+        return count>0?'ok:'+count:'no-address-fields';
       },
       clickTableRowAction: (rowText, btnText) => {
-        for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
-          if (!row.textContent.includes(rowText)) continue;
-          for (const btn of row.querySelectorAll('button,.el-button')) { const t=btn.textContent?.trim()||''; if(t.includes(btnText)&&btn.offsetParent){btn.click();return 'ok';} }
-          return 'button-not-found';
-        }
-        return 'row-not-found';
+        for(const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')){if(!row.textContent.includes(rowText))continue;for(const btn of row.querySelectorAll('button,.el-button,i[class*="icon"]')){const t=btn.textContent?.trim()||'',c=btn.className||'';if(t.includes(btnText)||c.includes(btnText.toLowerCase())){if(btn.offsetParent){btn.click();return'ok';}}}if(btnText==='edit'||btnText==='编辑'){const ic=row.querySelector('i.el-icon-edit,i[class*="bianji"],i[class*="edit"],i[class*="xiugai"]');if(ic&&ic.offsetParent){ic.click();return'ok-icon';}}if(btnText==='delete'||btnText==='删除'){const ic=row.querySelector('i.el-icon-delete,i[class*="shanchu"],i[class*="delete"]');if(ic&&ic.offsetParent){ic.click();return'ok-icon';}}return'button-not-found';}
+        return'row-not-found';
       },
       clickRadio: (label, option) => {
-        const c = window.CTRL.getContainer();
-        for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
-          if (!lbl.includes(label)) continue;
-          for (const radio of item.querySelectorAll('.el-radio')) { if(radio.textContent.trim()===option&&radio.offsetParent){radio.click();return 'ok';} }
-          return 'option-not-found';
-        }
-        return 'label-not-found';
+        const c=window.CTRL.getContainer();for(const item of c.querySelectorAll('.el-form-item')){const lbl=item.querySelector('.el-form-item__label')?.textContent?.trim()||'';if(!lbl.includes(label))continue;for(const radio of item.querySelectorAll('.el-radio')){if(radio.textContent.trim()===option&&radio.offsetParent){radio.click();return'ok';}}return'option-not-found';}
+        return'label-not-found';
       },
       clickAdjacentButton: (label) => {
-        const c = window.CTRL.getContainer();
-        for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
-          if (!lbl.includes(label)) continue;
-          const inp = item.querySelector('.el-input__inner');
-          if (inp&&inp.value&&inp.value.trim()!=='') return 'already-filled';
-          const btn = item.querySelector('button.el-button--primary.is-plain');
-          if (btn&&btn.offsetParent){btn.click();return 'clicked';}
-          return 'no-button-found';
-        }
-        return 'label-not-found';
+        const c=window.CTRL.getContainer();for(const item of c.querySelectorAll('.el-form-item')){const lbl=item.querySelector('.el-form-item__label')?.textContent?.trim()||'';if(!lbl.includes(label))continue;const inp=item.querySelector('.el-input__inner');if(inp&&inp.value&&inp.value.trim()!=='')return'already-filled';const btn=item.querySelector('button.el-button--primary.is-plain');if(btn&&btn.offsetParent){btn.click();return'clicked';}return'no-button-found';}
+        return'label-not-found';
       },
       closeDialog: () => {
-        for (const d of [...document.querySelectorAll('.el-dialog')].reverse()) { if(d.offsetParent) { const cb=d.querySelector('.el-dialog__headerbtn .el-icon-close'); if(cb){cb.click();return 'ok';} return 'no-close-button'; } }
-        return 'no-overlay-open';
+        for(const d of[...document.querySelectorAll('.el-dialog')].reverse()){if(d.offsetParent){const cb=d.querySelector('.el-dialog__headerbtn .el-icon-close');if(cb){cb.click();return'ok';}return'no-close-button';}}
+        return'no-overlay-open';
       },
       switchTab: (name) => {
-        for (const tab of document.querySelectorAll('.el-tabs__item')) { if(tab.textContent.trim()===name&&tab.offsetParent){tab.click();return 'ok';} }
-        return 'tab-not-found';
+        for(const tab of document.querySelectorAll('.el-tabs__item')){if(tab.textContent.trim()===name&&tab.offsetParent){tab.click();return'ok';}}
+        return'tab-not-found';
       },
-      waitForLoading: () => new Promise(resolve => { let el=0; const ck=()=>{ if(el>=30000){resolve('timeout');return; } const m=document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'); if(!m||m.offsetParent===null) resolve(); else { el+=200; setTimeout(ck,200); } }; ck(); }),
+      waitForLoading: () => new Promise(resolve=>{let el=0;const ck=()=>{if(el>=30000){resolve('timeout');return;}const m=document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)');if(!m||m.offsetParent===null)resolve();else{el+=200;setTimeout(ck,200);}};ck();}),
       checkFieldValue: (label) => {
-        const c = window.CTRL.getContainer();
-        for (const item of c.querySelectorAll('.el-form-item')) { const lbl=item.querySelector('.el-form-item__label')?.textContent?.trim()||''; if(!lbl.includes(label)) continue; const inp=item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea'); return inp?.value||'empty'; }
-        return 'label-not-found';
+        const c=window.CTRL.getContainer();for(const item of c.querySelectorAll('.el-form-item')){const lbl=item.querySelector('.el-form-item__label')?.textContent?.trim()||'';if(!lbl.includes(label))continue;const inp=item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea');return inp?.value||'empty';}
+        return'label-not-found';
       },
-      expandAllTreeNodes: () => { let t=0; for(let r=0;r<10;r++){ const n=document.querySelectorAll('.el-tree-node:not(.is-expanded)'); if(n.length===0)break; n.forEach(node=>{const i=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon');if(i){i.click();t++;}}); } return t; },
+      expandAllTreeNodes: () => {let t=0;for(let r=0;r<10;r++){const n=document.querySelectorAll('.el-tree-node:not(.is-expanded)');if(n.length===0)break;n.forEach(node=>{const i=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon');if(i){i.click();t++;}});}return t;},
     };
   });
 
@@ -210,16 +219,51 @@ CTRL_API_CODE = '''const { chromium } = require('playwright');
 '''
 
 CTRL_FOOTER = '''  } catch (err) {
-    console.error('Test failed:', err.message);
-    try { await page.screenshot({ path: '/tmp/error.png' }); } catch {}
-    throw err;
+    console.error('FATAL:', err.message);
+    _recordError(0, 'fatal', '', '', err.message, 'Script-level crash');
   } finally {
+    // Write error report
+    if (_errors.length > 0) {
+      const reportPath = require('path').join(_TMP, 'script-errors.json');
+      try { fs.writeFileSync(reportPath, JSON.stringify(_errors, null, 2)); } catch {}
+      console.log('===== ' + _errors.length + ' ERROR(S) =====');
+      _errors.forEach((e, i) => console.log('[' + (i+1) + '] Step ' + e.step + ': ' + e.action + ' - ' + e.error));
+    } else {
+      console.log('===== SUCCESS =====');
+    }
     console.log('Waiting 30s before closing browser...');
     await page.waitForTimeout(30000);
     await browser.close();
+    process.exit(_errors.length > 0 ? 1 : 0);
   }
 })().catch(err => { console.error(err); process.exit(1); });
 '''
+
+
+# ========================== Identity Field Detection ==========================
+
+# Keywords that indicate a field value should be dynamically generated each run
+_IDENTITY_KEYWORDS = [
+    ('genCreditCode', ['证件号码', '统一社会信用代码', '信用代码', '营业执照', '营业执照号']),
+    ('genValidIdCard', ['身份证', '身份证号', '居民身份证']),
+    ('genMobile', ['手机', '电话', '联系方式', '联系电话', '电话号码']),
+    ('genEmail', ['邮箱', 'Email', '电子邮箱']),
+    ('genBankCard', ['银行卡', '银行卡号', '银行账号']),
+    ('genName', ['姓名', '用户名', '联系人']),
+    ('genAmount', ['金额', '价格', '费用', '工资', '收入']),
+    ('genAddress', ['地址', '详细地址', '联系地址']),
+]
+
+def _is_identity_field(label):
+    """Check if a label matches identity-type fields that need unique values."""
+    if not label:
+        return None
+    t = re.sub(r'\s+', '', label)
+    for gen_fn, keywords in _IDENTITY_KEYWORDS:
+        for kw in keywords:
+            if kw in t:
+                return gen_fn
+    return None
 
 
 # ========================== Action-to-Code Mapping ==========================
@@ -229,16 +273,25 @@ def _escape(s):
     return s.replace('\\', '\\\\').replace("'", "\\'") if s else ''
 
 
+def _escape_js_string(s):
+    """Escape a string for use inside a JS template literal or string."""
+    if not s:
+        return ''
+    return s.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n')
+
+
 FILL_RETRY_ACTIONS = {'fill_form_field', 'fill_date_field'}
 
 def _generate_action_code(entry, step_num, url, is_first_fill=False):
     """Generate Playwright JS code from a recorded action entry."""
     action = entry.get('action', '')
     params = entry.get('params', {}) or {}
-    element = entry.get('element', None)
 
     def pre():
         return "    await page.evaluate(() => CTRL.waitForLoading());"
+
+    def pre_ready():
+        return "    await page.waitForSelector('.el-form-item', { timeout: 10000 }).catch(() => {});"
 
     lines = [f'    // [{step_num}] {action}']
 
@@ -246,152 +299,266 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         v = params.get(k, default)
         return str(v) if v else default
 
+    # ---- go_to_url (handled in header) ----
     if action == 'go_to_url':
-        return ''  # skip, URL already handled in header
+        return ''
 
+    # ---- fill_form_field ----
     if action == 'fill_form_field':
         l, v = p('label_text'), p('value')
+        id_fn = _is_identity_field(l)
+
         lines.append(f"    console.log('[{step_num}] Fill \"{l}\"');")
         lines.append(pre())
-        # Ensure form DOM is rendered before interacting
-        lines.append("    await page.waitForSelector('.el-form-item', { timeout: 10000 }).catch(() => {});")
+        lines.append(pre_ready())
+
+        # Identity field: generate dynamic value
+        if id_fn and v:
+            lines.append(f"    const _v{step_num} = {id_fn}();")
+            lines.append(f"    console.log('[{step_num}]   generated unique value:', _v{step_num});")
+            val_expr = f"_v{step_num}"
+        else:
+            val_expr = f"'{_escape(v)}'"
+
+        # Address fields use fillAddressFields
         if '地址' in l or '址' in l or 'address' in l.lower():
-            lines.append(f"    const _r{step_num} = await page.evaluate((addr) => CTRL.fillAddressFields(addr), '{_escape(v)}');")
+            lines.append(f"    const _r{step_num} = await page.evaluate((addr) => CTRL.fillAddressFields(addr), {val_expr});")
             lines.append(f"    if (_r{step_num} === 'no-address-fields') {{")
             lines.append(f"      console.log('[{step_num}] address fill result:', _r{step_num});")
             lines.append(f"      const _a{step_num} = await page.locator('.el-form-item:has-text(\"地址\")').locator('input, textarea').all();")
-            lines.append(f"      for (const _el of _a{step_num}) {{ await _el.fill('{_escape(v)}'); }}")
+            lines.append(f"      for (const _el of _a{step_num}) {{ await _el.fill({val_expr}); }}")
             lines.append(f"    }}")
         else:
-            lines.append(f"    const _r{step_num} = await page.evaluate(() => CTRL.fillFormField('{_escape(l)}', '{_escape(v)}'));")
+            # Tier 1: CTRL.fillFormField
+            lines.append(f"    let _r{step_num} = await page.evaluate((v) => CTRL.fillFormField('{_escape(l)}', v), {val_expr});")
+            lines.append(f"    console.log('[{step_num}]   CTRL:', _r{step_num});")
+
+            # Tier 2: Playwright text-based fallback
             lines.append(f"    if (_r{step_num} !== 'ok' && _r{step_num} !== 'ok-date' && _r{step_num} !== 'ok-placeholder' && _r{step_num} !== 'ok-fuzzy') {{")
-            lines.append(f"      console.log('[{step_num}] fill result:', _r{step_num});")
-            lines.append(f"      const _a{step_num} = await page.locator('.el-form-item:has-text(\"{_escape(l)}\")').locator('input, textarea').first();")
-            lines.append(f"      if (await _a{step_num}.count() > 0) await _a{step_num}.fill('{_escape(v)}');")
+            lines.append(f"      console.log('[{step_num}]   falling back to Playwright text...');")
+            lines.append(f"      try {{")
+            lines.append(f"        const _fb{step_num} = page.locator('.el-form-item').filter({{ hasText: '{_escape_js_string(l)}' }}).locator('input:not([type=\"hidden\"]), textarea').first();")
+            lines.append(f"        await _fb{step_num}.fill({val_expr}, {{ timeout: 3000 }});")
+            lines.append(f"        _r{step_num} = 'ok-playwright';")
+            lines.append(f"      }} catch (_e_fb{step_num}) {{")
+            lines.append(f"        console.log('[{step_num}]   Playwright fallback failed:', _e_fb{step_num}.message);")
+
+            # Tier 3: XPath fallback
+            xp = entry.get('target', '') or ''
+            if xp and not xp.startswith('/') and not xp.startswith('//'):
+                xp = '/' + xp
+            if xp:
+                lines.append(f"        try {{")
+                lines.append(f"          const _xp{step_num} = page.locator('xpath={_escape(xp)}').first();")
+                lines.append(f"          await _xp{step_num}.fill({val_expr}, {{ timeout: 3000 }});")
+                lines.append(f"          _r{step_num} = 'ok-xpath';")
+                lines.append(f"        }} catch (_e_xp{step_num}) {{")
+                lines.append(f"          console.log('[{step_num}]   XPath fallback failed:', _e_xp{step_num}.message);")
+
+            # All fallbacks exhausted
+            lines.append(f"          _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'all-strategies-failed', 'CTRL: ' + _r{step_num});")
+
+            if xp:
+                lines.append(f"        }}")
+            lines.append(f"      }}")
             lines.append(f"    }}")
+
         lines.append('    await page.waitForTimeout(300);')
-        # First fill in a new block: retry once after 300ms
+
+        # First fill in a new block: retry once
         if is_first_fill:
             lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
             if '地址' in l or '址' in l or 'address' in l.lower():
-                lines.append(f"    await page.evaluate((addr) => CTRL.fillAddressFields(addr), '{_escape(v)}');")
+                lines.append(f"    await page.evaluate((addr) => CTRL.fillAddressFields(addr), {val_expr});")
             else:
-                lines.append(f"    await page.evaluate(() => CTRL.fillFormField('{_escape(l)}', '{_escape(v)}'));")
+                lines.append(f"    await page.evaluate((v) => CTRL.fillFormField('{_escape(l)}', v), {val_expr});")
             lines.append('    await page.waitForTimeout(300);')
         return '\n'.join(lines)
 
+    # ---- select_option ----
     if action == 'select_option':
         l, o = p('label_text'), p('option_text')
-        lines.append(f"    console.log('[{step_num}] Select \"{l}\"');")
+        lines.append(f"    console.log('[{step_num}] Select \"{l}\" = \"{o}\"');")
         lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.selectOption('{_escape(l)}', '{_escape(o)}'));")
+        lines.append(pre_ready())
+
+        # Tier 1: CTRL.selectOption
+        lines.append(f"    let _rs{step_num} = await page.evaluate(() => CTRL.selectOption('{_escape(l)}', '{_escape(o)}'));")
+        lines.append(f"    console.log('[{step_num}]   CTRL:', _rs{step_num});")
+
+        # Tier 2: Playwright native fallback
+        lines.append(f"    if (_rs{step_num} !== 'triggered' && _rs{step_num} !== 'triggered-placeholder') {{")
+        lines.append(f"      console.log('[{step_num}]   falling back to Playwright...');")
+        lines.append(f"      try {{")
+        lines.append(f"        await page.locator('.el-form-item').filter({{ hasText: '{_escape_js_string(l)}' }}).locator('.el-select .el-input__inner').first().click({{ timeout: 3000 }});")
+        lines.append(f"        await page.waitForTimeout(300);")
+        lines.append(f"        const _opt{step_num} = page.locator('.el-select-dropdown__item').filter({{ hasText: '{_escape_js_string(o)}' }}).first();")
+        lines.append(f"        await _opt{step_num}.click({{ timeout: 3000 }});")
+        lines.append(f"        _rs{step_num} = 'ok-playwright';")
+        lines.append(f"        console.log('[{step_num}]   Playwright fallback OK');")
+        lines.append(f"      }} catch (_e_s{step_num}) {{")
+        lines.append(f"        console.log('[{step_num}]   Playwright fallback failed:', _e_s{step_num}.message);")
+        lines.append(f"        _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'all-strategies-failed', 'CTRL: ' + _rs{step_num} + ', Playwright: ' + _e_s{step_num}.message);")
+        lines.append(f"      }}")
+        lines.append(f"    }}")
+
         lines.append('    await page.waitForTimeout(300);')
         return '\n'.join(lines)
 
+    # ---- fill_date_field ----
     if action == 'fill_date_field':
         l, v = p('label_text'), p('value')
-        lines.append(f"    console.log('[{step_num}] Set date \"{l}\"');")
+        lines.append(f"    console.log('[{step_num}] Set date \"{l}\" = \"{v}\"');")
         lines.append(pre())
         lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
         lines.append('    await page.waitForTimeout(300);')
-        # First fill in a new block: retry once after 300ms
         if is_first_fill:
             lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
             lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
             lines.append('    await page.waitForTimeout(300);')
         return '\n'.join(lines)
 
+    # ---- click_menu_item ----
     if action == 'click_menu_item':
         t = p('menu_text')
         lines.append(f"    console.log('[{step_num}] Menu \"{t}\"');")
         lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.clickMenuItem('{_escape(t)}'));")
+        lines.append(pre_ready())
+        lines.append(f"    const _rm{step_num} = await page.evaluate(() => CTRL.clickMenuItem('{_escape(t)}'));")
+        lines.append(f"    if (_rm{step_num} === 'not-found') _recordError({step_num}, 'click_menu_item', '{_escape_js_string(t)}', '', 'not-found', 'Menu item not visible or not found');")
         lines.append('    await page.waitForTimeout(300);')
         lines.append("    await page.evaluate(() => CTRL.waitForLoading());")
         return '\n'.join(lines)
 
+    # ---- click_table_row_action ----
     if action == 'click_table_row_action':
         r, b = p('row_text'), p('button_text')
-        lines.append(f"    console.log('[{step_num}] Table action');")
+        lines.append(f"    console.log('[{step_num}] Table action \"{r}\" / \"{b}\"');")
         lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.clickTableRowAction('{_escape(r)}', '{_escape(b)}'));")
+        lines.append(pre_ready())
+        lines.append(f"    const _rt{step_num} = await page.evaluate(() => CTRL.clickTableRowAction('{_escape(r)}', '{_escape(b)}'));")
+        lines.append(f"    if (_rt{step_num} !== 'ok' && _rt{step_num} !== 'ok-icon') _recordError({step_num}, 'click_table_row_action', '{_escape_js_string(r)}', '{_escape_js_string(b)}', _rt{step_num}, 'Row or button not found');")
         lines.append('    await page.waitForTimeout(300);')
         return '\n'.join(lines)
 
+    # ---- click_adjacent_button ----
     if action == 'click_adjacent_button':
         l = p('label_text')
-        lines.append(f"    console.log('[{step_num}] Adjacent \"{l}\"');")
+        lines.append(f"    console.log('[{step_num}] Adjacent button \"{l}\"');")
         lines.append(pre())
         lines.append(f"    await page.evaluate(() => CTRL.clickAdjacentButton('{_escape(l)}'));")
         lines.append('    await page.evaluate(() => CTRL.waitForLoading());')
         lines.append('    await page.waitForTimeout(300);')
         return '\n'.join(lines)
 
+    # ---- click_radio ----
     if action == 'click_radio':
         l, o = p('label_text'), p('option_text')
-        lines.append(f"    console.log('[{step_num}] Radio \"{l}\"');")
+        lines.append(f"    console.log('[{step_num}] Radio \"{l}\" = \"{o}\"');")
         lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.clickRadio('{_escape(l)}', '{_escape(o)}'));")
+        lines.append(f"    const _rr{step_num} = await page.evaluate(() => CTRL.clickRadio('{_escape(l)}', '{_escape(o)}'));")
+        lines.append(f"    if (_rr{step_num} !== 'ok') _recordError({step_num}, 'click_radio', '{_escape_js_string(l)}', '{_escape_js_string(o)}', _rr{step_num}, '');")
         lines.append('    await page.waitForTimeout(300);')
         return '\n'.join(lines)
 
+    # ---- click_element_by_index ----
     if action == 'click_element_by_index':
         idx = p('index')
-        xp = ''
-        if element:
-            xp = (element.get('xpath') or '')
+        xp = entry.get('target', '') or ''
+        txt = p('text', '')
+        elem_id = entry.get('attributes', {}).get('id', '') or ''
+
         if not xp:
-            xp = entry.get('target', '') or ''
-        txt = ''
-        if element:
-            txt = (element.get('text') or '')
-        if not txt:
-            txt = entry.get('propertiesName', '') or p('text', '')
-        if xp:
-            if not xp.startswith('/') and not xp.startswith('//'):
-                xp = '/' + xp
-            lines.append(f"    console.log('[{step_num}] Click [{idx}]');")
-            lines.append("    await page.waitForFunction(before => location.href !== before, page.url(), { timeout: 5000 }).catch(() => {});")
-            lines.append('    await page.evaluate(() => CTRL.waitForLoading());')
-            lines.append('    try {')
-            lines.append(f"      await page.locator('xpath={_escape(xp)}').first().click({{ timeout: 3000 }});")
-            lines.append('    } catch (e) {')
-            lines.append('      try {')
-            if txt:
-                lines.append(f"        await page.locator(':text-is(\"{_escape(txt)}\")').first().click({{ timeout: 5000 }});")
-            else:
-                lines.append(f"        await page.locator('xpath={_escape(xp)}').first().click({{ timeout: 5000, force: true }});")
-            lines.append('      } catch (e2) {')
-            lines.append(f"        // Final fallback: JS dispatchEvent bypasses visibility/pointer-events checks")
-            lines.append(f"        await page.evaluate((xp) => {{")
-            lines.append(f"          const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;")
-            lines.append(f"          if (el) el.dispatchEvent(new MouseEvent('click', {{ bubbles: true }}));")
-            lines.append(f"        }}, '{_escape(xp)}');")
-            lines.append('      }')
-            if txt:
-                lines.append(f"      // Text-fuzzy fallback: search page elements by text similarity")
-                lines.append(f"      try {{")
-                lines.append(f"        await page.evaluate((text) => {{")
-                lines.append(f"          const candidates = [...document.querySelectorAll('button, a, span, li, label, .el-button, .el-menu-item')].filter(el => el.offsetParent !== null);")
-                lines.append(f"          let best = null, bestScore = 0;")
-                lines.append(f"          const t = [...new Set(text.replace(/\\s/g,''))];")
-                lines.append(f"          for (const el of candidates) {{")
-                lines.append(f"            const elText = el.textContent?.trim() || '';")
-                lines.append(f"            if (!elText) continue;")
-                lines.append(f"            const e = [...new Set(elText.replace(/\\s/g,''))];")
-                lines.append(f"            const common = t.filter(ch => e.includes(ch)).length;")
-                lines.append(f"            const score = common / Math.max(t.length, e.length, 1);")
-                lines.append(f"            if (score > bestScore) {{ bestScore = score; best = el; }}")
-                lines.append(f"          }}")
-                lines.append(f"          if (best && bestScore >= 0.4) best.click();")
-                lines.append(f"        }}, '{_escape(txt)}');")
-                lines.append(f"      }} catch (e3) {{}}")
-            lines.append('    }')
-            lines.append('    await page.waitForTimeout(300);')
+            lines.append(f"    console.log('[{step_num}] Click [{idx}] (no XPath)');")
             return '\n'.join(lines)
-        lines.append(f"    console.log('[{step_num}] Click [{idx}] (no XPath)');")
+
+        if not xp.startswith('/') and not xp.startswith('//'):
+            xp = '/' + xp
+
+        lines.append(f"    console.log('[{step_num}] Click [{idx}]');")
+        lines.append("    await page.waitForFunction(before => location.href !== before, page.url(), { timeout: 5000 }).catch(() => {});")
+        lines.append(pre())
+        lines.append(pre_ready())
+
+        # Build degradation chain
+        selectors = []
+        # Tier 0: ID selector (most stable)
+        if elem_id:
+            selectors.append(('id', f"page.locator('#{_escape(elem_id)}').first()"))
+        # Tier 1: Class-based (stable if unique enough)
+        tag = entry.get('tagName', '') or ''
+        attrs = entry.get('attributes', {}) or {}
+        cls = attrs.get('class', '') or ''
+        if cls and tag:
+            safe_cls = cls.split(' ')[0].replace('"', '').replace("'", '')
+            if safe_cls and len(safe_cls) > 2:
+                selectors.append(('class', f"page.locator('{tag}.{safe_cls}').first()"))
+        # Tier 2: XPath
+        selectors.append(('xpath', f"page.locator('xpath={_escape(xp)}').first()"))
+        # Tier 3: Text-based
+        if txt:
+            selectors.append(('text', f"page.locator(':text-is(\"{_escape(txt)}\")').first()"))
+        # Tier 4: JS dispatchEvent
+        selectors.append(('js', f"JS: document.evaluate('{_escape(xp)}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue"))
+        # Tier 5: Fuzzy text match
+        if txt:
+            selectors.append(('fuzzy', f"JS-fuzzy: text='{_escape(txt)}'"))
+
+        # Generate the degradation chain
+        lines.append("    let _clicked = false;")
+        for i, (sel_type, sel_expr) in enumerate(selectors):
+            if sel_type in ('js', 'fuzzy'):
+                # JS-based selectors use page.evaluate
+                if sel_type == 'js':
+                    lines.append(f"    if (!_clicked) {{")
+                    lines.append(f"      try {{")
+                    lines.append(f"        await page.evaluate((xp) => {{")
+                    lines.append(f"          const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;")
+                    lines.append(f"          if (el) {{ el.dispatchEvent(new MouseEvent('click', {{ bubbles: true }})); return true; }}")
+                    lines.append(f"          return false;")
+                    lines.append(f"        }}, '{_escape(xp)}');")
+                    lines.append(f"        _clicked = true;")
+                    lines.append(f"        console.log('[{step_num}]   clicked via JS dispatchEvent');")
+                    lines.append(f"      }} catch (_e_js{step_num}) {{}}")
+                    lines.append(f"    }}")
+                elif sel_type == 'fuzzy':
+                    lines.append(f"    if (!_clicked) {{")
+                    lines.append(f"      try {{")
+                    lines.append(f"        await page.evaluate((text) => {{")
+                    lines.append(f"          const candidates = [...document.querySelectorAll('button, a, span, li, label, .el-button, .el-menu-item')].filter(el => el.offsetParent !== null);")
+                    lines.append(f"          let best = null, bestScore = 0;")
+                    lines.append(f"          const t = [...new Set(text.replace(/\\s/g,''))];")
+                    lines.append(f"          for (const el of candidates) {{")
+                    lines.append(f"            const elText = el.textContent?.trim() || '';")
+                    lines.append(f"            if (!elText) continue;")
+                    lines.append(f"            const e = [...new Set(elText.replace(/\\s/g,''))];")
+                    lines.append(f"            const common = t.filter(ch => e.includes(ch)).length;")
+                    lines.append(f"            const score = common / Math.max(t.length, e.length, 1);")
+                    lines.append(f"            if (score > bestScore) {{ bestScore = score; best = el; }}")
+                    lines.append(f"          }}")
+                    lines.append(f"          if (best && bestScore >= 0.4) {{ best.click(); return bestScore; }}")
+                    lines.append(f"          return 0;")
+                    lines.append(f"        }}, '{_escape(txt)}').then(score => {{")
+                    lines.append(f"          if (score > 0) {{ _clicked = true; console.log('[{step_num}]   clicked via fuzzy (score=' + score.toFixed(2) + ')'); }}")
+                    lines.append(f"        }});")
+                    lines.append(f"      }} catch (_e_fz{step_num}) {{}}")
+                    lines.append(f"    }}")
+            else:
+                lines.append(f"    if (!_clicked) {{")
+                lines.append(f"      try {{")
+                lines.append(f"        await {sel_expr}.click({{ timeout: 3000 }});")
+                lines.append(f"        _clicked = true;")
+                lines.append(f"        console.log('[{step_num}]   clicked via {sel_type}');")
+                lines.append(f"      }} catch (_e_{sel_type}{step_num}) {{ console.log('[{step_num}]   {sel_type} failed:', _e_{sel_type}{step_num}.message); }}")
+                lines.append(f"    }}")
+
+        # If all fail
+        lines.append(f"    if (!_clicked) _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '{_escape_js_string(xp)}', 'all-strategies-failed', 'All {len(selectors)} tiers exhausted');")
+
+        lines.append('    await page.waitForTimeout(300);')
         return '\n'.join(lines)
 
+    # ---- switch_tab ----
     if action == 'switch_tab':
         n = p('tab_name')
         lines.append(f"    console.log('[{step_num}] Tab \"{n}\"');")
@@ -399,26 +566,27 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append('    await page.waitForTimeout(500);')
         return '\n'.join(lines)
 
+    # ---- close_dialog ----
     if action == 'close_dialog':
         lines.append(f"    console.log('[{step_num}] Close dialog');")
         lines.append('    await page.evaluate(() => CTRL.closeDialog());')
         lines.append('    await page.waitForTimeout(500);')
         return '\n'.join(lines)
 
+    # ---- wait_for_loading ----
     if action == 'wait_for_loading':
         lines.append('    await page.evaluate(() => CTRL.waitForLoading());')
         return '\n'.join(lines)
 
+    # ---- skip internal/exploratory actions ----
     if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
                   'check_field_value', 'verify_field_value', 'take_screenshot',
                   'save_trajectory', 'save_case_data', 'read_case_data',
                   'match_form_rule', 'init_task_list', 'get_pending_tasks', 'sync_tasks_from_errors',
                   'expand_all_el_tree', 'task_done', 'task_retry'):
-        # Skip internal/exploratory actions
         return ''
 
     if action in ('fill_form_fields_batch', 'fill_pending_batch'):
-        # Batch operations expanded as individual actions in the recording
         return ''
 
     lines.append(f'    // skipped: {action}')
@@ -451,11 +619,9 @@ def assemble_script(action_entries, target_url=None):
                       'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch'):
             continue
 
-        # Block boundary: exit current fill block
         if action in BOUNDARY_ACTIONS:
             in_block = False
 
-        # First fill in a new block: generate twice (300ms apart)
         is_first_fill = action in FILL_ACTIONS and not in_block
         if is_first_fill:
             in_block = True
@@ -468,15 +634,99 @@ def assemble_script(action_entries, target_url=None):
     return CTRL_API_CODE + '\n'.join(body) + '\n\n' + CTRL_FOOTER
 
 
+# ========================== Part 2: Partial assembly (for self-healing) ==========================
+
+def assemble_partial_script(action_entries, target_url=None, stop_before_step=None):
+    """Assemble script up to (but not including) the specified step number.
+    Used to reproduce error state for self-healing diagnostics."""
+    if stop_before_step is None:
+        return assemble_script(action_entries, target_url)
+
+    # Only include entries before the failing step
+    partial_entries = action_entries[:stop_before_step - 1] if stop_before_step > 1 else []
+    body = []
+    step = 1
+    in_block = False
+
+    url = target_url or ''
+    if not url or 'unknown' in url.lower():
+        url = 'http://target-url-placeholder'
+    body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
+    body.append("    await page.evaluate(() => CTRL.waitForLoading());")
+
+    for entry in partial_entries:
+        action = entry.get('action', '')
+        if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
+                      'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
+                      'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
+                      'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
+                      'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch'):
+            continue
+
+        if action in BOUNDARY_ACTIONS:
+            in_block = False
+
+        is_first_fill = action in FILL_ACTIONS and not in_block
+        if is_first_fill:
+            in_block = True
+
+        code = _generate_action_code(entry, step, url, is_first_fill)
+        if code:
+            body.append(code)
+            step += 1
+
+    return CTRL_API_CODE + '\n'.join(body) + '\n\n' + CTRL_FOOTER
+
+
+def apply_changes(commands, changes):
+    """Apply LLM-recommended changes to the commands array.
+
+    Args:
+        commands: List of action entry dicts
+        changes: List of {step: int, action: 'modify'|'delete'|'insert', entry: dict?}
+
+    Returns:
+        Modified commands list
+    """
+    cmds = list(commands)  # shallow copy
+    # Sort in reverse step order so indices don't shift when applying
+    for change in sorted(changes, key=lambda c: c['step'], reverse=True):
+        step_num = change['step']
+        action = change.get('action', 'modify')
+        idx = step_num - 1  # convert to 0-based index
+
+        if action == 'modify':
+            if 0 <= idx < len(cmds):
+                cmds[idx] = change.get('entry', cmds[idx])
+        elif action == 'delete':
+            if 0 <= idx < len(cmds):
+                del cmds[idx]
+        elif action == 'insert':
+            entry = change.get('entry')
+            if entry:
+                cmds.insert(min(idx, len(cmds)), entry)
+    return cmds
+
+
 # ========================== Main ==========================
 
 def main():
     if len(sys.argv) < 2:
-        print('Usage: python script_assembler.py <action_file.json> [output.js]', file=sys.stderr)
+        print('Usage: python script_assembler.py <action_file.json> [output.js] [--partial-stop N]', file=sys.stderr)
         sys.exit(1)
 
     input_path = sys.argv[1]
-    output_path = sys.argv[2] if len(sys.argv) > 2 else None
+    output_path = None
+    stop_before_step = None
+
+    # Parse remaining args
+    remaining = sys.argv[2:]
+    while remaining:
+        arg = remaining.pop(0)
+        if arg == '--partial-stop' and remaining:
+            stop_before_step = int(remaining.pop(0))
+        elif not output_path:
+            output_path = arg
 
     if input_path == '-':
         data = json.load(sys.stdin)
@@ -486,7 +736,6 @@ def main():
 
     # Read commands from either format
     raw_cmds = data.get('actions', []) or (data.get('tests', [{}])[0].get('commands', []) if data.get('tests') else [])
-    # If entries already have action field, use directly; otherwise convert old format
     has_new = raw_cmds and any(c.get('action') for c in raw_cmds if isinstance(c, dict))
     if not has_new:
         actions = []
@@ -494,15 +743,16 @@ def main():
             c = cmd.get('command', '')
             if c == 'input':
                 actions.append({'action': 'fill_form_field', 'params': {'label_text': cmd.get('propertiesName', ''), 'value': cmd.get('value', '')},
-                    'element': {'xpath': cmd.get('target', ''), 'tag_name': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})}})
+                    'target': cmd.get('target', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
             elif c == 'select':
                 actions.append({'action': 'select_option', 'params': {'label_text': cmd.get('propertiesName', ''), 'option_text': cmd.get('value', '')},
-                    'element': {'xpath': cmd.get('target', ''), 'tag_name': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})}})
+                    'target': cmd.get('target', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
             elif c == 'click':
                 actions.append({'action': 'click_element_by_index', 'params': {'index': cmd.get('value', '0'), 'tag_name': cmd.get('tagName', ''), 'text': cmd.get('propertiesName', '')},
-                    'element': {'xpath': cmd.get('target', ''), 'tag_name': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})}})
+                    'target': cmd.get('target', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
     else:
         actions = raw_cmds
+
     url = data.get('url', '') or ''
     if not url or 'unknown' in url.lower():
         for entry in actions if isinstance(actions, list) else []:
@@ -511,13 +761,17 @@ def main():
                 if url:
                     break
 
-    script = assemble_script(actions, url)
+    if stop_before_step is not None:
+        script = assemble_partial_script(actions, url, stop_before_step)
+    else:
+        script = assemble_script(actions, url)
 
     if output_path:
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(script)
         print(f'Script written: {output_path}')
-        print(f'Steps: {len([a for a in actions if a.get("action","") not in ("scroll_down","scroll_up","get_page_state","scan_form_fields","scan_visible_fields","check_field_value","verify_field_value","take_screenshot","save_trajectory","save_case_data","read_case_data","match_form_rule","init_task_list","get_pending_tasks","sync_tasks_from_errors","expand_all_el_tree","task_done","task_retry")])}')
+        visible_actions = [a for a in actions if a.get("action","") not in ("scroll_down","scroll_up","get_page_state","scan_form_fields","scan_visible_fields","check_field_value","verify_field_value","take_screenshot","save_trajectory","save_case_data","read_case_data","match_form_rule","init_task_list","get_pending_tasks","sync_tasks_from_errors","expand_all_el_tree","task_done","task_retry")]
+        print(f'Steps: {len(visible_actions)}')
     else:
         print(script)
 

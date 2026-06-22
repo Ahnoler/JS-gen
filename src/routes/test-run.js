@@ -1,4 +1,4 @@
-import { writeFileSync, readdirSync, existsSync } from 'fs';
+import { writeFileSync, readFileSync, readdirSync, existsSync, unlinkSync } from 'fs';
 import path from 'path';
 import { spawn, execSync } from 'child_process';
 import { TMP_DIR, SKILL_DIR } from '../config.js';
@@ -89,7 +89,7 @@ export default function (app) {
       send('log', { type: 'error', message: text.trimEnd() });
     });
 
-    child.on('close', (code) => {
+    child.on('close', async (code) => {
       if (aborted) return;
       send('log', { type: 'step', message: `Process exited with code ${code}` });
 
@@ -105,7 +105,23 @@ export default function (app) {
         send('screenshots', { screenshots });
       }
 
-      const success = code === 0;
+      // Check for structured error report written by the script
+      let scriptErrors = null;
+      const errorReportPath = path.join(TMP_DIR, 'script-errors.json');
+      try {
+        if (existsSync(errorReportPath)) {
+          scriptErrors = JSON.parse(readFileSync(errorReportPath, 'utf-8'));
+          unlinkSync(errorReportPath);  // clean up
+        }
+      } catch {}
+
+      const success = code === 0 && (!scriptErrors || scriptErrors.length === 0);
+
+      if (scriptErrors && scriptErrors.length > 0) {
+        send('log', { type: 'warning', message: `${scriptErrors.length} step(s) failed` });
+        send('script-errors', { errors: scriptErrors, needsFix: true });
+      }
+
       send('status', { phase: 'done', label: success ? 'Test completed' : 'Test failed', success });
 
       send('result', {
@@ -167,12 +183,25 @@ export default function (app) {
         url: `/api/test/screenshots/${f}`,
       }));
 
+      // Check for structured error report
+      let scriptErrors = null;
+      const errorReportPath = path.join(TMP_DIR, 'script-errors.json');
+      try {
+        if (existsSync(errorReportPath)) {
+          scriptErrors = JSON.parse(readFileSync(errorReportPath, 'utf-8'));
+          unlinkSync(errorReportPath);
+        }
+      } catch {}
+
+      const success = code === 0 && (!scriptErrors || scriptErrors.length === 0);
+
       res.json({
-        success: code === 0,
+        success,
         exitCode: code,
         stdout: stdout.slice(-2000),
         stderr: stderr.slice(-2000),
         screenshots,
+        ...(scriptErrors && scriptErrors.length > 0 ? { scriptErrors, needsFix: true } : {}),
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

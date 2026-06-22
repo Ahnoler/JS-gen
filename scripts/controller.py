@@ -45,33 +45,16 @@ def _record_action(action_name, params, result, element=None):
         'params': params_dict,
         'result': str(result)[:200] if result else '',
         'command': _ACTION_TO_COMMAND.get(action_name, action_name),
-        'propertiesName': '',
-        'value': '',
         'target': '',
-        'targetType': 'xpath',
         'tagName': '',
         'attributes': {},
-        'type': 'ATTRIBUTE',
     }
-
-    # Extract label and value from params
-    for key in ('label_text', 'menu_text', 'tab_name', 'row_text', 'button_text'):
-        if key in params_dict:
-            entry['propertiesName'] = str(params_dict[key])
-            break
-    if not entry['propertiesName']:
-        entry['propertiesName'] = str(params_dict.get('value', params_dict.get('option_text', '')))
-
-    entry['value'] = str(params_dict.get('value', params_dict.get('option_text', params_dict.get('index', ''))))
 
     if element:
         elem = dict(element) if isinstance(element, dict) else {}
-        entry['element'] = elem
         entry['target'] = elem.get('xpath', '') or ''
         entry['tagName'] = elem.get('tag_name', '') or ''
         entry['attributes'] = elem.get('attributes', {}) if isinstance(elem.get('attributes'), dict) else {}
-        if not entry['propertiesName'] and elem.get('text'):
-            entry['propertiesName'] = str(elem['text'])
 
     _ACTION_LOG.append(entry)
     # Capture URL from go_to_url action

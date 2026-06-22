@@ -147,8 +147,8 @@ export async function loadSnapshots() {
               const cardsHtml = commands.map((c, i) => {
                 if (c === null) return '';
                 const action = c.action || c.command || '';
-                const label = c.propertiesName || c.params?.label_text || '';
-                const value = c.value || c.params?.value || c.params?.option_text || '';
+                const label = c.params?.label_text || '';
+                const value = c.params?.value || c.params?.option_text || '';
                 if (!action) {
                   return `<div class="traj-card" data-index="${i}" style="border:1px solid var(--slate-200);border-radius:8px;margin-bottom:8px;overflow:hidden;background:#fff">
                     <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--slate-50);border-bottom:1px solid var(--slate-200);font-size:12px">
@@ -176,7 +176,7 @@ export async function loadSnapshots() {
                     ${action === 'select_option' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Label</span><br><span style="font-weight:500">${escapeHtml(label)}</span></div>
                       <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Option</span><br><span class="traj-value-display-${i}">${escapeHtml(value)}</span>
                       <input class="traj-value-input-${i}" type="text" value="${escapeHtml(value)}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
-                    ${action === 'click_element_by_index' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Element</span><br><span style="font-weight:500;font-family:var(--font-mono);font-size:12px">${escapeHtml(c.propertiesName || c.params?.text || '')}</span></div>
+                    ${action === 'click_element_by_index' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Element</span><br><span style="font-weight:500;font-family:var(--font-mono);font-size:12px">${escapeHtml(c.params?.text || '')}</span></div>
                       <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">XPath</span><br><span class="traj-value-display-${i}" style="font-size:11px;color:var(--slate-500);word-break:break-all;font-family:var(--font-mono)">${escapeHtml(c.target || '')}</span>
                       <input class="traj-value-input-${i}" type="text" value="${escapeHtml(c.target || '')}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
                     ${action === 'fill_date_field' || action === 'selectDate' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Label</span><br><span style="font-weight:500">${escapeHtml(label)}</span></div>
@@ -229,10 +229,7 @@ export async function loadSnapshots() {
                       display.style.display = '';
                       input.style.display = 'none';
                       const cmd = commands[idx];
-                      if (cmd.value !== undefined) cmd.value = newVal;
                       if (cmd.params?.value !== undefined) cmd.params.value = newVal;
-                      if (cmd.attributes?.value !== undefined) cmd.attributes.value = newVal;
-                      if (cmd.element?.attributes?.value !== undefined) cmd.element.attributes.value = newVal;
                       if (cmd.action === 'go_to_url' && cmd.params) cmd.params.url = newVal;
                       if (cmd.action === 'click_element_by_index') cmd.target = newVal;
                       btn.textContent = 'Edit';
