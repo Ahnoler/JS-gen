@@ -165,7 +165,7 @@ function _recordError(step, action, label, value, error, details) {
             const FIRST=['first','1st','第一个','第一项'];
             const t=FIRST.includes(option.toLowerCase().trim())?[...opts].find(it=>it.offsetParent!==null)||opts[0]:[...opts].find(it=>it.textContent.trim()===option)||[...opts].find(it=>it.textContent.trim().includes(option));
             if(t){t.scrollIntoView({block:'nearest'});t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));t.click();}
-          },200);
+          },600);
           return 'triggered';
         }
         return 'label-not-found';
@@ -249,16 +249,23 @@ _IDENTITY_KEYWORDS = [
     ('genMobile', ['手机', '电话', '联系方式', '联系电话', '电话号码']),
     ('genEmail', ['邮箱', 'Email', '电子邮箱']),
     ('genBankCard', ['银行卡', '银行卡号', '银行账号']),
-    ('genName', ['姓名', '用户名', '联系人']),
+    ('genName', ['姓名', '联系人']),
     ('genAmount', ['金额', '价格', '费用', '工资', '收入']),
     ('genAddress', ['地址', '详细地址', '联系地址']),
 ]
+
+# Labels that should NEVER trigger identity generation (login, system fields)
+_IDENTITY_EXCLUDE = ['用户名', '密码', '登录', '验证码', '图形', '短信', '验证', 'captcha']
 
 def _is_identity_field(label):
     """Check if a label matches identity-type fields that need unique values."""
     if not label:
         return None
     t = re.sub(r'\s+', '', label)
+    # Exclude login/system fields
+    for excl in _IDENTITY_EXCLUDE:
+        if excl in t:
+            return None
     for gen_fn, keywords in _IDENTITY_KEYWORDS:
         for kw in keywords:
             if kw in t:
@@ -320,12 +327,21 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         else:
             val_expr = f"'{_escape(v)}'"
 
+        # Scope fallbacks to visible dialog/drawer (prevent filling fields behind overlays)
+        lines.append(f"    // Scope fallback locators to active dialog/drawer")
+        lines.append(f"    const _scope{step_num} = await page.evaluate(() => {{")
+        lines.append(f"      for (const d of document.querySelectorAll('.el-dialog')) if (d.offsetParent !== null) return '.el-dialog';")
+        lines.append(f"      for (const d of document.querySelectorAll('.el-drawer')) if (d.offsetParent !== null) return '.el-drawer';")
+        lines.append(f"      return '';")
+        lines.append(f"    }});")
+        lines.append(f"    const _base{step_num} = _scope{step_num} ? page.locator(_scope{step_num}) : page;")
+
         # Address fields use fillAddressFields
         if '地址' in l or '址' in l or 'address' in l.lower():
             lines.append(f"    const _r{step_num} = await page.evaluate((addr) => CTRL.fillAddressFields(addr), {val_expr});")
             lines.append(f"    if (_r{step_num} === 'no-address-fields') {{")
             lines.append(f"      console.log('[{step_num}] address fill result:', _r{step_num});")
-            lines.append(f"      const _a{step_num} = await page.locator('.el-form-item:has-text(\"地址\")').locator('input, textarea').all();")
+            lines.append(f"      const _a{step_num} = await _base{step_num}.locator('.el-form-item:has-text(\"地址\")').locator('input, textarea').all();")
             lines.append(f"      for (const _el of _a{step_num}) {{ await _el.fill({val_expr}); }}")
             lines.append(f"    }}")
         else:
@@ -337,33 +353,40 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             lines.append(f"    if (_r{step_num} !== 'ok' && _r{step_num} !== 'ok-date' && _r{step_num} !== 'ok-placeholder' && _r{step_num} !== 'ok-fuzzy') {{")
             lines.append(f"      console.log('[{step_num}]   falling back to Playwright text...');")
             lines.append(f"      try {{")
-            lines.append(f"        const _fb{step_num} = page.locator('.el-form-item').filter({{ hasText: '{_escape_js_string(l)}' }}).locator('input:not([type=\"hidden\"]), textarea').first();")
+            lines.append(f"        const _fb{step_num} = _base{step_num}.locator('.el-form-item').filter({{ hasText: '{_escape_js_string(l)}' }}).locator('input:not([type=\"hidden\"]), textarea').first();")
             lines.append(f"        await _fb{step_num}.fill({val_expr}, {{ timeout: 3000 }});")
             lines.append(f"        _r{step_num} = 'ok-playwright';")
+            lines.append(f"        console.log('[{step_num}]   Playwright text OK');")
             lines.append(f"      }} catch (_e_fb{step_num}) {{")
             lines.append(f"        console.log('[{step_num}]   Playwright fallback failed:', _e_fb{step_num}.message);")
 
-            # Tier 3: XPath fallback
-            xp = entry.get('target', '') or ''
-            if xp and not xp.startswith('/') and not xp.startswith('//'):
-                xp = '/' + xp
-            if xp:
+            # Tier 3: absolute XPath fallback (page-wide, label-independent)
+            abs_xp = entry.get('absoluteTarget', '') or ''
+            if abs_xp and not abs_xp.startswith('/') and not abs_xp.startswith('//'):
+                abs_xp = '/' + abs_xp
+
+            if abs_xp:
                 lines.append(f"        try {{")
-                lines.append(f"          const _xp{step_num} = page.locator('xpath={_escape(xp)}').first();")
-                lines.append(f"          await _xp{step_num}.fill({val_expr}, {{ timeout: 3000 }});")
-                lines.append(f"          _r{step_num} = 'ok-xpath';")
-                lines.append(f"        }} catch (_e_xp{step_num}) {{")
-                lines.append(f"          console.log('[{step_num}]   XPath fallback failed:', _e_xp{step_num}.message);")
-
-            # All fallbacks exhausted
-            lines.append(f"          _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'all-strategies-failed', 'CTRL: ' + _r{step_num});")
-
-            if xp:
+                lines.append(f"          // absolute XPath is page-wide (starts from root)")
+                lines.append(f"          const _ax{step_num} = page.locator('xpath={_escape(abs_xp)}').first();")
+                lines.append(f"          await _ax{step_num}.fill({val_expr}, {{ timeout: 3000 }});")
+                lines.append(f"          _r{step_num} = 'ok-absxpath';")
+                lines.append(f"          console.log('[{step_num}]   absolute XPath OK');")
+                lines.append(f"        }} catch (_e_ax{step_num}) {{")
+                lines.append(f"          console.log('[{step_num}]   absolute XPath fallback failed:', _e_ax{step_num}.message);")
                 lines.append(f"        }}")
+
+            # Only record error if absolute XPath also failed
+            if abs_xp:
+                lines.append(f"        if (_r{step_num} !== 'ok-absxpath') {{")
+                lines.append(f"          _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', 'All tiers failed (CTRL + Playwright + absolute XPath). Page structure has changed beyond script tolerance.');")
+                lines.append(f"        }}")
+            else:
+                lines.append(f"        _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'all-strategies-failed', 'CTRL: ' + _r{step_num});")
             lines.append(f"      }}")
             lines.append(f"    }}")
 
-        lines.append('    await page.waitForTimeout(300);')
+        lines.append('    await page.waitForTimeout(400);')
 
         # First fill in a new block: retry once
         if is_first_fill:
@@ -372,7 +395,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
                 lines.append(f"    await page.evaluate((addr) => CTRL.fillAddressFields(addr), {val_expr});")
             else:
                 lines.append(f"    await page.evaluate((v) => CTRL.fillFormField('{_escape(l)}', v), {val_expr});")
-            lines.append('    await page.waitForTimeout(300);')
+            lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- select_option ----
@@ -386,23 +409,61 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"    let _rs{step_num} = await page.evaluate(() => CTRL.selectOption('{_escape(l)}', '{_escape(o)}'));")
         lines.append(f"    console.log('[{step_num}]   CTRL:', _rs{step_num});")
 
+        # Scope fallback to active dialog/drawer
+        lines.append(f"    const _scope{step_num} = await page.evaluate(() => {{")
+        lines.append(f"      for (const d of document.querySelectorAll('.el-dialog')) if (d.offsetParent !== null) return '.el-dialog';")
+        lines.append(f"      for (const d of document.querySelectorAll('.el-drawer')) if (d.offsetParent !== null) return '.el-drawer';")
+        lines.append(f"      return '';")
+        lines.append(f"    }});")
+        lines.append(f"    const _base{step_num} = _scope{step_num} ? page.locator(_scope{step_num}) : page;")
+
         # Tier 2: Playwright native fallback
         lines.append(f"    if (_rs{step_num} !== 'triggered' && _rs{step_num} !== 'triggered-placeholder') {{")
         lines.append(f"      console.log('[{step_num}]   falling back to Playwright...');")
+        lines.append(f"      // Dismiss any stray dropdown before retrying")
+        lines.append(f"      await page.keyboard.press('Escape');")
+        lines.append(f"      await page.waitForTimeout(300);")
         lines.append(f"      try {{")
-        lines.append(f"        await page.locator('.el-form-item').filter({{ hasText: '{_escape_js_string(l)}' }}).locator('.el-select .el-input__inner').first().click({{ timeout: 3000 }});")
-        lines.append(f"        await page.waitForTimeout(300);")
+        lines.append(f"        await _base{step_num}.locator('.el-form-item').filter({{ hasText: '{_escape_js_string(l)}' }}).locator('.el-select .el-input__inner').first().click({{ timeout: 3000 }});")
+        lines.append(f"        await page.waitForTimeout(400);")
         lines.append(f"        const _opt{step_num} = page.locator('.el-select-dropdown__item').filter({{ hasText: '{_escape_js_string(o)}' }}).first();")
         lines.append(f"        await _opt{step_num}.click({{ timeout: 3000 }});")
         lines.append(f"        _rs{step_num} = 'ok-playwright';")
         lines.append(f"        console.log('[{step_num}]   Playwright fallback OK');")
         lines.append(f"      }} catch (_e_s{step_num}) {{")
         lines.append(f"        console.log('[{step_num}]   Playwright fallback failed:', _e_s{step_num}.message);")
-        lines.append(f"        _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'all-strategies-failed', 'CTRL: ' + _rs{step_num} + ', Playwright: ' + _e_s{step_num}.message);")
+
+        # Tier 3: absolute XPath fallback (click trigger by structural path)
+        abs_xp = entry.get('absoluteTarget', '') or ''
+        if abs_xp and not abs_xp.startswith('/') and not abs_xp.startswith('//'):
+            abs_xp = '/' + abs_xp
+
+        if abs_xp:
+            lines.append(f"        try {{")
+            lines.append(f"          await page.locator('xpath={_escape(abs_xp)}').first().click({{ timeout: 3000 }});")
+            lines.append(f"          await page.waitForTimeout(600);")
+            lines.append(f"          const _axo{step_num} = page.locator('.el-select-dropdown__item').filter({{ hasText: '{_escape_js_string(o)}' }}).first();")
+            lines.append(f"          await _axo{step_num}.click({{ timeout: 3000 }});")
+            lines.append(f"          _rs{step_num} = 'ok-absxpath';")
+            lines.append(f"          console.log('[{step_num}]   absolute XPath OK');")
+            lines.append(f"        }} catch (_e_axs{step_num}) {{")
+            lines.append(f"          console.log('[{step_num}]   absolute XPath fallback failed:', _e_axs{step_num}.message);")
+            lines.append(f"        }}")
+
+        # Only record error if absolute XPath also failed
+        if abs_xp:
+            lines.append(f"        if (_rs{step_num} !== 'ok-absxpath') {{")
+            lines.append(f"          _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', 'All tiers failed (CTRL + Playwright + absolute XPath). Page structure has changed.');")
+            lines.append(f"        }}")
+        else:
+            lines.append(f"        _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'all-strategies-failed', 'CTRL: ' + _rs{step_num});")
+
+        lines.append(f"      }}")   # close Playwright catch
+
         lines.append(f"      }}")
         lines.append(f"    }}")
 
-        lines.append('    await page.waitForTimeout(300);')
+        lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- fill_date_field ----
@@ -411,11 +472,11 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"    console.log('[{step_num}] Set date \"{l}\" = \"{v}\"');")
         lines.append(pre())
         lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
-        lines.append('    await page.waitForTimeout(300);')
+        lines.append('    await page.waitForTimeout(400);')
         if is_first_fill:
             lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
             lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
-            lines.append('    await page.waitForTimeout(300);')
+            lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- click_menu_item ----
@@ -426,7 +487,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(pre_ready())
         lines.append(f"    const _rm{step_num} = await page.evaluate(() => CTRL.clickMenuItem('{_escape(t)}'));")
         lines.append(f"    if (_rm{step_num} === 'not-found') _recordError({step_num}, 'click_menu_item', '{_escape_js_string(t)}', '', 'not-found', 'Menu item not visible or not found');")
-        lines.append('    await page.waitForTimeout(300);')
+        lines.append('    await page.waitForTimeout(400);')
         lines.append("    await page.evaluate(() => CTRL.waitForLoading());")
         return '\n'.join(lines)
 
@@ -438,7 +499,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(pre_ready())
         lines.append(f"    const _rt{step_num} = await page.evaluate(() => CTRL.clickTableRowAction('{_escape(r)}', '{_escape(b)}'));")
         lines.append(f"    if (_rt{step_num} !== 'ok' && _rt{step_num} !== 'ok-icon') _recordError({step_num}, 'click_table_row_action', '{_escape_js_string(r)}', '{_escape_js_string(b)}', _rt{step_num}, 'Row or button not found');")
-        lines.append('    await page.waitForTimeout(300);')
+        lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- click_adjacent_button ----
@@ -448,7 +509,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(pre())
         lines.append(f"    await page.evaluate(() => CTRL.clickAdjacentButton('{_escape(l)}'));")
         lines.append('    await page.evaluate(() => CTRL.waitForLoading());')
-        lines.append('    await page.waitForTimeout(300);')
+        lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- click_radio ----
@@ -458,7 +519,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(pre())
         lines.append(f"    const _rr{step_num} = await page.evaluate(() => CTRL.clickRadio('{_escape(l)}', '{_escape(o)}'));")
         lines.append(f"    if (_rr{step_num} !== 'ok') _recordError({step_num}, 'click_radio', '{_escape_js_string(l)}', '{_escape_js_string(o)}', _rr{step_num}, '');")
-        lines.append('    await page.waitForTimeout(300);')
+        lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- click_element_by_index ----
@@ -505,24 +566,24 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             selectors.append(('fuzzy', f"JS-fuzzy: text='{_escape(txt)}'"))
 
         # Generate the degradation chain
-        lines.append("    let _clicked = false;")
+        lines.append(f"    let _clicked{step_num} = false;")
         for i, (sel_type, sel_expr) in enumerate(selectors):
             if sel_type in ('js', 'fuzzy'):
                 # JS-based selectors use page.evaluate
                 if sel_type == 'js':
-                    lines.append(f"    if (!_clicked) {{")
+                    lines.append(f"    if (!_clicked{step_num}) {{")
                     lines.append(f"      try {{")
                     lines.append(f"        await page.evaluate((xp) => {{")
                     lines.append(f"          const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;")
                     lines.append(f"          if (el) {{ el.dispatchEvent(new MouseEvent('click', {{ bubbles: true }})); return true; }}")
                     lines.append(f"          return false;")
                     lines.append(f"        }}, '{_escape(xp)}');")
-                    lines.append(f"        _clicked = true;")
+                    lines.append(f"        _clicked{step_num} = true;")
                     lines.append(f"        console.log('[{step_num}]   clicked via JS dispatchEvent');")
                     lines.append(f"      }} catch (_e_js{step_num}) {{}}")
                     lines.append(f"    }}")
                 elif sel_type == 'fuzzy':
-                    lines.append(f"    if (!_clicked) {{")
+                    lines.append(f"    if (!_clicked{step_num}) {{")
                     lines.append(f"      try {{")
                     lines.append(f"        await page.evaluate((text) => {{")
                     lines.append(f"          const candidates = [...document.querySelectorAll('button, a, span, li, label, .el-button, .el-menu-item')].filter(el => el.offsetParent !== null);")
@@ -539,23 +600,41 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
                     lines.append(f"          if (best && bestScore >= 0.4) {{ best.click(); return bestScore; }}")
                     lines.append(f"          return 0;")
                     lines.append(f"        }}, '{_escape(txt)}').then(score => {{")
-                    lines.append(f"          if (score > 0) {{ _clicked = true; console.log('[{step_num}]   clicked via fuzzy (score=' + score.toFixed(2) + ')'); }}")
+                    lines.append(f"          if (score > 0) {{ _clicked{step_num} = true; console.log('[{step_num}]   clicked via fuzzy (score=' + score.toFixed(2) + ')'); }}")
                     lines.append(f"        }});")
                     lines.append(f"      }} catch (_e_fz{step_num}) {{}}")
                     lines.append(f"    }}")
             else:
-                lines.append(f"    if (!_clicked) {{")
+                lines.append(f"    if (!_clicked{step_num}) {{")
                 lines.append(f"      try {{")
                 lines.append(f"        await {sel_expr}.click({{ timeout: 3000 }});")
-                lines.append(f"        _clicked = true;")
+                lines.append(f"        _clicked{step_num} = true;")
                 lines.append(f"        console.log('[{step_num}]   clicked via {sel_type}');")
                 lines.append(f"      }} catch (_e_{sel_type}{step_num}) {{ console.log('[{step_num}]   {sel_type} failed:', _e_{sel_type}{step_num}.message); }}")
                 lines.append(f"    }}")
 
         # If all fail
-        lines.append(f"    if (!_clicked) _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '{_escape_js_string(xp)}', 'all-strategies-failed', 'All {len(selectors)} tiers exhausted');")
+        lines.append(f"    if (!_clicked{step_num}) {{")
+        lines.append(f"      _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '{_escape_js_string(xp)}', 'all-strategies-failed', 'All {len(selectors)} tiers exhausted');")
+        lines.append(f"      throw new Error('[{step_num}] Click failed: target element not found on page. Stopping — subsequent steps depend on this navigation.');")
+        lines.append(f"    }}")
 
-        lines.append('    await page.waitForTimeout(300);')
+        # Post-click smart wait: detect navigation, wait for page to stabilize
+        lines.append(f"    // Post-click: check for page navigation")
+        lines.append(f"    const _urlBefore{step_num} = page.url();")
+        lines.append(f"    await page.evaluate(() => CTRL.waitForLoading());")
+        lines.append(f"    let _navigated{step_num} = false;")
+        lines.append(f"    try {{")
+        lines.append(f"      await page.waitForFunction((before) => location.href !== before, _urlBefore{step_num}, {{ timeout: 3000 }});")
+        lines.append(f"      _navigated{step_num} = true;")
+        lines.append(f"    }} catch (_e_nav{step_num}) {{ /* no URL change — dialog or in-page action */ }}")
+        lines.append(f"    if (_navigated{step_num}) {{")
+        lines.append(f"      // Page navigated, wait for full load")
+        lines.append(f"      await page.waitForLoadState('networkidle', {{ timeout: 15000 }}).catch(() => {{}});")
+        lines.append(f"      await page.waitForSelector('.el-menu, .el-table, .el-form-item, .el-tabs, .el-dialog', {{ timeout: 10000 }}).catch(() => {{}});")
+        lines.append(f"      await page.evaluate(() => CTRL.waitForLoading());")
+        lines.append(f"    }}")
+        lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- switch_tab ----
