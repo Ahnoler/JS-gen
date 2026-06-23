@@ -92,6 +92,34 @@ function handleSessionMessage(send, session, stepIndex, gb, res, cleanupListener
       case 'nav_step':
         send('status', { phase: 'navigating', label: msg.data.label });
         break;
+      // Rerun pipeline events
+      case 'rerun_start':
+        send('rerun_start', msg.data);
+        send('status', { phase: 'rerun', label: `Replaying ${msg.data.prefix_entries} history entries to step ${msg.data.failed_step}...` });
+        break;
+      case 'rerun_replay_done':
+        send('rerun_replay_done', msg.data);
+        send('status', { phase: 'rerun', label: 'Prefix replay complete — browser at error scene' });
+        break;
+      case 'rerun_replay_error':
+        send('rerun_replay_error', msg.data);
+        send('status', { phase: 'rerun', label: `Replay error: ${msg.data.message}` });
+        break;
+      case 'rerun_resume':
+        send('rerun_resume', msg.data);
+        send('status', { phase: 'rerun', label: `Resuming recording: ${msg.data.instruction?.slice(0, 60) || ''}` });
+        break;
+      case 'rerun_validate':
+        send('rerun_validate', msg.data);
+        send('status', { phase: 'rerun', label: msg.data.passed ? `Validation passed — ${msg.data.new_actions} actions recorded` : `Validation FAILED — agent completed but actions may be incomplete` });
+        break;
+      case 'rerun_done':
+        send('rerun_done', msg.data);
+        send('status', { phase: 'done', label: msg.data.validated !== false ? `Rerun complete — ${msg.data.new_actions} actions merged → ${msg.data.merged_file || '(none)'}` : 'Rerun complete — validation failed, not merged' });
+        gb.busy = false;
+        if (!res.writableEnded) res.end();
+        cleanupListener();
+        break;
     }
   };
 }
@@ -201,6 +229,83 @@ export default function (app) {
     const stepRoute = app._router.stack.find(r => r.route && r.route.path === '/api/browser/session/:id/step' && r.route.methods.post);
     if (stepRoute) stepRoute.handle(req, res);
     else res.status(500).json({ error: 'Step handler not found' });
+  });
+
+  // Self-healing: replay trajectory then continue from failed step
+  app.post('/api/browser/session/:id/rerun', async (req, res) => {
+    const { id } = req.params;
+    const { trajectoryFile, failedStep, instruction, maxSteps, action_file, log_file } = req.body || {};
+    const gb = state.globalBrowser;
+
+    const session = state.sessions.get(id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (gb.busy) return res.status(409).json({ error: 'Browser is busy executing a step' });
+    if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
+    if (!trajectoryFile) return res.status(400).json({ error: 'trajectoryFile is required' });
+    if (!failedStep || failedStep <= 0) return res.status(400).json({ error: 'failedStep (> 0) is required' });
+    if (!instruction && !action_file) return res.status(400).json({ error: 'instruction or action_file is required' });
+
+    gb.busy = true;
+    const send = setupSSE(res);
+    let aborted = false;
+
+    res.on('close', () => {
+      aborted = true;
+      if (gb.busy) {
+        const cancelFile = path.join(os.tmpdir(), `browser_use_cancel_global`);
+        try { writeFileSync(cancelFile, 'cancel'); } catch {}
+        try { gb.stdin.write(JSON.stringify({ event: 'cancel_step' }) + '\n'); } catch {}
+        gb.busy = false;
+      }
+      cleanupListener();
+    });
+
+    const cancelFlagPath = path.join(os.tmpdir(), 'browser_use_cancel_global');
+    try { if (existsSync(cancelFlagPath)) unlinkSync(cancelFlagPath); } catch {}
+
+    try {
+      gb.stdin.write(JSON.stringify({
+        event: 'rerun',
+        data: { trajectory_file: trajectoryFile, failed_step: failedStep, instruction, max_steps: maxSteps || 40, action_file, log_file }
+      }) + '\n');
+    } catch (writeErr) {
+      gb.busy = false;
+      send('error', { message: `Failed to write rerun to agent: ${writeErr.message}` });
+      if (!res.writableEnded) res.end();
+      return;
+    }
+
+    // Reuse step handler for rerun events (rerun_start, rerun_replay_done, rerun_resume,
+    // step, phase_done, phase_error, error)
+    let pendingBuffer = '';
+    const handleMsg = handleSessionMessage(send, session, failedStep, gb, res, cleanupListener);
+
+    const onStdout = (chunk) => {
+      if (aborted) return;
+      pendingBuffer += chunk.toString();
+      const lines = pendingBuffer.split('\n');
+      pendingBuffer = lines.pop() || '';
+      for (const line of lines) { if (!line.trim()) continue; try { handleMsg(JSON.parse(line)); } catch {} }
+    };
+
+    function cleanupListener() {
+      gb.process.stdout.removeListener('data', onStdout);
+      gb.process.removeListener('exit', onProcessExit);
+    }
+
+    function onProcessExit(code) {
+      if (aborted) return;
+      aborted = true;
+      gb.busy = false;
+      if (!res.writableEnded) {
+        send('error', { message: `Agent process exited unexpectedly (code ${code})` });
+        res.end();
+      }
+      cleanupListener();
+    }
+
+    gb.process.stdout.on('data', onStdout);
+    gb.process.on('exit', onProcessExit);
   });
 
   // Human intervention: inject an instruction into the running session

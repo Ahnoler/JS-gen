@@ -198,7 +198,6 @@ npm start
 │       ├── playwright-skill/     # 重写的 Playwright 自动化技能（自定义 action）
 │       ├── atp-ui/               # Element UI Playwright 脚本生成知识库
 │       ├── atp-rule/             # 表单字段值生成规则
-│       ├── atp-fix/              # 脚本修复技能
 │       ├── cdp-agent/            # CDP 浏览器自动化（银行柜面）
 │       ├── clarification-protocol/ # 需求澄清协议
 │       └── atp-step-gen/         # 测试执行案例生成
@@ -276,7 +275,6 @@ Session 模式下支持人工介入：当 agent 卡住时可通过 dashboard 发
 | `playwright-skill` | Playwright 脚本生成（已重写，注册自定义 action） |
 | `atp-ui` | Element UI 组件交互最佳实践 |
 | `atp-rule` | 表单字段随机值生成规则（身份证、手机号、邮箱等） |
-| `atp-fix` | 失败脚本错误分类与自动修复 |
 | `cdp-agent` | CDP 连接旧版 Chrome/CEF（银行柜面系统） |
 | `clarification-protocol` | 需求澄清问题生成 |
 | `atp-step-gen` | 测试执行案例生成（根据需求文档生成分阶段测试案例） |

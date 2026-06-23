@@ -398,6 +398,8 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             if abs_xp:
                 lines.append(f"        if (_r{step_num} === 'ok-absxpath') {{")
                 lines.append(f"          _dt{step_num} += ' | absolute XPath: OK → label_text only — selector still valid';")
+                lines.append(f"          // Label mismatch: CTRL + Playwright failed, only XPath saved us. Flag for review.")
+                lines.append(f"          _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', _dt{step_num});")
                 lines.append(f"        }} else {{")
                 lines.append(f"          _dt{step_num} += ' → page structure changed — re-locate element';")
                 lines.append(f"          _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', _dt{step_num});")
@@ -479,6 +481,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         if abs_xp:
             lines.append(f"        if (_rs{step_num} === 'ok-absxpath') {{")
             lines.append(f"          _dts{step_num} += ' | absolute XPath: OK → label_text/option_text only — selector still valid';")
+            lines.append(f"          _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', _dts{step_num});")
             lines.append(f"        }} else {{")
             lines.append(f"          _dts{step_num} += ' → page structure changed — re-locate element';")
             lines.append(f"          _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', _dts{step_num});")

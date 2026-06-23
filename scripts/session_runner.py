@@ -42,7 +42,11 @@ def _close_agent():
 
 
 def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
-    """Save two files: action_{ts}.json (recorded actions) + log_{ts}.txt (operation log)."""
+    """Save three files:
+    - action_{ts}.json  — custom action format (for script_assembler.py)
+    - traj_{ts}.json    — native AgentHistoryList format (for rerun_history)
+    - log_{ts}.txt      — operation log (for LLM context)
+    """
     from .controller import _ACTION_LOG, _TRAJECTORY_URL
     from .recorder import _ACTION_LOG as _recorder_log
     from .controller import _ACTION_LOG as _controller_log
@@ -62,14 +66,17 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
         return
     try:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        snapshots_dir = Path(__file__).parent / 'snapshots'
-        snapshots_dir.mkdir(parents=True, exist_ok=True)
+        scripts_dir = Path(__file__).parent
+        action_dir = scripts_dir / 'action'
+        log_dir = scripts_dir / 'log'
+        action_dir.mkdir(parents=True, exist_ok=True)
+        log_dir.mkdir(parents=True, exist_ok=True)
         action_path = None
         log_path = None
 
         # File 1: action_{ts}.json — recorded action calls (script generation source)
         if entries:
-            action_path = snapshots_dir / f"action_{ts}.json"
+            action_path = action_dir / f"action_{ts}.json"
             action_json = {
                 'id': str(uuid.uuid4()),
                 'name': 'browser-use-session',
@@ -85,7 +92,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
 
         # File 2: log_{ts}.txt — plain text operation log (LLM context only)
         if _recorder_log:
-            log_path = snapshots_dir / f"log_{ts}.txt"
+            log_path = log_dir / f"log_{ts}.txt"
             with open(log_path, 'w', encoding='utf-8') as f:
                 f.write(f"URL: {url}\n")
                 f.write(f"Total steps: {len(_recorder_log)}\n")
@@ -93,9 +100,27 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
                 for line in _recorder_log:
                     f.write(line + "\n")
 
+        # File 3: traj_{ts}.json — native AgentHistoryList (for rerun_history self-healing)
+        # Saved directly to trajectories/ — single source of truth, no copy needed
+        native_path = None
+        _native = None
+        if cumulative_path and cumulative_path.exists():
+            try:
+                with open(cumulative_path, 'r', encoding='utf-8') as _f:
+                    _native = json.load(_f)
+                if _native.get('history'):
+                    trajectories_dir = scripts_dir / 'trajectories'
+                    trajectories_dir.mkdir(parents=True, exist_ok=True)
+                    native_path = trajectories_dir / f"traj_{ts}.json"
+                    with open(native_path, 'w', encoding='utf-8') as _f:
+                        json.dump(_native, _f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+
         # Clear both
         action_count = len(entries)
         log_count = len(_recorder_log)
+        native_count = len(_native.get('history', [])) if _native else 0
         _ACTION_LOG.clear()
         _recorder_log.clear()
 
@@ -104,14 +129,15 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
             "data": {
                 "success": True,
                 "action_file": str(action_path) if action_path else None,
-                "trajectory_file": str(action_path) if action_path else None,
+                "trajectory_file": str(native_path) if native_path else (str(action_path) if action_path else None),
                 "log_file": str(log_path) if log_path else None,
                 "action_count": action_count,
                 "log_count": log_count,
+                "native_count": native_count,
                 "url": url,
             },
         })
-        sys.stderr.write(f"[session] Saved: action({action_count}) log({log_count})\n")
+        sys.stderr.write(f"[session] Saved: action({action_count}) log({log_count}) native({native_count})\n")
         sys.stderr.flush()
     except Exception as e:
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
@@ -173,6 +199,460 @@ def _accumulate_trajectory(output_path, cumulative_path):
     except Exception as _e:
         sys.stderr.write(f"[session] Accumulate error: {_e}\n")
         sys.stderr.flush()
+
+
+# ===== AgentHistoryList → Custom Action Step Mapping =====
+
+# Actions recorded by the custom controller (subset of all browser_use actions)
+_CUSTOM_ACTIONS = {
+    'fill_form_field', 'select_option', 'click_element_by_index',
+    'click_menu_item', 'click_table_row_action', 'click_radio',
+    'fill_date_field', 'click_adjacent_button', 'switch_tab', 'close_dialog',
+}
+
+
+def _get_history_custom_action_map(history):
+    """Build a mapping from custom action step number → AgentHistoryList index.
+
+    Args:
+        history: AgentHistoryList (with .history list) or raw dict with 'history' key.
+
+    Returns:
+        List of (custom_step_num, history_index) tuples, one per custom action found.
+    """
+    entries = history.history if hasattr(history, 'history') else history.get('history', [])
+    mapping = []
+    custom_step = 0
+    for idx, entry in enumerate(entries):
+        model_output = entry.get('model_output') if isinstance(entry, dict) else getattr(entry, 'model_output', None)
+        if not model_output:
+            continue
+        actions = model_output.get('action', []) if isinstance(model_output, dict) else getattr(model_output, 'action', []) or []
+        for act in actions:
+            if isinstance(act, dict):
+                action_name = next(iter(act), None)
+                if action_name in _CUSTOM_ACTIONS:
+                    custom_step += 1
+                    mapping.append((custom_step, idx))
+                    break  # count each history entry at most once
+    return mapping
+
+
+def slice_history_before_step(history, failed_step):
+    """Slice AgentHistoryList to stop before the failed custom action step.
+
+    Args:
+        history: AgentHistoryList (with .history list) or raw dict.
+        failed_step: The custom action step number that failed (1-indexed).
+
+    Returns:
+        Sliced history dict with only entries up to and including the (failed_step-1)-th
+        custom action. If failed_step <= 1, returns an empty history.
+    """
+    entries = history.history if hasattr(history, 'history') else history.get('history', [])
+    mapping = _get_history_custom_action_map(history)
+
+    if failed_step <= 1:
+        # No prefix to replay — all steps are after the failure
+        return {'history': []}
+
+    target_custom_step = failed_step - 1
+    slice_idx = None
+    for cs, hi in mapping:
+        if cs == target_custom_step:
+            slice_idx = hi + 1  # include this entry, exclude after
+            break
+
+    if slice_idx is None:
+        # Target not found — return everything up to the last known custom action
+        if mapping:
+            slice_idx = mapping[-1][1] + 1
+        else:
+            return {'history': []}
+
+    return {'history': entries[:slice_idx]}
+
+
+def _build_resume_instruction(action_file, log_file, failed_step):
+    """Auto-construct resume instruction from action JSON + log file.
+
+    Args:
+        action_file: Path to action_{ts}.json (custom format, tests[0].commands[])
+        log_file: Path to log_{ts}.txt (plain text operation log)
+        failed_step: The custom action step number that failed (1-indexed)
+
+    Returns:
+        str: Natural language instruction for the agent to continue recording.
+    """
+    from pathlib import Path as _Path
+    _af = _Path(action_file) if action_file else None
+    _lf = _Path(log_file) if log_file else None
+
+    url = ''
+    commands = []
+    log_content = ''
+
+    # Read action JSON
+    if _af and _af.exists():
+        try:
+            with open(_af, 'r', encoding='utf-8') as _f:
+                _action_data = json.load(_f)
+            url = _action_data.get('url', '')
+            commands = (_action_data.get('tests', [{}])[0].get('commands', [])
+                        if _action_data.get('tests') else _action_data.get('actions', []))
+        except Exception:
+            pass
+
+    # Read log file for context
+    if _lf and _lf.exists():
+        try:
+            with open(_lf, 'r', encoding='utf-8') as _f:
+                log_content = _f.read()
+        except Exception:
+            pass
+
+    # Build instruction — include URL as fallback if replay didn't reach the right page
+    lines = []
+    if url and 'unknown' not in url.lower():
+        lines.append(f'【目标URL】\n{url}\n')
+    lines.append('请先扫描当前表单，建立任务清单，完成剩余待填表单项。\n')
+
+    # Remaining steps (failed step onwards only)
+    if commands:
+        remaining = [c for c in commands if isinstance(c, dict)]
+        remaining_at_and_after = []
+        for i, cmd in enumerate(remaining):
+            step_num = i + 1
+            if step_num >= failed_step:
+                remaining_at_and_after.append((step_num, cmd))
+
+        if remaining_at_and_after:
+            for step_num, cmd in remaining_at_and_after:
+                action = cmd.get('action', '')
+                params = cmd.get('params', {})
+                label = params.get('label_text') or params.get('menu_text') or params.get('tab_name') or ''
+                value = params.get('value') or params.get('option_text') or ''
+                text = params.get('text') or params.get('row_text') or ''
+                index = params.get('index', '')
+
+                if action == 'fill_form_field':
+                    lines.append(f'- Step {step_num}: 填写 "{label}" = "{value}"')
+                elif action == 'select_option':
+                    lines.append(f'- Step {step_num}: 在 "{label}" 中选择 "{value}"')
+                elif action == 'click_element_by_index':
+                    desc = text or f'第{index}个元素'
+                    lines.append(f'- Step {step_num}: 点击 "{desc}"')
+                elif action == 'click_menu_item':
+                    lines.append(f'- Step {step_num}: 点击菜单 "{label}"')
+                elif action == 'click_table_row_action':
+                    lines.append(f'- Step {step_num}: 在表格行 "{text}" 上点击 "{value}"')
+                elif action == 'click_radio':
+                    lines.append(f'- Step {step_num}: 选择 "{label}" = "{value}"')
+                elif action == 'fill_date_field':
+                    lines.append(f'- Step {step_num}: 设置日期 "{label}" = "{value}"')
+                elif action == 'switch_tab':
+                    lines.append(f'- Step {step_num}: 切换到 "{label}" 标签页')
+                elif action == 'close_dialog':
+                    lines.append(f'- Step {step_num}: 关闭对话框')
+                elif action == 'go_to_url':
+                    lines.append(f'- Step {step_num}: 导航到 {cmd.get("params", {}).get("url", "")}')
+                elif action == 'wait_for_loading':
+                    lines.append(f'- Step {step_num}: 等待页面加载完成')
+                else:
+                    lines.append(f'- Step {step_num}: {action}')
+
+    # Append log context — only lines from failed_step onwards
+    if log_content:
+        log_lines = log_content.split('\n')
+        # Log format: "[N] goal: ... | actions: ... | result: ..."
+        relevant_log = []
+        for line in log_lines:
+            m = re.match(r'^\[(\d+)\]', line.strip())
+            if m and int(m.group(1)) >= failed_step:
+                relevant_log.append(line)
+        if relevant_log:
+            lines.append('\n## 原始执行日志\n```')
+            lines.extend(relevant_log[-40:])  # last 40 relevant lines
+            lines.append('```')
+
+    return '\n'.join(lines)
+
+
+async def _handle_rerun(data, args, session_id, llm, browser_context, controller,
+                        on_step_start_hook, on_step_end_hook):
+    """Replay AgentHistoryList to just before the failed step, then continue recording.
+
+    data expects: { trajectory_file, failed_step, instruction?, action_file?, log_file?, max_steps? }
+    If instruction is empty, auto-constructs from action_file + log_file.
+    """
+    from pathlib import Path as _Path
+    trajectory_file = data.get("trajectory_file", "")
+    failed_step = data.get("failed_step", 0)
+    resume_instruction = data.get("instruction", "")
+    max_steps = data.get("max_steps", 40)
+
+    if not trajectory_file or not _Path(trajectory_file).exists():
+        emit_json({"event": "error", "data": {"message": f"Trajectory file not found: {trajectory_file}"}})
+        return
+
+    if failed_step <= 0:
+        emit_json({"event": "error", "data": {"message": "failed_step is required"}})
+        return
+
+    # Auto-construct instruction from action file + log file if not provided
+    if not resume_instruction:
+        action_file = data.get("action_file", "")
+        log_file = data.get("log_file", "")
+        if action_file:
+            resume_instruction = _build_resume_instruction(action_file, log_file, failed_step)
+            sys.stderr.write(f"[session] Auto-constructed resume instruction ({len(resume_instruction)} chars)\n")
+            sys.stderr.flush()
+        else:
+            emit_json({"event": "error", "data": {"message": "instruction or action_file is required"}})
+            return
+
+    try:
+        # Load native AgentHistoryList
+        with open(trajectory_file, 'r', encoding='utf-8') as _f:
+            raw = json.load(_f)
+    except Exception as e:
+        emit_json({"event": "error", "data": {"message": f"Failed to load trajectory: {e}"}})
+        return
+
+    if not raw.get('history'):
+        emit_json({"event": "error", "data": {"message": "Trajectory file has no history array"}})
+        return
+
+    # Slice to stop before the failed step
+    sliced = slice_history_before_step(raw, failed_step)
+    sys.stderr.write(f"[session] Rerun: sliced history to {len(sliced.get('history', []))} entries (failed_step={failed_step})\n")
+    sys.stderr.flush()
+
+    emit_json({"event": "rerun_start", "data": {"failed_step": failed_step, "prefix_entries": len(sliced.get('history', [])), "resume_instruction": resume_instruction}})
+
+    # Phase 1: Replay prefix to reach error scene
+    if sliced.get('history'):
+        from browser_use.agent.views import AgentHistoryList
+        prefix_history = AgentHistoryList(history=sliced['history'])
+
+        # Create a temporary agent just for replay
+        from browser_use import Agent as BA_Agent
+        replay_agent = BA_Agent(
+            task="Replay trajectory to reproduce error state",
+            llm=llm,
+            controller=controller,
+            browser_context=browser_context,
+            use_vision=False, enable_memory=False,
+        )
+        try:
+            sys.stderr.write(f"[session] Replaying {len(sliced['history'])} history entries...\n")
+            sys.stderr.flush()
+            await replay_agent.rerun_history(prefix_history, max_retries=2, skip_failures=True, delay_between_actions=1.0)
+            emit_json({"event": "rerun_replay_done", "data": {"message": "Prefix replay complete, browser at error scene"}})
+        except Exception as e:
+            sys.stderr.write(f"[session] Rerun replay error: {e}\n")
+            sys.stderr.flush()
+            emit_json({"event": "rerun_replay_error", "data": {"message": f"Replay error (may be partial): {e}"}})
+    else:
+        emit_json({"event": "rerun_replay_done", "data": {"message": "No prefix to replay — browser at start page"}})
+
+    # Phase 2: Continue recording from error scene
+    # Clear action log so we only capture the re-recorded steps
+    from .controller import _ACTION_LOG as _ctrl_log
+    _ctrl_log.clear()
+
+    emit_json({"event": "rerun_resume", "data": {"instruction": resume_instruction}})
+    class _FakeGoalTracker(dict):
+        def __init__(self):
+            super().__init__(goals=[], stopped=False)
+        def __getattr__(self, name):
+            try: return self[name]
+            except KeyError: raise AttributeError(name)
+        def __setattr__(self, name, value):
+            self[name] = value
+
+    await _run_agent_step(
+        {"instruction": resume_instruction, "max_steps": max_steps},
+        failed_step,
+        session_id,
+        args,
+        llm, browser_context, controller,
+        _FakeGoalTracker(),
+        type('Path', (), {'exists': lambda self: False, 'unlink': lambda self, missing_ok=False: None})(),
+        on_step_start_hook, on_step_end_hook,
+        {},  # case_data_ref
+        None,  # cumulative_path — new recording starts fresh
+    )
+
+    # =====================================================================
+    # Phase 3-5: Validate → Merge → Done
+    # =====================================================================
+    new_actions = list(_ctrl_log)
+    action_file = data.get("action_file", "")
+    af_path = _Path(action_file) if action_file else None
+    merged_path = None
+    validated = False
+
+    if not af_path or not af_path.exists() or not new_actions:
+        emit_json({
+            "event": "rerun_done",
+            "data": {"failed_step": failed_step, "new_actions": len(new_actions), "merged_file": None, "validated": False}
+        })
+        return
+
+    # Read old action file, build prefix + merged
+    try:
+        with open(af_path, 'r', encoding='utf-8') as _f:
+            _old = json.load(_f)
+        old_commands = (_old.get('tests', [{}])[0].get('commands', [])
+                        if _old.get('tests') else _old.get('actions', []))
+        prefix = [c for i, c in enumerate(old_commands) if (i + 1) < failed_step]
+        merged = prefix + new_actions
+
+        # Build temp action file for validation
+        _temp_action = dict(_old)
+        if _temp_action.get('tests'):
+            _temp_action['tests'][0]['commands'] = merged
+        else:
+            _temp_action['actions'] = merged
+
+        tmp_dir = _Path(tempfile.gettempdir())
+        tmp_action_path = tmp_dir / f"_validate_action_{session_id}.json"
+        with open(tmp_action_path, 'w', encoding='utf-8') as _f:
+            json.dump(_temp_action, _f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        emit_json({"event": "rerun_done", "data": {"failed_step": failed_step, "merged_file": None, "validated": False, "error": str(e)}})
+        return
+
+    # ===================================================================
+    # Phase 4: Validate — assemble + run the merged script
+    # ===================================================================
+    emit_json({"event": "rerun_validate", "data": {"step": "assembling", "new_actions": len(new_actions), "prefix": len(prefix)}})
+
+    import subprocess
+    scripts_dir = _Path(__file__).parent
+    assembler_py = scripts_dir / 'script_assembler.py'
+    tmp_script_path = tmp_dir / f"_validate_script_{session_id}.js"
+
+    try:
+        # Step 4a: Assemble
+        result = subprocess.run(
+            ['python', str(assembler_py), str(tmp_action_path), str(tmp_script_path)],
+            capture_output=True, text=True, timeout=30, cwd=str(scripts_dir.parent)
+        )
+        if result.returncode != 0:
+            emit_json({"event": "rerun_validate", "data": {"step": "assemble_failed", "stderr": result.stderr[-500:]}})
+            emit_json({"event": "rerun_done", "data": {"failed_step": failed_step, "merged_file": None, "validated": False, "error": "Assembly failed"}})
+            try: tmp_action_path.unlink()
+            except: pass
+            return
+
+        if not tmp_script_path.exists():
+            emit_json({"event": "rerun_done", "data": {"failed_step": failed_step, "merged_file": None, "validated": False, "error": "Script not generated"}})
+            try: tmp_action_path.unlink()
+            except: pass
+            return
+
+        emit_json({"event": "rerun_validate", "data": {"step": "running"}})
+
+        # Step 4b: Run the script
+        run_js = scripts_dir.parent / '.opencode' / 'skills' / 'playwright-skill' / 'run.js'
+        proc = subprocess.run(
+            ['node', str(run_js), str(tmp_script_path)],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(scripts_dir.parent),
+            env={**__import__('os').environ, 'PLAYWRIGHT_SKIP_EXISTING': '1'}
+        )
+
+        # Step 4c: Check for errors
+        err_file = tmp_dir / 'script-errors.json'
+        script_errors = None
+        if err_file.exists():
+            try:
+                with open(err_file, 'r', encoding='utf-8') as _f:
+                    script_errors = json.load(_f)
+                err_file.unlink()
+            except Exception:
+                pass
+
+        run_ok = proc.returncode == 0 and (not script_errors or len(script_errors) == 0)
+
+        emit_json({
+            "event": "rerun_validate",
+            "data": {
+                "step": "done",
+                "exit_code": proc.returncode,
+                "errors": len(script_errors) if script_errors else 0,
+                "passed": run_ok,
+                "stdout_tail": (proc.stdout or '')[-300:],
+                "stderr_tail": (proc.stderr or '')[-300:],
+            }
+        })
+
+        if not run_ok:
+            emit_json({"event": "rerun_done", "data": {"failed_step": failed_step, "merged_file": None, "validated": False, "error": "Script execution failed"}})
+            try: tmp_action_path.unlink()
+            except: pass
+            try: tmp_script_path.unlink()
+            except: pass
+            return
+
+        validated = True
+
+    except subprocess.TimeoutExpired:
+        emit_json({"event": "rerun_done", "data": {"failed_step": failed_step, "merged_file": None, "validated": False, "error": "Validation timeout"}})
+        try: tmp_action_path.unlink()
+        except: pass
+        return
+    except Exception as e:
+        emit_json({"event": "rerun_done", "data": {"failed_step": failed_step, "merged_file": None, "validated": False, "error": str(e)}})
+        try: tmp_action_path.unlink()
+        except: pass
+        return
+
+    # ===================================================================
+    # Phase 5: Merge — validation passed, save permanently
+    # ===================================================================
+    action_dir = scripts_dir / 'action'
+    action_dir.mkdir(parents=True, exist_ok=True)
+    fixed_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    merged_path = action_dir / f"action_fixed_{fixed_ts}.json"
+
+    try:
+        with open(tmp_action_path, 'r', encoding='utf-8') as _f:
+            _final = json.load(_f)
+        with open(merged_path, 'w', encoding='utf-8') as _f:
+            json.dump(_final, _f, ensure_ascii=False, indent=2)
+        tmp_action_path.unlink()
+
+        # TODO: Uncomment after verification succeeds — delete old erroneous action file
+        # try:
+        #     af_path.unlink()
+        # except Exception:
+        #     pass
+
+        sys.stderr.write(f"[session] Validated + Merged: {len(prefix)} prefix + {len(new_actions)} new → {merged_path}\n")
+        sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"[session] Merge error: {e}\n")
+        sys.stderr.flush()
+        emit_json({"event": "rerun_done", "data": {"failed_step": failed_step, "merged_file": None, "validated": True, "error": f"Merge failed: {e}"}})
+        return
+
+    # Cleanup temp script
+    try: tmp_script_path.unlink()
+    except: pass
+
+    emit_json({
+        "event": "rerun_done",
+        "data": {
+            "failed_step": failed_step,
+            "new_actions": len(new_actions),
+            "prefix_actions": len(prefix),
+            "merged_file": str(merged_path),
+            "validated": True,
+        }
+    })
 
 
 async def _run_agent_step(instruction, step_index, session_id, args, llm, browser_context,
@@ -286,6 +766,9 @@ def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_r
         _handle_save_case_data(session_state['case_data_store'], session_state['session_id'])
         return 'continue'
 
+    if event == "rerun":
+        return ('rerun', msg.get("data", {}))
+
     if event == "reset_trajectory":
         cum_path = _handle_reset_trajectory(session_state['session_id'])
         session_state['cumulative_path'] = cum_path
@@ -393,6 +876,20 @@ async def run_session(args):
             if isinstance(action, tuple) and action[0] == 'intervene':
                 step_index += 1
                 await _run_step({"instruction": action[1], "max_steps": 20}, step_index)
+                continue
+
+            # Handle rerun: replay history to error scene, then continue recording
+            if isinstance(action, tuple) and action[0] == 'rerun':
+                rerun_data = action[1]
+                await _handle_rerun(
+                    rerun_data, args,
+                    session_id=session_id,
+                    llm=llm,
+                    browser_context=browser_context,
+                    controller=controller,
+                    on_step_start_hook=on_step_start_hook,
+                    on_step_end_hook=on_step_end_hook,
+                )
                 continue
 
             if action != 'step':

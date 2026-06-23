@@ -257,6 +257,7 @@ export async function loadSnapshots() {
           script: data.script,
           testId: data.testId,
           fileName: data.fileName,
+          actionFile: data.actionFile,
           steps: [],
           stats: data.stats,
         });

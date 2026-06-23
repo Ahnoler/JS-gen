@@ -274,12 +274,7 @@ export default function (app) {
     const sessionId = entry.sessionId;
 
     try {
-      // Load atp-fix skill content for error fix guidance
-      let atpFixGuide = '';
-      const atpFixPath = path.join(PROJECT_DIR, '.opencode', 'skills', 'atp-fix', 'SKILL.md');
-      try { atpFixGuide = readFileSync(atpFixPath, 'utf-8').slice(0, 3000); } catch {}
-
-      const refinePrompt = `${atpFixGuide ? '## atp-fix Skill (loaded)\n' + atpFixGuide + '\n\n' : ''}Modify the previous script based on the feedback below. Output ONLY the complete updated script.
+      const refinePrompt = `Modify the previous script based on the feedback below. Output ONLY the complete updated script.
 
 Feedback:
 ${feedback}

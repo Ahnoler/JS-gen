@@ -16,7 +16,6 @@ import registerBrowserSessionRoutes from './src/routes/browser-session.js';
 import registerTrajectoryRoutes from './src/routes/trajectory.js';
 import registerCaseDataRoutes from './src/routes/case-data.js';
 import registerAssembleRoutes from './src/routes/test-assemble.js';
-import registerTestFixRoutes from './src/routes/test-fix.js';
 import registerSSERoutes from './src/routes/sse.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +34,6 @@ registerBrowserSessionRoutes(app);
 registerTrajectoryRoutes(app);
 registerCaseDataRoutes(app);
 registerAssembleRoutes(app);
-registerTestFixRoutes(app);
 registerHealthRoutes(app);
 registerAgentRoutes(app);
 registerTestGenRoutes(app);
