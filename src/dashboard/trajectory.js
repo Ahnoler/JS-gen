@@ -1,6 +1,8 @@
 // Trajectory Tab — shows action_*.json and log_*.txt from scripts/snapshots/
 import { escapeHtml } from './swagger-api.js';
 import { pipelineState, displayGeneratedScript } from './script-pipeline.js';
+import { renderActionCards, wireActionButtons } from './trajectory-actions.js';
+import { renderLogView } from './trajectory-log-view.js';
 
 export let trajCurrentDetailId = null;
 
@@ -68,7 +70,8 @@ export async function loadSnapshots() {
           <td style="padding:8px;color:var(--slate-400);font-size:11px">${mtime}</td>
           <td style="padding:8px;white-space:nowrap">
             <button class="btn btn-outline btn-sm snap-view" data-path="${escapeHtml(f.path)}" data-type="action" style="margin-right:4px">View</button>
-            <button class="btn btn-outline btn-sm snap-assemble" data-path="${escapeHtml(f.path)}" style="color:var(--emerald-600);border-color:var(--emerald-200)">Assemble</button>
+            <button class="btn btn-outline btn-sm snap-assemble" data-path="${escapeHtml(f.path)}" style="color:var(--emerald-600);border-color:var(--emerald-200);margin-right:4px">Assemble</button>
+            <button class="btn btn-outline btn-sm snap-delete" data-path="${escapeHtml(f.path)}" data-name="${escapeHtml(f.name)}" style="color:var(--red-500);border-color:var(--red-200)">Delete</button>
           </td>
         </tr>`;
       }
@@ -99,7 +102,8 @@ export async function loadSnapshots() {
           <td style="padding:8px;color:var(--slate-400);font-size:12px">${sizeKb}</td>
           <td style="padding:8px;color:var(--slate-400);font-size:11px">${mtime}</td>
           <td style="padding:8px;white-space:nowrap">
-            <button class="btn btn-outline btn-sm snap-view" data-path="${escapeHtml(f.path)}" data-type="log">View</button>
+            <button class="btn btn-outline btn-sm snap-view" data-path="${escapeHtml(f.path)}" data-type="log" style="margin-right:4px">View</button>
+            <button class="btn btn-outline btn-sm snap-delete" data-path="${escapeHtml(f.path)}" data-name="${escapeHtml(f.name)}" style="color:var(--red-500);border-color:var(--red-200)">Delete</button>
           </td>
         </tr>`;
       }
@@ -134,171 +138,13 @@ export async function loadSnapshots() {
         document.getElementById('trajDetailId').textContent = filePath.split('/').pop();
         document.getElementById('trajDetailInfo').textContent = fileType === 'action' ? 'Action file — ' + filePath : 'Log file — ' + filePath;
 
+        const summaryEl = document.getElementById('trajDetailSummary');
+
         if (fileType === 'action') {
           try {
             const jsonData = JSON.parse(content);
             const commands = jsonData?.tests?.[0]?.commands || [];
             const url = jsonData?.url || '';
-
-            const summaryEl = document.getElementById('trajDetailSummary');
-
-            function renderActionCards() {
-              const actionTypes = ['go_to_url','fill_form_field','select_option','click_element_by_index','fill_date_field','selectDate'];
-              const cardsHtml = commands.map((c, i) => {
-                if (c === null) return '';
-                const action = c.action || c.command || '';
-                const label = c.params?.label_text || '';
-                const value = c.params?.value || c.params?.option_text || '';
-                if (!action) {
-                  return `<div class="traj-card" data-index="${i}" style="border:1px solid var(--slate-200);border-radius:8px;margin-bottom:8px;overflow:hidden;background:#fff">
-                    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--slate-50);border-bottom:1px solid var(--slate-200);font-size:12px">
-                      <span style="background:var(--indigo-100);color:var(--indigo-700);padding:1px 8px;border-radius:4px;font-weight:600;font-size:11px">#${i+1}</span>
-                      <select class="traj-type-select" data-index="${i}" style="flex:1;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:#fff;color:var(--slate-600)">
-                        <option value="">-- Select type --</option>
-                        ${actionTypes.map(t => `<option value="${t}">${t}</option>`).join('')}
-                      </select>
-                    </div>
-                    <div style="padding:16px 12px;font-size:13px;color:var(--slate-400);text-align:center">Select an action type</div>
-                  </div>`;
-                }
-                return `<div class="traj-card" data-index="${i}" style="border:1px solid var(--slate-200);border-radius:8px;margin-bottom:8px;overflow:hidden;background:#fff">
-                  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--slate-50);border-bottom:1px solid var(--slate-200);font-size:12px">
-                    <span style="background:var(--indigo-100);color:var(--indigo-700);padding:1px 8px;border-radius:4px;font-weight:600;font-size:11px">#${i+1}</span>
-                    <span style="color:var(--slate-600);font-weight:600;font-family:var(--font-mono);font-size:11px">${escapeHtml(action)}</span>
-                    <span style="flex:1"></span>
-                  </div>
-                  <div style="padding:8px 12px;font-size:13px">
-                    ${action === 'go_to_url' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">URL</span><br><span class="traj-value-display-${i}" style="word-break:break-all">${escapeHtml(c.params?.url || '')}</span>
-                      <input class="traj-value-input-${i}" type="text" value="${escapeHtml(c.params?.url || '')}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
-                    ${action === 'fill_form_field' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Label</span><br><span class="traj-label-${i}" style="font-weight:500">${escapeHtml(label)}</span></div>
-                      <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Value</span><br><span class="traj-value-display-${i}" style="font-weight:500">${escapeHtml(value)}</span>
-                      <input class="traj-value-input-${i}" type="text" value="${escapeHtml(value)}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
-                    ${action === 'select_option' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Label</span><br><span style="font-weight:500">${escapeHtml(label)}</span></div>
-                      <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Option</span><br><span class="traj-value-display-${i}">${escapeHtml(value)}</span>
-                      <input class="traj-value-input-${i}" type="text" value="${escapeHtml(value)}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
-                    ${action === 'click_element_by_index' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Element</span><br><span style="font-weight:500;font-family:var(--font-mono);font-size:12px">${escapeHtml(c.params?.text || '')}</span></div>
-                      <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">XPath</span><br><span class="traj-value-display-${i}" style="font-size:11px;color:var(--slate-500);word-break:break-all;font-family:var(--font-mono)">${escapeHtml(c.target || '')}</span>
-                      <input class="traj-value-input-${i}" type="text" value="${escapeHtml(c.target || '')}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
-                    ${action === 'fill_date_field' || action === 'selectDate' ? `<div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Label</span><br><span style="font-weight:500">${escapeHtml(label)}</span></div>
-                      <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">Date</span><br><span class="traj-value-display-${i}">${escapeHtml(value)}</span>
-                      <input class="traj-value-input-${i}" type="text" value="${escapeHtml(value)}" style="display:none;width:100%;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:13px;margin-top:2px;box-sizing:border-box"></div>` : ''}
-                    ${!['go_to_url','fill_form_field','select_option','click_element_by_index','fill_date_field','selectDate'].includes(action) ? `<div style="color:var(--slate-500);font-size:12px">${escapeHtml(label || value || JSON.stringify(c.params || ''))}</div>` : ''}
-                  </div>
-                  <div style="display:flex;gap:4px;padding:4px 12px 8px">
-                    <button class="traj-move-up-btn btn btn-outline btn-sm" data-index="${i}" style="font-size:11px;padding:3px 8px" ${i === 0 ? 'disabled' : ''}>↑</button>
-                    <button class="traj-move-down-btn btn btn-outline btn-sm" data-index="${i}" style="font-size:11px;padding:3px 8px" ${i === commands.length - 1 ? 'disabled' : ''}>↓</button>
-                    <button class="traj-edit-btn btn btn-outline btn-sm" data-index="${i}" style="font-size:11px">Edit</button>
-                    <button class="traj-del-btn btn btn-outline btn-sm" data-index="${i}" style="color:var(--red-500);border-color:var(--red-200);font-size:11px">Delete</button>
-                  </div>
-                </div>`;
-              }).join('');
-
-              const addBtnHtml = `<div id="trajAddActionBtn" style="border:2px dashed var(--slate-300);border-radius:8px;padding:12px;text-align:center;cursor:pointer;font-size:13px;color:var(--slate-400);margin-top:8px;transition:all .2s"
-                onmouseenter="this.style.borderColor='var(--indigo-400)';this.style.color='var(--indigo-600)'"
-                onmouseleave="this.style.borderColor='var(--slate-300)';this.style.color='var(--slate-400)'">+ Add Action</div>`;
-
-              summaryEl.innerHTML = `
-                <div style="margin-bottom:12px;padding:10px 12px;background:var(--slate-50);border-radius:8px;font-size:13px">
-                  <div style="margin-bottom:4px"><span style="color:var(--slate-400);font-size:11px">URL</span></div>
-                  <div style="word-break:break-all;font-family:var(--font-mono);font-size:12px;color:var(--indigo-600)">${escapeHtml(url || '(none)')}</div>
-                  <div style="margin-top:6px;font-size:11px;color:var(--slate-400)">${commands.length} actions</div>
-                </div>
-                ${cardsHtml}
-                ${addBtnHtml}`;
-
-              wireActionButtons();
-            }
-
-            function wireActionButtons() {
-              // Edit buttons
-              summaryEl.querySelectorAll('.traj-edit-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                  e.stopPropagation();
-                  const idx = parseInt(btn.dataset.index);
-                  const display = summaryEl.querySelector(`.traj-value-display-${idx}`);
-                  const input = summaryEl.querySelector(`.traj-value-input-${idx}`);
-                  if (display && input) {
-                    if (input.style.display === 'none') {
-                      display.style.display = 'none';
-                      input.style.display = 'block';
-                      input.focus();
-                      btn.textContent = 'Confirm';
-                    } else {
-                      const newVal = input.value;
-                      display.textContent = newVal;
-                      display.style.display = '';
-                      input.style.display = 'none';
-                      const cmd = commands[idx];
-                      if (cmd.params?.value !== undefined) cmd.params.value = newVal;
-                      if (cmd.action === 'go_to_url' && cmd.params) cmd.params.url = newVal;
-                      if (cmd.action === 'click_element_by_index') cmd.target = newVal;
-                      btn.textContent = 'Edit';
-                      showSaveBall();
-                    }
-                  }
-                });
-              });
-
-              // Delete buttons
-              summaryEl.querySelectorAll('.traj-del-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                  e.stopPropagation();
-                  const idx = parseInt(btn.dataset.index);
-                  const card = summaryEl.querySelector(`.traj-card[data-index="${idx}"]`);
-                  if (card && confirm('Delete action #' + (idx+1) + '?')) {
-                    card.style.display = 'none';
-                    commands[idx] = null;
-                    showSaveBall();
-                  }
-                });
-              });
-
-              // Move up
-              summaryEl.querySelectorAll('.traj-move-up-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                  e.stopPropagation();
-                  const idx = parseInt(btn.dataset.index);
-                  if (idx > 0) {
-                    [commands[idx-1], commands[idx]] = [commands[idx], commands[idx-1]];
-                    renderActionCards();
-                    showSaveBall();
-                  }
-                });
-              });
-
-              // Move down
-              summaryEl.querySelectorAll('.traj-move-down-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                  e.stopPropagation();
-                  const idx = parseInt(btn.dataset.index);
-                  if (idx < commands.length - 1) {
-                    [commands[idx], commands[idx+1]] = [commands[idx+1], commands[idx]];
-                    renderActionCards();
-                    showSaveBall();
-                  }
-                });
-              });
-
-              // Add action
-              const addBtn = document.getElementById('trajAddActionBtn');
-              if (addBtn) {
-                addBtn.addEventListener('click', () => {
-                  commands.push({ action: '', value: '', params: {} });
-                  renderActionCards();
-                  showSaveBall();
-                });
-              }
-
-              // Type selector change
-              summaryEl.querySelectorAll('.traj-type-select').forEach(sel => {
-                sel.addEventListener('change', () => {
-                  const idx = parseInt(sel.dataset.index);
-                  commands[idx].action = sel.value;
-                  renderActionCards();
-                  showSaveBall();
-                });
-              });
-            }
 
             // Hide raw JSON section and Send to Script Gen button
             document.getElementById('trajDetailJson').style.display = 'none';
@@ -331,10 +177,17 @@ export async function loadSnapshots() {
             function hideSaveBall() { saveBall.style.display = 'none'; }
             hideSaveBall();
 
+            // Re-render adapter: wires renderActionCards + wireActionButtons from trajectory-actions.js
+            function rerender() {
+              renderActionCards(commands, summaryEl, url, () => {
+                wireActionButtons(commands, summaryEl, showSaveBall, rerender);
+              });
+            }
+
             // Store original data for save
             summaryEl._trajectoryData = jsonData;
 
-            renderActionCards();
+            rerender();
 
             // Wire save ball
             saveBall.onclick = async () => {
@@ -367,10 +220,14 @@ export async function loadSnapshots() {
             document.getElementById('trajDetailJson').textContent = content;
           }
         } else {
-          document.getElementById('trajDetailSummary').textContent = 'Total lines: ' + content.split('\n').length;
-          document.getElementById('trajDetailJson').textContent = content;
+          // Log file — use structured log viewer
+          document.querySelectorAll('#trajDetailPanel .section-title')[1].style.display = 'none';
+          const jsonEl = document.getElementById('trajDetailJson');
+          jsonEl.style.display = 'none';
+          renderLogView(summaryEl, jsonEl, content);
         }
         detailPanel.style.display = '';
+        trajCurrentDetailId = filePath;
       } catch (err) {
         alert('View failed: ' + err.message);
       }
@@ -411,6 +268,32 @@ export async function loadSnapshots() {
       } finally {
         b.disabled = false;
         b.textContent = 'Assemble';
+      }
+    }));
+
+    // Wire delete buttons
+    body.querySelectorAll('.snap-delete').forEach(b => b.addEventListener('click', async () => {
+      const filePath = b.dataset.path;
+      const fileName = b.dataset.name || filePath.split('/').pop();
+      if (!confirm('Delete ' + fileName + '?')) return;
+      try {
+        const res = await fetch('/api/test/assemble/file', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: filePath }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Delete failed');
+        }
+        // Close detail panel if showing the deleted file
+        if (trajCurrentDetailId === filePath) {
+          document.getElementById('trajDetailPanel').style.display = 'none';
+          trajCurrentDetailId = null;
+        }
+        loadSnapshots();
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
       }
     }));
 

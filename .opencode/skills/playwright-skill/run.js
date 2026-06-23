@@ -299,21 +299,81 @@ async function main() {
       const vm = require('vm');
       new vm.Script(code, { filename: tempFile });
     } catch (syntaxErr) {
-      console.error('❌ Script syntax error detected before execution:');
-      console.error(`   ${syntaxErr.message}`);
-      // Check if error is near end of file (likely trailing non-JS content)
       const lines = code.split('\n');
-      const errLine = syntaxErr.stack ? parseInt(syntaxErr.stack.match(/:(\d+):(\d+)/)?.[1] || '0') : 0;
-      if (errLine > 0 && errLine >= lines.length - 3) {
-        console.error('   💡 The error is near end of file — check for trailing Chinese text,');
-        console.error('      backticks, or natural language outside the })(); block.');
-        if (lines.length > 1) {
-          const last = lines[lines.length - 1].trim();
-          if (last.length > 0 && !/^(?:\/\/|\/\*|function|if|}|\)|;)/.test(last)) {
-            console.error(`   📝 Suspect trailing content: "${last.substring(0, 80)}${last.length > 80 ? '...' : ''}"`);
+      const errMsg = syntaxErr.message || '';
+
+      // Extract line:col from error message or stack
+      let errLine = 0, errCol = 0;
+      // V8 format: "message\n    at new Script (vm.js:...)\n    at ..."
+      // Or: "message\n    at ... :line:col"
+      const stackMatch = (syntaxErr.stack || '').match(/:(\d+):(\d+)/);
+      if (stackMatch) {
+        errLine = parseInt(stackMatch[1]) || 0;
+        errCol = parseInt(stackMatch[2]) || 0;
+      }
+      // Also try parsing from the message itself (e.g. "Unexpected token at 581:10")
+      if (!errLine) {
+        const msgMatch = errMsg.match(/at\s+(\d+):(\d+)/);
+        if (msgMatch) { errLine = parseInt(msgMatch[1]) || 0; errCol = parseInt(msgMatch[2]) || 0; }
+      }
+
+      console.error('═══════════════════════════════════════════');
+      console.error('❌ Script syntax error detected before execution:');
+      console.error(`   ${errMsg}`);
+      console.error('───────────────────────────────────────────');
+
+      // Show the error location with context
+      if (errLine > 0 && errLine <= lines.length) {
+        const ctxStart = Math.max(0, errLine - 5);
+        const ctxEnd = Math.min(lines.length, errLine + 3);
+        console.error(`   📍 Error near line ${errLine}:`);
+        if (errCol > 0) {
+          console.error(`      Column: ${errCol}`);
+        }
+        console.error(`   📄 Context (lines ${ctxStart + 1}-${ctxEnd}):`);
+        console.error('   ─────────────────────────────────────');
+        for (let i = ctxStart; i < ctxEnd; i++) {
+          const marker = i === errLine - 1 ? '>>>' : '   ';
+          const ln = String(i + 1).padStart(4, ' ');
+          const snippet = lines[i].length > 120 ? lines[i].substring(0, 120) + '…' : lines[i];
+          console.error(`   ${marker} ${ln} │ ${snippet}`);
+        }
+        console.error('   ─────────────────────────────────────');
+      } else {
+        // Can't locate the error — show last few lines as fallback
+        console.error('   💡 Could not pinpoint error location. Showing end of file:');
+        const tail = lines.slice(Math.max(0, lines.length - 8));
+        tail.forEach((l, i) => {
+          const ln = String(lines.length - tail.length + i + 1).padStart(4, ' ');
+          console.error(`      ${ln} │ ${l.length > 120 ? l.substring(0, 120) + '…' : l}`);
+        });
+      }
+
+      // Smart hints for common syntax errors
+      if (errMsg.includes('Missing catch or finally after try')) {
+        console.error('   💡 Hint: A `try {` block is missing its matching `} catch` or `} finally`.');
+        if (errLine > 0) {
+          // Scan backwards from error line to find unclosed try
+          let depth = 0, lastTry = 0;
+          for (let i = errLine - 1; i >= 0; i--) {
+            const l = lines[i];
+            if (/try\s*\{/.test(l)) { depth--; if (depth < 0) { lastTry = i + 1; break; } }
+            if (/\}\s*catch/.test(l) || /\}\s*finally/.test(l)) depth++;
+          }
+          if (lastTry > 0) {
+            console.error(`   🔍 Nearest unclosed ` + '`try`' + ` appears to be at line ${lastTry}:`);
+            console.error(`      ${lines[lastTry - 1].trim().substring(0, 100)}`);
           }
         }
+      } else if (errMsg.includes('Unexpected token')) {
+        console.error('   💡 Hint: Check for extra/missing braces, parentheses, or brackets near this line.');
+      } else if (errMsg.includes('Unexpected end of input')) {
+        console.error('   💡 Hint: The script appears to be truncated — check for missing closing braces.');
       }
+
+      console.error('───────────────────────────────────────────');
+      console.error(`   📝 Full script saved at: ${tempFile}`);
+      console.error('═══════════════════════════════════════════');
       process.exit(1);
     }
 

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { deduplicateActionFile } from '../dedup.js';
@@ -141,6 +141,33 @@ export default function (app) {
         return res.status(404).json({ error: 'File not found: ' + absPath });
       }
       writeFileSync(absPath, JSON.stringify(data, null, 2), 'utf-8');
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * DELETE /api/test/assemble/file
+   * Body: { path: "scripts/snapshots/action_xxx.json" }
+   * Deletes a snapshot file (action JSON or log TXT) from disk.
+   */
+  app.delete('/api/test/assemble/file', async (req, res) => {
+    try {
+      const { path: filePath } = req.body || {};
+      if (!filePath) {
+        return res.status(400).json({ error: 'path is required' });
+      }
+      // Safety: only allow deletion within scripts/snapshots/
+      const absPath = path.resolve(PROJECT_DIR, filePath);
+      const snapshotsDir = path.resolve(PROJECT_DIR, 'scripts', 'snapshots');
+      if (!absPath.startsWith(snapshotsDir)) {
+        return res.status(403).json({ error: 'Path must be under scripts/snapshots/' });
+      }
+      if (!existsSync(absPath)) {
+        return res.status(404).json({ error: 'File not found: ' + absPath });
+      }
+      unlinkSync(absPath);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
