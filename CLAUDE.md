@@ -91,7 +91,6 @@ Single-page web dashboard with 11 ESM modules. Key panels: script generation pip
 - **`atp-ui`** — The canonical Element UI interaction knowledge base (~900 lines). Covers el-form, el-table, el-dialog, el-tree, el-menu, el-select, el-date-picker, el-cascader, el-tabs, el-upload. Agent and script generation both pull rules from here.
 - **`atp-rule`** — Smart form value generators (ID card with checksum, phone, credit code, etc.) via the `matchSpecialRule(label)` pattern.
 - **`atp-step-gen`** — Test case generation from requirement documents.
-- **`atp-fix`** — Failed script error classification and auto-repair rules.
 - **`playwright-skill`** — Rewritten Playwright automation skill with custom Element UI actions.
 - **`cdp-agent`** — CDP-based browser automation for legacy bank cabinet systems.
 - **`clarification-protocol`** — Structured requirement clarification templates.

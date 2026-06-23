@@ -17,6 +17,10 @@
       <excludeFolder url="file://$MODULE_DIR$/atp-record" />
       <excludeFolder url="file://$MODULE_DIR$/chrome-devtools-mcp" />
       <excludeFolder url="file://$MODULE_DIR$/playwright-mcp" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/action" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/log" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/snapshots" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/trajectories" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.12" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

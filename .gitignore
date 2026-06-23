@@ -4,7 +4,6 @@ node_modules/
 opencode.json
 agent-api.config.json
 *.log
-snapshots/
 tmp/
 .DS_Store
 Thumbs.db
@@ -12,6 +11,9 @@ report/
 report2/
 atp-record/
 docs/
+scripts/action/
+scripts/log/
+scripts/screenshots/
 scripts/trace/
 scripts/case_data/
 scripts/data/

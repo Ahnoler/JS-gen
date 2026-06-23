@@ -1351,7 +1351,7 @@ def _register_misc_actions(controller, browser_context):
             return _err('no-trajectory-entries')
         try:
             if not output_dir:
-                output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapshots')
+                output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'action')
             os.makedirs(output_dir, exist_ok=True)
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
             filepath = os.path.join(output_dir, f'action_{ts}.json')
@@ -1486,9 +1486,9 @@ def _register_misc_actions(controller, browser_context):
     async def take_screenshot():
         page = await browser_context.get_current_page()
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        snapshot_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapshots')
-        os.makedirs(snapshot_dir, exist_ok=True)
-        path = os.path.join(snapshot_dir, f"screenshot_{ts}.png")
+        screenshot_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'screenshots')
+        os.makedirs(screenshot_dir, exist_ok=True)
+        path = os.path.join(screenshot_dir, f"screenshot_{ts}.png")
         await page.screenshot(path=path, full_page=False)
         return _ok(f'screenshot-saved:{path}')
 

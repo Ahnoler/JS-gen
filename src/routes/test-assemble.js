@@ -13,7 +13,7 @@ export default function (app) {
 
   /**
    * POST /api/test/assemble
-   * Body: { actionFile: "scripts/snapshots/action_20260619_183411.json" }
+   * Body: { actionFile: "scripts/action/action_20260619_183411.json" }
    * Flow:  read → dedup → Python assembler → return script
    */
   app.post('/api/test/assemble', async (req, res) => {
@@ -90,35 +90,31 @@ export default function (app) {
 
   /**
    * GET /api/test/assemble/files
-   * List available action JSON and log files in snapshots directory
+   * List available action JSON files from scripts/action/ and log files from scripts/log/
    */
   app.get('/api/test/assemble/files', async (req, res) => {
     try {
-      const snapshotsDir = path.join(SCRIPTS_DIR, 'snapshots');
-      if (!existsSync(snapshotsDir)) {
-        return res.json({ actionFiles: [], logFiles: [] });
-      }
-      const names = readdirSync(snapshotsDir);
-      const actionFiles = names
+      const actionDir = path.join(SCRIPTS_DIR, 'action');
+      const logDir = path.join(SCRIPTS_DIR, 'log');
+
+      const actionFiles = existsSync(actionDir) ? readdirSync(actionDir)
         .filter(f => f.startsWith('action_') && f.endsWith('.json'))
-        .sort()
-        .reverse()
-        .slice(0, 30)
+        .sort().reverse().slice(0, 30)
         .map(f => {
-          const p = path.join(snapshotsDir, f);
+          const p = path.join(actionDir, f);
           const st = statSync(p);
-          return { name: f, path: path.join('scripts', 'snapshots', f), size: st.size, mtime: st.mtime };
-        });
-      const logFiles = names
+          return { name: f, path: path.join('scripts', 'action', f), size: st.size, mtime: st.mtime };
+        }) : [];
+
+      const logFiles = existsSync(logDir) ? readdirSync(logDir)
         .filter(f => f.startsWith('log_') && f.endsWith('.txt'))
-        .sort()
-        .reverse()
-        .slice(0, 30)
+        .sort().reverse().slice(0, 30)
         .map(f => {
-          const p = path.join(snapshotsDir, f);
+          const p = path.join(logDir, f);
           const st = statSync(p);
-          return { name: f, path: path.join('scripts', 'snapshots', f), size: st.size, mtime: st.mtime };
-        });
+          return { name: f, path: path.join('scripts', 'log', f), size: st.size, mtime: st.mtime };
+        }) : [];
+
       res.json({ actionFiles, logFiles });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -149,8 +145,8 @@ export default function (app) {
 
   /**
    * DELETE /api/test/assemble/file
-   * Body: { path: "scripts/snapshots/action_xxx.json" }
-   * Deletes a snapshot file (action JSON or log TXT) from disk.
+   * Body: { path: "scripts/action/action_xxx.json" }
+   * Deletes a file (action JSON or log TXT) from disk.
    */
   app.delete('/api/test/assemble/file', async (req, res) => {
     try {
@@ -158,11 +154,12 @@ export default function (app) {
       if (!filePath) {
         return res.status(400).json({ error: 'path is required' });
       }
-      // Safety: only allow deletion within scripts/snapshots/
+      // Safety: only allow deletion within scripts/action/ or scripts/log/
       const absPath = path.resolve(PROJECT_DIR, filePath);
-      const snapshotsDir = path.resolve(PROJECT_DIR, 'scripts', 'snapshots');
-      if (!absPath.startsWith(snapshotsDir)) {
-        return res.status(403).json({ error: 'Path must be under scripts/snapshots/' });
+      const actionDir = path.resolve(PROJECT_DIR, 'scripts', 'action');
+      const logDir = path.resolve(PROJECT_DIR, 'scripts', 'log');
+      if (!absPath.startsWith(actionDir) && !absPath.startsWith(logDir)) {
+        return res.status(403).json({ error: 'Path must be under scripts/action/ or scripts/log/' });
       }
       if (!existsSync(absPath)) {
         return res.status(404).json({ error: 'File not found: ' + absPath });

@@ -20,7 +20,9 @@ export const pipelineState = {
   currentTestId: null,
   currentFileName: null,
   currentScript: '',
-  lastError: '',  // captured from last run failure
+  lastError: '',       // captured from last run failure
+  actionFile: '',       // action JSON path (for self-heal)
+  healSessionId: null,  // browser session for self-heal
 };
 
 // ====== Helpers ======
@@ -104,6 +106,7 @@ async function runScriptOnce(script, fileName) {
 
 export function displayGeneratedScript(data) {
   pipelineState.currentScript = data.script || '';
+  pipelineState.actionFile = data.actionFile || pipelineState.actionFile || '';
   // Steps
   const stepsDiv = document.getElementById('genSteps');
   const stepsList = document.getElementById('genStepsList');
@@ -132,6 +135,9 @@ export function displayGeneratedScript(data) {
 
   // Show Run area
   document.getElementById('genRunArea').style.display = 'block';
+  document.getElementById('genHealArea').style.display = 'none';
+  document.getElementById('genHealBtn').disabled = true;
+  document.getElementById('genHealStatus').textContent = '';
   checkWorkerHealth();
 }
 
@@ -482,19 +488,25 @@ export function initScriptPipeline() {
                     addRunLog('error', `[Step ${e.step}] ${e.action} "${e.label || ''}" → ${e.error}${errDetail}${errVal}`);
                   });
 
-                  // Also show in result area immediately
+                  // Show in result area
                   const resultDiv2 = document.getElementById('genRunResult');
                   resultDiv2.style.display = 'block';
                   resultDiv2.style.background = 'var(--amber-50)';
                   resultDiv2.style.color = 'var(--amber-700)';
                   resultDiv2.innerHTML = `<div>🔍 DETECTION — ${errors.length} error(s) captured</div>
-                    <div style="font-size:11px;margin-top:4px">${errors.map(e => `[Step ${e.step}] ${e.action} → ${e.error}`).join('<br>')}</div>
-                    <div style="font-size:10px;margin-top:4px;color:var(--slate-400)">Fix channel disabled. Check server console or script-errors.json for full details.</div>`;
+                    <div style="font-size:11px;margin-top:4px">${errors.map(e => `[Step ${e.step}] ${e.action} → ${e.error}`).join('<br>')}</div>`;
                   document.getElementById('genRunDot').style.background = 'var(--amber-400)';
                   document.getElementById('genRunStatus').textContent = '检测到错误';
 
-                  // Store errors for potential manual fix
+                  // Enable self-heal button if we have an action file
                   pipelineState.lastError = JSON.stringify(errors, null, 2);
+                  if (pipelineState.actionFile) {
+                    const stepErrors = errors.filter(e => e.step > 0);
+                    const firstStep = stepErrors[0]?.step || errors[0]?.step || '?';
+                    document.getElementById('genHealArea').style.display = 'block';
+                    document.getElementById('genHealBtn').disabled = false;
+                    document.getElementById('genHealStatus').textContent = `Ready — ${stepErrors.length} error(s) at step ${firstStep}`;
+                  }
                 }
                 break;
 
@@ -527,7 +539,10 @@ export function initScriptPipeline() {
                   resultDiv.innerHTML = `<div>❌ 测试失败 <span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:1px 10px;border-radius:10px;font-size:11px;margin-left:8px">${errorTag}</span></div><div style="font-size:11px;margin-top:4px;color:#dc2626">${escapeHtml(errorText.slice(0, 300))}</div>`;
                   document.getElementById('genRunDot').style.background = 'var(--red-400)';
                   // Capture error for refine
-                  pipelineState.lastError = errorText;
+                  // Don't overwrite structured errors from script-errors event
+                  if (!pipelineState.lastError) {
+                    pipelineState.lastError = errorText;
+                  }
                   document.getElementById('genFeedback').value = `Error type: ${errorTag}\n\n${errorText}`;
                 }
                 break;
@@ -543,6 +558,156 @@ export function initScriptPipeline() {
       document.getElementById('genRunDot').style.background = 'var(--red-400)';
     } finally {
       document.getElementById('genRunBtn').disabled = false;
+    }
+  });
+
+  // Self-Heal button — triggers the rerun pipeline
+  document.getElementById('genHealBtn').addEventListener('click', async () => {
+    const actionFile = pipelineState.actionFile;
+    if (!actionFile) { alert('No action file — assemble a trajectory first'); return; }
+
+    let errors;
+    try { errors = JSON.parse(pipelineState.lastError || '[]'); } catch { errors = []; }
+    const stepErrors = errors.filter(e => e.step > 0);
+    if (!stepErrors.length) { alert('No step errors captured — run the script first'); return; }
+    const failedStep = stepErrors[0]?.step || 1;
+
+    // Derive traj and log paths from action file
+    // actionFile: "scripts/action/action_20260622_161836.json"
+    const tsMatch = actionFile.match(/action[\/\\]action_(\d{8}_\d{6})\.json$/);
+    const ts = tsMatch ? tsMatch[1] : '';
+    const trajFile = ts ? `scripts/trajectories/traj_${ts}.json` : '';
+    const logFile = ts ? `scripts/log/log_${ts}.txt` : '';
+
+    const healBtn = document.getElementById('genHealBtn');
+    const healStatus = document.getElementById('genHealStatus');
+    const terminal = document.getElementById('genRunTerminal');
+
+    healBtn.disabled = true;
+    healStatus.textContent = 'Starting self-heal...';
+
+    function addHealLog(type, msg) {
+      const line = document.createElement('div');
+      line.className = `log-line ${type}`;
+      const d = new Date();
+      const t = d.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+      line.innerHTML = `<span class="ts">${t}</span>${escapeHtml(msg)}`;
+      terminal.appendChild(line);
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    addHealLog('system', `🩹 Self-heal: step ${failedStep} failed, replaying from trajectory...`);
+
+    try {
+      // Step 1: Create/ensure browser session
+      let sessionId = pipelineState.healSessionId;
+      if (!sessionId) {
+        addHealLog('step', 'Creating browser session...');
+        const sessRes = await fetch('/api/browser/session', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const sessData = await sessRes.json();
+        if (!sessRes.ok) throw new Error(sessData.error || 'Session creation failed');
+        sessionId = sessData.sessionId;
+        pipelineState.healSessionId = sessionId;
+        addHealLog('success', `Session: ${sessionId}`);
+      }
+
+      // Step 2: Trigger rerun via SSE
+      addHealLog('step', `Rerun: traj=${trajFile} action=${actionFile} log=${logFile} failed_step=${failedStep}`);
+      const res = await fetch(`/api/browser/session/${sessionId}/rerun`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trajectoryFile: trajFile,
+          action_file: actionFile,
+          log_file: logFile,
+          failedStep,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Rerun returned ${res.status}`);
+      }
+
+      // SSE stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+        for (const event of events) {
+          const lines = event.split('\n');
+          const eventType = lines.find(l => l.startsWith('event:'))?.slice(7).trim();
+          const dataLine = lines.find(l => l.startsWith('data:'))?.slice(6);
+          if (!dataLine) continue;
+          try {
+            const d = JSON.parse(dataLine);
+            switch (eventType) {
+              case 'rerun_start':
+                addHealLog('step', `Replaying ${d.prefix_entries} history entries to step ${d.failed_step}...`);
+                healStatus.textContent = `Replaying prefix...`;
+                break;
+              case 'rerun_replay_done':
+                addHealLog('success', 'Prefix replay done — browser at error scene');
+                break;
+              case 'rerun_resume':
+                addHealLog('step', 'Agent recording resumed...');
+                healStatus.textContent = 'Recording...';
+                break;
+              case 'rerun_validate':
+                if (d.step === 'assembling') {
+                  addHealLog('step', `Validating: assembling merged script (${d.new_actions} new + ${d.prefix} prefix)...`);
+                  healStatus.textContent = 'Validating...';
+                } else if (d.step === 'running') {
+                  addHealLog('step', 'Running merged script...');
+                } else if (d.step === 'done') {
+                  if (d.passed) {
+                    addHealLog('success', `✅ Validation PASSED (exit=${d.exit_code}, errors=${d.errors})`);
+                  } else {
+                    addHealLog('error', `❌ Validation FAILED (exit=${d.exit_code}, errors=${d.errors})`);
+                    if (d.stdout_tail) addHealLog('info', `stdout: ${d.stdout_tail.slice(-200)}`);
+                    if (d.stderr_tail) addHealLog('error', `stderr: ${d.stderr_tail.slice(-200)}`);
+                  }
+                }
+                break;
+              case 'rerun_done':
+                if (d.validated) {
+                  addHealLog('success', `🩹 Self-heal complete! Fixed action: ${d.merged_file || '(saved)'}`);
+                  addHealLog('success', `Actions: ${d.prefix_actions} prefix + ${d.new_actions} re-recorded`);
+                  healStatus.textContent = `✅ Fixed — ${d.merged_file || ''}`;
+                  document.getElementById('genRunDot').style.background = 'var(--emerald-400)';
+                } else {
+                  addHealLog('error', `❌ Self-heal failed — ${d.error || 'validation did not pass'}`);
+                  healStatus.textContent = '❌ Failed';
+                  document.getElementById('genRunDot').style.background = 'var(--red-400)';
+                }
+                break;
+              case 'step':
+                addHealLog('info', `Step: ${d.next_goal || d.label || '...'}`);
+                break;
+              case 'phase_done':
+                addHealLog('step', 'Agent step completed');
+                break;
+              case 'error':
+                addHealLog('error', d.message || 'Unknown error');
+                break;
+            }
+          } catch {}
+        }
+      }
+    } catch (err) {
+      addHealLog('error', `Self-heal error: ${err.message}`);
+      healStatus.textContent = '❌ ' + err.message;
+    } finally {
+      healBtn.disabled = false;
     }
   });
 }
