@@ -118,8 +118,24 @@ export default function (app) {
       const success = code === 0 && (!scriptErrors || scriptErrors.length === 0);
 
       if (scriptErrors && scriptErrors.length > 0) {
-        send('log', { type: 'warning', message: `${scriptErrors.length} step(s) failed` });
-        send('script-errors', { errors: scriptErrors, needsFix: true });
+        // ============================================================
+        // DETECTION PHASE — 检测到脚本执行错误，打印详细日志
+        // ============================================================
+        console.log('═══════════════════════════════════════════');
+        console.log('⚠  SCRIPT ERRORS DETECTED: ' + scriptErrors.length + ' error(s)');
+        console.log('───────────────────────────────────────────');
+        scriptErrors.forEach((e, i) => {
+          console.log('[Step ' + e.step + '] ' + e.action + ' "' + (e.label || '') + '" → ' + e.error);
+          if (e.details) console.log('  Details: ' + e.details);
+          if (e.value) console.log('  Value: ' + e.value);
+        });
+        console.log('───────────────────────────────────────────');
+        console.log('  Script: ' + scriptPath);
+        console.log('  Exit code: ' + code);
+        console.log('═══════════════════════════════════════════');
+
+        // Send structured errors to client — frontend handler displays them
+        send('script-errors', { errors: scriptErrors, needsFix: true, scriptPath });
       }
 
       send('status', { phase: 'done', label: success ? 'Test completed' : 'Test failed', success });
@@ -194,6 +210,24 @@ export default function (app) {
       } catch {}
 
       const success = code === 0 && (!scriptErrors || scriptErrors.length === 0);
+
+      // ============================================================
+      // DETECTION PHASE — 检测到脚本执行错误，打印详细日志
+      // ============================================================
+      if (scriptErrors && scriptErrors.length > 0) {
+        console.log('═══════════════════════════════════════════');
+        console.log('⚠  SCRIPT ERRORS DETECTED (sync): ' + scriptErrors.length + ' error(s)');
+        console.log('───────────────────────────────────────────');
+        scriptErrors.forEach((e, i) => {
+          console.log('[Step ' + e.step + '] ' + e.action + ' "' + (e.label || '') + '" → ' + e.error);
+          if (e.details) console.log('  Details: ' + e.details);
+          if (e.value) console.log('  Value: ' + e.value);
+        });
+        console.log('───────────────────────────────────────────');
+        console.log('  Script: ' + scriptPath);
+        console.log('  Exit code: ' + code);
+        console.log('═══════════════════════════════════════════');
+      }
 
       res.json({
         success,

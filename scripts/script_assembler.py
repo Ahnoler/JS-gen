@@ -10,6 +10,21 @@ Features:
   - Multi-tier selector degradation (ID → class → XPath → text → fuzzy)
   - Identity field auto-generation (credit code, mobile, etc.)
   - Error collection + structured error report for self-healing
+  - Per-tier error diagnostics (CTRL | Playwright | absolute XPath → English hint)
+
+Verified (detection + self-healing):
+  ✅ fill_form_field       — 3-tier: CTRL → Playwright hasText → absolute XPath
+  ✅ select_option         — 3-tier: CTRL → Playwright native → absolute XPath
+  ✅ click_element_by_index — N-tier: ID → class → XPath → text → JS → fuzzy
+
+TODO — remaining operations lack multi-tier degradation + structured error reporting:
+  ☐ click_menu_item        — single-tier CTRL, error: 'not-found'
+  ☐ click_table_row_action — single-tier CTRL, error: returns CTRL string
+  ☐ click_radio            — single-tier CTRL, error: returns CTRL string
+  ☐ fill_date_field        — no fallback, direct CTRL call
+  ☐ click_adjacent_button  — no fallback, direct CTRL call
+  ☐ switch_tab             — no fallback
+  ☐ close_dialog           — no fallback
 
 Usage:
     python script_assembler.py <action_file.json> [output_path.js]
@@ -226,8 +241,8 @@ CTRL_FOOTER = '''  } catch (err) {
     if (_errors.length > 0) {
       const reportPath = require('path').join(_TMP, 'script-errors.json');
       try { fs.writeFileSync(reportPath, JSON.stringify(_errors, null, 2)); } catch {}
-      console.log('===== ' + _errors.length + ' ERROR(S) =====');
-      _errors.forEach((e, i) => console.log('[' + (i+1) + '] Step ' + e.step + ': ' + e.action + ' - ' + e.error));
+      console.error('===== ' + _errors.length + ' ERROR(S) =====');
+      _errors.forEach((e, i) => console.error('[' + (i+1) + '] Step ' + e.step + ': ' + e.action + ' - ' + e.error + (e.details ? ' | ' + e.details : '')));
     } else {
       console.log('===== SUCCESS =====');
     }
@@ -348,6 +363,8 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             # Tier 1: CTRL.fillFormField
             lines.append(f"    let _r{step_num} = await page.evaluate((v) => CTRL.fillFormField('{_escape(l)}', v), {val_expr});")
             lines.append(f"    console.log('[{step_num}]   CTRL:', _r{step_num});")
+            # Build structured details for LLM — tracks per-tier results
+            lines.append(f"    let _dt{step_num} = 'CTRL: ' + _r{step_num};")
 
             # Tier 2: Playwright text-based fallback
             lines.append(f"    if (_r{step_num} !== 'ok' && _r{step_num} !== 'ok-date' && _r{step_num} !== 'ok-placeholder' && _r{step_num} !== 'ok-fuzzy') {{")
@@ -359,6 +376,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             lines.append(f"        console.log('[{step_num}]   Playwright text OK');")
             lines.append(f"      }} catch (_e_fb{step_num}) {{")
             lines.append(f"        console.log('[{step_num}]   Playwright fallback failed:', _e_fb{step_num}.message);")
+            lines.append(f"        _dt{step_num} += ' | Playwright hasText: failed';")
 
             # Tier 3: absolute XPath fallback (page-wide, label-independent)
             abs_xp = entry.get('absoluteTarget', '') or ''
@@ -367,22 +385,26 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 
             if abs_xp:
                 lines.append(f"        try {{")
-                lines.append(f"          // absolute XPath is page-wide (starts from root)")
                 lines.append(f"          const _ax{step_num} = page.locator('xpath={_escape(abs_xp)}').first();")
                 lines.append(f"          await _ax{step_num}.fill({val_expr}, {{ timeout: 3000 }});")
                 lines.append(f"          _r{step_num} = 'ok-absxpath';")
                 lines.append(f"          console.log('[{step_num}]   absolute XPath OK');")
                 lines.append(f"        }} catch (_e_ax{step_num}) {{")
                 lines.append(f"          console.log('[{step_num}]   absolute XPath fallback failed:', _e_ax{step_num}.message);")
+                lines.append(f"          _dt{step_num} += ' | absolute XPath: failed';")
                 lines.append(f"        }}")
 
-            # Only record error if absolute XPath also failed
+            # Record error with per-tier structured details
             if abs_xp:
-                lines.append(f"        if (_r{step_num} !== 'ok-absxpath') {{")
-                lines.append(f"          _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', 'All tiers failed (CTRL + Playwright + absolute XPath). Page structure has changed beyond script tolerance.');")
+                lines.append(f"        if (_r{step_num} === 'ok-absxpath') {{")
+                lines.append(f"          _dt{step_num} += ' | absolute XPath: OK → label_text only — selector still valid';")
+                lines.append(f"        }} else {{")
+                lines.append(f"          _dt{step_num} += ' → page structure changed — re-locate element';")
+                lines.append(f"          _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', _dt{step_num});")
                 lines.append(f"        }}")
             else:
-                lines.append(f"        _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'all-strategies-failed', 'CTRL: ' + _r{step_num});")
+                lines.append(f"        _dt{step_num} += ' | absolute XPath: N/A → label_text may need updating and an absolute XPath may need updating';")
+                lines.append(f"        _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', _dt{step_num});")
             lines.append(f"      }}")
             lines.append(f"    }}")
 
@@ -408,6 +430,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         # Tier 1: CTRL.selectOption
         lines.append(f"    let _rs{step_num} = await page.evaluate(() => CTRL.selectOption('{_escape(l)}', '{_escape(o)}'));")
         lines.append(f"    console.log('[{step_num}]   CTRL:', _rs{step_num});")
+        lines.append(f"    let _dts{step_num} = 'CTRL: ' + _rs{step_num};")
 
         # Scope fallback to active dialog/drawer
         lines.append(f"    const _scope{step_num} = await page.evaluate(() => {{")
@@ -432,6 +455,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"        console.log('[{step_num}]   Playwright fallback OK');")
         lines.append(f"      }} catch (_e_s{step_num}) {{")
         lines.append(f"        console.log('[{step_num}]   Playwright fallback failed:', _e_s{step_num}.message);")
+        lines.append(f"        _dts{step_num} += ' | Playwright native: failed';")
 
         # Tier 3: absolute XPath fallback (click trigger by structural path)
         abs_xp = entry.get('absoluteTarget', '') or ''
@@ -448,19 +472,23 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             lines.append(f"          console.log('[{step_num}]   absolute XPath OK');")
             lines.append(f"        }} catch (_e_axs{step_num}) {{")
             lines.append(f"          console.log('[{step_num}]   absolute XPath fallback failed:', _e_axs{step_num}.message);")
+            lines.append(f"          _dts{step_num} += ' | absolute XPath: failed';")
             lines.append(f"        }}")
 
-        # Only record error if absolute XPath also failed
+        # Record error with per-tier structured details
         if abs_xp:
-            lines.append(f"        if (_rs{step_num} !== 'ok-absxpath') {{")
-            lines.append(f"          _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', 'All tiers failed (CTRL + Playwright + absolute XPath). Page structure has changed.');")
+            lines.append(f"        if (_rs{step_num} === 'ok-absxpath') {{")
+            lines.append(f"          _dts{step_num} += ' | absolute XPath: OK → label_text/option_text only — selector still valid';")
+            lines.append(f"        }} else {{")
+            lines.append(f"          _dts{step_num} += ' → page structure changed — re-locate element';")
+            lines.append(f"          _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', _dts{step_num});")
             lines.append(f"        }}")
         else:
-            lines.append(f"        _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'all-strategies-failed', 'CTRL: ' + _rs{step_num});")
+            lines.append(f"        _dts{step_num} += ' | absolute XPath: N/A → label_text/option_text may need updating and an absolute XPath may need updating';")
+            lines.append(f"        _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', _dts{step_num});")
 
         lines.append(f"      }}")   # close Playwright catch
 
-        lines.append(f"      }}")
         lines.append(f"    }}")
 
         lines.append('    await page.waitForTimeout(400);')
@@ -567,6 +595,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 
         # Generate the degradation chain
         lines.append(f"    let _clicked{step_num} = false;")
+        lines.append(f"    let _dt{step_num} = '';")
         for i, (sel_type, sel_expr) in enumerate(selectors):
             if sel_type in ('js', 'fuzzy'):
                 # JS-based selectors use page.evaluate
@@ -580,7 +609,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
                     lines.append(f"        }}, '{_escape(xp)}');")
                     lines.append(f"        _clicked{step_num} = true;")
                     lines.append(f"        console.log('[{step_num}]   clicked via JS dispatchEvent');")
-                    lines.append(f"      }} catch (_e_js{step_num}) {{}}")
+                    lines.append(f"      }} catch (_e_js{step_num}) {{ _dt{step_num} += ' | JS: failed'; }}")
                     lines.append(f"    }}")
                 elif sel_type == 'fuzzy':
                     lines.append(f"    if (!_clicked{step_num}) {{")
@@ -602,7 +631,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
                     lines.append(f"        }}, '{_escape(txt)}').then(score => {{")
                     lines.append(f"          if (score > 0) {{ _clicked{step_num} = true; console.log('[{step_num}]   clicked via fuzzy (score=' + score.toFixed(2) + ')'); }}")
                     lines.append(f"        }});")
-                    lines.append(f"      }} catch (_e_fz{step_num}) {{}}")
+                    lines.append(f"      }} catch (_e_fz{step_num}) {{ _dt{step_num} += ' | fuzzy: failed'; }}")
                     lines.append(f"    }}")
             else:
                 lines.append(f"    if (!_clicked{step_num}) {{")
@@ -610,12 +639,13 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
                 lines.append(f"        await {sel_expr}.click({{ timeout: 3000 }});")
                 lines.append(f"        _clicked{step_num} = true;")
                 lines.append(f"        console.log('[{step_num}]   clicked via {sel_type}');")
-                lines.append(f"      }} catch (_e_{sel_type}{step_num}) {{ console.log('[{step_num}]   {sel_type} failed:', _e_{sel_type}{step_num}.message); }}")
+                lines.append(f"      }} catch (_e_{sel_type}{step_num}) {{ console.log('[{step_num}]   {sel_type} failed:', _e_{sel_type}{step_num}.message); _dt{step_num} += ' | {sel_type}: failed'; }}")
                 lines.append(f"    }}")
 
         # If all fail
         lines.append(f"    if (!_clicked{step_num}) {{")
-        lines.append(f"      _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '{_escape_js_string(xp)}', 'all-strategies-failed', 'All {len(selectors)} tiers exhausted');")
+        lines.append(f"      _dt{step_num} += ' → page structure changed — re-locate element';")
+        lines.append(f"      _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '{_escape_js_string(xp)}', 'needs-llm-fix', _dt{step_num});")
         lines.append(f"      throw new Error('[{step_num}] Click failed: target element not found on page. Stopping — subsequent steps depend on this navigation.');")
         lines.append(f"    }}")
 

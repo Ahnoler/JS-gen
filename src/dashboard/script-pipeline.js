@@ -472,6 +472,32 @@ export function initScriptPipeline() {
                 ).join('');
                 break;
 
+              case 'script-errors':
+                // DETECTION PHASE — display captured script errors
+                const errors = data.errors || [];
+                if (errors.length > 0) {
+                  errors.forEach((e, i) => {
+                    const errDetail = e.details ? ` | ${e.details}` : '';
+                    const errVal = e.value ? ` | value: ${e.value}` : '';
+                    addRunLog('error', `[Step ${e.step}] ${e.action} "${e.label || ''}" → ${e.error}${errDetail}${errVal}`);
+                  });
+
+                  // Also show in result area immediately
+                  const resultDiv2 = document.getElementById('genRunResult');
+                  resultDiv2.style.display = 'block';
+                  resultDiv2.style.background = 'var(--amber-50)';
+                  resultDiv2.style.color = 'var(--amber-700)';
+                  resultDiv2.innerHTML = `<div>🔍 DETECTION — ${errors.length} error(s) captured</div>
+                    <div style="font-size:11px;margin-top:4px">${errors.map(e => `[Step ${e.step}] ${e.action} → ${e.error}`).join('<br>')}</div>
+                    <div style="font-size:10px;margin-top:4px;color:var(--slate-400)">Fix channel disabled. Check server console or script-errors.json for full details.</div>`;
+                  document.getElementById('genRunDot').style.background = 'var(--amber-400)';
+                  document.getElementById('genRunStatus').textContent = '检测到错误';
+
+                  // Store errors for potential manual fix
+                  pipelineState.lastError = JSON.stringify(errors, null, 2);
+                }
+                break;
+
               case 'result':
                 const resultDiv = document.getElementById('genRunResult');
                 resultDiv.style.display = 'block';
