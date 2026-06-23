@@ -19,6 +19,7 @@ def parse_args():
     parser.add_argument("--playwright-output", default=None, help="Path to save generated Playwright script (.py)")
     parser.add_argument("--session", action="store_true", help="Run in session mode (stdin/stdout interactive)")
     parser.add_argument("--session-id", default=None, help="Session ID (for trajectory file naming)")
+    parser.add_argument("--cdp-url", default=None, help="Connect to existing browser via CDP (ws://...). Used for self-healing.")
     return parser.parse_args()
 
 def emit_json(data):

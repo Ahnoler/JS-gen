@@ -572,11 +572,10 @@ export function initScriptPipeline() {
     if (!stepErrors.length) { alert('No step errors captured — run the script first'); return; }
     const failedStep = stepErrors[0]?.step || 1;
 
-    // Derive traj and log paths from action file
+    // Derive log path from action file
     // actionFile: "scripts/action/action_20260622_161836.json"
     const tsMatch = actionFile.match(/action[\/\\]action_(\d{8}_\d{6})\.json$/);
     const ts = tsMatch ? tsMatch[1] : '';
-    const trajFile = ts ? `scripts/trajectories/traj_${ts}.json` : '';
     const logFile = ts ? `scripts/log/log_${ts}.txt` : '';
 
     const healBtn = document.getElementById('genHealBtn');
@@ -615,12 +614,11 @@ export function initScriptPipeline() {
       }
 
       // Step 2: Trigger rerun via SSE
-      addHealLog('step', `Rerun: traj=${trajFile} action=${actionFile} log=${logFile} failed_step=${failedStep}`);
+      addHealLog('step', `Rerun: action=${actionFile} log=${logFile} failed_step=${failedStep}`);
       const res = await fetch(`/api/browser/session/${sessionId}/rerun`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          trajectoryFile: trajFile,
           action_file: actionFile,
           log_file: logFile,
           failedStep,
@@ -651,53 +649,34 @@ export function initScriptPipeline() {
           try {
             const d = JSON.parse(dataLine);
             switch (eventType) {
-              case 'rerun_start':
-                addHealLog('step', `Replaying ${d.prefix_entries} history entries to step ${d.failed_step}...`);
-                healStatus.textContent = `Replaying prefix...`;
+              case 'log':
+                addHealLog(d.type || 'info', d.message || '');
                 break;
-              case 'rerun_replay_done':
-                addHealLog('success', 'Prefix replay done — browser at error scene');
+              case 'status':
+                healStatus.textContent = d.label || '';
                 break;
-              case 'rerun_resume':
-                addHealLog('step', 'Agent recording resumed...');
-                healStatus.textContent = 'Recording...';
+              case 'step':
+                addHealLog('info', `Agent: ${d.next_goal || d.label || '...'}`);
                 break;
-              case 'rerun_validate':
-                if (d.step === 'assembling') {
-                  addHealLog('step', `Validating: assembling merged script (${d.new_actions} new + ${d.prefix} prefix)...`);
-                  healStatus.textContent = 'Validating...';
-                } else if (d.step === 'running') {
-                  addHealLog('step', 'Running merged script...');
-                } else if (d.step === 'done') {
-                  if (d.passed) {
-                    addHealLog('success', `✅ Validation PASSED (exit=${d.exit_code}, errors=${d.errors})`);
-                  } else {
-                    addHealLog('error', `❌ Validation FAILED (exit=${d.exit_code}, errors=${d.errors})`);
-                    if (d.stdout_tail) addHealLog('info', `stdout: ${d.stdout_tail.slice(-200)}`);
-                    if (d.stderr_tail) addHealLog('error', `stderr: ${d.stderr_tail.slice(-200)}`);
-                  }
-                }
+              case 'phase_done':
+                addHealLog('success', '🩹 Self-heal recording complete');
+                healStatus.textContent = '✅ Recording done';
+                document.getElementById('genRunDot').style.background = 'var(--emerald-400)';
                 break;
-              case 'rerun_done':
-                if (d.validated) {
-                  addHealLog('success', `🩹 Self-heal complete! Fixed action: ${d.merged_file || '(saved)'}`);
-                  addHealLog('success', `Actions: ${d.prefix_actions} prefix + ${d.new_actions} re-recorded`);
-                  healStatus.textContent = `✅ Fixed — ${d.merged_file || ''}`;
-                  document.getElementById('genRunDot').style.background = 'var(--emerald-400)';
+              case 'done':
+                if (d.success) {
+                  addHealLog('success', 'Self-heal step completed successfully');
                 } else {
-                  addHealLog('error', `❌ Self-heal failed — ${d.error || 'validation did not pass'}`);
+                  addHealLog('error', `Self-heal step failed: ${d.error || 'unknown'}`);
                   healStatus.textContent = '❌ Failed';
                   document.getElementById('genRunDot').style.background = 'var(--red-400)';
                 }
                 break;
-              case 'step':
-                addHealLog('info', `Step: ${d.next_goal || d.label || '...'}`);
-                break;
-              case 'phase_done':
-                addHealLog('step', 'Agent step completed');
-                break;
               case 'error':
                 addHealLog('error', d.message || 'Unknown error');
+                break;
+              default:
+                addHealLog('info', `[${eventType}] ${JSON.stringify(d).slice(0, 100)}`);
                 break;
             }
           } catch {}

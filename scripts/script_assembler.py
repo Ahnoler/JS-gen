@@ -116,7 +116,8 @@ function _recordError(step, action, label, value, error, details) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: false, slowMo: 100, args: ['--window-position=-8,0'] });
+  const _CDP_PORT = 9223 + Math.floor(Math.random() * 100);
+  const browser = await chromium.launch({ headless: false, slowMo: 100, args: [`--window-position=-8,0`, `--remote-debugging-port=${_CDP_PORT}`] });
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
 
   await context.addInitScript(() => {
@@ -250,6 +251,25 @@ CTRL_FOOTER = '''  } catch (err) {
     await page.waitForTimeout(30000);
     await browser.close();
     process.exit(_errors.length > 0 ? 1 : 0);
+  }
+})().catch(err => { console.error(err); process.exit(1); });
+'''
+
+# Footer for partial replay: keeps browser open, prints CDP endpoint for agent hand-off
+PARTIAL_CTRL_FOOTER = '''  } catch (err) {
+    console.error('FATAL:', err.message);
+    _recordError(0, 'fatal', '', '', err.message, 'Script-level crash');
+  } finally {
+    if (_errors.length > 0) {
+      const reportPath = require('path').join(_TMP, 'script-errors.json');
+      try { fs.writeFileSync(reportPath, JSON.stringify(_errors, null, 2)); } catch {}
+      console.error('===== ' + _errors.length + ' ERROR(S) =====');
+      _errors.forEach((e, i) => console.error('[' + (i+1) + '] Step ' + e.step + ': ' + e.action + ' - ' + e.error + (e.details ? ' | ' + e.details : '')));
+    } else {
+      console.log('===== PARTIAL REPLAY OK =====');
+    }
+    console.log('CDP_PORT:' + _CDP_PORT);
+    console.log('READY_FOR_AGENT: browser stays open');
   }
 })().catch(err => { console.error(err); process.exit(1); });
 '''
@@ -790,6 +810,39 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
     return CTRL_API_CODE + '\n'.join(body) + '\n\n' + CTRL_FOOTER
 
 
+def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=None):
+    """Like assemble_partial_script, but keeps browser open with CDP for agent hand-off."""
+    if stop_before_step is None:
+        return assemble_script(action_entries, target_url)
+    partial_entries = action_entries[:stop_before_step - 1] if stop_before_step > 1 else []
+    body = []
+    step = 1
+    in_block = False
+    url = target_url or ''
+    if not url or 'unknown' in url.lower():
+        url = 'http://target-url-placeholder'
+    body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
+    body.append("    await page.evaluate(() => CTRL.waitForLoading());")
+    for entry in partial_entries:
+        action = entry.get('action', '')
+        if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
+                      'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
+                      'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
+                      'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
+                      'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch'):
+            continue
+        if action in BOUNDARY_ACTIONS:
+            in_block = False
+        is_first_fill = action in FILL_ACTIONS and not in_block
+        if is_first_fill:
+            in_block = True
+        code = _generate_action_code(entry, step, url, is_first_fill)
+        if code:
+            body.append(code)
+            step += 1
+    return CTRL_API_CODE + '\n'.join(body) + '\n\n' + PARTIAL_CTRL_FOOTER
+
+
 def apply_changes(commands, changes):
     """Apply LLM-recommended changes to the commands array.
 
@@ -824,12 +877,13 @@ def apply_changes(commands, changes):
 
 def main():
     if len(sys.argv) < 2:
-        print('Usage: python script_assembler.py <action_file.json> [output.js] [--partial-stop N]', file=sys.stderr)
+        print('Usage: python script_assembler.py <action_file.json> [output.js] [--partial-stop N] [--partial-cdp N]', file=sys.stderr)
         sys.exit(1)
 
     input_path = sys.argv[1]
     output_path = None
     stop_before_step = None
+    cdp_mode = False
 
     # Parse remaining args
     remaining = sys.argv[2:]
@@ -837,6 +891,9 @@ def main():
         arg = remaining.pop(0)
         if arg == '--partial-stop' and remaining:
             stop_before_step = int(remaining.pop(0))
+        elif arg == '--partial-cdp' and remaining:
+            stop_before_step = int(remaining.pop(0))
+            cdp_mode = True
         elif not output_path:
             output_path = arg
 
@@ -874,7 +931,10 @@ def main():
                     break
 
     if stop_before_step is not None:
-        script = assemble_partial_script(actions, url, stop_before_step)
+        if cdp_mode:
+            script = assemble_partial_for_cdp(actions, url, stop_before_step)
+        else:
+            script = assemble_partial_script(actions, url, stop_before_step)
     else:
         script = assemble_script(actions, url)
 
