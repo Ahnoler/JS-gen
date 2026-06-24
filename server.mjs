@@ -7,7 +7,7 @@ import { startOpencode } from './src/opencode.js';
 import { state } from './src/state.js';
 import registerHealthRoutes from './src/routes/health.js';
 import registerAgentRoutes from './src/routes/agent.js';
-import registerTestGenRoutes from './src/routes/test-gen.js';
+
 import registerTestHistoryRoutes from './src/routes/test-history.js';
 import registerTestRunRoutes from './src/routes/test-run.js';
 import registerLLMProxyRoutes from './src/routes/llm-proxy.js';
@@ -36,7 +36,7 @@ registerCaseDataRoutes(app);
 registerAssembleRoutes(app);
 registerHealthRoutes(app);
 registerAgentRoutes(app);
-registerTestGenRoutes(app);
+
 registerTestHistoryRoutes(app);
 registerTestRunRoutes(app);
 registerSSERoutes(app);
@@ -122,8 +122,7 @@ async function main() {
     console.log(`  GET  /api/agent/session/:id/messages`);
     console.log(`  POST /api/agent/session/:id/message`);
     console.log(`  DELETE /api/agent/session/:id`);
-    console.log(`  POST /api/test/generate (script generation)`);
-    console.log(`  POST /api/test/refine (refine script)`);
+
     console.log(`  GET  /api/test/history`);
     console.log(`  GET  /api/test/history/:id`);
     console.log(`  DELETE /api/test/history/:id`);

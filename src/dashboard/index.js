@@ -87,28 +87,9 @@ async function checkHealth() {
   }
 }
 
-// Independent model loader (separate from health check)
-async function loadModels() {
-  const genModel = document.getElementById('genModel');
-  if (!genModel) return;
-  try {
-    const r = await fetch('/api/models');
-    const data = await r.json();
-    if (!data.models || !data.models.length) return;
-    const currentVal = genModel.value;
-    genModel.innerHTML = '<option value="">— Default —</option>' +
-      data.models.map(m => `<option value="${m.id}" ${m.id === data.defaultModel ? 'selected' : ''}>${m.provider} / ${m.name}</option>`).join('');
-    if (currentVal && Array.from(genModel.options).some(o => o.value === currentVal)) genModel.value = currentVal;
-  } catch (e) {
-    console.error('Model load failed:', e);
-  }
-}
-
 // ====== Init ======
 checkHealth();
-loadModels();
 setInterval(checkHealth, 10000);
-setInterval(loadModels, 15000);
 setInterval(checkWorkerHealth, 15000);
 
 // ====== Global execution lock ======
