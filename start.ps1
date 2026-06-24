@@ -18,10 +18,10 @@ try {
 
 # Check Python
 try {
-    $pyVer = & "D:\anaconda3\envs\browser_use\python.exe" --version 2>$null
+    $pyVer = & "C:\Program Files\Python312\python.exe" --version 2>$null
     Write-Host "[OK] Python $pyVer (browser_use env)" -ForegroundColor Green
 } catch {
-    Write-Host "[WARN] Python browser_use env not found at D:\anaconda3\envs\browser_use\python.exe" -ForegroundColor Yellow
+    Write-Host "[WARN] Python browser_use env not found at C:\Program Files\Python312\python.exe" -ForegroundColor Yellow
 }
 
 # Set environment
@@ -29,8 +29,9 @@ $env:PORT = $Port
 $env:HOST = "0.0.0.0"
 $env:STANDALONE_LLM = "true"
 $env:LLM_BASE_URL = "https://api.deepseek.com"
-$env:LLM_API_KEY = "sk-6d59343057ea48b3ac7621705514dca0"
-$env:PYTHON_EXE = "D:\anaconda3\envs\browser_use\python.exe"
+# $env:LLM_API_KEY = "sk-6d59343057ea48b3ac7621705514dca0"
+$env:LLM_API_KEY = "sk-1e639c69f0df40e39ba66a8f4786551c"
+$env:PYTHON_EXE = "C:\Program Files\Python312\python.exe"
 
 Write-Host ""
 Write-Host "Starting server on http://localhost:$Port ..." -ForegroundColor White

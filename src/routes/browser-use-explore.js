@@ -132,7 +132,7 @@ export default function (app) {
     exploreLockRef.value = true;
     console.log('[browser-use] Exploration started (locked)');
 
-    const modelId = model || (state.defaultModel ? `${state.defaultModel.providerID}/${state.defaultModel.modelID}` : 'deepseek/deepseek-chat');
+    const modelId = model || (state.defaultModel ? `${state.defaultModel.providerID}/${state.defaultModel.modelID}` : (STANDALONE_LLM ? 'deepseek-v4-flash' : 'deepseek/deepseek-v4-flash'));
 
     // Parse phases from task
     const phases = parsePhases(task);
@@ -523,7 +523,7 @@ export default function (app) {
     if (!existsSync(AGENT_SCRIPT)) return res.status(500).json({ error: `Agent script not found at ${AGENT_SCRIPT}` });
 
     const sessionId = crypto.randomUUID();
-    const modelId = model || (state.defaultModel ? `${state.defaultModel.providerID}/${state.defaultModel.modelID}` : 'deepseek/deepseek-chat');
+    const modelId = model || (state.defaultModel ? `${state.defaultModel.providerID}/${state.defaultModel.modelID}` : (STANDALONE_LLM ? 'deepseek-v4-flash' : 'deepseek/deepseek-v4-flash'));
 
     try {
       await ensureGlobalBrowser(modelId);

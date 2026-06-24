@@ -188,7 +188,7 @@ export function resolveModelId(model) {
     const parts = model.split('/');
     return parts.length >= 2 && STANDALONE_LLM ? parts.slice(1).join('/') : model;
   }
-  if (!state.defaultModel) return 'deepseek/deepseek-chat';
+  if (!state.defaultModel) return STANDALONE_LLM ? 'deepseek-v4-flash' : 'deepseek/deepseek-v4-flash';
   if (STANDALONE_LLM) return state.defaultModel.modelID;
   return `${state.defaultModel.providerID}/${state.defaultModel.modelID}`;
 }
