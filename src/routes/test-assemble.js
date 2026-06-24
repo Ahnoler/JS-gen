@@ -3,7 +3,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { deduplicateActionFile } from '../dedup.js';
 
-import { PROJECT_DIR } from '../config.js';
+import { PROJECT_DIR, TMP_DIR } from '../config.js';
 import { ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex } from '../script-utils.js';
 
 const SCRIPTS_DIR = path.join(PROJECT_DIR, 'scripts');
@@ -18,7 +18,7 @@ export default function (app) {
    */
   app.post('/api/test/assemble', async (req, res) => {
     try {
-      const { actionFile } = req.body || {};
+      const { actionFile, preview } = req.body || {};
       if (!actionFile) {
         return res.status(400).json({ error: 'actionFile is required' });
       }
@@ -34,52 +34,52 @@ export default function (app) {
       const dedupedJson = deduplicateActionFile(raw);
       const meta = dedupedJson._meta;
 
-      // Write deduplicated file
-      if (!existsSync(GENERATED_DIR)) {
-        mkdirSync(GENERATED_DIR, { recursive: true });
-      }
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      const cleanPath = path.join(GENERATED_DIR, `cleaned_${ts}.json`);
-      writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
+      let cleanPath, scriptPath;
+
+      if (preview) {
+        // Preview mode: write to temp, don't register in index
+        cleanPath = path.join(TMP_DIR, `cleaned_preview_${ts}.json`);
+        scriptPath = path.join(TMP_DIR, `script_preview_${ts}.js`);
+      } else {
+        if (!existsSync(GENERATED_DIR)) mkdirSync(GENERATED_DIR, { recursive: true });
+        cleanPath = path.join(GENERATED_DIR, `cleaned_${ts}.json`);
+        scriptPath = path.join(GENERATED_DIR, `script_${ts}.js`);
+        writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
+      }
 
       // Call Python assembler
-      const scriptPath = path.join(GENERATED_DIR, `script_${ts}.js`);
       const assemblerPy = path.join(SCRIPTS_DIR, 'script_assembler.py');
-
-      const cmd = `python "${assemblerPy}" "${cleanPath}" "${scriptPath}"`;
-      execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
+      // Always write deduplicated JSON for the assembler to read
+      if (!existsSync(cleanPath)) writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
+      execSync(`python "${assemblerPy}" "${cleanPath}" "${scriptPath}"`, { encoding: 'utf-8', timeout: 30000 });
 
       // Read the generated script
       const script = readFileSync(scriptPath, 'utf-8');
 
-      // Register in generated index so Run/History work
-      ensureGeneratedDir();
-      const index = loadGeneratedIndex();
-      const testId = 'assembled_' + ts;
-      const addItem = {
-        testId,
-        fileName: `script_${ts}.js`,
-        description: 'Assembled from ' + path.basename(actionFile),
-        url: '',
-        steps: [],
-        createdAt: new Date().toISOString(),
-        fromAssemble: true,
-      };
-      index.unshift(addItem);
-      saveGeneratedIndex(index);
+      let testId = '', fileName = '';
+      if (!preview) {
+        // Register in generated index so Run/History work
+        ensureGeneratedDir();
+        const index = loadGeneratedIndex();
+        testId = 'assembled_' + ts;
+        fileName = `script_${ts}.js`;
+        index.unshift({
+          testId, fileName,
+          description: 'Assembled from ' + path.basename(actionFile),
+          url: '', steps: [],
+          createdAt: new Date().toISOString(),
+          fromAssemble: true,
+        });
+        saveGeneratedIndex(index);
+      }
 
       res.json({
         success: true,
-        testId,
-        fileName: `script_${ts}.js`,
-        actionFile,
+        testId, fileName, actionFile,
         scriptFile: scriptPath,
         script,
-        stats: {
-          original: meta.originalCount,
-          deduped: meta.dedupedCount,
-          removed: meta.removedCount,
-        },
+        stats: { original: meta.originalCount, deduped: meta.dedupedCount, removed: meta.removedCount },
       });
 
     } catch (err) {
@@ -166,6 +166,29 @@ export default function (app) {
       }
       unlinkSync(absPath);
       res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * POST /api/test/assemble/apply-fix
+   * Persist the fixed action file. Creates a copy, does NOT delete the old file (for safety during testing).
+   */
+  app.post('/api/test/assemble/apply-fix', async (req, res) => {
+    try {
+      const { newPath } = req.body || {};
+      if (!newPath) return res.status(400).json({ error: 'newPath is required' });
+      const absNew = path.resolve(PROJECT_DIR, newPath);
+      if (!existsSync(absNew)) return res.status(404).json({ error: 'New file not found: ' + absNew });
+      // Persist: copy as-is to scripts/action/
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const actionDir = path.join(SCRIPTS_DIR, 'action');
+      if (!existsSync(actionDir)) mkdirSync(actionDir, { recursive: true });
+      const fixedPath = path.join(actionDir, `action_fixed_${ts}.json`);
+      const newData = readFileSync(absNew, 'utf-8');
+      writeFileSync(fixedPath, newData, 'utf-8');
+      res.json({ success: true, fixedPath: path.join('scripts', 'action', `action_fixed_${ts}.json`), message: 'Old file preserved, fixed copy saved to scripts/action/' });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

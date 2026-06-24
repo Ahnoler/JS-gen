@@ -22,7 +22,11 @@ export const pipelineState = {
   currentScript: '',
   lastError: '',       // captured from last run failure
   actionFile: '',       // action JSON path (for self-heal)
-  healSessionId: null,  // browser session for self-heal
+  healSessionId: null,     // browser session for self-heal
+  healSuccess: false,       // recording completed successfully
+  healActionFile: '',       // new action file after heal
+  healScript: '',           // assembled script after heal
+  healTested: false,        // test passed after heal
 };
 
 // ====== Helpers ======
@@ -135,7 +139,11 @@ export function displayGeneratedScript(data) {
 
   // Show Run area
   document.getElementById('genRunArea').style.display = 'block';
-  document.getElementById('genHealArea').style.display = 'none';
+  // Keep heal area visible if preview is showing
+  const healPreview = document.getElementById('genHealPreview');
+  if (!healPreview || healPreview.style.display === 'none') {
+    document.getElementById('genHealArea').style.display = 'none';
+  }
   document.getElementById('genHealBtn').disabled = true;
   document.getElementById('genHealStatus').textContent = '';
   checkWorkerHealth();
@@ -665,9 +673,10 @@ export function initScriptPipeline() {
                 break;
               case 'done':
                 if (d.success) {
-                  addHealLog('success', 'Self-heal step completed successfully');
+                  addHealLog('success', 'Self-heal recording done');
+                  pipelineState.healSuccess = true;
                 } else {
-                  addHealLog('error', `Self-heal step failed: ${d.error || 'unknown'}`);
+                  addHealLog('error', `Self-heal failed: ${d.error || 'unknown'}`);
                   healStatus.textContent = '❌ Failed';
                   document.getElementById('genRunDot').style.background = 'var(--red-400)';
                 }
@@ -682,6 +691,32 @@ export function initScriptPipeline() {
           } catch {}
         }
       }
+      // Post-recording: save trajectory + show preview
+      if (pipelineState.healSuccess) {
+        try {
+          // Save new trajectory from agent
+          addHealLog('step', 'Saving recorded trajectory...');
+          const saveRes = await fetch(`/api/browser/session/${sessionId}/trajectory`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task: 'Self-heal: recording from step ' + failedStep }),
+          });
+          const saveData = await saveRes.json();
+          if (saveRes.ok && saveData.action_file) {
+            const newActionFile = saveData.action_file;
+            addHealLog('success', `New action: ${newActionFile}`);
+            pipelineState.healActionFile = newActionFile;
+            pipelineState.healTested = false;
+            healStatus.textContent = '✅ Recording saved';
+
+            // Show preview card
+            showHealPreview(newActionFile);
+          } else {
+            addHealLog('error', `Save failed: ${saveData.error || 'unknown'}`);
+          }
+        } catch (e) {
+          addHealLog('error', `Save error: ${e.message}`);
+        }
+      }
     } catch (err) {
       addHealLog('error', `Self-heal error: ${err.message}`);
       healStatus.textContent = '❌ ' + err.message;
@@ -689,4 +724,126 @@ export function initScriptPipeline() {
       healBtn.disabled = false;
     }
   });
+
+  // ====== Heal Preview + Assemble/Run/Apply ======
+  function showHealPreview(actionFilePath) {
+    const preview = document.getElementById('genHealPreview');
+    const title = document.getElementById('genHealPreviewTitle');
+    const stepsDiv = document.getElementById('genHealPreviewSteps');
+    const assembleBtn = document.getElementById('genHealAssembleBtn');
+    const runBtn = document.getElementById('genHealRunBtn');
+    const applyBtn = document.getElementById('genHealApplyBtn');
+    const result = document.getElementById('genHealActionResult');
+
+    preview.style.display = 'block';
+    title.textContent = '📋 Preview: ' + (actionFilePath || '');
+    assembleBtn.disabled = false;
+    runBtn.disabled = true;
+    applyBtn.disabled = true;
+    result.textContent = '';
+
+    // Fetch and render action step preview
+    fetch('/api/test/assemble', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionFile: actionFilePath }),
+    }).then(r => r.json()).then(data => {
+      if (data.script) {
+        // Extract step console.log lines for preview
+        const stepLines = data.script.split('\n').filter(l =>
+          l.includes("console.log('[") && (l.includes('Fill') || l.includes('Select') || l.includes('Click') || l.includes('Tab') || l.includes('Menu') || l.includes('Close'))
+        ).slice(0, 30);
+        stepsDiv.innerHTML = stepLines.map(l => {
+          const text = l.replace(/.*console\.log\('/, '').replace(/'\);?/, '').trim();
+          return `<div style="padding:1px 0;color:var(--slate-700)">${escapeHtml(text)}</div>`;
+        }).join('') || `<div style="color:var(--slate-400)">${data.stats?.deduped || '?'} steps assembled</div>`;
+        pipelineState.healScript = data.script;
+      }
+    }).catch(() => {
+      stepsDiv.innerHTML = '<div style="color:var(--slate-400)">Waiting for assemble...</div>';
+    });
+
+    // Assemble button: assemble the new action file
+    assembleBtn.onclick = async () => {
+      assembleBtn.disabled = true;
+      result.textContent = 'Assembling...';
+      try {
+        const res = await fetch('/api/test/assemble', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ actionFile: actionFilePath, preview: true }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        // Show script in preview area (not main area)
+        const pre = document.getElementById('genHealScriptPre');
+        const scriptDiv = document.getElementById('genHealPreviewScript');
+        const lines = data.script.split('\n');
+        pre.innerHTML = lines.map((line, i) => {
+          const num = String(i + 1).padStart(3, ' ');
+          return `<span style="display:flex"><span style="color:var(--slate-500);user-select:none;width:32px;flex-shrink:0;text-align:right;padding-right:12px">${num}</span><span>${escapeHtml(line) || ' '}</span></span>`;
+        }).join('');
+        scriptDiv.style.display = 'block';
+        pipelineState.healScript = data.script;
+        runBtn.disabled = false;
+        result.textContent = '✅ Assembled (' + (data.stats?.deduped || '?') + ' steps)';
+      } catch (e) {
+        result.textContent = '❌ ' + e.message;
+      } finally {
+        assembleBtn.disabled = false;
+      }
+    };
+
+    // Run button: run the assembled script via sync API
+    runBtn.onclick = async () => {
+      const script = pipelineState.healScript;
+      if (!script) { alert('Assemble first'); return; }
+      runBtn.disabled = true;
+      result.textContent = 'Running...';
+      pipelineState.healTested = false;
+      try {
+        const runRes = await fetch('/api/test/run-sync', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ script, fileName: 'heal-test-' + Date.now() + '.js' }),
+        });
+        const runData = await runRes.json();
+        if (runData.success) {
+          pipelineState.healTested = true;
+          applyBtn.disabled = false;
+          result.textContent = '✅ Test passed';
+          document.getElementById('genRunDot').style.background = 'var(--emerald-400)';
+        } else {
+          result.textContent = '❌ Test failed (exit ' + runData.exitCode + ')';
+          if (runData.stderr) addHealLog('error', runData.stderr.slice(-200));
+        }
+      } catch (e) {
+        result.textContent = '❌ ' + e.message;
+      } finally {
+        runBtn.disabled = false;
+      }
+    };
+
+    // Apply Fix: persist the fix
+    applyBtn.onclick = async () => {
+      if (!pipelineState.healTested) {
+        alert('Run the test first to verify the fix');
+        return;
+      }
+      applyBtn.disabled = true;
+      result.textContent = 'Applying...';
+      try {
+        // Persist fixed action file (old file preserved for safety)
+        const res = await fetch('/api/test/assemble/apply-fix', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newPath: actionFilePath }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
+        addPipelineLog('success', `Fix applied: ${actionFilePath}`);
+        result.textContent = '✅ Fix applied';
+        document.getElementById('genRunDot').style.background = 'var(--emerald-400)';
+        document.getElementById('genHealStatus').textContent = '✅ Healed';
+      } catch (e) {
+        result.textContent = '❌ ' + e.message;
+        applyBtn.disabled = false;
+      }
+    };
+  }
 }

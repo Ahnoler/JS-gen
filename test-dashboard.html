@@ -139,6 +139,20 @@
           <div id="genHealArea" style="display:none;margin-top:8px">
             <button id="genHealBtn" class="btn btn-sm btn-primary" disabled>🩹 Self-Heal</button>
             <span id="genHealStatus" style="font-size:12px;color:var(--slate-400);margin-left:8px"></span>
+            <div id="genHealPreview" style="display:none;margin-top:8px;background:var(--slate-50);border:1px solid var(--slate-200);border-radius:6px;padding:10px;font-size:12px">
+              <div id="genHealPreviewTitle" style="font-weight:600;margin-bottom:6px"></div>
+              <div id="genHealPreviewSteps" style="max-height:120px;overflow-y:auto;margin-bottom:6px"></div>
+              <div id="genHealPreviewScript" style="display:none;margin-top:6px">
+                <div style="font-size:11px;color:var(--slate-400);margin-bottom:4px">📄 Preview Script</div>
+                <pre id="genHealScriptPre" style="background:var(--slate-900);color:var(--slate-200);padding:10px;border-radius:6px;font-size:11px;max-height:250px;overflow:auto;white-space:pre;font-family:monospace"></pre>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button id="genHealAssembleBtn" class="btn btn-sm btn-outline" disabled>🔧 Assemble</button>
+                <button id="genHealRunBtn" class="btn btn-sm btn-primary" disabled>▶ Run</button>
+                <button id="genHealApplyBtn" class="btn btn-sm btn-primary" disabled style="background:var(--emerald-500)">✅ Apply Fix</button>
+                <span id="genHealActionResult" style="font-size:11px;color:var(--slate-400)"></span>
+              </div>
+            </div>
           </div>
         </div>
         <div id="genRefineArea" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--slate-100)">

@@ -233,201 +233,60 @@ export default function (app) {
     else res.status(500).json({ error: 'Step handler not found' });
   });
 
-  // Self-healing: partial script (CDP) → agent re-records from failed step
+  // Self-healing: construct resume instruction, send as step to global agent.
   app.post('/api/browser/session/:id/rerun', async (req, res) => {
     const { id } = req.params;
     const { action_file, failedStep, maxSteps, log_file } = req.body || {};
-    const gb = state.globalBrowser;
 
     const session = state.sessions.get(id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    if (gb.busy) return res.status(409).json({ error: 'Browser is busy' });
     if (!action_file) return res.status(400).json({ error: 'action_file is required' });
     if (!failedStep || failedStep <= 0) return res.status(400).json({ error: 'failedStep (> 0) is required' });
 
     const absActionPath = path.resolve(PROJECT_DIR, action_file);
-    if (!existsSync(absActionPath)) return res.status(404).json({ error: `Action file not found: ${absActionPath}` });
+    if (!existsSync(absActionPath)) return res.status(404).json({ error: 'Action file not found' });
 
-    const send = setupSSE(res);
-    let aborted = false;
-    let partialProc = null;
-    let agentProc = null;
-
-    res.on('close', () => {
-      aborted = true;
-      try { if (partialProc && !partialProc.killed) partialProc.kill(); } catch {}
-      try { if (agentProc && !agentProc.killed) agentProc.kill(); } catch {}
-      gb.busy = false;
-    });
-
-    gb.busy = true;
-
+    // Construct resume instruction from action + log files
+    let resumeInstruction = '';
     try {
-      // Step 1: Assemble partial CDP script
-      send('status', { phase: 'assembling', label: 'Assembling partial script...' });
-      const assemblerPy = path.join(PROJECT_DIR, 'scripts', 'script_assembler.py');
-      const partialScriptPath = path.join(os.tmpdir(), `partial_cdp_${Date.now()}.js`);
-      execSync(`python "${assemblerPy}" "${absActionPath}" "${partialScriptPath}" --partial-cdp ${failedStep}`, {
-        encoding: 'utf-8', timeout: 30000, cwd: PROJECT_DIR,
-      });
-      if (!existsSync(partialScriptPath)) {
-        throw new Error('Partial script assembly failed');
+      const actionData = JSON.parse(readFileSync(absActionPath, 'utf-8'));
+      const url = actionData.url || '';
+      const commands = actionData?.tests?.[0]?.commands || actionData?.actions || [];
+      const remaining = commands.filter((c, i) => (i + 1) >= failedStep);
+      const lines = [];
+      if (url && !url.includes('unknown')) lines.push('【目标URL】\n' + url + '\n');
+      lines.push('请先扫描当前表单，建立任务清单，完成剩余待填表单项。\n');
+      for (const cmd of remaining) {
+        const stepNum = commands.indexOf(cmd) + 1;
+        const a = cmd.action || ''; const p = cmd.params || {};
+        if (a === 'fill_form_field') lines.push('- Step ' + stepNum + ': 填写 "' + (p.label_text || '') + '" = "' + (p.value || '') + '"');
+        else if (a === 'select_option') lines.push('- Step ' + stepNum + ': 在 "' + (p.label_text || '') + '" 中选择 "' + (p.option_text || '') + '"');
+        else if (a === 'click_element_by_index') lines.push('- Step ' + stepNum + ': 点击 "' + (p.text || p.index || '') + '"');
+        else lines.push('- Step ' + stepNum + ': ' + a);
       }
-
-      // Step 2: Run partial script, capture CDP port, resolve WS URL
-      send('status', { phase: 'replaying', label: 'Replaying steps 1~' + (failedStep - 1) + '...' });
-      const runJsPath = path.join(SKILL_DIR, 'run.js');
-      let cdpPort = null;
-      let partialStdout = '';
-
-      await new Promise((resolve, reject) => {
-        partialProc = spawn('node', [runJsPath, partialScriptPath], {
-          cwd: SKILL_DIR,
-          env: { ...process.env, PLAYWRIGHT_SKIP_EXISTING: '1' },
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
-        const timeout = setTimeout(() => { try { partialProc.kill(); } catch {} reject(new Error('Partial script timeout (90s)')); }, 90000);
-
-        partialProc.stdout.on('data', (chunk) => {
-          const text = chunk.toString();
-          partialStdout += text;
-          send('log', { type: 'info', message: text.trimEnd() });
-          const m = partialStdout.match(/CDP_PORT:(\d+)/);
-          if (m && !cdpPort) {
-            cdpPort = parseInt(m[1]);
-            send('status', { phase: 'cdp_ready', label: `CDP port ${cdpPort} captured` });
-          }
-        });
-        partialProc.stderr.on('data', (chunk) => {
-          send('log', { type: 'error', message: chunk.toString().trimEnd() });
-        });
-        partialProc.on('close', (code) => {
-          clearTimeout(timeout);
-          if (!cdpPort) {
-            reject(new Error(`Partial script exited code ${code} before exposing CDP port`));
-          } else {
-            resolve();
-          }
-        });
-        partialProc.on('error', (err) => { clearTimeout(timeout); reject(err); });
-      });
-
-      if (!cdpPort) throw new Error('No CDP port captured');
-
-      // Resolve WebSocket URL from Chrome's /json/version endpoint
-      let cdpEndpoint = null;
-      try {
-        const versionJson = await new Promise((resolve, reject) => {
-          http.get(`http://127.0.0.1:${cdpPort}/json/version`, (resp) => {
-            let data = '';
-            resp.on('data', c => data += c);
-            resp.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
-          }).on('error', reject);
-        });
-        cdpEndpoint = versionJson.webSocketDebuggerUrl;
-        send('log', { type: 'success', message: `CDP: ${cdpEndpoint}` });
-      } catch (e) {
-        // Fallback: construct URL manually
-        cdpEndpoint = `http://127.0.0.1:${cdpPort}`;
-        send('log', { type: 'warn', message: `CDP fallback: ${cdpEndpoint} (${e.message})` });
-      }
-      if (!cdpEndpoint) throw new Error('Could not resolve CDP WebSocket URL');
-
-      // Step 3: Kill old global browser, start new one with CDP
-      send('status', { phase: 'connecting', label: 'Connecting agent via CDP...' });
-      if (gb.process && !gb.process.killed) {
-        try { gb.stdin.write(JSON.stringify({ event: 'close' }) + '\n'); } catch {}
-        setTimeout(() => { try { if (gb.process && !gb.process.killed) gb.process.kill(); } catch {} }, 5000);
-      }
-
-      // Step 4: Spawn new agent with CDP
-      const pythonExe = process.env.PYTHON_EXE || 'python';
-      const agentScript = path.join(PROJECT_DIR, 'scripts', 'browser-use-agent.py');
-      const modelId = session.model || 'deepseek-v4-flash';
-      agentProc = spawn(pythonExe, [
-        agentScript, '--session', '--session-id', 'global',
-        '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`,
-        '--api-key', LLM_API_KEY || '', '--cdp-url', cdpEndpoint,
-      ], {
-        cwd: PROJECT_DIR,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1', OPENAI_API_KEY: LLM_API_KEY || '' },
-      });
-
-      // Wait for agent ready
-      let agentReady = false;
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Agent ready timeout')), 30000);
-        agentProc.stdout.on('data', (chunk) => {
-          const text = chunk.toString();
-          try {
-            const msg = JSON.parse(text.trim().split('\n').pop());
-            if (msg.event === 'ready') { agentReady = true; clearTimeout(timeout); resolve(); }
-          } catch {}
-        });
-        agentProc.on('error', (err) => { clearTimeout(timeout); reject(err); });
-        agentProc.on('close', (code) => { clearTimeout(timeout); reject(new Error(`Agent exited ${code}`)); });
-      });
-      if (!agentReady) throw new Error('Agent did not emit ready');
-
-      // Update globalBrowser state
-      state.globalBrowser.process = agentProc;
-      state.globalBrowser.stdin = agentProc.stdin;
-      state.globalBrowser.ready = true;
-      state.globalBrowser.busy = false;
-
-      gb.busy = false;
-
-      // Step 5: Construct resume instruction from action + log files
-      let resumeInstruction = '';
-      try {
-        const actionData = JSON.parse(readFileSync(absActionPath, 'utf-8'));
-        const url = actionData.url || '';
-        const commands = actionData?.tests?.[0]?.commands || actionData?.actions || [];
-        const remaining = commands.filter((c, i) => (i + 1) >= failedStep);
-        const lines = [];
-        if (url && !url.includes('unknown')) lines.push(`【目标URL】\n${url}\n`);
-        lines.push('请先扫描当前表单，建立任务清单，完成剩余待填表单项。\n');
-        for (const cmd of remaining) {
-          const stepNum = commands.indexOf(cmd) + 1;
-          const a = cmd.action || '';
-          const p = cmd.params || {};
-          if (a === 'fill_form_field') lines.push(`- Step ${stepNum}: 填写 "${p.label_text || ''}" = "${p.value || ''}"`);
-          else if (a === 'select_option') lines.push(`- Step ${stepNum}: 在 "${p.label_text || ''}" 中选择 "${p.option_text || ''}"`);
-          else if (a === 'click_element_by_index') lines.push(`- Step ${stepNum}: 点击 "${p.text || p.index || ''}"`);
-          else lines.push(`- Step ${stepNum}: ${a}`);
+      if (log_file) {
+        const logPath = path.resolve(PROJECT_DIR, log_file);
+        if (existsSync(logPath)) {
+          const logContent = readFileSync(logPath, 'utf-8');
+          if (logContent.trim()) lines.push('\n## 原始执行日志\n```\n' + logContent.trim() + '\n```');
         }
-        if (log_file) {
-          const logPath = path.resolve(PROJECT_DIR, log_file);
-          if (existsSync(logPath)) {
-            const logContent = readFileSync(logPath, 'utf-8');
-            const logLines = logContent.split('\n').filter(l => { const m = l.match(/^\[(\d+)\]/); return m && parseInt(m[1]) >= failedStep; });
-            if (logLines.length) lines.push('\n## 原始执行日志\n```\n' + logLines.slice(-40).join('\n') + '\n```');
-          }
-        }
-        resumeInstruction = lines.join('\n');
-      } catch (e) {
-        send('log', { type: 'warn', message: `Failed to auto-construct instruction: ${e.message}` });
-        resumeInstruction = `Continue recording from step ${failedStep}. See action file for remaining steps.`;
       }
+      resumeInstruction = lines.join('\n');
+    } catch (e) {
+      resumeInstruction = 'Continue recording from step ' + failedStep + '. See action file for details.';
+    }
 
-      // Step 6: Send step with resume instruction
-      req.body = { task: resumeInstruction, maxSteps: maxSteps || 40 };
-      const stepRoute = app._router.stack.find(r => r.route && r.route.path === '/api/browser/session/:id/step' && r.route.methods.post);
-      if (stepRoute) {
-        stepRoute.handle(req, res);
-      } else {
-        send('error', { message: 'Step handler not found' });
-        if (!res.writableEnded) res.end();
-      }
-    } catch (err) {
-      gb.busy = false;
-      send('error', { message: err.message });
-      if (!res.writableEnded) res.end();
+    // Forward to step handler (it handles SSE, agent communication)
+    req.body = { task: resumeInstruction, maxSteps: maxSteps || 40 };
+    const stepRoute = app._router.stack.find(r => r.route && r.route.path === '/api/browser/session/:id/step' && r.route.methods.post);
+    if (stepRoute) {
+      stepRoute.handle(req, res);
+    } else {
+      res.status(500).json({ error: 'Step handler not found' });
     }
   });
 
-  // Human intervention: inject an instruction into the running session
+// Human intervention: inject an instruction into the running session
   app.post('/api/browser/session/:id/intervene', (req, res) => {
     const { id } = req.params;
     const { instruction } = req.body || {};

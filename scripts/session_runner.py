@@ -117,12 +117,16 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
             except Exception:
                 pass
 
-        # Clear both
+        # Clear all logs so next task starts fresh
         action_count = len(entries)
         log_count = len(_recorder_log)
         native_count = len(_native.get('history', [])) if _native else 0
         _ACTION_LOG.clear()
         _recorder_log.clear()
+        # Reset cumulative trajectory file
+        if cumulative_path and cumulative_path.exists():
+            try: cumulative_path.unlink()
+            except: pass
 
         emit_json({
             "event": "save_trajectory_result",
@@ -299,19 +303,11 @@ def _build_resume_instruction(action_file, log_file, failed_step):
                 else:
                     lines.append(f'- Step {step_num}: {action}')
 
-    # Append log context — only lines from failed_step onwards
+    # Append full operation log
     if log_content:
-        log_lines = log_content.split('\n')
-        # Log format: "[N] goal: ... | actions: ... | result: ..."
-        relevant_log = []
-        for line in log_lines:
-            m = re.match(r'^\[(\d+)\]', line.strip())
-            if m and int(m.group(1)) >= failed_step:
-                relevant_log.append(line)
-        if relevant_log:
-            lines.append('\n## 原始执行日志\n```')
-            lines.extend(relevant_log[-40:])  # last 40 relevant lines
-            lines.append('```')
+        lines.append('\n## 原始执行日志\n```')
+        lines.append(log_content.strip())
+        lines.append('```')
 
     return '\n'.join(lines)
 
@@ -425,6 +421,9 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref):
         await stdin_queue.put(msg)
 
 
+def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_ref=None):
+    event = msg.get("event")
+
     if event == "save_trajectory":
         _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'])
         return 'continue'
@@ -466,15 +465,10 @@ async def run_session(args):
 
     cdp_url = getattr(args, 'cdp_url', None) or None
     if cdp_url:
-        try:
-            from browser_use.browser.browser import BrowserConfig
-            sys.stderr.write(f"[session] Connecting to existing browser via CDP: {cdp_url}\n")
-            sys.stderr.flush()
-            browser = Browser(config=BrowserConfig(cdp_url=cdp_url))
-        except ImportError:
-            sys.stderr.write(f"[session] BrowserConfig not available, falling back to new browser\n")
-            sys.stderr.flush()
-            browser = Browser()
+        from browser_use.browser.browser import BrowserConfig
+        sys.stderr.write(f"[session] Connecting to existing browser via CDP: {cdp_url}\n")
+        sys.stderr.flush()
+        browser = Browser(config=BrowserConfig(cdp_url=cdp_url))
     else:
         browser = Browser()
 
@@ -484,6 +478,8 @@ async def run_session(args):
         trace_path=_TRACE_DIR,
     )
     browser_context = await browser.new_context(config)
+    # When CDP is used, _create_context (called lazily by _initialize_session)
+    # automatically reuses existing browser contexts from the partial script.
 
     session_id = args.session_id or "unknown"
     case_data_store = {}  # process-level in-memory store, persists across steps
