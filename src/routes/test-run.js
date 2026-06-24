@@ -15,6 +15,45 @@ function killOrphanChrome() {
   } catch {}
 }
 
+/**
+ * Read and parse the script-errors.json report written by a failed Playwright run.
+ * Prints structured diagnostics to server console, deletes the file after reading.
+ * Returns { scriptErrors, success } — caller decides how to relay to client.
+ */
+function checkScriptErrors(scriptPath, code, logSuffix = '') {
+  let scriptErrors = null;
+  const errorReportPath = path.join(TMP_DIR, 'script-errors.json');
+  try {
+    if (existsSync(errorReportPath)) {
+      scriptErrors = JSON.parse(readFileSync(errorReportPath, 'utf-8'));
+      unlinkSync(errorReportPath);
+    }
+  } catch {}
+
+  const success = code === 0 && (!scriptErrors || scriptErrors.length === 0);
+  const suffix = logSuffix ? ` (${logSuffix})` : '';
+
+  if (scriptErrors && scriptErrors.length > 0) {
+    // ============================================================
+    // DETECTION PHASE — 检测到脚本执行错误，打印详细日志
+    // ============================================================
+    console.log('═══════════════════════════════════════════');
+    console.log(`⚠  SCRIPT ERRORS DETECTED${suffix}: ` + scriptErrors.length + ' error(s)');
+    console.log('───────────────────────────────────────────');
+    scriptErrors.forEach((e, i) => {
+      console.log('[Step ' + e.step + '] ' + e.action + ' "' + (e.label || '') + '" → ' + e.error);
+      if (e.details) console.log('  Details: ' + e.details);
+      if (e.value) console.log('  Value: ' + e.value);
+    });
+    console.log('───────────────────────────────────────────');
+    console.log('  Script: ' + scriptPath);
+    console.log('  Exit code: ' + code);
+    console.log('═══════════════════════════════════════════');
+  }
+
+  return { scriptErrors, success };
+}
+
 export default function (app) {
   app.post('/api/test/run', (req, res) => {
     const { script, fileName } = req.body;
@@ -105,36 +144,9 @@ export default function (app) {
         send('screenshots', { screenshots });
       }
 
-      // Check for structured error report written by the script
-      let scriptErrors = null;
-      const errorReportPath = path.join(TMP_DIR, 'script-errors.json');
-      try {
-        if (existsSync(errorReportPath)) {
-          scriptErrors = JSON.parse(readFileSync(errorReportPath, 'utf-8'));
-          unlinkSync(errorReportPath);  // clean up
-        }
-      } catch {}
-
-      const success = code === 0 && (!scriptErrors || scriptErrors.length === 0);
+      const { scriptErrors, success } = checkScriptErrors(scriptPath, code);
 
       if (scriptErrors && scriptErrors.length > 0) {
-        // ============================================================
-        // DETECTION PHASE — 检测到脚本执行错误，打印详细日志
-        // ============================================================
-        console.log('═══════════════════════════════════════════');
-        console.log('⚠  SCRIPT ERRORS DETECTED: ' + scriptErrors.length + ' error(s)');
-        console.log('───────────────────────────────────────────');
-        scriptErrors.forEach((e, i) => {
-          console.log('[Step ' + e.step + '] ' + e.action + ' "' + (e.label || '') + '" → ' + e.error);
-          if (e.details) console.log('  Details: ' + e.details);
-          if (e.value) console.log('  Value: ' + e.value);
-        });
-        console.log('───────────────────────────────────────────');
-        console.log('  Script: ' + scriptPath);
-        console.log('  Exit code: ' + code);
-        console.log('═══════════════════════════════════════════');
-
-        // Send structured errors to client — frontend handler displays them
         send('script-errors', { errors: scriptErrors, needsFix: true, scriptPath });
       }
 
@@ -199,35 +211,7 @@ export default function (app) {
         url: `/api/test/screenshots/${f}`,
       }));
 
-      // Check for structured error report
-      let scriptErrors = null;
-      const errorReportPath = path.join(TMP_DIR, 'script-errors.json');
-      try {
-        if (existsSync(errorReportPath)) {
-          scriptErrors = JSON.parse(readFileSync(errorReportPath, 'utf-8'));
-          unlinkSync(errorReportPath);
-        }
-      } catch {}
-
-      const success = code === 0 && (!scriptErrors || scriptErrors.length === 0);
-
-      // ============================================================
-      // DETECTION PHASE — 检测到脚本执行错误，打印详细日志
-      // ============================================================
-      if (scriptErrors && scriptErrors.length > 0) {
-        console.log('═══════════════════════════════════════════');
-        console.log('⚠  SCRIPT ERRORS DETECTED (sync): ' + scriptErrors.length + ' error(s)');
-        console.log('───────────────────────────────────────────');
-        scriptErrors.forEach((e, i) => {
-          console.log('[Step ' + e.step + '] ' + e.action + ' "' + (e.label || '') + '" → ' + e.error);
-          if (e.details) console.log('  Details: ' + e.details);
-          if (e.value) console.log('  Value: ' + e.value);
-        });
-        console.log('───────────────────────────────────────────');
-        console.log('  Script: ' + scriptPath);
-        console.log('  Exit code: ' + code);
-        console.log('═══════════════════════════════════════════');
-      }
+      const { scriptErrors, success } = checkScriptErrors(scriptPath, code, 'sync');
 
       res.json({
         success,

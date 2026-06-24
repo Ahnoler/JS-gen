@@ -94,34 +94,6 @@ function handleSessionMessage(send, session, stepIndex, gb, res, cleanupListener
       case 'nav_step':
         send('status', { phase: 'navigating', label: msg.data.label });
         break;
-      // Rerun pipeline events
-      case 'rerun_start':
-        send('rerun_start', msg.data);
-        send('status', { phase: 'rerun', label: `Replaying ${msg.data.prefix_entries} history entries to step ${msg.data.failed_step}...` });
-        break;
-      case 'rerun_replay_done':
-        send('rerun_replay_done', msg.data);
-        send('status', { phase: 'rerun', label: 'Prefix replay complete — browser at error scene' });
-        break;
-      case 'rerun_replay_error':
-        send('rerun_replay_error', msg.data);
-        send('status', { phase: 'rerun', label: `Replay error: ${msg.data.message}` });
-        break;
-      case 'rerun_resume':
-        send('rerun_resume', msg.data);
-        send('status', { phase: 'rerun', label: `Resuming recording: ${msg.data.instruction?.slice(0, 60) || ''}` });
-        break;
-      case 'rerun_validate':
-        send('rerun_validate', msg.data);
-        send('status', { phase: 'rerun', label: msg.data.passed ? `Validation passed — ${msg.data.new_actions} actions recorded` : `Validation FAILED — agent completed but actions may be incomplete` });
-        break;
-      case 'rerun_done':
-        send('rerun_done', msg.data);
-        send('status', { phase: 'done', label: msg.data.validated !== false ? `Rerun complete — ${msg.data.new_actions} actions merged → ${msg.data.merged_file || '(none)'}` : 'Rerun complete — validation failed, not merged' });
-        gb.busy = false;
-        if (!res.writableEnded) res.end();
-        cleanupListener();
-        break;
     }
   };
 }
@@ -268,7 +240,12 @@ export default function (app) {
         const logPath = path.resolve(PROJECT_DIR, log_file);
         if (existsSync(logPath)) {
           const logContent = readFileSync(logPath, 'utf-8');
-          if (logContent.trim()) lines.push('\n## 原始执行日志\n```\n' + logContent.trim() + '\n```');
+          if (logContent.trim()) {
+            lines.push('\n## 原始执行日志（测试案例成功录制记录）');
+            lines.push('以下日志来自 Browser Use 根据测试案例执行的成功录制过程，result 仅保留成功的操作条目。');
+            lines.push('请参照这些日志条目来理解测试案例的业务内容，并完成剩余步骤。');
+            lines.push('```\n' + logContent.trim() + '\n```');
+          }
         }
       }
       resumeInstruction = lines.join('\n');

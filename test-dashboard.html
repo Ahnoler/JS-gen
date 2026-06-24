@@ -43,7 +43,7 @@
 
   <!-- Tabs -->
   <div class="tabs-nav">
-    <button class="tab-btn btn btn-sm active" data-tab="gen">Script Generation</button>
+    <button class="tab-btn btn btn-sm active" data-tab="gen">Script Assemble</button>
     <button class="tab-btn btn btn-sm" data-tab="explore">AI Explore</button>
     <button class="tab-btn btn btn-sm" data-tab="history">Playwright Scripts</button>
     <button class="tab-btn btn btn-sm" data-tab="trajectories">Trajectories</button>
@@ -57,51 +57,13 @@
         <div class="card-header">
           <div class="card-title">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Script Generation
+            Script Tip
           </div>
           <span id="genStatus" style="font-size:12px;color:var(--slate-400)">Ready</span>
         </div>
-        <div class="form-group">
-          <label>Test Scenario Description</label>
-          <textarea id="genDesc" rows="4" placeholder="Describe the test scenario in detail..."></textarea>
-        </div>
-        <div class="form-group">
-          <label>Target URL <span style="font-weight:400;color:var(--slate-400)">(optional)</span></label>
-          <input id="genUrl" type="text" placeholder="http://example.com/login">
-        </div>
-        <div class="form-group">
-          <label>Login Credentials <span style="font-weight:400;color:var(--slate-400)">(optional)</span></label>
-          <div style="display:flex;gap:8px">
-            <input id="genUser" type="text" placeholder="Username" style="flex:1">
-            <input id="genPass" type="password" placeholder="Password" style="flex:1">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Reference Script <span style="font-weight:400;color:var(--slate-400)">(optional, max 100KB)</span></label>
-          <div id="genRefDropZone" style="border:2px dashed var(--slate-200);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;background:var(--slate-50);font-size:13px;color:var(--slate-400)">Drop a .js file here or click to upload</div>
-          <input id="genRefFile" type="file" accept=".js" style="display:none">
-          <div id="genRefFileName" style="display:none;align-items:center;gap:8px;padding:8px 12px;background:var(--indigo-50);border-radius:var(--radius-sm)">
-            <span id="genRefFileLabel" style="flex:1;font-size:13px;color:var(--indigo-700)"></span>
-            <button id="genRefFileClear" class="btn btn-sm btn-outline">Clear</button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Model</label>
-          <select id="genModel"><option value="">&mdash; Default &mdash;</option></select>
-        </div>
-        <button id="genBtn" class="btn btn-primary">Generate &amp; Auto-Test</button>
+        <div style="padding:16px 0;color:var(--slate-400);font-size:13px;text-align:center">脚本通过 Action JSON 组装生成，从 AI Explore 录制轨迹后在此查看和运行。</div>
       </div>
 
-      <div class="card" id="trajPromptCard" style="display:none;margin-bottom:24px">
-        <div class="card-header">
-          <div class="card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            Trajectory-to-Script Prompt
-          </div>
-          <button id="trajPromptClearBtn" class="btn btn-sm btn-outline">Clear</button>
-        </div>
-        <textarea id="trajPromptContent" style="font-size:13px;color:var(--slate-600);padding:12px;background:var(--slate-50);border-radius:var(--radius-sm);font-family:var(--font-mono);line-height:1.6;min-height:150px;width:100%;border:none;resize:vertical;outline:none;box-sizing:border-box"></textarea>
-      </div>
 
       <div class="card">
         <div class="card-header">
@@ -153,16 +115,6 @@
                 <span id="genHealActionResult" style="font-size:11px;color:var(--slate-400)"></span>
               </div>
             </div>
-          </div>
-        </div>
-        <div id="genRefineArea" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--slate-100)">
-          <div class="form-group">
-            <label>Refine Script</label>
-            <textarea id="genFeedback" rows="2" placeholder="Describe what to change..."></textarea>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <button id="genRefineBtn" class="btn btn-sm btn-primary">Refine</button>
-            <span id="genRefineStatus" style="font-size:12px;color:var(--slate-400)"></span>
           </div>
         </div>
       </div>
