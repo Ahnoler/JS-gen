@@ -67,7 +67,9 @@
    - 确认弹窗。
 6. **禁用字段 + 空值 + 无旁边按钮** → 跳过（真正的只读字段）。
 7. **日期选择器字段（tsscdatepicker / el-date-editor）：** `fill_form_field` 现在支持日期字段 — 直接设置值。如果日期字段已有值（通过 `scan_form_fields` 或 `check_field_value` 检查），跳过。
-{{field-rules.md}}
+{{agent-field-rules.md}}
+
+{{agent-special-rules.md}}
 
 # 🚨 任务列表规则（关键 — 跟踪表单填写进度）
 当你遇到包含多个字段的表单弹窗/抽屉时，使用任务列表系统来跟踪进度，避免冗余操作。
