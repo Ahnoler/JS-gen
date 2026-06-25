@@ -2,6 +2,7 @@ node_modules/
 .env
 .env.local
 opencode.json
+start.ps1
 agent-api.config.json
 *.log
 tmp/
@@ -14,7 +15,6 @@ docs/
 scripts/__pycache__//
 scripts/action/
 scripts/log/
-scripts/screenshots/
 scripts/trace/
 scripts/case_data/
 scripts/data/
@@ -22,3 +22,4 @@ scripts/generated/
 scripts/trajectories/
 chorme-devtools-mcp/
 playwright-cli/
+snapshots/

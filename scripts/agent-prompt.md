@@ -48,6 +48,10 @@
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
 - init_task_list(scan_json) — 从扫描结果创建待办/已完成列表。自动跳过已填写/禁用的字段。传入完整的扫描结果。
 - **fill_pending_batch() — 批量填写所有待办字段，按类型分组（select→input→date→radio→checkbox）。自动调用 task_done。在 init_task_list 之后使用。**
+  **填表值优先级（三级降级）：**
+  1. **用户明确数据** — 若任务指令中指定了字段值（如"客户名称=新创科技"），优先使用；系统会从 case_data_store 中查找
+  2. **智能生成（form_rules）** — input/date 字段调用 match_form_rule 生成合法随机值（身份证号、手机号、信用代码等）
+  3. **LLM 自主决策** — select 从 options 中按标签语义选取最合理选项；其余 input 字段按标签语义生成测试数据
 - **save_form_snapshot() — Save form structure snapshot for replay validation. Call ONCE right after init_task_list. Records field labels + count. The assembled script will verify the form has not changed before filling.**
 - fill_form_fields_batch(fields_json) — 填写最多10个指定字段：[{"action":"fill_input","label":"...","value":"..."}, ...]。用于指定特定值。
 - task_done(label) — 将字段标记为已完成。
@@ -75,11 +79,12 @@
 **工作流程：**
 1. **全面扫描：** 调用一次 `scan_form_fields()`。结果保存在 memory 中作为任务列表参考。
 2. **初始化任务列表：** 调用 `init_task_list(scan_json)`。待办列表中存储完整的字段对象 `{label, kind, currentValue, options, placeholder, disabled, required}`。自动跳过已填写/禁用的字段。
-3. **规划：** 调用 `get_pending_tasks()` — 返回 `{pending: [{label,kind,options,...}], done: [...]}`。读取 kind/options 来规划操作和值。
-4. **填写：** 调用 `fill_pending_batch()` — 按类型分组（select→input→date→radio→checkbox），使用第一个选项/placeholder/测试数据填充。自动 task_done。
-5. **检查：** 调用 `scan_visible_fields()` 检查通知/错误（输出量小得多）。
-6. **提交：** 当 `get_pending_tasks().pending` 为空时，提交。
-7. **错误处理：** 调用 `sync_tasks_from_errors()` 从 `.el-form-item__error` 重新加入出错字段。
+3. **保存表单快照：** 调用 `save_form_snapshot()`。记录当前表单的字段标签 + 必填/可选标记，用于回放时检测表单结构是否变化。**必须在 fill_pending_batch 之前调用。**
+4. **规划：** 调用 `get_pending_tasks()` — 返回 `{pending: [{label,kind,options,...}], done: [...]}`。读取 kind/options 来规划操作和值。
+5. **填写：** 调用 `fill_pending_batch()` — 按类型分组（select→input→date→radio→checkbox），使用第一个选项/placeholder/测试数据填充。自动 task_done。
+6. **检查：** 调用 `scan_visible_fields()` 检查通知/错误（输出量小得多）。
+7. **提交：** 当 `get_pending_tasks().pending` 为空时，提交。
+8. **错误处理：** 调用 `sync_tasks_from_errors()` 从 `.el-form-item__error` 重新加入出错字段。
 
 **示例：**
 ```
