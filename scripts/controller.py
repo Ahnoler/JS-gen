@@ -840,6 +840,15 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending[:5], ensure_ascii=False))
         return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending, ensure_ascii=False))
 
+    @controller.action('Save form structure snapshot for replay validation. Call after init_task_list, before fill_pending_batch. Records field labels + count so assembled scripts can verify the form has not changed.')
+    async def save_form_snapshot():
+        fields = case_data_store.get('_scan_fields', [])
+        labels = [f.get('label', '') for f in fields if f.get('label', '').strip()]
+        snapshot = {'fields': labels, 'count': len(labels)}
+        case_data_store['form_snapshot'] = snapshot
+        _record_action('save_form_snapshot', {'fields': labels, 'count': len(labels)})
+        return _ok(f'form-snapshot | count:{len(labels)}')
+
     def _task_done_impl(label_text):
         tl = case_data_store.get('task_list')
         if not tl:
@@ -1363,6 +1372,17 @@ def _register_misc_actions(controller, browser_context):
             }
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(action_json, f, ensure_ascii=False, indent=2)
+
+            # Write form structure snapshot if available
+            snapshot = case_data_store.get('form_snapshot')
+            if snapshot:
+                forms_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'forms')
+                os.makedirs(forms_dir, exist_ok=True)
+                form_path = os.path.join(forms_dir, f'form_{ts}.json')
+                with open(form_path, 'w', encoding='utf-8') as f:
+                    json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                action_json['form_snapshot'] = f'scripts/forms/form_{ts}.json'
+
             count = len(_ACTION_LOG)
             _ACTION_LOG.clear()
             return _ok(f'saved:{filepath} | entries:{count}')

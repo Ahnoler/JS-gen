@@ -48,6 +48,7 @@
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
 - init_task_list(scan_json) — 从扫描结果创建待办/已完成列表。自动跳过已填写/禁用的字段。传入完整的扫描结果。
 - **fill_pending_batch() — 批量填写所有待办字段，按类型分组（select→input→date→radio→checkbox）。自动调用 task_done。在 init_task_list 之后使用。**
+- **save_form_snapshot() — Save form structure snapshot for replay validation. Call ONCE right after init_task_list. Records field labels + count. The assembled script will verify the form has not changed before filling.**
 - fill_form_fields_batch(fields_json) — 填写最多10个指定字段：[{"action":"fill_input","label":"...","value":"..."}, ...]。用于指定特定值。
 - task_done(label) — 将字段标记为已完成。
 - task_retry(label) — 将字段重新加入待办。
@@ -134,6 +135,7 @@
 # 弹窗打开
 scan_form_fields() → 完整字段列表
 init_task_list(scan_json) → "pending:4"
+save_form_snapshot() → stores field count for replay validation
 fill_pending_batch() → "all done"
 get_pending_tasks() → "pending:[], done:[...]"
 

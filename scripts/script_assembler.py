@@ -226,6 +226,19 @@ function _recordError(step, action, label, value, error, details) {
         return'label-not-found';
       },
       expandAllTreeNodes: () => {let t=0;for(let r=0;r<10;r++){const n=document.querySelectorAll('.el-tree-node:not(.is-expanded)');if(n.length===0)break;n.forEach(node=>{const i=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon');if(i){i.click();t++;}});}return t;},
+      verifyFormStructure: (expectedLabels) => {
+        const container = window.CTRL.getContainer();
+        const items = container.querySelectorAll('.el-form-item');
+        const actualLabels = [];
+        for (const item of items) {
+          const lbl = item.querySelector('.el-form-item__label');
+          if (lbl) actualLabels.push(lbl.textContent.trim());
+        }
+        const missing = expectedLabels.filter(l => !actualLabels.includes(l));
+        const added = actualLabels.filter(l => !expectedLabels.includes(l));
+        if (missing.length === 0 && added.length === 0) return JSON.stringify({ ok: true, count: actualLabels.length });
+        return JSON.stringify({ ok: false, count: actualLabels.length, expected: expectedLabels.length, missing, added, fields: actualLabels });
+      },
     };
   });
 
@@ -742,13 +755,30 @@ def assemble_script(action_entries, target_url=None):
     body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
+    # Collect form snapshot for structure verification
+    form_snapshot_labels = []
+    for entry in action_entries:
+        if entry.get('action') == 'save_form_snapshot':
+            form_snapshot_labels = (entry.get('params') or {}).get('fields', [])
+            break
+
+    if form_snapshot_labels:
+        labels_json = json.dumps(form_snapshot_labels, ensure_ascii=False)
+        body.append(f'    // Verify form structure matches recording snapshot')
+        body.append(f'    const __formCheck = await page.evaluate((l) => JSON.parse(CTRL.verifyFormStructure(l)), {labels_json});')
+        body.append(f'    if (!__formCheck.ok) {{')
+        body.append(f'      _recordError(0, "form_structure_changed", "", JSON.stringify({{ missing: __formCheck.missing, added: __formCheck.added, expected: __formCheck.expected, actual: __formCheck.count }}));')
+        body.append(f'      throw new Error("Form changed: missing=[\\"" + __formCheck.missing.join("\\",\\"") + "\\"] added=[\\"" + __formCheck.added.join("\\",\\"") + "\\"]");')
+        body.append(f'    }}')
+
     for entry in action_entries:
         action = entry.get('action', '')
         if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
                       'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
                       'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
                       'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
-                      'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch'):
+                      'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch',
+                      'save_form_snapshot'):
             continue
 
         if action in BOUNDARY_ACTIONS:

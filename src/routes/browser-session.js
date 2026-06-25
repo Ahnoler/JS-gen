@@ -208,7 +208,7 @@ export default function (app) {
   // Self-healing: construct resume instruction, send as step to global agent.
   app.post('/api/browser/session/:id/rerun', async (req, res) => {
     const { id } = req.params;
-    const { action_file, failedStep, maxSteps, log_file } = req.body || {};
+    const { action_file, failedStep, maxSteps, log_file, form_changes } = req.body || {};
 
     const session = state.sessions.get(id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
@@ -227,7 +227,22 @@ export default function (app) {
       const remaining = commands.filter((c, i) => (i + 1) >= failedStep);
       const lines = [];
       if (url && !url.includes('unknown')) lines.push('【目标URL】\n' + url + '\n');
-      lines.push('请先扫描当前表单，建立任务清单，完成剩余待填表单项。\n');
+      lines.push('当前为脚本执行失败后的自愈修复阶段。请根据下方操作步骤与 Log 文件，逐步导航并复现失败场景，抵达出错页面后，扫描当前表单，建立任务清单，重新填写所有表单项。\n');
+
+      // Inject form structure change context for LLM self-heal
+      if (form_changes) {
+        const { missing, added } = form_changes;
+        if (missing && missing.length) {
+          lines.push('【表单结构变更 — 已移除的字段（无需填写）】');
+          missing.forEach(f => lines.push('  - "' + f + '"（已从表单中移除，跳过）'));
+          lines.push('');
+        }
+        if (added && added.length) {
+          lines.push('【表单结构变更 — 新增的字段（需要补充填写）】');
+          added.forEach(f => lines.push('  - "' + f + '"（新增字段，请扫描并填写）'));
+          lines.push('');
+        }
+      }
       for (const cmd of remaining) {
         const stepNum = commands.indexOf(cmd) + 1;
         const a = cmd.action || ''; const p = cmd.params || {};
@@ -241,9 +256,21 @@ export default function (app) {
         if (existsSync(logPath)) {
           const logContent = readFileSync(logPath, 'utf-8');
           if (logContent.trim()) {
-            lines.push('\n## 原始执行日志（测试案例成功录制记录）');
-            lines.push('以下日志来自 Browser Use 根据测试案例执行的成功录制过程，result 仅保留成功的操作条目。');
-            lines.push('请参照这些日志条目来理解测试案例的业务内容，并完成剩余步骤。');
+            lines.push('\n---');
+            lines.push('## 文件说明');
+            lines.push('以下包含两份文件，供你理解任务上下文：');
+            lines.push('');
+            lines.push('### 截断的 Action 文件（上方操作步骤列表）');
+            lines.push('- 来源于原始脚本从第 ' + failedStep + ' 步开始截断后的剩余操作步骤。');
+            lines.push('- 这是原始脚本期望执行的步骤（可能已不适用于当前页面状态，仅供参考业务意图）。');
+            lines.push('- 你需要根据下方 Log 文件中的完整上下文，理解原始录制的正确操作流程。');
+            lines.push('');
+            lines.push('### 完整的 Log 文件（下方日志内容）');
+            lines.push('- 来源于原始录制时完整成功执行的过程日志，包含完整的导航路径和所有成功操作。');
+            lines.push('- 请参照 Log 中的完整操作序列来理解业务目标、导航步骤和正确的操作方式。');
+            lines.push('- 复现失败场景后，请根据 Log 中的业务意图重新填写表单。');
+            lines.push('');
+            lines.push('## 原始执行日志');
             lines.push('```\n' + logContent.trim() + '\n```');
           }
         }

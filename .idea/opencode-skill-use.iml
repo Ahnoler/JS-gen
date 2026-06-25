@@ -21,6 +21,7 @@
       <excludeFolder url="file://$MODULE_DIR$/scripts/log" />
       <excludeFolder url="file://$MODULE_DIR$/scripts/snapshots" />
       <excludeFolder url="file://$MODULE_DIR$/scripts/trajectories" />
+      <excludeFolder url="file://$MODULE_DIR$/.playwright-cli" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.12" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

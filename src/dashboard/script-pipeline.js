@@ -411,16 +411,25 @@ export function initScriptPipeline() {
         addHealLog('success', `Session: ${sessionId}`);
       }
 
+      // Extract form structure change info for LLM self-heal context
+      let formChanges = null;
+      const formError = stepErrors.find(e => e.action === 'form_structure_changed');
+      if (formError && formError.details) {
+        try { formChanges = JSON.parse(formError.details); } catch {}
+      }
+
       // Step 2: Trigger rerun via SSE
       addHealLog('step', `Rerun: action=${actionFile} log=${logFile} failed_step=${failedStep}`);
+      const rerunBody = {
+        action_file: actionFile,
+        log_file: logFile,
+        failedStep,
+      };
+      if (formChanges) rerunBody.form_changes = formChanges;
       const res = await fetch(`/api/browser/session/${sessionId}/rerun`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action_file: actionFile,
-          log_file: logFile,
-          failedStep,
-        }),
+        body: JSON.stringify(rerunBody),
       });
 
       if (!res.ok) {

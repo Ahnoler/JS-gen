@@ -269,8 +269,20 @@ const CTRL_OBJECT = `{
     }
     return 'row-not-found';
   },
+  verifyFormStructure: (expectedLabels) => {
+    const container = CTRL.getContainer();
+    const items = container.querySelectorAll('.el-form-item');
+    const actualLabels = [];
+    for (const item of items) {
+      const lbl = item.querySelector('.el-form-item__label');
+      if (lbl) actualLabels.push(lbl.textContent.trim());
+    }
+    const missing = expectedLabels.filter(l => !actualLabels.includes(l));
+    const added = actualLabels.filter(l => !expectedLabels.includes(l));
+    if (missing.length === 0 && added.length === 0) return JSON.stringify({ ok: true, count: actualLabels.length });
+    return JSON.stringify({ ok: false, count: actualLabels.length, expected: expectedLabels.length, missing, added, fields: actualLabels });
+  },
 }`;
-
 /**
  * 模板生成用：以 page.evaluate 注入格式输出（含缩进）
  * 用于 convertTrajectoryToScript 的模板
