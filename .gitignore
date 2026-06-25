@@ -18,6 +18,7 @@ scripts/screenshots/
 scripts/trace/
 scripts/case_data/
 scripts/data/
+scripts/forms/
 scripts/generated/
 scripts/trajectories/
 chorme-devtools-mcp/
