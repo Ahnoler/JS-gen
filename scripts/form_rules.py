@@ -105,7 +105,31 @@ def load_rules(script_dir=None):
         opts_text = options_str.replace('`', '').strip()
         rules.append((kws, lambda o=opts_text: f'SELECT: {o}. Choose based on context.'))
     
-    sys.stderr.write(f"[rules] Loaded {len(rules)} rule groups from SKILL.md\n")
+    # Also load rules from field-rules.md (agent style rule tables)
+    field_rules_path = os.path.join(script_dir, 'field-rules.md')
+    if os.path.exists(field_rules_path):
+        try:
+            with open(field_rules_path, 'r', encoding='utf-8') as f:
+                field_content = f.read()
+            # Parse keyword => value tables: | keyword1、keyword2、... | rule description | example |
+            field_rows = re.findall(r'\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|', field_content)
+            for row in field_rows:
+                keywords_str = row[0].strip()
+                spec = row[1].strip()
+                # Only process rows where keywords look like Chinese text (not headers, not empty)
+                if not keywords_str or keywords_str.startswith('[') or keywords_str.startswith('-') or keywords_str.startswith('字段') or keywords_str.startswith('证件') or keywords_str.startswith('推导') or keywords_str.startswith('其他'):
+                    continue
+                kws = [k.strip() for k in keywords_str.replace('、', ',').split(',') if k.strip()]
+                if not kws:
+                    continue
+                # Generate value based on spec
+                rule_text = f"{spec} — {row[2].strip()}" if row[2].strip() else spec
+                rules.append((kws, lambda s=rule_text: s))
+        except Exception as e:
+            sys.stderr.write(f"[rules] Failed to parse field-rules.md: {e}\n")
+            sys.stderr.flush()
+
+    sys.stderr.write(f"[rules] Loaded {len(rules)} rule groups from SKILL.md + field-rules.md\n")
     sys.stderr.flush()
     return rules
 

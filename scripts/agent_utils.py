@@ -46,10 +46,25 @@ async def do_navigate(page, url):
 
 # ========== Load system prompts from external markdown file ==========
 # Edit agent-prompt.md instead of this file to change prompts.
-_PROMPT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'agent-prompt.md')
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROMPT_PATH = os.path.join(_SCRIPT_DIR, 'agent-prompt.md')
 
 with open(_PROMPT_PATH, 'r', encoding='utf-8') as _f:
     _prompt_content = _f.read()
+
+# Resolve {{include}} directives — replace {{filename.md}} with file content
+_DIRECTIVE_RE = re.compile(r'\{\{([^}]+\.md)\}\}')
+def _resolve_directives(text):
+    def _replacer(m):
+        fname = m.group(1)
+        fpath = os.path.join(_SCRIPT_DIR, fname)
+        if os.path.exists(fpath):
+            with open(fpath, 'r', encoding='utf-8') as _f:
+                return _f.read().strip()
+        return m.group(0)  # fallback: leave unchanged
+    return _DIRECTIVE_RE.sub(_replacer, text)
+
+_prompt_content = _resolve_directives(_prompt_content)
 
 # Split: main content (before ---) and planner section (after PLANNER SYSTEM PROMPT)
 _parts = _prompt_content.split('\n---\n', 1)
