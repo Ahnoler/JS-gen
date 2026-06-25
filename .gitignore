@@ -23,4 +23,3 @@ scripts/trajectories/
 chorme-devtools-mcp/
 playwright-cli/
 start.ps1
-__pycache__/
