@@ -47,7 +47,7 @@ async def do_navigate(page, url):
 # ========== Load system prompts from external markdown file ==========
 # Edit agent-prompt.md instead of this file to change prompts.
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROMPT_PATH = os.path.join(_SCRIPT_DIR, 'agent-prompt.md')
+_PROMPT_PATH = os.path.join(_SCRIPT_DIR, 'prompts', 'agent-prompt.md')
 
 with open(_PROMPT_PATH, 'r', encoding='utf-8') as _f:
     _prompt_content = _f.read()

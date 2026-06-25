@@ -106,7 +106,7 @@ def load_rules(script_dir=None):
         rules.append((kws, lambda o=opts_text: f'SELECT: {o}. Choose based on context.'))
     
     # Also load rules from agent-field-rules.md (agent style rule tables)
-    field_rules_path = os.path.join(script_dir, 'agent-field-rules.md')
+    field_rules_path = os.path.join(script_dir, 'prompts', 'agent-field-rules.md')
     if os.path.exists(field_rules_path):
         try:
             with open(field_rules_path, 'r', encoding='utf-8') as f:
@@ -129,28 +129,7 @@ def load_rules(script_dir=None):
             sys.stderr.write(f"[rules] Failed to parse agent-field-rules.md: {e}\n")
             sys.stderr.flush()
 
-    # Also load rules from agent-special-rules.md
-    spec_rules_path = os.path.join(script_dir, 'agent-special-rules.md')
-    if os.path.exists(spec_rules_path):
-        try:
-            with open(spec_rules_path, 'r', encoding='utf-8') as f:
-                spec_content = f.read()
-            spec_rows = re.findall(r'\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|', spec_content)
-            for row in spec_rows:
-                keywords_str = row[0].strip()
-                spec = row[1].strip()
-                if not keywords_str or keywords_str.startswith('字段'):
-                    continue
-                kws = [k.strip() for k in keywords_str.replace('、', ',').split(',') if k.strip()]
-                if not kws:
-                    continue
-                rule_text = f"{spec} — {row[2].strip()}" if row[2].strip() else spec
-                rules.append((kws, lambda s=rule_text: s))
-        except Exception as e:
-            sys.stderr.write(f"[rules] Failed to parse agent-special-rules.md: {e}\n")
-            sys.stderr.flush()
-
-    sys.stderr.write(f"[rules] Loaded {len(rules)} rule groups from SKILL.md + agent-field-rules.md + agent-special-rules.md\n")
+    sys.stderr.write(f"[rules] Loaded {len(rules)} rule groups from SKILL.md + agent-field-rules.md\n")
     sys.stderr.flush()
     return rules
 
