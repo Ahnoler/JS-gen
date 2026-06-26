@@ -229,18 +229,50 @@ export default function (app) {
       if (url && !url.includes('unknown')) lines.push('【目标URL】\n' + url + '\n');
       lines.push('当前为脚本执行失败后的自愈修复阶段。请根据下方操作步骤与 Log 文件，逐步导航并复现失败场景，抵达出错页面后，扫描当前表单，建立任务清单，重新填写所有表单项。\n');
 
-      // Inject form structure change context for LLM self-heal
+      // Inject form structure change context for LLM self-heal (multi-container support)
       if (form_changes) {
-        const { missing, added } = form_changes;
-        if (missing && missing.length) {
-          lines.push('【表单结构变更 — 已移除的字段（无需填写）】');
-          missing.forEach(f => lines.push('  - "' + f + '"（已从表单中移除，跳过）'));
-          lines.push('');
-        }
-        if (added && added.length) {
-          lines.push('【表单结构变更 — 新增的字段（需要补充填写）】');
-          added.forEach(f => lines.push('  - "' + f + '"（新增字段，请扫描并填写）'));
-          lines.push('');
+        const changesList = Array.isArray(form_changes) ? form_changes : [form_changes];
+
+        for (const change of changesList) {
+          const container = change.container || 'main';
+          const containerInfo = container !== 'main' ? ` (容器: ${container})` : '';
+          const missing_required = change.missing_required || [];
+          const added_required = change.added_required || [];
+          const missing_optional = change.missing_optional || [];
+          const added_optional = change.added_optional || [];
+          const isWarning = missing_required.length === 0 && added_required.length === 0;
+
+          if (isWarning) {
+            // P3/P4: warning only
+            if (missing_optional.length || added_optional.length) {
+              lines.push(`【P3 FORM WARNING: 可选字段变化${containerInfo}（仅参考）】`);
+              if (missing_optional.length) {
+                lines.push('  已移除的可选字段：' + missing_optional.map(f => '"' + f + '"').join('、'));
+              }
+              if (added_optional.length) {
+                lines.push('  新增的可选字段：' + added_optional.map(f => '"' + f + '"').join('、'));
+              }
+              lines.push('');
+            } else if (change.reordered) {
+              lines.push(`【P4 FORM WARNING: 字段顺序变化${containerInfo}（仅参考）】`);
+              lines.push('');
+            }
+          } else {
+            // P2: required field error
+            lines.push(`【P2 FORM ERROR: 必填字段变化${containerInfo}（导致脚本失败，需自愈修复）】`);
+            if (missing_required.length) {
+              lines.push('  已从表单中移除的必填字段（无需填写，跳过）：');
+              missing_required.forEach(f => lines.push('    - "' + f + '"'));
+            }
+            if (added_required.length) {
+              lines.push('  表单中新增的必填字段（必须扫描页面找到并填写）：');
+              added_required.forEach(f => lines.push('    - "' + f + '"'));
+            }
+            if (missing_optional.length || added_optional.length) {
+              lines.push('  附：可选字段变化 — 移除：' + missing_optional.map(f => '"' + f + '"').join('、') || '无' + ' | 新增：' + added_optional.map(f => '"' + f + '"').join('、') || '无');
+            }
+            lines.push('');
+          }
         }
       }
       for (const cmd of remaining) {

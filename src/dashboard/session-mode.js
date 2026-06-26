@@ -628,7 +628,7 @@ export function initSessionMode() {
   sessTrajBtn.addEventListener('click', async () => {
     const sessionId = sessActive.value;
     if (!sessionId) return;
-    if (!confirm('Save action file + operation log?')) return;
+    if (!confirm('Save action file + operation log + form snapshot?')) return;
     sessTrajBtn.disabled = true;
     sessLog('system', 'Saving...');
     try {

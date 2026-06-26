@@ -299,11 +299,16 @@ export function initScriptPipeline() {
                   // Enable self-heal button if we have an action file
                   pipelineState.lastError = JSON.stringify(errors, null, 2);
                   if (pipelineState.actionFile) {
-                    const stepErrors = errors.filter(e => e.step > 0);
-                    const firstStep = stepErrors[0]?.step || errors[0]?.step || '?';
+                    const formErr = errors.find(e => e.action === 'form_structure_changed');
+                    const stepErrs = errors.filter(e => e.step > 0 && e.action !== 'form_structure_changed' && e.action !== 'form_warning');
+                    const warnErrs = errors.filter(e => e.action === 'form_warning');
                     document.getElementById('genHealArea').style.display = 'block';
                     document.getElementById('genHealBtn').disabled = false;
-                    document.getElementById('genHealStatus').textContent = `Ready — ${stepErrors.length} error(s) at step ${firstStep}`;
+                    const parts = [];
+                    if (formErr) parts.push('form structure changed');
+                    if (stepErrs.length) parts.push(`${stepErrs.length} step error(s)`);
+                    if (warnErrs.length) parts.push(`${warnErrs.length} warning(s)`);
+                    document.getElementById('genHealStatus').textContent = 'Ready — ' + (parts.length ? parts.join(' + ') : 'errors detected');
                   }
                 }
                 break;
@@ -366,9 +371,36 @@ export function initScriptPipeline() {
 
     let errors;
     try { errors = JSON.parse(pipelineState.lastError || '[]'); } catch { errors = []; }
-    const stepErrors = errors.filter(e => e.step > 0);
-    if (!stepErrors.length) { alert('No step errors captured — run the script first'); return; }
-    const failedStep = stepErrors[0]?.step || 1;
+    if (!errors.length) { alert('No errors captured — run the script first'); return; }
+
+    // Collect all form-related errors: P2 (form_structure_changed) + P3/P4 (form_warning)
+    const formErrors = errors.filter(e => e.action === 'form_structure_changed' || e.action === 'form_warning');
+    const stepErrors = errors.filter(e => e.step > 0 && e.action !== 'form_structure_changed' && e.action !== 'form_warning');
+    const formError = errors.find(e => e.action === 'form_structure_changed'); // P2 only
+    const warnings = errors.filter(e => e.action === 'form_warning'); // P3/P4
+
+    // Build form_changes from all form errors (multi-container support)
+    let formChanges = null;
+    let formActionIndex = null;
+    const allFormChanges = [];
+    for (const fe of formErrors) {
+      const raw = fe.details || fe.value;
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          allFormChanges.push(parsed);
+          if (parsed.action_index) formActionIndex = parsed.action_index;
+        } catch {}
+      }
+    }
+    if (allFormChanges.length > 0) formChanges = allFormChanges;
+
+    // failedStep: P1 step error > P2 form error step > action_index > 1 > 0
+    const failedStep = stepErrors[0]?.step || formError?.step || formActionIndex || (formError ? 1 : 0);
+
+    // Trigger self-heal for: P1 step errors, P2 form errors, or P3/P4 warnings
+    const canHeal = stepErrors.length > 0 || formError || warnings.length > 0;
+    if (!canHeal) { alert('No recoverable errors — run the script first'); return; }
 
     // Derive log path from action file
     // actionFile: "scripts/action/action_20260622_161836.json"
@@ -393,30 +425,24 @@ export function initScriptPipeline() {
       terminal.scrollTop = terminal.scrollHeight;
     }
 
-    addHealLog('system', `🩹 Self-heal: step ${failedStep} failed, replaying from trajectory...`);
+    if (formError) {
+      addHealLog('system', `🩹 Self-heal: form structure changed, updating form snapshot...`);
+    } else {
+      addHealLog('system', `🩹 Self-heal: step ${failedStep} failed, replaying from trajectory...`);
+    }
 
     try {
-      // Step 1: Create/ensure browser session
-      let sessionId = pipelineState.healSessionId;
-      if (!sessionId) {
-        addHealLog('step', 'Creating browser session...');
-        const sessRes = await fetch('/api/browser/session', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        const sessData = await sessRes.json();
-        if (!sessRes.ok) throw new Error(sessData.error || 'Session creation failed');
-        sessionId = sessData.sessionId;
-        pipelineState.healSessionId = sessionId;
-        addHealLog('success', `Session: ${sessionId}`);
-      }
-
-      // Extract form structure change info for LLM self-heal context
-      let formChanges = null;
-      const formError = stepErrors.find(e => e.action === 'form_structure_changed');
-      if (formError && formError.details) {
-        try { formChanges = JSON.parse(formError.details); } catch {}
-      }
+      // Step 1: Create browser session (always fresh — self-heal is one-shot)
+      addHealLog('step', 'Creating browser session...');
+      const sessRes = await fetch('/api/browser/session', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const sessData = await sessRes.json();
+      if (!sessRes.ok) throw new Error(sessData.error || 'Session creation failed');
+      const sessionId = sessData.sessionId;
+      pipelineState.healSessionId = sessionId;
+      addHealLog('success', `Session: ${sessionId}`);
 
       // Step 2: Trigger rerun via SSE
       addHealLog('step', `Rerun: action=${actionFile} log=${logFile} failed_step=${failedStep}`);
@@ -629,10 +655,10 @@ export function initScriptPipeline() {
       applyBtn.disabled = true;
       result.textContent = 'Applying...';
       try {
-        // Persist fixed action file (old file preserved for safety)
+        const oldPath = pipelineState.actionFile;
         const res = await fetch('/api/test/assemble/apply-fix', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ newPath: actionFilePath }),
+          body: JSON.stringify({ oldPath, newPath: actionFilePath }),
         });
         if (!res.ok) throw new Error((await res.json()).error);
         addPipelineLog('success', `Fix applied: ${actionFilePath}`);

@@ -48,11 +48,22 @@ export default function (app) {
         writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
       }
 
+      // Look for matching form snapshot file
+      const actionName = path.basename(actionFile);  // action_20260625_153759.json
+      const tsMatch = actionName.match(/^action_(\d{8}_\d{6})\.json$/);
+      let formSnapshotArg = '';
+      if (tsMatch) {
+        const formPath = path.join(SCRIPTS_DIR, 'forms', `form_${tsMatch[1]}.json`);
+        if (existsSync(formPath)) {
+          formSnapshotArg = ` --form-snapshot "${formPath}"`;
+        }
+      }
+
       // Call Python assembler
       const assemblerPy = path.join(SCRIPTS_DIR, 'script_assembler.py');
       // Always write deduplicated JSON for the assembler to read
       if (!existsSync(cleanPath)) writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
-      execSync(`python "${assemblerPy}" "${cleanPath}" "${scriptPath}"`, { encoding: 'utf-8', timeout: 30000 });
+      execSync(`python "${assemblerPy}" "${cleanPath}" "${scriptPath}"${formSnapshotArg}`, { encoding: 'utf-8', timeout: 30000 });
 
       // Read the generated script
       const script = readFileSync(scriptPath, 'utf-8');
@@ -177,18 +188,17 @@ export default function (app) {
    */
   app.post('/api/test/assemble/apply-fix', async (req, res) => {
     try {
-      const { newPath } = req.body || {};
+      const { oldPath, newPath } = req.body || {};
+      if (!oldPath) return res.status(400).json({ error: 'oldPath is required' });
       if (!newPath) return res.status(400).json({ error: 'newPath is required' });
+      const absOld = path.resolve(PROJECT_DIR, oldPath);
       const absNew = path.resolve(PROJECT_DIR, newPath);
+      if (!existsSync(absOld)) return res.status(404).json({ error: 'Old file not found: ' + absOld });
       if (!existsSync(absNew)) return res.status(404).json({ error: 'New file not found: ' + absNew });
-      // Persist: copy as-is to scripts/action/
-      const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      const actionDir = path.join(SCRIPTS_DIR, 'action');
-      if (!existsSync(actionDir)) mkdirSync(actionDir, { recursive: true });
-      const fixedPath = path.join(actionDir, `action_fixed_${ts}.json`);
+      // Overwrite old action file with healed content
       const newData = readFileSync(absNew, 'utf-8');
-      writeFileSync(fixedPath, newData, 'utf-8');
-      res.json({ success: true, fixedPath: path.join('scripts', 'action', `action_fixed_${ts}.json`), message: 'Old file preserved, fixed copy saved to scripts/action/' });
+      writeFileSync(absOld, newData, 'utf-8');
+      res.json({ success: true, path: oldPath, message: 'Action file overwritten with fix' });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

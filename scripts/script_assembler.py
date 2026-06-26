@@ -226,7 +226,7 @@ function _recordError(step, action, label, value, error, details) {
         return'label-not-found';
       },
       expandAllTreeNodes: () => {let t=0;for(let r=0;r<10;r++){const n=document.querySelectorAll('.el-tree-node:not(.is-expanded)');if(n.length===0)break;n.forEach(node=>{const i=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon');if(i){i.click();t++;}});}return t;},
-      verifyFormStructure: (expectedLabels) => {
+      verifyFormStructure: (expectedFields) => {
         const container = window.CTRL.getContainer();
         const items = container.querySelectorAll('.el-form-item');
         const actualLabels = [];
@@ -234,10 +234,38 @@ function _recordError(step, action, label, value, error, details) {
           const lbl = item.querySelector('.el-form-item__label');
           if (lbl) actualLabels.push(lbl.textContent.trim());
         }
-        const missing = expectedLabels.filter(l => !actualLabels.includes(l));
-        const added = actualLabels.filter(l => !expectedLabels.includes(l));
-        if (missing.length === 0 && added.length === 0) return JSON.stringify({ ok: true, count: actualLabels.length });
-        return JSON.stringify({ ok: false, count: actualLabels.length, expected: expectedLabels.length, missing, added, fields: actualLabels });
+        const expectedLabels = expectedFields.map(f => f.label);
+        const requiredLabels = expectedFields.filter(f => f.is_required).map(f => f.label);
+        const optionalLabels = expectedFields.filter(f => !f.is_required).map(f => f.label);
+        const missing_required = requiredLabels.filter(l => !actualLabels.includes(l));
+        const missing_optional = optionalLabels.filter(l => !actualLabels.includes(l));
+        const added_all = actualLabels.filter(l => !expectedLabels.includes(l));
+        const added_required = [];
+        const added_optional = [];
+        for (const lbl of added_all) {
+          let isReq = false;
+          for (const item of items) {
+            const itemLbl = item.querySelector('.el-form-item__label');
+            if (itemLbl && itemLbl.textContent.trim() === lbl) {
+              isReq = !!(item.matches('.is-required') || item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required') || /\\*/.test(lbl));
+              break;
+            }
+          }
+          if (isReq) added_required.push(lbl);
+          else added_optional.push(lbl);
+        }
+        // P2: required fields changed → form error (triggers self-heal)
+        const hasRequiredChange = missing_required.length > 0 || added_required.length > 0;
+        // P3: optional fields changed → form warning (continue)
+        const hasOptionalChange = missing_optional.length > 0 || added_optional.length > 0;
+        // P4: field order changed → form warning (continue)
+        let reordered = false;
+        if (!hasRequiredChange && !hasOptionalChange && actualLabels.length === expectedLabels.length) {
+          for (let i = 0; i < expectedLabels.length; i++) {
+            if (expectedLabels[i] !== actualLabels[i]) { reordered = true; break; }
+          }
+        }
+        return JSON.stringify({ ok: !hasRequiredChange, count: actualLabels.length, expected_count: expectedLabels.length, required_count: requiredLabels.length, optional_count: optionalLabels.length, missing_required, missing_optional, added_required, added_optional, hasRequiredChange, hasOptionalChange, reordered, fields: actualLabels });
       },
     };
   });
@@ -743,8 +771,10 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 FILL_ACTIONS = {'fill_form_field', 'fill_date_field', 'select_option', 'click_radio'}
 BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'switch_tab', 'close_dialog', 'go_to_url'}
 
-def assemble_script(action_entries, target_url=None):
-    """Assemble a complete Playwright script from recorded action entries."""
+def assemble_script(action_entries, target_url=None, form_snapshots=None):
+    """Assemble a complete Playwright script from recorded action entries.
+    form_snapshots: list of {container, fields, action_index} — one per scanned container.
+    """
     body = []
     step = 1
     in_block = False
@@ -755,24 +785,56 @@ def assemble_script(action_entries, target_url=None):
     body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
-    # Collect form snapshot for structure verification
-    form_snapshot_labels = []
-    for entry in action_entries:
-        if entry.get('action') == 'save_form_snapshot':
-            form_snapshot_labels = (entry.get('params') or {}).get('fields', [])
-            break
+    # Sort snapshots by action_index so checks inject at the right points
+    pending_checks = sorted(form_snapshots or [], key=lambda s: s.get('action_index', 0))
+    action_counter = 0  # counts through ALL entries to find injection point
 
-    if form_snapshot_labels:
-        labels_json = json.dumps(form_snapshot_labels, ensure_ascii=False)
-        body.append(f'    // Verify form structure matches recording snapshot')
-        body.append(f'    const __formCheck = await page.evaluate((l) => JSON.parse(CTRL.verifyFormStructure(l)), {labels_json});')
-        body.append(f'    if (!__formCheck.ok) {{')
-        body.append(f'      _recordError(0, "form_structure_changed", "", JSON.stringify({{ missing: __formCheck.missing, added: __formCheck.added, expected: __formCheck.expected, actual: __formCheck.count }}));')
-        body.append(f'      throw new Error("Form changed: missing=[\\"" + __formCheck.missing.join("\\",\\"") + "\\"] added=[\\"" + __formCheck.added.join("\\",\\"") + "\\"]");')
+    def _inject_form_check(fields, container, action_index):
+        """Inject a verifyFormStructure call for one container."""
+        nonlocal step
+        fields_json = json.dumps(fields, ensure_ascii=False)
+        container_label = container or 'main'
+        body.append(f'    console.log("[FORM-CHECK] Verifying container: {container_label}");')
+        body.append(f'    const __formCheck = await page.evaluate((f) => JSON.parse(CTRL.verifyFormStructure(f)), {fields_json});')
+        # P2: required field change → error, stop script
+        body.append(f'    if (__formCheck.hasRequiredChange) {{')
+        body.append(f'      const _m = __formCheck.missing_required.join(",");')
+        body.append(f'      const _a = __formCheck.added_required.join(",");')
+        body.append(f'      _recordError({step}, "form_structure_changed", "", "", "missing=[" + _m + "] added=[" + _a + "]", JSON.stringify({{')
+        body.append(f'        container: "{container_label}",')
+        body.append(f'        missing_required: __formCheck.missing_required,')
+        body.append(f'        added_required: __formCheck.added_required,')
+        body.append(f'        missing_optional: __formCheck.missing_optional,')
+        body.append(f'        added_optional: __formCheck.added_optional,')
+        body.append(f'        expected_required: __formCheck.required_count,')
+        body.append(f'        expected_optional: __formCheck.optional_count,')
+        body.append(f'        action_index: {action_index or 0}')
+        body.append(f'      }}));')
+        body.append(f'      throw new Error("Form required fields changed: missing=[" + _m + "] added=[" + _a + "]");')
         body.append(f'    }}')
+        # P3: optional field change → warning, continue
+        body.append(f'    if (__formCheck.hasOptionalChange) {{')
+        body.append(f'      _recordError({step}, "form_warning", "", "", "optional fields changed", JSON.stringify({{')
+        body.append(f'        container: "{container_label}",')
+        body.append(f'        missing_optional: __formCheck.missing_optional,')
+        body.append(f'        added_optional: __formCheck.added_optional,')
+        body.append(f'      }}));')
+        body.append(f'      console.log("[FORM-CHECK P3] WARN: Optional fields changed | missing:", JSON.stringify(__formCheck.missing_optional), "| added:", JSON.stringify(__formCheck.added_optional));')
+        body.append(f'    }}')
+        # P4: field order change → warning, continue
+        body.append(f'    if (__formCheck.reordered && !__formCheck.hasRequiredChange && !__formCheck.hasOptionalChange) {{')
+        body.append(f'      _recordError({step}, "form_warning", "", "", "field order changed", JSON.stringify({{')
+        body.append(f'        container: "{container_label}",')
+        body.append(f'        reordered: true,')
+        body.append(f'      }}));')
+        body.append(f'      console.log("[FORM-CHECK P4] WARN: Field order changed, all fields present");')
+        body.append(f'    }}')
+        body.append(f'    console.log("[FORM-CHECK] Verification passed for container: {container_label}");')
 
     for entry in action_entries:
         action = entry.get('action', '')
+        action_counter += 1
+
         if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
                       'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
                       'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
@@ -786,6 +848,10 @@ def assemble_script(action_entries, target_url=None):
 
         is_first_fill = action in FILL_ACTIONS and not in_block
         if is_first_fill:
+            # Inject any pending form checks whose action_index has been passed
+            while pending_checks and action_counter > pending_checks[0].get('action_index', 0):
+                check = pending_checks.pop(0)
+                _inject_form_check(check.get('fields', []), check.get('container', 'main'), check.get('action_index', 0))
             in_block = True
 
         code = _generate_action_code(entry, step, url, is_first_fill)
@@ -914,6 +980,7 @@ def main():
     output_path = None
     stop_before_step = None
     cdp_mode = False
+    form_snapshot_path = None
 
     # Parse remaining args
     remaining = sys.argv[2:]
@@ -924,6 +991,8 @@ def main():
         elif arg == '--partial-cdp' and remaining:
             stop_before_step = int(remaining.pop(0))
             cdp_mode = True
+        elif arg == '--form-snapshot' and remaining:
+            form_snapshot_path = remaining.pop(0)
         elif not output_path:
             output_path = arg
 
@@ -960,13 +1029,33 @@ def main():
                 if url:
                     break
 
+    # Read form snapshots array (from --form-snapshot arg, or match by action filename)
+    form_snapshots = None
+    if form_snapshot_path:
+        if os.path.exists(form_snapshot_path):
+            with open(form_snapshot_path, 'r', encoding='utf-8') as _f:
+                _fs = json.load(_f)
+            if isinstance(_fs, list):
+                form_snapshots = _fs
+    else:
+        import re as _re
+        _m = _re.search(r'action_(\d{8}_\d{6})\.json', input_path)
+        if _m:
+            _ts = _m.group(1)
+            _form_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'forms', f'form_{_ts}.json')
+            if os.path.exists(_form_path):
+                with open(_form_path, 'r', encoding='utf-8') as _f:
+                    _fs = json.load(_f)
+                if isinstance(_fs, list):
+                    form_snapshots = _fs
+
     if stop_before_step is not None:
         if cdp_mode:
             script = assemble_partial_for_cdp(actions, url, stop_before_step)
         else:
             script = assemble_partial_script(actions, url, stop_before_step)
     else:
-        script = assemble_script(actions, url)
+        script = assemble_script(actions, url, form_snapshots=form_snapshots)
 
     if output_path:
         with open(output_path, 'w', encoding='utf-8') as f:

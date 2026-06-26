@@ -40,7 +40,7 @@ def _close_agent():
         _last_agent = None
 
 
-def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
+def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, case_data_store=None):
     """Save three files:
     - action_{ts}.json  — custom action format (for script_assembler.py)
     - traj_{ts}.json    — native AgentHistoryList format (for rerun_history)
@@ -74,34 +74,11 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
         action_path = None
         log_path = None
 
-        # File 1: action_{ts}.json — recorded action calls (script generation source)
-        if entries:
-            action_path = action_dir / f"action_{ts}.json"
-            action_json = {
-                'id': str(uuid.uuid4()),
-                'name': 'browser-use-session',
-                'url': url,
-                'tests': [{
-                    'id': str(uuid.uuid4()),
-                    'name': 'browser-use-session',
-                    'commands': entries,
-                }],
-            }
-            with open(action_path, 'w', encoding='utf-8') as f:
-                json.dump(action_json, f, ensure_ascii=False, indent=2)
+        # Prepare file paths (write later, after all metadata is ready)
+        action_path = action_dir / f"action_{ts}.json" if entries else None
+        log_path = log_dir / f"log_{ts}.txt" if _recorder_log else None
 
-        # File 2: log_{ts}.txt — plain text operation log (LLM context only)
-        if _recorder_log:
-            log_path = log_dir / f"log_{ts}.txt"
-            with open(log_path, 'w', encoding='utf-8') as f:
-                f.write(f"URL: {url}\n")
-                f.write(f"Total steps: {len(_recorder_log)}\n")
-                f.write("=" * 60 + "\n")
-                for line in _recorder_log:
-                    f.write(line + "\n")
-
-        # File 3: traj_{ts}.json — native AgentHistoryList (for rerun_history self-healing)
-        # Saved directly to trajectories/ — single source of truth, no copy needed
+        # File 3: traj_{ts}.json — native AgentHistoryList
         native_path = None
         _native = None
         if cumulative_path and cumulative_path.exists():
@@ -116,6 +93,46 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
                         json.dump(_native, _f, ensure_ascii=False, indent=2)
             except Exception:
                 pass
+
+        # File 4: form_{ts}.json — form structure snapshots (for replay validation)
+        form_path = None
+        snapshots = case_data_store.get('form_snapshots') if case_data_store else None
+        if not snapshots:
+            # Fallback to single snapshot
+            single = case_data_store.get('form_snapshot') if case_data_store else None
+            snapshots = [single] if single else None
+        if snapshots:
+            forms_dir = scripts_dir / 'forms'
+            forms_dir.mkdir(parents=True, exist_ok=True)
+            form_path = forms_dir / f"form_{ts}.json"
+            with open(form_path, 'w', encoding='utf-8') as f:
+                json.dump(snapshots, f, ensure_ascii=False, indent=2)
+            sys.stderr.write(f"[session] Form snapshots saved: {form_path}\n")
+            sys.stderr.flush()
+
+        # File 1: action_{ts}.json
+        if action_path and entries:
+            action_json = {
+                'id': str(uuid.uuid4()),
+                'name': 'browser-use-session',
+                'url': url,
+                'tests': [{
+                    'id': str(uuid.uuid4()),
+                    'name': 'browser-use-session',
+                    'commands': entries,
+                }],
+            }
+            with open(action_path, 'w', encoding='utf-8') as f:
+                json.dump(action_json, f, ensure_ascii=False, indent=2)
+
+        # File 2: log_{ts}.txt
+        if log_path and _recorder_log:
+            with open(log_path, 'w', encoding='utf-8') as f:
+                f.write(f"URL: {url}\n")
+                f.write(f"Total steps: {len(_recorder_log)}\n")
+                f.write("=" * 60 + "\n")
+                for line in _recorder_log:
+                    f.write(line + "\n")
 
         # Clear all logs so next task starts fresh
         action_count = len(entries)
@@ -141,7 +158,9 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
                 "url": url,
             },
         })
-        sys.stderr.write(f"[session] Saved: action({action_count}) log({log_count}) native({native_count})\n")
+        _fcounts = [s.get('count', 0) for s in snapshots] if snapshots else []
+        _fstr = ', '.join(str(c) for c in _fcounts) if _fcounts else '0'
+        sys.stderr.write(f"[session] Saved: action({action_count}) log({log_count}) trajectory({native_count}) form({_fstr})\n")
         sys.stderr.flush()
     except Exception as e:
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
@@ -185,6 +204,8 @@ def _accumulate_trajectory(output_path, cumulative_path):
     if not output_path.exists():
         return
     try:
+        from .controller import _ACTION_LOG as _action_log
+        from .recorder import _ACTION_LOG as _recorder_log
         with open(output_path, 'r', encoding='utf-8') as _f:
             _step = json.load(_f)
         _step_history = _step.get('history', [])
@@ -200,7 +221,7 @@ def _accumulate_trajectory(output_path, cumulative_path):
         with open(cumulative_path, 'w', encoding='utf-8') as _f:
             json.dump(_cum, _f, ensure_ascii=False, indent=2)
         sys.stderr.write(
-            f"[session] Accumulated {len(_step_history)} actions to case trajectory ({len(_cum['history'])} total)\n")
+            f"[session] Accumulated: action({len(_step_history)}) log({len(_recorder_log)}) trajectory({len(_cum['history'])} total)\n")
         sys.stderr.flush()
     except Exception as _e:
         sys.stderr.write(f"[session] Accumulate error: {_e}\n")
@@ -320,7 +341,7 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref):
         if event == "close":
             await stdin_queue.put(None)
             break
-        if agent_running_ref['value'] and event in ("reset_trajectory", "cancel_step"):
+        if agent_running_ref['value'] and event == "cancel_step":
             continue
         await stdin_queue.put(msg)
 
@@ -329,16 +350,18 @@ def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_r
     event = msg.get("event")
 
     if event == "save_trajectory":
-        _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'])
+        _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'], case_data_store=session_state.get('case_data_store'))
         return 'continue'
 
     if event == "save_case_data":
         _handle_save_case_data(session_state['case_data_store'], session_state['session_id'])
-        if event == "reset_trajectory":
-            cum_path = _handle_reset_trajectory(session_state['session_id'])
-            session_state['cumulative_path'] = cum_path
-            session_state['case_data_store'].clear()
-            return 'continue'
+        return 'continue'
+
+    if event == "reset_trajectory":
+        cum_path = _handle_reset_trajectory(session_state['session_id'])
+        session_state['cumulative_path'] = cum_path
+        session_state['case_data_store'].clear()
+        return 'continue'
 
     if event == "intervene":
         instruction = msg.get("data", {}).get("instruction", "")

@@ -86,6 +86,28 @@ JS_GET_CONTAINER = '''(() => {
     return document;
 })()'''
 
+JS_IDENTIFY_CONTAINER = '''(() => {
+    const c = ''' + JS_GET_CONTAINER + ''';
+    if (c === document) return 'main';
+    if (c.classList.contains('el-dialog')) {
+        const t = (c.querySelector('.el-dialog__title')?.textContent || '').trim() || 'unnamed';
+        return 'dialog:' + t;
+    }
+    if (c.classList.contains('el-drawer')) {
+        const l = c.getAttribute('aria-label') || 'unnamed';
+        return 'drawer:' + l;
+    }
+    const tp = c.closest('.el-tab-pane');
+    if (tp) {
+        const tabs = tp.closest('.el-tabs');
+        if (tabs) {
+            const a = tabs.querySelector('.el-tabs__item.is-active');
+            if (a) return 'tab:' + a.textContent.trim();
+        }
+    }
+    return 'unknown:' + (c.tagName || 'unknown');
+})()'''
+
 JS_NATIVE_SETTER = ''  # Inlined in JS_FILL_FORM_FIELD
 
 JS_CHECK_LOADING = '''() => {
@@ -506,7 +528,14 @@ JS_SCAN_FORM_FIELDS = '''(quick) => {
         // Read disabled: DOM → ARIA
         let disabled = !!(inputEl?.disabled || trigger?.disabled || inputEl?.readOnly);
         if (!disabled) disabled = item.querySelector('[aria-disabled="true"]') !== null;
-        const required = !!item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required');
+        // Three-level required detection
+        // L1: Element UI standard class (on item itself + children)
+        const hasRequiredClass = !!(item.matches('.is-required') || item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required'));
+        // L2: asterisk in label text (handwritten / custom component)
+        const hasAsterisk = /\\*/.test(label);
+        // L3: native HTML required attr or aria-required
+        const hasNativeRequired = (inputEl?.required) || (inputEl?.getAttribute('aria-required') === 'true');
+        const required = hasRequiredClass || hasAsterisk || hasNativeRequired;
         const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
         let options = [];
         if (kind === 'select') {
@@ -525,7 +554,32 @@ JS_SCAN_FORM_FIELDS = '''(quick) => {
             break;
         }
     }
-    const result = { fields, notification };
+    const containerId = (() => {
+        const c = (() => {
+            for (const d of document.querySelectorAll('.el-dialog')) if (d.offsetParent !== null) return d;
+            for (const d of document.querySelectorAll('.el-drawer')) if (d.offsetParent !== null) return d;
+            return document;
+        })();
+        if (c === document) return 'main';
+        if (c.classList.contains('el-dialog')) {
+            const t = (c.querySelector('.el-dialog__title')?.textContent || '').trim() || 'unnamed';
+            return 'dialog:' + t;
+        }
+        if (c.classList.contains('el-drawer')) {
+            const l = c.getAttribute('aria-label') || 'unnamed';
+            return 'drawer:' + l;
+        }
+        const tp = c.closest('.el-tab-pane');
+        if (tp) {
+            const tabs = tp.closest('.el-tabs');
+            if (tabs) {
+                const a = tabs.querySelector('.el-tabs__item.is-active');
+                if (a) return 'tab:' + a.textContent.trim();
+            }
+        }
+        return 'unknown';
+    })();
+    const result = { container: containerId, fields, notification };
     const json = JSON.stringify(result, null, 2);
     console.log('[AI填表] ====== 扫描的表单字段 ======');
     console.log(json);
@@ -774,7 +828,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             return _ok(f'verified:{current}')
         return _err(f'mismatch | current:{current} | expected:{expected}')
 
-    @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Use this ONCE at the start to build the task list. Returns {fields: [...], notification: {visible, text}|null}.')
+    @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Use this ONCE at the start to build the task list. Auto-saves form structure snapshot for replay validation. Returns {fields: [...], notification: {visible, text}|null}.')
     async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -790,6 +844,44 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 _merge_ax_text(dom_fields, ax_text)
         except Exception:
             pass
+
+        # Auto-save form structure snapshot (built into scan — no separate LLM call needed)
+        container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
+        entries = []
+        required_count = 0
+        optional_count = 0
+        for f in dom_fields:
+            label = f.get('label', '').strip()
+            if not label:
+                continue
+            is_req = f.get('required', False)
+            entries.append({'label': label, 'is_required': is_req})
+            if is_req:
+                required_count += 1
+            else:
+                optional_count += 1
+        snapshot_entry = {
+            'container': container_id,
+            'fields': entries,
+            'count': len(entries),
+            'required_count': required_count,
+            'optional_count': optional_count,
+            'action_index': len(_ACTION_LOG),
+        }
+        # Append to array (dedup by container), keep single-key for backward compat
+        snapshots = case_data_store.get('form_snapshots', [])
+        replaced = False
+        for i, s in enumerate(snapshots):
+            if s.get('container') == container_id:
+                snapshots[i] = snapshot_entry
+                replaced = True
+                break
+        if not replaced:
+            snapshots.append(snapshot_entry)
+        case_data_store['form_snapshots'] = snapshots
+        case_data_store['form_snapshot'] = snapshot_entry
+        _record_action('save_form_snapshot', snapshot_entry)
+
         result_out = result if isinstance(result, dict) else {'fields': dom_fields, 'notification': None}
         return json.dumps(result_out, ensure_ascii=False, indent=2)
 
@@ -837,17 +929,50 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             })
         case_data_store['task_list'] = {'pending': pending, 'done': []}
         case_data_store['_scan_fields'] = fields
-        return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending[:5], ensure_ascii=False))
-        return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending, ensure_ascii=False))
+        if len(pending) <= 5:
+            return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending, ensure_ascii=False))
+        return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending[:5], ensure_ascii=False) + ' ...')
 
-    @controller.action('Save form structure snapshot for replay validation. Call after init_task_list, before fill_pending_batch. Records field labels + count so assembled scripts can verify the form has not changed.')
+    @controller.action('Save form structure snapshot for replay validation. Call after init_task_list, before fill_pending_batch. Records per-field metadata (label + is_required) with separate required/optional counts so assembled scripts can grade changes by severity.')
     async def save_form_snapshot():
+        page = await browser_context.get_current_page()
+        container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         fields = case_data_store.get('_scan_fields', [])
-        labels = [f.get('label', '') for f in fields if f.get('label', '').strip()]
-        snapshot = {'fields': labels, 'count': len(labels)}
-        case_data_store['form_snapshot'] = snapshot
-        _record_action('save_form_snapshot', {'fields': labels, 'count': len(labels)})
-        return _ok(f'form-snapshot | count:{len(labels)}')
+        entries = []
+        required_count = 0
+        optional_count = 0
+        for f in fields:
+            label = f.get('label', '').strip()
+            if not label:
+                continue
+            is_req = f.get('required', False)
+            entries.append({'label': label, 'is_required': is_req})
+            if is_req:
+                required_count += 1
+            else:
+                optional_count += 1
+        snapshot_entry = {
+            'container': container_id,
+            'fields': entries,
+            'count': len(entries),
+            'required_count': required_count,
+            'optional_count': optional_count,
+            'action_index': len(_ACTION_LOG),
+        }
+        # Append to array (dedup by container), keep single-key for backward compat
+        snapshots = case_data_store.get('form_snapshots', [])
+        replaced = False
+        for i, s in enumerate(snapshots):
+            if s.get('container') == container_id:
+                snapshots[i] = snapshot_entry
+                replaced = True
+                break
+        if not replaced:
+            snapshots.append(snapshot_entry)
+        case_data_store['form_snapshots'] = snapshots
+        case_data_store['form_snapshot'] = snapshot_entry
+        _record_action('save_form_snapshot', snapshot_entry)
+        return _ok(f'form-snapshot | container:{container_id} | count:{len(entries)}')
 
     def _task_done_impl(label_text):
         tl = case_data_store.get('task_list')
@@ -946,6 +1071,14 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if not pending:
             return _ok('nothing-pending')
 
+        # Annotate pending items with user-specified values from case_data_store
+        for item in pending:
+            lbl = item['label'] if isinstance(item, dict) else item
+            user_val = case_data_store.get(lbl)
+            if user_val and str(user_val).strip():
+                if isinstance(item, dict):
+                    item['commandValue'] = str(user_val).strip()
+
         # Build label→kind lookup
         label_kind = {}
         for item in pending:
@@ -970,7 +1103,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 sub = group[i:i+20]
 
                 # Phase 1: Let LLM generate values for this sub-batch
-                actions = _llm_generate_values(llm, sub)
+                actions = _llm_generate_values(llm, sub, form_rules=form_rules, case_data_store=case_data_store)
 
                 # Phase 2: Execute each action
                 for a in actions:
@@ -1373,14 +1506,17 @@ def _register_misc_actions(controller, browser_context):
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(action_json, f, ensure_ascii=False, indent=2)
 
-            # Write form structure snapshot if available
-            snapshot = case_data_store.get('form_snapshot')
-            if snapshot:
+            # Write form structure snapshots if available (prefer array, fall back to single)
+            snapshots = case_data_store.get('form_snapshots')
+            if not snapshots:
+                single = case_data_store.get('form_snapshot')
+                snapshots = [single] if single else None
+            if snapshots:
                 forms_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'forms')
                 os.makedirs(forms_dir, exist_ok=True)
                 form_path = os.path.join(forms_dir, f'form_{ts}.json')
                 with open(form_path, 'w', encoding='utf-8') as f:
-                    json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                    json.dump(snapshots, f, ensure_ascii=False, indent=2)
                 action_json['form_snapshot'] = f'scripts/forms/form_{ts}.json'
 
             count = len(_ACTION_LOG)
@@ -1599,48 +1735,100 @@ FILL_FORM_SYSTEM_PROMPT = '''你是一个表单填写助手。根据字段列表
 - select_option: 选择下拉框，参数 {"action":"select_option","label":"字段标签","option":"要选的选项"}
 
 规则：
-- 每个字段都必须返回一个动作，不要跳过
-- 标签包含"姓名""名称""简称"→常见中文名称（如"测试企业有限公司""张三"）
-- 标签包含"手机""电话"→11位手机号
-- 标签包含"身份证"→18位身份证号
-- 标签包含"邮箱""Email"→合法邮箱
-- 标签包含"金额""收入""资产"→合理数值（如"5000000"）
-- 标签包含"人数"→正整数
-- 标签包含"邮编"→6位数字
-- 标签包含"地址"→完整中文地址
-- 标签包含"日期"→日期格式 YYYY-MM-DD
-- 标签包含"代码"→合理编号
-- 标签包含"账号"→银行账号格式
-- 标签包含"开户行"→银行名称
-- 标签包含"备注"→简短测试备注
-- 下拉框从 options 列表中选值
+- commandValue 标记的字段：用户已指定值，直接使用 commandValue 填入，不要修改或重新生成
+- 无 commandValue 的 input/date 字段：按 form_rules 规则生成合法随机值：
+  - 标签含"姓名""名称""简称"→常见中文名称（如"测试企业有限公司""张三"）
+  - 标签含"手机""电话"→11位手机号
+  - 标签含"身份证"→18位身份证号（含校验位）
+  - 标签含"邮箱""Email"→合法邮箱地址
+  - 标签含"金额""收入""资产"→合理数值（如"5000000"）
+  - 标签含"人数"→正整数
+  - 标签含"邮编"→6位数字
+  - 标签含"地址"→完整中文地址
+  - 标签含"日期"→日期格式 YYYY-MM-DD
+  - 标签含"代码""编号"→合理编号（含校验位）
+  - 标签含"证件号码""信用代码""营业执照"→合法统一社会信用代码（18位，含校验位）
+  - 标签含"账号"→银行账号格式
+  - 标签含"开户行"→银行名称
+  - 标签含"备注"→简短测试备注
+- 无 commandValue 的 select/radio/checkbox：结合字段标签语义，从 options 列表中选取最合理的选项（如"对公客户类型"→"企业类"，"证件类型"→"统一社会信用代码"）
 - 只返回 JSON 数组，不要解释'''
 
-def _llm_generate_values(llm, items, instruction="生成合理的测试数据"):
-    """Call LLM to generate values for a batch of form fields."""
+
+def _llm_generate_values(llm, items, form_rules=None, case_data_store=None, instruction="生成合理的测试数据"):
+    """Generate values for form fields with three-tier priority:
+    1. User-provided data (from case_data_store)
+    2. form_rules.py generators — match_rule() for input/date fields
+    3. LLM autonomous decision — for remaining fields (select picks from options, input generates smart values)"""
+    actions = []
+    llm_fields = []
+
+    for item in items:
+        label = item['label'] if isinstance(item, dict) else item
+        kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
+        opts = item.get('options', []) if isinstance(item, dict) else []
+
+        # —— Priority 1: User-specified commandValue ——
+        cmd_val = item.get('commandValue') if isinstance(item, dict) else None
+        if cmd_val and str(cmd_val).strip():
+            val = str(cmd_val).strip()
+            if kind in ('select', 'radio', 'checkbox'):
+                if kind == 'select' and opts and val not in opts:
+                    pass  # Fall through if user value isn't in current options
+                else:
+                    actions.append({'action': 'select_option', 'label': label, 'option': val})
+                    continue
+            else:
+                actions.append({'action': 'fill_input', 'label': label, 'value': val})
+                continue
+
+        # —— Priority 2: form_rules.py generators (input/date only) ——
+        if kind in ('input', 'date') and form_rules:
+            generated = match_rule(label, form_rules)
+            if generated:
+                actions.append({'action': 'fill_input', 'label': label, 'value': generated})
+                continue
+
+        # —— Priority 3: Defer to LLM ——
+        llm_fields.append(item)
+
+    if not llm_fields:
+        return actions
+
+    # No LLM available — basic fallback heuristics
     if not llm:
-        # Fallback without LLM — use very basic heuristics
-        actions = []
-        for item in items:
+        for item in llm_fields:
             label = item['label'] if isinstance(item, dict) else item
             kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
-            if kind == 'select':
-                opts = item.get('options', []) if isinstance(item, dict) else []
-                actions.append({'action': 'select_option', 'label': label, 'option': opts[0] if opts else '测试'})
+            opts = item.get('options', []) if isinstance(item, dict) else []
+            if kind in ('select', 'radio', 'checkbox'):
+                # Pick first non-placeholder option
+                picked = ''
+                for o in opts:
+                    if o and o not in ('请选择', '请输入', '全部', ''):
+                        picked = o
+                        break
+                if not picked and opts:
+                    picked = opts[0]
+                actions.append({'action': 'select_option', 'label': label, 'option': picked or '测试'})
             else:
                 actions.append({'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'})
         return actions
 
+    # —— Build prompt for LLM ——
     field_lines = []
-    for i, item in enumerate(items):
+    for i, item in enumerate(llm_fields):
         label = item['label'] if isinstance(item, dict) else item
         kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
         line = f'{i+1}. label: "{label}", kind: {kind}'
         if isinstance(item, dict):
+            if item.get('commandValue'):
+                line += f', commandValue: "{item["commandValue"]}"'
             if item.get('options'):
                 target = item['options']
                 opts = target if isinstance(target, list) else json.loads(target) if isinstance(target, str) else []
-                line += f', options: [{", ".join(f'"{o}"' for o in opts)}]'
+                opts_str = ', '.join('"' + str(o) + '"' for o in opts)
+                line += f', options: [{opts_str}]'
             if item.get('placeholder') and item['placeholder'] not in ('请选择', '请输入', ''):
                 line += f', placeholder: "{item["placeholder"]}"'
         field_lines.append(line)

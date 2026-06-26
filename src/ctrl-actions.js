@@ -269,7 +269,8 @@ const CTRL_OBJECT = `{
     }
     return 'row-not-found';
   },
-  verifyFormStructure: (expectedLabels) => {
+  verifyFormStructure: (expectedFields) => {
+    // expectedFields: [{label, is_required}, ...] from save_form_snapshot
     const container = CTRL.getContainer();
     const items = container.querySelectorAll('.el-form-item');
     const actualLabels = [];
@@ -277,10 +278,58 @@ const CTRL_OBJECT = `{
       const lbl = item.querySelector('.el-form-item__label');
       if (lbl) actualLabels.push(lbl.textContent.trim());
     }
-    const missing = expectedLabels.filter(l => !actualLabels.includes(l));
-    const added = actualLabels.filter(l => !expectedLabels.includes(l));
-    if (missing.length === 0 && added.length === 0) return JSON.stringify({ ok: true, count: actualLabels.length });
-    return JSON.stringify({ ok: false, count: actualLabels.length, expected: expectedLabels.length, missing, added, fields: actualLabels });
+
+    const expectedLabels = expectedFields.map(f => f.label);
+    const requiredLabels = expectedFields.filter(f => f.is_required).map(f => f.label);
+    const optionalLabels = expectedFields.filter(f => !f.is_required).map(f => f.label);
+
+    // Classify missing by severity
+    const missing_required = requiredLabels.filter(l => !actualLabels.includes(l));
+    const missing_optional = optionalLabels.filter(l => !actualLabels.includes(l));
+
+    // Classify added: check each actual label against expected
+    const added_all = actualLabels.filter(l => !expectedLabels.includes(l));
+    // Added fields: check if required (→ P2 error) or optional (→ P3 warning)
+    const added_required = [];
+    const added_optional = [];
+    for (const lbl of added_all) {
+      // Find the el-form-item for this label
+      let isReq = false;
+      for (const item of items) {
+        const itemLbl = item.querySelector('.el-form-item__label');
+        if (itemLbl && itemLbl.textContent.trim() === lbl) {
+          isReq = !!(item.matches('.is-required') || item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required') || /\*/.test(lbl));
+          break;
+        }
+      }
+      if (isReq) added_required.push(lbl);
+      else added_optional.push(lbl);
+    }
+
+    // P2: required fields changed → form error (triggers self-heal)
+    const hasRequiredChange = missing_required.length > 0 || added_required.length > 0;
+    // P3: optional fields changed → form warning (continue)
+    const hasOptionalChange = missing_optional.length > 0 || added_optional.length > 0;
+
+    // P4: field order changed → form warning (continue)
+    let reordered = false;
+    if (!hasRequiredChange && !hasOptionalChange && actualLabels.length === expectedLabels.length) {
+      for (let i = 0; i < expectedLabels.length; i++) {
+        if (expectedLabels[i] !== actualLabels[i]) { reordered = true; break; }
+      }
+    }
+
+    return JSON.stringify({
+      ok: !hasRequiredChange,
+      count: actualLabels.length,
+      expected_count: expectedLabels.length,
+      required_count: requiredLabels.length,
+      optional_count: optionalLabels.length,
+      missing_required, missing_optional,
+      added_required, added_optional,
+      hasRequiredChange, hasOptionalChange, reordered,
+      fields: actualLabels
+    });
   },
 }`;
 /**
