@@ -788,41 +788,45 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
     # Sort snapshots by action_index so checks inject at the right points
     pending_checks = sorted(form_snapshots or [], key=lambda s: s.get('action_index', 0))
     action_counter = 0  # counts through ALL entries to find injection point
+    _check_idx = [0]  # mutable counter for unique variable names
 
     def _inject_form_check(fields, container, action_index):
         """Inject a verifyFormStructure call for one container."""
         nonlocal step
+        idx = _check_idx[0]
+        _check_idx[0] += 1
         fields_json = json.dumps(fields, ensure_ascii=False)
         container_label = container or 'main'
+        v = f'__fc{idx}'  # unique variable name per check
         body.append(f'    console.log("[FORM-CHECK] Verifying container: {container_label}");')
-        body.append(f'    const __formCheck = await page.evaluate((f) => JSON.parse(CTRL.verifyFormStructure(f)), {fields_json});')
+        body.append(f'    const {v} = await page.evaluate((f) => JSON.parse(CTRL.verifyFormStructure(f)), {fields_json});')
         # P2: required field change → error, stop script
-        body.append(f'    if (__formCheck.hasRequiredChange) {{')
-        body.append(f'      const _m = __formCheck.missing_required.join(",");')
-        body.append(f'      const _a = __formCheck.added_required.join(",");')
+        body.append(f'    if ({v}.hasRequiredChange) {{')
+        body.append(f'      const _m = {v}.missing_required.join(",");')
+        body.append(f'      const _a = {v}.added_required.join(",");')
         body.append(f'      _recordError({step}, "form_structure_changed", "", "", "missing=[" + _m + "] added=[" + _a + "]", JSON.stringify({{')
         body.append(f'        container: "{container_label}",')
-        body.append(f'        missing_required: __formCheck.missing_required,')
-        body.append(f'        added_required: __formCheck.added_required,')
-        body.append(f'        missing_optional: __formCheck.missing_optional,')
-        body.append(f'        added_optional: __formCheck.added_optional,')
-        body.append(f'        expected_required: __formCheck.required_count,')
-        body.append(f'        expected_optional: __formCheck.optional_count,')
+        body.append(f'        missing_required: {v}.missing_required,')
+        body.append(f'        added_required: {v}.added_required,')
+        body.append(f'        missing_optional: {v}.missing_optional,')
+        body.append(f'        added_optional: {v}.added_optional,')
+        body.append(f'        expected_required: {v}.required_count,')
+        body.append(f'        expected_optional: {v}.optional_count,')
         body.append(f'        action_index: {action_index or 0}')
         body.append(f'      }}));')
         body.append(f'      throw new Error("Form required fields changed: missing=[" + _m + "] added=[" + _a + "]");')
         body.append(f'    }}')
         # P3: optional field change → warning, continue
-        body.append(f'    if (__formCheck.hasOptionalChange) {{')
+        body.append(f'    if ({v}.hasOptionalChange) {{')
         body.append(f'      _recordError({step}, "form_warning", "", "", "optional fields changed", JSON.stringify({{')
         body.append(f'        container: "{container_label}",')
-        body.append(f'        missing_optional: __formCheck.missing_optional,')
-        body.append(f'        added_optional: __formCheck.added_optional,')
+        body.append(f'        missing_optional: {v}.missing_optional,')
+        body.append(f'        added_optional: {v}.added_optional,')
         body.append(f'      }}));')
-        body.append(f'      console.log("[FORM-CHECK P3] WARN: Optional fields changed | missing:", JSON.stringify(__formCheck.missing_optional), "| added:", JSON.stringify(__formCheck.added_optional));')
+        body.append(f'      console.log("[FORM-CHECK P3] WARN: Optional fields changed | missing:", JSON.stringify({v}.missing_optional), "| added:", JSON.stringify({v}.added_optional));')
         body.append(f'    }}')
         # P4: field order change → warning, continue
-        body.append(f'    if (__formCheck.reordered && !__formCheck.hasRequiredChange && !__formCheck.hasOptionalChange) {{')
+        body.append(f'    if ({v}.reordered && !{v}.hasRequiredChange && !{v}.hasOptionalChange) {{')
         body.append(f'      _recordError({step}, "form_warning", "", "", "field order changed", JSON.stringify({{')
         body.append(f'        container: "{container_label}",')
         body.append(f'        reordered: true,')
