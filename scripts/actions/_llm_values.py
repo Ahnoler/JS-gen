@@ -135,11 +135,11 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
         parsed = json.loads(text)
         if isinstance(parsed, dict) and 'actions' in parsed:
             parsed = parsed['actions']
-        return parsed if isinstance(parsed, list) else []
+        llm_result = parsed if isinstance(parsed, list) else []
+        return actions + llm_result  # P1+P2 + LLM result
     except Exception:
-        # Fallback
-        actions = []
-        for item in items:
+        # Fallback — preserve P1+P2 actions, fill remaining with defaults
+        for item in llm_fields:
             label = item['label'] if isinstance(item, dict) else item
             kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
             if kind == 'select':

@@ -588,7 +588,10 @@ JS_SCAN_FORM_FIELDS = '''async (quick) => {
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
     const scanTime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    console.log('[AI填表] ====== 扫描的表单字段 ====== ' + scanTime);
+    const summary = { input:0, select:0, date:0, radio:0, checkbox:0, unknown:0, total:fields.length };
+    fields.forEach(f => { if (summary[f.kind] !== undefined) summary[f.kind]++; });
+    console.log('[AI填表] ====== 扫描的表单字段 ====== ' + scanTime + ' | ' +
+        `input:${summary.input} select:${summary.select} date:${summary.date} radio:${summary.radio} checkbox:${summary.checkbox} total:${summary.total}`);
     console.log(json);
     return json;
 }'''

@@ -17,7 +17,7 @@ from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER,
     JS_CHECK_SINGLE_FIELD, JS_SCAN_FORM_FIELDS,
     JS_FILL_FORM_FIELD, JS_FILL_DATE_FIELD,
-    JS_FIND_LABELED_SELECT, JS_SELECT_OPTION, JS_LOCATOR,
+    JS_FIND_LABELED_SELECT, JS_FIND_OPTION, JS_SELECT_OPTION, JS_LOCATOR,
     JS_CLICK_RADIO,
 )
 from ._llm_values import _llm_generate_values
@@ -323,6 +323,17 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         label_kind: dict[str, str] = {item.label: item.kind for item in pending}
 
+        # 打印待填写统计
+        kind_counts: dict[str, int] = {}
+        for item in pending:
+            k = item.kind
+            kind_counts[k] = kind_counts.get(k, 0) + 1
+        summary_parts = ' '.join(f'{k}:{v}' for k, v in sorted(kind_counts.items()))
+        await page.evaluate(
+            's => console.log("[AI填表] 预计填写: " + s)',
+            f'{len(pending)}个字段 | {summary_parts}',
+        )
+
         # 按 kind 分组，多次调用 LLM
         KIND_ORDER = {'select': 0, 'input': 1, 'date': 2, 'radio': 3, 'checkbox': 4}
         groups: dict[int, list[dict]] = {}
@@ -337,14 +348,25 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 continue
 
             # Step 1: LLM 规划（按分组调用）
-            actions = _llm_generate_values(llm, sub, form_rules=form_rules, case_data_store=case_data_store)
+            kind_name = {0:'select',1:'input',2:'date',3:'radio',4:'checkbox'}.get(idx, 'other')
             await page.evaluate(
-                'd => console.log("[AI填表] LLM 返回的动作 ======\\n" + JSON.stringify(d))',
+                's => console.log("[AI填表] 分组 " + s)',
+                f'{kind_name}: {len(sub)}个字段',
+            )
+            # sub 包含此组所有 pending 字段，_llm_generate_values 内部按三级优先级处理：
+            #   P1 commandValue → P2 form_rules → P3 LLM/fallback
+            # 返回的 actions 已包含 P1+P2+P3 全部结果
+            actions = _llm_generate_values(llm, sub, form_rules=form_rules, case_data_store=case_data_store)
+            # 打印完整动作列表（P1+P2+P3），确保数量与 pending 一致
+            await page.evaluate(
+                'd => console.log("[AI填表] 所有动作(" + d.length + "): " + JSON.stringify(d.map(a => a.label + "=" + (a.value||a.option||""))))',
                 actions,
             )
 
             # Step 2: 逐个执行
             total = len(actions)
+            ok_in_group = 0
+            fail_in_group = 0
             for i, a in enumerate(actions):
                 label = a.get('label', '')
                 kind = (a.get('action') or '').lower().replace('-', '_')
@@ -387,24 +409,34 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 all_results.append(entry)
 
                 if ok:
-                    # 成功 → 记录 action + 标记 done
+                    ok_in_group += 1
                     if kind in ('fill_input', 'fill', 'input'):
                         _record_action('fill_form_field', {'label_text': label, 'value': value}, result)
                     elif kind in ('select_option', 'select', 'option'):
                         _record_action('select_option', {'label_text': label, 'option_text': value}, result)
                     _task_done_impl(label, case_data_store)
-                    # 同步写入 action 日志确认
                     sys.stderr.write(f'[auto-fill] recorded: {kind} "{label}" = {value} (total: {len(_ACTION_LOG)})\n')
                     sys.stderr.flush()
-                # 失败 → 不标记 done，留在 pending 供 agent 手动处理
+                    # 进度日志：每步都打印
+                    status = 'ok' if ok else f'FAILED:{result}'
+                    await page.evaluate(
+                        'o => console.log("[AI填表] 执行进度 ======\\n" + o)',
+                        f'{step_num}/{total} {kind} "{label}" → {status}',
+                    )
+                else:
+                # 失败 → 不标记 done，留在 pending
+                    fail_in_group += 1
+                    await page.evaluate(
+                        'o => console.log("[AI填表] FAIL: " + o)',
+                        f'{step_num}/{total} {kind} "{label}" → {result}',
+                    )
 
-                # 进度日志
-                status = 'ok' if ok else ('FAILED: ' + result)
-                await page.evaluate(
-                    'o => console.log("[AI填表] 执行进度 ======\\n" + o)',
-                    f'{step_num}/{total} {kind} "{label}" → {status}',
-                )
-                await page.wait_for_timeout(400)
+                await page.wait_for_timeout(300)
+
+            await page.evaluate(
+                's => console.log("[AI填表] 本组完成: " + s)',
+                f'{total}个动作 | ok:{ok_in_group} failed:{fail_in_group}',
+            )
 
         # Step 3: 完成
         ok_count = sum(1 for r in all_results if r['result'].startswith('ok') or r['result'].startswith('already'))
