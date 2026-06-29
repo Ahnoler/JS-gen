@@ -221,7 +221,7 @@ def _accumulate_trajectory(output_path, cumulative_path):
         with open(cumulative_path, 'w', encoding='utf-8') as _f:
             json.dump(_cum, _f, ensure_ascii=False, indent=2)
         sys.stderr.write(
-            f"[session] Accumulated: action({len(_step_history)}) log({len(_recorder_log)}) trajectory({len(_cum['history'])} total)\n")
+            f"[session] Accumulated: step({len(_step_history)}) action({len(_action_log)}) log({len(_recorder_log)}) trajectory({len(_cum['history'])} total)\n")
         sys.stderr.flush()
     except Exception as _e:
         sys.stderr.write(f"[session] Accumulate error: {_e}\n")

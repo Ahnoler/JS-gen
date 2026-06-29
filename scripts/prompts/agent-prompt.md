@@ -46,13 +46,12 @@
 ## 任务列表动作
 - **`scan_form_fields()` — 全面扫描 ALL 字段。开始时使用 ONCE 来了解整个表单，然后调用 `init_task_list()`。**
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
-- init_task_list(scan_json) — 从扫描结果创建待办/已完成列表。自动跳过已填写/禁用的字段。传入完整的扫描结果。
-- **fill_pending_batch() — 批量填写所有待办字段，按类型分组（select→input→date→radio→checkbox）。自动调用 task_done。在 init_task_list 之后使用。**
+- **init_task_list(scan_json) — 从扫描结果创建待办/已完成列表并自动批量填写。调用后无需手动逐字段填写——系统通过 LLM 表单助手自动生成值、填写、记录 action。**
   **填表值优先级（三级降级）：**
-  1. **用户明确数据** — 若任务指令中指定了字段值（如"客户名称=新创科技"），优先使用；系统会从 case_data_store 中查找
-  2. **智能生成（form_rules）** — input/date 字段调用 match_form_rule 生成合法随机值（身份证号、手机号、信用代码等）
-  3. **LLM 自主决策** — select 从 options 中按标签语义选取最合理选项；其余 input 字段按标签语义生成测试数据
-- fill_form_fields_batch(fields_json) — 填写最多10个指定字段：[{"action":"fill_input","label":"...","value":"..."}, ...]。用于指定特定值。
+  1. **用户明确数据** — 若任务指令中指定了字段值，优先使用
+  2. **智能生成（form_rules）** — input/date 字段自动生成合法随机值
+  3. **LLM 自主决策** — select 从 options 中按标签语义选取最合理选项
+- fill_form_fields_batch(fields_json) — 手动指定值批量填写：[{"action":"fill_input","label":"...","value":"..."}, ...]。
 - task_done(label) — 将字段标记为已完成。
 - task_retry(label) — 将字段重新加入待办。
 - get_pending_tasks() — 返回 {"pending": [...], "done": [...]}。
@@ -71,21 +70,17 @@
 当你遇到包含多个字段的表单弹窗/抽屉时，使用任务列表系统来跟踪进度，避免冗余操作。
 
 **工作流程：**
-1. **全面扫描：** 调用一次 `scan_form_fields()`。结果保存在 memory 中作为任务列表参考。
-2. **初始化任务列表：** 调用 `init_task_list(scan_json)`。待办列表中存储完整的字段对象 `{label, kind, currentValue, options, placeholder, disabled, required}`。自动跳过已填写/禁用的字段。
-3. **规划：** 调用 `get_pending_tasks()` — 返回 `{pending: [{label,kind,options,...}], done: [...]}`。读取 kind/options 来规划操作和值。
-4. **填写：** 调用 `fill_pending_batch()` — 按类型分组（select→input→date→radio→checkbox），使用第一个选项/placeholder/测试数据填充。自动 task_done。
-5. **检查：** 调用 `scan_visible_fields()` 检查通知/错误（输出量小得多）。
-6. **提交：** 当 `get_pending_tasks().pending` 为空时，提交。
-7. **错误处理：** 调用 `sync_tasks_from_errors()` 从 `.el-form-item__error` 重新加入出错字段。
+1. **全面扫描：** 调用一次 `scan_form_fields()`。
+2. **初始化+自动填写：** 调用 `init_task_list(scan_json)`。系统自动完成全部字段填写、action 记录、任务标记，无需手动逐字段操作。
+3. **检查：** 调用 `scan_visible_fields()` 检查通知/错误。
+4. **提交：** 调用 `get_pending_tasks()` 确认无待办后提交。
+5. **错误处理：** 调用 `sync_tasks_from_errors()` 从 `.el-form-item__error` 重新加入出错字段，手动修复后 task_done。
 
 **示例：**
 ```
 # 弹窗打开
-scan_form_fields() → 完整字段列表（自动保存表单快照）
-init_task_list(scan_json) → "pending:4"
-save_form_snapshot() → stores field count for replay validation
-fill_pending_batch() → "all done"
+scan_form_fields() → 完整字段列表
+init_task_list(scan_json) → "auto-filled:4 remaining:0"
 get_pending_tasks() → "pending:[], done:[...]"
 
 # 提交失败 → 可见字段扫描

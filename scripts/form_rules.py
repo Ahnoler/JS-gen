@@ -122,8 +122,9 @@ def load_rules(script_dir=None):
                 kws = [k.strip() for k in keywords_str.replace('、', ',').split(',') if k.strip()]
                 if not kws:
                     continue
-                # Generate value based on spec
-                rule_text = f"{spec} — {row[2].strip()}" if row[2].strip() else spec
+                # Use example value (row[2]) as the generated value, fall back to spec
+                example = row[2].strip() if len(row) > 2 else ''
+                rule_text = example if example else spec
                 rules.append((kws, lambda s=rule_text: s))
         except Exception as e:
             sys.stderr.write(f"[rules] Failed to parse agent-field-rules.md: {e}\n")
