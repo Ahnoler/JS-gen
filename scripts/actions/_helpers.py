@@ -14,7 +14,7 @@ from ._js_snippets import (
     JS_CHECK_LOADING, JS_WAIT_LOADING,
     JS_SMART_LOCATOR, JS_LOCATOR,
 )
-from .models import ScannedField
+from ..models import ScannedField
 
 
 def _ok(msg):

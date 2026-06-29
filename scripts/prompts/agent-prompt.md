@@ -44,13 +44,9 @@
 - click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。如果字段已有值则返回 "already-filled" — 跳过。
 
 ## 任务列表动作
-- **`scan_form_fields()` — 全面扫描 ALL 字段。开始时使用 ONCE 来了解整个表单，然后调用 `init_task_list()`。**
+- **`scan_form_fields()` — 🚨 遇到表单弹窗/抽屉时，第一个调用的操作。自动扫描全部字段、初始化任务列表、批量填写所有待办字段。调用后无需手动逐字段填写。**
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
-- **init_task_list(scan_json) — 从扫描结果创建待办/已完成列表并自动批量填写。调用后无需手动逐字段填写——系统通过 LLM 表单助手自动生成值、填写、记录 action。**
-  **填表值优先级（三级降级）：**
-  1. **用户明确数据** — 若任务指令中指定了字段值，优先使用
-  2. **智能生成（form_rules）** — input/date 字段自动生成合法随机值
-  3. **LLM 自主决策** — select 从 options 中按标签语义选取最合理选项
+- **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要，scan_form_fields 已自动处理）。**
 - fill_form_fields_batch(fields_json) — 手动指定值批量填写：[{"action":"fill_input","label":"...","value":"..."}, ...]。
 - task_done(label) — 将字段标记为已完成。
 - task_retry(label) — 将字段重新加入待办。
@@ -70,17 +66,15 @@
 当你遇到包含多个字段的表单弹窗/抽屉时，使用任务列表系统来跟踪进度，避免冗余操作。
 
 **工作流程：**
-1. **全面扫描：** 调用一次 `scan_form_fields()`。
-2. **初始化+自动填写：** 调用 `init_task_list(scan_json)`。系统自动完成全部字段填写、action 记录、任务标记，无需手动逐字段操作。
-3. **检查：** 调用 `scan_visible_fields()` 检查通知/错误。
-4. **提交：** 调用 `get_pending_tasks()` 确认无待办后提交。
-5. **错误处理：** 调用 `sync_tasks_from_errors()` 从 `.el-form-item__error` 重新加入出错字段，手动修复后 task_done。
+1. **扫描+自动填写：** 调用 `scan_form_fields()` — 系统自动完成扫描、字段填写、action 记录。无需手动逐字段操作。
+2. **检查：** 调用 `scan_visible_fields()` 检查通知/错误。
+3. **提交：** 调用 `get_pending_tasks()` 确认无待办后提交。
+4. **错误处理：** 调用 `sync_tasks_from_errors()` 从 `.el-form-item__error` 重新加入出错字段，手动修复后 task_done。
 
 **示例：**
 ```
 # 弹窗打开
-scan_form_fields() → 完整字段列表
-init_task_list(scan_json) → "auto-filled:4 remaining:0"
+scan_form_fields() → "auto-filled:4 remaining:0"
 get_pending_tasks() → "pending:[], done:[...]"
 
 # 提交失败 → 可见字段扫描
@@ -88,7 +82,6 @@ scan_visible_fields() → notification:{visible:true, text:"证件号码格式�
 sync_tasks_from_errors() → "retried:1"
 fill_form_field("证件号码", "...") → "ok"
 task_done("证件号码") → "remaining:0"
-# 提交 → 成功
 ```
 
 # 🚨 跨阶段数据流转（通用规则）

@@ -1,7 +1,7 @@
 """Table actions: click row action button in el-table."""
 
-from .._state import _record_action
-from .._helpers import _ok
+from ._state import _record_action
+from ._helpers import _ok
 
 
 def _register_table_actions(controller, browser_context):

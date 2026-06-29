@@ -12,12 +12,12 @@ import os
 
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from .form_rules import match_rule
+from ..form_rules import match_rule
 
 
 def _load_fill_form_prompt():
     """Load the canonical form filling rules from agent-field-rules.md."""
-    _prompt_dir = os.path.dirname(os.path.abspath(__file__))
+    _prompt_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     _rules_path = os.path.join(_prompt_dir, 'prompts', 'agent-field-rules.md')
     try:
         with open(_rules_path, 'r', encoding='utf-8') as _f:

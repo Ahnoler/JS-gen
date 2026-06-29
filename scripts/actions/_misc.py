@@ -10,9 +10,9 @@ import json
 import os
 from datetime import datetime
 
-from .. import _state
-from .._helpers import _ok, _err
-from .._js_snippets import JS_GET_CONTAINER
+from . import _state
+from ._helpers import _ok, _err
+from ._js_snippets import JS_GET_CONTAINER
 from ..models import ActionFile, FormSnapshot, FormSnapshotCollection
 
 # Path helper: __file__ is scripts/actions/_misc.py, so go up 2 levels

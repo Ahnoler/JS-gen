@@ -3,11 +3,11 @@ Controller builder: factory function that assembles all action groups
 into a single browser_use Controller instance.
 """
 
-from .actions._case_data import _register_case_data_actions
-from .actions._form import _register_form_actions
-from .actions._navigation import _register_navigation_actions
-from .actions._table import _register_table_actions
-from .actions._misc import _register_misc_actions
+from ._case_data import _register_case_data_actions
+from ._form import _register_form_actions
+from ._navigation import _register_navigation_actions
+from ._table import _register_table_actions
+from ._misc import _register_misc_actions
 
 
 def build_controller(browser_context, form_rules, case_data_store=None,

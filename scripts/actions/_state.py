@@ -6,7 +6,7 @@ go through this module. The controller.py facade re-exports these
 for external callers (session_runner, recorder, agent_utils).
 """
 
-from .models import ActionEntry
+from ..models import ActionEntry
 
 _ACTION_LOG: list[dict] = []
 _TRAJECTORY_URL: str | None = None

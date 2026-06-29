@@ -8,19 +8,19 @@ Element UI form interaction.
 import json
 import sys
 
-from .._state import _ACTION_LOG, _record_action
-from .._helpers import (
+from ._state import _ACTION_LOG, _record_action
+from ._helpers import (
     _ok, _err,
     _wait_if_loading, _capture_element, _merge_ax_text,
 )
-from .._js_snippets import (
+from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER,
     JS_CHECK_SINGLE_FIELD, JS_SCAN_FORM_FIELDS,
     JS_FILL_FORM_FIELD, JS_FILL_DATE_FIELD,
     JS_FIND_LABELED_SELECT, JS_FIND_OPTION, JS_LOCATOR,
     JS_CLICK_RADIO,
 )
-from .._llm_values import _llm_generate_values
+from ._llm_values import _llm_generate_values
 from ..models import (
     ScannedField, FormScanResult, Notification,
     FormSnapshot, FormSnapshotCollection,
@@ -153,7 +153,16 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         case_data_store['form_snapshot'] = snapshot.model_dump()
         _record_action('save_form_snapshot', snapshot.model_dump(), f'ok | {snapshot.count}')
 
-        return json.dumps(scan_result.model_dump(), ensure_ascii=False, indent=2)
+        scan_json = json.dumps(scan_result.model_dump(), ensure_ascii=False, indent=2)
+
+        # 自动构建任务列表并批量填写（Agent 无感知）
+        tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
+        case_data_store['task_list'] = tl.to_store()
+        case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
+        if tl.pending:
+            fill_result = await _auto_fill_pending()
+            return _ok(f'scan+auto-fill | fields:{len(dom_fields)} | ' + str(fill_result))
+        return scan_json
 
     @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Returns {fields: [...], notification: {visible, text}|null}.')
     async def scan_visible_fields():
@@ -188,7 +197,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         )
         return json.dumps(scan_result.model_dump(), ensure_ascii=False, indent=2)
 
-    @controller.action('Initialize a form-filling task list from scan results. Pass scan_form_fields() result. Auto-fills all pending fields via LLM form assistant — no manual filling needed. All actions recorded for script replay.')
+    @controller.action('Rebuild the task list from scan results (utility — scan_form_fields already handles auto-fill).')
     async def init_task_list(fields_json: str):
         try:
             data = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
@@ -200,12 +209,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = fields
         pending_count = len(tl.pending)
-
-        if pending_count > 0:
-            fill_result = await _auto_fill_pending()
-            pending_after = len(TaskList.from_store(case_data_store.get('task_list')).pending)
-            return _ok(f'task-list-init | auto-filled:{pending_count} remaining:{pending_after} | ' + str(fill_result))
-        return _ok('task-list-init | no-pending-fields')
+        return _ok(f'task-list-init | pending:{pending_count}')
 
     @controller.action('Save form structure snapshot for replay validation. Call after init_task_list. Records per-field metadata (label + is_required) with separate required/optional counts so assembled scripts can grade changes by severity.')
     async def save_form_snapshot():

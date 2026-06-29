@@ -1,7 +1,7 @@
 """Navigation actions: switch tab, click menu item."""
 
-from .._state import _record_action
-from .._helpers import _ok
+from ._state import _record_action
+from ._helpers import _ok
 
 
 def _register_navigation_actions(controller, browser_context):
