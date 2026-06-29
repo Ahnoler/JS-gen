@@ -1057,7 +1057,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     _record_action('fill_form_field', {'label_text': label, 'value': value}, result)
                 elif kind in ('select_option', 'select', 'option'):
                     _record_action('select_option', {'label_text': label, 'option_text': value}, result)
-                task_done_impl(label)
+                _task_done_impl(label)
             await page.wait_for_timeout(400)
         return _ok(f'batch-done | {len(results)} fields | ' + json.dumps(results, ensure_ascii=False))
 
@@ -1096,6 +1096,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             groups.setdefault(idx, []).append(item)
 
         all_results = []
+        ok_list = []
+        failed_list = []
         for idx in sorted(groups.keys()):
             group = groups[idx]
             # Process in sub-batches of 20 (LLM can handle reasonably)
@@ -1105,7 +1107,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 # Phase 1: Let LLM generate values for this sub-batch
                 actions = _llm_generate_values(llm, sub, form_rules=form_rules, case_data_store=case_data_store)
 
-                # Phase 2: Execute each action
+                # Phase 2: Execute each action (defer done-marking until verified)
+                executed = []  # [{label, kind, value, result}]
                 for a in actions:
                     label = a.get('label', '')
                     kind = (a.get('action') or '').lower().replace('-', '_')
@@ -1181,16 +1184,57 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                             result = f'unknown-action:{kind}'
                     except Exception as e:
                         result = f'error:{e}'
-                    ok = result.startswith('ok') or result.startswith('already')
-                    all_results.append({'label': label, 'kind': label_kind.get(label, 'input'), 'ok': ok, 'result': result})
+                    executed.append({'label': label, 'kind': label_kind.get(label, 'input'), 'value': value, 'result': result})
+                    await page.wait_for_timeout(300)
+
+                # Phase 3: Verify each field's value was actually set on page
+                for ex in executed:
+                    label = ex['label']
+                    expected = ex['value']
+                    ok = False
+                    try:
+                        raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, label)
+                        if raw and raw != 'label-not-found':
+                            info = json.loads(raw) if isinstance(raw, str) else raw
+                            actual = (info.get('currentValue') or '').strip()
+                            is_select = info.get('kind') == 'select'
+                            if is_select:
+                                selected = info.get('selected', False)
+                                ok = selected or (actual and (actual == expected or expected in actual or actual in expected))
+                            else:
+                                ok = bool(actual) and (actual == expected or expected in actual or actual.replace(' ', '') == expected.replace(' ', ''))
+                    except Exception:
+                        pass
                     if ok:
-                        if kind in ('fill_input', 'fill', 'input'):
-                            _record_action('fill_form_field', {'label_text': label, 'value': value}, result)
-                        elif kind in ('select_option', 'select', 'option'):
-                            _record_action('select_option', {'label_text': label, 'option_text': value}, result)
-                        _task_done_impl(label)
-                    await page.wait_for_timeout(400)
-        return _ok(f'pending-batch-done | {len(all_results)} fields | ' + json.dumps(all_results, ensure_ascii=False))
+                        ok_list.append(ex)
+                    else:
+                        failed_list.append(ex)
+
+                # Phase 4: Mark only verified OK fields as done, record actions
+                sub_ok = [ex for ex in ok_list if ex in executed]
+                sub_failed = [ex for ex in failed_list if ex in executed]
+                for ex in sub_ok:
+                    label = ex['label']
+                    kind = ex['kind']
+                    value = ex['value']
+                    if kind in ('date', 'input'):
+                        _record_action('fill_form_field', {'label_text': label, 'value': value}, ex['result'])
+                    elif kind == 'select':
+                        _record_action('select_option', {'label_text': label, 'option_text': value}, ex['result'])
+                    elif kind in ('radio', 'checkbox'):
+                        _record_action('click_radio', {'label_text': label, 'option_text': value}, ex['result'])
+                    _task_done_impl(label)
+                    all_results.append({'label': label, 'kind': kind, 'ok': True, 'result': ex['result']})
+
+                # Failed fields stay in pending for manual handling by Browser agent
+                for ex in sub_failed:
+                    all_results.append({'label': ex['label'], 'kind': ex['kind'], 'ok': False, 'result': ex['result'] + ' | verify-failed'})
+
+        summary = f'pending-batch-done | ok:{len(ok_list)} failed:{len(failed_list)}'
+        if failed_list:
+            summary += ' | failed: ' + json.dumps([f['label'] for f in failed_list], ensure_ascii=False)
+        summary += ' | ' + json.dumps(all_results, ensure_ascii=False)
+        return _ok(summary)
 
     @controller.action('Mark a form field as completed in the task list. Use this after successfully filling a field.')
     async def task_done(label_text: str):
@@ -1438,7 +1482,7 @@ def _register_table_actions(controller, browser_context):
         return result
 
 
-def _register_misc_actions(controller, browser_context):
+def _register_misc_actions(controller, browser_context, case_data_store=None):
     @controller.action('Wait for Element UI loading mask to disappear.')
     async def wait_for_loading():
         page = await browser_context.get_current_page()
@@ -1873,6 +1917,6 @@ def build_controller(browser_context, form_rules, case_data_store=None, llm=None
     _register_form_actions(controller, browser_context, form_rules, case_data_store, llm)
     _register_navigation_actions(controller, browser_context)
     _register_table_actions(controller, browser_context)
-    _register_misc_actions(controller, browser_context)
+    _register_misc_actions(controller, browser_context, case_data_store)
 
     return controller

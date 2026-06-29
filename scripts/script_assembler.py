@@ -110,9 +110,11 @@ function genIdentityValue(label) {
 // ===== Error collection =====
 const _errors = [];
 const _TMP = process.env.TMPDIR || process.env.TMP || process.env.TEMP || '/tmp';
-function _recordError(step, action, label, value, error, details) {
-  _errors.push({ step, action, label: label||'', value: value||'', error, details: details||'' });
-  console.log('  [' + step + '] ' + action + ' FAILED: ' + error);
+function _recordError(step, action, label, value, error, details, severity) {
+  severity = severity || 'error';
+  _errors.push({ step, action, label: label||'', value: value||'', error, details: details||'', severity });
+  var tag = severity === 'warning' ? 'WARNING' : 'FAILED';
+  console.log('  [' + step + '] ' + action + ' ' + tag + ': ' + error);
 }
 
 (async () => {
@@ -283,15 +285,24 @@ CTRL_FOOTER = '''  } catch (err) {
     if (_errors.length > 0) {
       const reportPath = require('path').join(_TMP, 'script-errors.json');
       try { fs.writeFileSync(reportPath, JSON.stringify(_errors, null, 2)); } catch {}
-      console.error('===== ' + _errors.length + ' ERROR(S) =====');
-      _errors.forEach((e, i) => console.error('[' + (i+1) + '] Step ' + e.step + ': ' + e.action + ' - ' + e.error + (e.details ? ' | ' + e.details : '')));
+      const errCount = _errors.filter(e => e.severity !== 'warning').length;
+      const warnCount = _errors.filter(e => e.severity === 'warning').length;
+      var summary = '=====';
+      if (errCount > 0) summary += ' ' + errCount + ' ERROR(S)';
+      if (warnCount > 0) summary += (errCount > 0 ? ', ' : ' ') + warnCount + ' WARNING(S)';
+      summary += ' =====';
+      console.error(summary);
+      _errors.forEach((e, i) => {
+        var tag = e.severity === 'warning' ? 'WARN' : 'ERROR';
+        console.error('[' + (i+1) + '] ' + tag + ' Step ' + e.step + ': ' + e.action + ' - ' + e.error + (e.details ? ' | ' + e.details : ''));
+      });
+      process.exit(errCount > 0 ? 1 : 0);
     } else {
       console.log('===== SUCCESS =====');
     }
     console.log('Waiting 30s before closing browser...');
     await page.waitForTimeout(30000);
     await browser.close();
-    process.exit(_errors.length > 0 ? 1 : 0);
   }
 })().catch(err => { console.error(err); process.exit(1); });
 '''
@@ -304,8 +315,17 @@ PARTIAL_CTRL_FOOTER = '''  } catch (err) {
     if (_errors.length > 0) {
       const reportPath = require('path').join(_TMP, 'script-errors.json');
       try { fs.writeFileSync(reportPath, JSON.stringify(_errors, null, 2)); } catch {}
-      console.error('===== ' + _errors.length + ' ERROR(S) =====');
-      _errors.forEach((e, i) => console.error('[' + (i+1) + '] Step ' + e.step + ': ' + e.action + ' - ' + e.error + (e.details ? ' | ' + e.details : '')));
+      const errCount = _errors.filter(e => e.severity !== 'warning').length;
+      const warnCount = _errors.filter(e => e.severity === 'warning').length;
+      var summary = '=====';
+      if (errCount > 0) summary += ' ' + errCount + ' ERROR(S)';
+      if (warnCount > 0) summary += (errCount > 0 ? ', ' : ' ') + warnCount + ' WARNING(S)';
+      summary += ' =====';
+      console.error(summary);
+      _errors.forEach((e, i) => {
+        var tag = e.severity === 'warning' ? 'WARN' : 'ERROR';
+        console.error('[' + (i+1) + '] ' + tag + ' Step ' + e.step + ': ' + e.action + ' - ' + e.error + (e.details ? ' | ' + e.details : ''));
+      });
     } else {
       console.log('===== PARTIAL REPLAY OK =====');
     }
@@ -822,7 +842,7 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         body.append(f'        container: "{container_label}",')
         body.append(f'        missing_optional: {v}.missing_optional,')
         body.append(f'        added_optional: {v}.added_optional,')
-        body.append(f'      }}));')
+        body.append(f'      }}), "warning");')
         body.append(f'      console.log("[FORM-CHECK P3] WARN: Optional fields changed | missing:", JSON.stringify({v}.missing_optional), "| added:", JSON.stringify({v}.added_optional));')
         body.append(f'    }}')
         # P4: field order change → warning, continue
@@ -830,7 +850,7 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         body.append(f'      _recordError({step}, "form_warning", "", "", "field order changed", JSON.stringify({{')
         body.append(f'        container: "{container_label}",')
         body.append(f'        reordered: true,')
-        body.append(f'      }}));')
+        body.append(f'      }}), "warning");')
         body.append(f'      console.log("[FORM-CHECK P4] WARN: Field order changed, all fields present");')
         body.append(f'    }}')
         body.append(f'    console.log("[FORM-CHECK] Verification passed for container: {container_label}");')
