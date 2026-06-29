@@ -11,7 +11,8 @@ report/
 report2/
 atp-record/
 docs/
-scripts/__pycache__/
+__pycache__/
+
 scripts/action/
 scripts/log/
 scripts/screenshots/
