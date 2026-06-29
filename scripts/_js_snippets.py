@@ -521,7 +521,15 @@ JS_SCAN_FORM_FIELDS = '''async (quick) => {
         const disabled = isDisabled(inputEl, trigger);
         const required = isRequired(item, label, inputEl);
         const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
-        const field = { label, kind, currentValue, options: [], placeholder, required, disabled, selected };
+        const hasButton = !!item.querySelector('button.el-button--primary, button.el-button--primary.is-plain') ||
+            ['选择','获取地址','引入','新增','添加'].some(t => {
+                const btns = item.querySelectorAll('button');
+                for (let i = 0; i < btns.length; i++) {
+                    if (btns[i].textContent.includes(t)) return true;
+                }
+                return false;
+            });
+        const field = { label, kind, currentValue, options: [], placeholder, required, disabled, selected, hasButton };
         fields.push(field);
         if (kind === 'select') {
             const t = trigger || item.querySelector('input:not([type="hidden"])');
@@ -610,8 +618,16 @@ JS_CHECK_SINGLE_FIELD = '''(label) => {
             const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
             const disabled = isDisabled(inputEl, trigger);
             const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
+            const hasButton = !!item.querySelector('button.el-button--primary, button.el-button--primary.is-plain') ||
+                ['选择','获取地址','引入','新增','添加'].some(t => {
+                    const btns = item.querySelectorAll('button');
+                    for (let i = 0; i < btns.length; i++) {
+                        if (btns[i].textContent.includes(t)) return true;
+                    }
+                    return false;
+                });
             const required = isRequired(item, lbl, inputEl);
-            return JSON.stringify({ label: lbl, kind, currentValue, placeholder, disabled, selected, required });
+            return JSON.stringify({ label: lbl, kind, currentValue, placeholder, disabled, selected, required, hasButton });
         }
     }
     return 'label-not-found';
