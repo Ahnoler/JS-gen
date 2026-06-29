@@ -17,7 +17,7 @@ from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER,
     JS_CHECK_SINGLE_FIELD, JS_SCAN_FORM_FIELDS,
     JS_FILL_FORM_FIELD, JS_FILL_DATE_FIELD,
-    JS_FIND_LABELED_SELECT, JS_FIND_OPTION, JS_LOCATOR,
+    JS_FIND_LABELED_SELECT, JS_SELECT_OPTION, JS_LOCATOR,
     JS_CLICK_RADIO,
 )
 from ._llm_values import _llm_generate_values
@@ -367,36 +367,16 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                                 result = already
                             else:
                                 await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-                                await page.wait_for_timeout(800)
-                                matched = await page.evaluate(JS_FIND_OPTION, value)
-                                if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
-                                    matched = await page.evaluate(JS_FIND_OPTION, 'first')
-                                if matched and not matched.startswith('NOT_FOUND:') and matched != 'NO_ITEMS':
-                                    try:
-                                        opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
-                                        await opt.wait_for(state='visible', timeout=3000)
-                                        await opt.click()
-                                        result = 'ok'
-                                    except Exception as e:
-                                        result = f'click-failed:{e}'
-                                else:
-                                    result = matched
+                                await page.wait_for_timeout(350)
+                                result = await page.evaluate(JS_SELECT_OPTION, value)
+                                if result.startswith('option-not-found:'):
+                                    result = await page.evaluate(JS_SELECT_OPTION, 'first')
                         else:
                             await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-                            await page.wait_for_timeout(800)
-                            matched = await page.evaluate(JS_FIND_OPTION, value)
-                            if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
-                                matched = await page.evaluate(JS_FIND_OPTION, 'first')
-                            if matched and not matched.startswith('NOT_FOUND:') and matched != 'NO_ITEMS':
-                                try:
-                                    opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
-                                    await opt.wait_for(state='visible', timeout=3000)
-                                    await opt.click()
-                                    result = 'ok'
-                                except Exception as e:
-                                    result = f'click-failed:{e}'
-                            else:
-                                result = matched
+                            await page.wait_for_timeout(350)
+                            result = await page.evaluate(JS_SELECT_OPTION, value)
+                            if result.startswith('option-not-found:'):
+                                result = await page.evaluate(JS_SELECT_OPTION, 'first')
                     else:
                         result = f'unknown-action:{kind}'
                 except Exception as e:

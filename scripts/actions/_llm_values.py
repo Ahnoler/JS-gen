@@ -68,8 +68,8 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
                 actions.append({'action': 'fill_input', 'label': label, 'value': val})
                 continue
 
-        # —— Priority 2: form_rules.py generators (input/date only) ——
-        if kind in ('input', 'date') and form_rules:
+        # —— Priority 2: form_rules.py generators (input only) ——
+        if kind == 'input' and form_rules:
             generated = match_rule(label, form_rules)
             if generated:
                 actions.append({'action': 'fill_input', 'label': label, 'value': generated})
@@ -83,20 +83,21 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
 
     # No LLM available — basic fallback heuristics
     if not llm:
+        from datetime import date as _date
+        _today = _date.today().isoformat()
         for item in llm_fields:
             label = item['label'] if isinstance(item, dict) else item
             kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
             opts = item.get('options', []) if isinstance(item, dict) else []
             if kind in ('select', 'radio', 'checkbox'):
-                # Pick first non-placeholder option
                 picked = ''
                 for o in opts:
                     if o and o not in ('请选择', '请输入', '全部', ''):
-                        picked = o
-                        break
-                if not picked and opts:
-                    picked = opts[0]
+                        picked = o; break
+                if not picked and opts: picked = opts[0]
                 actions.append({'action': 'select_option', 'label': label, 'option': picked or '测试'})
+            elif kind == 'date':
+                actions.append({'action': 'fill_input', 'label': label, 'value': _today})
             else:
                 actions.append({'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'})
         return actions
