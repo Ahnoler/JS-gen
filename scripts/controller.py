@@ -10,6 +10,13 @@ from datetime import datetime
 
 from browser_use.agent.views import ActionResult
 from .form_rules import match_rule
+from .models import (
+    ScannedField, FormScanResult, Notification,
+    FormSnapshot, FormSnapshotCollection,
+    TaskItem, TaskList,
+    ActionEntry, ActionFile, ElementInfo,
+    FieldKind,
+)
 
 
 # ========================== Action Recording ==========================
@@ -34,31 +41,13 @@ _ACTION_TO_COMMAND = {
 
 
 def _record_action(action_name, params, result, element=None):
-    """Record a controller action call."""
+    """Record a controller action call using ActionEntry model."""
     global _TRAJECTORY_URL
     params_dict = dict(params) if params else {}
 
-    entry = {
-        'id': str(uuid.uuid4()),
-        'timestamp': int(time.time() * 1000),
-        'action': action_name,
-        'params': params_dict,
-        'result': str(result)[:200] if result else '',
-        'command': _ACTION_TO_COMMAND.get(action_name, action_name),
-        'target': '',
-        'absoluteTarget': '',
-        'tagName': '',
-        'attributes': {},
-    }
+    entry = ActionEntry.from_record(action_name, params_dict, str(result) if result else '', element)
 
-    if element:
-        elem = dict(element) if isinstance(element, dict) else {}
-        entry['target'] = elem.get('xpath', '') or ''
-        entry['absoluteTarget'] = elem.get('absolute_xpath', '') or ''
-        entry['tagName'] = elem.get('tag_name', '') or ''
-        entry['attributes'] = elem.get('attributes', {}) if isinstance(elem.get('attributes'), dict) else {}
-
-    _ACTION_LOG.append(entry)
+    _ACTION_LOG.append(entry.model_dump())
     # Capture URL from go_to_url action
     if action_name == 'go_to_url' and params_dict.get('url'):
         _TRAJECTORY_URL = params_dict['url']
@@ -658,13 +647,16 @@ async def _capture_element(page, label_text):
     return result if result else None
 
 
-def _merge_ax_text(dom_fields, snapshot_text):
+def _merge_ax_text(dom_fields: list[ScannedField], snapshot_text: str) -> None:
     """Parse aria_snapshot(mode='ai') text and merge AX values into DOM fields.
-    Handles both textbox (with value) and combobox (with selected option)."""
+
+    Handles both textbox (with value) and combobox (with selected option).
+    Mutates the ScannedField objects in-place.
+    """
     if not snapshot_text:
         return
     # Collect AX entries: label → {value, disabled}
-    ax_map = {}
+    ax_map: dict[str, dict] = {}
     _AX_LINE_RE = re.compile(
         r'(textbox|combobox|spinbutton|searchbox)\s+"([^"]+)"\s*'
         r'(?P<attrs>\[(?!ref=)[^\]]*\])*\s*\[ref=[^\]]+\]'
@@ -681,24 +673,12 @@ def _merge_ax_text(dom_fields, snapshot_text):
         value = (m.group('value') or '').strip().strip('"').strip("'")
         disabled = '[disabled]' in attrs
 
-        # If no value on this line, check for selected option on next lines (combobox)
-        if not value and role in ('combobox', 'listbox'):
-            # Look for option with [selected] — handled by subsequent lines in the snapshot
-            pass
-
         ax_map[name] = {'value': value, 'disabled': disabled, 'role': role}
 
     # Also capture option "[selected]" lines (format: option "{name}" [selected])
     _OPTION_RE = re.compile(r'option\s+"([^"]+)"\s*\[selected\]')
-    _COMBOS = {}
-    for line in snapshot_text.splitlines():
-        m = _OPTION_RE.search(line)
-        if m:
-            selected_option = m.group(1).strip()
-            # Walk backwards to find the parent combobox name
-            _COMBOS[id(line)] = selected_option
     # Attach selected options to their combobox parents by scanning previous lines
-    prev_combobox = None
+    prev_combobox: str | None = None
     for line in snapshot_text.splitlines():
         cm = _AX_LINE_RE.search(line)
         if cm and cm.group(1) in ('combobox', 'listbox'):
@@ -710,9 +690,9 @@ def _merge_ax_text(dom_fields, snapshot_text):
                 ax_map[prev_combobox]['value'] = selected
                 ax_map[prev_combobox]['selected_text'] = selected
 
-    # Merge AX data into DOM fields
+    # Merge AX data into ScannedField objects
     for f in dom_fields:
-        label = f.get('label', '').strip()
+        label = (f.label or '').strip()
         if not label:
             continue
         ax = ax_map.get(label)
@@ -724,16 +704,18 @@ def _merge_ax_text(dom_fields, snapshot_text):
                     break
         if not ax:
             continue
-        if not f.get('currentValue', '').strip() and ax['value']:
-            f['currentValue'] = ax['value']
-        if ax.get('disabled') and not f.get('disabled'):
-            f['disabled'] = True
+        # Update currentValue from AX if DOM value was empty
+        if not (f.currentValue or '').strip() and ax['value']:
+            f.currentValue = ax['value']
+        # AX disabled flag
+        if ax.get('disabled') and not f.disabled:
+            f.disabled = True
         # AX role → kind mapping (only override if kind is unknown)
-        if f.get('kind', 'unknown') in ('unknown',):
+        if f.kind in ('unknown',):
             if ax['role'] in ('combobox', 'listbox'):
-                f['kind'] = 'select'
+                f.kind = 'select'
             elif ax['role'] in ('textbox', 'spinbutton', 'searchbox'):
-                f['kind'] = 'input'
+                f.kind = 'input'
 
 
 def _register_case_data_actions(controller, case_data_store):
@@ -835,9 +817,16 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         raw = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
-            dom_fields = result.get('fields') if isinstance(result, dict) else result
+            raw_fields = result.get('fields') if isinstance(result, dict) else result
         except Exception:
             return raw
+
+        # Parse into typed models
+        dom_fields: list[ScannedField] = [
+            ScannedField(**f) if isinstance(f, dict) else f
+            for f in raw_fields
+        ]
+
         try:
             ax_text = await page.aria_snapshot(mode='ai')
             if ax_text:
@@ -845,45 +834,29 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         except Exception:
             pass
 
-        # Auto-save form structure snapshot (built into scan — no separate LLM call needed)
+        # Build FormScanResult
         container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
-        entries = []
-        required_count = 0
-        optional_count = 0
-        for f in dom_fields:
-            label = f.get('label', '').strip()
-            if not label:
-                continue
-            is_req = f.get('required', False)
-            entries.append({'label': label, 'is_required': is_req})
-            if is_req:
-                required_count += 1
-            else:
-                optional_count += 1
-        snapshot_entry = {
-            'container': container_id,
-            'fields': entries,
-            'count': len(entries),
-            'required_count': required_count,
-            'optional_count': optional_count,
-            'action_index': len(_ACTION_LOG),
-        }
-        # Append to array (dedup by container), keep single-key for backward compat
-        snapshots = case_data_store.get('form_snapshots', [])
-        replaced = False
-        for i, s in enumerate(snapshots):
-            if s.get('container') == container_id:
-                snapshots[i] = snapshot_entry
-                replaced = True
-                break
-        if not replaced:
-            snapshots.append(snapshot_entry)
-        case_data_store['form_snapshots'] = snapshots
-        case_data_store['form_snapshot'] = snapshot_entry
-        _record_action('save_form_snapshot', snapshot_entry)
+        raw_notification = result.get('notification') if isinstance(result, dict) else None
+        notification = Notification(**raw_notification) if raw_notification else None
+        scan_result = FormScanResult(
+            container=container_id,
+            fields=dom_fields,
+            notification=notification,
+        )
 
-        result_out = result if isinstance(result, dict) else {'fields': dom_fields, 'notification': None}
-        return json.dumps(result_out, ensure_ascii=False, indent=2)
+        # Auto-save form structure snapshot (built into scan — no separate LLM call needed)
+        snapshot = FormSnapshot.from_scan_fields(
+            container=container_id,
+            scan_fields=[f.model_dump() for f in dom_fields],
+            action_index=len(_ACTION_LOG),
+        )
+        coll = FormSnapshotCollection(case_data_store.get('form_snapshots', []))
+        coll.upsert(snapshot)
+        case_data_store['form_snapshots'] = coll.to_dicts()
+        case_data_store['form_snapshot'] = snapshot.model_dump()
+        _record_action('save_form_snapshot', snapshot.model_dump())
+
+        return json.dumps(scan_result.model_dump(), ensure_ascii=False, indent=2)
 
     @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Returns {fields: [...], notification: {visible, text}|null}.')
     async def scan_visible_fields():
@@ -892,17 +865,31 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         raw = await page.evaluate(JS_SCAN_FORM_FIELDS, True)
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
-            dom_fields = result.get('fields') if isinstance(result, dict) else result
+            raw_fields = result.get('fields') if isinstance(result, dict) else result
         except Exception:
             return raw
+
+        dom_fields: list[ScannedField] = [
+            ScannedField(**f) if isinstance(f, dict) else f
+            for f in raw_fields
+        ]
+
         try:
             ax_text = await page.aria_snapshot(mode='ai')
             if ax_text:
                 _merge_ax_text(dom_fields, ax_text)
         except Exception:
             pass
-        result_out = result if isinstance(result, dict) else {'fields': dom_fields, 'notification': None}
-        return json.dumps(result_out, ensure_ascii=False, indent=2)
+
+        container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
+        raw_notification = result.get('notification') if isinstance(result, dict) else None
+        notification = Notification(**raw_notification) if raw_notification else None
+        scan_result = FormScanResult(
+            container=container_id,
+            fields=dom_fields,
+            notification=notification,
+        )
+        return json.dumps(scan_result.model_dump(), ensure_ascii=False, indent=2)
 
     @controller.action('Initialize a form-filling task list from scan results. Pass scan_form_fields() result. Pending/done store full field objects (label, kind, currentValue, options, placeholder, disabled, required) for LLM planning. Auto-skips filled/disabled fields.')
     async def init_task_list(fields_json: str):
@@ -911,80 +898,39 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         except Exception:
             return _err('invalid-json')
         fields = data.get('fields') if isinstance(data, dict) else data
-        pending = []
-        for f in fields:
-            label = f.get('label', '')
-            has_value = f.get('currentValue', '').strip() != ''
-            is_disabled = f.get('disabled', False)
-            if has_value or is_disabled:
-                continue
-            pending.append({
-                'label': label,
-                'kind': f.get('kind', 'input'),
-                'currentValue': f.get('currentValue', ''),
-                'options': f.get('options', []),
-                'placeholder': f.get('placeholder', ''),
-                'disabled': f.get('disabled', False),
-                'required': f.get('required', False),
-            })
-        case_data_store['task_list'] = {'pending': pending, 'done': []}
+
+        tl = TaskList.from_scan(fields)
+        case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = fields
-        if len(pending) <= 5:
-            return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending, ensure_ascii=False))
-        return _ok(f'task-list-init | pending:{len(pending)} | ' + json.dumps(pending[:5], ensure_ascii=False) + ' ...')
+        pending_count = len(tl.pending)
+        if pending_count <= 5:
+            return _ok(f'task-list-init | pending:{pending_count} | ' + json.dumps(tl.to_store()['pending'], ensure_ascii=False))
+        return _ok(f'task-list-init | pending:{pending_count} | ' + json.dumps(tl.to_store()['pending'][:5], ensure_ascii=False) + ' ...')
 
     @controller.action('Save form structure snapshot for replay validation. Call after init_task_list, before fill_pending_batch. Records per-field metadata (label + is_required) with separate required/optional counts so assembled scripts can grade changes by severity.')
     async def save_form_snapshot():
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         fields = case_data_store.get('_scan_fields', [])
-        entries = []
-        required_count = 0
-        optional_count = 0
-        for f in fields:
-            label = f.get('label', '').strip()
-            if not label:
-                continue
-            is_req = f.get('required', False)
-            entries.append({'label': label, 'is_required': is_req})
-            if is_req:
-                required_count += 1
-            else:
-                optional_count += 1
-        snapshot_entry = {
-            'container': container_id,
-            'fields': entries,
-            'count': len(entries),
-            'required_count': required_count,
-            'optional_count': optional_count,
-            'action_index': len(_ACTION_LOG),
-        }
-        # Append to array (dedup by container), keep single-key for backward compat
-        snapshots = case_data_store.get('form_snapshots', [])
-        replaced = False
-        for i, s in enumerate(snapshots):
-            if s.get('container') == container_id:
-                snapshots[i] = snapshot_entry
-                replaced = True
-                break
-        if not replaced:
-            snapshots.append(snapshot_entry)
-        case_data_store['form_snapshots'] = snapshots
-        case_data_store['form_snapshot'] = snapshot_entry
-        _record_action('save_form_snapshot', snapshot_entry)
-        return _ok(f'form-snapshot | container:{container_id} | count:{len(entries)}')
+
+        snapshot = FormSnapshot.from_scan_fields(
+            container=container_id,
+            scan_fields=fields,
+            action_index=len(_ACTION_LOG),
+        )
+
+        # Dedup by container using collection helper
+        coll = FormSnapshotCollection(case_data_store.get('form_snapshots', []))
+        coll.upsert(snapshot)
+        case_data_store['form_snapshots'] = coll.to_dicts()
+        case_data_store['form_snapshot'] = snapshot.model_dump()
+        _record_action('save_form_snapshot', snapshot.model_dump())
+        return _ok(f'form-snapshot | container:{container_id} | count:{snapshot.count}')
 
     def _task_done_impl(label_text):
-        tl = case_data_store.get('task_list')
-        if not tl:
-            tl = {'pending': [], 'done': []}
-            case_data_store['task_list'] = tl
-        for item in list(tl.get('pending', [])):
-            lbl = item['label'] if isinstance(item, dict) else item
-            if lbl == label_text:
-                tl['pending'].remove(item)
-                tl.setdefault('done', []).append(item)
-                return
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        tl.mark_done(label_text)
+        case_data_store['task_list'] = tl.to_store()
 
     @controller.action('Fill multiple form fields in one call (up to 10 recommended). Pass a JSON array: [{"action":"fill_input","label":"客户名称","value":"张三"},{"action":"select_option","label":"证件类型","option":"营业执照"}]. Each success auto-calls task_done. Returns summary with per-field results.')
     async def fill_form_fields_batch(fields_json: str):
@@ -1065,35 +1011,33 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     async def fill_pending_batch():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        tl = case_data_store.get('task_list', {'pending': [], 'done': []})
-        pending = list(tl.get('pending', []))
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        pending = tl.pending
 
         if not pending:
             return _ok('nothing-pending')
 
         # Annotate pending items with user-specified values from case_data_store
+        pending_dicts: list[dict] = []
         for item in pending:
-            lbl = item['label'] if isinstance(item, dict) else item
+            d = item.model_dump()
+            lbl = item.label
             user_val = case_data_store.get(lbl)
             if user_val and str(user_val).strip():
-                if isinstance(item, dict):
-                    item['commandValue'] = str(user_val).strip()
+                d['commandValue'] = str(user_val).strip()
+            pending_dicts.append(d)
 
         # Build label→kind lookup
-        label_kind = {}
-        for item in pending:
-            lbl = item['label'] if isinstance(item, dict) else item
-            kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
-            label_kind[lbl] = kind
+        label_kind: dict[str, str] = {item.label: item.kind for item in pending}
 
         # Group pending by kind
         KIND_ORDER = {'select': 0, 'input': 1, 'date': 2, 'radio': 3, 'checkbox': 4}
-        groups = {}
-        for item in pending:
-            lbl = item['label'] if isinstance(item, dict) else item
+        groups: dict[int, list[dict]] = {}
+        for d in pending_dicts:
+            lbl = d['label']
             kind = label_kind.get(lbl, 'input')
             idx = KIND_ORDER.get(kind, 99)
-            groups.setdefault(idx, []).append(item)
+            groups.setdefault(idx, []).append(d)
 
         all_results = []
         ok_list = []
@@ -1239,35 +1183,31 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     @controller.action('Mark a form field as completed in the task list. Use this after successfully filling a field.')
     async def task_done(label_text: str):
         _task_done_impl(label_text)
-        tl = case_data_store.get('task_list', {'pending': [], 'done': []})
-        return _ok(f'task-done:{label_text} | remaining:{len(tl["pending"])}')
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
     @controller.action('Re-add a field to the pending task list (e.g., after a validation error).')
     async def task_retry(label_text: str):
-        tl = case_data_store.get('task_list')
-        if not tl:
-            tl = {'pending': [], 'done': []}
-            case_data_store['task_list'] = tl
-        for item in list(tl.get('done', [])):
-            lbl = item['label'] if isinstance(item, dict) else item
-            if lbl == label_text:
-                tl['done'].remove(item)
-                if item not in tl.get('pending', []):
-                    tl['pending'].append(item)
-                return _ok(f'task-retry:{label_text} | pending:{len(tl["pending"])}')
-        # Not in done — maybe it's a new error label, add as simple dict
-        pending_labels = [p['label'] if isinstance(p, dict) else p for p in tl.get('pending', [])]
-        if label_text not in pending_labels:
-            tl['pending'].append({'label': label_text, 'kind': 'input', 'currentValue': '', 'options': [], 'placeholder': '', 'disabled': False, 'required': False})
-        return _ok(f'task-retry:{label_text} | pending:{len(tl["pending"])}')
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        item = tl.retry(label_text)
+        if item is None:
+            # Not in done — maybe it's a new error label, add as simple entry
+            if tl.find_pending(label_text) is None:
+                tl.pending.append(TaskItem(label=label_text, kind='input'))
+                case_data_store['task_list'] = tl.to_store()
+                return _ok(f'task-retry:{label_text} | pending:{len(tl.pending)}')
+            case_data_store['task_list'] = tl.to_store()
+            return _ok(f'task-retry:{label_text} | pending:{len(tl.pending)} (already pending)')
+        case_data_store['task_list'] = tl.to_store()
+        return _ok(f'task-retry:{label_text} | pending:{len(tl.pending)}')
 
     @controller.action('Get the current pending/done task list. Returns {"pending": [{label,kind,options,...}], "done": [...]}. Each entry is a full field object for LLM planning.')
     async def get_pending_tasks():
-        tl = case_data_store.get('task_list', {'pending': [], 'done': []})
-        # Return the full objects, LLM reads kind/options to plan
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        done_labels = [d.label for d in tl.done]
         return json.dumps({
-            'pending': tl.get('pending', []),
-            'done': [d['label'] if isinstance(d, dict) else d for d in tl.get('done', [])]
+            'pending': tl.to_store()['pending'],
+            'done': done_labels,
         }, ensure_ascii=False)
 
     @controller.action('Sync task list from current page validation errors. Reads .el-form-item__error text, extracts field labels (strips 请选择/请输入/请上传 prefix), re-adds them to pending. Call this after a failed submit attempt.')
@@ -1288,26 +1228,25 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             error_labels = json.loads(errors) if isinstance(errors, str) else errors
         except Exception:
             error_labels = []
-        retried = []
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        retried_labels: list[str] = []
         for label in error_labels:
-            tl = case_data_store.get('task_list', {'pending': [], 'done': []})
-            matched = False
-            for d_item in list(tl.get('done', [])):
-                d_label = d_item['label'] if isinstance(d_item, dict) else d_item
-                if d_label == label or d_label in label or label in d_label:
-                    tl['done'].remove(d_item)
-                    if d_item not in tl.get('pending', []):
-                        tl['pending'].append(d_item)
-                    retried.append(d_label)
-                    matched = True
-                    break
-            if not matched:
-                pending_labels = [p['label'] if isinstance(p, dict) else p for p in tl.get('pending', [])]
-                if label not in pending_labels:
-                    tl['pending'].append({'label': label, 'kind': 'input', 'currentValue': '', 'options': [], 'placeholder': '', 'disabled': False, 'required': False})
-                retried.append(label)
-            case_data_store['task_list'] = tl
-        return _ok(f'sync-errors | retried:{len(retried)} | ' + json.dumps(retried, ensure_ascii=False))
+            # Try fuzzy match in done list
+            found = tl.find_done(label)
+            if not found:
+                # Fuzzy match
+                for d in list(tl.done):
+                    if label in d.label or d.label in label:
+                        found = d
+                        break
+            if found:
+                tl.retry(found.label)
+                retried_labels.append(found.label)
+            elif tl.find_pending(label) is None:
+                tl.pending.append(TaskItem(label=label, kind='input'))
+                retried_labels.append(label)
+        case_data_store['task_list'] = tl.to_store()
+        return _ok(f'sync-errors | retried:{len(retried_labels)} | ' + json.dumps(retried_labels, ensure_ascii=False))
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str):
@@ -1541,20 +1480,26 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             os.makedirs(output_dir, exist_ok=True)
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
             filepath = os.path.join(output_dir, f'action_{ts}.json')
-            action_json = {
-                'id': str(uuid.uuid4()),
-                'name': 'browser-use-exploration',
-                'url': _TRAJECTORY_URL or 'http://unknown',
-                'actions': list(_ACTION_LOG),
-            }
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(action_json, f, ensure_ascii=False, indent=2)
+
+            action_file = ActionFile.from_action_log(
+                list(_ACTION_LOG),
+                url=_TRAJECTORY_URL or 'http://unknown',
+                name='browser-use-exploration',
+            )
+            action_json = action_file.model_dump()
 
             # Write form structure snapshots if available (prefer array, fall back to single)
-            snapshots = case_data_store.get('form_snapshots')
-            if not snapshots:
+            raw_snapshots = case_data_store.get('form_snapshots', [])
+            snapshots = None
+            if raw_snapshots:
+                snapshots = [
+                    FormSnapshot(**s).model_dump() if isinstance(s, dict) else s.model_dump()
+                    for s in raw_snapshots
+                ]
+            else:
                 single = case_data_store.get('form_snapshot')
-                snapshots = [single] if single else None
+                if single:
+                    snapshots = [FormSnapshot(**single).model_dump() if isinstance(single, dict) else single.model_dump()]
             if snapshots:
                 forms_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'forms')
                 os.makedirs(forms_dir, exist_ok=True)
@@ -1562,6 +1507,9 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 with open(form_path, 'w', encoding='utf-8') as f:
                     json.dump(snapshots, f, ensure_ascii=False, indent=2)
                 action_json['form_snapshot'] = f'scripts/forms/form_{ts}.json'
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(action_json, f, ensure_ascii=False, indent=2)
 
             count = len(_ACTION_LOG)
             _ACTION_LOG.clear()

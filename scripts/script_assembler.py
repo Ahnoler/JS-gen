@@ -36,6 +36,8 @@ import sys
 import re
 from datetime import datetime
 
+from .models import ActionEntry, ActionFile, FormSnapshot, ElementInfo
+
 
 # ========================== CTRL Injection Template ==========================
 
@@ -386,9 +388,19 @@ def _escape_js_string(s):
 FILL_RETRY_ACTIONS = {'fill_form_field', 'fill_date_field'}
 
 def _generate_action_code(entry, step_num, url, is_first_fill=False):
-    """Generate Playwright JS code from a recorded action entry."""
-    action = entry.get('action', '')
-    params = entry.get('params', {}) or {}
+    """Generate Playwright JS code from a recorded action entry.
+
+    Accepts either a dict (legacy) or an ActionEntry model instance.
+    """
+    # Normalize to dict for backward compat with existing dict-access code
+    if isinstance(entry, ActionEntry):
+        _e = entry.model_dump()
+    elif isinstance(entry, dict):
+        _e = entry
+    else:
+        _e = {}
+    action = _e.get('action', '')
+    params = _e.get('params', {}) or {}
 
     def pre():
         return "    await page.evaluate(() => CTRL.waitForLoading());"
@@ -460,7 +472,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             lines.append(f"        _dt{step_num} += ' | Playwright hasText: failed';")
 
             # Tier 3: absolute XPath fallback (page-wide, label-independent)
-            abs_xp = entry.get('absoluteTarget', '') or ''
+            abs_xp = _e.get('absoluteTarget', '') or ''
             if abs_xp and not abs_xp.startswith('/') and not abs_xp.startswith('//'):
                 abs_xp = '/' + abs_xp
 
@@ -541,7 +553,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"        _dts{step_num} += ' | Playwright native: failed';")
 
         # Tier 3: absolute XPath fallback (click trigger by structural path)
-        abs_xp = entry.get('absoluteTarget', '') or ''
+        abs_xp = _e.get('absoluteTarget', '') or ''
         if abs_xp and not abs_xp.startswith('/') and not abs_xp.startswith('//'):
             abs_xp = '/' + abs_xp
 
@@ -637,9 +649,9 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
     # ---- click_element_by_index ----
     if action == 'click_element_by_index':
         idx = p('index')
-        xp = entry.get('target', '') or ''
+        xp = _e.get('target', '') or ''
         txt = p('text', '')
-        elem_id = entry.get('attributes', {}).get('id', '') or ''
+        elem_id = _e.get('attributes', {}).get('id', '') or ''
 
         if not xp:
             lines.append(f"    console.log('[{step_num}] Click [{idx}] (no XPath)');")
@@ -659,8 +671,8 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         if elem_id:
             selectors.append(('id', f"page.locator('#{_escape(elem_id)}').first()"))
         # Tier 1: Class-based (stable if unique enough)
-        tag = entry.get('tagName', '') or ''
-        attrs = entry.get('attributes', {}) or {}
+        tag = _e.get('tagName', '') or ''
+        attrs = _e.get('attributes', {}) or {}
         cls = attrs.get('class', '') or ''
         if cls and tag:
             safe_cls = cls.split(' ')[0].replace('"', '').replace("'", '')
@@ -806,7 +818,10 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
     # Sort snapshots by action_index so checks inject at the right points
-    pending_checks = sorted(form_snapshots or [], key=lambda s: s.get('action_index', 0))
+    # Normalize to FormSnapshot if raw dicts
+    _raw_checks = form_snapshots or []
+    _norm_checks = [FormSnapshot(**s) if isinstance(s, dict) else s for s in _raw_checks]
+    pending_checks = sorted(_norm_checks, key=lambda s: s.action_index)
     action_counter = 0  # counts through ALL entries to find injection point
     _check_idx = [0]  # mutable counter for unique variable names
 
@@ -856,7 +871,9 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         body.append(f'    console.log("[FORM-CHECK] Verification passed for container: {container_label}");')
 
     for entry in action_entries:
-        action = entry.get('action', '')
+        # Normalize entry to dict
+        _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
+        action = _e.get('action', '')
         action_counter += 1
 
         if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
@@ -873,9 +890,13 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         is_first_fill = action in FILL_ACTIONS and not in_block
         if is_first_fill:
             # Inject any pending form checks whose action_index has been passed
-            while pending_checks and action_counter > pending_checks[0].get('action_index', 0):
+            while pending_checks and action_counter > pending_checks[0].action_index:
                 check = pending_checks.pop(0)
-                _inject_form_check(check.get('fields', []), check.get('container', 'main'), check.get('action_index', 0))
+                _inject_form_check(
+                    [f.model_dump() for f in check.fields],
+                    check.container,
+                    check.action_index,
+                )
             in_block = True
 
         code = _generate_action_code(entry, step, url, is_first_fill)
@@ -907,7 +928,8 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
     for entry in partial_entries:
-        action = entry.get('action', '')
+        _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
+        action = _e.get('action', '')
         if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
                       'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
                       'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
@@ -944,7 +966,8 @@ def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=N
     body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
     for entry in partial_entries:
-        action = entry.get('action', '')
+        _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
+        action = _e.get('action', '')
         if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
                       'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
                       'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
@@ -1045,11 +1068,18 @@ def main():
     else:
         actions = raw_cmds
 
+    # Normalize to ActionEntry model objects
+    actions = [
+        ActionEntry(**a) if isinstance(a, dict) else a
+        for a in (actions if isinstance(actions, list) else [])
+    ]
+
     url = data.get('url', '') or ''
     if not url or 'unknown' in url.lower():
-        for entry in actions if isinstance(actions, list) else []:
-            if entry.get('action') == 'go_to_url':
-                url = entry.get('params', {}).get('url', '') or ''
+        for entry in actions:
+            ae = entry if isinstance(entry, ActionEntry) else ActionEntry(**entry) if isinstance(entry, dict) else None
+            if ae and ae.action == 'go_to_url':
+                url = ae.params.get('url', '') or ''
                 if url:
                     break
 
