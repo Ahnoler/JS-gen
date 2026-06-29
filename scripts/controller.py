@@ -229,7 +229,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     return 'label-not-found';
 }'''
 
-JS_FILL_DATE_SET = '''([label, val]) => {
+JS_FILL_DATE_FIELD = '''([label, val]) => {
     const setFn = (t, v) => {
         const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
         const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -250,37 +250,23 @@ JS_FILL_DATE_SET = '''([label, val]) => {
             if (!target) return 'no-input';
             if (target.disabled || target.readOnly) return 'disabled';
             if (target.closest('.el-date-editor, .tsscdatepicker')) {
+                // Step 1: Click to focus and open the picker panel
                 target.focus();
+                target.click();
+                // Step 2: Set value via native setter + Vue reactivity
                 setFn(target, val);
-                // Vue reactivity
                 try{let vm=target.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){}
-                // Click input again to ensure picker is open
-                target.parentNode?.querySelector('input')?.click() || target.click();
-                return 'opened';
+                // Step 3: Dispatch Enter key to confirm the date
+                target.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));
+                target.dispatchEvent(new KeyboardEvent('keyup', {key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));
+                // Close any remaining picker panels
+                document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
+                return 'ok-date:' + val;
             }
             return 'not-date';
         }
     }
     return 'nf:' + label;
-}'''
-
-JS_CLICK_DATE_CELL = '''([val]) => {
-    const day = new Date(val).getDate();
-    const panels = document.querySelectorAll('.el-picker-panel');
-    for (const panel of panels) {
-        if (!panel.offsetParent || panel.style.display === 'none') continue;
-        const cells = panel.querySelectorAll('td.available:not(.prev-month):not(.next-month)');
-        for (const td of cells) {
-            const text = td.textContent.trim();
-            if (parseInt(text) === day && !td.disabled) {
-                td.click();
-                document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
-                return 'ok-date:' + val;
-            }
-        }
-        return 'cell-not-found:' + day;
-    }
-    return 'panel-not-found';
 }'''
 
 JS_FIND_LABELED_SELECT = '''([label, mode]) => {
@@ -776,19 +762,15 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             return _ok(result)
         return result
 
-    @controller.action('Fill an Element UI date picker by label text. Two-step: sets value via native setter + Vue reactivity, then clicks the matching day cell in the picker panel to trigger the full pick event chain. Date value persists after save/re-render.')
+    @controller.action('Fill an Element UI date picker by label text. Clicks the input to open the picker, types the date value, and presses Enter to confirm. Date value persists after save/re-render.')
     async def fill_date_field(label_text: str, value: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        s1 = await page.evaluate(JS_FILL_DATE_SET, [label_text, value])
-        if not str(s1).startswith('opened'):
-            return s1
-        await page.wait_for_timeout(500)
-        s2 = await page.evaluate(JS_CLICK_DATE_CELL, [value])
-        if s2.startswith('ok-date'):
-            _record_action('fill_date_field', {'label_text': label_text, 'value': value}, s2)
-            return _ok(s2)
-        return s2
+        result = await page.evaluate(JS_FILL_DATE_FIELD, [label_text, value])
+        if result.startswith('ok-date'):
+            _record_action('fill_date_field', {'label_text': label_text, 'value': value}, result)
+            return _ok(result)
+        return result
 
     @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
@@ -950,12 +932,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             try:
                 if kind in ('fill_input', 'fill', 'input'):
                     if field_kind == 'date':
-                        s1 = await page.evaluate(JS_FILL_DATE_SET, [label, value])
-                        if str(s1).startswith('opened'):
-                            await page.wait_for_timeout(500)
-                            result = await page.evaluate(JS_CLICK_DATE_CELL, [value])
-                        else:
-                            result = s1
+                        result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
                     else:
                         result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
                 elif kind in ('select_option', 'select', 'option'):
@@ -1062,12 +1039,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     try:
                         if kind in ('fill_input', 'fill', 'input'):
                             if field_kind == 'date':
-                                s1 = await page.evaluate(JS_FILL_DATE_SET, [label, value])
-                                if str(s1).startswith('opened'):
-                                    await page.wait_for_timeout(500)
-                                    result = await page.evaluate(JS_CLICK_DATE_CELL, [value])
-                                else:
-                                    result = s1
+                                result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
                             else:
                                 result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
                         elif kind in ('select_option', 'select', 'option'):
@@ -1720,31 +1692,29 @@ def _err(msg):
     """Wrap an error string in ActionResult."""
     return ActionResult(extracted_content=str(msg), is_done=False, success=False)
 
-FILL_FORM_SYSTEM_PROMPT = '''你是一个表单填写助手。根据字段列表，返回 JSON 动作数组。
+def _load_fill_form_prompt():
+    """Load the canonical form filling rules from agent-field-rules.md."""
+    import os as _os
+    _prompt_dir = _os.path.dirname(_os.path.abspath(__file__))
+    _rules_path = _os.path.join(_prompt_dir, 'prompts', 'agent-field-rules.md')
+    try:
+        with open(_rules_path, 'r', encoding='utf-8') as _f:
+            _rules = _f.read()
+    except Exception:
+        _rules = ''
+    return f'''你是一个表单填写助手。根据字段列表，返回 JSON 动作数组。
 
 动作类型：
-- fill_input: 填写输入框，参数 {"action":"fill_input","label":"字段标签","value":"要填的值"}
-- select_option: 选择下拉框，参数 {"action":"select_option","label":"字段标签","option":"要选的选项"}
+- fill_input: 填写输入框，参数 {{"action":"fill_input","label":"字段标签","value":"要填的值"}}
+- select_option: 选择下拉框，参数 {{"action":"select_option","label":"字段标签","option":"要选的选项"}}
 
 规则：
 - commandValue 标记的字段：用户已指定值，直接使用 commandValue 填入，不要修改或重新生成
-- 无 commandValue 的 input/date 字段：按 form_rules 规则生成合法随机值：
-  - 标签含"姓名""名称""简称"→常见中文名称（如"测试企业有限公司""张三"）
-  - 标签含"手机""电话"→11位手机号
-  - 标签含"身份证"→18位身份证号（含校验位）
-  - 标签含"邮箱""Email"→合法邮箱地址
-  - 标签含"金额""收入""资产"→合理数值（如"5000000"）
-  - 标签含"人数"→正整数
-  - 标签含"邮编"→6位数字
-  - 标签含"地址"→完整中文地址
-  - 标签含"日期"→日期格式 YYYY-MM-DD
-  - 标签含"代码""编号"→合理编号（含校验位）
-  - 标签含"证件号码""信用代码""营业执照"→合法统一社会信用代码（18位，含校验位）
-  - 标签含"账号"→银行账号格式
-  - 标签含"开户行"→银行名称
-  - 标签含"备注"→简短测试备注
-- 无 commandValue 的 select/radio/checkbox：结合字段标签语义，从 options 列表中选取最合理的选项（如"对公客户类型"→"企业类"，"证件类型"→"统一社会信用代码"）
-- 只返回 JSON 数组，不要解释'''
+- 无 commandValue 的 input/date 字段：严格按照下方规则文档生成合法值
+- 无 commandValue 的 select/radio/checkbox：结合字段标签语义，从 options 列表中选取最合理的选项
+- 只返回 JSON 数组，不要解释
+
+{_rules}'''
 
 
 def _llm_generate_values(llm, items, form_rules=None, case_data_store=None, instruction="生成合理的测试数据"):
@@ -1830,7 +1800,7 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None, inst
     from langchain_core.messages import SystemMessage, HumanMessage
     try:
         response = llm.invoke([
-            SystemMessage(content=FILL_FORM_SYSTEM_PROMPT),
+            SystemMessage(content=_load_fill_form_prompt()),
             HumanMessage(content=prompt)
         ])
         text = response.content if hasattr(response, 'content') else str(response)
