@@ -137,9 +137,9 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         if (target.disabled || target.readOnly) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
             target.focus();
+            try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
             setFn(target, val);
             target.blur();
-            try{let vm=target.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);}}}catch(e){}
             document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
             return 'ok-date';
         }
@@ -158,9 +158,9 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         if (target.disabled || target.readOnly) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
             target.focus();
+            try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
             setFn(target, val);
             target.blur();
-            try{let vm=target.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);}}}catch(e){}
             document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
             return 'ok-date';
         }
@@ -187,11 +187,18 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     return 'label-not-found';
 }'''
 
-JS_FILL_DATE_FIELD = '''async ([label, val]) => {
-    const wait = ms => new Promise(r => setTimeout(r, ms));
+JS_FILL_DATE_FIELD = '''([label, val]) => {
+    const setFn = (t, v) => {
+        const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+        const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
+        setter.call(t, v);
+        t.setAttribute('value', v);
+        t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:v}));
+        t.dispatchEvent(new Event('change',{bubbles:true}));
+        t.dispatchEvent(new Event('blur',{bubbles:true}));
+    };
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
-    // Find the date input by label
     let target = null;
     for (let pass = 1; pass <= 2; pass++) {
         const exact = pass === 1;
@@ -207,45 +214,49 @@ JS_FILL_DATE_FIELD = '''async ([label, val]) => {
         if (target) break;
     }
     if (!target) return 'nf:' + label;
-
-    // Parse target day
-    const targetDate = new Date(val);
-    if (isNaN(targetDate.getTime())) return 'invalid-date:' + val;
-    const targetDay = targetDate.getDate();
-
-    // Step 1: Click to open the picker panel
+    if (isNaN(new Date(val).getTime())) return 'invalid-date:' + val;
+    // ── Design rationale: direct DOM injection, no panel interaction ──
+    // Three approaches were tested on real Element UI date pickers (Edge CDP, 2026-06-30):
+    //
+    // ❌ Approach 1 — input.click() to open panel:
+    //    Element UI listens on .el-input__prefix (calendar icon), not the <input>.
+    //    click() on the input itself does nothing → "panel-not-opened".
+    //
+    // ❌ Approach 2 — prefixIcon.click() + month navigation + day click:
+    //    Panel opens at current month. Requires prev/next button clicks to reach
+    //    target month (fragile parsing of Chinese header text). After first fill,
+    //    the panel gets display:none + is-hidden class; subsequent prefix clicks
+    //    cannot reliably re-open it. Also: multiple panels (year/month/day) coexist
+    //    in the DOM, making visible-panel detection error-prone.
+    //
+    // ❌ Approach 3 — setFn + p.date + parentNode click + setTimeout day click:
+    //    ctrl-actions.js uses this (sets value, syncs Vue, clicks parent, then
+    //    setTimeout→click day). On our target page, the panel opens at YEAR level
+    //    after p.date is set, so day cells aren't visible → day-not-found.
+    //
+    // ✅ Approach 4 — native DOM setter ONLY, no panel:
+    //    setFn() calls Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,
+    //    'value').set.call(input, val) + InputEvent('input') + Event('change') +
+    //    Event('blur'). This bypasses Element UI's panel entirely and writes
+    //    directly to the underlying <input>. Vue sync (p.date + $emit('pick'))
+    //    keeps the component's internal state consistent.
+    //    Verified: values survive dialog open/close and persist correctly.
+    // ── Date-picker Vue instance lookup ──
+    // .el-date-editor.__vue__ resolves to the INNER ElInput component,
+    // not the ElDatePicker.  ElInput.$emit('input') only reaches its
+    // parent ElDatePicker — the ElForm (which holds the v-model) never
+    // sees the update.  Must walk up the parent chain to find the
+    // ElDatePicker instance, whose $emit('input') reaches ElForm.
+    //
+    // Verified with Edge CDP (2026-06-30): after emitting from ElDatePicker
+    // level, ElForm.model.fdDt reflects the new value and save validation
+    // passes.  Without this walk-up, save clears the date fields.
     target.focus();
-    target.click();
-    await wait(400);
-
-    // Step 2: Find the visible picker panel
-    const findPanel = () => {
-        for (const p of document.querySelectorAll('.el-picker-panel')) {
-            if (p.offsetParent && p.style.display !== 'none') return p;
-        }
-        for (const p of document.querySelectorAll('.el-date-picker')) {
-            if (p.offsetParent && p.style.display !== 'none') return p;
-        }
-        return null;
-    };
-    let panel = findPanel();
-    if (!panel) return 'panel-not-opened';
-
-    // Step 3: Click the matching day cell in the current month view
-    const dayCells = panel.querySelectorAll('td.available:not(.prev-month):not(.next-month)');
-    for (const td of dayCells) {
-        const d = parseInt(td.textContent.trim());
-        if (d === targetDay && !td.disabled) {
-            td.click();
-            await wait(200);
-            document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
-            return 'ok-date:' + val;
-        }
-    }
-
-    // Close panel on failure
+    try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
+    setFn(target, val);
+    target.blur();
     document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
-    return 'day-not-found:' + targetDay;
+    return 'ok-date';
 }'''
 
 # ── Select / dropdown ──
@@ -256,14 +267,18 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         if (!select) return null;
         const trigger = select.querySelector('.el-input__inner');
         if (trigger) {
+            // 1. DOM property value (most reliable after native setter)
             const v = (trigger.value || '').trim();
             if (v) return v;
+            // 2. Attribute value (may persist even if property cleared)
+            const av = (trigger.getAttribute('value') || '').trim();
+            if (av) return av;
+            // 3. ARIA / title fallback
+            const aria = (trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '').trim();
+            if (aria) return aria;
         }
         const tag = select.querySelector('.el-select__tags-text');
-        if (tag) {
-            const t = tag.textContent.trim();
-            if (t) return t;
-        }
+        if (tag) { const t = tag.textContent.trim(); if (t) return t; }
         const selItem = select.querySelector('.el-select-dropdown__item.is-selected');
         if (selItem) return selItem.textContent.trim();
         return null;

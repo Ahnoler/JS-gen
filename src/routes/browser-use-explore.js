@@ -476,7 +476,7 @@ export default function (app) {
     });
 
     child.stderr.on('data', (chunk) => {
-      console.log('[browser-global stderr] ' + chunk.toString().trimEnd());
+      console.log('chunk.toString().trimEnd());
     });
 
     child.on('exit', () => {

@@ -25,6 +25,7 @@
 - done(text, success) — 仅在任务完全完成时调用
 
 ## Element UI 自定义动作（用于 Element UI 组件）
+- **login(username, password, captcha='', sms_code='') — 🚨 登录系统。填写用户名+密码+验证码(可选)+短信验证码(可选)、点击登录按钮、等待跳转。有验证码时传入 captcha='1111' sms_code='1111'。不要手动逐字段填写登录表单。**
 - select_option(label_text, option_text) — el-select 下拉框。"first" 选择第一个选项。**🚨 这是选择 el-select 选项的唯一正确方式。不要使用 click_element 来选择下拉选项。**
 - fill_form_field(label_text, value) — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 通过标签文本、placeholder 或输入类型匹配。如果输入框被禁用则返回 "field-disabled" — 跳过它。
 - click_radio(label_text, option_text) — el-radio 单选组
@@ -47,7 +48,7 @@
 - **`scan_form_fields()` — 🚨 遇到表单弹窗/抽屉时，第一个调用的操作。自动扫描全部字段、初始化任务列表、批量填写所有待办字段。调用后无需手动逐字段填写。**
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
 - **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要，scan_form_fields 已自动处理）。**
-- fill_form_fields_batch(fields_json) — 手动指定值批量填写：[{"action":"fill_input","label":"...","value":"..."}, ...]。
+- **`fill_form_fields_batch` — 已移除。批量填写功能已内建在 scan_form_fields 末尾，Agent 无需手动调用。**
 - task_done(label) — 将字段标记为已完成。
 - task_retry(label) — 将字段重新加入待办。
 - get_pending_tasks() — 返回 {"pending": [...], "done": [...]}。

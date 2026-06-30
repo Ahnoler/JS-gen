@@ -41,6 +41,45 @@ def _task_done_impl(label_text, case_data_store):
 
 
 def _register_form_actions(controller, browser_context, form_rules, case_data_store, llm=None):
+    async def _ensure_scanned(label_text: str):
+        """Auto-scan + auto-fill if label is not in the current task_list.
+
+        Deterministic trigger — no LLM dependency.  Two conditions:
+        1. task_list doesn't exist → first form on this task
+        2. task_list exists but label not in pending/done → new form
+
+        Only triggers for main-page forms.  Dialog/drawer containers are
+        skipped — they are search/utility dialogs where agent needs fine
+        control over which fields to fill.
+        """
+        page = await browser_context.get_current_page()
+        container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
+        if container_id.startswith('dialog:'):
+            return  # skip: agent manages dialog fields manually
+
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        if tl.total > 0:
+            pending_labels = {d.label for d in tl.pending}
+            done_labels = {d.label for d in tl.done}
+            if label_text in pending_labels or label_text in done_labels:
+                return  # already scanned for this form
+
+        # Scan main-page form
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
+        try:
+            result = json.loads(raw) if isinstance(raw, str) else raw
+            raw_fields = result.get('fields') if isinstance(result, dict) else result
+        except Exception:
+            return
+        dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields]
+
+        # Store scan data
+        tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
+        case_data_store['task_list'] = tl.to_store()
+        case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
+        if tl.pending:
+            await _auto_fill_pending()
+
     @controller.action('Expand ALL el-tree nodes recursively (up to 10 rounds).')
     async def expand_all_el_tree():
         page = await browser_context.get_current_page()
@@ -64,6 +103,55 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             await page.wait_for_timeout(500)
         return _ok(f'expanded-{total}-nodes')
 
+    @controller.action('Login to the system. Fills username + password (+ optional captcha/sms), clicks login button, waits for navigation. Use this instead of manually filling login fields one by one.')
+    async def login(username: str, password: str, captcha: str = '', sms_code: str = ''):
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+
+        results = []
+
+        # Fill username (try common labels)
+        u_r = await page.evaluate(JS_FILL_FORM_FIELD, ['用户名', username])
+        if u_r == 'label-not-found':
+            u_r = await page.evaluate(JS_FILL_FORM_FIELD, ['账号', username])
+        results.append(f'user:{u_r}')
+
+        # Fill password
+        p_r = await page.evaluate(JS_FILL_FORM_FIELD, ['密码', password])
+        results.append(f'pass:{p_r}')
+
+        # Optionally fill captcha
+        if captcha:
+            c_r = await page.evaluate(JS_FILL_FORM_FIELD, ['验证码', captcha])
+            if c_r == 'label-not-found':
+                c_r = await page.evaluate(JS_FILL_FORM_FIELD, ['图形验证码', captcha])
+            results.append(f'captcha:{c_r}')
+
+        # Optionally fill SMS code
+        if sms_code:
+            s_r = await page.evaluate(JS_FILL_FORM_FIELD, ['短信验证码', sms_code])
+            if s_r == 'label-not-found':
+                s_r = await page.evaluate(JS_FILL_FORM_FIELD, ['手机验证码', sms_code])
+            results.append(f'sms:{s_r}')
+
+        # Click login button
+        clicked = await page.evaluate('''() => {
+            const container = ''' + JS_GET_CONTAINER + ''';
+            for (const btn of container.querySelectorAll('button')) {
+                const t = btn.textContent.trim().replace(/\\s/g, '');
+                if ((t === '登录' || t === '登錄' || t === 'Login') && btn.offsetParent !== null && !btn.disabled) {
+                    btn.click();
+                    return 'ok';
+                }
+            }
+            return 'not-found';
+        }''')
+        results.append(f'btn:{clicked}')
+
+        # Wait for post-login navigation
+        await page.wait_for_timeout(3000)
+        return _ok('login-ok | ' + ' '.join(results))
+
     @controller.action('Get a value for a form field by its label using form rules.')
     async def match_form_rule(label_text: str):
         val = match_rule(label_text, form_rules)
@@ -73,6 +161,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     async def fill_form_field(label_text: str, value: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
+        await _ensure_scanned(label_text)
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
         if result == 'ok' or result == 'ok-date' or result == 'ok-placeholder' or result == 'ok-type':
             element = await _capture_element(page, label_text)
@@ -80,10 +169,11 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             return _ok(result)
         return result
 
-    @controller.action('Fill an Element UI date picker by label text. Opens the picker panel and clicks the matching day cell. Value should be current date in YYYY-MM-DD format.')
+    @controller.action('Fill an Element UI date picker by label text. Value should be in YYYY-MM-DD format.')
     async def fill_date_field(label_text: str, value: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
+        await _ensure_scanned(label_text)
         result = await page.evaluate(JS_FILL_DATE_FIELD, [label_text, value])
         if result.startswith('ok-date'):
             _record_action('fill_date_field', {'label_text': label_text, 'value': value}, result)
@@ -136,11 +226,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
         raw_notification = result.get('notification') if isinstance(result, dict) else None
         notification = Notification(**raw_notification) if raw_notification else None
-        scan_result = FormScanResult(
-            container=container_id,
-            fields=dom_fields,
-            notification=notification,
-        )
 
         snapshot = FormSnapshot.from_scan_fields(
             container=container_id,
@@ -153,18 +238,27 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         case_data_store['form_snapshot'] = snapshot.model_dump()
         _record_action('save_form_snapshot', snapshot.model_dump(), f'ok | {snapshot.count}')
 
-        scan_json = json.dumps(scan_result.model_dump(), ensure_ascii=False, indent=2)
-
         # 自动构建任务列表并批量填写（Agent 无感知）
         tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
         if tl.pending:
-            fill_result = await _auto_fill_pending()
-            return _ok(f'scan+auto-fill | fields:{len(dom_fields)} | ' + str(fill_result))
-        return scan_json
+            await _auto_fill_pending()
+            # Re-read task_list after auto-fill to get updated done list
+            tl = TaskList.from_store(case_data_store.get('task_list'))
+        # Annotate fields so agent knows which were handled
+        done_labels = {d.label for d in tl.done}
+        for f in dom_fields:
+            f.filled = f.label in done_labels
 
-    @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Returns {fields: [...], notification: {visible, text}|null}.')
+        scan_result = FormScanResult(
+            container=container_id,
+            fields=dom_fields,
+            notification=notification,
+        )
+        return json.dumps(scan_result.model_dump(), ensure_ascii=False, indent=2)
+
+    @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Excludes fields already filled by auto-fill. Returns {fields: [...], notification: {visible, text}|null}.')
     async def scan_visible_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -186,6 +280,13 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 _merge_ax_text(dom_fields, ax_text)
         except Exception:
             pass
+
+        # Only show fields that still need filling (pending) — keeps failed/error fields.
+        # Also keeps fields not yet tracked (safe default for dynamically shown fields).
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        pending_labels = {d.label for d in tl.pending}
+        done_labels = {d.label for d in tl.done}
+        dom_fields = [f for f in dom_fields if f.label in pending_labels or f.label not in done_labels]
 
         container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
         raw_notification = result.get('notification') if isinstance(result, dict) else None
@@ -230,77 +331,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         _record_action('save_form_snapshot', snapshot.model_dump(), f'ok | {snapshot.count}')
         return _ok(f'form-snapshot | container:{container_id} | count:{snapshot.count}')
 
-    @controller.action('Fill multiple form fields in one call (up to 10 recommended). Pass a JSON array: [{"action":"fill_input","label":"客户名称","value":"张三"},{"action":"select_option","label":"证件类型","option":"营业执照"}]. Each success auto-calls task_done. Returns summary with per-field results.')
-    async def fill_form_fields_batch(fields_json: str):
-        page = await browser_context.get_current_page()
-        await _wait_if_loading(page)
-        try:
-            actions = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
-        except Exception:
-            return _err('invalid-json')
-        results = []
-        for a in actions:
-            label = a.get('label', '')
-            kind = (a.get('action') or '').lower().replace('-', '_')
-            value = a.get('value', '') or a.get('option', '')
-            field_kind = a.get('kind') or ''
-            result = 'skipped'
-            try:
-                if kind in ('fill_input', 'fill', 'input'):
-                    if field_kind == 'date':
-                        result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
-                    else:
-                        result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
-                elif kind in ('select_option', 'select', 'option'):
-                    already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
-                    if already.startswith('already:'):
-                        cur_val = already.split(':', 1)[1]
-                        if cur_val == value or value in cur_val or cur_val in value:
-                            result = already
-                        else:
-                            await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-                            await page.wait_for_timeout(800)
-                            matched = await page.evaluate(JS_FIND_OPTION, value)
-                            if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
-                                result = matched
-                            else:
-                                try:
-                                    opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
-                                    await opt.wait_for(state='visible', timeout=3000)
-                                    await opt.click()
-                                    result = 'ok'
-                                except Exception:
-                                    result = 'click-failed'
-                    else:
-                        await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-                        await page.wait_for_timeout(800)
-                        matched = await page.evaluate(JS_FIND_OPTION, value)
-                        if matched.startswith('NOT_FOUND:') or matched == 'NO_ITEMS':
-                            result = matched
-                        else:
-                            try:
-                                opt = page.locator(f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched}"]').first
-                                await opt.wait_for(state='visible', timeout=3000)
-                                await opt.click()
-                                result = 'ok'
-                            except Exception:
-                                result = 'click-failed'
-                else:
-                    result = f'unknown-action:{kind}'
-            except Exception as e:
-                result = f'error:{e}'
-            ok = result.startswith('ok') or result.startswith('already')
-            results.append({'label': label, 'ok': ok, 'result': result})
-            if ok:
-                if kind in ('fill_input', 'fill', 'input'):
-                    _record_action('fill_form_field', {'label_text': label, 'value': value}, result)
-                elif kind in ('select_option', 'select', 'option'):
-                    _record_action('select_option', {'label_text': label, 'option_text': value}, result)
-                _task_done_impl(label, case_data_store)
-            await page.wait_for_timeout(400)
-        return _ok(f'batch-done | {len(results)} fields | ' + json.dumps(results, ensure_ascii=False))
-
-    # 内部函数 — 由 init_task_list 自动调用。
+    # 内部函数 — 由 scan_form_fields 末尾自动调用。
     # 按 kind 分组（select→input→date→radio→checkbox）多次调用 LLM，
     # 失败字段保留在 pending 供 agent 手动处理，成功字段记录 action + task_done。
     async def _auto_fill_pending():
@@ -516,6 +547,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     async def select_option(label_text: str, option_text: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
+        await _ensure_scanned(label_text)
 
         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'check'])
         if already.startswith('already:'):
@@ -636,4 +668,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     @controller.action('Click a radio option by label text and radio option text.')
     async def click_radio(label_text: str, option_text: str):
         page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        await _ensure_scanned(label_text)
         return await page.evaluate(JS_CLICK_RADIO, [label_text, option_text])

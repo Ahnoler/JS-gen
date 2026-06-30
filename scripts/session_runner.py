@@ -169,10 +169,10 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
 
 def _handle_save_case_data(case_data_store, session_id):
     try:
-        data_dir = Path(__file__).parent / 'data'
+        data_dir = Path(__file__).parent / 'case_data'
         data_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        case_data_path = data_dir / f"case_data_{ts}.json"
+        case_data_path = data_dir / f"cdata_{ts}.json"
         import json as _json
         with open(case_data_path, 'w', encoding='utf-8') as f:
             _json.dump(case_data_store, f, ensure_ascii=False, indent=2)

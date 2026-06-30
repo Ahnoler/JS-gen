@@ -2,6 +2,7 @@
 Recording hooks for browser-use agent: step callbacks, goal dedup detection, cancel signal,
 premature done() prevention, and human intervention injection.
 """
+import json
 import sys
 from langchain_core.messages import HumanMessage
 from .agent_utils import emit_json
@@ -41,10 +42,21 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
         _last_result_str = str(_last_result)[:300] if _last_result else 'None'
         _model_out = agent.state.history.history[-1].model_output if agent.state.history and agent.state.history.history else None
         _next_goal = getattr(getattr(_model_out, 'current_state', None), 'next_goal', '') if _model_out else ''
-        _actions = [str(a)[:100] for a in (getattr(_model_out, 'action', []) or [])] if _model_out else []
+        _actions_raw = (getattr(_model_out, 'action', []) or []) if _model_out else []
+        _actions = []
+        for a in _actions_raw:
+            try:
+                d = a.model_dump() if hasattr(a, 'model_dump') else (a.dict() if hasattr(a, 'dict') else vars(a))
+                active = {k: v for k, v in d.items() if v is not None}
+                _actions.append(json.dumps(active, ensure_ascii=False, default=str))
+            except Exception:
+                _actions.append(str(a))
         sys.stderr.write(f"[on_step_end]\t n_steps={agent.state.n_steps} is_done={_done} stopped={_stopped}\n")
         sys.stderr.write(f"[next_goal]\t {_next_goal[:150]}\n")
-        sys.stderr.write(f"[actions]\t {_actions}\n")
+        if _actions:
+            sys.stderr.write(f"[actions]\t {', '.join(_actions)}\n")
+        else:
+            sys.stderr.write(f"[actions]\t []\n")
         sys.stderr.write(f"[last_result]\t {_last_result_str}\n")
         sys.stderr.flush()
 

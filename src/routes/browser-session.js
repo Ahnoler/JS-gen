@@ -28,7 +28,7 @@ async function ensureGlobalBrowser(modelId) {
 
   const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY], { OPENAI_API_KEY: LLM_API_KEY });
 
-  child.stderr.on('data', (chunk) => { console.log('[browser-global stderr] ' + chunk.toString().trimEnd()); });
+  child.stderr.on('data', (chunk) => { console.log(chunk.toString().trimEnd()); });
   child.on('exit', () => {
     gb.process = null; gb.stdin = null; gb.ready = false; gb.busy = false; gb.stepIndex = 0;
     console.log('[browser-global] Process exited');
@@ -506,7 +506,7 @@ export default function (app) {
             if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save case data' });
             try {
               const { record } = saveCaseDataRecord({
-                sourcePath: msg.data.case_data_file,
+                caseDataPath: msg.data.case_data_file,
                 sessionId: id,
                 model: session.model,
                 description: session.lastTask ? session.lastTask.slice(0, 100) : '',

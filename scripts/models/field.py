@@ -76,6 +76,10 @@ class ScannedField(BaseModel):
         default=False,
         description="True if this .el-form-item contains an action button (e.g. '选择'/'获取地址' for address, '引入' for legal person)",
     )
+    filled: bool = Field(
+        default=False,
+        description="True if this field was already filled by auto-fill (label is in task_list.done)",
+    )
 
 
 # ── Scan result (top-level) ────────────────────────────────────────────────

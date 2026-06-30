@@ -509,7 +509,7 @@ DELETE /api/browser/browser         → 关闭浏览器
 | `scan_form_fields()` | 全面扫描所有表单字段（开始时使用一次） |
 | `scan_visible_fields()` | 仅扫描当前可见字段（后续检查用） |
 | `init_task_list(scan_json)` | 从扫描结果创建待办清单 |
-| `fill_pending_batch()` | 批量填写所有待办字段（按 select → input → date → radio → checkbox 分组） |
+| `fill_pending_batch()` | ❌ 已移除。批量填写已内建在 `scan_form_fields()` 末尾自动执行 |
 | `get_page_state()` | 页面诊断信息 |
 
 ### Agent 提示词系统
@@ -517,7 +517,7 @@ DELETE /api/browser/browser         → 关闭浏览器
 Agent 提示词位于 `scripts/prompts/agent-prompt.md`，包含：
 
 1. **主提示词**：Element UI 操作规则、可用动作列表、响应格式约束
-2. **任务列表系统**：`scan_form_fields` → `init_task_list` → `fill_pending_batch` 的批处理工作流
+2. **任务列表系统**：`scan_form_fields` 自动扫描 + 批量填写的批处理工作流
 3. **字段验证**：`check_field_value`、`verify_field_value` 的验证规则
 4. **分隔标记 `---` 和 `# PLANNER SYSTEM PROMPT`**：用于区分主提示词和规划器提示词
 

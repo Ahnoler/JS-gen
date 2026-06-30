@@ -36,7 +36,12 @@ import sys
 import re
 from datetime import datetime
 
-from .models import ActionEntry, ActionFile, FormSnapshot, ElementInfo
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_THIS_DIR)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from scripts.models import ActionEntry, ActionFile, FormSnapshot, ElementInfo
 
 
 # ========================== CTRL Injection Template ==========================
@@ -791,8 +796,6 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
                   'expand_all_el_tree', 'task_done', 'task_retry'):
         return ''
 
-    if action in ('fill_form_fields_batch', 'fill_pending_batch'):
-        return ''
 
     lines.append(f'    // skipped: {action}')
     return '\n'.join(lines)
@@ -880,7 +883,7 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
                       'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
                       'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
                       'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
-                      'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch',
+                      'task_done', 'task_retry',
                       'save_form_snapshot'):
             continue
 
@@ -934,7 +937,7 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
                       'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
                       'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
                       'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
-                      'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch'):
+                      'task_done', 'task_retry'):
             continue
 
         if action in BOUNDARY_ACTIONS:
@@ -972,7 +975,7 @@ def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=N
                       'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
                       'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
                       'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
-                      'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch'):
+                      'task_done', 'task_retry'):
             continue
         if action in BOUNDARY_ACTIONS:
             in_block = False
@@ -1115,7 +1118,7 @@ def main():
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(script)
         print(f'Script written: {output_path}')
-        visible_actions = [a for a in actions if a.get("action","") not in ("scroll_down","scroll_up","get_page_state","scan_form_fields","scan_visible_fields","check_field_value","verify_field_value","take_screenshot","save_trajectory","save_case_data","read_case_data","match_form_rule","init_task_list","get_pending_tasks","sync_tasks_from_errors","expand_all_el_tree","task_done","task_retry")]
+        visible_actions = [a for a in actions if (a.action if isinstance(a, ActionEntry) else a.get("action","")) not in ("scroll_down","scroll_up","get_page_state","scan_form_fields","scan_visible_fields","check_field_value","verify_field_value","take_screenshot","save_trajectory","save_case_data","read_case_data","match_form_rule","init_task_list","get_pending_tasks","sync_tasks_from_errors","expand_all_el_tree","task_done","task_retry")]
         print(f'Steps: {len(visible_actions)}')
     else:
         print(script)
