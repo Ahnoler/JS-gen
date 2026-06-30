@@ -73,8 +73,21 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         except Exception:
             return
         dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields]
+        container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
 
-        # Store scan data
+        # Save form structure snapshot BEFORE auto-fill (captures original state)
+        snapshot = FormSnapshot.from_scan_fields(
+            container=container_id,
+            scan_fields=[f.model_dump() for f in dom_fields],
+            action_index=len(_ACTION_LOG),
+        )
+        coll = FormSnapshotCollection(case_data_store.get('form_snapshots', []))
+        coll.upsert(snapshot)
+        case_data_store['form_snapshots'] = coll.to_dicts()
+        case_data_store['form_snapshot'] = snapshot.model_dump()
+        _record_action('save_form_snapshot', snapshot.model_dump(), f'ok | {snapshot.count}')
+
+        # Store scan data + auto-fill
         tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
@@ -151,6 +164,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         # Wait for post-login navigation
         await page.wait_for_timeout(3000)
+        _record_action('login', {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code}, 'login-ok')
         return _ok('login-ok | ' + ' '.join(results))
 
     @controller.action('Get a value for a form field by its label using form rules.')

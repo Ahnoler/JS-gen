@@ -193,6 +193,46 @@ const CTRL_OBJECT = `{
     }
     return 'label-not-found';
   },
+  selectTreeOption: (label, option) => {
+    const item = [...CTRL.getContainer().querySelectorAll('.el-form-item')].find(i => (i.querySelector('.el-form-item__label')?.textContent?.trim()||'').includes(label));
+    if (!item) return 'label-not-found';
+    const input = item.querySelector('input');
+    if (!input || input.disabled || input.readOnly) return input ? 'disabled' : 'no-input';
+    input.click();
+    const tree = document.querySelector('.el-tree');
+    if (!tree) return 'no-tree-component';
+    let vm = tree.__vue__;
+    while (vm && vm.$options && !vm.$options.name?.includes('TsscMultiTree')) vm = vm.$parent;
+    if (!vm) return 'no-tree-component';
+    const td = vm.treeData || [];
+    let code = null;
+    for (const n of td) { if (n.label===option) { code=n.value||n.id; break; } if (n.label&&n.label.includes(option)&&!code) { code=n.value||n.id; } }
+    if (!code) { const w=(ns)=>{for(const n of ns){if(n.label===option)return n.value||n.id;if(n.label&&n.label.includes(option))return n.value||n.id;if(n.children){const r=w(n.children);if(r)return r;}}return null;}; code=w(vm.data||[]); }
+    if (code) { vm.$emit('input', code); setTimeout(()=>{if(typeof vm.handleHideClick==='function')vm.handleHideClick();},100); return 'ok:'+option+' ('+code+')'; }
+    // P1: search UI fallback
+    const pop = document.querySelector('.tree-popover');
+    if (!pop) return 'no-popover';
+    const si = pop.querySelector('input'), sb = pop.querySelector('button');
+    if (si && sb) {
+      const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+      s.call(si, option||'科技'); si.dispatchEvent(new InputEvent('input',{bubbles:true}));
+      setTimeout(()=>sb.click(),200);
+      return new Promise(resolve => {
+        setTimeout(() => {
+          const ns = document.querySelectorAll('.el-tree-node:not(.is-hidden)');
+          for (const n of ns) { const ic=n.querySelector('.el-tree-node__expand-icon'), cd=n.querySelector('.el-tree-node__children'); if(!ic||ic.classList.contains('is-leaf')||!cd) { const lb=n.querySelector('.el-tree-node__label'); if(lb)lb.click();else n.click(); setTimeout(()=>{if(typeof vm.handleHideClick==='function')vm.handleHideClick();},100); resolve('ok-search:'+(lb?.textContent||n.textContent||'').trim()); return; } }
+          // P2: first leaf fallback
+          const wl=(ns)=>{for(const n of ns){if(!n.children||!n.children.length)return n;const r=wl(n.children);if(r)return r;}return null;};
+          const first=wl(vm.data||[]); if(first){code=first.value||first.id;const ol=first.label||first.value||first.id;vm.$emit('input',code);setTimeout(()=>{if(typeof vm.handleHideClick==='function')vm.handleHideClick();},100);resolve('ok-fallback:'+ol+' ('+code+')');return;}
+          resolve('no-leaf-after-search');
+        }, 1000);
+      });
+    }
+    // P2 only (no search UI)
+    const wl=(ns)=>{for(const n of ns){if(!n.children||!n.children.length)return n;const r=wl(n.children);if(r)return r;}return null;};
+    const first=wl(vm.data||[]); if(first){code=first.value||first.id;const ol=first.label||first.value||first.id;vm.$emit('input',code);setTimeout(()=>{if(typeof vm.handleHideClick==='function')vm.handleHideClick();},100);return 'ok-fallback:'+ol+' ('+code+')';}
+    return 'option-not-found';
+  },
   clickMenuItem: (text) => {
     const d = [...document.querySelectorAll('.el-menu-item')].find(el => el.textContent.trim()===text && el.offsetParent!==null);
     if (d) { d.click(); return 'ok'; }
@@ -359,6 +399,7 @@ export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 | CTRL.selectOption | (label, option) | 'triggered' / 'label-not-found' | 下拉选择 el-select，option='first' 选第一项 |
 | CTRL.selectDate | (label, dateStr) | 'selected:xxx' / 'already:xxx' / 'label-not-found' | 设置 el-date-editor，格式 YYYY-MM-DD |
 | CTRL.clickRadio | (label, option) | 'ok' / 'option-not-found' / 'label-not-found' | 点击 el-radio |
+| CTRL.selectTreeOption | (label, option) | 'ok:xxx (code)' / 'ok-search:xxx' / 'ok-fallback:xxx (code)' | 树选择器，P0 精确/P1 搜索/P2 兜底 |
 | CTRL.clickMenuItem | (text) | 'ok' / 'ok-expanded' / 'not-found' | 点击 el-menu-item，自动展开 el-submenu |
 | CTRL.clickTableRowAction | (rowText, btnText) | 'ok' / 'ok-icon' / 'button-not-found' / 'row-not-found' | 在 el-table 行内找按钮 |
 | CTRL.closeDialog | () | 'ok' / 'ok-notification' / 'ok-cancel' / 'no-overlay-open' | 关闭通知/弹窗/抽屉 |

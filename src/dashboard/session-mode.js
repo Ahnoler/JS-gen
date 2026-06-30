@@ -641,7 +641,7 @@ export function initSessionMode() {
       const data = await res.json();
       const actionName = (data.action_file || '').split(/[\\/]/).pop() || '';
       const logName = (data.log_file || '').split(/[\\/]/).pop() || '';
-      sessTrajectoryId.textContent = 'A:' + actionName.replace('.json','').slice(0,12) + '... L:' + logName.replace('.txt','').slice(0,12) + '...';
+      sessTrajectoryId.textContent = actionName.replace('.json','').slice(0,20) + '... |' + logName.replace('.txt','').slice(0,20) + '...';
       sessLog('success', data.action_count + ' actions + ' + data.log_count + ' log lines saved');
     } catch (err) {
       sessLog('error', 'Save failed: ' + err.message);

@@ -44,6 +44,16 @@ if _PROJECT_ROOT not in sys.path:
 from scripts.models import ActionEntry, ActionFile, FormSnapshot, ElementInfo
 
 
+# Actions that are meta/utility only — not rendered as Playwright steps
+_SKIP_ACTIONS = (
+    'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
+    'check_field_value', 'verify_field_value', 'take_screenshot',
+    'save_trajectory', 'save_case_data', 'read_case_data',
+    'match_form_rule', 'init_task_list', 'get_pending_tasks', 'sync_tasks_from_errors',
+    'expand_all_el_tree', 'task_done', 'task_retry',
+    'save_form_snapshot',
+)
+
 # ========================== CTRL Injection Template ==========================
 
 CTRL_API_CODE = '''const { chromium } = require('playwright');
@@ -423,6 +433,26 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
     if action == 'go_to_url':
         return ''
 
+    # ---- login (expand into fill + click) ----
+    if action == 'login':
+        u, pw = p('username') or '', p('password') or ''
+        cp = p('captcha') or ''
+        sm = p('sms_code') or ''
+        lines.append(f"    console.log('[{step_num}] Login: fill username + password');")
+        lines.append(f"    await page.evaluate((v) => CTRL.fillFormField('用户名', v), '{_escape(u)}');")
+        lines.append(f"    await page.evaluate((v) => CTRL.fillFormField('密码', v), '{_escape(pw)}');")
+        if cp:
+            lines.append(f"    await page.evaluate((v) => CTRL.fillFormField('验证码', v), '{_escape(cp)}');")
+        if sm:
+            lines.append(f"    await page.evaluate((v) => CTRL.fillFormField('短信验证码', v), '{_escape(sm)}');")
+        lines.append(f"    await page.evaluate(() => {{")
+        lines.append(f"      for (const btn of document.querySelectorAll('button')) {{")
+        lines.append(f"        if (['登录','登錄','Login'].includes(btn.textContent.trim().replace(/\\\\s/g,'')) && btn.offsetParent && !btn.disabled) {{ btn.click(); break; }}")
+        lines.append(f"      }}")
+        lines.append(f"    }});")
+        lines.append(f"    await page.waitForTimeout(3000);")
+        return ''
+
     # ---- fill_form_field ----
     if action == 'fill_form_field':
         l, v = p('label_text'), p('value')
@@ -651,6 +681,19 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
+    # ---- select_tree_option ----
+    if action == 'select_tree_option':
+        l, o = p('label_text'), p('option_text')
+        lines.append(f"    console.log('[{step_num}] Tree-select \"{l}\" = \"{o}\"');")
+        lines.append(pre())
+        lines.append(pre_ready())
+        lines.append(f"    const _rt{step_num} = await page.evaluate(() => CTRL.selectTreeOption('{_escape(l)}', '{_escape(o)}'));")
+        lines.append(f"    console.log('[{step_num}]   CTRL:', _rt{step_num});")
+        lines.append(f"    if (!_rt{step_num} || _rt{step_num} === 'label-not-found' || _rt{step_num} === 'option-not-found' || _rt{step_num} === 'no-tree-component') {{")
+        lines.append(f"      _recordError({step_num}, 'select_tree_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', _rt{step_num}, '');")
+        lines.append(f"    }}")
+        return '\n'.join(lines)
+
     # ---- click_element_by_index ----
     if action == 'click_element_by_index':
         idx = p('index')
@@ -789,11 +832,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         return '\n'.join(lines)
 
     # ---- skip internal/exploratory actions ----
-    if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
-                  'check_field_value', 'verify_field_value', 'take_screenshot',
-                  'save_trajectory', 'save_case_data', 'read_case_data',
-                  'match_form_rule', 'init_task_list', 'get_pending_tasks', 'sync_tasks_from_errors',
-                  'expand_all_el_tree', 'task_done', 'task_retry'):
+    if action in _SKIP_ACTIONS:
         return ''
 
 
@@ -803,7 +842,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 
 # ========================== Assembly ==========================
 
-FILL_ACTIONS = {'fill_form_field', 'fill_date_field', 'select_option', 'click_radio'}
+FILL_ACTIONS = {'fill_form_field', 'fill_date_field', 'select_option', 'click_radio', 'select_tree_option'}
 BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'switch_tab', 'close_dialog', 'go_to_url'}
 
 def assemble_script(action_entries, target_url=None, form_snapshots=None):
@@ -879,12 +918,7 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         action = _e.get('action', '')
         action_counter += 1
 
-        if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
-                      'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
-                      'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
-                      'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
-                      'task_done', 'task_retry',
-                      'save_form_snapshot'):
+        if action in _SKIP_ACTIONS:
             continue
 
         if action in BOUNDARY_ACTIONS:
@@ -933,11 +967,7 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
     for entry in partial_entries:
         _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
         action = _e.get('action', '')
-        if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
-                      'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
-                      'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
-                      'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
-                      'task_done', 'task_retry'):
+        if action in _SKIP_ACTIONS:
             continue
 
         if action in BOUNDARY_ACTIONS:
@@ -971,11 +1001,7 @@ def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=N
     for entry in partial_entries:
         _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
         action = _e.get('action', '')
-        if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
-                      'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
-                      'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
-                      'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
-                      'task_done', 'task_retry'):
+        if action in _SKIP_ACTIONS:
             continue
         if action in BOUNDARY_ACTIONS:
             in_block = False
@@ -1118,7 +1144,7 @@ def main():
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(script)
         print(f'Script written: {output_path}')
-        visible_actions = [a for a in actions if (a.action if isinstance(a, ActionEntry) else a.get("action","")) not in ("scroll_down","scroll_up","get_page_state","scan_form_fields","scan_visible_fields","check_field_value","verify_field_value","take_screenshot","save_trajectory","save_case_data","read_case_data","match_form_rule","init_task_list","get_pending_tasks","sync_tasks_from_errors","expand_all_el_tree","task_done","task_retry")]
+        visible_actions = [a for a in actions if (a.action if isinstance(a, ActionEntry) else a.get("action","")) not in _SKIP_ACTIONS]
         print(f'Steps: {len(visible_actions)}')
     else:
         print(script)
