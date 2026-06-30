@@ -418,7 +418,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
     params = _e.get('params', {}) or {}
 
     def pre():
-        return "    await page.evaluate(() => CTRL.waitForLoading());"
+        return ""  # Playwright built-in auto-wait handles element readiness
 
     def pre_ready():
         return "    await page.waitForSelector('.el-form-item', { timeout: 10000 }).catch(() => {});"
@@ -450,7 +450,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"        if (['登录','登錄','Login'].includes(btn.textContent.trim().replace(/\\\\s/g,'')) && btn.offsetParent && !btn.disabled) {{ btn.click(); break; }}")
         lines.append(f"      }}")
         lines.append(f"    }});")
-        lines.append(f"    await page.waitForTimeout(3000);")
+        lines.append(f"    await page.evaluate(() => CTRL.waitForLoading());")
         return ''
 
     # ---- fill_form_field ----
@@ -538,8 +538,6 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             lines.append(f"      }}")
             lines.append(f"    }}")
 
-        lines.append('    await page.waitForTimeout(400);')
-
         # First fill in a new block: retry once
         if is_first_fill:
             lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
@@ -547,7 +545,6 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
                 lines.append(f"    await page.evaluate((addr) => CTRL.fillAddressFields(addr), {val_expr});")
             else:
                 lines.append(f"    await page.evaluate((v) => CTRL.fillFormField('{_escape(l)}', v), {val_expr});")
-            lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- select_option ----
@@ -575,10 +572,9 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"      console.log('[{step_num}]   falling back to Playwright...');")
         lines.append(f"      // Dismiss any stray dropdown before retrying")
         lines.append(f"      await page.keyboard.press('Escape');")
-        lines.append(f"      await page.waitForTimeout(300);")
         lines.append(f"      try {{")
         lines.append(f"        await _base{step_num}.locator('.el-form-item').filter({{ hasText: '{_escape_js_string(l)}' }}).locator('.el-select .el-input__inner').first().click({{ timeout: 3000 }});")
-        lines.append(f"        await page.waitForTimeout(400);")
+        lines.append(f"        await page.evaluate(() => CTRL.waitForLoading());")
         lines.append(f"        const _opt{step_num} = page.locator('.el-select-dropdown__item').filter({{ hasText: '{_escape_js_string(o)}' }}).first();")
         lines.append(f"        await _opt{step_num}.click({{ timeout: 3000 }});")
         lines.append(f"        _rs{step_num} = 'ok-playwright';")
@@ -595,7 +591,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         if abs_xp:
             lines.append(f"        try {{")
             lines.append(f"          await page.locator('xpath={_escape(abs_xp)}').first().click({{ timeout: 3000 }});")
-            lines.append(f"          await page.waitForTimeout(600);")
+            lines.append(f"          await page.evaluate(() => CTRL.waitForLoading());")
             lines.append(f"          const _axo{step_num} = page.locator('.el-select-dropdown__item').filter({{ hasText: '{_escape_js_string(o)}' }}).first();")
             lines.append(f"          await _axo{step_num}.click({{ timeout: 3000 }});")
             lines.append(f"          _rs{step_num} = 'ok-absxpath';")
@@ -622,7 +618,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 
         lines.append(f"    }}")
 
-        lines.append('    await page.waitForTimeout(400);')
+        lines.append('')
         return '\n'.join(lines)
 
     # ---- fill_date_field ----
@@ -631,11 +627,10 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"    console.log('[{step_num}] Set date \"{l}\" = \"{v}\"');")
         lines.append(pre())
         lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
-        lines.append('    await page.waitForTimeout(400);')
+        lines.append('')
         if is_first_fill:
             lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
             lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
-            lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- click_menu_item ----
@@ -646,7 +641,6 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(pre_ready())
         lines.append(f"    const _rm{step_num} = await page.evaluate(() => CTRL.clickMenuItem('{_escape(t)}'));")
         lines.append(f"    if (_rm{step_num} === 'not-found') _recordError({step_num}, 'click_menu_item', '{_escape_js_string(t)}', '', 'not-found', 'Menu item not visible or not found');")
-        lines.append('    await page.waitForTimeout(400);')
         lines.append("    await page.evaluate(() => CTRL.waitForLoading());")
         return '\n'.join(lines)
 
@@ -658,7 +652,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(pre_ready())
         lines.append(f"    const _rt{step_num} = await page.evaluate(() => CTRL.clickTableRowAction('{_escape(r)}', '{_escape(b)}'));")
         lines.append(f"    if (_rt{step_num} !== 'ok' && _rt{step_num} !== 'ok-icon') _recordError({step_num}, 'click_table_row_action', '{_escape_js_string(r)}', '{_escape_js_string(b)}', _rt{step_num}, 'Row or button not found');")
-        lines.append('    await page.waitForTimeout(400);')
+        lines.append('')
         return '\n'.join(lines)
 
     # ---- click_adjacent_button ----
@@ -667,8 +661,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"    console.log('[{step_num}] Adjacent button \"{l}\"');")
         lines.append(pre())
         lines.append(f"    await page.evaluate(() => CTRL.clickAdjacentButton('{_escape(l)}'));")
-        lines.append('    await page.evaluate(() => CTRL.waitForLoading());')
-        lines.append('    await page.waitForTimeout(400);')
+        lines.append('')
         return '\n'.join(lines)
 
     # ---- click_radio ----
@@ -678,7 +671,6 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(pre())
         lines.append(f"    const _rr{step_num} = await page.evaluate(() => CTRL.clickRadio('{_escape(l)}', '{_escape(o)}'));")
         lines.append(f"    if (_rr{step_num} !== 'ok') _recordError({step_num}, 'click_radio', '{_escape_js_string(l)}', '{_escape_js_string(o)}', _rr{step_num}, '');")
-        lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- select_tree_option ----
@@ -715,25 +707,14 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 
         # Build degradation chain
         selectors = []
-        # Tier 0: ID selector (most stable)
-        if elem_id:
-            selectors.append(('id', f"page.locator('#{_escape(elem_id)}').first()"))
-        # Tier 1: Class-based (stable if unique enough)
-        tag = _e.get('tagName', '') or ''
-        attrs = _e.get('attributes', {}) or {}
-        cls = attrs.get('class', '') or ''
-        if cls and tag:
-            safe_cls = cls.split(' ')[0].replace('"', '').replace("'", '')
-            if safe_cls and len(safe_cls) > 2:
-                selectors.append(('class', f"page.locator('{tag}.{safe_cls}').first()"))
-        # Tier 2: XPath
+        # Tier 0: XPath
         selectors.append(('xpath', f"page.locator('xpath={_escape(xp)}').first()"))
-        # Tier 3: Text-based
+        # Tier 1: Text-based
         if txt:
             selectors.append(('text', f"page.locator(':text-is(\"{_escape(txt)}\")').first()"))
-        # Tier 4: JS dispatchEvent
+        # Tier 2: JS dispatchEvent
         selectors.append(('js', f"JS: document.evaluate('{_escape(xp)}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue"))
-        # Tier 5: Fuzzy text match
+        # Tier 3: Fuzzy text match
         if txt:
             selectors.append(('fuzzy', f"JS-fuzzy: text='{_escape(txt)}'"))
 
@@ -806,9 +787,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"      // Page navigated, wait for full load")
         lines.append(f"      await page.waitForLoadState('networkidle', {{ timeout: 15000 }}).catch(() => {{}});")
         lines.append(f"      await page.waitForSelector('.el-menu, .el-table, .el-form-item, .el-tabs, .el-dialog', {{ timeout: 10000 }}).catch(() => {{}});")
-        lines.append(f"      await page.evaluate(() => CTRL.waitForLoading());")
         lines.append(f"    }}")
-        lines.append('    await page.waitForTimeout(400);')
         return '\n'.join(lines)
 
     # ---- switch_tab ----
@@ -816,14 +795,12 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         n = p('tab_name')
         lines.append(f"    console.log('[{step_num}] Tab \"{n}\"');")
         lines.append(f"    await page.evaluate(() => CTRL.switchTab('{_escape(n)}'));")
-        lines.append('    await page.waitForTimeout(500);')
         return '\n'.join(lines)
 
     # ---- close_dialog ----
     if action == 'close_dialog':
         lines.append(f"    console.log('[{step_num}] Close dialog');")
         lines.append('    await page.evaluate(() => CTRL.closeDialog());')
-        lines.append('    await page.waitForTimeout(500);')
         return '\n'.join(lines)
 
     # ---- wait_for_loading ----
