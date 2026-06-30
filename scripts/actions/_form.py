@@ -19,6 +19,7 @@ from ._js_snippets import (
     JS_FILL_FORM_FIELD, JS_FILL_DATE_FIELD,
     JS_FIND_LABELED_SELECT, JS_FIND_OPTION, JS_SELECT_OPTION, JS_LOCATOR,
     JS_CLICK_RADIO,
+    JS_SELECT_TREE_OPTION,
 )
 from ._llm_values import _llm_generate_values
 from ..models import (
@@ -366,7 +367,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         )
 
         # 按 kind 分组，多次调用 LLM
-        KIND_ORDER = {'select': 0, 'input': 1, 'date': 2, 'radio': 3, 'checkbox': 4}
+        KIND_ORDER = {'select': 0, 'input': 1, 'date': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
         groups: dict[int, list[dict]] = {}
         for d in pending_dicts:
             idx = KIND_ORDER.get(label_kind.get(d['label'], 'input'), 99)
@@ -379,7 +380,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 continue
 
             # Step 1: LLM 规划（按分组调用）
-            kind_name = {0:'select',1:'input',2:'date',3:'radio',4:'checkbox'}.get(idx, 'other')
+            kind_name = {0:'select',1:'input',2:'date',3:'radio',4:'checkbox',5:'tree-select'}.get(idx, 'other')
             await page.evaluate(
                 's => console.log("[AI填表] 分组 " + s)',
                 f'{kind_name}: {len(sub)}个字段',
@@ -430,6 +431,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                             result = await page.evaluate(JS_SELECT_OPTION, value)
                             if result.startswith('option-not-found:'):
                                 result = await page.evaluate(JS_SELECT_OPTION, 'first')
+                    elif field_kind == 'tree-select':
+                        result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
                     else:
                         result = f'unknown-action:{kind}'
                 except Exception as e:
@@ -671,3 +674,16 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         return await page.evaluate(JS_CLICK_RADIO, [label_text, option_text])
+
+    @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover.')
+    async def select_tree_option(label_text: str, option_text: str):
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        await _ensure_scanned(label_text)
+        result = await page.evaluate(JS_SELECT_TREE_OPTION, [label_text, option_text])
+        if result.startswith('ok:'):
+            element = await _capture_element(page, label_text)
+            _record_action('select_tree_option', {'label_text': label_text, 'option_text': option_text}, result, element=element)
+            _task_done_impl(label_text, case_data_store)
+            return _ok(result)
+        return result

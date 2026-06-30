@@ -48,6 +48,7 @@ SkippedActionType = Literal[
     "get_pending_tasks",
     "sync_tasks_from_errors",
     "expand_all_el_tree",
+    "select_tree_option",
     "login",
     "task_done",
     "task_retry",

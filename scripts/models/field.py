@@ -10,7 +10,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 # ── Field kind ──────────────────────────────────────────────────────────────
-FieldKind = Literal["input", "select", "date", "radio", "checkbox", "unknown"]
+FieldKind = Literal["input", "select", "date", "radio", "checkbox", "tree-select", "unknown"]
 
 # ── Container kind ──────────────────────────────────────────────────────────
 ContainerKind = Literal["main", "dialog", "drawer", "tab", "unknown"]
