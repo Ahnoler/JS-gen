@@ -5,18 +5,22 @@ const SYSTEM_PROMPT = `你是一个表单填写助手。根据用户指令和当
 2. select_option — 选择下拉框，参数 { "action": "select_option", "label": "字段标签", "option": "要选的选项" }
 
 【核心规则】
-1. 对每个字段都必须返回一个动作，动作数量必须等于字段数量（除非 options 为空或已有值，见下方规则）
-2. 如果字段已经有值（current 非空），则跳过该字段（不生成动作）
-3. 用户指定了值的字段，必须使用用户指定的值
-4. 用户未指定的字段，你自主决定
+1. 对每个字段都必须返回一个动作，动作数量必须等于字段数量（除非 options 为空或已有值或 disabled，见下方规则）
+2. 如果字段已经有值（currentValue 非空），则跳过该字段（不生成动作）
+3. 如果字段 disabled 为 true，则跳过该字段（不生成动作）
+4. 如果字段 hasButton 为 true 且 currentValue 为空，优先点击相邻按钮（选择/获取地址/引入）来填写，而不是直接 fill_input
+5. 用户指定了值的字段，必须使用用户指定的值
+6. 用户未指定的字段，你自主决定
+7. selected 为 true 的字段表示下拉框已有选中值，跳过
+8. kind 为 'radio' 或 'checkbox' 的字段，从 options 中选一个合理的选项
 
 【下拉框规则 (Element UI el-select)】
 - select_option 的 option 必须从该字段的 options 列表中选取
-- options 列表是该下拉框打开后读取到的真实选项，不要使用列表以外的值
+- options 列表是通过 Vue 组件实例读取到的真实选项，不是通过打开下拉框获取的
 - 若 options 列表为空（[]），说明下拉框无法读取选项数据，跳过该字段（不生成动作）
 
 【输入框规则】
-- 标签包含"姓名"→生成常见中文姓名（如"张三""李四"）
+- 标签包含"姓名"→生成常见中文姓名（如"测试科技张三"）
 - 标签包含"手机""电话"→生成11位手机号（如"13800138000"）
 - 标签包含"身份证"→生成18位身份证号
 - 标签包含"邮箱""Email"→生成合法邮箱
@@ -31,17 +35,22 @@ const SYSTEM_PROMPT = `你是一个表单填写助手。根据用户指令和当
 - 返回的字段列表只包含当前对话框/抽屉内的字段，无需考虑其他位置的字段
 
 示例：
-输入字段：label:"客户名称",type:input | label:"客户状态",type:select,options:["正式","潜在"] | label:"证件类型",type:select,options:["身份证","护照","营业执照"]
+输入字段：label:"客户名称",kind:input | label:"客户状态",kind:select,options:["正式","潜在"] | label:"证件类型",kind:select,options:["身份证","护照","营业执照"]
 指令：随机填写
 返回：[{"action":"fill_input","label":"客户名称","value":"北京测试科技有限公司"},{"action":"select_option","label":"客户状态","option":"潜在"},{"action":"select_option","label":"证件类型","option":"身份证"}]`
 
 function buildUserPrompt(fields, instruction) {
   let fieldLines = fields.map((f, i) => {
-    let line = `${i + 1}. label: "${f.label}", type: ${f.type}`
-    if (f.type === 'select') line += `, options: [${f.options.map(o => `"${o}"`).join(', ')}]`
-    if (f.placeholder) line += `, placeholder: "${f.placeholder}"`
+    let line = `${i + 1}. label: "${f.label}", kind: ${f.kind}`
+    if (f.kind === 'select' || f.kind === 'radio' || f.kind === 'checkbox') {
+      line += `, options: [${(f.options || []).map(o => `"${o}"`).join(', ')}]`
+    }
+    if (f.placeholder && f.placeholder !== '请选择' && f.placeholder !== '请输入') line += `, placeholder: "${f.placeholder}"`
     if (f.required) line += `, required: true`
-    if (f.currentValue) line += `, current: "${f.currentValue}"`
+    if (f.disabled) line += `, disabled: true`
+    if (f.currentValue) line += `, currentValue: "${f.currentValue}"`
+    if (f.selected) line += `, selected: true`
+    if (f.hasButton) line += `, hasButton: true (点击按钮选择)`
     return line
   }).join('\n')
   return `当前页面的表单字段：\n${fieldLines}\n\n用户指令：${instruction}`

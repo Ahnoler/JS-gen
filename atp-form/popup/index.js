@@ -167,10 +167,14 @@ async function execute() {
   currentSession.url = tab.url || ''
 
   const fields = scanResult.fields
-  const inputCount = fields.filter(f => f.type === 'input').length
-  const selectCount = fields.filter(f => f.type === 'select').length
+  const kindCount = {}
+  for (const f of fields) { kindCount[f.kind] = (kindCount[f.kind] || 0) + 1 }
+  const summary = Object.entries(kindCount).map(([k, n]) => {
+    const names = { input: '输入框', select: '下拉框', date: '日期', radio: '单选', checkbox: '多选', unknown: '未知' }
+    return (names[k] || k) + ' ' + n + ' 个'
+  }).join('，')
   fieldSummary.style.display = 'block'
-  fieldSummary.textContent = '检测到 ' + fields.length + ' 个字段（输入框 ' + inputCount + ' 个，下拉框 ' + selectCount + ' 个）'
+  fieldSummary.textContent = '检测到 ' + fields.length + ' 个字段（' + summary + '）'
   addLog({ type: 'info', text: '检测到 ' + fields.length + ' 个字段，正在调用 LLM 规划动作...' })
 
   console.log('[AI填表] ====== 发送给 LLM 的字段列表 ======')
