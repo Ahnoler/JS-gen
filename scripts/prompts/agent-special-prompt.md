@@ -1,50 +1,63 @@
 # 🚨 特殊场景规则
 
 ## 禁用字段字段规则
-1. **禁用字段 + 旁边有"引入"/"选择"按钮**：点击按钮打开导入弹窗，然后：
-   - 读取法人数据：`name = read_case_data("法人_客户名称")`
-   - 填写弹窗搜索框：`fill_form_field("客户名称", name)`
-   - 点击查询，使用 `click_table_row_action("first", "确认")` 选择第一条结果
-   - 确认弹窗。
+1. **禁用字段 + 旁边有"引入"/"选择"按钮**：
+   - 如果该字段在 sync_tasks_from_errors 返回中标记为 NEEDS_INTERVENTION：
+     暂停并向用户报告，等待用户提供特殊填写流程方案。
+   - 如果用户已提供方案：按方案执行：
+     - 点击按钮打开导入弹窗
+     - 读取法人数据：`name = read_case_data("法人_客户名称")`
+     - 填写弹窗搜索框：`fill_form_field("客户名称", name)`
+     - 点击查询，使用 `click_table_row_action("first", "确认")` 选择第一条结果
+     - 确认弹窗。
 
 ## 🚨 法人类字段辅助填写（"引入"按钮 → 客户放大镜弹窗）
 
+**前提条件：用户已通过 case_data_store 或 commandValue 提供了可搜索的法人数据（如客户名称、证件号码）。**
+
 当法人相关字段（如"法定代表人"等）旁边出现文本为"引入"的按钮时，该按钮用于打开**客户放大镜弹窗**，通过搜索选择已有法人客户来回填字段。
 
+**判断流程：**
+
 ```
-# 1. 先检查字段是否已有值
-check = click_adjacent_button("法定代表人")
-# click_adjacent_button 会在当前及相邻 .el-form-item 中查找"引入"按钮
-# 返回 "clicked" → 继续；"already-filled" → 跳过
+# 0. 先检查是否有用户提供的数据
+name = read_case_data("法人_客户名称") or read_case_data("客户名称")
+idno = read_case_data("法人_证件号码") or read_case_data("证件号码")
 
-if check == "clicked":
-  # 2. 等待客户放大镜弹窗打开
-  wait(1000)
+if 无用户数据 (name 和 idno 都为空):
+  # 无法自行搜索 → 直接走干预路径
+  → 点击【保存】触发校验
+  → sync_tasks_from_errors()
+  → NEEDS_INTERVENTION → request_intervention(label)
+  → 向用户报告："字段 'XXX' 需要从已有法人客户引入数据，但未提供搜索条件。请提供客户名称或证件号码以便搜索引入。"
 
-  # 4. 填写搜索框
+if 有用户数据:
+  # 按用户提供的数据执行搜索引入流程
+  check = click_adjacent_button("法定代表人")
+  if check == "clicked":
+    wait(1000)
+    fill_form_field("客户名称", name)
+    click 查询 按钮
+    wait(1000)
+    wait_for_loading()
 
-  # 5. 点击"查询"按钮
-  click 查询 按钮
-  wait(1000)
-
-  # 6. 等待结果表格加载完成
-  # 使用 wait_for_loading() 等待加载遮罩消失
-
-  # 7. 选中结果表格第一行
-  click_table_row_action("first", "确认")  # 或使用 click 表格第一行中的 radio/checkbox
-  wait(200)
-
-  # 8. 点击弹窗"确认"按钮关闭并回填法人数据
-  click 确认 按钮  # el-dialog__footer 中的 el-button--primary
-  wait(200)
-
-  # 9. 弹窗关闭后法人数据已回填（姓名、证件类型、证件号码等均为 readonly）
+    if 表格有结果:
+      click_table_row_action("first", "确认")
+      wait(200)
+      click 确认 按钮
+      wait(200)
+    else:
+      # 搜索无结果 → 关闭弹窗 → 走干预路径
+      close_dialog()
+      → 点击【保存】 → sync_tasks_from_errors()
+      → NEEDS_INTERVENTION → request_intervention(label)
 ```
 
 **注意**：
+- **前提：本规则仅在用户通过 case_data_store 提供了可靠搜索数据时生效。无数据则跳过引入流程，直接走干预路径。**
 - "引入"按钮可能不在法定代表人字段所在的 .el-form-item 内，而是在**相邻**的 .el-form-item 中（如放在"证件号码"旁但影响姓名/证件类型/证件号码三个字段）。`click_adjacent_button` 已自动扩大搜索范围
 - 弹窗内搜索字段标签可能与主表单不同（弹窗用"客户名称"，主表单用"法定代表人"），按弹窗中的实际标签填写
 - case_data 优先使用带 `法人_` 前缀的 key，不存在则回退到无前缀版本
 - 结果表格有多条时选第一条即可，只需引入一条可用记录
 - 引入后回填字段为 readonly/disabled，**不要尝试修改或重新填写**
-- 如果查询无结果（表格为空），尝试更换搜索条件（只用客户名称或只用证件号码）重新查询。仍无结果则关闭弹窗并报告"未找到匹配的法人数据"
+- 查询无结果时：先尝试仅用客户名称或仅用证件号码重试一次。仍无结果 → 关闭弹窗 → 点击【保存】触发校验 → sync_tasks_from_errors() → NEEDS_INTERVENTION → request_intervention(label)

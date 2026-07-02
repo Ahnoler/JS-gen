@@ -15,7 +15,7 @@ from . import controller as ctrl_mod
 _ACTION_LOG = []
 
 
-def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention_queue=None):
+def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention_queue=None, case_data_store=None):
     """Build hooks with goal dedup detection, cancel signal, and intervention support."""
     if goal_tracker is None:
         goal_tracker = {'goals': [], 'stopped': False}
@@ -33,6 +33,32 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                     sys.stderr.flush()
             except Exception as e:
                 sys.stderr.write(f"[recorder] Intervention error: {e}\n")
+                sys.stderr.flush()
+
+        # Check for self-requested intervention from form retry flow
+        if case_data_store is not None:
+            intervention_request = case_data_store.pop('_intervention_request', None)
+            if intervention_request:
+                label = intervention_request.get('label', '')
+                reason = intervention_request.get('reason', '')
+                has_button = intervention_request.get('hasButton', '')
+                msg_text = (
+                    f'[HUMAN INTERVENTION - FIELD NEEDS SPECIAL WORKFLOW]\n'
+                    f'The field "{label}" is disabled but has an adjacent button "{has_button}".\n'
+                    f'Reason: {reason}\n\n'
+                    f'ACTIONS:\n'
+                    f'1. Skip this field for now — do NOT try fill_form_field on it (will return field-disabled).\n'
+                    f'2. Continue filling other fillable fields and complete everything else.\n'
+                    f'3. When all other fields are done, call done() and report: '
+                    f'"Field \'{label}\' requires a special fill workflow (disabled+hasButton=\'{has_button}\'). '
+                    f'Please design the workflow so I can complete it."\n'
+                    f'4. Wait for the user to provide the workflow design before attempting this field.\n'
+                    f'5. After the user provides the workflow, use request_intervention("{label}") to mark it resolved '
+                    f'and then follow the user\'s instructions to fill it.'
+                )
+                msg = HumanMessage(content=msg_text)
+                agent._message_manager._add_message_with_tokens(msg)
+                sys.stderr.write(f"[recorder] Injected self-requested intervention for: {label}\n")
                 sys.stderr.flush()
 
     async def on_step_end(agent):

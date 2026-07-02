@@ -414,7 +414,7 @@ async def run_session(args):
     goal_tracker = {'goals': [], 'stopped': False}
     intervention_queue = asyncio.Queue()  # human intervention messages
 
-    on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path, intervention_queue)
+    on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path, intervention_queue, case_data_store)
     controller = build_controller(browser_context, form_rules, case_data_store, llm=llm)
 
     emit_json({"event": "ready", "session_id": session_id})

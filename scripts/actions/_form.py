@@ -740,7 +740,14 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         tl = TaskList.from_store(case_data_store.get('task_list'))
         retried = tl.sync_from_errors(error_labels)
         case_data_store['task_list'] = tl.to_store()
-        retried_labels = [item.label for item in retried]
+
+        # 分离需要人工干预的字段（disabled+hasButton）
+        intervene = [item for item in retried if item.needs_intervention]
+        fillable = [item for item in retried if not item.needs_intervention]
+        if intervene:
+            intervene_labels = [item.label for item in intervene]
+            sys.stderr.write(f'[sync-errors] NEEDS INTERVENTION: {intervene_labels}\n')
+            sys.stderr.flush()
 
         # Auto-scroll to first error so agent can see and fix it immediately
         if retried:
@@ -755,7 +762,30 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 sys.stderr.write(f'[sync-errors] auto-scrolled to: "{jumped_label}" → {jumped_error}\n')
                 sys.stderr.flush()
 
-        return _ok(f'sync-errors | retried:{len(retried)} | ' + json.dumps(retried_labels, ensure_ascii=False))
+        # 构建返回消息
+        msg = f'sync-errors | retried:{len(retried)}'
+        if fillable:
+            msg += ' | fillable:' + json.dumps([item.label for item in fillable], ensure_ascii=False)
+        if intervene:
+            msg += ' | NEEDS_INTERVENTION:' + json.dumps([item.label for item in intervene], ensure_ascii=False)
+        return _ok(msg)
+
+    @controller.action('Request human intervention for a field that cannot be auto-filled. Use this when sync_tasks_from_errors returns NEEDS_INTERVENTION items, or when a field is disabled with an adjacent button. Writes to case_data_store so the recorder hook injects a [HUMAN INTERVENTION] message on the next step.')
+    async def request_intervention(label_text: str, reason: str = ''):
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        item = tl.find(label_text)
+        has_button = ''
+        if item:
+            _, task_item = item
+            has_button = task_item.hasButton or ''
+        case_data_store['_intervention_request'] = {
+            'label': label_text,
+            'hasButton': has_button,
+            'reason': reason or f"Field '{label_text}' has disabled=True and hasButton='{has_button}'. Needs a custom fill workflow.",
+        }
+        sys.stderr.write(f'[intervention] Agent requested: "{label_text}" (button={has_button})\n')
+        sys.stderr.flush()
+        return _ok(f'intervention-requested | label:{label_text}')
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str):

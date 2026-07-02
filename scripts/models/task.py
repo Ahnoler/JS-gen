@@ -57,6 +57,10 @@ class TaskItem(BaseModel):
         default="",
         description="Button text if this field has an adjacent action button (引入/选择/验证/获取/获取地址), empty string otherwise.",
     )
+    needs_intervention: bool = Field(
+        default=False,
+        description="True when field is disabled but has adjacent button — requires human-designed fill workflow.",
+    )
 
     # ── Status checks ────────────────────────────────────────────────────
 
@@ -88,7 +92,10 @@ class TaskItem(BaseModel):
         is_disabled = field.get("disabled", False)
         has_button = field.get("hasButton", "") or ""
 
-        if has_value or is_disabled:
+        # Filter: already filled → skip; disabled without button → truly unfillable → skip
+        if has_value:
+            return None
+        if is_disabled and not has_button:
             return None
 
         return cls(
@@ -100,6 +107,7 @@ class TaskItem(BaseModel):
             disabled=field.get("disabled", False),
             required=field.get("required", False),
             hasButton=has_button,
+            needs_intervention=is_disabled and bool(has_button),
         )
 
 
@@ -179,6 +187,9 @@ class TaskList(BaseModel):
         for i, item in enumerate(self.done):
             if item.label == label:
                 self.done.pop(i)
+                # 只读+有按钮 → 标记为需要人工干预
+                if item.disabled and item.hasButton:
+                    item.needs_intervention = True
                 self.pending.append(item)
                 return item
         # Tier 2: already in pending — no-op

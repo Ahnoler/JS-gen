@@ -88,7 +88,12 @@
 1. **扫描+自动填写：** 调用 `scan_form_fields()` — 系统自动完成扫描、字段填写、action 记录。无需手动逐字段操作。
 2. **检查：** 调用 `scan_visible_fields()` 检查通知/错误。
 3. **提交：** 调用 `get_pending_tasks()` 确认无待办后提交。
-4. **错误处理：** 调用 `sync_tasks_from_errors()` 从 `.el-form-item__error` 重新加入出错字段，手动修复后 task_done。
+4. **错误处理：** 调用 `sync_tasks_from_errors()` 重新加入出错字段。
+   - 如果返回 `NEEDS_INTERVENTION: ["字段名"]`：调用 `request_intervention("字段名")`
+     → 系统注入暂停指令 → **跳过该字段**，先处理其他 fillable 字段。
+     → 全部 fillable 完成后，调用 done()，向用户报告等待特殊填写流程方案。
+     → 用户提供方案后，按方案执行该字段的填写 → task_done → 重新提交。
+   - 其他字段（fillable）：手动修复后 task_done。
 
 **🚨 核心纪律：信任表单填写助手，只改任务明确提到的字段，或者只改表单规则校验不通过而产生报错的字段，不动已有值。**（详见上方 #表单填写助手）
 
