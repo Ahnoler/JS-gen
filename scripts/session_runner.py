@@ -96,11 +96,11 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
 
         # File 4: form_{ts}.json — form structure snapshots (for replay validation)
         form_path = None
-        snapshots = case_data_store.get('form_snapshots') if case_data_store else None
-        if not snapshots:
-            # Fallback to single snapshot
-            single = case_data_store.get('form_snapshot') if case_data_store else None
-            snapshots = [single] if single else None
+        snapshots = None
+        if case_data_store:
+            from .models import FormSnapshotCollection
+            coll = FormSnapshotCollection.from_store(case_data_store)
+            snapshots = coll.to_dicts()
         if snapshots:
             forms_dir = scripts_dir / 'forms'
             forms_dir.mkdir(parents=True, exist_ok=True)

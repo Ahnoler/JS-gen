@@ -130,6 +130,8 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     for (const item of items) {
         const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
         if (lbl !== label) continue;
+        // Scroll the form-item into view so Element UI components render correctly
+        item.scrollIntoView({ block: 'center', behavior: 'instant' });
         const input = item.querySelector('input:not([type="hidden"])');
         const textarea = item.querySelector('textarea');
         const target = input || textarea;
@@ -302,10 +304,14 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         }
         if (mode === 'trigger') {
             if (trigger.disabled) return 'select-disabled';
+            // Scroll the form-item into view so the dropdown opens in the correct position
+            item.scrollIntoView({ block: 'center', behavior: 'instant' });
             // tssc-multi-select needs real mouse events, not just .click()
             trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
             trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
             trigger.click();
+            // Save reference so JS_SELECT_OPTION can sync Vue model on the right trigger
+            window.__last_select_trigger = trigger;
             return 'triggered';
         }
         if (mode === 'confirm') {
@@ -368,9 +374,20 @@ JS_SELECT_OPTION = '''(option) => {
     const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
     const tryClick = (item) => {
         item.scrollIntoView({ block: 'nearest' });
+        const t = item.textContent.trim();
+        // Read the trigger that opened this dropdown (set by JS_FIND_LABELED_SELECT)
+        const triggerInput = window.__last_select_trigger || null;
         item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
         item.click();
-        const t = item.textContent.trim();
+        // Dispatch input+change on the specific trigger to force Vue model sync
+        // (tssc-form-item custom wrappers may not react to dropdown click alone)
+        if (triggerInput) {
+            setTimeout(() => {
+                triggerInput.dispatchEvent(new Event('input', { bubbles: true }));
+                triggerInput.dispatchEvent(new Event('change', { bubbles: true }));
+                window.__last_select_trigger = null;
+            }, 0);
+        }
         return 'ok:' + t;
     };
     if (FIRST_ALIASES.includes(option.toLowerCase().trim())) {
@@ -462,7 +479,7 @@ JS_CLICK_RADIO = '''([label, option]) => {
 #   - 测试 Vue 各种 API (setValue/handleSelect/onNodeClick/$emit) 找到正确入口
 #   - 不要假设标准 Element UI API 有效 (即使 DOM 类名相同)
 
-JS_SELECT_TREE_OPTION = '''([label, option]) => {
+JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
     // Open the popover first so tree DOM is rendered
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
@@ -494,24 +511,21 @@ JS_SELECT_TREE_OPTION = '''([label, option]) => {
 
     // Search treeData for matching label
     let code = null;
+    // P0: exact match in treeData → select via Vue API
     const treeData = vm.treeData || [];
     for (const node of treeData) {
         if (node.label === option) { code = node.value || node.id; break; }
-        if (node.label && node.label.includes(option) && !code) { code = node.value || node.id; }
     }
     if (!code) {
-        // Fallback: search in data
         const walk = (nodes) => {
             for (const n of nodes) {
                 if (n.label === option) return n.value || n.id;
-                if (n.label && n.label.includes(option)) return n.value || n.id;
                 if (n.children) { const r = walk(n.children); if (r) return r; }
             }
             return null;
         };
         code = walk(vm.data || []);
     }
-    // P0: exact/partial match in treeData → select via Vue API
     if (code) {
         vm.$emit('input', code);
         setTimeout(() => {
@@ -521,31 +535,65 @@ JS_SELECT_TREE_OPTION = '''([label, option]) => {
     }
 
     // P1: no match → search UI with keyword → click first visible leaf
-    const popover = document.querySelector('.tree-popover');
+    // Support both .tree-popover (old) and .el-popover (custom tssc-form-item wrappers)
+    let popover = document.querySelector('.tree-popover');
+    if (!popover || popover.offsetParent === null) {
+        const allPopovers = document.querySelectorAll('.el-popover');
+        for (const p of allPopovers) {
+            if (p.offsetParent !== null) { popover = p; break; }
+        }
+    }
     if (popover) {
-        const searchInput = popover.querySelector('input');
-        const searchBtn = popover.querySelector('button');
+        // For custom search-input wrappers: use field's own input (already focused)
+        // For standard tree-popover: find input/button inside popover
+        const searchInput = popover.querySelector('.search-input input') || popover.querySelector('input');
+        const searchBtn = popover.querySelector('.search-input button') || popover.querySelector('button');
         if (searchInput && searchBtn) {
             const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
             s.call(searchInput, option || '科技');
             searchInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
-            setTimeout(() => { searchBtn.click(); }, 200);
+            setTimeout(() => {
+                searchBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                searchBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                searchBtn.click();
+                searchBtn.dispatchEvent(new Event('click', { bubbles: true }));
+            }, 200);
             const result = await new Promise(resolve => {
-                setTimeout(() => {
-                    const nodes = document.querySelectorAll('.el-tree-node:not(.is-hidden)');
-                    for (const node of nodes) {
-                        const icon = node.querySelector('.el-tree-node__expand-icon');
-                        const children = node.querySelector('.el-tree-node__children');
-                        const isLeaf = !icon || icon.classList.contains('is-leaf') || !children;
-                        if (isLeaf) {
-                            const lbl = node.querySelector('.el-tree-node__label');
-                            if (lbl) lbl.click(); else node.click();
-                            resolve((lbl?.textContent || node.textContent || '').trim());
-                            return;
+                // Poll for filtered results — the tree may take time to re-render
+                let elapsed = 0;
+                const poll = () => {
+                    const allNodes = document.querySelectorAll('.el-tree-node');
+                    const hidden = document.querySelectorAll('.el-tree-node.is-hidden').length;
+                    const visible = allNodes.length - hidden;
+                    // Tree is filtered when hidden nodes appear (search narrowed results)
+                    if (visible < allNodes.length || elapsed >= 2000) {
+                        const nodes = document.querySelectorAll('.el-tree-node:not(.is-hidden)');
+                        for (const node of nodes) {
+                            const icon = node.querySelector('.el-tree-node__expand-icon');
+                            const children = node.querySelector('.el-tree-node__children');
+                            const isLeaf = !icon || icon.classList.contains('is-leaf') || !children || children.querySelectorAll('.el-tree-node').length === 0;
+                            if (isLeaf) {
+                                const lbl = node.querySelector('.el-tree-node__label');
+                                const labelText = (lbl?.textContent || node.textContent || '').trim();
+                                if (lbl) lbl.click(); else node.click();
+                                // Sync via Vue emit — DOM click alone may not trigger model update
+                                const nodeVm = node.__vue__;
+                                if (nodeVm && vm && typeof vm.$emit === 'function') {
+                                    const nodeData = nodeVm.data || nodeVm.$data || {};
+                                    const code = nodeData.value || nodeData.id || nodeData.code || '';
+                                    if (code) vm.$emit('input', code);
+                                }
+                                resolve(labelText);
+                                return;
+                            }
                         }
+                        resolve(null);
+                    } else {
+                        elapsed += 200;
+                        setTimeout(poll, 200);
                     }
-                    resolve(null);
-                }, 1000);
+                };
+                setTimeout(poll, 300);
             });
             if (result) {
                 setTimeout(() => {
@@ -678,14 +726,14 @@ JS_SCAN_FORM_FIELDS = '''async (quick) => {
         const disabled = isDisabled(inputEl, trigger);
         const required = isRequired(item, label, inputEl);
         const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
-        const hasButton = !!item.querySelector('button.el-button--primary, button.el-button--primary.is-plain') ||
-            ['选择','获取地址','引入','新增','添加'].some(t => {
-                const btns = item.querySelectorAll('button');
-                for (let i = 0; i < btns.length; i++) {
-                    if (btns[i].textContent.includes(t)) return true;
-                }
-                return false;
-            });
+        const hasButton = (() => {
+            const btns = item.querySelectorAll('button');
+            for (let i = 0; i < btns.length; i++) {
+                const t = btns[i].textContent.trim();
+                if (['选择','获取地址','引入','新增','添加','验证'].some(k => t.includes(k))) return t;
+            }
+            return '';
+        })();
         const field = { label, kind, currentValue, options: [], placeholder, required, disabled, selected, hasButton };
         fields.push(field);
         if (kind === 'select') {
@@ -778,14 +826,14 @@ JS_CHECK_SINGLE_FIELD = '''(label) => {
             const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
             const disabled = isDisabled(inputEl, trigger);
             const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
-            const hasButton = !!item.querySelector('button.el-button--primary, button.el-button--primary.is-plain') ||
-                ['选择','获取地址','引入','新增','添加'].some(t => {
-                    const btns = item.querySelectorAll('button');
-                    for (let i = 0; i < btns.length; i++) {
-                        if (btns[i].textContent.includes(t)) return true;
-                    }
-                    return false;
-                });
+            const hasButton = (() => {
+                const btns = item.querySelectorAll('button');
+                for (let i = 0; i < btns.length; i++) {
+                    const t = btns[i].textContent.trim();
+                    if (['选择','获取地址','引入','新增','添加','验证'].some(k => t.includes(k))) return t;
+                }
+                return '';
+            })();
             const required = isRequired(item, lbl, inputEl);
             return JSON.stringify({ label: lbl, kind, currentValue, placeholder, disabled, selected, required, hasButton });
         }

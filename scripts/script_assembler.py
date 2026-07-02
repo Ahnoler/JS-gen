@@ -451,14 +451,14 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"      }}")
         lines.append(f"    }});")
         lines.append(f"    await page.evaluate(() => CTRL.waitForLoading());")
-        return ''
+        return '\n'.join(lines)
 
     # ---- fill_form_field ----
     if action == 'fill_form_field':
         l, v = p('label_text'), p('value')
         id_fn = _is_identity_field(l)
 
-        lines.append(f"    console.log('[{step_num}] Fill \"{l}\"');")
+        lines.append(f"    console.log('[{step_num}] Fill \"{l}\" → \"{v}\"');")
         lines.append(pre())
         lines.append(pre_ready())
 
@@ -700,7 +700,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         if not xp.startswith('/') and not xp.startswith('//'):
             xp = '/' + xp
 
-        lines.append(f"    console.log('[{step_num}] Click [{idx}]');")
+        lines.append(f"    console.log('[{step_num}] Click [{idx}] \"{txt}\"');")
         lines.append("    await page.waitForFunction(before => location.href !== before, page.url(), { timeout: 5000 }).catch(() => {});")
         lines.append(pre())
         lines.append(pre_ready())

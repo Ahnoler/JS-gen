@@ -30,6 +30,24 @@ from ..models import (
 from ..form_rules import match_rule
 
 
+def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store: dict):
+    """Persist form structure snapshot to case_data_store.
+
+    Builds a FormSnapshot from scan fields, upserts into the collection
+    (deduped by container), and updates both form_snapshots (array) and
+    form_snapshot (latest single entry) in the store.
+    """
+    snapshot = FormSnapshot.from_scan_fields(
+        container=container,
+        scan_fields=scan_fields,
+        action_index=len(_ACTION_LOG),
+    )
+    coll = FormSnapshotCollection(case_data_store.get('form_snapshots', []))
+    coll.upsert(snapshot)
+    case_data_store['form_snapshots'] = coll.to_dicts()
+    case_data_store['form_snapshot'] = snapshot.model_dump()
+
+
 def _task_done_impl(label_text, case_data_store):
     """Mark a field as completed in the task list.
 
@@ -76,16 +94,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
 
         # Save form structure snapshot BEFORE auto-fill (captures original state)
-        snapshot = FormSnapshot.from_scan_fields(
-            container=container_id,
-            scan_fields=[f.model_dump() for f in dom_fields],
-            action_index=len(_ACTION_LOG),
-        )
-        coll = FormSnapshotCollection(case_data_store.get('form_snapshots', []))
-        coll.upsert(snapshot)
-        case_data_store['form_snapshots'] = coll.to_dicts()
-        case_data_store['form_snapshot'] = snapshot.model_dump()
-        _record_action('save_form_snapshot', snapshot.model_dump(), f'ok | {snapshot.count}')
+        _save_form_snapshot(container_id, [f.model_dump() for f in dom_fields], case_data_store)
 
         # Store scan data + auto-fill
         tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
@@ -242,16 +251,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         raw_notification = result.get('notification') if isinstance(result, dict) else None
         notification = Notification(**raw_notification) if raw_notification else None
 
-        snapshot = FormSnapshot.from_scan_fields(
-            container=container_id,
-            scan_fields=[f.model_dump() for f in dom_fields],
-            action_index=len(_ACTION_LOG),
-        )
-        coll = FormSnapshotCollection(case_data_store.get('form_snapshots', []))
-        coll.upsert(snapshot)
-        case_data_store['form_snapshots'] = coll.to_dicts()
-        case_data_store['form_snapshot'] = snapshot.model_dump()
-        _record_action('save_form_snapshot', snapshot.model_dump(), f'ok | {snapshot.count}')
+        _save_form_snapshot(container_id, [f.model_dump() for f in dom_fields], case_data_store)
 
         # 自动构建任务列表并批量填写（Agent 无感知）
         tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
@@ -333,17 +333,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         fields = case_data_store.get('_scan_fields', [])
 
-        snapshot = FormSnapshot.from_scan_fields(
-            container=container_id,
-            scan_fields=fields,
-            action_index=len(_ACTION_LOG),
-        )
-
-        coll = FormSnapshotCollection(case_data_store.get('form_snapshots', []))
-        coll.upsert(snapshot)
-        case_data_store['form_snapshots'] = coll.to_dicts()
-        case_data_store['form_snapshot'] = snapshot.model_dump()
-        _record_action('save_form_snapshot', snapshot.model_dump(), f'ok | {snapshot.count}')
+        _save_form_snapshot(container_id, fields, case_data_store)
         return _ok(f'form-snapshot | container:{container_id} | count:{snapshot.count}')
 
     # 内部函数 — 由 scan_form_fields 末尾自动调用。
@@ -368,6 +358,32 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             pending_dicts.append(d)
 
         label_kind: dict[str, str] = {item.label: item.kind for item in pending}
+
+        # Extract reference date from page (for date fallback to respect business constraints)
+        try:
+            ref_date = await page.evaluate('''() => {
+                const dateLabels = ['成立日期', '登记日期', '注册日期', '营业起始日期', '营业开始日期'];
+                const items = document.querySelectorAll('.el-form-item');
+                for (const el of items) {
+                    const lbl = el.querySelector('.el-form-item__label');
+                    if (!lbl) continue;
+                    const t = lbl.textContent.trim();
+                    if (dateLabels.some(d => t.includes(d))) {
+                        const inp = el.querySelector('input');
+                        if (inp && inp.value && /\\d{4}-\\d{2}-\\d{2}/.test(inp.value)) {
+                            return inp.value;
+                        }
+                    }
+                }
+                return '';
+            }''')
+            if ref_date:
+                from datetime import date as _date_cls
+                case_data_store['_ref_date'] = ref_date
+                await page.evaluate(
+                    's => console.log("[AI填表] 参考日期: " + s)', ref_date)
+        except Exception:
+            pass
 
         # 打印待填写统计
         kind_counts: dict[str, int] = {}
@@ -427,6 +443,10 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                             result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
                         else:
                             result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                    elif field_kind == 'tree-select':
+                        # Tree-select must take priority over select_option — the LLM
+                        # may return action='select_option' but the DOM component is a tree.
+                        result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
                     elif kind in ('select_option', 'select', 'option'):
                         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
                         if already.startswith('already:'):
@@ -439,20 +459,34 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                                 result = await page.evaluate(JS_SELECT_OPTION, value)
                                 if result.startswith('option-not-found:'):
                                     result = await page.evaluate(JS_SELECT_OPTION, 'first')
+                                # Confirm value synced to Vue model (tssc-form-item may lag)
+                                if result.startswith('ok'):
+                                    confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                                    if not confirmed.startswith('SELECTED:'):
+                                        # Retry: use native-setter + events as fallback
+                                        await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                                        await page.wait_for_timeout(200)
+                                        confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                                        result = confirmed2 if confirmed2.startswith('SELECTED:') else 'not-synced:' + confirmed
                         else:
                             await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
                             await page.wait_for_timeout(350)
                             result = await page.evaluate(JS_SELECT_OPTION, value)
                             if result.startswith('option-not-found:'):
                                 result = await page.evaluate(JS_SELECT_OPTION, 'first')
-                    elif field_kind == 'tree-select':
-                        result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
+                            if result.startswith('ok'):
+                                confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                                if not confirmed.startswith('SELECTED:'):
+                                    await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                                    await page.wait_for_timeout(200)
+                                    confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                                    result = confirmed2 if confirmed2.startswith('SELECTED:') else 'not-synced:' + confirmed
                     else:
                         result = f'unknown-action:{kind}'
                 except Exception as e:
                     result = f'error:{e}'
 
-                ok = result.startswith('ok') or result.startswith('already')
+                ok = result.startswith('ok') or result.startswith('already') or result.startswith('SELECTED:')
                 entry = {'index': step_num, 'action': kind, 'label': label, 'value': value, 'result': result}
                 all_results.append(entry)
 
@@ -479,15 +513,170 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                         f'{step_num}/{total} {kind} "{label}" → {result}',
                     )
 
-                await page.wait_for_timeout(300)
+                # tssc-form-item custom selects need longer settle time
+                await page.wait_for_timeout(500 if kind in ('select_option', 'select', 'option') else 300)
 
             await page.evaluate(
                 's => console.log("[AI填表] 本组完成: " + s)',
                 f'{total}个动作 | ok:{ok_in_group} failed:{fail_in_group}',
             )
 
-        # Step 3: 完成
-        ok_count = sum(1 for r in all_results if r['result'].startswith('ok') or r['result'].startswith('already'))
+        # Step 3: 第二轮 — 处理联动显隐字段
+        # select 赋值后可能 reveal 新的 .el-form-item（如 "实际控制企业" 系列），重新扫描填充
+        round1_count = len(all_results)
+        try:
+            raw2 = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
+            result2 = json.loads(raw2) if isinstance(raw2, str) else raw2
+            raw_fields2 = result2.get('fields') if isinstance(result2, dict) else result2
+        except Exception:
+            raw_fields2 = []
+        dom_fields2 = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields2]
+        # 构建新 pending：只包含尚未在 task_list 中的字段
+        tl_now = TaskList.from_store(case_data_store.get('task_list'))
+        known_labels = {d.label for d in tl_now.pending} | {d.label for d in tl_now.done}
+        new_pending: list[dict] = []
+        for f in dom_fields2:
+            if f.label and f.label not in known_labels and not f.disabled and not f.currentValue.strip():
+                new_pending.append(f.model_dump())
+        if new_pending:
+            await page.evaluate(
+                's => console.log("[AI填表] 第二轮(联动): " + s)',
+                f'{len(new_pending)}个新字段',
+            )
+            tl_now.pending.extend([TaskItem(**d) for d in new_pending])
+            case_data_store['task_list'] = tl_now.to_store()
+            # 第二轮：同样按 kind 分组处理
+            label_kind2: dict[str, str] = {d['label']: d.get('kind', 'input') for d in new_pending}
+            groups2: dict[int, list[dict]] = {}
+            for d in new_pending:
+                idx = KIND_ORDER.get(label_kind2.get(d['label'], 'input'), 99)
+                groups2.setdefault(idx, []).append(d)
+            for idx in sorted(groups2.keys()):
+                sub2 = groups2[idx]
+                actions2 = _llm_generate_values(llm, sub2, form_rules=form_rules, case_data_store=case_data_store)
+                for a in actions2:
+                    label2 = a.get('label', '')
+                    kind2 = (a.get('action') or '').lower().replace('-', '_')
+                    value2 = a.get('value', '') or a.get('option', '')
+                    fk2 = label_kind2.get(label2, kind2)
+                    result2 = 'skipped'
+                    try:
+                        if kind2 in ('fill_input', 'fill', 'input'):
+                            if fk2 == 'date':
+                                result2 = await page.evaluate(JS_FILL_DATE_FIELD, [label2, value2])
+                            else:
+                                result2 = await page.evaluate(JS_FILL_FORM_FIELD, [label2, value2])
+                        elif fk2 == 'tree-select':
+                            result2 = await page.evaluate(JS_SELECT_TREE_OPTION, [label2, value2])
+                        elif kind2 in ('select_option', 'select', 'option'):
+                            already2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label2, 'check'])
+                            if already2.startswith('already:'):
+                                result2 = already2
+                            else:
+                                await page.evaluate(JS_FIND_LABELED_SELECT, [label2, 'trigger'])
+                                await page.wait_for_timeout(400)
+                                result2 = await page.evaluate(JS_SELECT_OPTION, value2)
+                                if result2.startswith('option-not-found:'):
+                                    result2 = await page.evaluate(JS_SELECT_OPTION, 'first')
+                                if result2.startswith('ok'):
+                                    confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label2, 'confirm'])
+                                    if not confirmed2.startswith('SELECTED:'):
+                                        await page.evaluate(JS_FILL_FORM_FIELD, [label2, value2])
+                                        await page.wait_for_timeout(200)
+                                        c2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label2, 'confirm'])
+                                        result2 = c2 if c2.startswith('SELECTED:') else 'not-synced:' + confirmed2
+                    except Exception as e:
+                        result2 = f'error:{e}'
+                    ok2 = result2.startswith('ok') or result2.startswith('already') or result2.startswith('SELECTED:')
+                    all_results.append({'index': round1_count + len(all_results) + 1, 'action': kind2, 'label': label2, 'value': value2, 'result': result2})
+                    if ok2:
+                        if kind2 in ('fill_input', 'fill', 'input'):
+                            _record_action('fill_form_field', {'label_text': label2, 'value': value2}, result2)
+                        elif kind2 in ('select_option', 'select', 'option'):
+                            _record_action('select_option', {'label_text': label2, 'option_text': value2}, result2)
+                        _task_done_impl(label2, case_data_store)
+                        sys.stderr.write(f'[auto-fill] round2 recorded: {kind2} \"{label2}\" = {value2} (total: {len(_ACTION_LOG)})\n')
+                        sys.stderr.flush()
+                    await page.wait_for_timeout(500 if kind2 in ('select_option', 'select', 'option') else 300)
+
+        # Step 3.5: 第三轮 — 处理更深层联动字段
+        # 第二轮填完后可能再 reveal 新字段（如 "实际控制人" 系列在 "实际控制企业" 之后出现）
+        round2_count = len(all_results)
+        try:
+            raw3 = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
+            result3 = json.loads(raw3) if isinstance(raw3, str) else raw3
+            raw_fields3 = result3.get('fields') if isinstance(result3, dict) else result3
+        except Exception:
+            raw_fields3 = []
+        dom_fields3 = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields3]
+        tl_now3 = TaskList.from_store(case_data_store.get('task_list'))
+        known_labels3 = {d.label for d in tl_now3.pending} | {d.label for d in tl_now3.done}
+        new_pending3: list[dict] = []
+        for f in dom_fields3:
+            if f.label and f.label not in known_labels3 and not f.disabled and not f.currentValue.strip():
+                new_pending3.append(f.model_dump())
+        if new_pending3:
+            await page.evaluate(
+                's => console.log("[AI填表] 第三轮(深层联动): " + s)',
+                f'{len(new_pending3)}个新字段',
+            )
+            tl_now3.pending.extend([TaskItem(**d) for d in new_pending3])
+            case_data_store['task_list'] = tl_now3.to_store()
+            label_kind3: dict[str, str] = {d['label']: d.get('kind', 'input') for d in new_pending3}
+            groups3: dict[int, list[dict]] = {}
+            for d in new_pending3:
+                idx = KIND_ORDER.get(label_kind3.get(d['label'], 'input'), 99)
+                groups3.setdefault(idx, []).append(d)
+            for idx in sorted(groups3.keys()):
+                sub3 = groups3[idx]
+                actions3 = _llm_generate_values(llm, sub3, form_rules=form_rules, case_data_store=case_data_store)
+                for a in actions3:
+                    label3 = a.get('label', '')
+                    kind3 = (a.get('action') or '').lower().replace('-', '_')
+                    value3 = a.get('value', '') or a.get('option', '')
+                    fk3 = label_kind3.get(label3, kind3)
+                    result3 = 'skipped'
+                    try:
+                        if kind3 in ('fill_input', 'fill', 'input'):
+                            if fk3 == 'date':
+                                result3 = await page.evaluate(JS_FILL_DATE_FIELD, [label3, value3])
+                            else:
+                                result3 = await page.evaluate(JS_FILL_FORM_FIELD, [label3, value3])
+                        elif fk3 == 'tree-select':
+                            result3 = await page.evaluate(JS_SELECT_TREE_OPTION, [label3, value3])
+                        elif kind3 in ('select_option', 'select', 'option'):
+                            already3 = await page.evaluate(JS_FIND_LABELED_SELECT, [label3, 'check'])
+                            if already3.startswith('already:'):
+                                result3 = already3
+                            else:
+                                await page.evaluate(JS_FIND_LABELED_SELECT, [label3, 'trigger'])
+                                await page.wait_for_timeout(400)
+                                result3 = await page.evaluate(JS_SELECT_OPTION, value3)
+                                if result3.startswith('option-not-found:'):
+                                    result3 = await page.evaluate(JS_SELECT_OPTION, 'first')
+                                if result3.startswith('ok'):
+                                    c3 = await page.evaluate(JS_FIND_LABELED_SELECT, [label3, 'confirm'])
+                                    if not c3.startswith('SELECTED:'):
+                                        await page.evaluate(JS_FILL_FORM_FIELD, [label3, value3])
+                                        await page.wait_for_timeout(200)
+                                        c3b = await page.evaluate(JS_FIND_LABELED_SELECT, [label3, 'confirm'])
+                                        result3 = c3b if c3b.startswith('SELECTED:') else 'not-synced:' + c3
+                    except Exception as e:
+                        result3 = f'error:{e}'
+                    ok3 = result3.startswith('ok') or result3.startswith('already') or result3.startswith('SELECTED:')
+                    all_results.append({'index': round2_count + len(all_results) + 1, 'action': kind3, 'label': label3, 'value': value3, 'result': result3})
+                    if ok3:
+                        if kind3 in ('fill_input', 'fill', 'input'):
+                            _record_action('fill_form_field', {'label_text': label3, 'value': value3}, result3)
+                        elif kind3 in ('select_option', 'select', 'option'):
+                            _record_action('select_option', {'label_text': label3, 'option_text': value3}, result3)
+                        _task_done_impl(label3, case_data_store)
+                        sys.stderr.write(f'[auto-fill] round3 recorded: {kind3} \"{label3}\" = {value3} (total: {len(_ACTION_LOG)})\n')
+                        sys.stderr.flush()
+                    await page.wait_for_timeout(500 if kind3 in ('select_option', 'select', 'option') else 300)
+
+        # Step 4: 完成
+        ok_count = sum(1 for r in all_results if r['result'].startswith('ok') or r['result'].startswith('already') or r['result'].startswith('SELECTED:'))
         failed_count = len(all_results) - ok_count
         await page.evaluate(
             'd => console.log("[AI填表] 执行完成 ======\\n" + JSON.stringify(d))',
@@ -504,14 +693,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     @controller.action('Re-add a field to the pending task list (e.g., after a validation error).')
     async def task_retry(label_text: str):
         tl = TaskList.from_store(case_data_store.get('task_list'))
-        item = tl.retry(label_text)
-        if item is None:
-            if tl.find_pending(label_text) is None:
-                tl.pending.append(TaskItem(label=label_text, kind='input'))
-                case_data_store['task_list'] = tl.to_store()
-                return _ok(f'task-retry:{label_text} | pending:{len(tl.pending)}')
-            case_data_store['task_list'] = tl.to_store()
-            return _ok(f'task-retry:{label_text} | pending:{len(tl.pending)} (already pending)')
+        tl.retry(label_text)
         case_data_store['task_list'] = tl.to_store()
         return _ok(f'task-retry:{label_text} | pending:{len(tl.pending)}')
 
@@ -543,22 +725,10 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         except Exception:
             error_labels = []
         tl = TaskList.from_store(case_data_store.get('task_list'))
-        retried_labels: list[str] = []
-        for label in error_labels:
-            found = tl.find_done(label)
-            if not found:
-                for d in list(tl.done):
-                    if label in d.label or d.label in label:
-                        found = d
-                        break
-            if found:
-                tl.retry(found.label)
-                retried_labels.append(found.label)
-            elif tl.find_pending(label) is None:
-                tl.pending.append(TaskItem(label=label, kind='input'))
-                retried_labels.append(label)
+        retried = tl.sync_from_errors(error_labels)
         case_data_store['task_list'] = tl.to_store()
-        return _ok(f'sync-errors | retried:{len(retried_labels)} | ' + json.dumps(retried_labels, ensure_ascii=False))
+        retried_labels = [item.label for item in retried]
+        return _ok(f'sync-errors | retried:{len(retried)} | ' + json.dumps(retried_labels, ensure_ascii=False))
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str):
@@ -663,6 +833,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             for (const item of items) {
                 const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
                 if (!lbl.includes(label)) continue;
+                item.scrollIntoView({ block: 'center', behavior: 'instant' });
+                // Pass 1: match known button keywords
                 for (const tag of ['el-button', 'button', 'a']) {
                     const btns = item.querySelectorAll(tag);
                     for (const btn of btns) {
@@ -671,6 +843,14 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                         if (t && (t.includes('选择') || t.includes('引入') || t.includes('上传') || t.includes('添加') || t.includes('导入') || t.includes('新增'))) {
                             btn.click(); return 'clicked';
                         }
+                    }
+                }
+                // Pass 2: fallback — click any visible button inside the form item
+                for (const tag of ['el-button', 'button', 'a']) {
+                    const btns = item.querySelectorAll(tag);
+                    for (const btn of btns) {
+                        if (btn.offsetParent === null) continue;
+                        btn.click(); return 'clicked';
                     }
                 }
                 return 'no-adjacent-button-found';

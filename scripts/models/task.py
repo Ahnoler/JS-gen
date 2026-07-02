@@ -53,6 +53,10 @@ class TaskItem(BaseModel):
         default=False,
         description="True if the field is required",
     )
+    hasButton: str = Field(
+        default="",
+        description="Button text if this field has an adjacent action button (引入/选择/验证/获取地址), empty string otherwise.",
+    )
 
     # ── Status checks ────────────────────────────────────────────────────
 
@@ -72,15 +76,20 @@ class TaskItem(BaseModel):
     def from_scanned(cls, field: dict) -> Optional["TaskItem"]:
         """Create a TaskItem from a raw scanned field dict.
 
-        Returns None if the field should be skipped (already filled or disabled),
-        matching the init_task_list filter logic.
+        Returns None if the field should be skipped:
+        - Already filled (has currentValue)
+        - Disabled / read-only
+        - Has an adjacent action button (引入/选择) — these fields cannot be
+          filled directly; the agent must use click_adjacent_button to trigger
+          the import/search/select/confirm workflow
         """
         label = field.get("label", "")
         has_value = (field.get("currentValue", "") or "").strip() != ""
         is_disabled = field.get("disabled", False)
+        has_button = field.get("hasButton", "") or ""
 
         if has_value or is_disabled:
-            return None  # Skip — no task needed
+            return None
 
         return cls(
             label=label,
@@ -90,6 +99,7 @@ class TaskItem(BaseModel):
             placeholder=field.get("placeholder", ""),
             disabled=field.get("disabled", False),
             required=field.get("required", False),
+            hasButton=has_button,
         )
 
 
@@ -155,24 +165,58 @@ class TaskList(BaseModel):
                 return item
         return None
 
-    def retry(self, label: str) -> Optional[TaskItem]:
-        """Move a task from done back to pending. Returns the moved item or None."""
+    def retry(self, label: str) -> TaskItem:
+        """Move a task from done back to pending, or create a new one.
+
+        Matching strategy:
+        1. Exact match in done → move to pending
+        2. Already in pending → return existing item (no-op)
+        3. Not in either list → create new TaskItem(kind='input') in pending
+
+        Always returns a TaskItem — never None.
+        """
+        # Tier 1: exact match in done — move to pending
         for i, item in enumerate(self.done):
             if item.label == label:
                 self.done.pop(i)
                 self.pending.append(item)
                 return item
-        return None
+        # Tier 2: already in pending — no-op
+        found = self.find_pending(label)
+        if found:
+            return found
+        # Tier 3: not in either list — create new
+        item = TaskItem(label=label, kind='input')
+        self.pending.append(item)
+        return item
 
     def sync_from_errors(self, error_labels: list[str]) -> list[TaskItem]:
         """Move tasks matching error labels from done back to pending.
 
-        Returns the list of retried items.
+        Matching strategy (three tiers):
+        1. Exact match via find_done()
+        2. Fuzzy match — bidirectional substring search across done labels
+        3. Fallback — create a new TaskItem in pending if not found in either list
+
+        Returns the list of retried/created items.
         """
         retried: list[TaskItem] = []
         for label in error_labels:
-            item = self.retry(label)
-            if item:
+            # Tier 1: exact match
+            found = self.find_done(label)
+            if not found:
+                # Tier 2: fuzzy — bidirectional substring
+                for d in self.done:
+                    if label in d.label or d.label in label:
+                        found = d
+                        break
+            if found:
+                self.retry(found.label)
+                retried.append(found)
+            elif self.find_pending(label) is None:
+                # Tier 3: not in either list — create new
+                item = TaskItem(label=label, kind='input')
+                self.pending.append(item)
                 retried.append(item)
         return retried
 

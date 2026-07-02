@@ -85,17 +85,8 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             action_json = action_file.model_dump()
 
             # Write form structure snapshots if available (prefer array, fall back to single)
-            raw_snapshots = case_data_store.get('form_snapshots', [])
-            snapshots = None
-            if raw_snapshots:
-                snapshots = [
-                    FormSnapshot(**s).model_dump() if isinstance(s, dict) else s.model_dump()
-                    for s in raw_snapshots
-                ]
-            else:
-                single = case_data_store.get('form_snapshot')
-                if single:
-                    snapshots = [FormSnapshot(**single).model_dump() if isinstance(single, dict) else single.model_dump()]
+            coll = FormSnapshotCollection.from_store(case_data_store)
+            snapshots = coll.to_dicts()
             if snapshots:
                 forms_dir = os.path.join(_SCRIPTS_DIR, 'forms')
                 os.makedirs(forms_dir, exist_ok=True)

@@ -72,9 +72,9 @@ class ScannedField(BaseModel):
         default=False,
         description="True if a select option is currently selected",
     )
-    hasButton: bool = Field(
-        default=False,
-        description="True if this .el-form-item contains an action button (e.g. '选择'/'获取地址' for address, '引入' for legal person)",
+    hasButton: str = Field(
+        default="",
+        description="Button text if this .el-form-item contains an action button (e.g. '引入', '选择', '验证', '获取地址'), empty string otherwise",
     )
     filled: bool = Field(
         default=False,

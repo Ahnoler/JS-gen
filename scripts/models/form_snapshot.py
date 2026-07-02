@@ -121,6 +121,23 @@ class FormSnapshotCollection:
             FormSnapshot(**s) if isinstance(s, dict) else s for s in raw
         ]
 
+    @classmethod
+    def from_store(cls, case_data_store: dict | None) -> "FormSnapshotCollection":
+        """Create from case_data_store, with fallback from array to single entry.
+
+        Prefers case_data_store['form_snapshots'] (array), falls back to
+        case_data_store['form_snapshot'] (single entry). Returns an empty
+        collection if neither exists.
+        """
+        if not case_data_store:
+            return cls()
+        raw = case_data_store.get('form_snapshots', [])
+        if not raw:
+            single = case_data_store.get('form_snapshot')
+            if single:
+                raw = [single]
+        return cls(raw)
+
     @property
     def snapshots(self) -> list[FormSnapshot]:
         return self._snapshots

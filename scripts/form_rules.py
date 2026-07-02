@@ -136,10 +136,20 @@ def load_rules(script_dir=None):
 
 
 def match_rule(label_text, form_rules):
-    """Match a label against loaded form rules and return generated value, or None."""
+    """Match a label against loaded form rules and return generated value, or None.
+
+    Keywords are matched by descending length so that more specific terms
+    (e.g. '邮政编码', 4 chars) take priority over shorter ones
+    (e.g. '地址', 2 chars) when both appear in the same label.
+    """
     t = label_text.replace(' ','').replace('\t','')
+    # Flatten and sort: longest keyword first
+    flat: list[tuple[str, callable]] = []
     for keywords, gen in form_rules:
         for kw in keywords:
-            if kw in t:
-                return gen()
+            flat.append((kw, gen))
+    flat.sort(key=lambda x: -len(x[0]))
+    for kw, gen in flat:
+        if kw in t:
+            return gen()
     return None
