@@ -55,7 +55,7 @@ class TaskItem(BaseModel):
     )
     hasButton: str = Field(
         default="",
-        description="Button text if this field has an adjacent action button (引入/选择/验证/获取地址), empty string otherwise.",
+        description="Button text if this field has an adjacent action button (引入/选择/验证/获取/获取地址), empty string otherwise.",
     )
 
     # ── Status checks ────────────────────────────────────────────────────
@@ -79,9 +79,9 @@ class TaskItem(BaseModel):
         Returns None if the field should be skipped:
         - Already filled (has currentValue)
         - Disabled / read-only
-        - Has an adjacent action button (引入/选择) — these fields cannot be
-          filled directly; the agent must use click_adjacent_button to trigger
-          the import/search/select/confirm workflow
+
+        Fields with hasButton are kept in pending — their handling is
+        determined by the caller (agent or auto-fill engine).
         """
         label = field.get("label", "")
         has_value = (field.get("currentValue", "") or "").strip() != ""

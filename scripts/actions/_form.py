@@ -20,6 +20,7 @@ from ._js_snippets import (
     JS_FIND_LABELED_SELECT, JS_FIND_OPTION, JS_SELECT_OPTION, JS_LOCATOR,
     JS_CLICK_RADIO,
     JS_SELECT_TREE_OPTION,
+    JS_SCROLL_TO_FIRST_ERROR,
 )
 from ._llm_values import _llm_generate_values
 from ..models import (
@@ -46,6 +47,7 @@ def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store
     coll.upsert(snapshot)
     case_data_store['form_snapshots'] = coll.to_dicts()
     case_data_store['form_snapshot'] = snapshot.model_dump()
+    return snapshot
 
 
 def _task_done_impl(label_text, case_data_store):
@@ -67,9 +69,9 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         1. task_list doesn't exist → first form on this task
         2. task_list exists but label not in pending/done → new form
 
-        Only triggers for main-page forms.  Dialog/drawer containers are
-        skipped — they are search/utility dialogs where agent needs fine
-        control over which fields to fill.
+        Only triggers for main-page forms and drawers.  Dialogs are skipped
+        — they are search/utility dialogs where agent needs fine control
+        over which fields to fill.
         """
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
@@ -333,8 +335,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         fields = case_data_store.get('_scan_fields', [])
 
-        _save_form_snapshot(container_id, fields, case_data_store)
-        return _ok(f'form-snapshot | container:{container_id} | count:{snapshot.count}')
+        snap = _save_form_snapshot(container_id, fields, case_data_store)
+        return _ok(f'form-snapshot | container:{container_id} | count:{snap.count}')
 
     # 内部函数 — 由 scan_form_fields 末尾自动调用。
     # 按 kind 分组（select→input→date→radio→checkbox）多次调用 LLM，
@@ -378,7 +380,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 return '';
             }''')
             if ref_date:
-                from datetime import date as _date_cls
                 case_data_store['_ref_date'] = ref_date
                 await page.evaluate(
                     's => console.log("[AI填表] 参考日期: " + s)', ref_date)
@@ -435,8 +436,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 value = a.get('value', '') or a.get('option', '')
                 field_kind = label_kind.get(label, kind)
                 step_num = i + 1
-                result = 'skipped'
-
                 try:
                     if kind in ('fill_input', 'fill', 'input'):
                         if field_kind == 'date':
@@ -559,7 +558,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     kind2 = (a.get('action') or '').lower().replace('-', '_')
                     value2 = a.get('value', '') or a.get('option', '')
                     fk2 = label_kind2.get(label2, kind2)
-                    result2 = 'skipped'
                     try:
                         if kind2 in ('fill_input', 'fill', 'input'):
                             if fk2 == 'date':
@@ -635,7 +633,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     kind3 = (a.get('action') or '').lower().replace('-', '_')
                     value3 = a.get('value', '') or a.get('option', '')
                     fk3 = label_kind3.get(label3, kind3)
-                    result3 = 'skipped'
                     try:
                         if kind3 in ('fill_input', 'fill', 'input'):
                             if fk3 == 'date':
@@ -706,7 +703,23 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             'done': done_labels,
         }, ensure_ascii=False)
 
-    @controller.action('Sync task list from current page validation errors. Reads .el-form-item__error text, extracts field labels (strips 请选择/请输入/请上传 prefix), re-adds them to pending. Call this after a failed submit attempt.')
+    @controller.action('Scroll to the first visible form validation error (.el-form-item.is-error or .el-form-item__error). Returns {label, error} so agent knows which field to fix next. Call after a failed submit or when form errors are visible.')
+    async def scroll_to_first_error():
+        page = await browser_context.get_current_page()
+        raw = await page.evaluate(JS_SCROLL_TO_FIRST_ERROR)
+        try:
+            info = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            return _ok('no-error-found')
+        label = (info.get('label') or '').strip()
+        error = (info.get('error') or '').strip()
+        if not label and not error:
+            return _ok('no-error-found')
+        sys.stderr.write(f'[scroll-to-error] jumped to: "{label}" → {error}\n')
+        sys.stderr.flush()
+        return _ok(f'scrolled-to:{label} | {error}')
+
+    @controller.action('Sync task list from current page validation errors. Reads .el-form-item__error text, extracts field labels (strips 请选择/请输入/请上传 prefix), re-adds them to pending. Also scrolls to first error. Call this after a failed submit attempt.')
     async def sync_tasks_from_errors():
         page = await browser_context.get_current_page()
         errors = await page.evaluate('''() => {
@@ -728,6 +741,20 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         retried = tl.sync_from_errors(error_labels)
         case_data_store['task_list'] = tl.to_store()
         retried_labels = [item.label for item in retried]
+
+        # Auto-scroll to first error so agent can see and fix it immediately
+        if retried:
+            scroll_raw = await page.evaluate(JS_SCROLL_TO_FIRST_ERROR)
+            try:
+                scroll_info = json.loads(scroll_raw) if isinstance(scroll_raw, str) else scroll_raw
+            except Exception:
+                scroll_info = {}
+            jumped_label = (scroll_info.get('label') or '').strip()
+            jumped_error = (scroll_info.get('error') or '').strip()
+            if jumped_label:
+                sys.stderr.write(f'[sync-errors] auto-scrolled to: "{jumped_label}" → {jumped_error}\n')
+                sys.stderr.flush()
+
         return _ok(f'sync-errors | retried:{len(retried)} | ' + json.dumps(retried_labels, ensure_ascii=False))
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')

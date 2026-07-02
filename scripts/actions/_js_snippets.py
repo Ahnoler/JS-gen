@@ -636,11 +636,11 @@ JS_CLASSIFY_FIELD = '''(item) => {
     const el = item.querySelector('input:not([type="hidden"])');
     if (el && el.closest('.el-date-editor, .tsscdatepicker')) return 'date';
     if (el && (el.getAttribute('type') === 'date')) return 'date';
+    // Tree-select must be checked BEFORE .el-select — TsscMultiTree wraps .el-select
+    // internally so both selectors match, but .my-popover/.tree-popover/.el-tree
+    // is unique to tree components.
+    if (item.querySelector('.my-popover, .tree-popover, .el-tree')) return 'tree-select';
     if (item.querySelector('.el-select')) return 'select';
-    // Tree-select: custom TsscMultiTree component (e.g. 行业代码).
-    // The popover wrapper (.my-popover / .tree-popover) is always in the DOM
-    // even when collapsed — detect it before classifying as plain 'input'.
-    if (item.querySelector('.my-popover, .tree-popover')) return 'tree-select';
     if (item.querySelector('.el-radio')) return 'radio';
     if (item.querySelector('.el-checkbox')) return 'checkbox';
     if (el || item.querySelector('textarea')) return 'input';
@@ -839,4 +839,32 @@ JS_CHECK_SINGLE_FIELD = '''(label) => {
         }
     }
     return 'label-not-found';
+}'''
+
+JS_SCROLL_TO_FIRST_ERROR = '''() => {
+    const container = ''' + JS_GET_CONTAINER + ''';
+    // Pass 1: .el-form-item.is-error (Element UI sets this class on validation fail)
+    const errorItems = container.querySelectorAll('.el-form-item.is-error');
+    for (const item of errorItems) {
+        if (item.offsetParent === null) continue;
+        const errEl = item.querySelector('.el-form-item__error');
+        if (errEl && errEl.offsetParent !== null && errEl.textContent.trim()) {
+            item.scrollIntoView({ block: 'center', behavior: 'instant' });
+            const label = (item.querySelector('.el-form-item__label')?.textContent || '').trim();
+            const error = errEl.textContent.trim();
+            return JSON.stringify({ label, error });
+        }
+    }
+    // Pass 2: any visible .el-form-item__error (some custom forms don't set is-error)
+    const allErrors = container.querySelectorAll('.el-form-item__error');
+    for (const err of allErrors) {
+        if (err.offsetParent === null || !err.textContent.trim()) continue;
+        const item = err.closest('.el-form-item');
+        if (item && item.offsetParent !== null) {
+            item.scrollIntoView({ block: 'center', behavior: 'instant' });
+            const label = (item.querySelector('.el-form-item__label')?.textContent || '').trim();
+            return JSON.stringify({ label, error: err.textContent.trim() });
+        }
+    }
+    return JSON.stringify({ label: '', error: '' });
 }'''

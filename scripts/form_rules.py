@@ -48,6 +48,10 @@ def _gen_amount():
 def _gen_name():
     return _random.choice(['张','李','王','刘','陈','杨','赵','黄','周','吴']) + _random.choice(['伟','芳','敏','静','丽','强','磊','洋','涛','明']) + _random.choice(['华','平','刚','杰','峰','玲','超','文','林','军'])
 
+def _gen_institution_credit_code():
+    """10-digit institution credit code (人行征信中心分配), NOT 18-digit USCC."""
+    return ''.join(str(_random.randint(0, 9)) for _ in range(10))
+
 def _gen_address():
     return _random.choice(['北京市朝阳区','上海市浦东新区','广州市天河区','深圳市南山区','长沙市岳麓区']) + _random.choice(['中山路','人民路','解放路','五一路','芙蓉路']) + f"{_random.randint(1,200)}号"
 
@@ -56,6 +60,7 @@ _GEN_MAP = {
     'genEmail': _gen_email, 'genCreditCode': _gen_credit_code, 'genBankcard': _gen_bankcard,
     'genBankCard': _gen_bankcard,  # JS naming alias
     'genAmount': _gen_amount, 'genName': _gen_name, 'genAddress': _gen_address,
+    'genInstitutionCreditCode': _gen_institution_credit_code,
     'genQQ': lambda: ''.join(str(_random.randint(0,9)) for _ in range(_random.randint(5,11))),
     'genAge': lambda: str(_random.randint(18,65)),
     'genEmployeeId': lambda: 'EMP' + f"{_random.randint(100,999)}",

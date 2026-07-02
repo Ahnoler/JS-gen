@@ -35,6 +35,7 @@ description: |
 | `手机`、`电话`、`联系方式` | `genMobile()` | 11 位，`1` 开头，第二位 3-9 | 模糊匹配手机号/联系电话/联系方式等 |
 | `邮箱`、`Email`、`电子邮箱` | `genEmail()` | `xxx@domain.tld` | 随机用户名 + 常见域名 |
 | `统一社会信用代码`、`信用代码`、`营业执照`、`营业执照号`、`证件号码` | `genCreditCode()` | 18 位字母+数字 | 注册号前缀 + 随机段 |
+| `机构信用代码` | `genInstitutionCreditCode()` | 10 位数字 | 人行征信中心分配的机构信用编码 |
 | `银行卡`、`银行卡号`、`银行账号` | `genBankCard()` | 16-19 位，`62` 开头 | 银联卡号随机 |
 | `金额`、`价格`、`费用`、`工资`、`收入` | `genAmount()` | 数字，可含 2 位小数 | 10000.00 ~ 9999999.99 |
 | `邮编`、`邮政编码` | `'100000'` | 6 位数字 | 静态值 |
@@ -123,6 +124,13 @@ function genCreditCode() {
   for (let i = 0; i < 9; i++) body += CHARS[Math.floor(Math.random() * CHARS.length)];
   const total = body.split('').reduce((s, c, i) => s + CHARS.indexOf(c) * WEIGHTS[i], 0);
   return body + CHARS[(31 - total % 31) % 31];
+}
+
+/** 生成机构信用代码（人行征信中心分配的10位数字编码） */
+function genInstitutionCreditCode() {
+  let code = '';
+  for (let i = 0; i < 10; i++) code += Math.floor(Math.random() * 10);
+  return code;
 }
 
 /** 生成随机银行卡号 */
@@ -252,6 +260,7 @@ function matchSpecialRule(labelText) {
   if (t.includes('电话') || t.includes('手机') || t.includes('手机号') || t.includes('联系电话') || t.includes('联系方式') || t.includes('电话号码')) return [genMobile(), '手机号'];
   if (t.includes('单位电话') || t.includes('固定电话') || t.includes('座机')) return [genLandline(), '座机'];
   if (t.includes('邮箱') || t.includes('Email') || t.includes('电子邮箱')) return [genEmail(), '邮箱'];
+  if (t.includes('机构信用代码')) return [genInstitutionCreditCode(), '机构信用代码'];
   if (t.includes('统一社会信用代码') || t.includes('信用代码') || t.includes('营业执照') || t.includes('证件号码')) return [genCreditCode(), '信用代码'];
   if (t.includes('银行卡') || t.includes('银行卡号') || t.includes('银行账号')) return [genBankCard(), '银行卡'];
   if (t.includes('金额') || t.includes('价格') || t.includes('费用') || t.includes('工资') || t.includes('收入')) return [genAmount(), '金额'];
