@@ -210,6 +210,7 @@ JS_FILL_DATE_FIELD = '''([label, val]) => {
             else { if (lbl === label || !lbl.includes(label)) continue; }
             const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
             if (!t) return 'no-input';
+            item.scrollIntoView({ block: 'center', behavior: 'instant' });
             if (t.disabled || t.readOnly) return 'disabled';
             if (t.closest('.el-date-editor, .tsscdatepicker')) { target = t; break; }
         }
@@ -447,6 +448,7 @@ JS_CLICK_RADIO = '''([label, option]) => {
     for (const item of items) {
         const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
         if (!lbl.includes(label)) continue;
+        item.scrollIntoView({ block: 'center', behavior: 'instant' });
         const radios = item.querySelectorAll('.el-radio');
         for (const radio of radios) {
             if (radio.textContent.trim() === option && radio.offsetParent !== null) {
@@ -489,9 +491,17 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
         if (l === label || l.includes(label)) { fieldItem = item; break; }
     }
     if (!fieldItem) return 'label-not-found';
+    fieldItem.scrollIntoView({ block: 'center', behavior: 'instant' });
     const input = fieldItem.querySelector('input');
     if (!input) return 'no-input';
     if (input.disabled || input.readOnly) return 'disabled';
+    // Read value from any non-empty input in the form item
+    const readDisplayValue = () => {
+        for (const inp of fieldItem.querySelectorAll('input:not([type="hidden"])')) {
+            if (inp.value && inp.value.trim()) return inp.value.trim();
+        }
+        return '';
+    };
     // Open popover
     input.click();
     // Find TsscMultiTree instance
@@ -509,33 +519,65 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
     vm = tryFind();
     if (!vm) return 'no-tree-component';
 
-    // Search treeData for matching label
-    let code = null;
-    // P0: exact match in treeData → select via Vue API
-    const treeData = vm.treeData || [];
-    for (const node of treeData) {
-        if (node.label === option) { code = node.value || node.id; break; }
-    }
-    if (!code) {
-        const walk = (nodes) => {
-            for (const n of nodes) {
-                if (n.label === option) return n.value || n.id;
-                if (n.children) { const r = walk(n.children); if (r) return r; }
+    // ═══════════════════════════════════════════════════════════════════
+    // P0: Exact match — resolve to a leaf node code.
+    //
+    // data[] is hierarchical: { label, id, children? }.  Leaf = no children.
+    // treeData[] is flat:     { name, id, pId } (no children, no label).
+    //
+    // Match by display text (label / name) OR by code (id).
+    // ═══════════════════════════════════════════════════════════════════
+    const isLeafNode = (node) => !node.children || node.children.length === 0;
+    const dfsFirstLeaf = (nodes) => {
+        for (const n of nodes) {
+            if (isLeafNode(n)) return n;
+            if (n.children) {
+                const r = dfsFirstLeaf(n.children);
+                if (r) return r;
             }
-            return null;
-        };
-        code = walk(vm.data || []);
+        }
+        return null;
+    };
+    const nodeMatches = (n) => (n.label || n.name || '') === option || n.id === option;
+    const walkForLeaf = (nodes) => {
+        for (const n of nodes) {
+            if (nodeMatches(n)) {
+                if (isLeafNode(n)) return n.id;
+                const leaf = dfsFirstLeaf(n.children || []);
+                if (leaf) return leaf.id;
+                return null;
+            }
+            if (n.children) { const r = walkForLeaf(n.children); if (r) return r; }
+        }
+        return null;
+    };
+    // Try hierarchical data first (proper tree), then flat treeData
+    code = walkForLeaf(vm.data || []);
+    if (!code) {
+        const flat = vm.treeData || [];
+        for (const n of flat) {
+            if ((n.name || '') === option || n.id === option) { code = n.id; break; }
+        }
     }
     if (code) {
         vm.$emit('input', code);
+        // Verify the selection took effect — the component may reject invalid codes
+        await new Promise(r => setTimeout(r, 150));
+        const verifyVal = readDisplayValue();
+        if (!verifyVal) {
+            return 'fail: emit did not update input for code=' + code;
+        }
         setTimeout(() => {
             if (typeof vm.handleHideClick === 'function') vm.handleHideClick();
         }, 100);
         return 'ok:' + option + ' (' + code + ')';
     }
 
-    // P1: no match → search UI with keyword → click first visible leaf
-    // Support both .tree-popover (old) and .el-popover (custom tssc-form-item wrappers)
+    // ═══════════════════════════════════════════════════════════════════
+    // P1: UI keyword search — Pass 1: click first visible leaf.
+    // Pass 2: if only non-leaf visible → expand it → DFS first leaf child.
+    // Supports .tree-popover (old) and .el-popover (custom wrappers).
+    // ═══════════════════════════════════════════════════════════════════
     let popover = document.querySelector('.tree-popover');
     if (!popover || popover.offsetParent === null) {
         const allPopovers = document.querySelectorAll('.el-popover');
@@ -568,6 +610,7 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
                     // Tree is filtered when hidden nodes appear (search narrowed results)
                     if (visible < allNodes.length || elapsed >= 2000) {
                         const nodes = document.querySelectorAll('.el-tree-node:not(.is-hidden)');
+                        // Pass 1: look for a visible leaf node
                         for (const node of nodes) {
                             const icon = node.querySelector('.el-tree-node__expand-icon');
                             const children = node.querySelector('.el-tree-node__children');
@@ -576,7 +619,6 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
                                 const lbl = node.querySelector('.el-tree-node__label');
                                 const labelText = (lbl?.textContent || node.textContent || '').trim();
                                 if (lbl) lbl.click(); else node.click();
-                                // Sync via Vue emit — DOM click alone may not trigger model update
                                 const nodeVm = node.__vue__;
                                 if (nodeVm && vm && typeof vm.$emit === 'function') {
                                     const nodeData = nodeVm.data || nodeVm.$data || {};
@@ -585,6 +627,37 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
                                 }
                                 resolve(labelText);
                                 return;
+                            }
+                        }
+                        // Pass 2: no leaf visible — expand first non-leaf, poll for leaf children
+                        for (const node of nodes) {
+                            const icon = node.querySelector('.el-tree-node__expand-icon');
+                            if (icon && !icon.classList.contains('is-leaf')) {
+                                icon.click();
+                                setTimeout(() => {
+                                    const children = node.querySelector('.el-tree-node__children');
+                                    const leafKids = children ? children.querySelectorAll('.el-tree-node:not(.is-hidden)') : [];
+                                    for (const child of leafKids) {
+                                        const cIcon = child.querySelector('.el-tree-node__expand-icon');
+                                        const cChildren = child.querySelector('.el-tree-node__children');
+                                        const cIsLeaf = !cIcon || cIcon.classList.contains('is-leaf') || !cChildren || cChildren.querySelectorAll('.el-tree-node').length === 0;
+                                        if (cIsLeaf) {
+                                            const lbl = child.querySelector('.el-tree-node__label');
+                                            const labelText = (lbl?.textContent || child.textContent || '').trim();
+                                            if (lbl) lbl.click(); else child.click();
+                                            const nodeVm = child.__vue__;
+                                            if (nodeVm && vm && typeof vm.$emit === 'function') {
+                                                const nodeData = nodeVm.data || nodeVm.$data || {};
+                                                const code = nodeData.value || nodeData.id || nodeData.code || '';
+                                                if (code) vm.$emit('input', code);
+                                            }
+                                            resolve(labelText);
+                                            return;
+                                        }
+                                    }
+                                    resolve(null);
+                                }, 300);
+                                return; // async — poll callback will resolve
                             }
                         }
                         resolve(null);
@@ -596,15 +669,22 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
                 setTimeout(poll, 300);
             });
             if (result) {
+                await new Promise(r => setTimeout(r, 150));
+                const verifyVal = readDisplayValue();
                 setTimeout(() => {
                     if (typeof vm.handleHideClick === 'function') vm.handleHideClick();
                 }, 100);
+                if (!verifyVal) {
+                    return 'fail: search-click did not update input, clicked=' + result;
+                }
                 return 'ok-search:' + result;
             }
         }
     }
 
-    // P2: search returned no results → pick first leaf from tree data
+    // ═══════════════════════════════════════════════════════════════════
+    // P2: Last resort — pick the first leaf node from the full tree data.
+    // ═══════════════════════════════════════════════════════════════════
     const data = vm.data || [];
     const walkLeaf = (ns) => {
         for (const n of ns) {
@@ -619,9 +699,14 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
         code = first.value || first.id;
         option = first.label || first.value || first.id;
         vm.$emit('input', code);
+        await new Promise(r => setTimeout(r, 150));
+        const verifyVal = readDisplayValue();
         setTimeout(() => {
             if (typeof vm.handleHideClick === 'function') vm.handleHideClick();
         }, 100);
+        if (!verifyVal) {
+            return 'fail: fallback emit did not update input for code=' + code;
+        }
         return 'ok-fallback:' + option + ' (' + code + ')';
     }
     return 'option-not-found';
@@ -666,6 +751,26 @@ JS_FIELD_REQUIRED = '''(item, label, inputEl) => {
     return hasRequiredClass || hasAsterisk || hasNativeRequired;
 }'''
 
+JS_READ_CURRENT_VALUE = '''(inputEl, trigger, item) => {
+    // 1. primary input/textarea
+    let val = inputEl?.value || trigger?.value || '';
+    // 2. multi-input fallback (tree-select may have two inputs)
+    if (!val) {
+        const allInputs = item.querySelectorAll('input:not([type="hidden"])');
+        for (const inp of allInputs) {
+            if (inp.value && inp.value.trim()) { val = inp.value.trim(); break; }
+        }
+    }
+    // 3. ARIA attributes
+    if (!val) {
+        const ariaInput = item.querySelector('[aria-valuetext]') || item.querySelector('[aria-valuenow]');
+        if (ariaInput) val = ariaInput.getAttribute('aria-valuetext') || ariaInput.getAttribute('aria-valuenow') || '';
+    }
+    // 4. trigger aria/title fallback
+    if (!val && trigger) val = trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '';
+    return val;
+}'''
+
 # ── Form field scanning ──
 
 JS_SCAN_FORM_FIELDS = '''async (quick) => {
@@ -673,6 +778,7 @@ JS_SCAN_FORM_FIELDS = '''async (quick) => {
     const classify = ''' + JS_CLASSIFY_FIELD + ''';
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const isRequired = ''' + JS_FIELD_REQUIRED + ''';
+    const readValue = ''' + JS_READ_CURRENT_VALUE + ''';
     // 从 el-select 的 Vue 组件实例读取 options（不操作 DOM，不受下拉框位置影响）。
     // Element UI 的 Vue 实例挂载在 .el-select 的容器 DIV 上（不是内部 input）。
     const readVueOptions = (trigger) => {
@@ -715,12 +821,7 @@ JS_SCAN_FORM_FIELDS = '''async (quick) => {
         if (!label && !input && !textarea && !trigger) continue;
         const kind = classify(item);
         const inputEl = input || textarea;
-        let currentValue = inputEl?.value || trigger?.value || '';
-        if (!currentValue) {
-            const ariaInput = item.querySelector('[aria-valuetext]') || item.querySelector('[aria-valuenow]');
-            if (ariaInput) currentValue = ariaInput.getAttribute('aria-valuetext') || ariaInput.getAttribute('aria-valuenow') || '';
-        }
-        if (!currentValue && trigger) currentValue = trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '';
+        let currentValue = readValue(inputEl, trigger, item);
         const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
         // Two-level disabled detection (DOM native → ARIA on element itself)
         const disabled = isDisabled(inputEl, trigger);
@@ -806,6 +907,7 @@ JS_CHECK_SINGLE_FIELD = '''(label) => {
     const classify = ''' + JS_CLASSIFY_FIELD + ''';
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const isRequired = ''' + JS_FIELD_REQUIRED + ''';
+    const readValue = ''' + JS_READ_CURRENT_VALUE + ''';
     for (let pass = 1; pass <= 2; pass++) {
         const exact = pass === 1;
         for (const item of container.querySelectorAll('.el-form-item')) {
@@ -817,12 +919,7 @@ JS_CHECK_SINGLE_FIELD = '''(label) => {
             const trigger = item.querySelector('.el-select .el-input__inner');
             const kind = classify(item);
             const inputEl = input || textarea;
-            let currentValue = inputEl?.value || trigger?.value || '';
-            if (!currentValue) {
-                const ariaInput = item.querySelector('[aria-valuetext]') || item.querySelector('[aria-valuenow]');
-                if (ariaInput) currentValue = ariaInput.getAttribute('aria-valuetext') || ariaInput.getAttribute('aria-valuenow') || '';
-            }
-            if (!currentValue && trigger) currentValue = trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '';
+            let currentValue = readValue(inputEl, trigger, item);
             const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
             const disabled = isDisabled(inputEl, trigger);
             const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));

@@ -92,10 +92,14 @@ class TaskItem(BaseModel):
         is_disabled = field.get("disabled", False)
         has_button = field.get("hasButton", "") or ""
 
-        # Filter: already filled → skip; disabled without button → truly unfillable → skip
+        # Filter: already filled → skip
+        # Filter: disabled without button → truly unfillable → skip
+        # Filter: disabled + not required → optional read-only, no need to fill
         if has_value:
             return None
         if is_disabled and not has_button:
+            return None
+        if is_disabled and not field.get("required", False):
             return None
 
         return cls(

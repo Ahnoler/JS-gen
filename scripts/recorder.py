@@ -65,7 +65,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
         _done = agent.state.history.is_done() if agent.state.history else False
         _stopped = agent.state.stopped
         _last_result = agent.state.last_result
-        _last_result_str = str(_last_result)[:300] if _last_result else 'None'
+        _last_result_str = str(_last_result) if _last_result else 'None'
         _model_out = agent.state.history.history[-1].model_output if agent.state.history and agent.state.history.history else None
         _next_goal = getattr(getattr(_model_out, 'current_state', None), 'next_goal', '') if _model_out else ''
         _actions_raw = (getattr(_model_out, 'action', []) or []) if _model_out else []

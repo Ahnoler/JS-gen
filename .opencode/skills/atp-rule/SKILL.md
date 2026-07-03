@@ -32,7 +32,7 @@ description: |
 |--------|--------|----------|------|
 | `身份证`、`身份证号`、`居民身份证` | `genIdCard()` | 18 位，末位含校验码（可为 X） | 用 `genValidIdCard(prefix)` 生成真校验位 |
 | `单位电话`、`固定电话`、`座机` | `genLandline()` | 区号+号码 | 如 `0731` + 8 位随机数字 |
-| `手机`、`电话`、`联系方式` | `genMobile()` | 11 位，`1` 开头，第二位 3-9 | 模糊匹配手机号/联系电话/联系方式等 |
+| `手机号码`、`联系电话`、`手机`、`电话`、`联系方式` | `genMobile()` | 11 位，`1` 开头，第二位 3-9 | 模糊匹配手机号/联系电话/联系方式等 |
 | `邮箱`、`Email`、`电子邮箱` | `genEmail()` | `xxx@domain.tld` | 随机用户名 + 常见域名 |
 | `统一社会信用代码`、`信用代码`、`营业执照`、`营业执照号`、`证件号码` | `genCreditCode()` | 18 位字母+数字 | 注册号前缀 + 随机段 |
 | `机构信用代码` | `genInstitutionCreditCode()` | 10 位数字 | 人行征信中心分配的机构信用编码 |
@@ -257,7 +257,7 @@ function matchSpecialRule(labelText) {
   const t = labelText.replace(/\s+/g, '');
   // 随机生成器（12 组）
   if (t.includes('身份证') || t.includes('身份证号') || t.includes('居民身份证')) return [genValidIdCard(), '身份证'];
-  if (t.includes('电话') || t.includes('手机') || t.includes('手机号') || t.includes('联系电话') || t.includes('联系方式') || t.includes('电话号码')) return [genMobile(), '手机号'];
+  if (t.includes('手机号码') || t.includes('联系电话') || t.includes('手机号') || t.includes('电话') || t.includes('手机') || t.includes('联系方式') || t.includes('电话号码')) return [genMobile(), '手机号'];
   if (t.includes('单位电话') || t.includes('固定电话') || t.includes('座机')) return [genLandline(), '座机'];
   if (t.includes('邮箱') || t.includes('Email') || t.includes('电子邮箱')) return [genEmail(), '邮箱'];
   if (t.includes('机构信用代码')) return [genInstitutionCreditCode(), '机构信用代码'];
