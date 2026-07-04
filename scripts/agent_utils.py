@@ -65,13 +65,16 @@ def _resolve_directives(text):
     return _DIRECTIVE_RE.sub(_replacer, text)
 
 _prompt_content = _resolve_directives(_prompt_content)
+OVERRIDE_SYSTEM_MESSAGE = _prompt_content.strip()
 
-# Split: main content (before ---) and planner section (after PLANNER SYSTEM PROMPT)
-_parts = _prompt_content.split('\n---\n', 1)
-OVERRIDE_SYSTEM_MESSAGE = _parts[0].strip()
-
-_planner_idx = _prompt_content.find('# PLANNER SYSTEM PROMPT')
-PLANNER_SYSTEM_PROMPT = _prompt_content[_planner_idx:].strip() if _planner_idx != -1 else ''
+# Planner prompt: prefer standalone file, fall back to inline section in agent-prompt.md
+_PLANNER_PATH = os.path.join(_SCRIPT_DIR, 'prompts', 'planner-prompt.md')
+if os.path.exists(_PLANNER_PATH):
+    with open(_PLANNER_PATH, 'r', encoding='utf-8') as _f:
+        PLANNER_SYSTEM_PROMPT = _resolve_directives(_f.read()).strip()
+else:
+    _planner_idx = _prompt_content.find('# PLANNER SYSTEM PROMPT')
+    PLANNER_SYSTEM_PROMPT = _prompt_content[_planner_idx:].strip() if _planner_idx != -1 else ''
 
 
 def patch_message_manager():

@@ -78,7 +78,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
             except Exception:
                 _actions.append(str(a))
         sys.stderr.write(f"[on_step_end]\t n_steps={agent.state.n_steps} is_done={_done} stopped={_stopped}\n")
-        sys.stderr.write(f"[next_goal]\t {_next_goal[:150]}\n")
+        sys.stderr.write(f"[next_goal]\t {_next_goal}\n")
         if _actions:
             sys.stderr.write(f"[actions]\t {', '.join(_actions)}\n")
         else:

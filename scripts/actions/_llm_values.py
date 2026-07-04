@@ -15,10 +15,42 @@ If unset, falls back to the agent's LLM (the `llm` parameter).
 
 import json
 import os
+import re
 
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from ..form_rules import match_rule
+
+# ── Load form LLM system prompt from external file ──────────────────────────
+_DIRECTIVE_RE = re.compile(r'\{\{([^}]+\.md)\}\}')
+
+def _resolve_directives(text):
+    _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    def _replacer(m):
+        fname = m.group(1)
+        fpath = os.path.join(_base, fname)
+        if os.path.exists(fpath):
+            with open(fpath, 'r', encoding='utf-8') as _f:
+                return _f.read().strip()
+        return m.group(0)
+    return _DIRECTIVE_RE.sub(_replacer, text)
+
+def _load_fill_form_prompt():
+    """Load the form LLM system prompt from prompts/form-prompt.md."""
+    _prompt_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _form_path = os.path.join(_prompt_dir, 'prompts', 'form-prompt.md')
+    try:
+        with open(_form_path, 'r', encoding='utf-8') as _f:
+            return _resolve_directives(_f.read()).strip()
+    except Exception:
+        # Fallback: load rules and build prompt inline
+        _rules_path = os.path.join(_prompt_dir, 'prompts', 'agent-field-rules.md')
+        try:
+            with open(_rules_path, 'r', encoding='utf-8') as _f:
+                _rules = _f.read()
+        except Exception:
+            _rules = ''
+        return f'你是一个表单填写助手...\n\n{_rules}'
 
 # ── Cached form-specific LLM instance ──────────────────────────────────────
 _FORM_LLM = None
@@ -47,30 +79,6 @@ def _get_form_llm(agent_llm=None):
         _FORM_LLM_CONFIG = new_config
 
     return _FORM_LLM
-
-
-def _load_fill_form_prompt():
-    """Load the canonical form filling rules from agent-field-rules.md."""
-    _prompt_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    _rules_path = os.path.join(_prompt_dir, 'prompts', 'agent-field-rules.md')
-    try:
-        with open(_rules_path, 'r', encoding='utf-8') as _f:
-            _rules = _f.read()
-    except Exception:
-        _rules = ''
-    return f'''你是一个表单填写助手。根据字段列表，返回 JSON 动作数组。
-
-动作类型：
-- fill_input: 填写输入框，参数 {{"action":"fill_input","label":"字段标签","value":"要填的值"}}
-- select_option: 选择下拉框，参数 {{"action":"select_option","label":"字段标签","option":"要选的选项"}}
-
-规则：
-- commandValue 标记的字段：用户已指定值，直接使用 commandValue 填入
-- 无 commandValue 的 input/date 字段：严格按照下方规则文档生成合法值。value 必须是纯数据值（如"测试科技发展有限公司"），禁止包含规则描述、示例标注、括号说明等解释性文字。
-- 无 commandValue 的 select/radio/checkbox：从 options 列表中选取最合理的选项。option 必须是 options 中的原文字，禁止修改或添加说明。
-- 只返回 JSON 数组，不要解释，不要 markdown 代码块。
-
-{_rules}'''
 
 
 def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,

@@ -225,14 +225,23 @@ export default function (app) {
       const url = actionData.url || '';
       const commands = actionData?.tests?.[0]?.commands || actionData?.actions || [];
       const remaining = commands.filter((c, i) => (i + 1) >= failedStep);
-      const lines = [];
-      if (url && !url.includes('unknown')) lines.push('【目标URL】\n' + url + '\n');
-      lines.push('当前为脚本执行失败后的自愈修复阶段。请根据下方操作步骤与 Log 文件，逐步导航并复现失败场景，抵达出错页面后，扫描当前表单，建立任务清单，重新填写所有表单项。\n');
 
-      // Inject form structure change context for LLM self-heal (multi-container support)
+      // Load heal prompt template
+      const healPromptPath = path.resolve(PROJECT_DIR, 'scripts', 'prompts', 'heal-prompt.md');
+      let template = '';
+      try {
+        template = existsSync(healPromptPath) ? readFileSync(healPromptPath, 'utf-8') : '';
+      } catch (_) {}
+
+      // Build URL section
+      const urlSection = (url && !url.includes('unknown'))
+        ? '【目标URL】\n' + url + '\n\n'
+        : '';
+
+      // Build form changes section
+      let formChangesSection = '';
       if (form_changes) {
         const changesList = Array.isArray(form_changes) ? form_changes : [form_changes];
-
         for (const change of changesList) {
           const container = change.container || 'main';
           const containerInfo = container !== 'main' ? ` (容器: ${container})` : '';
@@ -243,71 +252,87 @@ export default function (app) {
           const isWarning = missing_required.length === 0 && added_required.length === 0;
 
           if (isWarning) {
-            // P3/P4: warning only
             if (missing_optional.length || added_optional.length) {
-              lines.push(`【P3 FORM WARNING: 可选字段变化${containerInfo}（仅参考）】`);
+              formChangesSection += `【P3 FORM WARNING: 可选字段变化${containerInfo}（仅参考）】\n`;
               if (missing_optional.length) {
-                lines.push('  已移除的可选字段：' + missing_optional.map(f => '"' + f + '"').join('、'));
+                formChangesSection += '  已移除的可选字段：' + missing_optional.map(f => '"' + f + '"').join('、') + '\n';
               }
               if (added_optional.length) {
-                lines.push('  新增的可选字段：' + added_optional.map(f => '"' + f + '"').join('、'));
+                formChangesSection += '  新增的可选字段：' + added_optional.map(f => '"' + f + '"').join('、') + '\n';
               }
-              lines.push('');
+              formChangesSection += '\n';
             } else if (change.reordered) {
-              lines.push(`【P4 FORM WARNING: 字段顺序变化${containerInfo}（仅参考）】`);
-              lines.push('');
+              formChangesSection += `【P4 FORM WARNING: 字段顺序变化${containerInfo}（仅参考）】\n\n`;
             }
           } else {
-            // P2: required field error
-            lines.push(`【P2 FORM ERROR: 必填字段变化${containerInfo}（导致脚本失败，需自愈修复）】`);
+            formChangesSection += `【P2 FORM ERROR: 必填字段变化${containerInfo}（导致脚本失败，需自愈修复）】\n`;
             if (missing_required.length) {
-              lines.push('  已从表单中移除的必填字段（无需填写，跳过）：');
-              missing_required.forEach(f => lines.push('    - "' + f + '"'));
+              formChangesSection += '  已从表单中移除的必填字段（无需填写，跳过）：\n';
+              missing_required.forEach(f => formChangesSection += '    - "' + f + '"\n');
             }
             if (added_required.length) {
-              lines.push('  表单中新增的必填字段（必须扫描页面找到并填写）：');
-              added_required.forEach(f => lines.push('    - "' + f + '"'));
+              formChangesSection += '  表单中新增的必填字段（必须扫描页面找到并填写）：\n';
+              added_required.forEach(f => formChangesSection += '    - "' + f + '"\n');
             }
             if (missing_optional.length || added_optional.length) {
-              lines.push('  附：可选字段变化 — 移除：' + missing_optional.map(f => '"' + f + '"').join('、') || '无' + ' | 新增：' + added_optional.map(f => '"' + f + '"').join('、') || '无');
+              formChangesSection += '  附：可选字段变化 — 移除：' + (missing_optional.map(f => '"' + f + '"').join('、') || '无') + ' | 新增：' + (added_optional.map(f => '"' + f + '"').join('、') || '无') + '\n';
             }
-            lines.push('');
+            formChangesSection += '\n';
           }
         }
       }
+
+      // Build remaining commands
+      let remainingCmds = '';
       for (const cmd of remaining) {
         const stepNum = commands.indexOf(cmd) + 1;
         const a = cmd.action || ''; const p = cmd.params || {};
-        if (a === 'fill_form_field') lines.push('- Step ' + stepNum + ': 填写 "' + (p.label_text || '') + '" = "' + (p.value || '') + '"');
-        else if (a === 'select_option') lines.push('- Step ' + stepNum + ': 在 "' + (p.label_text || '') + '" 中选择 "' + (p.option_text || '') + '"');
-        else if (a === 'click_element_by_index') lines.push('- Step ' + stepNum + ': 点击 "' + (p.text || p.index || '') + '"');
-        else lines.push('- Step ' + stepNum + ': ' + a);
+        if (a === 'fill_form_field') remainingCmds += '- Step ' + stepNum + ': 填写 "' + (p.label_text || '') + '" = "' + (p.value || '') + '"\n';
+        else if (a === 'select_option') remainingCmds += '- Step ' + stepNum + ': 在 "' + (p.label_text || '') + '" 中选择 "' + (p.option_text || '') + '"\n';
+        else if (a === 'click_element_by_index') remainingCmds += '- Step ' + stepNum + ': 点击 "' + (p.text || p.index || '') + '"\n';
+        else remainingCmds += '- Step ' + stepNum + ': ' + a + '\n';
       }
+
+      // Build log section
+      let logSection = '';
       if (log_file) {
         const logPath = path.resolve(PROJECT_DIR, log_file);
         if (existsSync(logPath)) {
           const logContent = readFileSync(logPath, 'utf-8');
           if (logContent.trim()) {
-            lines.push('\n---');
-            lines.push('## 文件说明');
-            lines.push('以下包含两份文件，供你理解任务上下文：');
-            lines.push('');
-            lines.push('### 截断的 Action 文件（上方操作步骤列表）');
-            lines.push('- 来源于原始脚本从第 ' + failedStep + ' 步开始截断后的剩余操作步骤。');
-            lines.push('- 这是原始脚本期望执行的步骤（可能已不适用于当前页面状态，仅供参考业务意图）。');
-            lines.push('- 你需要根据下方 Log 文件中的完整上下文，理解原始录制的正确操作流程。');
-            lines.push('');
-            lines.push('### 完整的 Log 文件（下方日志内容）');
-            lines.push('- 来源于原始录制时完整成功执行的过程日志，包含完整的导航路径和所有成功操作。');
-            lines.push('- 请参照 Log 中的完整操作序列来理解业务目标、导航步骤和正确的操作方式。');
-            lines.push('- 复现失败场景后，请根据 Log 中的业务意图重新填写表单。');
-            lines.push('');
-            lines.push('## 原始执行日志');
-            lines.push('```\n' + logContent.trim() + '\n```');
+            logSection = '\n---\n\n## 文件说明\n\n以下包含两份文件，供你理解任务上下文：\n\n' +
+              '### 截断的 Action 文件（上方操作步骤列表）\n' +
+              '- 来源于原始脚本从第 ' + failedStep + ' 步开始截断后的剩余操作步骤。\n' +
+              '- 这是原始脚本期望执行的步骤（可能已不适用于当前页面状态，仅供参考业务意图）。\n' +
+              '- 你需要根据下方 Log 文件中的完整上下文，理解原始录制的正确操作流程。\n\n' +
+              '### 完整的 Log 文件（下方日志内容）\n' +
+              '- 来源于原始录制时完整成功执行的过程日志，包含完整的导航路径和所有成功操作。\n' +
+              '- 请参照 Log 中的完整操作序列来理解业务目标、导航步骤和正确的操作方式。\n' +
+              '- 复现失败场景后，请根据 Log 中的业务意图重新填写表单。\n\n' +
+              '## 原始执行日志\n```\n' + logContent.trim() + '\n```\n';
           }
         }
       }
-      resumeInstruction = lines.join('\n');
+
+      // Assemble from template
+      if (template) {
+        resumeInstruction = template
+          .replace('{{URL_SECTION}}', urlSection)
+          .replace('{{FORM_CHANGES_SECTION}}', formChangesSection)
+          .replace('{{FAILED_STEP}}', String(failedStep))
+          .replace('{{REMAINING_COMMANDS}}', remainingCmds || '(无剩余操作步骤)')
+          .replace('{{LOG_SECTION}}', logSection);
+      } else {
+        // Fallback: build inline
+        const lines = [];
+        if (urlSection) lines.push(urlSection.trim());
+        lines.push('当前为脚本执行失败后的自愈修复阶段。请根据下方操作步骤与 Log 文件，逐步导航并复现失败场景，抵达出错页面后，扫描当前表单，建立任务清单，重新填写所有表单项。');
+        if (formChangesSection) lines.push('\n' + formChangesSection.trim());
+        lines.push('\n## 剩余操作步骤（从第 ' + failedStep + ' 步开始）');
+        lines.push(remainingCmds || '(无剩余操作步骤)');
+        if (logSection) lines.push(logSection.trim());
+        resumeInstruction = lines.join('\n');
+      }
     } catch (e) {
       resumeInstruction = 'Continue recording from step ' + failedStep + '. See action file for details.';
     }
