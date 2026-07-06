@@ -77,6 +77,57 @@ else:
     PLANNER_SYSTEM_PROMPT = _prompt_content[_planner_idx:].strip() if _planner_idx != -1 else ''
 
 
+def patch_planner_prompt():
+    """Monkey-patch PlannerPrompt.get_system_message() to use extend as override.
+
+    Before: built-in (hardcoded) + extended_planner_system_prompt (appended)
+    After:  extended_planner_system_prompt as full replacement (includes built-in part)
+
+    This allows editing the full Planner prompt in planner-prompt.md
+    without the library's hardcoded prefix interfering.
+    """
+    from browser_use.agent.prompts import PlannerPrompt
+
+    _original_get_system_message = PlannerPrompt.get_system_message
+
+    def _patched_get_system_message(self, is_planner_reasoning=False, extended_planner_system_prompt=None):
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        if extended_planner_system_prompt:
+            planner_prompt_text = extended_planner_system_prompt
+        else:
+            planner_prompt_text = """
+You are a planning agent that helps break down tasks into smaller steps and reason about the current state.
+Your role is to:
+1. Analyze the current state and history
+2. Evaluate progress towards the ultimate goal
+3. Identify potential challenges or roadblocks
+4. Suggest the next high-level steps to take
+
+Inside your messages, there will be AI messages from different agents with different formats.
+
+Your output format should be always a JSON object with the following fields:
+{{
+    "state_analysis": "Brief analysis of the current state and what has been done so far",
+    "progress_evaluation": "Evaluation of progress towards the ultimate goal (as percentage and description)",
+    "challenges": "List any potential challenges or roadblocks",
+    "next_steps": "List 2-3 concrete next steps to take",
+    "reasoning": "Explain your reasoning for the suggested next steps"
+}}
+
+Ignore the other AI messages output structures.
+
+Keep your responses concise and focused on actionable insights.
+"""
+
+        if is_planner_reasoning:
+            return HumanMessage(content=planner_prompt_text)
+        else:
+            return SystemMessage(content=planner_prompt_text)
+
+    PlannerPrompt.get_system_message = _patched_get_system_message
+
+
 def patch_message_manager():
     """Monkey-patch MessageManager to limit context size while preserving tool/tool_calls pairing."""
     from browser_use.agent.message_manager.service import MessageManager

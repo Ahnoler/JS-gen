@@ -17,7 +17,7 @@ from browser_use.browser.context import BrowserContextConfig
 from .agent_utils import (
     emit_json, extract_first_url, do_navigate,
     OVERRIDE_SYSTEM_MESSAGE, PLANNER_SYSTEM_PROMPT,
-    patch_message_manager, create_llm,
+    patch_message_manager, patch_planner_prompt, create_llm,
     make_step_callback, make_done_callback,
 )
 from .controller import build_controller
@@ -387,6 +387,7 @@ def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_r
 
 async def run_session(args):
     patch_message_manager()
+    patch_planner_prompt()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
     form_rules = load_rules()
 

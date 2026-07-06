@@ -13,7 +13,7 @@ sys.stdin.reconfigure(encoding='utf-8', errors='replace')
 
 from .agent_utils import (
     parse_args,
-    patch_message_manager, create_llm,
+    patch_message_manager, patch_planner_prompt, create_llm,
 )
 from .form_rules import load_rules
 from .session_runner import run_session
@@ -32,6 +32,7 @@ def main():
 
     # Shared setup for workflow / single-task modes
     patch_message_manager()
+    patch_planner_prompt()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
     form_rules = load_rules()
 
