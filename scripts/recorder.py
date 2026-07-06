@@ -35,30 +35,35 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                 sys.stderr.write(f"[recorder] Intervention error: {e}\n")
                 sys.stderr.flush()
 
-        # Check for self-requested intervention from form retry flow
+        # Check for self-requested intervention from form auto-fill or sync_tasks_from_errors
         if case_data_store is not None:
-            intervention_request = case_data_store.pop('_intervention_request', None)
-            if intervention_request:
-                label = intervention_request.get('label', '')
-                reason = intervention_request.get('reason', '')
-                has_button = intervention_request.get('hasButton', '')
+            intervention_queue_list = case_data_store.pop('_intervention_queue', None)
+            if intervention_queue_list is not None and len(intervention_queue_list) > 0:
+                labels = [r.get('label', '') for r in intervention_queue_list]
+                has_buttons = [r.get('hasButton', '') for r in intervention_queue_list]
+                reasons = [r.get('reason', '') for r in intervention_queue_list]
+
+                # Build a single merged message with all intervention fields
+                field_list = '\n'.join(
+                    f'  {i+1}. "{labels[i]}" — button: "{has_buttons[i]}"'
+                    for i in range(len(labels))
+                )
                 msg_text = (
-                    f'[HUMAN INTERVENTION - FIELD NEEDS SPECIAL WORKFLOW]\n'
-                    f'The field "{label}" is disabled but has an adjacent button "{has_button}".\n'
-                    f'Reason: {reason}\n\n'
+                    f'[HUMAN INTERVENTION - FIELD(S) NEED SPECIAL WORKFLOW]\n'
+                    f'The following {len(labels)} field(s) are disabled but have adjacent action buttons:\n'
+                    f'{field_list}\n\n'
                     f'ACTIONS:\n'
-                    f'1. Skip this field for now — do NOT try fill_form_field on it (will return field-disabled).\n'
+                    f'1. Skip these fields for now — do NOT try fill_form_field on them (will return field-disabled).\n'
                     f'2. Continue filling other fillable fields and complete everything else.\n'
                     f'3. When all other fields are done, call done() and report: '
-                    f'"Field \'{label}\' requires a special fill workflow (disabled+hasButton=\'{has_button}\'). '
-                    f'Please design the workflow so I can complete it."\n'
-                    f'4. Wait for the user to provide the workflow design before attempting this field.\n'
-                    f'5. After the user provides the workflow, use request_intervention("{label}") to mark it resolved '
-                    f'and then follow the user\'s instructions to fill it.'
+                    f'"Fields {labels} require a special fill workflow. '
+                    f'Please design the workflow so I can complete them."\n'
+                    f'4. Wait for the user to provide the workflow design before attempting these fields.\n'
+                    f'5. After the user provides the workflow, follow the user\'s instructions to fill each field.'
                 )
                 msg = HumanMessage(content=msg_text)
                 agent._message_manager._add_message_with_tokens(msg)
-                sys.stderr.write(f"[recorder] Injected self-requested intervention for: {label}\n")
+                sys.stderr.write(f'[recorder] Injected self-requested intervention for: {labels}\n')
                 sys.stderr.flush()
 
     async def on_step_end(agent):

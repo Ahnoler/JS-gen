@@ -185,13 +185,6 @@ export function initSessionMode() {
     html += '<input type="range" class="sess-phase-slider" min="0" max="' + (phases.length - 1) + '" value="0" style="width:80%;height:4px;cursor:pointer;accent-color:var(--indigo-500)">';
     html += '<span class="sess-phase-slider-label" style="font-size:11px;color:var(--slate-400);margin-left:8px">1 / ' + phases.length + '</span>';
     html += '</div>';
-    // Intervention textarea + continue button (below carousel, inside Phase Plan)
-    html += '<div style="margin-top:12px;border-top:1px solid var(--slate-200);padding-top:12px">';
-    html += '<textarea id="sessInterventionInput" placeholder="Human intervention: type instructions here (optional). Leave empty to just continue without changes." style="width:100%;min-height:60px;padding:8px;font-size:12px;font-family:var(--font-mono);border:1px solid var(--slate-300);border-radius:var(--radius-sm);resize:vertical;box-sizing:border-box"></textarea>';
-    html += '<div style="margin-top:8px;display:flex;gap:8px">';
-    html += '<button id="sessPhaseContinueBtn" class="btn btn-sm btn-primary" style="font-size:11px">Continue</button>';
-    html += '<span style="font-size:11px;color:var(--slate-400);align-self:center">Sends intervention instruction (if any) to the running session</span>';
-    html += '</div></div>';
     return html;
   }
 
@@ -226,32 +219,6 @@ export function initSessionMode() {
         executeSessionStep(sessActive.value, phase.task, phase.maxSteps, phase.name, idx);
       });
     });
-
-    // Continue button with optional intervention text
-    const continueBtn = list.querySelector('#sessPhaseContinueBtn');
-    if (continueBtn) {
-      continueBtn.addEventListener('click', async () => {
-        if (!sessActive.value) { sessLog('error', 'No active session'); return; }
-        const intervention = document.getElementById('sessInterventionInput')?.value?.trim() || '';
-        if (intervention) {
-          sessLog('system', 'Sending intervention: ' + intervention.slice(0, 80));
-          try {
-            const resp = await fetch('/api/browser/session/' + sessActive.value + '/intervene', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ instruction: intervention }),
-            });
-            if (!resp.ok) throw new Error((await resp.json()).error || 'Failed');
-            document.getElementById('sessInterventionInput').value = '';
-            sessLog('success', 'Intervention queued — agent will process it in the next step');
-          } catch (err) {
-            sessLog('error', 'Intervention failed: ' + err.message);
-          }
-        } else {
-          sessLog('system', 'No intervention text entered. Type an instruction above to guide the agent, or use Execute to run a new phase.');
-        }
-        // Do NOT re-send the phase task — the agent already has it in context
-      });
-    }
 
     const handleKey = (e) => {
       if (e.key === 'ArrowLeft') { showSlide(currentSlide - 1); e.preventDefault(); }
@@ -289,6 +256,66 @@ export function initSessionMode() {
     if (execBtn && (status === 'success' || status === 'failed')) execBtn.textContent = status === 'success' ? 'Re-run' : 'Retry';
   }
 
+  function setInterventionCardMode(mode) {
+    const card = document.getElementById('sessInterventionCard');
+    const header = document.getElementById('sessInterventionHeader');
+    const icon = document.getElementById('sessInterventionIcon');
+    if (!card || !header || !icon) return;
+
+    if (mode === 'warn') {
+      card.style.borderColor = '#f59e0b';
+      header.style.background = '#fffbeb';
+      icon.style.stroke = '#f59e0b';
+      icon.innerHTML = '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
+    } else {
+      card.style.borderColor = '';
+      header.style.background = '';
+      icon.style.stroke = 'currentColor';
+      icon.innerHTML = '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>';
+    }
+  }
+
+  let _interventionFields = [];  // tracked across SSE events for incremental updates
+
+  function showInterventionAlerts(data) {
+    const alerts = document.getElementById('sessInterventionAlerts');
+    const badge = document.getElementById('sessInterventionBadge');
+    if (!alerts) return;
+    const fields = data.fields || [];
+    const source = data.source || '';
+
+    // Track for incremental removal
+    _interventionFields = fields;
+
+    if (fields.length === 0) {
+      alerts.innerHTML = '';
+      if (badge) badge.style.display = 'none';
+      setInterventionCardMode('normal');
+      return;
+    }
+
+    // Switch to warning mode + update badge
+    setInterventionCardMode('warn');
+    if (badge) {
+      badge.textContent = fields.length + ' field' + (fields.length > 1 ? 's' : '');
+      badge.style.display = 'inline-block';
+    }
+
+    // Build field detail cards
+    let html = '';
+    for (const f of fields) {
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;margin-bottom:4px;font-size:12px">';
+      html += '<span style="font-weight:600;color:var(--slate-800)">' + escapeHtml(f.label) + '</span>';
+      html += '<span style="color:var(--slate-400)">kind:</span><code style="font-size:10px;background:var(--slate-100);padding:1px 4px;border-radius:2px">' + escapeHtml(f.kind || 'input') + '</code>';
+      html += '<span style="color:var(--slate-400)">button:</span><code style="font-size:10px;background:#fef3c7;padding:1px 4px;border-radius:2px;color:#92400e">' + escapeHtml(f.hasButton || '(none)') + '</code>';
+      html += '</div>';
+    }
+    if (source) {
+      html += '<div style="font-size:10px;color:var(--slate-400);margin-bottom:4px">Source: ' + escapeHtml(source) + '</div>';
+    }
+    alerts.innerHTML = html;
+  }
+
   function createSSEEventHandler(stepNum, label, phaseIdx) {
     return (evt, d) => {
       switch (evt) {
@@ -311,6 +338,16 @@ export function initSessionMode() {
           break;
         case 'nav_step': sessLog('info', 'Nav: ' + d.label); break;
         case 'done': sessLog('system', 'Finished'); break;
+        case 'intervention_needed':
+          showInterventionAlerts(d);
+          sessLog('system', '🔔 Intervention needed: ' + (d.fields || []).map(f => f.label).join(', '));
+          break;
+        case 'intervention_resolved':
+          // Remove resolved field from tracked list and re-render remaining
+          _interventionFields = _interventionFields.filter(f => f.label !== d.label);
+          showInterventionAlerts({ fields: _interventionFields, source: 'updated' });
+          sessLog('success', '✅ Intervention resolved: ' + d.label + (d.remaining && d.remaining.length ? ' — ' + d.remaining.length + ' remaining' : ' — all clear'));
+          break;
       }
     };
   }
@@ -417,6 +454,13 @@ export function initSessionMode() {
       sessStepCount.textContent = '0 steps';
       sessTimeline.innerHTML = '<div class="empty-state" style="padding:20px"><p>Send a step instruction to begin</p></div>';
       document.getElementById('sessPhasePlan').style.display = 'none';
+      // Clear intervention alerts + reset to normal style on session change
+      _interventionFields = [];
+      const alerts = document.getElementById('sessInterventionAlerts');
+      const badge = document.getElementById('sessInterventionBadge');
+      if (alerts) alerts.innerHTML = '';
+      if (badge) badge.style.display = 'none';
+      setInterventionCardMode('normal');
       sessionPhases = [];
       updateButtons();
       return;
@@ -744,6 +788,31 @@ export function initSessionMode() {
   if (sessTask) {
     sessTask.addEventListener('input', () => {
       updateButtons();
+    });
+  }
+
+  // Intervention Send button — sends instruction to running agent
+  const interventionSendBtn = document.getElementById('sessInterventionSendBtn');
+  if (interventionSendBtn) {
+    interventionSendBtn.addEventListener('click', async () => {
+      if (!sessActive.value) { sessLog('error', 'No active session'); return; }
+      const intervention = document.getElementById('sessInterventionInput')?.value?.trim() || '';
+      if (!intervention) {
+        sessLog('system', 'No intervention text entered. Describe the workflow above, then click Send.');
+        return;
+      }
+      sessLog('system', 'Sending intervention: ' + intervention.slice(0, 80));
+      try {
+        const resp = await fetch('/api/browser/session/' + sessActive.value + '/intervene', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ instruction: intervention }),
+        });
+        if (!resp.ok) throw new Error((await resp.json()).error || 'Failed');
+        document.getElementById('sessInterventionInput').value = '';
+        sessLog('success', 'Intervention sent — agent will process it on the next step');
+      } catch (err) {
+        sessLog('error', 'Intervention failed: ' + err.message);
+      }
     });
   }
 

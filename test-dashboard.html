@@ -265,6 +265,25 @@
         <div id="sessPhaseList" style="padding:8px 12px"></div>
       </div>
 
+      <!-- Human Intervention — always visible; amber warning style when fields need attention -->
+      <div class="card" id="sessInterventionCard" style="margin-bottom:16px">
+        <div class="card-header" id="sessInterventionHeader">
+          <div class="card-title">
+            <svg id="sessInterventionIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Human Intervention
+          </div>
+          <span id="sessInterventionBadge" style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;display:none"></span>
+        </div>
+        <div id="sessInterventionAlerts" style="padding:8px 12px 0"></div>
+        <div style="padding:8px 12px 12px">
+          <textarea id="sessInterventionInput" placeholder="Describe how the agent should fill the above fields. E.g. 'Click 引入 on 法定代表人, search for 张三 in the popup, select the first result, and confirm.'" style="width:100%;min-height:60px;padding:8px;font-size:12px;font-family:var(--font-mono);border:1px solid var(--slate-300);border-radius:var(--radius-sm);resize:vertical;box-sizing:border-box"></textarea>
+          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+            <button id="sessInterventionSendBtn" class="btn btn-sm btn-primary" style="font-size:11px">Send to Agent</button>
+            <span style="font-size:11px;color:var(--slate-400)">Agent will process this instruction on its next step</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Step Progress -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-header">

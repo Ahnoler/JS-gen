@@ -8,6 +8,7 @@ Element UI form interaction.
 import json
 import sys
 
+from ..agent_utils import emit_json
 from ._state import _ACTION_LOG, _record_action
 from ._helpers import (
     _ok, _err,
@@ -28,7 +29,7 @@ from ..models import (
     FormSnapshot, FormSnapshotCollection,
     TaskItem, TaskList,
 )
-from ..form_rules import match_rule
+from ..form_rules import match_rule, get_has_button_keywords
 
 
 def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store: dict):
@@ -69,7 +70,28 @@ def _task_done_impl(label_text, case_data_store):
     case_data_store['task_list'] = tl.to_store()
 
 
+def _queue_intervention(case_data_store: dict, label: str, has_button: str, reason: str):
+    """Queue an intervention request — appends to list so multiple fields are preserved.
+
+    Replaces the old single-slot ``_intervention_request`` dict with an
+    ``_intervention_queue`` list consumed by ``on_step_start`` in recorder.py.
+    """
+    queue = case_data_store.setdefault('_intervention_queue', [])
+    # Dedup: skip if this label is already queued
+    if any(q.get('label') == label for q in queue):
+        return
+    queue.append({
+        'label': label,
+        'hasButton': has_button or '',
+        'reason': reason,
+    })
+
+
 def _register_form_actions(controller, browser_context, form_rules, case_data_store, llm=None):
+    # Lazily read hasButton keywords — supports runtime override via case_data_store
+    def _button_keywords():
+        return get_has_button_keywords(case_data_store)
+
     async def _ensure_scanned(label_text: str):
         """Auto-scan + auto-fill if label is not in the current task_list.
 
@@ -94,7 +116,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 return  # already scanned for this form
 
         # Scan main-page form
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             raw_fields = result.get('fields') if isinstance(result, dict) else result
@@ -219,12 +241,12 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
         page = await browser_context.get_current_page()
-        return await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text)
+        return await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text, _button_keywords())
 
     @controller.action('Verify that a form field has an expected value. Calls check_field_value and compares currentValue with expected. Returns ok if match, err if mismatch. Use this to confirm a field was filled correctly.')
     async def verify_field_value(label_text: str, expected: str):
         page = await browser_context.get_current_page()
-        raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text)
+        raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text, _button_keywords())
         if raw == 'label-not-found':
             return _err('label-not-found')
         try:
@@ -240,7 +262,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             raw_fields = result.get('fields') if isinstance(result, dict) else result
@@ -313,7 +335,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     async def scan_visible_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, True)
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, True, _button_keywords())
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             raw_fields = result.get('fields') if isinstance(result, dict) else result
@@ -608,7 +630,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # ═══════════════════════════════════════════════════════════════════
         round1_count = len(all_results)
         try:
-            raw2 = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
+            raw2 = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
             result2 = json.loads(raw2) if isinstance(raw2, str) else raw2
             raw_fields2 = result2.get('fields') if isinstance(result2, dict) else result2
         except Exception:
@@ -629,7 +651,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # ═══════════════════════════════════════════════════════════════════
         round2_count = len(all_results)
         try:
-            raw3 = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
+            raw3 = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
             result3 = json.loads(raw3) if isinstance(raw3, str) else raw3
             raw_fields3 = result3.get('fields') if isinstance(result3, dict) else result3
         except Exception:
@@ -655,7 +677,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             all_results,
         )
 
-        # Step 5: needs_intervention 字段 — 跳转到第一个
+        # Step 5: needs_intervention 字段 — 全部入队，跳转到第一个
         tl_final = TaskList.from_store(case_data_store.get('task_list'))
         intervene_items = [item for item in tl_final.pending if item.needs_intervention]
         if intervene_items:
@@ -674,18 +696,21 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             sys.stderr.write(f'[auto-fill] NEEDS_INTERVENTION ({len(intervene_items)} fields): {[i.label for i in intervene_items]}\n')
             sys.stderr.write(f'[auto-fill] Scrolled to first: "{first.label}"\n')
             sys.stderr.flush()
-            # Auto-call request_intervention for the first intervention field
-            case_data_store['_intervention_request'] = {
-                'label': first.label,
-                'hasButton': first.hasButton or '',
-                'reason': f"Field '{first.label}' is disabled with adjacent button '{first.hasButton}'. Needs a custom fill workflow.",
-            }
-            sys.stderr.write(f'[auto-fill] Auto-requested intervention for: "{first.label}"\n')
+            # Queue ALL intervention fields (not just first) — consumed by on_step_start
+            for item in intervene_items:
+                _queue_intervention(case_data_store, item.label, item.hasButton or '',
+                    f"Field '{item.label}' is disabled with adjacent button '{item.hasButton}'. Needs a custom fill workflow.")
+            sys.stderr.write(f'[auto-fill] Queued {len(intervene_items)} intervention request(s)\n')
             sys.stderr.flush()
+            # Push SSE event so Dashboard shows which fields need intervention
+            emit_json({'event': 'intervention_needed', 'data': {
+                'fields': [{'label': item.label, 'hasButton': item.hasButton or '', 'kind': item.kind} for item in intervene_items],
+                'source': 'auto_fill',
+            }})
 
         # Step 6: full scan sync — 移除不在 DOM 的 pending 字段
         try:
-            raw_sync = await page.evaluate(JS_SCAN_FORM_FIELDS, False)
+            raw_sync = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
             sync_result = json.loads(raw_sync) if isinstance(raw_sync, str) else raw_sync
             sync_fields = sync_result.get('fields') if isinstance(sync_result, dict) else sync_result
             dom_labels = {f.get('label', '') for f in sync_fields}
@@ -710,8 +735,28 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
     @controller.action('Mark a form field as completed in the task list. Use this after successfully filling a field.')
     async def task_done(label_text: str):
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        # Check if this was an intervention field BEFORE marking done
+        was_intervention = any(
+            item.label == label_text and item.needs_intervention
+            for item in tl.pending
+        )
         _task_done_impl(label_text, case_data_store)
         tl = TaskList.from_store(case_data_store.get('task_list'))
+
+        if was_intervention:
+            # Remove from intervention queue so recorder doesn't re-inject
+            queue = case_data_store.get('_intervention_queue', [])
+            case_data_store['_intervention_queue'] = [q for q in queue if q.get('label') != label_text]
+            remaining = [q.get('label', '') for q in case_data_store['_intervention_queue']]
+            # Push SSE event so Dashboard removes the field from alerts
+            emit_json({'event': 'intervention_resolved', 'data': {
+                'label': label_text,
+                'remaining': remaining,
+            }})
+            sys.stderr.write(f'[intervention] Resolved: "{label_text}" — {len(remaining)} remaining\n')
+            sys.stderr.flush()
+
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
     @controller.action('Re-add a field to the pending task list (e.g., after a validation error).')
@@ -726,12 +771,12 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         tl = TaskList.from_store(case_data_store.get('task_list'))
         done_labels = [d.label for d in tl.done]
         intervene = [item.label for item in tl.pending if item.needs_intervention]
-        regular = [item for item in tl.to_store()['pending'] if not item.get('needs_intervention')]
+        pending_labels = [item for item in tl.to_store()['pending'] if not item.get('needs_intervention')]
         sys.stderr.write(f'[get-pending] done={len(tl.done)} pending={len(tl.pending)} intervene={len(intervene)}\n')
         sys.stderr.flush()
         result = {
             'done': done_labels,
-            'pending': regular,
+            'pending': pending_labels,
         }
         if intervene:
             result['NEEDS_INTERVENTION'] = intervene
@@ -782,6 +827,15 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             intervene_labels = [item.label for item in intervene]
             sys.stderr.write(f'[sync-errors] NEEDS INTERVENTION: {intervene_labels}\n')
             sys.stderr.flush()
+            # Auto-queue intervention requests — consistent with _auto_fill_pending Step 5
+            for item in intervene:
+                _queue_intervention(case_data_store, item.label, item.hasButton or '',
+                    f"Field '{item.label}' has a validation error and is disabled with adjacent button '{item.hasButton}'. Needs a custom fill workflow.")
+            # Push SSE event so Dashboard shows which fields need intervention
+            emit_json({'event': 'intervention_needed', 'data': {
+                'fields': [{'label': item.label, 'hasButton': item.hasButton or '', 'kind': item.kind} for item in intervene],
+                'source': 'sync_errors',
+            }})
 
         # Auto-scroll to first error so agent can see and fix it immediately
         if retried:
@@ -804,7 +858,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             msg += ' | NEEDS_INTERVENTION:' + json.dumps([item.label for item in intervene], ensure_ascii=False)
         return _ok(msg)
 
-    @controller.action('Request human intervention for a field that cannot be auto-filled. Use this when sync_tasks_from_errors returns NEEDS_INTERVENTION items, or when a field is disabled with an adjacent button. Writes to case_data_store so the recorder hook injects a [HUMAN INTERVENTION] message on the next step.')
+    @controller.action('Request human intervention for a field that cannot be auto-filled. Use this when sync_tasks_from_errors returns NEEDS_INTERVENTION items, or when a field is disabled with an adjacent button. Queues the request so multiple fields are preserved.')
     async def request_intervention(label_text: str, reason: str = ''):
         tl = TaskList.from_store(case_data_store.get('task_list'))
         item = tl.find(label_text)
@@ -812,12 +866,9 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if item:
             _, task_item = item
             has_button = task_item.hasButton or ''
-        case_data_store['_intervention_request'] = {
-            'label': label_text,
-            'hasButton': has_button,
-            'reason': reason or f"Field '{label_text}' has disabled=True and hasButton='{has_button}'. Needs a custom fill workflow.",
-        }
-        sys.stderr.write(f'[intervention] Agent requested: "{label_text}" (button={has_button})\n')
+        _queue_intervention(case_data_store, label_text, has_button,
+            reason or f"Field '{label_text}' has disabled=True and hasButton='{has_button}'. Needs a custom fill workflow.")
+        sys.stderr.write(f'[intervention] Agent requested: "{label_text}" (button={has_button}) queue_len={len(case_data_store.get("_intervention_queue", []))}\n')
         sys.stderr.flush()
         return _ok(f'intervention-requested | label:{label_text}')
 
@@ -872,7 +923,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         await page.wait_for_timeout(500)
 
-        current_raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text)
+        current_raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text, _button_keywords())
         if not current_raw or current_raw == 'label-not-found':
             loc = await page.evaluate(JS_LOCATOR, [label_text])
             return _ok(f'ok | {matched_text}' + (' | loc:' + loc) if loc else f'ok | {matched_text}')
@@ -911,7 +962,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         # First check if field already has a value — skip if so
-        check_info = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text)
+        check_info = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text, _button_keywords())
         if check_info != 'label-not-found':
             try:
                 info = json.loads(check_info)

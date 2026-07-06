@@ -129,6 +129,10 @@ async def scan_pending(browser):
 
 async def quick_snapshot(browser):
     """Quick DOM scan — count filled/empty/disabled fields."""
+    from .form_rules import get_has_button_keywords
+    import json as _json
+    has_btn_kw_json = _json.dumps(get_has_button_keywords(), ensure_ascii=False)
+
     for pg in browser.contexts[0].pages:
         url = pg.url
         if 'devtools' in url or not url.startswith('http'):
@@ -166,7 +170,7 @@ async def quick_snapshot(browser):
                 const hasBtn = (() => {
                     for (const b of item.querySelectorAll("button")) {
                         const t = b.textContent.trim();
-                        if (["选择","获取地址","引入","新增","添加","验证"].some(k => t.includes(k))) return t;
+                        if (''' + has_btn_kw_json + '''.some(k => t.includes(k))) return t;
                     }
                     return "";
                 })();

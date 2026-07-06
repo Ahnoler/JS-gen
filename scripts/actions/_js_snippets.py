@@ -773,7 +773,7 @@ JS_READ_CURRENT_VALUE = '''(inputEl, trigger, item) => {
 
 # ── Form field scanning ──
 
-JS_SCAN_FORM_FIELDS = '''async (quick) => {
+JS_SCAN_FORM_FIELDS = '''async (quick, buttonKeywords) => {
     const container = ''' + JS_GET_CONTAINER + ''';
     const classify = ''' + JS_CLASSIFY_FIELD + ''';
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
@@ -831,7 +831,7 @@ JS_SCAN_FORM_FIELDS = '''async (quick) => {
             const btns = item.querySelectorAll('button');
             for (let i = 0; i < btns.length; i++) {
                 const t = btns[i].textContent.trim();
-                if (['选择','获取地址','引入','新增','添加','验证'].some(k => t.includes(k))) return t;
+                if (buttonKeywords.some(k => t.includes(k))) return t;
             }
             return '';
         })();
@@ -902,7 +902,7 @@ JS_SCAN_FORM_FIELDS = '''async (quick) => {
     return json;
 }'''
 
-JS_CHECK_SINGLE_FIELD = '''(label) => {
+JS_CHECK_SINGLE_FIELD = '''(label, buttonKeywords) => {
     const container = ''' + JS_GET_CONTAINER + ''';
     const classify = ''' + JS_CLASSIFY_FIELD + ''';
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
@@ -927,7 +927,7 @@ JS_CHECK_SINGLE_FIELD = '''(label) => {
                 const btns = item.querySelectorAll('button');
                 for (let i = 0; i < btns.length; i++) {
                     const t = btns[i].textContent.trim();
-                    if (['选择','获取地址','引入','新增','添加','验证'].some(k => t.includes(k))) return t;
+                    if (buttonKeywords.some(k => t.includes(k))) return t;
                 }
                 return '';
             })();

@@ -94,6 +94,12 @@ function handleSessionMessage(send, session, stepIndex, gb, res, cleanupListener
       case 'nav_step':
         send('status', { phase: 'navigating', label: msg.data.label });
         break;
+      case 'intervention_needed':
+        send('intervention_needed', msg.data);
+        break;
+      case 'intervention_resolved':
+        send('intervention_resolved', msg.data);
+        break;
     }
   };
 }

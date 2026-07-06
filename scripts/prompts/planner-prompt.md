@@ -40,10 +40,14 @@ If `get_page_state` returns `formErrors: []` after the Agent's last action (and 
 A dialog has closed. Advise the Agent to check whether the target fields were backfilled (`check_field_value`). If backfilled, save immediately — **do NOT reopen the dialog**.
 
 ### Signal 3: get_pending_tasks returns pending=[]
-All fields are filled. The Agent should save immediately — do not scan or check again.
+⚠️ Check the `NEEDS_INTERVENTION` key in the same response:
+- If `NEEDS_INTERVENTION` is absent or empty → all fields are filled. The Agent should save immediately — do not scan or check again.
+- If `NEEDS_INTERVENTION` has items (e.g. `"NEEDS_INTERVENTION": ["field1"]`) → only fillable fields are done, but intervention fields remain. **Do NOT advise save.** The system auto-injects a `[HUMAN INTERVENTION]` message on the next step — the Agent follows the injected instructions (skip fields, complete fillables, report).
 
 ### Signal 4: Agent plan contradicts page state
-If the Agent's next_goal mentions "open import dialog" / "handle intervention field", but the page state shows formErrors=[] and pending=[], the Agent is repeating completed work. **Forcefully advise the Agent to save.**
+If the Agent's next_goal mentions "open import dialog" / "handle intervention field", first check `get_pending_tasks`:
+- If `NEEDS_INTERVENTION` is non-empty: the Agent is correctly handling active intervention fields. Do NOT override — let it continue.
+- If `NEEDS_INTERVENTION` is empty AND `formErrors=[]` AND `pending=[]`: the intervention workflow has already completed. Advise the Agent to verify backfilled fields with `check_field_value`, then save.
 
 ### Signal 5: Same action repeated 3+ times
 If the Agent repeatedly clicks the same button (e.g. "Import", "Confirm") with no material change in page state, it is stuck in a loop. Advise the Agent to change strategy or save directly.
@@ -53,7 +57,8 @@ If the Agent repeatedly clicks the same button (e.g. "Import", "Confirm") with n
 - NEEDS_INTERVENTION fields are readonly/disabled and must be backfilled via a dialog.
 - After clicking Confirm, the dialog closing = the dialog's form validation passed. The intervention workflow completed successfully.
 - After the dialog closes, verify fields were backfilled before deciding the next step.
-- If the page has no formErrors and no pending tasks, the task is complete — call done().
+- If the page has no formErrors, no pending tasks, AND no NEEDS_INTERVENTION fields, the task is complete — call done().
+- NEEDS_INTERVENTION fields are NOT auto-fillable. The system pauses for human workflow design. Do NOT treat them as "done."
 
 ## Domain Vocabulary
 

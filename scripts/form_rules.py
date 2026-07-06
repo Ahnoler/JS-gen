@@ -140,6 +140,32 @@ def load_rules(script_dir=None):
     return rules
 
 
+# ── hasButton detection keywords ─────────────────────────────────────────────
+# Configurable via (priority order):
+#case_data_store['_has_button_keywords'] (运行时, 148 行)
+#       ↓ 未设置
+#HAS_BUTTON_KEYWORDS 环境变量              (进程级)
+#       ↓ 未设置
+#_DEFAULT_HAS_BUTTON_KEYWORDS            (148 行 — 硬编码兜底)
+_DEFAULT_HAS_BUTTON_KEYWORDS = ['选择', '获取地址', '引入', '新增', '添加', '验证']
+
+
+def get_has_button_keywords(case_data_store=None):
+    """Return button keywords used by JS_SCAN_FORM_FIELDS / JS_CHECK_SINGLE_FIELD.
+
+    When a form-item contains a button whose text matches any keyword, the
+    field is marked with ``hasButton`` — which feeds the intervention pipeline.
+    """
+    if case_data_store:
+        override = case_data_store.get('_has_button_keywords')
+        if override and isinstance(override, list) and len(override) > 0:
+            return [str(k) for k in override]
+    env_val = os.environ.get('HAS_BUTTON_KEYWORDS', '').strip()
+    if env_val:
+        return [k.strip() for k in env_val.split(',') if k.strip()]
+    return list(_DEFAULT_HAS_BUTTON_KEYWORDS)
+
+
 def match_rule(label_text, form_rules):
     """Match a label against loaded form rules and return generated value, or None.
 

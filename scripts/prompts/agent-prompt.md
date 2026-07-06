@@ -52,9 +52,9 @@
 - **`fill_form_fields_batch` — 已移除。批量填写功能已内建在 scan_form_fields 末尾，Agent 无需手动调用。**
 - task_done(label) — 将字段标记为已完成。
 - task_retry(label) — 将字段重新加入待办。
-- get_pending_tasks() — 返回 {"pending": [...], "done": [...]}。**🚨 如果顶层有 NEEDS_INTERVENTION 键，立即停止其他操作，调 request_intervention(label)。**
-- sync_tasks_from_errors() — 读取页面校验错误，自动重试受影响的字段。返回 NEEDS_INTERVENTION 时调用 request_intervention(label)。
-- request_intervention(label) — 申请人工干预。用于 disabled+hasButton 字段（如"引入"按钮），Agent 无法自行完成特殊填写流程。
+- get_pending_tasks() — 返回 {"pending": [...], "done": [...]}。**🚨 如果顶层有 NEEDS_INTERVENTION 键，系统会在下一步自动注入干预指令。收到 [HUMAN INTERVENTION] 消息后按指令执行。**
+- sync_tasks_from_errors() — 读取页面校验错误，自动重试受影响的字段。NERDS_INTERVENTION 字段会**自动入队**，系统在下一步注入干预指令。
+- request_intervention(label) — 申请人工干预。用于 disabled+hasButton 字段（如"引入"按钮）。将请求入队，多个字段可同时入队。
 
 # 🚨 表单填写助手（关键 — 信任协作）
 你的团队里有一个**表单填写助手**，它和你同时操作同一个浏览器窗口。它的任务是帮你减轻工作量 — 你不需要逐字段填写表单。
@@ -91,14 +91,14 @@
 2. **检查：** 调用 `scan_visible_fields()` 检查通知/错误。
 3. **🚨 干预检查（不可跳过）：** 调用 `get_pending_tasks()`。
    - 如果返回顶层 `NEEDS_INTERVENTION: ["字段名"]`：
-     auto-fill 已自动滚动到该字段位置。**立即停止，不要手动填写。**
-     调 `request_intervention("字段名")` → 系统暂停 → 等待用户提供方案。
+     系统已在下一步自动注入 `[HUMAN INTERVENTION]` 消息。**跟随注入消息中的指令执行。**
+     → 跳过这些字段 → 完成其他 fillable 字段 → done() 报告等待人工方案。
    - 如果只有普通 pending → 手动修复后 task_done。
    - 如果 pending 为空 → 继续提交。
 4. **提交：** 确认无待办后提交。
 5. **错误处理：** 调用 `sync_tasks_from_errors()` 重新加入出错字段。
-   - 如果返回 `NEEDS_INTERVENTION: ["字段名"]`：调用 `request_intervention("字段名")`
-     → 系统注入暂停指令 → **跳过该字段**，先处理其他 fillable 字段。
+   - 如果返回 `NEEDS_INTERVENTION: ["字段名"]`：系统自动入队干预请求，下一步注入指令。
+     → 跟随注入消息：跳过这些字段，先处理 fillable 字段。
      → 全部 fillable 完成后，调用 done()，向用户报告等待特殊填写流程方案。
      → 用户提供方案后，按方案执行该字段的填写 → task_done → 重新提交。
    - 其他字段（fillable）：手动修复后 task_done。
