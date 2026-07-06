@@ -800,6 +800,100 @@ export function initSessionMode() {
     });
   }
 
+  // ---- Quick Actions (CDP Watcher) ----
+
+  const QUICK_ACTIONS = [
+    { name: 'fill_form_field', label: '填写字段', params: ['label', 'value'], desc: '通过标签文本填写表单字段' },
+    { name: 'select_option', label: '选择下拉', params: ['label', 'option'], desc: '选择 el-select 下拉选项' },
+    { name: 'click_table_row_radio', label: '选中表格行', params: ['row'], desc: '选中 el-table 中的单选按钮' },
+    { name: 'click_table_row_button', label: '点击表格按钮', params: ['row', 'button'], desc: '点击 el-table 行中的操作按钮' },
+    { name: 'click_adjacent_button', label: '点击相邻按钮', params: ['label'], desc: '点击字段旁的引入/选择按钮' },
+    { name: 'click_radio', label: '点击单选', params: ['label', 'option'], desc: '点击 el-radio 组中的选项' },
+    { name: 'click_menu_item', label: '点击菜单', params: ['text'], desc: '点击 el-menu 菜单项（自动展开子菜单）' },
+    { name: 'close_dialog', label: '关闭弹窗', params: [], desc: '关闭最上层对话框/抽屉' },
+    { name: 'close_notification', label: '关闭通知', params: [], desc: '关闭并读取 el-notification' },
+    { name: 'get_page_state', label: '页面状态', params: [], desc: '获取当前页面状态 JSON' },
+    { name: 'wait_for_loading', label: '等待加载', params: [], desc: '等待 Element UI 加载遮罩消失' },
+  ];
+
+  const quickActionSelect = document.getElementById('sessQuickAction');
+  const quickParam1 = document.getElementById('sessQuickParam1');
+  const quickParam2 = document.getElementById('sessQuickParam2');
+  const quickExecBtn = document.getElementById('sessQuickExecBtn');
+  const quickResult = document.getElementById('sessQuickResult');
+  const watcherStatus = document.getElementById('sessWatcherStatus');
+
+  // Populate action dropdown
+  if (quickActionSelect) {
+    QUICK_ACTIONS.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.name;
+      const sig = a.params.length ? '(' + a.params.join(', ') + ')' : '';
+      opt.textContent = a.label + ' - ' + a.name + ' ' + sig;
+      quickActionSelect.appendChild(opt);
+    });
+    quickActionSelect.addEventListener('change', () => {
+      const sel = QUICK_ACTIONS.find(a => a.name === quickActionSelect.value);
+      const p1 = quickParam1?.parentElement;
+      const p2 = quickParam2?.parentElement;
+      if (sel && sel.params.length === 0) { if (p1) p1.style.display = 'none'; if (p2) p2.style.display = 'none'; }
+      else if (sel && sel.params.length === 1) { if (p1) { p1.style.display = ''; p1.querySelector('label').textContent = sel.params[0]; } if (p2) p2.style.display = 'none'; }
+      else { if (p1) { p1.style.display = ''; p1.querySelector('label').textContent = sel?.params[0] || 'param1'; } if (p2) { p2.style.display = ''; p2.querySelector('label').textContent = sel?.params[1] || 'param2'; } }
+    });
+    quickActionSelect.dispatchEvent(new Event('change'));
+  }
+
+  // Execute button
+  if (quickExecBtn) {
+    quickExecBtn.addEventListener('click', async () => {
+      const action = quickActionSelect?.value;
+      if (!action) return;
+      const params = [];
+      if (quickParam1?.value?.trim()) params.push(quickParam1.value.trim());
+      if (quickParam2?.value?.trim()) params.push(quickParam2.value.trim());
+
+      quickExecBtn.disabled = true;
+      quickResult.style.display = 'none';
+      try {
+        const resp = await fetch('/api/browser/watcher/action', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, params }),
+        });
+        const data = await resp.json();
+        if (data.error) {
+          quickResult.style.display = 'block';
+          quickResult.style.background = '#fef2f2'; quickResult.style.border = '1px solid #fecaca'; quickResult.style.color = '#991b1b';
+          quickResult.textContent = '✗ ' + data.error;
+        } else {
+          quickResult.style.display = 'block';
+          quickResult.style.background = '#f0fdf4'; quickResult.style.border = '1px solid #bbf7d0'; quickResult.style.color = '#166534';
+          quickResult.textContent = '✓ ' + (data.result || 'ok');
+        }
+      } catch (err) {
+        quickResult.style.display = 'block';
+        quickResult.style.background = '#fef2f2'; quickResult.style.border = '1px solid #fecaca'; quickResult.style.color = '#991b1b';
+        quickResult.textContent = '✗ ' + err.message;
+      }
+      quickExecBtn.disabled = false;
+    });
+  }
+
+  // Poll watcher status
+  async function checkWatcher() {
+    if (!watcherStatus) return;
+    try {
+      const r = await fetch('/api/browser/watcher/status');
+      const data = await r.json();
+      const online = data.connected;
+      watcherStatus.textContent = online ? '已连接' : '离线';
+      watcherStatus.style.background = online ? '#dcfce7' : 'var(--slate-100)';
+      watcherStatus.style.color = online ? '#166534' : 'var(--slate-400)';
+      if (quickExecBtn) quickExecBtn.disabled = !online;
+    } catch { watcherStatus.textContent = '离线'; if (quickExecBtn) quickExecBtn.disabled = true; }
+  }
+  checkWatcher();
+  setInterval(checkWatcher, 5000);
+
   // Run All Phases button — sequentially execute all parsed phases
   const runAllBtn = document.getElementById('sessRunAllBtn');
   if (runAllBtn) {

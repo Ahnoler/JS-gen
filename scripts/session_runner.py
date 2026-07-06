@@ -22,7 +22,7 @@ from .agent_utils import (
 )
 from .controller import build_controller
 from .recorder import build_recording_hooks
-from .form_rules import load_rules
+from .actions.form_rules import load_rules
 
 _TRACE_DIR = str(Path(__file__).parent / "trace")
 
@@ -346,7 +346,7 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref):
         await stdin_queue.put(msg)
 
 
-def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_ref=None):
+def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_ref=None, cdp_action_queue=None):
     event = msg.get("event")
 
     if event == "save_trajectory":
@@ -361,6 +361,12 @@ def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_r
         cum_path = _handle_reset_trajectory(session_state['session_id'])
         session_state['cumulative_path'] = cum_path
         session_state['case_data_store'].clear()
+        return 'continue'
+
+    if event == "cdp_action":
+        action_data = msg.get("data", {})
+        if cdp_action_queue is not None:
+            await cdp_action_queue.put(action_data)
         return 'continue'
 
     if event == "intervene":
@@ -383,6 +389,58 @@ def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_r
         return 'continue'
 
     return 'step'
+
+
+async def _run_cdp_watcher(controller, action_queue, case_data_store, form_rules):
+    """In-process CDP watcher — connects to the same browser and executes quick actions.
+
+    Shares _ACTION_LOG and case_data_store with the main Agent, so all actions
+    executed through this watcher are recorded for script assembly.
+    """
+    from playwright.async_api import async_playwright
+    from .cdp.watcher import _build_ctrl, _get_page
+
+    port = 9242
+    try:
+        async with async_playwright() as pw:
+            browser = await pw.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+            ctx = browser.contexts[0]
+            page = await _get_page(ctx)
+            sys.stderr.write(f"[cdp-watcher] Connected to port {port}, page: {page.url if page else 'none'}\n")
+            sys.stderr.flush()
+
+            # Build a separate controller that shares the same case_data_store
+            cdp_ctrl = _build_ctrl(ctx, case_data_store, form_rules)
+            actions = cdp_ctrl.registry.registry.actions
+
+            while True:
+                msg = await action_queue.get()
+                action_name = msg.get("action", "")
+                params = msg.get("params", [])
+                req_id = msg.get("id", "")
+
+                act = actions.get(action_name)
+                if not act:
+                    sys.stderr.write(f"[cdp-watcher] Unknown action: {action_name}\n")
+                    sys.stderr.flush()
+                    continue
+
+                try:
+                    if isinstance(params, list):
+                        result = await act.function(*params)
+                    elif isinstance(params, dict):
+                        result = await act.function(**params)
+                    else:
+                        result = await act.function()
+                    # Record to shared _ACTION_LOG (done inside each action function)
+                    sys.stderr.write(f"[cdp-watcher] {action_name}{params} -> {result}\n")
+                    sys.stderr.flush()
+                except Exception as e:
+                    sys.stderr.write(f"[cdp-watcher] Error: {action_name}{params} -> {e}\n")
+                    sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"[cdp-watcher] Failed to connect: {e}\n")
+        sys.stderr.flush()
 
 
 async def run_session(args):
@@ -417,6 +475,10 @@ async def run_session(args):
 
     on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path, intervention_queue, case_data_store)
     controller = build_controller(browser_context, form_rules, case_data_store, llm=llm)
+
+    # Start CDP watcher — runs in-process, shares _ACTION_LOG and case_data_store
+    cdp_action_queue = asyncio.Queue()
+    cdp_task = asyncio.create_task(_run_cdp_watcher(controller, cdp_action_queue, case_data_store, form_rules))
 
     emit_json({"event": "ready", "session_id": session_id})
     sys.stderr.write(f"[session] Ready, session_id={session_id}\n")
@@ -468,7 +530,7 @@ async def run_session(args):
             break
 
         try:
-            action = _dispatch_event(msg, session_state, intervention_queue, agent_running_ref)
+            action = _dispatch_event(msg, session_state, intervention_queue, agent_running_ref, cdp_action_queue)
             cumulative_path = session_state['cumulative_path']
 
             # Handle immediate intervention when agent is idle

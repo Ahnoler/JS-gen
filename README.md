@@ -214,6 +214,8 @@ git clone <仓库地址>
 cd opencode-skill-use
 npm install
 # 编辑 opencode.json 和 agent-api.config.json 填入 API Key
+cd web-ui
+pip install -r requirements.txt
 .\start.ps1
 ```
 

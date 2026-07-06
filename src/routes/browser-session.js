@@ -2,8 +2,6 @@ import { writeFileSync, existsSync, unlinkSync, readFileSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import http from 'http';
-import { spawn, execSync } from 'child_process';
 import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR, SKILL_DIR } from '../config.js';
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
@@ -31,7 +29,7 @@ async function ensureGlobalBrowser(modelId) {
   child.stderr.on('data', (chunk) => { console.log(chunk.toString().trimEnd()); });
   child.on('exit', () => {
     gb.process = null; gb.stdin = null; gb.ready = false; gb.busy = false; gb.stepIndex = 0;
-    console.log('[browser-global] Process exited');
+    console.log('[browser-global] Agent process exited');
   });
 
   gb.process = child;
@@ -560,6 +558,35 @@ export default function (app) {
       list.push({ sessionId: id, model: s.model, stepIndex: s.stepIndex, busy: gb.busy, createdAt: s.createdAt, stepCount: s.trajectories.length });
     }
     res.json(list);
+  });
+
+  // ---- CDP Quick Action API (uses in-process watcher via Agent stdin) ----
+
+  app.get('/api/browser/watcher/status', (req, res) => {
+    const gb = state.globalBrowser;
+    const connected = !!(gb.ready && gb.stdin);
+    res.json({ connected, agentBusy: gb.busy });
+  });
+
+  app.post('/api/browser/watcher/action', async (req, res) => {
+    const gb = state.globalBrowser;
+    if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Agent not ready. Start a session first.' });
+
+    const { action, params } = req.body || {};
+    if (!action) return res.status(400).json({ error: 'action is required' });
+
+    // Wait up to 5s for agent to not be busy (quick actions need idle browser)
+    const deadline = Date.now() + 5000;
+    while (gb.busy && Date.now() < deadline) { await new Promise(r => setTimeout(r, 200)); }
+
+    try {
+      gb.stdin.write(JSON.stringify({ event: 'cdp_action', data: { action, params: params || [] } }) + '\n');
+      // Quick actions are fire-and-forget from the HTTP perspective
+      // Actions are recorded to _ACTION_LOG by the watcher automatically
+      res.json({ status: 'executed', action, params });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
 }

@@ -240,6 +240,37 @@
         </div>
       </div>
 
+      <!-- Quick Actions — direct CDP browser control -->
+      <div class="card" id="sessQuickActionCard" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            快速操作
+          </div>
+          <span id="sessWatcherStatus" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--slate-100);color:var(--slate-400)">离线</span>
+        </div>
+        <div style="padding:8px 12px">
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+            <div style="flex:1;min-width:160px">
+              <label style="font-size:11px;color:var(--slate-500)">操作</label>
+              <select id="sessQuickAction" style="width:100%;padding:4px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)">
+                <option value="">选择操作...</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:120px">
+              <label style="font-size:11px;color:var(--slate-500)">参数1 (label/row)</label>
+              <input id="sessQuickParam1" type="text" placeholder="字段标签或行文本" style="width:100%;padding:4px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px">
+            </div>
+            <div style="flex:1;min-width:120px">
+              <label style="font-size:11px;color:var(--slate-500)">参数2 (option/value)</label>
+              <input id="sessQuickParam2" type="text" placeholder="选项或值" style="width:100%;padding:4px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px">
+            </div>
+            <button id="sessQuickExecBtn" class="btn btn-sm btn-primary" style="font-size:11px;height:28px">▶ 执行</button>
+          </div>
+          <div id="sessQuickResult" style="display:none;margin-top:8px;padding:6px 10px;border-radius:4px;font-size:12px;font-family:var(--font-mono)"></div>
+        </div>
+      </div>
+
       <!-- Step Progress -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-header">

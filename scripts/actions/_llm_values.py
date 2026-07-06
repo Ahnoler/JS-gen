@@ -19,7 +19,7 @@ import re
 
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from ..form_rules import match_rule
+from .form_rules import match_rule
 
 # ── Load form LLM system prompt from external file ──────────────────────────
 _DIRECTIVE_RE = re.compile(r'\{\{([^}]+\.md)\}\}')

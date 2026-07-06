@@ -29,7 +29,7 @@ from ..models import (
     FormSnapshot, FormSnapshotCollection,
     TaskItem, TaskList,
 )
-from ..form_rules import match_rule, get_has_button_keywords
+from .form_rules import match_rule, get_has_button_keywords
 
 
 def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store: dict):

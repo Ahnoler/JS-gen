@@ -1,71 +1,17 @@
-"""Connect to the project's Python agent browser via CDP.
+"""
+CDP quick diagnostics — connect to the Agent's Chrome and inspect page state.
 
 Usage:
-  python scripts/_cdp_connect.py          # auto-find browser port, report state
-  python scripts/_cdp_connect.py --scan   # full scan_form_fields + pending report
-  python scripts/_cdp_connect.py --monitor # live page snapshot
+  python -m scripts.cdp.connect           # quick DOM snapshot
+  python -m scripts.cdp.connect --scan    # full scan + pending report
+  python -m scripts.cdp.connect --monitor # same as default
 
-How it works:
-  1. Find the Python process running session_runner.py
-  2. Find its Chrome child process (Playwright's Chromium for Testing)
-  3. Extract --remote-debugging-port from Chrome's command line
-  4. Connect via Playwright CDP
-  工作原理： WMI 查 Python 进程 → 找子进程 Node.js → 找孙进程 Chrome → 解析 --remote-debugging-port 参数 → Playwright CDP 连接。
+Port defaults to 9242 (browser_use's default). Override with --port.
 """
-
-import subprocess, re, asyncio, json, sys, io, os
+import asyncio, json, sys, io, os
 from playwright.async_api import async_playwright
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-
-
-def find_cdp_port():
-    """Find CDP port of the Chrome launched by Python session_runner.
-
-    Returns (port, pid) or raises RuntimeError.
-    """
-    cmd = [
-        'powershell.exe', '-Command',
-        "Get-WmiObject Win32_Process | Where-Object { $_.Name -eq 'python.exe' } | "
-        "Select-Object ProcessId, CommandLine | Format-List"
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-    python_pids = []
-    for match in re.finditer(r'ProcessId\s*:\s*(\d+)', result.stdout):
-        pid = int(match.group(1))
-        python_pids.append(pid)
-
-    if not python_pids:
-        raise RuntimeError('No Python process found')
-
-    # Find Chrome child processes of each Python process
-    for ppid in python_pids:
-        cmd2 = [
-            'powershell.exe', '-Command',
-            f'Get-WmiObject Win32_Process | Where-Object {{ $_.ParentProcessId -eq {ppid} -and $_.Name -eq "node.exe" }} | '
-            'Select-Object ProcessId | Format-List'
-        ]
-        result2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=10)
-        node_pids = [int(m.group(1)) for m in re.finditer(r'ProcessId\s*:\s*(\d+)', result2.stdout)]
-        if not node_pids:
-            continue  # Not the right Python process
-
-        # Find Chrome launched by this node (Playwright driver)
-        for npid in node_pids:
-            cmd3 = [
-                'powershell.exe', '-Command',
-                f"Get-WmiObject Win32_Process | Where-Object {{ $_.ParentProcessId -eq {npid} -and $_.Name -eq 'chrome.exe' }} | "
-                'Select-Object ProcessId, CommandLine | Format-List'
-            ]
-            result3 = subprocess.run(cmd3, capture_output=True, text=True, timeout=10)
-            match = re.search(r'--remote-debugging-port=(\d+)', result3.stdout)
-            if match:
-                port = int(match.group(1))
-                chrome_pid_match = re.search(r'ProcessId\s*:\s*(\d+)', result3.stdout)
-                chrome_pid = int(chrome_pid_match.group(1)) if chrome_pid_match else None
-                return port, chrome_pid
-
-    raise RuntimeError('Could not find CDP port. Is the Python agent running?')
 
 
 async def report_page_state(browser):
@@ -83,7 +29,7 @@ async def report_page_state(browser):
 async def scan_pending(browser):
     """Run scan_form_fields + get_pending_tasks on the agent's browser."""
     sys.path.insert(0, '.')
-    from scripts.form_rules import load_rules
+    from scripts.actions.form_rules import load_rules
     from scripts.actions._builder import build_controller
 
     rules = load_rules()
@@ -131,11 +77,10 @@ async def scan_pending(browser):
 async def quick_snapshot(browser):
     """Quick DOM scan — count filled/empty/disabled fields."""
     import json as _json
-    # Use absolute import when run as standalone script
     try:
-        from scripts.form_rules import get_has_button_keywords
+        from scripts.actions.form_rules import get_has_button_keywords
     except ImportError:
-        from form_rules import get_has_button_keywords
+        from scripts.actions.form_rules import get_has_button_keywords
     has_btn_kw_json = _json.dumps(get_has_button_keywords(), ensure_ascii=False)
 
     for pg in browser.contexts[0].pages:
@@ -143,7 +88,6 @@ async def quick_snapshot(browser):
         if 'devtools' in url or not url.startswith('http'):
             continue
         r = await pg.evaluate('''() => {
-            // Unified readValue — same logic as JS_READ_CURRENT_VALUE in _js_snippets.py
             const readValue = (inputEl, trigger, item) => {
                 let v = inputEl?.value || trigger?.value || "";
                 if (!v) {
@@ -179,16 +123,10 @@ async def quick_snapshot(browser):
                     }
                     return "";
                 })();
-                // Same filter as TaskItem.from_scanned:
-                // 1. has value → filled
                 if (val) { result.filled++; continue; }
-                // 2. disabled without button → truly unfillable → filter
                 if (isDisabled && !hasBtn) { result.filtered++; continue; }
-                // 3. disabled + not required → optional read-only → filter
                 if (isDisabled && !isRequired) { result.filtered++; continue; }
-                // 4. disabled + hasBtn + required → needs intervention
                 if (isDisabled && hasBtn) { result.needsIntervention++; result.interventionList.push(label); continue; }
-                // 5. empty + enabled → pending (need filling)
                 result.pending++;
                 result.pendingList.push(label);
             }
@@ -208,30 +146,31 @@ async def main():
     parser = argparse.ArgumentParser(description='CDP connect to Python agent browser')
     parser.add_argument('--scan', action='store_true', help='Run scan_form_fields + get_pending_tasks')
     parser.add_argument('--monitor', action='store_true', help='Quick DOM snapshot')
+    parser.add_argument('--port', type=int, default=9242, help='CDP port (default 9242)')
     args = parser.parse_args()
 
-    print('Finding CDP port...')
-    port, chrome_pid = find_cdp_port()
-    print(f'Found: port={port}, Chrome PID={chrome_pid}')
+    cdp_url = f'http://127.0.0.1:{args.port}'
+    print(f'Connecting to {cdp_url}...')
+    try:
+        async with async_playwright() as pw:
+            browser = await pw.chromium.connect_over_cdp(cdp_url)
+            print(f'Connected: {browser.version}')
+            print()
+            await report_page_state(browser)
+            print()
 
-    async with async_playwright() as pw:
-        browser = await pw.chromium.connect_over_cdp(f'http://127.0.0.1:{port}')
-        print(f'Connected: {browser.version}')
-        print()
-        await report_page_state(browser)
-        print()
-
-        if args.scan:
-            # Set LLM env vars for auto-fill
-            os.environ.setdefault('OPENAI_API_KEY', os.environ.get('FORM_LLM_API_KEY', ''))
-            os.environ.setdefault('FORM_LLM_MODEL', 'deepseek-v4-flash')
-            os.environ.setdefault('FORM_LLM_BASE_URL', 'https://api.deepseek.com')
-            await scan_pending(browser)
-        elif args.monitor:
-            await quick_snapshot(browser)
-        else:
-            # Default: quick snapshot
-            await quick_snapshot(browser)
+            if args.scan:
+                os.environ.setdefault('OPENAI_API_KEY', os.environ.get('FORM_LLM_API_KEY', ''))
+                os.environ.setdefault('FORM_LLM_MODEL', 'deepseek-v4-flash')
+                os.environ.setdefault('FORM_LLM_BASE_URL', 'https://api.deepseek.com')
+                await scan_pending(browser)
+            elif args.monitor:
+                await quick_snapshot(browser)
+            else:
+                await quick_snapshot(browser)
+    except Exception as e:
+        print(f'Failed to connect: {e}')
+        print('Is the Agent running? Try: python -m scripts.cdp.watcher')
 
 
 if __name__ == '__main__':
