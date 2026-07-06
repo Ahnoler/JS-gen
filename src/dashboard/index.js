@@ -62,9 +62,9 @@ async function checkHealth() {
     dot.className = 'status-dot ' + (data.status === 'ok' ? 'online' : 'offline');
     document.getElementById('serverStatus').innerHTML = `<span class="status-dot ${data.status === 'ok' ? 'online' : 'offline'}"></span>${data.opencode}`;
     const agents = data.agents || [];
-    document.getElementById('agentBadge').textContent = agents.length + ' agents';
+    document.getElementById('agentBadge').textContent = agents.length + ' 个智能体';
     const skills = data.skills || [];
-    document.getElementById('skillBadge').textContent = skills.length + ' skills';
+    document.getElementById('skillBadge').textContent = skills.length + ' 个技能';
   } catch (e) {
     document.getElementById('serverStatus').innerHTML = '<span class="status-dot offline"></span>Disconnected';
   }

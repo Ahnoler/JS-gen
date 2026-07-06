@@ -10,6 +10,7 @@ How it works:
   2. Find its Chrome child process (Playwright's Chromium for Testing)
   3. Extract --remote-debugging-port from Chrome's command line
   4. Connect via Playwright CDP
+  工作原理： WMI 查 Python 进程 → 找子进程 Node.js → 找孙进程 Chrome → 解析 --remote-debugging-port 参数 → Playwright CDP 连接。
 """
 
 import subprocess, re, asyncio, json, sys, io, os
@@ -129,8 +130,12 @@ async def scan_pending(browser):
 
 async def quick_snapshot(browser):
     """Quick DOM scan — count filled/empty/disabled fields."""
-    from .form_rules import get_has_button_keywords
     import json as _json
+    # Use absolute import when run as standalone script
+    try:
+        from scripts.form_rules import get_has_button_keywords
+    except ImportError:
+        from form_rules import get_has_button_keywords
     has_btn_kw_json = _json.dumps(get_has_button_keywords(), ensure_ascii=False)
 
     for pg in browser.contexts[0].pages:

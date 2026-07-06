@@ -5,32 +5,32 @@ export const swaggerEndpoints = [
   {
     method: 'GET', color: 'var(--emerald-600)', bg: 'var(--emerald-100)',
     path: '/api/health',
-    summary: 'Server health check & status',
-    desc: 'Returns the current server health status, opencode connection state, available agents, and skills.',
+    summary: '服务器健康检查与状态',
+    desc: '返回当前服务器健康状态、OpenCode 连接状态、可用智能体和技能。',
     params: [],
     respExample: JSON.stringify({ status: 'ok', opencode: 'connected', agents: [{ name: 'build', description: '...' }], skills: [{ name: 'playwright-skill', description: '...' }] }, null, 2),
   },
   {
     method: 'GET', color: 'var(--emerald-600)', bg: 'var(--emerald-100)',
     path: '/api/agents',
-    summary: 'List available agents',
-    desc: 'Returns a list of all available AI agents in the OpenCode system.',
+    summary: '列出可用智能体',
+    desc: '返回 OpenCode 系统中所有可用 AI 智能体的列表。',
     params: [],
     respExample: JSON.stringify({ agents: [{ name: 'build', description: 'The default agent' }] }, null, 2),
   },
   {
     method: 'GET', color: 'var(--emerald-600)', bg: 'var(--emerald-100)',
     path: '/api/skills',
-    summary: 'List available skills',
-    desc: 'Returns a list of all available skills with their name, description, and content.',
+    summary: '列出可用技能',
+    desc: '返回所有可用技能的名称、描述和内容。',
     params: [],
     respExample: JSON.stringify({ skills: [{ name: 'playwright-skill', description: 'Browser automation skill', content: '...' }] }, null, 2),
   },
   {
     method: 'POST', color: 'var(--indigo-600)', bg: 'var(--indigo-100)',
     path: '/api/agent/execute',
-    summary: 'Execute agent task (JSON)',
-    desc: 'Sends a task to the specified agent and returns the response. Optionally loads a skill as context.',
+    summary: '执行智能体任务 (JSON)',
+    desc: '向指定智能体发送任务并返回响应，可选择加载技能作为上下文。',
     contentType: 'application/json',
     reqExample: JSON.stringify({ agent: 'general', task: 'Explain what opencode is', system: 'Answer in Chinese', skill: 'playwright-skill', model: { providerID: 'myprovider', modelID: 'GLM-5' } }, null, 2),
     respExample: JSON.stringify({ sessionId: 'ses_xxx', response: 'opencode is...', partCount: 4 }, null, 2),
@@ -39,8 +39,8 @@ export const swaggerEndpoints = [
   {
     method: 'POST', color: 'var(--indigo-600)', bg: 'var(--indigo-100)',
     path: '/api/agent/execute-async',
-    summary: 'Fire-and-forget agent task',
-    desc: 'Sends a task to the agent and returns immediately without waiting for completion.',
+    summary: '即发即忘智能体任务',
+    desc: '向智能体发送任务并立即返回，不等待完成。',
     contentType: 'application/json',
     reqExample: JSON.stringify({ agent: 'general', task: 'Long running task...' }, null, 2),
     respExample: JSON.stringify({ sessionId: 'ses_xxx', status: 'accepted' }, null, 2),
@@ -49,8 +49,8 @@ export const swaggerEndpoints = [
   {
     method: 'POST', color: 'var(--indigo-600)', bg: 'var(--indigo-100)',
     path: '/api/agent/session',
-    summary: 'Create a new session',
-    desc: 'Creates a new OpenCode session for interacting with AI agents.',
+    summary: '创建新会话',
+    desc: '创建新的 OpenCode 会话用于与 AI 智能体交互。',
     contentType: 'application/json',
     reqExample: JSON.stringify({ title: 'My Session', agent: 'build' }, null, 2),
     respExample: JSON.stringify({ sessionId: 'ses_xxx' }, null, 2),
@@ -59,42 +59,42 @@ export const swaggerEndpoints = [
   {
     method: 'POST', color: 'var(--indigo-600)', bg: 'var(--indigo-100)',
     path: '/api/agent/session/{id}/message',
-    summary: 'Send message to session',
-    desc: 'Send a new message to an existing session. Replace {id} with the actual session ID.',
+    summary: '向会话发送消息',
+    desc: '向已有会话发送新消息。将 {id} 替换为实际会话 ID。',
     contentType: 'application/json',
-    params: [{ name: 'id', type: 'string', required: true, desc: 'Session ID', in: 'path', example: 'ses_xxx' }],
-    reqExample: JSON.stringify({ agent: 'general', task: 'Continue the conversation...', system: 'optional' }, null, 2),
+    params: [{ name: 'id', type: 'string', required: true, desc: '会话 ID', in: '路径', example: 'ses_xxx' }],
+    reqExample: JSON.stringify({ agent: 'general', task: 'Continue the conversation...', system: '可选' }, null, 2),
     respExample: JSON.stringify({ sessionId: 'ses_xxx', response: 'Response text...' }, null, 2),
     buildRequest(path, bodyObj) { return { url: path, options: { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyObj) } }; },
   },
   {
     method: 'GET', color: 'var(--emerald-600)', bg: 'var(--emerald-100)',
     path: '/api/agent/session/{id}/messages',
-    summary: 'Get session messages',
-    desc: 'Retrieve all messages in a session. Replace {id} with the actual session ID.',
-    params: [{ name: 'id', type: 'string', required: true, desc: 'Session ID', in: 'path', example: 'ses_xxx' }],
+    summary: '获取会话消息',
+    desc: '检索会话中的所有消息。将 {id} 替换为实际会话 ID。',
+    params: [{ name: 'id', type: 'string', required: true, desc: '会话 ID', in: '路径', example: 'ses_xxx' }],
     respExample: JSON.stringify([{ id: 'msg_xxx', role: 'assistant', parts: [{ type: 'text', text: '...' }] }], null, 2),
     buildRequest(path) { return { url: path, options: { method: 'GET' } }; },
   },
   {
     method: 'DELETE', color: 'var(--red-600)', bg: 'var(--red-100)',
     path: '/api/agent/session/{id}',
-    summary: 'Delete a session',
-    desc: 'Delete a session and permanently remove all associated data. Replace {id} with the actual session ID.',
-    params: [{ name: 'id', type: 'string', required: true, desc: 'Session ID', in: 'path', example: 'ses_xxx' }],
+    summary: '删除会话',
+    desc: '删除会话并永久移除所有关联数据。将 {id} 替换为实际会话 ID。',
+    params: [{ name: 'id', type: 'string', required: true, desc: '会话 ID', in: '路径', example: 'ses_xxx' }],
     respExample: JSON.stringify({ status: 'deleted', sessionId: 'ses_xxx' }, null, 2),
     buildRequest(path) { return { url: path, options: { method: 'DELETE' } }; },
   },
   {
     method: 'SSE', color: 'var(--amber-600)', bg: 'var(--amber-100)',
     path: '/api/agent/execute-stream',
-    summary: 'Streaming agent execution',
-    desc: 'Connects via Server-Sent Events to stream agent execution progress, logs, and partial text responses in real-time.',
+    summary: '流式智能体执行',
+    desc: '通过 Server-Sent Events 连接，实时流式传输智能体执行进度、日志和部分文本响应。',
     params: [
-      { name: 'agent', type: 'string', required: true, desc: 'Agent name', in: 'query', example: 'general' },
-      { name: 'task', type: 'string', required: true, desc: 'Task description', in: 'query', example: 'Say hello' },
-      { name: 'system', type: 'string', required: false, desc: 'System prompt override', in: 'query' },
-      { name: 'skill', type: 'string', required: false, desc: 'Skill name to load as context', in: 'query' },
+      { name: 'agent', type: 'string', required: true, desc: '智能体名称', in: 'query', example: 'general' },
+      { name: 'task', type: 'string', required: true, desc: '任务描述', in: 'query', example: 'Say hello' },
+      { name: 'system', type: 'string', required: false, desc: '系统提示词覆盖', in: 'query' },
+      { name: 'skill', type: 'string', required: false, desc: '要加载为上下文的技能名称', in: 'query' },
     ],
     respExample: 'event: step → { id, status, label }\nevent: log → { type, message }\nevent: text → { text }\nevent: result → { sessionId, response }\nevent: done → {}',
     buildRequest(path) { return { url: path, options: { method: 'GET' } }; },
@@ -102,8 +102,8 @@ export const swaggerEndpoints = [
   {
     method: 'POST', color: 'var(--indigo-600)', bg: 'var(--indigo-100)',
     path: '/api/test/run',
-    summary: 'Execute Playwright script (SSE)',
-    desc: 'Executes a Playwright test script and streams execution logs, screenshots, and results via Server-Sent Events.',
+    summary: '执行 Playwright 脚本 (SSE)',
+    desc: '执行 Playwright 测试脚本并通过 Server-Sent Events 流式传输执行日志、截图和结果。',
     contentType: 'application/json',
     reqExample: JSON.stringify({ script: 'const { chromium } = require("playwright");\n(async () => { ... })()', fileName: 'my-test.js' }, null, 2),
     respExample: 'event: log → { type, message }\nevent: screenshots → { screenshots: [{ fileName, url }] }\nevent: result → { success, exitCode, stdout, stderr }\nevent: done → {}',
@@ -112,8 +112,8 @@ export const swaggerEndpoints = [
   {
     method: 'POST', color: 'var(--indigo-600)', bg: 'var(--indigo-100)',
     path: '/api/test/run-sync',
-    summary: 'Execute Playwright script (JSON)',
-    desc: 'Executes a Playwright test script and returns results as JSON (non-streaming).',
+    summary: '执行 Playwright 脚本 (JSON)',
+    desc: '执行 Playwright 测试脚本并以 JSON 格式返回结果（非流式）。',
     contentType: 'application/json',
     reqExample: JSON.stringify({ script: 'const { chromium } = require("playwright");\n(async () => { ... })()', fileName: 'my-test.js' }, null, 2),
     respExample: JSON.stringify({ success: true, exitCode: 0, stdout: '...', stderr: '', screenshots: [{ fileName: 'step1.png', url: '/api/test/screenshots/step1.png' }] }, null, 2),
@@ -151,10 +151,10 @@ function createParamsSection(params) {
     row.innerHTML = `
       <code style="color:var(--slate-700);font-weight:500">${p.name}</code>
       <span style="color:var(--slate-400)">${p.type}</span>
-      <span style="color:${p.required ? 'var(--red-500)' : 'var(--slate-400)'}">${p.required ? 'required' : 'optional'}</span>
+      <span style="color:${p.required ? 'var(--red-500)' : 'var(--slate-400)'}">${p.required ? '必填' : '可选'}</span>
       <span style="color:var(--slate-400);flex:1">${p.desc}</span>
       ${p.example ? `<code style="color:var(--indigo-600);font-size:11px">Example: ${p.example}</code>` : ''}
-      ${p.in === 'path' ? `<span style="background:var(--slate-100);color:var(--slate-500);padding:1px 6px;border-radius:4px;font-size:10px">path</span>` : ''}
+      ${p.in === '路径' ? `<span style="background:var(--slate-100);color:var(--slate-500);padding:1px 6px;border-radius:4px;font-size:10px">path</span>` : ''}
     `;
     section.appendChild(row);
   });
@@ -173,7 +173,7 @@ function createCodeBlock(label, code, contentType) {
 }
 
 function createTrySection(ep) {
-  const pathParams = (ep.params || []).filter(p => p.in === 'path');
+  const pathParams = (ep.params || []).filter(p => p.in === '路径');
   const queryParams = (ep.params || []).filter(p => p.in === 'query');
 
   const section = document.createElement('div');
@@ -184,9 +184,9 @@ function createTrySection(ep) {
         ${ep.reqExample ? `<div style="margin-bottom:8px"><label style="font-size:12px;font-weight:500;color:var(--slate-600);display:block;margin-bottom:4px">Request Body <span style="font-weight:400;color:var(--slate-400)">(editable JSON)</span></label>
           <textarea class="ep-editor" rows="6" style="width:100%;background:var(--slate-800);color:#e2e8f0;border:1px solid var(--slate-600);border-radius:6px;padding:8px;font-family:var(--font-mono);font-size:12px;resize:vertical">${escapeHtml(ep.reqExample)}</textarea></div>` : ''}
         ${pathParams.length ? `<div style="margin-bottom:8px"><label style="font-size:12px;font-weight:500;color:var(--slate-600);display:block;margin-bottom:4px">Path Parameters</label>
-          ${pathParams.map(p => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px"><code style="color:var(--slate-700);font-size:12px;min-width:50px">{${p.name}}</code><input class="ep-param-path" data-param="${p.name}" placeholder="${p.example || ''}" style="flex:1;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:12px;font-family:var(--font-mono)"><span style="font-size:10px;color:var(--slate-400);min-width:40px">${p.required ? 'required' : 'optional'}</span></div>`).join('')}</div>` : ''}
+          ${pathParams.map(p => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px"><code style="color:var(--slate-700);font-size:12px;min-width:50px">{${p.name}}</code><input class="ep-param-path" data-param="${p.name}" placeholder="${p.example || ''}" style="flex:1;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:12px;font-family:var(--font-mono)"><span style="font-size:10px;color:var(--slate-400);min-width:40px">${p.required ? '必填' : '可选'}</span></div>`).join('')}</div>` : ''}
         ${queryParams.length ? `<div style="margin-bottom:8px"><label style="font-size:12px;font-weight:500;color:var(--slate-600);display:block;margin-bottom:4px">Query Parameters</label>
-          ${queryParams.map(p => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px"><code style="color:var(--slate-700);font-size:12px;min-width:50px">${p.name}</code><input class="ep-param-query" data-param="${p.name}" placeholder="${p.example || ''}" style="flex:1;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:12px;font-family:var(--font-mono)"><span style="font-size:10px;color:var(--slate-400);min-width:40px">${p.required ? 'required' : 'optional'}</span></div>`).join('')}</div>` : ''}
+          ${queryParams.map(p => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px"><code style="color:var(--slate-700);font-size:12px;min-width:50px">${p.name}</code><input class="ep-param-query" data-param="${p.name}" placeholder="${p.example || ''}" style="flex:1;padding:4px 8px;border:1px solid var(--slate-300);border-radius:4px;font-size:12px;font-family:var(--font-mono)"><span style="font-size:10px;color:var(--slate-400);min-width:40px">${p.required ? '必填' : '可选'}</span></div>`).join('')}</div>` : ''}
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button class="ep-execute-btn btn btn-primary btn-sm">Execute</button>
           <button class="ep-cancel-btn btn btn-outline btn-sm">Cancel</button>
@@ -214,13 +214,13 @@ function wireTrySectionEvents(section, ep, pathParams, queryParams) {
     e.stopPropagation();
     const isOpen = tryArea.style.display !== 'none';
     tryArea.style.display = isOpen ? 'none' : 'block';
-    tryBtn.textContent = isOpen ? 'Try it out' : 'Close';
+    tryBtn.textContent = isOpen ? '试用' : '关闭';
   });
 
   cancelBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     tryArea.style.display = 'none';
-    tryBtn.textContent = 'Try it out';
+    tryBtn.textContent = '试用';
     tryBtn.style.display = 'inline-flex';
   });
 
@@ -234,7 +234,7 @@ function wireTrySectionEvents(section, ep, pathParams, queryParams) {
   execBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
     execBtn.disabled = true;
-    execBtn.textContent = 'Executing...';
+    execBtn.textContent = '执行中…';
 
     const { url, bodyObj, fetchOptions } = buildFetchRequest(ep, section, pathParams, queryParams, editor, responseDiv, responseMeta, responseBody, execBtn);
     if (!fetchOptions) return;
@@ -243,7 +243,7 @@ function wireTrySectionEvents(section, ep, pathParams, queryParams) {
     await executeRequest(fetchOptions, responseDiv, responseMeta, responseBody);
 
     execBtn.disabled = false;
-    execBtn.textContent = 'Execute';
+    execBtn.textContent = '执行';
   });
 }
 
@@ -275,10 +275,10 @@ function buildFetchRequest(ep, section, pathParams, queryParams, editor, respons
       try { bodyObj = JSON.parse(editor.value); }
       catch {
         responseDiv.style.display = 'block';
-        responseMeta.textContent = '400 Bad Request';
-        responseBody.textContent = 'Invalid JSON in request body';
+        responseMeta.textContent = '400 请求错误';
+        responseBody.textContent = '请求体中的 JSON 无效';
         execBtn.disabled = false;
-        execBtn.textContent = 'Execute';
+        execBtn.textContent = '执行';
         return {};
       }
       fetchOptions = ep.buildRequest(url, bodyObj);
@@ -311,7 +311,7 @@ async function executeRequest(fetchOptions, responseDiv, responseMeta, responseB
     catch { responseBody.textContent = text; }
   } catch (err) {
     responseDiv.style.display = 'block';
-    responseMeta.textContent = 'Error';
+    responseMeta.textContent = '错误';
     responseBody.textContent = err.message;
   }
 }
@@ -339,7 +339,7 @@ export function renderSwaggerUI() {
     const paramsSection = createParamsSection(ep.params);
     if (paramsSection) body.appendChild(paramsSection);
 
-    if (ep.reqExample) body.appendChild(createCodeBlock('Request Body', ep.reqExample, ep.contentType));
+    if (ep.reqExample) body.appendChild(createCodeBlock('请求体', ep.reqExample, ep.contentType));
     if (ep.respExample) body.appendChild(createCodeBlock('Responses <code style="font-weight:400;font-size:11px;color:var(--emerald-600)">200</code>', ep.respExample));
 
     body.appendChild(createTrySection(ep));

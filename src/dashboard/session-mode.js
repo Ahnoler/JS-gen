@@ -98,13 +98,13 @@ export function initSessionMode() {
     const hasPhaseMarkers = (sessTask && (sessTask.value.trim().includes('【阶段') || /^##\s+Phase\s+\d+/m.test(sessTask.value.trim())));
     if (loadEnabled) {
       sessLoadBtn.disabled = !hasPhaseMarkers;
-      sessLoadBtn.title = hasPhaseMarkers ? 'Parse test case into phases' : 'Add 【阶段N：xxx】 or ## Phase N: markers first';
+      sessLoadBtn.title = hasPhaseMarkers ? '解析测试用例文本，提取阶段计划' : '请添加 【阶段N：xxx】 或 ## Phase N: 格式的阶段标记';
     } else {
       sessLoadBtn.disabled = true;
-      sessLoadBtn.title = locked ? 'Task running...' : 'No active session';
+      sessLoadBtn.title = locked ? '任务执行中…' : '无活跃会话';
     }
 
-    if (!hasSession) sessStatus.textContent = 'No active session';
+    if (!hasSession) sessStatus.textContent = '无活跃会话';
 
     console.log('[sess-mode] updateButtons:', JSON.stringify({
       hasSession, sessRunning, locked, hasPhaseMarkers,
@@ -149,7 +149,7 @@ export function initSessionMode() {
       const isNav = navPhases.some(kw => m.name.includes(kw));
       phases.push({
         num: m.num,
-        name: 'Phase ' + m.num + ': ' + m.name,
+        name: '阶段' + m.num + '：' + m.name,
         task: content,
         maxSteps: isNav ? 50 : 100,
         status: 'pending',
@@ -169,10 +169,10 @@ export function initSessionMode() {
       html += '<strong style="font-size:14px;color:var(--slate-700)">' + escapeHtml(p.name) + '</strong>';
       html += '<div style="display:flex;gap:8px;align-items:center">';
       html += '<span class="sess-phase-status" data-index="' + i + '" style="font-size:12px;font-weight:600;color:var(--slate-400)">' + p.status + '</span>';
-      html += '<button class="btn btn-sm btn-primary sess-phase-exec" data-index="' + i + '" style="font-size:11px">Execute</button>';
+      html += '<button class="btn btn-sm btn-primary sess-phase-exec" data-index="' + i + '" style="font-size:11px">执行</button>';
       html += '</div></div>';
       html += '<pre style="font-size:12px;color:var(--slate-500);white-space:pre-wrap;max-height:500px;overflow-y:auto;margin:0 0 6px;font-family:var(--font-mono)">' + escapeHtml(shortTask) + '</pre>';
-      html += '<div style="font-size:11px;color:var(--slate-400)">Max steps: ' + p.maxSteps + '</div>';
+      html += '<div style="font-size:11px;color:var(--slate-400)">最大步数：' + p.maxSteps + '</div>';
       html += '</div></div>';
     });
     html += '</div>';
@@ -212,7 +212,7 @@ export function initSessionMode() {
         const idx = parseInt(btn.dataset.index);
         const phase = phases[idx];
         if (!phase) return;
-        if (!sessActive.value) { sessLog('error', 'No active session'); return; }
+        if (!sessActive.value) { sessLog('error', '无活跃会话'); return; }
         executeSessionStep(sessActive.value, phase.task, phase.maxSteps, phase.name, idx);
       });
     });
@@ -236,7 +236,7 @@ export function initSessionMode() {
     if (!phases || phases.length === 0) { plan.style.display = 'none'; sessionPhases = []; return; }
     plan.style.display = 'block';
     sessionPhases = phases;
-    countEl.textContent = phases.length + ' phases';
+    countEl.textContent = phases.length + ' 个阶段';
     if (runAllBtn) runAllBtn.style.display = (phases.length > 1) ? '' : 'none';
 
     list.innerHTML = buildPhaseCarouselHtml(phases);
@@ -245,15 +245,15 @@ export function initSessionMode() {
 
   async function runAllPhases() {
     if (!sessionPhases || sessionPhases.length === 0) return;
-    if (!sessActive.value) { sessLog('error', 'No active session'); return; }
+    if (!sessActive.value) { sessLog('error', '无活跃会话'); return; }
     const runAllBtn = document.getElementById('sessRunAllBtn');
     if (runAllBtn) runAllBtn.disabled = true;
     setUILocked(true);
-    sessLog('system', '▶ Running all ' + sessionPhases.length + ' phases...');
+    sessLog('system', '▶ 正在执行全部 ' + sessionPhases.length + ' 个阶段…');
 
     for (let i = 0; i < sessionPhases.length; i++) {
       const phase = sessionPhases[i];
-      sessLog('system', '▶ Phase ' + (i + 1) + '/' + sessionPhases.length + ': ' + phase.name);
+      sessLog('system', '▶ 阶段 ' + (i + 1) + '/' + sessionPhases.length + ': ' + phase.name);
       sessPhaseUpdateStatus(i, 'running');
       try {
         await executeSessionStep(sessActive.value, phase.task, phase.maxSteps, phase.name, i);
@@ -267,7 +267,7 @@ export function initSessionMode() {
 
     setUILocked(false);
     if (runAllBtn) runAllBtn.disabled = false;
-    sessLog('success', 'All phases complete');
+    sessLog('success', '所有阶段已完成');
   }
 
   function sessPhaseUpdateStatus(idx, status) {
@@ -279,7 +279,7 @@ export function initSessionMode() {
     el.textContent = status;
     el.style.color = colors[status] || 'var(--slate-400)';
     const execBtn = list.querySelector('.sess-phase-exec[data-index="' + idx + '"]');
-    if (execBtn && (status === 'success' || status === 'failed')) execBtn.textContent = status === 'success' ? 'Re-run' : 'Retry';
+    if (execBtn && (status === 'success' || status === 'failed')) execBtn.textContent = status === 'success' ? '重跑' : '重试';
   }
 
   function setInterventionCardMode(mode) {
@@ -345,25 +345,25 @@ export function initSessionMode() {
   function createSSEEventHandler(stepNum, label, phaseIdx) {
     return (evt, d) => {
       switch (evt) {
-        case 'step': sessLog('info', 'Step ' + d.step + ': ' + (d.next_goal || (d.actions || []).join(', '))); break;
-        case 'phase_start': sessLog('system', 'Started: ' + d.name); break;
+        case 'step': sessLog('info', '步骤 ' + d.step + ': ' + (d.next_goal || (d.actions || []).join(', '))); break;
+        case 'phase_start': sessLog('system', '已开始：' + d.name); break;
         case 'phase_done':
-          sessLog('success', 'Completed: ' + label);
-          sessTimelineStep('step-' + stepNum, 'success', label, 'Done');
+          sessLog('success', '已完成：' + label);
+          sessTimelineStep('step-' + stepNum, 'success', label, '完成');
           if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'success');
           if (sessTrajPath && d.cumulative_file) {
             sessTrajPath.style.display = 'block';
-            sessTrajPath.textContent = 'Trajectory: ' + d.cumulative_file;
+            sessTrajPath.textContent = '轨迹：' + d.cumulative_file;
           }
           setTimeout(() => loadActiveSessions(), 300);
           break;
         case 'phase_error': case 'error':
-          sessLog('error', d.message || 'Error');
+          sessLog('error', d.message || '执行错误');
           sessTimelineStep('step-' + stepNum, 'failed', label, d.message || '');
           if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'failed');
           break;
         case 'nav_step': sessLog('info', 'Nav: ' + d.label); break;
-        case 'done': sessLog('system', 'Finished'); break;
+        case 'done': sessLog('system', '已完成'); break;
         case 'intervention_needed':
           showInterventionAlerts(d);
           sessLog('system', '🔔 Intervention needed: ' + (d.fields || []).map(f => f.label).join(', '));
@@ -414,11 +414,11 @@ export function initSessionMode() {
 
   async function executeSessionStep(sessionId, task, maxSteps, label, phaseIdx) {
     setUILocked(true);
-    sessStatus.textContent = 'Executing...';
+    sessStatus.textContent = '执行中…';
     const stepNum = (parseInt(sessStepCount.textContent) || 0) + 1;
     sessStepCount.textContent = stepNum + ' steps';
     sessTimelineStep('step-' + stepNum, 'running', label, task.slice(0, 80));
-    sessLog('system', 'Step ' + stepNum + ': ' + label);
+    sessLog('system', '步骤 ' + stepNum + ': ' + label);
     if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'running');
 
     sessAbortController = new AbortController();
@@ -437,8 +437,8 @@ export function initSessionMode() {
       await readSSEStream(resp.body.getReader(), handler);
     } catch (err) {
       const isAbort = err.name === 'AbortError';
-      sessLog(isAbort ? 'system' : 'error', isAbort ? 'Cancelled' : err.message);
-      sessTimelineStep('step-' + stepNum, 'failed', label, isAbort ? 'Cancelled' : err.message.slice(0, 100));
+      sessLog(isAbort ? 'system' : 'error', isAbort ? '已取消' : err.message);
+      sessTimelineStep('step-' + stepNum, 'failed', label, isAbort ? '已取消' : err.message.slice(0, 100));
       if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'failed');
     }
     sessAbortController = null;
@@ -474,11 +474,11 @@ export function initSessionMode() {
   function onSessionChange() {
     const active = sessActive.value;
     if (!active) {
-      sessStatus.textContent = 'No active session';
+      sessStatus.textContent = '无活跃会话';
       sessTrajectoryId.textContent = '';
       if (sessTrajPath) { sessTrajPath.style.display = 'none'; sessTrajPath.textContent = ''; }
-      sessStepCount.textContent = '0 steps';
-      sessTimeline.innerHTML = '<div class="empty-state" style="padding:20px"><p>Send a step instruction to begin</p></div>';
+      sessStepCount.textContent = '0 步';
+      sessTimeline.innerHTML = '<div class="empty-state" style="padding:20px"><p>发送步骤指令以开始</p></div>';
       document.getElementById('sessPhasePlan').style.display = 'none';
       // Clear intervention alerts + reset to normal style on session change
       _interventionFields = [];
@@ -492,13 +492,13 @@ export function initSessionMode() {
       return;
     }
     fetch('/api/browser/session/' + active + '/trajectories').then(r => r.json()).then(data => {
-      sessStatus.textContent = 'Active ' + active.slice(0, 8) + '... | ' + data.stepIndex + ' steps' + (data.busy ? ' (busy)' : '');
+      sessStatus.textContent = '活跃 ' + active.slice(0, 8) + '... | ' + data.stepIndex + ' 步' + (data.busy ? ' (忙碌)' : '');
       sessStepCount.textContent = data.stepIndex + ' steps';
       if (sessTimeline && data.steps && data.steps.length > 0) {
         sessTimeline.innerHTML = '';
         data.steps.forEach(s => {
           const time = s.time ? new Date(s.time).toLocaleString() : '';
-          sessTimelineStep('step-' + s.step, 'success', 'Step ' + s.step, time);
+          sessTimelineStep('step-' + s.step, 'success', '步骤 ' + s.step, time);
         });
       }
       updateButtons();
@@ -507,7 +507,7 @@ export function initSessionMode() {
         sessCancelBtn.disabled = false;
       }
     }).catch(() => {
-      sessStatus.textContent = 'Session gone (exited)';
+      sessStatus.textContent = '会话已退出';
       sessActive.value = '';
       updateButtons();
     });
@@ -518,8 +518,8 @@ export function initSessionMode() {
   sessNewBtn.addEventListener('click', async () => {
     const model = sessModel.value;
     sessNewBtn.disabled = true;
-    sessStatus.textContent = 'Creating...';
-    sessLog('system', 'Creating new session...');
+    sessStatus.textContent = '创建中…';
+    sessLog('system', '正在创建新会话…');
     try {
       const res = await fetch('/api/browser/session', {
         method: 'POST',
@@ -528,13 +528,13 @@ export function initSessionMode() {
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Failed');
       const data = await res.json();
-      sessLog('success', 'Session created: ' + data.sessionId);
+      sessLog('success', '会话已创建：' + data.sessionId);
       await loadActiveSessions();
       sessActive.value = data.sessionId;
       onSessionChange();
     } catch (err) {
-      sessLog('error', 'Create session failed: ' + err.message);
-      sessStatus.textContent = 'Creation failed';
+      sessLog('error', '创建会话失败：' + err.message);
+      sessStatus.textContent = '创建失败';
     }
     sessNewBtn.disabled = false;
     updateButtons();
@@ -543,9 +543,9 @@ export function initSessionMode() {
   sessLoadBtn.addEventListener('click', async () => {
     const sessionId = sessActive.value;
     const caseText = sessTask.value.trim();
-    if (!sessionId) { sessLog('error', 'No active session — create one first'); return; }
+    if (!sessionId) { sessLog('error', '无活跃会话 — 请先创建一个'); return; }
     if (!caseText || !(/【阶段|^##\s+Phase\s+\d+/m.test(caseText))) {
-      sessLog('warn', 'No phase markers found. Use 【阶段N：名称】 or ## Phase N: format in the textarea.');
+      sessLog('warn', '未找到阶段标记。请在文本区域中使用 【阶段N：名称】 或 ## Phase N: 格式。');
       return;
     }
 
@@ -591,14 +591,14 @@ export function initSessionMode() {
         const text = await file.text();
         sessTask.value = text;
         if (sessFileName) sessFileName.textContent = file.name + ' (' + (text.length / 1024).toFixed(1) + ' KB)';
-        sessLog('system', 'Loaded file: ' + file.name);
+        sessLog('system', '已加载文件：' + file.name);
         updateButtons();
         // Auto-trigger Load if session active and markers present
         if (sessActive.value && (/【阶段|^##\s+Phase\s+\d+/m.test(text))) {
           setTimeout(() => sessLoadBtn.click(), 300);
         }
       } catch (err) {
-        sessLog('error', 'File read failed: ' + err.message);
+        sessLog('error', '文件读取失败：' + err.message);
       }
       sessFileInput.value = '';
     });
@@ -609,7 +609,7 @@ export function initSessionMode() {
     sessLoginToggle.addEventListener('click', () => {
       const hidden = sessLoginSection.style.display === 'none';
       sessLoginSection.style.display = hidden ? '' : 'none';
-      sessLoginToggle.textContent = hidden ? 'Hide' : 'Show';
+      sessLoginToggle.textContent = hidden ? '收起' : '展开';
     });
   }
 
@@ -618,14 +618,14 @@ export function initSessionMode() {
       const url = sessLoginUrl?.value.trim();
       const user = sessLoginUser?.value.trim();
       const pass = sessLoginPass?.value.trim();
-      if (!url) { sessLog('error', 'Target URL is required'); return; }
+      if (!url) { sessLog('error', '目标地址不能为空'); return; }
 
       // Create a session if none active
       let sessionId = sessActive.value;
       if (!sessionId) {
         sessNewBtn.disabled = true;
-        sessStatus.textContent = 'Creating...';
-        sessLog('system', 'Creating new session for login...');
+        sessStatus.textContent = '创建中…';
+        sessLog('system', '正在为登录创建新会话…');
         try {
           const res = await fetch('/api/browser/session', {
             method: 'POST',
@@ -638,9 +638,9 @@ export function initSessionMode() {
           await loadActiveSessions();
           sessActive.value = data.sessionId;
           onSessionChange();
-          sessLog('success', 'Session created: ' + data.sessionId);
+          sessLog('success', '会话已创建：' + data.sessionId);
         } catch (err) {
-          sessLog('error', 'Create session failed: ' + err.message);
+          sessLog('error', '创建会话失败：' + err.message);
           sessNewBtn.disabled = false;
           return;
         }
@@ -668,16 +668,16 @@ export function initSessionMode() {
   sessCancelBtn.addEventListener('click', () => {
     if (sessAbortController) { sessAbortController.abort(); sessAbortController = null; }
     sessRunning = false;
-    sessLog('system', 'Step cancelled');
+    sessLog('system', '步骤已取消');
     updateButtons();
   });
 
   sessTrajBtn.addEventListener('click', async () => {
     const sessionId = sessActive.value;
     if (!sessionId) return;
-    if (!confirm('Save action file + operation log + form snapshot?')) return;
+    if (!confirm('保存动作文件 + 操作日志 + 表单快照？')) return;
     sessTrajBtn.disabled = true;
-    sessLog('system', 'Saving...');
+    sessLog('system', '正在保存…');
     try {
       const res = await fetch('/api/browser/session/' + sessionId + '/trajectory', {
         method: 'POST',
@@ -689,9 +689,9 @@ export function initSessionMode() {
       const actionName = (data.action_file || '').split(/[\\/]/).pop() || '';
       const logName = (data.log_file || '').split(/[\\/]/).pop() || '';
       sessTrajectoryId.textContent = actionName.replace('.json','').slice(0,20) + '... |' + logName.replace('.txt','').slice(0,20) + '...';
-      sessLog('success', data.action_count + ' actions + ' + data.log_count + ' log lines saved');
+      sessLog('success', data.action_count + ' 个动作 + ' + data.log_count + ' 条日志行已保存');
     } catch (err) {
-      sessLog('error', 'Save failed: ' + err.message);
+      sessLog('error', '保存失败：' + err.message);
     }
     sessTrajBtn.disabled = false;
   });
@@ -699,9 +699,9 @@ export function initSessionMode() {
   sessCaseDataBtn.addEventListener('click', async () => {
     const sessionId = sessActive.value;
     if (!sessionId) return;
-    if (!confirm('Save case data to a JSON file? This will persist the current case data store.')) return;
+    if (!confirm('保存案例数据到 JSON 文件？这将持久化当前案例数据存储。')) return;
     sessCaseDataBtn.disabled = true;
-    sessLog('system', 'Saving case data...');
+    sessLog('system', '正在保存案例数据…');
     try {
       const res = await fetch('/api/browser/session/' + sessionId + '/save-case-data', {
         method: 'POST',
@@ -709,9 +709,9 @@ export function initSessionMode() {
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Server error');
       const data = await res.json();
-      sessLog('success', 'Case data saved: ' + data.caseDataFile + ' (' + data.keys + ' keys)');
+      sessLog('success', '案例数据已保存：' + data.caseDataFile + ' (' + data.keys + ' 个键)');
     } catch (err) {
-      sessLog('error', 'Save case data failed: ' + err.message);
+      sessLog('error', '保存案例数据失败：' + err.message);
     }
     sessCaseDataBtn.disabled = false;
   });
@@ -719,9 +719,9 @@ export function initSessionMode() {
   sessResetTrajBtn.addEventListener('click', async () => {
     const sessionId = sessActive.value;
     if (!sessionId) return;
-    if (!confirm('Reset trajectory recording? A new cumulative trajectory file will be created. Old one stays in /tmp/.')) return;
+    if (!confirm('重置轨迹录制？将创建新的累积轨迹文件，旧文件保留在 /tmp/ 中。')) return;
     sessResetTrajBtn.disabled = true;
-    sessLog('system', 'Resetting trajectory recording...');
+    sessLog('system', '正在重置轨迹录制…');
     try {
       let res, data;
       for (let attempt = 0; attempt < 5; attempt++) {
@@ -738,13 +738,13 @@ export function initSessionMode() {
       if (sessTrajPath) {
         sessTrajPath.style.display = 'block';
         const parts = [];
-        if (data.cumulative_file) parts.push('Trajectory: ' + data.cumulative_file);
+        if (data.cumulative_file) parts.push('轨迹：' + data.cumulative_file);
         if (data.case_data_file) parts.push('CaseData: ' + data.case_data_file);
         sessTrajPath.textContent = parts.join(' | ');
       }
-      sessLog('success', 'New trajectory file: ' + (data.cumulative_file || 'ready'));
+      sessLog('success', '新轨迹文件：' + (data.cumulative_file || 'ready'));
     } catch (err) {
-      sessLog('error', 'Reset failed: ' + err.message);
+      sessLog('error', '重置失败：' + err.message);
     }
     sessResetTrajBtn.disabled = false;
   });
@@ -752,15 +752,15 @@ export function initSessionMode() {
 
   if (sessCloseBrowserBtn) {
     sessCloseBrowserBtn.addEventListener('click', async () => {
-      if (!confirm('Close global browser? All sessions will be cleared.')) return;
-      sessLog('system', 'Closing global browser...');
+      if (!confirm('关闭全局浏览器？所有会话将被清除。')) return;
+      sessLog('system', '正在关闭全局浏览器…');
       try {
         await fetch('/api/browser/browser', { method: 'DELETE' });
-        sessLog('success', 'Browser closed');
+        sessLog('success', '浏览器已关闭');
         sessActive.innerHTML = '<option value="">(none)</option>';
         onSessionChange();
       } catch (err) {
-        sessLog('error', 'Close failed: ' + err.message);
+        sessLog('error', '关闭失败：' + err.message);
       }
     });
   }
@@ -779,13 +779,13 @@ export function initSessionMode() {
   const interventionSendBtn = document.getElementById('sessInterventionSendBtn');
   if (interventionSendBtn) {
     interventionSendBtn.addEventListener('click', async () => {
-      if (!sessActive.value) { sessLog('error', 'No active session'); return; }
+      if (!sessActive.value) { sessLog('error', '无活跃会话'); return; }
       const intervention = document.getElementById('sessInterventionInput')?.value?.trim() || '';
       if (!intervention) {
-        sessLog('system', 'No intervention text entered. Describe the workflow above, then click Send.');
+        sessLog('system', '未输入干预文本。请在上方描述工作流，然后点击发送。');
         return;
       }
-      sessLog('system', 'Sending intervention: ' + intervention.slice(0, 80));
+      sessLog('system', '正在发送干预指令：' + intervention.slice(0, 80));
       try {
         const resp = await fetch('/api/browser/session/' + sessActive.value + '/intervene', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -795,7 +795,7 @@ export function initSessionMode() {
         document.getElementById('sessInterventionInput').value = '';
         sessLog('success', 'Intervention sent — agent will process it on the next step');
       } catch (err) {
-        sessLog('error', 'Intervention failed: ' + err.message);
+        sessLog('error', '干预发送失败：' + err.message);
       }
     });
   }

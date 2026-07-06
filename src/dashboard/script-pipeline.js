@@ -413,7 +413,7 @@ export function initScriptPipeline() {
     const terminal = document.getElementById('genRunTerminal');
 
     healBtn.disabled = true;
-    healStatus.textContent = 'Starting self-heal...';
+    healStatus.textContent = '正在启动自愈修复…';
 
     function addHealLog(type, msg) {
       const line = document.createElement('div');
@@ -433,7 +433,7 @@ export function initScriptPipeline() {
 
     try {
       // Step 1: Create browser session (always fresh — self-heal is one-shot)
-      addHealLog('step', 'Creating browser session...');
+      addHealLog('step', '正在创建浏览器会话…');
       const sessRes = await fetch('/api/browser/session', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -507,7 +507,7 @@ export function initScriptPipeline() {
                 }
                 break;
               case 'error':
-                addHealLog('error', d.message || 'Unknown error');
+                addHealLog('error', d.message || '未知错误');
                 break;
               default:
                 addHealLog('info', `[${eventType}] ${JSON.stringify(d).slice(0, 100)}`);
@@ -520,7 +520,7 @@ export function initScriptPipeline() {
       if (pipelineState.healSuccess) {
         try {
           // Save new trajectory from agent
-          addHealLog('step', 'Saving recorded trajectory...');
+          addHealLog('step', '正在保存录制的轨迹…');
           const saveRes = await fetch(`/api/browser/session/${sessionId}/trajectory`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ task: 'Self-heal: recording from step ' + failedStep }),
