@@ -6,8 +6,6 @@ import { initScriptPipeline, checkWorkerHealth } from './script-pipeline.js';
 import { initHistory, loadHistory } from './history.js';
 import { initTrajectory, loadSnapshots } from './trajectory.js';
 import { initCaseData, loadCaseDataHistory } from './case-data.js';
-import { initExecutionRecords, loadExecutionRecords } from './execution-records.js';
-import { initAIExplore } from './explore.js';
 import { initSessionMode } from './session-mode.js';
 import { initParticles } from './particles.js';
 
@@ -41,21 +39,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'history') loadHistory();
     if (btn.dataset.tab === 'trajectories') loadSnapshots();
     if (btn.dataset.tab === 'caseData') loadCaseDataHistory();
-    if (btn.dataset.tab === 'execRecords') loadExecutionRecords();
-  });
-});
-
-// Explore mode toggle (One-Shot / Multi-Turn Session)
-document.querySelectorAll('.explore-mode-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.explore-mode-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const mode = btn.dataset.mode;
-    const oneShot = document.getElementById('exploreOneShot');
-    const session = document.getElementById('exploreSession');
-    if (oneShot) oneShot.style.display = mode === 'oneshot' ? 'block' : 'none';
-    if (session) session.style.display = mode === 'session' ? 'block' : 'none';
-    if (mode === 'session' && typeof loadActiveSessions === 'function') loadActiveSessions();
   });
 });
 
@@ -101,7 +84,5 @@ initScriptPipeline();
 initHistory();
 initTrajectory();
 initCaseData();
-initExecutionRecords();
-initAIExplore();
 initSessionMode();
 initParticles();

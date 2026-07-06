@@ -380,9 +380,8 @@ export default function (app) {
       steps: session.trajectories.map(t => ({ step: t.step, path: t.path, time: t.time })),
       createdAt: session.createdAt, archivedAt: new Date().toISOString(),
     };
-    state.executionRecords.unshift(record);
     state.sessions.delete(id);
-    console.log(`[browser-session] Archived session ${id} to execution records (browser stays alive)`);
+    console.log(`[browser-session] Deleted session ${id}`);
     res.json({ status: 'archived', sessionId: id });
   });
 
@@ -564,19 +563,4 @@ export default function (app) {
     res.json(list);
   });
 
-  app.get('/api/browser/session/execution-records', (req, res) => { res.json(state.executionRecords); });
-
-  app.get('/api/browser/session/execution-record/:sessionId', (req, res) => {
-    const record = state.executionRecords.find(r => r.sessionId === req.params.sessionId);
-    if (!record) return res.status(404).json({ error: 'Execution record not found' });
-    res.json(record);
-  });
-
-  app.delete('/api/browser/session/execution-record/:sessionId', (req, res) => {
-    const idx = state.executionRecords.findIndex(r => r.sessionId === req.params.sessionId);
-    if (idx === -1) return res.status(404).json({ error: 'Execution record not found' });
-    state.executionRecords.splice(idx, 1);
-    console.log(`[browser-session] Permanently deleted execution record ${req.params.sessionId}`);
-    res.json({ status: 'deleted', sessionId: req.params.sessionId });
-  });
 }

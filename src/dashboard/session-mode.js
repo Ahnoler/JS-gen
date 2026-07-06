@@ -12,7 +12,6 @@ export function initSessionMode() {
   const sessResetTrajBtn = document.getElementById('sessResetTrajBtn');
   const sessCaseDataBtn = document.getElementById('sessCaseDataBtn');
   const sessCancelBtn = document.getElementById('sessCancelBtn');
-  const sessArchiveBtn = document.getElementById('sessArchiveBtn');
   const sessTask = document.getElementById('sessTask');
   const sessModel = document.getElementById('sessModel');
   const sessMaxSteps = document.getElementById('sessMaxSteps');
@@ -82,7 +81,6 @@ export function initSessionMode() {
     const loadEnabled = hasSession && !locked;
     const stepEnabled = hasSession && !locked;
     const trajEnabled = hasSession && !locked;
-    const archiveEnabled = hasSession && !locked;
     const resetEnabled = hasSession && !locked;
     const cancelEnabled = sessRunning;
     const newEnabled = !locked;
@@ -92,7 +90,6 @@ export function initSessionMode() {
     sessCaseDataBtn.disabled = !trajEnabled;
     if (sessResetTrajBtn) sessResetTrajBtn.disabled = !resetEnabled;
     sessCancelBtn.disabled = !cancelEnabled;
-    sessArchiveBtn.disabled = !archiveEnabled;
     sessNewBtn.disabled = !newEnabled;
 
     // Phase card execute buttons
@@ -234,14 +231,43 @@ export function initSessionMode() {
     const plan = document.getElementById('sessPhasePlan');
     const list = document.getElementById('sessPhaseList');
     const countEl = document.getElementById('sessPhaseCount');
+    const runAllBtn = document.getElementById('sessRunAllBtn');
     if (!plan || !list) return;
     if (!phases || phases.length === 0) { plan.style.display = 'none'; sessionPhases = []; return; }
     plan.style.display = 'block';
     sessionPhases = phases;
     countEl.textContent = phases.length + ' phases';
+    if (runAllBtn) runAllBtn.style.display = (phases.length > 1) ? '' : 'none';
 
     list.innerHTML = buildPhaseCarouselHtml(phases);
     bindPhaseCarouselEvents(list, phases);
+  }
+
+  async function runAllPhases() {
+    if (!sessionPhases || sessionPhases.length === 0) return;
+    if (!sessActive.value) { sessLog('error', 'No active session'); return; }
+    const runAllBtn = document.getElementById('sessRunAllBtn');
+    if (runAllBtn) runAllBtn.disabled = true;
+    setUILocked(true);
+    sessLog('system', '▶ Running all ' + sessionPhases.length + ' phases...');
+
+    for (let i = 0; i < sessionPhases.length; i++) {
+      const phase = sessionPhases[i];
+      sessLog('system', '▶ Phase ' + (i + 1) + '/' + sessionPhases.length + ': ' + phase.name);
+      sessPhaseUpdateStatus(i, 'running');
+      try {
+        await executeSessionStep(sessActive.value, phase.task, phase.maxSteps, phase.name, i);
+        sessPhaseUpdateStatus(i, 'success');
+      } catch (err) {
+        sessPhaseUpdateStatus(i, 'failed');
+        sessLog('error', 'Phase ' + (i + 1) + ' failed: ' + (err.message || err));
+        break;
+      }
+    }
+
+    setUILocked(false);
+    if (runAllBtn) runAllBtn.disabled = false;
+    sessLog('success', 'All phases complete');
   }
 
   function sessPhaseUpdateStatus(idx, status) {
@@ -523,29 +549,6 @@ export function initSessionMode() {
       return;
     }
 
-    // Reset cumulative trajectory for new test case
-    sessLog('system', 'Clearing old trajectory...');
-    try {
-      let resetData;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const r = await fetch('/api/browser/session/' + sessionId + '/reset-trajectory', { method: 'POST' });
-        if (r.status === 409) {
-          sessLog('system', 'Browser busy, retrying in 2s... (' + (attempt + 1) + '/5)');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          continue;
-        }
-        resetData = await r.json();
-        break;
-      }
-      if (resetData && sessTrajPath) {
-        sessTrajPath.style.display = 'block';
-        const parts = [];
-        if (resetData.cumulative_file) parts.push('Trajectory: ' + resetData.cumulative_file);
-        if (resetData.case_data_file) parts.push('CaseData: ' + resetData.case_data_file);
-        sessTrajPath.textContent = parts.join(' | ');
-      }
-    } catch (e) { /* non-critical */ }
-
     // 1. Preserve executed phases (success/failed) from current cards
     const preservedMap = {};
     sessionPhases.forEach((p, i) => {
@@ -746,25 +749,6 @@ export function initSessionMode() {
     sessResetTrajBtn.disabled = false;
   });
 
-  sessArchiveBtn.addEventListener('click', async () => {
-    const sessionId = sessActive.value;
-    if (!sessionId) return;
-    if (!confirm('Archive session ' + sessionId.slice(0, 12) + '... to execution records?')) return;
-    sessArchiveBtn.disabled = true;
-    sessLog('system', 'Archiving session...');
-    try {
-      const res = await fetch('/api/browser/session/' + sessionId, { method: 'DELETE' });
-      if (!res.ok) throw new Error((await res.json()).error || 'Server error');
-      sessLog('success', 'Archived: ' + sessionId);
-      sessActive.value = '';
-      onSessionChange();
-      await loadActiveSessions();
-    } catch (err) {
-      sessLog('error', 'Archive failed: ' + err.message);
-    }
-    sessArchiveBtn.disabled = false;
-    updateButtons();
-  });
 
   if (sessCloseBrowserBtn) {
     sessCloseBrowserBtn.addEventListener('click', async () => {
@@ -814,6 +798,12 @@ export function initSessionMode() {
         sessLog('error', 'Intervention failed: ' + err.message);
       }
     });
+  }
+
+  // Run All Phases button — sequentially execute all parsed phases
+  const runAllBtn = document.getElementById('sessRunAllBtn');
+  if (runAllBtn) {
+    runAllBtn.addEventListener('click', () => runAllPhases());
   }
 
   // Initial Load button state

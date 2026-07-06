@@ -11,7 +11,6 @@ import registerAgentRoutes from './src/routes/agent.js';
 import registerTestHistoryRoutes from './src/routes/test-history.js';
 import registerTestRunRoutes from './src/routes/test-run.js';
 import registerLLMProxyRoutes from './src/routes/llm-proxy.js';
-import registerExploreRoutes from './src/routes/explore-route.js';
 import registerBrowserSessionRoutes from './src/routes/browser-session.js';
 import registerTrajectoryRoutes from './src/routes/trajectory.js';
 import registerCaseDataRoutes from './src/routes/case-data.js';
@@ -28,8 +27,6 @@ app.use(express.static(DASHBOARD_DIR, { maxAge: 0 }));
 
 // Register all route modules
 registerLLMProxyRoutes(app);
-const exploreLockRef = { value: false };
-registerExploreRoutes(app, exploreLockRef);
 registerBrowserSessionRoutes(app);
 registerTrajectoryRoutes(app);
 registerCaseDataRoutes(app);

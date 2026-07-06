@@ -14,7 +14,7 @@ def _register_table_actions(controller, browser_context):
                 for (const row of rows) {
                     if (!row.textContent.includes(rowText)) continue;
                     const buttons = row.querySelectorAll('button, .el-button, i[class*="icon"]');
-                    for (const btn of buttons) {
+                    for (const btn of buttons) {C
                         const text = btn.textContent?.trim() || '';
                         const cls = btn.className || '';
                         if (text.includes(btnText) || cls.includes(btnText.toLowerCase())) {

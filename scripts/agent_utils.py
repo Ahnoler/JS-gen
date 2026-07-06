@@ -10,8 +10,6 @@ from pathlib import Path
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Browser Use Agent")
-    parser.add_argument("--task", help="Task description")
-    parser.add_argument("--workflow", help="Path to workflow JSON file (array of {name, task, maxSteps})")
     parser.add_argument("--model", required=True, help="Model ID")
     parser.add_argument("--base-url", default=os.getenv("LLM_BASE_URL"), help="LLM base URL (or set LLM_BASE_URL env)")
     parser.add_argument("--api-key", default=None, help="LLM API key (or set OPENAI_API_KEY env)")
