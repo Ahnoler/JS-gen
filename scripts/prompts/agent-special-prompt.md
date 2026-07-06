@@ -8,7 +8,7 @@
      - 点击按钮打开导入弹窗
      - 读取法人数据：`name = read_case_data("法人_客户名称")`
      - 填写弹窗搜索框：`fill_form_field("客户名称", name)`
-     - 点击查询，使用 `click_table_row_action("first", "确认")` 选择第一条结果
+     - 点击查询，使用 `click_table_row_radio("first")` 选择第一条结果
      - 确认弹窗。
 
 ## 🚨 法人类字段辅助填写（"引入"按钮 → 客户放大镜弹窗）
@@ -42,7 +42,7 @@ if 有用户数据:
     wait_for_loading()
 
     if 表格有结果:
-      click_table_row_action("first", "确认")
+      click_table_row_radio("first")
       wait(200)
       click 确认 按钮
       wait(200)

@@ -36,7 +36,8 @@
 - expand_all_el_tree() — 完全展开 el-tree
 - switch_tab(tab_name) — 切换 el-tabs 标签页。**⚠️ 切换前必须先点击"暂存"按钮保存数据，否则已填数据会丢失。**
 - click_menu_item(menu_text) — 点击 el-menu 菜单项（自动展开子菜单）
-- click_table_row_action(row_text, button_text) — 点击 el-table 行操作按钮
+- **click_table_row_button(row_text, button_text)** — 点击 el-table 行中的操作按钮。`row_text` 匹配行内容，`button_text` 匹配按钮文本或图标类名。支持 `"edit"/"编辑"` 和 `"delete"/"删除"` 快捷方式。无匹配时自动点击第一个可见按钮作为兜底。
+- **click_table_row_radio(row_text)** — 选中 el-table 行中的单选按钮（`label.el-radio`）。`row_text` 匹配行内容。
 - wait_for_loading() — 等待 Element UI 加载遮罩消失
 - get_page_state() — 诊断
 - save_case_data(key, value) — 将值保存到进程级 case data 存储（跨步骤/阶段持久化）

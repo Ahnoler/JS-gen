@@ -19,7 +19,6 @@ description: Complete browser automation with Playwright. Auto-detects dev serve
 >   * `await page.evaluate(() => CTRL.closeDialog())` — close dialogs/notifications
 >   * `await page.evaluate(() => CTRL.waitForLoading())` — wait for loading masks
 > - **Button clicks**: Use `page.locator('xpath=...').click()` but with `translate(.," ","")` to handle Chinese spaces.
-> - The `buildScriptPrompt` function in `script-utils.js` already includes these rules; follow them.
 
 > **🔄 NEW: Script Assembly Pipeline**
 > Scripts are now also generated via a Python assembler (`scripts/script_assembler.py`) that reads `action_{ts}.json` files and maps recorded controller actions directly to CTRL calls — no LLM guessing needed.

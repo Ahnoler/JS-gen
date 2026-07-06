@@ -19,7 +19,8 @@ Verified (detection + self-healing):
 
 TODO — remaining operations lack multi-tier degradation + structured error reporting:
   ☐ click_menu_item        — single-tier CTRL, error: 'not-found'
-  ☐ click_table_row_action — single-tier CTRL, error: returns CTRL string
+  ☐ click_table_row_button — multi-tier
+  ☐ click_table_row_radio  — single-tier CTRL, error: returns CTRL string
   ☐ click_radio            — single-tier CTRL, error: returns CTRL string
   ☐ fill_date_field        — no fallback, direct CTRL call
   ☐ click_adjacent_button  — no fallback, direct CTRL call
@@ -644,14 +645,23 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append("    await page.evaluate(() => CTRL.waitForLoading());")
         return '\n'.join(lines)
 
-    # ---- click_table_row_action ----
-    if action == 'click_table_row_action':
+    # ---- click_table_row_button ----
+    if action == 'click_table_row_button':
         r, b = p('row_text'), p('button_text')
-        lines.append(f"    console.log('[{step_num}] Table action \"{r}\" / \"{b}\"');")
+        lines.append(f"    console.log('[{step_num}] Table button \"{r}\" / \"{b}\"');")
         lines.append(pre())
         lines.append(pre_ready())
-        lines.append(f"    const _rt{step_num} = await page.evaluate(() => CTRL.clickTableRowAction('{_escape(r)}', '{_escape(b)}'));")
-        lines.append(f"    if (_rt{step_num} !== 'ok' && _rt{step_num} !== 'ok-icon') _recordError({step_num}, 'click_table_row_action', '{_escape_js_string(r)}', '{_escape_js_string(b)}', _rt{step_num}, 'Row or button not found');")
+        lines.append(f"    const _rt{step_num} = await page.evaluate(() => CTRL.clickTableRowButton('{_escape(r)}', '{_escape(b)}'));")
+        lines.append(f"    if (_rt{step_num} !== 'ok' && _rt{step_num} !== 'ok-icon' && _rt{step_num} !== 'ok-fallback') _recordError({step_num}, 'click_table_row_button', '{_escape_js_string(r)}', '{_escape_js_string(b)}', _rt{step_num}, 'Row or button not found');")
+        lines.append('')
+        return '\n'.join(lines)
+
+    # ---- click_table_row_radio ----
+    if action == 'click_table_row_radio':
+        r = p('row_text')
+        lines.append(f"    console.log('[{step_num}] Table radio \"{r}\"');")
+        lines.append(pre())
+        lines.append(f"    await page.evaluate(() => CTRL.clickTableRowRadio('{_escape(r)}'));")
         lines.append('')
         return '\n'.join(lines)
 

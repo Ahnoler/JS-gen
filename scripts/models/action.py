@@ -19,7 +19,8 @@ ActionType = Literal[
     "select_option",
     "click_element_by_index",
     "click_menu_item",
-    "click_table_row_action",
+    "click_table_row_button",
+    "click_table_row_radio",
     "click_adjacent_button",
     "click_radio",
     "switch_tab",
@@ -67,7 +68,8 @@ ACTION_TO_COMMAND: dict[str, CommandType] = {
     "select_option": "select",
     "click_element_by_index": "click",
     "click_menu_item": "click",
-    "click_table_row_action": "click",
+    "click_table_row_button": "click",
+    "click_table_row_radio": "click",
     "click_adjacent_button": "click",
     "click_radio": "click",
     "switch_tab": "tab",
@@ -126,7 +128,8 @@ class ActionEntry(BaseModel):
             "  select_option / click_radio:        {label_text, option_text}\n"
             "  click_element_by_index:             {index, tag_name, text}\n"
             "  click_menu_item:                    {menu_text}\n"
-            "  click_table_row_action:             {row_text, button_text}\n"
+            "  click_table_row_button:             {row_text, button_text}\n"
+            "  click_table_row_radio:              {row_text}\n"
             "  click_adjacent_button:              {label_text}\n"
             "  switch_tab:                         {tab_name}\n"
             "  close_dialog:                       {}\n"

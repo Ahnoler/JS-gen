@@ -231,7 +231,7 @@ def _accumulate_trajectory(output_path, cumulative_path):
 # Actions recorded by the custom controller (subset of all browser_use actions)
 _CUSTOM_ACTIONS = {
     'fill_form_field', 'select_option', 'click_element_by_index',
-    'click_menu_item', 'click_table_row_action', 'click_radio',
+    'click_menu_item', 'click_table_row_button', 'click_table_row_radio', 'click_radio',
     'fill_date_field', 'click_adjacent_button', 'switch_tab', 'close_dialog',
 }
 

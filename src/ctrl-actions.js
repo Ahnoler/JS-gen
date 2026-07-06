@@ -296,19 +296,31 @@ const CTRL_OBJECT = `{
     }
     return count > 0 ? 'ok:' + count : 'no-address-fields';
   },
-  clickTableRowAction: (rowText, btnText) => {
-    for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
-      if (!row.textContent.includes(rowText)) continue;
-      for (const btn of row.querySelectorAll('button,.el-button,i[class*="icon"]')) {
-        const t=btn.textContent?.trim()||'', c=btn.className||'';
-        if (t.includes(btnText) || c.includes(btnText.toLowerCase())) { if (btn.offsetParent!==null) { btn.click(); return 'ok'; } }
-      }
-      if (btnText==='edit'||btnText==='编辑') { const ic=row.querySelector('i.el-icon-edit,i[class*="bianji"],i[class*="edit"],i[class*="xiugai"]'); if (ic&&ic.offsetParent!==null) { ic.click(); return 'ok-icon'; } }
-      if (btnText==='delete'||btnText==='删除') { const ic=row.querySelector('i.el-icon-delete,i[class*="shanchu"],i[class*="delete"]'); if (ic&&ic.offsetParent!==null) { ic.click(); return 'ok-icon'; } }
-      return 'button-not-found';
-    }
-    return 'row-not-found';
-  },
+	  clickTableRowButton: (rowText, btnText) => {
+	    for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
+	      if (!row.textContent.includes(rowText)) continue;
+	      for (const btn of row.querySelectorAll('button,.el-button,i[class*="icon"]')) {
+	        const t=btn.textContent?.trim()||'', c=btn.className||'';
+	        if (t.includes(btnText) || c.includes(btnText.toLowerCase())) { if (btn.offsetParent!==null) { btn.click(); return 'ok'; } }
+	      }
+	      if (btnText==='edit'||btnText==='编辑') { const ic=row.querySelector('i.el-icon-edit,i[class*="bianji"],i[class*="edit"],i[class*="xiugai"]'); if (ic&&ic.offsetParent!==null) { ic.click(); return 'ok-icon'; } }
+	      if (btnText==='delete'||btnText==='删除') { const ic=row.querySelector('i.el-icon-delete,i[class*="shanchu"],i[class*="delete"]'); if (ic&&ic.offsetParent!==null) { ic.click(); return 'ok-icon'; } }
+	      for (const btn of row.querySelectorAll('button,.el-button')) { if (btn.offsetParent!==null) { btn.click(); return 'ok-fallback'; } }
+	      return 'button-not-found';
+	    }
+	    return 'row-not-found';
+	  },
+	  clickTableRowRadio: (rowText) => {
+	    for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
+	      if (!row.textContent.includes(rowText)) continue;
+	      const radio = row.querySelector('label.el-radio');
+	      if (!radio || radio.offsetParent === null) return 'radio-not-found';
+	      const inner = radio.querySelector('.el-radio__inner');
+	      (inner || radio).click();
+	      return 'ok';
+	    }
+	    return 'row-not-found';
+	  },
   verifyFormStructure: (expectedFields) => {
     // expectedFields: [{label, is_required}, ...] from save_form_snapshot
     const container = CTRL.getContainer();
@@ -386,7 +398,7 @@ ${sp}});`;
 
 /**
  * LLM prompt 用：以 Markdown 代码块格式输出（可复制）
- * 用于 buildScriptPrompt 中让 LLM 直接复制
+ * 用于 Agent prompt 中让 LLM 直接复制 CTRL 函数定义
  */
 export const CTRL_PROMPT_BLOCK = '```javascript\nawait page.evaluate(() => {\n  window.CTRL = ' + CTRL_OBJECT.replace(/\n/g, '\n  ') + '\n});\n```';
 
@@ -401,7 +413,8 @@ export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 | CTRL.clickRadio | (label, option) | 'ok' / 'option-not-found' / 'label-not-found' | 点击 el-radio |
 | CTRL.selectTreeOption | (label, option) | 'ok:xxx (code)' / 'ok-search:xxx' / 'ok-fallback:xxx (code)' | 树选择器，P0 精确/P1 搜索/P2 兜底 |
 | CTRL.clickMenuItem | (text) | 'ok' / 'ok-expanded' / 'not-found' | 点击 el-menu-item，自动展开 el-submenu |
-| CTRL.clickTableRowAction | (rowText, btnText) | 'ok' / 'ok-icon' / 'button-not-found' / 'row-not-found' | 在 el-table 行内找按钮 |
+| CTRL.clickTableRowButton | (rowText, btnText) | 'ok' / 'ok-icon' / 'ok-fallback' / 'button-not-found' / 'row-not-found' | 点击 el-table 行内操作按钮 |
+| CTRL.clickTableRowRadio | (rowText) | 'ok' / 'radio-not-found' / 'row-not-found' | 选中 el-table 行内单选按钮 |
 | CTRL.closeDialog | () | 'ok' / 'ok-notification' / 'ok-cancel' / 'no-overlay-open' | 关闭通知/弹窗/抽屉 |
 | CTRL.waitForLoading | () | 超时返回 'timeout' | 等待 loading 遮罩 + CSS 动画结束（200ms 轮询，最长 30s） |
 | CTRL.switchTab | (name) | 'ok' / 'tab-not-found' | 切换 el-tabs |

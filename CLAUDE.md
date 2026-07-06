@@ -54,7 +54,6 @@ The Python agent process communicates via JSON Lines on stdout (each line is `{"
 - **`agent.js`** — Generic AI agent execution (sync/async/SSE), session management. Dispatches to OpenCode SDK or standalone LLM.
 - **`browser-use-explore.js`** — Workflow mode: parses multi-phase task text, spawns Python agent, streams progress via SSE, saves trajectories and case data on completion.
 - **`browser-session.js`** — Session mode: maintains a long-lived browser via `state.globalBrowser`, supports multi-turn interaction with human intervention.
-- **`test-gen.js`** — LLM-based Playwright script generation. Calls `buildScriptPrompt()` from `script-utils.js`, sends to LLM, parses response.
 - **`test-assemble.js`** — Assembler pipeline: reads action JSON → `dedup.js` (consecutive-only dedup) → Python `script_assembler.py` → returns Playwright JS script.
 - **`test-run.js`** + **`sse.js`** — Execute generated Playwright scripts, streaming output.
 - **`llm-proxy.js`** — OpenAI-compatible `/v1/chat/completions` and `/v1/models` endpoints.

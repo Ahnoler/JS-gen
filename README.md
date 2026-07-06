@@ -53,40 +53,40 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         User / Client                               │
-│           (Dashboard / curl / Postman / 第三方系统)                   │
+│           (Dashboard / curl / Postman / Third-party system)         │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │ HTTP / SSE
                             ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      Node.js Express Server                          │
-│                     (port 4097, server.mjs)                          │
-│                                                                      │
+│                      Node.js Express Server                         │
+│                     (port 4097, server.mjs)                         │
+│                                                                     │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │
-│  │   Route Modules  │  │   Store Modules  │  │  Dashboard (SPA)   │  │
-│  │   (13 routes)    │  │  (trajectory,    │  │  (13 ESM modules)  │  │
-│  │                  │  │   case-data,     │  │                     │  │
-│  │  agent.js        │  │   script-utils)  │  │  Script Assemble   │  │
-│  │  browser-session │  └─────────────────┘  │  AI Explore         │  │
-│  │  browser-explore │                       │  Trajectories       │  │
-│  │  test-run        │  ┌─────────────────┐  │  Case Data          │  │
-│  │  test-assemble   │  │   LLM Utils     │  │  Session Mode       │  │
-│  │  llm-proxy       │  │  (callLLM)      │  │  Execution History  │  │
-│  │  ...             │  └─────────────────┘  └─────────────────────┘  │
-│  └─────────────────┘                       └─────────────────────────┘
+│  │   Route Modules │  │   Store Modules │  │  Dashboard (SPA)    │  │
+│  │   (13 routes)   │  │  (trajectory,   │  │  (13 ESM modules)   │  │
+│  │                 │  │   case-data,    │  │                     │  │
+│  │ agent.js        │  │   script-utils) │  │  Script Assemble    │  │
+│  │ browser-session │  └─────────────────┘  │  AI Explore         │  │
+│  │ browser-explore │                       │  Trajectories       │  │
+│  │ test-run        │  ┌─────────────────┐  │  Case Data          │  │
+│  │ test-assemble   │  │   LLM Utils     │  │  Session Mode       │  │
+│  │ llm-proxy       │  │  (callLLM)      │  │  Execution History  │  │
+│  │  ...            │  └─────────────────┘  └─────────────────────┘  │
+│  └─────────────────┘                       └────────────────────────┘
 │                       │
 │             spawn(StdIn/StdOut JSON Lines)
 │                       ▼
 │  ┌──────────────────────────────────────────────────────────────────┐
 │  │                   Python Agent (browser_use)                     │
 │  │                                                                  │
-│  │  main.py ──→ controller.py (20+ custom actions)                 │
-│  │  │             agent_utils.py (LLM, prompt)                     │
-│  │  ├──workflow  workflow_runner.py (multi-phase)                  │
-│  │  └──session   session_runner.py (stdin interactive)             │
+│  │  main.py ──→ controller.py (20+ custom actions)                  │
+│  │  │             agent_utils.py (LLM, prompt)                      │
+│  │  ├──workflow  workflow_runner.py (multi-phase)                   │
+│  │  └──session   session_runner.py (stdin interactive)              │
 │  │                                                                  │
-│  │  recorder.py (hooks, goal dedup, human intervention)            │
-│  │  form_rules.py (ID card, phone, email generators)               │
-│  │  prompts/agent-prompt.md (system prompt)                        │
+│  │  recorder.py (hooks, goal dedup, human intervention)             │
+│  │  form_rules.py (ID card, phone, email generators)                │
+│  │  prompts/agent-prompt.md (system prompt)                         │
 │  └──────────────────────────────────────────────────────────────────┘
 │                       │
 │                       ▼
@@ -94,9 +94,9 @@
 │  │              Script Assembly Pipeline                            │
 │  │                                                                  │
 │  │  1. Agent records → action_xxx.json (with {action,params})       │
-│  │  2. dedup.js → removes consecutive duplicates                   │
-│  │  3. script_assembler.py → generates Playwright JS script        │
-│  │  4. playwrite-skill/run.js → executes script in Chromium        │
+│  │  2. dedup.js → removes consecutive duplicates                    │
+│  │  3. script_assembler.py → generates Playwright JS script         │
+│  │  4. playwrite-skill/run.js → executes script in Chromium         │
 │  └──────────────────────────────────────────────────────────────────┘
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -367,7 +367,6 @@ npm start
 | `recorder.py` | **录制钩子**。`on_step_start` / `on_step_end` 回调，目标去重检测、取消信号、人工介入注入 |
 | `agent_utils.py` | **工具函数**。LLM 创建（ChatOpenAI）、参数解析、消息上下文裁剪（保留最后 12 条）、提示词加载 |
 | `form_rules.py` | **表单规则**。`match_rule(label_text)` → 有效随机值。包括身份证（校验和）、手机号、信用代码、银行卡号等 |
-| `playwright_gen.py` | **Playwright 脚本生成**（备选路径） |
 | `script_assembler.py` | **脚本组装器**。读取 action JSON → 生成完整 Playwright JS 脚本，含多级降级选择器（CTRL → Playwright → XPath） |
 | `prompts/agent-prompt.md` | Agent 系统提示词（Element UI 操作规则、字段扫描、任务清单管理） |
 | `prompts/agent-field-rules.md` | 表单字段规则补充提示词 |
@@ -446,7 +445,7 @@ Dashboard 面板标签页：
 
 提交多阶段任务文本，Python Agent 按顺序执行所有阶段后退出。任务阶段格式：
 
-```json
+```
 // 任务文本中的阶段定义
 【目标URL】
 http://example.com
@@ -495,7 +494,8 @@ DELETE /api/browser/browser         → 关闭浏览器
 | `fill_date_field(label, dateStr)` | 设置 el-date-picker / tsscdatepicker（格式 YYYY-MM-DD） |
 | `click_radio(label, option)` | 点击 el-radio 组中的选项 |
 | `click_menu_item(text)` | 点击 el-menu 菜单项（自动展开子菜单） |
-| `click_table_row_action(rowText, btnText)` | el-table 行内操作按钮 |
+| `click_table_row_button(rowText, btnText)` | el-table 行内操作按钮 |
+| `click_table_row_radio(rowText)` | el-table 行内单选按钮 |
 | `click_adjacent_button(label)` | 点击字段旁的"选择"/"引入"按钮（仅空字段时执行） |
 | `close_dialog()` | 关闭通知/弹窗/抽屉（优先级：notification > dialog > drawer） |
 | `close_notification()` | 关闭 el-notification 并读取其文本内容 |
@@ -531,13 +531,13 @@ Agent 提示词位于 `scripts/prompts/agent-prompt.md`，包含：
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
 │  Step 1      │    │  Step 2      │    │  Step 3      │    │  Step 4      │
 │  AI Agent    │───→│  Action JSON │───→│  Dedup       │───→│  Assembler   │
-│  探索执行    │    │  录制        │    │  (连续去重)  │    │  (Python)    │
+│Explore/excute│    │  record      │    │(deduplicate) │    │  (Python)    │
 └──────────────┘    └──────────────┘    └──────────────┘    └──────┬───────┘
                                                                    │
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐           │
 │  Step 6      │    │  Step 5      │    │  Preview     │           │
-│  Execute     │←───│  CTRL Helper │←───│  (可选)      │←──────────┘
-│  (Playwright)│    │  代码注入    │    │              │
+│  Execute     │←───│  CTRL Helper │←───│(selectable)  │←──────────┘
+│  (Playwright)│    │  code insert │    │              │
 └──────────────┘    └──────────────┘    └──────────────┘
 ```
 
