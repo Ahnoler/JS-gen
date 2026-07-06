@@ -4,7 +4,7 @@ import os from 'os';
 import crypto from 'crypto';
 import http from 'http';
 import { spawn, execSync } from 'child_process';
-import { STANDALONE_LLM, LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR, SKILL_DIR } from '../config.js';
+import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR, SKILL_DIR } from '../config.js';
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
 import { saveCaseDataRecord } from '../case-data-store.js';
@@ -107,7 +107,6 @@ function handleSessionMessage(send, session, stepIndex, gb, res, cleanupListener
 export default function (app) {
   app.post('/api/browser/session', async (req, res) => {
     const { model } = req.body || {};
-    if (!STANDALONE_LLM && !state.client) return res.status(503).json({ error: 'opencode server not ready' });
     if (!existsSync(PYTHON_EXE)) return res.status(500).json({ error: `Python not found at ${PYTHON_EXE}` });
     if (!existsSync(AGENT_SCRIPT)) return res.status(500).json({ error: `Agent script not found at ${AGENT_SCRIPT}` });
 

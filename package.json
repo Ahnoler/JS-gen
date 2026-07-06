@@ -8,7 +8,6 @@
     "dev": "node --watch server.mjs"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "^1.14.40",
     "express": "^4.21.0",
     "playwright-core": "^1.60.0",
     "undici": "^8.3.0"
