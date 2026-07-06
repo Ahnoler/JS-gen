@@ -3,7 +3,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { deduplicateActionFile } from '../dedup.js';
 
-import { PROJECT_DIR, TMP_DIR } from '../config.js';
+import { PROJECT_DIR, TMP_DIR } from '../../../config/config.js';
 import { ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex } from '../script-utils.js';
 
 const SCRIPTS_DIR = path.join(PROJECT_DIR, 'scripts');

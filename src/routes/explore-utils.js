@@ -2,7 +2,7 @@ import { spawn, execSync } from 'child_process';
 import { writeFileSync, unlinkSync } from 'fs';
 import path from 'path';
 import os from 'os';
-import { PROJECT_DIR, PYTHON_EXE as PYTHON_EXE_CONFIG, STANDALONE_LLM } from '../config.js';
+import { PROJECT_DIR, PYTHON_EXE as PYTHON_EXE_CONFIG, STANDALONE_LLM } from '../../../config/config.js';
 import { state } from '../state.js';
 
 export const PYTHON_EXE = PYTHON_EXE_CONFIG;

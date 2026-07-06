@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
 import path from 'path';
-import { GENERATED_DIR } from './config.js';
+import { GENERATED_DIR } from '../../config/config.js';
 
 export function ensureGeneratedDir() {
   if (!existsSync(GENERATED_DIR)) mkdirSync(GENERATED_DIR, { recursive: true });

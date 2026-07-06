@@ -2,7 +2,7 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync, existsSync } from 'fs';
-import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR } from './src/config.js';
+import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR } from './config/config.js';
 import { state } from './src/state.js';
 import registerHealthRoutes from './src/routes/health.js';
 import registerAgentRoutes from './src/routes/agent.js';
@@ -52,7 +52,7 @@ app.use((err, req, res, next) => {
 });
 
 function loadDefaultModel() {
-  const apiCfgPath = path.join(PROJECT_DIR, 'agent-api.config.json');
+  const apiCfgPath = path.join(PROJECT_DIR, 'config', 'agent-api.json');
   if (existsSync(apiCfgPath)) {
     try {
       const cfg = JSON.parse(readFileSync(apiCfgPath, 'utf-8'));

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import path from 'path';
 
-import { CASE_DATA_DIR } from './config.js';
+import { CASE_DATA_DIR } from '../../config/config.js';
 
 function indexPath() {
   return path.join(CASE_DATA_DIR, 'index.json');

@@ -1,4 +1,4 @@
-import { LLM_BASE_URL, LLM_API_KEY } from './config.js';
+import { LLM_BASE_URL, LLM_API_KEY } from '../../config/config.js';
 
 function resolveModelId(model) {
   if (!model) return 'deepseek-v4-flash';

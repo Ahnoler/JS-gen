@@ -2,7 +2,7 @@ import { writeFileSync, existsSync, unlinkSync, readFileSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR, SKILL_DIR } from '../config.js';
+import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR, SKILL_DIR } from '../../../config/config.js';
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
 import { saveCaseDataRecord } from '../case-data-store.js';

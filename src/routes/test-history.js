@@ -1,6 +1,6 @@
 import { readFileSync, existsSync, unlinkSync } from 'fs';
 import path from 'path';
-import { GENERATED_DIR } from '../config.js';
+import { GENERATED_DIR } from '../../../config/config.js';
 import { loadGeneratedIndex, saveGeneratedIndex } from '../script-utils.js';
 
 export default function (app) {

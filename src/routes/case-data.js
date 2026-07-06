@@ -5,7 +5,7 @@ import {
   deleteCaseData,
 } from '../case-data-store.js';
 import path from 'path';
-import { CASE_DATA_DIR } from '../config.js';
+import { CASE_DATA_DIR } from '../../../config/config.js';
 
 export default function (app) {
   app.get('/api/case-data', (req, res) => {

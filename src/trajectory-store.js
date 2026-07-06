@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { TRAJECTORIES_DIR } from './config.js';
+import { TRAJECTORIES_DIR } from '../../config/config.js';
 import { extractFlowFromTrajectory } from './script-utils.js';
 
 function extractNextGoals(trajectory, limit = 50) {

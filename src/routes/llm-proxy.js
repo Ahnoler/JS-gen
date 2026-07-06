@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { LLM_BASE_URL, LLM_API_KEY } from '../config.js';
+import { LLM_BASE_URL, LLM_API_KEY } from '../../../config/config.js';
 
 export default function (app) {
 
