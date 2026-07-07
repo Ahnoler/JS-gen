@@ -165,9 +165,15 @@ async def assemble(request: Request):
     visible = [a for a in actions if a.action not in _SKIP_ACTIONS]
 
     return {
+        "success": True,
         "script": script,
         "testId": test_id,
         "fileName": file_name,
-        "steps": len(visible),
-        "meta": {"original": len(entries), "deduplicated": len(deduped)},
+        "actionFile": action_file,
+        "scriptFile": str(script_path),
+        "stats": {
+            "original": len(entries),
+            "deduped": len(deduped),
+            "removed": len(entries) - len(deduped),
+        },
     }
