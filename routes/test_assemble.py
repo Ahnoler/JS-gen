@@ -52,6 +52,43 @@ def _get_ctrl_injection():
     return "// CTRL helpers not loaded"
 
 
+@router.get("/api/test/assemble/files")
+async def list_action_files():
+    action_dir = SCRIPTS_DIR / "action"
+    log_dir = SCRIPTS_DIR / "log"
+    action_files, log_files = [], []
+
+    if action_dir.exists():
+        for f in sorted(action_dir.iterdir(), key=lambda x: x.name, reverse=True):
+            if f.name.startswith("action_") and f.suffix == ".json":
+                st = f.stat()
+                action_files.append({"name": f.name, "path": f"scripts/action/{f.name}", "size": st.st_size, "mtime": str(st.st_mtime)})
+        action_files = action_files[:30]
+
+    if log_dir.exists():
+        for f in sorted(log_dir.iterdir(), key=lambda x: x.name, reverse=True):
+            if f.name.startswith("log_") and f.suffix == ".txt":
+                st = f.stat()
+                log_files.append({"name": f.name, "path": f"scripts/log/{f.name}", "size": st.st_size, "mtime": str(st.st_mtime)})
+        log_files = log_files[:30]
+
+    return {"actionFiles": action_files, "logFiles": log_files}
+
+
+@router.post("/api/test/assemble/save")
+async def save_action_file(request: Request):
+    body = await request.json()
+    file_path = body.get("path", "")
+    data = body.get("data")
+    if not file_path or data is None:
+        return JSONResponse({"error": "path and data are required"}, status_code=400)
+
+    abs_path = Path(SCRIPTS_DIR.parent / file_path)
+    abs_path.parent.mkdir(parents=True, exist_ok=True)
+    abs_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "path": str(abs_path)}
+
+
 @router.get("/api/test/generated")
 async def list_generated():
     items = []
