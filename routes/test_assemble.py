@@ -89,6 +89,63 @@ async def save_action_file(request: Request):
     return {"ok": True, "path": str(abs_path)}
 
 
+@router.delete("/api/test/assemble/file")
+async def delete_action_file(request: Request):
+    body = await request.json()
+    file_path = body.get("path", "")
+    if not file_path:
+        return JSONResponse({"error": "path is required"}, status_code=400)
+
+    abs_path = Path(SCRIPTS_DIR.parent / file_path).resolve()
+    action_dir = (SCRIPTS_DIR / "action").resolve()
+    log_dir = (SCRIPTS_DIR / "log").resolve()
+
+    if not (str(abs_path).startswith(str(action_dir)) or str(abs_path).startswith(str(log_dir))):
+        return JSONResponse({"error": "Path must be under scripts/action/ or scripts/log/"}, status_code=403)
+    if not abs_path.exists():
+        return JSONResponse({"error": f"File not found: {abs_path}"}, status_code=404)
+
+    abs_path.unlink()
+    return {"success": True}
+
+
+@router.post("/api/test/assemble/apply-fix")
+async def apply_fix(request: Request):
+    """Apply LLM-suggested fix to a script."""
+    body = await request.json()
+    file_path = body.get("path", "")
+    changes = body.get("changes", [])
+    if not file_path or not changes:
+        return JSONResponse({"error": "path and changes are required"}, status_code=400)
+
+    abs_path = Path(SCRIPTS_DIR.parent / file_path)
+    if not abs_path.exists():
+        return JSONResponse({"error": "File not found"}, status_code=404)
+
+    data = json.loads(abs_path.read_text(encoding="utf-8"))
+    cmds = data if isinstance(data, list) else data.get("actions", [])
+    for change in sorted(changes, key=lambda c: c.get("step", 0), reverse=True):
+        step = change.get("step", 1)
+        action = change.get("action", "modify")
+        idx = step - 1
+        if action == "modify" and 0 <= idx < len(cmds):
+            cmds[idx] = change.get("entry", cmds[idx])
+        elif action == "delete" and 0 <= idx < len(cmds):
+            del cmds[idx]
+        elif action == "insert":
+            entry = change.get("entry")
+            if entry:
+                cmds.insert(min(idx, len(cmds)), entry)
+
+    if isinstance(data, list):
+        abs_path.write_text(json.dumps(cmds, ensure_ascii=False, indent=2), encoding="utf-8")
+    else:
+        data["actions"] = cmds
+        abs_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return {"ok": True}
+
+
 @router.get("/api/test/generated")
 async def list_generated():
     items = []

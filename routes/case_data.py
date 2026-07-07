@@ -55,6 +55,14 @@ async def save_case_data(request: Request):
     return {"ok": True, "id": case_id}
 
 
+@router.get("/api/case-data/{case_id}/file")
+async def get_case_data_file(case_id: str):
+    case_file = CASE_DIR / f"{case_id}.json"
+    if not case_file.exists():
+        return JSONResponse({"error": "File not found"}, status_code=404)
+    return {"content": case_file.read_text(encoding="utf-8")}
+
+
 @router.delete("/api/case-data/{case_id}")
 async def delete_case_data(case_id: str):
     records = _load_index()
