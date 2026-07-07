@@ -1,8 +1,8 @@
 ﻿import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync, existsSync } from 'fs';
-import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR } from './config/config.js';
+import { readFileSync, existsSync, writeFileSync } from 'fs';
+import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR, LLM_API_KEY } from './config/config.js';
 import { state } from './src/state.js';
 import registerHealthRoutes from './src/routes/health.js';
 import registerAgentRoutes from './src/routes/agent.js';
@@ -24,6 +24,56 @@ app.use('/api/test/screenshots', express.static(TMP_DIR));
 app.use('/scripts', express.static(path.join(PROJECT_DIR, 'scripts')));
 app.use(express.static(DASHBOARD_DIR, { maxAge: 0 }));
 
+// ── First-launch setup (when no API key is configured) ──────────────────
+let _currentApiKey = LLM_API_KEY;            // mutable copy — updated on save
+const _isConfigured = () => !!(_currentApiKey && _currentApiKey.trim());
+
+// Serve the setup page
+app.get('/api/setup', (req, res) => {
+  res.sendFile(path.join(PROJECT_DIR, 'config', 'setup.html'));
+});
+
+// Save config from setup form
+app.post('/api/setup/save', (req, res) => {
+  const { LLM_API_KEY: key, LLM_BASE_URL: url, FORM_LLM_MODEL: model } = req.body || {};
+  if (!key || !key.trim()) {
+    return res.status(400).json({ ok: false, error: 'API Key 不能为空' });
+  }
+  const envPath = path.join(PROJECT_DIR, 'config', '.env');
+  const lines = [];
+  lines.push('# ───────────────────────────────────────');
+  lines.push('# 智能填表系统 — 运行配置');
+  lines.push('# ───────────────────────────────────────');
+  lines.push('');
+  lines.push('# 服务器');
+  lines.push('PORT=4097');
+  lines.push('HOST=0.0.0.0');
+  lines.push('');
+  lines.push('# LLM 连接');
+  lines.push(`LLM_BASE_URL=${url || 'https://api.deepseek.com'}`);
+  lines.push(`LLM_API_KEY=${key.trim()}`);
+  lines.push('');
+  lines.push('# 表单填写 LLM（可选用更便宜的模型）');
+  lines.push(`FORM_LLM_MODEL=${model || 'deepseek-v4-flash'}`);
+  lines.push(`FORM_LLM_BASE_URL=${url || 'https://api.deepseek.com'}`);
+  lines.push(`FORM_LLM_API_KEY=${key.trim()}`);
+  lines.push('');
+  lines.push('# Python 解释器路径（留空则自动查找）');
+  lines.push('# PYTHON_EXE=');
+  lines.push('');
+  lines.push('# 项目根目录（留空则自动检测）');
+  lines.push('# PROJECT_DIR=');
+  try {
+    writeFileSync(envPath, lines.join('\n'), 'utf-8');
+    _currentApiKey = key.trim();            // update runtime state
+    console.log('[server] API Key saved via setup page');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[server] Failed to save .env:', e.message);
+    res.status(500).json({ ok: false, error: '写入配置文件失败: ' + e.message });
+  }
+});
+
 // Register all route modules
 registerLLMProxyRoutes(app);
 registerBrowserSessionRoutes(app);
@@ -37,10 +87,18 @@ registerTestHistoryRoutes(app);
 registerTestRunRoutes(app);
 registerSSERoutes(app);
 
-// Redirect root to test dashboard
-app.get('/', (req, res) => res.redirect('/api/test'));
+// Redirect root to dashboard, or setup if unconfigured
+app.get('/', (req, res) => {
+  res.redirect(_isConfigured() ? '/api/test' : '/api/setup');
+});
+
+// API key status check (used by dashboard to detect unconfigured state)
+app.get('/api/setup/status', (req, res) => {
+  res.json({ configured: _isConfigured() });
+});
 
 app.get('/api/test', (req, res) => {
+  if (!_isConfigured()) return res.redirect('/api/setup');
   res.sendFile(path.join(__dirname, 'test-dashboard.html'));
 });
 
@@ -73,6 +131,10 @@ async function main() {
   loadDefaultModel();
   if (state.defaultModel) {
     console.log(`[server] Default model: ${state.defaultModel.providerID}/${state.defaultModel.modelID}`);
+  }
+
+  if (!_isConfigured()) {
+    console.log('[server] ⚠  LLM_API_KEY not set — visit http://localhost:' + PORT + '/api/setup to configure');
   }
 
   const server = app.listen(PORT, HOST, () => {

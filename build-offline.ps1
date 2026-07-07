@@ -1,120 +1,173 @@
-﻿param(
-    [string]$OutputDir = "D:\offline-deploy",
-    [switch]$UseMirror    # 中国内地使用镜像加速下载
+param(
+    [switch]$UseMirror    # Use China mirror for faster downloads
 )
 
-$OutputDir = New-Item -ItemType Directory -Path $OutputDir -Force | Select-Object -ExpandProperty FullName
 $scriptRoot = $PSScriptRoot
 
-# 国内镜像（解决下载超时/断连问题）
 if ($UseMirror) {
-    Write-Host "[INFO] Using China mirror for Playwright downloads" -ForegroundColor Yellow
+    Write-Host "[INFO] Using China mirror" -ForegroundColor Yellow
     $env:PLAYWRIGHT_DOWNLOAD_HOST = "https://npmmirror.com/mirrors/playwright"
 }
 
-Write-Host "================================" -ForegroundColor Cyan
-Write-Host "  Build Offline Deploy Package" -ForegroundColor Cyan
-Write-Host "================================" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  Build - bundle all deps into project" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 
-# 1. Node.js MSI
-$nodeMsi = Join-Path $OutputDir "node-v22.msi"
-if (-not (Test-Path $nodeMsi)) {
-    Write-Host "[1/7] Downloading Node.js 22 MSI ..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri "https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi" -OutFile $nodeMsi
-    Write-Host "  [OK]" -ForegroundColor Green
-} else { Write-Host "  [SKIP] exists" -ForegroundColor Gray }
+# === 1. Node.js portable -> ./nodejs/ ===
+Write-Host "[1/5] Node.js portable -> .\nodejs\" -ForegroundColor Yellow
+$nodejsDir = Join-Path $scriptRoot "nodejs"
+$nodeZip = Join-Path $env:TEMP "node-v22.14.0-win-x64.zip"
 
-# 2. Python 3.12
-$pythonExe = Join-Path $OutputDir "python-3.12.10-amd64.exe"
-if (-not (Test-Path $pythonExe)) {
-    Write-Host "[2/7] Downloading Python 3.12.10 ..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe" -OutFile $pythonExe
-    Write-Host "  [OK]" -ForegroundColor Green
-} else { Write-Host "  [SKIP] exists" -ForegroundColor Gray }
-
-# 3. VC++ Redistributable（解决 DLL load failed 问题）
-$vcRedist = Join-Path $OutputDir "VC_redist.x64.exe"
-if (-not (Test-Path $vcRedist)) {
-    Write-Host "[3/7] Downloading VC++ Redistributable 2022 ..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile $vcRedist
-    Write-Host "  [OK]" -ForegroundColor Green
-} else { Write-Host "  [SKIP] exists" -ForegroundColor Gray }
-
-# 4. npm dependencies
-$nodeZip = Join-Path $OutputDir "node_modules.zip"
-if (-not (Test-Path $nodeZip)) {
-    Write-Host "[4/7] npm ci + packaging node_modules ..." -ForegroundColor Yellow
-    Push-Location $scriptRoot
-    npm ci
-    if (Test-Path "node_modules") { Compress-Archive -Path "node_modules" -DestinationPath $nodeZip -Force }
-    Pop-Location
-    Write-Host "  [OK]" -ForegroundColor Green
-} else { Write-Host "  [SKIP] exists" -ForegroundColor Gray }
-
-# 5. pip cache
-$pipDir = Join-Path $OutputDir "pip-cache"
-$reqPath = Join-Path $scriptRoot "web-ui\requirements.txt"
-if ((Test-Path $reqPath) -and -not (Test-Path (Join-Path $pipDir "*.whl"))) {
-    Write-Host "[5/7] Downloading pip packages ..." -ForegroundColor Yellow
-    pip download -r $reqPath -d $pipDir
-    Write-Host "  [OK]" -ForegroundColor Green
-} elseif (-not (Test-Path $reqPath)) {
-    Write-Host "  [SKIP] no requirements.txt" -ForegroundColor Gray
-} else { Write-Host "  [SKIP] exists" -ForegroundColor Gray }
-
-# 6. Playwright browsers (Node.js)
-$pwNodeZip = Join-Path $OutputDir "ms-playwright-node.zip"
-$pwDir = "$env:USERPROFILE\AppData\Local\ms-playwright"
-if (-not (Test-Path $pwNodeZip)) {
-    Write-Host "[6/7] Installing Playwright Chromium (Node.js) ..." -ForegroundColor Yellow
-    Push-Location $scriptRoot
-    npx playwright install chromium 2>&1 | Out-Null
-    Pop-Location
-    if (Test-Path $pwDir) {
-        Compress-Archive -Path $pwDir -DestinationPath $pwNodeZip -Force
-        Write-Host "  [OK] Node.js browsers packaged" -ForegroundColor Green
-    } else {
-        Write-Host "  [WARN] Node.js Playwright install failed" -ForegroundColor Yellow
+if (-not (Test-Path $nodejsDir)) {
+    if (-not (Test-Path $nodeZip)) {
+        $nodeUrl = "https://nodejs.org/dist/v22.14.0/node-v22.14.0-win-x64.zip"
+        Write-Host "  Downloading Node.js 22 portable ..." -ForegroundColor Gray
+        Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeZip
     }
-} else { Write-Host "  [SKIP] exists" -ForegroundColor Gray }
-
-# 7. Playwright browsers (Python)
-$pwPyZip = Join-Path $OutputDir "ms-playwright-python.zip"
-if (-not (Test-Path $pwPyZip)) {
-    Write-Host "[7/7] Installing Playwright Chromium (Python) ..." -ForegroundColor Yellow
-    # 安装 Python Playwright CLI（如果尚未安装）
-    python -m playwright install chromium 2>&1 | Out-Null
-    if (Test-Path $pwDir) {
-        Compress-Archive -Path $pwDir -DestinationPath $pwPyZip -Force
-        Write-Host "  [OK] Python browsers packaged" -ForegroundColor Green
-    } else {
-        Write-Host "  [WARN] Python Playwright install failed" -ForegroundColor Yellow
+    Write-Host "  Extracting ..." -ForegroundColor Gray
+    Expand-Archive -Path $nodeZip -DestinationPath $nodejsDir -Force
+    # Node zip extracts to a subdirectory; flatten it
+    $inner = Get-ChildItem $nodejsDir -Directory | Select-Object -First 1
+    if ($inner) {
+        Get-ChildItem $inner.FullName | Move-Item -Destination $nodejsDir -Force
+        Remove-Item $inner.FullName -Recurse -Force
     }
-} else { Write-Host "  [SKIP] exists" -ForegroundColor Gray }
-
-# Project source
-$srcZip = Join-Path $OutputDir "project-source.zip"
-if (-not (Test-Path $srcZip)) {
-    Write-Host "[*] Packaging project source ..." -ForegroundColor Yellow
-    $items = Get-ChildItem -Path $scriptRoot -Exclude @('node_modules', '.git', '.idea', '__pycache__', '*.log', '.ruff_cache')
-    Compress-Archive -Path $items.FullName -DestinationPath $srcZip -Force
-    Write-Host "  [OK]" -ForegroundColor Green
+    Write-Host "  [OK] Node.js ready at .\nodejs\" -ForegroundColor Green
+} else {
+    Write-Host "  [SKIP] .\nodejs\ exists" -ForegroundColor Gray
 }
 
-# Copy deploy script
-Copy-Item (Join-Path $scriptRoot "deploy-offline.ps1") (Join-Path $OutputDir "deploy-offline.ps1") -Force
+# === 2. Embedded Python 3.12 -> ./python/ ===
+Write-Host "[2/5] Embedded Python 3.12 -> .\python\" -ForegroundColor Yellow
+$pythonDir = Join-Path $scriptRoot "python"
+$pythonZip = Join-Path $env:TEMP "python-3.12.10-embed-amd64.zip"
 
-Write-Host "================================" -ForegroundColor Cyan
-Write-Host "  Done! Offline package at: $OutputDir" -ForegroundColor Cyan
-Write-Host "================================" -ForegroundColor Green
+if (-not (Test-Path $pythonDir)) {
+    if (-not (Test-Path $pythonZip)) {
+        Write-Host "  Downloading python-3.12.10-embed-amd64.zip ..." -ForegroundColor Gray
+        Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip" -OutFile $pythonZip
+    }
+    Expand-Archive -Path $pythonZip -DestinationPath $pythonDir -Force
+    # Enable site-packages (embedded Python disables it by default)
+    $pthFile = Join-Path $pythonDir "python312._pth"
+    if (Test-Path $pthFile) {
+        $pthContent = Get-Content $pthFile
+        $pthContent = $pthContent -replace '#import site', 'import site'
+        $pthContent | Set-Content $pthFile
+    }
+    Write-Host "  [OK] Python ready at .\python\" -ForegroundColor Green
+} else {
+    Write-Host "  [SKIP] .\python\ exists" -ForegroundColor Gray
+}
+
+# === 3. npm dependencies -> ./node_modules/ ===
+Write-Host "[3/5] npm dependencies -> .\node_modules\" -ForegroundColor Yellow
+$nodeExe = Join-Path $nodejsDir "node.exe"
+$npmCmd = Join-Path $nodejsDir "npm.cmd"
+
+if (-not (Test-Path (Join-Path $scriptRoot "node_modules"))) {
+    Push-Location $scriptRoot
+    if (Test-Path $npmCmd) {
+        & $npmCmd install 2>&1 | Out-Null
+    } else {
+        npm install 2>&1 | Out-Null
+    }
+    Pop-Location
+    Write-Host "  [OK] node_modules installed" -ForegroundColor Green
+} else {
+    Write-Host "  [SKIP] node_modules exists" -ForegroundColor Gray
+}
+
+# === 4. Python deps: bootstrap pip + cache wheels + install ===
+Write-Host "[4/5] Python deps -> .\python\ (pip + packages)" -ForegroundColor Yellow
+$getPip = Join-Path $scriptRoot "get-pip.py"
+$pipDir = Join-Path $scriptRoot "pip-cache"
+$reqPath = Join-Path $scriptRoot "scripts\requirements.txt"
+$pyExe = Join-Path $pythonDir "python.exe"
+
+# 4a. Download get-pip.py
+if (-not (Test-Path $getPip)) {
+    Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
+    Write-Host "  [OK] get-pip.py" -ForegroundColor Green
+} else {
+    Write-Host "  [SKIP] get-pip.py exists" -ForegroundColor Gray
+}
+
+# 4b. Bootstrap pip into embedded Python
+Write-Host "  Bootstrapping pip ..." -ForegroundColor Gray
+& $pyExe $getPip --no-warn-script-location 2>&1 | Out-Null
+Write-Host "  [OK] pip ready" -ForegroundColor Green
+
+# 4c. Download wheels to pip-cache
+if (Test-Path $reqPath) {
+    if (-not (Test-Path (Join-Path $pipDir "*.whl"))) {
+        Write-Host "  Downloading wheels to pip-cache ..." -ForegroundColor Gray
+        & $pyExe -m pip download -r $reqPath -d $pipDir 2>&1 | Out-Null
+        Write-Host "  [OK] pip-cache ($((Get-ChildItem $pipDir -Filter *.whl | Measure-Object).Count) wheels)" -ForegroundColor Green
+    } else {
+        Write-Host "  [SKIP] pip-cache exists ($((Get-ChildItem $pipDir -Filter *.whl | Measure-Object).Count) wheels)" -ForegroundColor Gray
+    }
+
+    # 4d. Install packages into embedded Python
+    Write-Host "  Installing packages into .\python\ ..." -ForegroundColor Gray
+    & $pyExe -m pip install --no-index --find-links $pipDir -r $reqPath --no-warn-script-location 2>&1 | Out-Null
+    Write-Host "  [OK] Python packages installed" -ForegroundColor Green
+} else {
+    Write-Host "  [WARN] scripts\requirements.txt not found" -ForegroundColor Yellow
+}
+
+# === 5. Playwright Chromium -> ./browser/ ===
+Write-Host "[5/5] Playwright Chromium -> .\browser\" -ForegroundColor Yellow
+$browserDir = Join-Path $scriptRoot "browser"
+$env:PLAYWRIGHT_BROWSERS_PATH = $browserDir
+
+if (-not (Test-Path $browserDir)) {
+    Write-Host "  Installing Playwright Chromium ... (~350 MB, may take a while)" -ForegroundColor Gray
+    Push-Location $scriptRoot
+    if (Test-Path $nodeExe) {
+        & $nodeExe node_modules\playwright\cli.js install chromium 2>&1 | Out-Null
+    } else {
+        npx playwright install chromium 2>&1 | Out-Null
+    }
+    Pop-Location
+    if (Test-Path $browserDir) {
+        Write-Host "  [OK] .\browser\ ready" -ForegroundColor Green
+    } else {
+        Write-Host "  [WARN] Playwright install failed (check network)" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "  [SKIP] .\browser\ exists" -ForegroundColor Gray
+}
+
+# === Summary ===
 Write-Host ""
-Write-Host "Contents:" -ForegroundColor White
-Get-ChildItem $OutputDir | ForEach-Object {
-    if ($_.PSIsContainer) {
-        $totalSize = (Get-ChildItem $_.FullName -Recurse | Measure-Object -Property Length -Sum).Sum
-        $size = if ($totalSize -gt 1MB) { "$([math]::Round($totalSize/1MB,1)) MB" } else { "$([math]::Round($totalSize/1KB,0)) KB" }
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  All dependencies bundled into project" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "Runtime deps:" -ForegroundColor White
+$dirs = @(
+    @{Path=".\nodejs\";      Desc="Node.js portable"},
+    @{Path=".\python\";      Desc="Embedded Python 3.12"},
+    @{Path=".\node_modules\";Desc="npm packages"},
+    @{Path=".\pip-cache\";   Desc="pip offline wheels"},
+    @{Path=".\browser\";     Desc="Playwright Chromium"},
+    @{Path=".\get-pip.py";   Desc="pip bootstrapper"}
+)
+foreach ($d in $dirs) {
+    $full = Join-Path $scriptRoot $d.Path
+    if (Test-Path $full) {
+        $size = if ((Get-Item $full) -is [System.IO.DirectoryInfo]) {
+            $total = (Get-ChildItem $full -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+            if ($total -gt 1MB) { "$([math]::Round($total/1MB,1)) MB" } else { "$([math]::Round($total/1KB,0)) KB" }
+        } else {
+            if ((Get-Item $full).Length -gt 1MB) { "$([math]::Round((Get-Item $full).Length/1MB,1)) MB" } else { "$([math]::Round((Get-Item $full).Length/1KB,0)) KB" }
+        }
+        Write-Host "  $($d.Path.PadRight(18)) $size  $($d.Desc)" -ForegroundColor Gray
     } else {
-        $size = if ($_.Length -gt 1MB) { "$([math]::Round($_.Length/1MB,1)) MB" } else { "$([math]::Round($_.Length/1KB,0)) KB" }
+        Write-Host "  $($d.Path.PadRight(18)) (missing)  $($d.Desc)" -ForegroundColor Yellow
     }
-    Write-Host "  - $($_.Name) (${size})" -ForegroundColor Gray
 }
+Write-Host ""
+Write-Host "The project is self-contained - no external installs needed." -ForegroundColor Green
+Write-Host "Next: run NSIS compiler to produce .exe installer" -ForegroundColor Yellow

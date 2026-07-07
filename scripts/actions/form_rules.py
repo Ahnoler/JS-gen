@@ -1,161 +1,368 @@
 """
-Form rules and data generators for Element UI form filling.
+Declarative form rules and data generators for Element UI form filling.
+
+All rules are defined in the ``FIELD_RULES`` registry — no file I/O or regex
+parsing at runtime.  Call ``match_rule(label_text)`` directly.
+
+Architecture::
+
+  FIELD_RULES (list of FieldRule)
+    │
+    ├── match_rule(label) → str | None
+    ├── load_rules()       → list of (keywords, generator)  (deprecated)
+    └── get_has_button_keywords(case_data_store) → list[str]
 """
 import random as _random
-import re
 import os
-import json
 import sys
+from dataclasses import dataclass, field
+from typing import Callable, List, Optional
 
-def _gen_mobile():
-    return '1' + str(_random.choice([3,4,5,6,7,8,9])) + ''.join(str(_random.randint(0,9)) for _ in range(9))
 
-def _gen_idcard():
+# ══════════════════════════════════════════════════════════════════════════════
+# Generator functions
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _gen_mobile() -> str:
+    return '1' + str(_random.choice([3, 4, 5, 6, 7, 8, 9])) + ''.join(
+        str(_random.randint(0, 9)) for _ in range(9))
+
+
+def _gen_idcard() -> str:
     prefix = '430101'
-    birth = f"{1950+_random.randint(0,55)}{_random.randint(1,12):02d}{_random.randint(1,28):02d}"
-    seq = f"{_random.randint(0,999):03d}"
+    birth = f"{1950 + _random.randint(0, 55)}{_random.randint(1, 12):02d}{_random.randint(1, 28):02d}"
+    seq = f"{_random.randint(0, 999):03d}"
     base = prefix + birth + seq
-    weights = [7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2]
-    check = '10X98765432'[sum(int(base[i])*weights[i] for i in range(17)) % 11]
+    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+    check = '10X98765432'[sum(int(base[i]) * weights[i] for i in range(17)) % 11]
     return base + check
 
-def _gen_landline():
-    return _random.choice(['010','021','0731','0755','0571','028']) + ''.join(str(_random.randint(0,9)) for _ in range(8))
 
-def _gen_email():
-    return f"test{_random.randint(100,999)}@{_random.choice(['example.com','company.cn'])}"
+def _gen_landline() -> str:
+    return _random.choice(['010', '021', '0731', '0755', '0571', '028']) + ''.join(
+        str(_random.randint(0, 9)) for _ in range(8))
 
-def _gen_credit_code():
+
+def _gen_email() -> str:
+    return f"test{_random.randint(100, 999)}@{_random.choice(['example.com', 'company.cn'])}"
+
+
+def _gen_credit_code() -> str:
     CHARS = '0123456789ABCDEFGHJKLMNPQRTUWXY'
-    # 前2位：登记管理部门(9=市场监管)+机构类别(1=企业)
-    body = '91'
-    # 第3-8位：6位行政区划代码
-    body += f"{_random.randint(100000, 999999)}"
-    # 第9-17位：9位主体标识码（字母/数字随机）
+    body = '91' + f"{_random.randint(100000, 999999)}"
     for _ in range(9):
         body += _random.choice(CHARS)
-    # 第18位：校验码（ISO 7064:1983 MOD 31）
     WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28]
     total = sum(CHARS.index(body[i]) * WEIGHTS[i] for i in range(17))
     return body + CHARS[(31 - total % 31) % 31]
 
-def _gen_bankcard():
-    return '62' + ''.join(str(_random.randint(0,9)) for _ in range(17))
 
-def _gen_amount():
-    return f"{_random.randint(100000,9999999)}.{_random.randint(0,99):02d}"
+def _gen_bankcard() -> str:
+    return '62' + ''.join(str(_random.randint(0, 9)) for _ in range(17))
 
-def _gen_name():
-    return _random.choice(['张','李','王','刘','陈','杨','赵','黄','周','吴']) + _random.choice(['伟','芳','敏','静','丽','强','磊','洋','涛','明']) + _random.choice(['华','平','刚','杰','峰','玲','超','文','林','军'])
 
-def _gen_institution_credit_code():
-    """10-digit institution credit code (人行征信中心分配), NOT 18-digit USCC."""
+def _gen_amount() -> str:
+    return f"{_random.randint(100000, 9999999)}.{_random.randint(0, 99):02d}"
+
+
+def _gen_name() -> str:
+    return _random.choice(['张', '李', '王', '刘', '陈', '杨', '赵', '黄', '周', '吴']) + \
+        _random.choice(['伟', '芳', '敏', '静', '丽', '强', '磊', '洋', '涛', '明']) + \
+        _random.choice(['华', '平', '刚', '杰', '峰', '玲', '超', '文', '林', '军'])
+
+
+def _gen_institution_credit_code() -> str:
+    """10-digit institution credit code (人行征信中心分配)."""
     return ''.join(str(_random.randint(0, 9)) for _ in range(10))
 
-def _gen_address():
-    return _random.choice(['北京市朝阳区','上海市浦东新区','广州市天河区','深圳市南山区','长沙市岳麓区']) + _random.choice(['中山路','人民路','解放路','五一路','芙蓉路']) + f"{_random.randint(1,200)}号"
 
-_GEN_MAP = {
-    'genIdCard': _gen_idcard, 'genMobile': _gen_mobile, 'genLandline': _gen_landline,
-    'genEmail': _gen_email, 'genCreditCode': _gen_credit_code, 'genBankcard': _gen_bankcard,
-    'genBankCard': _gen_bankcard,  # JS naming alias
-    'genAmount': _gen_amount, 'genName': _gen_name, 'genAddress': _gen_address,
-    'genInstitutionCreditCode': _gen_institution_credit_code,
-    'genQQ': lambda: ''.join(str(_random.randint(0,9)) for _ in range(_random.randint(5,11))),
-    'genAge': lambda: str(_random.randint(18,65)),
-    'genEmployeeId': lambda: 'EMP' + f"{_random.randint(100,999)}",
-}
+def _gen_address() -> str:
+    return _random.choice(['北京市朝阳区', '上海市浦东新区', '广州市天河区', '深圳市南山区', '长沙市岳麓区']) + \
+        _random.choice(['中山路', '人民路', '解放路', '五一路', '芙蓉路']) + f"{_random.randint(1, 200)}号"
 
+
+def _gen_qq() -> str:
+    return ''.join(str(_random.randint(0, 9)) for _ in range(_random.randint(5, 11)))
+
+
+def _gen_age() -> str:
+    return str(_random.randint(18, 65))
+
+
+def _gen_employee_id() -> str:
+    return 'EMP' + f"{_random.randint(100, 999)}"
+
+
+def _gen_postal_code() -> str:
+    return str(_random.randint(100000, 999999))
+
+
+def _gen_count() -> str:
+    return str(_random.randint(1, 999999))
+
+
+def _gen_percent() -> str:
+    return f"{_random.randint(0, 10000) / 100:.2f}"
+
+
+def _gen_phone() -> str:
+    return _gen_mobile()
+
+
+def _gen_year() -> str:
+    return '2026'
+
+
+def _gen_month() -> str:
+    return f"{_random.randint(1, 12):02d}"
+
+
+def _gen_quarter() -> str:
+    return str(_random.randint(1, 4))
+
+
+def _gen_week() -> str:
+    return str(_random.randint(1, 7))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Rule registry
+# ══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class FieldRule:
+    """A single field-matching rule with its generator."""
+    keywords: List[str]
+    generator: Callable[[], str]
+    priority: int = 50
+    rule_type: str = "dynamic"
+    description: str = ""
+
+
+# ── Lookup helper ──────────────────────────────────────────────────────
+
+def _make_field_rules() -> List[FieldRule]:
+    """Build the complete rule registry.  Rules are tried in list order;
+    longer keywords within a rule are tried first to prefer specific matches.
+    """
+    return [
+        # ── Identity & certificates (priority 90-100) ──
+        FieldRule(["身份证", "身份证号", "居民身份证"], _gen_idcard, 100, "dynamic",
+                  "18位身份证号，含GB 11643-1999校验位"),
+        FieldRule(["统一社会信用代码", "信用代码", "营业执照", "营业执照号", "证件号码"],
+                  _gen_credit_code, 100, "dynamic",
+                  "18位统一社会信用代码，含ISO 7064校验码"),
+        FieldRule(["机构信用代码"], _gen_institution_credit_code, 95, "dynamic",
+                  "10位机构信用代码（人行征信中心分配）"),
+
+        # ── Contact (priority 85-95) ──
+        FieldRule(["手机号码", "联系电话", "手机", "电话", "联系方式", "电话号码", "手机号"],
+                  _gen_mobile, 95, "dynamic", "11位手机号，1开头"),
+        FieldRule(["单位电话", "固定电话", "座机"], _gen_landline, 90, "dynamic",
+                  "区号+8位号码"),
+        FieldRule(["邮箱", "Email", "电子邮箱"], _gen_email, 85, "dynamic",
+                  "随机用户名+常见域名"),
+
+        # ── Finance (priority 80-90) ──
+        FieldRule(["银行卡", "银行卡号", "银行账号"], _gen_bankcard, 85, "dynamic",
+                  "16-19位，62开头银联卡号"),
+        FieldRule(["金额", "价格", "费用", "工资", "收入"], _gen_amount, 80, "dynamic",
+                  "10000.00～9999999.99随机金额"),
+
+        # ── Personal (priority 75-80) ──
+        FieldRule(["姓名", "用户名", "联系人"], _gen_name, 80, "dynamic",
+                  "2-4字随机中文姓名"),
+        FieldRule(["地址", "详细地址", "联系地址"], _gen_address, 75, "dynamic",
+                  "省市区+街道+门牌号"),
+        FieldRule(["QQ", "QQ号", "QQ号码"], _gen_qq, 70, "dynamic",
+                  "5-11位随机数字"),
+        FieldRule(["年龄"], _gen_age, 65, "dynamic", "18-65随机"),
+        FieldRule(["工号", "员工编号"], _gen_employee_id, 65, "dynamic",
+                  "EMP+3位数字"),
+        FieldRule(["邮编", "邮政编码"], _gen_postal_code, 60, "dynamic",
+                  "6位随机数字"),
+
+        # ── Date / time (priority 60-70) ──
+        FieldRule(["成立日期", "登记日期", "注册日期", "设立日期", "创办日期", "开业日期"],
+                  lambda: f"{_random.randint(2016,2025)}-{_random.randint(1,12):02d}-{_random.randint(1,28):02d}",
+                  70, "semantic", "过去日期，当前日期前1~10年"),
+        FieldRule(["失效日期", "到期日期", "截止日期", "期满日期", "预计日期"],
+                  lambda: f"{_random.randint(2027,2036)}-{_random.randint(1,12):02d}-{_random.randint(1,28):02d}",
+                  70, "semantic", "未来日期，当前日期后1~10年"),
+        FieldRule(["年份", "年度"], _gen_year, 65, "semantic", "当前年份"),
+        FieldRule(["月份", "月度"], _gen_month, 60, "semantic", "1-12"),
+        FieldRule(["季度"], _gen_quarter, 60, "semantic", "1-4"),
+        FieldRule(["周", "星期"], _gen_week, 60, "semantic", "1-7"),
+
+        # ── Numeric (priority 50-65) ──
+        FieldRule(["人数", "员工人数", "职工人数", "党员人数", "从业人数", "人员数量"],
+                  lambda: str(_random.randint(10, 99999)), 55, "semantic",
+                  "10～99999随机正整数"),
+        FieldRule(["数量", "件数", "个数", "套数", "份数"], _gen_count, 55, "semantic",
+                  "1～999999随机正整数"),
+        FieldRule(["比例", "比率", "利率", "费率", "税率", "折扣", "占比", "份额"],
+                  _gen_percent, 50, "semantic", "0-100百分比"),
+        FieldRule(["股票代码"], lambda: str(_random.randint(100000, 999999)), 50, "semantic",
+                  "6位随机数字"),
+        FieldRule(["注册资本", "实收资本", "资本", "出资额", "投资额", "注册资金"],
+                  lambda: str(_random.randint(100000, 1000000000)), 55, "semantic",
+                  "正整数 10000～1000000000"),
+        FieldRule(["价格", "单价", "售价", "原价", "现价", "市场价"],
+                  lambda: f"{_random.randint(10, 9999999)}.{_random.randint(0,99):02d}", 50, "semantic",
+                  "10.00～9999999.99"),
+        FieldRule(["年限", "期限", "有效期", "使用年限", "有效期(年)"],
+                  lambda: str(_random.randint(1, 50)), 50, "semantic",
+                  "1-50年"),
+
+        # ── Codes / IDs (priority 50-60) ──
+        FieldRule(["行政编号", "行政区划代码"], lambda: str(_random.randint(100000, 999999)),
+                  60, "semantic", "6位行政编号"),
+        FieldRule(["客户编号", "客户号", "客户ID"], lambda: 'C' + ''.join(str(_random.randint(0,9)) for _ in range(8)),
+                  55, "semantic", "C+8位数字"),
+        FieldRule(["产品编码", "产品编号", "产品代码"], lambda: 'P' + ''.join(str(_random.randint(0,9)) for _ in range(6)),
+                  55, "semantic", "P+6位数字"),
+        FieldRule(["合同编号", "合同号", "协议编号"],
+                  lambda: f"CT{_random.randint(202001, 203012)}{_random.randint(1,999):03d}", 55, "semantic",
+                  "CT+年月+序号"),
+        FieldRule(["项目编号", "项目编码", "项目号"],
+                  lambda: f"PRJ{_random.randint(202001, 203012)}{_random.randint(1,999):03d}", 55, "semantic",
+                  "PRJ+年月+序号"),
+        FieldRule(["交易编号", "交易流水号", "流水号"],
+                  lambda: 'TXN' + ''.join(str(_random.randint(0,9)) for _ in range(11)), 50, "semantic",
+                  "TXN+11位数字"),
+        FieldRule(["订单编号", "订单号"],
+                  lambda: f"2026{_random.randint(1,12):02d}{_random.randint(1,28):02d}{_random.randint(1,999999):06d}", 50, "semantic",
+                  "年月日+6位序号"),
+        FieldRule(["档案编号", "档案号"], lambda: 'DA' + ''.join(str(_random.randint(0,9)) for _ in range(8)),
+                  50, "semantic", "DA+8位数字"),
+        FieldRule(["凭证编号", "凭证号"], lambda: 'PZ' + ''.join(str(_random.randint(0,9)) for _ in range(8)),
+                  50, "semantic", "PZ+8位数字"),
+        FieldRule(["序列号", "SN"], lambda: 'SN' + ''.join(str(_random.randint(0,9)) for _ in range(10)),
+                  45, "semantic", "SN+10位数字"),
+        FieldRule(["账号", "账户号"], lambda: '622202' + ''.join(str(_random.randint(0,9)) for _ in range(8)),
+                  45, "semantic", "622202+8位数字"),
+        FieldRule(["登记编号", "备案号"],
+                  lambda: f"BD{_random.randint(202001, 203012)}{_random.randint(1,999):03d}", 45, "semantic",
+                  "BD+年月+序号"),
+        FieldRule(["批号", "批次号"],
+                  lambda: f"2026{_random.randint(1,12):02d}{_random.randint(1,28):02d}{_random.randint(1,99):02d}", 45, "semantic",
+                  "年月日+2位序号"),
+
+        # ── Address / Region (priority 45-55) ──
+        FieldRule(["省", "省份", "所在省"], lambda: _random.choice(['湖南省', '广东省', '浙江省', '江苏省', '山东省', '湖北省']),
+                  55, "semantic", "省级行政区名称"),
+        FieldRule(["市", "城市", "所在市"], lambda: _random.choice(['长沙市', '广州市', '杭州市', '南京市', '济南市', '武汉市']),
+                  55, "semantic", "地级市名称"),
+        FieldRule(["区", "所在区", "城区"], lambda: _random.choice(['岳麓区', '天河区', '西湖区', '鼓楼区', '历下区', '武昌区']),
+                  55, "semantic", "区县级名称"),
+        FieldRule(["街道", "乡镇"], lambda: _random.choice(['麓谷街道', '天顶街道', '天河南街道', '西溪街道']),
+                  50, "semantic", "街道/乡镇名称"),
+        FieldRule(["村", "行政村"], lambda: 'XX村', 45, "semantic", "村级名称占位符"),
+        FieldRule(["门牌号", "详细地址"], lambda: f"{_random.randint(1,200)}号{_random.choice(['','XX室'])}",
+                  50, "semantic", "门牌号"),
+
+        # ── Select / Status (priority 40-50) ──
+        FieldRule(["状态", "状态位", "标志"], lambda: _random.choice(['正常', '启用', '有效']), 50, "static",
+                  "常见状态"),
+        FieldRule(["类型", "类别", "分类", "种类"], lambda: _random.choice(['企业类', '个人类', '机关类']), 50, "static",
+                  "常见类型"),
+        FieldRule(["等级", "级别", "评级"], lambda: _random.choice(['A级', 'B级', '一般', 'C级']), 50, "static",
+                  "常见等级"),
+        FieldRule(["性质", "属性"], lambda: _random.choice(['企业法人', '事业单位', '社会团体']), 50, "static",
+                  "常见性质"),
+        FieldRule(["来源", "来源渠道"], lambda: _random.choice(['系统录入', '批量导入']), 45, "static",
+                  "常见来源"),
+        FieldRule(["方式", "方法", "模式"], lambda: _random.choice(['线上', '线下']), 45, "static",
+                  "常见方式"),
+        FieldRule(["用途", "使用用途", "资金用途"], lambda: _random.choice(['生产经营', '流动资金', '项目投资']),
+                  45, "static", "常见用途"),
+        FieldRule(["币种", "货币"], lambda: 'CNY', 50, "static", "ISO币种代码"),
+        FieldRule(["语言", "语种"], lambda: '中文', 50, "static", "常见语言"),
+        FieldRule(["方向", "流向"], lambda: _random.choice(['流入', '流出', '转入', '转出']), 45, "static",
+                  "常见方向"),
+
+        # ── Name / Text (priority 40-55) ──
+        FieldRule(["名称", "客户名称", "公司名称", "企业名称", "单位名称", "全称"],
+                  lambda: '测试科技发展有限公司', 55, "semantic", "中文名称"),
+        FieldRule(["简称", "缩写", "短名"], lambda: '测试科技', 50, "semantic", "中文简称"),
+        FieldRule(["产品名称", "项目名称", "方案名称", "品牌名称"], lambda: '自动化测试项目',
+                  50, "semantic", "业务相关名称"),
+        FieldRule(["备注", "说明", "描述", "摘要", "简介"], lambda: '系统自动生成测试数据', 45, "semantic",
+                  "简要说明文本"),
+        FieldRule(["标题", "主题"], lambda: '关于XX的申请', 45, "semantic", "简短标题"),
+        FieldRule(["合同名称", "协议名称"], lambda: '信贷合同2026001', 45, "semantic", "合同类型+编号"),
+        FieldRule(["经营范围", "业务范围"], lambda: '计算机技术开发、技术服务', 45, "semantic", "标准经营范围"),
+        FieldRule(["所属行业", "行业类别", "行业"], lambda: '软件和信息技术服务业', 45, "semantic", "常见行业分类"),
+        FieldRule(["所属部门", "部门名称", "科室"], lambda: _random.choice(['技术部', '风控部', '信贷部']),
+                  45, "semantic", "常见部门名称"),
+        FieldRule(["职务", "职位", "岗位"], lambda: _random.choice(['经理', '主管', '工程师']), 45, "semantic",
+                  "常见企业职务"),
+        FieldRule(["学历", "文化程度"], lambda: _random.choice(['本科', '硕士', '大专']), 45, "semantic",
+                  "标准学历选项"),
+        FieldRule(["学位"], lambda: _random.choice(['学士', '硕士', '博士']), 45, "semantic", "标准学位选项"),
+        FieldRule(["民族"], lambda: _random.choice(['汉族', '苗族', '土家族', '回族', '蒙古族']), 45, "semantic",
+                  "中国56个民族"),
+        FieldRule(["国籍"], lambda: '中国', 50, "semantic", "国家名称"),
+        FieldRule(["性别"], lambda: _random.choice(['男', '女']), 50, "semantic", "性别"),
+        FieldRule(["婚姻状况"], lambda: _random.choice(['未婚', '已婚']), 45, "semantic", "婚姻状态"),
+        FieldRule(["政治面貌"], lambda: _random.choice(['群众', '中共党员']), 45, "semantic", "政治身份"),
+        FieldRule(["开户银行", "开户行"], lambda: '中国工商银行', 50, "semantic", "常见银行名称"),
+        FieldRule(["银行网点", "支行"], lambda: 'XX支行', 45, "semantic", "银行网点名称"),
+        FieldRule(["证件类型", "证照类型", "证件种类"],
+                  lambda: _random.choice(['身份证', '营业执照', '统一社会信用代码']), 50, "semantic",
+                  "常见证件类型"),
+        FieldRule(["单位"], lambda: _random.choice(['个', '套', '元', '万元']), 45, "static", "常见计量单位"),
+        FieldRule(["时间", "时分秒"], lambda: "14:30:00", 40, "static", "当前时间点"),
+        FieldRule(["开始时间", "起始时间", "生效时间"], lambda: "09:00:00", 40, "static", "开始时间"),
+        FieldRule(["结束时间", "截止时间", "终止时间"], lambda: "18:00:00", 40, "static", "结束时间"),
+    ]
+
+
+FIELD_RULES: List[FieldRule] = _make_field_rules()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Public API
+# ══════════════════════════════════════════════════════════════════════════════
 
 def load_rules(script_dir=None):
-    """Load form rules from ATP skill SKILL.md — single source of truth."""
-    if script_dir is None:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    skill_path = os.path.join(script_dir, '..', '.opencode', 'skills', 'atp-rule', 'SKILL.md')
-    if not os.path.exists(skill_path):
-        sys.stderr.write(f"[rules] SKILL.md not found at {skill_path}, no rules loaded\n")
-        sys.stderr.flush()
-        return []
-    
-    try:
-        with open(skill_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-    except:
-        sys.stderr.write(f"[rules] Failed to read SKILL.md\n")
-        sys.stderr.flush()
-        return []
-    
-    rules = []
-    
-    # Parse generator table: | `关键词1`、`关键词2`... | `genFunc()` | ... |
-    gen_table = re.findall(r'\|\s*`([^`]+(?:`、`[^`]+)*)`\s*\|\s*`(\w+)\(\)`', content)
-    for keywords_str, func_name in gen_table:
-        kws = [k.strip() for k in keywords_str.replace('`', '').split('、')]
-        gen = _GEN_MAP.get(func_name)
-        if gen:
-            rules.append((kws, gen))
-    
-    # Parse format templates: | `关键词`... | format spec | example |
-    fmt_rows = re.findall(r'\| `([^`]+)`\s*\|([^|]+?)\s*\|[^|]*\|', content)
-    for keywords_str, spec in fmt_rows:
-        kws = [k.strip().replace('`','') for k in keywords_str.split('、')]
-        spec_text = spec.strip().replace('`', '').strip()
-        rules.append((kws, lambda s=spec_text: s))
-    
-    # Parse code value selects: | `关键词`... | `可选值`... | description |
-    sel_rows = re.findall(r'\| `([^`]+)`\s*\| `([^`]+)`\s*\|', content)
-    for keywords_str, options_str in sel_rows:
-        kws = [k.strip().replace('`','') for k in keywords_str.split('、')]
-        opts_text = options_str.replace('`', '').strip()
-        rules.append((kws, lambda o=opts_text: f'SELECT: {o}. Choose based on context.'))
-    
-    # Also load rules from agent-field-rules.md (agent style rule tables)
-    field_rules_path = os.path.join(script_dir, 'prompts', 'agent-field-rules.md')
-    if os.path.exists(field_rules_path):
-        try:
-            with open(field_rules_path, 'r', encoding='utf-8') as f:
-                field_content = f.read()
-            # Parse keyword => value tables: | keyword1、keyword2、... | rule description | example |
-            field_rows = re.findall(r'\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|', field_content)
-            for row in field_rows:
-                keywords_str = row[0].strip()
-                spec = row[1].strip()
-                # Only process rows where keywords look like Chinese text (not headers, not empty)
-                if not keywords_str or keywords_str.startswith('[') or keywords_str.startswith('-') or keywords_str.startswith('字段') or keywords_str.startswith('证件') or keywords_str.startswith('推导') or keywords_str.startswith('其他'):
-                    continue
-                kws = [k.strip() for k in keywords_str.replace('、', ',').split(',') if k.strip()]
-                if not kws:
-                    continue
-                # Use example value (row[2]) as the generated value, fall back to spec
-                example = row[2].strip() if len(row) > 2 else ''
-                rule_text = example if example else spec
-                rules.append((kws, lambda s=rule_text: s))
-        except Exception as e:
-            sys.stderr.write(f"[rules] Failed to parse agent-field-rules.md: {e}\n")
-            sys.stderr.flush()
+    """Legacy wrapper — returns list of (keywords, generator) tuples.
 
-    sys.stderr.write(f"[rules] Loaded {len(rules)} rule groups from SKILL.md + agent-field-rules.md\n")
-    sys.stderr.flush()
-    return rules
+    Deprecated: use ``match_rule(label)`` directly instead.
+    """
+    return [(list(r.keywords), r.generator) for r in FIELD_RULES]
+
+
+def match_rule(label_text, form_rules=None):
+    """Match a label against registered rules and return a generated value, or None.
+
+    Args:
+        label_text: The field label text to match.
+        form_rules: Ignored (kept for backward compatibility with callers
+                    that pass previously-loaded rules).
+
+    Match order: rules are tried in priority-descending order.  Within a rule,
+    longer keywords are tried first to prefer specific matches over generic ones.
+    """
+    if form_rules is not None:
+        # Legacy call path — ignore the parameter and use FIELD_RULES
+        pass
+
+    t = label_text.replace(' ', '').replace('\t', '')
+    for rule in FIELD_RULES:
+        # Try longest keyword first within this rule
+        for kw in sorted(rule.keywords, key=len, reverse=True):
+            if kw in t:
+                return rule.generator()
+    return None
 
 
 # ── hasButton detection keywords ─────────────────────────────────────────────
-# Configurable via (priority order):
-#case_data_store['_has_button_keywords'] (运行时, 148 行)
-#       ↓ 未设置
-#HAS_BUTTON_KEYWORDS 环境变量              (进程级)
-#       ↓ 未设置
-#_DEFAULT_HAS_BUTTON_KEYWORDS            (148 行 — 硬编码兜底)
 _DEFAULT_HAS_BUTTON_KEYWORDS = ['选择', '获取地址', '引入', '新增', '添加', '验证']
 
 
 def get_has_button_keywords(case_data_store=None):
-    """Return button keywords used by JS_SCAN_FORM_FIELDS / JS_CHECK_SINGLE_FIELD.
-
-    When a form-item contains a button whose text matches any keyword, the
-    field is marked with ``hasButton`` — which feeds the intervention pipeline.
-    """
+    """Return button keywords used by JS_SCAN_FORM_FIELDS / JS_CHECK_SINGLE_FIELD."""
     if case_data_store:
         override = case_data_store.get('_has_button_keywords')
         if override and isinstance(override, list) and len(override) > 0:
@@ -164,23 +371,3 @@ def get_has_button_keywords(case_data_store=None):
     if env_val:
         return [k.strip() for k in env_val.split(',') if k.strip()]
     return list(_DEFAULT_HAS_BUTTON_KEYWORDS)
-
-
-def match_rule(label_text, form_rules):
-    """Match a label against loaded form rules and return generated value, or None.
-
-    Keywords are matched by descending length so that more specific terms
-    (e.g. '邮政编码', 4 chars) take priority over shorter ones
-    (e.g. '地址', 2 chars) when both appear in the same label.
-    """
-    t = label_text.replace(' ','').replace('\t','')
-    # Flatten and sort: longest keyword first
-    flat: list[tuple[str, callable]] = []
-    for keywords, gen in form_rules:
-        for kw in keywords:
-            flat.append((kw, gen))
-    flat.sort(key=lambda x: -len(x[0]))
-    for kw, gen in flat:
-        if kw in t:
-            return gen()
-    return None

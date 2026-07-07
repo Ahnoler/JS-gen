@@ -13,6 +13,9 @@ atp-record/
 docs/
 __pycache__/
 
+# Bundled runtime dependencies — all tracked in git for full self-containment
+# (built by build-offline.ps1)
+
 scripts/action/
 scripts/log/
 scripts/screenshots/

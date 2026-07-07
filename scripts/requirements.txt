@@ -1,0 +1,8 @@
+# Python agent runtime dependencies (minimal — 5 packages vs web-ui's 10)
+# These are the direct imports used by scripts/agent_utils.py, scripts/session_runner.py,
+# scripts/controller.py, scripts/models/*.py, scripts/actions/*.py, and scripts/cdp/*.py
+browser-use>=0.1.48
+langchain-openai
+langchain-core
+playwright
+pyperclip>=1.9.0

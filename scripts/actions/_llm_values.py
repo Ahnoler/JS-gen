@@ -91,6 +91,22 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
     actions = []
     llm_fields = []
 
+    # —— Cross-field dependency detection: postal code ↔ address ——
+    # When both an address field and a postal code field exist in the same batch,
+    # skip the P2 postal code rule so both go to the LLM together.  The LLM
+    # can then generate a postal code consistent with the address (e.g.
+    # "长沙市岳麓区..." → "410001" rather than a random 6-digit number).
+    _ADDRESS_KEYWORDS = ('地址', '住所', '经营地址', '注册地址', '联系地址',
+                          '通讯地址', '户籍地址', '办公地址', '单位地址')
+    _POSTAL_KEYWORDS = ('邮政编码', '邮编')
+    _has_address = any(
+        any(kw in (item['label'] if isinstance(item, dict) else item)
+            for kw in _ADDRESS_KEYWORDS)
+        for item in items
+    )
+    def _is_postal_code(label):
+        return any(kw in label for kw in _POSTAL_KEYWORDS)
+
     for item in items:
         label = item['label'] if isinstance(item, dict) else item
         kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
@@ -111,7 +127,9 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
                 continue
 
         # —— Priority 2: form_rules.py generators (input only) ——
-        if kind == 'input' and form_rules:
+        # Skip postal code P2 rule when address is present — defer to LLM
+        # so postal code can be derived from the address value.
+        if kind == 'input' and form_rules and not (_has_address and _is_postal_code(label)):
             generated = match_rule(label, form_rules)
             if generated:
                 actions.append({'action': 'fill_input', 'label': label, 'value': generated})

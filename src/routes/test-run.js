@@ -1,7 +1,7 @@
 import { writeFileSync, readFileSync, readdirSync, existsSync, unlinkSync } from 'fs';
 import path from 'path';
 import { spawn, execSync } from 'child_process';
-import { TMP_DIR, SKILL_DIR } from '../../../config/config.js';
+import { TMP_DIR, SKILL_DIR } from '../../config/config.js';
 import { cleanupScriptFile } from '../script-utils.js';
 
 function killOrphanChrome() {

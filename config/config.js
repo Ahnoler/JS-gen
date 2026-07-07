@@ -44,6 +44,13 @@ export const PROJECT_DIR = _resolve('PROJECT_DIR') || PROJECT_ROOT;
 export const SKILL_DIR = path.join(PROJECT_ROOT, '.opencode', 'skills', 'playwright-skill');
 export const TMP_DIR = process.env.TMPDIR || process.env.TMP || process.env.TEMP || os.tmpdir();
 export const DASHBOARD_DIR = PROJECT_ROOT;
+export const GENERATED_DIR = path.join(PROJECT_ROOT, 'scripts', 'generated');
+export const TRAJECTORIES_DIR = path.join(PROJECT_ROOT, 'scripts', 'trajectories');
+export const CASE_DATA_DIR = path.join(PROJECT_ROOT, 'scripts', 'case_data');
+export const BROWSER_DIR = path.join(PROJECT_ROOT, 'browser');
+
+// Redirect Playwright browsers to project-local directory (portable)
+process.env.PLAYWRIGHT_BROWSERS_PATH = BROWSER_DIR;
 
 // LLM
 export const LLM_BASE_URL = _resolve('LLM_BASE_URL');
@@ -52,8 +59,17 @@ export const FORM_LLM_MODEL = _resolve('FORM_LLM_MODEL', 'deepseek-v4-flash');
 export const FORM_LLM_BASE_URL = _resolve('FORM_LLM_BASE_URL', LLM_BASE_URL || 'https://api.deepseek.com');
 export const FORM_LLM_API_KEY = _resolve('FORM_LLM_API_KEY', LLM_API_KEY);
 
-// Python — fall back to "python" on system PATH instead of hardcoded conda path
-export const PYTHON_EXE = _resolve('PYTHON_EXE') || 'python';
+// Python — detection chain: explicit env → embedded in install dir → system PATH
+function _findPython() {
+  const explicit = _resolve('PYTHON_EXE');
+  if (explicit) return explicit;
+  // Check embedded Python (portable install alongside project)
+  const embedded = path.join(PROJECT_ROOT, 'python', 'python.exe');
+  if (existsSync(embedded)) return embedded;
+  // Fall back to system PATH
+  return 'python';
+}
+export const PYTHON_EXE = _findPython();
 
 // Legacy compatibility (used by explore-utils.js)
 export const PYTHON_EXE_CONFIG = PYTHON_EXE;

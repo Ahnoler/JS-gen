@@ -346,7 +346,7 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref):
         await stdin_queue.put(msg)
 
 
-def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_ref=None, cdp_action_queue=None):
+async def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_ref=None, cdp_action_queue=None):
     event = msg.get("event")
 
     if event == "save_trajectory":
@@ -530,7 +530,7 @@ async def run_session(args):
             break
 
         try:
-            action = _dispatch_event(msg, session_state, intervention_queue, agent_running_ref, cdp_action_queue)
+            action = await _dispatch_event(msg, session_state, intervention_queue, agent_running_ref, cdp_action_queue)
             cumulative_path = session_state['cumulative_path']
 
             # Handle immediate intervention when agent is idle

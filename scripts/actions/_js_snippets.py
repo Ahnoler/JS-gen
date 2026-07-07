@@ -773,7 +773,7 @@ JS_READ_CURRENT_VALUE = '''(inputEl, trigger, item) => {
 
 # ── Form field scanning ──
 
-JS_SCAN_FORM_FIELDS = '''async (quick, buttonKeywords) => {
+JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
     const container = ''' + JS_GET_CONTAINER + ''';
     const classify = ''' + JS_CLASSIFY_FIELD + ''';
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
@@ -902,7 +902,7 @@ JS_SCAN_FORM_FIELDS = '''async (quick, buttonKeywords) => {
     return json;
 }'''
 
-JS_CHECK_SINGLE_FIELD = '''(label, buttonKeywords) => {
+JS_CHECK_SINGLE_FIELD = '''([label, buttonKeywords]) => {
     const container = ''' + JS_GET_CONTAINER + ''';
     const classify = ''' + JS_CLASSIFY_FIELD + ''';
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';

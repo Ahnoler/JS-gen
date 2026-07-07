@@ -1,4 +1,4 @@
-import { SKILL_DIR, TMP_DIR } from '../../../config/config.js';
+import { SKILL_DIR, TMP_DIR } from '../../config/config.js';
 import { state } from '../state.js';
 
 export default function (app) {

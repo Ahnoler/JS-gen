@@ -2,8 +2,9 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSy
 import path from 'path';
 import { execSync } from 'child_process';
 import { deduplicateActionFile } from '../dedup.js';
+import { getInjectionCode } from '../ctrl-actions.js';
 
-import { PROJECT_DIR, TMP_DIR } from '../../../config/config.js';
+import { PROJECT_DIR, TMP_DIR } from '../../config/config.js';
 import { ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex } from '../script-utils.js';
 
 const SCRIPTS_DIR = path.join(PROJECT_DIR, 'scripts');
@@ -59,11 +60,15 @@ export default function (app) {
         }
       }
 
+      // Write shared CTRL injection code (single source: src/ctrl-actions.js)
+      const ctrlInjectionPath = path.join(TMP_DIR, `ctrl_injection_${ts}.js`);
+      writeFileSync(ctrlInjectionPath, getInjectionCode(), 'utf-8');
+
       // Call Python assembler
       const assemblerPy = path.join(SCRIPTS_DIR, 'script_assembler.py');
       // Always write deduplicated JSON for the assembler to read
       if (!existsSync(cleanPath)) writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
-      execSync(`python "${assemblerPy}" "${cleanPath}" "${scriptPath}"${formSnapshotArg}`, { encoding: 'utf-8', timeout: 30000 });
+      execSync(`python "${assemblerPy}" "${cleanPath}" "${scriptPath}" --ctrl-injection "${ctrlInjectionPath}"${formSnapshotArg}`, { encoding: 'utf-8', timeout: 30000 });
 
       // Read the generated script
       const script = readFileSync(scriptPath, 'utf-8');

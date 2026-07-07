@@ -108,7 +108,7 @@
 | 组件 | 要求 | 备注 |
 |------|------|------|
 | **Node.js** | 18+ | `node --version` 检查 |
-| **Python** | 3.10+ | 推荐 conda 环境，如 `browser_use` |
+| **Python** | 3.10+ | 推荐嵌入式 Python 3.12（自动检测 `.\python\python.exe` 或系统 PATH） |
 | **AI 模型** | 兼容 OpenAI API | DeepSeek、GLM、Ollama 本地模型等 |
 | **Chromium** | 可选 | 执行 Playwright 测试脚本时需要 |
 | **npm** | 9+ | 随 Node.js 安装 |
@@ -235,14 +235,14 @@ pip install -r requirements.txt
 | 文件 | 说明 |
 |------|------|
 | `node-v22.msi` | Node.js 22 安装包 |
-| `python-3.12.10-amd64.exe` | Python 3.12 安装包 |
+| `python-3.12.10-embed-amd64.zip` | Python 3.12 嵌入式（便携版） |
+| `get-pip.py` | pip 引导安装脚本 |
 | `VC_redist.x64.exe` | VC++ Redistributable（解决 DLL 加载失败） |
 | `node_modules.zip` | npm 依赖（`npm ci` 打包） |
 | `pip-cache\` | Python pip 离线包 |
 | `ms-playwright-node.zip` | Node.js Playwright 浏览器驱动 |
 | `ms-playwright-python.zip` | Python Playwright 浏览器驱动 |
-| `project-source.zip` | 项目源码（排除 node_modules/.git 等） |
-| `deploy-offline.ps1` | 内网部署脚本 |
+| `project-source.zip` | 项目源码（排除 node_modules/.git/web-ui 等） |
 
 > **注意**：Node.js 和 Python 的 Playwright 浏览器驱动版本可能不同（如 chromium-1217 vs chromium-1223），两者独立管理、互不干扰，分别打包为独立的 zip 文件。
 
@@ -253,36 +253,48 @@ pip install -r requirements.txt
 #### 步骤三：安装基础环境
 
 1. 双击安装 `node-v22.msi`（**勾选** Add to PATH）
-2. 双击安装 `python-3.12.10-amd64.exe`（**勾选** Add to PATH）
-3. 双击安装 `VC_redist.x64.exe`（解决 DLL 加载失败问题，安装后**重启电脑**）
+2. 双击安装 `VC_redist.x64.exe`（解决 DLL 加载失败问题，安装后**重启电脑**）
+3. Python 无需安装 — 项目使用嵌入式 Python 3.12，部署时自动解压到 `.\python\`
 
-#### 步骤四：运行部署脚本
+#### 步骤四：解压依赖（或等待 NSIS 安装包一键完成）
 
-在 `offline-deploy` 目录下执行：
+若使用 NSIS 安装包（`.exe`），安装向导会自动完成以下步骤。手动部署时：
 
 ```powershell
-.\deploy-offline.ps1 -ProjectRoot "C:\atp-gen"
-```
+# 解压项目源码
+Expand-Archive project-source.zip -DestinationPath C:\atp-gen -Force
 
-脚本自动完成：
-- 解压项目源码到 `C:\atp-gen`
-- 解压 `node_modules`
-- 解压 Node.js Playwright 浏览器到 `%USERPROFILE%\AppData\Local\ms-playwright`
-- 解压 Python Playwright 浏览器到同一目录（不同版本文件夹名不同，互不冲突）
-- pip 离线安装 Python 依赖（跳过浏览器下载）
+# 解压 node_modules
+Expand-Archive node_modules.zip -DestinationPath C:\atp-gen -Force
+
+# 解压嵌入式 Python
+Expand-Archive python-3.12.10-embed-amd64.zip -DestinationPath C:\atp-gen\python -Force
+# 编辑 python\python312._pth，取消注释 "import site"（启用 pip 包）
+
+# 引导 pip
+C:\atp-gen\python\python.exe get-pip.py
+
+# 离线安装 Python 依赖
+C:\atp-gen\python\python.exe -m pip install --no-index --find-links pip-cache -r scripts\requirements.txt
+
+# 解压 Playwright 浏览器
+Expand-Archive ms-playwright-node.zip -DestinationPath $env:LOCALAPPDATA -Force
+Expand-Archive ms-playwright-python.zip -DestinationPath $env:LOCALAPPDATA -Force
+```
 
 #### 步骤五：配置与启动
 
 ```powershell
 cd C:\atp-gen
-# 编辑 start.ps1 中的 LLM_API_KEY 和 PYTHON_EXE
 .\start.ps1
 ```
+
+首次启动时，系统检测到未配置 API Key，会自动打开配置页面 `http://localhost:4097/api/setup`。
+填写 API Key 后自动写入 `config\.env`，后续启动直接进入 Dashboard。
 
 或手动启动：
 
 ```powershell
-$env:STANDALONE_LLM = "true"
 $env:LLM_BASE_URL = "https://api.deepseek.com"
 $env:LLM_API_KEY = "sk-your-key"
 npm start
@@ -716,7 +728,7 @@ Agent → {save,read}_case_data(key, value)
 | `STANDALONE_LLM` | `false` | 设为 `true` 跳过 opencode SDK，直连 LLM API |
 | `LLM_BASE_URL` | — | 独立模式下 LLM API 地址 |
 | `LLM_API_KEY` | — | 独立模式下 LLM API Key |
-| `PYTHON_EXE` | `D:\anaconda3\envs\browser_use\python.exe` | Python 可执行文件路径 |
+| `PYTHON_EXE` | 自动检测（`.\python\python.exe` → 系统 PATH） | Python 可执行文件路径（嵌入式或系统安装） |
 | `OPENCODE_API_KEY` | — | 覆盖 `opencode.json` 中的 API Key |
 
 ---

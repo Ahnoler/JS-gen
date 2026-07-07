@@ -116,7 +116,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 return  # already scanned for this form
 
         # Scan main-page form
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             raw_fields = result.get('fields') if isinstance(result, dict) else result
@@ -241,12 +241,12 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
         page = await browser_context.get_current_page()
-        return await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text, _button_keywords())
+        return await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
 
     @controller.action('Verify that a form field has an expected value. Calls check_field_value and compares currentValue with expected. Returns ok if match, err if mismatch. Use this to confirm a field was filled correctly.')
     async def verify_field_value(label_text: str, expected: str):
         page = await browser_context.get_current_page()
-        raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text, _button_keywords())
+        raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
         if raw == 'label-not-found':
             return _err('label-not-found')
         try:
@@ -262,7 +262,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             raw_fields = result.get('fields') if isinstance(result, dict) else result
@@ -335,7 +335,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     async def scan_visible_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, True, _button_keywords())
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [True, _button_keywords()])
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             raw_fields = result.get('fields') if isinstance(result, dict) else result
@@ -630,7 +630,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # ═══════════════════════════════════════════════════════════════════
         round1_count = len(all_results)
         try:
-            raw2 = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
+            raw2 = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
             result2 = json.loads(raw2) if isinstance(raw2, str) else raw2
             raw_fields2 = result2.get('fields') if isinstance(result2, dict) else result2
         except Exception:
@@ -651,7 +651,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # ═══════════════════════════════════════════════════════════════════
         round2_count = len(all_results)
         try:
-            raw3 = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
+            raw3 = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
             result3 = json.loads(raw3) if isinstance(raw3, str) else raw3
             raw_fields3 = result3.get('fields') if isinstance(result3, dict) else result3
         except Exception:
@@ -710,7 +710,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         # Step 6: full scan sync — 移除不在 DOM 的 pending 字段
         try:
-            raw_sync = await page.evaluate(JS_SCAN_FORM_FIELDS, False, _button_keywords())
+            raw_sync = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
             sync_result = json.loads(raw_sync) if isinstance(raw_sync, str) else raw_sync
             sync_fields = sync_result.get('fields') if isinstance(sync_result, dict) else sync_result
             dom_labels = {f.get('label', '') for f in sync_fields}
@@ -923,7 +923,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         await page.wait_for_timeout(500)
 
-        current_raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text, _button_keywords())
+        current_raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
         if not current_raw or current_raw == 'label-not-found':
             loc = await page.evaluate(JS_LOCATOR, [label_text])
             return _ok(f'ok | {matched_text}' + (' | loc:' + loc) if loc else f'ok | {matched_text}')
@@ -962,7 +962,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         # First check if field already has a value — skip if so
-        check_info = await page.evaluate(JS_CHECK_SINGLE_FIELD, label_text, _button_keywords())
+        check_info = await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
         if check_info != 'label-not-found':
             try:
                 info = json.loads(check_info)
