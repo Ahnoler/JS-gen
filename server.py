@@ -112,12 +112,14 @@ from routes.browser_session import router as browser_session_router
 from routes.test_assemble import router as test_assemble_router
 from routes.trajectory import router as trajectory_router
 from routes.case_data import router as case_data_router
+from routes.test_history import router as test_history_router
 from routes.test_run import router as test_run_router
 app.include_router(llm_proxy_router)
 app.include_router(browser_session_router)
 app.include_router(test_assemble_router)
 app.include_router(trajectory_router)
 app.include_router(case_data_router)
+app.include_router(test_history_router)
 app.include_router(test_run_router)
 
 # ── Health ────────────────────────────────────────────────────────────
