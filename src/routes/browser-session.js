@@ -2,7 +2,19 @@ import { writeFileSync, existsSync, unlinkSync, readFileSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR } from '../../config/config.js';
+import { LLM_BASE_URL, PORT, PROJECT_DIR } from '../../config/config.js';
+
+function getApiKey() {
+  try {
+    const envPath = path.join(PROJECT_DIR, 'config', '.env');
+    if (existsSync(envPath)) {
+      const content = readFileSync(envPath, 'utf-8');
+      const match = content.match(/^LLM_API_KEY=(.+)$/m);
+      if (match) return match[1].trim();
+    }
+  } catch {}
+  return process.env.LLM_API_KEY || '';
+}
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
 import { saveCaseDataRecord } from '../case-data-store.js';
@@ -24,7 +36,8 @@ async function ensureGlobalBrowser(modelId) {
   gb.stepIndex = 0;
   killOrphans();
 
-  const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY], { OPENAI_API_KEY: LLM_API_KEY });
+  const apiKey = getApiKey();
+  const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', apiKey], { OPENAI_API_KEY: apiKey });
 
   child.stderr.on('data', (chunk) => { console.log(chunk.toString().trimEnd()); });
   child.on('exit', () => {

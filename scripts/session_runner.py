@@ -449,14 +449,14 @@ async def run_session(args):
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
     form_rules = load_rules()
 
+    from browser_use.browser.browser import BrowserConfig
     cdp_url = getattr(args, 'cdp_url', None) or None
     if cdp_url:
-        from browser_use.browser.browser import BrowserConfig
         sys.stderr.write(f"[session] Connecting to existing browser via CDP: {cdp_url}\n")
         sys.stderr.flush()
         browser = Browser(config=BrowserConfig(cdp_url=cdp_url))
     else:
-        browser = Browser()
+        browser = Browser(config=BrowserConfig(headless=False))
 
     config = BrowserContextConfig(
         viewport_width=1920, viewport_height=1080,
