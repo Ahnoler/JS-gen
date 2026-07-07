@@ -101,10 +101,15 @@ async def _read_agent_until(event_names):
 # ── Session CRUD ──────────────────────────────────────────────────────
 
 @router.get("/api/browser/sessions")
-@router.get("/api/browser/session/status")
 async def list_sessions():
+    return [{"sessionId": sid, "stepIndex": 0, "busy": _browser["busy"],
+             "createdAt": s.get("createdAt", ""), "stepCount": 0}
+            for sid, s in _sessions.items()]
+
+
+@router.get("/api/browser/session/status")
+async def session_status():
     return {
-        "sessions": list(_sessions.values()),
         "ready": _browser["ready"],
         "busy": _browser["busy"],
         "alive": _browser["process"] is not None and _browser["process"].poll() is None,
