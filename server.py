@@ -138,6 +138,15 @@ async def health():
     return {"status": "ok"}
 
 
+# ── Root static files (CSS, JS modules) — MUST be last ─────────────
+@app.get("/{filename:path}")
+async def root_static(filename: str):
+    fpath = PROJECT_DIR / filename
+    if fpath.is_file():
+        return FileResponse(str(fpath))
+    return JSONResponse({"error": "Not found"}, status_code=404)
+
+
 # ── Start ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print(f"[server] Smart Fill System (Python)")
