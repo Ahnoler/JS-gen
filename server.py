@@ -18,6 +18,16 @@ from src.state import state
 
 app = FastAPI(title="Smart Fill System")
 
+# Suppress access logs for polling endpoints
+import logging
+class _PollFilter(logging.Filter):
+    _silent = {"/api/browser/sessions", "/api/browser/watcher/status", "/api/health"}
+    def filter(self, record):
+        msg = record.getMessage()
+        return not any(p in msg for p in self._silent)
+
+logging.getLogger("uvicorn.access").addFilter(_PollFilter())
+
 # ── Static files ──────────────────────────────────────────────────────
 app.mount("/scripts", StaticFiles(directory=str(PROJECT_DIR / "scripts")), name="scripts")
 
