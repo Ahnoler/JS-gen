@@ -88,17 +88,17 @@ export default function (app) {
 
     const beforeFiles = new Set(readdirSync(TMP_DIR).filter(f => f.endsWith('.png')));
 
-    const runJsPath = path.join(SKILL_DIR, 'run.js');
+    const runJsPath = path.join(SKILL_DIR, 'run.cjs');
     if (!existsSync(runJsPath)) {
-      send('log', { type: 'error', message: `run.js not found at ${runJsPath}` });
-      send('result', { success: false, error: `run.js not found` });
+      send('log', { type: 'error', message: `run.cjs not found at ${runJsPath}` });
+      send('result', { success: false, error: `run.cjs not found` });
       send('done', {});
       cleanupScriptFile(scriptPath);
       res.end();
       return;
     }
 
-    send('log', { type: 'step', message: `Executing: node run.js ${scriptPath}` });
+    send('log', { type: 'step', message: `Executing: node run.cjs ${scriptPath}` });
     send('status', { phase: 'running', label: 'Executing Playwright script...' });
 
     const child = spawn('node', [runJsPath, scriptPath], {
@@ -185,11 +185,11 @@ export default function (app) {
     writeFileSync(scriptPath, script, 'utf-8');
 
     const beforeFiles = new Set(readdirSync(TMP_DIR).filter(f => f.endsWith('.png')));
-    const runJsPath = path.join(SKILL_DIR, 'run.js');
+    const runJsPath = path.join(SKILL_DIR, 'run.cjs');
 
     if (!existsSync(runJsPath)) {
       cleanupScriptFile(scriptPath);
-      return res.status(500).json({ error: `run.js not found` });
+      return res.status(500).json({ error: `run.cjs not found` });
     }
 
     try {

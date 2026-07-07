@@ -55,28 +55,55 @@ _SKIP_ACTIONS = (
     'save_form_snapshot',
 )
 
+# ========================== Script Bootstrap ==========================
+
+SCRIPT_PREAMBLE = '''const { chromium } = require('playwright');
+const path = require('path');
+const fs = require('fs');
+
+const _TMP = process.env.TMPDIR || process.env.TMP || process.env.TEMP || '/tmp';
+const _CDP_PORT = 0;
+const _errors = [];
+function _recordError(step, action, label, value, error, details, severity) {
+  _errors.push({ step, action, label, value, error, details, severity: severity || 'error' });
+}
+
+// Identity field generators
+function genCreditCode() { const s='0123456789ABCDEFGHJKLMNPQRTUWXY'; let r=''; for(let i=0;i<18;i++) r+=s[Math.floor(Math.random()*s.length)]; return r; }
+function genValidIdCard() { const a=[110101,110102,110105,120103,310101,320102,440103]; let r=String(a[Math.floor(Math.random()*a.length)]); for(let i=0;i<12;i++) r+=Math.floor(Math.random()*10); let w=[7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2], s=0; for(let i=0;i<17;i++) s+=parseInt(r[i])*w[i]; let c=['1','0','X','9','8','7','6','5','4','3','2']; r+=c[s%11]; return r; }
+function genMobile() { const p=['138','139','150','151','152','157','158','159','186','187','188']; let r=p[Math.floor(Math.random()*p.length)]; for(let i=0;i<8;i++) r+=Math.floor(Math.random()*10); return r; }
+function genEmail() { const n=['test','admin','user','demo','info']; const d=['example.com','test.com','demo.cn']; return n[Math.floor(Math.random()*n.length)]+Math.floor(Math.random()*1000)+'@'+d[Math.floor(Math.random()*d.length)]; }
+function genBankCard() { let r='62'; for(let i=0;i<17;i++) r+=Math.floor(Math.random()*10); return r; }
+function genName() { const s=['张','王','李','赵','陈','刘','杨','黄','周','吴']; const m=['伟','芳','娜','敏','静','强','磊','洋','勇','艳']; return s[Math.floor(Math.random()*s.length)]+m[Math.floor(Math.random()*m.length)]+m[Math.floor(Math.random()*m.length)]; }
+function genAmount() { return String(Math.floor(Math.random()*9000000+1000000)); }
+function genAddress() { const c=['北京市朝阳区','上海市浦东新区','广州市天河区','深圳市南山区','杭州市西湖区']; return c[Math.floor(Math.random()*c.length)]+'某某路'+Math.floor(Math.random()*200+1)+'号'; }
+
+(async () => {
+  const browser = await chromium.launch({ headless: false, args: ['--start-maximized'] });
+  const page = await browser.newPage();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  try {
+'''
+
 # ========================== CTRL Injection Template ==========================
 
-CTRL_API_CODE = None  # replaced by _get_ctrl_header() — loaded from src/ctrl-actions.js
-
 _ctrl_injection_path = None
+
+SCRIPT_POSTAMBLE = '''})().catch(err => { console.error(err); process.exit(1); });
+'''
 
 def _load_ctrl_injection():
     global _ctrl_injection_path
     if not _ctrl_injection_path or not os.path.exists(_ctrl_injection_path):
-        sys.stderr.write("[assembler] WARNING: No CTRL injection file. Use --ctrl-injection.
-")
+        sys.stderr.write("[assembler] WARNING: No CTRL injection file. Use --ctrl-injection.\n")
         sys.stderr.flush()
-        return "// CTRL helpers not loaded — provide --ctrl-injection path
-"
+        return "// CTRL helpers not loaded — provide --ctrl-injection path\n"
     with open(_ctrl_injection_path, 'r', encoding='utf-8') as f:
         return f.read()
 
 def _get_ctrl_header():
     injection = _load_ctrl_injection()
-    return f"// CTRL helpers — loaded from src/ctrl-actions.js
-{injection}
-"
+    return f"// CTRL helpers — loaded from src/ctrl-actions.js\n{injection}\n"
 
 
 CTRL_FOOTER = '''  } catch (err) {
@@ -106,7 +133,6 @@ CTRL_FOOTER = '''  } catch (err) {
     await page.waitForTimeout(30000);
     await browser.close();
   }
-})().catch(err => { console.error(err); process.exit(1); });
 '''
 
 # Footer for partial replay: keeps browser open, prints CDP endpoint for agent hand-off
@@ -627,7 +653,7 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
     url = target_url or ''
     if not url or 'unknown' in url.lower():
         url = 'http://target-url-placeholder'
-    body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
+    goto_line = f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});'
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
     # Sort snapshots by action_index so checks inject at the right points
@@ -712,7 +738,7 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
             body.append(code)
             step += 1
 
-    return CTRL_API_CODE + '\n'.join(body) + '\n\n' + CTRL_FOOTER
+    return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
 
 
 # ========================== Part 2: Partial assembly (for self-healing) ==========================
@@ -732,7 +758,7 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
     url = target_url or ''
     if not url or 'unknown' in url.lower():
         url = 'http://target-url-placeholder'
-    body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
+    goto_line = f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});'
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
     for entry in partial_entries:
@@ -753,7 +779,7 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
             body.append(code)
             step += 1
 
-    return CTRL_API_CODE + '\n'.join(body) + '\n\n' + CTRL_FOOTER
+    return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
 
 
 def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=None):
@@ -767,7 +793,7 @@ def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=N
     url = target_url or ''
     if not url or 'unknown' in url.lower():
         url = 'http://target-url-placeholder'
-    body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
+    goto_line = f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});'
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
     for entry in partial_entries:
         _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
@@ -783,7 +809,7 @@ def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=N
         if code:
             body.append(code)
             step += 1
-    return CTRL_API_CODE + '\n'.join(body) + '\n\n' + PARTIAL_CTRL_FOOTER
+    return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + PARTIAL_CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
 
 
 def apply_changes(commands, changes):
@@ -819,6 +845,7 @@ def apply_changes(commands, changes):
 # ========================== Main ==========================
 
 def main():
+    global _ctrl_injection_path
     if len(sys.argv) < 2:
         print('Usage: python script_assembler.py <action_file.json> [output.js] [--partial-stop N] [--partial-cdp N]', file=sys.stderr)
         sys.exit(1)

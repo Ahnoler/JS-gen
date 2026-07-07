@@ -5,6 +5,7 @@ import { deduplicateActionFile } from '../dedup.js';
 import { getInjectionCode } from '../ctrl-actions.js';
 
 import { PROJECT_DIR, TMP_DIR } from '../../config/config.js';
+import { PYTHON_EXE } from './explore-utils.js';
 import { ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex } from '../script-utils.js';
 
 const SCRIPTS_DIR = path.join(PROJECT_DIR, 'scripts');
@@ -68,7 +69,7 @@ export default function (app) {
       const assemblerPy = path.join(SCRIPTS_DIR, 'script_assembler.py');
       // Always write deduplicated JSON for the assembler to read
       if (!existsSync(cleanPath)) writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
-      execSync(`python "${assemblerPy}" "${cleanPath}" "${scriptPath}" --ctrl-injection "${ctrlInjectionPath}"${formSnapshotArg}`, { encoding: 'utf-8', timeout: 30000 });
+      execSync(`"${PYTHON_EXE}" "${assemblerPy}" "${cleanPath}" "${scriptPath}" --ctrl-injection "${ctrlInjectionPath}"${formSnapshotArg}`, { encoding: 'utf-8', timeout: 30000, env: { ...process.env, PYTHONPATH: PROJECT_DIR } });
 
       // Read the generated script
       const script = readFileSync(scriptPath, 'utf-8');

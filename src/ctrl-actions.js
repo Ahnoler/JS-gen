@@ -350,7 +350,7 @@ const CTRL_OBJECT = `{
       for (const item of items) {
         const itemLbl = item.querySelector('.el-form-item__label');
         if (itemLbl && itemLbl.textContent.trim() === lbl) {
-          isReq = !!(item.matches('.is-required') || item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required') || /\*/.test(lbl));
+          isReq = !!(item.matches('.is-required') || item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required') || /\\*/.test(lbl));
           break;
         }
       }

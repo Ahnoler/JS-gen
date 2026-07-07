@@ -160,6 +160,7 @@ export function spawnAgent(args, extraEnv = {}) {
       ...process.env,
       PYTHONIOENCODING: 'utf-8',
       PYTHONUNBUFFERED: '1',
+      PYTHONPATH: PROJECT_DIR,
       ...extraEnv,
     },
   });

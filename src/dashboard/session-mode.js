@@ -900,6 +900,14 @@ export function initSessionMode() {
     runAllBtn.addEventListener('click', () => runAllPhases());
   }
 
+  // Clear log button
+  const exploreClearLogBtn = document.getElementById('exploreClearLogBtn');
+  if (exploreClearLogBtn) {
+    exploreClearLogBtn.addEventListener('click', () => {
+      if (exploreLogTerminal) exploreLogTerminal.innerHTML = '<div class="log-line system"><span class="ts">⚡</span>就绪</div>';
+    });
+  }
+
   // Initial Load button state
   updateButtons();
 }
