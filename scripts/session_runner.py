@@ -81,18 +81,28 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
         # File 3: traj_{ts}.json — native AgentHistoryList
         native_path = None
         _native = None
+        sys.stderr.write(f"[save-trajectory] cumulative_path={cumulative_path}, exists={cumulative_path.exists() if cumulative_path else 'N/A'}\n")
+        sys.stderr.flush()
         if cumulative_path and cumulative_path.exists():
             try:
                 with open(cumulative_path, 'r', encoding='utf-8') as _f:
                     _native = json.load(_f)
+                _history_len = len(_native.get('history', [])) if _native else 0
+                sys.stderr.write(f"[save-trajectory] cumulative has history: {_history_len}\n")
+                sys.stderr.flush()
                 if _native.get('history'):
                     trajectories_dir = scripts_dir / 'trajectories'
                     trajectories_dir.mkdir(parents=True, exist_ok=True)
                     native_path = trajectories_dir / f"traj_{ts}.json"
+                    sys.stderr.write(f"[save-trajectory] writing native_path={native_path}\n")
+                    sys.stderr.flush()
                     with open(native_path, 'w', encoding='utf-8') as _f:
                         json.dump(_native, _f, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+            except Exception as _e:
+                sys.stderr.write(f"[save-trajectory] native write error: {_e}\n")
+                sys.stderr.flush()
+        sys.stderr.write(f"[save-trajectory] entries={len(entries)}, _recorder_log={len(_recorder_log)}\n")
+        sys.stderr.flush()
 
         # File 4: form_{ts}.json — form structure snapshots (for replay validation)
         form_path = None

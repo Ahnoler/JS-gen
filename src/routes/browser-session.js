@@ -485,9 +485,14 @@ export default function (app) {
           if (msg.event === 'save_trajectory_result') {
             clearTimeout(timeout);
             cleanupTrajListener();
+            console.log('[save-trajectory] Python response:', JSON.stringify(msg.data, null, 2));
             if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save trajectory' });
             const trajectoryFile = msg.data.trajectory_file;
-            if (!trajectoryFile || !existsSync(trajectoryFile)) return res.status(500).json({ error: 'Trajectory file not found' });
+            console.log('[save-trajectory] trajectoryFile:', trajectoryFile);
+            if (!trajectoryFile || !existsSync(trajectoryFile)) {
+              console.log('[save-trajectory] existsSync returned false!');
+              return res.status(500).json({ error: 'Trajectory file not found' });
+            }
             try {
               const trajectoryId = createTrajectoryId();
               const { record, flow } = saveTrajectoryRecord({ trajectoryId, task: task || '', model: session.model, sourcePath: trajectoryFile, exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful } });

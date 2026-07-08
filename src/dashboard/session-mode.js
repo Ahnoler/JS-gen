@@ -651,7 +651,7 @@ export function initSessionMode() {
       let loginTask = 'Navigate to ' + url;
       if (user) loginTask += '\nEnter username: ' + user;
       if (pass) loginTask += '\nEnter password: ' + pass;
-      if (user && pass) loginTask += '\nClick the login/submit button\nWait for the page to fully load after login';
+      loginTask += '\nClick the login/submit button\nWait for the page to fully load after login';
 
       await executeSessionStep(sessionId, loginTask, 30, 'Login: ' + url);
     });
