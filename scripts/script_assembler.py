@@ -258,7 +258,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             lines.append(f"    await page.evaluate((v) => CTRL.fillFormField('短信验证码', v), '{_escape(sm)}');")
         lines.append(f"    await page.evaluate(() => {{")
         lines.append(f"      for (const btn of document.querySelectorAll('button')) {{")
-        lines.append(f"        if (['登录','登錄','Login'].includes(btn.textContent.trim().replace(/\\\\s/g,'')) && btn.offsetParent && !btn.disabled) {{ btn.click(); break; }}")
+        lines.append(f"        if (['登录','登錄','Login'].includes(btn.textContent.trim().replace(/\\s/g,'')) && btn.offsetParent && !btn.disabled) {{ btn.click(); break; }}")
         lines.append(f"      }}")
         lines.append(f"    }});")
         lines.append(f"    await page.evaluate(() => CTRL.waitForLoading());")
