@@ -52,7 +52,6 @@
 - **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要，scan_form_fields 已自动处理）。**
 - **`fill_form_fields_batch` — 已移除。批量填写功能已内建在 scan_form_fields 末尾，Agent 无需手动调用。**
 - task_done(label) — 将字段标记为已完成。
-- task_retry(label) — 将字段重新加入待办。
 - get_pending_tasks() — 返回 {"pending": [...], "done": [...]}。**🚨 如果顶层有 NEEDS_INTERVENTION 键，系统会在下一步自动注入干预指令。收到 [HUMAN INTERVENTION] 消息后按指令执行。**
 - sync_tasks_from_errors() — 读取页面校验错误，自动重试受影响的字段。NERDS_INTERVENTION 字段会**自动入队**，系统在下一步注入干预指令。
 - request_intervention(label) — 申请人工干预。用于 disabled+hasButton 字段（如"引入"按钮）。将请求入队，多个字段可同时入队。

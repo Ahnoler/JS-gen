@@ -29,7 +29,7 @@ from ..models import (
     FormSnapshot, FormSnapshotCollection,
     TaskItem, TaskList,
 )
-from .form_rules import match_rule, get_has_button_keywords
+from .form_rules import match_rule, get_has_button_keywords, _gen_idcard, _gen_credit_code, _gen_name
 
 
 def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store: dict):
@@ -70,6 +70,35 @@ def _task_done_impl(label_text, case_data_store):
     case_data_store['task_list'] = tl.to_store()
 
 
+async def _clear_field_value(page, label_text):
+    """Clear a form field's input value by label.
+
+    Targets the input inside .el-form-item that matches the label,
+    resets its value and dispatches input/change events so Vue picks it up.
+    """
+    try:
+        await page.evaluate('''(label) => {
+            const items = document.querySelectorAll('.el-form-item');
+            for (const item of items) {
+                const lbl = item.querySelector('.el-form-item__label');
+                if (!lbl || !lbl.textContent.trim().includes(label)) continue;
+                const trigger = item.querySelector('input, .el-input__inner, textarea');
+                if (!trigger) continue;
+                // Clear via native setter so Vue reacts
+                Object.getOwnPropertyDescriptor(
+                    HTMLInputElement.prototype, 'value'
+                ).set.call(trigger, '');
+                trigger.dispatchEvent(new Event('input', { bubbles: true }));
+                trigger.dispatchEvent(new Event('change', { bubbles: true }));
+                trigger.setAttribute('value', '');
+                return 'cleared';
+            }
+            return 'not-found';
+        }''', label_text)
+    except Exception:
+        pass
+
+
 def _queue_intervention(case_data_store: dict, label: str, has_button: str, reason: str):
     """Queue an intervention request — appends to list so multiple fields are preserved.
 
@@ -102,7 +131,11 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         Only triggers for main-page forms and drawers.  Dialogs are skipped
         — they are search/utility dialogs where agent needs fine control
         over which fields to fill.
+
+        Skips auto-fill when _watcher_mode is set (CDP quick actions).
         """
+        if case_data_store.get('_watcher_mode'):
+            return  # CDP watcher: single-field action, no auto-scan
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         if container_id.startswith('dialog:'):
@@ -310,6 +343,38 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             await _auto_fill_pending()
             # Re-read task_list after auto-fill to get updated done list
             tl = TaskList.from_store(case_data_store.get('task_list'))
+
+        # ── 扫描校验错误：auto-fill 之后检查哪些字段有 .el-form-item__error ──
+        # 将报错字段从 done[] 移回 pending[]，让 Agent 能感知并重填。
+        try:
+            error_labels = await page.evaluate('''() => {
+                const container = ''' + JS_GET_CONTAINER + ''';
+                const items = [];
+                for (const el of container.querySelectorAll('.el-form-item__error')) {
+                    const raw = el.textContent.trim();
+                    if (!raw) continue;
+                    const label = raw.replace(/^(请选择|请?输入|请上传|填写|完善)/, '').replace(/[：:]/g, '').trim();
+                    if (label && label.length > 1 && label.length < 30) items.push(label);
+                }
+                return JSON.stringify(items);
+            }''')
+            error_labels_parsed = json.loads(error_labels) if isinstance(error_labels, str) else error_labels
+        except Exception:
+            error_labels_parsed = []
+        if error_labels_parsed:
+            retried = tl.sync_from_errors(error_labels_parsed)
+            case_data_store['task_list'] = tl.to_store()
+            if retried:
+                sys.stderr.write(f'[scan-form] Validation errors found: {error_labels_parsed} → retried {len(retried)} field(s)\n')
+                sys.stderr.flush()
+                # Clear retried fields' values in DOM so re-fill starts clean
+                for item in retried:
+                    await _clear_field_value(page, item.label)
+                # Re-run auto-fill for newly-pending error fields
+                tl = TaskList.from_store(case_data_store.get('task_list'))
+                if tl.pending:
+                    await _auto_fill_pending()
+                    tl = TaskList.from_store(case_data_store.get('task_list'))
         # Annotate fields so agent knows which were handled
         done_labels = {d.label for d in tl.done}
         for f in dom_fields:
@@ -354,9 +419,35 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         except Exception:
             pass
 
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+
+        # ── 扫描校验错误：将报错字段从 done[] 移回 pending[]，清空值 ──
+        try:
+            error_labels = await page.evaluate('''() => {
+                const container = ''' + JS_GET_CONTAINER + ''';
+                const items = [];
+                for (const el of container.querySelectorAll('.el-form-item__error')) {
+                    const raw = el.textContent.trim();
+                    if (!raw) continue;
+                    const label = raw.replace(/^(请选择|请?输入|请上传|填写|完善)/, '').replace(/[：:]/g, '').trim();
+                    if (label && label.length > 1 && label.length < 30) items.push(label);
+                }
+                return JSON.stringify(items);
+            }''')
+            error_labels_parsed = json.loads(error_labels) if isinstance(error_labels, str) else error_labels
+        except Exception:
+            error_labels_parsed = []
+        if error_labels_parsed:
+            retried = tl.sync_from_errors(error_labels_parsed)
+            if retried:
+                case_data_store['task_list'] = tl.to_store()
+                for item in retried:
+                    await _clear_field_value(page, item.label)
+                sys.stderr.write(f'[scan-visible] Validation errors: {error_labels_parsed} → retried {len(retried)} field(s)\n')
+                sys.stderr.flush()
+
         # Only show fields that still need filling (pending) — keeps failed/error fields.
         # Also keeps fields not yet tracked (safe default for dynamically shown fields).
-        tl = TaskList.from_store(case_data_store.get('task_list'))
         pending_labels = {d.label for d in tl.pending}
         done_labels = {d.label for d in tl.done}
         dom_fields = [f for f in dom_fields if f.label in pending_labels or f.label not in done_labels]
@@ -422,6 +513,67 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 's => console.log("[AI填表] 分组 " + s)',
                 f'{kind_name}: {len(sub)}个字段',
             )
+
+            # ---- Cross-field: cert type -> cert number ----
+            # When cert_number is in the input group and cert_type was already
+            # selected, inject the matching format as commandValue (Priority 1).
+            if idx == 1:
+                _has_cert_num = any(
+                    '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or '')
+                    for d in sub
+                )
+                if _has_cert_num:
+                    try:
+                        _ct = await page.evaluate('''(kw) => {
+                            const items = document.querySelectorAll('.el-form-item');
+                            for (const item of items) {
+                                const lbl = item.querySelector('.el-form-item__label');
+                                if (!lbl) continue;
+                                if (kw.some(k => lbl.textContent.trim().includes(k))) {
+                                    const inp = item.querySelector('input');
+                                    if (inp && inp.value) return inp.value;
+                                    const inner = item.querySelector('.el-input__inner');
+                                    if (inner && inner.value) return inner.value;
+                                }
+                            }
+                            return '';
+                        }''', ['证件类型', '证照类型', '证件种类'])
+                    except Exception:
+                        _ct = ''
+                    if _ct:
+                        if '身份证' in _ct:
+                            _ov = _gen_idcard()
+                        elif '统一社会信用代码' in _ct or '营业执照' in _ct:
+                            _ov = _gen_credit_code()
+                        else:
+                            _ov = None
+                        if _ov:
+                            for d in sub:
+                                if '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or ''):
+                                    d['commandValue'] = _ov
+                                    sys.stderr.write(f'[cert-detect] cert_type="{_ct}" -> cert_number override: {_ov}\n')
+                                    sys.stderr.flush()
+                                    break
+                    # ---- Cross-field: cert type -> customer name ----
+                    _has_cust_name = any(
+                        '客户名称' in (d.get('label', '') or '') or '客户姓名' in (d.get('label', '') or '')
+                        for d in sub
+                    )
+                    if _has_cust_name and _ct:
+                        if '身份证' in _ct:
+                            _name_ov = _gen_name()
+                        elif '统一社会信用代码' in _ct or '营业执照' in _ct:
+                            _name_ov = '测试科技发展有限公司'
+                        else:
+                            _name_ov = None
+                        if _name_ov:
+                            for d_name in sub:
+                                if '客户名称' in (d_name.get('label', '') or '') or '客户姓名' in (d_name.get('label', '') or ''):
+                                    d_name['commandValue'] = _name_ov
+                                    sys.stderr.write(f'[cert-detect] cert_type="{_ct}" -> customer name: {_name_ov}\n')
+                                    sys.stderr.flush()
+                                    break
+
             actions = _llm_generate_values(llm, sub, form_rules=form_rules, case_data_store=case_data_store)
             await page.evaluate(
                 'd => console.log("[AI填表] 所有动作(" + d.length + "): " + JSON.stringify(d.map(a => a.label + "=" + (a.value||a.option||""))))',
@@ -759,13 +911,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
-    @controller.action('Re-add a field to the pending task list (e.g., after a validation error).')
-    async def task_retry(label_text: str):
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        tl.retry(label_text)
-        case_data_store['task_list'] = tl.to_store()
-        return _ok(f'task-retry:{label_text} | pending:{len(tl.pending)}')
-
     @controller.action('Get the current pending/done task list. Returns {"pending": [{label,kind,options,...}], "done": [...]}. Each entry is a full field object for LLM planning.')
     async def get_pending_tasks():
         tl = TaskList.from_store(case_data_store.get('task_list'))
@@ -893,67 +1038,33 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         await page.wait_for_timeout(800)
 
-        matched_text = await page.evaluate(JS_FIND_OPTION, option_text)
-        if matched_text in ('NO_ITEMS',):
-            return _err('no-items')
-        if matched_text.startswith('NOT_FOUND:'):
-            retry_key = f'_sel_retry_{label_text}'
-            retries = case_data_store.get(retry_key, 0) + 1
-            case_data_store[retry_key] = retries
-            if retries >= 3:
-                matched_text = await page.evaluate(JS_FIND_OPTION, 'first')
-                if matched_text in ('NO_ITEMS',) or matched_text.startswith('NOT_FOUND:'):
-                    return _err(matched_text)
-            else:
-                return _err(matched_text)
-
-        try:
-            opt = page.locator(
-                f'//li[contains(@class, "el-select-dropdown__item")][normalize-space()="{matched_text}"]'
-            ).first
-            await opt.wait_for(state='visible', timeout=3000)
-            await opt.click()
-        except Exception:
-            try:
-                opt = page.locator('.el-select-dropdown__item').filter(has_text=matched_text).first
-                await opt.wait_for(state='attached', timeout=2000)
-                await opt.click()
-            except Exception as e:
-                return _err(f'click-failed:{e}')
-
-        await page.wait_for_timeout(500)
-
-        current_raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
-        if not current_raw or current_raw == 'label-not-found':
-            loc = await page.evaluate(JS_LOCATOR, [label_text])
-            return _ok(f'ok | {matched_text}' + (' | loc:' + loc) if loc else f'ok | {matched_text}')
-
-        try:
-            field_info = json.loads(current_raw)
-        except Exception:
-            field_info = {}
-        current_val = field_info.get('currentValue', '')
-
-        await page.evaluate('''([label, text]) => {
-            const container = ''' + JS_GET_CONTAINER + ''';
-            const items = container.querySelectorAll('.el-form-item');
-            for (const item of items) {
-                const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                if (!lbl.includes(label)) continue;
-                const trigger = item.querySelector('.el-select .el-input__inner');
-                if (trigger) { trigger.value = text; trigger.setAttribute('value', text); }
-                return;
-            }
-        }''', [label_text, matched_text])
-
-        if current_val and (current_val == matched_text or matched_text in current_val or current_val in matched_text):
+        select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
+        if select_result.startswith('ok:'):
+            matched_text = select_result.split(':', 1)[1]
             case_data_store.pop(f'_sel_retry_{label_text}', None)
             element = await _capture_element(page, label_text)
             _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
             _task_done_impl(label_text, case_data_store)
-            return _ok(f'ok | {current_val}')
-
-        return _err(f'confirm-failed | current:{current_val} | expected:{matched_text}')
+            return _ok(f'ok | {matched_text}')
+        elif select_result == 'no-items':
+            return _err('no-items')
+        elif select_result.startswith('option-not-found:'):
+            retry_key = f'_sel_retry_{label_text}'
+            retries = case_data_store.get(retry_key, 0) + 1
+            case_data_store[retry_key] = retries
+            if retries >= 3:
+                first_result = await page.evaluate(JS_SELECT_OPTION, 'first')
+                if first_result.startswith('ok:'):
+                    matched_text = first_result.split(':', 1)[1]
+                    case_data_store.pop(f'_sel_retry_{label_text}', None)
+                    element = await _capture_element(page, label_text)
+                    _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
+                    _task_done_impl(label_text, case_data_store)
+                    return _ok(f'ok | {matched_text}')
+                return _err(first_result)
+            return _err(select_result)
+        else:
+            return _err(select_result)
 
     # ── Adjacent button / radio (moved from misc for logical grouping) ──
 

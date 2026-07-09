@@ -574,22 +574,70 @@ export default function (app) {
   });
 
   app.post('/api/browser/watcher/action', async (req, res) => {
-    const gb = state.globalBrowser;
-    if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Agent not ready. Start a session first.' });
-
-    const { action, params } = req.body || {};
-    if (!action) return res.status(400).json({ error: 'action is required' });
-
-    // Wait up to 5s for agent to not be busy (quick actions need idle browser)
-    const deadline = Date.now() + 5000;
-    while (gb.busy && Date.now() < deadline) { await new Promise(r => setTimeout(r, 200)); }
-
     try {
-      gb.stdin.write(JSON.stringify({ event: 'cdp_action', data: { action, params: params || [] } }) + '\n');
-      // Quick actions are fire-and-forget from the HTTP perspective
-      // Actions are recorded to _ACTION_LOG by the watcher automatically
-      res.json({ status: 'executed', action, params });
+      const gb = state.globalBrowser;
+      if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Agent not ready. Start a session first.' });
+      if (!gb.process || !gb.process.stdout) return res.status(503).json({ error: 'Agent process not available' });
+
+      const { action, params } = req.body || {};
+      if (!action) return res.status(400).json({ error: 'action is required' });
+
+      // Wait up to 5s for agent to not be busy (quick actions need idle browser)
+      const deadline = Date.now() + 5000;
+      while (gb.busy && Date.now() < deadline) { await new Promise(r => setTimeout(r, 200)); }
+
+      const reqId = crypto.randomUUID().slice(0, 8);
+
+      // Set up one-shot listener for the result
+      const result = await new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve({ error: 'timeout: no response from agent within 15s' }), 15000);
+        let buffer = '';
+
+        const onData = (chunk) => {
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const msg = JSON.parse(line);
+              if (msg.event === 'cdp_action_result' && msg.id === reqId) {
+                cleanup();
+                resolve({ result: msg.result, error: msg.error });
+              }
+            } catch {}
+          }
+        };
+
+        const onExit = () => {
+          cleanup();
+          resolve({ error: 'Agent process exited before result' });
+        };
+
+        const cleanup = () => {
+          clearTimeout(timeout);
+          try { gb.process.stdout.removeListener('data', onData); } catch {}
+          try { gb.process.removeListener('exit', onExit); } catch {}
+        };
+
+        try { gb.process.stdout.on('data', onData); } catch (e) { cleanup(); resolve({ error: String(e) }); return; }
+        try { gb.process.on('exit', onExit); } catch (e) { cleanup(); resolve({ error: String(e) }); return; }
+
+        // Send after listener is attached
+        try {
+          gb.stdin.write(JSON.stringify({ event: 'cdp_action', data: { id: reqId, action, params: params || [] } }) + '\n');
+        } catch (err) {
+          cleanup();
+          resolve({ error: String(err) });
+        }
+      });
+
+      if (result.error) {
+        return res.status(500).json({ error: result.error, action, params });
+      }
+      res.json({ status: 'executed', action, params, result: result.result });
     } catch (err) {
+      console.error('[watcher-action] Error:', err.message);
       res.status(500).json({ error: err.message });
     }
   });

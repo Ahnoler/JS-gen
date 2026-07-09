@@ -170,7 +170,7 @@ PARTIAL_CTRL_FOOTER = '''  } catch (err) {
 _IDENTITY_KEYWORDS = [
     ('genCreditCode', ['证件号码', '统一社会信用代码', '信用代码', '营业执照', '营业执照号']),
     ('genValidIdCard', ['身份证', '身份证号', '居民身份证']),
-    ('genMobile', ['手机', '电话', '联系方式', '联系电话', '电话号码']),
+    ('genMobile', ['手机号', '电话', '联系方式', '联系电话', '电话号码']),
     ('genEmail', ['邮箱', 'Email', '电子邮箱']),
     ('genBankCard', ['银行卡', '银行卡号', '银行账号']),
     ('genName', ['姓名', '联系人']),

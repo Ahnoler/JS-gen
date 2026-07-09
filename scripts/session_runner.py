@@ -401,56 +401,61 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
     return 'step'
 
 
-async def _run_cdp_watcher(controller, action_queue, case_data_store, form_rules):
-    """In-process CDP watcher — connects to the same browser and executes quick actions.
+async def _run_cdp_watcher(browser_context, action_queue, case_data_store, form_rules):
+    """In-process quick-action executor — uses the same browser_context as the Agent.
 
     Shares _ACTION_LOG and case_data_store with the main Agent, so all actions
     executed through this watcher are recorded for script assembly.
+    No separate CDP connection needed — actions run on the same Playwright context.
     """
-    from playwright.async_api import async_playwright
-    from .cdp.watcher import _build_ctrl, _get_page
+    from .actions._builder import build_controller
 
-    port = 9242
-    try:
-        async with async_playwright() as pw:
-            browser = await pw.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
-            ctx = browser.contexts[0]
-            page = await _get_page(ctx)
-            sys.stderr.write(f"[cdp-watcher] Connected to port {port}, page: {page.url if page else 'none'}\n")
+    # TODO: 如果将来改用 raw Playwright context（如从 CDP 连接），
+    #       必须手动注入 get_current_page()，否则 controller action 会报错。
+    #       参考 scripts/cdp/watcher.py:69-70:
+    #         ctx = browser.contexts[0]
+    #         ctx.get_current_page = _get_page
+    # TODO: 自愈重跑场景下，CDP 操作可用于快速重建页面场景（填写表单、点击按钮等），
+    #       避免每次重跑都走完整的 AI 推理循环。见 browser-session.js rerun 路由的
+    #       form_changes 参数，结合 CDP 操作可以精准修复字段级差异。
+    ctrl = build_controller(browser_context, form_rules, case_data_store=case_data_store)
+    actions = ctrl.registry.registry.actions
+
+    while True:
+        msg = await action_queue.get()
+        action_name = msg.get("action", "")
+        params = msg.get("params", [])
+        req_id = msg.get("id", "")
+
+        act = actions.get(action_name)
+        if not act:
+            sys.stderr.write(f"[cdp-watcher] Unknown action: {action_name}\n")
             sys.stderr.flush()
+            continue
 
-            # Build a separate controller that shares the same case_data_store
-            cdp_ctrl = _build_ctrl(ctx, case_data_store, form_rules)
-            actions = cdp_ctrl.registry.registry.actions
-
-            while True:
-                msg = await action_queue.get()
-                action_name = msg.get("action", "")
-                params = msg.get("params", [])
-                req_id = msg.get("id", "")
-
-                act = actions.get(action_name)
-                if not act:
-                    sys.stderr.write(f"[cdp-watcher] Unknown action: {action_name}\n")
-                    sys.stderr.flush()
-                    continue
-
-                try:
-                    if isinstance(params, list):
-                        result = await act.function(*params)
-                    elif isinstance(params, dict):
-                        result = await act.function(**params)
-                    else:
-                        result = await act.function()
-                    # Record to shared _ACTION_LOG (done inside each action function)
-                    sys.stderr.write(f"[cdp-watcher] {action_name}{params} -> {result}\n")
-                    sys.stderr.flush()
-                except Exception as e:
-                    sys.stderr.write(f"[cdp-watcher] Error: {action_name}{params} -> {e}\n")
-                    sys.stderr.flush()
-    except Exception as e:
-        sys.stderr.write(f"[cdp-watcher] Failed to connect: {e}\n")
-        sys.stderr.flush()
+        try:
+            # Per-action watcher mode — skip _ensure_scanned, no auto-fill
+            case_data_store['_watcher_mode'] = True
+            try:
+                if isinstance(params, list):
+                    result = await act.function(*params)
+                elif isinstance(params, dict):
+                    result = await act.function(**params)
+                else:
+                    result = await act.function()
+                result_str = str(result)
+            finally:
+                case_data_store['_watcher_mode'] = False
+            sys.stderr.write(f"[cdp-watcher] {action_name}{params} -> {result_str}\n")
+            sys.stderr.flush()
+            if req_id:
+                emit_json({"event": "cdp_action_result", "id": req_id, "result": result_str, "error": None})
+        except Exception as e:
+            err_str = str(e)
+            sys.stderr.write(f"[cdp-watcher] Error: {action_name}{params} -> {err_str}\n")
+            sys.stderr.flush()
+            if req_id:
+                emit_json({"event": "cdp_action_result", "id": req_id, "result": None, "error": err_str})
 
 
 async def run_session(args):
@@ -488,7 +493,7 @@ async def run_session(args):
 
     # Start CDP watcher — runs in-process, shares _ACTION_LOG and case_data_store
     cdp_action_queue = asyncio.Queue()
-    cdp_task = asyncio.create_task(_run_cdp_watcher(controller, cdp_action_queue, case_data_store, form_rules))
+    cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, case_data_store, form_rules))
 
     emit_json({"event": "ready", "session_id": session_id})
     sys.stderr.write(f"[session] Ready, session_id={session_id}\n")

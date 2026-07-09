@@ -273,9 +273,12 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
             // 1. DOM property value (most reliable after native setter)
             const v = (trigger.value || '').trim();
             if (v) return v;
-            // 2. Attribute value (may persist even if property cleared)
+            // 2. Attribute value — only trust if trigger.value is also non-empty.
+            // When Vue/Element clears the model value it resets trigger.value to
+            // '' but leaves the HTML attribute unchanged, causing stale reads.
+            // So skip getAttribute('value') when the DOM property is empty.
             const av = (trigger.getAttribute('value') || '').trim();
-            if (av) return av;
+            if (av && trigger.value !== '') return av;
             // 3. ARIA / title fallback
             const aria = (trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '').trim();
             if (aria) return aria;
@@ -286,46 +289,94 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         if (selItem) return selItem.textContent.trim();
         return null;
     };
-    const container = ''' + JS_GET_CONTAINER + ''';
-    const items = container.querySelectorAll('.el-form-item');
-    // Pass 1: exact label match
-    for (let pass = 1; pass <= 2; pass++) {
-        const exact = pass === 1;
-        for (const item of items) {
-            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-            if (exact) { if (lbl !== label) continue; }
-            else { if (lbl === label || !lbl.includes(label)) continue; }
-        const trigger = item.querySelector('.el-select .el-input__inner');
-        if (!trigger && mode === 'trigger') return 'no-select-found';
-        if (!trigger) continue;
-        if (mode === 'check') {
-            const cur = getSelectedLabel(item);
-            if (cur) return 'already:' + cur;
-            return 'not-filled';
+    // Priority search: P0=dialog, P1=drawer, P2=document
+    // ════════════════════════════════════════════════════════════════
+    // Fix: container-level priority prevents cross-container field confusion.
+    //
+    // Problem:  When an el-drawer overlay has a field with the SAME label as
+    // a field on the main page (e.g. "对私客户细分类型" appears both in the
+    // drawer and on the main form), the old code searched all .el-form-item
+    // elements at the document level and matched the main page's field first
+    // (DOM order), ignoring the drawer's visible instance.
+    //
+    // Solution:  Three-tier priority search against containers:
+    //   P0 — visible el-dialog
+    //   P1 — visible el-drawer
+    //   P2 — document (fallback)
+    //
+    // Note: el-drawer uses position:fixed or position:absolute depending on
+    // the Element UI version; in either case offsetParent may be null (fixed)
+    // or non-null (absolute). We use getBoundingClientRect as a robust check.
+    // JS_GET_CONTAINER is left unchanged since it works for the fill path.
+    const _isVisibleContainer = (el) => {
+        if (el.offsetParent !== null) return true;
+        const style = getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    };
+    const _containers = [];
+    for (const d of document.querySelectorAll('.el-dialog'))
+        if (_isVisibleContainer(d)) _containers.push(d);
+    for (const d of document.querySelectorAll('.el-drawer'))
+        if (_isVisibleContainer(d)) _containers.push(d);
+    _containers.push(document);
+
+    function _tryItems(items, label, mode) {
+        for (let pass = 1; pass <= 2; pass++) {
+            const exact = pass === 1;
+            for (const item of items) {
+                const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                if (exact) { if (lbl !== label) continue; }
+                else { if (lbl === label || !lbl.includes(label)) continue; }
+            const trigger = item.querySelector('.el-select .el-input__inner');
+            if (!trigger && mode === 'trigger') return {skip: true, reason: 'no-select-found'};
+            if (!trigger) continue;
+            if (mode === 'check') {
+                const cur = getSelectedLabel(item);
+                if (cur) return {done: true, result: 'already:' + cur};
+                return {skip: true, reason: 'no-value'};
+            }
+            if (mode === 'trigger') {
+                if (trigger.disabled) return {skip: true, reason: 'disabled'};
+                item.scrollIntoView({ block: 'center', behavior: 'instant' });
+                trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                trigger.click();
+                window.__last_select_trigger = trigger;
+                return {done: true, result: 'triggered'};
+            }
+            if (mode === 'confirm') {
+                const cur = getSelectedLabel(item);
+                if (cur) return {done: true, result: 'SELECTED:' + cur};
+                return {done: true, result: 'NOT-SELECTED'};
+            }
+            return {done: true, result: 'unknown-mode'};
         }
-        if (mode === 'trigger') {
-            if (trigger.disabled) return 'select-disabled';
-            // Scroll the form-item into view so the dropdown opens in the correct position
-            item.scrollIntoView({ block: 'center', behavior: 'instant' });
-            // tssc-multi-select needs real mouse events, not just .click()
-            trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-            trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-            trigger.click();
-            // Save reference so JS_SELECT_OPTION can sync Vue model on the right trigger
-            window.__last_select_trigger = trigger;
-            return 'triggered';
         }
-        if (mode === 'confirm') {
-            const cur = getSelectedLabel(item);
-            if (cur) return 'SELECTED:' + cur;
-            return 'NOT-SELECTED';
-        }
-        return 'unknown-mode';
+        return null;
     }
+
+    for (const c of _containers) {
+        const items = c.querySelectorAll('.el-form-item');
+        const r = _tryItems(items, label, mode);
+        if (r) {
+            if (r.done) return r.result;
+            if (mode === 'check' && r.reason === 'no-value') {
+                // P0/P1 container found the field but it's empty (not yet filled).
+                // Return 'not-filled' immediately instead of falling through to
+                // lower-priority containers (e.g. P2 document) that might have a
+                // stale already: value from a different instance of the same label.
+                // Without this guard, the caller sees 'already:一般农户' (from the
+                // main page's filled select) and skips filling the drawer's empty one.
+                return 'not-filled';
+            }
+            if (mode === 'trigger' && r.reason !== 'no-select-found') continue;
+        }
     }
-    const allSelects = container.querySelectorAll('.el-select .el-input__inner');
+    const _allSelects = document.querySelectorAll('.el-select .el-input__inner');
     if (mode === 'check') {
-        for (const sel of allSelects) {
+        for (const sel of _allSelects) {
             if (sel.offsetParent !== null) {
                 const v = (sel.value || '').trim();
                 if (v.length > 0) return 'already:' + v;
@@ -337,17 +388,17 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         return 'not-filled';
     }
     if (mode === 'trigger') {
-        for (const sel of allSelects) {
+        for (const sel of _allSelects) {
             const ph = sel.getAttribute('placeholder') || '';
             if (ph.includes(label) && !sel.disabled && sel.offsetParent !== null) { sel.click(); return 'triggered'; }
         }
-        for (const sel of allSelects) {
+        for (const sel of _allSelects) {
             if (!sel.disabled && sel.offsetParent !== null) { sel.click(); return 'triggered'; }
         }
         return 'label-not-found';
     }
     if (mode === 'confirm') {
-        for (const sel of allSelects) {
+        for (const sel of _allSelects) {
             if (sel.offsetParent !== null) {
                 const v = (sel.value || '').trim();
                 if (v) return 'SELECTED:' + v;
@@ -361,7 +412,25 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
 JS_FIND_VISIBLE_DROPDOWN = '''(() => {
     const dropdowns = document.querySelectorAll('.el-select-dropdown');
     for (const dd of dropdowns) {
-        if (dd.offsetParent !== null && !dd.classList.contains('is-hidden')) return dd;
+        if (dd.classList.contains('is-hidden')) continue;
+        // ═══ Fix: handle position:fixed dropdowns ═══
+        // Problem: el-select-dropdown uses position:fixed (common in Element UI
+        // with custom popper wrappers).  HTMLElement.offsetParent is null for
+        // position:fixed elements, so `dd.offsetParent !== null` fails to detect
+        // the visible dropdown.  The function then returns `document`, causing
+        // JS_SELECT_OPTION to fall back to document.querySelectorAll('.el-select-
+        // dropdown__item') which picks items from ALL dropdowns — including hidden
+        // ones on the main page — resulting in clicking the wrong dropdown's item
+        // and silently failing to update the drawer's select value.
+        //
+        // Solution: when offsetParent is null, use getBoundingClientRect to check
+        // visibility.  position:absolute dropdowns (non-null offsetParent) are
+        // unaffected — the fast path still returns immediately.
+        if (dd.offsetParent !== null) return dd;
+        const style = getComputedStyle(dd);
+        if (style.display === 'none' || style.visibility === 'hidden') continue;
+        const rect = dd.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) return dd;
     }
     return document;
 })()'''
