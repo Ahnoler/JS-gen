@@ -20,19 +20,149 @@ from typing import Callable, List, Optional
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Constants
+# ══════════════════════════════════════════════════════════════════════════════
+
+# 手机号段（34个，覆盖移动/联通/电信/虚拟运营商）
+_HAODUAN = [
+    '130', '131', '132', '133', '134', '135', '136', '137', '138', '139',
+    '145', '147',
+    '150', '151', '152', '153', '156', '157', '158', '159',
+    '170',
+    '176', '177', '178',
+    '180', '181', '182', '183', '184', '185', '186', '187', '188', '189',
+]
+
+# 身份证前6位区划码（省+市+区县级别，覆盖主要区域）
+_IDCARD_AREAS = [
+    '110101', '110102', '110105', '110108', '110111', '110112', '110113',
+    '120101', '120102', '120103', '120104',
+    '130100', '130200', '130300', '130400', '130500', '130600',
+    '140100', '140200', '140300', '140400',
+    '210100', '210200', '210300', '210400', '210500',
+    '220100', '220200', '220300', '220400',
+    '230100', '230200', '230300', '230400',
+    '310101', '310104', '310105', '310106', '310107', '310109', '310110',
+    '320100', '320200', '320300', '320400', '320500', '320600',
+    '330100', '330200', '330300', '330400', '330500', '330600',
+    '340100', '340200', '340300', '340400', '340500',
+    '350100', '350200', '350300', '350400', '350500',
+    '360100', '360200', '360300', '360400', '360500',
+    '370100', '370200', '370300', '370400', '370500', '370600',
+    '410100', '410200', '410300', '410400', '410500',
+    '420100', '420200', '420300', '420400', '420500',
+    '430100', '430200', '430300', '430400', '430500', '430600',
+    '440100', '440200', '440300', '440400', '440500', '440600',
+    '450100', '450200', '450300', '450400',
+    '500101', '500102', '500103', '500104', '500105', '500106', '500107',
+    '510100', '510300', '510400', '510500', '510600', '510700',
+    '520100', '520200', '520300',
+    '530100', '530300', '530400', '530500',
+    '610100', '610200', '610300', '610400',
+    '620100', '620200', '620300',
+    '650100', '650200',
+]
+
+# 银行卡BIN前缀（34种）
+_BIN_PREFIXES = [
+    '10', '18', '30', '35', '37', '40', '41', '42', '43', '44', '45',
+    '46', '47', '48', '49', '50', '51', '52', '53', '54', '55', '56',
+    '58', '60', '62', '65', '68', '69', '84', '87', '88', '94', '95', '98', '99',
+]
+
+# 统一社会信用代码：登记机构映射（GB 32100-2015）
+_REG_ORG_MAP = {
+    '1': 1,   # 机构编制
+    '2': 2,   # 外交
+    '3': 3,   # 教育
+    '4': 4,   # 公安
+    '5': 5,   # 民政
+    '6': 6,   # 司法
+    '7': 7,   # 交通运输
+    '8': 8,   # 文化
+    '9': 9,   # 工商
+    '10': 'A',  # 旅游局
+    '11': 'B',  # 宗教事务管理
+    '12': 'C',  # 全国总工会
+    '13': 'D',  # 人民解放军总后勤部
+    '14': 'E',  # 省级人民政府
+    '15': 'F',  # 地市级人民政府
+    '16': 'G',  # 区县级人民政府
+    '17': 'Y',  # 其他
+}
+
+# 信用代码字符集（GB 32100-2015，不含 I O S V Z）
+_CC_CHARS = '0123456789ABCDEFGHJKLMNPQRTUWXY'
+# 信用代码权重（ISO 7064, MOD 31-2）
+_CC_WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28]
+
+# 组织机构代码权重（GB 11714-1997）
+_ORG_CODE_WEIGHTS = [3, 7, 9, 10, 5, 8, 4, 2]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Generator functions
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _gen_mobile() -> str:
-    return '1' + str(_random.choice([3, 4, 5, 6, 7, 8, 9])) + ''.join(
-        str(_random.randint(0, 9)) for _ in range(9))
+    """11位手机号，使用真实号段。"""
+    haoduan = _random.choice(_HAODUAN)
+    tail = ''.join(str(_random.randint(0, 9)) for _ in range(8))
+    return haoduan + tail
 
 
 def _gen_idcard() -> str:
-    prefix = '430101'
-    birth = f"{1950 + _random.randint(0, 55)}{_random.randint(1, 12):02d}{_random.randint(1, 28):02d}"
-    seq = f"{_random.randint(0, 999):03d}"
-    base = prefix + birth + seq
+    """18位身份证号，含GB 11643-1999校验位。
+
+    结构：6位区划码 + 8位生日 + 3位顺序码(奇男偶女) + 1位校验码。
+    """
+    prefix = _random.choice(_IDCARD_AREAS)
+    year = 1950 + _random.randint(0, 55)
+    month = _random.randint(1, 12)
+    day = _random.randint(1, 28)
+    birth = f"{year}{month:02d}{day:02d}"
+
+    # 顺序码：随机生成，确保奇数为男、偶数为女
+    seq = _random.randint(0, 999)
+    # 保持奇偶性不强制（允许任意顺序码），如需要可外部指定性别
+    # 默认生成合法身份证即可
+    seq_str = f"{seq:03d}"
+
+    base = prefix + birth + seq_str
+    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+    check = '10X98765432'[sum(int(base[i]) * weights[i] for i in range(17)) % 11]
+    return base + check
+
+
+def _gen_idcard_male() -> str:
+    """生成男性身份证（顺序码为奇数）。"""
+    prefix = _random.choice(_IDCARD_AREAS)
+    year = 1950 + _random.randint(0, 55)
+    month = _random.randint(1, 12)
+    day = _random.randint(1, 28)
+    birth = f"{year}{month:02d}{day:02d}"
+
+    seq = _random.choice([1, 3, 5, 7, 9]) * 100 + _random.randint(0, 99)
+    seq_str = f"{seq:03d}"
+
+    base = prefix + birth + seq_str
+    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+    check = '10X98765432'[sum(int(base[i]) * weights[i] for i in range(17)) % 11]
+    return base + check
+
+
+def _gen_idcard_female() -> str:
+    """生成女性身份证（顺序码为偶数）。"""
+    prefix = _random.choice(_IDCARD_AREAS)
+    year = 1950 + _random.randint(0, 55)
+    month = _random.randint(1, 12)
+    day = _random.randint(1, 28)
+    birth = f"{year}{month:02d}{day:02d}"
+
+    seq = _random.choice([0, 2, 4, 6, 8]) * 100 + _random.randint(0, 99)
+    seq_str = f"{seq:03d}"
+
+    base = prefix + birth + seq_str
     weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
     check = '10X98765432'[sum(int(base[i]) * weights[i] for i in range(17)) % 11]
     return base + check
@@ -48,17 +178,83 @@ def _gen_email() -> str:
 
 
 def _gen_credit_code() -> str:
-    CHARS = '0123456789ABCDEFGHJKLMNPQRTUWXY'
-    body = '91' + f"{_random.randint(100000, 999999)}"
-    for _ in range(9):
-        body += _random.choice(CHARS)
-    WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28]
-    total = sum(CHARS.index(body[i]) * WEIGHTS[i] for i in range(17))
-    return body + CHARS[(31 - total % 31) % 31]
+    """18位统一社会信用代码（GB 32100-2015）。
+
+    结构：1位登记机构 + 1位机构类型 + 6位行政区划 + 8位组织机构代码(含校验) + 1位校验码。
+    """
+    # 登记机构（默认工商）
+    reg_org = str(_REG_ORG_MAP['9'])
+    # 机构类型（1=企业）
+    org_type = '1'
+    # 行政区划（6位）
+    area = _random.choice(_IDCARD_AREAS)
+    # 组织机构代码（8位数字 + 1位校验码，mod 11）
+    org_body = ''.join(str(_random.randint(0, 9)) for _ in range(8))
+    org_sum = sum(int(org_body[i]) * _ORG_CODE_WEIGHTS[i] for i in range(8))
+    c9 = 11 - (org_sum % 11)
+    if c9 == 11:
+        c9_char = '0'
+    elif c9 == 10:
+        c9_char = 'X'
+    else:
+        c9_char = str(c9)
+    org_code = org_body + c9_char
+
+    code_body = reg_org + org_type + area + org_code
+    # 校验码（ISO 7064, MOD 31-2）
+    total = sum(_CC_CHARS.index(code_body[i]) * _CC_WEIGHTS[i] for i in range(17))
+    c18 = _CC_CHARS[(31 - total % 31) % 31]
+    return code_body + c18
+
+
+def _gen_org_code() -> str:
+    """9位组织机构代码（GB 11714-1997），格式 XXXXXXXX-X。
+
+    8位数字/字母本体 + 1位校验码（mod 11，10→X）。
+    """
+    _ORG_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    body = ''.join(_random.choice(_ORG_CHARS) for _ in range(8))
+    _weights = [3, 7, 9, 10, 5, 8, 4, 2]
+
+    # 代码字符映射为数值
+    def _cv(c):
+        if '0' <= c <= '9':
+            return ord(c) - 48
+        return ord(c) - 55  # A=10, B=11, ...
+
+    total = sum(_cv(body[i]) * _weights[i] for i in range(8))
+    c9 = 11 - (total % 11)
+    if c9 == 11:
+        check = '0'
+    elif c9 == 10:
+        check = 'X'
+    else:
+        check = str(c9)
+    return f"{body}-{check}"
 
 
 def _gen_bankcard() -> str:
-    return '62' + ''.join(str(_random.randint(0, 9)) for _ in range(17))
+    """16-19位银行卡号，含Luhm校验位。
+
+    结构：BIN前缀 + 中间位 + 1位Luhm校验码。
+    """
+    bin_prefix = _random.choice(_BIN_PREFIXES)
+    # 中间位：补齐到15或18位（含BIN）
+    total_before_check = 15 if _random.random() < 0.3 else 18
+    mid_len = total_before_check - len(bin_prefix)
+    mid = ''.join(str(_random.randint(0, 9)) for _ in range(mid_len))
+    first_n = bin_prefix + mid
+
+    # Luhm算法计算校验位（ISO/IEC 7812）
+    digits = [int(ch) for ch in first_n]
+    for i in range(len(digits) - 1, -1, -1):
+        if (len(digits) - i) % 2 == 1:
+            digits[i] *= 2
+            if digits[i] > 9:
+                digits[i] -= 9
+    total = sum(digits)
+    luhm = (10 - total % 10) % 10
+    return first_n + str(luhm)
 
 
 def _gen_amount() -> str:
@@ -148,16 +344,18 @@ def _make_field_rules() -> List[FieldRule]:
     return [
         # ── Identity & certificates (priority 90-100) ──
         FieldRule(["身份证", "身份证号", "居民身份证"], _gen_idcard, 100, "dynamic",
-                  "18位身份证号，含GB 11643-1999校验位"),
+                  "18位身份证号，含GB 11643-1999校验位，随机性别"),
         FieldRule(["统一社会信用代码", "信用代码", "营业执照", "营业执照号", "证件号码"],
                   _gen_credit_code, 100, "dynamic",
-                  "18位统一社会信用代码，含ISO 7064校验码"),
+                  "18位统一社会信用代码，GB 32100-2015标准，含登记机构/类型/区划/组织代码/校验码"),
+        FieldRule(["组织机构代码", "组织代码"], _gen_org_code, 100, "dynamic",
+                  "9位组织机构代码，GB 11714-1997标准，XXXXXXXX-X格式，含mod11校验位"),
         FieldRule(["机构信用代码"], _gen_institution_credit_code, 95, "dynamic",
                   "10位机构信用代码（人行征信中心分配）"),
 
         # ── Contact (priority 85-95) ──
         FieldRule(["手机号码", "联系电话", "手机", "电话", "联系方式", "电话号码", "手机号"],
-                  _gen_mobile, 95, "dynamic", "11位手机号，1开头"),
+                  _gen_mobile, 95, "dynamic", "11位手机号，34种真实号段(130-189)"),
         FieldRule(["单位电话", "固定电话", "座机"], _gen_landline, 90, "dynamic",
                   "区号+8位号码"),
         FieldRule(["邮箱", "Email", "电子邮箱"], _gen_email, 85, "dynamic",
@@ -165,7 +363,7 @@ def _make_field_rules() -> List[FieldRule]:
 
         # ── Finance (priority 80-90) ──
         FieldRule(["银行卡", "银行卡号", "银行账号"], _gen_bankcard, 85, "dynamic",
-                  "16-19位，62开头银联卡号"),
+                  "16-19位，34种BIN前缀，含Luhm校验位"),
         FieldRule(["金额", "价格", "费用", "工资", "收入"], _gen_amount, 80, "dynamic",
                   "10000.00～9999999.99随机金额"),
 

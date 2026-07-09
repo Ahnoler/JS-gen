@@ -715,6 +715,17 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         action = _e.get('action', '')
         action_counter += 1
 
+        # Inject any pending form checks whose action_index has been passed.
+        # Runs for EVERY entry (including SKIP_ACTIONS) so checks land at
+        # the correct position regardless of fill-block boundaries.
+        while pending_checks and action_counter > pending_checks[0].action_index:
+            check = pending_checks.pop(0)
+            _inject_form_check(
+                [f.model_dump() for f in check.fields],
+                check.container,
+                check.action_index,
+            )
+
         if action in _SKIP_ACTIONS:
             continue
 
@@ -723,14 +734,6 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
 
         is_first_fill = action in FILL_ACTIONS and not in_block
         if is_first_fill:
-            # Inject any pending form checks whose action_index has been passed
-            while pending_checks and action_counter > pending_checks[0].action_index:
-                check = pending_checks.pop(0)
-                _inject_form_check(
-                    [f.model_dump() for f in check.fields],
-                    check.container,
-                    check.action_index,
-                )
             in_block = True
 
         code = _generate_action_code(entry, step, url, is_first_fill)
