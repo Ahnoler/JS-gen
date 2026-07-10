@@ -3,6 +3,7 @@
 
 import { ts } from './utils.js';
 import { escapeHtml } from './swagger-api.js';
+import { on, send, isConnected } from './ws-client.js';
 
 export function initSessionMode() {
   const sessNewBtn = document.getElementById('sessNewBtn');
@@ -421,20 +422,43 @@ export function initSessionMode() {
     sessLog('system', '步骤 ' + stepNum + ': ' + label);
     if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'running');
 
+    const caseDataFile = document.getElementById('sessCaseDataFile')?.value?.trim() || undefined;
+
     sessAbortController = new AbortController();
     try {
-      const resp = await fetch('/api/browser/session/' + sessionId + '/step', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task, maxSteps,
-          caseDataFile: document.getElementById('sessCaseDataFile')?.value?.trim() || undefined,
-        }),
-        signal: sessAbortController.signal,
-      });
-      if (!resp.ok) { const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status })); throw new Error(err.error || 'Request failed'); }
+      if (isConnected()) {
+        // ── WebSocket 路径 ──
+        await new Promise((resolve) => {
+          const handler = createSSEEventHandler(stepNum, label, phaseIdx);
+          const subs = [
+            on('session:step', (d) => handler('step', d)),
+            on('session:phase_start', (d) => handler('phase_start', d)),
+            on('session:phase_done', (d) => { unsubAll(); handler('phase_done', d); resolve(); }),
+            on('session:phase_error', (d) => { unsubAll(); handler('phase_error', d); resolve(); }),
+            on('session:error', (d) => { unsubAll(); handler('error', d); resolve(); }),
+            on('session:nav_step', (d) => handler('nav_step', d)),
+            on('session:intervention_needed', (d) => handler('intervention_needed', d)),
+            on('session:intervention_resolved', (d) => handler('intervention_resolved', d)),
+            on('session:done', () => { unsubAll(); resolve(); }),
+          ];
+          const unsubAll = () => subs.forEach(fn => fn());
+          sessAbortController.signal.addEventListener('abort', () => {
+            resolve(); // 取消时不抛异常
+          });
+          send('session:step', { sessionId, task, maxSteps, caseDataFile });
+        });
+      } else {
+        // ── HTTP + SSE 回退路径 ──
+        const resp = await fetch('/api/browser/session/' + sessionId + '/step', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ task, maxSteps, caseDataFile }),
+          signal: sessAbortController.signal,
+        });
+        if (!resp.ok) { const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status })); throw new Error(err.error || 'Request failed'); }
 
-      const handler = createSSEEventHandler(stepNum, label, phaseIdx);
-      await readSSEStream(resp.body.getReader(), handler);
+        const handler = createSSEEventHandler(stepNum, label, phaseIdx);
+        await readSSEStream(resp.body.getReader(), handler);
+      }
     } catch (err) {
       const isAbort = err.name === 'AbortError';
       sessLog(isAbort ? 'system' : 'error', isAbort ? '已取消' : err.message);
@@ -766,7 +790,7 @@ export function initSessionMode() {
   }
 
   setTimeout(() => loadActiveSessions(), 500);
-  setInterval(() => loadActiveSessions(), 5000);
+  // 轮询已替换为 WebSocket 事件驱动（见下方 on('sessions:updated')）
 
   // Listen for task content changes so Load button auto-enables when 【阶段 markers appear
   if (sessTask) {
@@ -892,7 +916,7 @@ export function initSessionMode() {
     } catch { watcherStatus.textContent = '离线'; if (quickExecBtn) quickExecBtn.disabled = true; }
   }
   checkWatcher();
-  setInterval(checkWatcher, 5000);
+  // 轮询已替换为 WebSocket 事件驱动（见下方 on('watcher:status')）
 
   // Run All Phases button — sequentially execute all parsed phases
   const runAllBtn = document.getElementById('sessRunAllBtn');
@@ -907,6 +931,158 @@ export function initSessionMode() {
       if (exploreLogTerminal) exploreLogTerminal.innerHTML = '<div class="log-line system"><span class="ts">⚡</span>就绪</div>';
     });
   }
+
+  // ── 会话列表渲染 ──
+  const sessListCard = document.getElementById('sessListCard');
+  const sessListBody = document.getElementById('sessListBody');
+  const sessListEmpty = document.getElementById('sessListEmpty');
+  const sessListCount = document.getElementById('sessListCount');
+
+  function renderSessionList(sessions) {
+    const list = sessions || [];
+    if (!sessListBody) return;
+
+    // 控制卡片显隐
+    if (sessListCard) sessListCard.style.display = list.length > 0 ? '' : 'none';
+    if (sessListCount) sessListCount.textContent = list.length + ' 个会话';
+
+    // 空状态
+    if (list.length === 0) {
+      sessListBody.innerHTML = '';
+      if (sessListEmpty) sessListEmpty.style.display = '';
+      return;
+    }
+    if (sessListEmpty) sessListEmpty.style.display = 'none';
+
+    const isSelected = (id) => id === sessActive.value;
+
+    sessListBody.innerHTML = list.map(s => {
+      const shortId = s.sessionId.slice(0, 8) + '…';
+      const selected = isSelected(s.sessionId);
+      const busy = s.busy ? '忙碌' : '空闲';
+      const busyColor = s.busy ? 'var(--amber-500)' : 'var(--emerald-500)';
+      const created = s.createdAt ? new Date(s.createdAt).toLocaleTimeString('zh-CN', { hour12: false }) : '-';
+      const model = (s.model || '').split('/').pop() || '-';
+
+      return `<tr style="${selected ? 'background:var(--indigo-50)' : ''};border-bottom:1px solid var(--slate-100);transition:background .15s">
+        <td style="padding:6px 8px;font-family:var(--font-mono);font-size:11px;color:var(--slate-700)" title="${s.sessionId}">${shortId}</td>
+        <td style="padding:6px 8px;color:var(--slate-600)">${model}</td>
+        <td style="padding:6px 8px;text-align:center;color:var(--slate-600)">${s.stepIndex}</td>
+        <td style="padding:6px 8px;text-align:center"><span style="display:inline-block;padding:1px 8px;border-radius:8px;font-size:11px;background:${busyColor}15;color:${busyColor};font-weight:500">${busy}</span></td>
+        <td style="padding:6px 8px;text-align:center;color:var(--slate-400);font-size:11px">${created}</td>
+        <td style="padding:6px 8px;text-align:center">
+          <button class="sess-del-btn" data-id="${s.sessionId}" style="background:none;border:1px solid var(--red-200);color:var(--red-500);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;transition:all .15s"
+            onmouseover="this.style.background='var(--red-50)'" onmouseout="this.style.background=''"
+            title="关闭此会话">删除</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    // 绑定删除事件
+    sessListBody.querySelectorAll('.sess-del-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        if (!id) return;
+        if (!confirm('确定关闭会话 ' + id.slice(0, 8) + '… ？')) return;
+        btn.disabled = true;
+        btn.textContent = '…';
+        try {
+          const res = await fetch('/api/browser/session/' + id, { method: 'DELETE' });
+          if (!res.ok) throw new Error((await res.json()).error || '删除失败');
+          sessLog('success', '会话已关闭：' + id.slice(0, 8) + '…');
+          // 如果删除的是当前选中会话，清空选择
+          if (sessActive.value === id) {
+            sessActive.value = '';
+            onSessionChange();
+          }
+        } catch (err) {
+          sessLog('error', '关闭会话失败：' + err.message);
+          btn.disabled = false;
+          btn.textContent = '删除';
+        }
+      });
+    });
+  }
+
+  // ── WebSocket 事件驱动（替代轮询） ──
+  // 首次连接时接收全量状态
+  on('server:init', (data) => {
+    // 触发 sessions 更新
+    const list = data.sessions || [];
+    renderSessionList(list);
+
+    const currentVal = sessActive.value;
+    sessActive.innerHTML = '<option value="">(none)</option>';
+    list.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.sessionId;
+      const short = s.sessionId.slice(0, 8);
+      const busy = s.busy ? ' [busy]' : '';
+      opt.textContent = short + '... [' + s.stepIndex + ']' + busy + ' ' + (s.model || '').slice(0, 20);
+      sessActive.appendChild(opt);
+    });
+    if (currentVal && Array.from(sessActive.options).some(o => o.value === currentVal)) {
+      sessActive.value = currentVal;
+    }
+    if (sessCloseBrowserBtn) sessCloseBrowserBtn.style.display = list.length > 0 ? '' : 'none';
+    onSessionChange();
+
+    // 触发 watcher 更新
+    if (data.watcher && watcherStatus) {
+      const online = data.watcher.connected;
+      const busy = data.watcher.agentBusy;
+      const ready = online && !busy;
+      watcherStatus.textContent = busy ? '忙碌中' : (online ? '已连接' : '离线');
+      watcherStatus.style.background = ready ? '#dcfce7' : (busy ? '#fef3c7' : 'var(--slate-100)');
+      watcherStatus.style.color = ready ? '#166534' : (busy ? '#92400e' : 'var(--slate-400)');
+      if (quickExecBtn) quickExecBtn.disabled = !ready;
+    }
+  });
+
+  // 会话列表变化时更新下拉菜单和会话列表
+  on('sessions:updated', (data) => {
+    if (!sessActive) return;
+    const sessions = data.sessions || [];
+    renderSessionList(sessions);
+
+    const currentVal = sessActive.value;
+    sessActive.innerHTML = '<option value="">(none)</option>';
+    sessions.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.sessionId;
+      const short = s.sessionId.slice(0, 8);
+      const busy = s.busy ? ' [busy]' : '';
+      opt.textContent = short + '... [' + s.stepIndex + ']' + busy + ' ' + (s.model || '').slice(0, 20);
+      sessActive.appendChild(opt);
+    });
+    if (currentVal && Array.from(sessActive.options).some(o => o.value === currentVal)) {
+      sessActive.value = currentVal;
+    }
+    if (sessCloseBrowserBtn) sessCloseBrowserBtn.style.display = (data.sessions || []).length > 0 ? '' : 'none';
+    onSessionChange();
+  });
+
+  // Watcher 状态变化时更新快速操作面板
+  on('watcher:status', (data) => {
+    if (!watcherStatus) return;
+    const online = data.connected;
+    const busy = data.agentBusy;
+    const ready = online && !busy;
+    watcherStatus.textContent = busy ? '忙碌中' : (online ? '已连接' : '离线');
+    watcherStatus.style.background = ready ? '#dcfce7' : (busy ? '#fef3c7' : 'var(--slate-100)');
+    watcherStatus.style.color = ready ? '#166534' : (busy ? '#92400e' : 'var(--slate-400)');
+    if (quickExecBtn) quickExecBtn.disabled = !ready;
+  });
+
+  // WebSocket 断开时显示离线
+  on('ws:disconnected', () => {
+    if (!watcherStatus) return;
+    watcherStatus.textContent = '离线';
+    watcherStatus.style.background = 'var(--slate-100)';
+    watcherStatus.style.color = 'var(--slate-400)';
+    if (quickExecBtn) quickExecBtn.disabled = true;
+  });
 
   // Initial Load button state
   updateButtons();

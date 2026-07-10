@@ -1,21 +1,17 @@
-node_modules/
 .env
 .env.local
 opencode.json
 agent-api.config.json
 *.log
-tmp/
 .DS_Store
 Thumbs.db
+start.ps1
+node_modules/
+tmp/
 report/
 report2/
 atp-record/
 docs/
-__pycache__/
-
-# Bundled runtime dependencies — all tracked in git for full self-containment
-# (built by build-offline.ps1)
-
 scripts/action/
 scripts/log/
 scripts/screenshots/
@@ -27,5 +23,7 @@ scripts/generated/
 scripts/trajectories/
 chorme-devtools-mcp/
 playwright-cli/
-start.ps1
 browser/
+python/
+nodejs/
+*/__pycache__/

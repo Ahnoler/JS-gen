@@ -1,9 +1,11 @@
 ﻿import express from 'express';
+import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR, LLM_API_KEY } from './config/config.js';
 import { state } from './src/state.js';
+import { initWebSocket } from './src/ws-server.js';
 import registerHealthRoutes from './src/routes/health.js';
 import registerAgentRoutes from './src/routes/agent.js';
 
@@ -14,7 +16,6 @@ import registerBrowserSessionRoutes from './src/routes/browser-session.js';
 import registerTrajectoryRoutes from './src/routes/trajectory.js';
 import registerCaseDataRoutes from './src/routes/case-data.js';
 import registerAssembleRoutes from './src/routes/test-assemble.js';
-import registerSSERoutes from './src/routes/sse.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -85,7 +86,6 @@ registerAgentRoutes(app);
 
 registerTestHistoryRoutes(app);
 registerTestRunRoutes(app);
-registerSSERoutes(app);
 
 // Redirect root to dashboard, or setup if unconfigured
 app.get('/', (req, res) => {
@@ -137,8 +137,12 @@ async function main() {
     console.log('[server] ⚠  LLM_API_KEY not set — visit http://localhost:' + PORT + '/api/setup to configure');
   }
 
-  const server = app.listen(PORT, HOST, () => {
+  const httpServer = createServer(app);
+  initWebSocket(httpServer);
+
+  const server = httpServer.listen(PORT, HOST, () => {
     console.log(`[server] Agent API listening on http://${HOST}:${PORT}`);
+    console.log(`[server] WebSocket at ws://${HOST}:${PORT}/ws`);
     console.log(`[server] Endpoints:`);
     console.log(`  GET  /v1/models (OpenAI compatible)`);
     console.log(`  POST /v1/chat/completions (OpenAI compatible)`);
@@ -150,7 +154,6 @@ async function main() {
     console.log(`  GET  /api/agents`);
     console.log(`  GET  /api/skills`);
     console.log(`  POST /api/agent/execute`);
-    console.log(`  SSE  /api/agent/execute-stream`);
     console.log(`  POST /api/agent/execute-async`);
     console.log(`  POST /api/agent/session`);
     console.log(`  GET  /api/agent/session/:id/messages`);

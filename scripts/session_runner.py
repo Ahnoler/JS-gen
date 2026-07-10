@@ -356,6 +356,31 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref):
         await stdin_queue.put(msg)
 
 
+# Controller function param signatures — only these keys are passed to the action
+_REPLAY_ACTION_SIGNATURES = {
+    "fill_form_field": {"label_text", "value"},
+    "fill_date_field": {"label_text", "value"},
+    "select_option": {"label_text", "option_text"},
+    "click_element_by_index": {"index"},
+    "click_menu_item": {"menu_text"},
+    "click_table_row_button": {"row_text", "button_text"},
+    "click_table_row_radio": {"row_text"},
+    "click_adjacent_button": {"label_text"},
+    "click_radio": {"label_text", "option_text"},
+    "select_tree_option": {"label_text", "option_text"},
+    "switch_tab": {"tab_name"},
+    "close_dialog": set(),
+    "go_to_url": {"url"},
+    "login": {"username", "password", "captcha", "sms_code"},
+}
+
+def _convert_action_params(action_name, params):
+    sig = _REPLAY_ACTION_SIGNATURES.get(action_name)
+    if sig is None:
+        return dict(params) if params else {}
+    return {k: v for k, v in (params or {}).items() if k in sig}
+
+
 async def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_ref=None, cdp_action_queue=None):
     event = msg.get("event")
 
@@ -377,6 +402,39 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
         action_data = msg.get("data", {})
         if cdp_action_queue is not None:
             await cdp_action_queue.put(action_data)
+        return 'continue'
+
+    if event == "replay_actions":
+        entries = msg.get("data", {}).get("actions", [])
+        browser_context = session_state.get('browser_context')
+        form_rules = session_state.get('form_rules', [])
+        case_data_store = session_state.get('case_data_store', {})
+        if not browser_context or not entries:
+            emit_json({"event": "replay_done", "data": {"count": 0, "error": "no browser_context or empty actions"}})
+            return 'continue'
+        from .actions._builder import build_controller
+        controller = build_controller(browser_context, form_rules, case_data_store=case_data_store)
+        actions = controller.registry.registry.actions
+        total = len(entries)
+        for i, entry in enumerate(entries):
+            action_name = entry.get("action", "")
+            raw_params = entry.get("params", {})
+            params = _convert_action_params(action_name, raw_params)
+            act = actions.get(action_name)
+            if not act:
+                sys.stderr.write(f"[replay] [{i+1}/{total}] Unknown action: {action_name}, skipping\n")
+                sys.stderr.flush()
+                continue
+            sys.stderr.write(f"[replay] [{i+1}/{total}] {action_name} {params}\n")
+            sys.stderr.flush()
+            try:
+                await act.function(**params)
+            except Exception as e:
+                sys.stderr.write(f"[replay] [{i+1}/{total}] Error: {action_name} {params} -> {e}\n")
+                sys.stderr.flush()
+        sys.stderr.write(f"[replay] Done: {total} actions executed\n")
+        sys.stderr.flush()
+        emit_json({"event": "replay_done", "data": {"count": total}})
         return 'continue'
 
     if event == "intervene":
@@ -512,6 +570,8 @@ async def run_session(args):
         'session_id': session_id,
         'cumulative_path': cumulative_path,
         'case_data_store': case_data_store,
+        'browser_context': browser_context,
+        'form_rules': form_rules,
     }
 
     case_data_loaded = False

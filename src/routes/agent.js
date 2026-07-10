@@ -20,9 +20,14 @@ export default function (app) {
   });
 
   // Stubs — no session management in standalone mode
-  app.post('/api/agent/execute-async', (req, res) => res.status(501).json({ error: 'Not available in standalone mode' }));
-  app.post('/api/agent/session', (req, res) => res.status(501).json({ error: 'Not available in standalone mode' }));
-  app.post('/api/agent/session/:id/message', (req, res) => res.status(501).json({ error: 'Not available in standalone mode' }));
-  app.delete('/api/agent/session/:id', (req, res) => res.status(501).json({ error: 'Not available in standalone mode' }));
-  app.get('/api/agent/session/:id/messages', (req, res) => res.status(501).json({ error: 'Not available in standalone mode' }));
+  const STUBS = [
+    ['post', '/api/agent/execute-async'],
+    ['post', '/api/agent/session'],
+    ['post', '/api/agent/session/:id/message'],
+    ['delete', '/api/agent/session/:id'],
+    ['get', '/api/agent/session/:id/messages'],
+  ];
+  for (const [method, path] of STUBS) {
+    app[method](path, (req, res) => res.status(501).json({ error: 'Not available in standalone mode' }));
+  }
 }

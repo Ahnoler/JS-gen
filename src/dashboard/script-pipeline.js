@@ -3,6 +3,8 @@
 
 import { ts } from './utils.js';
 import { escapeHtml } from './swagger-api.js';
+import { on, send, isConnected } from './ws-client.js';
+import { renderActionCards, wireActionButtons } from './trajectory-actions.js';
 
 // ====== Pipeline Logging (scoped to dashboard) ======
 export function addPipelineLog(type, msg) {
@@ -197,11 +199,117 @@ export function initScriptPipeline() {
     URL.revokeObjectURL(a.href);
   });
 
-  // Run button (SSE execution)
+  // Run execution event handler (shared between WS and SSE paths)
+  function createExecutionHandler() {
+    const terminal = document.getElementById('genRunTerminal');
+    const addRunLog = (type, msg) => {
+      const line = document.createElement('div');
+      line.className = `log-line ${type}`;
+      const d = new Date();
+      const t = d.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+      line.innerHTML = `<span class="ts">${t}</span>${escapeHtml(msg)}`;
+      terminal.appendChild(line);
+      terminal.scrollTop = terminal.scrollHeight;
+    };
+    const handleEvent = (eventType, data) => {
+      switch (eventType) {
+        case 'log':
+          addRunLog(data.type || 'info', data.message || '');
+          break;
+
+        case 'screenshots': {
+          document.getElementById('genRunScreenshots').style.display = 'block';
+          const list = document.getElementById('genRunScreenshotList');
+          const urls = (data.screenshots || []).map(s => s.url);
+          window.registerScreenshots(urls);
+          list.innerHTML = (data.screenshots || []).map((s, i) =>
+            `<div style="cursor:pointer" onclick="viewScreenshot('${s.url}')">
+              <img src="${s.url}" style="width:120px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--slate-200)" title="${s.fileName}">
+              <div style="font-size:10px;color:var(--slate-400);text-align:center;margin-top:2px">${s.fileName}</div>
+            </div>`
+          ).join('');
+          break;
+        }
+
+        case 'script-errors': {
+          const errors = data.errors || [];
+          if (errors.length > 0) {
+            errors.forEach((e) => {
+              const errDetail = e.details ? ` | ${e.details}` : '';
+              const errVal = e.value ? ` | value: ${e.value}` : '';
+              addRunLog('error', `[Step ${e.step}] ${e.action} "${e.label || ''}" → ${e.error}${errDetail}${errVal}`);
+            });
+            const resultDiv2 = document.getElementById('genRunResult');
+            resultDiv2.style.display = 'block';
+            resultDiv2.style.background = 'var(--amber-50)';
+            resultDiv2.style.color = 'var(--amber-700)';
+            resultDiv2.innerHTML = `<div>🔍 DETECTION — ${errors.length} error(s) captured</div>
+              <div style="font-size:11px;margin-top:4px">${errors.map(e => `[Step ${e.step}] ${e.action} → ${e.error}`).join('<br>')}</div>`;
+            document.getElementById('genRunDot').style.background = 'var(--amber-400)';
+            document.getElementById('genRunStatus').textContent = '检测到错误';
+
+            pipelineState.lastError = JSON.stringify(errors, null, 2);
+            if (pipelineState.actionFile) {
+              const formErr = errors.find(e => e.action === 'form_structure_changed');
+              const stepErrs = errors.filter(e => e.step > 0 && e.action !== 'form_structure_changed' && e.action !== 'form_warning');
+              const warnErrs = errors.filter(e => e.action === 'form_warning');
+              document.getElementById('genHealArea').style.display = 'block';
+              document.getElementById('genHealBtn').disabled = false;
+              const parts = [];
+              if (formErr) parts.push('form structure changed');
+              if (stepErrs.length) parts.push(`${stepErrs.length} step error(s)`);
+              if (warnErrs.length) parts.push(`${warnErrs.length} warning(s)`);
+              document.getElementById('genHealStatus').textContent = 'Ready — ' + (parts.length ? parts.join(' + ') : 'errors detected');
+            }
+          }
+          break;
+        }
+
+        case 'result': {
+          const resultDiv = document.getElementById('genRunResult');
+          resultDiv.style.display = 'block';
+          if (data.success) {
+            resultDiv.style.background = 'var(--emerald-50)';
+            resultDiv.style.color = 'var(--emerald-700)';
+            resultDiv.textContent = `✅ 测试通过 (exit code: ${data.exitCode})`;
+            document.getElementById('genRunDot').style.background = 'var(--emerald-400)';
+            pipelineState.lastError = '';
+          } else {
+            resultDiv.style.background = 'var(--red-50)';
+            resultDiv.style.color = 'var(--red-600)';
+            const errMsg = data.error || '';
+            const stderr = data.stderr || '';
+            const errorText = (errMsg || stderr || '').slice(0, 1000);
+
+            let errorTag = '脚本错误';
+            if (errorText.includes('CTRL is not defined')) errorTag = 'CTRL 未注入';
+            else if (errorText.includes('strict mode violation')) errorTag = '定位器歧义';
+            else if (errorText.includes('Timeout') || errorText.includes('locator.waitFor')) errorTag = '元素超时';
+            else if (errorText.includes('ReferenceError') || errorText.includes('is not defined')) errorTag = '变量未定义';
+            else if (errorText.includes('page.fill') || errorText.includes('fill(')) errorTag = '禁止使用 page.fill';
+            else if (errorText.includes('selectOption') || errorText.includes("locator('select')") || errorText.includes('native select')) errorTag = '原生 select 误用';
+            else if (errorText.includes('navigating to') && errorText.includes('ERR_')) errorTag = '导航错误';
+
+            resultDiv.innerHTML = `<div>❌ 测试失败 <span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:1px 10px;border-radius:10px;font-size:11px;margin-left:8px">${errorTag}</span></div><div style="font-size:11px;margin-top:4px;color:#dc2626">${escapeHtml(errorText.slice(0, 300))}</div>`;
+            document.getElementById('genRunDot').style.background = 'var(--red-400)';
+            if (!pipelineState.lastError) {
+              pipelineState.lastError = errorText;
+            }
+            document.getElementById('genFeedback').value = `Error type: ${errorTag}\n\n${errorText}`;
+          }
+          break;
+        }
+      }
+    };
+    return { addRunLog, handleEvent };
+  }
+
+  // Run button — supports WebSocket (preferred) and HTTP+SSE (fallback)
   document.getElementById('genRunBtn').addEventListener('click', async () => {
     const script = pipelineState.currentScript;
     if (!script) { alert('没有可执行的脚本'); return; }
 
+    isExecutionRunning = true;
     const terminal = document.getElementById('genRunTerminal');
     terminal.innerHTML = '';
     document.getElementById('genRunLog').style.display = 'block';
@@ -211,146 +319,90 @@ export function initScriptPipeline() {
     document.getElementById('genRunStatus').textContent = '正在执行...';
     document.getElementById('genRunDot').style.background = 'var(--amber-400)';
 
-    function addRunLog(type, msg) {
-      const line = document.createElement('div');
-      line.className = `log-line ${type}`;
-      const d = new Date();
-      const t = d.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3,'0');
-      line.innerHTML = `<span class="ts">${t}</span>${escapeHtml(msg)}`;
-      terminal.appendChild(line);
-      terminal.scrollTop = terminal.scrollHeight;
-    }
-
+    const { addRunLog, handleEvent } = createExecutionHandler();
     addRunLog('system', `Executing script via server...`);
 
     try {
-      const res = await fetch(`/api/test/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script, fileName: pipelineState.currentFileName || 'test.js' }),
-      });
+      if (isConnected()) {
+        // ── WebSocket 路径 ──
+        await new Promise((resolve) => {
+          let settled = false;
+          const finish = (fn) => () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            fn();
+          };
 
-      if (!res.ok) {
-        addRunLog('error', `Worker returned ${res.status}`);
-        document.getElementById('genRunStatus').textContent = '执行失败';
-        document.getElementById('genRunDot').style.background = 'var(--red-400)';
-        document.getElementById('genRunBtn').disabled = false;
-        return;
-      }
+          const subs = [
+            on('execution:log', (d) => handleEvent('log', d)),
+            on('execution:screenshots', (d) => handleEvent('screenshots', d)),
+            on('execution:script-errors', (d) => handleEvent('script-errors', d)),
+            on('execution:result', (d) => handleEvent('result', d)),
+            on('execution:done', finish(resolve)),
+            on('execution:error', (d) => {
+              addRunLog('error', d.message || 'Execution error');
+              finish(resolve)();
+            }),
+            // WS 断线时立即结束等待,防止 Promise 永远挂起
+            on('ws:disconnected', finish(() => {
+              addRunLog('error', 'WebSocket 连接断开,执行已中断');
+              resolve();
+            })),
+          ];
 
-      // SSE stream
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+          // 超时保护:5 分钟无响应则放弃等待
+          const timeout = setTimeout(finish(() => {
+            addRunLog('error', '执行超时 (5 分钟)');
+            resolve();
+          }), 5 * 60 * 1000);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+          function cleanup() {
+            clearTimeout(timeout);
+            subs.forEach(fn => fn());
+          }
 
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
+          if (!send('execution:start', { script, fileName: pipelineState.currentFileName || 'test.js' })) {
+            addRunLog('error', 'WebSocket 未连接,无法发送执行请求');
+            finish(resolve)();
+          }
+        });
+      } else {
+        // ── HTTP + SSE 回退路径 ──
+        const res = await fetch(`/api/test/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ script, fileName: pipelineState.currentFileName || 'test.js' }),
+        });
+        if (!res.ok) {
+          addRunLog('error', `Worker returned ${res.status}`);
+          document.getElementById('genRunStatus').textContent = '执行失败';
+          document.getElementById('genRunDot').style.background = 'var(--red-400)';
+          document.getElementById('genRunBtn').disabled = false;
+          return;
+        }
 
-        for (const event of events) {
-          const lines = event.split('\n');
-          const eventType = lines.find(l => l.startsWith('event:'))?.slice(7).trim();
-          const dataLine = lines.find(l => l.startsWith('data:'))?.slice(6);
-          if (!dataLine) continue;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-          try {
-            const data = JSON.parse(dataLine);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-            switch (eventType) {
-              case 'log':
-                addRunLog(data.type || 'info', data.message || '');
-                break;
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
 
-              case 'screenshots':
-                document.getElementById('genRunScreenshots').style.display = 'block';
-                const list = document.getElementById('genRunScreenshotList');
-                list.innerHTML = (data.screenshots || []).map(s =>
-                  `<div style="cursor:pointer" onclick="viewScreenshot('${s.url}')">
-                    <img src="${s.url}" style="width:120px;height:90px;object-fit:cover;border-radius:6px;border:1px solid var(--slate-200)" title="${s.fileName}">
-                    <div style="font-size:10px;color:var(--slate-400);text-align:center;margin-top:2px">${s.fileName}</div>
-                  </div>`
-                ).join('');
-                break;
-
-              case 'script-errors':
-                // DETECTION PHASE — display captured script errors
-                const errors = data.errors || [];
-                if (errors.length > 0) {
-                  errors.forEach((e, i) => {
-                    const errDetail = e.details ? ` | ${e.details}` : '';
-                    const errVal = e.value ? ` | value: ${e.value}` : '';
-                    addRunLog('error', `[Step ${e.step}] ${e.action} "${e.label || ''}" → ${e.error}${errDetail}${errVal}`);
-                  });
-
-                  // Show in result area
-                  const resultDiv2 = document.getElementById('genRunResult');
-                  resultDiv2.style.display = 'block';
-                  resultDiv2.style.background = 'var(--amber-50)';
-                  resultDiv2.style.color = 'var(--amber-700)';
-                  resultDiv2.innerHTML = `<div>🔍 DETECTION — ${errors.length} error(s) captured</div>
-                    <div style="font-size:11px;margin-top:4px">${errors.map(e => `[Step ${e.step}] ${e.action} → ${e.error}`).join('<br>')}</div>`;
-                  document.getElementById('genRunDot').style.background = 'var(--amber-400)';
-                  document.getElementById('genRunStatus').textContent = '检测到错误';
-
-                  // Enable self-heal button if we have an action file
-                  pipelineState.lastError = JSON.stringify(errors, null, 2);
-                  if (pipelineState.actionFile) {
-                    const formErr = errors.find(e => e.action === 'form_structure_changed');
-                    const stepErrs = errors.filter(e => e.step > 0 && e.action !== 'form_structure_changed' && e.action !== 'form_warning');
-                    const warnErrs = errors.filter(e => e.action === 'form_warning');
-                    document.getElementById('genHealArea').style.display = 'block';
-                    document.getElementById('genHealBtn').disabled = false;
-                    const parts = [];
-                    if (formErr) parts.push('form structure changed');
-                    if (stepErrs.length) parts.push(`${stepErrs.length} step error(s)`);
-                    if (warnErrs.length) parts.push(`${warnErrs.length} warning(s)`);
-                    document.getElementById('genHealStatus').textContent = 'Ready — ' + (parts.length ? parts.join(' + ') : 'errors detected');
-                  }
-                }
-                break;
-
-              case 'result':
-                const resultDiv = document.getElementById('genRunResult');
-                resultDiv.style.display = 'block';
-                if (data.success) {
-                  resultDiv.style.background = 'var(--emerald-50)';
-                  resultDiv.style.color = 'var(--emerald-700)';
-                  resultDiv.textContent = `✅ 测试通过 (exit code: ${data.exitCode})`;
-                  document.getElementById('genRunDot').style.background = 'var(--emerald-400)';
-                  pipelineState.lastError = '';
-                } else {
-                  resultDiv.style.background = 'var(--red-50)';
-                  resultDiv.style.color = 'var(--red-600)';
-                  const errMsg = data.error || '';
-                  const stderr = data.stderr || '';
-                  const errorText = (errMsg || stderr || '').slice(0, 1000);
-                  
-                  // Classify error for display
-                  let errorTag = '脚本错误';
-                  if (errorText.includes('CTRL is not defined')) errorTag = 'CTRL 未注入';
-                  else if (errorText.includes('strict mode violation')) errorTag = '定位器歧义';
-                  else if (errorText.includes('Timeout') || errorText.includes('locator.waitFor')) errorTag = '元素超时';
-                  else if (errorText.includes('ReferenceError') || errorText.includes('is not defined')) errorTag = '变量未定义';
-                  else if (errorText.includes('page.fill') || errorText.includes('fill(')) errorTag = '禁止使用 page.fill';
-                  else if (errorText.includes('selectOption') || errorText.includes("locator('select')") || errorText.includes('native select')) errorTag = '原生 select 误用';
-                  else if (errorText.includes('navigating to') && errorText.includes('ERR_')) errorTag = '导航错误';
-                  
-                  resultDiv.innerHTML = `<div>❌ 测试失败 <span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:1px 10px;border-radius:10px;font-size:11px;margin-left:8px">${errorTag}</span></div><div style="font-size:11px;margin-top:4px;color:#dc2626">${escapeHtml(errorText.slice(0, 300))}</div>`;
-                  document.getElementById('genRunDot').style.background = 'var(--red-400)';
-                  // Capture error for refine
-                  // Don't overwrite structured errors from script-errors event
-                  if (!pipelineState.lastError) {
-                    pipelineState.lastError = errorText;
-                  }
-                  document.getElementById('genFeedback').value = `Error type: ${errorTag}\n\n${errorText}`;
-                }
-                break;
-            }
-          } catch {}
+          for (const event of events) {
+            const lines = event.split('\n');
+            const eventType = lines.find(l => l.startsWith('event:'))?.slice(7).trim();
+            const dataLine = lines.find(l => l.startsWith('data:'))?.slice(6);
+            if (!dataLine) continue;
+            try {
+              handleEvent(eventType, JSON.parse(dataLine));
+            } catch {}
+          }
         }
       }
 
@@ -360,6 +412,7 @@ export function initScriptPipeline() {
       document.getElementById('genRunStatus').textContent = '连接失败';
       document.getElementById('genRunDot').style.background = 'var(--red-400)';
     } finally {
+      isExecutionRunning = false;
       document.getElementById('genRunBtn').disabled = false;
     }
   });
@@ -567,24 +620,75 @@ export function initScriptPipeline() {
     applyBtn.disabled = true;
     result.textContent = '';
 
-    // Fetch and render action step preview
-    fetch('/api/test/assemble', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actionFile: actionFilePath }),
-    }).then(r => r.json()).then(data => {
-      if (data.script) {
-        // Extract step console.log lines for preview
-        const stepLines = data.script.split('\n').filter(l =>
-          l.includes("console.log('[") && (l.includes('Fill') || l.includes('Select') || l.includes('Click') || l.includes('Tab') || l.includes('Menu') || l.includes('Close'))
-        ).slice(0, 30);
-        stepsDiv.innerHTML = stepLines.map(l => {
-          const text = l.replace(/.*console\.log\('/, '').replace(/'\);?/, '').trim();
-          return `<div style="padding:1px 0;color:var(--slate-700)">${escapeHtml(text)}</div>`;
-        }).join('') || `<div style="color:var(--slate-400)">${data.stats?.deduped || '?'} steps assembled</div>`;
-        pipelineState.healScript = data.script;
+    // Fetch raw action JSON and render as editable cards
+    stepsDiv.style.maxHeight = '400px';
+    const relPath = actionFilePath.replace(/\\/g, '/').replace(/^.*\/scripts\//, 'scripts/');
+    fetch('/' + relPath).then(r => r.json()).then(jsonData => {
+      const commands = jsonData?.tests?.[0]?.commands || [];
+      const url = jsonData?.url || '';
+
+      function showSaveBall() { saveBall.style.display = 'flex'; }
+      function hideSaveBall() { saveBall.style.display = 'none'; }
+
+      // Floating save ball (same pattern as trajectory viewer)
+      let saveBall = document.getElementById('healSaveBall');
+      if (!saveBall) {
+        saveBall = document.createElement('div');
+        saveBall.id = 'healSaveBall';
+        saveBall.innerHTML = 'Save';
+        Object.assign(saveBall.style, {
+          position: 'fixed', left: '16px', bottom: '120px',
+          width: '56px', height: '56px', borderRadius: '50%',
+          background: 'var(--indigo-500)', color: '#fff',
+          display: 'none', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+          boxShadow: '0 4px 14px rgba(99,102,241,.4)',
+          zIndex: '1000', transition: 'transform .15s, opacity .15s',
+          border: 'none', fontFamily: 'inherit',
+        });
+        saveBall.onmouseenter = () => saveBall.style.transform = 'scale(1.08)';
+        saveBall.onmouseleave = () => saveBall.style.transform = '';
+        document.body.appendChild(saveBall);
       }
+      hideSaveBall();
+
+      // Store original data for save
+      stepsDiv._healData = jsonData;
+
+      function rerender() {
+        renderActionCards(commands, stepsDiv, url, () => {
+          wireActionButtons(commands, stepsDiv, showSaveBall, rerender);
+        });
+      }
+      rerender();
+
+      // Wire save ball
+      saveBall.onclick = async () => {
+        const cleaned = commands.filter(c => c !== null);
+        jsonData.tests[0].commands = cleaned;
+        try {
+          saveBall.textContent = '...';
+          const saveRes = await fetch('/api/test/assemble/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: actionFilePath, data: jsonData }),
+          });
+          const saveData = await saveRes.json();
+          if (!saveRes.ok) throw new Error(saveData.error);
+          saveBall.textContent = '✓';
+          saveBall.style.background = 'var(--emerald-500)';
+          setTimeout(() => {
+            hideSaveBall();
+            saveBall.textContent = 'Save';
+            saveBall.style.background = 'var(--indigo-500)';
+          }, 1500);
+        } catch (err) {
+          alert('Save failed: ' + err.message);
+          saveBall.textContent = 'Save';
+        }
+      };
     }).catch(() => {
-      stepsDiv.innerHTML = '<div style="color:var(--slate-400)">Waiting for assemble...</div>';
+      stepsDiv.innerHTML = '<div style="color:var(--slate-400);padding:12px">Failed to load action file</div>';
     });
 
     // Assemble button: assemble the new action file
@@ -637,7 +741,7 @@ export function initScriptPipeline() {
           document.getElementById('genRunDot').style.background = 'var(--emerald-400)';
         } else {
           result.textContent = '❌ Test failed (exit ' + runData.exitCode + ')';
-          if (runData.stderr) addHealLog('error', runData.stderr.slice(-200));
+          if (runData.stderr) addPipelineLog('error', runData.stderr.slice(-200));
         }
       } catch (e) {
         result.textContent = '❌ ' + e.message;
@@ -671,4 +775,35 @@ export function initScriptPipeline() {
       }
     };
   }
+
+  // ── WebSocket 事件驱动（替代 worker 健康轮询） ──
+  // 执行期间跳过状态更新，避免"正在执行..."被覆盖
+  let isExecutionRunning = false;
+
+  function updateRunButtonHealth(data) {
+    if (isExecutionRunning) return;  // 执行中，不覆盖状态
+    const dot = document.getElementById('genRunDot');
+    const status = document.getElementById('genRunStatus');
+    if (!dot || !status) return;
+    if (data.status === 'ok') {
+      dot.style.background = 'var(--emerald-400)';
+      status.textContent = '服务已就绪';
+      document.getElementById('genRunBtn').disabled = false;
+    } else {
+      dot.style.background = 'var(--red-400)';
+      status.textContent = '服务异常';
+    }
+  }
+
+  on('server:init', (data) => {
+    if (data.server) updateRunButtonHealth(data.server);
+  });
+  on('server:status', updateRunButtonHealth);
+  on('ws:disconnected', () => {
+    const dot = document.getElementById('genRunDot');
+    const status = document.getElementById('genRunStatus');
+    if (dot) dot.style.background = 'var(--red-400)';
+    if (status) status.textContent = '服务未启动';
+    document.getElementById('genRunBtn').disabled = true;
+  });
 }

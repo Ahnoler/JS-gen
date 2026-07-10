@@ -495,7 +495,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
     async def _execute_round(page, items, label_kind, all_results, round_tag):
         """分组 → LLM 规划 → 逐个执行。round_tag: '' | 'round2 ' | 'round3 '"""
-        KIND_ORDER = {'select': 0, 'input': 1, 'date': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
+        KIND_ORDER = {'select': 0, 'date': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
         groups: dict[int, list[dict]] = {}
         for d in items:
             # Skip needs_intervention — only auto-fill fillable fields
@@ -508,7 +508,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             sub = groups[idx]
             if not sub:
                 continue
-            kind_name = {0:'select',1:'input',2:'date',3:'radio',4:'checkbox',5:'tree-select'}.get(idx, 'other')
+            kind_name = {0:'select',1:'date',2:'input',3:'radio',4:'checkbox',5:'tree-select'}.get(idx, 'other')
             await page.evaluate(
                 's => console.log("[AI填表] 分组 " + s)',
                 f'{kind_name}: {len(sub)}个字段',

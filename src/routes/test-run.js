@@ -1,19 +1,10 @@
 import { writeFileSync, readFileSync, readdirSync, existsSync, unlinkSync } from 'fs';
 import path from 'path';
-import { spawn, execSync } from 'child_process';
+import { spawn } from 'child_process';
 import { TMP_DIR, SKILL_DIR } from '../../config/config.js';
 import { cleanupScriptFile } from '../script-utils.js';
-
-function killOrphanChrome() {
-  try {
-    if (process.platform === 'win32') {
-      execSync(
-        `powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"name='chrome.exe'\\" | Where-Object { $_.CommandLine -match 'remote.debugging.(port|pipe)|playwright|openclaw|xbrowser' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"`,
-        { stdio: 'ignore', timeout: 5000, windowsHide: true }
-      );
-    }
-  } catch {}
-}
+import { createPushChannel, killTree } from './explore-utils.js';
+import { onWsMessage } from '../ws-server.js';
 
 /**
  * Read and parse the script-errors.json report written by a failed Playwright run.
@@ -55,31 +46,23 @@ function checkScriptErrors(scriptPath, code, logSuffix = '') {
 }
 
 export default function (app) {
-  app.post('/api/test/run', (req, res) => {
-    const { script, fileName } = req.body;
+  // ── Shared: execute a Playwright script and push results via channel ──
+  let _isExecuting = false;
+  function executeScript({ script, fileName, channel }) {
+    const send = channel.send;
 
-    if (!script) return res.status(400).json({ error: 'script is required' });
-
-    // Kill orphan Chrome processes from previous runs
-    killOrphanChrome();
-
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
-    if (res.socket) {
-      res.socket.setNoDelay(true);
-      res.socket.setKeepAlive(true, 30000);
+    // 并发守卫:防止 WS 重连或重复点击导致两个 Playwright 同时运行
+    if (_isExecuting) {
+      send('log', { type: 'error', message: '另一个测试正在执行中,请等待完成' });
+      send('done', {});
+      channel.end();
+      return;
     }
-
-    const send = (event, data) => {
-      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    };
+    _isExecuting = true;
+    const finishExecuting = () => { _isExecuting = false; };
 
     let aborted = false;
-    res.on('close', () => { aborted = true; });
+    channel.onAbort(() => { aborted = true; });
 
     const scriptName = fileName ? fileName.replace(/[\\/:*?"<>|]/g, '_') : `playwright-test-${Date.now()}.js`;
     const scriptPath = path.join(TMP_DIR, scriptName);
@@ -93,8 +76,9 @@ export default function (app) {
       send('log', { type: 'error', message: `run.cjs not found at ${runJsPath}` });
       send('result', { success: false, error: `run.cjs not found` });
       send('done', {});
+      finishExecuting();
       cleanupScriptFile(scriptPath);
-      res.end();
+      channel.end();
       return;
     }
 
@@ -106,8 +90,10 @@ export default function (app) {
       env: { ...process.env, PLAYWRIGHT_SKIP_EXISTING: '1' },
     });
 
-    res.on('close', () => {
-      if (!child.killed) child.kill();
+    channel.onAbort(() => {
+      finishExecuting();
+      // Windows 下 child.kill() 不级联杀子进程,用 killTree 连同 Chrome 一起清理
+      if (child.pid) killTree(child.pid);
       cleanupScriptFile(scriptPath);
     });
 
@@ -134,10 +120,14 @@ export default function (app) {
 
       const afterFiles = readdirSync(TMP_DIR).filter(f => f.endsWith('.png'));
       const newScreenshots = afterFiles.filter(f => !beforeFiles.has(f));
-      const screenshots = newScreenshots.map(f => ({
-        fileName: f,
-        url: `/api/test/screenshots/${f}`,
-      }));
+      // 按 step-{index}-{timestamp}-{hash}.png 中的 index 数值排序
+      const stepIndex = (f) => parseInt(f.match(/^step-(\d+)-/)?.[1] ?? '0', 10);
+      const screenshots = newScreenshots
+        .sort((a, b) => stepIndex(a) - stepIndex(b))
+        .map(f => ({
+          fileName: f,
+          url: `/api/test/screenshots/${f}`,
+        }));
 
       if (screenshots.length > 0) {
         send('log', { type: 'success', message: `Captured ${screenshots.length} screenshot(s)` });
@@ -162,8 +152,9 @@ export default function (app) {
       });
 
       send('done', {});
+      finishExecuting();
       cleanupScriptFile(scriptPath);
-      res.end();
+      channel.end();
     });
 
     child.on('error', (err) => {
@@ -171,9 +162,43 @@ export default function (app) {
       send('log', { type: 'error', message: err.message });
       send('result', { success: false, error: err.message });
       send('done', {});
+      finishExecuting();
       cleanupScriptFile(scriptPath);
-      res.end();
+      channel.end();
     });
+  }
+
+  app.post('/api/test/run', (req, res) => {
+    const { script, fileName } = req.body || {};
+    if (!script) return res.status(400).json({ error: 'script is required' });
+
+    // SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    if (res.socket) {
+      res.socket.setNoDelay(true);
+      res.socket.setKeepAlive(true, 30000);
+    }
+
+    const channel = createPushChannel(null, res, 'execution');
+    executeScript({ script, fileName, channel });
+  });
+
+  // ── WebSocket handler ──
+  onWsMessage((ws, msg) => {
+    if (msg.type === 'execution:start') {
+      const { script, fileName } = msg.payload || {};
+      if (!script) {
+        ws.send(JSON.stringify({ type: 'execution:error', payload: { message: 'script is required' } }));
+        return;
+      }
+      const channel = createPushChannel(ws, null, 'execution');
+      executeScript({ script, fileName, channel });
+    }
   });
 
   app.post('/api/test/run-sync', async (req, res) => {

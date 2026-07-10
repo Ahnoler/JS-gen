@@ -183,6 +183,38 @@ export function setupSSE(res) {
   };
 }
 
+/**
+ * Create a dual push channel that sends to WebSocket AND/OR SSE.
+ * When WS is available, events go via WS; SSE is used as fallback.
+ * @param {object|null} ws - WebSocket client (or null)
+ * @param {object|null} res - Express response (or null)
+ * @param {string} [ns='session'] - WS event namespace prefix
+ * Returns { send, end, onAbort }
+ */
+export function createPushChannel(ws, res, ns = 'session') {
+  const channel = { ended: false };
+  channel.send = (event, data) => {
+    if (channel.ended) return;
+    // WS path (preferred)
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: `${ns}:${event}`, payload: data }));
+    }
+    // SSE fallback
+    if (res && !res.writableEnded) {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    }
+  };
+  channel.end = () => {
+    channel.ended = true;
+    if (res && !res.writableEnded) res.end();
+  };
+  channel.onAbort = (handler) => {
+    if (res) res.on('close', handler);
+    if (ws) ws.on('close', handler);
+  };
+  return channel;
+}
+
 export function resolveModelId(model) {
   if (model) {
     // Strip providerID prefix if present (e.g. "deepseek/deepseek-v4-flash" -> "deepseek-v4-flash")

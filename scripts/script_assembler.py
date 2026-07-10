@@ -360,7 +360,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 
     # ---- select_option ----
     if action == 'select_option':
-        l, o = p('label_text'), p('option_text')
+        l, o = p('label_text'), p('option_text') or p('value')
         lines.append(f"    console.log('[{step_num}] Select \"{l}\" = \"{o}\"');")
         lines.append(pre())
         lines.append(pre_ready())
@@ -486,7 +486,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 
     # ---- click_radio ----
     if action == 'click_radio':
-        l, o = p('label_text'), p('option_text')
+        l, o = p('label_text'), p('option_text') or p('value')
         lines.append(f"    console.log('[{step_num}] Radio \"{l}\" = \"{o}\"');")
         lines.append(pre())
         lines.append(f"    const _rr{step_num} = await page.evaluate(() => CTRL.clickRadio('{_escape(l)}', '{_escape(o)}'));")
@@ -495,7 +495,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 
     # ---- select_tree_option ----
     if action == 'select_tree_option':
-        l, o = p('label_text'), p('option_text')
+        l, o = p('label_text'), p('option_text') or p('value')
         lines.append(f"    console.log('[{step_num}] Tree-select \"{l}\" = \"{o}\"');")
         lines.append(pre())
         lines.append(pre_ready())
@@ -654,6 +654,7 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
     if not url or 'unknown' in url.lower():
         url = 'http://target-url-placeholder'
     goto_line = f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});'
+    body.append("    const _RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;")
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
     # Sort snapshots by action_index so checks inject at the right points
@@ -720,11 +721,12 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         # the correct position regardless of fill-block boundaries.
         while pending_checks and action_counter > pending_checks[0].action_index:
             check = pending_checks.pop(0)
-            _inject_form_check(
-                [f.model_dump() for f in check.fields],
-                check.container,
-                check.action_index,
-            )
+            if check.fields:  # skip empty snapshots (avoids false-positive "added" warnings)
+                _inject_form_check(
+                    [f.model_dump() for f in check.fields],
+                    check.container,
+                    check.action_index,
+                )
 
         if action in _SKIP_ACTIONS:
             continue
@@ -739,6 +741,7 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         code = _generate_action_code(entry, step, url, is_first_fill)
         if code:
             body.append(code)
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-${{_RUN_ID}}.png`), fullPage: true }});')
             step += 1
 
     return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
@@ -762,6 +765,7 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
     if not url or 'unknown' in url.lower():
         url = 'http://target-url-placeholder'
     goto_line = f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});'
+    body.append("    const _RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;")
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
     for entry in partial_entries:
@@ -780,6 +784,7 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
         code = _generate_action_code(entry, step, url, is_first_fill)
         if code:
             body.append(code)
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-${{_RUN_ID}}.png`), fullPage: true }});')
             step += 1
 
     return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
@@ -797,6 +802,7 @@ def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=N
     if not url or 'unknown' in url.lower():
         url = 'http://target-url-placeholder'
     goto_line = f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});'
+    body.append("    const _RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;")
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
     for entry in partial_entries:
         _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
@@ -811,6 +817,7 @@ def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=N
         code = _generate_action_code(entry, step, url, is_first_fill)
         if code:
             body.append(code)
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-${{_RUN_ID}}.png`), fullPage: true }});')
             step += 1
     return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + PARTIAL_CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
 

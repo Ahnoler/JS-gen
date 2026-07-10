@@ -6,10 +6,31 @@ import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR } from '../../config/confi
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
 import { saveCaseDataRecord } from '../case-data-store.js';
+import { broadcast, onWsMessage } from '../ws-server.js';
 import {
   PYTHON_EXE, AGENT_SCRIPT, killTree, killOrphans,
-  waitForReady, isProcessAlive, spawnAgent, setupSSE, resolveModelId,
+  waitForReady, isProcessAlive, spawnAgent, setupSSE, createPushChannel, resolveModelId,
 } from './explore-utils.js';
+
+function broadcastSessions() {
+  const gb = state.globalBrowser;
+  const list = [];
+  for (const [id, s] of state.sessions) {
+    list.push({
+      sessionId: id, model: s.model, stepIndex: s.stepIndex,
+      busy: gb.busy, createdAt: s.createdAt, stepCount: s.trajectories.length,
+    });
+  }
+  broadcast('sessions:updated', { sessions: list });
+}
+
+function broadcastWatcherStatus() {
+  const gb = state.globalBrowser;
+  broadcast('watcher:status', {
+    connected: !!(gb.ready && gb.stdin),
+    agentBusy: gb.busy,
+  });
+}
 
 async function ensureGlobalBrowser(modelId) {
   const gb = state.globalBrowser;
@@ -44,6 +65,7 @@ async function ensureGlobalBrowser(modelId) {
   try {
     await waitForReady(child, 15000);
     gb.ready = true;
+    broadcastWatcherStatus();
     console.log('[browser-global] Browser ready');
   } catch (err) {
     killTree(child.pid);
@@ -53,8 +75,9 @@ async function ensureGlobalBrowser(modelId) {
   }
 }
 
-function handleSessionMessage(send, session, stepIndex, gb, res, cleanupListener) {
+function handleSessionMessage(channel, session, stepIndex, gb, cleanupListener) {
   return (msg) => {
+    const send = channel.send;
     switch (msg.event) {
       case 'step':
         send('step', msg.data);
@@ -71,22 +94,27 @@ function handleSessionMessage(send, session, stepIndex, gb, res, cleanupListener
         send('phase_done', msg.data);
         send('status', { phase: 'step_done', label: `Step ${session.stepIndex} completed` });
         gb.busy = false;
+        broadcastSessions();
+        broadcastWatcherStatus();
         send('done', { stepIndex: session.stepIndex, success: true });
-        if (!res.writableEnded) res.end();
+        channel.end();
         cleanupListener();
         break;
       }
       case 'phase_error':
         send('status', { phase: 'error', label: `Step failed: ${msg.data.message}` });
         gb.busy = false;
+        broadcastWatcherStatus();
         send('done', { stepIndex, success: false, error: msg.data.message });
-        if (!res.writableEnded) res.end();
+        channel.end();
         cleanupListener();
         break;
       case 'error':
         send('error', msg.data);
         gb.busy = false;
-        if (!res.writableEnded) res.end();
+        broadcastWatcherStatus();
+        send('done', { stepIndex, success: false, error: msg.data.message || 'Agent error' });
+        channel.end();
         cleanupListener();
         break;
       case 'nav_step':
@@ -116,36 +144,33 @@ export default function (app) {
     const gb = state.globalBrowser;
     state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model, lastTask: null, lastMaxSteps: null, caseDataFile: null });
     console.log(`[browser-session] Created session ${sessionId} (shared browser)`);
+    broadcastSessions();
+    broadcastWatcherStatus();
     res.json({ sessionId, model: gb.model });
   });
 
-  app.post('/api/browser/session/:id/step', async (req, res) => {
-    const { id } = req.params;
-    const { task, maxSteps, caseDataFile } = req.body || {};
+  // ── Shared: execute a single step on the global browser agent ──
+  // Callers: HTTP+SSE handler (POST /step) and WebSocket handler
+  function executeAgentStep({ session, task, maxSteps, caseDataFile, channel }) {
     const gb = state.globalBrowser;
-    if (!task) return res.status(400).json({ error: 'task is required' });
+    if (gb.busy) return channel.send('error', { message: 'Browser is busy executing a step' });
+    if (!gb.ready || !gb.stdin) return channel.send('error', { message: 'Browser not ready' });
 
-    const session = state.sessions.get(id);
-    if (!session) return res.status(404).json({ error: 'Session not found' });
-    if (gb.busy) return res.status(409).json({ error: 'Browser is busy executing a step' });
-    if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
-
-    // Store case data paths in session (first step sets them)
     if (caseDataFile) session.caseDataFile = caseDataFile;
-
     gb.busy = true;
-    const send = setupSSE(res);
+    broadcastWatcherStatus();
+
     let aborted = false;
 
-    res.on('close', () => {
+    channel.onAbort(() => {
       aborted = true;
       if (gb.busy) {
-        const cancelFile = path.join(os.tmpdir(), `browser_use_cancel_global`);
+        const cancelFile = path.join(os.tmpdir(), 'browser_use_cancel_global');
         try { writeFileSync(cancelFile, 'cancel'); } catch {}
         try { gb.stdin.write(JSON.stringify({ event: 'cancel_step' }) + '\n'); } catch {}
         gb.busy = false;
       }
-      cleanupListener();
+      cleanupListeners();
     });
 
     const stepIndex = session.stepIndex + 1;
@@ -160,40 +185,55 @@ export default function (app) {
       gb.stdin.write(JSON.stringify({ event: 'step', data: stepData }) + '\n');
     } catch (writeErr) {
       gb.busy = false;
-      send('error', { message: `Failed to write step to agent: ${writeErr.message}` });
-      if (!res.writableEnded) res.end();
+      channel.send('error', { message: `Failed to write step to agent: ${writeErr.message}` });
+      channel.end();
       return;
     }
 
     let pendingBuffer = '';
-    const handleMsg = handleSessionMessage(send, session, stepIndex, gb, res, cleanupListener);
+    const handleMsg = handleSessionMessage(channel, session, stepIndex, gb, cleanupListeners);
 
-    const onStdout = (chunk) => {
+    function onStdout(chunk) {
       if (aborted) return;
       pendingBuffer += chunk.toString();
       const lines = pendingBuffer.split('\n');
       pendingBuffer = lines.pop() || '';
-      for (const line of lines) { if (!line.trim()) continue; try { handleMsg(JSON.parse(line)); } catch {} }
-    };
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { handleMsg(JSON.parse(line)); } catch {}
+      }
+    }
 
-    function cleanupListener() {
-      gb.process.stdout.removeListener('data', onStdout);
-      gb.process.removeListener('exit', onProcessExit);
+    function cleanupListeners() {
+      try { gb.process.stdout.removeListener('data', onStdout); } catch {}
+      try { gb.process.removeListener('exit', onProcessExit); } catch {}
     }
 
     function onProcessExit(code) {
       if (aborted) return;
       aborted = true;
       gb.busy = false;
-      if (!res.writableEnded) {
-        send('error', { message: `Agent process exited unexpectedly (code ${code})` });
-        res.end();
-      }
-      cleanupListener();
+      channel.send('error', { message: `Agent process exited unexpectedly (code ${code})` });
+      channel.end();
+      cleanupListeners();
     }
 
     gb.process.stdout.on('data', onStdout);
     gb.process.on('exit', onProcessExit);
+  }
+
+  app.post('/api/browser/session/:id/step', async (req, res) => {
+    const { id } = req.params;
+    const { task, maxSteps, caseDataFile } = req.body || {};
+    const gb = state.globalBrowser;
+    if (!task) return res.status(400).json({ error: 'task is required' });
+
+    const session = state.sessions.get(id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    const channel = createPushChannel(null, res);
+    setupSSE(res);  // sets headers
+    executeAgentStep({ session, task, maxSteps, caseDataFile, channel });
   });
 
   app.post('/api/browser/session/:id/continue', async (req, res) => {
@@ -207,6 +247,36 @@ export default function (app) {
     if (stepRoute) stepRoute.handle(req, res);
     else res.status(500).json({ error: 'Step handler not found' });
   });
+
+  // ── Helper: wait for a specific event from the agent process stdout ──
+  function waitForAgentEvent(eventName, timeoutMs = 60000) {
+    return new Promise((resolve, reject) => {
+      const gb = state.globalBrowser;
+      if (!gb.process || !gb.process.stdout) return reject(new Error('Agent process not available'));
+      const timeout = setTimeout(() => { cleanup(); reject(new Error(`Timeout waiting for ${eventName}`)); }, timeoutMs);
+      let buffer = '';
+      const onData = (chunk) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.event === eventName) { cleanup(); resolve(msg.data || {}); }
+          } catch {}
+        }
+      };
+      const onExit = () => { cleanup(); reject(new Error('Agent process exited')); };
+      const cleanup = () => {
+        clearTimeout(timeout);
+        try { gb.process.stdout.removeListener('data', onData); } catch {}
+        try { gb.process.removeListener('exit', onExit); } catch {}
+      };
+      try { gb.process.stdout.on('data', onData); } catch (e) { cleanup(); reject(e); }
+      try { gb.process.on('exit', onExit); } catch (e) { cleanup(); reject(e); }
+    });
+  }
 
   // Self-healing: construct resume instruction, send as step to global agent.
   app.post('/api/browser/session/:id/rerun', async (req, res) => {
@@ -223,11 +293,31 @@ export default function (app) {
 
     // Construct resume instruction from action + log files
     let resumeInstruction = '';
+    let replayedCount = 0;
     try {
       const actionData = JSON.parse(readFileSync(absActionPath, 'utf-8'));
       const url = actionData.url || '';
       const commands = actionData?.tests?.[0]?.commands || actionData?.actions || [];
       const remaining = commands.filter((c, i) => (i + 1) >= failedStep);
+
+      // ── CDP Replay phase: replay pre-failure actions to reproduce page state ──
+      const preFailure = commands.filter((c, i) => (i + 1) < failedStep);
+      if (preFailure.length > 0) {
+        const gb = state.globalBrowser;
+        if (gb.ready && gb.stdin) {
+          try {
+            gb.stdin.write(JSON.stringify({
+              event: 'replay_actions',
+              data: { actions: preFailure },
+            }) + '\n');
+            const replayResult = await waitForAgentEvent('replay_done', 120000);
+            replayedCount = replayResult.count || 0;
+            console.log(`[rerun] Replay done: ${replayedCount} actions executed via CDP`);
+          } catch (e) {
+            console.log(`[rerun] Replay error (continuing with heal): ${e.message}`);
+          }
+        }
+      }
 
       // Load heal prompt template
       const healPromptPath = path.resolve(PROJECT_DIR, 'scripts', 'prompts', 'heal-prompt.md');
@@ -237,9 +327,12 @@ export default function (app) {
       } catch (_) {}
 
       // Build URL section
-      const urlSection = (url && !url.includes('unknown'))
-        ? '【目标URL】\n' + url + '\n\n'
+      const replayNote = replayedCount > 0
+        ? `\n当前页面已通过 CDP 自动回放了前 ${replayedCount} 步操作，处于第 ${failedStep} 步的待操作状态。无需重复导航和填写已完成的字段，直接扫描当前表单，建立任务清单，从第 ${failedStep} 步开始继续。\n`
         : '';
+      const urlSection = (url && !url.includes('unknown'))
+        ? '【目标URL】\n' + url + '\n\n' + replayNote
+        : replayNote;
 
       // Build form changes section
       let formChangesSection = '';
@@ -329,7 +422,7 @@ export default function (app) {
         // Fallback: build inline
         const lines = [];
         if (urlSection) lines.push(urlSection.trim());
-        lines.push('当前为脚本执行失败后的自愈修复阶段。请根据下方操作步骤与 Log 文件，逐步导航并复现失败场景，抵达出错页面后，扫描当前表单，建立任务清单，重新填写所有表单项。');
+        if (replayedCount === 0) lines.push('当前为脚本执行失败后的自愈修复阶段。请根据下方操作步骤与 Log 文件，逐步导航并复现失败场景，抵达出错页面后，扫描当前表单，建立任务清单，重新填写所有表单项。');
         if (formChangesSection) lines.push('\n' + formChangesSection.trim());
         lines.push('\n## 剩余操作步骤（从第 ' + failedStep + ' 步开始）');
         lines.push(remainingCmds || '(无剩余操作步骤)');
@@ -379,6 +472,7 @@ export default function (app) {
     };
     state.sessions.delete(id);
     console.log(`[browser-session] Deleted session ${id}`);
+    broadcastSessions();
     res.json({ status: 'archived', sessionId: id });
   });
 
@@ -401,6 +495,8 @@ export default function (app) {
         gb.stepIndex = 0;
         state.sessions.clear();
         console.log('[browser-global] Browser close timeout, force killed');
+        broadcastSessions();
+        broadcastWatcherStatus();
         res.json({ status: 'closed (force killed)' });
       }, 30000);
 
@@ -413,6 +509,8 @@ export default function (app) {
         gb.stepIndex = 0;
         state.sessions.clear();
         console.log('[browser-global] Browser closed gracefully, trace saved');
+        broadcastSessions();
+        broadcastWatcherStatus();
         res.json({ status: 'closed' });
       });
     } else {
@@ -423,6 +521,8 @@ export default function (app) {
       gb.stepIndex = 0;
       state.sessions.clear();
       console.log('[browser-global] No browser process, cleaned up');
+      broadcastSessions();
+      broadcastWatcherStatus();
       res.json({ status: 'closed' });
     }
   });
@@ -642,4 +742,21 @@ export default function (app) {
     }
   });
 
+  // ── WebSocket 消息处理（通过 ws-server 的 onWsMessage 注册） ──
+  onWsMessage((ws, msg) => {
+    if (msg.type === 'session:step') {
+      const { sessionId, task, maxSteps, caseDataFile } = msg.payload || {};
+      if (!sessionId || !task) {
+        ws.send(JSON.stringify({ type: 'session:error', payload: { message: 'sessionId and task are required' } }));
+        return;
+      }
+      const session = state.sessions.get(sessionId);
+      if (!session) {
+        ws.send(JSON.stringify({ type: 'session:error', payload: { message: 'Session not found' } }));
+        return;
+      }
+      const channel = createPushChannel(ws, null);
+      executeAgentStep({ session, task, maxSteps: maxSteps || 40, caseDataFile, channel });
+    }
+  });
 }
