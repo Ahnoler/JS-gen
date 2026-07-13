@@ -157,6 +157,10 @@ class ActionEntry(BaseModel):
         default_factory=dict,
         description="Element attributes dict",
     )
+    phase: int = Field(
+        default=0,
+        description="Phase number (step_index). Used by Dashboard to group actions by phase.",
+    )
 
     # ── Legacy compat (used by script_assembler) ────────────────────────
 
@@ -221,6 +225,7 @@ class ActionEntry(BaseModel):
         params: dict,
         result: str = "",
         element: ElementInfo | dict | None = None,
+        phase: int = 0,
     ) -> "ActionEntry":
         """Build an ActionEntry matching _record_action() output.
 
@@ -229,6 +234,7 @@ class ActionEntry(BaseModel):
             params: Action-specific parameters dict.
             result: Result string from the action.
             element: Optional captured DOM element info.
+            phase: Phase number (step_index) for Dashboard grouping.
         """
         import uuid
         import time
@@ -240,6 +246,7 @@ class ActionEntry(BaseModel):
             params=dict(params) if params else {},
             result=str(result)[:200] if result else "",
             command=ACTION_TO_COMMAND.get(action_name, action_name),
+            phase=phase,
         )
 
         if element:

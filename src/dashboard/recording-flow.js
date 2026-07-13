@@ -1,6 +1,5 @@
-// Real-time action flow display
-// Passively listens to controller_action events from the Python agent
-// and renders action cards in real-time on the dashboard
+// Real-time action flow display — full state sync mode
+// Receives the entire _ACTION_LOG on every change, replaces local state
 
 import { escapeHtml } from './swagger-api.js';
 import { on } from './ws-client.js';
@@ -30,61 +29,107 @@ export function initActionFlow() {
   const countEl = document.getElementById('sessActionFlowCount');
   if (!flowEl) return;
 
-  let actionCount = 0;
+  function formatTime(ts) {
+    if (!ts) return new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    const d = typeof ts === 'number' ? new Date(ts) : new Date(ts);
+    return d.toLocaleTimeString('zh-CN', { hour12: false });
+  }
 
-  function appendAction(data) {
-    const icon = ACTION_ICONS[data.action] || '🔹';
-    const p = data.params || {};
-    const label = p.label_text || p.menu_text || p.tab_name || p.row_text || p.text || '';
-    const value = p.value || p.option_text || '';
-    const color = ACTION_COLORS[data.action] || 'slate';
-    const time = data.timestamp
-      ? new Date(data.timestamp).toLocaleTimeString('zh-CN', { hour12: false })
-      : new Date().toLocaleTimeString('zh-CN', { hour12: false });
-
-    const empty = flowEl.querySelector('.empty-state');
-    if (empty) empty.remove();
-
-    actionCount++;
-    countEl.textContent = actionCount + ' 条';
-    countEl.style.color = actionCount > 0 ? 'var(--indigo-600)' : 'var(--slate-400)';
+  function renderEntryCard(entry, index) {
+    const icon = ACTION_ICONS[entry.action] || '🔹';
+    const p = entry.params || {};
+    const label = p.label_text || p.menu_text || p.tab_name || p.row_text || p.text || p.username || p.key || '';
+    const value = p.value || p.option_text || p.expected || p.reason || p.amount || String(p.index != null ? p.index : '') || (entry.action === 'login' ? (p.password ? '(已填写)' : '') : p.output_dir || '');
+    const color = ACTION_COLORS[entry.action] || 'slate';
+    const time = formatTime(entry.timestamp);
+    const result = entry.result || '';
+    const dotColor = result.startsWith('field-disabled') || result.startsWith('no-')
+      ? 'var(--amber-400)'
+      : result.startsWith('not-found') || result.startsWith('error')
+        ? 'var(--red-400)'
+        : 'var(--emerald-400)';
 
     const card = document.createElement('div');
-    card.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--slate-100);transition:background .15s';
+    card.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--slate-100);transition:background .15s;position:relative';
     card.onmouseenter = () => card.style.background = 'var(--slate-50)';
-    card.onmouseleave = () => card.style.background = '';
+    card.onmouseleave = () => { if (!card.classList.contains('hover-detail')) card.style.background = ''; };
+
+    const labelHtml = label ? '<strong>' + escapeHtml(label) + '</strong>' : '';
+    const valueHtml = value ? ' = <span style="color:var(--emerald-600)">' + escapeHtml(String(value)) + '</span>' : '';
+    const fallbackHtml = (!label && !value) ? '<span style="color:var(--slate-400)">(无参数)</span>' : '';
+
     card.innerHTML = [
       '<span style="font-size:14px;flex-shrink:0">', icon, '</span>',
-      '<code style="background:var(--', color, '-50);color:var(--', color, '-700);padding:1px 6px;border-radius:3px;font-size:11px;font-family:var(--font-mono);white-space:nowrap;flex-shrink:0">', escapeHtml(data.action), '</code>',
+      '<code style="background:var(--', color, '-50);color:var(--', color, '-700);padding:1px 6px;border-radius:3px;font-size:11px;font-family:var(--font-mono);white-space:nowrap;flex-shrink:0">', escapeHtml(entry.action), '</code>',
       '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--slate-700)">',
-      label ? '<strong>' + escapeHtml(label) + '</strong>' : '',
-      value ? ' = <span style="color:var(--emerald-600)">' + escapeHtml(value) + '</span>' : '',
-      !label && !value ? '<span style="color:var(--slate-400)">(无参数)</span>' : '',
+      labelHtml, valueHtml, fallbackHtml,
       '</span>',
       '<span style="color:var(--slate-400);font-size:10px;white-space:nowrap;flex-shrink:0">', time, '</span>',
-      '<span style="width:7px;height:7px;border-radius:50%;background:var(--emerald-400);flex-shrink:0;box-shadow:0 0 4px rgba(16,185,129,.4)"></span>',
+      '<span style="width:7px;height:7px;border-radius:50%;background:', dotColor, ';flex-shrink:0;box-shadow:0 0 4px ', dotColor, '"></span>',
     ].join('');
 
-    flowEl.appendChild(card);
+    // Hover detail
+    const detail = document.createElement('div');
+    detail.className = 'rec-action-detail';
+    detail.style.cssText = 'display:none;padding:4px 0 4px 34px;font-size:10px;color:var(--slate-500);font-family:var(--font-mono);line-height:1.5';
+    const detailLines = ['action: ' + entry.action];
+    if (Object.keys(p).length) detailLines.push('params: ' + JSON.stringify(p));
+    if (result) detailLines.push('result: ' + result);
+    if (entry.target) detailLines.push('xpath: ' + entry.target.slice(0, 80));
+    detail.innerHTML = detailLines.map(l => '<div>' + escapeHtml(l) + '</div>').join('');
+
+    card.appendChild(detail);
+
+    let detailTimer = null;
+    card.addEventListener('mouseenter', () => {
+      card.style.background = 'var(--slate-50)';
+      clearTimeout(detailTimer);
+      detailTimer = setTimeout(() => { detail.style.display = 'block'; }, 300);
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.background = '';
+      clearTimeout(detailTimer);
+      detail.style.display = 'none';
+    });
+
+    return card;
+  }
+
+  function addStepSeparator(phase) {
+    const sep = document.createElement('div');
+    sep.className = 'rec-action-sep';
+    sep.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 10px;color:var(--slate-400);font-size:10px;font-weight:600;background:var(--slate-50);border-bottom:1px solid var(--slate-100)';
+    sep.innerHTML = '<span style="flex:1;height:1px;background:var(--slate-200)"></span>阶段 ' + phase + '<span style="flex:1;height:1px;background:var(--slate-200)"></span>';
+    return sep;
+  }
+
+  function replaceAll(entries, count) {
+    flowEl.innerHTML = '';
+
+    if (!entries || entries.length === 0 || count === 0) {
+      flowEl.innerHTML = '<div class="empty-state" style="padding:24px;text-align:center;color:var(--slate-400);font-size:12px">暂无动作</div>';
+      countEl.textContent = '等待中…';
+      countEl.style.color = 'var(--slate-400)';
+      return;
+    }
+
+    let currentPhase = null;
+    entries.forEach((entry, i) => {
+      const entryPhase = entry.phase != null ? entry.phase : 0;
+      if (entryPhase !== currentPhase) {
+        currentPhase = entryPhase;
+        flowEl.appendChild(addStepSeparator(currentPhase));
+      }
+      const card = renderEntryCard(entry, i);
+      flowEl.appendChild(card);
+    });
+
+    countEl.textContent = count + ' 条';
+    countEl.style.color = count > 0 ? 'var(--indigo-600)' : 'var(--slate-400)';
     flowEl.scrollTop = flowEl.scrollHeight;
   }
 
-  function addStepSeparator(label) {
-    const sep = document.createElement('div');
-    sep.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 10px;color:var(--slate-400);font-size:10px;font-weight:600;background:var(--slate-50);border-bottom:1px solid var(--slate-100)';
-    sep.innerHTML = '<span style="flex:1;height:1px;background:var(--slate-200)"></span>' + escapeHtml(label) + '<span style="flex:1;height:1px;background:var(--slate-200)"></span>';
-    flowEl.appendChild(sep);
-  }
-
-  on('controller_action', (data) => {
-    appendAction(data);
-  });
-
-  on('session:phase_start', (data) => {
-    addStepSeparator(data.name || 'Step ' + data.phase);
-  });
-
-  on('session:nav_step', (data) => {
-    addStepSeparator(data.label || '导航');
+  on('action_log_sync', (data) => {
+    replaceAll(data.entries || [], data.count || 0);
   });
 }

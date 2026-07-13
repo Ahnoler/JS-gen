@@ -100,6 +100,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
 
             count = len(_state._ACTION_LOG)
             _state._ACTION_LOG.clear()
+            _state._emit_action_log_sync()
             return _ok(f'saved:{filepath} | entries:{count}')
         except Exception as e:
             return _err(f'save-error:{e}')

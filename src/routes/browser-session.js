@@ -67,6 +67,24 @@ async function ensureGlobalBrowser(modelId) {
     gb.ready = true;
     broadcastWatcherStatus();
     console.log('[browser-global] Browser ready');
+
+    // Persistent stdout listener: always forward action_log_sync events
+    // regardless of which handler (step, CDP, etc.) is active
+    let syncBuf = '';
+    child.stdout.on('data', (chunk) => {
+      syncBuf += chunk.toString();
+      const lines = syncBuf.split('\n');
+      syncBuf = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg.event === 'action_log_sync') {
+            broadcast('action_log_sync', msg.data);
+          }
+        } catch {}
+      }
+    });
   } catch (err) {
     killTree(child.pid);
     setTimeout(() => killOrphans(), 2000);
@@ -126,9 +144,8 @@ function handleSessionMessage(channel, session, stepIndex, gb, cleanupListener) 
       case 'intervention_resolved':
         send('intervention_resolved', msg.data);
         break;
-      case 'controller_action':
-        send('controller_action', msg.data);
-        broadcast('controller_action', msg.data);
+      case 'action_log_sync':
+        send('action_log_sync', msg.data);
         break;
     }
   };

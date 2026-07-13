@@ -10,6 +10,7 @@ from ..models import ActionEntry
 
 _ACTION_LOG: list[dict] = []
 _TRAJECTORY_URL: str | None = None
+_CURRENT_PHASE: int = 0
 
 # Action → old-format command mapping (legacy, mirrors models/action.py:ACTION_TO_COMMAND)
 _ACTION_TO_COMMAND = {
@@ -24,27 +25,38 @@ _ACTION_TO_COMMAND = {
 }
 
 
+def set_current_phase(n: int):
+    """Set the current phase number. Called by session_runner before each step."""
+    global _CURRENT_PHASE
+    _CURRENT_PHASE = n
+
+
+def _emit_action_log_sync():
+    """Push the full _ACTION_LOG to the Dashboard."""
+    try:
+        from ..agent_utils import emit_json
+        emit_json({"event": "action_log_sync", "data": {
+            "entries": list(_ACTION_LOG),
+            "count": len(_ACTION_LOG),
+        }})
+    except ImportError:
+        pass
+
+
 def _record_action(action_name, params, result, element=None):
     """Record a controller action call using ActionEntry model."""
     global _TRAJECTORY_URL
     params_dict = dict(params) if params else {}
 
-    entry = ActionEntry.from_record(action_name, params_dict, str(result) if result else '', element)
+    entry = ActionEntry.from_record(
+        action_name, params_dict,
+        str(result) if result else '',
+        element,
+        phase=_CURRENT_PHASE,
+    )
 
     _ACTION_LOG.append(entry.model_dump())
-    # Capture URL from go_to_url action
     if action_name == 'go_to_url' and params_dict.get('url'):
         _TRAJECTORY_URL = params_dict['url']
 
-    # Real-time push to Dashboard via existing JSON Lines stdout protocol
-    try:
-        from ..agent_utils import emit_json
-        from datetime import datetime
-        emit_json({"event": "controller_action", "data": {
-            "action": action_name,
-            "params": params_dict,
-            "result": str(result) if result else '',
-            "timestamp": datetime.now().isoformat(),
-        }})
-    except ImportError:
-        pass  # agent_utils not available when imported standalone
+    _emit_action_log_sync()

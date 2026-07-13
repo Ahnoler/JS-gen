@@ -159,6 +159,8 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
         native_count = len(_native.get('history', [])) if _native else 0
         _ACTION_LOG.clear()
         _recorder_log.clear()
+        from .actions._state import _emit_action_log_sync
+        _emit_action_log_sync()
 
         emit_json({
             "event": "save_trajectory_result",
@@ -206,6 +208,8 @@ def _handle_reset_trajectory(session_id):
     from .recorder import _ACTION_LOG as _recorder_log
     _ACTION_LOG.clear()
     _recorder_log.clear()
+    from .actions._state import _emit_action_log_sync
+    _emit_action_log_sync()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"
     sys.stderr.write(f"[session] ATP trajectory reset ({ts})\n")
@@ -597,6 +601,8 @@ async def run_session(args):
     async def _run_step(data, step_idx):
         """Execute one agent step with the given data."""
         nonlocal cumulative_path
+        from .actions._state import set_current_phase
+        set_current_phase(step_idx)
         agent_running_ref['value'] = True
         try:
             output_path, task_text = await _run_agent_step(
