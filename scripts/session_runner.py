@@ -59,8 +59,12 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
                     break
     if not url:
         url = 'http://unknown'
+
+    # ── 快照：立即复制所有可变数据，后续只用副本 ──
     entries = list(_ACTION_LOG) if _ACTION_LOG else []
-    if not entries and not _recorder_log:
+    rec_log_snapshot = list(_recorder_log) if _recorder_log else []
+
+    if not entries and not rec_log_snapshot:
         emit_json(
             {"event": "save_trajectory_result", "data": {"success": False, "message": "No trajectory data available"}})
         return
@@ -76,7 +80,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
 
         # Prepare file paths (write later, after all metadata is ready)
         action_path = action_dir / f"action_{ts}.json" if entries else None
-        log_path = log_dir / f"log_{ts}.txt" if _recorder_log else None
+        log_path = log_dir / f"log_{ts}.txt" if rec_log_snapshot else None
 
         # File 3: traj_{ts}.json — native AgentHistoryList
         native_path = None
@@ -98,10 +102,15 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
                     sys.stderr.flush()
                     with open(native_path, 'w', encoding='utf-8') as _f:
                         json.dump(_native, _f, ensure_ascii=False, indent=2)
+                # ── 读完 cumulative 后立即删除（防重入：下一次 save 不会读到相同数据） ──
+                try:
+                    cumulative_path.unlink()
+                except:
+                    pass
             except Exception as _e:
                 sys.stderr.write(f"[save-trajectory] native write error: {_e}\n")
                 sys.stderr.flush()
-        sys.stderr.write(f"[save-trajectory] entries={len(entries)}, _recorder_log={len(_recorder_log)}\n")
+        sys.stderr.write(f"[save-trajectory] entries={len(entries)}, rec_log_snapshot={len(rec_log_snapshot)}\n")
         sys.stderr.flush()
 
         # File 4: form_{ts}.json — form structure snapshots (for replay validation)
@@ -136,24 +145,20 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
                 json.dump(action_json, f, ensure_ascii=False, indent=2)
 
         # File 2: log_{ts}.txt
-        if log_path and _recorder_log:
+        if log_path and rec_log_snapshot:
             with open(log_path, 'w', encoding='utf-8') as f:
                 f.write(f"URL: {url}\n")
-                f.write(f"Total steps: {len(_recorder_log)}\n")
+                f.write(f"Total steps: {len(rec_log_snapshot)}\n")
                 f.write("=" * 60 + "\n")
-                for line in _recorder_log:
+                for line in rec_log_snapshot:
                     f.write(line + "\n")
 
         # Clear all logs so next task starts fresh
         action_count = len(entries)
-        log_count = len(_recorder_log)
+        log_count = len(rec_log_snapshot)
         native_count = len(_native.get('history', [])) if _native else 0
         _ACTION_LOG.clear()
         _recorder_log.clear()
-        # Reset cumulative trajectory file
-        if cumulative_path and cumulative_path.exists():
-            try: cumulative_path.unlink()
-            except: pass
 
         emit_json({
             "event": "save_trajectory_result",

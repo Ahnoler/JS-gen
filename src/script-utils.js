@@ -39,6 +39,7 @@ export function extractFlowFromTrajectory(trajectory) {
       flow.push({
         stepNumber: i + 1,
         type: 'done',
+        phaseNumber: state?._phase_number || 0,
         description: results.find(r => r.extracted_content)?.extracted_content || 'Task completed',
         url: state?.url || '',
         success: results.some(r => r.success === true),
@@ -100,6 +101,7 @@ export function extractFlowFromTrajectory(trajectory) {
         stepNumber: i + 1,
         actionIndex: j,
         type: actionKey,
+        phaseNumber: state?._phase_number || 0,
         description: currentState.next_goal || '',
         url: state?.url || '',
         params: {
