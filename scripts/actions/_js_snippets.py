@@ -94,13 +94,30 @@ JS_SMART_LOCATOR = '''([label]) => {
         const attrs = {};
         for (const a of target.attributes) if (a.value && a.value.length > 0) attrs[a.name] = a.value;
         const id = target.id;
-        let xpath = '';
-        if (id && !/^\\d{4,}$/.test(id) && !/^el-id-/.test(id)) xpath = `//${tag}[@id="${id}"]`;
-        if (!xpath && target.placeholder && !target.closest('.el-select')) xpath = `//${tag}[@placeholder="${target.placeholder}"]`;
-        if (!xpath && target.name) xpath = `//${tag}[@name="${target.name}"]`;
-        if (!xpath && target.type && tag !== 'textarea') xpath = `//${tag}[@type="${target.type}"]`;
-        if (!xpath) xpath = `//${tag}[@class="${(target.getAttribute('class')||'').split(' ').filter(Boolean).join(' ')}"]`;
-        return JSON.stringify({xpath, tag, attrs});
+        const cls = (target.getAttribute('class')||'').split(' ').filter(Boolean);
+        let xpath = '', css_sel = '';
+        const esc = s => s.replace(/"/g, '\\"').replace(/'/g, "\\'");
+        if (id && !/^\\d{4,}$/.test(id) && !/^el-id-/.test(id)) {
+            xpath = `//${tag}[@id="${id}"]`;
+            css_sel = `${tag}#${id}`;
+        }
+        if (!xpath && target.placeholder && !target.closest('.el-select')) {
+            xpath = `//${tag}[@placeholder="${target.placeholder}"]`;
+            css_sel = `${tag}[placeholder="${esc(target.placeholder)}"]`;
+        }
+        if (!xpath && target.name) {
+            xpath = `//${tag}[@name="${target.name}"]`;
+            css_sel = `${tag}[name="${esc(target.name)}"]`;
+        }
+        if (!xpath && target.type && tag !== 'textarea') {
+            xpath = `//${tag}[@type="${target.type}"]`;
+            css_sel = `${tag}[type="${esc(target.type)}"]`;
+        }
+        if (!xpath) {
+            xpath = `//${tag}[@class="${cls.join(' ')}"]`;
+            css_sel = cls.length ? `${tag}.${cls.join('.')}` : tag;
+        }
+        return JSON.stringify({xpath, css_sel, tag, attrs});
     }
     for (const inp of container.querySelectorAll('input:not([type="hidden"]), textarea')) {
         const ph = inp.placeholder || '';

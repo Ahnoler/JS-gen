@@ -13,9 +13,9 @@ Features:
   - Per-tier error diagnostics (CTRL | Playwright | absolute XPath → English hint)
 
 Verified (detection + self-healing):
-  ✅ fill_form_field       — 3-tier: CTRL → Playwright hasText → absolute XPath
-  ✅ select_option         — 3-tier: CTRL → Playwright native → absolute XPath
-  ✅ click_element_by_index — N-tier: ID → class → XPath → text → JS → fuzzy
+  ✅ fill_form_field       — 2-tier: CTRL → Playwright hasText
+  ✅ select_option         — 2-tier: CTRL → Playwright native
+  ✅ click_element_by_index — N-tier: ID → class → XPath → CSS → text → JS → fuzzy
 
 TODO — remaining operations lack multi-tier degradation + structured error reporting:
   ☐ click_menu_item        — single-tier CTRL, error: 'not-found'
@@ -317,35 +317,9 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
             lines.append(f"        console.log('[{step_num}]   Playwright fallback failed:', _e_fb{step_num}.message);")
             lines.append(f"        _dt{step_num} += ' | Playwright hasText: failed';")
 
-            # Tier 3: absolute XPath fallback (page-wide, label-independent)
-            abs_xp = _e.get('absoluteTarget', '') or ''
-            if abs_xp and not abs_xp.startswith('/') and not abs_xp.startswith('//'):
-                abs_xp = '/' + abs_xp
-
-            if abs_xp:
-                lines.append(f"        try {{")
-                lines.append(f"          const _ax{step_num} = page.locator('xpath={_escape(abs_xp)}').first();")
-                lines.append(f"          await _ax{step_num}.fill({val_expr}, {{ timeout: 3000 }});")
-                lines.append(f"          _r{step_num} = 'ok-absxpath';")
-                lines.append(f"          console.log('[{step_num}]   absolute XPath OK');")
-                lines.append(f"        }} catch (_e_ax{step_num}) {{")
-                lines.append(f"          console.log('[{step_num}]   absolute XPath fallback failed:', _e_ax{step_num}.message);")
-                lines.append(f"          _dt{step_num} += ' | absolute XPath: failed';")
-                lines.append(f"        }}")
-
-            # Record error with per-tier structured details
-            if abs_xp:
-                lines.append(f"        if (_r{step_num} === 'ok-absxpath') {{")
-                lines.append(f"          _dt{step_num} += ' | absolute XPath: OK → label_text only — selector still valid';")
-                lines.append(f"          // Label mismatch: CTRL + Playwright failed, only XPath saved us. Flag for review.")
-                lines.append(f"          _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', _dt{step_num});")
-                lines.append(f"        }} else {{")
-                lines.append(f"          _dt{step_num} += ' → page structure changed — re-locate element';")
-                lines.append(f"          _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', _dt{step_num});")
-                lines.append(f"        }}")
-            else:
-                lines.append(f"        _dt{step_num} += ' | absolute XPath: N/A → label_text may need updating and an absolute XPath may need updating';")
-                lines.append(f"        _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', _dt{step_num});")
+            # Record error
+            lines.append(f"        _dt{step_num} += ' | label_text may need updating';")
+            lines.append(f"        _recordError({step_num}, 'fill_form_field', '{_escape_js_string(l)}', String({val_expr}), 'needs-llm-fix', _dt{step_num});")
             lines.append(f"      }}")
             lines.append(f"    }}")
 
@@ -394,36 +368,9 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"        console.log('[{step_num}]   Playwright fallback failed:', _e_s{step_num}.message);")
         lines.append(f"        _dts{step_num} += ' | Playwright native: failed';")
 
-        # Tier 3: absolute XPath fallback (click trigger by structural path)
-        abs_xp = _e.get('absoluteTarget', '') or ''
-        if abs_xp and not abs_xp.startswith('/') and not abs_xp.startswith('//'):
-            abs_xp = '/' + abs_xp
-
-        if abs_xp:
-            lines.append(f"        try {{")
-            lines.append(f"          await page.locator('xpath={_escape(abs_xp)}').first().click({{ timeout: 3000 }});")
-            lines.append(f"          await page.evaluate(() => CTRL.waitForLoading());")
-            lines.append(f"          const _axo{step_num} = page.locator('.el-select-dropdown__item').filter({{ hasText: '{_escape_js_string(o)}' }}).first();")
-            lines.append(f"          await _axo{step_num}.click({{ timeout: 3000 }});")
-            lines.append(f"          _rs{step_num} = 'ok-absxpath';")
-            lines.append(f"          console.log('[{step_num}]   absolute XPath OK');")
-            lines.append(f"        }} catch (_e_axs{step_num}) {{")
-            lines.append(f"          console.log('[{step_num}]   absolute XPath fallback failed:', _e_axs{step_num}.message);")
-            lines.append(f"          _dts{step_num} += ' | absolute XPath: failed';")
-            lines.append(f"        }}")
-
-        # Record error with per-tier structured details
-        if abs_xp:
-            lines.append(f"        if (_rs{step_num} === 'ok-absxpath') {{")
-            lines.append(f"          _dts{step_num} += ' | absolute XPath: OK → label_text/option_text only — selector still valid';")
-            lines.append(f"          _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', _dts{step_num});")
-            lines.append(f"        }} else {{")
-            lines.append(f"          _dts{step_num} += ' → page structure changed — re-locate element';")
-            lines.append(f"          _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', _dts{step_num});")
-            lines.append(f"        }}")
-        else:
-            lines.append(f"        _dts{step_num} += ' | absolute XPath: N/A → label_text/option_text may need updating and an absolute XPath may need updating';")
-            lines.append(f"        _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', _dts{step_num});")
+        # Record error
+        lines.append(f"        _dts{step_num} += ' | label_text/option_text may need updating';")
+        lines.append(f"        _recordError({step_num}, 'select_option', '{_escape_js_string(l)}', '{_escape_js_string(o)}', 'needs-llm-fix', _dts{step_num});")
 
         lines.append(f"      }}")   # close Playwright catch
 
@@ -897,13 +844,13 @@ def main():
             c = cmd.get('command', '')
             if c == 'input':
                 actions.append({'action': 'fill_form_field', 'params': {'label_text': cmd.get('propertiesName', ''), 'value': cmd.get('value', '')},
-                    'target': cmd.get('target', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
+                    'target': cmd.get('target', ''), 'cssSelector': cmd.get('cssSelector', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
             elif c == 'select':
                 actions.append({'action': 'select_option', 'params': {'label_text': cmd.get('propertiesName', ''), 'option_text': cmd.get('value', '')},
-                    'target': cmd.get('target', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
+                    'target': cmd.get('target', ''), 'cssSelector': cmd.get('cssSelector', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
             elif c == 'click':
                 actions.append({'action': 'click_element_by_index', 'params': {'index': cmd.get('value', '0'), 'tag_name': cmd.get('tagName', ''), 'text': cmd.get('propertiesName', '')},
-                    'target': cmd.get('target', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
+                    'target': cmd.get('target', ''), 'cssSelector': cmd.get('cssSelector', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
     else:
         actions = raw_cmds
 

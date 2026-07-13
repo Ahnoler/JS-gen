@@ -210,7 +210,7 @@ def _handle_reset_trajectory(session_id):
     return cumulative_path
 
 
-def _accumulate_trajectory(output_path, cumulative_path):
+def _accumulate_trajectory(output_path, cumulative_path, phase_number=None):
     if not output_path.exists():
         return
     try:
@@ -221,6 +221,10 @@ def _accumulate_trajectory(output_path, cumulative_path):
         _step_history = _step.get('history', [])
         if not _step_history:
             return
+        # ── 注入 phase_number 到每一步的 state 中 ──
+        if phase_number is not None:
+            for step in _step_history:
+                step.setdefault('state', {})['_phase_number'] = phase_number
         if cumulative_path.exists():
             with open(cumulative_path, 'r', encoding='utf-8') as _f:
                 _cum = json.load(_f)
@@ -432,6 +436,15 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
             except Exception as e:
                 sys.stderr.write(f"[replay] [{i+1}/{total}] Error: {action_name} {params} -> {e}\n")
                 sys.stderr.flush()
+            # ── Wait for page idle between actions ──
+            try:
+                page = await browser_context.get_current_page()
+                await page.wait_for_load_state('networkidle', timeout=10000)
+                from .actions._helpers import _wait_if_loading as _replay_wait
+                await _replay_wait(page)
+                await asyncio.sleep(0.3)
+            except Exception:
+                pass
         sys.stderr.write(f"[replay] Done: {total} actions executed\n")
         sys.stderr.flush()
         emit_json({"event": "replay_done", "data": {"count": total}})
@@ -590,7 +603,7 @@ async def run_session(args):
             agent_running_ref['value'] = False
         if output_path is None:
             return
-        _accumulate_trajectory(output_path, cumulative_path)
+        _accumulate_trajectory(output_path, cumulative_path, step_idx)
         emit_json({
             "event": "phase_done",
             "data": {"phase": step_idx, "total": -1, "name": task_text[:60], "trajectory_file": str(output_path),

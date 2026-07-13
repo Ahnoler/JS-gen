@@ -12,7 +12,7 @@ from browser_use.agent.views import ActionResult
 
 from ._js_snippets import (
     JS_CHECK_LOADING, JS_WAIT_LOADING,
-    JS_SMART_LOCATOR, JS_LOCATOR,
+    JS_SMART_LOCATOR,
 )
 from ..models import ScannedField
 
@@ -34,7 +34,7 @@ async def _wait_if_loading(page):
 
 
 async def _capture_element(page, label_text):
-    """Capture both attribute XPath (smart) and absolute XPath for a labeled form field."""
+    """Capture element info for a labeled form field."""
     result = {}
     try:
         raw = await page.evaluate(JS_SMART_LOCATOR, [label_text])
@@ -42,16 +42,9 @@ async def _capture_element(page, label_text):
             info = json.loads(raw) if isinstance(raw, str) else raw
             if info.get('xpath'):
                 result['xpath'] = info['xpath']
+                result['css_selector'] = info.get('css_sel', '')
                 result['tag_name'] = info.get('tag', 'input')
                 result['attributes'] = info.get('attrs', {})
-    except Exception:
-        pass
-    try:
-        raw_abs = await page.evaluate(JS_LOCATOR, [label_text])
-        if raw_abs:
-            abs_info = json.loads(raw_abs) if isinstance(raw_abs, str) else raw_abs
-            if abs_info.get('xpath'):
-                result['absolute_xpath'] = abs_info['xpath']
     except Exception:
         pass
     return result if result else None

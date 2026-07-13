@@ -328,11 +328,13 @@ export default function (app) {
 
       // Build URL section
       const replayNote = replayedCount > 0
-        ? `\n当前页面已通过 CDP 自动回放了前 ${replayedCount} 步操作，处于第 ${failedStep} 步的待操作状态。无需重复导航和填写已完成的字段，直接扫描当前表单，建立任务清单，从第 ${failedStep} 步开始继续。\n`
+        ? `当前页面已通过 CDP 自动回放了前 ${replayedCount} 步操作，处于第 ${failedStep} 步的待操作状态。无需重复导航和登录，直接扫描当前表单，建立任务清单，从第 ${failedStep} 步开始继续填写。\n\n`
         : '';
-      const urlSection = (url && !url.includes('unknown'))
-        ? '【目标URL】\n' + url + '\n\n' + replayNote
-        : replayNote;
+      const urlSection = replayedCount > 0
+        ? replayNote
+        : (url && !url.includes('unknown'))
+          ? '【目标URL】\n' + url + '\n\n'
+          : '';
 
       // Build form changes section
       let formChangesSection = '';
@@ -418,6 +420,9 @@ export default function (app) {
           .replace('{{FAILED_STEP}}', String(failedStep))
           .replace('{{REMAINING_COMMANDS}}', remainingCmds || '(无剩余操作步骤)')
           .replace('{{LOG_SECTION}}', logSection);
+        if (replayedCount > 0) {
+          resumeInstruction = resumeInstruction.replace('逐步导航并复现失败场景，抵达出错页面后，', '');
+        }
       } else {
         // Fallback: build inline
         const lines = [];

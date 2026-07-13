@@ -85,13 +85,12 @@ ACTION_TO_COMMAND: dict[str, CommandType] = {
 class ElementInfo(BaseModel):
     """Captured DOM element reference for an action entry.
 
-    Used by the assembler to generate resilient locators (3-tier degradation:
-    CTRL helper → Playwright hasText → absolute XPath fallback).
+    Used by the assembler to generate resilient locators.
     """
 
     tag_name: str = Field(default="", description="Element tag name (e.g., input, button)")
     xpath: str = Field(default="", description="Relative XPath to the element")
-    absolute_xpath: str = Field(default="", description="Absolute XPath from document root")
+    css_selector: str = Field(default="", description="CSS selector to the element")
     attributes: dict[str, str] = Field(
         default_factory=dict,
         description="Element attributes (class, type, id, placeholder, etc.)",
@@ -149,9 +148,9 @@ class ActionEntry(BaseModel):
         default="",
         description="Relative XPath to the target element (from element info)",
     )
-    absoluteTarget: str = Field(
+    cssSelector: str = Field(
         default="",
-        description="Absolute XPath to the target element (from document root)",
+        description="CSS selector to the target element (from element info)",
     )
     tagName: str = Field(default="", description="Element tag name")
     attributes: dict[str, str] = Field(
@@ -208,6 +207,7 @@ class ActionEntry(BaseModel):
         return {
             "tag_name": self.tagName,
             "xpath": self.target,
+            "css_selector": self.cssSelector,
             "attributes": self.attributes,
             "text": "",
         }
@@ -245,7 +245,7 @@ class ActionEntry(BaseModel):
         if element:
             elem = dict(element) if isinstance(element, dict) else element.model_dump()
             entry.target = elem.get("xpath", "") or ""
-            entry.absoluteTarget = elem.get("absolute_xpath", "") or ""
+            entry.cssSelector = elem.get("css_selector", "") or ""
             entry.tagName = elem.get("tag_name", "") or ""
             attrs = elem.get("attributes", {})
             entry.attributes = attrs if isinstance(attrs, dict) else {}
