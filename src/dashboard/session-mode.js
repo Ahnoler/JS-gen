@@ -809,18 +809,10 @@ export function initSessionMode() {
         sessLog('system', '未输入干预文本。请在上方描述工作流，然后点击发送。');
         return;
       }
-      sessLog('system', '正在发送干预指令：' + intervention.slice(0, 80));
-      try {
-        const resp = await fetch('/api/browser/session/' + sessActive.value + '/intervene', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ instruction: intervention }),
-        });
-        if (!resp.ok) throw new Error((await resp.json()).error || 'Failed');
-        document.getElementById('sessInterventionInput').value = '';
-        sessLog('success', 'Intervention sent — agent will process it on the next step');
-      } catch (err) {
-        sessLog('error', '干预发送失败：' + err.message);
-      }
+      // TODO:人工干预BUG：无法SSE传输消息，暂时使用 ExcuteSessionStep
+      document.getElementById('sessInterventionInput').value = '';
+      const maxSteps = parseInt(document.getElementById('sessMaxSteps')?.value) || 40;
+      await executeSessionStep(sessActive.value, intervention, maxSteps, '干预: ' + intervention.slice(0, 50));
     });
   }
 
