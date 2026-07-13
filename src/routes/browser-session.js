@@ -126,6 +126,10 @@ function handleSessionMessage(channel, session, stepIndex, gb, cleanupListener) 
       case 'intervention_resolved':
         send('intervention_resolved', msg.data);
         break;
+      case 'controller_action':
+        send('controller_action', msg.data);
+        broadcast('controller_action', msg.data);
+        break;
     }
   };
 }

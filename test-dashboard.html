@@ -299,6 +299,20 @@
         </div>
       </div>
 
+      <!-- Real-time Action Flow -->
+      <div class="card" id="sessActionFlowCard" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            实时动作流
+          </div>
+          <span id="sessActionFlowCount" style="font-size:12px;color:var(--slate-400)">等待中…</span>
+        </div>
+        <div id="sessActionFlow" style="max-height:360px;overflow-y:auto;border:1px solid var(--slate-200);border-radius:6px;background:#fff;font-size:12px">
+          <div class="empty-state" style="padding:24px;text-align:center;color:var(--slate-400)">Agent 执行动作时将实时显示在这里</div>
+        </div>
+      </div>
+
       <!-- Step Progress -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-header">

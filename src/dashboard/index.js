@@ -8,6 +8,7 @@ import { initTrajectory, loadSnapshots } from './trajectory.js';
 import { initCaseData, loadCaseDataHistory } from './case-data.js';
 import { initSessionMode } from './session-mode.js';
 import { initParticles } from './particles.js';
+import { initActionFlow } from './recording-flow.js';
 import { connect, on } from './ws-client.js';
 
 // ====== DOM refs helper (kept in global scope for inline onclick) ======
@@ -128,4 +129,5 @@ initHistory();
 initTrajectory();
 initCaseData();
 initSessionMode();
+initActionFlow();
 initParticles();

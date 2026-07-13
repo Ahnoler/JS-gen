@@ -389,6 +389,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             'container': container_id,
             'total': len(dom_fields),
             'filled': len(done_labels),
+            'filled_fields': {item.label: item.currentValue for item in tl.done},
             'pending': len(pending_labels),
             'pending_labels': pending_labels,
         }

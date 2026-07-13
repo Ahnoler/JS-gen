@@ -35,3 +35,16 @@ def _record_action(action_name, params, result, element=None):
     # Capture URL from go_to_url action
     if action_name == 'go_to_url' and params_dict.get('url'):
         _TRAJECTORY_URL = params_dict['url']
+
+    # Real-time push to Dashboard via existing JSON Lines stdout protocol
+    try:
+        from ..agent_utils import emit_json
+        from datetime import datetime
+        emit_json({"event": "controller_action", "data": {
+            "action": action_name,
+            "params": params_dict,
+            "result": str(result) if result else '',
+            "timestamp": datetime.now().isoformat(),
+        }})
+    except ImportError:
+        pass  # agent_utils not available when imported standalone

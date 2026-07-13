@@ -6,6 +6,7 @@ agent-api.config.json
 .DS_Store
 Thumbs.db
 start.ps1
+.opencode/
 node_modules/
 tmp/
 report/
