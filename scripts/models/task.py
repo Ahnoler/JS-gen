@@ -241,15 +241,34 @@ class TaskList(BaseModel):
     def from_scan(cls, fields: list[dict]) -> "TaskList":
         """Build a TaskList from raw scan fields, auto-filtering filled/disabled.
 
+        Fields with a currentValue are placed directly in done[] so the task
+        list always represents all DOM fields (not just empty ones).
+        This prevents _ensure_scanned from falsely detecting a "new form"
+        when the agent operates on a pre-filled field.
+
         Args:
             fields: Raw field dicts from scan_form_fields() result.
         """
         pending: list[TaskItem] = []
+        done: list[TaskItem] = []
         for f in fields:
-            item = TaskItem.from_scanned(f)
-            if item is not None:
-                pending.append(item)
-        return cls(pending=pending, done=[])
+            has_value = (f.get("currentValue", "") or "").strip() != ""
+            if has_value:
+                done.append(TaskItem(
+                    label=f.get("label", ""),
+                    kind=f.get("kind", "input"),
+                    currentValue=f.get("currentValue", ""),
+                    options=f.get("options", []),
+                    placeholder=f.get("placeholder", ""),
+                    disabled=f.get("disabled", False),
+                    required=f.get("required", False),
+                    hasButton=f.get("hasButton", "") or "",
+                ))
+            else:
+                item = TaskItem.from_scanned(f)
+                if item is not None:
+                    pending.append(item)
+        return cls(pending=pending, done=done)
 
     @classmethod
     def from_store(cls, data: dict | None) -> "TaskList":

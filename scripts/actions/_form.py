@@ -328,10 +328,12 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         prev_intervene = {item.label for item in prev_tl.pending if item.needs_intervention}
 
         tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
-        # Restore previously-done items — add directly to done since they won't be in pending
-        new_labels = {item.label for item in tl.pending}
+        # Restore previously-done items — add directly to done since they won't be in pending.
+        # from_scan now puts pre-filled fields in done[], so check both lists to avoid duplicates.
+        new_pending_labels = {item.label for item in tl.pending}
+        new_done_labels = {item.label for item in tl.done}
         for label in prev_done_labels:
-            if label not in new_labels:
+            if label not in new_pending_labels and label not in new_done_labels:
                 tl.done.append(TaskItem(label=label, kind='input'))
         # Restore needs_intervention flags on items that ended up in pending
         for item in tl.pending:
