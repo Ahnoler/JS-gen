@@ -56,11 +56,11 @@
 /**
  * @typedef {Object} Trajectory
  * @property {number} [id]
- * @property {string} trajectoryId
+ * @property {string|null} [trajectoryLog] operation log text (same as log_{ts}.txt)
  * @property {string} [task]
  * @property {string} [model]
  * @property {number} [stepCount]
- * @property {number} [actionCount]
+ * @property {number} [phaseCount]
  * @property {boolean|null} [isDone]
  * @property {boolean|null} [isSuccessful]
  * @property {string} [url]

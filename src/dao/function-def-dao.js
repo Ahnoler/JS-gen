@@ -3,6 +3,9 @@ import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
 const TABLE = 'function_def';
 
+/** Seed UUID for default unclassified function — must not be deleted. */
+export const SEED_FUNCTION_ID = '00000000-0000-0000-0000-000000000003';
+
 export async function listByProcess(processId) {
   const rows = await getDB()(TABLE).where({ process_id: processId }).orderBy('sort_order', 'asc');
   return fromDbRows(rows);
@@ -24,6 +27,12 @@ export async function update(id, data) {
 }
 
 export async function remove(id) {
+  const row = await getById(id);
+  if (row?.functionId === SEED_FUNCTION_ID) {
+    const err = new Error('Cannot delete the default「未分类」function');
+    err.code = 'SEED_PROTECTED';
+    throw err;
+  }
   return getDB()(TABLE).where({ id }).del();
 }
 

@@ -1,5 +1,6 @@
 import * as caseDataDao from '../dao/case-data-dao.js';
 import * as formSnapshotDao from '../dao/form-snapshot-dao.js';
+import { existsSync, readFileSync } from 'fs';
 
 /**
  * Normalize a Python FormSnapshot dict (snake_case or camelCase) for DAO insert.
@@ -57,12 +58,36 @@ export async function saveCaseData({ recordId, sessionId, model, description, da
 /**
  * Persist after JSON store save — accepts already-parsed data dict.
  */
-export async function persistSessionCaseData({ record, data }) {
+export async function persistSessionCaseData({ record, data, trajectoryId }) {
   return saveCaseData({
     recordId: record.recordId,
     sessionId: record.sessionId,
     model: record.model,
     description: record.description,
     dataStore: data,
+    trajectoryId: trajectoryId ?? null,
   });
+}
+
+/**
+ * Persist form_{ts}.json snapshots under a trajectory (and optional case_data).
+ */
+export async function persistFormSnapshotsFromFile(formFilePath, { trajectoryId, caseDataId } = {}) {
+  if (!formFilePath || !existsSync(formFilePath)) return 0;
+  let snapshots;
+  try {
+    snapshots = JSON.parse(readFileSync(formFilePath, 'utf-8'));
+  } catch (err) {
+    console.warn('[case-data] Failed to read form file:', err.message);
+    return 0;
+  }
+  if (!Array.isArray(snapshots)) {
+    snapshots = snapshots ? [snapshots] : [];
+  }
+  let n = 0;
+  for (const snap of snapshots) {
+    await formSnapshotDao.save(normalizeSnapshot(snap, caseDataId ?? null, trajectoryId ?? null));
+    n += 1;
+  }
+  return n;
 }

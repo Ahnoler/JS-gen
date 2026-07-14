@@ -42,6 +42,7 @@ export default function (app) {
       await systemDao.remove(+req.params.id);
       res.json({ status: 'deleted' });
     } catch (err) {
+      if (err.code === 'SEED_PROTECTED') return res.status(400).json({ error: err.message });
       res.status(500).json({ error: err.message });
     }
   });
@@ -82,6 +83,7 @@ export default function (app) {
       await processDao.remove(+req.params.id);
       res.json({ status: 'deleted' });
     } catch (err) {
+      if (err.code === 'SEED_PROTECTED') return res.status(400).json({ error: err.message });
       res.status(500).json({ error: err.message });
     }
   });
@@ -122,6 +124,7 @@ export default function (app) {
       await functionDefDao.remove(+req.params.id);
       res.json({ status: 'deleted' });
     } catch (err) {
+      if (err.code === 'SEED_PROTECTED') return res.status(400).json({ error: err.message });
       res.status(500).json({ error: err.message });
     }
   });

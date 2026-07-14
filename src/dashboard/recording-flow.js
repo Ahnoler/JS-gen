@@ -4,32 +4,43 @@ import { on } from './ws-client.js';
 
 const ACTION_ICONS = {
   fill_form_field:        '📝', select_option:          '📋',
-  click_menu_item:        '🔗', click_table_row_button:  '🖱️',
-  click_table_row_radio:  '◉',  click_radio:            '⭕',
-  click_adjacent_button:  '🔘', fill_date_field:         '📅',
-  switch_tab:             '📑', close_dialog:            '❌',
-  close_notification:     '🔔', wait_for_loading:        '⏳',
-  login:                  '🔐', go_to_url:               '🌐',
-  scroll_down:            '⬇️', scroll_up:               '⬆️',
+  click_element_by_index: '👆', click_menu_item:         '🔗',
+  click_table_row_button: '🖱️', click_table_row_radio:   '◉',
+  click_radio:            '⭕', click_adjacent_button:   '🔘',
+  fill_date_field:        '📅', switch_tab:              '📑',
+  close_dialog:           '❌', close_notification:      '🔔',
+  wait_for_loading:       '⏳', login:                   '🔐',
+  go_to_url:              '🌐', scroll_down:             '⬇️',
+  scroll_up:              '⬆️',
 };
 
 const ACTION_COLORS = {
   fill_form_field: 'indigo', select_option: 'emerald',
-  click_menu_item: 'amber', click_table_row_button: 'sky',
-  click_adjacent_button: 'slate', click_radio: 'emerald',
-  fill_date_field: 'indigo', switch_tab: 'sky',
-  close_dialog: 'red', close_notification: 'amber',
-  login: 'indigo', go_to_url: 'sky',
+  click_element_by_index: 'amber', click_menu_item: 'amber',
+  click_table_row_button: 'sky', click_adjacent_button: 'slate',
+  click_radio: 'emerald', fill_date_field: 'indigo',
+  switch_tab: 'sky', close_dialog: 'red',
+  close_notification: 'amber', login: 'indigo', go_to_url: 'sky',
 };
 
 /** @type {string|null} */
 let currentSessionId = null;
+/** @type {number|null} */
+let currentTrajectoryDbId = null;
 let reloadTimer = null;
 
-export function setActionFlowSession(sessionId) {
+export function setActionFlowSession(sessionId, trajectoryDbId = null) {
   currentSessionId = sessionId || null;
+  if (trajectoryDbId != null) currentTrajectoryDbId = Number(trajectoryDbId);
   if (currentSessionId) reloadActionFlow();
   else replaceAll([], 0);
+}
+
+export function setActionFlowTrajectory(trajectoryDbId) {
+  currentTrajectoryDbId = trajectoryDbId != null && trajectoryDbId !== ''
+    ? Number(trajectoryDbId)
+    : null;
+  if (currentSessionId) reloadActionFlow();
 }
 
 export async function reloadActionFlow(sessionId = currentSessionId) {
@@ -41,7 +52,10 @@ export async function reloadActionFlow(sessionId = currentSessionId) {
     return;
   }
   try {
-    const res = await fetch('/api/browser/session/' + encodeURIComponent(sessionId) + '/action-flow');
+    const qs = currentTrajectoryDbId != null
+      ? ('?trajectoryId=' + encodeURIComponent(String(currentTrajectoryDbId)))
+      : '';
+    const res = await fetch('/api/browser/session/' + encodeURIComponent(sessionId) + '/action-flow' + qs);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'load failed');
     replaceAll(data.entries || [], data.count || 0, {
@@ -89,11 +103,16 @@ function renderEntryCard(entry) {
   const fallbackHtml = (!label && !value) ? '<span style="color:var(--slate-400)">(无参数)</span>' : '';
   const badge = persisted
     ? '<span style="font-size:9px;color:var(--slate-400);border:1px solid var(--slate-200);border-radius:3px;padding:0 4px;flex-shrink:0">已入库</span>'
+    : '<span style="font-size:9px;color:#b45309;border:1px solid #fcd34d;border-radius:3px;padding:0 4px;flex-shrink:0;background:#fffbeb">待保存</span>';
+  const src = entry.source || '';
+  const sourceBadge = (src === 'manual' || src === 'cdp')
+    ? '<span style="font-size:9px;color:' + (src === 'manual' ? '#9a3412' : '#1d4ed8') + ';border:1px solid ' + (src === 'manual' ? '#fdba74' : '#93c5fd') + ';border-radius:3px;padding:0 4px;flex-shrink:0;background:' + (src === 'manual' ? '#fff7ed' : '#eff6ff') + '">' + src + '</span>'
     : '';
 
   card.innerHTML = [
     '<span style="font-size:14px;flex-shrink:0">', icon, '</span>',
     '<code style="background:var(--', color, '-50);color:var(--', color, '-700);padding:1px 6px;border-radius:3px;font-size:11px;font-family:var(--font-mono);white-space:nowrap;flex-shrink:0">', escapeHtml(entry.action), '</code>',
+    sourceBadge,
     badge,
     '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--slate-700)">',
     labelHtml, valueHtml, fallbackHtml,
@@ -110,6 +129,7 @@ function renderEntryCard(entry) {
   if (result) detailLines.push('result: ' + result);
   if (entry.target) detailLines.push('xpath: ' + String(entry.target).slice(0, 80));
   if (persisted) detailLines.push('status: persisted');
+  if (src) detailLines.push('source: ' + src);
   detail.innerHTML = detailLines.map(l => '<div>' + escapeHtml(l) + '</div>').join('');
   card.appendChild(detail);
 

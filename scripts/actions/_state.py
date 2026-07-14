@@ -11,6 +11,7 @@ from ..models import ActionEntry
 _ACTION_LOG: list[dict] = []
 _TRAJECTORY_URL: str | None = None
 _CURRENT_PHASE: int = 0
+_CURRENT_SOURCE: str = 'agent'
 
 # Action → old-format command mapping (legacy, mirrors models/action.py:ACTION_TO_COMMAND)
 _ACTION_TO_COMMAND = {
@@ -31,6 +32,12 @@ def set_current_phase(n: int):
     _CURRENT_PHASE = n
 
 
+def set_current_source(source: str):
+    """Set recording source for subsequent _record_action calls (agent|manual|cdp)."""
+    global _CURRENT_SOURCE
+    _CURRENT_SOURCE = source if source in ('agent', 'manual', 'cdp') else 'agent'
+
+
 def _emit_action_log_sync():
     """Push the full _ACTION_LOG to the Dashboard."""
     try:
@@ -43,20 +50,24 @@ def _emit_action_log_sync():
         pass
 
 
-def _record_action(action_name, params, result, element=None):
+def _record_action(action_name, params, result, element=None, source=None):
     """Record a controller action call using ActionEntry model."""
     global _TRAJECTORY_URL
     params_dict = dict(params) if params else {}
+    resolved_source = source or _CURRENT_SOURCE or 'agent'
 
     entry = ActionEntry.from_record(
         action_name, params_dict,
         str(result) if result else '',
         element,
         phase=_CURRENT_PHASE,
+        source=resolved_source,
     )
 
-    _ACTION_LOG.append(entry.model_dump())
+    dumped = entry.model_dump()
+    _ACTION_LOG.append(dumped)
     if action_name == 'go_to_url' and params_dict.get('url'):
         _TRAJECTORY_URL = params_dict['url']
 
     _emit_action_log_sync()
+    return dumped

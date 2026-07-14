@@ -7,11 +7,11 @@ export async function save(trajectory) {
   const db = getDB();
   return db.transaction(async (trx) => {
     const [id] = await trx(TABLE).insert(toDbRow({
-      trajectoryId: trajectory.trajectoryId,
+      trajectoryLog: trajectory.trajectoryLog ?? null,
       task: trajectory.task,
       model: trajectory.model,
       stepCount: trajectory.stepCount,
-      actionCount: trajectory.actionCount,
+      phaseCount: trajectory.phaseCount ?? 0,
       isDone: trajectory.isDone,
       isSuccessful: trajectory.isSuccessful,
       url: trajectory.url,
@@ -32,7 +32,7 @@ async function insertStepRows(trx, trajectoryDbId, steps, stepNumberOffset = 0) 
     step_number: s.stepNumber || stepNumberOffset + i + 1,
     phase_number: s.phaseNumber ?? 0,
     action_index: s.actionIndex ?? 0,
-    action_type: s.actionType ?? s.action ?? '',
+    action_type: (s.actionType ?? s.action) || '',
     description: s.description ?? '',
     params_json: s.paramsJson ?? s.params ?? null,
     element_json: s.elementJson ?? s.element ?? null,
@@ -49,8 +49,7 @@ async function insertStepRows(trx, trajectoryDbId, steps, stepNumberOffset = 0) 
 }
 
 /**
- * Append steps to an existing trajectory (same session_id / trajectory_id).
- * Returns number of steps inserted.
+ * Append steps to an existing trajectory (by numeric PK).
  */
 export async function appendSteps(trajectoryDbId, steps, { stepNumberOffset = 0 } = {}) {
   if (!steps?.length) return 0;
@@ -77,13 +76,22 @@ export async function getMaxStepNumber(trajectoryDbId) {
 export async function getExistingPhaseNumbers(trajectoryDbId) {
   const rows = await getDB()('trajectory_phase')
     .where({ trajectory_id: trajectoryDbId })
-    .select('id', 'phase_number');
+    .select('id', 'phase_number', 'description');
   return rows;
 }
 
-export async function getByTrajectoryId(trajectoryId) {
+export async function getMaxPhaseNumber(trajectoryDbId) {
+  const row = await getDB()('trajectory_phase')
+    .where({ trajectory_id: trajectoryDbId })
+    .max('phase_number as maxPhase')
+    .first();
+  return row?.maxPhase || 0;
+}
+
+/** Load trajectory by numeric PK with steps. */
+export async function getById(id) {
   const db = getDB();
-  const row = await db(TABLE).where({ trajectory_id: trajectoryId }).first();
+  const row = await db(TABLE).where({ id }).first();
   if (!row) return null;
   const entity = fromDbRow(row);
   entity.steps = await db('trajectory_step')
@@ -93,13 +101,31 @@ export async function getByTrajectoryId(trajectoryId) {
   return entity;
 }
 
+/** @deprecated use getById — kept for transitional call sites */
+export async function getByTrajectoryId(idOrBiz) {
+  const numeric = Number(idOrBiz);
+  if (Number.isFinite(numeric) && String(numeric) === String(idOrBiz)) {
+    return getById(numeric);
+  }
+  return null;
+}
+
 export async function listByFunction(functionId, { page = 1, pageSize = 20 } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
   const query = db(TABLE).where({ function_id: functionId });
   const [{ total }] = await query.clone().count('* as total');
   const rows = await query.clone().orderBy('created_at', 'desc').limit(pageSize).offset(offset);
-  return { rows: fromDbRows(rows), total, page, pageSize };
+  const entities = fromDbRows(rows);
+
+  // Attach phase counts for hierarchy UI
+  for (const e of entities) {
+    const [{ phases }] = await db('trajectory_phase')
+      .where({ trajectory_id: e.id })
+      .count('* as phases');
+    e.phaseCount = Number(phases) || 0;
+  }
+  return { rows: entities, total, page, pageSize };
 }
 
 export async function list({ page = 1, pageSize = 20 } = {}) {
@@ -107,13 +133,20 @@ export async function list({ page = 1, pageSize = 20 } = {}) {
   const offset = (page - 1) * pageSize;
   const [{ total }] = await db(TABLE).count('* as total');
   const rows = await db(TABLE).orderBy('created_at', 'desc').limit(pageSize).offset(offset);
-  return { rows: fromDbRows(rows), total, page, pageSize };
+  const entities = fromDbRows(rows);
+  for (const e of entities) {
+    const [{ phases }] = await db('trajectory_phase')
+      .where({ trajectory_id: e.id })
+      .count('* as phases');
+    e.phaseCount = Number(phases) || 0;
+  }
+  return { rows: entities, total, page, pageSize };
 }
 
 export async function remove(id) {
   return getDB()(TABLE).where({ id }).del();
 }
 
-export async function removeByTrajectoryId(trajectoryId) {
-  return getDB()(TABLE).where({ trajectory_id: trajectoryId }).del();
+export async function removeByTrajectoryId(id) {
+  return remove(+id);
 }

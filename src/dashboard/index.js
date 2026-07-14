@@ -9,6 +9,7 @@ import { initCaseData, loadCaseDataHistory } from './case-data.js';
 import { initSessionMode } from './session-mode.js';
 import { initParticles } from './particles.js';
 import { initActionFlow } from './recording-flow.js';
+import { initHierarchy, loadHierarchyTree } from './hierarchy.js';
 import { connect, on } from './ws-client.js';
 
 // ====== DOM refs helper (kept in global scope for inline onclick) ======
@@ -78,6 +79,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'history') loadHistory();
     if (btn.dataset.tab === 'trajectories') loadSnapshots();
     if (btn.dataset.tab === 'caseData') loadCaseDataHistory();
+    if (btn.dataset.tab === 'hierarchy') loadHierarchyTree();
   });
 });
 
@@ -130,4 +132,5 @@ initTrajectory();
 initCaseData();
 initSessionMode();
 initActionFlow();
+initHierarchy();
 initParticles();

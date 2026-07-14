@@ -33,6 +33,22 @@ export default function (app) {
     }
   });
 
+  /** Create empty long-lived trajectory under a function. */
+  app.post('/api/v2/trajectories', async (req, res) => {
+    try {
+      const { functionId, task, model } = req.body || {};
+      const id = await trajectoryService.createEmptyTrajectory({
+        functionId: functionId != null ? +functionId : undefined,
+        task: task || '',
+        model: model || '',
+      });
+      const traj = await trajectoryDao.getById(id);
+      res.status(201).json(traj);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/v2/trajectories/:id', async (req, res) => {
     try {
       const traj = await trajectoryService.getTrajectoryWithPhases(req.params.id);
@@ -43,24 +59,45 @@ export default function (app) {
     }
   });
 
+  /** Phases for a trajectory (by numeric trajectory.id). */
+  app.get('/api/v2/trajectories/:id/phases', async (req, res) => {
+    try {
+      const traj = await trajectoryDao.getById(+req.params.id);
+      if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
+      const phases = await trajectoryService.listPhasesByTrajectory(traj.id);
+      res.json({ trajectoryId: traj.id, phases });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /** Merged action flow for a trajectory (DB steps; pending empty — use session action-flow for live). */
+  app.get('/api/v2/trajectories/:id/action-flow', async (req, res) => {
+    try {
+      const flow = await trajectoryService.getTrajectoryActionFlow(+req.params.id, []);
+      res.json(flow);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   /**
    * Materialize DB steps as scripts/action/action_db_*.json for the assembler.
    */
   app.post('/api/v2/trajectories/:id/assemble-file', async (req, res) => {
     try {
-      const traj = await trajectoryDao.getByTrajectoryId(req.params.id);
+      const traj = await trajectoryDao.getById(+req.params.id);
       if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
       const actionDir = path.join(PROJECT_DIR, 'scripts', 'action');
       if (!existsSync(actionDir)) mkdirSync(actionDir, { recursive: true });
       const commands = stepsToActionCommands(traj.steps);
       const actionJson = {
-        id: traj.trajectoryId,
+        id: String(traj.id),
         name: 'db-trajectory',
         url: traj.url || '',
-        tests: [{ id: traj.trajectoryId, name: 'db-trajectory', commands }],
+        tests: [{ id: String(traj.id), name: 'db-trajectory', commands }],
       };
-      const safeId = String(traj.trajectoryId).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48);
-      const fileName = `action_db_${safeId}.json`;
+      const fileName = `action_db_${traj.id}.json`;
       const absPath = path.join(actionDir, fileName);
       writeFileSync(absPath, JSON.stringify(actionJson, null, 2), 'utf-8');
       res.json({
@@ -75,15 +112,20 @@ export default function (app) {
 
   app.delete('/api/v2/trajectories/:id', async (req, res) => {
     try {
-      const id = req.params.id;
-      const deleted = await trajectoryDao.removeByTrajectoryId(id);
-      if (deleted) return res.json({ status: 'deleted', trajectoryId: id });
-      const numeric = Number(id);
-      if (!Number.isNaN(numeric) && String(numeric) === id) {
-        await trajectoryDao.remove(numeric);
-        return res.json({ status: 'deleted', id: numeric });
-      }
-      return res.status(404).json({ error: 'Trajectory not found' });
+      const numeric = Number(req.params.id);
+      if (Number.isNaN(numeric)) return res.status(400).json({ error: 'Numeric trajectory id required' });
+      await trajectoryDao.remove(numeric);
+      return res.json({ status: 'deleted', id: numeric });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /** Steps for a trajectory_phase (by numeric phase.id). */
+  app.get('/api/v2/trajectory-phases/:id/steps', async (req, res) => {
+    try {
+      const steps = await trajectoryService.listStepsByPhase(+req.params.id);
+      res.json({ phaseId: +req.params.id, steps });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

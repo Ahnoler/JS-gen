@@ -6,8 +6,8 @@ import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR } from '../../config/confi
 import { state } from '../state.js';
 import { saveTrajectoryRecord } from '../trajectory-store.js';
 import { saveCaseDataRecord } from '../case-data-store.js';
-import { persistSessionTrajectory, getSessionActionFlow } from '../services/trajectory-service.js';
-import { persistSessionCaseData } from '../services/case-data-service.js';
+import { persistSessionTrajectory, getTrajectoryActionFlow, upsertPhaseDescription, appendRecordedStep } from '../services/trajectory-service.js';
+import { persistSessionCaseData, persistFormSnapshotsFromFile } from '../services/case-data-service.js';
 import { broadcast, onWsMessage } from '../ws-server.js';
 import {
   PYTHON_EXE, AGENT_SCRIPT, killTree, killOrphans,
@@ -85,6 +85,42 @@ async function ensureGlobalBrowser(modelId) {
           if (msg.event === 'action_log_sync') {
             gb.lastActionLog = msg.data?.entries || [];
             broadcast('action_log_sync', {
+              ...(msg.data || {}),
+              sessionId: [...state.sessions.keys()][0] || null,
+            });
+          } else if (msg.event === 'manual_action_recorded') {
+            const entry = msg.data?.entry;
+            gb.lastActionLog = Array.isArray(gb.lastActionLog) ? gb.lastActionLog : [];
+            if (entry) {
+              // Keep in-memory pending list in sync even if action_log_sync is delayed
+              const idx = gb.lastActionLog.findIndex((e) => e.id && entry.id && e.id === entry.id);
+              if (idx < 0) gb.lastActionLog.push(entry);
+            }
+            broadcast('manual_action_recorded', msg.data || {});
+            // Live-persist only when「自动入库」is on
+            const session = [...state.sessions.values()][0];
+            const trajId = session?.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null;
+            const autoPersist = !!(session?.autoPersist ?? gb.autoPersist);
+            if (autoPersist && Number.isFinite(trajId) && entry) {
+              appendRecordedStep(trajId, entry, { source: 'manual' })
+                .then((persisted) => {
+                  if (session) {
+                    if (!session.persistedActionIds) session.persistedActionIds = new Set();
+                    if (entry.id) session.persistedActionIds.add(String(entry.id));
+                  }
+                  if (persisted) {
+                    broadcast('manual_action_persisted', {
+                      trajectoryDbId: trajId,
+                      ...persisted,
+                      entry,
+                    });
+                  }
+                })
+                .catch((err) => console.warn('[manual-record] live persist failed:', err.message));
+            }
+          } else if (msg.event === 'manual_record_status') {
+            gb.manualRecording = !!msg.data?.enabled;
+            broadcast('manual_record_status', {
               ...(msg.data || {}),
               sessionId: [...state.sessions.keys()][0] || null,
             });
@@ -179,7 +215,7 @@ export default function (app) {
 
   // ── Shared: execute a single step on the global browser agent ──
   // Callers: HTTP+SSE handler (POST /step) and WebSocket handler
-  function executeAgentStep({ session, task, maxSteps, caseDataFile, channel }) {
+  function executeAgentStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel }) {
     const gb = state.globalBrowser;
     if (gb.busy) return channel.send('error', { message: 'Browser is busy executing a step' });
     if (!gb.ready || !gb.stdin) return channel.send('error', { message: 'Browser not ready' });
@@ -204,12 +240,34 @@ export default function (app) {
     const stepIndex = session.stepIndex + 1;
     session.lastTask = task;
     session.lastMaxSteps = maxSteps || 40;
+    if (phaseNumber != null) session.lastPhaseNumber = phaseNumber;
+
+    // Bind trajectory + remember phase task for phase.description
+    const resolvedTrajId = trajectoryDbId != null && trajectoryDbId !== ''
+      ? Number(trajectoryDbId)
+      : (session.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null);
+    if (Number.isFinite(resolvedTrajId)) session.dbTrajectoryId = resolvedTrajId;
+
+    const pn = phaseNumber != null ? Number(phaseNumber) : stepIndex;
+    if (Number.isFinite(pn) && task) {
+      if (!session.phaseDescriptions) session.phaseDescriptions = {};
+      session.phaseDescriptions[String(pn)] = String(task);
+      // Write description immediately so it does not depend on later「保存轨迹」payload
+      if (Number.isFinite(resolvedTrajId)) {
+        upsertPhaseDescription(resolvedTrajId, pn, task).catch((err) => {
+          console.warn('[session-step] upsertPhaseDescription failed:', err.message);
+        });
+      }
+    }
+
     const cancelFlagPath = path.join(os.tmpdir(), 'browser_use_cancel_global');
     try { if (existsSync(cancelFlagPath)) unlinkSync(cancelFlagPath); } catch {}
 
     try {
       const stepData = { instruction: task, max_steps: maxSteps || 40 };
       if (session.caseDataFile) stepData.case_data_file = session.caseDataFile;
+      // Prefer UI phase number so _ACTION_LOG.phase matches 【阶段N】 and DB trajectory_phase
+      if (Number.isFinite(pn)) stepData.phase_number = pn;
       gb.stdin.write(JSON.stringify({ event: 'step', data: stepData }) + '\n');
     } catch (writeErr) {
       gb.busy = false;
@@ -252,7 +310,7 @@ export default function (app) {
 
   app.post('/api/browser/session/:id/step', async (req, res) => {
     const { id } = req.params;
-    const { task, maxSteps, caseDataFile } = req.body || {};
+    const { task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId } = req.body || {};
     const gb = state.globalBrowser;
     if (!task) return res.status(400).json({ error: 'task is required' });
 
@@ -261,7 +319,7 @@ export default function (app) {
 
     const channel = createPushChannel(null, res);
     setupSSE(res);  // sets headers
-    executeAgentStep({ session, task, maxSteps, caseDataFile, channel });
+    executeAgentStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel });
   });
 
   app.post('/api/browser/session/:id/continue', async (req, res) => {
@@ -595,21 +653,24 @@ export default function (app) {
   });
 
   /**
-   * Merged action flow for a session:
-   * DB steps (trajectory_id = sessionId) + live _ACTION_LOG pending entries.
+   * Merged action flow: DB steps for trajectory.id + live _ACTION_LOG.
+   * Query: ?trajectoryId=<numeric trajectory.id>
    */
   app.get('/api/browser/session/:id/action-flow', async (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
+    const trajectoryDbId = req.query.trajectoryId != null && req.query.trajectoryId !== ''
+      ? Number(req.query.trajectoryId)
+      : (session.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null);
+
     const gb = state.globalBrowser;
     let pending = Array.isArray(gb.lastActionLog) ? gb.lastActionLog : [];
 
-    // Prefer a fresh snapshot from Python when agent is idle
     if (gb.ready && gb.stdin && !gb.busy) {
       try {
-        pending = await new Promise((resolve, reject) => {
+        pending = await new Promise((resolve) => {
           const timeout = setTimeout(() => {
             cleanup();
             resolve(gb.lastActionLog || []);
@@ -639,7 +700,7 @@ export default function (app) {
           gb.process.stdout.on('data', onData);
           try {
             gb.stdin.write(JSON.stringify({ event: 'get_action_log' }) + '\n');
-          } catch (err) {
+          } catch {
             clearTimeout(timeout);
             cleanup();
             resolve(gb.lastActionLog || []);
@@ -651,8 +712,16 @@ export default function (app) {
     }
 
     try {
-      const flow = await getSessionActionFlow(id, pending);
-      res.json(flow);
+      const flow = await getTrajectoryActionFlow(
+        Number.isFinite(trajectoryDbId) ? trajectoryDbId : null,
+        pending,
+        { excludeActionIds: session.persistedActionIds },
+      );
+      res.json({
+        ...flow,
+        sessionId: id,
+        autoPersist: !!(session.autoPersist ?? gb.autoPersist),
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -660,10 +729,25 @@ export default function (app) {
 
   app.post('/api/browser/session/:id/trajectory', async (req, res) => {
     const { id } = req.params;
-    const { task } = req.body || {};
+    const { task, functionId, trajectoryDbId, phaseDescriptions } = req.body || {};
+    const resolvedFunctionId = functionId != null && functionId !== ''
+      ? Number(functionId)
+      : undefined;
+    const resolvedTrajId = trajectoryDbId != null && trajectoryDbId !== ''
+      ? Number(trajectoryDbId)
+      : (state.sessions.get(id)?.dbTrajectoryId != null
+        ? Number(state.sessions.get(id).dbTrajectoryId)
+        : undefined);
     const gb = state.globalBrowser;
     const session = state.sessions.get(id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
+    // Merge: session-side (from each「执行阶段」) + client payload (client wins on conflict)
+    const mergedPhaseDescriptions = {
+      ...(session.phaseDescriptions || {}),
+      ...(phaseDescriptions && typeof phaseDescriptions === 'object' ? phaseDescriptions : {}),
+    };
+    console.log('[save-trajectory] phaseDescriptions keys:', Object.keys(mergedPhaseDescriptions),
+      'sample:', Object.fromEntries(Object.entries(mergedPhaseDescriptions).map(([k, v]) => [k, String(v).slice(0, 40)])));
     if (gb.busy) return res.status(409).json({ error: 'Browser is busy executing a step' });
     if (!gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
     gb.stdin.write(JSON.stringify({ event: 'save_trajectory' }) + '\n');
@@ -691,15 +775,22 @@ export default function (app) {
               return res.status(500).json({ error: 'Trajectory file not found' });
             }
             try {
-              // trajectory_id = sessionId; same session appends phases/steps
-              const trajectoryId = id;
-              const { record, flow } = saveTrajectoryRecord({ trajectoryId, task: task || '', model: session.model, sourcePath: trajectoryFile, exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful } });
+              // JSON dual-write still uses a file key; prefer db id when known, else session
+              const jsonKey = Number.isFinite(resolvedTrajId) ? `db_${resolvedTrajId}` : id;
+              const { record, flow } = saveTrajectoryRecord({
+                trajectoryId: jsonKey,
+                task: task || '',
+                model: session.model,
+                sourcePath: trajectoryFile,
+                exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful },
+              });
               const actionCount = flow.filter(s => s.type !== 'done' && !s.error).length;
 
               let dbId = null;
               try {
+                if (!session.persistedActionIds) session.persistedActionIds = new Set();
                 dbId = await persistSessionTrajectory({
-                  trajectoryId,
+                  id: Number.isFinite(resolvedTrajId) ? resolvedTrajId : undefined,
                   task: task || '',
                   model: session.model,
                   url: msg.data.url || '',
@@ -707,16 +798,29 @@ export default function (app) {
                   isSuccessful: msg.data.is_successful,
                   actionFile: msg.data.action_file,
                   flow,
+                  logFile: msg.data.log_file || null,
+                  phaseDescriptions: mergedPhaseDescriptions,
+                  excludeActionIds: session.persistedActionIds,
+                  ...(Number.isFinite(resolvedFunctionId) ? { functionId: resolvedFunctionId } : {}),
                 });
+                if (dbId != null) session.dbTrajectoryId = dbId;
+
+                // Persist form snapshots with trajectory.id
+                if (msg.data.form_file) {
+                  try {
+                    await persistFormSnapshotsFromFile(msg.data.form_file, { trajectoryId: dbId });
+                  } catch (formErr) {
+                    console.warn('[save-trajectory] form_snapshot dual-write failed:', formErr.message);
+                  }
+                }
               } catch (dbErr) {
                 console.warn('[save-trajectory] DB dual-write failed (JSON ok):', dbErr.message);
               }
 
-              // Clear Node-side pending log cache (Python already cleared + synced empty)
               gb.lastActionLog = [];
 
               return res.json({
-                trajectoryId,
+                trajectoryDbId: dbId,
                 sessionId: id,
                 dbId,
                 steps: record.stepCount,
@@ -775,7 +879,11 @@ export default function (app) {
 
               // Phase 1 dual-write: JSON remains primary; MySQL best-effort
               try {
-                await persistSessionCaseData({ record, data });
+                await persistSessionCaseData({
+                  record,
+                  data,
+                  trajectoryId: session.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null,
+                });
               } catch (dbErr) {
                 console.warn('[save-case-data] DB dual-write failed (JSON ok):', dbErr.message);
               }
@@ -806,8 +914,89 @@ export default function (app) {
 
   app.get('/api/browser/watcher/status', (req, res) => {
     const gb = state.globalBrowser;
+    const session = [...state.sessions.values()][0];
     const connected = !!(gb.ready && gb.stdin);
-    res.json({ connected, agentBusy: gb.busy });
+    res.json({
+      connected,
+      agentBusy: gb.busy,
+      manualRecording: !!gb.manualRecording,
+      autoPersist: !!(session?.autoPersist ?? gb.autoPersist),
+    });
+  });
+
+  /**
+   * Toggle live DB persist for CDP / manual recorded actions.
+   * Body: { enabled: boolean }
+   * ON  → appendRecordedStep immediately (and hide from「待保存」via exclude ids)
+   * OFF → only _ACTION_LOG until「保存轨迹」
+   */
+  app.post('/api/browser/session/:id/auto-persist', (req, res) => {
+    const { id } = req.params;
+    const { enabled } = req.body || {};
+    const session = state.sessions.get(id);
+    const gb = state.globalBrowser;
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    session.autoPersist = !!enabled;
+    gb.autoPersist = !!enabled;
+    res.json({ status: 'ok', autoPersist: !!enabled });
+  });
+
+  /**
+   * Start / stop manual DOM recording on the live browser page.
+   * Body: { enabled: boolean, trajectoryDbId?, sessionId? }
+   */
+  app.post('/api/browser/session/:id/manual-record', async (req, res) => {
+    const { id } = req.params;
+    const { enabled, trajectoryDbId } = req.body || {};
+    const session = state.sessions.get(id);
+    const gb = state.globalBrowser;
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
+
+    if (trajectoryDbId != null && trajectoryDbId !== '') {
+      session.dbTrajectoryId = Number(trajectoryDbId);
+    }
+
+    const event = enabled ? 'manual_record_start' : 'manual_record_stop';
+    try {
+      gb.stdin.write(JSON.stringify({ event }) + '\n');
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    // Wait briefly for status ack
+    const status = await new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve({ enabled: !!enabled, timedOut: true }), 5000);
+      let buf = '';
+      const onData = (chunk) => {
+        buf += chunk.toString();
+        const lines = buf.split('\n');
+        buf = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.event === 'manual_record_status') {
+              clearTimeout(timeout);
+              try { gb.process.stdout.removeListener('data', onData); } catch {}
+              resolve(msg.data || {});
+            }
+          } catch {}
+        }
+      };
+      try { gb.process.stdout.on('data', onData); } catch {
+        clearTimeout(timeout);
+        resolve({ enabled: !!enabled, error: 'no stdout' });
+      }
+    });
+
+    gb.manualRecording = !!status.enabled;
+    res.json({
+      status: 'ok',
+      enabled: !!status.enabled,
+      trajectoryDbId: session.dbTrajectoryId ?? null,
+      error: status.error || null,
+    });
   });
 
   app.post('/api/browser/watcher/action', async (req, res) => {
@@ -816,8 +1005,14 @@ export default function (app) {
       if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Agent not ready. Start a session first.' });
       if (!gb.process || !gb.process.stdout) return res.status(503).json({ error: 'Agent process not available' });
 
-      const { action, params } = req.body || {};
+      const { action, params, trajectoryDbId, sessionId, source } = req.body || {};
       if (!action) return res.status(400).json({ error: 'action is required' });
+
+      // Resolve session + trajectory for live persist
+      const session = sessionId ? state.sessions.get(sessionId) : null;
+      const resolvedTrajId = trajectoryDbId != null && trajectoryDbId !== ''
+        ? Number(trajectoryDbId)
+        : (session?.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null);
 
       // Wait up to 5s for agent to not be busy (quick actions need idle browser)
       const deadline = Date.now() + 5000;
@@ -840,7 +1035,7 @@ export default function (app) {
               const msg = JSON.parse(line);
               if (msg.event === 'cdp_action_result' && msg.id === reqId) {
                 cleanup();
-                resolve({ result: msg.result, error: msg.error });
+                resolve({ result: msg.result, error: msg.error, entry: msg.entry || null });
               }
             } catch {}
           }
@@ -872,7 +1067,42 @@ export default function (app) {
       if (result.error) {
         return res.status(500).json({ error: result.error, action, params });
       }
-      res.json({ status: 'executed', action, params, result: result.result });
+
+      // Live-persist CDP action only when「自动入库」is on
+      let persisted = null;
+      const bodyAuto = req.body && typeof req.body.autoPersist === 'boolean'
+        ? req.body.autoPersist
+        : null;
+      const autoPersist = !!(bodyAuto !== null
+        ? bodyAuto
+        : (session?.autoPersist ?? gb.autoPersist));
+      if (session) session.autoPersist = autoPersist;
+      gb.autoPersist = autoPersist;
+      if (autoPersist && Number.isFinite(resolvedTrajId) && result.entry) {
+        try {
+          const stepSource = source || result.entry.source || 'cdp';
+          persisted = await appendRecordedStep(resolvedTrajId, result.entry, { source: stepSource });
+          if (session) {
+            if (!session.persistedActionIds) session.persistedActionIds = new Set();
+            if (result.entry.id) session.persistedActionIds.add(String(result.entry.id));
+            session.dbTrajectoryId = resolvedTrajId;
+          }
+        } catch (dbErr) {
+          console.warn('[watcher-action] live DB persist failed:', dbErr.message);
+        }
+      } else if (session && Number.isFinite(resolvedTrajId)) {
+        session.dbTrajectoryId = resolvedTrajId;
+      }
+
+      res.json({
+        status: 'executed',
+        action,
+        params,
+        result: result.result,
+        trajectoryDbId: Number.isFinite(resolvedTrajId) ? resolvedTrajId : null,
+        autoPersist: !!autoPersist,
+        persisted,
+      });
     } catch (err) {
       console.error('[watcher-action] Error:', err.message);
       res.status(500).json({ error: err.message });
@@ -882,7 +1112,7 @@ export default function (app) {
   // ── WebSocket 消息处理（通过 ws-server 的 onWsMessage 注册） ──
   onWsMessage((ws, msg) => {
     if (msg.type === 'session:step') {
-      const { sessionId, task, maxSteps, caseDataFile } = msg.payload || {};
+      const { sessionId, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId } = msg.payload || {};
       if (!sessionId || !task) {
         ws.send(JSON.stringify({ type: 'session:error', payload: { message: 'sessionId and task are required' } }));
         return;
@@ -893,7 +1123,7 @@ export default function (app) {
         return;
       }
       const channel = createPushChannel(ws, null);
-      executeAgentStep({ session, task, maxSteps: maxSteps || 40, caseDataFile, channel });
+      executeAgentStep({ session, task, maxSteps: maxSteps || 40, caseDataFile, phaseNumber, trajectoryDbId, channel });
     }
   });
 }

@@ -4,9 +4,32 @@
 import { ts } from './utils.js';
 import { escapeHtml } from './swagger-api.js';
 import { on, send, isConnected } from './ws-client.js';
-import { setActionFlowSession, reloadActionFlow } from './recording-flow.js';
+import { setActionFlowSession, reloadActionFlow, setActionFlowTrajectory } from './recording-flow.js';
+import { fetchHierarchyTree, findDefaultUnclassified } from './hierarchy.js';
+
+const HIER_STORAGE_KEY = 'jsgen.selectedFunctionId';
+const TRAJ_STORAGE_KEY = 'jsgen.selectedTrajectoryId';
+const PHASE_DESC_STORAGE_KEY = 'jsgen.phaseDescriptions';
+
+function loadPhaseDescriptions() {
+  try {
+    const raw = sessionStorage.getItem(PHASE_DESC_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') window.__phaseDescriptions__ = parsed;
+    }
+  } catch {}
+  if (!window.__phaseDescriptions__) window.__phaseDescriptions__ = {};
+}
+
+function persistPhaseDescriptions() {
+  try {
+    sessionStorage.setItem(PHASE_DESC_STORAGE_KEY, JSON.stringify(window.__phaseDescriptions__ || {}));
+  } catch {}
+}
 
 export function initSessionMode() {
+  loadPhaseDescriptions();
   const sessNewBtn = document.getElementById('sessNewBtn');
   const sessLoadBtn = document.getElementById('sessLoadBtn');
   const sessStepBtn = document.getElementById('sessStepBtn');
@@ -149,10 +172,13 @@ export function initSessionMode() {
 
       const navPhases = ['登录', '导航'];
       const isNav = navPhases.some(kw => m.name.includes(kw));
+      // Marker name is the task when body between markers is empty
+      // (e.g. 【阶段1：登录】【阶段2：点击…】).
+      const task = content || m.name;
       phases.push({
         num: m.num,
         name: '阶段' + m.num + '：' + m.name,
-        task: content,
+        task,
         maxSteps: isNav ? 50 : 100,
         status: 'pending',
       });
@@ -215,7 +241,7 @@ export function initSessionMode() {
         const phase = phases[idx];
         if (!phase) return;
         if (!sessActive.value) { sessLog('error', '无活跃会话'); return; }
-        executeSessionStep(sessActive.value, phase.task, phase.maxSteps, phase.name, idx);
+        executeSessionStep(sessActive.value, phase.task, phase.maxSteps, phase.name, idx, phase.num);
       });
     });
 
@@ -385,7 +411,7 @@ export function initSessionMode() {
     updateButtons();
   }
 
-  async function executeSessionStep(sessionId, task, maxSteps, label, phaseIdx) {
+  async function executeSessionStep(sessionId, task, maxSteps, label, phaseIdx, phaseNumber) {
     setUILocked(true);
     sessStatus.textContent = '执行中…';
     const stepNum = (parseInt(sessStepCount.textContent) || 0) + 1;
@@ -394,7 +420,15 @@ export function initSessionMode() {
     sessLog('system', '步骤 ' + stepNum + ': ' + label);
     if (phaseIdx !== undefined) sessPhaseUpdateStatus(phaseIdx, 'running');
 
+    if (phaseNumber != null && task) {
+      if (!window.__phaseDescriptions__) window.__phaseDescriptions__ = {};
+      window.__phaseDescriptions__[String(phaseNumber)] = task;
+      persistPhaseDescriptions();
+    }
+
     const caseDataFile = document.getElementById('sessCaseDataFile')?.value?.trim() || undefined;
+    const pn = phaseNumber != null ? Number(phaseNumber) : undefined;
+    const trajectoryDbId = getSelectedTrajectoryDbId();
 
     sessAbortController = new AbortController();
     try {
@@ -417,13 +451,19 @@ export function initSessionMode() {
           sessAbortController.signal.addEventListener('abort', () => {
             resolve(); // 取消时不抛异常
           });
-          send('session:step', { sessionId, task, maxSteps, caseDataFile });
+          send('session:step', {
+            sessionId, task, maxSteps, caseDataFile, phaseNumber: pn,
+            ...(trajectoryDbId != null ? { trajectoryDbId } : {}),
+          });
         });
       } else {
         // ── HTTP + SSE 回退路径 ──
         const resp = await fetch('/api/browser/session/' + sessionId + '/step', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ task, maxSteps, caseDataFile }),
+          body: JSON.stringify({
+            task, maxSteps, caseDataFile, phaseNumber: pn,
+            ...(trajectoryDbId != null ? { trajectoryDbId } : {}),
+          }),
           signal: sessAbortController.signal,
         });
         if (!resp.ok) { const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status })); throw new Error(err.error || 'Request failed'); }
@@ -676,17 +716,39 @@ export function initSessionMode() {
     sessTrajBtn.disabled = true;
     sessLog('system', '正在保存…');
     try {
+      const functionId = getSelectedFunctionId();
+      const trajectoryDbId = getSelectedTrajectoryDbId();
+      // Executed phase tasks win. Plan text only fills gaps (never overwrite).
+      const phaseDescriptions = { ...(window.__phaseDescriptions__ || {}) };
+      (sessionPhases || []).forEach((p) => {
+        if (p.num == null) return;
+        const key = String(p.num);
+        if (phaseDescriptions[key]) return;
+        const text = (p.task || '').trim();
+        if (text) phaseDescriptions[key] = text;
+      });
       const res = await fetch('/api/browser/session/' + sessionId + '/trajectory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task: sessTask.value || undefined }),
+        body: JSON.stringify({
+          task: sessTask.value || undefined,
+          phaseDescriptions,
+          ...(functionId != null ? { functionId } : {}),
+          ...(trajectoryDbId != null ? { trajectoryDbId } : {}),
+        }),
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Server error');
       const data = await res.json();
       const actionName = (data.action_file || '').split(/[\\/]/).pop() || '';
       const logName = (data.log_file || '').split(/[\\/]/).pop() || '';
-      sessTrajectoryId.textContent = (data.trajectoryId || sessionId).slice(0, 20) + '… | ' + actionName.slice(0, 16);
-      sessLog('success', data.action_count + ' 个动作已保存（trajectoryId=' + (data.trajectoryId || sessionId) + '）' + (logName ? ' + ' + data.log_count + ' 条日志' : ''));
+      const dbId = data.trajectoryDbId ?? data.dbId;
+      if (dbId != null) {
+        sessionStorage.setItem(TRAJ_STORAGE_KEY, String(dbId));
+        setActionFlowTrajectory(dbId);
+        await refreshTrajectorySelect(functionId, dbId);
+      }
+      sessTrajectoryId.textContent = 'traj#' + (dbId || '?') + ' | ' + actionName.slice(0, 16);
+      sessLog('success', data.action_count + ' 个动作已保存（trajectory.id=' + (dbId || '?') + '）' + (logName ? ' + ' + data.log_count + ' 条日志' : ''));
       await reloadActionFlow(sessionId);
     } catch (err) {
       sessLog('error', '保存失败：' + err.message);
@@ -812,6 +874,110 @@ export function initSessionMode() {
   const quickExecBtn = document.getElementById('sessQuickExecBtn');
   const quickResult = document.getElementById('sessQuickResult');
   const watcherStatus = document.getElementById('sessWatcherStatus');
+  const manualRecBtn = document.getElementById('sessManualRecBtn');
+  const manualRecStatus = document.getElementById('sessManualRecStatus');
+  const autoPersistInput = document.getElementById('sessAutoPersist');
+  const autoPersistTrack = document.getElementById('sessAutoPersistTrack');
+  const autoPersistThumb = document.getElementById('sessAutoPersistThumb');
+  let manualRecording = false;
+  let autoPersist = false;
+
+  function setAutoPersistUI(enabled) {
+    autoPersist = !!enabled;
+    if (autoPersistInput) autoPersistInput.checked = autoPersist;
+    if (autoPersistTrack) {
+      autoPersistTrack.style.background = autoPersist ? 'var(--emerald-500, #10b981)' : 'var(--slate-200)';
+    }
+    if (autoPersistThumb) {
+      autoPersistThumb.style.transform = autoPersist ? 'translateX(16px)' : 'translateX(0)';
+    }
+  }
+
+  async function syncAutoPersist(enabled) {
+    const sessionId = sessActive?.value;
+    setAutoPersistUI(enabled);
+    if (!sessionId) return;
+    try {
+      await fetch('/api/browser/session/' + encodeURIComponent(sessionId) + '/auto-persist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !!enabled }),
+      });
+    } catch (err) {
+      console.warn('[auto-persist] sync failed:', err.message);
+    }
+  }
+
+  if (autoPersistInput) {
+    setAutoPersistUI(false);
+    autoPersistInput.addEventListener('change', () => {
+      syncAutoPersist(!!autoPersistInput.checked);
+      sessLog('system', autoPersistInput.checked
+        ? '自动入库已开启：CDP/人工操作将立即写入轨迹'
+        : '自动入库已关闭：操作仅进 ACTION_LOG，需「保存轨迹」');
+    });
+  }
+
+  function setManualRecUI(enabled) {
+    manualRecording = !!enabled;
+    if (manualRecBtn) {
+      manualRecBtn.textContent = manualRecording ? '■ 停止人工录制' : '● 开始人工录制';
+      manualRecBtn.style.color = manualRecording ? 'var(--red-500)' : '';
+      manualRecBtn.style.borderColor = manualRecording ? 'var(--red-200)' : '';
+    }
+    if (manualRecStatus) {
+      manualRecStatus.textContent = manualRecording ? '录制中' : '录制关';
+      manualRecStatus.style.background = manualRecording ? '#fee2e2' : 'var(--slate-100)';
+      manualRecStatus.style.color = manualRecording ? '#991b1b' : 'var(--slate-400)';
+    }
+  }
+
+  if (manualRecBtn) {
+    manualRecBtn.addEventListener('click', async () => {
+      const sessionId = sessActive?.value;
+      if (!sessionId) { alert('请先创建/选择会话'); return; }
+      const trajectoryDbId = getSelectedTrajectoryDbId();
+      if (!manualRecording && trajectoryDbId == null) {
+        if (!confirm('尚未选择长期轨迹，操作只会写入 ACTION_LOG。继续开启？')) return;
+      }
+      // Keep server autoPersist in sync before recording starts
+      await syncAutoPersist(autoPersist);
+      manualRecBtn.disabled = true;
+      try {
+        const res = await fetch('/api/browser/session/' + encodeURIComponent(sessionId) + '/manual-record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled: !manualRecording,
+            ...(trajectoryDbId != null ? { trajectoryDbId } : {}),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'failed');
+        setManualRecUI(!!data.enabled);
+        const persistHint = autoPersist && trajectoryDbId != null
+          ? '（自动入库 traj#' + trajectoryDbId + '）'
+          : '（仅 ACTION_LOG' + (autoPersist ? '' : '，可开「自动入库」') + '）';
+        sessLog(data.enabled ? 'success' : 'system',
+          data.enabled
+            ? ('人工录制已开启' + persistHint)
+            : '人工录制已停止');
+      } catch (err) {
+        alert('人工录制切换失败：' + err.message);
+      }
+      manualRecBtn.disabled = false;
+    });
+  }
+
+  on('manual_record_status', (d) => setManualRecUI(!!d.enabled));
+  on('manual_action_persisted', (d) => {
+    sessLog('success', '人工操作已入库 step#' + (d.stepNumber || '?')
+      + ' · ' + (d.entry?.action || ''));
+    if (sessActive?.value) reloadActionFlow(sessActive.value);
+  });
+  on('manual_action_recorded', () => {
+    if (sessActive?.value) reloadActionFlow(sessActive.value);
+  });
 
   // Populate action dropdown
   if (quickActionSelect) {
@@ -845,9 +1011,18 @@ export function initSessionMode() {
       quickExecBtn.disabled = true;
       quickResult.style.display = 'none';
       try {
+        const trajectoryDbId = getSelectedTrajectoryDbId();
+        const sessionId = sessActive?.value || undefined;
         const resp = await fetch('/api/browser/watcher/action', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, params }),
+          body: JSON.stringify({
+            action,
+            params,
+            source: 'cdp',
+            autoPersist,
+            ...(sessionId ? { sessionId } : {}),
+            ...(trajectoryDbId != null ? { trajectoryDbId } : {}),
+          }),
         });
         const data = await resp.json();
         if (data.error) {
@@ -857,7 +1032,13 @@ export function initSessionMode() {
         } else {
           quickResult.style.display = 'block';
           quickResult.style.background = '#f0fdf4'; quickResult.style.border = '1px solid #bbf7d0'; quickResult.style.color = '#166534';
-          quickResult.textContent = '✓ ' + (data.result || 'ok');
+          const persistHint = data.persisted
+            ? ' → 已入库 step#' + data.persisted.stepNumber
+            : (trajectoryDbId == null
+              ? '（未选轨迹，仅记入 ACTION_LOG）'
+              : (data.autoPersist ? '' : '（自动入库关，仅 ACTION_LOG）'));
+          quickResult.textContent = '✓ ' + (data.result || 'ok') + persistHint;
+          if (sessionId) reloadActionFlow(sessionId);
         }
       } catch (err) {
         quickResult.style.display = 'block';
@@ -879,6 +1060,8 @@ export function initSessionMode() {
       watcherStatus.style.background = online ? '#dcfce7' : 'var(--slate-100)';
       watcherStatus.style.color = online ? '#166534' : 'var(--slate-400)';
       if (quickExecBtn) quickExecBtn.disabled = !online;
+      if (typeof data.autoPersist === 'boolean') setAutoPersistUI(data.autoPersist);
+      if (typeof data.manualRecording === 'boolean') setManualRecUI(data.manualRecording);
     } catch { watcherStatus.textContent = '离线'; if (quickExecBtn) quickExecBtn.disabled = true; }
   }
   checkWatcher();
@@ -1043,6 +1226,185 @@ export function initSessionMode() {
     watcherStatus.style.color = 'var(--slate-400)';
     if (quickExecBtn) quickExecBtn.disabled = true;
   });
+
+  // ── Hierarchy cascading selects (system → process → function → trajectory) ──
+  const sessHierSystem = document.getElementById('sessHierSystem');
+  const sessHierProcess = document.getElementById('sessHierProcess');
+  const sessHierFunction = document.getElementById('sessHierFunction');
+  const sessTrajectorySelect = document.getElementById('sessTrajectorySelect');
+  const sessNewTrajBtn = document.getElementById('sessNewTrajBtn');
+  let hierTree = [];
+
+  function getSelectedFunctionId() {
+    const raw = sessHierFunction?.value;
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function getSelectedTrajectoryDbId() {
+    const raw = sessTrajectorySelect?.value;
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function persistFunctionSelection() {
+    const id = getSelectedFunctionId();
+    if (id != null) sessionStorage.setItem(HIER_STORAGE_KEY, String(id));
+  }
+
+  function persistTrajectorySelection() {
+    const id = getSelectedTrajectoryDbId();
+    if (id != null) sessionStorage.setItem(TRAJ_STORAGE_KEY, String(id));
+    else sessionStorage.removeItem(TRAJ_STORAGE_KEY);
+    setActionFlowTrajectory(id);
+    if (sessActive.value) reloadActionFlow(sessActive.value);
+  }
+
+  async function refreshTrajectorySelect(functionId, selectedId) {
+    if (!sessTrajectorySelect) return;
+    sessTrajectorySelect.innerHTML = '<option value="">新建轨迹（保存时创建）</option>';
+    if (functionId == null) return;
+    try {
+      const res = await fetch('/api/v2/trajectories?functionId=' + encodeURIComponent(functionId) + '&page=1&pageSize=50');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'load failed');
+      (data.rows || []).forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = String(t.id);
+        const task = (t.task || '').slice(0, 28);
+        opt.textContent = '#' + t.id + ' · ' + (t.phaseCount ?? '?') + '阶段 / ' + (t.stepCount ?? 0) + '步'
+          + (task ? ' · ' + task : '');
+        sessTrajectorySelect.appendChild(opt);
+      });
+      if (selectedId != null) sessTrajectorySelect.value = String(selectedId);
+    } catch (err) {
+      console.warn('[session] trajectory list failed:', err.message);
+    }
+  }
+
+  function fillProcessOptions(systemId, selectedProcessId) {
+    if (!sessHierProcess) return;
+    sessHierProcess.innerHTML = '<option value="">流程…</option>';
+    const sys = hierTree.find(s => String(s.id) === String(systemId));
+    (sys?.processes || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = String(p.id);
+      opt.textContent = p.name;
+      sessHierProcess.appendChild(opt);
+    });
+    if (selectedProcessId != null) sessHierProcess.value = String(selectedProcessId);
+  }
+
+  function fillFunctionOptions(systemId, processId, selectedFunctionId) {
+    if (!sessHierFunction) return;
+    sessHierFunction.innerHTML = '<option value="">功能点…</option>';
+    const sys = hierTree.find(s => String(s.id) === String(systemId));
+    const proc = (sys?.processes || []).find(p => String(p.id) === String(processId));
+    (proc?.functions || []).forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = String(f.id);
+      opt.textContent = f.name;
+      sessHierFunction.appendChild(opt);
+    });
+    if (selectedFunctionId != null) sessHierFunction.value = String(selectedFunctionId);
+  }
+
+  function applyHierarchySelection(sel) {
+    if (!sel || !sessHierSystem) return;
+    sessHierSystem.value = String(sel.systemId);
+    fillProcessOptions(sel.systemId, sel.processId);
+    fillFunctionOptions(sel.systemId, sel.processId, sel.functionId);
+    persistFunctionSelection();
+    const storedTraj = Number(sessionStorage.getItem(TRAJ_STORAGE_KEY));
+    refreshTrajectorySelect(sel.functionId, Number.isFinite(storedTraj) ? storedTraj : null).then(() => {
+      persistTrajectorySelection();
+    });
+  }
+
+  async function initHierarchySelects() {
+    if (!sessHierSystem || !sessHierProcess || !sessHierFunction) return;
+    try {
+      hierTree = await fetchHierarchyTree();
+    } catch (err) {
+      console.warn('[session] hierarchy load failed:', err.message);
+      return;
+    }
+
+    sessHierSystem.innerHTML = '<option value="">系统…</option>';
+    hierTree.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = String(s.id);
+      opt.textContent = s.name;
+      sessHierSystem.appendChild(opt);
+    });
+
+    const stored = Number(sessionStorage.getItem(HIER_STORAGE_KEY));
+    let applied = false;
+    if (Number.isFinite(stored)) {
+      for (const sys of hierTree) {
+        for (const proc of sys.processes || []) {
+          const fn = (proc.functions || []).find(f => f.id === stored);
+          if (fn) {
+            applyHierarchySelection({ systemId: sys.id, processId: proc.id, functionId: fn.id });
+            applied = true;
+            break;
+          }
+        }
+        if (applied) break;
+      }
+    }
+    if (!applied) {
+      const def = findDefaultUnclassified(hierTree);
+      if (def) applyHierarchySelection(def);
+    }
+
+    sessHierSystem.addEventListener('change', () => {
+      fillProcessOptions(sessHierSystem.value, null);
+      fillFunctionOptions(sessHierSystem.value, sessHierProcess.value, null);
+      refreshTrajectorySelect(null);
+    });
+    sessHierProcess.addEventListener('change', () => {
+      fillFunctionOptions(sessHierSystem.value, sessHierProcess.value, null);
+      refreshTrajectorySelect(null);
+    });
+    sessHierFunction.addEventListener('change', () => {
+      persistFunctionSelection();
+      refreshTrajectorySelect(getSelectedFunctionId(), null);
+    });
+    if (sessTrajectorySelect) {
+      sessTrajectorySelect.addEventListener('change', persistTrajectorySelection);
+    }
+    if (sessNewTrajBtn) {
+      sessNewTrajBtn.addEventListener('click', async () => {
+        const functionId = getSelectedFunctionId();
+        if (functionId == null) { alert('请先选择功能点'); return; }
+        const task = prompt('轨迹备注（可选）：', '') || '';
+        try {
+          const res = await fetch('/api/v2/trajectories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              functionId,
+              task,
+              model: sessModel?.value || '',
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Create failed');
+          sessionStorage.setItem(TRAJ_STORAGE_KEY, String(data.id));
+          await refreshTrajectorySelect(functionId, data.id);
+          persistTrajectorySelection();
+          sessLog('success', '已创建轨迹 #' + data.id);
+        } catch (err) {
+          alert('创建轨迹失败：' + err.message);
+        }
+      });
+    }
+  }
+
+  initHierarchySelects();
 
   // Initial Load button state
   updateButtons();

@@ -48,6 +48,7 @@
     <button class="tab-btn btn btn-sm" data-tab="history">录制脚本</button>
     <button class="tab-btn btn btn-sm" data-tab="trajectories">执行轨迹</button>
     <button class="tab-btn btn btn-sm" data-tab="caseData">案例数据</button>
+    <button class="tab-btn btn btn-sm" data-tab="hierarchy">层级</button>
   </div>
 
   <!-- Tab: Script Generation -->
@@ -198,12 +199,23 @@
           <textarea id="sessTask" rows="5" placeholder="在此粘贴测试用例内容，或点击"上传用例文件"加载 .md 文件…"></textarea>
         </div>
         <div style="display:flex;gap:8px;padding:0 12px 12px;flex-wrap:wrap;align-items:center">
-          <button id="sessStepBtn" class="btn btn-primary" disabled>&#9654; 执行步骤</button>
+          <button id="sessStepBtn" class="btn btn-primary" disabled>&#9654; 阶段执行</button>
           <button id="sessTrajBtn" class="btn btn-outline" disabled title="保存轨迹到轨迹存储">保存轨迹</button>
           <button id="sessCaseDataBtn" class="btn btn-outline" disabled title="保存案例数据到 JSON 文件" style="font-size:11px">保存案例</button>
           <button id="sessResetTrajBtn" class="btn btn-outline" disabled title="重置累积轨迹文件（开始新一轮录制）" style="font-size:11px">重置轨迹</button>
           <button id="sessCancelBtn" class="btn btn-outline" disabled>&#10005; 取消</button>
           <span id="sessTrajectoryId" style="font-size:12px;color:var(--slate-400)"></span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;padding:0 12px 12px;flex-wrap:wrap">
+          <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">挂靠功能点：</label>
+          <select id="sessHierSystem" style="min-width:120px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">系统…</option></select>
+          <select id="sessHierProcess" style="min-width:120px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">流程…</option></select>
+          <select id="sessHierFunction" style="min-width:120px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">功能点…</option></select>
+          <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">轨迹：</label>
+          <select id="sessTrajectorySelect" style="min-width:160px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)" title="长期录制目标 trajectory.id">
+            <option value="">新建轨迹（保存时创建）</option>
+          </select>
+          <button id="sessNewTrajBtn" type="button" class="btn btn-outline btn-sm" style="font-size:11px" title="在当前功能点下创建空轨迹">+ 新建</button>
         </div>
         <div id="sessTrajPath" style="display:none;padding:0 12px 6px;font-size:11px;font-family:var(--font-mono);color:var(--slate-400);word-break:break-all"></div>
       </div>
@@ -272,9 +284,21 @@
         <div class="card-header">
           <div class="card-title">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            快速操作
+            快速操作 / 人工录制
           </div>
-          <span id="sessWatcherStatus" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--slate-100);color:var(--slate-400)">离线</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <label id="sessAutoPersistLabel" title="开：CDP/人工操作立刻写入 trajectory_step；关：只进 ACTION_LOG，点「保存轨迹」时入库" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-size:11px;color:var(--slate-600)">
+              <span>自动入库</span>
+              <span style="position:relative;width:34px;height:18px;display:inline-block">
+                <input id="sessAutoPersist" type="checkbox" style="opacity:0;width:0;height:0;position:absolute">
+                <span id="sessAutoPersistTrack" style="position:absolute;inset:0;border-radius:999px;background:var(--slate-200);transition:background .15s"></span>
+                <span id="sessAutoPersistThumb" style="position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s"></span>
+              </span>
+            </label>
+            <span id="sessManualRecStatus" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--slate-100);color:var(--slate-400)">录制关</span>
+            <button id="sessManualRecBtn" type="button" class="btn btn-outline btn-sm" style="font-size:11px" title="监听用户在浏览器中的点击/输入，写入 ACTION_LOG（是否实时入库由「自动入库」开关决定）">● 开始人工录制</button>
+            <span id="sessWatcherStatus" style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--slate-100);color:var(--slate-400)">离线</span>
+          </div>
         </div>
         <div style="padding:8px 12px">
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
@@ -373,7 +397,12 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           轨迹历史
         </div>
-        <button id="trajRefreshBtn" class="btn btn-outline btn-sm">刷新</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="trajFunctionFilter" style="min-width:200px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)">
+            <option value="">全部功能点</option>
+          </select>
+          <button id="trajRefreshBtn" class="btn btn-outline btn-sm">刷新</button>
+        </div>
       </div>
       <div id="trajLoading" style="display:none;text-align:center;padding:20px;color:var(--slate-400)">加载中…</div>
       <div id="trajEmpty" class="empty-state">
@@ -451,6 +480,28 @@
         案例数据 JSON
       </div>
       <pre id="caseDataDetailJson" style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:var(--radius-sm);font-size:12px;line-height:1.6;overflow:auto;max-height:500px;font-family:var(--font-mono)"></pre>
+    </div>
+  </div>
+
+  <!-- Tab: Hierarchy -->
+  <div id="tabHierarchy" class="tab-panel" style="display:none">
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM8 14h7v7H8z"/></svg>
+          系统 / 流程 / 功能点
+        </div>
+        <div style="display:flex;gap:6px">
+          <button id="hierAddSystemBtn" class="btn btn-sm btn-primary">+ 系统</button>
+          <button id="hierRefreshBtn" class="btn btn-outline btn-sm">刷新</button>
+        </div>
+      </div>
+      <div style="padding:8px 12px;font-size:12px;color:var(--slate-500)">保存轨迹时可选择功能点挂靠。默认「未分类」为种子数据，不可删除。</div>
+      <div id="hierLoading" style="display:none;text-align:center;padding:20px;color:var(--slate-400)">加载中…</div>
+      <div id="hierEmpty" class="empty-state" style="display:none">
+        <p>暂无层级数据 — 点击「+ 系统」创建</p>
+      </div>
+      <div id="hierTreeBody" style="padding:8px 12px 16px"></div>
     </div>
   </div>
 

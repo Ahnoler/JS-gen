@@ -170,6 +170,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
                 "action_file": str(action_path) if action_path else None,
                 "trajectory_file": str(native_path) if native_path else (str(action_path) if action_path else None),
                 "log_file": str(log_path) if log_path else None,
+                "form_file": str(form_path) if form_path else None,
                 "action_count": action_count,
                 "log_count": log_count,
                 "native_count": native_count,
@@ -429,6 +430,31 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
             await cdp_action_queue.put(action_data)
         return 'continue'
 
+    if event == "manual_record_start":
+        recorder = session_state.get('manual_recorder')
+        if recorder is None:
+            from .manual_recorder import ManualRecorder
+            recorder = ManualRecorder(session_state.get('browser_context'))
+            session_state['manual_recorder'] = recorder
+        try:
+            await recorder.start()
+        except Exception as e:
+            emit_json({"event": "manual_record_status", "data": {"enabled": False, "error": str(e)}})
+            sys.stderr.write(f"[manual-recorder] start error: {e}\n")
+            sys.stderr.flush()
+        return 'continue'
+
+    if event == "manual_record_stop":
+        recorder = session_state.get('manual_recorder')
+        if recorder:
+            try:
+                await recorder.stop()
+            except Exception as e:
+                emit_json({"event": "manual_record_status", "data": {"enabled": False, "error": str(e)}})
+        else:
+            emit_json({"event": "manual_record_status", "data": {"enabled": False}})
+        return 'continue'
+
     if event == "replay_actions":
         entries = msg.get("data", {}).get("actions", [])
         browser_context = session_state.get('browser_context')
@@ -527,7 +553,10 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store, form_
 
         try:
             # Per-action watcher mode — skip _ensure_scanned, no auto-fill
+            # Tag recorded actions as source=cdp for DB persistence
+            from .actions._state import set_current_source
             case_data_store['_watcher_mode'] = True
+            set_current_source('cdp')
             try:
                 if isinstance(params, list):
                     result = await act.function(*params)
@@ -538,16 +567,31 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store, form_
                 result_str = str(result)
             finally:
                 case_data_store['_watcher_mode'] = False
+                set_current_source('agent')
             sys.stderr.write(f"[cdp-watcher] {action_name}{params} -> {result_str}\n")
             sys.stderr.flush()
+            from .actions._state import _ACTION_LOG
+            last_entry = _ACTION_LOG[-1] if _ACTION_LOG else None
             if req_id:
-                emit_json({"event": "cdp_action_result", "id": req_id, "result": result_str, "error": None})
+                emit_json({
+                    "event": "cdp_action_result",
+                    "id": req_id,
+                    "result": result_str,
+                    "error": None,
+                    "entry": last_entry,
+                })
         except Exception as e:
             err_str = str(e)
             sys.stderr.write(f"[cdp-watcher] Error: {action_name}{params} -> {err_str}\n")
             sys.stderr.flush()
+            try:
+                from .actions._state import set_current_source
+                set_current_source('agent')
+                case_data_store['_watcher_mode'] = False
+            except Exception:
+                pass
             if req_id:
-                emit_json({"event": "cdp_action_result", "id": req_id, "result": None, "error": err_str})
+                emit_json({"event": "cdp_action_result", "id": req_id, "result": None, "error": err_str, "entry": None})
 
 
 async def run_session(args):
@@ -614,7 +658,15 @@ async def run_session(args):
         """Execute one agent step with the given data."""
         nonlocal cumulative_path
         from .actions._state import set_current_phase
-        set_current_phase(step_idx)
+        # Prefer client-provided phase_number (matches 【阶段N】); fallback to step_idx
+        phase_num = data.get("phase_number")
+        if phase_num is None:
+            phase_num = data.get("phaseNumber")
+        try:
+            phase_num = int(phase_num) if phase_num is not None else int(step_idx)
+        except (TypeError, ValueError):
+            phase_num = step_idx
+        set_current_phase(phase_num)
         agent_running_ref['value'] = True
         try:
             output_path, task_text = await _run_agent_step(
@@ -626,13 +678,13 @@ async def run_session(args):
             agent_running_ref['value'] = False
         if output_path is None:
             return
-        _accumulate_trajectory(output_path, cumulative_path, step_idx)
+        _accumulate_trajectory(output_path, cumulative_path, phase_num)
         emit_json({
             "event": "phase_done",
-            "data": {"phase": step_idx, "total": -1, "name": task_text[:60], "trajectory_file": str(output_path),
+            "data": {"phase": phase_num, "total": -1, "name": task_text[:60], "trajectory_file": str(output_path),
                      "cumulative_file": str(cumulative_path), "step_index": step_idx},
         })
-        sys.stderr.write(f"[session] Step {step_idx} done\n")
+        sys.stderr.write(f"[session] Step {step_idx} done (phase={phase_num})\n")
         sys.stderr.flush()
 
     while True:

@@ -3,6 +3,7 @@ import { escapeHtml } from './swagger-api.js';
 import { formatTime } from './utils.js';
 import { pipelineState, displayGeneratedScript } from './script-pipeline.js';
 import { renderActionCards, wireActionButtons } from './trajectory-actions.js';
+import { fetchHierarchyTree, flattenFunctionOptions } from './hierarchy.js';
 
 export let trajCurrentDetailId = null;
 
@@ -13,6 +14,26 @@ export function initTrajectory() {
     const ball = document.getElementById('trajSaveBall');
     if (ball) ball.style.display = 'none';
   });
+  const filter = document.getElementById('trajFunctionFilter');
+  if (filter) {
+    filter.addEventListener('change', () => loadSnapshots());
+    populateFunctionFilter();
+  }
+}
+
+async function populateFunctionFilter() {
+  const filter = document.getElementById('trajFunctionFilter');
+  if (!filter) return;
+  const prev = filter.value;
+  try {
+    const tree = await fetchHierarchyTree();
+    const opts = flattenFunctionOptions(tree);
+    filter.innerHTML = '<option value="">全部功能点</option>' +
+      opts.map(o => `<option value="${o.id}">${escapeHtml(o.label)}</option>`).join('');
+    if (prev) filter.value = prev;
+  } catch (err) {
+    console.warn('[trajectory] function filter load failed:', err.message);
+  }
 }
 
 export async function loadSnapshots() {
@@ -21,6 +42,7 @@ export async function loadSnapshots() {
   const list = document.getElementById('trajList');
   const body = document.getElementById('trajBody');
   const detail = document.getElementById('trajDetailPanel');
+  const filter = document.getElementById('trajFunctionFilter');
 
   loading.style.display = 'block';
   empty.style.display = 'none';
@@ -28,7 +50,11 @@ export async function loadSnapshots() {
   if (detail) detail.style.display = 'none';
 
   try {
-    const res = await fetch('/api/v2/trajectories?page=1&pageSize=100');
+    await populateFunctionFilter();
+    const functionId = filter?.value || '';
+    const qs = new URLSearchParams({ page: '1', pageSize: '100' });
+    if (functionId) qs.set('functionId', functionId);
+    const res = await fetch('/api/v2/trajectories?' + qs.toString());
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Load failed');
     loading.style.display = 'none';
@@ -36,6 +62,9 @@ export async function loadSnapshots() {
     const rows = data.rows || [];
     if (!rows.length) {
       empty.style.display = 'block';
+      empty.innerHTML = functionId
+        ? '<p>该功能点下暂无轨迹</p>'
+        : '<p>暂无保存的轨迹</p>';
       return;
     }
 
@@ -43,20 +72,22 @@ export async function loadSnapshots() {
     body.innerHTML = `
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px">
         <thead><tr style="border-bottom:2px solid var(--slate-200)">
-          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Session / Trajectory ID</th>
+          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">ID</th>
           <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Task</th>
-          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Steps</th>
+          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Fn ID</th>
+          <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Phases / Steps</th>
           <th style="padding:8px;text-align:left;color:var(--slate-500);font-weight:600">Created</th>
           <th style="padding:8px;color:var(--slate-500);font-weight:600">Actions</th>
         </tr></thead>
         <tbody>
           ${rows.map(r => {
-            const tid = r.trajectoryId || '';
+            const tid = String(r.id || '');
             const task = (r.task || '').slice(0, 60);
             return `<tr style="border-bottom:1px solid var(--slate-100)">
-              <td style="padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--indigo-600)" title="${escapeHtml(tid)}">${escapeHtml(tid.slice(0, 28))}${tid.length > 28 ? '…' : ''}</td>
+              <td style="padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--indigo-600)" title="${escapeHtml(tid)}">#${escapeHtml(tid)}</td>
               <td style="padding:8px;color:var(--slate-600);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.task || '')}">${escapeHtml(task)}</td>
-              <td style="padding:8px;color:var(--slate-500);font-size:12px">${r.stepCount ?? 0} / ${r.actionCount ?? 0}</td>
+              <td style="padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--slate-500)">${r.functionId ?? '—'}</td>
+              <td style="padding:8px;color:var(--slate-500);font-size:12px">${r.phaseCount ?? 0} / ${r.stepCount ?? 0}</td>
               <td style="padding:8px;color:var(--slate-400);font-size:11px">${formatTime(r.createdAt)}</td>
               <td style="padding:8px;white-space:nowrap">
                 <button class="btn btn-outline btn-sm traj-view" data-id="${escapeHtml(tid)}" style="margin-right:4px">View</button>
@@ -87,7 +118,7 @@ async function viewTrajectory(trajectoryId) {
     const detailPanel = document.getElementById('trajDetailPanel');
     document.getElementById('trajDetailId').textContent = trajectoryId;
     document.getElementById('trajDetailInfo').textContent =
-      `Steps ${traj.stepCount ?? 0} · Actions ${traj.actionCount ?? 0} · ${traj.url || ''}`;
+      `id #${traj.id} · Phases ${traj.phaseCount ?? (traj.phases || []).length} · Steps ${traj.stepCount ?? 0} · Fn ${traj.functionId ?? '—'} · ${traj.url || ''}`;
 
     const summaryEl = document.getElementById('trajDetailSummary');
     document.getElementById('trajDetailJson').style.display = 'none';
