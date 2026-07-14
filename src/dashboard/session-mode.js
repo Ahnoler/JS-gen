@@ -4,6 +4,7 @@
 import { ts } from './utils.js';
 import { escapeHtml } from './swagger-api.js';
 import { on, send, isConnected } from './ws-client.js';
+import { setActionFlowSession, reloadActionFlow } from './recording-flow.js';
 
 export function initSessionMode() {
   const sessNewBtn = document.getElementById('sessNewBtn');
@@ -232,43 +233,14 @@ export function initSessionMode() {
     const plan = document.getElementById('sessPhasePlan');
     const list = document.getElementById('sessPhaseList');
     const countEl = document.getElementById('sessPhaseCount');
-    const runAllBtn = document.getElementById('sessRunAllBtn');
     if (!plan || !list) return;
     if (!phases || phases.length === 0) { plan.style.display = 'none'; sessionPhases = []; return; }
     plan.style.display = 'block';
     sessionPhases = phases;
     countEl.textContent = phases.length + ' 个阶段';
-    if (runAllBtn) runAllBtn.style.display = (phases.length > 1) ? '' : 'none';
 
     list.innerHTML = buildPhaseCarouselHtml(phases);
     bindPhaseCarouselEvents(list, phases);
-  }
-
-  async function runAllPhases() {
-    if (!sessionPhases || sessionPhases.length === 0) return;
-    if (!sessActive.value) { sessLog('error', '无活跃会话'); return; }
-    const runAllBtn = document.getElementById('sessRunAllBtn');
-    if (runAllBtn) runAllBtn.disabled = true;
-    setUILocked(true);
-    sessLog('system', '▶ 正在执行全部 ' + sessionPhases.length + ' 个阶段…');
-
-    for (let i = 0; i < sessionPhases.length; i++) {
-      const phase = sessionPhases[i];
-      sessLog('system', '▶ 阶段 ' + (i + 1) + '/' + sessionPhases.length + ': ' + phase.name);
-      sessPhaseUpdateStatus(i, 'running');
-      try {
-        await executeSessionStep(sessActive.value, phase.task, phase.maxSteps, phase.name, i);
-        sessPhaseUpdateStatus(i, 'success');
-      } catch (err) {
-        sessPhaseUpdateStatus(i, 'failed');
-        sessLog('error', 'Phase ' + (i + 1) + ' failed: ' + (err.message || err));
-        break;
-      }
-    }
-
-    setUILocked(false);
-    if (runAllBtn) runAllBtn.disabled = false;
-    sessLog('success', '所有阶段已完成');
   }
 
   function sessPhaseUpdateStatus(idx, status) {
@@ -497,6 +469,7 @@ export function initSessionMode() {
 
   function onSessionChange() {
     const active = sessActive.value;
+    setActionFlowSession(active || null);
     if (!active) {
       sessStatus.textContent = '无活跃会话';
       sessTrajectoryId.textContent = '';
@@ -712,8 +685,9 @@ export function initSessionMode() {
       const data = await res.json();
       const actionName = (data.action_file || '').split(/[\\/]/).pop() || '';
       const logName = (data.log_file || '').split(/[\\/]/).pop() || '';
-      sessTrajectoryId.textContent = actionName.replace('.json','').slice(0,20) + '... |' + logName.replace('.txt','').slice(0,20) + '...';
-      sessLog('success', data.action_count + ' 个动作 + ' + data.log_count + ' 条日志行已保存');
+      sessTrajectoryId.textContent = (data.trajectoryId || sessionId).slice(0, 20) + '… | ' + actionName.slice(0, 16);
+      sessLog('success', data.action_count + ' 个动作已保存（trajectoryId=' + (data.trajectoryId || sessionId) + '）' + (logName ? ' + ' + data.log_count + ' 条日志' : ''));
+      await reloadActionFlow(sessionId);
     } catch (err) {
       sessLog('error', '保存失败：' + err.message);
     }
@@ -909,12 +883,6 @@ export function initSessionMode() {
   }
   checkWatcher();
   // 轮询已替换为 WebSocket 事件驱动（见下方 on('watcher:status')）
-
-  // Run All Phases button — sequentially execute all parsed phases
-  const runAllBtn = document.getElementById('sessRunAllBtn');
-  if (runAllBtn) {
-    runAllBtn.addEventListener('click', () => runAllPhases());
-  }
 
   // Clear log button
   const exploreClearLogBtn = document.getElementById('exploreClearLogBtn');

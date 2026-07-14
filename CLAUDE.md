@@ -42,26 +42,29 @@ Both implement the same CTRL helpers (`fillFormField`, `selectOption`, `selectDa
 
 ```
 Node.js Express (server.mjs)
-  ├─ POST /api/browser-use/explore  → spawns python scripts/browser-use-agent.py --task/--workflow
-  ├─ POST /api/browser/session/:id/step → spawns python ...  --session
-  └─ POST /api/test/assemble        → execSync python scripts/script_assembler.py
+  ├─ POST /api/browser/session (+ /step, /trajectory, /action-flow)
+  │     → spawns python scripts/browser-use-agent.py --session
+  └─ POST /api/test/assemble
+        → execSync python scripts/script_assembler.py
 ```
+
+One-shot Explore/Workflow (`POST /api/browser-use/explore`, `--task` / `--workflow`) has been removed. Multi-phase batch “Run All Phases” is also removed pending a redesign; Dashboard can still **load** phase plans for display, and steps are sent one at a time via Session.
 
 The Python agent process communicates via JSON Lines on stdout (each line is `{"event": "step"|"done"|"nav_step", "data": {...}}`). Routes parse this line-by-line and forward as SSE to the client.
 
 ### Route Modules (`src/routes/`)
 
 - **`agent.js`** — Generic AI agent execution (sync/async/SSE), session management. Dispatches to OpenCode SDK or standalone LLM.
-- **`browser-use-explore.js`** — Workflow mode: parses multi-phase task text, spawns Python agent, streams progress via SSE, saves trajectories and case data on completion.
-- **`browser-session.js`** — Session mode: maintains a long-lived browser via `state.globalBrowser`, supports multi-turn interaction with human intervention.
+- **`browser-session.js`** — Session mode: long-lived browser via `state.globalBrowser`, multi-turn steps, human intervention, trajectory/case-data dual-write to MySQL.
 - **`test-assemble.js`** — Assembler pipeline: reads action JSON → `dedup.js` (consecutive-only dedup) → Python `script_assembler.py` → returns Playwright JS script.
 - **`test-run.js`** + **`sse.js`** — Execute generated Playwright scripts, streaming output.
 - **`llm-proxy.js`** — OpenAI-compatible `/v1/chat/completions` and `/v1/models` endpoints.
-- **`explore-utils.js`** — Shared spawn/kill/SSE utilities for browser routes (not a route module, but imported by routes).
+- **`explore-utils.js`** — Shared spawn/kill/SSE utilities for Session and test-run (not an Explore route; name is historical).
+- **`v2/`** — Database-backed APIs (hierarchy, trajectories, case-data, screenshots, remote-session, api-override).
 
 ### Stores (JSON File Persistence)
 
-All use the same pattern: `index.json` for metadata + individual JSON files for content, all under `scripts/`:
+All use the same pattern: `index.json` for metadata + individual JSON files for content, all under `scripts/`. Session saves also dual-write to MySQL via `src/services/*`.
 
 | Store | Module | Directory |
 |-------|--------|-----------|
@@ -71,18 +74,18 @@ All use the same pattern: `index.json` for metadata + individual JSON files for 
 
 ### Dashboard (`src/dashboard/`, `test-dashboard.html`)
 
-Single-page web dashboard with 11 ESM modules. Key panels: script generation pipeline, execution history, trajectory viewer, case data manager, browser session controller. Served statically from project root.
+Single-page web dashboard with ESM modules. Key panels: script generation pipeline, execution history, trajectory viewer (v2), case data manager (v2), browser session controller. Served statically from project root.
 
 ### Python Agent Internals (`scripts/`)
 
-- **`main.py`** — CLI entry point. Three modes: `--task` (single run), `--workflow` (multi-phase from JSON), `--session` (stdin-driven interactive).
+- **`main.py`** — CLI entry point. Session-only: requires `--session` (stdin-driven interactive).
 - **`controller.py`** — Registers ~20 custom `browser_use` controller actions for Element UI components. Records every action call via `_record_action()` into `_ACTION_LOG` (used later by the action recorder and assembler).
 - **`session_runner.py`** — Reads JSON instructions from stdin, runs agent steps, emits JSON events on stdout. Supports human intervention via a pending buffer.
-- **`workflow_runner.py`** — Executes phased tasks, saves per-phase trajectories.
 - **`script_assembler.py`** — Reads recorded action entries (`{action, params, element}`) and generates a complete Playwright JS script with injected CTRL helpers. No LLM involved — pure mapping from action+params to CTRL calls.
 - **`agent_utils.py`** — LLM creation (langchain `ChatOpenAI`), message context trimming (keeps last 12 messages, patches `browser_use`'s `MessageManager`), system prompt loading from `agent-prompt.md`.
 - **`recorder.py`** — Builds recording hooks that write `action_{ts}.json` and `log_{ts}.txt` files per session/phase.
 - **`form_rules.py`** — Python port of `atp-rule` skill: `match_rule(label_text)` → valid random value for form fields.
+- **`browser-use-agent.py`** — Thin compatibility wrapper that calls `main()`.
 
 ### OpenCode Skills (`.opencode/skills/`)
 

@@ -45,66 +45,6 @@ export function flushPendingBuffer(pendingBuffer, onMessage) {
   }
 }
 
-export function finishExplore(res, exploreLockRef, send, payload) {
-  send('done', payload);
-  exploreLockRef.value = false;
-  console.log('[browser-use] Exploration finished (lock released)');
-  if (!res.writableEnded) res.end();
-}
-
-export function parsePhases(task) {
-  const bracketRegex = /【阶段(\d+)[：:]\s*(.+?)】/g;
-  const markdownRegex = /^##\s+Phase\s+(\d+)[：:]\s*(.+)$/gm;
-
-  const usesMarkdown = /^##\s+Phase\s+\d+/m.test(task);
-  const phaseRegex = usesMarkdown ? markdownRegex : bracketRegex;
-
-  const phases = [];
-  let prefix = '';
-
-  phaseRegex.lastIndex = 0;
-  const firstMatch = phaseRegex.exec(task);
-  if (firstMatch && usesMarkdown) {
-    prefix = task.slice(0, firstMatch.index).trim();
-  }
-  phaseRegex.lastIndex = 0;
-
-  let match;
-  const matches = [];
-  while ((match = phaseRegex.exec(task)) !== null) {
-    matches.push({ num: parseInt(match[1]), name: match[2].trim(), index: match.index, endIndex: phaseRegex.lastIndex });
-  }
-
-  for (let i = 0; i < matches.length; i++) {
-    const m = matches[i];
-    const contentStart = m.endIndex;
-    const contentEnd = i + 1 < matches.length ? matches[i + 1].index : task.length;
-    let content = task.slice(contentStart, contentEnd).trim();
-
-    if (i === 0 && prefix) {
-      content = prefix + '\n\n' + content;
-    }
-
-    content = content.replace(/^\d+[\.\)、]\s*截图[^：:\n]*$/gm, '').trim();
-
-    if (usesMarkdown) {
-      content = content.replace(/\n{3,}/g, '\n\n').trim();
-    }
-
-    const navPhases = ['登录', '导航'];
-    const isNav = navPhases.some(kw => m.name.includes(kw));
-    const maxSteps = isNav ? 50 : 40;
-
-    phases.push({
-      name: `Phase ${m.num}: ${m.name}`,
-      task: content,
-      maxSteps,
-    });
-  }
-
-  return phases;
-}
-
 export function waitForReady(child, timeout = 15000) {
   return new Promise((resolve, reject) => {
     let buffer = '';

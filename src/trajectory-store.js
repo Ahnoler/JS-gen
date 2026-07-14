@@ -78,7 +78,13 @@ export function saveTrajectoryRecord({ trajectoryId, task, model, sourcePath, ex
   };
 
   const list = loadTrajectoryIndex();
-  list.unshift(record);
+  const existingIdx = list.findIndex((r) => r.trajectoryId === trajectoryId);
+  if (existingIdx >= 0) {
+    // Same session → replace index entry (do not stack duplicates)
+    list[existingIdx] = { ...list[existingIdx], ...record, createdAt: list[existingIdx].createdAt };
+  } else {
+    list.unshift(record);
+  }
   saveTrajectoryIndex(list);
 
   return { record, trajectory, flow };

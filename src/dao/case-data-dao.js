@@ -31,9 +31,9 @@ export async function getByRecordId(recordId) {
   const row = await db(TABLE).where({ record_id: recordId }).first();
   if (!row) return null;
   const entity = fromDbRow(row);
-  entity.entries = await db('case_data_entry')
+  entity.entries = fromDbRows(await db('case_data_entry')
     .where({ case_data_id: row.id })
-    .orderBy('id');
+    .orderBy('id'));
   return entity;
 }
 

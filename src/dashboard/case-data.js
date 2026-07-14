@@ -25,28 +25,31 @@ export async function loadCaseDataHistory() {
   caseDataCurrentId = null;
 
   try {
-    const res = await fetch('/api/case-data');
+    const res = await fetch('/api/v2/case-data?page=1&pageSize=100');
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Load failed');
     loading.style.display = 'none';
 
-    if (!data.length) {
+    const rows = data.rows || data || [];
+    if (!rows.length) {
       empty.style.display = 'block';
       return;
     }
 
     list.style.display = 'block';
-    body.innerHTML = data.map(r => {
+    body.innerHTML = rows.map(r => {
+      const recordId = r.recordId || '';
       const shortDesc = (r.description || '').slice(0, 60);
       return `
         <tr style="border-bottom:1px solid var(--slate-100)">
-          <td style="padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--indigo-600)" title="${escapeHtml(r.recordId)}">${escapeHtml(r.recordId.slice(0, 24))}...</td>
+          <td style="padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--indigo-600)" title="${escapeHtml(recordId)}">${escapeHtml(recordId.slice(0, 24))}...</td>
           <td style="padding:8px;color:var(--slate-600);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.description || '')}">${escapeHtml(shortDesc)}</td>
-          <td style="padding:8px;color:var(--slate-500);font-size:12px">${r.keyCount}</td>
+          <td style="padding:8px;color:var(--slate-500);font-size:12px">${r.keyCount ?? 0}</td>
           <td style="padding:8px;color:var(--slate-400);font-size:11px">${formatTime(r.createdAt)}</td>
           <td style="padding:8px;text-align:right;white-space:nowrap">
-            <button class="btn btn-outline btn-sm cdata-view" data-id="${escapeHtml(r.recordId)}" style="margin-right:4px">View</button>
-            <button class="btn btn-outline btn-sm cdata-import" data-id="${escapeHtml(r.recordId)}" style="margin-right:4px;color:var(--green-600);border-color:var(--green-300)">Import</button>
-            <button class="btn btn-outline btn-sm cdata-del" data-id="${escapeHtml(r.recordId)}" style="color:var(--red-500);border-color:var(--red-200)">Delete</button>
+            <button class="btn btn-outline btn-sm cdata-view" data-id="${escapeHtml(recordId)}" style="margin-right:4px">View</button>
+            <button class="btn btn-outline btn-sm cdata-import" data-id="${escapeHtml(recordId)}" style="margin-right:4px;color:var(--green-600);border-color:var(--green-300)">Import</button>
+            <button class="btn btn-outline btn-sm cdata-del" data-id="${escapeHtml(recordId)}" style="color:var(--red-500);border-color:var(--red-200)">Delete</button>
           </td>
         </tr>`;
     }).join('');
@@ -73,18 +76,21 @@ async function viewCaseDataDetail(recordId) {
   jsonPre.textContent = '';
 
   try {
-    const res = await fetch('/api/case-data/' + recordId + '?full=1');
+    const res = await fetch('/api/v2/case-data/' + encodeURIComponent(recordId));
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
     info.innerHTML = '<b>Keys:</b> ' + (data.keyCount || 0) +
       ' | <b>Created:</b> ' + formatTime(data.createdAt);
 
-    if (data.data) {
-      jsonPre.textContent = JSON.stringify(data.data, null, 2);
-    } else {
-      jsonPre.textContent = '(no data)';
-    }
+    const payload = data.rawJson
+      || Object.fromEntries((data.entries || []).map(e => [
+        e.fieldKey || e.field_key,
+        e.fieldValue ?? e.field_value ?? null,
+      ]));
+    jsonPre.textContent = payload && Object.keys(payload).length
+      ? JSON.stringify(payload, null, 2)
+      : '(no data)';
   } catch (err) {
     document.getElementById('caseDataDetailSummary').textContent = 'Error: ' + err.message;
   }
@@ -92,7 +98,7 @@ async function viewCaseDataDetail(recordId) {
 
 async function importCaseData(recordId) {
   try {
-    const res = await fetch('/api/case-data/' + recordId + '/file');
+    const res = await fetch('/api/v2/case-data/' + encodeURIComponent(recordId) + '/file');
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
@@ -110,7 +116,7 @@ async function importCaseData(recordId) {
 async function deleteCaseData(recordId) {
   if (!confirm('Delete case data ' + recordId.slice(0, 20) + '...?')) return;
   try {
-    const res = await fetch('/api/case-data/' + recordId, { method: 'DELETE' });
+    const res = await fetch('/api/v2/case-data/' + encodeURIComponent(recordId), { method: 'DELETE' });
     if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
 
     if (caseDataCurrentId === recordId) {

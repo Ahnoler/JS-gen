@@ -6,7 +6,7 @@
 
 | 功能 | 说明 |
 |------|------|
-| **AI 浏览器操控** | 自然语言驱动的浏览器自动化，支持 Workflow（一次性）和 Session（多轮对话）两种模式 |
+| **AI 浏览器操控** | 自然语言驱动的浏览器自动化（Session 多轮对话）；阶段计划可加载展示，批量执行待重做 |
 | **Element UI 深度集成** | CTRL 辅助函数原生支持 el-form、el-select、el-date-picker、el-table、el-tree、el-dialog 等 15+ 组件 |
 | **Playwright 脚本生成** | 从 AI 探索轨迹自动转录为可重放的 Playwright JS 脚本，支持人工修复 |
 | **轨迹录制与存储** | 每步 agent 决策与 DOM 状态完整记录，可回放、删除，支持转脚本 |
@@ -66,12 +66,11 @@
 │  │   (13 routes)   │  │  (trajectory,   │  │  (13 ESM modules)   │  │
 │  │                 │  │   case-data,    │  │                     │  │
 │  │ agent.js        │  │   script-utils) │  │  Script Assemble    │  │
-│  │ browser-session │  └─────────────────┘  │  AI Explore         │  │
-│  │ browser-explore │                       │  Trajectories       │  │
-│  │ test-run        │  ┌─────────────────┐  │  Case Data          │  │
-│  │ test-assemble   │  │   LLM Utils     │  │  Session Mode       │  │
+│  │ browser-session │  └─────────────────┘  │  Session Mode       │  │
+│  │ test-run        │  ┌─────────────────┐  │  Trajectories       │  │
+│  │ test-assemble   │  │   LLM Utils     │  │  Case Data          │  │
 │  │ llm-proxy       │  │  (callLLM)      │  │  Execution History  │  │
-│  │  ...            │  └─────────────────┘  └─────────────────────┘  │
+│  │  v2/*           │  └─────────────────┘  └─────────────────────┘  │
 │  └─────────────────┘                       └────────────────────────┘
 │                       │
 │             spawn(StdIn/StdOut JSON Lines)
@@ -79,10 +78,9 @@
 │  ┌──────────────────────────────────────────────────────────────────┐
 │  │                   Python Agent (browser_use)                     │
 │  │                                                                  │
-│  │  main.py ──→ controller.py (20+ custom actions)                  │
-│  │  │             agent_utils.py (LLM, prompt)                      │
-│  │  ├──workflow  workflow_runner.py (multi-phase)                   │
-│  │  └──session   session_runner.py (stdin interactive)              │
+│  │  main.py --session → controller.py (20+ custom actions)          │
+│  │                      agent_utils.py (LLM, prompt)                │
+│  │                      session_runner.py (stdin interactive)       │
 │  │                                                                  │
 │  │  recorder.py (hooks, goal dedup, human intervention)             │
 │  │  form_rules.py (ID card, phone, email generators)                │
@@ -347,10 +345,8 @@ npm start
 | `routes/agent.js` | Agent 对话（同步/异步/SSE/多Session管理） |
 | `routes/sse.js` | SSE 流式 Agent 对话端点 |
 | `routes/llm-proxy.js` | OpenAI 兼容代理（`/v1/chat/completions`、`/v1/models`） |
-| `routes/browser-use-explore.js` | 浏览器自动化探索（Workflow + Session 模式），含多阶段任务解析 |
-| `routes/browser-session.js` | 别名路由（代理到 browser-use-explore 的 Session 端点） |
-| `routes/explore-route.js` | 探索路由（整合 browser-use-explore 的入口） |
-| `routes/explore-utils.js` | 浏览器自动化工具函数（spawn/kill/SSE 共享逻辑） |
+| `routes/browser-session.js` | Session 浏览器自动化（多轮步骤、轨迹/案例保存、动作流） |
+| `routes/explore-utils.js` | 共享 spawn/kill/SSE 工具（历史命名；非 Explore 路由） |
 | `routes/test-assemble.js` | Action 文件 → 去重 → 组装 → Playwright 脚本管线 |
 | `routes/test-run.js` | 执行 Playwright 脚本（SSE 流式 + JSON 同步），截图捕获 |
 | `routes/test-history.js` | 已生成脚本的历史管理 |
@@ -374,10 +370,9 @@ npm start
 
 | 脚本 | 说明 |
 |------|------|
-| `main.py` | **主入口**。CLI 模式：`--task`（单次）、`--workflow`（多阶段）、`--session`（交互式）。输出 JSON Lines 到 stdout |
+| `main.py` | **主入口**。仅 `--session`（stdin 交互）。输出 JSON Lines 到 stdout |
 | `controller.py` | **核心 — Playwright Controller**。注册 ~20 个自定义 Element UI 操作。通过 `_record_action()` 记录每次操作到 `_ACTION_LOG` |
 | `session_runner.py` | **交互式会话**。从 stdin 读取 JSON 指令，执行 agent 步骤，输出 JSON 事件。支持人工介入 |
-| `workflow_runner.py` | **工作流执行**。按阶段（phase）顺序执行，保存每阶段轨迹 |
 | `recorder.py` | **录制钩子**。`on_step_start` / `on_step_end` 回调，目标去重检测、取消信号、人工介入注入 |
 | `agent_utils.py` | **工具函数**。LLM 创建（ChatOpenAI）、参数解析、消息上下文裁剪（保留最后 12 条）、提示词加载 |
 | `form_rules.py` | **表单规则**。`match_rule(label_text)` → 有效随机值。包括身份证（校验和）、手机号、信用代码、银行卡号等 |
@@ -418,13 +413,13 @@ npm start
 |------|------|
 | `index.js` | 主入口，初始化所有面板 |
 | `script-pipeline.js` | **脚本组装管线**：列出 action/log 文件 → 去重 → 预览 → 组装 → 运行 |
-| `explore.js` | **AI 探索面板**：提交任务 → 实时 SSE 流显示 → 轨迹保存 |
 | `history.js` | **已生成脚本列表**：查看、复制、下载、删除 |
-| `trajectory.js` | **轨迹浏览器**：列示/查看/删除轨迹 |
+| `trajectory.js` | **轨迹浏览器**：列示/查看/删除轨迹（v2 API） |
 | `trajectory-actions.js` | 轨迹操作日志查看 |
 | `trajectory-log-view.js` | 轨迹日志视图 |
-| `case-data.js` | **案例数据管理器**：CRUD |
-| `session-mode.js` | **会话模式面板**：创建/管理浏览器会话，分步骤提交任务 |
+| `case-data.js` | **案例数据管理器**：CRUD（v2 API） |
+| `session-mode.js` | **会话模式面板**：创建/管理浏览器会话，单步提交任务；可加载阶段计划（批量执行待重做） |
+| `recording-flow.js` | **实时动作流**：合并已入库 steps + 待保存 `_ACTION_LOG` |
 | `execution-records.js` | **执行记录**：历史会话归档查看 |
 | `swagger-api.js` | API 参考文档展示 |
 | `particles.js` | 背景粒子动画 |
@@ -432,7 +427,7 @@ npm start
 
 Dashboard 面板标签页：
 1. **Script Assemble** — 动作文件管理 + 组装脚本 + 运行
-2. **AI Explore** — 提交探索任务，实时查看 SSE 进度
+2. **Session** — 浏览器会话、单步任务、阶段计划加载、轨迹/案例保存
 3. **Playwright Scripts** — 已完成成的脚本历史
 4. **Trajectories** — 轨迹查看/删除
 5. **Case Data** — 案例数据管理
@@ -453,31 +448,7 @@ Dashboard 面板标签页：
 
 ### 工作模式
 
-**1. Workflow 模式（一次性执行）**
-
-`POST /api/browser-use/explore`
-
-提交多阶段任务文本，Python Agent 按顺序执行所有阶段后退出。任务阶段格式：
-
-```
-// 任务文本中的阶段定义
-【目标URL】
-http://example.com
-
-【阶段1：登录系统】
-1. 输入用户名 admin
-2. 输入密码 123456
-3. 点击登录按钮
-
-【阶段2：新增客户】
-1. 点击菜单"客户管理"
-2. 点击"新增"按钮
-3. 填写客户名称 → [具体值: "测试公司"]
-```
-
-每个阶段保存独立的轨迹文件。导航类阶段（含"登录""导航"关键字）max_steps=50，其他阶段 max_steps=40。
-
-**2. Session 模式（多轮对话）**
+**Session 模式（多轮对话）**
 
 浏览器跨步骤保持打开，适合需要人工分批确认的复杂流程：
 
@@ -494,8 +465,12 @@ DELETE /api/browser/browser         → 关闭浏览器
 - **取消机制**：通过取消文件标志和 stdin 发送 `cancel_step` 信号
 - **会话隔离**：轨道独立，删除会话仅归档不会关闭浏览器
 - **人工介入队列**：Agent 卡住时通过 Dashboard 发送指令，下个 on_step_start 自动注入
+- **阶段计划**：Dashboard「加载」可解析 `【阶段N】` / `## Phase N` 文本并展示；批量「全部执行」已移除，待重做
+- **双写**：保存轨迹/案例时写入 JSON，并 best-effort 写入 MySQL（`trajectory_id` = Session ID）
 
-**3. Chrome 孤儿进程清理**
+一次性 Explore/Workflow（`POST /api/browser-use/explore`、`--task` / `--workflow`）已移除。
+
+**Chrome 孤儿进程清理**
 
 每次启动前执行 `killOrphans()`，通过 PowerShell 查找并终止匹配 `playwright|browser_use|openclaw|xbrowser` 的 chrome.exe 进程。
 
@@ -677,14 +652,14 @@ Agent → {save,read}_case_data(key, value)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/browser-use/explore` | 浏览器自动化探索（workflow 模式，SSE） |
 | `POST` | `/api/browser/session` | 创建多轮会话 |
 | `POST` | `/api/browser/session/:id/step` | 发送子任务（SSE） |
 | `DELETE` | `/api/browser/session/:id` | 关闭/归档会话 |
 | `DELETE` | `/api/browser/browser` | 关闭浏览器进程 |
 | `GET` | `/api/browser/session/:id/trajectories` | 获取会话轨迹列表 |
+| `GET` | `/api/browser/session/:id/action-flow` | 合并已入库 + 待保存动作流 |
 | `POST` | `/api/browser/session/:id/reset-trajectory` | 重置轨迹 |
-| `POST` | `/api/browser/session/:id/trajectory` | 保存当前轨迹 |
+| `POST` | `/api/browser/session/:id/trajectory` | 保存当前轨迹（trajectory_id = sessionId） |
 | `GET` | `/api/browser/sessions` | 列出所有活跃会话 |
 | `GET` | `/api/browser/session/execution-records` | 已归档执行记录 |
 | `GET` | `/api/browser/session/execution-record/:sessionId` | 执行记录详情 |

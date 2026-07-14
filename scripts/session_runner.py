@@ -97,7 +97,8 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
                 if _native.get('history'):
                     trajectories_dir = scripts_dir / 'trajectories'
                     trajectories_dir.mkdir(parents=True, exist_ok=True)
-                    native_path = trajectories_dir / f"traj_{ts}.json"
+                    # trajectory_id = session_id (stable across multiple saves)
+                    native_path = trajectories_dir / f"{session_id}.json"
                     sys.stderr.write(f"[save-trajectory] writing native_path={native_path}\n")
                     sys.stderr.flush()
                     with open(native_path, 'w', encoding='utf-8') as _f:
@@ -399,6 +400,17 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
 
     if event == "save_trajectory":
         _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'], case_data_store=session_state.get('case_data_store'))
+        return 'continue'
+
+    if event == "get_action_log":
+        from .actions._state import _ACTION_LOG
+        emit_json({
+            "event": "get_action_log_result",
+            "data": {
+                "entries": list(_ACTION_LOG),
+                "count": len(_ACTION_LOG),
+            },
+        })
         return 'continue'
 
     if event == "save_case_data":

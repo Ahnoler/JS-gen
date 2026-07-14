@@ -6,6 +6,7 @@ import json
 import sys
 from langchain_core.messages import HumanMessage
 from . import controller as ctrl_mod
+from .actions._js_snippets import JS_SMART_LOCATOR
 
 
 # ========================== Operation Log (plain text, for LLM context) ==========================
@@ -190,6 +191,34 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                         sys.stderr.flush()
                         agent.state.stopped = True
                         return
+            except Exception:
+                pass
+
+            # ── Capture CSS selectors for action entries missing them ──
+            # 在 on_step_end 时，有些 controller action 可能没有传入 element
+            #（如 fill_date_field、click_adjacent_button 等），导致 cssSelector 为空。
+            # 这里用 JS_SMART_LOCATOR 在页面上按 label_text 实时抓取，补填缺失的 cssSelector。
+            try:
+                page = await agent.browser_context.get_current_page()
+                for entry in ctrl_mod._ACTION_LOG:
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get('cssSelector'):
+                        continue  # 已经有 cssSelector，跳过
+                    params = entry.get('params', {}) or {}
+                    label_text = params.get('label_text', '') or ''
+                    if not label_text:
+                        continue
+                    raw = await page.evaluate(JS_SMART_LOCATOR, [label_text])
+                    if raw:
+                        info = json.loads(raw) if isinstance(raw, str) else raw
+                        css = info.get('css_sel', '')
+                        if css:
+                            entry['cssSelector'] = css
+                            if not entry.get('tagName'):
+                                entry['tagName'] = info.get('tag', '')
+                            if not entry.get('attributes'):
+                                entry['attributes'] = info.get('attrs', {})
             except Exception:
                 pass
 

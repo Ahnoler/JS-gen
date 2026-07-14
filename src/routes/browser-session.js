@@ -4,9 +4,9 @@ import os from 'os';
 import crypto from 'crypto';
 import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR } from '../../config/config.js';
 import { state } from '../state.js';
-import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
+import { saveTrajectoryRecord } from '../trajectory-store.js';
 import { saveCaseDataRecord } from '../case-data-store.js';
-import { persistSessionTrajectory } from '../services/trajectory-service.js';
+import { persistSessionTrajectory, getSessionActionFlow } from '../services/trajectory-service.js';
 import { persistSessionCaseData } from '../services/case-data-service.js';
 import { broadcast, onWsMessage } from '../ws-server.js';
 import {
@@ -58,6 +58,7 @@ async function ensureGlobalBrowser(modelId) {
   gb.process = child;
   gb.stdin = child.stdin;
   gb.model = modelId;
+  gb.lastActionLog = [];
 
   child.stdin.on('error', () => {
     if (!gb.ready) return;
@@ -82,7 +83,11 @@ async function ensureGlobalBrowser(modelId) {
         try {
           const msg = JSON.parse(line);
           if (msg.event === 'action_log_sync') {
-            broadcast('action_log_sync', msg.data);
+            gb.lastActionLog = msg.data?.entries || [];
+            broadcast('action_log_sync', {
+              ...(msg.data || {}),
+              sessionId: [...state.sessions.keys()][0] || null,
+            });
           }
         } catch {}
       }
@@ -589,6 +594,70 @@ export default function (app) {
     gb.process.stdout.on('data', onData);
   });
 
+  /**
+   * Merged action flow for a session:
+   * DB steps (trajectory_id = sessionId) + live _ACTION_LOG pending entries.
+   */
+  app.get('/api/browser/session/:id/action-flow', async (req, res) => {
+    const { id } = req.params;
+    const session = state.sessions.get(id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    const gb = state.globalBrowser;
+    let pending = Array.isArray(gb.lastActionLog) ? gb.lastActionLog : [];
+
+    // Prefer a fresh snapshot from Python when agent is idle
+    if (gb.ready && gb.stdin && !gb.busy) {
+      try {
+        pending = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            cleanup();
+            resolve(gb.lastActionLog || []);
+          }, 3000);
+          let buf = '';
+          const onData = (chunk) => {
+            buf += chunk.toString();
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const msg = JSON.parse(line);
+                if (msg.event === 'get_action_log_result') {
+                  clearTimeout(timeout);
+                  cleanup();
+                  const entries = msg.data?.entries || [];
+                  gb.lastActionLog = entries;
+                  resolve(entries);
+                }
+              } catch {}
+            }
+          };
+          function cleanup() {
+            gb.process?.stdout?.removeListener('data', onData);
+          }
+          gb.process.stdout.on('data', onData);
+          try {
+            gb.stdin.write(JSON.stringify({ event: 'get_action_log' }) + '\n');
+          } catch (err) {
+            clearTimeout(timeout);
+            cleanup();
+            resolve(gb.lastActionLog || []);
+          }
+        });
+      } catch {
+        pending = gb.lastActionLog || [];
+      }
+    }
+
+    try {
+      const flow = await getSessionActionFlow(id, pending);
+      res.json(flow);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post('/api/browser/session/:id/trajectory', async (req, res) => {
     const { id } = req.params;
     const { task } = req.body || {};
@@ -622,13 +691,14 @@ export default function (app) {
               return res.status(500).json({ error: 'Trajectory file not found' });
             }
             try {
-              const trajectoryId = createTrajectoryId();
+              // trajectory_id = sessionId; same session appends phases/steps
+              const trajectoryId = id;
               const { record, flow } = saveTrajectoryRecord({ trajectoryId, task: task || '', model: session.model, sourcePath: trajectoryFile, exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful } });
               const actionCount = flow.filter(s => s.type !== 'done' && !s.error).length;
 
-              // Phase 1 dual-write: JSON remains primary; MySQL best-effort
+              let dbId = null;
               try {
-                await persistSessionTrajectory({
+                dbId = await persistSessionTrajectory({
                   trajectoryId,
                   task: task || '',
                   model: session.model,
@@ -642,7 +712,21 @@ export default function (app) {
                 console.warn('[save-trajectory] DB dual-write failed (JSON ok):', dbErr.message);
               }
 
-              return res.json({ trajectoryId, steps: record.stepCount, actions: actionCount, isSuccessful: record.isSuccessful, action_file: msg.data.action_file, log_file: msg.data.log_file, action_count: msg.data.action_count, log_count: msg.data.log_count });
+              // Clear Node-side pending log cache (Python already cleared + synced empty)
+              gb.lastActionLog = [];
+
+              return res.json({
+                trajectoryId,
+                sessionId: id,
+                dbId,
+                steps: record.stepCount,
+                actions: actionCount,
+                isSuccessful: record.isSuccessful,
+                action_file: msg.data.action_file,
+                log_file: msg.data.log_file,
+                action_count: msg.data.action_count,
+                log_count: msg.data.log_count,
+              });
             } catch (err) { return res.status(500).json({ error: `Trajectory save error: ${err.message}` }); }
           }
         } catch {}

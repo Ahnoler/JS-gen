@@ -16,7 +16,7 @@ import registerBrowserSessionRoutes from './src/routes/browser-session.js';
 import registerTrajectoryRoutes from './src/routes/trajectory.js';
 import registerCaseDataRoutes from './src/routes/case-data.js';
 import registerAssembleRoutes from './src/routes/test-assemble.js';
-import registerV2Routes from './src/routes/v2/__init.js';
+import registerV2Routes from './src/routes/v2/__init__.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -148,10 +148,14 @@ async function main() {
     console.log(`[server] Endpoints:`);
     console.log(`  GET  /v1/models (OpenAI compatible)`);
     console.log(`  POST /v1/chat/completions (OpenAI compatible)`);
-    console.log(`  POST /api/browser-use/explore (SSE - Browser Use exploration, saves trajectory)`);
+    console.log(`  POST /api/browser/session`);
+    console.log(`  POST /api/browser/session/:id/step (SSE)`);
+    console.log(`  POST /api/browser/session/:id/trajectory`);
+    console.log(`  GET  /api/browser/session/:id/action-flow`);
+    console.log(`  GET  /api/v2/trajectories`);
+    console.log(`  GET  /api/v2/case-data`);
     console.log(`  GET  /api/trajectory`);
-    console.log(`  GET  /api/trajectory/:id`);
-    console.log(`  DELETE /api/trajectory/:id`);
+    console.log(`  GET  /api/case-data`);
     console.log(`  GET  /api/health`);
     console.log(`  GET  /api/agents`);
     console.log(`  GET  /api/skills`);

@@ -84,6 +84,36 @@ JS_LOCATOR = '''(label) => {
 
 JS_SMART_LOCATOR = '''([label]) => {
     const container = ''' + JS_GET_CONTAINER + ''';
+
+    // ── 工具函数：获取同标签兄弟中的位置序号（1-based，唯一时返回 0） ──
+    // browser_use: getElementPosition() → siblings.filter(tag) → indexOf + 1
+    const _nth = (el) => {
+        const p = el.parentElement;
+        if (!p) return 0;
+        const tag = el.tagName.toLowerCase();
+        const sib = [...p.children].filter(c => c.tagName.toLowerCase() === tag);
+        return sib.length <= 1 ? 0 : sib.indexOf(el) + 1;
+    };
+
+    // ── 工具函数：构建从 <html> 到 el 的 CSS 路径（browser_use 风格） ──
+    // 每层: tag:nth-of-type(n).class（class 仅追加有效名）
+    // 例: html > body > div.app-wrapper > main.app-main > ... > .el-form-item:nth-of-type(3) > input.el-input__inner
+    const _cssPath = (el) => {
+        const parts = [];
+        let cur = el;
+        while (cur && cur.nodeType === 1) {
+            const tag = cur.tagName.toLowerCase();
+            const nth = _nth(cur);
+            let part = tag + (nth > 0 ? `:nth-of-type(${nth})` : '');
+            const cls = (cur.getAttribute('class') || '').split(' ').filter(Boolean);
+            const valid = cls.filter(c => /^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(c));
+            if (valid.length > 0) part += '.' + valid.join('.');
+            parts.unshift(part);
+            cur = cur.parentElement;
+        }
+        return parts.join(' > ');
+    };
+
     const items = container.querySelectorAll('.el-form-item');
     for (const item of items) {
         const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
@@ -94,36 +124,47 @@ JS_SMART_LOCATOR = '''([label]) => {
         const attrs = {};
         for (const a of target.attributes) if (a.value && a.value.length > 0) attrs[a.name] = a.value;
         const id = target.id;
-        const cls = (target.getAttribute('class')||'').split(' ').filter(Boolean);
-        let xpath = '', css_sel = '';
         const esc = s => s.replace(/"/g, '\\"').replace(/'/g, "\\'");
+        const cls = (target.getAttribute('class')||'').split(' ').filter(Boolean);
+
+        // ── CSS Selector ──
+        // browser_use 风格：完整 DOM 路径 + 语义属性增强，保证
+        // 唯一性（解决旧版多个字段同 placeholder/type 时选择器冲突的问题）
+        let css_sel = _cssPath(target);
+        if (id && !/^\\d{4,}$/.test(id) && !/^el-id-/.test(id)) {
+            css_sel += `[id="${id}"]`;
+        } else if (target.placeholder && !target.closest('.el-select')) {
+            css_sel += `[placeholder="${esc(target.placeholder)}"]`;
+        } else if (target.name) {
+            css_sel += `[name="${esc(target.name)}"]`;
+        } else if (tag === 'input' && target.type) {
+            css_sel += `[type="${target.type}"]`;
+        }
+
+        // ── XPath（保持原样：语义属性优先，class 兜底） ──
+        let xpath;
         if (id && !/^\\d{4,}$/.test(id) && !/^el-id-/.test(id)) {
             xpath = `//${tag}[@id="${id}"]`;
-            css_sel = `${tag}#${id}`;
-        }
-        if (!xpath && target.placeholder && !target.closest('.el-select')) {
+        } else if (target.placeholder && !target.closest('.el-select')) {
             xpath = `//${tag}[@placeholder="${target.placeholder}"]`;
-            css_sel = `${tag}[placeholder="${esc(target.placeholder)}"]`;
-        }
-        if (!xpath && target.name) {
+        } else if (target.name) {
             xpath = `//${tag}[@name="${target.name}"]`;
-            css_sel = `${tag}[name="${esc(target.name)}"]`;
-        }
-        if (!xpath && target.type && tag !== 'textarea') {
-            xpath = `//${tag}[@type="${target.type}"]`;
-            css_sel = `${tag}[type="${esc(target.type)}"]`;
-        }
-        if (!xpath) {
+        } else {
             xpath = `//${tag}[@class="${cls.join(' ')}"]`;
-            css_sel = cls.length ? `${tag}.${cls.join('.')}` : tag;
         }
+
         return JSON.stringify({xpath, css_sel, tag, attrs});
     }
+    // Fallback：无 el-form-item 匹配时直接按 placeholder 搜索
     for (const inp of container.querySelectorAll('input:not([type="hidden"]), textarea')) {
         const ph = inp.placeholder || '';
         if (ph.includes(label) && inp.offsetParent !== null) {
             const tag = inp.tagName.toLowerCase();
-            return JSON.stringify({xpath: `//${tag}[@placeholder="${ph}"]`, tag, attrs: {placeholder: ph}});
+            return JSON.stringify({
+                xpath: `//${tag}[@placeholder="${ph}"]`,
+                css_sel: _cssPath(inp) + `[placeholder="${ph.replace(/"/g, '\\\\"')}"]`,
+                tag, attrs: {placeholder: ph}
+            });
         }
     }
     return '';
