@@ -6,6 +6,8 @@ import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR } from '../../config/confi
 import { state } from '../state.js';
 import { createTrajectoryId, saveTrajectoryRecord } from '../trajectory-store.js';
 import { saveCaseDataRecord } from '../case-data-store.js';
+import { persistSessionTrajectory } from '../services/trajectory-service.js';
+import { persistSessionCaseData } from '../services/case-data-service.js';
 import { broadcast, onWsMessage } from '../ws-server.js';
 import {
   PYTHON_EXE, AGENT_SCRIPT, killTree, killOrphans,
@@ -600,7 +602,7 @@ export default function (app) {
     const timeout = setTimeout(() => { cleanupTrajListener(); if (!res.writableEnded) res.status(504).json({ error: 'Timeout waiting for trajectory' }); }, 30000);
     let pendingBuffer = '';
 
-    const onStdout = (chunk) => {
+    const onStdout = async (chunk) => {
       pendingBuffer += chunk.toString();
       const lines = pendingBuffer.split('\n');
       pendingBuffer = lines.pop() || '';
@@ -623,6 +625,23 @@ export default function (app) {
               const trajectoryId = createTrajectoryId();
               const { record, flow } = saveTrajectoryRecord({ trajectoryId, task: task || '', model: session.model, sourcePath: trajectoryFile, exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful } });
               const actionCount = flow.filter(s => s.type !== 'done' && !s.error).length;
+
+              // Phase 1 dual-write: JSON remains primary; MySQL best-effort
+              try {
+                await persistSessionTrajectory({
+                  trajectoryId,
+                  task: task || '',
+                  model: session.model,
+                  url: msg.data.url || '',
+                  isDone: msg.data.is_done,
+                  isSuccessful: msg.data.is_successful,
+                  actionFile: msg.data.action_file,
+                  flow,
+                });
+              } catch (dbErr) {
+                console.warn('[save-trajectory] DB dual-write failed (JSON ok):', dbErr.message);
+              }
+
               return res.json({ trajectoryId, steps: record.stepCount, actions: actionCount, isSuccessful: record.isSuccessful, action_file: msg.data.action_file, log_file: msg.data.log_file, action_count: msg.data.action_count, log_count: msg.data.log_count });
             } catch (err) { return res.status(500).json({ error: `Trajectory save error: ${err.message}` }); }
           }
@@ -650,7 +669,7 @@ export default function (app) {
     const timeout = setTimeout(() => { cleanupListener(); if (!res.writableEnded) res.status(504).json({ error: 'Timeout waiting for case data' }); }, 15000);
     let pendingBuffer = '';
 
-    const onStdout = (chunk) => {
+    const onStdout = async (chunk) => {
       pendingBuffer += chunk.toString();
       const lines = pendingBuffer.split('\n');
       pendingBuffer = lines.pop() || '';
@@ -663,12 +682,20 @@ export default function (app) {
             cleanupListener();
             if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save case data' });
             try {
-              const { record } = saveCaseDataRecord({
+              const { record, data } = saveCaseDataRecord({
                 caseDataPath: msg.data.case_data_file,
                 sessionId: id,
                 model: session.model,
                 description: session.lastTask ? session.lastTask.slice(0, 100) : '',
               });
+
+              // Phase 1 dual-write: JSON remains primary; MySQL best-effort
+              try {
+                await persistSessionCaseData({ record, data });
+              } catch (dbErr) {
+                console.warn('[save-case-data] DB dual-write failed (JSON ok):', dbErr.message);
+              }
+
               return res.json({ caseDataFile: msg.data.case_data_file, recordId: record.recordId, keys: msg.data.keys });
             } catch (err) {
               return res.json({ caseDataFile: msg.data.case_data_file, keys: msg.data.keys });

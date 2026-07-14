@@ -33,9 +33,12 @@ if (existsSync(_envPath)) {
 }
 
 // Resolver: .env file → process.env → default
-function _resolve(key, defaultValue = '') {
+export function resolve(key, defaultValue = '') {
   return _env[key] || process.env[key] || defaultValue;
 }
+
+// Legacy alias used inside this module
+const _resolve = resolve;
 
 // ── Exports ───────────────────────────────────────────────────────────
 export const PORT = parseInt(_resolve('PORT', '4097'), 10);

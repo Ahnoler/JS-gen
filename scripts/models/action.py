@@ -82,10 +82,21 @@ ACTION_TO_COMMAND: dict[str, CommandType] = {
 
 
 # ── Element info (captured DOM reference) ──────────────────────────────────
+LocatorCandidateType = Literal['css', 'xpath_full', 'xpath_smart']
+
+
+class LocatorCandidate(BaseModel):
+    """One candidate locator for element_json.candidates[]."""
+
+    type: LocatorCandidateType = 'css'
+    value: str = ""
+
+
 class ElementInfo(BaseModel):
     """Captured DOM element reference for an action entry.
 
     Used by the assembler to generate resilient locators.
+    Serialized to element_json; candidates[] supports CDP/manual recording.
     """
 
     tag_name: str = Field(default="", description="Element tag name (e.g., input, button)")
@@ -96,6 +107,23 @@ class ElementInfo(BaseModel):
         description="Element attributes (class, type, id, placeholder, etc.)",
     )
     text: str = Field(default="", description="Visible text content of the element")
+    candidates: list[LocatorCandidate] = Field(
+        default_factory=list,
+        description="Alternative locators: css | xpath_full | xpath_smart",
+    )
+
+    def to_element_json(self) -> dict:
+        """Convert to trajectory_step.element_json dict."""
+        data = {
+            'tag': self.tag_name,
+            'xpath': self.xpath,
+            'cssSelector': self.css_selector,
+            'attributes': dict(self.attributes),
+            'text': self.text,
+        }
+        if self.candidates:
+            data['candidates'] = [c.model_dump() for c in self.candidates]
+        return data
 
 
 # ── Action entry ───────────────────────────────────────────────────────────

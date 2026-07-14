@@ -18,6 +18,18 @@ Usage:
         # Action recording
         ActionEntry, ActionFile, ElementInfo, ActionType,
         ACTION_TO_COMMAND,
+
+        # Step recording (aligned with trajectory_step table)
+        StepEntry,
+
+        # Entity / storage models (aligned with MySQL tables)
+        SystemEntity, ProcessEntity, FunctionDefEntity,
+        TrajectoryEntity, TrajectoryStepEntity, TrajectoryPhaseEntity,
+        CaseDataEntity, CaseDataEntryEntity,
+        FormSnapshotEntity, SnapshotFieldEntity,
+        ScreenshotEntity,
+        RemoteSessionEntity,
+        ApiOverrideEntity,
     )
 """
 
@@ -47,7 +59,27 @@ from .action import (
     ActionType,
     CommandType,
     ElementInfo,
+    LocatorCandidate,
+    LocatorCandidateType,
     SkippedActionType,
+)
+
+from .step_entry import StepEntry
+
+from .entity import (
+    CaseDataEntity,
+    CaseDataEntryEntity,
+    FormSnapshotEntity,
+    FunctionDefEntity,
+    ProcessEntity,
+    ScreenshotEntity,
+    SnapshotFieldEntity,
+    SystemEntity,
+    TrajectoryEntity,
+    TrajectoryPhaseEntity,
+    TrajectoryStepEntity,
+    RemoteSessionEntity,
+    ApiOverrideEntity,
 )
 
 __all__ = [
@@ -71,5 +103,23 @@ __all__ = [
     "ActionType",
     "CommandType",
     "ElementInfo",
+    "LocatorCandidate",
+    "LocatorCandidateType",
     "SkippedActionType",
+    # step_entry
+    "StepEntry",
+    # entity
+    "CaseDataEntity",
+    "CaseDataEntryEntity",
+    "FormSnapshotEntity",
+    "FunctionDefEntity",
+    "ProcessEntity",
+    "ScreenshotEntity",
+    "SnapshotFieldEntity",
+    "SystemEntity",
+    "TrajectoryEntity",
+    "TrajectoryPhaseEntity",
+    "TrajectoryStepEntity",
+    "RemoteSessionEntity",
+    "ApiOverrideEntity",
 ]

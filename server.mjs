@@ -16,6 +16,7 @@ import registerBrowserSessionRoutes from './src/routes/browser-session.js';
 import registerTrajectoryRoutes from './src/routes/trajectory.js';
 import registerCaseDataRoutes from './src/routes/case-data.js';
 import registerAssembleRoutes from './src/routes/test-assemble.js';
+import registerV2Routes from './src/routes/v2/__init.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -86,6 +87,7 @@ registerAgentRoutes(app);
 
 registerTestHistoryRoutes(app);
 registerTestRunRoutes(app);
+registerV2Routes(app);
 
 // Redirect root to dashboard, or setup if unconfigured
 app.get('/', (req, res) => {
@@ -179,12 +181,20 @@ main().catch(err => {
   process.exit(1);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('\n[server] Shutting down...');
+  try {
+    const { closeDB } = await import('./config/database.js');
+    await closeDB();
+  } catch {}
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('\n[server] Shutting down...');
+  try {
+    const { closeDB } = await import('./config/database.js');
+    await closeDB();
+  } catch {}
   process.exit(0);
 });
