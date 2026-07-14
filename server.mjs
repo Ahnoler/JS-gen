@@ -79,6 +79,7 @@ app.post('/api/setup/save', (req, res) => {
 // Register all route modules
 registerLLMProxyRoutes(app);
 registerBrowserSessionRoutes(app);
+// Legacy JSON catalogs: return 410 Gone → use /api/v2/trajectories|case-data
 registerTrajectoryRoutes(app);
 registerCaseDataRoutes(app);
 registerAssembleRoutes(app);

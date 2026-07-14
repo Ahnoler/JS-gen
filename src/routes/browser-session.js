@@ -769,52 +769,59 @@ export default function (app) {
             console.log('[save-trajectory] Python response:', JSON.stringify(msg.data, null, 2));
             if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save trajectory' });
             const trajectoryFile = msg.data.trajectory_file;
-            console.log('[save-trajectory] trajectoryFile:', trajectoryFile);
-            if (!trajectoryFile || !existsSync(trajectoryFile)) {
-              console.log('[save-trajectory] existsSync returned false!');
-              return res.status(500).json({ error: 'Trajectory file not found' });
+            const actionFile = msg.data.action_file;
+            console.log('[save-trajectory] actionFile:', actionFile, 'trajectoryFile:', trajectoryFile);
+            // DB is primary. action_file (ACTION_LOG dump) is enough; native traj JSON optional.
+            if (!actionFile && !trajectoryFile) {
+              return res.status(500).json({ error: 'No action_file or trajectory_file from agent' });
             }
             try {
-              // JSON dual-write still uses a file key; prefer db id when known, else session
-              const jsonKey = Number.isFinite(resolvedTrajId) ? `db_${resolvedTrajId}` : id;
-              const { record, flow } = saveTrajectoryRecord({
-                trajectoryId: jsonKey,
+              if (!session.persistedActionIds) session.persistedActionIds = new Set();
+
+              // Optional legacy JSON index — never block save if it fails
+              let flow = [];
+              let jsonSteps = 0;
+              try {
+                if (trajectoryFile && existsSync(trajectoryFile)) {
+                  const jsonKey = Number.isFinite(resolvedTrajId) ? `db_${resolvedTrajId}` : id;
+                  const { record, flow: f } = saveTrajectoryRecord({
+                    trajectoryId: jsonKey,
+                    task: task || '',
+                    model: session.model,
+                    sourcePath: trajectoryFile,
+                    exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful },
+                  });
+                  flow = f || [];
+                  jsonSteps = record?.stepCount || 0;
+                }
+              } catch (jsonErr) {
+                console.warn('[save-trajectory] legacy JSON store skipped:', jsonErr.message);
+              }
+              const actionCount = msg.data.action_count
+                ?? flow.filter(s => s.type !== 'done' && !s.error).length;
+
+              const dbId = await persistSessionTrajectory({
+                id: Number.isFinite(resolvedTrajId) ? resolvedTrajId : undefined,
                 task: task || '',
                 model: session.model,
-                sourcePath: trajectoryFile,
-                exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful },
+                url: msg.data.url || '',
+                isDone: msg.data.is_done,
+                isSuccessful: msg.data.is_successful,
+                actionFile: actionFile || null,
+                flow,
+                logFile: msg.data.log_file || null,
+                phaseDescriptions: mergedPhaseDescriptions,
+                excludeActionIds: session.persistedActionIds,
+                ...(Number.isFinite(resolvedFunctionId) ? { functionId: resolvedFunctionId } : {}),
               });
-              const actionCount = flow.filter(s => s.type !== 'done' && !s.error).length;
+              if (dbId != null) session.dbTrajectoryId = dbId;
 
-              let dbId = null;
-              try {
-                if (!session.persistedActionIds) session.persistedActionIds = new Set();
-                dbId = await persistSessionTrajectory({
-                  id: Number.isFinite(resolvedTrajId) ? resolvedTrajId : undefined,
-                  task: task || '',
-                  model: session.model,
-                  url: msg.data.url || '',
-                  isDone: msg.data.is_done,
-                  isSuccessful: msg.data.is_successful,
-                  actionFile: msg.data.action_file,
-                  flow,
-                  logFile: msg.data.log_file || null,
-                  phaseDescriptions: mergedPhaseDescriptions,
-                  excludeActionIds: session.persistedActionIds,
-                  ...(Number.isFinite(resolvedFunctionId) ? { functionId: resolvedFunctionId } : {}),
-                });
-                if (dbId != null) session.dbTrajectoryId = dbId;
-
-                // Persist form snapshots with trajectory.id
-                if (msg.data.form_file) {
-                  try {
-                    await persistFormSnapshotsFromFile(msg.data.form_file, { trajectoryId: dbId });
-                  } catch (formErr) {
-                    console.warn('[save-trajectory] form_snapshot dual-write failed:', formErr.message);
-                  }
+              if (msg.data.form_file) {
+                try {
+                  await persistFormSnapshotsFromFile(msg.data.form_file, { trajectoryId: dbId });
+                } catch (formErr) {
+                  console.warn('[save-trajectory] form_snapshot DB write failed:', formErr.message);
                 }
-              } catch (dbErr) {
-                console.warn('[save-trajectory] DB dual-write failed (JSON ok):', dbErr.message);
               }
 
               gb.lastActionLog = [];
@@ -823,13 +830,14 @@ export default function (app) {
                 trajectoryDbId: dbId,
                 sessionId: id,
                 dbId,
-                steps: record.stepCount,
+                steps: jsonSteps || actionCount,
                 actions: actionCount,
-                isSuccessful: record.isSuccessful,
-                action_file: msg.data.action_file,
+                isSuccessful: msg.data.is_successful ?? null,
+                action_file: actionFile,
                 log_file: msg.data.log_file,
                 action_count: msg.data.action_count,
                 log_count: msg.data.log_count,
+                storage: 'db',
               });
             } catch (err) { return res.status(500).json({ error: `Trajectory save error: ${err.message}` }); }
           }
@@ -870,27 +878,55 @@ export default function (app) {
             cleanupListener();
             if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save case data' });
             try {
-              const { record, data } = saveCaseDataRecord({
-                caseDataPath: msg.data.case_data_file,
-                sessionId: id,
-                model: session.model,
-                description: session.lastTask ? session.lastTask.slice(0, 100) : '',
-              });
-
-              // Phase 1 dual-write: JSON remains primary; MySQL best-effort
-              try {
-                await persistSessionCaseData({
-                  record,
-                  data,
-                  trajectoryId: session.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null,
-                });
-              } catch (dbErr) {
-                console.warn('[save-case-data] DB dual-write failed (JSON ok):', dbErr.message);
+              let data = null;
+              if (msg.data.case_data_file && existsSync(msg.data.case_data_file)) {
+                try {
+                  data = JSON.parse(readFileSync(msg.data.case_data_file, 'utf-8'));
+                } catch (e) {
+                  return res.status(500).json({ error: `Failed to read case data file: ${e.message}` });
+                }
+              }
+              if (!data || typeof data !== 'object') {
+                return res.status(500).json({ error: 'Empty case data' });
               }
 
-              return res.json({ caseDataFile: msg.data.case_data_file, recordId: record.recordId, keys: msg.data.keys });
+              // Optional legacy JSON index — never blocks DB path
+              let recordId = null;
+              try {
+                const { record } = saveCaseDataRecord({
+                  caseDataPath: msg.data.case_data_file,
+                  sessionId: id,
+                  model: session.model,
+                  description: session.lastTask ? session.lastTask.slice(0, 100) : '',
+                });
+                recordId = record?.recordId || null;
+              } catch (jsonErr) {
+                console.warn('[save-case-data] legacy JSON store skipped:', jsonErr.message);
+              }
+              if (!recordId) {
+                recordId = 'cdata_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+              }
+
+              const dbId = await persistSessionCaseData({
+                record: {
+                  recordId,
+                  sessionId: id,
+                  model: session.model,
+                  description: session.lastTask ? session.lastTask.slice(0, 100) : '',
+                },
+                data,
+                trajectoryId: session.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null,
+              });
+
+              return res.json({
+                caseDataFile: msg.data.case_data_file,
+                recordId,
+                dbId,
+                keys: msg.data.keys,
+                storage: 'db',
+              });
             } catch (err) {
-              return res.json({ caseDataFile: msg.data.case_data_file, keys: msg.data.keys });
+              return res.status(500).json({ error: err.message, caseDataFile: msg.data.case_data_file, keys: msg.data.keys });
             }
           }
         } catch {}

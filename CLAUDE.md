@@ -55,22 +55,28 @@ The Python agent process communicates via JSON Lines on stdout (each line is `{"
 ### Route Modules (`src/routes/`)
 
 - **`agent.js`** — Generic AI agent execution (sync/async/SSE), session management. Dispatches to OpenCode SDK or standalone LLM.
-- **`browser-session.js`** — Session mode: long-lived browser via `state.globalBrowser`, multi-turn steps, human intervention, trajectory/case-data dual-write to MySQL.
+- **`browser-session.js`** — Session mode: long-lived browser via `state.globalBrowser`, multi-turn steps, human intervention; trajectory/case-data save to MySQL (JSON catalogs optional/legacy).
 - **`test-assemble.js`** — Assembler pipeline: reads action JSON → `dedup.js` (consecutive-only dedup) → Python `script_assembler.py` → returns Playwright JS script.
 - **`test-run.js`** + **`sse.js`** — Execute generated Playwright scripts, streaming output.
 - **`llm-proxy.js`** — OpenAI-compatible `/v1/chat/completions` and `/v1/models` endpoints.
 - **`explore-utils.js`** — Shared spawn/kill/SSE utilities for Session and test-run (not an Explore route; name is historical).
-- **`v2/`** — Database-backed APIs (hierarchy, trajectories, case-data, screenshots, remote-session, api-override).
+- **`v2/`** — Database-backed APIs (hierarchy, trajectories, case-data, screenshots, remote-session, api-override). **Primary persistence.**
 
-### Stores (JSON File Persistence)
+### Persistence
 
-All use the same pattern: `index.json` for metadata + individual JSON files for content, all under `scripts/`. Session saves also dual-write to MySQL via `src/services/*`.
+**Primary:** MySQL via Knex (`/api/v2/*`). Session「保存轨迹/案例」失败以 DB 为准。
 
-| Store | Module | Directory |
-|-------|--------|-----------|
-| Trajectories | `src/trajectory-store.js` | `scripts/trajectories/` |
-| Case data | `src/case-data-store.js` | `scripts/case_data/` |
-| Generated scripts | `src/script-utils.js` | `scripts/generated/` |
+**Legacy offline:** `/api/trajectory`、`/api/case-data` 返回 `410 Gone` → 用 `/api/v2/*`。  
+Session 保存时 `trajectory-store` / `case-data-store` 仅 best-effort，失败不阻断 DB。
+
+| Store | Module | Directory | Status |
+|-------|--------|-----------|--------|
+| Trajectories JSON | `src/trajectory-store.js` | `scripts/trajectories/` | optional bypass |
+| Case data JSON | `src/case-data-store.js` | `scripts/case_data/` | optional bypass |
+| Generated scripts | `src/script-utils.js` | `scripts/generated/` | active |
+| Action dump | Python / `assemble-file` | `scripts/action/` | ephemeral assemble input |
+
+前端契约见 `docs/前端接口文档.md`。
 
 ### Dashboard (`src/dashboard/`, `test-dashboard.html`)
 

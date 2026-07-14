@@ -11,6 +11,17 @@ Flow:
     → console `__JSGEN_MANUAL__{...}`
     → map to ActionEntry → _ACTION_LOG → emit manual_action_recorded
     → Node appendRecordedStep(source=manual)
+
+TODO (以后做 — 人工 click 的真实 highlight index):
+  当前 click_element_by_index 的 params.index 固定为 -1，定位靠点击瞬间 xpath/text。
+  原因：click 事件到达 Python 时页面往往已跳转，事后 get_state / selector_map 会偏。
+
+  可行方案（预刷缓存 + mousedown 内存匹配）:
+  1. Agent 空闲 / 人工录制开启时，周期性或按需 browser_context.get_state()，
+     缓存当次 selector_map（xpath / attrs / text → index）。
+  2. 页面侧改用 mousedown capture 上报（早于导航），用 bu_xpath 等与缓存做
+     内存匹配得到 index，不再在 Python 侧事后 get_state。
+  3. 未命中缓存时仍回退 index=-1 + xpath/text。
 """
 from __future__ import annotations
 
@@ -159,18 +170,31 @@ JS_MANUAL_RECORDER = r'''(() => {
   }
 
   function shortLabel(el) {
+    if (!el) return '';
+    // Prefer semantic attrs (submenu title / data-*) over nested innerText dump
+    const fromAttr = (el.getAttribute && (
+      el.getAttribute('title') ||
+      el.getAttribute('aria-label') ||
+      el.getAttribute('data-name') ||
+      el.getAttribute('data-menu') ||
+      ''
+    )) || '';
+    if (fromAttr.trim()) return fromAttr.trim().replace(/\s+/g, ' ').slice(0, 40);
     const t = visibleText(el);
     if (!t) return '';
-    // Prefer first line / first segment for nested menu titles
     return t.split(/[\n\r]/)[0].trim().slice(0, 40);
   }
 
   function elMeta(el, textOverride) {
     const t = textOverride != null ? String(textOverride) : shortLabel(el);
     const hi = highlightIndexOf(el);
+    // Prefer browser_use-compatible xpath for assembler; keep absolute as backup
+    const bu = buXPathOf(el);
+    const abs = xpathOf(el);
     const meta = {
-      xpath: xpathOf(el),
-      bu_xpath: buXPathOf(el),
+      xpath: bu || abs,
+      bu_xpath: bu,
+      xpath_abs: abs,
       tag: (el.tagName || '').toLowerCase(),
       attributes: attrs(el),
       text: t,
@@ -362,34 +386,26 @@ JS_MANUAL_RECORDER = r'''(() => {
 })()'''
 
 
-def _norm_text(s: str) -> str:
-    return ''.join((s or '').split())
-
-
 def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optional[dict]]]:
     """
     Map a DOM event payload to (action_name, params, element_info).
     Returns None if the event should be ignored.
 
-    For click_element_by_index, params['index'] starts as -1 (or highlight hint)
-    and is resolved against browser_use selector_map before _record_action.
+    Manual click_element_by_index always uses index=-1; locate via xpath/text.
     """
     kind = (payload.get('kind') or '').strip()
-    hi = payload.get('highlight_index')
-    try:
-        hi = int(hi) if hi is not None else None
-    except (TypeError, ValueError):
-        hi = None
+    attrs = payload.get('attributes') or {}
+    text = payload.get('text') or attrs.get('title') or ''
     element = {
-        'xpath': payload.get('xpath') or '',
+        # Prefer bu_xpath for assembler (same shape as agent recordings)
+        'xpath': payload.get('bu_xpath') or payload.get('xpath') or '',
         'bu_xpath': payload.get('bu_xpath') or '',
+        'xpath_abs': payload.get('xpath_abs') or payload.get('xpath') or '',
         'tag_name': payload.get('tag') or '',
         'css_selector': '',
-        'attributes': payload.get('attributes') or {},
-        'text': payload.get('text') or '',
+        'attributes': attrs,
+        'text': text,
     }
-    if hi is not None:
-        element['highlight_index'] = hi
 
     if kind == 'fill':
         label = (payload.get('label_text') or '').strip()
@@ -418,7 +434,7 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         return 'select_option', {'label_text': label or option, 'option_text': option}, element
 
     def _as_click_by_index(text: str):
-        """Manual clicks always record as click_element_by_index (xpath + text)."""
+        """Manual clicks → click_element_by_index with index=-1 (xpath/text locate only)."""
         t = (text or '').strip()
         if not t and not element.get('xpath') and not element.get('bu_xpath'):
             return None
@@ -426,8 +442,9 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         if t and not element.get('text'):
             element['text'] = t
         return 'click_element_by_index', {
-            # Placeholder — resolved via browser_use selector_map in ManualRecorder
-            'index': hi if hi is not None else -1,
+            # Manual recording: never resolve browser_use highlight index.
+            # Post-click get_state sees a different page → wrong index/xpath.
+            'index': -1,
             'tag_name': element.get('tag_name') or '',
             'text': t,
         }, element
@@ -465,76 +482,6 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         return 'close_dialog', {}, element
 
     return None
-
-
-def _match_index_in_selector_map(selector_map: dict, element: dict, text: str):
-    """
-    Resolve browser_use highlight index from a fresh/cached selector_map.
-    Match order mirrors agent reality: xpath (bu) → id → tag+text.
-    Returns (index, node) or (None, None).
-    """
-    if not selector_map:
-        return None, None
-
-    bu_xpath = (element.get('bu_xpath') or '').strip()
-    abs_xpath = (element.get('xpath') or '').strip().lstrip('/')
-    tag = (element.get('tag_name') or '').lower()
-    attrs = element.get('attributes') or {}
-    text_norm = _norm_text(text or element.get('text') or '')
-
-    # Prefer explicit highlight hint if still present in this scan
-    hint = element.get('highlight_index')
-    try:
-        hint = int(hint) if hint is not None else None
-    except (TypeError, ValueError):
-        hint = None
-    if hint is not None and hint in selector_map:
-        return hint, selector_map[hint]
-
-    # 1) exact browser_use xpath
-    if bu_xpath:
-        for idx, node in selector_map.items():
-            if getattr(node, 'xpath', None) == bu_xpath:
-                return idx, node
-
-    # 2) endswith / contained (absolute vs relative xpath formats)
-    if bu_xpath or abs_xpath:
-        for idx, node in selector_map.items():
-            nx = getattr(node, 'xpath', '') or ''
-            if not nx:
-                continue
-            if bu_xpath and (bu_xpath.endswith(nx) or nx.endswith(bu_xpath)):
-                return idx, node
-            if abs_xpath and (abs_xpath.endswith(nx) or nx.endswith(abs_xpath)):
-                return idx, node
-
-    # 3) id attribute
-    eid = attrs.get('id')
-    if eid:
-        for idx, node in selector_map.items():
-            if (getattr(node, 'attributes', None) or {}).get('id') == eid:
-                return idx, node
-
-    # 4) tag + text (exact, then containment)
-    soft = None
-    for idx, node in selector_map.items():
-        ntag = (getattr(node, 'tag_name', '') or '').lower()
-        if tag and ntag and ntag != tag:
-            # allow li vs a wrapping differences for menus
-            if not ({tag, ntag} <= {'a', 'li', 'span', 'div', 'button'}):
-                continue
-        try:
-            nt = (node.get_all_text_till_next_clickable_element() or '').strip()
-        except Exception:
-            nt = (getattr(node, 'attributes', None) or {}).get('aria-label') or ''
-        nn = _norm_text(nt)
-        if text_norm and nn == text_norm:
-            return idx, node
-        if text_norm and nn and (text_norm in nn or nn in text_norm):
-            soft = soft or (idx, node)
-    if soft:
-        return soft
-    return None, None
 
 
 class ManualRecorder:
@@ -765,47 +712,15 @@ class ManualRecorder:
             self._handle_lock = asyncio.Lock()
         return self._handle_lock
 
-    async def _resolve_highlight_index(self, element: dict, text: str):
-        """
-        Mirror browser_use click path: index comes from the current selector_map
-        produced by DomService / BrowserContext.get_state().
-        """
-        ctx = self.browser_context
-        if ctx is None:
-            return -1, None
-
-        # Fast path: cached map from last agent state
-        try:
-            sel_map = await ctx.get_selector_map()
-        except Exception:
-            sel_map = {}
-        idx, node = _match_index_in_selector_map(sel_map or {}, element, text)
-        if idx is not None:
-            return idx, node
-
-        # Refresh DOM scan (same source of truth agent uses for [N] labels)
-        try:
-            state = await ctx.get_state(cache_clickable_elements_hashes=False)
-            sel_map = getattr(state, 'selector_map', None) or {}
-            idx, node = _match_index_in_selector_map(sel_map, element, text)
-            if idx is not None:
-                return idx, node
-        except Exception as e:
-            sys.stderr.write(f'[manual-recorder] get_state for index failed: {e}\n')
-            sys.stderr.flush()
-
-        return -1, None
-
     def _record_mapped(self, mapped) -> Optional[dict]:
         if not mapped:
             return None
         action_name, params, element = mapped
         try:
             set_current_source('manual')
-            idx = params.get('index') if action_name == 'click_element_by_index' else None
             result = (
-                f'manual:clicked-{idx}'
-                if action_name == 'click_element_by_index' and isinstance(idx, int) and idx >= 0
+                f'manual:click_element_by_index'
+                if action_name == 'click_element_by_index'
                 else f'manual:{action_name}'
             )
             entry = _record_action(
@@ -836,38 +751,11 @@ class ManualRecorder:
                 sys.stderr.write(f'[manual-recorder] unmapped kind={payload.get("kind")}\n')
                 sys.stderr.flush()
                 return
-            action_name, params, element = mapped
-
+            # Manual click_element_by_index: keep index=-1 and xpath/text from the
+            # DOM event at click time. Do NOT call get_state / selector_map — that
+            # reflects the post-navigation page and skews index + xpath.
             if action_name == 'click_element_by_index':
-                idx, node = await self._resolve_highlight_index(
-                    element, params.get('text') or '',
-                )
-                params['index'] = idx
-                if node is not None:
-                    # Align stored descriptors with what the agent would have clicked
-                    if getattr(node, 'xpath', None):
-                        element['xpath'] = node.xpath
-                        element['bu_xpath'] = node.xpath
-                    if getattr(node, 'tag_name', None):
-                        element['tag_name'] = node.tag_name
-                        params['tag_name'] = node.tag_name
-                    if getattr(node, 'attributes', None):
-                        element['attributes'] = dict(node.attributes)
-                    try:
-                        ntext = (node.get_all_text_till_next_clickable_element() or '').strip()[:80]
-                        if ntext:
-                            element['text'] = ntext
-                            if not params.get('text'):
-                                params['text'] = ntext
-                    except Exception:
-                        pass
-                    element['highlight_index'] = idx
-                elif idx < 0:
-                    sys.stderr.write(
-                        '[manual-recorder] index unresolved; kept -1 '
-                        f'(bu_xpath={element.get("bu_xpath")!r} text={params.get("text")!r})\n'
-                    )
-                    sys.stderr.flush()
+                params['index'] = -1
 
             self._record_mapped((action_name, params, element))
 

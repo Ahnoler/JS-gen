@@ -456,12 +456,40 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
     # ---- click_element_by_index ----
     if action == 'click_element_by_index':
         idx = p('index')
-        xp = _e.get('target', '') or ''
-        txt = p('text', '')
-        elem_id = _e.get('attributes', {}).get('id', '') or ''
+        # target (ActionEntry) or nested element.xpath (DB → assemble-file)
+        _el = _e.get('element') if isinstance(_e.get('element'), dict) else {}
+        xp = (_e.get('target') or _el.get('xpath') or _el.get('target')
+              or _e.get('xpath') or '')
+        txt = p('text', '') or (_el.get('text') or '')
+        attrs = _e.get('attributes') if isinstance(_e.get('attributes'), dict) else {}
+        if not attrs and isinstance(_el.get('attributes'), dict):
+            attrs = _el['attributes']
+        elem_id = attrs.get('id', '') or ''
 
         if not xp:
+            # Durable fallback: text / role click (index alone is ephemeral)
+            if txt:
+                lines.append(f"    console.log('[{step_num}] Click [{idx}] \"{txt}\" (text fallback, no XPath)');")
+                lines.append(pre())
+                lines.append(f"    let _clicked{step_num} = false;")
+                lines.append(f"    try {{")
+                lines.append(f"      await page.locator(':text-is(\"{_escape(txt)}\")').first().click({{ timeout: 3000 }});")
+                lines.append(f"      _clicked{step_num} = true;")
+                lines.append(f"    }} catch (_e_tx{step_num}) {{")
+                lines.append(f"      try {{")
+                lines.append(f"        await page.getByText('{_escape(txt)}', {{ exact: true }}).first().click({{ timeout: 3000 }});")
+                lines.append(f"        _clicked{step_num} = true;")
+                lines.append(f"      }} catch (_e_tx2{step_num}) {{}}")
+                lines.append(f"    }}")
+                lines.append(f"    if (!_clicked{step_num}) {{")
+                lines.append(f"      _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '', 'needs-llm-fix', 'no xpath/text match');")
+                lines.append(f"      throw new Error('[{step_num}] Click failed: no XPath and text \"{_escape(txt)}\" not found');")
+                lines.append(f"    }}")
+                lines.append('')
+                return '\n'.join(lines)
             lines.append(f"    console.log('[{step_num}] Click [{idx}] (no XPath)');")
+            lines.append(f"    _recordError({step_num}, 'click_element_by_index', '', '', 'needs-llm-fix', 'missing xpath');")
+            lines.append(f"    throw new Error('[{step_num}] Click failed: missing XPath and text');")
             return '\n'.join(lines)
 
         if not xp.startswith('/') and not xp.startswith('//'):

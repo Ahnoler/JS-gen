@@ -151,14 +151,15 @@ export function stepsToActionEntries(steps) {
   if (!Array.isArray(steps)) return [];
   return steps.map((s) => {
     const params = s.params ?? s.paramsJson ?? null;
-    const element = s.element ?? s.elementJson ?? null;
+    let element = s.element ?? s.elementJson ?? null;
+    if (typeof element === 'string') element = safeJson(element);
     return {
       action: s.actionType || s.action || '',
       params: typeof params === 'string' ? safeJson(params) : (params || {}),
       result: s.extractedContent || s.result || '',
       phase: s.phaseNumber ?? s.phase ?? 0,
       target: element?.xpath || element?.target || '',
-      cssSelector: element?.cssSelector || '',
+      cssSelector: element?.cssSelector || element?.css_selector || '',
       tagName: element?.tag || element?.tagName || '',
       attributes: element?.attributes || {},
       timestamp: s.createdAt || null,

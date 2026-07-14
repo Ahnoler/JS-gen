@@ -81,14 +81,21 @@ export function stepEntryToTrajectoryStep(entry, context = {}) {
  * @returns {Object}
  */
 export function trajectoryStepToActionEntry(step) {
-  const el = step.element || step.elementJson || {};
+  let el = step.element ?? step.elementJson ?? {};
+  if (typeof el === 'string') {
+    try { el = JSON.parse(el); } catch { el = {}; }
+  }
+  let params = step.params ?? step.paramsJson ?? {};
+  if (typeof params === 'string') {
+    try { params = JSON.parse(params); } catch { params = {}; }
+  }
   return {
-    action: step.actionType,
-    params: step.params || step.paramsJson || {},
+    action: step.actionType || step.action || '',
+    params: params || {},
     result: step.extractedContent || '',
-    target: el.xpath || '',
-    cssSelector: el.cssSelector || '',
-    tagName: el.tag || '',
+    target: el.xpath || el.target || '',
+    cssSelector: el.cssSelector || el.css_selector || '',
+    tagName: el.tag || el.tagName || '',
     attributes: el.attributes || {},
   };
 }

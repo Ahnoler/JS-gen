@@ -1,6 +1,6 @@
 /**
- * v2 API routes — all use database-backed services.
- * Old /api/* routes remain untouched for backward compatibility.
+ * v2 API routes — MySQL-backed (primary).
+ * Legacy /api/trajectory and /api/case-data return 410 Gone.
  */
 import registerHierarchy from './hierarchy.js';
 import registerTrajectory from './trajectory.js';
