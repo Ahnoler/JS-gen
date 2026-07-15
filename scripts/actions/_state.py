@@ -65,6 +65,31 @@ def _record_action(action_name, params, result, element=None, source=None):
     )
 
     dumped = entry.model_dump()
+
+    # Manual/CDP: coalesce consecutive fills on the same field → keep last only
+    if (
+        resolved_source in ('manual', 'cdp')
+        and action_name in ('fill_form_field', 'fill_date_field')
+        and _ACTION_LOG
+    ):
+        last = _ACTION_LOG[-1]
+        if last.get('action') == action_name and last.get('source') in ('manual', 'cdp', None):
+            last_params = last.get('params') or {}
+            same_label = bool(params_dict.get('label_text')) and (
+                last_params.get('label_text') == params_dict.get('label_text')
+            )
+            last_el = last.get('element') if isinstance(last.get('element'), dict) else {}
+            last_xpath = (last_el or {}).get('xpath') or last.get('target') or ''
+            new_xpath = ''
+            if isinstance(element, dict):
+                new_xpath = element.get('xpath') or element.get('bu_xpath') or ''
+            same_xpath = bool(new_xpath) and bool(last_xpath) and last_xpath == new_xpath
+            if same_label or same_xpath:
+                _ACTION_LOG.pop()
+
+    # Do NOT drop a preceding click when recording select_option — that click is often
+    # 「新增」/导航等真实步骤。Opening the dropdown is skipped at capture time instead.
+
     _ACTION_LOG.append(dumped)
     if action_name == 'go_to_url' and params_dict.get('url'):
         _TRAJECTORY_URL = params_dict['url']

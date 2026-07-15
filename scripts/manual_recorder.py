@@ -26,6 +26,7 @@ TODO (以后做 — 人工 click 的真实 highlight index):
 from __future__ import annotations
 
 import json
+import re
 import sys
 from typing import Any, Callable, Optional
 
@@ -39,11 +40,6 @@ from .agent_utils import emit_json
 # ── Injected page script ───────────────────────────────────────────────────
 # Emits console messages: __JSGEN_MANUAL__ + JSON payload
 JS_MANUAL_RECORDER = r'''(() => {
-  if (window.__jsgenManualInstalled) {
-    window.__jsgenManualEnabled = true;
-    return 'already';
-  }
-  window.__jsgenManualInstalled = true;
   window.__jsgenManualEnabled = true;
 
   const PREFIX = '__JSGEN_MANUAL__';
@@ -52,6 +48,7 @@ JS_MANUAL_RECORDER = r'''(() => {
 
   function emit(payload) {
     if (!window.__jsgenManualEnabled) return;
+    if (window.__jsgenManualSkipUntil && Date.now() < window.__jsgenManualSkipUntil) return;
     const sig = JSON.stringify(payload);
     const now = Date.now();
     // Debounce identical events within 400ms
@@ -210,13 +207,60 @@ JS_MANUAL_RECORDER = r'''(() => {
     return true;
   }
 
-  // --- clicks ---
-  document.addEventListener('click', (ev) => {
+  function isNonRecordableFocusClick(el) {
+    if (!el || !el.closest) return false;
+    // Real action controls inside a form-item must still be recorded
+    if (el.closest('.el-radio, .el-checkbox, .el-switch, button, .el-button, a[href], .el-upload')) {
+      if (!el.closest('.el-select, .el-cascader, .el-date-editor, .el-input, .el-autocomplete')) {
+        return false;
+      }
+    }
+    if (el.closest(
+      '.el-select, .el-cascader, .el-date-editor, .el-time-picker, .el-autocomplete,' +
+      '.el-input__inner, .el-input__suffix, .el-input__prefix, .el-input__icon,' +
+      '.el-textarea__inner, .el-select__caret, .el-input__suffix-inner'
+    )) {
+      return true;
+    }
+    const focusInput = el.closest('input, textarea, .el-input, .el-textarea');
+    if (focusInput) {
+      const tag = (focusInput.tagName || '').toLowerCase();
+      const type = (focusInput.getAttribute && focusInput.getAttribute('type') || '').toLowerCase();
+      if (
+        tag === 'textarea' ||
+        (tag === 'input' && !['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'image', 'hidden'].includes(type)) ||
+        (focusInput.classList && (focusInput.classList.contains('el-input') || focusInput.classList.contains('el-textarea')))
+      ) {
+        return true;
+      }
+    }
+    // Label / blank area of a field form-item (incl. select) — not a step
+    const formItem = el.closest('.el-form-item');
+    if (formItem && formItem.querySelector(
+      '.el-select, .el-cascader, .el-date-editor, .el-time-picker, .el-autocomplete,' +
+      '.el-input, .el-textarea, input:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea'
+    )) {
+      return true;
+    }
+    return false;
+  }
+
+  // --- clicks (assigned so reinject can hot-update without duplicate listeners) ---
+  window.__jsgenManualOnClick = (ev) => {
     if (!window.__jsgenManualEnabled) return;
+    if (window.__jsgenManualSkipUntil && Date.now() < window.__jsgenManualSkipUntil) return;
     let el = ev.target;
     if (!el) return;
     if (el.nodeType !== 1) el = el.parentElement;
     if (!el || !el.closest) return;
+
+    // Skip anonymous body teleports / masks (same junk as CDP /div[2] pattern)
+    const junkCls = /(^| )(v-modal|el-loading-mask|el-overlay|el-dialog__wrapper|el-drawer__wrapper|el-message|el-notification|el-popper|el-select-dropdown|el-picker-panel)( |$)/;
+    if (el === document.body || el === document.documentElement) return;
+    if (junkCls.test(String(el.className || ''))) {
+      if (!el.closest('.el-select-dropdown__item, .el-cascader-node, .el-picker-panel td')) return;
+    }
+    if (el.parentElement === document.body && !el.id && !String(el.className || '').trim()) return;
 
     // el-select option
     const opt = el.closest('.el-select-dropdown__item');
@@ -234,6 +278,22 @@ JS_MANUAL_RECORDER = r'''(() => {
         attributes: attrs(opt),
         text: optionText,
       });
+      return;
+    }
+
+    // Opening select/cascader/date is NOT a step — only the option pick above counts
+    if (
+      el.closest('.el-select') ||
+      el.closest('.el-cascader') ||
+      el.closest('.el-date-editor') ||
+      el.closest('.el-time-picker') ||
+      el.closest('.el-autocomplete')
+    ) {
+      return;
+    }
+
+    // Focusing a text field is NOT a step — fill is recorded on leave / change
+    if (isNonRecordableFocusClick(el)) {
       return;
     }
 
@@ -263,6 +323,18 @@ JS_MANUAL_RECORDER = r'''(() => {
         row_text: rowText,
         button_text: buttonText,
       }, elMeta(rowBtn, buttonText)));
+      return;
+    }
+
+    // table row radio (e.g. 客户列表) — row_text only, no option label on the control
+    const tableRadio = el.closest('.el-table__body .el-radio, .el-table__body .el-radio-button, .el-table__row .el-radio, .el-table__row .el-radio-button');
+    if (tableRadio) {
+      const row = tableRadio.closest('.el-table__row, tr');
+      const rowText = row ? visibleText(row).slice(0, 80) : '';
+      emit(Object.assign({
+        kind: 'click_table_row_radio',
+        row_text: rowText,
+      }, elMeta(tableRadio, rowText || 'radio')));
       return;
     }
 
@@ -325,7 +397,12 @@ JS_MANUAL_RECORDER = r'''(() => {
     // generic button / link / clickable
     const btn = el.closest('button, .el-button, a.el-link, a[href], [role="button"]');
     if (btn && !isInIgnore(btn)) {
+      // Extra guard: never record select/date openers as clicks
+      if (btn.closest('.el-select') || btn.closest('.el-cascader') || btn.closest('.el-date-editor')) {
+        return;
+      }
       const text = shortLabel(btn) || (btn.getAttribute && (btn.getAttribute('aria-label') || btn.getAttribute('title'))) || '';
+      if (!text && (btn.tagName || '').toLowerCase() === 'div') return;
       emit(Object.assign({ kind: 'click' }, elMeta(btn, text)));
       return;
     }
@@ -334,6 +411,13 @@ JS_MANUAL_RECORDER = r'''(() => {
     const tree = el.closest('.el-tree-node__content');
     if (tree) {
       emit(Object.assign({ kind: 'click' }, elMeta(tree)));
+      return;
+    }
+
+    // Never emit empty anonymous div/span clicks (CDP /div[2] junk pattern)
+    const tag = (el.tagName || '').toLowerCase();
+    const t = shortLabel(el);
+    if (!t && (tag === 'div' || tag === 'span') && !String(el.className || '').trim() && !el.id) {
       return;
     }
 
@@ -348,7 +432,7 @@ JS_MANUAL_RECORDER = r'''(() => {
         }
       }
     }
-  }, true);
+  };
 
   // --- input / change (form fields) ---
   function emitFill(el) {
@@ -372,15 +456,28 @@ JS_MANUAL_RECORDER = r'''(() => {
     });
   }
 
-  document.addEventListener('change', (ev) => {
+  window.__jsgenManualOnChange = (ev) => {
     const el = ev.target;
     if (el && el.matches && el.matches('input, textarea')) emitFill(el);
-  }, true);
+  };
 
-  document.addEventListener('blur', (ev) => {
+  window.__jsgenManualOnBlur = (ev) => {
     const el = ev.target;
     if (el && el.matches && el.matches('input, textarea')) emitFill(el);
-  }, true);
+  };
+
+  if (!window.__jsgenManualInstalled) {
+    window.__jsgenManualInstalled = true;
+    document.addEventListener('click', (ev) => {
+      if (typeof window.__jsgenManualOnClick === 'function') window.__jsgenManualOnClick(ev);
+    }, true);
+    document.addEventListener('change', (ev) => {
+      if (typeof window.__jsgenManualOnChange === 'function') window.__jsgenManualOnChange(ev);
+    }, true);
+    document.addEventListener('blur', (ev) => {
+      if (typeof window.__jsgenManualOnBlur === 'function') window.__jsgenManualOnBlur(ev);
+    }, true);
+  }
 
   return 'installed';
 })()'''
@@ -438,6 +535,23 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         t = (text or '').strip()
         if not t and not element.get('xpath') and not element.get('bu_xpath'):
             return None
+        # Reject junk hits: empty body-level shells like /div[2] (teleport/mask)
+        tag = (element.get('tag_name') or '').lower()
+        attrs_map = element.get('attributes') or {}
+        cls = str(attrs_map.get('class') or attrs_map.get('className') or '')
+        xp = (element.get('bu_xpath') or element.get('xpath') or element.get('xpath_abs') or '').strip()
+        if (
+            not t
+            and tag in ('div', 'span')
+            and not cls
+            and not attrs_map.get('id')
+            and not attrs_map.get('role')
+        ):
+            if re.match(r'^(html/body/)?/?div\[\d+\]$', xp, re.I):
+                return None
+            # empty anonymous div/span with no usable locator text
+            if tag in ('div', 'span') and not t:
+                return None
         # Keep text on element for assembler XPath/text degradation chain
         if t and not element.get('text'):
             element['text'] = t
@@ -456,6 +570,12 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
     if kind == 'click_table_row_button':
         btn = (payload.get('button_text') or payload.get('text') or '').strip()
         return _as_click_by_index(btn)
+
+    if kind == 'click_table_row_radio':
+        row = (payload.get('row_text') or payload.get('text') or '').strip()
+        if not row and not element.get('xpath') and not element.get('bu_xpath'):
+            return None
+        return 'click_table_row_radio', {'row_text': row}, element
 
     if kind == 'click_adjacent_button':
         # Prefer button visible text; fall back to field label
@@ -517,6 +637,14 @@ class ManualRecorder:
             sys.stderr.write(f'[manual-recorder] page listener skip: {e}\n')
             sys.stderr.flush()
 
+        # Brief warm-up: skip focus-only clicks while inject/CDP paths settle
+        try:
+            await page.evaluate(
+                '() => { window.__jsgenManualWarmUntil = Date.now() + 1200; }'
+            )
+        except Exception:
+            pass
+
         emit_json({"event": "manual_record_status", "data": {"enabled": True}})
         sys.stderr.write('[manual-recorder] STARTED\n')
         sys.stderr.flush()
@@ -560,7 +688,9 @@ class ManualRecorder:
         try:
             await page.evaluate(JS_MANUAL_RECORDER)
             # Force enable even if install was a no-op leftover flag from init race
-            await page.evaluate('() => { window.__jsgenManualEnabled = true; }')
+            await page.evaluate(
+                '() => { window.__jsgenManualEnabled = true; window.__jsgenManualWarmUntil = Date.now() + 1200; }'
+            )
         except Exception as e:
             sys.stderr.write(f'[manual-recorder] reinject failed: {e}\n')
             sys.stderr.flush()
@@ -706,6 +836,19 @@ class ManualRecorder:
         # Last resort: record without selector_map refresh
         self._record_mapped(_map_dom_event_to_action(payload))
 
+    def ingest_external(self, payload: dict) -> None:
+        """Ingest a payload from Node CDP BiB path (same shape as page inject)."""
+        if not self.enabled or not isinstance(payload, dict):
+            return
+        import time
+        sig = json.dumps(payload, sort_keys=True, ensure_ascii=False)[:500]
+        now = time.time()
+        last = getattr(self, '_ext_last', None)
+        if last and last[0] == sig and now - last[1] < 0.45:
+            return
+        self._ext_last = (sig, now)
+        self._schedule_payload(payload)
+
     async def _ensure_lock(self):
         import asyncio
         if self._handle_lock is None:
@@ -751,6 +894,7 @@ class ManualRecorder:
                 sys.stderr.write(f'[manual-recorder] unmapped kind={payload.get("kind")}\n')
                 sys.stderr.flush()
                 return
+            action_name, params, element = mapped
             # Manual click_element_by_index: keep index=-1 and xpath/text from the
             # DOM event at click time. Do NOT call get_state / selector_map — that
             # reflects the post-navigation page and skews index + xpath.

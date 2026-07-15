@@ -455,6 +455,20 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
             emit_json({"event": "manual_record_status", "data": {"enabled": False}})
         return 'continue'
 
+    # BiB canvas / CDP inspect path — same payload shape as page inject
+    if event == "manual_dom_event":
+        recorder = session_state.get('manual_recorder')
+        payload = msg.get("data") or msg.get("payload") or {}
+        if not recorder or not getattr(recorder, 'enabled', False):
+            return 'continue'
+        if isinstance(payload, dict) and payload:
+            try:
+                recorder.ingest_external(payload)
+            except Exception as e:
+                sys.stderr.write(f"[manual-recorder] ingest_external error: {e}\n")
+                sys.stderr.flush()
+        return 'continue'
+
     if event == "replay_actions":
         entries = msg.get("data", {}).get("actions", [])
         browser_context = session_state.get('browser_context')
