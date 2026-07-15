@@ -847,6 +847,16 @@ export default function (app) {
               });
               if (dbId != null) session.dbTrajectoryId = dbId;
 
+              let dbStepCount = null;
+              try {
+                const { getDB } = await import('../../config/database.js');
+                const row = await getDB()('trajectory').where({ id: dbId }).first();
+                dbStepCount = row?.step_count ?? null;
+                console.log(`[save-trajectory] DB trajectory id=${dbId} step_count=${dbStepCount}`);
+              } catch (e) {
+                console.warn('[save-trajectory] could not read back step_count:', e.message);
+              }
+
               if (msg.data.form_file) {
                 try {
                   await persistFormSnapshotsFromFile(msg.data.form_file, { trajectoryId: dbId });
@@ -861,8 +871,9 @@ export default function (app) {
                 trajectoryDbId: dbId,
                 sessionId: id,
                 dbId,
-                steps: jsonSteps || actionCount,
+                steps: dbStepCount ?? (jsonSteps || actionCount),
                 actions: actionCount,
+                dbStepCount,
                 isSuccessful: msg.data.is_successful ?? null,
                 action_file: actionFile,
                 log_file: msg.data.log_file,

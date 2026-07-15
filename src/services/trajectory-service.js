@@ -207,23 +207,28 @@ export async function persistSessionTrajectory({
     steps = buildStepsFromFlow(flow, { source: 'agent' });
   }
 
-  // Preserve per-command source from action file; default agent
-  // Skip CDP/manual entries already written live to avoid duplicates
+  // Skip only actions already live-persisted (by ActionEntry.id).
+  // Do NOT drop all manual/cdp just because excludeActionIds is non-empty —
+  // that caused「保存轨迹」to write 0 steps when autoPersist had recorded earlier ones.
+  const beforeFilter = steps.length;
   if (excludeActionIds?.size) {
     steps = steps.filter((s) => {
       const aid = s.id || s.actionId;
       if (aid && excludeActionIds.has(String(aid))) return false;
-      // Also skip cdp/manual when we already live-persisted any (no id match)
-      if ((s.source === 'cdp' || s.source === 'manual') && excludeActionIds.size) return false;
       return true;
     });
-  } else if (id != null) {
-    // Live-persisted CDP/manual without tracked ids: prefer not re-appending those sources
-    const existing = await trajectoryDao.getById(+id);
-    const hasLive = (existing?.steps || []).some((s) => s.source === 'cdp' || s.source === 'manual');
-    if (hasLive) {
-      steps = steps.filter((s) => (s.source || 'agent') === 'agent');
-    }
+  }
+  if (beforeFilter !== steps.length) {
+    console.log(
+      `[trajectory-service] persist filter: ${beforeFilter} → ${steps.length} steps `
+      + `(excluded ${beforeFilter - steps.length} already live-persisted)`,
+    );
+  }
+  if (!steps.length && beforeFilter > 0) {
+    console.warn(
+      '[trajectory-service] all action-file steps were already live-persisted; '
+      + 'updating trajectory meta only (no new steps)',
+    );
   }
 
   const fromFile = readOperationLogText(logFile);
