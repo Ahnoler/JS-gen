@@ -8,7 +8,7 @@ import { broadcast, broadcastBinary, onWsMessage } from '../ws-server.js';
 import * as remoteSessionService from '../services/remote-session-service.js';
 import {
   enableInspect, highlightAt, hideHighlight, resolvePayloadAt, suppressPageManualRecorder,
-  resolveFocusedFillPayload, resolveCommittedDateFillPayload,
+  resolveFocusedFillPayload, resolveCommittedDateFillPayload, snapshotDateEditorValues,
 } from './inspect.js';
 
 /** Binary frame magic: Remote ScreenCast Frame */
@@ -30,7 +30,7 @@ let lastInspectLabel = '';
 let inspectEnabled = true;
 let fillRecordTimer = null;
 let lastTypedTextAt = 0;
-/** @type {object | null} press-time date-day payload awaiting post-click confirm */
+/** @type {{ hint: object, beforeSnap: Array } | null} */
 let pendingDateDayPick = null;
 
 /** Called when Dashboard toggles manual recording — suppress page inject briefly. */
@@ -477,7 +477,8 @@ async function handleInput(payload) {
           }
           // Date day: confirm after click commits (year/month arrows steal focus → missing label at press)
           if (recPayload && (recPayload.kind === 'fill_date' || recPayload.kind === 'fill_date_pending')) {
-            pendingDateDayPick = recPayload;
+            const beforeSnap = await snapshotDateEditorValues(client);
+            pendingDateDayPick = { hint: recPayload, beforeSnap };
           } else if (recPayload && recPayload.kind !== 'fill') {
             pendingDateDayPick = null;
             const label = recPayload.text || recPayload.menu_text || recPayload.option_text
@@ -503,13 +504,15 @@ async function handleInput(payload) {
         clickCount,
       });
 
-      // After day cell click applies, read committed input value + label
+      // After day cell click applies, read which date field changed (multi-date forms)
       if (type === 'mouseReleased' && gb.manualRecording && pendingDateDayPick) {
-        const hint = pendingDateDayPick;
+        const pending = pendingDateDayPick;
         pendingDateDayPick = null;
         try {
           await new Promise((r) => setTimeout(r, 80));
-          let confirmed = await resolveCommittedDateFillPayload(client, hint);
+          const hint = pending.hint || pending;
+          const beforeSnap = pending.beforeSnap || null;
+          let confirmed = await resolveCommittedDateFillPayload(client, hint, beforeSnap);
           if (!confirmed && hint.kind === 'fill_date' && hint.label_text && hint.value) {
             confirmed = { ...hint, kind: 'fill_date' };
           }

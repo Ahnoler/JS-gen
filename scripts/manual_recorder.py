@@ -135,18 +135,8 @@ JS_MANUAL_RECORDER = r'''(() => {
 
   function openDateEditorMeta() {
     let editor = null;
-    try {
-      if (window.__jsgenActiveDateEditor && document.contains(window.__jsgenActiveDateEditor)) {
-        editor = window.__jsgenActiveDateEditor;
-      }
-    } catch (e) {}
-    const active = document.activeElement;
-    if (!editor && active && active.closest) editor = active.closest('.el-date-editor');
-    if (!editor) editor = document.querySelector('.el-date-editor.is-active');
-    if (!editor) {
-      const focused = document.querySelector('.el-date-editor .el-input.is-focus, .el-date-editor input:focus');
-      if (focused) editor = focused.closest('.el-date-editor');
-    }
+    // Prefer LIVE open/focused editor over stale stash (multi date fields in one form)
+    editor = document.querySelector('.el-date-editor.is-active');
     if (!editor) {
       const eds = Array.from(document.querySelectorAll('.el-date-editor'));
       for (const ed of eds) {
@@ -155,19 +145,17 @@ JS_MANUAL_RECORDER = r'''(() => {
       }
     }
     if (!editor) {
-      const panelOpen = Array.from(document.querySelectorAll('.el-picker-panel, .el-date-picker')).some((p) => {
-        try {
-          const st = window.getComputedStyle(p);
-          return st.display !== 'none' && st.visibility !== 'hidden' && p.offsetParent !== null;
-        } catch (e) { return false; }
-      });
-      if (panelOpen) {
-        const visible = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null);
-        const inDlg = visible.filter((ed) => ed.closest('.el-dialog, .el-drawer, .el-message-box'));
-        const pool = inDlg.length ? inDlg : visible;
-        if (pool.length === 1) editor = pool[0];
-        else if (pool.length > 1) editor = pool.find((ed) => ed.classList.contains('is-active')) || pool[0];
-      }
+      const focused = document.querySelector('.el-date-editor .el-input.is-focus, .el-date-editor input:focus');
+      if (focused) editor = focused.closest('.el-date-editor');
+    }
+    const active = document.activeElement;
+    if (!editor && active && active.closest) editor = active.closest('.el-date-editor');
+    if (!editor) {
+      try {
+        if (window.__jsgenActiveDateEditor && document.contains(window.__jsgenActiveDateEditor)) {
+          editor = window.__jsgenActiveDateEditor;
+        }
+      } catch (e) {}
     }
     if (editor) {
       try { window.__jsgenActiveDateEditor = editor; } catch (e) {}
@@ -400,19 +388,36 @@ JS_MANUAL_RECORDER = r'''(() => {
     const dateTd = el.closest('.el-date-table td');
     if (dateTd && dateTd.closest('.el-picker-panel, .el-date-picker')) {
       const built = dateValueFromPickerCell(dateTd);
-      const metaAtClick = openDateEditorMeta();
-      // Defer: after year/month arrows, label/value are reliable once input commits
+      const before = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null).map((ed) => {
+        const input = ed.querySelector('input');
+        return { label: formItemLabel(ed), value: String((input && input.value) || '').trim() };
+      });
+      openDateEditorMeta();
+      // Defer: detect which date field changed (multi-date forms); also covers year/month arrow focus loss
       setTimeout(() => {
-        const meta = openDateEditorMeta();
-        const input = (meta.input || metaAtClick.input);
-        const value = String((input && input.value) || built || '').trim();
-        const label = (meta.label || metaAtClick.label || '').trim();
-        if (!value || !label) return;
+        const after = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null).map((ed) => {
+          const input = ed.querySelector('input');
+          return { label: formItemLabel(ed), value: String((input && input.value) || '').trim(), input: input, ed: ed };
+        });
+        const beforeMap = {};
+        for (const b of before) beforeMap[b.label] = b.value;
+        let pick = null;
+        const changed = after.filter((a) => a.label && a.value && a.value !== (beforeMap[a.label] || ''));
+        if (built) pick = changed.find((a) => a.value === built) || null;
+        if (!pick && changed.length === 1) pick = changed[0];
+        if (!pick && changed.length > 1) pick = changed[changed.length - 1];
+        if (!pick) {
+          const meta = openDateEditorMeta();
+          const value = String((meta.input && meta.input.value) || built || '').trim();
+          const label = (meta.label || '').trim();
+          if (value && label) pick = { label: label, value: value, input: meta.input };
+        }
+        if (!pick || !pick.label || !pick.value) return;
         emit(Object.assign({
           kind: 'fill_date',
-          label_text: label,
-          value: value,
-        }, elMeta(input || dateTd, value)));
+          label_text: pick.label,
+          value: pick.value,
+        }, elMeta(pick.input || dateTd, pick.value)));
       }, 80);
       return;
     }

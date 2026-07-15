@@ -134,20 +134,8 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
 
   function openDateEditorMeta() {
     let editor = null;
-    try {
-      if (window.__jsgenActiveDateEditor && document.contains(window.__jsgenActiveDateEditor)) {
-        editor = window.__jsgenActiveDateEditor;
-      }
-    } catch (e) {}
-    const active = document.activeElement;
-    if (!editor && active && active.closest) editor = active.closest('.el-date-editor');
-    if (!editor) {
-      editor = document.querySelector('.el-date-editor.is-active');
-    }
-    if (!editor) {
-      const focused = document.querySelector('.el-date-editor .el-input.is-focus, .el-date-editor input:focus');
-      if (focused) editor = focused.closest('.el-date-editor');
-    }
+    // Prefer LIVE open/focused editor over stale stash (multi date fields in one form)
+    editor = document.querySelector('.el-date-editor.is-active');
     if (!editor) {
       const eds = Array.from(document.querySelectorAll('.el-date-editor'));
       for (const ed of eds) {
@@ -155,21 +143,18 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
         if (inp && inp.getAttribute('aria-expanded') === 'true') { editor = ed; break; }
       }
     }
-    // Visible picker open: prefer the single visible editor in a dialog, else any expanded-looking one
     if (!editor) {
-      const panelOpen = Array.from(document.querySelectorAll('.el-picker-panel, .el-date-picker')).some((p) => {
-        const st = window.getComputedStyle(p);
-        return st.display !== 'none' && st.visibility !== 'hidden' && p.offsetParent !== null;
-      });
-      if (panelOpen) {
-        const visible = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null);
-        const inDlg = visible.filter((ed) => ed.closest('.el-dialog, .el-drawer, .el-message-box'));
-        const pool = inDlg.length ? inDlg : visible;
-        if (pool.length === 1) editor = pool[0];
-        else if (pool.length > 1) {
-          editor = pool.find((ed) => ed.classList.contains('is-active')) || pool[0];
+      const focused = document.querySelector('.el-date-editor .el-input.is-focus, .el-date-editor input:focus');
+      if (focused) editor = focused.closest('.el-date-editor');
+    }
+    const active = document.activeElement;
+    if (!editor && active && active.closest) editor = active.closest('.el-date-editor');
+    if (!editor) {
+      try {
+        if (window.__jsgenActiveDateEditor && document.contains(window.__jsgenActiveDateEditor)) {
+          editor = window.__jsgenActiveDateEditor;
         }
-      }
+      } catch (e) {}
     }
     if (editor) {
       try { window.__jsgenActiveDateEditor = editor; } catch (e) {}
@@ -655,19 +640,14 @@ export async function resolveFocusedFillPayload(client) {
 }
 
 /**
- * After a date-picker day click commits, read the open/stashed date editor value.
- * Used when year/month arrows stole focus so press-time label/value was incomplete.
+ * Snapshot all visible date editors: [{label, value, xpath}].
+ * Used to detect which field changed after a picker day click (multi-date forms).
  * @param {import('./client.js').CdpClient} client
- * @param {{ label_text?: string, value?: string } | null} [hint]
  */
-export async function resolveCommittedDateFillPayload(client, hint = null) {
+export async function snapshotDateEditorValues(client) {
   try {
-    const hintLabel = hint?.label_text ? String(hint.label_text) : '';
-    const hintValue = hint?.value ? String(hint.value) : '';
     const result = await client.send('Runtime.evaluate', {
       expression: `(() => {
-        const hintLabel = ${JSON.stringify(hintLabel)};
-        const hintValue = ${JSON.stringify(hintValue)};
         function formItemLabel(node) {
           const item = node && node.closest && node.closest('.el-form-item');
           if (!item) return '';
@@ -691,32 +671,137 @@ export async function resolveCommittedDateFillPayload(client, hint = null) {
           }
           return '/' + parts.join('/');
         }
-        let editor = null;
-        try {
-          if (window.__jsgenActiveDateEditor && document.contains(window.__jsgenActiveDateEditor)) {
-            editor = window.__jsgenActiveDateEditor;
+        const out = [];
+        const eds = document.querySelectorAll('.el-date-editor');
+        for (const ed of eds) {
+          if (ed.offsetParent === null) continue;
+          const input = ed.querySelector('input');
+          const label = formItemLabel(ed);
+          if (!label && !input) continue;
+          out.push({
+            label: label,
+            value: String((input && input.value) || '').trim(),
+            xpath: xpathOf(input || ed),
+            active: !!(ed.classList.contains('is-active')
+              || (input && input.getAttribute('aria-expanded') === 'true')
+              || (input && input === document.activeElement)),
+          });
+        }
+        return out;
+      })()`,
+      returnByValue: true,
+      awaitPromise: false,
+    });
+    const rows = result?.result?.value;
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * After a date-picker day click commits, resolve which date field changed.
+ * @param {import('./client.js').CdpClient} client
+ * @param {{ label_text?: string, value?: string } | null} [hint]
+ * @param {Array<{label?: string, value?: string, xpath?: string}> | null} [beforeSnap]
+ */
+export async function resolveCommittedDateFillPayload(client, hint = null, beforeSnap = null) {
+  try {
+    const afterSnap = await snapshotDateEditorValues(client);
+    const hintLabel = hint?.label_text ? String(hint.label_text).trim() : '';
+    const hintValue = hint?.value ? String(hint.value).trim() : '';
+    const before = Array.isArray(beforeSnap) ? beforeSnap : [];
+
+    // 1) Prefer the editor whose value changed vs pre-click snapshot
+    if (before.length && afterSnap.length) {
+      const beforeMap = new Map(before.map((r) => [r.label || r.xpath || '', r]));
+      const changed = [];
+      for (const row of afterSnap) {
+        const key = row.label || row.xpath || '';
+        const prev = beforeMap.get(key);
+        const prevVal = prev ? String(prev.value || '').trim() : '';
+        const nextVal = String(row.value || '').trim();
+        if (nextVal && nextVal !== prevVal) {
+          changed.push(row);
+        }
+      }
+      // Prefer change that matches constructed picker date when available
+      let pick = null;
+      if (hintValue) {
+        pick = changed.find((r) => r.value === hintValue) || null;
+      }
+      if (!pick && changed.length === 1) pick = changed[0];
+      if (!pick && changed.length > 1) {
+        pick = changed.find((r) => r.active) || changed[changed.length - 1];
+      }
+      if (pick && pick.label && pick.value) {
+        return {
+          kind: 'fill_date',
+          label_text: pick.label,
+          value: pick.value,
+          xpath: pick.xpath || '',
+          bu_xpath: '',
+          xpath_abs: pick.xpath || '',
+          tag: 'input',
+          attributes: {},
+          text: String(pick.value).slice(0, 80),
+          source_channel: 'cdp_bib',
+        };
+      }
+    }
+
+    // 2) Fallback: live active editor / hint match (never blindly use first editor)
+    const hintLabelJs = JSON.stringify(hintLabel);
+    const hintValueJs = JSON.stringify(hintValue);
+    const result = await client.send('Runtime.evaluate', {
+      expression: `(() => {
+        const hintLabel = ${hintLabelJs};
+        const hintValue = ${hintValueJs};
+        function formItemLabel(node) {
+          const item = node && node.closest && node.closest('.el-form-item');
+          if (!item) return '';
+          const lbl = item.querySelector('.el-form-item__label');
+          return (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+        }
+        function xpathOf(node) {
+          if (!node || node.nodeType !== 1) return '';
+          if (node.id) return '//*[@id="' + node.id + '"]';
+          const parts = [];
+          let cur = node;
+          while (cur && cur.nodeType === 1 && cur !== document.body) {
+            let ix = 1;
+            let sib = cur.previousElementSibling;
+            while (sib) {
+              if (sib.tagName === cur.tagName) ix++;
+              sib = sib.previousElementSibling;
+            }
+            parts.unshift(cur.tagName.toLowerCase() + '[' + ix + ']');
+            cur = cur.parentElement;
           }
-        } catch (e) {}
-        if (!editor) editor = document.querySelector('.el-date-editor.is-active');
+          return '/' + parts.join('/');
+        }
+        const pool = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null);
+        let editor = document.querySelector('.el-date-editor.is-active');
         if (!editor) {
-          const focused = document.querySelector('.el-date-editor .el-input.is-focus, .el-date-editor input:focus');
-          if (focused) editor = focused.closest('.el-date-editor');
+          for (const ed of pool) {
+            const inp = ed.querySelector('input');
+            if (inp && inp.getAttribute('aria-expanded') === 'true') { editor = ed; break; }
+          }
+        }
+        if (!editor && hintValue) {
+          const matches = pool.filter((ed) => String((ed.querySelector('input') || {}).value || '').trim() === hintValue);
+          if (matches.length === 1) editor = matches[0];
+          else if (hintLabel) editor = matches.find((ed) => formItemLabel(ed) === hintLabel) || null;
+        }
+        if (!editor && hintLabel) {
+          editor = pool.find((ed) => formItemLabel(ed) === hintLabel) || null;
         }
         if (!editor) {
-          const visible = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null);
-          const inDlg = visible.filter((ed) => ed.closest('.el-dialog, .el-drawer, .el-message-box'));
-          const pool = inDlg.length ? inDlg : visible;
-          if (hintLabel) {
-            editor = pool.find((ed) => formItemLabel(ed) === hintLabel) || null;
-          }
-          if (!editor && pool.length === 1) editor = pool[0];
-          if (!editor && pool.length > 1) {
-            // Prefer the editor whose value matches the just-picked date / changed most recently
-            editor = pool.find((ed) => {
-              const v = (ed.querySelector('input') || {}).value || '';
-              return hintValue && v === hintValue;
-            }) || pool.find((ed) => ((ed.querySelector('input') || {}).value || '').trim()) || pool[0];
-          }
+          try {
+            if (window.__jsgenActiveDateEditor && document.contains(window.__jsgenActiveDateEditor)) {
+              editor = window.__jsgenActiveDateEditor;
+            }
+          } catch (e) {}
         }
         if (!editor) return null;
         try { window.__jsgenActiveDateEditor = editor; } catch (e) {}
