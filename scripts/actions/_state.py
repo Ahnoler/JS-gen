@@ -7,6 +7,7 @@ for external callers (session_runner, recorder, agent_utils).
 """
 
 from ..models import ActionEntry
+import re
 
 _ACTION_LOG: list[dict] = []
 _TRAJECTORY_URL: str | None = None
@@ -65,6 +66,36 @@ def _record_action(action_name, params, result, element=None, source=None):
     )
 
     dumped = entry.model_dump()
+
+    # Manual/CDP: drop date-picker reopen clicks that echo the just-selected date
+    if (
+        resolved_source in ('manual', 'cdp')
+        and action_name == 'click_element_by_index'
+        and _ACTION_LOG
+    ):
+        click_text = str(params_dict.get('text') or '').strip()
+        last = _ACTION_LOG[-1]
+        if last.get('action') == 'fill_date_field' and last.get('source') in ('manual', 'cdp', None):
+            last_val = str((last.get('params') or {}).get('value') or '').strip()
+            if click_text and (click_text == last_val or re.match(r'^\d{4}-\d{2}-\d{2}$', click_text)):
+                return None  # skip reopen noise; do not append / emit
+
+    # Manual/CDP: before coalescing fills, drop a junk click left from date-picker UI
+    if (
+        resolved_source in ('manual', 'cdp')
+        and action_name == 'fill_date_field'
+        and _ACTION_LOG
+    ):
+        last = _ACTION_LOG[-1]
+        if last.get('action') == 'click_element_by_index' and last.get('source') in ('manual', 'cdp', None):
+            last_text = str((last.get('params') or {}).get('text') or '').strip()
+            date_val = str(params_dict.get('value') or '').strip()
+            if (
+                (last_text.isdigit() and 1 <= int(last_text) <= 31)
+                or bool(re.match(r'^\d{4}-\d{2}-\d{2}$', last_text))
+                or (date_val and last_text == date_val)
+            ):
+                _ACTION_LOG.pop()
 
     # Manual/CDP: coalesce consecutive fills on the same field → keep last only
     if (

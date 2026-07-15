@@ -46,16 +46,36 @@ def _register_table_actions(controller, browser_context):
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
         return result
 
-    @controller.action('Click the radio button in an el-table row, identified by row text. Clicks label.el-radio > .el-radio__inner.')
+    @controller.action('Click the radio button in an el-table row, identified by row text. Clicks label.el-radio > .el-radio__inner. Supports Element UI fixed columns.')
     async def click_table_row_radio(row_text: str):
         page = await browser_context.get_current_page()
         result = await page.evaluate('''
             ([rowText]) => {
+                if (!rowText) return 'row-text-empty';
+                const tables = document.querySelectorAll('.el-table');
+                for (const table of tables) {
+                    const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr.el-table__row, .el-table__body-wrapper tbody tr');
+                    for (let i = 0; i < bodyRows.length; i++) {
+                        const row = bodyRows[i];
+                        if (!(row.textContent || '').includes(rowText)) continue;
+                        let radio = row.querySelector('label.el-radio');
+                        if (!radio) {
+                            const fixedRows = table.querySelectorAll(
+                                '.el-table__fixed-body-wrapper tbody tr.el-table__row, .el-table__fixed tbody tr.el-table__row, .el-table__fixed-left tbody tr.el-table__row'
+                            );
+                            if (fixedRows[i]) radio = fixedRows[i].querySelector('label.el-radio');
+                        }
+                        if (!radio) return 'radio-not-found-in-row';
+                        const inner = radio.querySelector('.el-radio__inner');
+                        (inner || radio).click();
+                        return 'ok';
+                    }
+                }
                 const rows = document.querySelectorAll('.el-table__body-wrapper .el-table__row');
                 for (const row of rows) {
                     if (!row.textContent.includes(rowText)) continue;
                     const radio = row.querySelector('label.el-radio');
-                    if (!radio || radio.offsetParent === null) return 'radio-not-found-in-row';
+                    if (!radio) return 'radio-not-found-in-row';
                     const inner = radio.querySelector('.el-radio__inner');
                     (inner || radio).click();
                     return 'ok';

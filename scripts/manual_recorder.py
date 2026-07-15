@@ -133,9 +133,124 @@ JS_MANUAL_RECORDER = r'''(() => {
     return (lbl && lbl.textContent || '').trim().replace(/[：:*\s]+$/g, '');
   }
 
+  function openDateEditorMeta() {
+    let editor = null;
+    try {
+      if (window.__jsgenActiveDateEditor && document.contains(window.__jsgenActiveDateEditor)) {
+        editor = window.__jsgenActiveDateEditor;
+      }
+    } catch (e) {}
+    const active = document.activeElement;
+    if (!editor && active && active.closest) editor = active.closest('.el-date-editor');
+    if (!editor) editor = document.querySelector('.el-date-editor.is-active');
+    if (!editor) {
+      const focused = document.querySelector('.el-date-editor .el-input.is-focus, .el-date-editor input:focus');
+      if (focused) editor = focused.closest('.el-date-editor');
+    }
+    if (!editor) {
+      const eds = Array.from(document.querySelectorAll('.el-date-editor'));
+      for (const ed of eds) {
+        const inp = ed.querySelector('input');
+        if (inp && inp.getAttribute('aria-expanded') === 'true') { editor = ed; break; }
+      }
+    }
+    if (!editor) {
+      const panelOpen = Array.from(document.querySelectorAll('.el-picker-panel, .el-date-picker')).some((p) => {
+        try {
+          const st = window.getComputedStyle(p);
+          return st.display !== 'none' && st.visibility !== 'hidden' && p.offsetParent !== null;
+        } catch (e) { return false; }
+      });
+      if (panelOpen) {
+        const visible = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null);
+        const inDlg = visible.filter((ed) => ed.closest('.el-dialog, .el-drawer, .el-message-box'));
+        const pool = inDlg.length ? inDlg : visible;
+        if (pool.length === 1) editor = pool[0];
+        else if (pool.length > 1) editor = pool.find((ed) => ed.classList.contains('is-active')) || pool[0];
+      }
+    }
+    if (editor) {
+      try { window.__jsgenActiveDateEditor = editor; } catch (e) {}
+    }
+    if (!editor) return { label: '', editor: null, input: null };
+    return { label: formItemLabel(editor), editor: editor, input: editor.querySelector('input') };
+  }
+
+  function dateValueFromPickerCell(cell) {
+    const td = cell.closest ? cell.closest('td') : cell;
+    if (!td || !td.closest) return '';
+    const panel = td.closest('.el-picker-panel, .el-date-picker');
+    if (!panel) return '';
+    if (td.classList.contains('disabled')) return '';
+    const dayRaw = ((td.querySelector('span') || td).textContent || '').trim();
+    const day = parseInt(dayRaw, 10);
+    if (!day || day < 1 || day > 31) return '';
+    let year = null, month = null;
+    const labels = panel.querySelectorAll('.el-date-picker__header-label');
+    for (const lb of labels) {
+      const t = (lb.textContent || '').trim();
+      const ym = t.match(/(\d{4})\s*年/);
+      const mm = t.match(/(\d{1,2})\s*月/);
+      if (ym) year = parseInt(ym[1], 10);
+      if (mm) month = parseInt(mm[1], 10);
+    }
+    if (year == null || month == null) {
+      const header = panel.querySelector('.el-date-picker__header');
+      const ht = (header && header.textContent || '').replace(/\s+/g, ' ');
+      const ym = ht.match(/(\d{4})\s*年/);
+      const mm = ht.match(/(\d{1,2})\s*月/);
+      if (ym) year = parseInt(ym[1], 10);
+      if (mm) month = parseInt(mm[1], 10);
+    }
+    if (year == null || month == null) return '';
+    if (td.classList.contains('prev-month')) {
+      month -= 1;
+      if (month < 1) { month = 12; year -= 1; }
+    } else if (td.classList.contains('next-month')) {
+      month += 1;
+      if (month > 12) { month = 1; year += 1; }
+    }
+    return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  }
+
   function visibleText(el) {
     if (!el) return '';
     return (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  }
+
+  /** Prefer main body row text — Element UI fixed columns often only contain radio/checkbox. */
+  function tableRowIdentityText(rowOrEl) {
+    if (!rowOrEl) return '';
+    const row = rowOrEl.closest ? rowOrEl.closest('.el-table__row, tr') : rowOrEl;
+    if (!row) return '';
+    let dataRow = row;
+    const table = row.closest && row.closest('.el-table');
+    if (table && row.parentElement) {
+      const siblings = Array.from(row.parentElement.children).filter(
+        (r) => r.nodeType === 1 && ((r.classList && r.classList.contains('el-table__row')) || r.tagName === 'TR')
+      );
+      const idx = siblings.indexOf(row);
+      const bodyRows = table.querySelectorAll(
+        '.el-table__body-wrapper tbody tr.el-table__row, .el-table__body-wrapper tbody tr'
+      );
+      if (idx >= 0 && bodyRows[idx]) dataRow = bodyRows[idx];
+    }
+    const cells = dataRow.querySelectorAll('td');
+    const parts = [];
+    for (const td of cells) {
+      const onlySelect = td.querySelector('.el-radio, .el-checkbox');
+      let t = (td.innerText || td.textContent || '').trim().replace(/\s+/g, ' ');
+      if (onlySelect && t.length < 2) continue;
+      if (!t || t === 'radio' || t === 'checkbox') continue;
+      parts.push(t);
+    }
+    if (!parts.length) {
+      const raw = (dataRow.innerText || dataRow.textContent || '').trim().replace(/\s+/g, ' ');
+      if (!raw || raw === 'radio' || raw === 'checkbox') return '';
+      return raw.slice(0, 80);
+    }
+    const best = parts.find((p) => p.length >= 2 && !/^(操作|编辑|删除|修改|查看|详情)$/.test(p)) || parts[0];
+    return String(best || '').slice(0, 80);
   }
 
   function attrs(el) {
@@ -281,6 +396,31 @@ JS_MANUAL_RECORDER = r'''(() => {
       return;
     }
 
+    // Date picker day → fill_date (calendar pick, not typed)
+    const dateTd = el.closest('.el-date-table td');
+    if (dateTd && dateTd.closest('.el-picker-panel, .el-date-picker')) {
+      const built = dateValueFromPickerCell(dateTd);
+      const metaAtClick = openDateEditorMeta();
+      // Defer: after year/month arrows, label/value are reliable once input commits
+      setTimeout(() => {
+        const meta = openDateEditorMeta();
+        const input = (meta.input || metaAtClick.input);
+        const value = String((input && input.value) || built || '').trim();
+        const label = (meta.label || metaAtClick.label || '').trim();
+        if (!value || !label) return;
+        emit(Object.assign({
+          kind: 'fill_date',
+          label_text: label,
+          value: value,
+        }, elMeta(input || dateTd, value)));
+      }, 80);
+      return;
+    }
+    if (el.closest('.el-picker-panel, .el-date-picker, .el-time-panel')) {
+      openDateEditorMeta();
+      return;
+    }
+
     // Opening select/cascader/date is NOT a step — only the option pick above counts
     if (
       el.closest('.el-select') ||
@@ -289,6 +429,10 @@ JS_MANUAL_RECORDER = r'''(() => {
       el.closest('.el-time-picker') ||
       el.closest('.el-autocomplete')
     ) {
+      const dateEd = el.closest('.el-date-editor');
+      if (dateEd) {
+        try { window.__jsgenActiveDateEditor = dateEd; } catch (e) {}
+      }
       return;
     }
 
@@ -315,8 +459,7 @@ JS_MANUAL_RECORDER = r'''(() => {
     // table row action button
     const rowBtn = el.closest('.el-table__body .el-button, .el-table__body button, .el-table__body a');
     if (rowBtn) {
-      const row = rowBtn.closest('tr');
-      const rowText = row ? visibleText(row).slice(0, 40) : '';
+      const rowText = tableRowIdentityText(rowBtn).slice(0, 40);
       const buttonText = visibleText(rowBtn);
       emit(Object.assign({
         kind: 'click_table_row_button',
@@ -326,15 +469,18 @@ JS_MANUAL_RECORDER = r'''(() => {
       return;
     }
 
-    // table row radio (e.g. 客户列表) — row_text only, no option label on the control
-    const tableRadio = el.closest('.el-table__body .el-radio, .el-table__body .el-radio-button, .el-table__row .el-radio, .el-table__row .el-radio-button');
+    // table row radio (e.g. 客户列表) — identify row by main-body cell text, not fixed-column shell
+    const tableRadio = el.closest(
+      '.el-table__body .el-radio, .el-table__body .el-radio-button, .el-table__row .el-radio, .el-table__row .el-radio-button,' +
+      '.el-table__fixed .el-radio, .el-table__fixed-body-wrapper .el-radio, .el-table__fixed-left .el-radio'
+    );
     if (tableRadio) {
-      const row = tableRadio.closest('.el-table__row, tr');
-      const rowText = row ? visibleText(row).slice(0, 80) : '';
+      const rowText = tableRowIdentityText(tableRadio);
+      if (!rowText) return; // cannot replay without a durable row key
       emit(Object.assign({
         kind: 'click_table_row_radio',
         row_text: rowText,
-      }, elMeta(tableRadio, rowText || 'radio')));
+      }, elMeta(tableRadio, rowText)));
       return;
     }
 
@@ -415,8 +561,15 @@ JS_MANUAL_RECORDER = r'''(() => {
     }
 
     // Never emit empty anonymous div/span clicks (CDP /div[2] junk pattern)
+    // or date-string clicks from reopening a filled date editor
     const tag = (el.tagName || '').toLowerCase();
     const t = shortLabel(el);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(t) && (tag === 'div' || tag === 'span' || tag === 'input')) {
+      return;
+    }
+    if (el.parentElement === document.body && tag === 'div' && !el.id && !String(el.className || '').trim()) {
+      return;
+    }
     if (!t && (tag === 'div' || tag === 'span') && !String(el.className || '').trim() && !el.id) {
       return;
     }
@@ -442,9 +595,14 @@ JS_MANUAL_RECORDER = r'''(() => {
     const tag = (el.tagName || '').toLowerCase();
     if (tag !== 'input' && tag !== 'textarea') return;
     if (el.closest('.el-select')) return; // select handled via option click
+    // Date: prefer calendar pick recording; only emit typed non-empty values.
+    // TODO(date-leave-backup): blur/change 到其他字段时，若日期 input 已有非空值则补录
+    // fill_date（与 src/cdp/inspect.js resolveFocusedFillPayload 同需求）。选天主路径够用前不实现。
+    const isDate = !!el.closest('.el-date-editor');
     const label = formItemLabel(el);
     const value = el.value || '';
-    const kind = el.closest('.el-date-editor') ? 'fill_date' : 'fill';
+    if (!String(value).trim()) return;
+    const kind = isDate ? 'fill_date' : 'fill';
     emit({
       kind: kind,
       label_text: label,
@@ -518,8 +676,8 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
 
     if kind == 'fill_date':
         label = (payload.get('label_text') or '').strip()
-        value = payload.get('value') or ''
-        if not label:
+        value = (payload.get('value') or '').strip()
+        if not label or not value:
             return None
         return 'fill_date_field', {'label_text': label, 'value': value}, element
 
@@ -540,6 +698,12 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         attrs_map = element.get('attributes') or {}
         cls = str(attrs_map.get('class') or attrs_map.get('className') or '')
         xp = (element.get('bu_xpath') or element.get('xpath') or element.get('xpath_abs') or '').strip()
+        # Body teleport /div[N] — never a durable control (even if text stole a date value)
+        if re.match(r'^(html/body/)?/?div\[\d+\]$', xp, re.I):
+            return None
+        # Date-string clicks from reopening el-date-editor / picker residue
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', t) and tag in ('div', 'span', 'input', ''):
+            return None
         if (
             not t
             and tag in ('div', 'span')
@@ -547,8 +711,6 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
             and not attrs_map.get('id')
             and not attrs_map.get('role')
         ):
-            if re.match(r'^(html/body/)?/?div\[\d+\]$', xp, re.I):
-                return None
             # empty anonymous div/span with no usable locator text
             if tag in ('div', 'span') and not t:
                 return None
@@ -572,8 +734,9 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         return _as_click_by_index(btn)
 
     if kind == 'click_table_row_radio':
-        row = (payload.get('row_text') or payload.get('text') or '').strip()
-        if not row and not element.get('xpath') and not element.get('bu_xpath'):
+        row = (payload.get('row_text') or '').strip()
+        # Reject junk fallbacks from empty fixed-column rows (was recorded as "radio")
+        if not row or row.lower() in ('radio', 'checkbox', 'true', 'false'):
             return None
         return 'click_table_row_radio', {'row_text': row}, element
 
@@ -874,6 +1037,9 @@ class ManualRecorder:
             )
         finally:
             set_current_source('agent')
+
+        if not entry:
+            return None
 
         emit_json({
             "event": "manual_action_recorded",

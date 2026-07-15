@@ -8,7 +8,7 @@ import { broadcast, broadcastBinary, onWsMessage } from '../ws-server.js';
 import * as remoteSessionService from '../services/remote-session-service.js';
 import {
   enableInspect, highlightAt, hideHighlight, resolvePayloadAt, suppressPageManualRecorder,
-  resolveFocusedFillPayload,
+  resolveFocusedFillPayload, resolveCommittedDateFillPayload,
 } from './inspect.js';
 
 /** Binary frame magic: Remote ScreenCast Frame */
@@ -30,6 +30,8 @@ let lastInspectLabel = '';
 let inspectEnabled = true;
 let fillRecordTimer = null;
 let lastTypedTextAt = 0;
+/** @type {object | null} press-time date-day payload awaiting post-click confirm */
+let pendingDateDayPick = null;
 
 /** Called when Dashboard toggles manual recording — suppress page inject briefly. */
 export function notifyManualRecordingChanged(enabled) {
@@ -49,17 +51,21 @@ function isSpuriousFocusClickPayload(payload) {
   const cls = String(payload.attributes?.class || payload.attributes?.className || '');
   const xp = String(payload.bu_xpath || payload.xpath || payload.xpath_abs || '').trim();
 
-  // Exact junk pattern from DB: empty div click at body /div[N]
-  if (tag === 'div' && !text && !cls && /^(\/?div\[\d+\]|html\/body\/div\[\d+\])$/i.test(xp)) {
+  // Body-level teleport shell — never a real control (even if shortLabel stole a date string)
+  if (/^(\/?div\[\d+\]|html\/body\/div\[\d+\])$/i.test(xp)) {
+    return true;
+  }
+  // Date string clicks are reopen/picker noise, not buttons
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text) && (tag === 'div' || tag === 'span' || !cls)) {
     return true;
   }
   if (tag === 'input' || tag === 'textarea') {
-    const type = String(payload.attributes?.type || '').toLowerCase();
+    const type = String(payload.attributes?.type || '').trim().toLowerCase();
     if (!['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'image'].includes(type)) {
       return true;
     }
   }
-  if (/el-select|el-cascader|el-date-editor|el-time-picker|el-autocomplete|el-input|el-textarea/i.test(cls)) {
+  if (/el-select|el-cascader|el-date-editor|el-time-picker|el-autocomplete|el-input|el-textarea|el-picker|el-popper/i.test(cls)) {
     return true;
   }
   if (/\/(input|textarea)(\[|$)/i.test(xp) && kind === 'click') {
@@ -469,10 +475,13 @@ async function handleInput(payload) {
           if (recPayload && isSpuriousFocusClickPayload(recPayload)) {
             recPayload = null;
           }
-          // null = intentionally skipped (e.g. opening el-select without choosing option)
-          if (recPayload && recPayload.kind !== 'fill' && recPayload.kind !== 'fill_date') {
+          // Date day: confirm after click commits (year/month arrows steal focus → missing label at press)
+          if (recPayload && (recPayload.kind === 'fill_date' || recPayload.kind === 'fill_date_pending')) {
+            pendingDateDayPick = recPayload;
+          } else if (recPayload && recPayload.kind !== 'fill') {
+            pendingDateDayPick = null;
             const label = recPayload.text || recPayload.menu_text || recPayload.option_text
-              || recPayload.button_text || recPayload.kind || '';
+              || recPayload.button_text || recPayload.label_text || recPayload.value || recPayload.kind || '';
             broadcastInspect(label);
             pushAgentEvent('manual_dom_event', recPayload);
           }
@@ -493,6 +502,26 @@ async function handleInput(payload) {
         buttons: type === 'mouseReleased' ? 0 : (type === 'mouseMoved' ? (payload.buttons || 0) : 1),
         clickCount,
       });
+
+      // After day cell click applies, read committed input value + label
+      if (type === 'mouseReleased' && gb.manualRecording && pendingDateDayPick) {
+        const hint = pendingDateDayPick;
+        pendingDateDayPick = null;
+        try {
+          await new Promise((r) => setTimeout(r, 80));
+          let confirmed = await resolveCommittedDateFillPayload(client, hint);
+          if (!confirmed && hint.kind === 'fill_date' && hint.label_text && hint.value) {
+            confirmed = { ...hint, kind: 'fill_date' };
+          }
+          if (confirmed && confirmed.kind === 'fill_date' && confirmed.label_text && confirmed.value) {
+            broadcastInspect(confirmed.label_text + '=' + confirmed.value);
+            pushAgentEvent('manual_dom_event', confirmed);
+          }
+        } catch (e) {
+          console.warn('[remote-bridge] date confirm failed:', e.message);
+        }
+      }
+
       return { ok: true };
     }
 

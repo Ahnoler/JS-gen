@@ -75,6 +75,41 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
     return (node.innerText || node.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 80);
   }
 
+  /** Prefer main body row text — Element UI fixed columns often only contain radio/checkbox. */
+  function tableRowIdentityText(rowOrEl) {
+    if (!rowOrEl) return '';
+    const row = rowOrEl.closest ? rowOrEl.closest('.el-table__row, tr') : rowOrEl;
+    if (!row) return '';
+    let dataRow = row;
+    const table = row.closest && row.closest('.el-table');
+    if (table && row.parentElement) {
+      const siblings = Array.from(row.parentElement.children).filter(
+        (r) => r.nodeType === 1 && ((r.classList && r.classList.contains('el-table__row')) || r.tagName === 'TR')
+      );
+      const idx = siblings.indexOf(row);
+      const bodyRows = table.querySelectorAll(
+        '.el-table__body-wrapper tbody tr.el-table__row, .el-table__body-wrapper tbody tr'
+      );
+      if (idx >= 0 && bodyRows[idx]) dataRow = bodyRows[idx];
+    }
+    const cells = dataRow.querySelectorAll('td');
+    const parts = [];
+    for (const td of cells) {
+      const onlySelect = td.querySelector('.el-radio, .el-checkbox');
+      let t = (td.innerText || td.textContent || '').trim().replace(/\\s+/g, ' ');
+      if (onlySelect && t.length < 2) continue;
+      if (!t || t === 'radio' || t === 'checkbox') continue;
+      parts.push(t);
+    }
+    if (!parts.length) {
+      const raw = (dataRow.innerText || dataRow.textContent || '').trim().replace(/\\s+/g, ' ');
+      if (!raw || raw === 'radio' || raw === 'checkbox') return '';
+      return raw.slice(0, 80);
+    }
+    const best = parts.find((p) => p.length >= 2 && !/^(操作|编辑|删除|修改|查看|详情)$/.test(p)) || parts[0];
+    return String(best || '').slice(0, 80);
+  }
+
   function shortLabel(node) {
     if (!node) return '';
     const fromAttr = (node.getAttribute && (
@@ -95,6 +130,90 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
     if (!item) return '';
     const lbl = item.querySelector('.el-form-item__label');
     return (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+  }
+
+  function openDateEditorMeta() {
+    let editor = null;
+    try {
+      if (window.__jsgenActiveDateEditor && document.contains(window.__jsgenActiveDateEditor)) {
+        editor = window.__jsgenActiveDateEditor;
+      }
+    } catch (e) {}
+    const active = document.activeElement;
+    if (!editor && active && active.closest) editor = active.closest('.el-date-editor');
+    if (!editor) {
+      editor = document.querySelector('.el-date-editor.is-active');
+    }
+    if (!editor) {
+      const focused = document.querySelector('.el-date-editor .el-input.is-focus, .el-date-editor input:focus');
+      if (focused) editor = focused.closest('.el-date-editor');
+    }
+    if (!editor) {
+      const eds = Array.from(document.querySelectorAll('.el-date-editor'));
+      for (const ed of eds) {
+        const inp = ed.querySelector('input');
+        if (inp && inp.getAttribute('aria-expanded') === 'true') { editor = ed; break; }
+      }
+    }
+    // Visible picker open: prefer the single visible editor in a dialog, else any expanded-looking one
+    if (!editor) {
+      const panelOpen = Array.from(document.querySelectorAll('.el-picker-panel, .el-date-picker')).some((p) => {
+        const st = window.getComputedStyle(p);
+        return st.display !== 'none' && st.visibility !== 'hidden' && p.offsetParent !== null;
+      });
+      if (panelOpen) {
+        const visible = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null);
+        const inDlg = visible.filter((ed) => ed.closest('.el-dialog, .el-drawer, .el-message-box'));
+        const pool = inDlg.length ? inDlg : visible;
+        if (pool.length === 1) editor = pool[0];
+        else if (pool.length > 1) {
+          editor = pool.find((ed) => ed.classList.contains('is-active')) || pool[0];
+        }
+      }
+    }
+    if (editor) {
+      try { window.__jsgenActiveDateEditor = editor; } catch (e) {}
+    }
+    if (!editor) return { label: '', editor: null, input: null };
+    const input = editor.querySelector('input');
+    return { label: formItemLabel(editor), editor: editor, input: input };
+  }
+
+  /** Build YYYY-MM-DD from el-date-table cell + panel header (picker click, before value commits). */
+  function dateValueFromPickerCell(cell) {
+    const td = cell.closest ? cell.closest('td') : cell;
+    if (!td || !td.closest) return '';
+    const panel = td.closest('.el-picker-panel, .el-date-picker');
+    if (!panel) return '';
+    if (td.classList.contains('disabled')) return '';
+    const dayRaw = ((td.querySelector('span') || td).textContent || '').trim();
+    const day = parseInt(dayRaw, 10);
+    if (!day || day < 1 || day > 31) return '';
+    let year = null, month = null;
+    const labels = panel.querySelectorAll('.el-date-picker__header-label');
+    for (const lb of labels) {
+      const t = (lb.textContent || '').trim();
+      const ym = t.match(/(\\d{4})\\s*年/);
+      const mm = t.match(/(\\d{1,2})\\s*月/);
+      if (ym) year = parseInt(ym[1], 10);
+      if (mm) month = parseInt(mm[1], 10);
+    }
+    if (year == null || month == null) {
+      const ht = ((panel.querySelector('.el-date-picker__header') || {}).textContent || '').replace(/\\s+/g, ' ');
+      const ym = ht.match(/(\\d{4})\\s*年/);
+      const mm = ht.match(/(\\d{1,2})\\s*月/);
+      if (ym) year = parseInt(ym[1], 10);
+      if (mm) month = parseInt(mm[1], 10);
+    }
+    if (year == null || month == null) return '';
+    if (td.classList.contains('prev-month')) {
+      month -= 1;
+      if (month < 1) { month = 12; year -= 1; }
+    } else if (td.classList.contains('next-month')) {
+      month += 1;
+      if (month > 12) { month = 1; year += 1; }
+    }
+    return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
   }
 
   function elMeta(node, textOverride) {
@@ -130,15 +249,35 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
     if (!node) return true;
     if (isJunkShell(node)) return true;
     const t = (text || '').trim();
-    if (t) return false;
     const tag = (node.tagName || '').toLowerCase();
+    // YYYY-MM-DD text on non-buttons = date-editor reopen / picker residue
+    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(t) && tag !== 'button' && tag !== 'a') {
+      return true;
+    }
+    // body > anonymous div (xpath /div[N]) — never a durable control
+    if (node.parentElement === document.body && tag === 'div' && !node.id && !String(node.className || '').trim()) {
+      return true;
+    }
+    if (t) {
+      const role = (node.getAttribute && node.getAttribute('role')) || '';
+      if (tag === 'button' || tag === 'a' || role === 'button' || role === 'menuitem' || role === 'link' || role === 'tab') {
+        return false;
+      }
+      const cls = String(node.className || '');
+      if (/el-button|el-menu-item|el-dropdown-menu__item|btn/.test(cls)) return false;
+      if (node.closest && node.closest('button, .el-button, a[href], [role="button"], .el-menu-item')) return false;
+      // Has text but not a recognizable control — still skip anonymous shells
+      if (tag === 'div' || tag === 'span') {
+        if (!cls && !node.id) return true;
+      }
+      return false;
+    }
     if (tag === 'button' || tag === 'a') return false;
     const role = (node.getAttribute && node.getAttribute('role')) || '';
     if (role === 'button' || role === 'menuitem' || role === 'link' || role === 'tab') return false;
     const cls = String(node.className || '');
     if (/el-button|el-menu-item|el-dropdown-menu__item|btn/.test(cls)) return false;
     if (node.closest && node.closest('button, .el-button, a[href], [role="button"]')) return false;
-    // empty anonymous div/span — not a meaningful control
     if (tag === 'div' || tag === 'span') return true;
     return false;
   }
@@ -147,14 +286,19 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
   if (typeof clientX === 'number' && typeof clientY === 'number' && isJunkShell(el)) {
     try {
       const stack = document.elementsFromPoint(clientX, clientY) || [];
+      let pierced = null;
       for (let i = 0; i < stack.length; i++) {
         const n = stack[i];
         if (n && n.nodeType === 1 && !isJunkShell(n)) {
-          el = n;
+          pierced = n;
           break;
         }
       }
-    } catch (e) {}
+      if (pierced) el = pierced;
+      else return null; // pure overlay hit — do not record
+    } catch (e) {
+      return null;
+    }
   }
 
   // Classify like scripts/manual_recorder.py JS_MANUAL_RECORDER click handler
@@ -209,8 +353,47 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
     }, elMeta(opt, optionText));
   }
 
+  // Date picker day cell → fill_date (user picks from calendar, does not type)
+  const dateTd = el.closest && el.closest('.el-date-table td');
+  if (dateTd && dateTd.closest('.el-picker-panel, .el-date-picker')) {
+    const value = dateValueFromPickerCell(dateTd);
+    const meta = openDateEditorMeta();
+    // After year/month arrow navigation focus often leaves the input — still record
+    if (value && meta.label) {
+      return Object.assign({
+        kind: 'fill_date',
+        label_text: meta.label,
+        value: value,
+        source_channel: 'cdp_bib',
+      }, elMeta(meta.input || dateTd, value));
+    }
+    // Incomplete at press-time (no label / header parse) → bridge confirms after click commits
+    return {
+      kind: 'fill_date_pending',
+      label_text: (meta && meta.label) || '',
+      value: value || '',
+      source_channel: 'cdp_bib',
+      tag: 'input',
+      attributes: {},
+      text: value || '',
+      xpath: (meta && meta.input) ? (buXPathOf(meta.input) || xpathOf(meta.input)) : '',
+      bu_xpath: (meta && meta.input) ? buXPathOf(meta.input) : '',
+      xpath_abs: (meta && meta.input) ? xpathOf(meta.input) : '',
+    };
+  }
+  // Year/month tables & header arrows: keep active editor stash, do not record
+  if (el.closest && el.closest('.el-picker-panel, .el-date-picker, .el-time-panel')) {
+    openDateEditorMeta();
+    return null;
+  }
+
   // Skip opening pickers / focusing text fields before any generic click classification
   if (isNonRecordableFocusClick(el)) {
+    // Remember which date editor the user opened (arrows later steal focus)
+    const dateEd = el.closest && el.closest('.el-date-editor');
+    if (dateEd) {
+      try { window.__jsgenActiveDateEditor = dateEd; } catch (e) {}
+    }
     return null;
   }
 
@@ -245,27 +428,27 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
 
   const rowBtn = el.closest && el.closest('.el-table__body .el-button, .el-table__body button, .el-table__body a');
   if (rowBtn) {
-    const row = rowBtn.closest('tr');
     const buttonText = visibleText(rowBtn);
     return Object.assign({
       kind: 'click_table_row_button',
-      row_text: row ? visibleText(row).slice(0, 40) : '',
+      row_text: tableRowIdentityText(rowBtn).slice(0, 40),
       button_text: buttonText,
       source_channel: 'cdp_bib',
     }, elMeta(rowBtn, buttonText));
   }
 
   const tableRadio = el.closest && el.closest(
-    '.el-table__body .el-radio, .el-table__body .el-radio-button, .el-table__row .el-radio, .el-table__row .el-radio-button'
+    '.el-table__body .el-radio, .el-table__body .el-radio-button, .el-table__row .el-radio, .el-table__row .el-radio-button,' +
+    '.el-table__fixed .el-radio, .el-table__fixed-body-wrapper .el-radio, .el-table__fixed-left .el-radio'
   );
   if (tableRadio) {
-    const row = tableRadio.closest('.el-table__row, tr');
-    const rowText = row ? visibleText(row).slice(0, 80) : '';
+    const rowText = tableRowIdentityText(tableRadio);
+    if (!rowText) return null;
     return Object.assign({
       kind: 'click_table_row_radio',
       row_text: rowText,
       source_channel: 'cdp_bib',
-    }, elMeta(tableRadio, rowText || 'radio'));
+    }, elMeta(tableRadio, rowText));
   }
 
   const radio = el.closest && el.closest('.el-radio, .el-radio-button');
@@ -419,11 +602,16 @@ export async function resolveFocusedFillPayload(client) {
         const tag = (el.tagName || '').toLowerCase();
         if (tag !== 'input' && tag !== 'textarea') return null;
         if (el.closest && el.closest('.el-select')) return null;
+        // Date values come from picker day clicks, not focus flush (often still empty).
+        // TODO(date-leave-backup): 离开日期框点到其他字段时，若 input 已有非空值则补录
+        // fill_date（选天路径漏记时的兜底）。等端到端/用户反馈需要再做；注意与打开空选择器、
+        // 重复选同一日期的去重配合，避免误记/双记。
+        if (el.closest && el.closest('.el-date-editor')) return null;
         const item = el.closest && el.closest('.el-form-item');
         const lbl = item && item.querySelector('.el-form-item__label');
         const label = (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
         const value = el.value || '';
-        const isDate = !!(el.closest && el.closest('.el-date-editor'));
+        if (!String(value).trim()) return null;
         function xpathOf(node) {
           if (!node || node.nodeType !== 1) return '';
           if (node.id) return '//*[@id="' + node.id + '"]';
@@ -442,7 +630,7 @@ export async function resolveFocusedFillPayload(client) {
           return '/' + parts.join('/');
         }
         return {
-          kind: isDate ? 'fill_date' : 'fill',
+          kind: 'fill',
           label_text: label,
           value: value,
           xpath: xpathOf(el),
@@ -460,6 +648,101 @@ export async function resolveFocusedFillPayload(client) {
     const payload = result?.result?.value;
     if (!payload || typeof payload !== 'object') return null;
     if (!payload.label_text && !payload.xpath) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * After a date-picker day click commits, read the open/stashed date editor value.
+ * Used when year/month arrows stole focus so press-time label/value was incomplete.
+ * @param {import('./client.js').CdpClient} client
+ * @param {{ label_text?: string, value?: string } | null} [hint]
+ */
+export async function resolveCommittedDateFillPayload(client, hint = null) {
+  try {
+    const hintLabel = hint?.label_text ? String(hint.label_text) : '';
+    const hintValue = hint?.value ? String(hint.value) : '';
+    const result = await client.send('Runtime.evaluate', {
+      expression: `(() => {
+        const hintLabel = ${JSON.stringify(hintLabel)};
+        const hintValue = ${JSON.stringify(hintValue)};
+        function formItemLabel(node) {
+          const item = node && node.closest && node.closest('.el-form-item');
+          if (!item) return '';
+          const lbl = item.querySelector('.el-form-item__label');
+          return (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+        }
+        function xpathOf(node) {
+          if (!node || node.nodeType !== 1) return '';
+          if (node.id) return '//*[@id="' + node.id + '"]';
+          const parts = [];
+          let cur = node;
+          while (cur && cur.nodeType === 1 && cur !== document.body) {
+            let ix = 1;
+            let sib = cur.previousElementSibling;
+            while (sib) {
+              if (sib.tagName === cur.tagName) ix++;
+              sib = sib.previousElementSibling;
+            }
+            parts.unshift(cur.tagName.toLowerCase() + '[' + ix + ']');
+            cur = cur.parentElement;
+          }
+          return '/' + parts.join('/');
+        }
+        let editor = null;
+        try {
+          if (window.__jsgenActiveDateEditor && document.contains(window.__jsgenActiveDateEditor)) {
+            editor = window.__jsgenActiveDateEditor;
+          }
+        } catch (e) {}
+        if (!editor) editor = document.querySelector('.el-date-editor.is-active');
+        if (!editor) {
+          const focused = document.querySelector('.el-date-editor .el-input.is-focus, .el-date-editor input:focus');
+          if (focused) editor = focused.closest('.el-date-editor');
+        }
+        if (!editor) {
+          const visible = Array.from(document.querySelectorAll('.el-date-editor')).filter((ed) => ed.offsetParent !== null);
+          const inDlg = visible.filter((ed) => ed.closest('.el-dialog, .el-drawer, .el-message-box'));
+          const pool = inDlg.length ? inDlg : visible;
+          if (hintLabel) {
+            editor = pool.find((ed) => formItemLabel(ed) === hintLabel) || null;
+          }
+          if (!editor && pool.length === 1) editor = pool[0];
+          if (!editor && pool.length > 1) {
+            // Prefer the editor whose value matches the just-picked date / changed most recently
+            editor = pool.find((ed) => {
+              const v = (ed.querySelector('input') || {}).value || '';
+              return hintValue && v === hintValue;
+            }) || pool.find((ed) => ((ed.querySelector('input') || {}).value || '').trim()) || pool[0];
+          }
+        }
+        if (!editor) return null;
+        try { window.__jsgenActiveDateEditor = editor; } catch (e) {}
+        const input = editor.querySelector('input');
+        const value = String((input && input.value) || hintValue || '').trim();
+        const label = formItemLabel(editor) || hintLabel;
+        if (!value || !label) return null;
+        return {
+          kind: 'fill_date',
+          label_text: label,
+          value: value,
+          xpath: xpathOf(input || editor),
+          bu_xpath: '',
+          xpath_abs: xpathOf(input || editor),
+          tag: 'input',
+          attributes: {},
+          text: value.slice(0, 80),
+          source_channel: 'cdp_bib',
+        };
+      })()`,
+      returnByValue: true,
+      awaitPromise: false,
+    });
+    const payload = result?.result?.value;
+    if (!payload || typeof payload !== 'object') return null;
+    if (!payload.label_text || !payload.value) return null;
     return payload;
   } catch {
     return null;

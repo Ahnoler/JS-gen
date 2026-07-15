@@ -33,6 +33,7 @@ const CTRL_OBJECT = `{
     for (const item of c.querySelectorAll('.el-form-item')) {
       const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
       if (!lbl.includes(label)) continue;
+      item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
       if (!t) return 'no-input-found';
       if (t.disabled || t.readOnly) return 'field-disabled';
@@ -65,6 +66,7 @@ const CTRL_OBJECT = `{
       if (searchChars.length < 2) continue;
       const allCharsMatch = searchChars.every(ch => lbl.includes(ch));
       if (!allCharsMatch) continue;
+      item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
       if (!t) return 'no-input-found';
       if (t.disabled || t.readOnly) return 'field-disabled';
@@ -94,6 +96,7 @@ const CTRL_OBJECT = `{
       if (inp.closest('.el-date-editor,.tsscdatepicker')) continue;
       const ph = inp.getAttribute('placeholder') || '';
       if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent !== null) {
+        inp.scrollIntoView({ block: 'center', behavior: 'instant' });
         setFn(inp, val);
         return 'ok-placeholder';
       }
@@ -110,6 +113,7 @@ const CTRL_OBJECT = `{
       if (score > bestScore) { bestScore = score; bestMatch = item; }
     }
     if (bestMatch && bestScore >= 0.4) {
+      bestMatch.scrollIntoView({ block: 'center', behavior: 'instant' });
       const t = bestMatch.querySelector('input:not([type="hidden"])') || bestMatch.querySelector('textarea');
       if (t && !t.disabled && !t.readOnly) { setFn(t, val); return 'ok-fuzzy'; }
     }
@@ -122,6 +126,7 @@ const CTRL_OBJECT = `{
     for (const item of c.querySelectorAll('.el-form-item')) {
       const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
       if (!lbl.includes(label)) continue;
+      item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const trigger = item.querySelector('.el-select .el-input__inner');
       if (!trigger) return 'no-select-found';
       if (trigger.disabled) return 'select-disabled';
@@ -145,6 +150,7 @@ const CTRL_OBJECT = `{
     for (const sel of c.querySelectorAll('.el-select .el-input__inner')) {
       const ph = sel.getAttribute('placeholder') || '';
       if (ph.includes(label) && !sel.disabled && sel.offsetParent !== null) {
+        sel.scrollIntoView({ block: 'center', behavior: 'instant' });
         sel.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
         sel.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
         sel.click();
@@ -169,6 +175,7 @@ const CTRL_OBJECT = `{
     for (const item of c.querySelectorAll('.el-form-item')) {
       const lbl = item.querySelector('.el-form-item__label');
       if (!lbl || !lbl.textContent.trim().includes(label)) continue;
+      item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const input = item.querySelector('input');
       if (!input) return 'no-input';
       if (input.value === dateStr) return 'already:' + dateStr;
@@ -188,6 +195,7 @@ const CTRL_OBJECT = `{
   clickRadio: (label, option) => {
     for (const item of CTRL.getContainer().querySelectorAll('.el-form-item')) {
       if (!(item.querySelector('.el-form-item__label')?.textContent?.trim()||'').includes(label)) continue;
+      item.scrollIntoView({ block: 'center', behavior: 'instant' });
       for (const r of item.querySelectorAll('.el-radio')) { if (r.textContent.trim()===option && r.offsetParent!==null) { r.click(); return 'ok'; } }
       return 'option-not-found';
     }
@@ -196,6 +204,7 @@ const CTRL_OBJECT = `{
   selectTreeOption: (label, option) => {
     const item = [...CTRL.getContainer().querySelectorAll('.el-form-item')].find(i => (i.querySelector('.el-form-item__label')?.textContent?.trim()||'').includes(label));
     if (!item) return 'label-not-found';
+    item.scrollIntoView({ block: 'center', behavior: 'instant' });
     const input = item.querySelector('input');
     if (!input || input.disabled || input.readOnly) return input ? 'disabled' : 'no-input';
     input.click();
@@ -235,11 +244,11 @@ const CTRL_OBJECT = `{
   },
   clickMenuItem: (text) => {
     const d = [...document.querySelectorAll('.el-menu-item')].find(el => el.textContent.trim()===text && el.offsetParent!==null);
-    if (d) { d.click(); return 'ok'; }
+    if (d) { d.scrollIntoView({ block: 'center', behavior: 'instant' }); d.click(); return 'ok'; }
     for (const sm of document.querySelectorAll('.el-submenu')) {
       if ([...sm.querySelectorAll('.el-menu-item')].some(i => i.textContent.trim()===text)) {
         if (!sm.classList.contains('is-opened')) sm.querySelector('.el-submenu__title')?.click();
-        setTimeout(() => { const t = [...sm.querySelectorAll('.el-menu-item')].find(i => i.textContent.trim()===text); if (t) t.click(); }, 300);
+        setTimeout(() => { const t = [...sm.querySelectorAll('.el-menu-item')].find(i => i.textContent.trim()===text); if (t) { t.scrollIntoView({ block: 'center', behavior: 'instant' }); t.click(); } }, 300);
         return 'ok-expanded';
       }
     }
@@ -247,17 +256,18 @@ const CTRL_OBJECT = `{
   },
   closeDialog: () => {
     const n = document.querySelector('.el-notification');
-    if (n && n.offsetParent!==null) { const cb = n.querySelector('.el-notification__closeBtn'); if (cb) cb.click(); return 'ok-notification'; }
+    if (n && n.offsetParent!==null) { n.scrollIntoView({ block: 'center', behavior: 'instant' }); const cb = n.querySelector('.el-notification__closeBtn'); if (cb) cb.click(); return 'ok-notification'; }
     for (const d of [...document.querySelectorAll('.el-dialog')].reverse()) {
-      if (d.offsetParent!==null) { const cb = d.querySelector('.el-dialog__headerbtn .el-dialog__close,.el-dialog__headerbtn .el-icon-close'); if (cb) { cb.click(); return 'ok'; } const cb2 = d.querySelector('.el-dialog__footer .el-button--default'); if (cb2) { cb2.click(); return 'ok-cancel'; } return 'no-close-button'; }
+      if (d.offsetParent!==null) { d.scrollIntoView({ block: 'center', behavior: 'instant' }); const cb = d.querySelector('.el-dialog__headerbtn .el-dialog__close,.el-dialog__headerbtn .el-icon-close'); if (cb) { cb.click(); return 'ok'; } const cb2 = d.querySelector('.el-dialog__footer .el-button--default'); if (cb2) { cb2.click(); return 'ok-cancel'; } return 'no-close-button'; }
     }
-    for (const d of [...document.querySelectorAll('.el-drawer')].reverse()) { if (d.offsetParent!==null) { const cb = d.querySelector('.el-drawer__close-btn,.el-drawer__header .el-icon-close'); if (cb) { cb.click(); return 'ok'; } return 'no-close-button'; } }
+    for (const d of [...document.querySelectorAll('.el-drawer')].reverse()) { if (d.offsetParent!==null) { d.scrollIntoView({ block: 'center', behavior: 'instant' }); const cb = d.querySelector('.el-drawer__close-btn,.el-drawer__header .el-icon-close'); if (cb) { cb.click(); return 'ok'; } return 'no-close-button'; } }
     return 'no-overlay-open';
   },
   checkFieldValue: (label) => {
     for (const item of CTRL.getContainer().querySelectorAll('.el-form-item')) {
       const lbl = item.querySelector('.el-form-item__label');
       if (!lbl || !lbl.textContent.trim().includes(label)) continue;
+      item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const input = item.querySelector('input:not([type="hidden"]),textarea,.el-select .el-input__inner');
       if (!input) return 'no-input';
       return (input.value||'').trim() || 'empty';
@@ -267,6 +277,7 @@ const CTRL_OBJECT = `{
   clickAdjacentButton: (label) => {
     for (const item of CTRL.getContainer().querySelectorAll('.el-form-item')) {
       if (!(item.querySelector('.el-form-item__label')?.textContent?.trim()||'').includes(label)) continue;
+      item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const input = item.querySelector('.el-input__inner');
       if (input && input.value && input.value.trim()!=='') return 'already-filled';
       const btn = item.querySelector('button.el-button--primary.is-plain,button.el-button--primary');
@@ -276,13 +287,14 @@ const CTRL_OBJECT = `{
     return 'label-not-found';
   },
   waitForLoading: () => new Promise(resolve => { let el=0; const ck=()=>{ if(el>=30000){resolve('timeout');return; } const busy=document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden), .el-loading-spinner, [class*=\"loading-spinner\"], [class*=\"loading-mask\"]:not([class*=\"hidden\"])'); if(!busy||busy.offsetParent===null){ const anims=document.getAnimations?document.getAnimations().filter(a=>a.playState==='running'):[]; if(anims.length===0) resolve(); else { el+=100; setTimeout(ck,100); } } else { el+=200; setTimeout(ck,200); } }; ck(); }),
-  switchTab: (name) => { for (const tab of document.querySelectorAll('.el-tabs__item')) { if (tab.textContent.trim()===name && tab.offsetParent!==null) { tab.click(); return 'ok'; } } return 'tab-not-found'; },
-  expandAllTreeNodes: () => { let t=0; for(let r=0;r<10;r++){ const tree=document.querySelector('.el-tree'); if(!tree) return -1; let n=0; tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node=>{ const ic=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon'); if(ic){ic.click();n++;} }); if(n===0)break; t+=n; } return t; },
+  switchTab: (name) => { for (const tab of document.querySelectorAll('.el-tabs__item')) { if (tab.textContent.trim()===name && tab.offsetParent!==null) { tab.scrollIntoView({ block: 'center', behavior: 'instant' }); tab.click(); return 'ok'; } } return 'tab-not-found'; },
+  expandAllTreeNodes: () => { let t=0; for(let r=0;r<10;r++){ const tree=document.querySelector('.el-tree'); if(!tree) return -1; tree.scrollIntoView({ block: 'center', behavior: 'instant' }); let n=0; tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node=>{ const ic=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon'); if(ic){ic.click();n++;} }); if(n===0)break; t+=n; } return t; },
   fillAddressFields: (addr) => {
     let count = 0;
     for (const item of CTRL.getContainer().querySelectorAll('.el-form-item')) {
       const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
       if (!lbl.includes('地址')) continue;
+      item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const t = item.querySelector('input:not([type="hidden"]):not([disabled]):not([readOnly]),textarea:not([disabled]):not([readOnly])');
       if (!t) continue;
       const TagProto = t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
@@ -297,8 +309,9 @@ const CTRL_OBJECT = `{
     return count > 0 ? 'ok:' + count : 'no-address-fields';
   },
 	  clickTableRowButton: (rowText, btnText) => {
-	    for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
-	      if (!row.textContent.includes(rowText)) continue;
+		    for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
+		      if (!row.textContent.includes(rowText)) continue;
+		      row.scrollIntoView({ block: 'center', behavior: 'instant' });
 	      for (const btn of row.querySelectorAll('button,.el-button,i[class*="icon"]')) {
 	        const t=btn.textContent?.trim()||'', c=btn.className||'';
 	        if (t.includes(btnText) || c.includes(btnText.toLowerCase())) { if (btn.offsetParent!==null) { btn.click(); return 'ok'; } }
@@ -311,10 +324,35 @@ const CTRL_OBJECT = `{
 	    return 'row-not-found';
 	  },
 	  clickTableRowRadio: (rowText) => {
+	    if (!rowText) return 'row-text-empty';
+	    const tables = document.querySelectorAll('.el-table');
+	    for (const table of tables) {
+	      const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr.el-table__row, .el-table__body-wrapper tbody tr');
+	      for (let i = 0; i < bodyRows.length; i++) {
+	        const row = bodyRows[i];
+	        if (!(row.textContent || '').includes(rowText)) continue;
+	        row.scrollIntoView({ block: 'center', behavior: 'instant' });
+	        // Radio may live on the body row or the matching fixed-column row
+	        let radio = row.querySelector('label.el-radio');
+	        if (!radio) {
+	          const fixedRows = table.querySelectorAll(
+	            '.el-table__fixed-body-wrapper tbody tr.el-table__row, .el-table__fixed tbody tr.el-table__row, .el-table__fixed-left tbody tr.el-table__row'
+	          );
+	          if (fixedRows[i]) radio = fixedRows[i].querySelector('label.el-radio');
+	        }
+	        if (!radio) return 'radio-not-found';
+	        if (radio.offsetParent === null && !radio.closest('.el-table__fixed')) return 'radio-not-found';
+	        const inner = radio.querySelector('.el-radio__inner');
+	        (inner || radio).click();
+	        return 'ok';
+	      }
+	    }
+	    // Fallback: original body-wrapper scan
 	    for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
 	      if (!row.textContent.includes(rowText)) continue;
+	      row.scrollIntoView({ block: 'center', behavior: 'instant' });
 	      const radio = row.querySelector('label.el-radio');
-	      if (!radio || radio.offsetParent === null) return 'radio-not-found';
+	      if (!radio) return 'radio-not-found';
 	      const inner = radio.querySelector('.el-radio__inner');
 	      (inner || radio).click();
 	      return 'ok';

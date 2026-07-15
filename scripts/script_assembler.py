@@ -418,7 +418,9 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         r = p('row_text')
         lines.append(f"    console.log('[{step_num}] Table radio \"{r}\"');")
         lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.clickTableRowRadio('{_escape(r)}'));")
+        lines.append(f"    const _trr{step_num} = await page.evaluate(() => CTRL.clickTableRowRadio('{_escape(r)}'));")
+        lines.append(f"    console.log('[{step_num}]   table radio:', _trr{step_num});")
+        lines.append(f"    if (_trr{step_num} !== 'ok') _recordError({step_num}, 'click_table_row_radio', '{_escape_js_string(r)}', '', _trr{step_num}, 'Row or radio not found');")
         lines.append('')
         return '\n'.join(lines)
 
