@@ -1,0 +1,611 @@
+/**
+ * Minimal Remote Browser-in-Browser canvas (CDP screencast + normalized input).
+ * Display uses object-fit:contain letterboxing; clicks map only over the image area.
+ */
+import { on, send, isConnected } from './ws-client.js';
+
+const MAGIC = 'RSCF';
+
+let canvas, ctx, statusEl, inputHintEl, stageEl, stageWrapEl;
+let attached = false;
+let inputEnabled = false;
+let remoteSessionId = null;
+let streaming = false;
+let lastBitmap = null;
+let cdpReady = false;
+let browserConnected = false;
+let attaching = false;
+/** Logical CSS viewport of remote Chrome (from status / frames) */
+let remoteViewport = { w: 1920, h: 1080 };
+/** Effective display scale currently applied */
+let displayScale = 0.6;
+/**
+ * Scale mode:
+ * - 'auto' → fit into wrap (may go small)
+ * - number string / manual → fixed % of remote frame (scroll if needed)
+ */
+const SCALE_STORAGE_KEY = 'jsgen.remoteDisplayScale';
+let scaleMode = 'manual'; // 'auto' | 'manual'
+let manualScale = 0.6;
+/** Where the JPEG is drawn inside the canvas (letterbox), in canvas CSS pixels */
+let contentBox = { x: 0, y: 0, w: 0, h: 0 };
+
+function $(id) {
+  return document.getElementById(id);
+}
+
+function setUiStatus(text, tone = 'neutral') {
+  if (!statusEl) return;
+  statusEl.textContent = text;
+  const colors = {
+    ok: '#065f46',
+    warn: '#92400e',
+    bad: '#991b1b',
+    neutral: 'var(--slate-500)',
+  };
+  const bgs = {
+    ok: '#d1fae5',
+    warn: '#fef3c7',
+    bad: '#fee2e2',
+    neutral: 'var(--slate-100)',
+  };
+  statusEl.style.color = colors[tone] || colors.neutral;
+  statusEl.style.background = bgs[tone] || bgs.neutral;
+}
+
+function updateInputHint() {
+  if (!inputHintEl) return;
+  if (!attached) {
+    inputHintEl.textContent = '未附着 — 先启动 Session，再点「附着画面」';
+    return;
+  }
+  const vh = remoteViewport.w && remoteViewport.h
+    ? `远端 ${remoteViewport.w}×${remoteViewport.h}`
+    : '远端';
+  const sc = `显示 ${(displayScale * 100).toFixed(0)}%${scaleMode === 'auto' ? '（自适应）' : ''}`;
+  const rec = (typeof window !== 'undefined' && document.getElementById('sessManualRecStatus')?.textContent === '录制中')
+    ? ' · 画布录制中'
+    : '';
+  if (!inputEnabled) {
+    inputHintEl.textContent = `仅观看：Agent 忙碌 · ${vh} · ${sc}${rec}`;
+    return;
+  }
+  inputHintEl.textContent = `可输入：点击/按键 · ${vh} · ${sc}${rec}`;
+}
+
+function syncScaleControls() {
+  const sel = $('sessRemoteScaleMode');
+  const slider = $('sessRemoteScaleSlider');
+  const label = $('sessRemoteScaleLabel');
+  const pct = Math.round(manualScale * 100);
+  if (sel) {
+    const optVals = [...sel.options].map((o) => o.value);
+    if (scaleMode === 'auto') sel.value = 'auto';
+    else if (optVals.includes(String(manualScale)) || optVals.includes(manualScale.toFixed(2))) {
+      sel.value = String(manualScale);
+    } else {
+      // custom — keep select on nearest preset without forcing
+      sel.value = optVals.includes('0.6') ? '0.6' : sel.value;
+    }
+  }
+  if (slider && scaleMode !== 'auto') slider.value = String(pct);
+  if (label) label.textContent = scaleMode === 'auto' ? '自适应' : `${pct}%`;
+}
+
+function loadScalePreference() {
+  try {
+    const raw = localStorage.getItem(SCALE_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed?.mode === 'auto') {
+      scaleMode = 'auto';
+    } else if (typeof parsed?.scale === 'number' && parsed.scale > 0) {
+      scaleMode = 'manual';
+      manualScale = Math.min(1, Math.max(0.25, parsed.scale));
+    } else if (typeof parsed === 'string' && parsed === 'auto') {
+      scaleMode = 'auto';
+    } else if (typeof parsed === 'number') {
+      scaleMode = 'manual';
+      manualScale = Math.min(1, Math.max(0.25, parsed));
+    }
+  } catch {}
+}
+
+function saveScalePreference() {
+  try {
+    localStorage.setItem(SCALE_STORAGE_KEY, JSON.stringify(
+      scaleMode === 'auto' ? { mode: 'auto' } : { mode: 'manual', scale: manualScale },
+    ));
+  } catch {}
+}
+
+function setScaleFromUi(modeOrScale) {
+  if (modeOrScale === 'auto') {
+    scaleMode = 'auto';
+  } else {
+    const n = Number(modeOrScale);
+    if (!Number.isFinite(n) || n <= 0) return;
+    scaleMode = 'manual';
+    manualScale = Math.min(1, Math.max(0.25, n));
+  }
+  saveScalePreference();
+  syncScaleControls();
+  fitCanvasToStage();
+}
+
+function syncButtons() {
+  const attachBtn = $('sessRemoteAttachBtn');
+  const detachBtn = $('sessRemoteDetachBtn');
+  if (attachBtn) attachBtn.disabled = attached || attaching;
+  if (detachBtn) detachBtn.disabled = (!attached && !remoteSessionId) || attaching;
+}
+
+function applyStatus(payload = {}) {
+  if ('attached' in payload) attached = !!payload.attached;
+  if ('inputEnabled' in payload) inputEnabled = !!payload.inputEnabled;
+  if ('remoteSessionId' in payload) remoteSessionId = payload.remoteSessionId ?? null;
+  if ('cdpReady' in payload) cdpReady = !!payload.cdpReady;
+  if ('connected' in payload) browserConnected = !!payload.connected;
+  if ('agentBusy' in payload && !('inputEnabled' in payload)) {
+    inputEnabled = attached && !payload.agentBusy;
+  }
+  if (payload.viewportW > 0) remoteViewport.w = Math.round(payload.viewportW);
+  if (payload.viewportH > 0) remoteViewport.h = Math.round(payload.viewportH);
+
+  updateInputHint();
+  syncButtons();
+  fitCanvasToStage();
+
+  if (attached) {
+    setUiStatus(
+      `已附着 #${remoteSessionId}${payload.agentBusy ? ' · Agent busy' : ''} · ${remoteViewport.w}×${remoteViewport.h} · 显示${(displayScale * 100).toFixed(0)}%`,
+      payload.agentBusy ? 'warn' : 'ok',
+    );
+  } else if (cdpReady) {
+    setUiStatus('CDP 就绪 · 未附着', 'neutral');
+  } else if (browserConnected) {
+    setUiStatus('浏览器已就绪 · CDP 探测中（仍可尝试附着）', 'warn');
+  } else {
+    setUiStatus('先新建 Session 再附着', 'neutral');
+  }
+}
+
+function parseFrame(buf) {
+  const view = new DataView(buf);
+  const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
+  if (magic !== MAGIC || buf.byteLength < 10) return null;
+  const frameId = view.getUint32(4, false);
+  const uuidLen = view.getUint16(8, false);
+  if (buf.byteLength < 10 + uuidLen) return null;
+  const uuidBytes = new Uint8Array(buf, 10, uuidLen);
+  const sessionUuid = new TextDecoder().decode(uuidBytes);
+  const jpeg = buf.slice(10 + uuidLen);
+  return { frameId, sessionUuid, jpeg };
+}
+
+/**
+ * Layout stage by user scale or auto-fit. Never crops the remote frame.
+ * Manual 60% of 1920×1080 → 1152×648 (scroll wrap if needed).
+ */
+function layoutStage() {
+  if (!stageEl || !stageWrapEl) return { cssW: 640, cssH: 360 };
+
+  // Prefer remote CSS viewport for scale base so status matches Session (1920×1080).
+  // Fall back to bitmap when status not yet known.
+  const srcW = remoteViewport.w || lastBitmap?.width || 1920;
+  const srcH = remoteViewport.h || lastBitmap?.height || 1080;
+  const maxW = Math.max(160, stageWrapEl.clientWidth || stageWrapEl.getBoundingClientRect().width);
+  const maxH = Math.max(120, Math.min(window.innerHeight * 0.75, 900));
+
+  let scale;
+  if (scaleMode === 'auto') {
+    scale = Math.min(maxW / srcW, maxH / srcH, 1);
+  } else {
+    scale = manualScale;
+  }
+  displayScale = scale;
+  const cssW = Math.max(1, Math.round(srcW * scale));
+  const cssH = Math.max(1, Math.round(srcH * scale));
+
+  stageEl.style.width = `${cssW}px`;
+  stageEl.style.height = `${cssH}px`;
+  stageEl.style.maxWidth = 'none';
+  stageEl.style.aspectRatio = 'auto';
+  // Wheel must go to CDP, not scroll the Dashboard / wrap
+  if (stageWrapEl) {
+    stageWrapEl.style.overflow = 'hidden';
+    stageWrapEl.style.overscrollBehavior = 'contain';
+  }
+
+  return { cssW, cssH, srcW, srcH, scale };
+}
+
+/** Size canvas buffer to the scaled stage and redraw full frame (contain / no crop). */
+function fitCanvasToStage() {
+  if (!canvas || !stageEl) return;
+  const { cssW, cssH } = layoutStage();
+  const dpr = window.devicePixelRatio || 1;
+  const bw = Math.round(cssW * dpr);
+  const bh = Math.round(cssH * dpr);
+  if (canvas.width !== bw || canvas.height !== bh) {
+    canvas.width = bw;
+    canvas.height = bh;
+  }
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
+  if (lastBitmap) paintBitmap(lastBitmap);
+  updateInputHint();
+}
+
+function paintBitmap(bitmap) {
+  if (!canvas || !ctx || !bitmap) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.width / dpr;
+  const cssH = canvas.height / dpr;
+
+  // Stretch frame into the scaled stage box (stage already matches remote aspect).
+  contentBox = { x: 0, y: 0, w: cssW, h: cssH };
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, cssW, cssH);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, 0, 0, cssW, cssH);
+}
+
+async function drawJpeg(arrayBuffer) {
+  if (!canvas || !ctx) return;
+  try {
+    const bitmap = await createImageBitmap(new Blob([arrayBuffer], { type: 'image/jpeg' }));
+    if (lastBitmap) lastBitmap.close();
+    lastBitmap = bitmap;
+    // Frame pixels define the aspect we must preserve when scaling the stage
+    if (bitmap.width > 0 && bitmap.height > 0) {
+      // Prefer live frame size for layout when status viewport lags
+      if (!remoteViewport.w || !remoteViewport.h
+        || Math.abs(bitmap.width / bitmap.height - remoteViewport.w / remoteViewport.h) > 0.02) {
+        // keep remoteViewport for click→CSS mapping from server status;
+        // layout uses bitmap dimensions
+      }
+    }
+    fitCanvasToStage();
+  } catch (e) {
+    console.warn('[remote-browser] draw failed', e);
+  }
+}
+
+/**
+ * Map pointer → normalized 0–1 over the *image content* (not letterbox bars).
+ * Returns null if click is outside the image.
+ */
+function normCoords(evt) {
+  const rect = canvas.getBoundingClientRect();
+  const cssX = evt.clientX - rect.left;
+  const cssY = evt.clientY - rect.top;
+  if (contentBox.w <= 0 || contentBox.h <= 0) return null;
+  const x = (cssX - contentBox.x) / contentBox.w;
+  const y = (cssY - contentBox.y) / contentBox.h;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+  return { x, y };
+}
+
+function sendMouse(type, evt, extra = {}) {
+  if (!streaming) return;
+  const coords = normCoords(evt);
+  if (!coords) return;
+  // Hover highlight allowed even when input disabled (agent busy)
+  const hoverOnly = !!extra.hoverOnly;
+  if (!hoverOnly && !inputEnabled) return;
+  if (!hoverOnly) evt.preventDefault();
+  send('remote:input', {
+    kind: 'mouse',
+    type,
+    x: coords.x,
+    y: coords.y,
+    button: evt.button === 2 ? 'right' : 'left',
+    clickCount: evt.detail || 1,
+    buttons: evt.buttons || 0,
+    hoverOnly,
+  });
+}
+
+async function attachLiveHttp() {
+  attaching = true;
+  syncButtons();
+  try {
+    // Do NOT send dashboard canvas size as Chrome viewport — preserves real window ratio.
+    const res = await fetch('/api/v2/remote-sessions/attach-live', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quality: 70 }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    applyStatus(data.status || {});
+    startStream();
+  } finally {
+    attaching = false;
+    syncButtons();
+  }
+}
+
+async function detachLiveHttp() {
+  const id = remoteSessionId;
+  stopStream();
+  if (!id) {
+    applyStatus({ attached: false, cdpReady: true });
+    return;
+  }
+  const res = await fetch(`/api/v2/remote-sessions/${id}/detach`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok && res.status !== 404) throw new Error(data.error || res.statusText);
+  applyStatus(data.status || { attached: false, cdpReady: true });
+}
+
+function startStream() {
+  streaming = true;
+  send('remote:subscribe', {});
+  // No viewportW/H — must not Emulation-resize Session Chrome
+  send('remote:start', { quality: 70 });
+  fitCanvasToStage();
+}
+
+function stopStream() {
+  streaming = false;
+  send('remote:stop', {});
+  send('remote:unsubscribe', {});
+}
+
+function bindCanvasInput() {
+  if (!canvas) return;
+  // Prevent double-binding if initRemoteBrowser runs twice (HMR / re-entry)
+  if (canvas.dataset.remoteBound === '1') return;
+  canvas.dataset.remoteBound = '1';
+
+  let keyboardArmed = false;
+  let lastSentKey = { ch: '', t: 0 };
+
+  const armKeyboard = () => {
+    keyboardArmed = true;
+    try { canvas.focus({ preventScroll: true }); } catch { try { canvas.focus(); } catch {} }
+  };
+
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('mousedown', (e) => {
+    armKeyboard();
+    sendMouse('mousePressed', e);
+  });
+  canvas.addEventListener('mouseup', (e) => {
+    armKeyboard();
+    sendMouse('mouseReleased', e);
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (!streaming) return;
+    if (e.buttons === 0) {
+      sendMouse('mouseMoved', e, { hoverOnly: true });
+      return;
+    }
+    if (!inputEnabled) return;
+    const coords = normCoords(e);
+    if (!coords) return;
+    send('remote:input', {
+      kind: 'mouse', type: 'mouseMoved', x: coords.x, y: coords.y,
+      button: 'left', buttons: e.buttons,
+    });
+  });
+  canvas.addEventListener('mouseleave', () => {
+    send('remote:inspect', { clear: true });
+  });
+
+  function forwardWheel(e) {
+    // Always stop Dashboard page scroll when pointer is over the remote stage
+    if (!streaming) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!inputEnabled) return;
+    const coords = normCoords(e) || { x: 0.5, y: 0.5 };
+    let dx = e.deltaX;
+    let dy = e.deltaY;
+    if (e.deltaMode === 1) { dx *= 16; dy *= 16; }
+    else if (e.deltaMode === 2) {
+      const h = Math.max(240, canvas?.clientHeight || 720);
+      dx *= h; dy *= h;
+    }
+    send('remote:input', {
+      kind: 'mouse',
+      type: 'mouseWheel',
+      x: coords.x,
+      y: coords.y,
+      deltaX: dx,
+      deltaY: dy,
+    });
+  }
+
+  // Capture on wrap so Dashboard page scroll cannot steal the gesture (single handler — no double scroll)
+  const wheelTarget = stageWrapEl || canvas;
+  wheelTarget.addEventListener('wheel', forwardWheel, { passive: false, capture: true });
+
+  canvas.setAttribute('tabindex', '0');
+
+  function modifiersOf(e) {
+    return (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0);
+  }
+
+  function onKeyDown(e) {
+    if (!streaming || !inputEnabled || !keyboardArmed) return;
+    const tag = (e.target && e.target.tagName) || '';
+    if (e.target !== canvas && (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable)) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const mods = modifiersOf(e);
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const now = Date.now();
+      // Client-side dedupe (guards double window listeners / repeat storms)
+      if (lastSentKey.ch === e.key && now - lastSentKey.t < 20) return;
+      lastSentKey = { ch: e.key, t: now };
+      send('remote:input', { kind: 'text', text: e.key });
+      return;
+    }
+    // Ignore browser key-repeat flood for navigation keys slightly
+    if (e.repeat && (e.key === 'Backspace' || e.key === 'Delete')) {
+      // allow repeat for backspace
+    }
+    send('remote:input', {
+      kind: 'key',
+      type: 'keyDown',
+      key: e.key,
+      code: e.code,
+      keyCode: e.keyCode,
+      modifiers: mods,
+    });
+  }
+
+  function onKeyUp(e) {
+    if (!streaming || !inputEnabled || !keyboardArmed) return;
+    const tag = (e.target && e.target.tagName) || '';
+    if (e.target !== canvas && (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable)) {
+      return;
+    }
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) return;
+    e.preventDefault();
+    send('remote:input', {
+      kind: 'key',
+      type: 'keyUp',
+      key: e.key,
+      code: e.code,
+      keyCode: e.keyCode,
+      modifiers: modifiersOf(e),
+    });
+  }
+
+  window.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('keyup', onKeyUp, true);
+  document.addEventListener('mousedown', (e) => {
+    if (!canvas.contains(e.target) && e.target !== canvas
+      && !(stageWrapEl && stageWrapEl.contains(e.target))) {
+      keyboardArmed = false;
+    }
+  }, true);
+}
+
+export function initRemoteBrowser() {
+  canvas = $('sessRemoteCanvas');
+  stageEl = $('sessRemoteStage') || canvas?.parentElement;
+  stageWrapEl = $('sessRemoteStageWrap') || stageEl?.parentElement;
+  ctx = canvas?.getContext('2d');
+  statusEl = $('sessRemoteStatus');
+  inputHintEl = $('sessRemoteInputHint');
+  if (!canvas) return;
+
+  loadScalePreference();
+  syncScaleControls();
+  bindCanvasInput();
+  fitCanvasToStage();
+  window.addEventListener('resize', () => fitCanvasToStage());
+  if (typeof ResizeObserver !== 'undefined' && stageWrapEl) {
+    new ResizeObserver(() => fitCanvasToStage()).observe(stageWrapEl);
+  }
+
+  $('sessRemoteScaleMode')?.addEventListener('change', (e) => {
+    setScaleFromUi(e.target.value);
+  });
+  $('sessRemoteScaleSlider')?.addEventListener('input', (e) => {
+    const pct = Number(e.target.value);
+    setScaleFromUi(pct / 100);
+    const sel = $('sessRemoteScaleMode');
+    if (sel) {
+      // Reflect custom % — if exact preset exists select it, else leave previous preset
+      const asStr = String(+(pct / 100).toFixed(2));
+      const hit = [...sel.options].find((o) => o.value === asStr || o.value === String(pct / 100));
+      if (hit) sel.value = hit.value;
+    }
+  });
+
+  $('sessRemoteAttachBtn')?.addEventListener('click', async () => {
+    try {
+      await attachLiveHttp();
+      setUiStatus('已附着 · 推流中', 'ok');
+    } catch (e) {
+      setUiStatus(`附着失败: ${e.message}`, 'bad');
+    }
+  });
+
+  $('sessRemoteDetachBtn')?.addEventListener('click', async () => {
+    try {
+      await detachLiveHttp();
+      setUiStatus('已分离', 'neutral');
+    } catch (e) {
+      setUiStatus(`分离失败: ${e.message}`, 'bad');
+    }
+  });
+
+  on('remote:status', applyStatus);
+  on('remote:inspect', (p) => {
+    const el = $('sessRemoteInspectLabel');
+    if (!el) return;
+    const label = p?.label;
+    el.textContent = label ? `悬停高亮：${label}` : '悬停高亮：—';
+    el.title = label || '悬停高亮的元素';
+  });
+  on('remote:error', (p) => setUiStatus(`错误: ${p?.message || 'unknown'}`, 'bad'));
+  on('manual_record_status', (p) => {
+    // Refresh hint when user toggles 人工录制
+    if ('enabled' in (p || {})) {
+      applyStatus({ manualRecording: !!p.enabled });
+    }
+  });
+  on('remote:frame', async (payload) => {
+    if (!streaming) return;
+    if (payload?.jpeg) await drawJpeg(payload.jpeg);
+    if (payload?.frameId != null) {
+      send('remote:ack', {
+        frameId: payload.frameId,
+        sessionId: payload.frameId,
+        sessionUuid: payload.sessionUuid,
+      });
+    }
+  });
+  on('watcher:status', (p) => {
+    if (!p) return;
+    applyStatus({
+      connected: !!p.connected,
+      cdpReady: !!p.cdpReady,
+      agentBusy: !!p.agentBusy,
+      inputEnabled: attached && !p.agentBusy,
+    });
+  });
+  on('server:init', (data) => {
+    const w = data?.watcher;
+    if (w) {
+      applyStatus({
+        connected: !!w.connected,
+        cdpReady: !!w.cdpReady,
+        agentBusy: !!w.agentBusy,
+      });
+    }
+  });
+
+  on('ws:binary', async (buf) => {
+    const parsed = parseFrame(buf);
+    if (!parsed) return;
+    if (!streaming) streaming = true;
+    await drawJpeg(parsed.jpeg);
+    send('remote:ack', { frameId: parsed.frameId, sessionId: parsed.frameId, sessionUuid: parsed.sessionUuid });
+  });
+
+  fetch('/api/v2/remote-sessions/live/status')
+    .then((r) => r.json())
+    .then(applyStatus)
+    .catch(() => {});
+
+  if (isConnected()) send('remote:status', {});
+}
+
+export { parseFrame };

@@ -10,6 +10,10 @@ import { persistSessionTrajectory, getTrajectoryActionFlow, upsertPhaseDescripti
 import { persistSessionCaseData, persistFormSnapshotsFromFile } from '../services/case-data-service.js';
 import { broadcast, onWsMessage } from '../ws-server.js';
 import {
+  refreshCdpEndpoints, clearCdpEndpoints, detachLive, getRemoteStatus, initRemoteBridgeWs,
+  notifyManualRecordingChanged,
+} from '../cdp/remote-bridge.js';
+import {
   PYTHON_EXE, AGENT_SCRIPT, killTree, killOrphans,
   waitForReady, isProcessAlive, spawnAgent, setupSSE, createPushChannel, resolveModelId,
 } from './explore-utils.js';
@@ -31,13 +35,32 @@ function broadcastWatcherStatus() {
   broadcast('watcher:status', {
     connected: !!(gb.ready && gb.stdin),
     agentBusy: gb.busy,
+    cdpReady: !!(gb.cdpWsUrl || gb.cdpHttp),
+    cdpHttp: gb.cdpHttp || null,
   });
+  broadcast('remote:status', getRemoteStatus());
+}
+
+async function ensureCdpDiscovered() {
+  const gb = state.globalBrowser;
+  if (gb.cdpWsUrl) return;
+  try {
+    await refreshCdpEndpoints();
+  } catch (e) {
+    console.warn('[browser-global] CDP discover failed:', e.message);
+  }
+}
+
+async function teardownRemoteBridge() {
+  try { await detachLive({ crashed: true }); } catch {}
+  clearCdpEndpoints();
 }
 
 async function ensureGlobalBrowser(modelId) {
   const gb = state.globalBrowser;
   if (isProcessAlive(gb.process)) {
     if (!gb.ready) await waitForReady(gb.process, 15000);
+    await ensureCdpDiscovered();
     return;
   }
   gb.process = null;
@@ -45,6 +68,9 @@ async function ensureGlobalBrowser(modelId) {
   gb.ready = false;
   gb.busy = false;
   gb.stepIndex = 0;
+  gb.cdpHttp = null;
+  gb.cdpWsUrl = null;
+  gb.cdpPort = null;
   killOrphans();
 
   const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY], { OPENAI_API_KEY: LLM_API_KEY });
@@ -52,6 +78,7 @@ async function ensureGlobalBrowser(modelId) {
   child.stderr.on('data', (chunk) => { console.log(chunk.toString().trimEnd()); });
   child.on('exit', () => {
     gb.process = null; gb.stdin = null; gb.ready = false; gb.busy = false; gb.stepIndex = 0;
+    teardownRemoteBridge().finally(() => broadcastWatcherStatus());
     console.log('[browser-global] Agent process exited');
   });
 
@@ -63,11 +90,13 @@ async function ensureGlobalBrowser(modelId) {
   child.stdin.on('error', () => {
     if (!gb.ready) return;
     gb.process = null; gb.stdin = null; gb.ready = false; gb.busy = false; gb.stepIndex = 0;
+    teardownRemoteBridge().finally(() => broadcastWatcherStatus());
   });
 
   try {
     await waitForReady(child, 15000);
     gb.ready = true;
+    await ensureCdpDiscovered();
     broadcastWatcherStatus();
     console.log('[browser-global] Browser ready');
 
@@ -120,6 +149,7 @@ async function ensureGlobalBrowser(modelId) {
             }
           } else if (msg.event === 'manual_record_status') {
             gb.manualRecording = !!msg.data?.enabled;
+            if (gb.manualRecording) notifyManualRecordingChanged(true);
             broadcast('manual_record_status', {
               ...(msg.data || {}),
               sessionId: [...state.sessions.keys()][0] || null,
@@ -567,9 +597,10 @@ export default function (app) {
     res.json({ status: 'archived', sessionId: id });
   });
 
-  app.delete('/api/browser/browser', (req, res) => {
+  app.delete('/api/browser/browser', async (req, res) => {
     const gb = state.globalBrowser;
     const proc = gb.process;
+    await teardownRemoteBridge();
 
     if (gb.stdin) {
       try { gb.stdin.write(JSON.stringify({ event: 'close' }) + '\n'); } catch {}
@@ -948,6 +979,9 @@ export default function (app) {
 
   // ---- CDP Quick Action API (uses in-process watcher via Agent stdin) ----
 
+  // Register remote:* WS handlers (screencast / input)
+  initRemoteBridgeWs();
+
   app.get('/api/browser/watcher/status', (req, res) => {
     const gb = state.globalBrowser;
     const session = [...state.sessions.values()][0];
@@ -955,8 +989,11 @@ export default function (app) {
     res.json({
       connected,
       agentBusy: gb.busy,
+      cdpReady: !!(gb.cdpWsUrl || gb.cdpHttp),
+      cdpHttp: gb.cdpHttp || null,
       manualRecording: !!gb.manualRecording,
       autoPersist: !!(session?.autoPersist ?? gb.autoPersist),
+      remote: getRemoteStatus(),
     });
   });
 
@@ -1027,6 +1064,7 @@ export default function (app) {
     });
 
     gb.manualRecording = !!status.enabled;
+    if (gb.manualRecording) notifyManualRecordingChanged(true);
     res.json({
       status: 'ok',
       enabled: !!status.enabled,

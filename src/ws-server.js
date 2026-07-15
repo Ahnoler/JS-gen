@@ -38,6 +38,8 @@ function getFullState() {
     watcher: {
       connected: !!(gb.ready && gb.stdin),
       agentBusy: gb.busy,
+      cdpReady: !!(gb.cdpWsUrl || gb.cdpHttp),
+      cdpHttp: gb.cdpHttp || null,
     },
   };
 }
@@ -51,6 +53,21 @@ export function broadcast(type, payload) {
     if (client.readyState === 1) {
       client.send(msg);
       count++;
+    }
+  }
+  return count;
+}
+
+/** Broadcast a binary Buffer/Uint8Array to all clients (remote screencast frames). */
+export function broadcastBinary(data) {
+  if (!wss) return 0;
+  let count = 0;
+  for (const client of wss.clients) {
+    if (client.readyState === 1) {
+      try {
+        client.send(data);
+        count++;
+      } catch {}
     }
   }
   return count;
@@ -83,9 +100,13 @@ export function initWebSocket(httpServer) {
         return;
       }
 
-      // 分发给各路由模块注册的处理器
+      // 分发给各路由模块注册的处理器（支持 async）
       for (const handler of wsMessageHandlers) {
-        try { handler(ws, msg); } catch (err) {
+        try {
+          Promise.resolve(handler(ws, msg)).catch((err) => {
+            console.error('[ws] Handler error:', err);
+          });
+        } catch (err) {
           console.error('[ws] Handler error:', err);
         }
       }

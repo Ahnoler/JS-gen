@@ -65,3 +65,23 @@ export async function getByUuid(sessionUuid) {
 export async function listSessions(opts) {
   return remoteSessionDao.list(opts);
 }
+
+/**
+ * Attach Node CDP bridge to the live Session Chrome and open a DB row.
+ * Lazy-imports bridge to avoid circular dependency with CRUD helpers.
+ */
+export async function attachLive(opts = {}) {
+  const bridge = await import('../cdp/remote-bridge.js');
+  return bridge.attachLive(opts);
+}
+
+/** Stop screencast, close CDP client, mark remote_session closed. */
+export async function detachLive(opts = {}) {
+  const bridge = await import('../cdp/remote-bridge.js');
+  return bridge.detachLive(opts);
+}
+
+export async function getLiveStatus() {
+  const bridge = await import('../cdp/remote-bridge.js');
+  return bridge.getRemoteStatus();
+}

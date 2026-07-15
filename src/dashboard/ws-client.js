@@ -28,6 +28,8 @@ export function connect() {
     return;
   }
 
+  ws.binaryType = 'arraybuffer';
+
   ws.onopen = () => {
     console.info('[ws] Connected');
     retries = 0;
@@ -35,6 +37,14 @@ export function connect() {
   };
 
   ws.onmessage = (evt) => {
+    if (evt.data instanceof ArrayBuffer) {
+      emit('ws:binary', evt.data);
+      return;
+    }
+    if (typeof Blob !== 'undefined' && evt.data instanceof Blob) {
+      evt.data.arrayBuffer().then((buf) => emit('ws:binary', buf)).catch(() => {});
+      return;
+    }
     let msg;
     try {
       msg = JSON.parse(evt.data);
