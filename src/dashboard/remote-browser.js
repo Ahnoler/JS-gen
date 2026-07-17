@@ -67,10 +67,10 @@ function updateInputHint() {
     ? ' · 画布录制中'
     : '';
   if (!inputEnabled) {
-    inputHintEl.textContent = `仅观看：Agent 忙碌 · ${vh} · ${sc}${rec}`;
+    inputHintEl.textContent = `仅观看（AI/Agent 执行中）· 悬停可高亮，点击/按键暂不可用 · ${vh} · ${sc}${rec}`;
     return;
   }
-  inputHintEl.textContent = `可输入：点击/按键 · ${vh} · ${sc}${rec}`;
+  inputHintEl.textContent = `可操作：点击/按键 · ${vh} · ${sc}${rec}`;
 }
 
 function syncScaleControls() {
@@ -158,7 +158,9 @@ function applyStatus(payload = {}) {
 
   if (attached) {
     setUiStatus(
-      `已附着 #${remoteSessionId}${payload.agentBusy ? ' · Agent busy' : ''} · ${remoteViewport.w}×${remoteViewport.h} · 显示${(displayScale * 100).toFixed(0)}%`,
+      payload.agentBusy
+        ? `已附着 #${remoteSessionId} · AI 执行中（画布锁定）· ${remoteViewport.w}×${remoteViewport.h}`
+        : `已附着 #${remoteSessionId} · 可操作 · ${remoteViewport.w}×${remoteViewport.h} · 显示${(displayScale * 100).toFixed(0)}%`,
       payload.agentBusy ? 'warn' : 'ok',
     );
   } else if (cdpReady) {
@@ -563,7 +565,6 @@ export function initRemoteBrowser() {
   });
   on('remote:frame', async (payload) => {
     if (!streaming) return;
-    if (payload?.jpeg) await drawJpeg(payload.jpeg);
     if (payload?.frameId != null) {
       send('remote:ack', {
         frameId: payload.frameId,
@@ -571,15 +572,37 @@ export function initRemoteBrowser() {
         sessionUuid: payload.sessionUuid,
       });
     }
+    if (payload?.jpeg) await drawJpeg(payload.jpeg);
   });
+  let lastAgentBusy = false;
   on('watcher:status', (p) => {
     if (!p) return;
+    const busy = !!p.agentBusy;
+    // Prefer watcher busy flip; keep attached from last remote:status (do not invent attach=false)
     applyStatus({
       connected: !!p.connected,
-      cdpReady: !!p.cdpReady,
-      agentBusy: !!p.agentBusy,
-      inputEnabled: attached && !p.agentBusy,
+      cdpReady: p.cdpReady != null ? !!p.cdpReady : cdpReady,
+      agentBusy: busy,
+      inputEnabled: attached && !busy,
     });
+    if (lastAgentBusy && !busy && attached) {
+      send('remote:start', {});
+      // Re-fetch authoritative BiB status after agent unlocks
+      send('remote:status', {});
+    }
+    lastAgentBusy = busy;
+  });
+  on('session:phase_done', () => {
+    if (attached) applyStatus({ agentBusy: false, inputEnabled: true });
+  });
+  on('session:done', () => {
+    if (attached) applyStatus({ agentBusy: false, inputEnabled: true });
+  });
+  on('session:phase_error', () => {
+    if (attached) applyStatus({ agentBusy: false, inputEnabled: true });
+  });
+  on('session:error', () => {
+    if (attached) applyStatus({ agentBusy: false, inputEnabled: true });
   });
   on('server:init', (data) => {
     const w = data?.watcher;
@@ -596,8 +619,9 @@ export function initRemoteBrowser() {
     const parsed = parseFrame(buf);
     if (!parsed) return;
     if (!streaming) streaming = true;
-    await drawJpeg(parsed.jpeg);
+    // Ack before decode/draw so a slow canvas never blocks CDP (producer also acks now).
     send('remote:ack', { frameId: parsed.frameId, sessionId: parsed.frameId, sessionUuid: parsed.sessionUuid });
+    await drawJpeg(parsed.jpeg);
   });
 
   fetch('/api/v2/remote-sessions/live/status')

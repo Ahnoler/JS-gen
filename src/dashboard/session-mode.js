@@ -4,11 +4,12 @@
 import { ts } from './utils.js';
 import { escapeHtml } from './swagger-api.js';
 import { on, send, isConnected } from './ws-client.js';
-import { setActionFlowSession, reloadActionFlow, setActionFlowTrajectory } from './recording-flow.js';
+import { setActionFlowSession, reloadActionFlow, setActionFlowTrajectory, setActionFlowHandlers, setSelectedActionFlowPhaseId } from './recording-flow.js';
 import { fetchHierarchyTree, findDefaultUnclassified } from './hierarchy.js';
 
 const HIER_STORAGE_KEY = 'jsgen.selectedFunctionId';
 const TRAJ_STORAGE_KEY = 'jsgen.selectedTrajectoryId';
+const PHASE_STORAGE_KEY = 'jsgen.selectedPhaseId';
 const PHASE_DESC_STORAGE_KEY = 'jsgen.phaseDescriptions';
 
 function loadPhaseDescriptions() {
@@ -57,6 +58,11 @@ export function initSessionMode() {
   const sessLoginUser = document.getElementById('sessLoginUser');
   const sessLoginPass = document.getElementById('sessLoginPass');
   const sessLoginBtn = document.getElementById('sessLoginBtn');
+  const sessLoginSystem = document.getElementById('sessLoginSystem');
+  const sessLoginAccount = document.getElementById('sessLoginAccount');
+  const sessLoginRemark = document.getElementById('sessLoginRemark');
+  /** @type {Array} */
+  let loginHierTree = [];
 
   if (!sessNewBtn) return;
 
@@ -354,6 +360,10 @@ export function initSessionMode() {
             sessTrajPath.style.display = 'block';
             sessTrajPath.textContent = '轨迹：' + d.cumulative_file;
           }
+          // Refresh phase-step tree (steps may have been live-persisted)
+          reloadActionFlow(sessActive?.value);
+          const tid = getSelectedTrajectoryDbId();
+          if (tid != null) refreshPhaseSelect(tid, getSelectedPhaseId());
           setTimeout(() => loadActiveSessions(), 300);
           break;
         case 'phase_error': case 'error':
@@ -641,12 +651,105 @@ export function initSessionMode() {
     });
   }
 
-  // Login & Navigate
+  // Login & Navigate (system → role account → fill url/user/pass)
+  async function refreshLoginAccountSelectors() {
+    if (!sessLoginSystem) return;
+    try {
+      loginHierTree = await fetchHierarchyTree();
+    } catch (err) {
+      console.warn('[session] login hierarchy load failed:', err.message);
+      loginHierTree = [];
+    }
+    const prevSys = sessLoginSystem.value;
+    const prevAcct = sessLoginAccount?.value || '';
+    sessLoginSystem.innerHTML = '<option value="">手动填写…</option>';
+    loginHierTree.forEach((s) => {
+      const opt = document.createElement('option');
+      opt.value = String(s.id);
+      const n = (s.accounts || []).length;
+      opt.textContent = n ? `${s.name}（${n} 账号）` : s.name;
+      sessLoginSystem.appendChild(opt);
+    });
+    if (prevSys && [...sessLoginSystem.options].some((o) => o.value === prevSys)) {
+      sessLoginSystem.value = prevSys;
+    }
+    fillLoginAccountOptions(sessLoginSystem.value, prevAcct);
+  }
+
+  function fillLoginAccountOptions(systemId, selectedAccountId = null) {
+    if (!sessLoginAccount) return;
+    sessLoginAccount.innerHTML = '';
+    if (!systemId) {
+      sessLoginAccount.disabled = true;
+      sessLoginAccount.innerHTML = '<option value="">先选系统…</option>';
+      if (sessLoginRemark) sessLoginRemark.style.display = 'none';
+      return;
+    }
+    const sys = loginHierTree.find((s) => String(s.id) === String(systemId));
+    const accounts = sys?.accounts || [];
+    if (!accounts.length) {
+      sessLoginAccount.disabled = true;
+      sessLoginAccount.innerHTML = '<option value="">该系统暂无账号</option>';
+      if (sessLoginRemark) {
+        sessLoginRemark.style.display = 'block';
+        sessLoginRemark.textContent = '请到「层级」页为该系统添加测试账号';
+      }
+      return;
+    }
+    sessLoginAccount.disabled = false;
+    sessLoginAccount.innerHTML = '<option value="">选择角色账号…</option>';
+    accounts.forEach((a) => {
+      const opt = document.createElement('option');
+      opt.value = String(a.id);
+      opt.textContent = a.username ? `${a.name}（${a.username}）` : a.name;
+      sessLoginAccount.appendChild(opt);
+    });
+    if (selectedAccountId && [...sessLoginAccount.options].some((o) => o.value === String(selectedAccountId))) {
+      sessLoginAccount.value = String(selectedAccountId);
+      applyLoginAccount(sessLoginAccount.value);
+    } else if (accounts.length === 1) {
+      sessLoginAccount.value = String(accounts[0].id);
+      applyLoginAccount(sessLoginAccount.value);
+    } else if (sessLoginRemark) {
+      sessLoginRemark.style.display = 'none';
+    }
+  }
+
+  function applyLoginAccount(accountId) {
+    if (!accountId) {
+      if (sessLoginRemark) sessLoginRemark.style.display = 'none';
+      return;
+    }
+    const sys = loginHierTree.find((s) => String(s.id) === String(sessLoginSystem?.value));
+    const account = (sys?.accounts || []).find((a) => String(a.id) === String(accountId));
+    if (!account) return;
+    if (sessLoginUrl) sessLoginUrl.value = account.loginUrl || '';
+    if (sessLoginUser) sessLoginUser.value = account.username || '';
+    if (sessLoginPass) sessLoginPass.value = account.password || '';
+    if (sessLoginRemark) {
+      const remark = (account.remark || '').trim();
+      if (remark) {
+        sessLoginRemark.style.display = 'block';
+        sessLoginRemark.textContent = '备注：' + remark;
+      } else {
+        sessLoginRemark.style.display = 'none';
+      }
+    }
+  }
+
+  if (sessLoginSystem) {
+    sessLoginSystem.addEventListener('change', () => fillLoginAccountOptions(sessLoginSystem.value, null));
+  }
+  if (sessLoginAccount) {
+    sessLoginAccount.addEventListener('change', () => applyLoginAccount(sessLoginAccount.value));
+  }
+
   if (sessLoginToggle && sessLoginSection) {
-    sessLoginToggle.addEventListener('click', () => {
+    sessLoginToggle.addEventListener('click', async () => {
       const hidden = sessLoginSection.style.display === 'none';
       sessLoginSection.style.display = hidden ? '' : 'none';
       sessLoginToggle.textContent = hidden ? '收起' : '展开';
+      if (hidden) await refreshLoginAccountSelectors();
     });
   }
 
@@ -950,13 +1053,17 @@ export function initSessionMode() {
           body: JSON.stringify({
             enabled: !manualRecording,
             ...(trajectoryDbId != null ? { trajectoryDbId } : {}),
+            ...(getSelectedPhaseId() != null ? { phaseId: getSelectedPhaseId() } : {}),
           }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'failed');
         setManualRecUI(!!data.enabled);
+        const phaseHint = data.phaseId != null
+          ? ' phase#' + data.phaseId
+          : (trajectoryDbId != null ? '（末尾阶段）' : '');
         const persistHint = autoPersist && trajectoryDbId != null
-          ? '（自动入库 traj#' + trajectoryDbId + '）'
+          ? '（自动入库 traj#' + trajectoryDbId + phaseHint + '）'
           : '（仅 ACTION_LOG' + (autoPersist ? '' : '，可开「自动入库」') + '）';
         sessLog(data.enabled ? 'success' : 'system',
           data.enabled
@@ -1232,6 +1339,7 @@ export function initSessionMode() {
   const sessHierProcess = document.getElementById('sessHierProcess');
   const sessHierFunction = document.getElementById('sessHierFunction');
   const sessTrajectorySelect = document.getElementById('sessTrajectorySelect');
+  const sessPhaseSelect = document.getElementById('sessPhaseSelect');
   const sessNewTrajBtn = document.getElementById('sessNewTrajBtn');
   let hierTree = [];
 
@@ -1249,9 +1357,87 @@ export function initSessionMode() {
     return Number.isFinite(n) ? n : null;
   }
 
+  function getSelectedPhaseId() {
+    const raw = sessPhaseSelect?.value;
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+
   function persistFunctionSelection() {
     const id = getSelectedFunctionId();
     if (id != null) sessionStorage.setItem(HIER_STORAGE_KEY, String(id));
+  }
+
+  function persistPhaseSelection() {
+    const id = getSelectedPhaseId();
+    if (id != null) sessionStorage.setItem(PHASE_STORAGE_KEY, String(id));
+    else sessionStorage.removeItem(PHASE_STORAGE_KEY);
+    setSelectedActionFlowPhaseId(id, { silent: true });
+    // Bind selected phase to live session for manual persist targeting
+    const trajId = getSelectedTrajectoryDbId();
+    if (sessActive?.value && trajId != null) {
+      let qs = '/action-flow?trajectoryId=' + encodeURIComponent(String(trajId));
+      if (id != null) qs += '&phaseId=' + encodeURIComponent(String(id));
+      fetch('/api/browser/session/' + encodeURIComponent(sessActive.value) + qs).catch(() => {});
+    }
+  }
+
+  async function createPhaseForCurrentTrajectory(descriptionHint) {
+    const trajId = getSelectedTrajectoryDbId();
+    if (trajId == null) {
+      alert('请先选择轨迹');
+      return null;
+    }
+    const description = prompt('阶段描述（将作为 AI 执行指令）：', descriptionHint || '') || '';
+    if (!description.trim()) return null;
+    try {
+      const res = await fetch('/api/v2/trajectories/' + encodeURIComponent(trajId) + '/phases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: description.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'create phase failed');
+      await refreshPhaseSelect(trajId, data.id);
+      if (sessPhaseSelect) sessPhaseSelect.value = String(data.id);
+      persistPhaseSelection();
+      reloadActionFlow(sessActive?.value);
+      sessLog('success', '已创建阶段 #' + data.id + ' · P' + data.phaseNumber);
+      return data;
+    } catch (err) {
+      alert('创建阶段失败：' + err.message);
+      return null;
+    }
+  }
+
+  async function refreshPhaseSelect(trajectoryId, preferPhaseId) {
+    if (!sessPhaseSelect) return;
+    sessPhaseSelect.innerHTML = '<option value="">末尾阶段（默认）</option>';
+    if (trajectoryId == null) return;
+    try {
+      const res = await fetch('/api/v2/trajectories/' + encodeURIComponent(trajectoryId) + '/tree');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'tree failed');
+      const phases = data.phases || [];
+      phases.forEach((p) => {
+        const opt = document.createElement('option');
+        opt.value = String(p.id);
+        const desc = (p.description || '').slice(0, 24);
+        opt.textContent = 'P' + (p.phaseNumber ?? '?') + ' #' + p.id
+          + (desc ? ' · ' + desc : '')
+          + ' (' + (p.steps?.length ?? 0) + '步)';
+        sessPhaseSelect.appendChild(opt);
+      });
+      const prefer = preferPhaseId != null
+        ? preferPhaseId
+        : Number(sessionStorage.getItem(PHASE_STORAGE_KEY));
+      if (Number.isFinite(prefer) && Array.from(sessPhaseSelect.options).some((o) => o.value === String(prefer))) {
+        sessPhaseSelect.value = String(prefer);
+      }
+    } catch (err) {
+      console.warn('[session] phase list failed:', err.message);
+    }
   }
 
   function persistTrajectorySelection() {
@@ -1259,7 +1445,8 @@ export function initSessionMode() {
     if (id != null) sessionStorage.setItem(TRAJ_STORAGE_KEY, String(id));
     else sessionStorage.removeItem(TRAJ_STORAGE_KEY);
     setActionFlowTrajectory(id);
-    if (sessActive.value) reloadActionFlow(sessActive.value);
+    refreshPhaseSelect(id).then(() => persistPhaseSelection());
+    reloadActionFlow(sessActive?.value);
   }
 
   async function refreshTrajectorySelect(functionId, selectedId) {
@@ -1376,6 +1563,45 @@ export function initSessionMode() {
     if (sessTrajectorySelect) {
       sessTrajectorySelect.addEventListener('change', persistTrajectorySelection);
     }
+    if (sessPhaseSelect) {
+      sessPhaseSelect.addEventListener('change', persistPhaseSelection);
+    }
+    const sessNewPhaseBtn = document.getElementById('sessNewPhaseBtn');
+    if (sessNewPhaseBtn) {
+      sessNewPhaseBtn.addEventListener('click', () => createPhaseForCurrentTrajectory(''));
+    }
+
+    setActionFlowHandlers({
+      onPhaseSelect(phaseId) {
+        if (sessPhaseSelect) {
+          sessPhaseSelect.value = phaseId != null ? String(phaseId) : '';
+        }
+        persistPhaseSelection();
+        if (phaseId != null) {
+          sessLog('system', '已选中 phase#' + phaseId + '（人工录制将写入该阶段）');
+        } else {
+          sessLog('system', '已取消选中阶段（人工录制写入末尾阶段）');
+        }
+      },
+      onPhaseExecute(phase) {
+        if (!sessActive?.value) { sessLog('error', '无活跃会话'); return; }
+        const task = phase.description || '';
+        if (!task.trim()) { alert('阶段描述为空，请先编辑或重新创建'); return; }
+        const label = '阶段' + (phase.phaseNumber || '?') + '：' + task.slice(0, 40);
+        executeSessionStep(
+          sessActive.value,
+          task,
+          100,
+          label,
+          undefined,
+          phase.phaseNumber,
+        );
+      },
+      onPhaseCreate() {
+        createPhaseForCurrentTrajectory('');
+      },
+    });
+
     if (sessNewTrajBtn) {
       sessNewTrajBtn.addEventListener('click', async () => {
         const functionId = getSelectedFunctionId();

@@ -147,6 +147,21 @@
           <button id="sessLoginToggle" class="btn btn-sm btn-outline">展开</button>
         </div>
         <div id="sessLoginSection" style="display:none;padding:12px">
+          <div style="display:flex;gap:8px">
+            <div class="form-group" style="flex:1;margin-bottom:8px">
+              <label>系统</label>
+              <select id="sessLoginSystem" style="width:100%;padding:6px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:13px;background:var(--slate-50)">
+                <option value="">手动填写…</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1;margin-bottom:8px">
+              <label>账号角色</label>
+              <select id="sessLoginAccount" style="width:100%;padding:6px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:13px;background:var(--slate-50)" disabled>
+                <option value="">先选系统…</option>
+              </select>
+            </div>
+          </div>
+          <div id="sessLoginRemark" style="display:none;margin:0 0 10px;font-size:12px;color:var(--slate-500);line-height:1.4"></div>
           <div class="form-group">
             <label>目标地址</label>
             <input id="sessLoginUrl" type="text" placeholder="http://example.com/login">
@@ -215,7 +230,12 @@
           <select id="sessTrajectorySelect" style="min-width:160px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)" title="长期录制目标 trajectory.id">
             <option value="">新建轨迹（保存时创建）</option>
           </select>
-          <button id="sessNewTrajBtn" type="button" class="btn btn-outline btn-sm" style="font-size:11px" title="在当前功能点下创建空轨迹">+ 新建</button>
+          <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">阶段：</label>
+          <select id="sessPhaseSelect" style="min-width:140px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)" title="人工录制写入的 trajectory_phase.id；空=当前轨迹最后一个阶段">
+            <option value="">末尾阶段（默认）</option>
+          </select>
+          <button id="sessNewPhaseBtn" type="button" class="btn btn-outline btn-sm" style="font-size:11px" title="在当前轨迹下新增一个 phase">+ 阶段</button>
+          <button id="sessNewTrajBtn" type="button" class="btn btn-outline btn-sm" style="font-size:11px" title="在当前功能点下创建空轨迹">+ 新建轨迹</button>
         </div>
         <div id="sessTrajPath" style="display:none;padding:0 12px 6px;font-size:11px;font-family:var(--font-mono);color:var(--slate-400);word-break:break-all"></div>
       </div>
@@ -371,10 +391,14 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             实时动作流
           </div>
-          <span id="sessActionFlowCount" style="font-size:12px;color:var(--slate-400)">等待中…</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button id="sessActionFlowAddPhaseBtn" type="button" class="btn btn-outline btn-sm" style="font-size:11px" title="在当前轨迹下新建 phase">+ 阶段</button>
+            <span id="sessActionFlowCount" style="font-size:12px;color:var(--slate-400)">等待中…</span>
+          </div>
         </div>
+        <div style="padding:0 12px 8px;font-size:11px;color:var(--slate-400)">点击阶段行可选中（人工录制写入该 phase）；点「执行」用阶段描述跑 AI</div>
         <div id="sessActionFlow" style="max-height:360px;overflow-y:auto;border:1px solid var(--slate-200);border-radius:6px;background:#fff;font-size:12px">
-          <div class="empty-state" style="padding:24px;text-align:center;color:var(--slate-400)">Agent 执行动作时将实时显示在这里</div>
+          <div class="empty-state" style="padding:24px;text-align:center;color:var(--slate-400)">选择轨迹后按「阶段 → 步骤」展示；可用「+ 阶段」创建 phase</div>
         </div>
       </div>
 
@@ -538,7 +562,7 @@
           <button id="hierRefreshBtn" class="btn btn-outline btn-sm">刷新</button>
         </div>
       </div>
-      <div style="padding:8px 12px;font-size:12px;color:var(--slate-500)">保存轨迹时可选择功能点挂靠。默认「未分类」为种子数据，不可删除。</div>
+      <div style="padding:8px 12px;font-size:12px;color:var(--slate-500)">保存轨迹时可选择功能点挂靠。每个系统可配置多个测试账号（管理员/测试人员等角色）。默认「未分类」为种子数据，不可删除。</div>
       <div id="hierLoading" style="display:none;text-align:center;padding:20px;color:var(--slate-400)">加载中…</div>
       <div id="hierEmpty" class="empty-state" style="display:none">
         <p>暂无层级数据 — 点击「+ 系统」创建</p>
@@ -547,6 +571,46 @@
     </div>
   </div>
 
+</div>
+
+<!-- System account config dialog -->
+<div id="hierAccountOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:8px;width:min(480px,92vw);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.25)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--slate-100)">
+      <strong id="hierAcctTitle" style="color:var(--slate-800)">测试账号</strong>
+      <button type="button" id="hierAcctClose" class="btn btn-sm btn-outline" style="font-size:16px;line-height:1;padding:2px 8px">&times;</button>
+    </div>
+    <form id="hierAcctForm" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <input type="hidden" id="hierAcctId" value="">
+      <input type="hidden" id="hierAcctSystemId" value="">
+      <div class="form-group" style="margin:0">
+        <label>角色名称</label>
+        <input id="hierAcctName" type="text" required placeholder="如 管理员 / 测试人员 / 客户经理">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>登录网址</label>
+        <input id="hierAcctUrl" type="text" placeholder="http://example.com/login">
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="form-group" style="flex:1;margin:0">
+          <label>账号</label>
+          <input id="hierAcctUser" type="text" placeholder="测试账号" autocomplete="off">
+        </div>
+        <div class="form-group" style="flex:1;margin:0">
+          <label>密码</label>
+          <input id="hierAcctPass" type="text" placeholder="测试密码" autocomplete="off">
+        </div>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>备注</label>
+        <textarea id="hierAcctRemark" rows="2" placeholder="权限范围、适用环境等" style="width:100%;padding:6px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:13px;resize:vertical"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:4px">
+        <button type="button" id="hierAcctCancel" class="btn btn-outline btn-sm">取消</button>
+        <button type="submit" class="btn btn-primary btn-sm">保存</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div class="overlay" id="imageOverlay">
