@@ -1,5 +1,7 @@
 .env
 .env.local
+executor/.env
+executor/.node-uuid
 opencode.json
 agent-api.config.json
 *.log
