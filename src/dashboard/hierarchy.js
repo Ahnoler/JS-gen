@@ -85,6 +85,117 @@ export function initHierarchy() {
       }
     });
   }
+  wireAccountDialog();
+}
+
+function wireAccountDialog() {
+  const overlay = document.getElementById('hierAccountOverlay');
+  const form = document.getElementById('hierAcctForm');
+  if (!overlay || !form || form.dataset.wired === '1') return;
+  form.dataset.wired = '1';
+
+  const close = () => { overlay.style.display = 'none'; };
+  document.getElementById('hierAcctClose')?.addEventListener('click', close);
+  document.getElementById('hierAcctCancel')?.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('hierAcctId')?.value || '';
+    const systemId = document.getElementById('hierAcctSystemId')?.value || '';
+    const name = document.getElementById('hierAcctName')?.value?.trim() || '';
+    if (!name) { alert('角色名称不能为空'); return; }
+    const body = {
+      name,
+      loginUrl: document.getElementById('hierAcctUrl')?.value?.trim() || '',
+      username: document.getElementById('hierAcctUser')?.value?.trim() || '',
+      password: document.getElementById('hierAcctPass')?.value || '',
+      remark: document.getElementById('hierAcctRemark')?.value?.trim() || null,
+    };
+    try {
+      const res = await fetch(
+        id ? `/api/v2/system-accounts/${id}` : `/api/v2/systems/${systemId}/accounts`,
+        {
+          method: id ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Save failed');
+      close();
+      await loadHierarchyTree();
+    } catch (err) {
+      alert((id ? '更新' : '创建') + '账号失败：' + err.message);
+    }
+  });
+}
+
+function openAccountDialog({ mode = 'create', systemId, account = null, systemName = '' } = {}) {
+  const overlay = document.getElementById('hierAccountOverlay');
+  if (!overlay) return;
+  const title = document.getElementById('hierAcctTitle');
+  if (title) {
+    title.textContent = mode === 'create'
+      ? `新增账号 — ${systemName || '系统'}`
+      : `编辑账号 — ${account?.name || ''}`;
+  }
+  document.getElementById('hierAcctId').value = mode === 'edit' && account?.id != null ? String(account.id) : '';
+  document.getElementById('hierAcctSystemId').value = String(systemId || account?.systemId || '');
+  document.getElementById('hierAcctName').value = account?.name || '';
+  document.getElementById('hierAcctUrl').value = account?.loginUrl || '';
+  document.getElementById('hierAcctUser').value = account?.username || '';
+  document.getElementById('hierAcctPass').value = account?.password || '';
+  document.getElementById('hierAcctRemark').value = account?.remark || '';
+  overlay.style.display = 'flex';
+  document.getElementById('hierAcctName')?.focus();
+}
+
+function renderAccountsBlock(sys) {
+  const accounts = sys.accounts || [];
+  if (!accounts.length) {
+    return `<div style="padding:6px 12px;font-size:11px;color:var(--slate-400);border-bottom:1px solid var(--slate-100)">暂无测试账号 — 点击「+ 账号」添加管理员/测试人员等角色</div>`;
+  }
+  return `
+    <div style="padding:6px 12px 8px;border-bottom:1px solid var(--slate-100);background:#fff">
+      <div style="font-size:10px;color:var(--slate-400);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">测试账号</div>
+      ${accounts.map((a) => {
+        const bits = [escapeHtml(a.name)];
+        if (a.username) bits.push(`<span style="color:var(--slate-500)">${escapeHtml(a.username)}</span>`);
+        if (a.loginUrl) bits.push(`<span style="color:var(--slate-400);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom">${escapeHtml(a.loginUrl)}</span>`);
+        const remark = (a.remark || '').trim();
+        return `<div class="hier-acct" data-id="${a.id}" style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;border-bottom:1px dashed var(--slate-100)">
+          <div style="flex:1;min-width:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${bits.join('')}</div>
+          ${remark ? `<span title="${escapeHtml(remark)}" style="font-size:10px;color:var(--slate-400);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(remark)}</span>` : ''}
+          <button class="btn btn-outline btn-sm hier-edit-acct" data-id="${a.id}" data-system-id="${sys.id}" style="font-size:10px">编辑</button>
+          <button class="btn btn-outline btn-sm hier-del-acct" data-id="${a.id}" style="font-size:10px;color:var(--red-500);border-color:var(--red-200)">删</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderSystemNode(sys) {
+  const seed = isSeedSystem(sys);
+  const processes = sys.processes || [];
+  const acctCount = (sys.accounts || []).length;
+  return `
+    <div class="hier-system" data-id="${sys.id}" style="border:1px solid var(--slate-200);border-radius:6px;margin-bottom:10px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--slate-50);border-bottom:1px solid var(--slate-100);flex-wrap:wrap">
+        <strong style="color:var(--slate-800)">${escapeHtml(sys.name)}</strong>
+        ${seed ? '<span style="font-size:10px;color:var(--slate-400);border:1px solid var(--slate-200);border-radius:3px;padding:0 4px">种子</span>' : ''}
+        <span style="flex:1;font-size:11px;color:var(--slate-400)">${acctCount ? acctCount + ' 个账号' : '未配置账号'}</span>
+        <button class="btn btn-outline btn-sm hier-add-acct" data-system-id="${sys.id}" data-system-name="${escapeHtml(sys.name)}" style="font-size:11px">+ 账号</button>
+        <button class="btn btn-outline btn-sm hier-add-proc" data-system-id="${sys.id}" style="font-size:11px">+ 流程</button>
+        <button class="btn btn-outline btn-sm hier-rename-sys" data-id="${sys.id}" data-name="${escapeHtml(sys.name)}" style="font-size:11px">重命名</button>
+        ${seed ? '' : `<button class="btn btn-outline btn-sm hier-del-sys" data-id="${sys.id}" style="font-size:11px;color:var(--red-500);border-color:var(--red-200)">删除</button>`}
+      </div>
+      ${renderAccountsBlock(sys)}
+      <div style="padding:4px 8px 8px 20px">
+        ${processes.length
+          ? processes.map(p => renderProcessNode(p, sys.id)).join('')
+          : '<div style="padding:8px;font-size:12px;color:var(--slate-400)">暂无流程</div>'}
+      </div>
+    </div>`;
 }
 
 export async function loadHierarchyTree() {
@@ -112,26 +223,6 @@ export async function loadHierarchyTree() {
     if (loading) loading.style.display = 'none';
     body.innerHTML = `<p style="font-size:13px;color:var(--red-400);padding:12px">加载失败：${escapeHtml(err.message)}</p>`;
   }
-}
-
-function renderSystemNode(sys) {
-  const seed = isSeedSystem(sys);
-  const processes = sys.processes || [];
-  return `
-    <div class="hier-system" data-id="${sys.id}" style="border:1px solid var(--slate-200);border-radius:6px;margin-bottom:10px;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--slate-50);border-bottom:1px solid var(--slate-100)">
-        <strong style="flex:1;color:var(--slate-800)">${escapeHtml(sys.name)}</strong>
-        ${seed ? '<span style="font-size:10px;color:var(--slate-400);border:1px solid var(--slate-200);border-radius:3px;padding:0 4px">种子</span>' : ''}
-        <button class="btn btn-outline btn-sm hier-add-proc" data-system-id="${sys.id}" style="font-size:11px">+ 流程</button>
-        <button class="btn btn-outline btn-sm hier-rename-sys" data-id="${sys.id}" data-name="${escapeHtml(sys.name)}" style="font-size:11px">重命名</button>
-        ${seed ? '' : `<button class="btn btn-outline btn-sm hier-del-sys" data-id="${sys.id}" style="font-size:11px;color:var(--red-500);border-color:var(--red-200)">删除</button>`}
-      </div>
-      <div style="padding:4px 8px 8px 20px">
-        ${processes.length
-          ? processes.map(p => renderProcessNode(p, sys.id)).join('')
-          : '<div style="padding:8px;font-size:12px;color:var(--slate-400)">暂无流程</div>'}
-      </div>
-    </div>`;
 }
 
 function renderProcessNode(proc, systemId) {
@@ -171,6 +262,38 @@ function renderFunctionNode(fn) {
 }
 
 function wireHierarchyActions(root) {
+  root.querySelectorAll('.hier-add-acct').forEach(b => b.addEventListener('click', () => {
+    openAccountDialog({
+      mode: 'create',
+      systemId: b.dataset.systemId,
+      systemName: b.dataset.systemName || '',
+    });
+  }));
+
+  root.querySelectorAll('.hier-edit-acct').forEach(b => b.addEventListener('click', () => {
+    const sys = hierarchyTree.find(s => String(s.id) === String(b.dataset.systemId));
+    const account = (sys?.accounts || []).find(a => String(a.id) === String(b.dataset.id));
+    if (!account) { alert('未找到该账号'); return; }
+    openAccountDialog({
+      mode: 'edit',
+      systemId: sys.id,
+      systemName: sys.name,
+      account: { ...account, systemId: sys.id },
+    });
+  }));
+
+  root.querySelectorAll('.hier-del-acct').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('删除该测试账号？')) return;
+    try {
+      const res = await fetch(`/api/v2/system-accounts/${b.dataset.id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      await loadHierarchyTree();
+    } catch (err) {
+      alert('删除账号失败：' + err.message);
+    }
+  }));
+
   root.querySelectorAll('.hier-add-proc').forEach(b => b.addEventListener('click', async () => {
     const name = prompt('新流程名称：');
     if (!name || !name.trim()) return;

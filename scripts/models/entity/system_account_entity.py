@@ -1,20 +1,17 @@
-"""System entity — unified hierarchy node in `system` table.
-
-type: 0=系统, 1=流程, 2=功能点
-parent_id: null for type=0; points to parent system.id otherwise
-"""
+"""SystemAccount entity — maps to `system_account` table (multi-role logins)."""
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class SystemEntity(BaseModel):
+class SystemAccountEntity(BaseModel):
     id: Optional[int] = None
-    system_id: str = ""
-    type: int = 0
-    parent_id: Optional[int] = None
+    system_id: int = 0
     name: str = ""
-    description: Optional[str] = None
+    login_url: str = ""
+    username: str = ""
+    password: str = ""
+    remark: Optional[str] = None
     sort_order: int = 0
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None

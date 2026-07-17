@@ -5,9 +5,10 @@ These are used for DAO-layer data transfer, NOT for runtime business logic.
 Runtime logic uses the models in `scripts/models/` (ActionEntry, FormSnapshot, etc.).
 
 Each entity class name matches the table (singular, PascalCase):
-    SystemEntity       → system
-    ProcessEntity      → process
-    FunctionDefEntity  → function_def
+    SystemEntity       → system (type 0/1/2 统一层级)
+    ProcessEntity      → deprecated (已并入 system type=1)
+    FunctionDefEntity  → deprecated (已并入 system type=2)
+    SystemAccountEntity → system_account
     TrajectoryEntity   → trajectory
     TrajectoryStepEntity   → trajectory_step
     TrajectoryPhaseEntity  → trajectory_phase
@@ -21,6 +22,7 @@ Each entity class name matches the table (singular, PascalCase):
 """
 
 from .system_entity import SystemEntity
+from .system_account_entity import SystemAccountEntity
 from .process_entity import ProcessEntity
 from .function_def_entity import FunctionDefEntity
 from .trajectory_entity import TrajectoryEntity
@@ -34,6 +36,7 @@ from .api_override_entity import ApiOverrideEntity, ApiOverrideMatchType, ApiOve
 
 __all__ = [
     "SystemEntity",
+    "SystemAccountEntity",
     "ProcessEntity",
     "FunctionDefEntity",
     "TrajectoryEntity",
