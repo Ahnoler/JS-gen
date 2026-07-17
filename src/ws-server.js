@@ -73,9 +73,9 @@ export function broadcastBinary(data) {
   return count;
 }
 
-// 初始化 WebSocket 服务（挂载在共享 HTTP 服务器上）
-export function initWebSocket(httpServer) {
-  wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+// 初始化 WebSocket 服务（noServer 模式，由 server.mjs 统一 upgrade 路由）
+export function initWebSocket() {
+  wss = new WebSocketServer({ noServer: true });
 
   wss.on('connection', (ws) => {
     ws.id = crypto.randomUUID();
@@ -140,6 +140,11 @@ export function initWebSocket(httpServer) {
 
   wss.on('close', () => clearInterval(heartbeat));
 
-  console.log(`[ws-server] WebSocket server ready at /ws (${wss.options.maxPayload || 'default'} max payload)`);
+  console.log('[ws-server] WebSocket server ready at /ws (noServer mode)');
+  return wss;
+}
+
+/** @returns {import('ws').WebSocketServer|null} */
+export function getDashboardWss() {
   return wss;
 }

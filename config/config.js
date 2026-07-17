@@ -1,7 +1,7 @@
 /**
  * Application configuration — reads from config/.env, falls back to environment variables.
  *
- * Search order: .env file value → process.env → hardcoded default
+ * Search order: process.env → .env file value → hardcoded default
  */
 import path from 'path';
 import os from 'os';
@@ -32,9 +32,9 @@ if (existsSync(_envPath)) {
   } catch {}
 }
 
-// Resolver: .env file → process.env → default
+// Resolver: process.env → .env file → default (env vars override file for deployment/tests)
 export function resolve(key, defaultValue = '') {
-  return _env[key] || process.env[key] || defaultValue;
+  return process.env[key] || _env[key] || defaultValue;
 }
 
 // Legacy alias used inside this module
@@ -77,3 +77,17 @@ export const PYTHON_EXE = _findPython();
 // Legacy compatibility (used by explore-utils.js)
 export const PYTHON_EXE_CONFIG = PYTHON_EXE;
 export const STANDALONE_LLM = true;
+
+// Executor agent (WS /ws/executor) — unset token rejects all executor connections
+export const EXECUTOR_TOKEN = _resolve('EXECUTOR_TOKEN', '');
+export const EXECUTOR_HEARTBEAT_TIMEOUT_MS = parseInt(
+  _resolve('EXECUTOR_HEARTBEAT_TIMEOUT_MS', '45000'),
+  10,
+);
+export const EXECUTOR_DISCONNECT_GRACE_MS = parseInt(
+  _resolve('EXECUTOR_DISCONNECT_GRACE_MS', String(EXECUTOR_HEARTBEAT_TIMEOUT_MS)),
+  10,
+);
+
+/** Route browser sessions to online executor agent instead of local globalBrowser */
+export const USE_EXECUTOR = _resolve('USE_EXECUTOR', 'false').toLowerCase() === 'true';

@@ -1,11 +1,13 @@
-﻿import express from 'express';
+import express from 'express';
 import { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync, existsSync, writeFileSync } from 'fs';
-import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR, LLM_API_KEY } from './config/config.js';
+import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR, LLM_API_KEY, EXECUTOR_HEARTBEAT_TIMEOUT_MS } from './config/config.js';
 import { state } from './src/state.js';
 import { initWebSocket } from './src/ws-server.js';
+import { initExecutorWs, validateExecutorToken, rejectUpgrade } from './src/executor-ws.js';
+import * as executorService from './src/services/executor-node-service.js';
 import registerHealthRoutes from './src/routes/health.js';
 import registerAgentRoutes from './src/routes/agent.js';
 
@@ -141,11 +143,44 @@ async function main() {
   }
 
   const httpServer = createServer(app);
-  initWebSocket(httpServer);
+  const dashboardWss = initWebSocket();
+  const executorWss = initExecutorWs();
+
+  httpServer.on('upgrade', (req, socket, head) => {
+    const { pathname } = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+
+    if (pathname === '/ws') {
+      dashboardWss.handleUpgrade(req, socket, head, (ws) => {
+        dashboardWss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    if (pathname === '/ws/executor') {
+      if (!validateExecutorToken(req)) {
+        rejectUpgrade(socket, 401, 'Unauthorized');
+        return;
+      }
+      executorWss.handleUpgrade(req, socket, head, (ws) => {
+        executorWss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    socket.destroy();
+  });
+
+  const sweepInterval = setInterval(() => {
+    executorService.sweepStale(EXECUTOR_HEARTBEAT_TIMEOUT_MS).catch((err) => {
+      console.error('[server] executor sweep failed:', err);
+    });
+  }, Math.max(15000, Math.floor(EXECUTOR_HEARTBEAT_TIMEOUT_MS / 2)));
+  sweepInterval.unref?.();
 
   const server = httpServer.listen(PORT, HOST, () => {
     console.log(`[server] Agent API listening on http://${HOST}:${PORT}`);
     console.log(`[server] WebSocket at ws://${HOST}:${PORT}/ws`);
+    console.log(`[server] Executor WebSocket at ws://${HOST}:${PORT}/ws/executor`);
     console.log(`[server] Endpoints:`);
     console.log(`  GET  /v1/models (OpenAI compatible)`);
     console.log(`  POST /v1/chat/completions (OpenAI compatible)`);

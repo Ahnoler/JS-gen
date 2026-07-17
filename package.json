@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "dev": "node --watch server.mjs"
+    "dev": "node --watch server.mjs",
+    "executor": "node executor/agent.mjs",
+    "executor:dev": "node --watch executor/agent.mjs"
   },
   "dependencies": {
     "express": "^4.21.0",
