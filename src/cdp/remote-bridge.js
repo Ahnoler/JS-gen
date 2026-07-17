@@ -6,6 +6,8 @@ import { discoverCdpWithRetry } from './discover.js';
 import { state } from '../state.js';
 import { broadcast, broadcastBinary, onWsMessage } from '../ws-server.js';
 import * as remoteSessionService from '../services/remote-session-service.js';
+import { USE_EXECUTOR } from '../../config/config.js';
+import { sendToExecutor } from '../executor-session-client.js';
 import {
   enableInspect, highlightAt, hideHighlight, resolvePayloadAt, suppressPageManualRecorder,
   resolveFocusedFillPayload, resolveCommittedDateFillPayload, snapshotDateEditorValues,
@@ -32,6 +34,12 @@ let fillRecordTimer = null;
 let lastTypedTextAt = 0;
 /** @type {{ hint: object, beforeSnap: Array } | null} */
 let pendingDateDayPick = null;
+let lastFrameAt = 0;
+let lastForwardAt = 0;
+let stallTimer = null;
+let restartingCast = false;
+const MIN_FORWARD_MS = 40;
+const STALL_RESTART_MS = 2500;
 
 /** Called when Dashboard toggles manual recording — suppress page inject briefly. */
 export function notifyManualRecordingChanged(enabled) {
@@ -263,6 +271,7 @@ export async function attachLive(opts = {}) {
 
     client.on('Page.screencastFrame', onScreencastFrame);
     client.on('Client.disconnected', () => {
+      clearStallWatch();
       screencastOn = false;
       broadcastStatus();
     });
@@ -284,6 +293,7 @@ export async function attachLive(opts = {}) {
 }
 
 export async function detachLive({ crashed = false } = {}) {
+  clearStallWatch();
   screencastOn = false;
   if (client) {
     try { await client.send('Page.stopScreencast'); } catch {}
@@ -333,6 +343,37 @@ async function persistViewport() {
   } catch {}
 }
 
+function clearStallWatch() {
+  if (stallTimer) {
+    clearInterval(stallTimer);
+    stallTimer = null;
+  }
+}
+
+function armStallWatch() {
+  clearStallWatch();
+  stallTimer = setInterval(() => {
+    if (!screencastOn || !client) return;
+    if (Date.now() - lastFrameAt > STALL_RESTART_MS) {
+      restartScreencast().catch(() => {});
+    }
+  }, 1000);
+}
+
+async function restartScreencast() {
+  if (!client || restartingCast) return;
+  restartingCast = true;
+  try {
+    try { await client.send('Page.stopScreencast'); } catch {}
+    screencastOn = false;
+    await startScreencast();
+  } catch (e) {
+    console.warn('[remote-bridge] restartScreencast failed:', e.message);
+  } finally {
+    restartingCast = false;
+  }
+}
+
 async function startScreencast() {
   if (!client) return;
   // Encode at session viewport size (may downscale JPEG for bandwidth, never crops layout).
@@ -346,12 +387,26 @@ async function startScreencast() {
     everyNthFrame: 1,
   });
   screencastOn = true;
+  lastFrameAt = Date.now();
+  armStallWatch();
 }
 
 function onScreencastFrame(params) {
   if (!screencastOn || !remoteSession) return;
-  const dataB64 = params.data;
   const sessionId = params.sessionId;
+  // Ack Chrome immediately — never wait for dashboard round-trip (stalls video while input still works).
+  if (sessionId != null) {
+    client?.send('Page.screencastFrameAck', { sessionId: Number(sessionId) }).catch(() => {});
+  }
+  lastFrameAt = Date.now();
+
+  const dataB64 = params.data;
+  if (!dataB64) return;
+
+  const now = Date.now();
+  if (now - lastForwardAt < MIN_FORWARD_MS) return;
+  lastForwardAt = now;
+
   const metadata = params.metadata || {};
   // Keep coordinate space aligned with the live page (CSS px).
   const dw = Number(metadata.deviceWidth);
@@ -396,6 +451,7 @@ export function parseRemoteFrame(buf) {
 }
 
 async function handleAck(payload) {
+  // Producer already acks Chrome on receive; client ack is best-effort / legacy.
   if (!client || !screencastOn) return;
   const frameId = payload?.frameId ?? payload?.sessionId;
   if (frameId == null) return;
@@ -422,7 +478,7 @@ async function flushFillRecord() {
 }
 
 async function handleInput(payload) {
-  if (!client || !screencastOn) return { ok: false, reason: 'not_attached' };
+  if (!client) return { ok: false, reason: 'not_attached' };
 
   const kind = payload?.kind;
   const gb = state.globalBrowser;
@@ -503,6 +559,11 @@ async function handleInput(payload) {
         buttons: type === 'mouseReleased' ? 0 : (type === 'mouseMoved' ? (payload.buttons || 0) : 1),
         clickCount,
       });
+
+      if ((type === 'mousePressed' || type === 'mouseReleased')
+        && screencastOn && Date.now() - lastFrameAt > 800) {
+        restartScreencast().catch(() => {});
+      }
 
       // After day cell click applies, read which date field changed (multi-date forms)
       if (type === 'mouseReleased' && gb.manualRecording && pendingDateDayPick) {
@@ -608,6 +669,50 @@ function ensureWsHook() {
   onWsMessage(async (ws, msg) => {
     const type = msg?.type;
     if (!type || !String(type).startsWith('remote:')) return;
+
+    // Executor mode: proxy remote_* WS commands to executor bib bridge.
+    if (USE_EXECUTOR) {
+      const pick = [...state.sessions.values()].find((s) => s?.useExecutor && s?.executorNodeUuid && s?.sessionId);
+      if (type === 'remote:subscribe') {
+        const live = await remoteSessionService.getLiveStatus().catch(() => null);
+        ws.send(JSON.stringify({ type: 'remote:status', payload: live || { attached: false, cdpReady: true } }));
+        return;
+      }
+      if (type === 'remote:unsubscribe') return;
+
+      if (!pick) {
+        if (type === 'remote:status') {
+          ws.send(JSON.stringify({ type: 'remote:status', payload: { attached: false, cdpReady: true } }));
+        }
+        return;
+      }
+
+      const { executorNodeUuid, sessionId } = pick;
+
+      try {
+        if (type === 'remote:start') {
+          sendToExecutor(executorNodeUuid, 'session.bib_start', { sessionId });
+        } else if (type === 'remote:stop') {
+          sendToExecutor(executorNodeUuid, 'session.bib_stop', { sessionId });
+        } else if (type === 'remote:ack') {
+          sendToExecutor(executorNodeUuid, 'session.bib_ack', { sessionId, ...(msg.payload || {}) });
+        } else if (type === 'remote:input') {
+          sendToExecutor(executorNodeUuid, 'session.bib_input', { sessionId, ...(msg.payload || {}) });
+        } else if (type === 'remote:viewport') {
+          // viewport resize is handled at attach-time; ignore for now
+        } else if (type === 'remote:inspect') {
+          // optional inspect ignored in minimal executor bib bridge
+        } else if (type === 'remote:status') {
+          // below
+        }
+      } catch {}
+
+      if (type === 'remote:start' || type === 'remote:stop' || type === 'remote:status') {
+        const live = await remoteSessionService.getLiveStatus().catch(() => null);
+        ws.send(JSON.stringify({ type: 'remote:status', payload: live || { attached: false, cdpReady: true } }));
+      }
+      return;
+    }
 
     if (type === 'remote:subscribe') {
       subscribers.add(ws);

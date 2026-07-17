@@ -1,5 +1,17 @@
 import { randomUUID } from 'crypto';
 import * as remoteSessionDao from '../dao/remote-session-dao.js';
+import { USE_EXECUTOR } from '../../config/config.js';
+import { state } from '../state.js';
+import { sendToExecutor, waitForSessionEvent } from '../executor-session-client.js';
+
+let executorLive = {
+  attached: false,
+  remoteSession: null,
+  sessionId: null,
+  executorNodeUuid: null,
+  viewportW: 1920,
+  viewportH: 1080,
+};
 
 /**
  * Open a new remote browser session record.
@@ -71,17 +83,122 @@ export async function listSessions(opts) {
  * Lazy-imports bridge to avoid circular dependency with CRUD helpers.
  */
 export async function attachLive(opts = {}) {
-  const bridge = await import('../cdp/remote-bridge.js');
-  return bridge.attachLive(opts);
+  if (!USE_EXECUTOR) {
+    const bridge = await import('../cdp/remote-bridge.js');
+    return bridge.attachLive(opts);
+  }
+
+  const wantSessionId = opts.sessionId || opts.browserSessionId;
+  const active = wantSessionId
+    ? state.sessions.get(wantSessionId)
+    : [...state.sessions.values()].find((s) => s?.useExecutor);
+
+  if (!active?.executorNodeUuid || !active?.sessionId) {
+    throw new Error('No executor-backed browser session found for attachLive');
+  }
+
+  // Create a remote_session row for RSCF header association.
+  const remoteSession = await openSession({
+    isolation: 'target',
+    viewportW: Number(opts.viewportW) || 1920,
+    viewportH: Number(opts.viewportH) || 1080,
+    deviceScaleFactor: opts.deviceScaleFactor ?? 1.0,
+    url: '',
+  });
+
+  const sessionId = active.sessionId;
+  const nodeUuid = active.executorNodeUuid;
+  executorLive = {
+    attached: true,
+    remoteSession,
+    sessionId,
+    executorNodeUuid: nodeUuid,
+    viewportW: remoteSession.viewportW || 1920,
+    viewportH: remoteSession.viewportH || 1080,
+  };
+
+  sendToExecutor(nodeUuid, 'session.attach_bib', {
+    sessionId,
+    remoteSessionUuid: remoteSession.sessionUuid,
+    quality: opts.quality ?? 70,
+    resize: opts.resize === true,
+    viewportW: executorLive.viewportW,
+    viewportH: executorLive.viewportH,
+    deviceScaleFactor: opts.deviceScaleFactor ?? 1.0,
+  });
+
+  // Wait for executor to confirm bib-ready (so UI can trust viewport).
+  const ready = await waitForSessionEvent(sessionId, 'session.bib_ready', 30000).catch(() => null);
+  if (ready?.viewportW) executorLive.viewportW = Number(ready.viewportW);
+  if (ready?.viewportH) executorLive.viewportH = Number(ready.viewportH);
+
+  return {
+    remoteSession,
+    status: {
+      attached: true,
+      remoteSessionId: remoteSession.id,
+      remoteSessionUuid: remoteSession.sessionUuid,
+      cdpReady: true,
+      inputEnabled: !active.busy,
+      agentBusy: !!active.busy,
+      viewportW: executorLive.viewportW,
+      viewportH: executorLive.viewportH,
+      manualRecording: false,
+    },
+  };
 }
 
 /** Stop screencast, close CDP client, mark remote_session closed. */
 export async function detachLive(opts = {}) {
-  const bridge = await import('../cdp/remote-bridge.js');
-  return bridge.detachLive(opts);
+  if (!USE_EXECUTOR) {
+    const bridge = await import('../cdp/remote-bridge.js');
+    return bridge.detachLive(opts);
+  }
+
+  const sessionId = executorLive.sessionId;
+  const remoteSession = executorLive.remoteSession;
+  if (!executorLive.attached || !sessionId || !remoteSession?.id) {
+    return { closedId: null, status: await getLiveStatus() };
+  }
+
+  try {
+    sendToExecutor(executorLive.executorNodeUuid, 'session.detach_bib', {
+      sessionId,
+      crashed: !!opts.crashed,
+    });
+    await waitForSessionEvent(sessionId, 'session.bib_detached', 15000).catch(() => {});
+  } finally {
+    try { await closeSession(remoteSession.id, { crashed: !!opts.crashed }); } catch {}
+    const closedId = remoteSession.id;
+    executorLive = {
+      attached: false,
+      remoteSession: null,
+      sessionId: null,
+      executorNodeUuid: null,
+      viewportW: 1920,
+      viewportH: 1080,
+    };
+    return { closedId, status: await getLiveStatus() };
+  }
 }
 
 export async function getLiveStatus() {
-  const bridge = await import('../cdp/remote-bridge.js');
-  return bridge.getRemoteStatus();
+  if (!USE_EXECUTOR) {
+    const bridge = await import('../cdp/remote-bridge.js');
+    return bridge.getRemoteStatus();
+  }
+
+  const sessionObj = executorLive.sessionId ? state.sessions.get(executorLive.sessionId) : null;
+  const agentBusy = !!sessionObj?.busy;
+  return {
+    attached: !!executorLive.attached,
+    remoteSessionId: executorLive.remoteSession?.id ?? null,
+    remoteSessionUuid: executorLive.remoteSession?.sessionUuid ?? null,
+    cdpReady: true,
+    inputEnabled: !!executorLive.attached && !agentBusy,
+    agentBusy,
+    viewportW: executorLive.viewportW,
+    viewportH: executorLive.viewportH,
+    manualRecording: false,
+  };
 }

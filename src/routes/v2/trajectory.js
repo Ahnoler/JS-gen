@@ -24,25 +24,76 @@ function stepsToActionCommands(steps) {
 }
 
 export default function (app) {
+  /** AI 分析：需求描述 -> 阶段步骤数组（不落库） */
+  app.post('/api/v2/trajectories/analyze', async (req, res) => {
+    try {
+      const { description, stepLength, model } = req.body || {};
+      const phases = await trajectoryService.analyzeRequirementToPhases({
+        description,
+        stepLength,
+        model,
+      });
+      res.json(phases);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/v2/trajectories', async (req, res) => {
     try {
-      const { page, pageSize, functionId } = req.query;
+      const {
+        page,
+        pageSize,
+        functionId,
+        keyword,
+        sortBy,
+        order,
+      } = req.query;
+      const pagination = {
+        page: +page || 1,
+        pageSize: +pageSize || 20,
+        keyword,
+        sortBy,
+        order,
+      };
       const result = functionId
-        ? await trajectoryService.listByFunction(+functionId, { page: +page || 1, pageSize: +pageSize || 20 })
-        : await trajectoryDao.list({ page: +page || 1, pageSize: +pageSize || 20 });
+        ? await trajectoryService.listByFunction(+functionId, pagination)
+        : await trajectoryDao.list(pagination);
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  /** Create empty long-lived trajectory under a function. */
+  /** Create a transaction (trajectory) shell under a function. */
   app.post('/api/v2/trajectories', async (req, res) => {
     try {
-      const { functionId, task, model } = req.body || {};
+      const {
+        functionId,
+        name,
+        requirement,
+        task,
+        model,
+        phases,
+      } = req.body || {};
+
+      const functionNum = functionId != null ? +functionId : undefined;
+      if (Array.isArray(phases)) {
+        const traj = await trajectoryService.createTransactionWithPhases({
+          functionId: functionNum,
+          name: name || '',
+          requirement: requirement ?? task ?? '',
+          phases,
+          model: model || '',
+        });
+        res.status(201).json(traj);
+        return;
+      }
+
       const id = await trajectoryService.createEmptyTrajectory({
-        functionId: functionId != null ? +functionId : undefined,
-        task: task || '',
+        functionId: functionNum,
+        name: name || '',
+        task: requirement ?? task ?? '',
         model: model || '',
       });
       const traj = await trajectoryDao.getById(id);
@@ -62,6 +113,35 @@ export default function (app) {
     }
   });
 
+  app.post('/api/v2/trajectories/:id/attach', async (req, res) => {
+    try {
+      const result = await trajectoryService.attachTrajectoryLive(+req.params.id);
+      res.status(201).json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/v2/trajectories/:id/detach', async (req, res) => {
+    try {
+      const result = await trajectoryService.detachTrajectoryLive(+req.params.id);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /** Phase-step tree: { phases:[{...phase, steps:[...]}, ...] } */
+  app.get('/api/v2/trajectories/:id/tree', async (req, res) => {
+    try {
+      const tree = await trajectoryService.getTrajectoryTree(+req.params.id);
+      if (!tree) return res.status(404).json({ error: 'Trajectory not found' });
+      res.json(tree);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   /** Phases for a trajectory (by numeric trajectory.id). */
   app.get('/api/v2/trajectories/:id/phases', async (req, res) => {
     try {
@@ -71,6 +151,19 @@ export default function (app) {
       res.json({ trajectoryId: traj.id, phases });
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  /** Append a phase: body { description?, phaseNumber? } */
+  app.post('/api/v2/trajectories/:id/phases', async (req, res) => {
+    try {
+      const phase = await trajectoryService.addPhaseToTrajectory(+req.params.id, {
+        description: req.body?.description ?? req.body?.task ?? '',
+        phaseNumber: req.body?.phaseNumber ?? null,
+      });
+      res.status(201).json(phase);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
     }
   });
 
@@ -124,11 +217,121 @@ export default function (app) {
     }
   });
 
+  /** Clear recorded steps; keep phase descriptions and reset statuses to pending. */
+  app.post('/api/v2/trajectories/:id/clear', async (req, res) => {
+    try {
+      const cleared = await trajectoryService.clearTrajectory(+req.params.id);
+      if (!cleared) return res.status(404).json({ error: 'Trajectory not found' });
+      res.json(cleared);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * Enter recording: idempotent attach + return trajectory, phases, session, live status.
+   * POST /api/v2/trajectories/:id/record/prepare
+   */
+  app.post('/api/v2/trajectories/:id/record/prepare', async (req, res) => {
+    try {
+      const result = await trajectoryService.prepareTrajectoryRecording(+req.params.id);
+      res.json(result);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * Start AI recording for all phases or subset.
+   * Body: { phaseIds?: number[] }
+   */
+  app.post('/api/v2/trajectories/:id/record/start', async (req, res) => {
+    try {
+      const phaseIds = req.body?.phaseIds;
+      const result = await trajectoryService.startTrajectoryRecording(+req.params.id, {
+        phaseIds: Array.isArray(phaseIds) ? phaseIds : null,
+      });
+      res.json(result);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * Explicit end of recording (does not detach BiB).
+   * Body: { success?: boolean } default true → recorded; false → draft
+   */
+  app.post('/api/v2/trajectories/:id/record/stop', async (req, res) => {
+    try {
+      const success = req.body?.success !== false && req.body?.success !== 0;
+      const result = await trajectoryService.stopTrajectoryRecording(+req.params.id, { success });
+      res.json(result);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * Toggle manual recording. Body: { enabled, phaseId? }
+   * phaseId omitted → append to last phase of trajectory.
+   */
+  app.post('/api/v2/trajectories/:id/manual-record', async (req, res) => {
+    try {
+      const result = await trajectoryService.toggleTrajectoryManualRecord(
+        +req.params.id,
+        !!req.body?.enabled,
+        { phaseId: req.body?.phaseId ?? req.body?.trajectoryPhaseId ?? null },
+      );
+      res.json(result);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
+
   /** Steps for a trajectory_phase (by numeric phase.id). */
   app.get('/api/v2/trajectory-phases/:id/steps', async (req, res) => {
     try {
       const steps = await trajectoryService.listStepsByPhase(+req.params.id);
       res.json({ phaseId: +req.params.id, steps });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.patch('/api/v2/trajectory-steps/:id/confirm', async (req, res) => {
+    try {
+      const row = await trajectoryService.confirmTrajectoryStep(+req.params.id, !!req.body?.confirmed);
+      if (!row) return res.status(404).json({ error: 'Trajectory step not found' });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/v2/trajectory-steps', async (req, res) => {
+    try {
+      const row = await trajectoryService.createTrajectoryStep(req.body || {});
+      res.status(201).json(row);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.patch('/api/v2/trajectory-steps/:id', async (req, res) => {
+    try {
+      const row = await trajectoryService.updateTrajectoryStep(+req.params.id, req.body || {});
+      if (!row) return res.status(404).json({ error: 'Trajectory step not found' });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/v2/trajectory-steps/:id', async (req, res) => {
+    try {
+      const result = await trajectoryService.removeTrajectoryStep(+req.params.id);
+      if (!result.removed) return res.status(404).json({ error: 'Trajectory step not found' });
+      res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

@@ -55,3 +55,53 @@ export async function listBySource(trajectoryId, source) {
 export async function removeByTrajectory(trajectoryId) {
   return getDB()(TABLE).where({ trajectory_id: trajectoryId }).del();
 }
+
+export async function getById(id) {
+  const row = await getDB()(TABLE).where({ id }).first();
+  return fromDbRow(row);
+}
+
+export async function create(step) {
+  const row = toDbRow({
+    trajectoryId: step.trajectoryId,
+    stepNumber: step.stepNumber,
+    phaseNumber: step.phaseNumber ?? 0,
+    actionIndex: step.actionIndex ?? 0,
+    actionType: step.actionType ?? step.action ?? '',
+    description: step.description ?? '',
+    success: step.success ?? null,
+    error: step.error ?? null,
+    extractedContent: step.extractedContent ?? step.result ?? '',
+    trajectoryPhaseId: step.trajectoryPhaseId ?? null,
+    source: step.source ?? 'manual',
+    confirmed: step.confirmed ?? false,
+    confirmedAt: step.confirmedAt ?? null,
+  });
+  row.params_json = step.paramsJson ?? step.params ?? null;
+  row.element_json = step.elementJson ?? step.element ?? null;
+  const [id] = await getDB()(TABLE).insert(row);
+  return getById(id);
+}
+
+export async function update(id, fields) {
+  const patch = toDbRow(fields);
+  if ('paramsJson' in fields || 'params' in fields) patch.params_json = fields.paramsJson ?? fields.params ?? null;
+  if ('elementJson' in fields || 'element' in fields) patch.element_json = fields.elementJson ?? fields.element ?? null;
+  if (!Object.keys(patch).length) return getById(id);
+  await getDB()(TABLE).where({ id }).update(patch);
+  return getById(id);
+}
+
+export async function removeById(id) {
+  return getDB()(TABLE).where({ id }).del();
+}
+
+export async function reorderByTrajectory(trajectoryId) {
+  const rows = await getDB()(TABLE)
+    .where({ trajectory_id: trajectoryId })
+    .orderBy(['step_number', 'action_index', 'id']);
+  for (let i = 0; i < rows.length; i += 1) {
+    await getDB()(TABLE).where({ id: rows[i].id }).update({ step_number: i + 1 });
+  }
+  return listByTrajectory(trajectoryId);
+}

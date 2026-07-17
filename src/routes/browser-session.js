@@ -2,17 +2,19 @@ import { writeFileSync, existsSync, unlinkSync, readFileSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
-import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR } from '../../config/config.js';
+import { LLM_BASE_URL, LLM_API_KEY, PORT, PROJECT_DIR, USE_EXECUTOR } from '../../config/config.js';
 import { state } from '../state.js';
 import { saveTrajectoryRecord } from '../trajectory-store.js';
 import { saveCaseDataRecord } from '../case-data-store.js';
-import { persistSessionTrajectory, getTrajectoryActionFlow, upsertPhaseDescription, appendRecordedStep } from '../services/trajectory-service.js';
+import { persistSessionTrajectory, getTrajectoryActionFlow, upsertPhaseDescription, appendRecordedStep, markPhaseStatus } from '../services/trajectory-service.js';
 import { persistSessionCaseData, persistFormSnapshotsFromFile } from '../services/case-data-service.js';
 import { broadcast, onWsMessage } from '../ws-server.js';
 import {
   refreshCdpEndpoints, clearCdpEndpoints, detachLive, getRemoteStatus, initRemoteBridgeWs,
   notifyManualRecordingChanged,
 } from '../cdp/remote-bridge.js';
+import * as remoteSessionService from '../services/remote-session-service.js';
+import * as execSession from '../executor-session-client.js';
 import {
   PYTHON_EXE, AGENT_SCRIPT, killTree, killOrphans,
   waitForReady, isProcessAlive, spawnAgent, setupSSE, createPushChannel, resolveModelId,
@@ -30,15 +32,113 @@ function broadcastSessions() {
   broadcast('sessions:updated', { sessions: list });
 }
 
+/** Prefer executor live BiB status when USE_EXECUTOR — local bridge is always detached then. */
+function pushRemoteStatus() {
+  if (USE_EXECUTOR) {
+    remoteSessionService.getLiveStatus()
+      .then((s) => broadcast('remote:status', s))
+      .catch(() => {});
+    return;
+  }
+  broadcast('remote:status', getRemoteStatus());
+}
+
 function broadcastWatcherStatus() {
   const gb = state.globalBrowser;
+  const executorSessions = [...state.sessions.values()].filter((s) => s.useExecutor);
+  const executorBusy = executorSessions.some((s) => s.busy);
   broadcast('watcher:status', {
-    connected: !!(gb.ready && gb.stdin),
-    agentBusy: gb.busy,
-    cdpReady: !!(gb.cdpWsUrl || gb.cdpHttp),
-    cdpHttp: gb.cdpHttp || null,
+    connected: USE_EXECUTOR
+      ? executorSessions.length > 0
+      : !!(gb.ready && gb.stdin),
+    agentBusy: USE_EXECUTOR ? executorBusy : gb.busy,
+    cdpReady: USE_EXECUTOR ? false : !!(gb.cdpWsUrl || gb.cdpHttp),
+    cdpHttp: USE_EXECUTOR ? null : (gb.cdpHttp || null),
+    useExecutor: USE_EXECUTOR,
   });
-  broadcast('remote:status', getRemoteStatus());
+  pushRemoteStatus();
+}
+
+/**
+ * Live-persist ACTION_LOG entries for a bound trajectory (executor + local).
+ * Dedupes by entry.id via session.persistedActionIds.
+ *
+ * Phase targeting:
+ * - manual: session.selectedPhaseId, else last phase of trajectory
+ * - agent:  session.activePhaseId (current executing phase), else entry.phase, else last phase
+ */
+async function persistLiveActionEntries(session, entries, { source } = {}) {
+  const trajId = session?.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null;
+  if (!Number.isFinite(trajId) || !Array.isArray(entries) || !entries.length) return;
+  if (!session.persistedActionIds) session.persistedActionIds = new Set();
+
+  for (const entry of entries) {
+    if (!entry) continue;
+    const aid = entry.id != null ? String(entry.id) : '';
+    if (aid && session.persistedActionIds.has(aid)) continue;
+
+    const entrySource = source || entry.source || 'agent';
+    const phaseIdOverride = entrySource === 'manual'
+      ? (session.selectedPhaseId != null ? Number(session.selectedPhaseId) : null)
+      : (session.activePhaseId != null
+        ? Number(session.activePhaseId)
+        : (session.selectedPhaseId != null ? Number(session.selectedPhaseId) : null));
+
+    try {
+      const persisted = await appendRecordedStep(trajId, entry, {
+        source: entrySource,
+        trajectoryPhaseId: Number.isFinite(phaseIdOverride) ? phaseIdOverride : undefined,
+      });
+      if (persisted) {
+        if (aid) session.persistedActionIds.add(aid);
+        const evt = entrySource === 'manual' ? 'manual_action_persisted' : 'action_persisted';
+        broadcast(evt, {
+          trajectoryDbId: trajId,
+          sessionId: session.sessionId,
+          ...persisted,
+          entry,
+        });
+      }
+    } catch (err) {
+      console.warn('[live-persist] appendRecordedStep failed:', err.message);
+    }
+  }
+}
+
+/** Durable executor → control-plane event hook for a session (persist + broadcast). */
+function bindExecutorSessionEvents(session) {
+  if (!session?.useExecutor || !session.sessionId || session._persistUnsub) return;
+  session._persistUnsub = execSession.subscribeSessionEvents(session.sessionId, (type, payload) => {
+    if (type === 'action_log_sync') {
+      const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+      session.lastActionLog = entries;
+      broadcast('action_log_sync', { ...(payload || {}), sessionId: session.sessionId });
+      // When a trajectory is selected, AI/manual actions persist immediately
+      if (Number.isFinite(Number(session.dbTrajectoryId))) {
+        persistLiveActionEntries(session, entries).catch(() => {});
+      }
+      return;
+    }
+    if (type === 'manual_action_recorded') {
+      const entry = payload?.entry;
+      if (entry) {
+        session.lastActionLog = Array.isArray(session.lastActionLog) ? session.lastActionLog : [];
+        const idx = session.lastActionLog.findIndex((e) => e.id && entry.id && e.id === entry.id);
+        if (idx < 0) session.lastActionLog.push(entry);
+        else session.lastActionLog[idx] = entry;
+      }
+      broadcast('manual_action_recorded', { ...(payload || {}), sessionId: session.sessionId });
+      const autoPersist = !!(session.autoPersist ?? state.globalBrowser.autoPersist);
+      if (autoPersist && entry) {
+        persistLiveActionEntries(session, [entry], { source: 'manual' }).catch(() => {});
+      }
+      return;
+    }
+    if (type === 'manual_record_status') {
+      session.manualRecording = !!payload?.enabled;
+      broadcast('manual_record_status', { ...(payload || {}), sessionId: session.sessionId });
+    }
+  });
 }
 
 async function ensureCdpDiscovered() {
@@ -126,25 +226,11 @@ async function ensureGlobalBrowser(modelId) {
               if (idx < 0) gb.lastActionLog.push(entry);
             }
             broadcast('manual_action_recorded', msg.data || {});
-            // Live-persist only when「自动入库」is on
+            // Live-persist only when「自动入库」is on (phase via selectedPhaseId → last phase)
             const session = [...state.sessions.values()][0];
-            const trajId = session?.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null;
             const autoPersist = !!(session?.autoPersist ?? gb.autoPersist);
-            if (autoPersist && Number.isFinite(trajId) && entry) {
-              appendRecordedStep(trajId, entry, { source: 'manual' })
-                .then((persisted) => {
-                  if (session) {
-                    if (!session.persistedActionIds) session.persistedActionIds = new Set();
-                    if (entry.id) session.persistedActionIds.add(String(entry.id));
-                  }
-                  if (persisted) {
-                    broadcast('manual_action_persisted', {
-                      trajectoryDbId: trajId,
-                      ...persisted,
-                      entry,
-                    });
-                  }
-                })
+            if (autoPersist && entry && session) {
+              persistLiveActionEntries(session, [entry], { source: 'manual' })
                 .catch((err) => console.warn('[manual-record] live persist failed:', err.message));
             }
           } else if (msg.event === 'manual_record_status') {
@@ -166,25 +252,37 @@ async function ensureGlobalBrowser(modelId) {
   }
 }
 
-function handleSessionMessage(channel, session, stepIndex, gb, cleanupListener) {
+function handleSessionMessage(channel, session, stepIndex, cleanupListener) {
   return (msg) => {
     const send = channel.send;
-    switch (msg.event) {
+    const event = msg.event || msg.type;
+    const data = msg.data || msg.payload || msg;
+
+    const finalizePhaseStatus = (status) => {
+      const phaseId = session.activePhaseId != null ? Number(session.activePhaseId) : null;
+      if (!Number.isFinite(phaseId) || phaseId <= 0) return;
+      markPhaseStatus(phaseId, status).catch((err) => {
+        console.warn('[session] markPhaseStatus failed:', err.message);
+      });
+    };
+
+    switch (event) {
       case 'step':
-        send('step', msg.data);
-        send('status', { phase: 'exploring', label: `Step ${msg.data.step}: ${msg.data.next_goal || 'thinking...'}` });
+        send('step', data);
+        send('status', { phase: 'exploring', label: `Step ${data.step}: ${data.next_goal || 'thinking...'}` });
         break;
       case 'phase_start':
-        send('phase_start', msg.data);
-        send('status', { phase: 'session_step', label: `Step ${msg.data.phase}: ${msg.data.name}`, currentStep: msg.data.phase });
+        send('phase_start', data);
+        send('status', { phase: 'session_step', label: `Step ${data.phase}: ${data.name}`, currentStep: data.phase });
         break;
       case 'phase_done': {
-        const trajectoryFile = msg.data?.trajectory_file;
-        session.stepIndex = msg.data?.step_index || stepIndex;
+        const trajectoryFile = data?.trajectory_file;
+        session.stepIndex = data?.step_index || stepIndex;
         session.trajectories.push({ step: session.stepIndex, path: trajectoryFile || '', time: new Date().toISOString() });
-        send('phase_done', msg.data);
+        finalizePhaseStatus('completed');
+        send('phase_done', data);
         send('status', { phase: 'step_done', label: `Step ${session.stepIndex} completed` });
-        gb.busy = false;
+        session.busy = false;
         broadcastSessions();
         broadcastWatcherStatus();
         send('done', { stepIndex: session.stepIndex, success: true });
@@ -193,45 +291,102 @@ function handleSessionMessage(channel, session, stepIndex, gb, cleanupListener) 
         break;
       }
       case 'phase_error':
-        send('status', { phase: 'error', label: `Step failed: ${msg.data.message}` });
-        gb.busy = false;
+        finalizePhaseStatus('failed');
+        send('status', { phase: 'error', label: `Step failed: ${data.message}` });
+        send('phase_error', data);
+        session.busy = false;
         broadcastWatcherStatus();
-        send('done', { stepIndex, success: false, error: msg.data.message });
+        send('done', { stepIndex, success: false, error: data.message });
         channel.end();
         cleanupListener();
         break;
       case 'error':
-        send('error', msg.data);
-        gb.busy = false;
+        finalizePhaseStatus('failed');
+        send('error', data);
+        session.busy = false;
         broadcastWatcherStatus();
-        send('done', { stepIndex, success: false, error: msg.data.message || 'Agent error' });
+        send('done', { stepIndex, success: false, error: data.message || 'Agent error' });
         channel.end();
         cleanupListener();
         break;
       case 'nav_step':
-        send('status', { phase: 'navigating', label: msg.data.label });
+        send('status', { phase: 'navigating', label: data.label });
         break;
       case 'intervention_needed':
-        send('intervention_needed', msg.data);
+        send('intervention_needed', data);
         break;
       case 'intervention_resolved':
-        send('intervention_resolved', msg.data);
+        send('intervention_resolved', data);
         break;
       case 'action_log_sync':
-        send('action_log_sync', msg.data);
+        send('action_log_sync', data);
         break;
     }
   };
 }
 
 export default function (app) {
+  function writeAgentEvent(session, event, data) {
+    if (session?.useExecutor && session.executorNodeUuid) {
+      execSession.forwardStdin({
+        nodeUuid: session.executorNodeUuid,
+        sessionId: session.sessionId,
+        event,
+        data,
+      });
+      return true;
+    }
+    const gb = state.globalBrowser;
+    if (gb.stdin) {
+      gb.stdin.write(JSON.stringify({ event, data }) + '\n');
+      return true;
+    }
+    return false;
+  }
+
+  function sessionRuntimeReady(session) {
+    if (session?.useExecutor) return !!session.executorNodeUuid;
+    const gb = state.globalBrowser;
+    return !!(gb.ready && gb.stdin);
+  }
+
   app.post('/api/browser/session', async (req, res) => {
     const { model } = req.body || {};
-    if (!existsSync(PYTHON_EXE)) return res.status(500).json({ error: `Python not found at ${PYTHON_EXE}` });
-    if (!existsSync(AGENT_SCRIPT)) return res.status(500).json({ error: `Agent script not found at ${AGENT_SCRIPT}` });
-
     const sessionId = crypto.randomUUID();
     const modelId = resolveModelId(model);
+
+    if (USE_EXECUTOR) {
+      try {
+        const opened = await execSession.openSession({ sessionId, model: modelId });
+        const session = {
+          sessionId,
+          stepIndex: 0,
+          trajectories: [],
+          createdAt: new Date().toISOString(),
+          model: modelId,
+          lastTask: null,
+          lastMaxSteps: null,
+          caseDataFile: null,
+          useExecutor: true,
+          executorNodeUuid: opened.nodeUuid,
+          executorSlotIndex: opened.slotIndex,
+          busy: false,
+          lastActionLog: [],
+          persistedActionIds: new Set(),
+        };
+        state.sessions.set(sessionId, session);
+        bindExecutorSessionEvents(session);
+        console.log(`[browser-session] Created session ${sessionId} on executor ${opened.nodeUuid}`);
+        broadcastSessions();
+        broadcastWatcherStatus();
+        return res.json({ sessionId, model: modelId, executorNodeUuid: opened.nodeUuid });
+      } catch (err) {
+        return res.status(503).json({ error: err.message });
+      }
+    }
+
+    if (!existsSync(PYTHON_EXE)) return res.status(500).json({ error: `Python not found at ${PYTHON_EXE}` });
+    if (!existsSync(AGENT_SCRIPT)) return res.status(500).json({ error: `Agent script not found at ${AGENT_SCRIPT}` });
 
     try { await ensureGlobalBrowser(modelId); } catch (err) { return res.status(500).json({ error: err.message }); }
 
@@ -245,7 +400,11 @@ export default function (app) {
 
   // ── Shared: execute a single step on the global browser agent ──
   // Callers: HTTP+SSE handler (POST /step) and WebSocket handler
-  function executeAgentStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel }) {
+  async function executeAgentStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel }) {
+    if (session.useExecutor) {
+      return executeExecutorStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel });
+    }
+
     const gb = state.globalBrowser;
     if (gb.busy) return channel.send('error', { message: 'Browser is busy executing a step' });
     if (!gb.ready || !gb.stdin) return channel.send('error', { message: 'Browser not ready' });
@@ -284,9 +443,12 @@ export default function (app) {
       session.phaseDescriptions[String(pn)] = String(task);
       // Write description immediately so it does not depend on later「保存轨迹」payload
       if (Number.isFinite(resolvedTrajId)) {
-        upsertPhaseDescription(resolvedTrajId, pn, task).catch((err) => {
+        try {
+          const phaseDbId = await upsertPhaseDescription(resolvedTrajId, pn, task);
+          if (phaseDbId) session.activePhaseId = phaseDbId;
+        } catch (err) {
           console.warn('[session-step] upsertPhaseDescription failed:', err.message);
-        });
+        }
       }
     }
 
@@ -307,7 +469,7 @@ export default function (app) {
     }
 
     let pendingBuffer = '';
-    const handleMsg = handleSessionMessage(channel, session, stepIndex, gb, cleanupListeners);
+    const handleMsg = handleSessionMessage(channel, session, stepIndex, cleanupListeners);
 
     function onStdout(chunk) {
       if (aborted) return;
@@ -336,6 +498,99 @@ export default function (app) {
 
     gb.process.stdout.on('data', onStdout);
     gb.process.on('exit', onProcessExit);
+  }
+
+  async function executeExecutorStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel }) {
+    if (session.busy) return channel.send('error', { message: 'Browser is busy executing a step' });
+    if (!session.executorNodeUuid) return channel.send('error', { message: 'Executor session not bound' });
+
+    if (caseDataFile) session.caseDataFile = caseDataFile;
+    session.busy = true;
+    broadcastWatcherStatus();
+
+    let aborted = false;
+    channel.onAbort(() => {
+      aborted = true;
+      if (session.busy) {
+        try {
+          execSession.forwardStdin({
+            nodeUuid: session.executorNodeUuid,
+            sessionId: session.sessionId,
+            event: 'cancel_step',
+          });
+        } catch {}
+        session.busy = false;
+      }
+      cleanupListeners();
+    });
+
+    const stepIndex = session.stepIndex + 1;
+    session.lastTask = task;
+    session.lastMaxSteps = maxSteps || 40;
+    if (phaseNumber != null) session.lastPhaseNumber = phaseNumber;
+
+    const resolvedTrajId = trajectoryDbId != null && trajectoryDbId !== ''
+      ? Number(trajectoryDbId)
+      : (session.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null);
+    if (Number.isFinite(resolvedTrajId)) session.dbTrajectoryId = resolvedTrajId;
+
+    const pn = phaseNumber != null ? Number(phaseNumber) : stepIndex;
+    if (Number.isFinite(pn) && task) {
+      if (!session.phaseDescriptions) session.phaseDescriptions = {};
+      session.phaseDescriptions[String(pn)] = String(task);
+      if (Number.isFinite(resolvedTrajId)) {
+        try {
+          const phaseDbId = await upsertPhaseDescription(resolvedTrajId, pn, task);
+          if (phaseDbId) session.activePhaseId = phaseDbId;
+        } catch (err) {
+          console.warn('[session-step] upsertPhaseDescription failed:', err.message);
+        }
+      }
+    }
+
+    const handleMsg = handleSessionMessage(channel, session, stepIndex, cleanupListeners);
+
+    function cleanupListeners() {
+      if (session._executorUnsub) {
+        session._executorUnsub();
+        session._executorUnsub = null;
+      }
+    }
+
+    // Ensure durable persist hook is active (also set on session create)
+    bindExecutorSessionEvents(session);
+
+    session._executorUnsub = execSession.subscribeSessionEvents(session.sessionId, (type, payload) => {
+      if (aborted) return;
+      if (type === 'session.process_exit') {
+        aborted = true;
+        session.busy = false;
+        channel.send('error', { message: `Executor agent process exited (code ${payload.code})` });
+        channel.end();
+        cleanupListeners();
+        return;
+      }
+      handleMsg({ type, data: payload });
+    });
+
+    try {
+      execSession.forwardStdin({
+        nodeUuid: session.executorNodeUuid,
+        sessionId: session.sessionId,
+        event: 'step',
+        data: {
+          instruction: task,
+          max_steps: maxSteps || 40,
+          phase_number: Number.isFinite(pn) ? pn : stepIndex,
+          case_data_file: session.caseDataFile,
+        },
+      });
+    } catch (writeErr) {
+      session.busy = false;
+      channel.send('error', { message: `Failed to send step to executor: ${writeErr.message}` });
+      channel.end();
+      cleanupListeners();
+    }
   }
 
   app.post('/api/browser/session/:id/step', async (req, res) => {
@@ -581,10 +836,22 @@ export default function (app) {
     }
   });
 
-  app.delete('/api/browser/session/:id', (req, res) => {
+  app.delete('/api/browser/session/:id', async (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    if (session.useExecutor && session.executorNodeUuid) {
+      try {
+        await execSession.closeSession({ nodeUuid: session.executorNodeUuid, sessionId: id });
+      } catch (err) {
+        console.warn('[browser-session] executor close failed:', err.message);
+      }
+    }
+    if (session._persistUnsub) {
+      try { session._persistUnsub(); } catch {}
+      session._persistUnsub = null;
+    }
 
     const record = {
       sessionId: id, model: session.model, stepIndex: session.stepIndex,
@@ -685,7 +952,8 @@ export default function (app) {
 
   /**
    * Merged action flow: DB steps for trajectory.id + live _ACTION_LOG.
-   * Query: ?trajectoryId=<numeric trajectory.id>
+   * Query: ?trajectoryId=<numeric trajectory.id>&phaseId=<trajectory_phase.id>
+   * Prefer GET /api/v2/trajectories/:id/tree on the Dashboard for phase-step view.
    */
   app.get('/api/browser/session/:id/action-flow', async (req, res) => {
     const { id } = req.params;
@@ -696,10 +964,31 @@ export default function (app) {
       ? Number(req.query.trajectoryId)
       : (session.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null);
 
-    const gb = state.globalBrowser;
-    let pending = Array.isArray(gb.lastActionLog) ? gb.lastActionLog : [];
+    if (Number.isFinite(trajectoryDbId)) session.dbTrajectoryId = trajectoryDbId;
 
-    if (gb.ready && gb.stdin && !gb.busy) {
+    const phaseQ = req.query.phaseId ?? req.query.trajectoryPhaseId;
+    if (phaseQ != null && phaseQ !== '') {
+      const pid = Number(phaseQ);
+      if (Number.isFinite(pid) && pid > 0) session.selectedPhaseId = pid;
+    }
+
+    const gb = state.globalBrowser;
+    let pending = Array.isArray(session.lastActionLog)
+      ? session.lastActionLog
+      : (Array.isArray(gb.lastActionLog) ? gb.lastActionLog : []);
+
+    // Pull fresh ACTION_LOG from local or executor agent
+    if (session.useExecutor && session.executorNodeUuid && !session.busy) {
+      try {
+        const resultP = execSession.waitForSessionEvent(id, 'get_action_log_result', 3000);
+        writeAgentEvent(session, 'get_action_log', {});
+        const payload = await resultP;
+        pending = Array.isArray(payload?.entries) ? payload.entries : pending;
+        session.lastActionLog = pending;
+      } catch {
+        pending = session.lastActionLog || [];
+      }
+    } else if (gb.ready && gb.stdin && !gb.busy) {
       try {
         pending = await new Promise((resolve) => {
           const timeout = setTimeout(() => {
@@ -752,6 +1041,7 @@ export default function (app) {
         ...flow,
         sessionId: id,
         autoPersist: !!(session.autoPersist ?? gb.autoPersist),
+        useExecutor: !!session.useExecutor,
       });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -779,11 +1069,159 @@ export default function (app) {
     };
     console.log('[save-trajectory] phaseDescriptions keys:', Object.keys(mergedPhaseDescriptions),
       'sample:', Object.fromEntries(Object.entries(mergedPhaseDescriptions).map(([k, v]) => [k, String(v).slice(0, 40)])));
-    if (gb.busy) return res.status(409).json({ error: 'Browser is busy executing a step' });
-    if (!gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
-    gb.stdin.write(JSON.stringify({ event: 'save_trajectory' }) + '\n');
 
-    const timeout = setTimeout(() => { cleanupTrajListener(); if (!res.writableEnded) res.status(504).json({ error: 'Timeout waiting for trajectory' }); }, 30000);
+    const busy = session.useExecutor ? !!session.busy : !!gb.busy;
+    if (busy) return res.status(409).json({ error: 'Browser is busy executing a step' });
+    if (!sessionRuntimeReady(session)) {
+      return res.status(503).json({ error: 'Browser not ready' });
+    }
+    if (Number.isFinite(resolvedTrajId)) session.dbTrajectoryId = resolvedTrajId;
+
+    async function finalizeSave(data) {
+      console.log('[save-trajectory] Python response:', JSON.stringify(data, null, 2));
+      if (!data?.success) {
+        return res.status(500).json({ error: data?.message || 'Failed to save trajectory' });
+      }
+      const trajectoryFile = data.trajectory_file;
+      const actionFile = data.action_file;
+      console.log('[save-trajectory] actionFile:', actionFile, 'trajectoryFile:', trajectoryFile);
+
+      // Prefer action_file; if only live ACTION_LOG entries exist (executor), persist those.
+      const liveEntries = Array.isArray(session.lastActionLog) ? session.lastActionLog : [];
+      if (!actionFile && !trajectoryFile && !liveEntries.length) {
+        return res.status(500).json({ error: 'No action_file or trajectory_file from agent' });
+      }
+
+      try {
+        if (!session.persistedActionIds) session.persistedActionIds = new Set();
+
+        let flow = [];
+        let jsonSteps = 0;
+        try {
+          if (trajectoryFile && existsSync(trajectoryFile)) {
+            const jsonKey = Number.isFinite(resolvedTrajId) ? `db_${resolvedTrajId}` : id;
+            const { record, flow: f } = saveTrajectoryRecord({
+              trajectoryId: jsonKey,
+              task: task || '',
+              model: session.model,
+              sourcePath: trajectoryFile,
+              exploreMeta: { is_done: data.is_done, is_successful: data.is_successful },
+            });
+            flow = f || [];
+            jsonSteps = record?.stepCount || 0;
+          }
+        } catch (jsonErr) {
+          console.warn('[save-trajectory] legacy JSON store skipped:', jsonErr.message);
+        }
+
+        // If no action_file but we have live entries, persist them directly
+        if (!actionFile && liveEntries.length) {
+          await persistLiveActionEntries(session, liveEntries);
+        }
+
+        const actionCount = data.action_count
+          ?? liveEntries.length
+          ?? flow.filter((s) => s.type !== 'done' && !s.error).length;
+
+        let dbId = Number.isFinite(resolvedTrajId) ? resolvedTrajId : null;
+        if (actionFile || trajectoryFile) {
+          dbId = await persistSessionTrajectory({
+            id: Number.isFinite(resolvedTrajId) ? resolvedTrajId : undefined,
+            task: task || '',
+            model: session.model,
+            url: data.url || '',
+            isDone: data.is_done,
+            isSuccessful: data.is_successful,
+            actionFile: actionFile || null,
+            flow,
+            logFile: data.log_file || null,
+            phaseDescriptions: mergedPhaseDescriptions,
+            excludeActionIds: session.persistedActionIds,
+            ...(Number.isFinite(resolvedFunctionId) ? { functionId: resolvedFunctionId } : {}),
+          });
+        } else if (dbId != null) {
+          // Live entries already appended; refresh phase descriptions
+          for (const [k, v] of Object.entries(mergedPhaseDescriptions)) {
+            const n = Number(k);
+            if (Number.isFinite(n) && v) {
+              await upsertPhaseDescription(dbId, n, String(v)).catch(() => {});
+            }
+          }
+        }
+        if (dbId != null) session.dbTrajectoryId = dbId;
+
+        let dbStepCount = null;
+        try {
+          const { getDB } = await import('../../config/database.js');
+          const row = await getDB()('trajectory').where({ id: dbId }).first();
+          dbStepCount = row?.step_count ?? null;
+          console.log(`[save-trajectory] DB trajectory id=${dbId} step_count=${dbStepCount}`);
+        } catch (e) {
+          console.warn('[save-trajectory] could not read back step_count:', e.message);
+        }
+
+        if (data.form_file) {
+          try {
+            await persistFormSnapshotsFromFile(data.form_file, { trajectoryId: dbId });
+          } catch (formErr) {
+            console.warn('[save-trajectory] form_snapshot DB write failed:', formErr.message);
+          }
+        }
+
+        gb.lastActionLog = [];
+        session.lastActionLog = [];
+
+        return res.json({
+          trajectoryDbId: dbId,
+          sessionId: id,
+          dbId,
+          steps: dbStepCount ?? (jsonSteps || actionCount),
+          actions: actionCount,
+          dbStepCount,
+          isSuccessful: data.is_successful ?? null,
+          action_file: actionFile,
+          log_file: data.log_file,
+          action_count: data.action_count ?? actionCount,
+          log_count: data.log_count,
+          storage: 'db',
+        });
+      } catch (err) {
+        return res.status(500).json({ error: `Trajectory save error: ${err.message}` });
+      }
+    }
+
+    // Executor path: WS event instead of local stdin/stdout
+    if (session.useExecutor) {
+      try {
+        const resultP = execSession.waitForSessionEvent(id, 'save_trajectory_result', 30000);
+        writeAgentEvent(session, 'save_trajectory', {});
+        const data = await resultP;
+        return finalizeSave(data);
+      } catch (err) {
+        // Fallback: persist whatever live ACTION_LOG we already have
+        if (Array.isArray(session.lastActionLog) && session.lastActionLog.length) {
+          console.warn('[save-trajectory] executor save timed out; persisting live ACTION_LOG:', err.message);
+          return finalizeSave({
+            success: true,
+            action_count: session.lastActionLog.length,
+            is_done: null,
+            is_successful: null,
+          });
+        }
+        return res.status(504).json({ error: err.message || 'Timeout waiting for trajectory' });
+      }
+    }
+
+    try {
+      gb.stdin.write(JSON.stringify({ event: 'save_trajectory' }) + '\n');
+    } catch (err) {
+      return res.status(503).json({ error: `Browser not ready: ${err.message}` });
+    }
+
+    const timeout = setTimeout(() => {
+      cleanupTrajListener();
+      if (!res.writableEnded) res.status(504).json({ error: 'Timeout waiting for trajectory' });
+    }, 30000);
     let pendingBuffer = '';
 
     const onStdout = async (chunk) => {
@@ -797,97 +1235,13 @@ export default function (app) {
           if (msg.event === 'save_trajectory_result') {
             clearTimeout(timeout);
             cleanupTrajListener();
-            console.log('[save-trajectory] Python response:', JSON.stringify(msg.data, null, 2));
-            if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save trajectory' });
-            const trajectoryFile = msg.data.trajectory_file;
-            const actionFile = msg.data.action_file;
-            console.log('[save-trajectory] actionFile:', actionFile, 'trajectoryFile:', trajectoryFile);
-            // DB is primary. action_file (ACTION_LOG dump) is enough; native traj JSON optional.
-            if (!actionFile && !trajectoryFile) {
-              return res.status(500).json({ error: 'No action_file or trajectory_file from agent' });
-            }
-            try {
-              if (!session.persistedActionIds) session.persistedActionIds = new Set();
-
-              // Optional legacy JSON index — never block save if it fails
-              let flow = [];
-              let jsonSteps = 0;
-              try {
-                if (trajectoryFile && existsSync(trajectoryFile)) {
-                  const jsonKey = Number.isFinite(resolvedTrajId) ? `db_${resolvedTrajId}` : id;
-                  const { record, flow: f } = saveTrajectoryRecord({
-                    trajectoryId: jsonKey,
-                    task: task || '',
-                    model: session.model,
-                    sourcePath: trajectoryFile,
-                    exploreMeta: { is_done: msg.data.is_done, is_successful: msg.data.is_successful },
-                  });
-                  flow = f || [];
-                  jsonSteps = record?.stepCount || 0;
-                }
-              } catch (jsonErr) {
-                console.warn('[save-trajectory] legacy JSON store skipped:', jsonErr.message);
-              }
-              const actionCount = msg.data.action_count
-                ?? flow.filter(s => s.type !== 'done' && !s.error).length;
-
-              const dbId = await persistSessionTrajectory({
-                id: Number.isFinite(resolvedTrajId) ? resolvedTrajId : undefined,
-                task: task || '',
-                model: session.model,
-                url: msg.data.url || '',
-                isDone: msg.data.is_done,
-                isSuccessful: msg.data.is_successful,
-                actionFile: actionFile || null,
-                flow,
-                logFile: msg.data.log_file || null,
-                phaseDescriptions: mergedPhaseDescriptions,
-                excludeActionIds: session.persistedActionIds,
-                ...(Number.isFinite(resolvedFunctionId) ? { functionId: resolvedFunctionId } : {}),
-              });
-              if (dbId != null) session.dbTrajectoryId = dbId;
-
-              let dbStepCount = null;
-              try {
-                const { getDB } = await import('../../config/database.js');
-                const row = await getDB()('trajectory').where({ id: dbId }).first();
-                dbStepCount = row?.step_count ?? null;
-                console.log(`[save-trajectory] DB trajectory id=${dbId} step_count=${dbStepCount}`);
-              } catch (e) {
-                console.warn('[save-trajectory] could not read back step_count:', e.message);
-              }
-
-              if (msg.data.form_file) {
-                try {
-                  await persistFormSnapshotsFromFile(msg.data.form_file, { trajectoryId: dbId });
-                } catch (formErr) {
-                  console.warn('[save-trajectory] form_snapshot DB write failed:', formErr.message);
-                }
-              }
-
-              gb.lastActionLog = [];
-
-              return res.json({
-                trajectoryDbId: dbId,
-                sessionId: id,
-                dbId,
-                steps: dbStepCount ?? (jsonSteps || actionCount),
-                actions: actionCount,
-                dbStepCount,
-                isSuccessful: msg.data.is_successful ?? null,
-                action_file: actionFile,
-                log_file: msg.data.log_file,
-                action_count: msg.data.action_count,
-                log_count: msg.data.log_count,
-                storage: 'db',
-              });
-            } catch (err) { return res.status(500).json({ error: `Trajectory save error: ${err.message}` }); }
+            return finalizeSave(msg.data || {});
           }
         } catch {}
       }
     };
 
-    function cleanupTrajListener() { gb.process.stdout.removeListener('data', onStdout); }
+    function cleanupTrajListener() { gb.process?.stdout?.removeListener('data', onStdout); }
     gb.process.stdout.on('data', onStdout);
   });
 
@@ -993,18 +1347,27 @@ export default function (app) {
   // Register remote:* WS handlers (screencast / input)
   initRemoteBridgeWs();
 
-  app.get('/api/browser/watcher/status', (req, res) => {
+  app.get('/api/browser/watcher/status', async (req, res) => {
     const gb = state.globalBrowser;
     const session = [...state.sessions.values()][0];
-    const connected = !!(gb.ready && gb.stdin);
+    const executorSessions = [...state.sessions.values()].filter((s) => s.useExecutor);
+    const connected = USE_EXECUTOR
+      ? executorSessions.length > 0
+      : !!(gb.ready && gb.stdin);
+    const agentBusy = USE_EXECUTOR
+      ? executorSessions.some((s) => s.busy)
+      : !!gb.busy;
+    const remote = USE_EXECUTOR
+      ? await remoteSessionService.getLiveStatus().catch(() => ({ attached: false }))
+      : getRemoteStatus();
     res.json({
       connected,
-      agentBusy: gb.busy,
-      cdpReady: !!(gb.cdpWsUrl || gb.cdpHttp),
-      cdpHttp: gb.cdpHttp || null,
+      agentBusy,
+      cdpReady: USE_EXECUTOR ? true : !!(gb.cdpWsUrl || gb.cdpHttp),
+      cdpHttp: USE_EXECUTOR ? null : (gb.cdpHttp || null),
       manualRecording: !!gb.manualRecording,
       autoPersist: !!(session?.autoPersist ?? gb.autoPersist),
-      remote: getRemoteStatus(),
+      remote,
     });
   });
 
@@ -1027,30 +1390,45 @@ export default function (app) {
 
   /**
    * Start / stop manual DOM recording on the live browser page.
-   * Body: { enabled: boolean, trajectoryDbId?, sessionId? }
+   * Body: { enabled: boolean, trajectoryDbId?, phaseId? / trajectoryPhaseId? }
+   * phaseId → append live steps to that trajectory_phase; omit → last phase of traj.
    */
   app.post('/api/browser/session/:id/manual-record', async (req, res) => {
     const { id } = req.params;
-    const { enabled, trajectoryDbId } = req.body || {};
+    const { enabled, trajectoryDbId, phaseId, trajectoryPhaseId } = req.body || {};
     const session = state.sessions.get(id);
     const gb = state.globalBrowser;
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
+    if (!sessionRuntimeReady(session)) return res.status(503).json({ error: 'Browser not ready' });
 
     if (trajectoryDbId != null && trajectoryDbId !== '') {
       session.dbTrajectoryId = Number(trajectoryDbId);
     }
+    const selectedPhase = phaseId ?? trajectoryPhaseId;
+    if (selectedPhase != null && selectedPhase !== '') {
+      session.selectedPhaseId = Number(selectedPhase);
+    } else if (enabled) {
+      // Manual start without phase → clear so persist falls back to last phase
+      session.selectedPhaseId = null;
+    }
 
     const event = enabled ? 'manual_record_start' : 'manual_record_stop';
     try {
-      gb.stdin.write(JSON.stringify({ event }) + '\n');
+      writeAgentEvent(session, event);
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
 
-    // Wait briefly for status ack
     const status = await new Promise((resolve) => {
       const timeout = setTimeout(() => resolve({ enabled: !!enabled, timedOut: true }), 5000);
+      if (session.useExecutor) {
+        const off = execSession.onSessionEvent(id, 'manual_record_status', (data) => {
+          clearTimeout(timeout);
+          off();
+          resolve(data || {});
+        });
+        return;
+      }
       let buf = '';
       const onData = (chunk) => {
         buf += chunk.toString();
@@ -1080,6 +1458,7 @@ export default function (app) {
       status: 'ok',
       enabled: !!status.enabled,
       trajectoryDbId: session.dbTrajectoryId ?? null,
+      phaseId: session.selectedPhaseId ?? null,
       error: status.error || null,
     });
   });
@@ -1163,15 +1542,16 @@ export default function (app) {
         : (session?.autoPersist ?? gb.autoPersist));
       if (session) session.autoPersist = autoPersist;
       gb.autoPersist = autoPersist;
-      if (autoPersist && Number.isFinite(resolvedTrajId) && result.entry) {
+      if (autoPersist && Number.isFinite(resolvedTrajId) && result.entry && session) {
         try {
           const stepSource = source || result.entry.source || 'cdp';
-          persisted = await appendRecordedStep(resolvedTrajId, result.entry, { source: stepSource });
-          if (session) {
-            if (!session.persistedActionIds) session.persistedActionIds = new Set();
-            if (result.entry.id) session.persistedActionIds.add(String(result.entry.id));
-            session.dbTrajectoryId = resolvedTrajId;
+          session.dbTrajectoryId = resolvedTrajId;
+          const bodyPhase = req.body?.phaseId ?? req.body?.trajectoryPhaseId;
+          if (bodyPhase != null && bodyPhase !== '') {
+            session.selectedPhaseId = Number(bodyPhase);
           }
+          await persistLiveActionEntries(session, [result.entry], { source: stepSource });
+          persisted = { ok: true };
         } catch (dbErr) {
           console.warn('[watcher-action] live DB persist failed:', dbErr.message);
         }

@@ -24,6 +24,9 @@ export async function updateStatus(phaseId, status) {
   const data = { status };
   if (status === 'completed' || status === 'failed') {
     data.completed_at = getDB().fn.now();
+  } else {
+    // Keep completed_at consistent for non-terminal statuses (e.g. pending/running).
+    data.completed_at = null;
   }
   await getDB()(TABLE).where({ id: phaseId }).update(toDbRow(data));
   return getById(phaseId);

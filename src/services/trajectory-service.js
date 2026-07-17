@@ -6,6 +6,10 @@ import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
 import * as functionDefDao from '../dao/function-def-dao.js';
 import { getDB } from '../../config/database.js';
 import { stepFromActionLog } from '../models/helpers.js';
+import { callLLM } from '../llm-utils.js';
+import * as execSession from '../executor-session-client.js';
+import * as remoteSessionService from './remote-session-service.js';
+import { state } from '../state.js';
 
 /**
  * Build trajectory_step rows from action_{ts}.json commands.
@@ -472,24 +476,75 @@ export async function saveFullTrajectory({ trajectory, phases, functionId, remot
 }
 
 /**
- * Append a single recorded action (CDP/manual/agent) to an existing trajectory immediately.
- * @returns {{ stepId: number, stepNumber: number }|null}
+ * Resolve which trajectory_phase.id a live step should attach to.
+ * Priority: explicit phaseId → phaseNumber match → last phase of trajectory.
  */
-export async function appendRecordedStep(trajectoryDbId, entry, { source } = {}) {
+export async function resolvePhaseIdForPersist(trajectoryId, {
+  phaseId = null,
+  phaseNumber = null,
+  fallbackLast = true,
+} = {}) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) return null;
+
+  if (phaseId != null && Number.isFinite(Number(phaseId)) && Number(phaseId) > 0) {
+    const p = await trajectoryPhaseDao.getById(+phaseId);
+    if (p && Number(p.trajectoryId) === tid) return p.id;
+  }
+
+  const pn = Number(phaseNumber);
+  if (Number.isFinite(pn) && pn > 0) {
+    const row = await getDB()('trajectory_phase')
+      .where({ trajectory_id: tid, phase_number: pn })
+      .first();
+    if (row?.id) return row.id;
+  }
+
+  if (fallbackLast) {
+    const last = await getDB()('trajectory_phase')
+      .where({ trajectory_id: tid })
+      .orderBy('phase_number', 'desc')
+      .first();
+    return last?.id ?? null;
+  }
+  return null;
+}
+
+/**
+ * Append a single recorded action (CDP/manual/agent) to an existing trajectory immediately.
+ * Always prefers an explicit trajectory_phase.id; falls back to last phase.
+ * @returns {{ stepNumber: number, actionId: string|null, trajectoryPhaseId: number|null }|null}
+ */
+export async function appendRecordedStep(trajectoryDbId, entry, { source, trajectoryPhaseId } = {}) {
   const tid = Number(trajectoryDbId);
   if (!Number.isFinite(tid) || tid <= 0 || !entry) return null;
 
   const resolvedSource = source || entry.source || 'agent';
+  const phaseNumberHint = Number(entry.phase ?? entry.phaseNumber ?? 0) || 0;
   const maxStep = await trajectoryDao.getMaxStepNumber(tid);
   const stepNumber = maxStep + 1;
+
+  const resolvedPhaseId = await resolvePhaseIdForPersist(tid, {
+    phaseId: trajectoryPhaseId ?? entry.trajectoryPhaseId ?? null,
+    phaseNumber: phaseNumberHint || null,
+    fallbackLast: true,
+  });
+
+  let phaseNumber = phaseNumberHint;
+  if (resolvedPhaseId) {
+    const phase = await trajectoryPhaseDao.getById(resolvedPhaseId);
+    if (phase?.phaseNumber != null) phaseNumber = Number(phase.phaseNumber);
+  }
+
   const step = stepFromActionLog(entry, {
     trajectoryId: tid,
     stepNumber,
-    phaseNumber: entry.phase ?? entry.phaseNumber ?? 0,
+    phaseNumber,
     source: resolvedSource,
   });
   step.trajectoryId = tid;
   step.stepNumber = stepNumber;
+  step.trajectoryPhaseId = resolvedPhaseId;
 
   await trajectoryStepDao.batchSave([step]);
 
@@ -499,12 +554,13 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source } = {})
     phaseCount: counts.phaseCount,
   });
 
-  return { stepNumber, actionId: entry.id || null };
+  return { stepNumber, actionId: entry.id || null, trajectoryPhaseId: resolvedPhaseId };
 }
 
 /**
  * Upsert a trajectory_phase row with the full phase task description.
  * Called when the user clicks「执行阶段」so description is stored immediately.
+ * Also marks the phase as running for the live action-flow status.
  */
 export async function upsertPhaseDescription(trajectoryDbId, phaseNumber, description) {
   const tid = Number(trajectoryDbId);
@@ -522,7 +578,11 @@ export async function upsertPhaseDescription(trajectoryDbId, phaseNumber, descri
   if (existing) {
     await db('trajectory_phase')
       .where({ id: existing.id })
-      .update({ description: desc });
+      .update({
+        description: desc,
+        status: 'running',
+        completed_at: null,
+      });
     return existing.id;
   }
 
@@ -539,14 +599,23 @@ export async function upsertPhaseDescription(trajectoryDbId, phaseNumber, descri
   return row?.id ?? null;
 }
 
+/** Mark a trajectory_phase terminal/non-terminal status (completed | failed | running | pending). */
+export async function markPhaseStatus(phaseDbId, status) {
+  const id = Number(phaseDbId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  if (!['pending', 'running', 'completed', 'failed'].includes(status)) return null;
+  return trajectoryPhaseDao.updateStatus(id, status);
+}
+
 /**
  * Create empty trajectory shell under a function (for long-lived recording).
  */
-export async function createEmptyTrajectory({ functionId, task = '', model = '' } = {}) {
+export async function createEmptyTrajectory({ functionId, task = '', model = '', name = '' } = {}) {
   let resolvedFunctionId = typeof functionId === 'number'
     ? functionId
     : await functionDefDao.getDefaultFunctionId();
   return trajectoryDao.save({
+    name: String(name || '').trim(),
     trajectoryLog: null,
     task: task || '',
     model: model || '',
@@ -556,8 +625,661 @@ export async function createEmptyTrajectory({ functionId, task = '', model = '' 
     isSuccessful: null,
     url: '',
     functionId: resolvedFunctionId,
+    recordStatus: 'draft',
     steps: [],
   });
+}
+
+/**
+ * Create a "transaction" (trajectory) shell with pre-defined phases.
+ * `phases[]` can be string[] or {description: string}[].
+ */
+export async function createTransactionWithPhases({
+  functionId,
+  name = '',
+  requirement = '',
+  phases = [],
+  model = '',
+} = {}) {
+  const resolvedFunctionId = typeof functionId === 'number'
+    ? functionId
+    : await functionDefDao.getDefaultFunctionId();
+
+  const parsed = Array.isArray(phases)
+    ? phases
+      .map((p) => (typeof p === 'string' ? { description: p } : p))
+      .map((p) => (p && p.description != null ? String(p.description) : ''))
+      .map((d) => d.trim())
+      .filter(Boolean)
+    : [];
+
+  const trajId = await trajectoryDao.save({
+    name: String(name || '').trim(),
+    trajectoryLog: null,
+    task: String(requirement || '').trim(),
+    model: model || '',
+    stepCount: 0,
+    phaseCount: parsed.length,
+    isDone: null,
+    isSuccessful: null,
+    url: '',
+    functionId: resolvedFunctionId,
+    recordStatus: 'draft',
+    steps: [],
+  });
+
+  for (let i = 0; i < parsed.length; i++) {
+    await trajectoryPhaseDao.create({
+      phaseId: randomUUID(),
+      phaseNumber: i + 1,
+      trajectoryId: trajId,
+      status: 'pending',
+      description: parsed[i],
+    });
+  }
+
+  return trajectoryDao.getById(trajId);
+}
+
+export async function getTrajectoryTree(trajectoryDbId) {
+  const tid = Number(trajectoryDbId);
+  if (!Number.isFinite(tid) || tid <= 0) return null;
+
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) return null;
+
+  const phases = await trajectoryPhaseDao.listByTrajectory(tid);
+  const allSteps = await trajectoryStepDao.listByTrajectory(tid);
+
+  const assigned = new Set();
+  const phasesWithSteps = phases.map((p) => {
+    const steps = allSteps.filter((s) => {
+      if (s.trajectoryPhaseId != null && Number(s.trajectoryPhaseId) === Number(p.id)) {
+        assigned.add(s.id);
+        return true;
+      }
+      // Fallback: match by phase_number when phase_id not yet bound
+      if (
+        (s.trajectoryPhaseId == null || s.trajectoryPhaseId === 0)
+        && Number(s.phaseNumber) === Number(p.phaseNumber)
+      ) {
+        assigned.add(s.id);
+        return true;
+      }
+      return false;
+    });
+    return { ...p, steps };
+  });
+
+  const orphanSteps = allSteps.filter((s) => !assigned.has(s.id));
+  return {
+    trajectoryId: traj.id,
+    ...traj,
+    phases: phasesWithSteps,
+    orphanSteps,
+  };
+}
+
+export async function clearTrajectory(trajectoryDbId) {
+  const tid = Number(trajectoryDbId);
+  if (!Number.isFinite(tid) || tid <= 0) return null;
+
+  const db = getDB();
+
+  // Delete steps; keep phase descriptions but reset statuses.
+  await db('trajectory_step').where({ trajectory_id: tid }).del();
+  await db('trajectory_phase')
+    .where({ trajectory_id: tid })
+    .update({ status: 'pending', completed_at: null });
+
+  const [{ phases }] = await db('trajectory_phase')
+    .where({ trajectory_id: tid })
+    .count('* as phases');
+
+  const phaseCount = Number(phases) || 0;
+
+  await trajectoryDao.updateMeta(tid, {
+    recordStatus: 'draft',
+    stepCount: 0,
+    phaseCount,
+    isDone: null,
+    isSuccessful: null,
+  });
+
+  return trajectoryDao.getById(tid);
+}
+
+/**
+ * Analyze a requirement description into an ordered phase list.
+ * Returns: string[] (phase descriptions). Does not persist.
+ */
+export async function analyzeRequirementToPhases({
+  description,
+  stepLength,
+  model,
+} = {}) {
+  const desc = String(description || '').trim();
+  if (!desc) throw new Error('description is required');
+
+  const targetCount = Number(stepLength);
+  const n = Number.isFinite(targetCount) && targetCount > 0
+    ? Math.max(2, Math.min(20, Math.floor(targetCount)))
+    : 6;
+
+  const prompt = [
+    '你是资深业务流程拆解助手。',
+    '请把下面“需求描述”拆分成按执行顺序的阶段步骤列表。',
+    `阶段数量目标: ${n}（可在 ${Math.max(2, n - 1)} ~ ${Math.max(2, n + 1)} 范围内浮动，但尽量接近）。`,
+    '每个阶段必须是简短、可执行的中文描述，避免“分析/思考/总结”等元话术。',
+    '输出必须是严格 JSON（不要 Markdown，不要解释），格式：{"phases":[...字符串...]}.',
+    '',
+    '需求描述：',
+    desc,
+  ].join('\n');
+
+  const modelId = model || 'deepseek-v4-flash';
+  const content = await callLLM(prompt, modelId);
+  const raw = String(content || '').trim();
+
+  // 1) Try strict JSON first
+  try {
+    const obj = JSON.parse(raw);
+    const phases = obj?.phases;
+    if (Array.isArray(phases)) return phases.map((p) => String(p).trim()).filter(Boolean);
+  } catch {}
+
+  // 2) Extract JSON-ish substring if wrapped
+  const firstBrace = raw.indexOf('{');
+  const lastBrace = raw.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    try {
+      const slice = raw.slice(firstBrace, lastBrace + 1);
+      const obj = JSON.parse(slice);
+      const phases = obj?.phases;
+      if (Array.isArray(phases)) return phases.map((p) => String(p).trim()).filter(Boolean);
+    } catch {}
+  }
+
+  // 3) Fallback: parse array lines / bullets
+  const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
+  const phases = [];
+  for (const line of lines) {
+    // strip leading numbering/bullets
+    const cleaned = line
+      .replace(/^[-*•]\s*/, '')
+      .replace(/^\d+[\.\)]\s*/, '')
+      .replace(/^\"|\"$/g, '')
+      .trim();
+    if (!cleaned) continue;
+    if (/^phases?\s*[:=]\s*\[/i.test(cleaned)) continue;
+    if (/^\]$/.test(cleaned)) continue;
+    phases.push(cleaned.replace(/,$/, ''));
+  }
+
+  // If still empty, last attempt: regex for "phases":[...]
+  if (!phases.length) {
+    const m = raw.match(/\"phases\"\s*:\s*\[(.*)\]/s);
+    if (m) {
+      try {
+        const arrJson = `[${m[1]}]`;
+        const arr = JSON.parse(arrJson);
+        if (Array.isArray(arr)) return arr.map((p) => String(p).trim()).filter(Boolean);
+      } catch {}
+    }
+  }
+
+  // Enforce at least 1 and cap
+  return phases.slice(0, 20);
+}
+
+const trajectoryRuntimeMap = new Map();
+
+export function getTrajectoryRuntime(trajectoryId) {
+  return trajectoryRuntimeMap.get(Number(trajectoryId)) || null;
+}
+
+/**
+ * Enter recording: idempotent attach + return trajectory/phases/session/live status.
+ */
+export async function prepareTrajectoryRecording(trajectoryId) {
+  const tid = Number(trajectoryId);
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  let attachResult = null;
+  let runtime = trajectoryRuntimeMap.get(tid);
+  if (!runtime) {
+    attachResult = await attachTrajectoryLive(tid);
+    runtime = trajectoryRuntimeMap.get(tid);
+  }
+
+  const tree = await getTrajectoryTree(tid);
+  const liveStatus = await remoteSessionService.getLiveStatus().catch(() => null);
+
+  return {
+    trajectoryId: tid,
+    trajectory: traj,
+    phases: tree?.phases || [],
+    orphanSteps: tree?.orphanSteps || [],
+    sessionId: runtime?.sessionId ?? attachResult?.sessionId ?? null,
+    executorNodeUuid: runtime?.executorNodeUuid ?? attachResult?.executorNodeUuid ?? null,
+    remoteSessionId: runtime?.remoteSessionId ?? attachResult?.remoteSessionId ?? null,
+    status: liveStatus || attachResult?.status || null,
+    attached: !!(runtime || attachResult),
+  };
+}
+
+export async function attachTrajectoryLive(trajectoryId) {
+  const tid = Number(trajectoryId);
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) throw new Error('Trajectory not found');
+
+  // Idempotent: already attached for this trajectory
+  const existing = trajectoryRuntimeMap.get(tid);
+  if (existing?.sessionId && state.sessions.has(existing.sessionId)) {
+    const liveStatus = await remoteSessionService.getLiveStatus().catch(() => null);
+    return {
+      trajectoryId: tid,
+      sessionId: existing.sessionId,
+      executorNodeUuid: existing.executorNodeUuid,
+      remoteSessionId: existing.remoteSessionId,
+      status: liveStatus,
+      reused: true,
+    };
+  }
+
+  const sessionId = randomUUID();
+  const model = traj.model || 'deepseek-v4-flash';
+  const opened = await execSession.openSession({ sessionId, model });
+
+  const persistedActionIds = new Set();
+  state.sessions.set(sessionId, {
+    sessionId,
+    stepIndex: 0,
+    trajectories: [],
+    createdAt: new Date().toISOString(),
+    model,
+    lastTask: null,
+    lastMaxSteps: null,
+    caseDataFile: null,
+    useExecutor: true,
+    executorNodeUuid: opened.nodeUuid,
+    executorSlotIndex: opened.slotIndex,
+    busy: false,
+    dbTrajectoryId: tid,
+    selectedPhaseId: null,
+    activePhaseId: null,
+    autoPersist: true,
+    persistedActionIds,
+  });
+
+  const attached = await remoteSessionService.attachLive({ sessionId, quality: 70 });
+  const remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
+  if (remoteSessionId) await trajectoryDao.updateMeta(tid, { remoteSessionId });
+
+  const runtime = {
+    trajectoryId: tid,
+    sessionId,
+    executorNodeUuid: opened.nodeUuid,
+    executorSlotIndex: opened.slotIndex,
+    remoteSessionId,
+    attachedAt: new Date().toISOString(),
+    persistedActionIds,
+    selectedPhaseId: null,
+    abortRecording: false,
+  };
+  trajectoryRuntimeMap.set(tid, runtime);
+  bindTrajectoryManualPersist(tid, sessionId, runtime);
+  return {
+    trajectoryId: tid,
+    sessionId,
+    executorNodeUuid: opened.nodeUuid,
+    remoteSessionId,
+    status: attached?.status || null,
+  };
+}
+
+/** Persist manual CDP actions for trajectory-attached sessions (phase via selectedPhaseId). */
+function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
+  const session = state.sessions.get(sessionId);
+  if (!session || session._trajPersistUnsub) return;
+  session._trajPersistUnsub = execSession.subscribeSessionEvents(sessionId, async (type, payload) => {
+    if (type !== 'manual_action_recorded') return;
+    const entry = payload?.entry;
+    if (!entry) return;
+    const aid = entry.id != null ? String(entry.id) : '';
+    if (aid && runtime.persistedActionIds.has(aid)) return;
+    const phaseId = session.selectedPhaseId ?? runtime.selectedPhaseId ?? null;
+    try {
+      const persisted = await appendRecordedStep(trajectoryId, entry, {
+        source: 'manual',
+        trajectoryPhaseId: phaseId != null ? Number(phaseId) : undefined,
+      });
+      if (persisted && aid) runtime.persistedActionIds.add(aid);
+    } catch (err) {
+      console.warn('[trajectory-manual] live persist failed:', err.message);
+    }
+  });
+}
+
+export async function detachTrajectoryLive(trajectoryId) {
+  const tid = Number(trajectoryId);
+  const runtime = trajectoryRuntimeMap.get(tid);
+  const traj = await trajectoryDao.getById(tid);
+  if (runtime?.remoteSessionId) {
+    await remoteSessionService.detachLive({ crashed: false }).catch(() => {});
+  }
+  if (runtime?.sessionId) {
+    const session = state.sessions.get(runtime.sessionId);
+    if (session?._trajPersistUnsub) {
+      try { session._trajPersistUnsub(); } catch {}
+      session._trajPersistUnsub = null;
+    }
+    try {
+      await execSession.closeSession({
+        nodeUuid: runtime.executorNodeUuid,
+        sessionId: runtime.sessionId,
+      });
+    } catch {}
+    state.sessions.delete(runtime.sessionId);
+  }
+  trajectoryRuntimeMap.delete(tid);
+  if (traj) await trajectoryDao.updateMeta(tid, { remoteSessionId: null });
+  return { trajectoryId: tid, detached: true };
+}
+
+export async function startTrajectoryRecording(trajectoryId, { phaseIds = null } = {}) {
+  const tid = Number(trajectoryId);
+  const runtime = trajectoryRuntimeMap.get(tid);
+  if (!runtime) {
+    const err = new Error('Trajectory is not attached');
+    err.statusCode = 400;
+    throw err;
+  }
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  const allPhases = await trajectoryPhaseDao.listByTrajectory(tid);
+  if (!allPhases.length) throw new Error('Trajectory has no phases');
+
+  let phases = allPhases;
+  if (Array.isArray(phaseIds) && phaseIds.length > 0) {
+    const idSet = new Set(phaseIds.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0));
+    phases = allPhases.filter((p) => idSet.has(Number(p.id)));
+    if (!phases.length) {
+      const err = new Error('No matching phases for phaseIds');
+      err.statusCode = 400;
+      throw err;
+    }
+    phases.sort((a, b) => Number(a.phaseNumber) - Number(b.phaseNumber));
+  }
+
+  runtime.abortRecording = false;
+  await trajectoryDao.updateMeta(tid, { recordStatus: 'recording' });
+  for (const p of phases) await trajectoryPhaseDao.updateStatus(p.id, 'pending');
+
+  const session = state.sessions.get(runtime.sessionId);
+  if (session) {
+    session.dbTrajectoryId = tid;
+    session.busy = true;
+  }
+
+  const events = [];
+  const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, async (type, payload) => {
+    if (type !== 'action_log_sync') return;
+    const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+    const phaseIdHint = session?.activePhaseId != null ? Number(session.activePhaseId) : null;
+    for (const entry of entries) {
+      const id = entry?.id ? String(entry.id) : '';
+      if (!id || runtime.persistedActionIds.has(id)) continue;
+      const persisted = await appendRecordedStep(tid, entry, {
+        source: 'agent',
+        trajectoryPhaseId: Number.isFinite(phaseIdHint) ? phaseIdHint : undefined,
+      }).catch(() => null);
+      if (persisted) runtime.persistedActionIds.add(id);
+    }
+  });
+
+  try {
+    for (const phase of phases) {
+      if (runtime.abortRecording) {
+        await trajectoryPhaseDao.updateStatus(phase.id, 'failed').catch(() => {});
+        throw new Error('Recording aborted');
+      }
+      events.push({ type: 'phase_start', phaseNumber: phase.phaseNumber, description: phase.description });
+      await trajectoryPhaseDao.updateStatus(phase.id, 'running');
+      if (session) session.activePhaseId = phase.id;
+
+      const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', 300000);
+      const errP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000)
+        .then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
+      execSession.forwardStdin({
+        nodeUuid: runtime.executorNodeUuid,
+        sessionId: runtime.sessionId,
+        event: 'step',
+        data: {
+          instruction: phase.description,
+          max_steps: 40,
+          phase_number: phase.phaseNumber,
+        },
+      });
+      await Promise.race([doneP, errP]);
+      if (runtime.abortRecording) {
+        await trajectoryPhaseDao.updateStatus(phase.id, 'failed').catch(() => {});
+        throw new Error('Recording aborted');
+      }
+      await trajectoryPhaseDao.updateStatus(phase.id, 'completed');
+      events.push({ type: 'phase_done', phaseNumber: phase.phaseNumber, description: phase.description });
+    }
+
+    await trajectoryDao.updateMeta(tid, {
+      recordStatus: 'recorded',
+      isDone: true,
+      isSuccessful: true,
+    });
+  } catch (err) {
+    const aborted = runtime.abortRecording || /aborted/i.test(err.message || '');
+    await trajectoryDao.updateMeta(tid, {
+      recordStatus: aborted ? 'draft' : 'draft',
+      isDone: false,
+      isSuccessful: false,
+    });
+    throw err;
+  } finally {
+    if (session) {
+      session.busy = false;
+      session.activePhaseId = null;
+    }
+    runtime.abortRecording = false;
+    unsubscribe?.();
+  }
+
+  return {
+    trajectoryId: tid,
+    recordStatus: 'recorded',
+    phaseIds: phases.map((p) => p.id),
+    events,
+    steps: await trajectoryStepDao.listByTrajectory(tid),
+  };
+}
+
+/**
+ * Explicit end of recording (manual-only or cancel AI). Does not detach BiB.
+ */
+export async function stopTrajectoryRecording(trajectoryId, { success = true } = {}) {
+  const tid = Number(trajectoryId);
+  const runtime = trajectoryRuntimeMap.get(tid);
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (runtime) {
+    runtime.abortRecording = true;
+    const session = state.sessions.get(runtime.sessionId);
+    if (session?.busy) {
+      try {
+        execSession.forwardStdin({
+          nodeUuid: runtime.executorNodeUuid,
+          sessionId: runtime.sessionId,
+          event: 'cancel_step',
+          data: {},
+        });
+      } catch {}
+      session.busy = false;
+    }
+    // Stop manual recording if on
+    try {
+      execSession.forwardStdin({
+        nodeUuid: runtime.executorNodeUuid,
+        sessionId: runtime.sessionId,
+        event: 'manual_record_stop',
+        data: {},
+      });
+    } catch {}
+    if (session) session.selectedPhaseId = null;
+    runtime.selectedPhaseId = null;
+  }
+
+  const recordStatus = success ? 'recorded' : 'draft';
+  await trajectoryDao.updateMeta(tid, {
+    recordStatus,
+    isDone: !!success,
+    isSuccessful: !!success,
+  });
+
+  const tree = await getTrajectoryTree(tid);
+  return {
+    trajectoryId: tid,
+    recordStatus,
+    detached: false,
+    tree,
+  };
+}
+
+export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phaseId = null } = {}) {
+  const tid = Number(trajectoryId);
+  const runtime = trajectoryRuntimeMap.get(tid);
+  if (!runtime) {
+    const err = new Error('Trajectory is not attached');
+    err.statusCode = 400;
+    throw err;
+  }
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (traj.recordStatus === 'recording' && enabled) {
+    const err = new Error('AI recording in progress');
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const session = state.sessions.get(runtime.sessionId);
+  let resolvedPhaseId = null;
+  if (enabled) {
+    if (phaseId != null && phaseId !== '') {
+      const pid = Number(phaseId);
+      if (!Number.isFinite(pid) || pid <= 0) {
+        const err = new Error('Invalid phaseId');
+        err.statusCode = 400;
+        throw err;
+      }
+      const phase = await trajectoryPhaseDao.getById(pid);
+      if (!phase || Number(phase.trajectoryId) !== tid) {
+        const err = new Error('phaseId does not belong to this trajectory');
+        err.statusCode = 400;
+        throw err;
+      }
+      resolvedPhaseId = phase.id;
+      runtime.selectedPhaseId = phase.id;
+      if (session) session.selectedPhaseId = phase.id;
+    } else {
+      runtime.selectedPhaseId = null;
+      if (session) session.selectedPhaseId = null;
+    }
+  }
+
+  execSession.forwardStdin({
+    nodeUuid: runtime.executorNodeUuid,
+    sessionId: runtime.sessionId,
+    event: enabled ? 'manual_record_start' : 'manual_record_stop',
+    data: {},
+  });
+  const status = await execSession.waitForSessionEvent(runtime.sessionId, 'manual_record_status', 10000)
+    .catch(() => ({ enabled: !!enabled }));
+  return {
+    trajectoryId: tid,
+    enabled: !!status.enabled,
+    phaseId: enabled ? (resolvedPhaseId ?? runtime.selectedPhaseId ?? null) : null,
+  };
+}
+
+export async function confirmTrajectoryStep(stepId, confirmed) {
+  return trajectoryStepDao.update(Number(stepId), {
+    confirmed: !!confirmed,
+    confirmedAt: confirmed ? new Date().toISOString().slice(0, 23).replace('T', ' ') : null,
+  });
+}
+
+export async function createTrajectoryStep(input = {}) {
+  const trajectoryId = Number(input.trajectoryId);
+  if (!Number.isFinite(trajectoryId) || trajectoryId <= 0) throw new Error('trajectoryId required');
+  const max = await trajectoryDao.getMaxStepNumber(trajectoryId);
+  const row = await trajectoryStepDao.create({
+    trajectoryId,
+    stepNumber: input.stepNumber ?? (max + 1),
+    phaseNumber: input.phaseNumber ?? 0,
+    actionIndex: input.actionIndex ?? 0,
+    actionType: input.actionType ?? input.action ?? '',
+    description: input.description ?? '',
+    params: input.params ?? null,
+    element: input.element ?? null,
+    source: input.source ?? 'manual',
+    success: input.success ?? null,
+    error: input.error ?? null,
+    extractedContent: input.extractedContent ?? '',
+    trajectoryPhaseId: input.trajectoryPhaseId ?? null,
+    confirmed: !!input.confirmed,
+    confirmedAt: input.confirmed ? new Date().toISOString().slice(0, 23).replace('T', ' ') : null,
+  });
+  await trajectoryStepDao.reorderByTrajectory(trajectoryId);
+  const counts = await refreshTrajectoryCounts(trajectoryId);
+  await trajectoryDao.updateMeta(trajectoryId, { stepCount: counts.stepCount, phaseCount: counts.phaseCount });
+  return row;
+}
+
+export async function updateTrajectoryStep(stepId, fields = {}) {
+  const existing = await trajectoryStepDao.getById(Number(stepId));
+  if (!existing) return null;
+  const patch = { ...fields };
+  if ('confirmed' in fields) {
+    patch.confirmedAt = fields.confirmed ? new Date().toISOString().slice(0, 23).replace('T', ' ') : null;
+  }
+  const row = await trajectoryStepDao.update(Number(stepId), patch);
+  await trajectoryStepDao.reorderByTrajectory(existing.trajectoryId);
+  return row;
+}
+
+export async function removeTrajectoryStep(stepId) {
+  const existing = await trajectoryStepDao.getById(Number(stepId));
+  if (!existing) return { removed: false };
+  await trajectoryStepDao.removeById(Number(stepId));
+  await trajectoryStepDao.reorderByTrajectory(existing.trajectoryId);
+  const counts = await refreshTrajectoryCounts(existing.trajectoryId);
+  await trajectoryDao.updateMeta(existing.trajectoryId, { stepCount: counts.stepCount, phaseCount: counts.phaseCount });
+  return { removed: true, trajectoryId: existing.trajectoryId };
 }
 
 /**
@@ -614,6 +1336,45 @@ export async function getTrajectoryWithPhases(id) {
 
 export async function listPhasesByTrajectory(trajectoryDbId) {
   return trajectoryPhaseDao.listByTrajectory(+trajectoryDbId);
+}
+
+/**
+ * Append a pending phase to an existing trajectory (for Dashboard「+ 阶段」).
+ */
+export async function addPhaseToTrajectory(trajectoryDbId, { description = '', phaseNumber = null } = {}) {
+  const tid = Number(trajectoryDbId);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    const err = new Error('Invalid trajectory id');
+    err.statusCode = 400;
+    throw err;
+  }
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const existing = await trajectoryPhaseDao.listByTrajectory(tid);
+  const maxNum = existing.reduce((m, p) => Math.max(m, Number(p.phaseNumber) || 0), 0);
+  let nextNum = phaseNumber != null ? Number(phaseNumber) : maxNum + 1;
+  if (!Number.isFinite(nextNum) || nextNum <= 0) nextNum = maxNum + 1;
+  if (existing.some((p) => Number(p.phaseNumber) === nextNum)) {
+    nextNum = maxNum + 1;
+  }
+
+  const desc = String(description || '').trim() || `阶段 ${nextNum}`;
+  const row = await trajectoryPhaseDao.create({
+    phaseId: randomUUID(),
+    phaseNumber: nextNum,
+    trajectoryId: tid,
+    status: 'pending',
+    description: desc,
+  });
+
+  const counts = await refreshTrajectoryCounts(tid);
+  await trajectoryDao.updateMeta(tid, { phaseCount: counts.phaseCount });
+  return row;
 }
 
 export async function listStepsByPhase(phaseDbId) {

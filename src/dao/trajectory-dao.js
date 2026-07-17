@@ -7,6 +7,7 @@ export async function save(trajectory) {
   const db = getDB();
   return db.transaction(async (trx) => {
     const [id] = await trx(TABLE).insert(toDbRow({
+      name: trajectory.name ?? '',
       trajectoryLog: trajectory.trajectoryLog ?? null,
       task: trajectory.task,
       model: trajectory.model,
@@ -17,6 +18,7 @@ export async function save(trajectory) {
       url: trajectory.url,
       functionId: trajectory.functionId ?? null,
       remoteSessionId: trajectory.remoteSessionId ?? null,
+      recordStatus: trajectory.recordStatus ?? 'draft',
     }));
 
     if (trajectory.steps?.length) {
@@ -110,12 +112,33 @@ export async function getByTrajectoryId(idOrBiz) {
   return null;
 }
 
-export async function listByFunction(functionId, { page = 1, pageSize = 20 } = {}) {
+export async function listByFunction(functionId, { page = 1, pageSize = 20, keyword, sortBy, order } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
   const query = db(TABLE).where({ function_id: functionId });
+  if (keyword && String(keyword).trim()) {
+    const kw = `%${String(keyword).trim()}%`;
+    query.where(function () {
+      this.where('name', 'like', kw).orWhere('task', 'like', kw);
+    });
+  }
+
+  const sortColMap = {
+    created_at: 'created_at',
+    createdAt: 'created_at',
+    updated_at: 'updated_at',
+    updatedAt: 'updated_at',
+    name: 'name',
+    step_count: 'step_count',
+    stepCount: 'step_count',
+    phase_count: 'phase_count',
+    phaseCount: 'phase_count',
+  };
+  const sortCol = sortColMap[sortBy] || 'created_at';
+  const sortOrder = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
+
   const [{ total }] = await query.clone().count('* as total');
-  const rows = await query.clone().orderBy('created_at', 'desc').limit(pageSize).offset(offset);
+  const rows = await query.clone().orderBy(sortCol, sortOrder).limit(pageSize).offset(offset);
   const entities = fromDbRows(rows);
 
   // Attach phase counts for hierarchy UI
@@ -128,11 +151,33 @@ export async function listByFunction(functionId, { page = 1, pageSize = 20 } = {
   return { rows: entities, total, page, pageSize };
 }
 
-export async function list({ page = 1, pageSize = 20 } = {}) {
+export async function list({ page = 1, pageSize = 20, keyword, sortBy, order } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
-  const [{ total }] = await db(TABLE).count('* as total');
-  const rows = await db(TABLE).orderBy('created_at', 'desc').limit(pageSize).offset(offset);
+  const query = db(TABLE);
+  if (keyword && String(keyword).trim()) {
+    const kw = `%${String(keyword).trim()}%`;
+    query.where(function () {
+      this.where('name', 'like', kw).orWhere('task', 'like', kw);
+    });
+  }
+
+  const sortColMap = {
+    created_at: 'created_at',
+    createdAt: 'created_at',
+    updated_at: 'updated_at',
+    updatedAt: 'updated_at',
+    name: 'name',
+    step_count: 'step_count',
+    stepCount: 'step_count',
+    phase_count: 'phase_count',
+    phaseCount: 'phase_count',
+  };
+  const sortCol = sortColMap[sortBy] || 'created_at';
+  const sortOrder = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
+
+  const [{ total }] = await query.clone().count('* as total');
+  const rows = await query.orderBy(sortCol, sortOrder).limit(pageSize).offset(offset);
   const entities = fromDbRows(rows);
   for (const e of entities) {
     const [{ phases }] = await db('trajectory_phase')
