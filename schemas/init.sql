@@ -2,7 +2,7 @@
 -- 智能填表系统 — 数据库初始化脚本
 -- 目标数据库: MySQL 8.0+
 -- 字符集: utf8mb4
--- 表数量: 13
+-- 表数量: 12
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS `uara`
@@ -12,52 +12,44 @@ CREATE DATABASE IF NOT EXISTS `uara`
 USE `uara`;
 
 -- ─────────────────────────────────────────────────────────────
--- 一级：被测系统 (System)
+-- 层级节点 (System) — 系统/流程/功能点 合并为一表
+-- type: 0=系统 1=流程 2=功能点；parent_id 指向父节点
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `system` (
   `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '代理主键',
-  `system_id`   VARCHAR(36)  NOT NULL COMMENT 'UUID 业务标识',
-  `name`        VARCHAR(255) NOT NULL COMMENT '系统名称，如 天阳信贷V5.2',
+  `system_id`   VARCHAR(36)  NOT NULL COMMENT 'UUID 业务标识（各级节点共用）',
+  `type`        TINYINT NOT NULL COMMENT '0=系统 1=模块 2=功能',
+  `parent_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '父节点 id；type=0 时为空',
+  `name`        VARCHAR(255) NOT NULL COMMENT '名称',
   `description` TEXT COMMENT '描述',
+  `sort_order`  INT UNSIGNED DEFAULT 0 COMMENT '同级排序',
   `created_at`  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updated_at`  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   UNIQUE KEY `uk_system_id` (`system_id`),
-  UNIQUE KEY `uk_name` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='被测系统';
+  KEY `idx_type` (`type`),
+  KEY `idx_parent_id` (`parent_id`),
+  KEY `idx_parent_name` (`parent_id`, `name`),
+  CONSTRAINT `fk_system_parent` FOREIGN KEY (`parent_id`) REFERENCES `system` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='层级节点（0=系统 1=模块 2=功能）';
 
 -- ─────────────────────────────────────────────────────────────
--- 二级：业务流程 (Process)
+-- 系统测试账号 (SystemAccount) — 挂在 type=0 系统节点下
 -- ─────────────────────────────────────────────────────────────
-CREATE TABLE `process` (
+CREATE TABLE `system_account` (
   `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `process_id`  VARCHAR(36)  NOT NULL COMMENT 'UUID 业务标识',
-  `system_id`   BIGINT UNSIGNED NOT NULL COMMENT '外键 → system.id',
-  `name`        VARCHAR(255) NOT NULL COMMENT '流程名称，如 客户转正流程',
-  `description` TEXT,
-  `sort_order`  INT UNSIGNED DEFAULT 0 COMMENT '排序序号',
-  `created_at`  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  `updated_at`  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  UNIQUE KEY `uk_process_id` (`process_id`),
-  UNIQUE KEY `uk_system_name` (`system_id`, `name`),
-  CONSTRAINT `fk_process_system` FOREIGN KEY (`system_id`) REFERENCES `system` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='业务流程';
-
--- ─────────────────────────────────────────────────────────────
--- 三级：功能点 (FunctionDef)
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE `function_def` (
-  `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `function_id` VARCHAR(36)  NOT NULL COMMENT 'UUID 业务标识',
-  `process_id`  BIGINT UNSIGNED NOT NULL COMMENT '外键 → process.id',
-  `name`        VARCHAR(255) NOT NULL COMMENT '功能名称，如 新增信贷潜在客户',
-  `description` TEXT,
+  `system_id`   BIGINT UNSIGNED NOT NULL COMMENT '外键 → system.id（type=0）',
+  `name`        VARCHAR(255) NOT NULL COMMENT '角色名：管理员/测试人员/…',
+  `login_url`   VARCHAR(2048) DEFAULT '' COMMENT '登录/入口网址',
+  `username`    VARCHAR(255) DEFAULT '' COMMENT '测试账号',
+  `password`    VARCHAR(255) DEFAULT '' COMMENT '测试密码',
+  `remark`      TEXT COMMENT '备注（权限说明等）',
   `sort_order`  INT UNSIGNED DEFAULT 0,
   `created_at`  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updated_at`  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-  UNIQUE KEY `uk_function_id` (`function_id`),
-  UNIQUE KEY `uk_process_name` (`process_id`, `name`),
-  CONSTRAINT `fk_func_process` FOREIGN KEY (`process_id`) REFERENCES `process` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='功能点';
+  UNIQUE KEY `uk_system_account_name` (`system_id`, `name`),
+  KEY `idx_system_account_system` (`system_id`),
+  CONSTRAINT `fk_system_account_system` FOREIGN KEY (`system_id`) REFERENCES `system` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='被测系统测试账号（多角色）';
 
 -- ─────────────────────────────────────────────────────────────
 -- 远程浏览器会话 (RemoteSession) — P6 运行时
@@ -86,25 +78,28 @@ CREATE TABLE `remote_session` (
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `trajectory` (
   `id`                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `name`              VARCHAR(255) DEFAULT '' COMMENT '交易名称',
   `trajectory_log`    LONGTEXT DEFAULT NULL COMMENT '操作日志全文（同 log_{ts}.txt：含 URL + goal/actions/result 行）',
-  `task`              TEXT COMMENT '任务描述',
+  `task`              TEXT COMMENT '需求描述 / 任务描述',
   `model`             VARCHAR(128) DEFAULT '' COMMENT '使用的 LLM 模型',
   `step_count`        INT UNSIGNED DEFAULT 0 COMMENT '总步数（trajectory_step 行数）',
   `phase_count`       INT UNSIGNED DEFAULT 0 COMMENT '阶段数（trajectory_phase 行数）',
   `is_done`           TINYINT(1) DEFAULT NULL COMMENT '是否完成',
   `is_successful`     TINYINT(1) DEFAULT NULL COMMENT '是否成功',
   `url`               VARCHAR(2048) DEFAULT '' COMMENT '目标页面 URL',
-  `function_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → function_def.id',
+  `function_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → system.id（type=2 功能点）',
   `remote_session_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → remote_session.id（远程/人工录制来源，可空）',
+  `record_status`     ENUM('draft','recording','recorded') NOT NULL DEFAULT 'draft' COMMENT '录制生命周期',
   `created_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updated_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   KEY `idx_function_id` (`function_id`),
   KEY `idx_remote_session_id` (`remote_session_id`),
   KEY `idx_created_at` (`created_at`),
   KEY `idx_model` (`model`),
-  CONSTRAINT `fk_traj_function` FOREIGN KEY (`function_id`) REFERENCES `function_def` (`id`) ON DELETE SET NULL,
+  KEY `idx_record_status` (`record_status`),
+  CONSTRAINT `fk_traj_function` FOREIGN KEY (`function_id`) REFERENCES `system` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_traj_remote_session` FOREIGN KEY (`remote_session_id`) REFERENCES `remote_session` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='浏览器操作轨迹';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='浏览器操作轨迹（交易）';
 
 -- ─────────────────────────────────────────────────────────────
 -- 轨迹执行阶段 (TrajectoryPhase)
@@ -115,7 +110,7 @@ CREATE TABLE `trajectory_phase` (
   `trajectory_id`  BIGINT UNSIGNED NOT NULL COMMENT '外键 → trajectory.id',
   `phase_number`   INT UNSIGNED NOT NULL COMMENT '阶段序号（1-based）',
   `description`    TEXT COMMENT '阶段任务完整描述（执行阶段时下发的 task）',
-  `status`         ENUM('running','completed','failed') DEFAULT 'completed',
+  `status`         ENUM('pending','running','completed','failed') DEFAULT 'pending',
   `created_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `completed_at`   DATETIME(3) DEFAULT NULL,
   UNIQUE KEY `uk_phase_id` (`phase_id`),
@@ -144,6 +139,8 @@ CREATE TABLE `trajectory_step` (
   `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
   `source`              ENUM('agent','manual','cdp') NOT NULL DEFAULT 'agent'
     COMMENT '动作来源：agent=AI Agent 录制 | manual=人工录制 | cdp=CDP 反查录制',
+  `confirmed`           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '人工确认',
+  `confirmed_at`        DATETIME(3) DEFAULT NULL COMMENT '人工确认时间',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_trajectory_id` (`trajectory_id`),
   KEY `idx_step_number` (`trajectory_id`, `step_number`),
@@ -238,7 +235,7 @@ CREATE TABLE `screenshot` (
 
 -- ─────────────────────────────────────────────────────────────
 -- API 响应覆写/Mock 规则 (ApiOverride) — P7 配置数据
--- scope_ref_id 为逻辑关联：scope 决定指向 system/process/function_def 哪张表
+-- scope_ref_id 为逻辑关联：scope 决定指向 system 表中 type=0/1/2 的节点
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `api_override` (
   `id`                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -261,13 +258,13 @@ CREATE TABLE `api_override` (
   COMMENT='响应覆写/Mock 规则，运行时由 CDP Fetch.fulfillRequest 应用';
 
 -- ============================================================
--- 默认数据
+-- 默认数据（type 0/1/2 三级未分类）
 -- ============================================================
-INSERT INTO `system` (`system_id`, `name`, `description`) VALUES
-  ('00000000-0000-0000-0000-000000000001', '未分类', '默认系统分类，用于尚未分配系统的历史轨迹');
+INSERT INTO `system` (`system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
+  ('00000000-0000-0000-0000-000000000001', 0, NULL, '未分类', '默认系统分类，用于尚未分配系统的历史轨迹', 0);
 
-INSERT INTO `process` (`process_id`, `system_id`, `name`, `description`) VALUES
-  ('00000000-0000-0000-0000-000000000002', 1, '未分类', '默认流程分类');
+INSERT INTO `system` (`system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
+  ('00000000-0000-0000-0000-000000000002', 1, 1, '未分类', '默认流程分类', 0);
 
-INSERT INTO `function_def` (`function_id`, `process_id`, `name`, `description`) VALUES
-  ('00000000-0000-0000-0000-000000000003', 1, '未分类', '默认功能分类');
+INSERT INTO `system` (`system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
+  ('00000000-0000-0000-0000-000000000003', 2, 2, '未分类', '默认功能分类', 0);

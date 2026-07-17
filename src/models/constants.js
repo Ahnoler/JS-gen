@@ -8,6 +8,12 @@
 
 /** @typedef {'global'|'system'|'process'|'function'} ApiOverrideScope */
 
+/** @typedef {'online'|'draining'|'offline'} ExecutorNodeStatus */
+
+/** @typedef {'draft'|'recording'|'recorded'} TrajectoryRecordStatus */
+
+/** @typedef {'pending'|'running'|'completed'|'failed'} TrajectoryPhaseStatus */
+
 /** @typedef {'css'|'xpath_full'|'xpath_smart'} LocatorCandidateType */
 
 /** @type {readonly StepSource[]} */
@@ -27,3 +33,12 @@ export const API_OVERRIDE_SCOPES = Object.freeze(['global', 'system', 'process',
 
 /** @type {readonly LocatorCandidateType[]} */
 export const LOCATOR_CANDIDATE_TYPES = Object.freeze(['css', 'xpath_full', 'xpath_smart']);
+
+/** @type {readonly ExecutorNodeStatus[]} */
+export const EXECUTOR_NODE_STATUSES = Object.freeze(['online', 'draining', 'offline']);
+
+/** @type {readonly TrajectoryRecordStatus[]} */
+export const TRAJECTORY_RECORD_STATUSES = Object.freeze(['draft', 'recording', 'recorded']);
+
+/** @type {readonly TrajectoryPhaseStatus[]} */
+export const TRAJECTORY_PHASE_STATUSES = Object.freeze(['pending', 'running', 'completed', 'failed']);
