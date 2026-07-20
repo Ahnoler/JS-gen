@@ -15,6 +15,7 @@ import {
 } from '../cdp/remote-bridge.js';
 import * as remoteSessionService from '../services/remote-session-service.js';
 import * as execSession from '../executor-session-client.js';
+import * as slotLease from '../executor-slot-lease.js';
 import {
   PYTHON_EXE, AGENT_SCRIPT, killTree, killOrphans,
   waitForReady, isProcessAlive, spawnAgent, setupSSE, createPushChannel, resolveModelId,
@@ -381,7 +382,10 @@ export default function (app) {
         broadcastWatcherStatus();
         return res.json({ sessionId, model: modelId, executorNodeUuid: opened.nodeUuid });
       } catch (err) {
-        return res.status(503).json({ error: err.message });
+        const status = err.statusCode || 503;
+        const body = { error: err.message };
+        if (err.holders) body.holders = err.holders;
+        return res.status(status).json(body);
       }
     }
 
@@ -846,6 +850,7 @@ export default function (app) {
         await execSession.closeSession({ nodeUuid: session.executorNodeUuid, sessionId: id });
       } catch (err) {
         console.warn('[browser-session] executor close failed:', err.message);
+        slotLease.releaseBySession(id);
       }
     }
     if (session._persistUnsub) {

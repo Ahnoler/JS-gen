@@ -15,9 +15,8 @@ import registerTestHistoryRoutes from './src/routes/test-history.js';
 import registerTestRunRoutes from './src/routes/test-run.js';
 import registerLLMProxyRoutes from './src/routes/llm-proxy.js';
 import registerBrowserSessionRoutes from './src/routes/browser-session.js';
-import registerTrajectoryRoutes from './src/routes/trajectory.js';
-import registerCaseDataRoutes from './src/routes/case-data.js';
 import registerAssembleRoutes from './src/routes/test-assemble.js';
+import registerLegacyGoneRoutes from './src/routes/legacy-gone.js';
 import registerV2Routes from './src/routes/v2/__init__.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -82,8 +81,7 @@ app.post('/api/setup/save', (req, res) => {
 registerLLMProxyRoutes(app);
 registerBrowserSessionRoutes(app);
 // Legacy JSON catalogs: return 410 Gone → use /api/v2/trajectories|case-data
-registerTrajectoryRoutes(app);
-registerCaseDataRoutes(app);
+registerLegacyGoneRoutes(app);
 registerAssembleRoutes(app);
 registerHealthRoutes(app);
 registerAgentRoutes(app);
@@ -105,6 +103,23 @@ app.get('/api/setup/status', (req, res) => {
 app.get('/api/test', (req, res) => {
   if (!_isConfigured()) return res.redirect('/api/setup');
   res.sendFile(path.join(__dirname, 'test-dashboard.html'));
+});
+
+/** Product API docs for frontend (Swagger-like, /api/v2 + WebSocket) */
+app.get('/api/docs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'api-docs.html'));
+});
+
+/** Backend self-use recording console (not product SPA) */
+app.get('/api/test/record-console', (req, res) => {
+  if (!_isConfigured()) return res.redirect('/api/setup');
+  res.sendFile(path.join(__dirname, 'record-console.html'));
+});
+
+/** Dedicated recording studio: left canvas + right phase/steps */
+app.get('/api/test/record-studio', (req, res) => {
+  if (!_isConfigured()) return res.redirect('/api/setup');
+  res.sendFile(path.join(__dirname, 'record-studio.html'));
 });
 
 // Global error handler
@@ -178,37 +193,26 @@ async function main() {
   sweepInterval.unref?.();
 
   const server = httpServer.listen(PORT, HOST, () => {
-    console.log(`[server] Agent API listening on http://${HOST}:${PORT}`);
+    console.log(`[server] JS-gen control plane listening on http://${HOST}:${PORT}`);
     console.log(`[server] WebSocket at ws://${HOST}:${PORT}/ws`);
     console.log(`[server] Executor WebSocket at ws://${HOST}:${PORT}/ws/executor`);
-    console.log(`[server] Endpoints:`);
-    console.log(`  GET  /v1/models (OpenAI compatible)`);
-    console.log(`  POST /v1/chat/completions (OpenAI compatible)`);
-    console.log(`  POST /api/browser/session`);
-    console.log(`  POST /api/browser/session/:id/step (SSE)`);
-    console.log(`  POST /api/browser/session/:id/trajectory`);
-    console.log(`  GET  /api/browser/session/:id/action-flow`);
-    console.log(`  GET  /api/v2/trajectories`);
-    console.log(`  GET  /api/v2/case-data`);
-    console.log(`  GET  /api/trajectory`);
-    console.log(`  GET  /api/case-data`);
+    console.log(`[server] Key endpoints:`);
     console.log(`  GET  /api/health`);
-    console.log(`  GET  /api/agents`);
-    console.log(`  GET  /api/skills`);
-    console.log(`  POST /api/agent/execute`);
-    console.log(`  POST /api/agent/execute-async`);
-    console.log(`  POST /api/agent/session`);
-    console.log(`  GET  /api/agent/session/:id/messages`);
-    console.log(`  POST /api/agent/session/:id/message`);
-    console.log(`  DELETE /api/agent/session/:id`);
-
-    console.log(`  GET  /api/test/history`);
-    console.log(`  GET  /api/test/history/:id`);
-    console.log(`  DELETE /api/test/history/:id`);
-    console.log(`  POST /api/test/run (SSE streaming)`);
-    console.log(`  POST /api/test/run-sync (JSON)`);
-    console.log(`  GET  /api/test/screenshots/* (static)`);
-    console.log(`  GET  /api/test (dashboard)`);
+    console.log(`  GET  /api/v2/system-mgmt/tree`);
+    console.log(`  GET  /api/v2/trajectories`);
+    console.log(`  POST /api/v2/trajectories/:id/record/prepare|start|stop`);
+    console.log(`  POST /api/v2/trajectories/:id/attach|detach`);
+    console.log(`  POST /api/v2/trajectories/:id/replay/prepare|start|stop`);
+    console.log(`  GET  /api/v2/executors`);
+    console.log(`  GET  /api/v2/case-data`);
+    console.log(`  POST /api/browser/session  (debug)`);
+    console.log(`  POST /api/test/assemble | /api/test/run`);
+    console.log(`  GET  /api/docs  (product API docs for frontend)`);
+    console.log(`  GET  /api/test  (engineering dashboard)`);
+    console.log(`  GET  /api/test/record-console  (self-use recording console)`);
+    console.log(`  GET  /api/test/record-studio?id=  (recording studio)`);
+    console.log(`  GET  /api/trajectory|/api/case-data  → 410 Gone (use /api/v2/*)`);
+    console.log(`  GET  /v1/models | POST /v1/chat/completions`);
   });
   server.timeout = 0;
   server.keepAliveTimeout = 65000;
@@ -221,20 +225,14 @@ main().catch(err => {
   process.exit(1);
 });
 
-process.on('SIGINT', async () => {
+async function gracefulShutdown() {
   console.log('\n[server] Shutting down...');
   try {
     const { closeDB } = await import('./config/database.js');
     await closeDB();
   } catch {}
   process.exit(0);
-});
+}
 
-process.on('SIGTERM', async () => {
-  console.log('\n[server] Shutting down...');
-  try {
-    const { closeDB } = await import('./config/database.js');
-    await closeDB();
-  } catch {}
-  process.exit(0);
-});
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);

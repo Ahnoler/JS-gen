@@ -13,6 +13,11 @@ let executorLive = {
   viewportH: 1080,
 };
 
+/** Browser session id currently bound by attachLive (executor mode). */
+export function getExecutorLiveSessionId() {
+  return executorLive.sessionId || null;
+}
+
 /**
  * Open a new remote browser session record.
  * @param {Object} [opts]
@@ -117,6 +122,13 @@ export async function attachLive(opts = {}) {
     viewportH: remoteSession.viewportH || 1080,
   };
 
+  const readyP = waitForSessionEvent(sessionId, 'session.bib_ready', 45000);
+  const errP = waitForSessionEvent(sessionId, 'session.bib_error', 45000).then((p) => {
+    const msg = p?.error || p?.message || 'BiB attach failed';
+    const err = new Error(msg);
+    err.statusCode = 503;
+    throw err;
+  });
   sendToExecutor(nodeUuid, 'session.attach_bib', {
     sessionId,
     remoteSessionUuid: remoteSession.sessionUuid,
@@ -128,7 +140,35 @@ export async function attachLive(opts = {}) {
   });
 
   // Wait for executor to confirm bib-ready (so UI can trust viewport).
-  const ready = await waitForSessionEvent(sessionId, 'session.bib_ready', 30000).catch(() => null);
+  let ready;
+  try {
+    ready = await Promise.race([readyP, errP]);
+  } catch (err) {
+    executorLive = {
+      attached: false,
+      remoteSession: null,
+      sessionId: null,
+      executorNodeUuid: null,
+      viewportW: 1920,
+      viewportH: 1080,
+    };
+    try { await closeSession(remoteSession.id, { crashed: true }); } catch {}
+    throw err;
+  }
+  if (!ready) {
+    executorLive = {
+      attached: false,
+      remoteSession: null,
+      sessionId: null,
+      executorNodeUuid: null,
+      viewportW: 1920,
+      viewportH: 1080,
+    };
+    try { await closeSession(remoteSession.id, { crashed: true }); } catch {}
+    throw new Error(
+      `Executor BiB attach timed out (no session.bib_ready). Check executor CDP port / Chrome for session ${sessionId}`,
+    );
+  }
   if (ready?.viewportW) executorLive.viewportW = Number(ready.viewportW);
   if (ready?.viewportH) executorLive.viewportH = Number(ready.viewportH);
 

@@ -2,7 +2,8 @@
  * Minimal Remote Browser-in-Browser canvas (CDP screencast + normalized input).
  * Display uses object-fit:contain letterboxing; clicks map only over the image area.
  */
-import { on, send, isConnected } from './ws-client.js';
+import { on, send, isConnected, waitUntilConnected } from './ws-client.js';
+import { readV2, unwrapApi, isApiFail, apiErrorMessage } from './api-envelope.js';
 
 const MAGIC = 'RSCF';
 
@@ -15,6 +16,10 @@ let lastBitmap = null;
 let cdpReady = false;
 let browserConnected = false;
 let attaching = false;
+/** Prefer this browser session when calling attach-live (product prepare path). */
+let preferredSessionId = null;
+/** Optional sink for studio / dashboard logs: (msg, level?) => void */
+let remoteLogFn = null;
 /** Logical CSS viewport of remote Chrome (from status / frames) */
 let remoteViewport = { w: 1920, h: 1080 };
 /** Effective display scale currently applied */
@@ -136,8 +141,24 @@ function setScaleFromUi(modeOrScale) {
 function syncButtons() {
   const attachBtn = $('sessRemoteAttachBtn');
   const detachBtn = $('sessRemoteDetachBtn');
-  if (attachBtn) attachBtn.disabled = attached || attaching;
+  // Keep attach enabled when already attached — user can re-start stream (prepare already BiB-attached).
+  if (attachBtn) {
+    attachBtn.disabled = attaching;
+    attachBtn.textContent = attached ? '重新推流' : '附着/推流';
+  }
   if (detachBtn) detachBtn.disabled = (!attached && !remoteSessionId) || attaching;
+}
+
+function remoteLog(msg, level = 'info') {
+  try { remoteLogFn?.(msg, level); } catch {}
+}
+
+export function setRemotePreferredSessionId(sessionId) {
+  preferredSessionId = sessionId || null;
+}
+
+export function setRemoteLog(fn) {
+  remoteLogFn = typeof fn === 'function' ? fn : null;
 }
 
 function applyStatus(payload = {}) {
@@ -312,24 +333,83 @@ function sendMouse(type, evt, extra = {}) {
   });
 }
 
-async function attachLiveHttp() {
+async function fetchLiveStatus() {
+  const res = await fetch('/api/v2/remote-sessions/live/status');
+  return readV2(res);
+}
+
+/**
+ * Subscribe to remote frames before/without attach-live.
+ * Used so prepare's login is visible on the canvas while the HTTP call runs.
+ */
+export async function armRemoteStream(opts = {}) {
+  if (opts.sessionId) preferredSessionId = opts.sessionId;
+  const wsOk = await waitUntilConnected(10000);
+  if (!wsOk) return false;
+  streaming = true;
+  send('remote:subscribe', {});
+  fitCanvasToStage();
+  return true;
+}
+
+/**
+ * Ensure BiB is attached and dashboard WS is subscribed + bib_start.
+ * If prepare already attached on the server, only re-start stream (no second attach-live).
+ * @param {{ sessionId?: string, forceAttach?: boolean }} [opts]
+ */
+export async function ensureRemoteStream(opts = {}) {
+  if (opts.sessionId) preferredSessionId = opts.sessionId;
   attaching = true;
   syncButtons();
   try {
-    // Do NOT send dashboard canvas size as Chrome viewport — preserves real window ratio.
-    const res = await fetch('/api/v2/remote-sessions/attach-live', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quality: 70 }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || res.statusText);
-    applyStatus(data.status || {});
-    startStream();
+    const wsOk = await waitUntilConnected(10000);
+    if (!wsOk) {
+      throw new Error('Dashboard WebSocket (/ws) 未连接，无法收画面。请刷新页面后重试');
+    }
+
+    let status = await fetchLiveStatus().catch(() => null);
+    const already = !!(status?.attached && status?.remoteSessionId);
+    const force = opts.forceAttach === true;
+
+    if (!already || force) {
+      remoteLog(already ? '强制重新附着 BiB…' : '附着 BiB（attach-live）…');
+      // Do NOT send dashboard canvas size as Chrome viewport — preserves real window ratio.
+      const body = { quality: 70 };
+      if (preferredSessionId) body.sessionId = preferredSessionId;
+      const res = await fetch('/api/v2/remote-sessions/attach-live', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await readV2(res);
+      status = data.status || status;
+      applyStatus(status || {});
+    } else {
+      applyStatus(status || {});
+      remoteLog(`已附着 #${status.remoteSessionId}，仅重新推流…`, 'ok');
+    }
+
+    await startStream();
+    setUiStatus(
+      attached
+        ? `已附着 #${remoteSessionId} · 推流中 · ${remoteViewport.w}×${remoteViewport.h}`
+        : '推流已请求',
+      'ok',
+    );
+    return { ok: true, attached: !!attached, remoteSessionId, reused: already && !force };
+  } catch (e) {
+    setUiStatus(`附着/推流失败: ${e.message}`, 'bad');
+    remoteLog(`附着/推流失败: ${e.message}`, 'err');
+    throw e;
   } finally {
     attaching = false;
     syncButtons();
   }
+}
+
+async function attachLiveHttp() {
+  // Button path: re-stream if already attached; otherwise attach-live.
+  await ensureRemoteStream({ sessionId: preferredSessionId || undefined });
 }
 
 async function detachLiveHttp() {
@@ -344,17 +424,34 @@ async function detachLiveHttp() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok && res.status !== 404) throw new Error(data.error || res.statusText);
+  const raw = await res.json().catch(() => ({}));
+  if (res.status === 404) {
+    applyStatus({ attached: false, cdpReady: true });
+    return;
+  }
+  if (isApiFail(res, raw)) throw new Error(apiErrorMessage(raw, res.statusText));
+  const data = unwrapApi(raw);
   applyStatus(data.status || { attached: false, cdpReady: true });
 }
 
-function startStream() {
+async function startStream() {
   streaming = true;
+  const wsOk = await waitUntilConnected(8000);
+  if (!wsOk) {
+    console.warn('[remote] startStream: WS not connected');
+    remoteLog('推流指令未发出：/ws 未连接', 'err');
+    return false;
+  }
   send('remote:subscribe', {});
   // No viewportW/H — must not Emulation-resize Session Chrome
-  send('remote:start', { quality: 70 });
+  const sent = send('remote:start', { quality: 70 });
   fitCanvasToStage();
+  if (!sent) {
+    remoteLog('remote:start 发送失败', 'err');
+    return false;
+  }
+  remoteLog('已发送 remote:start（执行机 bib_start）', 'ok');
+  return true;
 }
 
 function stopStream() {
@@ -532,10 +629,14 @@ export function initRemoteBrowser() {
 
   $('sessRemoteAttachBtn')?.addEventListener('click', async () => {
     try {
-      await attachLiveHttp();
-      setUiStatus('已附着 · 推流中', 'ok');
+      // Manual click always re-attaches BiB so stalled CDP after AI steps can recover.
+      await ensureRemoteStream({
+        sessionId: preferredSessionId || undefined,
+        forceAttach: true,
+      });
     } catch (e) {
-      setUiStatus(`附着失败: ${e.message}`, 'bad');
+      // ensureRemoteStream already set status + remoteLog
+      console.warn('[remote] attach/stream failed:', e.message);
     }
   });
 
@@ -626,7 +727,7 @@ export function initRemoteBrowser() {
 
   fetch('/api/v2/remote-sessions/live/status')
     .then((r) => r.json())
-    .then(applyStatus)
+    .then((raw) => applyStatus(unwrapApi(raw) || {}))
     .catch(() => {});
 
   if (isConnected()) send('remote:status', {});

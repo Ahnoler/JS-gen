@@ -17,6 +17,7 @@ export async function save(trajectory) {
       isSuccessful: trajectory.isSuccessful,
       url: trajectory.url,
       functionId: trajectory.functionId ?? null,
+      systemAccountId: trajectory.systemAccountId ?? null,
       remoteSessionId: trajectory.remoteSessionId ?? null,
       recordStatus: trajectory.recordStatus ?? 'draft',
     }));
@@ -43,6 +44,7 @@ async function insertStepRows(trx, trajectoryDbId, steps, stepNumberOffset = 0) 
     extracted_content: s.extractedContent ?? s.result ?? '',
     trajectory_phase_id: s.trajectoryPhaseId ?? null,
     source: s.source ?? 'agent',
+    is_replay: s.isReplay ? 1 : 0,
   }));
   for (let i = 0; i < stepRows.length; i += 100) {
     await trx('trajectory_step').insert(stepRows.slice(i, i + 100));
@@ -98,12 +100,15 @@ export async function getById(id) {
   const entity = fromDbRow(row);
   entity.steps = await db('trajectory_step')
     .where({ trajectory_id: row.id })
+    .andWhere((qb) => {
+      qb.where({ is_replay: false }).orWhereNull('is_replay');
+    })
     .orderBy(['step_number', 'action_index'])
     .then(fromDbRows);
   return entity;
 }
 
-/** @deprecated use getById — kept for transitional call sites */
+/** @deprecated use getById ? kept for transitional call sites */
 export async function getByTrajectoryId(idOrBiz) {
   const numeric = Number(idOrBiz);
   if (Number.isFinite(numeric) && String(numeric) === String(idOrBiz)) {

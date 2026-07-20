@@ -1,7 +1,7 @@
 {
   "name": "opencode-agent-api",
   "version": "1.0.0",
-  "description": "Agent API service - exposes opencode agent capabilities via HTTP/JSON",
+  "description": "Browser automation control plane: v2 trajectory record/replay, MySQL, executor, Playwright assemble/run",
   "type": "module",
   "scripts": {
     "start": "node server.mjs",

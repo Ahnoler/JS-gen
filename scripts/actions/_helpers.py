@@ -27,10 +27,81 @@ def _err(msg):
     return ActionResult(extracted_content=str(msg), is_done=False, success=False)
 
 
+async def dismiss_https_first_interstitial(page) -> str:
+    """
+    Dismiss Chromium HTTPS-First / 'Always use secure connections' interstitial.
+
+    UI copy (zh): 「此网站不支持安全连接」 + button 「继续访问网站」.
+    Also handles classic SSL interstitial proceed links.
+    Returns: 'none' | 'proceeded' | 'proceeded-advanced' | error string.
+    """
+    try:
+        result = await page.evaluate('''() => {
+          const bodyText = (document.body && document.body.innerText) || '';
+          const isHttpsFirst =
+            bodyText.includes('此网站不支持安全连接')
+            || bodyText.includes('does not support a secure connection')
+            || bodyText.includes('Your connection is not private')
+            || bodyText.includes('您的连接不是私密连接');
+          const url = location.href || '';
+          const isChromeError =
+            url.includes('chrome-error')
+            || url.includes('chromewebdata')
+            || url.startsWith('chrome://');
+
+          if (!isHttpsFirst && !isChromeError) {
+            // Still try exact proceed button if present (some builds keep http URL)
+            const exact = [...document.querySelectorAll('button, a')].find(el => {
+              const t = (el.textContent || '').trim();
+              return t === '继续访问网站' || t === 'Continue to site' || t === 'Proceed to site';
+            });
+            if (!exact) return 'none';
+          }
+
+          const clickIf = (el) => { if (el) { el.click(); return true; } return false; };
+
+          // Prefer the explicit proceed CTA
+          const proceed =
+            [...document.querySelectorAll('button, a')].find(el => {
+              const t = (el.textContent || '').trim();
+              return t === '继续访问网站'
+                || t === 'Continue to site'
+                || t === 'Proceed to site'
+                || /^继续访问/.test(t)
+                || /Continue to .+ site/i.test(t);
+            })
+            || document.getElementById('proceed-button')
+            || document.getElementById('proceed-link');
+
+          if (clickIf(proceed)) return 'proceeded';
+
+          // Classic cert interstitial: Advanced → Proceed
+          const adv = document.getElementById('details-button')
+            || [...document.querySelectorAll('button, a')].find(el =>
+                /高级|详情|Advanced|Details/i.test((el.textContent || '').trim()));
+          if (adv) adv.click();
+          const go = document.getElementById('proceed-link')
+            || document.getElementById('proceed-button')
+            || [...document.querySelectorAll('a, button')].find(el =>
+                /继续前往|继续|Proceed|unsafe/i.test(el.textContent || '')
+                || (el.href || '').includes('proceed'));
+          if (clickIf(go)) return 'proceeded-advanced';
+          return isHttpsFirst || isChromeError ? 'no-proceed' : 'none';
+        }''')
+        if result and str(result).startswith('proceeded'):
+            await page.wait_for_timeout(800)
+        return str(result or 'none')
+    except Exception as e:
+        return f'error:{e}'
+
+
 async def _wait_if_loading(page):
+    # HTTP sites may show HTTPS-First interstitial mid-navigation — clear before waiting.
+    await dismiss_https_first_interstitial(page)
     loading = await page.evaluate(JS_CHECK_LOADING)
     if loading:
         await page.evaluate(JS_WAIT_LOADING)
+    await dismiss_https_first_interstitial(page)
 
 
 async def _capture_element(page, label_text):

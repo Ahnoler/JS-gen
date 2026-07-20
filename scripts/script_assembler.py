@@ -719,6 +719,11 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         if code:
             body.append(code)
             body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-${{_RUN_ID}}.png`), fullPage: true }});')
+            # Machine-readable marker for trajectory replay WS (step id/phase from action JSON)
+            _sid = _e.get('id') or _e.get('stepId') or ''
+            _pid = _e.get('phaseId') or _e.get('trajectoryPhaseId') or ''
+            _marker = json.dumps({'step': step, 'ok': True, 'id': _sid, 'phaseId': _pid}, ensure_ascii=False)
+            body.append(f"    console.log('__REPLAY_STEP__' + {repr(_marker)});")
             step += 1
 
     return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE

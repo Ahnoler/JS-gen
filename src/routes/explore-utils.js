@@ -2,7 +2,7 @@ import { spawn, execSync } from 'child_process';
 import { writeFileSync, unlinkSync } from 'fs';
 import path from 'path';
 import os from 'os';
-import { PROJECT_DIR, PYTHON_EXE as PYTHON_EXE_CONFIG, STANDALONE_LLM } from '../../config/config.js';
+import { PROJECT_DIR, PYTHON_EXE as PYTHON_EXE_CONFIG } from '../../config/config.js';
 import { state } from '../state.js';
 
 export const PYTHON_EXE = PYTHON_EXE_CONFIG;
@@ -159,9 +159,8 @@ export function resolveModelId(model) {
   if (model) {
     // Strip providerID prefix if present (e.g. "deepseek/deepseek-v4-flash" -> "deepseek-v4-flash")
     const parts = model.split('/');
-    return parts.length >= 2 && STANDALONE_LLM ? parts.slice(1).join('/') : model;
+    return parts.length >= 2 ? parts.slice(1).join('/') : model;
   }
-  if (!state.defaultModel) return STANDALONE_LLM ? 'deepseek-v4-flash' : 'deepseek/deepseek-v4-flash';
-  if (STANDALONE_LLM) return state.defaultModel.modelID;
-  return `${state.defaultModel.providerID}/${state.defaultModel.modelID}`;
+  if (!state.defaultModel) return 'deepseek-v4-flash';
+  return state.defaultModel.modelID;
 }

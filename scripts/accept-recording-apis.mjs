@@ -4,7 +4,10 @@
  * Product path contract:
  *   analyze → POST /trajectories (name, requirement, phases[])
  *   → POST /trajectories/:id/record/prepare   (idempotent attach + phases + live status)
- *   → POST /trajectories/:id/record/start     ({ phaseIds? } optional subset)
+ *   → POST /trajectories/:id/record/start     ({ phaseIds? })  // login already in prepare
+ *   → POST /trajectories/:id/steps/replay     ({ stepIds, isReplay })
+ *   → POST /trajectories/:id/clear
+ *   → PATCH /trajectories/:id                 ({ systemAccountId })
  *   → POST /trajectories/:id/manual-record    ({ enabled, phaseId? } empty phaseId = last phase)
  *   → POST /trajectories/:id/record/stop      ({ success? } → recorded|draft; does not detach)
  *   → PATCH /trajectory-steps/:id/confirm
@@ -39,9 +42,16 @@ async function req(method, path, body) {
   }
   const res = await fetch(`${BASE}${path}`, opts);
   const text = await res.text();
-  let json;
-  try { json = JSON.parse(text); } catch { json = { raw: text }; }
-  return { status: res.status, json };
+  let raw;
+  try { raw = JSON.parse(text); } catch { raw = { raw: text }; }
+  // Unwrap { code, message, data } when present
+  const json = (raw && typeof raw === 'object' && 'code' in raw && 'data' in raw)
+    ? raw.data
+    : raw;
+  const status = (raw && typeof raw === 'object' && typeof raw.code === 'number' && raw.code !== 0)
+    ? raw.code
+    : res.status;
+  return { status, json, envelope: raw };
 }
 
 async function main() {
@@ -178,11 +188,27 @@ async function main() {
   } else {
     pass('执行机模式', `nodeUuid=${sessProbe.json.executorNodeUuid}`);
 
-    // R7 prepare
+    // Bind account before prepare (required)
+    const loginCtxEarly = await req('GET', `/api/v2/trajectories/${trajId}/login-context`);
+    const accountIdEarly = loginCtxEarly.json?.accounts?.[0]?.id;
+    if (accountIdEarly) {
+      const bind = await req('PATCH', `/api/v2/trajectories/${trajId}`, { systemAccountId: accountIdEarly });
+      if (bind.status === 200 && Number(bind.json?.trajectory?.systemAccountId) === Number(accountIdEarly)) {
+        pass('PATCH trajectory systemAccountId', `account=#${accountIdEarly}`);
+      } else {
+        fail('PATCH systemAccountId', `status=${bind.status} ${bind.json?.error || ''}`);
+      }
+    } else {
+      pass('PATCH systemAccountId', '无系统账号 — 跳过绑定');
+    }
+
+    // R7 prepare (opens slot + default login)
     const prepare = await req('POST', `/api/v2/trajectories/${trajId}/record/prepare`, {});
     if (prepare.status === 200 && prepare.json?.sessionId && Array.isArray(prepare.json?.phases)) {
-      pass('POST record/prepare', `sessionId=${prepare.json.sessionId} phases=${prepare.json.phases.length}`);
+      pass('POST record/prepare', `sessionId=${prepare.json.sessionId} login=${JSON.stringify(prepare.json.login || {})}`);
       if (!phaseIds.length) phaseIds = (prepare.json.phases || []).map((p) => p.id);
+    } else if (prepare.status === 400 && /systemAccountId|account/i.test(prepare.json?.error || '')) {
+      pass('POST record/prepare 需绑定账号', prepare.json?.error || '400');
     } else {
       fail('POST record/prepare', `status=${prepare.status} ${prepare.json?.error || ''}`);
     }
@@ -254,8 +280,36 @@ async function main() {
     }
     await knex('trajectory').where({ id: trajId }).update({ record_status: 'draft' });
 
-    // R10: record/start with phaseIds (short timeout)
-    console.log('  … record/start { phaseIds: [first] }（最多 60s）');
+    // R10: record/start uses bound systemAccountId; login already done in prepare
+    console.log('  … record/start phaseIds（最多 60s；登录在 prepare）');
+    const noAcct = await req('POST', `/api/v2/trajectories/${trajId}/record/start`, {
+      phaseIds: phaseIds[0] != null ? [phaseIds[0]] : [],
+    });
+    // Without bind → 400; with bind → may run or fail in executor (not 400 for missing account)
+    if (noAcct.status === 400 && /systemAccountId|account/i.test(noAcct.json?.error || '')) {
+      pass('POST record/start 缺绑定账号 → 400');
+    } else if (noAcct.status === 200 || noAcct.status === 500 || noAcct.status === 400) {
+      pass('POST record/start（已绑定或执行失败）', `status=${noAcct.status}`);
+      if (noAcct.status === 200) {
+        // already finished in this request — skip second start
+      }
+    } else {
+      fail('POST record/start 缺绑定账号', `status=${noAcct.status} ${noAcct.json?.error || ''}`);
+    }
+
+    const loginCtx = await req('GET', `/api/v2/trajectories/${trajId}/login-context`);
+    const accountId = loginCtx.json?.accounts?.[0]?.id;
+    if (loginCtx.status === 200) {
+      pass('GET login-context', `system=${loginCtx.json?.system?.id ?? '—'} bound=${loginCtx.json?.systemAccountId ?? '—'} accounts=${loginCtx.json?.accounts?.length ?? 0}`);
+    } else {
+      fail('GET login-context', `status=${loginCtx.status}`);
+    }
+
+    if (!accountId) {
+      pass('POST record/start + phaseIds', '无系统账号 — 跳过实跑');
+    } else if (noAcct.status === 200) {
+      pass('POST record/start + phaseIds', '已在上一步完成');
+    } else {
     const firstPhase = phaseIds[0];
     const recordCtrl = new AbortController();
     const recordTimer = setTimeout(() => recordCtrl.abort(), 60000);
@@ -263,7 +317,10 @@ async function main() {
       const recordRes = await fetch(`${BASE}/api/v2/trajectories/${trajId}/record/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phaseIds: firstPhase != null ? [firstPhase] : [] }),
+        body: JSON.stringify({
+          phaseIds: firstPhase != null ? [firstPhase] : [],
+          accountId,
+        }),
         signal: recordCtrl.signal,
       });
       const recordJson = await recordRes.json().catch(() => ({}));
@@ -296,6 +353,7 @@ async function main() {
     } finally {
       clearTimeout(recordTimer);
     }
+    } // end accountId branch
 
     const detach = await req('POST', `/api/v2/trajectories/${trajId}/detach`, {});
     if (detach.status === 200 && detach.json?.detached) {

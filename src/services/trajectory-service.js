@@ -4,12 +4,216 @@ import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
 import * as functionDefDao from '../dao/function-def-dao.js';
+import * as systemDao from '../dao/system-dao.js';
+import * as systemAccountDao from '../dao/system-account-dao.js';
+import { NODE_TYPE } from '../models/hierarchy-constants.js';
 import { getDB } from '../../config/database.js';
 import { stepFromActionLog } from '../models/helpers.js';
 import { callLLM } from '../llm-utils.js';
 import * as execSession from '../executor-session-client.js';
+import * as slotLease from '../executor-slot-lease.js';
 import * as remoteSessionService from './remote-session-service.js';
 import { state } from '../state.js';
+import { broadcast } from '../ws-server.js';
+
+/** Build agent login instruction (aligned with Dashboard session-mode login).
+ * Prefer system.url；兼容旧数据回退 account.loginUrl。
+ */
+export function buildLoginInstruction(account = {}, system = {}) {
+  const url = String(system.url || account.loginUrl || '').trim();
+  const user = String(account.username || '').trim();
+  const pass = String(account.password || '').trim();
+  if (!url) {
+    const err = new Error('System url is empty — set system.url (or legacy account.loginUrl)');
+    err.statusCode = 400;
+    throw err;
+  }
+  let task = `Navigate to ${url}`;
+  if (user) task += `\nEnter username: ${user}`;
+  if (pass) task += `\nEnter password: ${pass}`;
+  task += '\nClick the login/submit button\nWait for the page to fully load after login';
+  return task;
+}
+
+/**
+ * Resolve owning system + accounts for a trajectory (via function_id ancestry).
+ * @returns {Promise<{ trajectoryId, functionId, system: object|null, accounts: object[] }>}
+ */
+export async function getTrajectoryLoginContext(trajectoryId) {
+  const tid = Number(trajectoryId);
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  const functionId = traj.functionId != null ? Number(traj.functionId) : null;
+  if (!Number.isFinite(functionId)) {
+    return {
+      trajectoryId: tid,
+      functionId: null,
+      systemAccountId: traj.systemAccountId != null ? Number(traj.systemAccountId) : null,
+      system: null,
+      accounts: [],
+      error: 'Trajectory has no functionId — bind to a function node under a system first',
+    };
+  }
+
+  let cur = await systemDao.getById(functionId);
+  const guard = new Set();
+  while (cur && !guard.has(cur.id)) {
+    guard.add(cur.id);
+    if (Number(cur.type) === NODE_TYPE.SYSTEM) break;
+    if (cur.parentId == null) {
+      cur = null;
+      break;
+    }
+    cur = await systemDao.getById(cur.parentId);
+  }
+
+  if (!cur || Number(cur.type) !== NODE_TYPE.SYSTEM) {
+    return {
+      trajectoryId: tid,
+      functionId,
+      systemAccountId: traj.systemAccountId != null ? Number(traj.systemAccountId) : null,
+      system: null,
+      accounts: [],
+      error: 'Could not resolve system for function',
+    };
+  }
+
+  const accounts = (await systemAccountDao.listBySystem(cur.id)).map((a) => ({
+    id: a.id,
+    name: a.name,
+    // Prefer system.url；账号上旧 loginUrl 仅作兼容回退
+    loginUrl: a.loginUrl || cur.url || '',
+    username: a.username || '',
+    // password returned for self-use recording console (same as hierarchy tree)
+    password: a.password || '',
+    remark: a.remark || null,
+    sortOrder: a.sortOrder ?? 0,
+  }));
+
+  return {
+    trajectoryId: tid,
+    functionId,
+    systemAccountId: traj.systemAccountId != null ? Number(traj.systemAccountId) : null,
+    system: {
+      id: cur.id,
+      name: cur.name,
+      uid: cur.uid || cur.systemId,
+      description: cur.description || null,
+      url: cur.url || '',
+    },
+    accounts,
+  };
+}
+
+/**
+ * Resolve + validate system account for a trajectory.
+ * Prefers explicit accountId, else trajectory.systemAccountId.
+ */
+export async function resolveTrajectoryAccount(trajectoryId, accountId = null) {
+  const tid = Number(trajectoryId);
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  const acctId = accountId != null && accountId !== ''
+    ? Number(accountId)
+    : (traj.systemAccountId != null ? Number(traj.systemAccountId) : null);
+  if (!Number.isFinite(acctId) || acctId <= 0) {
+    const err = new Error('systemAccountId is required — bind a system account on the trajectory first');
+    err.statusCode = 400;
+    throw err;
+  }
+  const account = await systemAccountDao.getById(acctId);
+  if (!account) {
+    const err = new Error(`System account #${acctId} not found`);
+    err.statusCode = 404;
+    throw err;
+  }
+  const loginCtx = await getTrajectoryLoginContext(tid);
+  if (loginCtx.system?.id != null && Number(account.systemId) !== Number(loginCtx.system.id)) {
+    const err = new Error('Selected account does not belong to this trajectory system');
+    err.statusCode = 400;
+    throw err;
+  }
+  return { traj, account, accountId: acctId, loginCtx };
+}
+
+/** Persist bound system account on trajectory. */
+export async function setTrajectoryAccount(trajectoryId, systemAccountId) {
+  const { account, accountId } = await resolveTrajectoryAccount(trajectoryId, systemAccountId);
+  await trajectoryDao.updateMeta(Number(trajectoryId), { systemAccountId: accountId });
+  const traj = await trajectoryDao.getById(Number(trajectoryId));
+  return { trajectory: traj, account: { id: account.id, name: account.name, loginUrl: account.loginUrl || '' } };
+}
+
+/** Mark current ACTION_LOG ids as consumed so they are not later appended as steps. */
+async function markConsumedActionLog(runtime) {
+  if (!runtime?.sessionId || !runtime?.executorNodeUuid) return;
+  try {
+    const resultP = execSession.waitForSessionEvent(runtime.sessionId, 'get_action_log_result', 5000);
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: 'get_action_log',
+      data: {},
+    });
+    const result = await resultP.catch(() => null);
+    const entries = Array.isArray(result?.entries) ? result.entries : [];
+    for (const entry of entries) {
+      const id = entry?.id != null ? String(entry.id) : '';
+      if (id) runtime.persistedActionIds.add(id);
+    }
+  } catch (err) {
+    console.warn('[trajectory] markConsumedActionLog failed:', err.message);
+  }
+}
+
+/**
+ * Default login/navigate — NOT written to trajectory_step (is_replay / suppress persist).
+ */
+async function runDefaultLogin(runtime, account, system = null) {
+  const session = state.sessions.get(runtime.sessionId);
+  if (session) session.busy = true;
+  runtime.suppressStepPersist = true;
+  runtime.isReplay = true;
+  try {
+    let sys = system;
+    if (!sys?.url && account?.systemId) {
+      sys = await systemDao.getById(Number(account.systemId));
+    }
+    const instruction = buildLoginInstruction(account, sys || {});
+    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', 300000);
+    const errP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000)
+      .then((p) => Promise.reject(new Error(p?.message || 'login phase_error')));
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: 'step',
+      data: {
+        instruction,
+        max_steps: 30,
+        phase_number: 0,
+      },
+    });
+    await Promise.race([doneP, errP]);
+    await markConsumedActionLog(runtime);
+    runtime.loginDone = true;
+    runtime.loginAccountId = Number(account.id);
+  } finally {
+    runtime.suppressStepPersist = false;
+    runtime.isReplay = false;
+    if (session) {
+      session.busy = false;
+      session.activePhaseId = null;
+    }
+  }
+}
 
 /**
  * Build trajectory_step rows from action_{ts}.json commands.
@@ -120,6 +324,9 @@ async function refreshTrajectoryCounts(trajectoryDbId) {
   const db = getDB();
   const [{ steps }] = await db('trajectory_step')
     .where({ trajectory_id: trajectoryDbId })
+    .andWhere((qb) => {
+      qb.where({ is_replay: false }).orWhereNull('is_replay');
+    })
     .count('* as steps');
   const [{ phases }] = await db('trajectory_phase')
     .where({ trajectory_id: trajectoryDbId })
@@ -610,7 +817,9 @@ export async function markPhaseStatus(phaseDbId, status) {
 /**
  * Create empty trajectory shell under a function (for long-lived recording).
  */
-export async function createEmptyTrajectory({ functionId, task = '', model = '', name = '' } = {}) {
+export async function createEmptyTrajectory({
+  functionId, task = '', model = '', name = '', systemAccountId = null,
+} = {}) {
   let resolvedFunctionId = typeof functionId === 'number'
     ? functionId
     : await functionDefDao.getDefaultFunctionId();
@@ -625,6 +834,7 @@ export async function createEmptyTrajectory({ functionId, task = '', model = '',
     isSuccessful: null,
     url: '',
     functionId: resolvedFunctionId,
+    systemAccountId: systemAccountId != null ? Number(systemAccountId) : null,
     recordStatus: 'draft',
     steps: [],
   });
@@ -640,6 +850,7 @@ export async function createTransactionWithPhases({
   requirement = '',
   phases = [],
   model = '',
+  systemAccountId = null,
 } = {}) {
   const resolvedFunctionId = typeof functionId === 'number'
     ? functionId
@@ -664,6 +875,7 @@ export async function createTransactionWithPhases({
     isSuccessful: null,
     url: '',
     functionId: resolvedFunctionId,
+    systemAccountId: systemAccountId != null ? Number(systemAccountId) : null,
     recordStatus: 'draft',
     steps: [],
   });
@@ -746,7 +958,7 @@ export async function clearTrajectory(trajectoryDbId) {
     isSuccessful: null,
   });
 
-  return trajectoryDao.getById(tid);
+  return getTrajectoryTree(tid);
 }
 
 /**
@@ -838,10 +1050,184 @@ export function getTrajectoryRuntime(trajectoryId) {
   return trajectoryRuntimeMap.get(Number(trajectoryId)) || null;
 }
 
+/** Clear in-memory trajectory↔executor bindings for a node (offline / crash). */
+export function clearTrajectoryRuntimesForNode(nodeUuid) {
+  if (!nodeUuid) return 0;
+  let n = 0;
+  for (const [tid, runtime] of [...trajectoryRuntimeMap.entries()]) {
+    if (runtime?.executorNodeUuid !== nodeUuid) continue;
+    if (runtime.sessionId) {
+      const session = state.sessions.get(runtime.sessionId);
+      if (session?._trajPersistUnsub) {
+        try { session._trajPersistUnsub(); } catch {}
+      }
+      state.sessions.delete(runtime.sessionId);
+    }
+    trajectoryRuntimeMap.delete(tid);
+    n += 1;
+  }
+  return n;
+}
+
+/** Drop stale trajectory runtime when the control-plane session is gone. */
+function clearStaleTrajectoryRuntime(tid) {
+  const existing = trajectoryRuntimeMap.get(tid);
+  if (!existing) return null;
+  if (existing.sessionId && state.sessions.has(existing.sessionId)) return existing;
+  slotLease.releaseByTrajectory(tid);
+  trajectoryRuntimeMap.delete(tid);
+  return null;
+}
+
 /**
- * Enter recording: idempotent attach + return trajectory/phases/session/live status.
+ * One-shot prepare for recording studio:
+ *  1) session create (executor slot)
+ *  2) browser allocate (+ CDP)
+ *  3) BiB attach + screencast (stream)
+ *  4) navigate/login (not persisted as steps)
+ *
+ * Requires trajectory.systemAccountId. Idempotent when session+login already live.
  */
 export async function prepareTrajectoryRecording(trajectoryId) {
+  const tid = Number(trajectoryId);
+  const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
+
+  const stages = {
+    session: { status: 'pending' },
+    browser: { status: 'pending' },
+    stream: { status: 'pending' },
+    login: { status: 'pending' },
+  };
+
+  const emitStage = (stage, status, extra = {}) => {
+    stages[stage] = { status, ...extra, at: new Date().toISOString() };
+    try {
+      broadcast('recording:prepare', { trajectoryId: tid, stage, status, ...extra });
+    } catch {}
+  };
+
+  // ── 1+2: session + browser (+ best-effort BiB inside attachTrajectoryLive) ──
+  emitStage('session', 'running');
+  emitStage('browser', 'running');
+
+  let attachResult = null;
+  let runtime = clearStaleTrajectoryRuntime(tid);
+  if (!runtime) {
+    attachResult = await attachTrajectoryLive(tid);
+    runtime = trajectoryRuntimeMap.get(tid);
+  } else {
+    attachResult = {
+      sessionId: runtime.sessionId,
+      executorNodeUuid: runtime.executorNodeUuid,
+      remoteSessionId: runtime.remoteSessionId,
+      bibError: runtime.bibError || null,
+      reused: true,
+      status: await remoteSessionService.getLiveStatus().catch(() => null),
+    };
+  }
+
+  if (!runtime?.sessionId) {
+    emitStage('session', 'error', { error: 'no session' });
+    const err = new Error('Failed to open executor session for prepare');
+    err.statusCode = 503;
+    throw err;
+  }
+
+  emitStage('session', 'done', {
+    sessionId: runtime.sessionId,
+    executorNodeUuid: runtime.executorNodeUuid,
+    reused: !!attachResult?.reused,
+  });
+  emitStage('browser', 'done', {
+    cdpPort: state.sessions.get(runtime.sessionId)?.cdpPort ?? null,
+    cdpReady: state.sessions.get(runtime.sessionId)?.cdpReady !== false,
+  });
+
+  // ── 3: ensure stream (BiB screencast) before login so canvas can show login ──
+  emitStage('stream', 'running');
+  let bibError = runtime.bibError || attachResult?.bibError || null;
+  let remoteSessionId = runtime.remoteSessionId || attachResult?.remoteSessionId || null;
+
+  if (!remoteSessionId && !bibError) {
+    try {
+      const attached = await remoteSessionService.attachLive({
+        sessionId: runtime.sessionId,
+        quality: 70,
+      });
+      remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
+      runtime.remoteSessionId = remoteSessionId;
+      if (remoteSessionId) await trajectoryDao.updateMeta(tid, { remoteSessionId });
+      runtime.bibError = null;
+      bibError = null;
+    } catch (err) {
+      bibError = err?.message || String(err);
+      runtime.bibError = bibError;
+    }
+  }
+
+  if (remoteSessionId && runtime.executorNodeUuid) {
+    try {
+      execSession.sendToExecutor(runtime.executorNodeUuid, 'session.bib_start', {
+        sessionId: runtime.sessionId,
+      });
+    } catch (err) {
+      console.warn('[prepare] bib_start failed:', err.message);
+    }
+  }
+
+  if (bibError || !remoteSessionId) {
+    emitStage('stream', 'degraded', {
+      remoteSessionId,
+      sessionId: runtime.sessionId,
+      error: bibError || 'BiB not attached',
+    });
+  } else {
+    emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
+  }
+
+  // ── 4: login / navigate (default ops — not written to trajectory_step) ──
+  emitStage('login', 'running', { accountId });
+  let login = { skipped: false, done: false, accountId };
+  try {
+    if (runtime.loginDone && Number(runtime.loginAccountId) === Number(accountId)) {
+      login = { skipped: true, done: true, accountId };
+      emitStage('login', 'skipped', { accountId });
+    } else {
+      await runDefaultLogin(runtime, account);
+      login = { skipped: false, done: true, accountId };
+      emitStage('login', 'done', { accountId });
+    }
+  } catch (err) {
+    emitStage('login', 'error', { accountId, error: err.message });
+    throw err;
+  }
+
+  const fresh = await trajectoryDao.getById(tid);
+  const tree = await getTrajectoryTree(tid);
+  const liveStatus = await remoteSessionService.getLiveStatus().catch(() => null);
+
+  const streamOk = !!remoteSessionId && !bibError;
+  return {
+    trajectoryId: tid,
+    trajectory: fresh || traj,
+    phases: tree?.phases || [],
+    orphanSteps: tree?.orphanSteps || [],
+    sessionId: runtime.sessionId,
+    executorNodeUuid: runtime.executorNodeUuid,
+    remoteSessionId,
+    status: liveStatus || attachResult?.status || null,
+    attached: !!remoteSessionId,
+    login,
+    systemAccountId: accountId,
+    bibError,
+    stream: { ok: streamOk, remoteSessionId },
+    stages,
+    /** Critical path ready: session + browser + login (stream may be degraded). */
+    ready: true,
+  };
+}
+
+export async function attachTrajectoryLive(trajectoryId) {
   const tid = Number(trajectoryId);
   const traj = await trajectoryDao.getById(tid);
   if (!traj) {
@@ -850,36 +1236,8 @@ export async function prepareTrajectoryRecording(trajectoryId) {
     throw err;
   }
 
-  let attachResult = null;
-  let runtime = trajectoryRuntimeMap.get(tid);
-  if (!runtime) {
-    attachResult = await attachTrajectoryLive(tid);
-    runtime = trajectoryRuntimeMap.get(tid);
-  }
-
-  const tree = await getTrajectoryTree(tid);
-  const liveStatus = await remoteSessionService.getLiveStatus().catch(() => null);
-
-  return {
-    trajectoryId: tid,
-    trajectory: traj,
-    phases: tree?.phases || [],
-    orphanSteps: tree?.orphanSteps || [],
-    sessionId: runtime?.sessionId ?? attachResult?.sessionId ?? null,
-    executorNodeUuid: runtime?.executorNodeUuid ?? attachResult?.executorNodeUuid ?? null,
-    remoteSessionId: runtime?.remoteSessionId ?? attachResult?.remoteSessionId ?? null,
-    status: liveStatus || attachResult?.status || null,
-    attached: !!(runtime || attachResult),
-  };
-}
-
-export async function attachTrajectoryLive(trajectoryId) {
-  const tid = Number(trajectoryId);
-  const traj = await trajectoryDao.getById(tid);
-  if (!traj) throw new Error('Trajectory not found');
-
-  // Idempotent: already attached for this trajectory
-  const existing = trajectoryRuntimeMap.get(tid);
+  // Idempotent: already attached for this trajectory with a live session
+  const existing = clearStaleTrajectoryRuntime(tid);
   if (existing?.sessionId && state.sessions.has(existing.sessionId)) {
     const liveStatus = await remoteSessionService.getLiveStatus().catch(() => null);
     return {
@@ -892,9 +1250,12 @@ export async function attachTrajectoryLive(trajectoryId) {
     };
   }
 
+  // One trajectory → one slot: drop any orphan lease before opening another
+  slotLease.releaseByTrajectory(tid);
+
   const sessionId = randomUUID();
   const model = traj.model || 'deepseek-v4-flash';
-  const opened = await execSession.openSession({ sessionId, model });
+  const opened = await execSession.openSession({ sessionId, model, trajectoryId: tid });
 
   const persistedActionIds = new Set();
   state.sessions.set(sessionId, {
@@ -915,9 +1276,26 @@ export async function attachTrajectoryLive(trajectoryId) {
     activePhaseId: null,
     autoPersist: true,
     persistedActionIds,
+    cdpPort: opened.cdpPort ?? null,
+    cdpReady: opened.cdpReady !== false,
   });
 
-  const attached = await remoteSessionService.attachLive({ sessionId, quality: 70 });
+  // BiB is display-only and requires CDP HTTP. Skip when session reports cdp_ready=false.
+  // Never close the executor session if BiB fails — login/recording still need the browser.
+  let attached = null;
+  let bibError = null;
+  const cdpReady = opened.cdpReady !== false;
+  if (!cdpReady) {
+    bibError = `CDP not ready on port ${opened.cdpPort ?? '?'} — skipped BiB attach`;
+    console.warn(`[trajectory] ${bibError}`);
+  } else {
+    try {
+      attached = await remoteSessionService.attachLive({ sessionId, quality: 70 });
+    } catch (err) {
+      bibError = err?.message || String(err);
+      console.warn(`[trajectory] BiB attach failed (session kept): ${bibError}`);
+    }
+  }
   const remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
   if (remoteSessionId) await trajectoryDao.updateMeta(tid, { remoteSessionId });
 
@@ -931,6 +1309,7 @@ export async function attachTrajectoryLive(trajectoryId) {
     persistedActionIds,
     selectedPhaseId: null,
     abortRecording: false,
+    bibError,
   };
   trajectoryRuntimeMap.set(tid, runtime);
   bindTrajectoryManualPersist(tid, sessionId, runtime);
@@ -939,7 +1318,8 @@ export async function attachTrajectoryLive(trajectoryId) {
     sessionId,
     executorNodeUuid: opened.nodeUuid,
     remoteSessionId,
-    status: attached?.status || null,
+    status: attached?.status || { attached: false, cdpReady: false, bibError },
+    bibError,
   };
 }
 
@@ -949,6 +1329,7 @@ function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
   if (!session || session._trajPersistUnsub) return;
   session._trajPersistUnsub = execSession.subscribeSessionEvents(sessionId, async (type, payload) => {
     if (type !== 'manual_action_recorded') return;
+    if (runtime.suppressStepPersist || runtime.isReplay) return;
     const entry = payload?.entry;
     if (!entry) return;
     const aid = entry.id != null ? String(entry.id) : '';
@@ -964,6 +1345,100 @@ function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
       console.warn('[trajectory-manual] live persist failed:', err.message);
     }
   });
+}
+
+/**
+ * Re-execute selected DB steps in the live executor session.
+ * isReplay=true (default): actions are NOT appended to trajectory_step lists.
+ */
+export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isReplay = true } = {}) {
+  const tid = Number(trajectoryId);
+  const runtime = trajectoryRuntimeMap.get(tid);
+  if (!runtime?.sessionId) {
+    const err = new Error('Trajectory is not attached — call record/prepare first');
+    err.statusCode = 400;
+    throw err;
+  }
+  const ids = (Array.isArray(stepIds) ? stepIds : [])
+    .map((x) => Number(x))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (!ids.length) {
+    const err = new Error('stepIds is required');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const db = getDB();
+  const rows = await db('trajectory_step')
+    .where({ trajectory_id: tid })
+    .whereIn('id', ids)
+    .orderBy(['step_number', 'action_index']);
+  if (!rows.length) {
+    const err = new Error('No matching steps for stepIds');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const { trajectoryStepToActionEntry } = await import('../models/element.js');
+  const actions = rows.map((r) => {
+    const step = fromDbRowCompat(r);
+    const entry = trajectoryStepToActionEntry(step);
+    return {
+      action: entry.action,
+      params: entry.params || {},
+      target: entry.target || '',
+      cssSelector: entry.cssSelector || '',
+      tagName: entry.tagName || '',
+      attributes: entry.attributes || {},
+      description: entry.description || '',
+      id: entry.id,
+    };
+  });
+
+  const session = state.sessions.get(runtime.sessionId);
+  if (session?.busy) {
+    const err = new Error('Session is busy (AI recording in progress)');
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const doSuppress = isReplay !== false;
+  runtime.suppressStepPersist = doSuppress;
+  runtime.isReplay = doSuppress;
+  if (session) session.busy = true;
+
+  try {
+    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 300000);
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: 'replay_actions',
+      data: { actions, is_replay: doSuppress },
+    });
+    const result = await doneP;
+    await markConsumedActionLog(runtime);
+    return {
+      trajectoryId: tid,
+      isReplay: doSuppress,
+      stepIds: rows.map((r) => r.id),
+      count: result?.count ?? actions.length,
+      error: result?.error || null,
+    };
+  } finally {
+    runtime.suppressStepPersist = false;
+    runtime.isReplay = false;
+    if (session) session.busy = false;
+  }
+}
+
+function fromDbRowCompat(row) {
+  if (!row) return null;
+  const obj = {};
+  for (const [key, val] of Object.entries(row)) {
+    const camel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    obj[camel] = val;
+  }
+  return obj;
 }
 
 export async function detachTrajectoryLive(trajectoryId) {
@@ -984,15 +1459,18 @@ export async function detachTrajectoryLive(trajectoryId) {
         nodeUuid: runtime.executorNodeUuid,
         sessionId: runtime.sessionId,
       });
-    } catch {}
+    } catch {
+      slotLease.releaseBySession(runtime.sessionId);
+    }
     state.sessions.delete(runtime.sessionId);
   }
+  slotLease.releaseByTrajectory(tid);
   trajectoryRuntimeMap.delete(tid);
   if (traj) await trajectoryDao.updateMeta(tid, { remoteSessionId: null });
   return { trajectoryId: tid, detached: true };
 }
 
-export async function startTrajectoryRecording(trajectoryId, { phaseIds = null } = {}) {
+export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, accountId = null } = {}) {
   const tid = Number(trajectoryId);
   const runtime = trajectoryRuntimeMap.get(tid);
   if (!runtime) {
@@ -1021,8 +1499,14 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null }
     phases.sort((a, b) => Number(a.phaseNumber) - Number(b.phaseNumber));
   }
 
+  // Login is a prepare-time default op (not in step table). Ensure browser is logged in.
+  const { account, accountId: acctId } = await resolveTrajectoryAccount(tid, accountId);
+  if (!(runtime.loginDone && Number(runtime.loginAccountId) === Number(acctId))) {
+    await runDefaultLogin(runtime, account);
+  }
+
   runtime.abortRecording = false;
-  await trajectoryDao.updateMeta(tid, { recordStatus: 'recording' });
+  await trajectoryDao.updateMeta(tid, { recordStatus: 'recording', systemAccountId: acctId });
   for (const p of phases) await trajectoryPhaseDao.updateStatus(p.id, 'pending');
 
   const session = state.sessions.get(runtime.sessionId);
@@ -1034,6 +1518,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null }
   const events = [];
   const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, async (type, payload) => {
     if (type !== 'action_log_sync') return;
+    if (runtime.suppressStepPersist || runtime.isReplay) return;
     const entries = Array.isArray(payload?.entries) ? payload.entries : [];
     const phaseIdHint = session?.activePhaseId != null ? Number(session.activePhaseId) : null;
     for (const entry of entries) {
@@ -1101,18 +1586,18 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null }
     unsubscribe?.();
   }
 
+  const tree = await getTrajectoryTree(tid);
   return {
     trajectoryId: tid,
     recordStatus: 'recorded',
     phaseIds: phases.map((p) => p.id),
+    accountId: acctId,
+    systemAccountId: acctId,
     events,
-    steps: await trajectoryStepDao.listByTrajectory(tid),
+    steps: tree?.phases?.flatMap((p) => p.steps || []) || [],
   };
 }
 
-/**
- * Explicit end of recording (manual-only or cancel AI). Does not detach BiB.
- */
 export async function stopTrajectoryRecording(trajectoryId, { success = true } = {}) {
   const tid = Number(trajectoryId);
   const runtime = trajectoryRuntimeMap.get(tid);

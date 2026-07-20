@@ -56,7 +56,12 @@ export class SessionManager {
     this.emitToControlPlane({
       event: 'session.ready',
       session_id: payload.sessionId,
-      data: { sessionId: payload.sessionId, slotIndex: result.slotIndex },
+      data: {
+        sessionId: payload.sessionId,
+        slotIndex: result.slotIndex,
+        cdpPort: result.cdpPort ?? slot.cdpPort,
+        cdpReady: result.cdpReady !== false,
+      },
     });
     return result;
   }
@@ -109,6 +114,8 @@ export class SessionManager {
     if (!remoteSessionUuid) throw new Error('remoteSessionUuid required for attachBib');
     if (!this.sendBinary) throw new Error('sendBinary callback missing');
 
+    const slot = this.sessions.get(sessionId);
+
     // Replace existing bib (idempotent attach)
     const existing = this.bibs.get(sessionId);
     if (existing) await existing.detach().catch(() => {});
@@ -118,13 +125,27 @@ export class SessionManager {
       remoteSessionUuid,
       sendBinary: this.sendBinary,
     });
-    await bib.attach({
-      quality,
-      viewportW,
-      viewportH,
-      deviceScaleFactor,
-      resize,
-    });
+    try {
+      await bib.attach({
+        quality,
+        viewportW,
+        viewportH,
+        deviceScaleFactor,
+        resize,
+        cdpPort: slot.cdpPort,
+      });
+    } catch (err) {
+      this.emitToControlPlane({
+        event: 'session.bib_error',
+        session_id: sessionId,
+        data: {
+          sessionId,
+          remoteSessionUuid,
+          error: err?.message || String(err),
+        },
+      });
+      throw err;
+    }
 
     this.bibs.set(sessionId, bib);
     this.emitToControlPlane({

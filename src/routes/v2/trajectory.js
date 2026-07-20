@@ -24,6 +24,13 @@ function stepsToActionCommands(steps) {
 }
 
 export default function (app) {
+  function sendErr(res, err, fallback = 500) {
+    const status = err.statusCode || fallback;
+    const body = { error: err.message };
+    if (err.holders) body.holders = err.holders;
+    res.status(status).json(body);
+  }
+
   /** AI 分析：需求描述 -> 阶段步骤数组（不落库） */
   app.post('/api/v2/trajectories/analyze', async (req, res) => {
     try {
@@ -75,9 +82,12 @@ export default function (app) {
         task,
         model,
         phases,
+        systemAccountId,
+        accountId,
       } = req.body || {};
 
       const functionNum = functionId != null ? +functionId : undefined;
+      const boundAccount = systemAccountId ?? accountId ?? null;
       if (Array.isArray(phases)) {
         const traj = await trajectoryService.createTransactionWithPhases({
           functionId: functionNum,
@@ -85,6 +95,7 @@ export default function (app) {
           requirement: requirement ?? task ?? '',
           phases,
           model: model || '',
+          systemAccountId: boundAccount,
         });
         res.status(201).json(traj);
         return;
@@ -95,11 +106,40 @@ export default function (app) {
         name: name || '',
         task: requirement ?? task ?? '',
         model: model || '',
+        systemAccountId: boundAccount,
       });
       const traj = await trajectoryDao.getById(id);
       res.status(201).json(traj);
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  /** Patch trajectory meta (e.g. bind systemAccountId before studio). */
+  app.patch('/api/v2/trajectories/:id', async (req, res) => {
+    try {
+      const tid = +req.params.id;
+      const body = req.body || {};
+      if (body.systemAccountId != null || body.accountId != null) {
+        const result = await trajectoryService.setTrajectoryAccount(
+          tid,
+          body.systemAccountId ?? body.accountId,
+        );
+        return res.json(result);
+      }
+      const allowed = {};
+      if (body.name != null) allowed.name = String(body.name);
+      if (body.task != null) allowed.task = String(body.task);
+      if (body.model != null) allowed.model = String(body.model);
+      if (!Object.keys(allowed).length) {
+        return res.status(400).json({ error: 'No updatable fields' });
+      }
+      await trajectoryDao.updateMeta(tid, allowed);
+      const traj = await trajectoryService.getTrajectoryWithPhases(tid);
+      if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
+      res.json(traj);
+    } catch (err) {
+      sendErr(res, err);
     }
   });
 
@@ -118,7 +158,7 @@ export default function (app) {
       const result = await trajectoryService.attachTrajectoryLive(+req.params.id);
       res.status(201).json(result);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      sendErr(res, err);
     }
   });
 
@@ -127,7 +167,7 @@ export default function (app) {
       const result = await trajectoryService.detachTrajectoryLive(+req.params.id);
       res.json(result);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      sendErr(res, err);
     }
   });
 
@@ -229,7 +269,10 @@ export default function (app) {
   });
 
   /**
-   * Enter recording: idempotent attach + return trajectory, phases, session, live status.
+   * One-shot enter recording studio (requires bound systemAccountId):
+   * 1) session create  2) allocate browser  3) BiB stream  4) navigate/login
+   * Broadcasts recording:prepare { stage, status } over /ws. Stream may be degraded
+   * without failing the critical path (session + login). Idempotent when already live.
    * POST /api/v2/trajectories/:id/record/prepare
    */
   app.post('/api/v2/trajectories/:id/record/prepare', async (req, res) => {
@@ -237,23 +280,56 @@ export default function (app) {
       const result = await trajectoryService.prepareTrajectoryRecording(+req.params.id);
       res.json(result);
     } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
+      sendErr(res, err);
+    }
+  });
+
+  /**
+   * Login context: owning system + accounts for AI recording pre-login.
+   * GET /api/v2/trajectories/:id/login-context
+   */
+  app.get('/api/v2/trajectories/:id/login-context', async (req, res) => {
+    try {
+      const ctx = await trajectoryService.getTrajectoryLoginContext(+req.params.id);
+      res.json(ctx);
+    } catch (err) {
+      sendErr(res, err);
     }
   });
 
   /**
    * Start AI recording for all phases or subset.
-   * Body: { phaseIds?: number[] }
+   * Body: { phaseIds?: number[], accountId?: number }
+   * Login/navigate is done in record/prepare (not stored as steps).
+   * accountId optional — defaults to trajectory.systemAccountId.
    */
   app.post('/api/v2/trajectories/:id/record/start', async (req, res) => {
     try {
       const phaseIds = req.body?.phaseIds;
+      const accountId = req.body?.accountId ?? req.body?.systemAccountId;
       const result = await trajectoryService.startTrajectoryRecording(+req.params.id, {
         phaseIds: Array.isArray(phaseIds) ? phaseIds : null,
+        accountId,
       });
       res.json(result);
     } catch (err) {
       res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * Re-run selected steps in the live session.
+   * Body: { stepIds: number[], isReplay?: boolean } — default isReplay=true (not counted in step list).
+   */
+  app.post('/api/v2/trajectories/:id/steps/replay', async (req, res) => {
+    try {
+      const result = await trajectoryService.replayTrajectorySteps(+req.params.id, {
+        stepIds: req.body?.stepIds,
+        isReplay: req.body?.isReplay !== false && req.body?.is_replay !== false,
+      });
+      res.json(result);
+    } catch (err) {
+      sendErr(res, err);
     }
   });
 

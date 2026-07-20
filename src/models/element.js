@@ -97,5 +97,11 @@ export function trajectoryStepToActionEntry(step) {
     cssSelector: el.cssSelector || el.css_selector || '',
     tagName: el.tag || el.tagName || '',
     attributes: el.attributes || {},
+    // Replay / assembler markers
+    id: step.id != null ? String(step.id) : '',
+    stepId: step.id != null ? String(step.id) : '',
+    phaseId: step.trajectoryPhaseId ?? step.phaseId ?? null,
+    phase: step.phaseNumber ?? step.phase ?? 0,
+    description: step.description || '',
   };
 }

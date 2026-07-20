@@ -1,15 +1,10 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
-import { deduplicateActionFile } from '../dedup.js';
-import { getInjectionCode } from '../ctrl-actions.js';
+import { assembleActionToScript } from '../services/assemble-service.js';
 
-import { PROJECT_DIR, TMP_DIR } from '../../config/config.js';
-import { PYTHON_EXE } from './explore-utils.js';
-import { ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex } from '../script-utils.js';
+import { PROJECT_DIR } from '../../config/config.js';
 
 const SCRIPTS_DIR = path.join(PROJECT_DIR, 'scripts');
-const GENERATED_DIR = path.join(SCRIPTS_DIR, 'generated');
 
 export default function (app) {
 
@@ -25,83 +20,19 @@ export default function (app) {
         return res.status(400).json({ error: 'actionFile is required' });
       }
 
-      // Resolve the action file path
-      const absPath = path.resolve(SCRIPTS_DIR, '..', actionFile);
-      if (!existsSync(absPath)) {
-        return res.status(404).json({ error: 'actionFile not found: ' + absPath });
-      }
-
-      // Read and deduplicate
-      const raw = readFileSync(absPath, 'utf-8');
-      const dedupedJson = deduplicateActionFile(raw);
-      const meta = dedupedJson._meta;
-
-      const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      let cleanPath, scriptPath;
-
-      if (preview) {
-        // Preview mode: write to temp, don't register in index
-        cleanPath = path.join(TMP_DIR, `cleaned_preview_${ts}.json`);
-        scriptPath = path.join(TMP_DIR, `script_preview_${ts}.js`);
-      } else {
-        if (!existsSync(GENERATED_DIR)) mkdirSync(GENERATED_DIR, { recursive: true });
-        cleanPath = path.join(GENERATED_DIR, `cleaned_${ts}.json`);
-        scriptPath = path.join(GENERATED_DIR, `script_${ts}.js`);
-        writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
-      }
-
-      // Look for matching form snapshot file
-      const actionName = path.basename(actionFile);  // action_20260625_153759.json
-      const tsMatch = actionName.match(/^action_(\d{8}_\d{6})\.json$/);
-      let formSnapshotArg = '';
-      if (tsMatch) {
-        const formPath = path.join(SCRIPTS_DIR, 'forms', `form_${tsMatch[1]}.json`);
-        if (existsSync(formPath)) {
-          formSnapshotArg = ` --form-snapshot "${formPath}"`;
-        }
-      }
-
-      // Write shared CTRL injection code (single source: src/ctrl-actions.js)
-      const ctrlInjectionPath = path.join(TMP_DIR, `ctrl_injection_${ts}.js`);
-      writeFileSync(ctrlInjectionPath, getInjectionCode(), 'utf-8');
-
-      // Call Python assembler
-      const assemblerPy = path.join(SCRIPTS_DIR, 'script_assembler.py');
-      // Always write deduplicated JSON for the assembler to read
-      if (!existsSync(cleanPath)) writeFileSync(cleanPath, JSON.stringify(dedupedJson, null, 2), 'utf-8');
-      execSync(`"${PYTHON_EXE}" "${assemblerPy}" "${cleanPath}" "${scriptPath}" --ctrl-injection "${ctrlInjectionPath}"${formSnapshotArg}`, { encoding: 'utf-8', timeout: 30000, env: { ...process.env, PYTHONPATH: PROJECT_DIR } });
-
-      // Read the generated script
-      const script = readFileSync(scriptPath, 'utf-8');
-
-      let testId = '', fileName = '';
-      if (!preview) {
-        // Register in generated index so Run/History work
-        ensureGeneratedDir();
-        const index = loadGeneratedIndex();
-        testId = 'assembled_' + ts;
-        fileName = `script_${ts}.js`;
-        index.unshift({
-          testId, fileName,
-          description: 'Assembled from ' + path.basename(actionFile),
-          url: '', steps: [],
-          createdAt: new Date().toISOString(),
-          fromAssemble: true,
-        });
-        saveGeneratedIndex(index);
-      }
-
+      const result = assembleActionToScript({ actionFile, preview: !!preview });
       res.json({
-        success: true,
-        testId, fileName, actionFile,
-        scriptFile: scriptPath,
-        script,
-        stats: { original: meta.originalCount, deduped: meta.dedupedCount, removed: meta.removedCount },
+        success: result.success,
+        testId: result.testId,
+        fileName: result.fileName,
+        actionFile: result.actionFile,
+        scriptFile: result.scriptFile,
+        script: result.script,
+        stats: result.stats,
       });
-
     } catch (err) {
       console.error('Assemble error:', err.message);
-      res.status(500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message });
     }
   });
 

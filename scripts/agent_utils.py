@@ -18,6 +18,12 @@ def parse_args():
     parser.add_argument("--session", action="store_true", help="Run in session mode (stdin/stdout interactive)")
     parser.add_argument("--session-id", default=None, help="Session ID (for trajectory file naming)")
     parser.add_argument("--cdp-url", default=None, help="Connect to existing browser via CDP (ws://...). Used for self-healing.")
+    parser.add_argument(
+        "--cdp-port",
+        type=int,
+        default=None,
+        help="Chrome remote-debugging port when launching a new browser (per executor slot; default browser_use 9242)",
+    )
     return parser.parse_args()
 
 def emit_json(data):
@@ -30,15 +36,25 @@ def extract_first_url(task):
 
 async def do_navigate(page, url):
     from . import controller as ctrl_mod
+    from .actions._helpers import dismiss_https_first_interstitial
     ctrl_mod._TRAJECTORY_URL = url
     emit_json({"event": "nav_step", "data": {"step": 0, "label": "Navigating to target URL"}})
     try:
         await page.goto(url, wait_until='networkidle', timeout=60000)
-    except:
+    except Exception:
         try:
             await page.goto(url, wait_until='load', timeout=30000)
-        except:
+        except Exception:
             await page.goto(url, timeout=30000)
+    # Plain HTTP may land on HTTPS-First interstitial («此网站不支持安全连接»).
+    bypass = await dismiss_https_first_interstitial(page)
+    if bypass and bypass.startswith('proceeded'):
+        # After proceed, wait for real page
+        try:
+            await page.wait_for_load_state('domcontentloaded', timeout=15000)
+        except Exception:
+            pass
+        await dismiss_https_first_interstitial(page)
     await page.wait_for_timeout(2000)
     emit_json({"event": "nav_step", "data": {"step": 1, "label": "Page loaded"}})
 

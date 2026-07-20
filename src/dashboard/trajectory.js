@@ -4,6 +4,7 @@ import { formatTime } from './utils.js';
 import { pipelineState, displayGeneratedScript } from './script-pipeline.js';
 import { renderActionCards, wireActionButtons } from './trajectory-actions.js';
 import { fetchHierarchyTree, flattenFunctionOptions } from './hierarchy.js';
+import { unwrapApi, apiErrorMessage, isApiFail, readV2 } from './api-envelope.js';
 
 export let trajCurrentDetailId = null;
 
@@ -55,8 +56,7 @@ export async function loadSnapshots() {
     const qs = new URLSearchParams({ page: '1', pageSize: '100' });
     if (functionId) qs.set('functionId', functionId);
     const res = await fetch('/api/v2/trajectories?' + qs.toString());
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Load failed');
+    const data = await readV2(res);
     loading.style.display = 'none';
 
     const rows = data.rows || [];
@@ -112,8 +112,7 @@ export async function loadSnapshots() {
 async function viewTrajectory(trajectoryId) {
   try {
     const res = await fetch('/api/v2/trajectories/' + encodeURIComponent(trajectoryId));
-    const traj = await res.json();
-    if (!res.ok) throw new Error(traj.error || 'Not found');
+    const traj = await readV2(res);
 
     const detailPanel = document.getElementById('trajDetailPanel');
     document.getElementById('trajDetailId').textContent = trajectoryId;
@@ -158,8 +157,7 @@ async function assembleTrajectory(btn) {
     const fileRes = await fetch('/api/v2/trajectories/' + encodeURIComponent(trajectoryId) + '/assemble-file', {
       method: 'POST',
     });
-    const fileData = await fileRes.json();
-    if (!fileRes.ok) throw new Error(fileData.error || 'Materialize failed');
+    const fileData = await readV2(fileRes);
 
     const res = await fetch('/api/test/assemble', {
       method: 'POST',
@@ -196,7 +194,7 @@ async function deleteTrajectory(trajectoryId) {
   if (!confirm('Delete trajectory ' + trajectoryId.slice(0, 20) + '…?')) return;
   try {
     const res = await fetch('/api/v2/trajectories/' + encodeURIComponent(trajectoryId), { method: 'DELETE' });
-    if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+    await readV2(res);
     if (trajCurrentDetailId === trajectoryId) {
       document.getElementById('trajDetailPanel').style.display = 'none';
       trajCurrentDetailId = null;

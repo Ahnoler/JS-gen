@@ -1,0 +1,89 @@
+.rs-body { margin: 0; min-height: 100vh; background: #0f172a; color: #e2e8f0; }
+.rs-top {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px 14px; background: #1e293b; border-bottom: 1px solid #334155;
+}
+.rs-top a { color: #93c5fd; text-decoration: none; font-size: 13px; margin-right: 10px; }
+.rs-top-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rs-top-right { display: flex; align-items: center; gap: 8px; }
+.rs-muted { color: #94a3b8; font-size: 12px; }
+.rs-pill {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  background: #334155; color: #cbd5e1;
+}
+.rs-pill.rs-warn { background: #92400e; color: #fef3c7; }
+.rs-layout {
+  display: grid;
+  grid-template-columns: 1fr min(400px, 38vw);
+  height: calc(100vh - 48px);
+}
+@media (max-width: 960px) {
+  .rs-layout { grid-template-columns: 1fr; height: auto; }
+}
+.rs-canvas-pane {
+  display: flex; flex-direction: column; min-width: 0; border-right: 1px solid #334155;
+}
+.rs-canvas-bar {
+  display: flex; gap: 8px; align-items: center; padding: 8px 10px;
+  background: #1e293b; border-bottom: 1px solid #334155; flex-wrap: wrap;
+}
+.rs-stage-wrap {
+  flex: 1; min-height: 280px; overflow: auto; background: #020617;
+  display: flex; align-items: flex-start; justify-content: center;
+  position: relative;
+}
+.rs-stage-wrap::before {
+  content: '等待画面（一键 prepare 后自动推流；失败可点「附着/推流」）';
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #64748b; font-size: 13px; pointer-events: none; z-index: 0;
+}
+#sessRemoteStage { position: relative; z-index: 1; }
+#sessRemoteCanvas { display: block; max-width: 100%; outline: none; background: transparent; }
+.rs-inspect { padding: 6px 10px; }
+.rs-side {
+  overflow: auto; padding: 12px; background: #0f172a;
+}
+.rs-side h3 { font-size: 13px; margin: 14px 0 6px; color: #cbd5e1; }
+.rs-resource {
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.55;
+  background: #1e293b; padding: 8px; border-radius: 8px; color: #94a3b8;
+}
+.rs-phases { margin: 6px 0 10px; }
+.rs-phase-pick {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 12px; padding: 8px 10px; margin-bottom: 6px; cursor: pointer;
+  color: #e2e8f0; background: #1e293b; border: 1px solid #475569; border-radius: 8px;
+}
+.rs-phase-pick input[type="checkbox"] {
+  width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: #6366f1;
+}
+.rs-phase-pick-text { line-height: 1.4; }
+.rs-step {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 12px; padding: 4px 0; cursor: pointer; color: #e2e8f0;
+}
+.rs-step input[type="checkbox"] {
+  width: 14px; height: 14px; margin-top: 2px; flex-shrink: 0; accent-color: #6366f1;
+}
+.rs-phase-head { font-weight: 600; margin: 8px 0 4px; font-size: 12px; color: #93c5fd; }
+.rs-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+.rs-actions select {
+  flex: 1; min-width: 120px; padding: 4px 6px; border-radius: 6px;
+  border: 1px solid #334155; background: #1e293b; color: #e2e8f0; font-size: 12px;
+}
+.rs-hint { font-size: 11px; color: #64748b; margin: 0 0 8px; }
+.rs-step-tree {
+  max-height: 36vh; overflow: auto; background: #1e293b;
+  border-radius: 8px; padding: 8px; font-size: 11px;
+}
+.rs-log {
+  margin-top: 12px; max-height: 120px; overflow: auto;
+  font-size: 11px; color: #94a3b8; background: #1e293b; border-radius: 8px; padding: 8px;
+}
+.rs-side .btn-outline {
+  background: transparent; border-color: #475569; color: #e2e8f0;
+}
+.rs-btn-blocked {
+  opacity: 0.55;
+  outline: 1px dashed #fbbf24;
+}

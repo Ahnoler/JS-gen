@@ -112,6 +112,34 @@ export function isConnected() {
   return !!(ws && ws.readyState === WebSocket.OPEN);
 }
 
+/** Wait until dashboard /ws is OPEN (or timeout). */
+export function waitUntilConnected(timeoutMs = 8000) {
+  if (isConnected()) return Promise.resolve(true);
+  connect();
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const onOk = () => {
+      cleanup();
+      resolve(true);
+    };
+    const timer = setInterval(() => {
+      if (isConnected()) {
+        onOk();
+        return;
+      }
+      if (Date.now() - t0 >= timeoutMs) {
+        cleanup();
+        resolve(false);
+      }
+    }, 80);
+    const off = on('ws:connected', onOk);
+    function cleanup() {
+      clearInterval(timer);
+      try { off(); } catch {}
+    }
+  });
+}
+
 // ─── internal ──────────────────────────────────────────
 
 function emit(type, payload) {

@@ -12,16 +12,17 @@ CREATE DATABASE IF NOT EXISTS `uara`
 USE `uara`;
 
 -- ─────────────────────────────────────────────────────────────
--- 层级节点 (System) — 系统/流程/功能点 合并为一表
--- type: 0=系统 1=流程 2=功能点；parent_id 指向父节点
+-- 层级节点 (System) — 系统/模块/功能 合并为一表
+-- type: 1=系统 2=模块 3=功能；parent_id 指向父节点
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `system` (
   `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '代理主键',
   `system_id`   VARCHAR(36)  NOT NULL COMMENT 'UUID 业务标识（各级节点共用）',
-  `type`        TINYINT NOT NULL COMMENT '0=系统 1=模块 2=功能',
-  `parent_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '父节点 id；type=0 时为空',
+  `type`        TINYINT NOT NULL COMMENT '1=系统 2=模块 3=功能',
+  `parent_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '父节点 id；type=1 时为空',
   `name`        VARCHAR(255) NOT NULL COMMENT '名称',
   `description` TEXT COMMENT '描述',
+  `url`         VARCHAR(2048) DEFAULT '' COMMENT '系统地址/入口 URL（仅 type=1 系统节点有意义）',
   `sort_order`  INT UNSIGNED DEFAULT 0 COMMENT '同级排序',
   `created_at`  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updated_at`  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -30,14 +31,14 @@ CREATE TABLE `system` (
   KEY `idx_parent_id` (`parent_id`),
   KEY `idx_parent_name` (`parent_id`, `name`),
   CONSTRAINT `fk_system_parent` FOREIGN KEY (`parent_id`) REFERENCES `system` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='层级节点（0=系统 1=模块 2=功能）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='层级节点（1=系统 2=模块 3=功能）';
 
 -- ─────────────────────────────────────────────────────────────
--- 系统测试账号 (SystemAccount) — 挂在 type=0 系统节点下
+-- 系统测试账号 (SystemAccount) — 挂在 type=1 系统节点下
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `system_account` (
   `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `system_id`   BIGINT UNSIGNED NOT NULL COMMENT '外键 → system.id（type=0）',
+  `system_id`   BIGINT UNSIGNED NOT NULL COMMENT '外键 → system.id（type=1）',
   `name`        VARCHAR(255) NOT NULL COMMENT '角色名：管理员/测试人员/…',
   `login_url`   VARCHAR(2048) DEFAULT '' COMMENT '登录/入口网址',
   `username`    VARCHAR(255) DEFAULT '' COMMENT '测试账号',
@@ -87,17 +88,20 @@ CREATE TABLE `trajectory` (
   `is_done`           TINYINT(1) DEFAULT NULL COMMENT '是否完成',
   `is_successful`     TINYINT(1) DEFAULT NULL COMMENT '是否成功',
   `url`               VARCHAR(2048) DEFAULT '' COMMENT '目标页面 URL',
-  `function_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → system.id（type=2 功能点）',
+  `function_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → system.id（type=3 功能）',
+  `system_account_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → system_account.id（录制默认登录账号）',
   `remote_session_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → remote_session.id（远程/人工录制来源，可空）',
   `record_status`     ENUM('draft','recording','recorded') NOT NULL DEFAULT 'draft' COMMENT '录制生命周期',
   `created_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updated_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   KEY `idx_function_id` (`function_id`),
+  KEY `idx_traj_system_account` (`system_account_id`),
   KEY `idx_remote_session_id` (`remote_session_id`),
   KEY `idx_created_at` (`created_at`),
   KEY `idx_model` (`model`),
   KEY `idx_record_status` (`record_status`),
   CONSTRAINT `fk_traj_function` FOREIGN KEY (`function_id`) REFERENCES `system` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_traj_system_account` FOREIGN KEY (`system_account_id`) REFERENCES `system_account` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_traj_remote_session` FOREIGN KEY (`remote_session_id`) REFERENCES `remote_session` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='浏览器操作轨迹（交易）';
 
@@ -141,6 +145,7 @@ CREATE TABLE `trajectory_step` (
     COMMENT '动作来源：agent=AI Agent 录制 | manual=人工录制 | cdp=CDP 反查录制',
   `confirmed`           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '人工确认',
   `confirmed_at`        DATETIME(3) DEFAULT NULL COMMENT '人工确认时间',
+  `is_replay`           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=回放执行产生，不计入阶段步骤列表',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_trajectory_id` (`trajectory_id`),
   KEY `idx_step_number` (`trajectory_id`, `step_number`),
@@ -148,6 +153,7 @@ CREATE TABLE `trajectory_step` (
   KEY `idx_action_type` (`action_type`),
   KEY `idx_traj_phase_id` (`trajectory_phase_id`),
   KEY `idx_source` (`source`),
+  KEY `idx_step_is_replay` (`trajectory_id`, `is_replay`),
   CONSTRAINT `fk_step_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_step_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='轨迹步骤';
@@ -235,7 +241,7 @@ CREATE TABLE `screenshot` (
 
 -- ─────────────────────────────────────────────────────────────
 -- API 响应覆写/Mock 规则 (ApiOverride) — P7 配置数据
--- scope_ref_id 为逻辑关联：scope 决定指向 system 表中 type=0/1/2 的节点
+-- scope_ref_id 为逻辑关联：scope 决定指向 system 表中 type=1/2/3 的节点
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `api_override` (
   `id`                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -258,13 +264,13 @@ CREATE TABLE `api_override` (
   COMMENT='响应覆写/Mock 规则，运行时由 CDP Fetch.fulfillRequest 应用';
 
 -- ============================================================
--- 默认数据（type 0/1/2 三级未分类）
+-- 默认数据（type 1/2/3 三级未分类）
 -- ============================================================
 INSERT INTO `system` (`system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
-  ('00000000-0000-0000-0000-000000000001', 0, NULL, '未分类', '默认系统分类，用于尚未分配系统的历史轨迹', 0);
+  ('00000000-0000-0000-0000-000000000001', 1, NULL, '未分类', '默认系统分类，用于尚未分配系统的历史轨迹', 0);
 
 INSERT INTO `system` (`system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
-  ('00000000-0000-0000-0000-000000000002', 1, 1, '未分类', '默认流程分类', 0);
+  ('00000000-0000-0000-0000-000000000002', 2, 1, '未分类', '默认流程分类', 0);
 
 INSERT INTO `system` (`system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
-  ('00000000-0000-0000-0000-000000000003', 2, 2, '未分类', '默认功能分类', 0);
+  ('00000000-0000-0000-0000-000000000003', 3, 2, '未分类', '默认功能分类', 0);

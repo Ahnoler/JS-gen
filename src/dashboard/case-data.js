@@ -1,5 +1,6 @@
 import { formatTime } from './utils.js';
 import { escapeHtml } from './swagger-api.js';
+import { readV2 } from './api-envelope.js';
 
 export let caseDataCurrentId = null;
 
@@ -26,8 +27,7 @@ export async function loadCaseDataHistory() {
 
   try {
     const res = await fetch('/api/v2/case-data?page=1&pageSize=100');
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Load failed');
+    const data = await readV2(res);
     loading.style.display = 'none';
 
     const rows = data.rows || data || [];
@@ -77,8 +77,7 @@ async function viewCaseDataDetail(recordId) {
 
   try {
     const res = await fetch('/api/v2/case-data/' + encodeURIComponent(recordId));
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    const data = await readV2(res);
 
     info.innerHTML = '<b>Keys:</b> ' + (data.keyCount || 0) +
       ' | <b>Created:</b> ' + formatTime(data.createdAt);
@@ -99,8 +98,7 @@ async function viewCaseDataDetail(recordId) {
 async function importCaseData(recordId) {
   try {
     const res = await fetch('/api/v2/case-data/' + encodeURIComponent(recordId) + '/file');
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    const data = await readV2(res);
 
     const input = document.getElementById('sessCaseDataFile');
     if (input) {
@@ -117,7 +115,7 @@ async function deleteCaseData(recordId) {
   if (!confirm('Delete case data ' + recordId.slice(0, 20) + '...?')) return;
   try {
     const res = await fetch('/api/v2/case-data/' + encodeURIComponent(recordId), { method: 'DELETE' });
-    if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+    await readV2(res);
 
     if (caseDataCurrentId === recordId) {
       document.getElementById('caseDataDetailPanel').style.display = 'none';

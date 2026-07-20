@@ -1,18 +1,67 @@
 /**
  * forwardStdin mapping — expanded for all session stdin events.
+ * Slot leases: capacity-aware pick + confirm/release via executor-slot-lease.
  */
 import * as registry from './executor-registry.js';
+import * as executorNodeDao from './dao/executor-node-dao.js';
+import * as lease from './executor-slot-lease.js';
 import {
   waitForSessionEvent,
   onSessionEvent,
   removeSessionHub,
 } from './executor-event-hub.js';
 
-export function pickExecutorNode(nodeUuid) {
-  if (nodeUuid && registry.isConnected(nodeUuid)) return nodeUuid;
+/**
+ * Pick a connected executor with a free slot (lease count < capacity).
+ * @param {{ nodeUuid?: string }} [opts]
+ * @returns {Promise<string>} nodeUuid
+ */
+export async function pickExecutorNode(opts = {}) {
+  const preferred = opts.nodeUuid || null;
+  const dbNodes = await executorNodeDao.list().catch(() => []);
+  const byUuid = new Map(dbNodes.map((n) => [n.nodeUuid, n]));
+
+  function capacityOf(nodeUuid) {
+    const row = byUuid.get(nodeUuid);
+    return Math.max(1, Number(row?.capacity) || 1);
+  }
+
+  function isDraining(nodeUuid) {
+    const row = byUuid.get(nodeUuid);
+    return row?.status === 'draining' || row?.status === 'offline';
+  }
+
+  if (preferred) {
+    if (!registry.isConnected(preferred)) {
+      throw new Error(`Executor ${preferred} is not connected`);
+    }
+    if (isDraining(preferred)) {
+      const err = new Error(`Executor ${preferred} is draining or offline`);
+      err.statusCode = 409;
+      err.holders = lease.listHolders();
+      throw err;
+    }
+    if (lease.countInUse(preferred) >= capacityOf(preferred)) {
+      throw lease.noFreeSlotsError();
+    }
+    return preferred;
+  }
+
   const live = registry.list().filter((n) => n.connected);
   if (!live.length) throw new Error('No executor agent online');
-  return live[0].nodeUuid;
+
+  const candidates = live
+    .filter((n) => !isDraining(n.nodeUuid))
+    .map((n) => ({
+      nodeUuid: n.nodeUuid,
+      capacity: capacityOf(n.nodeUuid),
+      inUse: lease.countInUse(n.nodeUuid),
+    }))
+    .filter((n) => n.inUse < n.capacity)
+    .sort((a, b) => a.inUse - b.inUse || a.nodeUuid.localeCompare(b.nodeUuid));
+
+  if (!candidates.length) throw lease.noFreeSlotsError();
+  return candidates[0].nodeUuid;
 }
 
 export function sendToExecutor(nodeUuid, type, payload) {
@@ -36,12 +85,39 @@ const STDIN_TO_WS = {
   close: 'session.close',
 };
 
-export async function openSession({ sessionId, model, nodeUuid }) {
-  const uuid = pickExecutorNode(nodeUuid);
-  const readyP = waitForSessionEvent(sessionId, 'session.ready', 120000);
-  sendToExecutor(uuid, 'session.open', { sessionId, model });
-  const payload = await readyP;
-  return { ...payload, nodeUuid: uuid };
+/**
+ * Open a session on an executor and confirm a slot lease.
+ * @param {{ sessionId: string, model?: string, nodeUuid?: string, trajectoryId?: number|null }} opts
+ */
+export async function openSession({ sessionId, model, nodeUuid, trajectoryId = null }) {
+  let uuid = null;
+  await lease.withLeaseMutex(async () => {
+    uuid = await pickExecutorNode({ nodeUuid });
+    lease.reservePending(uuid);
+  });
+
+  try {
+    const readyP = waitForSessionEvent(sessionId, 'session.ready', 120000);
+    sendToExecutor(uuid, 'session.open', { sessionId, model });
+    const payload = await readyP;
+    const slotIndex = Number(payload?.slotIndex ?? 0);
+    lease.confirmLease({
+      sessionId,
+      nodeUuid: uuid,
+      slotIndex,
+      trajectoryId: trajectoryId == null ? null : Number(trajectoryId),
+    });
+    lease.releasePending(uuid);
+    return { ...payload, nodeUuid: uuid, slotIndex };
+  } catch (err) {
+    if (uuid) lease.releasePending(uuid);
+    if (err?.message?.includes('No free executor slots') || /no free/i.test(err?.message || '')) {
+      const e = lease.noFreeSlotsError();
+      e.message = err.message || e.message;
+      throw e;
+    }
+    throw err;
+  }
 }
 
 export async function closeSession({ nodeUuid, sessionId }) {
@@ -49,6 +125,7 @@ export async function closeSession({ nodeUuid, sessionId }) {
     sendToExecutor(nodeUuid, 'session.close', { sessionId });
     await waitForSessionEvent(sessionId, 'session.closed', 15000).catch(() => {});
   } finally {
+    lease.releaseBySession(sessionId);
     removeSessionHub(sessionId);
   }
 }

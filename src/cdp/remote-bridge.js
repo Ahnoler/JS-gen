@@ -672,9 +672,16 @@ function ensureWsHook() {
 
     // Executor mode: proxy remote_* WS commands to executor bib bridge.
     if (USE_EXECUTOR) {
-      const pick = [...state.sessions.values()].find((s) => s?.useExecutor && s?.executorNodeUuid && s?.sessionId);
+      const live = await remoteSessionService.getLiveStatus().catch(() => null);
+      // Prefer the session that attachLive bound; fall back to first executor session.
+      const boundId = remoteSessionService.getExecutorLiveSessionId?.() || null;
+      let pick = boundId && state.sessions.get(boundId)?.useExecutor
+        ? state.sessions.get(boundId)
+        : null;
+      if (!pick) {
+        pick = [...state.sessions.values()].find((s) => s?.useExecutor && s?.executorNodeUuid && s?.sessionId);
+      }
       if (type === 'remote:subscribe') {
-        const live = await remoteSessionService.getLiveStatus().catch(() => null);
         ws.send(JSON.stringify({ type: 'remote:status', payload: live || { attached: false, cdpReady: true } }));
         return;
       }
@@ -708,8 +715,8 @@ function ensureWsHook() {
       } catch {}
 
       if (type === 'remote:start' || type === 'remote:stop' || type === 'remote:status') {
-        const live = await remoteSessionService.getLiveStatus().catch(() => null);
-        ws.send(JSON.stringify({ type: 'remote:status', payload: live || { attached: false, cdpReady: true } }));
+        const live2 = await remoteSessionService.getLiveStatus().catch(() => null);
+        ws.send(JSON.stringify({ type: 'remote:status', payload: live2 || { attached: false, cdpReady: true } }));
       }
       return;
     }

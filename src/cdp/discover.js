@@ -1,6 +1,7 @@
 /**
  * Probe Chrome remote-debugging HTTP endpoints for CDP WebSocket URL.
  * browser_use default port is 9242; also try common 9222.
+ * Prefer an explicit `ports` / `port` (per executor slot) to avoid the wrong Chrome.
  */
 import { request } from 'undici';
 
@@ -40,10 +41,18 @@ export async function discoverCdp(opts = {}) {
 
 /**
  * Retry discover a few times (Chrome may need a moment after Agent ready).
+ * @param {{ attempts?: number, delayMs?: number, host?: string, ports?: number[], port?: number }} [opts]
  */
-export async function discoverCdpWithRetry({ attempts = 8, delayMs = 500, ...opts } = {}) {
+export async function discoverCdpWithRetry({
+  attempts = 20,
+  delayMs = 400,
+  port,
+  ports,
+  ...opts
+} = {}) {
+  const portList = ports || (port != null && Number.isFinite(Number(port)) ? [Number(port)] : undefined);
   for (let i = 0; i < attempts; i++) {
-    const hit = await discoverCdp(opts);
+    const hit = await discoverCdp({ ...opts, ports: portList });
     if (hit) return hit;
     await new Promise((r) => setTimeout(r, delayMs));
   }

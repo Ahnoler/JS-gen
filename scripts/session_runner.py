@@ -29,6 +29,75 @@ _TRACE_DIR = str(Path(__file__).parent / "trace")
 _last_agent = None
 
 
+def _port_is_connectable(host: str, port: int) -> bool:
+    """Same check browser_use uses before dropping --remote-debugging-port."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.3)
+        return s.connect_ex((host, int(port))) == 0
+
+
+def _pick_free_cdp_port(preferred: int, span: int = 40) -> int:
+    """
+    Pick a port that is NOT connectable (browser_use will strip
+    --remote-debugging-port if localhost:port accepts connections).
+    Also try binding so we do not race with another binder.
+    """
+    import socket
+    start = max(1024, int(preferred) or 9242)
+    for port in range(start, start + span):
+        if _port_is_connectable('127.0.0.1', port) or _port_is_connectable('localhost', port):
+            continue
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(('127.0.0.1', port))
+            # Released — double-check nothing answered while we held it
+            if _port_is_connectable('127.0.0.1', port) or _port_is_connectable('localhost', port):
+                continue
+            return port
+        except OSError:
+            continue
+    return start
+
+
+async def _wait_cdp_http(port: int, timeout_s: float = 20.0) -> bool:
+    """Poll Chrome /json/version until CDP HTTP is reachable."""
+    import urllib.request
+
+    url = f'http://127.0.0.1:{int(port)}/json/version'
+    deadline = asyncio.get_event_loop().time() + timeout_s
+    while asyncio.get_event_loop().time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=1.5) as resp:
+                if getattr(resp, 'status', 200) == 200:
+                    return True
+        except Exception:
+            pass
+        await asyncio.sleep(0.4)
+    sys.stderr.write(f'[session] WARN: CDP HTTP not ready on port {port} after {timeout_s}s\n')
+    sys.stderr.flush()
+    return False
+
+
+async def _probe_cdp_ws_url(port: int) -> str | None:
+    """Return webSocketDebuggerUrl from /json/version if available."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f'http://127.0.0.1:{int(port)}/json/version', timeout=2) as resp:
+            raw = resp.read().decode('utf-8', errors='replace')
+            data = json.loads(raw)
+            ws = data.get('webSocketDebuggerUrl')
+            return str(ws) if ws else None
+    except Exception:
+        return None
+
+
+# Keep old name for any external imports
+async def wait_cdp_http(port: int, timeout_s: float = 20.0) -> bool:
+    return await _wait_cdp_http(port, timeout_s)
+
+
 def _close_agent():
     global _last_agent
     if _last_agent is not None:
@@ -477,38 +546,41 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
         if not browser_context or not entries:
             emit_json({"event": "replay_done", "data": {"count": 0, "error": "no browser_context or empty actions"}})
             return 'continue'
+
+        # Orchestrate like `_form._auto_fill_pending` / `_execute_round`:
+        # sequential JS form ops + short waits (no networkidle, no mid-replay auto-fill).
         from .actions._builder import build_controller
+        from .actions._replay import replay_action_entries
+
         controller = build_controller(browser_context, form_rules, case_data_store=case_data_store)
-        actions = controller.registry.registry.actions
-        total = len(entries)
-        for i, entry in enumerate(entries):
+        registry_actions = controller.registry.registry.actions
+
+        # Pass raw params — `_normalize_params` accepts aliases; controller path
+        # filters by function signature inside `_replay_controller_action`.
+        filtered = []
+        for entry in entries:
             action_name = entry.get("action", "")
-            raw_params = entry.get("params", {})
-            params = _convert_action_params(action_name, raw_params)
-            act = actions.get(action_name)
-            if not act:
-                sys.stderr.write(f"[replay] [{i+1}/{total}] Unknown action: {action_name}, skipping\n")
-                sys.stderr.flush()
-                continue
-            sys.stderr.write(f"[replay] [{i+1}/{total}] {action_name} {params}\n")
-            sys.stderr.flush()
-            try:
-                await act.function(**params)
-            except Exception as e:
-                sys.stderr.write(f"[replay] [{i+1}/{total}] Error: {action_name} {params} -> {e}\n")
-                sys.stderr.flush()
-            # ── Wait for page idle between actions ──
-            try:
-                page = await browser_context.get_current_page()
-                await page.wait_for_load_state('networkidle', timeout=10000)
-                from .actions._helpers import _wait_if_loading as _replay_wait
-                await _replay_wait(page)
-                await asyncio.sleep(0.3)
-            except Exception:
-                pass
-        sys.stderr.write(f"[replay] Done: {total} actions executed\n")
-        sys.stderr.flush()
-        emit_json({"event": "replay_done", "data": {"count": total}})
+            raw_params = entry.get("params", {}) or {}
+            # Prefer signature filter when known, else keep raw for alias normalize.
+            converted = _convert_action_params(action_name, raw_params)
+            merged = {**raw_params, **converted} if converted else dict(raw_params)
+            filtered.append({**entry, "action": action_name, "params": merged})
+
+        summary = await replay_action_entries(
+            browser_context,
+            filtered,
+            controller_actions=registry_actions,
+            case_data_store=case_data_store,
+            emit=emit_json,
+        )
+        emit_json({
+            "event": "replay_done",
+            "data": {
+                "count": summary.get("count", 0),
+                "ok": summary.get("ok", 0),
+                "failed": summary.get("failed", 0),
+            },
+        })
         return 'continue'
 
     if event == "intervene":
@@ -608,31 +680,300 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store, form_
                 emit_json({"event": "cdp_action_result", "id": req_id, "result": None, "error": err_str, "entry": None})
 
 
+async def _resolve_chromium_executable() -> str | None:
+    """Playwright-bundled Chromium path (used with browser_binary_path for reliable CDP)."""
+    try:
+        from playwright.async_api import async_playwright
+        pw = await async_playwright().start()
+        try:
+            exe = pw.chromium.executable_path
+            return str(exe) if exe else None
+        finally:
+            await pw.stop()
+    except Exception as e:
+        sys.stderr.write(f'[session] WARN: cannot resolve Playwright Chromium: {e}\n')
+        sys.stderr.flush()
+        return None
+
+
+def _chrome_automation_args() -> list[str]:
+    """Flags that suppress Chrome chrome UI prompts agents cannot click, and start maximized."""
+    # NOT incognito — Incognito enables stricter HTTPS-First by default.
+    return [
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--disable-extensions',
+        '--disable-component-update',
+        '--disable-background-networking',
+        '--disable-client-side-phishing-detection',
+        '--disable-hang-monitor',
+        '--disable-popup-blocking',
+        '--disable-prompt-on-repost',
+        '--disable-infobars',
+        '--hide-crash-restore-bubble',
+        '--disable-session-crashed-bubble',
+        '--password-store=basic',
+        '--use-mock-keychain',
+        '--metrics-recording-only',
+        '--no-service-autorun',
+        '--start-maximized',
+        '--window-position=0,0',
+        # Cert / mixed content
+        '--ignore-certificate-errors',
+        '--ignore-certificate-errors-spki-list',
+        '--ignore-ssl-errors',
+        '--allow-insecure-localhost',
+        '--allow-running-insecure-content',
+        # Plain HTTP sites (e.g. http://test.creditv5p2…) hit HTTPS-First interstitial:
+        # 「此网站不支持安全连接」→「继续访问网站」. Disable the feature family entirely.
+        (
+            '--disable-features='
+            'TranslateUI,ChromeWhatsNewUI,PrivacySandboxSettings4,'
+            'HttpsUpgrades,'
+            'HttpsFirstModeV2,'
+            'HttpsFirstModeV2ForTypicallySecureUsers,'
+            'HttpsFirstModeV2ForEngagedSites,'
+            'HttpsFirstBalancedMode,'
+            'HttpsFirstBalancedModeAutoEnable,'
+            'HttpsFirstModeIncognito,'
+            'HttpsFirstDialogUi,'
+            'BlockInsecurePrivateNetworkRequests'
+        ),
+    ]
+
+
+def _seed_chrome_profile(profile_dir: Path) -> None:
+    """Clean exit + explicitly disable HTTPS-First / Always Use Secure Connections prefs."""
+    try:
+        default_dir = profile_dir / 'Default'
+        default_dir.mkdir(parents=True, exist_ok=True)
+        prefs_path = default_dir / 'Preferences'
+        prefs = {}
+        if prefs_path.exists():
+            try:
+                prefs = json.loads(prefs_path.read_text(encoding='utf-8'))
+            except Exception:
+                prefs = {}
+        profile = prefs.setdefault('profile', {})
+        profile['exit_type'] = 'Normal'
+        profile['exited_cleanly'] = True
+
+        # Chromium pref names (chrome/common/pref_names.h) — flat booleans, not nested.
+        # Setting these BEFORE first launch prevents auto-enable heuristics on fresh profiles.
+        prefs['https_only_mode_enabled'] = False
+        prefs['https_first_balanced_mode_enabled'] = False
+        prefs['https_first_mode_incognito_enabled'] = False
+        prefs['https_only_mode_auto_enabled'] = False
+        prefs.setdefault('ssl', {})['rev_checking'] = {'enabled': False}
+
+        prefs_path.write_text(json.dumps(prefs), encoding='utf-8')
+
+        local_state_path = profile_dir / 'Local State'
+        local_state = {}
+        if local_state_path.exists():
+            try:
+                local_state = json.loads(local_state_path.read_text(encoding='utf-8'))
+            except Exception:
+                local_state = {}
+        local_state.setdefault('profile', {})['exited_cleanly'] = True
+        local_state_path.write_text(json.dumps(local_state), encoding='utf-8')
+    except Exception as e:
+        sys.stderr.write(f'[session] WARN: seed chrome profile failed: {e}\n')
+        sys.stderr.flush()
+
+
+async def _ignore_certificate_errors(browser_context) -> None:
+    """CDP-level cert bypass (covers pages opened after launch)."""
+    try:
+        page = await browser_context.get_current_page()
+        session = await browser_context.get_session()
+        cdp = await session.context.new_cdp_session(page)
+        try:
+            await cdp.send('Security.enable')
+            await cdp.send('Security.setIgnoreCertificateErrors', {'ignore': True})
+            sys.stderr.write('[session] CDP Security.setIgnoreCertificateErrors=true\n')
+            sys.stderr.flush()
+        finally:
+            await cdp.detach()
+    except Exception as e:
+        sys.stderr.write(f'[session] WARN: ignore certificate errors failed: {e}\n')
+        sys.stderr.flush()
+
+
+async def _bypass_ssl_interstitial_if_any(browser_context) -> None:
+    """Click 「继续访问网站」 on HTTPS-First / SSL interstitial if present."""
+    try:
+        from .actions._helpers import dismiss_https_first_interstitial
+        page = await browser_context.get_current_page()
+        result = await dismiss_https_first_interstitial(page)
+        if result and result != 'none':
+            sys.stderr.write(f'[session] HTTPS-First interstitial bypass: {result} url={page.url}\n')
+            sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f'[session] WARN: SSL interstitial bypass failed: {e}\n')
+        sys.stderr.flush()
+
+
+def _screen_window_size() -> tuple[int, int]:
+    try:
+        from browser_use.browser.utils.screen_resolution import get_screen_resolution
+        screen = get_screen_resolution()
+        w = int(screen.get('width') or 1920)
+        h = int(screen.get('height') or 1080)
+        return max(w, 1280), max(h, 720)
+    except Exception:
+        return 1920, 1080
+
+
+async def _maximize_browser_window(browser_context) -> None:
+    """
+    Force maximized window after browser_use's _resize_window (which sets windowState=normal).
+    Maximized window = better BiB canvas coverage.
+    """
+    try:
+        page = await browser_context.get_current_page()
+        session = await browser_context.get_session()
+        cdp = await session.context.new_cdp_session(page)
+        try:
+            win = await cdp.send('Browser.getWindowForTarget')
+            window_id = win.get('windowId')
+            if window_id is None:
+                return
+            await cdp.send(
+                'Browser.setWindowBounds',
+                {'windowId': window_id, 'bounds': {'windowState': 'maximized'}},
+            )
+            sys.stderr.write('[session] Browser window maximized\n')
+            sys.stderr.flush()
+        finally:
+            await cdp.detach()
+    except Exception as e:
+        sys.stderr.write(f'[session] WARN: maximize window failed: {e}\n')
+        sys.stderr.flush()
+
+
+async def _dismiss_native_js_dialogs(browser_context) -> None:
+    """Auto-accept in-page alert/confirm/prompt — agents struggle with modal JS dialogs."""
+    try:
+        page = await browser_context.get_current_page()
+
+        async def _on_dialog(dialog):
+            try:
+                sys.stderr.write(f'[session] Auto-accept JS dialog: {dialog.type} {dialog.message[:80]!r}\n')
+                sys.stderr.flush()
+                await dialog.accept()
+            except Exception:
+                pass
+
+        page.on('dialog', lambda d: asyncio.create_task(_on_dialog(d)))
+    except Exception as e:
+        sys.stderr.write(f'[session] WARN: dialog handler setup failed: {e}\n')
+        sys.stderr.flush()
+
+
+async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
+    """
+    Launch browser with a *reliable* CDP HTTP endpoint for BiB.
+
+    browser_use's builtin Playwright launch path silently strips
+    --remote-debugging-port when the port appears busy. The user-provided
+    binary path launches Chrome itself and waits for /json/version — that
+    is what we need for BibBridge.
+    """
+    from browser_use.browser.browser import BrowserConfig
+
+    if cdp_url:
+        sys.stderr.write(f"[session] Connecting to existing browser via CDP: {cdp_url}\n")
+        sys.stderr.flush()
+        return Browser(config=BrowserConfig(cdp_url=cdp_url)), None, True
+
+    preferred = int(cdp_port) if cdp_port else 9242
+    port = _pick_free_cdp_port(preferred)
+    if port != preferred:
+        sys.stderr.write(f"[session] CDP port {preferred} busy — using free port {port}\n")
+        sys.stderr.flush()
+
+    exe = await _resolve_chromium_executable()
+    profile_dir = Path(tempfile.gettempdir()) / 'jsgen-chrome-profiles' / str(session_id)
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    _seed_chrome_profile(profile_dir)
+
+    extra_args = [
+        f'--user-data-dir={profile_dir.resolve()}',
+        *_chrome_automation_args(),
+    ]
+
+    if exe:
+        sys.stderr.write(
+            f"[session] Launching Chromium via browser_binary_path for CDP "
+            f"port={port} exe={exe}\n"
+        )
+        sys.stderr.flush()
+        browser = Browser(config=BrowserConfig(
+            browser_binary_path=exe,
+            chrome_remote_debugging_port=port,
+            disable_security=True,  # ignore cert / CORS blockers for internal systems
+            extra_browser_args=extra_args,
+        ))
+        return browser, port, None  # cdp_ready unknown until after new_context
+
+    # Fallback: builtin launch (may drop CDP port — BiB may be unavailable)
+    sys.stderr.write(
+        f"[session] WARN: no Chromium exe — fallback builtin launch port={port}\n"
+    )
+    sys.stderr.flush()
+    browser = Browser(config=BrowserConfig(
+        chrome_remote_debugging_port=port,
+        disable_security=True,
+        extra_browser_args=extra_args,
+    ))
+    return browser, port, None
+
+
 async def run_session(args):
     patch_message_manager()
     patch_planner_prompt()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
     form_rules = load_rules()
 
-    cdp_url = getattr(args, 'cdp_url', None) or None
-    if cdp_url:
-        from browser_use.browser.browser import BrowserConfig
-        sys.stderr.write(f"[session] Connecting to existing browser via CDP: {cdp_url}\n")
-        sys.stderr.flush()
-        browser = Browser(config=BrowserConfig(cdp_url=cdp_url))
-    else:
-        browser = Browser()
+    session_id = args.session_id or "unknown"
 
+    cdp_url = getattr(args, 'cdp_url', None) or None
+    cdp_port = getattr(args, 'cdp_port', None)
+    if cdp_port is not None:
+        try:
+            cdp_port = int(cdp_port)
+        except (TypeError, ValueError):
+            cdp_port = None
+
+    browser, cdp_port, _ = await _build_browser(
+        cdp_url=cdp_url,
+        cdp_port=cdp_port,
+        session_id=session_id,
+    )
+
+    # window_width/height (not viewport_*) — browser_use ignores unknown fields.
+    # Still call CDP maximize after init: browser_use _resize_window forces windowState=normal.
+    win_w, win_h = _screen_window_size()
     config = BrowserContextConfig(
-        viewport_width=1920, viewport_height=1080,
+        window_width=win_w,
+        window_height=win_h,
+        no_viewport=True,
         wait_for_network_idle_page_load_time=3.0,
         trace_path=_TRACE_DIR,
     )
     browser_context = await browser.new_context(config)
-    # When CDP is used, _create_context (called lazily by _initialize_session)
-    # automatically reuses existing browser contexts from the partial script.
 
-    session_id = args.session_id or "unknown"
+    # Eagerly launch Chrome BEFORE CDP readiness check / BiB attach.
+    # Previously launch was lazy (first agent step), so prepare often saw cdp_ready=false.
+    await browser_context.get_session()
+    await _ignore_certificate_errors(browser_context)
+    await _maximize_browser_window(browser_context)
+    await _dismiss_native_js_dialogs(browser_context)
+    await _bypass_ssl_interstitial_if_any(browser_context)
+
     case_data_store = {}  # process-level in-memory store, persists across steps
     cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
     goal_tracker = {'goals': [], 'stopped': False}
@@ -645,8 +986,40 @@ async def run_session(args):
     cdp_action_queue = asyncio.Queue()
     cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, case_data_store, form_rules))
 
-    emit_json({"event": "ready", "session_id": session_id})
-    sys.stderr.write(f"[session] Ready, session_id={session_id}\n")
+    # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
+    cdp_ready = False
+    cdp_ws_url = None
+    if cdp_url:
+        cdp_ready = True
+        cdp_ws_url = cdp_url
+    elif cdp_port:
+        cdp_ready = await _wait_cdp_http(int(cdp_port), timeout_s=45)
+        if cdp_ready:
+            cdp_ws_url = await _probe_cdp_ws_url(int(cdp_port))
+        else:
+            sys.stderr.write(
+                f"[session] WARN: CDP HTTP still not ready on port {cdp_port} after launch. "
+                "BiB canvas unavailable; AI/manual recording can still run.\n"
+            )
+            sys.stderr.flush()
+
+    ready_payload = {
+        "event": "ready",
+        "session_id": session_id,
+        "cdp_ready": bool(cdp_ready),
+    }
+    if cdp_port and not cdp_url:
+        ready_payload["cdp_port"] = int(cdp_port)
+        ready_payload["cdp_http"] = f"http://127.0.0.1:{int(cdp_port)}"
+    if cdp_ws_url:
+        ready_payload["cdp_ws_url"] = cdp_ws_url
+    emit_json(ready_payload)
+    sys.stderr.write(
+        f"[session] Ready, session_id={session_id}"
+        + (f", cdp_port={cdp_port}" if cdp_port and not cdp_url else "")
+        + f", cdp_ready={bool(cdp_ready)}"
+        + "\n"
+    )
     sys.stderr.flush()
 
     loop = asyncio.get_event_loop()

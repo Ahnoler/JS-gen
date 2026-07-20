@@ -95,6 +95,8 @@ export const EXECUTOR_NODE_UUID = resolveNodeUuidSync();
 export const EXECUTOR_NAME = resolve('EXECUTOR_NAME', os.hostname());
 export const EXECUTOR_HOST = resolve('EXECUTOR_HOST', os.hostname());
 export const EXECUTOR_CAPACITY = parseInt(resolve('EXECUTOR_CAPACITY', '2'), 10);
+/** Base Chrome remote-debugging port; slot i uses base + i (avoids multi-session CDP collision). */
+export const EXECUTOR_CDP_PORT_BASE = parseInt(resolve('EXECUTOR_CDP_PORT_BASE', '19242'), 10);
 export const EXECUTOR_AGENT_VERSION = resolve('EXECUTOR_AGENT_VERSION', '0.1.0');
 export const EXECUTOR_HEARTBEAT_INTERVAL_MS = parseInt(
   resolve('EXECUTOR_HEARTBEAT_INTERVAL_MS', '20000'),

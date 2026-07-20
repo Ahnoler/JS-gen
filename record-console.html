@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>交易录制联调（自用）</title>
+  <link rel="stylesheet" href="/test-dashboard.css" />
+  <link rel="stylesheet" href="/src/dashboard/record-console/record-console.css" />
+</head>
+<body>
+  <header class="navbar" style="height:auto;padding:12px 20px;gap:12px;flex-wrap:wrap">
+    <h1 style="font-size:16px;margin:0">交易录制联调 <span class="badge">自用 · 浏览/创建</span></h1>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span id="rcCrumb" class="badge" style="font-size:11px">—</span>
+      <a class="badge" href="/api/docs" style="color:#fff;text-decoration:none">API 文档</a>
+      <a class="badge" href="/api/test" style="color:#fff;text-decoration:none">← 工程 Dashboard</a>
+    </div>
+  </header>
+
+  <main class="rc-layout">
+    <aside class="rc-aside card">
+      <div class="rc-aside-head">
+        <input id="rcSearch" type="search" placeholder="模糊查询系统/模块/功能…" />
+        <button type="button" id="rcSearchBtn" class="btn btn-sm btn-primary">搜</button>
+        <button type="button" id="rcRefreshTree" class="btn btn-sm btn-outline">刷新树</button>
+      </div>
+      <div id="rcSearchHits" class="rc-hits"></div>
+      <div id="rcTree" class="rc-tree"></div>
+    </aside>
+
+    <section class="rc-main">
+      <div id="rcViewBrowse" class="card">
+        <div class="rc-toolbar">
+          <h2>功能下交易</h2>
+          <button type="button" id="rcNewTrajBtn" class="btn btn-sm btn-primary">＋ 创建交易</button>
+        </div>
+        <p class="rc-muted" style="margin:0 0 8px">进入录制前须选择<strong>系统账号</strong>；工作室 prepare 会开槽、自动登录（不计入步骤）、并推流。</p>
+        <div id="rcTrajList" class="rc-traj-list"><div class="rc-muted">请选择左侧功能节点</div></div>
+      </div>
+
+      <div id="rcViewCreate" class="card" style="display:none">
+        <h2>创建交易</h2>
+        <p class="rc-muted">挂在当前功能下；阶段由需求解析生成，可编辑后保存并跳转录制工作室。</p>
+        <label class="rc-field">交易名称
+          <input id="rcCreateName" type="text" placeholder="如：对公客户修改" />
+        </label>
+        <label class="rc-field">系统账号（必选）
+          <select id="rcCreateAccount"></select>
+        </label>
+        <label class="rc-field">需求描述
+          <textarea id="rcCreateReq" rows="4" placeholder="登录、查询、修改对公客户…"></textarea>
+        </label>
+        <div class="rc-toolbar">
+          <label>stepLength <input id="rcStepLength" type="number" min="2" max="20" placeholder="可选" style="width:64px" /></label>
+          <button type="button" id="rcAnalyzeBtn" class="btn btn-sm btn-outline">需求解析 (analyze)</button>
+          <button type="button" id="rcAddPhaseBtn" class="btn btn-sm btn-outline">＋ 手动加阶段</button>
+        </div>
+        <div id="rcCreatePhases" class="rc-phases"></div>
+        <div class="rc-toolbar" style="margin-top:12px">
+          <button type="button" id="rcSaveTrajBtn" class="btn btn-sm btn-primary">保存并进入录制工作室</button>
+          <button type="button" id="rcCancelCreateBtn" class="btn btn-sm btn-outline">取消</button>
+        </div>
+      </div>
+
+      <div id="rcViewReview" class="card" style="display:none">
+        <h2>确认操作列表</h2>
+        <p class="rc-muted">勾选 = PATCH /trajectory-steps/:id/confirm。确认完再 detach。</p>
+        <div id="rcStepList"></div>
+        <div class="rc-toolbar" style="margin-top:12px">
+          <button type="button" id="rcReviewDetachBtn" class="btn btn-sm btn-primary">detach 释放槽位</button>
+          <button type="button" id="rcBackBrowseBtn" class="btn btn-sm btn-outline">回交易列表</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3 style="margin:0 0 8px;font-size:13px">调用日志</h3>
+        <div id="rcLog" class="rc-log"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/src/dashboard/record-console/app.js"></script>
+</body>
+</html>

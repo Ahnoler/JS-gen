@@ -2,7 +2,28 @@
  * One executor slot = one Python session subprocess + stdin/stdout bridge.
  */
 import { spawnAgent, waitForReady, isProcessAlive, killTree } from './spawn-agent.js';
-import { LLM_API_KEY, LLM_BASE_URL, CONTROL_PLANE_HTTP } from './config.js';
+import { LLM_API_KEY, LLM_BASE_URL, CONTROL_PLANE_HTTP, EXECUTOR_CDP_PORT_BASE } from './config.js';
+import net from 'net';
+
+/** @returns {Promise<boolean>} true if port is free to bind */
+function isPortFree(port) {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.once('error', () => resolve(false));
+    srv.once('listening', () => {
+      srv.close(() => resolve(true));
+    });
+    srv.listen(port, '127.0.0.1');
+  });
+}
+
+/** Pick first free port at or above preferred (scan a short range). */
+async function allocateCdpPort(preferred) {
+  for (let p = preferred; p < preferred + 20; p++) {
+    if (await isPortFree(p)) return p;
+  }
+  return preferred;
+}
 
 export class SessionSlot {
   /**
@@ -19,6 +40,8 @@ export class SessionSlot {
     this.process = null;
     this.onAgentEvent = onAgentEvent;
     this._stdoutBuf = '';
+    /** Chrome remote-debugging port for this slot (BiB attach). */
+    this.cdpPort = EXECUTOR_CDP_PORT_BASE + slotIndex;
   }
 
   /**
@@ -37,9 +60,17 @@ export class SessionSlot {
     const model = opts.model || 'deepseek/deepseek-v4-flash';
     const baseUrl = opts.baseUrl || `${CONTROL_PLANE_HTTP}/v1`;
     const apiKey = opts.apiKey || LLM_API_KEY;
+    this.cdpPort = await allocateCdpPort(EXECUTOR_CDP_PORT_BASE + this.slotIndex);
 
     const child = spawnAgent(
-      ['--session', '--session-id', sessionId, '--model', model, '--base-url', baseUrl, '--api-key', apiKey],
+      [
+        '--session',
+        '--session-id', sessionId,
+        '--model', model,
+        '--base-url', baseUrl,
+        '--api-key', apiKey,
+        '--cdp-port', String(this.cdpPort),
+      ],
       { OPENAI_API_KEY: apiKey },
     );
 
@@ -68,9 +99,21 @@ export class SessionSlot {
 
     child.stdin.on('error', () => {});
 
-    await waitForReady(child, 90000);
+    const readyMsg = await waitForReady(child, 90000);
+    if (readyMsg?.cdp_port != null) {
+      this.cdpPort = Number(readyMsg.cdp_port) || this.cdpPort;
+    }
     this.ready = true;
-    return { sessionId, slotIndex: this.slotIndex };
+    // Prefer explicit cdp_ready from Python (false when browser_use dropped the port).
+    const readyFlag = readyMsg && Object.prototype.hasOwnProperty.call(readyMsg, 'cdp_ready')
+      ? !!readyMsg.cdp_ready
+      : true;
+    return {
+      sessionId,
+      slotIndex: this.slotIndex,
+      cdpPort: this.cdpPort,
+      cdpReady: readyFlag,
+    };
   }
 
   _onStdout(chunk) {

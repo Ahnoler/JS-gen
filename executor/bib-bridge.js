@@ -51,6 +51,8 @@ export class BibBridge {
     deviceScaleFactor,
     host = '127.0.0.1',
     resize = false,
+    /** Prefer explicit port from session slot (multi-Chrome safe). */
+    cdpPort,
   } = {}) {
     this.quality = Math.min(95, Math.max(40, Number(quality) || 70));
     this.viewport = {
@@ -61,8 +63,20 @@ export class BibBridge {
         : DEFAULT_VIEWPORT.dpr,
     };
 
-    const hit = await discoverCdpWithRetry({ host });
-    if (!hit?.cdpWsUrl) throw new Error('CDP WebSocket not found for BibBridge');
+    const hit = await discoverCdpWithRetry({
+      host,
+      port: cdpPort,
+      ports: cdpPort != null ? [Number(cdpPort)] : undefined,
+      attempts: 24,
+      delayMs: 500,
+    });
+    if (!hit?.cdpWsUrl) {
+      throw new Error(
+        cdpPort != null
+          ? `CDP WebSocket not found for BibBridge on port ${cdpPort}`
+          : 'CDP WebSocket not found for BibBridge',
+      );
+    }
 
     this.client = new CdpClient();
     await this.client.connect(hit.cdpWsUrl);

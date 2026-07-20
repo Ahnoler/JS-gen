@@ -1,8 +1,27 @@
 import * as executorNodeDao from '../dao/executor-node-dao.js';
 import * as registry from '../executor-registry.js';
+import * as slotLease from '../executor-slot-lease.js';
+import { clearTrajectoryRuntimesForNode } from './trajectory-service.js';
+import { state } from '../state.js';
 import {
   EXECUTOR_DISCONNECT_GRACE_MS,
 } from '../../config/config.js';
+
+function purgeNodeBindings(nodeUuid) {
+  slotLease.releaseByNode(nodeUuid);
+  clearTrajectoryRuntimesForNode(nodeUuid);
+  for (const [sessionId, session] of [...state.sessions.entries()]) {
+    if (session?.executorNodeUuid === nodeUuid) {
+      if (session._persistUnsub) {
+        try { session._persistUnsub(); } catch {}
+      }
+      if (session._trajPersistUnsub) {
+        try { session._trajPersistUnsub(); } catch {}
+      }
+      state.sessions.delete(sessionId);
+    }
+  }
+}
 
 /**
  * @param {Object} data
@@ -33,6 +52,7 @@ export async function unregister(nodeUuid) {
 
   await executorNodeDao.setStatus(nodeUuid, 'offline');
   await executorNodeDao.crashActiveSessions(node.id);
+  purgeNodeBindings(nodeUuid);
   registry.detach(nodeUuid, { immediate: true });
   return node;
 }
@@ -41,6 +61,7 @@ export async function unregister(nodeUuid) {
 export async function markOfflineAndCrash(nodeUuid, nodeId) {
   await executorNodeDao.setStatus(nodeUuid, 'offline');
   await executorNodeDao.crashActiveSessions(nodeId);
+  purgeNodeBindings(nodeUuid);
 }
 
 export async function drain(nodeUuid) {
@@ -68,15 +89,37 @@ export function onDisconnect(nodeUuid, nodeId) {
   });
 }
 
+function withLeaseSlots(node) {
+  if (!node) return null;
+  const leases = slotLease.listByNode(node.nodeUuid);
+  const leaseInUse = slotLease.countHardLeases(node.nodeUuid);
+  return {
+    ...node,
+    /** Live WS attachment (DB status alone can be stale). */
+    connected: registry.isConnected(node.nodeUuid),
+    // Prefer lease table for live occupancy (falls back to DB-derived inUse)
+    inUse: Math.max(Number(node.inUse) || 0, leaseInUse),
+    slots: leases.map((l) => ({
+      slotIndex: l.slotIndex,
+      sessionId: l.sessionId,
+      trajectoryId: l.trajectoryId,
+      busy: true,
+      acquiredAt: l.acquiredAt,
+    })),
+  };
+}
+
 export async function list() {
-  return executorNodeDao.list();
+  const nodes = await executorNodeDao.list();
+  return nodes.map(withLeaseSlots);
 }
 
 export async function getByUuid(nodeUuid) {
   const node = await executorNodeDao.getByUuid(nodeUuid);
   if (!node) return null;
   const all = await executorNodeDao.list();
-  return all.find((n) => n.nodeUuid === nodeUuid) || { ...node, inUse: 0 };
+  const withDbInUse = all.find((n) => n.nodeUuid === nodeUuid) || { ...node, inUse: 0 };
+  return withLeaseSlots(withDbInUse);
 }
 
 /**
@@ -87,6 +130,7 @@ export async function sweepStale(timeoutMs) {
   const stale = await executorNodeDao.markStaleOffline(timeoutMs);
   for (const { nodeId, nodeUuid } of stale) {
     await executorNodeDao.crashActiveSessions(nodeId);
+    purgeNodeBindings(nodeUuid);
     registry.detach(nodeUuid, { immediate: true });
   }
   return stale;

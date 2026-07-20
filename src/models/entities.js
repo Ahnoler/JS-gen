@@ -8,13 +8,14 @@
  * Hierarchy node in unified `system` table.
  * @property {number} [id]
  * @property {string} systemId UUID 业务标识（各级节点共用此列）
- * @property {0|1|2} type 0=系统 1=流程 2=功能点
+ * @property {1|2|3} type 1=系统 2=模块 3=功能
  * @property {number|null} [parentId]
  * @property {string} name
  * @property {string} [description]
+ * @property {string} [url] 系统地址（仅 type=1）
  * @property {number} [sortOrder]
- * @property {string} [processId] type=1 时的 UUID 别名（= systemId）
- * @property {string} [functionId] type=2 时的 UUID 别名（= systemId）
+ * @property {string} [processId] type=2 时的 UUID 别名（= systemId）
+ * @property {string} [functionId] type=3 时的 UUID 别名（= systemId）
  * @property {string} createdAt
  * @property {string} [updatedAt]
  */
@@ -22,9 +23,9 @@
 /**
  * @typedef {Object} SystemAccount
  * @property {number} [id]
- * @property {number} systemId 归属 type=0 的系统节点 id
+ * @property {number} systemId 归属 type=1 的系统节点 id
  * @property {string} name 角色名（管理员/测试人员/…）
- * @property {string} [loginUrl] 登录/入口网址
+ * @property {string} [loginUrl] 登录网址（已迁移到 system.url，保留兼容）
  * @property {string} [username] 测试账号
  * @property {string} [password] 测试密码
  * @property {string} [remark] 备注
@@ -35,7 +36,7 @@
 
 /**
  * @typedef {Object} Process
- * @deprecated 已合并进 System（type=1）；保留 typedef 兼容旧注释
+ * @deprecated 已合并进 System（type=2）；保留 typedef 兼容旧注释
  * @property {number} [id]
  * @property {string} processId
  * @property {number} systemId
@@ -48,7 +49,7 @@
 
 /**
  * @typedef {Object} FunctionDef
- * @deprecated 已合并进 System（type=2）；保留 typedef 兼容旧注释
+ * @deprecated 已合并进 System（type=3）；保留 typedef 兼容旧注释
  * @property {number} [id]
  * @property {string} functionId
  * @property {number} processId

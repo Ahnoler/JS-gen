@@ -1,6 +1,7 @@
 // Real-time action flow — prefers phase-step tree (GET /api/v2/trajectories/:id/tree)
 import { escapeHtml } from './swagger-api.js';
 import { on } from './ws-client.js';
+import { readV2, apiErrorMessage } from './api-envelope.js';
 
 const ACTION_ICONS = {
   fill_form_field:        '📝', select_option:          '📋',
@@ -77,8 +78,7 @@ export async function reloadActionFlow(sessionId = currentSessionId) {
   if (currentTrajectoryDbId != null && Number.isFinite(currentTrajectoryDbId)) {
     try {
       const res = await fetch('/api/v2/trajectories/' + encodeURIComponent(String(currentTrajectoryDbId)) + '/tree');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'tree load failed');
+      const data = await readV2(res);
       renderTree(data);
       return;
     } catch (err) {

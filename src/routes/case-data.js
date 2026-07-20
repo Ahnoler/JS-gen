@@ -1,16 +1,9 @@
 /**
- * Legacy JSON case-data catalog — OFFLINE.
- * Use /api/v2/case-data instead (MySQL).
+ * Legacy JSON case-data catalog — OFFLINE (410 Gone).
+ * Prefer registering via legacy-gone.js; this file kept for direct imports.
  */
+import { registerGoneCatalog } from './legacy-gone.js';
+
 export default function (app) {
-  const gone = (req, res) => {
-    res.status(410).json({
-      error: 'This endpoint has been removed. Use /api/v2/case-data',
-      migratedTo: '/api/v2/case-data',
-    });
-  };
-  app.get('/api/case-data', gone);
-  app.get('/api/case-data/:recordId', gone);
-  app.get('/api/case-data/:recordId/file', gone);
-  app.delete('/api/case-data/:recordId', gone);
+  registerGoneCatalog(app, '/api/case-data', '/api/v2/case-data', ['/:id/file']);
 }
