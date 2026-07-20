@@ -4,7 +4,7 @@ import * as systemAccountService from '../../services/system-account-service.js'
 import { NODE_TYPE } from '../../models/hierarchy-constants.js';
 
 export default function (app) {
-  // ── Systems (type=0) ──
+  // ── Systems (type=1) ──
   app.get('/api/v2/systems', async (req, res) => {
     try {
       res.json(await systemDao.list());
@@ -15,9 +15,9 @@ export default function (app) {
 
   app.post('/api/v2/systems', async (req, res) => {
     try {
-      const { name, description } = req.body || {};
+      const { name, description, url } = req.body || {};
       if (!name) return res.status(400).json({ error: 'name is required' });
-      const system = await hierarchyService.createSystem(name, description);
+      const system = await hierarchyService.createSystem(name, description, url);
       res.status(201).json(system);
     } catch (err) {
       const status = err.code === 'VALIDATION' ? 400 : 500;
@@ -43,8 +43,8 @@ export default function (app) {
       if (!existing || existing.type !== NODE_TYPE.SYSTEM) {
         return res.status(404).json({ error: 'System not found' });
       }
-      const { name, description } = req.body || {};
-      const system = await hierarchyService.updateSystem(+req.params.id, { name, description });
+      const { name, description, url } = req.body || {};
+      const system = await hierarchyService.updateSystem(+req.params.id, { name, description, url });
       res.json(system);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -114,7 +114,7 @@ export default function (app) {
     }
   });
 
-  // ── Processes (type=1) ──
+  // ── Processes / Modules (type=2) ──
   app.get('/api/v2/systems/:systemId/processes', async (req, res) => {
     try {
       res.json(await systemDao.listProcesses(+req.params.systemId));
@@ -162,7 +162,7 @@ export default function (app) {
     }
   });
 
-  // ── Functions (type=2) ──
+  // ── Functions (type=3) ──
   app.get('/api/v2/processes/:processId/functions', async (req, res) => {
     try {
       res.json(await systemDao.listFunctions(+req.params.processId));

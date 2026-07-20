@@ -167,7 +167,7 @@ Node.js Express (server.mjs, :4097)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `GET` | `/api/v2/system-mgmt/tree` | 系统树（平级；`q` 模糊名、`type` 筛选；`{ code, message, data }`） |
+| `GET` | `/api/v2/system-mgmt/tree` | 系统树（`children[]` 嵌套；`name`/`type` 可筛选；`{ code, message, data }`） |
 | `GET/POST/...` | `/api/v2/system-mgmt/nodes` | 节点 CRUD |
 
 ### 交易录制

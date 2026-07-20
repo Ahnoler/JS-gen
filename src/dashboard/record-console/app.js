@@ -4,15 +4,13 @@
  */
 import { api, escapeHtml } from './api.js';
 import { NODE_TYPE } from '../../models/hierarchy-constants.js';
-import { nestFlatTree, asNodeList } from '../hierarchy-tree-utils.js';
+import { asTree, flattenTree } from '../hierarchy-tree-utils.js';
 
 const NODE_FUNCTION = NODE_TYPE.FUNCTION;
 
 const state = {
   view: 'browse', // browse | create | review
-  /** Flat nodes from API */
-  flatNodes: [],
-  /** Nested view for UI (modules / functions) */
+  /** Nested children[] tree from API */
   tree: [],
   searchHits: [],
   selectedFn: null,
@@ -72,10 +70,10 @@ function updateNav() {
 async function loadTree() {
   try {
     const data = await api('GET', '/api/v2/system-mgmt/tree?accounts=false');
-    state.flatNodes = asNodeList(data);
-    state.tree = nestFlatTree(state.flatNodes);
+    state.tree = asTree(data);
     renderTree();
-    log(`系统树已加载 (${state.tree.length} 系统 / ${state.flatNodes.length} 节点)`, 'ok');
+    const n = flattenTree(state.tree).length;
+    log(`系统树已加载 (${state.tree.length} 系统 / ${n} 节点)`, 'ok');
   } catch (e) {
     log(`加载系统树失败: ${e.message}`, 'err');
   }
@@ -90,11 +88,11 @@ function renderTree(filterIds = null) {
   }
   const html = [];
   for (const sys of state.tree) {
-    const mods = sys.modules || sys.children || [];
+    const mods = sys.children || [];
     html.push(`<div class="rc-tree-sys">${escapeHtml(sys.name)}</div>`);
     for (const mod of mods) {
       html.push(`<div class="rc-tree-mod">${escapeHtml(mod.name)}</div>`);
-      const fns = mod.functions || mod.children || [];
+      const fns = mod.children || [];
       for (const fn of fns) {
         if (filterIds && !filterIds.has(fn.id)) continue;
         const sel = state.selectedFn?.id === fn.id ? ' rc-selected' : '';
@@ -124,8 +122,8 @@ function renderTree(filterIds = null) {
 
 function findSystemForFunction(fnId) {
   for (const sys of state.tree) {
-    for (const mod of sys.modules || sys.children || []) {
-      for (const fn of mod.functions || mod.children || []) {
+    for (const mod of sys.children || []) {
+      for (const fn of mod.children || []) {
         if (Number(fn.id) === Number(fnId)) {
           return { id: Number(sys.id), name: sys.name || '' };
         }
@@ -169,9 +167,13 @@ async function onSearch() {
   try {
     const data = await api(
       'GET',
-      `/api/v2/system-mgmt/tree?accounts=false&q=${encodeURIComponent(q)}&limit=30`,
+      `/api/v2/system-mgmt/tree?accounts=false&name=${encodeURIComponent(q)}&limit=30`,
     );
-    state.searchHits = asNodeList(data);
+    const tree = asTree(data);
+    // Hits: nodes that matched keyword (have path) — fallback to all flattened
+    const flat = flattenTree(tree);
+    state.searchHits = flat.filter((n) => n.path) ;
+    if (!state.searchHits.length) state.searchHits = flat;
     const hits = $('rcSearchHits');
     hits.innerHTML = state.searchHits
       .map(
@@ -205,17 +207,17 @@ function collectFunctionIdsUnder(nodeId) {
   const ids = new Set();
   for (const sys of state.tree) {
     if (sys.id === nodeId) {
-      for (const mod of sys.modules || []) {
-        for (const fn of mod.functions || []) ids.add(fn.id);
+      for (const mod of sys.children || []) {
+        for (const fn of mod.children || []) ids.add(fn.id);
       }
       return ids;
     }
-    for (const mod of sys.modules || []) {
+    for (const mod of sys.children || []) {
       if (mod.id === nodeId) {
-        for (const fn of mod.functions || []) ids.add(fn.id);
+        for (const fn of mod.children || []) ids.add(fn.id);
         return ids;
       }
-      for (const fn of mod.functions || []) {
+      for (const fn of mod.children || []) {
         if (fn.id === nodeId) ids.add(fn.id);
       }
     }

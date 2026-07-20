@@ -1,6 +1,6 @@
 /**
  * Seed: default hierarchy nodes in unified `system` table.
- * type 0/1/2 = 系统/流程/功能点. Idempotent.
+ * type 1/2/3 = 系统/模块/功能. Idempotent.
  */
 export async function seed(knex) {
   const existing = await knex('system')
@@ -14,7 +14,7 @@ export async function seed(knex) {
 
   const [rootId] = await knex('system').insert({
     system_id: '00000000-0000-0000-0000-000000000001',
-    type: 0,
+    type: 1,
     parent_id: null,
     name: '未分类',
     description: '默认系统分类，用于尚未分配系统的历史轨迹',
@@ -23,7 +23,7 @@ export async function seed(knex) {
 
   const [procId] = await knex('system').insert({
     system_id: '00000000-0000-0000-0000-000000000002',
-    type: 1,
+    type: 2,
     parent_id: rootId,
     name: '未分类',
     description: '默认流程分类',
@@ -32,7 +32,7 @@ export async function seed(knex) {
 
   await knex('system').insert({
     system_id: '00000000-0000-0000-0000-000000000003',
-    type: 2,
+    type: 3,
     parent_id: procId,
     name: '未分类',
     description: '默认功能分类',

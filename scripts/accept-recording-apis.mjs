@@ -48,10 +48,8 @@ async function req(method, path, body) {
   const json = (raw && typeof raw === 'object' && 'code' in raw && 'data' in raw)
     ? raw.data
     : raw;
-  const status = (raw && typeof raw === 'object' && typeof raw.code === 'number' && raw.code !== 0)
-    ? raw.code
-    : res.status;
-  return { status, json, envelope: raw };
+  // Prefer HTTP status for assertions; body.code is the coarse product bucket (200/4**/5**)
+  return { status: res.status, json, envelope: raw, code: raw?.code };
 }
 
 async function main() {

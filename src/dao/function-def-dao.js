@@ -1,6 +1,6 @@
 /**
  * @deprecated Prefer system-dao with NODE_TYPE.FUNCTION.
- * Thin adapter over unified `system` table (type=2).
+ * Thin adapter over unified `system` table (type=3).
  */
 export {
   SEED_FUNCTION_ID,

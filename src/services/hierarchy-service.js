@@ -12,40 +12,74 @@ import {
 const EXPORT_VERSION = 1;
 
 /**
- * Full hierarchy tree: 系统 → 模块 → 功能 (+ accounts on type=0).
+ * Hierarchy tree: 系统 → 模块 → 功能，统一挂在 children[] 下（不再分 modules/functions）。
+ * 支持名称模糊查询（HTTP 参数 name → keyword）与 type 筛选；筛选时会带上祖先节点以保持树完整。
+ * 有关键词时，命中节点附带 path / pathNodes。
+ * 可选在 type=1 系统节点上附带 accounts。
+ * @param {{ includeAccounts?: boolean, keyword?: string, type?: number|string, limit?: number }} [opts]
+ * @returns {Promise<object[]>} 根节点数组（系统）
  */
-export async function getTree({ includeAccounts = true } = {}) {
-  const systems = await systemDao.list();
-  const tree = [];
-  for (const sys of systems) {
-    const modules = await systemDao.listModules(sys.id);
-    const moduleNodes = [];
-    for (const mod of modules) {
-      const functions = await systemDao.listFunctions(mod.id);
-      moduleNodes.push({
-        ...mod,
-        children: functions,
-        functions: functions.map((f) => ({
-          id: f.id,
-          functionId: f.functionId || f.uid,
-          name: f.name,
-          type: f.type,
-          typeLabel: f.typeLabel,
-          description: f.description,
-          sortOrder: f.sortOrder,
-        })),
-      });
+export async function getTree({
+  includeAccounts = true,
+  keyword,
+  type,
+  limit,
+} = {}) {
+  const kw = String(keyword || '').trim();
+  const typeFilter = type !== undefined && type !== null && type !== ''
+    ? Number(type)
+    : undefined;
+  if (typeFilter != null && Number.isFinite(typeFilter)) {
+    assertTypeFilter(typeFilter);
+  }
+
+  const allNodes = await systemDao.listAll();
+  let nodes = allNodes;
+  const matchedIds = new Set();
+
+  if (kw || typeFilter != null) {
+    const matched = await systemDao.listFiltered({
+      type: typeFilter,
+      keyword: kw || undefined,
+      limit: kw ? (limit ?? 50) : limit,
+    });
+    for (const m of matched) matchedIds.add(Number(m.id));
+
+    const allRaw = await systemDao.listAllRaw();
+    const byId = new Map(allRaw.map((n) => [n.id, n]));
+    const keep = new Set();
+    for (const m of matched) {
+      let cur = byId.get(m.id);
+      const guard = new Set();
+      while (cur && !guard.has(cur.id)) {
+        guard.add(cur.id);
+        keep.add(cur.id);
+        if (kw && matchedIds.has(cur.id)) {
+          // path filled after we pick shaped nodes
+        }
+        if (cur.parentId == null) break;
+        cur = byId.get(cur.parentId);
+      }
     }
-    const node = {
-      ...sys,
-      children: moduleNodes,
-      modules: moduleNodes,
-      processes: moduleNodes,
-    };
-    if (includeAccounts) {
-      const accounts = await systemAccountDao.listBySystem(sys.id);
+    nodes = allNodes.filter((n) => keep.has(Number(n.id)));
+
+    if (kw) {
+      for (const n of nodes) {
+        if (!matchedIds.has(Number(n.id))) continue;
+        const pathNodes = buildPath(n.id, byId);
+        n.pathNodes = pathNodes;
+        n.path = formatPath(pathNodes);
+      }
+    }
+  }
+
+  if (includeAccounts) {
+    for (const node of nodes) {
+      if (node.type !== NODE_TYPE.SYSTEM) continue;
+      const accounts = await systemAccountDao.listBySystem(node.id);
       node.accounts = accounts.map((a) => ({
         id: a.id,
+        systemId: a.systemId,
         name: a.name,
         loginUrl: a.loginUrl || '',
         username: a.username || '',
@@ -54,17 +88,77 @@ export async function getTree({ includeAccounts = true } = {}) {
         sortOrder: a.sortOrder ?? 0,
       }));
     }
-    tree.push(node);
   }
-  return tree;
+
+  return nestToChildrenTree(nodes);
 }
 
-export async function createSystem(name, description) {
+function assertTypeFilter(t) {
+  if (![NODE_TYPE.SYSTEM, NODE_TYPE.MODULE, NODE_TYPE.FUNCTION].includes(t)) {
+    const err = new Error('type 须为 1=系统 / 2=模块 / 3=功能');
+    err.code = 'VALIDATION';
+    throw err;
+  }
+}
+
+function formatPath(pathNodes) {
+  const display = (n) => {
+    const label = TYPE_LABEL[n.type] || '';
+    if (n.type === NODE_TYPE.SYSTEM) return n.name;
+    if (label && n.name.endsWith(label)) return n.name;
+    return `${n.name}${label}`;
+  };
+  return pathNodes.map(display).join('-');
+}
+
+/**
+ * Nest flat nodes into a children[] tree only (no modules/functions aliases).
+ * @param {object[]} nodes
+ * @returns {object[]}
+ */
+export function nestToChildrenTree(nodes = []) {
+  const byId = new Map();
+  for (const n of nodes) {
+    byId.set(Number(n.id), {
+      ...n,
+      children: [],
+    });
+  }
+  const roots = [];
+  for (const node of byId.values()) {
+    // drop legacy nested aliases if present on copies
+    delete node.modules;
+    delete node.processes;
+    delete node.functions;
+
+    const pid = node.parentId == null ? null : Number(node.parentId);
+    if (pid == null || !byId.has(pid)) {
+      roots.push(node);
+      continue;
+    }
+    byId.get(pid).children.push(node);
+  }
+  // stable order within each children list
+  const sortChildren = (list) => {
+    list.sort((a, b) => (a.sortOrder - b.sortOrder) || (a.id - b.id));
+    for (const c of list) sortChildren(c.children);
+  };
+  sortChildren(roots);
+  return roots;
+}
+
+/** @deprecated use nestToChildrenTree */
+export function nestFlatTree(nodes = []) {
+  return nestToChildrenTree(nodes);
+}
+
+export async function createSystem(name, description, url = '') {
   return systemDao.create({
     type: NODE_TYPE.SYSTEM,
     parentId: null,
     name,
     description,
+    url,
   });
 }
 
@@ -154,40 +248,15 @@ export function buildPath(nodeId, byId) {
 }
 
 /**
- * Fuzzy search by name, then trace ancestry.
- * Example path: 信贷系统-对公客户管理模块-对公客户新增功能
+ * @deprecated 已合并进 getTree({ keyword, type })；保留兼容调用。
  */
-export async function searchNodes(keyword, { limit = 50 } = {}) {
-  const q = String(keyword || '').trim();
-  if (!q) {
-    return { query: '', count: 0, results: [] };
-  }
-  const matched = await systemDao.searchByName(q, { limit });
-  const all = await systemDao.listAllRaw();
-  const byId = new Map(all.map((n) => [n.id, n]));
-
-  const results = matched.map((m) => {
-    const pathNodes = buildPath(m.id, byId);
-    const display = (n) => {
-      const label = TYPE_LABEL[n.type] || '';
-      if (n.type === NODE_TYPE.SYSTEM) return n.name;
-      if (label && n.name.endsWith(label)) return n.name;
-      return `${n.name}${label}`;
-    };
-    const path = pathNodes.map(display).join('-');
-    return {
-      id: m.id,
-      name: m.name,
-      type: m.type,
-      typeLabel: m.typeLabel || TYPE_LABEL[m.type],
-      uid: m.uid || m.systemId,
-      parentId: m.parentId,
-      path,
-      pathNodes,
-    };
+export async function searchNodes(keyword, { limit = 50, type } = {}) {
+  return getTree({
+    includeAccounts: false,
+    keyword,
+    type,
+    limit,
   });
-
-  return { query: q, count: results.length, results };
 }
 
 /** Export tree as portable JSON (no DB ids; uses uid). */
@@ -220,6 +289,7 @@ export async function exportTree() {
       type: NODE_TYPE.SYSTEM,
       name: sys.name,
       description: sys.description || '',
+      url: sys.url || '',
       sortOrder: sys.sortOrder ?? 0,
       children,
     });
@@ -227,7 +297,7 @@ export async function exportTree() {
   return {
     version: EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
-    typeMap: { 0: '系统', 1: '模块', 2: '功能' },
+    typeMap: { ...TYPE_LABEL },
     nodes,
   };
 }
@@ -236,26 +306,27 @@ export async function exportTree() {
 export function getTreeTemplate() {
   return {
     version: EXPORT_VERSION,
-    typeMap: { 0: '系统', 1: '模块', 2: '功能' },
-    description: '将 nodes 填入后 POST /api/v2/system-mgmt/import。uid 可选；缺省自动生成。mode=merge 按 uid 合并，append 始终新建。',
+    typeMap: { ...TYPE_LABEL },
+    description: '将 nodes 填入后 POST /api/v2/system-mgmt/import。uid 可选；缺省自动生成。mode=merge 按 uid 合并，append 始终新建。系统节点可带 url。',
     nodes: [
       {
         uid: '',
-        type: 0,
+        type: NODE_TYPE.SYSTEM,
         name: '示例系统',
         description: '',
+        url: 'https://example.com',
         sortOrder: 0,
         children: [
           {
             uid: '',
-            type: 1,
+            type: NODE_TYPE.MODULE,
             name: '示例模块',
             description: '',
             sortOrder: 0,
             children: [
               {
                 uid: '',
-                type: 2,
+                type: NODE_TYPE.FUNCTION,
                 name: '示例功能',
                 description: '',
                 sortOrder: 0,
@@ -313,6 +384,7 @@ export async function importTree(payload = {}) {
         name,
         description: node.description ?? existing.description,
         sortOrder: node.sortOrder ?? existing.sortOrder,
+        ...(type === NODE_TYPE.SYSTEM ? { url: node.url ?? existing.url ?? '' } : {}),
       });
       stats.updated += 1;
     } else {
@@ -326,6 +398,7 @@ export async function importTree(payload = {}) {
         parentId,
         name,
         description: node.description ?? null,
+        url: type === NODE_TYPE.SYSTEM ? (node.url ?? '') : '',
         sortOrder: node.sortOrder ?? 0,
       });
       stats.created += 1;

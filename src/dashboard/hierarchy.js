@@ -1,17 +1,19 @@
 import { escapeHtml } from './swagger-api.js';
+import { asTree } from './hierarchy-tree-utils.js';
+import { unwrapApi, apiErrorMessage, isApiFail, readV2 } from './api-envelope.js';
 
 const SEED_SYSTEM_ID = '00000000-0000-0000-0000-000000000001';
 const SEED_PROCESS_ID = '00000000-0000-0000-0000-000000000002';
 const SEED_FUNCTION_ID = '00000000-0000-0000-0000-000000000003';
 
-/** @type {Array} */
+/** @type {Array} nested systems (children[]) for UI */
 let hierarchyTree = [];
 
 export async function fetchHierarchyTree() {
   const res = await fetch('/api/v2/hierarchy/tree');
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Load hierarchy failed');
-  hierarchyTree = Array.isArray(data) ? data : [];
+  const raw = await res.json();
+  if (isApiFail(res, raw)) throw new Error(apiErrorMessage(raw, 'Load hierarchy failed'));
+  hierarchyTree = asTree(unwrapApi(raw));
   return hierarchyTree;
 }
 
@@ -23,17 +25,17 @@ export function getHierarchyTreeCache() {
 export function flattenFunctionOptions(tree = hierarchyTree) {
   const opts = [];
   for (const sys of tree || []) {
-    for (const proc of sys.processes || []) {
-      for (const fn of proc.functions || []) {
+    for (const proc of sys.children || []) {
+      for (const fn of proc.children || []) {
         opts.push({
           id: fn.id,
-          functionId: fn.functionId,
+          functionId: fn.functionId || fn.uid,
           name: fn.name,
           label: `${sys.name} / ${proc.name} / ${fn.name}`,
           systemId: sys.id,
-          systemUuid: sys.systemId,
+          systemUuid: sys.systemId || sys.uid,
           processId: proc.id,
-          processUuid: proc.processId,
+          processUuid: proc.processId || proc.moduleId || proc.uid,
         });
       }
     }
@@ -42,25 +44,26 @@ export function flattenFunctionOptions(tree = hierarchyTree) {
 }
 
 export function findDefaultUnclassified(tree = hierarchyTree) {
-  const sys = (tree || []).find(s => s.systemId === SEED_SYSTEM_ID || s.name === '未分类');
+  const sys = (tree || []).find(s => s.systemId === SEED_SYSTEM_ID || s.uid === SEED_SYSTEM_ID || s.name === '未分类');
   if (!sys) return null;
-  const proc = (sys.processes || []).find(p => p.processId === SEED_PROCESS_ID || p.name === '未分类')
-    || (sys.processes || [])[0];
+  const processes = sys.children || [];
+  const proc = processes.find(p => p.processId === SEED_PROCESS_ID || p.uid === SEED_PROCESS_ID || p.name === '未分类')
+    || processes[0];
   if (!proc) return null;
-  const fn = (proc.functions || []).find(f => f.functionId === SEED_FUNCTION_ID || f.name === '未分类')
-    || (proc.functions || [])[0];
+  const fn = (proc.children || []).find(f => f.functionId === SEED_FUNCTION_ID || f.uid === SEED_FUNCTION_ID || f.name === '未分类')
+    || (proc.children || [])[0];
   if (!fn) return null;
   return { systemId: sys.id, processId: proc.id, functionId: fn.id };
 }
 
 function isSeedSystem(sys) {
-  return sys?.systemId === SEED_SYSTEM_ID;
+  return sys?.systemId === SEED_SYSTEM_ID || sys?.uid === SEED_SYSTEM_ID;
 }
 function isSeedProcess(proc) {
-  return proc?.processId === SEED_PROCESS_ID;
+  return proc?.processId === SEED_PROCESS_ID || proc?.uid === SEED_PROCESS_ID || proc?.moduleId === SEED_PROCESS_ID;
 }
 function isSeedFunction(fn) {
-  return fn?.functionId === SEED_FUNCTION_ID;
+  return fn?.functionId === SEED_FUNCTION_ID || fn?.uid === SEED_FUNCTION_ID;
 }
 
 export function initHierarchy() {
@@ -77,8 +80,7 @@ export function initHierarchy() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name.trim() }),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Create failed');
+        const data = await readV2(res);
         await loadHierarchyTree();
       } catch (err) {
         alert('创建系统失败：' + err.message);
@@ -121,8 +123,7 @@ function wireAccountDialog() {
           body: JSON.stringify(body),
         },
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Save failed');
+      const data = await readV2(res);
       close();
       await loadHierarchyTree();
     } catch (err) {
@@ -176,7 +177,7 @@ function renderAccountsBlock(sys) {
 
 function renderSystemNode(sys) {
   const seed = isSeedSystem(sys);
-  const processes = sys.processes || [];
+  const processes = sys.children || [];
   const acctCount = (sys.accounts || []).length;
   return `
     <div class="hier-system" data-id="${sys.id}" style="border:1px solid var(--slate-200);border-radius:6px;margin-bottom:10px;overflow:hidden">
@@ -227,7 +228,7 @@ export async function loadHierarchyTree() {
 
 function renderProcessNode(proc, systemId) {
   const seed = isSeedProcess(proc);
-  const functions = proc.functions || [];
+  const functions = proc.children || [];
   return `
     <div class="hier-process" data-id="${proc.id}" style="margin:6px 0;border-left:2px solid var(--indigo-200);padding-left:10px">
       <div style="display:flex;align-items:center;gap:6px;padding:4px 0">
@@ -286,8 +287,7 @@ function wireHierarchyActions(root) {
     if (!confirm('删除该测试账号？')) return;
     try {
       const res = await fetch(`/api/v2/system-accounts/${b.dataset.id}`, { method: 'DELETE' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      const data = await readV2(res);
       await loadHierarchyTree();
     } catch (err) {
       alert('删除账号失败：' + err.message);
@@ -303,8 +303,7 @@ function wireHierarchyActions(root) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), sortOrder: 0 }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Create failed');
+      const data = await readV2(res);
       await loadHierarchyTree();
     } catch (err) {
       alert('创建流程失败：' + err.message);
@@ -320,8 +319,7 @@ function wireHierarchyActions(root) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), sortOrder: 0 }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Create failed');
+      const data = await readV2(res);
       await loadHierarchyTree();
     } catch (err) {
       alert('创建功能点失败：' + err.message);
@@ -363,8 +361,7 @@ function wireHierarchyActions(root) {
     box.textContent = '加载中…';
     try {
       const res = await fetch('/api/v2/trajectories?functionId=' + encodeURIComponent(fnId) + '&page=1&pageSize=50');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Load failed');
+      const data = await readV2(res);
       const rows = data.rows || [];
       if (!rows.length) {
         box.innerHTML = '<div style="color:var(--slate-400)">暂无轨迹</div>';
@@ -392,8 +389,7 @@ async function renameEntity(kind, id, name) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Rename failed');
+    const data = await readV2(res);
     await loadHierarchyTree();
   } catch (err) {
     alert('重命名失败：' + err.message);
@@ -404,8 +400,7 @@ async function deleteEntity(kind, id, label) {
   if (!confirm(`删除该${label}？`)) return;
   try {
     const res = await fetch(`/api/v2/${kind}/${id}`, { method: 'DELETE' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Delete failed');
+    const data = await readV2(res);
     await loadHierarchyTree();
   } catch (err) {
     alert('删除失败：' + err.message);

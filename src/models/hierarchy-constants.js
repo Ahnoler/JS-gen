@@ -1,13 +1,13 @@
 /**
  * Hierarchy node types in unified `system` table.
- * 0 = 系统, 1 = 模块, 2 = 功能
+ * 1 = 系统, 2 = 模块, 3 = 功能（不从 0 起计）
  */
 export const NODE_TYPE = Object.freeze({
-  SYSTEM: 0,
-  MODULE: 1,
+  SYSTEM: 1,
+  MODULE: 2,
   /** @deprecated use MODULE */
-  PROCESS: 1,
-  FUNCTION: 2,
+  PROCESS: 2,
+  FUNCTION: 3,
 });
 
 export const TYPE_LABEL = Object.freeze({

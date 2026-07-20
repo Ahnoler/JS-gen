@@ -5,9 +5,9 @@ These are used for DAO-layer data transfer, NOT for runtime business logic.
 Runtime logic uses the models in `scripts/models/` (ActionEntry, FormSnapshot, etc.).
 
 Each entity class name matches the table (singular, PascalCase):
-    SystemEntity       → system (type 0/1/2 统一层级)
-    ProcessEntity      → deprecated (已并入 system type=1)
-    FunctionDefEntity  → deprecated (已并入 system type=2)
+    SystemEntity       → system (type 1/2/3 统一层级)
+    ProcessEntity      → deprecated (已并入 system type=2)
+    FunctionDefEntity  → deprecated (已并入 system type=3)
     SystemAccountEntity → system_account
     TrajectoryEntity   → trajectory
     TrajectoryStepEntity   → trajectory_step
