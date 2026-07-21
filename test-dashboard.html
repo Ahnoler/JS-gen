@@ -321,16 +321,16 @@
             <label style="font-size:11px;color:var(--slate-500);display:inline-flex;align-items:center;gap:6px;white-space:nowrap" title="仅缩放 Dashboard 画面，不改变远端 Chrome 视口">
               显示缩放
               <select id="sessRemoteScaleMode" style="padding:2px 6px;border:1px solid var(--slate-200);border-radius:4px;font-size:11px;background:var(--slate-50)">
-                <option value="auto">自适应</option>
+                <option value="auto" selected>自适应</option>
                 <option value="0.4">40%</option>
                 <option value="0.5">50%</option>
-                <option value="0.6" selected>60%</option>
+                <option value="0.6">60%</option>
                 <option value="0.75">75%</option>
                 <option value="1">100%</option>
               </select>
             </label>
-            <input id="sessRemoteScaleSlider" type="range" min="25" max="100" value="60" step="5" style="width:120px" title="自定义显示缩放 %">
-            <span id="sessRemoteScaleLabel" style="font-size:11px;color:var(--slate-500);min-width:36px">60%</span>
+            <input id="sessRemoteScaleSlider" type="range" min="25" max="100" value="60" step="5" style="width:120px" title="自定义显示缩放 %（选固定比例时）">
+            <span id="sessRemoteScaleLabel" style="font-size:11px;color:var(--slate-500);min-width:36px">自适应</span>
           </div>
           <div style="font-size:11px;color:var(--slate-400);margin-bottom:8px">
             悬停可高亮远端元素；开启上方「人工录制」后，在画布点击会写入轨迹（与 Chrome 窗口录制同源）。

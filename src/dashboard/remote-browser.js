@@ -19,6 +19,10 @@ let activeTargetId = null;
 let switchingTab = false;
 let streaming = false;
 let lastBitmap = null;
+/** Latest JPEG waiting to paint (coalesce — drop stale frames). */
+let pendingJpeg = null;
+let drawPumpRunning = false;
+let lastLayoutKey = '';
 let cdpReady = false;
 let browserConnected = false;
 let attaching = false;
@@ -29,14 +33,14 @@ let remoteLogFn = null;
 /** Logical CSS viewport of remote Chrome (from status / frames) */
 let remoteViewport = { w: 1920, h: 1080 };
 /** Effective display scale currently applied */
-let displayScale = 0.6;
+let displayScale = 1;
 /**
  * Scale mode:
  * - 'auto' → fit into wrap (may go small)
  * - number string / manual → fixed % of remote frame (scroll if needed)
  */
 const SCALE_STORAGE_KEY = 'jsgen.remoteDisplayScale';
-let scaleMode = 'manual'; // 'auto' | 'manual'
+let scaleMode = 'auto'; // 'auto' | 'manual' — default fit to canvas wrap
 let manualScale = 0.6;
 /** Where the JPEG is drawn inside the canvas (letterbox), in canvas CSS pixels */
 let contentBox = { x: 0, y: 0, w: 0, h: 0 };
@@ -111,11 +115,20 @@ function loadScalePreference() {
     if (parsed?.mode === 'auto') {
       scaleMode = 'auto';
     } else if (typeof parsed?.scale === 'number' && parsed.scale > 0) {
+      // Migrate former default 60% → auto fit to canvas.
+      if (parsed.mode === 'manual' && Math.abs(parsed.scale - 0.6) < 0.001) {
+        scaleMode = 'auto';
+        return;
+      }
       scaleMode = 'manual';
       manualScale = Math.min(1, Math.max(0.25, parsed.scale));
     } else if (typeof parsed === 'string' && parsed === 'auto') {
       scaleMode = 'auto';
     } else if (typeof parsed === 'number') {
+      if (Math.abs(parsed - 0.6) < 0.001) {
+        scaleMode = 'auto';
+        return;
+      }
       scaleMode = 'manual';
       manualScale = Math.min(1, Math.max(0.25, parsed));
     }
@@ -288,7 +301,11 @@ function applyStatus(payload = {}) {
     setUiStatus(
       payload.agentBusy
         ? `已附着 #${remoteSessionId} · AI 执行中（画布锁定）· ${remoteViewport.w}×${remoteViewport.h}`
-        : `已附着 #${remoteSessionId} · 可操作 · ${remoteViewport.w}×${remoteViewport.h} · 显示${(displayScale * 100).toFixed(0)}%`,
+        : `已附着 #${remoteSessionId} · 可操作 · ${remoteViewport.w}×${remoteViewport.h} · ${
+          scaleMode === 'auto'
+            ? `自适应 ${(displayScale * 100).toFixed(0)}%`
+            : `显示${(displayScale * 100).toFixed(0)}%`
+        }`,
       payload.agentBusy ? 'warn' : 'ok',
     );
   } else if (cdpReady) {
@@ -327,8 +344,14 @@ function layoutStage() {
   // Fall back to bitmap when status not yet known.
   const srcW = remoteViewport.w || lastBitmap?.width || 1920;
   const srcH = remoteViewport.h || lastBitmap?.height || 1080;
-  const maxW = Math.max(160, stageWrapEl.clientWidth || stageWrapEl.getBoundingClientRect().width);
-  const maxH = Math.max(120, Math.min(window.innerHeight * 0.75, 900));
+  const wrapRect = stageWrapEl.getBoundingClientRect();
+  const maxW = Math.max(160, stageWrapEl.clientWidth || wrapRect.width || 160);
+  // Prefer the actual canvas pane height (studio / dashboard wrap), not a fixed 75vh guess.
+  const wrapH = stageWrapEl.clientHeight || wrapRect.height || 0;
+  const maxH = Math.max(
+    120,
+    wrapH > 80 ? wrapH - 4 : Math.min(window.innerHeight * 0.75, 900),
+  );
 
   let scale;
   if (scaleMode === 'auto') {
@@ -348,6 +371,7 @@ function layoutStage() {
   if (stageWrapEl) {
     stageWrapEl.style.overflow = 'hidden';
     stageWrapEl.style.overscrollBehavior = 'contain';
+    stageWrapEl.style.alignItems = scaleMode === 'auto' ? 'center' : 'flex-start';
   }
 
   return { cssW, cssH, srcW, srcH, scale };
@@ -360,12 +384,16 @@ function fitCanvasToStage() {
   const dpr = window.devicePixelRatio || 1;
   const bw = Math.round(cssW * dpr);
   const bh = Math.round(cssH * dpr);
+  const key = `${cssW}x${cssH}@${dpr}`;
   if (canvas.width !== bw || canvas.height !== bh) {
     canvas.width = bw;
     canvas.height = bh;
   }
-  canvas.style.width = `${cssW}px`;
-  canvas.style.height = `${cssH}px`;
+  if (lastLayoutKey !== key) {
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
+    lastLayoutKey = key;
+  }
   if (lastBitmap) paintBitmap(lastBitmap);
   updateInputHint();
 }
@@ -380,32 +408,52 @@ function paintBitmap(bitmap) {
   contentBox = { x: 0, y: 0, w: cssW, h: cssH };
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(0, 0, cssW, cssH);
   ctx.imageSmoothingEnabled = true;
+  // medium is enough for live stream and much cheaper than high
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bitmap, 0, 0, cssW, cssH);
 }
 
-async function drawJpeg(arrayBuffer) {
+/**
+ * Coalesce incoming JPEGs: always paint the latest, drop intermediates so decode
+ * backlog cannot make the canvas lag behind realtime.
+ */
+function enqueueJpeg(arrayBuffer) {
+  pendingJpeg = arrayBuffer;
+  if (!drawPumpRunning) pumpDraw();
+}
+
+async function pumpDraw() {
+  if (drawPumpRunning) return;
+  drawPumpRunning = true;
+  try {
+    while (pendingJpeg) {
+      const jpeg = pendingJpeg;
+      pendingJpeg = null;
+      await paintJpegFrame(jpeg);
+    }
+  } finally {
+    drawPumpRunning = false;
+    if (pendingJpeg) pumpDraw();
+  }
+}
+
+async function paintJpegFrame(arrayBuffer) {
   if (!canvas || !ctx) return;
   try {
     const bitmap = await createImageBitmap(new Blob([arrayBuffer], { type: 'image/jpeg' }));
     if (lastBitmap) lastBitmap.close();
     lastBitmap = bitmap;
-    // Frame pixels define the aspect we must preserve when scaling the stage
-    if (bitmap.width > 0 && bitmap.height > 0) {
-      // Prefer live frame size for layout when status viewport lags
-      if (!remoteViewport.w || !remoteViewport.h
-        || Math.abs(bitmap.width / bitmap.height - remoteViewport.w / remoteViewport.h) > 0.02) {
-        // keep remoteViewport for click→CSS mapping from server status;
-        // layout uses bitmap dimensions
-      }
-    }
-    fitCanvasToStage();
+    // ResizeObserver / scale UI already call fitCanvasToStage — avoid layout thrash per frame.
+    if (!canvas.width || !lastLayoutKey) fitCanvasToStage();
+    else paintBitmap(bitmap);
   } catch (e) {
     console.warn('[remote-browser] draw failed', e);
   }
+}
+
+async function drawJpeg(arrayBuffer) {
+  enqueueJpeg(arrayBuffer);
 }
 
 /**
@@ -484,7 +532,7 @@ export async function ensureRemoteStream(opts = {}) {
     if (!already || force) {
       remoteLog(already ? '强制重新附着 BiB…' : '附着 BiB（attach-live）…');
       // Do NOT send dashboard canvas size as Chrome viewport — preserves real window ratio.
-      const body = { quality: 70 };
+      const body = { quality: 75 };
       if (preferredSessionId) body.sessionId = preferredSessionId;
       const res = await fetch('/api/v2/remote-sessions/attach-live', {
         method: 'POST',
@@ -555,7 +603,7 @@ async function startStream() {
   }
   send('remote:subscribe', {});
   // No viewportW/H — must not Emulation-resize Session Chrome
-  const sent = send('remote:start', { quality: 70 });
+  const sent = send('remote:start', { quality: 75 });
   fitCanvasToStage();
   if (!sent) {
     remoteLog('remote:start 发送失败', 'err');
@@ -778,7 +826,7 @@ export function initRemoteBrowser() {
       applyStatus({ manualRecording: !!p.enabled });
     }
   });
-  on('remote:frame', async (payload) => {
+  on('remote:frame', (payload) => {
     if (!streaming) return;
     if (remoteSessionUuid && payload?.sessionUuid && payload.sessionUuid !== remoteSessionUuid) {
       return;
@@ -786,14 +834,8 @@ export function initRemoteBrowser() {
     if (!remoteSessionUuid && payload?.sessionUuid) {
       remoteSessionUuid = String(payload.sessionUuid);
     }
-    if (payload?.frameId != null) {
-      send('remote:ack', {
-        frameId: payload.frameId,
-        sessionId: payload.frameId,
-        sessionUuid: payload.sessionUuid,
-      });
-    }
-    if (payload?.jpeg) await drawJpeg(payload.jpeg);
+    // Per-frame ack removed — executor acks CDP immediately.
+    if (payload?.jpeg) enqueueJpeg(payload.jpeg);
   });
   let lastAgentBusy = false;
   on('watcher:status', (p) => {
@@ -836,7 +878,7 @@ export function initRemoteBrowser() {
     }
   });
 
-  on('ws:binary', async (buf) => {
+  on('ws:binary', (buf) => {
     const parsed = parseFrame(buf);
     if (!parsed) return;
     // Drop frames from other remote sessions (orphan / concurrent BiB).
@@ -847,9 +889,8 @@ export function initRemoteBrowser() {
       remoteSessionUuid = parsed.sessionUuid;
     }
     if (!streaming) streaming = true;
-    // Ack only matching frames so a foreign producer cannot keep the pipeline warm forever.
-    send('remote:ack', { frameId: parsed.frameId, sessionId: parsed.frameId, sessionUuid: parsed.sessionUuid });
-    await drawJpeg(parsed.jpeg);
+    // Chrome is acked on the executor; do not echo remote:ack per frame (congests /ws).
+    enqueueJpeg(parsed.jpeg);
   });
 
   fetch('/api/v2/remote-sessions/live/status')

@@ -114,10 +114,12 @@ export class ExecutorWsClient {
 
   /**
    * Send raw binary over WS (used by RSCF screencast frames).
+   * Returns false when socket is closed or outbound buffer is backing up (caller should drop frame).
    * @param {Buffer|Uint8Array} data
    */
   sendBinary(data) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    if ((this.ws.bufferedAmount || 0) > 1.5 * 1024 * 1024) return false;
     this.ws.send(data);
     return true;
   }

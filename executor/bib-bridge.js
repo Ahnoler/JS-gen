@@ -15,8 +15,11 @@ import { discoverCdpWithRetry } from '../src/cdp/discover.js';
 
 const MAGIC = Buffer.from('RSCF');
 const DEFAULT_VIEWPORT = { w: 1920, h: 1080, dpr: 1 };
+/** Screencast encode cap — keep at session viewport for clarity (1920×1080). */
+const STREAM_MAX_W = 1920;
+const STREAM_MAX_H = 1080;
 /** Min interval between forwarded JPEG frames (CDP ack is always immediate). */
-const MIN_FORWARD_MS = 40;
+const MIN_FORWARD_MS = 33;
 /** If no CDP frame for this long while attached, restart screencast. */
 const STALL_RESTART_MS = 2500;
 
@@ -48,7 +51,7 @@ export class BibBridge {
     this.client = null;
     this.screencastOn = false;
     this.viewport = { ...DEFAULT_VIEWPORT };
-    this.quality = 70;
+    this.quality = 75;
     this._disposed = false;
     this._lastForwardAt = 0;
     this._lastFrameAt = 0;
@@ -60,7 +63,7 @@ export class BibBridge {
   }
 
   async attach({
-    quality = 70,
+    quality = 75,
     viewportW,
     viewportH,
     deviceScaleFactor,
@@ -71,7 +74,7 @@ export class BibBridge {
     /** Optional: attach to this CDP target instead of default pick. */
     targetId = null,
   } = {}) {
-    this.quality = Math.min(95, Math.max(40, Number(quality) || 70));
+    this.quality = Math.min(90, Math.max(50, Number(quality) || 75));
     this.viewport = {
       w: Number.isFinite(Number(viewportW)) && Number(viewportW) > 0 ? Math.round(viewportW) : DEFAULT_VIEWPORT.w,
       h: Number.isFinite(Number(viewportH)) && Number(viewportH) > 0 ? Math.round(viewportH) : DEFAULT_VIEWPORT.h,
@@ -191,8 +194,9 @@ export class BibBridge {
 
   async startScreencast() {
     if (!this.client || this._disposed) return;
-    const maxW = Math.max(this.viewport.w, DEFAULT_VIEWPORT.w);
-    const maxH = Math.max(this.viewport.h, DEFAULT_VIEWPORT.h);
+    // Encode at session viewport (typically 1920×1080); never upscale beyond STREAM_MAX_*.
+    const maxW = Math.min(Math.max(this.viewport.w, DEFAULT_VIEWPORT.w), STREAM_MAX_W);
+    const maxH = Math.min(Math.max(this.viewport.h, DEFAULT_VIEWPORT.h), STREAM_MAX_H);
     await this.client.send('Page.startScreencast', {
       format: 'jpeg',
       quality: this.quality,
@@ -289,6 +293,27 @@ export class BibBridge {
       return { ok: true };
     }
 
+    if (kind === 'navigate') {
+      const action = String(payload.action || '');
+      if (action === 'reload') {
+        await this.client.send('Page.reload', { ignoreCache: false });
+        return { ok: true };
+      }
+      if (action === 'back' || action === 'forward') {
+        const hist = await this.client.send('Page.getNavigationHistory');
+        const entries = hist?.entries || [];
+        const idx = Number(hist?.currentIndex);
+        if (!Number.isFinite(idx) || !entries.length) return { ok: true, noop: true };
+        const targetIdx = action === 'back' ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= entries.length) return { ok: true, noop: true };
+        const entry = entries[targetIdx];
+        if (entry?.id == null) return { ok: true, noop: true };
+        await this.client.send('Page.navigateToHistoryEntry', { entryId: entry.id });
+        return { ok: true };
+      }
+      return { ok: false, reason: 'unknown_navigate_action' };
+    }
+
     return { ok: false, reason: 'unknown input kind' };
   }
 
@@ -326,7 +351,10 @@ export class BibBridge {
       header.writeUInt16BE(uuidBuf.length, 8);
       uuidBuf.copy(header, 10);
       const packet = Buffer.concat([header, jpeg]);
-      this.sendBinary(packet);
+      // Backpressure: skip frame rather than queue multi-second lag on the WS.
+      if (typeof this.sendBinary === 'function') {
+        this.sendBinary(packet);
+      }
     } catch {}
   }
 

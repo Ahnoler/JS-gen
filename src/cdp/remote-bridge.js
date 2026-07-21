@@ -18,12 +18,14 @@ const MAGIC = Buffer.from('RSCF');
 
 /** Align with Session BrowserContextConfig (session_runner.py) */
 const SESSION_VIEWPORT = { w: 1920, h: 1080, dpr: 1 };
+const STREAM_MAX_W = 1920;
+const STREAM_MAX_H = 1080;
 
 let client = null;
 let remoteSession = null;
 let screencastOn = false;
 let viewport = { ...SESSION_VIEWPORT };
-let quality = 70;
+let quality = 75;
 /** @type {Set<import('ws').WebSocket>} */
 const subscribers = new Set();
 let wsHooked = false;
@@ -38,7 +40,7 @@ let lastFrameAt = 0;
 let lastForwardAt = 0;
 let stallTimer = null;
 let restartingCast = false;
-const MIN_FORWARD_MS = 40;
+const MIN_FORWARD_MS = 33;
 const STALL_RESTART_MS = 2500;
 
 /** Called when Dashboard toggles manual recording — suppress page inject briefly. */
@@ -227,7 +229,7 @@ export async function attachLive(opts = {}) {
   await refreshCdpEndpoints();
   if (!gb.cdpWsUrl) throw new Error('CDP WebSocket URL unavailable (is Session Chrome on 9242/9222?)');
 
-  quality = Math.min(95, Math.max(40, Number(opts.quality) || 70));
+  quality = Math.min(95, Math.max(40, Number(opts.quality) || 75));
   const wantResize = opts.resize === true;
 
   client = new CdpClient();
@@ -382,9 +384,9 @@ async function restartScreencast() {
 
 async function startScreencast() {
   if (!client) return;
-  // Encode at session viewport size (may downscale JPEG for bandwidth, never crops layout).
-  const maxW = Math.max(viewport.w, SESSION_VIEWPORT.w);
-  const maxH = Math.max(viewport.h, SESSION_VIEWPORT.h);
+  // Encode at session viewport (typically 1920×1080) for clarity.
+  const maxW = Math.min(Math.max(viewport.w, SESSION_VIEWPORT.w), STREAM_MAX_W);
+  const maxH = Math.min(Math.max(viewport.h, SESSION_VIEWPORT.h), STREAM_MAX_H);
   await client.send('Page.startScreencast', {
     format: 'jpeg',
     quality,
@@ -431,9 +433,9 @@ function onScreencastFrame(params) {
 
     if (subscribers.size) {
       for (const ws of subscribers) {
-        if (ws.readyState === 1) {
-          try { ws.send(packet); } catch {}
-        }
+        if (ws.readyState !== 1) continue;
+        if ((ws.bufferedAmount || 0) > 2 * 1024 * 1024) continue;
+        try { ws.send(packet); } catch {}
       }
     } else {
       broadcastBinary(packet);
@@ -596,6 +598,27 @@ async function handleInput(payload) {
     }
 
     if (gb.busy) return { ok: false, reason: 'agent_busy' };
+
+    if (kind === 'navigate') {
+      const action = String(payload.action || '');
+      if (action === 'reload') {
+        await client.send('Page.reload', { ignoreCache: false });
+        return { ok: true };
+      }
+      if (action === 'back' || action === 'forward') {
+        const hist = await client.send('Page.getNavigationHistory');
+        const entries = hist?.entries || [];
+        const idx = Number(hist?.currentIndex);
+        if (!Number.isFinite(idx) || !entries.length) return { ok: true, noop: true };
+        const targetIdx = action === 'back' ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= entries.length) return { ok: true, noop: true };
+        const entry = entries[targetIdx];
+        if (entry?.id == null) return { ok: true, noop: true };
+        await client.send('Page.navigateToHistoryEntry', { entryId: entry.id });
+        return { ok: true };
+      }
+      return { ok: false, reason: 'unknown_navigate_action' };
+    }
 
     if (kind === 'key') {
       const params = {

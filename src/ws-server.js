@@ -58,17 +58,20 @@ export function broadcast(type, payload) {
   return count;
 }
 
+/** Drop frame to a client when its outbound buffer is already large (prefer fresh frames). */
+const BINARY_BUFFERED_LIMIT = 2 * 1024 * 1024;
+
 /** Broadcast a binary Buffer/Uint8Array to all clients (remote screencast frames). */
 export function broadcastBinary(data) {
   if (!wss) return 0;
   let count = 0;
   for (const client of wss.clients) {
-    if (client.readyState === 1) {
-      try {
-        client.send(data);
-        count++;
-      } catch {}
-    }
+    if (client.readyState !== 1) continue;
+    if ((client.bufferedAmount || 0) > BINARY_BUFFERED_LIMIT) continue;
+    try {
+      client.send(data);
+      count++;
+    } catch {}
   }
   return count;
 }
