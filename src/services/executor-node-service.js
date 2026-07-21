@@ -21,6 +21,10 @@ function purgeNodeBindings(nodeUuid) {
       state.sessions.delete(sessionId);
     }
   }
+  // Clear stale BiB live pointer so UI does not think attach is still valid.
+  import('./remote-session-service.js')
+    .then((m) => m.clearExecutorLiveForNode?.(nodeUuid))
+    .catch(() => {});
 }
 
 /**

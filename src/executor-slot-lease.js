@@ -145,7 +145,7 @@ export function releaseByNode(nodeUuid) {
 }
 
 export function noFreeSlotsError() {
-  const err = new Error('No free executor slots');
+  const err = new Error('无可用执行资源（执行机槽位已满）');
   err.statusCode = 409;
   err.holders = listHolders();
   return err;

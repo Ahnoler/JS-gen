@@ -62,7 +62,35 @@ const client = new ExecutorWsClient({
     }
     if (!handleSession) return;
     try {
-      await handleSession(msg.type, msg.payload || {});
+      const result = await handleSession(msg.type, msg.payload || {});
+      // Query-style commands need an explicit reply (return value was previously discarded).
+      if (msg.type === 'session.list' && result) {
+        client.send('session.list_result', {
+          sessionId: msg.payload?.sessionId || msg.payload?.requestId,
+          requestId: result.requestId || msg.payload?.requestId,
+          sessions: result.sessions || [],
+        });
+      } else if (msg.type === 'session.list_cdp' && result) {
+        client.send('session.list_cdp_result', {
+          sessionId: msg.payload?.sessionId || msg.payload?.requestId,
+          requestId: result.requestId || msg.payload?.requestId,
+          browsers: result.browsers || [],
+          occupiedPorts: result.occupiedPorts || [],
+        });
+      } else if (msg.type === 'session.bib_tabs' && result) {
+        client.send('session.bib_tabs', {
+          sessionId: msg.payload?.sessionId,
+          tabs: result.tabs || [],
+          activeTargetId: result.activeTargetId || null,
+        });
+      } else if (msg.type === 'session.bib_switch_tab' && result) {
+        client.send('session.bib_tabs', {
+          sessionId: msg.payload?.sessionId,
+          tabs: result.tabs || [],
+          activeTargetId: result.activeTargetId || null,
+          switched: true,
+        });
+      }
     } catch (err) {
       console.error('[executor] session error:', err.message);
       client.send('session.error', {

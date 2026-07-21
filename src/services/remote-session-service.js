@@ -18,6 +18,25 @@ export function getExecutorLiveSessionId() {
   return executorLive.sessionId || null;
 }
 
+/** Reset live BiB state (executor disconnect / purge). */
+export function clearExecutorLive() {
+  executorLive = {
+    attached: false,
+    remoteSession: null,
+    sessionId: null,
+    executorNodeUuid: null,
+    viewportW: 1920,
+    viewportH: 1080,
+  };
+}
+
+/** Clear live BiB only when it belonged to the given node. */
+export function clearExecutorLiveForNode(nodeUuid) {
+  if (!nodeUuid || executorLive.executorNodeUuid === nodeUuid) {
+    clearExecutorLive();
+  }
+}
+
 /**
  * Open a new remote browser session record.
  * @param {Object} [opts]

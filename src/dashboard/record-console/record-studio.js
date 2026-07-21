@@ -158,6 +158,10 @@ function renderResource() {
     $('rsPrepareBtn').textContent = state.preparing
       ? '准备中…'
       : '一键准备 (prepare)';
+    $('rsPrepareBtn').title = '复用空闲执行资源或占新槽；无资源将 409。离开本页不会自动释放槽位。';
+  }
+  if ($('rsDetachBtn')) {
+    $('rsDetachBtn').title = '关闭浏览器并释放执行机槽位（离开工作室不会自动执行）';
   }
 }
 
@@ -246,6 +250,14 @@ async function refreshExecutors() {
     state.executors = [];
   }
   renderResource();
+}
+
+let treeReloadTimer = null;
+function scheduleRefreshTree(delayMs = 120) {
+  clearTimeout(treeReloadTimer);
+  treeReloadTimer = setTimeout(() => {
+    refreshTree().catch(() => {});
+  }, delayMs);
 }
 
 async function refreshTree() {
@@ -552,8 +564,8 @@ async function detach() {
   try {
     await api('POST', `/api/v2/trajectories/${trajId}/detach`, {});
     state.prepare = null;
-    log('detach OK', 'ok');
-    alert('已释放执行机槽位');
+    log('detach OK — 已释放执行资源', 'ok');
+    alert('已释放执行机槽位（浏览器会话已关闭）');
     location.href = '/api/test/record-console';
   } catch (e) {
     alert(e.message);
@@ -577,6 +589,16 @@ async function main() {
     return;
   }
   connect();
+  on('manual_action_persisted', (payload) => {
+    if (Number(payload?.trajectoryDbId) !== trajId) return;
+    scheduleRefreshTree(80);
+  });
+  on('action_persisted', (payload) => {
+    if (Number(payload?.trajectoryDbId) !== trajId) return;
+    scheduleRefreshTree(80);
+  });
+  on('manual_action_recorded', () => scheduleRefreshTree(250));
+  on('action_log_sync', () => scheduleRefreshTree(250));
   on('recording:prepare', (payload) => {
     if (Number(payload?.trajectoryId) !== trajId) return;
     const stage = payload.stage;
@@ -636,7 +658,7 @@ async function main() {
   state.poll = setInterval(async () => {
     await refreshTree();
     await refreshExecutors();
-  }, 4000);
+  }, 10000);
 
   await loadTrajMeta();
   await loadLoginContext();

@@ -49,7 +49,7 @@ function renderOverview(container) {
         <li>错误：<code>{ "code": 5**, "message": "&lt;原因&gt;", "data": null }</code>（额外字段如 holders 放在 data）</li>
         <li>body <code>code</code> 约定：<strong>200</strong> 成功 · <strong>4**</strong> 鉴权失败 · <strong>5**</strong> 错误。原 HTTP 400/404/409 等在 body.code 中统一为 500。</li>
         <li>系统树 <code>data</code> 为<strong>嵌套树</strong>：子节点统一在 <code>children[]</code>（type：1 系统 / 2 模块 / 3 功能）。</li>
-        <li>树接口筛选：<code>GET /tree?name=关键词&amp;type=3</code>（筛选时保留祖先；命中节点可带 <code>path</code>）。</li>
+        <li>系统树 <code>GET /tree</code>：<code>data</code> 恒为 <code>[{ id:0, type:0, children:[系统…] }]</code>；筛选参数 <code>name</code> / <code>type</code>；无命中亦返回根（children 为空）。</li>
         <li>系统节点可带 <code>url</code>（系统地址）；由原账号 <code>loginUrl</code> 转储至 <code>system.url</code>，登录优先用系统 url。</li>
         <li>类型常量：<code>GET /api/v2/system-mgmt/meta</code> → <code>data.typeMap</code>。</li>
       </ul>
@@ -60,8 +60,10 @@ function renderOverview(container) {
       <h3 style="margin-top:16px">关键语义</h3>
       <ul>
         <li><code>record/stop</code> 只改 <code>recordStatus</code>，<strong>不</strong>释放执行机槽位。</li>
-        <li><code>detach</code> 关闭会话并释放槽位；离开录制页前应调用。</li>
-        <li><code>record/prepare</code> 含登录/导航，不写入 <code>trajectory_step</code>。</li>
+        <li>断开画面（BiB detach）只停推流，<strong>不</strong>释放槽位。</li>
+        <li>离开录制工作室<strong>不</strong>自动 detach；AI 可后台继续录。无步骤写入超过 10 分钟由服务端自动回收。</li>
+        <li><code>detach</code> 关闭会话并释放槽位（手动释放执行资源）。</li>
+        <li><code>record/prepare</code> 优先复用 live session / 空闲 CDP Chrome；无资源返回 409 + holders。登录不写入 <code>trajectory_step</code>。</li>
         <li>回放由服务端组装 Playwright 脚本，客户端只收 <code>replay:*</code> 进度，不拿 JS 源码。</li>
         <li>旧路径 <code>/api/trajectory</code>、<code>/api/case-data</code> → <strong>410 Gone</strong>。</li>
       </ul>

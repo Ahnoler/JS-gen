@@ -24,8 +24,8 @@ export const API_GROUPS = [
     endpoints: [
       {
         method: 'GET', path: '/api/v2/system-mgmt/tree',
-        summary: '系统树（children[]，可筛选）',
-        desc: '返回嵌套树：子节点统一在 children[]。支持 name 模糊名与 type 筛选；筛选时保留祖先节点。',
+        summary: '系统树（以 id=0 根为顶层）',
+        desc: 'data 恒为 [{ id:0, type:0, children:[系统…] }]。支持 name / type 筛选；无命中时 children 为空数组。命中节点可带 path（不含根名）。',
         params: [
           { name: 'name', type: 'string', in: 'query', desc: '名称模糊关键词', example: '客户' },
           { name: 'type', type: 'number', in: 'query', desc: '1 系统 / 2 模块 / 3 功能', example: '3' },
@@ -37,12 +37,17 @@ export const API_GROUPS = [
           message: 'ok',
           data: [
             {
-              id: 1, type: 1, typeLabel: '系统', name: '核心系统', url: 'https://example.com', parentId: null,
+              id: 0, type: 0, typeLabel: '根', name: '根', parentId: 0,
               children: [
                 {
-                  id: 2, type: 2, typeLabel: '模块', name: '客户模块', parentId: 1,
+                  id: 1, type: 1, typeLabel: '系统', name: '核心系统', url: 'https://example.com', parentId: 0,
                   children: [
-                    { id: 3, type: 3, typeLabel: '功能', name: '查询客户', parentId: 2, children: [] },
+                    {
+                      id: 2, type: 2, typeLabel: '模块', name: '客户模块', parentId: 1,
+                      children: [
+                        { id: 3, type: 3, typeLabel: '功能', name: '查询客户', parentId: 2, children: [] },
+                      ],
+                    },
                   ],
                 },
               ],
@@ -51,6 +56,7 @@ export const API_GROUPS = [
         }),
         notes: [
           '统一信封：code=200 成功 / 4** 鉴权 / 5** 错误；业务数据在 data',
+          '表内固定存在 id=0 根节点（type=0）；系统节点 parentId=0',
           '子节点只用 children[]，不再返回 modules/functions',
           '示例：GET /tree?name=客户&type=3&accounts=false',
         ],
@@ -59,8 +65,9 @@ export const API_GROUPS = [
         method: 'GET', path: '/api/v2/system-mgmt/meta',
         summary: '节点类型常量',
         respExample: J({
-          typeMap: { '1': '系统', '2': '模块', '3': '功能' },
+          typeMap: { '0': '根', '1': '系统', '2': '模块', '3': '功能' },
           types: [
+            { type: 0, label: '根' },
             { type: 1, label: '系统' },
             { type: 2, label: '模块' },
             { type: 3, label: '功能' },
@@ -75,7 +82,7 @@ export const API_GROUPS = [
           { name: 'type', type: 'number', in: 'query', example: '1' },
           { name: 'parentId', type: 'number', in: 'query', example: '1' },
         ],
-        respExample: J([{ id: 1, name: '核心系统', type: 1, parentId: null }]),
+        respExample: J([{ id: 1, name: '核心系统', type: 1, parentId: 0 }]),
       },
       {
         method: 'GET', path: '/api/v2/system-mgmt/nodes/{id}',
@@ -89,11 +96,11 @@ export const API_GROUPS = [
         params: [
           { name: 'type', type: 'number', required: true, in: 'body', desc: '1 系统 / 2 模块 / 3 功能' },
           { name: 'name', type: 'string', required: true, in: 'body', desc: '名称' },
-          { name: 'parentId', type: 'number|null', in: 'body', desc: '父节点；系统可为 null' },
+          { name: 'parentId', type: 'number', in: 'body', desc: '父节点；系统节点固定为 0' },
           { name: 'url', type: 'string', in: 'body', desc: '系统地址（仅 type=1）', example: 'https://example.com' },
         ],
-        reqExample: J({ type: 1, parentId: null, name: '核心系统', url: 'https://example.com', description: '' }),
-        respExample: J({ id: 1, type: 1, name: '核心系统', url: 'https://example.com', parentId: null }),
+        reqExample: J({ type: 1, parentId: 0, name: '核心系统', url: 'https://example.com', description: '' }),
+        respExample: J({ id: 1, type: 1, name: '核心系统', url: 'https://example.com', parentId: 0 }),
       },
       {
         method: 'PUT', path: '/api/v2/system-mgmt/nodes/{id}',
@@ -390,7 +397,7 @@ export const API_GROUPS = [
   {
     id: 'recording',
     name: '交易录制',
-    description: 'prepare → start → stop → detach。stop 不释放槽位，detach 才释放。',
+    description: 'prepare → start → stop → detach。stop / 断开画面不释放槽位；detach 才释放。离开工作室不自动 detach；10 分钟无步骤写入自动回收。',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/login-context',
@@ -405,12 +412,12 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/prepare',
         summary: '一键准备（占槽 + 登录 + 推流）',
-        desc: '幂等。需已绑定 systemAccountId。登录/导航不写入 trajectory_step。通过 WS 广播 recording:prepare。',
+        desc: '幂等。优先复用本交易 live session，其次复用空闲 CDP Chrome，再次新建浏览器；无空闲槽位则 409。登录/导航不写入 trajectory_step。通过 WS 广播 recording:prepare。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
           trajectoryId: 42, sessionId: 'uuid', executorNodeUuid: 'node-uuid',
-          remoteSessionId: 7, ready: true, attached: true,
+          remoteSessionId: 7, ready: true, attached: true, reused: false, reusedChrome: true,
           login: { skipped: false, done: true, accountId: 10 },
           stream: { ok: true, remoteSessionId: 7 },
           stages: {
@@ -418,7 +425,11 @@ export const API_GROUPS = [
             stream: { status: 'done' }, login: { status: 'done' },
           },
         }),
-        notes: ['409：无空闲执行机槽位（可能含 holders）', '503：会话/执行机不可用'],
+        notes: [
+          '409：无可用执行资源（含 holders）',
+          '503：会话/执行机不可用',
+          '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
+        ],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/start',
@@ -470,7 +481,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/detach',
         summary: '释放执行机槽位',
-        desc: '关闭会话并释放槽位。离开录制工作室前应调用。',
+        desc: '关闭会话并释放槽位。离开录制工作室不会自动调用；无步骤写入超过 10 分钟会由服务端自动回收。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({ trajectoryId: 42, detached: true }),
@@ -735,12 +746,13 @@ export const API_GROUPS = [
       {
         method: 'WS', path: '/ws',
         summary: '产品前端 / Dashboard 通道',
-        desc: '连接后可收 recording:*、replay:*、remote:*、二进制投屏帧。客户端可发 ws:ping、replay:start。',
+        desc: '连接后可收 recording:*、replay:*、remote:*（含标签页列表）、二进制投屏帧。客户端可发 ws:ping、replay:start、remote:tabs、remote:switch_tab 等。',
         tryable: false,
         respExample: J({ type: 'server:init', payload: { /* 会话快照 */ } }),
         notes: [
           '客户端 → { type: "ws:ping", payload: {} } → 收到 ws:pong',
           '客户端 → { type: "replay:start", payload: { trajectoryId, replayPlanId? } }',
+          '客户端 → { type: "remote:tabs" | "remote:switch_tab", payload: {...} }（见下方条目）',
           '二进制帧：RSCF 投屏（record-studio 画布）',
         ],
       },
@@ -783,6 +795,70 @@ export const API_GROUPS = [
         summary: 'BiB 附着状态变化',
         tryable: false,
         respExample: J({ type: 'remote:status', payload: { attached: true, remoteSessionId: 7 } }),
+      },
+      {
+        method: 'WS', path: 'remote:tabs',
+        summary: '查询 / 推送浏览器标签页列表',
+        desc: '客户端请求当前 Chrome 打开的 page targets；服务端在 BiB ready、列表刷新、切换标签后也会主动推送同结构消息。投屏与 Agent 操作应对齐到 activeTargetId 对应页。',
+        tryable: false,
+        reqExample: J({ type: 'remote:tabs', payload: {} }),
+        respExample: J({
+          type: 'remote:tabs',
+          payload: {
+            sessionId: 'uuid',
+            activeTargetId: 'CDP-TARGET-ID',
+            switched: false,
+            tabs: [
+              {
+                targetId: 'CDP-TARGET-ID',
+                url: 'https://example.com/app',
+                title: '业务页',
+                index: 0,
+                active: true,
+                pageId: null,
+              },
+            ],
+          },
+        }),
+        notes: [
+          '方向：客户端 → 控制面 → 执行机 session.bib_tabs；结果广播为 remote:tabs',
+          'tabs[].targetId：CDP Target ID（切换必填）',
+          'tabs[].active / activeTargetId：当前 BiB 投屏所在页',
+          'BiB attach 成功（session.bib_ready）时也会推送一次 remote:tabs',
+          '无独立 REST；产品前端走 /ws',
+        ],
+      },
+      {
+        method: 'WS', path: 'remote:switch_tab',
+        summary: '切换 BiB 投屏标签（并同步 Agent 当前页）',
+        desc: '将 screencast 切到指定 targetId，并通知 Agent switch_tab，避免「画面在 B 页、操作在 A 页」。',
+        tryable: false,
+        reqExample: J({
+          type: 'remote:switch_tab',
+          payload: {
+            targetId: 'CDP-TARGET-ID',
+            url: 'https://example.com/app',
+            pageId: null,
+          },
+        }),
+        respExample: J({
+          type: 'remote:tabs',
+          payload: {
+            sessionId: 'uuid',
+            activeTargetId: 'CDP-TARGET-ID',
+            tabs: [
+              { targetId: 'OTHER', url: '...', title: '...', index: 0, active: false },
+              { targetId: 'CDP-TARGET-ID', url: 'https://example.com/app', title: '业务页', index: 1, active: true },
+            ],
+          },
+        }),
+        notes: [
+          '方向：客户端 → 控制面 → 执行机 session.bib_switch_tab',
+          'payload.targetId 必填；url / pageId 可选（用于对齐 Agent 当前 page）',
+          '成功后服务端广播 remote:tabs（新 activeTargetId）',
+          '同时可能收到 remote:status（附着/会话状态快照）',
+          '无独立 REST；产品前端走 /ws',
+        ],
       },
       {
         method: 'WS', path: 'replay:status',
@@ -840,8 +916,8 @@ export const ENUMS = [
 export const RECORDING_FLOW = [
   'analyze → POST /trajectories（带 phases）',
   'PATCH /trajectories/:id 绑定 systemAccountId',
-  'POST .../record/prepare（占槽 + 登录，幂等）',
-  'POST .../record/start（可选 phaseIds）',
+  'POST .../record/prepare（复用空闲资源 / 占槽 + 登录，幂等）',
+  'POST .../record/start（可选 phaseIds；可关页后台继续）',
   'POST .../record/stop（不释放槽位）',
-  'POST .../detach（释放执行机槽位）',
+  'POST .../detach（释放执行机槽位；或等 10 分钟无步骤自动回收）',
 ];

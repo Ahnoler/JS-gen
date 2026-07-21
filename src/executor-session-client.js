@@ -2,6 +2,7 @@
  * forwardStdin mapping — expanded for all session stdin events.
  * Slot leases: capacity-aware pick + confirm/release via executor-slot-lease.
  */
+import { randomUUID } from 'crypto';
 import * as registry from './executor-registry.js';
 import * as executorNodeDao from './dao/executor-node-dao.js';
 import * as lease from './executor-slot-lease.js';
@@ -87,9 +88,23 @@ const STDIN_TO_WS = {
 
 /**
  * Open a session on an executor and confirm a slot lease.
- * @param {{ sessionId: string, model?: string, nodeUuid?: string, trajectoryId?: number|null }} opts
+ * @param {{
+ *   sessionId: string,
+ *   model?: string,
+ *   nodeUuid?: string,
+ *   trajectoryId?: number|null,
+ *   cdpUrl?: string|null,
+ *   cdpPort?: number|null,
+ * }} opts
  */
-export async function openSession({ sessionId, model, nodeUuid, trajectoryId = null }) {
+export async function openSession({
+  sessionId,
+  model,
+  nodeUuid,
+  trajectoryId = null,
+  cdpUrl = null,
+  cdpPort = null,
+} = {}) {
   let uuid = null;
   await lease.withLeaseMutex(async () => {
     uuid = await pickExecutorNode({ nodeUuid });
@@ -98,7 +113,10 @@ export async function openSession({ sessionId, model, nodeUuid, trajectoryId = n
 
   try {
     const readyP = waitForSessionEvent(sessionId, 'session.ready', 120000);
-    sendToExecutor(uuid, 'session.open', { sessionId, model });
+    const openPayload = { sessionId, model };
+    if (cdpUrl) openPayload.cdpUrl = cdpUrl;
+    if (cdpPort != null && Number.isFinite(Number(cdpPort))) openPayload.cdpPort = Number(cdpPort);
+    sendToExecutor(uuid, 'session.open', openPayload);
     const payload = await readyP;
     const slotIndex = Number(payload?.slotIndex ?? 0);
     lease.confirmLease({
@@ -111,13 +129,70 @@ export async function openSession({ sessionId, model, nodeUuid, trajectoryId = n
     return { ...payload, nodeUuid: uuid, slotIndex };
   } catch (err) {
     if (uuid) lease.releasePending(uuid);
-    if (err?.message?.includes('No free executor slots') || /no free/i.test(err?.message || '')) {
+    if (
+      err?.message?.includes('No free executor slots')
+      || /no free/i.test(err?.message || '')
+      || /无可用执行资源/.test(err?.message || '')
+    ) {
       const e = lease.noFreeSlotsError();
       e.message = err.message || e.message;
       throw e;
     }
     throw err;
   }
+}
+
+/**
+ * Ask executor for live sessions (request/response via session hub).
+ * @param {string} nodeUuid
+ * @param {number} [timeoutMs]
+ */
+export async function listExecutorSessions(nodeUuid, timeoutMs = 10000) {
+  const requestId = randomUUID();
+  const resultP = waitForSessionEvent(requestId, 'session.list_result', timeoutMs);
+  sendToExecutor(nodeUuid, 'session.list', { sessionId: requestId, requestId });
+  const payload = await resultP;
+  return Array.isArray(payload?.sessions) ? payload.sessions : [];
+}
+
+/**
+ * Ask executor for reusable CDP Chromes (not bound to a live slot).
+ * @param {string} nodeUuid
+ * @param {number} [timeoutMs]
+ */
+export async function listExecutorCdp(nodeUuid, timeoutMs = 15000) {
+  const requestId = randomUUID();
+  const resultP = waitForSessionEvent(requestId, 'session.list_cdp_result', timeoutMs);
+  sendToExecutor(nodeUuid, 'session.list_cdp', { sessionId: requestId, requestId });
+  const payload = await resultP;
+  return {
+    browsers: Array.isArray(payload?.browsers) ? payload.browsers : [],
+    occupiedPorts: Array.isArray(payload?.occupiedPorts) ? payload.occupiedPorts : [],
+  };
+}
+
+/**
+ * Drop control-plane leases whose session no longer exists on the executor.
+ * @param {string} nodeUuid
+ */
+export async function reconcileLeasesWithExecutor(nodeUuid) {
+  if (!nodeUuid || !registry.isConnected(nodeUuid)) return { released: 0 };
+  let sessions;
+  try {
+    sessions = await listExecutorSessions(nodeUuid, 8000);
+  } catch (err) {
+    console.warn('[executor] reconcile list failed:', err.message);
+    return { released: 0, error: err.message };
+  }
+  const liveIds = new Set(sessions.map((s) => s.sessionId).filter(Boolean));
+  let released = 0;
+  for (const holder of lease.listByNode(nodeUuid)) {
+    if (holder.sessionId && !liveIds.has(holder.sessionId)) {
+      lease.releaseBySession(holder.sessionId);
+      released += 1;
+    }
+  }
+  return { released, liveSessionIds: [...liveIds] };
 }
 
 export async function closeSession({ nodeUuid, sessionId }) {

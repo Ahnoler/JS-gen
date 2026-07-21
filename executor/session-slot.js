@@ -50,6 +50,8 @@ export class SessionSlot {
    * @param {string} [opts.model]
    * @param {string} [opts.baseUrl]
    * @param {string} [opts.apiKey]
+   * @param {string} [opts.cdpUrl] Connect to existing Chrome via CDP (reuse orphan)
+   * @param {number} [opts.cdpPort] Explicit CDP port when launching or reusing
    */
   async open(opts) {
     if (this.process && isProcessAlive(this.process)) {
@@ -60,19 +62,35 @@ export class SessionSlot {
     const model = opts.model || 'deepseek/deepseek-v4-flash';
     const baseUrl = opts.baseUrl || `${CONTROL_PLANE_HTTP}/v1`;
     const apiKey = opts.apiKey || LLM_API_KEY;
-    this.cdpPort = await allocateCdpPort(EXECUTOR_CDP_PORT_BASE + this.slotIndex);
+    const cdpUrl = opts.cdpUrl || opts.cdp_url || null;
+    const explicitPort = opts.cdpPort ?? opts.cdp_port;
 
-    const child = spawnAgent(
-      [
-        '--session',
-        '--session-id', sessionId,
-        '--model', model,
-        '--base-url', baseUrl,
-        '--api-key', apiKey,
-        '--cdp-port', String(this.cdpPort),
-      ],
-      { OPENAI_API_KEY: apiKey },
-    );
+    const agentArgs = [
+      '--session',
+      '--session-id', sessionId,
+      '--model', model,
+      '--base-url', baseUrl,
+      '--api-key', apiKey,
+    ];
+
+    if (cdpUrl) {
+      // Reuse existing Chrome — do not allocate a new debugging port.
+      agentArgs.push('--cdp-url', String(cdpUrl));
+      if (explicitPort != null && Number.isFinite(Number(explicitPort))) {
+        this.cdpPort = Number(explicitPort);
+      } else {
+        // Best-effort extract port from ws://127.0.0.1:PORT/...
+        const m = String(cdpUrl).match(/:(\d+)\//) || String(cdpUrl).match(/:(\d+)$/);
+        this.cdpPort = m ? Number(m[1]) : EXECUTOR_CDP_PORT_BASE + this.slotIndex;
+      }
+    } else {
+      this.cdpPort = explicitPort != null && Number.isFinite(Number(explicitPort))
+        ? Number(explicitPort)
+        : await allocateCdpPort(EXECUTOR_CDP_PORT_BASE + this.slotIndex);
+      agentArgs.push('--cdp-port', String(this.cdpPort));
+    }
+
+    const child = spawnAgent(agentArgs, { OPENAI_API_KEY: apiKey });
 
     this.sessionId = sessionId;
     this.process = child;

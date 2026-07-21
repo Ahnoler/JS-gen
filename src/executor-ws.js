@@ -102,6 +102,14 @@ async function handleMessage(ws, msg) {
     if (type === 'manual_record_status') {
       broadcast('manual_record_status', { ...payload, sessionId: payload.sessionId });
     }
+    if (type === 'session.bib_tabs' || type === 'session.bib_ready') {
+      broadcast('remote:tabs', {
+        sessionId: payload.sessionId,
+        tabs: payload.tabs || [],
+        activeTargetId: payload.activeTargetId || null,
+        switched: !!payload.switched,
+      });
+    }
   }
 }
 

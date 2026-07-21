@@ -58,3 +58,21 @@ export async function discoverCdpWithRetry({
   }
   return null;
 }
+
+/**
+ * Probe every port in a contiguous range; return all live CDP endpoints.
+ * @param {{ host?: string, portBase?: number, span?: number }} [opts]
+ * @returns {Promise<{ port: number, cdpHttp: string, cdpWsUrl: string, browser: string }[]>}
+ */
+export async function discoverAllCdpInRange(opts = {}) {
+  const host = opts.host || '127.0.0.1';
+  const portBase = Number(opts.portBase) || 19242;
+  const span = Math.max(1, Number(opts.span) || 40);
+  const ports = Array.from({ length: span }, (_, i) => portBase + i);
+  const out = [];
+  for (const port of ports) {
+    const hit = await discoverCdp({ host, ports: [port] });
+    if (hit) out.push(hit);
+  }
+  return out;
+}

@@ -28,7 +28,7 @@ node scripts/characterize-dedup.mjs
 node scripts/accept-replay-apis.mjs
 ```
 
-Manual verification: engineering dashboard at `http://localhost:4097/api/test` after starting the server. Product API docs (Swagger-like, for frontend): `http://localhost:4097/api/docs`. Product APIs are under `/api/v2/*` (see `docs/前端交付_系统管理与交易录制.md`). Human-oriented overview: `README.md` (keep in sync with this file’s architecture section).
+Manual verification: engineering dashboard at `http://localhost:4097/api/test` after starting the server. Product API docs (Swagger-like, for frontend — sole source of truth): `http://localhost:4097/api/docs` (`src/dashboard/api-docs/catalog.js`). Product APIs are under `/api/v2/*`. Human-oriented overview: `README.md` (keep in sync with this file’s architecture section).
 
 ## Architecture
 
@@ -100,7 +100,7 @@ Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps
 | Action dump | assemble-file / replay prepare | `scripts/action/` | ephemeral |
 | Trajectories / case JSON | `*-store.js` | `scripts/trajectories/` etc. | optional bypass |
 
-Frontend delivery contract: `docs/前端交付_系统管理与交易录制.md` (system-mgmt + recording + replay). Broader notes: `docs/前端接口文档.md`. Refactor status: `docs/REFACTOR_INSIGHT.md`.
+Frontend delivery contract: `/api/docs` only (do not maintain separate product API markdown). Refactor status: `docs/REFACTOR_INSIGHT.md` (local/gitignore).
 
 ### Dashboard (`src/dashboard/`, `test-dashboard.html`)
 

@@ -6,7 +6,7 @@
 > **LLM 默认走独立模式**（`STANDALONE_LLM=true`），不依赖 OpenCode SDK。  
 > **没有活跃的 `.opencode/skills/`**；知识在 `scripts/prompts/*.md` + CTRL / `form_rules` 代码中。
 
-更细的 Agent 工作约定见 [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md)。前端契约见 `docs/前端交付_系统管理与交易录制.md`（本地 docs，默认 gitignore）。
+更细的 Agent 工作约定见 [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md)。前端契约以 `/api/docs` 为准（`src/dashboard/api-docs/catalog.js`），不再维护单独产品 API markdown。
 
 ---
 

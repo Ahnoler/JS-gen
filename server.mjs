@@ -192,6 +192,9 @@ async function main() {
   }, Math.max(15000, Math.floor(EXECUTOR_HEARTBEAT_TIMEOUT_MS / 2)));
   sweepInterval.unref?.();
 
+  const { startTrajectoryIdleReaper } = await import('./src/services/trajectory-idle-reaper.js');
+  startTrajectoryIdleReaper();
+
   const server = httpServer.listen(PORT, HOST, () => {
     console.log(`[server] JS-gen control plane listening on http://${HOST}:${PORT}`);
     console.log(`[server] WebSocket at ws://${HOST}:${PORT}/ws`);

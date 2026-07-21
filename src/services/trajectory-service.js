@@ -6,7 +6,7 @@ import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
 import * as functionDefDao from '../dao/function-def-dao.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
-import { NODE_TYPE } from '../models/hierarchy-constants.js';
+import { NODE_TYPE, isRootParentId } from '../models/hierarchy-constants.js';
 import { getDB } from '../../config/database.js';
 import { stepFromActionLog } from '../models/helpers.js';
 import { callLLM } from '../llm-utils.js';
@@ -64,7 +64,7 @@ export async function getTrajectoryLoginContext(trajectoryId) {
   while (cur && !guard.has(cur.id)) {
     guard.add(cur.id);
     if (Number(cur.type) === NODE_TYPE.SYSTEM) break;
-    if (cur.parentId == null) {
+    if (isRootParentId(cur.parentId)) {
       cur = null;
       break;
     }
@@ -761,6 +761,8 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
     phaseCount: counts.phaseCount,
   });
 
+  touchTrajectoryRuntimeActivity(tid);
+
   return { stepNumber, actionId: entry.id || null, trajectoryPhaseId: resolvedPhaseId };
 }
 
@@ -1050,6 +1052,18 @@ export function getTrajectoryRuntime(trajectoryId) {
   return trajectoryRuntimeMap.get(Number(trajectoryId)) || null;
 }
 
+/** @returns {Map<number, object>} */
+export function getAllTrajectoryRuntimes() {
+  return trajectoryRuntimeMap;
+}
+
+/** Mark activity for idle reaper (after a step is persisted). */
+export function touchTrajectoryRuntimeActivity(trajectoryId, at = new Date()) {
+  const runtime = trajectoryRuntimeMap.get(Number(trajectoryId));
+  if (!runtime) return;
+  runtime.lastStepAt = at instanceof Date ? at.toISOString() : String(at);
+}
+
 /** Clear in-memory trajectory↔executor bindings for a node (offline / crash). */
 export function clearTrajectoryRuntimesForNode(nodeUuid) {
   if (!nodeUuid) return 0;
@@ -1069,14 +1083,108 @@ export function clearTrajectoryRuntimesForNode(nodeUuid) {
   return n;
 }
 
-/** Drop stale trajectory runtime when the control-plane session is gone. */
-function clearStaleTrajectoryRuntime(tid) {
+/**
+ * Drop stale trajectory runtime when the control-plane session is gone,
+ * or when the executor no longer has that sessionId.
+ */
+async function clearStaleTrajectoryRuntime(tid, { verifyExecutor = true } = {}) {
   const existing = trajectoryRuntimeMap.get(tid);
   if (!existing) return null;
-  if (existing.sessionId && state.sessions.has(existing.sessionId)) return existing;
-  slotLease.releaseByTrajectory(tid);
-  trajectoryRuntimeMap.delete(tid);
-  return null;
+  if (!existing.sessionId || !state.sessions.has(existing.sessionId)) {
+    slotLease.releaseByTrajectory(tid);
+    trajectoryRuntimeMap.delete(tid);
+    return null;
+  }
+  if (verifyExecutor && existing.executorNodeUuid) {
+    try {
+      const sessions = await execSession.listExecutorSessions(existing.executorNodeUuid, 8000);
+      const live = sessions.some((s) => s.sessionId === existing.sessionId);
+      if (!live) {
+        const session = state.sessions.get(existing.sessionId);
+        if (session?._trajPersistUnsub) {
+          try { session._trajPersistUnsub(); } catch {}
+        }
+        state.sessions.delete(existing.sessionId);
+        slotLease.releaseByTrajectory(tid);
+        trajectoryRuntimeMap.delete(tid);
+        return null;
+      }
+    } catch {
+      // If executor is unreachable, keep runtime until disconnect purge.
+    }
+  }
+  return existing;
+}
+
+/**
+ * Bind control-plane session + trajectory runtime after a successful openSession.
+ */
+function registerTrajectorySession(tid, sessionId, opened, { bibError = null, remoteSessionId = null } = {}) {
+  const persistedActionIds = new Set();
+  state.sessions.set(sessionId, {
+    sessionId,
+    stepIndex: 0,
+    trajectories: [],
+    createdAt: new Date().toISOString(),
+    model: opened.model || null,
+    lastTask: null,
+    lastMaxSteps: null,
+    caseDataFile: null,
+    useExecutor: true,
+    executorNodeUuid: opened.nodeUuid,
+    executorSlotIndex: opened.slotIndex,
+    busy: false,
+    dbTrajectoryId: tid,
+    selectedPhaseId: null,
+    activePhaseId: null,
+    autoPersist: true,
+    persistedActionIds,
+    cdpPort: opened.cdpPort ?? null,
+    cdpReady: opened.cdpReady !== false,
+  });
+
+  const runtime = {
+    trajectoryId: tid,
+    sessionId,
+    executorNodeUuid: opened.nodeUuid,
+    executorSlotIndex: opened.slotIndex,
+    remoteSessionId,
+    attachedAt: new Date().toISOString(),
+    lastStepAt: null,
+    persistedActionIds,
+    selectedPhaseId: null,
+    abortRecording: false,
+    bibError,
+    manualRecording: false,
+  };
+  trajectoryRuntimeMap.set(tid, runtime);
+  bindTrajectoryManualPersist(tid, sessionId, runtime);
+  return runtime;
+}
+
+async function attachBibBestEffort(tid, sessionId, runtime) {
+  let attached = null;
+  let bibError = null;
+  const session = state.sessions.get(sessionId);
+  const cdpReady = session?.cdpReady !== false;
+  if (!cdpReady) {
+    bibError = `CDP not ready on port ${session?.cdpPort ?? '?'} — skipped BiB attach`;
+    console.warn(`[trajectory] ${bibError}`);
+  } else {
+    try {
+      attached = await remoteSessionService.attachLive({ sessionId, quality: 70 });
+    } catch (err) {
+      bibError = err?.message || String(err);
+      console.warn(`[trajectory] BiB attach failed (session kept): ${bibError}`);
+    }
+  }
+  const remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
+  if (remoteSessionId) await trajectoryDao.updateMeta(tid, { remoteSessionId });
+  if (runtime) {
+    runtime.remoteSessionId = remoteSessionId;
+    runtime.bibError = bibError;
+  }
+  return { attached, bibError, remoteSessionId, status: attached?.status };
 }
 
 /**
@@ -1111,7 +1219,7 @@ export async function prepareTrajectoryRecording(trajectoryId) {
   emitStage('browser', 'running');
 
   let attachResult = null;
-  let runtime = clearStaleTrajectoryRuntime(tid);
+  let runtime = await clearStaleTrajectoryRuntime(tid);
   if (!runtime) {
     attachResult = await attachTrajectoryLive(tid);
     runtime = trajectoryRuntimeMap.get(tid);
@@ -1137,6 +1245,7 @@ export async function prepareTrajectoryRecording(trajectoryId) {
     sessionId: runtime.sessionId,
     executorNodeUuid: runtime.executorNodeUuid,
     reused: !!attachResult?.reused,
+    reusedChrome: !!attachResult?.reusedChrome,
   });
   emitStage('browser', 'done', {
     cdpPort: state.sessions.get(runtime.sessionId)?.cdpPort ?? null,
@@ -1222,11 +1331,20 @@ export async function prepareTrajectoryRecording(trajectoryId) {
     bibError,
     stream: { ok: streamOk, remoteSessionId },
     stages,
+    reused: !!attachResult?.reused,
+    reusedChrome: !!attachResult?.reusedChrome,
     /** Critical path ready: session + browser + login (stream may be degraded). */
     ready: true,
   };
 }
 
+/**
+ * Acquire executor resources for a trajectory:
+ *  1) reuse live session for this traj
+ *  2) free slot + orphan CDP Chrome → open with cdpUrl
+ *  3) free slot → launch new Chrome
+ *  4) no free slot → 409
+ */
 export async function attachTrajectoryLive(trajectoryId) {
   const tid = Number(trajectoryId);
   const traj = await trajectoryDao.getById(tid);
@@ -1236,8 +1354,8 @@ export async function attachTrajectoryLive(trajectoryId) {
     throw err;
   }
 
-  // Idempotent: already attached for this trajectory with a live session
-  const existing = clearStaleTrajectoryRuntime(tid);
+  // Idempotent: already attached for this trajectory with a live session on executor
+  const existing = await clearStaleTrajectoryRuntime(tid);
   if (existing?.sessionId && state.sessions.has(existing.sessionId)) {
     const liveStatus = await remoteSessionService.getLiveStatus().catch(() => null);
     return {
@@ -1247,79 +1365,85 @@ export async function attachTrajectoryLive(trajectoryId) {
       remoteSessionId: existing.remoteSessionId,
       status: liveStatus,
       reused: true,
+      reusedChrome: false,
     };
   }
 
-  // One trajectory → one slot: drop any orphan lease before opening another
+  // Drop orphan lease for this traj, then reconcile leases vs executor reality on candidates.
   slotLease.releaseByTrajectory(tid);
+
+  let nodeUuid;
+  try {
+    nodeUuid = await execSession.pickExecutorNode({});
+  } catch (err) {
+    if (err?.statusCode === 409) throw err;
+    const e = slotLease.noFreeSlotsError();
+    e.message = err?.message || e.message;
+    throw e;
+  }
+
+  await execSession.reconcileLeasesWithExecutor(nodeUuid).catch(() => {});
+
+  // Re-check capacity after reconcile
+  try {
+    nodeUuid = await execSession.pickExecutorNode({ nodeUuid });
+  } catch (err) {
+    throw err?.statusCode === 409 ? err : slotLease.noFreeSlotsError();
+  }
+
+  let cdpUrl = null;
+  let cdpPort = null;
+  let reusedChrome = false;
+  try {
+    const { browsers } = await execSession.listExecutorCdp(nodeUuid, 12000);
+    const pick = browsers?.[0];
+    if (pick?.cdpWsUrl) {
+      cdpUrl = pick.cdpWsUrl;
+      cdpPort = pick.port != null ? Number(pick.port) : null;
+      reusedChrome = true;
+      console.log(`[trajectory] reusing CDP Chrome port=${cdpPort} for traj #${tid}`);
+    }
+  } catch (err) {
+    console.warn('[trajectory] list_cdp failed, will launch new Chrome:', err.message);
+  }
 
   const sessionId = randomUUID();
   const model = traj.model || 'deepseek-v4-flash';
-  const opened = await execSession.openSession({ sessionId, model, trajectoryId: tid });
-
-  const persistedActionIds = new Set();
-  state.sessions.set(sessionId, {
-    sessionId,
-    stepIndex: 0,
-    trajectories: [],
-    createdAt: new Date().toISOString(),
-    model,
-    lastTask: null,
-    lastMaxSteps: null,
-    caseDataFile: null,
-    useExecutor: true,
-    executorNodeUuid: opened.nodeUuid,
-    executorSlotIndex: opened.slotIndex,
-    busy: false,
-    dbTrajectoryId: tid,
-    selectedPhaseId: null,
-    activePhaseId: null,
-    autoPersist: true,
-    persistedActionIds,
-    cdpPort: opened.cdpPort ?? null,
-    cdpReady: opened.cdpReady !== false,
-  });
-
-  // BiB is display-only and requires CDP HTTP. Skip when session reports cdp_ready=false.
-  // Never close the executor session if BiB fails — login/recording still need the browser.
-  let attached = null;
-  let bibError = null;
-  const cdpReady = opened.cdpReady !== false;
-  if (!cdpReady) {
-    bibError = `CDP not ready on port ${opened.cdpPort ?? '?'} — skipped BiB attach`;
-    console.warn(`[trajectory] ${bibError}`);
-  } else {
-    try {
-      attached = await remoteSessionService.attachLive({ sessionId, quality: 70 });
-    } catch (err) {
-      bibError = err?.message || String(err);
-      console.warn(`[trajectory] BiB attach failed (session kept): ${bibError}`);
+  let opened;
+  try {
+    opened = await execSession.openSession({
+      sessionId,
+      model,
+      trajectoryId: tid,
+      nodeUuid,
+      cdpUrl,
+      cdpPort,
+    });
+  } catch (err) {
+    if (
+      err?.statusCode === 409
+      || /no free/i.test(err?.message || '')
+      || /无可用执行资源/.test(err?.message || '')
+    ) {
+      const e = slotLease.noFreeSlotsError();
+      e.message = err.message || e.message;
+      throw e;
     }
+    throw err;
   }
-  const remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
-  if (remoteSessionId) await trajectoryDao.updateMeta(tid, { remoteSessionId });
 
-  const runtime = {
-    trajectoryId: tid,
-    sessionId,
-    executorNodeUuid: opened.nodeUuid,
-    executorSlotIndex: opened.slotIndex,
-    remoteSessionId,
-    attachedAt: new Date().toISOString(),
-    persistedActionIds,
-    selectedPhaseId: null,
-    abortRecording: false,
-    bibError,
-  };
-  trajectoryRuntimeMap.set(tid, runtime);
-  bindTrajectoryManualPersist(tid, sessionId, runtime);
+  const runtime = registerTrajectorySession(tid, sessionId, { ...opened, model }, {});
+  const bib = await attachBibBestEffort(tid, sessionId, runtime);
+
   return {
     trajectoryId: tid,
     sessionId,
     executorNodeUuid: opened.nodeUuid,
-    remoteSessionId,
-    status: attached?.status || { attached: false, cdpReady: false, bibError },
-    bibError,
+    remoteSessionId: bib.remoteSessionId,
+    status: bib.status || { attached: false, cdpReady: opened.cdpReady !== false, bibError: bib.bibError },
+    bibError: bib.bibError,
+    reused: false,
+    reusedChrome,
   };
 }
 
@@ -1340,7 +1464,15 @@ function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
         source: 'manual',
         trajectoryPhaseId: phaseId != null ? Number(phaseId) : undefined,
       });
-      if (persisted && aid) runtime.persistedActionIds.add(aid);
+      if (persisted) {
+        if (aid) runtime.persistedActionIds.add(aid);
+        broadcast('manual_action_persisted', {
+          trajectoryDbId: trajectoryId,
+          sessionId,
+          ...persisted,
+          entry,
+        });
+      }
     } catch (err) {
       console.warn('[trajectory-manual] live persist failed:', err.message);
     }
@@ -1506,6 +1638,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   }
 
   runtime.abortRecording = false;
+  runtime.recordStartAt = new Date().toISOString();
+  touchTrajectoryRuntimeActivity(tid);
   await trajectoryDao.updateMeta(tid, { recordStatus: 'recording', systemAccountId: acctId });
   for (const p of phases) await trajectoryPhaseDao.updateStatus(p.id, 'pending');
 
@@ -1528,7 +1662,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         source: 'agent',
         trajectoryPhaseId: Number.isFinite(phaseIdHint) ? phaseIdHint : undefined,
       }).catch(() => null);
-      if (persisted) runtime.persistedActionIds.add(id);
+      if (persisted) {
+        runtime.persistedActionIds.add(id);
+        broadcast('action_persisted', {
+          trajectoryDbId: tid,
+          sessionId: runtime.sessionId,
+          ...persisted,
+          entry,
+        });
+      }
     }
   });
 
@@ -1704,6 +1846,9 @@ export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phas
   });
   const status = await execSession.waitForSessionEvent(runtime.sessionId, 'manual_record_status', 10000)
     .catch(() => ({ enabled: !!enabled }));
+  runtime.manualRecording = !!status.enabled;
+  // Manual activity resets idle timer
+  if (runtime.manualRecording) touchTrajectoryRuntimeActivity(tid);
   return {
     trajectoryId: tid,
     enabled: !!status.enabled,

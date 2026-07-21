@@ -11,6 +11,12 @@ let canvas, ctx, statusEl, inputHintEl, stageEl, stageWrapEl;
 let attached = false;
 let inputEnabled = false;
 let remoteSessionId = null;
+/** UUID embedded in RSCF frames — only draw matching frames. */
+let remoteSessionUuid = null;
+/** Open page tabs from BiB ({ targetId, url, title, active }). */
+let remoteTabs = [];
+let activeTargetId = null;
+let switchingTab = false;
 let streaming = false;
 let lastBitmap = null;
 let cdpReady = false;
@@ -145,8 +151,15 @@ function syncButtons() {
   if (attachBtn) {
     attachBtn.disabled = attaching;
     attachBtn.textContent = attached ? '重新推流' : '附着/推流';
+    attachBtn.title = attached
+      ? '仅重启画面推流（不释放执行机槽位）'
+      : '附着 CDP 并开始推流（不释放/不占用新槽位以外的资源）';
   }
-  if (detachBtn) detachBtn.disabled = (!attached && !remoteSessionId) || attaching;
+  if (detachBtn) {
+    detachBtn.disabled = (!attached && !remoteSessionId) || attaching;
+    detachBtn.textContent = '断开画面';
+    detachBtn.title = '断开 BiB 推流，不释放执行机槽位；离开工作室也不会自动释放';
+  }
 }
 
 function remoteLog(msg, level = 'info') {
@@ -161,10 +174,103 @@ export function setRemoteLog(fn) {
   remoteLogFn = typeof fn === 'function' ? fn : null;
 }
 
+function tabLabel(tab) {
+  const title = (tab.title || '').trim();
+  const url = (tab.url || '').trim();
+  if (title && title !== 'ignore this tab and do not use it') return title;
+  try {
+    const u = new URL(url);
+    return u.hostname + (u.pathname === '/' ? '' : u.pathname.slice(0, 24));
+  } catch {
+    return url.slice(0, 40) || '空白页';
+  }
+}
+
+function renderTabs() {
+  const el = $('sessRemoteTabs');
+  if (!el) return;
+  if (!remoteTabs.length) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = remoteTabs.map((tab) => {
+    const active = tab.active || tab.targetId === activeTargetId;
+    const title = escapeAttr(tabLabel(tab));
+    const url = escapeAttr(tab.url || '');
+    return `<button type="button" class="rs-tab${active ? ' active' : ''}" data-target-id="${escapeAttr(tab.targetId)}" title="${url}">
+      <span class="rs-tab-title">${title}</span>
+      <span class="rs-tab-url">${url}</span>
+    </button>`;
+  }).join('');
+  el.querySelectorAll('.rs-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tid = btn.getAttribute('data-target-id');
+      const tab = remoteTabs.find((t) => t.targetId === tid);
+      if (tab) switchRemoteTab(tab).catch((e) => remoteLog(`切换标签失败: ${e.message}`, 'err'));
+    });
+  });
+}
+
+function escapeAttr(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function applyTabsPayload(payload = {}) {
+  if (Array.isArray(payload.tabs)) {
+    remoteTabs = payload.tabs.map((t) => ({
+      targetId: t.targetId,
+      url: t.url || '',
+      title: t.title || '',
+      index: t.index,
+      active: !!t.active,
+      pageId: t.pageId,
+    }));
+  }
+  if (payload.activeTargetId) activeTargetId = payload.activeTargetId;
+  renderTabs();
+}
+
+async function switchRemoteTab(tab) {
+  if (!tab?.targetId || switchingTab) return;
+  if (tab.targetId === activeTargetId && tab.active) return;
+  switchingTab = true;
+  try {
+    remoteLog(`切换标签 → ${tabLabel(tab)}`);
+    const sent = send('remote:switch_tab', {
+      targetId: tab.targetId,
+      url: tab.url || '',
+      pageId: tab.pageId ?? null,
+    });
+    if (!sent) throw new Error('/ws 未连接');
+    activeTargetId = tab.targetId;
+    remoteTabs = remoteTabs.map((t) => ({ ...t, active: t.targetId === tab.targetId }));
+    renderTabs();
+    // Refresh authoritative list after switch
+    setTimeout(() => send('remote:tabs', {}), 300);
+  } finally {
+    switchingTab = false;
+  }
+}
+
+function refreshRemoteTabs() {
+  if (!attached && !remoteSessionId) return;
+  send('remote:tabs', {});
+}
+
 function applyStatus(payload = {}) {
   if ('attached' in payload) attached = !!payload.attached;
   if ('inputEnabled' in payload) inputEnabled = !!payload.inputEnabled;
   if ('remoteSessionId' in payload) remoteSessionId = payload.remoteSessionId ?? null;
+  if ('remoteSessionUuid' in payload) {
+    remoteSessionUuid = payload.remoteSessionUuid ? String(payload.remoteSessionUuid) : null;
+  }
+  if (payload.attached === false && !('remoteSessionUuid' in payload)) {
+    remoteSessionUuid = null;
+  }
   if ('cdpReady' in payload) cdpReady = !!payload.cdpReady;
   if ('connected' in payload) browserConnected = !!payload.connected;
   if ('agentBusy' in payload && !('inputEnabled' in payload)) {
@@ -172,6 +278,7 @@ function applyStatus(payload = {}) {
   }
   if (payload.viewportW > 0) remoteViewport.w = Math.round(payload.viewportW);
   if (payload.viewportH > 0) remoteViewport.h = Math.round(payload.viewportH);
+  if (Array.isArray(payload.tabs)) applyTabsPayload(payload);
 
   updateInputHint();
   syncButtons();
@@ -186,6 +293,9 @@ function applyStatus(payload = {}) {
     );
   } else if (cdpReady) {
     setUiStatus('CDP 就绪 · 未附着', 'neutral');
+    remoteTabs = [];
+    activeTargetId = null;
+    renderTabs();
   } else if (browserConnected) {
     setUiStatus('浏览器已就绪 · CDP 探测中（仍可尝试附着）', 'warn');
   } else {
@@ -396,6 +506,7 @@ export async function ensureRemoteStream(opts = {}) {
         : '推流已请求',
       'ok',
     );
+    refreshRemoteTabs();
     return { ok: true, attached: !!attached, remoteSessionId, reused: already && !force };
   } catch (e) {
     setUiStatus(`附着/推流失败: ${e.message}`, 'bad');
@@ -643,13 +754,16 @@ export function initRemoteBrowser() {
   $('sessRemoteDetachBtn')?.addEventListener('click', async () => {
     try {
       await detachLiveHttp();
-      setUiStatus('已分离', 'neutral');
+      setUiStatus('已断开画面（槽位仍占用）', 'neutral');
     } catch (e) {
-      setUiStatus(`分离失败: ${e.message}`, 'bad');
+      setUiStatus(`断开画面失败: ${e.message}`, 'bad');
     }
   });
 
   on('remote:status', applyStatus);
+  on('remote:tabs', (payload) => {
+    applyTabsPayload(payload || {});
+  });
   on('remote:inspect', (p) => {
     const el = $('sessRemoteInspectLabel');
     if (!el) return;
@@ -666,6 +780,12 @@ export function initRemoteBrowser() {
   });
   on('remote:frame', async (payload) => {
     if (!streaming) return;
+    if (remoteSessionUuid && payload?.sessionUuid && payload.sessionUuid !== remoteSessionUuid) {
+      return;
+    }
+    if (!remoteSessionUuid && payload?.sessionUuid) {
+      remoteSessionUuid = String(payload.sessionUuid);
+    }
     if (payload?.frameId != null) {
       send('remote:ack', {
         frameId: payload.frameId,
@@ -719,8 +839,15 @@ export function initRemoteBrowser() {
   on('ws:binary', async (buf) => {
     const parsed = parseFrame(buf);
     if (!parsed) return;
+    // Drop frames from other remote sessions (orphan / concurrent BiB).
+    if (remoteSessionUuid && parsed.sessionUuid && parsed.sessionUuid !== remoteSessionUuid) {
+      return;
+    }
+    if (!remoteSessionUuid && parsed.sessionUuid) {
+      remoteSessionUuid = parsed.sessionUuid;
+    }
     if (!streaming) streaming = true;
-    // Ack before decode/draw so a slow canvas never blocks CDP (producer also acks now).
+    // Ack only matching frames so a foreign producer cannot keep the pipeline warm forever.
     send('remote:ack', { frameId: parsed.frameId, sessionId: parsed.frameId, sessionUuid: parsed.sessionUuid });
     await drawJpeg(parsed.jpeg);
   });

@@ -17,7 +17,7 @@
     <div class="rs-top-right">
       <span id="sessRemoteStatus" class="rs-pill">画面</span>
       <span id="rsAiBusy" class="rs-pill rs-warn" style="display:none">AI 录制中</span>
-      <button type="button" id="rsDetachBtn" class="btn btn-sm btn-outline">detach</button>
+      <button type="button" id="rsDetachBtn" class="btn btn-sm btn-outline" title="关闭浏览器并释放执行机槽位">释放执行资源</button>
     </div>
   </header>
 
@@ -25,9 +25,10 @@
     <section class="rs-canvas-pane">
       <div class="rs-canvas-bar">
         <span id="sessRemoteInputHint" class="rs-muted">未附着</span>
-        <button type="button" id="sessRemoteAttachBtn" class="btn btn-sm btn-outline">附着/推流</button>
-        <button type="button" id="sessRemoteDetachBtn" class="btn btn-sm btn-outline">停推流</button>
+        <button type="button" id="sessRemoteAttachBtn" class="btn btn-sm btn-outline" title="附着 CDP 并推流（不释放槽位）">附着/推流</button>
+        <button type="button" id="sessRemoteDetachBtn" class="btn btn-sm btn-outline" title="断开画面推流，不释放执行机槽位">断开画面</button>
       </div>
+      <div id="sessRemoteTabs" class="rs-tabs" title="点击切换标签：推流与 Agent 操作会同步到同一页"></div>
       <div id="sessRemoteStageWrap" class="rs-stage-wrap">
         <div id="sessRemoteStage">
           <canvas id="sessRemoteCanvas" tabindex="0"></canvas>

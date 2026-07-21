@@ -2,8 +2,9 @@
  * Manages session slots on the executor (capacity-bound).
  */
 import { SessionSlot } from './session-slot.js';
-import { EXECUTOR_CAPACITY } from './config.js';
+import { EXECUTOR_CAPACITY, EXECUTOR_CDP_PORT_BASE } from './config.js';
 import { BibBridge } from './bib-bridge.js';
+import { discoverAllCdpInRange } from '../src/cdp/discover.js';
 
 export class SessionManager {
   /**
@@ -24,6 +25,9 @@ export class SessionManager {
 
     /** @type {Map<string, BibBridge>} */
     this.bibs = new Map();
+    /** Serialize attachBib per sessionId to avoid orphan screencast producers. */
+    /** @type {Map<string, Promise<unknown>>} */
+    this._attachLocks = new Map();
   }
 
   _findFreeSlot() {
@@ -37,14 +41,56 @@ export class SessionManager {
     return this.sessions.get(sessionId) || null;
   }
 
+  /** CDP ports currently claimed by live slots. */
+  occupiedCdpPorts() {
+    const ports = new Set();
+    for (const slot of this.slots) {
+      if (slot.sessionId && slot.cdpPort != null) ports.add(Number(slot.cdpPort));
+    }
+    return ports;
+  }
+
+  /**
+   * List live CDP Chromes on this host; exclude ports already bound to a live slot.
+   * @returns {Promise<{ browsers: object[], occupiedPorts: number[] }>}
+   */
+  async listCdp() {
+    const occupied = this.occupiedCdpPorts();
+    const hits = await discoverAllCdpInRange({
+      portBase: EXECUTOR_CDP_PORT_BASE,
+      span: Math.max(40, this.capacity * 20),
+    });
+    const browsers = hits
+      .filter((h) => !occupied.has(Number(h.port)))
+      .map((h) => ({
+        port: h.port,
+        cdpHttp: h.cdpHttp,
+        cdpWsUrl: h.cdpWsUrl,
+        browser: h.browser || '',
+      }));
+    return {
+      browsers,
+      occupiedPorts: [...occupied],
+    };
+  }
+
   /**
    * @param {object} payload
    * @param {string} payload.sessionId
+   * @param {string} [payload.model]
+   * @param {string} [payload.cdpUrl]
+   * @param {number} [payload.cdpPort]
    */
   async open(payload) {
     if (this.sessions.has(payload.sessionId)) {
       const existing = this.sessions.get(payload.sessionId);
-      return { sessionId: payload.sessionId, slotIndex: existing.slotIndex, reused: true };
+      return {
+        sessionId: payload.sessionId,
+        slotIndex: existing.slotIndex,
+        cdpPort: existing.cdpPort,
+        cdpReady: existing.ready,
+        reused: true,
+      };
     }
 
     const slot = this._findFreeSlot();
@@ -61,6 +107,7 @@ export class SessionManager {
         slotIndex: result.slotIndex,
         cdpPort: result.cdpPort ?? slot.cdpPort,
         cdpReady: result.cdpReady !== false,
+        reusedChrome: !!(payload.cdpUrl || payload.cdp_url),
       },
     });
     return result;
@@ -82,6 +129,7 @@ export class SessionManager {
   async close(sessionId) {
     const slot = this.sessions.get(sessionId);
     if (!slot) return { sessionId, closed: false };
+    await this.detachBib(sessionId, { crashed: false }).catch(() => {});
     await slot.close();
     this.sessions.delete(sessionId);
     this.emitToControlPlane({
@@ -98,10 +146,44 @@ export class SessionManager {
       slotIndex: slot.slotIndex,
       ready: slot.ready,
       busy: slot.busy,
+      cdpPort: slot.cdpPort ?? null,
     }));
   }
 
   async attachBib({
+    sessionId,
+    remoteSessionUuid,
+    quality,
+    viewportW,
+    viewportH,
+    deviceScaleFactor,
+    resize,
+  }) {
+    const prev = this._attachLocks.get(sessionId) || Promise.resolve();
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    this._attachLocks.set(sessionId, prev.then(() => gate));
+    await prev.catch(() => {});
+
+    try {
+      return await this._attachBibLocked({
+        sessionId,
+        remoteSessionUuid,
+        quality,
+        viewportW,
+        viewportH,
+        deviceScaleFactor,
+        resize,
+      });
+    } finally {
+      release();
+      if (this._attachLocks.get(sessionId) === gate) {
+        // chain continues via next waiter; clear if we are tail
+      }
+    }
+  }
+
+  async _attachBibLocked({
     sessionId,
     remoteSessionUuid,
     quality,
@@ -116,9 +198,18 @@ export class SessionManager {
 
     const slot = this.sessions.get(sessionId);
 
-    // Replace existing bib (idempotent attach)
+    // Replace existing bib (idempotent attach) — force dispose so screencast cannot orphan.
     const existing = this.bibs.get(sessionId);
-    if (existing) await existing.detach().catch(() => {});
+    if (existing) {
+      this.bibs.delete(sessionId);
+      try {
+        await existing.detach();
+      } catch {
+        try { existing._disposed = true; } catch {}
+        try { existing.screencastOn = false; } catch {}
+        try { existing.sendBinary = () => {}; } catch {}
+      }
+    }
 
     const bib = new BibBridge({
       sessionId,
@@ -135,6 +226,7 @@ export class SessionManager {
         cdpPort: slot.cdpPort,
       });
     } catch (err) {
+      try { await bib.detach(); } catch {}
       this.emitToControlPlane({
         event: 'session.bib_error',
         session_id: sessionId,
@@ -148,6 +240,10 @@ export class SessionManager {
     }
 
     this.bibs.set(sessionId, bib);
+    let tabsPayload = { tabs: [], activeTargetId: bib.activeTargetId };
+    try {
+      tabsPayload = await bib.listTabs();
+    } catch {}
     this.emitToControlPlane({
       event: 'session.bib_ready',
       session_id: sessionId,
@@ -156,16 +252,67 @@ export class SessionManager {
         remoteSessionUuid,
         viewportW: bib.viewport.w,
         viewportH: bib.viewport.h,
+        activeTargetId: bib.activeTargetId,
+        tabs: tabsPayload.tabs || [],
       },
     });
-    return { attached: true };
+    return { attached: true, tabs: tabsPayload.tabs, activeTargetId: bib.activeTargetId };
+  }
+
+  async bibListTabs(sessionId) {
+    const bib = this.bibs.get(sessionId);
+    if (!bib) return { tabs: [], activeTargetId: null };
+    return bib.listTabs();
+  }
+
+  /**
+   * Switch BiB screencast to targetId and ask Agent to switch_to_tab by url/pageId.
+   */
+  async bibSwitchTab(sessionId, { targetId, url, pageId } = {}) {
+    const bib = this.bibs.get(sessionId);
+    if (!bib) throw new Error('BiB not attached');
+    if (!targetId) throw new Error('targetId required');
+
+    const result = await bib.switchToTarget(targetId);
+    const tabsPayload = await bib.listTabs().catch(() => ({ tabs: [], activeTargetId: targetId }));
+
+    // Align Agent current page with the streamed tab.
+    try {
+      const slot = this.sessions.get(sessionId);
+      if (slot?.ready) {
+        slot.writeEvent('switch_tab', {
+          targetId,
+          url: url || tabsPayload.tabs?.find((t) => t.targetId === targetId)?.url || '',
+          pageId: pageId ?? null,
+        });
+      }
+    } catch (err) {
+      console.warn('[session-manager] switch_tab to agent failed:', err.message);
+    }
+
+    this.emitToControlPlane({
+      event: 'session.bib_tabs',
+      session_id: sessionId,
+      data: {
+        sessionId,
+        tabs: tabsPayload.tabs || [],
+        activeTargetId: tabsPayload.activeTargetId || targetId,
+      },
+    });
+
+    return {
+      ok: true,
+      ...result,
+      tabs: tabsPayload.tabs || [],
+      activeTargetId: tabsPayload.activeTargetId || targetId,
+    };
   }
 
   async detachBib(sessionId, { crashed = false } = {}) {
     const bib = this.bibs.get(sessionId);
     if (!bib) return { closed: false };
-    await bib.detach().catch(() => {});
     this.bibs.delete(sessionId);
+    await bib.detach().catch(() => {});
     this.emitToControlPlane({
       event: 'session.bib_detached',
       session_id: sessionId,

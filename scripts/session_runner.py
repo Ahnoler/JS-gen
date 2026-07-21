@@ -538,8 +538,92 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
                 sys.stderr.flush()
         return 'continue'
 
+    if event == "list_tabs":
+        browser_context = session_state.get('browser_context')
+        if not browser_context:
+            emit_json({"event": "tabs_result", "data": {"tabs": [], "activePageId": None, "error": "no browser_context"}})
+            return 'continue'
+        try:
+            tabs_info = await browser_context.get_tabs_info()
+            active = None
+            try:
+                cur = await browser_context.get_current_page()
+                for t in tabs_info:
+                    if getattr(t, 'url', None) == getattr(cur, 'url', None):
+                        active = getattr(t, 'page_id', None)
+                        break
+            except Exception:
+                pass
+            emit_json({
+                "event": "tabs_result",
+                "data": {
+                    "tabs": [
+                        {
+                            "pageId": getattr(t, 'page_id', i),
+                            "url": getattr(t, 'url', '') or '',
+                            "title": getattr(t, 'title', '') or '',
+                        }
+                        for i, t in enumerate(tabs_info)
+                    ],
+                    "activePageId": active,
+                },
+            })
+        except Exception as e:
+            emit_json({"event": "tabs_result", "data": {"tabs": [], "activePageId": None, "error": str(e)}})
+        return 'continue'
+
+    if event == "switch_tab":
+        browser_context = session_state.get('browser_context')
+        data = msg.get("data") or {}
+        if not browser_context:
+            emit_json({"event": "switch_tab_result", "data": {"ok": False, "error": "no browser_context"}})
+            return 'continue'
+        try:
+            page_id = data.get("pageId")
+            url = (data.get("url") or "").strip()
+            if page_id is not None and str(page_id) != "":
+                await browser_context.switch_to_tab(int(page_id))
+            elif url:
+                tabs_info = await browser_context.get_tabs_info()
+                matched = None
+                for t in tabs_info:
+                    if (getattr(t, 'url', '') or '') == url:
+                        matched = getattr(t, 'page_id', None)
+                        break
+                if matched is None:
+                    # Soft match: same path without trailing slash / query noise
+                    for t in tabs_info:
+                        tu = (getattr(t, 'url', '') or '').rstrip('/')
+                        if tu and tu == url.rstrip('/'):
+                            matched = getattr(t, 'page_id', None)
+                            break
+                if matched is None:
+                    raise RuntimeError(f'No Playwright tab matches url={url!r}')
+                await browser_context.switch_to_tab(int(matched))
+                page_id = matched
+            else:
+                raise RuntimeError('pageId or url required')
+            cur = await browser_context.get_current_page()
+            emit_json({
+                "event": "switch_tab_result",
+                "data": {
+                    "ok": True,
+                    "pageId": int(page_id) if page_id is not None else None,
+                    "url": getattr(cur, 'url', '') or url,
+                },
+            })
+            sys.stderr.write(f"[session] switch_tab -> pageId={page_id} url={getattr(cur, 'url', '')}\n")
+            sys.stderr.flush()
+        except Exception as e:
+            emit_json({"event": "switch_tab_result", "data": {"ok": False, "error": str(e)}})
+            sys.stderr.write(f"[session] switch_tab failed: {e}\n")
+            sys.stderr.flush()
+        return 'continue'
+
     if event == "replay_actions":
-        entries = msg.get("data", {}).get("actions", [])
+        data = msg.get("data", {}) or {}
+        entries = data.get("actions", [])
+        seed_action_log = bool(data.get("seed_action_log"))
         browser_context = session_state.get('browser_context')
         form_rules = session_state.get('form_rules', [])
         case_data_store = session_state.get('case_data_store', {})
@@ -547,8 +631,8 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
             emit_json({"event": "replay_done", "data": {"count": 0, "error": "no browser_context or empty actions"}})
             return 'continue'
 
-        # Orchestrate like `_form._auto_fill_pending` / `_execute_round`:
-        # sequential JS form ops + short waits (no networkidle, no mid-replay auto-fill).
+        # Self-heal / trajectory replay: sequential ops via scripts/actions/_replay.py
+        # (form JS + durable click + controller) — not LLM, not Playwright assemble_partial.
         from .actions._builder import build_controller
         from .actions._replay import replay_action_entries
 
@@ -573,6 +657,37 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
             case_data_store=case_data_store,
             emit=emit_json,
         )
+
+        # Heal path: seed ACTION_LOG with the original pre-failure entries so the
+        # subsequent agent recording can be saved as a complete trajectory (prefix + fix).
+        if seed_action_log:
+            try:
+                from .actions import _state as action_state
+                action_state._ACTION_LOG.clear()
+                for entry in filtered:
+                    action_name = entry.get("action") or ""
+                    if action_name in (
+                        'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields',
+                        'scan_visible_fields', 'check_field_value', 'verify_field_value',
+                        'take_screenshot', 'save_trajectory', 'save_case_data', 'read_case_data',
+                        'match_form_rule', 'init_task_list', 'get_pending_tasks',
+                        'sync_tasks_from_errors', 'expand_all_el_tree', 'task_done', 'task_retry',
+                        'save_form_snapshot',
+                    ):
+                        continue
+                    dumped = dict(entry)
+                    dumped.setdefault('source', 'replay')
+                    action_state._ACTION_LOG.append(dumped)
+                    if action_name == 'go_to_url' and (entry.get('params') or {}).get('url'):
+                        action_state._TRAJECTORY_URL = entry['params']['url']
+                sys.stderr.write(
+                    f"[replay] Seeded ACTION_LOG with {len(action_state._ACTION_LOG)} pre-failure entries\n"
+                )
+                sys.stderr.flush()
+            except Exception as e:
+                sys.stderr.write(f"[replay] seed_action_log failed: {e}\n")
+                sys.stderr.flush()
+
         emit_json({
             "event": "replay_done",
             "data": {
@@ -619,9 +734,8 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store, form_
     #       参考 scripts/cdp/watcher.py:69-70:
     #         ctx = browser.contexts[0]
     #         ctx.get_current_page = _get_page
-    # TODO: 自愈重跑场景下，CDP 操作可用于快速重建页面场景（填写表单、点击按钮等），
-    #       避免每次重跑都走完整的 AI 推理循环。见 browser-session.js rerun 路由的
-    #       form_changes 参数，结合 CDP 操作可以精准修复字段级差异。
+    # Self-heal scene reproduce uses replay_actions → _replay.replay_action_entries
+    # (see browser-session.js /rerun), not this CDP watcher loop.
     ctrl = build_controller(browser_context, form_rules, case_data_store=case_data_store)
     actions = ctrl.registry.registry.actions
 

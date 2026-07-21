@@ -6,13 +6,24 @@
 export function createSessionHandler(manager) {
   return async function handleSessionMessage(type, payload) {
     const sessionId = payload?.sessionId;
-    if (!sessionId && type !== 'session.list') {
+    // list / list_cdp may use requestId as sessionId for reply routing
+    if (!sessionId && type !== 'session.list' && type !== 'session.list_cdp') {
       throw new Error('sessionId is required');
     }
 
     switch (type) {
       case 'session.open':
         return manager.open(payload);
+      case 'session.list':
+        return {
+          requestId: payload?.requestId || sessionId,
+          sessions: manager.list(),
+        };
+      case 'session.list_cdp':
+        return {
+          requestId: payload?.requestId || sessionId,
+          ...(await manager.listCdp()),
+        };
       case 'session.attach_bib':
         return manager.attachBib({
           sessionId,
@@ -33,6 +44,14 @@ export function createSessionHandler(manager) {
         return manager.bibAck(sessionId, payload);
       case 'session.bib_input':
         return manager.bibInput(sessionId, payload);
+      case 'session.bib_tabs':
+        return manager.bibListTabs(sessionId);
+      case 'session.bib_switch_tab':
+        return manager.bibSwitchTab(sessionId, {
+          targetId: payload.targetId,
+          url: payload.url,
+          pageId: payload.pageId,
+        });
       case 'session.step':
         return manager.forward(sessionId, 'step', {
           instruction: payload.task || payload.instruction,
@@ -64,8 +83,6 @@ export function createSessionHandler(manager) {
         return manager.forward(sessionId, 'reset_trajectory', {});
       case 'session.stdin':
         return manager.forward(sessionId, payload.event, payload.data || {});
-      case 'session.list':
-        return { sessions: manager.list() };
       default:
         throw new Error(`Unknown session command: ${type}`);
     }

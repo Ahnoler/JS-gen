@@ -20,6 +20,18 @@ const MIN_FORWARD_MS = 40;
 /** If no CDP frame for this long while attached, restart screencast. */
 const STALL_RESTART_MS = 2500;
 
+function isUsablePage(p) {
+  const url = p?.url || '';
+  return !url.startsWith('devtools://') && !url.startsWith('chrome-extension://');
+}
+
+/** Prefer newest page (last) so Agent's working tab wins over leftover homepage tabs. */
+function pickDefaultPage(pages) {
+  const usable = (pages || []).filter(isUsablePage);
+  if (usable.length) return usable[usable.length - 1];
+  return (pages || []).find((p) => !p.url?.startsWith('devtools://')) || pages?.[0] || null;
+}
+
 export class BibBridge {
   /**
    * @param {object} opts
@@ -42,6 +54,9 @@ export class BibBridge {
     this._lastFrameAt = 0;
     this._stallTimer = null;
     this._restarting = false;
+    /** @type {string|null} */
+    this.activeTargetId = null;
+    this._switching = false;
   }
 
   async attach({
@@ -53,6 +68,8 @@ export class BibBridge {
     resize = false,
     /** Prefer explicit port from session slot (multi-Chrome safe). */
     cdpPort,
+    /** Optional: attach to this CDP target instead of default pick. */
+    targetId = null,
   } = {}) {
     this.quality = Math.min(95, Math.max(40, Number(quality) || 70));
     this.viewport = {
@@ -82,9 +99,35 @@ export class BibBridge {
     await this.client.connect(hit.cdpWsUrl);
 
     const pages = await this.client.listPageTargets();
-    const page = pages.find((p) => !p.url?.startsWith('devtools://')) || pages[0];
+    let page = null;
+    if (targetId) {
+      page = pages.find((p) => p.targetId === targetId) || null;
+    }
+    if (!page) page = pickDefaultPage(pages);
     if (!page) throw new Error('No page target on CDP browser');
-    await this.client.attachToTarget(page.targetId);
+
+    await this._bindPageTarget(page.targetId, { resize });
+    this.client.on('Page.screencastFrame', (params) => this._onScreencastFrame(params));
+    this.client.on('Client.disconnected', () => {
+      this.screencastOn = false;
+      this._clearStallWatch();
+    });
+
+    await this.startScreencast();
+  }
+
+  /**
+   * Attach Page/Runtime domains to a target and mark it active.
+   * @param {string} targetId
+   * @param {{ resize?: boolean }} [opts]
+   */
+  async _bindPageTarget(targetId, { resize = false } = {}) {
+    if (!this.client) throw new Error('not attached');
+    try {
+      await this.client.send('Target.activateTarget', { targetId }, null);
+    } catch {}
+    await this.client.attachToTarget(targetId);
+    this.activeTargetId = targetId;
 
     await this.client.send('Page.enable');
     await this.client.send('Runtime.enable');
@@ -97,14 +140,53 @@ export class BibBridge {
         mobile: false,
       });
     }
+  }
 
-    this.client.on('Page.screencastFrame', (params) => this._onScreencastFrame(params));
-    this.client.on('Client.disconnected', () => {
-      this.screencastOn = false;
-      this._clearStallWatch();
-    });
+  /**
+   * List open page tabs for the bound Chrome.
+   * @returns {Promise<{ tabs: object[], activeTargetId: string|null }>}
+   */
+  async listTabs() {
+    if (!this.client || this._disposed) {
+      return { tabs: [], activeTargetId: this.activeTargetId };
+    }
+    const pages = await this.client.listPageTargets();
+    const tabs = pages
+      .filter(isUsablePage)
+      .map((p, index) => ({
+        targetId: p.targetId,
+        url: p.url || '',
+        title: p.title || '',
+        index,
+        active: p.targetId === this.activeTargetId,
+      }));
+    if (tabs.length && !tabs.some((t) => t.active)) {
+      tabs[tabs.length - 1].active = true;
+    }
+    return { tabs, activeTargetId: this.activeTargetId };
+  }
 
-    await this.startScreencast();
+  /**
+   * Switch screencast + Chrome foreground to another page target.
+   * @param {string} targetId
+   */
+  async switchToTarget(targetId) {
+    if (!this.client || this._disposed) throw new Error('not attached');
+    if (!targetId) throw new Error('targetId required');
+    if (targetId === this.activeTargetId && this.screencastOn) {
+      try { await this.client.send('Target.activateTarget', { targetId }, null); } catch {}
+      return { ok: true, targetId, reused: true };
+    }
+    if (this._switching) throw new Error('tab switch already in progress');
+    this._switching = true;
+    try {
+      await this.stopScreencast().catch(() => {});
+      await this._bindPageTarget(targetId, { resize: false });
+      await this.startScreencast();
+      return { ok: true, targetId, reused: false };
+    } finally {
+      this._switching = false;
+    }
   }
 
   async startScreencast() {
@@ -158,7 +240,6 @@ export class BibBridge {
   }
 
   async handleInput(payload = {}) {
-    // Input must work even if screencast briefly stalled (restart in progress).
     if (!this.client || this._disposed) return { ok: false, reason: 'not attached' };
 
     const kind = payload.kind;
@@ -186,7 +267,6 @@ export class BibBridge {
         deltaY,
         modifiers: payload.modifiers ?? 0,
       });
-      // Page changed under cursor — nudge stream if it was frozen
       if (type === 'mousePressed' || type === 'mouseReleased') {
         this._nudgeIfStalled();
       }
@@ -220,19 +300,16 @@ export class BibBridge {
   _onScreencastFrame(params = {}) {
     if (!this.screencastOn || !this.remoteSessionUuid) return;
     const cdpSessionId = params.sessionId;
-    // CRITICAL: always ack Chrome first so the next frame can be produced.
     this._ackChrome(cdpSessionId);
     this._lastFrameAt = Date.now();
 
     const dataB64 = params.data;
     if (!dataB64) return;
 
-    // Throttle WS forward; dropped frames are already acked above.
     const now = Date.now();
     if (now - this._lastForwardAt < MIN_FORWARD_MS) return;
     this._lastForwardAt = now;
 
-    // Keep coordinate space aligned with the live page (CSS px).
     const metadata = params.metadata || {};
     const dw = Number(metadata.deviceWidth);
     const dh = Number(metadata.deviceHeight);
@@ -285,5 +362,6 @@ export class BibBridge {
       try { await this.client.close(); } catch {}
       this.client = null;
     }
+    this.activeTargetId = null;
   }
 }

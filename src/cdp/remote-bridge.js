@@ -236,8 +236,14 @@ export async function attachLive(opts = {}) {
 
     const pages = await client.listPageTargets();
     if (!pages.length) throw new Error('No page target on CDP browser');
-    // Prefer non-devtools / last focused page
-    const page = pages.find((p) => !p.url?.startsWith('devtools://')) || pages[0];
+    // Prefer newest usable page (last) so leftover homepage tabs are not streamed by default
+    const usable = pages.filter((p) => {
+      const u = p.url || '';
+      return !u.startsWith('devtools://') && !u.startsWith('chrome-extension://');
+    });
+    const page = (usable.length ? usable[usable.length - 1] : null)
+      || pages.find((p) => !p.url?.startsWith('devtools://'))
+      || pages[0];
     await client.attachToTarget(page.targetId);
 
     await client.send('Page.enable');
@@ -705,6 +711,15 @@ function ensureWsHook() {
           sendToExecutor(executorNodeUuid, 'session.bib_ack', { sessionId, ...(msg.payload || {}) });
         } else if (type === 'remote:input') {
           sendToExecutor(executorNodeUuid, 'session.bib_input', { sessionId, ...(msg.payload || {}) });
+        } else if (type === 'remote:tabs') {
+          sendToExecutor(executorNodeUuid, 'session.bib_tabs', { sessionId });
+        } else if (type === 'remote:switch_tab') {
+          sendToExecutor(executorNodeUuid, 'session.bib_switch_tab', {
+            sessionId,
+            targetId: msg.payload?.targetId,
+            url: msg.payload?.url,
+            pageId: msg.payload?.pageId,
+          });
         } else if (type === 'remote:viewport') {
           // viewport resize is handled at attach-time; ignore for now
         } else if (type === 'remote:inspect') {
@@ -714,7 +729,13 @@ function ensureWsHook() {
         }
       } catch {}
 
-      if (type === 'remote:start' || type === 'remote:stop' || type === 'remote:status') {
+      if (
+        type === 'remote:start'
+        || type === 'remote:stop'
+        || type === 'remote:status'
+        || type === 'remote:tabs'
+        || type === 'remote:switch_tab'
+      ) {
         const live2 = await remoteSessionService.getLiveStatus().catch(() => null);
         ws.send(JSON.stringify({ type: 'remote:status', payload: live2 || { attached: false, cdpReady: true } }));
       }
