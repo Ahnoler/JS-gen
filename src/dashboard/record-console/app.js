@@ -4,7 +4,7 @@
  */
 import { api, escapeHtml } from './api.js';
 import { NODE_TYPE } from '../../models/hierarchy-constants.js';
-import { asTree, flattenTree } from '../hierarchy-tree-utils.js';
+import { asSystemForest, flattenTree } from '../hierarchy-tree-utils.js';
 
 const NODE_FUNCTION = NODE_TYPE.FUNCTION;
 
@@ -70,7 +70,7 @@ function updateNav() {
 async function loadTree() {
   try {
     const data = await api('GET', '/api/v2/system-mgmt/tree?accounts=false');
-    state.tree = asTree(data);
+    state.tree = asSystemForest(data);
     renderTree();
     const n = flattenTree(state.tree).length;
     log(`系统树已加载 (${state.tree.length} 系统 / ${n} 节点)`, 'ok');
@@ -169,7 +169,7 @@ async function onSearch() {
       'GET',
       `/api/v2/system-mgmt/tree?accounts=false&name=${encodeURIComponent(q)}&limit=30`,
     );
-    const tree = asTree(data);
+    const tree = asSystemForest(data);
     // Hits: nodes that matched keyword (have path) — fallback to all flattened
     const flat = flattenTree(tree);
     state.searchHits = flat.filter((n) => n.path) ;

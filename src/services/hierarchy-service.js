@@ -4,6 +4,9 @@ import * as systemAccountDao from '../dao/system-account-dao.js';
 import {
   NODE_TYPE,
   TYPE_LABEL,
+  ROOT_NODE_ID,
+  isRootParentId,
+  isRootNodeId,
   SEED_SYSTEM_ID,
   SEED_MODULE_ID,
   SEED_FUNCTION_ID,
@@ -12,12 +15,12 @@ import {
 const EXPORT_VERSION = 1;
 
 /**
- * Hierarchy tree: 系统 → 模块 → 功能，统一挂在 children[] 下（不再分 modules/functions）。
- * 支持名称模糊查询（HTTP 参数 name → keyword）与 type 筛选；筛选时会带上祖先节点以保持树完整。
- * 有关键词时，命中节点附带 path / pathNodes。
+ * Hierarchy tree under sentinel root id=0：根 → 系统 → 模块 → 功能（children[]）。
+ * 支持名称模糊（HTTP name → keyword）与 type 筛选；筛选时保留祖先，且始终带上根节点。
+ * 有关键词时，命中节点附带 path（不含根名「根」）。
  * 可选在 type=1 系统节点上附带 accounts。
  * @param {{ includeAccounts?: boolean, keyword?: string, type?: number|string, limit?: number }} [opts]
- * @returns {Promise<object[]>} 根节点数组（系统）
+ * @returns {Promise<object[]>} 长度为 1 的数组：[{ id:0, type:0, children:[…] }]
  */
 export async function getTree({
   includeAccounts = true,
@@ -42,22 +45,21 @@ export async function getTree({
       type: typeFilter,
       keyword: kw || undefined,
       limit: kw ? (limit ?? 50) : limit,
-    });
+    }).then((rows) => rows.filter((n) => !isRootNodeId(n.id)));
+
     for (const m of matched) matchedIds.add(Number(m.id));
 
     const allRaw = await systemDao.listAllRaw();
     const byId = new Map(allRaw.map((n) => [n.id, n]));
-    const keep = new Set();
+    const keep = new Set([ROOT_NODE_ID]);
     for (const m of matched) {
       let cur = byId.get(m.id);
       const guard = new Set();
       while (cur && !guard.has(cur.id)) {
         guard.add(cur.id);
         keep.add(cur.id);
-        if (kw && matchedIds.has(cur.id)) {
-          // path filled after we pick shaped nodes
-        }
-        if (cur.parentId == null) break;
+        if (isRootNodeId(cur.id)) break;
+        if (isRootParentId(cur.parentId) && !byId.has(cur.parentId)) break;
         cur = byId.get(cur.parentId);
       }
     }
@@ -66,9 +68,7 @@ export async function getTree({
     if (kw) {
       for (const n of nodes) {
         if (!matchedIds.has(Number(n.id))) continue;
-        const pathNodes = buildPath(n.id, byId);
-        n.pathNodes = pathNodes;
-        n.path = formatPath(pathNodes);
+        n.path = formatPath(buildPath(n.id, byId));
       }
     }
   }
@@ -90,7 +90,42 @@ export async function getTree({
     }
   }
 
-  return nestToChildrenTree(nodes);
+  return ensureRootTree(nestToChildrenTree(nodes));
+}
+
+/**
+ * Guarantee API shape: data = [{ id:0, type:0, children:[…] }].
+ */
+export async function ensureRootTree(tree = []) {
+  const list = Array.isArray(tree) ? tree : [];
+  if (list.length === 1 && isRootNodeId(list[0].id)) {
+    list[0].children = list[0].children || [];
+    return list;
+  }
+
+  let rootNode = list.find((n) => isRootNodeId(n.id));
+  const others = list.filter((n) => !isRootNodeId(n.id));
+  if (!rootNode) {
+    const fromDb = await systemDao.getById(ROOT_NODE_ID);
+    rootNode = fromDb
+      ? { ...fromDb, children: [] }
+      : {
+        id: ROOT_NODE_ID,
+        type: NODE_TYPE.ROOT,
+        typeLabel: TYPE_LABEL[NODE_TYPE.ROOT],
+        parentId: ROOT_NODE_ID,
+        name: '根',
+        description: '系统树根节点（不可删除）',
+        url: '',
+        sortOrder: 0,
+        children: [],
+      };
+  }
+  rootNode.children = [
+    ...(rootNode.children || []),
+    ...others,
+  ];
+  return [rootNode];
 }
 
 function assertTypeFilter(t) {
@@ -108,7 +143,10 @@ function formatPath(pathNodes) {
     if (label && n.name.endsWith(label)) return n.name;
     return `${n.name}${label}`;
   };
-  return pathNodes.map(display).join('-');
+  return pathNodes
+    .filter((n) => n.type !== NODE_TYPE.ROOT && !isRootNodeId(n.id))
+    .map(display)
+    .join('-');
 }
 
 /**
@@ -131,8 +169,14 @@ export function nestToChildrenTree(nodes = []) {
     delete node.processes;
     delete node.functions;
 
-    const pid = node.parentId == null ? null : Number(node.parentId);
-    if (pid == null || !byId.has(pid)) {
+    // id=0 根节点始终作为森林根（即使 parent_id 指向自身）
+    if (isRootNodeId(node.id)) {
+      roots.push(node);
+      continue;
+    }
+
+    const pid = isRootParentId(node.parentId) ? ROOT_NODE_ID : Number(node.parentId);
+    if (!byId.has(pid)) {
       roots.push(node);
       continue;
     }
@@ -155,7 +199,7 @@ export function nestFlatTree(nodes = []) {
 export async function createSystem(name, description, url = '') {
   return systemDao.create({
     type: NODE_TYPE.SYSTEM,
-    parentId: null,
+    parentId: ROOT_NODE_ID,
     name,
     description,
     url,
@@ -216,7 +260,9 @@ export async function listNodes({ type, parentId } = {}) {
       if (t === NODE_TYPE.SYSTEM) return systemDao.list();
       return systemDao.listByType(t, {});
     }
-    const pid = parentId === null || parentId === 'null' ? null : +parentId;
+    const pid = parentId === null || parentId === 'null' || parentId === '0'
+      ? ROOT_NODE_ID
+      : +parentId;
     return systemDao.listByType(t, { parentId: pid });
   }
   if (parentId != null && parentId !== '') {
@@ -241,7 +287,8 @@ export function buildPath(nodeId, byId) {
       typeLabel: TYPE_LABEL[cur.type] || String(cur.type),
       uid: cur.uid,
     });
-    if (cur.parentId == null) break;
+    if (isRootNodeId(cur.id)) break;
+    if (isRootParentId(cur.parentId) && !byId.has(cur.parentId)) break;
     cur = byId.get(cur.parentId);
   }
   return chain;
@@ -421,7 +468,7 @@ export async function importTree(payload = {}) {
   }
 
   for (const root of roots) {
-    await upsertNode(root, null, NODE_TYPE.SYSTEM);
+    await upsertNode(root, ROOT_NODE_ID, NODE_TYPE.SYSTEM);
   }
 
   return { mode, ...stats, tree: await getTree({ includeAccounts: false }) };

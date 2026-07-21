@@ -3,6 +3,11 @@ import { toDbRow, fromDbRow } from './helpers.js';
 import {
   NODE_TYPE,
   TYPE_LABEL,
+  ROOT_NODE_ID,
+  ROOT_PARENT_ID,
+  isRootParentId,
+  isRootNodeId,
+  SEED_ROOT_ID,
   SEED_SYSTEM_ID,
   SEED_PROCESS_ID,
   SEED_FUNCTION_ID,
@@ -14,6 +19,11 @@ const TABLE = 'system';
 export {
   NODE_TYPE,
   TYPE_LABEL,
+  ROOT_NODE_ID,
+  ROOT_PARENT_ID,
+  isRootParentId,
+  isRootNodeId,
+  SEED_ROOT_ID,
   SEED_SYSTEM_ID,
   SEED_PROCESS_ID,
   SEED_FUNCTION_ID,
@@ -37,7 +47,9 @@ export function fromRaw(row) {
     systemId: n.systemId,
     type: n.type,
     typeLabel: TYPE_LABEL[n.type] || String(n.type),
-    parentId: n.parentId ?? null,
+    parentId: isRootNodeId(n.id) || n.type === NODE_TYPE.ROOT || n.type === NODE_TYPE.SYSTEM
+      ? (isRootParentId(n.parentId) ? ROOT_NODE_ID : Number(n.parentId))
+      : (n.parentId ?? null),
     name: n.name,
     description: n.description ?? null,
     url: n.url || '',
@@ -78,8 +90,16 @@ function shapeNodes(rows) {
 export async function listByType(type, { parentId } = {}) {
   assertType(type);
   let q = getDB()(TABLE).where({ type });
-  if (parentId === null) q = q.whereNull('parent_id');
-  else if (parentId !== undefined) q = q.where({ parent_id: parentId });
+  if (parentId !== undefined) {
+    if (isRootParentId(parentId)) {
+      // type=系统 roots: parent_id=0（兼容尚未迁移的 NULL）
+      q = q.andWhere(function rootParent() {
+        this.where({ parent_id: ROOT_NODE_ID }).orWhereNull('parent_id');
+      });
+    } else {
+      q = q.where({ parent_id: parentId });
+    }
+  }
   const rows = await q.orderBy([
     { column: 'sort_order', order: 'asc' },
     { column: 'id', order: 'asc' },
@@ -87,9 +107,9 @@ export async function listByType(type, { parentId } = {}) {
   return shapeNodes(rows);
 }
 
-/** List root systems (type=1). */
+/** List root systems (type=1, parent_id=0). */
 export async function list() {
-  return listByType(NODE_TYPE.SYSTEM, { parentId: null });
+  return listByType(NODE_TYPE.SYSTEM, { parentId: ROOT_NODE_ID });
 }
 
 export async function listAllRaw() {
@@ -183,15 +203,19 @@ export async function searchByName(keyword, { limit = 50 } = {}) {
 
 export async function create(data) {
   const type = assertType(data.type ?? NODE_TYPE.SYSTEM);
-  const parentId = data.parentId ?? null;
-  if (type === NODE_TYPE.SYSTEM && parentId != null) {
-    throw Object.assign(new Error('type=1（系统）的 parentId 必须为空'), { code: 'VALIDATION' });
-  }
-  if (type !== NODE_TYPE.SYSTEM && (parentId == null || !Number.isFinite(+parentId))) {
-    throw Object.assign(new Error('模块/功能必须指定 parentId'), { code: 'VALIDATION' });
-  }
-  if (parentId != null) {
-    const parent = await getRawById(+parentId);
+  let parentId = data.parentId;
+
+  if (type === NODE_TYPE.SYSTEM) {
+    if (!isRootParentId(parentId) && parentId !== undefined) {
+      throw Object.assign(new Error('type=1（系统）的 parentId 必须为 0'), { code: 'VALIDATION' });
+    }
+    parentId = ROOT_PARENT_ID;
+  } else {
+    if (isRootParentId(parentId) || !Number.isFinite(+parentId)) {
+      throw Object.assign(new Error('模块/功能必须指定有效 parentId'), { code: 'VALIDATION' });
+    }
+    parentId = +parentId;
+    const parent = await getRawById(parentId);
     if (!parent) throw Object.assign(new Error('父节点不存在'), { code: 'NOT_FOUND' });
     if (type === NODE_TYPE.MODULE && parent.type !== NODE_TYPE.SYSTEM) {
       throw Object.assign(new Error('模块的父节点必须是系统（type=1）'), { code: 'VALIDATION' });
@@ -247,6 +271,11 @@ export async function update(id, data) {
 export async function remove(id) {
   const row = await getRawById(id);
   if (!row) return 0;
+  if (isRootNodeId(id) || row.uid === SEED_ROOT_ID || row.type === NODE_TYPE.ROOT) {
+    const err = new Error('不能删除系统树根节点');
+    err.code = 'SEED_PROTECTED';
+    throw err;
+  }
   const seedUuid = SEED_UUID_BY_TYPE[row.type];
   if (seedUuid && row.uid === seedUuid) {
     const err = new Error(`不能删除默认「未分类」${TYPE_LABEL[row.type] || '节点'}`);

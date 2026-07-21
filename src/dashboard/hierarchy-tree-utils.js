@@ -2,7 +2,7 @@
  * Client-safe helpers for hierarchy trees (children[] only).
  * Keep free of Node/DB imports — used by Dashboard / record-console.
  */
-import { NODE_TYPE } from '../models/hierarchy-constants.js';
+import { NODE_TYPE, ROOT_NODE_ID, isRootParentId, isRootNodeId } from '../models/hierarchy-constants.js';
 
 /**
  * Nest flat nodes into children[] tree (no modules/functions aliases).
@@ -19,8 +19,14 @@ export function nestToChildrenTree(nodes = []) {
     delete node.modules;
     delete node.processes;
     delete node.functions;
-    const pid = node.parentId == null ? null : Number(node.parentId);
-    if (pid == null || !byId.has(pid)) {
+
+    if (isRootNodeId(node.id)) {
+      roots.push(node);
+      continue;
+    }
+
+    const pid = isRootParentId(node.parentId) ? ROOT_NODE_ID : Number(node.parentId);
+    if (!byId.has(pid)) {
       roots.push(node);
       continue;
     }
@@ -70,10 +76,22 @@ export function asTree(payload) {
   // Already nested?
   if (body.some((n) => Array.isArray(n.children))) return body;
   // Flat list → nest
-  if (body.some((n) => n.parentId != null || Number(n.type) === NODE_TYPE.SYSTEM)) {
+  if (body.some((n) => !isRootParentId(n.parentId) || Number(n.type) === NODE_TYPE.SYSTEM || isRootNodeId(n.id))) {
     return nestToChildrenTree(body);
   }
   return body;
+}
+
+/**
+ * System forest for UIs that iterate type=1 at top level.
+ * If API returns [根 id=0], unwrap to its children.
+ */
+export function asSystemForest(payload) {
+  const tree = asTree(payload);
+  if (tree.length === 1 && isRootNodeId(tree[0].id)) {
+    return tree[0].children || [];
+  }
+  return tree;
 }
 
 /** @deprecated */

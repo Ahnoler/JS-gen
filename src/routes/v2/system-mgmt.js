@@ -21,12 +21,13 @@ function httpError(err) {
 
 export default function (app) {
   /**
-   * 1. 系统树（children[] 嵌套，可筛选）
+   * 1. 系统树（始终以 id=0 根为唯一顶层）
    * Query:
-   *   name     — 名称模糊查询（命中节点附带 path；会带上祖先以保持树完整）
+   *   name     — 名称模糊（命中节点附带 path，不含「根」；保留祖先）
    *   type     — 1|2|3 类型筛选
    *   limit    — 有 name 时生效，默认 50，最大 500
    *   accounts — 0/false 时不附带账号
+   * data: [{ id:0, type:0, name:'根', children:[ 系统… ] }]
    */
   app.get('/api/v2/system-mgmt/tree', async (req, res) => {
     try {
@@ -128,7 +129,7 @@ export default function (app) {
       }
       const node = await hierarchyService.createNode({
         type: +body.type,
-        parentId: body.parentId != null && body.parentId !== '' ? +body.parentId : null,
+        parentId: body.parentId != null && body.parentId !== '' ? +body.parentId : undefined,
         name: body.name,
         description: body.description,
         url: body.url,
@@ -169,6 +170,7 @@ export default function (app) {
     res.json({
       typeMap: TYPE_LABEL,
       types: [
+        { type: NODE_TYPE.ROOT, label: '根' },
         { type: NODE_TYPE.SYSTEM, label: '系统' },
         { type: NODE_TYPE.MODULE, label: '模块' },
         { type: NODE_TYPE.FUNCTION, label: '功能' },

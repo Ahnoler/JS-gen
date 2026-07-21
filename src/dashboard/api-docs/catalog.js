@@ -348,14 +348,27 @@ export const API_GROUPS = [
         reqExample: J({ description: '补充审核阶段' }),
       },
       {
+        method: 'PUT', path: '/api/v2/trajectories/{id}/phases',
+        summary: '按 id 同步阶段（删缺补新并重排 phase_number）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        reqExample: J({
+          phases: [
+            { id: 101, description: '登录系统' },
+            { description: '新阶段' },
+            { id: 103, description: '提交' },
+          ],
+        }),
+      },
+      {
         method: 'GET', path: '/api/v2/trajectories/{id}/action-flow',
         summary: 'DB 步骤动作流',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/clear',
-        summary: '清空步骤，阶段重置 pending',
+        summary: '清空步骤，阶段重置 pending（可按 phaseIds 局部清空）',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        reqExample: J({ phaseIds: [101, 102] }),
         respExample: J({ trajectoryId: 42, recordStatus: 'draft', stepCount: 0, phases: [], orphanSteps: [] }),
       },
       {
@@ -795,6 +808,11 @@ export const API_GROUPS = [
         summary: 'BiB 附着状态变化',
         tryable: false,
         respExample: J({ type: 'remote:status', payload: { attached: true, remoteSessionId: 7 } }),
+        notes: [
+          '推流为二进制 RSCF JPEG；执行端约 30fps 上限、默认编码 1920×1080 / quality≈75；画布显示默认自适应容器',
+          'Chrome screencast 在执行端即时 ack；客户端无需每帧 remote:ack',
+          '控制面 / 客户端在 WS 积压时丢弃旧帧，优先最新画面',
+        ],
       },
       {
         method: 'WS', path: 'remote:tabs',

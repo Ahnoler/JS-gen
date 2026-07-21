@@ -1,5 +1,5 @@
 import { escapeHtml } from './swagger-api.js';
-import { asTree } from './hierarchy-tree-utils.js';
+import { asSystemForest } from './hierarchy-tree-utils.js';
 import { unwrapApi, apiErrorMessage, isApiFail, readV2 } from './api-envelope.js';
 
 const SEED_SYSTEM_ID = '00000000-0000-0000-0000-000000000001';
@@ -13,7 +13,7 @@ export async function fetchHierarchyTree() {
   const res = await fetch('/api/v2/hierarchy/tree');
   const raw = await res.json();
   if (isApiFail(res, raw)) throw new Error(apiErrorMessage(raw, 'Load hierarchy failed'));
-  hierarchyTree = asTree(unwrapApi(raw));
+  hierarchyTree = asSystemForest(unwrapApi(raw));
   return hierarchyTree;
 }
 

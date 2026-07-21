@@ -9,7 +9,7 @@
  * @property {number} [id]
  * @property {string} systemId UUID 业务标识（各级节点共用此列）
  * @property {1|2|3} type 1=系统 2=模块 3=功能
- * @property {number|null} [parentId]
+ * @property {number} [parentId] 系统根为 0；模块/功能指向父节点 id
  * @property {string} name
  * @property {string} [description]
  * @property {string} [url] 系统地址（仅 type=1）

@@ -2,7 +2,7 @@
  * Migration: Create all core tables (13 tables).
  *
  * Table creation order follows foreign key dependencies:
- *   system (type 0/1/2, self-FK parent_id) → system_account
+ *   system (type 0/1/2/3 根/系统/模块/功能；根 id=0) → system_account
  *   remote_session → trajectory → trajectory_phase → trajectory_step
  *   case_data → case_data_entry
  *   form_snapshot → snapshot_field
@@ -11,13 +11,13 @@
  */
 export function up(knex) {
   return knex.schema
-    // ── Hierarchy: unified system (type 0/1/2) ──
+    // ── Hierarchy: unified system (type 0/1/2/3) ──
     .createTable('system', (t) => {
       t.bigIncrements('id').unsigned().primary();
       t.string('system_id', 36).notNullable().unique();
       t.specificType('type', 'tinyint').notNullable();
-      t.bigInteger('parent_id').unsigned().nullable()
-        .references('id').inTable('system').onDelete('CASCADE');
+      // type=1 系统挂在根 id=0；FK 在 seed/迁移插入根后再加
+      t.bigInteger('parent_id').unsigned().nullable().defaultTo(0);
       t.string('name', 255).notNullable();
       t.text('description');
       t.integer('sort_order').unsigned().defaultTo(0);

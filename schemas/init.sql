@@ -13,13 +13,13 @@ USE `uara`;
 
 -- ─────────────────────────────────────────────────────────────
 -- 层级节点 (System) — 系统/模块/功能 合并为一表
--- type: 1=系统 2=模块 3=功能；parent_id 指向父节点
+-- type: 0=根 1=系统 2=模块 3=功能；系统节点 parent_id=0 指向根
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `system` (
-  `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '代理主键',
+  `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '代理主键；根节点固定 id=0',
   `system_id`   VARCHAR(36)  NOT NULL COMMENT 'UUID 业务标识（各级节点共用）',
-  `type`        TINYINT NOT NULL COMMENT '1=系统 2=模块 3=功能',
-  `parent_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '父节点 id；type=1 时为空',
+  `type`        TINYINT NOT NULL COMMENT '0=根 1=系统 2=模块 3=功能',
+  `parent_id`   BIGINT UNSIGNED DEFAULT 0 COMMENT '父节点 id；系统挂在根 0 下',
   `name`        VARCHAR(255) NOT NULL COMMENT '名称',
   `description` TEXT COMMENT '描述',
   `url`         VARCHAR(2048) DEFAULT '' COMMENT '系统地址/入口 URL（仅 type=1 系统节点有意义）',
@@ -29,9 +29,8 @@ CREATE TABLE `system` (
   UNIQUE KEY `uk_system_id` (`system_id`),
   KEY `idx_type` (`type`),
   KEY `idx_parent_id` (`parent_id`),
-  KEY `idx_parent_name` (`parent_id`, `name`),
-  CONSTRAINT `fk_system_parent` FOREIGN KEY (`parent_id`) REFERENCES `system` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='层级节点（1=系统 2=模块 3=功能）';
+  KEY `idx_parent_name` (`parent_id`, `name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='层级节点（0=根 1=系统 2=模块 3=功能）';
 
 -- ─────────────────────────────────────────────────────────────
 -- 系统测试账号 (SystemAccount) — 挂在 type=1 系统节点下
@@ -264,10 +263,15 @@ CREATE TABLE `api_override` (
   COMMENT='响应覆写/Mock 规则，运行时由 CDP Fetch.fulfillRequest 应用';
 
 -- ============================================================
--- 默认数据（type 1/2/3 三级未分类）
+-- 默认数据（根 id=0 + type 1/2/3 三级未分类）
 -- ============================================================
+SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_AUTO_VALUE_ON_ZERO');
+
+INSERT INTO `system` (`id`, `system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
+  (0, '00000000-0000-0000-0000-000000000000', 0, 0, '根', '系统树根节点（不可删除）', 0);
+
 INSERT INTO `system` (`system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
-  ('00000000-0000-0000-0000-000000000001', 1, NULL, '未分类', '默认系统分类，用于尚未分配系统的历史轨迹', 0);
+  ('00000000-0000-0000-0000-000000000001', 1, 0, '未分类', '默认系统分类，用于尚未分配系统的历史轨迹', 0);
 
 INSERT INTO `system` (`system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
   ('00000000-0000-0000-0000-000000000002', 2, 1, '未分类', '默认流程分类', 0);

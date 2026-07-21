@@ -29,15 +29,8 @@ export async function up(knex) {
     await knex.raw('ALTER TABLE `system` ADD INDEX `idx_parent_id` (`parent_id`)');
   }
 
-  // Ensure self-FK for parent_id
-  try {
-    await knex.raw(
-      'ALTER TABLE `system` ADD CONSTRAINT `fk_system_parent` '
-      + 'FOREIGN KEY (`parent_id`) REFERENCES `system` (`id`) ON DELETE CASCADE',
-    );
-  } catch {
-    /* already exists */
-  }
+  // parent_id=0 marks type=系统 roots; do not add self-FK (0 is not a real row id)
+  // See migrations/20260720_system_parent_id_zero.js
 
   if (!hasProcess && !hasFunction) {
     console.log('[migrate] hierarchy already unified');
