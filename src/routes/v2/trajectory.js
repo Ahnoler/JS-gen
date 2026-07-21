@@ -207,6 +207,17 @@ export default function (app) {
     }
   });
 
+  /** Sync phases by id: body { phases: string[] | { id?, description }[] } */
+  app.put('/api/v2/trajectories/:id/phases', async (req, res) => {
+    try {
+      const phases = req.body?.phases ?? req.body?.descriptions ?? null;
+      const traj = await trajectoryService.syncTrajectoryPhaseDescriptions(+req.params.id, phases);
+      res.json(traj);
+    } catch (err) {
+      sendErr(res, err);
+    }
+  });
+
   /** Merged action flow for a trajectory (DB steps; pending empty — use session action-flow for live). */
   app.get('/api/v2/trajectories/:id/action-flow', async (req, res) => {
     try {
@@ -257,14 +268,16 @@ export default function (app) {
     }
   });
 
-  /** Clear recorded steps; keep phase descriptions and reset statuses to pending. */
+  /** Clear recorded steps; keep phase descriptions and reset statuses to pending.
+   *  Optional body.phaseIds: clear only those phases' steps (omit / empty = all). */
   app.post('/api/v2/trajectories/:id/clear', async (req, res) => {
     try {
-      const cleared = await trajectoryService.clearTrajectory(+req.params.id);
+      const phaseIds = req.body?.phaseIds ?? req.body?.phase_ids ?? null;
+      const cleared = await trajectoryService.clearTrajectory(+req.params.id, { phaseIds });
       if (!cleared) return res.status(404).json({ error: 'Trajectory not found' });
       res.json(cleared);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      sendErr(res, err);
     }
   });
 

@@ -934,31 +934,82 @@ export async function getTrajectoryTree(trajectoryDbId) {
   };
 }
 
-export async function clearTrajectory(trajectoryDbId) {
+/**
+ * Clear recorded steps.
+ * - No phaseIds / empty: clear all steps; reset all phases to pending.
+ * - With phaseIds: delete steps bound to those phases (by phase FK or phase_number);
+ *   reset only those phases.
+ */
+export async function clearTrajectory(trajectoryDbId, { phaseIds = null } = {}) {
   const tid = Number(trajectoryDbId);
   if (!Number.isFinite(tid) || tid <= 0) return null;
 
   const db = getDB();
+  const idSet = Array.isArray(phaseIds)
+    ? [...new Set(phaseIds.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))]
+    : [];
 
-  // Delete steps; keep phase descriptions but reset statuses.
-  await db('trajectory_step').where({ trajectory_id: tid }).del();
-  await db('trajectory_phase')
-    .where({ trajectory_id: tid })
-    .update({ status: 'pending', completed_at: null });
+  if (idSet.length > 0) {
+    const owned = await db('trajectory_phase')
+      .where({ trajectory_id: tid })
+      .whereIn('id', idSet)
+      .select('id', 'phase_number');
+    const ownedIds = owned.map((r) => Number(r.id)).filter((n) => n > 0);
+    const phaseNumbers = owned
+      .map((r) => Number(r.phase_number))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (!ownedIds.length) {
+      const err = new Error('No matching phases for phaseIds');
+      err.status = 400;
+      throw err;
+    }
+
+    // Match getTrajectoryTree assignment: FK first, else unbound steps by phase_number
+    await db('trajectory_step')
+      .where({ trajectory_id: tid })
+      .andWhere(function () {
+        this.whereIn('trajectory_phase_id', ownedIds);
+        if (phaseNumbers.length) {
+          this.orWhere(function () {
+            this.where(function () {
+              this.whereNull('trajectory_phase_id').orWhere('trajectory_phase_id', 0);
+            }).whereIn('phase_number', phaseNumbers);
+          });
+        }
+      })
+      .del();
+    await db('trajectory_phase')
+      .where({ trajectory_id: tid })
+      .whereIn('id', ownedIds)
+      .update({ status: 'pending', completed_at: null });
+  } else {
+    // Delete all steps; keep phase descriptions but reset statuses.
+    await db('trajectory_step').where({ trajectory_id: tid }).del();
+    await db('trajectory_phase')
+      .where({ trajectory_id: tid })
+      .update({ status: 'pending', completed_at: null });
+  }
 
   const [{ phases }] = await db('trajectory_phase')
     .where({ trajectory_id: tid })
     .count('* as phases');
+  const [{ steps }] = await db('trajectory_step')
+    .where({ trajectory_id: tid })
+    .count('* as steps');
 
   const phaseCount = Number(phases) || 0;
+  const stepCount = Number(steps) || 0;
 
-  await trajectoryDao.updateMeta(tid, {
+  const meta = {
     recordStatus: 'draft',
-    stepCount: 0,
+    stepCount,
     phaseCount,
-    isDone: null,
-    isSuccessful: null,
-  });
+  };
+  if (stepCount === 0) {
+    meta.isDone = null;
+    meta.isSuccessful = null;
+  }
+  await trajectoryDao.updateMeta(tid, meta);
 
   return getTrajectoryTree(tid);
 }
@@ -2005,6 +2056,121 @@ export async function addPhaseToTrajectory(trajectoryDbId, { description = '', p
   const counts = await refreshTrajectoryCounts(tid);
   await trajectoryDao.updateMeta(tid, { phaseCount: counts.phaseCount });
   return row;
+}
+
+/**
+ * Sync phases by identity (edit dialog).
+ * Body items: { id?, description } in desired order.
+ * - Keep/update phases whose id is still present (and belongs to this trajectory)
+ * - Delete missing phases and their bound steps (also unbound steps with that phase_number)
+ * - Create items without id
+ * - Renumber phase_number 1..n on phases and their steps
+ */
+export async function syncTrajectoryPhaseDescriptions(trajectoryDbId, descriptions = []) {
+  const tid = Number(trajectoryDbId);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    const err = new Error('Invalid trajectory id');
+    err.statusCode = 400;
+    throw err;
+  }
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Normalize: string[] or { id?, description }[]
+  const raw = Array.isArray(descriptions) ? descriptions : [];
+  const items = raw
+    .map((item) => {
+      if (typeof item === 'string') {
+        return { id: null, description: item.trim() };
+      }
+      if (item && typeof item === 'object') {
+        const idNum = item.id != null ? Number(item.id) : null;
+        return {
+          id: Number.isFinite(idNum) && idNum > 0 ? idNum : null,
+          description: String(item.description ?? item.content ?? '').trim(),
+        };
+      }
+      return null;
+    })
+    .filter((x) => x && x.description);
+
+  if (!items.length) {
+    const err = new Error('phases is required');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const db = getDB();
+  const existing = await trajectoryPhaseDao.listByTrajectory(tid);
+  const existingById = new Map(existing.map((p) => [Number(p.id), p]));
+
+  const keepIds = new Set(
+    items.map((it) => it.id).filter((id) => id != null && existingById.has(id)),
+  );
+
+  // Delete phases removed from the list (+ their steps)
+  for (const p of existing) {
+    const pid = Number(p.id);
+    if (keepIds.has(pid)) continue;
+    const oldPn = Number(p.phaseNumber) || 0;
+    await db('trajectory_step').where({ trajectory_phase_id: pid }).del();
+    if (oldPn > 0) {
+      await db('trajectory_step')
+        .where({ trajectory_id: tid, phase_number: oldPn })
+        .where(function () {
+          this.whereNull('trajectory_phase_id').orWhere('trajectory_phase_id', 0);
+        })
+        .del();
+    }
+    await db('trajectory_phase').where({ id: pid }).del();
+  }
+
+  // Upsert in order and renumber
+  for (let i = 0; i < items.length; i++) {
+    const phaseNumber = i + 1;
+    const { id, description } = items[i];
+    let phaseRow = id != null ? existingById.get(id) : null;
+
+    if (phaseRow) {
+      const oldPn = Number(phaseRow.phaseNumber) || 0;
+      await db('trajectory_phase')
+        .where({ id: phaseRow.id })
+        .update({ description, phase_number: phaseNumber });
+      await db('trajectory_step')
+        .where({ trajectory_phase_id: phaseRow.id })
+        .update({ phase_number: phaseNumber });
+      if (oldPn > 0 && oldPn !== phaseNumber) {
+        await db('trajectory_step')
+          .where({ trajectory_id: tid, phase_number: oldPn })
+          .where(function () {
+            this.whereNull('trajectory_phase_id').orWhere('trajectory_phase_id', 0);
+          })
+          .update({ phase_number: phaseNumber });
+      }
+      phaseRow.phaseNumber = phaseNumber;
+    } else {
+      phaseRow = await trajectoryPhaseDao.create({
+        phaseId: randomUUID(),
+        phaseNumber,
+        trajectoryId: tid,
+        status: 'pending',
+        description,
+      });
+      existingById.set(Number(phaseRow.id), phaseRow);
+    }
+  }
+
+  const counts = await refreshTrajectoryCounts(tid);
+  await trajectoryDao.updateMeta(tid, {
+    phaseCount: counts.phaseCount,
+    stepCount: counts.stepCount,
+  });
+
+  return getTrajectoryWithPhases(tid);
 }
 
 export async function listStepsByPhase(phaseDbId) {
