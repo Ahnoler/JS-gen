@@ -89,8 +89,17 @@ export async function create(step) {
 
 export async function update(id, fields) {
   const patch = toDbRow(fields);
-  if ('paramsJson' in fields || 'params' in fields) patch.params_json = fields.paramsJson ?? fields.params ?? null;
-  if ('elementJson' in fields || 'element' in fields) patch.element_json = fields.elementJson ?? fields.element ?? null;
+  // params/element are not DB columns — map to *_json
+  delete patch.params;
+  delete patch.element;
+  if ('paramsJson' in fields || 'params' in fields) {
+    const raw = fields.paramsJson ?? fields.params ?? null;
+    patch.params_json = raw == null || typeof raw === 'string' ? raw : JSON.stringify(raw);
+  }
+  if ('elementJson' in fields || 'element' in fields) {
+    const raw = fields.elementJson ?? fields.element ?? null;
+    patch.element_json = raw == null || typeof raw === 'string' ? raw : JSON.stringify(raw);
+  }
   if (!Object.keys(patch).length) return getById(id);
   await getDB()(TABLE).where({ id }).update(patch);
   return getById(id);
