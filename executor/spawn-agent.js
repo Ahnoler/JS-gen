@@ -25,6 +25,38 @@ export function killTree(pid) {
   } catch {}
 }
 
+/**
+ * Best-effort: kill whatever still listens on a CDP port (orphan Chromium).
+ * @param {number} port
+ */
+export function killListenerOnPort(port) {
+  const p = Number(port);
+  if (!Number.isFinite(p) || p <= 0) return;
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync(`netstat -ano | findstr :${p}`, {
+        encoding: 'utf8',
+        timeout: 5000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const pids = new Set();
+      for (const line of String(out).split(/\r?\n/)) {
+        if (!/LISTENING/i.test(line)) continue;
+        const m = line.trim().match(/(\d+)\s*$/);
+        if (m) pids.add(m[1]);
+      }
+      for (const pid of pids) {
+        if (pid === '0') continue;
+        try {
+          execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore', timeout: 5000 });
+        } catch {}
+      }
+    } else {
+      execSync(`fuser -k ${p}/tcp`, { stdio: 'ignore', timeout: 5000 });
+    }
+  } catch {}
+}
+
 export function waitForReady(child, timeout = 60000) {
   return new Promise((resolve, reject) => {
     let buffer = '';

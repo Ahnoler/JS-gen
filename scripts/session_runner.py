@@ -1240,8 +1240,19 @@ async def run_session(args):
 
     reader_task.cancel()
     try:
-        await browser_context.close()
-    except:
+        cdp_task.cancel()
+    except Exception:
         pass
+    try:
+        await browser_context.close()
+    except Exception:
+        pass
+    # Context.close() alone does NOT shut down Chromium when launched via
+    # browser_binary_path + user-data-dir — must close the Browser handle.
+    try:
+        await browser.close()
+    except Exception as e:
+        sys.stderr.write(f"[session] WARN: browser.close failed: {e}\n")
+        sys.stderr.flush()
     sys.stderr.write("[session] Browser closed, exiting\n")
     sys.stderr.flush()

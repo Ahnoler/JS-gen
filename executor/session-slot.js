@@ -1,7 +1,7 @@
 /**
  * One executor slot = one Python session subprocess + stdin/stdout bridge.
  */
-import { spawnAgent, waitForReady, isProcessAlive, killTree } from './spawn-agent.js';
+import { spawnAgent, waitForReady, isProcessAlive, killTree, killListenerOnPort } from './spawn-agent.js';
 import { LLM_API_KEY, LLM_BASE_URL, CONTROL_PLANE_HTTP, EXECUTOR_CDP_PORT_BASE } from './config.js';
 import net from 'net';
 
@@ -175,15 +175,19 @@ export class SessionSlot {
 
   async close() {
     const sessionId = this.sessionId;
+    const cdpPort = this.cdpPort;
     if (this.process?.stdin && this.ready) {
       try {
         this.process.stdin.write(JSON.stringify({ event: 'close' }) + '\n');
       } catch {}
     }
-    await new Promise((r) => setTimeout(r, 500));
+    // Allow Python to run browser.close() before force-kill.
+    await new Promise((r) => setTimeout(r, 2000));
     if (this.process && isProcessAlive(this.process)) {
       killTree(this.process.pid);
     }
+    // Chromium launched with user-data-dir often survives parent kill — clear CDP holder.
+    if (cdpPort != null) killListenerOnPort(cdpPort);
     this.process = null;
     this.ready = false;
     this.busy = false;
