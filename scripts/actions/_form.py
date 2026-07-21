@@ -489,7 +489,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         return _ok(f'form-snapshot | container:{container_id} | count:{snap.count}')
 
     # 内部函数 — 由 scan_form_fields 末尾自动调用。
-    # 按 kind 分组（select→input→date→radio→checkbox）多次调用 LLM，
+    # 按 kind 分组（date→select→input→radio→checkbox→tree-select）多次调用 LLM，
     # 失败字段保留在 pending 供 agent 手动处理，成功字段记录 action + task_done。
     # ── 辅助闭包（共享 page / llm / case_data_store / form_rules）──
     #
@@ -498,7 +498,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
     async def _execute_round(page, items, label_kind, all_results, round_tag):
         """分组 → LLM 规划 → 逐个执行。round_tag: '' | 'round2 ' | 'round3 '"""
-        KIND_ORDER = {'select': 0, 'date': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
+        KIND_ORDER = {'date': 0, 'select': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
         groups: dict[int, list[dict]] = {}
         for d in items:
             # Skip needs_intervention — only auto-fill fillable fields
@@ -511,7 +511,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             sub = groups[idx]
             if not sub:
                 continue
-            kind_name = {0:'select',1:'date',2:'input',3:'radio',4:'checkbox',5:'tree-select'}.get(idx, 'other')
+            kind_name = {0: 'date', 1: 'select', 2: 'input', 3: 'radio', 4: 'checkbox', 5: 'tree-select'}.get(idx, 'other')
             await page.evaluate(
                 's => console.log("[AI填表] 分组 " + s)',
                 f'{kind_name}: {len(sub)}个字段',
@@ -520,7 +520,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             # ---- Cross-field: cert type -> cert number ----
             # When cert_number is in the input group and cert_type was already
             # selected, inject the matching format as commandValue (Priority 1).
-            if idx == 1:
+            if idx == KIND_ORDER['input']:
                 _has_cert_num = any(
                     '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or '')
                     for d in sub

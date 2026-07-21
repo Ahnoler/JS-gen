@@ -222,6 +222,24 @@ async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
     )
 
 
+async def _replay_goto(page, params: dict) -> str:
+    """Navigate via Playwright — same role as assemble_script page.goto header."""
+    url = str(params.get('url') or '').strip()
+    if not url:
+        return 'error:missing-url'
+    await _wait_if_loading(page)
+    try:
+        await page.goto(url, wait_until='networkidle', timeout=60000)
+    except Exception:
+        try:
+            await page.goto(url, wait_until='load', timeout=30000)
+        except Exception as e:
+            return f'error:goto:{e}'
+    await page.wait_for_timeout(400)
+    await _wait_if_loading(page)
+    return 'ok'
+
+
 async def _replay_form_action(page, action_name: str, params: dict) -> str:
     """One form field op using the same JS path as `_execute_round`."""
     label = str(params.get('label_text') or '')
@@ -318,7 +336,9 @@ async def replay_action_entries(
             sys.stderr.flush()
 
             try:
-                if action_name == _CLICK_BY_INDEX:
+                if action_name == 'go_to_url':
+                    result = await _replay_goto(page, params)
+                elif action_name == _CLICK_BY_INDEX:
                     result = await _replay_click_by_index(page, entry, params)
                 elif action_name == 'click_menu_item':
                     menu_params = {

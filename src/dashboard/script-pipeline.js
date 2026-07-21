@@ -479,9 +479,9 @@ export function initScriptPipeline() {
     }
 
     if (formError) {
-      addHealLog('system', `🩹 Self-heal: form structure changed, updating form snapshot...`);
+      addHealLog('system', `🩹 Self-heal: form structure changed — _replay then re-record`);
     } else {
-      addHealLog('system', `🩹 Self-heal: step ${failedStep} failed, replaying from trajectory...`);
+      addHealLog('system', `🩹 Self-heal: step ${failedStep} failed — _replay pre-failure then re-record`);
     }
 
     try {

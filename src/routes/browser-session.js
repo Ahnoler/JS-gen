@@ -675,21 +675,51 @@ export default function (app) {
       const commands = actionData?.tests?.[0]?.commands || actionData?.actions || [];
       const remaining = commands.filter((c, i) => (i + 1) >= failedStep);
 
-      // ── CDP Replay phase: replay pre-failure actions to reproduce page state ──
-      const preFailure = commands.filter((c, i) => (i + 1) < failedStep);
-      if (preFailure.length > 0) {
-        const gb = state.globalBrowser;
-        if (gb.ready && gb.stdin) {
+      // ── Reproduce failure scene via scripts/actions/_replay.py ──
+      // Replay failedStep 之前的操作（必要时先 go_to_url），重建页面状态后再交给 Agent 修复。
+      const SKIP_REPLAY = new Set([
+        'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
+        'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
+        'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
+        'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree', 'task_done',
+        'task_retry', 'save_form_snapshot',
+      ]);
+      const preFailure = commands.filter(
+        (c, i) => (i + 1) < failedStep && !SKIP_REPLAY.has(c.action),
+      );
+      const replayActions = preFailure.map((c) => ({ ...c }));
+      const hasGoto = replayActions.some((c) => c.action === 'go_to_url');
+      if (url && !String(url).includes('unknown') && !hasGoto) {
+        replayActions.unshift({ action: 'go_to_url', params: { url } });
+      }
+
+      if (replayActions.length > 0) {
+        if (!sessionRuntimeReady(session)) {
+          console.log('[rerun] Session runtime not ready — skipping _replay reproduce');
+        } else {
           try {
-            gb.stdin.write(JSON.stringify({
-              event: 'replay_actions',
-              data: { actions: preFailure },
-            }) + '\n');
-            const replayResult = await waitForAgentEvent('replay_done', 120000);
+            const replayPayload = {
+              actions: replayActions,
+              seed_action_log: true,
+              is_replay: true,
+            };
+            let replayResult;
+            if (session.useExecutor && session.executorNodeUuid) {
+              const doneP = execSession.waitForSessionEvent(session.sessionId, 'replay_done', 180000);
+              writeAgentEvent(session, 'replay_actions', replayPayload);
+              replayResult = await doneP;
+            } else {
+              const doneP = waitForAgentEvent('replay_done', 180000);
+              writeAgentEvent(session, 'replay_actions', replayPayload);
+              replayResult = await doneP;
+            }
             replayedCount = replayResult.count || 0;
-            console.log(`[rerun] Replay done: ${replayedCount} actions executed via CDP`);
+            console.log(
+              `[rerun] _replay done: ${replayedCount} actions `
+              + `(ok=${replayResult.ok ?? '?'} failed=${replayResult.failed ?? '?'})`,
+            );
           } catch (e) {
-            console.log(`[rerun] Replay error (continuing with heal): ${e.message}`);
+            console.log(`[rerun] _replay error (continuing with heal): ${e.message}`);
           }
         }
       }
@@ -703,7 +733,7 @@ export default function (app) {
 
       // Build URL section
       const replayNote = replayedCount > 0
-        ? `当前页面已通过 CDP 自动回放了前 ${replayedCount} 步操作，处于第 ${failedStep} 步的待操作状态。无需重复导航和登录，直接扫描当前表单，建立任务清单，从第 ${failedStep} 步开始继续填写。\n\n`
+        ? `当前页面已通过 _replay（scripts/actions/_replay.py）自动回放了前 ${replayedCount} 步操作，处于第 ${failedStep} 步的待操作状态。无需重复导航和登录，直接扫描当前表单，建立任务清单，从第 ${failedStep} 步开始继续填写。\n\n`
         : '';
       const urlSection = replayedCount > 0
         ? replayNote
@@ -796,13 +826,21 @@ export default function (app) {
           .replace('{{REMAINING_COMMANDS}}', remainingCmds || '(无剩余操作步骤)')
           .replace('{{LOG_SECTION}}', logSection);
         if (replayedCount > 0) {
+          resumeInstruction = resumeInstruction.replace(
+            '若上方未说明「已回放」，请根据目标 URL 与下方步骤抵达出错页面。抵达后',
+            '',
+          );
           resumeInstruction = resumeInstruction.replace('逐步导航并复现失败场景，抵达出错页面后，', '');
         }
       } else {
         // Fallback: build inline
         const lines = [];
         if (urlSection) lines.push(urlSection.trim());
-        if (replayedCount === 0) lines.push('当前为脚本执行失败后的自愈修复阶段。请根据下方操作步骤与 Log 文件，逐步导航并复现失败场景，抵达出错页面后，扫描当前表单，建立任务清单，重新填写所有表单项。');
+        if (replayedCount === 0) {
+          lines.push('当前为脚本执行失败后的自愈修复阶段。失败步之前的页面状态应由 _replay 自动回放重建；若未能回放，请根据目标 URL 与下方步骤抵达出错页面。抵达后扫描当前表单，建立任务清单，重新填写所有表单项。');
+        } else {
+          lines.push('当前为脚本执行失败后的自愈修复阶段。请扫描当前表单，建立任务清单，重新填写所有表单项。');
+        }
         if (formChangesSection) lines.push('\n' + formChangesSection.trim());
         lines.push('\n## 剩余操作步骤（从第 ' + failedStep + ' 步开始）');
         lines.push(remainingCmds || '(无剩余操作步骤)');
