@@ -6,7 +6,7 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { PROJECT_DIR } from '../../config/config.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
-import { getTrajectoryTree, getTrajectoryRuntime } from './trajectory-service.js';
+import { getTrajectoryTree } from './trajectory-service.js';
 import { trajectoryStepToActionEntry } from '../models/element.js';
 import { assembleActionToScript } from './assemble-service.js';
 import {
@@ -44,15 +44,14 @@ function stepsToReplayCommands(steps) {
   });
 }
 
-function assertNotRecording(traj, tid) {
+function assertNotRecording(traj) {
   if (traj.recordStatus === 'recording') {
     const err = new Error('Trajectory is AI-recording; stop recording before replay');
     err.statusCode = 409;
     throw err;
   }
-  const runtime = getTrajectoryRuntime(tid);
-  if (runtime && traj.recordStatus === 'recording') {
-    const err = new Error('Trajectory recording session is active');
+  if (traj.recordStatus === 'live') {
+    const err = new Error('Trajectory is live (prepared); detach before replay');
     err.statusCode = 409;
     throw err;
   }
@@ -69,7 +68,7 @@ export async function prepareReplay(trajectoryId) {
     err.statusCode = 404;
     throw err;
   }
-  assertNotRecording(traj, tid);
+  assertNotRecording(traj);
 
   const tree = await getTrajectoryTree(tid);
   const flatSteps = [];
@@ -228,7 +227,7 @@ export async function startReplay(trajectoryId, { replayPlanId = null, ws = null
     err.statusCode = 404;
     throw err;
   }
-  assertNotRecording(traj, tid);
+  assertNotRecording(traj);
 
   if (isScriptExecuting()) {
     const err = new Error('Another script is already executing');

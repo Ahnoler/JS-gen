@@ -1343,6 +1343,8 @@ export async function prepareTrajectoryRecording(trajectoryId) {
     });
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
+    // Occupy indicator for trajectory list: stream ready ⇒ live (not AI recording)
+    await trajectoryDao.updateMeta(tid, { recordStatus: 'live' }).catch(() => {});
   }
 
   // ── 4: login / navigate (default ops — not written to trajectory_step) ──
@@ -1370,6 +1372,7 @@ export async function prepareTrajectoryRecording(trajectoryId) {
   return {
     trajectoryId: tid,
     trajectory: fresh || traj,
+    recordStatus: fresh?.recordStatus || (streamOk ? 'live' : traj?.recordStatus) || null,
     phases: tree?.phases || [],
     orphanSteps: tree?.orphanSteps || [],
     sessionId: runtime.sessionId,
@@ -1676,8 +1679,17 @@ export async function detachTrajectoryLive(trajectoryId) {
   }
   slotLease.releaseByTrajectory(tid);
   trajectoryRuntimeMap.delete(tid);
-  if (traj) await trajectoryDao.updateMeta(tid, { remoteSessionId: null });
-  return { trajectoryId: tid, detached: true };
+
+  // Release occupancy: live/recording → draft (do not clobber recorded/completed)
+  let recordStatus = traj?.recordStatus || null;
+  const meta = { remoteSessionId: null };
+  if (traj && (traj.recordStatus === 'live' || traj.recordStatus === 'recording')) {
+    meta.recordStatus = 'draft';
+    recordStatus = 'draft';
+  }
+  if (traj) await trajectoryDao.updateMeta(tid, meta);
+
+  return { trajectoryId: tid, detached: true, recordStatus };
 }
 
 export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, accountId = null } = {}) {
@@ -1895,8 +1907,12 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
     err.statusCode = 404;
     throw err;
   }
-  if (traj.recordStatus === 'recording') {
-    const err = new Error('Cannot confirm while recording');
+  if (traj.recordStatus === 'recording' || traj.recordStatus === 'live') {
+    const err = new Error(
+      traj.recordStatus === 'recording'
+        ? 'Cannot confirm while AI recording'
+        : 'Cannot confirm while live (prepared); detach first',
+    );
     err.statusCode = 409;
     throw err;
   }

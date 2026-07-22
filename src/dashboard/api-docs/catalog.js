@@ -426,12 +426,13 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/prepare',
         summary: '一键准备（占槽 + 登录 + 推流）',
-        desc: '幂等。优先复用本交易 live session，其次复用空闲 CDP Chrome，再次新建浏览器；无空闲槽位则 409。登录/导航不写入 trajectory_step。通过 WS 广播 recording:prepare。',
+        desc: '幂等。优先复用本交易 live session，其次复用空闲 CDP Chrome，再次新建浏览器；无空闲槽位则 409。登录/导航不写入 trajectory_step。画面推流成功时将 recordStatus 置为 live（占用，非 AI 录制）。通过 WS 广播 recording:prepare。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
           trajectoryId: 42, sessionId: 'uuid', executorNodeUuid: 'node-uuid',
           remoteSessionId: 7, ready: true, attached: true, reused: false, reusedChrome: true,
+          recordStatus: 'live',
           login: { skipped: false, done: true, accountId: 10 },
           stream: { ok: true, remoteSessionId: 7 },
           stages: {
@@ -443,6 +444,8 @@ export const API_GROUPS = [
           '409：无可用执行资源（含 holders）',
           '503：会话/执行机不可用',
           '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
+          'stream.ok=true → recordStatus=live（列表可见占用中；人工录制可用）',
+          'record/start → recording；stop → recorded；detach(live|recording) → draft',
         ],
       },
       {
@@ -473,7 +476,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/confirm',
         summary: '人工确认 / 取消确认（交易级）',
-        desc: 'confirmed=true → recordStatus=completed；false → draft。不修改 trajectory_step.confirmed。录制中 409。',
+        desc: 'confirmed=true → recordStatus=completed；false → draft。不修改 trajectory_step.confirmed。live/recording 时 409。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ confirmed: true }),
         respExample: J({
@@ -484,7 +487,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/manual-record',
         summary: '开关人工录制',
-        desc: 'AI 录制中（recordStatus=recording）时开启会 409。phaseId 省略则追加到最后阶段。',
+        desc: 'AI 录制中（recordStatus=recording）时开启会 409。live（推流占用）下可开人工录制。phaseId 省略则追加到最后阶段。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ enabled: true, phaseId: 102 }),
         respExample: J({ trajectoryId: 42, enabled: true, phaseId: 102 }),
@@ -507,10 +510,10 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/detach',
         summary: '释放执行机槽位',
-        desc: '关闭会话并释放槽位。离开录制工作室不会自动调用；无步骤写入超过 10 分钟会由服务端自动回收。',
+        desc: '关闭会话并释放槽位。若当前 recordStatus 为 live 或 recording，则改回 draft（不覆盖 recorded/completed）。离开录制工作室不会自动调用；无步骤写入超过 10 分钟会由服务端自动回收。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
-        respExample: J({ trajectoryId: 42, detached: true }),
+        respExample: J({ trajectoryId: 42, detached: true, recordStatus: 'draft' }),
       },
     ],
   },
@@ -522,7 +525,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/replay/prepare',
         summary: '组装回放计划',
-        desc: 'recordStatus=recording 时 409。脚本不返回给客户端。',
+        desc: 'recordStatus 为 live 或 recording 时 409。脚本不返回给客户端。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
@@ -938,7 +941,7 @@ export const API_GROUPS = [
 ];
 
 export const ENUMS = [
-  { name: 'recordStatus', values: 'draft / recording / recorded / completed' },
+  { name: 'recordStatus', values: 'draft / live / recording / recorded / completed' },
   { name: 'phase.status', values: 'pending / running / completed / failed' },
   { name: 'step.source', values: 'agent / manual' },
   { name: '节点 type', values: '1 系统 / 2 模块 / 3 功能' },
