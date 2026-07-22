@@ -291,13 +291,38 @@ JS_MANUAL_RECORDER = r'''(() => {
     // Prefer browser_use-compatible xpath for assembler; keep absolute as backup
     const bu = buXPathOf(el);
     const abs = xpathOf(el);
+    const tag = (el.tagName || '').toLowerCase();
+    const cls = String((el.getAttribute && el.getAttribute('class')) || el.className || '');
+    // Text-anchored smart xpath for buttons/links (stable across dialog remounts)
+    let smart = '';
+    const nt = String(t || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+    if (nt && (tag === 'button' || tag === 'a' || /(^| )el-button( |$)/.test(cls))) {
+      const lit = nt.indexOf("'") < 0 ? ("'" + nt + "'") : ('"' + nt.replace(/"/g, '') + '"');
+      const local = tag === 'a' ? ('a[normalize-space()=' + lit + ']') : ('button[normalize-space()=' + lit + ']');
+      const inDrawer = !!(el.closest && el.closest('.el-drawer'));
+    const inDialog = !!(el.closest && el.closest('.el-dialog, .el-message-box'));
+    if (inDrawer) {
+      smart = "(//div[contains(@class,'el-drawer')])[last()]//" + local;
+    } else if (inDialog) {
+      smart = "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]//" + local;
+    } else {
+      smart = '//' + local;
+    }
+    }
+    const primary = smart || bu || abs;
+    const candidates = [];
+    if (smart) candidates.push({ type: 'xpath_smart', value: smart });
+    if (abs) candidates.push({ type: 'xpath_full', value: abs });
     const meta = {
-      xpath: bu || abs,
+      xpath: primary,
       bu_xpath: bu,
       xpath_abs: abs,
-      tag: (el.tagName || '').toLowerCase(),
+      xpath_full: abs,
+      xpath_smart: smart,
+      candidates: candidates,
+      tag: tag,
       attributes: attrs(el),
-      text: t,
+      text: nt || t,
     };
     if (hi != null) meta.highlight_index = hi;
     return meta;
@@ -646,6 +671,41 @@ JS_MANUAL_RECORDER = r'''(() => {
 })()'''
 
 
+def _xpath_literal(text: str) -> str:
+    t = str(text or '')
+    if "'" not in t:
+        return f"'{t}'"
+    if '"' not in t:
+        return f'"{t}"'
+    parts = t.split("'")
+    return 'concat(' + ', "\'", '.join(f"'{p}'" for p in parts) + ')'
+
+
+def _build_xpath_smart(tag: str, text: str, xpath_abs: str = '', class_name: str = '') -> str:
+    """Text-anchored xpath for buttons/links — stable across dialog remounts."""
+    t = re.sub(r'\s+', ' ', str(text or '')).strip()[:40]
+    if not t:
+        return ''
+    tag_l = (tag or '').lower()
+    cls = class_name or ''
+    clickable = tag_l in ('button', 'a') or bool(re.search(r'(?:^|\s)el-button(?:\s|$)', cls))
+    if not clickable:
+        return ''
+    lit = _xpath_literal(t)
+    local = f'a[normalize-space()={lit}]' if tag_l == 'a' else f'button[normalize-space()={lit}]'
+    abs_l = xpath_abs or ''
+    if re.search(r'el-drawer', abs_l, re.I) or re.search(r'el-drawer', cls, re.I):
+        return f"(//div[contains(@class,'el-drawer')])[last()]//{local}"
+    if re.search(r'el-dialog|el-message-box', abs_l, re.I) or re.search(
+        r'el-dialog|el-message-box', cls, re.I
+    ):
+        return (
+            "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]"
+            f"//{local}"
+        )
+    return f'//{local}'
+
+
 def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optional[dict]]]:
     """
     Map a DOM event payload to (action_name, params, element_info).
@@ -656,15 +716,38 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
     kind = (payload.get('kind') or '').strip()
     attrs = payload.get('attributes') or {}
     text = payload.get('text') or attrs.get('title') or ''
+    text = re.sub(r'\s+', ' ', str(text or '')).strip()
+    abs_xp = payload.get('xpath_abs') or payload.get('xpath_full') or ''
+    bu = payload.get('bu_xpath') or ''
+    smart = payload.get('xpath_smart') or ''
+    tag = payload.get('tag') or ''
+    cls = str(attrs.get('class') or attrs.get('className') or '')
+    if not smart:
+        smart = _build_xpath_smart(tag, text, abs_xp or str(payload.get('xpath') or ''), cls)
+    css = payload.get('cssSelector') or payload.get('css_selector') or ''
+    primary = smart or bu or payload.get('xpath') or abs_xp or ''
+    candidates = payload.get('candidates')
+    if not isinstance(candidates, list) or not candidates:
+        candidates = []
+        if smart:
+            candidates.append({'type': 'xpath_smart', 'value': smart})
+        if abs_xp:
+            candidates.append({'type': 'xpath_full', 'value': abs_xp})
+        elif primary and primary != smart:
+            candidates.append({'type': 'xpath_full', 'value': primary})
+        if css:
+            candidates.append({'type': 'css', 'value': css})
     element = {
-        # Prefer bu_xpath for assembler (same shape as agent recordings)
-        'xpath': payload.get('bu_xpath') or payload.get('xpath') or '',
-        'bu_xpath': payload.get('bu_xpath') or '',
-        'xpath_abs': payload.get('xpath_abs') or payload.get('xpath') or '',
-        'tag_name': payload.get('tag') or '',
-        'css_selector': '',
+        'xpath': primary,
+        'bu_xpath': bu,
+        'xpath_abs': abs_xp or payload.get('xpath') or '',
+        'xpath_full': abs_xp or '',
+        'xpath_smart': smart,
+        'tag_name': tag,
+        'css_selector': css,
         'attributes': attrs,
         'text': text,
+        'candidates': candidates,
     }
 
     if kind == 'fill':

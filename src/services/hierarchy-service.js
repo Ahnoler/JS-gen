@@ -11,6 +11,7 @@ import {
   SEED_MODULE_ID,
   SEED_FUNCTION_ID,
 } from '../models/hierarchy-constants.js';
+import * as systemMgmtExcel from './system-mgmt-excel.js';
 
 const EXPORT_VERSION = 1;
 
@@ -349,7 +350,7 @@ export async function exportTree() {
   };
 }
 
-/** Empty / sample template for import. */
+/** Empty / sample template for import (legacy JSON shape; prefer Excel endpoints). */
 export function getTreeTemplate() {
   return {
     version: EXPORT_VERSION,
@@ -385,6 +386,108 @@ export function getTreeTemplate() {
       },
     ],
   };
+}
+
+/** Excel template (.xlsx Buffer). */
+export async function getTreeTemplateExcel() {
+  return systemMgmtExcel.buildExcelBuffer(systemMgmtExcel.sampleTemplateRows());
+}
+
+/** Export whole tree as Excel (.xlsx Buffer). */
+export async function exportTreeExcel() {
+  const data = await exportTree();
+  const rows = systemMgmtExcel.flattenNodesToRows(data.nodes || []);
+  return systemMgmtExcel.buildExcelBuffer(rows);
+}
+
+/**
+ * Import tree from Excel buffer (flat rows with parent path).
+ * @param {Buffer|ArrayBuffer|Uint8Array} buffer
+ * @param {{ mode?: 'merge'|'append' }} [opts]
+ */
+export async function importTreeExcel(buffer, { mode: modeOpt } = {}) {
+  const mode = modeOpt === 'append' ? 'append' : 'merge';
+  const rows = await systemMgmtExcel.parseExcelBuffer(buffer);
+  const stats = { created: 0, updated: 0, skipped: 0 };
+
+  /** @type {Map<string, number>} path -> db id */
+  const pathToId = new Map();
+
+  // Seed existing tree paths so merge can attach under existing parents
+  const all = await systemDao.listAll();
+  const byId = new Map(all.map((n) => [Number(n.id), n]));
+  for (const n of all) {
+    if (isRootNodeId(n.id) || n.type === NODE_TYPE.ROOT) continue;
+    const parts = [];
+    let cur = n;
+    const guard = new Set();
+    while (cur && !isRootNodeId(cur.id) && cur.type !== NODE_TYPE.ROOT && !guard.has(cur.id)) {
+      guard.add(cur.id);
+      parts.unshift(String(cur.name || '').trim());
+      const pid = isRootParentId(cur.parentId) ? ROOT_NODE_ID : Number(cur.parentId);
+      cur = byId.get(pid);
+    }
+    if (parts.length) pathToId.set(parts.join('/'), Number(n.id));
+  }
+
+  for (const row of rows) {
+    const parentParts = systemMgmtExcel.splitParentPath(row.parentPath);
+    let parentId = ROOT_NODE_ID;
+    if (parentParts.length) {
+      const parentKey = parentParts.join('/');
+      const pid = pathToId.get(parentKey);
+      if (pid == null) {
+        throw Object.assign(
+          new Error(`第 ${row.rowNumber} 行找不到父节点路径「${parentKey}」`),
+          { code: 'VALIDATION' },
+        );
+      }
+      parentId = pid;
+    }
+
+    const selfPath = [...parentParts, row.name].join('/');
+    const siblings = await systemDao.listByParent(parentId);
+    const existing = siblings.find(
+      (s) => s.type === row.type && String(s.name || '').trim() === row.name,
+    );
+
+    let saved;
+    if (existing && mode === 'merge') {
+      saved = await systemDao.update(existing.id, {
+        name: row.name,
+        description: row.description || existing.description,
+        ...(row.type === NODE_TYPE.SYSTEM ? { url: row.url || existing.url || '' } : {}),
+      });
+      stats.updated += 1;
+    } else if (existing && mode === 'append') {
+      // Same name under parent already exists — create with new uuid still uses same name (allowed)
+      saved = await systemDao.create({
+        systemId: randomUUID(),
+        type: row.type,
+        parentId,
+        name: row.name,
+        description: row.description || null,
+        url: row.type === NODE_TYPE.SYSTEM ? (row.url || '') : '',
+        sortOrder: existing.sortOrder ?? 0,
+      });
+      stats.created += 1;
+    } else {
+      saved = await systemDao.create({
+        systemId: randomUUID(),
+        type: row.type,
+        parentId,
+        name: row.name,
+        description: row.description || null,
+        url: row.type === NODE_TYPE.SYSTEM ? (row.url || '') : '',
+        sortOrder: 0,
+      });
+      stats.created += 1;
+    }
+
+    pathToId.set(selfPath, Number(saved.id));
+  }
+
+  return { mode, ...stats, tree: await getTree({ includeAccounts: false }) };
 }
 
 /**

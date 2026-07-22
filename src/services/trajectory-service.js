@@ -366,15 +366,18 @@ export function stepsToActionEntries(steps) {
     const params = s.params ?? s.paramsJson ?? null;
     let element = s.element ?? s.elementJson ?? null;
     if (typeof element === 'string') element = safeJson(element);
+    const parsedParams = typeof params === 'string' ? safeJson(params) : (params || {});
+    const text = element?.text || parsedParams?.text || '';
     return {
       action: s.actionType || s.action || '',
-      params: typeof params === 'string' ? safeJson(params) : (params || {}),
+      params: text && !parsedParams.text ? { ...parsedParams, text } : parsedParams,
       result: s.extractedContent || s.result || '',
       phase: s.phaseNumber ?? s.phase ?? 0,
       target: element?.xpath || element?.target || '',
       cssSelector: element?.cssSelector || element?.css_selector || '',
       tagName: element?.tag || element?.tagName || '',
       attributes: element?.attributes || {},
+      element: element || undefined,
       timestamp: s.createdAt || null,
       persisted: true,
       source: s.source || 'agent',

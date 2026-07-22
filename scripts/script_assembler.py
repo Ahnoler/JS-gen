@@ -211,6 +211,17 @@ def _escape_js_string(s):
     return s.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n')
 
 
+def _xpath_literal_py(text):
+    """Build an XPath string literal for text matching."""
+    t = str(text or '')
+    if "'" not in t:
+        return f"'{t}'"
+    if '"' not in t:
+        return f'"{t}"'
+    parts = t.split("'")
+    return 'concat(' + ', "\'", '.join(f"'{p}'" for p in parts) + ')'
+
+
 FILL_RETRY_ACTIONS = {'fill_form_field', 'fill_date_field'}
 
 def _generate_action_code(entry, step_num, url, is_first_fill=False):
@@ -460,98 +471,123 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         idx = p('index')
         # target (ActionEntry) or nested element.xpath (DB → assemble-file)
         _el = _e.get('element') if isinstance(_e.get('element'), dict) else {}
-        xp = (_e.get('target') or _el.get('xpath') or _el.get('target')
-              or _e.get('xpath') or '')
+        _cands = _el.get('candidates') if isinstance(_el.get('candidates'), list) else []
+
+        def _cand(typ):
+            for c in _cands:
+                if isinstance(c, dict) and c.get('type') == typ and c.get('value'):
+                    return str(c.get('value'))
+            return ''
+
+        xp_smart = _cand('xpath_smart') or str(_el.get('xpath_smart') or '')
+        xp_full = _cand('xpath_full') or str(_el.get('xpath_full') or _el.get('xpath_abs') or '')
+        xp_primary = (_e.get('target') or _el.get('xpath') or _el.get('target')
+                      or _e.get('xpath') or '')
+        # Prefer text-anchored smart xpath; keep absolute as last resort
+        if xp_smart:
+            xp = xp_smart
+        elif str(xp_primary).startswith('//'):
+            xp = xp_primary
+            xp_smart = xp_primary
+        else:
+            xp = xp_primary
         txt = p('text', '') or (_el.get('text') or '')
         attrs = _e.get('attributes') if isinstance(_e.get('attributes'), dict) else {}
         if not attrs and isinstance(_el.get('attributes'), dict):
             attrs = _el['attributes']
-        elem_id = attrs.get('id', '') or ''
 
-        if not xp:
-            # Durable fallback: text / role click (index alone is ephemeral)
-            if txt:
-                lines.append(f"    console.log('[{step_num}] Click [{idx}] \"{txt}\" (text fallback, no XPath)');")
-                lines.append(pre())
-                lines.append(f"    let _clicked{step_num} = false;")
-                lines.append(f"    try {{")
-                lines.append(f"      await page.locator(':text-is(\"{_escape(txt)}\")').first().click({{ timeout: 3000 }});")
-                lines.append(f"      _clicked{step_num} = true;")
-                lines.append(f"    }} catch (_e_tx{step_num}) {{")
-                lines.append(f"      try {{")
-                lines.append(f"        await page.getByText('{_escape(txt)}', {{ exact: true }}).first().click({{ timeout: 3000 }});")
-                lines.append(f"        _clicked{step_num} = true;")
-                lines.append(f"      }} catch (_e_tx2{step_num}) {{}}")
-                lines.append(f"    }}")
-                lines.append(f"    if (!_clicked{step_num}) {{")
-                lines.append(f"      _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '', 'needs-llm-fix', 'no xpath/text match');")
-                lines.append(f"      throw new Error('[{step_num}] Click failed: no XPath and text \"{_escape(txt)}\" not found');")
-                lines.append(f"    }}")
-                lines.append('')
-                return '\n'.join(lines)
+        if not xp and not txt:
             lines.append(f"    console.log('[{step_num}] Click [{idx}] (no XPath)');")
             lines.append(f"    _recordError({step_num}, 'click_element_by_index', '', '', 'needs-llm-fix', 'missing xpath');")
             lines.append(f"    throw new Error('[{step_num}] Click failed: missing XPath and text');")
             return '\n'.join(lines)
 
-        if not xp.startswith('/') and not xp.startswith('//'):
-            xp = '/' + xp
+        if xp and not str(xp).startswith('/') and not str(xp).startswith('//'):
+            xp = '/' + str(xp)
+        if xp_full and not str(xp_full).startswith('/') and not str(xp_full).startswith('//'):
+            xp_full = '/' + str(xp_full)
 
         lines.append(f"    console.log('[{step_num}] Click [{idx}] \"{txt}\"');")
         lines.append("    await page.waitForFunction(before => location.href !== before, page.url(), { timeout: 5000 }).catch(() => {});")
         lines.append(pre())
         lines.append(pre_ready())
 
-        # Build degradation chain
+        # Degradation: visible text / xpath_smart BEFORE absolute xpath_full
+        # Prefer .last() — page often keeps hidden dialogs with the same button text.
         selectors = []
-        # Tier 0: XPath
-        selectors.append(('xpath', f"page.locator('xpath={_escape(xp)}').first()"))
-        # Tier 1: Text-based
         if txt:
-            selectors.append(('text', f"page.locator(':text-is(\"{_escape(txt)}\")').first()"))
-        # Tier 2: JS dispatchEvent
-        selectors.append(('js', f"JS: document.evaluate('{_escape(xp)}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue"))
-        # Tier 3: Fuzzy text match
+            selectors.append((
+                'role',
+                f"page.getByRole('button', {{ name: '{_escape(txt)}', exact: true }}).last()",
+            ))
+            selectors.append((
+                'text_btn',
+                f"page.locator('button.el-button, button').filter({{ hasText: '{_escape(txt)}' }}).last()",
+            ))
+        if xp_smart or (xp and str(xp).startswith('//')):
+            smart_xp = xp_smart or xp
+            selectors.append(('xpath_smart', f"page.locator('xpath={_escape(smart_xp)}').last()"))
+            if txt and 'el-dialog' in str(smart_xp) and 'el-drawer' not in str(smart_xp):
+                drawer_xp = f"(//div[contains(@class,'el-drawer')])[last()]//button[normalize-space()={_xpath_literal_py(txt)}]"
+                selectors.append(('xpath_drawer', f"page.locator('xpath={_escape(drawer_xp)}').last()"))
+            if txt:
+                plain_xp = f"//button[normalize-space()={_xpath_literal_py(txt)}]"
+                if plain_xp != str(smart_xp):
+                    selectors.append(('xpath_plain', f"page.locator('xpath={_escape(plain_xp)}').last()"))
+        if xp_full and xp_full != xp_smart and xp_full != xp:
+            selectors.append(('xpath_full', f"page.locator('xpath={_escape(xp_full)}').first()"))
+        elif xp and not str(xp).startswith('//') and xp != xp_smart:
+            selectors.append(('xpath_full', f"page.locator('xpath={_escape(xp)}').first()"))
+        js_xp = xp_smart or xp or xp_full
+        if js_xp:
+            selectors.append(('js', f"JS: document.evaluate('{_escape(js_xp)}', ...)"))
         if txt:
             selectors.append(('fuzzy', f"JS-fuzzy: text='{_escape(txt)}'"))
 
-        # Generate the degradation chain
+        if not selectors:
+            lines.append(f"    _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '', 'needs-llm-fix', 'no xpath/text match');")
+            lines.append(f"    throw new Error('[{step_num}] Click failed: no XPath and text \"{_escape(txt)}\" not found');")
+            return '\n'.join(lines)
+
         lines.append(f"    let _clicked{step_num} = false;")
         lines.append(f"    let _dt{step_num} = '';")
         for i, (sel_type, sel_expr) in enumerate(selectors):
             if sel_type in ('js', 'fuzzy'):
-                # JS-based selectors use page.evaluate
                 if sel_type == 'js':
                     lines.append(f"    if (!_clicked{step_num}) {{")
                     lines.append(f"      try {{")
-                    lines.append(f"        await page.evaluate((xp) => {{")
+                    lines.append(f"        const _okJs{step_num} = await page.evaluate((xp) => {{")
                     lines.append(f"          const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;")
-                    lines.append(f"          if (el) {{ el.dispatchEvent(new MouseEvent('click', {{ bubbles: true }})); return true; }}")
-                    lines.append(f"          return false;")
-                    lines.append(f"        }}, '{_escape(xp)}');")
-                    lines.append(f"        _clicked{step_num} = true;")
-                    lines.append(f"        console.log('[{step_num}]   clicked via JS dispatchEvent');")
+                    lines.append(f"          if (!el) return false;")
+                    lines.append(f"          const st = getComputedStyle(el);")
+                    lines.append(f"          const box = el.getBoundingClientRect();")
+                    lines.append(f"          if (st.display === 'none' || st.visibility === 'hidden' || box.width < 1 || box.height < 1) return false;")
+                    lines.append(f"          el.scrollIntoView({{ block: 'center', behavior: 'instant' }});")
+                    lines.append(f"          el.click();")
+                    lines.append(f"          return true;")
+                    lines.append(f"        }}, '{_escape(js_xp)}');")
+                    lines.append(f"        if (_okJs{step_num}) {{")
+                    lines.append(f"          _clicked{step_num} = true;")
+                    lines.append(f"          console.log('[{step_num}]   clicked via JS dispatchEvent');")
+                    lines.append(f"        }}")
                     lines.append(f"      }} catch (_e_js{step_num}) {{ _dt{step_num} += ' | JS: failed'; }}")
                     lines.append(f"    }}")
                 elif sel_type == 'fuzzy':
                     lines.append(f"    if (!_clicked{step_num}) {{")
                     lines.append(f"      try {{")
                     lines.append(f"        await page.evaluate((text) => {{")
-                    lines.append(f"          const candidates = [...document.querySelectorAll('button, a, span, li, label, .el-button, .el-menu-item')].filter(el => el.offsetParent !== null);")
-                    lines.append(f"          let best = null, bestScore = 0;")
-                    lines.append(f"          const t = [...new Set(text.replace(/\\s/g,''))];")
-                    lines.append(f"          for (const el of candidates) {{")
-                    lines.append(f"            const elText = el.textContent?.trim() || '';")
-                    lines.append(f"            if (!elText) continue;")
-                    lines.append(f"            const e = [...new Set(elText.replace(/\\s/g,''))];")
-                    lines.append(f"            const common = t.filter(ch => e.includes(ch)).length;")
-                    lines.append(f"            const score = common / Math.max(t.length, e.length, 1);")
-                    lines.append(f"            if (score > bestScore) {{ bestScore = score; best = el; }}")
-                    lines.append(f"          }}")
-                    lines.append(f"          if (best && bestScore >= 0.4) {{ best.click(); return bestScore; }}")
+                    lines.append(f"          const want = String(text || '').replace(/\\s+/g, ' ').trim();")
+                    lines.append(f"          const candidates = [...document.querySelectorAll('button, .el-button, a, [role=button]')].filter(el => {{")
+                    lines.append(f"            const st = getComputedStyle(el);")
+                    lines.append(f"            const box = el.getBoundingClientRect();")
+                    lines.append(f"            return st.display !== 'none' && st.visibility !== 'hidden' && box.width > 0 && box.height > 0;")
+                    lines.append(f"          }});")
+                    lines.append(f"          const exact = candidates.filter(el => (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim() === want);")
+                    lines.append(f"          const el = exact.length ? exact[exact.length - 1] : null;")
+                    lines.append(f"          if (el) {{ el.scrollIntoView({{ block: 'center', behavior: 'instant' }}); el.click(); return 1; }}")
                     lines.append(f"          return 0;")
                     lines.append(f"        }}, '{_escape(txt)}').then(score => {{")
-                    lines.append(f"          if (score > 0) {{ _clicked{step_num} = true; console.log('[{step_num}]   clicked via fuzzy (score=' + score.toFixed(2) + ')'); }}")
+                    lines.append(f"          if (score > 0) {{ _clicked{step_num} = true; console.log('[{step_num}]   clicked via fuzzy exact-visible'); }}")
                     lines.append(f"        }});")
                     lines.append(f"      }} catch (_e_fz{step_num}) {{ _dt{step_num} += ' | fuzzy: failed'; }}")
                     lines.append(f"    }}")
@@ -567,7 +603,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         # If all fail
         lines.append(f"    if (!_clicked{step_num}) {{")
         lines.append(f"      _dt{step_num} += ' → page structure changed — re-locate element';")
-        lines.append(f"      _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '{_escape_js_string(xp)}', 'needs-llm-fix', _dt{step_num});")
+        lines.append(f"      _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '{_escape_js_string(xp or xp_full or '')}', 'needs-llm-fix', _dt{step_num});")
         lines.append(f"      throw new Error('[{step_num}] Click failed: target element not found on page. Stopping — subsequent steps depend on this navigation.');")
         lines.append(f"    }}")
 

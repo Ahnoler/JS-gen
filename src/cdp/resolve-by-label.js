@@ -1,11 +1,18 @@
 /**
- * Resolve Element UI form control by label_text via CDP Runtime.evaluate.
+ * Resolve Element UI control by label_text via CDP Runtime.evaluate.
  * Returns ElementJson-compatible shape for trajectory_step.element_json.
+ *
+ * Match order:
+ * 1) .el-form-item by label text (form fields)
+ * 2) visible button / .el-button / link by visible text (dialog 取消/确定 etc.)
+ *
+ * For clickable text controls, primary xpath is xpath_smart (text-anchored).
  */
 import { toElementJson } from '../models/element.js';
+import { PAGE_LOCATOR_HELPERS, enrichLocatorFields } from './locator-candidates.js';
 
 /**
- * Page-side script: find .el-form-item by label text, return locator snapshot.
+ * Page-side script: find form control or clickable by label/text.
  * @param {string} labelText
  */
 export function buildResolveByLabelExpression(labelText) {
@@ -13,6 +20,8 @@ export function buildResolveByLabelExpression(labelText) {
   return `(() => {
     const want = ${labelJs};
     if (!want) return null;
+
+${PAGE_LOCATOR_HELPERS}
 
     function normLabel(s) {
       return String(s || '').trim().replace(/[：:*\\s]+$/g, '');
@@ -22,6 +31,13 @@ export function buildResolveByLabelExpression(labelText) {
       if (!item) return '';
       const lbl = item.querySelector('.el-form-item__label');
       return normLabel(lbl && lbl.textContent);
+    }
+    function visible(el) {
+      if (!el || el.nodeType !== 1) return false;
+      const st = getComputedStyle(el);
+      if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) === 0) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
     }
     function xpathOf(node) {
       if (!node || node.nodeType !== 1) return '';
@@ -39,18 +55,6 @@ export function buildResolveByLabelExpression(labelText) {
         cur = cur.parentElement;
       }
       return '/' + parts.join('/');
-    }
-    function cssOf(node) {
-      if (!node || node.nodeType !== 1) return '';
-      if (node.id) return '#' + CSS.escape(node.id);
-      const tag = node.tagName.toLowerCase();
-      const cls = String(node.className || '')
-        .split(/\\s+/)
-        .filter(Boolean)
-        .slice(0, 3)
-        .map((c) => '.' + CSS.escape(c))
-        .join('');
-      return tag + cls;
     }
     function pickControl(item) {
       if (!item) return null;
@@ -70,11 +74,42 @@ export function buildResolveByLabelExpression(labelText) {
       ].filter(Boolean);
       return candidates[0] || item;
     }
+    function snap(el, matchedLabel) {
+      const attrs = {};
+      try {
+        for (const a of el.attributes || []) {
+          if (a && a.name) attrs[a.name] = a.value;
+        }
+      } catch {}
+      const abs = xpathOf(el);
+      const rawText = String(el.innerText || el.value || el.textContent || '').trim().slice(0, 120);
+      const loc = buildLocatorSnap(el, rawText, abs);
+      return {
+        matchedLabel,
+        tag: el.tagName ? el.tagName.toLowerCase() : '',
+        xpath: loc.xpath || abs,
+        xpath_smart: loc.xpath_smart || '',
+        xpath_full: loc.xpath_full || abs,
+        xpath_abs: abs,
+        cssSelector: loc.cssSelector || '',
+        attributes: attrs,
+        text: loc.text || rawText,
+        className: String(el.className || attrs.class || ''),
+        candidates: loc.candidates || [],
+      };
+    }
+    function textMatch(elText, needle) {
+      const t = normLabel(elText);
+      const w = normLabel(needle);
+      if (!t || !w) return false;
+      return t === w || t.includes(w) || w.includes(t);
+    }
 
+    // 1) Form item by label
     const items = Array.from(document.querySelectorAll('.el-form-item'));
     let matched = null;
     for (const item of items) {
-      if (item.offsetParent === null && getComputedStyle(item).display === 'none') continue;
+      if (!visible(item) && item.offsetParent === null) continue;
       const label = formItemLabel(item);
       if (!label) continue;
       if (label === want || label.includes(want) || want.includes(label)) {
@@ -82,26 +117,31 @@ export function buildResolveByLabelExpression(labelText) {
         if (label === want) break;
       }
     }
-    if (!matched) return null;
+    if (matched) {
+      const el = pickControl(matched.item);
+      if (el) return snap(el, matched.label);
+    }
 
-    const el = pickControl(matched.item);
-    if (!el) return null;
-    const attrs = {};
-    try {
-      for (const a of el.attributes || []) {
-        if (a && a.name) attrs[a.name] = a.value;
+    // 2) Clickable by visible text (dialog footer 取消/确定, plain buttons, links)
+    const clickables = Array.from(document.querySelectorAll(
+      '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, .el-message-box__btns .el-button, button.el-button, .el-button, button, a'
+    ));
+    let exactBtn = null;
+    let fuzzyBtn = null;
+    for (const el of clickables) {
+      if (!visible(el)) continue;
+      const t = String(el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+      if (!t) continue;
+      if (normLabel(t) === normLabel(want)) {
+        exactBtn = el;
+        break;
       }
-    } catch {}
-    const text = String(el.innerText || el.value || el.textContent || '').trim().slice(0, 120);
-    return {
-      matchedLabel: matched.label,
-      tag: el.tagName ? el.tagName.toLowerCase() : '',
-      xpath: xpathOf(el),
-      cssSelector: cssOf(el),
-      attributes: attrs,
-      text,
-      className: String(el.className || attrs.class || ''),
-    };
+      if (!fuzzyBtn && textMatch(t, want)) fuzzyBtn = el;
+    }
+    const btn = exactBtn || fuzzyBtn;
+    if (btn) return snap(btn, want);
+
+    return null;
   })()`;
 }
 
@@ -130,22 +170,29 @@ export async function resolveElementByLabel(client, labelText) {
   });
   const value = result?.result?.value;
   if (!value || typeof value !== 'object') {
-    const err = new Error(`No form field found for label: ${label}`);
+    const err = new Error(`页上找不到「${label}」对应的表单项或按钮（请确认弹窗已打开且按钮可见）`);
     err.statusCode = 404;
     throw err;
   }
 
   const className = String(value.className || value.attributes?.class || '').trim();
-  const element = toElementJson({
+  const enriched = enrichLocatorFields({
     tag: value.tag,
     xpath: value.xpath,
+    xpath_abs: value.xpath_abs || value.xpath_full,
+    xpath_full: value.xpath_full,
+    xpath_smart: value.xpath_smart,
     cssSelector: value.cssSelector,
     attributes: {
       ...(value.attributes || {}),
       ...(className ? { class: className } : {}),
     },
     text: value.text,
+    className,
+    candidates: value.candidates,
   });
+
+  const element = toElementJson(enriched);
 
   return {
     element,

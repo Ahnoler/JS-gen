@@ -152,9 +152,15 @@ export async function listFiltered({ type, keyword, limit } = {}) {
 }
 
 export async function listByParent(parentId) {
-  const rows = await getDB()(TABLE)
-    .where({ parent_id: parentId })
-    .orderBy([{ column: 'sort_order', order: 'asc' }, { column: 'id', order: 'asc' }]);
+  let q = getDB()(TABLE);
+  if (isRootParentId(parentId)) {
+    q = q.andWhere(function rootParent() {
+      this.where({ parent_id: ROOT_NODE_ID }).orWhereNull('parent_id');
+    });
+  } else {
+    q = q.where({ parent_id: parentId });
+  }
+  const rows = await q.orderBy([{ column: 'sort_order', order: 'asc' }, { column: 'id', order: 'asc' }]);
   return shapeNodes(rows);
 }
 

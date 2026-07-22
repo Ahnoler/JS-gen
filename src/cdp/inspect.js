@@ -1,6 +1,8 @@
 /**
  * CDP DOM inspect helpers: highlight under cursor + resolve element meta for recording.
  */
+import { PAGE_LOCATOR_HELPERS } from './locator-candidates.js';
+
 const HIGHLIGHT_CONFIG = {
   showInfo: false,
   showRulers: false,
@@ -60,6 +62,8 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
     }
     return segments.join('/');
   }
+
+${PAGE_LOCATOR_HELPERS}
 
   function attrs(node) {
     const a = {};
@@ -205,13 +209,18 @@ const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
     const t = textOverride != null ? String(textOverride) : shortLabel(node);
     const bu = buXPathOf(node);
     const abs = xpathOf(node);
+    const loc = buildLocatorSnap(node, t, abs);
     return {
-      xpath: bu || abs,
+      xpath: loc.xpath || bu || abs,
       bu_xpath: bu,
       xpath_abs: abs,
+      xpath_full: loc.xpath_full || abs,
+      xpath_smart: loc.xpath_smart || '',
+      cssSelector: loc.cssSelector || '',
+      candidates: loc.candidates || [],
       tag: (node.tagName || '').toLowerCase(),
       attributes: attrs(node),
-      text: t,
+      text: loc.text || t,
     };
   }
 

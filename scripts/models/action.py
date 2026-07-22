@@ -202,6 +202,10 @@ class ActionEntry(BaseModel):
         default="agent",
         description="Recording source: agent | manual | cdp",
     )
+    element: Optional[dict] = Field(
+        default=None,
+        description="Full element_json payload (xpath_smart/candidates/text) for DB persistence",
+    )
 
     # ── Legacy compat (used by script_assembler) ────────────────────────
 
@@ -246,17 +250,6 @@ class ActionEntry(BaseModel):
         """The selected option text, if this is a select/radio action."""
         return self.params.get("option_text")
 
-    @property
-    def element(self) -> dict:
-        """Legacy element dict for atp-record format."""
-        return {
-            "tag_name": self.tagName,
-            "xpath": self.target,
-            "css_selector": self.cssSelector,
-            "attributes": self.attributes,
-            "text": "",
-        }
-
     # ── Factory ─────────────────────────────────────────────────────────
 
     @classmethod
@@ -295,11 +288,33 @@ class ActionEntry(BaseModel):
 
         if element:
             elem = dict(element) if isinstance(element, dict) else element.model_dump()
-            entry.target = elem.get("xpath", "") or ""
-            entry.cssSelector = elem.get("css_selector", "") or ""
-            entry.tagName = elem.get("tag_name", "") or ""
+            # Accept both snake_case (recorder) and camelCase
+            xpath = elem.get("xpath", "") or ""
+            css = elem.get("css_selector", "") or elem.get("cssSelector", "") or ""
+            tag = elem.get("tag_name", "") or elem.get("tag", "") or ""
             attrs = elem.get("attributes", {})
+            text = elem.get("text", "") or ""
+            cands = elem.get("candidates") if isinstance(elem.get("candidates"), list) else []
+            entry.target = xpath
+            entry.cssSelector = css
+            entry.tagName = tag
             entry.attributes = attrs if isinstance(attrs, dict) else {}
+            entry.element = {
+                "tag": tag,
+                "xpath": xpath,
+                "cssSelector": css,
+                "attributes": entry.attributes,
+                "text": text,
+            }
+            if cands:
+                entry.element["candidates"] = [
+                    {"type": c.get("type", ""), "value": c.get("value", "")}
+                    if isinstance(c, dict) else {"type": getattr(c, "type", ""), "value": getattr(c, "value", "")}
+                    for c in cands
+                ]
+            # Ensure click params carry visible text for text-first replay
+            if entry.action == "click_element_by_index" and text and not entry.params.get("text"):
+                entry.params["text"] = text
 
         return entry
 

@@ -10,8 +10,10 @@
     "executor:dev": "node --watch executor/agent.mjs"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "express": "^4.21.0",
     "knex": "^3.3.0",
+    "multer": "^2.2.0",
     "mysql2": "^3.22.6",
     "playwright": "1.61.0",
     "undici": "^8.3.0",

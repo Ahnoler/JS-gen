@@ -91,14 +91,39 @@ export function trajectoryStepToActionEntry(step) {
   if (typeof params === 'string') {
     try { params = JSON.parse(params); } catch { params = {}; }
   }
+  const candidates = Array.isArray(el.candidates) ? el.candidates : [];
+  const xpathSmart = candidates.find((c) => c && c.type === 'xpath_smart')?.value
+    || el.xpath_smart
+    || '';
+  const xpathFull = candidates.find((c) => c && c.type === 'xpath_full')?.value
+    || el.xpath_full
+    || el.xpath_abs
+    || '';
+  // Prefer smart as primary target for assembler
+  const primaryXpath = xpathSmart || el.xpath || el.target || xpathFull || '';
+  const text = el.text || params?.text || '';
+  // Ensure click params keep visible text for text-first replay of legacy rows
+  const nextParams = { ...(params || {}) };
+  if (text && !nextParams.text) nextParams.text = text;
+
   return {
     action: normalizeActionName(step.actionType || step.action || ''),
-    params: params || {},
+    params: nextParams,
     result: step.extractedContent || '',
-    target: el.xpath || el.target || '',
+    target: primaryXpath,
     cssSelector: el.cssSelector || el.css_selector || '',
     tagName: el.tag || el.tagName || '',
     attributes: el.attributes || {},
+    element: {
+      tag: el.tag || el.tagName || '',
+      xpath: primaryXpath,
+      xpath_smart: xpathSmart || (String(primaryXpath).startsWith('//') ? primaryXpath : ''),
+      xpath_full: xpathFull || '',
+      cssSelector: el.cssSelector || el.css_selector || '',
+      attributes: el.attributes || {},
+      text,
+      candidates,
+    },
     // Replay / assembler markers
     id: step.id != null ? String(step.id) : '',
     stepId: step.id != null ? String(step.id) : '',

@@ -9,14 +9,43 @@
  * - 列表 / 树的 data 为数组；单资源 data 为对象；删除 data 为 null
  * - 类型常量：GET /meta → data: { typeMap, types }
  * - body.code：200 成功 / 4** 鉴权 / 5** 错误（400/404 等非鉴权失败在 body 中亦映射为 500）
+ * - template / export 返回 Excel 二进制（不走 JSON 信封）；import 接受 multipart Excel
  */
+import multer from 'multer';
 import * as hierarchyService from '../../services/hierarchy-service.js';
+import { EXCEL_MIME } from '../../services/system-mgmt-excel.js';
 import { NODE_TYPE, TYPE_LABEL } from '../../models/hierarchy-constants.js';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter(_req, file, cb) {
+    const name = String(file.originalname || '').toLowerCase();
+    const ok =
+      name.endsWith('.xlsx')
+      || name.endsWith('.xls')
+      || String(file.mimetype || '').includes('sheet')
+      || String(file.mimetype || '').includes('excel')
+      || file.mimetype === 'application/octet-stream';
+    if (!ok) {
+      return cb(Object.assign(new Error('请上传 Excel 文件（.xlsx）'), { code: 'VALIDATION' }));
+    }
+    cb(null, true);
+  },
+});
 
 function httpError(err) {
   if (err.code === 'SEED_PROTECTED' || err.code === 'VALIDATION') return 400;
   if (err.code === 'NOT_FOUND') return 404;
+  if (err instanceof multer.MulterError) return 400;
   return 500;
+}
+
+function sendExcel(res, buffer, filename) {
+  res.setHeader('Content-Type', EXCEL_MIME);
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Length', Buffer.byteLength(buffer));
+  res.send(buffer);
 }
 
 export default function (app) {
@@ -47,17 +76,21 @@ export default function (app) {
     }
   });
 
-  /** 6. 模板（放在 :id 之前） */
-  app.get('/api/v2/system-mgmt/template', (_req, res) => {
-    res.json(hierarchyService.getTreeTemplate());
+  /** 6. 模板（Excel） */
+  app.get('/api/v2/system-mgmt/template', async (_req, res) => {
+    try {
+      const buf = await hierarchyService.getTreeTemplateExcel();
+      sendExcel(res, buf, 'system-tree-template.xlsx');
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
-  /** 5. 导出（嵌套 JSON，便于再导入） */
+  /** 5. 导出（Excel，列与模板一致） */
   app.get('/api/v2/system-mgmt/export', async (_req, res) => {
     try {
-      const data = await hierarchyService.exportTree();
-      res.setHeader('Content-Disposition', 'attachment; filename="system-tree.json"');
-      res.json(data);
+      const buf = await hierarchyService.exportTreeExcel();
+      sendExcel(res, buf, 'system-tree-export.xlsx');
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -85,14 +118,26 @@ export default function (app) {
     }
   });
 
-  /** 4. 导入 */
-  app.post('/api/v2/system-mgmt/import', async (req, res) => {
-    try {
-      const result = await hierarchyService.importTree(req.body || {});
-      res.status(201).json(result);
-    } catch (err) {
-      res.status(httpError(err)).json({ error: err.message });
-    }
+  /**
+   * 4. 导入 Excel（multipart field: file）
+   * Query/body: mode=merge|append（默认 merge，按 父路径+名称+类型 合并）
+   */
+  app.post('/api/v2/system-mgmt/import', (req, res) => {
+    upload.single('file')(req, res, async (err) => {
+      if (err) {
+        return res.status(httpError(err)).json({ error: err.message });
+      }
+      try {
+        if (!req.file?.buffer?.length) {
+          return res.status(400).json({ error: '请上传 Excel 文件（form-data 字段名 file）' });
+        }
+        const mode = req.body?.mode || req.query?.mode || 'merge';
+        const result = await hierarchyService.importTreeExcel(req.file.buffer, { mode });
+        res.status(201).json(result);
+      } catch (e) {
+        res.status(httpError(e)).json({ error: e.message });
+      }
+    });
   });
 
   /** 2. 列表（可选 type / parentId）→ 数组 */
