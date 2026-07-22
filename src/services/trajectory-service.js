@@ -1844,6 +1844,55 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
   };
 }
 
+/**
+ * Human confirmation of a trajectory (transaction-level).
+ * confirmed=true  → recordStatus=completed
+ * confirmed=false → recordStatus=draft (cancel confirmation)
+ * Does NOT touch trajectory_step.confirmed (kept for future features).
+ */
+export async function confirmTrajectory(trajectoryId, confirmed = true) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    const err = new Error('Invalid trajectory id');
+    err.statusCode = 400;
+    throw err;
+  }
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (traj.recordStatus === 'recording') {
+    const err = new Error('Cannot confirm while recording');
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const want = !!confirmed;
+  if (want) {
+    await trajectoryDao.updateMeta(tid, {
+      recordStatus: 'completed',
+      isDone: true,
+      isSuccessful: true,
+    });
+  } else {
+    await trajectoryDao.updateMeta(tid, {
+      recordStatus: 'draft',
+      isDone: null,
+      isSuccessful: null,
+    });
+  }
+
+  const tree = await getTrajectoryTree(tid);
+  return {
+    trajectoryId: tid,
+    recordStatus: tree?.recordStatus || (want ? 'completed' : 'draft'),
+    confirmed: want,
+    tree,
+  };
+}
+
 export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phaseId = null } = {}) {
   const tid = Number(trajectoryId);
   const runtime = trajectoryRuntimeMap.get(tid);

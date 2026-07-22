@@ -10,7 +10,7 @@
 
 /** @typedef {'online'|'draining'|'offline'} ExecutorNodeStatus */
 
-/** @typedef {'draft'|'recording'|'recorded'} TrajectoryRecordStatus */
+/** @typedef {'draft'|'recording'|'recorded'|'completed'} TrajectoryRecordStatus */
 
 /** @typedef {'pending'|'running'|'completed'|'failed'} TrajectoryPhaseStatus */
 
@@ -38,7 +38,7 @@ export const LOCATOR_CANDIDATE_TYPES = Object.freeze(['css', 'xpath_full', 'xpat
 export const EXECUTOR_NODE_STATUSES = Object.freeze(['online', 'draining', 'offline']);
 
 /** @type {readonly TrajectoryRecordStatus[]} */
-export const TRAJECTORY_RECORD_STATUSES = Object.freeze(['draft', 'recording', 'recorded']);
+export const TRAJECTORY_RECORD_STATUSES = Object.freeze(['draft', 'recording', 'recorded', 'completed']);
 
 /** @type {readonly TrajectoryPhaseStatus[]} */
 export const TRAJECTORY_PHASE_STATUSES = Object.freeze(['pending', 'running', 'completed', 'failed']);

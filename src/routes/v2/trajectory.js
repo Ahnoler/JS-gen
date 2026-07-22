@@ -361,6 +361,21 @@ export default function (app) {
   });
 
   /**
+   * Human confirm / cancel-confirm a trajectory (transaction-level).
+   * Body: { confirmed: boolean } — true → recordStatus=completed; false → draft.
+   * Does not modify trajectory_step.confirmed.
+   */
+  app.post('/api/v2/trajectories/:id/confirm', async (req, res) => {
+    try {
+      const confirmed = req.body?.confirmed !== false && req.body?.confirmed !== 0;
+      const result = await trajectoryService.confirmTrajectory(+req.params.id, confirmed);
+      res.json(result);
+    } catch (err) {
+      sendErr(res, err);
+    }
+  });
+
+  /**
    * Toggle manual recording. Body: { enabled, phaseId? }
    * phaseId omitted → append to last phase of trajectory.
    */

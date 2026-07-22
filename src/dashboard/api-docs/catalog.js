@@ -395,7 +395,8 @@ export const API_GROUPS = [
       },
       {
         method: 'PATCH', path: '/api/v2/trajectory-steps/{id}/confirm',
-        summary: '确认 / 取消确认步骤',
+        summary: '确认 / 取消确认步骤（步骤级，暂保留）',
+        desc: '与交易级 POST /trajectories/{id}/confirm 无关；字段保留供后续功能使用。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '501' }],
         reqExample: J({ confirmed: true }),
         respExample: J({ id: 501, confirmed: true, confirmedAt: '2026-07-20 12:00:00.000' }),
@@ -466,6 +467,17 @@ export const API_GROUPS = [
         reqExample: J({ success: true }),
         respExample: J({
           trajectoryId: 42, recordStatus: 'recorded', detached: false,
+          tree: { phases: [], orphanSteps: [] },
+        }),
+      },
+      {
+        method: 'POST', path: '/api/v2/trajectories/{id}/confirm',
+        summary: '人工确认 / 取消确认（交易级）',
+        desc: 'confirmed=true → recordStatus=completed；false → draft。不修改 trajectory_step.confirmed。录制中 409。',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        reqExample: J({ confirmed: true }),
+        respExample: J({
+          trajectoryId: 42, recordStatus: 'completed', confirmed: true,
           tree: { phases: [], orphanSteps: [] },
         }),
       },
@@ -925,7 +937,7 @@ export const API_GROUPS = [
 ];
 
 export const ENUMS = [
-  { name: 'recordStatus', values: 'draft / recording / recorded' },
+  { name: 'recordStatus', values: 'draft / recording / recorded / completed' },
   { name: 'phase.status', values: 'pending / running / completed / failed' },
   { name: 'step.source', values: 'agent / manual' },
   { name: '节点 type', values: '1 系统 / 2 模块 / 3 功能' },
@@ -937,5 +949,6 @@ export const RECORDING_FLOW = [
   'POST .../record/prepare（复用空闲资源 / 占槽 + 登录，幂等）',
   'POST .../record/start（可选 phaseIds；可关页后台继续）',
   'POST .../record/stop（不释放槽位）',
+  'POST .../confirm（人工确认 → completed；取消 → draft）',
   'POST .../detach（释放执行机槽位；或等 10 分钟无步骤自动回收）',
 ];
