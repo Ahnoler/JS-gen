@@ -1502,13 +1502,22 @@ export async function attachTrajectoryLive(trajectoryId) {
 function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
   const session = state.sessions.get(sessionId);
   if (!session || session._trajPersistUnsub) return;
+  // Share dedupe set with session-level live persist when present
+  if (!session.persistedActionIds) session.persistedActionIds = runtime.persistedActionIds;
+  else runtime.persistedActionIds = session.persistedActionIds;
+
   session._trajPersistUnsub = execSession.subscribeSessionEvents(sessionId, async (type, payload) => {
     if (type !== 'manual_action_recorded') return;
     if (runtime.suppressStepPersist || runtime.isReplay) return;
+    // Dashboard/session hook already owns live persist when active
+    if (session._persistUnsub && session.autoPersist !== false) return;
     const entry = payload?.entry;
     if (!entry) return;
     const aid = entry.id != null ? String(entry.id) : '';
-    if (aid && runtime.persistedActionIds.has(aid)) return;
+    if (aid) {
+      if (runtime.persistedActionIds.has(aid)) return;
+      runtime.persistedActionIds.add(aid);
+    }
     const phaseId = session.selectedPhaseId ?? runtime.selectedPhaseId ?? null;
     try {
       const persisted = await appendRecordedStep(trajectoryId, entry, {
@@ -1516,15 +1525,17 @@ function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
         trajectoryPhaseId: phaseId != null ? Number(phaseId) : undefined,
       });
       if (persisted) {
-        if (aid) runtime.persistedActionIds.add(aid);
         broadcast('manual_action_persisted', {
           trajectoryDbId: trajectoryId,
           sessionId,
           ...persisted,
           entry,
         });
+      } else if (aid) {
+        runtime.persistedActionIds.delete(aid);
       }
     } catch (err) {
+      if (aid) runtime.persistedActionIds.delete(aid);
       console.warn('[trajectory-manual] live persist failed:', err.message);
     }
   });
@@ -1709,18 +1720,23 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     for (const entry of entries) {
       const id = entry?.id ? String(entry.id) : '';
       if (!id || runtime.persistedActionIds.has(id)) continue;
+      // Manual/CDP have dedicated persist paths; skip to avoid double-write with action_log_sync
+      const src = entry?.source || 'agent';
+      if (src === 'manual' || src === 'cdp') continue;
+      runtime.persistedActionIds.add(id);
       const persisted = await appendRecordedStep(tid, entry, {
         source: 'agent',
         trajectoryPhaseId: Number.isFinite(phaseIdHint) ? phaseIdHint : undefined,
       }).catch(() => null);
       if (persisted) {
-        runtime.persistedActionIds.add(id);
         broadcast('action_persisted', {
           trajectoryDbId: tid,
           sessionId: runtime.sessionId,
           ...persisted,
           entry,
         });
+      } else {
+        runtime.persistedActionIds.delete(id);
       }
     }
   });

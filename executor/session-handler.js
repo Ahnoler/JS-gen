@@ -93,9 +93,13 @@ export function createSessionHandler(manager) {
 export function relayAgentEvent(send, msg) {
   const event = msg.event;
   if (!event) return;
+  // Flat agent events (e.g. cdp_action_result) put fields on the root;
+  // nested ones use data{}. Merge both so nothing is dropped.
+  const { event: _e, session_id: sid, data, ...rest } = msg;
   const payload = {
-    sessionId: msg.session_id || msg.data?.sessionId,
-    ...(msg.data || {}),
+    sessionId: sid || data?.sessionId,
+    ...(data && typeof data === 'object' ? data : {}),
+    ...rest,
   };
   send(event, payload);
 }

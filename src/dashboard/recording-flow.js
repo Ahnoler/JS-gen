@@ -411,6 +411,7 @@ export function initActionFlow() {
   on('action_log_sync', () => scheduleReload());
   on('action_persisted', () => scheduleReload());
   on('manual_action_persisted', () => scheduleReload());
+  on('cdp_action_persisted', () => scheduleReload());
   on('manual_action_recorded', () => scheduleReload());
 
   const addBtn = document.getElementById('sessActionFlowAddPhaseBtn');

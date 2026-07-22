@@ -772,6 +772,9 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store, form_
             sys.stderr.flush()
             from .actions._state import _ACTION_LOG
             last_entry = _ACTION_LOG[-1] if _ACTION_LOG else None
+            # Always tag CDP result entry so control-plane never treats it as agent
+            if isinstance(last_entry, dict):
+                last_entry = {**last_entry, "source": "cdp"}
             if req_id:
                 emit_json({
                     "event": "cdp_action_result",

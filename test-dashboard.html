@@ -224,10 +224,10 @@
           <span id="sessTrajectoryId" style="font-size:12px;color:var(--slate-400)"></span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;padding:0 12px 12px;flex-wrap:wrap">
-          <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">挂靠功能点：</label>
+          <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">挂靠功能：</label>
           <select id="sessHierSystem" style="min-width:120px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">系统…</option></select>
-          <select id="sessHierProcess" style="min-width:120px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">流程…</option></select>
-          <select id="sessHierFunction" style="min-width:120px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">功能点…</option></select>
+          <select id="sessHierProcess" style="min-width:120px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">模块…</option></select>
+          <select id="sessHierFunction" style="min-width:120px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)"><option value="">功能…</option></select>
           <label style="font-size:12px;color:var(--slate-500);white-space:nowrap">轨迹：</label>
           <select id="sessTrajectorySelect" style="min-width:160px;padding:3px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px;background:var(--slate-50)" title="长期录制目标 trajectory.id">
             <option value="">新建轨迹（保存时创建）</option>
@@ -557,14 +557,20 @@
       <div class="card-header">
         <div class="card-title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM8 14h7v7H8z"/></svg>
-          系统 / 流程 / 功能点
+          系统 / 模块 / 功能
         </div>
         <div style="display:flex;gap:6px">
           <button id="hierAddSystemBtn" class="btn btn-sm btn-primary">+ 系统</button>
           <button id="hierRefreshBtn" class="btn btn-outline btn-sm">刷新</button>
         </div>
       </div>
-      <div style="padding:8px 12px;font-size:12px;color:var(--slate-500)">保存轨迹时可选择功能点挂靠。每个系统可配置多个测试账号（管理员/测试人员等角色）。默认「未分类」为种子数据，不可删除。</div>
+      <div style="padding:8px 12px;font-size:12px;color:var(--slate-500)">数据来自 <code>GET /api/v2/system-mgmt/tree</code>（根 id=0，子节点 children[]）。保存轨迹时可选择功能挂靠。每个系统可配置多个测试账号。默认「未分类」为种子数据，不可删除。</div>
+      <div style="display:flex;gap:8px;align-items:center;padding:0 12px 8px">
+        <input id="hierSearchInput" type="search" placeholder="按名称筛选（name=）" style="flex:1;max-width:280px;padding:5px 8px;border:1px solid var(--slate-200);border-radius:4px;font-size:12px">
+        <button id="hierSearchBtn" type="button" class="btn btn-outline btn-sm">查询</button>
+        <button id="hierSearchClearBtn" type="button" class="btn btn-outline btn-sm">清空</button>
+        <span id="hierSearchHint" style="font-size:11px;color:var(--slate-400)"></span>
+      </div>
       <div id="hierLoading" style="display:none;text-align:center;padding:20px;color:var(--slate-400)">加载中…</div>
       <div id="hierEmpty" class="empty-state" style="display:none">
         <p>暂无层级数据 — 点击「+ 系统」创建</p>

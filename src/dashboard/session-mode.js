@@ -6,6 +6,7 @@ import { escapeHtml } from './swagger-api.js';
 import { on, send, isConnected } from './ws-client.js';
 import { setActionFlowSession, reloadActionFlow, setActionFlowTrajectory, setActionFlowHandlers, setSelectedActionFlowPhaseId } from './recording-flow.js';
 import { fetchHierarchyTree, findDefaultUnclassified } from './hierarchy.js';
+import { unwrapApi, apiErrorMessage, isApiFail } from './api-envelope.js';
 
 const HIER_STORAGE_KEY = 'jsgen.selectedFunctionId';
 const TRAJ_STORAGE_KEY = 'jsgen.selectedTrajectoryId';
@@ -1082,6 +1083,11 @@ export function initSessionMode() {
       + ' · ' + (d.entry?.action || ''));
     if (sessActive?.value) reloadActionFlow(sessActive.value);
   });
+  on('cdp_action_persisted', (d) => {
+    sessLog('success', '快速操作已入库 step#' + (d.stepNumber || '?')
+      + ' · ' + (d.entry?.action || ''));
+    if (sessActive?.value) reloadActionFlow(sessActive.value);
+  });
   on('manual_action_recorded', () => {
     if (sessActive?.value) reloadActionFlow(sessActive.value);
   });
@@ -1120,6 +1126,9 @@ export function initSessionMode() {
       try {
         const trajectoryDbId = getSelectedTrajectoryDbId();
         const sessionId = sessActive?.value || undefined;
+        if (!sessionId) {
+          throw new Error('请先在上方选择/创建会话（执行机模式下快速操作依赖当前会话）');
+        }
         const resp = await fetch('/api/browser/watcher/action', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1127,15 +1136,15 @@ export function initSessionMode() {
             params,
             source: 'cdp',
             autoPersist,
-            ...(sessionId ? { sessionId } : {}),
+            sessionId,
             ...(trajectoryDbId != null ? { trajectoryDbId } : {}),
           }),
         });
         const data = await resp.json();
-        if (data.error) {
+        if (!resp.ok || data.error) {
           quickResult.style.display = 'block';
           quickResult.style.background = '#fef2f2'; quickResult.style.border = '1px solid #fecaca'; quickResult.style.color = '#991b1b';
-          quickResult.textContent = '✗ ' + data.error;
+          quickResult.textContent = '✗ ' + (data.error || `HTTP ${resp.status}`);
         } else {
           quickResult.style.display = 'block';
           quickResult.style.background = '#f0fdf4'; quickResult.style.border = '1px solid #bbf7d0'; quickResult.style.color = '#166534';
@@ -1397,8 +1406,9 @@ export function initSessionMode() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: description.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'create phase failed');
+      const raw = await res.json();
+      if (isApiFail(res, raw)) throw new Error(apiErrorMessage(raw, 'create phase failed'));
+      const data = unwrapApi(raw);
       await refreshPhaseSelect(trajId, data.id);
       if (sessPhaseSelect) sessPhaseSelect.value = String(data.id);
       persistPhaseSelection();
@@ -1417,8 +1427,9 @@ export function initSessionMode() {
     if (trajectoryId == null) return;
     try {
       const res = await fetch('/api/v2/trajectories/' + encodeURIComponent(trajectoryId) + '/tree');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'tree failed');
+      const raw = await res.json();
+      if (isApiFail(res, raw)) throw new Error(apiErrorMessage(raw, 'tree failed'));
+      const data = unwrapApi(raw) || {};
       const phases = data.phases || [];
       phases.forEach((p) => {
         const opt = document.createElement('option');
@@ -1455,8 +1466,9 @@ export function initSessionMode() {
     if (functionId == null) return;
     try {
       const res = await fetch('/api/v2/trajectories?functionId=' + encodeURIComponent(functionId) + '&page=1&pageSize=50');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'load failed');
+      const raw = await res.json();
+      if (isApiFail(res, raw)) throw new Error(apiErrorMessage(raw, 'load failed'));
+      const data = unwrapApi(raw) || {};
       (data.rows || []).forEach((t) => {
         const opt = document.createElement('option');
         opt.value = String(t.id);
@@ -1473,9 +1485,9 @@ export function initSessionMode() {
 
   function fillProcessOptions(systemId, selectedProcessId) {
     if (!sessHierProcess) return;
-    sessHierProcess.innerHTML = '<option value="">流程…</option>';
+    sessHierProcess.innerHTML = '<option value="">模块…</option>';
     const sys = hierTree.find(s => String(s.id) === String(systemId));
-    (sys?.processes || []).forEach(p => {
+    (sys?.children || []).forEach(p => {
       const opt = document.createElement('option');
       opt.value = String(p.id);
       opt.textContent = p.name;
@@ -1486,10 +1498,10 @@ export function initSessionMode() {
 
   function fillFunctionOptions(systemId, processId, selectedFunctionId) {
     if (!sessHierFunction) return;
-    sessHierFunction.innerHTML = '<option value="">功能点…</option>';
+    sessHierFunction.innerHTML = '<option value="">功能…</option>';
     const sys = hierTree.find(s => String(s.id) === String(systemId));
-    const proc = (sys?.processes || []).find(p => String(p.id) === String(processId));
-    (proc?.functions || []).forEach(f => {
+    const proc = (sys?.children || []).find(p => String(p.id) === String(processId));
+    (proc?.children || []).forEach(f => {
       const opt = document.createElement('option');
       opt.value = String(f.id);
       opt.textContent = f.name;
@@ -1531,8 +1543,8 @@ export function initSessionMode() {
     let applied = false;
     if (Number.isFinite(stored)) {
       for (const sys of hierTree) {
-        for (const proc of sys.processes || []) {
-          const fn = (proc.functions || []).find(f => f.id === stored);
+        for (const proc of sys.children || []) {
+          const fn = (proc.children || []).find(f => f.id === stored);
           if (fn) {
             applyHierarchySelection({ systemId: sys.id, processId: proc.id, functionId: fn.id });
             applied = true;
@@ -1605,7 +1617,7 @@ export function initSessionMode() {
     if (sessNewTrajBtn) {
       sessNewTrajBtn.addEventListener('click', async () => {
         const functionId = getSelectedFunctionId();
-        if (functionId == null) { alert('请先选择功能点'); return; }
+        if (functionId == null) { alert('请先选择功能'); return; }
         const task = prompt('轨迹备注（可选）：', '') || '';
         try {
           const res = await fetch('/api/v2/trajectories', {
@@ -1617,8 +1629,9 @@ export function initSessionMode() {
               model: sessModel?.value || '',
             }),
           });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Create failed');
+          const raw = await res.json();
+          if (isApiFail(res, raw)) throw new Error(apiErrorMessage(raw, 'Create failed'));
+          const data = unwrapApi(raw);
           sessionStorage.setItem(TRAJ_STORAGE_KEY, String(data.id));
           await refreshTrajectorySelect(functionId, data.id);
           persistTrajectorySelection();

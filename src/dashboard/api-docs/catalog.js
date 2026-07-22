@@ -495,7 +495,7 @@ export const API_GROUPS = [
         desc: '与 Playwright 全量回放不同。默认 isReplay=true 时不写入步骤表。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ stepIds: [501, 502], isReplay: true }),
-        respExample: J({ trajectoryId: 42, isReplay: true, stepIds: [501], count: 2, error: null }),
+        respExample: J({ trajectoryId: 42, isReplay: true, stepIds: [501, 502], count: 2, error: null }),
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/attach',

@@ -8,9 +8,17 @@ const SEED_FUNCTION_ID = '00000000-0000-0000-0000-000000000003';
 
 /** @type {Array} nested systems (children[]) for UI */
 let hierarchyTree = [];
+/** Last name= filter used by hierarchy tab */
+let hierarchyNameFilter = '';
 
-export async function fetchHierarchyTree() {
-  const res = await fetch('/api/v2/hierarchy/tree');
+export async function fetchHierarchyTree({ name } = {}) {
+  const qs = new URLSearchParams();
+  const kw = name != null ? String(name).trim() : '';
+  if (kw) qs.set('name', kw);
+  const url = qs.toString()
+    ? `/api/v2/system-mgmt/tree?${qs}`
+    : '/api/v2/system-mgmt/tree';
+  const res = await fetch(url);
   const raw = await res.json();
   if (isApiFail(res, raw)) throw new Error(apiErrorMessage(raw, 'Load hierarchy failed'));
   hierarchyTree = asSystemForest(unwrapApi(raw));
@@ -21,21 +29,21 @@ export function getHierarchyTreeCache() {
   return hierarchyTree;
 }
 
-/** Flatten functions as "System / Process / Function" options. */
+/** Flatten functions as "系统 / 模块 / 功能" options. */
 export function flattenFunctionOptions(tree = hierarchyTree) {
   const opts = [];
   for (const sys of tree || []) {
-    for (const proc of sys.children || []) {
-      for (const fn of proc.children || []) {
+    for (const mod of sys.children || []) {
+      for (const fn of mod.children || []) {
         opts.push({
           id: fn.id,
           functionId: fn.functionId || fn.uid,
           name: fn.name,
-          label: `${sys.name} / ${proc.name} / ${fn.name}`,
+          label: `${sys.name} / ${mod.name} / ${fn.name}`,
           systemId: sys.id,
           systemUuid: sys.systemId || sys.uid,
-          processId: proc.id,
-          processUuid: proc.processId || proc.moduleId || proc.uid,
+          processId: mod.id,
+          processUuid: mod.processId || mod.moduleId || mod.uid,
         });
       }
     }
@@ -69,7 +77,31 @@ function isSeedFunction(fn) {
 export function initHierarchy() {
   const refreshBtn = document.getElementById('hierRefreshBtn');
   const addSystemBtn = document.getElementById('hierAddSystemBtn');
+  const searchInput = document.getElementById('hierSearchInput');
+  const searchBtn = document.getElementById('hierSearchBtn');
+  const searchClearBtn = document.getElementById('hierSearchClearBtn');
   if (refreshBtn) refreshBtn.addEventListener('click', () => loadHierarchyTree());
+  if (searchBtn) {
+    searchBtn.addEventListener('click', () => {
+      hierarchyNameFilter = searchInput?.value?.trim() || '';
+      loadHierarchyTree();
+    });
+  }
+  if (searchClearBtn) {
+    searchClearBtn.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      hierarchyNameFilter = '';
+      loadHierarchyTree();
+    });
+  }
+  if (searchInput) {
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      hierarchyNameFilter = searchInput.value.trim();
+      loadHierarchyTree();
+    });
+  }
   if (addSystemBtn) {
     addSystemBtn.addEventListener('click', async () => {
       const name = prompt('新系统名称：');
@@ -80,7 +112,7 @@ export function initHierarchy() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name.trim() }),
         });
-        const data = await readV2(res);
+        await readV2(res);
         await loadHierarchyTree();
       } catch (err) {
         alert('创建系统失败：' + err.message);
@@ -179,14 +211,17 @@ function renderSystemNode(sys) {
   const seed = isSeedSystem(sys);
   const processes = sys.children || [];
   const acctCount = (sys.accounts || []).length;
+  const url = (sys.url || '').trim();
   return `
     <div class="hier-system" data-id="${sys.id}" style="border:1px solid var(--slate-200);border-radius:6px;margin-bottom:10px;overflow:hidden">
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--slate-50);border-bottom:1px solid var(--slate-100);flex-wrap:wrap">
         <strong style="color:var(--slate-800)">${escapeHtml(sys.name)}</strong>
+        <span style="font-size:10px;color:var(--slate-400)">#${sys.id} · type=${sys.type ?? 1}</span>
         ${seed ? '<span style="font-size:10px;color:var(--slate-400);border:1px solid var(--slate-200);border-radius:3px;padding:0 4px">种子</span>' : ''}
+        ${url ? `<span title="${escapeHtml(url)}" style="font-size:11px;color:var(--slate-400);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(url)}</span>` : ''}
         <span style="flex:1;font-size:11px;color:var(--slate-400)">${acctCount ? acctCount + ' 个账号' : '未配置账号'}</span>
         <button class="btn btn-outline btn-sm hier-add-acct" data-system-id="${sys.id}" data-system-name="${escapeHtml(sys.name)}" style="font-size:11px">+ 账号</button>
-        <button class="btn btn-outline btn-sm hier-add-proc" data-system-id="${sys.id}" style="font-size:11px">+ 流程</button>
+        <button class="btn btn-outline btn-sm hier-add-proc" data-system-id="${sys.id}" style="font-size:11px">+ 模块</button>
         <button class="btn btn-outline btn-sm hier-rename-sys" data-id="${sys.id}" data-name="${escapeHtml(sys.name)}" style="font-size:11px">重命名</button>
         ${seed ? '' : `<button class="btn btn-outline btn-sm hier-del-sys" data-id="${sys.id}" style="font-size:11px;color:var(--red-500);border-color:var(--red-200)">删除</button>`}
       </div>
@@ -194,7 +229,7 @@ function renderSystemNode(sys) {
       <div style="padding:4px 8px 8px 20px">
         ${processes.length
           ? processes.map(p => renderProcessNode(p, sys.id)).join('')
-          : '<div style="padding:8px;font-size:12px;color:var(--slate-400)">暂无流程</div>'}
+          : '<div style="padding:8px;font-size:12px;color:var(--slate-400)">暂无模块</div>'}
       </div>
     </div>`;
 }
@@ -210,8 +245,14 @@ export async function loadHierarchyTree() {
   body.innerHTML = '';
 
   try {
-    const tree = await fetchHierarchyTree();
+    const tree = await fetchHierarchyTree({ name: hierarchyNameFilter || undefined });
     if (loading) loading.style.display = 'none';
+    const hint = document.getElementById('hierSearchHint');
+    if (hint) {
+      hint.textContent = hierarchyNameFilter
+        ? `筛选 name=${hierarchyNameFilter} · ${tree.length} 个系统`
+        : `${tree.length} 个系统`;
+    }
 
     if (!tree.length) {
       if (empty) empty.style.display = 'block';
@@ -234,7 +275,7 @@ function renderProcessNode(proc, systemId) {
       <div style="display:flex;align-items:center;gap:6px;padding:4px 0">
         <span style="flex:1;font-size:13px;color:var(--slate-700)">${escapeHtml(proc.name)}</span>
         ${seed ? '<span style="font-size:9px;color:var(--slate-400)">种子</span>' : ''}
-        <button class="btn btn-outline btn-sm hier-add-fn" data-process-id="${proc.id}" style="font-size:10px">+ 功能点</button>
+        <button class="btn btn-outline btn-sm hier-add-fn" data-process-id="${proc.id}" style="font-size:10px">+ 功能</button>
         <button class="btn btn-outline btn-sm hier-rename-proc" data-id="${proc.id}" data-name="${escapeHtml(proc.name)}" style="font-size:10px">重命名</button>
         ${seed ? '' : `<button class="btn btn-outline btn-sm hier-del-proc" data-id="${proc.id}" style="font-size:10px;color:var(--red-500);border-color:var(--red-200)">删除</button>`}
       </div>
@@ -295,7 +336,7 @@ function wireHierarchyActions(root) {
   }));
 
   root.querySelectorAll('.hier-add-proc').forEach(b => b.addEventListener('click', async () => {
-    const name = prompt('新流程名称：');
+    const name = prompt('新模块名称：');
     if (!name || !name.trim()) return;
     try {
       const res = await fetch(`/api/v2/systems/${b.dataset.systemId}/processes`, {
@@ -303,15 +344,15 @@ function wireHierarchyActions(root) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), sortOrder: 0 }),
       });
-      const data = await readV2(res);
+      await readV2(res);
       await loadHierarchyTree();
     } catch (err) {
-      alert('创建流程失败：' + err.message);
+      alert('创建模块失败：' + err.message);
     }
   }));
 
   root.querySelectorAll('.hier-add-fn').forEach(b => b.addEventListener('click', async () => {
-    const name = prompt('新功能点名称：');
+    const name = prompt('新功能名称：');
     if (!name || !name.trim()) return;
     try {
       const res = await fetch(`/api/v2/processes/${b.dataset.processId}/functions`, {
@@ -319,10 +360,10 @@ function wireHierarchyActions(root) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), sortOrder: 0 }),
       });
-      const data = await readV2(res);
+      await readV2(res);
       await loadHierarchyTree();
     } catch (err) {
-      alert('创建功能点失败：' + err.message);
+      alert('创建功能失败：' + err.message);
     }
   }));
 
@@ -332,12 +373,12 @@ function wireHierarchyActions(root) {
     await renameEntity('systems', b.dataset.id, name.trim());
   }));
   root.querySelectorAll('.hier-rename-proc').forEach(b => b.addEventListener('click', async () => {
-    const name = prompt('流程新名称：', b.dataset.name);
+    const name = prompt('模块新名称：', b.dataset.name);
     if (!name || !name.trim()) return;
     await renameEntity('processes', b.dataset.id, name.trim());
   }));
   root.querySelectorAll('.hier-rename-fn').forEach(b => b.addEventListener('click', async () => {
-    const name = prompt('功能点新名称：', b.dataset.name);
+    const name = prompt('功能新名称：', b.dataset.name);
     if (!name || !name.trim()) return;
     await renameEntity('functions', b.dataset.id, name.trim());
   }));
@@ -345,9 +386,9 @@ function wireHierarchyActions(root) {
   root.querySelectorAll('.hier-del-sys').forEach(b => b.addEventListener('click', () =>
     deleteEntity('systems', b.dataset.id, '系统')));
   root.querySelectorAll('.hier-del-proc').forEach(b => b.addEventListener('click', () =>
-    deleteEntity('processes', b.dataset.id, '流程')));
+    deleteEntity('processes', b.dataset.id, '模块')));
   root.querySelectorAll('.hier-del-fn').forEach(b => b.addEventListener('click', () =>
-    deleteEntity('functions', b.dataset.id, '功能点')));
+    deleteEntity('functions', b.dataset.id, '功能')));
 
   root.querySelectorAll('.hier-load-traj').forEach(b => b.addEventListener('click', async () => {
     const fnId = b.dataset.id;

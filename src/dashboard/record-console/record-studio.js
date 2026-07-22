@@ -593,6 +593,10 @@ async function main() {
     if (Number(payload?.trajectoryDbId) !== trajId) return;
     scheduleRefreshTree(80);
   });
+  on('cdp_action_persisted', (payload) => {
+    if (Number(payload?.trajectoryDbId) !== trajId) return;
+    scheduleRefreshTree(80);
+  });
   on('action_persisted', (payload) => {
     if (Number(payload?.trajectoryDbId) !== trajId) return;
     scheduleRefreshTree(80);

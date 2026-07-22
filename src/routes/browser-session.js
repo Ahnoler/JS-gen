@@ -70,16 +70,41 @@ function broadcastWatcherStatus() {
  */
 async function persistLiveActionEntries(session, entries, { source } = {}) {
   const trajId = session?.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null;
-  if (!Number.isFinite(trajId) || !Array.isArray(entries) || !entries.length) return;
+  if (!Number.isFinite(trajId) || !Array.isArray(entries) || !entries.length) return [];
   if (!session.persistedActionIds) session.persistedActionIds = new Set();
+  if (!session._lastPersistByActionId) session._lastPersistByActionId = new Map();
+  if (!session._persistInflight) session._persistInflight = new Map();
 
+  const out = [];
   for (const entry of entries) {
     if (!entry) continue;
     const aid = entry.id != null ? String(entry.id) : '';
-    if (aid && session.persistedActionIds.has(aid)) continue;
+
+    // Another dedicated-path caller already owns this id — wait for it (no second DB write)
+    if (aid && session.persistedActionIds.has(aid)) {
+      const prev = session._lastPersistByActionId.get(aid);
+      if (prev) {
+        out.push(prev);
+        continue;
+      }
+      const inflight = session._persistInflight.get(aid);
+      if (inflight) {
+        const waited = await inflight;
+        if (waited) out.push(waited);
+      }
+      continue;
+    }
+
+    let resolveInflight = null;
+    if (aid) {
+      session.persistedActionIds.add(aid);
+      const inflightPromise = new Promise((resolve) => { resolveInflight = resolve; });
+      session._persistInflight.set(aid, inflightPromise);
+    }
 
     const entrySource = source || entry.source || 'agent';
-    const phaseIdOverride = entrySource === 'manual'
+    // User-driven paths (manual / CDP quick action) bind to selected phase
+    const phaseIdOverride = (entrySource === 'manual' || entrySource === 'cdp')
       ? (session.selectedPhaseId != null ? Number(session.selectedPhaseId) : null)
       : (session.activePhaseId != null
         ? Number(session.activePhaseId)
@@ -91,19 +116,34 @@ async function persistLiveActionEntries(session, entries, { source } = {}) {
         trajectoryPhaseId: Number.isFinite(phaseIdOverride) ? phaseIdOverride : undefined,
       });
       if (persisted) {
-        if (aid) session.persistedActionIds.add(aid);
-        const evt = entrySource === 'manual' ? 'manual_action_persisted' : 'action_persisted';
+        const evt = entrySource === 'manual'
+          ? 'manual_action_persisted'
+          : entrySource === 'cdp'
+            ? 'cdp_action_persisted'
+            : 'action_persisted';
         broadcast(evt, {
           trajectoryDbId: trajId,
           sessionId: session.sessionId,
           ...persisted,
           entry,
         });
+        const result = { ...persisted, entry };
+        if (aid) session._lastPersistByActionId.set(aid, result);
+        if (resolveInflight) resolveInflight(result);
+        out.push(result);
+      } else {
+        if (aid) session.persistedActionIds.delete(aid);
+        if (resolveInflight) resolveInflight(null);
       }
     } catch (err) {
+      if (aid) session.persistedActionIds.delete(aid);
+      if (resolveInflight) resolveInflight(null);
       console.warn('[live-persist] appendRecordedStep failed:', err.message);
+    } finally {
+      if (aid) session._persistInflight.delete(aid);
     }
   }
+  return out;
 }
 
 /** Durable executor → control-plane event hook for a session (persist + broadcast). */
@@ -114,9 +154,16 @@ function bindExecutorSessionEvents(session) {
       const entries = Array.isArray(payload?.entries) ? payload.entries : [];
       session.lastActionLog = entries;
       broadcast('action_log_sync', { ...(payload || {}), sessionId: session.sessionId });
-      // When a trajectory is selected, AI/manual actions persist immediately
-      if (Number.isFinite(Number(session.dbTrajectoryId))) {
-        persistLiveActionEntries(session, entries).catch(() => {});
+      // Agent steps only — manual/cdp are persisted via dedicated events (avoid double-write race)
+      const autoPersist = !!(session.autoPersist ?? state.globalBrowser.autoPersist);
+      if (autoPersist && Number.isFinite(Number(session.dbTrajectoryId))) {
+        const agentEntries = entries.filter((e) => {
+          const src = e?.source || 'agent';
+          return src === 'agent';
+        });
+        if (agentEntries.length) {
+          persistLiveActionEntries(session, agentEntries).catch(() => {});
+        }
       }
       return;
     }
@@ -132,6 +179,22 @@ function bindExecutorSessionEvents(session) {
       const autoPersist = !!(session.autoPersist ?? state.globalBrowser.autoPersist);
       if (autoPersist && entry) {
         persistLiveActionEntries(session, [entry], { source: 'manual' }).catch(() => {});
+      }
+      return;
+    }
+    // Quick actions (CDP watcher): dedicated persist path — not via action_log_sync
+    if (type === 'cdp_action_result') {
+      const raw = payload?.entry;
+      const entry = raw ? { ...raw, source: 'cdp' } : null;
+      if (entry) {
+        session.lastActionLog = Array.isArray(session.lastActionLog) ? session.lastActionLog : [];
+        const idx = session.lastActionLog.findIndex((e) => e.id && entry.id && e.id === entry.id);
+        if (idx < 0) session.lastActionLog.push(entry);
+        else session.lastActionLog[idx] = entry;
+      }
+      const autoPersist = !!(session.autoPersist ?? state.globalBrowser.autoPersist);
+      if (autoPersist && entry && Number.isFinite(Number(session.dbTrajectoryId))) {
+        persistLiveActionEntries(session, [entry], { source: 'cdp' }).catch(() => {});
       }
       return;
     }
@@ -233,6 +296,21 @@ async function ensureGlobalBrowser(modelId) {
             if (autoPersist && entry && session) {
               persistLiveActionEntries(session, [entry], { source: 'manual' })
                 .catch((err) => console.warn('[manual-record] live persist failed:', err.message));
+            }
+          } else if (msg.event === 'cdp_action_result') {
+            // Quick-action dedicated persist (local agent); HTTP handler also claim-safe
+            const raw = msg.entry || msg.data?.entry;
+            const entry = raw ? { ...raw, source: 'cdp' } : null;
+            const session = [...state.sessions.values()][0];
+            const autoPersist = !!(session?.autoPersist ?? gb.autoPersist);
+            if (entry) {
+              gb.lastActionLog = Array.isArray(gb.lastActionLog) ? gb.lastActionLog : [];
+              const idx = gb.lastActionLog.findIndex((e) => e.id && entry.id && e.id === entry.id);
+              if (idx < 0) gb.lastActionLog.push(entry);
+            }
+            if (autoPersist && entry && session && Number.isFinite(Number(session.dbTrajectoryId))) {
+              persistLiveActionEntries(session, [entry], { source: 'cdp' })
+                .catch((err) => console.warn('[cdp-action] live persist failed:', err.message));
             }
           } else if (msg.event === 'manual_record_status') {
             gb.manualRecording = !!msg.data?.enabled;
@@ -1508,75 +1586,125 @@ export default function (app) {
 
   app.post('/api/browser/watcher/action', async (req, res) => {
     try {
-      const gb = state.globalBrowser;
-      if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Agent not ready. Start a session first.' });
-      if (!gb.process || !gb.process.stdout) return res.status(503).json({ error: 'Agent process not available' });
-
       const { action, params, trajectoryDbId, sessionId, source } = req.body || {};
       if (!action) return res.status(400).json({ error: 'action is required' });
 
-      // Resolve session + trajectory for live persist
-      const session = sessionId ? state.sessions.get(sessionId) : null;
+      let session = sessionId ? state.sessions.get(sessionId) : null;
+      // Executor mode: quick actions must target the live session agent (not globalBrowser).
+      if (!session && USE_EXECUTOR) {
+        const execSessions = [...state.sessions.values()].filter((s) => s.useExecutor && sessionRuntimeReady(s));
+        if (execSessions.length === 1) session = execSessions[0];
+      }
+
       const resolvedTrajId = trajectoryDbId != null && trajectoryDbId !== ''
         ? Number(trajectoryDbId)
         : (session?.dbTrajectoryId != null ? Number(session.dbTrajectoryId) : null);
 
-      // Wait up to 5s for agent to not be busy (quick actions need idle browser)
-      const deadline = Date.now() + 5000;
-      while (gb.busy && Date.now() < deadline) { await new Promise(r => setTimeout(r, 200)); }
-
       const reqId = crypto.randomUUID().slice(0, 8);
+      let result;
 
-      // Set up one-shot listener for the result
-      const result = await new Promise((resolve) => {
-        const timeout = setTimeout(() => resolve({ error: 'timeout: no response from agent within 15s' }), 15000);
-        let buffer = '';
-
-        const onData = (chunk) => {
-          buffer += chunk.toString();
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const msg = JSON.parse(line);
-              if (msg.event === 'cdp_action_result' && msg.id === reqId) {
-                cleanup();
-                resolve({ result: msg.result, error: msg.error, entry: msg.entry || null });
-              }
-            } catch {}
-          }
-        };
-
-        const onExit = () => {
-          cleanup();
-          resolve({ error: 'Agent process exited before result' });
-        };
-
-        const cleanup = () => {
-          clearTimeout(timeout);
-          try { gb.process.stdout.removeListener('data', onData); } catch {}
-          try { gb.process.removeListener('exit', onExit); } catch {}
-        };
-
-        try { gb.process.stdout.on('data', onData); } catch (e) { cleanup(); resolve({ error: String(e) }); return; }
-        try { gb.process.on('exit', onExit); } catch (e) { cleanup(); resolve({ error: String(e) }); return; }
-
-        // Send after listener is attached
-        try {
-          gb.stdin.write(JSON.stringify({ event: 'cdp_action', data: { id: reqId, action, params: params || [] } }) + '\n');
-        } catch (err) {
-          cleanup();
-          resolve({ error: String(err) });
+      if (session?.useExecutor) {
+        if (!sessionRuntimeReady(session)) {
+          return res.status(503).json({ error: 'Agent not ready. Start a session first.' });
         }
-      });
+        const deadline = Date.now() + 5000;
+        while (session.busy && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+
+        const resultP = new Promise((resolve) => {
+          const timer = setTimeout(() => {
+            unsub();
+            resolve({ error: 'timeout: no response from agent within 15s' });
+          }, 15000);
+          const unsub = execSession.onSessionEvent(session.sessionId, 'cdp_action_result', (payload) => {
+            if (payload?.id != null && String(payload.id) !== String(reqId)) return;
+            clearTimeout(timer);
+            unsub();
+            resolve({
+              result: payload?.result,
+              error: payload?.error || null,
+              entry: payload?.entry || null,
+            });
+          });
+        });
+
+        try {
+          execSession.forwardStdin({
+            nodeUuid: session.executorNodeUuid,
+            sessionId: session.sessionId,
+            event: 'cdp_action',
+            data: { id: reqId, action, params: params || [] },
+          });
+        } catch (err) {
+          return res.status(503).json({ error: err.message || 'Failed to send action to executor' });
+        }
+        result = await resultP;
+      } else {
+        const gb = state.globalBrowser;
+        if (!gb.ready || !gb.stdin) {
+          return res.status(503).json({ error: 'Agent not ready. Start a session first.' });
+        }
+        if (!gb.process || !gb.process.stdout) {
+          return res.status(503).json({ error: 'Agent process not available' });
+        }
+
+        const deadline = Date.now() + 5000;
+        while (gb.busy && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 200));
+        }
+
+        result = await new Promise((resolve) => {
+          const timeout = setTimeout(() => resolve({ error: 'timeout: no response from agent within 15s' }), 15000);
+          let buffer = '';
+
+          const onData = (chunk) => {
+            buffer += chunk.toString();
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const msg = JSON.parse(line);
+                if (msg.event === 'cdp_action_result' && msg.id === reqId) {
+                  cleanup();
+                  resolve({ result: msg.result, error: msg.error, entry: msg.entry || null });
+                }
+              } catch {}
+            }
+          };
+
+          const onExit = () => {
+            cleanup();
+            resolve({ error: 'Agent process exited before result' });
+          };
+
+          const cleanup = () => {
+            clearTimeout(timeout);
+            try { gb.process.stdout.removeListener('data', onData); } catch {}
+            try { gb.process.removeListener('exit', onExit); } catch {}
+          };
+
+          try { gb.process.stdout.on('data', onData); } catch (e) { cleanup(); resolve({ error: String(e) }); return; }
+          try { gb.process.on('exit', onExit); } catch (e) { cleanup(); resolve({ error: String(e) }); return; }
+
+          try {
+            gb.stdin.write(JSON.stringify({ event: 'cdp_action', data: { id: reqId, action, params: params || [] } }) + '\n');
+          } catch (err) {
+            cleanup();
+            resolve({ error: String(err) });
+          }
+        });
+      }
 
       if (result.error) {
         return res.status(500).json({ error: result.error, action, params });
       }
 
-      // Live-persist CDP action only when「自动入库」is on
+      // CDP persist: dedicated path via cdp_action_result hooks + claim-safe HTTP fallback
+      // (never via action_log_sync). Same id is claimed once.
       let persisted = null;
+      const gb = state.globalBrowser;
       const bodyAuto = req.body && typeof req.body.autoPersist === 'boolean'
         ? req.body.autoPersist
         : null;
@@ -1585,21 +1713,21 @@ export default function (app) {
         : (session?.autoPersist ?? gb.autoPersist));
       if (session) session.autoPersist = autoPersist;
       gb.autoPersist = autoPersist;
+      if (session && Number.isFinite(resolvedTrajId)) {
+        session.dbTrajectoryId = resolvedTrajId;
+      }
+      const bodyPhase = req.body?.phaseId ?? req.body?.trajectoryPhaseId;
+      if (session && bodyPhase != null && bodyPhase !== '') {
+        session.selectedPhaseId = Number(bodyPhase);
+      }
       if (autoPersist && Number.isFinite(resolvedTrajId) && result.entry && session) {
         try {
-          const stepSource = source || result.entry.source || 'cdp';
-          session.dbTrajectoryId = resolvedTrajId;
-          const bodyPhase = req.body?.phaseId ?? req.body?.trajectoryPhaseId;
-          if (bodyPhase != null && bodyPhase !== '') {
-            session.selectedPhaseId = Number(bodyPhase);
-          }
-          await persistLiveActionEntries(session, [result.entry], { source: stepSource });
-          persisted = { ok: true };
+          const entry = { ...result.entry, source: 'cdp' };
+          const results = await persistLiveActionEntries(session, [entry], { source: 'cdp' });
+          persisted = results[0] || null;
         } catch (dbErr) {
           console.warn('[watcher-action] live DB persist failed:', dbErr.message);
         }
-      } else if (session && Number.isFinite(resolvedTrajId)) {
-        session.dbTrajectoryId = resolvedTrajId;
       }
 
       res.json({
@@ -1610,6 +1738,7 @@ export default function (app) {
         trajectoryDbId: Number.isFinite(resolvedTrajId) ? resolvedTrajId : null,
         autoPersist: !!autoPersist,
         persisted,
+        sessionId: session?.sessionId || sessionId || null,
       });
     } catch (err) {
       console.error('[watcher-action] Error:', err.message);
