@@ -338,6 +338,42 @@ export class SessionManager {
     await bib.stopScreencast().catch(() => {});
   }
 
+  /**
+   * Resolve form element by label_text on the attached BiB page.
+   * @param {string} sessionId
+   * @param {{ labelText?: string, requestId?: string }} [opts]
+   */
+  async bibResolveElement(sessionId, { labelText, requestId } = {}) {
+    try {
+      const bib = this.bibs.get(sessionId);
+      if (!bib) {
+        return {
+          requestId: requestId || null,
+          sessionId,
+          element: null,
+          matchedLabel: null,
+          error: 'BiB not attached — call record/prepare (stream) first',
+        };
+      }
+      const resolved = await bib.resolveByLabel(labelText);
+      return {
+        requestId: requestId || null,
+        sessionId,
+        element: resolved.element || null,
+        matchedLabel: resolved.matchedLabel || null,
+        error: null,
+      };
+    } catch (err) {
+      return {
+        requestId: requestId || null,
+        sessionId,
+        element: null,
+        matchedLabel: null,
+        error: err?.message || String(err),
+      };
+    }
+  }
+
   async bibAck(sessionId, payload = {}) {
     const bib = this.bibs.get(sessionId);
     if (!bib) return;

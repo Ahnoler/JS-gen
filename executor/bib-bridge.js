@@ -12,6 +12,7 @@
  */
 import { CdpClient } from '../src/cdp/client.js';
 import { discoverCdpWithRetry } from '../src/cdp/discover.js';
+import { resolveElementByLabel } from '../src/cdp/resolve-by-label.js';
 
 const MAGIC = Buffer.from('RSCF');
 const DEFAULT_VIEWPORT = { w: 1920, h: 1080, dpr: 1 };
@@ -380,6 +381,17 @@ export class BibBridge {
     if (Date.now() - this._lastFrameAt > 800) {
       this.restartScreencast().catch(() => {});
     }
+  }
+
+  /**
+   * Resolve Element UI control by form label via CDP.
+   * @param {string} labelText
+   */
+  async resolveByLabel(labelText) {
+    if (!this.client || this._disposed) {
+      throw new Error('BiB not attached');
+    }
+    return resolveElementByLabel(this.client, labelText);
   }
 
   async detach() {

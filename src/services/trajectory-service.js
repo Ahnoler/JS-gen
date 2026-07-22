@@ -15,6 +15,8 @@ import * as slotLease from '../executor-slot-lease.js';
 import * as remoteSessionService from './remote-session-service.js';
 import { state } from '../state.js';
 import { broadcast } from '../ws-server.js';
+import { USE_EXECUTOR } from '../../config/config.js';
+import * as remoteBridge from '../cdp/remote-bridge.js';
 
 /** Build agent login instruction (aligned with Dashboard session-mode login).
  * Prefer system.url；兼容旧数据回退 account.loginUrl。
@@ -1938,6 +1940,69 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
     recordStatus: tree?.recordStatus || (want ? 'completed' : 'draft'),
     confirmed: want,
     tree,
+  };
+}
+
+/**
+ * Resolve Element UI control by label_text on the attached BiB/CDP page.
+ * Returns ElementJson for writing into trajectory_step.element_json.
+ */
+export async function resolveTrajectoryElement(trajectoryId, { labelText } = {}) {
+  const tid = Number(trajectoryId);
+  const label = String(labelText || '').trim();
+  if (!label) {
+    const err = new Error('labelText is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  const runtime = trajectoryRuntimeMap.get(tid);
+  if (!runtime?.sessionId) {
+    const err = new Error('Trajectory is not attached — call record/prepare first');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (USE_EXECUTOR) {
+    if (!runtime.executorNodeUuid) {
+      const err = new Error('Executor node missing on trajectory runtime');
+      err.statusCode = 400;
+      throw err;
+    }
+    const requestId = randomUUID();
+    const resultP = execSession.waitForSessionEvent(
+      runtime.sessionId,
+      'session.bib_resolve_element_result',
+      20000,
+    );
+    execSession.sendToExecutor(runtime.executorNodeUuid, 'session.bib_resolve_element', {
+      sessionId: runtime.sessionId,
+      labelText: label,
+      requestId,
+    });
+    const payload = await resultP;
+    if (payload?.error) {
+      const msg = String(payload.error);
+      const err = new Error(msg);
+      err.statusCode = /not attached|not available|required/i.test(msg) ? 400 : 404;
+      throw err;
+    }
+    if (!payload?.element) {
+      const err = new Error(`No form field found for label: ${label}`);
+      err.statusCode = 404;
+      throw err;
+    }
+    return {
+      trajectoryId: tid,
+      matchedLabel: payload.matchedLabel || label,
+      element: payload.element,
+    };
+  }
+
+  const resolved = await remoteBridge.resolveElementByLabelText(label);
+  return {
+    trajectoryId: tid,
+    matchedLabel: resolved.matchedLabel,
+    element: resolved.element,
   };
 }
 

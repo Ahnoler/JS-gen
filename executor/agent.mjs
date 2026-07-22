@@ -90,6 +90,14 @@ const client = new ExecutorWsClient({
           activeTargetId: result.activeTargetId || null,
           switched: true,
         });
+      } else if (msg.type === 'session.bib_resolve_element' && result) {
+        client.send('session.bib_resolve_element_result', {
+          sessionId: msg.payload?.sessionId,
+          requestId: result.requestId || msg.payload?.requestId,
+          element: result.element || null,
+          matchedLabel: result.matchedLabel || null,
+          error: result.error || null,
+        });
       }
     } catch (err) {
       console.error('[executor] session error:', err.message);

@@ -485,6 +485,22 @@ export const API_GROUPS = [
         }),
       },
       {
+        method: 'POST', path: '/api/v2/trajectories/{id}/resolve-element',
+        summary: '按 label_text 从已附着页面解析定位器',
+        desc: '需 record/prepare 且 BiB 已附着。返回 element_json 形态，供手动新增/编辑步骤写入。',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        reqExample: J({ labelText: '姓名' }),
+        respExample: J({
+          trajectoryId: 42,
+          matchedLabel: '姓名',
+          element: {
+            tag: 'input', xpath: '/html/body/.../input[1]', cssSelector: 'input.el-input__inner',
+            attributes: { class: 'el-input__inner' }, text: '',
+          },
+        }),
+        notes: ['400：未 attach / BiB 未就绪', '404：页上找不到对应 label'],
+      },
+      {
         method: 'POST', path: '/api/v2/trajectories/{id}/manual-record',
         summary: '开关人工录制',
         desc: 'AI 录制中（recordStatus=recording）时开启会 409。live（推流占用）下可开人工录制。phaseId 省略则追加到最后阶段。',
@@ -954,5 +970,6 @@ export const RECORDING_FLOW = [
   'POST .../record/start（可选 phaseIds；可关页后台继续）',
   'POST .../record/stop（不释放槽位）',
   'POST .../confirm（人工确认 → completed；取消 → draft）',
+  'POST .../resolve-element（可选：按 label 抓定位器写入步骤 element_json）',
   'POST .../detach（释放执行机槽位；或等 10 分钟无步骤自动回收）',
 ];

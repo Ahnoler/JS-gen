@@ -12,6 +12,7 @@ import {
   enableInspect, highlightAt, hideHighlight, resolvePayloadAt, suppressPageManualRecorder,
   resolveFocusedFillPayload, resolveCommittedDateFillPayload, snapshotDateEditorValues,
 } from './inspect.js';
+import { resolveElementByLabel } from './resolve-by-label.js';
 
 /** Binary frame magic: Remote ScreenCast Frame */
 const MAGIC = Buffer.from('RSCF');
@@ -835,4 +836,17 @@ function ensureWsHook() {
 /** Call once from route registration so WS handlers exist even before attach */
 export function initRemoteBridgeWs() {
   ensureWsHook();
+}
+
+/**
+ * Resolve form control by label_text on the currently attached local BiB CDP page.
+ * @param {string} labelText
+ */
+export async function resolveElementByLabelText(labelText) {
+  if (!client) {
+    const err = new Error('BiB stream not attached — call record/prepare first');
+    err.statusCode = 400;
+    throw err;
+  }
+  return resolveElementByLabel(client, labelText);
 }

@@ -52,6 +52,11 @@ export function createSessionHandler(manager) {
           url: payload.url,
           pageId: payload.pageId,
         });
+      case 'session.bib_resolve_element':
+        return manager.bibResolveElement(sessionId, {
+          labelText: payload.labelText || payload.label_text,
+          requestId: payload.requestId,
+        });
       case 'session.step':
         return manager.forward(sessionId, 'step', {
           instruction: payload.task || payload.instruction,

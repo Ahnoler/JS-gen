@@ -383,6 +383,21 @@ export default function (app) {
   });
 
   /**
+   * Resolve Element UI form control by label_text on attached BiB page.
+   * Body: { labelText: string }
+   * Returns { element, matchedLabel } for writing trajectory_step.element_json.
+   */
+  app.post('/api/v2/trajectories/:id/resolve-element', async (req, res) => {
+    try {
+      const labelText = req.body?.labelText ?? req.body?.label_text ?? '';
+      const result = await trajectoryService.resolveTrajectoryElement(+req.params.id, { labelText });
+      res.json(result);
+    } catch (err) {
+      sendErr(res, err);
+    }
+  });
+
+  /**
    * Toggle manual recording. Body: { enabled, phaseId? }
    * phaseId omitted → append to last phase of trajectory.
    */
