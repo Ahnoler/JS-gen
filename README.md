@@ -226,7 +226,7 @@ Node.js Express (server.mjs, :4097)
 | `DB_*` | MySQL（v2） |
 | `USE_EXECUTOR` | `true` 时 Session/录制走在线执行机 |
 | `EXECUTOR_TOKEN` | 执行机鉴权；未配置则拒绝连接 |
-| `EXECUTOR_CAPACITY` | 执行机侧每节点槽位数（默认 2，见 `executor/.env.example`） |
+| `EXECUTOR_CAPACITY` | 执行机侧每节点槽位数（默认 16，见 `executor/.env.example`） |
 | `EXECUTOR_HEARTBEAT_TIMEOUT_MS` | 心跳超时扫除 |
 
 ---
