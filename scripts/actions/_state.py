@@ -17,7 +17,7 @@ _CURRENT_SOURCE: str = 'agent'
 # Action → old-format command mapping (legacy, mirrors models/action.py:ACTION_TO_COMMAND)
 _ACTION_TO_COMMAND = {
     'fill_form_field': 'input', 'fill_date_field': 'input',
-    'select_option': 'select',
+    'select_option': 'select', 'select_tree_option': 'select',
     'click_element_by_index': 'click', 'click_menu_item': 'click',
     'click_table_row_button': 'click', 'click_table_row_radio': 'click',
     'click_adjacent_button': 'click', 'click_radio': 'click',
@@ -67,27 +67,28 @@ def _record_action(action_name, params, result, element=None, source=None):
 
     dumped = entry.model_dump()
 
-    # Manual/CDP: drop date-picker reopen clicks that echo the just-selected date
+    # Manual only: drop date-picker reopen clicks that echo the just-selected date
+    # (CDP quick actions record as-is — no coalesce / noise filter)
     if (
-        resolved_source in ('manual', 'cdp')
+        resolved_source == 'manual'
         and action_name == 'click_element_by_index'
         and _ACTION_LOG
     ):
         click_text = str(params_dict.get('text') or '').strip()
         last = _ACTION_LOG[-1]
-        if last.get('action') == 'fill_date_field' and last.get('source') in ('manual', 'cdp', None):
+        if last.get('action') == 'fill_date_field' and last.get('source') in ('manual', None):
             last_val = str((last.get('params') or {}).get('value') or '').strip()
             if click_text and (click_text == last_val or re.match(r'^\d{4}-\d{2}-\d{2}$', click_text)):
                 return None  # skip reopen noise; do not append / emit
 
-    # Manual/CDP: before coalescing fills, drop a junk click left from date-picker UI
+    # Manual only: before coalescing fills, drop a junk click left from date-picker UI
     if (
-        resolved_source in ('manual', 'cdp')
+        resolved_source == 'manual'
         and action_name == 'fill_date_field'
         and _ACTION_LOG
     ):
         last = _ACTION_LOG[-1]
-        if last.get('action') == 'click_element_by_index' and last.get('source') in ('manual', 'cdp', None):
+        if last.get('action') == 'click_element_by_index' and last.get('source') in ('manual', None):
             last_text = str((last.get('params') or {}).get('text') or '').strip()
             date_val = str(params_dict.get('value') or '').strip()
             if (
@@ -97,14 +98,14 @@ def _record_action(action_name, params, result, element=None, source=None):
             ):
                 _ACTION_LOG.pop()
 
-    # Manual/CDP: coalesce consecutive fills on the same field → keep last only
+    # Manual only: coalesce consecutive fills on the same field → keep last only
     if (
-        resolved_source in ('manual', 'cdp')
+        resolved_source == 'manual'
         and action_name in ('fill_form_field', 'fill_date_field')
         and _ACTION_LOG
     ):
         last = _ACTION_LOG[-1]
-        if last.get('action') == action_name and last.get('source') in ('manual', 'cdp', None):
+        if last.get('action') == action_name and last.get('source') in ('manual', None):
             last_params = last.get('params') or {}
             same_label = bool(params_dict.get('label_text')) and (
                 last_params.get('label_text') == params_dict.get('label_text')

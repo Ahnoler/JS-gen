@@ -34,7 +34,7 @@ if 无用户数据 (name 和 idno 都为空):
 if 有用户数据:
   # 按用户提供的数据执行搜索引入流程
   check = click_adjacent_button("法定代表人")
-  if check == "clicked":
+  if check == "ok-clicked":
     wait(1000)
     fill_form_field("客户名称", name)
     click 查询 按钮

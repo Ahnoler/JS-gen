@@ -66,6 +66,7 @@ ACTION_TO_COMMAND: dict[str, CommandType] = {
     "fill_form_field": "input",
     "fill_date_field": "input",
     "select_option": "select",
+    "select_tree_option": "select",
     "click_element_by_index": "click",
     "click_menu_item": "click",
     "click_table_row_button": "click",

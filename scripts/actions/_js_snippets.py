@@ -392,7 +392,7 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
             if (!trigger) continue;
             if (mode === 'check') {
                 const cur = getSelectedLabel(item);
-                if (cur) return {done: true, result: 'already:' + cur};
+                if (cur) return {done: true, result: 'ok-already:' + cur};
                 return {skip: true, reason: 'no-value'};
             }
             if (mode === 'trigger') {
@@ -402,11 +402,11 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
                 trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
                 trigger.click();
                 window.__last_select_trigger = trigger;
-                return {done: true, result: 'triggered'};
+                return {done: true, result: 'ok-triggered'};
             }
             if (mode === 'confirm') {
                 const cur = getSelectedLabel(item);
-                if (cur) return {done: true, result: 'SELECTED:' + cur};
+                if (cur) return {done: true, result: 'ok-confirmed:' + cur};
                 return {done: true, result: 'NOT-SELECTED'};
             }
             return {done: true, result: 'unknown-mode'};
@@ -424,8 +424,8 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
                 // P0/P1 container found the field but it's empty (not yet filled).
                 // Return 'not-filled' immediately instead of falling through to
                 // lower-priority containers (e.g. P2 document) that might have a
-                // stale already: value from a different instance of the same label.
-                // Without this guard, the caller sees 'already:一般农户' (from the
+                // stale ok-already: value from a different instance of the same label.
+                // Without this guard, the caller sees 'ok-already:一般农户' (from the
                 // main page's filled select) and skips filling the drawer's empty one.
                 return 'not-filled';
             }
@@ -437,9 +437,9 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         for (const sel of _allSelects) {
             if (sel.offsetParent !== null) {
                 const v = (sel.value || '').trim();
-                if (v.length > 0) return 'already:' + v;
+                if (v.length > 0) return 'ok-already:' + v;
                 const t = (sel.textContent || '').trim();
-                if (t.length > 0 && !t.includes('请选择')) return 'already:' + t;
+                if (t.length > 0 && !t.includes('请选择')) return 'ok-already:' + t;
                 break;
             }
         }
@@ -448,10 +448,10 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     if (mode === 'trigger') {
         for (const sel of _allSelects) {
             const ph = sel.getAttribute('placeholder') || '';
-            if (ph.includes(label) && !sel.disabled && sel.offsetParent !== null) { sel.click(); return 'triggered'; }
+            if (ph.includes(label) && !sel.disabled && sel.offsetParent !== null) { sel.click(); return 'ok-triggered'; }
         }
         for (const sel of _allSelects) {
-            if (!sel.disabled && sel.offsetParent !== null) { sel.click(); return 'triggered'; }
+            if (!sel.disabled && sel.offsetParent !== null) { sel.click(); return 'ok-triggered'; }
         }
         return 'label-not-found';
     }
@@ -459,7 +459,7 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         for (const sel of _allSelects) {
             if (sel.offsetParent !== null) {
                 const v = (sel.value || '').trim();
-                if (v) return 'SELECTED:' + v;
+                if (v) return 'ok-confirmed:' + v;
             }
         }
         return 'NOT-SELECTED';

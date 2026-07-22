@@ -961,6 +961,7 @@ export function initSessionMode() {
   const QUICK_ACTIONS = [
     { name: 'fill_form_field', label: '填写字段', params: ['label', 'value'], desc: '通过标签文本填写表单字段' },
     { name: 'select_option', label: '选择下拉', params: ['label', 'option'], desc: '选择 el-select 下拉选项' },
+    { name: 'select_tree_option', label: '树选择器', params: ['label', 'option'], desc: '树形选择器（如行业代码）：P0 精确 / P1 搜索 / P2 兜底叶节点' },
     { name: 'click_table_row_radio', label: '选中表格行', params: ['row'], desc: '选中 el-table 中的单选按钮' },
     { name: 'click_table_row_button', label: '点击表格按钮', params: ['row', 'button'], desc: '点击 el-table 行中的操作按钮' },
     { name: 'click_adjacent_button', label: '点击相邻按钮', params: ['label'], desc: '点击字段旁的引入/选择按钮' },

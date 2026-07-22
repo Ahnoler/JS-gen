@@ -217,8 +217,8 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     'index': index,
                     'tag_name': element_node.tag_name,
                     'text': elem_text or '',
-                }, f'clicked-{index}', element=element_info)
-            return _ok(f'clicked-{index}')
+                }, f'ok-clicked-{index}', element=element_info)
+            return _ok(f'ok-clicked-{index}')
         except Exception as e:
             return _err(f'click-failed:{e}')
 

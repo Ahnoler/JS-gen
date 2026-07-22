@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import re
 import sys
 
-from ._helpers import _wait_if_loading
+from ._helpers import _wait_if_loading, _is_ok_result
 from ._js_snippets import (
     JS_FILL_FORM_FIELD,
     JS_FILL_DATE_FIELD,
@@ -36,6 +37,52 @@ _FORM_ACTIONS = {
     'select_tree_option',
     'click_radio',
 }
+
+# Historical / LLM / CTRL aliases → canonical controller action names
+_ACTION_NAME_ALIASES = {
+    'treeSelect': 'select_tree_option',
+    'selectTreeOption': 'select_tree_option',
+    'tree_select': 'select_tree_option',
+    'treeselect': 'select_tree_option',
+    'fill_tree': 'select_tree_option',
+    'fillTree': 'select_tree_option',
+    'fillFormField': 'fill_form_field',
+    'fillDateField': 'fill_date_field',
+    'selectOption': 'select_option',
+    'clickRadio': 'click_radio',
+    'clickMenuItem': 'click_menu_item',
+    'clickTableRowButton': 'click_table_row_button',
+    'clickTableRowRadio': 'click_table_row_radio',
+    'clickAdjacentButton': 'click_adjacent_button',
+    'closeDialog': 'close_dialog',
+    'waitForLoading': 'wait_for_loading',
+    'goToUrl': 'go_to_url',
+    'clickElementByIndex': 'click_element_by_index',
+}
+
+
+def normalize_action_name(action_name: str) -> str:
+    """Map aliases (camelCase / LLM kinds) to canonical snake_case action names."""
+    raw = str(action_name or '').strip()
+    if not raw:
+        return ''
+    if raw in _ACTION_NAME_ALIASES:
+        return _ACTION_NAME_ALIASES[raw]
+    # kebab / mixed → snake
+    snake = raw.replace('-', '_')
+    if snake in _ACTION_NAME_ALIASES:
+        return _ACTION_NAME_ALIASES[snake]
+    lower = snake.lower()
+    if lower in _ACTION_NAME_ALIASES:
+        return _ACTION_NAME_ALIASES[lower]
+    # camelCase → snake_case (selectTreeOption → select_tree_option)
+    camel_to_snake = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', raw).replace('-', '_').lower()
+    if camel_to_snake in _FORM_ACTIONS or camel_to_snake in _ACTION_NAME_ALIASES.values():
+        return camel_to_snake
+    if camel_to_snake in _ACTION_NAME_ALIASES:
+        return _ACTION_NAME_ALIASES[camel_to_snake]
+    return raw
+
 
 _CLICK_BY_INDEX = 'click_element_by_index'
 
@@ -154,24 +201,22 @@ def _filter_callable_kwargs(fn, params: dict) -> dict:
 
 
 def _result_ok(action_name: str, result: str) -> bool:
+    """Unified success check: recordable/successful CTRL results use ``ok`` prefix.
+
+    ``already-filled`` (skip) intentionally does NOT start with ``ok``.
+    """
     if not isinstance(result, str) or not result:
         return False
     if result.startswith('error:') or result.startswith('unknown-') or result.startswith('err'):
         return False
     if result.startswith('click-failed') or result == 'not-found':
         return False
-    if result.startswith('ok') or result.startswith('already') or result.startswith('SELECTED:'):
+    if _is_ok_result(result):
         return True
-    if result in ('clicked', 'login-ok') or result.startswith('login-ok') or result.startswith('clicked-'):
-        return True
-    if result.startswith('expanded-'):
-        return True
+    # Compound messages from ActionResult wrappers: "ok-login | …"
     if ' | ' in result and not result.lower().startswith('fail'):
-        head = result.split(' | ', 1)[0].strip().lower()
-        if head in ('ok', 'clicked', 'already-filled', 'login-ok') or head.startswith('clicked'):
-            return True
-    if action_name.startswith('click') and 'not-found' not in result and 'error' not in result.lower():
-        if result in ('clicked', 'ok') or result.startswith('clicked'):
+        head = result.split(' | ', 1)[0].strip()
+        if _is_ok_result(head):
             return True
     return False
 
@@ -269,7 +314,7 @@ async def _replay_form_action(page, action_name: str, params: dict) -> str:
 
     if action_name == 'select_option':
         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
-        if isinstance(already, str) and already.startswith('already:'):
+        if isinstance(already, str) and already.startswith('ok-already:'):
             cur_val = already.split(':', 1)[1]
             if cur_val == value or value in cur_val or cur_val in value:
                 await page.wait_for_timeout(200)
@@ -282,11 +327,11 @@ async def _replay_form_action(page, action_name: str, params: dict) -> str:
             result = await page.evaluate(JS_SELECT_OPTION, 'first')
         if isinstance(result, str) and result.startswith('ok'):
             confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-            if not (isinstance(confirmed, str) and confirmed.startswith('SELECTED:')):
+            if not (isinstance(confirmed, str) and confirmed.startswith('ok-confirmed:')):
                 await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
                 await page.wait_for_timeout(200)
                 confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                if isinstance(confirmed2, str) and confirmed2.startswith('SELECTED:'):
+                if isinstance(confirmed2, str) and confirmed2.startswith('ok-confirmed:'):
                     result = confirmed2
         await page.wait_for_timeout(500)
         return str(result)
@@ -329,7 +374,7 @@ async def replay_action_entries(
         await _wait_if_loading(page)
 
         for i, entry in enumerate(entries):
-            action_name = str(entry.get('action') or '')
+            action_name = normalize_action_name(entry.get('action') or '')
             params = _normalize_params(action_name, entry.get('params'))
             step_num = i + 1
             sys.stderr.write(f'[replay] [{step_num}/{total}] {action_name} {params}\n')
@@ -404,10 +449,19 @@ async def replay_action_entries(
 
         sys.stderr.write(f'[replay] Done: {total} actions | ok:{ok_count} failed:{fail_count}\n')
         sys.stderr.flush()
+        error = None
+        if fail_count > 0:
+            failed_rows = [r for r in results if not r.get('ok')]
+            first = failed_rows[0] if failed_rows else {}
+            error = (
+                f"{fail_count}/{total} steps failed"
+                + (f"; first: {first.get('action')} → {first.get('result')}" if first else '')
+            )
         return {
             'count': total,
             'ok': ok_count,
             'failed': fail_count,
+            'error': error,
             'results': results,
         }
     finally:

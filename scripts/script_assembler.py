@@ -353,7 +353,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"    const _base{step_num} = _scope{step_num} ? page.locator(_scope{step_num}) : page;")
 
         # Tier 2: Playwright native fallback
-        lines.append(f"    if (_rs{step_num} !== 'triggered' && _rs{step_num} !== 'triggered-placeholder') {{")
+        lines.append(f"    if (!_rs{step_num} || !_rs{step_num}.startsWith('ok')) {{")
         lines.append(f"      console.log('[{step_num}]   falling back to Playwright...');")
         lines.append(f"      // Dismiss any stray dropdown before retrying")
         lines.append(f"      await page.keyboard.press('Escape');")

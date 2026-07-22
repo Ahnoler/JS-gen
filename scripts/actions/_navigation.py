@@ -1,7 +1,7 @@
 """Navigation actions: switch tab, click menu item."""
 
 from ._state import _record_action
-from ._helpers import _ok
+from ._helpers import _ok, _is_ok_result
 
 
 def _register_navigation_actions(controller, browser_context):
@@ -45,7 +45,7 @@ def _register_navigation_actions(controller, browser_context):
             }
         ''', menu_text)
         await page.wait_for_timeout(500)
-        if result.startswith('ok'):
+        if _is_ok_result(result):
             _record_action('click_menu_item', {'menu_text': menu_text}, result)
             return _ok(result + ' | loc:.el-menu-item:has-text("' + menu_text + '")')
         return result

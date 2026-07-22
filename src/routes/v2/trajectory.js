@@ -342,6 +342,13 @@ export default function (app) {
       });
       res.json(result);
     } catch (err) {
+      // Include replay summary (ok/failed/results) in envelope data when present
+      if (err.payload) {
+        return res.status(err.statusCode || 500).json({
+          error: err.message,
+          ...err.payload,
+        });
+      }
       sendErr(res, err);
     }
   });

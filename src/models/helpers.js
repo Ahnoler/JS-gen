@@ -1,5 +1,11 @@
 /**
  * Convert a step/action record to trajectory_step.element_json shape.
+ */
+import { normalizeActionName } from './action-name.js';
+
+export { normalizeActionName } from './action-name.js';
+
+/**
  * @param {import('./entities.js').ElementJson|Record<string, unknown>|null|undefined} element
  * @returns {import('./entities.js').ElementJson|null}
  */
@@ -36,7 +42,7 @@ export function normalizeElementJson(element) {
  * @returns {import('./entities.js').TrajectoryStep}
  */
 export function stepFromActionLog(step, context = {}) {
-  const action = step.action ?? step.actionType ?? '';
+  const action = normalizeActionName(step.action ?? step.actionType ?? '');
   const element = step.element ?? {
     tag: step.tagName,
     xpath: step.target,

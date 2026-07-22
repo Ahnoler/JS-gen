@@ -1611,13 +1611,29 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
     });
     const result = await doneP;
     await markConsumedActionLog(runtime);
-    return {
+    const failed = Number(result?.failed) || 0;
+    const okCount = Number(result?.ok) || 0;
+    const count = result?.count ?? actions.length;
+    const error = result?.error || (failed > 0
+      ? `${failed}/${count} steps failed`
+      : null);
+    const payload = {
       trajectoryId: tid,
       isReplay: doSuppress,
       stepIds: rows.map((r) => r.id),
-      count: result?.count ?? actions.length,
-      error: result?.error || null,
+      count,
+      ok: okCount,
+      failed,
+      error,
+      results: Array.isArray(result?.results) ? result.results : undefined,
     };
+    if (error) {
+      const err = new Error(error);
+      err.statusCode = 500;
+      err.payload = payload;
+      throw err;
+    }
+    return payload;
   } finally {
     runtime.suppressStepPersist = false;
     runtime.isReplay = false;

@@ -165,9 +165,7 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
                 actions.append({'action': 'select_option', 'label': label, 'option': picked or '测试'})
             elif kind == 'tree-select':
                 # Tree-select needs tree navigation via JS_SELECT_TREE_OPTION.
-                # Use 'first' as a reasonable default — the tree handler will
-                # pick the first matching/visible node.
-                actions.append({'action': 'fill_tree', 'label': label, 'value': 'first'})
+                actions.append({'action': 'select_tree_option', 'label': label, 'option': 'first'})
             elif kind == 'date':
                 actions.append({'action': 'fill_input', 'label': label, 'value': _date_val})
             else:

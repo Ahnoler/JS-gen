@@ -502,16 +502,20 @@ async function replaySelectedSteps() {
     alert('AI 录制进行中，请先结束后再回放');
     return;
   }
-  log(`steps/replay count=${stepIds.length} isReplay=true…`);
+    log(`steps/replay count=${stepIds.length} isReplay=true…`);
   try {
     const data = await api('POST', `/api/v2/trajectories/${trajId}/steps/replay`, {
       stepIds,
       isReplay: true,
     });
-    log(`回放完成 count=${data.count}${data.error ? ` error=${data.error}` : ''}`, data.error ? 'err' : 'ok');
+    log(`回放完成 count=${data.count} ok=${data.ok ?? '?'} failed=${data.failed ?? 0}`, 'ok');
     await ensureRemoteStream({ sessionId: state.prepare?.sessionId || undefined }).catch(() => {});
   } catch (e) {
-    log(`replay: ${e.message}`, 'err');
+    const detail = e.body?.data;
+    const summary = detail
+      ? ` ok=${detail.ok ?? 0} failed=${detail.failed ?? 0}`
+      : '';
+    log(`replay: ${e.message}${summary}`, 'err');
     alert(e.message);
   }
 }

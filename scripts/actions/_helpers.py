@@ -27,6 +27,17 @@ def _err(msg):
     return ActionResult(extracted_content=str(msg), is_done=False, success=False)
 
 
+def _is_ok_result(result) -> bool:
+    """True when result is a successful / recordable CTRL outcome (prefix ``ok``).
+
+    Convention: every successful, recordable action returns a string starting with
+    ``ok`` (``ok``, ``ok:…``, ``ok-date``, ``ok-clicked``, ``ok-already:…``, …).
+    Skip / non-recordable codes (e.g. ``already-filled``, ``not-filled``) must NOT
+    use the ``ok`` prefix.
+    """
+    return isinstance(result, str) and result.startswith('ok')
+
+
 async def dismiss_https_first_interstitial(page) -> str:
     """
     Dismiss Chromium HTTPS-First / 'Always use secure connections' interstitial.

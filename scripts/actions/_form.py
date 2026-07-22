@@ -11,7 +11,7 @@ import sys
 from ..agent_utils import emit_json
 from ._state import _ACTION_LOG, _record_action
 from ._helpers import (
-    _ok, _err,
+    _ok, _err, _is_ok_result,
     _wait_if_loading, _capture_element, _merge_ax_text,
 )
 from ._js_snippets import (
@@ -189,7 +189,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 break
             total += clicked
             await page.wait_for_timeout(500)
-        return _ok(f'expanded-{total}-nodes')
+        return _ok(f'ok-expanded-{total}-nodes')
 
     @controller.action('Login to the system. Fills username + password (+ optional captcha/sms), clicks login button, waits for navigation. Use this instead of manually filling login fields one by one.')
     async def login(username: str, password: str, captcha: str = '', sms_code: str = ''):
@@ -238,8 +238,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         # Wait for post-login navigation
         await page.wait_for_timeout(3000)
-        _record_action('login', {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code}, 'login-ok')
-        return _ok('login-ok | ' + ' '.join(results))
+        _record_action('login', {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code}, 'ok-login')
+        return _ok('ok-login | ' + ' '.join(results))
 
     @controller.action('Get a value for a form field by its label using form rules.')
     async def match_form_rule(label_text: str):
@@ -252,7 +252,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
-        if result == 'ok' or result == 'ok-date' or result == 'ok-placeholder' or result == 'ok-type':
+        if _is_ok_result(result):
             element = await _capture_element(page, label_text)
             _record_action('fill_form_field', {'label_text': label_text, 'value': value}, result, element=element)
             _task_done_impl(label_text, case_data_store)
@@ -265,7 +265,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         result = await page.evaluate(JS_FILL_DATE_FIELD, [label_text, value])
-        if result.startswith('ok-date'):
+        if _is_ok_result(result):
             _record_action('fill_date_field', {'label_text': label_text, 'value': value}, result)
             _task_done_impl(label_text, case_data_store)
             return _ok(result)
@@ -601,11 +601,13 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                             result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
                         else:
                             result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
-                    elif field_kind == 'tree-select':
+                    elif field_kind == 'tree-select' or kind in (
+                        'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
+                    ):
                         result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
                     elif kind in ('select_option', 'select', 'option'):
                         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
-                        if already.startswith('already:'):
+                        if already.startswith('ok-already:'):
                             cur_val = already.split(':', 1)[1]
                             if cur_val == value or value in cur_val or cur_val in value:
                                 result = already
@@ -617,11 +619,11 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                                     result = await page.evaluate(JS_SELECT_OPTION, 'first')
                                 if result.startswith('ok'):
                                     confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                    if not confirmed.startswith('SELECTED:'):
+                                    if not confirmed.startswith('ok-confirmed:'):
                                         await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
                                         await page.wait_for_timeout(200)
                                         confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                        result = confirmed2 if confirmed2.startswith('SELECTED:') else 'not-synced:' + confirmed
+                                        result = confirmed2 if confirmed2.startswith('ok-confirmed:') else 'not-synced:' + confirmed
                         else:
                             await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
                             await page.wait_for_timeout(350)
@@ -630,24 +632,28 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                                 result = await page.evaluate(JS_SELECT_OPTION, 'first')
                             if result.startswith('ok'):
                                 confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                if not confirmed.startswith('SELECTED:'):
+                                if not confirmed.startswith('ok-confirmed:'):
                                     await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
                                     await page.wait_for_timeout(200)
                                     confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                    result = confirmed2 if confirmed2.startswith('SELECTED:') else 'not-synced:' + confirmed
+                                    result = confirmed2 if confirmed2.startswith('ok-confirmed:') else 'not-synced:' + confirmed
                     else:
                         result = f'unknown-action:{kind}'
                 except Exception as e:
                     result = f'error:{e}'
 
-                ok = result.startswith('ok') or result.startswith('already') or result.startswith('SELECTED:')
+                ok = _is_ok_result(result)
                 entry = {'index': step_num, 'action': kind, 'label': label, 'value': value, 'result': result}
                 all_results.append(entry)
 
                 if ok:
                     ok_in_group += 1
-                    if kind in ('fill_input', 'fill', 'input'):
+                    if kind in ('fill_input', 'fill', 'input') and field_kind != 'tree-select':
                         _record_action('fill_form_field', {'label_text': label, 'value': value}, result)
+                    elif field_kind == 'tree-select' or kind in (
+                        'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
+                    ):
+                        _record_action('select_tree_option', {'label_text': label, 'option_text': value}, result)
                     elif kind in ('select_option', 'select', 'option'):
                         _record_action('select_option', {'label_text': label, 'option_text': value}, result)
                     _task_done_impl(label, case_data_store)
@@ -662,7 +668,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                                     if (!t.includes(lbl)) continue;
                                     for (const b of item.querySelectorAll('button')) {
                                         if (b.offsetParent !== null && b.textContent.includes('验证')) {
-                                            b.click(); return 'verify-clicked';
+                                            b.click(); return 'ok-verify-clicked';
                                         }
                                     }
                                 }
@@ -825,7 +831,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # ═══════════════════════════════════════════════════════════════════
         # Step 4-6: 完成、干预、同步
         # ═══════════════════════════════════════════════════════════════════
-        ok_count = sum(1 for r in all_results if r['result'].startswith('ok') or r['result'].startswith('already') or r['result'].startswith('SELECTED:'))
+        ok_count = sum(1 for r in all_results if _is_ok_result(r['result']))
         failed_count = len(all_results) - ok_count
         await page.evaluate(
             'd => console.log("[AI填表] 执行完成 ======\\n" + JSON.stringify(d))',
@@ -1027,7 +1033,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         await _ensure_scanned(label_text)
 
         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'check'])
-        if already.startswith('already:'):
+        if already.startswith('ok-already:'):
             cur_val = already.split(':', 1)[1]
             if cur_val == option_text or option_text in cur_val or cur_val in option_text:
                 element = await _capture_element(page, label_text)
@@ -1042,8 +1048,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         await page.wait_for_timeout(800)
 
         select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
-        if select_result.startswith('ok:'):
-            matched_text = select_result.split(':', 1)[1]
+        if _is_ok_result(select_result):
+            matched_text = select_result.split(':', 1)[1] if ':' in select_result else select_result
             case_data_store.pop(f'_sel_retry_{label_text}', None)
             element = await _capture_element(page, label_text)
             _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
@@ -1057,8 +1063,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             case_data_store[retry_key] = retries
             if retries >= 3:
                 first_result = await page.evaluate(JS_SELECT_OPTION, 'first')
-                if first_result.startswith('ok:'):
-                    matched_text = first_result.split(':', 1)[1]
+                if _is_ok_result(first_result):
+                    matched_text = first_result.split(':', 1)[1] if ':' in first_result else first_result
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
                     element = await _capture_element(page, label_text)
                     _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
@@ -1071,7 +1077,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
     # ── Adjacent button / radio (moved from misc for logical grouping) ──
 
-    @controller.action('Click an adjacent button (选择/引入/上传) to fill a field, but only if the field is empty. Returns "already-filled" if field has value.')
+    @controller.action('Click an adjacent button (选择/引入/上传) to fill a field, but only if the field is empty. Returns "already-filled" (non-ok skip) if field has value.')
     async def click_adjacent_button(label_text: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -1081,6 +1087,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             try:
                 info = json.loads(check_info)
                 if (info.get('currentValue', '').strip() != '' or info.get('selected', False)) and label_text not in ('查询', '搜索', '确定', '提交', '保存'):
+                    # Non-recordable skip — must NOT use ok prefix
                     return _ok(f'already-filled | {info.get("currentValue", "")}')
             except Exception:
                 pass
@@ -1098,7 +1105,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                         if (btn.offsetParent === null) continue;
                         const t = btn.textContent.trim();
                         if (t && (t.includes('选择') || t.includes('引入') || t.includes('上传') || t.includes('添加') || t.includes('导入') || t.includes('新增'))) {
-                            btn.click(); return 'clicked';
+                            btn.click(); return 'ok-clicked';
                         }
                     }
                 }
@@ -1107,16 +1114,16 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     const btns = item.querySelectorAll(tag);
                     for (const btn of btns) {
                         if (btn.offsetParent === null) continue;
-                        btn.click(); return 'clicked';
+                        btn.click(); return 'ok-clicked';
                     }
                 }
                 return 'no-adjacent-button-found';
             }
             return 'label-not-found';
         }''', [label_text])
-        if result == 'clicked':
+        if _is_ok_result(result):
             _record_action('click_adjacent_button', {'label_text': label_text}, result)
-            return _ok('clicked')
+            return _ok(result)
         return result
 
     @controller.action('Click a radio option by label text and radio option text.')
@@ -1124,7 +1131,13 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
-        return await page.evaluate(JS_CLICK_RADIO, [label_text, option_text])
+        result = await page.evaluate(JS_CLICK_RADIO, [label_text, option_text])
+        if _is_ok_result(result):
+            element = await _capture_element(page, label_text)
+            _record_action('click_radio', {'label_text': label_text, 'option_text': option_text}, result, element=element)
+            _task_done_impl(label_text, case_data_store)
+            return _ok(result)
+        return result
 
     @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover.')
     async def select_tree_option(label_text: str, option_text: str):
@@ -1132,7 +1145,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         result = await page.evaluate(JS_SELECT_TREE_OPTION, [label_text, option_text])
-        if result.startswith('ok:'):
+        # P0/P1/P2 success codes all use ok prefix → recordable via _is_ok_result
+        if _is_ok_result(result):
             element = await _capture_element(page, label_text)
             _record_action('select_tree_option', {'label_text': label_text, 'option_text': option_text}, result, element=element)
             _task_done_impl(label_text, case_data_store)

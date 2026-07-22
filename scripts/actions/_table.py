@@ -1,7 +1,7 @@
 """Table actions: click row actions in el-table."""
 
 from ._state import _record_action
-from ._helpers import _ok
+from ._helpers import _ok, _is_ok_result
 
 
 def _register_table_actions(controller, browser_context):
@@ -41,7 +41,7 @@ def _register_table_actions(controller, browser_context):
             }
         ''', [row_text, button_text])
         await page.wait_for_timeout(500)
-        if result.startswith('ok'):
+        if _is_ok_result(result):
             _record_action('click_table_row_button', {'row_text': row_text, 'button_text': button_text}, result)
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
         return result
@@ -84,7 +84,7 @@ def _register_table_actions(controller, browser_context):
             }
         ''', [row_text])
         await page.wait_for_timeout(500)
-        if result == 'ok':
+        if _is_ok_result(result):
             _record_action('click_table_row_radio', {'row_text': row_text}, result)
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
         return result

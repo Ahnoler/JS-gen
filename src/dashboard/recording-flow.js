@@ -5,7 +5,8 @@ import { readV2, apiErrorMessage } from './api-envelope.js';
 
 const ACTION_ICONS = {
   fill_form_field:        '📝', select_option:          '📋',
-  click_element_by_index: '👆', click_menu_item:         '🔗',
+  select_tree_option:     '🌳', click_element_by_index: '👆',
+  click_menu_item:         '🔗',
   click_table_row_button: '🖱️', click_table_row_radio:   '◉',
   click_radio:            '⭕', click_adjacent_button:   '🔘',
   fill_date_field:        '📅', switch_tab:              '📑',
@@ -17,6 +18,7 @@ const ACTION_ICONS = {
 
 const ACTION_COLORS = {
   fill_form_field: 'indigo', select_option: 'emerald',
+  select_tree_option: 'emerald',
   click_element_by_index: 'amber', click_menu_item: 'amber',
   click_table_row_button: 'sky', click_adjacent_button: 'slate',
   click_radio: 'emerald', fill_date_field: 'indigo',

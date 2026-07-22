@@ -492,10 +492,11 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/steps/replay',
         summary: 'live 会话中重放选中步骤',
-        desc: '与 Playwright 全量回放不同。默认 isReplay=true 时不写入步骤表。',
+        desc: '与 Playwright 全量回放不同。默认 isReplay=true 时不写入步骤表。任一步失败时业务 code≠200，data 含 ok/failed/results。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ stepIds: [501, 502], isReplay: true }),
-        respExample: J({ trajectoryId: 42, isReplay: true, stepIds: [501, 502], count: 2, error: null }),
+        respExample: J({ trajectoryId: 42, isReplay: true, stepIds: [501, 502], count: 2, ok: 2, failed: 0, error: null }),
+        errExample: J({ code: 500, message: '1/1 steps failed; first: select_tree_option → unknown-action:…', data: { trajectoryId: 42, ok: 0, failed: 1, count: 1 } }),
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/attach',

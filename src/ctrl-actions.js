@@ -144,7 +144,7 @@ const CTRL_OBJECT = `{
         t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
         t.click();
       }, 200);
-      return 'triggered';
+      return 'ok-triggered';
     }
     // Fallback: match by placeholder (for forms without .el-form-item__label)
     for (const sel of c.querySelectorAll('.el-select .el-input__inner')) {
@@ -165,7 +165,7 @@ const CTRL_OBJECT = `{
           t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
           t.click();
         }, 200);
-        return 'triggered-placeholder';
+        return 'ok-triggered-placeholder';
       }
     }
     return 'label-not-found';
@@ -178,7 +178,7 @@ const CTRL_OBJECT = `{
       item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const input = item.querySelector('input');
       if (!input) return 'no-input';
-      if (input.value === dateStr) return 'already:' + dateStr;
+      if (input.value === dateStr) return 'ok-already:' + dateStr;
       const editor = item.querySelector('.el-date-editor') || input.closest('.el-date-editor');
       if (!editor) return 'no-editor';
       editor.click();
@@ -188,7 +188,7 @@ const CTRL_OBJECT = `{
       input.dispatchEvent(new Event('change',{bubbles:true}));
       const p = document.querySelector('.el-picker-panel,.el-date-range-picker');
       if (p && p.offsetParent !== null) document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
-      return 'selected:' + dateStr;
+      return 'ok-date:' + dateStr;
     }
     return 'label-not-found';
   },
@@ -281,7 +281,7 @@ const CTRL_OBJECT = `{
       const input = item.querySelector('.el-input__inner');
       if (input && input.value && input.value.trim()!=='') return 'already-filled';
       const btn = item.querySelector('button.el-button--primary.is-plain,button.el-button--primary');
-      if (btn && btn.offsetParent!==null) { btn.click(); return 'clicked'; }
+      if (btn && btn.offsetParent!==null) { btn.click(); return 'ok-clicked'; }
       return 'no-button-found';
     }
     return 'label-not-found';
@@ -445,9 +445,9 @@ export const CTRL_PROMPT_BLOCK = '```javascript\nawait page.evaluate(() => {\n  
  */
 export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
-| CTRL.fillFormField | (label, value) | 'ok' / 'field-disabled' / 'is-date-picker' / 'label-not-found' | 填充 el-input/textarea，原生 setter |
-| CTRL.selectOption | (label, option) | 'triggered' / 'label-not-found' | 下拉选择 el-select，option='first' 选第一项 |
-| CTRL.selectDate | (label, dateStr) | 'selected:xxx' / 'already:xxx' / 'label-not-found' | 设置 el-date-editor，格式 YYYY-MM-DD |
+| CTRL.fillFormField | (label, value) | 'ok' / 'ok-date' / 'ok-placeholder' / 'ok-fuzzy' / 'field-disabled' / 'label-not-found' | 填充 el-input/textarea；成功均以 ok 开头 |
+| CTRL.selectOption | (label, option) | 'ok-triggered' / 'ok-triggered-placeholder' / 'label-not-found' | 下拉选择 el-select，option='first' 选第一项 |
+| CTRL.selectDate | (label, dateStr) | 'ok-date:xxx' / 'ok-already:xxx' / 'label-not-found' | 设置 el-date-editor，格式 YYYY-MM-DD |
 | CTRL.clickRadio | (label, option) | 'ok' / 'option-not-found' / 'label-not-found' | 点击 el-radio |
 | CTRL.selectTreeOption | (label, option) | 'ok:xxx (code)' / 'ok-search:xxx' / 'ok-fallback:xxx (code)' | 树选择器，P0 精确/P1 搜索/P2 兜底 |
 | CTRL.clickMenuItem | (text) | 'ok' / 'ok-expanded' / 'not-found' | 点击 el-menu-item，自动展开 el-submenu |
@@ -457,9 +457,11 @@ export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 | CTRL.waitForLoading | () | 超时返回 'timeout' | 等待 loading 遮罩 + CSS 动画结束（200ms 轮询，最长 30s） |
 | CTRL.switchTab | (name) | 'ok' / 'tab-not-found' | 切换 el-tabs |
 | CTRL.checkFieldValue | (label) | 值 / 'empty' / 'label-not-found' | 读取表单字段当前值 |
-| CTRL.clickAdjacentButton | (label) | 'clicked' / 'already-filled' / 'no-button-found' | 点击字段旁的选择/引入按钮 |
+| CTRL.clickAdjacentButton | (label) | 'ok-clicked' / 'already-filled'(非ok跳过) / 'no-button-found' | 点击字段旁的选择/引入按钮 |
 | CTRL.fillAddressFields | (addr) | 'ok:N' / 'no-address-fields' | 填充所有标签含"地址"的字段 |
-| CTRL.expandAllTreeNodes | () | 展开节点数 | 展开全部 el-tree 节点 |`;
+| CTRL.expandAllTreeNodes | () | 展开节点数 | 展开全部 el-tree 节点 |
+
+成功可录制约定：result.startsWith('ok')。跳过码（如 already-filled）不以 ok 开头。`;
 
 // Re-export raw CTRL object for template generation
 export { CTRL_OBJECT };

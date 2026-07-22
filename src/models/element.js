@@ -2,6 +2,8 @@
  * Helpers for trajectory_step.element_json (ElementInfo + candidates[]).
  */
 
+import { normalizeActionName } from './action-name.js';
+
 /**
  * @typedef {Object} LocatorCandidate
  * @property {'css'|'xpath_full'|'xpath_smart'} type
@@ -57,7 +59,7 @@ export function toElementJson(element = {}) {
 export function stepEntryToTrajectoryStep(entry, context = {}) {
   const element = entry.element || {};
   return {
-    actionType: entry.action || entry.actionType || '',
+    actionType: normalizeActionName(entry.action || entry.actionType || ''),
     params: entry.params || entry.paramsJson || null,
     element: typeof element === 'object' && !Array.isArray(element)
       ? toElementJson(element)
@@ -90,7 +92,7 @@ export function trajectoryStepToActionEntry(step) {
     try { params = JSON.parse(params); } catch { params = {}; }
   }
   return {
-    action: step.actionType || step.action || '',
+    action: normalizeActionName(step.actionType || step.action || ''),
     params: params || {},
     result: step.extractedContent || '',
     target: el.xpath || el.target || '',

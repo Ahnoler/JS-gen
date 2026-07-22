@@ -25,6 +25,7 @@
 - done(text, success) — 仅在任务完全完成时调用
 
 ## Element UI 自定义动作（用于 Element UI 组件）
+**成功可录制约定：** 动作结果字符串以 `ok` 开头（`ok` / `ok:` / `ok-clicked` / `ok-already:…` 等）才视为成功并写入轨迹；`already-filled`、`label-not-found` 等不以 `ok` 开头的码表示跳过或失败。
 - **login(username, password, captcha='', sms_code='') — 🚨 登录系统。填写用户名+密码+验证码(可选)+短信验证码(可选)、点击登录按钮、等待跳转。有验证码时传入 captcha='1111' sms_code='1111'。不要手动逐字段填写登录表单。**
 - select_option(label_text, option_text) — el-select 下拉框。"first" 选择第一个选项。**🚨 这是选择 el-select 选项的唯一正确方式。不要使用 click_element 来选择下拉选项。**
 - fill_form_field(label_text, value) — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 通过标签文本、placeholder 或输入类型匹配。如果输入框被禁用则返回 "field-disabled" — 跳过它。
@@ -44,7 +45,7 @@
 - read_case_data(key) — 从 case data 存储中读取值
 - check_field_value(label_text) — 返回包含 label/kind/currentValue/placeholder/disabled/selected/required 的 JSON。**kind 为：input/select/date/radio/checkbox 之一。** 用于验证字段是否正确填写。
 - verify_field_value(label_text, expected) — 调用 check_field_value 并将 currentValue 与 expected 比较。匹配返回 ok，不匹配返回 err。填写后用于确认值已正确设置。
-- click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。如果字段已有值则返回 "already-filled" — 跳过。
+- click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。成功返回 `"ok-clicked"`；如果字段已有值则返回 `"already-filled"`（不以 ok 开头）— 跳过、不录制。
 
 ## 任务列表动作
 - **`scan_form_fields()` — 🚨 遇到表单弹窗/抽屉时，第一个调用的操作。自动扫描全部字段、初始化任务列表、批量填写所有待办字段。返回摘要（非全部字段）。调用后无需手动逐字段填写。后续检查用 scan_visible_fields。**
@@ -153,7 +154,7 @@ read_case_data("FieldA") → "value1"
 1. 对于 el-select 下拉框，必须使用 `select_option(label_text, option_text)`。
 2. **绝不使用 `click_element(index)` 点击下拉选项** — 它会点击内部的 `<span>` 文本，而不是 Vue 监听的 `<li>` 项。
 3. **`scroll(down|up)` 可用于页面滚动，但不适用于 `tssc-multi-select` 下拉弹窗** — 它们是固定定位的，页面滚动不会移动它们。使用 `select_option`，它能在文档级别查找选项，不受滚动位置影响。
-4. 如果 `select_option` 返回 `"already:XXX"` — 字段已有值 XXX。**停止。不要再次尝试选择。**
+4. 如果 `select_option` 返回 `"ok-already:XXX"` — 字段已有值 XXX。**停止。不要再次尝试选择。**
 5. **如果 `select_option` 返回 `"no-items"`：** 下拉列表为空（无级联数据）。**立即跳过。**
 6. 选择后，通过检查返回值确认值已更改。
 7. **如果 `select_option` 返回 `"option-not-found:..."` 且列出的项明显来自其他字段**（如"企业类"、"营业执照"），说明级联数据为空（如"乡镇/街道"、"行政村/社区"无数据）。**跳过此字段。**
@@ -167,7 +168,7 @@ read_case_data("FieldA") → "value1"
     - **然后立即点击提交/保存。** 关闭通知后和提交前不要调用 `get_page_state()` 或 `extract_content()` — 通知已经消失，重新检查浪费步骤。验证修复的唯一方法是提交并检查结果。
 4. **如果服务端错误提示"已存在""重复"等：** 当 `close_notification()` 返回的错误文本包含"已存在"、"重复"、"已被占用"等关键词时（如 `统一社会信用代码已存在`、`证件号码重复`），说明该字段的值已在系统中存在。此时应调用 `match_form_rule(label_text)` 重新生成一个新的值，通过 `fill_form_field` 或 `select_option` 填写，然后重新提交。**不要尝试修改其他字段 — 只需替换冲突字段的值即可。**
 5. **如果 `close_notification()` 返回 `"no-notification"`：** 没有需要关闭的通知。**操作成功 — 继续。** 不要重新点击提交/保存。
-6. 不要回退重新选择或填写已返回 "already:XXX"、"ok" 或 "field-disabled" 的字段。
+6. 不要回退重新选择或填写已返回 "ok-already:XXX"、"ok" 或 "field-disabled" 的字段。
 7. 验证表单是否正确的唯一方法是点击提交并检查结果。
 8. **成功通知（"操作成功"的 el-notification）会在2-3秒后自动消失。** 点击保存/提交后，调用一次 `close_notification()`。如果返回 "no-notification"，则认为成功并继续。不要重复调用 `close_notification()` 或重新点击保存。错误通知会一直保持可见直到被关闭 — 它们不出现即表示成功。
 9. **在任意弹窗/抽屉交互后**（如法人引入、客户搜索等），向导表单可能已被刷新/重置。在填写前使用 `check_field_value(label_text)` 检查字段是否仍有值。跳过返回非空值的字段。对于日期字段，检查输入框是否已有值 — 如有则跳过。不要盲目重新填写所有字段。

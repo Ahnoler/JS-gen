@@ -694,6 +694,8 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
                 "count": summary.get("count", 0),
                 "ok": summary.get("ok", 0),
                 "failed": summary.get("failed", 0),
+                "error": summary.get("error"),
+                "results": summary.get("results") or [],
             },
         })
         return 'continue'
