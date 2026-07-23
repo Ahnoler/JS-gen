@@ -266,9 +266,16 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/analyze',
         summary: 'AI 需求拆解为阶段（不落库）',
-        desc: '调用 LLM 将需求拆成阶段描述数组，供创建交易前预览。',
-        reqExample: J({ description: '登录后查询并修改客户', stepLength: 3, model: 'deepseek-v4-flash' }),
-        respExample: J(['登录系统', '查询客户', '修改信息']),
+        desc: '调用 LLM 将需求拆成阶段描述数组。每阶段须含「预期结果」：原文有则保留，无则由助手补全。',
+        reqExample: J({
+          description: '1.点击客户管理，点击对公客户管理。\n2.新增客户并保存。预期结果：跳转基本信息页。',
+          stepLength: 2,
+          model: 'deepseek-v4-flash',
+        }),
+        respExample: J([
+          '点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理。',
+          '新增客户并保存。预期结果：跳转基本信息页。',
+        ]),
       },
       {
         method: 'GET', path: '/api/v2/trajectories',
