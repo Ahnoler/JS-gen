@@ -285,7 +285,12 @@ export const API_GROUPS = [
           { name: 'pageSize', type: 'number', in: 'query', example: '20' },
           { name: 'functionId', type: 'number', in: 'query', desc: '按功能筛选', example: '3' },
           { name: 'keyword', type: 'string', in: 'query', desc: '名称模糊' },
-          { name: 'sortBy', type: 'string', in: 'query', desc: 'created_at | name | step_count' },
+          {
+            name: 'recordStatus', type: 'string', in: 'query',
+            desc: '按录制状态筛选；支持单个或逗号分隔多值：draft | live | recording | recorded | completed。别名 status',
+            example: 'draft,recorded',
+          },
+          { name: 'sortBy', type: 'string', in: 'query', desc: 'created_at | name | step_count | record_status' },
           { name: 'order', type: 'string', in: 'query', desc: 'asc | desc' },
         ],
         respExample: J({

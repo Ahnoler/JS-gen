@@ -1,7 +1,65 @@
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
+import { TRAJECTORY_RECORD_STATUSES } from '../models/constants.js';
 
 const TABLE = 'trajectory';
+
+const ALLOWED_RECORD_STATUS = new Set(TRAJECTORY_RECORD_STATUSES);
+
+/**
+ * Normalize query recordStatus / status into a unique list of valid enums.
+ * Accepts string, comma-separated string, or array.
+ * @returns {string[]|null} null = no filter
+ */
+export function parseRecordStatuses(raw) {
+  if (raw == null || raw === '') return null;
+  const parts = Array.isArray(raw)
+    ? raw.flatMap((s) => String(s).split(','))
+    : String(raw).split(',');
+  const statuses = [...new Set(
+    parts.map((s) => s.trim()).filter((s) => s && ALLOWED_RECORD_STATUS.has(s)),
+  )];
+  return statuses.length ? statuses : null;
+}
+
+/** @returns {string[]} statuses that were requested but not in the enum */
+export function invalidRecordStatuses(raw) {
+  if (raw == null || raw === '') return [];
+  const parts = Array.isArray(raw)
+    ? raw.flatMap((s) => String(s).split(','))
+    : String(raw).split(',');
+  return [...new Set(
+    parts.map((s) => s.trim()).filter((s) => s && !ALLOWED_RECORD_STATUS.has(s)),
+  )];
+}
+
+function applyListFilters(query, { keyword, recordStatus } = {}) {
+  if (keyword && String(keyword).trim()) {
+    const kw = `%${String(keyword).trim()}%`;
+    query.where(function () {
+      this.where('name', 'like', kw).orWhere('task', 'like', kw);
+    });
+  }
+  const statuses = parseRecordStatuses(recordStatus);
+  if (statuses) {
+    query.whereIn('record_status', statuses);
+  }
+  return query;
+}
+
+const SORT_COL_MAP = {
+  created_at: 'created_at',
+  createdAt: 'created_at',
+  updated_at: 'updated_at',
+  updatedAt: 'updated_at',
+  name: 'name',
+  step_count: 'step_count',
+  stepCount: 'step_count',
+  phase_count: 'phase_count',
+  phaseCount: 'phase_count',
+  record_status: 'record_status',
+  recordStatus: 'record_status',
+};
 
 export async function save(trajectory) {
   const db = getDB();
@@ -117,29 +175,17 @@ export async function getByTrajectoryId(idOrBiz) {
   return null;
 }
 
-export async function listByFunction(functionId, { page = 1, pageSize = 20, keyword, sortBy, order } = {}) {
+export async function listByFunction(functionId, {
+  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus,
+} = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
-  const query = db(TABLE).where({ function_id: functionId });
-  if (keyword && String(keyword).trim()) {
-    const kw = `%${String(keyword).trim()}%`;
-    query.where(function () {
-      this.where('name', 'like', kw).orWhere('task', 'like', kw);
-    });
-  }
+  const query = applyListFilters(db(TABLE).where({ function_id: functionId }), {
+    keyword,
+    recordStatus,
+  });
 
-  const sortColMap = {
-    created_at: 'created_at',
-    createdAt: 'created_at',
-    updated_at: 'updated_at',
-    updatedAt: 'updated_at',
-    name: 'name',
-    step_count: 'step_count',
-    stepCount: 'step_count',
-    phase_count: 'phase_count',
-    phaseCount: 'phase_count',
-  };
-  const sortCol = sortColMap[sortBy] || 'created_at';
+  const sortCol = SORT_COL_MAP[sortBy] || 'created_at';
   const sortOrder = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
 
   const [{ total }] = await query.clone().count('* as total');
@@ -156,29 +202,14 @@ export async function listByFunction(functionId, { page = 1, pageSize = 20, keyw
   return { rows: entities, total, page, pageSize };
 }
 
-export async function list({ page = 1, pageSize = 20, keyword, sortBy, order } = {}) {
+export async function list({
+  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus,
+} = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
-  const query = db(TABLE);
-  if (keyword && String(keyword).trim()) {
-    const kw = `%${String(keyword).trim()}%`;
-    query.where(function () {
-      this.where('name', 'like', kw).orWhere('task', 'like', kw);
-    });
-  }
+  const query = applyListFilters(db(TABLE), { keyword, recordStatus });
 
-  const sortColMap = {
-    created_at: 'created_at',
-    createdAt: 'created_at',
-    updated_at: 'updated_at',
-    updatedAt: 'updated_at',
-    name: 'name',
-    step_count: 'step_count',
-    stepCount: 'step_count',
-    phase_count: 'phase_count',
-    phaseCount: 'phase_count',
-  };
-  const sortCol = sortColMap[sortBy] || 'created_at';
+  const sortCol = SORT_COL_MAP[sortBy] || 'created_at';
   const sortOrder = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
 
   const [{ total }] = await query.clone().count('* as total');

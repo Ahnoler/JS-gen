@@ -3,6 +3,7 @@ import path from 'path';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryService from '../../services/trajectory-service.js';
 import { trajectoryStepToActionEntry } from '../../models/element.js';
+import { TRAJECTORY_RECORD_STATUSES } from '../../models/constants.js';
 import { PROJECT_DIR } from '../../../config/config.js';
 
 /** Normalize DAO step → assembler command (DAO returns elementJson, not element). */
@@ -55,13 +56,24 @@ export default function (app) {
         keyword,
         sortBy,
         order,
+        recordStatus,
+        status,
       } = req.query;
+      const statusRaw = recordStatus ?? status;
+      const bad = trajectoryDao.invalidRecordStatuses(statusRaw);
+      if (bad.length) {
+        return res.status(400).json({
+          error: `Invalid recordStatus: ${bad.join(', ')}`,
+          allowed: [...TRAJECTORY_RECORD_STATUSES],
+        });
+      }
       const pagination = {
         page: +page || 1,
         pageSize: +pageSize || 20,
         keyword,
         sortBy,
         order,
+        recordStatus: statusRaw,
       };
       const result = functionId
         ? await trajectoryService.listByFunction(+functionId, pagination)
