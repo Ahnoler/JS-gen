@@ -920,16 +920,14 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
-    @controller.action('Get the current pending/done task list. Returns {"pending": [{label,kind,options,...}], "done": [...]}. Each entry is a full field object for LLM planning.')
+    @controller.action('Get the current pending task list. Returns {"pending": [{label,kind,options,...}]}. Completed fields are omitted. Each pending entry is a full field object for LLM planning.')
     async def get_pending_tasks():
         tl = TaskList.from_store(case_data_store.get('task_list'))
-        done_labels = [d.label for d in tl.done]
         intervene = [item.label for item in tl.pending if item.needs_intervention]
         pending_labels = [item for item in tl.to_store()['pending'] if not item.get('needs_intervention')]
         sys.stderr.write(f'[get-pending] done={len(tl.done)} pending={len(tl.pending)} intervene={len(intervene)}\n')
         sys.stderr.flush()
         result = {
-            'done': done_labels,
             'pending': pending_labels,
         }
         if intervene:
