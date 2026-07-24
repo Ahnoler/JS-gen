@@ -7,6 +7,20 @@
 .rs-top-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .rs-top-right { display: flex; align-items: center; gap: 8px; }
 .rs-muted { color: #94a3b8; font-size: 12px; }
+.rc-status {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 2px 7px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.rc-status-slate { background: #334155; color: #cbd5e1; }
+.rc-status-sky { background: #0c4a6e; color: #7dd3fc; }
+.rc-status-amber { background: #78350f; color: #fcd34d; }
+.rc-status-emerald { background: #064e3b; color: #6ee7b7; }
+.rc-status-indigo { background: #312e81; color: #a5b4fc; }
 .rs-pill {
   font-size: 11px; padding: 2px 8px; border-radius: 999px;
   background: #334155; color: #cbd5e1;

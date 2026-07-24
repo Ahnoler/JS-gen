@@ -5,7 +5,7 @@
  * One prepare call: session → browser → stream → login.
  * Client arms WS subscribe early so login is visible on canvas.
  */
-import { api, escapeHtml } from './api.js';
+import { api, escapeHtml, recordStatusBadgeHtml, recordStatusLabel } from './api.js';
 import { connect, on } from '../ws-client.js';
 import {
   initRemoteBrowser,
@@ -137,7 +137,8 @@ function renderResource() {
 
   if ($('rsTitle')) $('rsTitle').textContent = state.traj?.name || `交易 #${trajId}`;
   if ($('rsMeta')) {
-    $('rsMeta').textContent = `recordStatus=${state.traj?.recordStatus || p.trajectory?.recordStatus || '—'}`;
+    const st = state.traj?.recordStatus || p.trajectory?.recordStatus || p.recordStatus || '';
+    $('rsMeta').innerHTML = `状态 ${recordStatusBadgeHtml(st)} <span class="rs-muted">(${escapeHtml(st || '—')})</span>`;
   }
   if ($('rsReviewLink')) $('rsReviewLink').href = `/api/test/record-console#review=${trajId}`;
 
@@ -455,7 +456,7 @@ async function startAi() {
       phaseIds,
       accountId,
     });
-    log(`start done → ${data.recordStatus}`, 'ok');
+    log(`start done → ${recordStatusLabel(data.recordStatus)}`, 'ok');
     if (data.phases) state.phases = data.phases;
     try {
       await ensureRemoteStream({ sessionId: state.prepare?.sessionId || undefined });
@@ -479,7 +480,7 @@ async function clearSteps() {
     const data = await api('POST', `/api/v2/trajectories/${trajId}/clear`, {});
     state.traj = data;
     state.selectedStepIds = new Set();
-    log(`已清空步骤 → recordStatus=${data.recordStatus} stepCount=${data.stepCount}`, 'ok');
+    log(`已清空步骤 → ${recordStatusLabel(data.recordStatus)} · stepCount=${data.stepCount}`, 'ok');
     await refreshTree();
     renderResource();
   } catch (e) {
@@ -554,7 +555,7 @@ async function stopRecord() {
       state.manualOn = false;
     }
     const data = await api('POST', `/api/v2/trajectories/${trajId}/record/stop`, { success });
-    log(`stop → ${data.recordStatus} detached=${data.detached}`, 'ok');
+    log(`stop → ${recordStatusLabel(data.recordStatus)} detached=${data.detached}`, 'ok');
     state.tree = data.tree || state.tree;
     renderStepTree();
     location.href = `/api/test/record-console#review=${trajId}`;

@@ -2,7 +2,7 @@
  * Self-use record console — browse / create / review only.
  * Recording (prepare/start/manual/BiB) lives on record-studio.html.
  */
-import { api, escapeHtml } from './api.js';
+import { api, escapeHtml, recordStatusBadgeHtml } from './api.js';
 import { NODE_TYPE } from '../../models/hierarchy-constants.js';
 import { asSystemForest, flattenTree } from '../hierarchy-tree-utils.js';
 
@@ -64,7 +64,10 @@ function updateNav() {
   if (!crumb) return;
   const fn = state.selectedFn ? `功能 #${state.selectedFn.id} ${state.selectedFn.name}` : '未选功能';
   const traj = state.traj ? ` · 交易 #${state.traj.id}` : '';
-  crumb.textContent = `${fn}${traj} · ${state.view}`;
+  const st = state.traj?.recordStatus
+    ? ` · ${recordStatusBadgeHtml(state.traj.recordStatus)}`
+    : '';
+  crumb.innerHTML = `${escapeHtml(fn)}${escapeHtml(traj)}${st} · ${escapeHtml(state.view)}`;
 }
 
 async function loadTree() {
@@ -249,7 +252,7 @@ async function loadTrajectories() {
         (t) => `<div class="rc-traj-row">
           <div>
             <strong>#${t.id}</strong> ${escapeHtml(t.name || t.task || '未命名')}
-            <div class="rc-muted">${escapeHtml(t.recordStatus || '')} · ${t.phaseCount ?? 0} 阶段 · ${t.stepCount ?? 0} 步</div>
+            <div class="rc-muted">${recordStatusBadgeHtml(t.recordStatus)} · ${t.phaseCount ?? 0} 阶段 · ${t.stepCount ?? 0} 步</div>
             <label class="rc-field" style="margin-top:6px;font-size:12px">系统账号
               <select data-acct-traj="${t.id}" style="display:block;margin-top:4px;min-width:180px">
                 ${accountOptionsHtml(t.systemAccountId)}

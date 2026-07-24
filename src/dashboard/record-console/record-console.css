@@ -36,6 +36,20 @@
 }
 .rc-muted { color: var(--slate-400); font-size: 12px; }
 .rc-err { color: var(--red-600); font-size: 12px; }
+.rc-status {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 2px 7px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.rc-status-slate { background: #f1f5f9; color: #475569; }
+.rc-status-sky { background: #e0f2fe; color: #0369a1; }
+.rc-status-amber { background: #fef3c7; color: #b45309; }
+.rc-status-emerald { background: #d1fae5; color: #047857; }
+.rc-status-indigo { background: #e0e7ff; color: #4338ca; }
 .rc-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .rc-toolbar h2 { flex: 1; font-size: 16px; margin: 0; }
 .rc-traj-row {
