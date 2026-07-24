@@ -97,17 +97,23 @@ class ElementInfo(BaseModel):
     """Captured DOM element reference for an action entry.
 
     Used by the assembler to generate resilient locators.
-    Serialized to element_json; candidates[] supports CDP/manual recording.
+    Serialized to element_json; candidates[] supports CDP/manual/AI recording.
     """
 
     tag_name: str = Field(default="", description="Element tag name (e.g., input, button)")
-    xpath: str = Field(default="", description="Relative XPath to the element")
+    xpath: str = Field(default="", description="Primary XPath (prefer xpath_smart when present)")
     css_selector: str = Field(default="", description="CSS selector to the element")
     attributes: dict[str, str] = Field(
         default_factory=dict,
         description="Element attributes (class, type, id, placeholder, etc.)",
     )
     text: str = Field(default="", description="Visible text content of the element")
+    xpath_smart: str = Field(
+        default="",
+        description="Text-anchored xpath (drawer/dialog scoped when applicable)",
+    )
+    xpath_full: str = Field(default="", description="Absolute xpath fallback")
+    xpath_abs: str = Field(default="", description="Alias of absolute xpath")
     candidates: list[LocatorCandidate] = Field(
         default_factory=list,
         description="Alternative locators: css | xpath_full | xpath_smart",
@@ -122,6 +128,12 @@ class ElementInfo(BaseModel):
             'attributes': dict(self.attributes),
             'text': self.text,
         }
+        if self.xpath_smart:
+            data['xpath_smart'] = self.xpath_smart
+        if self.xpath_full:
+            data['xpath_full'] = self.xpath_full
+        if self.xpath_abs:
+            data['xpath_abs'] = self.xpath_abs
         if self.candidates:
             data['candidates'] = [c.model_dump() for c in self.candidates]
         return data
@@ -289,12 +301,31 @@ class ActionEntry(BaseModel):
         if element:
             elem = dict(element) if isinstance(element, dict) else element.model_dump()
             # Accept both snake_case (recorder) and camelCase
+            xpath_smart = elem.get("xpath_smart", "") or ""
+            xpath_full = (
+                elem.get("xpath_full", "")
+                or elem.get("xpath_abs", "")
+                or ""
+            )
             xpath = elem.get("xpath", "") or ""
+            # Prefer text-anchored smart xpath as primary target for replay/assemble
+            if xpath_smart:
+                xpath = xpath_smart
+            elif not xpath and xpath_full:
+                xpath = xpath_full
             css = elem.get("css_selector", "") or elem.get("cssSelector", "") or ""
             tag = elem.get("tag_name", "") or elem.get("tag", "") or ""
             attrs = elem.get("attributes", {})
             text = elem.get("text", "") or ""
             cands = elem.get("candidates") if isinstance(elem.get("candidates"), list) else []
+            if not cands:
+                cands = []
+                if xpath_smart:
+                    cands.append({"type": "xpath_smart", "value": xpath_smart})
+                if xpath_full and xpath_full != xpath_smart:
+                    cands.append({"type": "xpath_full", "value": xpath_full})
+                if css:
+                    cands.append({"type": "css", "value": css})
             entry.target = xpath
             entry.cssSelector = css
             entry.tagName = tag
@@ -306,6 +337,11 @@ class ActionEntry(BaseModel):
                 "attributes": entry.attributes,
                 "text": text,
             }
+            if xpath_smart:
+                entry.element["xpath_smart"] = xpath_smart
+            if xpath_full:
+                entry.element["xpath_full"] = xpath_full
+                entry.element["xpath_abs"] = xpath_full
             if cands:
                 entry.element["candidates"] = [
                     {"type": c.get("type", ""), "value": c.get("value", "")}

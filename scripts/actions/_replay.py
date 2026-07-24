@@ -7,8 +7,8 @@ Key lessons from `_auto_fill_pending` / `_execute_round`:
   3. Between steps: `_wait_if_loading` + short timeout (300ms input / 500ms select),
      never `networkidle` (SPA keep-alives hang forever).
 
-For click_element_by_index: highlight `index` is ephemeral — relocate by text/menu/xpath
-(same idea as script_assembler N-tier click).
+For click_element_by_index: highlight `index` is ephemeral — relocate by
+xpath_smart / drawer-dialog text / xpath (same idea as script_assembler).
 """
 
 from __future__ import annotations
@@ -86,10 +86,18 @@ def normalize_action_name(action_name: str) -> str:
 
 _CLICK_BY_INDEX = 'click_element_by_index'
 
-# Locate + click by durable cues (text / menu / xpath). Index is last resort only.
-_JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint]) => {
+# Locate + click by durable cues (xpath_smart → drawer/dialog text → xpath → text).
+# Prefer last visible match — Element UI keeps leftover overlays with same button text.
+_JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
   const norm = (s) => (s || '').replace(/\s+/g, '').trim();
   const want = norm(text);
+  const isVisible = (el) => {
+    if (!el) return false;
+    const st = getComputedStyle(el);
+    const box = el.getBoundingClientRect();
+    if (st.display === 'none' || st.visibility === 'hidden' || box.width < 1 || box.height < 1) return false;
+    return true;
+  };
   const clickEl = (el, how) => {
     if (!el) return null;
     el.scrollIntoView({ block: 'center', behavior: 'instant' });
@@ -97,17 +105,40 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint]) => {
     return how;
   };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const evalXpathAll = (xp) => {
+    let s = String(xp || '');
+    if (!s) return [];
+    if (!s.startsWith('/') && !s.startsWith('(')) s = '/' + s;
+    try {
+      const snap = document.evaluate(s, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      const out = [];
+      for (let i = 0; i < snap.snapshotLength; i++) out.push(snap.snapshotItem(i));
+      return out;
+    } catch (e) {
+      return [];
+    }
+  };
+  const clickLastVisibleXpath = (xp, how) => {
+    const nodes = evalXpathAll(xp).filter(isVisible);
+    if (!nodes.length) return null;
+    return clickEl(nodes[nodes.length - 1], how);
+  };
+
+  // 0) xpath_smart (drawer/dialog scoped text xpath)
+  if (xpathSmart) {
+    const hit = clickLastVisibleXpath(xpathSmart, 'ok-xpath-smart');
+    if (hit) return hit;
+  }
 
   // 1) Element UI menu
   if (want) {
     const menuItems = [...document.querySelectorAll('.el-menu-item')];
-    const direct = menuItems.find(el => norm(el.textContent) === want && el.offsetParent !== null);
+    const direct = menuItems.find(el => norm(el.textContent) === want && isVisible(el));
     if (direct) return clickEl(direct, 'ok-menu-item');
 
     for (const sm of document.querySelectorAll('.el-submenu')) {
       const title = sm.querySelector(':scope > .el-submenu__title');
       const titleText = norm(title?.textContent || '');
-      // Parent submenu title (e.g. 客户管理)
       if (title && (titleText === want || titleText.startsWith(want))) {
         if (!sm.classList.contains('is-opened')) {
           title.click();
@@ -130,32 +161,42 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint]) => {
     }
   }
 
-  // 2) XPath from recording
+  // 2) Absolute / recorded xpath (fragile body>div[N] — last resort before text)
   if (xpath) {
-    let xp = String(xpath);
-    if (xp && !xp.startsWith('/') && !xp.startsWith('(')) xp = '/' + xp;
-    try {
-      const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-      if (el) {
-        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-        return 'ok-xpath';
-      }
-    } catch (e) {}
+    const hit = clickLastVisibleXpath(xpath, 'ok-xpath');
+    if (hit) return hit;
   }
 
-  // 3) Exact / fuzzy text on common clickables
+  // 3) Text: prefer last drawer → last dialog → page; buttons only (not span wrappers)
   if (want) {
-    const sel = 'button, a, span, li, label, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item';
-    const candidates = [...document.querySelectorAll(sel)].filter(el => el.offsetParent !== null);
-    const exact = candidates.find(el => norm(el.textContent) === want);
-    if (exact) return clickEl(exact, 'ok-text-exact');
+    const drawers = [...document.querySelectorAll('.el-drawer')].filter(isVisible);
+    const dialogs = [...document.querySelectorAll('.el-dialog, .el-message-box')].filter(isVisible);
+    const scopes = [];
+    if (drawers.length) scopes.push({ el: drawers[drawers.length - 1], how: 'ok-text-drawer' });
+    if (dialogs.length) scopes.push({ el: dialogs[dialogs.length - 1], how: 'ok-text-dialog' });
+    scopes.push({ el: document, how: 'ok-text-exact' });
+
+    const btnSel = 'button, button.el-button, a.el-button, a[role="button"], .el-button';
+    for (const { el: scope, how } of scopes) {
+      const hits = [...scope.querySelectorAll(btnSel)].filter(isVisible).filter((el) => {
+        const t = norm(el.innerText || el.textContent || '');
+        return t === want;
+      });
+      if (hits.length) return clickEl(hits[hits.length - 1], how);
+    }
+
+    // Broader fuzzy fallback (still prefer last match)
+    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item';
+    const candidates = [...document.querySelectorAll(sel)].filter(isVisible);
+    const exact = candidates.filter(el => norm(el.innerText || el.textContent) === want);
+    if (exact.length) return clickEl(exact[exact.length - 1], 'ok-text-exact');
     let best = null;
     let bestLen = Infinity;
     for (const el of candidates) {
-      const t = norm(el.textContent);
+      const t = norm(el.innerText || el.textContent);
       if (!t || t.length > 40) continue;
       if (t.includes(want) || want.includes(t)) {
-        if (t.length < bestLen) { best = el; bestLen = t.length; }
+        if (t.length <= bestLen) { best = el; bestLen = t.length; }
       }
     }
     if (best) return clickEl(best, 'ok-text-fuzzy');
@@ -225,35 +266,73 @@ async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
     """
     Replay click_element_by_index without relying on ephemeral highlight index.
 
-    Same idea as script_assembler N-tier relocate: text → menu → xpath → Playwright text.
+    Prefer xpath_smart / drawer-scoped text (same idea as script_assembler).
     """
     await _wait_if_loading(page)
-    text = str(params.get('text') or params.get('menu_text') or entry.get('description') or '').strip()
-    xpath = str(
-        entry.get('target')
+    el = entry.get('element') if isinstance(entry.get('element'), dict) else {}
+    text = str(
+        params.get('text')
+        or params.get('menu_text')
+        or el.get('text')
+        or entry.get('description')
+        or ''
+    ).strip()
+    cands = el.get('candidates') if isinstance(el.get('candidates'), list) else []
+
+    def _cand(ctype: str) -> str:
+        for c in cands:
+            if isinstance(c, dict) and c.get('type') == ctype and c.get('value'):
+                return str(c['value'])
+        return ''
+
+    xpath_smart = str(
+        el.get('xpath_smart')
+        or _cand('xpath_smart')
+        or ''
+    ).strip()
+    # If primary target is already a smart-style xpath, treat it as smart
+    target = str(entry.get('target') or el.get('xpath') or '').strip()
+    if not xpath_smart and target.startswith('//'):
+        xpath_smart = target
+    xpath_full = str(
+        el.get('xpath_full')
+        or el.get('xpath_abs')
+        or _cand('xpath_full')
         or params.get('xpath')
         or (entry.get('attributes') or {}).get('xpath')
         or ''
     ).strip()
-    tag_hint = str(params.get('tag_name') or entry.get('tagName') or '').strip()
+    # Absolute xpath only as fallback (avoid using smart twice)
+    xpath = xpath_full
+    if not xpath and target and not target.startswith('//'):
+        xpath = target
+    tag_hint = str(params.get('tag_name') or entry.get('tagName') or el.get('tag') or '').strip()
 
-    result = await page.evaluate(_JS_CLICK_DURABLE, [text, xpath, tag_hint])
+    result = await page.evaluate(_JS_CLICK_DURABLE, [text, xpath, tag_hint, xpath_smart])
     if isinstance(result, str) and result.startswith('ok'):
         wait_ms = 600 if ('expand' in result or 'submenu' in result) else 400
         await page.wait_for_timeout(wait_ms)
         await _wait_if_loading(page)
         return result
 
-    # Playwright text click (still durable; never trust highlight index)
+    # Playwright text click — prefer last visible button (overlay remounts)
     if text:
         try:
-            await page.get_by_text(text, exact=True).first.click(timeout=3000)
+            loc = page.get_by_role('button', name=text, exact=True).last
+            await loc.click(timeout=3000)
             await page.wait_for_timeout(400)
             await _wait_if_loading(page)
-            return 'ok-playwright-text'
+            return 'ok-playwright-role-last'
+        except Exception:
+            pass
+        try:
+            await page.get_by_text(text, exact=True).last.click(timeout=3000)
+            await page.wait_for_timeout(400)
+            await _wait_if_loading(page)
+            return 'ok-playwright-text-last'
         except Exception:
             try:
-                await page.locator(f'text={text}').first.click(timeout=3000)
+                await page.locator(f'text={text}').last.click(timeout=3000)
                 await page.wait_for_timeout(400)
                 return 'ok-playwright-text-loose'
             except Exception:
@@ -263,7 +342,7 @@ async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
     return (
         f'click-failed:index={index} (ephemeral; text/xpath not found: {text!r})'
         if index is not None
-        else f'click-failed:not-found text={text!r} xpath={xpath!r}'
+        else f'click-failed:not-found text={text!r} xpath={xpath_smart or xpath!r}'
     )
 
 

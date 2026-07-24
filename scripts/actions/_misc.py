@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 
 from . import _state
-from ._helpers import _ok, _err
+from ._helpers import _ok, _err, _enrich_click_element
 from ._js_snippets import JS_GET_CONTAINER
 from ..models import ActionFile, FormSnapshot, FormSnapshotCollection
 
@@ -198,25 +198,33 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
         page = await browser_context.get_current_page()
         try:
             element_node = await browser_context.get_dom_element_by_index(index)
-            download_path = await browser_context._click_element_node(element_node)
-            if download_path:
-                return _ok(f'downloaded:{download_path}')
+            # Capture stable locators BEFORE click (drawer/dialog may unmount after).
+            element_info = None
+            elem_text = ''
+            tag_name = ''
             if element_node:
                 try:
                     elem_text = element_node.get_all_text_till_next_clickable_element() or ''
                     elem_text = elem_text.strip()[:80]
                 except Exception:
                     elem_text = ''
-                element_info = {
-                    'tag_name': element_node.tag_name,
-                    'xpath': element_node.xpath or '',
-                    'attributes': element_node.attributes or {},
-                    'text': elem_text or '',
-                }
+                tag_name = element_node.tag_name or ''
+                element_info = await _enrich_click_element(
+                    page,
+                    xpath=element_node.xpath or '',
+                    text=elem_text,
+                    tag_name=tag_name,
+                    attributes=element_node.attributes or {},
+                )
+
+            download_path = await browser_context._click_element_node(element_node)
+            if download_path:
+                return _ok(f'downloaded:{download_path}')
+            if element_node:
                 _state._record_action('click_element_by_index', {
                     'index': index,
-                    'tag_name': element_node.tag_name,
-                    'text': elem_text or '',
+                    'tag_name': element_info.get('tag_name') if element_info else tag_name,
+                    'text': (element_info or {}).get('text') or elem_text or '',
                 }, f'ok-clicked-{index}', element=element_info)
             return _ok(f'ok-clicked-{index}')
         except Exception as e:

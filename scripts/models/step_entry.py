@@ -54,9 +54,18 @@ class StepEntry(BaseModel):
         Returns:
             StepEntry with fields from ActionEntry plus context overrides.
         """
-        from .action import ActionEntry
+        from .action import ActionEntry, LocatorCandidate
         if not isinstance(entry, ActionEntry):
             entry = ActionEntry(**entry) if isinstance(entry, dict) else entry
+
+        el = entry.element if isinstance(entry.element, dict) else {}
+        raw_cands = el.get("candidates") if isinstance(el.get("candidates"), list) else []
+        candidates = []
+        for c in raw_cands:
+            if isinstance(c, LocatorCandidate):
+                candidates.append(c)
+            elif isinstance(c, dict) and c.get("type") and c.get("value") is not None:
+                candidates.append(LocatorCandidate(type=c.get("type"), value=str(c.get("value") or "")))
 
         return cls(
             action=entry.action,
@@ -66,7 +75,11 @@ class StepEntry(BaseModel):
                 xpath=entry.target,
                 css_selector=entry.cssSelector,
                 attributes=dict(entry.attributes) if entry.attributes else {},
-                text="",
+                text=str(el.get("text") or ""),
+                xpath_smart=str(el.get("xpath_smart") or ""),
+                xpath_full=str(el.get("xpath_full") or ""),
+                xpath_abs=str(el.get("xpath_abs") or ""),
+                candidates=candidates,
             ),
             result=entry.result,
             phase=entry.phase,

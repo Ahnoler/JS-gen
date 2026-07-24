@@ -13,6 +13,7 @@ from browser_use.agent.views import ActionResult
 from ._js_snippets import (
     JS_CHECK_LOADING, JS_WAIT_LOADING,
     JS_SMART_LOCATOR,
+    JS_ENRICH_CLICK_LOCATOR,
 )
 from ..models import ScannedField
 
@@ -130,6 +131,47 @@ async def _capture_element(page, label_text):
     except Exception:
         pass
     return result if result else None
+
+
+async def _enrich_click_element(page, *, xpath='', text='', tag_name='', attributes=None):
+    """Build xpath_smart/candidates for AI click_element_by_index (before click).
+
+    Mirrors manual/CDP locator enrichment: drawer/dialog-scoped text xpath when
+    the live node sits under el-drawer / el-dialog.
+    """
+    base = {
+        'tag_name': tag_name or '',
+        'xpath': xpath or '',
+        'attributes': attributes if isinstance(attributes, dict) else {},
+        'text': (text or '').strip()[:80],
+    }
+    try:
+        raw = await page.evaluate(
+            JS_ENRICH_CLICK_LOCATOR,
+            [xpath or '', text or '', tag_name or ''],
+        )
+        if not raw:
+            return base
+        info = json.loads(raw) if isinstance(raw, str) else raw
+        if not isinstance(info, dict) or not (info.get('xpath') or info.get('xpath_smart')):
+            return base
+        # Prefer live attrs from page when present
+        attrs = info.get('attributes') if isinstance(info.get('attributes'), dict) else {}
+        if not attrs and isinstance(attributes, dict):
+            attrs = attributes
+        return {
+            'tag_name': info.get('tag_name') or tag_name or '',
+            'xpath': info.get('xpath') or info.get('xpath_smart') or xpath or '',
+            'xpath_smart': info.get('xpath_smart') or '',
+            'xpath_full': info.get('xpath_full') or info.get('xpath_abs') or '',
+            'xpath_abs': info.get('xpath_abs') or info.get('xpath_full') or '',
+            'css_selector': info.get('css_selector') or info.get('cssSelector') or '',
+            'attributes': attrs,
+            'text': (info.get('text') or text or '').strip()[:80],
+            'candidates': info.get('candidates') if isinstance(info.get('candidates'), list) else [],
+        }
+    except Exception:
+        return base
 
 
 def _merge_ax_text(dom_fields: list[ScannedField], snapshot_text: str) -> None:

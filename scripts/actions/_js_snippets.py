@@ -1092,3 +1092,154 @@ JS_SCROLL_TO_FIRST_ERROR = '''() => {
     }
     return JSON.stringify({ label: '', error: '' });
 }'''
+
+# ── Click locator enrichment (AI click_element_by_index → xpath_smart) ──
+# Args: [xpath, text, tagHint] — resolve node BEFORE click; walk up to button/a.
+JS_ENRICH_CLICK_LOCATOR = r'''([xpath, text, tagHint]) => {
+  function xpathLiteral(t) {
+    t = String(t || '');
+    if (t.indexOf("'") < 0) return "'" + t + "'";
+    if (t.indexOf('"') < 0) return '"' + t + '"';
+    return 'concat(' + t.split("'").map(function (p) { return "'" + p + "'"; }).join(", \"'\", ") + ')';
+  }
+  function normalizeControlText(t) {
+    return String(t || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  }
+  function absXPath(node) {
+    if (!node || node.nodeType !== 1) return '';
+    const parts = [];
+    let cur = node;
+    while (cur && cur.nodeType === 1) {
+      const tag = cur.tagName.toLowerCase();
+      const parent = cur.parentNode;
+      if (!parent) break;
+      const sibs = [...parent.children].filter(c => c.tagName === cur.tagName);
+      const idx = sibs.indexOf(cur) + 1;
+      parts.unshift(tag + '[' + idx + ']');
+      cur = parent;
+      if (cur === document.documentElement) {
+        parts.unshift('html[1]');
+        break;
+      }
+    }
+    return '/' + parts.join('/');
+  }
+  function cssOfSimple(node) {
+    if (!node || node.nodeType !== 1) return '';
+    if (node.id) {
+      try { return '#' + CSS.escape(node.id); } catch (e) { return '#' + node.id; }
+    }
+    const tag = node.tagName.toLowerCase();
+    const cls = String(node.className || '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 3)
+      .map(function (c) {
+        try { return '.' + CSS.escape(c); } catch (e2) { return '.' + c; }
+      })
+      .join('');
+    return tag + cls;
+  }
+  function clickableRoot(node) {
+    if (!node || node.nodeType !== 1) return null;
+    if (node.closest) {
+      const btn = node.closest('button, a.el-button, a[role="button"], .el-button');
+      if (btn) return btn;
+    }
+    return node;
+  }
+  function xpathSmartOf(node, t) {
+    t = normalizeControlText(t);
+    if (!t || !node) return '';
+    const tagL = (node.tagName || '').toLowerCase();
+    const cls = String(node.className || '');
+    const clickable = tagL === 'button' || tagL === 'a' || /(^| )el-button( |$)/.test(cls);
+    if (!clickable) return '';
+    const lit = xpathLiteral(t);
+    const local = tagL === 'a'
+      ? 'a[normalize-space()=' + lit + ']'
+      : 'button[normalize-space()=' + lit + ']';
+    if (node.closest && node.closest('.el-drawer')) {
+      return "(//div[contains(@class,'el-drawer')])[last()]//" + local;
+    }
+    if (node.closest && node.closest('.el-dialog, .el-message-box')) {
+      return "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]//" + local;
+    }
+    return '//' + local;
+  }
+  function resolveByXpath(xp) {
+    if (!xp) return null;
+    let s = String(xp);
+    if (s && !s.startsWith('/') && !s.startsWith('(')) s = '/' + s;
+    try {
+      return document.evaluate(s, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+    } catch (e) {
+      return null;
+    }
+  }
+  function findByText(want, tagHint) {
+    want = normalizeControlText(want);
+    if (!want) return null;
+    const isVis = (el) => {
+      if (!el) return false;
+      const st = getComputedStyle(el);
+      const box = el.getBoundingClientRect();
+      return st.display !== 'none' && st.visibility !== 'hidden' && box.width >= 1 && box.height >= 1;
+    };
+    const drawers = [...document.querySelectorAll('.el-drawer')].filter(isVis);
+    const dialogs = [...document.querySelectorAll('.el-dialog, .el-message-box')].filter(isVis);
+    const scopes = [];
+    if (drawers.length) scopes.push(drawers[drawers.length - 1]);
+    if (dialogs.length) scopes.push(dialogs[dialogs.length - 1]);
+    scopes.push(document);
+    const sel = 'button, a, .el-button';
+    for (const scope of scopes) {
+      const hits = [...scope.querySelectorAll(sel)].filter(isVis).filter((el) => {
+        const t = normalizeControlText(el.innerText || el.textContent || '');
+        return t === want;
+      });
+      if (hits.length) {
+        if (tagHint) {
+          const th = String(tagHint).toLowerCase();
+          const tagged = hits.filter((el) => (el.tagName || '').toLowerCase() === th);
+          if (tagged.length) return tagged[tagged.length - 1];
+        }
+        return hits[hits.length - 1];
+      }
+    }
+    return null;
+  }
+
+  let el = resolveByXpath(xpath);
+  if (el) el = clickableRoot(el);
+  if (!el) el = findByText(text, tagHint);
+  if (!el) return null;
+
+  const t = normalizeControlText(text) || normalizeControlText(el.innerText || el.textContent || '');
+  const abs = absXPath(el);
+  const smart = xpathSmartOf(el, t);
+  const css = cssOfSimple(el);
+  const primary = smart || abs;
+  const candidates = [];
+  if (smart) candidates.push({ type: 'xpath_smart', value: smart });
+  if (abs) candidates.push({ type: 'xpath_full', value: abs });
+  if (css) candidates.push({ type: 'css', value: css });
+  return {
+    tag_name: (el.tagName || '').toLowerCase(),
+    xpath: primary,
+    xpath_smart: smart,
+    xpath_full: abs,
+    xpath_abs: abs,
+    css_selector: css,
+    text: t,
+    attributes: (function () {
+      const a = {};
+      if (!el.attributes) return a;
+      for (const at of el.attributes) {
+        if (at.value && at.value.length < 120) a[at.name] = at.value;
+      }
+      return a;
+    })(),
+    candidates: candidates,
+  };
+}'''

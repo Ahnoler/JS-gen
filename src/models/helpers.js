@@ -13,20 +13,38 @@ export function normalizeElementJson(element) {
   if (!element || typeof element !== 'object') return null;
 
   const el = /** @type {Record<string, unknown>} */ ({ ...element });
+  const candidates = Array.isArray(el.candidates)
+    ? el.candidates.map((c) => ({
+      type: c.type,
+      value: c.value ?? '',
+    }))
+    : [];
+  const xpathSmart = String(
+    el.xpath_smart
+    || candidates.find((c) => c?.type === 'xpath_smart')?.value
+    || '',
+  );
+  const xpathFull = String(
+    el.xpath_full
+    || el.xpath_abs
+    || candidates.find((c) => c?.type === 'xpath_full')?.value
+    || '',
+  );
+  const primaryXpath = xpathSmart || el.xpath || el.target || xpathFull || '';
+
   const normalized = {
     tag: el.tag ?? el.tagName ?? '',
-    xpath: el.xpath ?? el.target ?? '',
+    xpath: primaryXpath,
     cssSelector: el.cssSelector ?? el.css_selector ?? '',
     attributes: el.attributes && typeof el.attributes === 'object' ? el.attributes : {},
     text: el.text ?? '',
   };
-
-  if (Array.isArray(el.candidates)) {
-    normalized.candidates = el.candidates.map((c) => ({
-      type: c.type,
-      value: c.value ?? '',
-    }));
+  if (xpathSmart) normalized.xpath_smart = xpathSmart;
+  if (xpathFull) {
+    normalized.xpath_full = xpathFull;
+    normalized.xpath_abs = xpathFull;
   }
+  if (candidates.length) normalized.candidates = candidates;
 
   return normalized;
 }
