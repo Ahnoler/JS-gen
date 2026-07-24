@@ -22,6 +22,21 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
 
     async def on_step_start(agent):
         sys.stderr.write(f"[on_step_start]\t n_steps={agent.state.n_steps}\n"); sys.stderr.flush()
+        # Honor cancel before starting another LLM/action cycle
+        if cancel_flag_path is not None and cancel_flag_path.exists():
+            sys.stderr.write("[recorder] Cancel signal on step start — stopping agent\n")
+            sys.stderr.flush()
+            agent.state.stopped = True
+            if goal_tracker is not None:
+                goal_tracker['stopped'] = True
+            try:
+                cancel_flag_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return
+        if goal_tracker is not None and goal_tracker.get('stopped'):
+            agent.state.stopped = True
+            return
         # Check for human intervention before proceeding
         if intervention_queue is not None:
             try:

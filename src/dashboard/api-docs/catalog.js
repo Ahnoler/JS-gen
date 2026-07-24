@@ -478,13 +478,14 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/stop',
         summary: '结束录制（不 detach）',
-        desc: 'success=true → recordStatus=recorded；false → draft。响应含 detached:false。',
+        desc: 'success=true → recordStatus=recorded；false → draft。会向执行机会话发送 cancel_step，当前 Agent 立即停止后续步骤（当前正在执行的一步结束后不再继续）。响应含 detached:false。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ success: true }),
         respExample: J({
           trajectoryId: 42, recordStatus: 'recorded', detached: false,
           tree: { phases: [], orphanSteps: [] },
         }),
+        notes: ['不释放执行机槽位；释放请 detach', 'busy 时也会发送 cancel_step；Agent 收到后置 stopped，不再开下一步'],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/confirm',

@@ -109,6 +109,44 @@ def _close_agent():
         _last_agent = None
 
 
+def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel_step'):
+    """Stop the in-flight browser-use Agent ASAP (no further steps).
+
+    Cooperative: browser-use honors agent.state.stopped at the next step boundary.
+    Also writes cancel_flag_path so on_step_start/end hooks reinforce the stop.
+    """
+    global _last_agent
+    try:
+        if cancel_flag_path is not None:
+            Path(cancel_flag_path).write_text('cancel', encoding='utf-8')
+    except Exception as e:
+        sys.stderr.write(f"[session] cancel flag write failed: {e}\n")
+        sys.stderr.flush()
+
+    if isinstance(goal_tracker, dict):
+        goal_tracker['stopped'] = True
+
+    agent = _last_agent
+    if agent is not None:
+        try:
+            if getattr(agent, 'state', None) is not None:
+                agent.state.stopped = True
+        except Exception:
+            pass
+        try:
+            for t in getattr(agent, '_tasks', []) or []:
+                try:
+                    t.cancel()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    sys.stderr.write(f"[session] Stop requested ({reason}) — agent will not take further steps\n")
+    sys.stderr.flush()
+    emit_json({"event": "agent_stopped", "data": {"reason": reason}})
+
+
 def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, case_data_store=None):
     """Save three files:
     - action_{ts}.json  — custom action format (for script_assembler.py)
@@ -410,7 +448,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     return output_path, task_text
 
 
-async def _stdin_reader(loop, stdin_queue, agent_running_ref):
+async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=None, goal_tracker=None):
     while True:
         try:
             line = await loop.run_in_executor(None, sys.stdin.readline)
@@ -435,7 +473,9 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref):
         if event == "close":
             await stdin_queue.put(None)
             break
-        if agent_running_ref['value'] and event == "cancel_step":
+        # Stop immediately even while agent.run() is blocking the main loop.
+        if event == "cancel_step":
+            _request_agent_stop(cancel_flag_path, goal_tracker, reason='cancel_step')
             continue
         await stdin_queue.put(msg)
 
@@ -1145,7 +1185,9 @@ async def run_session(args):
     stdin_queue = asyncio.Queue()
     agent_running_ref = {'value': False}
 
-    reader_task = asyncio.create_task(_stdin_reader(loop, stdin_queue, agent_running_ref))
+    reader_task = asyncio.create_task(
+        _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path, goal_tracker)
+    )
 
     step_index = 0
     cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_cumulative.json"
