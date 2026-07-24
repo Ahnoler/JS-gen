@@ -13,9 +13,14 @@ import * as remoteBridge from '../cdp/remote-bridge.js';
 import {
   buildLoginInstruction,
   resolveTrajectoryAccount,
-  appendRecordedStep,
-  getTrajectoryTree,
-} from './trajectory-service.js';
+} from './trajectory-account-service.js';
+import { getTrajectoryTree } from './trajectory-query-service.js';
+
+/** Lazy accessor — avoid static cycle with trajectory-service.js (persist helpers) */
+async function appendRecordedStep(...args) {
+  const mod = await import('./trajectory-service.js');
+  return mod.appendRecordedStep(...args);
+}
 
 /** Mark current ACTION_LOG ids as consumed so they are not later appended as steps. */
 async function markConsumedActionLog(runtime) {

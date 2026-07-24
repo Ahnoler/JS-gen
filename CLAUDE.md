@@ -27,6 +27,9 @@ python scripts/script_assembler.py <action_file.json> [output.js]
 node scripts/characterize-dedup.mjs
 node scripts/accept-replay-apis.mjs
 python scripts/characterize-assembler-click.py
+python scripts/characterize-form-rules.py
+node scripts/characterize-ctrl.mjs
+node scripts/characterize-trajectory.mjs
 ```
 
 Manual verification: engineering dashboard at `http://localhost:4097/api/test` after starting the server. Product API docs (Swagger-like, for frontend — sole source of truth): `http://localhost:4097/api/docs` (`src/dashboard/api-docs/catalog.js`). Product APIs are under `/api/v2/*`. Human-oriented overview: `README.md` (keep in sync with this file’s architecture section).

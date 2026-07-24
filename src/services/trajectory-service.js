@@ -4,148 +4,38 @@ import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
 import * as functionDefDao from '../dao/function-def-dao.js';
-import * as systemDao from '../dao/system-dao.js';
-import * as systemAccountDao from '../dao/system-account-dao.js';
-import { NODE_TYPE, isRootParentId } from '../models/hierarchy-constants.js';
 import { getDB } from '../../config/database.js';
 import { stepFromActionLog } from '../models/helpers.js';
 import { callLLM } from '../llm-utils.js';
+import { touchTrajectoryRuntimeActivity } from './trajectory-recording-service.js';
+import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
+import { refreshTrajectoryCounts } from './trajectory-step-service.js';
 
-/** Build agent login instruction (aligned with Dashboard session-mode login).
- * Prefer system.url；兼容旧数据回退 account.loginUrl。
- */
-export function buildLoginInstruction(account = {}, system = {}) {
-  const url = String(system.url || account.loginUrl || '').trim();
-  const user = String(account.username || '').trim();
-  const pass = String(account.password || '').trim();
-  if (!url) {
-    const err = new Error('System url is empty — set system.url (or legacy account.loginUrl)');
-    err.statusCode = 400;
-    throw err;
-  }
-  let task = `Navigate to ${url}`;
-  if (user) task += `\nEnter username: ${user}`;
-  if (pass) task += `\nEnter password: ${pass}`;
-  task += '\nClick the login/submit button\nWait for the page to fully load after login';
-  return task;
-}
+export {
+  buildLoginInstruction,
+  getTrajectoryLoginContext,
+  resolveTrajectoryAccount,
+  setTrajectoryAccount,
+} from './trajectory-account-service.js';
 
-/**
- * Resolve owning system + accounts for a trajectory (via function_id ancestry).
- * @returns {Promise<{ trajectoryId, functionId, system: object|null, accounts: object[] }>}
- */
-export async function getTrajectoryLoginContext(trajectoryId) {
-  const tid = Number(trajectoryId);
-  const traj = await trajectoryDao.getById(tid);
-  if (!traj) {
-    const err = new Error('Trajectory not found');
-    err.statusCode = 404;
-    throw err;
-  }
-  const functionId = traj.functionId != null ? Number(traj.functionId) : null;
-  if (!Number.isFinite(functionId)) {
-    return {
-      trajectoryId: tid,
-      functionId: null,
-      systemAccountId: traj.systemAccountId != null ? Number(traj.systemAccountId) : null,
-      system: null,
-      accounts: [],
-      error: 'Trajectory has no functionId — bind to a function node under a system first',
-    };
-  }
+export {
+  stepsToActionEntries,
+  getTrajectoryTree,
+  getTrajectoryActionFlow,
+  getSessionActionFlow,
+  getTrajectoryWithPhases,
+  listPhasesByTrajectory,
+  listStepsByPhase,
+  listByFunction,
+} from './trajectory-query-service.js';
 
-  let cur = await systemDao.getById(functionId);
-  const guard = new Set();
-  while (cur && !guard.has(cur.id)) {
-    guard.add(cur.id);
-    if (Number(cur.type) === NODE_TYPE.SYSTEM) break;
-    if (isRootParentId(cur.parentId)) {
-      cur = null;
-      break;
-    }
-    cur = await systemDao.getById(cur.parentId);
-  }
-
-  if (!cur || Number(cur.type) !== NODE_TYPE.SYSTEM) {
-    return {
-      trajectoryId: tid,
-      functionId,
-      systemAccountId: traj.systemAccountId != null ? Number(traj.systemAccountId) : null,
-      system: null,
-      accounts: [],
-      error: 'Could not resolve system for function',
-    };
-  }
-
-  const accounts = (await systemAccountDao.listBySystem(cur.id)).map((a) => ({
-    id: a.id,
-    name: a.name,
-    // Prefer system.url；账号上旧 loginUrl 仅作兼容回退
-    loginUrl: a.loginUrl || cur.url || '',
-    username: a.username || '',
-    // password returned for self-use recording console (same as hierarchy tree)
-    password: a.password || '',
-    remark: a.remark || null,
-    sortOrder: a.sortOrder ?? 0,
-  }));
-
-  return {
-    trajectoryId: tid,
-    functionId,
-    systemAccountId: traj.systemAccountId != null ? Number(traj.systemAccountId) : null,
-    system: {
-      id: cur.id,
-      name: cur.name,
-      uid: cur.uid || cur.systemId,
-      description: cur.description || null,
-      url: cur.url || '',
-    },
-    accounts,
-  };
-}
-
-/**
- * Resolve + validate system account for a trajectory.
- * Prefers explicit accountId, else trajectory.systemAccountId.
- */
-export async function resolveTrajectoryAccount(trajectoryId, accountId = null) {
-  const tid = Number(trajectoryId);
-  const traj = await trajectoryDao.getById(tid);
-  if (!traj) {
-    const err = new Error('Trajectory not found');
-    err.statusCode = 404;
-    throw err;
-  }
-  const acctId = accountId != null && accountId !== ''
-    ? Number(accountId)
-    : (traj.systemAccountId != null ? Number(traj.systemAccountId) : null);
-  if (!Number.isFinite(acctId) || acctId <= 0) {
-    const err = new Error('systemAccountId is required — bind a system account on the trajectory first');
-    err.statusCode = 400;
-    throw err;
-  }
-  const account = await systemAccountDao.getById(acctId);
-  if (!account) {
-    const err = new Error(`System account #${acctId} not found`);
-    err.statusCode = 404;
-    throw err;
-  }
-  const loginCtx = await getTrajectoryLoginContext(tid);
-  if (loginCtx.system?.id != null && Number(account.systemId) !== Number(loginCtx.system.id)) {
-    const err = new Error('Selected account does not belong to this trajectory system');
-    err.statusCode = 400;
-    throw err;
-  }
-  return { traj, account, accountId: acctId, loginCtx };
-}
-
-/** Persist bound system account on trajectory. */
-export async function setTrajectoryAccount(trajectoryId, systemAccountId) {
-  const { account, accountId } = await resolveTrajectoryAccount(trajectoryId, systemAccountId);
-  await trajectoryDao.updateMeta(Number(trajectoryId), { systemAccountId: accountId });
-  const traj = await trajectoryDao.getById(Number(trajectoryId));
-  return { trajectory: traj, account: { id: account.id, name: account.name, loginUrl: account.loginUrl || '' } };
-}
+export {
+  refreshTrajectoryCounts,
+  confirmTrajectoryStep,
+  createTrajectoryStep,
+  updateTrajectoryStep,
+  removeTrajectoryStep,
+} from './trajectory-step-service.js';
 
 
 /**
@@ -253,23 +143,6 @@ function resolveUrl(...candidates) {
   return '';
 }
 
-async function refreshTrajectoryCounts(trajectoryDbId) {
-  const db = getDB();
-  const [{ steps }] = await db('trajectory_step')
-    .where({ trajectory_id: trajectoryDbId })
-    .andWhere((qb) => {
-      qb.where({ is_replay: false }).orWhereNull('is_replay');
-    })
-    .count('* as steps');
-  const [{ phases }] = await db('trajectory_phase')
-    .where({ trajectory_id: trajectoryDbId })
-    .count('* as phases');
-  return {
-    stepCount: Number(steps) || 0,
-    phaseCount: Number(phases) || 0,
-  };
-}
-
 /**
  * @param {Array} steps
  * @param {Record<string|number, string>} [phaseDescriptions] phaseNumber → task text
@@ -289,49 +162,6 @@ function buildPhasesFromSteps(steps, phaseDescriptions = {}) {
     }
   }
   return [...phaseMap.values()].sort((a, b) => a.phaseNumber - b.phaseNumber);
-}
-
-export function stepsToActionEntries(steps) {
-  if (!Array.isArray(steps)) return [];
-  return steps.map((s) => {
-    const params = s.params ?? s.paramsJson ?? null;
-    let element = s.element ?? s.elementJson ?? null;
-    if (typeof element === 'string') element = safeJson(element);
-    const parsedParams = typeof params === 'string' ? safeJson(params) : (params || {});
-    const text = element?.text || parsedParams?.text || '';
-    const xpathSmart = element?.xpath_smart
-      || (Array.isArray(element?.candidates)
-        ? element.candidates.find((c) => c?.type === 'xpath_smart')?.value
-        : '')
-      || '';
-    const primaryXpath = xpathSmart || element?.xpath || element?.target || '';
-    return {
-      action: s.actionType || s.action || '',
-      params: text && !parsedParams.text ? { ...parsedParams, text } : parsedParams,
-      result: s.extractedContent || s.result || '',
-      phase: s.phaseNumber ?? s.phase ?? 0,
-      target: primaryXpath,
-      cssSelector: element?.cssSelector || element?.css_selector || '',
-      tagName: element?.tag || element?.tagName || '',
-      attributes: element?.attributes || {},
-      element: element
-        ? {
-            ...element,
-            xpath: primaryXpath,
-            xpath_smart: xpathSmart || element.xpath_smart || '',
-            text: text || element.text || '',
-          }
-        : undefined,
-      timestamp: s.createdAt || null,
-      persisted: true,
-      source: s.source || 'agent',
-      stepNumber: s.stepNumber,
-    };
-  });
-}
-
-function safeJson(str) {
-  try { return JSON.parse(str); } catch { return {}; }
 }
 
 /**
@@ -710,7 +540,6 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
     phaseCount: counts.phaseCount,
   });
 
-  const { touchTrajectoryRuntimeActivity } = await import('./trajectory-recording-service.js');
   touchTrajectoryRuntimeActivity(tid);
 
   return { stepNumber, actionId: entry.id || null, trajectoryPhaseId: resolvedPhaseId };
@@ -843,45 +672,6 @@ export async function createTransactionWithPhases({
   }
 
   return trajectoryDao.getById(trajId);
-}
-
-export async function getTrajectoryTree(trajectoryDbId) {
-  const tid = Number(trajectoryDbId);
-  if (!Number.isFinite(tid) || tid <= 0) return null;
-
-  const traj = await trajectoryDao.getById(tid);
-  if (!traj) return null;
-
-  const phases = await trajectoryPhaseDao.listByTrajectory(tid);
-  const allSteps = await trajectoryStepDao.listByTrajectory(tid);
-
-  const assigned = new Set();
-  const phasesWithSteps = phases.map((p) => {
-    const steps = allSteps.filter((s) => {
-      if (s.trajectoryPhaseId != null && Number(s.trajectoryPhaseId) === Number(p.id)) {
-        assigned.add(s.id);
-        return true;
-      }
-      // Fallback: match by phase_number when phase_id not yet bound
-      if (
-        (s.trajectoryPhaseId == null || s.trajectoryPhaseId === 0)
-        && Number(s.phaseNumber) === Number(p.phaseNumber)
-      ) {
-        assigned.add(s.id);
-        return true;
-      }
-      return false;
-    });
-    return { ...p, steps };
-  });
-
-  const orphanSteps = allSteps.filter((s) => !assigned.has(s.id));
-  return {
-    trajectoryId: traj.id,
-    ...traj,
-    phases: phasesWithSteps,
-    orphanSteps,
-  };
 }
 
 /**
@@ -1121,123 +911,6 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
 }
 
 /**
- * Resolve Element UI control by label_text on the attached BiB/CDP page.
- * Returns ElementJson for writing into trajectory_step.element_json.
- */
-
-export async function confirmTrajectoryStep(stepId, confirmed) {
-  return trajectoryStepDao.update(Number(stepId), {
-    confirmed: !!confirmed,
-    confirmedAt: confirmed ? new Date().toISOString().slice(0, 23).replace('T', ' ') : null,
-  });
-}
-
-export async function createTrajectoryStep(input = {}) {
-  const trajectoryId = Number(input.trajectoryId);
-  if (!Number.isFinite(trajectoryId) || trajectoryId <= 0) throw new Error('trajectoryId required');
-  const max = await trajectoryDao.getMaxStepNumber(trajectoryId);
-  const row = await trajectoryStepDao.create({
-    trajectoryId,
-    stepNumber: input.stepNumber ?? (max + 1),
-    phaseNumber: input.phaseNumber ?? 0,
-    actionIndex: input.actionIndex ?? 0,
-    actionType: input.actionType ?? input.action ?? '',
-    description: input.description ?? '',
-    params: input.params ?? null,
-    element: input.element ?? null,
-    source: input.source ?? 'manual',
-    success: input.success ?? null,
-    error: input.error ?? null,
-    extractedContent: input.extractedContent ?? '',
-    trajectoryPhaseId: input.trajectoryPhaseId ?? null,
-    confirmed: !!input.confirmed,
-    confirmedAt: input.confirmed ? new Date().toISOString().slice(0, 23).replace('T', ' ') : null,
-  });
-  await trajectoryStepDao.reorderByTrajectory(trajectoryId);
-  const counts = await refreshTrajectoryCounts(trajectoryId);
-  await trajectoryDao.updateMeta(trajectoryId, { stepCount: counts.stepCount, phaseCount: counts.phaseCount });
-  return row;
-}
-
-export async function updateTrajectoryStep(stepId, fields = {}) {
-  const existing = await trajectoryStepDao.getById(Number(stepId));
-  if (!existing) return null;
-  const patch = { ...fields };
-  if ('confirmed' in fields) {
-    patch.confirmedAt = fields.confirmed ? new Date().toISOString().slice(0, 23).replace('T', ' ') : null;
-  }
-  const row = await trajectoryStepDao.update(Number(stepId), patch);
-  await trajectoryStepDao.reorderByTrajectory(existing.trajectoryId);
-  return row;
-}
-
-export async function removeTrajectoryStep(stepId) {
-  const existing = await trajectoryStepDao.getById(Number(stepId));
-  if (!existing) return { removed: false };
-  await trajectoryStepDao.removeById(Number(stepId));
-  await trajectoryStepDao.reorderByTrajectory(existing.trajectoryId);
-  const counts = await refreshTrajectoryCounts(existing.trajectoryId);
-  await trajectoryDao.updateMeta(existing.trajectoryId, { stepCount: counts.stepCount, phaseCount: counts.phaseCount });
-  return { removed: true, trajectoryId: existing.trajectoryId };
-}
-
-/**
- * Merged action flow by trajectory numeric id: DB steps + live pending.
- * @param {number|null} trajectoryDbId
- * @param {Array} pendingEntries
- * @param {{ excludeActionIds?: Iterable<string> }} [opts]
- *   ActionEntry.id already live-persisted — omit from pending to avoid
- *   「已入库」+「待保存」duplicates.
- */
-export async function getTrajectoryActionFlow(trajectoryDbId, pendingEntries = [], opts = {}) {
-  const traj = trajectoryDbId != null ? await trajectoryDao.getById(+trajectoryDbId) : null;
-  const persisted = traj ? stepsToActionEntries(traj.steps || []) : [];
-  const exclude = new Set(
-    [...(opts.excludeActionIds || [])].map((id) => String(id)).filter(Boolean),
-  );
-  const pending = (pendingEntries || [])
-    .filter((e) => !e?.id || !exclude.has(String(e.id)))
-    .map((e) => ({ ...e, persisted: false }));
-  const entries = [...persisted, ...pending];
-  return {
-    trajectoryDbId: traj?.id ?? null,
-    persistedCount: persisted.length,
-    pendingCount: pending.length,
-    count: entries.length,
-    entries,
-    trajectory: traj
-      ? {
-          id: traj.id,
-          stepCount: traj.stepCount,
-          phaseCount: traj.phaseCount ?? (await trajectoryPhaseDao.listByTrajectory(traj.id)).length,
-          task: traj.task,
-          url: traj.url,
-          model: traj.model,
-          functionId: traj.functionId,
-          createdAt: traj.createdAt,
-        }
-      : null,
-  };
-}
-
-/** @deprecated use getTrajectoryActionFlow */
-export async function getSessionActionFlow(sessionId, pendingEntries = [], trajectoryDbId = null, opts = {}) {
-  const flow = await getTrajectoryActionFlow(trajectoryDbId, pendingEntries, opts);
-  return { ...flow, sessionId };
-}
-
-export async function getTrajectoryWithPhases(id) {
-  const traj = await trajectoryDao.getById(+id);
-  if (!traj) return null;
-  traj.phases = await trajectoryPhaseDao.listByTrajectory(traj.id);
-  return traj;
-}
-
-export async function listPhasesByTrajectory(trajectoryDbId) {
-  return trajectoryPhaseDao.listByTrajectory(+trajectoryDbId);
-}
-
-/**
  * Append a pending phase to an existing trajectory (for Dashboard「+ 阶段」).
  */
 export async function addPhaseToTrajectory(trajectoryDbId, { description = '', phaseNumber = null } = {}) {
@@ -1389,14 +1062,6 @@ export async function syncTrajectoryPhaseDescriptions(trajectoryDbId, descriptio
   });
 
   return getTrajectoryWithPhases(tid);
-}
-
-export async function listStepsByPhase(phaseDbId) {
-  return trajectoryStepDao.listByPhase(+phaseDbId);
-}
-
-export async function listByFunction(functionId, pagination) {
-  return trajectoryDao.listByFunction(functionId, pagination);
 }
 
 export {
