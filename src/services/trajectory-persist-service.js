@@ -9,7 +9,7 @@ import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
 import * as functionDefDao from '../dao/function-def-dao.js';
 import { getDB } from '../../config/database.js';
 import { stepFromActionLog } from '../models/helpers.js';
-import { touchTrajectoryRuntimeActivity } from './trajectory-recording-service.js';
+import { touchTrajectoryRuntimeActivity } from './trajectory-runtime.js';
 import { refreshTrajectoryCounts } from './trajectory-step-service.js';
 
 /**

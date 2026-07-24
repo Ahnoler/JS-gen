@@ -85,6 +85,10 @@ async function testFocusedModules() {
   const persist = await import('../src/services/trajectory-persist-service.js');
   const phase = await import('../src/services/trajectory-phase-service.js');
   const meta = await import('../src/services/trajectory-meta-service.js');
+  const recording = await import('../src/services/trajectory-recording-service.js');
+  const lifecycle = await import('../src/services/trajectory-record-lifecycle.js');
+  const runtime = await import('../src/services/trajectory-runtime.js');
+  const attach = await import('../src/services/trajectory-attach-service.js');
   for (const name of [
     'buildStepsFromActionFile',
     'buildStepsFromFlow',
@@ -111,12 +115,44 @@ async function testFocusedModules() {
   ]) {
     assert(typeof meta[name] === 'function', `meta module missing: ${name}`);
   }
+  for (const name of [
+    'getTrajectoryRuntime',
+    'getAllTrajectoryRuntimes',
+    'touchTrajectoryRuntimeActivity',
+    'clearTrajectoryRuntimesForNode',
+    'prepareTrajectoryRecording',
+    'attachTrajectoryLive',
+    'detachTrajectoryLive',
+    'startTrajectoryRecording',
+    'stopTrajectoryRecording',
+    'replayTrajectorySteps',
+    'resolveTrajectoryElement',
+    'toggleTrajectoryManualRecord',
+  ]) {
+    assert(typeof recording[name] === 'function', `recording facade missing: ${name}`);
+  }
   // Facade re-exports must be the same function identity as focused modules
   assert(clearTrajectory === phase.clearTrajectory, 'clearTrajectory must re-export phase module');
   assert(confirmTrajectory === meta.confirmTrajectory, 'confirmTrajectory must re-export meta module');
   assert(
     buildStepsFromFlow === persist.buildStepsFromFlow,
     'buildStepsFromFlow must re-export persist module',
+  );
+  assert(
+    stopTrajectoryRecording === lifecycle.stopTrajectoryRecording,
+    'stopTrajectoryRecording must re-export lifecycle module',
+  );
+  assert(
+    stopTrajectoryRecording === recording.stopTrajectoryRecording,
+    'trajectory-service stop must match recording facade',
+  );
+  assert(
+    recording.touchTrajectoryRuntimeActivity === runtime.touchTrajectoryRuntimeActivity,
+    'touch must re-export runtime module',
+  );
+  assert(
+    recording.attachTrajectoryLive === attach.attachTrajectoryLive,
+    'attach must re-export attach module',
   );
 }
 

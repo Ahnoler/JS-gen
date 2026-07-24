@@ -1,10 +1,26 @@
 """
 JS code snippets injected into the browser via page.evaluate().
 
-These are pure string constants used by controller actions to interact
-with Element UI / Vue components. Several constants reference
-JS_GET_CONTAINER via string concatenation — all MUST remain in this
-single module to satisfy Python module-level concat evaluation order.
+Canonical CTRL.* for replay/assemble lives in src/ctrl-actions.js
+(window.CTRL via getInjectionCode). This module is the agent-side twin —
+not byte-identical (more helpers than CTRL). Parity check:
+
+    node scripts/characterize-ctrl.mjs
+
+CTRL.* ↔ primary JS_* (or action) mapping:
+    getContainer       → JS_GET_CONTAINER
+    fillFormField      → JS_FILL_FORM_FIELD
+    selectOption       → JS_SELECT_OPTION (+ JS_FIND_LABELED_SELECT)
+    selectDate         → JS_FILL_DATE_FIELD
+    clickRadio         → JS_CLICK_RADIO
+    selectTreeOption   → JS_SELECT_TREE_OPTION
+    waitForLoading     → JS_WAIT_LOADING
+    (navigation/table/dialog/adjacent/expand/address/verifyFormStructure
+     live as inline evaluate or actions in _navigation/_table/_misc/_form;
+     fillAddressFields / verifyFormStructure are assembler/replay-oriented)
+
+Several constants reference JS_GET_CONTAINER via string concatenation —
+all MUST remain in this single module for Python module-level concat order.
 """
 
 # ── Container detection (must be defined FIRST — referenced by other snippets) ──

@@ -29,6 +29,7 @@ node scripts/accept-replay-apis.mjs
 python scripts/characterize-assembler-click.py
 python scripts/characterize-form-rules.py
 node scripts/characterize-ctrl.mjs
+# ↑ CTRL parity: parses CTRL_OBJECT methods vs _js_snippets / actions/*.py cues
 node scripts/characterize-trajectory.mjs
 ```
 
@@ -40,15 +41,15 @@ This is a **browser automation service** for Element UI / Vue web applications. 
 
 ### Two-Language Architecture
 
-Element UI interaction helpers exist in **synchronized copies** that must be kept in sync:
+Element UI CTRL helpers: **`src/ctrl-actions.js` is canonical** for `window.CTRL` (replay/assemble). Agent-side copies are dual (not byte-identical):
 
 | Language | File | Used by |
 |----------|------|---------|
+| JavaScript (canonical) | `src/ctrl-actions.js` | Injected into generated Playwright scripts (`getInjectionCode`) |
+| Python JS strings | `scripts/actions/_js_snippets.py` | `page.evaluate` injection from Python agent |
 | Python | `scripts/controller.py` + `scripts/actions/*` | Browser Use agent at runtime |
-| Python JS strings | `scripts/actions/_js_snippets.py` | `page.evaluate` injection from Python |
-| JavaScript | `src/ctrl-actions.js` | Injected into generated Playwright scripts |
 
-Same CTRL surface (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem`, `clickTableRowAction`, `closeDialog`, etc.). When modifying one, update the others.
+Same CTRL surface (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem`, `clickTableRowButton`, `closeDialog`, etc.). Edit canonical first; keep Python cues in sync — `node scripts/characterize-ctrl.mjs` fails on missing methods.
 
 ### Control plane pipelines
 

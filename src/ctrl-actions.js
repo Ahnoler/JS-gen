@@ -1,17 +1,19 @@
 /**
- * ctrl-actions.js — Element UI 自定义操作实现（单⼀来源）
+ * ctrl-actions.js — Canonical source for window.CTRL (replay / assemble).
  *
- * 从 scripts/controller.py 移植的 JavaScript 版 CTRL 辅助函数。
- * 所有 JS 侧的 Element UI 交互代码必须从此文件导入，杜绝重复。
+ * `CTRL_OBJECT` + `getInjectionCode()` are the single source of truth for the
+ * CTRL.* surface injected into Playwright scripts. Agent-side duplicates live
+ * in scripts/actions/_js_snippets.py and inline evaluate in actions/*.py —
+ * keep name-level parity via `node scripts/characterize-ctrl.mjs` (not
+ * byte-identical; agent has extra JS beyond CTRL).
  *
- * 使用场景：
- *   1. convertTrajectoryToScript 模板直接嵌入（CTRL_INJECT_CODE）
- *   2. LLM prompt 中的可复制代码块（CTRL_PROMPT_BLOCK）
+ * Consumers:
+ *   1. assemble / script_assembler — getInjectionCode() → window.CTRL
+ *   2. LLM prompt blocks — CTRL_PROMPT_BLOCK / CTRL_API_TABLE
  */
 
 // ============================================================
-// CTRL 方法实现（纯对象字面量，不含包装代码）
-// 这是 JS 侧的唯一来源。修改 controller.py 时同步改这里。
+// CTRL method body (object literal only). Edit here first; sync Python cues.
 // ============================================================
 const CTRL_OBJECT = `{
   getContainer: () => {
