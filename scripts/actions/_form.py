@@ -51,14 +51,18 @@ def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store
     return snapshot
 
 
-def _task_done_impl(label_text, case_data_store):
+def _task_done_impl(label_text, case_data_store, value=None):
     """Mark a field as completed in the task list.
 
     Extracted from closure so the form module can share it internally
     and future split modules can import it.
+
+    ``value`` is the value that was just written (fill/select). Stored on
+    TaskItem.currentValue so scan_form_fields summaries are not empty after
+    auto-fill.
     """
     tl = TaskList.from_store(case_data_store.get('task_list'))
-    found = tl.mark_done(label_text)
+    found = tl.mark_done(label_text, value=value)
     if found is not None:
         sys.stderr.write(f'[task-done] OK: "{label_text}" → done={len(tl.done)}\n')
     else:
@@ -255,7 +259,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if _is_ok_result(result):
             element = await _capture_element(page, label_text)
             _record_action('fill_form_field', {'label_text': label_text, 'value': value}, result, element=element)
-            _task_done_impl(label_text, case_data_store)
+            _task_done_impl(label_text, case_data_store, value=value)
             return _ok(result)
         return result
 
@@ -267,7 +271,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         result = await page.evaluate(JS_FILL_DATE_FIELD, [label_text, value])
         if _is_ok_result(result):
             _record_action('fill_date_field', {'label_text': label_text, 'value': value}, result)
-            _task_done_impl(label_text, case_data_store)
+            _task_done_impl(label_text, case_data_store, value=value)
             return _ok(result)
         return result
 
@@ -330,11 +334,23 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
         # Restore previously-done items — add directly to done since they won't be in pending.
         # from_scan now puts pre-filled fields in done[], so check both lists to avoid duplicates.
+        # Preserve currentValue from prior done items so re-scan summaries stay accurate.
         new_pending_labels = {item.label for item in tl.pending}
         new_done_labels = {item.label for item in tl.done}
+        prev_done_by_label = {d.label: d for d in prev_tl.done}
         for label in prev_done_labels:
             if label not in new_pending_labels and label not in new_done_labels:
-                tl.done.append(TaskItem(label=label, kind='input'))
+                prev = prev_done_by_label.get(label)
+                tl.done.append(TaskItem(
+                    label=label,
+                    kind=prev.kind if prev else 'input',
+                    currentValue=prev.currentValue if prev else '',
+                    options=list(prev.options) if prev else [],
+                    placeholder=prev.placeholder if prev else '',
+                    disabled=prev.disabled if prev else False,
+                    required=prev.required if prev else False,
+                    hasButton=prev.hasButton if prev else '',
+                ))
         # Restore needs_intervention flags on items that ended up in pending
         for item in tl.pending:
             if item.label in prev_intervene:
@@ -656,7 +672,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                         _record_action('select_tree_option', {'label_text': label, 'option_text': value}, result)
                     elif kind in ('select_option', 'select', 'option'):
                         _record_action('select_option', {'label_text': label, 'option_text': value}, result)
-                    _task_done_impl(label, case_data_store)
+                    _task_done_impl(label, case_data_store, value=value)
                     # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
                     btn = has_button_map.get(label, '')
                     if '验证' in btn and kind in ('fill_input', 'fill', 'input'):
@@ -1036,7 +1052,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             if cur_val == option_text or option_text in cur_val or cur_val in option_text:
                 element = await _capture_element(page, label_text)
                 _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, already, element=element)
-                _task_done_impl(label_text, case_data_store)
+                _task_done_impl(label_text, case_data_store, value=option_text)
                 return _ok(already + ' | already-matched')
 
         trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'trigger'])
@@ -1051,7 +1067,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             case_data_store.pop(f'_sel_retry_{label_text}', None)
             element = await _capture_element(page, label_text)
             _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
-            _task_done_impl(label_text, case_data_store)
+            _task_done_impl(label_text, case_data_store, value=matched_text or option_text)
             return _ok(f'ok | {matched_text}')
         elif select_result == 'no-items':
             return _err('no-items')
@@ -1066,7 +1082,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
                     element = await _capture_element(page, label_text)
                     _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
-                    _task_done_impl(label_text, case_data_store)
+                    _task_done_impl(label_text, case_data_store, value=matched_text or option_text)
                     return _ok(f'ok | {matched_text}')
                 return _err(first_result)
             return _err(select_result)
@@ -1133,7 +1149,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if _is_ok_result(result):
             element = await _capture_element(page, label_text)
             _record_action('click_radio', {'label_text': label_text, 'option_text': option_text}, result, element=element)
-            _task_done_impl(label_text, case_data_store)
+            _task_done_impl(label_text, case_data_store, value=option_text)
             return _ok(result)
         return result
 
@@ -1147,6 +1163,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if _is_ok_result(result):
             element = await _capture_element(page, label_text)
             _record_action('select_tree_option', {'label_text': label_text, 'option_text': option_text}, result, element=element)
-            _task_done_impl(label_text, case_data_store)
+            _task_done_impl(label_text, case_data_store, value=option_text)
             return _ok(result)
         return result

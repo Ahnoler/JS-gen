@@ -62,6 +62,7 @@
 
 **助手的行为：**
 - 当你调用 `scan_form_fields()` 时，助手在扫描完成后**自动批量填写**所有待办字段。它使用智能规则（身份证号校验位、统一社会信用代码格式等）生成合理合法的值。
+- `scan_form_fields()` 返回摘要：`filled`/`pending` 是权威进度；`filled_fields` 为已填字段及其值。若 `pending=0` 且 `filled == total`，表单已填完 — **不要**因看到旧记忆或再次扫描结果而重复填写。
 - 当你第一次对主页面表单调用 `fill_form_field` / `select_option` / `click_radio` 时，助手也会**自动触发扫描和填写**（你不知道它已经做了，但它确实做了）。
 - 助手填完之后，`scan_visible_fields()` 只会返回**尚未填写的字段**（不会显示already-filled的），所以你看到的结果已经是干净的。
 

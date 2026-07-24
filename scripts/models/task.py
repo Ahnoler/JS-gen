@@ -168,13 +168,26 @@ class TaskList(BaseModel):
             return ("done", item)
         return None
 
-    def mark_done(self, label: str) -> Optional[TaskItem]:
-        """Move a task from pending to done. Returns the moved item or None."""
+    def mark_done(self, label: str, value: str | None = None) -> Optional[TaskItem]:
+        """Move a task from pending to done. Returns the moved item or None.
+
+        When ``value`` is provided, write it onto ``currentValue`` so summaries
+        (e.g. scan_form_fields filled_fields) reflect what was actually filled
+        rather than the empty pre-fill scan snapshot.
+        """
         for i, item in enumerate(self.pending):
             if item.label == label:
                 self.pending.pop(i)
+                if value is not None and str(value).strip() != "":
+                    item.currentValue = str(value)
                 self.done.append(item)
                 return item
+        # Already done — still refresh currentValue if a new value was provided
+        if value is not None and str(value).strip() != "":
+            already = self.find_done(label)
+            if already is not None:
+                already.currentValue = str(value)
+                return already
         return None
 
     def retry(self, label: str) -> TaskItem:
