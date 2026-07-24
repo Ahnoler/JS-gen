@@ -159,7 +159,6 @@
  * @property {number} [phaseNumber]
  * @property {number} [actionIndex]
  * @property {string} [actionType]
- * @property {string} [description]
  * @property {Record<string, unknown>|null} [params]
  * @property {ElementJson|null} [element]
  * @property {boolean|null} [success]

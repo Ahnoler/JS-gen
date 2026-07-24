@@ -102,7 +102,6 @@ export function extractFlowFromTrajectory(trajectory) {
         actionIndex: j,
         type: actionKey,
         phaseNumber: state?._phase_number || 0,
-        description: currentState.next_goal || '',
         url: state?.url || '',
         params: {
           text: actionParams.text || actionParams.label_text || actionParams.label || '',

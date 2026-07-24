@@ -98,7 +98,6 @@ export function up(knex) {
       t.integer('phase_number').unsigned().defaultTo(0);
       t.integer('action_index').unsigned().defaultTo(0);
       t.string('action_type', 64).defaultTo('');
-      t.text('description');
       t.json('params_json');
       t.json('element_json');
       t.boolean('success').nullable();

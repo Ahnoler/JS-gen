@@ -474,7 +474,7 @@ function stepRow(st) {
   const conf = st.confirmed === true || st.confirmed === 1;
   return `<label class="rc-step">
     <input type="checkbox" data-confirm="${st.id}" ${conf ? 'checked' : ''} />
-    <span><code>#${st.id}</code> [${escapeHtml(st.source || '')}] ${escapeHtml(st.actionType || '')} — ${escapeHtml(st.description || '')}</span>
+    <span><code>#${st.id}</code> [${escapeHtml(st.source || '')}] ${escapeHtml(st.actionType || '')}</span>
   </label>`;
 }
 

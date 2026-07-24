@@ -65,7 +65,6 @@ export function stepEntryToTrajectoryStep(entry, context = {}) {
       ? toElementJson(element)
       : element,
     extractedContent: entry.result ?? entry.extractedContent ?? '',
-    description: entry.description || '',
     success: entry.success ?? null,
     error: entry.error ?? null,
     phaseNumber: context.phaseNumber ?? entry.phaseNumber ?? entry.phase ?? 0,
@@ -129,6 +128,5 @@ export function trajectoryStepToActionEntry(step) {
     stepId: step.id != null ? String(step.id) : '',
     phaseId: step.trajectoryPhaseId ?? step.phaseId ?? null,
     phase: step.phaseNumber ?? step.phase ?? 0,
-    description: step.description || '',
   };
 }

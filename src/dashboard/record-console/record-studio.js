@@ -228,7 +228,7 @@ function renderStepTree() {
       parts.push(
         `<label class="rs-step"><input type="checkbox" data-step="${st.id}" ${checked} ${state.aiBusy ? 'disabled' : ''} />`
           + `<span>${conf}</span>`
-          + `<span><code>#${st.id}</code> [${escapeHtml(st.source || '')}] ${escapeHtml(st.actionType || '')} — ${escapeHtml(st.description || '')}</span></label>`,
+          + `<span><code>#${st.id}</code> [${escapeHtml(st.source || '')}] ${escapeHtml(st.actionType || '')}</span></label>`,
       );
     }
     if (!(ph.steps || []).length) parts.push('<div class="rs-muted">（无步骤）</div>');

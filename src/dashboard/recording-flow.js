@@ -140,7 +140,6 @@ function stepToEntry(step) {
     persisted: true,
     confirmed: !!(step.confirmed === true || step.confirmed === 1),
     timestamp: step.createdAt || step.confirmedAt || null,
-    description: step.description || '',
   };
 }
 
@@ -148,7 +147,7 @@ function renderEntryCard(entry) {
   const icon = ACTION_ICONS[entry.action] || '🔹';
   const p = entry.params || {};
   const label = p.label_text || p.menu_text || p.tab_name || p.row_text || p.text || p.username || p.key
-    || entry.description || '';
+    || '';
   const value = p.value || p.option_text || p.expected || p.reason || p.amount
     || String(p.index != null ? p.index : '')
     || (entry.action === 'login' ? (p.password ? '(已填写)' : '') : p.output_dir || '');

@@ -44,7 +44,6 @@ export function buildStepsFromFlow(flow, { source = 'agent' } = {}) {
       phaseNumber: s.phaseNumber ?? 0,
       actionIndex: s.actionIndex ?? 0,
       actionType: s.type,
-      description: s.description || '',
       params: s.params || null,
       element: s.element || null,
       success: s.success ?? null,

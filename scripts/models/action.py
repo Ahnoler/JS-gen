@@ -206,10 +206,6 @@ class ActionEntry(BaseModel):
         default=None,
         description="DB trajectory_phase.id for replay progress mapping",
     )
-    description: str = Field(
-        default="",
-        description="Human-readable step description",
-    )
     source: str = Field(
         default="agent",
         description="Recording source: agent | manual | cdp",

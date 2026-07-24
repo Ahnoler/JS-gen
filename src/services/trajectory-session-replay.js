@@ -62,7 +62,6 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
       cssSelector: entry.cssSelector || '',
       tagName: entry.tagName || '',
       attributes: entry.attributes || {},
-      description: entry.description || '',
       id: entry.id,
     };
   });

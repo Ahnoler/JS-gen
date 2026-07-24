@@ -39,7 +39,6 @@ export async function createTrajectoryStep(input = {}) {
     phaseNumber: input.phaseNumber ?? 0,
     actionIndex: input.actionIndex ?? 0,
     actionType: input.actionType ?? input.action ?? '',
-    description: input.description ?? '',
     params: input.params ?? null,
     element: input.element ?? null,
     source: input.source ?? 'manual',
@@ -63,6 +62,7 @@ export async function updateTrajectoryStep(stepId, fields = {}) {
   const existing = await trajectoryStepDao.getById(Number(stepId));
   if (!existing) return null;
   const patch = { ...fields };
+  delete patch.description;
   if ('confirmed' in fields) {
     patch.confirmedAt = fields.confirmed
       ? new Date().toISOString().slice(0, 23).replace('T', ' ')

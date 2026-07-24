@@ -74,7 +74,6 @@ export function stepFromActionLog(step, context = {}) {
     phaseNumber: context.phaseNumber ?? step.phaseNumber ?? step.phase ?? 0,
     actionIndex: step.actionIndex ?? 0,
     actionType: action,
-    description: step.description ?? '',
     params: step.params ?? null,
     element: normalizeElementJson(element),
     success: step.success ?? null,

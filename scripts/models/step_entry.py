@@ -29,7 +29,6 @@ class StepEntry(BaseModel):
     params: dict = Field(default_factory=dict, description="Action parameters -> params_json")
     element: ElementInfo = Field(default_factory=ElementInfo, description="DOM element reference -> element_json")
     result: str = Field(default="", description="Result string -> extracted_content")
-    description: str = Field(default="", description="Current goal (next_goal) -> description")
     success: Optional[bool] = Field(default=None, description="Whether the action succeeded -> success")
     error: Optional[str] = Field(default=None, description="Error message if failed -> error")
     trajectory_id: Optional[int] = Field(default=None, description="FK -> trajectory.id (set at persist time)")
@@ -49,7 +48,7 @@ class StepEntry(BaseModel):
 
         Args:
             entry: ActionEntry instance or dict.
-            **context: Override fields (e.g., description, phase_number, source).
+            **context: Override fields (e.g., phase_number, source).
 
         Returns:
             StepEntry with fields from ActionEntry plus context overrides.
@@ -97,7 +96,6 @@ class StepEntry(BaseModel):
             phase_number=self.phase_number or self.phase,
             action_index=self.action_index,
             action_type=self.action,
-            description=self.description,
             params_json=dict(self.params) if self.params else None,
             element_json=self.element.to_element_json(),
             success=self.success,

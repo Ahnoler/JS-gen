@@ -216,7 +216,6 @@ function testStepFromActionLog() {
     {
       action: 'clickElementByIndex',
       params: { index: 12, text: '保存' },
-      description: '点击保存',
       element: {
         tag: 'button',
         text: '保存',
@@ -279,7 +278,6 @@ function testTrajectoryStepToActionEntry() {
     actionType: 'click_element_by_index',
     phaseNumber: 2,
     trajectoryPhaseId: 7,
-    description: '点保存',
     params: { index: 5 },
     element: {
       tag: 'button',
@@ -321,7 +319,7 @@ function testBuildLoginInstruction() {
 
 function testBuildStepsHelpers() {
   const fromFlow = buildStepsFromFlow([
-    { type: 'go_to_url', description: 'open', params: { url: 'https://x' } },
+    { type: 'go_to_url', params: { url: 'https://x' } },
     { type: 'done' },
     { type: 'click_element_by_index', phaseNumber: 1, params: { index: 1 }, element: { text: 'a' } },
   ]);

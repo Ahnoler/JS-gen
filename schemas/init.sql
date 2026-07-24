@@ -133,7 +133,6 @@ CREATE TABLE `trajectory_step` (
   `phase_number`        INT UNSIGNED DEFAULT 0 COMMENT '阶段编号，向后兼容',
   `action_index`        INT UNSIGNED DEFAULT 0 COMMENT '同一步内的动作索引',
   `action_type`         VARCHAR(64) DEFAULT '' COMMENT '动作类型: fill_form_field | select_option | click_element_by_index | ...',
-  `description`         TEXT COMMENT '当前目标（来自 model_output.current_state.next_goal）',
   `params_json`         JSON COMMENT '动作参数 { text, value, index, url, label_text, option_text, ... }',
   `element_json`        JSON COMMENT '交互元素信息 { tag, xpath, cssSelector, attributes, candidates[], ... }',
   `success`             TINYINT(1) DEFAULT NULL COMMENT '是否成功',

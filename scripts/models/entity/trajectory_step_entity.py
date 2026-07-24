@@ -13,7 +13,6 @@ class TrajectoryStepEntity(BaseModel):
     phase_number: int = 0
     action_index: int = 0
     action_type: str = ""
-    description: str = ""
     params_json: Optional[dict] = None
     element_json: Optional[dict] = None
     success: Optional[bool] = None

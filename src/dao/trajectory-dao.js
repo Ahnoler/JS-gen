@@ -94,7 +94,6 @@ async function insertStepRows(trx, trajectoryDbId, steps, stepNumberOffset = 0) 
     phase_number: s.phaseNumber ?? 0,
     action_index: s.actionIndex ?? 0,
     action_type: (s.actionType ?? s.action) || '',
-    description: s.description ?? '',
     params_json: s.paramsJson ?? s.params ?? null,
     element_json: s.elementJson ?? s.element ?? null,
     success: s.success ?? null,

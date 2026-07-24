@@ -79,7 +79,6 @@ export async function prepareReplay(trajectoryId) {
         phaseId: phase.id,
         phaseNumber: phase.phaseNumber,
         stepNumber: step.stepNumber,
-        description: step.description || '',
         actionType: step.actionType || '',
         confirmed: !!step.confirmed,
       });
@@ -91,7 +90,6 @@ export async function prepareReplay(trajectoryId) {
       phaseId: step.trajectoryPhaseId || null,
       phaseNumber: step.phaseNumber ?? 0,
       stepNumber: step.stepNumber,
-      description: step.description || '',
       actionType: step.actionType || '',
       confirmed: !!step.confirmed,
     });
@@ -109,7 +107,6 @@ export async function prepareReplay(trajectoryId) {
     trajectoryPhaseId: s.phaseId,
     phaseNumber: s.phaseNumber,
     stepNumber: s.stepNumber,
-    description: s.description,
     actionType: s.actionType,
   })));
 
@@ -156,7 +153,6 @@ export async function prepareReplay(trajectoryId) {
       phaseId: phaseId != null ? Number(phaseId) : (meta?.phaseId ?? null),
       phaseNumber: meta?.phaseNumber ?? cmd.phase ?? 0,
       stepNumber: meta?.stepNumber ?? assemblerStep,
-      description: meta?.description || cmd.description || '',
       actionType: action,
     });
   }

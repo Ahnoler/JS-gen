@@ -347,7 +347,7 @@ export const API_GROUPS = [
             id: 101, phaseNumber: 1, description: '登录系统', status: 'pending',
             steps: [{
               id: 501, stepNumber: 1, actionType: 'click_element_by_index',
-              description: '点击查询', source: 'agent', confirmed: false,
+              source: 'agent', confirmed: false,
               params: {}, trajectoryPhaseId: 101,
             }],
           }],
@@ -400,7 +400,6 @@ export const API_GROUPS = [
         reqExample: J({
           trajectoryId: 42, phaseNumber: 1,
           actionType: 'click_element_by_index',
-          description: '点击新增',
           params: { index: 1, text: '新增' },
           source: 'manual',
         }),
@@ -409,7 +408,7 @@ export const API_GROUPS = [
         method: 'PATCH', path: '/api/v2/trajectory-steps/{id}',
         summary: '修改步骤',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '501' }],
-        reqExample: J({ description: '新描述', params: { index: 2 } }),
+        reqExample: J({ params: { index: 2, text: '保存' } }),
       },
       {
         method: 'PATCH', path: '/api/v2/trajectory-steps/{id}/confirm',
@@ -566,7 +565,7 @@ export const API_GROUPS = [
         respExample: J({
           replayPlanId: 'uuid', trajectoryId: 42, ready: true, stepCount: 15,
           steps: [{ stepId: 501, phaseId: 101, phaseNumber: 1, actionType: '...', confirmed: true }],
-          stepMap: [{ assemblerStep: 1, stepId: 501, phaseId: 101, description: '...' }],
+          stepMap: [{ assemblerStep: 1, stepId: 501, phaseId: 101, actionType: 'click_element_by_index' }],
         }),
       },
       {

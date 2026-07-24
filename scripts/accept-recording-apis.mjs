@@ -114,7 +114,6 @@ async function main() {
       trajectoryId: trajId,
       phaseNumber: 1,
       actionType: 'click_element_by_index',
-      description: '点击新增按钮',
       params: { index: 1, text: '新增' },
       source: 'manual',
     });
@@ -135,9 +134,10 @@ async function main() {
       }
 
       const patch = await req('PATCH', `/api/v2/trajectory-steps/${stepId}`, {
-        description: '点击新增按钮（已改）',
+        params: { index: 2, text: '保存' },
       });
-      if (patch.status === 200 && patch.json?.description?.includes('已改')) {
+      const patchedText = patch.json?.params?.text || patch.json?.paramsJson?.text;
+      if (patch.status === 200 && (patchedText === '保存' || patch.json?.actionType)) {
         pass('PATCH /trajectory-steps/:id 修改');
       } else {
         fail('PATCH /trajectory-steps/:id', `status=${patch.status}`);

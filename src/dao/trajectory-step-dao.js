@@ -17,7 +17,6 @@ export async function batchSave(steps) {
       phaseNumber: s.phaseNumber ?? 0,
       actionIndex: s.actionIndex ?? 0,
       actionType: s.actionType ?? s.action ?? '',
-      description: s.description ?? '',
       success: s.success ?? null,
       error: s.error ?? null,
       extractedContent: s.extractedContent ?? s.result ?? '',
@@ -72,7 +71,6 @@ export async function create(step) {
     phaseNumber: step.phaseNumber ?? 0,
     actionIndex: step.actionIndex ?? 0,
     actionType: step.actionType ?? step.action ?? '',
-    description: step.description ?? '',
     success: step.success ?? null,
     error: step.error ?? null,
     extractedContent: step.extractedContent ?? step.result ?? '',
@@ -92,6 +90,8 @@ export async function update(id, fields) {
   // params/element are not DB columns — map to *_json
   delete patch.params;
   delete patch.element;
+  // description column removed from trajectory_step
+  delete patch.description;
   if ('paramsJson' in fields || 'params' in fields) {
     const raw = fields.paramsJson ?? fields.params ?? null;
     patch.params_json = raw == null || typeof raw === 'string' ? raw : JSON.stringify(raw);

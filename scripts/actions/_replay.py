@@ -274,7 +274,6 @@ async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
         params.get('text')
         or params.get('menu_text')
         or el.get('text')
-        or entry.get('description')
         or ''
     ).strip()
     cands = el.get('candidates') if isinstance(el.get('candidates'), list) else []
