@@ -1,4 +1,4 @@
-import { createPushChannel } from './explore-utils.js';
+import { createPushChannel } from '../runtime/sse-channel.js';
 import { onWsMessage } from '../ws-server.js';
 import { executeScript, executeScriptSync } from '../runtime/script-runner.js';
 

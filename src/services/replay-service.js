@@ -16,7 +16,7 @@ import {
   parseReplayStepMarker,
   findScreenshotForStep,
 } from '../runtime/script-runner.js';
-import { createPushChannel } from '../routes/explore-utils.js';
+import { createPushChannel } from '../runtime/sse-channel.js';
 import { broadcast } from '../ws-server.js';
 
 /** @type {Map<string, object>} */

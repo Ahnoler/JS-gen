@@ -16,9 +16,9 @@ import {
 } from './trajectory-account-service.js';
 import { getTrajectoryTree } from './trajectory-query-service.js';
 
-/** Lazy accessor — avoid static cycle with trajectory-service.js (persist helpers) */
+/** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
-  const mod = await import('./trajectory-service.js');
+  const mod = await import('./trajectory-persist-service.js');
   return mod.appendRecordedStep(...args);
 }
 

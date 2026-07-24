@@ -2,7 +2,8 @@
  * Characterization: trajectory critical path contracts (offline, no DB/server).
  *
  * Covers:
- *   - facade module surface (query / step / account / recording re-exports)
+ *   - facade module surface (query / step / account / recording / persist / phase / meta re-exports)
+ *   - focused modules loadable directly (persist / phase / meta)
  *   - recordStatus enum + stop → recorded|draft, detached:false (≠ detach)
  *   - action log → stepFromActionLog → element xpath_smart preference
  *   - stepsToActionEntries / trajectoryStepToActionEntry for assemble/replay
@@ -78,6 +79,45 @@ function testFacadeSurface() {
   for (const [name, fn] of Object.entries(fns)) {
     assert(typeof fn === 'function', `facade missing export: ${name}`);
   }
+}
+
+async function testFocusedModules() {
+  const persist = await import('../src/services/trajectory-persist-service.js');
+  const phase = await import('../src/services/trajectory-phase-service.js');
+  const meta = await import('../src/services/trajectory-meta-service.js');
+  for (const name of [
+    'buildStepsFromActionFile',
+    'buildStepsFromFlow',
+    'persistSessionTrajectory',
+    'appendRecordedStep',
+    'saveFullTrajectory',
+  ]) {
+    assert(typeof persist[name] === 'function', `persist module missing: ${name}`);
+  }
+  for (const name of [
+    'upsertPhaseDescription',
+    'markPhaseStatus',
+    'clearTrajectory',
+    'addPhaseToTrajectory',
+    'syncTrajectoryPhaseDescriptions',
+  ]) {
+    assert(typeof phase[name] === 'function', `phase module missing: ${name}`);
+  }
+  for (const name of [
+    'createEmptyTrajectory',
+    'createTransactionWithPhases',
+    'analyzeRequirementToPhases',
+    'confirmTrajectory',
+  ]) {
+    assert(typeof meta[name] === 'function', `meta module missing: ${name}`);
+  }
+  // Facade re-exports must be the same function identity as focused modules
+  assert(clearTrajectory === phase.clearTrajectory, 'clearTrajectory must re-export phase module');
+  assert(confirmTrajectory === meta.confirmTrajectory, 'confirmTrajectory must re-export meta module');
+  assert(
+    buildStepsFromFlow === persist.buildStepsFromFlow,
+    'buildStepsFromFlow must re-export persist module',
+  );
 }
 
 function testStopDoesNotDetach() {
@@ -283,11 +323,12 @@ function testBuildStepsHelpers() {
   assert(buildStepsFromActionFile('/nonexistent/action.json').length === 0);
 }
 
-function main() {
+async function main() {
   console.log('\n=== Trajectory critical-path characterization ===\n');
   const tests = [
     ['status enums', testStatusEnums],
     ['facade surface', testFacadeSurface],
+    ['focused modules', testFocusedModules],
     ['stop ≠ detach', testStopDoesNotDetach],
     ['normalizeActionName', testNormalizeActionName],
     ['element xpath_smart', testElementSmartXpathPreference],
@@ -300,7 +341,7 @@ function main() {
   let failed = 0;
   for (const [name, fn] of tests) {
     try {
-      fn();
+      await fn();
       console.log(`  ✓ ${name}`);
     } catch (err) {
       failed += 1;

@@ -5,7 +5,7 @@ import {
   refreshCdpEndpoints, clearCdpEndpoints, detachLive, notifyManualRecordingChanged,
 } from '../../cdp/remote-bridge.js';
 import {
-  killTree, killOrphans, waitForReady, isProcessAlive, spawnAgent,
+  killTree, killOrphans, waitForReady, spawnAgent,
 } from '../../runtime/agent-process.js';
 import { broadcastWatcherStatus } from './broadcasts.js';
 import { persistLiveActionEntries } from './persist-live.js';
@@ -27,26 +27,19 @@ export async function teardownRemoteBridge() {
 
 export async function ensureGlobalBrowser(modelId) {
   const gb = state.globalBrowser;
-  if (isProcessAlive(gb.process)) {
+  if (gb.isAlive()) {
     if (!gb.ready) await waitForReady(gb.process, 15000);
     await ensureCdpDiscovered();
     return;
   }
-  gb.process = null;
-  gb.stdin = null;
-  gb.ready = false;
-  gb.busy = false;
-  gb.stepIndex = 0;
-  gb.cdpHttp = null;
-  gb.cdpWsUrl = null;
-  gb.cdpPort = null;
+  gb.reset();
   killOrphans();
 
   const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY], { OPENAI_API_KEY: LLM_API_KEY });
 
   child.stderr.on('data', (chunk) => { console.log(chunk.toString().trimEnd()); });
   child.on('exit', () => {
-    gb.process = null; gb.stdin = null; gb.ready = false; gb.busy = false; gb.stepIndex = 0;
+    gb.reset({ clearCdp: false });
     teardownRemoteBridge().finally(() => broadcastWatcherStatus());
     console.log('[browser-global] Agent process exited');
   });
@@ -58,7 +51,7 @@ export async function ensureGlobalBrowser(modelId) {
 
   child.stdin.on('error', () => {
     if (!gb.ready) return;
-    gb.process = null; gb.stdin = null; gb.ready = false; gb.busy = false; gb.stepIndex = 0;
+    gb.reset({ clearCdp: false });
     teardownRemoteBridge().finally(() => broadcastWatcherStatus());
   });
 

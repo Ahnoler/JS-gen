@@ -7,7 +7,7 @@ import { execSync } from 'child_process';
 import { deduplicateActionFile } from '../dedup.js';
 import { getInjectionCode } from '../ctrl-actions.js';
 import { PROJECT_DIR, TMP_DIR } from '../../config/config.js';
-import { PYTHON_EXE } from '../routes/explore-utils.js';
+import { PYTHON_EXE } from '../runtime/agent-process.js';
 import { ensureGeneratedDir, loadGeneratedIndex, saveGeneratedIndex } from '../script-utils.js';
 
 const SCRIPTS_DIR = path.join(PROJECT_DIR, 'scripts');

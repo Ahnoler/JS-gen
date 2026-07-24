@@ -1,12 +1,13 @@
 /**
  * Shared Playwright script execution for /api/test/run and trajectory replay.
  */
-import { writeFileSync, readFileSync, readdirSync, existsSync, unlinkSync } from 'fs';
+import { writeFileSync, readFileSync, readdirSync, existsSync, unlinkSync, mkdirSync } from 'fs';
 import path from 'path';
+import { randomBytes } from 'crypto';
 import { spawn } from 'child_process';
 import { TMP_DIR, SKILL_DIR } from '../../config/config.js';
 import { cleanupScriptFile } from '../script-utils.js';
-import { killTree } from '../routes/explore-utils.js';
+import { killTree } from './agent-process.js';
 
 let _isExecuting = false;
 /** @type {{ pid: number|null, abort: () => void }|null} */
@@ -25,12 +26,42 @@ export function abortActiveScriptRun() {
 }
 
 /**
+ * Isolated per-run directory under TMP_DIR for script + artifacts
+ * (script-errors.json, step-*.png). Left in place after the run so
+ * /api/test/screenshots still serves nested paths while clients fetch.
+ */
+function createRunDir() {
+  const runDir = path.join(TMP_DIR, `pw-run-${Date.now()}-${randomBytes(4).toString('hex')}`);
+  mkdirSync(runDir, { recursive: true });
+  return runDir;
+}
+
+function childEnv(runDir) {
+  return {
+    ...process.env,
+    TMPDIR: runDir,
+    TMP: runDir,
+    TEMP: runDir,
+    PLAYWRIGHT_SKIP_EXISTING: '1',
+  };
+}
+
+/** Relative path from TMP_DIR for express.static URL segments. */
+function runDirUrlPrefix(runDir) {
+  return path.relative(TMP_DIR, runDir).split(path.sep).join('/');
+}
+
+/**
  * Read and parse script-errors.json from a Playwright run.
+ * @param {string} scriptPath
+ * @param {number|null} code
+ * @param {string} [logSuffix]
+ * @param {string} [runDir] directory that received TMPDIR for this run
  * @returns {{ scriptErrors: object[]|null, success: boolean }}
  */
-export function checkScriptErrors(scriptPath, code, logSuffix = '') {
+export function checkScriptErrors(scriptPath, code, logSuffix = '', runDir = TMP_DIR) {
   let scriptErrors = null;
-  const errorReportPath = path.join(TMP_DIR, 'script-errors.json');
+  const errorReportPath = path.join(runDir, 'script-errors.json');
   try {
     if (existsSync(errorReportPath)) {
       scriptErrors = JSON.parse(readFileSync(errorReportPath, 'utf-8'));
@@ -59,15 +90,17 @@ export function checkScriptErrors(scriptPath, code, logSuffix = '') {
   return { scriptErrors, success };
 }
 
-function listNewScreenshots(beforeFiles) {
-  const afterFiles = readdirSync(TMP_DIR).filter((f) => f.endsWith('.png'));
+function listNewScreenshots(beforeFiles, runDir) {
+  if (!existsSync(runDir)) return [];
+  const afterFiles = readdirSync(runDir).filter((f) => f.endsWith('.png'));
   const newScreenshots = afterFiles.filter((f) => !beforeFiles.has(f));
+  const prefix = runDirUrlPrefix(runDir);
   const stepIndex = (f) => parseInt(f.match(/^step-(\d+)-/)?.[1] ?? '0', 10);
   return newScreenshots
     .sort((a, b) => stepIndex(a) - stepIndex(b))
     .map((f) => ({
       fileName: f,
-      url: `/api/test/screenshots/${f}`,
+      url: `/api/test/screenshots/${prefix}/${f}`,
       stepNumber: stepIndex(f) || null,
     }));
 }
@@ -128,14 +161,17 @@ export function executeScript({ script, fileName, channel, hooks = {} }) {
   let aborted = false;
   channel.onAbort(() => { aborted = true; });
 
+  const runDir = createRunDir();
   const scriptName = fileName
     ? fileName.replace(/[\\/:*?"<>|]/g, '_')
     : `playwright-test-${Date.now()}.js`;
-  const scriptPath = path.join(TMP_DIR, scriptName);
+  const scriptPath = path.join(runDir, scriptName);
   writeFileSync(scriptPath, script, 'utf-8');
   send('log', { type: 'info', message: `Script saved: ${scriptPath}` });
 
-  const beforeFiles = new Set(readdirSync(TMP_DIR).filter((f) => f.endsWith('.png')));
+  const beforeFiles = new Set(
+    existsSync(runDir) ? readdirSync(runDir).filter((f) => f.endsWith('.png')) : [],
+  );
   /** @type {ReturnType<typeof listNewScreenshots>} */
   let knownScreenshots = [];
 
@@ -155,7 +191,7 @@ export function executeScript({ script, fileName, channel, hooks = {} }) {
 
   const child = spawn('node', [runJsPath, scriptPath], {
     cwd: SKILL_DIR,
-    env: { ...process.env, PLAYWRIGHT_SKIP_EXISTING: '1' },
+    env: childEnv(runDir),
   });
 
   const abort = () => {
@@ -185,10 +221,10 @@ export function executeScript({ script, fileName, channel, hooks = {} }) {
     const parts = lineBuf.split(/\r?\n/);
     lineBuf = parts.pop() || '';
     for (const line of parts) {
-      knownScreenshots = listNewScreenshots(beforeFiles);
+      knownScreenshots = listNewScreenshots(beforeFiles, runDir);
       if (hooks.onStdoutLine) {
         hooks.onStdoutLine(line, {
-          screenshotsSoFar: () => listNewScreenshots(beforeFiles),
+          screenshotsSoFar: () => listNewScreenshots(beforeFiles, runDir),
         });
       }
     }
@@ -205,13 +241,13 @@ export function executeScript({ script, fileName, channel, hooks = {} }) {
     if (aborted) return;
     send('log', { type: 'step', message: `Process exited with code ${code}` });
 
-    const screenshots = listNewScreenshots(beforeFiles);
+    const screenshots = listNewScreenshots(beforeFiles, runDir);
     if (screenshots.length > 0) {
       send('log', { type: 'success', message: `Captured ${screenshots.length} screenshot(s)` });
       send('screenshots', { screenshots });
     }
 
-    const { scriptErrors, success } = checkScriptErrors(scriptPath, code);
+    const { scriptErrors, success } = checkScriptErrors(scriptPath, code, '', runDir);
 
     if (scriptErrors && scriptErrors.length > 0) {
       send('script-errors', { errors: scriptErrors, needsFix: true, scriptPath });
@@ -231,6 +267,7 @@ export function executeScript({ script, fileName, channel, hooks = {} }) {
 
     send('done', {});
     finishExecuting();
+    // Keep runDir (pngs) for /api/test/screenshots nested URLs; only drop the .js if allowed.
     if (!hooks.keepScriptFile) cleanupScriptFile(scriptPath);
     channel.end();
   });
@@ -252,13 +289,16 @@ export function executeScript({ script, fileName, channel, hooks = {} }) {
  * Sync run (for /api/test/run-sync).
  */
 export async function executeScriptSync({ script, fileName }) {
+  const runDir = createRunDir();
   const scriptName = fileName
     ? fileName.replace(/[\\/:*?"<>|]/g, '_')
     : `playwright-test-${Date.now()}.js`;
-  const scriptPath = path.join(TMP_DIR, scriptName);
+  const scriptPath = path.join(runDir, scriptName);
   writeFileSync(scriptPath, script, 'utf-8');
 
-  const beforeFiles = new Set(readdirSync(TMP_DIR).filter((f) => f.endsWith('.png')));
+  const beforeFiles = new Set(
+    existsSync(runDir) ? readdirSync(runDir).filter((f) => f.endsWith('.png')) : [],
+  );
   const runJsPath = path.join(SKILL_DIR, 'run.cjs');
 
   if (!existsSync(runJsPath)) {
@@ -270,7 +310,7 @@ export async function executeScriptSync({ script, fileName }) {
     const { stdout, stderr, code } = await new Promise((resolve, reject) => {
       const child = spawn('node', [runJsPath, scriptPath], {
         cwd: SKILL_DIR,
-        env: { ...process.env, PLAYWRIGHT_SKIP_EXISTING: '1' },
+        env: childEnv(runDir),
       });
       let out = '';
       let err = '';
@@ -280,8 +320,8 @@ export async function executeScriptSync({ script, fileName }) {
       child.on('error', reject);
     });
 
-    const screenshots = listNewScreenshots(beforeFiles);
-    const { scriptErrors, success } = checkScriptErrors(scriptPath, code, 'sync');
+    const screenshots = listNewScreenshots(beforeFiles, runDir);
+    const { scriptErrors, success } = checkScriptErrors(scriptPath, code, 'sync', runDir);
 
     return {
       success,
