@@ -15,7 +15,7 @@ Features:
 Verified (detection + self-healing):
   ✅ fill_form_field       — 2-tier: CTRL → Playwright hasText
   ✅ select_option         — 2-tier: CTRL → Playwright native
-  ✅ click_element_by_index — N-tier: ID → class → XPath → CSS → text → JS → fuzzy
+  ✅ click_element_by_index — button: role/text/xpath_smart; menu: xpath/text/menu-item/fuzzy
 
 TODO — remaining operations lack multi-tier degradation + structured error reporting:
   ☐ click_menu_item        — single-tier CTRL, error: 'not-found'
@@ -220,6 +220,50 @@ def _xpath_literal_py(text):
         return f'"{t}"'
     parts = t.split("'")
     return 'concat(' + ', "\'", '.join(f"'{p}'" for p in parts) + ')'
+
+
+def _click_kind(tag, attrs, xp_smart, xp_full, xp_primary):
+    """Classify click target: 'button' | 'menu' | 'generic'.
+
+    Button path uses role/text_btn/xpath_smart; menu path must NOT (el-menu-item
+    is not a button — those strategies only burn timeouts).
+    """
+    tag_l = str(tag or '').lower()
+    attrs = attrs if isinstance(attrs, dict) else {}
+    cls = str(attrs.get('class') or attrs.get('className') or '')
+    blob = ' '.join([
+        cls,
+        str(xp_smart or ''),
+        str(xp_full or ''),
+        str(xp_primary or ''),
+    ]).lower()
+
+    is_button = (
+        tag_l == 'button'
+        or bool(re.search(r'(?:^|\s)el-button(?:\s|$)', cls))
+        or 'button[normalize-space' in str(xp_smart or '').replace(' ', '').lower()
+        or str(xp_smart or '').lstrip('(').startswith('//button')
+    )
+    # <a class="el-button"> still a button-like control
+    if tag_l == 'a' and 'el-button' in cls:
+        is_button = True
+
+    is_menu = (
+        tag_l in ('li',)
+        or 'el-menu' in blob
+        or 'el-submenu' in blob
+        or bool(re.search(r'/nav/', blob))
+        or bool(re.search(r'/ul\[\d+\]/li\[\d+\]', blob))
+    )
+
+    if is_button and not is_menu:
+        return 'button'
+    if is_menu and not is_button:
+        return 'menu'
+    if is_button and is_menu:
+        # Conflicting cues — prefer absolute/menu path over button role
+        return 'menu' if ('el-menu' in blob or tag_l == 'li') else 'button'
+    return 'generic'
 
 
 FILL_RETRY_ACTIONS = {'fill_form_field', 'fill_date_field'}
@@ -495,6 +539,14 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         attrs = _e.get('attributes') if isinstance(_e.get('attributes'), dict) else {}
         if not attrs and isinstance(_el.get('attributes'), dict):
             attrs = _el['attributes']
+        tag = (
+            p('tag_name', '')
+            or _el.get('tag')
+            or _el.get('tag_name')
+            or _e.get('tagName')
+            or ''
+        )
+        kind = _click_kind(tag, attrs, xp_smart, xp_full, xp_primary)
 
         if not xp and not txt:
             lines.append(f"    console.log('[{step_num}] Click [{idx}] (no XPath)');")
@@ -507,47 +559,82 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         if xp_full and not str(xp_full).startswith('/') and not str(xp_full).startswith('//'):
             xp_full = '/' + str(xp_full)
 
-        lines.append(f"    console.log('[{step_num}] Click [{idx}] \"{txt}\"');")
+        # Menu clicks: prefer absolute xpath over button-only xpath_smart
+        if kind == 'menu':
+            abs_xp = xp_full or (
+                xp_primary if xp_primary and not str(xp_primary).startswith('//') else ''
+            )
+            if abs_xp:
+                if not str(abs_xp).startswith('/') and not str(abs_xp).startswith('('):
+                    abs_xp = '/' + str(abs_xp)
+                xp = abs_xp
+                xp_smart = ''  # do not try //button[...] for menu items
+
+        lines.append(f"    console.log('[{step_num}] Click [{idx}] \"{txt}\" ({kind})');")
         lines.append("    await page.waitForFunction(before => location.href !== before, page.url(), { timeout: 5000 }).catch(() => {});")
         lines.append(pre())
         lines.append(pre_ready())
 
-        # Degradation: visible text / xpath_smart BEFORE absolute xpath_full
-        # Prefer .last() — page often keeps hidden dialogs with the same button text.
+        # Degradation chain — button vs menu/generic diverge on purpose.
         selectors = []
-        if txt:
-            selectors.append((
-                'role',
-                f"page.getByRole('button', {{ name: '{_escape(txt)}', exact: true }}).last()",
-            ))
-            selectors.append((
-                'text_btn',
-                f"page.locator('button.el-button, button').filter({{ hasText: '{_escape(txt)}' }}).last()",
-            ))
-        if xp_smart or (xp and str(xp).startswith('//')):
-            smart_xp = xp_smart or xp
-            selectors.append(('xpath_smart', f"page.locator('xpath={_escape(smart_xp)}').last()"))
-            if txt and 'el-dialog' in str(smart_xp) and 'el-drawer' not in str(smart_xp):
-                drawer_xp = f"(//div[contains(@class,'el-drawer')])[last()]//button[normalize-space()={_xpath_literal_py(txt)}]"
-                selectors.append(('xpath_drawer', f"page.locator('xpath={_escape(drawer_xp)}').last()"))
+        if kind == 'button':
+            # Button: role / text_btn / xpath_smart BEFORE absolute xpath_full
             if txt:
-                plain_xp = f"//button[normalize-space()={_xpath_literal_py(txt)}]"
-                if plain_xp != str(smart_xp):
-                    selectors.append(('xpath_plain', f"page.locator('xpath={_escape(plain_xp)}').last()"))
-        if xp_full and xp_full != xp_smart and xp_full != xp:
-            selectors.append(('xpath_full', f"page.locator('xpath={_escape(xp_full)}').first()"))
-        elif xp and not str(xp).startswith('//') and xp != xp_smart:
-            selectors.append(('xpath_full', f"page.locator('xpath={_escape(xp)}').first()"))
-        js_xp = xp_smart or xp or xp_full
+                selectors.append((
+                    'role',
+                    f"page.getByRole('button', {{ name: '{_escape(txt)}', exact: true }}).last()",
+                ))
+                selectors.append((
+                    'text_btn',
+                    f"page.locator('button.el-button, button').filter({{ hasText: '{_escape(txt)}' }}).last()",
+                ))
+            if xp_smart or (xp and str(xp).startswith('//')):
+                smart_xp = xp_smart or xp
+                selectors.append(('xpath_smart', f"page.locator('xpath={_escape(smart_xp)}').last()"))
+                if txt and 'el-dialog' in str(smart_xp) and 'el-drawer' not in str(smart_xp):
+                    drawer_xp = f"(//div[contains(@class,'el-drawer')])[last()]//button[normalize-space()={_xpath_literal_py(txt)}]"
+                    selectors.append(('xpath_drawer', f"page.locator('xpath={_escape(drawer_xp)}').last()"))
+                if txt:
+                    plain_xp = f"//button[normalize-space()={_xpath_literal_py(txt)}]"
+                    if plain_xp != str(smart_xp):
+                        selectors.append(('xpath_plain', f"page.locator('xpath={_escape(plain_xp)}').last()"))
+            if xp_full and xp_full != xp_smart and xp_full != xp:
+                selectors.append(('xpath_full', f"page.locator('xpath={_escape(xp_full)}').first()"))
+            elif xp and not str(xp).startswith('//') and xp != xp_smart:
+                selectors.append(('xpath_full', f"page.locator('xpath={_escape(xp)}').first()"))
+        else:
+            # Menu / generic: xpath → :text-is → menu-item text (no button role)
+            abs_or_primary = xp_full or xp
+            if abs_or_primary:
+                selectors.append(('xpath', f"page.locator('xpath={_escape(abs_or_primary)}').first()"))
+            if txt:
+                selectors.append(('text', f"page.locator(':text-is(\"{_escape(txt)}\")').first()"))
+            if kind == 'menu' and txt:
+                selectors.append((
+                    'menu_item',
+                    f"page.locator('.el-menu-item, .el-submenu__title').filter({{ hasText: '{_escape(txt)}' }}).first()",
+                ))
+            # Generic may still benefit from smart xpath when it is not button-only noise
+            if kind == 'generic' and xp_smart and 'button[normalize-space' not in str(xp_smart):
+                selectors.append(('xpath_smart', f"page.locator('xpath={_escape(xp_smart)}').last()"))
+
+        js_xp = (xp if kind == 'menu' else (xp_smart or xp or xp_full)) or xp_full or xp
         if js_xp:
             selectors.append(('js', f"JS: document.evaluate('{_escape(js_xp)}', ...)"))
         if txt:
-            selectors.append(('fuzzy', f"JS-fuzzy: text='{_escape(txt)}'"))
+            selectors.append(('fuzzy', f"JS-fuzzy: text='{_escape(txt)}' ({kind})"))
 
         if not selectors:
             lines.append(f"    _recordError({step_num}, 'click_element_by_index', '{_escape_js_string(txt)}', '', 'needs-llm-fix', 'no xpath/text match');")
             lines.append(f"    throw new Error('[{step_num}] Click failed: no XPath and text \"{_escape(txt)}\" not found');")
             return '\n'.join(lines)
+
+        # Fuzzy candidate set: buttons-only vs menu-aware
+        fuzzy_sel = (
+            "button, .el-button, a, [role=button]"
+            if kind == 'button'
+            else "button, a, span, li, label, .el-button, .el-menu-item, .el-submenu__title, [role=menuitem], .el-tabs__item"
+        )
 
         lines.append(f"    let _clicked{step_num} = false;")
         lines.append(f"    let _dt{step_num} = '';")
@@ -559,11 +646,16 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
                     lines.append(f"        const _okJs{step_num} = await page.evaluate((xp) => {{")
                     lines.append(f"          const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;")
                     lines.append(f"          if (!el) return false;")
-                    lines.append(f"          const st = getComputedStyle(el);")
-                    lines.append(f"          const box = el.getBoundingClientRect();")
-                    lines.append(f"          if (st.display === 'none' || st.visibility === 'hidden' || box.width < 1 || box.height < 1) return false;")
-                    lines.append(f"          el.scrollIntoView({{ block: 'center', behavior: 'instant' }});")
-                    lines.append(f"          el.click();")
+                    if kind == 'button':
+                        lines.append(f"          const st = getComputedStyle(el);")
+                        lines.append(f"          const box = el.getBoundingClientRect();")
+                        lines.append(f"          if (st.display === 'none' || st.visibility === 'hidden' || box.width < 1 || box.height < 1) return false;")
+                        lines.append(f"          el.scrollIntoView({{ block: 'center', behavior: 'instant' }});")
+                        lines.append(f"          el.click();")
+                    else:
+                        # Menu: dispatchEvent even if offsetParent quirks
+                        lines.append(f"          el.scrollIntoView({{ block: 'center', behavior: 'instant' }});")
+                        lines.append(f"          el.dispatchEvent(new MouseEvent('click', {{ bubbles: true, cancelable: true, view: window }}));")
                     lines.append(f"          return true;")
                     lines.append(f"        }}, '{_escape(js_xp)}');")
                     lines.append(f"        if (_okJs{step_num}) {{")
@@ -577,13 +669,19 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
                     lines.append(f"      try {{")
                     lines.append(f"        await page.evaluate((text) => {{")
                     lines.append(f"          const want = String(text || '').replace(/\\s+/g, ' ').trim();")
-                    lines.append(f"          const candidates = [...document.querySelectorAll('button, .el-button, a, [role=button]')].filter(el => {{")
+                    lines.append(f"          const candidates = [...document.querySelectorAll('{fuzzy_sel}')].filter(el => {{")
                     lines.append(f"            const st = getComputedStyle(el);")
                     lines.append(f"            const box = el.getBoundingClientRect();")
                     lines.append(f"            return st.display !== 'none' && st.visibility !== 'hidden' && box.width > 0 && box.height > 0;")
                     lines.append(f"          }});")
                     lines.append(f"          const exact = candidates.filter(el => (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim() === want);")
-                    lines.append(f"          const el = exact.length ? exact[exact.length - 1] : null;")
+                    if kind == 'menu':
+                        # Prefer el-menu-item / submenu title when multiple exact hits
+                        lines.append(f"          const menuExact = exact.filter(el => el.matches && el.matches('.el-menu-item, .el-submenu__title'));")
+                        lines.append(f"          const pool = menuExact.length ? menuExact : exact;")
+                        lines.append(f"          const el = pool.length ? pool[0] : null;")
+                    else:
+                        lines.append(f"          const el = exact.length ? exact[exact.length - 1] : null;")
                     lines.append(f"          if (el) {{ el.scrollIntoView({{ block: 'center', behavior: 'instant' }}); el.click(); return 1; }}")
                     lines.append(f"          return 0;")
                     lines.append(f"        }}, '{_escape(txt)}').then(score => {{")
