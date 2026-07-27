@@ -146,10 +146,14 @@ def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel
 
 
 def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, case_data_store=None):
-    """Save three files:
+    """Save action/log/form files for assemble + MySQL persist.
+
     - action_{ts}.json  — custom action format (for script_assembler.py)
-    - traj_{ts}.json    — native AgentHistoryList format (for rerun_history)
     - log_{ts}.txt      — operation log (for LLM context)
+    - form_{ts}.json    — form structure snapshots (optional)
+
+    Native browser-use AgentHistory (scripts/trajectories/{session_id}.json /
+    traj_*.json) is no longer saved — product truth is MySQL + action JSON.
     """
     from .controller import _ACTION_LOG, _TRAJECTORY_URL
     from .recorder import _ACTION_LOG as _recorder_log
@@ -187,36 +191,13 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
         action_path = action_dir / f"action_{ts}.json" if entries else None
         log_path = log_dir / f"log_{ts}.txt" if rec_log_snapshot else None
 
-        # File 3: traj_{ts}.json — native AgentHistoryList
-        native_path = None
-        _native = None
-        sys.stderr.write(f"[save-trajectory] cumulative_path={cumulative_path}, exists={cumulative_path.exists() if cumulative_path else 'N/A'}\n")
-        sys.stderr.flush()
+        # Native AgentHistory dump disabled — discard temp cumulative so it does not grow.
         if cumulative_path and cumulative_path.exists():
             try:
-                with open(cumulative_path, 'r', encoding='utf-8') as _f:
-                    _native = json.load(_f)
-                _history_len = len(_native.get('history', [])) if _native else 0
-                sys.stderr.write(f"[save-trajectory] cumulative has history: {_history_len}\n")
-                sys.stderr.flush()
-                if _native.get('history'):
-                    trajectories_dir = scripts_dir / 'trajectories'
-                    trajectories_dir.mkdir(parents=True, exist_ok=True)
-                    # trajectory_id = session_id (stable across multiple saves)
-                    native_path = trajectories_dir / f"{session_id}.json"
-                    sys.stderr.write(f"[save-trajectory] writing native_path={native_path}\n")
-                    sys.stderr.flush()
-                    with open(native_path, 'w', encoding='utf-8') as _f:
-                        json.dump(_native, _f, ensure_ascii=False, indent=2)
-                # ── 读完 cumulative 后立即删除（防重入：下一次 save 不会读到相同数据） ──
-                try:
-                    cumulative_path.unlink()
-                except:
-                    pass
-            except Exception as _e:
-                sys.stderr.write(f"[save-trajectory] native write error: {_e}\n")
-                sys.stderr.flush()
-        sys.stderr.write(f"[save-trajectory] entries={len(entries)}, rec_log_snapshot={len(rec_log_snapshot)}\n")
+                cumulative_path.unlink()
+            except OSError:
+                pass
+        sys.stderr.write(f"[save-trajectory] entries={len(entries)}, rec_log_snapshot={len(rec_log_snapshot)} (native AgentHistory skipped)\n")
         sys.stderr.flush()
 
         # File 4: form_{ts}.json — form structure snapshots (for replay validation)
@@ -262,7 +243,6 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
         # Clear all logs so next task starts fresh
         action_count = len(entries)
         log_count = len(rec_log_snapshot)
-        native_count = len(_native.get('history', [])) if _native else 0
         _ACTION_LOG.clear()
         _recorder_log.clear()
         from .actions._state import _emit_action_log_sync
@@ -273,18 +253,20 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
             "data": {
                 "success": True,
                 "action_file": str(action_path) if action_path else None,
-                "trajectory_file": str(native_path) if native_path else (str(action_path) if action_path else None),
+                # Native AgentHistory path removed; do not fall back to action_file
+                # (would wrongly feed trajectory-store / scripts/trajectories).
+                "trajectory_file": None,
                 "log_file": str(log_path) if log_path else None,
                 "form_file": str(form_path) if form_path else None,
                 "action_count": action_count,
                 "log_count": log_count,
-                "native_count": native_count,
+                "native_count": 0,
                 "url": url,
             },
         })
         _fcounts = [s.get('count', 0) for s in snapshots] if snapshots else []
         _fstr = ', '.join(str(c) for c in _fcounts) if _fcounts else '0'
-        sys.stderr.write(f"[session] Saved: action({action_count}) log({log_count}) trajectory({native_count}) form({_fstr})\n")
+        sys.stderr.write(f"[session] Saved: action({action_count}) log({log_count}) form({_fstr})\n")
         sys.stderr.flush()
     except Exception as e:
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
@@ -1224,7 +1206,8 @@ async def run_session(args):
             agent_running_ref['value'] = False
         if output_path is None:
             return
-        _accumulate_trajectory(output_path, cumulative_path, phase_num)
+        # Native AgentHistory accumulate disabled (scripts/trajectories/*.json no longer saved).
+        # Temp per-step history files may still exist under %TEMP%; not copied to repo.
         emit_json({
             "event": "phase_done",
             "data": {"phase": phase_num, "total": -1, "name": task_text[:60], "trajectory_file": str(output_path),
