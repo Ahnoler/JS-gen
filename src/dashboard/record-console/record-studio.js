@@ -13,6 +13,7 @@ import {
   armRemoteStream,
   setRemotePreferredSessionId,
   setRemoteLog,
+  resetRemoteBrowserUi,
 } from '../remote-browser.js';
 
 const params = new URLSearchParams(location.search);
@@ -608,6 +609,20 @@ async function main() {
   });
   on('manual_action_recorded', () => scheduleRefreshTree(250));
   on('action_log_sync', () => scheduleRefreshTree(250));
+  on('recording:detached', (payload) => {
+    if (Number(payload?.trajectoryId) !== trajId) return;
+    state.prepare = null;
+    state.prepareError = null;
+    state.prepareStages = null;
+    state.manualOn = false;
+    resetRemoteBrowserUi({ reason: payload?.reason || 'manual' });
+    const why = payload?.reason === 'idle'
+      ? '空闲超时（约 10 分钟无步骤入库），执行资源已回收'
+      : '执行资源已释放';
+    log(`${why}。请重新「一键准备」后再录制/推流。`, 'err');
+    renderResource();
+    renderPhases();
+  });
   on('recording:prepare', (payload) => {
     if (Number(payload?.trajectoryId) !== trajId) return;
     const stage = payload.stage;

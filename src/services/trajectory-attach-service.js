@@ -358,15 +358,22 @@ export async function attachTrajectoryLive(trajectoryId) {
   };
 }
 
-export async function detachTrajectoryLive(trajectoryId) {
+export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } = {}) {
   const tid = Number(trajectoryId);
   const runtime = getTrajectoryRuntime(tid);
   const traj = await trajectoryDao.getById(tid);
-  if (runtime?.remoteSessionId) {
-    await remoteSessionService.detachLive({ crashed: false }).catch(() => {});
-  }
-  if (runtime?.sessionId) {
-    const session = state.sessions.get(runtime.sessionId);
+  const sessionId = runtime?.sessionId || null;
+
+  // Always tear down BiB / live pointer (even if runtime.remoteSessionId missing).
+  try {
+    await remoteSessionService.detachLive({ crashed: false });
+  } catch {}
+  try {
+    remoteSessionService.clearExecutorLive?.();
+  } catch {}
+
+  if (sessionId) {
+    const session = state.sessions.get(sessionId);
     if (session?._trajPersistUnsub) {
       try { session._trajPersistUnsub(); } catch {}
       session._trajPersistUnsub = null;
@@ -374,12 +381,12 @@ export async function detachTrajectoryLive(trajectoryId) {
     try {
       await execSession.closeSession({
         nodeUuid: runtime.executorNodeUuid,
-        sessionId: runtime.sessionId,
+        sessionId,
       });
     } catch {
-      slotLease.releaseBySession(runtime.sessionId);
+      slotLease.releaseBySession(sessionId);
     }
-    state.sessions.delete(runtime.sessionId);
+    state.sessions.delete(sessionId);
   }
   slotLease.releaseByTrajectory(tid);
   deleteTrajectoryRuntime(tid);
@@ -393,5 +400,26 @@ export async function detachTrajectoryLive(trajectoryId) {
   }
   if (traj) await trajectoryDao.updateMeta(tid, meta);
 
-  return { trajectoryId: tid, detached: true, recordStatus };
+  const status = await remoteSessionService.getLiveStatus().catch(() => ({
+    attached: false,
+    remoteSessionId: null,
+    cdpReady: false,
+  }));
+  broadcast('remote:status', {
+    ...status,
+    attached: false,
+    remoteSessionId: null,
+    remoteSessionUuid: null,
+    inputEnabled: false,
+    reason,
+    trajectoryId: tid,
+  });
+  broadcast('recording:detached', {
+    trajectoryId: tid,
+    reason,
+    recordStatus,
+    sessionId,
+  });
+
+  return { trajectoryId: tid, detached: true, recordStatus, reason };
 }

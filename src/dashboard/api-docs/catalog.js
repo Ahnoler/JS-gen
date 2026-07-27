@@ -836,6 +836,20 @@ export const API_GROUPS = [
         notes: ['stage: session | browser | stream | login', 'status: running | done | degraded | error | skipped'],
       },
       {
+        method: 'WS', path: 'recording:detached',
+        summary: '执行资源已释放（手动 detach / 空闲回收）',
+        tryable: false,
+        respExample: J({
+          type: 'recording:detached',
+          payload: { trajectoryId: 42, reason: 'idle', recordStatus: 'draft', sessionId: 'uuid' },
+        }),
+        notes: [
+          'reason: idle（10 分钟无步骤）| manual',
+          '前端应清空画布与 prepare 状态，提示重新 prepare 后再附着',
+          '同时会广播 remote:status（attached=false）',
+        ],
+      },
+      {
         method: 'WS', path: 'action_log_sync',
         summary: 'AI 步骤实时同步',
         tryable: false,

@@ -67,7 +67,7 @@ export async function reapIdleTrajectoryRuntimes() {
       console.log(
         `[idle-reaper] detaching traj #${tid} (idle ${Math.round((now - anchor) / 1000)}s, no steps)`,
       );
-      await detachTrajectoryLive(tid);
+      await detachTrajectoryLive(tid, { reason: 'idle' });
       detached.push(Number(tid));
     } catch (err) {
       console.warn(`[idle-reaper] detach failed for traj #${tid}:`, err.message);

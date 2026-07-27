@@ -308,6 +308,29 @@ function applyStatus(payload = {}) {
         }`,
       payload.agentBusy ? 'warn' : 'ok',
     );
+  } else if (payload.reason === 'idle' || payload.reason === 'manual') {
+    stopStream();
+    if (lastBitmap) {
+      try { lastBitmap.close(); } catch {}
+      lastBitmap = null;
+    }
+    if (canvas && ctx) {
+      try {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, canvas.width || 1, canvas.height || 1);
+      } catch {}
+    }
+    preferredSessionId = null;
+    remoteTabs = [];
+    activeTargetId = null;
+    renderTabs();
+    setUiStatus(
+      payload.reason === 'idle'
+        ? '执行资源已空闲回收 — 请重新 prepare 后再附着'
+        : '执行资源已释放 — 请重新 prepare 后再附着',
+      'warn',
+    );
   } else if (cdpReady) {
     setUiStatus('CDP 就绪 · 未附着', 'neutral');
     remoteTabs = [];
@@ -557,8 +580,17 @@ export async function ensureRemoteStream(opts = {}) {
     refreshRemoteTabs();
     return { ok: true, attached: !!attached, remoteSessionId, reused: already && !force };
   } catch (e) {
-    setUiStatus(`附着/推流失败: ${e.message}`, 'bad');
-    remoteLog(`附着/推流失败: ${e.message}`, 'err');
+    const raw = e?.message || String(e);
+    const gone = /No executor-backed browser session|not found|未找到/i.test(raw);
+    if (gone) {
+      resetRemoteBrowserUi({
+        reason: 'manual',
+        message: '浏览器会话已失效。请重新 prepare 后再附着推流。',
+      });
+    } else {
+      setUiStatus(`附着/推流失败: ${raw}`, 'bad');
+      remoteLog(`附着/推流失败: ${raw}`, 'err');
+    }
     throw e;
   } finally {
     attaching = false;
@@ -617,6 +649,42 @@ function stopStream() {
   streaming = false;
   send('remote:stop', {});
   send('remote:unsubscribe', {});
+}
+
+/** Clear canvas + local attach state after full resource release (idle / detach). */
+export function resetRemoteBrowserUi(opts = {}) {
+  stopStream();
+  preferredSessionId = null;
+  remoteSessionId = null;
+  remoteSessionUuid = null;
+  attached = false;
+  inputEnabled = false;
+  cdpReady = false;
+  browserConnected = false;
+  remoteTabs = [];
+  activeTargetId = null;
+  renderTabs();
+  if (lastBitmap) {
+    try { lastBitmap.close(); } catch {}
+    lastBitmap = null;
+  }
+  if (canvas && ctx) {
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, canvas.width || 1, canvas.height || 1);
+    } catch {}
+  }
+  const reason = opts.reason || '';
+  const msg = opts.message || (
+    reason === 'idle'
+      ? '执行资源已空闲回收（约 10 分钟无步骤）— 请重新 prepare 后再附着'
+      : '执行资源已释放 — 请重新 prepare 后再附着'
+  );
+  setUiStatus(msg, 'warn');
+  remoteLog(msg, 'err');
+  updateInputHint();
+  syncButtons();
 }
 
 function bindCanvasInput() {
@@ -786,8 +854,18 @@ export function initRemoteBrowser() {
     }
   });
 
+  on('recording:detached', (payload) => {
+    resetRemoteBrowserUi({ reason: payload?.reason || 'manual' });
+  });
+
   $('sessRemoteAttachBtn')?.addEventListener('click', async () => {
     try {
+      if (!attached && !preferredSessionId) {
+        const msg = '当前无可用浏览器会话。请先点「一键准备 / prepare」再附着推流。';
+        setUiStatus(msg, 'warn');
+        remoteLog(msg, 'err');
+        return;
+      }
       // Manual click always re-attaches BiB so stalled CDP after AI steps can recover.
       await ensureRemoteStream({
         sessionId: preferredSessionId || undefined,
