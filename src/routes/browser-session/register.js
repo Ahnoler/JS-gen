@@ -267,7 +267,7 @@ export default function registerBrowserSessionRoutes(app) {
         gb.busy = false;
         gb.stepIndex = 0;
         state.sessions.clear();
-        console.log('[browser-global] Browser closed gracefully, trace saved');
+        console.log('[browser-global] Browser closed gracefully');
         broadcastSessions();
         broadcastWatcherStatus();
         res.json({ status: 'closed' });

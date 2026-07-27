@@ -24,8 +24,6 @@ from .controller import build_controller
 from .recorder import build_recording_hooks
 from .actions.form_rules import load_rules
 
-_TRACE_DIR = str(Path(__file__).parent / "trace")
-
 _last_agent = None
 
 
@@ -1121,7 +1119,7 @@ async def run_session(args):
         window_height=win_h,
         no_viewport=True,
         wait_for_network_idle_page_load_time=3.0,
-        trace_path=_TRACE_DIR,
+        # trace_path disabled: Playwright traces under scripts/trace/ are no longer needed.
     )
     browser_context = await browser.new_context(config)
 
