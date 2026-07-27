@@ -44,6 +44,12 @@ function isSandboxPlaywrightPath(value) {
   return norm.includes('cursor-sandbox-cache') || norm.includes('/temp/cursor-');
 }
 
+/**
+ * Explicit override only. When unset, leave Playwright's default cache
+ * (e.g. %LOCALAPPDATA%\\ms-playwright) so each executor host can just run
+ * `npx playwright install chromium` / `playwright install chromium` with no path config.
+ * Optional: set PLAYWRIGHT_BROWSERS_PATH to pin a custom dir (incl. project `browser/`).
+ */
 function resolvePlaywrightBrowsersPath() {
   const fromFile = _dotEnv.PLAYWRIGHT_BROWSERS_PATH || '';
   if (fromFile && !isSandboxPlaywrightPath(fromFile)) return fromFile;
@@ -51,12 +57,16 @@ function resolvePlaywrightBrowsersPath() {
   const fromEnv = process.env.PLAYWRIGHT_BROWSERS_PATH || '';
   if (fromEnv && !isSandboxPlaywrightPath(fromEnv)) return fromEnv;
 
-  return BROWSER_DIR;
+  return '';
 }
 
 export const PLAYWRIGHT_BROWSERS_PATH = resolvePlaywrightBrowsersPath();
-// Override inherited sandbox path for this Node process and Python children.
-process.env.PLAYWRIGHT_BROWSERS_PATH = PLAYWRIGHT_BROWSERS_PATH;
+// Pin only when configured; otherwise clear sandbox / stale overrides so Playwright uses its default cache.
+if (PLAYWRIGHT_BROWSERS_PATH) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = PLAYWRIGHT_BROWSERS_PATH;
+} else {
+  delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+}
 
 function resolve(key, defaultValue = '') {
   return process.env[key] || _dotEnv[key] || defaultValue;
@@ -148,10 +158,11 @@ export const CONTROL_PLANE_HTTP = resolve('CONTROL_PLANE_URL', 'http://127.0.0.1
 /** Env for Python browser-use subprocess — never inherit sandbox Playwright cache. */
 export function buildPythonSubprocessEnv(extraEnv = {}) {
   const env = { ...process.env };
-  if (isSandboxPlaywrightPath(env.PLAYWRIGHT_BROWSERS_PATH)) {
+  if (isSandboxPlaywrightPath(env.PLAYWRIGHT_BROWSERS_PATH) || !PLAYWRIGHT_BROWSERS_PATH) {
     delete env.PLAYWRIGHT_BROWSERS_PATH;
+  } else {
+    env.PLAYWRIGHT_BROWSERS_PATH = PLAYWRIGHT_BROWSERS_PATH;
   }
-  env.PLAYWRIGHT_BROWSERS_PATH = PLAYWRIGHT_BROWSERS_PATH;
   env.PYTHONIOENCODING = 'utf-8';
   env.PYTHONUNBUFFERED = '1';
   env.PYTHONPATH = PROJECT_ROOT;
