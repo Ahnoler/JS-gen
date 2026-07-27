@@ -30,7 +30,7 @@ export async function up(knex) {
   }
 
   // parent_id=0 marks type=系统 roots; do not add self-FK (0 is not a real row id)
-  // See migrations/20260720_system_parent_id_zero.js
+  // See migrations/20260720175852_system_parent_id_zero.js
 
   if (!hasProcess && !hasFunction) {
     console.log('[migrate] hierarchy already unified');

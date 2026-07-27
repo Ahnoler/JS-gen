@@ -18,16 +18,20 @@ export async function up(knex) {
   const existing = await knex('system').where({ id: ROOT_ID }).first();
   if (!existing) {
     await knex.raw("SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_AUTO_VALUE_ON_ZERO')");
-    await knex('system').insert({
+    // url is added by 20260720161449_system_url (runs before this migration).
+    const row = {
       id: ROOT_ID,
       system_id: ROOT_UUID,
       type: TYPE_ROOT,
       parent_id: ROOT_ID,
       name: '根',
       description: '系统树根节点（不可删除）',
-      url: '',
       sort_order: 0,
-    });
+    };
+    if (await knex.schema.hasColumn('system', 'url')) {
+      row.url = '';
+    }
+    await knex('system').insert(row);
     console.log('[migrate] inserted system id=0 root');
   } else {
     console.log('[migrate] system id=0 root already present');
