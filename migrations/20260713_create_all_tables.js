@@ -162,7 +162,9 @@ export function up(knex) {
     .createTable('screenshot', (t) => {
       t.bigIncrements('id').unsigned().primary();
       t.string('file_name', 255).notNullable();
-      t.mediumblob('image_data').notNullable();
+      // Knex registers mediumblob() but MySQL dialect may emit type "undefined";
+      // specificType keeps MEDIUMBLOB stable (matches schemas/init.sql).
+      t.specificType('image_data', 'MEDIUMBLOB').notNullable();
       t.integer('file_size').unsigned().defaultTo(0);
       t.string('mime_type', 64).defaultTo('image/png');
       t.bigInteger('trajectory_id').unsigned().nullable().references('id').inTable('trajectory').onDelete('SET NULL');
