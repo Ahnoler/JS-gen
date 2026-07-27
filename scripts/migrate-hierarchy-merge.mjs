@@ -3,7 +3,7 @@
  * Usage: node scripts/migrate-hierarchy-merge.mjs
  */
 import { getDB, closeDB } from '../config/database.js';
-import { up } from '../migrations/20260716_merge_hierarchy_to_system.js';
+import { up } from '../migrations/20260716114536_merge_hierarchy_to_system.js';
 
 const db = getDB();
 try {
