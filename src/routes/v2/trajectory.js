@@ -96,6 +96,8 @@ export default function (app) {
         phases,
         systemAccountId,
         accountId,
+        caseEntries,
+        caseData,
       } = req.body || {};
 
       const functionNum = functionId != null ? +functionId : undefined;
@@ -108,6 +110,8 @@ export default function (app) {
           phases,
           model: model || '',
           systemAccountId: boundAccount,
+          caseEntries,
+          caseData,
         });
         res.status(201).json(traj);
         return;
@@ -137,18 +141,45 @@ export default function (app) {
           tid,
           body.systemAccountId ?? body.accountId,
         );
+        // Allow binding account + case entries in one call
+        if (body.caseEntries !== undefined || body.caseData !== undefined) {
+          await trajectoryService.setTrajectoryCaseEntries(
+            tid,
+            body.caseEntries ?? body.caseData,
+          );
+          const traj = await trajectoryService.getTrajectoryWithPhases(tid);
+          return res.json({ ...result, trajectory: traj });
+        }
         return res.json(result);
       }
       const allowed = {};
       if (body.name != null) allowed.name = String(body.name);
       if (body.task != null) allowed.task = String(body.task);
       if (body.model != null) allowed.model = String(body.model);
-      if (!Object.keys(allowed).length) {
+      if (Object.keys(allowed).length) {
+        await trajectoryDao.updateMeta(tid, allowed);
+      }
+      if (body.caseEntries !== undefined || body.caseData !== undefined) {
+        await trajectoryService.setTrajectoryCaseEntries(
+          tid,
+          body.caseEntries ?? body.caseData,
+        );
+      } else if (!Object.keys(allowed).length) {
         return res.status(400).json({ error: 'No updatable fields' });
       }
-      await trajectoryDao.updateMeta(tid, allowed);
       const traj = await trajectoryService.getTrajectoryWithPhases(tid);
       if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
+      res.json(traj);
+    } catch (err) {
+      sendErr(res, err);
+    }
+  });
+
+  /** Replace case KV entries for a trajectory. */
+  app.put('/api/v2/trajectories/:id/case-data', async (req, res) => {
+    try {
+      const entries = req.body?.caseEntries ?? req.body?.caseData ?? req.body?.entries ?? [];
+      const traj = await trajectoryService.setTrajectoryCaseEntries(+req.params.id, entries);
       res.json(traj);
     } catch (err) {
       sendErr(res, err);
@@ -219,11 +250,17 @@ export default function (app) {
     }
   });
 
-  /** Sync phases by id: body { phases: string[] | { id?, description }[] } */
+  /** Sync phases by id: body { phases: string[] | { id?, description }[], caseEntries? } */
   app.put('/api/v2/trajectories/:id/phases', async (req, res) => {
     try {
       const phases = req.body?.phases ?? req.body?.descriptions ?? null;
-      const traj = await trajectoryService.syncTrajectoryPhaseDescriptions(+req.params.id, phases);
+      let traj = await trajectoryService.syncTrajectoryPhaseDescriptions(+req.params.id, phases);
+      if (req.body?.caseEntries !== undefined || req.body?.caseData !== undefined) {
+        traj = await trajectoryService.setTrajectoryCaseEntries(
+          +req.params.id,
+          req.body.caseEntries ?? req.body.caseData,
+        );
+      }
       res.json(traj);
     } catch (err) {
       sendErr(res, err);

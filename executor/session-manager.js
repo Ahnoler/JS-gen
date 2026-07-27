@@ -126,18 +126,35 @@ export class SessionManager {
     return { sessionId, slotIndex: slot.slotIndex };
   }
 
-  async close(sessionId) {
+  /**
+   * @param {string} sessionId
+   * @param {{ keepBrowser?: boolean }} [opts]
+   * keepBrowser=false (default): kill Chrome — 「释放执行资源」
+   * keepBrowser=true: leave Chrome on CDP — rare soft close
+   */
+  async close(sessionId, { keepBrowser = false } = {}) {
     const slot = this.sessions.get(sessionId);
     if (!slot) return { sessionId, closed: false };
     await this.detachBib(sessionId, { crashed: false }).catch(() => {});
-    await slot.close();
+    const closed = await slot.close({ keepBrowser: !!keepBrowser });
     this.sessions.delete(sessionId);
     this.emitToControlPlane({
       event: 'session.closed',
       session_id: sessionId,
-      data: { sessionId, slotIndex: slot.slotIndex },
+      data: {
+        sessionId,
+        slotIndex: slot.slotIndex,
+        keepBrowser: !!keepBrowser,
+        cdpPort: closed?.cdpPort ?? slot.cdpPort ?? null,
+      },
     });
-    return { sessionId, slotIndex: slot.slotIndex, closed: true };
+    return {
+      sessionId,
+      slotIndex: slot.slotIndex,
+      closed: true,
+      keepBrowser: !!keepBrowser,
+      cdpPort: closed?.cdpPort ?? null,
+    };
   }
 
   list() {

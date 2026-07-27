@@ -17,7 +17,7 @@ export function buildRerunResumeInstruction({ actionData, failedStep, log_file, 
 
     // Build URL section
     const replayNote = replayedCount > 0
-      ? `当前页面已通过 _replay（scripts/actions/_replay.py）自动回放了前 ${replayedCount} 步操作，处于第 ${failedStep} 步的待操作状态。无需重复导航和登录，直接扫描当前表单，建立任务清单，从第 ${failedStep} 步开始继续填写。\n\n`
+      ? `当前页面已通过 _replay（scripts/actions/_replay.py）自动回放了前 ${replayedCount} 步操作，处于第 ${failedStep} 步的待操作状态。无需重复导航和登录，直接从第 ${failedStep} 步继续；若需填表，对主页面/抽屉字段调用 fill/select 以触发隐式 auto-fill。\n\n`
       : '';
     const urlSection = replayedCount > 0
       ? replayNote
@@ -121,9 +121,9 @@ export function buildRerunResumeInstruction({ actionData, failedStep, log_file, 
       const lines = [];
       if (urlSection) lines.push(urlSection.trim());
       if (replayedCount === 0) {
-        lines.push('当前为脚本执行失败后的自愈修复阶段。失败步之前的页面状态应由 _replay 自动回放重建；若未能回放，请根据目标 URL 与下方步骤抵达出错页面。抵达后扫描当前表单，建立任务清单，重新填写所有表单项。');
+        lines.push('当前为脚本执行失败后的自愈修复阶段。失败步之前的页面状态应由 _replay 自动回放重建；若未能回放，请根据目标 URL 与下方步骤抵达出错页面。抵达后对主页面/抽屉字段调用 fill/select 触发隐式 auto-fill，或逐字段填写；勿仅靠 scan_form_fields（它不再自动填表）。');
       } else {
-        lines.push('当前为脚本执行失败后的自愈修复阶段。请扫描当前表单，建立任务清单，重新填写所有表单项。');
+        lines.push('当前为脚本执行失败后的自愈修复阶段。请对主页面/抽屉字段调用 fill/select 触发隐式 auto-fill，或逐字段填写；勿仅靠 scan_form_fields（它不再自动填表）。');
       }
       if (formChangesSection) lines.push('\n' + formChangesSection.trim());
       lines.push('\n## 剩余操作步骤（从第 ' + failedStep + ' 步开始）');

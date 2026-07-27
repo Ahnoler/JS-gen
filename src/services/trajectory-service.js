@@ -50,6 +50,7 @@ export {
 export {
   createEmptyTrajectory,
   createTransactionWithPhases,
+  setTrajectoryCaseEntries,
   analyzeRequirementToPhases,
   confirmTrajectory,
 } from './trajectory-meta-service.js';

@@ -207,7 +207,9 @@ export async function attachLive(opts = {}) {
   };
 }
 
-/** Stop screencast, close CDP client, mark remote_session closed. */
+/** Stop screencast / BiB only — browser + executor slot stay alive (idle).
+ * Frontend「断开画面」→ this. Frontend「释放执行资源」→ trajectory detach (kills browser).
+ */
 export async function detachLive(opts = {}) {
   if (!USE_EXECUTOR) {
     const bridge = await import('../cdp/remote-bridge.js');
@@ -237,7 +239,20 @@ export async function detachLive(opts = {}) {
       viewportW: 1920,
       viewportH: 1080,
     };
-    return { closedId, status: await getLiveStatus() };
+    // Clear stream binding on trajectory runtime — browser/session remain for prepare reuse.
+    try {
+      const { getAllTrajectoryRuntimes } = await import('./trajectory-runtime.js');
+      const { updateMeta } = await import('../dao/trajectory-dao.js');
+      for (const [tid, runtime] of getAllTrajectoryRuntimes().entries()) {
+        if (runtime?.sessionId !== sessionId) continue;
+        runtime.remoteSessionId = null;
+        runtime.bibError = null;
+        await updateMeta(tid, { remoteSessionId: null }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[remote] clear traj remoteSessionId after stream detach:', err.message);
+    }
+    return { closedId, status: await getLiveStatus(), streamDetached: true, sessionKept: true };
   }
 }
 
@@ -253,6 +268,7 @@ export async function getLiveStatus() {
     attached: !!executorLive.attached,
     remoteSessionId: executorLive.remoteSession?.id ?? null,
     remoteSessionUuid: executorLive.remoteSession?.sessionUuid ?? null,
+    sessionId: executorLive.sessionId || null,
     cdpReady: true,
     inputEnabled: !!executorLive.attached && !agentBusy,
     agentBusy,

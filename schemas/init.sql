@@ -177,14 +177,17 @@ CREATE TABLE `case_data` (
 -- 案例数据 KV 明细 (CaseDataEntry)
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `case_data_entry` (
-  `id`           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `case_data_id` BIGINT UNSIGNED NOT NULL COMMENT '外键 → case_data.id',
-  `field_key`    VARCHAR(255) NOT NULL COMMENT '字段键名，如 "姓名"',
-  `field_value`  TEXT COMMENT '字段值',
-  `created_at`   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `id`             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `case_data_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → case_data.id（可空；新产品用 trajectory_id）',
+  `trajectory_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id；产品路径按交易绑定案例 KV',
+  `field_key`      VARCHAR(255) NOT NULL COMMENT '字段键名，如 "姓名"',
+  `field_value`    TEXT COMMENT '字段值',
+  `created_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_case_data_id` (`case_data_id`),
+  KEY `idx_entry_trajectory` (`trajectory_id`),
   KEY `idx_field_key` (`field_key`),
-  CONSTRAINT `fk_entry_case_data` FOREIGN KEY (`case_data_id`) REFERENCES `case_data` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_entry_case_data` FOREIGN KEY (`case_data_id`) REFERENCES `case_data` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_entry_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='案例数据键值';
 
 -- ─────────────────────────────────────────────────────────────

@@ -14,11 +14,13 @@ import {
 
 /**
  * Pick a connected executor with a free slot (lease count < capacity).
- * @param {{ nodeUuid?: string }} [opts]
- * @returns {Promise<string>} nodeUuid
+ * When preferIdleChrome=true, prefer nodes that already have reusable CDP Chromes.
+ * @param {{ nodeUuid?: string, preferIdleChrome?: boolean }} [opts]
+ * @returns {Promise<{ nodeUuid: string, cdpUrl?: string|null, cdpPort?: number|null, reusedChrome?: boolean }>}
  */
 export async function pickExecutorNode(opts = {}) {
   const preferred = opts.nodeUuid || null;
+  const preferIdleChrome = opts.preferIdleChrome !== false;
   const dbNodes = await executorNodeDao.list().catch(() => []);
   const byUuid = new Map(dbNodes.map((n) => [n.nodeUuid, n]));
 
@@ -45,7 +47,23 @@ export async function pickExecutorNode(opts = {}) {
     if (lease.countInUse(preferred) >= capacityOf(preferred)) {
       throw lease.noFreeSlotsError();
     }
-    return preferred;
+    if (preferIdleChrome) {
+      try {
+        const { browsers } = await listExecutorCdp(preferred, 8000);
+        const pick = browsers?.[0];
+        if (pick?.cdpWsUrl) {
+          return {
+            nodeUuid: preferred,
+            cdpUrl: pick.cdpWsUrl,
+            cdpPort: pick.port != null ? Number(pick.port) : null,
+            reusedChrome: true,
+          };
+        }
+      } catch (err) {
+        console.warn('[executor] list_cdp on preferred failed:', err.message);
+      }
+    }
+    return { nodeUuid: preferred, cdpUrl: null, cdpPort: null, reusedChrome: false };
   }
 
   const live = registry.list().filter((n) => n.connected);
@@ -62,7 +80,51 @@ export async function pickExecutorNode(opts = {}) {
     .sort((a, b) => a.inUse - b.inUse || a.nodeUuid.localeCompare(b.nodeUuid));
 
   if (!candidates.length) throw lease.noFreeSlotsError();
-  return candidates[0].nodeUuid;
+
+  // Prefer an idle CDP Chrome on any free-capacity node; else least-loaded node.
+  if (preferIdleChrome) {
+    const probed = await Promise.all(
+      candidates.map(async (c) => {
+        try {
+          const { browsers } = await listExecutorCdp(c.nodeUuid, 8000);
+          const pick = browsers?.[0] || null;
+          return { ...c, browser: pick };
+        } catch {
+          return { ...c, browser: null };
+        }
+      }),
+    );
+    probed.sort((a, b) => {
+      const aIdle = a.browser?.cdpWsUrl ? 0 : 1;
+      const bIdle = b.browser?.cdpWsUrl ? 0 : 1;
+      return aIdle - bIdle || a.inUse - b.inUse || a.nodeUuid.localeCompare(b.nodeUuid);
+    });
+    const best = probed[0];
+    if (best?.browser?.cdpWsUrl) {
+      console.log(
+        `[executor] prefer idle Chrome port=${best.browser.port} on node=${best.nodeUuid}`,
+      );
+      return {
+        nodeUuid: best.nodeUuid,
+        cdpUrl: best.browser.cdpWsUrl,
+        cdpPort: best.browser.port != null ? Number(best.browser.port) : null,
+        reusedChrome: true,
+      };
+    }
+    return {
+      nodeUuid: best.nodeUuid,
+      cdpUrl: null,
+      cdpPort: null,
+      reusedChrome: false,
+    };
+  }
+
+  return {
+    nodeUuid: candidates[0].nodeUuid,
+    cdpUrl: null,
+    cdpPort: null,
+    reusedChrome: false,
+  };
 }
 
 export function sendToExecutor(nodeUuid, type, payload) {
@@ -95,6 +157,7 @@ const STDIN_TO_WS = {
  *   trajectoryId?: number|null,
  *   cdpUrl?: string|null,
  *   cdpPort?: number|null,
+ *   preferIdleChrome?: boolean,
  * }} opts
  */
 export async function openSession({
@@ -104,18 +167,35 @@ export async function openSession({
   trajectoryId = null,
   cdpUrl = null,
   cdpPort = null,
+  preferIdleChrome = true,
 } = {}) {
   let uuid = null;
+  let reuseCdpUrl = cdpUrl || null;
+  let reuseCdpPort = cdpPort != null && Number.isFinite(Number(cdpPort)) ? Number(cdpPort) : null;
+  let reusedChrome = !!(reuseCdpUrl);
+
   await lease.withLeaseMutex(async () => {
-    uuid = await pickExecutorNode({ nodeUuid });
+    // Skip CDP probe inside mutex when caller already chose cdpUrl / explicit node without prefer.
+    const picked = await pickExecutorNode({
+      nodeUuid,
+      preferIdleChrome: preferIdleChrome && !reuseCdpUrl,
+    });
+    uuid = typeof picked === 'string' ? picked : picked.nodeUuid;
+    if (!reuseCdpUrl && picked?.cdpUrl) {
+      reuseCdpUrl = picked.cdpUrl;
+      reuseCdpPort = picked.cdpPort != null ? Number(picked.cdpPort) : null;
+      reusedChrome = !!picked.reusedChrome;
+    }
     lease.reservePending(uuid);
   });
 
   try {
     const readyP = waitForSessionEvent(sessionId, 'session.ready', 120000);
     const openPayload = { sessionId, model };
-    if (cdpUrl) openPayload.cdpUrl = cdpUrl;
-    if (cdpPort != null && Number.isFinite(Number(cdpPort))) openPayload.cdpPort = Number(cdpPort);
+    if (reuseCdpUrl) openPayload.cdpUrl = reuseCdpUrl;
+    if (reuseCdpPort != null && Number.isFinite(Number(reuseCdpPort))) {
+      openPayload.cdpPort = Number(reuseCdpPort);
+    }
     sendToExecutor(uuid, 'session.open', openPayload);
     const payload = await readyP;
     const slotIndex = Number(payload?.slotIndex ?? 0);
@@ -126,7 +206,14 @@ export async function openSession({
       trajectoryId: trajectoryId == null ? null : Number(trajectoryId),
     });
     lease.releasePending(uuid);
-    return { ...payload, nodeUuid: uuid, slotIndex };
+    return {
+      ...payload,
+      nodeUuid: uuid,
+      slotIndex,
+      reusedChrome: reusedChrome || !!payload?.reusedChrome,
+      cdpUrl: reuseCdpUrl || null,
+      cdpPort: payload?.cdpPort ?? reuseCdpPort,
+    };
   } catch (err) {
     if (uuid) lease.releasePending(uuid);
     if (
@@ -195,9 +282,13 @@ export async function reconcileLeasesWithExecutor(nodeUuid) {
   return { released, liveSessionIds: [...liveIds] };
 }
 
-export async function closeSession({ nodeUuid, sessionId }) {
+export async function closeSession({ nodeUuid, sessionId, keepBrowser = false } = {}) {
   try {
-    sendToExecutor(nodeUuid, 'session.close', { sessionId });
+    sendToExecutor(nodeUuid, 'session.close', {
+      sessionId,
+      // false = kill Chrome（释放资源）；true = leave idle CDP（一般不走这条）
+      keepBrowser: keepBrowser === true,
+    });
     await waitForSessionEvent(sessionId, 'session.closed', 15000).catch(() => {});
   } finally {
     lease.releaseBySession(sessionId);
@@ -214,6 +305,7 @@ export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
       maxSteps: data.max_steps,
       phaseNumber: data.phase_number,
       caseDataFile: data.case_data_file,
+      caseData: data.case_data,
     });
     return;
   }

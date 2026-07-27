@@ -2,13 +2,16 @@
  * AI / manual recording lifecycle: start, stop, toggle, resolve, default login.
  */
 import { randomUUID } from 'crypto';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import path from 'path';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as systemDao from '../dao/system-dao.js';
+import * as caseDataDao from '../dao/case-data-dao.js';
 import * as execSession from '../executor-session-client.js';
 import { state } from '../state.js';
 import { broadcast } from '../ws-server.js';
-import { USE_EXECUTOR } from '../../config/config.js';
+import { USE_EXECUTOR, CASE_DATA_DIR } from '../../config/config.js';
 import * as remoteBridge from '../cdp/remote-bridge.js';
 import {
   buildLoginInstruction,
@@ -20,6 +23,26 @@ import {
   markConsumedActionLog,
   touchTrajectoryRuntimeActivity,
 } from './trajectory-runtime.js';
+
+/** Write traj_{id}.json and return { caseDataFile, caseData } for stdin step.
+ * Empty / missing case data = user has not configured — not an error.
+ */
+async function prepareCaseDataInjection(trajectoryId) {
+  let caseData = null;
+  try {
+    caseData = await caseDataDao.loadFlatDictByTrajectory(trajectoryId);
+  } catch (err) {
+    console.warn('[record] case data load skipped:', err.message);
+    return { caseDataFile: null, caseData: null };
+  }
+  if (!caseData || !Object.keys(caseData).length) {
+    return { caseDataFile: null, caseData: null };
+  }
+  if (!existsSync(CASE_DATA_DIR)) mkdirSync(CASE_DATA_DIR, { recursive: true });
+  const caseDataFile = path.join(CASE_DATA_DIR, `traj_${trajectoryId}.json`);
+  writeFileSync(caseDataFile, JSON.stringify(caseData, null, 2), 'utf8');
+  return { caseDataFile, caseData };
+}
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
@@ -145,6 +168,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     }
   });
 
+  const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
+
   try {
     for (const phase of phases) {
       if (runtime.abortRecording) {
@@ -158,15 +183,22 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', 300000);
       const errP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000)
         .then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
+      const stepData = {
+        instruction: phase.description,
+        max_steps: 40,
+        phase_number: phase.phaseNumber,
+      };
+      // First step carries case data; Python loads once (case_data_loaded flag).
+      // Inline case_data works on remote executors; case_data_file for local path.
+      if (caseData) {
+        stepData.case_data = caseData;
+        if (caseDataFile) stepData.case_data_file = caseDataFile;
+      }
       execSession.forwardStdin({
         nodeUuid: runtime.executorNodeUuid,
         sessionId: runtime.sessionId,
         event: 'step',
-        data: {
-          instruction: phase.description,
-          max_steps: 40,
-          phase_number: phase.phaseNumber,
-        },
+        data: stepData,
       });
       await Promise.race([doneP, errP]);
       if (runtime.abortRecording) {

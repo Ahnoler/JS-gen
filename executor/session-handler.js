@@ -63,9 +63,13 @@ export function createSessionHandler(manager) {
           max_steps: payload.maxSteps ?? payload.max_steps ?? 40,
           phase_number: payload.phaseNumber ?? payload.phase_number,
           case_data_file: payload.caseDataFile ?? payload.case_data_file,
+          case_data: payload.caseData ?? payload.case_data,
         });
       case 'session.close':
-        return manager.close(sessionId);
+        return manager.close(sessionId, {
+          // 释放资源默认关浏览器；显式 keepBrowser:true 才留空闲 CDP
+          keepBrowser: payload?.keepBrowser === true || payload?.keep_browser === true,
+        });
       case 'session.cancel_step':
         return manager.forward(sessionId, 'cancel_step', {});
       case 'session.intervene':

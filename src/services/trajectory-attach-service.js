@@ -160,9 +160,26 @@ export async function prepareTrajectoryRecording(trajectoryId) {
   });
 
   // ── 3: ensure stream (BiB screencast) before login so canvas can show login ──
+  // 「断开画面」只停推流：session/browser 仍在；推流未附着则重新 attachLive。
   emitStage('stream', 'running');
   let bibError = runtime.bibError || attachResult?.bibError || null;
   let remoteSessionId = runtime.remoteSessionId || attachResult?.remoteSessionId || null;
+
+  const liveNow = await remoteSessionService.getLiveStatus().catch(() => null);
+  const liveSid = remoteSessionService.getExecutorLiveSessionId?.() || null;
+
+  // Stale remoteSessionId after「断开画面」: BiB gone but runtime still has old id.
+  if (remoteSessionId && !liveNow?.attached) {
+    remoteSessionId = null;
+    runtime.remoteSessionId = null;
+  }
+  if (liveNow?.attached && liveSid && runtime.sessionId && liveSid !== runtime.sessionId) {
+    // Live stream belongs to another session — re-attach to ours below.
+    remoteSessionId = null;
+  } else if (liveNow?.attached && liveNow?.remoteSessionId && (!liveSid || liveSid === runtime.sessionId)) {
+    remoteSessionId = liveNow.remoteSessionId;
+    runtime.remoteSessionId = remoteSessionId;
+  }
 
   if (!remoteSessionId && !bibError) {
     try {
@@ -251,7 +268,7 @@ export async function prepareTrajectoryRecording(trajectoryId) {
 /**
  * Acquire executor resources for a trajectory:
  *  1) reuse live session for this traj
- *  2) free slot + orphan CDP Chrome → open with cdpUrl
+ *  2) free slot + idle CDP Chrome → open with cdpUrl
  *  3) free slot → launch new Chrome
  *  4) no free slot → 409
  */
@@ -279,55 +296,27 @@ export async function attachTrajectoryLive(trajectoryId) {
     };
   }
 
-  // Drop orphan lease for this traj, then reconcile leases vs executor reality on candidates.
+  // Drop orphan lease for this traj, then reconcile leases vs executor reality.
   slotLease.releaseByTrajectory(tid);
 
-  let nodeUuid;
+  // Soft reconcile on all connected nodes so stale leases don't block idle Chrome reuse
   try {
-    nodeUuid = await execSession.pickExecutorNode({});
-  } catch (err) {
-    if (err?.statusCode === 409) throw err;
-    const e = slotLease.noFreeSlotsError();
-    e.message = err?.message || e.message;
-    throw e;
-  }
-
-  await execSession.reconcileLeasesWithExecutor(nodeUuid).catch(() => {});
-
-  // Re-check capacity after reconcile
-  try {
-    nodeUuid = await execSession.pickExecutorNode({ nodeUuid });
-  } catch (err) {
-    throw err?.statusCode === 409 ? err : slotLease.noFreeSlotsError();
-  }
-
-  let cdpUrl = null;
-  let cdpPort = null;
-  let reusedChrome = false;
-  try {
-    const { browsers } = await execSession.listExecutorCdp(nodeUuid, 12000);
-    const pick = browsers?.[0];
-    if (pick?.cdpWsUrl) {
-      cdpUrl = pick.cdpWsUrl;
-      cdpPort = pick.port != null ? Number(pick.port) : null;
-      reusedChrome = true;
-      console.log(`[trajectory] reusing CDP Chrome port=${cdpPort} for traj #${tid}`);
-    }
-  } catch (err) {
-    console.warn('[trajectory] list_cdp failed, will launch new Chrome:', err.message);
-  }
+    const live = (await import('../executor-registry.js')).list().filter((n) => n.connected);
+    await Promise.all(
+      live.map((n) => execSession.reconcileLeasesWithExecutor(n.nodeUuid).catch(() => {})),
+    );
+  } catch {}
 
   const sessionId = randomUUID();
   const model = traj.model || 'deepseek-v4-flash';
   let opened;
   try {
+    // pickExecutorNode (via openSession) prefers nodes with idle CDP Chrome first.
     opened = await execSession.openSession({
       sessionId,
       model,
       trajectoryId: tid,
-      nodeUuid,
-      cdpUrl,
-      cdpPort,
+      preferIdleChrome: true,
     });
   } catch (err) {
     if (
@@ -340,6 +329,17 @@ export async function attachTrajectoryLive(trajectoryId) {
       throw e;
     }
     throw err;
+  }
+
+  const reusedChrome = !!opened.reusedChrome;
+  if (reusedChrome) {
+    console.log(
+      `[trajectory] reusing idle CDP Chrome`
+      + (opened.cdpPort != null ? ` port=${opened.cdpPort}` : '')
+      + ` for traj #${tid}`,
+    );
+  } else {
+    console.log(`[trajectory] launching new Chrome for traj #${tid}`);
   }
 
   const runtime = registerTrajectorySession(tid, sessionId, { ...opened, model }, {});
@@ -379,9 +379,11 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
       session._trajPersistUnsub = null;
     }
     try {
+      // 「释放执行资源」：关浏览器 + 释槽（与「断开画面」只停推流相对）
       await execSession.closeSession({
         nodeUuid: runtime.executorNodeUuid,
         sessionId,
+        keepBrowser: false,
       });
     } catch {
       slotLease.releaseBySession(sessionId);

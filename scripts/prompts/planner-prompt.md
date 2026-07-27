@@ -66,7 +66,7 @@ These terms may appear in the Agent's trajectory. Use them to understand what th
 
 | Term | Meaning |
 |------|---------|
-| `scan_form_fields` | Scans all form fields, auto-fills what it can, returns filled/pending/NEEDS_INTERVENTION |
+| `scan_form_fields` | Scans all form fields and builds task list only — does NOT auto-fill; returns filled/pending/NEEDS_INTERVENTION |
 | `get_pending_tasks` | Returns `{pending: [...], NEEDS_INTERVENTION: [...]}` — remaining form fields only (completed omitted) |
 | `sync_tasks_from_errors` | Reads page validation errors, adds them to the pending list, returns fillable and NEEDS_INTERVENTION categories |
 | `NEEDS_INTERVENTION` | A disabled field with an adjacent "Import"/"Select" button — cannot be filled directly, requires customer selection via dialog |

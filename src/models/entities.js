@@ -188,7 +188,8 @@
 /**
  * @typedef {Object} CaseDataEntry
  * @property {number} [id]
- * @property {number} caseDataId
+ * @property {number|null} [caseDataId]
+ * @property {number|null} [trajectoryId]
  * @property {string} fieldKey
  * @property {string|null} [fieldValue]
  * @property {string} createdAt

@@ -1,4 +1,4 @@
-{{URL_SECTION}}当前为脚本执行失败后的自愈修复阶段。失败步之前的页面状态应由 `_replay`（`scripts/actions/_replay.py`）自动回放重建；若上方未说明「已回放」，请根据目标 URL 与下方步骤抵达出错页面。抵达后扫描当前表单，建立任务清单，重新填写所有表单项。
+{{URL_SECTION}}当前为脚本执行失败后的自愈修复阶段。失败步之前的页面状态应由 `_replay`（`scripts/actions/_replay.py`）自动回放重建；若上方未说明「已回放」，请根据目标 URL 与下方步骤抵达出错页面。抵达后对主页面/抽屉字段调用 fill/select 触发隐式 auto-fill，或逐字段填写；`scan_form_fields` 仅建任务列表、不再自动填表。
 
 {{FORM_CHANGES_SECTION}}
 ## 剩余操作步骤（从第 {{FAILED_STEP}} 步开始）

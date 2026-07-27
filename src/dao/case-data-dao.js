@@ -2,6 +2,59 @@ import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
 const TABLE = 'case_data';
+const ENTRY_TABLE = 'case_data_entry';
+
+const RESERVED_KEYS = new Set(['form_snapshots', 'form_snapshot', 'task_list', '_watcher_mode']);
+
+/** Cached: case_data_entry.trajectory_id present (null = unchecked). */
+let _hasTrajectoryIdCol = null;
+
+async function hasEntryTrajectoryId(db = getDB()) {
+  if (_hasTrajectoryIdCol != null) return _hasTrajectoryIdCol;
+  try {
+    _hasTrajectoryIdCol = await db.schema.hasColumn(ENTRY_TABLE, 'trajectory_id');
+  } catch {
+    _hasTrajectoryIdCol = false;
+  }
+  return _hasTrajectoryIdCol;
+}
+
+function isUnknownTrajectoryIdColumn(err) {
+  const msg = String(err?.message || err || '');
+  return /Unknown column ['`]?trajectory_id['`]?/i.test(msg)
+    || err?.code === 'ER_BAD_FIELD_ERROR';
+}
+
+/**
+ * Normalize API / UI case entry payloads to { fieldKey, fieldValue }.
+ * Accepts `{ fieldKey, fieldValue }` or `{ key, value }`.
+ */
+export function normalizeCaseEntries(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const e of raw) {
+    if (!e || typeof e !== 'object') continue;
+    const fieldKey = String(e.fieldKey ?? e.key ?? '').trim();
+    if (!fieldKey || RESERVED_KEYS.has(fieldKey) || seen.has(fieldKey)) continue;
+    seen.add(fieldKey);
+    const v = e.fieldValue ?? e.value;
+    out.push({
+      fieldKey,
+      fieldValue: v == null ? null : String(v),
+    });
+  }
+  return out;
+}
+
+/** Flat label→value dict for Python case_data_store. */
+export function entriesToFlatDict(entries) {
+  const dict = {};
+  for (const e of normalizeCaseEntries(entries)) {
+    dict[e.fieldKey] = e.fieldValue ?? '';
+  }
+  return dict;
+}
 
 export async function save(record) {
   const db = getDB();
@@ -15,12 +68,17 @@ export async function save(record) {
       rawJson: record.rawJson ?? null,
     }));
     if (record.entries?.length) {
-      const entryRows = record.entries.map(e => ({
-        case_data_id: id,
-        field_key: e.fieldKey || e.key,
-        field_value: e.fieldValue ?? e.value ?? null,
-      }));
-      await trx('case_data_entry').insert(entryRows);
+      const bindTraj = await hasEntryTrajectoryId(trx);
+      const entryRows = normalizeCaseEntries(record.entries).map((e) => {
+        const row = {
+          case_data_id: id,
+          field_key: e.fieldKey,
+          field_value: e.fieldValue,
+        };
+        if (bindTraj) row.trajectory_id = null;
+        return row;
+      });
+      if (entryRows.length) await trx(ENTRY_TABLE).insert(entryRows);
     }
     return id;
   });
@@ -31,7 +89,7 @@ export async function getByRecordId(recordId) {
   const row = await db(TABLE).where({ record_id: recordId }).first();
   if (!row) return null;
   const entity = fromDbRow(row);
-  entity.entries = fromDbRows(await db('case_data_entry')
+  entity.entries = fromDbRows(await db(ENTRY_TABLE)
     .where({ case_data_id: row.id })
     .orderBy('id'));
   return entity;
@@ -47,4 +105,68 @@ export async function list({ page = 1, pageSize = 20 } = {}) {
 
 export async function remove(id) {
   return getDB()(TABLE).where({ id }).del();
+}
+
+/**
+ * Case KV bound to a trajectory. Empty = user has not configured case data
+ * (also when schema lacks trajectory_id — treat as unconfigured, not fatal).
+ */
+export async function listEntriesByTrajectory(trajectoryId) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) return [];
+  if (!(await hasEntryTrajectoryId())) return [];
+  try {
+    const rows = await getDB()(ENTRY_TABLE)
+      .where({ trajectory_id: tid })
+      .orderBy('id');
+    return fromDbRows(rows);
+  } catch (err) {
+    if (isUnknownTrajectoryIdColumn(err)) {
+      _hasTrajectoryIdCol = false;
+      return [];
+    }
+    throw err;
+  }
+}
+
+/**
+ * Replace all case entries bound to a trajectory (delete + insert).
+ * @param {number} trajectoryId
+ * @param {Array} entries raw caseEntries
+ * @param {import('knex').Knex.Transaction} [trx]
+ */
+export async function replaceEntriesForTrajectory(trajectoryId, entries, trx = null) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    throw new Error('Invalid trajectory id');
+  }
+  if (!(await hasEntryTrajectoryId(trx || getDB()))) {
+    const err = new Error(
+      'case_data_entry.trajectory_id missing — run: npx knex migrate:latest --knexfile config/knexfile.js',
+    );
+    err.statusCode = 503;
+    throw err;
+  }
+  const db = trx || getDB();
+  const normalized = normalizeCaseEntries(entries);
+  const run = async (client) => {
+    await client(ENTRY_TABLE).where({ trajectory_id: tid }).del();
+    if (!normalized.length) return [];
+    const rows = normalized.map((e) => ({
+      case_data_id: null,
+      trajectory_id: tid,
+      field_key: e.fieldKey,
+      field_value: e.fieldValue,
+    }));
+    await client(ENTRY_TABLE).insert(rows);
+    return fromDbRows(await client(ENTRY_TABLE).where({ trajectory_id: tid }).orderBy('id'));
+  };
+  if (trx) return run(db);
+  return getDB().transaction((t) => run(t));
+}
+
+/** Load trajectory case entries as flat dict for agent injection. */
+export async function loadFlatDictByTrajectory(trajectoryId) {
+  const entries = await listEntriesByTrajectory(trajectoryId);
+  return entriesToFlatDict(entries);
 }

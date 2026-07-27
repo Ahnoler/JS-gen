@@ -53,7 +53,7 @@ async def scan_pending(browser):
         print('ERROR: actions not found')
         return
 
-    print('=== scan_form_fields (auto-fill + LLM) ===')
+    print('=== scan_form_fields (scan only, no auto-fill) ===')
     result = await sf.function()
     print(str(result)[:500])
 

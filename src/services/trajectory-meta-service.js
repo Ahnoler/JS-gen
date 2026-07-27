@@ -5,8 +5,9 @@ import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as functionDefDao from '../dao/function-def-dao.js';
+import * as caseDataDao from '../dao/case-data-dao.js';
 import { callLLM } from '../llm-utils.js';
-import { getTrajectoryTree } from './trajectory-query-service.js';
+import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
 
 /**
  * Create empty trajectory shell under a function (for long-lived recording).
@@ -45,6 +46,8 @@ export async function createTransactionWithPhases({
   phases = [],
   model = '',
   systemAccountId = null,
+  caseEntries = undefined,
+  caseData = undefined,
 } = {}) {
   const resolvedFunctionId = typeof functionId === 'number'
     ? functionId
@@ -84,7 +87,34 @@ export async function createTransactionWithPhases({
     });
   }
 
-  return trajectoryDao.getById(trajId);
+  const rawEntries = caseEntries ?? caseData;
+  if (rawEntries !== undefined) {
+    await caseDataDao.replaceEntriesForTrajectory(trajId, rawEntries);
+  }
+
+  return getTrajectoryWithPhases(trajId);
+}
+
+/**
+ * Replace case KV entries bound to a trajectory.
+ * @param {number} trajectoryId
+ * @param {Array} entries
+ */
+export async function setTrajectoryCaseEntries(trajectoryId, entries) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    const err = new Error('Invalid trajectory id');
+    err.statusCode = 400;
+    throw err;
+  }
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  await caseDataDao.replaceEntriesForTrajectory(tid, entries);
+  return getTrajectoryWithPhases(tid);
 }
 
 /**

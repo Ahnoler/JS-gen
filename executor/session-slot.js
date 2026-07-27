@@ -1,7 +1,7 @@
 /**
  * One executor slot = one Python session subprocess + stdin/stdout bridge.
  */
-import { spawnAgent, waitForReady, isProcessAlive, killTree, killListenerOnPort } from './spawn-agent.js';
+import { spawnAgent, waitForReady, isProcessAlive, killTree, killProcessOnly, killListenerOnPort } from './spawn-agent.js';
 import { LLM_API_KEY, LLM_BASE_URL, CONTROL_PLANE_HTTP, EXECUTOR_CDP_PORT_BASE } from './config.js';
 import net from 'net';
 
@@ -173,25 +173,37 @@ export class SessionSlot {
     this.process.stdin.write(JSON.stringify({ event, data }) + '\n');
   }
 
-  async close() {
+  /**
+   * @param {{ keepBrowser?: boolean }} [opts]
+   * keepBrowser=false (default): kill Chrome for「释放执行资源」.
+   * keepBrowser=true: leave Chrome on CDP (soft close).
+   */
+  async close({ keepBrowser = false } = {}) {
     const sessionId = this.sessionId;
     const cdpPort = this.cdpPort;
+    const pid = this.process?.pid;
     if (this.process?.stdin && this.ready) {
       try {
-        this.process.stdin.write(JSON.stringify({ event: 'close' }) + '\n');
+        this.process.stdin.write(JSON.stringify({
+          event: 'close',
+          data: { keep_browser: !!keepBrowser },
+        }) + '\n');
       } catch {}
     }
-    // Allow Python to run browser.close() before force-kill.
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, keepBrowser ? 2500 : 2000));
     if (this.process && isProcessAlive(this.process)) {
-      killTree(this.process.pid);
+      if (keepBrowser) {
+        // Soft close: do not kill process tree — Chromium is often a child of the agent.
+        killProcessOnly(this.process.pid || pid);
+      } else {
+        killTree(this.process.pid || pid);
+      }
     }
-    // Chromium launched with user-data-dir often survives parent kill — clear CDP holder.
-    if (cdpPort != null) killListenerOnPort(cdpPort);
+    if (!keepBrowser && cdpPort != null) killListenerOnPort(cdpPort);
     this.process = null;
     this.ready = false;
     this.busy = false;
     this.sessionId = null;
-    return { sessionId, slotIndex: this.slotIndex };
+    return { sessionId, slotIndex: this.slotIndex, keepBrowser: !!keepBrowser, cdpPort };
   }
 }

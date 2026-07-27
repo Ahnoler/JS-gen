@@ -25,6 +25,17 @@ export function killTree(pid) {
   } catch {}
 }
 
+/** Kill only the agent PID — leave child Chromium running for CDP reuse. */
+export function killProcessOnly(pid) {
+  try {
+    if (process.platform === 'win32') {
+      execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore', timeout: 5000 });
+    } else {
+      process.kill(pid, 'SIGKILL');
+    }
+  } catch {}
+}
+
 /**
  * Best-effort: kill whatever still listens on a CDP port (orphan Chromium).
  * @param {number} port

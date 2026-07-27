@@ -128,10 +128,12 @@ export function up(knex) {
     })
     .createTable('case_data_entry', (t) => {
       t.bigIncrements('id').unsigned().primary();
-      t.bigInteger('case_data_id').unsigned().notNullable().references('id').inTable('case_data').onDelete('CASCADE');
+      t.bigInteger('case_data_id').unsigned().nullable().references('id').inTable('case_data').onDelete('CASCADE');
+      t.bigInteger('trajectory_id').unsigned().nullable().references('id').inTable('trajectory').onDelete('CASCADE');
       t.string('field_key', 255).notNullable();
       t.text('field_value');
       t.index('case_data_id');
+      t.index('trajectory_id');
       t.index('field_key');
       t.datetime('created_at', 3).notNullable().defaultTo(knex.fn.now(3));
     })

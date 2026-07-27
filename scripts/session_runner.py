@@ -451,7 +451,8 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=N
             continue
         event = msg.get("event")
         if event == "close":
-            await stdin_queue.put(None)
+            # Pass close msg through so main loop can read keep_browser
+            await stdin_queue.put(msg)
             break
         # Stop immediately even while agent.run() is blocking the main loop.
         if event == "cancel_step":
@@ -1181,6 +1182,7 @@ async def run_session(args):
     }
 
     case_data_loaded = False
+    keep_browser = False  # 「释放资源」默认关浏览器；keep_browser=True 才留 CDP
 
     async def _run_step(data, step_idx):
         """Execute one agent step with the given data."""
@@ -1220,6 +1222,10 @@ async def run_session(args):
         msg = await stdin_queue.get()
         if msg is None:
             break
+        if isinstance(msg, dict) and msg.get("event") == "close":
+            data = msg.get("data") or {}
+            keep_browser = data.get("keep_browser", data.get("keepBrowser", False)) is True
+            break
 
         try:
             action = await _dispatch_event(msg, session_state, intervention_queue, agent_running_ref, cdp_action_queue)
@@ -1236,16 +1242,23 @@ async def run_session(args):
             step_index += 1
             data = msg.get("data", {})
 
-            # Import case data from file on first step
+            # Import case data on first step (inline dict preferred for remote executors)
+            case_data_inline = data.get("case_data")
             case_data_file = data.get("case_data_file")
-            if case_data_file and not case_data_loaded:
+            if not case_data_loaded and (case_data_inline or case_data_file):
                 try:
-                    with open(case_data_file, 'r', encoding='utf-8') as f:
-                        imported = json.load(f)
-                    case_data_store.update(imported)
-                    case_data_loaded = True
-                    sys.stderr.write(f"[session] Imported case data ({len(imported)} keys) from {case_data_file}\n")
-                    sys.stderr.flush()
+                    imported = {}
+                    if isinstance(case_data_inline, dict):
+                        imported = case_data_inline
+                    elif case_data_file:
+                        with open(case_data_file, 'r', encoding='utf-8') as f:
+                            imported = json.load(f)
+                    if isinstance(imported, dict) and imported:
+                        case_data_store.update(imported)
+                        case_data_loaded = True
+                        src = "inline" if isinstance(case_data_inline, dict) else case_data_file
+                        sys.stderr.write(f"[session] Imported case data ({len(imported)} keys) from {src}\n")
+                        sys.stderr.flush()
                 except Exception as e:
                     sys.stderr.write(f"[session] Failed to import case data: {e}\n")
                     sys.stderr.flush()
@@ -1275,12 +1288,20 @@ async def run_session(args):
         await browser_context.close()
     except Exception:
         pass
-    # Context.close() alone does NOT shut down Chromium when launched via
-    # browser_binary_path + user-data-dir — must close the Browser handle.
-    try:
-        await browser.close()
-    except Exception as e:
-        sys.stderr.write(f"[session] WARN: browser.close failed: {e}\n")
+    if keep_browser:
+        # Soft close — leave Chromium on CDP (not the normal「释放资源」path).
+        sys.stderr.write(
+            f"[session] Leaving Chrome idle"
+            + (f" on CDP port={cdp_port}" if cdp_port and not cdp_url else "")
+            + (f" via {cdp_url}" if cdp_url else "")
+            + "\n"
+        )
         sys.stderr.flush()
-    sys.stderr.write("[session] Browser closed, exiting\n")
-    sys.stderr.flush()
+    else:
+        try:
+            await browser.close()
+        except Exception as e:
+            sys.stderr.write(f"[session] WARN: browser.close failed: {e}\n")
+            sys.stderr.flush()
+        sys.stderr.write("[session] Browser closed, exiting\n")
+        sys.stderr.flush()

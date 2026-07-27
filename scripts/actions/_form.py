@@ -295,7 +295,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             return _ok(f'verified:{current}')
         return _err(f'mismatch | current:{current} | expected:{expected}')
 
-    @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Use this ONCE at the start to build the task list. Auto-saves form structure snapshot for replay validation. Returns {fields: [...], notification: {visible, text}|null}.')
+    @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Builds task list + form snapshot only — does NOT auto-fill (auto-fill is triggered implicitly by fill/select on main/drawer). Returns summary {total, filled, pending, ...}.')
     async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -324,7 +324,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         _save_form_snapshot(container_id, [f.model_dump() for f in dom_fields], case_data_store)
 
-        # 自动构建任务列表并批量填写（Agent 无感知）
+        # Build task list only — no auto-fill (avoids filling on browse/list pages).
         # Preserve existing done items — from_scan filters fields with values,
         # so mark_done() won't find them in pending. Create TaskItems directly.
         prev_tl = TaskList.from_store(case_data_store.get('task_list'))
@@ -357,42 +357,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 item.needs_intervention = True
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
-        if tl.pending:
-            await _auto_fill_pending()
-            # Re-read task_list after auto-fill to get updated done list
-            tl = TaskList.from_store(case_data_store.get('task_list'))
 
-        # ── 扫描校验错误：auto-fill 之后检查哪些字段有 .el-form-item__error ──
-        # 将报错字段从 done[] 移回 pending[]，让 Agent 能感知并重填。
-        try:
-            error_labels = await page.evaluate('''() => {
-                const container = ''' + JS_GET_CONTAINER + ''';
-                const items = [];
-                for (const el of container.querySelectorAll('.el-form-item__error')) {
-                    const raw = el.textContent.trim();
-                    if (!raw) continue;
-                    const label = raw.replace(/^(请选择|请?输入|请上传|填写|完善)/, '').replace(/[：:]/g, '').trim();
-                    if (label && label.length > 1 && label.length < 30) items.push(label);
-                }
-                return JSON.stringify(items);
-            }''')
-            error_labels_parsed = json.loads(error_labels) if isinstance(error_labels, str) else error_labels
-        except Exception:
-            error_labels_parsed = []
-        if error_labels_parsed:
-            retried = tl.sync_from_errors(error_labels_parsed)
-            case_data_store['task_list'] = tl.to_store()
-            if retried:
-                sys.stderr.write(f'[scan-form] Validation errors found: {error_labels_parsed} → retried {len(retried)} field(s)\n')
-                sys.stderr.flush()
-                # Clear retried fields' values in DOM so re-fill starts clean
-                for item in retried:
-                    await _clear_field_value(page, item.label)
-                # Re-run auto-fill for newly-pending error fields
-                tl = TaskList.from_store(case_data_store.get('task_list'))
-                if tl.pending:
-                    await _auto_fill_pending()
-                    tl = TaskList.from_store(case_data_store.get('task_list'))
         # Annotate fields so agent knows which were handled
         done_labels = {d.label for d in tl.done}
         for f in dom_fields:
@@ -481,7 +446,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         )
         return json.dumps(scan_result.model_dump(), ensure_ascii=False, indent=2)
 
-    @controller.action('Rebuild the task list from scan results (utility — scan_form_fields already handles auto-fill).')
+    @controller.action('Rebuild the task list from scan results (utility — does not auto-fill).')
     async def init_task_list(fields_json: str):
         try:
             data = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
@@ -504,7 +469,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         snap = _save_form_snapshot(container_id, fields, case_data_store)
         return _ok(f'form-snapshot | container:{container_id} | count:{snap.count}')
 
-    # 内部函数 — 由 scan_form_fields 末尾自动调用。
+    # 内部函数 — 仅由 _ensure_scanned（隐式）触发的 _auto_fill_pending 调用。
     # 按 kind 分组（date→select→input→radio→checkbox→tree-select）多次调用 LLM，
     # 失败字段保留在 pending 供 agent 手动处理，成功字段记录 action + task_done。
     # ── 辅助闭包（共享 page / llm / case_data_store / form_rules）──

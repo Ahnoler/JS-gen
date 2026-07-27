@@ -1,4 +1,4 @@
-"""CaseData entity — maps to `case_data` table."""
+"""CaseData entity — maps to `case_data` / `case_data_entry` tables."""
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -20,7 +20,8 @@ class CaseDataEntity(BaseModel):
 
 class CaseDataEntryEntity(BaseModel):
     id: Optional[int] = None
-    case_data_id: int = 0
+    case_data_id: Optional[int] = None
+    trajectory_id: Optional[int] = None
     field_key: str = ""
     field_value: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now)

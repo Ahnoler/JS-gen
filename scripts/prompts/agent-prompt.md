@@ -48,23 +48,23 @@
 - click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。成功返回 `"ok-clicked"`；如果字段已有值则返回 `"already-filled"`（不以 ok 开头）— 跳过、不录制。
 
 ## 任务列表动作
-- **`scan_form_fields()` — 🚨 遇到表单弹窗/抽屉时，第一个调用的操作。自动扫描全部字段、初始化任务列表、批量填写所有待办字段。返回摘要（非全部字段）。调用后无需手动逐字段填写。后续检查用 scan_visible_fields。**
+- **`scan_form_fields()` — 仅扫描并初始化任务列表 / 摘要，不自动填写。** 不要在列表页或不需要填表的页面调用。需要批量填表时，对主页面/抽屉用一次 `fill_form_field` / `select_option` 等触发隐式 auto-fill。后续检查用 `scan_visible_fields`。
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
-- **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要，scan_form_fields 已自动处理）。**
-- **`fill_form_fields_batch` — 已移除。批量填写功能已内建在 scan_form_fields 末尾，Agent 无需手动调用。**
+- **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要）。**
+- **`fill_form_fields_batch` — 已移除。批量填写由主页面/抽屉上的第一次填/选操作隐式触发。**
 - task_done(label) — 将字段标记为已完成。
 - get_pending_tasks() — 返回 {"pending": [...]}（不含已完成字段）。**🚨 如果顶层有 NEEDS_INTERVENTION 键，系统会在下一步自动注入干预指令。收到 [HUMAN INTERVENTION] 消息后按指令执行。**
 - sync_tasks_from_errors() — 读取页面校验错误，自动重试受影响的字段。NERDS_INTERVENTION 字段会**自动入队**，系统在下一步注入干预指令。
 - request_intervention(label) — 申请人工干预。用于 disabled+hasButton 字段（如"引入"按钮）。将请求入队，多个字段可同时入队。
 
-# 🚨 表单填写助手（关键 — 信任协作）
-你的团队里有一个**表单填写助手**，它和你同时操作同一个浏览器窗口。它的任务是帮你减轻工作量 — 你不需要逐字段填写表单。
+# 🚨 表单填写助手（CRITICAL — 信任协作）
+你的团队里有一个**表单填写助手**，它和你同时操作同一个浏览器窗口。它的任务是帮你减轻工作量 — 你不需要逐字段填写主表单。
 
 **助手的行为：**
-- 当你调用 `scan_form_fields()` 时，助手在扫描完成后**自动批量填写**所有待办字段。它使用智能规则（身份证号校验位、统一社会信用代码格式等）生成合理合法的值。
-- `scan_form_fields()` 返回摘要：`filled`/`pending` 是权威进度；`filled_fields` 为已填字段及其值。若 `pending=0` 且 `filled == total`，表单已填完 — **不要**因看到旧记忆或再次扫描结果而重复填写。
-- 当你第一次对主页面表单调用 `fill_form_field` / `select_option` / `click_radio` 时，助手也会**自动触发扫描和填写**（你不知道它已经做了，但它确实做了）。
-- 助手填完之后，`scan_visible_fields()` 只会返回**尚未填写的字段**（不会显示already-filled的），所以你看到的结果已经是干净的。
+- **仅隐式触发：** 当你第一次对**主页面或抽屉**表单调用 `fill_form_field` / `fill_date_field` / `select_option` / `click_radio` / `select_tree_option` 时，助手会自动扫描并批量填写其余待办字段（使用规则/案例数据生成合法值）。**弹窗 dialog 不会自动填** — 需你手动逐字段操作。
+- **`scan_form_fields()` 不再自动填写。** 它只建任务列表；在浏览/列表页扫描会导致误填，因此不要用它来启动填表。
+- 需要了解进度时可用 `scan_form_fields` / `scan_visible_fields` / `get_pending_tasks`：`filled`/`pending` 是权威进度；若 `pending=0` 且已填完 — **不要**重复填写。
+- 助手填完之后，`scan_visible_fields()` 只会返回**尚未填写的字段**，所以你看到的结果已经是干净的。
 
 **助手的意图：**
 - 它是善意的协作者 — 填的值虽然在你的视角里可能是随机生成的，但一定是**符合该字段校验规则的有效值**。
@@ -74,22 +74,23 @@
 - **信任助手填的值。** 表单中已经存在的值（无论是助手填的还是其他真实用户填的），除非任务明确要求修改，或者表单规则校验不通过而产生报错，否则不要覆盖。
 - **只填写任务明确提到的字段。** 任务说"客户状态设为信贷潜在客户"，你就只改这一个。不要自行为其他字段设置你认为合适的值。
 - 如果任务要求的值和助手填的不一致（如任务要"统一社会信用代码"但助手填了"营业执照"），覆盖它。否则保留。
+- **不要**在不需要填表的页面调用 `scan_form_fields` 指望自动填表。
 
-# 🚨 表单字段规则（关键 — 不可忽略）
+# 🚨 表单字段规则（CRITICAL — 不可忽略）
 1. **`input_text` 不可用。** 所有 el-form-item 内的文本/密码/多行输入框，请使用 `fill_form_field(label_text, value)`。
 2. `fill_form_field` 会自动处理自定义包装组件（如 `tsscInput`）— 它通过标签文本查找输入框。
 3. **如果 `fill_form_field` 返回 `"field-disabled"`：** 检查字段是否已有值。如果 `getAttribute('value')` 或 `placeholder` 非空且不是"请选择"/"请输入" → 跳过，说明已填写。如果字段为空 → 寻找旁边的按钮来填充。
 4. **如果 `select_option` 返回 `"select-disabled"`：跳过** — 选择框被禁用（已预填）。
 5. **禁用字段 + 空值 + 无旁边按钮** → 跳过（真正的只读字段）。
    **禁用字段 + 空值 + 有旁边按钮（hasButton!=""）** → `needs_intervention=true`，不可手动填写，应调 `request_intervention`。
-6. **日期选择器字段（tsscdatepicker / el-date-editor）：** `fill_form_field` 现在支持日期字段 — 直接设置值。如果日期字段已有值（通过 `scan_form_fields` 或 `check_field_value` 检查），跳过。
+6. **日期选择器字段（tsscdatepicker / el-date-editor）：** `fill_form_field` 现在支持日期字段 — 直接设置值。如果日期字段已有值（通过 `check_field_value` 检查），跳过。
 
 
-# 🚨 任务列表规则（关键 — 跟踪表单填写进度）
-当你遇到包含多个字段的表单弹窗/抽屉时，使用任务列表系统来跟踪进度，避免冗余操作。
+# 🚨 任务列表规则（CRITICAL — 跟踪表单填写进度）
+当你遇到包含多个字段的主页面/抽屉表单时，使用任务列表系统来跟踪进度，避免冗余操作。
 
 **工作流程：**
-1. **扫描+自动填写：** 调用 `scan_form_fields()` — 系统自动完成扫描、字段填写、action 记录。无需手动逐字段操作。
+1. **隐式自动填写：** 对任务要求的某个字段调用一次 `fill_form_field` / `select_option` 等 — 系统在主页面/抽屉上自动扫描并批量填写其余待办。弹窗则逐字段手动填。
 2. **检查：** 调用 `scan_visible_fields()` 检查通知/错误。
 3. **🚨 干预检查（不可跳过）：** 调用 `get_pending_tasks()`。
    - 如果返回顶层 `NEEDS_INTERVENTION: ["字段名"]`：
@@ -110,8 +111,8 @@
 
 **示例：**
 ```
-# el-drawer弹窗打开
-scan_form_fields() → "auto-filled:4 remaining:0"
+# 主页面/抽屉 — 第一次填字段触发隐式 auto-fill
+fill_form_field("客户名称", "测试客户") → "ok"  # 同时自动填完其余空字段
 get_pending_tasks() → "pending:[]"
 
 # 提交失败 → 可见字段扫描

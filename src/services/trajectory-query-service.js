@@ -4,6 +4,7 @@
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
+import * as caseDataDao from '../dao/case-data-dao.js';
 
 function safeJson(str) {
   try { return JSON.parse(str); } catch { return {}; }
@@ -79,11 +80,13 @@ export async function getTrajectoryTree(trajectoryDbId) {
   });
 
   const orphanSteps = allSteps.filter((s) => !assigned.has(s.id));
+  const caseEntries = await caseDataDao.listEntriesByTrajectory(tid);
   return {
     trajectoryId: traj.id,
     ...traj,
     phases: phasesWithSteps,
     orphanSteps,
+    caseEntries,
   };
 }
 
@@ -134,6 +137,7 @@ export async function getTrajectoryWithPhases(id) {
   const traj = await trajectoryDao.getById(+id);
   if (!traj) return null;
   traj.phases = await trajectoryPhaseDao.listByTrajectory(traj.id);
+  traj.caseEntries = await caseDataDao.listEntriesByTrajectory(traj.id);
   return traj;
 }
 
