@@ -195,6 +195,17 @@ async function main() {
   const { startTrajectoryIdleReaper } = await import('./src/services/trajectory-idle-reaper.js');
   startTrajectoryIdleReaper();
 
+  // Boot: crash remote_session rows whose executor node is offline (stale after restart).
+  try {
+    const remoteSessionDao = await import('./src/dao/remote-session-dao.js');
+    const n = await remoteSessionDao.crashOccupiedOnOfflineNodes();
+    if (n) console.log(`[server] crashed ${n} occupied remote_session(s) on offline nodes`);
+    const remoteSessionService = await import('./src/services/remote-session-service.js');
+    remoteSessionService.clearExecutorLive();
+  } catch (err) {
+    console.warn('[server] boot remote_session reconcile skipped:', err.message);
+  }
+
   const server = httpServer.listen(PORT, HOST, () => {
     console.log(`[server] JS-gen control plane listening on http://${HOST}:${PORT}`);
     console.log(`[server] WebSocket at ws://${HOST}:${PORT}/ws`);
@@ -204,7 +215,7 @@ async function main() {
     console.log(`  GET  /api/v2/system-mgmt/tree`);
     console.log(`  GET  /api/v2/trajectories`);
     console.log(`  POST /api/v2/trajectories/:id/record/prepare|start|stop`);
-    console.log(`  POST /api/v2/trajectories/:id/attach|detach`);
+    console.log(`  POST /api/v2/trajectories/:id/stream/detach | attach|detach`);
     console.log(`  POST /api/v2/trajectories/:id/replay/prepare|start|stop`);
     console.log(`  GET  /api/v2/executors`);
     console.log(`  GET  /api/v2/case-data`);

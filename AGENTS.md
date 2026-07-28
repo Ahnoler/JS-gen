@@ -56,7 +56,7 @@ Same CTRL surface (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem
 ```
 Node.js Express (server.mjs)
   ├─ Product recording (preferred)
-  │     /api/v2/trajectories/*  record/prepare|start|stop, manual-record, attach|detach
+  │     /api/v2/trajectories/*  record/prepare|start|stop, stream/detach, manual-record, attach|detach
   │     → executor session (USE_EXECUTOR) or local browser session
   ├─ Product replay
   │     /api/v2/trajectories/:id/replay/*  → assemble (server-side) → script-runner
@@ -152,6 +152,7 @@ Do **not** look for or restore OpenCode skill packages unless the user explicitl
 - **Native setter pattern** for Element UI inputs — never rely on Playwright `page.fill()` alone for el-form.
 - **`el-select`** — Use `selectOption`; generic click-by-index on option spans fails silently.
 - **Re-query DOM** before each op — Vue may recreate dialogs/components.
-- **Recording vs detach** — `record/stop` ends recording status but **does not** free the executor slot; `detach` does.
+- **Recording vs detach** — `record/stop` ends recording status but **does not** free the executor slot; `POST .../stream/detach` stops BiB only (`remote_session`→`idle`, `live`→`draft`); `POST .../detach` closes Chrome + Python + slot.
+- **Multi-traj BiB** — Push identity is `remote_session.id`; bindings are 1:1 trajectory ↔ remote_session ↔ agent session. Detach/stream-detach are scoped per trajectory (no global singleton).
 - **Replay** — Server assembles Playwright script in memory/temp; clients get step progress + screenshots over `replay:*`, not the JS source.
 - **Executor slots** — `EXECUTOR_CAPACITY` slots per node; control-plane lease until detach / node offline.

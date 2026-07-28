@@ -98,8 +98,9 @@ export async function list() {
   const rows = await db(TABLE).orderBy('created_at', 'desc');
   const nodes = fromExecutorRows(rows);
 
+  // active|idle both occupy a browser slot
   const counts = await db('remote_session')
-    .where({ status: 'active' })
+    .whereIn('status', ['active', 'idle'])
     .whereNotNull('executor_node_id')
     .groupBy('executor_node_id')
     .select('executor_node_id')
@@ -139,7 +140,9 @@ export async function markStaleOffline(timeoutMs) {
 export async function crashActiveSessions(nodeId) {
   const db = getDB();
   const now = new Date();
+  // Idle browsers still occupy the node — crash both active and idle.
   return db('remote_session')
-    .where({ executor_node_id: nodeId, status: 'active' })
-    .update({ status: 'crashed', closed_at: now });
+    .where({ executor_node_id: nodeId })
+    .whereIn('status', ['active', 'idle'])
+    .update({ status: 'crashed', closed_at: now, trajectory_id: null });
 }

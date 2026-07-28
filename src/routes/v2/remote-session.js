@@ -8,17 +8,29 @@ export default function (app) {
   /** Live CDP attach: Session Chrome + screencast bridge + DB row */
   app.post('/api/v2/remote-sessions/attach-live', async (req, res) => {
     try {
-      const result = await remoteSessionService.attachLive(req.body || {});
+      const body = req.body || {};
+      if (!body.sessionId && !body.browserSessionId) {
+        return res.status(400).json({ error: 'sessionId is required' });
+      }
+      const result = await remoteSessionService.attachLive(body);
       res.status(201).json(result);
     } catch (err) {
-      const code = /not ready|unavailable|No page/i.test(err.message) ? 503 : 500;
+      const code = err.statusCode
+        || (/not ready|unavailable|No page/i.test(err.message) ? 503 : 500);
       res.status(code).json({ error: err.message });
     }
   });
 
   app.get('/api/v2/remote-sessions/live/status', async (req, res) => {
     try {
-      res.json(await remoteSessionService.getLiveStatus());
+      const trajectoryId = req.query.trajectoryId != null ? +req.query.trajectoryId : undefined;
+      const remoteSessionId = req.query.remoteSessionId != null ? +req.query.remoteSessionId : undefined;
+      const sessionId = req.query.sessionId || undefined;
+      res.json(await remoteSessionService.getLiveStatus({
+        trajectoryId,
+        remoteSessionId,
+        sessionId,
+      }));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -85,41 +97,67 @@ export default function (app) {
     }
   });
 
-  /** Detach live CDP bridge for this remote_session (or current live if id matches). */
+  /**
+   * Disconnect stream for this remote_session (→ idle). Ownership-checked.
+   * Body may include trajectoryId for extra validation.
+   */
   app.post('/api/v2/remote-sessions/:id/detach', async (req, res) => {
     try {
       const id = +req.params.id;
-      const live = await remoteSessionService.getLiveStatus();
-      if (live.remoteSessionId && live.remoteSessionId !== id) {
-        return res.status(409).json({
-          error: 'Detached id does not match the active live session',
-          activeId: live.remoteSessionId,
+      const trajectoryId = req.body?.trajectoryId != null ? +req.body.trajectoryId : undefined;
+      const remote = await remoteSessionDao.getById(id);
+      if (!remote) return res.status(404).json({ error: 'Remote session not found' });
+
+      if (remote.status !== 'active' && remote.status !== 'idle') {
+        // Idempotent: already idle/closed
+        const status = await remoteSessionService.getLiveStatus({
+          trajectoryId,
+          remoteSessionId: id,
+        });
+        return res.json({
+          closedId: id,
+          streamDetached: remote.status === 'idle',
+          sessionKept: true,
+          status,
         });
       }
+
+      if (
+        trajectoryId
+        && remote.trajectoryId != null
+        && Number(remote.trajectoryId) !== trajectoryId
+      ) {
+        return res.status(409).json({
+          error: 'remote_session does not belong to this trajectory',
+          trajectoryId: remote.trajectoryId,
+        });
+      }
+
       const result = await remoteSessionService.detachLive({
+        remoteSessionId: id,
+        trajectoryId: trajectoryId ?? (remote.trajectoryId != null ? Number(remote.trajectoryId) : undefined),
         crashed: !!(req.body && req.body.crashed),
       });
-      if (!result.closedId && !live.attached) {
-        const session = await remoteSessionService.closeSession(id, {
-          crashed: !!(req.body && req.body.crashed),
-        });
-        if (!session) return res.status(404).json({ error: 'Remote session not found' });
-        return res.json({ remoteSession: session, status: result.status });
-      }
       res.json(result);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message });
     }
   });
 
   app.post('/api/v2/remote-sessions/:id/close', async (req, res) => {
     try {
       const crashed = !!(req.body && req.body.crashed);
-      const live = await remoteSessionService.getLiveStatus();
-      if (live.remoteSessionId === +req.params.id) {
-        await remoteSessionService.detachLive({ crashed });
-      }
-      const session = await remoteSessionService.closeSession(+req.params.id, { crashed });
+      const id = +req.params.id;
+      const remote = await remoteSessionDao.getById(id);
+      if (!remote) return res.status(404).json({ error: 'Remote session not found' });
+
+      await remoteSessionService.detachLive({
+        remoteSessionId: id,
+        trajectoryId: remote.trajectoryId != null ? Number(remote.trajectoryId) : undefined,
+        crashed,
+      }).catch(() => {});
+
+      const session = await remoteSessionService.closeSession(id, { crashed });
       if (!session) return res.status(404).json({ error: 'Remote session not found' });
       res.json(session);
     } catch (err) {

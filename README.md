@@ -237,7 +237,8 @@ Node.js Express (server.mjs, :4097)
 - **原生 setter**：Element 表单不要只用 `page.fill()`。
 - **`el-select`**：用 `selectOption`，不要靠点 option span 下标。
 - **操作前重查 DOM**：Vue 可能重建弹窗/组件。
-- **`record/stop` ≠ `detach`**：停录制不释放执行机槽；`detach` 才释放。
+- **`record/stop` ≠ `stream/detach` ≠ `detach`**：停录制不释放槽；断开画面只停推流（浏览器 idle）；`detach` 才关浏览器并释放槽。
+- **多交易推流**：按 `trajectoryId` ↔ `remote_session` 1:1 隔离，释放/断开只影响本交易。
 - **回放**：客户端拿进度与截图，不拿组装后的 JS。
 
 ---

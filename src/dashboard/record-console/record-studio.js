@@ -12,6 +12,7 @@ import {
   ensureRemoteStream,
   armRemoteStream,
   setRemotePreferredSessionId,
+  setRemotePreferredTrajectoryId,
   setRemoteLog,
   resetRemoteBrowserUi,
 } from '../remote-browser.js';
@@ -317,8 +318,9 @@ async function prepare() {
       throw new Error(state.prepareError);
     }
 
-    // Arm canvas subscribe before HTTP prepare so login frames can appear mid-call.
-    await armRemoteStream().catch(() => false);
+    // Scope BiB to this trajectory before prepare so WS frames/events don't crosstalk.
+    setRemotePreferredTrajectoryId(trajId);
+    await armRemoteStream({ trajectoryId: trajId }).catch(() => false);
 
     const data = await api('POST', `/api/v2/trajectories/${trajId}/record/prepare`, {});
     state.prepare = data;
@@ -336,6 +338,7 @@ async function prepare() {
       ? `login=${data.login.skipped ? 'skipped' : 'done'} account=#${data.login.accountId || data.systemAccountId}`
       : '';
     log(`prepare OK session=${data.sessionId || '—'} ${loginInfo} ready=${data.ready}`, 'ok');
+    setRemotePreferredTrajectoryId(trajId);
     if (data.sessionId) setRemotePreferredSessionId(data.sessionId);
 
     const streamOk = data.stream?.ok !== false && !data.bibError && data.remoteSessionId;
@@ -639,6 +642,7 @@ async function main() {
     if (stage === 'stream' && (payload.status === 'done' || payload.status === 'degraded') && payload.remoteSessionId) {
       ensureRemoteStream({
         sessionId: payload.sessionId || state.prepareStages.session?.sessionId || undefined,
+        trajectoryId: trajId,
       }).catch(() => {});
     }
     if (state.preparing) renderResource();

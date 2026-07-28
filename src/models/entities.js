@@ -75,13 +75,15 @@
  * @property {number|null} [executorNodeId] FK → executor_node.id
  * @property {number|null} [slotIndex] 执行机内槽位号
  * @property {string|null} [clientKey] 前端会话/用户标识（亲和调度）
+ * @property {string|null} [agentSessionId] Python/执行机 agent session UUID
+ * @property {number|null} [trajectoryId] 当前挂载交易；断开画面后可空
  * @property {string} createdAt
  * @property {string|null} [closedAt]
  */
 
 /**
  * 一台已注册的执行机节点。业务层据此过滤/选机/占槽。
- * 占用量不落列（由 active remote_session 计数派生）。
+ * 占用量不落列（由 active|idle remote_session 计数派生）。
  *
  * @typedef {Object} ExecutorNode
  * @property {number} [id]
@@ -95,7 +97,7 @@
  * @property {string|null} [lastHeartbeatAt] 最近心跳时间
  * @property {string} createdAt
  * @property {string} [updatedAt]
- * @property {number} [inUse] 派生字段：active remote_session 计数（不落库）
+ * @property {number} [inUse] 派生字段：active|idle remote_session 计数（不落库）
  */
 
 /**

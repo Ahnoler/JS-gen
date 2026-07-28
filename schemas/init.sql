@@ -64,12 +64,21 @@ CREATE TABLE `remote_session` (
   `viewport_h`          INT UNSIGNED DEFAULT 0 COMMENT '视口高',
   `device_scale_factor` DECIMAL(4,2) DEFAULT 1.00 COMMENT 'DPR，处理 Retina/2x 屏',
   `url`                 VARCHAR(2048) DEFAULT '' COMMENT '当前/初始页面 URL',
-  `status`              ENUM('active','closed','crashed') DEFAULT 'active' COMMENT '会话状态',
+  `status`              ENUM('active','idle','closed','crashed') NOT NULL DEFAULT 'active' COMMENT 'active=推流中; idle=断开画面浏览器仍在; closed=已释放; crashed=异常',
+  `executor_node_id`    BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → executor_node.id（会话所在执行机）',
+  `slot_index`          INT UNSIGNED DEFAULT NULL COMMENT '执行机内槽位号',
+  `client_key`          VARCHAR(64) DEFAULT NULL COMMENT '前端会话/用户标识，用于亲和调度',
+  `agent_session_id`    VARCHAR(64) DEFAULT NULL COMMENT 'Python/执行机 agent session UUID',
+  `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '当前挂载交易 → trajectory.id；断开画面后可置 NULL',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `closed_at`           DATETIME(3) DEFAULT NULL,
   UNIQUE KEY `uk_session_uuid` (`session_uuid`),
   KEY `idx_status` (`status`),
-  KEY `idx_created_at` (`created_at`)
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_executor_node_id` (`executor_node_id`),
+  KEY `idx_client_key` (`client_key`),
+  KEY `idx_rs_agent_session` (`agent_session_id`),
+  KEY `idx_rs_trajectory` (`trajectory_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='远程浏览器操控/录制会话（BrowserContext 隔离、视口、Target、生命周期）';
 

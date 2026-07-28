@@ -13,6 +13,7 @@ export {
   prepareTrajectoryRecording,
   attachTrajectoryLive,
   detachTrajectoryLive,
+  detachTrajectoryStream,
   bindTrajectoryManualPersist,
 } from './trajectory-attach-service.js';
 

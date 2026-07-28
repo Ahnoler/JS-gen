@@ -693,6 +693,31 @@ async function handleViewport(payload) {
   broadcastStatus();
 }
 
+/** @type {WeakMap<import('ws').WebSocket, { trajectoryId: number|null }>} */
+const wsTrajectoryBind = new WeakMap();
+
+function resolveExecutorPick(trajectoryId) {
+  if (trajectoryId != null) {
+    const binding = remoteSessionService.getLiveBindingByTrajectory?.(trajectoryId);
+    if (binding?.agentSessionId) {
+      const session = state.sessions.get(binding.agentSessionId);
+      if (session?.useExecutor && session?.executorNodeUuid) {
+        return {
+          executorNodeUuid: session.executorNodeUuid || binding.nodeUuid,
+          sessionId: binding.agentSessionId,
+          trajectoryId: binding.trajectoryId,
+          remoteSessionId: binding.remoteSessionId,
+        };
+      }
+    }
+    // Fallback: runtime session for this traj even if BiB not attached yet
+    try {
+      // lazy — avoid circular import at module load
+    } catch {}
+  }
+  return null;
+}
+
 function ensureWsHook() {
   if (wsHooked) return;
   wsHooked = true;
@@ -700,26 +725,57 @@ function ensureWsHook() {
     const type = msg?.type;
     if (!type || !String(type).startsWith('remote:')) return;
 
-    // Executor mode: proxy remote_* WS commands to executor bib bridge.
+    // Executor mode: proxy remote_* WS commands — scoped by subscribed trajectoryId.
     if (USE_EXECUTOR) {
-      const live = await remoteSessionService.getLiveStatus().catch(() => null);
-      // Prefer the session that attachLive bound; fall back to first executor session.
-      const boundId = remoteSessionService.getExecutorLiveSessionId?.() || null;
-      let pick = boundId && state.sessions.get(boundId)?.useExecutor
-        ? state.sessions.get(boundId)
-        : null;
-      if (!pick) {
-        pick = [...state.sessions.values()].find((s) => s?.useExecutor && s?.executorNodeUuid && s?.sessionId);
-      }
       if (type === 'remote:subscribe') {
-        ws.send(JSON.stringify({ type: 'remote:status', payload: live || { attached: false, cdpReady: true } }));
+        const trajectoryId = msg.payload?.trajectoryId != null
+          ? Number(msg.payload.trajectoryId)
+          : null;
+        wsTrajectoryBind.set(ws, { trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : null });
+        const live = await remoteSessionService.getLiveStatus({
+          trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
+        }).catch(() => null);
+        ws.send(JSON.stringify({
+          type: 'remote:status',
+          payload: live || { attached: false, cdpReady: true, trajectoryId },
+        }));
         return;
       }
-      if (type === 'remote:unsubscribe') return;
+      if (type === 'remote:unsubscribe') {
+        wsTrajectoryBind.delete(ws);
+        return;
+      }
+
+      const bind = wsTrajectoryBind.get(ws) || {};
+      const trajectoryId = msg.payload?.trajectoryId != null
+        ? Number(msg.payload.trajectoryId)
+        : bind.trajectoryId;
+      const live = await remoteSessionService.getLiveStatus({
+        trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
+      }).catch(() => null);
+
+      let pick = null;
+      if (Number.isFinite(trajectoryId)) {
+        pick = resolveExecutorPick(trajectoryId);
+      }
+      // No "first useExecutor" fallback — avoid cross-traj routing.
 
       if (!pick) {
-        if (type === 'remote:status') {
-          ws.send(JSON.stringify({ type: 'remote:status', payload: { attached: false, cdpReady: true } }));
+        if (
+          type === 'remote:status'
+          || type === 'remote:start'
+          || type === 'remote:stop'
+          || type === 'remote:tabs'
+          || type === 'remote:switch_tab'
+        ) {
+          ws.send(JSON.stringify({
+            type: 'remote:status',
+            payload: live || {
+              attached: false,
+              cdpReady: true,
+              trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : null,
+            },
+          }));
         }
         return;
       }
@@ -744,12 +800,6 @@ function ensureWsHook() {
             url: msg.payload?.url,
             pageId: msg.payload?.pageId,
           });
-        } else if (type === 'remote:viewport') {
-          // viewport resize is handled at attach-time; ignore for now
-        } else if (type === 'remote:inspect') {
-          // optional inspect ignored in minimal executor bib bridge
-        } else if (type === 'remote:status') {
-          // below
         }
       } catch {}
 
@@ -760,8 +810,13 @@ function ensureWsHook() {
         || type === 'remote:tabs'
         || type === 'remote:switch_tab'
       ) {
-        const live2 = await remoteSessionService.getLiveStatus().catch(() => null);
-        ws.send(JSON.stringify({ type: 'remote:status', payload: live2 || { attached: false, cdpReady: true } }));
+        const live2 = await remoteSessionService.getLiveStatus({
+          trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
+        }).catch(() => null);
+        ws.send(JSON.stringify({
+          type: 'remote:status',
+          payload: live2 || { attached: false, cdpReady: true, trajectoryId },
+        }));
       }
       return;
     }

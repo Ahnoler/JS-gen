@@ -10,9 +10,12 @@
  *   → PATCH /trajectories/:id                 ({ systemAccountId })
  *   → POST /trajectories/:id/manual-record    ({ enabled, phaseId? } empty phaseId = last phase)
  *   → POST /trajectories/:id/record/stop      ({ success? } → recorded|draft; does not detach)
+ *   → POST /trajectories/:id/stream/detach    (disconnect BiB only; browser idle)
  *   → PATCH /trajectory-steps/:id/confirm
  *   → GET /trajectories/:id/tree
- *   → POST /trajectories/:id/detach
+ *   → POST /trajectories/:id/detach           (release Chrome + slot)
+ *
+ * Also see: node scripts/accept-multi-traj-lifecycle.mjs
  *
  * Usage: node scripts/accept-recording-apis.mjs [baseUrl]
  * Default baseUrl: http://127.0.0.1:4101

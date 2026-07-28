@@ -459,7 +459,7 @@ export const API_GROUPS = [
   {
     id: 'recording',
     name: '交易录制',
-    description: 'prepare → start → stop → detach。stop / 断开画面不释放槽位；detach 才释放。离开工作室不自动 detach；10 分钟无步骤写入自动回收。',
+    description: 'prepare → start → stop → stream/detach（断开画面）或 detach（释放执行资源）。stop / 断开画面不释放槽位；detach 才关浏览器并释放槽。离开工作室不自动 detach；10 分钟无步骤写入自动回收。',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/login-context',
@@ -474,7 +474,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/prepare',
         summary: '一键准备（占槽 + 登录 + 推流）',
-        desc: '幂等。① 复用本交易已存活 session（含「断开画面」后空闲浏览器）；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录/导航不写入 trajectory_step。画面推流成功时将 recordStatus 置为 live（占用，非 AI 录制）。通过 WS 广播 recording:prepare。',
+        desc: '幂等。① 复用本交易已存活 session（含「断开画面」后空闲浏览器）；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录/导航不写入 trajectory_step。画面推流成功时将 recordStatus 置为 live（占用，非 AI 录制）。通过 WS 广播 recording:prepare。推流身份以 remote_session.id 为准，按 trajectory 隔离。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
@@ -493,7 +493,7 @@ export const API_GROUPS = [
           '503：会话/执行机不可用',
           '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
           'stream.ok=true → recordStatus=live（列表可见占用中；人工录制可用）',
-          'record/start → recording；stop → recorded；detach(live|recording) → draft',
+          'record/start → recording；stop → recorded；stream/detach(live) → draft；detach(live|recording) → draft',
         ],
       },
       {
@@ -573,9 +573,21 @@ export const API_GROUPS = [
         reqExample: J({}),
       },
       {
+        method: 'POST', path: '/api/v2/trajectories/{id}/stream/detach',
+        summary: '断开画面（只停推流）',
+        desc: 'remote_session → idle，清 trajectory.remote_session_id；若 recordStatus=live 则改回 draft。Agent 会话与 Chrome 仍存活，可再附着。与 detach（释放执行资源）不同。广播 recording:stream_detached + remote:status。',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        reqExample: J({}),
+        respExample: J({
+          trajectoryId: 42, streamDetached: true, sessionKept: true,
+          recordStatus: 'draft', remoteSessionId: 7,
+        }),
+        notes: ['幂等；不影响其他交易的推流', '再附着：prepare 或 attach-live + remote:subscribe({trajectoryId})'],
+      },
+      {
         method: 'POST', path: '/api/v2/trajectories/{id}/detach',
         summary: '释放执行资源（关闭浏览器）',
-        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 live 或 recording，则改回 draft（不覆盖 recorded/completed）。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 10 分钟会由服务端自动回收。',
+        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 live 或 recording，则改回 draft（不覆盖 recorded/completed）。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 10 分钟会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({ trajectoryId: 42, detached: true, recordStatus: 'draft' }),
@@ -696,13 +708,20 @@ export const API_GROUPS = [
   {
     id: 'remote-session',
     name: '远程会话 / BiB',
-    description: 'CDP 附着与推流状态（录制工作室左侧画布）',
+    description: 'CDP 附着与推流状态（录制工作室左侧画布）。多交易并存时以 trajectoryId / remoteSessionId 隔离，勿依赖全局 singleton。',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/remote-sessions/live/status',
         summary: '当前 live 状态',
+        desc: '推荐带 trajectoryId 查询本交易推流；省略时返回任一已附着绑定（工程调试）。',
+        params: [
+          { name: 'trajectoryId', type: 'number', in: 'query', example: '42' },
+          { name: 'remoteSessionId', type: 'number', in: 'query', example: '7' },
+          { name: 'sessionId', type: 'string', in: 'query', example: 'uuid' },
+        ],
         respExample: J({
           attached: true, remoteSessionId: 7, remoteSessionUuid: 'uuid',
+          sessionId: 'uuid', trajectoryId: 42,
           cdpReady: true, inputEnabled: true, agentBusy: false,
           viewportW: 1920, viewportH: 1080, manualRecording: false,
         }),
@@ -710,9 +729,9 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/remote-sessions/attach-live',
         summary: '附着 CDP + 推流',
-        reqExample: J({ sessionId: 'uuid', quality: 0.7, viewportW: 1920, viewportH: 1080 }),
-        respExample: J({ remoteSession: { id: 7 }, status: { attached: true, remoteSessionId: 7 } }),
-        notes: ['503：CDP/页面未就绪'],
+        reqExample: J({ sessionId: 'uuid', trajectoryId: 42, quality: 0.7, viewportW: 1920, viewportH: 1080 }),
+        respExample: J({ remoteSession: { id: 7 }, status: { attached: true, remoteSessionId: 7, trajectoryId: 42 } }),
+        notes: ['503：CDP/页面未就绪', '须传 sessionId；按 trajectoryId 写入 live 映射'],
       },
       {
         method: 'GET', path: '/api/v2/remote-sessions',
@@ -741,8 +760,9 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/remote-sessions/{id}/detach',
         summary: '断开画面推流（不停浏览器）',
-        desc: '只停 BiB screencast / 关闭 remote_session 记录。执行机槽位与 Chrome 仍存活（空闲），可再次附着/推流或 prepare 复用。与 trajectories/:id/detach（释放执行资源、关浏览器）不同。',
+        desc: 'remote_session → idle；可选 body.trajectoryId 做归属校验。Chrome 与 Agent 会话仍存活。产品路径优先用 POST /trajectories/{id}/stream/detach。与 trajectories/:id/detach（释放执行资源、关浏览器）不同。',
         params: [{ name: 'id', type: 'string', required: true, in: 'path', example: '7' }],
+        reqExample: J({ trajectoryId: 42 }),
       },
       {
         method: 'POST', path: '/api/v2/remote-sessions/{id}/close',
@@ -877,8 +897,24 @@ export const API_GROUPS = [
         }),
         notes: [
           'reason: idle（10 分钟无步骤）| manual',
-          '前端应清空画布与 prepare 状态，提示重新 prepare 后再附着',
-          '同时会广播 remote:status（attached=false）',
+          '前端应按 trajectoryId 过滤；只清空本交易画布与 prepare 状态',
+          '同时会广播 remote:status（attached=false, trajectoryId）',
+        ],
+      },
+      {
+        method: 'WS', path: 'recording:stream_detached',
+        summary: '已断开画面（浏览器仍空闲）',
+        tryable: false,
+        respExample: J({
+          type: 'recording:stream_detached',
+          payload: {
+            trajectoryId: 42, remoteSessionId: 7, recordStatus: 'draft', sessionId: 'uuid',
+          },
+        }),
+        notes: [
+          '对应 POST .../stream/detach',
+          '前端可保留 preferredSessionId，再次附着即可',
+          '勿与 recording:detached（关浏览器）混淆',
         ],
       },
       {
@@ -1022,6 +1058,7 @@ export const API_GROUPS = [
 
 export const ENUMS = [
   { name: 'recordStatus', values: 'draft / live / recording / recorded / completed' },
+  { name: 'remote_session.status', values: 'active（推流中）/ idle（断开画面浏览器仍在）/ closed / crashed' },
   { name: 'phase.status', values: 'pending / running / completed / failed' },
   { name: 'step.source', values: 'agent / manual' },
   { name: '节点 type', values: '1 系统 / 2 模块 / 3 功能' },
@@ -1035,5 +1072,5 @@ export const RECORDING_FLOW = [
   'POST .../record/stop（不释放槽位）',
   'POST .../confirm（人工确认 → completed；取消 → draft）',
   'POST .../resolve-element（可选：按 label 抓定位器写入步骤 element_json）',
-  'POST .../detach（释放执行机槽位；或等 10 分钟无步骤自动回收）',
+  'POST .../stream/detach（断开画面；或 .../detach 释放执行资源关浏览器）',
 ];

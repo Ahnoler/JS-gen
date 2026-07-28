@@ -63,6 +63,7 @@ export {
   prepareTrajectoryRecording,
   attachTrajectoryLive,
   detachTrajectoryLive,
+  detachTrajectoryStream,
   startTrajectoryRecording,
   stopTrajectoryRecording,
   replayTrajectorySteps,

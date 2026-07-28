@@ -28,6 +28,8 @@ let browserConnected = false;
 let attaching = false;
 /** Prefer this browser session when calling attach-live (product prepare path). */
 let preferredSessionId = null;
+/** Current studio trajectory — filter WS events to this traj only. */
+let preferredTrajectoryId = null;
 /** Optional sink for studio / dashboard logs: (msg, level?) => void */
 let remoteLogFn = null;
 /** Logical CSS viewport of remote Chrome (from status / frames) */
@@ -183,8 +185,19 @@ export function setRemotePreferredSessionId(sessionId) {
   preferredSessionId = sessionId || null;
 }
 
+export function setRemotePreferredTrajectoryId(trajectoryId) {
+  const tid = Number(trajectoryId);
+  preferredTrajectoryId = Number.isFinite(tid) && tid > 0 ? tid : null;
+}
+
 export function setRemoteLog(fn) {
   remoteLogFn = typeof fn === 'function' ? fn : null;
+}
+
+function eventBelongsHere(payload = {}) {
+  if (preferredTrajectoryId == null) return true;
+  if (payload.trajectoryId == null) return true;
+  return Number(payload.trajectoryId) === preferredTrajectoryId;
 }
 
 function tabLabel(tab) {
@@ -275,6 +288,7 @@ function refreshRemoteTabs() {
 }
 
 function applyStatus(payload = {}) {
+  if (!eventBelongsHere(payload)) return;
   if ('attached' in payload) attached = !!payload.attached;
   if ('inputEnabled' in payload) inputEnabled = !!payload.inputEnabled;
   if ('remoteSessionId' in payload) remoteSessionId = payload.remoteSessionId ?? null;
@@ -308,7 +322,11 @@ function applyStatus(payload = {}) {
         }`,
       payload.agentBusy ? 'warn' : 'ok',
     );
-  } else if (payload.reason === 'idle' || payload.reason === 'manual') {
+  } else if (
+    payload.reason === 'idle'
+    || payload.reason === 'manual'
+    || payload.reason === 'stream_detach'
+  ) {
     stopStream();
     if (lastBitmap) {
       try { lastBitmap.close(); } catch {}
@@ -321,14 +339,19 @@ function applyStatus(payload = {}) {
         ctx.fillRect(0, 0, canvas.width || 1, canvas.height || 1);
       } catch {}
     }
-    preferredSessionId = null;
+    // Full resource release clears preferred session; stream-only detach keeps it.
+    if (payload.reason === 'idle' || payload.reason === 'manual') {
+      preferredSessionId = null;
+    }
     remoteTabs = [];
     activeTargetId = null;
     renderTabs();
     setUiStatus(
       payload.reason === 'idle'
         ? '执行资源已空闲回收 — 请重新 prepare 后再附着'
-        : '执行资源已释放 — 请重新 prepare 后再附着',
+        : payload.reason === 'stream_detach'
+          ? '已断开画面（浏览器仍空闲，可再附着）'
+          : '执行资源已释放 — 请重新 prepare 后再附着',
       'warn',
     );
   } else if (cdpReady) {
@@ -515,7 +538,11 @@ function sendMouse(type, evt, extra = {}) {
 }
 
 async function fetchLiveStatus() {
-  const res = await fetch('/api/v2/remote-sessions/live/status');
+  const q = new URLSearchParams();
+  if (preferredTrajectoryId != null) q.set('trajectoryId', String(preferredTrajectoryId));
+  if (preferredSessionId) q.set('sessionId', preferredSessionId);
+  const qs = q.toString();
+  const res = await fetch(`/api/v2/remote-sessions/live/status${qs ? `?${qs}` : ''}`);
   return readV2(res);
 }
 
@@ -525,10 +552,13 @@ async function fetchLiveStatus() {
  */
 export async function armRemoteStream(opts = {}) {
   if (opts.sessionId) preferredSessionId = opts.sessionId;
+  if (opts.trajectoryId != null) setRemotePreferredTrajectoryId(opts.trajectoryId);
   const wsOk = await waitUntilConnected(10000);
   if (!wsOk) return false;
   streaming = true;
-  send('remote:subscribe', {});
+  send('remote:subscribe', {
+    trajectoryId: preferredTrajectoryId || undefined,
+  });
   fitCanvasToStage();
   return true;
 }
@@ -536,10 +566,11 @@ export async function armRemoteStream(opts = {}) {
 /**
  * Ensure BiB is attached and dashboard WS is subscribed + bib_start.
  * If prepare already attached on the server, only re-start stream (no second attach-live).
- * @param {{ sessionId?: string, forceAttach?: boolean }} [opts]
+ * @param {{ sessionId?: string, trajectoryId?: number, forceAttach?: boolean }} [opts]
  */
 export async function ensureRemoteStream(opts = {}) {
   if (opts.sessionId) preferredSessionId = opts.sessionId;
+  if (opts.trajectoryId != null) setRemotePreferredTrajectoryId(opts.trajectoryId);
   attaching = true;
   syncButtons();
   try {
@@ -549,14 +580,17 @@ export async function ensureRemoteStream(opts = {}) {
     }
 
     let status = await fetchLiveStatus().catch(() => null);
-    const already = !!(status?.attached && status?.remoteSessionId);
-    const force = opts.forceAttach === true;
+    const sameSession = !preferredSessionId
+      || !status?.sessionId
+      || status.sessionId === preferredSessionId;
+    const already = !!(status?.attached && status?.remoteSessionId && sameSession);
+    const force = opts.forceAttach === true || (status?.attached && !sameSession);
 
     if (!already || force) {
       remoteLog(already ? '强制重新附着 BiB…' : '附着 BiB（attach-live）…');
-      // Do NOT send dashboard canvas size as Chrome viewport — preserves real window ratio.
       const body = { quality: 75 };
       if (preferredSessionId) body.sessionId = preferredSessionId;
+      if (preferredTrajectoryId != null) body.trajectoryId = preferredTrajectoryId;
       const res = await fetch('/api/v2/remote-sessions/attach-live', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -581,7 +615,7 @@ export async function ensureRemoteStream(opts = {}) {
     return { ok: true, attached: !!attached, remoteSessionId, reused: already && !force };
   } catch (e) {
     const raw = e?.message || String(e);
-    const gone = /No executor-backed browser session|not found|未找到/i.test(raw);
+    const gone = /No executor-backed browser session|not found|未找到|sessionId is required/i.test(raw);
     if (gone) {
       resetRemoteBrowserUi({
         reason: 'manual',
@@ -606,23 +640,49 @@ async function attachLiveHttp() {
 async function detachLiveHttp() {
   const id = remoteSessionId;
   stopStream();
+  // Prefer trajectory-scoped stream detach when we know the traj
+  if (preferredTrajectoryId != null) {
+    const res = await fetch(`/api/v2/trajectories/${preferredTrajectoryId}/stream/detach`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const raw = await res.json().catch(() => ({}));
+    if (res.ok || res.status === 404) {
+      applyStatus({
+        ...(unwrapApi(raw)?.status || { attached: false, cdpReady: true }),
+        reason: 'stream_detach',
+        trajectoryId: preferredTrajectoryId,
+      });
+      return;
+    }
+    if (isApiFail(res, raw) && res.status !== 404) {
+      // fall through to remote-session detach
+    }
+  }
   if (!id) {
-    applyStatus({ attached: false, cdpReady: true });
+    applyStatus({ attached: false, cdpReady: true, reason: 'stream_detach', trajectoryId: preferredTrajectoryId });
     return;
   }
   const res = await fetch(`/api/v2/remote-sessions/${id}/detach`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      trajectoryId: preferredTrajectoryId || undefined,
+    }),
   });
   const raw = await res.json().catch(() => ({}));
   if (res.status === 404) {
-    applyStatus({ attached: false, cdpReady: true });
+    applyStatus({ attached: false, cdpReady: true, reason: 'stream_detach', trajectoryId: preferredTrajectoryId });
     return;
   }
   if (isApiFail(res, raw)) throw new Error(apiErrorMessage(raw, res.statusText));
   const data = unwrapApi(raw);
-  applyStatus(data.status || { attached: false, cdpReady: true });
+  applyStatus({
+    ...(data.status || { attached: false, cdpReady: true }),
+    reason: 'stream_detach',
+    trajectoryId: preferredTrajectoryId,
+  });
 }
 
 async function startStream() {
@@ -633,9 +693,14 @@ async function startStream() {
     remoteLog('推流指令未发出：/ws 未连接', 'err');
     return false;
   }
-  send('remote:subscribe', {});
+  send('remote:subscribe', {
+    trajectoryId: preferredTrajectoryId || undefined,
+  });
   // No viewportW/H — must not Emulation-resize Session Chrome
-  const sent = send('remote:start', { quality: 75 });
+  const sent = send('remote:start', {
+    quality: 75,
+    trajectoryId: preferredTrajectoryId || undefined,
+  });
   fitCanvasToStage();
   if (!sent) {
     remoteLog('remote:start 发送失败', 'err');
@@ -855,7 +920,18 @@ export function initRemoteBrowser() {
   });
 
   on('recording:detached', (payload) => {
+    if (!eventBelongsHere(payload)) return;
     resetRemoteBrowserUi({ reason: payload?.reason || 'manual' });
+  });
+  on('recording:stream_detached', (payload) => {
+    if (!eventBelongsHere(payload)) return;
+    applyStatus({
+      attached: false,
+      cdpReady: true,
+      remoteSessionId: null,
+      reason: 'stream_detach',
+      trajectoryId: payload?.trajectoryId,
+    });
   });
 
   $('sessRemoteAttachBtn')?.addEventListener('click', async () => {
@@ -869,6 +945,7 @@ export function initRemoteBrowser() {
       // Manual click always re-attaches BiB so stalled CDP after AI steps can recover.
       await ensureRemoteStream({
         sessionId: preferredSessionId || undefined,
+        trajectoryId: preferredTrajectoryId || undefined,
         forceAttach: true,
       });
     } catch (e) {

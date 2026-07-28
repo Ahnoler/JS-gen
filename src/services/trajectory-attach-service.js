@@ -1,8 +1,10 @@
 /**
  * Trajectory attach / prepare / detach + BiB and manual-persist binding.
+ * Lifecycle is 1:1 trajectory ↔ remote_session ↔ agent session.
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
+import * as remoteSessionDao from '../dao/remote-session-dao.js';
 import * as execSession from '../executor-session-client.js';
 import * as slotLease from '../executor-slot-lease.js';
 import * as remoteSessionService from './remote-session-service.js';
@@ -19,6 +21,7 @@ import {
   registerTrajectorySession,
 } from './trajectory-runtime.js';
 import { runDefaultLogin } from './trajectory-record-lifecycle.js';
+import { USE_EXECUTOR } from '../../config/config.js';
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
@@ -36,7 +39,11 @@ async function attachBibBestEffort(tid, sessionId, runtime) {
     console.warn(`[trajectory] ${bibError}`);
   } else {
     try {
-      attached = await remoteSessionService.attachLive({ sessionId, quality: 70 });
+      attached = await remoteSessionService.attachLive({
+        sessionId,
+        trajectoryId: tid,
+        quality: 70,
+      });
     } catch (err) {
       bibError = err?.message || String(err);
       console.warn(`[trajectory] BiB attach failed (session kept): ${bibError}`);
@@ -55,14 +62,12 @@ async function attachBibBestEffort(tid, sessionId, runtime) {
 export function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
   const session = state.sessions.get(sessionId);
   if (!session || session._trajPersistUnsub) return;
-  // Share dedupe set with session-level live persist when present
   if (!session.persistedActionIds) session.persistedActionIds = runtime.persistedActionIds;
   else runtime.persistedActionIds = session.persistedActionIds;
 
   session._trajPersistUnsub = execSession.subscribeSessionEvents(sessionId, async (type, payload) => {
     if (type !== 'manual_action_recorded') return;
     if (runtime.suppressStepPersist || runtime.isReplay) return;
-    // Dashboard/session hook already owns live persist when active
     if (session._persistUnsub && session.autoPersist !== false) return;
     const entry = payload?.entry;
     if (!entry) return;
@@ -95,17 +100,25 @@ export function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
 }
 
 /**
- * One-shot prepare for recording studio:
- *  1) session create (executor slot)
- *  2) browser allocate (+ CDP)
- *  3) BiB attach + screencast (stream)
- *  4) navigate/login (not persisted as steps)
- *
- * Requires trajectory.systemAccountId. Idempotent when session+login already live.
+ * One-shot prepare for recording studio (serialized per trajectory).
  */
 export async function prepareTrajectoryRecording(trajectoryId) {
   const tid = Number(trajectoryId);
+  return remoteSessionService.withTrajectoryLock(tid, () => prepareTrajectoryRecordingUnlocked(tid));
+}
+
+async function prepareTrajectoryRecordingUnlocked(tid) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
+
+  if (!USE_EXECUTOR) {
+    // Local path: single-live only — refuse if another traj already holds a stream.
+    const anyLive = remoteSessionService.listLiveBindings?.()?.some((b) => b.attached && Number(b.trajectoryId) !== tid);
+    if (anyLive) {
+      const err = new Error('Local (non-executor) mode only supports one live trajectory; detach the other first');
+      err.statusCode = 409;
+      throw err;
+    }
+  }
 
   const stages = {
     session: { status: 'pending' },
@@ -121,7 +134,6 @@ export async function prepareTrajectoryRecording(trajectoryId) {
     } catch {}
   };
 
-  // ── 1+2: session + browser (+ best-effort BiB inside attachTrajectoryLive) ──
   emitStage('session', 'running');
   emitStage('browser', 'running');
 
@@ -137,7 +149,7 @@ export async function prepareTrajectoryRecording(trajectoryId) {
       remoteSessionId: runtime.remoteSessionId,
       bibError: runtime.bibError || null,
       reused: true,
-      status: await remoteSessionService.getLiveStatus().catch(() => null),
+      status: await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => null),
     };
   }
 
@@ -159,32 +171,25 @@ export async function prepareTrajectoryRecording(trajectoryId) {
     cdpReady: state.sessions.get(runtime.sessionId)?.cdpReady !== false,
   });
 
-  // ── 3: ensure stream (BiB screencast) before login so canvas can show login ──
-  // 「断开画面」只停推流：session/browser 仍在；推流未附着则重新 attachLive。
+  // ── stream: attach BiB for THIS trajectory only ──
   emitStage('stream', 'running');
   let bibError = runtime.bibError || attachResult?.bibError || null;
   let remoteSessionId = runtime.remoteSessionId || attachResult?.remoteSessionId || null;
 
-  const liveNow = await remoteSessionService.getLiveStatus().catch(() => null);
-  const liveSid = remoteSessionService.getExecutorLiveSessionId?.() || null;
-
-  // Stale remoteSessionId after「断开画面」: BiB gone but runtime still has old id.
-  if (remoteSessionId && !liveNow?.attached) {
-    remoteSessionId = null;
-    runtime.remoteSessionId = null;
-  }
-  if (liveNow?.attached && liveSid && runtime.sessionId && liveSid !== runtime.sessionId) {
-    // Live stream belongs to another session — re-attach to ours below.
-    remoteSessionId = null;
-  } else if (liveNow?.attached && liveNow?.remoteSessionId && (!liveSid || liveSid === runtime.sessionId)) {
+  const liveNow = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => null);
+  if (liveNow?.attached && liveNow?.remoteSessionId) {
     remoteSessionId = liveNow.remoteSessionId;
     runtime.remoteSessionId = remoteSessionId;
+  } else {
+    remoteSessionId = null;
+    runtime.remoteSessionId = null;
   }
 
   if (!remoteSessionId && !bibError) {
     try {
       const attached = await remoteSessionService.attachLive({
         sessionId: runtime.sessionId,
+        trajectoryId: tid,
         quality: 70,
       });
       remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
@@ -216,11 +221,9 @@ export async function prepareTrajectoryRecording(trajectoryId) {
     });
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
-    // Occupy indicator for trajectory list: stream ready ⇒ live (not AI recording)
     await trajectoryDao.updateMeta(tid, { recordStatus: 'live' }).catch(() => {});
   }
 
-  // ── 4: login / navigate (default ops — not written to trajectory_step) ──
   emitStage('login', 'running', { accountId });
   let login = { skipped: false, done: false, accountId };
   try {
@@ -239,7 +242,7 @@ export async function prepareTrajectoryRecording(trajectoryId) {
 
   const fresh = await trajectoryDao.getById(tid);
   const tree = await getTrajectoryTree(tid);
-  const liveStatus = await remoteSessionService.getLiveStatus().catch(() => null);
+  const liveStatus = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => null);
 
   const streamOk = !!remoteSessionId && !bibError;
   return {
@@ -260,17 +263,12 @@ export async function prepareTrajectoryRecording(trajectoryId) {
     stages,
     reused: !!attachResult?.reused,
     reusedChrome: !!attachResult?.reusedChrome,
-    /** Critical path ready: session + browser + login (stream may be degraded). */
     ready: true,
   };
 }
 
 /**
- * Acquire executor resources for a trajectory:
- *  1) reuse live session for this traj
- *  2) free slot + idle CDP Chrome → open with cdpUrl
- *  3) free slot → launch new Chrome
- *  4) no free slot → 409
+ * Acquire executor resources for a trajectory (agent session + optional BiB).
  */
 export async function attachTrajectoryLive(trajectoryId) {
   const tid = Number(trajectoryId);
@@ -281,10 +279,9 @@ export async function attachTrajectoryLive(trajectoryId) {
     throw err;
   }
 
-  // Idempotent: already attached for this trajectory with a live session on executor
   const existing = await clearStaleTrajectoryRuntime(tid);
   if (existing?.sessionId && state.sessions.has(existing.sessionId)) {
-    const liveStatus = await remoteSessionService.getLiveStatus().catch(() => null);
+    const liveStatus = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => null);
     return {
       trajectoryId: tid,
       sessionId: existing.sessionId,
@@ -296,10 +293,8 @@ export async function attachTrajectoryLive(trajectoryId) {
     };
   }
 
-  // Drop orphan lease for this traj, then reconcile leases vs executor reality.
   slotLease.releaseByTrajectory(tid);
 
-  // Soft reconcile on all connected nodes so stale leases don't block idle Chrome reuse
   try {
     const live = (await import('../executor-registry.js')).list().filter((n) => n.connected);
     await Promise.all(
@@ -311,7 +306,6 @@ export async function attachTrajectoryLive(trajectoryId) {
   const model = traj.model || 'deepseek-v4-flash';
   let opened;
   try {
-    // pickExecutorNode (via openSession) prefers nodes with idle CDP Chrome first.
     opened = await execSession.openSession({
       sessionId,
       model,
@@ -334,9 +328,9 @@ export async function attachTrajectoryLive(trajectoryId) {
   const reusedChrome = !!opened.reusedChrome;
   if (reusedChrome) {
     console.log(
-      `[trajectory] reusing idle CDP Chrome`
+      `[trajectory] reusing orphan CDP Chrome`
       + (opened.cdpPort != null ? ` port=${opened.cdpPort}` : '')
-      + ` for traj #${tid}`,
+      + ` for traj #${tid} (orphan-recovery)`,
     );
   } else {
     console.log(`[trajectory] launching new Chrome for traj #${tid}`);
@@ -358,70 +352,162 @@ export async function attachTrajectoryLive(trajectoryId) {
   };
 }
 
+/**
+ * Disconnect stream only (浏览器置 idle，清 FK，live→draft). Agent session kept.
+ * Idempotent when already disconnected.
+ */
+export async function detachTrajectoryStream(trajectoryId) {
+  const tid = Number(trajectoryId);
+  return remoteSessionService.withTrajectoryLock(tid, async () => {
+    const traj = await trajectoryDao.getById(tid);
+    if (!traj) {
+      const err = new Error('Trajectory not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const runtime = getTrajectoryRuntime(tid);
+    const remoteSessionId = traj.remoteSessionId
+      || runtime?.remoteSessionId
+      || remoteSessionService.getLiveBindingByTrajectory(tid)?.remoteSessionId
+      || null;
+
+    const result = await remoteSessionService.detachLive({
+      trajectoryId: tid,
+      remoteSessionId: remoteSessionId || undefined,
+      crashed: false,
+    });
+
+    const fresh = await trajectoryDao.getById(tid);
+    const status = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => ({
+      attached: false,
+      remoteSessionId: null,
+    }));
+
+    broadcast('remote:status', {
+      ...status,
+      attached: false,
+      remoteSessionId: null,
+      remoteSessionUuid: null,
+      inputEnabled: false,
+      reason: 'stream_detach',
+      trajectoryId: tid,
+    });
+    broadcast('recording:stream_detached', {
+      trajectoryId: tid,
+      remoteSessionId: result.remoteSessionId || remoteSessionId,
+      recordStatus: fresh?.recordStatus || 'draft',
+      sessionId: runtime?.sessionId || null,
+    });
+
+    return {
+      trajectoryId: tid,
+      streamDetached: true,
+      sessionKept: true,
+      remoteSessionId: result.remoteSessionId || remoteSessionId,
+      recordStatus: fresh?.recordStatus || null,
+      status,
+    };
+  });
+}
+
+/**
+ * Release executor resources: kill Chrome + Python + slot.
+ * Only touches THIS trajectory's remote_session / agent session.
+ */
 export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } = {}) {
   const tid = Number(trajectoryId);
-  const runtime = getTrajectoryRuntime(tid);
-  const traj = await trajectoryDao.getById(tid);
-  const sessionId = runtime?.sessionId || null;
-
-  // Always tear down BiB / live pointer (even if runtime.remoteSessionId missing).
-  try {
-    await remoteSessionService.detachLive({ crashed: false });
-  } catch {}
-  try {
-    remoteSessionService.clearExecutorLive?.();
-  } catch {}
-
-  if (sessionId) {
-    const session = state.sessions.get(sessionId);
-    if (session?._trajPersistUnsub) {
-      try { session._trajPersistUnsub(); } catch {}
-      session._trajPersistUnsub = null;
+  return remoteSessionService.withTrajectoryLock(tid, async () => {
+    const runtime = getTrajectoryRuntime(tid);
+    const traj = await trajectoryDao.getById(tid);
+    if (!traj && !runtime) {
+      // Idempotent: nothing to release
+      return { trajectoryId: tid, detached: true, recordStatus: null, reason };
     }
+
+    const sessionId = runtime?.sessionId || null;
+    const remoteSessionId = traj?.remoteSessionId
+      || runtime?.remoteSessionId
+      || null;
+
+    // Stop BiB for THIS traj only (never clear global map blindly)
     try {
-      // 「释放执行资源」：关浏览器 + 释槽（与「断开画面」只停推流相对）
-      await execSession.closeSession({
-        nodeUuid: runtime.executorNodeUuid,
-        sessionId,
-        keepBrowser: false,
+      await remoteSessionService.detachLive({
+        trajectoryId: tid,
+        remoteSessionId: remoteSessionId || undefined,
+        crashed: false,
       });
-    } catch {
-      slotLease.releaseBySession(sessionId);
+    } catch {}
+
+    // Close remote_session row (browser released)
+    if (remoteSessionId) {
+      try {
+        await remoteSessionDao.close(remoteSessionId, { crashed: false });
+        remoteSessionService.clearLiveBinding(remoteSessionId);
+      } catch {}
     }
-    state.sessions.delete(sessionId);
-  }
-  slotLease.releaseByTrajectory(tid);
-  deleteTrajectoryRuntime(tid);
 
-  // Release occupancy: live/recording → draft (do not clobber recorded/completed)
-  let recordStatus = traj?.recordStatus || null;
-  const meta = { remoteSessionId: null };
-  if (traj && (traj.recordStatus === 'live' || traj.recordStatus === 'recording')) {
-    meta.recordStatus = 'draft';
-    recordStatus = 'draft';
-  }
-  if (traj) await trajectoryDao.updateMeta(tid, meta);
+    // Also close any occupied remote row still bound to this agent session
+    if (sessionId) {
+      const occupied = await remoteSessionDao.getOccupiedByAgentSession(sessionId).catch(() => null);
+      if (occupied) {
+        try {
+          await remoteSessionDao.close(occupied.id, { crashed: false });
+          remoteSessionService.clearLiveBinding(occupied.id);
+        } catch {}
+      }
+    }
 
-  const status = await remoteSessionService.getLiveStatus().catch(() => ({
-    attached: false,
-    remoteSessionId: null,
-    cdpReady: false,
-  }));
-  broadcast('remote:status', {
-    ...status,
-    attached: false,
-    remoteSessionId: null,
-    remoteSessionUuid: null,
-    inputEnabled: false,
-    reason,
-    trajectoryId: tid,
+    if (sessionId) {
+      const session = state.sessions.get(sessionId);
+      if (session?._trajPersistUnsub) {
+        try { session._trajPersistUnsub(); } catch {}
+        session._trajPersistUnsub = null;
+      }
+      try {
+        await execSession.closeSession({
+          nodeUuid: runtime?.executorNodeUuid,
+          sessionId,
+          keepBrowser: false,
+        });
+      } catch {
+        slotLease.releaseBySession(sessionId);
+      }
+      state.sessions.delete(sessionId);
+    }
+    slotLease.releaseByTrajectory(tid);
+    deleteTrajectoryRuntime(tid);
+
+    let recordStatus = traj?.recordStatus || null;
+    const meta = { remoteSessionId: null };
+    if (traj && (traj.recordStatus === 'live' || traj.recordStatus === 'recording')) {
+      meta.recordStatus = 'draft';
+      recordStatus = 'draft';
+    }
+    if (traj) await trajectoryDao.updateMeta(tid, meta);
+
+    const status = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => ({
+      attached: false,
+      remoteSessionId: null,
+      cdpReady: false,
+    }));
+    broadcast('remote:status', {
+      ...status,
+      attached: false,
+      remoteSessionId: null,
+      remoteSessionUuid: null,
+      inputEnabled: false,
+      reason,
+      trajectoryId: tid,
+    });
+    broadcast('recording:detached', {
+      trajectoryId: tid,
+      reason,
+      recordStatus,
+      sessionId,
+      remoteSessionId,
+    });
+
+    return { trajectoryId: tid, detached: true, recordStatus, reason, remoteSessionId };
   });
-  broadcast('recording:detached', {
-    trajectoryId: tid,
-    reason,
-    recordStatus,
-    sessionId,
-  });
-
-  return { trajectoryId: tid, detached: true, recordStatus, reason };
 }

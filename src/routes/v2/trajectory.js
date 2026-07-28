@@ -214,6 +214,16 @@ export default function (app) {
     }
   });
 
+  /** Disconnect BiB stream only — keep agent session + browser idle. */
+  app.post('/api/v2/trajectories/:id/stream/detach', async (req, res) => {
+    try {
+      const result = await trajectoryService.detachTrajectoryStream(+req.params.id);
+      res.json(result);
+    } catch (err) {
+      sendErr(res, err);
+    }
+  });
+
   /** Phase-step tree: { phases:[{...phase, steps:[...]}, ...] } */
   app.get('/api/v2/trajectories/:id/tree', async (req, res) => {
     try {

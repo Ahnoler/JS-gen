@@ -1,6 +1,6 @@
 /** @typedef {'agent'|'manual'|'cdp'} StepSource */
 
-/** @typedef {'active'|'closed'|'crashed'} RemoteSessionStatus */
+/** @typedef {'active'|'idle'|'closed'|'crashed'} RemoteSessionStatus */
 
 /** @typedef {'context'|'target'} RemoteSessionIsolation */
 
@@ -20,7 +20,10 @@
 export const STEP_SOURCES = Object.freeze(['agent', 'manual', 'cdp']);
 
 /** @type {readonly RemoteSessionStatus[]} */
-export const REMOTE_SESSION_STATUSES = Object.freeze(['active', 'closed', 'crashed']);
+export const REMOTE_SESSION_STATUSES = Object.freeze(['active', 'idle', 'closed', 'crashed']);
+
+/** Statuses that still occupy an executor slot / browser. */
+export const REMOTE_SESSION_OCCUPIED = Object.freeze(['active', 'idle']);
 
 /** @type {readonly RemoteSessionIsolation[]} */
 export const REMOTE_SESSION_ISOLATIONS = Object.freeze(['context', 'target']);

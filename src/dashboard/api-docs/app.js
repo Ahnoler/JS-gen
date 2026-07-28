@@ -60,9 +60,10 @@ function renderOverview(container) {
       <h3 style="margin-top:16px">关键语义</h3>
       <ul>
         <li><code>record/stop</code> 只改 <code>recordStatus</code>，<strong>不</strong>释放执行机槽位。</li>
-        <li>断开画面（BiB detach）只停推流，<strong>不</strong>释放槽位。</li>
+        <li>断开画面 <code>POST .../stream/detach</code> 只停推流（remote_session→idle，live→draft），<strong>不</strong>关浏览器。</li>
         <li>离开录制工作室<strong>不</strong>自动 detach；AI 可后台继续录。无步骤写入超过 10 分钟由服务端自动回收。</li>
-        <li><code>detach</code> 关闭会话并释放槽位（手动释放执行资源）。</li>
+        <li><code>POST .../detach</code> 关闭会话并杀死 Chrome、释放槽位（手动释放执行资源）。</li>
+        <li>多交易并行：推流按 <code>trajectoryId</code> / <code>remote_session.id</code> 隔离，互不串扰。</li>
         <li><code>record/prepare</code> 优先复用 live session / 空闲 CDP Chrome；无资源返回 409 + holders。登录不写入 <code>trajectory_step</code>。</li>
         <li>回放由服务端组装 Playwright 脚本，客户端只收 <code>replay:*</code> 进度，不拿 JS 源码。</li>
         <li>旧路径 <code>/api/trajectory</code>、<code>/api/case-data</code> → <strong>410 Gone</strong>。</li>
