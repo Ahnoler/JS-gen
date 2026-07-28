@@ -2,6 +2,7 @@
 Interactive session mode for browser-use agent.
 Reads JSON instructions from stdin, runs agent steps with SSE output.
 """
+import os
 import sys
 import asyncio
 import json
@@ -839,7 +840,7 @@ async def _resolve_chromium_executable() -> str | None:
 def _chrome_automation_args() -> list[str]:
     """Flags that suppress Chrome chrome UI prompts agents cannot click, and start maximized."""
     # NOT incognito — Incognito enables stricter HTTPS-First by default.
-    return [
+    args = [
         '--no-first-run',
         '--no-default-browser-check',
         '--disable-default-apps',
@@ -882,6 +883,10 @@ def _chrome_automation_args() -> list[str]:
             'BlockInsecurePrivateNetworkRequests'
         ),
     ]
+    # Linux root (typical cloud executor): Chrome exits immediately without these.
+    if sys.platform != 'win32' and hasattr(os, 'geteuid') and os.geteuid() == 0:
+        args.extend(['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
+    return args
 
 
 def _seed_chrome_profile(profile_dir: Path) -> None:
