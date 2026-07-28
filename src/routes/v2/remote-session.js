@@ -25,10 +25,12 @@ export default function (app) {
     try {
       const trajectoryId = req.query.trajectoryId != null ? +req.query.trajectoryId : undefined;
       const remoteSessionId = req.query.remoteSessionId != null ? +req.query.remoteSessionId : undefined;
+      const remoteSessionUuid = req.query.remoteSessionUuid || undefined;
       const sessionId = req.query.sessionId || undefined;
       res.json(await remoteSessionService.getLiveStatus({
         trajectoryId,
         remoteSessionId,
+        remoteSessionUuid,
         sessionId,
       }));
     } catch (err) {

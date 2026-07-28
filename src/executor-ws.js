@@ -57,6 +57,27 @@ async function handleRegister(ws, payload) {
     nodeUuid: node.nodeUuid,
     status: node.status,
   });
+
+  // Rebuild in-memory BiB bindings for active remote_sessions on this node
+  // (control-plane restart otherwise leaves DB rows orphaned from liveByRemoteSessionId).
+  try {
+    const remoteSessionDao = await import('./dao/remote-session-dao.js');
+    const remoteSessionService = await import('./services/remote-session-service.js');
+    const rows = await remoteSessionDao.listByNode(node.id, ['active']);
+    let restored = 0;
+    for (const row of rows) {
+      const binding = remoteSessionService.restoreLiveBindingFromRow(row, {
+        nodeUuid: node.nodeUuid,
+        attached: true,
+      });
+      if (binding?.attached) restored += 1;
+    }
+    if (restored) {
+      console.log(`[executor-ws] restored ${restored} live BiB binding(s) for ${nodeUuid}`);
+    }
+  } catch (err) {
+    console.warn('[executor-ws] live binding restore skipped:', err.message);
+  }
 }
 
 async function handleMessage(ws, msg) {

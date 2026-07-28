@@ -694,7 +694,7 @@ async function handleViewport(payload) {
   broadcastStatus();
 }
 
-/** @type {WeakMap<import('ws').WebSocket, { trajectoryId: number|null, sessionId: string|null }>} */
+/** @type {WeakMap<import('ws').WebSocket, { trajectoryId: number|null, sessionId: string|null, remoteSessionId: number|null, remoteSessionUuid: string|null }>} */
 const wsTrajectoryBind = new WeakMap();
 
 function pickFromBinding(binding, trajectoryId = null) {
@@ -734,19 +734,32 @@ function pickFromAgentSession(sessionId, trajectoryId = null) {
 
 /**
  * Resolve which executor session should receive remote:* commands.
- * Prefer trajectory live binding; fall back to agent session / traj runtime.
+ * Priority: trajectoryId → remoteSessionId/uuid → sessionId → traj runtime →
+ * single attached binding (only when no identity keys were sent).
+ *
+ * @param {{ trajectoryId?: number|null, sessionId?: string|null, remoteSessionId?: number|null, remoteSessionUuid?: string|null }} [opts]
  */
-function resolveExecutorPick(trajectoryId, { sessionId = null } = {}) {
-  const tid = trajectoryId != null ? Number(trajectoryId) : null;
+export function resolveBibTarget(opts = {}) {
+  const tid = opts.trajectoryId != null ? Number(opts.trajectoryId) : null;
+  const sessionId = opts.sessionId || null;
+  const remoteSessionId = opts.remoteSessionId != null ? Number(opts.remoteSessionId) : null;
+  const remoteSessionUuid = opts.remoteSessionUuid || null;
+  const hasIdentity = Number.isFinite(tid)
+    || !!sessionId
+    || Number.isFinite(remoteSessionId)
+    || !!remoteSessionUuid;
 
-  if (Number.isFinite(tid)) {
-    const binding = remoteSessionService.getLiveBindingByTrajectory?.(tid);
-    const picked = pickFromBinding(binding, tid);
-    if (picked) return picked;
-  }
+  const binding = remoteSessionService.resolveLiveBinding?.({
+    trajectoryId: Number.isFinite(tid) ? tid : null,
+    sessionId,
+    remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : null,
+    remoteSessionUuid,
+  });
+  const fromBinding = pickFromBinding(binding, Number.isFinite(tid) ? tid : null);
+  if (fromBinding) return fromBinding;
 
   if (sessionId) {
-    const picked = pickFromAgentSession(sessionId, tid);
+    const picked = pickFromAgentSession(sessionId, Number.isFinite(tid) ? tid : null);
     if (picked) return picked;
   }
 
@@ -763,6 +776,16 @@ function resolveExecutorPick(trajectoryId, { sessionId = null } = {}) {
           remoteSessionId: runtime.remoteSessionId || null,
         };
       }
+    }
+  }
+
+  // Legacy no-identity callers: if resolveLiveBinding already tried single-attach
+  // and missed (e.g. binding without agentSessionId), try list again via pick.
+  if (!hasIdentity) {
+    const attached = (remoteSessionService.listLiveBindings?.() || []).filter((b) => b.attached);
+    if (attached.length === 1) {
+      const picked = pickFromBinding(attached[0], null);
+      if (picked) return picked;
     }
   }
 
@@ -783,13 +806,23 @@ function ensureWsHook() {
           ? Number(msg.payload.trajectoryId)
           : null;
         const sessionId = msg.payload?.sessionId || null;
+        const remoteSessionId = msg.payload?.remoteSessionId != null
+          ? Number(msg.payload.remoteSessionId)
+          : null;
+        const remoteSessionUuid = msg.payload?.remoteSessionUuid
+          ? String(msg.payload.remoteSessionUuid)
+          : null;
         wsTrajectoryBind.set(ws, {
           trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : null,
           sessionId: sessionId || null,
+          remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : null,
+          remoteSessionUuid: remoteSessionUuid || null,
         });
         const live = await remoteSessionService.getLiveStatus({
           trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
           sessionId: sessionId || undefined,
+          remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : undefined,
+          remoteSessionUuid: remoteSessionUuid || undefined,
         }).catch(() => null);
         ws.send(JSON.stringify({
           type: 'remote:status',
@@ -807,15 +840,25 @@ function ensureWsHook() {
         ? Number(msg.payload.trajectoryId)
         : bind.trajectoryId;
       const sessionId = msg.payload?.sessionId || bind.sessionId || null;
+      const remoteSessionId = msg.payload?.remoteSessionId != null
+        ? Number(msg.payload.remoteSessionId)
+        : (bind.remoteSessionId != null ? Number(bind.remoteSessionId) : null);
+      const remoteSessionUuid = msg.payload?.remoteSessionUuid
+        || bind.remoteSessionUuid
+        || null;
       const live = await remoteSessionService.getLiveStatus({
         trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
         sessionId: sessionId || undefined,
+        remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : undefined,
+        remoteSessionUuid: remoteSessionUuid || undefined,
       }).catch(() => null);
 
-      const pick = resolveExecutorPick(
-        Number.isFinite(trajectoryId) ? trajectoryId : null,
-        { sessionId },
-      );
+      const pick = resolveBibTarget({
+        trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : null,
+        sessionId,
+        remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : null,
+        remoteSessionUuid,
+      });
 
       if (!pick) {
         // Do not invent attached:false for input — that would lock the canvas while
@@ -838,8 +881,20 @@ function ensureWsHook() {
         } else if (type === 'remote:input') {
           console.warn(
             '[remote-bridge] drop remote:input — no executor pick',
-            { trajectoryId, sessionId },
+            { trajectoryId, sessionId, remoteSessionId, remoteSessionUuid },
           );
+          try {
+            ws.send(JSON.stringify({
+              type: 'remote:error',
+              payload: {
+                id: 'resolve-pick',
+                message: 'no executor pick for remote:input',
+                trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : null,
+                sessionId: sessionId || null,
+                remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : null,
+              },
+            }));
+          } catch {}
         }
         return;
       }
@@ -862,6 +917,7 @@ function ensureWsHook() {
             trajectoryId: _t,
             sessionId: _s,
             remoteSessionId: _r,
+            remoteSessionUuid: _u,
             ...inputPayload
           } = msg.payload || {};
           sendToExecutor(executorNodeUuid, 'session.bib_input', {
@@ -890,6 +946,7 @@ function ensureWsHook() {
         const live2 = await remoteSessionService.getLiveStatus({
           trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
           sessionId: pickSessionId || undefined,
+          remoteSessionId: Number.isFinite(remoteSessionId) ? remoteSessionId : undefined,
         }).catch(() => null);
         ws.send(JSON.stringify({
           type: 'remote:status',

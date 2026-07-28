@@ -25,7 +25,12 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use('/api/test/screenshots', express.static(TMP_DIR));
 app.use('/scripts', express.static(path.join(PROJECT_DIR, 'scripts')));
-app.use(express.static(DASHBOARD_DIR, { maxAge: 0 }));
+app.use(express.static(DASHBOARD_DIR, {
+  maxAge: 0,
+  setHeaders(res) {
+    res.setHeader('Cache-Control', 'no-store');
+  },
+}));
 
 // ── First-launch setup (when no API key is configured) ──────────────────
 let _currentApiKey = LLM_API_KEY;            // mutable copy — updated on save
@@ -195,16 +200,20 @@ async function main() {
   const { startTrajectoryIdleReaper } = await import('./src/services/trajectory-idle-reaper.js');
   startTrajectoryIdleReaper();
 
-  // Boot: crash remote_session rows whose executor node is offline (stale after restart).
-  try {
-    const remoteSessionDao = await import('./src/dao/remote-session-dao.js');
-    const n = await remoteSessionDao.crashOccupiedOnOfflineNodes();
-    if (n) console.log(`[server] crashed ${n} occupied remote_session(s) on offline nodes`);
-    const remoteSessionService = await import('./src/services/remote-session-service.js');
-    remoteSessionService.clearExecutorLive();
-  } catch (err) {
-    console.warn('[server] boot remote_session reconcile skipped:', err.message);
-  }
+  // Do NOT crash occupied remote_sessions at raw boot — executor nodes look offline
+  // until they reconnect. Defer reconcile until after the reconnect window.
+  const BOOT_RECONCILE_DELAY_MS = Number(process.env.BOOT_REMOTE_RECONCILE_MS) || 15000;
+  setTimeout(() => {
+    (async () => {
+      try {
+        const remoteSessionDao = await import('./src/dao/remote-session-dao.js');
+        const n = await remoteSessionDao.crashOccupiedOnOfflineNodes();
+        if (n) console.log(`[server] crashed ${n} occupied remote_session(s) on offline nodes`);
+      } catch (err) {
+        console.warn('[server] deferred remote_session reconcile skipped:', err.message);
+      }
+    })().catch(() => {});
+  }, BOOT_RECONCILE_DELAY_MS).unref?.();
 
   const server = httpServer.listen(PORT, HOST, () => {
     console.log(`[server] JS-gen control plane listening on http://${HOST}:${PORT}`);

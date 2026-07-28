@@ -6,6 +6,8 @@
  *   - POST /trajectories/:id/stream/detach (idempotent, scoped)
  *   - GET /remote-sessions/live/status?trajectoryId=
  *   - stream/detach vs detach semantics on draft trajs
+ *   - resolveLiveBinding single-bind fallback / ambiguous reject
+ *   - recording:stream_detached broadcast on stream/detach
  *
  * Full crosstalk (two prepare + release one keeps the other) needs a live executor;
  * this script validates the control-plane contract without requiring Chrome.
@@ -13,7 +15,10 @@
  * Usage: node scripts/accept-multi-traj-lifecycle.mjs [baseUrl]
  * Default baseUrl: http://127.0.0.1:4097
  */
+import WebSocket from 'ws';
+
 const BASE = (process.argv[2] || 'http://127.0.0.1:4097').replace(/\/$/, '');
+const WS_URL = BASE.replace(/^http/, 'ws') + '/ws';
 
 const results = [];
 
@@ -41,6 +46,24 @@ async function req(method, path, body) {
     ? raw.data
     : raw;
   return { status: res.status, json, envelope: raw };
+}
+
+async function waitUntilWsOpen(timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(WS_URL);
+    const timer = setTimeout(() => {
+      try { ws.close(); } catch {}
+      reject(new Error('ws open timeout'));
+    }, timeoutMs);
+    ws.on('open', () => {
+      clearTimeout(timer);
+      resolve(ws);
+    });
+    ws.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
 }
 
 async function main() {
@@ -119,6 +142,38 @@ async function main() {
     }
   }
 
+  // stream/detach broadcasts recording:stream_detached (distinct from recording:detached)
+  console.log('\n[WS] recording:stream_detached broadcast');
+  try {
+    const ws = await waitUntilWsOpen(5000);
+    const waitP = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('timeout waiting for recording:stream_detached')), 8000);
+      ws.on('message', (raw) => {
+        let msg;
+        try { msg = JSON.parse(String(raw)); } catch { return; }
+        if (msg?.type !== 'recording:stream_detached') return;
+        if (Number(msg.payload?.trajectoryId) !== t2) return;
+        clearTimeout(timer);
+        resolve(msg.payload);
+      });
+    });
+    const det = await req('POST', `/api/v2/trajectories/${t2}/stream/detach`, {});
+    if (det.status !== 200) {
+      fail('stream/detach for WS probe', `status=${det.status}`);
+      try { ws.close(); } catch {}
+    } else {
+      const payload = await waitP;
+      try { ws.close(); } catch {}
+      if (payload && Number(payload.trajectoryId) === t2) {
+        pass('recording:stream_detached broadcast', `trajectoryId=${payload.trajectoryId}`);
+      } else {
+        fail('recording:stream_detached broadcast', JSON.stringify(payload));
+      }
+    }
+  } catch (err) {
+    fail('recording:stream_detached broadcast', err.message);
+  }
+
   // Release one must not 500 the other
   console.log('\n[API] detach scoped (no crosstalk errors)');
   const release1 = await req('POST', `/api/v2/trajectories/${t1}/detach`, {});
@@ -149,10 +204,12 @@ async function main() {
     fail(`detach traj #${t2}`, `status=${release2.status}`);
   }
 
-  // In-process lock smoke (same process as this script imports services)
-  console.log('\n[unit] withTrajectoryLock serializes');
+  // In-process lock smoke + resolveLiveBinding fallback / ambiguous reject
+  console.log('\n[unit] withTrajectoryLock + resolveLiveBinding');
   try {
-    const { withTrajectoryLock } = await import('../src/services/remote-session-service.js');
+    const rss = await import('../src/services/remote-session-service.js');
+    const { withTrajectoryLock, clearExecutorLive, restoreLiveBindingFromRow, resolveLiveBinding } = rss;
+
     const order = [];
     await Promise.all([
       withTrajectoryLock(t1, async () => {
@@ -171,8 +228,118 @@ async function main() {
     } else {
       fail('withTrajectoryLock same-traj serial', joined);
     }
+
+    clearExecutorLive();
+    const single = restoreLiveBindingFromRow({
+      id: 90001,
+      sessionUuid: 'uuid-single',
+      trajectoryId: t1,
+      agentSessionId: 'agent-single',
+      executorNodeId: 1,
+      viewportW: 1920,
+      viewportH: 1080,
+      status: 'active',
+    }, { nodeUuid: 'node-a', attached: true });
+    if (single?.attached) {
+      const picked = resolveLiveBinding({});
+      if (picked && picked.remoteSessionId === 90001) {
+        pass('resolveLiveBinding single-bind fallback', `id=${picked.remoteSessionId}`);
+      } else {
+        fail('resolveLiveBinding single-bind fallback', JSON.stringify(picked));
+      }
+    } else {
+      fail('restoreLiveBindingFromRow single', 'not attached');
+    }
+
+    restoreLiveBindingFromRow({
+      id: 90002,
+      sessionUuid: 'uuid-two',
+      trajectoryId: t2,
+      agentSessionId: 'agent-two',
+      executorNodeId: 1,
+      viewportW: 1920,
+      viewportH: 1080,
+      status: 'active',
+    }, { nodeUuid: 'node-a', attached: true });
+
+    const ambiguous = resolveLiveBinding({});
+    if (ambiguous == null) {
+      pass('resolveLiveBinding ambiguous (2+) rejects no-identity');
+    } else {
+      fail('resolveLiveBinding ambiguous reject', `got id=${ambiguous.remoteSessionId}`);
+    }
+
+    const byTid = resolveLiveBinding({ trajectoryId: t1 });
+    if (byTid && byTid.remoteSessionId === 90001) {
+      pass('resolveLiveBinding by trajectoryId', `id=${byTid.remoteSessionId}`);
+    } else {
+      fail('resolveLiveBinding by trajectoryId', JSON.stringify(byTid));
+    }
+
+    const miss = resolveLiveBinding({ trajectoryId: 999999001 });
+    if (miss == null) {
+      pass('resolveLiveBinding miss identity does not fall back');
+    } else {
+      fail('resolveLiveBinding miss identity', `got id=${miss.remoteSessionId}`);
+    }
+
+    clearExecutorLive();
   } catch (err) {
-    fail('withTrajectoryLock', err.message);
+    fail('resolveLiveBinding unit', err.message);
+  }
+
+  // resolveBibTarget export smoke
+  console.log('\n[unit] resolveBibTarget');
+  try {
+    const { resolveBibTarget } = await import('../src/cdp/remote-bridge.js');
+    const rss = await import('../src/services/remote-session-service.js');
+    rss.clearExecutorLive();
+    rss.restoreLiveBindingFromRow({
+      id: 90011,
+      sessionUuid: 'uuid-bib',
+      trajectoryId: t1,
+      agentSessionId: 'agent-bib',
+      executorNodeId: 1,
+      viewportW: 1920,
+      viewportH: 1080,
+      status: 'active',
+    }, { nodeUuid: 'node-bib', attached: true });
+
+    const pick = resolveBibTarget({});
+    if (pick && pick.sessionId === 'agent-bib' && pick.executorNodeUuid === 'node-bib') {
+      pass('resolveBibTarget single-bind fallback', `sessionId=${pick.sessionId}`);
+    } else {
+      fail('resolveBibTarget single-bind fallback', JSON.stringify(pick));
+    }
+
+    rss.restoreLiveBindingFromRow({
+      id: 90012,
+      sessionUuid: 'uuid-bib-2',
+      trajectoryId: t2,
+      agentSessionId: 'agent-bib-2',
+      executorNodeId: 1,
+      viewportW: 1920,
+      viewportH: 1080,
+      status: 'active',
+    }, { nodeUuid: 'node-bib', attached: true });
+
+    const none = resolveBibTarget({});
+    if (none == null) {
+      pass('resolveBibTarget ambiguous rejects no-identity');
+    } else {
+      fail('resolveBibTarget ambiguous reject', JSON.stringify(none));
+    }
+
+    const scoped = resolveBibTarget({ trajectoryId: t2 });
+    if (scoped && scoped.sessionId === 'agent-bib-2') {
+      pass('resolveBibTarget by trajectoryId', `sessionId=${scoped.sessionId}`);
+    } else {
+      fail('resolveBibTarget by trajectoryId', JSON.stringify(scoped));
+    }
+
+    rss.clearExecutorLive();
+  } catch (err) {
+    fail('resolveBibTarget unit', err.message);
   }
 
   await closeDB().catch(() => {});

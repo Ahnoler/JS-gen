@@ -83,7 +83,12 @@ export function getLiveBindingByTrajectory(trajectoryId) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid)) return null;
   for (const b of liveByRemoteSessionId.values()) {
-    if (Number(b.trajectoryId) === tid && b.attached) return b;
+    if (Number(b.trajectoryId) !== tid) continue;
+    if (b.attached) return b;
+  }
+  // Mild drift: prefer attached first, then any mount for this trajectory.
+  for (const b of liveByRemoteSessionId.values()) {
+    if (Number(b.trajectoryId) === tid) return b;
   }
   return null;
 }
@@ -93,6 +98,62 @@ export function getLiveBindingByAgentSession(agentSessionId) {
   for (const b of liveByRemoteSessionId.values()) {
     if (b.agentSessionId === agentSessionId && b.attached) return b;
   }
+  for (const b of liveByRemoteSessionId.values()) {
+    if (b.agentSessionId === agentSessionId) return b;
+  }
+  return null;
+}
+
+export function getLiveBindingByUuid(remoteSessionUuid) {
+  if (!remoteSessionUuid) return null;
+  const want = String(remoteSessionUuid);
+  for (const b of liveByRemoteSessionId.values()) {
+    if (b.remoteSessionUuid && String(b.remoteSessionUuid) === want) return b;
+  }
+  return null;
+}
+
+/**
+ * Shared BiB target resolution (trajectory ↔ remote_session ↔ agent session).
+ * Priority: trajectoryId → remoteSessionId/uuid → sessionId →
+ * (only when no identity keys given) single attached binding.
+ * @param {{ trajectoryId?: number|null, sessionId?: string|null, remoteSessionId?: number|null, remoteSessionUuid?: string|null }} opts
+ * @returns {LiveBinding|null}
+ */
+export function resolveLiveBinding(opts = {}) {
+  const tid = opts.trajectoryId != null ? Number(opts.trajectoryId) : null;
+  const hasTid = Number.isFinite(tid);
+  const hasRemoteId = opts.remoteSessionId != null && Number.isFinite(Number(opts.remoteSessionId));
+  const hasRemoteUuid = !!opts.remoteSessionUuid;
+  const hasSessionId = !!opts.sessionId;
+  const hasIdentity = hasTid || hasRemoteId || hasRemoteUuid || hasSessionId;
+
+  if (hasTid) {
+    const b = getLiveBindingByTrajectory(tid);
+    if (b) return b;
+  }
+
+  if (hasRemoteId) {
+    const b = getLiveBindingByRemoteSessionId(opts.remoteSessionId);
+    if (b) return b;
+  }
+
+  if (hasRemoteUuid) {
+    const b = getLiveBindingByUuid(opts.remoteSessionUuid);
+    if (b) return b;
+  }
+
+  if (hasSessionId) {
+    const b = getLiveBindingByAgentSession(opts.sessionId);
+    if (b) return b;
+  }
+
+  // Safe legacy fallback: only when caller sent no identity at all.
+  if (!hasIdentity) {
+    const attached = [...liveByRemoteSessionId.values()].filter((b) => b.attached);
+    if (attached.length === 1) return attached[0];
+  }
+
   return null;
 }
 
@@ -444,7 +505,7 @@ export async function detachLive(opts = {}) {
 }
 
 /**
- * @param {{ trajectoryId?: number, remoteSessionId?: number, sessionId?: string }} [opts]
+ * @param {{ trajectoryId?: number, remoteSessionId?: number, remoteSessionUuid?: string, sessionId?: string }} [opts]
  */
 export async function getLiveStatus(opts = {}) {
   if (!USE_EXECUTOR) {
@@ -452,45 +513,16 @@ export async function getLiveStatus(opts = {}) {
     return bridge.getRemoteStatus();
   }
 
-  if (opts.trajectoryId != null) {
-    const b = getLiveBindingByTrajectory(opts.trajectoryId);
-    if (b) return bindingToStatus(b);
-    return {
-      attached: false,
-      remoteSessionId: null,
-      remoteSessionUuid: null,
-      sessionId: null,
-      trajectoryId: Number(opts.trajectoryId),
-      cdpReady: true,
-      inputEnabled: false,
-      agentBusy: false,
-      viewportW: 1920,
-      viewportH: 1080,
-      manualRecording: false,
-    };
-  }
+  const binding = resolveLiveBinding(opts);
+  if (binding) return bindingToStatus(binding);
 
-  if (opts.remoteSessionId != null) {
-    const b = getLiveBindingByRemoteSessionId(opts.remoteSessionId);
-    if (b) return bindingToStatus(b);
-  }
-
-  if (opts.sessionId) {
-    const b = getLiveBindingByAgentSession(opts.sessionId);
-    if (b) return bindingToStatus(b);
-  }
-
-  // Legacy no-arg: return first attached binding (engineering dashboard)
-  for (const b of liveByRemoteSessionId.values()) {
-    if (b.attached) return bindingToStatus(b);
-  }
-
+  const tid = opts.trajectoryId != null ? Number(opts.trajectoryId) : null;
   return {
     attached: false,
     remoteSessionId: null,
     remoteSessionUuid: null,
     sessionId: null,
-    trajectoryId: null,
+    trajectoryId: Number.isFinite(tid) ? tid : null,
     cdpReady: true,
     inputEnabled: false,
     agentBusy: false,
