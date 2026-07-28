@@ -88,6 +88,10 @@ export async function runDefaultLogin(runtime, account, system = null) {
       session.busy = false;
       session.activePhaseId = null;
     }
+    try {
+      const { broadcastWatcherStatus } = await import('../routes/browser-session/broadcasts.js');
+      broadcastWatcherStatus();
+    } catch {}
   }
 }
 

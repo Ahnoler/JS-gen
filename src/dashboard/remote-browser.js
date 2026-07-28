@@ -196,8 +196,20 @@ export function setRemoteLog(fn) {
 
 function eventBelongsHere(payload = {}) {
   if (preferredTrajectoryId == null) return true;
-  if (payload.trajectoryId == null) return true;
-  return Number(payload.trajectoryId) === preferredTrajectoryId;
+  if (payload.trajectoryId != null) {
+    return Number(payload.trajectoryId) === preferredTrajectoryId;
+  }
+  // Unscoped attach/identity updates must not clobber a traj-scoped studio
+  // (e.g. global live/status with attached:false while prepare frames still flow).
+  if (
+    'attached' in payload
+    || 'remoteSessionId' in payload
+    || 'remoteSessionUuid' in payload
+    || 'inputEnabled' in payload
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function tabLabel(tab) {
@@ -266,7 +278,7 @@ async function switchRemoteTab(tab) {
   switchingTab = true;
   try {
     remoteLog(`切换标签 → ${tabLabel(tab)}`);
-    const sent = send('remote:switch_tab', {
+    const sent = sendRemote('remote:switch_tab', {
       targetId: tab.targetId,
       url: tab.url || '',
       pageId: tab.pageId ?? null,
@@ -276,7 +288,7 @@ async function switchRemoteTab(tab) {
     remoteTabs = remoteTabs.map((t) => ({ ...t, active: t.targetId === tab.targetId }));
     renderTabs();
     // Refresh authoritative list after switch
-    setTimeout(() => send('remote:tabs', {}), 300);
+    setTimeout(() => sendRemote('remote:tabs', {}), 300);
   } finally {
     switchingTab = false;
   }
@@ -284,7 +296,7 @@ async function switchRemoteTab(tab) {
 
 function refreshRemoteTabs() {
   if (!attached && !remoteSessionId) return;
-  send('remote:tabs', {});
+  sendRemote('remote:tabs', {});
 }
 
 function applyStatus(payload = {}) {
@@ -517,6 +529,17 @@ function normCoords(evt) {
   return { x, y };
 }
 
+function remoteRoutePayload(extra = {}) {
+  const payload = { ...extra };
+  if (preferredTrajectoryId != null) payload.trajectoryId = preferredTrajectoryId;
+  if (preferredSessionId) payload.sessionId = preferredSessionId;
+  return payload;
+}
+
+function sendRemote(type, extra = {}) {
+  return send(type, remoteRoutePayload(extra));
+}
+
 function sendMouse(type, evt, extra = {}) {
   if (!streaming) return;
   const coords = normCoords(evt);
@@ -525,7 +548,7 @@ function sendMouse(type, evt, extra = {}) {
   const hoverOnly = !!extra.hoverOnly;
   if (!hoverOnly && !inputEnabled) return;
   if (!hoverOnly) evt.preventDefault();
-  send('remote:input', {
+  sendRemote('remote:input', {
     kind: 'mouse',
     type,
     x: coords.x,
@@ -556,9 +579,7 @@ export async function armRemoteStream(opts = {}) {
   const wsOk = await waitUntilConnected(10000);
   if (!wsOk) return false;
   streaming = true;
-  send('remote:subscribe', {
-    trajectoryId: preferredTrajectoryId || undefined,
-  });
+  sendRemote('remote:subscribe', {});
   fitCanvasToStage();
   return true;
 }
@@ -693,14 +714,9 @@ async function startStream() {
     remoteLog('推流指令未发出：/ws 未连接', 'err');
     return false;
   }
-  send('remote:subscribe', {
-    trajectoryId: preferredTrajectoryId || undefined,
-  });
+  sendRemote('remote:subscribe', {});
   // No viewportW/H — must not Emulation-resize Session Chrome
-  const sent = send('remote:start', {
-    quality: 75,
-    trajectoryId: preferredTrajectoryId || undefined,
-  });
+  const sent = sendRemote('remote:start', { quality: 75 });
   fitCanvasToStage();
   if (!sent) {
     remoteLog('remote:start 发送失败', 'err');
@@ -712,8 +728,8 @@ async function startStream() {
 
 function stopStream() {
   streaming = false;
-  send('remote:stop', {});
-  send('remote:unsubscribe', {});
+  sendRemote('remote:stop', {});
+  sendRemote('remote:unsubscribe', {});
 }
 
 /** Clear canvas + local attach state after full resource release (idle / detach). */
@@ -784,13 +800,13 @@ function bindCanvasInput() {
     if (!inputEnabled) return;
     const coords = normCoords(e);
     if (!coords) return;
-    send('remote:input', {
+    sendRemote('remote:input', {
       kind: 'mouse', type: 'mouseMoved', x: coords.x, y: coords.y,
       button: 'left', buttons: e.buttons,
     });
   });
   canvas.addEventListener('mouseleave', () => {
-    send('remote:inspect', { clear: true });
+    sendRemote('remote:inspect', { clear: true });
   });
 
   function forwardWheel(e) {
@@ -807,7 +823,7 @@ function bindCanvasInput() {
       const h = Math.max(240, canvas?.clientHeight || 720);
       dx *= h; dy *= h;
     }
-    send('remote:input', {
+    sendRemote('remote:input', {
       kind: 'mouse',
       type: 'mouseWheel',
       x: coords.x,
@@ -841,14 +857,14 @@ function bindCanvasInput() {
       // Client-side dedupe (guards double window listeners / repeat storms)
       if (lastSentKey.ch === e.key && now - lastSentKey.t < 20) return;
       lastSentKey = { ch: e.key, t: now };
-      send('remote:input', { kind: 'text', text: e.key });
+      sendRemote('remote:input', { kind: 'text', text: e.key });
       return;
     }
     // Ignore browser key-repeat flood for navigation keys slightly
     if (e.repeat && (e.key === 'Backspace' || e.key === 'Delete')) {
       // allow repeat for backspace
     }
-    send('remote:input', {
+    sendRemote('remote:input', {
       kind: 'key',
       type: 'keyDown',
       key: e.key,
@@ -866,7 +882,7 @@ function bindCanvasInput() {
     }
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) return;
     e.preventDefault();
-    send('remote:input', {
+    sendRemote('remote:input', {
       kind: 'key',
       type: 'keyUp',
       key: e.key,
@@ -995,8 +1011,27 @@ export function initRemoteBrowser() {
   let lastAgentBusy = false;
   on('watcher:status', (p) => {
     if (!p) return;
+    // Prefer traj/session-scoped live status over global agentBusy (multi-traj safe).
+    if (preferredTrajectoryId != null || preferredSessionId) {
+      fetchLiveStatus()
+        .then((status) => {
+          if (!status) return;
+          applyStatus({
+            ...status,
+            connected: p.connected ?? status.connected,
+            cdpReady: p.cdpReady != null ? !!p.cdpReady : status.cdpReady,
+          });
+          const busy = !!status.agentBusy;
+          if (lastAgentBusy && !busy && attached) {
+            sendRemote('remote:start', {});
+            sendRemote('remote:status', {});
+          }
+          lastAgentBusy = busy;
+        })
+        .catch(() => {});
+      return;
+    }
     const busy = !!p.agentBusy;
-    // Prefer watcher busy flip; keep attached from last remote:status (do not invent attach=false)
     applyStatus({
       connected: !!p.connected,
       cdpReady: p.cdpReady != null ? !!p.cdpReady : cdpReady,
@@ -1004,23 +1039,22 @@ export function initRemoteBrowser() {
       inputEnabled: attached && !busy,
     });
     if (lastAgentBusy && !busy && attached) {
-      send('remote:start', {});
-      // Re-fetch authoritative BiB status after agent unlocks
-      send('remote:status', {});
+      sendRemote('remote:start', {});
+      sendRemote('remote:status', {});
     }
     lastAgentBusy = busy;
   });
   on('session:phase_done', () => {
-    if (attached) applyStatus({ agentBusy: false, inputEnabled: true });
+    if (attached) applyStatus({ agentBusy: false, inputEnabled: true, trajectoryId: preferredTrajectoryId });
   });
   on('session:done', () => {
-    if (attached) applyStatus({ agentBusy: false, inputEnabled: true });
+    if (attached) applyStatus({ agentBusy: false, inputEnabled: true, trajectoryId: preferredTrajectoryId });
   });
   on('session:phase_error', () => {
-    if (attached) applyStatus({ agentBusy: false, inputEnabled: true });
+    if (attached) applyStatus({ agentBusy: false, inputEnabled: true, trajectoryId: preferredTrajectoryId });
   });
   on('session:error', () => {
-    if (attached) applyStatus({ agentBusy: false, inputEnabled: true });
+    if (attached) applyStatus({ agentBusy: false, inputEnabled: true, trajectoryId: preferredTrajectoryId });
   });
   on('server:init', (data) => {
     const w = data?.watcher;
@@ -1030,6 +1064,16 @@ export function initRemoteBrowser() {
         cdpReady: !!w.cdpReady,
         agentBusy: !!w.agentBusy,
       });
+    }
+  });
+  on('ws:connected', () => {
+    // Rebind traj scope after reconnect — otherwise frames keep flowing but input has no pick.
+    if (streaming || attached || preferredTrajectoryId != null || preferredSessionId) {
+      sendRemote('remote:subscribe', {});
+      if (streaming || attached) {
+        sendRemote('remote:start', { quality: 75 });
+        sendRemote('remote:status', {});
+      }
     }
   });
 
@@ -1048,12 +1092,11 @@ export function initRemoteBrowser() {
     enqueueJpeg(parsed.jpeg);
   });
 
-  fetch('/api/v2/remote-sessions/live/status')
-    .then((r) => r.json())
-    .then((raw) => applyStatus(unwrapApi(raw) || {}))
+  fetchLiveStatus()
+    .then((status) => { if (status) applyStatus(status); })
     .catch(() => {});
 
-  if (isConnected()) send('remote:status', {});
+  if (isConnected()) sendRemote('remote:status', {});
 }
 
 export { parseFrame };

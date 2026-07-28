@@ -345,7 +345,10 @@ async function prepare() {
     if (streamOk) {
       // Server already attached + bib_start; just ensure client subscribe/startStream.
       try {
-        await ensureRemoteStream({ sessionId: data.sessionId || undefined });
+        await ensureRemoteStream({
+          sessionId: data.sessionId || undefined,
+          trajectoryId: trajId,
+        });
         log(`画面已就绪 remoteSession #${data.remoteSessionId}`, 'ok');
       } catch (e) {
         log(`画布订阅失败: ${e.message}（可点左侧「附着/推流」重试）`, 'err');
@@ -659,6 +662,7 @@ async function main() {
   });
   setRemoteLog((msg, level) => log(msg, level === 'err' ? 'err' : level === 'ok' ? 'ok' : undefined));
   initRemoteBrowser();
+  if (trajId) setRemotePreferredTrajectoryId(trajId);
   $('rsAiStartBtn').addEventListener('click', startAi);
   $('rsManualBtn').addEventListener('click', toggleManual);
   $('rsStopBtn').addEventListener('click', stopRecord);

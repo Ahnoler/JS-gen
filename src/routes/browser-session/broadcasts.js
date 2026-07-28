@@ -19,9 +19,26 @@ export function broadcastSessions() {
 /** Prefer executor live BiB status when USE_EXECUTOR — local bridge is always detached then. */
 function pushRemoteStatus() {
   if (USE_EXECUTOR) {
-    remoteSessionService.getLiveStatus()
-      .then((s) => broadcast('remote:status', s))
-      .catch(() => {});
+    // Broadcast per attached binding so traj-scoped studios do not get clobbered
+    // by an unscoped attached:false / wrong-traj status.
+    const bindings = remoteSessionService.listLiveBindings?.() || [];
+    const attached = bindings.filter((b) => b.attached);
+    if (!attached.length) {
+      remoteSessionService.getLiveStatus()
+        .then((s) => broadcast('remote:status', s))
+        .catch(() => {});
+      return;
+    }
+    Promise.all(
+      attached.map((b) => remoteSessionService.getLiveStatus({
+        trajectoryId: b.trajectoryId ?? undefined,
+        remoteSessionId: b.remoteSessionId,
+      }).catch(() => null)),
+    ).then((statuses) => {
+      for (const s of statuses) {
+        if (s) broadcast('remote:status', s);
+      }
+    }).catch(() => {});
     return;
   }
   broadcast('remote:status', getRemoteStatus());

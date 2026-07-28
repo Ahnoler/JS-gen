@@ -8,6 +8,7 @@ import { broadcast, broadcastBinary, onWsMessage } from '../ws-server.js';
 import * as remoteSessionService from '../services/remote-session-service.js';
 import { USE_EXECUTOR } from '../../config/config.js';
 import { sendToExecutor } from '../executor-session-client.js';
+import { getTrajectoryRuntime } from '../services/trajectory-runtime.js';
 import {
   enableInspect, highlightAt, hideHighlight, resolvePayloadAt, suppressPageManualRecorder,
   resolveFocusedFillPayload, resolveCommittedDateFillPayload, snapshotDateEditorValues,
@@ -693,28 +694,78 @@ async function handleViewport(payload) {
   broadcastStatus();
 }
 
-/** @type {WeakMap<import('ws').WebSocket, { trajectoryId: number|null }>} */
+/** @type {WeakMap<import('ws').WebSocket, { trajectoryId: number|null, sessionId: string|null }>} */
 const wsTrajectoryBind = new WeakMap();
 
-function resolveExecutorPick(trajectoryId) {
-  if (trajectoryId != null) {
-    const binding = remoteSessionService.getLiveBindingByTrajectory?.(trajectoryId);
-    if (binding?.agentSessionId) {
-      const session = state.sessions.get(binding.agentSessionId);
-      if (session?.useExecutor && session?.executorNodeUuid) {
+function pickFromBinding(binding, trajectoryId = null) {
+  if (!binding?.agentSessionId) return null;
+  const session = state.sessions.get(binding.agentSessionId);
+  const nodeUuid = session?.executorNodeUuid || binding.nodeUuid;
+  if (!nodeUuid) return null;
+  // Prefer executor-backed sessions; allow nodeUuid from binding after mild state drift.
+  if (session && session.useExecutor === false) return null;
+  return {
+    executorNodeUuid: nodeUuid,
+    sessionId: binding.agentSessionId,
+    trajectoryId: binding.trajectoryId != null
+      ? Number(binding.trajectoryId)
+      : (trajectoryId != null ? Number(trajectoryId) : null),
+    remoteSessionId: binding.remoteSessionId,
+  };
+}
+
+function pickFromAgentSession(sessionId, trajectoryId = null) {
+  if (!sessionId) return null;
+  const binding = remoteSessionService.getLiveBindingByAgentSession?.(sessionId);
+  const fromBinding = pickFromBinding(binding, trajectoryId);
+  if (fromBinding) return fromBinding;
+
+  const session = state.sessions.get(sessionId);
+  if (session?.useExecutor && session?.executorNodeUuid) {
+    return {
+      executorNodeUuid: session.executorNodeUuid,
+      sessionId,
+      trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
+      remoteSessionId: null,
+    };
+  }
+  return null;
+}
+
+/**
+ * Resolve which executor session should receive remote:* commands.
+ * Prefer trajectory live binding; fall back to agent session / traj runtime.
+ */
+function resolveExecutorPick(trajectoryId, { sessionId = null } = {}) {
+  const tid = trajectoryId != null ? Number(trajectoryId) : null;
+
+  if (Number.isFinite(tid)) {
+    const binding = remoteSessionService.getLiveBindingByTrajectory?.(tid);
+    const picked = pickFromBinding(binding, tid);
+    if (picked) return picked;
+  }
+
+  if (sessionId) {
+    const picked = pickFromAgentSession(sessionId, tid);
+    if (picked) return picked;
+  }
+
+  if (Number.isFinite(tid)) {
+    const runtime = getTrajectoryRuntime(tid);
+    if (runtime?.sessionId) {
+      const picked = pickFromAgentSession(runtime.sessionId, tid);
+      if (picked) return picked;
+      if (runtime.executorNodeUuid) {
         return {
-          executorNodeUuid: session.executorNodeUuid || binding.nodeUuid,
-          sessionId: binding.agentSessionId,
-          trajectoryId: binding.trajectoryId,
-          remoteSessionId: binding.remoteSessionId,
+          executorNodeUuid: runtime.executorNodeUuid,
+          sessionId: runtime.sessionId,
+          trajectoryId: tid,
+          remoteSessionId: runtime.remoteSessionId || null,
         };
       }
     }
-    // Fallback: runtime session for this traj even if BiB not attached yet
-    try {
-      // lazy — avoid circular import at module load
-    } catch {}
   }
+
   return null;
 }
 
@@ -731,9 +782,14 @@ function ensureWsHook() {
         const trajectoryId = msg.payload?.trajectoryId != null
           ? Number(msg.payload.trajectoryId)
           : null;
-        wsTrajectoryBind.set(ws, { trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : null });
+        const sessionId = msg.payload?.sessionId || null;
+        wsTrajectoryBind.set(ws, {
+          trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : null,
+          sessionId: sessionId || null,
+        });
         const live = await remoteSessionService.getLiveStatus({
           trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
+          sessionId: sessionId || undefined,
         }).catch(() => null);
         ws.send(JSON.stringify({
           type: 'remote:status',
@@ -750,17 +806,20 @@ function ensureWsHook() {
       const trajectoryId = msg.payload?.trajectoryId != null
         ? Number(msg.payload.trajectoryId)
         : bind.trajectoryId;
+      const sessionId = msg.payload?.sessionId || bind.sessionId || null;
       const live = await remoteSessionService.getLiveStatus({
         trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
+        sessionId: sessionId || undefined,
       }).catch(() => null);
 
-      let pick = null;
-      if (Number.isFinite(trajectoryId)) {
-        pick = resolveExecutorPick(trajectoryId);
-      }
-      // No "first useExecutor" fallback — avoid cross-traj routing.
+      const pick = resolveExecutorPick(
+        Number.isFinite(trajectoryId) ? trajectoryId : null,
+        { sessionId },
+      );
 
       if (!pick) {
+        // Do not invent attached:false for input — that would lock the canvas while
+        // prepare's bib_start is still broadcasting frames.
         if (
           type === 'remote:status'
           || type === 'remote:start'
@@ -776,26 +835,44 @@ function ensureWsHook() {
               trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : null,
             },
           }));
+        } else if (type === 'remote:input') {
+          console.warn(
+            '[remote-bridge] drop remote:input — no executor pick',
+            { trajectoryId, sessionId },
+          );
         }
         return;
       }
 
-      const { executorNodeUuid, sessionId } = pick;
+      const { executorNodeUuid, sessionId: pickSessionId } = pick;
 
       try {
         if (type === 'remote:start') {
-          sendToExecutor(executorNodeUuid, 'session.bib_start', { sessionId });
+          sendToExecutor(executorNodeUuid, 'session.bib_start', { sessionId: pickSessionId });
         } else if (type === 'remote:stop') {
-          sendToExecutor(executorNodeUuid, 'session.bib_stop', { sessionId });
+          sendToExecutor(executorNodeUuid, 'session.bib_stop', { sessionId: pickSessionId });
         } else if (type === 'remote:ack') {
-          sendToExecutor(executorNodeUuid, 'session.bib_ack', { sessionId, ...(msg.payload || {}) });
+          sendToExecutor(executorNodeUuid, 'session.bib_ack', {
+            sessionId: pickSessionId,
+            ...(msg.payload || {}),
+          });
         } else if (type === 'remote:input') {
-          sendToExecutor(executorNodeUuid, 'session.bib_input', { sessionId, ...(msg.payload || {}) });
+          // Strip routing keys so executor Input.* payload stays clean
+          const {
+            trajectoryId: _t,
+            sessionId: _s,
+            remoteSessionId: _r,
+            ...inputPayload
+          } = msg.payload || {};
+          sendToExecutor(executorNodeUuid, 'session.bib_input', {
+            sessionId: pickSessionId,
+            ...inputPayload,
+          });
         } else if (type === 'remote:tabs') {
-          sendToExecutor(executorNodeUuid, 'session.bib_tabs', { sessionId });
+          sendToExecutor(executorNodeUuid, 'session.bib_tabs', { sessionId: pickSessionId });
         } else if (type === 'remote:switch_tab') {
           sendToExecutor(executorNodeUuid, 'session.bib_switch_tab', {
-            sessionId,
+            sessionId: pickSessionId,
             targetId: msg.payload?.targetId,
             url: msg.payload?.url,
             pageId: msg.payload?.pageId,
@@ -812,6 +889,7 @@ function ensureWsHook() {
       ) {
         const live2 = await remoteSessionService.getLiveStatus({
           trajectoryId: Number.isFinite(trajectoryId) ? trajectoryId : undefined,
+          sessionId: pickSessionId || undefined,
         }).catch(() => null);
         ws.send(JSON.stringify({
           type: 'remote:status',
