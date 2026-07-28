@@ -131,6 +131,8 @@ export async function listEntriesByTrajectory(trajectoryId) {
 
 /**
  * Replace all case entries bound to a trajectory (delete + insert).
+ * Empty / unconfigured case data is a no-op when the column is missing
+ * (treat as "no case data"), so draft save without KV still succeeds.
  * @param {number} trajectoryId
  * @param {Array} entries raw caseEntries
  * @param {import('knex').Knex.Transaction} [trx]
@@ -140,7 +142,11 @@ export async function replaceEntriesForTrajectory(trajectoryId, entries, trx = n
   if (!Number.isFinite(tid) || tid <= 0) {
     throw new Error('Invalid trajectory id');
   }
-  if (!(await hasEntryTrajectoryId(trx || getDB()))) {
+  const normalized = normalizeCaseEntries(entries);
+  const hasCol = await hasEntryTrajectoryId(trx || getDB());
+  if (!hasCol) {
+    // No schema support yet: unconfigured (empty) → default none; configured → ask migrate
+    if (!normalized.length) return [];
     const err = new Error(
       'case_data_entry.trajectory_id missing — run: npx knex migrate:latest --knexfile config/knexfile.js',
     );
@@ -148,7 +154,6 @@ export async function replaceEntriesForTrajectory(trajectoryId, entries, trx = n
     throw err;
   }
   const db = trx || getDB();
-  const normalized = normalizeCaseEntries(entries);
   const run = async (client) => {
     await client(ENTRY_TABLE).where({ trajectory_id: tid }).del();
     if (!normalized.length) return [];
