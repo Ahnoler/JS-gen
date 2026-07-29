@@ -15,6 +15,7 @@ CTRL.* ↔ primary JS_* (or action) mapping:
     clickRadio         → JS_CLICK_RADIO
     selectTreeOption   → JS_SELECT_TREE_OPTION
     waitForLoading     → JS_WAIT_LOADING
+    clickIconButton    → JS_CLICK_ICON_BUTTON (+ click_icon_button in _misc.py)
     (navigation/table/dialog/adjacent/expand/address/verifyFormStructure
      live as inline evaluate or actions in _navigation/_table/_misc/_form;
      fillAddressFields / verifyFormStructure are assembler/replay-oriented)
@@ -1425,4 +1426,81 @@ JS_ENRICH_CLICK_LOCATOR = r'''([xpath, text, tagHint]) => {
     })(),
     candidates: candidates,
   };
+}'''
+
+# ── Icon buttons (el-tooltip + aria-describedby → tooltip text) ──────────────
+# Shared helpers concatenated into stamp / collect / click snippets.
+
+_JS_ICON_BUTTON_HELPERS = r'''
+function _iconNormText(s) { return (s || '').replace(/\s+/g, ' ').trim(); }
+function _iconTooltipText(el) {
+  const id = el.getAttribute('aria-describedby');
+  if (!id) return '';
+  const tip = document.getElementById(id);
+  if (!tip) return '';
+  const clone = tip.cloneNode(true);
+  clone.querySelectorAll('.popper__arrow,[x-arrow]').forEach(n => n.remove());
+  return _iconNormText(clone.textContent);
+}
+function _iconResolveLabel(el) {
+  return _iconNormText(el.getAttribute('aria-label'))
+    || _iconNormText(el.getAttribute('title'))
+    || _iconTooltipText(el);
+}
+function _iconCandidates(root) {
+  const sel = 'a.el-tooltip, button.el-tooltip, [aria-describedby].el-tooltip, [aria-describedby][class*="el-icon"]';
+  return [...(root || document).querySelectorAll(sel)];
+}
+function _iconIsVisible(el) {
+  return el.offsetParent !== null || !!el.closest('.el-table__fixed');
+}
+'''
+
+JS_STAMP_ICON_ARIA_LABELS = r'''() => {
+''' + _JS_ICON_BUTTON_HELPERS + r'''
+  let n = 0;
+  for (const el of _iconCandidates(document)) {
+    const existing = _iconNormText(el.getAttribute('aria-label'))
+      || _iconNormText(el.getAttribute('title'));
+    if (existing) continue;
+    const tip = _iconTooltipText(el);
+    if (!tip) continue;
+    el.setAttribute('aria-label', tip);
+    n++;
+  }
+  return n;
+}'''
+
+JS_COLLECT_ICON_BUTTONS = r'''() => {
+''' + _JS_ICON_BUTTON_HELPERS + r'''
+  const root = ''' + JS_GET_CONTAINER + r''';
+  const iconButtons = [];
+  const seen = new Set();
+  for (const el of _iconCandidates(root)) {
+    if (!_iconIsVisible(el)) continue;
+    const text = _iconResolveLabel(el);
+    if (!text) continue;
+    const className = typeof el.className === 'string' ? el.className : '';
+    const key = text + '|' + className;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    iconButtons.push({ text, className });
+  }
+  return iconButtons;
+}'''
+
+JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
+''' + _JS_ICON_BUTTON_HELPERS + r'''
+  if (!buttonText) return 'button-text-empty';
+  const root = ''' + JS_GET_CONTAINER + r''';
+  for (const el of _iconCandidates(root)) {
+    if (!_iconIsVisible(el)) continue;
+    const label = _iconResolveLabel(el);
+    if (label === buttonText || (label && label.includes(buttonText))) {
+      el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      el.click();
+      return 'ok';
+    }
+  }
+  return 'not-found';
 }'''

@@ -499,6 +499,17 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append('')
         return '\n'.join(lines)
 
+    # ---- click_icon_button ----
+    if action == 'click_icon_button':
+        t = p('button_text')
+        lines.append(f"    console.log('[{step_num}] Icon button \"{t}\"');")
+        lines.append(pre())
+        lines.append(pre_ready())
+        lines.append(f"    const _ib{step_num} = await page.evaluate(() => CTRL.clickIconButton('{_escape(t)}'));")
+        lines.append(f"    if (_ib{step_num} === 'not-found' || _ib{step_num} === 'button-text-empty') _recordError({step_num}, 'click_icon_button', '{_escape_js_string(t)}', '', _ib{step_num}, 'Icon button not found by tooltip text');")
+        lines.append("    await page.evaluate(() => CTRL.waitForLoading());")
+        return '\n'.join(lines)
+
     # ---- click_radio ----
     if action == 'click_radio':
         l, o = p('label_text'), p('option_text') or p('value')
@@ -762,7 +773,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
 # ========================== Assembly ==========================
 
 FILL_ACTIONS = {'fill_form_field', 'fill_date_field', 'select_option', 'click_radio', 'select_tree_option'}
-BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'switch_tab', 'close_dialog', 'go_to_url'}
+BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'click_icon_button', 'switch_tab', 'close_dialog', 'go_to_url'}
 
 def assemble_script(action_entries, target_url=None, form_snapshots=None):
     """Assemble a complete Playwright script from recorded action entries.

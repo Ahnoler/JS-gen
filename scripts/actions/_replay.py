@@ -54,6 +54,7 @@ _ACTION_NAME_ALIASES = {
     'clickTableRowButton': 'click_table_row_button',
     'clickTableRowRadio': 'click_table_row_radio',
     'clickAdjacentButton': 'click_adjacent_button',
+    'clickIconButton': 'click_icon_button',
     'closeDialog': 'close_dialog',
     'waitForLoading': 'wait_for_loading',
     'goToUrl': 'go_to_url',

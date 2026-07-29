@@ -35,6 +35,18 @@ from .form_rules import (
     match_rule, match_cert_number, get_has_button_keywords,
     _gen_name,
 )
+from ._case_data import lookup_case_value
+
+# Search/picker dialogs — agent must control which query fields to fill.
+# Data-entry dialogs (新增/编辑/校验…) still get auto-fill + case data.
+_SEARCH_DIALOG_HINTS = ('查询', '搜索', '查找', '选择客户', '选择法人', '引入', '挑选')
+
+
+def _is_search_dialog(container_id: str) -> bool:
+    if not (container_id or '').startswith('dialog:'):
+        return False
+    title = container_id[7:]
+    return any(h in title for h in _SEARCH_DIALOG_HINTS)
 
 # Read current 证件类型 / 证照类型 display value from the open form.
 _JS_READ_CERT_TYPE = '''(kw) => {
@@ -217,9 +229,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         1. task_list doesn't exist → first form on this task
         2. task_list exists but label not in pending/done → new form
 
-        Only triggers for main-page forms and drawers.  Dialogs are skipped
-        — they are search/utility dialogs where agent needs fine control
-        over which fields to fill.
+        Triggers for main-page, drawers, and data-entry dialogs.
+        Search/picker dialogs are skipped — agent needs fine control there.
 
         Skips auto-fill when _watcher_mode is set (CDP quick actions).
         """
@@ -227,8 +238,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             return  # CDP watcher: single-field action, no auto-scan
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
-        if container_id.startswith('dialog:'):
-            return  # skip: agent manages dialog fields manually
+        if _is_search_dialog(container_id):
+            return  # skip: search/picker dialogs — agent manages fields
 
         tl = TaskList.from_store(case_data_store.get('task_list'))
         if tl.total > 0:
@@ -339,8 +350,13 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         _record_action('login', {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code}, 'ok-login')
         return _ok('ok-login | ' + ' '.join(results))
 
-    @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code).')
+    @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code). Prefers case_data_store presets when present.')
     async def match_form_rule(label_text: str):
+        preset = lookup_case_value(case_data_store, label_text)
+        if preset:
+            sys.stderr.write(f'[match-form-rule] case_data preset {label_text!r} → {preset}\n')
+            sys.stderr.flush()
+            return preset
         t = (label_text or '').replace(' ', '')
         if '证件号码' in t or (t.endswith('证件号') and '类型' not in t):
             page = await browser_context.get_current_page()
@@ -647,9 +663,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 f'{kind_name}: {len(sub)}个字段',
             )
 
-            # ---- Cross-field: cert type -> cert number ----
-            # When cert_number is in the input group and cert_type was already
-            # selected, inject the matching format as commandValue (Priority 1).
+            # ---- Cross-field: cert type -> cert number / customer name ----
+            # Only fill gaps — never overwrite user case_data presets (commandValue).
             if idx == KIND_ORDER['input']:
                 _has_cert_num = any(
                     '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or '')
@@ -662,10 +677,19 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                         _ct = ''
                     _ov = match_cert_number(_ct or '')
                     for d in sub:
-                        if '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or ''):
-                            d['commandValue'] = _ov
-                            sys.stderr.write(f'[cert-detect] cert_type="{_ct}" -> cert_number override: {_ov}\n')
-                            sys.stderr.flush()
+                        lbl = d.get('label', '') or ''
+                        if '证件号码' in lbl or '证件号' in lbl:
+                            if d.get('commandValue') and str(d.get('commandValue')).strip():
+                                sys.stderr.write(
+                                    f'[cert-detect] keep case_data cert_number={d["commandValue"]!r}\n'
+                                )
+                                sys.stderr.flush()
+                            else:
+                                d['commandValue'] = _ov
+                                sys.stderr.write(
+                                    f'[cert-detect] cert_type="{_ct}" -> cert_number override: {_ov}\n'
+                                )
+                                sys.stderr.flush()
                             break
                     # ---- Cross-field: cert type -> customer name ----
                     _has_cust_name = any(
@@ -678,10 +702,19 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                         else:
                             _name_ov = _gen_name()
                         for d_name in sub:
-                            if '客户名称' in (d_name.get('label', '') or '') or '客户姓名' in (d_name.get('label', '') or ''):
-                                d_name['commandValue'] = _name_ov
-                                sys.stderr.write(f'[cert-detect] cert_type="{_ct}" -> customer name: {_name_ov}\n')
-                                sys.stderr.flush()
+                            nlbl = d_name.get('label', '') or ''
+                            if '客户名称' in nlbl or '客户姓名' in nlbl:
+                                if d_name.get('commandValue') and str(d_name.get('commandValue')).strip():
+                                    sys.stderr.write(
+                                        f'[cert-detect] keep case_data name={d_name["commandValue"]!r}\n'
+                                    )
+                                    sys.stderr.flush()
+                                else:
+                                    d_name['commandValue'] = _name_ov
+                                    sys.stderr.write(
+                                        f'[cert-detect] cert_type="{_ct}" -> customer name: {_name_ov}\n'
+                                    )
+                                    sys.stderr.flush()
                                 break
 
             actions = _llm_generate_values(llm, sub, form_rules=form_rules, case_data_store=case_data_store)
@@ -817,9 +850,13 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     continue
             new_pending.append(f.model_dump())
         if new_pending:
+            for d in new_pending:
+                preset = lookup_case_value(case_data_store, d.get('label', ''))
+                if preset:
+                    d['commandValue'] = preset
             new_labels = [d.get('label', '') for d in new_pending]
             for d in new_pending:
-                item = TaskItem(**d)
+                item = TaskItem(**{k: v for k, v in d.items() if k != 'commandValue'})
                 if d.get('disabled') and d.get('hasButton'):
                     item.needs_intervention = True
                 tl.pending.append(item)
@@ -844,13 +881,15 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if not pending:
             return _ok('nothing-pending')
 
-        # 构建待填字段列表（带 commandValue 注解）
+        # 构建待填字段列表（带 commandValue 注解；案例数据优先）
         pending_dicts: list[dict] = []
         for item in pending:
             d = item.model_dump()
-            user_val = case_data_store.get(item.label)
-            if user_val and str(user_val).strip():
-                d['commandValue'] = str(user_val).strip()
+            user_val = lookup_case_value(case_data_store, item.label)
+            if user_val:
+                d['commandValue'] = user_val
+                sys.stderr.write(f'[autofill] case_data → {item.label}={user_val!r}\n')
+                sys.stderr.flush()
             pending_dicts.append(d)
 
         label_kind: dict[str, str] = {item.label: item.kind for item in pending}

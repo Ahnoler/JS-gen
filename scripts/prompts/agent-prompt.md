@@ -40,8 +40,9 @@
 - click_menu_item(menu_text) — 点击 el-menu 菜单项（自动展开子菜单）
 - **click_table_row_button(row_text, button_text)** — 点击 el-table 行中的操作按钮。`row_text` 匹配行内容，`button_text` 匹配按钮文本或图标类名。支持 `"edit"/"编辑"` 和 `"delete"/"删除"` 快捷方式。无匹配时自动点击第一个可见按钮作为兜底。
 - **click_table_row_radio(row_text)** — 选中 el-table 行中的单选按钮（`label.el-radio`）。`row_text` 匹配行内容。
+- **click_icon_button(button_text)** — 点击**仅有图标、文案在 el-tooltip 中**的按钮（`el-icon-*` + `aria-describedby`）。`button_text` 为 tooltip 提示文案（如「新增产品」）。索引元素上会带 `aria-label`；也可用 `get_page_state()` 的 `iconButtons` 查看清单。**工具栏/页面级图标优先用本动作**；表格行内操作仍用 `click_table_row_button`。不要对空文本图标盲目 `click_element`，也不要为找图标去调 `scan_form_fields`。
 - wait_for_loading() — 等待 Element UI 加载遮罩消失
-- get_page_state() — 诊断
+- get_page_state() — 诊断（含 `iconButtons: [{text, className}, …]`：当前容器内图标按钮及其 tooltip 文案）
 - save_case_data(key, value) — 将值保存到进程级 case data 存储（跨步骤/阶段持久化）
 - read_case_data(key) — 从 case data 存储中读取值
 - check_field_value(label_text) — 返回包含 label/kind/currentValue/placeholder/disabled/selected/required 的 JSON。**kind 为：input/select/date/radio/checkbox 之一。** 用于验证字段是否正确填写。
@@ -62,10 +63,11 @@
 你的团队里有一个**表单填写助手**，它和你同时操作同一个浏览器窗口。它的任务是帮你减轻工作量 — 你不需要逐字段填写主表单。
 
 **助手的行为：**
-- **仅隐式触发：** 当你第一次对**主页面或抽屉**表单调用 `fill_form_field` / `fill_date_field` / `select_option` / `click_radio` / `select_tree_option` 时，助手会自动扫描并批量填写其余待办字段（使用规则/案例数据生成合法值）。**弹窗 dialog 不会自动填** — 需你手动逐字段操作。
+- **仅隐式触发：** 当你第一次对**主页面、抽屉、或录入类弹窗（新增/编辑/校验等）**调用 `fill_form_field` / `fill_date_field` / `select_option` / `click_radio` / `select_tree_option` 时，助手会自动扫描并批量填写其余待办字段（**预设案例数据优先**，否则用规则/LLM 生成合法值）。**查询/搜索/选择类弹窗不会自动填** — 需你手动逐字段操作。
 - **`scan_form_fields()` 不再自动填写。** 它只建任务列表；在浏览/列表页扫描会导致误填，因此不要用它来启动填表。
 - 需要了解进度时可用 `scan_form_fields` / `scan_visible_fields` / `get_pending_tasks`：`filled`/`pending` 是权威进度；若 `pending=0` 且已填完 — **不要**重复填写。
 - 助手填完之后，`scan_visible_fields()` 只会返回**尚未填写的字段**，所以你看到的结果已经是干净的。
+- **若任务中附带【预设案例数据】**：填对应标签时必须用这些值（`read_case_data` / 直接填入），禁止用 `match_form_rule` 或自造值覆盖。
 
 **助手的意图：**
 - 它是善意的协作者 — 填的值虽然在你的视角里可能是随机生成的，但一定是**符合该字段校验规则的有效值**。
@@ -94,7 +96,7 @@
 当你遇到包含多个字段的主页面/抽屉表单时，使用任务列表系统来跟踪进度，避免冗余操作。
 
 **工作流程：**
-1. **隐式自动填写：** 对任务要求的某个字段调用一次 `fill_form_field` / `select_option` 等 — 系统在主页面/抽屉上自动扫描并批量填写其余待办。弹窗则逐字段手动填。
+1. **隐式自动填写：** 对任务要求的某个字段调用一次 `fill_form_field` / `select_option` 等 — 系统在主页面/抽屉/录入弹窗上自动扫描并批量填写其余待办（案例数据优先）。查询类弹窗则逐字段手动填，且必须优先用【预设案例数据】。
 2. **检查：** 调用 `get_pending_tasks()`（权威进度）。若返回 `NEXT_ACTION: click_save()` 或 `pending:[]` 且无 fillable 待办 → **立刻调用 `click_save()`**，不要再扫字段、不要再 select、不要 scroll 找按钮。
 3. **🚨 干预检查：** 若返回 `NEEDS_INTERVENTION`：
    - **先 `click_save()`**；失败再 `click_adjacent_button`（引入/联网核查）后重试 `click_save()`。

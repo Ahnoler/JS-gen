@@ -169,6 +169,29 @@ def patch_message_manager():
     MessageManager.get_messages = _patched_get_messages
 
 
+def patch_icon_tooltip_labels():
+    """Before DomService scans, stamp aria-label from el-tooltip aria-describedby.
+
+    Icon-only triggers often have empty text; browser-use already surfaces
+    aria-label in the indexed element list, so resolving tooltips into
+    aria-label lets the agent recognize buttons like 「新增产品」.
+    """
+    from browser_use.browser.context import BrowserContext
+    from .actions._js_snippets import JS_STAMP_ICON_ARIA_LABELS
+
+    _original_get_state = BrowserContext.get_state
+
+    async def _patched_get_state(self, cache_clickable_elements_hashes: bool):
+        try:
+            page = await self.get_current_page()
+            await page.evaluate(JS_STAMP_ICON_ARIA_LABELS)
+        except Exception:
+            pass
+        return await _original_get_state(self, cache_clickable_elements_hashes)
+
+    BrowserContext.get_state = _patched_get_state
+
+
 def create_llm(model, base_url, api_key=None):
     from langchain_openai import ChatOpenAI
     effective_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")

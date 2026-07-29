@@ -18,7 +18,7 @@ from browser_use.browser.context import BrowserContextConfig
 from .agent_utils import (
     emit_json, extract_first_url, do_navigate,
     OVERRIDE_SYSTEM_MESSAGE, PLANNER_SYSTEM_PROMPT,
-    patch_message_manager, patch_planner_prompt, create_llm,
+    patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, create_llm,
     make_step_callback, make_done_callback,
 )
 from .controller import build_controller
@@ -387,6 +387,17 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             sys.stderr.flush()
 
     agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', task_text, count=1).strip() or task_text
+    try:
+        from .actions._case_data import format_case_data_hint, iter_user_case_entries
+        entries = iter_user_case_entries(case_data_ref)
+        hint = format_case_data_hint(case_data_ref)
+        if hint:
+            agent_task = agent_task + hint
+            sys.stderr.write(f"[session] Appended case data hint ({len(entries)} keys)\n")
+            sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"[session] case data hint skipped: {e}\n")
+        sys.stderr.flush()
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_step{step_index}_{ts}.json"
@@ -1080,6 +1091,7 @@ async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
 async def run_session(args):
     patch_message_manager()
     patch_planner_prompt()
+    patch_icon_tooltip_labels()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
     form_rules = load_rules()
 

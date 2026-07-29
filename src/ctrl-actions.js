@@ -288,6 +288,32 @@ const CTRL_OBJECT = `{
     }
     return 'label-not-found';
   },
+  clickIconButton: (buttonText) => {
+    if (!buttonText) return 'button-text-empty';
+    const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+    const tipText = (el) => {
+      const id = el.getAttribute('aria-describedby');
+      if (!id) return '';
+      const tip = document.getElementById(id);
+      if (!tip) return '';
+      const clone = tip.cloneNode(true);
+      clone.querySelectorAll('.popper__arrow,[x-arrow]').forEach(n => n.remove());
+      return norm(clone.textContent);
+    };
+    const resolveLabel = (el) => norm(el.getAttribute('aria-label')) || norm(el.getAttribute('title')) || tipText(el);
+    const root = CTRL.getContainer();
+    const sel = 'a.el-tooltip, button.el-tooltip, [aria-describedby].el-tooltip, [aria-describedby][class*=\"el-icon\"]';
+    for (const el of root.querySelectorAll(sel)) {
+      if (el.offsetParent === null && !el.closest('.el-table__fixed')) continue;
+      const label = resolveLabel(el);
+      if (label === buttonText || (label && label.includes(buttonText))) {
+        el.scrollIntoView({ block: 'center', behavior: 'instant' });
+        el.click();
+        return 'ok';
+      }
+    }
+    return 'not-found';
+  },
   waitForLoading: () => new Promise(resolve => { let el=0; const ck=()=>{ if(el>=30000){resolve('timeout');return; } const busy=document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden), .el-loading-spinner, [class*=\"loading-spinner\"], [class*=\"loading-mask\"]:not([class*=\"hidden\"])'); if(!busy||busy.offsetParent===null){ const anims=document.getAnimations?document.getAnimations().filter(a=>a.playState==='running'):[]; if(anims.length===0) resolve(); else { el+=100; setTimeout(ck,100); } } else { el+=200; setTimeout(ck,200); } }; ck(); }),
   switchTab: (name) => { for (const tab of document.querySelectorAll('.el-tabs__item')) { if (tab.textContent.trim()===name && tab.offsetParent!==null) { tab.scrollIntoView({ block: 'center', behavior: 'instant' }); tab.click(); return 'ok'; } } return 'tab-not-found'; },
   expandAllTreeNodes: () => { let t=0; for(let r=0;r<10;r++){ const tree=document.querySelector('.el-tree'); if(!tree) return -1; tree.scrollIntoView({ block: 'center', behavior: 'instant' }); let n=0; tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node=>{ const ic=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon'); if(ic){ic.click();n++;} }); if(n===0)break; t+=n; } return t; },
@@ -460,6 +486,7 @@ export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 | CTRL.switchTab | (name) | 'ok' / 'tab-not-found' | 切换 el-tabs |
 | CTRL.checkFieldValue | (label) | 值 / 'empty' / 'label-not-found' | 读取表单字段当前值 |
 | CTRL.clickAdjacentButton | (label) | 'ok-clicked' / 'already-filled'(非ok跳过) / 'no-button-found' | 点击字段旁的选择/引入按钮 |
+| CTRL.clickIconButton | (buttonText) | 'ok' / 'not-found' / 'button-text-empty' | 按 el-tooltip / aria-describedby 提示文案点击图标按钮 |
 | CTRL.fillAddressFields | (addr) | 'ok:N' / 'no-address-fields' | 填充所有标签含"地址"的字段 |
 | CTRL.expandAllTreeNodes | () | 展开节点数 | 展开全部 el-tree 节点 |
 

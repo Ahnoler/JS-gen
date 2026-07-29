@@ -11,8 +11,8 @@ import os
 from datetime import datetime
 
 from . import _state
-from ._helpers import _ok, _err, _enrich_click_element
-from ._js_snippets import JS_GET_CONTAINER
+from ._helpers import _ok, _err, _enrich_click_element, _is_ok_result
+from ._js_snippets import JS_COLLECT_ICON_BUTTONS, JS_CLICK_ICON_BUTTON
 from ..models import ActionFile, FormSnapshot, FormSnapshotCollection
 
 # Path helper: __file__ is scripts/actions/_misc.py, so go up 2 levels
@@ -37,7 +37,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
         })''')
         return _ok('loading-done')
 
-    @controller.action('Get current page state: visible dialogs, loading, errors, etc. formErrors entries are {label, error} with the field label from .el-form-item__label.')
+    @controller.action('Get current page state: visible dialogs, loading, errors, iconButtons (el-tooltip / aria-describedby labels), etc. formErrors entries are {label, error} with the field label from .el-form-item__label.')
     async def get_page_state():
         page = await browser_context.get_current_page()
         state = await page.evaluate('''() => {
@@ -76,8 +76,27 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 url: location.href,
             };
         }''')
+        try:
+            icon_buttons = await page.evaluate(JS_COLLECT_ICON_BUTTONS)
+            state['iconButtons'] = icon_buttons if isinstance(icon_buttons, list) else []
+        except Exception:
+            state['iconButtons'] = []
         _state._TRAJECTORY_URL = state.get('url', '')
         return json.dumps(state, ensure_ascii=False)
+
+    @controller.action(
+        'Click an icon-only button by its tooltip / aria-describedby label text '
+        '(e.g. el-tooltip + el-icon-*). Prefer this over click_element on empty-text icons. '
+        'Use get_page_state().iconButtons or aria-label on indexed elements to discover labels.'
+    )
+    async def click_icon_button(button_text: str):
+        page = await browser_context.get_current_page()
+        result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
+        await page.wait_for_timeout(400)
+        if _is_ok_result(result):
+            _state._record_action('click_icon_button', {'button_text': button_text}, result)
+            return _ok(result)
+        return result
 
     @controller.action('Save the accumulated trajectory in atp-record import-compatible JSON format.')
     async def save_trajectory(output_dir: str = None):
