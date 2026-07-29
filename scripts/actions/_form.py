@@ -13,6 +13,7 @@ from ._state import _ACTION_LOG, _record_action
 from ._helpers import (
     _ok, _err, _is_ok_result,
     _wait_if_loading, _capture_element, _merge_ax_text,
+    _enrich_click_element,
 )
 from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER,
@@ -22,6 +23,7 @@ from ._js_snippets import (
     JS_CLICK_RADIO,
     JS_SELECT_TREE_OPTION,
     JS_SCROLL_TO_FIRST_ERROR,
+    JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME,
 )
 from ._llm_values import _llm_generate_values
 from ..models import (
@@ -29,7 +31,52 @@ from ..models import (
     FormSnapshot, FormSnapshotCollection,
     TaskItem, TaskList,
 )
-from .form_rules import match_rule, get_has_button_keywords, _gen_idcard, _gen_credit_code, _gen_name
+from .form_rules import (
+    match_rule, match_cert_number, get_has_button_keywords,
+    _gen_name,
+)
+
+# Read current 证件类型 / 证照类型 display value from the open form.
+_JS_READ_CERT_TYPE = '''(kw) => {
+    const items = document.querySelectorAll('.el-form-item');
+    for (const item of items) {
+        const lbl = item.querySelector('.el-form-item__label');
+        if (!lbl) continue;
+        if (kw.some(k => lbl.textContent.trim().includes(k))) {
+            const inp = item.querySelector('input:not([type="hidden"])');
+            if (inp && inp.value) return inp.value;
+            const inner = item.querySelector('.el-input__inner');
+            if (inner && inner.value) return inner.value;
+            const selected = item.querySelector('.el-select__tags-text, .el-radio.is-checked');
+            if (selected && selected.textContent) return selected.textContent.trim();
+        }
+    }
+    return '';
+}'''
+
+# Extract validation-error field labels from parent .el-form-item (not error text).
+_JS_EXTRACT_ERROR_LABELS = '''() => {
+    const container = ''' + JS_GET_CONTAINER + ''';
+    const items = [];
+    const seen = new Set();
+    for (const el of container.querySelectorAll('.el-form-item__error')) {
+        const raw = (el.textContent || '').trim();
+        if (!raw) continue;
+        const formItem = el.closest('.el-form-item');
+        let label = (formItem && formItem.querySelector('.el-form-item__label')
+            ? formItem.querySelector('.el-form-item__label').textContent.trim()
+            : '');
+        if (!label) {
+            // Fallback: strip imperative prefix from error message
+            label = raw.replace(/^(请选择|请?输入|请上传|填写|完善)/, '').replace(/[：:]/g, '').trim();
+        }
+        if (label && label.length > 0 && label.length < 40 && !seen.has(label)) {
+            seen.add(label);
+            items.push(label);
+        }
+    }
+    return JSON.stringify(items);
+}'''
 
 
 def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store: dict):
@@ -72,6 +119,44 @@ def _task_done_impl(label_text, case_data_store, value=None):
         else:
             sys.stderr.write(f'[task-done] ALREADY: "{label_text}"\n')
     case_data_store['task_list'] = tl.to_store()
+
+
+def _submit_ready_hint(case_data_store: dict) -> str:
+    """Return a short NEXT_ACTION cue when fillable pending is empty."""
+    tl = TaskList.from_store(case_data_store.get('task_list'))
+    intervene = [i.label for i in tl.pending if i.needs_intervention]
+    fillable = [i for i in tl.pending if not i.needs_intervention]
+    if fillable:
+        return ''
+    if intervene:
+        return (
+            f'NEXT_ACTION: click_save() | '
+            f'fillable pending=0 but NEEDS_INTERVENTION={intervene}. '
+            f'Call click_save() first. If validation blocks on those fields, '
+            f'use click_adjacent_button / follow [HUMAN INTERVENTION]. '
+            f'Do NOT re-select already-filled fields. Do NOT scroll_down to hunt for 保存.'
+        )
+    if tl.total > 0:
+        return (
+            'NEXT_ACTION: click_save() | fillable pending=0. '
+            'Call click_save() NOW (auto-finds 保存/提交, scrolls into view). '
+            'Do NOT scroll_down / click_element_by_index to hunt for 保存. '
+            'Do NOT re-fill or re-select already-filled fields.'
+        )
+    return ''
+
+
+def _with_submit_cue(result: str, case_data_store: dict) -> str:
+    """Append auto-fill / submit-ready cue to an action result string."""
+    parts = [result]
+    summary = case_data_store.pop('_autofill_summary', None)
+    if summary:
+        parts.append(summary)
+    cue = _submit_ready_hint(case_data_store)
+    if cue:
+        parts.append(cue)
+        case_data_store['_submit_ready'] = True
+    return ' | '.join(parts)
 
 
 async def _clear_field_value(page, label_text):
@@ -171,6 +256,15 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
         if tl.pending:
             await _auto_fill_pending()
+            tl_after = TaskList.from_store(case_data_store.get('task_list'))
+            fillable_left = sum(1 for i in tl_after.pending if not i.needs_intervention)
+            intervene_left = [i.label for i in tl_after.pending if i.needs_intervention]
+            case_data_store['_autofill_summary'] = (
+                f'auto-fill-complete done={len(tl_after.done)} '
+                f'fillable_pending={fillable_left} intervene={intervene_left or []}'
+            )
+            if fillable_left == 0:
+                case_data_store['_submit_ready'] = True
 
     @controller.action('Expand ALL el-tree nodes recursively (up to 10 rounds).')
     async def expand_all_el_tree():
@@ -245,8 +339,19 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         _record_action('login', {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code}, 'ok-login')
         return _ok('ok-login | ' + ' '.join(results))
 
-    @controller.action('Get a value for a form field by its label using form rules.')
+    @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code).')
     async def match_form_rule(label_text: str):
+        t = (label_text or '').replace(' ', '')
+        if '证件号码' in t or (t.endswith('证件号') and '类型' not in t):
+            page = await browser_context.get_current_page()
+            try:
+                cert_type = await page.evaluate(_JS_READ_CERT_TYPE, ['证件类型', '证照类型', '证件种类'])
+            except Exception:
+                cert_type = ''
+            val = match_cert_number(cert_type or '')
+            sys.stderr.write(f'[match-form-rule] cert_type={cert_type!r} → {val}\n')
+            sys.stderr.flush()
+            return val
         val = match_rule(label_text, form_rules)
         return val if val else 'NO-RULE'
 
@@ -260,8 +365,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             element = await _capture_element(page, label_text)
             _record_action('fill_form_field', {'label_text': label_text, 'value': value}, result, element=element)
             _task_done_impl(label_text, case_data_store, value=value)
-            return _ok(result)
-        return result
+            return _ok(_with_submit_cue(result, case_data_store))
+        return _with_submit_cue(result, case_data_store)
 
     @controller.action('Fill an Element UI date picker by label text. Value should be in YYYY-MM-DD format.')
     async def fill_date_field(label_text: str, value: str):
@@ -272,8 +377,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         if _is_ok_result(result):
             _record_action('fill_date_field', {'label_text': label_text, 'value': value}, result)
             _task_done_impl(label_text, case_data_store, value=value)
-            return _ok(result)
-        return result
+            return _ok(_with_submit_cue(result, case_data_store))
+        return _with_submit_cue(result, case_data_store)
 
     @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
@@ -407,17 +512,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         # ── 扫描校验错误：将报错字段从 done[] 移回 pending[]，清空值 ──
         try:
-            error_labels = await page.evaluate('''() => {
-                const container = ''' + JS_GET_CONTAINER + ''';
-                const items = [];
-                for (const el of container.querySelectorAll('.el-form-item__error')) {
-                    const raw = el.textContent.trim();
-                    if (!raw) continue;
-                    const label = raw.replace(/^(请选择|请?输入|请上传|填写|完善)/, '').replace(/[：:]/g, '').trim();
-                    if (label && label.length > 1 && label.length < 30) items.push(label);
-                }
-                return JSON.stringify(items);
-            }''')
+            error_labels = await page.evaluate(_JS_EXTRACT_ERROR_LABELS)
             error_labels_parsed = json.loads(error_labels) if isinstance(error_labels, str) else error_labels
         except Exception:
             error_labels_parsed = []
@@ -434,17 +529,71 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # Also keeps fields not yet tracked (safe default for dynamically shown fields).
         pending_labels = {d.label for d in tl.pending}
         done_labels = {d.label for d in tl.done}
-        dom_fields = [f for f in dom_fields if f.label in pending_labels or f.label not in done_labels]
+        intervene_labels = {d.label for d in tl.pending if d.needs_intervention}
+        filtered = []
+        for f in dom_fields:
+            if f.label in done_labels and f.label not in pending_labels:
+                continue
+            # Drop optional disabled fields with no adjacent button (内部评级等只读噪音)
+            if f.disabled and not f.hasButton and not f.required:
+                continue
+            # Drop disabled fields that already have a value and no button
+            if f.disabled and not f.hasButton and (f.currentValue or '').strip():
+                continue
+            filtered.append(f)
+        dom_fields = filtered
+
+        # If DOM quick-scan returned nothing but pending tasks exist (e.g. drawer
+        # visibility quirks), surface pending items so the agent can still act.
+        if not dom_fields and tl.pending:
+            dom_fields = [
+                ScannedField(
+                    label=item.label,
+                    kind=item.kind or 'input',
+                    currentValue='',
+                    options=list(item.options or []),
+                    placeholder=item.placeholder or '',
+                    disabled=bool(item.disabled),
+                    required=True,
+                    hasButton=item.hasButton or '',
+                )
+                for item in tl.pending
+                if not item.needs_intervention
+            ]
 
         container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
         raw_notification = result.get('notification') if isinstance(result, dict) else None
         notification = Notification(**raw_notification) if raw_notification else None
-        scan_result = FormScanResult(
+        payload = FormScanResult(
             container=container_id,
             fields=dom_fields,
             notification=notification,
-        )
-        return json.dumps(scan_result.model_dump(), ensure_ascii=False, indent=2)
+        ).model_dump()
+        if intervene_labels:
+            payload['NEEDS_INTERVENTION'] = sorted(intervene_labels)
+        fillable = [f['label'] for f in payload['fields'] if not f.get('disabled')]
+        cue = _submit_ready_hint(case_data_store)
+        if cue:
+            payload['NEXT_ACTION'] = cue.split('|', 1)[0].replace('NEXT_ACTION:', '').strip()
+            payload['hint'] = cue
+        else:
+            payload['hint'] = (
+                f'fillable:{len(fillable)} pending:{len(pending_labels)} '
+                f'intervene:{len(intervene_labels)} — do NOT re-select already-filled fields; '
+                f'handle NEEDS_INTERVENTION via click_adjacent_button / request_intervention'
+            )
+        # Required disabled "联网核查" with empty value — nudge button click before save
+        for f in payload.get('fields') or []:
+            if (
+                f.get('required') and f.get('disabled') and not (f.get('currentValue') or '').strip()
+                and ('核查' in (f.get('label') or '') or '联网' in (f.get('label') or ''))
+            ):
+                payload['hint'] = (
+                    f'Click adjacent 联网核查 button for "{f.get("label")}", wait_for_loading, '
+                    f'then click 保存. ' + payload.get('hint', '')
+                )
+                break
+        return json.dumps(payload, ensure_ascii=False, indent=2)
 
     @controller.action('Rebuild the task list from scan results (utility — does not auto-fill).')
     async def init_task_list(fields_json: str):
@@ -508,55 +657,32 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 )
                 if _has_cert_num:
                     try:
-                        _ct = await page.evaluate('''(kw) => {
-                            const items = document.querySelectorAll('.el-form-item');
-                            for (const item of items) {
-                                const lbl = item.querySelector('.el-form-item__label');
-                                if (!lbl) continue;
-                                if (kw.some(k => lbl.textContent.trim().includes(k))) {
-                                    const inp = item.querySelector('input');
-                                    if (inp && inp.value) return inp.value;
-                                    const inner = item.querySelector('.el-input__inner');
-                                    if (inner && inner.value) return inner.value;
-                                }
-                            }
-                            return '';
-                        }''', ['证件类型', '证照类型', '证件种类'])
+                        _ct = await page.evaluate(_JS_READ_CERT_TYPE, ['证件类型', '证照类型', '证件种类'])
                     except Exception:
                         _ct = ''
-                    if _ct:
-                        if '身份证' in _ct:
-                            _ov = _gen_idcard()
-                        elif '统一社会信用代码' in _ct or '营业执照' in _ct:
-                            _ov = _gen_credit_code()
-                        else:
-                            _ov = None
-                        if _ov:
-                            for d in sub:
-                                if '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or ''):
-                                    d['commandValue'] = _ov
-                                    sys.stderr.write(f'[cert-detect] cert_type="{_ct}" -> cert_number override: {_ov}\n')
-                                    sys.stderr.flush()
-                                    break
+                    _ov = match_cert_number(_ct or '')
+                    for d in sub:
+                        if '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or ''):
+                            d['commandValue'] = _ov
+                            sys.stderr.write(f'[cert-detect] cert_type="{_ct}" -> cert_number override: {_ov}\n')
+                            sys.stderr.flush()
+                            break
                     # ---- Cross-field: cert type -> customer name ----
                     _has_cust_name = any(
                         '客户名称' in (d.get('label', '') or '') or '客户姓名' in (d.get('label', '') or '')
                         for d in sub
                     )
-                    if _has_cust_name and _ct:
-                        if '身份证' in _ct:
-                            _name_ov = _gen_name()
-                        elif '统一社会信用代码' in _ct or '营业执照' in _ct:
+                    if _has_cust_name:
+                        if _ct and ('统一社会信用代码' in _ct or '营业执照' in _ct):
                             _name_ov = '测试科技发展有限公司'
                         else:
-                            _name_ov = None
-                        if _name_ov:
-                            for d_name in sub:
-                                if '客户名称' in (d_name.get('label', '') or '') or '客户姓名' in (d_name.get('label', '') or ''):
-                                    d_name['commandValue'] = _name_ov
-                                    sys.stderr.write(f'[cert-detect] cert_type="{_ct}" -> customer name: {_name_ov}\n')
-                                    sys.stderr.flush()
-                                    break
+                            _name_ov = _gen_name()
+                        for d_name in sub:
+                            if '客户名称' in (d_name.get('label', '') or '') or '客户姓名' in (d_name.get('label', '') or ''):
+                                d_name['commandValue'] = _name_ov
+                                sys.stderr.write(f'[cert-detect] cert_type="{_ct}" -> customer name: {_name_ov}\n')
+                                sys.stderr.flush()
+                                break
 
             actions = _llm_generate_values(llm, sub, form_rules=form_rules, case_data_store=case_data_store)
             await page.evaluate(
@@ -901,7 +1027,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
-    @controller.action('Get the current pending task list. Returns {"pending": [{label,kind,options,...}]}. Completed fields are omitted. Each pending entry is a full field object for LLM planning.')
+    @controller.action('Get the current pending task list. Returns {"pending": [...], optional NEEDS_INTERVENTION, NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 保存 — do not re-fill fields.')
     async def get_pending_tasks():
         tl = TaskList.from_store(case_data_store.get('task_list'))
         intervene = [item.label for item in tl.pending if item.needs_intervention]
@@ -910,10 +1036,220 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         sys.stderr.flush()
         result = {
             'pending': pending_labels,
+            'done': len(tl.done),
         }
         if intervene:
             result['NEEDS_INTERVENTION'] = intervene
+        cue = _submit_ready_hint(case_data_store)
+        if cue:
+            # Parse NEXT_ACTION token for structured field
+            if cue.startswith('NEXT_ACTION:'):
+                result['NEXT_ACTION'] = cue.split('|', 1)[0].replace('NEXT_ACTION:', '').strip()
+            result['hint'] = cue
+            case_data_store['_submit_ready'] = True
         return json.dumps(result, ensure_ascii=False)
+
+    @controller.action(
+        'Find the 保存/提交 button, scroll it into view, click it, wait for loading, '
+        'then scan the whole page for .el-form-item__error and success/error notifications. '
+        'Prefer this over scroll_down + click_element_by_index for form submit. '
+        'Returns ok-save-success only when an 操作成功 (or equivalent) toast appears — '
+        'no-notification is NOT success. On validation errors returns err-save-validation.'
+    )
+    async def click_save(button_text: str = '保存'):
+        page = await browser_context.get_current_page()
+        url_before = page.url
+        if case_data_store is not None:
+            case_data_store['_url_before_save'] = url_before
+            case_data_store['_last_save_ok'] = False
+
+        # Capture short-lived success toasts that may vanish between polls
+        await page.evaluate(r'''() => {
+          const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功/;
+          const failRe = /失败|错误|异常|不能|不允许|已存在|重复|校验|必填|不通过/;
+          window.__saveWatch = { successNotifs: [], errorNotifs: [] };
+          const take = (el) => {
+            const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+            if (!t) return;
+            if (successRe.test(t) && !failRe.test(t)) window.__saveWatch.successNotifs.push(t.slice(0, 160));
+            else if (failRe.test(t) || /el-notification--error|el-message--error/.test(el.className || ''))
+              window.__saveWatch.errorNotifs.push(t.slice(0, 160));
+            else if (el.classList && (el.classList.contains('el-notification--success') || el.classList.contains('el-message--success')))
+              window.__saveWatch.successNotifs.push(t.slice(0, 160));
+          };
+          for (const el of document.querySelectorAll('.el-notification, .el-message')) take(el);
+          const obs = new MutationObserver((muts) => {
+            for (const m of muts) {
+              for (const n of m.addedNodes || []) {
+                if (!n || n.nodeType !== 1) continue;
+                if (n.matches && (n.matches('.el-notification, .el-message') || n.querySelector?.('.el-notification, .el-message'))) {
+                  if (n.matches?.('.el-notification, .el-message')) take(n);
+                  for (const el of (n.querySelectorAll?.('.el-notification, .el-message') || [])) take(el);
+                }
+              }
+            }
+          });
+          obs.observe(document.body, { childList: true, subtree: true });
+          window.__saveWatchObs = obs;
+        }''')
+
+        raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, button_text or '保存')
+        try:
+            info = json.loads(raw) if isinstance(raw, str) else (raw or {})
+        except Exception:
+            info = {}
+        if not info.get('ok'):
+            try:
+                await page.evaluate('() => { try { window.__saveWatchObs?.disconnect(); } catch(e) {} }')
+            except Exception:
+                pass
+            reason = info.get('reason') or 'button-not-found'
+            needle = info.get('needle') or (button_text or '保存')
+            sys.stderr.write(f'[click_save] NOT FOUND: "{needle}" ({reason})\n')
+            sys.stderr.flush()
+            return _err(
+                f'err-save-button-not-found:{needle}. '
+                f'Close interfering dialogs (查询/返回) with close_dialog, then retry click_save().'
+            )
+
+        btn_text = info.get('text') or (button_text or '保存')
+        xpath = info.get('xpath') or ''
+        tag_name = info.get('tag') or 'button'
+        element_info = await _enrich_click_element(
+            page, xpath=xpath, text=btn_text, tag_name=tag_name, attributes={},
+        )
+        _record_action(
+            'click_element_by_index',
+            {
+                'index': -1,
+                'tag_name': (element_info or {}).get('tag_name') or tag_name,
+                'text': btn_text,
+            },
+            f'ok-clicked-save:{btn_text}',
+            element=element_info,
+        )
+        sys.stderr.write(f'[click_save] clicked "{btn_text}" xpath={xpath[:80]}\n')
+        sys.stderr.flush()
+
+        await page.wait_for_timeout(150)
+        await _wait_if_loading(page)
+
+        # Poll briefly — success toasts auto-dismiss in ~2–3s
+        outcome = {'formErrors': [], 'successNotifs': [], 'errorNotifs': [], 'url': page.url}
+        for _ in range(20):  # ~3s at 150ms
+            scanned = await page.evaluate(JS_SCAN_SAVE_OUTCOME)
+            if isinstance(scanned, str):
+                try:
+                    scanned = json.loads(scanned)
+                except Exception:
+                    scanned = {}
+            watched = await page.evaluate('() => window.__saveWatch || {successNotifs:[], errorNotifs:[]}')
+            outcome = scanned or outcome
+            # Merge watcher captures (may include dismissed toasts)
+            for t in (watched or {}).get('successNotifs') or []:
+                if t not in (outcome.get('successNotifs') or []):
+                    outcome.setdefault('successNotifs', []).append(t)
+            for t in (watched or {}).get('errorNotifs') or []:
+                if t not in (outcome.get('errorNotifs') or []):
+                    outcome.setdefault('errorNotifs', []).append(t)
+            if outcome.get('formErrors'):
+                break
+            if outcome.get('successNotifs'):
+                break
+            if outcome.get('errorNotifs'):
+                break
+            await page.wait_for_timeout(150)
+            await _wait_if_loading(page)
+
+        try:
+            await page.evaluate('() => { try { window.__saveWatchObs?.disconnect(); } catch(e) {} }')
+        except Exception:
+            pass
+
+        form_errors = outcome.get('formErrors') or []
+        success_notifs = outcome.get('successNotifs') or []
+        error_notifs = outcome.get('errorNotifs') or []
+
+        if form_errors:
+            labels = [e.get('label') or e.get('error') for e in form_errors[:8]]
+            # Re-queue validation errors into task list when possible
+            try:
+                error_labels = await page.evaluate(
+                    '''() => {
+                      const out = [];
+                      for (const el of document.querySelectorAll('.el-form-item__error')) {
+                        const r = el.getBoundingClientRect();
+                        if (r.width <= 0 || r.height <= 0) continue;
+                        const t = (el.textContent || '').trim();
+                        if (!t) continue;
+                        const item = el.closest('.el-form-item');
+                        const label = (item && item.querySelector('.el-form-item__label')
+                          ? item.querySelector('.el-form-item__label').textContent : '').trim();
+                        if (label) out.push(label);
+                      }
+                      return out;
+                    }'''
+                )
+                if error_labels:
+                    tl = TaskList.from_store(case_data_store.get('task_list'))
+                    tl.sync_from_errors(error_labels)
+                    case_data_store['task_list'] = tl.to_store()
+            except Exception:
+                pass
+            try:
+                await page.evaluate(JS_SCROLL_TO_FIRST_ERROR)
+            except Exception:
+                pass
+            msg = (
+                f'err-save-validation:{json.dumps(form_errors[:8], ensure_ascii=False)} | '
+                f'Fix fields {labels} then call click_save() again. '
+                f'Do NOT call done(success=true).'
+            )
+            sys.stderr.write(f'[click_save] validation errors: {labels}\n')
+            sys.stderr.flush()
+            return _err(msg)
+
+        if success_notifs:
+            if case_data_store is not None:
+                case_data_store['_last_save_ok'] = True
+                case_data_store.pop('_submit_ready', None)
+            toast = success_notifs[0]
+            sys.stderr.write(f'[click_save] SUCCESS: {toast[:80]}\n')
+            sys.stderr.flush()
+            return _ok(
+                f'ok-save-success:{toast} | '
+                f'Save confirmed (操作成功). Call done(success=true) if phase goal is save.'
+            )
+
+        if error_notifs:
+            toast = error_notifs[0]
+            sys.stderr.write(f'[click_save] error notification: {toast[:80]}\n')
+            sys.stderr.flush()
+            return _err(
+                f'err-save-notification:{toast} | '
+                f'Fix the reported issue then click_save() again. Do NOT treat as success.'
+            )
+
+        url_after = outcome.get('url') or page.url
+        url_changed = bool(url_before and url_after and url_before != url_after)
+        if url_changed:
+            sys.stderr.write(
+                f'[click_save] no success toast; URL changed {url_before[:60]} -> {url_after[:60]}\n'
+            )
+            sys.stderr.flush()
+            return _err(
+                'err-save-no-feedback: URL changed but no 操作成功 notification. '
+                'Do NOT call done(success=true) unless you observed 操作成功. '
+                'If form errors appear, fix them and click_save() again.'
+            )
+
+        sys.stderr.write('[click_save] no feedback (no toast, no form errors)\n')
+        sys.stderr.flush()
+        return _err(
+            'err-save-no-feedback: no 操作成功 notification and no .el-form-item__error. '
+            'no-notification is NOT success. Check overlays (close_dialog), then retry click_save(). '
+            'Do NOT call done(success=true).'
+        )
 
     @controller.action('Scroll to the first visible form validation error (.el-form-item.is-error or .el-form-item__error). Returns {label, error} so agent knows which field to fix next. Call after a failed submit or when form errors are visible.')
     async def scroll_to_first_error():
@@ -934,17 +1270,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     @controller.action('Sync task list from current page validation errors. Reads .el-form-item__error text, extracts field labels (strips 请选择/请输入/请上传 prefix), re-adds them to pending. Also scrolls to first error. Call this after a failed submit attempt.')
     async def sync_tasks_from_errors():
         page = await browser_context.get_current_page()
-        errors = await page.evaluate('''() => {
-            const container = ''' + JS_GET_CONTAINER + ''';
-            const items = [];
-            for (const el of container.querySelectorAll('.el-form-item__error')) {
-                const raw = el.textContent.trim();
-                if (!raw) continue;
-                const label = raw.replace(/^(请选择|请?输入|请上传|填写|完善)/, '').replace(/[：:]/g, '').trim();
-                if (label && label.length > 1 && label.length < 30) items.push(label);
-            }
-            return JSON.stringify(items);
-        }''')
+        errors = await page.evaluate(_JS_EXTRACT_ERROR_LABELS)
         try:
             error_labels = json.loads(errors) if isinstance(errors, str) else errors
         except Exception:
@@ -1014,17 +1340,45 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'check'])
         if already.startswith('ok-already:'):
             cur_val = already.split(':', 1)[1]
-            if cur_val == option_text or option_text in cur_val or cur_val in option_text:
+            _FIRST = ('first', '1st', '第一个', '第一项')
+            # "first" means "any existing value is fine" — do NOT re-open the
+            # dropdown (re-selecting first can cascade-reset dependent fields).
+            if (
+                (option_text or '').strip().lower() in _FIRST
+                or cur_val == option_text
+                or option_text in cur_val
+                or cur_val in option_text
+            ):
                 element = await _capture_element(page, label_text)
                 _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, already, element=element)
-                _task_done_impl(label_text, case_data_store, value=option_text)
-                return _ok(already + ' | already-matched')
+                _task_done_impl(label_text, case_data_store, value=cur_val or option_text)
+                # Count consecutive already-matched for recorder loop-break
+                streak = int(case_data_store.get('_already_matched_streak', 0) or 0) + 1
+                case_data_store['_already_matched_streak'] = streak
+                return _ok(_with_submit_cue(
+                    already + ' | already-matched | SKIP — field already set; do not re-select',
+                    case_data_store,
+                ))
+
+        case_data_store['_already_matched_streak'] = 0
+
+        # Close any leftover open dropdowns before opening the target select
+        await page.evaluate('''() => {
+            document.querySelectorAll('.el-select-dropdown:not(.is-hidden)').forEach(dd => {
+                dd.style.display = 'none';
+                dd.classList.add('is-hidden');
+            });
+            document.body.click();
+        }''')
+        await page.wait_for_timeout(100)
 
         trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'trigger'])
         if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled'):
+            if trigger_result == 'no-select-found':
+                return _err('no-select-found | field may be radio — use click_radio')
             return trigger_result
 
-        await page.wait_for_timeout(800)
+        await page.wait_for_timeout(500)
 
         select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
         if _is_ok_result(select_result):
@@ -1033,10 +1387,32 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             element = await _capture_element(page, label_text)
             _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
             _task_done_impl(label_text, case_data_store, value=matched_text or option_text)
-            return _ok(f'ok | {matched_text}')
+            return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
         elif select_result == 'no-items':
+            # Dropdown empty — if field already has a value, treat as done
+            recheck = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'check'])
+            if recheck.startswith('ok-already:'):
+                cur = recheck.split(':', 1)[1]
+                _task_done_impl(label_text, case_data_store, value=cur)
+                return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', case_data_store))
             return _err('no-items')
         elif select_result.startswith('option-not-found:'):
+            # Fuzzy: pick listed option that contains / is contained by option_text
+            listed = [x.strip() for x in select_result.split(':', 1)[1].split(',') if x.strip()]
+            want = (option_text or '').strip()
+            fuzzy = next((o for o in listed if want and (want in o or o in want)), None)
+            # Common alias: 中国 → 中华人民共和国
+            if not fuzzy and want in ('中国', '中国大陆'):
+                fuzzy = next((o for o in listed if '中国' in o), None)
+            if fuzzy:
+                fuzzy_result = await page.evaluate(JS_SELECT_OPTION, fuzzy)
+                if _is_ok_result(fuzzy_result):
+                    matched_text = fuzzy_result.split(':', 1)[1] if ':' in fuzzy_result else fuzzy_result
+                    case_data_store.pop(f'_sel_retry_{label_text}', None)
+                    element = await _capture_element(page, label_text)
+                    _record_action('select_option', {'label_text': label_text, 'option_text': matched_text}, matched_text, element=element)
+                    _task_done_impl(label_text, case_data_store, value=matched_text)
+                    return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', case_data_store))
             retry_key = f'_sel_retry_{label_text}'
             retries = case_data_store.get(retry_key, 0) + 1
             case_data_store[retry_key] = retries
@@ -1048,7 +1424,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     element = await _capture_element(page, label_text)
                     _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
                     _task_done_impl(label_text, case_data_store, value=matched_text or option_text)
-                    return _ok(f'ok | {matched_text}')
+                    return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
                 return _err(first_result)
             return _err(select_result)
         else:

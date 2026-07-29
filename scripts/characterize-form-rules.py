@@ -20,6 +20,7 @@ from scripts.actions.form_rules import (  # noqa: E402
     FIELD_RULES,
     get_has_button_keywords,
     match_rule,
+    match_cert_number,
 )
 
 
@@ -68,9 +69,28 @@ def test_unmatched_label() -> None:
 
 def test_keyword_specificity() -> None:
     """Longer / higher-priority rules win for overlapping keywords."""
-    # 「证件号码」bound to credit-code rule in FIELD_RULES
-    val = match_rule('证件号码')
-    assert_true(val is not None and len(val) == 18, f'证件号码 should be credit code, got {val!r}')
+    # 「证件号码」is ambiguous — must use match_cert_number(cert_type)
+    assert_true(match_rule('证件号码') is None, '证件号码 alone should not match a rule')
+    id_val = match_cert_number('居民身份证')
+    assert_true(_idcard_checksum_ok(id_val), f'居民身份证 → bad idcard: {id_val!r}')
+    credit = match_cert_number('统一社会信用代码')
+    assert_true(credit is not None and len(credit) == 18, f'信用代码 → {credit!r}')
+    # Default (no type) → idcard
+    default_val = match_cert_number('')
+    assert_true(_idcard_checksum_ok(default_val), f'default → bad idcard: {default_val!r}')
+
+    # False-positive guards from production logs
+    admin = match_rule('行政区划编码')
+    assert_true(admin is not None and admin.isdigit() and len(admin) == 6,
+                f'行政区划编码 should be 6-digit code, got {admin!r}')
+    work = match_rule('工作单位')
+    assert_true(work is not None and '公司' in work, f'工作单位 → {work!r}')
+    foreign = match_rule('外文名称')
+    assert_true(foreign is not None and re.search(r'[A-Za-z]', foreign),
+                f'外文名称 should be Latin text, got {foreign!r}')
+    region = match_rule('工作单位区域')
+    assert_true(region is not None and '区' in region and '公司' not in region,
+                f'工作单位区域 → {region!r}')
 
 
 def test_field_rules_registry_shape() -> None:

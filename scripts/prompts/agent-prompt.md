@@ -32,8 +32,9 @@
 - click_radio(label_text, option_text) — el-radio 单选组
 - **select_tree_option(label_text, option_text) — 树形选择器，如行业代码。三段式匹配：P0 精确匹配（label/id）→ 非叶节点 DFS 取第一个叶后代；P1 UI关键词搜索 → 过滤列表下非叶节点 DFS 取第一个叶后代；P2 兜底取全树第一个叶节点。** **`ok-fallback` 是正常结果——表示你的 option_text 在树中无精确叶节点匹配，系统已选最接近的叶节点。信任该结果，不要重新填写。**
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
+- **click_save(button_text='保存') — 🚨 提交表单的首选动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element_by_index 盲目找保存按钮。**
 - close_dialog() — 关闭最上层的 el-dialog 或 el-drawer。**不适用于通知 — 请使用 close_notification()。**
-- close_notification() — 关闭可见的 el-notification 弹窗，读取并返回其文本。如果没有则返回 "no-notification"。**用于处理服务端校验错误。**
+- close_notification() — 关闭可见的 el-notification 弹窗，读取并返回其文本。如果没有则返回 "no-notification"。**用于处理服务端校验错误。`no-notification` ≠ 保存成功。**
 - expand_all_el_tree() — 完全展开 el-tree
 - switch_tab(tab_name) — 切换 el-tabs 标签页。**⚠️ 切换前必须先点击"暂存"按钮保存数据，否则已填数据会丢失。**
 - click_menu_item(menu_text) — 点击 el-menu 菜单项（自动展开子菜单）
@@ -72,6 +73,9 @@
 
 **你需要的纪律：**
 - **信任助手填的值。** 表单中已经存在的值（无论是助手填的还是其他真实用户填的），除非任务明确要求修改，或者表单规则校验不通过而产生报错，否则不要覆盖。
+- **auto-fill 完成后（日志/`get_pending_tasks` 显示 pending≈0）：直接调用 `click_save()`。** 不要再用 `select_option(..., "first")` 或批量重选已填字段 — 会级联清空依赖项并浪费步数。不要 `scroll_down` 找保存按钮。
+- **每步最多 2～3 个 select_option**，不要一次并行十几个 — 下拉残留会串选项。
+- **性别等 radio 字段用 `click_radio`，不要用 `select_option`。**
 - **只填写任务明确提到的字段。** 任务说"客户状态设为信贷潜在客户"，你就只改这一个。不要自行为其他字段设置你认为合适的值。
 - 如果任务要求的值和助手填的不一致（如任务要"统一社会信用代码"但助手填了"营业执照"），覆盖它。否则保留。
 - **不要**在不需要填表的页面调用 `scan_form_fields` 指望自动填表。
@@ -91,35 +95,31 @@
 
 **工作流程：**
 1. **隐式自动填写：** 对任务要求的某个字段调用一次 `fill_form_field` / `select_option` 等 — 系统在主页面/抽屉上自动扫描并批量填写其余待办。弹窗则逐字段手动填。
-2. **检查：** 调用 `scan_visible_fields()` 检查通知/错误。
-3. **🚨 干预检查（不可跳过）：** 调用 `get_pending_tasks()`。
-   - 如果返回顶层 `NEEDS_INTERVENTION: ["字段名"]`：
-     系统已在下一步自动注入 `[HUMAN INTERVENTION]` 消息。**跟随注入消息中的指令执行。**
-     → 跳过这些字段 → 完成其他 fillable 字段 → done() 报告等待人工方案。
-   - 如果只有普通 pending → 手动修复后 task_done。
-   - 如果 pending 为空 → 继续提交。
-4. **提交：** 确认无待办后提交。
-5. **错误处理：** 调用 `sync_tasks_from_errors()` 重新加入出错字段。
-   - 如果返回 `NEEDS_INTERVENTION: ["字段名"]`：系统自动入队干预请求，下一步注入指令。
-     → 跟随注入消息：跳过这些字段，先处理 fillable 字段。
-     → 全部 fillable 完成后，调用 done()，向用户报告等待特殊填写流程方案。
-     → 用户提供方案后，按方案执行该字段的填写 → task_done → 重新提交。
-   - 其他字段（fillable）：手动修复后 task_done。
+2. **检查：** 调用 `get_pending_tasks()`（权威进度）。若返回 `NEXT_ACTION: click_save()` 或 `pending:[]` 且无 fillable 待办 → **立刻调用 `click_save()`**，不要再扫字段、不要再 select、不要 scroll 找按钮。
+3. **🚨 干预检查：** 若返回 `NEEDS_INTERVENTION`：
+   - **先 `click_save()`**；失败再 `click_adjacent_button`（引入/联网核查）后重试 `click_save()`。
+   - 不要把已填字段（婚姻状况等）改成别的值来“补齐”配偶区 — 会级联出更多必填项。
+4. **提交后：** 仅当 `click_save()` 返回 `ok-save-success`（出现操作成功）→ `done(success=true)`。`err-save-*` / `no-notification` → 不算成功。
+5. **错误处理：** `err-save-validation` 或 `sync_tasks_from_errors()` 只修报错字段，然后再次 `click_save()`。
 
-**🚨 核心纪律：信任表单填写助手，只改任务明确提到的字段，或者只改表单规则校验不通过而产生报错的字段，不动已有值。**（详见上方 #表单填写助手）
-**⚠️ 切换 Tab 前必须点击"暂存"：el-tabs 切换会导致未保存数据丢失。切换前先查找并点击"暂存"按钮保存当前页面数据。**
+**🚨 严禁：** 在 `already-matched` / `pending:[]` / `NEXT_ACTION: click_save()` 之后继续逐个重选民族/学历/婚姻状况等。浪费步数且会改坏级联表单。
+**🚨 严禁：** 用 `scroll_down`/`scroll_up` + `click_element_by_index` 盲目寻找「保存」——必须用 `click_save()`。
+
+**🚨 核心纪律：信任表单填写助手，只改任务明确提到的字段，或者只改表单规则校验不通过而产生报错的字段，不动已有值。**
+**⚠️ 切换 Tab 前必须点击"暂存"：el-tabs 切换会导致未保存数据丢失。**
 
 **示例：**
 ```
 # 主页面/抽屉 — 第一次填字段触发隐式 auto-fill
-fill_form_field("客户名称", "测试客户") → "ok"  # 同时自动填完其余空字段
-get_pending_tasks() → "pending:[]"
+fill_form_field("客户名称", "测试客户")
+→ "ok | auto-fill-complete done=58 fillable_pending=0 | NEXT_ACTION: click_save()"
+→ 立即 click_save()——不要再 fill/select
 
-# 提交失败 → 可见字段扫描
-scan_visible_fields() → notification:{visible:true, text:"证件号码格式错误"}
-sync_tasks_from_errors() → "retried:1"
-fill_form_field("证件号码", "...") → "ok"
-task_done("证件号码") → "remaining:0"
+get_pending_tasks() → {"pending":[],"NEXT_ACTION":"click_save()",...}
+→ click_save()
+→ ok-save-success:操作成功 → done(success=true)
+→ err-save-validation:[...] → 修字段后再次 click_save()
+→ err-save-no-feedback → 不是成功；检查弹窗后重试 click_save()
 ```
 
 # 🚨 跨阶段数据流转（通用规则）
@@ -147,10 +147,10 @@ read_case_data("FieldA") → "value1"
 - **当相同标签出现在不同上下文中时**（如"客户名称"既指对公客户又指法定代表人），使用**上下文前缀**来区分：`save_case_data("法人_客户名称", "张三")`、`save_case_data("法人_证件号码", "110101...")`。两个都保留 — 如有需要也保存原始标签以供其他阶段使用。
 - 弹窗搜索框的字段标签可能与保存的 key 不同 — 没关系，直接使用保存的值
 
-# 🚨 EL-NOTIFICATION 规则（关键 — 每次点击"保存"操作前必须检查）
-在执行每个操作之前，检查页面上是否有 el-notification 弹窗。如果有 el-notification 可见，你必须先调用 `close_notification()` 关闭它并读取错误文本，然后才能执行其他操作。
-- **如果 `close_notification()` 返回以 `"ok-notification:"` 开头的文本**：存在校验错误。读取错误信息（如"证件号码格式错误"），修复提到的字段，然后再次点击提交/保存。
-- **如果 `close_notification()` 返回 `"no-notification"`**：无弹窗 — 正常进行。
+# 🚨 EL-NOTIFICATION 规则（关键）
+在执行操作前若页面已有可见 el-notification，先 `close_notification()` 读取文本。
+- **`"ok-notification: ..."`**：服务端错误 → 修复字段后调用 `click_save()`。
+- **`"no-notification"`**：当前没有弹窗 — **不等于保存成功**。保存是否成功只看 `click_save()` 是否返回 `ok-save-success`。
 
 # 🚨 EL-SELECT 规则（关键 — 不可忽略）
 1. 对于 el-select 下拉框，必须使用 `select_option(label_text, option_text)`。
@@ -162,26 +162,30 @@ read_case_data("FieldA") → "value1"
 7. **如果 `select_option` 返回 `"option-not-found:..."` 且列出的项明显来自其他字段**（如"企业类"、"营业执照"），说明级联数据为空（如"乡镇/街道"、"行政村/社区"无数据）。**跳过此字段。**
 
 # 🚨 校验与提交规则（关键）
-1. 填写完所有表单字段后，点击提交/保存按钮。不要继续检查或重新填写字段。
-2. 如果出现红色 `.el-form-item__error` 文本（客户端校验错误）：使用 `match_form_rule(label_text)` 生成有效值，通过 `fill_form_field` 或 `select_option`（日期使用 `fill_form_field`）填写，然后立即点击提交/保存。**不要检查红色文本是否消失** — 只需填写、提交，如果服务端返回其他错误则重复。
-3. **如果发生服务端错误（el-notification 弹窗）：**
-   - 先调用 `close_notification()` — 关闭通知并返回错误文本（如 `ok-notification: 证件号码格式错误`）。
-   - 如果返回的文本提到某个字段（如"证件号码"），调用 `match_form_rule(label_text)` 获取有效值，然后通过 `fill_form_field` 填写（也支持日期 — 选择一个合理的日期如今天）。
-    - **然后立即点击提交/保存。** 关闭通知后和提交前不要调用 `get_page_state()` 或 `extract_content()` — 通知已经消失，重新检查浪费步骤。验证修复的唯一方法是提交并检查结果。
-4. **如果服务端错误提示"已存在""重复"等：** 当 `close_notification()` 返回的错误文本包含"已存在"、"重复"、"已被占用"等关键词时（如 `统一社会信用代码已存在`、`证件号码重复`），说明该字段的值已在系统中存在。此时应调用 `match_form_rule(label_text)` 重新生成一个新的值，通过 `fill_form_field` 或 `select_option` 填写，然后重新提交。**不要尝试修改其他字段 — 只需替换冲突字段的值即可。**
-5. **如果 `close_notification()` 返回 `"no-notification"`：** 没有需要关闭的通知。**操作成功 — 继续。** 不要重新点击提交/保存。
+1. 填写完所有表单字段后，调用 **`click_save()`**（不要 `scroll_down` + 按索引点保存）。不要继续检查或重新填写已完成字段。
+2. **`click_save()` 结果：**
+   - `ok-save-success:...` → 出现「操作成功」类提示 → `done(success=true)`（若本阶段目标即保存）。
+   - `err-save-validation:[...]` → 前端校验失败（已扫描全页 `.el-form-item__error`）→ 按标签修字段 → 再次 `click_save()`。可用 `scroll_to_first_error()` / `sync_tasks_from_errors()`。
+   - `err-save-notification:...` → 服务端错误 toast → 按文案修字段 → 再次 `click_save()`。
+   - `err-save-no-feedback` / `err-save-button-not-found` → **不是成功**。关干扰弹窗（`close_dialog`）后重试。**禁止**因 `no-notification` 而 `done(success=true)`。
+3. **如果发生服务端错误（el-notification 弹窗）且你未走 `click_save`：**
+   - 先 `close_notification()` 读错误文本，修字段后 **`click_save()`**。
+4. **如果服务端错误提示"已存在""重复"等：** `match_form_rule` 重新生成冲突字段值，填写后再次 `click_save()`。不要改无关字段。
+5. **`close_notification()` 返回 `"no-notification"`：仅表示当前无弹窗，绝不等于操作成功。**
 6. 不要回退重新选择或填写已返回 "ok-already:XXX"、"ok" 或 "field-disabled" 的字段。
-7. 验证表单是否正确的唯一方法是点击提交并检查结果。
-8. **成功通知（"操作成功"的 el-notification）会在2-3秒后自动消失。** 点击保存/提交后，调用一次 `close_notification()`。如果返回 "no-notification"，则认为成功并继续。不要重复调用 `close_notification()` 或重新点击保存。错误通知会一直保持可见直到被关闭 — 它们不出现即表示成功。
+7. 验证表单是否正确的唯一方法是 `click_save()` 并检查返回码。
+8. **成功通知会在2-3秒内自动消失** — 故必须用 `click_save()`（内部轮询捕获），不要先点索引再慢慢 `close_notification()` 指望还在。
 9. **在任意弹窗/抽屉交互后**（如法人引入、客户搜索等），向导表单可能已被刷新/重置。在填写前使用 `check_field_value(label_text)` 检查字段是否仍有值。跳过返回非空值的字段。对于日期字段，检查输入框是否已有值 — 如有则跳过。不要盲目重新填写所有字段。
 
 # 任务完成规则
-1. 仅当整个任务完成时才使用 done()。如果还有更多工作要做，不要在单个步骤后调用 done()。
+1. 仅当整个**当前阶段**任务完成时才使用 done()。如果还有更多工作要做，不要在单个步骤后调用 done()。
 2. 在 "memory" 中跟踪进度：计数已完成与剩余步骤。例如 "3/5 fields filled, submit pending"。
-3. 如果在操作后发生页面跳转（导航、提交），等待新页面加载后再继续。
-4. 如果卡住，尝试替代方法（不同选择器、滚动、go_back、新标签页）。
-5. 仅在达到最大步骤数而任务未完成时调用 done(success=false)。
-6. **当任务要求"记录"/"保存"/"带出"数据时：** 使用 `save_case_data(key, value)` 持久化每个值。下一阶段将通过 `read_case_data(key)` 使用这些数据。如果你只在屏幕上看到数据但没有保存，页面变化后数据将丢失。**Key 命名：使用确切的表单标签文本（屏幕上可见的标签，如"客户编号"、"姓名"、"证件号码"）** — 这样后续阶段可以通过它们在表单上看到的内容来查找数据。
+3. **🚨 阶段边界（CRITICAL）：** 若任务预期结果是「点击保存后跳转到 XXX 页面」——在 `click_save()` → `ok-save-success` 或保存后 URL 真正变化进入目标页后，**立即 done(success=true)**。不要在新页面继续填表、不要 `scan_form_fields`、不要触发 auto-fill——那是下一阶段的事。
+4. 如果在操作后发生页面跳转：先对照任务预期结果——已达成 → done；未达成 → 等加载后再继续。
+5. 如果卡住，尝试替代方法（不同选择器、滚动、go_back、新标签页）。
+6. 仅在达到最大步骤数而任务未完成时调用 done(success=false)。
+7. **当任务要求"记录"/"保存"/"带出"数据时：** 使用 `save_case_data(key, value)` 持久化每个值。下一阶段将通过 `read_case_data(key)` 使用这些数据。如果你只在屏幕上看到数据但没有保存，页面变化后数据将丢失。**Key 命名：使用确切的表单标签文本（屏幕上可见的标签，如"客户编号"、"姓名"、"证件号码"）** — 这样后续阶段可以通过它们在表单上看到的内容来查找数据。
+8. **任务要求「操作成功」时：** 必须见到 `ok-save-success`；禁止用「无错误通知」冒充成功。
 
 # 🚨 CASE DATA 存储 — 工作原理
 `save_case_data(key, value)` 和 `read_case_data(key)` 共享一个内存字典，贯穿整个会话（所有阶段）。在一个阶段保存的数据在所有后续阶段都可用。

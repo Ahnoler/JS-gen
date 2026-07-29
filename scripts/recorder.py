@@ -3,6 +3,7 @@ Recording hooks for browser-use agent: step callbacks, goal dedup detection, can
 premature done() prevention, and human intervention injection.
 """
 import json
+import re
 import sys
 from langchain_core.messages import HumanMessage
 from . import controller as ctrl_mod
@@ -67,18 +68,47 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                     f'[HUMAN INTERVENTION - FIELD(S) NEED SPECIAL WORKFLOW]\n'
                     f'The following {len(labels)} field(s) are disabled but have adjacent action buttons:\n'
                     f'{field_list}\n\n'
-                    f'ACTIONS:\n'
-                    f'1. Skip these fields for now — do NOT try fill_form_field on them (will return field-disabled).\n'
-                    f'2. Continue filling other fillable fields and complete everything else.\n'
-                    f'3. When all other fields are done, call done() and report: '
-                    f'"Fields {labels} require a special fill workflow. '
-                    f'Please design the workflow so I can complete them."\n'
-                    f'4. Wait for the user to provide the workflow design before attempting these fields.\n'
-                    f'5. After the user provides the workflow, follow the user\'s instructions to fill each field.'
+                    f'ACTIONS (in order):\n'
+                    f'1. Do NOT re-select or re-fill already-completed fields.\n'
+                    f'2. FIRST call click_save(). If ok-save-success (操作成功), call done(success=true).\n'
+                    f'3. If err-save-validation on these fields: use click_adjacent_button '
+                    f'(e.g. 引入/联网核查) for each, wait_for_loading, then click_save() again.\n'
+                    f'4. Only if still blocked after trying adjacent buttons, call done() and report: '
+                    f'"Fields {labels} require a special fill workflow."\n'
+                    f'5. After the user provides a workflow, follow it, then task_done + click_save().'
                 )
                 msg = HumanMessage(content=msg_text)
                 agent._message_manager._add_message_with_tokens(msg)
                 sys.stderr.write(f'[recorder] Injected self-requested intervention for: {labels}\n')
+                sys.stderr.flush()
+
+            # After auto-fill / empty pending: force agent toward 保存 instead of re-filling
+            if case_data_store.get('_submit_ready'):
+                case_data_store['_submit_ready'] = False
+                msg = HumanMessage(content=(
+                    '[SYSTEM] Fillable form fields are done (pending≈0).\n'
+                    'NEXT_ACTION: Call click_save() NOW (finds 保存/提交 and scrolls into view).\n'
+                    'Do NOT scroll_down / scroll_up hunting for 保存.\n'
+                    'Do NOT call select_option / fill_form_field on fields that already have values.\n'
+                    'If 联网核查结果 is required and empty, click_adjacent_button(联网核查) first, '
+                    'wait_for_loading, then click_save().\n'
+                    'click_save() returns ok-save-success only when 操作成功 toast appears — '
+                    'then done(success=true). err-save-validation / err-save-no-feedback = NOT success.'
+                ))
+                agent._message_manager._add_message_with_tokens(msg)
+                sys.stderr.write('[recorder] Injected submit-ready cue\n')
+                sys.stderr.flush()
+            # Break already-matched re-select loops
+            streak = int(case_data_store.get('_already_matched_streak', 0) or 0)
+            if streak >= 3:
+                case_data_store['_already_matched_streak'] = 0
+                msg = HumanMessage(content=(
+                    f'[SYSTEM] You received already-matched {streak}+ times in a row. '
+                    f'STOP re-selecting fields. Call click_save() immediately. '
+                    f'Only fix fields that sync_tasks_from_errors / formErrors / err-save-validation report.'
+                ))
+                agent._message_manager._add_message_with_tokens(msg)
+                sys.stderr.write(f'[recorder] Injected already-matched loop break (streak={streak})\n')
                 sys.stderr.flush()
 
     async def on_step_end(agent):
@@ -130,41 +160,202 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
             return
 
         # ===== Prevent premature done() =====
-        # If the agent calls done() while a dialog/drawer is still open,
-        # clear the is_done flag so the agent continues working.
+        # Only block done() when something VISIBLE still blocks the phase goal
+        # (open dialog/drawer, visible validation errors, or error notifications).
+        # Do NOT count hidden DOM leftovers — Element UI keeps .el-form-item__error
+        # / .el-notification nodes in the tree after navigation, which previously
+        # caused false "pending errors" and forced the agent to keep filling the
+        # NEXT page after a successful create→navigate.
         if _done:
             try:
                 page = await agent.browser_context.get_current_page()
-                has_open_dialog = await page.evaluate('''() => {
-                    const dialogs = document.querySelectorAll('.el-dialog');
-                    const drawers = document.querySelectorAll('.el-drawer');
-                    return [...dialogs, ...drawers].some(d => d.offsetParent !== null);
+                # Prefer explicit success from the done() action
+                done_success = False
+                try:
+                    for r in (_last_result or []):
+                        if getattr(r, 'success', None) is True:
+                            done_success = True
+                            break
+                        text = (getattr(r, 'extracted_content', None) or '') + (getattr(r, 'error', None) or '')
+                        if 'success": true' in text.lower() or 'success=true' in text.lower():
+                            done_success = True
+                            break
+                except Exception:
+                    pass
+
+                # Give brief settle time if loading mask is up (post-save navigation)
+                try:
+                    await page.evaluate('''() => new Promise(resolve => {
+                        let n = 0;
+                        const tick = () => {
+                            const mask = document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)');
+                            const visible = mask && mask.offsetParent !== null;
+                            if (!visible || n > 25) return resolve();
+                            n += 1;
+                            setTimeout(tick, 200);
+                        };
+                        tick();
+                    })''')
+                except Exception:
+                    pass
+
+                block = await page.evaluate('''() => {
+                    const isVisible = (el) => {
+                        if (!el) return false;
+                        const style = getComputedStyle(el);
+                        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0)
+                            return false;
+                        const r = el.getBoundingClientRect();
+                        return r.width > 0 && r.height > 0;
+                    };
+                    // Visible dialog / drawer (not just offsetParent — fixed wrappers)
+                    let openOverlay = null;
+                    for (const d of document.querySelectorAll('.el-dialog')) {
+                        const wrap = d.closest('.el-dialog__wrapper') || d;
+                        if (isVisible(wrap) && isVisible(d)) {
+                            const title = (d.querySelector('.el-dialog__title')?.textContent || '').trim();
+                            openOverlay = 'dialog:' + (title || 'unnamed');
+                            break;
+                        }
+                    }
+                    if (!openOverlay) {
+                        for (const d of document.querySelectorAll('.el-drawer')) {
+                            const wrap = d.closest('.el-drawer__wrapper') || d;
+                            if (isVisible(wrap) && isVisible(d)) {
+                                const label = d.getAttribute('aria-label') || 'unnamed';
+                                openOverlay = 'drawer:' + label;
+                                break;
+                            }
+                        }
+                    }
+                    // Visible ERROR notifications only (ignore 成功/完成 success toasts)
+                    const errorNotifs = [];
+                    for (const el of document.querySelectorAll('.el-notification')) {
+                        if (!isVisible(el)) continue;
+                        const t = (el.textContent || '').replace(/\\s+/g, ' ').trim();
+                        if (!t) continue;
+                        if (/成功|完成|已保存|提交成功/.test(t) && !/失败|错误|不成功/.test(t))
+                            continue;
+                        errorNotifs.push(t.slice(0, 120));
+                    }
+                    // Visible form validation errors with non-empty text
+                    const formErrors = [];
+                    for (const el of document.querySelectorAll('.el-form-item__error')) {
+                        if (!isVisible(el)) continue;
+                        const t = (el.textContent || '').trim();
+                        if (t) formErrors.push(t.slice(0, 80));
+                    }
+                    return {
+                        openOverlay,
+                        errorNotifs,
+                        formErrors,
+                        url: location.href,
+                    };
                 }''')
-                if has_open_dialog:
-                    sys.stderr.write(f"[recorder] ⚠ Premature done() detected — dialog still open at step {agent.state.n_steps}, forcing continue\n")
+
+                open_overlay = (block or {}).get('openOverlay')
+                error_notifs = (block or {}).get('errorNotifs') or []
+                form_errors = (block or {}).get('formErrors') or []
+                cur_url = (block or {}).get('url') or ''
+
+                save_ok = bool(case_data_store and case_data_store.get('_last_save_ok'))
+                url_before_save = (case_data_store or {}).get('_url_before_save') or ''
+                url_changed = bool(url_before_save and cur_url and url_before_save != cur_url)
+
+                # Navigation success only if URL actually changed after save (not already-on-detail)
+                navigated_ok = bool(
+                    done_success
+                    and url_changed
+                    and (
+                        'cstNo=' in cur_url
+                        or 'viewType=add' in cur_url
+                        or 'mdfIdcstInf' in cur_url
+                        or 'HostCstmgrMdf' in cur_url
+                    )
+                )
+
+                # Extract done() text for claim checks
+                done_text = ''
+                try:
+                    for r in (_last_result or []):
+                        done_text += (getattr(r, 'extracted_content', None) or '') + ' '
+                except Exception:
+                    pass
+                claims_save_ok = bool(
+                    done_success
+                    and re.search(
+                        r'操作成功|保存成功|提交成功|已成功保存|成功填写并保存|无错误通知',
+                        done_text or '',
+                    )
+                )
+
+                # Claiming save success without ok-save-success / real post-save navigation
+                if claims_save_ok and not save_ok and not navigated_ok:
+                    sys.stderr.write(
+                        f"[recorder] ⚠ Premature done() — claimed save success without "
+                        f"ok-save-success / URL change at step {agent.state.n_steps}, forcing continue\n"
+                    )
                     sys.stderr.flush()
-                    # Clear is_done and inject error to force continuation
                     for h in agent.state.history.history:
                         if h.result:
                             for r in h.result:
                                 r.is_done = False
-                                r.error = 'Premature done() rejected: dialog still open. Continue filling form and click submit.'
+                                r.error = (
+                                    'Premature done() rejected: no 操作成功 observed. '
+                                    'Call click_save(); only done(success=true) after ok-save-success. '
+                                    'no-notification / no error toast is NOT success.'
+                                )
                     return
-                # Also check if page has visible notifications or form errors
-                has_pending = await page.evaluate('''() => {
-                    const notifs = document.querySelectorAll('.el-notification');
-                    const errors = document.querySelectorAll('.el-form-item__error');
-                    return (notifs.length > 0 || errors.length > 0) ? 'pending' : 'none';
-                }''')
-                if has_pending == 'pending' or _next_goal in ('', 'Task is done - call done()'):
-                    sys.stderr.write(f"[recorder] ⚠ Premature done() detected — pending errors/notifications at step {agent.state.n_steps}, forcing continue\n")
+
+                if open_overlay and not navigated_ok and not save_ok:
+                    sys.stderr.write(
+                        f"[recorder] ⚠ Premature done() — visible overlay {open_overlay} "
+                        f"at step {agent.state.n_steps}, forcing continue\n"
+                    )
                     sys.stderr.flush()
                     for h in agent.state.history.history:
                         if h.result:
                             for r in h.result:
                                 r.is_done = False
-                                r.error = 'Premature done() rejected: validation errors remain. Fix fields and click submit.'
+                                r.error = (
+                                    f'Premature done() rejected: {open_overlay} still open. '
+                                    f'Finish or close it, then click submit / call done() again.'
+                                )
                     return
+
+                if (error_notifs or form_errors) and not navigated_ok and not save_ok:
+                    sys.stderr.write(
+                        f"[recorder] ⚠ Premature done() — visible errors at step {agent.state.n_steps}: "
+                        f"notifs={error_notifs[:2]} formErrors={form_errors[:3]}, forcing continue\n"
+                    )
+                    sys.stderr.flush()
+                    for h in agent.state.history.history:
+                        if h.result:
+                            for r in h.result:
+                                r.is_done = False
+                                r.error = (
+                                    'Premature done() rejected: visible validation errors remain. '
+                                    f'Errors={form_errors[:3] or error_notifs[:2]}. '
+                                    f'Fix fields then call click_save() again.'
+                                )
+                    return
+
+                if navigated_ok or save_ok:
+                    reason = 'save-ok' if save_ok else 'navigation'
+                    sys.stderr.write(
+                        f"[recorder] ✓ done() accepted after {reason} "
+                        f"(success={done_success}) at step {agent.state.n_steps}\n"
+                    )
+                    sys.stderr.flush()
+                    # Clear stale task_list so the next phase starts clean
+                    if case_data_store is not None:
+                        case_data_store.pop('task_list', None)
+                        case_data_store.pop('_scan_fields', None)
+                        case_data_store.pop('_submit_ready', None)
+                        case_data_store.pop('_autofill_summary', None)
+                        case_data_store.pop('_last_save_ok', None)
+                        case_data_store.pop('_url_before_save', None)
+                # else: no visible blockers — allow done() (including success=false reports)
             except Exception as e:
                 sys.stderr.write(f"[recorder] done-check error: {e}\n")
                 sys.stderr.flush()

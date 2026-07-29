@@ -26,7 +26,7 @@ idno = read_case_data("法人_证件号码") or read_case_data("证件号码")
 
 if 无用户数据 (name 和 idno 都为空):
   # 无法自行搜索 → 直接走干预路径
-  → 点击【保存】触发校验
+  → 调用 click_save() 触发校验（勿 scroll 找保存按钮）
   → sync_tasks_from_errors()
   → NEEDS_INTERVENTION → request_intervention(label)
   → 向用户报告："字段 'XXX' 需要从已有法人客户引入数据，但未提供搜索条件。请提供客户名称或证件号码以便搜索引入。"

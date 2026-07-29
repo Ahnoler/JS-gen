@@ -194,7 +194,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
         setter.call(t, v);
         t.setAttribute('value', v);
-        t.dispatchEvent(new Event('input', {bubbles:true}));
+        t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:v}));
         t.dispatchEvent(new Event('change', {bubbles:true}));
         t.dispatchEvent(new Event('blur', {bubbles:true}));
     };
@@ -462,12 +462,16 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         return 'not-filled';
     }
     if (mode === 'trigger') {
+        // Never click an unrelated select — that opens the wrong dropdown
+        // (e.g. 国籍) and pollutes subsequent option-not-found lists.
         for (const sel of _allSelects) {
             const ph = sel.getAttribute('placeholder') || '';
-            if (ph.includes(label) && !sel.disabled && sel.offsetParent !== null) { sel.click(); return 'ok-triggered'; }
-        }
-        for (const sel of _allSelects) {
-            if (!sel.disabled && sel.offsetParent !== null) { sel.click(); return 'ok-triggered'; }
+            if (ph.includes(label) && !sel.disabled && sel.offsetParent !== null) {
+                sel.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                sel.click();
+                window.__last_select_trigger = sel;
+                return 'ok-triggered';
+            }
         }
         return 'label-not-found';
     }
@@ -510,21 +514,59 @@ JS_FIND_VISIBLE_DROPDOWN = '''(() => {
 })()'''
 
 JS_SELECT_OPTION = '''(option) => {
-    const dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
-    let items = dropdown.querySelectorAll('.el-select-dropdown__item');
-    if (items.length === 0 || dropdown === document) {
-        items = document.querySelectorAll('.el-select-dropdown__item');
+    // Prefer the dropdown tied to the trigger we just opened.
+    const triggerInput = window.__last_select_trigger || null;
+    let dropdown = null;
+    if (triggerInput) {
+        // Element UI often sets aria-owns / aria-controls on the input wrapper
+        const owned = triggerInput.getAttribute('aria-controls')
+            || triggerInput.getAttribute('aria-owns')
+            || triggerInput.closest('.el-select')?.getAttribute('aria-owns');
+        if (owned) {
+            const byId = document.getElementById(owned);
+            if (byId) dropdown = byId;
+        }
+        // Popper may sit next to the select; pick the visible dropdown nearest the trigger
+        if (!dropdown) {
+            const tr = triggerInput.getBoundingClientRect();
+            let best = null, bestDist = Infinity;
+            for (const dd of document.querySelectorAll('.el-select-dropdown')) {
+                if (dd.classList.contains('is-hidden')) continue;
+                const style = getComputedStyle(dd);
+                if (style.display === 'none' || style.visibility === 'hidden') continue;
+                const rect = dd.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) continue;
+                const dist = Math.abs(rect.top - tr.bottom) + Math.abs(rect.left - tr.left);
+                if (dist < bestDist) { bestDist = dist; best = dd; }
+            }
+            dropdown = best;
+        }
     }
+    if (!dropdown) {
+        dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
+    }
+    let items = dropdown && dropdown !== document
+        ? dropdown.querySelectorAll('.el-select-dropdown__item')
+        : [];
+    // Do NOT fall back to all document items — that mixes 国籍/行业/性别 options.
+    if (items.length === 0) {
+        const vis = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
+        if (vis && vis !== document) items = vis.querySelectorAll('.el-select-dropdown__item');
+    }
+    const visibleItems = [...items].filter(i => {
+        if (i.classList.contains('is-disabled')) return false;
+        const style = getComputedStyle(i);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        const r = i.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+    });
+    const pickPool = visibleItems.length > 0 ? visibleItems : [...items];
     const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
     const tryClick = (item) => {
         item.scrollIntoView({ block: 'nearest' });
         const t = item.textContent.trim();
-        // Read the trigger that opened this dropdown (set by JS_FIND_LABELED_SELECT)
-        const triggerInput = window.__last_select_trigger || null;
         item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
         item.click();
-        // Dispatch input+change on the specific trigger to force Vue model sync
-        // (tssc-form-item custom wrappers may not react to dropdown click alone)
         if (triggerInput) {
             setTimeout(() => {
                 triggerInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -534,28 +576,22 @@ JS_SELECT_OPTION = '''(option) => {
         }
         return 'ok:' + t;
     };
+    if (pickPool.length === 0) return 'no-items';
     if (FIRST_ALIASES.includes(option.toLowerCase().trim())) {
-        for (const item of items) {
-            if (item.offsetParent !== null) { return tryClick(item); }
-        }
-        if (items.length > 0) { return tryClick(items[0]); }
-        return 'no-items';
+        return tryClick(pickPool[0]);
     }
-    for (const item of items) {
-        if (item.textContent.trim() === option) {
-            return tryClick(item);
-        }
+    for (const item of pickPool) {
+        if (item.textContent.trim() === option) return tryClick(item);
     }
-    for (const item of items) {
-        if (item.textContent.trim().includes(option)) {
-            return tryClick(item);
-        }
+    for (const item of pickPool) {
+        if (item.textContent.trim().includes(option)) return tryClick(item);
     }
-    const hasEmpty = document.querySelector('.el-select-dropdown__empty');
-    if (hasEmpty) {
-        return 'no-items';
-    }
-    return 'option-not-found:' + [...items].map(i => i.textContent.trim()).join(', ');
+    const hasEmpty = (dropdown && dropdown !== document)
+        ? dropdown.querySelector('.el-select-dropdown__empty')
+        : document.querySelector('.el-select-dropdown__empty');
+    if (hasEmpty) return 'no-items';
+    const preview = pickPool.slice(0, 30).map(i => i.textContent.trim()).filter(Boolean);
+    return 'option-not-found:' + preview.join(', ');
 }'''
 
 JS_FIND_OPTION = '''(option) => {
@@ -956,7 +992,14 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
     const fields = [];
     const selectFields = [];  // [{field, trigger}] — Phase 2 从这里读取 options
     for (const item of allItems) {
-        if (quick && (item.offsetParent === null)) continue;
+        // Prefer getBoundingClientRect over offsetParent — Element UI drawers
+        // use position:fixed wrappers where offsetParent is often null while visible.
+        if (quick) {
+            const style = getComputedStyle(item);
+            if (style.display === 'none' || style.visibility === 'hidden') continue;
+            const rect = item.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) continue;
+        }
         const label = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
         const input = item.querySelector('input:not([type="hidden"])');
         const textarea = item.querySelector('textarea');
@@ -1107,6 +1150,130 @@ JS_SCROLL_TO_FIRST_ERROR = '''() => {
         }
     }
     return JSON.stringify({ label: '', error: '' });
+}'''
+
+# Find 保存/提交 (or custom text), scrollIntoView, click. Prefer footer / primary.
+# Arg: buttonText string (default 保存). Returns JSON {ok, text, xpath, reason}.
+JS_CLICK_SAVE_BUTTON = r'''(buttonText) => {
+  const needle = String(buttonText || '保存').trim() || '保存';
+  const rejectRe = /查询|返回|取消|关闭|重置|清空|删除|导出|引入|核查|上传|下载|暂存/;
+  const isVisible = (el) => {
+    if (!el || el.offsetParent === null && el.tagName !== 'BODY') {
+      const r0 = el.getBoundingClientRect();
+      if (!(r0.width > 0 && r0.height > 0)) return false;
+    }
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && cs.opacity !== '0';
+  };
+  const btnText = (el) => (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+  const absXPath = (node) => {
+    if (!node || node.nodeType !== 1) return '';
+    const parts = [];
+    let cur = node;
+    while (cur && cur.nodeType === 1) {
+      const tag = cur.tagName.toLowerCase();
+      const parent = cur.parentNode;
+      if (!parent) break;
+      const sibs = [...parent.children].filter(c => c.tagName === cur.tagName);
+      const idx = sibs.indexOf(cur) + 1;
+      parts.unshift(tag + '[' + idx + ']');
+      cur = parent;
+      if (cur === document.documentElement) {
+        parts.unshift('html[1]');
+        break;
+      }
+    }
+    return '/' + parts.join('/');
+  };
+  const scoreBtn = (el, text) => {
+    let s = 0;
+    if (text === needle) s += 100;
+    else if (text.startsWith(needle)) s += 80;
+    else if (text.includes(needle)) s += 50;
+    else return -1;
+    if (rejectRe.test(text) && text !== needle) return -1;
+    if (el.classList.contains('el-button--primary') || el.classList.contains('el-button--success')) s += 30;
+    if (el.closest('.el-dialog__footer, .el-drawer__footer, .el-message-box__btns, .dialog-footer, .form-footer, .footer-btns, [class*="footer"]')) s += 40;
+    if (el.closest('.el-dialog, .el-drawer, .el-message-box')) s += 10;
+    // Prefer page-level 保存 over nested utility dialogs (查询/返回)
+    const overlay = el.closest('.el-dialog, .el-drawer, .el-message-box');
+    if (overlay && /查询|返回|核查|核验/.test(btnText(overlay.querySelector('.el-dialog__title, .el-drawer__title, .el-message-box__title') || overlay))) {
+      if (text === needle) s -= 5;
+    }
+    return s;
+  };
+  const selectors = 'button, .el-button, [role="button"], a.el-button';
+  let best = null;
+  let bestScore = -1;
+  let bestText = '';
+  for (const el of document.querySelectorAll(selectors)) {
+    if (!isVisible(el)) continue;
+    if (el.disabled || el.getAttribute('disabled') != null || el.classList.contains('is-disabled')) continue;
+    const text = btnText(el);
+    if (!text || text.length > 40) continue;
+    const sc = scoreBtn(el, text);
+    if (sc > bestScore) {
+      bestScore = sc;
+      best = el;
+      bestText = text;
+    }
+  }
+  if (!best || bestScore < 0) {
+    return JSON.stringify({ ok: false, reason: 'button-not-found', needle });
+  }
+  try {
+    best.scrollIntoView({ block: 'center', behavior: 'instant' });
+  } catch (e) {}
+  best.click();
+  return JSON.stringify({
+    ok: true,
+    text: bestText,
+    xpath: absXPath(best),
+    tag: (best.tagName || '').toLowerCase(),
+  });
+}'''
+
+# After submit: scan visible form errors + notifications / el-message.
+JS_SCAN_SAVE_OUTCOME = r'''() => {
+  const isVisible = (el) => {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+  };
+  const formErrors = [];
+  for (const el of document.querySelectorAll('.el-form-item__error')) {
+    if (!isVisible(el)) continue;
+    const error = (el.textContent || '').trim();
+    if (!error) continue;
+    const item = el.closest('.el-form-item');
+    const label = ((item && item.querySelector('.el-form-item__label'))
+      ? item.querySelector('.el-form-item__label').textContent
+      : '').replace(/\s+/g, ' ').trim();
+    formErrors.push({ label, error: error.slice(0, 120) });
+  }
+  const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功/;
+  const failRe = /失败|错误|异常|不能|不允许|已存在|重复|校验|必填|不通过/;
+  const successNotifs = [];
+  const errorNotifs = [];
+  const collect = (el) => {
+    if (!isVisible(el)) return;
+    const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!t) return;
+    if (successRe.test(t) && !failRe.test(t)) successNotifs.push(t.slice(0, 160));
+    else if (failRe.test(t) || /el-notification--error|el-message--error|el-message--warning/.test(el.className || ''))
+      errorNotifs.push(t.slice(0, 160));
+    else if (el.classList && (el.classList.contains('el-notification--success') || el.classList.contains('el-message--success')))
+      successNotifs.push(t.slice(0, 160));
+  };
+  for (const el of document.querySelectorAll('.el-notification, .el-message')) collect(el);
+  return {
+    formErrors,
+    successNotifs,
+    errorNotifs,
+    url: location.href,
+  };
 }'''
 
 # ── Click locator enrichment (AI click_element_by_index → xpath_smart) ──

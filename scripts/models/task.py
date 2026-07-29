@@ -228,6 +228,10 @@ class TaskList(BaseModel):
 
         Returns the list of retried/created items.
         """
+        # Normalize common validation messages → field labels
+        # e.g. "有效身份证号码" / "身份证号码格式错误" → prefer matching 证件号码
+        _CERT_HINTS = ('身份证', '证件号', '信用代码', '组织机构代码')
+
         retried: list[TaskItem] = []
         for label in error_labels:
             # Tier 1: exact match
@@ -238,6 +242,13 @@ class TaskList(BaseModel):
                     if label in d.label or d.label in label:
                         found = d
                         break
+            if not found:
+                # Tier 2b: cert-related error text → 证件号码 / similar done labels
+                if any(h in label for h in _CERT_HINTS):
+                    for d in self.done:
+                        if '证件号码' in d.label or '证件号' in d.label or '信用代码' in d.label:
+                            found = d
+                            break
             if found:
                 self.retry(found.label)
                 retried.append(found)

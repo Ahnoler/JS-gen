@@ -345,7 +345,9 @@ def _make_field_rules() -> List[FieldRule]:
         # ── Identity & certificates (priority 90-100) ──
         FieldRule(["身份证", "身份证号", "居民身份证"], _gen_idcard, 100, "dynamic",
                   "18位身份证号，含GB 11643-1999校验位，随机性别"),
-        FieldRule(["统一社会信用代码", "信用代码", "营业执照", "营业执照号", "证件号码"],
+        # NOTE: Do NOT bind bare「证件号码」here — it is ambiguous (身份证 vs 统一社会信用代码).
+        # Use match_cert_number(cert_type) / match_form_rule which reads 证件类型 from the page.
+        FieldRule(["统一社会信用代码", "信用代码", "营业执照", "营业执照号"],
                   _gen_credit_code, 100, "dynamic",
                   "18位统一社会信用代码，GB 32100-2015标准，含登记机构/类型/区划/组织代码/校验码"),
         FieldRule(["组织机构代码", "组织代码"], _gen_org_code, 100, "dynamic",
@@ -413,7 +415,7 @@ def _make_field_rules() -> List[FieldRule]:
                   "1-50年"),
 
         # ── Codes / IDs (priority 50-60) ──
-        FieldRule(["行政编号", "行政区划代码"], lambda: str(_random.randint(100000, 999999)),
+        FieldRule(["行政编号", "行政区划代码", "行政区划编码"], lambda: str(_random.randint(100000, 999999)),
                   60, "semantic", "6位行政编号"),
         FieldRule(["客户编号", "客户号", "客户ID"], lambda: 'C' + ''.join(str(_random.randint(0,9)) for _ in range(8)),
                   55, "semantic", "C+8位数字"),
@@ -447,11 +449,13 @@ def _make_field_rules() -> List[FieldRule]:
                   "年月日+2位序号"),
 
         # ── Address / Region (priority 45-55) ──
+        # Short keywords (省/市/区) are matched with exact-ish guards in match_rule
+        # to avoid「行政区划编码」→「区」false positives.
         FieldRule(["省", "省份", "所在省"], lambda: _random.choice(['湖南省', '广东省', '浙江省', '江苏省', '山东省', '湖北省']),
                   55, "semantic", "省级行政区名称"),
         FieldRule(["市", "城市", "所在市"], lambda: _random.choice(['长沙市', '广州市', '杭州市', '南京市', '济南市', '武汉市']),
                   55, "semantic", "地级市名称"),
-        FieldRule(["区", "所在区", "城区"], lambda: _random.choice(['岳麓区', '天河区', '西湖区', '鼓楼区', '历下区', '武昌区']),
+        FieldRule(["所在区", "城区"], lambda: _random.choice(['岳麓区', '天河区', '西湖区', '鼓楼区', '历下区', '武昌区']),
                   55, "semantic", "区县级名称"),
         FieldRule(["街道", "乡镇"], lambda: _random.choice(['麓谷街道', '天顶街道', '天河南街道', '西溪街道']),
                   50, "semantic", "街道/乡镇名称"),
@@ -480,7 +484,12 @@ def _make_field_rules() -> List[FieldRule]:
                   "常见方向"),
 
         # ── Name / Text (priority 40-55) ──
-        FieldRule(["名称", "客户名称", "公司名称", "企业名称", "单位名称", "全称"],
+        # Put specific name rules BEFORE the generic「名称」rule.
+        FieldRule(["工作单位区域", "单位区域"], lambda: _random.choice(['岳麓区', '天河区', '西湖区', '鼓楼区']),
+                  62, "semantic", "工作单位所在区域"),
+        FieldRule(["外文名称", "英文名称", "英文名"], lambda: 'Test Customer', 60, "semantic", "英文/外文名称"),
+        FieldRule(["工作单位", "任职单位", "所在单位"], lambda: '测试科技有限公司', 60, "semantic", "工作单位名称"),
+        FieldRule(["客户名称", "公司名称", "企业名称", "单位名称", "全称"],
                   lambda: '测试科技发展有限公司', 55, "semantic", "中文名称"),
         FieldRule(["简称", "缩写", "短名"], lambda: '测试科技', 50, "semantic", "中文简称"),
         FieldRule(["产品名称", "项目名称", "方案名称", "品牌名称"], lambda: '自动化测试项目',
@@ -500,7 +509,7 @@ def _make_field_rules() -> List[FieldRule]:
         FieldRule(["学位"], lambda: _random.choice(['学士', '硕士', '博士']), 45, "semantic", "标准学位选项"),
         FieldRule(["民族"], lambda: _random.choice(['汉族', '苗族', '土家族', '回族', '蒙古族']), 45, "semantic",
                   "中国56个民族"),
-        FieldRule(["国籍"], lambda: '中国', 50, "semantic", "国家名称"),
+        FieldRule(["国籍"], lambda: '中华人民共和国', 50, "semantic", "国家名称"),
         FieldRule(["性别"], lambda: _random.choice(['男', '女']), 50, "semantic", "性别"),
         FieldRule(["婚姻状况"], lambda: _random.choice(['未婚', '已婚']), 45, "semantic", "婚姻状态"),
         FieldRule(["政治面貌"], lambda: _random.choice(['群众', '中共党员']), 45, "semantic", "政治身份"),
@@ -509,7 +518,8 @@ def _make_field_rules() -> List[FieldRule]:
         FieldRule(["证件类型", "证照类型", "证件种类"],
                   lambda: _random.choice(['身份证', '营业执照', '统一社会信用代码']), 50, "semantic",
                   "常见证件类型"),
-        FieldRule(["单位"], lambda: _random.choice(['个', '套', '元', '万元']), 45, "static", "常见计量单位"),
+        # Generic「单位」计量词 — only exact/short labels, not 工作单位/单位电话/…
+        FieldRule(["计量单位"], lambda: _random.choice(['个', '套', '元', '万元']), 40, "static", "常见计量单位"),
         FieldRule(["时间", "时分秒"], lambda: "14:30:00", 40, "static", "当前时间点"),
         FieldRule(["开始时间", "起始时间", "生效时间"], lambda: "09:00:00", 40, "static", "开始时间"),
         FieldRule(["结束时间", "截止时间", "终止时间"], lambda: "18:00:00", 40, "static", "结束时间"),
@@ -531,6 +541,25 @@ def load_rules(script_dir=None):
     return [(list(r.keywords), r.generator) for r in FIELD_RULES]
 
 
+def match_cert_number(cert_type: str = '') -> str:
+    """Generate a certificate number based on the selected 证件类型 text.
+
+    「证件号码」 alone is ambiguous — personal forms need an ID card, corporate
+    forms need a unified social credit code.  Callers should pass the current
+    证件类型 / 证照类型 display value when available.
+    """
+    ct = (cert_type or '').replace(' ', '').replace('\t', '')
+    if any(k in ct for k in ('身份证', '户口簿', '临时身份证')):
+        return _gen_idcard()
+    if any(k in ct for k in ('统一社会信用代码', '营业执照', '信用代码')):
+        return _gen_credit_code()
+    if '组织机构' in ct:
+        return _gen_org_code()
+    # No usable type — default to ID card (personal-customer forms are common;
+    # corporate pages usually label the field 统一社会信用代码 explicitly).
+    return _gen_idcard()
+
+
 def match_rule(label_text, form_rules=None):
     """Match a label against registered rules and return a generated value, or None.
 
@@ -539,19 +568,32 @@ def match_rule(label_text, form_rules=None):
         form_rules: Ignored (kept for backward compatibility with callers
                     that pass previously-loaded rules).
 
-    Match order: rules are tried in priority-descending order.  Within a rule,
-    longer keywords are tried first to prefer specific matches over generic ones.
+    Match order: across all rules, prefer the longest matching keyword; ties
+    break by rule.priority (higher wins).
+
+    Ambiguous labels like「证件号码」return None — use ``match_cert_number``.
     """
     if form_rules is not None:
         # Legacy call path — ignore the parameter and use FIELD_RULES
         pass
 
     t = label_text.replace(' ', '').replace('\t', '')
+    # Ambiguous — must be resolved via 证件类型 context
+    if t in ('证件号码', '证件号') or t.endswith('证件号码') or t.endswith('证件号'):
+        # Still allow specific compounds already covered by other rules
+        # (e.g. label that also contains 身份证 / 统一社会信用代码).
+        if not any(k in t for k in ('身份证', '统一社会信用代码', '信用代码', '营业执照', '组织机构')):
+            return None
+
+    best = None  # (kw_len, priority, generator)
     for rule in FIELD_RULES:
-        # Try longest keyword first within this rule
-        for kw in sorted(rule.keywords, key=len, reverse=True):
-            if kw in t:
-                return rule.generator()
+        for kw in rule.keywords:
+            if kw and kw in t:
+                score = (len(kw), rule.priority)
+                if best is None or score > (best[0], best[1]):
+                    best = (len(kw), rule.priority, rule.generator)
+    if best:
+        return best[2]()
     return None
 
 

@@ -37,7 +37,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
         })''')
         return _ok('loading-done')
 
-    @controller.action('Get current page state: visible dialogs, loading, errors, etc.')
+    @controller.action('Get current page state: visible dialogs, loading, errors, etc. formErrors entries are {label, error} with the field label from .el-form-item__label.')
     async def get_page_state():
         page = await browser_context.get_current_page()
         state = await page.evaluate('''() => {
@@ -45,6 +45,20 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             const visibleDialogs = [...dialogs].filter(d => d.offsetParent !== null);
             const drawers = document.querySelectorAll('.el-drawer');
             const visibleDrawers = [...drawers].filter(d => d.offsetParent !== null);
+            const formErrors = [];
+            const seen = new Set();
+            for (const el of document.querySelectorAll('.el-form-item__error')) {
+                const error = (el.textContent || '').trim();
+                if (!error) continue;
+                const formItem = el.closest('.el-form-item');
+                const label = (formItem && formItem.querySelector('.el-form-item__label')
+                    ? formItem.querySelector('.el-form-item__label').textContent.trim()
+                    : '');
+                const key = label + '|' + error;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                formErrors.push({ label, error });
+            }
             return {
                 dialogCount: dialogs.length,
                 visibleDialogCount: visibleDialogs.length,
@@ -53,7 +67,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 drawerCount: visibleDrawers.length,
                 loading: !!document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'),
                 openDropdown: !!document.querySelector('.el-select-dropdown:not(.is-hidden)'),
-                formErrors: [...document.querySelectorAll('.el-form-item__error')].map(e => e.textContent.trim()).filter(Boolean),
+                formErrors,
                 messages: [...document.querySelectorAll('.el-message')].map(e => e.textContent.trim()).filter(Boolean),
                 notifications: [...document.querySelectorAll('.el-notification')].filter(e => e.offsetParent !== null).map(e => e.textContent.trim()).filter(Boolean),
                 activeTab: document.querySelector('.el-tabs__item.is-active')?.textContent?.trim() || null,

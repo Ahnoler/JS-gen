@@ -75,6 +75,7 @@ These terms may appear in the Agent's trajectory. Use them to understand what th
 | `check_field_value(label)` | Checks a field's current value — used to verify a disabled field was backfilled by a dialog |
 | `request_intervention(label)` | Agent requests human intervention — the system pauses and waits for user instructions |
 | `Import` button (引入) | Opens a customer lookup dialog; selecting a customer backfills the associated disabled fields |
-| `formErrors` | `.el-form-item__error` elements on the page — client-side validation failures |
+| `formErrors` | `{label, error}[]` from `.el-form-item__error` — `label` is the field's `.el-form-item__label`, `error` is the validation message |
 | `notification` | el-notification popup — server-side validation errors or success messages |
-| `close_notification()` | Closes a notification and returns its text. `"ok-notification: ..."` = error, `"no-notification"` = success |
+| `click_save(button_text='保存')` | Find/scroll/click 保存·提交, then scan form errors + toasts. `ok-save-success` only if 操作成功 appears. Prefer over scroll+index click. |
+| `close_notification()` | Closes a notification and returns its text. `"ok-notification: ..."` = error toast text. `"no-notification"` = no toast (NOT save success). |

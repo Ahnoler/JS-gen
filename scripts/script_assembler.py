@@ -168,7 +168,7 @@ PARTIAL_CTRL_FOOTER = '''  } catch (err) {
 
 # Keywords that indicate a field value should be dynamically generated each run
 _IDENTITY_KEYWORDS = [
-    ('genCreditCode', ['证件号码', '统一社会信用代码', '信用代码', '营业执照', '营业执照号']),
+    ('genCreditCode', ['统一社会信用代码', '信用代码', '营业执照', '营业执照号']),
     ('genValidIdCard', ['身份证', '身份证号', '居民身份证']),
     ('genMobile', ['手机号', '电话', '联系方式', '联系电话', '电话号码']),
     ('genEmail', ['邮箱', 'Email', '电子邮箱']),
@@ -181,8 +181,11 @@ _IDENTITY_KEYWORDS = [
 # Labels that should NEVER trigger identity generation (login, system fields)
 _IDENTITY_EXCLUDE = ['用户名', '密码', '登录', '验证码', '图形', '短信', '验证', 'captcha']
 
-def _is_identity_field(label):
-    """Check if a label matches identity-type fields that need unique values."""
+def _is_identity_field(label, value=None):
+    """Check if a label matches identity-type fields that need unique values.
+
+    「证件号码」is ambiguous — prefer recorded value shape when available.
+    """
     if not label:
         return None
     t = re.sub(r'\s+', '', label)
@@ -190,6 +193,14 @@ def _is_identity_field(label):
     for excl in _IDENTITY_EXCLUDE:
         if excl in t:
             return None
+    # Ambiguous cert-number label: infer from recorded value
+    if '证件号码' in t or (t.endswith('证件号') and '类型' not in t):
+        v = (value or '').strip()
+        if re.fullmatch(r'\d{17}[\dXx]', v):
+            return 'genValidIdCard'
+        if re.fullmatch(r'[0-9A-Z]{18}', v) and re.search(r'[A-Z]', v):
+            return 'genCreditCode'
+        return 'genValidIdCard'
     for gen_fn, keywords in _IDENTITY_KEYWORDS:
         for kw in keywords:
             if kw in t:
@@ -322,7 +333,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
     # ---- fill_form_field ----
     if action == 'fill_form_field':
         l, v = p('label_text'), p('value')
-        id_fn = _is_identity_field(l)
+        id_fn = _is_identity_field(l, v)
 
         lines.append(f"    console.log('[{step_num}] Fill \"{l}\" → \"{v}\"');")
         lines.append(pre())
