@@ -41,7 +41,7 @@ export function parseExplorePhases(text) {
       num: m.num,
       name: '阶段' + m.num + '：' + m.name,
       task,
-      maxSteps: isNav ? 50 : 100,
+      maxSteps: isNav ? 20 : 40,
       status: 'pending',
     });
   }

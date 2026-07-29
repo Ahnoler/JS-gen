@@ -34,7 +34,7 @@ async function executeExecutorStep({ session, task, maxSteps, caseDataFile, phas
 
   const stepIndex = session.stepIndex + 1;
   session.lastTask = task;
-  session.lastMaxSteps = maxSteps || 40;
+  session.lastMaxSteps = maxSteps || 30;
   if (phaseNumber != null) session.lastPhaseNumber = phaseNumber;
 
   const resolvedTrajId = trajectoryDbId != null && trajectoryDbId !== ''
@@ -159,7 +159,7 @@ export async function executeAgentStep({ session, task, maxSteps, caseDataFile, 
   try { if (existsSync(cancelFlagPath)) unlinkSync(cancelFlagPath); } catch {}
 
   try {
-    const stepData = { instruction: task, max_steps: maxSteps || 40 };
+    const stepData = { instruction: task, max_steps: maxSteps || 30 };
     if (session.caseDataFile) stepData.case_data_file = session.caseDataFile;
     // Prefer UI phase number so _ACTION_LOG.phase matches 【阶段N】 and DB trajectory_phase
     if (Number.isFinite(pn)) stepData.phase_number = pn;

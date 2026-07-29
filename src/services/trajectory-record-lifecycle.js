@@ -73,7 +73,7 @@ export async function runDefaultLogin(runtime, account, system = null) {
       event: 'step',
       data: {
         instruction,
-        max_steps: 30,
+        max_steps: 10,
         phase_number: 0,
       },
     });
@@ -189,7 +189,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         .then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
       const stepData = {
         instruction: phase.description,
-        max_steps: 40,
+        max_steps: 30,
         phase_number: phase.phaseNumber,
       };
       // First step carries case data; Python loads once (case_data_loaded flag).

@@ -281,7 +281,7 @@ export function wireLifecycle(ctx) {
   ctx.sessStepBtn.addEventListener('click', () => {
     const sessionId = ctx.sessActive.value;
     const task = ctx.sessTask.value.trim();
-    const maxSteps = parseInt(ctx.sessMaxSteps.value) || 100;
+    const maxSteps = parseInt(ctx.sessMaxSteps.value) || 40;
     if (!sessionId || !task) return;
     executeSessionStep(sessionId, task, maxSteps, task.slice(0, 60));
   });
