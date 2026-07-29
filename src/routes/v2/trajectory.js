@@ -391,7 +391,10 @@ export default function (app) {
 
   /**
    * Re-run selected steps in the live session.
-   * Body: { stepIds: number[], isReplay?: boolean } — default isReplay=true (not counted in step list).
+   * Body: { stepIds: number[], isReplay?: boolean }
+   * isReplay (default true) is a runtime suppress-persist switch — not “write rows with
+   * trajectory_step.is_replay=1”. Default path does not append new trajectory_step rows.
+   * Table column is_replay is TINYINT(1) default 0; normal recorded steps are 0.
    */
   app.post('/api/v2/trajectories/:id/steps/replay', async (req, res) => {
     try {

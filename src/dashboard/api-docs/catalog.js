@@ -560,11 +560,31 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/steps/replay',
         summary: 'live 会话中重放选中步骤',
-        desc: '与 Playwright 全量回放不同。默认 isReplay=true 时不写入步骤表。任一步失败时业务 code≠200，data 含 ok/failed/results。',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        desc:
+          '与 Playwright 全量回放不同：在已 prepare 的 live 会话中，按已落库步骤的 action 载荷顺序重跑。'
+          + '请求体 isReplay（默认 true）是执行时开关，不是“把新行标成回放再过滤”：'
+          + 'true → 打开 suppressStepPersist，本次重跑不写入 trajectory_step；'
+          + 'false → 允许走正常入库路径。'
+          + '响应字段 isReplay 仅回显该开关。'
+          + '表字段 trajectory_step.is_replay 为 TINYINT(1)，默认 0；正常 AI/人工/CDP 录制落库均为 0，步骤树展示的就是这些记录。'
+          + '任一步失败时业务 code≠200，data 含 ok/failed/results。',
+        params: [
+          { name: 'id', type: 'number', required: true, in: 'path', example: '42' },
+          { name: 'stepIds', type: 'number[]', required: true, in: 'body', desc: '已落库 trajectory_step.id 列表', example: '[501, 502]' },
+          {
+            name: 'isReplay', type: 'boolean', in: 'body',
+            desc: '执行时是否抑制入库（默认 true）。与表字段 is_replay 不同：默认路径不会新增 is_replay=1 的行。',
+            example: 'true',
+          },
+        ],
         reqExample: J({ stepIds: [501, 502], isReplay: true }),
         respExample: J({ trajectoryId: 42, isReplay: true, stepIds: [501, 502], count: 2, ok: 2, failed: 0, error: null }),
         errExample: J({ code: 500, message: '1/1 steps failed; first: select_tree_option → unknown-action:…', data: { trajectoryId: 42, ok: 0, failed: 1, count: 1 } }),
+        notes: [
+          '表字段 is_replay（TINYINT(1)）≠ 本接口请求参数 isReplay',
+          '默认 isReplay=true：重跑已有步骤，不新增 trajectory_step 行',
+          '正式录制步骤在库中通常均为 is_replay=0',
+        ],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/attach',

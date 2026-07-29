@@ -21,7 +21,9 @@ function fromDbRowCompat(row) {
 
 /**
  * Re-execute selected DB steps in the live executor session.
- * isReplay=true (default): actions are NOT appended to trajectory_step lists.
+ * isReplay=true (default): runtime suppressStepPersist — do NOT append new trajectory_step
+ * rows. This is not the same as writing rows with trajectory_step.is_replay=1
+ * (TINYINT column; normal recorded steps are 0).
  */
 export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isReplay = true } = {}) {
   const tid = Number(trajectoryId);
