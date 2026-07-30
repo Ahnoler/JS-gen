@@ -33,11 +33,11 @@ node scripts/characterize-ctrl.mjs
 node scripts/characterize-trajectory.mjs
 ```
 
-Manual verification: engineering dashboard at `http://localhost:4097/api/test` after starting the server. Product API docs (Swagger-like, for frontend — sole source of truth): `http://localhost:4097/api/docs` (`src/dashboard/api-docs/catalog.js`). Product APIs are under `/api/v2/*`. Human-oriented overview: `README.md` (keep in sync with this file’s architecture section).
+Manual verification: product API docs at `http://localhost:4097/api/docs` after starting the server (`src/dashboard/api-docs/catalog.js` — sole frontend contract). Product APIs are under `/api/v2/*`. Human-oriented overview: `README.md` (keep in sync with this file’s architecture section). Legacy engineering HTML (`/api/test`, record-console/studio) redirects to `/api/docs`.
 
 ## Architecture
 
-This is a **browser automation service** for Element UI / Vue web applications. It provides AI-driven browser control, Playwright script generation, MySQL-backed trajectory recording/replay, an optional remote **executor** process, and an engineering web dashboard — served from a Node.js Express control plane (port 4097).
+This is a **browser automation service** for Element UI / Vue web applications. It provides AI-driven browser control, Playwright script generation, MySQL-backed trajectory recording/replay, and an optional remote **executor** process — served from a Node.js Express control plane (port 4097). Product UI lives in a separate Vue repo; this repo exposes APIs and `/api/docs`.
 
 ### Two-Language Architecture
 
@@ -60,7 +60,7 @@ Node.js Express (server.mjs)
   │     → executor session (USE_EXECUTOR) or local browser session
   ├─ Product replay
   │     /api/v2/trajectories/:id/replay/*  → assemble (server-side) → script-runner
-  ├─ Session debug (Dashboard; secondary)
+  ├─ Session debug (engineering; secondary)
   │     POST /api/browser/session (+ /step, …)
   │     → python scripts/browser-use-agent.py --session  and/or executor
   └─ Assemble / run (engineering)
@@ -68,14 +68,14 @@ Node.js Express (server.mjs)
         POST /api/test/run       → src/runtime/script-runner.js → playwright-runner/run.cjs
 ```
 
-One-shot Explore/Workflow and multi-phase “Run All Phases” are removed. Dashboard may still load phase plans; product AI recording uses v2 `record/start` (optional `phaseIds`).
+One-shot Explore/Workflow and the legacy engineering HTML dashboard / record-console / record-studio pages are removed (product SPA is external). Product AI recording uses v2 `record/start` (optional `phaseIds`).
 
 Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps also persist live to MySQL when `autoPersist` / trajectory binding is on.
 
 ### Route modules (`src/routes/`)
 
 - **`v2/`** — Primary product APIs: system-mgmt, trajectories (+ recording), replay, executors, case-data, screenshots, remote-session, accounts.
-- **`browser-session.js`** — Long-lived session debug path (Dashboard); trajectory/case save prefers MySQL.
+- **`browser-session.js`** — Long-lived session debug path; trajectory/case save prefers MySQL.
 - **`test-assemble.js`** — Thin HTTP over `assemble-service` (dedup → assembler).
 - **`test-run.js`** — Thin HTTP/WS over `script-runner` (`execution:*` events).
 - **`llm-proxy.js`** — OpenAI-compatible `/v1/chat/completions` and `/v1/models`.
@@ -107,15 +107,13 @@ Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps
 
 Frontend delivery contract: `/api/docs` only (do not maintain separate product API markdown). Refactor status: `docs/REFACTOR_INSIGHT.md` (local/gitignore).
 
-### Dashboard (`src/dashboard/`, `test-dashboard.html`)
+### Product frontend & docs
 
-Engineering console only (not the product SPA). Panels: session debug, BiB canvas, assemble/run/history, trajectory viewer.
+Product SPA is external (Vue). In-repo UI is only **`/api/docs`** (`api-docs.html` + `src/dashboard/api-docs/`). Former `test-dashboard.html` / `record-console.html` / `record-studio.html` are deleted; `GET /api/test`, `/api/test/record-console`, `/api/test/record-studio` **301 → `/api/docs`**. Engineering APIs `/api/test/assemble` and `/api/test/run` remain. Root `/` redirects to `/api/docs` when configured.
 
-**Self-use recording console (backend API testing):** `GET /api/test/record-console` → browse/create; `GET /api/test/record-studio?id=` → left BiB canvas + right phases/steps. Executor BiB uses per-slot CDP ports (`9242+slotIndex`) to avoid `CDP WebSocket not found`.
+Executor BiB uses per-slot CDP ports (`9242+slotIndex`) to avoid `CDP WebSocket not found`.
 
 Executor ops notes: `docs/执行机解耦与操作总结.md` (gitignored docs/).
-
-**Do not assume the main Dashboard tabs already wire every v2 API.** Product SPA is expected against the delivery doc.
 
 ### Python agent (`scripts/`)
 

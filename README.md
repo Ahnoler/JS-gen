@@ -1,6 +1,6 @@
 # JS-gen — 浏览器自动化控制面
 
-面向 **Element UI / Vue** 被测系统的浏览器自动化服务：AI / 人工录制、Playwright 脚本组装与执行、MySQL 交易（轨迹）持久化、可选远程执行机，以及工程调试台 Dashboard。
+面向 **Element UI / Vue** 被测系统的浏览器自动化服务：AI / 人工录制、Playwright 脚本组装与执行、MySQL 交易（轨迹）持久化、可选远程执行机。产品前端在独立 Vue 仓库；本仓库提供控制面 API 与 `/api/docs`。
 
 > **产品主路径是 `/api/v2/*`（MySQL）**，不是旧的 `/api/trajectory` / `/api/case-data`（已返回 **410 Gone**）。  
 > **LLM 默认走独立模式**（`STANDALONE_LLM=true`），不依赖 OpenCode SDK。  
@@ -18,9 +18,9 @@
 | **产品回放** | `/api/v2/trajectories/:id/replay/*`：服务端组装脚本，WS 推送 `replay:*`（**不向客户端返回 JS 源码**） |
 | **系统树** | `/api/v2/system-mgmt/*`：系统 → 模块 → 功能（+ 账号）；交易挂在功能下 |
 | **执行机** | `npm run executor` → WS `/ws/executor`；槽位租约至 `detach`（`EXECUTOR_CAPACITY`） |
-| **Session 调试** | `/api/browser/session` — Dashboard 次要路径，非整条产品录制主线 |
+| **Session 调试** | `/api/browser/session` — 工程调试路径，非整条产品录制主线 |
 | **组装 / 运行** | `/api/test/assemble`、`/api/test/run` — 工程管线；内核已抽到 `assemble-service` / `script-runner` |
-| **Dashboard** | `http://localhost:4097/api/test` — **工程调试台**（非产品 SPA）；自用录制联调见 `/api/test/record-console`；前端接口文档见 `/api/docs` |
+| **产品 API 文档** | `http://localhost:4097/api/docs` — 前端对接唯一契约（旧工程 HTML 页已移除，入口 301 到此处） |
 
 ---
 
@@ -72,10 +72,7 @@ npm run executor   # 可选：远程执行机（另开终端）
 npm run dev        # 控制面文件监视
 ```
 
-- Dashboard：`http://localhost:4097/api/test`
-- **产品 API 文档（给前端）**：`http://localhost:4097/api/docs`
-- **自用交易录制联调页**：`http://localhost:4097/api/test/record-console`
-- **录制工作室（左画布 / 右阶段步骤）**：`http://localhost:4097/api/test/record-studio?id=<trajectoryId>`
+- **产品 API 文档（给前端）**：`http://localhost:4097/api/docs`（根路径 `/` 亦跳转至此）
 - 健康检查：`GET /api/health`
 - Dashboard WS：`ws://localhost:4097/ws`
 - 执行机 WS：`ws://localhost:4097/ws/executor`
@@ -98,14 +95,14 @@ Node.js Express (server.mjs, :4097)
  │     → USE_EXECUTOR ? 执行机会话 : 本地 browser session
  ├─ 产品回放
  │     /api/v2/trajectories/:id/replay/* → assemble-service → script-runner
- ├─ Session 调试（Dashboard 次要）
+ ├─ Session 调试（工程次要）
  │     /api/browser/session (+ /step, …)
  └─ 工程组装 / 运行
        /api/test/assemble → assemble-service → script_assembler.py
        /api/test/run      → script-runner → playwright-runner/run.cjs
 ```
 
-一次性 Explore/Workflow、以及 Dashboard「全部执行各阶段」已移除。产品 AI 录制用 v2 `record/start`（可选 `phaseIds`）。
+一次性 Explore/Workflow、以及旧工程 Dashboard / 录制联调 HTML 页已移除（产品 SPA 在独立 Vue 仓库）。产品 AI 录制用 v2 `record/start`（可选 `phaseIds`）。
 
 ### 双语言 CTRL（必须同步）
 
@@ -132,14 +129,9 @@ Node.js Express (server.mjs, :4097)
 
 ---
 
-### Dashboard（工程调试台）
+### 产品前端
 
-入口：`test-dashboard.html` + `src/dashboard/`。
-
-当前面板偏工程能力（组装、Session、轨迹浏览、案例、执行历史）。**不要假定已接齐全部 v2 录制/回放 API**。
-
-**后端自用联调页（推荐测交易录制）：** `http://localhost:4097/api/test/record-console`  
-→ [`record-console.html`](record-console.html) + [`src/dashboard/record-console/`](src/dashboard/record-console/)。按交付文档走：系统树/搜索 → 创建交易 → prepare → AI/人工录制 → confirm → detach。零构建，非产品 SPA。
+产品 SPA 在独立仓库（Vue）；本仓库只提供控制面与 [`/api/docs`](http://localhost:4097/api/docs)。旧 `test-dashboard.html` / `record-console.html` / `record-studio.html` 已删除，对应 `GET /api/test*` 入口 **301 → `/api/docs`**。`/api/test/assemble`、`/api/test/run` 等工程 API 仍保留。
 
 执行机与控制面操作说明：`docs/执行机解耦与操作总结.md`（本地 docs，gitignore）。
 
@@ -206,10 +198,8 @@ Node.js Express (server.mjs, :4097)
 | `POST` | `/api/browser/session` … | Session 调试 |
 | `POST` | `/api/test/assemble` | Action JSON → Playwright |
 | `POST` | `/api/test/run` | 执行脚本（`execution:*`） |
-| `GET` | `/api/docs` | 产品 API 文档（Swagger 风格，给前端） |
-| `GET` | `/api/test` | Dashboard |
-| `GET` | `/api/test/record-console` | 自用交易录制联调页 |
-| `GET` | `/api/test/record-studio?id=` | 录制工作室（左画布右列表） |
+| `GET` | `/api/docs` | 产品 API 文档（Swagger 风格，给前端；根路径亦跳转至此） |
+| `GET` | `/api/test`、`/record-console`、`/record-studio` | 旧工程 HTML 已移除 → **301** `/api/docs` |
 
 遗留：`GET /api/trajectory`、`GET /api/case-data` → **410**，请改用 v2。
 

@@ -880,7 +880,7 @@ export const API_GROUPS = [
     endpoints: [
       {
         method: 'WS', path: '/ws',
-        summary: '产品前端 / Dashboard 通道',
+        summary: '产品前端通道',
         desc: '连接后可收 recording:*、replay:*、remote:*（含标签页列表）、二进制投屏帧。客户端可发 ws:ping、replay:start、remote:tabs、remote:switch_tab 等。',
         tryable: false,
         respExample: J({ type: 'server:init', payload: { /* 会话快照 */ } }),
@@ -888,7 +888,7 @@ export const API_GROUPS = [
           '客户端 → { type: "ws:ping", payload: {} } → 收到 ws:pong',
           '客户端 → { type: "replay:start", payload: { trajectoryId, replayPlanId? } }',
           '客户端 → { type: "remote:tabs" | "remote:switch_tab", payload: {...} }（见下方条目）',
-          '二进制帧：RSCF 投屏（record-studio 画布）',
+          '二进制帧：RSCF 投屏（产品前端画布）',
         ],
       },
       {

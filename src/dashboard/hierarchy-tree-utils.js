@@ -1,6 +1,6 @@
 /**
  * Client-safe helpers for hierarchy trees (children[] only).
- * Keep free of Node/DB imports — used by Dashboard / record-console.
+ * Keep free of Node/DB imports — shared tree shaping helpers.
  */
 import { NODE_TYPE, ROOT_NODE_ID, isRootParentId, isRootNodeId } from '../models/hierarchy-constants.js';
 

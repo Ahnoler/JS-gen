@@ -95,19 +95,14 @@ registerTestHistoryRoutes(app);
 registerTestRunRoutes(app);
 registerV2Routes(app);
 
-// Redirect root to dashboard, or setup if unconfigured
+// Redirect root to product API docs, or setup if unconfigured
 app.get('/', (req, res) => {
-  res.redirect(_isConfigured() ? '/api/test' : '/api/setup');
+  res.redirect(_isConfigured() ? '/api/docs' : '/api/setup');
 });
 
-// API key status check (used by dashboard to detect unconfigured state)
+// API key status check (used by setup / clients to detect unconfigured state)
 app.get('/api/setup/status', (req, res) => {
   res.json({ configured: _isConfigured() });
-});
-
-app.get('/api/test', (req, res) => {
-  if (!_isConfigured()) return res.redirect('/api/setup');
-  res.sendFile(path.join(__dirname, 'test-dashboard.html'));
 });
 
 /** Product API docs for frontend (Swagger-like, /api/v2 + WebSocket) */
@@ -115,16 +110,10 @@ app.get('/api/docs', (req, res) => {
   res.sendFile(path.join(__dirname, 'api-docs.html'));
 });
 
-/** Backend self-use recording console (not product SPA) */
-app.get('/api/test/record-console', (req, res) => {
-  if (!_isConfigured()) return res.redirect('/api/setup');
-  res.sendFile(path.join(__dirname, 'record-console.html'));
-});
-
-/** Dedicated recording studio: left canvas + right phase/steps */
-app.get('/api/test/record-studio', (req, res) => {
-  if (!_isConfigured()) return res.redirect('/api/setup');
-  res.sendFile(path.join(__dirname, 'record-studio.html'));
+// Legacy engineering UI pages removed (product SPA lives outside this repo).
+// Keep /api/test/assemble|run|…; only these HTML entry routes redirect.
+app.get(['/api/test', '/api/test/record-console', '/api/test/record-studio'], (req, res) => {
+  res.redirect(301, '/api/docs');
 });
 
 // Global error handler
@@ -231,9 +220,7 @@ async function main() {
     console.log(`  POST /api/browser/session  (debug)`);
     console.log(`  POST /api/test/assemble | /api/test/run`);
     console.log(`  GET  /api/docs  (product API docs for frontend)`);
-    console.log(`  GET  /api/test  (engineering dashboard)`);
-    console.log(`  GET  /api/test/record-console  (self-use recording console)`);
-    console.log(`  GET  /api/test/record-studio?id=  (recording studio)`);
+    console.log(`  GET  /api/test|/record-console|/record-studio  → 301 /api/docs (UI removed)`);
     console.log(`  GET  /api/trajectory|/api/case-data  → 410 Gone (use /api/v2/*)`);
     console.log(`  GET  /v1/models | POST /v1/chat/completions`);
   });

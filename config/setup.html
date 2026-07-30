@@ -127,7 +127,7 @@ form.addEventListener('submit', async (e) => {
     const data = await res.json();
     if (data.ok) {
       showToast('配置已保存，即将跳转...', 'success');
-      setTimeout(() => { location.href = '/api/test'; }, 1500);
+      setTimeout(() => { location.href = '/api/docs'; }, 1500);
     } else {
       showToast(data.error || '保存失败', 'error');
       submitBtn.disabled = false;
