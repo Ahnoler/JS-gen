@@ -291,20 +291,50 @@ const CTRL_OBJECT = `{
   clickIconButton: (buttonText) => {
     if (!buttonText) return 'button-text-empty';
     const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
-    const tipText = (el) => {
+    const hasIconClass = (el) => {
+      const cls = typeof el.className === 'string' ? el.className : '';
+      if (/(?:^|\\s)el-icon-[\\w-]+/.test(cls) || /(?:^|\\s)el-icon(?:\\s|$)/.test(cls)) return true;
+      return !!el.querySelector('[class*=\"el-icon-\"], i[class*=\"icon\"]');
+    };
+    const isExcluded = (el) => {
+      const cls = typeof el.className === 'string' ? el.className : '';
+      if (/(?:^|\\s)el-popover__reference(?:\\s|$)/.test(cls)) return true;
+      if (/(?:^|\\s)el-dropdown(?:\\s|$)/.test(cls)) return true;
+      if (/(?:^|\\s)el-submenu(?:\\s|$)/.test(cls)) return true;
+      if (/(?:^|\\s)el-menu-item(?:\\s|$)/.test(cls)) return true;
+      if (/(?:^|\\s)header__action-item(?:\\s|$)/.test(cls)) return true;
+      if (el.closest('.el-menu, .el-submenu, .el-dropdown-menu, .el-select-dropdown, .el-pagination')) return true;
+      return norm(el.innerText || '').length > 8;
+    };
+    const tipEl = (el) => {
       const id = el.getAttribute('aria-describedby');
-      if (!id) return '';
+      if (!id) return null;
       const tip = document.getElementById(id);
+      if (!tip) return null;
+      const role = (tip.getAttribute('role') || '').toLowerCase();
+      const tipCls = typeof tip.className === 'string' ? tip.className : '';
+      if (role === 'tooltip' || /(?:^|\\s)el-tooltip__popper(?:\\s|$)/.test(tipCls)) return tip;
+      return null;
+    };
+    const tipText = (el) => {
+      const tip = tipEl(el);
       if (!tip) return '';
       const clone = tip.cloneNode(true);
       clone.querySelectorAll('.popper__arrow,[x-arrow]').forEach(n => n.remove());
-      return norm(clone.textContent);
+      const text = norm(clone.textContent);
+      if (!text || text.length > 40 || text.split(/\\s+/).length > 6) return '';
+      return text;
     };
-    const resolveLabel = (el) => norm(el.getAttribute('aria-label')) || norm(el.getAttribute('title')) || tipText(el);
+    const resolveLabel = (el) => {
+      const fromAttr = norm(el.getAttribute('aria-label')) || norm(el.getAttribute('title'));
+      if (fromAttr && fromAttr.length <= 40 && fromAttr.split(/\\s+/).length <= 6) return fromAttr;
+      return tipText(el);
+    };
     const root = CTRL.getContainer();
-    const sel = 'a.el-tooltip, button.el-tooltip, [aria-describedby].el-tooltip, [aria-describedby][class*=\"el-icon\"]';
+    const sel = '[aria-describedby][class*=\"el-icon\"], [aria-describedby].el-tooltip';
     for (const el of root.querySelectorAll(sel)) {
       if (el.offsetParent === null && !el.closest('.el-table__fixed')) continue;
+      if (!hasIconClass(el) || isExcluded(el)) continue;
       const label = resolveLabel(el);
       if (label === buttonText || (label && label.includes(buttonText))) {
         el.scrollIntoView({ block: 'center', behavior: 'instant' });

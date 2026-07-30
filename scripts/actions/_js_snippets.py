@@ -932,12 +932,29 @@ JS_FIELD_REQUIRED = '''(item, label, inputEl) => {
 }'''
 
 JS_READ_CURRENT_VALUE = '''(inputEl, trigger, item) => {
+    // Radio / checkbox: input.value is the option's value attribute, NOT selection state.
+    // Unchecked radios still have value="1"/value="对公" → must only read checked UI.
+    if (item && item.querySelector('.el-radio')) {
+        const checked = item.querySelector('.el-radio.is-checked');
+        if (!checked) return '';
+        const lab = checked.querySelector('.el-radio__label');
+        return ((lab && lab.textContent) || checked.textContent || '').replace(/\\s+/g, ' ').trim();
+    }
+    if (item && item.querySelector('.el-checkbox')) {
+        const checkedBoxes = item.querySelectorAll('.el-checkbox.is-checked');
+        if (!checkedBoxes.length) return '';
+        return [...checkedBoxes].map(c => {
+            const lab = c.querySelector('.el-checkbox__label');
+            return ((lab && lab.textContent) || c.textContent || '').replace(/\\s+/g, ' ').trim();
+        }).filter(Boolean).join(',');
+    }
     // 1. primary input/textarea
     let val = inputEl?.value || trigger?.value || '';
     // 2. multi-input fallback (tree-select may have two inputs)
     if (!val) {
         const allInputs = item.querySelectorAll('input:not([type="hidden"])');
         for (const inp of allInputs) {
+            if (inp.type === 'radio' || inp.type === 'checkbox') continue;
             if (inp.value && inp.value.trim()) { val = inp.value.trim(); break; }
         }
     }
@@ -1027,6 +1044,16 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         if (kind === 'select') {
             const t = trigger || item.querySelector('input:not([type="hidden"])');
             selectFields.push({ field, trigger: t });
+        } else if (kind === 'radio') {
+            field.options = [...item.querySelectorAll('.el-radio')].map(r => {
+                const lab = r.querySelector('.el-radio__label');
+                return ((lab && lab.textContent) || r.textContent || '').replace(/\\s+/g, ' ').trim();
+            }).filter(Boolean);
+        } else if (kind === 'checkbox') {
+            field.options = [...item.querySelectorAll('.el-checkbox')].map(c => {
+                const lab = c.querySelector('.el-checkbox__label');
+                return ((lab && lab.textContent) || c.textContent || '').replace(/\\s+/g, ' ').trim();
+            }).filter(Boolean);
         }
     }
     // Phase 2: 从 Vue 组件实例读取每个 select 的 options。
@@ -1433,23 +1460,61 @@ JS_ENRICH_CLICK_LOCATOR = r'''([xpath, text, tagHint]) => {
 
 _JS_ICON_BUTTON_HELPERS = r'''
 function _iconNormText(s) { return (s || '').replace(/\s+/g, ' ').trim(); }
-function _iconTooltipText(el) {
+function _iconHasIconClass(el) {
+  const cls = typeof el.className === 'string' ? el.className : '';
+  if (/(?:^|\s)el-icon-[\w-]+/.test(cls) || /(?:^|\s)el-icon(?:\s|$)/.test(cls)) return true;
+  return !!el.querySelector('[class*="el-icon-"], i[class*="icon"]');
+}
+function _iconIsExcludedHost(el) {
+  const cls = typeof el.className === 'string' ? el.className : '';
+  if (/(?:^|\s)el-popover__reference(?:\s|$)/.test(cls)) return true;
+  if (/(?:^|\s)el-dropdown(?:\s|$)/.test(cls)) return true;
+  if (/(?:^|\s)el-submenu(?:\s|$)/.test(cls)) return true;
+  if (/(?:^|\s)el-menu-item(?:\s|$)/.test(cls)) return true;
+  if (/(?:^|\s)header__action-item(?:\s|$)/.test(cls)) return true;
+  if (el.closest('.el-menu, .el-submenu, .el-dropdown-menu, .el-select-dropdown, .el-pagination')) return true;
+  // Real icon buttons are textless (or nearly); hosts with own body text are menus/search.
+  const own = _iconNormText(el.innerText || '');
+  if (own.length > 8) return true;
+  return false;
+}
+function _iconTooltipEl(el) {
   const id = el.getAttribute('aria-describedby');
-  if (!id) return '';
+  if (!id) return null;
   const tip = document.getElementById(id);
+  if (!tip) return null;
+  // Only accept Element UI tooltip poppers — not popover/menu panels.
+  const role = (tip.getAttribute('role') || '').toLowerCase();
+  const tipCls = typeof tip.className === 'string' ? tip.className : '';
+  if (role === 'tooltip' || /(?:^|\s)el-tooltip__popper(?:\s|$)/.test(tipCls)) return tip;
+  return null;
+}
+function _iconTooltipText(el) {
+  const tip = _iconTooltipEl(el);
   if (!tip) return '';
   const clone = tip.cloneNode(true);
   clone.querySelectorAll('.popper__arrow,[x-arrow]').forEach(n => n.remove());
-  return _iconNormText(clone.textContent);
+  const text = _iconNormText(clone.textContent);
+  // Icon tooltips are short labels (e.g. 「新增产品」); reject menu dumps.
+  if (!text || text.length > 40 || text.split(/\s+/).length > 6) return '';
+  return text;
 }
 function _iconResolveLabel(el) {
-  return _iconNormText(el.getAttribute('aria-label'))
-    || _iconNormText(el.getAttribute('title'))
-    || _iconTooltipText(el);
+  const fromAttr = _iconNormText(el.getAttribute('aria-label'))
+    || _iconNormText(el.getAttribute('title'));
+  if (fromAttr && fromAttr.length <= 40 && fromAttr.split(/\s+/).length <= 6) return fromAttr;
+  return _iconTooltipText(el);
 }
 function _iconCandidates(root) {
-  const sel = 'a.el-tooltip, button.el-tooltip, [aria-describedby].el-tooltip, [aria-describedby][class*="el-icon"]';
-  return [...(root || document).querySelectorAll(sel)];
+  // Prefer icon-class hosts with aria-describedby (user pattern: el-tooltip el-icon-*).
+  const sel = '[aria-describedby][class*="el-icon"], [aria-describedby].el-tooltip';
+  const out = [];
+  for (const el of (root || document).querySelectorAll(sel)) {
+    if (!_iconHasIconClass(el)) continue;
+    if (_iconIsExcludedHost(el)) continue;
+    out.push(el);
+  }
+  return out;
 }
 function _iconIsVisible(el) {
   return el.offsetParent !== null || !!el.closest('.el-table__fixed');

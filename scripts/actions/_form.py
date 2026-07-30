@@ -741,16 +741,35 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                             result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
                         else:
                             result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                    elif field_kind == 'radio' or kind in ('click_radio', 'radio'):
+                        result = await page.evaluate(JS_CLICK_RADIO, [label, value])
                     elif field_kind == 'tree-select' or kind in (
                         'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
                     ):
                         result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
                     elif kind in ('select_option', 'select', 'option'):
-                        already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
-                        if already.startswith('ok-already:'):
-                            cur_val = already.split(':', 1)[1]
-                            if cur_val == value or value in cur_val or cur_val in value:
-                                result = already
+                        # LLM may emit select_option for radio — route correctly
+                        if field_kind == 'radio':
+                            result = await page.evaluate(JS_CLICK_RADIO, [label, value])
+                        else:
+                            already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
+                            if already.startswith('ok-already:'):
+                                cur_val = already.split(':', 1)[1]
+                                if cur_val == value or value in cur_val or cur_val in value:
+                                    result = already
+                                else:
+                                    await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+                                    await page.wait_for_timeout(350)
+                                    result = await page.evaluate(JS_SELECT_OPTION, value)
+                                    if result.startswith('option-not-found:'):
+                                        result = await page.evaluate(JS_SELECT_OPTION, 'first')
+                                    if result.startswith('ok'):
+                                        confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                                        if not confirmed.startswith('ok-confirmed:'):
+                                            await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                                            await page.wait_for_timeout(200)
+                                            confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                                            result = confirmed2 if confirmed2.startswith('ok-confirmed:') else 'not-synced:' + confirmed
                             else:
                                 await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
                                 await page.wait_for_timeout(350)
@@ -764,19 +783,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                                         await page.wait_for_timeout(200)
                                         confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
                                         result = confirmed2 if confirmed2.startswith('ok-confirmed:') else 'not-synced:' + confirmed
-                        else:
-                            await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-                            await page.wait_for_timeout(350)
-                            result = await page.evaluate(JS_SELECT_OPTION, value)
-                            if result.startswith('option-not-found:'):
-                                result = await page.evaluate(JS_SELECT_OPTION, 'first')
-                            if result.startswith('ok'):
-                                confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                if not confirmed.startswith('ok-confirmed:'):
-                                    await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
-                                    await page.wait_for_timeout(200)
-                                    confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                    result = confirmed2 if confirmed2.startswith('ok-confirmed:') else 'not-synced:' + confirmed
                     else:
                         result = f'unknown-action:{kind}'
                 except Exception as e:
@@ -788,14 +794,19 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
                 if ok:
                     ok_in_group += 1
-                    if kind in ('fill_input', 'fill', 'input') and field_kind != 'tree-select':
+                    if field_kind == 'radio' or kind in ('click_radio', 'radio'):
+                        _record_action('click_radio', {'label_text': label, 'option_text': value}, result)
+                    elif kind in ('fill_input', 'fill', 'input') and field_kind != 'tree-select':
                         _record_action('fill_form_field', {'label_text': label, 'value': value}, result)
                     elif field_kind == 'tree-select' or kind in (
                         'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
                     ):
                         _record_action('select_tree_option', {'label_text': label, 'option_text': value}, result)
                     elif kind in ('select_option', 'select', 'option'):
-                        _record_action('select_option', {'label_text': label, 'option_text': value}, result)
+                        if field_kind == 'radio':
+                            _record_action('click_radio', {'label_text': label, 'option_text': value}, result)
+                        else:
+                            _record_action('select_option', {'label_text': label, 'option_text': value}, result)
                     _task_done_impl(label, case_data_store, value=value)
                     # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
                     btn = has_button_map.get(label, '')

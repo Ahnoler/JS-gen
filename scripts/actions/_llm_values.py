@@ -120,7 +120,8 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
                 if kind == 'select' and opts and val not in opts:
                     pass  # Fall through if user value isn't in current options
                 else:
-                    actions.append({'action': 'select_option', 'label': label, 'option': val})
+                    action_name = 'click_radio' if kind == 'radio' else 'select_option'
+                    actions.append({'action': action_name, 'label': label, 'option': val})
                     continue
             else:
                 actions.append({'action': 'fill_input', 'label': label, 'value': val})
@@ -162,7 +163,8 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
                     if o and o not in ('请选择', '请输入', '全部', ''):
                         picked = o; break
                 if not picked and opts: picked = opts[0]
-                actions.append({'action': 'select_option', 'label': label, 'option': picked or '测试'})
+                action_name = 'click_radio' if kind == 'radio' else 'select_option'
+                actions.append({'action': action_name, 'label': label, 'option': picked or '测试'})
             elif kind == 'tree-select':
                 # Tree-select needs tree navigation via JS_SELECT_TREE_OPTION.
                 actions.append({'action': 'select_tree_option', 'label': label, 'option': 'first'})
