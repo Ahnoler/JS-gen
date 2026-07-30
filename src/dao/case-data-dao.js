@@ -6,17 +6,18 @@ const ENTRY_TABLE = 'case_data_entry';
 
 const RESERVED_KEYS = new Set(['form_snapshots', 'form_snapshot', 'task_list', '_watcher_mode']);
 
-/** Cached: case_data_entry.trajectory_id present (null = unchecked). */
+/** Cached positive only — never stick on false (schema may be migrated while process runs). */
 let _hasTrajectoryIdCol = null;
 
 async function hasEntryTrajectoryId(db = getDB()) {
-  if (_hasTrajectoryIdCol != null) return _hasTrajectoryIdCol;
+  if (_hasTrajectoryIdCol === true) return true;
   try {
-    _hasTrajectoryIdCol = await db.schema.hasColumn(ENTRY_TABLE, 'trajectory_id');
+    const ok = await db.schema.hasColumn(ENTRY_TABLE, 'trajectory_id');
+    if (ok) _hasTrajectoryIdCol = true;
+    return ok;
   } catch {
-    _hasTrajectoryIdCol = false;
+    return false;
   }
-  return _hasTrajectoryIdCol;
 }
 
 function isUnknownTrajectoryIdColumn(err) {
@@ -122,7 +123,7 @@ export async function listEntriesByTrajectory(trajectoryId) {
     return fromDbRows(rows);
   } catch (err) {
     if (isUnknownTrajectoryIdColumn(err)) {
-      _hasTrajectoryIdCol = false;
+      _hasTrajectoryIdCol = null; // allow re-probe after migrate
       return [];
     }
     throw err;
