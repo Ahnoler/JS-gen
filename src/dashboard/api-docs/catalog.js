@@ -559,15 +559,17 @@ export const API_GROUPS = [
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/steps/replay',
-        summary: 'live 会话中重放选中步骤',
+        summary: 'live 会话中重放选中步骤（遇错自动 AI 修步后续放）',
         desc:
-          '与 Playwright 全量回放不同：在已 prepare 的 live 会话中，按已落库步骤的 action 载荷顺序重跑。'
+          '与 Playwright 全量回放不同：在已 prepare 的 live 会话中，按已落库步骤的 action 载荷顺序走 replay_actions（_replay.py）重跑。'
           + '请求体 isReplay（默认 true）是执行时开关，不是“把新行标成回放再过滤”：'
-          + 'true → 打开 suppressStepPersist，本次重跑不写入 trajectory_step；'
+          + 'true → 打开 suppressStepPersist，本次重跑与 AI 修步均不写入 trajectory_step；'
           + 'false → 允许走正常入库路径。'
           + '响应字段 isReplay 仅回显该开关。'
           + '表字段 trajectory_step.is_replay 为 TINYINT(1)，默认 0；正常 AI/人工/CDP 录制落库均为 0，步骤树展示的就是这些记录。'
-          + '任一步失败时业务 code≠200，data 含 ok/failed/results。',
+          + '遇错即停（stop_on_fail）：失败步自动调用 Agent 单步自愈（每步最多 1 次），成功后从下一步继续回放。'
+          + '长请求期间 WS 广播 recording:replay_step / recording:replay_heal。'
+          + '自愈耗尽或 Agent 失败时业务 code≠200，data 含 ok/failed/healed/results。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', example: '42' },
           { name: 'stepIds', type: 'number[]', required: true, in: 'body', desc: '已落库 trajectory_step.id 列表', example: '[501, 502]' },
@@ -578,12 +580,41 @@ export const API_GROUPS = [
           },
         ],
         reqExample: J({ stepIds: [501, 502], isReplay: true }),
-        respExample: J({ trajectoryId: 42, isReplay: true, stepIds: [501, 502], count: 2, ok: 2, failed: 0, error: null }),
-        errExample: J({ code: 500, message: '1/1 steps failed; first: select_tree_option → unknown-action:…', data: { trajectoryId: 42, ok: 0, failed: 1, count: 1 } }),
+        respExample: J({
+          trajectoryId: 42,
+          isReplay: true,
+          stepIds: [501, 502],
+          count: 2,
+          ok: 2,
+          failed: 0,
+          error: null,
+          healed: [{ stepId: 502, action: 'fill_form_field', index: 2 }],
+          results: [
+            { index: 1, action: 'click_menu_item', ok: true, result: 'ok' },
+            { index: 2, action: 'fill_form_field', ok: true, healed: true, result: 'healed-by-ai (was: not-found)' },
+          ],
+        }),
+        errExample: J({
+          code: 500,
+          message: 'AI heal exhausted for step 2: fill_form_field → not-found',
+          data: {
+            trajectoryId: 42,
+            ok: 1,
+            failed: 1,
+            count: 2,
+            healed: [],
+            results: [
+              { index: 1, action: 'click_menu_item', ok: true },
+              { index: 2, action: 'fill_form_field', ok: false, result: 'not-found' },
+            ],
+          },
+        }),
         notes: [
           '表字段 is_replay（TINYINT(1)）≠ 本接口请求参数 isReplay',
-          '默认 isReplay=true：重跑已有步骤，不新增 trajectory_step 行',
+          '默认 isReplay=true：重跑已有步骤，不新增 trajectory_step 行（含 AI 修步）',
           '正式录制步骤在库中通常均为 is_replay=0',
+          'WS: recording:replay_step { trajectoryId, stepId, index, total, ok, action, result }',
+          'WS: recording:replay_heal { trajectoryId, stepId, phase: start|done|error, message? }',
         ],
       },
       {

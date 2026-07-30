@@ -49,7 +49,7 @@ if 有用户数据:
     else:
       # 搜索无结果 → 关闭弹窗 → 走干预路径
       close_dialog()
-      → 点击【保存】 → sync_tasks_from_errors()
+      → click_save() 触发校验（禁止用索引点「保存」）→ sync_tasks_from_errors()
       → NEEDS_INTERVENTION → request_intervention(label)
 ```
 
@@ -60,7 +60,7 @@ if 有用户数据:
 - case_data 优先使用带 `法人_` 前缀的 key，不存在则回退到无前缀版本
 - 结果表格有多条时选第一条即可，只需引入一条可用记录
 - 引入后回填字段为 readonly/disabled，**不要尝试修改或重新填写**
-- 查询无结果时：先尝试仅用客户名称或仅用证件号码重试一次。仍无结果 → 关闭弹窗 → 点击【保存】触发校验 → sync_tasks_from_errors() → NEEDS_INTERVENTION → request_intervention(label)
+- 查询无结果时：先尝试仅用客户名称或仅用证件号码重试一次。仍无结果 → 关闭弹窗 → **`click_save()`** 触发校验 → sync_tasks_from_errors() → NEEDS_INTERVENTION → request_intervention(label)。**禁止** `click_element` / 索引点击「保存」。
 
 ## 📱 手机号验证规则
 

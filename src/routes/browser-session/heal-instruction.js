@@ -1,6 +1,93 @@
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 
+/**
+ * Heal prompt for live steps/replay when a step fails.
+ * Emphasizes diagnosing page/structure changes (new required fields, validation
+ * errors after save) — not blindly retrying the same action.
+ * @param {{ action?: string, params?: object, id?: string|number }} failedEntry
+ * @param {string} [errorResult]
+ * @returns {string}
+ */
+export function buildStepHealInstruction(failedEntry, errorResult = '') {
+  const action = failedEntry?.action || 'unknown';
+  const params = failedEntry?.params || {};
+  const intent = describeActionIntent(action, params);
+  const err = errorResult ? String(errorResult) : '(unknown)';
+  const looksLikeValidation = /validation|form.?error|必填|err-save|el-form-item__error|not-found|missing/i.test(err);
+
+  return [
+    '当前为步骤回放失败后的自愈阶段。页面结构或校验可能已变化（例如表单新增必填字段、标签改名、保存后出现校验红字）。',
+    '你的目标：先诊断并排除阻塞，再完成下方「原意图」，成功后立即停止；不要执行后续未列出的业务步骤。',
+    '',
+    `【失败动作】${action}`,
+    `【原意图】${intent}`,
+    `【失败原因】${err}`,
+    '',
+    '【推荐排查顺序】',
+    '1. 用 get_page_state() 查看 notifications / formErrors；若有校验红字，调用 sync_tasks_from_errors() 或 scroll_to_form_error() 定位未填/错误字段。',
+    '2. 若失败原因含校验/必填/保存失败，或页面上出现 .el-form-item__error：逐项补齐新增或未填的必填字段（fill_form_field / select_option / select_date 等）。可用一次 fill/select 触发隐式 auto-fill；scan_form_fields 只建任务列表、不会自动填表。',
+    '3. 若是控件找不到（not-found）：在当前页找文案相近的等价控件完成同一意图，不要离开当前流程去乱点菜单。',
+    '4. 阻塞清除后，重新执行原意图'
+      + (isSaveLike(action, params)
+        ? '（优先 click_save()，确认 ok-save-success 或校验已清空）。'
+        : '（完成与失败动作等价的操作）。'),
+    '5. 原意图达成后立即 task_done / done，停止本轮。',
+    '',
+    '约束：',
+    '- 允许为完成原意图而补填「新增必填 / 校验失败」字段；不要改写已填对的业务值，除非校验要求必须改。',
+    '- 不要导航到无关页面，不要开始下一段业务流程。',
+    '- 禁用且带旁路按钮的字段走 request_intervention，不要硬填。',
+    looksLikeValidation
+      ? '- 本次失败很像表单校验/结构变更：请优先按第 1–2 步排查，不要只重复点击保存。'
+      : '- 若重试原动作仍失败，再按第 1–2 步做表单诊断。',
+  ].filter(Boolean).join('\n');
+}
+
+function isSaveLike(action, params) {
+  const a = String(action || '');
+  if (a === 'click_save') return true;
+  const text = String(params?.text || params?.button_text || params?.menu_text || '');
+  return /保存|提交|确定|确认|submit|save/i.test(text);
+}
+
+function describeActionIntent(action, params) {
+  const p = params || {};
+  switch (action) {
+    case 'fill_form_field':
+      return `填写 "${p.label_text || ''}" = "${p.value ?? ''}"`;
+    case 'select_option':
+      return `在 "${p.label_text || ''}" 中选择 "${p.option_text || ''}"`;
+    case 'select_tree_option':
+      return `在树选择 "${p.label_text || ''}" 中选择 "${p.option_text || p.node_text || ''}"`;
+    case 'fill_date_field':
+    case 'select_date':
+      return `填写日期 "${p.label_text || ''}" = "${p.value || p.date || ''}"`;
+    case 'click_save':
+      return `点击保存/提交（${p.button_text || p.text || '保存'}），直到保存成功或校验通过`;
+    case 'click_element_by_index':
+      return `点击 "${p.text || p.index || ''}"`;
+    case 'click_menu_item':
+      return `点击菜单 "${p.menu_text || p.text || ''}"`;
+    case 'click_table_row_button':
+      return `点击表格行按钮 "${p.button_text || p.text || ''}"（行匹配: ${p.row_text || p.row_match || ''}）`;
+    case 'click_adjacent_button':
+      return `点击相邻按钮 "${p.button_text || p.text || ''}"`;
+    case 'go_to_url':
+      return `打开 URL ${p.url || ''}`;
+    case 'switch_tab':
+      return `切换标签 "${p.tab_text || p.text || ''}"`;
+    case 'close_dialog':
+      return '关闭对话框';
+    default:
+      try {
+        return `${action} ${JSON.stringify(p)}`;
+      } catch {
+        return action;
+      }
+  }
+}
+
 export function buildRerunResumeInstruction({ actionData, failedStep, log_file, form_changes, replayedCount, PROJECT_DIR }) {
   let resumeInstruction = '';
   try {

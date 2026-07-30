@@ -433,11 +433,14 @@ async def replay_action_entries(
     controller_actions: dict | None = None,
     case_data_store: dict | None = None,
     emit=None,
+    stop_on_fail: bool = False,
 ) -> dict:
     """
     Replay recorded steps sequentially (auto-fill style orchestration).
 
-    Returns {count, ok, failed, results}.
+    When stop_on_fail=True, break after the first failed step (still emit replay_step).
+
+    Returns {count, ok, failed, results, stoppedAt?}.
     """
     store = case_data_store if case_data_store is not None else {}
     prev_watcher = store.get('_watcher_mode')
@@ -447,6 +450,7 @@ async def replay_action_entries(
     ok_count = 0
     fail_count = 0
     total = len(entries)
+    stopped_at = None
 
     try:
         page = await browser_context.get_current_page()
@@ -496,6 +500,8 @@ async def replay_action_entries(
                 'result': result,
                 'ok': ok,
             }
+            if entry.get('id') is not None:
+                row['id'] = entry.get('id')
             results.append(row)
             sys.stderr.write(
                 f'[replay] [{step_num}/{total}] {"OK" if ok else "FAIL"} → {result}\n'
@@ -519,6 +525,14 @@ async def replay_action_entries(
                 except Exception:
                     pass
 
+            if not ok and stop_on_fail:
+                stopped_at = step_num
+                sys.stderr.write(
+                    f'[replay] stop_on_fail: halted at step {step_num}/{total}\n'
+                )
+                sys.stderr.flush()
+                break
+
             try:
                 page = await browser_context.get_current_page()
             except Exception:
@@ -526,23 +540,31 @@ async def replay_action_entries(
 
             await asyncio.sleep(0)
 
-        sys.stderr.write(f'[replay] Done: {total} actions | ok:{ok_count} failed:{fail_count}\n')
+        ran = len(results)
+        sys.stderr.write(
+            f'[replay] Done: {ran}/{total} actions | ok:{ok_count} failed:{fail_count}'
+            + (f' stoppedAt:{stopped_at}' if stopped_at else '')
+            + '\n'
+        )
         sys.stderr.flush()
         error = None
         if fail_count > 0:
             failed_rows = [r for r in results if not r.get('ok')]
             first = failed_rows[0] if failed_rows else {}
             error = (
-                f"{fail_count}/{total} steps failed"
+                f"{fail_count}/{ran} steps failed"
                 + (f"; first: {first.get('action')} → {first.get('result')}" if first else '')
             )
-        return {
-            'count': total,
+        out = {
+            'count': ran,
             'ok': ok_count,
             'failed': fail_count,
             'error': error,
             'results': results,
         }
+        if stopped_at is not None:
+            out['stoppedAt'] = stopped_at
+        return out
     finally:
         if prev_watcher is None:
             store.pop('_watcher_mode', None)

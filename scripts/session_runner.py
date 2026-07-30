@@ -657,6 +657,7 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
         data = msg.get("data", {}) or {}
         entries = data.get("actions", [])
         seed_action_log = bool(data.get("seed_action_log"))
+        stop_on_fail = bool(data.get("stop_on_fail"))
         browser_context = session_state.get('browser_context')
         form_rules = session_state.get('form_rules', [])
         case_data_store = session_state.get('case_data_store', {})
@@ -689,6 +690,7 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
             controller_actions=registry_actions,
             case_data_store=case_data_store,
             emit=emit_json,
+            stop_on_fail=stop_on_fail,
         )
 
         # Heal path: seed ACTION_LOG with the original pre-failure entries so the
@@ -721,16 +723,16 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
                 sys.stderr.write(f"[replay] seed_action_log failed: {e}\n")
                 sys.stderr.flush()
 
-        emit_json({
-            "event": "replay_done",
-            "data": {
-                "count": summary.get("count", 0),
-                "ok": summary.get("ok", 0),
-                "failed": summary.get("failed", 0),
-                "error": summary.get("error"),
-                "results": summary.get("results") or [],
-            },
-        })
+        done_data = {
+            "count": summary.get("count", 0),
+            "ok": summary.get("ok", 0),
+            "failed": summary.get("failed", 0),
+            "error": summary.get("error"),
+            "results": summary.get("results") or [],
+        }
+        if summary.get("stoppedAt") is not None:
+            done_data["stoppedAt"] = summary["stoppedAt"]
+        emit_json({"event": "replay_done", "data": done_data})
         return 'continue'
 
     if event == "intervene":

@@ -16,7 +16,7 @@
 
 # 可用动作
 ## 默认浏览器动作（始终可用）
-- click_element(index) — 通过 [] 索引点击元素。**🚨 不适用于 el-select 下拉选项（请使用 select_option）**
+- click_element(index) — 通过 [] 索引点击元素。**🚨 不适用于 el-select 下拉选项（请使用 select_option）。🚨 严禁用于表单「保存/提交/确定」——必须用 `click_save()`，否则回放无法捕获校验错误。**
 - **`input_text` 不可用** — 所有 el-form-item 内的文本输入请使用 `fill_form_field`
 - **`select_dropdown_option` 不可用** — el-select 请使用 `select_option`，原生 `<select>` 使用对应处理
 - go_to_url(url)、go_back()、scroll(down|up)、send_keys(keys)
@@ -26,13 +26,19 @@
 
 ## Element UI 自定义动作（用于 Element UI 组件）
 **成功可录制约定：** 动作结果字符串以 `ok` 开头（`ok` / `ok:` / `ok-clicked` / `ok-already:…` 等）才视为成功并写入轨迹；`already-filled`、`label-not-found` 等不以 `ok` 开头的码表示跳过或失败。
+
+### 🚨 录制硬规则：表单保存必须用 `click_save`
+- 主表单 / 抽屉 / 向导里需要「保存」「提交」「确定」（提交表单语义）时，**唯一允许的动作是 `click_save(button_text=…)`**。
+- **禁止**用 `click_element` / `click_element_by_index` / `scroll_*` + 索引点击去点保存类按钮；此类轨迹回放时无法可靠读到 `.el-form-item__error`，自愈也会失效。
+- 弹窗内「确认/查询」等非整表提交按钮可用索引或其它专用动作；**整表提交一律 `click_save`。**
+
 - **login(username, password, captcha='', sms_code='') — 🚨 登录系统。填写用户名+密码+验证码(可选)+短信验证码(可选)、点击登录按钮、等待跳转。有验证码时传入 captcha='1111' sms_code='1111'。不要手动逐字段填写登录表单。**
 - select_option(label_text, option_text) — el-select 下拉框。"first" 选择第一个选项。**🚨 这是选择 el-select 选项的唯一正确方式。不要使用 click_element 来选择下拉选项。**
 - fill_form_field(label_text, value) — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 通过标签文本、placeholder 或输入类型匹配。如果输入框被禁用则返回 "field-disabled" — 跳过它。
 - click_radio(label_text, option_text) — el-radio 单选组
 - **select_tree_option(label_text, option_text) — 树形选择器，如行业代码。三段式匹配：P0 精确匹配（label/id）→ 非叶节点 DFS 取第一个叶后代；P1 UI关键词搜索 → 过滤列表下非叶节点 DFS 取第一个叶后代；P2 兜底取全树第一个叶节点。** **`ok-fallback` 是正常结果——表示你的 option_text 在树中无精确叶节点匹配，系统已选最接近的叶节点。信任该结果，不要重新填写。**
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
-- **click_save(button_text='保存') — 🚨 提交表单的首选动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element_by_index 盲目找保存按钮。**
+- **click_save(button_text='保存') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
 - close_dialog() — 关闭最上层的 el-dialog 或 el-drawer。**不适用于通知 — 请使用 close_notification()。**
 - close_notification() — 关闭可见的 el-notification 弹窗，读取并返回其文本。如果没有则返回 "no-notification"。**用于处理服务端校验错误。`no-notification` ≠ 保存成功。**
 - expand_all_el_tree() — 完全展开 el-tree
@@ -164,7 +170,7 @@ read_case_data("FieldA") → "value1"
 7. **如果 `select_option` 返回 `"option-not-found:..."` 且列出的项明显来自其他字段**（如"企业类"、"营业执照"），说明级联数据为空（如"乡镇/街道"、"行政村/社区"无数据）。**跳过此字段。**
 
 # 🚨 校验与提交规则（关键）
-1. 填写完所有表单字段后，调用 **`click_save()`**（不要 `scroll_down` + 按索引点保存）。不要继续检查或重新填写已完成字段。
+1. 填写完所有表单字段后，**必须**调用 **`click_save()`** 提交。**录制轨迹里禁止出现用索引点击「保存/提交」的步骤。** 不要继续检查或重新填写已完成字段。
 2. **`click_save()` 结果：**
    - `ok-save-success:...` → 出现「操作成功」类提示 → `done(success=true)`（若本阶段目标即保存）。
    - `err-save-validation:[...]` → 前端校验失败（已扫描全页 `.el-form-item__error`）→ 按标签修字段 → 再次 `click_save()`。可用 `scroll_to_first_error()` / `sync_tasks_from_errors()`。
@@ -178,6 +184,7 @@ read_case_data("FieldA") → "value1"
 7. 验证表单是否正确的唯一方法是 `click_save()` 并检查返回码。
 8. **成功通知会在2-3秒内自动消失** — 故必须用 `click_save()`（内部轮询捕获），不要先点索引再慢慢 `close_notification()` 指望还在。
 9. **在任意弹窗/抽屉交互后**（如法人引入、客户搜索等），向导表单可能已被刷新/重置。在填写前使用 `check_field_value(label_text)` 检查字段是否仍有值。跳过返回非空值的字段。对于日期字段，检查输入框是否已有值 — 如有则跳过。不要盲目重新填写所有字段。
+10. **录制质量：** 轨迹中的保存步必须是 `click_save`，以便日后回放遇新增必填/校验失败时能返回 `err-save-validation` 并触发 AI 自愈。
 
 # 任务完成规则
 1. 仅当整个**当前阶段**任务完成时才使用 done()。如果还有更多工作要做，不要在单个步骤后调用 done()。
