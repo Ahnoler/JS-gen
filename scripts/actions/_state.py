@@ -27,6 +27,12 @@ _ACTION_TO_COMMAND = {
     'expand_all_el_tree': 'expand',
 }
 
+# Consecutive ops on the same page element coalesce → keep the later step.
+_FIELD_COALESCE_ACTIONS = frozenset({
+    'fill_form_field', 'fill_date_field',
+    'select_option', 'select_tree_option', 'click_radio',
+})
+
 
 def set_current_phase(n: int):
     """Set the current phase number. Called by session_runner before each step."""
@@ -40,16 +46,63 @@ def set_current_source(source: str):
     _CURRENT_SOURCE = source if source in ('agent', 'manual', 'cdp') else 'agent'
 
 
-def _emit_action_log_sync():
-    """Push the full _ACTION_LOG to the Dashboard."""
+def _emit_action_log_sync(removed_ids=None):
+    """Push the full _ACTION_LOG to the Dashboard (optional removedIds for live-persist cleanup)."""
     try:
         from ..agent_utils import emit_json
-        emit_json({"event": "action_log_sync", "data": {
+        data = {
             "entries": list(_ACTION_LOG),
             "count": len(_ACTION_LOG),
-        }})
+        }
+        if removed_ids:
+            data["removedIds"] = [str(x) for x in removed_ids if x]
+        emit_json({"event": "action_log_sync", "data": data})
     except ImportError:
         pass
+
+
+def _element_identity(action_name, params_dict, element=None) -> str | None:
+    """Stable key for 'same page element' coalesce, or None if unknown."""
+    params = params_dict or {}
+    label = str(params.get('label_text') or '').strip()
+    if action_name in _FIELD_COALESCE_ACTIONS and label:
+        return f'field:{label}'
+
+    el = element if isinstance(element, dict) else {}
+    xpath = str(
+        (el or {}).get('xpath')
+        or (el or {}).get('xpath_smart')
+        or (el or {}).get('bu_xpath')
+        or ''
+    ).strip()
+    if xpath:
+        return f'xpath:{xpath}'
+
+    if action_name == 'click_icon_button':
+        text = str(params.get('button_text') or '').strip()
+        if text:
+            return f'icon:{text}'
+    if action_name == 'click_menu_item':
+        text = str(params.get('menu_text') or '').strip()
+        if text:
+            return f'menu:{text}'
+    if action_name == 'switch_tab':
+        text = str(params.get('tab_name') or '').strip()
+        if text:
+            return f'tab:{text}'
+    if action_name == 'click_adjacent_button' and label:
+        return f'adjacent:{label}'
+    return None
+
+
+def _entry_element_identity(entry: dict) -> str | None:
+    if not isinstance(entry, dict):
+        return None
+    return _element_identity(
+        entry.get('action') or '',
+        entry.get('params') or {},
+        entry.get('element'),
+    )
 
 
 def _record_action(action_name, params, result, element=None, source=None):
@@ -67,6 +120,7 @@ def _record_action(action_name, params, result, element=None, source=None):
     )
 
     dumped = entry.model_dump()
+    removed_ids: list[str] = []
 
     # Manual only: drop date-picker reopen clicks that echo the just-selected date
     # (CDP quick actions record as-is — no coalesce / noise filter)
@@ -97,28 +151,27 @@ def _record_action(action_name, params, result, element=None, source=None):
                 or bool(re.match(r'^\d{4}-\d{2}-\d{2}$', last_text))
                 or (date_val and last_text == date_val)
             ):
-                _ACTION_LOG.pop()
+                popped = _ACTION_LOG.pop()
+                pid = popped.get('id') if isinstance(popped, dict) else None
+                if pid:
+                    removed_ids.append(str(pid))
 
-    # Manual only: coalesce consecutive fills on the same field → keep last only
-    if (
-        resolved_source == 'manual'
-        and action_name in ('fill_form_field', 'fill_date_field')
-        and _ACTION_LOG
-    ):
-        last = _ACTION_LOG[-1]
-        if last.get('action') == action_name and last.get('source') in ('manual', None):
-            last_params = last.get('params') or {}
-            same_label = bool(params_dict.get('label_text')) and (
-                last_params.get('label_text') == params_dict.get('label_text')
-            )
-            last_el = last.get('element') if isinstance(last.get('element'), dict) else {}
-            last_xpath = (last_el or {}).get('xpath') or last.get('target') or ''
-            new_xpath = ''
-            if isinstance(element, dict):
-                new_xpath = element.get('xpath') or element.get('bu_xpath') or ''
-            same_xpath = bool(new_xpath) and bool(last_xpath) and last_xpath == new_xpath
-            if same_label or same_xpath:
-                _ACTION_LOG.pop()
+    # Agent + manual: consecutive ops on the same page element → keep later only.
+    # (CDP quick actions record as-is.) Covers auto-fill then agent re-fill of same label.
+    if resolved_source in ('agent', 'manual') and _ACTION_LOG:
+        new_id = _element_identity(action_name, params_dict, element)
+        if new_id:
+            last = _ACTION_LOG[-1]
+            last_src = last.get('source') or 'agent'
+            if last_src == resolved_source or (
+                resolved_source == 'manual' and last_src in ('manual', None)
+            ):
+                last_id = _entry_element_identity(last)
+                if last_id and last_id == new_id:
+                    popped = _ACTION_LOG.pop()
+                    pid = popped.get('id') if isinstance(popped, dict) else None
+                    if pid:
+                        removed_ids.append(str(pid))
 
     # Do NOT drop a preceding click when recording select_option — that click is often
     # 「新增」/导航等真实步骤。Opening the dropdown is skipped at capture time instead.
@@ -127,5 +180,5 @@ def _record_action(action_name, params, result, element=None, source=None):
     if action_name == 'go_to_url' and params_dict.get('url'):
         _TRAJECTORY_URL = params_dict['url']
 
-    _emit_action_log_sync()
+    _emit_action_log_sync(removed_ids or None)
     return dumped

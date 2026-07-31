@@ -507,6 +507,12 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
 
   await trajectoryStepDao.batchSave([step]);
 
+  const row = await getDB()('trajectory_step')
+    .where({ trajectory_id: tid, step_number: stepNumber })
+    .orderBy('id', 'desc')
+    .first();
+  const dbId = row?.id != null ? Number(row.id) : null;
+
   const counts = await refreshTrajectoryCounts(tid);
   await trajectoryDao.updateMeta(tid, {
     stepCount: counts.stepCount,
@@ -515,5 +521,39 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
 
   touchTrajectoryRuntimeActivity(tid);
 
-  return { stepNumber, actionId: entry.id || null, trajectoryPhaseId: resolvedPhaseId };
+  return {
+    stepNumber,
+    actionId: entry.id || null,
+    trajectoryPhaseId: resolvedPhaseId,
+    dbId,
+  };
+}
+
+/**
+ * Delete live-persisted steps by DB primary keys, then renumber remaining steps.
+ * Used when AI/manual coalesce drops a prior ACTION_LOG entry that was already persisted.
+ */
+export async function removeRecordedStepsByDbIds(trajectoryDbId, dbIds = []) {
+  const tid = Number(trajectoryDbId);
+  const ids = (Array.isArray(dbIds) ? dbIds : [])
+    .map((x) => Number(x))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (!Number.isFinite(tid) || tid <= 0 || !ids.length) return { removed: 0 };
+
+  const deleted = await getDB()('trajectory_step')
+    .where({ trajectory_id: tid })
+    .whereIn('id', ids)
+    .del();
+
+  if (deleted > 0) {
+    await trajectoryStepDao.reorderByTrajectory(tid);
+    const counts = await refreshTrajectoryCounts(tid);
+    await trajectoryDao.updateMeta(tid, {
+      stepCount: counts.stepCount,
+      phaseCount: counts.phaseCount,
+    });
+    touchTrajectoryRuntimeActivity(tid);
+  }
+
+  return { removed: deleted || 0 };
 }

@@ -50,6 +50,11 @@ async function appendRecordedStep(...args) {
   return mod.appendRecordedStep(...args);
 }
 
+async function removeRecordedStepsByDbIds(...args) {
+  const mod = await import('./trajectory-persist-service.js');
+  return mod.removeRecordedStepsByDbIds(...args);
+}
+
 /**
  * Default login/navigate — NOT written to trajectory_step (is_replay / suppress persist).
  */
@@ -147,6 +152,42 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     if (type !== 'action_log_sync') return;
     if (runtime.suppressStepPersist || runtime.isReplay) return;
     const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+    const removedIds = Array.isArray(payload?.removedIds) ? payload.removedIds : [];
+    if (!runtime._lastPersistByActionId) runtime._lastPersistByActionId = new Map();
+    if (session && !session._lastPersistByActionId) {
+      session._lastPersistByActionId = runtime._lastPersistByActionId;
+    }
+    if (session && !session.persistedActionIds) {
+      session.persistedActionIds = runtime.persistedActionIds;
+    }
+
+    if (removedIds.length) {
+      const dbIds = [];
+      for (const rid of removedIds) {
+        const aid = String(rid || '');
+        if (!aid) continue;
+        const info = runtime._lastPersistByActionId.get(aid)
+          || session?._lastPersistByActionId?.get(aid);
+        const dbId = info?.dbId != null ? Number(info.dbId) : null;
+        if (Number.isFinite(dbId) && dbId > 0) dbIds.push(dbId);
+        runtime.persistedActionIds.delete(aid);
+        runtime._lastPersistByActionId.delete(aid);
+        session?.persistedActionIds?.delete(aid);
+        session?._lastPersistByActionId?.delete(aid);
+      }
+      if (dbIds.length) {
+        await removeRecordedStepsByDbIds(tid, dbIds).catch((err) => {
+          console.warn('[record] remove coalesced steps failed:', err?.message || err);
+        });
+        broadcast('action_removed', {
+          trajectoryDbId: tid,
+          sessionId: runtime.sessionId,
+          removedIds,
+          dbIds,
+        });
+      }
+    }
+
     const phaseIdHint = session?.activePhaseId != null ? Number(session.activePhaseId) : null;
     for (const entry of entries) {
       const id = entry?.id ? String(entry.id) : '';
@@ -160,6 +201,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         trajectoryPhaseId: Number.isFinite(phaseIdHint) ? phaseIdHint : undefined,
       }).catch(() => null);
       if (persisted) {
+        runtime._lastPersistByActionId.set(id, persisted);
+        session?._lastPersistByActionId?.set(id, persisted);
         broadcast('action_persisted', {
           trajectoryDbId: tid,
           sessionId: runtime.sessionId,

@@ -11,12 +11,20 @@ import os
 from datetime import datetime
 
 from . import _state
-from ._helpers import _ok, _err, _enrich_click_element, _is_ok_result
-from ._js_snippets import JS_COLLECT_ICON_BUTTONS, JS_CLICK_ICON_BUTTON, JS_STAMP_ICON_ARIA_LABELS
+from ._helpers import _ok, _err, _enrich_click_element, _is_ok_result, _wait_if_loading
+from ._js_snippets import (
+    JS_CHECK_LOADING,
+    JS_COLLECT_ICON_BUTTONS,
+    JS_CLICK_ICON_BUTTON,
+    JS_STAMP_ICON_ARIA_LABELS,
+)
 from ..models import ActionFile, FormSnapshot, FormSnapshotCollection
 
 # Path helper: __file__ is scripts/actions/_misc.py, so go up 2 levels
 _SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Consecutive get_page_state while mask still visible after wait (blocks idle spin).
+_GPS_LOADING_SPIN = {'count': 0}
 
 
 def _register_misc_actions(controller, browser_context, case_data_store=None):
@@ -35,11 +43,53 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             };
             check();
         })''')
+        _GPS_LOADING_SPIN['count'] = 0
         return _ok('loading-done')
 
-    @controller.action('Get current page state: visible dialogs, loading, errors, iconButtons (el-tooltip / aria-describedby / ElTooltip content labels), etc. formErrors entries are {label, error} with the field label from .el-form-item__label.')
+    @controller.action(
+        'Get current page state: visible dialogs, loading, errors, iconButtons '
+        '(el-tooltip / aria-describedby / ElTooltip content labels), etc. formErrors entries are '
+        '{label, error} with the field label from .el-form-item__label. '
+        'If the page is loading, this waits for the mask first — do NOT call '
+        'get_page_state repeatedly while loading; use wait_for_loading or a real UI action.'
+    )
     async def get_page_state():
         page = await browser_context.get_current_page()
+
+        # Auto-wait when mask is up so the agent cannot idle-poll loading snapshots.
+        try:
+            if await page.evaluate(JS_CHECK_LOADING):
+                await _wait_if_loading(page)
+        except Exception:
+            pass
+
+        still_loading = False
+        try:
+            still_loading = bool(await page.evaluate(JS_CHECK_LOADING))
+        except Exception:
+            still_loading = False
+
+        if still_loading:
+            _GPS_LOADING_SPIN['count'] = int(_GPS_LOADING_SPIN.get('count') or 0) + 1
+            n = _GPS_LOADING_SPIN['count']
+            if n >= 2:
+                return _err(
+                    'page-loading-spin-blocked | loading mask still visible after wait. '
+                    'Do NOT call get_page_state again. Call wait_for_loading() once, then '
+                    'click_icon_button / click_element_by_index / scan_visible_fields — '
+                    'not another get_page_state.',
+                    include_in_memory=True,
+                )
+            return _err(
+                'page-still-loading | waited for loading mask but it is still present. '
+                'Do NOT call get_page_state again while loading. '
+                'NEXT_ACTION: wait_for_loading() once, then a UI action '
+                '(click_icon_button / click_element / scan) — not get_page_state.',
+                include_in_memory=True,
+            )
+
+        _GPS_LOADING_SPIN['count'] = 0
+
         state = await page.evaluate('''() => {
             const dialogs = document.querySelectorAll('.el-dialog');
             const visibleDialogs = [...dialogs].filter(d => d.offsetParent !== null);

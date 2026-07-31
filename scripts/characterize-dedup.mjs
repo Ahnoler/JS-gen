@@ -1,7 +1,7 @@
 /**
- * Characterization: consecutive-only dedup (must not remove non-consecutive duplicates).
+ * Characterization: consecutive-only element dedup (keep later; must not remove non-consecutive).
  */
-import { deduplicateByXPath, deduplicateActionFile } from '../src/dedup.js';
+import { deduplicateByXPath, deduplicateActionFile, elementDedupKey } from '../src/dedup.js';
 import { parseReplayStepMarker, findScreenshotForStep } from '../src/runtime/script-runner.js';
 
 function assert(cond, msg) {
@@ -10,12 +10,27 @@ function assert(cond, msg) {
 
 const entries = [
   { action: 'fill_form_field', params: { label_text: 'A', value: '1' } },
-  { action: 'fill_form_field', params: { label_text: 'A', value: '1' } }, // consecutive dup
+  { action: 'fill_form_field', params: { label_text: 'A', value: '1' } }, // consecutive identical
   { action: 'click_element_by_index', params: { index: 1 } },
   { action: 'fill_form_field', params: { label_text: 'A', value: '1' } }, // non-consecutive — keep
 ];
 const deduped = deduplicateByXPath(entries);
 assert(deduped.length === 3, `expected 3 after consecutive dedup, got ${deduped.length}`);
+assert(deduped[0].params.value === '1', 'first remaining fill keeps value');
+
+// Same element, different values → keep later
+const refilled = deduplicateByXPath([
+  { action: 'fill_form_field', params: { label_text: '名称', value: 'auto' } },
+  { action: 'fill_form_field', params: { label_text: '名称', value: 'agent' } },
+]);
+assert(refilled.length === 1, 'same-label consecutive fills coalesce to 1');
+assert(refilled[0].params.value === 'agent', 'keep later fill value');
+
+assert(
+  elementDedupKey({ action: 'fill_form_field', params: { label_text: '名称', value: 'x' } })
+    === 'field:名称',
+  'elementDedupKey uses label',
+);
 
 const file = deduplicateActionFile({
   tests: [{ id: 't1', commands: entries }],
