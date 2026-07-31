@@ -14,6 +14,7 @@ import registerRemoteSession from './remote-session.js';
 import registerApiOverride from './api-override.js';
 import registerExecutor from './executor.js';
 import registerReplay from './replay.js';
+import registerExportMgmt from './export-mgmt.js';
 
 export default function (app) {
   app.use('/api/v2', v2ResponseEnvelope);
@@ -27,4 +28,5 @@ export default function (app) {
   registerApiOverride(app);
   registerExecutor(app);
   registerReplay(app);
+  registerExportMgmt(app);
 }

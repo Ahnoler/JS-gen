@@ -32,16 +32,15 @@ export default function (app) {
     res.status(status).json(body);
   }
 
-  /** AI 分析：需求描述 -> 阶段步骤数组（不落库） */
+  /** AI 分析：需求描述 -> { phases, caseEntries }（不落库；阶段数跟用户分步） */
   app.post('/api/v2/trajectories/analyze', async (req, res) => {
     try {
-      const { description, stepLength, model } = req.body || {};
-      const phases = await trajectoryService.analyzeRequirementToPhases({
+      const { description, model } = req.body || {};
+      const result = await trajectoryService.analyzeRequirementToPhases({
         description,
-        stepLength,
         model,
       });
-      res.json(phases);
+      res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

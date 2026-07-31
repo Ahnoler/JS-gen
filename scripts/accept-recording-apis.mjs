@@ -99,11 +99,14 @@ async function main() {
   // ── R2: AI 分析（不落库）──
   console.log('\n[R2] AI 分析');
   const analyze = await req('POST', '/api/v2/trajectories/analyze', {
-    description: '用户登录后查询对公客户并修改联系方式',
-    stepLength: 3,
+    description: '1、用户登录。\n2、查询对公客户。\n3、修改联系方式。',
   });
-  if (analyze.status === 200 && Array.isArray(analyze.json) && analyze.json.length >= 2) {
-    pass('POST /trajectories/analyze', `phases=${analyze.json.length}`);
+  if (analyze.status === 200 && Array.isArray(analyze.json?.phases) && analyze.json.phases.length >= 2) {
+    const nCase = Array.isArray(analyze.json.caseEntries) ? analyze.json.caseEntries.length : 0;
+    pass('POST /trajectories/analyze', `phases=${analyze.json.phases.length} caseEntries=${nCase}`);
+  } else if (analyze.status === 200 && Array.isArray(analyze.json) && analyze.json.length >= 2) {
+    // legacy array response (pre caseEntries)
+    pass('POST /trajectories/analyze', `phases=${analyze.json.length} (legacy array)`);
   } else if (analyze.status === 500 && /LLM/i.test(analyze.json?.error || '')) {
     pass('POST /trajectories/analyze 接口可达', `LLM 未配置: ${analyze.json.error}`);
   } else {

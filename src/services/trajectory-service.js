@@ -52,6 +52,7 @@ export {
   createTransactionWithPhases,
   setTrajectoryCaseEntries,
   analyzeRequirementToPhases,
+  extractCaseEntriesFromRequirement,
   confirmTrajectory,
 } from './trajectory-meta-service.js';
 
