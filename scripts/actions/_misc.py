@@ -171,7 +171,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     }
                 }''')
             await page.wait_for_timeout(300)
-            return _ok(f'ok-notification: {notif_text[:200]}')
+            return _ok(f'ok-notification: {notif_text[:200]}', include_in_memory=True)
         return 'no-notification'
 
     @controller.action('Close the topmost el-dialog, el-message-box, or el-drawer. El-notification has its own close_notification action.')

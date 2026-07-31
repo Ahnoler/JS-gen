@@ -305,6 +305,12 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                                     'Call click_save(); only done(success=true) after ok-save-success. '
                                     'no-notification / no error toast is NOT success.'
                                 )
+                                try:
+                                    from scripts.feature_flags import memory_whitelist_enabled
+                                    if memory_whitelist_enabled():
+                                        r.include_in_memory = True
+                                except Exception:
+                                    pass
                     return
 
                 if open_overlay and not navigated_ok and not save_ok:
@@ -321,6 +327,12 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                                     f'Premature done() rejected: {open_overlay} still open. '
                                     f'Finish or close it, then click submit / call done() again.'
                                 )
+                                try:
+                                    from scripts.feature_flags import memory_whitelist_enabled
+                                    if memory_whitelist_enabled():
+                                        r.include_in_memory = True
+                                except Exception:
+                                    pass
                     return
 
                 if (error_notifs or form_errors) and not navigated_ok and not save_ok:
@@ -338,6 +350,12 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                                     f'Errors={form_errors[:3] or error_notifs[:2]}. '
                                     f'Fix fields then call click_save() again.'
                                 )
+                                try:
+                                    from scripts.feature_flags import memory_whitelist_enabled
+                                    if memory_whitelist_enabled():
+                                        r.include_in_memory = True
+                                except Exception:
+                                    pass
                     return
 
                 if navigated_ok or save_ok:
@@ -356,6 +374,26 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                         case_data_store.pop('_last_save_ok', None)
                         case_data_store.pop('_url_before_save', None)
                 # else: no visible blockers — allow done() (including success=false reports)
+
+                # Persist done() outcome for next-phase business-scenario preamble
+                if case_data_store is not None:
+                    try:
+                        from .actions import _state as action_state
+                        from .actions._phase_context import record_phase_outcome
+                        record_phase_outcome(
+                            case_data_store,
+                            action_state._CURRENT_PHASE,
+                            success=done_success,
+                            text=done_text or '',
+                        )
+                        sys.stderr.write(
+                            f"[recorder] phase outcome saved "
+                            f"phase={action_state._CURRENT_PHASE} success={done_success}\n"
+                        )
+                        sys.stderr.flush()
+                    except Exception as e:
+                        sys.stderr.write(f"[recorder] phase outcome save failed: {e}\n")
+                        sys.stderr.flush()
             except Exception as e:
                 sys.stderr.write(f"[recorder] done-check error: {e}\n")
                 sys.stderr.flush()

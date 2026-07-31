@@ -47,5 +47,5 @@ def _register_navigation_actions(controller, browser_context):
         await page.wait_for_timeout(500)
         if _is_ok_result(result):
             _record_action('click_menu_item', {'menu_text': menu_text}, result)
-            return _ok(result + ' | loc:.el-menu-item:has-text("' + menu_text + '")')
+            return _ok(result + ' | loc:.el-menu-item:has-text("' + menu_text + '")', include_in_memory=True)
         return result

@@ -143,29 +143,74 @@ Keep your responses concise and focused on actionable insights.
 
 
 def patch_message_manager():
-    """Monkey-patch MessageManager to limit context size while preserving tool/tool_calls pairing."""
+    """Monkey-patch MessageManager to limit context size while preserving:
+    - init / memory message_type
+    - include_in_memory Action result/error human messages
+    - tool/tool_calls pairing for recent messages
+    """
     from browser_use.agent.message_manager.service import MessageManager
-    
+
     _original_get_messages = MessageManager.get_messages
-    MAX_RECENT = 12
-    
+    MAX_RECENT = 16
+
+    def _msg_content_text(message) -> str:
+        content = getattr(message, 'content', None)
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, dict) and item.get('type') == 'text':
+                    parts.append(str(item.get('text') or ''))
+                elif isinstance(item, str):
+                    parts.append(item)
+            return '\n'.join(parts)
+        return ''
+
+    def _is_keepalive(managed) -> bool:
+        meta = getattr(managed, 'metadata', None)
+        mt = getattr(meta, 'message_type', None) if meta is not None else None
+        if mt in ('init', 'memory'):
+            return True
+        text = _msg_content_text(getattr(managed, 'message', None)).lstrip()
+        if text.startswith('Action result:') or text.startswith('Action error:'):
+            return True
+        return False
+
     def _patched_get_messages(self):
-        msgs = _original_get_messages(self)
-        total = len(msgs)
+        history = getattr(getattr(self, 'state', None), 'history', None)
+        managed_list = getattr(history, 'messages', None) if history is not None else None
+        if not managed_list:
+            return _original_get_messages(self)
+
+        total = len(managed_list)
         if total <= MAX_RECENT + 2:
-            return msgs
-        tail = msgs[-(MAX_RECENT):]
-        # Ensure tool/tool_calls pairing: if tail starts with a tool message,
-        # include its preceding assistant message to avoid breaking the pair
-        first = tail[0]
-        role = getattr(first, 'role', '') or getattr(first, 'type', '')
-        if role == 'tool':
-            start = max(2, total - MAX_RECENT - 1)
-        else:
-            start = total - MAX_RECENT
-        trimmed = msgs[:2] + msgs[start:]
-        return trimmed
-    
+            return [m.message for m in managed_list]
+
+        keep = set()
+        for i, m in enumerate(managed_list):
+            if _is_keepalive(m):
+                keep.add(i)
+
+        # Always keep the first message (system)
+        keep.add(0)
+
+        recent_start = max(0, total - MAX_RECENT)
+        for i in range(recent_start, total):
+            keep.add(i)
+
+        # Ensure tool/tool_calls pairing: if an index is a tool message, keep predecessor
+        for i in sorted(keep):
+            msg = managed_list[i].message
+            role = getattr(msg, 'role', '') or getattr(msg, 'type', '')
+            class_name = type(msg).__name__
+            if role == 'tool' or class_name == 'ToolMessage':
+                if i > 0:
+                    keep.add(i - 1)
+
+        indices = sorted(keep)
+        return [managed_list[i].message for i in indices]
+
     MessageManager.get_messages = _patched_get_messages
 
 

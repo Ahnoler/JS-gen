@@ -18,14 +18,24 @@ from ._js_snippets import (
 from ..models import ScannedField
 
 
-def _ok(msg):
-    """Wrap a success string in ActionResult with is_done=False."""
-    return ActionResult(extracted_content=str(msg), is_done=False)
+def _ok(msg, include_in_memory: bool = False):
+    """Wrap a success string in ActionResult with is_done=False.
+
+    When include_in_memory=True and AI_MEMORY_WHITELIST is on, browser-use keeps
+    this result in long-term memory across context trims.
+    """
+    from scripts.feature_flags import memory_whitelist_enabled
+    keep = bool(include_in_memory) and memory_whitelist_enabled()
+    return ActionResult(extracted_content=str(msg), is_done=False, include_in_memory=keep)
 
 
-def _err(msg):
+def _err(msg, include_in_memory: bool = False):
     """Wrap an error string in ActionResult."""
-    return ActionResult(extracted_content=str(msg), is_done=False, success=False)
+    from scripts.feature_flags import memory_whitelist_enabled
+    keep = bool(include_in_memory) and memory_whitelist_enabled()
+    return ActionResult(
+        extracted_content=str(msg), is_done=False, success=False, include_in_memory=keep,
+    )
 
 
 def _is_ok_result(result) -> bool:

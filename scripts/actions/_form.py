@@ -348,7 +348,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         # Wait for post-login navigation
         await page.wait_for_timeout(3000)
         _record_action('login', {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code}, 'ok-login')
-        return _ok('ok-login | ' + ' '.join(results))
+        return _ok('ok-login | ' + ' '.join(results), include_in_memory=True)
 
     @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code). Prefers case_data_store presets when present.')
     async def match_form_rule(label_text: str):
@@ -1097,6 +1097,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 result['NEXT_ACTION'] = cue.split('|', 1)[0].replace('NEXT_ACTION:', '').strip()
             result['hint'] = cue
             case_data_store['_submit_ready'] = True
+            return _ok(json.dumps(result, ensure_ascii=False), include_in_memory=True)
         return json.dumps(result, ensure_ascii=False)
 
     @controller.action(
@@ -1159,7 +1160,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             sys.stderr.flush()
             return _err(
                 f'err-save-button-not-found:{needle}. '
-                f'Close interfering dialogs (查询/返回) with close_dialog, then retry click_save().'
+                f'Close interfering dialogs (查询/返回) with close_dialog, then retry click_save().',
+                include_in_memory=True,
             )
 
         btn_text = info.get('text') or (button_text or '保存')
@@ -1257,7 +1259,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             )
             sys.stderr.write(f'[click_save] validation errors: {labels}\n')
             sys.stderr.flush()
-            return _err(msg)
+            return _err(msg, include_in_memory=True)
 
         if success_notifs:
             if case_data_store is not None:
@@ -1268,7 +1270,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             sys.stderr.flush()
             return _ok(
                 f'ok-save-success:{toast} | '
-                f'Save confirmed (操作成功). Call done(success=true) if phase goal is save.'
+                f'Save confirmed (操作成功). Call done(success=true) if phase goal is save.',
+                include_in_memory=True,
             )
 
         if error_notifs:
@@ -1277,7 +1280,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             sys.stderr.flush()
             return _err(
                 f'err-save-notification:{toast} | '
-                f'Fix the reported issue then click_save() again. Do NOT treat as success.'
+                f'Fix the reported issue then click_save() again. Do NOT treat as success.',
+                include_in_memory=True,
             )
 
         url_after = outcome.get('url') or page.url
@@ -1290,7 +1294,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             return _err(
                 'err-save-no-feedback: URL changed but no 操作成功 notification. '
                 'Do NOT call done(success=true) unless you observed 操作成功. '
-                'If form errors appear, fix them and click_save() again.'
+                'If form errors appear, fix them and click_save() again.',
+                include_in_memory=True,
             )
 
         sys.stderr.write('[click_save] no feedback (no toast, no form errors)\n')
@@ -1298,7 +1303,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         return _err(
             'err-save-no-feedback: no 操作成功 notification and no .el-form-item__error. '
             'no-notification is NOT success. Check overlays (close_dialog), then retry click_save(). '
-            'Do NOT call done(success=true).'
+            'Do NOT call done(success=true).',
+            include_in_memory=True,
         )
 
     @controller.action('Scroll to the first visible form validation error (.el-form-item.is-error or .el-form-item__error). Returns {label, error} so agent knows which field to fix next. Call after a failed submit or when form errors are visible.')
@@ -1365,7 +1371,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             msg += ' | fillable:' + json.dumps([item.label for item in fillable], ensure_ascii=False)
         if intervene:
             msg += ' | NEEDS_INTERVENTION:' + json.dumps([item.label for item in intervene], ensure_ascii=False)
-        return _ok(msg)
+        return _ok(msg, include_in_memory=True)
 
     @controller.action('Request human intervention for a field that cannot be auto-filled. Use this when sync_tasks_from_errors returns NEEDS_INTERVENTION items, or when a field is disabled with an adjacent button. Queues the request so multiple fields are preserved.')
     async def request_intervention(label_text: str, reason: str = ''):

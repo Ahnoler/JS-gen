@@ -175,7 +175,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
 
   try {
-    for (const phase of phases) {
+    for (let i = 0; i < phases.length; i++) {
+      const phase = phases[i];
       if (runtime.abortRecording) {
         await trajectoryPhaseDao.updateStatus(phase.id, 'failed').catch(() => {});
         throw new Error('Recording aborted');
@@ -187,11 +188,18 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', 300000);
       const errP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000)
         .then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
+      // Prior 0–2 phases by array position (not phaseNumber±1 — phaseIds filter may skip).
+      const priorSlice = phases.slice(Math.max(0, i - 2), i);
+      const prior_phases = priorSlice.map((p) => ({
+        phaseNumber: p.phaseNumber,
+        description: p.description || '',
+      }));
       const stepData = {
         instruction: phase.description,
         max_steps: 30,
         phase_number: phase.phaseNumber,
       };
+      if (prior_phases.length) stepData.prior_phases = prior_phases;
       // First step carries case data; Python loads once (case_data_loaded flag).
       // Inline case_data works on remote executors; case_data_file for local path.
       if (caseData) {

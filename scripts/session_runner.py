@@ -293,11 +293,13 @@ def _handle_save_case_data(case_data_store, session_id):
         emit_json({"event": "save_case_data_result", "data": {"success": False, "message": str(e)}})
 
 
-def _handle_reset_trajectory(session_id):
+def _handle_reset_trajectory(session_id, case_data_store=None):
     from .controller import _ACTION_LOG
     from .recorder import _ACTION_LOG as _recorder_log
+    from .actions._phase_context import clear_phase_outcomes
     _ACTION_LOG.clear()
     _recorder_log.clear()
+    clear_phase_outcomes(case_data_store)
     from .actions._state import _emit_action_log_sync
     _emit_action_log_sync()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -387,6 +389,27 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             sys.stderr.flush()
 
     agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', task_text, count=1).strip() or task_text
+    try:
+        from .actions._phase_context import format_phase_preamble
+        from .actions._state import _CURRENT_PHASE
+        prior_phases = instruction.get('prior_phases') or instruction.get('priorPhases')
+        phase_for_preamble = instruction.get('phase_number')
+        if phase_for_preamble is None:
+            phase_for_preamble = instruction.get('phaseNumber')
+        if phase_for_preamble is None:
+            phase_for_preamble = _CURRENT_PHASE
+        agent_task = format_phase_preamble(
+            current_phase=int(phase_for_preamble) if phase_for_preamble is not None else 0,
+            current_task=agent_task,
+            prior_phases=prior_phases if isinstance(prior_phases, list) else None,
+            case_data_store=case_data_ref,
+        )
+        if agent_task.startswith('【业务场景】'):
+            sys.stderr.write(f"[session] agent_task preview: {agent_task[:400]}\n")
+            sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"[session] phase preamble skipped: {e}\n")
+        sys.stderr.flush()
     try:
         from .actions._case_data import format_case_data_hint, iter_user_case_entries
         entries = iter_user_case_entries(case_data_ref)
@@ -521,7 +544,10 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
         return 'continue'
 
     if event == "reset_trajectory":
-        cum_path = _handle_reset_trajectory(session_state['session_id'])
+        cum_path = _handle_reset_trajectory(
+            session_state['session_id'],
+            case_data_store=session_state.get('case_data_store'),
+        )
         session_state['cumulative_path'] = cum_path
         session_state['case_data_store'].clear()
         return 'continue'

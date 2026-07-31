@@ -8,7 +8,7 @@ _RESERVED_CASE_KEYS = frozenset({
     '_watcher_mode', '_intervention_queue', '_scan_fields',
     '_submit_ready', '_autofill_summary', '_last_save_ok',
     '_url_before_save', '_ref_date', '_already_matched_streak',
-    '_has_button_keywords',
+    '_has_button_keywords', '_phase_outcomes',
 })
 
 
@@ -102,7 +102,7 @@ def _register_case_data_actions(controller, case_data_store):
     async def save_case_data(key: str, value: str):
         try:
             case_data_store[key] = value
-            return _ok(f'saved:{key}={value}')
+            return _ok(f'saved:{key}={value}', include_in_memory=True)
         except Exception as e:
             return _err(f'save-error:{e}')
 
