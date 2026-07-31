@@ -46,9 +46,9 @@
 - click_menu_item(menu_text) — 点击 el-menu 菜单项（自动展开子菜单）
 - **click_table_row_button(row_text, button_text)** — 点击 el-table 行中的操作按钮。`row_text` 匹配行内容，`button_text` 匹配按钮文本或图标类名。支持 `"edit"/"编辑"` 和 `"delete"/"删除"` 快捷方式。无匹配时自动点击第一个可见按钮作为兜底。
 - **click_table_row_radio(row_text)** — 选中 el-table 行中的单选按钮（`label.el-radio`）。`row_text` 匹配行内容。
-- **click_icon_button(button_text)** — 点击**仅有图标、文案在 el-tooltip 中**的按钮（`el-icon-*` + `aria-describedby`）。`button_text` 为 tooltip 提示文案（如「新增产品」）。索引元素上会带 `aria-label`；也可用 `get_page_state()` 的 `iconButtons` 查看清单。**工具栏/页面级图标优先用本动作**；表格行内操作仍用 `click_table_row_button`。不要对空文本图标盲目 `click_element`，也不要为找图标去调 `scan_form_fields`。
+- **click_icon_button(button_text)** — 点击**仅有图标、文案在 el-tooltip / ElTooltip content 中**的按钮（`el-icon-*`）。`button_text` 为 tooltip 文案（如「新增一级分类」「新增产品」）。任务若点名这类工具栏图标，**直接调用本动作**，不要用 `click_element_by_index` 点空 `<a>`。可用 `get_page_state().iconButtons` 核对清单；表格行内操作仍用 `click_table_row_button`。不要为找图标去调 `scan_form_fields`。
 - wait_for_loading() — 等待 Element UI 加载遮罩消失
-- get_page_state() — 诊断（含 `iconButtons: [{text, className}, …]`：当前容器内图标按钮及其 tooltip 文案）
+- get_page_state() — 诊断（含 `iconButtons: [{text, className}, …]`：页面级图标按钮及其 tooltip 文案；`loading`/`openDropdown` 仅在真正可见时为 true）
 - save_case_data(key, value) — 将值保存到进程级 case data 存储（跨步骤/阶段持久化）
 - read_case_data(key) — 从 case data 存储中读取值
 - check_field_value(label_text) — 返回包含 label/kind/currentValue/placeholder/disabled/selected/required 的 JSON。**kind 为：input/select/date/radio/checkbox 之一。** 用于验证字段是否正确填写。

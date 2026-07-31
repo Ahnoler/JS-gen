@@ -1460,6 +1460,12 @@ JS_ENRICH_CLICK_LOCATOR = r'''([xpath, text, tagHint]) => {
 
 _JS_ICON_BUTTON_HELPERS = r'''
 function _iconNormText(s) { return (s || '').replace(/\s+/g, ' ').trim(); }
+function _iconShortLabel(text) {
+  const t = _iconNormText(text);
+  // Icon tooltips are short labels (e.g. 「新增一级分类」); reject menu dumps.
+  if (!t || t.length > 40 || t.split(/\s+/).length > 6) return '';
+  return t;
+}
 function _iconHasIconClass(el) {
   const cls = typeof el.className === 'string' ? el.className : '';
   if (/(?:^|\s)el-icon-[\w-]+/.test(cls) || /(?:^|\s)el-icon(?:\s|$)/.test(cls)) return true;
@@ -1494,22 +1500,44 @@ function _iconTooltipText(el) {
   if (!tip) return '';
   const clone = tip.cloneNode(true);
   clone.querySelectorAll('.popper__arrow,[x-arrow]').forEach(n => n.remove());
-  const text = _iconNormText(clone.textContent);
-  // Icon tooltips are short labels (e.g. 「新增产品」); reject menu dumps.
-  if (!text || text.length > 40 || text.split(/\s+/).length > 6) return '';
-  return text;
+  return _iconShortLabel(clone.textContent);
+}
+function _iconVueContent(el) {
+  // Element UI ElTooltip keeps `content` on the Vue instance even before first
+  // hover (aria-describedby / popper may be absent until then).
+  try {
+    let cur = el;
+    for (let i = 0; i < 3 && cur; i++) {
+      const v = cur.__vue__;
+      if (v) {
+        const raw = (v.content != null) ? v.content
+          : (v.$props && v.$props.content != null ? v.$props.content : null);
+        const short = _iconShortLabel(typeof raw === 'string' ? raw : '');
+        if (short) return short;
+      }
+      cur = cur.parentElement;
+    }
+  } catch (e) {}
+  return '';
 }
 function _iconResolveLabel(el) {
-  const fromAttr = _iconNormText(el.getAttribute('aria-label'))
-    || _iconNormText(el.getAttribute('title'));
-  if (fromAttr && fromAttr.length <= 40 && fromAttr.split(/\s+/).length <= 6) return fromAttr;
-  return _iconTooltipText(el);
+  const fromAttr = _iconShortLabel(el.getAttribute('aria-label'))
+    || _iconShortLabel(el.getAttribute('title'));
+  if (fromAttr) return fromAttr;
+  return _iconTooltipText(el) || _iconVueContent(el);
 }
 function _iconCandidates(root) {
-  // Prefer icon-class hosts with aria-describedby (user pattern: el-tooltip el-icon-*).
-  const sel = '[aria-describedby][class*="el-icon"], [aria-describedby].el-tooltip';
+  // Include el-tooltip+el-icon hosts even without aria-describedby (pre-hover).
+  const sel = [
+    '[aria-describedby][class*="el-icon"]',
+    '[aria-describedby].el-tooltip',
+    '.el-tooltip[class*="el-icon"]',
+  ].join(', ');
   const out = [];
+  const seen = new Set();
   for (const el of (root || document).querySelectorAll(sel)) {
+    if (seen.has(el)) continue;
+    seen.add(el);
     if (!_iconHasIconClass(el)) continue;
     if (_iconIsExcludedHost(el)) continue;
     out.push(el);
@@ -1525,10 +1553,10 @@ JS_STAMP_ICON_ARIA_LABELS = r'''() => {
 ''' + _JS_ICON_BUTTON_HELPERS + r'''
   let n = 0;
   for (const el of _iconCandidates(document)) {
-    const existing = _iconNormText(el.getAttribute('aria-label'))
-      || _iconNormText(el.getAttribute('title'));
+    const existing = _iconShortLabel(el.getAttribute('aria-label'))
+      || _iconShortLabel(el.getAttribute('title'));
     if (existing) continue;
-    const tip = _iconTooltipText(el);
+    const tip = _iconResolveLabel(el);
     if (!tip) continue;
     el.setAttribute('aria-label', tip);
     n++;
@@ -1536,12 +1564,12 @@ JS_STAMP_ICON_ARIA_LABELS = r'''() => {
   return n;
 }'''
 
+# Page toolbars (tree action icons etc.) live outside dialogs — always scan document.
 JS_COLLECT_ICON_BUTTONS = r'''() => {
 ''' + _JS_ICON_BUTTON_HELPERS + r'''
-  const root = ''' + JS_GET_CONTAINER + r''';
   const iconButtons = [];
   const seen = new Set();
-  for (const el of _iconCandidates(root)) {
+  for (const el of _iconCandidates(document)) {
     if (!_iconIsVisible(el)) continue;
     const text = _iconResolveLabel(el);
     if (!text) continue;
@@ -1557,8 +1585,7 @@ JS_COLLECT_ICON_BUTTONS = r'''() => {
 JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
 ''' + _JS_ICON_BUTTON_HELPERS + r'''
   if (!buttonText) return 'button-text-empty';
-  const root = ''' + JS_GET_CONTAINER + r''';
-  for (const el of _iconCandidates(root)) {
+  for (const el of _iconCandidates(document)) {
     if (!_iconIsVisible(el)) continue;
     const label = _iconResolveLabel(el);
     if (label === buttonText || (label && label.includes(buttonText))) {

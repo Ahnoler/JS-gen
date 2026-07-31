@@ -12,7 +12,7 @@ from datetime import datetime
 
 from . import _state
 from ._helpers import _ok, _err, _enrich_click_element, _is_ok_result
-from ._js_snippets import JS_COLLECT_ICON_BUTTONS, JS_CLICK_ICON_BUTTON
+from ._js_snippets import JS_COLLECT_ICON_BUTTONS, JS_CLICK_ICON_BUTTON, JS_STAMP_ICON_ARIA_LABELS
 from ..models import ActionFile, FormSnapshot, FormSnapshotCollection
 
 # Path helper: __file__ is scripts/actions/_misc.py, so go up 2 levels
@@ -37,7 +37,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
         })''')
         return _ok('loading-done')
 
-    @controller.action('Get current page state: visible dialogs, loading, errors, iconButtons (el-tooltip / aria-describedby labels), etc. formErrors entries are {label, error} with the field label from .el-form-item__label.')
+    @controller.action('Get current page state: visible dialogs, loading, errors, iconButtons (el-tooltip / aria-describedby / ElTooltip content labels), etc. formErrors entries are {label, error} with the field label from .el-form-item__label.')
     async def get_page_state():
         page = await browser_context.get_current_page()
         state = await page.evaluate('''() => {
@@ -59,14 +59,28 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 seen.add(key);
                 formErrors.push({ label, error });
             }
+            const isVis = (el) => {
+                if (!el) return false;
+                if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+                const st = getComputedStyle(el);
+                return st.display !== 'none' && st.visibility !== 'hidden';
+            };
+            const loading = [...document.querySelectorAll('.el-loading-mask')].some(m => {
+                if (m.classList.contains('el-loading-mask--hidden')) return false;
+                return isVis(m);
+            });
+            const openDropdown = [...document.querySelectorAll('.el-select-dropdown')].some(d => {
+                if (d.classList.contains('is-hidden')) return false;
+                return isVis(d);
+            });
             return {
                 dialogCount: dialogs.length,
                 visibleDialogCount: visibleDialogs.length,
                 visibleDialogTitles: visibleDialogs.map(d => d.querySelector('.el-dialog__title')?.textContent?.trim() || ''),
                 msgboxVisible: !!document.querySelector('.el-message-box') && document.querySelector('.el-message-box').offsetParent !== null,
                 drawerCount: visibleDrawers.length,
-                loading: !!document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'),
-                openDropdown: !!document.querySelector('.el-select-dropdown:not(.is-hidden)'),
+                loading,
+                openDropdown,
                 formErrors,
                 messages: [...document.querySelectorAll('.el-message')].map(e => e.textContent.trim()).filter(Boolean),
                 notifications: [...document.querySelectorAll('.el-notification')].filter(e => e.offsetParent !== null).map(e => e.textContent.trim()).filter(Boolean),
@@ -77,6 +91,9 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             };
         }''')
         try:
+            # Stamp aria-label from ElTooltip content / popper before collect so
+            # iconButtons is non-empty even before first hover.
+            await page.evaluate(JS_STAMP_ICON_ARIA_LABELS)
             icon_buttons = await page.evaluate(JS_COLLECT_ICON_BUTTONS)
             state['iconButtons'] = icon_buttons if isinstance(icon_buttons, list) else []
         except Exception:
@@ -85,12 +102,17 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
         return json.dumps(state, ensure_ascii=False)
 
     @controller.action(
-        'Click an icon-only button by its tooltip / aria-describedby label text '
+        'Click an icon-only button by its tooltip / ElTooltip content / aria-label text '
         '(e.g. el-tooltip + el-icon-*). Prefer this over click_element on empty-text icons. '
-        'Use get_page_state().iconButtons or aria-label on indexed elements to discover labels.'
+        'Use get_page_state().iconButtons or aria-label on indexed elements to discover labels. '
+        'If the task names a toolbar icon (e.g. 新增一级分类), call this directly.'
     )
     async def click_icon_button(button_text: str):
         page = await browser_context.get_current_page()
+        try:
+            await page.evaluate(JS_STAMP_ICON_ARIA_LABELS)
+        except Exception:
+            pass
         result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
         await page.wait_for_timeout(400)
         if _is_ok_result(result):

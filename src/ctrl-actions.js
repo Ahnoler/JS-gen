@@ -291,6 +291,11 @@ const CTRL_OBJECT = `{
   clickIconButton: (buttonText) => {
     if (!buttonText) return 'button-text-empty';
     const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+    const shortLabel = (text) => {
+      const t = norm(text);
+      if (!t || t.length > 40 || t.split(/\\s+/).length > 6) return '';
+      return t;
+    };
     const hasIconClass = (el) => {
       const cls = typeof el.className === 'string' ? el.className : '';
       if (/(?:^|\\s)el-icon-[\\w-]+/.test(cls) || /(?:^|\\s)el-icon(?:\\s|$)/.test(cls)) return true;
@@ -321,18 +326,35 @@ const CTRL_OBJECT = `{
       if (!tip) return '';
       const clone = tip.cloneNode(true);
       clone.querySelectorAll('.popper__arrow,[x-arrow]').forEach(n => n.remove());
-      const text = norm(clone.textContent);
-      if (!text || text.length > 40 || text.split(/\\s+/).length > 6) return '';
-      return text;
+      return shortLabel(clone.textContent);
+    };
+    const vueContent = (el) => {
+      try {
+        let cur = el;
+        for (let i = 0; i < 3 && cur; i++) {
+          const v = cur.__vue__;
+          if (v) {
+            const raw = (v.content != null) ? v.content
+              : (v.$props && v.$props.content != null ? v.$props.content : null);
+            const short = shortLabel(typeof raw === 'string' ? raw : '');
+            if (short) return short;
+          }
+          cur = cur.parentElement;
+        }
+      } catch (e) {}
+      return '';
     };
     const resolveLabel = (el) => {
-      const fromAttr = norm(el.getAttribute('aria-label')) || norm(el.getAttribute('title'));
-      if (fromAttr && fromAttr.length <= 40 && fromAttr.split(/\\s+/).length <= 6) return fromAttr;
-      return tipText(el);
+      const fromAttr = shortLabel(el.getAttribute('aria-label')) || shortLabel(el.getAttribute('title'));
+      if (fromAttr) return fromAttr;
+      return tipText(el) || vueContent(el);
     };
-    const root = CTRL.getContainer();
-    const sel = '[aria-describedby][class*=\"el-icon\"], [aria-describedby].el-tooltip';
-    for (const el of root.querySelectorAll(sel)) {
+    // Page toolbars sit outside dialogs — scan document, not getContainer().
+    const sel = '[aria-describedby][class*=\"el-icon\"], [aria-describedby].el-tooltip, .el-tooltip[class*=\"el-icon\"]';
+    const seen = new Set();
+    for (const el of document.querySelectorAll(sel)) {
+      if (seen.has(el)) continue;
+      seen.add(el);
       if (el.offsetParent === null && !el.closest('.el-table__fixed')) continue;
       if (!hasIconClass(el) || isExcluded(el)) continue;
       const label = resolveLabel(el);
@@ -516,7 +538,7 @@ export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 | CTRL.switchTab | (name) | 'ok' / 'tab-not-found' | 切换 el-tabs |
 | CTRL.checkFieldValue | (label) | 值 / 'empty' / 'label-not-found' | 读取表单字段当前值 |
 | CTRL.clickAdjacentButton | (label) | 'ok-clicked' / 'already-filled'(非ok跳过) / 'no-button-found' | 点击字段旁的选择/引入按钮 |
-| CTRL.clickIconButton | (buttonText) | 'ok' / 'not-found' / 'button-text-empty' | 按 el-tooltip / aria-describedby 提示文案点击图标按钮 |
+| CTRL.clickIconButton | (buttonText) | 'ok' / 'not-found' / 'button-text-empty' | 按 el-tooltip / ElTooltip content / aria-label 点击图标按钮 |
 | CTRL.fillAddressFields | (addr) | 'ok:N' / 'no-address-fields' | 填充所有标签含"地址"的字段 |
 | CTRL.expandAllTreeNodes | () | 展开节点数 | 展开全部 el-tree 节点 |
 
