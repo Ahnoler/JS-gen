@@ -3,6 +3,9 @@ Controller builder: factory function that assembles all action groups
 into a single browser_use Controller instance.
 """
 
+import functools
+import inspect
+
 from ._case_data import _register_case_data_actions
 from ._form import _register_form_actions
 from ._navigation import _register_navigation_actions
@@ -22,6 +25,11 @@ def _wrap_action_with_screenshots(controller, browser_context):
 
     AI agent and CDP watcher both invoke the same act.function, so one wrap
     covers both recording paths.
+
+    Critical: preserve the original callable signature. browser-use builds
+    Pydantic param models from inspect.signature; a bare (*args, **kwargs)
+    wrapper yields inspect._empty and crashes Agent creation with
+    PydanticInvalidForJsonSchema.
     """
     original_action = controller.action
 
@@ -30,7 +38,9 @@ def _wrap_action_with_screenshots(controller, browser_context):
 
         def decorator(func):
             action_name = getattr(func, '__name__', '') or ''
+            orig_sig = inspect.signature(func)
 
+            @functools.wraps(func)
             async def wrapped(*args, **kwargs):
                 if (
                     not capture_screenshots_enabled()
@@ -65,16 +75,9 @@ def _wrap_action_with_screenshots(controller, browser_context):
                     emit_step_screenshot(str(entry_id), before_b64, after_b64)
                 return result
 
-            wrapped.__name__ = getattr(func, '__name__', 'wrapped')
-            wrapped.__doc__ = getattr(func, '__doc__', None)
-            wrapped.__qualname__ = getattr(func, '__qualname__', wrapped.__name__)
-            # Preserve pydantic / browser_use metadata if present
-            for attr in ('__annotations__', '__signature__', '__module__'):
-                if hasattr(func, attr):
-                    try:
-                        setattr(wrapped, attr, getattr(func, attr))
-                    except Exception:
-                        pass
+            # functools.wraps copies __annotations__ but not a bound Signature;
+            # set explicitly so pydantic / browser-use see real params.
+            wrapped.__signature__ = orig_sig
             return register(wrapped)
 
         return decorator

@@ -404,11 +404,18 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
   };
 }
 
-export async function resolveTrajectoryElement(trajectoryId, { labelText } = {}) {
+export async function resolveTrajectoryElement(trajectoryId, {
+  labelText,
+  actionType,
+  action,
+  params,
+} = {}) {
   const tid = Number(trajectoryId);
   const label = String(labelText || '').trim();
-  if (!label) {
-    const err = new Error('labelText is required');
+  const act = String(actionType || action || '').trim();
+  const p = params && typeof params === 'object' ? params : {};
+  if (!label && !act && !Object.keys(p).length) {
+    const err = new Error('labelText or actionType/params is required');
     err.statusCode = 400;
     throw err;
   }
@@ -434,6 +441,8 @@ export async function resolveTrajectoryElement(trajectoryId, { labelText } = {})
     execSession.sendToExecutor(runtime.executorNodeUuid, 'session.bib_resolve_element', {
       sessionId: runtime.sessionId,
       labelText: label,
+      actionType: act,
+      params: p,
       requestId,
     });
     const payload = await resultP;
@@ -443,8 +452,15 @@ export async function resolveTrajectoryElement(trajectoryId, { labelText } = {})
       err.statusCode = /not attached|not available|required/i.test(msg) ? 400 : 404;
       throw err;
     }
+    if (payload?.ambiguous && Array.isArray(payload.matches)) {
+      return {
+        trajectoryId: tid,
+        ambiguous: true,
+        matches: payload.matches,
+      };
+    }
     if (!payload?.element) {
-      const err = new Error(`No form field found for label: ${label}`);
+      const err = new Error(`No form field found for label: ${label || act}`);
       err.statusCode = 404;
       throw err;
     }
@@ -455,7 +471,17 @@ export async function resolveTrajectoryElement(trajectoryId, { labelText } = {})
     };
   }
 
-  const resolved = await remoteBridge.resolveElementByLabelText(label);
+  const resolved = await remoteBridge.resolveElementByLabelText(label, {
+    actionType: act,
+    params: p,
+  });
+  if (resolved?.ambiguous) {
+    return {
+      trajectoryId: tid,
+      ambiguous: true,
+      matches: resolved.matches,
+    };
+  }
   return {
     trajectoryId: tid,
     matchedLabel: resolved.matchedLabel,

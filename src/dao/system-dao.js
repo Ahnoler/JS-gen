@@ -41,15 +41,16 @@ function assertType(type) {
 export function fromRaw(row) {
   if (!row) return null;
   const n = fromDbRow(row);
+  const type = Number(n.type);
   return {
     id: n.id,
     uid: n.systemId,
     systemId: n.systemId,
-    type: n.type,
-    typeLabel: TYPE_LABEL[n.type] || String(n.type),
-    parentId: isRootNodeId(n.id) || n.type === NODE_TYPE.ROOT || n.type === NODE_TYPE.SYSTEM
+    type,
+    typeLabel: TYPE_LABEL[type] || String(n.type),
+    parentId: isRootNodeId(n.id) || type === NODE_TYPE.ROOT || type === NODE_TYPE.SYSTEM
       ? (isRootParentId(n.parentId) ? ROOT_NODE_ID : Number(n.parentId))
-      : (n.parentId ?? null),
+      : (n.parentId == null || n.parentId === '' ? null : Number(n.parentId)),
     name: n.name,
     description: n.description ?? null,
     url: n.url || '',

@@ -1,5 +1,8 @@
 /**
  * Shared action-file → Playwright script assembly (used by /api/test/assemble and replay).
+ *
+ * @deprecated For product replay prefer live `_replay.py`. Assemble/test-run
+ * remain engineering assets; CTRL injection path is frozen for product use.
  */
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import path from 'path';

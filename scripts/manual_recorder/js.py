@@ -1,6 +1,8 @@
 """Injected page script for manual DOM recording."""
 from __future__ import annotations
 
+from scripts.actions._locator_helpers_js import PAGE_LOCATOR_HELPERS
+
 # ── Injected page script ───────────────────────────────────────────────────
 # Emits console messages: __JSGEN_MANUAL__ + JSON payload
 JS_MANUAL_RECORDER = r'''(() => {
@@ -249,45 +251,37 @@ JS_MANUAL_RECORDER = r'''(() => {
     return t.split(/[\n\r]/)[0].trim().slice(0, 40);
   }
 
+''' + PAGE_LOCATOR_HELPERS + r'''
   function elMeta(el, textOverride) {
     const t = textOverride != null ? String(textOverride) : shortLabel(el);
     const hi = highlightIndexOf(el);
-    // Prefer browser_use-compatible xpath for assembler; keep absolute as backup
     const bu = buXPathOf(el);
     const abs = xpathOf(el);
-    const tag = (el.tagName || '').toLowerCase();
-    const cls = String((el.getAttribute && el.getAttribute('class')) || el.className || '');
-    // Text-anchored smart xpath for buttons/links (stable across dialog remounts)
-    let smart = '';
-    const nt = String(t || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
-    if (nt && (tag === 'button' || tag === 'a' || /(^| )el-button( |$)/.test(cls))) {
-      const lit = nt.indexOf("'") < 0 ? ("'" + nt + "'") : ('"' + nt.replace(/"/g, '') + '"');
-      const local = tag === 'a' ? ('a[normalize-space()=' + lit + ']') : ('button[normalize-space()=' + lit + ']');
-      const inDrawer = !!(el.closest && el.closest('.el-drawer'));
-    const inDialog = !!(el.closest && el.closest('.el-dialog, .el-message-box'));
-    if (inDrawer) {
-      smart = "(//div[contains(@class,'el-drawer')])[last()]//" + local;
-    } else if (inDialog) {
-      smart = "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]//" + local;
-    } else {
-      smart = '//' + local;
-    }
-    }
-    const primary = smart || bu || abs;
-    const candidates = [];
-    if (smart) candidates.push({ type: 'xpath_smart', value: smart });
-    if (abs) candidates.push({ type: 'xpath_full', value: abs });
+    const formLbl = (function () {
+      const item = el.closest && el.closest('.el-form-item');
+      if (!item) return '';
+      const lbl = item.querySelector('.el-form-item__label');
+      return normalizeFormLabel(lbl && lbl.textContent);
+    })();
+    const loc = buildLocatorSnap(el, t, abs, formLbl);
     const meta = {
-      xpath: primary,
+      xpath: loc.xpath || bu || abs,
       bu_xpath: bu,
       xpath_abs: abs,
-      xpath_full: abs,
-      xpath_smart: smart,
-      candidates: candidates,
-      tag: tag,
-      attributes: attrs(el),
-      text: nt || t,
+      xpath_full: loc.xpath_full || abs,
+      xpath_smart: loc.xpath_smart || '',
+      candidates: loc.candidates || [],
+      tag: loc.tag || (el.tagName || '').toLowerCase(),
+      attributes: loc.attributes || attrs(el),
+      text: loc.text || t,
+      formLabel: loc.formLabel || formLbl || '',
+      target_kind: loc.target_kind || '',
+      locator_scope: loc.locator_scope || '',
+      locator_occurrence: loc.locator_occurrence || 0,
+      locator_verified: loc.locator_verified === true,
+      locator_strategy: loc.locator_strategy || '',
     };
+    if (loc.locator_fallback_reason) meta.locator_fallback_reason = loc.locator_fallback_reason;
     if (hi != null) meta.highlight_index = hi;
     return meta;
   }
@@ -361,10 +355,47 @@ JS_MANUAL_RECORDER = r'''(() => {
       // find active select input if possible
       const open = document.querySelector('.el-select .el-input.is-focus, .el-select .is-focus');
       const label = open ? formItemLabel(open) : '';
+      const dropdown = opt.closest('.el-select-dropdown') || opt.parentElement;
+      const options = [];
+      const seen = new Set();
+      if (dropdown) {
+        dropdown.querySelectorAll('.el-select-dropdown__item').forEach((item) => {
+          if (item.classList && item.classList.contains('is-disabled')) return;
+          const t = visibleText(item);
+          if (!t || t === '请选择' || seen.has(t)) return;
+          seen.add(t);
+          options.push(t);
+        });
+      }
+      // Also try Vue options on the focused select
+      try {
+        const selectEl = open && open.closest ? open.closest('.el-select') : null;
+        const vm = selectEl && selectEl.__vue__;
+        const ingest = (arr) => {
+          if (!arr) return;
+          const values = Array.isArray(arr) ? arr
+            : (typeof arr.values === 'function' ? [...arr.values()] : Object.values(arr));
+          for (const o of values) {
+            let t = '';
+            if (typeof o === 'string' || typeof o === 'number') t = String(o);
+            else if (o) t = String(o.label ?? o.currentLabel ?? (o.$props && o.$props.label) ?? o.value ?? '');
+            t = t.replace(/\s+/g, ' ').trim();
+            if (!t || t === '请选择' || seen.has(t)) continue;
+            seen.add(t);
+            options.push(t);
+          }
+        };
+        if (vm) {
+          ingest(vm.options);
+          ingest(vm.cachedOptions);
+          ingest(vm.$data && vm.$data.options);
+        }
+      } catch (e) {}
       emit({
         kind: 'select_option',
         label_text: label,
         option_text: optionText,
+        options: options,
         xpath: xpathOf(opt),
         tag: 'li',
         attributes: attrs(opt),

@@ -58,7 +58,9 @@ Node.js Express (server.mjs)
   ├─ Product recording (preferred)
   │     /api/v2/trajectories/*  record/prepare|start|stop, stream/detach, manual-record, attach|detach
   │     → executor session (USE_EXECUTOR) or local browser session
-  ├─ Product replay
+  ├─ Product replay (supported)
+  │     /api/v2/trajectories/:id/steps/replay → live replay_actions → _replay.py
+  ├─ Assembled full replay (DEPRECATED engineering asset)
   │     /api/v2/trajectories/:id/replay/*  → assemble (server-side) → script-runner
   ├─ Session debug (engineering; secondary)
   │     POST /api/browser/session (+ /step, …)
@@ -89,7 +91,9 @@ Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps
 |--------|------|
 | `src/runtime/script-runner.js` | Shared Playwright execute (test-run + replay) |
 | `src/services/assemble-service.js` | action JSON → Playwright script |
-| `src/services/replay-service.js` | Trajectory replay orchestration (assembled JS **not** returned to clients) |
+| `src/services/replay-service.js` | **DEPRECATED** assembled Playwright replay (engineering asset) |
+| Live replay | `scripts/actions/_replay.py` via `/steps/replay` — **product-supported** |
+
 | `src/executor-slot-lease.js` | Executor slot exclusive leases until `detach` |
 | `src/executor-*.js` | Executor WS registry, session client, event hub |
 
@@ -152,5 +156,6 @@ Do **not** look for or restore OpenCode skill packages unless the user explicitl
 - **Re-query DOM** before each op — Vue may recreate dialogs/components.
 - **Recording vs detach** — `record/stop` ends recording status but **does not** free the executor slot; `POST .../stream/detach` stops BiB only (`remote_session`→`idle`, `live`→`draft`); `POST .../detach` closes Chrome + Python + slot.
 - **Multi-traj BiB** — Push identity is `remote_session.id`; bindings are 1:1 trajectory ↔ remote_session ↔ agent session. Detach/stream-detach are scoped per trajectory (no global singleton).
-- **Replay** — Server assembles Playwright script in memory/temp; clients get step progress + screenshots over `replay:*`, not the JS source.
+- **Replay (product)** — Attached/live `replay_actions` via `_replay.py` (`POST .../steps/replay`). Prefers recorded `xpath_smart`, then label/semantic, then `xpath_full`.
+- **Replay (deprecated)** — `/api/v2/trajectories/:id/replay/*` assembles Playwright + CTRL; kept runnable as an engineering asset, not product-supported. Assemble/test-run remain engineering APIs.
 - **Executor slots** — `EXECUTOR_CAPACITY` slots per node; control-plane lease until detach / node offline.

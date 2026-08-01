@@ -18,7 +18,10 @@ import inspect
 import re
 import sys
 
-from ._helpers import _wait_if_loading, _is_ok_result
+from ._helpers import (
+    _wait_if_loading,
+    _is_ok_result,
+)
 from ._js_snippets import (
     JS_FILL_FORM_FIELD,
     JS_FILL_DATE_FIELD,
@@ -27,6 +30,48 @@ from ._js_snippets import (
     JS_SELECT_TREE_OPTION,
     JS_CLICK_RADIO,
 )
+from scripts.feature_flags import relative_xpath_primary_enabled
+
+# Fill an input/textarea resolved by relative xpath (native setter for Element UI).
+_JS_FILL_BY_XPATH = r'''([xpath, val]) => {
+  if (!xpath) return 'xpath-empty';
+  let snap;
+  try {
+    snap = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+  } catch (e) {
+    return 'xpath-invalid';
+  }
+  const setFn = (t, v) => {
+    const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
+    setter.call(t, v);
+    t.setAttribute('value', v);
+    t.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: v }));
+    t.dispatchEvent(new Event('change', { bubbles: true }));
+    t.dispatchEvent(new Event('blur', { bubbles: true }));
+  };
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  let target = null;
+  for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+    const n = snap.snapshotItem(i);
+    if (!n || !isVis(n)) continue;
+    // If xpath hit el-select / date wrapper, prefer inner input.
+    const inner = (n.matches && (n.matches('input, textarea') ? n : null))
+      || n.querySelector?.('input:not([type="hidden"]), textarea');
+    target = inner || n;
+    break;
+  }
+  if (!target) return 'xpath-not-found';
+  if (target.disabled || target.readOnly) return 'field-disabled';
+  if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return 'xpath-not-input';
+  setFn(target, val == null ? '' : String(val));
+  return 'ok-xpath-smart';
+}'''
 
 
 # Form actions that auto-fill owns — replay via JS, not controller (avoids _ensure_scanned).
@@ -364,59 +409,247 @@ async def _replay_goto(page, params: dict) -> str:
     return 'ok'
 
 
-async def _replay_form_action(page, action_name: str, params: dict) -> str:
-    """One form field op using the same JS path as `_execute_round`."""
+def _element_xpath_smart(entry: dict | None) -> str:
+    """Prefer relative xpath_smart from recorded element / candidates / target."""
+    el = entry.get('element') if isinstance(entry, dict) and isinstance(entry.get('element'), dict) else {}
+    cands = el.get('candidates') if isinstance(el.get('candidates'), list) else []
+
+    def _cand(ctype: str) -> str:
+        for c in cands:
+            if isinstance(c, dict) and c.get('type') == ctype and c.get('value'):
+                return str(c['value']).strip()
+        return ''
+
+    smart = str(el.get('xpath_smart') or _cand('xpath_smart') or '').strip()
+    if smart.startswith('//') or smart.startswith('('):
+        return smart
+    target = str((entry or {}).get('target') or el.get('xpath') or '').strip()
+    if target.startswith('//') or target.startswith('('):
+        return target
+    return ''
+
+
+def _annotate_label_result(result: str) -> str:
+    """Make label-based success self-describing in replay logs."""
+    if not isinstance(result, str) or not result:
+        return result
+    if result == 'ok':
+        return 'ok-label'
+    if result.startswith('ok-') and 'label' not in result and 'xpath' not in result:
+        # ok-date / ok-placeholder / ok-already:… → keep suffix, mark label path
+        return f'ok-label:{result[3:]}' if result.startswith('ok-') else result
+    return result
+
+
+def _element_xpath_full(entry: dict | None) -> str:
+    """Absolute xpath fallback from recorded element / candidates."""
+    el = entry.get('element') if isinstance(entry, dict) and isinstance(entry.get('element'), dict) else {}
+    cands = el.get('candidates') if isinstance(el.get('candidates'), list) else []
+
+    def _cand(ctype: str) -> str:
+        for c in cands:
+            if isinstance(c, dict) and c.get('type') == ctype and c.get('value'):
+                return str(c['value']).strip()
+        return ''
+
+    full = str(el.get('xpath_full') or el.get('xpath_abs') or _cand('xpath_full') or '').strip()
+    if full.startswith('/') or full.startswith('('):
+        return full
+    return ''
+
+
+# Click / focus a control resolved by xpath (returns ok-xpath-smart when found).
+_JS_LOCATE_BY_XPATH = r'''([xpath]) => {
+  if (!xpath) return 'xpath-empty';
+  let snap;
+  try {
+    snap = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+  } catch (e) {
+    return 'xpath-invalid';
+  }
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+    const n = snap.snapshotItem(i);
+    if (n && isVis(n)) return 'ok-xpath-smart';
+  }
+  return 'xpath-not-found';
+}'''
+
+
+async def _try_xpath_locate(page, xpath: str) -> bool:
+    if not xpath:
+        return False
+    result = await page.evaluate(_JS_LOCATE_BY_XPATH, [xpath])
+    return isinstance(result, str) and result.startswith('ok')
+
+
+async def _replay_form_action(page, action_name: str, params: dict, entry: dict | None = None) -> str:
+    """One form field op using the same JS path as `_execute_round`.
+
+    Locator order when RELATIVE_XPATH_PRIMARY:
+      1) xpath_smart
+      2) label/semantic
+      3) xpath_full
+    """
     label = str(params.get('label_text') or '')
     value = str(params.get('value') or params.get('option_text') or '')
+    use_relative = relative_xpath_primary_enabled()
+    xpath_smart = _element_xpath_smart(entry) if use_relative else ''
+    xpath_full = _element_xpath_full(entry) if use_relative else ''
 
     await _wait_if_loading(page)
 
     if action_name == 'fill_form_field':
+        if xpath_smart:
+            result = await page.evaluate(_JS_FILL_BY_XPATH, [xpath_smart, value])
+            if isinstance(result, str) and result.startswith('ok'):
+                await page.wait_for_timeout(300)
+                return str(result)
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
-        await page.wait_for_timeout(300)
-        return str(result)
+        if isinstance(result, str) and result.startswith('ok'):
+            await page.wait_for_timeout(300)
+            return _annotate_label_result(str(result))
+        if xpath_full:
+            result = await page.evaluate(_JS_FILL_BY_XPATH, [xpath_full, value])
+            if isinstance(result, str) and result.startswith('ok'):
+                await page.wait_for_timeout(300)
+                return 'ok-xpath-full'
+        return _annotate_label_result(str(result))
+
+    # Widget ops: prefer confirming xpath_smart host, then label JS, then xpath_full confirm.
+    async def _with_xpath_first(label_js_coro):
+        located_smart = await _try_xpath_locate(page, xpath_smart) if xpath_smart else False
+        result = await label_js_coro()
+        if isinstance(result, str) and result.startswith('ok'):
+            if located_smart:
+                # Prefer truthful xpath_smart when the stored locator still resolves
+                return 'ok-xpath-smart' if result == 'ok' else f'ok-xpath-smart:{result[3:]}'
+            return _annotate_label_result(str(result))
+        if xpath_full and await _try_xpath_locate(page, xpath_full):
+            result2 = await label_js_coro()
+            if isinstance(result2, str) and result2.startswith('ok'):
+                return 'ok-xpath-full' if result2 == 'ok' else f'ok-xpath-full:{result2[3:]}'
+        return _annotate_label_result(str(result))
 
     if action_name == 'fill_date_field':
-        result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
-        await page.wait_for_timeout(300)
-        return str(result)
+        async def _date():
+            r = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
+            await page.wait_for_timeout(300)
+            return r
+        return await _with_xpath_first(_date)
 
     if action_name == 'select_tree_option':
-        result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
-        await page.wait_for_timeout(500)
-        return str(result)
+        async def _tree():
+            r = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
+            await page.wait_for_timeout(500)
+            return r
+        return await _with_xpath_first(_tree)
 
     if action_name == 'click_radio':
-        result = await page.evaluate(JS_CLICK_RADIO, [label, value])
-        await page.wait_for_timeout(300)
-        return str(result)
+        async def _radio():
+            r = await page.evaluate(JS_CLICK_RADIO, [label, value])
+            await page.wait_for_timeout(300)
+            return r
+        return await _with_xpath_first(_radio)
 
     if action_name == 'select_option':
-        already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
-        if isinstance(already, str) and already.startswith('ok-already:'):
-            cur_val = already.split(':', 1)[1]
-            if cur_val == value or value in cur_val or cur_val in value:
-                await page.wait_for_timeout(200)
-                return already
+        # Recorded selection is authoritative — replay MUST pick the same option_text.
+        # params.options / element.options are inventory for export & downstream products
+        # (reference only; never used to substitute a different value).
+        pick = str(value or '').strip()
 
-        await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-        await page.wait_for_timeout(350)
-        result = await page.evaluate(JS_SELECT_OPTION, value)
-        if isinstance(result, str) and result.startswith('option-not-found:'):
-            result = await page.evaluate(JS_SELECT_OPTION, 'first')
-        if isinstance(result, str) and result.startswith('ok'):
-            confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-            if not (isinstance(confirmed, str) and confirmed.startswith('ok-confirmed:')):
-                await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
-                await page.wait_for_timeout(200)
-                confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                if isinstance(confirmed2, str) and confirmed2.startswith('ok-confirmed:'):
-                    result = confirmed2
-        await page.wait_for_timeout(500)
-        return str(result)
+        async def _select():
+            if not pick:
+                return 'error:missing-option_text'
+
+            already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
+            if isinstance(already, str) and already.startswith('ok-already:'):
+                cur_val = already.split(':', 1)[1].strip()
+                # Exact match only — do not accept a different label as "already done"
+                if cur_val == pick:
+                    await page.wait_for_timeout(200)
+                    return already
+
+            # Close leftover poppers (same as live select_option)
+            await page.evaluate('''() => {
+                document.querySelectorAll('.el-select-dropdown:not(.is-hidden)').forEach(dd => {
+                    dd.style.display = 'none';
+                    dd.classList.add('is-hidden');
+                });
+                document.body.click();
+            }''')
+            await page.wait_for_timeout(100)
+
+            trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+            if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled'):
+                return str(trigger_result)
+
+            # Wait for dropdown items (remote dict / drawer mount); still pick `pick` only
+            result = 'no-items'
+            for attempt in range(3):
+                await page.wait_for_timeout(500 if attempt == 0 else 400)
+                result = await page.evaluate(JS_SELECT_OPTION, [pick, True])
+                if isinstance(result, str) and result.startswith('ok'):
+                    break
+                if isinstance(result, str) and result.startswith('option-not-found:'):
+                    break
+                if result != 'no-items':
+                    break
+                await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+
+            if isinstance(result, str) and result.startswith('ok'):
+                got = result.split(':', 1)[1].strip() if ':' in result else ''
+                # JS_SELECT_OPTION may includes()-match; reject drift from recorded value
+                if got and got != pick:
+                    return f'option-mismatch:want={pick}|got={got}'
+                confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                if isinstance(confirmed, str) and confirmed.startswith('ok-confirmed:'):
+                    cur = confirmed.split(':', 1)[1].strip()
+                    if cur and cur != pick:
+                        return f'option-mismatch:want={pick}|got={cur}'
+                elif not (isinstance(confirmed, str) and confirmed.startswith('ok-confirmed:')):
+                    # Force native path with exact recorded text, then re-check
+                    await page.evaluate(JS_FILL_FORM_FIELD, [label, pick])
+                    await page.wait_for_timeout(200)
+                    confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                    if isinstance(confirmed2, str) and confirmed2.startswith('ok-confirmed:'):
+                        cur = confirmed2.split(':', 1)[1].strip()
+                        if cur != pick:
+                            return f'option-mismatch:want={pick}|got={cur}'
+                        result = confirmed2
+                    else:
+                        return f'option-not-synced:want={pick}|confirm={confirmed2}'
+            # no-items / option-not-found / other → fail as-is (never pick "first")
+            await page.wait_for_timeout(500)
+            return result
+        return await _with_xpath_first(_select)
 
     return f'unknown-form-action:{action_name}'
 
+
+def _locate_hint(result: str) -> str:
+    """Human-readable locate strategy for replay stderr logs."""
+    r = str(result or '')
+    if 'xpath-smart' in r or r.startswith('ok-xpath-smart'):
+        return 'xpath_smart'
+    if 'xpath-full' in r or r.startswith('ok-xpath-full'):
+        return 'xpath_full'
+    if r.startswith('ok-playwright'):
+        return 'playwright'
+    if r.startswith('ok-label') or r.startswith('ok-already') or r.startswith('ok-confirmed'):
+        return 'label'
+    if r.startswith('ok-menu') or r.startswith('ok-submenu') or 'menu' in r:
+        return 'semantic'
+    if r.startswith('ok-text') or 'text' in r:
+        return 'semantic'
+    if r.startswith('ok'):
+        return 'ok'
+    return 'n/a'
 
 async def _replay_controller_action(act, params: dict) -> str:
     """Non-form actions via controller registry (menu/table/dialog/login/…)."""
@@ -468,14 +701,39 @@ async def replay_action_entries(
                     result = await _replay_goto(page, params)
                 elif action_name == _CLICK_BY_INDEX:
                     result = await _replay_click_by_index(page, entry, params)
-                elif action_name == 'click_menu_item':
-                    menu_params = {
-                        **params,
-                        'text': params.get('menu_text') or params.get('text') or '',
-                    }
-                    result = await _replay_click_by_index(page, entry, menu_params)
+                elif action_name in (
+                    'click_menu_item',
+                    'click_icon_button',
+                    'click_adjacent_button',
+                    'click_table_row_button',
+                    'click_table_row_radio',
+                    'switch_tab',
+                    'close_dialog',
+                ):
+                    # Prefer recorded xpath_smart via durable click path; fall back to controller.
+                    click_params = {**params}
+                    if action_name == 'click_menu_item':
+                        click_params['text'] = params.get('menu_text') or params.get('text') or ''
+                    elif action_name == 'click_icon_button':
+                        click_params['text'] = params.get('button_text') or params.get('text') or ''
+                    elif action_name == 'switch_tab':
+                        click_params['text'] = params.get('tab_name') or params.get('text') or ''
+                    elif action_name == 'click_table_row_button':
+                        click_params['text'] = params.get('button_text') or params.get('text') or ''
+                    elif action_name == 'click_adjacent_button':
+                        click_params['text'] = params.get('text') or params.get('label_text') or ''
+                    if _element_xpath_smart(entry) or click_params.get('text'):
+                        result = await _replay_click_by_index(page, entry, click_params)
+                    else:
+                        act = (controller_actions or {}).get(action_name)
+                        if not act:
+                            result = f'unknown-action:{action_name}'
+                        else:
+                            result = await _replay_controller_action(act, params)
+                            await page.wait_for_timeout(400)
+                            await _wait_if_loading(page)
                 elif action_name in _FORM_ACTIONS:
-                    result = await _replay_form_action(page, action_name, params)
+                    result = await _replay_form_action(page, action_name, params, entry)
                 else:
                     act = (controller_actions or {}).get(action_name)
                     if not act:
@@ -493,18 +751,20 @@ async def replay_action_entries(
             else:
                 fail_count += 1
 
+            locate = _locate_hint(result)
             row = {
                 'index': step_num,
                 'action': action_name,
                 'params': params,
                 'result': result,
                 'ok': ok,
+                'locate': locate,
             }
             if entry.get('id') is not None:
                 row['id'] = entry.get('id')
             results.append(row)
             sys.stderr.write(
-                f'[replay] [{step_num}/{total}] {"OK" if ok else "FAIL"} → {result}\n'
+                f'[replay] [{step_num}/{total}] {"OK" if ok else "FAIL"} → {result} | locate={locate}\n'
             )
             sys.stderr.flush()
 
@@ -519,6 +779,7 @@ async def replay_action_entries(
                             'params': params,
                             'result': result,
                             'ok': ok,
+                            'locate': locate,
                             'id': entry.get('id'),
                         },
                     })

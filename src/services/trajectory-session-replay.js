@@ -182,7 +182,9 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
         message: String(failResult),
       });
 
-      const instruction = buildStepHealInstruction(failedEntry, failResult);
+      const instruction = buildStepHealInstruction(failedEntry, failResult, {
+        nextEntry: actions[failedAbsIndex + 1] || null,
+      });
       try {
         await runHealStep(runtime, instruction);
         await markConsumedActionLog(runtime);

@@ -37,6 +37,11 @@ export const API_OVERRIDE_SCOPES = Object.freeze(['global', 'system', 'process',
 /** @type {readonly LocatorCandidateType[]} */
 export const LOCATOR_CANDIDATE_TYPES = Object.freeze(['css', 'xpath_full', 'xpath_smart']);
 
+/** @typedef {'xpath_smart'|'xpath_full'} LocatorStrategy */
+
+/** @type {readonly LocatorStrategy[]} */
+export const LOCATOR_STRATEGIES = Object.freeze(['xpath_smart', 'xpath_full']);
+
 /** @type {readonly ExecutorNodeStatus[]} */
 export const EXECUTOR_NODE_STATUSES = Object.freeze(['online', 'draining', 'offline']);
 

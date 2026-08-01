@@ -444,14 +444,18 @@ export default function (app) {
   });
 
   /**
-   * Resolve Element UI form control by label_text on attached BiB page.
-   * Body: { labelText: string }
-   * Returns { element, matchedLabel } for writing trajectory_step.element_json.
+   * Resolve Element UI control by label_text / actionType+params on attached BiB page.
+   * Body: { labelText?, actionType?, params? }
+   * Returns { element, matchedLabel } or { ambiguous:true, matches:[] }.
    */
   app.post('/api/v2/trajectories/:id/resolve-element', async (req, res) => {
     try {
-      const labelText = req.body?.labelText ?? req.body?.label_text ?? '';
-      const result = await trajectoryService.resolveTrajectoryElement(+req.params.id, { labelText });
+      const body = req.body || {};
+      const result = await trajectoryService.resolveTrajectoryElement(+req.params.id, {
+        labelText: body.labelText ?? body.label_text ?? '',
+        actionType: body.actionType ?? body.action ?? '',
+        params: body.params || {},
+      });
       res.json(result);
     } catch (err) {
       sendErr(res, err);
@@ -500,7 +504,7 @@ export default function (app) {
       const row = await trajectoryService.createTrajectoryStep(req.body || {});
       res.status(201).json(row);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message, code: err.code });
     }
   });
 
@@ -510,7 +514,7 @@ export default function (app) {
       if (!row) return res.status(404).json({ error: 'Trajectory step not found' });
       res.json(row);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message, code: err.code });
     }
   });
 

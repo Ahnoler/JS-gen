@@ -15,7 +15,7 @@
 | 能力 | 说明 |
 |------|------|
 | **产品录制** | `/api/v2/trajectories/*`：`record/prepare\|start\|stop`、`manual-record`、`attach` / `detach` |
-| **产品回放** | `/api/v2/trajectories/:id/replay/*`：服务端组装脚本，WS 推送 `replay:*`（**不向客户端返回 JS 源码**） |
+| **产品回放** | `/api/v2/trajectories/:id/steps/replay`：附着会话内 live `replay_actions`（`_replay.py`）。`/replay/*` 组装 Playwright 全量回放已**弃用**（工程资产，仍可跑） |
 | **系统树** | `/api/v2/system-mgmt/*`：系统 → 模块 → 功能（+ 账号）；交易挂在功能下 |
 | **执行机** | `npm run executor` → WS `/ws/executor`；槽位租约至 `detach`（`EXECUTOR_CAPACITY`） |
 | **Session 调试** | `/api/browser/session` — 工程调试路径，非整条产品录制主线 |
@@ -94,7 +94,8 @@ Node.js Express (server.mjs, :4097)
  │     /api/v2/trajectories/*  record/*, manual-record, attach|detach
  │     → USE_EXECUTOR ? 执行机会话 : 本地 browser session
  ├─ 产品回放
- │     /api/v2/trajectories/:id/replay/* → assemble-service → script-runner
+ │     /api/v2/trajectories/:id/steps/replay → live replay_actions (_replay.py)
+ │     /api/v2/trajectories/:id/replay/* → DEPRECATED assemble → script-runner
  ├─ Session 调试（工程次要）
  │     /api/browser/session (+ /step, …)
  └─ 工程组装 / 运行
@@ -179,10 +180,11 @@ Node.js Express (server.mjs, :4097)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/v2/trajectories/:id/replay/prepare` | 服务端组装；返回 `replayPlanId` + 步骤映射，**不含脚本正文** |
-| `POST` | `/api/v2/trajectories/:id/replay/start\|stop` | 启动 / 停止 |
-| `GET` | `/api/v2/trajectories/:id/replay/latest` | 最近一次回放状态 |
-| WS | `/ws` | 事件前缀 `replay:*`（step / screenshot / result） |
+| `POST` | `/api/v2/trajectories/:id/steps/replay` | **产品支持**：附着会话内 live `replay_actions`（`_replay.py`） |
+| `POST` | `/api/v2/trajectories/:id/replay/prepare` | **已弃用** 组装 Playwright；返回 `replayPlanId`，**不含脚本正文** |
+| `POST` | `/api/v2/trajectories/:id/replay/start\|stop` | **已弃用** 启动 / 停止全量组装回放 |
+| `GET` | `/api/v2/trajectories/:id/replay/latest` | **已弃用** 最近一次组装回放状态 |
+| WS | `/ws` | 组装回放事件前缀 `replay:*`（工程资产） |
 
 ### 执行机 / 案例
 

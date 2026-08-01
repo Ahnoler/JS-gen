@@ -1,6 +1,11 @@
 /**
  * ctrl-actions.js — Canonical source for window.CTRL (replay / assemble).
  *
+ * @deprecated For product replay prefer live `_replay.py`. CTRL remains the
+ * engineering injection surface for assemble/test-run and the deprecated
+ * `/api/v2/trajectories/:id/replay/*` path. Keep name-level parity with
+ * Python cues via `node scripts/characterize-ctrl.mjs`.
+ *
  * `CTRL_OBJECT` + `getInjectionCode()` are the single source of truth for the
  * CTRL.* surface injected into Playwright scripts. Agent-side duplicates live
  * in scripts/actions/_js_snippets.py and inline evaluate in actions/*.py —

@@ -384,14 +384,19 @@ export class BibBridge {
   }
 
   /**
-   * Resolve Element UI control by form label via CDP.
+   * Resolve Element UI control by form label / actionType+params via CDP.
    * @param {string} labelText
+   * @param {{ actionType?: string, params?: object }} [opts]
    */
-  async resolveByLabel(labelText) {
+  async resolveByLabel(labelText, opts = {}) {
     if (!this.client || this._disposed) {
       throw new Error('BiB not attached');
     }
-    return resolveElementByLabel(this.client, labelText);
+    return resolveElementByLabel(this.client, {
+      labelText,
+      actionType: opts.actionType || opts.action || '',
+      params: opts.params || {},
+    });
   }
 
   async detach() {

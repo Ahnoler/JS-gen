@@ -6,7 +6,7 @@
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
-import { NODE_TYPE, isRootParentId } from '../models/hierarchy-constants.js';
+import { NODE_TYPE, isRootParentId, isRootNodeId } from '../models/hierarchy-constants.js';
 
 /** Build agent login instruction (aligned with Dashboard session-mode login).
  * Prefer system.url；兼容旧数据回退 account.loginUrl。
@@ -28,6 +28,48 @@ export function buildLoginInstruction(account = {}, system = {}) {
 }
 
 /**
+ * Climb function → module → … until owning system (type=1), or the top-level
+ * node hanging under 根 (parent_id=0). Tolerates mislabeled types from older data.
+ * @param {number} startId
+ * @returns {Promise<{ system: object|null, chain: object[] }>}
+ */
+export async function resolveOwningSystem(startId) {
+  const sid = Number(startId);
+  if (!Number.isFinite(sid)) return { system: null, chain: [] };
+
+  let cur = await systemDao.getById(sid);
+  const guard = new Set();
+  const chain = [];
+
+  while (cur && !guard.has(Number(cur.id))) {
+    guard.add(Number(cur.id));
+    chain.push(cur);
+
+    if (isRootNodeId(cur.id) || Number(cur.type) === NODE_TYPE.ROOT) {
+      // Should not treat 根 itself as a login system
+      cur = null;
+      break;
+    }
+    if (Number(cur.type) === NODE_TYPE.SYSTEM) break;
+    // Top-level under 根 — product treats this as the owning system node
+    // (even if type was historically mislabeled as 模块)
+    if (isRootParentId(cur.parentId)) break;
+
+    const pid = Number(cur.parentId);
+    if (!Number.isFinite(pid)) {
+      cur = null;
+      break;
+    }
+    cur = await systemDao.getById(pid);
+  }
+
+  if (!cur || isRootNodeId(cur.id) || Number(cur.type) === NODE_TYPE.ROOT) {
+    return { system: null, chain };
+  }
+  return { system: cur, chain };
+}
+
+/**
  * Resolve owning system + accounts for a trajectory (via function_id ancestry).
  * @returns {Promise<{ trajectoryId, functionId, system: object|null, accounts: object[] }>}
  */
@@ -40,65 +82,89 @@ export async function getTrajectoryLoginContext(trajectoryId) {
     throw err;
   }
   const functionId = traj.functionId != null ? Number(traj.functionId) : null;
+  const systemAccountId = traj.systemAccountId != null ? Number(traj.systemAccountId) : null;
+
   if (!Number.isFinite(functionId)) {
+    // No function binding — still try account → system so UI can list siblings
+    if (Number.isFinite(systemAccountId) && systemAccountId > 0) {
+      const viaAccount = await _systemFromAccount(systemAccountId);
+      if (viaAccount) {
+        const accounts = await _accountsForSystem(viaAccount);
+        return {
+          trajectoryId: tid,
+          functionId: null,
+          systemAccountId,
+          system: _shapeSystem(viaAccount),
+          accounts,
+        };
+      }
+    }
     return {
       trajectoryId: tid,
       functionId: null,
-      systemAccountId: traj.systemAccountId != null ? Number(traj.systemAccountId) : null,
+      systemAccountId: Number.isFinite(systemAccountId) ? systemAccountId : null,
       system: null,
       accounts: [],
       error: 'Trajectory has no functionId — bind to a function node under a system first',
     };
   }
 
-  let cur = await systemDao.getById(functionId);
-  const guard = new Set();
-  while (cur && !guard.has(cur.id)) {
-    guard.add(cur.id);
-    if (Number(cur.type) === NODE_TYPE.SYSTEM) break;
-    if (isRootParentId(cur.parentId)) {
-      cur = null;
-      break;
-    }
-    cur = await systemDao.getById(cur.parentId);
+  let { system } = await resolveOwningSystem(functionId);
+
+  // Fallback: bound account's system_id (same path prepare/login already uses)
+  if (!system && Number.isFinite(systemAccountId) && systemAccountId > 0) {
+    system = await _systemFromAccount(systemAccountId);
   }
 
-  if (!cur || Number(cur.type) !== NODE_TYPE.SYSTEM) {
+  if (!system) {
     return {
       trajectoryId: tid,
       functionId,
-      systemAccountId: traj.systemAccountId != null ? Number(traj.systemAccountId) : null,
+      systemAccountId: Number.isFinite(systemAccountId) ? systemAccountId : null,
       system: null,
       accounts: [],
       error: 'Could not resolve system for function',
     };
   }
 
-  const accounts = (await systemAccountDao.listBySystem(cur.id)).map((a) => ({
+  const accounts = await _accountsForSystem(system);
+  return {
+    trajectoryId: tid,
+    functionId,
+    systemAccountId: Number.isFinite(systemAccountId) ? systemAccountId : null,
+    system: _shapeSystem(system),
+    accounts,
+  };
+}
+
+function _shapeSystem(cur) {
+  return {
+    id: cur.id,
+    name: cur.name,
+    uid: cur.uid || cur.systemId,
+    description: cur.description || null,
+    url: cur.url || '',
+  };
+}
+
+async function _systemFromAccount(accountId) {
+  const account = await systemAccountDao.getById(accountId);
+  if (!account?.systemId) return null;
+  const sys = await systemDao.getById(account.systemId);
+  if (!sys || isRootNodeId(sys.id) || Number(sys.type) === NODE_TYPE.ROOT) return null;
+  return sys;
+}
+
+async function _accountsForSystem(cur) {
+  return (await systemAccountDao.listBySystem(cur.id)).map((a) => ({
     id: a.id,
     name: a.name,
-    // Prefer system.url；账号上旧 loginUrl 仅作兼容回退
     loginUrl: a.loginUrl || cur.url || '',
     username: a.username || '',
-    // password returned for self-use recording console (same as hierarchy tree)
     password: a.password || '',
     remark: a.remark || null,
     sortOrder: a.sortOrder ?? 0,
   }));
-
-  return {
-    trajectoryId: tid,
-    functionId,
-    systemAccountId: traj.systemAccountId != null ? Number(traj.systemAccountId) : null,
-    system: {
-      id: cur.id,
-      name: cur.name,
-      uid: cur.uid || cur.systemId,
-      description: cur.description || null,
-      url: cur.url || '',
-    },
-    accounts,
-  };
 }
 
 /**

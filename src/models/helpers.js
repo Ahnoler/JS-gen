@@ -2,51 +2,36 @@
  * Convert a step/action record to trajectory_step.element_json shape.
  */
 import { normalizeActionName } from './action-name.js';
+import {
+  hasUsableLocator,
+  isSingleTargetAction,
+  prepareElementJson,
+  toElementJson,
+} from './element.js';
 
 export { normalizeActionName } from './action-name.js';
+export {
+  hasUsableLocator,
+  isSingleTargetAction,
+  prepareElementJson,
+  toElementJson,
+  SINGLE_TARGET_ACTIONS,
+  LOCATOR_EXEMPT_ACTIONS,
+} from './element.js';
 
 /**
  * @param {import('./entities.js').ElementJson|Record<string, unknown>|null|undefined} element
+ * @param {{ actionType?: string, params?: object|null, requireUsable?: boolean }} [opts]
  * @returns {import('./entities.js').ElementJson|null}
  */
-export function normalizeElementJson(element) {
+export function normalizeElementJson(element, opts = {}) {
   if (!element || typeof element !== 'object') return null;
-
-  const el = /** @type {Record<string, unknown>} */ ({ ...element });
-  const candidates = Array.isArray(el.candidates)
-    ? el.candidates.map((c) => ({
-      type: c.type,
-      value: c.value ?? '',
-    }))
-    : [];
-  const xpathSmart = String(
-    el.xpath_smart
-    || candidates.find((c) => c?.type === 'xpath_smart')?.value
-    || '',
-  );
-  const xpathFull = String(
-    el.xpath_full
-    || el.xpath_abs
-    || candidates.find((c) => c?.type === 'xpath_full')?.value
-    || '',
-  );
-  const primaryXpath = xpathSmart || el.xpath || el.target || xpathFull || '';
-
-  const normalized = {
-    tag: el.tag ?? el.tagName ?? '',
-    xpath: primaryXpath,
-    cssSelector: el.cssSelector ?? el.css_selector ?? '',
-    attributes: el.attributes && typeof el.attributes === 'object' ? el.attributes : {},
-    text: el.text ?? '',
-  };
-  if (xpathSmart) normalized.xpath_smart = xpathSmart;
-  if (xpathFull) {
-    normalized.xpath_full = xpathFull;
-    normalized.xpath_abs = xpathFull;
-  }
-  if (candidates.length) normalized.candidates = candidates;
-
-  return normalized;
+  return prepareElementJson({
+    element,
+    actionType: opts.actionType || '',
+    params: opts.params || null,
+    requireUsable: !!opts.requireUsable,
+  });
 }
 
 /**
@@ -61,11 +46,16 @@ export function normalizeElementJson(element) {
  */
 export function stepFromActionLog(step, context = {}) {
   const action = normalizeActionName(step.action ?? step.actionType ?? '');
-  const element = step.element ?? {
+  const params = step.params ?? null;
+  const rawElement = step.element ?? {
     tag: step.tagName,
     xpath: step.target,
     cssSelector: step.cssSelector,
     attributes: step.attributes,
+    text: step.text,
+    xpath_smart: step.xpath_smart,
+    xpath_full: step.xpath_full,
+    candidates: step.candidates,
   };
 
   return {
@@ -74,8 +64,8 @@ export function stepFromActionLog(step, context = {}) {
     phaseNumber: context.phaseNumber ?? step.phaseNumber ?? step.phase ?? 0,
     actionIndex: step.actionIndex ?? 0,
     actionType: action,
-    params: step.params ?? null,
-    element: normalizeElementJson(element),
+    params,
+    element: normalizeElementJson(rawElement, { actionType: action, params }),
     success: step.success ?? null,
     error: step.error ?? null,
     extractedContent: step.result ?? step.extractedContent ?? '',

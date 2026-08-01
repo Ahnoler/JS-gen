@@ -83,7 +83,18 @@ async def capture_page_png_b64(browser_context, *, full_page: bool = True) -> st
         page = await browser_context.get_current_page()
         if page is None:
             return None
-        png = await page.screenshot(full_page=full_page, type='png')
+        return await capture_page_png_b64_from_page(page, full_page=full_page)
+    except Exception:
+        return None
+
+
+async def capture_page_png_b64_from_page(page, *, full_page: bool = True) -> str | None:
+    """Screenshot from an existing page/handle (auto-fill already holds ``page``)."""
+    if not capture_screenshots_enabled() or page is None:
+        return None
+    try:
+        target = getattr(page, 'page', page)
+        png = await target.screenshot(full_page=full_page, type='png')
         if not png:
             return None
         return base64.b64encode(png).decode('ascii')
@@ -109,6 +120,32 @@ def emit_step_screenshot(entry_id: str, before_b64: str | None, after_b64: str |
         })
     except ImportError:
         pass
+
+
+async def record_action_with_screenshots(
+    page,
+    action_name,
+    params,
+    result,
+    element=None,
+    source=None,
+    *,
+    before_b64: str | None = None,
+):
+    """_record_action + after shot + step_screenshot (for paths that bypass controller.action).
+
+    Pass ``before_b64`` captured before the DOM mutation when possible.
+    """
+    after_b64 = None
+    if capture_screenshots_enabled():
+        try:
+            after_b64 = await capture_page_png_b64_from_page(page)
+        except Exception:
+            after_b64 = None
+    entry = _record_action(action_name, params, result, element=element, source=source)
+    if isinstance(entry, dict) and entry.get('id'):
+        emit_step_screenshot(str(entry['id']), before_b64, after_b64)
+    return entry
 
 
 def _emit_action_log_sync(removed_ids=None):

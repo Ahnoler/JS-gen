@@ -3,6 +3,11 @@
 """
 Playwright script assembler.
 
+DEPRECATED for product replay: prefer live scripts/actions/_replay.py
+(replay_actions). This assembler + CTRL injection remains an engineering
+asset (test/assemble, legacy /replay/*) and must not be functionally removed
+without an explicit migration.
+
 Reads an action JSON file (with {action, params, element} entries) and generates
 a Playwright JS script with proper CTRL helpers for Element UI components.
 

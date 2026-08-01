@@ -39,18 +39,22 @@ export function buildStepsFromFlow(flow, { source = 'agent' } = {}) {
   if (!Array.isArray(flow)) return [];
   return flow
     .filter((s) => s.type && s.type !== 'done')
-    .map((s, i) => ({
-      stepNumber: s.stepNumber || i + 1,
-      phaseNumber: s.phaseNumber ?? 0,
-      actionIndex: s.actionIndex ?? 0,
-      actionType: s.type,
-      params: s.params || null,
-      element: s.element || null,
-      success: s.success ?? null,
-      error: s.error || null,
-      extractedContent: s.extractedContent || '',
-      source,
-    }));
+    .map((s, i) => stepFromActionLog(
+      {
+        action: s.type,
+        params: s.params || null,
+        element: s.element || null,
+        success: s.success ?? null,
+        error: s.error || null,
+        result: s.extractedContent || '',
+        source: s.source || source,
+      },
+      {
+        stepNumber: s.stepNumber || i + 1,
+        phaseNumber: s.phaseNumber ?? 0,
+        source: s.source || source,
+      },
+    ));
 }
 
 /**

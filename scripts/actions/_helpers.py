@@ -14,8 +14,91 @@ from ._js_snippets import (
     JS_CHECK_LOADING, JS_WAIT_LOADING,
     JS_SMART_LOCATOR,
     JS_ENRICH_CLICK_LOCATOR,
+    JS_READ_SELECT_OPTIONS,
 )
 from ..models import ScannedField
+
+_SELECT_OPTION_PLACEHOLDERS = frozenset({'请选择', '请选择…', '请选择...', ''})
+
+
+def normalize_select_options(raw) -> list[str]:
+    """Dedupe / clean option label lists for params.options / element.options."""
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        s = str(item).strip() if item is not None else ''
+        if not s or s in _SELECT_OPTION_PLACEHOLDERS or s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
+
+
+def options_from_scan_store(case_data_store: dict | None, label: str) -> list[str]:
+    """Pull previously scanned options for a label from case_data_store."""
+    if not case_data_store or not label:
+        return []
+    for f in case_data_store.get('_scan_fields') or []:
+        if isinstance(f, dict) and f.get('label') == label:
+            opts = normalize_select_options(f.get('options') or [])
+            if opts:
+                return opts
+    tl = case_data_store.get('task_list') or {}
+    if isinstance(tl, dict):
+        for bucket in ('pending', 'done'):
+            for item in tl.get(bucket) or []:
+                if isinstance(item, dict) and item.get('label') == label:
+                    opts = normalize_select_options(item.get('options') or [])
+                    if opts:
+                        return opts
+    return []
+
+
+def attach_select_options(params: dict | None, element, options) -> tuple[dict, object]:
+    """Merge option list into action params and element snapshot (if any)."""
+    opts = normalize_select_options(options)
+    p = dict(params) if params else {}
+    if not opts:
+        return p, element
+    p['options'] = opts
+    if isinstance(element, dict):
+        el = dict(element)
+        el['options'] = opts
+        return p, el
+    return p, element
+
+
+async def read_select_options(page, label_text: str) -> list[str]:
+    """Live-read el-select option labels (Vue + open dropdown)."""
+    try:
+        raw = await page.evaluate(JS_READ_SELECT_OPTIONS, [label_text or ''])
+        return normalize_select_options(raw if isinstance(raw, list) else [])
+    except Exception:
+        return []
+
+
+def resolve_option_against_list(want: str, options: list[str] | None) -> str:
+    """Map a desired label onto a catalog list (recording / agent assist only).
+
+    Replay must NOT use this to change option_text — recorded value is authoritative;
+    ``options`` is export/reference inventory for other products.
+    """
+    w = (want or '').strip()
+    opts = normalize_select_options(options or [])
+    if not w or not opts:
+        return w
+    if w in opts:
+        return w
+    for o in opts:
+        if w in o or o in w:
+            return o
+    if w in ('中国', '中国大陆'):
+        for o in opts:
+            if '中国' in o:
+                return o
+    return w
 
 
 def _ok(msg, include_in_memory: bool = False):
@@ -126,50 +209,76 @@ async def _wait_if_loading(page):
     await dismiss_https_first_interstitial(page)
 
 
-async def _capture_element(page, label_text):
-    """Capture element info for a labeled form field."""
+async def _capture_element(page, label_text, *, target_kind=''):
+    """Capture element info for a labeled form field (pre-mutation)."""
     result = {}
     try:
         raw = await page.evaluate(JS_SMART_LOCATOR, [label_text])
         if raw:
             info = json.loads(raw) if isinstance(raw, str) else raw
-            if info.get('xpath'):
-                result['xpath'] = info['xpath']
-                result['css_selector'] = info.get('css_sel', '')
-                result['tag_name'] = info.get('tag', 'input')
-                result['attributes'] = info.get('attrs', {})
+            if not isinstance(info, dict):
+                return None
+            if info.get('xpath') or info.get('xpath_smart') or info.get('xpath_full'):
+                result = {
+                    'xpath': info.get('xpath') or info.get('xpath_smart') or info.get('xpath_full') or '',
+                    'css_selector': info.get('css_sel') or info.get('css_selector') or info.get('cssSelector') or '',
+                    'tag_name': info.get('tag') or info.get('tag_name') or 'input',
+                    'attributes': info.get('attrs') or info.get('attributes') or {},
+                    'text': info.get('text') or '',
+                    'xpath_smart': info.get('xpath_smart') or '',
+                    'xpath_full': info.get('xpath_full') or info.get('xpath_abs') or '',
+                    'xpath_abs': info.get('xpath_abs') or info.get('xpath_full') or '',
+                    'candidates': info.get('candidates') if isinstance(info.get('candidates'), list) else [],
+                    'formLabel': info.get('formLabel') or label_text or '',
+                    'target_kind': info.get('target_kind') or target_kind or '',
+                    'locator_scope': info.get('locator_scope') or '',
+                    'locator_occurrence': info.get('locator_occurrence') or 0,
+                    'locator_verified': bool(info.get('locator_verified')),
+                    'locator_strategy': info.get('locator_strategy') or '',
+                }
+                if info.get('locator_fallback_reason'):
+                    result['locator_fallback_reason'] = info['locator_fallback_reason']
     except Exception:
         pass
     return result if result else None
 
 
-async def _enrich_click_element(page, *, xpath='', text='', tag_name='', attributes=None):
-    """Build xpath_smart/candidates for AI click_element_by_index (before click).
+async def _enrich_click_element(
+    page,
+    *,
+    xpath='',
+    text='',
+    tag_name='',
+    attributes=None,
+    target_kind='',
+    form_label='',
+):
+    """Build xpath_smart/candidates for AI click actions (before click).
 
-    Mirrors manual/CDP locator enrichment: drawer/dialog-scoped text xpath when
-    the live node sits under el-drawer / el-dialog.
+    Mirrors manual/CDP locator enrichment via PAGE_LOCATOR_HELPERS / buildLocatorSnap.
     """
     base = {
         'tag_name': tag_name or '',
         'xpath': xpath or '',
         'attributes': attributes if isinstance(attributes, dict) else {},
         'text': (text or '').strip()[:80],
+        'target_kind': target_kind or '',
+        'formLabel': form_label or '',
     }
     try:
         raw = await page.evaluate(
             JS_ENRICH_CLICK_LOCATOR,
-            [xpath or '', text or '', tag_name or ''],
+            [xpath or '', text or '', tag_name or '', target_kind or '', form_label or ''],
         )
         if not raw:
             return base
         info = json.loads(raw) if isinstance(raw, str) else raw
         if not isinstance(info, dict) or not (info.get('xpath') or info.get('xpath_smart')):
             return base
-        # Prefer live attrs from page when present
         attrs = info.get('attributes') if isinstance(info.get('attributes'), dict) else {}
         if not attrs and isinstance(attributes, dict):
             attrs = attributes
-        return {
+        out = {
             'tag_name': info.get('tag_name') or tag_name or '',
             'xpath': info.get('xpath') or info.get('xpath_smart') or xpath or '',
             'xpath_smart': info.get('xpath_smart') or '',
@@ -179,7 +288,16 @@ async def _enrich_click_element(page, *, xpath='', text='', tag_name='', attribu
             'attributes': attrs,
             'text': (info.get('text') or text or '').strip()[:80],
             'candidates': info.get('candidates') if isinstance(info.get('candidates'), list) else [],
+            'formLabel': info.get('formLabel') or form_label or '',
+            'target_kind': info.get('target_kind') or target_kind or '',
+            'locator_scope': info.get('locator_scope') or '',
+            'locator_occurrence': info.get('locator_occurrence') or 0,
+            'locator_verified': bool(info.get('locator_verified')),
+            'locator_strategy': info.get('locator_strategy') or '',
         }
+        if info.get('locator_fallback_reason'):
+            out['locator_fallback_reason'] = info['locator_fallback_reason']
+        return out
     except Exception:
         return base
 

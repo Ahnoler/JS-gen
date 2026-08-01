@@ -120,6 +120,13 @@ class ElementInfo(BaseModel):
         default_factory=list,
         description="Alternative locators: css | xpath_full | xpath_smart",
     )
+    target_kind: str = Field(default="", description="Normalized host kind (menu/form_input/...)")
+    locator_scope: str = Field(default="", description="dialog|drawer|nav|table|form_item|page")
+    locator_occurrence: int = Field(default=0, description="1-based occurrence among xpath matches")
+    locator_verified: bool = Field(default=False, description="True only when DOM-evaluated unique")
+    locator_strategy: str = Field(default="", description="xpath_smart | xpath_full")
+    locator_fallback_reason: str = Field(default="", description="Why absolute was primary")
+    formLabel: str = Field(default="", description="Form label used for smart xpath")
 
     def to_element_json(self) -> dict:
         """Convert to trajectory_step.element_json dict."""
@@ -138,6 +145,20 @@ class ElementInfo(BaseModel):
             data['xpath_abs'] = self.xpath_abs
         if self.candidates:
             data['candidates'] = [c.model_dump() for c in self.candidates]
+        if self.target_kind:
+            data['target_kind'] = self.target_kind
+        if self.locator_scope:
+            data['locator_scope'] = self.locator_scope
+        if self.locator_occurrence:
+            data['locator_occurrence'] = self.locator_occurrence
+        if self.locator_verified:
+            data['locator_verified'] = True
+        if self.locator_strategy:
+            data['locator_strategy'] = self.locator_strategy
+        if self.locator_fallback_reason:
+            data['locator_fallback_reason'] = self.locator_fallback_reason
+        if self.formLabel:
+            data['formLabel'] = self.formLabel
         return data
 
 
@@ -167,7 +188,9 @@ class ActionEntry(BaseModel):
         description=(
             "Action-specific parameters. Keys vary by action:\n"
             "  fill_form_field / fill_date_field: {label_text, value}\n"
-            "  select_option / click_radio:        {label_text, option_text}\n"
+            "  select_option / click_radio:        {label_text, option_text, options?}\n"
+            "    option_text: value selected at record time (replay MUST use this exact value)\n"
+            "    options: full dropdown inventory for export / other products (reference only)\n"
             "  click_element_by_index:             {index, tag_name, text}\n"
             "  click_menu_item:                    {menu_text}\n"
             "  click_table_row_button:             {row_text, button_text}\n"
@@ -347,6 +370,19 @@ class ActionEntry(BaseModel):
                     if isinstance(c, dict) else {"type": getattr(c, "type", ""), "value": getattr(c, "value", "")}
                     for c in cands
                 ]
+            for meta_key in (
+                'target_kind', 'locator_scope', 'locator_occurrence',
+                'locator_verified', 'locator_strategy', 'locator_fallback_reason',
+                'formLabel',
+            ):
+                if elem.get(meta_key) not in (None, '', False):
+                    entry.element[meta_key] = elem[meta_key]
+                elif meta_key == 'locator_verified' and elem.get(meta_key) is False:
+                    entry.element[meta_key] = False
+            if not entry.element.get('locator_strategy'):
+                entry.element['locator_strategy'] = (
+                    'xpath_smart' if xpath_smart else ('xpath_full' if (xpath_full or xpath) else '')
+                )
             # Ensure click params carry visible text for text-first replay
             if entry.action == "click_element_by_index" and text and not entry.params.get("text"):
                 entry.params["text"] = text

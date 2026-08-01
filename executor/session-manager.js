@@ -356,11 +356,11 @@ export class SessionManager {
   }
 
   /**
-   * Resolve form element by label_text on the attached BiB page.
+   * Resolve form element by label / actionType+params on the attached BiB page.
    * @param {string} sessionId
-   * @param {{ labelText?: string, requestId?: string }} [opts]
+   * @param {{ labelText?: string, actionType?: string, params?: object, requestId?: string }} [opts]
    */
-  async bibResolveElement(sessionId, { labelText, requestId } = {}) {
+  async bibResolveElement(sessionId, { labelText, actionType, params, requestId } = {}) {
     try {
       const bib = this.bibs.get(sessionId);
       if (!bib) {
@@ -369,15 +369,30 @@ export class SessionManager {
           sessionId,
           element: null,
           matchedLabel: null,
-          error: 'BiB not attached — call record/prepare (stream) first',
+          ambiguous: false,
+          matches: null,
+          error: 'BiB not attached - call record/prepare (stream) first',
         };
       }
-      const resolved = await bib.resolveByLabel(labelText);
+      const resolved = await bib.resolveByLabel(labelText, { actionType, params });
+      if (resolved?.ambiguous) {
+        return {
+          requestId: requestId || null,
+          sessionId,
+          element: null,
+          matchedLabel: null,
+          ambiguous: true,
+          matches: resolved.matches || [],
+          error: null,
+        };
+      }
       return {
         requestId: requestId || null,
         sessionId,
         element: resolved.element || null,
         matchedLabel: resolved.matchedLabel || null,
+        ambiguous: false,
+        matches: null,
         error: null,
       };
     } catch (err) {
@@ -386,6 +401,8 @@ export class SessionManager {
         sessionId,
         element: null,
         matchedLabel: null,
+        ambiguous: false,
+        matches: null,
         error: err?.message || String(err),
       };
     }

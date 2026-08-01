@@ -22,7 +22,12 @@ CTRL.* ↔ primary JS_* (or action) mapping:
 
 Several constants reference JS_GET_CONTAINER via string concatenation —
 all MUST remain in this single module for Python module-level concat order.
+
+Locator snapshot helpers: scripts/actions/_locator_helpers_js.py
+(regenerate: node scripts/_gen_locator_helpers_py.mjs).
 """
+
+from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 
 # ── Container detection (must be defined FIRST — referenced by other snippets) ──
 
@@ -100,91 +105,77 @@ JS_LOCATOR = '''(label) => {
 }'''
 
 JS_SMART_LOCATOR = '''([label]) => {
+''' + PAGE_LOCATOR_HELPERS + '''
     const container = ''' + JS_GET_CONTAINER + ''';
+    const want = normalizeFormLabel(label);
+    if (!want) return '';
 
-    // ── 工具函数：获取同标签兄弟中的位置序号（1-based，唯一时返回 0） ──
-    // browser_use: getElementPosition() → siblings.filter(tag) → indexOf + 1
-    const _nth = (el) => {
-        const p = el.parentElement;
-        if (!p) return 0;
-        const tag = el.tagName.toLowerCase();
-        const sib = [...p.children].filter(c => c.tagName.toLowerCase() === tag);
-        return sib.length <= 1 ? 0 : sib.indexOf(el) + 1;
-    };
+    function formItemLabel(item) {
+      const lbl = item.querySelector('.el-form-item__label');
+      return normalizeFormLabel(lbl && lbl.textContent);
+    }
+    function pickControl(item) {
+      const candidates = [
+        item.querySelector('.el-tree-select'),
+        item.querySelector('.el-cascader'),
+        item.querySelector('span.my-popover, .my-popover'),
+        item.querySelector('.el-select'),
+        item.querySelector('.el-date-editor'),
+        item.querySelector('.el-radio-group'),
+        item.querySelector('.el-checkbox-group'),
+        item.querySelector('.el-textarea__inner'),
+        item.querySelector('textarea'),
+        Array.from(item.querySelectorAll('.el-input__inner, input:not([type="hidden"])'))
+          .find(function (inp) { return !inp.closest('.el-popover, .tree-popover'); }),
+      ].filter(Boolean);
+      return candidates[0] || null;
+    }
 
-    // ── 工具函数：构建从 <html> 到 el 的 CSS 路径（browser_use 风格） ──
-    // 每层: tag:nth-of-type(n).class（class 仅追加有效名）
-    // 例: html > body > div.app-wrapper > main.app-main > ... > .el-form-item:nth-of-type(3) > input.el-input__inner
-    const _cssPath = (el) => {
-        const parts = [];
-        let cur = el;
-        while (cur && cur.nodeType === 1) {
-            const tag = cur.tagName.toLowerCase();
-            const nth = _nth(cur);
-            let part = tag + (nth > 0 ? `:nth-of-type(${nth})` : '');
-            const cls = (cur.getAttribute('class') || '').split(' ').filter(Boolean);
-            const valid = cls.filter(c => /^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(c));
-            if (valid.length > 0) part += '.' + valid.join('.');
-            parts.unshift(part);
-            cur = cur.parentElement;
-        }
-        return parts.join(' > ');
-    };
-
+    let matched = null;
     const items = container.querySelectorAll('.el-form-item');
     for (const item of items) {
-        const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-        if (lbl !== label && !lbl.includes(label)) continue;
-        const target = item.querySelector('input:not([type="hidden"]), textarea, .el-select .el-input__inner');
-        if (!target) continue;
-        const tag = target.tagName.toLowerCase();
-        const attrs = {};
-        for (const a of target.attributes) if (a.value && a.value.length > 0) attrs[a.name] = a.value;
-        const id = target.id;
-        const esc = s => s.replace(/"/g, '\\"').replace(/'/g, "\\'");
-        const cls = (target.getAttribute('class')||'').split(' ').filter(Boolean);
-
-        // ── CSS Selector ──
-        // browser_use 风格：完整 DOM 路径 + 语义属性增强，保证
-        // 唯一性（解决旧版多个字段同 placeholder/type 时选择器冲突的问题）
-        let css_sel = _cssPath(target);
-        if (id && !/^\\d{4,}$/.test(id) && !/^el-id-/.test(id)) {
-            css_sel += `[id="${id}"]`;
-        } else if (target.placeholder && !target.closest('.el-select')) {
-            css_sel += `[placeholder="${esc(target.placeholder)}"]`;
-        } else if (target.name) {
-            css_sel += `[name="${esc(target.name)}"]`;
-        } else if (tag === 'input' && target.type) {
-            css_sel += `[type="${target.type}"]`;
-        }
-
-        // ── XPath（保持原样：语义属性优先，class 兜底） ──
-        let xpath;
-        if (id && !/^\\d{4,}$/.test(id) && !/^el-id-/.test(id)) {
-            xpath = `//${tag}[@id="${id}"]`;
-        } else if (target.placeholder && !target.closest('.el-select')) {
-            xpath = `//${tag}[@placeholder="${target.placeholder}"]`;
-        } else if (target.name) {
-            xpath = `//${tag}[@name="${target.name}"]`;
-        } else {
-            xpath = `//${tag}[@class="${cls.join(' ')}"]`;
-        }
-
-        return JSON.stringify({xpath, css_sel, tag, attrs});
+      if (!isVisible(item) && item.offsetParent === null) continue;
+      const lbl = formItemLabel(item);
+      if (!lbl) continue;
+      if (lbl === want || lbl.includes(want) || want.includes(lbl)) {
+        matched = { item, label: lbl };
+        if (lbl === want) break;
+      }
     }
-    // Fallback：无 el-form-item 匹配时直接按 placeholder 搜索
-    for (const inp of container.querySelectorAll('input:not([type="hidden"]), textarea')) {
-        const ph = inp.placeholder || '';
-        if (ph.includes(label) && inp.offsetParent !== null) {
-            const tag = inp.tagName.toLowerCase();
-            return JSON.stringify({
-                xpath: `//${tag}[@placeholder="${ph}"]`,
-                css_sel: _cssPath(inp) + `[placeholder="${ph.replace(/"/g, '\\\\"')}"]`,
-                tag, attrs: {placeholder: ph}
-            });
+    let target = matched ? pickControl(matched.item) : null;
+    let formLabel = matched ? matched.label : '';
+    if (!target) {
+      for (const inp of container.querySelectorAll('input:not([type="hidden"]), textarea')) {
+        const ph = String(inp.placeholder || '');
+        if (ph && (ph.includes(label) || normalizeFormLabel(ph) === want) && isVisible(inp)) {
+          target = inp;
+          formLabel = want;
+          break;
         }
+      }
     }
-    return '';
+    if (!target) return '';
+    const host = normalizeTargetRoot(target) || target;
+    const abs = absXPath(host);
+    const loc = buildLocatorSnap(host, cleanVisibleText(host), abs, formLabel);
+    return JSON.stringify({
+      xpath: loc.xpath || abs,
+      css_sel: loc.cssSelector || '',
+      tag: loc.tag || (host.tagName || '').toLowerCase(),
+      attrs: loc.attributes || {},
+      xpath_smart: loc.xpath_smart || '',
+      xpath_full: loc.xpath_full || abs,
+      xpath_abs: abs,
+      candidates: loc.candidates || [],
+      text: loc.text || '',
+      formLabel: loc.formLabel || formLabel,
+      target_kind: loc.target_kind,
+      locator_scope: loc.locator_scope,
+      locator_occurrence: loc.locator_occurrence,
+      locator_verified: loc.locator_verified,
+      locator_strategy: loc.locator_strategy,
+      locator_fallback_reason: loc.locator_fallback_reason,
+    });
 }'''
 
 # ── Fill form field ──
@@ -514,7 +505,16 @@ JS_FIND_VISIBLE_DROPDOWN = '''(() => {
     return document;
 })()'''
 
-JS_SELECT_OPTION = '''(option) => {
+JS_SELECT_OPTION = '''(arg) => {
+    // arg: string option text, or [option, exactOnly]
+    // exactOnly=true → only exact label match (replay must not drift from recorded value)
+    let option = arg;
+    let exactOnly = false;
+    if (Array.isArray(arg)) {
+        option = arg[0];
+        exactOnly = !!arg[1];
+    }
+    option = String(option == null ? '' : option);
     // Prefer the dropdown tied to the trigger we just opened.
     const triggerInput = window.__last_select_trigger || null;
     let dropdown = null;
@@ -578,14 +578,16 @@ JS_SELECT_OPTION = '''(option) => {
         return 'ok:' + t;
     };
     if (pickPool.length === 0) return 'no-items';
-    if (FIRST_ALIASES.includes(option.toLowerCase().trim())) {
+    if (!exactOnly && FIRST_ALIASES.includes(option.toLowerCase().trim())) {
         return tryClick(pickPool[0]);
     }
     for (const item of pickPool) {
         if (item.textContent.trim() === option) return tryClick(item);
     }
-    for (const item of pickPool) {
-        if (item.textContent.trim().includes(option)) return tryClick(item);
+    if (!exactOnly) {
+        for (const item of pickPool) {
+            if (item.textContent.trim().includes(option)) return tryClick(item);
+        }
     }
     const hasEmpty = (dropdown && dropdown !== document)
         ? dropdown.querySelector('.el-select-dropdown__empty')
@@ -593,6 +595,143 @@ JS_SELECT_OPTION = '''(option) => {
     if (hasEmpty) return 'no-items';
     const preview = pickPool.slice(0, 30).map(i => i.textContent.trim()).filter(Boolean);
     return 'option-not-found:' + preview.join(', ');
+}'''
+
+# Read all option labels for a labeled el-select (Vue instance + open popper).
+# Used when recording select_option so params.options / element.options persist.
+JS_READ_SELECT_OPTIONS = '''([label]) => {
+    const want = String(label || '').trim();
+    const SKIP = new Set(['请选择', '请选择…', '请选择...', '']);
+    const pushUnique = (arr, s) => {
+        const t = String(s || '').replace(/\\s+/g, ' ').trim();
+        if (!t || SKIP.has(t) || arr.includes(t)) return;
+        arr.push(t);
+    };
+    const fromOptionObj = (o) => {
+        if (o == null) return '';
+        if (typeof o === 'string' || typeof o === 'number') return String(o);
+        // ElOption component instance or plain {label,value}
+        const lab = o.label ?? o.currentLabel ?? (o.$props && o.$props.label)
+            ?? o.text ?? o.name;
+        if (lab != null && String(lab).trim()) return String(lab);
+        const val = o.value ?? (o.$props && o.$props.value);
+        return val != null ? String(val) : '';
+    };
+    const readVueOptions = (selectEl) => {
+        const out = [];
+        try {
+            const vm = selectEl && selectEl.__vue__;
+            if (!vm) return out;
+            const ingest = (opts) => {
+                if (!opts) return;
+                if (Array.isArray(opts)) {
+                    for (const o of opts) pushUnique(out, fromOptionObj(o));
+                    return;
+                }
+                if (typeof opts === 'object') {
+                    // Element UI may keep options as object / Map-like
+                    const values = typeof opts.values === 'function'
+                        ? [...opts.values()]
+                        : Object.values(opts);
+                    for (const o of values) pushUnique(out, fromOptionObj(o));
+                }
+            };
+            ingest(vm.options);
+            ingest(vm.$data && vm.$data.options);
+            ingest(vm.$props && vm.$props.options);
+            ingest(vm.cachedOptions);
+            ingest(vm.$data && vm.$data.cachedOptions);
+        } catch (e) {}
+        return out;
+    };
+    const readOpenDropdown = (trigger) => {
+        const out = [];
+        try {
+            let dropdown = null;
+            if (trigger) {
+                const owned = trigger.getAttribute('aria-controls')
+                    || trigger.getAttribute('aria-owns')
+                    || trigger.closest('.el-select')?.getAttribute('aria-owns');
+                if (owned) dropdown = document.getElementById(owned);
+                if (!dropdown) {
+                    const tr = trigger.getBoundingClientRect();
+                    let best = null, bestDist = Infinity;
+                    for (const dd of document.querySelectorAll('.el-select-dropdown')) {
+                        if (dd.classList.contains('is-hidden')) continue;
+                        const style = getComputedStyle(dd);
+                        if (style.display === 'none' || style.visibility === 'hidden') continue;
+                        const rect = dd.getBoundingClientRect();
+                        if (rect.width <= 0 || rect.height <= 0) continue;
+                        const dist = Math.abs(rect.top - tr.bottom) + Math.abs(rect.left - tr.left);
+                        if (dist < bestDist) { bestDist = dist; best = dd; }
+                    }
+                    dropdown = best;
+                }
+            }
+            if (!dropdown) {
+                for (const dd of document.querySelectorAll('.el-select-dropdown')) {
+                    if (dd.classList.contains('is-hidden')) continue;
+                    const style = getComputedStyle(dd);
+                    if (style.display === 'none' || style.visibility === 'hidden') continue;
+                    const rect = dd.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) { dropdown = dd; break; }
+                }
+            }
+            if (!dropdown) return out;
+            for (const item of dropdown.querySelectorAll('.el-select-dropdown__item')) {
+                if (item.classList.contains('is-disabled')) continue;
+                pushUnique(out, (item.textContent || '').trim());
+            }
+        } catch (e) {}
+        return out;
+    };
+    const _isVisibleContainer = (el) => {
+        if (el.offsetParent !== null) return true;
+        const style = getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    };
+    const containers = [];
+    for (const d of document.querySelectorAll('.el-dialog'))
+        if (_isVisibleContainer(d)) containers.push(d);
+    for (const d of document.querySelectorAll('.el-drawer'))
+        if (_isVisibleContainer(d)) containers.push(d);
+    containers.push(document);
+
+    let trigger = null;
+    let selectEl = null;
+    if (want) {
+        for (const c of containers) {
+            for (let pass = 1; pass <= 2 && !trigger; pass++) {
+                const exact = pass === 1;
+                for (const item of c.querySelectorAll('.el-form-item')) {
+                    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                    if (exact) { if (lbl !== want) continue; }
+                    else { if (lbl === want || !lbl.includes(want)) continue; }
+                    const t = item.querySelector('.el-select .el-input__inner');
+                    const sel = item.querySelector('.el-select');
+                    if (t || sel) {
+                        trigger = t;
+                        selectEl = sel || (t && t.closest('.el-select'));
+                        break;
+                    }
+                }
+            }
+            if (trigger || selectEl) break;
+        }
+    }
+    if (!trigger && window.__last_select_trigger) {
+        trigger = window.__last_select_trigger;
+        selectEl = trigger.closest && trigger.closest('.el-select');
+    }
+
+    const out = [];
+    if (selectEl) {
+        for (const s of readVueOptions(selectEl)) pushUnique(out, s);
+    }
+    for (const s of readOpenDropdown(trigger)) pushUnique(out, s);
+    return out;
 }'''
 
 JS_FIND_OPTION = '''(option) => {
@@ -1306,78 +1445,8 @@ JS_SCAN_SAVE_OUTCOME = r'''() => {
 
 # ── Click locator enrichment (AI click_element_by_index → xpath_smart) ──
 # Args: [xpath, text, tagHint] — resolve node BEFORE click; walk up to button/a.
-JS_ENRICH_CLICK_LOCATOR = r'''([xpath, text, tagHint]) => {
-  function xpathLiteral(t) {
-    t = String(t || '');
-    if (t.indexOf("'") < 0) return "'" + t + "'";
-    if (t.indexOf('"') < 0) return '"' + t + '"';
-    return 'concat(' + t.split("'").map(function (p) { return "'" + p + "'"; }).join(", \"'\", ") + ')';
-  }
-  function normalizeControlText(t) {
-    return String(t || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-  }
-  function absXPath(node) {
-    if (!node || node.nodeType !== 1) return '';
-    const parts = [];
-    let cur = node;
-    while (cur && cur.nodeType === 1) {
-      const tag = cur.tagName.toLowerCase();
-      const parent = cur.parentNode;
-      if (!parent) break;
-      const sibs = [...parent.children].filter(c => c.tagName === cur.tagName);
-      const idx = sibs.indexOf(cur) + 1;
-      parts.unshift(tag + '[' + idx + ']');
-      cur = parent;
-      if (cur === document.documentElement) {
-        parts.unshift('html[1]');
-        break;
-      }
-    }
-    return '/' + parts.join('/');
-  }
-  function cssOfSimple(node) {
-    if (!node || node.nodeType !== 1) return '';
-    if (node.id) {
-      try { return '#' + CSS.escape(node.id); } catch (e) { return '#' + node.id; }
-    }
-    const tag = node.tagName.toLowerCase();
-    const cls = String(node.className || '')
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 3)
-      .map(function (c) {
-        try { return '.' + CSS.escape(c); } catch (e2) { return '.' + c; }
-      })
-      .join('');
-    return tag + cls;
-  }
-  function clickableRoot(node) {
-    if (!node || node.nodeType !== 1) return null;
-    if (node.closest) {
-      const btn = node.closest('button, a.el-button, a[role="button"], .el-button');
-      if (btn) return btn;
-    }
-    return node;
-  }
-  function xpathSmartOf(node, t) {
-    t = normalizeControlText(t);
-    if (!t || !node) return '';
-    const tagL = (node.tagName || '').toLowerCase();
-    const cls = String(node.className || '');
-    const clickable = tagL === 'button' || tagL === 'a' || /(^| )el-button( |$)/.test(cls);
-    if (!clickable) return '';
-    const lit = xpathLiteral(t);
-    const local = tagL === 'a'
-      ? 'a[normalize-space()=' + lit + ']'
-      : 'button[normalize-space()=' + lit + ']';
-    if (node.closest && node.closest('.el-drawer')) {
-      return "(//div[contains(@class,'el-drawer')])[last()]//" + local;
-    }
-    if (node.closest && node.closest('.el-dialog, .el-message-box')) {
-      return "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]//" + local;
-    }
-    return '//' + local;
-  }
+JS_ENRICH_CLICK_LOCATOR = '''([xpath, text, tagHint, targetKindHint, formLabelHint]) => {
+''' + PAGE_LOCATOR_HELPERS + '''
   function resolveByXpath(xp) {
     if (!xp) return null;
     let s = String(xp);
@@ -1391,23 +1460,17 @@ JS_ENRICH_CLICK_LOCATOR = r'''([xpath, text, tagHint]) => {
   function findByText(want, tagHint) {
     want = normalizeControlText(want);
     if (!want) return null;
-    const isVis = (el) => {
-      if (!el) return false;
-      const st = getComputedStyle(el);
-      const box = el.getBoundingClientRect();
-      return st.display !== 'none' && st.visibility !== 'hidden' && box.width >= 1 && box.height >= 1;
-    };
-    const drawers = [...document.querySelectorAll('.el-drawer')].filter(isVis);
-    const dialogs = [...document.querySelectorAll('.el-dialog, .el-message-box')].filter(isVis);
+    const drawers = [...document.querySelectorAll('.el-drawer')].filter(isVisible);
+    const dialogs = [...document.querySelectorAll('.el-dialog, .el-message-box')].filter(isVisible);
     const scopes = [];
     if (drawers.length) scopes.push(drawers[drawers.length - 1]);
     if (dialogs.length) scopes.push(dialogs[dialogs.length - 1]);
     scopes.push(document);
-    const sel = 'button, a, .el-button';
+    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"], .el-tabs__item, [role="tab"], .el-tree-node__content, [aria-label], [title]';
     for (const scope of scopes) {
-      const hits = [...scope.querySelectorAll(sel)].filter(isVis).filter((el) => {
-        const t = normalizeControlText(el.innerText || el.textContent || '');
-        return t === want;
+      const hits = [...scope.querySelectorAll(sel)].filter(isVisible).filter((el) => {
+        const t = cleanVisibleText(el);
+        return t === want || t.includes(want);
       });
       if (hits.length) {
         if (tagHint) {
@@ -1422,36 +1485,33 @@ JS_ENRICH_CLICK_LOCATOR = r'''([xpath, text, tagHint]) => {
   }
 
   let el = resolveByXpath(xpath);
-  if (el) el = clickableRoot(el);
+  if (el) el = normalizeTargetRoot(el) || el;
   if (!el) el = findByText(text, tagHint);
+  if (el) el = normalizeTargetRoot(el) || el;
   if (!el) return null;
 
-  const t = normalizeControlText(text) || normalizeControlText(el.innerText || el.textContent || '');
+  const formLbl = normalizeFormLabel(formLabelHint || '');
+  const kindHint = String(targetKindHint || '').trim();
+  const t = normalizeControlText(text) || cleanVisibleText(el);
   const abs = absXPath(el);
-  const smart = xpathSmartOf(el, t);
-  const css = cssOfSimple(el);
-  const primary = smart || abs;
-  const candidates = [];
-  if (smart) candidates.push({ type: 'xpath_smart', value: smart });
-  if (abs) candidates.push({ type: 'xpath_full', value: abs });
-  if (css) candidates.push({ type: 'css', value: css });
+  const loc = buildLocatorSnap(el, t, abs, formLbl, { targetKind: kindHint || undefined });
   return {
-    tag_name: (el.tagName || '').toLowerCase(),
-    xpath: primary,
-    xpath_smart: smart,
-    xpath_full: abs,
+    tag_name: loc.tag || (el.tagName || '').toLowerCase(),
+    xpath: loc.xpath || abs,
+    xpath_smart: loc.xpath_smart || '',
+    xpath_full: loc.xpath_full || abs,
     xpath_abs: abs,
-    css_selector: css,
-    text: t,
-    attributes: (function () {
-      const a = {};
-      if (!el.attributes) return a;
-      for (const at of el.attributes) {
-        if (at.value && at.value.length < 120) a[at.name] = at.value;
-      }
-      return a;
-    })(),
-    candidates: candidates,
+    css_selector: loc.cssSelector || '',
+    text: loc.text || t,
+    formLabel: loc.formLabel || formLbl,
+    attributes: loc.attributes || {},
+    candidates: loc.candidates || [],
+    target_kind: loc.target_kind,
+    locator_scope: loc.locator_scope,
+    locator_occurrence: loc.locator_occurrence,
+    locator_verified: loc.locator_verified,
+    locator_strategy: loc.locator_strategy,
+    locator_fallback_reason: loc.locator_fallback_reason,
   };
 }'''
 

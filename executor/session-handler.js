@@ -55,6 +55,8 @@ export function createSessionHandler(manager) {
       case 'session.bib_resolve_element':
         return manager.bibResolveElement(sessionId, {
           labelText: payload.labelText || payload.label_text,
+          actionType: payload.actionType || payload.action || '',
+          params: payload.params || {},
           requestId: payload.requestId,
         });
       case 'session.step':

@@ -1029,14 +1029,19 @@ export function initRemoteBridgeWs() {
 }
 
 /**
- * Resolve form control by label_text on the currently attached local BiB CDP page.
+ * Resolve form control by label_text / actionType+params on the attached local BiB CDP page.
  * @param {string} labelText
+ * @param {{ actionType?: string, action?: string, params?: object }} [opts]
  */
-export async function resolveElementByLabelText(labelText) {
+export async function resolveElementByLabelText(labelText, opts = {}) {
   if (!client) {
     const err = new Error('BiB stream not attached — call record/prepare first');
     err.statusCode = 400;
     throw err;
   }
-  return resolveElementByLabel(client, labelText);
+  return resolveElementByLabel(client, {
+    labelText,
+    actionType: opts.actionType || opts.action || '',
+    params: opts.params || {},
+  });
 }

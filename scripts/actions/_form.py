@@ -9,11 +9,17 @@ import json
 import sys
 
 from ..agent_utils import emit_json
-from ._state import _ACTION_LOG, _record_action
+from ._state import (
+    _ACTION_LOG,
+    _record_action,
+    capture_page_png_b64_from_page,
+    record_action_with_screenshots,
+)
 from ._helpers import (
     _ok, _err, _is_ok_result,
     _wait_if_loading, _capture_element, _merge_ax_text,
     _enrich_click_element,
+    attach_select_options, options_from_scan_store, read_select_options,
 )
 from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER,
@@ -47,6 +53,28 @@ def _is_search_dialog(container_id: str) -> bool:
         return False
     title = container_id[7:]
     return any(h in title for h in _SEARCH_DIALOG_HINTS)
+
+
+async def _pack_select_record(page, case_data_store, label_text, option_text, element):
+    """Build select_option params/element.
+
+    - option_text: the value actually selected (replay contract — must stay exact)
+    - options: full dropdown inventory for export / downstream products (reference)
+    """
+    opts = options_from_scan_store(case_data_store, label_text)
+    live = await read_select_options(page, label_text)
+    if live:
+        # Prefer live (more complete after dropdown open); keep scan extras
+        merged = list(live)
+        for o in opts:
+            if o not in merged:
+                merged.append(o)
+        opts = merged
+    if option_text and option_text not in opts and option_text not in ('first', '1st', '第一个', '第一项'):
+        opts = list(opts) + [option_text]
+    params = {'label_text': label_text, 'option_text': option_text}
+    return attach_select_options(params, element, opts)
+
 
 # Read current 证件类型 / 证照类型 display value from the open form.
 _JS_READ_CERT_TYPE = '''(kw) => {
@@ -376,9 +404,9 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
+        element = await _capture_element(page, label_text, target_kind='form_input')
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
         if _is_ok_result(result):
-            element = await _capture_element(page, label_text)
             _record_action('fill_form_field', {'label_text': label_text, 'value': value}, result, element=element)
             _task_done_impl(label_text, case_data_store, value=value)
             return _ok(_with_submit_cue(result, case_data_store))
@@ -389,9 +417,10 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
+        element = await _capture_element(page, label_text, target_kind='form_date')
         result = await page.evaluate(JS_FILL_DATE_FIELD, [label_text, value])
         if _is_ok_result(result):
-            _record_action('fill_date_field', {'label_text': label_text, 'value': value}, result)
+            _record_action('fill_date_field', {'label_text': label_text, 'value': value}, result, element=element)
             _task_done_impl(label_text, case_data_store, value=value)
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
@@ -735,6 +764,26 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 value = a.get('value', '') or a.get('option', '')
                 field_kind = label_kind.get(label, kind)
                 step_num = i + 1
+                # Pre-mutation locator snapshot (same contract as explicit fill/select/radio actions)
+                if field_kind == 'radio' or kind in ('click_radio', 'radio'):
+                    capture_kind = 'form_radio'
+                elif field_kind == 'tree-select' or kind in (
+                    'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
+                ):
+                    capture_kind = 'form_tree_select'
+                elif field_kind == 'date':
+                    capture_kind = 'form_date'
+                elif kind in ('select_option', 'select', 'option'):
+                    capture_kind = 'form_select'
+                else:
+                    capture_kind = 'form_input'
+                element = await _capture_element(page, label, target_kind=capture_kind)
+                # before shot must precede DOM mutation (auto-fill bypasses controller.action wrap)
+                before_b64 = None
+                try:
+                    before_b64 = await capture_page_png_b64_from_page(page)
+                except Exception:
+                    before_b64 = None
                 try:
                     if kind in ('fill_input', 'fill', 'input'):
                         if field_kind == 'date':
@@ -795,18 +844,56 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 if ok:
                     ok_in_group += 1
                     if field_kind == 'radio' or kind in ('click_radio', 'radio'):
-                        _record_action('click_radio', {'label_text': label, 'option_text': value}, result)
+                        await record_action_with_screenshots(
+                            page,
+                            'click_radio',
+                            {'label_text': label, 'option_text': value},
+                            result,
+                            element=element,
+                            before_b64=before_b64,
+                        )
                     elif kind in ('fill_input', 'fill', 'input') and field_kind != 'tree-select':
-                        _record_action('fill_form_field', {'label_text': label, 'value': value}, result)
+                        await record_action_with_screenshots(
+                            page,
+                            'fill_form_field',
+                            {'label_text': label, 'value': value},
+                            result,
+                            element=element,
+                            before_b64=before_b64,
+                        )
                     elif field_kind == 'tree-select' or kind in (
                         'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
                     ):
-                        _record_action('select_tree_option', {'label_text': label, 'option_text': value}, result)
+                        await record_action_with_screenshots(
+                            page,
+                            'select_tree_option',
+                            {'label_text': label, 'option_text': value},
+                            result,
+                            element=element,
+                            before_b64=before_b64,
+                        )
                     elif kind in ('select_option', 'select', 'option'):
                         if field_kind == 'radio':
-                            _record_action('click_radio', {'label_text': label, 'option_text': value}, result)
+                            await record_action_with_screenshots(
+                                page,
+                                'click_radio',
+                                {'label_text': label, 'option_text': value},
+                                result,
+                                element=element,
+                                before_b64=before_b64,
+                            )
                         else:
-                            _record_action('select_option', {'label_text': label, 'option_text': value}, result)
+                            params, element = await _pack_select_record(
+                                page, case_data_store, label, value, element,
+                            )
+                            await record_action_with_screenshots(
+                                page,
+                                'select_option',
+                                params,
+                                result,
+                                element=element,
+                                before_b64=before_b64,
+                            )
                     _task_done_impl(label, case_data_store, value=value)
                     # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
                     btn = has_button_map.get(label, '')
@@ -1393,6 +1480,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
 
+        element = await _capture_element(page, label_text, target_kind='form_select')
+
         already = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'check'])
         if already.startswith('ok-already:'):
             cur_val = already.split(':', 1)[1]
@@ -1405,8 +1494,10 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 or option_text in cur_val
                 or cur_val in option_text
             ):
-                element = await _capture_element(page, label_text)
-                _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, already, element=element)
+                params, element = await _pack_select_record(
+                    page, case_data_store, label_text, option_text, element,
+                )
+                _record_action('select_option', params, already, element=element)
                 _task_done_impl(label_text, case_data_store, value=cur_val or option_text)
                 # Count consecutive already-matched for recorder loop-break
                 streak = int(case_data_store.get('_already_matched_streak', 0) or 0) + 1
@@ -1436,12 +1527,18 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
 
         await page.wait_for_timeout(500)
 
+        # Capture full option list while dropdown is open (before pick)
+        params, element = await _pack_select_record(
+            page, case_data_store, label_text, option_text, element,
+        )
+
         select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
         if _is_ok_result(select_result):
             matched_text = select_result.split(':', 1)[1] if ':' in select_result else select_result
             case_data_store.pop(f'_sel_retry_{label_text}', None)
-            element = await _capture_element(page, label_text)
-            _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
+            params['option_text'] = matched_text or option_text
+            params, element = attach_select_options(params, element, params.get('options'))
+            _record_action('select_option', params, matched_text, element=element)
             _task_done_impl(label_text, case_data_store, value=matched_text or option_text)
             return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
         elif select_result == 'no-items':
@@ -1450,23 +1547,30 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             if recheck.startswith('ok-already:'):
                 cur = recheck.split(':', 1)[1]
                 _task_done_impl(label_text, case_data_store, value=cur)
+                _record_action('select_option', params, recheck, element=element)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', case_data_store))
             return _err('no-items')
         elif select_result.startswith('option-not-found:'):
             # Fuzzy: pick listed option that contains / is contained by option_text
             listed = [x.strip() for x in select_result.split(':', 1)[1].split(',') if x.strip()]
+            # Prefer union of live dropdown preview + stored options
+            stored = list(params.get('options') or [])
+            for x in listed:
+                if x not in stored:
+                    stored.append(x)
+            params, element = attach_select_options(params, element, stored)
             want = (option_text or '').strip()
-            fuzzy = next((o for o in listed if want and (want in o or o in want)), None)
+            fuzzy = next((o for o in stored if want and (want in o or o in want)), None)
             # Common alias: 中国 → 中华人民共和国
             if not fuzzy and want in ('中国', '中国大陆'):
-                fuzzy = next((o for o in listed if '中国' in o), None)
+                fuzzy = next((o for o in stored if '中国' in o), None)
             if fuzzy:
                 fuzzy_result = await page.evaluate(JS_SELECT_OPTION, fuzzy)
                 if _is_ok_result(fuzzy_result):
                     matched_text = fuzzy_result.split(':', 1)[1] if ':' in fuzzy_result else fuzzy_result
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
-                    element = await _capture_element(page, label_text)
-                    _record_action('select_option', {'label_text': label_text, 'option_text': matched_text}, matched_text, element=element)
+                    params['option_text'] = matched_text
+                    _record_action('select_option', params, matched_text, element=element)
                     _task_done_impl(label_text, case_data_store, value=matched_text)
                     return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', case_data_store))
             retry_key = f'_sel_retry_{label_text}'
@@ -1477,8 +1581,8 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 if _is_ok_result(first_result):
                     matched_text = first_result.split(':', 1)[1] if ':' in first_result else first_result
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
-                    element = await _capture_element(page, label_text)
-                    _record_action('select_option', {'label_text': label_text, 'option_text': option_text}, matched_text, element=element)
+                    params['option_text'] = matched_text or option_text
+                    _record_action('select_option', params, matched_text, element=element)
                     _task_done_impl(label_text, case_data_store, value=matched_text or option_text)
                     return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
                 return _err(first_result)
@@ -1502,6 +1606,10 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                     return _ok(f'already-filled | {info.get("currentValue", "")}')
             except Exception:
                 pass
+        # Snapshot the adjacent button (not the input) before click
+        element = await _enrich_click_element(
+            page, text='', form_label=label_text, target_kind='adjacent_button',
+        )
         result = await page.evaluate('''([label]) => {
             const container = ''' + JS_GET_CONTAINER + ''';
             const items = container.querySelectorAll('.el-form-item');
@@ -1509,7 +1617,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                 const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
                 if (!lbl.includes(label)) continue;
                 item.scrollIntoView({ block: 'center', behavior: 'instant' });
-                // Pass 1: match known button keywords
                 for (const tag of ['el-button', 'button', 'a']) {
                     const btns = item.querySelectorAll(tag);
                     for (const btn of btns) {
@@ -1520,7 +1627,6 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                         }
                     }
                 }
-                // Pass 2: fallback — click any visible button inside the form item
                 for (const tag of ['el-button', 'button', 'a']) {
                     const btns = item.querySelectorAll(tag);
                     for (const btn of btns) {
@@ -1533,7 +1639,12 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             return 'label-not-found';
         }''', [label_text])
         if _is_ok_result(result):
-            _record_action('click_adjacent_button', {'label_text': label_text}, result)
+            _record_action(
+                'click_adjacent_button',
+                {'label_text': label_text},
+                result,
+                element=element,
+            )
             return _ok(result)
         return result
 
@@ -1542,9 +1653,9 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
+        element = await _capture_element(page, label_text, target_kind='form_radio')
         result = await page.evaluate(JS_CLICK_RADIO, [label_text, option_text])
         if _is_ok_result(result):
-            element = await _capture_element(page, label_text)
             _record_action('click_radio', {'label_text': label_text, 'option_text': option_text}, result, element=element)
             _task_done_impl(label_text, case_data_store, value=option_text)
             return _ok(result)
@@ -1555,10 +1666,10 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
+        element = await _capture_element(page, label_text, target_kind='form_tree_select')
         result = await page.evaluate(JS_SELECT_TREE_OPTION, [label_text, option_text])
         # P0/P1/P2 success codes all use ok prefix → recordable via _is_ok_result
         if _is_ok_result(result):
-            element = await _capture_element(page, label_text)
             _record_action('select_tree_option', {'label_text': label_text, 'option_text': option_text}, result, element=element)
             _task_done_impl(label_text, case_data_store, value=option_text)
             return _ok(result)

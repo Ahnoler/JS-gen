@@ -150,7 +150,17 @@
  * @property {string} [id]
  * @property {string} [class]
  * @property {string} [placeholder]
+ * @property {string} [xpath_smart]
+ * @property {string} [xpath_full]
+ * @property {string} [xpath_abs]
  * @property {LocatorCandidate[]} [candidates]
+ * @property {string} [target_kind]
+ * @property {string} [locator_scope]
+ * @property {number} [locator_occurrence]
+ * @property {boolean} [locator_verified]
+ * @property {string} [locator_strategy]
+ * @property {string} [locator_fallback_reason]
+ * @property {string} [formLabel]
  */
 
 /**

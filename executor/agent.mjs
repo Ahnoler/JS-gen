@@ -96,6 +96,8 @@ const client = new ExecutorWsClient({
           requestId: result.requestId || msg.payload?.requestId,
           element: result.element || null,
           matchedLabel: result.matchedLabel || null,
+          ambiguous: result.ambiguous || false,
+          matches: result.matches || null,
           error: result.error || null,
         });
       }

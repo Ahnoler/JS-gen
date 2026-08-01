@@ -209,7 +209,8 @@ ${PAGE_LOCATOR_HELPERS}
     const t = textOverride != null ? String(textOverride) : shortLabel(node);
     const bu = buXPathOf(node);
     const abs = xpathOf(node);
-    const loc = buildLocatorSnap(node, t, abs);
+    const formLbl = formItemLabel(node);
+    const loc = buildLocatorSnap(node, t, abs, formLbl);
     return {
       xpath: loc.xpath || bu || abs,
       bu_xpath: bu,
@@ -219,8 +220,15 @@ ${PAGE_LOCATOR_HELPERS}
       cssSelector: loc.cssSelector || '',
       candidates: loc.candidates || [],
       tag: (node.tagName || '').toLowerCase(),
-      attributes: attrs(node),
+      attributes: loc.attributes || attrs(node),
       text: loc.text || t,
+      formLabel: loc.formLabel || formLbl || '',
+      target_kind: loc.target_kind || '',
+      locator_scope: loc.locator_scope || '',
+      locator_occurrence: loc.locator_occurrence || 0,
+      locator_verified: loc.locator_verified === true,
+      locator_strategy: loc.locator_strategy || '',
+      locator_fallback_reason: loc.locator_fallback_reason || undefined,
     };
   }
 

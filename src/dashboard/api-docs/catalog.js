@@ -441,15 +441,28 @@ export const API_GROUPS = [
         reqExample: J({
           trajectoryId: 42, phaseNumber: 1,
           actionType: 'click_element_by_index',
-          params: { index: 1, text: '新增' },
+          params: { index: -1, text: '新增' },
+          element: {
+            xpath: "//button[normalize-space()='新增']",
+            xpath_smart: "//button[normalize-space()='新增']",
+            xpath_full: '/div[1]/button[2]',
+            locator_strategy: 'xpath_smart',
+          },
           source: 'manual',
         }),
+        notes: [
+          '单目标动作会 prepareElementJson；无可用 xpath_smart/xpath_full 时 400',
+          '优先写入相对 xpath_smart；否则 xpath_full + locator_fallback_reason',
+        ],
       },
       {
         method: 'PATCH', path: '/api/v2/trajectory-steps/{id}',
         summary: '修改步骤',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '501' }],
-        reqExample: J({ params: { index: 2, text: '保存' } }),
+        reqExample: J({ params: { index: -1, text: '保存' }, element: { xpath_smart: "//button[normalize-space()='保存']" } }),
+        notes: [
+          '仅当 actionType/params/element 变更时重校验定位器；纯元数据 PATCH 不强制历史行修复',
+        ],
       },
       {
         method: 'PATCH', path: '/api/v2/trajectory-steps/{id}/confirm',
@@ -545,19 +558,44 @@ export const API_GROUPS = [
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/resolve-element',
-        summary: '按 label_text 从已附着页面解析定位器',
-        desc: '需 record/prepare 且 BiB 已附着。返回 element_json 形态，供手动新增/编辑步骤写入。',
+        summary: '按 label / actionType+params 从已附着页面解析定位器',
+        desc: '需 record/prepare 且 BiB 已附着。单匹配返回 element；多匹配返回 ambiguous+matches[] 供用户选择后写入 add-step。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
-        reqExample: J({ labelText: '姓名' }),
+        reqExample: J({
+          labelText: '客户名称',
+          actionType: 'fill_form_field',
+          params: { label_text: '客户名称' },
+        }),
         respExample: J({
           trajectoryId: 42,
-          matchedLabel: '姓名',
+          matchedLabel: '客户名称',
           element: {
-            tag: 'input', xpath: '/html/body/.../input[1]', cssSelector: 'input.el-input__inner',
-            attributes: { class: 'el-input__inner' }, text: '',
+            tag: 'input',
+            xpath: "//div[contains(@class,'el-form-item')][.//label[contains(normalize-space(.),'客户名称')]]//input",
+            xpath_smart: "//div[contains(@class,'el-form-item')][.//label[contains(normalize-space(.),'客户名称')]]//input",
+            xpath_full: '/div[1]/form[1]/div[3]/input[1]',
+            cssSelector: 'input.el-input__inner',
+            attributes: { class: 'el-input__inner' },
+            text: '',
+            formLabel: '客户名称',
+            locator_strategy: 'xpath_smart',
+            locator_verified: true,
+            target_kind: 'form_input',
+            candidates: [
+              { type: 'xpath_smart', value: "//div[contains(@class,'el-form-item')][.//label[contains(normalize-space(.),'客户名称')]]//input" },
+              { type: 'xpath_full', value: '/div[1]/form[1]/div[3]/input[1]' },
+            ],
           },
         }),
-        notes: ['400：未 attach / BiB 未就绪', '404：页上找不到对应 label'],
+        notes: [
+          '可选 actionType + params（menu_text / tab_name / row_text+button_text / …）做动作感知解析',
+          '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }] } — 不静默择一',
+          '菜单示例：客户管理优先稳定 data-id；否则 class-token + 文案 + occurrence',
+          '表单字段：xpath / xpath_smart 为 label 锚定相对 xpath；xpath_full 绝对兜底',
+          'POST/PATCH trajectory-steps：单目标动作无可用 xpath 时 400 locator-capture-error',
+          'PATCH 仅在 actionType/params/element 变更时重校验定位器',
+          '400：未 attach / BiB 未就绪；404：无匹配',
+        ],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/manual-record',
@@ -577,7 +615,7 @@ export const API_GROUPS = [
           + 'false → 允许走正常入库路径。'
           + '响应字段 isReplay 仅回显该开关。'
           + '表字段 trajectory_step.is_replay 为 TINYINT(1)，默认 0；正常 AI/人工/CDP 录制落库均为 0，步骤树展示的就是这些记录。'
-          + '遇错即停（stop_on_fail）：失败步自动调用 Agent 单步自愈（每步最多 1 次），成功后从下一步继续回放。'
+          + '遇错即停（stop_on_fail）：失败步自动调用 Agent 单步自愈（每步最多 1 次；只完成失败步本身，不抢跑下一步如弹窗「确认」），成功后从下一步继续回放。'
           + '长请求期间 WS 广播 recording:replay_step / recording:replay_heal。'
           + '自愈耗尽或 Agent 失败时业务 code≠200，data 含 ok/failed/healed/results。',
         params: [
@@ -657,13 +695,13 @@ export const API_GROUPS = [
   },
   {
     id: 'replay',
-    name: '回放',
-    description: 'Playwright 全量回放。服务端组装脚本，不向客户端返回 JS 源码；进度走 WS replay:*。',
+    name: '回放（已弃用：组装 Playwright 全量）',
+    description: 'DEPRECATED。产品请用 POST .../steps/replay（live replay_actions / _replay.py）。本路径仍可跑：服务端组装脚本，不向客户端返回 JS 源码；进度走 WS replay:*。',
     endpoints: [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/replay/prepare',
-        summary: '组装回放计划',
-        desc: 'recordStatus 为 live 或 recording 时 409。脚本不返回给客户端。',
+        summary: '[DEPRECATED] 组装回放计划',
+        desc: '已弃用。recordStatus 为 live 或 recording 时 409。脚本不返回给客户端。产品请改用 /steps/replay。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
@@ -671,6 +709,7 @@ export const API_GROUPS = [
           steps: [{ stepId: 501, phaseId: 101, phaseNumber: 1, actionType: '...', confirmed: true }],
           stepMap: [{ assemblerStep: 1, stepId: 501, phaseId: 101, actionType: 'click_element_by_index' }],
         }),
+        notes: ['DEPRECATED — 工程资产保留，非产品支持路径'],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/replay/start',
@@ -850,18 +889,6 @@ export const API_GROUPS = [
           id: 1, fileSize: 12345,
           mimeType: 'image/png', trajectoryStepId: 501, stepNumber: 1, kind: 'before',
         }]),
-      },
-      {
-        method: 'POST', path: '/api/v2/screenshots/by-steps',
-        summary: '按 steps[] 批量取 screenshots[] 元数据',
-        desc: 'body.steps 为 trajectory_step.id 数组；返回 before/after 元数据（不含 BLOB），取图走 GET /image',
-        reqExample: J({ steps: [501, 502] }),
-        respExample: J({
-          screenshots: [
-            { id: 1, fileSize: 12345, mimeType: 'image/png', trajectoryStepId: 501, kind: 'before' },
-            { id: 2, fileSize: 12400, mimeType: 'image/png', trajectoryStepId: 501, kind: 'after' },
-          ],
-        }),
       },
       {
         method: 'GET', path: '/api/v2/screenshots/{id}/image',

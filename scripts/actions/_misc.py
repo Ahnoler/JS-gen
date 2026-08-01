@@ -163,10 +163,18 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             await page.evaluate(JS_STAMP_ICON_ARIA_LABELS)
         except Exception:
             pass
+        element = await _enrich_click_element(
+            page, text=button_text, target_kind='icon',
+        )
         result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
         await page.wait_for_timeout(400)
         if _is_ok_result(result):
-            _state._record_action('click_icon_button', {'button_text': button_text}, result)
+            _state._record_action(
+                'click_icon_button',
+                {'button_text': button_text},
+                result,
+                element=element,
+            )
             return _ok(result)
         return result
 
@@ -246,45 +254,49 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             return _ok(f'ok-notification: {notif_text[:200]}', include_in_memory=True)
         return 'no-notification'
 
-    @controller.action('Close the topmost el-dialog, el-message-box, or el-drawer. El-notification has its own close_notification action.')
+    @controller.action('Close the topmost el-dialog / el-drawer / el-message-box via the title-bar X close control. Message-box primary/cancel buttons should use click_element_by_index instead.')
     async def close_dialog():
         page = await browser_context.get_current_page()
-        msgbox = await page.query_selector('.el-message-box')
-        if msgbox:
-            visible = await msgbox.evaluate('el => el.offsetParent !== null')
-            if visible:
-                text = await msgbox.evaluate('el => el.textContent?.trim() || ""')
-                confirm = await msgbox.query_selector('.el-message-box__btns .el-button--primary, .el-message-box__btns .el-button--default')
-                if confirm:
-                    await confirm.click()
-                    await page.wait_for_timeout(300)
-                    return _ok(f'ok-msgbox: {text[:200]}')
-                close_btn = await msgbox.query_selector('.el-message-box__headerbtn .el-icon-close')
-                if close_btn:
-                    await close_btn.click()
-                    await page.wait_for_timeout(300)
-                    return _ok(f'ok-msgbox-close: {text[:200]}')
+        element = await _enrich_click_element(
+            page, text='', target_kind='dialog_close',
+        )
         result = await page.evaluate('''() => {
-            const dialogs = [...document.querySelectorAll('.el-dialog')].reverse();
-            for (const d of dialogs) {
-                if (d.offsetParent !== null) {
-                    const closeBtn = d.querySelector('.el-dialog__headerbtn .el-dialog__close, .el-dialog__headerbtn .el-icon-close');
-                    if (closeBtn) { closeBtn.click(); return 'ok'; }
-                    const cancelBtn = d.querySelector('.el-dialog__footer .el-button--default');
-                    if (cancelBtn) { cancelBtn.click(); return 'ok-cancel'; }
-                    return 'no-close-button';
-                }
+            function clickClose(root, sels) {
+              for (const sel of sels) {
+                const btn = root.querySelector(sel);
+                if (btn && btn.offsetParent !== null) { btn.click(); return true; }
+              }
+              return false;
+            }
+            const closeSels = [
+              '.el-dialog__headerbtn', '.el-dialog__close', '.el-dialog__headerbtn .el-icon-close',
+              '.el-drawer__close-btn', '.el-drawer__header .el-icon-close',
+              '.el-message-box__headerbtn', '.el-message-box__headerbtn .el-icon-close',
+            ];
+            for (const d of [...document.querySelectorAll('.el-dialog')].reverse()) {
+              if (d.offsetParent !== null) {
+                if (clickClose(d, closeSels)) return 'ok';
+                return 'no-close-button';
+              }
             }
             for (const d of [...document.querySelectorAll('.el-drawer')].reverse()) {
-                if (d.offsetParent !== null) {
-                    const closeBtn = d.querySelector('.el-drawer__close-btn, .el-drawer__header .el-icon-close');
-                    if (closeBtn) { closeBtn.click(); return 'ok'; }
-                    return 'no-close-button';
-                }
+              if (d.offsetParent !== null) {
+                if (clickClose(d, closeSels)) return 'ok';
+                return 'no-close-button';
+              }
+            }
+            for (const d of [...document.querySelectorAll('.el-message-box')].reverse()) {
+              if (d.offsetParent !== null) {
+                if (clickClose(d, closeSels)) return 'ok';
+                return 'no-close-button';
+              }
             }
             return 'no-overlay-open';
         }''')
         await page.wait_for_timeout(500)
+        if _is_ok_result(result):
+            _state._record_action('close_dialog', {}, result, element=element)
+            return _ok(result)
         return result
 
     @controller.action('Take a screenshot and save it to the snapshots directory.')
