@@ -87,22 +87,6 @@ export async function listByTrajectory(trajectoryId) {
   return fromDbRows(rows);
 }
 
-export async function listByStepIds(stepIds = []) {
-  const ids = (Array.isArray(stepIds) ? stepIds : [])
-    .map((x) => Number(x))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  if (!ids.length) return [];
-
-  const rows = await getDB()(TABLE)
-    .select(...META_COLS)
-    .whereIn('trajectory_step_id', ids)
-    .orderBy([
-      { column: 'trajectory_step_id', order: 'asc' },
-      { column: 'kind', order: 'asc' },
-    ]);
-  return fromDbRows(rows);
-}
-
 export async function removeByTrajectoryStepId(stepId) {
   const id = Number(stepId);
   if (!Number.isFinite(id) || id <= 0) return 0;

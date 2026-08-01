@@ -53,8 +53,3 @@ export async function getScreenshotImage(id) {
 export async function listByTrajectory(trajectoryId) {
   return screenshotDao.listByTrajectory(trajectoryId);
 }
-
-/** Batch metadata by trajectory_step.id list. */
-export async function listBySteps(stepIds) {
-  return screenshotDao.listByStepIds(stepIds);
-}
