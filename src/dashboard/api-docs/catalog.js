@@ -839,14 +839,29 @@ export const API_GROUPS = [
   },
   {
     id: 'screenshot',
-    name: '截图',
-    description: '交易关联截图；回放中亦可经 WS replay:screenshot 获取 URL',
+    name: '截图管理',
+    description: '按 trajectory_step 绑定的 before/after 截图；回放中亦可经 WS replay:screenshot 获取临时 URL',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/trajectories/{trajectoryId}/screenshots',
         summary: '交易关联截图列表',
         params: [{ name: 'trajectoryId', type: 'number', required: true, in: 'path', example: '42' }],
-        respExample: J([{ id: 1, fileName: 'step_1.png', fileSize: 12345, stepIndex: 1, mimeType: 'image/png' }]),
+        respExample: J([{
+          id: 1, fileSize: 12345,
+          mimeType: 'image/png', trajectoryStepId: 501, stepNumber: 1, kind: 'before',
+        }]),
+      },
+      {
+        method: 'POST', path: '/api/v2/screenshots/by-steps',
+        summary: '按 steps[] 批量取 screenshots[] 元数据',
+        desc: 'body.steps 为 trajectory_step.id 数组；返回 before/after 元数据（不含 BLOB），取图走 GET /image',
+        reqExample: J({ steps: [501, 502] }),
+        respExample: J({
+          screenshots: [
+            { id: 1, fileSize: 12345, mimeType: 'image/png', trajectoryStepId: 501, kind: 'before' },
+            { id: 2, fileSize: 12400, mimeType: 'image/png', trajectoryStepId: 501, kind: 'after' },
+          ],
+        }),
       },
       {
         method: 'GET', path: '/api/v2/screenshots/{id}/image',
@@ -1091,11 +1106,14 @@ export const API_GROUPS = [
       },
       {
         method: 'WS', path: 'replay:screenshot',
-        summary: '回放截图',
+        summary: '回放截图（before/after 各一次，含 kind）',
         tryable: false,
         respExample: J({
           type: 'replay:screenshot',
-          payload: { replayId: 'uuid', trajectoryId: 42, stepId: 501, fileName: 'step.png', url: '/api/...' },
+          payload: {
+            replayId: 'uuid', trajectoryId: 42, stepId: 501,
+            kind: 'after', fileName: 'step-1-after-….png', url: '/api/test/screenshots/...',
+          },
         }),
       },
       {

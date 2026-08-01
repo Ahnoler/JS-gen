@@ -96,22 +96,44 @@ function listNewScreenshots(beforeFiles, runDir) {
   const newScreenshots = afterFiles.filter((f) => !beforeFiles.has(f));
   const prefix = runDirUrlPrefix(runDir);
   const stepIndex = (f) => parseInt(f.match(/^step-(\d+)-/)?.[1] ?? '0', 10);
+  const kindOf = (f) => {
+    if (/-before-/.test(f)) return 'before';
+    if (/-after-/.test(f)) return 'after';
+    return 'after';
+  };
   return newScreenshots
-    .sort((a, b) => stepIndex(a) - stepIndex(b))
+    .sort((a, b) => {
+      const d = stepIndex(a) - stepIndex(b);
+      if (d !== 0) return d;
+      return kindOf(a) === 'before' ? -1 : 1;
+    })
     .map((f) => ({
       fileName: f,
       url: `/api/test/screenshots/${prefix}/${f}`,
       stepNumber: stepIndex(f) || null,
+      kind: kindOf(f),
+      absolutePath: path.join(runDir, f),
     }));
 }
 
 /**
- * Find screenshot for assembler step N among known files (newest match).
+ * Find screenshot(s) for assembler step N.
+ * @param {number} stepNumber
+ * @param {Array} screenshotList
+ * @param {'before'|'after'|null} [kind] if set, return that kind only; else return newest match
  */
-export function findScreenshotForStep(stepNumber, screenshotList) {
+export function findScreenshotForStep(stepNumber, screenshotList, kind = null) {
   const n = Number(stepNumber);
-  const matches = (screenshotList || []).filter((s) => s.stepNumber === n || s.fileName?.startsWith(`step-${n}-`));
+  let matches = (screenshotList || []).filter((s) => s.stepNumber === n || s.fileName?.startsWith(`step-${n}-`));
+  if (kind) matches = matches.filter((s) => s.kind === kind || s.fileName?.includes(`-${kind}-`));
   return matches.length ? matches[matches.length - 1] : null;
+}
+
+export function findScreenshotsForStep(stepNumber, screenshotList) {
+  return {
+    before: findScreenshotForStep(stepNumber, screenshotList, 'before'),
+    after: findScreenshotForStep(stepNumber, screenshotList, 'after'),
+  };
 }
 
 /**

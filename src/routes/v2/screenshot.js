@@ -13,6 +13,17 @@ export default function (app) {
     }
   });
 
+  /** Body: { steps: number[] } → screenshots[] metadata (no BLOB). */
+  app.post('/api/v2/screenshots/by-steps', async (req, res) => {
+    try {
+      const steps = Array.isArray(req.body?.steps) ? req.body.steps : [];
+      const screenshots = await screenshotService.listBySteps(steps);
+      res.json({ screenshots });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/v2/trajectories/:trajectoryId/screenshots', async (req, res) => {
     try {
       const list = await screenshotService.listByTrajectory(+req.params.trajectoryId);

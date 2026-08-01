@@ -1,9 +1,26 @@
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
 import * as execSession from '../../executor-session-client.js';
-import { persistLiveActionEntries, removeLivePersistedActions } from './persist-live.js';
+import {
+  persistLiveActionEntries,
+  removeLivePersistedActions,
+  stashOrApplyStepScreenshot,
+} from './persist-live.js';
+import { writeAgentEvent } from './agent-io.js';
 
-/** Durable executor → control-plane event hook for a session (persist + broadcast). */
+/** Enable/disable Python before/after page screenshots for a session. */
+export function setSessionCaptureScreenshots(session, enabled) {
+  if (!session) return false;
+  return writeAgentEvent(session, 'capture_screenshots', { enabled: !!enabled });
+}
+
+/** Durable executor → control-plane event hook for a session (persist + broadcast).
+ *
+ * Listener #1 of 3 for step_screenshot (executor product path):
+ * USE_EXECUTOR sessions receive Python events via executor WS → subscribeSessionEvents.
+ * Handles manual / CDP live-persist (+ agent action_log_sync when autoPersist).
+ * AI record/start has its own subscribe in trajectory-record-lifecycle.js (listener #3).
+ */
 export function bindExecutorSessionEvents(session) {
   if (!session?.useExecutor || !session.sessionId || session._persistUnsub) return;
   session._persistUnsub = execSession.subscribeSessionEvents(session.sessionId, (type, payload) => {
@@ -59,6 +76,15 @@ export function bindExecutorSessionEvents(session) {
       if (autoPersist && entry && Number.isFinite(Number(session.dbTrajectoryId))) {
         persistLiveActionEntries(session, [entry], { source: 'cdp' }).catch(() => {});
       }
+      return;
+    }
+    if (type === 'step_screenshot') {
+      const entryId = payload?.entryId;
+      stashOrApplyStepScreenshot(session, entryId, {
+        before: payload?.before,
+        after: payload?.after,
+        trajectoryId: session.dbTrajectoryId,
+      }).catch((err) => console.warn('[step-screenshot] stash failed:', err?.message || err));
       return;
     }
     if (type === 'manual_record_status') {

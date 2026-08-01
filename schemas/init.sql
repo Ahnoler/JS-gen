@@ -236,17 +236,18 @@ CREATE TABLE `snapshot_field` (
 -- 截图 (Screenshot)
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `screenshot` (
-  `id`            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  `file_name`     VARCHAR(255) NOT NULL COMMENT '文件名，如 step-3-1712345678-abc.png',
-  `image_data`    MEDIUMBLOB NOT NULL COMMENT 'PNG 图片二进制 (MEDIUMBLOB 最大 16MB)',
-  `file_size`     INT UNSIGNED DEFAULT 0 COMMENT '文件大小（字节）',
-  `mime_type`     VARCHAR(64) DEFAULT 'image/png' COMMENT 'MIME 类型',
-  `trajectory_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id',
-  `step_index`    INT UNSIGNED DEFAULT 0 COMMENT '对应步骤序号',
-  `created_at`    DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `id`                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `image_data`          MEDIUMBLOB NOT NULL COMMENT 'PNG 图片二进制 (MEDIUMBLOB 最大 16MB)',
+  `file_size`           INT UNSIGNED DEFAULT 0 COMMENT '文件大小（字节）',
+  `mime_type`           VARCHAR(64) DEFAULT 'image/png' COMMENT 'MIME 类型',
+  `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id',
+  `trajectory_step_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_step.id',
+  `kind`                ENUM('before','after') NOT NULL DEFAULT 'after' COMMENT '执行前/执行后截图',
+  `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_trajectory_id` (`trajectory_id`),
-  KEY `idx_step_index` (`step_index`),
-  CONSTRAINT `fk_ss_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL
+  UNIQUE KEY `uk_ss_step_kind` (`trajectory_step_id`, `kind`),
+  CONSTRAINT `fk_ss_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_ss_trajectory_step` FOREIGN KEY (`trajectory_step_id`) REFERENCES `trajectory_step` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='截图';
 
 -- ─────────────────────────────────────────────────────────────

@@ -583,6 +583,16 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
             emit_json({"event": "manual_record_status", "data": {"enabled": False}})
         return 'continue'
 
+    if event == "capture_screenshots":
+        from .actions._state import set_capture_screenshots
+        data = msg.get("data") or {}
+        enabled = bool(data.get("enabled", True))
+        set_capture_screenshots(enabled)
+        emit_json({"event": "capture_screenshots_status", "data": {"enabled": enabled}})
+        sys.stderr.write(f"[session] capture_screenshots={enabled}\n")
+        sys.stderr.flush()
+        return 'continue'
+
     # BiB canvas / CDP inspect path — same payload shape as page inject
     if event == "manual_dom_event":
         recorder = session_state.get('manual_recorder')

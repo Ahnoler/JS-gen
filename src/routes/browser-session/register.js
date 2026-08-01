@@ -755,6 +755,10 @@ export default function registerBrowserSessionRoutes(app) {
     if (!session) return res.status(404).json({ error: 'Session not found' });
     session.autoPersist = !!enabled;
     gb.autoPersist = !!enabled;
+    // Sync Python capture flag when auto-persist + trajectory binding
+    if (sessionRuntimeReady(session) && Number.isFinite(Number(session.dbTrajectoryId))) {
+      writeAgentEvent(session, 'capture_screenshots', { enabled: !!enabled });
+    }
     res.json({ status: 'ok', autoPersist: !!enabled });
   });
 

@@ -163,16 +163,17 @@ export function up(knex) {
     // ── Screenshot ──
     .createTable('screenshot', (t) => {
       t.bigIncrements('id').unsigned().primary();
-      t.string('file_name', 255).notNullable();
       // Knex registers mediumblob() but MySQL dialect may emit type "undefined";
       // specificType keeps MEDIUMBLOB stable (matches schemas/init.sql).
       t.specificType('image_data', 'MEDIUMBLOB').notNullable();
       t.integer('file_size').unsigned().defaultTo(0);
       t.string('mime_type', 64).defaultTo('image/png');
       t.bigInteger('trajectory_id').unsigned().nullable().references('id').inTable('trajectory').onDelete('SET NULL');
-      t.integer('step_index').unsigned().defaultTo(0);
+      t.bigInteger('trajectory_step_id').unsigned().nullable()
+        .references('id').inTable('trajectory_step').onDelete('CASCADE');
+      t.enu('kind', ['before', 'after']).notNullable().defaultTo('after');
       t.index('trajectory_id');
-      t.index('step_index');
+      t.unique(['trajectory_step_id', 'kind'], { indexName: 'uk_ss_step_kind' });
       t.datetime('created_at', 3).notNullable().defaultTo(knex.fn.now(3));
     })
     // ── ApiOverride (config; scope_ref_id is logical, not hard FK) ──

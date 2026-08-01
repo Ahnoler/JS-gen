@@ -55,6 +55,16 @@ async function removeRecordedStepsByDbIds(...args) {
   return mod.removeRecordedStepsByDbIds(...args);
 }
 
+async function stashOrApplyStepScreenshot(...args) {
+  const mod = await import('../routes/browser-session/persist-live.js');
+  return mod.stashOrApplyStepScreenshot(...args);
+}
+
+async function flushPendingStepScreenshot(...args) {
+  const mod = await import('../routes/browser-session/persist-live.js');
+  return mod.flushPendingStepScreenshot(...args);
+}
+
 /**
  * Default login/navigate — NOT written to trajectory_step (is_replay / suppress persist).
  */
@@ -148,7 +158,26 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   }
 
   const events = [];
+  // Listener #3 of 3 for step_screenshot (product AI record/start):
+  // startTrajectoryRecording opens its own subscribeSessionEvents for this run's agent
+  // action_log_sync → appendRecordedStep. Separate from bindExecutorSessionEvents (#1),
+  // which focuses on manual/cdp (+ optional agent autoPersist). Both must handle
+  // step_screenshot or AI-recording shots would be dropped.
   const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, async (type, payload) => {
+    if (type === 'step_screenshot') {
+      const entryId = payload?.entryId;
+      if (!entryId) return;
+      const ctx = session || runtime;
+      if (session && !session._pendingStepShots) session._pendingStepShots = runtime._pendingStepShots || new Map();
+      if (!runtime._pendingStepShots) runtime._pendingStepShots = session?._pendingStepShots || new Map();
+      if (session) session._pendingStepShots = runtime._pendingStepShots;
+      await stashOrApplyStepScreenshot(ctx, entryId, {
+        before: payload?.before,
+        after: payload?.after,
+        trajectoryId: tid,
+      }).catch((err) => console.warn('[record] step_screenshot failed:', err?.message || err));
+      return;
+    }
     if (type !== 'action_log_sync') return;
     if (runtime.suppressStepPersist || runtime.isReplay) return;
     const entries = Array.isArray(payload?.entries) ? payload.entries : [];
@@ -160,6 +189,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     if (session && !session.persistedActionIds) {
       session.persistedActionIds = runtime.persistedActionIds;
     }
+    if (!runtime._pendingStepShots) runtime._pendingStepShots = new Map();
+    if (session) session._pendingStepShots = runtime._pendingStepShots;
 
     if (removedIds.length) {
       const dbIds = [];
@@ -174,6 +205,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         runtime._lastPersistByActionId.delete(aid);
         session?.persistedActionIds?.delete(aid);
         session?._lastPersistByActionId?.delete(aid);
+        runtime._pendingStepShots?.delete(aid);
+        session?._pendingStepShots?.delete(aid);
       }
       if (dbIds.length) {
         await removeRecordedStepsByDbIds(tid, dbIds).catch((err) => {
@@ -203,6 +236,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       if (persisted) {
         runtime._lastPersistByActionId.set(id, persisted);
         session?._lastPersistByActionId?.set(id, persisted);
+        if (persisted.dbId != null) {
+          await flushPendingStepScreenshot(runtime, id, persisted.dbId, tid);
+        }
         broadcast('action_persisted', {
           trajectoryDbId: tid,
           sessionId: runtime.sessionId,
@@ -213,6 +249,14 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         runtime.persistedActionIds.delete(id);
       }
     }
+  });
+
+  // Enable per-step before/after screenshots for this recording session
+  execSession.forwardStdin({
+    nodeUuid: runtime.executorNodeUuid,
+    sessionId: runtime.sessionId,
+    event: 'capture_screenshots',
+    data: { enabled: true },
   });
 
   const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
@@ -331,6 +375,14 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
         sessionId: runtime.sessionId,
         event: 'manual_record_stop',
         data: {},
+      });
+    } catch {}
+    try {
+      execSession.forwardStdin({
+        nodeUuid: runtime.executorNodeUuid,
+        sessionId: runtime.sessionId,
+        event: 'capture_screenshots',
+        data: { enabled: false },
       });
     } catch {}
     runtime.selectedPhaseId = null;
@@ -462,6 +514,15 @@ export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phas
     event: enabled ? 'manual_record_start' : 'manual_record_stop',
     data: {},
   });
+  // Manual recording also needs before/after capture when steps will persist
+  try {
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: 'capture_screenshots',
+      data: { enabled: !!enabled },
+    });
+  } catch {}
   const status = await execSession.waitForSessionEvent(runtime.sessionId, 'manual_record_status', 10000)
     .catch(() => ({ enabled: !!enabled }));
   runtime.manualRecording = !!status.enabled;

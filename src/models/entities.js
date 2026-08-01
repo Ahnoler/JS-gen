@@ -223,12 +223,12 @@
 /**
  * @typedef {Object} Screenshot
  * @property {number} [id]
- * @property {string} fileName
  * @property {Buffer} imageData
  * @property {number} [fileSize]
  * @property {string} [mimeType]
  * @property {number|null} [trajectoryId]
- * @property {number} [stepIndex]
+ * @property {number|null} [trajectoryStepId]
+ * @property {'before'|'after'} [kind]
  * @property {string} createdAt
  */
 

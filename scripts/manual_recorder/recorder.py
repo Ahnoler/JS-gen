@@ -32,6 +32,9 @@ from typing import Callable, Optional
 from ..actions._state import (
     _ACTION_LOG,
     _record_action,
+    capture_page_png_b64,
+    capture_screenshots_enabled,
+    emit_step_screenshot,
     set_current_source,
 )
 from ..agent_utils import emit_json
@@ -50,6 +53,7 @@ class ManualRecorder:
         self._binding_pages: set[int] = set()
         self._nav_hooks: set[int] = set()
         self._handle_lock = None  # asyncio.Lock, created lazily
+        self._pending_before_b64: str | None = None
 
     async def start(self) -> dict:
         self.enabled = True
@@ -324,11 +328,49 @@ class ManualRecorder:
         sys.stderr.flush()
         return entry
 
+    async def _record_mapped_async(self, mapped) -> Optional[dict]:
+        """Record + optional before/after screenshots (manual path)."""
+        before_b64 = self._pending_before_b64
+        self._pending_before_b64 = None
+
+        if capture_screenshots_enabled() and before_b64 is None:
+            try:
+                before_b64 = await capture_page_png_b64(self.browser_context)
+            except Exception:
+                before_b64 = None
+
+        entry = self._record_mapped(mapped)
+        if not entry:
+            return None
+
+        if capture_screenshots_enabled():
+            after_b64 = None
+            try:
+                import asyncio
+                await asyncio.sleep(0.08)
+                after_b64 = await capture_page_png_b64(self.browser_context)
+            except Exception:
+                after_b64 = None
+            eid = entry.get('id') if isinstance(entry, dict) else None
+            if eid:
+                emit_step_screenshot(str(eid), before_b64, after_b64)
+        return entry
+
     async def _handle_payload_async(self, payload: dict) -> None:
         lock = await self._ensure_lock()
         async with lock:
+            # before: first thing under the lock (user action already happened)
+            before_b64 = None
+            if capture_screenshots_enabled():
+                try:
+                    before_b64 = await capture_page_png_b64(self.browser_context)
+                except Exception:
+                    before_b64 = None
+            self._pending_before_b64 = before_b64
+
             mapped = _map_dom_event_to_action(payload)
             if not mapped:
+                self._pending_before_b64 = None
                 sys.stderr.write(f'[manual-recorder] unmapped kind={payload.get("kind")}\n')
                 sys.stderr.flush()
                 return
@@ -339,7 +381,7 @@ class ManualRecorder:
             if action_name == 'click_element_by_index':
                 params['index'] = -1
 
-            self._record_mapped((action_name, params, element))
+            await self._record_mapped_async((action_name, params, element))
 
 
 def asyncio_create_task(coro):

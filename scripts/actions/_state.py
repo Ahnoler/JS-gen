@@ -7,12 +7,27 @@ for external callers (session_runner, recorder, agent_utils).
 """
 
 from ..models import ActionEntry
+import base64
 import re
 
 _ACTION_LOG: list[dict] = []
 _TRAJECTORY_URL: str | None = None
 _CURRENT_PHASE: int = 0
 _CURRENT_SOURCE: str = 'agent'
+_CAPTURE_SCREENSHOTS: bool = False
+
+# Actions that never become replay steps — skip before/after capture.
+# Shared with scripts/script_assembler.py (imported there).
+_SKIP_SCREENSHOT_ACTIONS = frozenset({
+    'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
+    'check_field_value', 'verify_field_value', 'take_screenshot',
+    'save_trajectory', 'save_case_data', 'read_case_data',
+    'match_form_rule', 'init_task_list', 'get_pending_tasks', 'sync_tasks_from_errors',
+    'expand_all_el_tree', 'task_done', 'task_retry',
+    'save_form_snapshot',
+    'wait_for_loading', 'close_notification',
+    'mark_field_done', 'rebuild_task_list',
+})
 
 # Action → old-format command mapping (legacy, mirrors models/action.py:ACTION_TO_COMMAND)
 _ACTION_TO_COMMAND = {
@@ -44,6 +59,56 @@ def set_current_source(source: str):
     """Set recording source for subsequent _record_action calls (agent|manual|cdp)."""
     global _CURRENT_SOURCE
     _CURRENT_SOURCE = source if source in ('agent', 'manual', 'cdp') else 'agent'
+
+
+def set_capture_screenshots(enabled: bool):
+    """Enable/disable per-step before/after page.screenshot capture."""
+    global _CAPTURE_SCREENSHOTS
+    _CAPTURE_SCREENSHOTS = bool(enabled)
+
+
+def capture_screenshots_enabled() -> bool:
+    return bool(_CAPTURE_SCREENSHOTS)
+
+
+def should_skip_screenshot_action(action_name: str) -> bool:
+    return (action_name or '') in _SKIP_SCREENSHOT_ACTIONS
+
+
+async def capture_page_png_b64(browser_context, *, full_page: bool = True) -> str | None:
+    """Best-effort Playwright screenshot → base64 PNG string (no data: prefix)."""
+    if not capture_screenshots_enabled():
+        return None
+    try:
+        page = await browser_context.get_current_page()
+        if page is None:
+            return None
+        png = await page.screenshot(full_page=full_page, type='png')
+        if not png:
+            return None
+        return base64.b64encode(png).decode('ascii')
+    except Exception:
+        return None
+
+
+def emit_step_screenshot(entry_id: str, before_b64: str | None, after_b64: str | None):
+    """One-shot screenshot event — never attach bytes to _ACTION_LOG entries."""
+    if not entry_id:
+        return
+    if not before_b64 and not after_b64:
+        return
+    try:
+        from ..agent_utils import emit_json
+        emit_json({
+            "event": "step_screenshot",
+            "data": {
+                "entryId": str(entry_id),
+                "before": before_b64,
+                "after": after_b64,
+            },
+        })
+    except ImportError:
+        pass
 
 
 def _emit_action_log_sync(removed_ids=None):

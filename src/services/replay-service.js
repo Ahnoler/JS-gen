@@ -14,10 +14,11 @@ import {
   abortActiveScriptRun,
   isScriptExecuting,
   parseReplayStepMarker,
-  findScreenshotForStep,
+  findScreenshotsForStep,
 } from '../runtime/script-runner.js';
 import { createPushChannel } from '../runtime/sse-channel.js';
 import { broadcast } from '../ws-server.js';
+import * as screenshotService from './screenshot-service.js';
 
 /** @type {Map<string, object>} */
 const plansById = new Map();
@@ -344,10 +345,13 @@ export async function startReplay(trajectoryId, { replayPlanId = null, ws = null
           stepNumber: n,
         };
         const shots = ctx.screenshotsSoFar();
-        const shot = findScreenshotForStep(n, shots);
-        if (shot && !screenshotsAcc.find((s) => s.fileName === shot.fileName)) {
+        const { before, after } = findScreenshotsForStep(n, shots);
+
+        const emitShot = (shot, kind) => {
+          if (!shot || screenshotsAcc.find((s) => s.fileName === shot.fileName)) return;
           screenshotsAcc.push({
             ...shot,
+            kind,
             stepId: mapped.stepId,
             stepNumber: mapped.stepNumber ?? n,
           });
@@ -355,10 +359,33 @@ export async function startReplay(trajectoryId, { replayPlanId = null, ws = null
             stepId: mapped.stepId,
             phaseId: mapped.phaseId,
             stepNumber: mapped.stepNumber ?? n,
+            kind,
             fileName: shot.fileName,
             url: shot.url,
           });
+        };
+        emitShot(before, 'before');
+        emitShot(after, 'after');
+
+        // Persist to MySQL (overwrite recording screenshots for this step)
+        if (mapped.stepId != null && (before?.absolutePath || after?.absolutePath)) {
+          const persistOne = (shot, kind) => {
+            if (!shot?.absolutePath || !existsSync(shot.absolutePath)) return;
+            try {
+              const buf = readFileSync(shot.absolutePath);
+              screenshotService.replaceStepScreenshot(mapped.stepId, {
+                trajectoryId: tid,
+                kind,
+                buffer: buf,
+              }).catch((err) => console.warn('[replay] screenshot upsert failed:', err?.message || err));
+            } catch (err) {
+              console.warn('[replay] screenshot read failed:', err?.message || err);
+            }
+          };
+          persistOne(before, 'before');
+          persistOne(after, 'after');
         }
+
         if (mapped.stepId != null && !completedStepIds.includes(mapped.stepId)) {
           completedStepIds.push(mapped.stepId);
         }

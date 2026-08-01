@@ -8,7 +8,7 @@ import {
   killTree, killOrphans, waitForReady, spawnAgent,
 } from '../../runtime/agent-process.js';
 import { broadcastWatcherStatus } from './broadcasts.js';
-import { persistLiveActionEntries } from './persist-live.js';
+import { persistLiveActionEntries, stashOrApplyStepScreenshot } from './persist-live.js';
 
 async function ensureCdpDiscovered() {
   const gb = state.globalBrowser;
@@ -62,8 +62,13 @@ export async function ensureGlobalBrowser(modelId) {
     broadcastWatcherStatus();
     console.log('[browser-global] Browser ready');
 
-    // Persistent stdout listener: always forward action_log_sync events
-    // regardless of which handler (step, CDP, etc.) is active
+    // Persistent stdout listener: always forward action_log_sync / manual / cdp / step_screenshot
+    // regardless of which handler (step, CDP, etc.) is active.
+    //
+    // Listener #2 of 3 for step_screenshot (local / engineering debug session):
+    // When USE_EXECUTOR is off, the control plane spawns Python directly (ensureGlobalBrowser)
+    // and reads child.stdout — there is no executor WS fan-out. This is the /api/browser/session
+    // debug path used by the in-repo engineering tools, not the product v2 executor attach flow.
     let syncBuf = '';
     child.stdout.on('data', (chunk) => {
       syncBuf += chunk.toString();
@@ -109,6 +114,16 @@ export async function ensureGlobalBrowser(modelId) {
             if (autoPersist && entry && session && Number.isFinite(Number(session.dbTrajectoryId))) {
               persistLiveActionEntries(session, [entry], { source: 'cdp' })
                 .catch((err) => console.warn('[cdp-action] live persist failed:', err.message));
+            }
+          } else if (msg.event === 'step_screenshot') {
+            const session = [...state.sessions.values()][0];
+            const data = msg.data || {};
+            if (session && data.entryId) {
+              stashOrApplyStepScreenshot(session, data.entryId, {
+                before: data.before,
+                after: data.after,
+                trajectoryId: session.dbTrajectoryId,
+              }).catch((err) => console.warn('[step-screenshot] stash failed:', err.message));
             }
           } else if (msg.event === 'manual_record_status') {
             gb.manualRecording = !!msg.data?.enabled;

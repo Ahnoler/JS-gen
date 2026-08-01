@@ -873,8 +873,9 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
 
         code = _generate_action_code(entry, step, url, is_first_fill)
         if code:
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-before-${{_RUN_ID}}.png`), fullPage: true }});')
             body.append(code)
-            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-${{_RUN_ID}}.png`), fullPage: true }});')
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-after-${{_RUN_ID}}.png`), fullPage: true }});')
             # Machine-readable marker for trajectory replay WS (step id/phase from action JSON)
             _sid = _e.get('id') or _e.get('stepId') or ''
             _pid = _e.get('phaseId') or _e.get('trajectoryPhaseId') or ''
@@ -921,8 +922,9 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
 
         code = _generate_action_code(entry, step, url, is_first_fill)
         if code:
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-before-${{_RUN_ID}}.png`), fullPage: true }});')
             body.append(code)
-            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-${{_RUN_ID}}.png`), fullPage: true }});')
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-after-${{_RUN_ID}}.png`), fullPage: true }});')
             step += 1
 
     return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
@@ -954,8 +956,9 @@ def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=N
             in_block = True
         code = _generate_action_code(entry, step, url, is_first_fill)
         if code:
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-before-${{_RUN_ID}}.png`), fullPage: true }});')
             body.append(code)
-            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-${{_RUN_ID}}.png`), fullPage: true }});')
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-after-${{_RUN_ID}}.png`), fullPage: true }});')
             step += 1
     return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + PARTIAL_CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
 
