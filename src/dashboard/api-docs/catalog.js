@@ -480,6 +480,104 @@ export const API_GROUPS = [
     ],
   },
   {
+    id: 'batch-import',
+    name: '批量导入管理',
+    description: 'Excel 批量导入交易并自动录制。主接口一站式：analyze → 草稿 → prepare → record/start → detach；模板 / 状态查询 / 取消为辅助。进度可通过 WS batch:* 或轮询获取。',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/v2/trajectories/batch/template',
+        summary: '下载批量录制 Excel 模板',
+        desc: '返回 .xlsx 二进制（非 JSON 信封）。列：交易名称 / 需求描述。',
+        tryable: false,
+        notes: [
+          'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'filename=trajectory-batch-template.xlsx',
+        ],
+      },
+      {
+        method: 'POST', path: '/api/v2/trajectories/batch/import',
+        summary: '批量导入 Excel 并自动录制（一站式）',
+        desc: 'multipart 上传 .xlsx；服务端对每行自动执行 analyze → 保存草稿 → prepare → record/start → detach。'
+          + ' 立即返回 HTTP 202；后台并行录制（全局 FIFO，受执行机槽位限制）。'
+          + ' 需 USE_EXECUTOR=true；须带 Idempotency-Key。functionId / systemAccountId 由页面上下文随表单提交。',
+        reqExample: 'form-data: file=@batch.xlsx; functionId=3; systemAccountId=10; model=deepseek-v4-flash\nHeader: Idempotency-Key: <uuid>',
+        respExample: J({
+          batchId: 'uuid',
+          status: 'accepted',
+          functionId: 3,
+          systemAccountId: 10,
+          summary: { total: 5, accepted: 4, rejected: 1, recorded: 0, failed: 0 },
+          items: [{ id: 1, rowNumber: 2, name: '开户交易', status: 'pending' }],
+        }),
+        notes: [
+          'HTTP 202 Accepted；v2 信封 body.code 仍为 200',
+          '仅 .xlsx；无效行记 rejected，有效行继续；无有效行则 400',
+          '同 Idempotency-Key + 同内容 → 返回原任务当前状态；内容不一致 → 409',
+          'USE_EXECUTOR=false → 503',
+          'WS: batch:progress / batch:done',
+        ],
+      },
+      {
+        method: 'GET', path: '/api/v2/trajectories/batch/{batchId}',
+        summary: '查询批量任务状态（分页明细）',
+        params: [
+          { name: 'batchId', type: 'string', required: true, in: 'path' },
+          { name: 'page', type: 'number', in: 'query', example: '1' },
+          { name: 'pageSize', type: 'number', in: 'query', example: '50' },
+        ],
+        notes: [
+          '非终态 HTTP 202；终态 HTTP 200',
+          'itemStatus: pending|analyzing|analyzed|queued|waiting_executor|preparing|recording|recorded|failed|rejected|cancelled',
+          'jobStatus: accepted|running|waiting_executor|cancelling|cancelled|completed|completed_with_errors|failed',
+        ],
+      },
+      {
+        method: 'POST', path: '/api/v2/trajectories/batch/{batchId}/cancel',
+        summary: '取消批量任务',
+        desc: '未开始项标 cancelled；analyzing 丢弃 LLM 结果不建草稿；preparing/recording 安全停止并 detach。'
+          + ' 已 recorded 永不回退。',
+        params: [{ name: 'batchId', type: 'string', required: true, in: 'path' }],
+      },
+      {
+        method: 'WS', path: 'batch:progress',
+        summary: '批量导入/录制进度',
+        tryable: false,
+        respExample: J({
+          type: 'batch:progress',
+          payload: {
+            batchId: 'uuid',
+            itemId: 1,
+            row: 2,
+            trajectoryId: 42,
+            itemStatus: 'recording',
+            jobStatus: 'running',
+            version: 3,
+            summary: { total: 5, recorded: 1, failed: 0 },
+          },
+        }),
+        notes: [
+          '先写库再广播；允许丢失/乱序，前端用 version 去重并以 GET 状态为事实源',
+          '批量页只需订阅 batch:*，无需编排 recording:*',
+          '连接通道仍为 ws://<host>/ws',
+        ],
+      },
+      {
+        method: 'WS', path: 'batch:done',
+        summary: '批量任务全部行终态',
+        tryable: false,
+        respExample: J({
+          type: 'batch:done',
+          payload: {
+            batchId: 'uuid',
+            jobStatus: 'completed_with_errors',
+            summary: { total: 5, recorded: 4, failed: 1, rejected: 0 },
+          },
+        }),
+        notes: ['连接通道仍为 ws://<host>/ws'],
+      },
+    ],
+  },
+  {
     id: 'recording',
     name: '交易录制',
     description: 'prepare → start → stop → stream/detach（断开画面）或 detach（释放执行资源）。stop / 断开画面不释放槽位；detach 才关浏览器并释放槽。离开工作室不自动 detach；10 分钟无步骤写入自动回收。',
@@ -999,7 +1097,7 @@ export const API_GROUPS = [
           payload: { trajectoryId: 42, reason: 'idle', recordStatus: 'draft', sessionId: 'uuid' },
         }),
         notes: [
-          'reason: idle（10 分钟无步骤）| manual',
+          'reason: idle（10 分钟无步骤）| manual | batch_complete | batch_cancel | batch_failed | batch_recovery',
           '前端应按 trajectoryId 过滤；只清空本交易画布与 prepare 状态',
           '同时会广播 remote:status（attached=false, trajectoryId）',
         ],
@@ -1298,6 +1396,8 @@ export const ENUMS = [
   { name: 'remote_session.status', values: 'active（推流中）/ idle（断开画面浏览器仍在）/ closed / crashed' },
   { name: 'phase.status', values: 'pending / running / completed / failed' },
   { name: 'step.source', values: 'agent / manual' },
+  { name: 'batch jobStatus', values: 'accepted / running / waiting_executor / cancelling / cancelled / completed / completed_with_errors / failed' },
+  { name: 'batch itemStatus', values: 'pending / analyzing / analyzed / queued / waiting_executor / preparing / recording / recorded / failed / rejected / cancelled' },
   { name: '节点 type', values: '1 系统 / 2 模块 / 3 功能' },
   { name: 'legacy-engine type', values: 'click / input / select / tab / close / wait / navigate / expand' },
   { name: 'legacy-engine locateBy', values: 'xpath（默认）' },
@@ -1312,4 +1412,12 @@ export const RECORDING_FLOW = [
   'POST .../confirm（人工确认 → completed；取消 → draft）',
   'POST .../resolve-element（可选：按 label 抓定位器写入步骤 element_json）',
   'POST .../stream/detach（断开画面；或 .../detach 释放执行资源关浏览器）',
+];
+
+export const BATCH_RECORDING_FLOW = [
+  'GET /trajectories/batch/template → 填写 交易名称 / 需求描述',
+  'POST /trajectories/batch/import（file + functionId + systemAccountId + Idempotency-Key）→ HTTP 202',
+  '后台：analyze → 草稿 → prepare → record/start → detach（并行，全局 FIFO）',
+  'WS batch:progress / batch:done；或 GET /trajectories/batch/{batchId} 轮询',
+  '可选 POST .../batch/{batchId}/cancel',
 ];

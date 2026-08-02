@@ -2,7 +2,7 @@
  * Swagger-like product API docs UI.
  * Open: /api/docs
  */
-import { API_GROUPS, ENUMS, RECORDING_FLOW } from './catalog.js';
+import { API_GROUPS, ENUMS, RECORDING_FLOW, BATCH_RECORDING_FLOW } from './catalog.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 
@@ -56,6 +56,10 @@ function renderOverview(container) {
       <h3 style="margin-top:16px">推荐录制流程</h3>
       <div class="docs-flow">
         ${RECORDING_FLOW.map((s, i) => `<div class="docs-flow-step">${i + 1}. ${escapeHtml(s)}</div>`).join('')}
+      </div>
+      <h3 style="margin-top:16px">批量 Excel 导入录制</h3>
+      <div class="docs-flow">
+        ${BATCH_RECORDING_FLOW.map((s, i) => `<div class="docs-flow-step">${i + 1}. ${escapeHtml(s)}</div>`).join('')}
       </div>
       <h3 style="margin-top:16px">关键语义</h3>
       <ul>
