@@ -51,6 +51,7 @@
 - get_page_state() — 诊断（含 `iconButtons: [{text, className}, …]`：页面级图标按钮及其 tooltip 文案；`loading`/`openDropdown` 仅在真正可见时为 true）。**🚨 禁止在 loading 时反复调用**：若返回 `page-still-loading` / `page-loading-spin-blocked`，只调用一次 `wait_for_loading()`，然后改用 `click_icon_button` / `click_element` / `scan_visible_fields` 等真实 UI 动作，不要再空转 `get_page_state`。
 - save_case_data(key, value) — 将值保存到进程级 case data 存储（跨步骤/阶段持久化）
 - read_case_data(key) — 从 case data 存储中读取值
+- **use_special_element(special_element_id) — 执行当前阶段下发的特殊元素操作组。仅可使用任务中【特殊元素库候选】列出的 id；成功后步骤会以特殊元素来源写入轨迹。页面状态匹配复杂组件流程时优先调用，不要编造未提供的 id。**
 - check_field_value(label_text) — 返回包含 label/kind/currentValue/placeholder/disabled/selected/required 的 JSON。**kind 为：input/select/date/radio/checkbox 之一。** 用于验证字段是否正确填写。
 - verify_field_value(label_text, expected) — 调用 check_field_value 并将 currentValue 与 expected 比较。匹配返回 ok，不匹配返回 err。填写后用于确认值已正确设置。
 - click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。成功返回 `"ok-clicked"`；如果字段已有值则返回 `"already-filled"`（不以 ok 开头）— 跳过、不录制。

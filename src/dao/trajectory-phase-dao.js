@@ -12,14 +12,14 @@ export async function create(data, trx = null) {
 export async function getById(id, trx = null) {
   const db = trx || getDB();
   const row = await db(TABLE).where({ id }).first();
-  return fromDbRow(row);
+  return parseCandidates(row);
 }
 
 export async function listByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
     .where({ trajectory_id: trajectoryId })
     .orderBy('phase_number');
-  return fromDbRows(rows);
+  return rows.map(parseCandidates);
 }
 
 export async function updateStatus(phaseId, status) {
@@ -32,4 +32,36 @@ export async function updateStatus(phaseId, status) {
   }
   await getDB()(TABLE).where({ id: phaseId }).update(toDbRow(data));
   return getById(phaseId);
+}
+
+function parseCandidates(row) {
+  const obj = fromDbRow(row);
+  if (!obj) return null;
+  const raw = obj.specialElementCandidatesJson;
+  if (raw != null && typeof raw === 'string') {
+    try {
+      obj.specialElementCandidatesJson = JSON.parse(raw);
+    } catch {
+      /* keep string */
+    }
+  }
+  return obj;
+}
+
+export async function update(phaseId, fields, trx = null) {
+  const db = trx || getDB();
+  const patch = toDbRow({ ...fields });
+  delete patch.id;
+  if ('specialElementCandidatesJson' in fields || 'special_element_candidates_json' in fields) {
+    const raw = fields.specialElementCandidatesJson
+      ?? fields.special_element_candidates_json
+      ?? null;
+    patch.special_element_candidates_json = raw == null || typeof raw === 'string'
+      ? raw
+      : JSON.stringify(raw);
+    delete patch.specialElementCandidatesJson;
+  }
+  if (!Object.keys(patch).length) return getById(phaseId, trx);
+  await db(TABLE).where({ id: phaseId }).update(patch);
+  return getById(phaseId, trx);
 }

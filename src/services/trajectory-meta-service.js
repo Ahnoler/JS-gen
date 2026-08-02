@@ -298,13 +298,31 @@ export async function createTransactionWithPhases({
       steps: [],
     }, client);
 
+    let systemId = null;
+    try {
+      const { resolveAncestorSystemId } = await import('./hierarchy-service.js');
+      systemId = await resolveAncestorSystemId(resolvedFunctionId);
+    } catch {
+      systemId = null;
+    }
+
     for (let i = 0; i < parsed.length; i++) {
+      let candidates = null;
+      if (systemId) {
+        try {
+          const { fetchDisplayCandidatesForDescription } = await import('./special-element-service.js');
+          candidates = await fetchDisplayCandidatesForDescription(systemId, parsed[i], 3);
+        } catch {
+          candidates = [];
+        }
+      }
       await trajectoryPhaseDao.create({
         phaseId: randomUUID(),
         phaseNumber: i + 1,
         trajectoryId: trajId,
         status: 'pending',
         description: parsed[i],
+        specialElementCandidatesJson: candidates?.length ? JSON.stringify(candidates) : null,
       }, client);
     }
 

@@ -268,6 +268,29 @@ export async function listNodes({ type, parentId } = {}) {
 }
 
 /**
+ * Walk parent_id upward until a type=1 系统 node is found.
+ * Returns that system id, or null if the chain is broken / not under a system.
+ * @param {number|string} nodeId
+ * @returns {Promise<number|null>}
+ */
+export async function resolveAncestorSystemId(nodeId) {
+  const startId = Number(nodeId);
+  if (!Number.isFinite(startId) || startId <= 0) return null;
+  const guard = new Set();
+  let curId = startId;
+  while (Number.isFinite(curId) && curId > 0 && !guard.has(curId)) {
+    guard.add(curId);
+    const node = await systemDao.getRawById(curId);
+    if (!node) return null;
+    if (Number(node.type) === NODE_TYPE.SYSTEM) return Number(node.id);
+    if (isRootNodeId(node.id)) return null;
+    if (isRootParentId(node.parentId)) return null;
+    curId = Number(node.parentId);
+  }
+  return null;
+}
+
+/**
  * Build ancestry chain root → … → node (inclusive).
  */
 export function buildPath(nodeId, byId) {

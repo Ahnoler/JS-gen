@@ -122,6 +122,7 @@ CREATE TABLE `trajectory_phase` (
   `trajectory_id`  BIGINT UNSIGNED NOT NULL COMMENT '外键 → trajectory.id',
   `phase_number`   INT UNSIGNED NOT NULL COMMENT '阶段序号（1-based）',
   `description`    TEXT COMMENT '阶段任务完整描述（执行阶段时下发的 task）',
+  `special_element_candidates_json` JSON NULL COMMENT '阶段创建/同步时标记的候选特殊元素快照',
   `status`         ENUM('pending','running','completed','failed') DEFAULT 'pending',
   `created_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `completed_at`   DATETIME(3) DEFAULT NULL,
@@ -148,8 +149,8 @@ CREATE TABLE `trajectory_step` (
   `error`               TEXT COMMENT '错误信息',
   `extracted_content`   TEXT COMMENT '执行结果',
   `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
-  `source`              ENUM('agent','manual','cdp') NOT NULL DEFAULT 'agent'
-    COMMENT '动作来源：agent=AI Agent 录制 | manual=人工录制 | cdp=CDP 反查录制',
+  `source`              ENUM('agent','manual','cdp','special_element') NOT NULL DEFAULT 'agent'
+    COMMENT '动作来源：agent|manual|cdp|special_element',
   `confirmed`           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '人工确认',
   `confirmed_at`        DATETIME(3) DEFAULT NULL COMMENT '人工确认时间',
   `is_replay`           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=回放执行产生，不计入阶段步骤列表',
@@ -164,6 +165,89 @@ CREATE TABLE `trajectory_step` (
   CONSTRAINT `fk_step_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_step_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='轨迹步骤';
+
+-- ─────────────────────────────────────────────────────────────
+-- 字典类型 / 字典数据（公司同款）
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE `sys_dict_type` (
+  `dict_id`     BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '字典主键',
+  `dict_name`   VARCHAR(100) DEFAULT '' COMMENT '字典名称',
+  `dict_type`   VARCHAR(100) DEFAULT '' COMMENT '字典类型',
+  `status`      CHAR(1) DEFAULT '0' COMMENT '状态（0正常 1停用）',
+  `create_by`   VARCHAR(64) DEFAULT '' COMMENT '创建者',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by`   VARCHAR(64) DEFAULT '' COMMENT '更新者',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `remark`      VARCHAR(500) NULL COMMENT '备注',
+  UNIQUE KEY `dict_type` (`dict_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字典类型表';
+
+CREATE TABLE `sys_dict_data` (
+  `dict_code`   BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '字典编码',
+  `dict_sort`   INT(4) DEFAULT 0 COMMENT '字典排序',
+  `dict_label`  VARCHAR(100) DEFAULT '' COMMENT '字典标签',
+  `dict_value`  VARCHAR(255) DEFAULT '' COMMENT '字典键值',
+  `dict_type`   VARCHAR(100) DEFAULT '' COMMENT '字典类型',
+  `css_class`   VARCHAR(100) NULL COMMENT '样式属性',
+  `list_class`  VARCHAR(100) NULL COMMENT '表格回显样式',
+  `is_default`  CHAR(1) DEFAULT 'N' COMMENT '是否默认（Y是 N否）',
+  `status`      CHAR(1) DEFAULT '0' COMMENT '状态（0正常 1停用）',
+  `create_by`   VARCHAR(64) DEFAULT '' COMMENT '创建者',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by`   VARCHAR(64) DEFAULT '' COMMENT '更新者',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `remark`      VARCHAR(500) NULL COMMENT '备注',
+  KEY `idx_sys_dict_data_type` (`dict_type`, `status`, `dict_sort`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字典数据表';
+
+-- ─────────────────────────────────────────────────────────────
+-- 特殊元素库
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE `special_element` (
+  `id`                         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `name`                       VARCHAR(255) NOT NULL COMMENT '操作组名称',
+  `phase_description`          TEXT NOT NULL COMMENT '来源 trajectory_phase.description 快照',
+  `tag_dict_code`              BIGINT UNSIGNED NOT NULL COMMENT 'FK → sys_dict_data.dict_code',
+  `system_id`                  BIGINT UNSIGNED NOT NULL COMMENT 'FK → system.id（type=1）',
+  `function_id`                BIGINT UNSIGNED NULL COMMENT 'FK → system.id（type=3）；可空',
+  `source_trajectory_id`       BIGINT UNSIGNED NULL,
+  `source_trajectory_phase_id` BIGINT UNSIGNED NULL,
+  `enabled`                    TINYINT(1) NOT NULL DEFAULT 1,
+  `step_count`                 INT UNSIGNED NOT NULL DEFAULT 0,
+  `remark`                     VARCHAR(512) DEFAULT '',
+  `search_text`                TEXT NULL,
+  `embedding_json`             JSON NULL,
+  `embedding_model`            VARCHAR(128) DEFAULT '',
+  `embedding_status`           ENUM('pending','ready','failed','stale') NOT NULL DEFAULT 'pending',
+  `embedding_content_hash`     VARCHAR(64) DEFAULT '',
+  `embedded_at`                DATETIME(3) NULL,
+  `created_at`                 DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at`                 DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY `uk_special_element_sys_name` (`system_id`, `name`),
+  KEY `idx_se_tag_dict` (`tag_dict_code`),
+  KEY `idx_se_system` (`system_id`),
+  KEY `idx_se_source_function` (`function_id`),
+  KEY `idx_se_enabled_system` (`enabled`, `system_id`),
+  CONSTRAINT `fk_se_tag_dict_data` FOREIGN KEY (`tag_dict_code`) REFERENCES `sys_dict_data` (`dict_code`),
+  CONSTRAINT `fk_se_system` FOREIGN KEY (`system_id`) REFERENCES `system` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_se_function` FOREIGN KEY (`function_id`) REFERENCES `system` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_se_source_traj` FOREIGN KEY (`source_trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_se_source_phase` FOREIGN KEY (`source_trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='特殊页面元素操作组';
+
+CREATE TABLE `special_element_step` (
+  `id`                 BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `special_element_id` BIGINT UNSIGNED NOT NULL,
+  `step_number`        INT UNSIGNED NOT NULL,
+  `action_index`       INT UNSIGNED NOT NULL DEFAULT 0,
+  `action_type`        VARCHAR(64) NOT NULL DEFAULT '',
+  `params_json`        JSON NULL,
+  `element_json`       JSON NULL,
+  `created_at`         DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at`         DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY `uk_ses_elem_step` (`special_element_id`, `step_number`),
+  CONSTRAINT `fk_ses_element` FOREIGN KEY (`special_element_id`) REFERENCES `special_element` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='特殊元素所属操作步骤';
 
 -- ─────────────────────────────────────────────────────────────
 -- 案例数据 (CaseData)

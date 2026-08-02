@@ -259,6 +259,157 @@ export const API_GROUPS = [
     ],
   },
   {
+    id: 'sys-dict',
+    name: '字典管理',
+    description: '通用字典类型与数据（sys_dict_type / sys_dict_data）；特殊元素分类用 dict_type=special_element_tag',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/v2/system/dict/type',
+        summary: '字典类型列表',
+        params: [{ name: 'status', type: 'string', in: 'query', desc: '0 正常 / 1 停用', example: '0' }],
+        respExample: J([{ dictId: 1, dictName: '特殊元素标签', dictType: 'special_element_tag', status: '0' }]),
+      },
+      {
+        method: 'GET', path: '/api/v2/system/dict/type/{dictId}',
+        summary: '字典类型详情',
+        params: [{ name: 'dictId', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'POST', path: '/api/v2/system/dict/type',
+        summary: '新增字典类型',
+        reqExample: J({ dictName: '特殊元素标签', dictType: 'special_element_tag', remark: '' }),
+      },
+      {
+        method: 'PUT', path: '/api/v2/system/dict/type/{dictId}',
+        summary: '更新字典类型',
+        params: [{ name: 'dictId', type: 'number', required: true, in: 'path', example: '1' }],
+        reqExample: J({ dictName: '特殊元素标签', status: '0' }),
+      },
+      {
+        method: 'DELETE', path: '/api/v2/system/dict/type/{dictId}',
+        summary: '删除字典类型（下有数据则拒绝）',
+        params: [{ name: 'dictId', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'GET', path: '/api/v2/system/dict/data',
+        summary: '字典数据列表',
+        params: [
+          { name: 'dictType', type: 'string', in: 'query', example: 'special_element_tag' },
+          { name: 'status', type: 'string', in: 'query', example: '0' },
+        ],
+      },
+      {
+        method: 'GET', path: '/api/v2/system/dict/data/type/{dictType}',
+        summary: '某类型下正常状态条目（入库弹窗下拉）',
+        params: [{ name: 'dictType', type: 'string', required: true, in: 'path', example: 'special_element_tag' }],
+        respExample: J([
+          { dictCode: 1, dictLabel: '登录', dictValue: 'login', dictType: 'special_element_tag', status: '0' },
+          { dictCode: 2, dictLabel: '填写', dictValue: 'fill', dictType: 'special_element_tag', status: '0' },
+        ]),
+      },
+      {
+        method: 'GET', path: '/api/v2/system/dict/data/{dictCode}',
+        summary: '字典数据详情',
+        params: [{ name: 'dictCode', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'POST', path: '/api/v2/system/dict/data',
+        summary: '新增字典数据',
+        reqExample: J({
+          dictType: 'special_element_tag',
+          dictLabel: '登录',
+          dictValue: 'login',
+          dictSort: 1,
+        }),
+      },
+      {
+        method: 'PUT', path: '/api/v2/system/dict/data/{dictCode}',
+        summary: '更新字典数据',
+        params: [{ name: 'dictCode', type: 'number', required: true, in: 'path', example: '1' }],
+        reqExample: J({ dictLabel: '登录', status: '0' }),
+      },
+      {
+        method: 'DELETE', path: '/api/v2/system/dict/data/{dictCode}',
+        summary: '删除字典数据（被 special_element 引用则拒绝）',
+        params: [{ name: 'dictCode', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+    ],
+  },
+  {
+    id: 'special-element',
+    name: '特殊元素管理',
+    description: '特殊元素库、步骤快照；按 system_id 隔离；分类标签来自字典管理 special_element_tag',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/v2/special-elements',
+        summary: '特殊元素分页列表',
+        params: [
+          { name: 'systemId', type: 'number', in: 'query', desc: '系统范围（推荐必填）', example: '1' },
+          { name: 'functionId', type: 'number', in: 'query', desc: '可选来源功能过滤' },
+          { name: 'tagDictCode', type: 'number', in: 'query' },
+          { name: 'keyword', type: 'string', in: 'query' },
+          { name: 'enabled', type: 'string', in: 'query', desc: '1/0' },
+          { name: 'page', type: 'number', in: 'query', example: '1' },
+          { name: 'pageSize', type: 'number', in: 'query', example: '20' },
+        ],
+      },
+      {
+        method: 'GET', path: '/api/v2/special-elements/{id}',
+        summary: '详情（含有序 steps）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'PUT', path: '/api/v2/special-elements/{id}',
+        summary: '更新元数据（不可改 systemId）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+        reqExample: J({ name: '复杂登录组', tagDictCode: 1, remark: '', enabled: true }),
+      },
+      {
+        method: 'DELETE', path: '/api/v2/special-elements/{id}',
+        summary: '物理删除（级联 steps）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'POST', path: '/api/v2/special-elements/from-trajectory',
+        summary: '从轨迹步骤原子入库',
+        desc: '所选 stepIds 须同属一个 trajectoryPhaseId；systemId 可由 trajectory.functionId 解析，失败时需显式传入。',
+        reqExample: J({
+          trajectoryPhaseId: 10,
+          stepIds: [101, 102, 103],
+          tagDictCode: 1,
+          name: '复杂组件操作组',
+          remark: '',
+        }),
+      },
+      {
+        method: 'POST', path: '/api/v2/special-elements/search',
+        summary: '混合检索候选',
+        reqExample: J({ systemId: 1, description: '填写登录表单', limit: 3 }),
+      },
+      {
+        method: 'POST', path: '/api/v2/special-elements/{id}/replay',
+        summary: '人工试跑（默认不落库）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+        reqExample: J({ trajectoryId: 42, persist: false }),
+        notes: [
+          '目标 trajectory 须已 record/prepare 附着会话',
+          'persist=true 时写入 trajectory_step 且 source=special_element',
+        ],
+      },
+      {
+        method: 'PATCH', path: '/api/v2/special-element-steps/{id}',
+        summary: '更新单步 action/params/element',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+        reqExample: J({ actionType: 'fill_form_field', paramsJson: { label_text: '用户名', value: 'u' } }),
+      },
+      {
+        method: 'DELETE', path: '/api/v2/special-element-steps/{id}',
+        summary: '删除单步并重排（最后一条拒绝 409）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+    ],
+  },
+  {
     id: 'trajectory',
     name: '交易 / 轨迹',
     description: '交易 CRUD、阶段树、步骤管理',
@@ -266,7 +417,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/analyze',
         summary: 'AI 需求拆解为阶段 + 案例数据（不落库）',
-        desc: '调用 LLM 将需求拆成 phases，并解析「案例数据/关键数据」等段落为 caseEntries。阶段条数严格跟用户编号分步，不再使用 stepLength。每阶段须含「预期结果」。前端保存草稿时把 caseEntries 一并 POST /trajectories。',
+        desc: '调用 LLM 将需求拆成 phases，并解析「案例数据/关键数据」等段落为 caseEntries。阶段条数严格跟用户编号分步，不再使用 stepLength。每阶段须含「预期结果」。可选 functionId：解析系统后为每个 phase 挂 specialElementCandidates（仅预览，不落库）。',
         reqExample: J({
           description:
             '1、点击客户管理，点击对公客户管理。\n'
@@ -275,6 +426,7 @@ export const API_GROUPS = [
             + '客户名称：测试公司111\n'
             + '证件号码：11111111111',
           model: 'deepseek-v4-flash',
+          functionId: 3,
         }),
         respExample: J({
           phases: [

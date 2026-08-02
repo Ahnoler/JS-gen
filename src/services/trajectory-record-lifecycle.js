@@ -230,7 +230,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       if (src === 'manual' || src === 'cdp') continue;
       runtime.persistedActionIds.add(id);
       const persisted = await appendRecordedStep(tid, entry, {
-        source: 'agent',
+        source: src === 'special_element' ? 'special_element' : 'agent',
         trajectoryPhaseId: Number.isFinite(phaseIdHint) ? phaseIdHint : undefined,
       }).catch(() => null);
       if (persisted) {
@@ -260,6 +260,17 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   });
 
   const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
+
+  let recordingSystemId = null;
+  try {
+    const trajRow = await trajectoryDao.getById(tid);
+    if (trajRow?.functionId) {
+      const { resolveAncestorSystemId } = await import('./hierarchy-service.js');
+      recordingSystemId = await resolveAncestorSystemId(trajRow.functionId);
+    }
+  } catch {
+    recordingSystemId = null;
+  }
 
   try {
     for (let i = 0; i < phases.length; i++) {
@@ -292,6 +303,20 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       if (caseData) {
         stepData.case_data = caseData;
         if (caseDataFile) stepData.case_data_file = caseDataFile;
+      }
+      if (recordingSystemId) {
+        try {
+          const { searchSpecialElements } = await import('./special-element-search-service.js');
+          const candidates = await searchSpecialElements({
+            systemId: recordingSystemId,
+            description: phase.description || '',
+            limit: 3,
+            includeSteps: true,
+          });
+          if (candidates.length) stepData.special_element_candidates = candidates;
+        } catch (err) {
+          console.warn('[record] special-element search skipped:', err?.message || err);
+        }
       }
       execSession.forwardStdin({
         nodeUuid: runtime.executorNodeUuid,

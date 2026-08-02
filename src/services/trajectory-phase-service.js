@@ -164,12 +164,27 @@ export async function addPhaseToTrajectory(trajectoryDbId, { description = '', p
   }
 
   const desc = String(description || '').trim() || `阶段 ${nextNum}`;
+  let candidates = null;
+  try {
+    const { resolveAncestorSystemId } = await import('./hierarchy-service.js');
+    const { fetchDisplayCandidatesForDescription } = await import('./special-element-service.js');
+    const systemId = traj.functionId
+      ? await resolveAncestorSystemId(traj.functionId)
+      : null;
+    if (systemId) {
+      candidates = await fetchDisplayCandidatesForDescription(systemId, desc, 3);
+    }
+  } catch {
+    candidates = null;
+  }
+
   const row = await trajectoryPhaseDao.create({
     phaseId: randomUUID(),
     phaseNumber: nextNum,
     trajectoryId: tid,
     status: 'pending',
     description: desc,
+    specialElementCandidatesJson: candidates?.length ? JSON.stringify(candidates) : null,
   });
 
   const counts = await refreshTrajectoryCounts(tid);
@@ -249,16 +264,39 @@ export async function syncTrajectoryPhaseDescriptions(trajectoryDbId, descriptio
   }
 
   // Upsert in order and renumber
+  let systemId = null;
+  try {
+    const { resolveAncestorSystemId } = await import('./hierarchy-service.js');
+    systemId = traj.functionId ? await resolveAncestorSystemId(traj.functionId) : null;
+  } catch {
+    systemId = null;
+  }
+  const { fetchDisplayCandidatesForDescription } = await import('./special-element-service.js');
+
   for (let i = 0; i < items.length; i++) {
     const phaseNumber = i + 1;
     const { id, description } = items[i];
     let phaseRow = id != null ? existingById.get(id) : null;
 
+    let candidates = [];
+    if (systemId) {
+      try {
+        candidates = await fetchDisplayCandidatesForDescription(systemId, description, 3);
+      } catch {
+        candidates = [];
+      }
+    }
+    const candidatesJson = candidates.length ? JSON.stringify(candidates) : null;
+
     if (phaseRow) {
       const oldPn = Number(phaseRow.phaseNumber) || 0;
       await db('trajectory_phase')
         .where({ id: phaseRow.id })
-        .update({ description, phase_number: phaseNumber });
+        .update({
+          description,
+          phase_number: phaseNumber,
+          special_element_candidates_json: candidatesJson,
+        });
       await db('trajectory_step')
         .where({ trajectory_phase_id: phaseRow.id })
         .update({ phase_number: phaseNumber });
@@ -278,6 +316,7 @@ export async function syncTrajectoryPhaseDescriptions(trajectoryDbId, descriptio
         trajectoryId: tid,
         status: 'pending',
         description,
+        specialElementCandidatesJson: candidatesJson,
       });
       existingById.set(Number(phaseRow.id), phaseRow);
     }

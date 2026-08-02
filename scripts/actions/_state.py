@@ -22,6 +22,7 @@ _SKIP_SCREENSHOT_ACTIONS = frozenset({
     'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
     'check_field_value', 'verify_field_value', 'take_screenshot',
     'save_trajectory', 'save_case_data', 'read_case_data',
+    'use_special_element',
     'match_form_rule', 'init_task_list', 'get_pending_tasks', 'sync_tasks_from_errors',
     'expand_all_el_tree', 'task_done', 'task_retry',
     'save_form_snapshot',

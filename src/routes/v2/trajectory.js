@@ -35,11 +35,43 @@ export default function (app) {
   /** AI 分析：需求描述 -> { phases, caseEntries }（不落库；阶段数跟用户分步） */
   app.post('/api/v2/trajectories/analyze', async (req, res) => {
     try {
-      const { description, model } = req.body || {};
+      const { description, model, functionId } = req.body || {};
       const result = await trajectoryService.analyzeRequirementToPhases({
         description,
         model,
       });
+
+      // Optional: mark special-element candidates per phase for UI preview
+      const fid = functionId != null ? Number(functionId) : null;
+      if (Number.isFinite(fid) && fid > 0 && Array.isArray(result?.phases)) {
+        try {
+          const { resolveAncestorSystemId } = await import('../../services/hierarchy-service.js');
+          const { fetchDisplayCandidatesForDescription } = await import(
+            '../../services/special-element-service.js'
+          );
+          const systemId = await resolveAncestorSystemId(fid);
+          if (systemId) {
+            const enriched = [];
+            for (const p of result.phases) {
+              const desc = typeof p === 'string' ? p : (p?.description || '');
+              const specialElementCandidates = await fetchDisplayCandidatesForDescription(
+                systemId,
+                desc,
+                3,
+              );
+              if (typeof p === 'string') {
+                enriched.push({ description: p, specialElementCandidates });
+              } else {
+                enriched.push({ ...p, specialElementCandidates });
+              }
+            }
+            result.phases = enriched;
+          }
+        } catch (err) {
+          console.warn('[analyze] special-element candidates skipped:', err?.message || err);
+        }
+      }
+
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });

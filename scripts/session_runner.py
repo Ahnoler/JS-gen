@@ -353,7 +353,8 @@ _CUSTOM_ACTIONS = {
 
 async def _run_agent_step(instruction, step_index, session_id, args, llm, browser_context,
                           controller, goal_tracker, cancel_flag_path,
-                          on_step_start_hook, on_step_end_hook, case_data_ref, cumulative_path):
+                          on_step_start_hook, on_step_end_hook, case_data_ref, cumulative_path,
+                          special_element_candidates_store=None):
     global _last_agent
     max_steps = instruction.get("max_steps", 40)
     task_text = instruction.get("instruction", "")
@@ -369,6 +370,24 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             cancel_flag_path.unlink(missing_ok=True)
         except Exception:
             pass
+
+    # Replace per-phase special-element candidates (do not accumulate across phases)
+    try:
+        from .actions._special_element import replace_special_element_candidates
+        raw_cands = (
+            instruction.get('special_element_candidates')
+            or instruction.get('specialElementCandidates')
+            or []
+        )
+        if special_element_candidates_store is not None:
+            replace_special_element_candidates(special_element_candidates_store, raw_cands)
+            sys.stderr.write(
+                f"[session] special_element_candidates loaded: {len(special_element_candidates_store)}\n"
+            )
+            sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"[session] special_element_candidates skipped: {e}\n")
+        sys.stderr.flush()
 
     emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
     sys.stderr.write(f"[session] Step {step_index}: {task_text[:80]} (max_steps={max_steps})\n")
@@ -419,6 +438,20 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             sys.stderr.flush()
     except Exception as e:
         sys.stderr.write(f"[session] case data hint skipped: {e}\n")
+        sys.stderr.flush()
+
+    try:
+        from .actions._special_element import format_special_element_hint
+        se_hint = format_special_element_hint(special_element_candidates_store)
+        if se_hint:
+            agent_task = agent_task + se_hint
+            sys.stderr.write(
+                f"[session] Appended special-element hint "
+                f"({len(special_element_candidates_store or {})} candidates)\n"
+            )
+            sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f"[session] special-element hint skipped: {e}\n")
         sys.stderr.flush()
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1167,12 +1200,18 @@ async def run_session(args):
     await _bypass_ssl_interstitial_if_any(browser_context)
 
     case_data_store = {}  # process-level in-memory store, persists across steps
+    special_element_candidates_store = {}  # replaced each phase; AI may only use these ids
     cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
     goal_tracker = {'goals': [], 'stopped': False}
     intervention_queue = asyncio.Queue()  # human intervention messages
 
     on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path, intervention_queue, case_data_store)
-    controller = build_controller(browser_context, case_data_store=case_data_store, llm=llm)
+    controller = build_controller(
+        browser_context,
+        case_data_store=case_data_store,
+        llm=llm,
+        special_element_candidates_store=special_element_candidates_store,
+    )
 
     # Start CDP watcher — runs in-process, shares _ACTION_LOG and case_data_store
     cdp_action_queue = asyncio.Queue()
@@ -1229,6 +1268,7 @@ async def run_session(args):
         'session_id': session_id,
         'cumulative_path': cumulative_path,
         'case_data_store': case_data_store,
+        'special_element_candidates_store': special_element_candidates_store,
         'browser_context': browser_context,
     }
 
@@ -1254,6 +1294,7 @@ async def run_session(args):
                 data, step_idx, session_id, args, llm, browser_context,
                 controller, goal_tracker, cancel_flag_path,
                 on_step_start_hook, on_step_end_hook, case_data_store, cumulative_path,
+                special_element_candidates_store=special_element_candidates_store,
             )
         finally:
             agent_running_ref['value'] = False
