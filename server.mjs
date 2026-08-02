@@ -201,6 +201,16 @@ async function main() {
       } catch (err) {
         console.warn('[server] deferred remote_session reconcile skipped:', err.message);
       }
+      try {
+        const batchService = await import('./src/services/trajectory-batch-service.js');
+        await batchService.recoverBatchJobsOnStartup();
+      } catch (err) {
+        console.warn('[server] batch recovery skipped:', err.message);
+        try {
+          const batchService = await import('./src/services/trajectory-batch-service.js');
+          batchService.startBatchScheduler();
+        } catch {}
+      }
     })().catch(() => {});
   }, BOOT_RECONCILE_DELAY_MS).unref?.();
 

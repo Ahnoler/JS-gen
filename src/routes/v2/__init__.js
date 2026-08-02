@@ -7,6 +7,7 @@
 import { v2ResponseEnvelope } from '../../http/api-response.js';
 import registerHierarchy from './hierarchy.js';
 import registerSystemMgmt from './system-mgmt.js';
+import registerTrajectoryBatch from './trajectory-batch.js';
 import registerTrajectory from './trajectory.js';
 import registerScreenshot from './screenshot.js';
 import registerCaseData from './case-data.js';
@@ -21,6 +22,8 @@ export default function (app) {
 
   registerHierarchy(app);
   registerSystemMgmt(app);
+  // batch/* before trajectories/:id
+  registerTrajectoryBatch(app);
   registerTrajectory(app);
   registerScreenshot(app);
   registerCaseData(app);
