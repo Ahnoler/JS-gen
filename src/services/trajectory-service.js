@@ -67,6 +67,8 @@ export {
   detachTrajectoryStream,
   startTrajectoryRecording,
   stopTrajectoryRecording,
+  stopTrajectoryRecordingSafe,
+  cleanupPersistedTrajectoryResources,
   replayTrajectorySteps,
   resolveTrajectoryElement,
   toggleTrajectoryManualRecord,

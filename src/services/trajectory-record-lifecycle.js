@@ -404,6 +404,78 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
   };
 }
 
+/**
+ * Batch-safe stop: never downgrade recorded/completed back to draft.
+ * Sends cancel_step when a runtime exists; CAS-updates only live/recording.
+ */
+export async function stopTrajectoryRecordingSafe(trajectoryId, {
+  success = false,
+} = {}) {
+  const tid = Number(trajectoryId);
+  const runtime = getTrajectoryRuntime(tid);
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (runtime) {
+    runtime.abortRecording = true;
+    const session = state.sessions.get(runtime.sessionId);
+    try {
+      execSession.forwardStdin({
+        nodeUuid: runtime.executorNodeUuid,
+        sessionId: runtime.sessionId,
+        event: 'cancel_step',
+        data: {},
+      });
+    } catch {}
+    if (session) {
+      session.busy = false;
+      session.selectedPhaseId = null;
+    }
+    try {
+      execSession.forwardStdin({
+        nodeUuid: runtime.executorNodeUuid,
+        sessionId: runtime.sessionId,
+        event: 'manual_record_stop',
+        data: {},
+      });
+    } catch {}
+    runtime.selectedPhaseId = null;
+  }
+
+  let recordStatus = traj.recordStatus;
+  if (traj.recordStatus === 'recorded' || traj.recordStatus === 'completed') {
+    // Do not downgrade terminal success
+    recordStatus = traj.recordStatus;
+  } else if (success) {
+    const n = await trajectoryDao.updateMetaIf(tid, {
+      recordStatus: 'recorded',
+      isDone: true,
+      isSuccessful: true,
+    }, { recordStatusIn: ['live', 'recording', 'draft'] });
+    recordStatus = n ? 'recorded' : (await trajectoryDao.getById(tid))?.recordStatus;
+  } else {
+    const n = await trajectoryDao.updateMetaIf(tid, {
+      recordStatus: 'draft',
+      isDone: false,
+      isSuccessful: false,
+    }, { recordStatusIn: ['live', 'recording'] });
+    const fresh = await trajectoryDao.getById(tid);
+    recordStatus = n ? 'draft' : (fresh?.recordStatus || traj.recordStatus);
+  }
+
+  const tree = await getTrajectoryTree(tid);
+  return {
+    trajectoryId: tid,
+    recordStatus,
+    detached: false,
+    tree,
+  };
+}
+
 export async function resolveTrajectoryElement(trajectoryId, {
   labelText,
   actionType,

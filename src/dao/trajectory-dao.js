@@ -61,10 +61,13 @@ const SORT_COL_MAP = {
   recordStatus: 'record_status',
 };
 
-export async function save(trajectory) {
-  const db = getDB();
-  return db.transaction(async (trx) => {
-    const [id] = await trx(TABLE).insert(toDbRow({
+/**
+ * Insert trajectory row. When `trx` is provided, uses that transaction and does not commit.
+ * @returns {Promise<number>} numeric PK
+ */
+export async function save(trajectory, trx = null) {
+  const run = async (client) => {
+    const [id] = await client(TABLE).insert(toDbRow({
       name: trajectory.name ?? '',
       trajectoryLog: trajectory.trajectoryLog ?? null,
       task: trajectory.task,
@@ -81,10 +84,12 @@ export async function save(trajectory) {
     }));
 
     if (trajectory.steps?.length) {
-      await insertStepRows(trx, id, trajectory.steps);
+      await insertStepRows(client, id, trajectory.steps);
     }
     return id;
-  });
+  };
+  if (trx) return run(trx);
+  return getDB().transaction((t) => run(t));
 }
 
 async function insertStepRows(trx, trajectoryDbId, steps, stepNumberOffset = 0) {
@@ -120,10 +125,27 @@ export async function appendSteps(trajectoryDbId, steps, { stepNumberOffset = 0 
   });
 }
 
-export async function updateMeta(trajectoryDbId, fields) {
+export async function updateMeta(trajectoryDbId, fields, trx = null) {
   const patch = toDbRow(fields);
-  if (!Object.keys(patch).length) return;
-  await getDB()(TABLE).where({ id: trajectoryDbId }).update(patch);
+  if (!Object.keys(patch).length) return 0;
+  const db = trx || getDB();
+  return db(TABLE).where({ id: trajectoryDbId }).update(patch);
+}
+
+/**
+ * Conditional meta update (CAS). Returns number of affected rows.
+ * @param {number} trajectoryDbId
+ * @param {object} fields
+ * @param {{ recordStatusIn?: string[] }} [where]
+ */
+export async function updateMetaIf(trajectoryDbId, fields, { recordStatusIn = null } = {}) {
+  const patch = toDbRow(fields);
+  if (!Object.keys(patch).length) return 0;
+  let q = getDB()(TABLE).where({ id: trajectoryDbId });
+  if (Array.isArray(recordStatusIn) && recordStatusIn.length) {
+    q = q.whereIn('record_status', recordStatusIn);
+  }
+  return q.update(patch);
 }
 
 export async function getMaxStepNumber(trajectoryDbId) {

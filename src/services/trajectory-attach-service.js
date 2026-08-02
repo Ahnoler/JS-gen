@@ -508,6 +508,85 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
       remoteSessionId,
     });
 
+    try {
+      const batchService = await import('./trajectory-batch-service.js');
+      batchService.kickScheduler();
+    } catch {}
+
     return { trajectoryId: tid, detached: true, recordStatus, reason, remoteSessionId };
   });
+}
+
+/**
+ * Best-effort cleanup after control-plane restart using DB bindings only
+ * (runtime map may be empty). Corrects live/recording → draft when requested.
+ */
+export async function cleanupPersistedTrajectoryResources(trajectoryId, {
+  demoteLive = true,
+  reason = 'batch_recovery',
+} = {}) {
+  const tid = Number(trajectoryId);
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    return { trajectoryId: tid, cleaned: false };
+  }
+
+  // Prefer live detach when runtime still exists
+  const runtime = getTrajectoryRuntime(tid);
+  if (runtime?.sessionId) {
+    try {
+      await detachTrajectoryLive(tid, { reason });
+    } catch (err) {
+      console.warn('[batch-cleanup] detach failed:', err.message);
+    }
+    return { trajectoryId: tid, cleaned: true, via: 'detach' };
+  }
+
+  const remoteSessionId = traj.remoteSessionId || null;
+  let closed = false;
+  if (remoteSessionId) {
+    try {
+      await remoteSessionService.detachLive({
+        trajectoryId: tid,
+        remoteSessionId,
+        crashed: true,
+      }).catch(() => {});
+      await remoteSessionDao.close(remoteSessionId, { crashed: true });
+      remoteSessionService.clearLiveBinding(remoteSessionId);
+      closed = true;
+    } catch {}
+  }
+
+  // Also try agent_session_id from remote_session bound to trajectory
+  try {
+    const rs = await remoteSessionDao.getByTrajectory(tid);
+    if (rs && (rs.status === 'active' || rs.status === 'idle')) {
+      await remoteSessionDao.close(rs.id, { crashed: true });
+      remoteSessionService.clearLiveBinding(rs.id);
+      closed = true;
+      if (rs.agentSessionId) {
+        try {
+          await execSession.closeSession({
+            sessionId: rs.agentSessionId,
+            keepBrowser: false,
+          });
+        } catch {
+          slotLease.releaseBySession(rs.agentSessionId);
+        }
+      }
+    }
+  } catch {}
+
+  slotLease.releaseByTrajectory(tid);
+
+  if (demoteLive && (traj.recordStatus === 'live' || traj.recordStatus === 'recording')) {
+    await trajectoryDao.updateMetaIf(tid, {
+      recordStatus: 'draft',
+      remoteSessionId: null,
+    }, { recordStatusIn: ['live', 'recording'] });
+  } else if (traj.remoteSessionId) {
+    await trajectoryDao.updateMeta(tid, { remoteSessionId: null });
+  }
+
+  return { trajectoryId: tid, cleaned: closed || demoteLive, via: 'persisted' };
 }

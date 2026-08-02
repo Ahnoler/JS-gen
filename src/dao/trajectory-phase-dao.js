@@ -3,13 +3,15 @@ import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
 const TABLE = 'trajectory_phase';
 
-export async function create(data) {
-  const [id] = await getDB()(TABLE).insert(toDbRow(data));
-  return getById(id);
+export async function create(data, trx = null) {
+  const db = trx || getDB();
+  const [id] = await db(TABLE).insert(toDbRow(data));
+  return getById(id, trx);
 }
 
-export async function getById(id) {
-  const row = await getDB()(TABLE).where({ id }).first();
+export async function getById(id, trx = null) {
+  const db = trx || getDB();
+  const row = await db(TABLE).where({ id }).first();
   return fromDbRow(row);
 }
 

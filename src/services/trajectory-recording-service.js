@@ -15,11 +15,13 @@ export {
   detachTrajectoryLive,
   detachTrajectoryStream,
   bindTrajectoryManualPersist,
+  cleanupPersistedTrajectoryResources,
 } from './trajectory-attach-service.js';
 
 export {
   startTrajectoryRecording,
   stopTrajectoryRecording,
+  stopTrajectoryRecordingSafe,
   resolveTrajectoryElement,
   toggleTrajectoryManualRecord,
   runDefaultLogin,

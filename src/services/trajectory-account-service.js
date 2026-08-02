@@ -212,3 +212,61 @@ export async function setTrajectoryAccount(trajectoryId, systemAccountId) {
     account: { id: account.id, name: account.name, loginUrl: account.loginUrl || '' },
   };
 }
+
+/**
+ * Validate functionId + systemAccountId before creating any trajectory
+ * (batch import). Ensures function exists and account belongs to owning system.
+ */
+export async function validateFunctionAndAccount(functionId, systemAccountId) {
+  const fid = Number(functionId);
+  const aid = Number(systemAccountId);
+  if (!Number.isFinite(fid) || fid <= 0) {
+    const err = new Error('functionId is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!Number.isFinite(aid) || aid <= 0) {
+    const err = new Error('systemAccountId is required');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const fnNode = await systemDao.getById(fid);
+  if (!fnNode) {
+    const err = new Error(`Function #${fid} not found`);
+    err.statusCode = 404;
+    throw err;
+  }
+  if (Number(fnNode.type) !== NODE_TYPE.FUNCTION) {
+    const err = new Error(`Node #${fid} is not a function`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const account = await systemAccountDao.getById(aid);
+  if (!account) {
+    const err = new Error(`System account #${aid} not found`);
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const { system } = await resolveOwningSystem(fid);
+  if (!system) {
+    const err = new Error('Could not resolve system for function');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (Number(account.systemId) !== Number(system.id)) {
+    const err = new Error('Selected account does not belong to this function system');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  return {
+    functionId: fid,
+    systemAccountId: aid,
+    function: fnNode,
+    account,
+    system: _shapeSystem(system),
+  };
+}

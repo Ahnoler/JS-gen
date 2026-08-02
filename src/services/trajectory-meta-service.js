@@ -7,6 +7,7 @@ import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as functionDefDao from '../dao/function-def-dao.js';
 import * as caseDataDao from '../dao/case-data-dao.js';
 import { callLLM } from '../llm-utils.js';
+import { getDB } from '../../config/database.js';
 import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
 
 /** Section headers that introduce a case-data KV block in a requirement. */
@@ -246,6 +247,8 @@ export async function createEmptyTrajectory({
 /**
  * Create a "transaction" (trajectory) shell with pre-defined phases.
  * `phases[]` can be string[] or {description: string}[].
+ * When `trx` is provided, all writes share that transaction (caller commits).
+ * Pass `requireFunctionId: true` to forbid silent default-function fallback.
  */
 export async function createTransactionWithPhases({
   functionId,
@@ -256,10 +259,19 @@ export async function createTransactionWithPhases({
   systemAccountId = null,
   caseEntries = undefined,
   caseData = undefined,
+  requireFunctionId = false,
+  trx = null,
 } = {}) {
-  const resolvedFunctionId = typeof functionId === 'number'
-    ? functionId
-    : await functionDefDao.getDefaultFunctionId();
+  let resolvedFunctionId;
+  if (typeof functionId === 'number' && Number.isFinite(functionId) && functionId > 0) {
+    resolvedFunctionId = functionId;
+  } else if (requireFunctionId) {
+    const err = new Error('functionId is required');
+    err.statusCode = 400;
+    throw err;
+  } else {
+    resolvedFunctionId = await functionDefDao.getDefaultFunctionId();
+  }
 
   const parsed = Array.isArray(phases)
     ? phases
@@ -269,37 +281,48 @@ export async function createTransactionWithPhases({
       .filter(Boolean)
     : [];
 
-  const trajId = await trajectoryDao.save({
-    name: String(name || '').trim(),
-    trajectoryLog: null,
-    task: String(requirement || '').trim(),
-    model: model || '',
-    stepCount: 0,
-    phaseCount: parsed.length,
-    isDone: null,
-    isSuccessful: null,
-    url: '',
-    functionId: resolvedFunctionId,
-    systemAccountId: systemAccountId != null ? Number(systemAccountId) : null,
-    recordStatus: 'draft',
-    steps: [],
-  });
+  const run = async (client) => {
+    const trajId = await trajectoryDao.save({
+      name: String(name || '').trim(),
+      trajectoryLog: null,
+      task: String(requirement || '').trim(),
+      model: model || '',
+      stepCount: 0,
+      phaseCount: parsed.length,
+      isDone: null,
+      isSuccessful: null,
+      url: '',
+      functionId: resolvedFunctionId,
+      systemAccountId: systemAccountId != null ? Number(systemAccountId) : null,
+      recordStatus: 'draft',
+      steps: [],
+    }, client);
 
-  for (let i = 0; i < parsed.length; i++) {
-    await trajectoryPhaseDao.create({
-      phaseId: randomUUID(),
-      phaseNumber: i + 1,
-      trajectoryId: trajId,
-      status: 'pending',
-      description: parsed[i],
-    });
+    for (let i = 0; i < parsed.length; i++) {
+      await trajectoryPhaseDao.create({
+        phaseId: randomUUID(),
+        phaseNumber: i + 1,
+        trajectoryId: trajId,
+        status: 'pending',
+        description: parsed[i],
+      }, client);
+    }
+
+    const rawEntries = caseEntries ?? caseData;
+    if (rawEntries !== undefined) {
+      await caseDataDao.replaceEntriesForTrajectory(trajId, rawEntries, client);
+    }
+
+    return trajId;
+  };
+
+  if (trx) {
+    const trajId = await run(trx);
+    // Caller owns the transaction; return id only when trx is external
+    return trajId;
   }
 
-  const rawEntries = caseEntries ?? caseData;
-  if (rawEntries !== undefined) {
-    await caseDataDao.replaceEntriesForTrajectory(trajId, rawEntries);
-  }
-
+  const trajId = await getDB().transaction((t) => run(t));
   return getTrajectoryWithPhases(trajId);
 }
 
