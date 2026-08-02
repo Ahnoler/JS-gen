@@ -50,3 +50,59 @@ export const TRAJECTORY_RECORD_STATUSES = Object.freeze(['draft', 'live', 'recor
 
 /** @type {readonly TrajectoryPhaseStatus[]} */
 export const TRAJECTORY_PHASE_STATUSES = Object.freeze(['pending', 'running', 'completed', 'failed']);
+
+/** @typedef {'accepted'|'running'|'waiting_executor'|'cancelling'|'cancelled'|'completed'|'completed_with_errors'|'failed'} BatchJobStatus */
+
+/** @typedef {'pending'|'analyzing'|'analyzed'|'queued'|'waiting_executor'|'preparing'|'recording'|'recorded'|'failed'|'rejected'|'cancelled'} BatchItemStatus */
+
+/** @type {readonly BatchJobStatus[]} */
+export const BATCH_JOB_STATUSES = Object.freeze([
+  'accepted',
+  'running',
+  'waiting_executor',
+  'cancelling',
+  'cancelled',
+  'completed',
+  'completed_with_errors',
+  'failed',
+]);
+
+/** @type {readonly BatchItemStatus[]} */
+export const BATCH_ITEM_STATUSES = Object.freeze([
+  'pending',
+  'analyzing',
+  'analyzed',
+  'queued',
+  'waiting_executor',
+  'preparing',
+  'recording',
+  'recorded',
+  'failed',
+  'rejected',
+  'cancelled',
+]);
+
+/** Item statuses that can still be scheduled / recovered after restart. */
+export const BATCH_ITEM_RESUMABLE = Object.freeze([
+  'pending',
+  'analyzing',
+  'analyzed',
+  'queued',
+  'waiting_executor',
+]);
+
+/** Item terminal statuses. */
+export const BATCH_ITEM_TERMINAL = Object.freeze([
+  'recorded',
+  'failed',
+  'rejected',
+  'cancelled',
+]);
+
+/** Job terminal statuses. */
+export const BATCH_JOB_TERMINAL = Object.freeze([
+  'cancelled',
+  'completed',
+  'completed_with_errors',
+  'failed',
+]);

@@ -91,3 +91,30 @@ export const EXECUTOR_DISCONNECT_GRACE_MS = parseInt(
 
 /** Route browser sessions to online executor agent instead of local globalBrowser */
 export const USE_EXECUTOR = _resolve('USE_EXECUTOR', 'false').toLowerCase() === 'true';
+
+/** Max non-empty Excel rows accepted by batch import (whole file rejected when exceeded). */
+export const BATCH_IMPORT_MAX_ROWS = parseInt(_resolve('BATCH_IMPORT_MAX_ROWS', '500'), 10);
+
+/** Global analysis concurrency for batch jobs (default serial to protect LLM). */
+export const BATCH_ANALYZE_CONCURRENCY = Math.max(
+  1,
+  parseInt(_resolve('BATCH_ANALYZE_CONCURRENCY', '1'), 10) || 1,
+);
+
+/** How often the batch scheduler wakes waiting_executor items (ms). */
+export const BATCH_SCHEDULER_INTERVAL_MS = Math.max(
+  1000,
+  parseInt(_resolve('BATCH_SCHEDULER_INTERVAL_MS', '5000'), 10) || 5000,
+);
+
+/** Transient LLM / analyze retries before marking an item failed. */
+export const BATCH_ANALYZE_MAX_ATTEMPTS = Math.max(
+  1,
+  parseInt(_resolve('BATCH_ANALYZE_MAX_ATTEMPTS', '3'), 10) || 3,
+);
+
+/** Worker claim lease duration for batch items (ms). */
+export const BATCH_ITEM_LEASE_MS = Math.max(
+  30000,
+  parseInt(_resolve('BATCH_ITEM_LEASE_MS', '600000'), 10) || 600000,
+);
