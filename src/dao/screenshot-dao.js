@@ -48,22 +48,6 @@ export async function replaceForStep(screenshot) {
   return row?.id != null ? Number(row.id) : null;
 }
 
-/** @deprecated Prefer replaceForStep — kept for callers that still use save(). */
-export async function save(screenshot) {
-  if (screenshot.trajectoryStepId != null && screenshot.kind) {
-    return replaceForStep(screenshot);
-  }
-  const [id] = await getDB()(TABLE).insert({
-    image_data: screenshot.imageData,
-    file_size: screenshot.fileSize || (screenshot.imageData ? screenshot.imageData.length : 0),
-    mime_type: screenshot.mimeType || 'image/png',
-    trajectory_id: screenshot.trajectoryId || null,
-    trajectory_step_id: screenshot.trajectoryStepId || null,
-    kind: screenshot.kind === 'before' ? 'before' : 'after',
-  });
-  return id;
-}
-
 export async function getImage(id) {
   const row = await getDB()(TABLE)
     .select('id', 'image_data', 'mime_type', 'file_size')

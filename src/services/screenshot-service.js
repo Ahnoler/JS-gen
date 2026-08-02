@@ -26,26 +26,6 @@ export async function replaceStepScreenshot(trajectoryStepId, {
   });
 }
 
-/** @deprecated Use replaceStepScreenshot */
-export async function saveScreenshot({
-  imageData, trajectoryStepId, kind, trajectoryId,
-}) {
-  if (trajectoryStepId != null && kind) {
-    return replaceStepScreenshot(trajectoryStepId, {
-      trajectoryId,
-      kind,
-      buffer: imageData,
-    });
-  }
-  return screenshotDao.save({
-    imageData,
-    fileSize: imageData?.length || 0,
-    trajectoryId: trajectoryId || null,
-    trajectoryStepId: trajectoryStepId || null,
-    kind: kind === 'before' ? 'before' : 'after',
-  });
-}
-
 export async function getScreenshotImage(id) {
   return screenshotDao.getImage(id);
 }

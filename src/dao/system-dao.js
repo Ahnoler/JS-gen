@@ -4,12 +4,11 @@ import {
   NODE_TYPE,
   TYPE_LABEL,
   ROOT_NODE_ID,
-  ROOT_PARENT_ID,
   isRootParentId,
   isRootNodeId,
   SEED_ROOT_ID,
   SEED_SYSTEM_ID,
-  SEED_PROCESS_ID,
+  SEED_MODULE_ID,
   SEED_FUNCTION_ID,
   SEED_UUID_BY_TYPE,
 } from '../models/hierarchy-constants.js';
@@ -20,12 +19,11 @@ export {
   NODE_TYPE,
   TYPE_LABEL,
   ROOT_NODE_ID,
-  ROOT_PARENT_ID,
   isRootParentId,
   isRootNodeId,
   SEED_ROOT_ID,
   SEED_SYSTEM_ID,
-  SEED_PROCESS_ID,
+  SEED_MODULE_ID,
   SEED_FUNCTION_ID,
 };
 
@@ -192,11 +190,6 @@ export async function getByUuid(systemId) {
   return shapeNode(row);
 }
 
-/** @deprecated use getByUuid */
-export async function getBySystemId(systemId) {
-  return getByUuid(systemId);
-}
-
 /** Fuzzy match on name; returns shaped nodes. */
 export async function searchByName(keyword, { limit = 50 } = {}) {
   const q = String(keyword || '').trim();
@@ -216,7 +209,7 @@ export async function create(data) {
     if (!isRootParentId(parentId) && parentId !== undefined) {
       throw Object.assign(new Error('type=1（系统）的 parentId 必须为 0'), { code: 'VALIDATION' });
     }
-    parentId = ROOT_PARENT_ID;
+    parentId = ROOT_NODE_ID;
   } else {
     if (isRootParentId(parentId) || !Number.isFinite(+parentId)) {
       throw Object.assign(new Error('模块/功能必须指定有效 parentId'), { code: 'VALIDATION' });

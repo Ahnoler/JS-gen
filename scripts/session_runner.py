@@ -23,7 +23,6 @@ from .agent_utils import (
 )
 from .controller import build_controller
 from .recorder import build_recording_hooks
-from .actions.form_rules import load_rules
 
 _last_agent = None
 
@@ -695,7 +694,6 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
         seed_action_log = bool(data.get("seed_action_log"))
         stop_on_fail = bool(data.get("stop_on_fail"))
         browser_context = session_state.get('browser_context')
-        form_rules = session_state.get('form_rules', [])
         case_data_store = session_state.get('case_data_store', {})
         if not browser_context or not entries:
             emit_json({"event": "replay_done", "data": {"count": 0, "error": "no browser_context or empty actions"}})
@@ -706,7 +704,7 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
         from .actions._builder import build_controller
         from .actions._replay import replay_action_entries
 
-        controller = build_controller(browser_context, form_rules, case_data_store=case_data_store)
+        controller = build_controller(browser_context, case_data_store=case_data_store)
         registry_actions = controller.registry.registry.actions
 
         # Pass raw params — `_normalize_params` accepts aliases; controller path
@@ -793,7 +791,7 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
     return 'step'
 
 
-async def _run_cdp_watcher(browser_context, action_queue, case_data_store, form_rules):
+async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
     """In-process quick-action executor — uses the same browser_context as the Agent.
 
     Shares _ACTION_LOG and case_data_store with the main Agent, so all actions
@@ -809,7 +807,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store, form_
     #         ctx.get_current_page = _get_page
     # Self-heal scene reproduce uses replay_actions → _replay.replay_action_entries
     # (see browser-session.js /rerun), not this CDP watcher loop.
-    ctrl = build_controller(browser_context, form_rules, case_data_store=case_data_store)
+    ctrl = build_controller(browser_context, case_data_store=case_data_store)
     actions = ctrl.registry.registry.actions
 
     while True:
@@ -1131,7 +1129,6 @@ async def run_session(args):
     patch_planner_prompt()
     patch_icon_tooltip_labels()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
-    form_rules = load_rules()
 
     session_id = args.session_id or "unknown"
 
@@ -1175,11 +1172,11 @@ async def run_session(args):
     intervention_queue = asyncio.Queue()  # human intervention messages
 
     on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path, intervention_queue, case_data_store)
-    controller = build_controller(browser_context, form_rules, case_data_store, llm=llm)
+    controller = build_controller(browser_context, case_data_store=case_data_store, llm=llm)
 
     # Start CDP watcher — runs in-process, shares _ACTION_LOG and case_data_store
     cdp_action_queue = asyncio.Queue()
-    cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, case_data_store, form_rules))
+    cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, case_data_store))
 
     # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
     cdp_ready = False
@@ -1233,7 +1230,6 @@ async def run_session(args):
         'cumulative_path': cumulative_path,
         'case_data_store': case_data_store,
         'browser_context': browser_context,
-        'form_rules': form_rules,
     }
 
     case_data_loaded = False

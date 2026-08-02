@@ -36,7 +36,7 @@
 
 /**
  * @typedef {Object} Process
- * @deprecated 已合并进 System（type=2）；保留 typedef 兼容旧注释
+ * Legacy: 已合并进 System（type=2）；保留 typedef 兼容旧注释
  * @property {number} [id]
  * @property {string} processId
  * @property {number} systemId
@@ -49,7 +49,7 @@
 
 /**
  * @typedef {Object} FunctionDef
- * @deprecated 已合并进 System（type=3）；保留 typedef 兼容旧注释
+ * Legacy: 已合并进 System（type=3）；保留 typedef 兼容旧注释
  * @property {number} [id]
  * @property {string} functionId
  * @property {number} processId

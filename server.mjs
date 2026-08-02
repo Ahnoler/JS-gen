@@ -1,10 +1,9 @@
 import express from 'express';
 import { createServer } from 'http';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { readFileSync, existsSync, writeFileSync } from 'fs';
-import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR, LLM_API_KEY, EXECUTOR_HEARTBEAT_TIMEOUT_MS } from './config/config.js';
-import { state } from './src/state.js';
+import { readFileSync, existsSync } from 'fs';
+import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR, EXECUTOR_HEARTBEAT_TIMEOUT_MS } from './config/config.js';
+import { state, isConfigured } from './src/state.js';
 import { initWebSocket } from './src/ws-server.js';
 import { initExecutorWs, validateExecutorToken, rejectUpgrade } from './src/executor-ws.js';
 import * as executorService from './src/services/executor-node-service.js';
@@ -17,9 +16,8 @@ import registerLLMProxyRoutes from './src/routes/llm-proxy.js';
 import registerBrowserSessionRoutes from './src/routes/browser-session.js';
 import registerAssembleRoutes from './src/routes/test-assemble.js';
 import registerLegacyGoneRoutes from './src/routes/legacy-gone.js';
+import registerSetupRoutes from './src/routes/setup.js';
 import registerV2Routes from './src/routes/v2/__init__.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -32,56 +30,6 @@ app.use(express.static(DASHBOARD_DIR, {
   },
 }));
 
-// ── First-launch setup (when no API key is configured) ──────────────────
-let _currentApiKey = LLM_API_KEY;            // mutable copy — updated on save
-const _isConfigured = () => !!(_currentApiKey && _currentApiKey.trim());
-
-// Serve the setup page
-app.get('/api/setup', (req, res) => {
-  res.sendFile(path.join(PROJECT_DIR, 'config', 'setup.html'));
-});
-
-// Save config from setup form
-app.post('/api/setup/save', (req, res) => {
-  const { LLM_API_KEY: key, LLM_BASE_URL: url, FORM_LLM_MODEL: model } = req.body || {};
-  if (!key || !key.trim()) {
-    return res.status(400).json({ ok: false, error: 'API Key 不能为空' });
-  }
-  const envPath = path.join(PROJECT_DIR, 'config', '.env');
-  const lines = [];
-  lines.push('# ───────────────────────────────────────');
-  lines.push('# 智能填表系统 — 运行配置');
-  lines.push('# ───────────────────────────────────────');
-  lines.push('');
-  lines.push('# 服务器');
-  lines.push('PORT=4097');
-  lines.push('HOST=0.0.0.0');
-  lines.push('');
-  lines.push('# LLM 连接');
-  lines.push(`LLM_BASE_URL=${url || 'https://api.deepseek.com'}`);
-  lines.push(`LLM_API_KEY=${key.trim()}`);
-  lines.push('');
-  lines.push('# 表单填写 LLM（可选用更便宜的模型）');
-  lines.push(`FORM_LLM_MODEL=${model || 'deepseek-v4-flash'}`);
-  lines.push(`FORM_LLM_BASE_URL=${url || 'https://api.deepseek.com'}`);
-  lines.push(`FORM_LLM_API_KEY=${key.trim()}`);
-  lines.push('');
-  lines.push('# Python 解释器路径（留空则自动查找）');
-  lines.push('# PYTHON_EXE=');
-  lines.push('');
-  lines.push('# 项目根目录（留空则自动检测）');
-  lines.push('# PROJECT_DIR=');
-  try {
-    writeFileSync(envPath, lines.join('\n'), 'utf-8');
-    _currentApiKey = key.trim();            // update runtime state
-    console.log('[server] API Key saved via setup page');
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('[server] Failed to save .env:', e.message);
-    res.status(500).json({ ok: false, error: '写入配置文件失败: ' + e.message });
-  }
-});
-
 // Register all route modules
 registerLLMProxyRoutes(app);
 registerBrowserSessionRoutes(app);
@@ -93,28 +41,8 @@ registerAgentRoutes(app);
 
 registerTestHistoryRoutes(app);
 registerTestRunRoutes(app);
+registerSetupRoutes(app);
 registerV2Routes(app);
-
-// Redirect root to product API docs, or setup if unconfigured
-app.get('/', (req, res) => {
-  res.redirect(_isConfigured() ? '/api/docs' : '/api/setup');
-});
-
-// API key status check (used by setup / clients to detect unconfigured state)
-app.get('/api/setup/status', (req, res) => {
-  res.json({ configured: _isConfigured() });
-});
-
-/** Product API docs for frontend (Swagger-like, /api/v2 + WebSocket) */
-app.get('/api/docs', (req, res) => {
-  res.sendFile(path.join(__dirname, 'api-docs.html'));
-});
-
-// Legacy engineering UI pages removed (product SPA lives outside this repo).
-// Keep /api/test/assemble|run|…; only these HTML entry routes redirect.
-app.get(['/api/test', '/api/test/record-console', '/api/test/record-studio'], (req, res) => {
-  res.redirect(301, '/api/docs');
-});
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -147,7 +75,7 @@ async function main() {
     console.log(`[server] Default model: ${state.defaultModel.providerID}/${state.defaultModel.modelID}`);
   }
 
-  if (!_isConfigured()) {
+  if (!isConfigured()) {
     console.log('[server] ⚠  LLM_API_KEY not set — visit http://localhost:' + PORT + '/api/setup to configure');
   }
 

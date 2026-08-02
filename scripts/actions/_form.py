@@ -245,7 +245,7 @@ def _queue_intervention(case_data_store: dict, label: str, has_button: str, reas
     })
 
 
-def _register_form_actions(controller, browser_context, form_rules, case_data_store, llm=None):
+def _register_form_actions(controller, browser_context, case_data_store, llm=None):
     # Lazily read hasButton keywords — supports runtime override via case_data_store
     def _button_keywords():
         return get_has_button_keywords(case_data_store)
@@ -396,7 +396,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
             sys.stderr.write(f'[match-form-rule] cert_type={cert_type!r} → {val}\n')
             sys.stderr.flush()
             return val
-        val = match_rule(label_text, form_rules)
+        val = match_rule(label_text)
         return val if val else 'NO-RULE'
 
     @controller.action('Fill a form field using Element UI native DOM setter. Works for text inputs AND date fields (sets value directly).')
@@ -666,7 +666,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
     # 内部函数 — 仅由 _ensure_scanned（隐式）触发的 _auto_fill_pending 调用。
     # 按 kind 分组（date→select→input→radio→checkbox→tree-select）多次调用 LLM，
     # 失败字段保留在 pending 供 agent 手动处理，成功字段记录 action + task_done。
-    # ── 辅助闭包（共享 page / llm / case_data_store / form_rules）──
+    # ── 辅助闭包（共享 page / llm / case_data_store）──
     #
     # _execute_round: 分组 → LLM → 逐个执行，三轮回合共用。
     # _scan_new_fields: 全量扫描 → 差值过滤 → TaskItem 创建，Round 2/3 共用。
@@ -746,7 +746,7 @@ def _register_form_actions(controller, browser_context, form_rules, case_data_st
                                     sys.stderr.flush()
                                 break
 
-            actions = _llm_generate_values(llm, sub, form_rules=form_rules, case_data_store=case_data_store)
+            actions = _llm_generate_values(llm, sub, case_data_store=case_data_store)
             await page.evaluate(
                 'd => console.log("[AI填表] 所有动作(" + d.length + "): " + JSON.stringify(d.map(a => a.label + "=" + (a.value||a.option||""))))',
                 actions,

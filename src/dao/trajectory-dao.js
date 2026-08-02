@@ -187,15 +187,6 @@ export async function getById(id) {
   return entity;
 }
 
-/** @deprecated use getById ? kept for transitional call sites */
-export async function getByTrajectoryId(idOrBiz) {
-  const numeric = Number(idOrBiz);
-  if (Number.isFinite(numeric) && String(numeric) === String(idOrBiz)) {
-    return getById(numeric);
-  }
-  return null;
-}
-
 export async function listByFunction(functionId, {
   page = 1, pageSize = 20, keyword, sortBy, order, recordStatus,
 } = {}) {

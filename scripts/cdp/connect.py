@@ -29,10 +29,8 @@ async def report_page_state(browser):
 async def scan_pending(browser):
     """Run scan_form_fields + get_pending_tasks on the agent's browser."""
     sys.path.insert(0, '.')
-    from scripts.actions.form_rules import load_rules
     from scripts.actions._builder import build_controller
 
-    rules = load_rules()
     ctx = browser.contexts[0]
 
     async def get_page():
@@ -44,7 +42,7 @@ async def scan_pending(browser):
     ctx.get_current_page = get_page
 
     case_data = {}
-    ctrl = build_controller(ctx, rules, case_data_store=case_data)
+    ctrl = build_controller(ctx, case_data_store=case_data)
     actions = ctrl.registry.registry.actions
 
     sf = actions.get('scan_form_fields')

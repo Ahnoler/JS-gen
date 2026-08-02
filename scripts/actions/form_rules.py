@@ -9,7 +9,6 @@ Architecture::
   FIELD_RULES (list of FieldRule)
     │
     ├── match_rule(label) → str | None
-    ├── load_rules()       → list of (keywords, generator)  (deprecated)
     └── get_has_button_keywords(case_data_store) → list[str]
 """
 import random as _random
@@ -533,13 +532,6 @@ FIELD_RULES: List[FieldRule] = _make_field_rules()
 # Public API
 # ══════════════════════════════════════════════════════════════════════════════
 
-def load_rules(script_dir=None):
-    """Legacy wrapper — returns list of (keywords, generator) tuples.
-
-    Deprecated: use ``match_rule(label)`` directly instead.
-    """
-    return [(list(r.keywords), r.generator) for r in FIELD_RULES]
-
 
 def match_cert_number(cert_type: str = '') -> str:
     """Generate a certificate number based on the selected 证件类型 text.
@@ -560,23 +552,17 @@ def match_cert_number(cert_type: str = '') -> str:
     return _gen_idcard()
 
 
-def match_rule(label_text, form_rules=None):
+def match_rule(label_text):
     """Match a label against registered rules and return a generated value, or None.
 
     Args:
         label_text: The field label text to match.
-        form_rules: Ignored (kept for backward compatibility with callers
-                    that pass previously-loaded rules).
 
     Match order: across all rules, prefer the longest matching keyword; ties
     break by rule.priority (higher wins).
 
     Ambiguous labels like「证件号码」return None — use ``match_cert_number``.
     """
-    if form_rules is not None:
-        # Legacy call path — ignore the parameter and use FIELD_RULES
-        pass
-
     t = label_text.replace(' ', '').replace('\t', '')
     # Ambiguous — must be resolved via 证件类型 context
     if t in ('证件号码', '证件号') or t.endswith('证件号码') or t.endswith('证件号'):

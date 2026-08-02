@@ -4,7 +4,7 @@
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
-import * as functionDefDao from '../dao/function-def-dao.js';
+import * as systemDao from '../dao/system-dao.js';
 import * as caseDataDao from '../dao/case-data-dao.js';
 import { callLLM } from '../llm-utils.js';
 import { getDB } from '../../config/database.js';
@@ -226,7 +226,7 @@ export async function createEmptyTrajectory({
 } = {}) {
   let resolvedFunctionId = typeof functionId === 'number'
     ? functionId
-    : await functionDefDao.getDefaultFunctionId();
+    : await systemDao.getDefaultFunctionId();
   return trajectoryDao.save({
     name: String(name || '').trim(),
     trajectoryLog: null,
@@ -270,7 +270,7 @@ export async function createTransactionWithPhases({
     err.statusCode = 400;
     throw err;
   } else {
-    resolvedFunctionId = await functionDefDao.getDefaultFunctionId();
+    resolvedFunctionId = await systemDao.getDefaultFunctionId();
   }
 
   const parsed = Array.isArray(phases)

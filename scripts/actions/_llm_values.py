@@ -81,7 +81,7 @@ def _get_form_llm(agent_llm=None):
     return _FORM_LLM
 
 
-def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
+def _llm_generate_values(llm, items, case_data_store=None,
                          instruction="生成合理的测试数据"):
     """Generate values for form fields with three-tier priority:
     1. User-provided data (from case_data_store)
@@ -130,8 +130,8 @@ def _llm_generate_values(llm, items, form_rules=None, case_data_store=None,
         # —— Priority 2: form_rules.py generators (input only) ——
         # Skip postal code P2 rule when address is present — defer to LLM
         # so postal code can be derived from the address value.
-        if kind == 'input' and form_rules and not (_has_address and _is_postal_code(label)):
-            generated = match_rule(label, form_rules)
+        if kind == 'input' and not (_has_address and _is_postal_code(label)):
+            generated = match_rule(label)
             if generated:
                 actions.append({'action': 'fill_input', 'label': label, 'value': generated})
                 continue

@@ -3,7 +3,7 @@
 面向 **Element UI / Vue** 被测系统的浏览器自动化服务：AI / 人工录制、Playwright 脚本组装与执行、MySQL 交易（轨迹）持久化、可选远程执行机。产品前端在独立 Vue 仓库；本仓库提供控制面 API 与 `/api/docs`。
 
 > **产品主路径是 `/api/v2/*`（MySQL）**，不是旧的 `/api/trajectory` / `/api/case-data`（已返回 **410 Gone**）。  
-> **LLM 默认走独立模式**（`STANDALONE_LLM=true`），不依赖 OpenCode SDK。  
+> **LLM 默认走独立模式**（经 `src/llm-utils.js`），不依赖 OpenCode SDK。
 > **没有活跃的 `.opencode/skills/`**；知识在 `scripts/prompts/*.md` + CTRL / `form_rules` 代码中。
 
 更细的 Agent 工作约定见 [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md)。前端契约以 `/api/docs` 为准（`src/dashboard/api-docs/catalog.js`），不再维护单独产品 API markdown。

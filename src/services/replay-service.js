@@ -1,7 +1,7 @@
 /**
  * Trajectory Playwright replay orchestration.
  *
- * @deprecated Assembled full-replay product path. Prefer live `_replay.py`
+ * Legacy: Assembled full-replay product path. Prefer live `_replay.py`
  * (`replay_actions`) for product. This module stays as an engineering asset.
  */
 import { randomUUID } from 'crypto';

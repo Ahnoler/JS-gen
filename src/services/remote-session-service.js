@@ -157,15 +157,6 @@ export function resolveLiveBinding(opts = {}) {
   return null;
 }
 
-/** @deprecated Prefer getLiveBindingByTrajectory / getLiveBindingByAgentSession */
-export function getExecutorLiveSessionId() {
-  // Prefer any attached binding (legacy single-cursor callers).
-  for (const b of liveByRemoteSessionId.values()) {
-    if (b.attached) return b.agentSessionId;
-  }
-  return null;
-}
-
 export function clearExecutorLive() {
   liveByRemoteSessionId.clear();
 }

@@ -85,7 +85,7 @@ def _wrap_action_with_screenshots(controller, browser_context):
     controller.action = action_decorator
 
 
-def build_controller(browser_context, form_rules, case_data_store=None,
+def build_controller(browser_context, case_data_store=None,
                      llm=None, exclude_actions=None):
     """Build and return a browser_use Controller with all custom actions registered."""
     from browser_use import Controller
@@ -99,7 +99,7 @@ def build_controller(browser_context, form_rules, case_data_store=None,
     _wrap_action_with_screenshots(controller, browser_context)
 
     _register_case_data_actions(controller, case_data_store)
-    _register_form_actions(controller, browser_context, form_rules, case_data_store, llm)
+    _register_form_actions(controller, browser_context, case_data_store, llm)
     _register_navigation_actions(controller, browser_context)
     _register_table_actions(controller, browser_context)
     _register_misc_actions(controller, browser_context, case_data_store)

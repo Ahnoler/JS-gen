@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'fs';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
-import * as functionDefDao from '../dao/function-def-dao.js';
+import * as systemDao from '../dao/system-dao.js';
 import { getDB } from '../../config/database.js';
 import { stepFromActionLog } from '../models/helpers.js';
 import { touchTrajectoryRuntimeActivity } from './trajectory-runtime.js';
@@ -55,30 +55,6 @@ export function buildStepsFromFlow(flow, { source = 'agent' } = {}) {
         source: s.source || source,
       },
     ));
-}
-
-/**
- * Extract next_goal list from native AgentHistory JSON (traj_*.json).
- * @deprecated Prefer readOperationLogText — kept for transitional callers
- * @returns {{ step: number, goal: string }[]}
- */
-export function extractTrajectoryLog(nativePathOrObj, limit = 200) {
-  let trajectory = nativePathOrObj;
-  if (typeof nativePathOrObj === 'string') {
-    if (!existsSync(nativePathOrObj)) return [];
-    try {
-      trajectory = JSON.parse(readFileSync(nativePathOrObj, 'utf-8'));
-    } catch {
-      return [];
-    }
-  }
-  const history = trajectory?.history || [];
-  const goals = [];
-  for (let i = 0; i < history.length && goals.length < limit; i++) {
-    const goal = history[i]?.model_output?.current_state?.next_goal;
-    if (goal) goals.push({ step: i + 1, goal: String(goal) });
-  }
-  return goals;
 }
 
 /**
@@ -400,7 +376,7 @@ export async function saveFullTrajectory({ trajectory, phases, functionId, remot
   if (typeof functionId === 'number') {
     resolvedFunctionId = functionId;
   } else {
-    resolvedFunctionId = await functionDefDao.getDefaultFunctionId();
+    resolvedFunctionId = await systemDao.getDefaultFunctionId();
   }
 
   const trajId = await trajectoryDao.save({

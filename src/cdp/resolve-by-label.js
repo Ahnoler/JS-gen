@@ -395,8 +395,3 @@ export async function resolveElementByLabel(client, opts = {}) {
     matches,
   };
 }
-
-/** @deprecated use resolveElementByLabel */
-export function buildResolveByLabelExpression(labelText) {
-  return buildResolveExpression({ labelText });
-}

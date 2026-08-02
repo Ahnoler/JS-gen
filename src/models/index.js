@@ -4,7 +4,7 @@
  * @example
  * import { stepFromActionLog } from './models/index.js';
  * /** @type {import('./models/index.js').Trajectory} *\/
- * const traj = await trajectoryDao.getByTrajectoryId(id);
+ * const traj = await trajectoryDao.getById(id);
  */
 
 export * from './constants.js';

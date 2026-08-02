@@ -13,7 +13,6 @@ export {
   stepsToActionEntries,
   getTrajectoryTree,
   getTrajectoryActionFlow,
-  getSessionActionFlow,
   getTrajectoryWithPhases,
   listPhasesByTrajectory,
   listStepsByPhase,
@@ -31,7 +30,6 @@ export {
 export {
   buildStepsFromActionFile,
   buildStepsFromFlow,
-  extractTrajectoryLog,
   readOperationLogText,
   persistSessionTrajectory,
   saveFullTrajectory,

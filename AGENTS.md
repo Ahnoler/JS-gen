@@ -81,7 +81,7 @@ Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps
 - **`test-assemble.js`** — Thin HTTP over `assemble-service` (dedup → assembler).
 - **`test-run.js`** — Thin HTTP/WS over `script-runner` (`execution:*` events).
 - **`llm-proxy.js`** — OpenAI-compatible `/v1/chat/completions` and `/v1/models`.
-- **`explore-utils.js`** — Process/SSE helpers (name is historical; not an Explore route).
+- **`setup.js`** — `/api/setup*`, `/` redirect, `/api/docs`, legacy 301 redirects (extracted from `server.mjs`).
 - **`legacy-gone.js`** — `/api/trajectory` and `/api/case-data` → **410 Gone**.
 - **`agent.js`** — Generic LLM agent HTTP (standalone LLM).
 
@@ -149,7 +149,7 @@ Do **not** look for or restore OpenCode skill packages unless the user explicitl
 
 ### Key design decisions
 
-- **`STANDALONE_LLM=true`** — Default; LLM via `src/llm-utils.js`. OpenCode SDK is not the product path.
+- **LLM standalone mode** — Default; LLM via `src/llm-utils.js`. OpenCode SDK is not the product path.
 - **Consecutive-only dedup** (`src/dedup.js`) — Only back-to-back identical `(action, params)`; non-consecutive duplicates kept.
 - **Native setter pattern** for Element UI inputs — never rely on Playwright `page.fill()` alone for el-form.
 - **`el-select`** — Use `selectOption`; generic click-by-index on option spans fails silently.

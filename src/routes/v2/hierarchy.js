@@ -138,7 +138,7 @@ export default function (app) {
   app.put('/api/v2/processes/:id', async (req, res) => {
     try {
       const existing = await systemDao.getById(+req.params.id);
-      if (!existing || existing.type !== NODE_TYPE.PROCESS) {
+      if (!existing || existing.type !== NODE_TYPE.MODULE) {
         return res.status(404).json({ error: 'Process not found' });
       }
       const process = await systemDao.update(+req.params.id, req.body || {});
@@ -151,7 +151,7 @@ export default function (app) {
   app.delete('/api/v2/processes/:id', async (req, res) => {
     try {
       const existing = await systemDao.getById(+req.params.id);
-      if (!existing || existing.type !== NODE_TYPE.PROCESS) {
+      if (!existing || existing.type !== NODE_TYPE.MODULE) {
         return res.status(404).json({ error: 'Process not found' });
       }
       await systemDao.remove(+req.params.id);

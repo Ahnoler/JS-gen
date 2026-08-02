@@ -74,9 +74,8 @@ function _findPython() {
 }
 export const PYTHON_EXE = _findPython();
 
-// Legacy compatibility (used by explore-utils.js)
+// Legacy compatibility export
 export const PYTHON_EXE_CONFIG = PYTHON_EXE;
-export const STANDALONE_LLM = true;
 
 // Executor agent (WS /ws/executor) — unset token rejects all executor connections
 export const EXECUTOR_TOKEN = _resolve('EXECUTOR_TOKEN', '');

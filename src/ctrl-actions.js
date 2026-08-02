@@ -1,7 +1,7 @@
 /**
  * ctrl-actions.js — Canonical source for window.CTRL (replay / assemble).
  *
- * @deprecated For product replay prefer live `_replay.py`. CTRL remains the
+ * Legacy: For product replay prefer live `_replay.py`. CTRL remains the
  * engineering injection surface for assemble/test-run and the deprecated
  * `/api/v2/trajectories/:id/replay/*` path. Keep name-level parity with
  * Python cues via `node scripts/characterization/characterize-ctrl.mjs`.

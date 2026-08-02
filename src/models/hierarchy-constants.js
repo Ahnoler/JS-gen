@@ -6,8 +6,6 @@ export const NODE_TYPE = Object.freeze({
   ROOT: 0,
   SYSTEM: 1,
   MODULE: 2,
-  /** @deprecated use MODULE */
-  PROCESS: 2,
   FUNCTION: 3,
 });
 
@@ -20,8 +18,6 @@ export const TYPE_LABEL = Object.freeze({
 
 /** Sentinel root row id / parent_id for type=1 系统 nodes. */
 export const ROOT_NODE_ID = 0;
-/** @deprecated use ROOT_NODE_ID */
-export const ROOT_PARENT_ID = ROOT_NODE_ID;
 
 /** True for null / undefined / 0 (points at virtual/real root). */
 export function isRootParentId(parentId) {
@@ -38,8 +34,6 @@ export function isRootNodeId(id) {
 export const SEED_ROOT_ID = '00000000-0000-0000-0000-000000000000';
 export const SEED_SYSTEM_ID = '00000000-0000-0000-0000-000000000001';
 export const SEED_MODULE_ID = '00000000-0000-0000-0000-000000000002';
-/** @deprecated use SEED_MODULE_ID */
-export const SEED_PROCESS_ID = SEED_MODULE_ID;
 export const SEED_FUNCTION_ID = '00000000-0000-0000-0000-000000000003';
 
 export const SEED_UUID_BY_TYPE = Object.freeze({

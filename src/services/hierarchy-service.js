@@ -192,11 +192,6 @@ export function nestToChildrenTree(nodes = []) {
   return roots;
 }
 
-/** @deprecated use nestToChildrenTree */
-export function nestFlatTree(nodes = []) {
-  return nestToChildrenTree(nodes);
-}
-
 export async function createSystem(name, description, url = '') {
   return systemDao.create({
     type: NODE_TYPE.SYSTEM,
@@ -296,7 +291,7 @@ export function buildPath(nodeId, byId) {
 }
 
 /**
- * @deprecated 已合并进 getTree({ keyword, type })；保留兼容调用。
+ * Legacy: 已合并进 getTree({ keyword, type })；保留兼容调用。
  */
 export async function searchNodes(keyword, { limit = 50, type } = {}) {
   return getTree({

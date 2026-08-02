@@ -6,13 +6,13 @@ import { randomUUID } from 'crypto';
 import { persistSessionTrajectory } from '../../src/services/trajectory-service.js';
 import { persistSessionCaseData } from '../../src/services/case-data-service.js';
 import { getDB, closeDB } from '../../config/database.js';
-import * as functionDefDao from '../../src/dao/function-def-dao.js';
+import * as systemDao from '../../src/dao/system-dao.js';
 
 const trajId = `traj_smoke_${Date.now()}`;
 const recordId = `cdata_smoke_${Date.now()}`;
 
 try {
-  const defaultFn = await functionDefDao.getDefaultFunctionId();
+  const defaultFn = await systemDao.getDefaultFunctionId();
   console.log('[smoke] default function_def.id =', defaultFn);
   if (!defaultFn) throw new Error('Default function_def missing — run seed first');
 

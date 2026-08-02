@@ -127,12 +127,6 @@ export async function getTrajectoryActionFlow(trajectoryDbId, pendingEntries = [
   };
 }
 
-/** @deprecated use getTrajectoryActionFlow */
-export async function getSessionActionFlow(sessionId, pendingEntries = [], trajectoryDbId = null, opts = {}) {
-  const flow = await getTrajectoryActionFlow(trajectoryDbId, pendingEntries, opts);
-  return { ...flow, sessionId };
-}
-
 export async function getTrajectoryWithPhases(id) {
   const traj = await trajectoryDao.getById(+id);
   if (!traj) return null;

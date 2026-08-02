@@ -97,7 +97,7 @@ export default function (app) {
   });
 
   /**
-   * @deprecated 已合并到 GET /tree?name=&type=
+   * Legacy: 已合并到 GET /tree?name=&type=
    * 保留别名：等价于 tree?accounts=false&name=...
    */
   app.get('/api/v2/system-mgmt/search', async (req, res) => {

@@ -17,12 +17,4 @@ export default function (app) {
       defaultModel: state.defaultModel ? `${state.defaultModel.providerID}/${state.defaultModel.modelID}` : null,
     });
   });
-
-  app.get('/api/agents', (req, res) => {
-    res.json({ agents: [] });
-  });
-
-  app.get('/api/skills', (req, res) => {
-    res.json({ skills: [] });
-  });
 }
