@@ -1,8 +1,8 @@
 /**
  * Characterization: consecutive-only element dedup (keep later; must not remove non-consecutive).
  */
-import { deduplicateByXPath, deduplicateActionFile, elementDedupKey } from '../src/dedup.js';
-import { parseReplayStepMarker, findScreenshotForStep, findScreenshotsForStep } from '../src/runtime/script-runner.js';
+import { deduplicateByXPath, deduplicateActionFile, elementDedupKey } from '../../src/dedup.js';
+import { parseReplayStepMarker, findScreenshotForStep, findScreenshotsForStep } from '../../src/runtime/script-runner.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);

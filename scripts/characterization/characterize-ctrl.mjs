@@ -7,7 +7,7 @@
  * This script asserts name-level parity so drift is caught loudly.
  *
  * Run:
- *   node scripts/characterize-ctrl.mjs
+ *   node scripts/characterization/characterize-ctrl.mjs
  *
  * ---------------------------------------------------------------------------
  * Mapping: CTRL method → cue(s) that must appear in Python (or assembler)
@@ -43,14 +43,14 @@ import {
   CTRL_API_TABLE,
   CTRL_OBJECT,
   getInjectionCode,
-} from '../src/ctrl-actions.js';
+} from '../../src/ctrl-actions.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(here, '..');
+const ROOT = join(here, '..', '..');
 
 /** @type {Record<string, { cues: string[], roots?: 'agent' | 'assembler' | 'both' }>} */
 const CTRL_PYTHON_MAP = {
@@ -88,8 +88,8 @@ function parseCtrlMethods(ctrlObjectSrc) {
 }
 
 function loadAgentCorpus() {
-  const snippets = readFileSync(join(here, 'actions/_js_snippets.py'), 'utf8');
-  const actionsDir = join(here, 'actions');
+  const snippets = readFileSync(join(here, '..', 'actions', '_js_snippets.py'), 'utf8');
+  const actionsDir = join(here, '..', 'actions');
   const actionFiles = readdirSync(actionsDir)
     .filter((f) => f.endsWith('.py'))
     .map((f) => readFileSync(join(actionsDir, f), 'utf8'));
@@ -98,8 +98,8 @@ function loadAgentCorpus() {
 
 function loadAssemblerCorpus() {
   const parts = [
-    readFileSync(join(here, 'script_assembler.py'), 'utf8'),
-    readFileSync(join(here, 'models/form_snapshot.py'), 'utf8'),
+    readFileSync(join(here, '..', 'script_assembler.py'), 'utf8'),
+    readFileSync(join(here, '..', 'models', 'form_snapshot.py'), 'utf8'),
   ];
   return parts.join('\n');
 }
@@ -184,7 +184,7 @@ function testPythonParityCues(methods) {
 }
 
 function testAssemblerLoadsCtrl() {
-  const assembler = readFileSync(join(here, 'script_assembler.py'), 'utf8');
+  const assembler = readFileSync(join(here, '..', 'script_assembler.py'), 'utf8');
   assert(
     assembler.includes('ctrl-actions.js') || assembler.includes('getInjectionCode'),
     'script_assembler should load CTRL from ctrl-actions.js',

@@ -1,6 +1,6 @@
 /**
  * E1 smoke test: executor WS register / heartbeat / unregister.
- * Usage: node scripts/smoke-executor-ws.mjs
+ * Usage: node scripts/smoke/smoke-executor-ws.mjs
  */
 import { spawn } from 'child_process';
 import path from 'path';
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import WebSocket from 'ws';
 import { randomUUID } from 'crypto';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const TOKEN = 'e1-smoke-token';
 const PORT = 4098;

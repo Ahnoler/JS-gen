@@ -24,13 +24,13 @@ npm install
 python scripts/script_assembler.py <action_file.json> [output.js]
 
 # Lightweight characterization / import smokes (not a full test suite)
-node scripts/characterize-dedup.mjs
-node scripts/accept-replay-apis.mjs
-python scripts/characterize-assembler-click.py
-python scripts/characterize-form-rules.py
-node scripts/characterize-ctrl.mjs
+node scripts/characterization/characterize-dedup.mjs
+node scripts/smoke/accept-replay-apis.mjs
+python scripts/characterization/characterize-assembler-click.py
+python scripts/characterization/characterize-form-rules.py
+node scripts/characterization/characterize-ctrl.mjs
 # ↑ CTRL parity: parses CTRL_OBJECT methods vs _js_snippets / actions/*.py cues
-node scripts/characterize-trajectory.mjs
+node scripts/characterization/characterize-trajectory.mjs
 ```
 
 Manual verification: product API docs at `http://localhost:4097/api/docs` after starting the server (`src/dashboard/api-docs/catalog.js` — sole frontend contract). Product APIs are under `/api/v2/*`. Human-oriented overview: `README.md` (keep in sync with this file’s architecture section). Legacy engineering HTML (`/api/test`, record-console/studio) redirects to `/api/docs`.
@@ -49,7 +49,7 @@ Element UI CTRL helpers: **`src/ctrl-actions.js` is canonical** for `window.CTRL
 | Python JS strings | `scripts/actions/_js_snippets.py` | `page.evaluate` injection from Python agent |
 | Python | `scripts/controller.py` + `scripts/actions/*` | Browser Use agent at runtime |
 
-Same CTRL surface (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem`, `clickTableRowButton`, `closeDialog`, etc.). Edit canonical first; keep Python cues in sync — `node scripts/characterize-ctrl.mjs` fails on missing methods.
+Same CTRL surface (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem`, `clickTableRowButton`, `closeDialog`, etc.). Edit canonical first; keep Python cues in sync — `node scripts/characterization/characterize-ctrl.mjs` fails on missing methods.
 
 ### Control plane pipelines
 

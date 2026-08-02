@@ -10,9 +10,9 @@
  *   - buildLoginInstruction / buildStepsFromFlow / buildStepsFromActionFile
  *
  * Run:
- *   node scripts/characterize-trajectory.mjs
+ *   node scripts/characterization/characterize-trajectory.mjs
  *
- * Live HTTP path remains: node scripts/accept-recording-apis.mjs [baseUrl]
+ * Live HTTP path remains: node scripts/smoke/accept-recording-apis.mjs [baseUrl]
  */
 import { mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -23,8 +23,8 @@ import {
   normalizeActionName,
   normalizeElementJson,
   stepFromActionLog,
-} from '../src/models/helpers.js';
-import { trajectoryStepToActionEntry } from '../src/models/element.js';
+} from '../../src/models/helpers.js';
+import { trajectoryStepToActionEntry } from '../../src/models/element.js';
 import {
   buildLoginInstruction,
   stepsToActionEntries,
@@ -42,7 +42,7 @@ import {
   confirmTrajectoryStep,
   clearTrajectory,
   confirmTrajectory,
-} from '../src/services/trajectory-service.js';
+} from '../../src/services/trajectory-service.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -82,13 +82,13 @@ function testFacadeSurface() {
 }
 
 async function testFocusedModules() {
-  const persist = await import('../src/services/trajectory-persist-service.js');
-  const phase = await import('../src/services/trajectory-phase-service.js');
-  const meta = await import('../src/services/trajectory-meta-service.js');
-  const recording = await import('../src/services/trajectory-recording-service.js');
-  const lifecycle = await import('../src/services/trajectory-record-lifecycle.js');
-  const runtime = await import('../src/services/trajectory-runtime.js');
-  const attach = await import('../src/services/trajectory-attach-service.js');
+  const persist = await import('../../src/services/trajectory-persist-service.js');
+  const phase = await import('../../src/services/trajectory-phase-service.js');
+  const meta = await import('../../src/services/trajectory-meta-service.js');
+  const recording = await import('../../src/services/trajectory-recording-service.js');
+  const lifecycle = await import('../../src/services/trajectory-record-lifecycle.js');
+  const runtime = await import('../../src/services/trajectory-runtime.js');
+  const attach = await import('../../src/services/trajectory-attach-service.js');
   for (const name of [
     'buildStepsFromActionFile',
     'buildStepsFromFlow',

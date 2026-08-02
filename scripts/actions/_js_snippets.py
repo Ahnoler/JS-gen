@@ -5,7 +5,7 @@ Canonical CTRL.* for replay/assemble lives in src/ctrl-actions.js
 (window.CTRL via getInjectionCode). This module is the agent-side twin —
 not byte-identical (more helpers than CTRL). Parity check:
 
-    node scripts/characterize-ctrl.mjs
+    node scripts/characterization/characterize-ctrl.mjs
 
 CTRL.* ↔ primary JS_* (or action) mapping:
     getContainer       → JS_GET_CONTAINER

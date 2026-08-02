@@ -1,12 +1,12 @@
 /**
  * E3 smoke: USE_EXECUTOR session open/close via HTTP + executor agent.
- * Usage: node scripts/smoke-executor-session.mjs
+ * Usage: node scripts/smoke/smoke-executor-session.mjs
  */
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TOKEN = 'e3-smoke-token';
 const PORT = 4100;
 

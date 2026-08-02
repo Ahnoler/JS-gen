@@ -1,7 +1,7 @@
 /**
  * Characterization: traditional engine export (5-field contract).
  *
- * Run: node scripts/characterize-legacy-engine-export.mjs
+ * Run: node scripts/characterization/characterize-legacy-engine-export.mjs
  */
 import assert from 'node:assert/strict';
 import {
@@ -10,7 +10,7 @@ import {
   exportStepsToLegacyEngine,
   pickRelativeTarget,
   buildOperationName,
-} from '../src/services/legacy-engine-export.js';
+} from '../../src/services/legacy-engine-export.js';
 
 function testSchema() {
   const keys = LEGACY_ENGINE_FIELD_SCHEMA.map((f) => f.key);

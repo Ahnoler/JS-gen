@@ -1,7 +1,7 @@
 /**
  * Characterize relative xpath builders (form / menu / icon / tab / table / close).
  *
- *   node scripts/characterize-locator-candidates.mjs
+ *   node scripts/characterization/characterize-locator-candidates.mjs
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -23,7 +23,7 @@ import {
   enrichLocatorFields,
   isGeneratedId,
   xpathLiteral,
-} from '../src/cdp/locator-candidates.js';
+} from '../../src/cdp/locator-candidates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -294,7 +294,7 @@ function ok(name) {
 
 {
   // Python mirror must contain the same page helpers.
-  const py = readFileSync(join(__dirname, 'actions/_locator_helpers_js.py'), 'utf8');
+  const py = readFileSync(join(__dirname, '..', 'actions', '_locator_helpers_js.py'), 'utf8');
   assert.ok(py.includes('buildLocatorSnap'));
   assert.ok(py.includes('normalizeTargetRoot'));
   assert.ok(py.includes('classTokenPred'));

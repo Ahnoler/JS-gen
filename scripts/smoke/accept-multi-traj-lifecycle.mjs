@@ -12,7 +12,7 @@
  * Full crosstalk (two prepare + release one keeps the other) needs a live executor;
  * this script validates the control-plane contract without requiring Chrome.
  *
- * Usage: node scripts/accept-multi-traj-lifecycle.mjs [baseUrl]
+ * Usage: node scripts/smoke/accept-multi-traj-lifecycle.mjs [baseUrl]
  * Default baseUrl: http://127.0.0.1:4097
  */
 import WebSocket from 'ws';

@@ -80,8 +80,8 @@ npm run dev        # 控制面文件监视
 轻量冒烟（非完整测试套件）：
 
 ```bash
-node scripts/characterize-dedup.mjs
-node scripts/accept-replay-apis.mjs
+node scripts/characterization/characterize-dedup.mjs
+node scripts/smoke/accept-replay-apis.mjs
 ```
 
 ---

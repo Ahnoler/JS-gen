@@ -4,7 +4,7 @@
 Characterization: scripts/actions/form_rules.py (match_rule + generators).
 
 Run:
-  python scripts/characterize-form-rules.py
+  python scripts/characterization/characterize-form-rules.py
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import os
 import re
 import sys
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 

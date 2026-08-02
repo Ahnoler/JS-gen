@@ -4,17 +4,17 @@
 Characterization: click_element_by_index button vs menu vs absolute-xpath branching.
 
 Run:
-  python scripts/characterize-assembler-click.py
+  python scripts/characterization/characterize-assembler-click.py
   # or from repo root with PYTHONPATH=.
-  PYTHONPATH=. python scripts/characterize-assembler-click.py
+  PYTHONPATH=. python scripts/characterization/characterize-assembler-click.py
 """
 from __future__ import annotations
 
 import os
 import sys
 
-# Allow `python scripts/characterize-assembler-click.py` from repo root
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Allow `python scripts/characterization/characterize-assembler-click.py` from repo root
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 

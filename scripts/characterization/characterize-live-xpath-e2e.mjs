@@ -5,14 +5,14 @@
  * Element-UI-shaped fixture, and asserts the three write-path builders produce
  * verified relative xpath_smart for representative targets.
  *
- *   node scripts/characterize-live-xpath-e2e.mjs
- *   node scripts/characterize-live-xpath-e2e.mjs --cdp=http://127.0.0.1:9242
+ *   node scripts/characterization/characterize-live-xpath-e2e.mjs
+ *   node scripts/characterization/characterize-live-xpath-e2e.mjs --cdp=http://127.0.0.1:9242
  */
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
-import { PAGE_LOCATOR_HELPERS } from '../src/cdp/locator-candidates.js';
-import { buildResolveExpression } from '../src/cdp/resolve-by-label.js';
-import { prepareElementJson, hasUsableLocator } from '../src/models/element.js';
+import { PAGE_LOCATOR_HELPERS } from '../../src/cdp/locator-candidates.js';
+import { buildResolveExpression } from '../../src/cdp/resolve-by-label.js';
+import { prepareElementJson, hasUsableLocator } from '../../src/models/element.js';
 
 const cdpArg = process.argv.find((a) => a.startsWith('--cdp='));
 const CDP_URL = cdpArg ? cdpArg.slice('--cdp='.length) : '';

@@ -6,7 +6,7 @@ import { spawnSync } from 'child_process';
 import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { findScreenshotForStep, findScreenshotsForStep } from '../src/runtime/script-runner.js';
+import { findScreenshotForStep, findScreenshotsForStep } from '../../src/runtime/script-runner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,7 +22,7 @@ assert(pair.before?.kind === 'before', 'before shot missing');
 assert(pair.after?.kind === 'after', 'after shot missing');
 assert(findScreenshotForStep(3, [pair.before, pair.after], 'before')?.fileName.includes('before'), 'kind filter');
 
-const actionFile = path.join(__dirname, 'action', `_characterize_ss_${Date.now()}.json`);
+const actionFile = path.join(__dirname, '..', 'action', `_characterize_ss_${Date.now()}.json`);
 writeFileSync(actionFile, JSON.stringify({
   url: 'http://example.com',
   actions: [
@@ -30,9 +30,9 @@ writeFileSync(actionFile, JSON.stringify({
   ],
 }), 'utf8');
 
-const py = spawnSync('python', [path.join(__dirname, 'script_assembler.py'), actionFile], {
+const py = spawnSync('python', [path.join(__dirname, '..', 'script_assembler.py'), actionFile], {
   encoding: 'utf-8',
-  cwd: path.join(__dirname, '..'),
+  cwd: path.join(__dirname, '..', '..'),
 });
 if (existsSync(actionFile)) unlinkSync(actionFile);
 assert(py.status === 0, `assembler failed: ${py.stderr || py.stdout}`);

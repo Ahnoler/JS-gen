@@ -1,12 +1,12 @@
 /**
  * Smoke test: dual-write trajectory + case_data into MySQL.
- * Run: node scripts/smoke-db-write.mjs
+ * Run: node scripts/smoke/smoke-db-write.mjs
  */
 import { randomUUID } from 'crypto';
-import { persistSessionTrajectory } from '../src/services/trajectory-service.js';
-import { persistSessionCaseData } from '../src/services/case-data-service.js';
-import { getDB, closeDB } from '../config/database.js';
-import * as functionDefDao from '../src/dao/function-def-dao.js';
+import { persistSessionTrajectory } from '../../src/services/trajectory-service.js';
+import { persistSessionCaseData } from '../../src/services/case-data-service.js';
+import { getDB, closeDB } from '../../config/database.js';
+import * as functionDefDao from '../../src/dao/function-def-dao.js';
 
 const trajId = `traj_smoke_${Date.now()}`;
 const recordId = `cdata_smoke_${Date.now()}`;

@@ -15,9 +15,9 @@
  *   → GET /trajectories/:id/tree
  *   → POST /trajectories/:id/detach           (release Chrome + slot)
  *
- * Also see: node scripts/accept-multi-traj-lifecycle.mjs
+ * Also see: node scripts/smoke/accept-multi-traj-lifecycle.mjs
  *
- * Usage: node scripts/accept-recording-apis.mjs [baseUrl]
+ * Usage: node scripts/smoke/accept-recording-apis.mjs [baseUrl]
  * Default baseUrl: http://127.0.0.1:4101
  */
 const BASE = (process.argv[2] || 'http://127.0.0.1:4101').replace(/\/$/, '');

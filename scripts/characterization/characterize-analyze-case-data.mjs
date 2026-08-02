@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Characterization: extractCaseEntriesFromRequirement (no LLM).
- *   node scripts/characterize-analyze-case-data.mjs
+ *   node scripts/characterization/characterize-analyze-case-data.mjs
  */
-import { extractCaseEntriesFromRequirement } from '../src/services/trajectory-meta-service.js';
+import { extractCaseEntriesFromRequirement } from '../../src/services/trajectory-meta-service.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
