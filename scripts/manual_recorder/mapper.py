@@ -68,6 +68,9 @@ def _offline_xpath_smart_fallback(
     t = re.sub(r'\s+', ' ', str(text or '')).strip()[:40]
     if not t:
         return ''
+    if kind == 'icon':
+        lit = _xpath_literal(t)
+        return f'//*[@aria-label={lit} or @title={lit}]'
     # Only rebuild button/link text xpath offline — never menu from absolute path alone
     tag_l = (tag or '').lower()
     cls = class_name or ''
@@ -125,6 +128,7 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
             target_kind=target_kind or (
                 'form_input' if kind in ('fill', 'fill_date', 'select_option') else
                 'adjacent_button' if kind == 'click_adjacent_button' else
+                'icon' if kind == 'click_icon_button' else
                 'menu' if kind == 'click_menu_item' else
                 'tab' if kind == 'switch_tab' else
                 'dialog_close' if kind == 'close_dialog' else
@@ -258,6 +262,13 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
 
     if kind == 'click_adjacent_button':
         return _as_click_by_index(payload.get('text') or payload.get('label_text') or '')
+
+    if kind == 'click_icon_button':
+        text = (payload.get('button_text') or payload.get('text') or '').strip()
+        if not text:
+            return None
+        element['target_kind'] = 'icon'
+        return 'click_icon_button', {'button_text': text}, element
 
     if kind == 'click':
         return _as_click_by_index(payload.get('text') or '')

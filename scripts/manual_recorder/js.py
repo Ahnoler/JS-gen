@@ -1,6 +1,7 @@
 """Injected page script for manual DOM recording."""
 from __future__ import annotations
 
+from scripts.actions._js_snippets import _JS_ICON_BUTTON_HELPERS
 from scripts.actions._locator_helpers_js import PAGE_LOCATOR_HELPERS
 
 # ── Injected page script ───────────────────────────────────────────────────
@@ -251,7 +252,7 @@ JS_MANUAL_RECORDER = r'''(() => {
     return t.split(/[\n\r]/)[0].trim().slice(0, 40);
   }
 
-''' + PAGE_LOCATOR_HELPERS + r'''
+''' + PAGE_LOCATOR_HELPERS + _JS_ICON_BUTTON_HELPERS + r'''
   function elMeta(el, textOverride) {
     const t = textOverride != null ? String(textOverride) : shortLabel(el);
     const hi = highlightIndexOf(el);
@@ -562,6 +563,21 @@ JS_MANUAL_RECORDER = r'''(() => {
           label_text: label,
         }, elMeta(adjBtn, visibleText(adjBtn))));
         return;
+      }
+    }
+
+    // Icon buttons (tooltip / aria-label / Vue content) — fallback before generic button
+    const iconHost = el.closest('[class*="el-icon-"], .el-tooltip, i[class*="icon"]');
+    if (iconHost && !isInIgnore(iconHost)) {
+      if (_iconHasIconClass(iconHost) && !_iconIsExcludedHost(iconHost)) {
+        const btnText = _iconResolveLabel(iconHost);
+        if (btnText) {
+          emit(Object.assign({
+            kind: 'click_icon_button',
+            button_text: btnText,
+          }, elMeta(iconHost, btnText)));
+          return;
+        }
       }
     }
 
