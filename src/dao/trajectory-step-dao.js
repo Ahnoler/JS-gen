@@ -76,7 +76,7 @@ export async function create(step) {
     extractedContent: step.extractedContent ?? step.result ?? '',
     trajectoryPhaseId: step.trajectoryPhaseId ?? null,
     source: step.source ?? 'manual',
-    confirmed: step.confirmed ?? false,
+    confirmed: step.confirmed !== undefined && step.confirmed !== null ? !!step.confirmed : true,
     confirmedAt: step.confirmedAt ?? null,
   });
   row.params_json = step.paramsJson ?? step.params ?? null;

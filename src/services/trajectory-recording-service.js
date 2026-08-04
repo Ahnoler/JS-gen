@@ -29,4 +29,5 @@ export {
 
 export {
   replayTrajectorySteps,
+  acceptTrajectoryStepsReplay,
 } from './trajectory-session-replay.js';

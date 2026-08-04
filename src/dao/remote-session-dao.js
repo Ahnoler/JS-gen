@@ -30,6 +30,17 @@ export async function getByTrajectory(trajectoryId) {
   return fromDbRow(row);
 }
 
+/** All occupied (active|idle) rows for a trajectory — oldest first. */
+export async function listOccupiedByTrajectory(trajectoryId) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) return [];
+  const rows = await getDB()(TABLE)
+    .where({ trajectory_id: tid })
+    .whereIn('status', [...REMOTE_SESSION_OCCUPIED])
+    .orderBy('id', 'asc');
+  return fromDbRows(rows);
+}
+
 /** Occupied (active|idle) row for an agent session UUID. */
 export async function getOccupiedByAgentSession(agentSessionId) {
   if (!agentSessionId) return null;

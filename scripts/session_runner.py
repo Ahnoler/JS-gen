@@ -408,8 +408,17 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
 
     agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', task_text, count=1).strip() or task_text
     try:
-        from .actions._phase_context import format_phase_preamble
+        from .actions._phase_context import (
+            format_phase_preamble,
+            force_refill_all_required,
+            force_refill_hint,
+        )
         from .actions._state import _CURRENT_PHASE
+        if case_data_ref is not None:
+            case_data_ref['_force_refill_all'] = force_refill_all_required(agent_task)
+            if case_data_ref['_force_refill_all']:
+                sys.stderr.write("[session] force_refill_all=True (modify-all-fields task)\n")
+                sys.stderr.flush()
         prior_phases = instruction.get('prior_phases') or instruction.get('priorPhases')
         phase_for_preamble = instruction.get('phase_number')
         if phase_for_preamble is None:
@@ -422,6 +431,8 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             prior_phases=prior_phases if isinstance(prior_phases, list) else None,
             case_data_store=case_data_ref,
         )
+        if case_data_ref is not None and case_data_ref.get('_force_refill_all'):
+            agent_task = agent_task + force_refill_hint()
         if agent_task.startswith('【业务场景】'):
             sys.stderr.write(f"[session] agent_task preview: {agent_task[:400]}\n")
             sys.stderr.flush()

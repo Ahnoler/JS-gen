@@ -159,3 +159,39 @@ Do **not** look for or restore OpenCode skill packages unless the user explicitl
 - **Replay (product)** — Attached/live `replay_actions` via `_replay.py` (`POST .../steps/replay`). Prefers recorded `xpath_smart`, then label/semantic, then `xpath_full`.
 - **Replay (deprecated)** — `/api/v2/trajectories/:id/replay/*` assembles Playwright + CTRL; kept runnable as an engineering asset, not product-supported. Assemble/test-run remain engineering APIs.
 - **Executor slots** — `EXECUTOR_CAPACITY` slots per node; control-plane lease until detach / node offline.
+
+## 同步约定（Python 控制面对齐）
+
+本项目（JS-gen）与 `d:\dev\ui-auto-recording-agent-python`（Python FastAPI 控制面）并行开发。Python 端对齐 JS-gen 的 schema / 接口 / WS 协议。
+
+**强制规则**：每次修改 JS-gen，必须同步更新 `CHANGELOG.md` 的 `[Unreleased]` 区段，按 Keep a Changelog 分类追加条目。条目需说明影响范围和 Python 同步提示。
+
+涉及以下变更时**必须**写 CHANGELOG：
+- `migrations/` 新增或修改迁移（schema 变更）
+- `src/routes/` 端点新增/删除/改路径/改响应格式
+- `src/services/` 业务逻辑变更（影响 Python 对齐语义）
+- `server.mjs` WebSocket 协议变更
+- `config/` 配置项变更
+
+仅改 `scripts/`（Python 子进程）可不写 CHANGELOG（Python 不迁 scripts）。
+
+条目格式见 `CHANGELOG.md` 顶部"条目格式约定"。
+
+### Git post-commit hook（自动跑同步检查）
+
+仓库提供 `scripts/hooks/post-commit` 脚本：commit 后若本次修改了 `migrations/` / `schemas/init.sql` / `src/routes/` / `src/services/` / `server.mjs` / `config/`，自动跑 Python 端 `scripts/check_jsgen_sync.py` 并打印报告（不阻塞 commit）。
+
+**首次安装 / 换机器后安装**：
+
+```bash
+cp scripts/hooks/post-commit .git/hooks/post-commit
+chmod +x .git/hooks/post-commit
+```
+
+`.git/hooks/` 不被 git 跟踪，重装 git 或换机器后需重新安装。脚本本身被 git 跟踪在 `scripts/hooks/post-commit`，永久保留。
+
+**报告解读**：
+- `[0] 增量对比`：自上次 `--mark-synced` 以来新增的迁移（最关键的区段）
+- `[3] CHANGELOG [Unreleased]`：JS-gen 端待跟进的变更条目
+- `[5] Python 同步提示`：每条带"Python 同步提示"的 CHANGELOG 条目
+- 跟进完 Python 端变更后，在 Python 仓库跑 `python scripts/check_jsgen_sync.py --mark-synced` 重置增量基线

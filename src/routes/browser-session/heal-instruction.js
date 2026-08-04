@@ -2,91 +2,77 @@ import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 
 /**
- * Heal prompt for live steps/replay when a step fails.
- * Emphasizes diagnosing page/structure changes (new required fields, validation
- * errors after save) — not blindly retrying the same action.
- * Scope is exactly ONE recorded step; do not advance into the next trajectory step.
+ * Single-step heal prompt for live steps/replay.
+ * Only redo the failed recorded action — no extra diagnosis / fill / next-step ops.
  *
  * @param {{ action?: string, params?: object, id?: string|number }} failedEntry
  * @param {string} [errorResult]
- * @param {{ nextEntry?: { action?: string, params?: object }|null }} [opts]
  * @returns {string}
  */
-export function buildStepHealInstruction(failedEntry, errorResult = '', opts = {}) {
+export function buildStepHealInstruction(failedEntry, errorResult = '') {
   const action = failedEntry?.action || 'unknown';
   const params = failedEntry?.params || {};
   const intent = describeActionIntent(action, params);
   const err = errorResult ? String(errorResult) : '(unknown)';
-  const looksLikeValidation = /validation|form.?error|必填|err-save|el-form-item__error|not-found|missing/i.test(err);
-  const nextEntry = opts?.nextEntry || null;
-  const nextHint = nextEntry
-    ? describeActionIntent(nextEntry.action || '', nextEntry.params || {})
-    : '';
-  const failedIsConfirm = isConfirmLike(action, params);
-  const pickerLike = isPickerSelectAction(action);
 
   return [
-    '当前为步骤回放失败后的自愈阶段。页面结构或校验可能已变化（例如表单新增必填字段、标签改名、保存后出现校验红字）。',
-    '你的目标：先诊断并排除阻塞，再完成下方「原意图」——且只完成这一步；成功后立即 done() 停止。',
-    '严禁执行轨迹中的下一步（确认/确定/保存/关闭弹窗等会由后续回放步骤执行）。',
+    '当前为步骤回放失败后的单步自愈阶段。页面已停在失败步。',
+    '请只完成下面这一步的原意图，成功后立即 done(success=true) 停止。',
+    '不要做任何额外操作：不要补填其它字段、不要诊断整表、不要点确认/确定/保存（除非原意图本身就是该按钮）、不要执行轨迹下一步。',
     '',
     `【失败动作】${action}`,
     `【原意图】${intent}`,
     `【失败原因】${err}`,
-    nextHint
-      ? `【下一步（禁止现在做）】${nextHint} — 留给确定性回放，自愈阶段不要点。`
-      : '',
-    '',
-    '【推荐排查顺序】',
-    '1. 用 get_page_state() 查看 notifications / formErrors；若有校验红字，调用 sync_tasks_from_errors() 或 scroll_to_form_error() 定位未填/错误字段。',
-    '2. 若失败原因含校验/必填/保存失败，或页面上出现 .el-form-item__error：逐项补齐新增或未填的必填字段（fill_form_field / select_option / select_date 等）。可用一次 fill/select 触发隐式 auto-fill；scan_form_fields 只建任务列表、不会自动填表。',
-    '3. 若是控件找不到（not-found）：在当前页找文案相近的等价控件完成同一意图，不要离开当前流程去乱点菜单。',
-    '4. 阻塞清除后，重新执行原意图'
-      + (isSaveLike(action, params)
-        ? '（优先 click_save()，确认 ok-save-success 或校验已清空）。'
-        : pickerLike
-          ? '（仅完成行内选择/单选；弹窗仍保持打开）。'
-          : '（完成与失败动作等价的操作）。'),
-    '5. 原意图达成后立即 done(success=true)，停止本轮。不要再点确认/确定/保存（除非原意图本身就是这些按钮）。',
     '',
     '约束：',
-    '- 【单步边界】本轮只修复失败的那一步；等价操作完成后立刻 done，不要「顺便」做完弹窗流程。',
-    pickerLike && !failedIsConfirm
-      ? '- 【弹窗/引入】click_table_row_radio / 行选择：只点目标行的单选/行本体；禁止再点「确认」「确定」「提交」「关闭」。'
-      : '',
-    !failedIsConfirm
-      ? '- 除非【失败动作】本身是确认/确定类按钮，否则禁止点击文案为 确认/确定/OK/提交 的按钮。'
-      : '',
-    '- 允许为完成原意图而补填「新增必填 / 校验失败」字段；不要改写已填对的业务值，除非校验要求必须改。',
-    '- 不要导航到无关页面，不要开始下一段业务流程。',
-    '- 禁用且带旁路按钮的字段走 request_intervention，不要硬填。',
-    looksLikeValidation
-      ? '- 本次失败很像表单校验/结构变更：请优先按第 1–2 步排查，不要只重复点击保存。'
-      : '- 若重试原动作仍失败，再按第 1–2 步做表单诊断。',
-  ].filter(Boolean).join('\n');
+    '- 仅用与失败动作等价的 Element UI 动作重做这一步（控件文案轻微变化时可找等价控件）。',
+    '- 禁止 fill/select 其它无关字段；禁止 sync_tasks_from_errors / 整表 auto-fill。',
+    '- 不要导航离开当前流程。',
+    '- 完成后立即 done，停止本轮。',
+  ].join('\n');
 }
 
-function isSaveLike(action, params) {
-  const a = String(action || '');
-  if (a === 'click_save') return true;
-  const text = String(params?.text || params?.button_text || params?.menu_text || '');
-  return /保存|提交|确定|确认|submit|save/i.test(text);
-}
+/**
+ * Type B — form structure change heal (distinct from single-step Type A).
+ * AI only fills newly added fields in the browser; control plane persists steps separately.
+ *
+ * @param {{ container?: string, added_required?: string[], added_optional?: string[], missing_required?: string[], missing_optional?: string[] }} report
+ * @returns {string}
+ */
+export function buildFormStructureHealInstruction(report = {}) {
+  const container = report.container || 'main';
+  const addedReq = Array.isArray(report.added_required) ? report.added_required : [];
+  const addedOpt = Array.isArray(report.added_optional) ? report.added_optional : [];
+  const missingReq = Array.isArray(report.missing_required) ? report.missing_required : [];
+  const missingOpt = Array.isArray(report.missing_optional) ? report.missing_optional : [];
+  const toFill = [...addedReq, ...addedOpt];
 
-/** Confirm / OK footer buttons (often the *next* recorded step after a picker). */
-function isConfirmLike(action, params) {
-  const a = String(action || '');
-  if (a === 'click_save') return true;
-  const text = String(params?.text || params?.button_text || params?.menu_text || '');
-  return /^(确认|确定|OK|Ok|ok|提交)$/i.test(text.trim())
-    || /确认|确定/.test(text);
-}
-
-function isPickerSelectAction(action) {
-  const a = String(action || '');
-  return a === 'click_table_row_radio'
-    || a === 'click_table_row_button'
-    || a === 'click_table_row';
+  const lines = [
+    '当前为【表单结构变化自愈】阶段（healType=form_structure），不是单步自愈。',
+    `表单容器：${container}`,
+    '页面已停在结构校验检查点。请只填写下方新增字段，成功后立即 done(success=true) 停止。',
+    '',
+  ];
+  if (missingReq.length || missingOpt.length) {
+    lines.push('【已从表单移除的字段】（勿再填写；控制面会删除对应步骤）');
+    for (const l of missingReq) lines.push(`  - [必填已删] "${l}"`);
+    for (const l of missingOpt) lines.push(`  - [可选已删] "${l}"`);
+    lines.push('');
+  }
+  lines.push('【必须填写的新增字段】');
+  if (!toFill.length) {
+    lines.push('  （无新增字段 — 直接 done）');
+  } else {
+    for (const l of addedReq) lines.push(`  - [必填] "${l}"`);
+    for (const l of addedOpt) lines.push(`  - [可选] "${l}"`);
+  }
+  lines.push('');
+  lines.push('约束：');
+  lines.push('- 仅填写上述新增字段（fill_form_field / select_option / fill_date_field / click_radio 等）。');
+  lines.push('- 不要点保存/提交/确认；不要导航；不要处理其它业务步骤。');
+  lines.push('- 禁止整表 auto-fill / sync_tasks_from_errors。');
+  lines.push('- 完成后立即 done，停止本轮。');
+  return lines.join('\n');
 }
 
 function describeActionIntent(action, params) {
@@ -102,21 +88,15 @@ function describeActionIntent(action, params) {
     case 'select_date':
       return `填写日期 "${p.label_text || ''}" = "${p.value || p.date || ''}"`;
     case 'click_save':
-      return `点击保存/提交（${p.button_text || p.text || '保存'}），直到保存成功或校验通过`;
+      return `点击保存/提交（${p.button_text || p.text || '保存'}）`;
     case 'click_element_by_index':
       return `点击 "${p.text || p.index || ''}"`;
     case 'click_menu_item':
       return `点击菜单 "${p.menu_text || p.text || ''}"`;
     case 'click_table_row_radio':
-      return (
-        `在表格中选中行单选（行匹配: "${p.row_text || p.text || p.row_match || ''}"）。`
-        + '只点该行的 radio/单选，不要点弹窗「确认/确定」。'
-      );
+      return `在表格中选中行单选（行匹配: "${p.row_text || p.text || p.row_match || ''}"）`;
     case 'click_table_row_button':
-      return (
-        `点击表格行按钮 "${p.button_text || p.text || ''}"（行匹配: ${p.row_text || p.row_match || ''}）。`
-        + '只点该行按钮，不要再点弹窗确认。'
-      );
+      return `点击表格行按钮 "${p.button_text || p.text || ''}"（行匹配: ${p.row_text || p.row_match || ''}）`;
     case 'click_adjacent_button':
       return `点击相邻按钮 "${p.button_text || p.text || ''}"`;
     case 'go_to_url':

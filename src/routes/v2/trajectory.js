@@ -32,7 +32,7 @@ export default function (app) {
     res.status(status).json(body);
   }
 
-  /** AI 分析：需求描述 -> { phases, caseEntries }（不落库；阶段数跟用户分步） */
+  /** AI 分析：需求描述 -> { phases }（不落库；阶段数跟用户分步；案例数据附在各阶段描述后） */
   app.post('/api/v2/trajectories/analyze', async (req, res) => {
     try {
       const { description, model, functionId } = req.body || {};
@@ -421,21 +421,22 @@ export default function (app) {
   });
 
   /**
-   * Re-run selected steps in the live session.
+   * Re-run selected steps in the live session (async).
    * Body: { stepIds: number[], isReplay?: boolean }
-   * isReplay (default true) is a runtime suppress-persist switch — not “write rows with
-   * trajectory_step.is_replay=1”. Default path does not append new trajectory_step rows.
-   * Table column is_replay is TINYINT(1) default 0; normal recorded steps are 0.
+   * HTTP 202 Accepted; v2 envelope body.code remains 200 with
+   * { trajectoryId, accepted: true, stepIds }. Progress via WS:
+   * replay:started → replay:step (running|success|failed) → replay:finished.
+   * Failure → confirmed=0 + single-step AI heal → continue remaining steps.
    */
   app.post('/api/v2/trajectories/:id/steps/replay', async (req, res) => {
     try {
-      const result = await trajectoryService.replayTrajectorySteps(+req.params.id, {
+      const accepted = await trajectoryService.acceptTrajectoryStepsReplay(+req.params.id, {
         stepIds: req.body?.stepIds,
         isReplay: req.body?.isReplay !== false && req.body?.is_replay !== false,
       });
-      res.json(result);
+      // HTTP 202; envelope middleware wraps as { code: 200, data: accepted }
+      res.status(202).json(accepted);
     } catch (err) {
-      // Include replay summary (ok/failed/results) in envelope data when present
       if (err.payload) {
         return res.status(err.statusCode || 500).json({
           error: err.message,
@@ -463,7 +464,7 @@ export default function (app) {
   /**
    * Human confirm / cancel-confirm a trajectory (transaction-level).
    * Body: { confirmed: boolean } — true → recordStatus=completed; false → draft.
-   * Does not modify trajectory_step.confirmed.
+   * Does not modify trajectory_step.confirmed (回放确认).
    */
   app.post('/api/v2/trajectories/:id/confirm', async (req, res) => {
     try {

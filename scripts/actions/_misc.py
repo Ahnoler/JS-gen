@@ -8,6 +8,7 @@ logical coherence with other form-filling actions.
 
 import json
 import os
+import re
 from datetime import datetime
 
 from . import _state
@@ -25,6 +26,35 @@ _SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Consecutive get_page_state while mask still visible after wait (blocks idle spin).
 _GPS_LOADING_SPIN = {'count': 0}
+
+# Form-submit button labels — must use click_save during AI recording (not index click).
+_SUBMIT_BTN_RE = re.compile(r'^(保存|提交|确认|确定)(并.*)?$')
+
+
+def _is_form_submit_label(text: str) -> bool:
+    t = re.sub(r'\s+', '', (text or '').strip())
+    return bool(t and _SUBMIT_BTN_RE.match(t))
+
+
+_JS_VISIBLE_FORM_OVERLAY = '''() => {
+    const isVisible = (el) => {
+        if (!el) return false;
+        const style = getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0)
+            return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+    };
+    for (const d of document.querySelectorAll('.el-dialog')) {
+        const wrap = d.closest('.el-dialog__wrapper') || d;
+        if (isVisible(wrap) && isVisible(d) && d.querySelector('.el-form')) return true;
+    }
+    for (const d of document.querySelectorAll('.el-drawer')) {
+        const wrap = d.closest('.el-drawer__wrapper') || d;
+        if (isVisible(wrap) && isVisible(d) && d.querySelector('.el-form')) return true;
+    }
+    return false;
+}'''
 
 
 def _register_misc_actions(controller, browser_context, case_data_store=None):
@@ -333,6 +363,35 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     tag_name=tag_name,
                     attributes=element_node.attributes or {},
                 )
+
+            # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
+            # select→修改→确认 loops after premature done() rejection.
+            btn_label = ((element_info or {}).get('text') or elem_text or '').strip()
+            if _is_form_submit_label(btn_label):
+                compact = re.sub(r'\s+', '', btn_label)
+                always_block = compact.startswith(('保存', '提交'))
+                in_form_overlay = False
+                if not always_block:
+                    try:
+                        in_form_overlay = bool(await page.evaluate(_JS_VISIBLE_FORM_OVERLAY))
+                    except Exception:
+                        in_form_overlay = False
+                if always_block or in_form_overlay:
+                    if compact.startswith('确认'):
+                        needle = '确认'
+                    elif compact.startswith('确定'):
+                        needle = '确定'
+                    elif compact.startswith('提交'):
+                        needle = '提交'
+                    else:
+                        needle = '保存'
+                    return _err(
+                        f'use-click-save | Index click on "{btn_label}" is forbidden for form submit. '
+                        f'Call click_save(button_text="{needle}") NOW. '
+                        f'Do NOT re-select the table row or re-click 修改 — if the dialog is open, '
+                        f'only click_save. Do NOT call done() until ok-save-success.',
+                        include_in_memory=True,
+                    )
 
             download_path = await browser_context._click_element_node(element_node)
             if download_path:

@@ -151,8 +151,8 @@ CREATE TABLE `trajectory_step` (
   `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
   `source`              ENUM('agent','manual','cdp','special_element') NOT NULL DEFAULT 'agent'
     COMMENT '动作来源：agent|manual|cdp|special_element',
-  `confirmed`           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '人工确认',
-  `confirmed_at`        DATETIME(3) DEFAULT NULL COMMENT '人工确认时间',
+  `confirmed`           TINYINT(1) NOT NULL DEFAULT 1 COMMENT '回放确认',
+  `confirmed_at`        DATETIME(3) DEFAULT NULL COMMENT '回放确认时间',
   `is_replay`           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=回放执行产生，不计入阶段步骤列表',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_trajectory_id` (`trajectory_id`),
@@ -293,14 +293,17 @@ CREATE TABLE `form_snapshot` (
   `required_count` INT UNSIGNED DEFAULT 0 COMMENT '必填字段数',
   `optional_count` INT UNSIGNED DEFAULT 0 COMMENT '可选字段数',
   `action_index`   INT UNSIGNED DEFAULT 0 COMMENT '在 _ACTION_LOG 中的位置索引',
+  `trigger_step_id` BIGINT UNSIGNED DEFAULT NULL COMMENT 'checkpoint trajectory_step.id（1:1，创建/去重更新时绑定）',
   `case_data_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → case_data.id',
   `trajectory_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id',
   `created_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_container` (`container`),
   KEY `idx_case_data_id` (`case_data_id`),
   KEY `idx_trajectory_id` (`trajectory_id`),
+  UNIQUE KEY `uk_fs_trigger_step` (`trigger_step_id`),
   CONSTRAINT `fk_fs_case_data` FOREIGN KEY (`case_data_id`) REFERENCES `case_data` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_fs_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL
+  CONSTRAINT `fk_fs_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_fs_trigger_step` FOREIGN KEY (`trigger_step_id`) REFERENCES `trajectory_step` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='表单结构快照';
 
 -- ─────────────────────────────────────────────────────────────

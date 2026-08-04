@@ -5,7 +5,11 @@ Key lessons from `_auto_fill_pending` / `_execute_round`:
   1. Execute one recorded action at a time (no scan/auto-fill side effects).
   2. Form ops use the same JS snippets as auto-fill (fill / select / date / tree / radio).
   3. Between steps: `_wait_if_loading` + short timeout (300ms input / 500ms select),
-     never `networkidle` (SPA keep-alives hang forever).
+     never Playwright `networkidle` as the sole gate (SPA keep-alives hang forever).
+  4. After 保存/提交: wait for **page idle** (loading masks / button spinners / in-flight
+     xhr|fetch quiet) — not tree-specific. SPA often clears panels while APIs reload.
+  5. After el-tree node click: wait until the right-side edit form input is visible
+     before the next fill step.
 
 For click_element_by_index: highlight `index` is ephemeral — relocate by
 xpath_smart / drawer-dialog text / xpath (same idea as script_assembler).
@@ -15,22 +19,228 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import re
 import sys
+import time
 
 from ._helpers import (
     _wait_if_loading,
     _is_ok_result,
 )
 from ._js_snippets import (
+    JS_CHECK_LOADING,
     JS_FILL_FORM_FIELD,
     JS_FILL_DATE_FIELD,
     JS_FIND_LABELED_SELECT,
     JS_SELECT_OPTION,
     JS_SELECT_TREE_OPTION,
     JS_CLICK_RADIO,
+    JS_VERIFY_FORM_STRUCTURE,
 )
 from scripts.feature_flags import relative_xpath_primary_enabled
+
+# Broad "page busy" cues after save — masks, button/icon spinners, aria-busy.
+# (Do not rely on tree DOM alone; tables/forms/dialogs share the same save pattern.)
+_JS_PAGE_BUSY = r'''() => {
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    const st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) === 0) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const masks = [...document.querySelectorAll('.el-loading-mask')].filter(
+    (m) => !m.classList.contains('el-loading-mask--hidden') && isVis(m)
+  );
+  if (masks.length) return 'mask';
+  if ([...document.querySelectorAll('.el-button.is-loading, button.is-loading')].some(isVis)) {
+    return 'btn-loading';
+  }
+  if ([...document.querySelectorAll('.el-icon-loading, .el-loading-spinner')].some(isVis)) {
+    return 'spinner';
+  }
+  if ([...document.querySelectorAll('[aria-busy="true"]')].some(isVis)) return 'aria-busy';
+  // Generic overlays (avoid matching tiny decorative is-loading on non-controls)
+  for (const el of document.querySelectorAll('.loading, .is-loading')) {
+    if (el.matches('.el-button, button')) continue;
+    if (!isVis(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width >= 24 && r.height >= 24) return 'loading-cls';
+  }
+  return '';
+}'''
+
+# Visible editable input in right panel / any el-form (tree detail / edit).
+_JS_EDIT_FORM_INPUT_VISIBLE = r'''() => {
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) === 0) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const roots = [
+    document.querySelector('.right-container'),
+    document.querySelector('.right-content'),
+    document,
+  ].filter(Boolean);
+  const seen = new Set();
+  for (const root of roots) {
+    if (seen.has(root)) continue;
+    seen.add(root);
+    const inputs = root.querySelectorAll(
+      '.el-form-item input:not([type="hidden"]):not([disabled]), '
+      + '.el-form-item textarea:not([disabled])'
+    );
+    for (const el of inputs) {
+      if (isVis(el) && !el.readOnly) return true;
+    }
+  }
+  return false;
+}'''
+
+_SAVE_BUTTON_TEXTS = frozenset({'保存', '提交'})
+
+
+def _is_save_click_text(text: str) -> bool:
+    t = re.sub(r'\s+', '', str(text or '').strip())
+    return t in _SAVE_BUTTON_TEXTS
+
+
+def _is_tree_node_entry(entry: dict | None, xpath_smart: str = '', xpath: str = '') -> bool:
+    el = entry.get('element') if isinstance(entry, dict) and isinstance(entry.get('element'), dict) else {}
+    if str(el.get('target_kind') or '') == 'tree_node':
+        return True
+    blob = ' '.join(
+        str(x or '')
+        for x in (
+            xpath_smart,
+            xpath,
+            el.get('xpath_smart'),
+            el.get('xpath'),
+            el.get('cssSelector'),
+            (el.get('attributes') or {}).get('class') if isinstance(el.get('attributes'), dict) else '',
+        )
+    )
+    return 'el-tree-node__content' in blob or 'el-tree-node__label' in blob
+
+
+def _is_trackable_request(request) -> bool:
+    """XHR/fetch only — skip documents/assets; keep-alives are handled via soft timeout."""
+    try:
+        return request.resource_type in ('xhr', 'fetch')
+    except Exception:
+        return False
+
+
+async def _wait_after_save_page_idle(
+    page,
+    *,
+    timeout_ms: int = 10000,
+    quiet_ms: int = 500,
+) -> None:
+    """After 保存/提交: wait until the page looks idle (DOM busy cues + xhr/fetch quiet).
+
+    Broader than tree-reload detection: any save-triggered list/form/dialog refresh.
+    Soft-exits if DOM is idle but a long-lived request never finishes (SPA poll).
+    """
+    inflight: set = set()
+
+    def _on_request(req):
+        if _is_trackable_request(req):
+            inflight.add(req)
+
+    def _on_done(req):
+        inflight.discard(req)
+
+    page.on('request', _on_request)
+    page.on('requestfinished', _on_done)
+    page.on('requestfailed', _on_done)
+    try:
+        # Let save XHR / loading mask have a moment to appear.
+        await page.wait_for_timeout(200)
+        await _wait_if_loading(page)
+
+        deadline = time.monotonic() + timeout_ms / 1000.0
+        quiet_since: float | None = None
+        dom_idle_since: float | None = None
+
+        while time.monotonic() < deadline:
+            try:
+                busy = str(await page.evaluate(_JS_PAGE_BUSY) or '')
+            except Exception:
+                busy = ''
+            try:
+                loading_mask = bool(await page.evaluate(JS_CHECK_LOADING))
+            except Exception:
+                loading_mask = False
+            if loading_mask and not busy:
+                busy = 'mask'
+
+            net_busy = len(inflight) > 0
+
+            if busy:
+                if loading_mask or busy == 'mask':
+                    await _wait_if_loading(page)
+                quiet_since = None
+                dom_idle_since = None
+                await page.wait_for_timeout(100)
+                continue
+
+            # DOM idle
+            now = time.monotonic()
+            if dom_idle_since is None:
+                dom_idle_since = now
+
+            if net_busy:
+                # Soft: if DOM stayed idle long enough, don't hang on keep-alive/poll.
+                if (now - dom_idle_since) >= max(quiet_ms / 1000.0, 0.8) * 3:
+                    break
+                quiet_since = None
+                await page.wait_for_timeout(100)
+                continue
+
+            if quiet_since is None:
+                quiet_since = now
+            elif (now - quiet_since) >= quiet_ms / 1000.0:
+                break
+
+            await page.wait_for_timeout(100)
+
+        await page.wait_for_timeout(120)
+        await _wait_if_loading(page)
+    finally:
+        try:
+            page.remove_listener('request', _on_request)
+            page.remove_listener('requestfinished', _on_done)
+            page.remove_listener('requestfailed', _on_done)
+        except Exception:
+            pass
+
+
+async def _wait_after_tree_node_for_form(page, *, timeout_ms: int = 5000) -> bool:
+    """After tree node click: wait until right-side edit form input is visible.
+
+    Soft wait — returns False on timeout without failing the click itself.
+    """
+    await _wait_if_loading(page)
+    deadline = time.monotonic() + timeout_ms / 1000.0
+    while time.monotonic() < deadline:
+        try:
+            if await page.evaluate(_JS_EDIT_FORM_INPUT_VISIBLE):
+                await page.wait_for_timeout(120)
+                return True
+        except Exception:
+            pass
+        try:
+            if await page.evaluate(JS_CHECK_LOADING):
+                await _wait_if_loading(page)
+        except Exception:
+            pass
+        await page.wait_for_timeout(100)
+    return False
 
 # Fill an input/textarea resolved by relative xpath (native setter for Element UI).
 _JS_FILL_BY_XPATH = r'''([xpath, val]) => {
@@ -176,7 +386,14 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
     if (hit) return hit;
   }
 
-  // 1) Element UI menu
+  // 1a) Custom app menu (tssc / non-ElementUI): li.menu-item — often NO role=menuitem
+  if (want) {
+    const customMenu = [...document.querySelectorAll('li.menu-item, .menu-item')].filter(isVisible);
+    const exactCustom = customMenu.filter((el) => norm(el.textContent) === want);
+    if (exactCustom.length) return clickEl(exactCustom[exactCustom.length - 1], 'ok-menu-item-custom');
+  }
+
+  // 1b) Element UI menu
   if (want) {
     const menuItems = [...document.querySelectorAll('.el-menu-item')];
     const direct = menuItems.find(el => norm(el.textContent) === want && isVisible(el));
@@ -207,6 +424,41 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
     }
   }
 
+  // 1c) Icon / tree / aria-label (click_icon_button replay often stores button_text only)
+  if (want) {
+    const ariaHits = [...document.querySelectorAll('[aria-label], [title], [aria-describedby]')].filter(isVisible).filter((el) => {
+      const a = norm(el.getAttribute('aria-label') || '');
+      const t = norm(el.getAttribute('title') || '');
+      return a === want || t === want;
+    });
+    if (ariaHits.length) return clickEl(ariaHits[ariaHits.length - 1], 'ok-aria-label');
+
+    const treeHits = [...document.querySelectorAll('.el-tree-node__content, .el-tree-node__label')].filter(isVisible).filter((el) => {
+      const t = norm(el.innerText || el.textContent);
+      return t === want || t.startsWith(want);
+    });
+    if (treeHits.length) return clickEl(treeHits[treeHits.length - 1], 'ok-tree-content');
+
+    // ElTooltip icon anchors (a.el-tooltip.el-icon-*) — tip text only after hover
+    const tipAnchors = [...document.querySelectorAll(
+      'a.el-tooltip, .el-tooltip[class*="el-icon"], a[class*="el-icon-"], i.el-tooltip, .el-tooltip.item'
+    )].filter(isVisible);
+    for (const el of tipAnchors) {
+      el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+      await sleep(80);
+      const poppers = [...document.querySelectorAll('.el-tooltip__popper, [role="tooltip"]')].filter((p) => {
+        const st = getComputedStyle(p);
+        return st.display !== 'none' && st.visibility !== 'hidden' && (p.offsetWidth > 0 || p.offsetHeight > 0);
+      });
+      const hit = poppers.find((p) => norm(p.textContent) === want);
+      if (hit) {
+        el.click();
+        return 'ok-tooltip-icon';
+      }
+      el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    }
+  }
+
   // 2) Absolute / recorded xpath (fragile body>div[N] — last resort before text)
   if (xpath) {
     const hit = clickLastVisibleXpath(xpath, 'ok-xpath');
@@ -231,8 +483,8 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
       if (hits.length) return clickEl(hits[hits.length - 1], how);
     }
 
-    // Broader fuzzy fallback (still prefer last match)
-    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item';
+    // Broader fuzzy fallback (still prefer last match) — include custom .menu-item
+    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item, li.menu-item, .menu-item, .el-tree-node__content';
     const candidates = [...document.querySelectorAll(sel)].filter(isVisible);
     const exact = candidates.filter(el => norm(el.innerText || el.textContent) === want);
     if (exact.length) return clickEl(exact[exact.length - 1], 'ok-text-exact');
@@ -291,9 +543,13 @@ def _result_ok(action_name: str, result: str) -> bool:
     """Unified success check: recordable/successful CTRL results use ``ok`` prefix.
 
     ``already-filled`` (skip) intentionally does NOT start with ``ok``.
+    Checkpoint verify (`save_form_snapshot`) returns JSON; transport always ok when
+    evaluate succeeded (prefix `form-structure:`).
     """
     if not isinstance(result, str) or not result:
         return False
+    if action_name == 'save_form_snapshot' and result.startswith('form-structure:'):
+        return True
     if result.startswith('error:') or result.startswith('unknown-') or result.startswith('err'):
         return False
     if result.startswith('click-failed') or result == 'not-found':
@@ -306,6 +562,18 @@ def _result_ok(action_name: str, result: str) -> bool:
         if _is_ok_result(head):
             return True
     return False
+
+
+async def _replay_verify_form_structure(page, params: dict) -> str:
+    """Run verifyFormStructure; always return form-structure:<json> on success."""
+    await _wait_if_loading(page)
+    fields = params.get('fields') if isinstance(params, dict) else None
+    if not isinstance(fields, list):
+        fields = []
+    raw = await page.evaluate(JS_VERIFY_FORM_STRUCTURE, [fields])
+    if isinstance(raw, dict):
+        return 'form-structure:' + json.dumps(raw, ensure_ascii=False)
+    return 'form-structure:' + str(raw or '{}')
 
 
 async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
@@ -355,9 +623,7 @@ async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
 
     result = await page.evaluate(_JS_CLICK_DURABLE, [text, xpath, tag_hint, xpath_smart])
     if isinstance(result, str) and result.startswith('ok'):
-        wait_ms = 600 if ('expand' in result or 'submenu' in result) else 400
-        await page.wait_for_timeout(wait_ms)
-        await _wait_if_loading(page)
+        await _post_click_settle(page, entry, text, xpath_smart, xpath, result)
         return result
 
     # Playwright text click — prefer last visible button (overlay remounts)
@@ -365,20 +631,18 @@ async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
         try:
             loc = page.get_by_role('button', name=text, exact=True).last
             await loc.click(timeout=3000)
-            await page.wait_for_timeout(400)
-            await _wait_if_loading(page)
+            await _post_click_settle(page, entry, text, xpath_smart, xpath, 'ok-playwright-role-last')
             return 'ok-playwright-role-last'
         except Exception:
             pass
         try:
             await page.get_by_text(text, exact=True).last.click(timeout=3000)
-            await page.wait_for_timeout(400)
-            await _wait_if_loading(page)
+            await _post_click_settle(page, entry, text, xpath_smart, xpath, 'ok-playwright-text-last')
             return 'ok-playwright-text-last'
         except Exception:
             try:
                 await page.locator(f'text={text}').last.click(timeout=3000)
-                await page.wait_for_timeout(400)
+                await _post_click_settle(page, entry, text, xpath_smart, xpath, 'ok-playwright-text-loose')
                 return 'ok-playwright-text-loose'
             except Exception:
                 pass
@@ -389,6 +653,31 @@ async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
         if index is not None
         else f'click-failed:not-found text={text!r} xpath={xpath_smart or xpath!r}'
     )
+
+
+async def _post_click_settle(
+    page,
+    entry: dict | None,
+    text: str,
+    xpath_smart: str,
+    xpath: str,
+    click_result: str,
+) -> None:
+    """Post-click waits: save→tree reload settle; tree node→edit form visible; else short pause."""
+    if _is_save_click_text(text):
+        await _wait_after_save_page_idle(page)
+        return
+    if _is_tree_node_entry(entry, xpath_smart, xpath):
+        await page.wait_for_timeout(300)
+        await _wait_if_loading(page)
+        appeared = await _wait_after_tree_node_for_form(page)
+        if not appeared:
+            sys.stderr.write('[replay] tree-node click: edit form input not visible within timeout\n')
+            sys.stderr.flush()
+        return
+    wait_ms = 600 if ('expand' in click_result or 'submenu' in click_result) else 400
+    await page.wait_for_timeout(wait_ms)
+    await _wait_if_loading(page)
 
 
 async def _replay_goto(page, params: dict) -> str:
@@ -645,6 +934,8 @@ def _locate_hint(result: str) -> str:
         return 'label'
     if r.startswith('ok-menu') or r.startswith('ok-submenu') or 'menu' in r:
         return 'semantic'
+    if r.startswith('ok-aria') or r.startswith('ok-tree') or r.startswith('ok-tooltip'):
+        return 'semantic'
     if r.startswith('ok-text') or 'text' in r:
         return 'semantic'
     if r.startswith('ok'):
@@ -699,6 +990,8 @@ async def replay_action_entries(
             try:
                 if action_name == 'go_to_url':
                     result = await _replay_goto(page, params)
+                elif action_name == 'save_form_snapshot':
+                    result = await _replay_verify_form_structure(page, params)
                 elif action_name == _CLICK_BY_INDEX:
                     result = await _replay_click_by_index(page, entry, params)
                 elif action_name in (
@@ -742,6 +1035,8 @@ async def replay_action_entries(
                         result = await _replay_controller_action(act, params)
                         await page.wait_for_timeout(400)
                         await _wait_if_loading(page)
+                        if action_name == 'click_save' and _result_ok(action_name, result):
+                            await _wait_after_save_page_idle(page)
             except Exception as e:
                 result = f'error:{e}'
 

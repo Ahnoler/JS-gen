@@ -16,9 +16,10 @@ CTRL.* ↔ primary JS_* (or action) mapping:
     selectTreeOption   → JS_SELECT_TREE_OPTION
     waitForLoading     → JS_WAIT_LOADING
     clickIconButton    → JS_CLICK_ICON_BUTTON (+ click_icon_button in _misc.py)
-    (navigation/table/dialog/adjacent/expand/address/verifyFormStructure
+    verifyFormStructure → JS_VERIFY_FORM_STRUCTURE
+    (navigation/table/dialog/adjacent/expand/address
      live as inline evaluate or actions in _navigation/_table/_misc/_form;
-     fillAddressFields / verifyFormStructure are assembler/replay-oriented)
+     fillAddressFields is assembler/replay-oriented)
 
 Several constants reference JS_GET_CONTAINER via string concatenation —
 all MUST remain in this single module for Python module-level concat order.
@@ -1655,4 +1656,106 @@ JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
     }
   }
   return 'not-found';
+}'''
+
+# Lightweight page snapshot for scenario describer (no iconButtons / no side effects).
+JS_SCENARIO_PAGE_SNAPSHOT = r'''() => {
+  const isVis = (el) => {
+    if (!el) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const dialogs = document.querySelectorAll('.el-dialog');
+  const visibleDialogs = [...dialogs].filter(d => d.offsetParent !== null);
+  const drawers = document.querySelectorAll('.el-drawer');
+  const visibleDrawers = [...drawers].filter(d => d.offsetParent !== null);
+  const formErrors = [];
+  const seen = new Set();
+  for (const el of document.querySelectorAll('.el-form-item__error')) {
+    const error = (el.textContent || '').trim();
+    if (!error) continue;
+    const formItem = el.closest('.el-form-item');
+    const label = (formItem && formItem.querySelector('.el-form-item__label')
+      ? formItem.querySelector('.el-form-item__label').textContent.trim()
+      : '');
+    const key = label + '|' + error;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    formErrors.push({ label, error });
+  }
+  const loading = [...document.querySelectorAll('.el-loading-mask')].some(m => {
+    if (m.classList.contains('el-loading-mask--hidden')) return false;
+    return isVis(m);
+  });
+  return {
+    url: location.href,
+    title: (document.title || '').trim(),
+    visibleDialogCount: visibleDialogs.length,
+    visibleDialogTitles: visibleDialogs.map(
+      d => d.querySelector('.el-dialog__title')?.textContent?.trim() || ''
+    ).filter(Boolean).slice(0, 3),
+    drawerCount: visibleDrawers.length,
+    loading,
+    formErrors: formErrors.slice(0, 8),
+    activeTab: document.querySelector('.el-tabs__item.is-active')?.textContent?.trim() || null,
+    messages: [...document.querySelectorAll('.el-message')]
+      .map(e => e.textContent.trim()).filter(Boolean).slice(0, 3),
+    notifications: [...document.querySelectorAll('.el-notification')]
+      .filter(e => e.offsetParent !== null)
+      .map(e => e.textContent.trim()).filter(Boolean).slice(0, 3),
+  };
+}'''
+
+# Align with src/ctrl-actions.js CTRL.verifyFormStructure
+JS_VERIFY_FORM_STRUCTURE = '''(expectedFields) => {
+    const container = ''' + JS_GET_CONTAINER + ''';
+    const items = container.querySelectorAll('.el-form-item');
+    const actualLabels = [];
+    for (const item of items) {
+        const lbl = item.querySelector('.el-form-item__label');
+        if (lbl) actualLabels.push(lbl.textContent.trim());
+    }
+    const expected = Array.isArray(expectedFields) ? expectedFields : [];
+    const expectedLabels = expected.map(f => f.label || f);
+    const requiredLabels = expected.filter(f => f.is_required || f.isRequired).map(f => f.label);
+    const optionalLabels = expected.filter(f => !(f.is_required || f.isRequired)).map(f => f.label);
+    const missing_required = requiredLabels.filter(l => !actualLabels.includes(l));
+    const missing_optional = optionalLabels.filter(l => !actualLabels.includes(l));
+    const added_all = actualLabels.filter(l => !expectedLabels.includes(l));
+    const added_required = [];
+    const added_optional = [];
+    for (const lbl of added_all) {
+        let isReq = false;
+        for (const item of items) {
+            const itemLbl = item.querySelector('.el-form-item__label');
+            if (itemLbl && itemLbl.textContent.trim() === lbl) {
+                isReq = !!(item.matches('.is-required')
+                    || item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required')
+                    || /\\*/.test(lbl));
+                break;
+            }
+        }
+        if (isReq) added_required.push(lbl);
+        else added_optional.push(lbl);
+    }
+    const hasRequiredChange = missing_required.length > 0 || added_required.length > 0;
+    const hasOptionalChange = missing_optional.length > 0 || added_optional.length > 0;
+    let reordered = false;
+    if (!hasRequiredChange && !hasOptionalChange && actualLabels.length === expectedLabels.length) {
+        for (let i = 0; i < expectedLabels.length; i++) {
+            if (expectedLabels[i] !== actualLabels[i]) { reordered = true; break; }
+        }
+    }
+    return JSON.stringify({
+        ok: !hasRequiredChange,
+        count: actualLabels.length,
+        expected_count: expectedLabels.length,
+        required_count: requiredLabels.length,
+        optional_count: optionalLabels.length,
+        missing_required, missing_optional,
+        added_required, added_optional,
+        hasRequiredChange, hasOptionalChange, reordered,
+        fields: actualLabels,
+    });
 }'''

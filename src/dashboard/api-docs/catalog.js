@@ -416,27 +416,29 @@ export const API_GROUPS = [
     endpoints: [
       {
         method: 'POST', path: '/api/v2/trajectories/analyze',
-        summary: 'AI 需求拆解为阶段 + 案例数据（不落库）',
-        desc: '调用 LLM 将需求拆成 phases，并解析「案例数据/关键数据」等段落为 caseEntries。阶段条数严格跟用户编号分步，不再使用 stepLength。每阶段须含「预期结果」。可选 functionId：解析系统后为每个 phase 挂 specialElementCandidates（仅预览，不落库）。',
+        summary: 'AI 需求拆解为阶段（不落库）',
+        desc: '将需求拆成 phases（条数跟用户编号分步）。「案例数据/关键数据」段落不拆成 caseEntries，原文附加到每个 phase 描述末尾供 AI 填表参考。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。录制侧不再注入 Python case_data_store（V2.2）。',
         reqExample: J({
           description:
             '1、点击客户管理，点击对公客户管理。\n'
             + '2、新增一个对公潜在客户。\n\n'
             + '关键数据\n'
-            + '客户名称：测试公司111\n'
-            + '证件号码：11111111111',
+            + '对公客户基本信息：\n'
+            + '法定责任人的客户名称：朱桂武\n'
+            + '客户标签：',
           model: 'deepseek-v4-flash',
           functionId: 3,
         }),
         respExample: J({
           phases: [
-            '点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理。',
-            '新增一个对公潜在客户。预期结果：打开对公潜在客户新增表单。',
+            '点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理。\n\n'
+            + '【业务场景案例数据 — 填表时参考理解，按场景填写关键字段】\n'
+            + '关键数据\n对公客户基本信息：\n法定责任人的客户名称：朱桂武\n客户标签：',
+            '新增一个对公潜在客户。预期结果：打开对公潜在客户新增表单。\n\n'
+            + '【业务场景案例数据 — 填表时参考理解，按场景填写关键字段】\n'
+            + '关键数据\n对公客户基本信息：\n法定责任人的客户名称：朱桂武\n客户标签：',
           ],
-          caseEntries: [
-            { fieldKey: '客户名称', fieldValue: '测试公司111' },
-            { fieldKey: '证件号码', fieldValue: '11111111111' },
-          ],
+          caseEntries: [],
         }),
       },
       {
@@ -489,7 +491,7 @@ export const API_GROUPS = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}',
         summary: '交易详情（含 phases、caseEntries）',
-        desc: 'caseEntries 为绑定到该交易的案例 KV；录制时注入 Agent case_data_store。',
+        desc: 'caseEntries 为绑定到该交易的案例 KV（可选；录制注入 Python case_data_store 已停用，V2.2）。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {
@@ -538,7 +540,7 @@ export const API_GROUPS = [
             id: 101, phaseNumber: 1, description: '登录系统', status: 'pending',
             steps: [{
               id: 501, stepNumber: 1, actionType: 'click_element_by_index',
-              source: 'agent', confirmed: false,
+              source: 'agent', confirmed: true,
               params: {}, trajectoryPhaseId: 101,
             }],
           }],
@@ -618,11 +620,18 @@ export const API_GROUPS = [
       },
       {
         method: 'PATCH', path: '/api/v2/trajectory-steps/{id}/confirm',
-        summary: '确认 / 取消确认步骤（步骤级，暂保留）',
-        desc: '与交易级 POST /trajectories/{id}/confirm 无关；字段保留供后续功能使用。',
+        summary: '设置步骤回放确认标记',
+        desc:
+          '写入 trajectory_step.confirmed（回放确认）：true/1=通过，false/0=不通过。'
+          + '与交易级 POST /trajectories/{id}/confirm（改 recordStatus）无关。'
+          + 'steps/replay 遇错触发自愈时会自动将对应步骤置为 confirmed=0。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '501' }],
         reqExample: J({ confirmed: true }),
-        respExample: J({ id: 501, confirmed: true, confirmedAt: '2026-07-20 12:00:00.000' }),
+        respExample: J({ id: 501, confirmed: true, confirmedAt: '2026-08-03 12:00:00.000' }),
+        notes: [
+          '列 COMMENT=回放确认；默认值为 1（通过）；新录制步骤默认为通过',
+          'confirmed_at = 回放确认时间',
+        ],
       },
       {
         method: 'DELETE', path: '/api/v2/trajectory-steps/{id}',
@@ -732,7 +741,7 @@ export const API_GROUPS = [
   {
     id: 'recording',
     name: '交易录制',
-    description: 'prepare → start → stop → stream/detach（断开画面）或 detach（释放执行资源）。stop / 断开画面不释放槽位；detach 才关浏览器并释放槽。离开工作室不自动 detach；10 分钟无步骤写入自动回收。',
+    description: 'prepare → start → stop → stream/detach（断开画面）或 detach（释放执行资源）。stop / 断开画面不释放槽位；detach 才关浏览器并释放槽。离开工作室不自动 detach；30 分钟无步骤写入自动回收。',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/login-context',
@@ -772,7 +781,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/start',
         summary: '开始 AI 录制',
-        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。启动时按 trajectory_id 加载 case_data_entry，经 step.case_data / case_data_file 注入 Python case_data_store（首次 step 加载一次）。',
+        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。案例数据不再注入 Python case_data_store（V2.2：接口报文捞取 / 阶段描述内业务场景参考）。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ phaseIds: [101, 102], accountId: 10 }),
         respExample: J({
@@ -857,62 +866,43 @@ export const API_GROUPS = [
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/steps/replay',
-        summary: 'live 会话中重放选中步骤（遇错自动 AI 修步后续放）',
+        summary: 'live 会话中重放选中步骤（HTTP 202 + WS 进度；遇错 AI 单步自愈；结构检查点走表单结构自愈）',
         desc:
-          '与 Playwright 全量回放不同：在已 prepare 的 live 会话中，按已落库步骤的 action 载荷顺序走 replay_actions（_replay.py）重跑。'
-          + '请求体 isReplay（默认 true）是执行时开关，不是“把新行标成回放再过滤”：'
-          + 'true → 打开 suppressStepPersist，本次重跑与 AI 修步均不写入 trajectory_step；'
-          + 'false → 允许走正常入库路径。'
-          + '响应字段 isReplay 仅回显该开关。'
-          + '表字段 trajectory_step.is_replay 为 TINYINT(1)，默认 0；正常 AI/人工/CDP 录制落库均为 0，步骤树展示的就是这些记录。'
-          + '遇错即停（stop_on_fail）：失败步自动调用 Agent 单步自愈（每步最多 1 次；只完成失败步本身，不抢跑下一步如弹窗「确认」），成功后从下一步继续回放。'
-          + '长请求期间 WS 广播 recording:replay_step / recording:replay_heal。'
-          + '自愈耗尽或 Agent 失败时业务 code≠200，data 含 ok/failed/healed/results。',
+          '在已 prepare 的 live 会话中，按落库步骤顺序逐步走 replay_actions（_replay.py）。'
+          + '请求体 isReplay（默认 true）抑制入库（含 AI 修步）。'
+          + 'HTTP **202 Accepted**；v2 信封 **body.code 仍为 200**，data={ trajectoryId, trajectoryDbId, accepted:true, stepIds }。'
+          + '进度只走 WS：replay:started → replay:step / replay:form_structure → replay:finished。'
+          + '普通步：success → confirmed=1；failed → confirmed=0 后【单步自愈 healType=step】，自愈成功不改回 confirmed，并继续后续步。'
+          + 'action_type=save_form_snapshot 为表单结构检查点：verifyFormStructure；有 diff 时走【表单结构变化自愈 healType=form_structure】'
+          + '（删 missing 同 phase+label 步骤、AI 填 adding、控制面结构化插入 confirmed=0 的新步，本批不执行新步）。'
+          + 'payload 含 trajectoryId（及 trajectoryDbId，同值）便于前端过滤。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', example: '42' },
           { name: 'stepIds', type: 'number[]', required: true, in: 'body', desc: '已落库 trajectory_step.id 列表', example: '[501, 502]' },
           {
             name: 'isReplay', type: 'boolean', in: 'body',
-            desc: '执行时是否抑制入库（默认 true）。与表字段 is_replay 不同：默认路径不会新增 is_replay=1 的行。',
+            desc: '执行时是否抑制入库（默认 true）。与表字段 is_replay 不同。Type B 结构化插入绕过此抑制。',
             example: 'true',
           },
         ],
         reqExample: J({ stepIds: [501, 502], isReplay: true }),
         respExample: J({
           trajectoryId: 42,
-          isReplay: true,
+          trajectoryDbId: 42,
+          accepted: true,
           stepIds: [501, 502],
-          count: 2,
-          ok: 2,
-          failed: 0,
-          error: null,
-          healed: [{ stepId: 502, action: 'fill_form_field', index: 2 }],
-          results: [
-            { index: 1, action: 'click_menu_item', ok: true, result: 'ok' },
-            { index: 2, action: 'fill_form_field', ok: true, healed: true, result: 'healed-by-ai (was: not-found)' },
-          ],
-        }),
-        errExample: J({
-          code: 500,
-          message: 'AI heal exhausted for step 2: fill_form_field → not-found',
-          data: {
-            trajectoryId: 42,
-            ok: 1,
-            failed: 1,
-            count: 2,
-            healed: [],
-            results: [
-              { index: 1, action: 'click_menu_item', ok: true },
-              { index: 2, action: 'fill_form_field', ok: false, result: 'not-found' },
-            ],
-          },
         }),
         notes: [
-          '表字段 is_replay（TINYINT(1)）≠ 本接口请求参数 isReplay',
-          '默认 isReplay=true：重跑已有步骤，不新增 trajectory_step 行（含 AI 修步）',
-          '正式录制步骤在库中通常均为 is_replay=0',
-          'WS: recording:replay_step { trajectoryId, stepId, index, total, ok, action, result }',
-          'WS: recording:replay_heal { trajectoryId, stepId, phase: start|done|error, message? }',
+          'HTTP 202；信封 code=200（勿用 body.code=202）',
+          '以 WS replay:finished 为批次结束信号；勿仅用 HTTP 收尾',
+          '表字段 is_replay ≠ 请求参数 isReplay',
+          'trajectory_step.confirmed（回放确认）：1=通过，0=不通过（含触发自愈）',
+          '两种自愈：healType=step（单步）vs healType=form_structure（表单结构）— 勿混淆',
+          'WS replay:started { trajectoryId, trajectoryDbId, stepIds }',
+          'WS replay:step { trajectoryId, trajectoryDbId, stepId, status, error?, healType? }',
+          'WS replay:form_structure { trajectoryId, healType:"form_structure", container, missing_required, added_required, ... }',
+          'WS replay:finished { trajectoryId, successCount, failedCount, failedStepIds, error?, healType? }',
+          '旧事件 recording:replay_heal 可带 healType；前端可按 healType 区分',
         ],
       },
       {
@@ -936,7 +926,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/detach',
         summary: '释放执行资源（关闭浏览器）',
-        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 live 或 recording，则改回 draft（不覆盖 recorded/completed）。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 10 分钟会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
+        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 live 或 recording，则改回 draft（不覆盖 recorded/completed）。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 30 分钟会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({ trajectoryId: 42, detached: true, recordStatus: 'draft' }),
@@ -1249,7 +1239,7 @@ export const API_GROUPS = [
           payload: { trajectoryId: 42, reason: 'idle', recordStatus: 'draft', sessionId: 'uuid' },
         }),
         notes: [
-          'reason: idle（10 分钟无步骤）| manual | batch_complete | batch_cancel | batch_failed | batch_recovery',
+          'reason: idle（30 分钟无步骤）| manual | batch_complete | batch_cancel | batch_failed | batch_recovery',
           '前端应按 trajectoryId 过滤；只清空本交易画布与 prepare 状态',
           '同时会广播 remote:status（attached=false, trajectoryId）',
         ],
@@ -1371,15 +1361,41 @@ export const API_GROUPS = [
       },
       {
         method: 'WS', path: 'replay:step',
-        summary: '回放单步进度',
+        summary: '回放单步进度（可含 healType）',
         tryable: false,
         respExample: J({
           type: 'replay:step',
           payload: {
-            replayId: 'uuid', trajectoryId: 42, stepId: 501,
-            phaseId: 101, status: 'completed',
+            trajectoryId: 42, trajectoryDbId: 42, stepId: 501,
+            status: 'failed', error: '…', healType: 'step',
           },
         }),
+      },
+      {
+        method: 'WS', path: 'replay:form_structure',
+        summary: '表单结构变化检测报告（Type B / healType=form_structure）',
+        tryable: false,
+        respExample: J({
+          type: 'replay:form_structure',
+          payload: {
+            trajectoryId: 42,
+            trajectoryDbId: 42,
+            stepId: 510,
+            healType: 'form_structure',
+            container: 'main',
+            missing_required: ['旧字段'],
+            added_required: ['新字段'],
+            missing_optional: [],
+            added_optional: [],
+            hasRequiredChange: true,
+            hasOptionalChange: false,
+            reordered: false,
+          },
+        }),
+        notes: [
+          '仅在 save_form_snapshot 检查点校验发现 diff 时发出',
+          '随后可能删库 missing 步骤、AI 补填 adding，并结构化插入 confirmed=0 新步',
+        ],
       },
       {
         method: 'WS', path: 'replay:screenshot',

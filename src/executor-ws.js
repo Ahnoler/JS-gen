@@ -64,16 +64,48 @@ async function handleRegister(ws, payload) {
     const remoteSessionDao = await import('./dao/remote-session-dao.js');
     const remoteSessionService = await import('./services/remote-session-service.js');
     const rows = await remoteSessionDao.listByNode(node.id, ['active']);
-    let restored = 0;
+    /** Per trajectory keep only the newest active row — close older duplicates in DB. */
+    const pickRows = [];
+    const byTraj = new Map();
     for (const row of rows) {
+      const tid = row.trajectoryId != null ? Number(row.trajectoryId) : null;
+      if (Number.isFinite(tid) && tid > 0) {
+        const prev = byTraj.get(tid);
+        if (!prev || row.id > prev.id) byTraj.set(tid, row);
+      } else {
+        pickRows.push(row);
+      }
+    }
+    pickRows.push(...byTraj.values());
+    const keepIds = new Set(pickRows.map((r) => r.id));
+
+    let closedStale = 0;
+    for (const row of rows) {
+      if (keepIds.has(row.id)) continue;
+      const tid = row.trajectoryId != null ? Number(row.trajectoryId) : null;
+      if (!(Number.isFinite(tid) && tid > 0)) continue;
+      try {
+        await remoteSessionDao.close(row.id, { crashed: false });
+        remoteSessionService.clearLiveBinding(row.id);
+        closedStale += 1;
+      } catch (err) {
+        console.warn(`[executor-ws] close stale remote_session #${row.id} failed:`, err.message);
+      }
+    }
+
+    let restored = 0;
+    for (const row of pickRows) {
       const binding = remoteSessionService.restoreLiveBindingFromRow(row, {
         nodeUuid: node.nodeUuid,
         attached: true,
       });
       if (binding?.attached) restored += 1;
     }
-    if (restored) {
-      console.log(`[executor-ws] restored ${restored} live BiB binding(s) for ${nodeUuid}`);
+    if (restored || closedStale) {
+      console.log(
+        `[executor-ws] restored ${restored} live BiB binding(s) for ${nodeUuid}`
+        + (closedStale ? ` (closed ${closedStale} stale duplicate(s))` : ''),
+      );
     }
   } catch (err) {
     console.warn('[executor-ws] live binding restore skipped:', err.message);

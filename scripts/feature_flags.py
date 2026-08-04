@@ -37,3 +37,20 @@ def phase_preamble_enabled() -> bool:
 def memory_whitelist_enabled() -> bool:
     """AI_MEMORY_WHITELIST — ActionResult.include_in_memory on critical actions (default on)."""
     return _env_flag('AI_MEMORY_WHITELIST', True)
+
+
+def scenario_describer_enabled() -> bool:
+    """AI_SCENARIO_DESCRIBER — inject business-scenario summary at agent step start (default on)."""
+    return _env_flag('AI_SCENARIO_DESCRIBER', True)
+
+
+def scenario_describer_interval() -> int:
+    """SCENARIO_DESCRIBER_INTERVAL — run scenario LLM every N agent micro-steps (default 3)."""
+    raw = os.environ.get('SCENARIO_DESCRIBER_INTERVAL')
+    if raw is None or str(raw).strip() == '':
+        return 3
+    try:
+        n = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return 3
+    return n if n >= 1 else 3

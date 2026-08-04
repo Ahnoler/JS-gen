@@ -79,14 +79,37 @@ export function getLiveBindingByRemoteSessionId(remoteSessionId) {
   return liveByRemoteSessionId.get(id) || null;
 }
 
-export function getLiveBindingByTrajectory(trajectoryId) {
+export function getLiveBindingByTrajectory(
+  trajectoryId,
+  { preferRemoteSessionId = null, preferAgentSessionId = null } = {},
+) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid)) return null;
-  for (const b of liveByRemoteSessionId.values()) {
-    if (Number(b.trajectoryId) !== tid) continue;
-    if (b.attached) return b;
+
+  // Prefer actually-attached binding that matches the live agent session.
+  if (preferAgentSessionId) {
+    const want = String(preferAgentSessionId);
+    for (const b of liveByRemoteSessionId.values()) {
+      if (Number(b.trajectoryId) !== tid || !b.attached) continue;
+      if (b.agentSessionId && String(b.agentSessionId) === want) return b;
+    }
   }
-  // Mild drift: prefer attached first, then any mount for this trajectory.
+
+  const preferId = preferRemoteSessionId != null ? Number(preferRemoteSessionId) : null;
+  if (Number.isFinite(preferId)) {
+    const preferred = liveByRemoteSessionId.get(preferId);
+    if (preferred && Number(preferred.trajectoryId) === tid) return preferred;
+  }
+
+  const attached = [...liveByRemoteSessionId.values()].filter(
+    (b) => Number(b.trajectoryId) === tid && b.attached,
+  );
+  if (attached.length === 1) return attached[0];
+  if (attached.length > 1) {
+    // Multiple stale bindings — prefer newest remote_session row id.
+    return attached.reduce((a, b) => (a.remoteSessionId > b.remoteSessionId ? a : b));
+  }
+
   for (const b of liveByRemoteSessionId.values()) {
     if (Number(b.trajectoryId) === tid) return b;
   }
@@ -129,7 +152,10 @@ export function resolveLiveBinding(opts = {}) {
   const hasIdentity = hasTid || hasRemoteId || hasRemoteUuid || hasSessionId;
 
   if (hasTid) {
-    const b = getLiveBindingByTrajectory(tid);
+    const b = getLiveBindingByTrajectory(tid, {
+      preferRemoteSessionId: hasRemoteId ? Number(opts.remoteSessionId) : null,
+      preferAgentSessionId: hasSessionId ? opts.sessionId : null,
+    });
     if (b) return b;
   }
 
@@ -246,6 +272,41 @@ async function resolveExecutorNodeId(nodeUuid) {
 }
 
 /**
+ * Close duplicate occupied remote_session rows for one trajectory so BiB UUID
+ * stays aligned with the live agent session (avoids black-screen subscribe).
+ * Keeps rows matching keepRemoteSessionId and/or keepAgentSessionId.
+ */
+export async function supersedeStaleForTrajectory(
+  trajectoryId,
+  { keepRemoteSessionId = null, keepAgentSessionId = null } = {},
+) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) return [];
+  const keepId = keepRemoteSessionId != null ? Number(keepRemoteSessionId) : null;
+  const keepAgent = keepAgentSessionId ? String(keepAgentSessionId) : null;
+  const rows = await remoteSessionDao.listOccupiedByTrajectory(tid);
+  const closed = [];
+  for (const row of rows) {
+    if (Number.isFinite(keepId) && row.id === keepId) continue;
+    if (keepAgent && row.agentSessionId && String(row.agentSessionId) === keepAgent) continue;
+    try {
+      await detachLive({ trajectoryId: tid, remoteSessionId: row.id, crashed: false });
+    } catch (err) {
+      console.warn('[remote] supersede detach failed:', row.id, err.message);
+    }
+    try {
+      const fresh = await remoteSessionDao.getById(row.id);
+      if (fresh && (fresh.status === 'active' || fresh.status === 'idle')) {
+        await remoteSessionDao.close(row.id, { crashed: false });
+      }
+    } catch {}
+    clearLiveBinding(row.id);
+    closed.push(row.id);
+  }
+  return closed;
+}
+
+/**
  * Attach BiB for a specific trajectory + agent session.
  * Creates or reactivates remote_session; mounts trajectory.remote_session_id.
  */
@@ -257,6 +318,7 @@ export async function attachLive(opts = {}) {
 
   const wantSessionId = opts.sessionId || opts.browserSessionId;
   const trajectoryId = opts.trajectoryId != null ? Number(opts.trajectoryId) : null;
+
   const active = wantSessionId
     ? state.sessions.get(wantSessionId)
     : null;
@@ -272,6 +334,11 @@ export async function attachLive(opts = {}) {
   }
 
   const sessionId = active.sessionId;
+
+  // Drop other traj-bound occupied rows; keep this agent session's row for reuse.
+  if (Number.isFinite(trajectoryId)) {
+    await supersedeStaleForTrajectory(trajectoryId, { keepAgentSessionId: sessionId });
+  }
   const nodeUuid = active.executorNodeUuid;
   const executorNodeId = await resolveExecutorNodeId(nodeUuid);
   const viewportW = Number(opts.viewportW) || 1920;
@@ -496,7 +563,7 @@ export async function detachLive(opts = {}) {
 }
 
 /**
- * @param {{ trajectoryId?: number, remoteSessionId?: number, remoteSessionUuid?: string, sessionId?: string }} [opts]
+ * @param {{ trajectoryId?: number, remoteSessionId?: number, remoteSessionUuid?: string, sessionId?: string, preferAgentSessionId?: string }} [opts]
  */
 export async function getLiveStatus(opts = {}) {
   if (!USE_EXECUTOR) {
@@ -504,10 +571,67 @@ export async function getLiveStatus(opts = {}) {
     return bridge.getRemoteStatus();
   }
 
-  const binding = resolveLiveBinding(opts);
-  if (binding) return bindingToStatus(binding);
-
   const tid = opts.trajectoryId != null ? Number(opts.trajectoryId) : null;
+  let preferRemoteSessionId = opts.remoteSessionId != null ? Number(opts.remoteSessionId) : null;
+  let preferAgentSessionId = opts.preferAgentSessionId || opts.sessionId || null;
+
+  if (Number.isFinite(tid)) {
+    try {
+      const { getTrajectoryRuntime } = await import('./trajectory-runtime.js');
+      const runtime = getTrajectoryRuntime(tid);
+      if (!preferAgentSessionId && runtime?.sessionId) {
+        preferAgentSessionId = runtime.sessionId;
+      }
+      if (!Number.isFinite(preferRemoteSessionId) && runtime?.remoteSessionId != null) {
+        preferRemoteSessionId = Number(runtime.remoteSessionId);
+      }
+    } catch {}
+    if (!Number.isFinite(preferRemoteSessionId)) {
+      try {
+        const trajectoryDao = await import('../dao/trajectory-dao.js');
+        const traj = await trajectoryDao.getById(tid);
+        if (traj?.remoteSessionId != null) preferRemoteSessionId = Number(traj.remoteSessionId);
+      } catch {}
+    }
+  }
+
+  let binding = null;
+  if (Number.isFinite(tid)) {
+    binding = getLiveBindingByTrajectory(tid, {
+      preferRemoteSessionId: Number.isFinite(preferRemoteSessionId) ? preferRemoteSessionId : null,
+      preferAgentSessionId: preferAgentSessionId || null,
+    });
+  }
+  if (!binding) {
+    binding = resolveLiveBinding({
+      ...opts,
+      trajectoryId: Number.isFinite(tid) ? tid : opts.trajectoryId,
+      remoteSessionId: Number.isFinite(preferRemoteSessionId) ? preferRemoteSessionId : opts.remoteSessionId,
+      sessionId: preferAgentSessionId || opts.sessionId,
+    });
+  }
+  if (binding) {
+    // Keep trajectory.remote_session_id aligned with the BiB UUID clients filter on.
+    if (
+      Number.isFinite(tid)
+      && binding.attached
+      && binding.remoteSessionId
+      && preferAgentSessionId
+      && binding.agentSessionId
+      && String(binding.agentSessionId) === String(preferAgentSessionId)
+    ) {
+      try {
+        const trajectoryDao = await import('../dao/trajectory-dao.js');
+        const traj = await trajectoryDao.getById(tid);
+        if (traj && Number(traj.remoteSessionId) !== Number(binding.remoteSessionId)) {
+          await trajectoryDao.updateMeta(tid, { remoteSessionId: binding.remoteSessionId });
+        }
+      } catch (err) {
+        console.warn('[remote] rewrite traj.remote_session_id failed:', err.message);
+      }
+    }
+    return bindingToStatus(binding);
+  }
   return {
     attached: false,
     remoteSessionId: null,

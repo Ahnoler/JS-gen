@@ -174,15 +174,39 @@ async function prepareTrajectoryRecordingUnlocked(tid) {
   // ── stream: attach BiB for THIS trajectory only ──
   emitStage('stream', 'running');
   let bibError = runtime.bibError || attachResult?.bibError || null;
-  let remoteSessionId = runtime.remoteSessionId || attachResult?.remoteSessionId || null;
+  let remoteSessionId = null;
 
-  const liveNow = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => null);
-  if (liveNow?.attached && liveNow?.remoteSessionId) {
+  const liveNow = await remoteSessionService.getLiveStatus({
+    trajectoryId: tid,
+    preferAgentSessionId: runtime.sessionId,
+  }).catch(() => null);
+  const liveMatchesRuntime = liveNow?.attached
+    && liveNow?.remoteSessionId
+    && liveNow.sessionId === runtime.sessionId;
+
+  if (liveMatchesRuntime) {
     remoteSessionId = liveNow.remoteSessionId;
     runtime.remoteSessionId = remoteSessionId;
+    await trajectoryDao.updateMeta(tid, { remoteSessionId }).catch(() => {});
   } else {
-    remoteSessionId = null;
-    runtime.remoteSessionId = null;
+    // Drop dirty bindings for other agent sessions; keep current agent's row if any.
+    await remoteSessionService.supersedeStaleForTrajectory(tid, {
+      keepAgentSessionId: runtime.sessionId,
+    }).catch(() => {});
+
+    const liveAfter = await remoteSessionService.getLiveStatus({
+      trajectoryId: tid,
+      preferAgentSessionId: runtime.sessionId,
+    }).catch(() => null);
+    if (liveAfter?.attached && liveAfter.sessionId === runtime.sessionId && liveAfter.remoteSessionId) {
+      remoteSessionId = liveAfter.remoteSessionId;
+      runtime.remoteSessionId = remoteSessionId;
+      await trajectoryDao.updateMeta(tid, { remoteSessionId }).catch(() => {});
+    } else {
+      // Do not reuse a superseded/closed runtime.remoteSessionId — force re-attach.
+      remoteSessionId = null;
+      runtime.remoteSessionId = null;
+    }
   }
 
   if (!remoteSessionId && !bibError) {
@@ -294,6 +318,8 @@ export async function attachTrajectoryLive(trajectoryId) {
   }
 
   slotLease.releaseByTrajectory(tid);
+
+  await remoteSessionService.supersedeStaleForTrajectory(tid).catch(() => {});
 
   try {
     const live = (await import('../executor-registry.js')).list().filter((n) => n.connected);

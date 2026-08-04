@@ -159,3 +159,11 @@ Do **not** look for or restore OpenCode skill packages unless the user explicitl
 - **Replay (product)** — Attached/live `replay_actions` via `_replay.py` (`POST .../steps/replay`). Prefers recorded `xpath_smart`, then label/semantic, then `xpath_full`.
 - **Replay (deprecated)** — `/api/v2/trajectories/:id/replay/*` assembles Playwright + CTRL; kept runnable as an engineering asset, not product-supported. Assemble/test-run remain engineering APIs.
 - **Executor slots** — `EXECUTOR_CAPACITY` slots per node; control-plane lease until detach / node offline.
+
+## 同步约定（Python 控制面对齐）
+
+本项目（JS-gen）与 `d:\dev\ui-auto-recording-agent-python`（Python FastAPI 控制面）并行开发。Python 端对齐 JS-gen 的 schema / 接口 / WS 协议。
+
+**强制规则**：每次修改 JS-gen，必须同步更新 `CHANGELOG.md` 的 `[Unreleased]` 区段，按 Keep a Changelog 分类追加条目。条目需说明影响范围和 Python 同步提示。详见 `AGENTS.md` 的"同步约定"章节与 `CHANGELOG.md` 顶部的"条目格式约定"。
+
+**Git post-commit hook**：仓库提供 `scripts/hooks/post-commit`，commit 后若改了 `migrations/` / `schemas/init.sql` / `src/routes/` / `src/services/` / `server.mjs` / `config/`，自动跑 Python 同步检查脚本。首次需安装：`cp scripts/hooks/post-commit .git/hooks/post-commit && chmod +x .git/hooks/post-commit`。详见 `AGENTS.md`。

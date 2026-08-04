@@ -119,22 +119,50 @@ _JS_EXTRACT_ERROR_LABELS = '''() => {
 }'''
 
 
-def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store: dict):
-    """Persist form structure snapshot to case_data_store.
+def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store: dict, *, emit_checkpoint: bool = True):
+    """Persist form structure snapshot to case_data_store; optionally emit ACTION_LOG checkpoint.
 
     Builds a FormSnapshot from scan fields, upserts into the collection
-    (deduped by container), and updates both form_snapshots (array) and
+    (always append in memory), and updates both form_snapshots (array) and
     form_snapshot (latest single entry) in the store.
+
+    When emit_checkpoint is True and the fingerprint is new for this root
+    container, also _record_action('save_form_snapshot') for live MySQL dual-write.
+    Identical fingerprint for the same root container → memory refresh only.
     """
     snapshot = FormSnapshot.from_scan_fields(
         container=container,
         scan_fields=scan_fields,
         action_index=len(_ACTION_LOG),
     )
-    coll = FormSnapshotCollection(case_data_store.get('form_snapshots', []))
+    existing = case_data_store.get('form_snapshots') or []
+    root = FormSnapshot._root_container(snapshot.container)
+    fp = snapshot.fields_fingerprint
+    already = False
+    for s in existing:
+        prev = FormSnapshot(**s) if isinstance(s, dict) else s
+        if FormSnapshot._root_container(prev.container) == root and prev.fields_fingerprint == fp:
+            already = True
+            break
+
+    if already:
+        # Same structure already captured — refresh latest pointer only; no new ACTION_LOG
+        case_data_store['form_snapshot'] = snapshot.model_dump()
+        return snapshot
+
+    coll = FormSnapshotCollection(list(existing))
     coll.upsert(snapshot)
     case_data_store['form_snapshots'] = coll.to_dicts()
     case_data_store['form_snapshot'] = snapshot.model_dump()
+
+    if emit_checkpoint:
+        params = snapshot.model_dump()
+        params['fields'] = [
+            {'label': f.label, 'is_required': f.is_required}
+            for f in snapshot.fields
+        ]
+        _record_action('save_form_snapshot', params, f'form-snapshot|{snapshot.container}|{snapshot.count}')
+
     return snapshot
 
 
@@ -290,7 +318,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         _save_form_snapshot(container_id, [f.model_dump() for f in dom_fields], case_data_store)
 
         # Store scan data + auto-fill
-        tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
+        tl = TaskList.from_scan(
+            [f.model_dump() for f in dom_fields],
+            force_refill=bool(case_data_store.get('_force_refill_all')),
+        )
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
         if tl.pending:
@@ -472,7 +503,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         raw_notification = result.get('notification') if isinstance(result, dict) else None
         notification = Notification(**raw_notification) if raw_notification else None
 
-        _save_form_snapshot(container_id, [f.model_dump() for f in dom_fields], case_data_store)
+        # Browse/list scan: task list only — do NOT save form structure checkpoint.
+        # Structure is saved on fill path (_ensure_scanned) or explicit save_form_snapshot().
 
         # Build task list only — no auto-fill (avoids filling on browse/list pages).
         # Preserve existing done items — from_scan filters fields with values,
@@ -481,7 +513,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         prev_done_labels = {d.label for d in prev_tl.done}
         prev_intervene = {item.label for item in prev_tl.pending if item.needs_intervention}
 
-        tl = TaskList.from_scan([f.model_dump() for f in dom_fields])
+        tl = TaskList.from_scan(
+            [f.model_dump() for f in dom_fields],
+            force_refill=bool(case_data_store.get('_force_refill_all')),
+        )
         # Restore previously-done items — add directly to done since they won't be in pending.
         # from_scan now puts pre-filled fields in done[], so check both lists to avoid duplicates.
         # Preserve currentValue from prior done items so re-scan summaries stay accurate.
@@ -648,7 +683,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return _err('invalid-json')
         fields = data.get('fields') if isinstance(data, dict) else data
 
-        tl = TaskList.from_scan(fields)
+        tl = TaskList.from_scan(
+            fields,
+            force_refill=bool(case_data_store.get('_force_refill_all')),
+        )
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = fields
         pending_count = len(tl.pending)
@@ -1188,9 +1226,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         return json.dumps(result, ensure_ascii=False)
 
     @controller.action(
-        'Find the 保存/提交 button, scroll it into view, click it, wait for loading, '
+        'Find the 保存/提交/确认/确定 button, scroll it into view, click it, wait for loading, '
         'then scan the whole page for .el-form-item__error and success/error notifications. '
-        'Prefer this over scroll_down + click_element_by_index for form submit. '
+        'Prefer this over scroll_down + click_element_by_index for form submit (including '
+        'maintain/edit dialog 确认). '
         'Returns ok-save-success only when an 操作成功 (or equivalent) toast appears — '
         'no-notification is NOT success. On validation errors returns err-save-validation.'
     )

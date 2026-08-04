@@ -5,6 +5,7 @@ Feature flags: see ``scripts.feature_flags`` (re-exported here for callers).
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from scripts.feature_flags import (  # noqa: F401 — re-export
@@ -16,6 +17,28 @@ from scripts.feature_flags import (  # noqa: F401 — re-export
 _OUTCOME_TEXT_MAX = 400
 _PRIOR_DESC_MAX = 200
 _PREAMBLE_TOTAL_MAX = 1200
+
+# Task text that requires overwriting every editable field (modify-dialog refill).
+_FORCE_REFILL_RE = re.compile(
+    r'修改表单中所有字段|修改所有字段|改所有字段|全部字段.*修改|修改.*全部字段'
+)
+
+
+def force_refill_all_required(task_text: str) -> bool:
+    """True when the phase task requires overwriting all editable form fields."""
+    return bool(_FORCE_REFILL_RE.search(task_text or ''))
+
+
+def force_refill_hint() -> str:
+    return (
+        '\n\n【强制改填 — CRITICAL】\n'
+        '本阶段要求修改表单中所有可编辑字段。\n'
+        '1. 打开修改弹窗后，禁止只 check_field_value / 核对回显就点确认。\n'
+        '2. 对每个可编辑字段必须执行覆盖写入：input→fill_form_field，'
+        'select→select_option，radio→click_radio（可用 match_form_rule / 案例数据生成新值）。\n'
+        '3. 回显的旧值必须换成新值；仅 disabled 且无旁边按钮的只读字段可跳过。\n'
+        '4. 全部改完后用 click_save(button_text="确认"或"保存")，见到 ok-save-success 再 done。\n'
+    )
 
 
 def truncate_text(text: str, max_len: int) -> str:

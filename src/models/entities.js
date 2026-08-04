@@ -178,8 +178,8 @@
  * @property {string} [extractedContent]
  * @property {number|null} [trajectoryPhaseId]
  * @property {import('./constants.js').StepSource} [source]
- * @property {boolean} [confirmed] 人工确认
- * @property {string|null} [confirmedAt]
+ * @property {boolean} [confirmed] 回放确认（1/true=通过，0/false=不通过含触发自愈）
+ * @property {string|null} [confirmedAt] 回放确认时间
  * @property {string} createdAt
  */
 
@@ -215,6 +215,7 @@
  * @property {number} [requiredCount]
  * @property {number} [optionalCount]
  * @property {number} [actionIndex]
+ * @property {number|null} [triggerStepId]
  * @property {number|null} [caseDataId]
  * @property {number|null} [trajectoryId]
  * @property {string} createdAt

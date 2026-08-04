@@ -1,23 +1,49 @@
 /**
  * Re-execute selected DB steps in a live executor session.
- * On step failure: stop → AI single-step heal → resume remaining steps.
+ *
+ * Product contract (Recording Studio):
+ * - HTTP 202 + envelope code 200 → { trajectoryId, accepted, stepIds }; progress via WS
+ * - WS: replay:started → replay:step / replay:form_structure → replay:finished
+ * - Type A: locator/action fail → confirmed=0 → single-step AI heal → continue
+ * - Type B: save_form_snapshot checkpoint → verifyFormStructure → delete missing /
+ *   AI-fill adding + structured insert (confirmed=0, next batch) — healType=form_structure
  */
 import { getDB } from '../../config/database.js';
 import * as execSession from '../executor-session-client.js';
-import { buildStepHealInstruction } from '../routes/browser-session/heal-instruction.js';
+import * as formSnapshotDao from '../dao/form-snapshot-dao.js';
+import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
+import {
+  buildStepHealInstruction,
+  buildFormStructureHealInstruction,
+} from '../routes/browser-session/heal-instruction.js';
 import { state } from '../state.js';
 import { broadcast } from '../ws-server.js';
 import {
   getTrajectoryRuntime,
   markConsumedActionLog,
 } from './trajectory-runtime.js';
+import {
+  markStepReplayFailed,
+  markStepReplayOk,
+  insertStepsAfter,
+  refreshTrajectoryCounts,
+} from './trajectory-step-service.js';
+import * as trajectoryDao from '../dao/trajectory-dao.js';
 
 const REPLAY_TIMEOUT_MS = 300000;
 const HEAL_TIMEOUT_MS = 300000;
-/** Enough room to diagnose validation, fill new required fields, retry save. */
-const HEAL_MAX_STEPS = 30;
-/** Max AI heal attempts per failed step index (absolute in the selected list). */
-const HEAL_PER_STEP = 1;
+/** Enough room to redo one failed action only (no extra form diagnosis). */
+const HEAL_MAX_STEPS = 12;
+/** Type B may fill several new fields. */
+const FORM_STRUCTURE_HEAL_MAX_STEPS = 24;
+
+const FILL_ACTION_TYPES = new Set([
+  'fill_form_field',
+  'fill_date_field',
+  'select_option',
+  'click_radio',
+  'select_tree_option',
+]);
 
 function fromDbRowCompat(row) {
   if (!row) return null;
@@ -29,23 +55,120 @@ function fromDbRowCompat(row) {
   return obj;
 }
 
-function remapBatchResults(batchResults, offset) {
-  if (!Array.isArray(batchResults)) return [];
-  return batchResults.map((r) => ({
-    ...r,
-    index: offset + Number(r.index || 0),
-  }));
+function trajScope(tid) {
+  return { trajectoryId: tid, trajectoryDbId: tid };
+}
+
+function emitReplay(type, tid, extra = {}) {
+  broadcast(type, { ...trajScope(tid), ...extra });
+}
+
+function toNumericStepId(id) {
+  if (id == null || id === '') return null;
+  const n = Number(id);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseFormStructureResult(raw) {
+  const s = String(raw || '');
+  const jsonPart = s.startsWith('form-structure:') ? s.slice('form-structure:'.length) : s;
+  try {
+    const obj = typeof jsonPart === 'object' ? jsonPart : JSON.parse(jsonPart);
+    return obj && typeof obj === 'object' ? obj : null;
+  } catch {
+    return null;
+  }
+}
+
+function needsTypeB(report) {
+  if (!report) return false;
+  return !!(
+    report.hasRequiredChange
+    || (Array.isArray(report.missing_required) && report.missing_required.length)
+    || (Array.isArray(report.added_required) && report.added_required.length)
+    || (Array.isArray(report.added_optional) && report.added_optional.length)
+    || (Array.isArray(report.missing_optional) && report.missing_optional.length)
+  );
 }
 
 /**
- * Re-execute selected DB steps in the live executor session.
- * isReplay=true (default): runtime suppressStepPersist — do NOT append new trajectory_step
- * rows. This is not the same as writing rows with trajectory_step.is_replay=1
- * (TINYINT column; normal recorded steps are 0).
- *
- * Failure path: stop_on_fail → AI heal (once per step) → continue remaining actions.
+ * Validate + accept replay, return 202 payload; run batch in background.
  */
+export async function acceptTrajectoryStepsReplay(trajectoryId, {
+  stepIds = [],
+  isReplay = true,
+} = {}) {
+  const prepared = await prepareReplayBatch(trajectoryId, { stepIds, isReplay });
+  const { tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger } = prepared;
+
+  runtime.suppressStepPersist = doSuppress;
+  runtime.isReplay = doSuppress;
+  if (session) session.busy = true;
+
+  const accepted = {
+    trajectoryId: tid,
+    trajectoryDbId: tid,
+    accepted: true,
+    stepIds: orderedStepIds,
+  };
+
+  setImmediate(() => {
+    runReplayBatch({
+      tid,
+      orderedStepIds,
+      doSuppress,
+      runtime,
+      session,
+      actions,
+      rows,
+      snapshotsByTrigger,
+    }).catch((err) => {
+      const msg = err?.message || String(err);
+      console.error(`[steps/replay] background batch failed traj=${tid}:`, msg);
+      try {
+        emitReplay('replay:finished', tid, {
+          successCount: 0,
+          failedCount: orderedStepIds.length,
+          failedStepIds: orderedStepIds,
+          error: msg,
+        });
+      } catch { /* ignore */ }
+      try {
+        runtime.suppressStepPersist = false;
+        runtime.isReplay = false;
+        if (session) session.busy = false;
+      } catch { /* ignore */ }
+    });
+  });
+
+  return accepted;
+}
+
 export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isReplay = true } = {}) {
+  const prepared = await prepareReplayBatch(trajectoryId, { stepIds, isReplay });
+  const { tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger } = prepared;
+
+  runtime.suppressStepPersist = doSuppress;
+  runtime.isReplay = doSuppress;
+  if (session) session.busy = true;
+
+  try {
+    return await runReplayBatch({
+      tid,
+      orderedStepIds,
+      doSuppress,
+      runtime,
+      session,
+      actions,
+      rows,
+      snapshotsByTrigger,
+    });
+  } finally {
+    // runReplayBatch also clears busy in finally
+  }
+}
+
+async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true } = {}) {
   const tid = Number(trajectoryId);
   const runtime = getTrajectoryRuntime(tid);
   if (!runtime?.sessionId) {
@@ -86,8 +209,22 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
       attributes: entry.attributes || {},
       id: entry.id,
       element: entry.element || undefined,
+      trajectoryPhaseId: step.trajectoryPhaseId ?? null,
+      phaseNumber: step.phaseNumber ?? 0,
     };
   });
+
+  const orderedStepIds = actions
+    .map((a) => toNumericStepId(a.id))
+    .filter((n) => n != null);
+
+  const snapshots = await formSnapshotDao.listByTrajectory(tid);
+  const snapshotsByTrigger = new Map();
+  for (const s of snapshots) {
+    if (s.triggerStepId != null) {
+      snapshotsByTrigger.set(Number(s.triggerStepId), s);
+    }
+  }
 
   const session = state.sessions.get(runtime.sessionId);
   if (session?.busy) {
@@ -97,173 +234,692 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
   }
 
   const doSuppress = isReplay !== false;
-  runtime.suppressStepPersist = doSuppress;
-  runtime.isReplay = doSuppress;
-  if (session) session.busy = true;
+  return {
+    tid,
+    orderedStepIds,
+    doSuppress,
+    runtime,
+    session,
+    actions,
+    rows,
+    snapshotsByTrigger,
+  };
+}
 
+async function runReplayBatch({
+  tid,
+  orderedStepIds,
+  doSuppress,
+  runtime,
+  session,
+  actions,
+  rows,
+  snapshotsByTrigger,
+}) {
   const allResults = [];
   const healed = [];
-  const healAttempts = new Map(); // absolute action index → count
-  let cursor = 0;
-  const total = actions.length;
+  const failedStepIds = [];
+  let successCount = 0;
+  /** @type {Set<number>} step ids removed mid-batch (Type B missing) */
+  const skippedIds = new Set();
 
-  const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, (type, payload) => {
-    if (type !== 'replay_step') return;
-    const batchIndex = Number(payload?.index) || 0;
-    const absoluteIndex = cursor + batchIndex;
-    broadcast('recording:replay_step', {
-      trajectoryId: tid,
-      stepId: payload?.id ?? actions[absoluteIndex - 1]?.id ?? null,
-      index: absoluteIndex,
-      total,
-      ok: !!payload?.ok,
-      action: payload?.action,
-      result: payload?.result,
-    });
-  });
+  emitReplay('replay:started', tid, { stepIds: orderedStepIds });
 
   try {
-    while (cursor < total) {
-      const remaining = actions.slice(cursor);
-      const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', REPLAY_TIMEOUT_MS);
-      execSession.forwardStdin({
-        nodeUuid: runtime.executorNodeUuid,
-        sessionId: runtime.sessionId,
-        event: 'replay_actions',
-        data: {
-          actions: remaining,
-          is_replay: doSuppress,
-          stop_on_fail: true,
-        },
+    for (let i = 0; i < actions.length; i += 1) {
+      const entry = actions[i];
+      const stepId = toNumericStepId(entry.id);
+      if (stepId != null && skippedIds.has(stepId)) continue;
+
+      const stepNum = i + 1;
+
+      emitReplay('replay:step', tid, {
+        stepId,
+        status: 'running',
+        index: stepNum,
+        total: actions.length,
+        action: entry.action,
       });
-      const result = await doneP;
-      await markConsumedActionLog(runtime);
+
+      // ── Type B: form structure checkpoint (before Type A) ──
+      if (entry.action === 'save_form_snapshot') {
+        const typeB = await handleFormStructureCheckpoint({
+          tid,
+          runtime,
+          doSuppress,
+          entry,
+          stepId,
+          stepNum,
+          total: actions.length,
+          actions,
+          skippedIds,
+          snapshotsByTrigger,
+        });
+        if (typeB.aborted) {
+          if (stepId != null) failedStepIds.push(stepId);
+          allResults.push(...typeB.results);
+          emitReplay('replay:finished', tid, {
+            successCount,
+            failedCount: failedStepIds.length,
+            failedStepIds: [...new Set(failedStepIds)],
+            error: typeB.error,
+            healType: 'form_structure',
+          });
+          return buildPayload(tid, doSuppress, rows, allResults, healed, typeB.error, {
+            successCount,
+            failedCount: failedStepIds.length,
+            failedStepIds: [...new Set(failedStepIds)],
+          });
+        }
+        if (typeB.ok) successCount += 1;
+        allResults.push(...typeB.results);
+        if (typeB.healed) healed.push(...typeB.healed);
+        continue;
+      }
+
+      let result;
+      try {
+        const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', REPLAY_TIMEOUT_MS);
+        execSession.forwardStdin({
+          nodeUuid: runtime.executorNodeUuid,
+          sessionId: runtime.sessionId,
+          event: 'replay_actions',
+          data: {
+            actions: [entry],
+            is_replay: doSuppress,
+            stop_on_fail: true,
+          },
+        });
+        result = await doneP;
+        await markConsumedActionLog(runtime);
+      } catch (e) {
+        const msg = e?.message || String(e);
+        if (stepId != null) {
+          try { await markStepReplayFailed(stepId); } catch { /* ignore */ }
+          failedStepIds.push(stepId);
+        }
+        emitReplay('replay:step', tid, {
+          stepId,
+          status: 'failed',
+          error: msg,
+          index: stepNum,
+          total: actions.length,
+          action: entry.action,
+        });
+        allResults.push({
+          index: stepNum,
+          action: entry.action,
+          params: entry.params,
+          result: msg,
+          ok: false,
+          id: entry.id,
+        });
+        emitReplay('replay:finished', tid, {
+          successCount,
+          failedCount: failedStepIds.length,
+          failedStepIds: [...new Set(failedStepIds)],
+          error: msg,
+        });
+        return buildPayload(tid, doSuppress, rows, allResults, healed, msg, {
+          successCount,
+          failedCount: failedStepIds.length,
+          failedStepIds: [...new Set(failedStepIds)],
+        });
+      }
 
       const batchResults = Array.isArray(result?.results) ? result.results : [];
-      allResults.push(...remapBatchResults(batchResults, cursor));
+      const row = batchResults[0] || null;
+      const ok = Number(result?.failed || 0) === 0 && (row ? !!row.ok : Number(result?.ok || 0) > 0);
+      const failResult = row?.result || result?.error || 'unknown';
 
-      const failed = Number(result?.failed) || 0;
-      if (failed === 0) {
-        cursor = total;
-        break;
+      if (ok) {
+        successCount += 1;
+        if (stepId != null) {
+          try { await markStepReplayOk(stepId); } catch { /* ignore */ }
+        }
+        emitReplay('replay:step', tid, {
+          stepId,
+          status: 'success',
+          index: stepNum,
+          total: actions.length,
+          action: entry.action,
+        });
+        allResults.push({
+          index: stepNum,
+          action: entry.action,
+          params: entry.params,
+          result: row?.result || 'ok',
+          ok: true,
+          id: entry.id,
+          confirmed: true,
+        });
+        continue;
       }
 
-      const stoppedAt = Number(result?.stoppedAt)
-        || batchResults.find((r) => !r.ok)?.index
-        || batchResults.length;
-      const failedAbsIndex = cursor + stoppedAt - 1; // 0-based in full actions
-      const failedEntry = actions[failedAbsIndex];
-      const failedRow = batchResults.find((r) => !r.ok) || batchResults[stoppedAt - 1];
-      const failResult = failedRow?.result || result?.error || 'unknown';
-
-      if (!failedEntry) {
-        const err = new Error(result?.error || `${failed} steps failed`);
-        err.statusCode = 500;
-        err.payload = buildPayload(tid, doSuppress, rows, allResults, healed, err.message);
-        throw err;
+      // Type A — single-step heal
+      if (stepId != null) {
+        try { await markStepReplayFailed(stepId); } catch { /* ignore */ }
+        failedStepIds.push(stepId);
       }
+      emitReplay('replay:step', tid, {
+        stepId,
+        status: 'failed',
+        error: String(failResult),
+        index: stepNum,
+        total: actions.length,
+        action: entry.action,
+        healType: 'step',
+      });
+      allResults.push({
+        index: stepNum,
+        action: entry.action,
+        params: entry.params,
+        result: failResult,
+        ok: false,
+        id: entry.id,
+        confirmed: false,
+      });
 
-      const attempts = healAttempts.get(failedAbsIndex) || 0;
-      if (attempts >= HEAL_PER_STEP) {
-        const msg = `AI heal exhausted for step ${failedAbsIndex + 1}: ${failedEntry.action} → ${failResult}`;
-        const err = new Error(msg);
-        err.statusCode = 500;
-        err.payload = buildPayload(tid, doSuppress, rows, allResults, healed, msg);
-        throw err;
-      }
-      healAttempts.set(failedAbsIndex, attempts + 1);
-
-      const stepId = failedEntry.id ?? null;
       broadcast('recording:replay_heal', {
-        trajectoryId: tid,
+        ...trajScope(tid),
         stepId,
         phase: 'start',
-        action: failedEntry.action,
+        action: entry.action,
         message: String(failResult),
+        confirmed: false,
+        healType: 'step',
       });
 
-      const instruction = buildStepHealInstruction(failedEntry, failResult, {
-        nextEntry: actions[failedAbsIndex + 1] || null,
-      });
       try {
-        await runHealStep(runtime, instruction);
+        const instruction = buildStepHealInstruction(entry, failResult);
+        await runHealStep(runtime, instruction, HEAL_MAX_STEPS);
         await markConsumedActionLog(runtime);
         broadcast('recording:replay_heal', {
-          trajectoryId: tid,
+          ...trajScope(tid),
           stepId,
           phase: 'done',
-          action: failedEntry.action,
+          action: entry.action,
+          confirmed: false,
+          healType: 'step',
         });
         healed.push({
           stepId,
-          action: failedEntry.action,
-          index: failedAbsIndex + 1,
+          action: entry.action,
+          index: stepNum,
+          confirmed: false,
+          healType: 'step',
         });
-        // Mark failed replay row as healed in aggregate results
-        const lastFail = [...allResults].reverse().find((r) => !r.ok);
-        if (lastFail) {
-          lastFail.healed = true;
-          lastFail.ok = true;
-          lastFail.result = `healed-by-ai (was: ${failResult})`;
+        const last = allResults[allResults.length - 1];
+        if (last) {
+          last.healed = true;
+          last.result = `healed-by-ai (was: ${failResult})`;
         }
-        // Resume from the next action after the failed one
-        cursor = failedAbsIndex + 1;
       } catch (healErr) {
         const msg = healErr?.message || String(healErr);
         broadcast('recording:replay_heal', {
-          trajectoryId: tid,
+          ...trajScope(tid),
           stepId,
           phase: 'error',
-          action: failedEntry.action,
+          action: entry.action,
           message: msg,
+          confirmed: false,
+          healType: 'step',
         });
-        const err = new Error(
-          `AI heal failed for step ${failedAbsIndex + 1} (${failedEntry.action}): ${msg}`,
+        emitReplay('replay:finished', tid, {
+          successCount,
+          failedCount: failedStepIds.length,
+          failedStepIds: [...new Set(failedStepIds)],
+          error: `AI heal failed for step ${stepNum} (${entry.action}): ${msg}`,
+          healType: 'step',
+        });
+        return buildPayload(
+          tid,
+          doSuppress,
+          rows,
+          allResults,
+          healed,
+          `AI heal failed for step ${stepNum} (${entry.action}): ${msg}`,
+          {
+            successCount,
+            failedCount: failedStepIds.length,
+            failedStepIds: [...new Set(failedStepIds)],
+          },
         );
-        err.statusCode = 500;
-        err.payload = buildPayload(tid, doSuppress, rows, allResults, healed, err.message);
-        throw err;
       }
     }
 
-    const okCount = allResults.filter((r) => r.ok).length;
-    const failCount = allResults.filter((r) => !r.ok).length;
-    const payload = buildPayload(tid, doSuppress, rows, allResults, healed, null);
-    payload.ok = okCount;
-    payload.failed = failCount;
-    payload.count = allResults.length;
-    if (failCount > 0) {
-      const err = new Error(`${failCount}/${allResults.length} steps failed`);
-      err.statusCode = 500;
-      err.payload = payload;
-      throw err;
-    }
-    return payload;
+    const uniqueFailed = [...new Set(failedStepIds)];
+    emitReplay('replay:finished', tid, {
+      successCount,
+      failedCount: uniqueFailed.length,
+      failedStepIds: uniqueFailed,
+    });
+
+    return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
+      successCount,
+      failedCount: uniqueFailed.length,
+      failedStepIds: uniqueFailed,
+    });
   } finally {
-    try { unsubscribe?.(); } catch { /* ignore */ }
     runtime.suppressStepPersist = false;
     runtime.isReplay = false;
+    runtime.formStructureHealLabels = null;
     if (session) session.busy = false;
   }
 }
 
-function buildPayload(tid, doSuppress, rows, allResults, healed, error) {
-  const okCount = allResults.filter((r) => r.ok).length;
-  const failCount = allResults.filter((r) => !r.ok).length;
+async function handleFormStructureCheckpoint({
+  tid,
+  runtime,
+  doSuppress,
+  entry,
+  stepId,
+  stepNum,
+  total,
+  actions,
+  skippedIds,
+  snapshotsByTrigger,
+}) {
+  const results = [];
+  const healed = [];
+  const snap = stepId != null ? snapshotsByTrigger.get(stepId) : null;
+
+  // No bound snapshot (legacy) → skip Type B, treat as success no-op
+  if (!snap) {
+    if (stepId != null) {
+      try { await markStepReplayOk(stepId); } catch { /* ignore */ }
+    }
+    emitReplay('replay:step', tid, {
+      stepId,
+      status: 'success',
+      index: stepNum,
+      total,
+      action: entry.action,
+      healType: 'form_structure',
+      skipped: 'no_trigger_snapshot',
+    });
+    results.push({
+      index: stepNum,
+      action: entry.action,
+      params: entry.params,
+      result: 'ok-skip-no-snapshot',
+      ok: true,
+      id: entry.id,
+      confirmed: true,
+    });
+    return { ok: true, aborted: false, results, healed };
+  }
+
+  let result;
+  try {
+    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', REPLAY_TIMEOUT_MS);
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: 'replay_actions',
+      data: {
+        actions: [{
+          ...entry,
+          params: {
+            ...(entry.params || {}),
+            fields: (snap.fields || []).map((f) => ({
+              label: f.label,
+              is_required: !!(f.isRequired ?? f.is_required),
+            })),
+            container: snap.container,
+          },
+        }],
+        is_replay: doSuppress,
+        stop_on_fail: true,
+      },
+    });
+    result = await doneP;
+    await markConsumedActionLog(runtime);
+  } catch (e) {
+    const msg = e?.message || String(e);
+    if (stepId != null) {
+      try { await markStepReplayFailed(stepId); } catch { /* ignore */ }
+    }
+    emitReplay('replay:step', tid, {
+      stepId,
+      status: 'failed',
+      error: msg,
+      index: stepNum,
+      total,
+      action: entry.action,
+      healType: 'form_structure',
+    });
+    results.push({
+      index: stepNum,
+      action: entry.action,
+      params: entry.params,
+      result: msg,
+      ok: false,
+      id: entry.id,
+    });
+    return { ok: false, aborted: true, error: msg, results, healed };
+  }
+
+  const batchResults = Array.isArray(result?.results) ? result.results : [];
+  const row = batchResults[0] || null;
+  const report = parseFormStructureResult(row?.result || '');
+
+  if (!needsTypeB(report)) {
+    if (stepId != null) {
+      try { await markStepReplayOk(stepId); } catch { /* ignore */ }
+    }
+    emitReplay('replay:step', tid, {
+      stepId,
+      status: 'success',
+      index: stepNum,
+      total,
+      action: entry.action,
+      healType: 'form_structure',
+    });
+    results.push({
+      index: stepNum,
+      action: entry.action,
+      params: entry.params,
+      result: row?.result || 'ok',
+      ok: true,
+      id: entry.id,
+      confirmed: true,
+    });
+    return { ok: true, aborted: false, results, healed };
+  }
+
+  const container = snap.container || entry.params?.container || 'main';
+  emitReplay('replay:form_structure', tid, {
+    stepId,
+    healType: 'form_structure',
+    container,
+    missing_required: report.missing_required || [],
+    missing_optional: report.missing_optional || [],
+    added_required: report.added_required || [],
+    added_optional: report.added_optional || [],
+    hasRequiredChange: !!report.hasRequiredChange,
+    hasOptionalChange: !!report.hasOptionalChange,
+    reordered: !!report.reordered,
+  });
+
+  // Delete missing-label fill steps in same phase
+  const missingLabels = new Set([
+    ...(report.missing_required || []),
+    ...(report.missing_optional || []),
+  ]);
+  const deletedIds = [];
+  if (missingLabels.size) {
+    const phaseId = entry.trajectoryPhaseId != null ? Number(entry.trajectoryPhaseId) : null;
+    const db = getDB();
+    let q = db('trajectory_step').where({ trajectory_id: tid });
+    if (Number.isFinite(phaseId) && phaseId > 0) {
+      q = q.andWhere({ trajectory_phase_id: phaseId });
+    } else if (entry.phaseNumber) {
+      q = q.andWhere({ phase_number: Number(entry.phaseNumber) });
+    }
+    const candidates = await q.select('*');
+    for (const r of candidates) {
+      const actionType = r.action_type || '';
+      if (!FILL_ACTION_TYPES.has(actionType)) continue;
+      let params = r.params_json;
+      if (typeof params === 'string') {
+        try { params = JSON.parse(params); } catch { params = {}; }
+      }
+      const label = String(params?.label_text || '').trim();
+      if (!label || !missingLabels.has(label)) continue;
+      const sid = Number(r.id);
+      if (sid === stepId) continue; // never delete checkpoint
+      await trajectoryStepDao.removeById(sid);
+      deletedIds.push(sid);
+      skippedIds.add(sid);
+      // Also drop from remaining in-memory queue
+      for (let j = 0; j < actions.length; j += 1) {
+        if (toNumericStepId(actions[j].id) === sid) {
+          skippedIds.add(sid);
+        }
+      }
+    }
+    if (deletedIds.length) {
+      await trajectoryStepDao.reorderByTrajectory(tid);
+      const counts = await refreshTrajectoryCounts(tid);
+      await trajectoryDao.updateMeta(tid, {
+        stepCount: counts.stepCount,
+        phaseCount: counts.phaseCount,
+      });
+    }
+  }
+
+  const addingLabels = [
+    ...(report.added_required || []),
+    ...(report.added_optional || []),
+  ];
+
+  if (addingLabels.length) {
+    const instruction = buildFormStructureHealInstruction({
+      container,
+      added_required: report.added_required || [],
+      added_optional: report.added_optional || [],
+      missing_required: report.missing_required || [],
+      missing_optional: report.missing_optional || [],
+    });
+    broadcast('recording:replay_heal', {
+      ...trajScope(tid),
+      stepId,
+      phase: 'start',
+      action: entry.action,
+      healType: 'form_structure',
+      message: `form structure: fill ${addingLabels.length} added field(s)`,
+    });
+
+    try {
+      const beforeIds = await peekActionLogIds(runtime);
+      await runHealStep(runtime, instruction, FORM_STRUCTURE_HEAL_MAX_STEPS);
+      const afterEntries = await fetchActionLogEntries(runtime);
+      const newEntries = afterEntries.filter((e) => {
+        const id = e?.id != null ? String(e.id) : '';
+        if (!id || beforeIds.has(id)) return false;
+        const a = e.action || '';
+        if (!FILL_ACTION_TYPES.has(a)) return false;
+        const label = String(e.params?.label_text || '').trim();
+        return addingLabels.includes(label);
+      });
+
+      if (stepId != null && newEntries.length) {
+        await insertStepsAfter(stepId, newEntries.map((e) => ({
+          actionType: e.action,
+          params: e.params || {},
+          element: e.element || null,
+          source: 'agent',
+          confirmed: false,
+          trajectoryPhaseId: entry.trajectoryPhaseId ?? null,
+          phaseNumber: entry.phaseNumber ?? 0,
+        })));
+      }
+
+      // Require coverage of added_required at minimum
+      const filledLabels = new Set(
+        newEntries.map((e) => String(e.params?.label_text || '').trim()).filter(Boolean),
+      );
+      const missingRequiredAdds = (report.added_required || []).filter((l) => !filledLabels.has(l));
+      await markConsumedActionLog(runtime);
+
+      if (missingRequiredAdds.length) {
+        const err = `Type B incomplete: missing fills for ${missingRequiredAdds.join(', ')}`;
+        broadcast('recording:replay_heal', {
+          ...trajScope(tid),
+          stepId,
+          phase: 'error',
+          action: entry.action,
+          healType: 'form_structure',
+          message: err,
+        });
+        if (stepId != null) {
+          try { await markStepReplayFailed(stepId); } catch { /* ignore */ }
+        }
+        // Still update snapshot to current DOM truth where possible
+        await updateSnapshotFromReport(snap, report).catch(() => null);
+        results.push({
+          index: stepNum,
+          action: entry.action,
+          params: entry.params,
+          result: err,
+          ok: false,
+          id: entry.id,
+          healType: 'form_structure',
+          deletedStepIds: deletedIds,
+        });
+        return { ok: false, aborted: true, error: err, results, healed };
+      }
+
+      broadcast('recording:replay_heal', {
+        ...trajScope(tid),
+        stepId,
+        phase: 'done',
+        action: entry.action,
+        healType: 'form_structure',
+        inserted: newEntries.length,
+      });
+      healed.push({
+        stepId,
+        action: entry.action,
+        index: stepNum,
+        confirmed: false,
+        healType: 'form_structure',
+        inserted: newEntries.length,
+        deletedStepIds: deletedIds,
+      });
+    } catch (healErr) {
+      const msg = healErr?.message || String(healErr);
+      broadcast('recording:replay_heal', {
+        ...trajScope(tid),
+        stepId,
+        phase: 'error',
+        action: entry.action,
+        healType: 'form_structure',
+        message: msg,
+      });
+      if (stepId != null) {
+        try { await markStepReplayFailed(stepId); } catch { /* ignore */ }
+      }
+      results.push({
+        index: stepNum,
+        action: entry.action,
+        params: entry.params,
+        result: msg,
+        ok: false,
+        id: entry.id,
+        healType: 'form_structure',
+        deletedStepIds: deletedIds,
+      });
+      return {
+        ok: false,
+        aborted: true,
+        error: `form_structure heal failed: ${msg}`,
+        results,
+        healed,
+      };
+    }
+  }
+
+  // Update snapshot fields in place to post-heal DOM truth
+  await updateSnapshotFromReport(snap, report).catch(() => null);
+
+  if (stepId != null) {
+    try { await markStepReplayOk(stepId); } catch { /* ignore */ }
+  }
+  emitReplay('replay:step', tid, {
+    stepId,
+    status: 'success',
+    index: stepNum,
+    total,
+    action: entry.action,
+    healType: 'form_structure',
+    deletedStepIds: deletedIds,
+  });
+  results.push({
+    index: stepNum,
+    action: entry.action,
+    params: entry.params,
+    result: row?.result || 'ok-form-structure-healed',
+    ok: true,
+    id: entry.id,
+    confirmed: true,
+    healType: 'form_structure',
+    deletedStepIds: deletedIds,
+  });
+  return { ok: true, aborted: false, results, healed };
+}
+
+async function updateSnapshotFromReport(snap, report) {
+  if (!snap?.id || !report) return;
+  const actualLabels = Array.isArray(report.fields) ? report.fields : [];
+  const missing = new Set([
+    ...(report.missing_required || []),
+    ...(report.missing_optional || []),
+  ]);
+  const prevByLabel = new Map(
+    (snap.fields || []).map((f) => [f.label, !!(f.isRequired ?? f.is_required)]),
+  );
+  const fields = [];
+  for (const label of actualLabels) {
+    if (missing.has(label)) continue;
+    let isReq = prevByLabel.has(label) ? prevByLabel.get(label) : false;
+    if ((report.added_required || []).includes(label)) isReq = true;
+    if ((report.added_optional || []).includes(label)) isReq = false;
+    fields.push({ label, isRequired: isReq });
+  }
+  const requiredCount = fields.filter((f) => f.isRequired).length;
+  await formSnapshotDao.updateFields(snap.id, {
+    fieldCount: fields.length,
+    requiredCount,
+    optionalCount: fields.length - requiredCount,
+    fields,
+  });
+}
+
+async function peekActionLogIds(runtime) {
+  const entries = await fetchActionLogEntries(runtime);
+  return new Set(entries.map((e) => (e?.id != null ? String(e.id) : '')).filter(Boolean));
+}
+
+async function fetchActionLogEntries(runtime) {
+  if (!runtime?.sessionId || !runtime?.executorNodeUuid) return [];
+  try {
+    const resultP = execSession.waitForSessionEvent(runtime.sessionId, 'get_action_log_result', 5000);
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: 'get_action_log',
+      data: {},
+    });
+    const result = await resultP.catch(() => null);
+    return Array.isArray(result?.entries) ? result.entries : [];
+  } catch {
+    return [];
+  }
+}
+
+function buildPayload(tid, doSuppress, rows, allResults, healed, error, counts = {}) {
+  const okCount = allResults.filter((r) => r.ok && !r.healed).length;
+  const failCount = allResults.filter((r) => !r.ok || r.healed || r.confirmed === false).length;
   return {
     trajectoryId: tid,
+    trajectoryDbId: tid,
     isReplay: doSuppress,
     stepIds: rows.map((r) => r.id),
     count: allResults.length,
-    ok: okCount,
-    failed: failCount,
+    ok: counts.successCount ?? okCount,
+    failed: counts.failedCount ?? failCount,
+    successCount: counts.successCount ?? okCount,
+    failedCount: counts.failedCount ?? failCount,
+    failedStepIds: counts.failedStepIds || [],
     error: error || null,
     healed: Array.isArray(healed) ? healed : [],
     results: allResults,
   };
 }
 
-async function runHealStep(runtime, instruction) {
+async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS) {
   await new Promise((resolve, reject) => {
     let settled = false;
     const unsubDone = execSession.onSessionEvent(runtime.sessionId, 'phase_done', () => {
@@ -293,7 +949,7 @@ async function runHealStep(runtime, instruction) {
       event: 'step',
       data: {
         instruction,
-        max_steps: HEAL_MAX_STEPS,
+        max_steps: maxSteps,
         phase_number: 0,
       },
     });

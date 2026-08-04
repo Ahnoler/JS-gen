@@ -262,7 +262,7 @@ class TaskList(BaseModel):
     # ── Factory ──────────────────────────────────────────────────────────
 
     @classmethod
-    def from_scan(cls, fields: list[dict]) -> "TaskList":
+    def from_scan(cls, fields: list[dict], *, force_refill: bool = False) -> "TaskList":
         """Build a TaskList from raw scan fields, auto-filtering filled/disabled.
 
         Fields with a currentValue are placed directly in done[] so the task
@@ -270,26 +270,59 @@ class TaskList(BaseModel):
         This prevents _ensure_scanned from falsely detecting a "new form"
         when the agent operates on a pre-filled field.
 
+        When ``force_refill=True`` (task requires 修改所有字段), editable fields
+        that already have values stay in pending[] so auto-fill / agent must
+        overwrite them. Truly disabled fields (no adjacent button) stay in done[].
+
         Args:
             fields: Raw field dicts from scan_form_fields() result.
+            force_refill: Treat pre-filled editable fields as still pending.
         """
         pending: list[TaskItem] = []
         done: list[TaskItem] = []
         for f in fields:
             has_value = (f.get("currentValue", "") or "").strip() != ""
-            if has_value:
+            is_disabled = bool(f.get("disabled", False))
+            has_button = (f.get("hasButton", "") or "").strip()
+            # Readonly: cannot overwrite → done (even under force_refill)
+            if is_disabled and not has_button:
                 done.append(TaskItem(
                     label=f.get("label", ""),
                     kind=f.get("kind", "input"),
                     currentValue=f.get("currentValue", ""),
                     options=f.get("options", []),
                     placeholder=f.get("placeholder", ""),
-                    disabled=f.get("disabled", False),
+                    disabled=True,
                     required=f.get("required", False),
-                    hasButton=f.get("hasButton", "") or "",
+                    hasButton="",
+                ))
+                continue
+            if has_value and not force_refill:
+                done.append(TaskItem(
+                    label=f.get("label", ""),
+                    kind=f.get("kind", "input"),
+                    currentValue=f.get("currentValue", ""),
+                    options=f.get("options", []),
+                    placeholder=f.get("placeholder", ""),
+                    disabled=is_disabled,
+                    required=f.get("required", False),
+                    hasButton=has_button,
                 ))
             else:
                 item = TaskItem.from_scanned(f)
+                if item is None and force_refill and has_value:
+                    # from_scanned skips already-filled; rebuild for overwrite
+                    item = TaskItem(
+                        label=f.get("label", ""),
+                        kind=f.get("kind", "input"),
+                        currentValue=f.get("currentValue", ""),
+                        options=f.get("options", []),
+                        placeholder=f.get("placeholder", ""),
+                        disabled=is_disabled,
+                        required=f.get("required", False),
+                        hasButton=has_button,
+                        needs_intervention=is_disabled and bool(has_button),
+                    )
                 if item is not None:
                     pending.append(item)
         return cls(pending=pending, done=done)

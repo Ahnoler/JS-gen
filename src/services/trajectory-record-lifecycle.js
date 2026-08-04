@@ -2,16 +2,13 @@
  * AI / manual recording lifecycle: start, stop, toggle, resolve, default login.
  */
 import { randomUUID } from 'crypto';
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import path from 'path';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as systemDao from '../dao/system-dao.js';
-import * as caseDataDao from '../dao/case-data-dao.js';
 import * as execSession from '../executor-session-client.js';
 import { state } from '../state.js';
 import { broadcast } from '../ws-server.js';
-import { USE_EXECUTOR, CASE_DATA_DIR } from '../../config/config.js';
+import { USE_EXECUTOR } from '../../config/config.js';
 import * as remoteBridge from '../cdp/remote-bridge.js';
 import {
   buildLoginInstruction,
@@ -24,24 +21,13 @@ import {
   touchTrajectoryRuntimeActivity,
 } from './trajectory-runtime.js';
 
-/** Write traj_{id}.json and return { caseDataFile, caseData } for stdin step.
- * Empty / missing case data = user has not configured — not an error.
+/**
+ * 版本V2.2开发：案例数据注入 Python case_data_store 暂时停用；
+ * 转移到接口报文捞取数据，AI 填表自动参考。
+ * （原实现：按 trajectory_id 加载 case_data_entry → traj_{id}.json / inline case_data）
  */
-async function prepareCaseDataInjection(trajectoryId) {
-  let caseData = null;
-  try {
-    caseData = await caseDataDao.loadFlatDictByTrajectory(trajectoryId);
-  } catch (err) {
-    console.warn('[record] case data load skipped:', err.message);
-    return { caseDataFile: null, caseData: null };
-  }
-  if (!caseData || !Object.keys(caseData).length) {
-    return { caseDataFile: null, caseData: null };
-  }
-  if (!existsSync(CASE_DATA_DIR)) mkdirSync(CASE_DATA_DIR, { recursive: true });
-  const caseDataFile = path.join(CASE_DATA_DIR, `traj_${trajectoryId}.json`);
-  writeFileSync(caseDataFile, JSON.stringify(caseData, null, 2), 'utf8');
-  return { caseDataFile, caseData };
+async function prepareCaseDataInjection(_trajectoryId) {
+  return { caseDataFile: null, caseData: null };
 }
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
@@ -259,7 +245,11 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     data: { enabled: true },
   });
 
-  const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
+  // 版本V2.2开发：案例数据注入 Python case_data_store 暂时停用；
+  // 转移到接口报文捞取数据，AI 填表自动参考（阶段描述内已附带业务场景案例数据）。
+  // const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
+  const caseDataFile = null;
+  const caseData = null;
 
   let recordingSystemId = null;
   try {
@@ -298,8 +288,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         phase_number: phase.phaseNumber,
       };
       if (prior_phases.length) stepData.prior_phases = prior_phases;
-      // First step carries case data; Python loads once (case_data_loaded flag).
-      // Inline case_data works on remote executors; case_data_file for local path.
+      // 版本V2.2：不再注入 case_data / case_data_file 到 Python case_data_store
+      // （业务场景案例数据已写在 phase.description 内，供 AI 填表参考）
       if (caseData) {
         stepData.case_data = caseData;
         if (caseDataFile) stepData.case_data_file = caseDataFile;

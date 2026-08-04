@@ -22,9 +22,12 @@ export {
 export {
   refreshTrajectoryCounts,
   confirmTrajectoryStep,
+  markStepReplayFailed,
+  markStepReplayOk,
   createTrajectoryStep,
   updateTrajectoryStep,
   removeTrajectoryStep,
+  insertStepsAfter,
 } from './trajectory-step-service.js';
 
 export {
@@ -35,6 +38,7 @@ export {
   saveFullTrajectory,
   resolvePhaseIdForPersist,
   appendRecordedStep,
+  appendRecordedFormSnapshot,
 } from './trajectory-persist-service.js';
 
 export {
@@ -50,6 +54,7 @@ export {
   createTransactionWithPhases,
   setTrajectoryCaseEntries,
   analyzeRequirementToPhases,
+  extractCaseDataBlock,
   extractCaseEntriesFromRequirement,
   confirmTrajectory,
 } from './trajectory-meta-service.js';
@@ -68,6 +73,7 @@ export {
   stopTrajectoryRecordingSafe,
   cleanupPersistedTrajectoryResources,
   replayTrajectorySteps,
+  acceptTrajectoryStepsReplay,
   resolveTrajectoryElement,
   toggleTrajectoryManualRecord,
 } from './trajectory-recording-service.js';

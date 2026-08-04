@@ -38,6 +38,15 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
         if goal_tracker is not None and goal_tracker.get('stopped'):
             agent.state.stopped = True
             return
+
+        # Business-scenario summary (non-mandatory background) — before force cues
+        try:
+            from .actions._scenario_describer import inject_scenario_summary
+            await inject_scenario_summary(agent, case_data_store)
+        except Exception as e:
+            sys.stderr.write(f"[recorder] scenario_describer error: {e}\n")
+            sys.stderr.flush()
+
         # Check for human intervention before proceeding
         if intervention_queue is not None:
             try:
@@ -301,9 +310,13 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                             for r in h.result:
                                 r.is_done = False
                                 r.error = (
-                                    'Premature done() rejected: no 操作成功 observed. '
-                                    'Call click_save(); only done(success=true) after ok-save-success. '
-                                    'no-notification / no error toast is NOT success.'
+                                    'Premature done() rejected: no ok-save-success observed. '
+                                    'Do NOT re-select the table row and do NOT re-click 修改. '
+                                    'If the maintain dialog is still open: call '
+                                    'click_save(button_text="确认") NOW. '
+                                    'If closed: open 修改 once, then click_save(button_text="确认"). '
+                                    'Never use click_element_by_index for 确认/保存/提交. '
+                                    'Only done(success=true) after ok-save-success.'
                                 )
                                 try:
                                     from scripts.feature_flags import memory_whitelist_enabled
@@ -434,6 +447,53 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                         sys.stderr.write(f"[recorder] Stopping agent at step {step_num}\n")
                         sys.stderr.flush()
                         agent.state.stopped = True
+                        return
+            except Exception:
+                pass
+
+            # Repeated recorded-action cycle (e.g. radio→修改→确认×2) — stop spinning
+            try:
+                from .controller import _ACTION_LOG as _ctrl_log
+
+                def _fp(entry):
+                    if not isinstance(entry, dict):
+                        return None
+                    a = entry.get('action') or ''
+                    p = entry.get('params') or {}
+                    if a == 'click_table_row_radio':
+                        return f'radio:{(p.get("row_text") or "").strip()}'
+                    if a == 'click_element_by_index':
+                        return f'click:{(p.get("text") or "").strip()}'
+                    if a == 'click_save':
+                        return f'save:{(p.get("button_text") or "保存").strip()}'
+                    if a in ('fill_form_field', 'fill_date_field', 'select_option', 'click_radio'):
+                        return f'{a}:{(p.get("label_text") or "").strip()}'
+                    return None
+
+                fps = [x for x in (_fp(e) for e in _ctrl_log) if x]
+                # Detect cycle length 2–4 repeated twice at the end
+                for cycle_len in (3, 2, 4):
+                    if len(fps) < cycle_len * 2:
+                        continue
+                    a = fps[-cycle_len:]
+                    b = fps[-cycle_len * 2:-cycle_len]
+                    if a and a == b:
+                        goal_tracker['stopped'] = True
+                        sys.stderr.write(
+                            f"[recorder] Repeated action cycle detected ({cycle_len}×2): {a}\n"
+                        )
+                        sys.stderr.write(f"[recorder] Stopping agent at step {step_num}\n")
+                        sys.stderr.flush()
+                        agent.state.stopped = True
+                        try:
+                            msg = HumanMessage(content=(
+                                '[RECORDER] Repeated select→modify→confirm cycle detected. STOP. '
+                                'If the phase still needs submit: call click_save(button_text="确认") '
+                                'once (do not re-select the row). If already ok-save-success, call done(success=true).'
+                            ))
+                            agent._message_manager._add_message_with_tokens(msg)
+                        except Exception:
+                            pass
                         return
             except Exception:
                 pass
