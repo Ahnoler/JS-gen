@@ -37,6 +37,34 @@ const HEAL_MAX_STEPS = 12;
 /** Type B may fill several new fields. */
 const FORM_STRUCTURE_HEAL_MAX_STEPS = 24;
 
+/** Sentinel: user stopped replay/heal via cancel_step / steps/replay/stop. */
+const USER_ABORT_CODE = 'USER_ABORT';
+
+function makeUserAbortError() {
+  const err = new Error(USER_ABORT_CODE);
+  err.code = USER_ABORT_CODE;
+  return err;
+}
+
+function isUserAbort(err) {
+  if (!err) return false;
+  if (err.code === USER_ABORT_CODE) return true;
+  const msg = String(err.message || err || '');
+  return msg === USER_ABORT_CODE || /USER_ABORT|Replay aborted/i.test(msg);
+}
+
+function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
+  const uniqueFailed = [...new Set(failedStepIds)];
+  emitReplay('replay:finished', tid, {
+    successCount,
+    failedCount: uniqueFailed.length,
+    failedStepIds: uniqueFailed,
+    aborted: true,
+    reason: 'user_stop',
+    error: null,
+  });
+}
+
 const FILL_ACTION_TYPES = new Set([
   'fill_form_field',
   'fill_date_field',
@@ -101,6 +129,7 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
   const prepared = await prepareReplayBatch(trajectoryId, { stepIds, isReplay });
   const { tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger } = prepared;
 
+  runtime.abortReplay = false;
   runtime.suppressStepPersist = doSuppress;
   runtime.isReplay = doSuppress;
   if (session) session.busy = true;
@@ -136,6 +165,7 @@ export async function acceptTrajectoryStepsReplay(trajectoryId, {
       try {
         runtime.suppressStepPersist = false;
         runtime.isReplay = false;
+        runtime.abortReplay = false;
         if (session) session.busy = false;
       } catch { /* ignore */ }
     });
@@ -148,6 +178,7 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
   const prepared = await prepareReplayBatch(trajectoryId, { stepIds, isReplay });
   const { tid, orderedStepIds, doSuppress, runtime, session, actions, rows, snapshotsByTrigger } = prepared;
 
+  runtime.abortReplay = false;
   runtime.suppressStepPersist = doSuppress;
   runtime.isReplay = doSuppress;
   if (session) session.busy = true;
@@ -166,6 +197,38 @@ export async function replayTrajectorySteps(trajectoryId, { stepIds = [], isRepl
   } finally {
     // runReplayBatch also clears busy in finally
   }
+}
+
+/**
+ * Stop an in-flight steps/replay batch (including Type A/B heal).
+ * Does not change recordStatus. Idempotent if no batch is running.
+ */
+export async function stopTrajectoryStepsReplay(trajectoryId) {
+  const tid = Number(trajectoryId);
+  const runtime = getTrajectoryRuntime(tid);
+  if (!runtime?.sessionId) {
+    const err = new Error('Trajectory is not attached — call record/prepare first');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  runtime.abortReplay = true;
+  try {
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: 'cancel_step',
+      data: {},
+    });
+  } catch (err) {
+    console.warn('[steps/replay/stop] cancel_step failed:', err?.message || err);
+  }
+
+  return {
+    trajectoryId: tid,
+    trajectoryDbId: tid,
+    stopped: true,
+  };
 }
 
 async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true } = {}) {
@@ -267,6 +330,17 @@ async function runReplayBatch({
 
   try {
     for (let i = 0; i < actions.length; i += 1) {
+      if (runtime.abortReplay) {
+        emitReplayAborted(tid, { successCount, failedStepIds });
+        return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
+          successCount,
+          failedCount: [...new Set(failedStepIds)].length,
+          failedStepIds: [...new Set(failedStepIds)],
+          aborted: true,
+          reason: 'user_stop',
+        });
+      }
+
       const entry = actions[i];
       const stepId = toNumericStepId(entry.id);
       if (stepId != null && skippedIds.has(stepId)) continue;
@@ -295,6 +369,17 @@ async function runReplayBatch({
           skippedIds,
           snapshotsByTrigger,
         });
+        if (typeB.userAbort || isUserAbort(typeB.error)) {
+          allResults.push(...typeB.results);
+          emitReplayAborted(tid, { successCount, failedStepIds });
+          return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
+            successCount,
+            failedCount: [...new Set(failedStepIds)].length,
+            failedStepIds: [...new Set(failedStepIds)],
+            aborted: true,
+            reason: 'user_stop',
+          });
+        }
         if (typeB.aborted) {
           if (stepId != null) failedStepIds.push(stepId);
           allResults.push(...typeB.results);
@@ -367,6 +452,17 @@ async function runReplayBatch({
         });
       }
 
+      if (runtime.abortReplay) {
+        emitReplayAborted(tid, { successCount, failedStepIds });
+        return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
+          successCount,
+          failedCount: [...new Set(failedStepIds)].length,
+          failedStepIds: [...new Set(failedStepIds)],
+          aborted: true,
+          reason: 'user_stop',
+        });
+      }
+
       const batchResults = Array.isArray(result?.results) ? result.results : [];
       const row = batchResults[0] || null;
       const ok = Number(result?.failed || 0) === 0 && (row ? !!row.ok : Number(result?.ok || 0) > 0);
@@ -434,6 +530,26 @@ async function runReplayBatch({
         const instruction = buildStepHealInstruction(entry, failResult);
         await runHealStep(runtime, instruction, HEAL_MAX_STEPS, 'step');
         await markConsumedActionLog(runtime);
+        if (runtime.abortReplay) {
+          broadcast('recording:replay_heal', {
+            ...trajScope(tid),
+            stepId,
+            phase: 'error',
+            action: entry.action,
+            message: USER_ABORT_CODE,
+            confirmed: false,
+            healType: 'step',
+            aborted: true,
+          });
+          emitReplayAborted(tid, { successCount, failedStepIds });
+          return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
+            successCount,
+            failedCount: [...new Set(failedStepIds)].length,
+            failedStepIds: [...new Set(failedStepIds)],
+            aborted: true,
+            reason: 'user_stop',
+          });
+        }
         broadcast('recording:replay_heal', {
           ...trajScope(tid),
           stepId,
@@ -456,6 +572,26 @@ async function runReplayBatch({
         }
       } catch (healErr) {
         const msg = healErr?.message || String(healErr);
+        if (isUserAbort(healErr) || runtime.abortReplay) {
+          broadcast('recording:replay_heal', {
+            ...trajScope(tid),
+            stepId,
+            phase: 'error',
+            action: entry.action,
+            message: USER_ABORT_CODE,
+            confirmed: false,
+            healType: 'step',
+            aborted: true,
+          });
+          emitReplayAborted(tid, { successCount, failedStepIds });
+          return buildPayload(tid, doSuppress, rows, allResults, healed, null, {
+            successCount,
+            failedCount: [...new Set(failedStepIds)].length,
+            failedStepIds: [...new Set(failedStepIds)],
+            aborted: true,
+            reason: 'user_stop',
+          });
+        }
         broadcast('recording:replay_heal', {
           ...trajScope(tid),
           stepId,
@@ -504,6 +640,7 @@ async function runReplayBatch({
     runtime.suppressStepPersist = false;
     runtime.isReplay = false;
     runtime.formStructureHealLabels = null;
+    runtime.abortReplay = false;
     if (session) session.busy = false;
   }
 }
@@ -790,6 +927,36 @@ async function handleFormStructureCheckpoint({
       });
     } catch (healErr) {
       const msg = healErr?.message || String(healErr);
+      if (isUserAbort(healErr) || runtime.abortReplay) {
+        broadcast('recording:replay_heal', {
+          ...trajScope(tid),
+          stepId,
+          phase: 'error',
+          action: entry.action,
+          healType: 'form_structure',
+          message: USER_ABORT_CODE,
+          aborted: true,
+        });
+        results.push({
+          index: stepNum,
+          action: entry.action,
+          params: entry.params,
+          result: USER_ABORT_CODE,
+          ok: false,
+          id: entry.id,
+          healType: 'form_structure',
+          deletedStepIds: deletedIds,
+          aborted: true,
+        });
+        return {
+          ok: false,
+          aborted: true,
+          userAbort: true,
+          error: USER_ABORT_CODE,
+          results,
+          healed,
+        };
+      }
       broadcast('recording:replay_heal', {
         ...trajScope(tid),
         stepId,
@@ -913,7 +1080,9 @@ function buildPayload(tid, doSuppress, rows, allResults, healed, error, counts =
     successCount: counts.successCount ?? okCount,
     failedCount: counts.failedCount ?? failCount,
     failedStepIds: counts.failedStepIds || [],
-    error: error || null,
+    error: counts.aborted ? null : (error || null),
+    aborted: !!counts.aborted,
+    reason: counts.reason || null,
     healed: Array.isArray(healed) ? healed : [],
     results: allResults,
   };
@@ -922,15 +1091,43 @@ function buildPayload(tid, doSuppress, rows, allResults, healed, error, counts =
 async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, healType = 'step') {
   await new Promise((resolve, reject) => {
     let settled = false;
+    let sawAgentStopped = false;
+
+    const rejectAbort = () => {
+      cleanup();
+      reject(makeUserAbortError());
+    };
+
     const unsubDone = execSession.onSessionEvent(runtime.sessionId, 'phase_done', () => {
+      if (settled) return;
+      if (runtime.abortReplay || sawAgentStopped) {
+        rejectAbort();
+        return;
+      }
       cleanup();
       resolve();
     });
     const unsubErr = execSession.onSessionEvent(runtime.sessionId, 'phase_error', (payload) => {
+      if (settled) return;
+      if (runtime.abortReplay || sawAgentStopped) {
+        rejectAbort();
+        return;
+      }
       cleanup();
       reject(new Error(payload?.message || 'phase_error'));
     });
+    const unsubStopped = execSession.onSessionEvent(runtime.sessionId, 'agent_stopped', () => {
+      if (settled) return;
+      sawAgentStopped = true;
+      runtime.abortReplay = true;
+      rejectAbort();
+    });
     const timer = setTimeout(() => {
+      if (settled) return;
+      if (runtime.abortReplay || sawAgentStopped) {
+        rejectAbort();
+        return;
+      }
       cleanup();
       reject(new Error('Timeout waiting for heal phase_done'));
     }, HEAL_TIMEOUT_MS);
@@ -941,6 +1138,12 @@ async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, heal
       clearTimeout(timer);
       try { unsubDone(); } catch { /* ignore */ }
       try { unsubErr(); } catch { /* ignore */ }
+      try { unsubStopped(); } catch { /* ignore */ }
+    }
+
+    if (runtime.abortReplay) {
+      rejectAbort();
+      return;
     }
 
     execSession.forwardStdin({

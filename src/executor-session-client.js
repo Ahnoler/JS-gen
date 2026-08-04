@@ -67,7 +67,7 @@ export async function pickExecutorNode(opts = {}) {
   }
 
   const live = registry.list().filter((n) => n.connected);
-  if (!live.length) throw new Error('No executor agent online');
+  if (!live.length) throw lease.noExecutorOnlineError();
 
   const candidates = live
     .filter((n) => !isDraining(n.nodeUuid))

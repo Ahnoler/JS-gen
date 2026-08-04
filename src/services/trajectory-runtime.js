@@ -136,6 +136,8 @@ export function registerTrajectorySession(tid, sessionId, opened, { bibError = n
     persistedActionIds,
     selectedPhaseId: null,
     abortRecording: false,
+    /** User stop for in-flight steps/replay (incl. Type A/B heal). */
+    abortReplay: false,
     bibError,
     manualRecording: false,
   };

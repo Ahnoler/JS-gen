@@ -771,8 +771,8 @@ export const API_GROUPS = [
           },
         }),
         notes: [
-          '409：无可用执行资源（含 holders）',
-          '503：会话/执行机不可用',
+          '409：无可用执行资源（含 holders）— 槽位已满或没有在线执行机',
+          '503：会话/执行机其它不可用',
           '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
           'stream.ok=true → recordStatus=live（列表可见占用中；人工录制可用）',
           'record/start → recording；stop → recorded；stream/detach(live) → draft；detach(live|recording) → draft',
@@ -898,11 +898,29 @@ export const API_GROUPS = [
           '表字段 is_replay ≠ 请求参数 isReplay',
           'trajectory_step.confirmed（回放确认）：1=通过，0=不通过（含触发自愈）',
           '两种自愈：healType=step（单步）vs healType=form_structure（表单结构）— 勿混淆',
+          '用户可 POST .../steps/replay/stop 中断自愈/批次 → WS replay:finished { aborted:true, reason:"user_stop", error:null }',
           'WS replay:started { trajectoryId, trajectoryDbId, stepIds }',
           'WS replay:step { trajectoryId, trajectoryDbId, stepId, status, error?, healType? }',
           'WS replay:form_structure { trajectoryId, healType:"form_structure", container, missing_required, added_required, ... }',
-          'WS replay:finished { trajectoryId, successCount, failedCount, failedStepIds, error?, healType? }',
+          'WS replay:finished { trajectoryId, successCount, failedCount, failedStepIds, error?, healType?, aborted?, reason? }',
           '旧事件 recording:replay_heal 可带 healType；前端可按 healType 区分',
+        ],
+      },
+      {
+        method: 'POST', path: '/api/v2/trajectories/{id}/steps/replay/stop',
+        summary: '停止进行中的 steps/replay（含 Type A/B 自愈）',
+        desc:
+          '置 abortReplay 并向执行机发送 cancel_step。不改变 recordStatus、不释放槽位。'
+          + '自愈中任何 cancel（含误点 record/stop 触发的 cancel_step）均视为用户中断，避免假成功。'
+          + '批次以 WS replay:finished { aborted:true, reason:"user_stop", error:null } 结束。'
+          + '幂等：无进行中批次时仍返回 stopped:true。',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        reqExample: J({}),
+        respExample: J({ trajectoryId: 42, trajectoryDbId: 42, stopped: true }),
+        notes: [
+          '需已 attach（record/prepare）；未附着 → 400',
+          '确定性 replay_actions 当前步可能仍跑完，停止在自愈边界 / 下一步边界生效',
+          'FE 应用 aborted 判断主动停止，勿把 error 当失败 toast（error 为 null）',
         ],
       },
       {
@@ -1063,13 +1081,13 @@ export const API_GROUPS = [
           attached: true, remoteSessionId: 7, remoteSessionUuid: 'uuid',
           sessionId: 'uuid', trajectoryId: 42,
           cdpReady: true, inputEnabled: true, agentBusy: false,
-          viewportW: 1920, viewportH: 1080, manualRecording: false,
+          viewportW: 1600, viewportH: 900, manualRecording: false,
         }),
       },
       {
         method: 'POST', path: '/api/v2/remote-sessions/attach-live',
         summary: '附着 CDP + 推流',
-        reqExample: J({ sessionId: 'uuid', trajectoryId: 42, quality: 0.7, viewportW: 1920, viewportH: 1080 }),
+        reqExample: J({ sessionId: 'uuid', trajectoryId: 42, quality: 0.65, viewportW: 1600, viewportH: 900 }),
         respExample: J({ remoteSession: { id: 7 }, status: { attached: true, remoteSessionId: 7, trajectoryId: 42 } }),
         notes: ['503：CDP/页面未就绪', '须传 sessionId；按 trajectoryId 写入 live 映射'],
       },
@@ -1084,7 +1102,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/remote-sessions',
         summary: '新建会话记录',
-        reqExample: J({ sessionId: 'uuid', viewportW: 1920, viewportH: 1080 }),
+        reqExample: J({ sessionId: 'uuid', viewportW: 1600, viewportH: 900 }),
       },
       {
         method: 'GET', path: '/api/v2/remote-sessions/{id}',
@@ -1095,7 +1113,7 @@ export const API_GROUPS = [
         method: 'PATCH', path: '/api/v2/remote-sessions/{id}',
         summary: '更新视口等',
         params: [{ name: 'id', type: 'string', required: true, in: 'path', example: '7' }],
-        reqExample: J({ viewportW: 1280, viewportH: 720 }),
+        reqExample: J({ viewportW: 1600, viewportH: 900 }),
       },
       {
         method: 'POST', path: '/api/v2/remote-sessions/{id}/detach',
@@ -1210,6 +1228,7 @@ export const API_GROUPS = [
         notes: [
           '客户端 → { type: "ws:ping", payload: {} } → 收到 ws:pong',
           '客户端 → { type: "replay:start", payload: { trajectoryId, replayPlanId? } }',
+          '客户端 → { type: "remote:input", payload: { kind, ... } }（画布键鼠/文本透传，见 remote:input）',
           '客户端 → { type: "remote:tabs" | "remote:switch_tab", payload: {...} }（见下方条目）',
           '二进制帧：RSCF 投屏（产品前端画布）',
         ],
@@ -1279,12 +1298,38 @@ export const API_GROUPS = [
         respExample: J({ type: 'manual_record_status', payload: { sessionId: 'uuid', enabled: true } }),
       },
       {
+        method: 'WS', path: 'remote:input',
+        summary: '画布键鼠 / 文本透传到远程 Chrome（CDP）',
+        desc: '产品前端投屏画布将鼠标、键盘与已确认文本转发到执行端。中文等 IME 必须在 SPA 本机透明 input 完成 composition，只把已确认字符串用 kind:text 下发；禁止把拼音 keyDown 当字符透传。',
+        tryable: false,
+        reqExample: J({
+          type: 'remote:input',
+          payload: {
+            kind: 'text',
+            text: '分类名称',
+            replace: false,
+            trajectoryId: 36,
+          },
+        }),
+        notes: [
+          'kind: mouse | key | text | navigate',
+          'mouse：{ type: mousePressed|mouseReleased|mouseMoved|mouseWheel, x, y }（x/y 为 0~1 归一化）',
+          'key：{ type: keyDown|keyUp, key, code, keyCode, modifiers } — Backspace / Enter / 方向键等控制键',
+          'text：{ text, replace?: boolean } — CDP Input.insertText；replace:true 时先选中 activeElement 再写入（空 text 则清空）',
+          'navigate：{ action: back|forward|reload }',
+          'IME 约定：SPA 在画布上盖透明本机 input；composition 期间不发 key/text；compositionend / 已确认增量发 kind:text；控制键仍走 kind:key',
+          '打字前先 mouse 点中远程输入框，保证 remote activeElement 正确',
+          'agentBusy / inputEnabled=false 时控制面拒绝写入（hover 检查可例外）',
+          '路由字段：trajectoryId / sessionId / remoteSessionId 与其它 remote:* 一致',
+        ],
+      },
+      {
         method: 'WS', path: 'remote:status',
         summary: 'BiB 附着状态变化',
         tryable: false,
         respExample: J({ type: 'remote:status', payload: { attached: true, remoteSessionId: 7 } }),
         notes: [
-          '推流为二进制 RSCF JPEG；执行端约 30fps 上限、默认编码 1920×1080 / quality≈75；画布显示默认自适应容器',
+          '推流为二进制 RSCF JPEG；执行端约 30fps 上限、默认编码 1600×900 / quality≈65；画布显示默认自适应容器；编码跟视口走（不再强制抬到 1080p）',
           'Chrome screencast 在执行端即时 ack；客户端无需每帧 remote:ack',
           '控制面 / 客户端在 WS 积压时丢弃旧帧，优先最新画面',
         ],

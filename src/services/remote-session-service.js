@@ -51,8 +51,8 @@ function bindingToStatus(binding) {
       cdpReady: true,
       inputEnabled: false,
       agentBusy: false,
-      viewportW: binding?.viewportW ?? 1920,
-      viewportH: binding?.viewportH ?? 1080,
+      viewportW: binding?.viewportW ?? 1600,
+      viewportH: binding?.viewportH ?? 900,
       manualRecording: false,
     };
   }
@@ -405,8 +405,8 @@ export async function attachLive(opts = {}) {
   }
   const nodeUuid = active.executorNodeUuid;
   const executorNodeId = await resolveExecutorNodeId(nodeUuid);
-  const viewportW = Number(opts.viewportW) || 1920;
-  const viewportH = Number(opts.viewportH) || 1080;
+  const viewportW = Number(opts.viewportW) || 1600;
+  const viewportH = Number(opts.viewportH) || 900;
 
   // Reuse idle remote row for same agent session when possible
   let remoteSession = await remoteSessionDao.getOccupiedByAgentSession(sessionId);
@@ -489,7 +489,7 @@ export async function attachLive(opts = {}) {
   sendToExecutor(nodeUuid, 'session.attach_bib', {
     sessionId,
     remoteSessionUuid: remoteSession.sessionUuid,
-    quality: opts.quality ?? 70,
+    quality: opts.quality ?? 65,
     resize: opts.resize === true,
     viewportW: binding.viewportW,
     viewportH: binding.viewportH,
@@ -697,8 +697,8 @@ export async function getLiveStatus(opts = {}) {
     cdpReady: true,
     inputEnabled: false,
     agentBusy: false,
-    viewportW: 1920,
-    viewportH: 1080,
+    viewportW: 1600,
+    viewportH: 900,
     manualRecording: false,
   };
 }
@@ -713,8 +713,8 @@ export function restoreLiveBindingFromRow(row, { nodeUuid = null, attached = fal
     agentSessionId: row.agentSessionId || '',
     nodeUuid,
     executorNodeId: row.executorNodeId ?? null,
-    viewportW: row.viewportW || 1920,
-    viewportH: row.viewportH || 1080,
+    viewportW: row.viewportW || 1600,
+    viewportH: row.viewportH || 900,
     attached: !!attached && row.status === 'active',
   };
   if (binding.attached) liveByRemoteSessionId.set(row.id, binding);

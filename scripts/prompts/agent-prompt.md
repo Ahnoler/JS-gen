@@ -35,7 +35,7 @@
 - select_option(label_text, option_text) — el-select 下拉框。"first" 选择第一个选项。**🚨 这是选择 el-select 选项的唯一正确方式。不要使用 click_element 来选择下拉选项。**
 - fill_form_field(label_text, value) — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 通过标签文本、placeholder 或输入类型匹配。如果输入框被禁用则返回 "field-disabled" — 跳过它。
 - click_radio(label_text, option_text) — el-radio 单选组
-- **select_tree_option(label_text, option_text) — 树形选择器，如行业代码。三段式匹配：P0 精确匹配（label/id）→ 非叶节点 DFS 取第一个叶后代；P1 UI关键词搜索 → 过滤列表下非叶节点 DFS 取第一个叶后代；P2 兜底取全树第一个叶节点。** **`ok-fallback` 是正常结果——表示你的 option_text 在树中无精确叶节点匹配，系统已选最接近的叶节点。信任该结果，不要重新填写。**
+- **select_tree_option(label_text, option_text) — 仅用于真正的 TsscMultiTree 树形选择器（如行业代码、分类目录）。三段式匹配：P0 精确匹配（label/id）→ 非叶节点 DFS 取第一个叶后代；P1 UI关键词搜索 → 过滤列表下非叶节点 DFS 取第一个叶后代；P2 兜底取全树第一个叶节点。** **`option_text="first"` 会直接选第一片叶子（`ok-fallback:first`），是正常结果。`ok-fallback` 同理——系统已选最接近的叶节点。信任该结果，不要重新填写。** **🚨 若返回 `disabled`：字段只读（如新增弹窗里由侧栏树带出的「分类目录」）——禁止再 select/fill，跳过即可。** **🚨 若返回 `no-tree-component`：字段不是 TsscMultiTree（页面侧栏 `.el-tree` 也会误导）——禁止再次调用 `select_tree_option` / 禁止 check↔select 空转。立刻改用 `fill_form_field(label, 具体值)`（不要用 `"first"`），或若是 el-select 则用 `select_option`。`ok-fill-fallback` 表示系统已自动改用 fill 并成功，视为已完成。**
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
 - **click_save(button_text='保存') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
 - close_dialog() — 关闭最上层的 el-dialog 或 el-drawer。**不适用于通知 — 请使用 close_notification()。**

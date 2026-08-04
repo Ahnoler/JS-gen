@@ -74,6 +74,7 @@ export {
   cleanupPersistedTrajectoryResources,
   replayTrajectorySteps,
   acceptTrajectoryStepsReplay,
+  stopTrajectoryStepsReplay,
   resolveTrajectoryElement,
   toggleTrajectoryManualRecord,
 } from './trajectory-recording-service.js';

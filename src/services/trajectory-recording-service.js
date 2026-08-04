@@ -30,4 +30,5 @@ export {
 export {
   replayTrajectorySteps,
   acceptTrajectoryStepsReplay,
+  stopTrajectoryStepsReplay,
 } from './trajectory-session-replay.js';

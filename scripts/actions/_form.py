@@ -935,6 +935,33 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
                     ):
                         result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
+                        # Non-Tssc "tree-looking" fields: fall back to native fill / select
+                        if not _is_ok_result(result) and str(result or '').startswith('no-tree-component'):
+                            fill_val = (value or '').strip()
+                            if fill_val and fill_val.lower() != 'first':
+                                fill_try = await page.evaluate(JS_FILL_FORM_FIELD, [label, fill_val])
+                                if _is_ok_result(fill_try):
+                                    result = fill_try
+                                    kind = 'fill_input'
+                                    field_kind = 'input'
+                                    capture_kind = 'form_input'
+                                    element = await _capture_element(
+                                        page, label, target_kind='form_input',
+                                    )
+                            if not _is_ok_result(result):
+                                sel_try = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+                                if sel_try and not str(sel_try).startswith('label-not-found'):
+                                    await page.wait_for_timeout(350)
+                                    opt = fill_val if fill_val and fill_val.lower() != 'first' else 'first'
+                                    sel_result = await page.evaluate(JS_SELECT_OPTION, opt)
+                                    if _is_ok_result(sel_result):
+                                        result = sel_result
+                                        kind = 'select_option'
+                                        field_kind = 'select'
+                                        capture_kind = 'form_select'
+                                        element = await _capture_element(
+                                            page, label, target_kind='form_select',
+                                        )
                     elif kind in ('select_option', 'select', 'option'):
                         # LLM may emit select_option for radio — route correctly
                         if field_kind == 'radio':
@@ -1348,6 +1375,34 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 include_in_memory=True,
             )
         gate_ok, pending_labels = check_pending_write_gate(case_data_store)
+        if not gate_ok:
+            # Live-prune: fields wrongly left in pending because scan missed Vue disabled
+            btn_kw = _button_keywords()
+            tl = TaskList.from_store((case_data_store or {}).get('task_list'))
+            kept = []
+            pruned = []
+            for item in list(tl.pending):
+                if item.needs_intervention:
+                    kept.append(item)
+                    continue
+                try:
+                    raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, [item.label, btn_kw])
+                    info = json.loads(raw) if isinstance(raw, str) and raw.startswith('{') else {}
+                except Exception:
+                    info = {}
+                if info.get('disabled') and not info.get('hasButton'):
+                    item.disabled = True
+                    tl.done.append(item)
+                    pruned.append(item.label)
+                    continue
+                kept.append(item)
+            if pruned:
+                tl.pending = kept
+                if case_data_store is not None:
+                    case_data_store['task_list'] = tl.to_store()
+                sys.stderr.write(f'[click_save] pruned disabled pending: {pruned}\n')
+                sys.stderr.flush()
+                gate_ok, pending_labels = check_pending_write_gate(case_data_store)
         if not gate_ok:
             return _err(
                 f'err-pending-fields:{json.dumps(pending_labels[:12], ensure_ascii=False)} | '
@@ -1824,7 +1879,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return _ok(result)
         return result
 
-    @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover.')
+    @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover. If result starts with no-tree-component, do NOT retry — use fill_form_field with a concrete value (not "first") or select_option.')
     async def select_tree_option(label_text: str, option_text: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -1836,4 +1891,39 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             _record_action('select_tree_option', {'label_text': label_text, 'option_text': option_text}, result, element=element)
             _task_done_impl(label_text, case_data_store, value=option_text)
             return _ok(result)
+        res_s = str(result or '')
+        if res_s == 'disabled' or res_s.startswith('disabled'):
+            return (
+                f'disabled | Field "{label_text}" is read-only '
+                f'(TsscMultiTree/component disabled; e.g. 分类目录 prefilled from sidebar). '
+                f'Do NOT retry select_tree_option or fill_form_field — skip this field.'
+            )
+        # Misclassified / non-Tssc field: concrete values often work via native fill
+        if res_s.startswith('no-tree-component'):
+            fill_val = (option_text or '').strip()
+            if fill_val and fill_val.lower() != 'first':
+                fill_el = await _capture_element(page, label_text, target_kind='form_input')
+                fill_result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, fill_val])
+                if _is_ok_result(fill_result):
+                    _record_action(
+                        'fill_form_field',
+                        {'label_text': label_text, 'value': fill_val},
+                        fill_result,
+                        element=fill_el,
+                    )
+                    _task_done_impl(label_text, case_data_store, value=fill_val)
+                    return _ok(
+                        f'ok-fill-fallback:{fill_val} | was no-tree-component; '
+                        f'recorded as fill_form_field (do not retry select_tree_option)'
+                    )
+                return (
+                    f'{res_s} | fill_form_field also failed ({fill_result}). '
+                    f'Do NOT retry select_tree_option on this field.'
+                )
+            return (
+                f'{res_s} | option_text="first" cannot fill. '
+                f'Do NOT retry select_tree_option. '
+                f'Call fill_form_field("{label_text}", concreteValue) '
+                f'or select_option if the field is an el-select.'
+            )
         return result

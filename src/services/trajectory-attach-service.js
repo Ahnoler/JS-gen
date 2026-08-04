@@ -42,7 +42,9 @@ async function attachBibBestEffort(tid, sessionId, runtime) {
       attached = await remoteSessionService.attachLive({
         sessionId,
         trajectoryId: tid,
-        quality: 70,
+        quality: 65,
+        viewportW: 1600,
+        viewportH: 900,
       });
     } catch (err) {
       bibError = err?.message || String(err);
@@ -218,7 +220,9 @@ async function prepareTrajectoryRecordingUnlocked(tid) {
       const attached = await remoteSessionService.attachLive({
         sessionId: runtime.sessionId,
         trajectoryId: tid,
-        quality: 70,
+        quality: 65,
+        viewportW: 1600,
+        viewportH: 900,
       });
       remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
       runtime.remoteSessionId = remoteSessionId;

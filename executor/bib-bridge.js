@@ -15,8 +15,8 @@ import { discoverCdpWithRetry } from '../src/cdp/discover.js';
 import { resolveElementByLabel } from '../src/cdp/resolve-by-label.js';
 
 const MAGIC = Buffer.from('RSCF');
-const DEFAULT_VIEWPORT = { w: 1920, h: 1080, dpr: 1 };
-/** Screencast encode cap — keep at session viewport for clarity (1920×1080). */
+const DEFAULT_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
+/** Screencast encode cap (optional upscale ceiling; default stream is 1600×900). */
 const STREAM_MAX_W = 1920;
 const STREAM_MAX_H = 1080;
 /** Min interval between forwarded JPEG frames (CDP ack is always immediate). */
@@ -52,7 +52,7 @@ export class BibBridge {
     this.client = null;
     this.screencastOn = false;
     this.viewport = { ...DEFAULT_VIEWPORT };
-    this.quality = 75;
+    this.quality = 65;
     this._disposed = false;
     this._lastForwardAt = 0;
     this._lastFrameAt = 0;
@@ -75,7 +75,7 @@ export class BibBridge {
     /** Optional: attach to this CDP target instead of default pick. */
     targetId = null,
   } = {}) {
-    this.quality = Math.min(90, Math.max(50, Number(quality) || 75));
+    this.quality = Math.min(90, Math.max(50, Number(quality) || 65));
     this.viewport = {
       w: Number.isFinite(Number(viewportW)) && Number(viewportW) > 0 ? Math.round(viewportW) : DEFAULT_VIEWPORT.w,
       h: Number.isFinite(Number(viewportH)) && Number(viewportH) > 0 ? Math.round(viewportH) : DEFAULT_VIEWPORT.h,
@@ -195,9 +195,9 @@ export class BibBridge {
 
   async startScreencast() {
     if (!this.client || this._disposed) return;
-    // Encode at session viewport (typically 1920×1080); never upscale beyond STREAM_MAX_*.
-    const maxW = Math.min(Math.max(this.viewport.w, DEFAULT_VIEWPORT.w), STREAM_MAX_W);
-    const maxH = Math.min(Math.max(this.viewport.h, DEFAULT_VIEWPORT.h), STREAM_MAX_H);
+    // Encode at current viewport; never upscale beyond STREAM_MAX_* (do not floor to 1080p).
+    const maxW = Math.min(Math.max(320, Number(this.viewport.w) || DEFAULT_VIEWPORT.w), STREAM_MAX_W);
+    const maxH = Math.min(Math.max(240, Number(this.viewport.h) || DEFAULT_VIEWPORT.h), STREAM_MAX_H);
     await this.client.send('Page.startScreencast', {
       format: 'jpeg',
       quality: this.quality,
@@ -290,7 +290,51 @@ export class BibBridge {
     }
 
     if (kind === 'text') {
-      await this.client.send('Input.insertText', { text: String(payload.text || '') });
+      const text = String(payload.text || '');
+      if (!text && payload.replace !== true) return { ok: true };
+
+      if (payload.replace === true) {
+        try {
+          await this.client.send('Runtime.evaluate', {
+            expression: `(() => {
+              const el = document.activeElement;
+              if (!el) return 'no-focus';
+              if (el.isContentEditable) {
+                const sel = window.getSelection();
+                if (sel) {
+                  const range = document.createRange();
+                  range.selectNodeContents(el);
+                  sel.removeAllRanges();
+                  sel.addRange(range);
+                }
+                return 'ok';
+              }
+              const tag = (el.tagName || '').toUpperCase();
+              if (tag === 'INPUT' || tag === 'TEXTAREA') {
+                el.select();
+                return 'ok';
+              }
+              return 'not-editable';
+            })()`,
+            returnByValue: true,
+          });
+        } catch (e) {
+          console.warn('[bib-bridge] text replace select failed:', e.message);
+        }
+      }
+
+      if (text) {
+        await this.client.send('Input.insertText', { text });
+      } else if (payload.replace === true) {
+        await this.client.send('Input.dispatchKeyEvent', {
+          type: 'keyDown', key: 'Backspace', code: 'Backspace',
+          windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8,
+        });
+        await this.client.send('Input.dispatchKeyEvent', {
+          type: 'keyUp', key: 'Backspace', code: 'Backspace',
+          windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8,
+        });
+      }
       return { ok: true };
     }
 

@@ -55,6 +55,7 @@ const ROOT = join(here, '..', '..');
 /** @type {Record<string, { cues: string[], roots?: 'agent' | 'assembler' | 'both' }>} */
 const CTRL_PYTHON_MAP = {
   getContainer: { cues: ['JS_GET_CONTAINER'], roots: 'agent' },
+  isFormItemDisabled: { cues: ['JS_FIELD_DISABLED'], roots: 'agent' },
   fillFormField: { cues: ['JS_FILL_FORM_FIELD'], roots: 'agent' },
   selectOption: { cues: ['JS_SELECT_OPTION'], roots: 'agent' },
   selectDate: { cues: ['JS_FILL_DATE_FIELD'], roots: 'agent' },

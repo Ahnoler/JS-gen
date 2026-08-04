@@ -1026,7 +1026,7 @@ async def _resolve_chromium_executable() -> str | None:
 
 
 def _chrome_automation_args() -> list[str]:
-    """Flags that suppress Chrome chrome UI prompts agents cannot click, and start maximized."""
+    """Flags that suppress Chrome chrome UI prompts agents cannot click."""
     # NOT incognito — Incognito enables stricter HTTPS-First by default.
     args = [
         '--no-first-run',
@@ -1047,7 +1047,8 @@ def _chrome_automation_args() -> list[str]:
         '--use-mock-keychain',
         '--metrics-recording-only',
         '--no-service-autorun',
-        '--start-maximized',
+        # Match BiB default viewport (1600×900); do not start maximized.
+        '--window-size=1600,900',
         '--window-position=0,0',
         # Cert / mixed content
         '--ignore-certificate-errors',
@@ -1149,21 +1150,15 @@ async def _bypass_ssl_interstitial_if_any(browser_context) -> None:
         sys.stderr.flush()
 
 
-def _screen_window_size() -> tuple[int, int]:
-    try:
-        from browser_use.browser.utils.screen_resolution import get_screen_resolution
-        screen = get_screen_resolution()
-        w = int(screen.get('width') or 1920)
-        h = int(screen.get('height') or 1080)
-        return max(w, 1280), max(h, 720)
-    except Exception:
-        return 1920, 1080
+def _session_window_size() -> tuple[int, int]:
+    """OS window size aligned with BiB default viewport (not full screen)."""
+    return 1600, 900
 
 
-async def _maximize_browser_window(browser_context) -> None:
+async def _fit_browser_window(browser_context, width: int = 1600, height: int = 900) -> None:
     """
-    Force maximized window after browser_use's _resize_window (which sets windowState=normal).
-    Maximized window = better BiB canvas coverage.
+    Keep a normal (non-maximized) window at the BiB viewport size.
+    browser_use _resize_window may change bounds; re-assert after init.
     """
     try:
         page = await browser_context.get_current_page()
@@ -1174,16 +1169,24 @@ async def _maximize_browser_window(browser_context) -> None:
             window_id = win.get('windowId')
             if window_id is None:
                 return
+            # Chrome UI chrome ≈ +16 / +88 vs content viewport
             await cdp.send(
                 'Browser.setWindowBounds',
-                {'windowId': window_id, 'bounds': {'windowState': 'maximized'}},
+                {
+                    'windowId': window_id,
+                    'bounds': {
+                        'width': int(width) + 16,
+                        'height': int(height) + 88,
+                        'windowState': 'normal',
+                    },
+                },
             )
-            sys.stderr.write('[session] Browser window maximized\n')
+            sys.stderr.write(f'[session] Browser window fitted {width}x{height} (normal)\n')
             sys.stderr.flush()
         finally:
             await cdp.detach()
     except Exception as e:
-        sys.stderr.write(f'[session] WARN: maximize window failed: {e}\n')
+        sys.stderr.write(f'[session] WARN: fit window failed: {e}\n')
         sys.stderr.flush()
 
 
@@ -1288,8 +1291,8 @@ async def run_session(args):
     )
 
     # window_width/height (not viewport_*) — browser_use ignores unknown fields.
-    # Still call CDP maximize after init: browser_use _resize_window forces windowState=normal.
-    win_w, win_h = _screen_window_size()
+    # Keep normal window at BiB default size (do not maximize to screen).
+    win_w, win_h = _session_window_size()
     config = BrowserContextConfig(
         window_width=win_w,
         window_height=win_h,
@@ -1303,7 +1306,7 @@ async def run_session(args):
     # Previously launch was lazy (first agent step), so prepare often saw cdp_ready=false.
     await browser_context.get_session()
     await _ignore_certificate_errors(browser_context)
-    await _maximize_browser_window(browser_context)
+    await _fit_browser_window(browser_context, win_w, win_h)
     await _dismiss_native_js_dialogs(browser_context)
     await _bypass_ssl_interstitial_if_any(browser_context)
 

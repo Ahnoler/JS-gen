@@ -197,9 +197,54 @@ JS_SMART_LOCATOR = '''([label]) => {
     });
 }'''
 
+# ── Shared: is form-item control disabled? (scan / fill / select / tree / radio) ──
+# Single source for "editable vs read-only". Native input.disabled alone is NOT enough:
+# TsscMultiTree / TsscInput keep <input> enabled while Vue props.disabled=true
+# (e.g. 新增弹窗「分类目录」). Also honor Element UI .is-disabled wrappers.
+# Do NOT treat input readOnly as disabled (el-select / date inputs are often readOnly).
+
+JS_FIELD_DISABLED = '''(inputEl, trigger, item) => {
+    if (trigger && trigger.disabled) return true;
+    if (inputEl && inputEl.disabled) return true;
+    const root = item
+        || (inputEl && inputEl.closest && inputEl.closest('.el-form-item'))
+        || (trigger && trigger.closest && trigger.closest('.el-form-item'));
+    if (!root) return false;
+    const content = root.querySelector('.el-form-item__content') || root;
+    if (content.querySelector(
+        '.el-input.is-disabled, .el-textarea.is-disabled, .el-select.is-disabled,'
+        + ' .el-radio-group.is-disabled, .el-checkbox-group.is-disabled,'
+        + ' .el-cascader.is-disabled, .el-date-editor.is-disabled,'
+        + ' .el-radio.is-disabled, .el-checkbox.is-disabled'
+    )) return true;
+    const hosts = content.querySelectorAll(
+        '.my-popover, .tree-popover, [class*="tssc"], .el-select, .el-input,'
+        + ' .el-cascader, .el-date-editor, .el-radio-group, .el-checkbox-group'
+    );
+    for (const host of hosts) {
+        let v = host.__vue__;
+        let depth = 0;
+        while (v && depth < 10) {
+            const n = (v.$options && v.$options.name) ? String(v.$options.name) : '';
+            if (
+                n.includes('TsscMultiTree') || n.includes('TsscInput') || n.includes('TsscSelect')
+                || n.includes('TsscDate') || n === 'ElSelect' || n === 'ElInput'
+                || n === 'ElCascader' || n === 'ElDatePicker' || n === 'ElRadioGroup'
+                || n === 'ElCheckboxGroup'
+            ) {
+                if (v.disabled === true || (v.$props && v.$props.disabled === true)) return true;
+            }
+            v = v.$parent;
+            depth++;
+        }
+    }
+    return false;
+}'''
+
 # ── Fill form field ──
 
 JS_FILL_FORM_FIELD = '''([label, val]) => {
+    const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const setFn = (t, v) => {
         const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
         const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -219,9 +264,14 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         item.scrollIntoView({ block: 'center', behavior: 'instant' });
         const input = item.querySelector('input:not([type="hidden"])');
         const textarea = item.querySelector('textarea');
+        const trigger = item.querySelector('.el-select .el-input__inner');
         const target = input || textarea;
         if (!target) return 'no-input-found';
-        if (target.disabled || target.readOnly) return 'field-disabled';
+        if (isDisabled(target, trigger, item)) return 'field-disabled';
+        // Plain readonly text (not select/date/tree — those use readOnly on purpose)
+        if (target.readOnly && !item.querySelector(
+            '.el-date-editor, .tsscdatepicker, .el-select, .my-popover, .tree-popover, .el-cascader'
+        )) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
             target.focus();
             try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
@@ -240,9 +290,13 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         if (!lbl.includes(label)) continue;
         const input = item.querySelector('input:not([type="hidden"])');
         const textarea = item.querySelector('textarea');
+        const trigger = item.querySelector('.el-select .el-input__inner');
         const target = input || textarea;
         if (!target) return 'no-input-found';
-        if (target.disabled || target.readOnly) return 'field-disabled';
+        if (isDisabled(target, trigger, item)) return 'field-disabled';
+        if (target.readOnly && !item.querySelector(
+            '.el-date-editor, .tsscdatepicker, .el-select, .my-popover, .tree-popover, .el-cascader'
+        )) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
             target.focus();
             try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
@@ -275,6 +329,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
 }'''
 
 JS_FILL_DATE_FIELD = '''([label, val]) => {
+    const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const setFn = (t, v) => {
         const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
         const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -296,7 +351,7 @@ JS_FILL_DATE_FIELD = '''([label, val]) => {
             const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
             if (!t) return 'no-input';
             item.scrollIntoView({ block: 'center', behavior: 'instant' });
-            if (t.disabled || t.readOnly) return 'disabled';
+            if (isDisabled(t, null, item)) return 'disabled';
             if (t.closest('.el-date-editor, .tsscdatepicker')) { target = t; break; }
         }
         if (target) break;
@@ -350,6 +405,7 @@ JS_FILL_DATE_FIELD = '''([label, val]) => {
 # ── Select / dropdown ──
 
 JS_FIND_LABELED_SELECT = '''([label, mode]) => {
+    const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const getSelectedLabel = (formItem) => {
         const select = formItem.querySelector('.el-select');
         if (!select) return null;
@@ -423,7 +479,7 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
                 return {skip: true, reason: 'no-value'};
             }
             if (mode === 'trigger') {
-                if (trigger.disabled) return {skip: true, reason: 'disabled'};
+                if (isDisabled(trigger, trigger, item)) return {skip: true, reason: 'disabled'};
                 item.scrollIntoView({ block: 'center', behavior: 'instant' });
                 trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
                 trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
@@ -781,14 +837,18 @@ JS_FIND_OPTION = '''(option) => {
 # ── Radio ──
 
 JS_CLICK_RADIO = '''([label, option]) => {
+    const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
     for (const item of items) {
         const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
         if (!lbl.includes(label)) continue;
         item.scrollIntoView({ block: 'center', behavior: 'instant' });
+        const input = item.querySelector('input:not([type="hidden"])');
+        if (isDisabled(input, null, item)) return 'disabled';
         const radios = item.querySelectorAll('.el-radio');
         for (const radio of radios) {
+            if (radio.classList.contains('is-disabled')) continue;
             if (radio.textContent.trim() === option && radio.offsetParent !== null) {
                 radio.click(); return 'ok';
             }
@@ -820,6 +880,7 @@ JS_CLICK_RADIO = '''([label, option]) => {
 #   - 不要假设标准 Element UI API 有效 (即使 DOM 类名相同)
 
 JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
+    const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     // Open the popover first so tree DOM is rendered
     const container = ''' + JS_GET_CONTAINER + ''';
     const items = container.querySelectorAll('.el-form-item');
@@ -832,7 +893,7 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
     fieldItem.scrollIntoView({ block: 'center', behavior: 'instant' });
     const input = fieldItem.querySelector('input');
     if (!input) return 'no-input';
-    if (input.disabled || input.readOnly) return 'disabled';
+    if (isDisabled(input, null, fieldItem)) return 'disabled';
     // Read value from any non-empty input in the form item
     const readDisplayValue = () => {
         for (const inp of fieldItem.querySelectorAll('input:not([type="hidden"])')) {
@@ -842,20 +903,55 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
     };
     // Open popover
     input.click();
-    // Find TsscMultiTree instance
-    let vm = null;
-    setTimeout(() => {}, 0); // let DOM settle
-    const tryFind = () => {
-        const tree = document.querySelector('.el-tree');
-        if (tree) {
-            vm = tree.__vue__;
-            while (vm && vm.$options && !vm.$options.name?.includes('TsscMultiTree'))
-                vm = vm.$parent;
+    await new Promise(r => setTimeout(r, 200));
+    // Find TsscMultiTree — NEVER use bare document.querySelector('.el-tree'):
+    // product/category sidebars also use .el-tree and are not this component.
+    const isTssc = (v) => !!(v && v.$options && v.$options.name
+        && String(v.$options.name).includes('TsscMultiTree'));
+    const walkVueForTssc = (start) => {
+        let v = start;
+        while (v) {
+            if (isTssc(v)) return v;
+            v = v.$parent;
         }
-        return vm;
+        return null;
     };
-    vm = tryFind();
-    if (!vm) return 'no-tree-component';
+    const tryFind = () => {
+        const hosts = fieldItem.querySelectorAll(
+            '.my-popover, .tree-popover, [class*="tssc"], .el-select, input'
+        );
+        for (const host of [fieldItem, ...hosts]) {
+            if (!host || !host.__vue__) continue;
+            const found = walkVueForTssc(host.__vue__);
+            if (found) return found;
+        }
+        const popTrees = document.querySelectorAll(
+            '.tree-popover .el-tree, .el-popper[aria-hidden="false"] .el-tree,'
+            + ' .el-popover[aria-hidden="false"] .el-tree'
+        );
+        for (const tree of popTrees) {
+            if (!tree.__vue__) continue;
+            const found = walkVueForTssc(tree.__vue__);
+            if (found) return found;
+        }
+        for (const pop of document.querySelectorAll('.tree-popover, .el-popover, .el-popper')) {
+            if (pop.getAttribute('aria-hidden') === 'true') continue;
+            const st = pop.getAttribute('style') || '';
+            if (/display:\\s*none/i.test(st)) continue;
+            const tree = pop.querySelector('.el-tree');
+            if (!tree || !tree.__vue__) continue;
+            const found = walkVueForTssc(tree.__vue__);
+            if (found) return found;
+        }
+        return null;
+    };
+    let vm = tryFind();
+    if (!vm) {
+        return 'no-tree-component | Not TsscMultiTree (ignore page sidebar .el-tree).'
+            + ' Do NOT retry select_tree_option.'
+            + ' Use fill_form_field(label, concreteValue) or select_option if el-select.';
+    }
+    if (vm.disabled === true || (vm.$props && vm.$props.disabled === true)) return 'disabled';
 
     // ═══════════════════════════════════════════════════════════════════
     // P0: Exact match — resolve to a leaf node code.
@@ -876,6 +972,31 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
         }
         return null;
     };
+    // option "first"/empty → skip keyword search (would search literal "first")
+    const wantFirst = !option || String(option).trim().toLowerCase() === 'first';
+    if (wantFirst) {
+        const leaf = dfsFirstLeaf(vm.data || []);
+        let codeFirst = leaf ? leaf.id : null;
+        let labelFirst = leaf ? (leaf.label || leaf.name || leaf.id) : '';
+        if (!codeFirst && (vm.treeData || []).length) {
+            const flat0 = vm.treeData[0];
+            codeFirst = flat0 && (flat0.id != null ? flat0.id : flat0.value);
+            labelFirst = (flat0 && (flat0.name || flat0.label)) || codeFirst;
+        }
+        if (codeFirst != null && codeFirst !== '') {
+            vm.$emit('input', codeFirst);
+            await new Promise(r => setTimeout(r, 150));
+            const verifyVal = readDisplayValue();
+            setTimeout(() => {
+                if (typeof vm.handleHideClick === 'function') vm.handleHideClick();
+            }, 100);
+            if (verifyVal) {
+                return 'ok-fallback:first → ' + verifyVal + ' (' + codeFirst + ')';
+            }
+            return 'fail: first-leaf emit did not update input for code=' + codeFirst;
+        }
+        return 'no-leaf-for-first';
+    }
     const nodeMatches = (n) => (n.label || n.name || '') === option || n.id === option;
     const walkForLeaf = (nodes) => {
         for (const n of nodes) {
@@ -1059,10 +1180,22 @@ JS_CLASSIFY_FIELD = '''(item) => {
     const el = item.querySelector('input:not([type="hidden"])');
     if (el && el.closest('.el-date-editor, .tsscdatepicker')) return 'date';
     if (el && (el.getAttribute('type') === 'date')) return 'date';
-    // Tree-select must be checked BEFORE .el-select — TsscMultiTree wraps .el-select
-    // internally so both selectors match, but .my-popover/.tree-popover/.el-tree
-    // is unique to tree components.
-    if (item.querySelector('.my-popover, .tree-popover, .el-tree')) return 'tree-select';
+    // TsscMultiTree / Element tree-select BEFORE .el-select (Tssc wraps el-select).
+    // Do NOT use bare .el-tree — product/category sidebars also use .el-tree.
+    if (item.querySelector(
+        '.tree-popover, .tsscTree, .el-tree-select,'
+        + ' [class*="tsscmultitree"], [class*="TsscMultiTree"]'
+    )) return 'tree-select';
+    // .my-popover alone is ambiguous — only tree-select when Vue ancestry is TsscMultiTree
+    const popHosts = item.querySelectorAll('.my-popover, [class*="tssc"]');
+    for (const host of popHosts) {
+        let v = host.__vue__;
+        while (v) {
+            const n = (v.$options && v.$options.name) ? String(v.$options.name) : '';
+            if (n.includes('TsscMultiTree')) return 'tree-select';
+            v = v.$parent;
+        }
+    }
     if (item.querySelector('.el-select')) return 'select';
     if (item.querySelector('.el-radio')) return 'radio';
     if (item.querySelector('.el-checkbox')) return 'checkbox';
@@ -1070,17 +1203,7 @@ JS_CLASSIFY_FIELD = '''(item) => {
     return 'unknown';
 }'''
 
-JS_FIELD_DISABLED = '''(inputEl, trigger) => {
-    // 只检查原生 disabled 属性，不检查 readOnly。
-    // 原因：Element UI 的 el-select 内部 <input> 默认带 readOnly（阻止键盘输入但允许下拉交互）。
-    // 如果把 readOnly 当作禁用标志，会导致所有 el-select 被误判为不可填写。
-    // 同理不检查 aria-disabled——祖先元素可能通过 aria-disabled 标记整个表单区域为只读，
-    // 但实际 input 元素本身并未禁用。
-    // 2026-06-29：通过 Edge CDP 连接实际页面验证，readOnly 不等于不可填写。
-    if (trigger) return !!(trigger.disabled);
-    if (inputEl) return !!(inputEl.disabled);
-    return false;
-}'''
+# JS_FIELD_DISABLED is defined once above (before fill/select) — single source for editable checks.
 
 JS_FIELD_REQUIRED = '''(item, label, inputEl) => {
     const hasRequiredClass = !!(item.matches('.is-required') || item.querySelector('.is-required, .el-form-item__label .el-form-item__label--required'));
@@ -1186,7 +1309,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         let currentValue = readValue(inputEl, trigger, item);
         const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
         // Two-level disabled detection (DOM native → ARIA on element itself)
-        const disabled = isDisabled(inputEl, trigger);
+        const disabled = isDisabled(inputEl, trigger, item);
         const required = isRequired(item, label, inputEl);
         const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
         const hasButton = (() => {
@@ -1293,7 +1416,7 @@ JS_CHECK_SINGLE_FIELD = '''([label, buttonKeywords]) => {
             const inputEl = input || textarea;
             let currentValue = readValue(inputEl, trigger, item);
             const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
-            const disabled = isDisabled(inputEl, trigger);
+            const disabled = isDisabled(inputEl, trigger, item);
             const selected = !!(trigger && item.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
             const hasButton = (() => {
                 const btns = item.querySelectorAll('button');

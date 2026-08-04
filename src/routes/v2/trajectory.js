@@ -448,6 +448,19 @@ export default function (app) {
   });
 
   /**
+   * Stop in-flight steps/replay (including Type A/B heal). Does not change recordStatus.
+   * Sends cancel_step; batch ends with WS replay:finished { aborted:true, reason:'user_stop' }.
+   */
+  app.post('/api/v2/trajectories/:id/steps/replay/stop', async (req, res) => {
+    try {
+      const result = await trajectoryService.stopTrajectoryStepsReplay(+req.params.id);
+      res.json(result);
+    } catch (err) {
+      sendErr(res, err);
+    }
+  });
+
+  /**
    * Explicit end of recording (does not detach BiB).
    * Body: { success?: boolean } default true → recorded; false → draft
    */

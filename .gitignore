@@ -24,6 +24,11 @@ scripts/data/
 scripts/forms/
 scripts/generated/
 scripts/trajectories/
+# Local scratch probes / temp outputs (do not match scripts/__init__.py)
+scripts/_probe_*
+scripts/_tmp_*
+scripts/_verify_*
+scripts/_traj*
 chorme-devtools-mcp/
 playwright-cli/
 browser/

@@ -19,7 +19,7 @@ import { resolveElementByLabel } from './resolve-by-label.js';
 const MAGIC = Buffer.from('RSCF');
 
 /** Align with Session BrowserContextConfig (session_runner.py) */
-const SESSION_VIEWPORT = { w: 1920, h: 1080, dpr: 1 };
+const SESSION_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
 const STREAM_MAX_W = 1920;
 const STREAM_MAX_H = 1080;
 
@@ -27,7 +27,7 @@ let client = null;
 let remoteSession = null;
 let screencastOn = false;
 let viewport = { ...SESSION_VIEWPORT };
-let quality = 75;
+let quality = 65;
 /** @type {Set<import('ws').WebSocket>} */
 const subscribers = new Set();
 let wsHooked = false;
@@ -182,7 +182,7 @@ async function syncViewportFromPage() {
 }
 
 /**
- * Restore Session full viewport (1920×1080). Clears leftover Emulation crops
+ * Restore Session full viewport (1600×900). Clears leftover Emulation crops
  * from earlier dashboard-sized overrides; does NOT shrink to the Dashboard.
  */
 async function ensureFullSessionViewport(targetId) {
@@ -219,7 +219,7 @@ async function ensureFullSessionViewport(targetId) {
 
 /**
  * Attach to live Session Chrome, open remote_session row, start screencast.
- * Default: restore full Session viewport (1920×1080), never shrink to Dashboard.
+ * Default: restore full Session viewport (1600×900), never shrink to Dashboard.
  * Pass `{ resize: true, viewportW, viewportH }` only when intentionally resizing.
  */
 export async function attachLive(opts = {}) {
@@ -231,7 +231,7 @@ export async function attachLive(opts = {}) {
   await refreshCdpEndpoints();
   if (!gb.cdpWsUrl) throw new Error('CDP WebSocket URL unavailable (is Session Chrome on 9242/9222?)');
 
-  quality = Math.min(95, Math.max(40, Number(opts.quality) || 75));
+  quality = Math.min(95, Math.max(40, Number(opts.quality) || 65));
   const wantResize = opts.resize === true;
 
   client = new CdpClient();
@@ -386,9 +386,9 @@ async function restartScreencast() {
 
 async function startScreencast() {
   if (!client) return;
-  // Encode at session viewport (typically 1920×1080) for clarity.
-  const maxW = Math.min(Math.max(viewport.w, SESSION_VIEWPORT.w), STREAM_MAX_W);
-  const maxH = Math.min(Math.max(viewport.h, SESSION_VIEWPORT.h), STREAM_MAX_H);
+  // Encode at current viewport; never upscale beyond STREAM_MAX_* (do not floor to 1080p).
+  const maxW = Math.min(Math.max(320, Number(viewport.w) || SESSION_VIEWPORT.w), STREAM_MAX_W);
+  const maxH = Math.min(Math.max(240, Number(viewport.h) || SESSION_VIEWPORT.h), STREAM_MAX_H);
   await client.send('Page.startScreencast', {
     format: 'jpeg',
     quality,
@@ -644,18 +644,61 @@ async function handleInput(payload) {
     }
     if (kind === 'text') {
       const text = String(payload.text || '');
-      if (!text) return { ok: true };
+      // Allow empty text when replace:true (clear field)
+      if (!text && payload.replace !== true) return { ok: true };
       // Dedupe burst duplicates (e.g. double-bound window listeners)
       const now = Date.now();
-      const sig = text;
+      const sig = `${payload.replace === true ? 'R' : 'A'}:${text}`;
       if (sig === handleInput._lastTextSig && now - lastTypedTextAt < 25) {
         return { ok: true, deduped: true };
       }
       handleInput._lastTextSig = sig;
       lastTypedTextAt = now;
 
+      if (payload.replace === true) {
+        try {
+          await client.send('Runtime.evaluate', {
+            expression: `(() => {
+              const el = document.activeElement;
+              if (!el) return 'no-focus';
+              if (el.isContentEditable) {
+                const sel = window.getSelection();
+                if (sel) {
+                  const range = document.createRange();
+                  range.selectNodeContents(el);
+                  sel.removeAllRanges();
+                  sel.addRange(range);
+                }
+                return 'ok';
+              }
+              const tag = (el.tagName || '').toUpperCase();
+              if (tag === 'INPUT' || tag === 'TEXTAREA') {
+                el.select();
+                return 'ok';
+              }
+              return 'not-editable';
+            })()`,
+            returnByValue: true,
+          });
+        } catch (e) {
+          console.warn('[remote-bridge] text replace select failed:', e.message);
+        }
+      }
+
       // Single path: insertText only (do NOT also send keyDown with text)
-      await client.send('Input.insertText', { text });
+      if (text) {
+        await client.send('Input.insertText', { text });
+      } else if (payload.replace === true) {
+        // Clear selection via Backspace after select-all
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyDown', key: 'Backspace', code: 'Backspace',
+          windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8,
+        });
+        await client.send('Input.dispatchKeyEvent', {
+          type: 'keyUp', key: 'Backspace', code: 'Backspace',
+          windowsVirtualKeyCode: 8, nativeVirtualKeyCode: 8,
+        });
+      }
       // Mark that this field has pending edits; emit once on leave (click/Enter)
       if (gb.manualRecording) {
         if (fillRecordTimer) clearTimeout(fillRecordTimer);

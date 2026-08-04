@@ -150,3 +150,11 @@ export function noFreeSlotsError() {
   err.holders = listHolders();
   return err;
 }
+
+/** No connected executor WS — same 409 + holders shape as capacity exhaustion. */
+export function noExecutorOnlineError() {
+  const err = new Error('无可用执行资源（没有在线执行机）');
+  err.statusCode = 409;
+  err.holders = listHolders();
+  return err;
+}

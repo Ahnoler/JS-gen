@@ -26,6 +26,27 @@ const CTRL_OBJECT = `{
     for (const d of document.querySelectorAll('.el-drawer')) if (d.offsetParent !== null) return d;
     return document;
   },
+  isFormItemDisabled: (item, inputEl, trigger) => {
+    if (trigger && trigger.disabled) return true;
+    if (inputEl && inputEl.disabled) return true;
+    if (!item) return false;
+    const content = item.querySelector('.el-form-item__content') || item;
+    if (content.querySelector('.el-input.is-disabled, .el-textarea.is-disabled, .el-select.is-disabled, .el-radio-group.is-disabled, .el-checkbox-group.is-disabled, .el-cascader.is-disabled, .el-date-editor.is-disabled, .el-radio.is-disabled, .el-checkbox.is-disabled')) return true;
+    const hosts = content.querySelectorAll('.my-popover, .tree-popover, [class*="tssc"], .el-select, .el-input, .el-cascader, .el-date-editor, .el-radio-group');
+    for (const host of hosts) {
+      let v = host.__vue__;
+      let depth = 0;
+      while (v && depth < 10) {
+        const n = (v.$options && v.$options.name) ? String(v.$options.name) : '';
+        if (n.includes('TsscMultiTree') || n.includes('TsscInput') || n.includes('TsscSelect') || n.includes('TsscDate') || n === 'ElSelect' || n === 'ElInput' || n === 'ElCascader' || n === 'ElDatePicker' || n === 'ElRadioGroup') {
+          if (v.disabled === true || (v.$props && v.$props.disabled === true)) return true;
+        }
+        v = v.$parent;
+        depth++;
+      }
+    }
+    return false;
+  },
   fillFormField: (label, val) => {
     const c = CTRL.getContainer();
     const setFn = (t, v) => {
@@ -43,7 +64,8 @@ const CTRL_OBJECT = `{
       item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
       if (!t) return 'no-input-found';
-      if (t.disabled || t.readOnly) return 'field-disabled';
+      if (CTRL.isFormItemDisabled(item, t, item.querySelector('.el-select .el-input__inner'))) return 'field-disabled';
+      if (t.readOnly && !item.querySelector('.el-date-editor, .tsscdatepicker, .el-select, .my-popover, .tree-popover, .el-cascader')) return 'field-disabled';
       if (t.closest('.el-date-editor, .tsscdatepicker')) {
         t.focus();
         setFn(t, val);
@@ -76,7 +98,8 @@ const CTRL_OBJECT = `{
       item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const t = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
       if (!t) return 'no-input-found';
-      if (t.disabled || t.readOnly) return 'field-disabled';
+      if (CTRL.isFormItemDisabled(item, t, item.querySelector('.el-select .el-input__inner'))) return 'field-disabled';
+      if (t.readOnly && !item.querySelector('.el-date-editor, .tsscdatepicker, .el-select, .my-popover, .tree-popover, .el-cascader')) return 'field-disabled';
       if (t.closest('.el-date-editor, .tsscdatepicker')) {
         t.focus();
         setFn(t, val);
@@ -122,7 +145,7 @@ const CTRL_OBJECT = `{
     if (bestMatch && bestScore >= 0.4) {
       bestMatch.scrollIntoView({ block: 'center', behavior: 'instant' });
       const t = bestMatch.querySelector('input:not([type="hidden"])') || bestMatch.querySelector('textarea');
-      if (t && !t.disabled && !t.readOnly) { setFn(t, val); return 'ok-fuzzy'; }
+      if (t && !CTRL.isFormItemDisabled(bestMatch, t, bestMatch.querySelector('.el-select .el-input__inner'))) { setFn(t, val); return 'ok-fuzzy'; }
     }
     const _allLbls = [...c.querySelectorAll('.el-form-item')].map(i => i.querySelector('.el-form-item__label')?.textContent?.trim() || '').filter(Boolean);
     if (_allLbls.length > 0) console.log('[fillFormField] Available labels:', JSON.stringify(_allLbls));
@@ -136,7 +159,7 @@ const CTRL_OBJECT = `{
       item.scrollIntoView({ block: 'center', behavior: 'instant' });
       const trigger = item.querySelector('.el-select .el-input__inner');
       if (!trigger) return 'no-select-found';
-      if (trigger.disabled) return 'select-disabled';
+      if (CTRL.isFormItemDisabled(item, trigger, trigger)) return 'select-disabled';
       trigger.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
       trigger.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
       trigger.click();
@@ -203,7 +226,11 @@ const CTRL_OBJECT = `{
     for (const item of CTRL.getContainer().querySelectorAll('.el-form-item')) {
       if (!(item.querySelector('.el-form-item__label')?.textContent?.trim()||'').includes(label)) continue;
       item.scrollIntoView({ block: 'center', behavior: 'instant' });
-      for (const r of item.querySelectorAll('.el-radio')) { if (r.textContent.trim()===option && r.offsetParent!==null) { r.click(); return 'ok'; } }
+      if (CTRL.isFormItemDisabled(item, item.querySelector('input'), null)) return 'disabled';
+      for (const r of item.querySelectorAll('.el-radio')) {
+        if (r.classList.contains('is-disabled')) continue;
+        if (r.textContent.trim()===option && r.offsetParent!==null) { r.click(); return 'ok'; }
+      }
       return 'option-not-found';
     }
     return 'label-not-found';
@@ -213,13 +240,26 @@ const CTRL_OBJECT = `{
     if (!item) return 'label-not-found';
     item.scrollIntoView({ block: 'center', behavior: 'instant' });
     const input = item.querySelector('input');
-    if (!input || input.disabled || input.readOnly) return input ? 'disabled' : 'no-input';
+    if (!input) return 'no-input';
+    if (CTRL.isFormItemDisabled(item, input, null)) return 'disabled';
     input.click();
-    const tree = document.querySelector('.el-tree');
-    if (!tree) return 'no-tree-component';
-    let vm = tree.__vue__;
-    while (vm && vm.$options && !vm.$options.name?.includes('TsscMultiTree')) vm = vm.$parent;
-    if (!vm) return 'no-tree-component';
+    // Never bare document.querySelector('.el-tree') — page sidebars also use .el-tree
+    const isTssc = (v) => !!(v && v.$options && v.$options.name && String(v.$options.name).includes('TsscMultiTree'));
+    const walkVueForTssc = (start) => { let v = start; while (v) { if (isTssc(v)) return v; v = v.$parent; } return null; };
+    let vm = null;
+    for (const host of [item, ...item.querySelectorAll('.my-popover, .tree-popover, [class*="tssc"], .el-select, input')]) {
+      if (!host || !host.__vue__) continue;
+      vm = walkVueForTssc(host.__vue__);
+      if (vm) break;
+    }
+    if (!vm) {
+      for (const tree of document.querySelectorAll('.tree-popover .el-tree, .el-popper[aria-hidden="false"] .el-tree, .el-popover[aria-hidden="false"] .el-tree')) {
+        if (!tree.__vue__) continue;
+        vm = walkVueForTssc(tree.__vue__);
+        if (vm) break;
+      }
+    }
+    if (!vm) return 'no-tree-component | Not TsscMultiTree; use fill_form_field or select_option';
     const td = vm.treeData || [];
     let code = null;
     for (const n of td) { if (n.label===option) { code=n.value||n.id; break; } if (n.label&&n.label.includes(option)&&!code) { code=n.value||n.id; } }
@@ -533,12 +573,12 @@ export const CTRL_PROMPT_BLOCK = '```javascript\nawait page.evaluate(() => {\n  
  */
 export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
-| CTRL.fillFormField | (label, value) | 'ok' / 'ok-date' / 'ok-placeholder' / 'ok-fuzzy' / 'field-disabled' / 'label-not-found' | 填充 el-input/textarea；成功均以 ok 开头 |
-| CTRL.selectOption | (label, option) | 'ok-triggered' / 'ok-triggered-placeholder' / 'label-not-found' | 下拉选择 el-select，option='first' 选第一项 |
+| CTRL.fillFormField | (label, value) | 'ok' / 'ok-date' / 'ok-placeholder' / 'ok-fuzzy' / 'field-disabled' / 'label-not-found' | 填充 el-input/textarea；成功均以 ok 开头；Vue/.is-disabled 只读字段返回 field-disabled |
+| CTRL.selectOption | (label, option) | 'ok-triggered' / 'ok-triggered-placeholder' / 'select-disabled' / 'label-not-found' | 下拉选择 el-select，option='first' 选第一项 |
 | CTRL.selectDate | (label, dateStr) | 'ok-date:xxx' / 'ok-already:xxx' / 'label-not-found' | 设置 el-date-editor，格式 YYYY-MM-DD |
-| CTRL.clickRadio | (label, option) | 'ok' / 'option-not-found' / 'label-not-found' | 点击 el-radio |
-| CTRL.selectTreeOption | (label, option) | 'ok:xxx (code)' / 'ok-search:xxx' / 'ok-fallback:xxx (code)' | 树选择器，P0 精确/P1 搜索/P2 兜底 |
-| CTRL.clickMenuItem | (text) | 'ok' / 'ok-expanded' / 'not-found' | 点击 el-menu-item，自动展开 el-submenu |
+| CTRL.clickRadio | (label, option) | 'ok' / 'disabled' / 'option-not-found' / 'label-not-found' | 点击 el-radio |
+| CTRL.selectTreeOption | (label, option) | 'ok:xxx (code)' / 'ok-search:xxx' / 'ok-fallback:xxx (code)' / 'disabled' / 'no-tree-component' | 树选择器；只读 TsscMultiTree 返回 disabled |
+| CTRL.isFormItemDisabled | (item, inputEl?, trigger?) | true/false | 可编辑判定：原生 disabled + .is-disabled 包装 + Vue props.disabled || CTRL.clickMenuItem | (text) | 'ok' / 'ok-expanded' / 'not-found' | 点击 el-menu-item，自动展开 el-submenu |
 | CTRL.clickTableRowButton | (rowText, btnText) | 'ok' / 'ok-icon' / 'ok-fallback' / 'button-not-found' / 'row-not-found' | 点击 el-table 行内操作按钮 |
 | CTRL.clickTableRowRadio | (rowText) | 'ok' / 'radio-not-found' / 'row-not-found' | 选中 el-table 行内单选按钮 |
 | CTRL.closeDialog | () | 'ok' / 'ok-notification' / 'ok-cancel' / 'no-overlay-open' | 关闭通知/弹窗/抽屉 |
