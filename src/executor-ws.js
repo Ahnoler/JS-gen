@@ -87,6 +87,7 @@ async function handleRegister(ws, payload) {
       try {
         await remoteSessionDao.close(row.id, { crashed: false });
         remoteSessionService.clearLiveBinding(row.id);
+        await remoteSessionService.unmountTrajectoriesFromRemoteSession(row.id).catch(() => {});
         closedStale += 1;
       } catch (err) {
         console.warn(`[executor-ws] close stale remote_session #${row.id} failed:`, err.message);

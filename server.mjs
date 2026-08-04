@@ -130,6 +130,15 @@ async function main() {
         console.warn('[server] deferred remote_session reconcile skipped:', err.message);
       }
       try {
+        const remoteSessionService = await import('./src/services/remote-session-service.js');
+        const cleared = await remoteSessionService.reconcileStaleTrajectoryRemoteMounts();
+        if (cleared.length) {
+          console.log(`[server] cleared ${cleared.length} stale trajectory.remote_session_id mount(s): ${cleared.join(',')}`);
+        }
+      } catch (err) {
+        console.warn('[server] stale remote mount reconcile skipped:', err.message);
+      }
+      try {
         const batchService = await import('./src/services/trajectory-batch-service.js');
         await batchService.recoverBatchJobsOnStartup();
       } catch (err) {

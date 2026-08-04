@@ -50,7 +50,11 @@ async function attachBibBestEffort(tid, sessionId, runtime) {
     }
   }
   const remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
-  if (remoteSessionId) await trajectoryDao.updateMeta(tid, { remoteSessionId });
+  if (remoteSessionId) {
+    await remoteSessionService.mountTrajectoryRemoteSession(tid, remoteSessionId).catch(async () => {
+      await trajectoryDao.updateMeta(tid, { remoteSessionId });
+    });
+  }
   if (runtime) {
     runtime.remoteSessionId = remoteSessionId;
     runtime.bibError = bibError;
@@ -187,7 +191,7 @@ async function prepareTrajectoryRecordingUnlocked(tid) {
   if (liveMatchesRuntime) {
     remoteSessionId = liveNow.remoteSessionId;
     runtime.remoteSessionId = remoteSessionId;
-    await trajectoryDao.updateMeta(tid, { remoteSessionId }).catch(() => {});
+    await remoteSessionService.mountTrajectoryRemoteSession(tid, remoteSessionId).catch(() => {});
   } else {
     // Drop dirty bindings for other agent sessions; keep current agent's row if any.
     await remoteSessionService.supersedeStaleForTrajectory(tid, {
@@ -201,7 +205,7 @@ async function prepareTrajectoryRecordingUnlocked(tid) {
     if (liveAfter?.attached && liveAfter.sessionId === runtime.sessionId && liveAfter.remoteSessionId) {
       remoteSessionId = liveAfter.remoteSessionId;
       runtime.remoteSessionId = remoteSessionId;
-      await trajectoryDao.updateMeta(tid, { remoteSessionId }).catch(() => {});
+      await remoteSessionService.mountTrajectoryRemoteSession(tid, remoteSessionId).catch(() => {});
     } else {
       // Do not reuse a superseded/closed runtime.remoteSessionId — force re-attach.
       remoteSessionId = null;
@@ -218,7 +222,7 @@ async function prepareTrajectoryRecordingUnlocked(tid) {
       });
       remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
       runtime.remoteSessionId = remoteSessionId;
-      if (remoteSessionId) await trajectoryDao.updateMeta(tid, { remoteSessionId });
+      // attachLive already mounts exclusively; keep runtime in sync
       runtime.bibError = null;
       bibError = null;
     } catch (err) {
@@ -470,6 +474,7 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
       try {
         await remoteSessionDao.close(remoteSessionId, { crashed: false });
         remoteSessionService.clearLiveBinding(remoteSessionId);
+        await remoteSessionService.unmountTrajectoriesFromRemoteSession(remoteSessionId).catch(() => {});
       } catch {}
     }
 
@@ -480,6 +485,7 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
         try {
           await remoteSessionDao.close(occupied.id, { crashed: false });
           remoteSessionService.clearLiveBinding(occupied.id);
+          await remoteSessionService.unmountTrajectoriesFromRemoteSession(occupied.id).catch(() => {});
         } catch {}
       }
     }
@@ -579,6 +585,7 @@ export async function cleanupPersistedTrajectoryResources(trajectoryId, {
       }).catch(() => {});
       await remoteSessionDao.close(remoteSessionId, { crashed: true });
       remoteSessionService.clearLiveBinding(remoteSessionId);
+      await remoteSessionService.unmountTrajectoriesFromRemoteSession(remoteSessionId).catch(() => {});
       closed = true;
     } catch {}
   }
@@ -589,6 +596,7 @@ export async function cleanupPersistedTrajectoryResources(trajectoryId, {
     if (rs && (rs.status === 'active' || rs.status === 'idle')) {
       await remoteSessionDao.close(rs.id, { crashed: true });
       remoteSessionService.clearLiveBinding(rs.id);
+      await remoteSessionService.unmountTrajectoriesFromRemoteSession(rs.id).catch(() => {});
       closed = true;
       if (rs.agentSessionId) {
         try {

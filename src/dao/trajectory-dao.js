@@ -133,6 +133,83 @@ export async function updateMeta(trajectoryDbId, fields, trx = null) {
 }
 
 /**
+ * Clear trajectory.remote_session_id rows pointing at a remote_session.
+ * Used for exclusive mount + close/idle sweeps (prevents ghost "occupancy").
+ * @param {number} remoteSessionId
+ * @param {{ exceptTrajectoryId?: number|null, demoteLive?: boolean, trx?: import('knex').Knex|null }} [opts]
+ * @returns {Promise<number[]>} cleared trajectory ids
+ */
+export async function clearMountByRemoteSessionId(remoteSessionId, {
+  exceptTrajectoryId = null,
+  demoteLive = true,
+  trx = null,
+} = {}) {
+  const rid = Number(remoteSessionId);
+  if (!Number.isFinite(rid) || rid <= 0) return [];
+  const db = trx || getDB();
+  let q = db(TABLE).where({ remote_session_id: rid });
+  const exceptId = exceptTrajectoryId != null ? Number(exceptTrajectoryId) : null;
+  if (Number.isFinite(exceptId) && exceptId > 0) {
+    q = q.whereNot({ id: exceptId });
+  }
+  const rows = await q.clone().select('id', 'record_status');
+  if (!rows.length) return [];
+
+  const cleared = [];
+  for (const row of rows) {
+    const fields = { remoteSessionId: null };
+    if (demoteLive && row.record_status === 'live') {
+      fields.recordStatus = 'draft';
+    }
+    await updateMeta(row.id, fields, db);
+    cleared.push(Number(row.id));
+  }
+  return cleared;
+}
+
+/**
+ * Trajectories whose remote_session_id is stale:
+ * missing rs / closed|crashed / rs unmounted / rs owned by another traj.
+ * @returns {Promise<Array<{ id: number, remoteSessionId: number, recordStatus: string }>>}
+ */
+export async function listStaleRemoteMounts() {
+  const db = getDB();
+  const rows = await db({ t: TABLE })
+    .leftJoin({ rs: 'remote_session' }, 'rs.id', 't.remote_session_id')
+    .whereNotNull('t.remote_session_id')
+    .andWhere(function staleMountWhere() {
+      this.whereNull('rs.id')
+        .orWhereIn('rs.status', ['closed', 'crashed'])
+        .orWhereNull('rs.trajectory_id')
+        .orWhereRaw('rs.trajectory_id <> t.id');
+    })
+    .select('t.id as id', 't.remote_session_id as remoteSessionId', 't.record_status as recordStatus');
+  return rows.map((r) => ({
+    id: Number(r.id),
+    remoteSessionId: Number(r.remoteSessionId),
+    recordStatus: r.recordStatus,
+  }));
+}
+
+/**
+ * Repair stale trajectory.remote_session_id pointers (and demote live→draft).
+ * @returns {Promise<number[]>} cleared trajectory ids
+ */
+export async function repairStaleRemoteMounts(trx = null) {
+  const stale = await listStaleRemoteMounts();
+  if (!stale.length) return [];
+  const db = trx || getDB();
+  const cleared = [];
+  for (const row of stale) {
+    const fields = { remoteSessionId: null };
+    if (row.recordStatus === 'live') fields.recordStatus = 'draft';
+    await updateMeta(row.id, fields, db);
+    cleared.push(row.id);
+  }
+  return cleared;
+}
+
+/**
  * Conditional meta update (CAS). Returns number of affected rows.
  * @param {number} trajectoryDbId
  * @param {object} fields

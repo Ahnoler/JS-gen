@@ -13,7 +13,7 @@ import {
 import { state } from '../state.js';
 import * as remoteSessionDao from '../dao/remote-session-dao.js';
 import * as executorNodeDao from '../dao/executor-node-dao.js';
-import { clearLiveBinding } from './remote-session-service.js';
+import { clearLiveBinding, unmountTrajectoriesFromRemoteSession } from './remote-session-service.js';
 import * as execSession from '../executor-session-client.js';
 import * as slotLease from '../executor-slot-lease.js';
 
@@ -78,6 +78,7 @@ export async function reapOrphanIdleRemoteSessions() {
       }
       await remoteSessionDao.close(row.id, { crashed: false });
       clearLiveBinding(row.id);
+      await unmountTrajectoriesFromRemoteSession(row.id).catch(() => {});
       closed.push(Number(row.id));
       console.log(`[idle-reaper] closed orphan idle remote_session #${row.id}`);
     } catch (err) {

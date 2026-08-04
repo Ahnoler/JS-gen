@@ -239,11 +239,75 @@ export async function attachTarget(id, { browserContextId, targetId }) {
   });
 }
 
+/**
+ * Clear trajectory.remote_session_id (+ runtime) for rows pointing at this remote_session.
+ * @param {number} remoteSessionId
+ * @param {{ exceptTrajectoryId?: number|null, demoteLive?: boolean }} [opts]
+ * @returns {Promise<number[]>}
+ */
+export async function unmountTrajectoriesFromRemoteSession(remoteSessionId, {
+  exceptTrajectoryId = null,
+  demoteLive = true,
+} = {}) {
+  const trajectoryDao = await import('../dao/trajectory-dao.js');
+  const cleared = await trajectoryDao.clearMountByRemoteSessionId(remoteSessionId, {
+    exceptTrajectoryId,
+    demoteLive,
+  });
+  if (!cleared.length) return cleared;
+  try {
+    const { getTrajectoryRuntime } = await import('./trajectory-runtime.js');
+    const rid = Number(remoteSessionId);
+    for (const tid of cleared) {
+      const runtime = getTrajectoryRuntime(tid);
+      if (runtime && Number(runtime.remoteSessionId) === rid) {
+        runtime.remoteSessionId = null;
+        runtime.bibError = null;
+      }
+    }
+  } catch {}
+  return cleared;
+}
+
+/** Mount remote_session exclusively onto one trajectory (clears other traj FKs first). */
+export async function mountTrajectoryRemoteSession(trajectoryId, remoteSessionId) {
+  const tid = Number(trajectoryId);
+  const rid = Number(remoteSessionId);
+  if (!Number.isFinite(tid) || tid <= 0 || !Number.isFinite(rid) || rid <= 0) return [];
+  const cleared = await unmountTrajectoriesFromRemoteSession(rid, {
+    exceptTrajectoryId: tid,
+    demoteLive: true,
+  });
+  const trajectoryDao = await import('../dao/trajectory-dao.js');
+  await trajectoryDao.updateMeta(tid, { remoteSessionId: rid });
+  return cleared;
+}
+
+/** One-shot repair for ghost occupancy (stale trajectory.remote_session_id). */
+export async function reconcileStaleTrajectoryRemoteMounts() {
+  const trajectoryDao = await import('../dao/trajectory-dao.js');
+  const cleared = await trajectoryDao.repairStaleRemoteMounts();
+  if (!cleared.length) return cleared;
+  try {
+    const { getTrajectoryRuntime } = await import('./trajectory-runtime.js');
+    for (const tid of cleared) {
+      const runtime = getTrajectoryRuntime(tid);
+      if (runtime) {
+        runtime.remoteSessionId = null;
+        runtime.bibError = null;
+      }
+    }
+  } catch {}
+  return cleared;
+}
+
 export async function closeSession(id, { crashed = false } = {}) {
   const session = await remoteSessionDao.getById(id);
+  clearLiveBinding(id);
+  // Always sweep traj FKs — even if row already closed (repairs ghost mounts).
+  await unmountTrajectoriesFromRemoteSession(id, { demoteLive: true }).catch(() => {});
   if (!session) return null;
   if (session.status === 'closed' || session.status === 'crashed') return session;
-  clearLiveBinding(id);
   return remoteSessionDao.close(id, { crashed });
 }
 
@@ -409,8 +473,7 @@ export async function attachLive(opts = {}) {
 
   if (trajectoryId) {
     try {
-      const { updateMeta } = await import('../dao/trajectory-dao.js');
-      await updateMeta(trajectoryId, { remoteSessionId: remoteSession.id });
+      await mountTrajectoryRemoteSession(trajectoryId, remoteSession.id);
     } catch (err) {
       console.warn('[remote] mount trajectory.remote_session_id failed:', err.message);
     }
@@ -533,24 +596,17 @@ export async function detachLive(opts = {}) {
     await remoteSessionDao.markIdle(remoteSessionId);
   }
 
-  const tid = trajectoryId || (remote.trajectoryId != null ? Number(remote.trajectoryId) : null);
-  if (tid) {
-    try {
-      const trajectoryDao = await import('../dao/trajectory-dao.js');
-      const traj = await trajectoryDao.getById(tid);
-      const meta = { remoteSessionId: null };
-      if (traj?.recordStatus === 'live') meta.recordStatus = 'draft';
-      await trajectoryDao.updateMeta(tid, meta);
-      const { getTrajectoryRuntime } = await import('./trajectory-runtime.js');
-      const runtime = getTrajectoryRuntime(tid);
-      if (runtime) {
-        runtime.remoteSessionId = null;
-        runtime.bibError = null;
-      }
-    } catch (err) {
-      console.warn('[remote] clear traj mount after stream detach:', err.message);
-    }
-  }
+  // Clear ALL traj FKs pointing at this remote_session (not only the caller tid).
+  const cleared = await unmountTrajectoriesFromRemoteSession(remoteSessionId, {
+    demoteLive: true,
+  }).catch((err) => {
+    console.warn('[remote] clear traj mounts after stream detach:', err.message);
+    return [];
+  });
+
+  const tid = trajectoryId
+    || (remote.trajectoryId != null ? Number(remote.trajectoryId) : null)
+    || (cleared[0] != null ? Number(cleared[0]) : null);
 
   return {
     closedId: remoteSessionId,
@@ -624,7 +680,7 @@ export async function getLiveStatus(opts = {}) {
         const trajectoryDao = await import('../dao/trajectory-dao.js');
         const traj = await trajectoryDao.getById(tid);
         if (traj && Number(traj.remoteSessionId) !== Number(binding.remoteSessionId)) {
-          await trajectoryDao.updateMeta(tid, { remoteSessionId: binding.remoteSessionId });
+          await mountTrajectoryRemoteSession(tid, binding.remoteSessionId);
         }
       } catch (err) {
         console.warn('[remote] rewrite traj.remote_session_id failed:', err.message);
