@@ -270,9 +270,10 @@ class TaskList(BaseModel):
         This prevents _ensure_scanned from falsely detecting a "new form"
         when the agent operates on a pre-filled field.
 
-        When ``force_refill=True`` (task requires 修改所有字段), editable fields
+        When ``force_refill=True`` (recording contract / 修改所有字段), editable fields
         that already have values stay in pending[] so auto-fill / agent must
-        overwrite them. Truly disabled fields (no adjacent button) stay in done[].
+        overwrite them (same value allowed for element capture). Truly disabled
+        fields (no adjacent button) stay in done[].
 
         Args:
             fields: Raw field dicts from scan_form_fields() result.

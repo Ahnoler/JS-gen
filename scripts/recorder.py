@@ -91,8 +91,11 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                 sys.stderr.write(f'[recorder] Injected self-requested intervention for: {labels}\n')
                 sys.stderr.flush()
 
-            # After auto-fill / empty pending: force agent toward 保存 instead of re-filling
-            if case_data_store.get('_submit_ready'):
+            # After auto-fill / empty pending: force agent toward 保存 — never on query UI
+            if case_data_store.get('_task_mode') == 'query' or case_data_store.get('_query_task') or case_data_store.get('_query_ui'):
+                case_data_store.pop('_submit_ready', None)
+                case_data_store.pop('_query_ready', None)
+            elif case_data_store.get('_submit_ready'):
                 case_data_store['_submit_ready'] = False
                 msg = HumanMessage(content=(
                     '[SYSTEM] Fillable form fields are done (pending≈0).\n'
@@ -101,8 +104,9 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                     'Do NOT call select_option / fill_form_field on fields that already have values.\n'
                     'If 联网核查结果 is required and empty, click_adjacent_button(联网核查) first, '
                     'wait_for_loading, then click_save().\n'
-                    'click_save() returns ok-save-success only when 操作成功 toast appears — '
-                    'then done(success=true). err-save-validation / err-save-no-feedback = NOT success.'
+                    'click_save() returns ok-save-success (操作成功) OR ok-save-navigation (URL change) — '
+                    'either counts as save success; then done(success=true). '
+                    'err-save-validation / err-save-no-feedback = NOT success.'
                 ))
                 agent._message_manager._add_message_with_tokens(msg)
                 sys.stderr.write('[recorder] Injected submit-ready cue\n')
@@ -111,11 +115,29 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
             streak = int(case_data_store.get('_already_matched_streak', 0) or 0)
             if streak >= 3:
                 case_data_store['_already_matched_streak'] = 0
-                msg = HumanMessage(content=(
-                    f'[SYSTEM] You received already-matched {streak}+ times in a row. '
-                    f'STOP re-selecting fields. Call click_save() immediately. '
-                    f'Only fix fields that sync_tasks_from_errors / formErrors / err-save-validation report.'
-                ))
+                if (
+                    case_data_store.get('_task_mode') == 'query'
+                    or case_data_store.get('_query_task')
+                    or case_data_store.get('_query_ui')
+                ):
+                    msg = HumanMessage(content=(
+                        f'[SYSTEM] You received already-matched {streak}+ times in a row. '
+                        f'Task mode=query — NOT form fill. '
+                        f'STOP re-selecting filters. Click the 查询 button now. '
+                        f'Do NOT call click_save() / scan_form_fields / get_pending_tasks.'
+                    ))
+                elif case_data_store.get('_task_mode') == 'form_modify' and not case_data_store.get('_force_refill_all'):
+                    msg = HumanMessage(content=(
+                        f'[SYSTEM] You received already-matched {streak}+ times in a row. '
+                        f'Task mode=form_modify — record write actions on editable fields. '
+                        f'STOP re-selecting. Call click_save() if fields are written.'
+                    ))
+                else:
+                    msg = HumanMessage(content=(
+                        f'[SYSTEM] You received already-matched {streak}+ times in a row. '
+                        f'STOP re-selecting fields. Call click_save() immediately. '
+                        f'Only fix fields that sync_tasks_from_errors / formErrors / err-save-validation report.'
+                    ))
                 agent._message_manager._add_message_with_tokens(msg)
                 sys.stderr.write(f'[recorder] Injected already-matched loop break (streak={streak})\n')
                 sys.stderr.flush()
@@ -177,6 +199,15 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
         # NEXT page after a successful create→navigate.
         if _done:
             try:
+                from .actions._phase_intent import (
+                    check_pending_write_gate,
+                    get_phase_intent,
+                    has_contract_success,
+                    is_introduce_phase,
+                    mark_quality_failed,
+                    recovery_prescription_message,
+                )
+                from .actions._phase_context import is_heal_mode
                 page = await agent.browser_context.get_current_page()
                 # Prefer explicit success from the done() action
                 done_success = False
@@ -192,23 +223,57 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                 except Exception:
                     pass
 
-                # Give brief settle time if loading mask is up (post-save navigation)
-                try:
-                    await page.evaluate('''() => new Promise(resolve => {
-                        let n = 0;
-                        const tick = () => {
-                            const mask = document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)');
-                            const visible = mask && mask.offsetParent !== null;
-                            if (!visible || n > 25) return resolve();
-                            n += 1;
-                            setTimeout(tick, 200);
-                        };
-                        tick();
-                    })''')
-                except Exception:
-                    pass
+                # ===== Heal done vs recording done (separate rules) =====
+                # Heal: no phase-intent contract; accept after redo intent.
+                # Recording: overlay / save / contract token gates in the else branch.
+                heal_mode = (case_data_store or {}).get('_heal_mode') if case_data_store else None
+                if heal_mode and is_heal_mode(case_data_store):
+                    done_text = ''
+                    try:
+                        for r in (_last_result or []):
+                            done_text += (getattr(r, 'extracted_content', None) or '') + ' '
+                    except Exception:
+                        pass
+                    sys.stderr.write(
+                        f"[recorder] ✓ heal done() accepted "
+                        f"(mode={heal_mode}, success={done_success}) "
+                        f"at step {agent.state.n_steps} — no contract / overlay / save gates\n"
+                    )
+                    sys.stderr.flush()
+                    if case_data_store is not None:
+                        try:
+                            from .actions import _state as action_state
+                            from .actions._phase_context import record_phase_outcome
+                            record_phase_outcome(
+                                case_data_store,
+                                action_state._CURRENT_PHASE,
+                                success=done_success,
+                                text=done_text or '',
+                            )
+                        except Exception as e:
+                            sys.stderr.write(f"[recorder] heal phase outcome save failed: {e}\n")
+                            sys.stderr.flush()
+                        case_data_store.pop('_heal_mode', None)
+                else:
+                    # Recording done gates only
+                    heal_mode = None
+                    # Give brief settle time if loading mask is up (post-save navigation)
+                    try:
+                        await page.evaluate('''() => new Promise(resolve => {
+                            let n = 0;
+                            const tick = () => {
+                                const mask = document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)');
+                                const visible = mask && mask.offsetParent !== null;
+                                if (!visible || n > 25) return resolve();
+                                n += 1;
+                                setTimeout(tick, 200);
+                            };
+                            tick();
+                        })''')
+                    except Exception:
+                        pass
 
-                block = await page.evaluate('''() => {
+                    block = await page.evaluate('''() => {
                     const isVisible = (el) => {
                         if (!el) return false;
                         const style = getComputedStyle(el);
@@ -262,151 +327,214 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
                     };
                 }''')
 
-                open_overlay = (block or {}).get('openOverlay')
-                error_notifs = (block or {}).get('errorNotifs') or []
-                form_errors = (block or {}).get('formErrors') or []
-                cur_url = (block or {}).get('url') or ''
+                    open_overlay = (block or {}).get('openOverlay')
+                    error_notifs = (block or {}).get('errorNotifs') or []
+                    form_errors = (block or {}).get('formErrors') or []
+                    cur_url = (block or {}).get('url') or ''
 
-                save_ok = bool(case_data_store and case_data_store.get('_last_save_ok'))
-                url_before_save = (case_data_store or {}).get('_url_before_save') or ''
-                url_changed = bool(url_before_save and cur_url and url_before_save != cur_url)
+                    save_ok = bool(case_data_store and case_data_store.get('_last_save_ok'))
+                    introduce_ok = bool(case_data_store and case_data_store.get('_last_introduce_ok'))
+                    url_before_save = (case_data_store or {}).get('_url_before_save') or ''
+                    url_changed = bool(url_before_save and cur_url and url_before_save != cur_url)
 
-                # Navigation success only if URL actually changed after save (not already-on-detail)
-                navigated_ok = bool(
-                    done_success
-                    and url_changed
-                    and (
-                        'cstNo=' in cur_url
-                        or 'viewType=add' in cur_url
-                        or 'mdfIdcstInf' in cur_url
-                        or 'HostCstmgrMdf' in cur_url
+                    contract = get_phase_intent(case_data_store) if case_data_store else None
+
+                    # Navigation success: any URL change after save attempt (not only legacy patterns)
+                    navigated_ok = bool(
+                        save_ok
+                        and url_changed
+                    ) or bool(
+                        done_success
+                        and url_changed
+                        and save_ok
                     )
-                )
+                    if contract and is_introduce_phase(contract):
+                        navigated_ok = False  # introduce uses confirm token only
 
-                # Extract done() text for claim checks
-                done_text = ''
-                try:
-                    for r in (_last_result or []):
-                        done_text += (getattr(r, 'extracted_content', None) or '') + ' '
-                except Exception:
-                    pass
-                claims_save_ok = bool(
-                    done_success
-                    and re.search(
-                        r'操作成功|保存成功|提交成功|已成功保存|成功填写并保存|无错误通知',
-                        done_text or '',
-                    )
-                )
+                    # Write gate on done for all_editable
+                    if case_data_store and contract and contract.get('refill') == 'all_editable':
+                        ok_pending, pending_labels = check_pending_write_gate(case_data_store)
+                        if not ok_pending:
+                            mark_quality_failed(
+                                case_data_store,
+                                f'pending_fields:{",".join(pending_labels[:6])}',
+                            )
+                            sys.stderr.write(
+                                f"[recorder] ⚠ Premature done() — pending fields {pending_labels[:6]}\n"
+                            )
+                            sys.stderr.flush()
+                            for h in agent.state.history.history:
+                                if h.result:
+                                    for r in h.result:
+                                        r.is_done = False
+                                        r.error = (
+                                            f'Premature done() rejected: pending fields remain '
+                                            f'{pending_labels[:8]}. Write each editable field '
+                                            f'(same value OK) then click_save().'
+                                        )
+                                        try:
+                                            from scripts.feature_flags import memory_whitelist_enabled
+                                            if memory_whitelist_enabled():
+                                                r.include_in_memory = True
+                                        except Exception:
+                                            pass
+                            return
 
-                # Claiming save success without ok-save-success / real post-save navigation
-                if claims_save_ok and not save_ok and not navigated_ok:
-                    sys.stderr.write(
-                        f"[recorder] ⚠ Premature done() — claimed save success without "
-                        f"ok-save-success / URL change at step {agent.state.n_steps}, forcing continue\n"
-                    )
-                    sys.stderr.flush()
-                    for h in agent.state.history.history:
-                        if h.result:
-                            for r in h.result:
-                                r.is_done = False
-                                r.error = (
-                                    'Premature done() rejected: no ok-save-success observed. '
-                                    'Do NOT re-select the table row and do NOT re-click 修改. '
-                                    'If the maintain dialog is still open: call '
-                                    'click_save(button_text="确认") NOW. '
-                                    'If closed: open 修改 once, then click_save(button_text="确认"). '
-                                    'Never use click_element_by_index for 确认/保存/提交. '
-                                    'Only done(success=true) after ok-save-success.'
-                                )
-                                try:
-                                    from scripts.feature_flags import memory_whitelist_enabled
-                                    if memory_whitelist_enabled():
-                                        r.include_in_memory = True
-                                except Exception:
-                                    pass
-                    return
-
-                if open_overlay and not navigated_ok and not save_ok:
-                    sys.stderr.write(
-                        f"[recorder] ⚠ Premature done() — visible overlay {open_overlay} "
-                        f"at step {agent.state.n_steps}, forcing continue\n"
-                    )
-                    sys.stderr.flush()
-                    for h in agent.state.history.history:
-                        if h.result:
-                            for r in h.result:
-                                r.is_done = False
-                                r.error = (
-                                    f'Premature done() rejected: {open_overlay} still open. '
-                                    f'Finish or close it, then click submit / call done() again.'
-                                )
-                                try:
-                                    from scripts.feature_flags import memory_whitelist_enabled
-                                    if memory_whitelist_enabled():
-                                        r.include_in_memory = True
-                                except Exception:
-                                    pass
-                    return
-
-                if (error_notifs or form_errors) and not navigated_ok and not save_ok:
-                    sys.stderr.write(
-                        f"[recorder] ⚠ Premature done() — visible errors at step {agent.state.n_steps}: "
-                        f"notifs={error_notifs[:2]} formErrors={form_errors[:3]}, forcing continue\n"
-                    )
-                    sys.stderr.flush()
-                    for h in agent.state.history.history:
-                        if h.result:
-                            for r in h.result:
-                                r.is_done = False
-                                r.error = (
-                                    'Premature done() rejected: visible validation errors remain. '
-                                    f'Errors={form_errors[:3] or error_notifs[:2]}. '
-                                    f'Fix fields then call click_save() again.'
-                                )
-                                try:
-                                    from scripts.feature_flags import memory_whitelist_enabled
-                                    if memory_whitelist_enabled():
-                                        r.include_in_memory = True
-                                except Exception:
-                                    pass
-                    return
-
-                if navigated_ok or save_ok:
-                    reason = 'save-ok' if save_ok else 'navigation'
-                    sys.stderr.write(
-                        f"[recorder] ✓ done() accepted after {reason} "
-                        f"(success={done_success}) at step {agent.state.n_steps}\n"
-                    )
-                    sys.stderr.flush()
-                    # Clear stale task_list so the next phase starts clean
-                    if case_data_store is not None:
-                        case_data_store.pop('task_list', None)
-                        case_data_store.pop('_scan_fields', None)
-                        case_data_store.pop('_submit_ready', None)
-                        case_data_store.pop('_autofill_summary', None)
-                        case_data_store.pop('_last_save_ok', None)
-                        case_data_store.pop('_url_before_save', None)
-                # else: no visible blockers — allow done() (including success=false reports)
-
-                # Persist done() outcome for next-phase business-scenario preamble
-                if case_data_store is not None:
+                    # Extract done() text for claim checks
+                    done_text = ''
                     try:
-                        from .actions import _state as action_state
-                        from .actions._phase_context import record_phase_outcome
-                        record_phase_outcome(
-                            case_data_store,
-                            action_state._CURRENT_PHASE,
-                            success=done_success,
-                            text=done_text or '',
+                        for r in (_last_result or []):
+                            done_text += (getattr(r, 'extracted_content', None) or '') + ' '
+                    except Exception:
+                        pass
+                    claims_save_ok = bool(
+                        done_success
+                        and re.search(
+                            r'操作成功|保存成功|提交成功|已成功保存|成功填写并保存|无错误通知',
+                            done_text or '',
                         )
+                    )
+
+                    # Claiming save success without token when contract requires submit
+                    needs_token = bool(
+                        contract
+                        and (contract.get('submit') or {}).get('required')
+                    )
+                    if needs_token and done_success and not has_contract_success(case_data_store):
+                        if not (introduce_ok and contract and is_introduce_phase(contract)):
+                            recovery = recovery_prescription_message(
+                                contract,
+                                reason='Premature done() rejected: missing success token.',
+                            )
+                            sys.stderr.write(
+                                f"[recorder] ⚠ Premature done() — no success token at step {agent.state.n_steps}\n"
+                            )
+                            sys.stderr.flush()
+                            for h in agent.state.history.history:
+                                if h.result:
+                                    for r in h.result:
+                                        r.is_done = False
+                                        r.error = recovery
+                                        try:
+                                            from scripts.feature_flags import memory_whitelist_enabled
+                                            if memory_whitelist_enabled():
+                                                r.include_in_memory = True
+                                        except Exception:
+                                            pass
+                            return
+
+                    # Legacy path when no contract
+                    if not needs_token and claims_save_ok and not save_ok and not navigated_ok and not introduce_ok:
                         sys.stderr.write(
-                            f"[recorder] phase outcome saved "
-                            f"phase={action_state._CURRENT_PHASE} success={done_success}\n"
+                            f"[recorder] ⚠ Premature done() — claimed save success without "
+                            f"ok-save-success / URL change at step {agent.state.n_steps}, forcing continue\n"
                         )
                         sys.stderr.flush()
-                    except Exception as e:
-                        sys.stderr.write(f"[recorder] phase outcome save failed: {e}\n")
+                        for h in agent.state.history.history:
+                            if h.result:
+                                for r in h.result:
+                                    r.is_done = False
+                                    r.error = (
+                                        'Premature done() rejected: no save success observed '
+                                        '(need 操作成功 toast OR post-save navigation). '
+                                        'Do NOT re-select the table row and do NOT re-click 修改. '
+                                        'If the maintain dialog is still open: call '
+                                        'click_save(button_text="确认") NOW. '
+                                        'Only done(success=true) after save success.'
+                                    )
+                                    try:
+                                        from scripts.feature_flags import memory_whitelist_enabled
+                                        if memory_whitelist_enabled():
+                                            r.include_in_memory = True
+                                    except Exception:
+                                        pass
+                        return
+
+                    if open_overlay and not navigated_ok and not save_ok and not introduce_ok:
+                        sys.stderr.write(
+                            f"[recorder] ⚠ Premature done() — visible overlay {open_overlay} "
+                            f"at step {agent.state.n_steps}, forcing continue\n"
+                        )
                         sys.stderr.flush()
+                        for h in agent.state.history.history:
+                            if h.result:
+                                for r in h.result:
+                                    r.is_done = False
+                                    r.error = (
+                                        f'Premature done() rejected: {open_overlay} still open. '
+                                        f'Finish or close it, then click submit / call done() again.'
+                                    )
+                                    try:
+                                        from scripts.feature_flags import memory_whitelist_enabled
+                                        if memory_whitelist_enabled():
+                                            r.include_in_memory = True
+                                    except Exception:
+                                        pass
+                        return
+
+                    if (error_notifs or form_errors) and not navigated_ok and not save_ok and not introduce_ok:
+                        sys.stderr.write(
+                            f"[recorder] ⚠ Premature done() — visible errors at step {agent.state.n_steps}: "
+                            f"notifs={error_notifs[:2]} formErrors={form_errors[:3]}, forcing continue\n"
+                        )
+                        sys.stderr.flush()
+                        for h in agent.state.history.history:
+                            if h.result:
+                                for r in h.result:
+                                    r.is_done = False
+                                    r.error = (
+                                        'Premature done() rejected: visible validation errors remain. '
+                                        f'Errors={form_errors[:3] or error_notifs[:2]}. '
+                                        f'Fix fields then call click_save() again.'
+                                    )
+                                    try:
+                                        from scripts.feature_flags import memory_whitelist_enabled
+                                        if memory_whitelist_enabled():
+                                            r.include_in_memory = True
+                                    except Exception:
+                                        pass
+                        return
+
+                    if navigated_ok or save_ok or introduce_ok:
+                        reason = 'introduce' if introduce_ok else ('save-ok' if save_ok else 'navigation')
+                        sys.stderr.write(
+                            f"[recorder] ✓ done() accepted after {reason} "
+                            f"(success={done_success}) at step {agent.state.n_steps}\n"
+                        )
+                        sys.stderr.flush()
+                        # Clear stale task_list so the next phase starts clean
+                        if case_data_store is not None:
+                            case_data_store.pop('task_list', None)
+                            case_data_store.pop('_scan_fields', None)
+                            case_data_store.pop('_submit_ready', None)
+                            case_data_store.pop('_query_ready', None)
+                            case_data_store.pop('_query_ui', None)
+                            case_data_store.pop('_autofill_summary', None)
+                            case_data_store.pop('_last_save_ok', None)
+                            case_data_store.pop('_last_introduce_ok', None)
+                            case_data_store.pop('_url_before_save', None)
+                            case_data_store.pop('_success_tokens', None)
+                    # else: no visible blockers — allow done() (including success=false reports)
+
+                    # Persist done() outcome for next-phase business-scenario preamble
+                    if case_data_store is not None:
+                        try:
+                            from .actions import _state as action_state
+                            from .actions._phase_context import record_phase_outcome
+                            record_phase_outcome(
+                                case_data_store,
+                                action_state._CURRENT_PHASE,
+                                success=done_success,
+                                text=done_text or '',
+                            )
+                            sys.stderr.write(
+                                f"[recorder] phase outcome saved "
+                                f"phase={action_state._CURRENT_PHASE} success={done_success}\n"
+                            )
+                            sys.stderr.flush()
+                        except Exception as e:
+                            sys.stderr.write(f"[recorder] phase outcome save failed: {e}\n")
+                            sys.stderr.flush()
             except Exception as e:
                 sys.stderr.write(f"[recorder] done-check error: {e}\n")
                 sys.stderr.flush()
@@ -451,45 +579,96 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
             except Exception:
                 pass
 
-            # Repeated recorded-action cycle (e.g. radio→修改→确认×2) — stop spinning
+            # Repeated recorded-action cycle within THIS agent.run only.
+            # Full _ACTION_LOG spans phases / phase retries; using it whole causes false
+            # stops like ['click:查询','click:'] when re-running a query phase.
             try:
                 from .controller import _ACTION_LOG as _ctrl_log
+                from .actions._state import _CURRENT_PHASE
+                from .actions._phase_intent import (
+                    get_phase_intent,
+                    is_cycle_deviate_fingerprint,
+                    recovery_prescription_message,
+                    mark_quality_failed,
+                )
+
+                baseline = int(goal_tracker.get('cycle_baseline') or 0)
 
                 def _fp(entry):
                     if not isinstance(entry, dict):
                         return None
+                    # Prefer current phase when tagged; still allow untagged entries in slice
+                    try:
+                        ep = entry.get('phase')
+                        if ep is not None and int(ep) != int(_CURRENT_PHASE) and int(_CURRENT_PHASE) > 0:
+                            return None
+                    except (TypeError, ValueError):
+                        pass
                     a = entry.get('action') or ''
                     p = entry.get('params') or {}
                     if a == 'click_table_row_radio':
-                        return f'radio:{(p.get("row_text") or "").strip()}'
+                        text = (p.get('row_text') or '').strip()
+                        return f'radio:{text}' if text else None
                     if a == 'click_element_by_index':
-                        return f'click:{(p.get("text") or "").strip()}'
+                        text = (p.get('text') or '').strip()
+                        # Empty-label clicks (expand/icon) are too weak for cycle detect
+                        if not text:
+                            return None
+                        return f'click:{text}'
                     if a == 'click_save':
                         return f'save:{(p.get("button_text") or "保存").strip()}'
                     if a in ('fill_form_field', 'fill_date_field', 'select_option', 'click_radio'):
-                        return f'{a}:{(p.get("label_text") or "").strip()}'
+                        lab = (p.get('label_text') or '').strip()
+                        return f'{a}:{lab}' if lab else None
                     return None
 
-                fps = [x for x in (_fp(e) for e in _ctrl_log) if x]
-                # Detect cycle length 2–4 repeated twice at the end
-                for cycle_len in (3, 2, 4):
-                    if len(fps) < cycle_len * 2:
-                        continue
-                    a = fps[-cycle_len:]
-                    b = fps[-cycle_len * 2:-cycle_len]
-                    if a and a == b:
-                        goal_tracker['stopped'] = True
+                slice_entries = list(_ctrl_log[baseline:]) if baseline <= len(_ctrl_log) else list(_ctrl_log)
+                fps = [x for x in (_fp(e) for e in slice_entries) if x]
+
+                def _is_substantive(fp: str) -> bool:
+                    return fp.startswith(('radio:', 'save:', 'fill_', 'select_', 'click_radio:'))
+
+                # Too early in the phase — avoid false stop on open/expand clicks
+                if case_data_store and case_data_store.get('_heal_mode'):
+                    pass  # heal: no contract cycle prescription
+                elif agent.state.n_steps < 4:
+                    pass
+                else:
+                    # Prefer longer cycles (select→modify→confirm); len=2 only if substantive
+                    for cycle_len in (3, 4, 2):
+                        if len(fps) < cycle_len * 2:
+                            continue
+                        a = fps[-cycle_len:]
+                        b = fps[-cycle_len * 2:-cycle_len]
+                        if not (a and a == b):
+                            continue
+                        if cycle_len == 2 and not any(_is_substantive(x) for x in a):
+                            continue  # pure click:查询 / click:xxx loops are common, not a spin
+                        contract = get_phase_intent(case_data_store) if case_data_store else None
+                        prescribed = bool(case_data_store and case_data_store.get('_cycle_prescribed'))
+                        if prescribed and case_data_store:
+                            recent = fps[-cycle_len:] if fps else []
+                            if any(is_cycle_deviate_fingerprint(x) for x in recent):
+                                mark_quality_failed(case_data_store, f'cycle_deviate:{recent}')
+                                goal_tracker['stopped'] = True
+                                sys.stderr.write(
+                                    f"[recorder] Cycle deviate after prescription: {recent}\n"
+                                )
+                                sys.stderr.flush()
+                                agent.state.stopped = True
+                                return
+                            break
+                        if case_data_store is not None:
+                            case_data_store['_cycle_prescribed'] = True
+                            case_data_store['_recovery_active'] = True
                         sys.stderr.write(
-                            f"[recorder] Repeated action cycle detected ({cycle_len}×2): {a}\n"
+                            f"[recorder] Repeated action cycle detected ({cycle_len}×2): {a} — prescribing recovery\n"
                         )
-                        sys.stderr.write(f"[recorder] Stopping agent at step {step_num}\n")
                         sys.stderr.flush()
-                        agent.state.stopped = True
                         try:
-                            msg = HumanMessage(content=(
-                                '[RECORDER] Repeated select→modify→confirm cycle detected. STOP. '
-                                'If the phase still needs submit: call click_save(button_text="确认") '
-                                'once (do not re-select the row). If already ok-save-success, call done(success=true).'
+                            msg = HumanMessage(content=recovery_prescription_message(
+                                contract,
+                                reason='Repeated action cycle detected.',
                             ))
                             agent._message_manager._add_message_with_tokens(msg)
                         except Exception:

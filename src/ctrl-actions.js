@@ -410,37 +410,40 @@ const CTRL_OBJECT = `{
 	  },
 	  clickTableRowRadio: (rowText) => {
 	    if (!rowText) return 'row-text-empty';
+	    const pickSel = (root) => root && root.querySelector(
+	      'label.el-radio, .el-radio, label.el-checkbox, .el-checkbox, input[type="radio"]'
+	    );
+	    const clickSel = (el) => {
+	      if (!el) return false;
+	      const inner = el.querySelector
+	        ? el.querySelector('.el-radio__inner, .el-checkbox__inner')
+	        : null;
+	      (inner || el).click();
+	      return true;
+	    };
+	    const wantFirst = /^(first|1st|第一个|第一项|首行)$/i.test(String(rowText).trim());
 	    const tables = document.querySelectorAll('.el-table');
 	    for (const table of tables) {
 	      const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr.el-table__row, .el-table__body-wrapper tbody tr');
 	      for (let i = 0; i < bodyRows.length; i++) {
 	        const row = bodyRows[i];
-	        if (!(row.textContent || '').includes(rowText)) continue;
+	        if (!wantFirst && !(row.textContent || '').includes(rowText)) continue;
 	        row.scrollIntoView({ block: 'center', behavior: 'instant' });
-	        // Radio may live on the body row or the matching fixed-column row
-	        let radio = row.querySelector('label.el-radio');
+	        let radio = pickSel(row);
 	        if (!radio) {
 	          const fixedRows = table.querySelectorAll(
-	            '.el-table__fixed-body-wrapper tbody tr.el-table__row, .el-table__fixed tbody tr.el-table__row, .el-table__fixed-left tbody tr.el-table__row'
+	            '.el-table__fixed-body-wrapper tbody tr.el-table__row, .el-table__fixed tbody tr.el-table__row, .el-table__fixed-left tbody tr.el-table__row, .el-table__fixed-right tbody tr.el-table__row'
 	          );
-	          if (fixedRows[i]) radio = fixedRows[i].querySelector('label.el-radio');
+	          if (fixedRows[i]) radio = pickSel(fixedRows[i]);
 	        }
-	        if (!radio) return 'radio-not-found';
+	        if (!radio) {
+	          if (wantFirst) continue;
+	          return 'radio-not-found';
+	        }
 	        if (radio.offsetParent === null && !radio.closest('.el-table__fixed')) return 'radio-not-found';
-	        const inner = radio.querySelector('.el-radio__inner');
-	        (inner || radio).click();
+	        clickSel(radio);
 	        return 'ok';
 	      }
-	    }
-	    // Fallback: original body-wrapper scan
-	    for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
-	      if (!row.textContent.includes(rowText)) continue;
-	      row.scrollIntoView({ block: 'center', behavior: 'instant' });
-	      const radio = row.querySelector('label.el-radio');
-	      if (!radio) return 'radio-not-found';
-	      const inner = radio.querySelector('.el-radio__inner');
-	      (inner || radio).click();
-	      return 'ok';
 	    }
 	    return 'row-not-found';
 	  },

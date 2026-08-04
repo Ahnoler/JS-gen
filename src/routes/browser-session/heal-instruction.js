@@ -28,7 +28,8 @@ export function buildStepHealInstruction(failedEntry, errorResult = '') {
     '- 仅用与失败动作等价的 Element UI 动作重做这一步（控件文案轻微变化时可找等价控件）。',
     '- 禁止 fill/select 其它无关字段；禁止 sync_tasks_from_errors / 整表 auto-fill。',
     '- 不要导航离开当前流程。',
-    '- 完成后立即 done，停止本轮。',
+    '- 行选/引入类步骤：选中后弹窗可能仍保持打开——这是正常的；不要点确认/确定去关窗（那是轨迹下一步）。',
+    '- 完成后立即 done(success=true)。系统对单步自愈的 done 使用单独判定，不会因弹窗仍开着而拒绝。',
   ].join('\n');
 }
 
@@ -71,7 +72,7 @@ export function buildFormStructureHealInstruction(report = {}) {
   lines.push('- 仅填写上述新增字段（fill_form_field / select_option / fill_date_field / click_radio 等）。');
   lines.push('- 不要点保存/提交/确认；不要导航；不要处理其它业务步骤。');
   lines.push('- 禁止整表 auto-fill / sync_tasks_from_errors。');
-  lines.push('- 完成后立即 done，停止本轮。');
+  lines.push('- 完成后立即 done(success=true)。系统对表单结构自愈的 done 使用单独判定，不会因弹窗仍开着而拒绝。');
   return lines.join('\n');
 }
 

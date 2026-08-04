@@ -1,12 +1,22 @@
 """Cross-phase business-scenario preamble for AI long-term context.
 
 Feature flags: see ``scripts.feature_flags`` (re-exported here for callers).
+
+Task modes:
+  - login       — sign-in only; use login(); no form-fill cues
+  - query       — filter/search; AI sets conditions; NO auto-fill; click 查询
+  - form_fill   — new/entry form (explicit 新增/录入…); implicit auto-fill; click_save
+  - form_modify — edit existing; all-fields OR partial per task text; click_save
+  - other       — navigate / delete / misc; no form-fill auto-fill or form-type hint
+
+``form_fill`` is NOT the default — only when entry keywords match. Login must not
+be classified as form_fill (that caused agents to hunt for business forms).
 """
 
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Literal
 
 from scripts.feature_flags import (  # noqa: F401 — re-export
     memory_whitelist_enabled,
@@ -18,9 +28,29 @@ _OUTCOME_TEXT_MAX = 400
 _PRIOR_DESC_MAX = 200
 _PREAMBLE_TOTAL_MAX = 1200
 
+TaskMode = Literal['login', 'query', 'form_fill', 'form_modify', 'other']
+
 # Task text that requires overwriting every editable field (modify-dialog refill).
 _FORCE_REFILL_RE = re.compile(
     r'修改表单中所有字段|修改所有字段|改所有字段|全部字段.*修改|修改.*全部字段'
+)
+
+# Query/filter-only phases — no 保存/提交; agent must click 查询, not click_save.
+_QUERY_TASK_RE = re.compile(r'查询|搜索|查找')
+_QUERY_EXCLUDE_RE = re.compile(
+    r'新增|创建|编辑|修改|保存|提交|删除|录入|校验|导入'
+)
+
+# Form modify (edit existing values) — distinct from blank form_fill.
+_MODIFY_TASK_RE = re.compile(r'修改|编辑|更新|变更|改填|维护')
+
+# Explicit new/entry form fill — required for form_fill (not a catch-all default).
+_FILL_TASK_RE = re.compile(r'新增|创建|录入|填写|新建|添加|校验|开立')
+
+# Pure login phase (navigate to login / enter credentials).
+_LOGIN_TASK_RE = re.compile(r'登录|登入|/login|#/login', re.IGNORECASE)
+_LOGIN_EXCLUDE_RE = re.compile(
+    r'新增|创建|录入|填写|修改|编辑|查询|搜索|删除|保存|提交|校验'
 )
 
 
@@ -29,21 +59,208 @@ def force_refill_all_required(task_text: str) -> bool:
     return bool(_FORCE_REFILL_RE.search(task_text or ''))
 
 
+def is_query_task(task_text: str) -> bool:
+    """True when the phase is a search/filter task (no form-save semantics).
+
+    Matches「查询产品信息」etc. Excludes mixed CRUD tasks that also mention 查询
+    (e.g. 查询后新增 / 修改并保存) — those still use form-save when a dialog opens.
+    Main-page query toolbars are additionally detected via DOM (有查询无保存).
+    """
+    t = (task_text or '').strip()
+    if not _QUERY_TASK_RE.search(t):
+        return False
+    if _QUERY_EXCLUDE_RE.search(t):
+        return False
+    return True
+
+
+def is_login_task(task_text: str) -> bool:
+    """True when the phase is only sign-in (not login-then-fill in one blob)."""
+    t = (task_text or '').strip()
+    if not t or not _LOGIN_TASK_RE.search(t):
+        return False
+    if _LOGIN_EXCLUDE_RE.search(t):
+        return False
+    return True
+
+
+def is_modify_task(task_text: str) -> bool:
+    """True when the phase is editing an existing form (not blank entry, not query)."""
+    t = (task_text or '').strip()
+    if not t or is_query_task(t) or is_login_task(t):
+        return False
+    if force_refill_all_required(t):
+        return True
+    return bool(_MODIFY_TASK_RE.search(t))
+
+
+def is_fill_task(task_text: str) -> bool:
+    """True when the phase is explicit new/entry form filling."""
+    t = (task_text or '').strip()
+    if not t or is_query_task(t) or is_login_task(t) or is_modify_task(t):
+        return False
+    return bool(_FILL_TASK_RE.search(t))
+
+
+def classify_task_mode(task_text: str) -> TaskMode:
+    """Classify phase intent. ``form_fill`` only when entry keywords match — never default."""
+    t = task_text or ''
+    if is_login_task(t):
+        return 'login'
+    if is_query_task(t):
+        return 'query'
+    if is_modify_task(t):
+        return 'form_modify'
+    if is_fill_task(t):
+        return 'form_fill'
+    return 'other'
+
+
+def apply_task_mode(case_data_store: dict | None, task_text: str) -> TaskMode:
+    """Write ``_task_mode`` / compat flags into case_data_store. Returns mode."""
+    mode = classify_task_mode(task_text)
+    if case_data_store is None:
+        return mode
+    case_data_store['_task_mode'] = mode
+    case_data_store['_query_task'] = mode == 'query'
+    # Legacy default; PhaseIntentContract may override via apply_phase_intent().
+    case_data_store['_force_refill_all'] = (
+        mode == 'form_fill'
+        or (mode == 'form_modify' and force_refill_all_required(task_text))
+    )
+    case_data_store.pop('_query_ui', None)
+    case_data_store.pop('_query_ready', None)
+    case_data_store.pop('_submit_ready', None)
+    if mode in ('query', 'login', 'other'):
+        case_data_store.pop('task_list', None)
+        case_data_store.pop('_scan_fields', None)
+        case_data_store.pop('_autofill_summary', None)
+    return mode
+
+
+def query_task_hint() -> str:
+    """Phase preamble: query/filter — AI-driven, no auto-fill."""
+    return (
+        '\n\n【任务类型：查询】\n'
+        '本阶段是查询/筛选，不是表单填写、也不是表单修改。\n'
+        '1. 禁止自动填写：不要等 auto-fill、不要 scan_form_fields / get_pending_tasks 当进度。\n'
+        '2. 由你根据任务描述设置筛选条件（fill_form_field / select_option / select_tree_option）。\n'
+        '3. 设完后用 click_element_by_index 点击「查询」（或「搜索」），然后 done(success=true)。\n'
+        '4. 本页没有「保存/提交」语义；click_save 不适用。\n'
+    )
+
+
+def login_task_hint() -> str:
+    return (
+        '\n\n【任务类型：登录】\n'
+        '本阶段只做登录，不是表单填写。\n'
+        '1. 使用 login(username, password, …) 完成登录（必要时填验证码）。\n'
+        '2. 登录成功进入系统后立刻 done(success=true)。\n'
+        '3. 不要 get_pending_tasks、不要找业务表单、不要把本阶段当成「新增/录入」。\n'
+    )
+
+
+def form_fill_hint() -> str:
+    """Phase preamble: blank/new form entry — use auto-fill."""
+    return (
+        '\n\n【任务类型：表单填写】\n'
+        '本阶段是新增/录入类填写。\n'
+        '1. 对每个可编辑字段须执行写动作（可同值重填），以录制可操作元素；不要仅 check_field_value 跳过。\n'
+        '2. 第一次 fill_form_field / select_option 会触发自动填写助手覆盖其余待办。\n'
+        '3. pending≈0 后立刻 click_save()，不要重选已填字段。\n'
+        '4. click_save 成功 = 操作成功提示 或 保存后页面跳转；满足其一再 done(success=true)。\n'
+    )
+
+
+def form_modify_partial_hint() -> str:
+    """Phase preamble: edit — recording still touches all editable fields when contract says so."""
+    return (
+        '\n\n【任务类型：表单修改】\n'
+        '本阶段是修改已有表单，不是查询。\n'
+        '1. 录制须对每个可编辑字段执行写动作（可同值重填），以采集可操作元素。\n'
+        '2. 禁止仅 check_field_value / 核对回显就点确认。\n'
+        '3. 改完后 click_save(button_text="确认"或"保存")；成功 = 操作成功 或 页面跳转。\n'
+    )
+
+
 def force_refill_hint() -> str:
     return (
-        '\n\n【强制改填 — CRITICAL】\n'
-        '本阶段要求修改表单中所有可编辑字段。\n'
-        '1. 打开修改弹窗后，禁止只 check_field_value / 核对回显就点确认。\n'
+        '\n\n【任务类型：表单修改 — 全部字段】\n'
+        '本阶段要求覆盖表单中所有可编辑字段（含编号类主键，可同值重填）。\n'
+        '1. 禁止只 check_field_value / 核对回显就点确认。\n'
         '2. 对每个可编辑字段必须执行覆盖写入：input→fill_form_field，'
         'select→select_option，radio→click_radio（可用 match_form_rule / 案例数据生成新值）。\n'
-        '3. 回显的旧值必须换成新值；仅 disabled 且无旁边按钮的只读字段可跳过。\n'
-        '4. 全部改完后用 click_save(button_text="确认"或"保存")，见到 ok-save-success 再 done。\n'
+        '3. 仅 disabled 且无旁边按钮的只读字段可跳过。\n'
+        '4. click_save(button_text="确认"或"保存")；成功 = 操作成功 或 页面跳转。\n'
     )
+
+
+def task_mode_hint(mode: TaskMode, *, force_refill_all: bool = False) -> str:
+    if mode == 'login':
+        return login_task_hint()
+    if mode == 'query':
+        return query_task_hint()
+    if mode == 'form_modify':
+        return force_refill_hint() if force_refill_all else form_modify_partial_hint()
+    if mode == 'form_fill':
+        return form_fill_hint()
+    return ''  # other — no form-type cue
+
+
+def recording_refill_hint(mode: TaskMode, *, force_refill_all: bool) -> str:
+    """Hint when phase intent requires all editable fields recorded."""
+    if force_refill_all and mode in ('form_fill', 'form_modify'):
+        return force_refill_hint() if mode == 'form_modify' else form_fill_hint()
+    return task_mode_hint(mode, force_refill_all=force_refill_all)
+
+
+def detect_heal_mode(instruction: dict | None, task_text: str = '') -> str | None:
+    """Return 'step' | 'form_structure' | None for heal agent runs."""
+    if isinstance(instruction, dict):
+        raw = instruction.get('heal_type') or instruction.get('healType') or ''
+        raw = str(raw).strip().lower()
+        if raw in ('step', 'form_structure'):
+            return raw
+        if raw in ('form-structure', 'structure'):
+            return 'form_structure'
+    t = task_text or ''
+    if '表单结构变化自愈' in t or 'healType=form_structure' in t:
+        return 'form_structure'
+    if '单步自愈' in t or '步骤回放失败后的单步自愈' in t:
+        return 'step'
+    return None
+
+
+def apply_heal_mode(case_data_store: dict | None, heal_mode: str | None) -> str | None:
+    """Set/clear ``_heal_mode``. Heal never carries a phase-intent contract.
+
+    Recording phases compile ``_phase_intent``; heal clears it and must not
+    re-apply create/modify submit or recovery→click_save rules.
+    """
+    if case_data_store is None:
+        return heal_mode
+    if heal_mode:
+        case_data_store['_heal_mode'] = heal_mode
+        try:
+            from ._phase_intent import clear_phase_intent
+            clear_phase_intent(case_data_store)
+        except Exception:
+            case_data_store.pop('_phase_intent', None)
+        case_data_store['_force_refill_all'] = False
+        case_data_store.pop('_submit_ready', None)
+        case_data_store.pop('_success_tokens', None)
+    else:
+        case_data_store.pop('_heal_mode', None)
+    return heal_mode
+
+
+def is_heal_mode(case_data_store: dict | None) -> bool:
+    return bool(case_data_store and case_data_store.get('_heal_mode'))
 
 
 def truncate_text(text: str, max_len: int) -> str:
     t = (text or '').strip()
-    if len(t) <= max_len:
+    if max_len <= 0 or len(t) <= max_len:
         return t
     return t[: max_len - 1].rstrip() + '…'
 

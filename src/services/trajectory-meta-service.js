@@ -229,7 +229,8 @@ export async function analyzeRequirementToPhases({
   // Append raw business-scenario case data to each phase (for AI fill reference)
   phases = appendCaseDataToPhases(phases, caseBlock);
 
-  // caseEntries no longer produced by analyze (V2.2: payload / AI fill). Keep [] for batch compat.
+  // caseEntries: analyze 不再拆 KV（返回 []）。结构化 KV 仍可由前端 POST/PATCH 入库，
+  // 供后续分块标注/报文捞取；本期录制不注入 store，只靠 phase 文本中的业务场景块。
   return { phases, caseEntries: [] };
 }
 

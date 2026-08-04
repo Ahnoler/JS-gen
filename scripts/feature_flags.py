@@ -44,6 +44,11 @@ def scenario_describer_enabled() -> bool:
     return _env_flag('AI_SCENARIO_DESCRIBER', True)
 
 
+def phase_intent_contract_enabled() -> bool:
+    """AI_PHASE_INTENT_CONTRACT — phase intent hard contract for AI recording (default on)."""
+    return _env_flag('AI_PHASE_INTENT_CONTRACT', True)
+
+
 def scenario_describer_interval() -> int:
     """SCENARIO_DESCRIBER_INTERVAL — run scenario LLM every N agent micro-steps (default 3)."""
     raw = os.environ.get('SCENARIO_DESCRIBER_INTERVAL')

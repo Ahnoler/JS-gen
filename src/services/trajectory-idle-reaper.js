@@ -17,7 +17,7 @@ import { clearLiveBinding } from './remote-session-service.js';
 import * as execSession from '../executor-session-client.js';
 import * as slotLease from '../executor-slot-lease.js';
 
-const IDLE_MS = 30 * 60 * 1000;
+const IDLE_MS = 2 * 60 * 60 * 1000;
 const TICK_MS = 45 * 1000;
 
 let timer = null;

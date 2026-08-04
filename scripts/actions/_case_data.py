@@ -6,9 +6,13 @@ from ._helpers import _ok, _err
 _RESERVED_CASE_KEYS = frozenset({
     'form_snapshot', 'form_snapshots', 'task_list',
     '_watcher_mode', '_intervention_queue', '_scan_fields',
-    '_submit_ready', '_autofill_summary', '_last_save_ok',
+    '_submit_ready', '_query_ready', '_query_task', '_query_ui', '_task_mode',
+    '_autofill_summary', '_last_save_ok',
     '_url_before_save', '_ref_date', '_already_matched_streak',
-    '_has_button_keywords', '_phase_outcomes',
+    '_has_button_keywords', '_phase_outcomes', '_force_refill_all',
+    '_phase_intent', '_phase_intent_flag_locked', '_success_tokens',
+    '_last_introduce_ok', '_quality_failed', '_quality_failed_reasons',
+    '_cycle_prescribed', '_recovery_active', '_heal_mode',
 })
 
 

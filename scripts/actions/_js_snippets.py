@@ -62,6 +62,24 @@ JS_IDENTIFY_CONTAINER = '''(() => {
     return 'unknown:' + (c.tagName || 'unknown');
 })()'''
 
+# True when visible scope has 查询/搜索 and no 保存/提交 (list filter / query dialog).
+JS_IS_QUERY_TOOLBAR = '''(() => {
+    const root = ''' + JS_GET_CONTAINER + ''';
+    const scope = root === document ? document.body : root;
+    if (!scope) return false;
+    const btns = scope.querySelectorAll('button, .el-button, [role="button"]');
+    let hasQuery = false;
+    let hasSave = false;
+    for (const b of btns) {
+        if (b.offsetParent === null && b.getClientRects().length === 0) continue;
+        const t = (b.innerText || b.textContent || '').replace(/\\s+/g, ' ').trim();
+        if (!t || t.length > 12) continue;
+        if (/^(查询|搜索|查找)$/.test(t)) hasQuery = true;
+        if (/^(保存|提交)$/.test(t)) hasSave = true;
+    }
+    return hasQuery && !hasSave;
+})()'''
+
 # ── Loading / waiting ──
 
 JS_WAIT_LOADING = '''() => new Promise(resolve => {

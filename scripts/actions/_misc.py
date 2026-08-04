@@ -369,14 +369,66 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             btn_label = ((element_info or {}).get('text') or elem_text or '').strip()
             if _is_form_submit_label(btn_label):
                 compact = re.sub(r'\s+', '', btn_label)
-                always_block = compact.startswith(('保存', '提交'))
                 in_form_overlay = False
-                if not always_block:
-                    try:
-                        in_form_overlay = bool(await page.evaluate(_JS_VISIBLE_FORM_OVERLAY))
-                    except Exception:
-                        in_form_overlay = False
-                if always_block or in_form_overlay:
+                dialog_title = ''
+                try:
+                    overlay_info = await page.evaluate('''() => {
+                        const isVisible = (el) => {
+                            if (!el) return false;
+                            const style = getComputedStyle(el);
+                            if (style.display === 'none' || style.visibility === 'hidden') return false;
+                            const r = el.getBoundingClientRect();
+                            return r.width > 0 && r.height > 0;
+                        };
+                        for (const d of document.querySelectorAll('.el-dialog')) {
+                            const wrap = d.closest('.el-dialog__wrapper') || d;
+                            if (isVisible(wrap) && isVisible(d)) {
+                                const title = (d.querySelector('.el-dialog__title')?.textContent || '').trim();
+                                const hasForm = !!d.querySelector('.el-form');
+                                return { inForm: hasForm, title };
+                            }
+                        }
+                        for (const d of document.querySelectorAll('.el-drawer')) {
+                            const wrap = d.closest('.el-drawer__wrapper') || d;
+                            if (isVisible(wrap) && isVisible(d)) {
+                                const title = (d.getAttribute('aria-label') || '').trim();
+                                const hasForm = !!d.querySelector('.el-form');
+                                return { inForm: hasForm, title };
+                            }
+                        }
+                        return { inForm: false, title: '' };
+                    }''')
+                    if isinstance(overlay_info, dict):
+                        in_form_overlay = bool(overlay_info.get('inForm'))
+                        dialog_title = str(overlay_info.get('title') or '')
+                except Exception:
+                    in_form_overlay = bool(await page.evaluate(_JS_VISIBLE_FORM_OVERLAY))
+                try:
+                    from ._phase_intent import (
+                        get_phase_intent,
+                        is_introduce_phase,
+                        record_success_token,
+                        should_block_index_submit,
+                    )
+                    contract = get_phase_intent(case_data_store)
+                except Exception:
+                    contract = None
+                    is_introduce_phase = lambda c: False  # noqa: E731
+                    should_block_index_submit = None  # type: ignore
+                    record_success_token = None  # type: ignore
+
+                block = False
+                if should_block_index_submit is not None:
+                    block = should_block_index_submit(
+                        contract,
+                        btn_label,
+                        in_form_overlay=in_form_overlay,
+                        dialog_title=dialog_title,
+                    )
+                elif compact.startswith(('保存', '提交')) or in_form_overlay:
+                    block = True
+
+                if block:
                     if compact.startswith('确认'):
                         needle = '确认'
                     elif compact.startswith('确定'):
@@ -389,7 +441,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         f'use-click-save | Index click on "{btn_label}" is forbidden for form submit. '
                         f'Call click_save(button_text="{needle}") NOW. '
                         f'Do NOT re-select the table row or re-click 修改 — if the dialog is open, '
-                        f'only click_save. Do NOT call done() until ok-save-success.',
+                        f'only click_save. Success = 操作成功 toast OR post-save navigation.',
                         include_in_memory=True,
                     )
 
@@ -402,6 +454,15 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     'tag_name': element_info.get('tag_name') if element_info else tag_name,
                     'text': (element_info or {}).get('text') or elem_text or '',
                 }, f'ok-clicked-{index}', element=element_info)
+                try:
+                    from ._phase_intent import get_phase_intent, is_introduce_phase, record_success_token
+                    contract = get_phase_intent(case_data_store)
+                    if contract and is_introduce_phase(contract):
+                        compact = re.sub(r'\s+', '', btn_label)
+                        if compact.startswith(('确认', '确定')):
+                            record_success_token(case_data_store, 'confirm_click', btn_label)
+                except Exception:
+                    pass
             return _ok(f'ok-clicked-{index}')
         except Exception as e:
             return _err(f'click-failed:{e}')

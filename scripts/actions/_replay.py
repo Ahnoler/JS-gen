@@ -950,6 +950,49 @@ async def _replay_controller_action(act, params: dict) -> str:
     return str(extracted if extracted is not None else result)
 
 
+async def _replay_table_row_radio(
+    page,
+    entry: dict,
+    params: dict,
+    *,
+    controller_actions: dict | None = None,
+) -> str:
+    """Replay row radio: semantic first (fixed columns), then durable xpath."""
+    row_text = (
+        params.get('row_text')
+        or params.get('text')
+        or params.get('row_match')
+        or ''
+    )
+    row_text = str(row_text).strip()
+
+    semantic = ''
+    act = (controller_actions or {}).get('click_table_row_radio')
+    if act and row_text:
+        semantic = await _replay_controller_action(act, {'row_text': row_text})
+        await page.wait_for_timeout(400)
+        await _wait_if_loading(page)
+        if _result_ok('click_table_row_radio', semantic):
+            return f'{semantic} | locate=semantic-row'
+
+    # Fallback: recorded xpath_smart / text durable click
+    click_params = {**params, 'text': row_text or params.get('text') or ''}
+    if _element_xpath_smart(entry) or click_params.get('text'):
+        durable = await _replay_click_by_index(page, entry, click_params)
+        if _result_ok('click_table_row_radio', durable):
+            prefix = f'{semantic} | ' if semantic else ''
+            return f'{prefix}{durable} | locate=durable-fallback'
+        if semantic:
+            return f'{semantic} | durable:{durable}'
+        return durable
+
+    if semantic:
+        return semantic
+    if act and not row_text:
+        return 'row-text-empty'
+    return 'unknown-action:click_table_row_radio'
+
+
 async def replay_action_entries(
     browser_context,
     entries: list[dict],
@@ -999,7 +1042,6 @@ async def replay_action_entries(
                     'click_icon_button',
                     'click_adjacent_button',
                     'click_table_row_button',
-                    'click_table_row_radio',
                     'switch_tab',
                     'close_dialog',
                 ):
@@ -1025,6 +1067,12 @@ async def replay_action_entries(
                             result = await _replay_controller_action(act, params)
                             await page.wait_for_timeout(400)
                             await _wait_if_loading(page)
+                elif action_name == 'click_table_row_radio':
+                    # Prefer semantic row match (handles Element UI fixed-column radios).
+                    # Durable xpath often requires name+radio in the same <tr> and fails.
+                    result = await _replay_table_row_radio(
+                        page, entry, params, controller_actions=controller_actions,
+                    )
                 elif action_name in _FORM_ACTIONS:
                     result = await _replay_form_action(page, action_name, params, entry)
                 else:

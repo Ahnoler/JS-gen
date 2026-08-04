@@ -417,7 +417,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/analyze',
         summary: 'AI 需求拆解为阶段（不落库）',
-        desc: '将需求拆成 phases（条数跟用户编号分步）。「案例数据/关键数据」段落不拆成 caseEntries，原文附加到每个 phase 描述末尾供 AI 填表参考。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。录制侧不再注入 Python case_data_store（V2.2）。',
+        desc: '将需求拆成 phases（条数跟用户编号分步）。「案例数据/关键数据」段落不拆成 caseEntries，原文附加到每个 phase 描述末尾供 LLM 填表优先参考；其余字段仍可由 autofill 随机补。返回 caseEntries 恒为 []。结构化 caseEntries 仍可由创建/PATCH 入库（本期录制不注入 store，留待后续分块标注/报文捞取）。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。',
         reqExample: J({
           description:
             '1、点击客户管理，点击对公客户管理。\n'
@@ -469,7 +469,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories',
         summary: '创建交易',
-        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 caseEntries 按 trajectory 写入案例 KV（字段名=表单 label）。',
+        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 caseEntries 入库（case_data_entry）；本期录制不注入 Python case_data_store，填表靠 phase 文本中的业务场景案例数据；KV 留待后续分块标注/报文捞取。',
         reqExample: J({
           functionId: 3,
           name: '开户交易',
@@ -491,7 +491,7 @@ export const API_GROUPS = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}',
         summary: '交易详情（含 phases、caseEntries）',
-        desc: 'caseEntries 为绑定到该交易的案例 KV（可选；录制注入 Python case_data_store 已停用，V2.2）。',
+        desc: 'caseEntries 为绑定到该交易的案例 KV（可入库；本期录制不注入 Python，留待后续分块标注/报文捞取）。录制填表权威来源是 phase 描述内的【业务场景案例数据】。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {
@@ -511,7 +511,7 @@ export const API_GROUPS = [
       {
         method: 'PUT', path: '/api/v2/trajectories/{id}/case-data',
         summary: '替换交易案例数据',
-        desc: '按 trajectory_id 全量替换 case_data_entry（先删后插）。字段名须与表单 label 一致。',
+        desc: '按 trajectory_id 全量替换 case_data_entry（先删后插）。字段名宜与表单 label 一致。本期仅持久化，不参与录制注入。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
           caseEntries: [
@@ -741,7 +741,7 @@ export const API_GROUPS = [
   {
     id: 'recording',
     name: '交易录制',
-    description: 'prepare → start → stop → stream/detach（断开画面）或 detach（释放执行资源）。stop / 断开画面不释放槽位；detach 才关浏览器并释放槽。离开工作室不自动 detach；30 分钟无步骤写入自动回收。',
+    description: 'prepare → start → stop → stream/detach（断开画面）或 detach（释放执行资源）。stop / 断开画面不释放槽位；detach 才关浏览器并释放槽。离开工作室不自动 detach；2 小时无步骤写入自动回收。',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/login-context',
@@ -781,7 +781,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/start',
         summary: '开始 AI 录制',
-        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。案例数据不再注入 Python case_data_store（V2.2：接口报文捞取 / 阶段描述内业务场景参考）。',
+        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。本期不注入 case_data_entry→Python；填表靠 phase 内【业务场景案例数据】+ LLM 优先对齐（autofill 可随机补其余字段）。报文捞取为后续占位。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ phaseIds: [101, 102], accountId: 10 }),
         respExample: J({
@@ -926,7 +926,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/detach',
         summary: '释放执行资源（关闭浏览器）',
-        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 live 或 recording，则改回 draft（不覆盖 recorded/completed）。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 30 分钟会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
+        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 live 或 recording，则改回 draft（不覆盖 recorded/completed）。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 2 小时会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({ trajectoryId: 42, detached: true, recordStatus: 'draft' }),
@@ -1239,7 +1239,7 @@ export const API_GROUPS = [
           payload: { trajectoryId: 42, reason: 'idle', recordStatus: 'draft', sessionId: 'uuid' },
         }),
         notes: [
-          'reason: idle（30 分钟无步骤）| manual | batch_complete | batch_cancel | batch_failed | batch_recovery',
+          'reason: idle（2 小时无步骤）| manual | batch_complete | batch_cancel | batch_failed | batch_recovery',
           '前端应按 trajectoryId 过滤；只清空本交易画布与 prepare 状态',
           '同时会广播 remote:status（attached=false, trajectoryId）',
         ],

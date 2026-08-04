@@ -296,9 +296,11 @@ def _handle_reset_trajectory(session_id, case_data_store=None):
     from .controller import _ACTION_LOG
     from .recorder import _ACTION_LOG as _recorder_log
     from .actions._phase_context import clear_phase_outcomes
+    from .actions._phase_intent import clear_phase_intent
     _ACTION_LOG.clear()
     _recorder_log.clear()
     clear_phase_outcomes(case_data_store)
+    clear_phase_intent(case_data_store)
     from .actions._state import _emit_action_log_sync
     _emit_action_log_sync()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -389,7 +391,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         sys.stderr.write(f"[session] special_element_candidates skipped: {e}\n")
         sys.stderr.flush()
 
-    emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
+    contract = None
     sys.stderr.write(f"[session] Step {step_index}: {task_text[:80]} (max_steps={max_steps})\n")
     sys.stderr.flush()
 
@@ -409,36 +411,90 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', task_text, count=1).strip() or task_text
     try:
         from .actions._phase_context import (
+            apply_heal_mode,
+            apply_task_mode,
+            detect_heal_mode,
             format_phase_preamble,
-            force_refill_all_required,
-            force_refill_hint,
+            recording_refill_hint,
+        )
+        from .actions._phase_intent import (
+            apply_phase_intent,
+            contract_summary_hint,
         )
         from .actions._state import _CURRENT_PHASE
+        heal_mode = detect_heal_mode(instruction, agent_task)
         if case_data_ref is not None:
-            case_data_ref['_force_refill_all'] = force_refill_all_required(agent_task)
-            if case_data_ref['_force_refill_all']:
-                sys.stderr.write("[session] force_refill_all=True (modify-all-fields task)\n")
+            apply_heal_mode(case_data_ref, heal_mode)
+            if heal_mode:
+                mode = 'other'
+                contract = None
+                sys.stderr.write(
+                    f"[session] task_mode=other force_refill_all=False "
+                    f"heal_mode={heal_mode} phase_intent=False\n"
+                )
                 sys.stderr.flush()
+            else:
+                mode = apply_task_mode(case_data_ref, agent_task)
+                contract = apply_phase_intent(case_data_ref, agent_task)
+                sys.stderr.write(
+                    f"[session] task_mode={mode} "
+                    f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
+                    f"phase_intent={bool(contract)}\n"
+                )
+                sys.stderr.flush()
+        else:
+            mode = 'other'
+            contract = None
         prior_phases = instruction.get('prior_phases') or instruction.get('priorPhases')
         phase_for_preamble = instruction.get('phase_number')
         if phase_for_preamble is None:
             phase_for_preamble = instruction.get('phaseNumber')
         if phase_for_preamble is None:
             phase_for_preamble = _CURRENT_PHASE
-        agent_task = format_phase_preamble(
-            current_phase=int(phase_for_preamble) if phase_for_preamble is not None else 0,
-            current_task=agent_task,
-            prior_phases=prior_phases if isinstance(prior_phases, list) else None,
-            case_data_store=case_data_ref,
-        )
-        if case_data_ref is not None and case_data_ref.get('_force_refill_all'):
-            agent_task = agent_task + force_refill_hint()
+        if not heal_mode:
+            agent_task = format_phase_preamble(
+                current_phase=int(phase_for_preamble) if phase_for_preamble is not None else 0,
+                current_task=agent_task,
+                prior_phases=prior_phases if isinstance(prior_phases, list) else None,
+                case_data_store=case_data_ref,
+            )
+        if case_data_ref is not None and not heal_mode:
+            agent_task = agent_task + recording_refill_hint(
+                mode,
+                force_refill_all=bool(case_data_ref.get('_force_refill_all')),
+            )
+            if contract:
+                agent_task = agent_task + contract_summary_hint(contract)
+            emit_json({
+                "event": "phase_intent_obs",
+                "data": {
+                    "phase": step_index,
+                    "phase_intent": contract,
+                    "recovery": (contract or {}).get('recovery') if contract else None,
+                },
+            })
+        elif heal_mode:
+            emit_json({
+                "event": "phase_intent_obs",
+                "data": {
+                    "phase": step_index,
+                    "heal_mode": heal_mode,
+                    "phase_intent": None,
+                },
+            })
+        phase_start_payload = {"phase": step_index, "total": -1, "name": task_text[:60]}
+        if contract:
+            phase_start_payload["phase_intent"] = contract
+        if heal_mode:
+            phase_start_payload["heal_mode"] = heal_mode
+        emit_json({"event": "phase_start", "data": phase_start_payload})
         if agent_task.startswith('【业务场景】'):
             sys.stderr.write(f"[session] agent_task preview: {agent_task[:400]}\n")
             sys.stderr.flush()
     except Exception as e:
         sys.stderr.write(f"[session] phase preamble skipped: {e}\n")
         sys.stderr.flush()
+        emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
     try:
         from .actions._case_data import format_case_data_hint, iter_user_case_entries
         entries = iter_user_case_entries(case_data_ref)
@@ -469,6 +525,13 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     output_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_step{step_index}_{ts}.json"
     goal_tracker['goals'] = []
     goal_tracker['stopped'] = False
+    goal_tracker.pop('cycle_baseline', None)
+    # Snapshot ACTION_LOG length so cycle detect ignores prior phases / phase retries
+    try:
+        from .controller import _ACTION_LOG as _ctrl_log
+        goal_tracker['cycle_baseline'] = len(_ctrl_log)
+    except Exception:
+        goal_tracker['cycle_baseline'] = 0
 
     sys.stderr.write(f"[session] Creating Agent...\n");
     sys.stderr.flush()
@@ -502,6 +565,40 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                    "data": {"phase": step_index, "name": task_text[:60], "message": "Agent run cancelled"}})
     except Exception as e:
         emit_json({"event": "phase_error", "data": {"phase": step_index, "name": task_text[:60], "message": str(e)}})
+
+    # Phase-end observability + soft quality gate
+    try:
+        if case_data_ref is not None:
+            from .actions._phase_intent import (
+                check_pending_write_gate,
+                emit_phase_observability,
+                get_phase_intent,
+                has_contract_success,
+                mark_quality_failed,
+            )
+            ok_pending, labels = check_pending_write_gate(case_data_ref)
+            contract = get_phase_intent(case_data_ref)
+            if contract and contract.get('refill') == 'all_editable' and not ok_pending:
+                mark_quality_failed(case_data_ref, f'pending_fields:{",".join(labels[:8])}')
+            submit = (contract or {}).get('submit') or {}
+            if submit.get('required') and not has_contract_success(case_data_ref):
+                if contract and contract.get('mode') not in ('introduce_pick',):
+                    if not case_data_ref.get('_last_save_ok') and not case_data_ref.get('_last_introduce_ok'):
+                        mark_quality_failed(case_data_ref, 'missing_success_token')
+            emit_phase_observability(case_data_ref, emit_json)
+            phase_payload = {"phase": step_index, "name": task_text[:60]}
+            c = get_phase_intent(case_data_ref)
+            if c:
+                phase_payload["phase_intent"] = c
+            if case_data_ref.get('_quality_failed'):
+                phase_payload["quality_failed"] = True
+                phase_payload["quality_failed_reasons"] = list(
+                    case_data_ref.get('_quality_failed_reasons') or []
+                )
+            emit_json({"event": "phase_end", "data": phase_payload})
+    except Exception as e:
+        sys.stderr.write(f"[session] phase_end observability skipped: {e}\n")
+        sys.stderr.flush()
 
     return output_path, task_text
 

@@ -432,7 +432,7 @@ async function runReplayBatch({
 
       try {
         const instruction = buildStepHealInstruction(entry, failResult);
-        await runHealStep(runtime, instruction, HEAL_MAX_STEPS);
+        await runHealStep(runtime, instruction, HEAL_MAX_STEPS, 'step');
         await markConsumedActionLog(runtime);
         broadcast('recording:replay_heal', {
           ...trajScope(tid),
@@ -713,7 +713,7 @@ async function handleFormStructureCheckpoint({
 
     try {
       const beforeIds = await peekActionLogIds(runtime);
-      await runHealStep(runtime, instruction, FORM_STRUCTURE_HEAL_MAX_STEPS);
+      await runHealStep(runtime, instruction, FORM_STRUCTURE_HEAL_MAX_STEPS, 'form_structure');
       const afterEntries = await fetchActionLogEntries(runtime);
       const newEntries = afterEntries.filter((e) => {
         const id = e?.id != null ? String(e.id) : '';
@@ -919,7 +919,7 @@ function buildPayload(tid, doSuppress, rows, allResults, healed, error, counts =
   };
 }
 
-async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS) {
+async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, healType = 'step') {
   await new Promise((resolve, reject) => {
     let settled = false;
     const unsubDone = execSession.onSessionEvent(runtime.sessionId, 'phase_done', () => {
@@ -951,6 +951,8 @@ async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS) {
         instruction,
         max_steps: maxSteps,
         phase_number: 0,
+        heal_type: healType,
+        healType,
       },
     });
   });

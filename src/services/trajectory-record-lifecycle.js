@@ -22,8 +22,9 @@ import {
 } from './trajectory-runtime.js';
 
 /**
- * 版本V2.2开发：案例数据注入 Python case_data_store 暂时停用；
- * 转移到接口报文捞取数据，AI 填表自动参考。
+ * 版本V2.2：案例数据注入 Python case_data_store 暂时停用。
+ * 本期录制只靠 phase 文本中的【业务场景案例数据】（analyze 附加），由 LLM 读文本优先填写。
+ * case_data_entry 仍可经 API 入库，供后续「分块标注 / 接口报文捞取」再用（本期不注入）。
  * （原实现：按 trajectory_id 加载 case_data_entry → traj_{id}.json / inline case_data）
  */
 async function prepareCaseDataInjection(_trajectoryId) {
@@ -245,8 +246,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     data: { enabled: true },
   });
 
-  // 版本V2.2开发：案例数据注入 Python case_data_store 暂时停用；
-  // 转移到接口报文捞取数据，AI 填表自动参考（阶段描述内已附带业务场景案例数据）。
+  // 版本V2.2：不注入 case_data 到 Python。case_data_entry 可入库留待后续；
+  // 本期填表靠 phase.description 内【业务场景案例数据】+ LLM 优先对齐。
   // const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
   const caseDataFile = null;
   const caseData = null;

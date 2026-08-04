@@ -22,7 +22,7 @@ from ._helpers import (
     attach_select_options, options_from_scan_store, read_select_options,
 )
 from ._js_snippets import (
-    JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER,
+    JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR,
     JS_CHECK_SINGLE_FIELD, JS_SCAN_FORM_FIELDS,
     JS_FILL_FORM_FIELD, JS_FILL_DATE_FIELD,
     JS_FIND_LABELED_SELECT, JS_FIND_OPTION, JS_SELECT_OPTION, JS_LOCATOR,
@@ -47,12 +47,75 @@ from ._case_data import lookup_case_value
 # Data-entry dialogs (新增/编辑/校验…) still get auto-fill + case data.
 _SEARCH_DIALOG_HINTS = ('查询', '搜索', '查找', '选择客户', '选择法人', '引入', '挑选')
 
+_QUERY_NEXT_HINT = (
+    'NOT_FORM_FILL | mode=query_filter | '
+    'Search/filter UI — not a data-entry form. '
+    'Do NOT use task_list / auto-fill / click_save. '
+    'Set filters named by the task, then click 查询 via click_element_by_index.'
+)
+
 
 def _is_search_dialog(container_id: str) -> bool:
     if not (container_id or '').startswith('dialog:'):
         return False
     title = container_id[7:]
     return any(h in title for h in _SEARCH_DIALOG_HINTS)
+
+
+def _force_refill_flag(case_data_store: dict | None) -> bool:
+    from ._phase_intent import contract_force_refill
+    return contract_force_refill(case_data_store)
+
+
+def _is_query_mode(case_data_store: dict | None) -> bool:
+    """True when this phase/UI is query-filter (no form-save / no auto-fill)."""
+    if not case_data_store:
+        return False
+    if case_data_store.get('_task_mode') == 'query':
+        return True
+    return bool(
+        case_data_store.get('_query_task')
+        or case_data_store.get('_query_ui')
+    )
+
+
+def _skip_auto_fill(case_data_store: dict | None) -> bool:
+    """True when implicit auto-fill must not run.
+
+    Auto-fill only for form_fill and form_modify+force_refill_all.
+    login / query / other / partial modify → skip.
+    """
+    if not case_data_store:
+        return True
+    if _is_query_mode(case_data_store):
+        return True
+    mode = case_data_store.get('_task_mode')
+    if mode == 'form_fill':
+        return False
+    if mode == 'form_modify' and _force_refill_flag(case_data_store):
+        return False
+    return True
+
+
+async def _mark_query_ui_if_needed(page, case_data_store, container_id: str = '') -> bool:
+    """Detect query/filter UI; set _query_ui. Returns True if search context."""
+    if case_data_store is None:
+        return _is_search_dialog(container_id)
+    if _is_search_dialog(container_id) or case_data_store.get('_query_task'):
+        case_data_store['_query_ui'] = True
+        return True
+    if case_data_store.get('_query_ui'):
+        return True
+    try:
+        if await page.evaluate(JS_IS_QUERY_TOOLBAR):
+            case_data_store['_query_ui'] = True
+            sys.stderr.write('[form] Detected query toolbar (有查询无保存) — skip save cues\n')
+            sys.stderr.flush()
+            return True
+    except Exception as e:
+        sys.stderr.write(f'[form] query-toolbar detect failed: {e}\n')
+        sys.stderr.flush()
+    return False
 
 
 async def _pack_select_record(page, case_data_store, label_text, option_text, element):
@@ -175,7 +238,11 @@ def _task_done_impl(label_text, case_data_store, value=None):
     ``value`` is the value that was just written (fill/select). Stored on
     TaskItem.currentValue so scan_form_fields summaries are not empty after
     auto-fill.
+
+    Query/filter UI is not form-fill — skip task_list tracking entirely.
     """
+    if _is_query_mode(case_data_store):
+        return
     tl = TaskList.from_store(case_data_store.get('task_list'))
     found = tl.mark_done(label_text, value=value)
     if found is not None:
@@ -190,7 +257,12 @@ def _task_done_impl(label_text, case_data_store, value=None):
 
 
 def _submit_ready_hint(case_data_store: dict) -> str:
-    """Return a short NEXT_ACTION cue when fillable pending is empty."""
+    """Return a short NEXT_ACTION cue when fillable pending is empty.
+
+    Query/filter UI is never form-fill — no click_save / pending-form cues.
+    """
+    if _is_query_mode(case_data_store):
+        return ''
     tl = TaskList.from_store(case_data_store.get('task_list'))
     intervene = [i.label for i in tl.pending if i.needs_intervention]
     fillable = [i for i in tl.pending if not i.needs_intervention]
@@ -215,7 +287,12 @@ def _submit_ready_hint(case_data_store: dict) -> str:
 
 
 def _with_submit_cue(result: str, case_data_store: dict) -> str:
-    """Append auto-fill / submit-ready cue to an action result string."""
+    """Append auto-fill / submit-ready cue — skipped entirely for query/filter UI."""
+    if _is_query_mode(case_data_store):
+        case_data_store.pop('_autofill_summary', None)
+        case_data_store.pop('_submit_ready', None)
+        case_data_store.pop('_query_ready', None)
+        return result
     parts = [result]
     summary = case_data_store.pop('_autofill_summary', None)
     if summary:
@@ -225,6 +302,16 @@ def _with_submit_cue(result: str, case_data_store: dict) -> str:
         parts.append(cue)
         case_data_store['_submit_ready'] = True
     return ' | '.join(parts)
+
+
+def _query_not_form_payload(container_id: str = '') -> str:
+    """JSON payload telling the agent this UI is not form-fill."""
+    return json.dumps({
+        'not_form_fill': True,
+        'mode': 'query_filter',
+        'container': container_id or '',
+        'hint': _QUERY_NEXT_HINT,
+    }, ensure_ascii=False)
 
 
 async def _clear_field_value(page, label_text):
@@ -285,17 +372,23 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         1. task_list doesn't exist → first form on this task
         2. task_list exists but label not in pending/done → new form
 
-        Triggers for main-page, drawers, and data-entry dialogs.
-        Search/picker dialogs are skipped — agent needs fine control there.
+        Triggers for main-page, drawers, and data-entry dialogs when task_mode
+        is form_fill (or form_modify with force_refill_all).
 
-        Skips auto-fill when _watcher_mode is set (CDP quick actions).
+        Skipped (no auto-fill):
+        - query / search toolbar (有查询无保存)
+        - form_modify partial — AI changes only task-named fields
+        - _watcher_mode (CDP quick actions)
         """
         if case_data_store.get('_watcher_mode'):
             return  # CDP watcher: single-field action, no auto-scan
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
-        if _is_search_dialog(container_id):
-            return  # skip: search/picker dialogs — agent manages fields
+        if await _mark_query_ui_if_needed(page, case_data_store, container_id):
+            return  # query/filter UI
+        if _skip_auto_fill(case_data_store):
+            # form_modify partial (or query flagged without DOM yet)
+            return
 
         tl = TaskList.from_store(case_data_store.get('task_list'))
         if tl.total > 0:
@@ -320,7 +413,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         # Store scan data + auto-fill
         tl = TaskList.from_scan(
             [f.model_dump() for f in dom_fields],
-            force_refill=bool(case_data_store.get('_force_refill_all')),
+            force_refill=_force_refill_flag(case_data_store),
         )
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
@@ -439,7 +532,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
         if _is_ok_result(result):
             _record_action('fill_form_field', {'label_text': label_text, 'value': value}, result, element=element)
-            _task_done_impl(label_text, case_data_store, value=value)
+            if not _is_query_mode(case_data_store):
+                _task_done_impl(label_text, case_data_store, value=value)
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
 
@@ -452,7 +546,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         result = await page.evaluate(JS_FILL_DATE_FIELD, [label_text, value])
         if _is_ok_result(result):
             _record_action('fill_date_field', {'label_text': label_text, 'value': value}, result, element=element)
-            _task_done_impl(label_text, case_data_store, value=value)
+            if not _is_query_mode(case_data_store):
+                _task_done_impl(label_text, case_data_store, value=value)
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
 
@@ -480,6 +575,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
+        container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
+        if await _mark_query_ui_if_needed(page, case_data_store, container_id):
+            return _query_not_form_payload(container_id)
         raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
@@ -515,7 +613,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         tl = TaskList.from_scan(
             [f.model_dump() for f in dom_fields],
-            force_refill=bool(case_data_store.get('_force_refill_all')),
+            force_refill=_force_refill_flag(case_data_store),
         )
         # Restore previously-done items — add directly to done since they won't be in pending.
         # from_scan now puts pre-filled fields in done[], so check both lists to avoid duplicates.
@@ -569,6 +667,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     async def scan_visible_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
+        container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
+        if await _mark_query_ui_if_needed(page, case_data_store, container_id):
+            return _query_not_form_payload(container_id)
         raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [True, _button_keywords()])
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
@@ -685,7 +786,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         tl = TaskList.from_scan(
             fields,
-            force_refill=bool(case_data_store.get('_force_refill_all')),
+            force_refill=_force_refill_flag(case_data_store),
         )
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = fields
@@ -1204,6 +1305,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     @controller.action('Get the current pending task list. Returns {"pending": [...], optional NEEDS_INTERVENTION, NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 保存 — do not re-fill fields.')
     async def get_pending_tasks():
+        if _is_query_mode(case_data_store):
+            return _ok(_query_not_form_payload(), include_in_memory=True)
         tl = TaskList.from_store(case_data_store.get('task_list'))
         intervene = [item.label for item in tl.pending if item.needs_intervention]
         pending_labels = [item for item in tl.to_store()['pending'] if not item.get('needs_intervention')]
@@ -1230,11 +1333,28 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'then scan the whole page for .el-form-item__error and success/error notifications. '
         'Prefer this over scroll_down + click_element_by_index for form submit (including '
         'maintain/edit dialog 确认). '
-        'Returns ok-save-success only when an 操作成功 (or equivalent) toast appears — '
-        'no-notification is NOT success. On validation errors returns err-save-validation.'
+        'Returns ok-save-success when 操作成功 toast appears, or ok-save-navigation when URL changes after save. '
+        'no-notification without navigation is NOT success. On validation errors returns err-save-validation.'
     )
     async def click_save(button_text: str = '保存'):
+        from ._phase_intent import check_pending_write_gate, record_success_token
+
         page = await browser_context.get_current_page()
+        container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
+        if await _mark_query_ui_if_needed(page, case_data_store, container_id):
+            return _err(
+                'not-form-save | query/filter UI — NOT a form-fill submit. '
+                'Click 查询 via click_element_by_index; do not call click_save().',
+                include_in_memory=True,
+            )
+        gate_ok, pending_labels = check_pending_write_gate(case_data_store)
+        if not gate_ok:
+            return _err(
+                f'err-pending-fields:{json.dumps(pending_labels[:12], ensure_ascii=False)} | '
+                f'All editable fields must be written before submit (recording contract). '
+                f'Fill remaining fields then click_save() again.',
+                include_in_memory=True,
+            )
         url_before = page.url
         if case_data_store is not None:
             case_data_store['_url_before_save'] = url_before
@@ -1391,6 +1511,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if case_data_store is not None:
                 case_data_store['_last_save_ok'] = True
                 case_data_store.pop('_submit_ready', None)
+            record_success_token(case_data_store, 'toast_ok', success_notifs[0])
             toast = success_notifs[0]
             sys.stderr.write(f'[click_save] SUCCESS: {toast[:80]}\n')
             sys.stderr.flush()
@@ -1413,18 +1534,21 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         url_after = outcome.get('url') or page.url
         url_changed = bool(url_before and url_after and url_before != url_after)
         if url_changed:
+            if case_data_store is not None:
+                case_data_store['_last_save_ok'] = True
+                case_data_store.pop('_submit_ready', None)
+            record_success_token(case_data_store, 'url_change', url_after)
             sys.stderr.write(
-                f'[click_save] no success toast; URL changed {url_before[:60]} -> {url_after[:60]}\n'
+                f'[click_save] SUCCESS via navigation {url_before[:60]} -> {url_after[:60]}\n'
             )
             sys.stderr.flush()
-            return _err(
-                'err-save-no-feedback: URL changed but no 操作成功 notification. '
-                'Do NOT call done(success=true) unless you observed 操作成功. '
-                'If form errors appear, fix them and click_save() again.',
+            return _ok(
+                f'ok-save-navigation:{url_after[:120]} | '
+                f'Save confirmed (post-save navigation). Call done(success=true) if phase goal is save.',
                 include_in_memory=True,
             )
 
-        sys.stderr.write('[click_save] no feedback (no toast, no form errors)\n')
+        sys.stderr.write('[click_save] no feedback (no toast, no form errors, no navigation)\n')
         sys.stderr.flush()
         return _err(
             'err-save-no-feedback: no 操作成功 notification and no .el-form-item__error. '
