@@ -15,7 +15,7 @@ const META_COLS = [
 
 /**
  * UPSERT one screenshot row by (trajectory_step_id, kind).
- * @returns {Promise<number>} row id
+ * @returns {Promise<number|null>} row id, or null if step no longer exists
  */
 export async function replaceForStep(screenshot) {
   const stepId = screenshot.trajectoryStepId != null ? Number(screenshot.trajectoryStepId) : null;
@@ -29,6 +29,16 @@ export async function replaceForStep(screenshot) {
   const trajectoryId = screenshot.trajectoryId != null ? Number(screenshot.trajectoryId) : null;
 
   const db = getDB();
+  // Step may have been coalesced away between persist and screenshot flush.
+  const stepExists = await db('trajectory_step').where({ id: stepId }).first('id');
+  if (!stepExists) {
+    const err = new Error(`trajectory_step ${stepId} not found`);
+    err.errno = 1452;
+    err.code = 'ER_NO_REFERENCED_ROW_2';
+    err.sqlMessage = `trajectory_step ${stepId} not found (coalesce/remove race)`;
+    throw err;
+  }
+
   await db.raw(
     `INSERT INTO \`${TABLE}\`
       (image_data, file_size, mime_type, trajectory_id, trajectory_step_id, kind)

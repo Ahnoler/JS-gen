@@ -47,20 +47,37 @@ async function writeShotsForStep(trajectoryStepId, trajectoryId, beforeB64, afte
   const trajId = trajectoryId != null ? Number(trajectoryId) : null;
   const before = decodeB64(beforeB64);
   const after = decodeB64(afterB64);
-  if (before) {
-    await screenshotService.replaceStepScreenshot(stepId, {
-      trajectoryId: trajId,
-      kind: 'before',
-      buffer: before,
-    }).catch((err) => console.warn('[step-screenshot] before upsert failed:', err?.message || err));
-  }
-  if (after) {
-    await screenshotService.replaceStepScreenshot(stepId, {
-      trajectoryId: trajId,
-      kind: 'after',
-      buffer: after,
-    }).catch((err) => console.warn('[step-screenshot] after upsert failed:', err?.message || err));
-  }
+
+  const upsertOne = async (kind, buffer) => {
+    try {
+      await screenshotService.replaceStepScreenshot(stepId, {
+        trajectoryId: trajId,
+        kind,
+        buffer,
+      });
+    } catch (err) {
+      // Coalesce / live-remove can delete trajectory_step before the matching
+      // step_screenshot flush lands → FK 1452. Harmless; the replacement step
+      // gets its own before/after under a new entryId.
+      const errno = err?.errno ?? err?.code;
+      const sqlMsg = err?.sqlMessage || '';
+      if (errno === 1452 || errno === 'ER_NO_REFERENCED_ROW_2'
+        || /foreign key constraint fails/i.test(sqlMsg)
+        || /foreign key constraint fails/i.test(String(err?.message || ''))) {
+        console.warn(
+          `[step-screenshot] ${kind} upsert skipped (step ${stepId} gone — coalesce/remove race)`,
+        );
+        return;
+      }
+      console.warn(
+        `[step-screenshot] ${kind} upsert failed:`,
+        sqlMsg || err?.message || err,
+      );
+    }
+  };
+
+  if (before) await upsertOne('before', before);
+  if (after) await upsertOne('after', after);
 }
 
 /**
