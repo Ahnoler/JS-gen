@@ -14,6 +14,16 @@
 
 /** @typedef {'pending'|'running'|'completed'|'failed'} TrajectoryPhaseStatus */
 
+/** @typedef {'phase'|'step_seq'} OperationComponentGrain */
+
+/** @typedef {'draft'|'confirmed'|'deprecated'} OperationComponentStatus */
+
+/** @type {readonly OperationComponentGrain[]} */
+export const OPERATION_COMPONENT_GRAINS = Object.freeze(['phase', 'step_seq']);
+
+/** @type {readonly OperationComponentStatus[]} */
+export const OPERATION_COMPONENT_STATUSES = Object.freeze(['draft', 'confirmed', 'deprecated']);
+
 /** @typedef {'css'|'xpath_full'|'xpath_smart'} LocatorCandidateType */
 
 /** @type {readonly StepSource[]} */

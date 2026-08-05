@@ -20,6 +20,7 @@ import registerExecutor from './executor.js';
 import registerReplay from './replay.js';
 import registerExportMgmt from './export-mgmt.js';
 import registerMemory from './memory.js';
+import registerOperationComponent from './operation-component.js';
 
 export default function (app) {
   app.use('/api/v2', v2ResponseEnvelope);
@@ -34,6 +35,7 @@ export default function (app) {
   registerScreenshot(app);
   registerCaseData(app);
   registerSystemRefData(app);
+  registerOperationComponent(app);
   registerRemoteSession(app);
   registerApiOverride(app);
   registerExecutor(app);

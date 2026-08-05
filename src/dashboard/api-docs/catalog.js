@@ -410,6 +410,78 @@ export const API_GROUPS = [
     ],
   },
   {
+    id: 'component-library',
+    name: '组件库管理',
+    description:
+      '操作步骤原子化组件库（operation_component / occurrence）。'
+      + 'LLM 离线扫描轨迹三表 → draft 组件；人工 confirm/deprecate。'
+      + '本阶段不引用录制/回放、不碰 login。签名含 label_text 等稳定语义字段。',
+    endpoints: [
+      {
+        method: 'POST', path: '/api/v2/operation-components/mine',
+        summary: '离线扫描沉淀（LLM 命名新簇）',
+        desc: 'scope 三选一：systemId | functionId | trajectoryIds。同 system+signature 已存在则只加 occurrence，不改文案。簇内 phase≥2 才沉淀。',
+        reqExample: J({ systemId: 1, model: 'deepseek-v4-flash' }),
+        respExample: J({
+          created: [{ id: 1, name: '查询并引入', status: 'draft', occurrenceCount: 3 }],
+          updated: [],
+          createdCount: 1,
+          updatedCount: 0,
+          skippedSingletons: 5,
+          scannedPhases: 12,
+          trajectoryCount: 4,
+        }),
+      },
+      {
+        method: 'GET', path: '/api/v2/operation-components',
+        summary: '分页列表',
+        params: [
+          { name: 'page', type: 'number', in: 'query', example: '1' },
+          { name: 'pageSize', type: 'number', in: 'query', example: '20' },
+          { name: 'systemId', type: 'number', in: 'query', example: '1' },
+          { name: 'status', type: 'string', in: 'query', desc: 'draft | confirmed | deprecated' },
+          { name: 'grain', type: 'string', in: 'query', desc: 'phase | step_seq' },
+          { name: 'q', type: 'string', in: 'query', desc: 'name/description/key 模糊' },
+        ],
+        respExample: J({
+          rows: [{ id: 1, name: '查询并引入', status: 'draft', systemId: 1, grain: 'phase', occurrenceCount: 3 }],
+          total: 1, page: 1, pageSize: 20,
+        }),
+      },
+      {
+        method: 'GET', path: '/api/v2/operation-components/{id}',
+        summary: '详情（含 stepsJson + occurrences）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'POST', path: '/api/v2/operation-components',
+        summary: '手工创建（从 phase 或 steps）',
+        reqExample: J({ trajectoryPhaseId: 101 }),
+      },
+      {
+        method: 'PATCH', path: '/api/v2/operation-components/{id}',
+        summary: '改 name/key/description/paramSchema（不可改 stepsJson/signature）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+        reqExample: J({ name: '引入法定代表人', description: '查询确认后引入' }),
+      },
+      {
+        method: 'POST', path: '/api/v2/operation-components/{id}/confirm',
+        summary: 'draft → confirmed',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'POST', path: '/api/v2/operation-components/{id}/deprecate',
+        summary: '→ deprecated',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'DELETE', path: '/api/v2/operation-components/{id}',
+        summary: '仅 draft 硬删',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+    ],
+  },
+  {
     id: 'trajectory',
     name: '交易 / 轨迹',
     description: '交易 CRUD、阶段树、步骤管理',

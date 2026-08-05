@@ -9,6 +9,13 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ## [Unreleased]
 
+### Added
+
+- 2026-08-06: **操作步骤原子化组件库 Phase 1（沉淀）**：新建 `operation_component` / `operation_component_occurrence`；`trajectory_phase.component_id` 预留列（业务不写）。v2 API：`/api/v2/operation-components`（list/get/create/patch/confirm/deprecate/delete）+ `POST .../mine`（按 systemId/functionId/trajectoryIds 扫轨迹三表，签名含 label_text 等稳定语义；已存在组件只加 occurrence 不改文案）。api-docs 归入分组 **「组件库管理」**（`id: component-library`）。本阶段不碰 login、不接录制/回放引用。
+  影响范围：MySQL schema、v2 API、api-docs。
+  文件：migrations/20260806120000_operation_component.js, migrations/20260806120100_trajectory_phase_component_id.js, schemas/init.sql, src/dao/operation-component-dao.js, src/dao/operation-component-occurrence-dao.js, src/services/operation-component-signature.js, src/services/operation-component-service.js, src/services/operation-component-mine-service.js, src/routes/v2/operation-component.js, src/routes/v2/__init__.js, src/dashboard/api-docs/catalog.js, src/models/entities.js, src/models/constants.js, scripts/prompts/component-mine-prompt.md, scripts/characterization/characterize-operation-component.mjs
+  Python 同步提示：对齐新表 schema + `/api/v2/operation-components*`；`trajectory_phase.component_id` 可空预留；mine/CRUD 语义见 CHANGELOG。
+
 ### Fixed
 
 - 2026-08-05: **导航阶段被【业务数据】误判为 form_fill 导致越界**（实锤：阶段「点击客户管理…抵达对公客户管理页面」却继续新增/保存/引入）。根因：每阶段挂业务数据 boilerplate 含「填写」，且「引入」关键值污染 classify；`抵达…页面` 未进 open_page 规则。修复：① classify/boundary/intent **先剥离【业务数据】**；② **仅填表/修改/引入**阶段注入业务数据（analyze append + record/start + Python hint）；③ open_page 支持「抵达/到达」。

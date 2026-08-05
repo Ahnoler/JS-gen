@@ -130,8 +130,46 @@
  * @property {number} phaseNumber
  * @property {string} [description]
  * @property {import('./constants.js').TrajectoryPhaseStatus} [status]
+ * @property {number|null} [componentId] 预留 → operation_component.id；Phase1 业务不写入
  * @property {string} createdAt
  * @property {string|null} [completedAt]
+ */
+
+/**
+ * Phase-level operation component (atomic step library asset).
+ * @typedef {Object} OperationComponent
+ * @property {number} [id]
+ * @property {string} name
+ * @property {string|null} [key]
+ * @property {string|null} [description]
+ * @property {'phase'|'step_seq'} [grain]
+ * @property {number} systemId
+ * @property {'draft'|'confirmed'|'deprecated'} [status]
+ * @property {Record<string, unknown>|null} [paramSchema]
+ * @property {Array<{actionType: string, params: object|null, elementJson: object|null}>} [stepsJson]
+ * @property {string} signature
+ * @property {number|null} [sourceTrajectoryId]
+ * @property {number|null} [sourcePhaseId]
+ * @property {number} [occurrenceCount]
+ * @property {number|null} [confidence]
+ * @property {string} [createdAt]
+ * @property {string} [updatedAt]
+ * @property {OperationComponentOccurrence[]} [occurrences]
+ */
+
+/**
+ * @typedef {Object} OperationComponentOccurrence
+ * @property {number} [id]
+ * @property {number} componentId
+ * @property {number} trajectoryId
+ * @property {number} trajectoryPhaseId
+ * @property {number|null} [similarity]
+ * @property {number|null} [stepStart]
+ * @property {number|null} [stepEnd]
+ * @property {string} [createdAt]
+ * @property {number|null} [phaseNumber]
+ * @property {string|null} [phaseDescription]
+ * @property {string|null} [trajectoryName]
  */
 
 /**

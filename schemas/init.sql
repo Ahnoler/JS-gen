@@ -124,11 +124,13 @@ CREATE TABLE `trajectory_phase` (
   `description`    TEXT COMMENT '阶段任务完整描述（执行阶段时下发的 task）',
   `special_element_candidates_json` JSON NULL COMMENT '阶段创建/同步时标记的候选特殊元素快照',
   `status`         ENUM('pending','running','completed','failed') DEFAULT 'pending',
+  `component_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '预留 → operation_component.id；Phase1 业务不写入',
   `created_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `completed_at`   DATETIME(3) DEFAULT NULL,
   UNIQUE KEY `uk_phase_id` (`phase_id`),
   KEY `idx_trajectory_id` (`trajectory_id`),
   KEY `idx_phase_number` (`trajectory_id`, `phase_number`),
+  KEY `idx_phase_component` (`component_id`),
   CONSTRAINT `fk_phase_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='轨迹执行阶段';
 
@@ -165,6 +167,57 @@ CREATE TABLE `trajectory_step` (
   CONSTRAINT `fk_step_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_step_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='轨迹步骤';
+
+-- ─────────────────────────────────────────────────────────────
+-- 操作原子化组件库 (OperationComponent) — Phase 级步骤快照
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE `operation_component` (
+  `id`                     BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `name`                   VARCHAR(255) NOT NULL COMMENT '展示名',
+  `key`                    VARCHAR(128) DEFAULT NULL COMMENT '稳定键（展示辅助，不参与去重）',
+  `description`            TEXT COMMENT '语义说明',
+  `grain`                  ENUM('phase','step_seq') NOT NULL DEFAULT 'phase' COMMENT '组件粒度；本阶段恒 phase',
+  `system_id`              BIGINT UNSIGNED NOT NULL COMMENT '归属系统 → system.id',
+  `status`                 ENUM('draft','confirmed','deprecated') NOT NULL DEFAULT 'draft',
+  `param_schema`           JSON DEFAULT NULL COMMENT '参数化预留 JSON',
+  `steps_json`             JSON NOT NULL COMMENT '代表样例步骤快照',
+  `signature`              CHAR(64) NOT NULL COMMENT '结构签名 sha256 hex',
+  `source_trajectory_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '代表样例来源轨迹',
+  `source_phase_id`        BIGINT UNSIGNED DEFAULT NULL COMMENT '代表样例来源阶段',
+  `occurrence_count`       INT UNSIGNED NOT NULL DEFAULT 0,
+  `confidence`             DECIMAL(4,3) DEFAULT NULL,
+  `created_at`             DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at`             DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY `uk_oc_system_signature` (`system_id`, `signature`),
+  KEY `idx_oc_status` (`status`),
+  KEY `idx_oc_grain` (`grain`),
+  KEY `idx_oc_system` (`system_id`),
+  CONSTRAINT `fk_oc_system` FOREIGN KEY (`system_id`) REFERENCES `system` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_oc_source_traj` FOREIGN KEY (`source_trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_oc_source_phase` FOREIGN KEY (`source_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作原子化组件（Phase 级）';
+
+CREATE TABLE `operation_component_occurrence` (
+  `id`                   BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `component_id`         BIGINT UNSIGNED NOT NULL,
+  `trajectory_id`        BIGINT UNSIGNED NOT NULL,
+  `trajectory_phase_id`  BIGINT UNSIGNED NOT NULL,
+  `similarity`           DECIMAL(4,3) DEFAULT NULL,
+  `step_start`           INT UNSIGNED DEFAULT NULL COMMENT '预留 step_seq',
+  `step_end`             INT UNSIGNED DEFAULT NULL COMMENT '预留 step_seq',
+  `created_at`           DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY `uk_oco_comp_phase` (`component_id`, `trajectory_phase_id`),
+  KEY `idx_oco_trajectory` (`trajectory_id`),
+  KEY `idx_oco_component` (`component_id`),
+  CONSTRAINT `fk_oco_component` FOREIGN KEY (`component_id`) REFERENCES `operation_component` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_oco_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_oco_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组件候选/证据 occurrence';
+
+-- trajectory_phase.component_id FK（表已在上方建好，此处补约束）
+-- ALTER 在迁移 20260806120100 中执行；init 全量建库时用下方可选约束：
+-- ALTER TABLE `trajectory_phase` ADD CONSTRAINT `fk_phase_component`
+--   FOREIGN KEY (`component_id`) REFERENCES `operation_component` (`id`) ON DELETE SET NULL;
 
 -- ─────────────────────────────────────────────────────────────
 -- 字典类型 / 字典数据（公司同款）
