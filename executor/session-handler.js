@@ -66,6 +66,7 @@ export function createSessionHandler(manager) {
           phase_number: payload.phaseNumber ?? payload.phase_number,
           case_data_file: payload.caseDataFile ?? payload.case_data_file,
           case_data: payload.caseData ?? payload.case_data,
+          case_data_block: payload.caseDataBlock ?? payload.case_data_block,
           special_element_candidates:
             payload.specialElementCandidates
             ?? payload.special_element_candidates

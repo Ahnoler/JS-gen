@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-05: 新建 **system_ref_data / system_ref_entry**（方案 C：旧 `case_data` / `case_data_entry` 保留并标 legacy）。专存目标系统回写、经校验可复用的填表参考值（`source` / `verification_status`）；用户需求**业务数据**仍走 `trajectory.task`【业务数据】块，**禁止**把 analyze/`caseEntries` 写入 system_ref。本迭代提供 CRUD API 地基，录制暂不自动注入 system_ref。
+  影响范围：MySQL schema、v2 API、api-docs。
+  文件：migrations/20260805220000_system_ref_data.js, schemas/init.sql, src/dao/system-ref-dao.js, src/services/system-ref-service.js, src/routes/v2/system-ref-data.js, src/routes/v2/__init__.js, src/dashboard/api-docs/catalog.js, src/models/entities.js
+  Python 同步提示：对齐新表 schema + `/api/v2/system-ref-data`、`/api/v2/trajectories/:id/system-ref-entries`；业务数据与系统参考值用语勿混。
+
 - 2026-08-05: 记忆 P1 收尾：① **权重引擎完整版**（weight-engine.js）：时间衰减 `recencyFactor`（半衰期默认 1h，检索时动态计算）+ 冲突惩罚（superseded ×0.6）+ `computeWeight` 完整公式；摄取时**冲突版本化**——同 (trajectory, entity, attribute) 新值取代旧值：旧值 `superseded_by` + `disputed`（审计保留），新值 `version=旧.version+1`；检索按 `effectiveWeight`（存储权重×衰减）排序，Fact Pack 带出有效权重（Python fact_pack 同步读取）。② **action 打点 + `fill_before_save` 建模**：`writer.emit_memory_event` 支持 `facts` 参数；recorder 每步上报 `action` 事件（填写动作 label → `filled` 事实）；`phase_done` 补 `outcome` 事实；Node 摄取 phase_done 时对同阶段 filled 字段 × outcome 建 `fill_before_save` 关系（strength 1.0）。
   影响范围：记忆摄取（冲突/关系建模）、检索排序、Python agent 打点。
   文件：src/memory/weight-engine.js, src/memory/memory-dao.js, src/memory/memory-service.js, src/memory/fact-pack.js, src/memory/protocol.js, scripts/memory/writer.py, scripts/memory/fact_pack.py, scripts/recorder.py
@@ -66,6 +71,16 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：无（纯文档）。Playwright MCP 接入后 Python 侧 session_runner 的 CDP 端口分配不变，agent 驱动切换在 Node 侧。
 
 ### Fixed
+
+- 2026-08-05: 明确区分 **业务数据** vs **案例数据**：前者是用户需求里要使用的关键/场景说明（相对结构化 NL，容忍偏差，原文给 AI 判断）；后者是系统回写、由本项目落库的录制产物（`save_case_data` / form snapshot / case_data 表）。历史符号 `case_data_block` 等常承载业务数据，注释已标明勿混用。同步将 agent 提示头 /api-docs 改为【业务数据】。
+  影响范围：设计口径 / agent preamble /api-docs / 工程师注释。
+  文件：src/services/trajectory-record-lifecycle.js, src/services/trajectory-meta-service.js, scripts/actions/_case_data.py, scripts/session_runner.py, scripts/prompts/agent-prompt.md, src/dashboard/api-docs/catalog.js
+  Python 同步提示：对齐「业务数据=用户需求；案例数据=系统回写」用语，避免文档/接口混称。
+
+- 2026-08-05: 案例数据改为**原文提示给 AI 自行判断**，不再用 fieldKey↔表单 label 硬匹配驱动 autofill/`match_form_rule`（修复「法定责任人引入 朱桂武」注入后放大镜仍查主表「客户名称」的错配）。record/start 抽取 `case_data_block` 写入 phase instruction + Python `_case_scenario_text`；KV 仍可选透传供 `read_case_data`。设计前提：用户需求里的关键数据多为相对结构化表述（如「引入 / 法定责任人引入 朱桂武」），无法也不应要求严格 KV，需容忍措辞偏差——已在 lifecycle / `_case_data.py` / meta-service 注释写明。
+  影响范围：录制注入、agent preamble、autofill。
+  文件：src/services/trajectory-record-lifecycle.js, src/executor-session-client.js, executor/session-handler.js, scripts/actions/_case_data.py, scripts/actions/_form.py, scripts/session_runner.py, src/services/trajectory-meta-service.js
+  Python 同步提示：step 指令可透传 case_data_block；勿再依赖 label 硬匹配灌值。
 
 - 2026-08-05: 人工录制开/关：执行机未连接时 `forwardStdin` 改为明确 503；`manual_record_status` ack 等待 8s 后乐观回落，避免 HTTP 长时间挂起。Vue 侧 `manual-record` / `record/stop` / `detach` / `stream/detach` 显式加长超时。
   影响范围：manual-record API、产品前端录制超时。

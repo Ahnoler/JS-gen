@@ -15,8 +15,16 @@ const CASE_DATA_SECTION_RE = /^(案例数据|关键数据|测试数据|预设数
 const CASE_DATA_HEADER_INLINE_RE = /^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]/i;
 
 /**
- * Extract the raw「案例数据 / 关键数据 …」block from a requirement (not split into KV).
- * Keeps original lines for the agent to interpret as business-scenario context.
+ * Extract the raw「关键数据 / 案例数据 …」block from a *user requirement*.
+ *
+ * Semantically this is **业务数据** (what the user wants to use), not
+ * **system_ref** (target-system captured / verified) and not legacy case_data
+ * as the product home for system references. Section headers in NL often still
+ * say「关键数据」or「案例数据」— treat the block as 业务数据.
+ * Never persist this block into system_ref_*.
+ *
+ * Primary contract for AI fill: soft, relatively-structured notes; tolerate
+ * wording drift; do not require colon-separated label=value.
  * @param {string} text
  * @returns {string} block including header, or '' if none
  */
@@ -43,8 +51,13 @@ export function extractCaseDataBlock(text) {
 }
 
 /**
- * @deprecated Prefer extractCaseDataBlock — KV split paused (V2.2: API payload / AI fill).
- * Kept for characterize / callers that still need flat KV from a text block.
+ * Best-effort KV parse of requirement **业务数据** (user wish-list text).
+ *
+ * Secondary to {@link extractCaseDataBlock}. Do not confuse with 案例数据
+ * persisted from the system. Incomplete / fuzzy user wording is normal —
+ * empty parse ≠ “no 业务数据”; the raw block still goes to the agent.
+ *
+ * @deprecated Prefer extractCaseDataBlock for AI fill context.
  */
 export function extractCaseEntriesFromRequirement(text) {
   const lines = String(text || '').split(/\r?\n/);
@@ -105,11 +118,15 @@ export function extractCaseEntriesFromRequirement(text) {
 function appendCaseDataToPhases(phases, caseBlock) {
   const block = String(caseBlock || '').trim();
   if (!block || !Array.isArray(phases) || !phases.length) return phases || [];
-  const suffix = `\n\n【业务场景案例数据 — 填表时参考理解，按场景填写关键字段】\n${block}`;
+  const suffix = `\n\n【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n${block}`;
   return phases.map((p) => {
     const text = String(p || '').trim();
     if (!text) return text;
-    if (text.includes('【业务场景案例数据') || text.includes(block.slice(0, Math.min(40, block.length)))) {
+    if (
+      text.includes('【业务数据')
+      || text.includes('【业务场景案例数据')
+      || text.includes(block.slice(0, Math.min(40, block.length)))
+    ) {
       return text;
     }
     return text + suffix;
@@ -241,8 +258,9 @@ export async function analyzeRequirementToPhases({
   phases = appendCaseDataToPhases(phases, caseBlock);
 
   // P1：analyze 附带结构化 KV（extractCaseEntriesFromRequirement 规则解析，非 LLM 拆解）。
-  // 前端创建轨迹时透传 → case_data_entry 落库 + memory_fact(requirement/authoritative)
-  // 摄取，事实包注入优先采用（权威值不可被 LLM 覆盖）。
+  // 前端创建轨迹时透传 → legacy case_data_entry 落库 + memory_fact(requirement/authoritative)。
+  // 这是用户需求业务数据的 KV 投影，不是 system_ref（目标系统回写参考值）。
+  // 禁止把本结果写入 system_ref_data / system_ref_entry。
   // 注意：必须是 KV 数组（normalizeCaseEntries 对非数组返回 []），raw 文本块
   // 仅用于 appendCaseDataToPhases，不作为 caseEntries。
   return { phases, caseEntries: extractCaseEntriesFromRequirement(desc) };
@@ -386,7 +404,9 @@ export async function createTransactionWithPhases({
 }
 
 /**
- * Replace case KV entries bound to a trajectory.
+ * Replace case KV entries bound to a trajectory (legacy case_data_entry).
+ * These are NOT system_ref rows — use system-ref-service for target-system
+ * verified references. Requirement 业务数据 should prefer task text / 【业务数据】.
  * @param {number} trajectoryId
  * @param {Array} entries
  */

@@ -1497,9 +1497,18 @@ async def run_session(args):
             step_index += 1
             data = msg.get("data", {})
 
-            # Import case data on first step (inline dict preferred for remote executors)
+            # 业务数据 from the user requirement (soft NL), not 案例数据 from the system.
+            # Prefer case_data_block → _case_scenario_text for the agent; flat case_data
+            # is optional. See prepareCaseDataInjection terminology note.
             case_data_inline = data.get("case_data")
             case_data_file = data.get("case_data_file")
+            case_data_block = data.get("case_data_block") or data.get("caseDataBlock")
+            if isinstance(case_data_block, str) and case_data_block.strip():
+                case_data_store['_case_scenario_text'] = case_data_block.strip()
+                sys.stderr.write(
+                    f"[session] Case scenario text ready ({len(case_data_block.strip())} chars)\n"
+                )
+                sys.stderr.flush()
             if not case_data_loaded and (case_data_inline or case_data_file):
                 try:
                     imported = {}

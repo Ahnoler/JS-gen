@@ -1,3 +1,8 @@
+/**
+ * Legacy case_data catalog APIs.
+ * Prefer system_ref_* for target-system verified fill references.
+ * User 业务数据 lives in trajectory.task / phase 【业务数据】blocks.
+ */
 import path from 'path';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import * as caseDataDao from '../../dao/case-data-dao.js';

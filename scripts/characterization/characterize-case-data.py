@@ -69,9 +69,20 @@ def test_hint_lists_user_keys_only() -> None:
     entries = iter_user_case_entries(store)
     assert_true(entries == [('客户名称', 'UI录制')], f'entries={entries}')
     hint = format_case_data_hint(store)
-    assert_true('客户名称 = UI录制' in hint, 'hint body')
-    assert_true('预设案例数据' in hint, 'hint header')
+    assert_true('客户名称：UI录制' in hint or '客户名称' in hint, 'hint body')
+    assert_true('业务数据' in hint, 'hint header')
     assert_true(format_case_data_hint({}) == '', 'empty store')
+
+    # Prefer raw scenario text over KV hard-match messaging
+    with_block = {
+        '_case_scenario_text': '关键数据\n法定责任人引入 朱桂武',
+        '客户名称': '测试科技发展有限公司',
+    }
+    hint2 = format_case_data_hint(with_block)
+    assert_true('法定责任人引入 朱桂武' in hint2, 'block text in hint')
+    assert_true('自行判断' in hint2, 'AI-judge cue')
+    assert_true('非系统回写' in hint2 or '不是系统回写' in hint2, '业务 vs 案例 distinction')
+    assert_true('必须优先使用这些值' not in hint2, 'no hard-match mandate')
 
 
 def test_search_dialog_heuristic() -> None:

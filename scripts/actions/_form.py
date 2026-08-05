@@ -42,7 +42,6 @@ from .form_rules import (
     match_rule, match_cert_number, get_has_button_keywords,
     _gen_name,
 )
-from ._case_data import lookup_case_value
 
 # Search/picker dialogs — agent must control which query fields to fill.
 # Data-entry dialogs (新增/编辑/校验…) still get auto-fill + case data.
@@ -568,11 +567,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code). Prefers case_data_store presets when present.')
     async def match_form_rule(label_text: str):
-        preset = lookup_case_value(case_data_store, label_text)
-        if preset:
-            sys.stderr.write(f'[match-form-rule] case_data preset {label_text!r} → {preset}\n')
-            sys.stderr.flush()
-            return preset
+        # 业务数据（用户需求）仅作原文提示给 AI；不用 label↔key 硬匹配灌值
         t = (label_text or '').replace(' ', '')
         if '证件号码' in t or (t.endswith('证件号') and '类型' not in t):
             page = await browser_context.get_current_page()
@@ -1178,10 +1173,6 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     continue
             new_pending.append(f.model_dump())
         if new_pending:
-            for d in new_pending:
-                preset = lookup_case_value(case_data_store, d.get('label', ''))
-                if preset:
-                    d['commandValue'] = preset
             new_labels = [d.get('label', '') for d in new_pending]
             for d in new_pending:
                 item = TaskItem(**{k: v for k, v in d.items() if k != 'commandValue'})
@@ -1209,15 +1200,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if not pending:
             return _ok('nothing-pending')
 
-        # 构建待填字段列表（带 commandValue 注解；案例数据优先）
+        # 构建待填字段列表（不再用案例 KV 硬匹配灌 commandValue；场景原文由 preamble 提示）
         pending_dicts: list[dict] = []
         for item in pending:
             d = item.model_dump()
-            user_val = lookup_case_value(case_data_store, item.label)
-            if user_val:
-                d['commandValue'] = user_val
-                sys.stderr.write(f'[autofill] case_data → {item.label}={user_val!r}\n')
-                sys.stderr.flush()
             pending_dicts.append(d)
 
         label_kind: dict[str, str] = {item.label: item.kind for item in pending}

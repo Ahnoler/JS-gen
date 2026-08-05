@@ -164,6 +164,7 @@ async function main() {
     console.log(`  POST /api/v2/trajectories/:id/replay/prepare|start|stop`);
     console.log(`  GET  /api/v2/executors`);
     console.log(`  GET  /api/v2/case-data`);
+    console.log(`  GET  /api/v2/system-ref-data`);
     console.log(`  POST /api/browser/session  (debug)`);
     console.log(`  POST /api/test/assemble | /api/test/run`);
     console.log(`  GET  /api/docs  (product API docs for frontend)`);

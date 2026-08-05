@@ -417,7 +417,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/analyze',
         summary: 'AI 需求拆解为阶段（不落库）',
-        desc: '将需求拆成 phases（条数跟用户编号分步）。「案例数据/关键数据」段落不拆成 caseEntries，原文附加到每个 phase 描述末尾供 LLM 填表优先参考；其余字段仍可由 autofill 随机补。返回 caseEntries 恒为 []。结构化 caseEntries 仍可由创建/PATCH 入库（本期录制不注入 store，留待后续分块标注/报文捞取）。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。',
+        desc: '将需求拆成 phases（条数跟用户编号分步）。需求中的「关键数据/案例数据」段落语义上是**业务数据**（用户希望使用的值，≠ 本项目落库的系统回写案例数据）：原文附加到每个 phase 描述末尾供 LLM 理解填表；其余字段仍可由 autofill 随机补。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。',
         reqExample: J({
           description:
             '1、点击客户管理，点击对公客户管理。\n'
@@ -432,10 +432,10 @@ export const API_GROUPS = [
         respExample: J({
           phases: [
             '点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理。\n\n'
-            + '【业务场景案例数据 — 填表时参考理解，按场景填写关键字段】\n'
+            + '【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n'
             + '关键数据\n对公客户基本信息：\n法定责任人的客户名称：朱桂武\n客户标签：',
             '新增一个对公潜在客户。预期结果：打开对公潜在客户新增表单。\n\n'
-            + '【业务场景案例数据 — 填表时参考理解，按场景填写关键字段】\n'
+            + '【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n'
             + '关键数据\n对公客户基本信息：\n法定责任人的客户名称：朱桂武\n客户标签：',
           ],
           caseEntries: [],
@@ -469,7 +469,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories',
         summary: '创建交易',
-        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 caseEntries 入库（case_data_entry）；本期录制不注入 Python case_data_store，填表靠 phase 文本中的业务场景案例数据；KV 留待后续分块标注/报文捞取。',
+        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 caseEntries 写入 legacy case_data_entry（勿与业务数据、system_ref 混用）。录制填表优先参考 phase 内【业务数据】（用户需求原文）。系统回写参考值见 PUT …/system-ref-entries。',
         reqExample: J({
           functionId: 3,
           name: '开户交易',
@@ -491,7 +491,7 @@ export const API_GROUPS = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}',
         summary: '交易详情（含 phases、caseEntries）',
-        desc: 'caseEntries 为绑定到该交易的案例 KV（可入库；本期录制不注入 Python，留待后续分块标注/报文捞取）。录制填表权威来源是 phase 描述内的【业务场景案例数据】。',
+        desc: 'caseEntries 为交易级 legacy KV（case_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {
@@ -511,7 +511,7 @@ export const API_GROUPS = [
       {
         method: 'PUT', path: '/api/v2/trajectories/{id}/case-data',
         summary: '替换交易案例数据',
-        desc: '按 trajectory_id 全量替换 case_data_entry（先删后插）。字段名宜与表单 label 一致。本期仅持久化，不参与录制注入。',
+        desc: '按 trajectory_id 全量替换 legacy case_data_entry（先删后插）。不是 system_ref；系统参考值请用 PUT …/system-ref-entries。本期仅持久化，不参与录制注入。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
           caseEntries: [
@@ -781,7 +781,7 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/start',
         summary: '开始 AI 录制',
-        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。本期不注入 case_data_entry→Python；填表靠 phase 内【业务场景案例数据】+ LLM 优先对齐（autofill 可随机补其余字段）。报文捞取为后续占位。',
+        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。填表靠 phase 内【业务数据】（用户需求希望使用的值）+ LLM 理解对齐；业务数据 ≠ 系统回写并落库的案例数据（autofill 可随机补其余字段）。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ phaseIds: [101, 102], accountId: 10 }),
         respExample: J({
@@ -1041,12 +1041,14 @@ export const API_GROUPS = [
   },
   {
     id: 'case-data',
-    name: '案例数据',
-    description: '旧路径 /api/case-data → 410 Gone，请用本分组',
+    name: '案例数据（legacy）',
+    description:
+      'LEGACY：旧 case_data / case_data_entry。用户需求业务数据走 trajectory.task【业务数据】；'
+      + '目标系统回写/已校验填表参考值请用「系统参考数据」system_ref_*。旧路径 /api/case-data → 410 Gone。',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/case-data',
-        summary: '分页列表',
+        summary: '分页列表（legacy）',
         params: [
           { name: 'page', type: 'number', in: 'query', example: '1' },
           { name: 'pageSize', type: 'number', in: 'query', example: '20' },
@@ -1058,18 +1060,100 @@ export const API_GROUPS = [
       },
       {
         method: 'GET', path: '/api/v2/case-data/{recordId}',
-        summary: '详情（含 entries）',
+        summary: '详情（含 entries，legacy）',
         params: [{ name: 'recordId', type: 'string', required: true, in: 'path', example: 'case_xxx' }],
       },
       {
         method: 'GET', path: '/api/v2/case-data/{recordId}/file',
-        summary: '物化为本地 JSON 文件路径',
+        summary: '物化为本地 JSON 文件路径（legacy）',
         params: [{ name: 'recordId', type: 'string', required: true, in: 'path', example: 'case_xxx' }],
       },
       {
         method: 'DELETE', path: '/api/v2/case-data/{recordId}',
-        summary: '删除',
+        summary: '删除（legacy）',
         params: [{ name: 'recordId', type: 'string', required: true, in: 'path', example: 'case_xxx' }],
+      },
+    ],
+  },
+  {
+    id: 'system-ref-data',
+    name: '系统参考数据',
+    description:
+      '目标系统回写/经校验可复用的填表参考值（system_ref_data / system_ref_entry）。'
+      + '≠ 用户需求业务数据；≠ legacy case_data。本迭代仅 CRUD 地基，录制暂不自动注入。',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/v2/system-ref-data',
+        summary: '分页列表（可按交易/校验状态过滤）',
+        params: [
+          { name: 'page', type: 'number', in: 'query', example: '1' },
+          { name: 'pageSize', type: 'number', in: 'query', example: '20' },
+          { name: 'trajectoryId', type: 'number', in: 'query', example: '42' },
+          {
+            name: 'verificationStatus', type: 'string', in: 'query',
+            desc: 'raw | verified | rejected', example: 'verified',
+          },
+        ],
+        respExample: J({
+          rows: [{
+            id: 1, recordId: 'sref_xxx', trajectoryId: 42,
+            source: 'system_capture', verificationStatus: 'raw', keyCount: 2,
+          }],
+          total: 1, page: 1, pageSize: 20,
+        }),
+      },
+      {
+        method: 'GET', path: '/api/v2/system-ref-data/{id}',
+        summary: '详情（含 entries）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'DELETE', path: '/api/v2/system-ref-data/{id}',
+        summary: '删除头表（级联 entries）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'GET', path: '/api/v2/trajectories/{id}/system-ref-entries',
+        summary: '按交易列出系统参考 KV',
+        params: [
+          { name: 'id', type: 'number', required: true, in: 'path', example: '42' },
+          {
+            name: 'verificationStatus', type: 'string', in: 'query',
+            desc: 'raw | verified | rejected', example: 'verified',
+          },
+        ],
+        respExample: J({
+          trajectoryId: 42,
+          entries: [
+            { id: 1, fieldKey: '客户名称', fieldValue: '某某公司', verificationStatus: 'verified' },
+          ],
+        }),
+      },
+      {
+        method: 'PUT', path: '/api/v2/trajectories/{id}/system-ref-entries',
+        summary: '按交易全量替换系统参考 KV',
+        desc:
+          '先删后插。写入目标系统回写/人工导入的参考值；禁止把用户需求业务数据块当 system_ref 写入。'
+          + 'verificationStatus=verified 表示经校验可复用。',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        reqExample: J({
+          source: 'system_capture',
+          verificationStatus: 'raw',
+          entries: [
+            { fieldKey: '客户名称', fieldValue: '某某科技有限公司' },
+            { fieldKey: '证件号码', fieldValue: '91440101MA5XXXXXX' },
+          ],
+        }),
+        respExample: J({
+          trajectoryId: 42,
+          entries: [{ id: 1, fieldKey: '客户名称', fieldValue: '某某科技有限公司', trajectoryId: 42 }],
+          header: { id: 1, recordId: 'sref_xxx', verificationStatus: 'raw' },
+        }),
+      },
+      {
+        method: 'DELETE', path: '/api/v2/trajectories/{id}/system-ref-entries',
+        summary: '删除该交易全部系统参考数据',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
     ],
   },

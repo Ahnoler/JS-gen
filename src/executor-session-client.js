@@ -312,6 +312,7 @@ export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
       // P1：记忆事件归属 —— Python writer 需要 trajectory_id + fact_pack
       trajectoryId: data.trajectory_id,
       factPack: data.fact_pack,
+      caseDataBlock: data.case_data_block ?? data.caseDataBlock,
     });
     return;
   }

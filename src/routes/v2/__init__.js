@@ -13,6 +13,7 @@ import registerTrajectoryBatch from './trajectory-batch.js';
 import registerTrajectory from './trajectory.js';
 import registerScreenshot from './screenshot.js';
 import registerCaseData from './case-data.js';
+import registerSystemRefData from './system-ref-data.js';
 import registerRemoteSession from './remote-session.js';
 import registerApiOverride from './api-override.js';
 import registerExecutor from './executor.js';
@@ -32,6 +33,7 @@ export default function (app) {
   registerTrajectory(app);
   registerScreenshot(app);
   registerCaseData(app);
+  registerSystemRefData(app);
   registerRemoteSession(app);
   registerApiOverride(app);
   registerExecutor(app);

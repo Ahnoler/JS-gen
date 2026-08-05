@@ -250,7 +250,7 @@ CREATE TABLE `special_element_step` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='特殊元素所属操作步骤';
 
 -- ─────────────────────────────────────────────────────────────
--- 案例数据 (CaseData)
+-- 案例数据 (CaseData) — LEGACY；新产品系统参考值见 system_ref_*
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `case_data` (
   `id`          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -264,10 +264,10 @@ CREATE TABLE `case_data` (
   UNIQUE KEY `uk_record_id` (`record_id`),
   KEY `idx_session_id` (`session_id`),
   KEY `idx_created_at` (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='案例数据';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='案例数据（legacy；系统参考值用 system_ref_data）';
 
 -- ─────────────────────────────────────────────────────────────
--- 案例数据 KV 明细 (CaseDataEntry)
+-- 案例数据 KV 明细 (CaseDataEntry) — LEGACY
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `case_data_entry` (
   `id`             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -281,7 +281,53 @@ CREATE TABLE `case_data_entry` (
   KEY `idx_field_key` (`field_key`),
   CONSTRAINT `fk_entry_case_data` FOREIGN KEY (`case_data_id`) REFERENCES `case_data` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_entry_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='案例数据键值';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='案例数据键值（legacy；系统参考值用 system_ref_entry）';
+
+-- ─────────────────────────────────────────────────────────────
+-- 系统参考数据 (SystemRefData)
+-- 目标系统回写 / 经校验可复用的填表参考值（≠ 用户需求业务数据）
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE `system_ref_data` (
+  `id`                   BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `trajectory_id`        BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id；按交易绑定',
+  `session_id`           VARCHAR(128) DEFAULT '' COMMENT '关联会话 ID',
+  `record_id`            VARCHAR(64)  NOT NULL COMMENT '业务标识，如 sref_20260805_120000',
+  `source`               VARCHAR(32)  NOT NULL DEFAULT 'system_capture' COMMENT 'system_capture | manual | import',
+  `verification_status`  VARCHAR(32)  NOT NULL DEFAULT 'raw' COMMENT 'raw | verified | rejected',
+  `description`          VARCHAR(512) DEFAULT '',
+  `key_count`            INT UNSIGNED DEFAULT 0 COMMENT 'KV 字段数量',
+  `raw_json`             JSON COMMENT '可选整包 JSON',
+  `created_at`           DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at`           DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY `uk_sref_record_id` (`record_id`),
+  KEY `idx_sref_trajectory` (`trajectory_id`),
+  KEY `idx_sref_session` (`session_id`),
+  KEY `idx_sref_verify` (`verification_status`),
+  KEY `idx_sref_created` (`created_at`),
+  CONSTRAINT `fk_sref_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统参考数据（目标系统回写/已校验填表真值）';
+
+-- ─────────────────────────────────────────────────────────────
+-- 系统参考数据 KV 明细 (SystemRefEntry)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE `system_ref_entry` (
+  `id`                   BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `system_ref_data_id`   BIGINT UNSIGNED NOT NULL COMMENT '外键 → system_ref_data.id',
+  `trajectory_id`        BIGINT UNSIGNED DEFAULT NULL COMMENT '冗余 → trajectory.id，便于按交易查询',
+  `field_key`            VARCHAR(255) NOT NULL COMMENT '字段键名',
+  `field_value`          TEXT COMMENT '字段值',
+  `source`               VARCHAR(32)  NOT NULL DEFAULT 'system_capture' COMMENT 'system_capture | manual | import',
+  `verification_status`  VARCHAR(32)  NOT NULL DEFAULT 'raw' COMMENT 'raw | verified | rejected',
+  `verified_at`          DATETIME(3) DEFAULT NULL COMMENT '校验通过时间',
+  `created_at`           DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY `idx_sre_header` (`system_ref_data_id`),
+  KEY `idx_sre_trajectory` (`trajectory_id`),
+  KEY `idx_sre_field_key` (`field_key`),
+  KEY `idx_sre_traj_key` (`trajectory_id`, `field_key`),
+  KEY `idx_sre_verify` (`verification_status`),
+  CONSTRAINT `fk_sre_header` FOREIGN KEY (`system_ref_data_id`) REFERENCES `system_ref_data` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_sre_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统参考数据键值';
 
 -- ─────────────────────────────────────────────────────────────
 -- 表单快照 (FormSnapshot)

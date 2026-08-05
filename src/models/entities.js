@@ -195,6 +195,8 @@
  * @property {string} createdAt
  * @property {CaseDataEntry[]} [entries]
  * @property {FormSnapshot[]} [formSnapshots]
+ * @deprecated Legacy store. Prefer SystemRefData for target-system verified fill references.
+ *   User 业务数据 stays in trajectory.task / phase 【业务数据】blocks — do not conflate.
  */
 
 /**
@@ -205,6 +207,39 @@
  * @property {string} fieldKey
  * @property {string|null} [fieldValue]
  * @property {string} createdAt
+ * @deprecated Legacy KV. Prefer SystemRefEntry.
+ */
+
+/**
+ * System reference header — values captured from the *target system*
+ * (and optionally verified for reuse). Not user requirement 业务数据.
+ *
+ * @typedef {Object} SystemRefData
+ * @property {number} [id]
+ * @property {number|null} [trajectoryId]
+ * @property {string} [sessionId]
+ * @property {string} recordId
+ * @property {'system_capture'|'manual'|'import'} [source]
+ * @property {'raw'|'verified'|'rejected'} [verificationStatus]
+ * @property {string} [description]
+ * @property {number} [keyCount]
+ * @property {Record<string, unknown>|null} [rawJson]
+ * @property {string} [createdAt]
+ * @property {string} [updatedAt]
+ * @property {SystemRefEntry[]} [entries]
+ */
+
+/**
+ * @typedef {Object} SystemRefEntry
+ * @property {number} [id]
+ * @property {number} [systemRefDataId]
+ * @property {number|null} [trajectoryId]
+ * @property {string} fieldKey
+ * @property {string|null} [fieldValue]
+ * @property {'system_capture'|'manual'|'import'} [source]
+ * @property {'raw'|'verified'|'rejected'} [verificationStatus]
+ * @property {string|null} [verifiedAt]
+ * @property {string} [createdAt]
  */
 
 /**

@@ -1,4 +1,29 @@
-"""Case data storage actions for cross-phase data sharing."""
+"""Case / business data helpers for cross-phase sharing.
+
+Terminology (keep distinct — do not mix in new code)
+====================================================
+- **业务数据 (business data)**  
+  Provided by the *user* in the requirement / task description (often a
+  「关键数据」section). It is the data they *want* the automation to use
+  (e.g.「法定责任人引入 朱桂武」). Soft, relatively structured NL — not our
+  DB tables and not a guaranteed label→value schema.
+
+- **案例数据 (case data)**  
+  Reported from the *target system* and persisted by *this project*
+  (``save_case_data``, form snapshots, ``case_data`` / ``case_data_entry``
+  written during recording). Runtime capture of what the system showed or
+  what we stored — not the user's wish-list from the requirement.
+
+User 业务数据 ≠ project 案例数据. Agent fill/introduce context should present
+业务数据 as readable text for the model to interpret. 案例数据 is what we
+save back from the system.
+
+Legacy names (``case_data_block``, ``_case_scenario_text``, ``caseEntries``)
+often hold **业务数据** from the requirement; rename carefully if you touch them.
+
+Design for 业务数据: tolerate wording drift; never hard-match fieldKey to form
+labels for autofill (that caused magnifier queries to reuse main-form names).
+"""
 
 from ._helpers import _ok, _err
 from ..memory.writer import emit_memory_event
@@ -17,6 +42,7 @@ _RESERVED_CASE_KEYS = frozenset({
     '_phase_boundary', '_phase_boundary_flag_locked', '_evidence_observed',
     '_form_stale', '_task_lists_by_container', '_active_container',
     '_parent_container_before_picker', '_boundary_hint',
+    '_case_scenario_text',
 })
 
 
@@ -93,20 +119,35 @@ def iter_user_case_entries(case_data_store: dict | None) -> list[tuple[str, str]
 
 
 def format_case_data_hint(case_data_store: dict | None) -> str:
-    """Append-able task hint so the agent prefers presets (esp. dialogs)."""
-    entries = iter_user_case_entries(case_data_store)
-    if not entries:
+    """Append 业务数据 (user requirement notes) for the AI to interpret.
+
+    This hint is **业务数据**, not system-captured 案例数据. Users write soft
+    notes (「法定责任人引入 朱桂武」); the agent maps them to controls. Do not
+    hard-match keys to form labels.
+    """
+    if not case_data_store:
         return ''
-    lines = '\n'.join(f'- {k} = {v}' for k, v in entries)
-    return (
-        '\n\n【预设案例数据 — 填表必须优先使用这些值；'
-        '可用 read_case_data(key) 读取；不要用规则/LLM 另造替代值】\n'
-        f'{lines}'
-    )
+    block = str(case_data_store.get('_case_scenario_text') or '').strip()
+    entries = iter_user_case_entries(case_data_store)
+    if not block and not entries:
+        return ''
+    parts = [
+        '\n\n【业务数据 — 来自用户需求/关键数据，不是系统回写的案例数据；'
+        '由你根据场景自行判断填入哪个字段；禁止机械按标签名与键名一一对应；'
+        '引入/选人弹窗查询值优先取「引入」相关说明】',
+    ]
+    if block:
+        parts.append(block)
+    elif entries:
+        parts.append('\n'.join(f'- {k}：{v}' for k, v in entries))
+    return '\n'.join(parts) + '\n'
 
 
 def _register_case_data_actions(controller, case_data_store):
-    @controller.action('Save data to the shared case data store for cross-phase data sharing.')
+    @controller.action(
+        'Save data reported from the target system into the project case-data store '
+        '(案例数据 — system-captured, not user 业务数据 from the requirement).'
+    )
     async def save_case_data(key: str, value: str):
         try:
             case_data_store[key] = value
@@ -124,7 +165,10 @@ def _register_case_data_actions(controller, case_data_store):
         except Exception as e:
             return _err(f'save-error:{e}')
 
-    @controller.action('Read data from the shared case data store.')
+    @controller.action(
+        'Read from the project case-data store (案例数据). '
+        'For user requirement notes (业务数据), rely on the task 【业务数据】block.'
+    )
     async def read_case_data(key: str):
         val = lookup_case_value(case_data_store, key)
         if val is None:

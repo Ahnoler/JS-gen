@@ -22,59 +22,89 @@ import {
 } from './trajectory-runtime.js';
 
 /**
- * P1 恢复（V2.2 停用后）：案例数据 KV 注入 Python case_data_store。
- * 只注入结构化 KV（{fieldKey: fieldValue}），不注入 raw 文本块。
+ * Terminology (do not conflate):
  *
- * 数据来源（两级）：
- *   1. case_data_entry 表（analyze caseEntries / 前端 POST 的 KV）
- *   2. 兜底：trajectory.task 里的「关键数据」段（extractCaseEntriesFromRequirement
- *      规则解析）——前端未透传 caseEntries 时（实锤：交易 35 phases 无案例数据块、
- *      case_data_entry 0 条），从需求原文提取并落库+摄取，保证模型能拿到权威值。
+ * - **业务数据 (business data)** — values the *user* puts in the requirement /
+ *   task text (often under「关键数据」「案例数据」section headers in NL).
+ *   This is what they *want* the recording to use (e.g. introduce person 朱桂武).
+ *   Soft / relatively-structured prose; not a DB schema. Stays in task / 【业务数据】.
  *
- * 效果：Python preamble 的【预设案例数据】hint 生效 —— 放大镜查询/填表
- * 优先采用需求里的权威值（如「法定责任人引入 朱桂武」→ 查询框用「朱桂武」）。
+ * - **系统参考值 (system_ref_*)** — values captured from the *target system*
+ *   and optionally verified for reuse (`system_ref_data` / `system_ref_entry`).
+ *   Future fill-form reference; **not** injected into the agent in this iteration.
+ *   Never write extractCaseEntriesFromRequirement / user 业务数据 into system_ref_*.
+ *
+ * - **案例数据 legacy (case_data / case_data_entry)** — historical tables; retain
+ *   but do not treat as the product home for system-captured verified values.
+ *
+ * User 业务数据 ≠ system_ref ≠ legacy case_data. Feeding the agent for
+ * fill/introduce must prefer 业务数据 as readable context.
+ *
+ * Historical note: symbols like `case_data_block` / `caseEntries` often carry
+ * **业务数据** extracted from the requirement — names predate this split.
+ *
+ * Design for 业务数据:
+ *   Users rarely supply a clean fieldKey→value map. Demand text is only
+ *   *relatively* structured, e.g. under「对公客户基本信息」they may write
+ *   「法定责任人引入 朱桂武」or「引入时客户名称用朱桂武」. Labels drift; we
+ *   MUST tolerate soft deviations — ship the raw block to the AI, do NOT
+ *   drive autofill by hard label↔key matching.
+ *
+ * Returns:
+ *   caseDataBlock — raw 业务数据 text from trajectory.task (preferred AI context)
+ *   caseData      — optional flat KV derived from that text (secondary; may also
+ *                   land in legacy case_data_entry for memory — NOT system_ref)
  */
 export async function prepareCaseDataInjection(trajectoryId) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) {
-    return { caseDataFile: null, caseData: null };
+    return { caseDataFile: null, caseData: null, caseDataBlock: '' };
   }
   try {
     const { loadFlatDictByTrajectory, replaceEntriesForTrajectory } =
       await import('../dao/case-data-dao.js');
-    const { extractCaseEntriesFromRequirement } =
-      await import('./trajectory-meta-service.js');
+    const {
+      extractCaseEntriesFromRequirement,
+      extractCaseDataBlock,
+    } = await import('./trajectory-meta-service.js');
 
-    // 1) 已有落库 KV → 直接注入
-    const flat = await loadFlatDictByTrajectory(tid);
-    if (flat && Object.keys(flat).length) {
-      return { caseDataFile: null, caseData: flat };
-    }
-
-    // 2) 兜底：从 trajectory.task 解析「关键数据」段（幂等：解析出即落库，
-    //    后续 phase 走第 1 级直接命中，不重复摄取）
     const trajDao = await import('../dao/trajectory-dao.js');
     const traj = await trajDao.getById(tid);
-    const entries = extractCaseEntriesFromRequirement(traj?.task || '');
-    if (entries.length) {
-      await replaceEntriesForTrajectory(tid, entries).catch((err) => {
-        console.warn('[record] case-data fallback persist skipped:', err?.message || err);
-      });
-      try {
-        const { ingestCaseEntriesAsFacts } = await import('../memory/memory-service.js');
-        await ingestCaseEntriesAsFacts(tid, entries);
-      } catch (err) {
-        console.warn('[record] case-data fallback fact ingest skipped:', err?.message || err);
+    const taskText = traj?.task || '';
+    const caseDataBlock = extractCaseDataBlock(taskText) || '';
+
+    // 扁平 KV：有则用；空则从 task 兜底解析并落库（记忆摄取仍可用）
+    let flat = await loadFlatDictByTrajectory(tid);
+    if (!(flat && Object.keys(flat).length)) {
+      const entries = extractCaseEntriesFromRequirement(taskText);
+      if (entries.length) {
+        await replaceEntriesForTrajectory(tid, entries).catch((err) => {
+          console.warn('[record] case-data fallback persist skipped:', err?.message || err);
+        });
+        try {
+          const { ingestCaseEntriesAsFacts } = await import('../memory/memory-service.js');
+          await ingestCaseEntriesAsFacts(tid, entries);
+        } catch (err) {
+          console.warn('[record] case-data fallback fact ingest skipped:', err?.message || err);
+        }
+        flat = {};
+        for (const e of entries) flat[e.fieldKey] = e.fieldValue ?? '';
+        console.log(`[record] case-data fallback from task: ${entries.length} keys`);
       }
-      const flat2 = {};
-      for (const e of entries) flat2[e.fieldKey] = e.fieldValue ?? '';
-      console.log(`[record] case-data fallback from task: ${entries.length} keys`);
-      return { caseDataFile: null, caseData: flat2 };
     }
+
+    if (caseDataBlock) {
+      console.log(`[record] case-data block ready (${caseDataBlock.length} chars) for AI context`);
+    }
+    return {
+      caseDataFile: null,
+      caseData: flat && Object.keys(flat).length ? flat : null,
+      caseDataBlock,
+    };
   } catch (err) {
     console.warn('[record] case-data injection skipped:', err?.message || err);
   }
-  return { caseDataFile: null, caseData: null };
+  return { caseDataFile: null, caseData: null, caseDataBlock: '' };
 }
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
@@ -301,10 +331,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     data: { enabled: true },
   });
 
-  // P1 恢复：案例数据 KV 注入 Python（case_data_entry 优先；为空则从
-  // trajectory.task 兜底解析「关键数据」段）。模型 preamble 的【预设案例数据】
-  // hint 生效，放大镜查询/填表优先采用需求权威值。
-  const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
+      // 业务数据 (user requirement notes) → agent context for the model to interpret.
+      // Not the same as 案例数据 (system-captured / project-persisted).
+      // Flat KV remains optional; do not rely on key↔form-label matching.
+      const { caseDataFile, caseData, caseDataBlock } = await prepareCaseDataInjection(tid);
+      const CASE_BLOCK_MARK = '【业务数据';
+      const CASE_BLOCK_MARK_LEGACY = '【业务场景案例数据';
+      const caseBlockSuffix = caseDataBlock
+        ? `\n\n${CASE_BLOCK_MARK} — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n${caseDataBlock}`
+        : '';
 
   let recordingSystemId = null;
   try {
@@ -363,8 +398,20 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       // P1：Python 记忆 writer 需要 trajectory_id（否则 case_saved 等事件无归属）
       stepData.trajectory_id = tid;
       if (prior_phases.length) stepData.prior_phases = prior_phases;
-      // 版本V2.2：不再注入 case_data / case_data_file 到 Python case_data_store
-      // （业务场景案例数据已写在 phase.description 内，供 AI 填表参考）
+      // 原文块：phase 描述缺业务数据时补上，保证 AI 每阶段都能看见
+      let instruction = phase.description || '';
+      if (
+        caseBlockSuffix
+        && !instruction.includes(CASE_BLOCK_MARK)
+        && !instruction.includes(CASE_BLOCK_MARK_LEGACY)
+      ) {
+        instruction = instruction + caseBlockSuffix;
+      }
+      stepData.instruction = instruction;
+      if (caseDataBlock) {
+        stepData.case_data_block = caseDataBlock;
+      }
+      // Optional flat KV (still named case_data historically); autofill must not hard-match labels
       if (caseData) {
         stepData.case_data = caseData;
         if (caseDataFile) stepData.case_data_file = caseDataFile;
