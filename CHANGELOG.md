@@ -11,6 +11,95 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-05: 记忆 P1 收尾：① **权重引擎完整版**（weight-engine.js）：时间衰减 `recencyFactor`（半衰期默认 1h，检索时动态计算）+ 冲突惩罚（superseded ×0.6）+ `computeWeight` 完整公式；摄取时**冲突版本化**——同 (trajectory, entity, attribute) 新值取代旧值：旧值 `superseded_by` + `disputed`（审计保留），新值 `version=旧.version+1`；检索按 `effectiveWeight`（存储权重×衰减）排序，Fact Pack 带出有效权重（Python fact_pack 同步读取）。② **action 打点 + `fill_before_save` 建模**：`writer.emit_memory_event` 支持 `facts` 参数；recorder 每步上报 `action` 事件（填写动作 label → `filled` 事实）；`phase_done` 补 `outcome` 事实；Node 摄取 phase_done 时对同阶段 filled 字段 × outcome 建 `fill_before_save` 关系（strength 1.0）。
+  影响范围：记忆摄取（冲突/关系建模）、检索排序、Python agent 打点。
+  文件：src/memory/weight-engine.js, src/memory/memory-dao.js, src/memory/memory-service.js, src/memory/fact-pack.js, src/memory/protocol.js, scripts/memory/writer.py, scripts/memory/fact_pack.py, scripts/recorder.py
+  Python 同步提示：无强 schema；Python 控制面如镜像摄取，对齐冲突版本化（superseded_by/disputed/version）与 fill_before_save 关系语义。
+
+- 2026-08-05: 记忆 P1——**analyze 结构化案例数据摄取**：`analyzeRequirementToPhases` 恢复返回结构化 KV（`caseEntries`，复用已有 `extractCaseDataBlock` 规则解析，非 LLM 拆解）；`createTransactionWithPhases` / `setTrajectoryCaseEntries` 落 case_data_entry 后同步摄取 `memory_fact`——`source=requirement`（新加入 EVENT/FACT_SOURCES）、`stance=authoritative`、权重 1.5（base 1.0 × stance 1.5），不可被 LLM 覆盖；空值/空白 label 过滤（与 extractCaseDataBlock 对齐）。配合已就位的事实包注入，模型填表优先采用需求里的权威值。
+  影响范围：analyze API 返回（新增 caseEntries 非空）、轨迹创建/案例数据更新、记忆摄取、事实包内容。
+  文件：src/services/trajectory-meta-service.js, src/memory/memory-service.js, src/memory/protocol.js
+  Python 同步提示：无强 schema；Python 控制面如镜像 analyze，可对齐「案例数据 → 权威事实」语义（requirement/authoritative）。
+
+- 2026-08-05: 记忆 P1 全量第一块：① **ContextCompiler v1**（`scripts/context_compiler.py`）：消息窗口裁剪逻辑从 `patch_message_manager` 内联抽取，每次裁剪产出结构化丢弃明细（index/role/preview），随 `context_drop` 事件上报（dropped_items），丢弃可见可审计；`AI_MEMORY_MAX_RECENT` 可配（默认 16 保持旧行为），compiler 异常回退旧内联逻辑。② **表单值决策记录**：`_llm_values.py` LLM 生成（成功/异常两条路径）写 `decision_record(form_value)`——记录模型、温度、输入字段、prompt 预览、输出 actions、parse 策略校验、audit_status；`writer.emit_memory_event` 扩展 `decision` 字段透传。回答「这个测试值是谁、依据什么生成的」。
+  影响范围：Python agent 上下文管理 + 表单值生成、记忆摄取（决策类型 form_value 已有）。
+  文件：scripts/context_compiler.py（新增）, scripts/agent_utils.py, scripts/actions/_llm_values.py, scripts/memory/writer.py
+  Python 同步提示：无强 schema；Python 控制面如镜像决策摄取，事件内嵌 decision 对象即可落 decision_record。
+
+- 2026-08-05: 记忆 P1 最小切片——**事实包注入**（`AI_MEMORY_FACT_PACK` 默认关，opt-in）：phase 开始前 Node 按 trajectory_id 检索 `memory_fact`（`retrieveFactPack`，含 P0 无归属 NULL 阶段事实），随 step 指令透传 `fact_pack` + `trajectory_id`（lifecycle → forwardStdin → session-handler → Python）；Python 在 preamble 后追加【记忆事实包】块（`scripts/memory/fact_pack.py` 格式化，权威值/已保存值带 stance/source/weight），替代「靠 MAX_RECENT 截断记忆猜」。另修复 `case_saved` 事件补传 `phase_number`（否则事实包按阶段检索不到），`listFacts` 放宽为「匹配阶段或 NULL」。
+  影响范围：AI 录制链路（Node step 指令 + Python preamble）、记忆检索、feature flag、api-docs 无变更。
+  文件：src/services/trajectory-record-lifecycle.js, src/executor-session-client.js, executor/session-handler.js, src/memory/memory-dao.js, scripts/session_runner.py, scripts/actions/_case_data.py, scripts/memory/fact_pack.py
+  Python 同步提示：无强 schema；Python 控制面如镜像录制链路，step 指令需透传 trajectory_id / fact_pack，事件上报带 phase_number。
+
+### Changed
+
+- 2026-08-05: 步骤日志改为**每步一行紧凑格式**：`[step N] done=yes/no stopped=yes/no | goal=…(≤100字) | act=…(≤200字) | res=…(≤120字) err=…`——统一前缀可 grep，goal/actions/result 全截断防刷屏（此前 `[on_step_end]/[next_goal]/[actions]/[last_result]` 四行无前缀输出，`get_page_state` 长 JSON 每次全量刷屏）。完整 tool 结果仍在模型上下文内，日志侧只留关键信号。
+  影响范围：Python agent stderr 日志。
+  文件：scripts/recorder.py
+  Python 同步提示：无（仅 JS-gen scripts）。
+
+- 2026-08-05: 移除 `recorder.py` on_step_start 的逐步 `[on_step_start] n_steps=N` 冗余日志（每步刷屏，无信息增量；on_step_end 的状态日志与 5 步节流的 `[recorder] step N done` 保留）。
+  影响范围：Python agent stderr 日志。
+  文件：scripts/recorder.py
+  Python 同步提示：无（仅 JS-gen scripts）。
+
+- 2026-08-05: 文档修订：Codex × 浏览器 MCP 集成计划（v1.1）对内驱动由 chrome-devtools-mcp 改为 **Playwright MCP 为主**（`--cdp-endpoint` 附着现有 CDP 端口、a11y 快照、`browser_run_code` 执行现有 CTRL helpers、testing 断言做边界证据），chrome-devtools-mcp 降级为可选深度诊断；新增三个产品痛点（弹窗循环 / 任务边界漂移 / 人工辅助依赖）的方案归属——前两者主战场在记忆系统 P1 + 阶段边界合约，驱动层只提供确定性快照与断言证据。灰度测试开发计划同步更新（开关 `AI_MCP_PLAYWRIGHT_URL` / `AI_MCP_PLAYWRIGHT_CAPS`、`AGENT_DRIVER=playwright-mcp|browser-use`、P1 任务与矩阵）。
+  影响范围：设计文档（未改动代码）。
+  文件：docs/JS-gen学习Codex与ChromeDevTools集成计划.md, docs/JS-gen灰度测试开发计划.md
+  Python 同步提示：无（纯文档）。Playwright MCP 接入后 Python 侧 session_runner 的 CDP 端口分配不变，agent 驱动切换在 Node 侧。
+
+### Fixed
+
+- 2026-08-05: 人工录制开/关：执行机未连接时 `forwardStdin` 改为明确 503；`manual_record_status` ack 等待 8s 后乐观回落，避免 HTTP 长时间挂起。Vue 侧 `manual-record` / `record/stop` / `detach` / `stream/detach` 显式加长超时。
+  影响范围：manual-record API、产品前端录制超时。
+  文件：src/services/trajectory-record-lifecycle.js（Vue 在 ui-auto-recording-agent-vue-master）
+  Python 同步提示：可选对齐 manual-record ack 短等+乐观回落（无强 schema）。
+
+- 2026-08-05: 记忆系统 P0 摄取层两处数据 bug（冒烟脚本实测暴露）：① `normalizeDecision` 的 `policyChecks` / `outputJson` / `finalAction` 未显式序列化——mysql2 会把数组参数展开为多值，`decision_record` 插入报 `Column count doesn't match value count`；现统一 `toJsonString` 序列化。② 多行 `INSERT` 仅返回单 insertId——`insertFacts` 返回值长度被当作事实计数（少计）且 `co_occur` 关系因 `ids[1]=undefined` 静默丢失；新增 `factIdsByEvent` 按 event_id 回查真实 id，关系建模基于真实 id。新增冒烟脚本 `scripts/smoke/smoke-memory-ingest.mjs`（摄取→检索→审计→统计→清理，23 项断言全过）。
+  影响范围：记忆系统摄取（Node service/dao）、冒烟验证。
+  文件：src/memory/memory-service.js, src/memory/memory-dao.js, scripts/smoke/smoke-memory-ingest.mjs
+  Python 同步提示：无强 schema；Python 控制面如镜像决策摄取，注意 policy_checks 等 JSON 列需序列化后传输。
+
+- 2026-08-05: `select_option` check 模式在 label 未匹配时无条件取**第一个可见 select** 的当前值（常是分页器 `10条/页`），误导模型跳过真实字段（自愈日志实锤：`ok-already:10条/页`）。现 fallback 仅认可 placeholder 或所属 form-item label 关联目标 label 的 select，否则返回 `not-found` → 走 `label-not-found` 报错。修复自愈链路 `select_option 模型名称/first` 错配为分页器。
+  影响范围：Python agent 表单动作（select_option / check / replay fallback）。
+  文件：scripts/actions/_js_snippets.py
+  Python 同步提示：无（仅 JS-gen scripts 内嵌 JS 片段）。
+
+- 2026-08-05: 无进展循环止损（自愈日志实锤：`get_page_state` 连发 3 次空转至 max_steps 后需人工）。`recorder.py` 指纹映射新增只读动作（`get_page_state` / `check_field_value` / `scan_form_fields` / `get_pending_tasks`），heal 模式新增「连续 ≥3 次相同只读动作 → 停止」检测（原 heal 分支完全跳过周期检测）。非 heal 模式的只读动作循环亦可被 cycle detect 捕获。
+  影响范围：Python 录制/自愈止损。
+  文件：scripts/recorder.py
+  Python 同步提示：无（仅 JS-gen scripts）。
+
+- 2026-08-05: `close_dialog` 回放幂等化：录制语义为「确保弹窗关闭」，回放时若前置动作（确定/下一步）已关掉弹窗/抽屉/message-box，不再报 `click-failed:not-found` 触发无效自愈，直接返回 `ok (no visible dialog/drawer — already closed)`。可见性检测用 offsetParent + getBoundingClientRect 兜底（对齐固定定位 drawer）。
+  影响范围：live replay（scripts）。
+  文件：scripts/actions/_replay.py
+  Python 同步提示：无（仅 JS-gen scripts）。
+
+- 2026-08-05: 记忆系统 P0 阻断项修复：`scripts/session_runner.py` 中 `from scripts.memory.writer import (` 首行丢失导致 IndentationError，且 `configure_memory_writer(session_id=session_id, …)` 在 `session_id` 赋值前调用（运行期 NameError）。现导入语句完整、`session_id` 先赋值再 configure；`recorder.py` 501 行 f-string 为单行无语法问题。Python 侧 9 个记忆相关文件 AST 全部通过，writer/store/fact_pack/feature_flags 导入验证通过。
+  影响范围：Python agent 记忆旁路（P0，只写不读）。
+  文件：scripts/session_runner.py
+  Python 同步提示：无（仅 JS-gen scripts）。
+
+
+- 2026-08-05: 「客户名称搜索为…，点击下一步」误判为 query（强制点查询收口）；现含「下一步/上一步」时退出 query，boundary `role=navigate` + 向导 hint；表单动词（新增/填写/修改…）优先于 wizard 关键词，向导表单步仍按 maintain 录制。
+  影响范围：scripts 阶段分类 / agent preamble。
+  文件：scripts/actions/_phase_context.py, scripts/actions/_phase_boundary.py, scripts/session_runner.py
+  Python 同步提示：无（仅 Python 子进程 scripts）。
+
+- 2026-08-05: 「点击评级申请。预期结果：打开…页面」类阶段此前为 `other` 无收口 cue，AI 打开页面后继续把弹窗流程走完；现识别为 boundary `role=navigate`（goal `open_page`）+【打开页面/导航】hint：页面/弹窗出现即 done，禁止在新页面内继续操作；agent-prompt 任务类型表与完成规则同步。
+  影响范围：scripts 阶段分类 / agent preamble / agent prompt。
+  文件：scripts/actions/_phase_context.py, scripts/actions/_phase_boundary.py, scripts/prompts/agent-prompt.md
+  Python 同步提示：无（仅 Python 子进程 scripts）。
+
+### Changed
+
+- 2026-08-05: 稳健相对 xpath：录制生成不再写 dialog `[last()]`；树节点剥 `(n)`/`[V-x]` + 可选 parent_text；图标优先 `el-icon-*` class（tip 文案入 params）；无 label 时 placeholder 锚点。回放侧对旧 `[last()]` 改解析为最后可见 dialog/drawer，树/按钮全去空格匹配，图标 class+tooltip。
+  影响范围：locator-candidates / inspect / live replay（scripts）/ api-docs 合同文案。
+  文件：src/cdp/locator-candidates.js, src/cdp/inspect.js, scripts/actions/_replay.py, scripts/actions/_js_snippets.py, scripts/actions/_locator_helpers_js.py, src/dashboard/api-docs/catalog.js
+  Python 同步提示：无强 schema；若 Python 控制面有 xpath_smart 生成/回放，对齐可见 dialog、树剥后缀、图标 class+tip、placeholder 兜底。
+
+### Added
+
 - 2026-08-05: AI 录制 **阶段边界合约**（`AI_PHASE_BOUNDARY` 默认 on，opt-out）：role/goals/证据收口替代散落 if；混合「新增+完成引入」须引入证据+保存证据；picker 确认写 `picker_closed` 并父 container `_form_stale` 重扫；`_task_lists_by_container` 按 `JS_IDENTIFY_CONTAINER` 分存；录制 `events[]` / SSE 含 `phase_boundary_obs`。
   影响范围：scripts 录制语义、record-lifecycle events、api-docs、feature flag。
   文件：scripts/actions/_phase_boundary.py, scripts/actions/_phase_intent.py, scripts/actions/_form.py, scripts/actions/_misc.py, scripts/feature_flags.py, scripts/session_runner.py, src/services/trajectory-record-lifecycle.js, src/dashboard/api-docs/catalog.js
