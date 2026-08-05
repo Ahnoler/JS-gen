@@ -28,7 +28,9 @@ export async function saveCaseData({ recordId, sessionId, model, description, da
   const entries = [];
   const skipKeys = new Set([
     'form_snapshot', 'form_snapshots', 'task_list',
-    '_watcher_mode', '_intervention_queue',
+    '_watcher_mode',
+    '_phase_boundary', '_evidence_observed', '_form_stale',
+    '_task_lists_by_container', '_active_container', '_parent_container_before_picker',
   ]);
   for (const [key, val] of Object.entries(dataStore || {})) {
     if (!skipKeys.has(key) && (val === null || typeof val !== 'object')) {

@@ -188,21 +188,12 @@ export default function registerBrowserSessionRoutes(app) {
     return runSessionStep(req, res);
   });
 
-  // Human intervention: inject an instruction into the running session
+  // Human intervention retired — use manual recording instead
   app.post('/api/browser/session/:id/intervene', (req, res) => {
-    const { id } = req.params;
-    const { instruction } = req.body || {};
-    const gb = state.globalBrowser;
-    const session = state.sessions.get(id);
-    if (!session) return res.status(404).json({ error: 'Session not found' });
-    if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
-    if (!instruction) return res.status(400).json({ error: 'instruction is required' });
-    try {
-      gb.stdin.write(JSON.stringify({ event: 'intervene', data: { instruction } }) + '\n');
-      res.json({ status: 'queued', instruction: instruction.slice(0, 200) });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
+    res.status(410).json({
+      error: 'Gone',
+      message: 'intervene is retired. Use manual recording for human correction.',
+    });
   });
 
   app.delete('/api/browser/session/:id', async (req, res) => {

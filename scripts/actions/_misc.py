@@ -9,6 +9,7 @@ logical coherence with other form-filling actions.
 import json
 import os
 import re
+import sys
 from datetime import datetime
 
 from . import _state
@@ -326,6 +327,20 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
         await page.wait_for_timeout(500)
         if _is_ok_result(result):
             _state._record_action('close_dialog', {}, result, element=element)
+            try:
+                from ._phase_boundary import maybe_record_picker_closed
+                from ._js_snippets import JS_IS_QUERY_TOOLBAR
+                still = False
+                try:
+                    still = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
+                except Exception:
+                    still = False
+                parent = (case_data_store or {}).get('_parent_container_before_picker') or 'main'
+                maybe_record_picker_closed(
+                    case_data_store, still_query_ui=still, parent_container=parent,
+                )
+            except Exception:
+                pass
             return _ok(result)
         return result
 
@@ -366,11 +381,13 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
 
             # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
             # select→修改→确认 loops after premature done() rejection.
+            # Exception: customer-magnifier / query-toolbar pickers — allow 确认.
             btn_label = ((element_info or {}).get('text') or elem_text or '').strip()
             if _is_form_submit_label(btn_label):
                 compact = re.sub(r'\s+', '', btn_label)
                 in_form_overlay = False
                 dialog_title = ''
+                is_picker_ui = False
                 try:
                     overlay_info = await page.evaluate('''() => {
                         const isVisible = (el) => {
@@ -380,42 +397,64 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                             const r = el.getBoundingClientRect();
                             return r.width > 0 && r.height > 0;
                         };
-                        for (const d of document.querySelectorAll('.el-dialog')) {
-                            const wrap = d.closest('.el-dialog__wrapper') || d;
-                            if (isVisible(wrap) && isVisible(d)) {
-                                const title = (d.querySelector('.el-dialog__title')?.textContent || '').trim();
-                                const hasForm = !!d.querySelector('.el-form');
-                                return { inForm: hasForm, title };
+                        // Prefer topmost visible dialog by z-index
+                        let best = null;
+                        let bestZ = -1;
+                        const consider = (d, titleSel) => {
+                            const wrap = d.closest('.el-dialog__wrapper, .el-drawer__wrapper') || d;
+                            if (!isVisible(wrap) || !isVisible(d)) return;
+                            const z = parseInt(getComputedStyle(wrap).zIndex || '0', 10) || 0;
+                            if (z < bestZ) return;
+                            const title = titleSel(d);
+                            const hasForm = !!d.querySelector('.el-form');
+                            const btns = d.querySelectorAll('button, .el-button');
+                            let hasQuery = false, hasSave = false, hasConfirm = false;
+                            for (const b of btns) {
+                                if (b.offsetParent === null && b.getClientRects().length === 0) continue;
+                                const t = (b.innerText || b.textContent || '').replace(/\\s+/g, ' ').trim();
+                                if (/^(查询|搜索|查找)$/.test(t)) hasQuery = true;
+                                if (/^(保存|提交)$/.test(t)) hasSave = true;
+                                if (/^(确认|确定)$/.test(t)) hasConfirm = true;
                             }
+                            bestZ = z;
+                            best = { inForm: hasForm, title, hasQuery, hasSave, hasConfirm };
+                        };
+                        for (const d of document.querySelectorAll('.el-dialog')) {
+                            consider(d, (el) => (el.querySelector('.el-dialog__title')?.textContent || '').trim());
                         }
                         for (const d of document.querySelectorAll('.el-drawer')) {
-                            const wrap = d.closest('.el-drawer__wrapper') || d;
-                            if (isVisible(wrap) && isVisible(d)) {
-                                const title = (d.getAttribute('aria-label') || '').trim();
-                                const hasForm = !!d.querySelector('.el-form');
-                                return { inForm: hasForm, title };
-                            }
+                            consider(d, (el) => (el.getAttribute('aria-label') || '').trim());
                         }
-                        return { inForm: false, title: '' };
+                        return best || { inForm: false, title: '', hasQuery: false, hasSave: false, hasConfirm: false };
                     }''')
                     if isinstance(overlay_info, dict):
                         in_form_overlay = bool(overlay_info.get('inForm'))
                         dialog_title = str(overlay_info.get('title') or '')
+                        is_picker_ui = bool(
+                            overlay_info.get('hasQuery') and not overlay_info.get('hasSave')
+                        )
                 except Exception:
                     in_form_overlay = bool(await page.evaluate(_JS_VISIBLE_FORM_OVERLAY))
+
+                # Authoritative: page-level query toolbar / sticky flag (overlay scan can miss)
+                if compact.startswith(('确认', '确定')):
+                    try:
+                        from ._js_snippets import JS_IS_QUERY_TOOLBAR
+                        if (case_data_store or {}).get('_query_ui') or await page.evaluate(JS_IS_QUERY_TOOLBAR):
+                            is_picker_ui = True
+                    except Exception:
+                        if (case_data_store or {}).get('_query_ui'):
+                            is_picker_ui = True
+
                 try:
                     from ._phase_intent import (
                         get_phase_intent,
-                        is_introduce_phase,
-                        record_success_token,
                         should_block_index_submit,
                     )
                     contract = get_phase_intent(case_data_store)
                 except Exception:
                     contract = None
-                    is_introduce_phase = lambda c: False  # noqa: E731
                     should_block_index_submit = None  # type: ignore
-                    record_success_token = None  # type: ignore
 
                 block = False
                 if should_block_index_submit is not None:
@@ -424,11 +463,33 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         btn_label,
                         in_form_overlay=in_form_overlay,
                         dialog_title=dialog_title,
+                        is_picker_ui=is_picker_ui,
+                        container_id='',
+                        query_ui=is_picker_ui or bool((case_data_store or {}).get('_query_ui')),
+                        case_data_store=case_data_store,
                     )
-                elif compact.startswith(('保存', '提交')) or in_form_overlay:
+                elif compact.startswith(('保存', '提交')) or (in_form_overlay and not is_picker_ui):
+                    block = True
+
+                # Hard allow: never trap picker confirm in use-click-save ↔ not-form-save loop
+                if block and compact.startswith(('确认', '确定')) and is_picker_ui:
+                    block = False
+                    sys.stderr.write(
+                        f'[click] allow index confirm on picker UI title={dialog_title!r}\n'
+                    )
+                    sys.stderr.flush()
+
+                # Hard block: query/picker UI never index-click 保存/提交
+                if compact.startswith(('保存', '提交')) and is_picker_ui:
                     block = True
 
                 if block:
+                    if compact.startswith(('保存', '提交')) and is_picker_ui:
+                        return _err(
+                            f'not-form-save | Index click on "{btn_label}" forbidden on query/picker UI. '
+                            f'Use 查询 / 确认 instead of 保存/提交.',
+                            include_in_memory=True,
+                        )
                     if compact.startswith('确认'):
                         needle = '确认'
                     elif compact.startswith('确定'):
@@ -455,12 +516,22 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     'text': (element_info or {}).get('text') or elem_text or '',
                 }, f'ok-clicked-{index}', element=element_info)
                 try:
-                    from ._phase_intent import get_phase_intent, is_introduce_phase, record_success_token
-                    contract = get_phase_intent(case_data_store)
-                    if contract and is_introduce_phase(contract):
-                        compact = re.sub(r'\s+', '', btn_label)
-                        if compact.startswith(('确认', '确定')):
-                            record_success_token(case_data_store, 'confirm_click', btn_label)
+                    from ._phase_intent import record_success_token
+                    from ._phase_boundary import maybe_record_picker_closed
+                    compact2 = re.sub(r'\s+', '', btn_label)
+                    if compact2.startswith(('确认', '确定')):
+                        record_success_token(case_data_store, 'confirm_click', btn_label)
+                        await page.wait_for_timeout(400)
+                        still = False
+                        try:
+                            from ._js_snippets import JS_IS_QUERY_TOOLBAR
+                            still = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
+                        except Exception:
+                            still = False
+                        parent = (case_data_store or {}).get('_parent_container_before_picker') or 'main'
+                        maybe_record_picker_closed(
+                            case_data_store, still_query_ui=still, parent_container=parent,
+                        )
                 except Exception:
                     pass
             return _ok(f'ok-clicked-{index}')

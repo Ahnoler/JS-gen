@@ -49,6 +49,16 @@ def phase_intent_contract_enabled() -> bool:
     return _env_flag('AI_PHASE_INTENT_CONTRACT', True)
 
 
+def phase_boundary_enabled() -> bool:
+    """AI_PHASE_BOUNDARY — loose phase boundary completion contract (default on).
+
+    When on (default), recording uses ``_phase_boundary`` as authority; legacy
+    ``_phase_intent`` is adapted from it. Set ``AI_PHASE_BOUNDARY=off`` to
+    fall back to the pre-boundary intent contract only.
+    """
+    return _env_flag('AI_PHASE_BOUNDARY', True)
+
+
 def scenario_describer_interval() -> int:
     """SCENARIO_DESCRIBER_INTERVAL — run scenario LLM every N agent micro-steps (default 3)."""
     raw = os.environ.get('SCENARIO_DESCRIBER_INTERVAL')

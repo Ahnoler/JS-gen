@@ -1,6 +1,6 @@
 """
 Recording hooks for browser-use agent: step callbacks, goal dedup detection, cancel signal,
-premature done() prevention, and human intervention injection.
+and premature done() prevention.
 """
 import json
 import re
@@ -16,8 +16,8 @@ from .actions._js_snippets import JS_SMART_LOCATOR
 _ACTION_LOG = []
 
 
-def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention_queue=None, case_data_store=None):
-    """Build hooks with goal dedup detection, cancel signal, and intervention support."""
+def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_store=None):
+    """Build hooks with goal dedup detection and cancel signal."""
     if goal_tracker is None:
         goal_tracker = {'goals': [], 'stopped': False}
 
@@ -47,50 +47,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, intervention
             sys.stderr.write(f"[recorder] scenario_describer error: {e}\n")
             sys.stderr.flush()
 
-        # Check for human intervention before proceeding
-        if intervention_queue is not None:
-            try:
-                while not intervention_queue.empty():
-                    instruction = intervention_queue.get_nowait()
-                    msg = HumanMessage(content=f'[HUMAN INTERVENTION] {instruction}\n\nPause your current plan and follow this new instruction first. After completing it, resume the original task.')
-                    agent._message_manager._add_message_with_tokens(msg)
-                    sys.stderr.write(f"[recorder] Injected human intervention: {instruction[:100]}\n")
-                    sys.stderr.flush()
-            except Exception as e:
-                sys.stderr.write(f"[recorder] Intervention error: {e}\n")
-                sys.stderr.flush()
-
-        # Check for self-requested intervention from form auto-fill or sync_tasks_from_errors
         if case_data_store is not None:
-            intervention_queue_list = case_data_store.pop('_intervention_queue', None)
-            if intervention_queue_list is not None and len(intervention_queue_list) > 0:
-                labels = [r.get('label', '') for r in intervention_queue_list]
-                has_buttons = [r.get('hasButton', '') for r in intervention_queue_list]
-                reasons = [r.get('reason', '') for r in intervention_queue_list]
-
-                # Build a single merged message with all intervention fields
-                field_list = '\n'.join(
-                    f'  {i+1}. "{labels[i]}" — button: "{has_buttons[i]}"'
-                    for i in range(len(labels))
-                )
-                msg_text = (
-                    f'[HUMAN INTERVENTION - FIELD(S) NEED SPECIAL WORKFLOW]\n'
-                    f'The following {len(labels)} field(s) are disabled but have adjacent action buttons:\n'
-                    f'{field_list}\n\n'
-                    f'ACTIONS (in order):\n'
-                    f'1. Do NOT re-select or re-fill already-completed fields.\n'
-                    f'2. FIRST call click_save(). If ok-save-success (操作成功), call done(success=true).\n'
-                    f'3. If err-save-validation on these fields: use click_adjacent_button '
-                    f'(e.g. 引入/联网核查) for each, wait_for_loading, then click_save() again.\n'
-                    f'4. Only if still blocked after trying adjacent buttons, call done() and report: '
-                    f'"Fields {labels} require a special fill workflow."\n'
-                    f'5. After the user provides a workflow, follow it, then task_done + click_save().'
-                )
-                msg = HumanMessage(content=msg_text)
-                agent._message_manager._add_message_with_tokens(msg)
-                sys.stderr.write(f'[recorder] Injected self-requested intervention for: {labels}\n')
-                sys.stderr.flush()
-
             # After auto-fill / empty pending: force agent toward 保存 — never on query UI
             if case_data_store.get('_task_mode') == 'query' or case_data_store.get('_query_task') or case_data_store.get('_query_ui'):
                 case_data_store.pop('_submit_ready', None)

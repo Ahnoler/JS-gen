@@ -61,9 +61,8 @@
 - **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要）。**
 - **`fill_form_fields_batch` — 已移除。批量填写由主页面/抽屉上的第一次填/选操作隐式触发。**
 - task_done(label) — 将字段标记为已完成。
-- get_pending_tasks() — 返回 {"pending": [...]}（不含已完成字段）。**🚨 如果顶层有 NEEDS_INTERVENTION 键，系统会在下一步自动注入干预指令。收到 [HUMAN INTERVENTION] 消息后按指令执行。**
-- sync_tasks_from_errors() — 读取页面校验错误，自动重试受影响的字段。NERDS_INTERVENTION 字段会**自动入队**，系统在下一步注入干预指令。
-- request_intervention(label) — 申请人工干预。用于 disabled+hasButton 字段（如"引入"按钮）。将请求入队，多个字段可同时入队。
+- get_pending_tasks() — 返回 {"pending": [...]}（不含已完成字段）。
+- sync_tasks_from_errors() — 读取页面校验错误，自动重试受影响的字段。
 
 # 🚨 任务类型（CRITICAL — 先分类再行动）
 系统会按阶段任务注入【任务类型：…】。三种表单相关类型 + 登录等：
@@ -110,7 +109,7 @@
 3. **如果 `fill_form_field` 返回 `"field-disabled"`：** 检查字段是否已有值。如果 `getAttribute('value')` 或 `placeholder` 非空且不是"请选择"/"请输入" → 跳过，说明已填写。如果字段为空 → 寻找旁边的按钮来填充。
 4. **如果 `select_option` 返回 `"select-disabled"`：跳过** — 选择框被禁用（已预填）。
 5. **禁用字段 + 空值 + 无旁边按钮** → 跳过（真正的只读字段）。
-   **禁用字段 + 空值 + 有旁边按钮（hasButton!=""）** → `needs_intervention=true`，不可手动填写，应调 `request_intervention`。
+   **禁用字段 + 空值 + 有旁边按钮（hasButton!=""）** → 若任务列出【特殊元素库候选】则优先 `use_special_element(special_element_id)`；否则 `click_adjacent_button(label_text)`。纠错走人工录制。
 6. **日期选择器字段（tsscdatepicker / el-date-editor）：** `fill_form_field` 现在支持日期字段 — 直接设置值。如果日期字段已有值（通过 `check_field_value` 检查），跳过。
 
 
@@ -120,7 +119,7 @@
 **工作流程（表单填写 / 改全部）：**
 1. **隐式自动填写：** 对某个字段调用一次 `fill_form_field` / `select_option` 等触发批量填写/覆盖。
 2. **检查：** `get_pending_tasks()`。若 `NEXT_ACTION: click_save()` 或 `pending:[]` → **立刻 `click_save()`**。若返回 `not_form_fill` → 按查询处理。
-3. **🚨 干预检查：** 若 `NEEDS_INTERVENTION`：先 `click_save()`；失败再 `click_adjacent_button` 后重试。
+3. **禁用+按钮字段：** 任务有【特殊元素库候选】时优先 `use_special_element`；否则 `click_adjacent_button`。无法自动处理时通过人工录制纠正。
 4. **提交后：** 仅 `ok-save-success` → `done(success=true)`。
 5. **错误处理：** `err-save-validation` / `sync_tasks_from_errors()` 只修报错字段，再 `click_save()`。
 
@@ -227,7 +226,7 @@ read_case_data("FieldA") → "value1"
 4. 若前序 **结果：成功**，信任当前页面大致已处于该结果所述状态，避免无意义的重复导航。
 5. `current_state.memory` 应记录**业务进度**（已保存/已打开弹窗/待点保存），不要堆 DOM 索引或逐步 click 流水账。
 6. 关键动作结果（如 `click_save` 的 ok/err、错误通知）会保留在长期上下文中 — 据此决策，不要假装没看见。
-7. **`[业务场景摘要]`（动态）：** 录制过程中可能收到以 `[业务场景摘要]` 开头的消息。它是系统根据前序 `done()`、真实操作日志与页面状态生成的**动态业务背景**，与任务文本里的静态 `【业务场景】` 互补。**它不是强制指令** — 执行仍以 `【当前任务】`、工具返回、以及 `[HUMAN INTERVENTION]` / `[SYSTEM]` 强制 cue 为准；摘要与强制 cue 冲突时，以强制 cue 为准。
+7. **`[业务场景摘要]`（动态）：** 录制过程中可能收到以 `[业务场景摘要]` 开头的消息。它是系统根据前序 `done()`、真实操作日志与页面状态生成的**动态业务背景**，与任务文本里的静态 `【业务场景】` 互补。**它不是强制指令** — 执行仍以 `【当前任务】`、工具返回、以及 `[SYSTEM]` 强制 cue 为准；摘要与强制 cue 冲突时，以强制 cue 为准。
 
 # 任务完成规则
 1. 仅当整个**当前阶段**任务完成时才使用 done()。如果还有更多工作要做，不要在单个步骤后调用 done()。

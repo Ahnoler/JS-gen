@@ -151,6 +151,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   // which focuses on manual/cdp (+ optional agent autoPersist). Both must handle
   // step_screenshot or AI-recording shots would be dropped.
   const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, async (type, payload) => {
+    if (type === 'phase_intent_obs' || type === 'phase_boundary_obs' || type === 'phase_end') {
+      events.push({
+        type,
+        phaseNumber: payload?.phase ?? payload?.phaseNumber ?? session?.activePhaseId ?? null,
+        ...(payload && typeof payload === 'object' ? payload : {}),
+        at: new Date().toISOString(),
+      });
+      return;
+    }
     if (type === 'step_screenshot') {
       const entryId = payload?.entryId;
       if (!entryId) return;
@@ -304,7 +313,18 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
             limit: 3,
             includeSteps: true,
           });
-          if (candidates.length) stepData.special_element_candidates = candidates;
+          if (candidates.length) {
+            stepData.special_element_candidates = candidates;
+            console.log(
+              `[record] special-element candidates phase=${phase.phaseNumber} `
+              + `n=${candidates.length} ids=${candidates.map((c) => c.id).join(',')}`,
+            );
+          } else {
+            console.log(
+              `[record] special-element candidates phase=${phase.phaseNumber} n=0 `
+              + `(systemId=${recordingSystemId})`,
+            );
+          }
         } catch (err) {
           console.warn('[record] special-element search skipped:', err?.message || err);
         }

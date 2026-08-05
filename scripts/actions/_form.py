@@ -6,6 +6,7 @@ Element UI form interaction.
 """
 
 import json
+import re
 import sys
 
 from ..agent_utils import emit_json
@@ -98,24 +99,31 @@ def _skip_auto_fill(case_data_store: dict | None) -> bool:
 
 
 async def _mark_query_ui_if_needed(page, case_data_store, container_id: str = '') -> bool:
-    """Detect query/filter UI; set _query_ui. Returns True if search context."""
+    """Detect query/filter UI; set _query_ui. Returns True if search context.
+
+    Re-evaluates on every call — do not sticky-keep ``_query_ui`` after a picker
+    dialog closes (that blocked click_save on the parent maintain form).
+    Phase-level ``_query_task`` / task_mode=query still forces query semantics.
+    """
     if case_data_store is None:
         return _is_search_dialog(container_id)
-    if _is_search_dialog(container_id) or case_data_store.get('_query_task'):
+    if case_data_store.get('_query_task') or case_data_store.get('_task_mode') == 'query':
         case_data_store['_query_ui'] = True
         return True
-    if case_data_store.get('_query_ui'):
+    if _is_search_dialog(container_id):
+        case_data_store['_query_ui'] = True
         return True
+    is_qt = False
     try:
-        if await page.evaluate(JS_IS_QUERY_TOOLBAR):
-            case_data_store['_query_ui'] = True
-            sys.stderr.write('[form] Detected query toolbar (有查询无保存) — skip save cues\n')
-            sys.stderr.flush()
-            return True
+        is_qt = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
     except Exception as e:
         sys.stderr.write(f'[form] query-toolbar detect failed: {e}\n')
         sys.stderr.flush()
-    return False
+    case_data_store['_query_ui'] = is_qt
+    if is_qt:
+        sys.stderr.write('[form] Detected query toolbar (有查询无保存) — skip save cues\n')
+        sys.stderr.flush()
+    return is_qt
 
 
 async def _pack_select_record(page, case_data_store, label_text, option_text, element):
@@ -260,9 +268,18 @@ def _submit_ready_hint(case_data_store: dict) -> str:
     """Return a short NEXT_ACTION cue when fillable pending is empty.
 
     Query/filter UI is never form-fill — no click_save / pending-form cues.
+    Prefers PhaseBoundary.next_action_hint when active.
     """
     if _is_query_mode(case_data_store):
         return ''
+    try:
+        from ._phase_boundary import next_action_hint, phase_boundary_active
+        if phase_boundary_active(case_data_store):
+            cue = next_action_hint(case_data_store)
+            if cue:
+                return cue
+    except Exception:
+        pass
     tl = TaskList.from_store(case_data_store.get('task_list'))
     intervene = [i.label for i in tl.pending if i.needs_intervention]
     fillable = [i for i in tl.pending if not i.needs_intervention]
@@ -270,11 +287,11 @@ def _submit_ready_hint(case_data_store: dict) -> str:
         return ''
     if intervene:
         return (
-            f'NEXT_ACTION: click_save() | '
-            f'fillable pending=0 but NEEDS_INTERVENTION={intervene}. '
-            f'Call click_save() first. If validation blocks on those fields, '
-            f'use click_adjacent_button / follow [HUMAN INTERVENTION]. '
-            f'Do NOT re-select already-filled fields. Do NOT scroll_down to hunt for 保存.'
+            f'NEXT_ACTION: resolve disabled+button fields first={intervene}. '
+            f'Prefer use_special_element(id) when candidates listed; else '
+            f'click_adjacent_button(label) to open引入/选择, complete picker, then click_save(). '
+            f'Do NOT call click_save() while these introduce fields are still empty. '
+            f'Do NOT re-select already-filled fields.'
         )
     if tl.total > 0:
         return (
@@ -284,6 +301,34 @@ def _submit_ready_hint(case_data_store: dict) -> str:
             'Do NOT re-fill or re-select already-filled fields.'
         )
     return ''
+
+
+def _switch_task_list_container(case_data_store: dict, container_id: str) -> None:
+    """Persist/restore task_list keyed by JS_IDENTIFY_CONTAINER id."""
+    by = case_data_store.setdefault('_task_lists_by_container', {})
+    if not isinstance(by, dict):
+        by = {}
+        case_data_store['_task_lists_by_container'] = by
+    active = case_data_store.get('_active_container')
+    if active and active != container_id:
+        # Save current flat view
+        by[active] = {
+            'task_list': case_data_store.get('task_list'),
+            '_scan_fields': case_data_store.get('_scan_fields'),
+        }
+    case_data_store['_active_container'] = container_id
+    saved = by.get(container_id)
+    if isinstance(saved, dict):
+        if saved.get('task_list') is not None:
+            case_data_store['task_list'] = saved['task_list']
+        if saved.get('_scan_fields') is not None:
+            case_data_store['_scan_fields'] = saved['_scan_fields']
+    elif active != container_id:
+        # Fresh container — clear flat view so scan runs
+        case_data_store.pop('task_list', None)
+        case_data_store.pop('_scan_fields', None)
+        case_data_store.pop('_autofill_summary', None)
+        case_data_store.pop('_submit_ready', None)
 
 
 def _with_submit_cue(result: str, case_data_store: dict) -> str:
@@ -343,23 +388,6 @@ async def _clear_field_value(page, label_text):
         pass
 
 
-def _queue_intervention(case_data_store: dict, label: str, has_button: str, reason: str):
-    """Queue an intervention request — appends to list so multiple fields are preserved.
-
-    Replaces the old single-slot ``_intervention_request`` dict with an
-    ``_intervention_queue`` list consumed by ``on_step_start`` in recorder.py.
-    """
-    queue = case_data_store.setdefault('_intervention_queue', [])
-    # Dedup: skip if this label is already queued
-    if any(q.get('label') == label for q in queue):
-        return
-    queue.append({
-        'label': label,
-        'hasButton': has_button or '',
-        'reason': reason,
-    })
-
-
 def _register_form_actions(controller, browser_context, case_data_store, llm=None):
     # Lazily read hasButton keywords — supports runtime override via case_data_store
     def _button_keywords():
@@ -384,6 +412,29 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return  # CDP watcher: single-field action, no auto-scan
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
+
+        # Remember parent before entering search/picker dialog
+        if _is_search_dialog(container_id) or (
+            container_id.startswith(('dialog:', 'drawer:'))
+            and case_data_store.get('_active_container')
+            and not str(case_data_store.get('_active_container')).startswith(('dialog:', 'drawer:'))
+        ):
+            if not case_data_store.get('_parent_container_before_picker'):
+                case_data_store['_parent_container_before_picker'] = (
+                    case_data_store.get('_active_container') or 'main'
+                )
+
+        _switch_task_list_container(case_data_store, container_id)
+
+        # Force rescan when parent marked stale after picker close
+        stale = case_data_store.get('_form_stale')
+        if stale and stale == container_id:
+            case_data_store.pop('task_list', None)
+            case_data_store.pop('_scan_fields', None)
+            case_data_store.pop('_form_stale', None)
+            sys.stderr.write(f'[form] force rescan stale container={container_id}\n')
+            sys.stderr.flush()
+
         if await _mark_query_ui_if_needed(page, case_data_store, container_id):
             return  # query/filter UI
         if _skip_auto_fill(case_data_store):
@@ -397,7 +448,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if label_text in pending_labels or label_text in done_labels:
                 return  # already scanned for this form
 
-        # Scan main-page form
+        # Scan form in current container
         raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
@@ -405,7 +456,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         except Exception:
             return
         dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields]
-        container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
+        container_id = result.get('container', container_id) if isinstance(result, dict) else container_id
+        _switch_task_list_container(case_data_store, container_id)
 
         # Save form structure snapshot BEFORE auto-fill (captures original state)
         _save_form_snapshot(container_id, [f.model_dump() for f in dom_fields], case_data_store)
@@ -417,6 +469,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         )
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
+        # Persist into by-container map
+        by = case_data_store.setdefault('_task_lists_by_container', {})
+        if isinstance(by, dict):
+            by[container_id] = {
+                'task_list': case_data_store.get('task_list'),
+                '_scan_fields': case_data_store.get('_scan_fields'),
+            }
         if tl.pending:
             await _auto_fill_pending()
             tl_after = TaskList.from_store(case_data_store.get('task_list'))
@@ -428,6 +487,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             )
             if fillable_left == 0:
                 case_data_store['_submit_ready'] = True
+            if isinstance(by, dict):
+                by[container_id] = {
+                    'task_list': case_data_store.get('task_list'),
+                    '_scan_fields': case_data_store.get('_scan_fields'),
+                }
 
     @controller.action('Expand ALL el-tree nodes recursively (up to 10 rounds).')
     async def expand_all_el_tree():
@@ -658,7 +722,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             'pending_labels': pending_labels,
         }
         if intervene:
-            summary['intervention_needed'] = intervene
+            summary['disabled_button_fields'] = intervene
         if notification:
             summary['notification'] = {'visible': notification.visible, 'text': (notification.text or '')[:200]}
         return json.dumps(summary, ensure_ascii=False)
@@ -751,7 +815,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             notification=notification,
         ).model_dump()
         if intervene_labels:
-            payload['NEEDS_INTERVENTION'] = sorted(intervene_labels)
+            payload['disabled_button_fields'] = sorted(intervene_labels)
         fillable = [f['label'] for f in payload['fields'] if not f.get('disabled')]
         cue = _submit_ready_hint(case_data_store)
         if cue:
@@ -760,8 +824,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         else:
             payload['hint'] = (
                 f'fillable:{len(fillable)} pending:{len(pending_labels)} '
-                f'intervene:{len(intervene_labels)} — do NOT re-select already-filled fields; '
-                f'handle NEEDS_INTERVENTION via click_adjacent_button / request_intervention'
+                f'disabled_button:{len(intervene_labels)} — do NOT re-select already-filled fields; '
+                f'handle disabled+button via click_adjacent_button / special-element candidates'
             )
         # Required disabled "联网核查" with empty value — nudge button click before save
         for f in payload.get('fields') or []:
@@ -1264,20 +1328,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     }
                 }
             }''', [first.label])
-            sys.stderr.write(f'[auto-fill] NEEDS_INTERVENTION ({len(intervene_items)} fields): {[i.label for i in intervene_items]}\n')
-            sys.stderr.write(f'[auto-fill] Scrolled to first: "{first.label}"\n')
+            sys.stderr.write(f'[auto-fill] disabled+button fields ({len(intervene_items)}): {[i.label for i in intervene_items]}\n')
+            sys.stderr.write(f'[auto-fill] Scrolled to first: "{first.label}" — prefer special-element candidates\n')
             sys.stderr.flush()
-            # Queue ALL intervention fields (not just first) — consumed by on_step_start
-            for item in intervene_items:
-                _queue_intervention(case_data_store, item.label, item.hasButton or '',
-                    f"Field '{item.label}' is disabled with adjacent button '{item.hasButton}'. Needs a custom fill workflow.")
-            sys.stderr.write(f'[auto-fill] Queued {len(intervene_items)} intervention request(s)\n')
-            sys.stderr.flush()
-            # Push SSE event so Dashboard shows which fields need intervention
-            emit_json({'event': 'intervention_needed', 'data': {
-                'fields': [{'label': item.label, 'hasButton': item.hasButton or '', 'kind': item.kind} for item in intervene_items],
-                'source': 'auto_fill',
-            }})
 
         # Step 6: full scan sync — 移除不在 DOM 的 pending 字段
         try:
@@ -1306,48 +1359,24 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     @controller.action('Mark a form field as completed in the task list. Use this after successfully filling a field.')
     async def task_done(label_text: str):
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        # Check if this was an intervention field BEFORE marking done
-        was_intervention = any(
-            item.label == label_text and item.needs_intervention
-            for item in tl.pending
-        )
         _task_done_impl(label_text, case_data_store)
         tl = TaskList.from_store(case_data_store.get('task_list'))
-
-        if was_intervention:
-            # Remove from intervention queue so recorder doesn't re-inject
-            queue = case_data_store.get('_intervention_queue', [])
-            case_data_store['_intervention_queue'] = [q for q in queue if q.get('label') != label_text]
-            remaining = [q.get('label', '') for q in case_data_store['_intervention_queue']]
-            # Push SSE event so Dashboard removes the field from alerts
-            emit_json({'event': 'intervention_resolved', 'data': {
-                'label': label_text,
-                'remaining': remaining,
-            }})
-            sys.stderr.write(f'[intervention] Resolved: "{label_text}" — {len(remaining)} remaining\n')
-            sys.stderr.flush()
-
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
-    @controller.action('Get the current pending task list. Returns {"pending": [...], optional NEEDS_INTERVENTION, NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 保存 — do not re-fill fields.')
+    @controller.action('Get the current pending task list. Returns {"pending": [...], NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 保存 — do not re-fill fields.')
     async def get_pending_tasks():
         if _is_query_mode(case_data_store):
             return _ok(_query_not_form_payload(), include_in_memory=True)
         tl = TaskList.from_store(case_data_store.get('task_list'))
-        intervene = [item.label for item in tl.pending if item.needs_intervention]
         pending_labels = [item for item in tl.to_store()['pending'] if not item.get('needs_intervention')]
-        sys.stderr.write(f'[get-pending] done={len(tl.done)} pending={len(tl.pending)} intervene={len(intervene)}\n')
+        sys.stderr.write(f'[get-pending] done={len(tl.done)} pending={len(tl.pending)}\n')
         sys.stderr.flush()
         result = {
             'pending': pending_labels,
             'done': len(tl.done),
         }
-        if intervene:
-            result['NEEDS_INTERVENTION'] = intervene
         cue = _submit_ready_hint(case_data_store)
         if cue:
-            # Parse NEXT_ACTION token for structured field
             if cue.startswith('NEXT_ACTION:'):
                 result['NEXT_ACTION'] = cue.split('|', 1)[0].replace('NEXT_ACTION:', '').strip()
             result['hint'] = cue
@@ -1368,13 +1397,35 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
-        if await _mark_query_ui_if_needed(page, case_data_store, container_id):
+        compact_btn = re.sub(r'\s+', '', (button_text or '保存').strip()) or '保存'
+        # 确认/确定 = dialog/picker confirm (never treat as form-save blocked by query toolbar)
+        is_picker_confirm = bool(
+            compact_btn.startswith(('确认', '确定'))
+            or ('确认' in compact_btn)
+            or ('确定' in compact_btn)
+        )
+        query_ui = await _mark_query_ui_if_needed(page, case_data_store, container_id)
+        sys.stderr.write(
+            f'[click_save] enter button={button_text!r} compact={compact_btn!r} '
+            f'query_ui={query_ui} picker_confirm={is_picker_confirm}\n'
+        )
+        sys.stderr.flush()
+        if query_ui and not is_picker_confirm:
             return _err(
                 'not-form-save | query/filter UI — NOT a form-fill submit. '
-                'Click 查询 via click_element_by_index; do not call click_save().',
+                'Click 查询 via click_element_by_index; '
+                'for picker 确认 use click_element_by_index or click_save(button_text="确认").',
                 include_in_memory=True,
             )
-        gate_ok, pending_labels = check_pending_write_gate(case_data_store)
+        if is_picker_confirm and query_ui:
+            # Magnifier/picker: 确认 is introduce confirm, not maintain click_save.
+            sys.stderr.write(
+                f'[click_save] picker confirm via click_save({button_text!r}) on query UI\n'
+            )
+            sys.stderr.flush()
+            gate_ok, pending_labels = True, []
+        else:
+            gate_ok, pending_labels = check_pending_write_gate(case_data_store)
         if not gate_ok:
             # Live-prune: fields wrongly left in pending because scan missed Vue disabled
             btn_kw = _button_keywords()
@@ -1603,6 +1654,56 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 include_in_memory=True,
             )
 
+        # Picker confirm: no toast expected — dialog close counts as success
+        if is_picker_confirm and query_ui:
+            still_query = False
+            try:
+                still_query = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
+            except Exception:
+                still_query = False
+            if not still_query:
+                record_success_token(case_data_store, 'confirm_click', button_text or '确认')
+                try:
+                    from ._phase_boundary import maybe_record_picker_closed, record_evidence
+                    parent = (case_data_store or {}).get('_parent_container_before_picker') or 'main'
+                    maybe_record_picker_closed(
+                        case_data_store,
+                        still_query_ui=False,
+                        parent_container=parent,
+                    )
+                    # Best-effort backfill check on parent form disabled fields
+                    btn_kw = _button_keywords()
+                    backfilled = []
+                    try:
+                        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, btn_kw])
+                        result = json.loads(raw) if isinstance(raw, str) else raw
+                        fields = result.get('fields') if isinstance(result, dict) else result
+                        for f in fields or []:
+                            if not isinstance(f, dict):
+                                continue
+                            if f.get('disabled') and (f.get('currentValue') or '').strip():
+                                backfilled.append(f.get('label') or '')
+                    except Exception:
+                        pass
+                    if backfilled:
+                        record_evidence(
+                            case_data_store,
+                            'introduced_backfilled',
+                            ','.join(backfilled[:6]),
+                        )
+                except Exception as e:
+                    sys.stderr.write(f'[click_save] picker_closed helper: {e}\n')
+                    sys.stderr.flush()
+                    if case_data_store is not None:
+                        case_data_store.pop('_query_ui', None)
+                sys.stderr.write('[click_save] SUCCESS picker confirm (dialog closed)\n')
+                sys.stderr.flush()
+                return _ok(
+                    'ok-introduce-confirm | Picker confirmed; introduce fields should be backfilled. '
+                    'Continue filling remaining form fields then click_save(button_text="保存").',
+                    include_in_memory=True,
+                )
+
         sys.stderr.write('[click_save] no feedback (no toast, no form errors, no navigation)\n')
         sys.stderr.flush()
         return _err(
@@ -1640,22 +1741,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         retried = tl.sync_from_errors(error_labels)
         case_data_store['task_list'] = tl.to_store()
 
-        # 分离需要人工干预的字段（disabled+hasButton）
+        # 分离 disabled+旁钮字段（靠特殊元素流程，不入干预队列）
         intervene = [item for item in retried if item.needs_intervention]
         fillable = [item for item in retried if not item.needs_intervention]
         if intervene:
             intervene_labels = [item.label for item in intervene]
-            sys.stderr.write(f'[sync-errors] NEEDS INTERVENTION: {intervene_labels}\n')
+            sys.stderr.write(
+                f'[sync-errors] disabled+button fields (prefer special-element): {intervene_labels}\n'
+            )
             sys.stderr.flush()
-            # Auto-queue intervention requests — consistent with _auto_fill_pending Step 5
-            for item in intervene:
-                _queue_intervention(case_data_store, item.label, item.hasButton or '',
-                    f"Field '{item.label}' has a validation error and is disabled with adjacent button '{item.hasButton}'. Needs a custom fill workflow.")
-            # Push SSE event so Dashboard shows which fields need intervention
-            emit_json({'event': 'intervention_needed', 'data': {
-                'fields': [{'label': item.label, 'hasButton': item.hasButton or '', 'kind': item.kind} for item in intervene],
-                'source': 'sync_errors',
-            }})
 
         # Auto-scroll to first error so agent can see and fix it immediately
         if retried:
@@ -1675,22 +1769,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if fillable:
             msg += ' | fillable:' + json.dumps([item.label for item in fillable], ensure_ascii=False)
         if intervene:
-            msg += ' | NEEDS_INTERVENTION:' + json.dumps([item.label for item in intervene], ensure_ascii=False)
+            msg += ' | disabled_button_fields:' + json.dumps(
+                [item.label for item in intervene], ensure_ascii=False
+            )
         return _ok(msg, include_in_memory=True)
-
-    @controller.action('Request human intervention for a field that cannot be auto-filled. Use this when sync_tasks_from_errors returns NEEDS_INTERVENTION items, or when a field is disabled with an adjacent button. Queues the request so multiple fields are preserved.')
-    async def request_intervention(label_text: str, reason: str = ''):
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        item = tl.find(label_text)
-        has_button = ''
-        if item:
-            _, task_item = item
-            has_button = task_item.hasButton or ''
-        _queue_intervention(case_data_store, label_text, has_button,
-            reason or f"Field '{label_text}' has disabled=True and hasButton='{has_button}'. Needs a custom fill workflow.")
-        sys.stderr.write(f'[intervention] Agent requested: "{label_text}" (button={has_button}) queue_len={len(case_data_store.get("_intervention_queue", []))}\n')
-        sys.stderr.flush()
-        return _ok(f'intervention-requested | label:{label_text}')
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str):

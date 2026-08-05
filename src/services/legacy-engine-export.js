@@ -1,38 +1,45 @@
 /**
  * Traditional execution-engine export mapping.
  *
- * Contract (agreed; engine-side naming may evolve):
+ * Only maps actions we can currently record — not the full traditional-engine
+ * type catalog. Contract:
  *   name      — 操作名称
- *   type      — 类型 (click|input|select|tab|close|wait|navigate|expand|…)
+ *   type      — 类型（见 ACTION_TO_ENGINE_TYPE）
  *   value     — 值
  *   locateBy  — 定位方法 (default xpath)
- *   target    — 操作对象 (relative xpath_smart preferred)
+ *   target    — 操作对象 (prefer xpath_smart; fall back to absolute xpath_full)
  */
 
 import { normalizeActionName } from '../models/action-name.js';
 import { trajectoryStepToActionEntry } from '../models/element.js';
 
-/** action → engine type (parity with Python ACTION_TO_COMMAND) */
+/**
+ * Recorded action → traditional-engine type.
+ * Only entries for actions the agent/manual recorder actually persist.
+ */
 export const ACTION_TO_ENGINE_TYPE = Object.freeze({
   fill_form_field: 'input',
-  fill_date_field: 'input',
-  select_option: 'select',
-  select_tree_option: 'select',
+  fill_date_field: 'date',
+  select_option: 'select:click',
+  select_tree_option: 'select:tree',
   click_element_by_index: 'click',
   click_menu_item: 'click',
   click_table_row_button: 'click',
-  click_table_row_radio: 'click',
+  click_table_row_radio: 'radio',
   click_adjacent_button: 'click',
   click_icon_button: 'click',
-  click_radio: 'click',
-  switch_tab: 'tab',
-  close_dialog: 'close',
-  wait_for_loading: 'wait',
-  go_to_url: 'navigate',
-  expand_all_el_tree: 'expand',
+  click_radio: 'radio',
+  switch_tab: 'click',
+  close_dialog: 'click',
+  expand_all_el_tree: 'click',
 });
 
-/** Meta / scan / memory actions — not executable by a traditional UI engine */
+/** Types we emit today (derived from ACTION_TO_ENGINE_TYPE). */
+export const LEGACY_ENGINE_EMITTED_TYPES = Object.freeze(
+  [...new Set(Object.values(ACTION_TO_ENGINE_TYPE))].sort(),
+);
+
+/** Meta / scan / memory / non-recorded-UI actions — not exported */
 const SKIP_ACTIONS = new Set([
   'scroll_down',
   'scroll_up',
@@ -54,6 +61,8 @@ const SKIP_ACTIONS = new Set([
   'task_retry',
   'save_form_snapshot',
   'done',
+  'wait_for_loading',
+  'go_to_url',
 ]);
 
 export const LEGACY_ENGINE_FIELD_SCHEMA = Object.freeze([
@@ -67,7 +76,7 @@ export const LEGACY_ENGINE_FIELD_SCHEMA = Object.freeze([
     key: 'type',
     zh: '类型',
     type: 'string',
-    desc: 'click | input | select | tab | close | wait | navigate | expand',
+    desc: `当前可录制动作映射：${LEGACY_ENGINE_EMITTED_TYPES.join(' | ')}`,
   },
   {
     key: 'value',
@@ -79,22 +88,24 @@ export const LEGACY_ENGINE_FIELD_SCHEMA = Object.freeze([
     key: 'locateBy',
     zh: '定位方法',
     type: 'string',
-    desc: '默认 xpath；后续可扩展 css 等',
+    desc: '默认 xpath',
     default: 'xpath',
   },
   {
     key: 'target',
     zh: '操作对象',
     type: 'string',
-    desc: '相对 xpath（优先 xpath_smart）；无则空串',
+    desc: '优先相对 xpath（xpath_smart）；无则回退绝对 xpath_full，不丢弃步骤',
   },
 ]);
 
 /**
- * Prefer relative xpath_smart; never invent absolute as primary for engine export.
+ * Prefer relative xpath_smart; fall back to absolute when smart is unavailable.
+ * Some controls genuinely have no stable relative xpath — still export a locator.
  * @param {object} entry — from trajectoryStepToActionEntry
+ * @returns {{ target: string, source: 'xpath_smart'|'xpath_full'|'' }}
  */
-export function pickRelativeTarget(entry) {
+export function pickExportTarget(entry) {
   const el = entry?.element || {};
   const cands = Array.isArray(el.candidates) ? el.candidates : [];
   const smart = String(
@@ -102,12 +113,36 @@ export function pickRelativeTarget(entry) {
     || cands.find((c) => c?.type === 'xpath_smart')?.value
     || '',
   ).trim();
-  if (smart.startsWith('//') || smart.startsWith('(')) return smart;
+  if (smart.startsWith('//') || smart.startsWith('(')) {
+    return { target: smart, source: 'xpath_smart' };
+  }
 
   const primary = String(entry?.target || el.xpath || '').trim();
-  if (primary.startsWith('//') || primary.startsWith('(')) return primary;
+  if (primary.startsWith('//') || primary.startsWith('(')) {
+    return { target: primary, source: 'xpath_smart' };
+  }
 
-  return '';
+  const full = String(
+    el.xpath_full
+    || el.xpath_abs
+    || cands.find((c) => c?.type === 'xpath_full')?.value
+    || '',
+  ).trim();
+  if (full) {
+    return { target: full, source: 'xpath_full' };
+  }
+
+  // Absolute-looking primary (e.g. /html/body/...)
+  if (primary.startsWith('/')) {
+    return { target: primary, source: 'xpath_full' };
+  }
+
+  return { target: '', source: '' };
+}
+
+/** @deprecated use pickExportTarget — kept for callers expecting a string */
+export function pickRelativeTarget(entry) {
+  return pickExportTarget(entry).target;
 }
 
 /**
@@ -193,12 +228,14 @@ export function mapStepToLegacyEngineOp(step) {
   const action = normalizeActionName(entry.action || step?.actionType || '');
   if (!action || SKIP_ACTIONS.has(action)) return null;
 
-  const engineType = ACTION_TO_ENGINE_TYPE[action] || 'click';
+  const engineType = ACTION_TO_ENGINE_TYPE[action];
+  if (!engineType) return null;
   const params = entry.params || {};
   const element = entry.element || {};
-  const target = pickRelativeTarget(entry);
+  const { target, source } = pickExportTarget(entry);
   const warnings = [];
-  if (!target) warnings.push('missing_relative_xpath');
+  if (source === 'xpath_full') warnings.push('absolute_xpath_fallback');
+  if (!target) warnings.push('missing_xpath');
 
   return {
     name: buildOperationName(action, params, element),
@@ -212,17 +249,20 @@ export function mapStepToLegacyEngineOp(step) {
       action,
       phaseNumber: entry.phase ?? step?.phaseNumber ?? 0,
       ok: Boolean(target),
+      targetSource: source || null,
       warnings,
+      // Pass through raw step payloads (no clone) — consumer decides what to use
+      element: step?.element ?? step?.elementJson ?? entry.element ?? null,
+      params: step?.params ?? step?.paramsJson ?? entry.params ?? null,
     },
   };
 }
 
 /**
  * @param {object[]} steps
- * @param {{ requireTarget?: boolean, stepIds?: Array<number|string>, phaseIds?: Array<number|string>, includeMeta?: boolean }} [opts]
+ * @param {{ stepIds?: Array<number|string>, phaseIds?: Array<number|string>, includeMeta?: boolean }} [opts]
  */
 export function exportStepsToLegacyEngine(steps, opts = {}) {
-  const requireTarget = opts.requireTarget === true;
   const includeMeta = opts.includeMeta !== false;
   const stepIdSet = opts.stepIds?.length
     ? new Set(opts.stepIds.map((x) => String(x)))
@@ -234,7 +274,7 @@ export function exportStepsToLegacyEngine(steps, opts = {}) {
   const operations = [];
   let skippedMeta = 0;
   let skippedFilter = 0;
-  let skippedNoTarget = 0;
+  let absoluteFallback = 0;
 
   for (const step of steps || []) {
     if (stepIdSet) {
@@ -259,10 +299,7 @@ export function exportStepsToLegacyEngine(steps, opts = {}) {
       skippedMeta += 1;
       continue;
     }
-    if (requireTarget && !op.target) {
-      skippedNoTarget += 1;
-      continue;
-    }
+    if (op.meta?.targetSource === 'xpath_full') absoluteFallback += 1;
     if (!includeMeta) {
       const { name, type, value, locateBy, target } = op;
       operations.push({ name, type, value, locateBy, target });
@@ -278,7 +315,9 @@ export function exportStepsToLegacyEngine(steps, opts = {}) {
     skipped: {
       metaActions: skippedMeta,
       filtered: skippedFilter,
-      missingTarget: skippedNoTarget,
+    },
+    stats: {
+      absoluteFallback,
     },
     operations,
   };

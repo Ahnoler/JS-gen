@@ -787,10 +787,20 @@ export const API_GROUPS = [
         respExample: J({
           trajectoryId: 42, recordStatus: 'recorded',
           phaseIds: [101], systemAccountId: 10,
-          events: [{ type: 'phase_start', phaseNumber: 1 }],
+          events: [
+            { type: 'phase_start', phaseNumber: 1 },
+            { type: 'phase_boundary_obs', phaseNumber: 1, phase_boundary: { role: 'maintain' } },
+            { type: 'phase_intent_obs', phaseNumber: 1 },
+            { type: 'phase_done', phaseNumber: 1 },
+          ],
           steps: [],
         }),
-        notes: ['400：未 attach / 无匹配 phase / 缺账号', '409：session busy'],
+        notes: [
+          '400：未 attach / 无匹配 phase / 缺账号',
+          '409：session busy',
+          'events[] 可含 phase_boundary_obs / phase_intent_obs（录制可观测，不入 MySQL）',
+          'AI_PHASE_BOUNDARY 默认 on；设 off 回退旧意图合约',
+        ],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/stop',
@@ -1487,29 +1497,41 @@ export const API_GROUPS = [
             schemaVersion: 1,
             fields: [
               { key: 'name', zh: '操作名称', type: 'string' },
-              { key: 'type', zh: '类型', type: 'string' },
+              { key: 'type', zh: '类型', type: 'string', desc: '仅当前可录制动作：click/input/select:click/select:tree/radio/date' },
               { key: 'value', zh: '值', type: 'string' },
               { key: 'locateBy', zh: '定位方法', type: 'string', default: 'xpath' },
-              { key: 'target', zh: '操作对象', type: 'string', desc: '相对 xpath' },
+              { key: 'target', zh: '操作对象', type: 'string', desc: '优先相对 xpath；无则绝对 xpath' },
             ],
-            types: ['click', 'input', 'select', 'tab', 'close', 'wait', 'navigate', 'expand'],
+            types: ['click', 'date', 'input', 'radio', 'select:click', 'select:tree'],
+            actionTypeMap: {
+              fill_form_field: 'input',
+              fill_date_field: 'date',
+              select_option: 'select:click',
+              select_tree_option: 'select:tree',
+              click_radio: 'radio',
+              click_element_by_index: 'click',
+              click_menu_item: 'click',
+              close_dialog: 'click',
+              switch_tab: 'click',
+            },
           },
         }),
         notes: [
+          '仅映射当前可录制并落库的动作，不枚举传统引擎全部操作类型',
           'locateBy 默认 xpath',
-          'target 优先 element.xpath_smart / candidates xpath_smart；无相对 xpath 时为空串',
-          'meta 为调试扩展，对接传统引擎时可剥离',
+          'target 优先 xpath_smart；无相对 xpath 时回退 xpath_full，不丢弃步骤',
+          'wait_for_loading / go_to_url 等非落库 UI 步骤跳过',
+          'meta 含 element / params（步骤原始 JSON）及 targetSource 等，对接核心 5 字段时可剥离',
         ],
       },
       {
         method: 'GET', path: '/api/v2/export/trajectories/{id}/legacy-engine',
         summary: '导出轨迹步骤（传统引擎）',
-        desc: '将 trajectory_step 映射为 operations[]。跳过扫描/记忆类 meta 动作。',
+        desc: '将 trajectory_step 映射为 operations[]。跳过扫描/记忆类 meta 动作。无相对 xpath 的步骤仍导出（target 回退绝对路径）。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', desc: '轨迹 id', example: '53' },
           { name: 'stepIds', type: 'string', in: 'query', desc: '逗号分隔步骤 id', example: '2343,2344' },
           { name: 'phaseIds', type: 'string', in: 'query', desc: '逗号分隔阶段 id 或 phaseNumber', example: '1' },
-          { name: 'requireTarget', type: 'boolean', in: 'query', desc: 'true 时丢弃无相对 xpath 的步骤', example: 'false' },
           { name: 'includeMeta', type: 'boolean', in: 'query', desc: 'false 时只返回 5 字段', example: 'true' },
         ],
         respExample: J({
@@ -1519,7 +1541,8 @@ export const API_GROUPS = [
             trajectoryId: 53,
             schemaVersion: 1,
             count: 2,
-            skipped: { metaActions: 0, filtered: 0, missingTarget: 0 },
+            skipped: { metaActions: 0, filtered: 0 },
+            stats: { absoluteFallback: 0 },
             operations: [
               {
                 name: '点击:产品管理',
@@ -1527,7 +1550,15 @@ export const API_GROUPS = [
                 value: '',
                 locateBy: 'xpath',
                 target: "//li[contains(concat(' ', normalize-space(@class), ' '), ' menu-item ')][normalize-space()='产品管理']",
-                meta: { stepId: '2343', action: 'click_element_by_index', ok: true, warnings: [] },
+                meta: {
+                  stepId: '2343',
+                  action: 'click_element_by_index',
+                  ok: true,
+                  targetSource: 'xpath_smart',
+                  warnings: [],
+                  params: { text: '产品管理', index: -1, tag_name: 'li' },
+                  element: { xpath_smart: "//li[…][normalize-space()='产品管理']" },
+                },
               },
               {
                 name: '点击:产品库管理',
@@ -1535,7 +1566,7 @@ export const API_GROUPS = [
                 value: '',
                 locateBy: 'xpath',
                 target: "//*[contains(concat(' ', normalize-space(@class), ' '), ' submenu-item ')][normalize-space()='产品库管理']",
-                meta: { stepId: '2344', action: 'click_element_by_index', ok: true, warnings: [] },
+                meta: { stepId: '2344', action: 'click_element_by_index', ok: true, targetSource: 'xpath_smart', warnings: [] },
               },
             ],
           },
@@ -1549,10 +1580,9 @@ export const API_GROUPS = [
           { name: 'id', type: 'number', required: true, in: 'path', desc: '轨迹 id' },
           { name: 'stepIds', type: 'number[]', in: 'body', desc: '步骤 id 列表', example: '[2343,2344]' },
           { name: 'phaseIds', type: 'number[]', in: 'body', desc: '阶段过滤' },
-          { name: 'requireTarget', type: 'boolean', in: 'body', desc: '仅导出有相对 xpath 的步骤' },
           { name: 'includeMeta', type: 'boolean', in: 'body', desc: '是否附带 meta' },
         ],
-        reqExample: J({ stepIds: [2343, 2344], requireTarget: true, includeMeta: false }),
+        reqExample: J({ stepIds: [2343, 2344], includeMeta: false }),
       },
       {
         method: 'POST', path: '/api/v2/export/legacy-engine/preview',
@@ -1560,7 +1590,6 @@ export const API_GROUPS = [
         desc: '传入 steps[]（DB 步骤或 action entry 形态），返回 operations。供前端预览 / 契约联调。',
         params: [
           { name: 'steps', type: 'object[]', required: true, in: 'body', desc: '步骤数组' },
-          { name: 'requireTarget', type: 'boolean', in: 'body' },
           { name: 'includeMeta', type: 'boolean', in: 'body' },
         ],
         reqExample: J({
@@ -1612,7 +1641,7 @@ export const ENUMS = [
   { name: 'batch jobStatus', values: 'accepted / running / waiting_executor / cancelling / cancelled / completed / completed_with_errors / failed' },
   { name: 'batch itemStatus', values: 'pending / analyzing / analyzed / queued / waiting_executor / preparing / recording / recorded / failed / rejected / cancelled' },
   { name: '节点 type', values: '1 系统 / 2 模块 / 3 功能' },
-  { name: 'legacy-engine type', values: 'click / input / select / tab / close / wait / navigate / expand' },
+  { name: 'legacy-engine type', values: 'click / input / select:click / select:tree / radio / date（仅当前可录制动作）' },
   { name: 'legacy-engine locateBy', values: 'xpath（默认）' },
 ];
 

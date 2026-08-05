@@ -5,7 +5,7 @@ from ._helpers import _ok, _err
 # Internal / nested keys that must not be treated as user field presets.
 _RESERVED_CASE_KEYS = frozenset({
     'form_snapshot', 'form_snapshots', 'task_list',
-    '_watcher_mode', '_intervention_queue', '_scan_fields',
+    '_watcher_mode', '_scan_fields',
     '_submit_ready', '_query_ready', '_query_task', '_query_ui', '_task_mode',
     '_autofill_summary', '_last_save_ok',
     '_url_before_save', '_ref_date', '_already_matched_streak',
@@ -13,6 +13,9 @@ _RESERVED_CASE_KEYS = frozenset({
     '_phase_intent', '_phase_intent_flag_locked', '_success_tokens',
     '_last_introduce_ok', '_quality_failed', '_quality_failed_reasons',
     '_cycle_prescribed', '_recovery_active', '_heal_mode',
+    '_phase_boundary', '_phase_boundary_flag_locked', '_evidence_observed',
+    '_form_stale', '_task_lists_by_container', '_active_container',
+    '_parent_container_before_picker', '_boundary_hint',
 })
 
 

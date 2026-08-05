@@ -13,24 +13,41 @@ function tokenize(text) {
     .filter((t) => t.length >= 1);
 }
 
+function normalizeLegalAliases(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/法定责任人/g, '法定代表人')
+    .replace(/责任人的引入/g, '代表人的引入');
+}
+
+const INTRODUCE_HINT_RE = /引入|选人|放大镜|法定代表人|法定责任人/;
+
 function scoreCandidate(el, tag, queryText) {
   const dictLabel = tag?.dictLabel || '';
   const dictValue = tag?.dictValue || '';
-  const hay = [
+  const hay = normalizeLegalAliases([
     el.name || '',
     dictLabel,
     dictValue,
     el.phaseDescription || '',
     el.remark || '',
-  ].join(' ').toLowerCase();
-
+  ].join(' '));
+  const q = normalizeLegalAliases(queryText);
   let tagScore = 0;
   let lexicalScore = 0;
-  const q = String(queryText || '').toLowerCase();
-  if (dictLabel && q.includes(dictLabel.toLowerCase())) tagScore += 40;
-  if (dictValue && q.includes(dictValue.toLowerCase())) tagScore += 30;
-  if (el.name && q.includes(String(el.name).toLowerCase())) lexicalScore += 35;
-  const tokens = tokenize(queryText);
+  if (normalizeLegalAliases(dictLabel) && q.includes(normalizeLegalAliases(dictLabel))) {
+    tagScore += 40;
+  } else if (
+    normalizeLegalAliases(dictLabel).includes('引入')
+    && q.includes('引入')
+    && (q.includes('代表人') || hay.includes('代表人'))
+  ) {
+    tagScore += 25;
+  }
+  if (dictValue && q.includes(String(dictValue).toLowerCase())) tagScore += 30;
+  if (el.name && q.includes(normalizeLegalAliases(el.name))) lexicalScore += 35;
+  if (INTRODUCE_HINT_RE.test(q) && INTRODUCE_HINT_RE.test(hay)) lexicalScore += 20;
+  const tokens = tokenize(q);
   let covered = 0;
   for (const tok of tokens) {
     if (tok.length >= 2 && hay.includes(tok)) covered += 1;
@@ -58,6 +75,19 @@ assert.ok(s1 > s2, `login should rank above fill for login query (${s1} vs ${s2}
 
 const s3 = scoreCandidate(fill, tagFill, '填写客户信息');
 assert.ok(s3 > 0, 'fill query should score > 0');
+
+const introEl = {
+  name: '对公客户引入流程',
+  phaseDescription: '点击法定代表人引入按钮选择客户',
+  remark: '',
+};
+const tagIntro = { dictLabel: '法定责任人的引入流程', dictValue: 'Introduction' };
+const sIntro = scoreCandidate(
+  introEl,
+  tagIntro,
+  '点击法定代表人/负责人证件号码的引入按钮，客户名称填写测试',
+);
+assert.ok(sIntro >= 40, `introduce synonym+hint should score high (${sIntro})`);
 
 // Hint formatting (inline equivalent of Python format_special_element_hint)
 function formatHint(store) {

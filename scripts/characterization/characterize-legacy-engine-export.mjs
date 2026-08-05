@@ -6,8 +6,11 @@
 import assert from 'node:assert/strict';
 import {
   LEGACY_ENGINE_FIELD_SCHEMA,
+  LEGACY_ENGINE_EMITTED_TYPES,
+  ACTION_TO_ENGINE_TYPE,
   mapStepToLegacyEngineOp,
   exportStepsToLegacyEngine,
+  pickExportTarget,
   pickRelativeTarget,
   buildOperationName,
 } from '../../src/services/legacy-engine-export.js';
@@ -16,6 +19,15 @@ function testSchema() {
   const keys = LEGACY_ENGINE_FIELD_SCHEMA.map((f) => f.key);
   assert.deepEqual(keys, ['name', 'type', 'value', 'locateBy', 'target']);
   assert.ok(LEGACY_ENGINE_FIELD_SCHEMA.every((f) => f.zh));
+  assert.deepEqual(
+    [...LEGACY_ENGINE_EMITTED_TYPES].sort(),
+    ['click', 'date', 'input', 'radio', 'select:click', 'select:tree'],
+  );
+  assert.equal(ACTION_TO_ENGINE_TYPE.select_option, 'select:click');
+  assert.equal(ACTION_TO_ENGINE_TYPE.fill_date_field, 'date');
+  assert.equal(ACTION_TO_ENGINE_TYPE.click_radio, 'radio');
+  assert.ok(!('wait_for_loading' in ACTION_TO_ENGINE_TYPE));
+  assert.ok(!('go_to_url' in ACTION_TO_ENGINE_TYPE));
 }
 
 function testClickMenu() {
@@ -39,6 +51,9 @@ function testClickMenu() {
   assert.equal(op.locateBy, 'xpath');
   assert.ok(op.target.includes('menu-item') && op.target.includes('产品管理'));
   assert.equal(op.meta.ok, true);
+  assert.equal(op.meta.targetSource, 'xpath_smart');
+  assert.ok(op.meta.element && op.meta.element.xpath_smart);
+  assert.equal(op.meta.params.text, '产品管理');
 }
 
 function testFill() {
@@ -55,19 +70,54 @@ function testFill() {
   assert.ok(op.target.startsWith('//'));
 }
 
-function testSkipMetaAndAbsolute() {
+function testEngineTypeVariants() {
+  const sel = mapStepToLegacyEngineOp({
+    actionType: 'select_option',
+    params: { label_text: '状态', option_text: '启用' },
+    element: { xpath_smart: "//div[contains(@class,'el-select')]" },
+  });
+  assert.equal(sel.type, 'select:click');
+  assert.equal(sel.value, '启用');
+
+  const tree = mapStepToLegacyEngineOp({
+    actionType: 'select_tree_option',
+    params: { label_text: '行业', option_text: '金融' },
+    element: { xpath_smart: "//div[contains(@class,'el-tree-select')]" },
+  });
+  assert.equal(tree.type, 'select:tree');
+
+  const date = mapStepToLegacyEngineOp({
+    actionType: 'fill_date_field',
+    params: { label_text: '申请日期', value: '2026-01-01' },
+    element: { xpath_smart: "//div[contains(@class,'el-date-editor')]//input" },
+  });
+  assert.equal(date.type, 'date');
+
+  const radio = mapStepToLegacyEngineOp({
+    actionType: 'click_radio',
+    params: { label_text: '是否', option_text: '是' },
+    element: { xpath_smart: "//label[contains(@class,'el-radio')]" },
+  });
+  assert.equal(radio.type, 'radio');
+
+  assert.equal(mapStepToLegacyEngineOp({ actionType: 'wait_for_loading', params: {} }), null);
+  assert.equal(mapStepToLegacyEngineOp({ actionType: 'go_to_url', params: { url: 'http://x' } }), null);
+}
+
+function testAbsoluteFallbackKept() {
   assert.equal(mapStepToLegacyEngineOp({ actionType: 'scan_form_fields', params: {} }), null);
   const absOnly = mapStepToLegacyEngineOp({
     actionType: 'click_element_by_index',
     params: { text: 'x' },
     element: { xpath: '/html/body/div[1]/button', xpath_full: '/html/body/div[1]/button' },
   });
-  assert.equal(absOnly.target, '');
-  assert.equal(absOnly.meta.ok, false);
-  assert.ok(absOnly.meta.warnings.includes('missing_relative_xpath'));
+  assert.equal(absOnly.target, '/html/body/div[1]/button');
+  assert.equal(absOnly.meta.ok, true);
+  assert.equal(absOnly.meta.targetSource, 'xpath_full');
+  assert.ok(absOnly.meta.warnings.includes('absolute_xpath_fallback'));
 }
 
-function testRequireTargetFilter() {
+function testExportKeepsAbsoluteSteps() {
   const steps = [
     {
       id: 1,
@@ -83,24 +133,30 @@ function testRequireTargetFilter() {
     },
     { id: 3, actionType: 'get_pending_tasks', params: {} },
   ];
-  const all = exportStepsToLegacyEngine(steps, { includeMeta: false });
-  assert.equal(all.count, 2);
-  const strict = exportStepsToLegacyEngine(steps, { requireTarget: true, includeMeta: false });
-  assert.equal(strict.count, 1);
-  assert.equal(strict.operations[0].name, '点击:A');
+  const all = exportStepsToLegacyEngine(steps, { includeMeta: true });
+  assert.equal(all.count, 2, 'absolute-only steps must not be dropped');
+  assert.equal(all.stats.absoluteFallback, 1);
+  assert.equal(all.operations[1].target, '/html/body/div[1]');
+  const bare = exportStepsToLegacyEngine(steps, { includeMeta: false });
   assert.deepEqual(
-    Object.keys(strict.operations[0]).sort(),
+    Object.keys(bare.operations[0]).sort(),
     ['locateBy', 'name', 'target', 'type', 'value'],
   );
 }
 
-function testPickRelative() {
+function testPickExportTarget() {
   assert.equal(
-    pickRelativeTarget({
+    pickExportTarget({
       target: '/html/x',
       element: { xpath_smart: "//li[normalize-space()='t']" },
-    }),
+    }).target,
     "//li[normalize-space()='t']",
+  );
+  assert.equal(
+    pickRelativeTarget({
+      element: { xpath_full: '/html/body/div[9]' },
+    }),
+    '/html/body/div[9]',
   );
   assert.equal(buildOperationName('click_menu_item', { menu_text: '产品管理' }), '菜单:产品管理');
 }
@@ -108,7 +164,8 @@ function testPickRelative() {
 testSchema();
 testClickMenu();
 testFill();
-testSkipMetaAndAbsolute();
-testRequireTargetFilter();
-testPickRelative();
+testEngineTypeVariants();
+testAbsoluteFallbackKept();
+testExportKeepsAbsoluteSteps();
+testPickExportTarget();
 console.log('ok: characterization legacy-engine export');

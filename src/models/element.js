@@ -61,7 +61,6 @@ export const LOCATOR_EXEMPT_ACTIONS = Object.freeze([
   'wait_for_loading',
   'done',
   'save_form_snapshot',
-  'request_intervention',
   'scan_visible_fields',
   'get_page_state',
 ]);

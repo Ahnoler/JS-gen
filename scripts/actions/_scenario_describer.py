@@ -326,7 +326,7 @@ async def inject_scenario_summary(agent, case_data_store: dict | None = None) ->
         msg = HumanMessage(content=(
             f'{_SCENARIO_PREFIX}\n{summary}\n\n'
             f'（仅供理解当前业务上下文，非强制指令；执行仍以【当前任务】、工具返回、'
-            f'以及 [HUMAN INTERVENTION] / [SYSTEM] 强制 cue 为准。）'
+            f'以及 [SYSTEM] 强制 cue 为准。）'
         ))
         mm = getattr(agent, '_message_manager', None)
         if mm is None:

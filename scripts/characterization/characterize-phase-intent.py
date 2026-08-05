@@ -42,11 +42,29 @@ def main() -> int:
     assert_true(c_modify['refill'] == 'all_editable', 'modify all_editable')
     assert_true(c_modify.get('explicit_all_fields') is True, 'explicit all fields synonym')
 
-    # introduce
+    # introduce — pure pick; mixed create+conditional introduce stays create
     c_intro = compile_phase_intent('点击引入按钮，选择客户后点确认')
     assert_true(is_introduce_phase(c_intro), 'introduce phase')
     assert_true(c_intro['submit']['via'] == 'any', 'introduce via any')
     assert_true('confirm_click' in c_intro['success']['kinds'], 'introduce confirm success')
+
+    mixed = (
+        '新增一个信贷潜在客户，点击保存。（如果出现法定代表人/负责人证件号码的引入按钮，'
+        '那么该法定责任人的客户名称填写朱桂武，点击查询，选择一个客户，点击确认。'
+        '预期结果：完成引入流程）预期结果：新增信贷潜在客户并保存成功。'
+    )
+    c_mixed = compile_phase_intent(mixed)
+    assert_true(c_mixed['mode'] == 'create', 'mixed create+introduce → create')
+    assert_true(c_mixed['refill'] == 'all_editable', 'mixed keeps all_editable')
+    assert_true(not is_introduce_phase(c_mixed), 'mixed not introduce_pick')
+
+    intro_fill = (
+        '点击法定代表人/负责人证件号码的引入按钮，客户名称 填写 测试，'
+        '点击查询，选择一个客户，点击确认。预期结果：完成引入流程。'
+    )
+    c_intro_fill = compile_phase_intent(intro_fill)
+    assert_true(is_introduce_phase(c_intro_fill), 'introduce with 填写 picker field')
+    assert_true(c_intro_fill['refill'] == 'none', 'introduce refill none')
 
     # query unchanged
     c_query = compile_phase_intent('查询产品信息')
@@ -68,8 +86,16 @@ def main() -> int:
         'block confirm in maintain',
     )
     assert_true(
-        not should_block_index_submit(c_intro, '确认', in_form_overlay=True, dialog_title='选择客户'),
-        'allow confirm in picker',
+        not should_block_index_submit(
+            maintain, '确认', in_form_overlay=True, dialog_title='选择客户', is_picker_ui=False,
+        ),
+        'allow confirm in picker title',
+    )
+    assert_true(
+        not should_block_index_submit(
+            c_create, '确认', in_form_overlay=True, dialog_title='', is_picker_ui=True,
+        ),
+        'allow confirm on query-toolbar picker during create',
     )
     assert_true(
         should_block_index_submit(maintain, '保存', in_form_overlay=False, dialog_title=''),

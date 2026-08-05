@@ -6,6 +6,7 @@
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import {
   LEGACY_ENGINE_FIELD_SCHEMA,
+  LEGACY_ENGINE_EMITTED_TYPES,
   ACTION_TO_ENGINE_TYPE,
   exportStepsToLegacyEngine,
   mapStepToLegacyEngineOp,
@@ -27,17 +28,17 @@ function parseBool(raw, defaultValue = false) {
 }
 
 export default function (app) {
-  /** Field contract + type vocabulary for traditional engines */
+  /** Field contract + recorded-action → engine type map */
   app.get('/api/v2/export/legacy-engine/schema', (_req, res) => {
     res.json({
       schemaVersion: 1,
       fields: LEGACY_ENGINE_FIELD_SCHEMA,
-      types: [...new Set(Object.values(ACTION_TO_ENGINE_TYPE))],
+      types: LEGACY_ENGINE_EMITTED_TYPES,
       actionTypeMap: ACTION_TO_ENGINE_TYPE,
       notes: [
-        'locateBy 默认 xpath；target 为相对 xpath（xpath_smart）',
-        '引擎侧字段名未最终敲定前，以 name/type/value/locateBy/target 为准',
-        'meta 为调试扩展，对接时可忽略',
+        '仅映射当前可录制并落库的动作；不覆盖传统引擎全部操作类型',
+        'locateBy 默认 xpath；target 优先 xpath_smart，无相对 xpath 时回退 xpath_full（不丢弃步骤）',
+        'meta 含 stepId/action/element/params 等调试字段，对接传统引擎核心 5 字段时可剥离',
       ],
     });
   });
@@ -45,7 +46,7 @@ export default function (app) {
   /**
    * Export trajectory steps for traditional engine.
    * GET: full trajectory (query filters).
-   * Query: stepIds, phaseIds, requireTarget, includeMeta
+   * Query: stepIds, phaseIds, includeMeta
    */
   app.get('/api/v2/export/trajectories/:id/legacy-engine', async (req, res) => {
     try {
@@ -54,7 +55,6 @@ export default function (app) {
       const payload = exportStepsToLegacyEngine(traj.steps || [], {
         stepIds: parseIdList(req.query.stepIds),
         phaseIds: parseIdList(req.query.phaseIds),
-        requireTarget: parseBool(req.query.requireTarget, false),
         includeMeta: parseBool(req.query.includeMeta, true),
       });
       res.json({
@@ -69,7 +69,7 @@ export default function (app) {
 
   /**
    * Same export with JSON body filters (preferred for long stepId lists).
-   * Body: { stepIds?, phaseIds?, requireTarget?, includeMeta? }
+   * Body: { stepIds?, phaseIds?, includeMeta? }
    */
   app.post('/api/v2/export/trajectories/:id/legacy-engine', async (req, res) => {
     try {
@@ -79,7 +79,6 @@ export default function (app) {
       const payload = exportStepsToLegacyEngine(traj.steps || [], {
         stepIds: parseIdList(body.stepIds ?? body.step_ids),
         phaseIds: parseIdList(body.phaseIds ?? body.phase_ids),
-        requireTarget: parseBool(body.requireTarget ?? body.require_target, false),
         includeMeta: parseBool(body.includeMeta ?? body.include_meta, true),
       });
       res.json({
@@ -94,7 +93,7 @@ export default function (app) {
 
   /**
    * Dry-run: map an in-memory steps array (no DB). For SPA preview / contract tests.
-   * Body: { steps: [...], requireTarget?, includeMeta? }
+   * Body: { steps: [...], includeMeta? }
    */
   app.post('/api/v2/export/legacy-engine/preview', (req, res) => {
     try {
@@ -104,7 +103,6 @@ export default function (app) {
         return res.status(400).json({ error: 'steps[] is required' });
       }
       const payload = exportStepsToLegacyEngine(steps, {
-        requireTarget: parseBool(body.requireTarget ?? body.require_target, false),
         includeMeta: parseBool(body.includeMeta ?? body.include_meta, true),
       });
       res.json(payload);

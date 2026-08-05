@@ -61,11 +61,11 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
       case 'nav_step':
         send('status', { phase: 'navigating', label: data.label });
         break;
-      case 'intervention_needed':
-        send('intervention_needed', data);
+      case 'phase_intent_obs':
+        send('phase_intent_obs', data);
         break;
-      case 'intervention_resolved':
-        send('intervention_resolved', data);
+      case 'phase_boundary_obs':
+        send('phase_boundary_obs', data);
         break;
       case 'action_log_sync':
         send('action_log_sync', data);

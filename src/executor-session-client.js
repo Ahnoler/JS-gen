@@ -136,7 +136,6 @@ export function sendToExecutor(nodeUuid, type, payload) {
 const STDIN_TO_WS = {
   step: 'session.step',
   cancel_step: 'session.cancel_step',
-  intervene: 'session.intervene',
   manual_record_start: 'session.manual_record_start',
   manual_record_stop: 'session.manual_record_stop',
   manual_dom_event: 'session.manual_dom_event',
@@ -306,6 +305,10 @@ export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
       phaseNumber: data.phase_number,
       caseDataFile: data.case_data_file,
       caseData: data.case_data,
+      // Must forward — otherwise Python loads 0 special-element candidates
+      specialElementCandidates:
+        data.special_element_candidates ?? data.specialElementCandidates,
+      priorPhases: data.prior_phases ?? data.priorPhases,
     });
     return;
   }

@@ -33,6 +33,10 @@ _INTRODUCE_RE = re.compile(
     r'引入|选人|选择客户|选择企业|选择法人|联网核查|挑选.*客户|挑选.*企业'
 )
 
+# CRUD verbs that mean the phase goal is form maintain (create/modify), not introduce-only.
+# Conditional「如果出现引入按钮…」inside an 新增 task must NOT hijack mode→introduce_pick.
+_CRUD_PHASE_RE = re.compile(r'新增|创建|录入|新建|添加|修改|编辑|更新|维护')
+
 _MAINTAIN_DIALOG_TITLE_RE = re.compile(
     r'维护|修改|编辑|新增|录入|详情|信息'
 )
@@ -59,6 +63,11 @@ def clear_phase_intent(case_data_store: dict | None) -> None:
         '_quality_failed_reasons',
     ):
         case_data_store.pop(key, None)
+    try:
+        from ._phase_boundary import clear_phase_boundary
+        clear_phase_boundary(case_data_store)
+    except Exception:
+        pass
 
 
 def get_phase_intent(case_data_store: dict | None) -> dict[str, Any] | None:
@@ -78,12 +87,23 @@ def phase_intent_active(case_data_store: dict | None) -> bool:
 
 
 def _is_introduce_task(task_text: str) -> bool:
+    """True when introduce/pick is the *primary* phase goal.
+
+    Mixed create+conditional-introduce tasks (「新增…如果出现引入按钮…」) return False
+    so compile keeps mode=create with refill=all_editable.
+
+    Does **not** defer to ``is_query_task`` — picker phases routinely contain「查询」;
+    compile_phase_intent checks introduce before query.
+    """
     t = (task_text or '').strip()
-    if not t or is_query_task(t) or is_login_task(t):
+    if not t or is_login_task(t):
         return False
-    if _INTRODUCE_RE.search(t):
-        return True
-    return False
+    if not _INTRODUCE_RE.search(t):
+        return False
+    # Form maintain verbs win over nested introduce instructions.
+    if _CRUD_PHASE_RE.search(t):
+        return False
+    return True
 
 
 def compile_phase_intent(task_text: str) -> dict[str, Any]:
@@ -96,12 +116,8 @@ def compile_phase_intent(task_text: str) -> dict[str, Any]:
         refill: RefillMode = 'none'
         submit = {'required': False, 'via': 'any', 'button_text': ''}
         success = {'kinds': [], 'evidence': []}
-    elif is_query_task(t):
-        mode = 'query'
-        refill = 'none'
-        submit = {'required': False, 'via': 'any', 'button_text': '查询'}
-        success = {'kinds': [], 'evidence': []}
     elif _is_introduce_task(t):
+        # Before query/form_fill: picker phases often contain「填写」「查询」words.
         mode = 'introduce_pick'
         refill = 'none'
         submit = {'required': True, 'via': 'any', 'button_text': '确认'}
@@ -109,6 +125,11 @@ def compile_phase_intent(task_text: str) -> dict[str, Any]:
             'kinds': ['confirm_click', 'picker_closed'],
             'evidence': ['ok-introduce-confirm', 'picker-dialog-closed'],
         }
+    elif is_query_task(t):
+        mode = 'query'
+        refill = 'none'
+        submit = {'required': False, 'via': 'any', 'button_text': '查询'}
+        success = {'kinds': [], 'evidence': []}
     elif task_mode == 'form_fill':
         mode = 'create'
         refill = 'all_editable'
@@ -172,23 +193,50 @@ def compile_phase_intent(task_text: str) -> dict[str, Any]:
 
 
 def apply_phase_intent(case_data_store: dict | None, task_text: str) -> dict[str, Any] | None:
-    """Clear old contract, compile if flag on, write store. Returns contract or None."""
+    """Clear old contract, compile if flag on, write store. Returns contract or None.
+
+    When AI_PHASE_BOUNDARY is on, compiles PhaseBoundary first and adapts it
+    into the legacy intent dict so existing callers keep working.
+    """
     clear_phase_intent(case_data_store)
     if case_data_store is None:
         return None
+
+    from scripts.feature_flags import phase_boundary_enabled
+
+    if phase_boundary_enabled():
+        from ._phase_boundary import (
+            apply_phase_boundary,
+            boundary_to_legacy_intent,
+        )
+        boundary = apply_phase_boundary(case_data_store, task_text)
+        case_data_store['_phase_intent_flag_locked'] = True
+        if not boundary:
+            return None
+        contract = boundary_to_legacy_intent(boundary)
+        case_data_store['_phase_intent'] = contract
+        case_data_store['_force_refill_all'] = bool(boundary.get('requires_write_all_editable'))
+        return contract
+
     enabled = phase_intent_contract_enabled()
     case_data_store['_phase_intent_flag_locked'] = enabled
     if not enabled:
         return None
     contract = compile_phase_intent(task_text)
     case_data_store['_phase_intent'] = contract
-    # Sync legacy flag used across form/task paths
     case_data_store['_force_refill_all'] = contract.get('refill') == 'all_editable'
     return contract
 
 
 def contract_force_refill(case_data_store: dict | None) -> bool:
     """Whether TaskList should treat pre-filled editable fields as pending."""
+    try:
+        from ._phase_boundary import get_phase_boundary, phase_boundary_active
+        if phase_boundary_active(case_data_store):
+            b = get_phase_boundary(case_data_store)
+            return bool(b and b.get('requires_write_all_editable'))
+    except Exception:
+        pass
     c = get_phase_intent(case_data_store)
     if c:
         return c.get('refill') == 'all_editable'
@@ -241,10 +289,35 @@ def should_block_index_submit(
     *,
     in_form_overlay: bool,
     dialog_title: str = '',
+    is_picker_ui: bool = False,
+    container_id: str = '',
+    query_ui: bool = False,
+    case_data_store: dict | None = None,
 ) -> bool:
-    """True when index-click on submit label must be blocked (maintain dialog only)."""
+    """True when index-click on submit label must be blocked.
+
+    Prefers PhaseBoundary when active; falls back to legacy intent rules.
+    """
+    try:
+        from ._phase_boundary import (
+            get_phase_boundary,
+            phase_boundary_active,
+            should_block_index_submit_boundary,
+        )
+        if phase_boundary_active(case_data_store):
+            return should_block_index_submit_boundary(
+                get_phase_boundary(case_data_store),
+                btn_label,
+                in_form_overlay=in_form_overlay,
+                dialog_title=dialog_title,
+                container_id=container_id,
+                query_ui=query_ui or is_picker_ui,
+            )
+    except Exception:
+        pass
+
     if not contract:
-        return in_form_overlay
+        return in_form_overlay and not is_picker_ui
     if is_introduce_phase(contract):
         return False
     submit = contract.get('submit') or {}
@@ -257,16 +330,24 @@ def should_block_index_submit(
         return False
     if compact.startswith(('保存', '提交')):
         return True
-    # 确认/确定 — only block in maintain context, not picker dialogs
-    if _PICKER_DIALOG_TITLE_RE.search(dialog_title or '') and not _MAINTAIN_DIALOG_TITLE_RE.search(
-        dialog_title or ''
-    ):
+    if is_picker_ui:
+        return False
+    title = dialog_title or ''
+    if re.search(r'选择|引入|放大镜|查询客户|客户列表|挑选', title):
+        return False
+    if _PICKER_DIALOG_TITLE_RE.search(title) and not _MAINTAIN_DIALOG_TITLE_RE.search(title):
         return False
     return in_form_overlay
 
 
 def check_pending_write_gate(case_data_store: dict | None) -> tuple[bool, list[str]]:
-    """Return (ok, pending_labels). Hard gate when refill=all_editable."""
+    """Return (ok, pending_labels). Hard gate when refill / boundary requires write."""
+    try:
+        from ._phase_boundary import can_submit_writes, phase_boundary_active
+        if phase_boundary_active(case_data_store):
+            return can_submit_writes(case_data_store)
+    except Exception:
+        pass
     if not contract_force_refill(case_data_store):
         return True, []
     from scripts.models.task import TaskList
@@ -279,6 +360,18 @@ def check_pending_write_gate(case_data_store: dict | None) -> tuple[bool, list[s
 def record_success_token(case_data_store: dict | None, kind: str, evidence: str = '') -> None:
     if not case_data_store:
         return
+    try:
+        from ._phase_boundary import phase_boundary_active, record_evidence
+        if phase_boundary_active(case_data_store):
+            mapping = {
+                'toast_ok': 'toast_ok',
+                'url_change': 'url_change',
+                'confirm_click': 'dialog_confirmed',
+                'picker_closed': 'picker_closed',
+            }
+            record_evidence(case_data_store, mapping.get(kind, kind), evidence)
+    except Exception:
+        pass
     store = case_data_store.setdefault('_success_tokens', [])
     if not isinstance(store, list):
         store = []
@@ -294,6 +387,13 @@ def record_success_token(case_data_store: dict | None, kind: str, evidence: str 
 
 def has_contract_success(case_data_store: dict | None) -> bool:
     """True when required success token for this phase is satisfied."""
+    try:
+        from ._phase_boundary import phase_boundary_active, phase_done_ok
+        if phase_boundary_active(case_data_store):
+            ok, _ = phase_done_ok(case_data_store)
+            return ok
+    except Exception:
+        pass
     c = get_phase_intent(case_data_store)
     if not c:
         if case_data_store:
@@ -360,7 +460,7 @@ def mark_quality_failed(case_data_store: dict | None, *reasons: str) -> None:
 
 
 def emit_phase_observability(case_data_store: dict | None, emit_fn) -> None:
-    """Emit phase_intent / recovery / quality_failed on recording events."""
+    """Emit phase_intent / phase_boundary / recovery / quality_failed on recording events."""
     if not case_data_store or not emit_fn:
         return
     payload: dict[str, Any] = {}
@@ -368,6 +468,23 @@ def emit_phase_observability(case_data_store: dict | None, emit_fn) -> None:
     if c:
         payload['phase_intent'] = c
         payload['recovery'] = c.get('recovery')
+    try:
+        from ._phase_boundary import get_phase_boundary, phase_boundary_active
+        if phase_boundary_active(case_data_store):
+            b = get_phase_boundary(case_data_store)
+            evidence = list(case_data_store.get('_evidence_observed') or [])
+            payload['phase_boundary'] = b
+            payload['evidence_observed'] = evidence
+            emit_fn({
+                'event': 'phase_boundary_obs',
+                'data': {
+                    'phase_boundary': b,
+                    'evidence_observed': evidence,
+                    'recovery': (c or {}).get('recovery') if c else None,
+                },
+            })
+    except Exception:
+        pass
     if case_data_store.get('_quality_failed'):
         payload['quality_failed'] = True
         payload['quality_failed_reasons'] = list(

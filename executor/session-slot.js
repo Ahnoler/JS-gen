@@ -108,6 +108,8 @@ export class SessionSlot {
       this.ready = false;
       this.busy = false;
       this.process = null;
+      // Free the slot so _findFreeSlot can reuse it (open-failure ghosts used to stick forever).
+      if (this.sessionId === sessionId) this.sessionId = null;
       this.onAgentEvent({
         event: 'session.process_exit',
         session_id: sessionId,
@@ -117,21 +119,34 @@ export class SessionSlot {
 
     child.stdin.on('error', () => {});
 
-    const readyMsg = await waitForReady(child, 90000);
-    if (readyMsg?.cdp_port != null) {
-      this.cdpPort = Number(readyMsg.cdp_port) || this.cdpPort;
+    try {
+      const readyMsg = await waitForReady(child, 90000);
+      if (readyMsg?.cdp_port != null) {
+        this.cdpPort = Number(readyMsg.cdp_port) || this.cdpPort;
+      }
+      this.ready = true;
+      // Prefer explicit cdp_ready from Python (false when browser_use dropped the port).
+      const readyFlag = readyMsg && Object.prototype.hasOwnProperty.call(readyMsg, 'cdp_ready')
+        ? !!readyMsg.cdp_ready
+        : true;
+      return {
+        sessionId,
+        slotIndex: this.slotIndex,
+        cdpPort: this.cdpPort,
+        cdpReady: readyFlag,
+      };
+    } catch (err) {
+      // Agent died / timed out before ready — reclaim slot and kill orphans.
+      if (this.process && isProcessAlive(this.process)) {
+        killTree(this.process.pid);
+      }
+      if (this.cdpPort != null) killListenerOnPort(this.cdpPort);
+      this.process = null;
+      this.ready = false;
+      this.busy = false;
+      if (this.sessionId === sessionId) this.sessionId = null;
+      throw err;
     }
-    this.ready = true;
-    // Prefer explicit cdp_ready from Python (false when browser_use dropped the port).
-    const readyFlag = readyMsg && Object.prototype.hasOwnProperty.call(readyMsg, 'cdp_ready')
-      ? !!readyMsg.cdp_ready
-      : true;
-    return {
-      sessionId,
-      slotIndex: this.slotIndex,
-      cdpPort: this.cdpPort,
-      cdpReady: readyFlag,
-    };
   }
 
   _onStdout(chunk) {

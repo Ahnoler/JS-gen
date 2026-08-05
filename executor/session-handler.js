@@ -66,6 +66,12 @@ export function createSessionHandler(manager) {
           phase_number: payload.phaseNumber ?? payload.phase_number,
           case_data_file: payload.caseDataFile ?? payload.case_data_file,
           case_data: payload.caseData ?? payload.case_data,
+          special_element_candidates:
+            payload.specialElementCandidates
+            ?? payload.special_element_candidates
+            ?? null,
+          prior_phases:
+            payload.priorPhases ?? payload.prior_phases ?? null,
         });
       case 'session.close':
         return manager.close(sessionId, {
@@ -75,7 +81,7 @@ export function createSessionHandler(manager) {
       case 'session.cancel_step':
         return manager.forward(sessionId, 'cancel_step', {});
       case 'session.intervene':
-        return manager.forward(sessionId, 'intervene', { instruction: payload.instruction });
+        return { ok: false, error: 'Gone', message: 'session.intervene is retired. Use manual recording.' };
       case 'session.manual_record_start':
         return manager.forward(sessionId, 'manual_record_start', {});
       case 'session.manual_record_stop':

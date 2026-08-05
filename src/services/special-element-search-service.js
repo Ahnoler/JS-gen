@@ -10,6 +10,16 @@ function tokenize(text) {
     .filter((t) => t.length >= 1);
 }
 
+/** Normalize common typos / aliases so tag「法定责任人」matches UI「法定代表人». */
+function normalizeLegalAliases(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/法定责任人/g, '法定代表人')
+    .replace(/责任人的引入/g, '代表人的引入');
+}
+
+const INTRODUCE_HINT_RE = /引入|选人|放大镜|法定代表人|法定责任人/;
+
 function stepSummary(steps = []) {
   return steps.slice(0, 8).map((s) => ({
     stepNumber: s.stepNumber,
@@ -32,7 +42,8 @@ export async function searchSpecialElements({
   if (!Number.isFinite(sid) || sid <= 0) return [];
 
   const queryText = String(description || keyword || '').trim();
-  const tokens = tokenize(queryText);
+  const queryNorm = normalizeLegalAliases(queryText);
+  const tokens = tokenize(queryNorm);
   const elements = await specialElementDao.listEnabledBySystem(sid);
   if (!elements.length) return [];
 
@@ -48,39 +59,55 @@ export async function searchSpecialElements({
     const tag = tagMap.get(Number(el.tagDictCode));
     const dictLabel = tag?.dictLabel || '';
     const dictValue = tag?.dictValue || '';
-    const hay = [
+    const hayRaw = [
       el.name || '',
       dictLabel,
       dictValue,
       el.phaseDescription || '',
       el.remark || '',
       el.searchText || '',
-    ].join(' ').toLowerCase();
+    ].join(' ');
+    const hay = normalizeLegalAliases(hayRaw);
 
     let tagScore = 0;
     let lexicalScore = 0;
     const matchReasons = [];
 
     if (queryText) {
-      const q = queryText.toLowerCase();
-      if (dictLabel && q.includes(dictLabel.toLowerCase())) {
+      const q = queryNorm;
+      const labelNorm = normalizeLegalAliases(dictLabel);
+      const nameNorm = normalizeLegalAliases(el.name || '');
+      if (labelNorm && q.includes(labelNorm)) {
         tagScore += 40;
         matchReasons.push(`标签匹配: ${dictLabel}`);
+      } else if (
+        labelNorm.includes('引入')
+        && q.includes('引入')
+        && (q.includes('代表人') || hay.includes('代表人'))
+      ) {
+        tagScore += 25;
+        matchReasons.push(`标签近义: ${dictLabel}`);
       }
-      if (dictValue && q.includes(dictValue.toLowerCase())) {
+      if (dictValue && q.includes(String(dictValue).toLowerCase())) {
         tagScore += 30;
         matchReasons.push(`标签键值匹配: ${dictValue}`);
       }
-      if (el.name && q.includes(String(el.name).toLowerCase())) {
+      if (nameNorm && q.includes(nameNorm)) {
         lexicalScore += 35;
         matchReasons.push(`名称包含查询`);
       }
-      if (el.phaseDescription && (
-        String(el.phaseDescription).toLowerCase().includes(q)
-        || q.includes(String(el.phaseDescription).toLowerCase().slice(0, 40))
+      const phaseNorm = normalizeLegalAliases(el.phaseDescription || '');
+      if (phaseNorm && (
+        phaseNorm.includes(q)
+        || q.includes(phaseNorm.slice(0, 40))
       )) {
         lexicalScore += 25;
         matchReasons.push(`阶段描述相关`);
+      }
+      // Introduce / legal-person soft boost when both sides mention the workflow
+      if (INTRODUCE_HINT_RE.test(q) && INTRODUCE_HINT_RE.test(hay)) {
+        lexicalScore += 20;
+        matchReasons.push('引入/选人语义相关');
       }
     }
 

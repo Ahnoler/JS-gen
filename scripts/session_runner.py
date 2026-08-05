@@ -465,14 +465,26 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             )
             if contract:
                 agent_task = agent_task + contract_summary_hint(contract)
+            boundary = (case_data_ref or {}).get('_phase_boundary') if case_data_ref else None
             emit_json({
                 "event": "phase_intent_obs",
                 "data": {
                     "phase": step_index,
                     "phase_intent": contract,
+                    "phase_boundary": boundary,
                     "recovery": (contract or {}).get('recovery') if contract else None,
                 },
             })
+            if boundary:
+                emit_json({
+                    "event": "phase_boundary_obs",
+                    "data": {
+                        "phase": step_index,
+                        "phase_boundary": boundary,
+                        "evidence_observed": list((case_data_ref or {}).get('_evidence_observed') or []),
+                        "recovery": (contract or {}).get('recovery') if contract else None,
+                    },
+                })
         elif heal_mode:
             emit_json({
                 "event": "phase_intent_obs",
@@ -485,6 +497,8 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         phase_start_payload = {"phase": step_index, "total": -1, "name": task_text[:60]}
         if contract:
             phase_start_payload["phase_intent"] = contract
+        if case_data_ref and case_data_ref.get('_phase_boundary'):
+            phase_start_payload["phase_boundary"] = case_data_ref['_phase_boundary']
         if heal_mode:
             phase_start_payload["heal_mode"] = heal_mode
         emit_json({"event": "phase_start", "data": phase_start_payload})
@@ -661,7 +675,7 @@ def _convert_action_params(action_name, params):
     return {k: v for k, v in (params or {}).items() if k in sig}
 
 
-async def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_ref=None, cdp_action_queue=None):
+async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action_queue=None):
     event = msg.get("event")
 
     if event == "save_trajectory":
@@ -911,16 +925,16 @@ async def _dispatch_event(msg, session_state, intervention_queue=None, agent_run
         return 'continue'
 
     if event == "intervene":
-        instruction = msg.get("data", {}).get("instruction", "")
-        if instruction:
-            if agent_running_ref and not agent_running_ref.get('value'):
-                sys.stderr.write(f"[session] Intervention immediate: {instruction[:80]}\n")
-                sys.stderr.flush()
-                return ('intervene', instruction)
-            if intervention_queue is not None:
-                intervention_queue.put_nowait(instruction)
-                sys.stderr.write(f"[session] Intervention queued for running agent: {instruction[:80]}\n")
-                sys.stderr.flush()
+        # Human intervention via AI session is retired — use manual recording instead.
+        emit_json({
+            "event": "error",
+            "data": {
+                "message": "intervene is gone (410). Use manual recording for human correction.",
+                "code": 410,
+            },
+        })
+        sys.stderr.write("[session] intervene rejected (410 Gone — use manual recording)\n")
+        sys.stderr.flush()
         return 'continue'
 
     if event != "step":
@@ -1314,9 +1328,10 @@ async def run_session(args):
     special_element_candidates_store = {}  # replaced each phase; AI may only use these ids
     cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
     goal_tracker = {'goals': [], 'stopped': False}
-    intervention_queue = asyncio.Queue()  # human intervention messages
 
-    on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path, intervention_queue, case_data_store)
+    on_step_start_hook, on_step_end_hook = build_recording_hooks(
+        goal_tracker, cancel_flag_path, case_data_store,
+    )
     controller = build_controller(
         browser_context,
         case_data_store=case_data_store,
@@ -1431,13 +1446,8 @@ async def run_session(args):
             break
 
         try:
-            action = await _dispatch_event(msg, session_state, intervention_queue, agent_running_ref, cdp_action_queue)
+            action = await _dispatch_event(msg, session_state, agent_running_ref, cdp_action_queue)
             cumulative_path = session_state['cumulative_path']
-
-            # Handle immediate intervention when agent is idle
-            if isinstance(action, tuple) and action[0] == 'intervene':
-                step_index += 1
-                await _run_step({"instruction": action[1], "max_steps": 20}, step_index)
 
             if action != 'step':
                 continue

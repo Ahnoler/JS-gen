@@ -5,6 +5,7 @@ import { SessionSlot } from './session-slot.js';
 import { EXECUTOR_CAPACITY, EXECUTOR_CDP_PORT_BASE } from './config.js';
 import { BibBridge } from './bib-bridge.js';
 import { discoverAllCdpInRange } from '../src/cdp/discover.js';
+import { isProcessAlive } from './spawn-agent.js';
 
 export class SessionManager {
   /**
@@ -18,6 +19,10 @@ export class SessionManager {
     this.sessions = new Map();
     /** @type {SessionSlot[]} */
     this.slots = Array.from({ length: capacity }, (_, i) => new SessionSlot(i, (msg) => {
+      // Drop crashed sessions from the map so leases/list stay consistent with free slots.
+      if (msg?.event === 'session.process_exit' && msg.session_id) {
+        this.sessions.delete(msg.session_id);
+      }
       emitToControlPlane(msg);
     }));
     this.emitToControlPlane = emitToControlPlane;
@@ -33,6 +38,16 @@ export class SessionManager {
   _findFreeSlot() {
     for (const slot of this.slots) {
       if (!slot.sessionId) return slot;
+      // Reclaim ghost: sessionId set but process already dead (failed open / unclean exit).
+      if (!slot.process || !isProcessAlive(slot.process)) {
+        const stale = slot.sessionId;
+        slot.sessionId = null;
+        slot.ready = false;
+        slot.busy = false;
+        slot.process = null;
+        if (stale) this.sessions.delete(stale);
+        return slot;
+      }
     }
     return null;
   }

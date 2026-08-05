@@ -168,7 +168,9 @@ def form_fill_hint() -> str:
         '1. 对每个可编辑字段须执行写动作（可同值重填），以录制可操作元素；不要仅 check_field_value 跳过。\n'
         '2. 第一次 fill_form_field / select_option 会触发自动填写助手覆盖其余待办。\n'
         '3. pending≈0 后立刻 click_save()，不要重选已填字段。\n'
-        '4. click_save 成功 = 操作成功提示 或 保存后页面跳转；满足其一再 done(success=true)。\n'
+        '4. click_save 成功 = 操作成功提示 或 保存后页面跳转。\n'
+        '5. 若保存后跳转到同阶段的详情/大表（仍有大量待填字段），继续填写后再保存；'
+        '不要把「向导中段跳转」当成阶段结束去 done。\n'
     )
 
 

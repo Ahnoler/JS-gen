@@ -41,25 +41,13 @@ If `get_page_state` returns `formErrors: []` after the Agent's last action (and 
 A dialog has closed. Advise the Agent to check whether the target fields were backfilled (`check_field_value`). If backfilled, **`click_save()`** immediately — **do NOT reopen the dialog**.
 
 ### Signal 3: get_pending_tasks returns pending=[]
-⚠️ Check the `NEEDS_INTERVENTION` key in the same response:
-- If `NEEDS_INTERVENTION` is absent or empty → all fields are filled. The Agent should **`click_save()`** immediately — do not scan or check again; do not advise index-click on 保存.
-- If `NEEDS_INTERVENTION` has items (e.g. `"NEEDS_INTERVENTION": ["field1"]`) → only fillable fields are done, but intervention fields remain. **Do NOT advise save.** The system auto-injects a `[HUMAN INTERVENTION]` message on the next step — the Agent follows the injected instructions (skip fields, complete fillables, report).
+All fillable fields are done. The Agent should **`click_save()`** immediately — do not scan or check again; do not advise index-click on 保存.
 
 ### Signal 4: Agent plan contradicts page state
-If the Agent's next_goal mentions "open import dialog" / "handle intervention field", first check `get_pending_tasks`:
-- If `NEEDS_INTERVENTION` is non-empty: the Agent is correctly handling active intervention fields. Do NOT override — let it continue.
-- If `NEEDS_INTERVENTION` is empty AND `formErrors=[]` AND `pending=[]`: the intervention workflow has already completed. Advise the Agent to verify backfilled fields with `check_field_value`, then **`click_save()`**.
+If the Agent's next_goal mentions "open import dialog" / disabled field with adjacent button, check whether the task lists special element candidates — advise `use_special_element` or `click_adjacent_button` as appropriate. If `pending=[]` AND `formErrors=[]`, advise **`click_save()`**.
 
 ### Signal 5: Same action repeated 3+ times
 If the Agent repeatedly clicks the same button (e.g. "Import", "Confirm") with no material change in page state, it is stuck in a loop. Advise the Agent to change strategy or save directly.
-
-## Intervention Flow Awareness
-
-- NEEDS_INTERVENTION fields are readonly/disabled and must be backfilled via a dialog.
-- After clicking Confirm, the dialog closing = the dialog's form validation passed. The intervention workflow completed successfully.
-- After the dialog closes, verify fields were backfilled before deciding the next step.
-- If the page has no formErrors, no pending tasks, AND no NEEDS_INTERVENTION fields, the task is complete — call done().
-- NEEDS_INTERVENTION fields are NOT auto-fillable. The system pauses for human workflow design. Do NOT treat them as "done."
 
 ## Domain Vocabulary
 
@@ -67,14 +55,14 @@ These terms may appear in the Agent's trajectory. Use them to understand what th
 
 | Term | Meaning |
 |------|---------|
-| `scan_form_fields` | Scans all form fields and builds task list only — does NOT auto-fill; returns filled/pending/NEEDS_INTERVENTION |
-| `get_pending_tasks` | Returns `{pending: [...], NEEDS_INTERVENTION: [...]}` — remaining form fields only (completed omitted) |
-| `sync_tasks_from_errors` | Reads page validation errors, adds them to the pending list, returns fillable and NEEDS_INTERVENTION categories |
-| `NEEDS_INTERVENTION` | A disabled field with an adjacent "Import"/"Select" button — cannot be filled directly, requires customer selection via dialog |
+| `scan_form_fields` | Scans all form fields and builds task list only — does NOT auto-fill; returns filled/pending |
+| `get_pending_tasks` | Returns `{pending: [...]}` — remaining form fields only (completed omitted) |
+| `sync_tasks_from_errors` | Reads page validation errors, adds them to the pending list |
+| `use_special_element(id)` | Executes a special-element action group from task candidates — preferred for complex disabled+button flows |
+| `click_adjacent_button(label)` | Clicks adjacent "Import"/"Select" button when field is empty — fallback when no special element matches |
 | `fillable` | A field that can be filled directly (input/select/date) — Agent should fill then call task_done |
 | `task_done(label)` | Marks a field as completed |
 | `check_field_value(label)` | Checks a field's current value — used to verify a disabled field was backfilled by a dialog |
-| `request_intervention(label)` | Agent requests human intervention — the system pauses and waits for user instructions |
 | `Import` button (引入) | Opens a customer lookup dialog; selecting a customer backfills the associated disabled fields |
 | `formErrors` | `{label, error}[]` from `.el-form-item__error` — `label` is the field's `.el-form-item__label`, `error` is the validation message |
 | `notification` | el-notification popup — server-side validation errors or success messages |
