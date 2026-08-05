@@ -262,6 +262,51 @@ export async function listFactsByFunctionHistory(functionId, excludeTrajectoryId
   }));
 }
 
+/** P2-4：按 id 批量取交易基础字段（对比报告用）。 */
+export async function listTrajectoriesByIds(ids) {
+  const nums = Array.from(
+    new Set((Array.isArray(ids) ? ids : [])
+      .map((x) => Number(x))
+      .filter((n) => Number.isFinite(n) && n > 0)),
+  ).slice(0, 10);
+  if (!nums.length) return [];
+  const rows = await getDB()('trajectory')
+    .whereIn('id', nums)
+    .select(
+      'id',
+      'model',
+      'task',
+      'step_count',
+      'phase_count',
+      'is_successful',
+      'is_done',
+      'function_id',
+    );
+  const map = new Map(rows.map((r) => [Number(r.id), fromDbRow(r)]));
+  // 保持请求顺序
+  return nums.map((n) => map.get(n)).filter(Boolean);
+}
+
+/**
+ * P2-4：多交易当前版本 value 事实（formValues 原料）。
+ * 调用方再按 source 白名单过滤；同 (trajectory, entity) 多条由调用方按 weight 取最高。
+ */
+export async function listCurrentValueFactsByTrajectories(ids) {
+  const nums = Array.from(
+    new Set((Array.isArray(ids) ? ids : [])
+      .map((x) => Number(x))
+      .filter((n) => Number.isFinite(n) && n > 0)),
+  );
+  if (!nums.length) return [];
+  const rows = await getDB()(FACT_TABLE)
+    .whereIn('trajectory_id', nums)
+    .where({ attribute: 'value' })
+    .whereNull('superseded_by')
+    .orderBy('weight', 'desc')
+    .orderBy('created_at', 'desc');
+  return fromDbRows(rows);
+}
+
 /** 交易审计汇总。 */
 export async function auditSummary(trajectoryId) {
   const tid = Number(trajectoryId);

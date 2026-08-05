@@ -309,6 +309,149 @@ export async function auditSummary(trajectoryId) {
   return memoryDao.auditSummary(Number(trajectoryId));
 }
 
+/** P2-4 formValues 允许的产出源（排除 requirement / history）。 */
+const COMPARE_FORM_SOURCES = new Set(['llm', 'page', 'rule', 'agent', 'observer']);
+
+function truncateTask(task, max = 200) {
+  const s = String(task ?? '');
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 1)}…`;
+}
+
+function buildFormValues(facts, trajectoryId) {
+  const tid = Number(trajectoryId);
+  const best = new Map(); // entity -> { value, weight }
+  for (const f of facts) {
+    if (Number(f.trajectoryId) !== tid) continue;
+    const source = String(f.source || '').toLowerCase();
+    if (!COMPARE_FORM_SOURCES.has(source)) continue;
+    const entity = String(f.entity || '').trim();
+    if (!entity) continue;
+    const weight = Number(f.weight) || 0;
+    const prev = best.get(entity);
+    if (!prev || weight > prev.weight) {
+      best.set(entity, { value: f.value == null ? '' : String(f.value), weight });
+    }
+  }
+  const out = {};
+  for (const [entity, { value }] of best) out[entity] = value;
+  return out;
+}
+
+function decisionsFromAudit(summary) {
+  const total = Number(summary?.total) || 0;
+  const byStatus = {
+    pending: Number(summary?.byStatus?.pending) || 0,
+    passed: Number(summary?.byStatus?.passed) || 0,
+    failed: Number(summary?.byStatus?.failed) || 0,
+  };
+  const passRate = total > 0 ? Number((byStatus.passed / total).toFixed(4)) : null;
+  return {
+    total,
+    byStatus,
+    passRate,
+    overridden: Number(summary?.overridden) || 0,
+  };
+}
+
+/** 并集分母：缺字段 = 不一致；所有交易取值完全一致才算 match。 */
+function computeConsistency(trajectories) {
+  if (!Array.isArray(trajectories) || trajectories.length < 2) return null;
+  const entitySet = new Set();
+  for (const t of trajectories) {
+    for (const k of Object.keys(t.formValues || {})) entitySet.add(k);
+  }
+  const entities = Array.from(entitySet);
+  const entitiesCompared = entities.length;
+  if (entitiesCompared === 0) {
+    return { entitiesCompared: 0, exactMatchRate: null, pairwise: [] };
+  }
+
+  let exactMatches = 0;
+  for (const entity of entities) {
+    const values = trajectories.map((t) => {
+      const fv = t.formValues || {};
+      return Object.prototype.hasOwnProperty.call(fv, entity) ? fv[entity] : undefined;
+    });
+    const first = values[0];
+    if (first !== undefined && values.every((v) => v === first)) exactMatches += 1;
+  }
+  const exactMatchRate = Number((exactMatches / entitiesCompared).toFixed(4));
+
+  const pairwise = [];
+  for (let i = 0; i < trajectories.length; i++) {
+    for (let j = i + 1; j < trajectories.length; j++) {
+      const a = trajectories[i];
+      const b = trajectories[j];
+      const union = new Set([...Object.keys(a.formValues || {}), ...Object.keys(b.formValues || {})]);
+      const compared = union.size;
+      let matched = 0;
+      for (const entity of union) {
+        const hasA = Object.prototype.hasOwnProperty.call(a.formValues || {}, entity);
+        const hasB = Object.prototype.hasOwnProperty.call(b.formValues || {}, entity);
+        if (hasA && hasB && a.formValues[entity] === b.formValues[entity]) matched += 1;
+      }
+      pairwise.push({
+        a: a.id,
+        b: b.id,
+        matchRate: compared > 0 ? Number((matched / compared).toFixed(4)) : null,
+        compared,
+      });
+    }
+  }
+
+  return { entitiesCompared, exactMatchRate, pairwise };
+}
+
+/**
+ * P2-4：多模型对比报告。
+ * @param {{ trajectoryIds: number[] }} opts
+ * @returns {Promise<{ trajectories, consistency, missingIds, note } | { error, status, missingIds? }>}
+ */
+export async function compareModels({ trajectoryIds } = {}) {
+  const raw = Array.isArray(trajectoryIds) ? trajectoryIds : [];
+  const ids = Array.from(
+    new Set(raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)),
+  ).slice(0, 10);
+
+  if (!ids.length) {
+    return { error: 'trajectoryIds is required (at least one positive id)', status: 400 };
+  }
+
+  const found = await memoryDao.listTrajectoriesByIds(ids);
+  const foundIds = new Set(found.map((t) => Number(t.id)));
+  const missingIds = ids.filter((id) => !foundIds.has(id));
+
+  if (!found.length) {
+    return { error: 'No trajectories found', status: 404, missingIds };
+  }
+
+  const facts = await memoryDao.listCurrentValueFactsByTrajectories(found.map((t) => t.id));
+
+  const trajectories = [];
+  for (const t of found) {
+    const summary = await memoryDao.auditSummary(t.id);
+    trajectories.push({
+      id: Number(t.id),
+      model: String(t.model || ''),
+      stepCount: Number(t.stepCount) || 0,
+      phaseCount: Number(t.phaseCount) || 0,
+      isSuccessful: t.isSuccessful == null ? null : Boolean(t.isSuccessful),
+      isDone: t.isDone == null ? null : Boolean(t.isDone),
+      task: truncateTask(t.task),
+      decisions: decisionsFromAudit(summary),
+      formValues: buildFormValues(facts, t.id),
+    });
+  }
+
+  return {
+    trajectories,
+    consistency: computeConsistency(trajectories),
+    missingIds,
+    note: 'token usage not stored; use decisions.passRate and isSuccessful as success proxies',
+  };
+}
+
 /**
  * 离线复检（P0 只重算汇总；P1 实现 policy checks 逐条重放）。
  */

@@ -1161,9 +1161,10 @@ export const API_GROUPS = [
     id: 'memory',
     name: '记忆 / 审计',
     description:
-      'AI 记忆系统（P0/P1/P2）：事件摄取、Fact Pack 检索（可含同功能历史复用）、决策记录与审计汇总。外部 Vue 审计页据此渲染。'
+      'AI 记忆系统（P0/P1/P2）：事件摄取、Fact Pack 检索（可含同功能历史复用）、决策记录、审计汇总与多模型对比。外部 Vue 审计页据此渲染。'
       + '决策类型：form_value / scenario_summary / heal（回放自愈）/ analyze_phase；agent_step 本迭代不做。'
-      + 'AI_MEMORY_HISTORY 默认关；开启后 retrieve 传 functionId 并入历史事实（低权重）。',
+      + 'AI_MEMORY_HISTORY 默认关；开启后 retrieve 传 functionId 并入历史事实（低权重）。'
+      + 'GET /memory/compare：同需求多模型录制对比（步骤数 / 成功 / 审计通过率 / 填表值并集一致性）。',
     endpoints: [
       {
         method: 'POST', path: '/api/v2/memory/events',
@@ -1231,6 +1232,34 @@ export const API_GROUPS = [
           topReferencedFacts: [
             { id: 7, refs: 5, entity: '客户名称', attribute: 'value', value: '某某公司' },
           ],
+        }),
+      },
+      {
+        method: 'GET', path: '/api/v2/memory/compare',
+        summary: '多模型对比报告（P2-4）',
+        desc:
+          '对已录制的多条交易（通常同需求、不同 model）汇总步骤数、成功状态、审计通过率与填表值一致性。'
+          + 'formValues 仅含 source∈{llm,page,rule,agent,observer}（排除 requirement/history）。'
+          + 'consistency 用 entity 并集分母（缺字段=不一致）；找到 <2 条时 consistency=null。'
+          + '无 token 用量字段，用 isSuccessful + decisions.passRate 代理。'
+          + '400=无有效 id；404=全部缺失；200=至少找到 1 条（含 missingIds）。',
+        params: [{
+          name: 'trajectoryIds', type: 'string', required: true, in: 'query',
+          example: '10,11', desc: '逗号分隔交易 id（2–10；重复 query 亦可）',
+        }],
+        respExample: J({
+          trajectories: [{
+            id: 10, model: 'deepseek-chat', stepCount: 42, phaseCount: 5,
+            isSuccessful: true, isDone: true, task: '…',
+            decisions: { total: 12, byStatus: { pending: 0, passed: 11, failed: 1 }, passRate: 0.9167, overridden: 0 },
+            formValues: { 客户名称: '某某公司' },
+          }],
+          consistency: {
+            entitiesCompared: 8, exactMatchRate: 0.625,
+            pairwise: [{ a: 10, b: 11, matchRate: 0.7, compared: 10 }],
+          },
+          missingIds: [],
+          note: 'token usage not stored; use decisions.passRate and isSuccessful as success proxies',
         }),
       },
       {

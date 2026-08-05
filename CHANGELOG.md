@@ -33,6 +33,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-06: 记忆 **P2-4 多模型对比报告**：`GET /api/v2/memory/compare?trajectoryIds=1,2,3` 对已录制交易汇总步骤数 / 成功状态 / 审计通过率 / 填表值一致性。formValues 仅 `source∈{llm,page,rule,agent,observer}`；consistency 用 entity **并集**分母（缺字段=不一致）；全部缺失 404、≥1 条 200、<2 条 `consistency=null`。无 token 字段（用 passRate + isSuccessful 代理）。烟测 `smoke-memory-compare.mjs` 19/19。
+  影响范围：记忆 API / api-docs；不写库、不改 schema。
+  文件：src/memory/memory-dao.js, src/memory/memory-service.js, src/routes/v2/memory.js, src/dashboard/api-docs/catalog.js, scripts/smoke/smoke-memory-compare.mjs
+  Python 同步提示：对齐 `GET /api/v2/memory/compare` 响应契约（trajectories + consistency + missingIds）。
+
 - 2026-08-05: 记忆 **P2-2 跨交易复用**：`POST /api/v2/memory/retrieve` 接受 `functionId`；`AI_MEMORY_HISTORY=true` 时，并入同 `function_id` 历史成功交易（`is_successful=1`，排除本交易，取最近 5 条）的当前版本事实——标记 `source=history, stance=inferred, weight×0.5`，排序自然靠后，**绝不覆盖本交易 requirement 事实**、不参与冲突 supersede。`protocol.js` 新增 `history` 到 FACT/EVENT sources；`weight-engine` 基准 0.4；`config` 新增 `AI_MEMORY_HISTORY`（默认 false）。录制链路 `trajectory-record-lifecycle` 传 `trajRow.functionId`。烟测：`scripts/smoke/smoke-memory-history.mjs`（子进程验证开关三态，12/12）。
   影响范围：Fact Pack 检索 / 录制阶段注入；向后兼容（不传 functionId 或开关关闭时行为不变）。
   文件：src/memory/protocol.js, src/memory/weight-engine.js, src/memory/memory-dao.js, src/memory/memory-service.js, src/routes/v2/memory.js, src/services/trajectory-record-lifecycle.js, config/config.js, config/.env.example, src/dashboard/api-docs/catalog.js, scripts/smoke/smoke-memory-history.mjs
