@@ -183,6 +183,33 @@ def patch_message_manager():
         if not managed_list:
             return _original_get_messages(self)
 
+        # P1：走 ContextCompiler —— 同裁剪逻辑 + 丢弃明细审计；
+        # compiler 异常时回退下方内联逻辑（保持旧行为可用）。
+        try:
+            from .context_compiler import (
+                compile_message_window,
+                emit_context_drop,
+                message_window_budget,
+            )
+            max_recent = message_window_budget()
+            kept_messages, dropped_detail = compile_message_window(
+                managed_list,
+                max_recent=max_recent,
+                is_keepalive=_is_keepalive,
+            )
+            if dropped_detail:
+                from scripts.memory.writer import emit_memory_event
+                emit_context_drop(
+                    emit_memory_event,
+                    dropped_detail,
+                    len(managed_list),
+                    len(kept_messages),
+                    max_recent,
+                )
+            return kept_messages
+        except Exception:
+            pass  # fall through to legacy inline truncation
+
         total = len(managed_list)
         if total <= MAX_RECENT + 2:
             return [m.message for m in managed_list]
@@ -209,6 +236,20 @@ def patch_message_manager():
                     keep.add(i - 1)
 
         indices = sorted(keep)
+        dropped = total - len(indices)
+
+        # P0：上下文裁剪可审计 —— 丢弃数量写入外部记忆（feature flag 控制）
+        if dropped > 0:
+            try:
+                from scripts.memory.writer import emit_memory_event
+                emit_memory_event(
+                    'context_drop',
+                    {'dropped_messages': dropped, 'total': total, 'kept': len(indices), 'max_recent': MAX_RECENT},
+                    source='system',
+                )
+            except Exception:
+                pass
+
         return [managed_list[i].message for i in indices]
 
     MessageManager.get_messages = _patched_get_messages

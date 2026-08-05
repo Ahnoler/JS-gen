@@ -18,6 +18,7 @@ import registerApiOverride from './api-override.js';
 import registerExecutor from './executor.js';
 import registerReplay from './replay.js';
 import registerExportMgmt from './export-mgmt.js';
+import registerMemory from './memory.js';
 
 export default function (app) {
   app.use('/api/v2', v2ResponseEnvelope);
@@ -36,4 +37,5 @@ export default function (app) {
   registerExecutor(app);
   registerReplay(app);
   registerExportMgmt(app);
+  registerMemory(app);
 }

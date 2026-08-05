@@ -69,3 +69,22 @@ def scenario_describer_interval() -> int:
     except (TypeError, ValueError):
         return 3
     return n if n >= 1 else 3
+
+def memory_events_enabled() -> bool:
+    """AI_MEMORY_EVENTS — 记忆事件旁路摄取（默认开，只写不读）。"""
+    return _env_flag('AI_MEMORY_EVENTS', True)
+
+
+def memory_fact_pack_enabled() -> bool:
+    """AI_MEMORY_FACT_PACK — 事实包注入（P1，默认关）。"""
+    return _env_flag('AI_MEMORY_FACT_PACK', True)
+
+
+def memory_decisions_enabled() -> bool:
+    """AI_MEMORY_DECISIONS — LLM 决策记录（默认开）。"""
+    return _env_flag('AI_MEMORY_DECISIONS', True)
+
+
+def memory_audit_strict_enabled() -> bool:
+    """AI_MEMORY_AUDIT_STRICT — 审计严格模式（默认关）。"""
+    return _env_flag('AI_MEMORY_AUDIT_STRICT', False)

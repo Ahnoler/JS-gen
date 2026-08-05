@@ -229,9 +229,10 @@ export async function analyzeRequirementToPhases({
   // Append raw business-scenario case data to each phase (for AI fill reference)
   phases = appendCaseDataToPhases(phases, caseBlock);
 
-  // caseEntries: analyze 不再拆 KV（返回 []）。结构化 KV 仍可由前端 POST/PATCH 入库，
-  // 供后续分块标注/报文捞取；本期录制不注入 store，只靠 phase 文本中的业务场景块。
-  return { phases, caseEntries: [] };
+  // P1：analyze 附带结构化 KV（extractCaseDataBlock 规则解析，非 LLM 拆解）。
+  // 前端创建轨迹时透传 → case_data_entry 落库 + memory_fact(requirement/authoritative)
+  // 摄取，事实包注入优先采用（权威值不可被 LLM 覆盖）。
+  return { phases, caseEntries: caseBlock };
 }
 
 /**
@@ -347,6 +348,17 @@ export async function createTransactionWithPhases({
       await caseDataDao.replaceEntriesForTrajectory(trajId, rawEntries, client);
     }
 
+    // P1：结构化案例数据 → memory_fact（requirement/authoritative，供事实包注入）。
+    // 独立连接摄取（不参与本事务原子性），失败仅告警不阻塞创建。
+    if (Array.isArray(rawEntries) && rawEntries.length) {
+      try {
+        const { ingestCaseEntriesAsFacts } = await import('../memory/memory-service.js');
+        await ingestCaseEntriesAsFacts(trajId, rawEntries);
+      } catch (err) {
+        console.warn('[trajectory] case-entry fact ingest skipped:', err?.message || err);
+      }
+    }
+
     return trajId;
   };
 
@@ -379,6 +391,13 @@ export async function setTrajectoryCaseEntries(trajectoryId, entries) {
     throw err;
   }
   await caseDataDao.replaceEntriesForTrajectory(tid, entries);
+  // P1：同步摄取为 authoritative 事实（事实包注入用）
+  try {
+    const { ingestCaseEntriesAsFacts } = await import('../memory/memory-service.js');
+    await ingestCaseEntriesAsFacts(tid, entries);
+  } catch (err) {
+    console.warn('[trajectory] case-entry fact ingest skipped:', err?.message || err);
+  }
   return getTrajectoryWithPhases(tid);
 }
 

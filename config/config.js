@@ -117,3 +117,11 @@ export const BATCH_ITEM_LEASE_MS = Math.max(
   30000,
   parseInt(_resolve('BATCH_ITEM_LEASE_MS', '600000'), 10) || 600000,
 );
+
+// 鈹€鈹€ AI 璁板繂绯荤粺锛圥0 鏃佽矾鎽勫彇锛氫簨浠跺啓榛樿寮€銆佷簨瀹炲寘璇婚粯璁ゅ叧锛夆攢鈹€
+
+// ── AI 记忆系统（P0 旁路摄取：事件写默认开、事实包读默认关）──
+export const AI_MEMORY_EVENTS = _resolve('AI_MEMORY_EVENTS', 'true').toLowerCase() !== 'false';
+export const AI_MEMORY_FACT_PACK = _resolve('AI_MEMORY_FACT_PACK', 'false').toLowerCase() === 'true';
+export const AI_MEMORY_DECISIONS = _resolve('AI_MEMORY_DECISIONS', 'true').toLowerCase() !== 'false';
+export const AI_MEMORY_AUDIT_STRICT = _resolve('AI_MEMORY_AUDIT_STRICT', 'false').toLowerCase() === 'true';

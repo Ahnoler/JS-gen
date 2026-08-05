@@ -194,6 +194,39 @@ def _llm_generate_values(llm, items, case_data_store=None,
 
     prompt = f'当前表单字段：\n{chr(10).join(field_lines)}\n\n指令：{instruction}'
 
+    def _record_decision(status, output, error=None):
+        # P1：LLM 表单值决策留痕（AI_MEMORY_DECISIONS 默认开）——
+        # 回答「这个测试值是谁、依据什么生成的」；失败不阻塞填表。
+        try:
+            from ..memory.writer import emit_memory_event
+            from ..feature_flags import memory_decisions_enabled
+            if not memory_decisions_enabled():
+                return
+            model_name = (
+                getattr(form_llm, 'model_name', None)
+                or getattr(form_llm, 'model', None)
+                or os.getenv('FORM_LLM_MODEL', '')
+            )
+            emit_memory_event(
+                'decision',
+                {
+                    'kind': 'form_value',
+                    'fields': [lbl for lbl in [f.get('label') for f in llm_fields]],
+                    'status': status,
+                },
+                decision={
+                    'decision_type': 'form_value',
+                    'model': str(model_name or ''),
+                    'temperature': 0.0,
+                    'input_preview': str(prompt)[:500],
+                    'output_json': {'actions': output, 'error': error} if error else {'actions': output},
+                    'policy_checks': [{'check': 'parse', 'pass': status == 'passed'}],
+                    'audit_status': 'passed' if status == 'passed' else 'failed',
+                },
+            )
+        except Exception:
+            pass
+
     try:
         response = form_llm.invoke([
             SystemMessage(content=_load_fill_form_prompt()),
@@ -208,8 +241,10 @@ def _llm_generate_values(llm, items, case_data_store=None,
         if isinstance(parsed, dict) and 'actions' in parsed:
             parsed = parsed['actions']
         llm_result = parsed if isinstance(parsed, list) else []
+        _record_decision('passed', llm_result)
         return actions + llm_result  # P1+P2 + LLM result
-    except Exception:
+    except Exception as e:
+        _record_decision('failed', [], error=str(e)[:300])
         # Fallback — preserve P1+P2 actions, fill remaining with defaults
         for item in llm_fields:
             label = item['label'] if isinstance(item, dict) else item

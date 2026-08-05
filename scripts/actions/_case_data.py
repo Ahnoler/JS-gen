@@ -1,6 +1,7 @@
 """Case data storage actions for cross-phase data sharing."""
 
 from ._helpers import _ok, _err
+from ..memory.writer import emit_memory_event
 
 # Internal / nested keys that must not be treated as user field presets.
 _RESERVED_CASE_KEYS = frozenset({
@@ -109,6 +110,16 @@ def _register_case_data_actions(controller, case_data_store):
     async def save_case_data(key: str, value: str):
         try:
             case_data_store[key] = value
+            # P1：带 phase_number 归属（事实包按阶段检索；P0 缺省导致检索不到）
+            try:
+                from ._state import _CURRENT_PHASE
+                emit_memory_event(
+                    'case_saved',
+                    {'key': key, 'value': str(value)[:500]},
+                    phase_number=_CURRENT_PHASE if _CURRENT_PHASE else None,
+                )
+            except Exception:
+                emit_memory_event('case_saved', {'key': key, 'value': str(value)[:500]})
             return _ok(f'saved:{key}={value}', include_in_memory=True)
         except Exception as e:
             return _err(f'save-error:{e}')

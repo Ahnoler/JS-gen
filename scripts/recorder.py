@@ -16,13 +16,29 @@ from .actions._js_snippets import JS_SMART_LOCATOR
 _ACTION_LOG = []
 
 
+def _compact_last_result(_last_result, max_chars=120):
+    """把 ActionResult（单条或列表）压缩为一行 res=/err= 摘要，避免长 JSON 刷屏。
+
+    完整 tool 结果仍在模型上下文里，日志侧只需关键信号与首段预览。
+    """
+    results = _last_result if isinstance(_last_result, list) else ([_last_result] if _last_result else [])
+    parts = []
+    for r in results:
+        text = (getattr(r, 'extracted_content', None) or '').strip()
+        err = (getattr(r, 'error', None) or '').strip()
+        if text:
+            parts.append(f'res={text[:max_chars]}')
+        if err:
+            parts.append(f'err={err[:max_chars]}')
+    return ' | '.join(parts) if parts else 'res=None'
+
+
 def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_store=None):
     """Build hooks with goal dedup detection and cancel signal."""
     if goal_tracker is None:
         goal_tracker = {'goals': [], 'stopped': False}
 
     async def on_step_start(agent):
-        sys.stderr.write(f"[on_step_start]\t n_steps={agent.state.n_steps}\n"); sys.stderr.flush()
         # Honor cancel before starting another LLM/action cycle
         if cancel_flag_path is not None and cancel_flag_path.exists():
             sys.stderr.write("[recorder] Cancel signal on step start — stopping agent\n")
@@ -115,14 +131,56 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                 _actions.append(json.dumps(active, ensure_ascii=False, default=str))
             except Exception:
                 _actions.append(str(a))
-        sys.stderr.write(f"[on_step_end]\t n_steps={agent.state.n_steps} is_done={_done} stopped={_stopped}\n")
-        sys.stderr.write(f"[next_goal]\t {_next_goal}\n")
-        if _actions:
-            sys.stderr.write(f"[actions]\t {', '.join(_actions)}\n")
-        else:
-            sys.stderr.write(f"[actions]\t []\n")
-        sys.stderr.write(f"[last_result]\t {_last_result_str}\n")
+        # 每步一行紧凑格式：步骤号 + done/stopped 状态 + goal + 动作 + 结果摘要
+        # （goal/actions/res 均截断防刷屏；完整 tool 结果在模型上下文内）
+        sys.stderr.write(
+            f"[step {agent.state.n_steps}] "
+            f"done={'yes' if _done else 'no'} stopped={'yes' if _stopped else 'no'} | "
+            f"goal={(_next_goal or '-')[:100]} | "
+            f"act={(', '.join(_actions))[:200] if _actions else '-'} | "
+            f"{_compact_last_result(_last_result)}\n"
+        )
         sys.stderr.flush()
+
+        # P1：动作事件打点（fill_before_save 建模用）——异步旁路，失败不阻塞
+        try:
+            from .actions._state import _CURRENT_PHASE
+            from scripts.memory.writer import emit_memory_event
+            action_payload = []
+            fill_labels = []
+            for a in _actions:
+                try:
+                    parsed = json.loads(a)
+                except Exception:
+                    parsed = {}
+                if not isinstance(parsed, dict):
+                    parsed = {}
+                name = str(parsed.get('action') or '')
+                if name in ('fill_form_field', 'select_option', 'click_radio',
+                            'fill_date_field', 'select_tree_option', 'fill_input'):
+                    lab = str(parsed.get('label') or parsed.get('label_text') or '').strip()
+                    if lab:
+                        fill_labels.append(lab)
+                action_payload.append(parsed)
+            emit_memory_event(
+                'action',
+                {'actions': action_payload, 'result': _last_result_str[:200]},
+                phase_number=_CURRENT_PHASE or None,
+                step_number=agent.state.n_steps,
+                facts=[
+                    {
+                        'entity': lab,
+                        'attribute': 'filled',
+                        'value': '1',
+                        'factType': 'page_state',
+                        'source': 'observer',
+                        'stance': 'neutral',
+                    }
+                    for lab in dict.fromkeys(fill_labels)
+                ],
+            )
+        except Exception:
+            pass
 
         # ===== Capture page URL from agent state =====
         try:
@@ -489,6 +547,26 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                                 f"phase={action_state._CURRENT_PHASE} success={done_success}\n"
                             )
                             sys.stderr.flush()
+                            # P0：阶段结果写入外部记忆（append-only，失败不阻塞）
+                            try:
+                                from scripts.memory.writer import emit_memory_event
+                                emit_memory_event(
+                                    'phase_done',
+                                    {'success': bool(done_success), 'text': str(done_text or '')[:400]},
+                                    phase_number=action_state._CURRENT_PHASE,
+                                    # P1：outcome 事实（fill_before_save 建模的锚点）
+                                    facts=[{
+                                        'entity': f'phase_{action_state._CURRENT_PHASE}',
+                                        'attribute': 'outcome',
+                                        'value': 'success' if done_success else 'failed',
+                                        'factType': 'outcome',
+                                        'source': 'observer',
+                                        'stance': 'authoritative',
+                                    }],
+                                )
+                            except Exception as _me:
+                                sys.stderr.write(f"[recorder] memory phase_done emit failed: {_me}")
+                                sys.stderr.flush()
                         except Exception as e:
                             sys.stderr.write(f"[recorder] phase outcome save failed: {e}\n")
                             sys.stderr.flush()
@@ -577,6 +655,14 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                     if a in ('fill_form_field', 'fill_date_field', 'select_option', 'click_radio'):
                         lab = (p.get('label_text') or '').strip()
                         return f'{a}:{lab}' if lab else None
+                    # Read-only no-progress actions: repeated identical calls
+                    # (e.g. get_page_state xN with no write in between) are a
+                    # spin — count them so cycle detect / heal can stop it.
+                    if a in ('get_page_state', 'scan_form_fields', 'get_pending_tasks'):
+                        return a
+                    if a == 'check_field_value':
+                        lab = (p.get('label_text') or '').strip()
+                        return f'check_field_value:{lab}' if lab else 'check_field_value'
                     return None
 
                 slice_entries = list(_ctrl_log[baseline:]) if baseline <= len(_ctrl_log) else list(_ctrl_log)
@@ -587,7 +673,19 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
 
                 # Too early in the phase — avoid false stop on open/expand clicks
                 if case_data_store and case_data_store.get('_heal_mode'):
-                    pass  # heal: no contract cycle prescription
+                    # heal: no contract cycle prescription, but stop on a
+                    # no-progress spin — repeated identical read-only actions
+                    # (get_page_state / check_field_value) with no write between.
+                    # Previously the agent spun until max_steps, then required
+                    # manual intervention.
+                    recent = fps[-4:]
+                    if len(recent) >= 3 and len(set(recent)) == 1:
+                        sys.stderr.write(
+                            f"[recorder] heal no-progress spin x{len(recent)}: {recent[0]} — stopping\n"
+                        )
+                        sys.stderr.flush()
+                        goal_tracker['stopped'] = True
+                        agent.state.stopped = True
                 elif agent.state.n_steps < 4:
                     pass
                 else:

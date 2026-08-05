@@ -391,6 +391,16 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         sys.stderr.write(f"[session] special_element_candidates skipped: {e}\n")
         sys.stderr.flush()
 
+    # P1：记忆事件携带 trajectory_id（Node step 指令透传；writer 自 P0 支持）
+    try:
+        from .memory.writer import configure as configure_memory_writer
+        tid = instruction.get('trajectory_id') or instruction.get('trajectoryId')
+        if tid:
+            configure_memory_writer(trajectory_id=int(tid))
+    except Exception as e:
+        sys.stderr.write(f"[session] memory trajectory_id skipped: {e}\n")
+        sys.stderr.flush()
+
     contract = None
     sys.stderr.write(f"[session] Step {step_index}: {task_text[:80]} (max_steps={max_steps})\n")
     sys.stderr.flush()
@@ -409,6 +419,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             sys.stderr.flush()
 
     agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', task_text, count=1).strip() or task_text
+    phase_task_text = agent_task
     try:
         from .actions._phase_context import (
             apply_heal_mode,
@@ -458,10 +469,29 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 prior_phases=prior_phases if isinstance(prior_phases, list) else None,
                 case_data_store=case_data_ref,
             )
+        # P1：记忆事实包注入（AI_MEMORY_FACT_PACK 默认关）——权威值/已保存值
+        # 作为事实依据，替代「靠 MAX_RECENT 截断记忆猜」；失败不阻塞主链路。
+        try:
+            from .memory.fact_pack import parse_fact_pack, format_fact_pack
+            from .feature_flags import memory_fact_pack_enabled
+            raw_pack = instruction.get('fact_pack')
+            if not heal_mode and memory_fact_pack_enabled() and raw_pack:
+                parsed = parse_fact_pack(raw_pack)
+                fp_text = format_fact_pack((parsed or {}).get('facts') or [])
+                if fp_text:
+                    agent_task = agent_task + '\n\n' + fp_text
+                    sys.stderr.write(
+                        f"[session] fact pack injected: {len((parsed or {}).get('facts') or [])} facts\n"
+                    )
+                    sys.stderr.flush()
+        except Exception as e:
+            sys.stderr.write(f"[session] fact pack skipped: {e}\n")
+            sys.stderr.flush()
         if case_data_ref is not None and not heal_mode:
             agent_task = agent_task + recording_refill_hint(
                 mode,
                 force_refill_all=bool(case_data_ref.get('_force_refill_all')),
+                task_text=phase_task_text,
             )
             if contract:
                 agent_task = agent_task + contract_summary_hint(contract)
@@ -1061,6 +1091,8 @@ def _chrome_automation_args() -> list[str]:
         '--use-mock-keychain',
         '--metrics-recording-only',
         '--no-service-autorun',
+        # Cut image decode / GPU work on BiB cloud executors (pages still usable for form ops).
+        '--blink-settings=imagesEnabled=false',
         # Match BiB default viewport (1600×900); do not start maximized.
         '--window-size=1600,900',
         '--window-position=0,0',
@@ -1290,6 +1322,16 @@ async def run_session(args):
 
     session_id = args.session_id or "unknown"
 
+    # P0：初始化外部记忆 writer（异步批量上报，失败不阻塞 Agent）
+    from scripts.memory.writer import (
+        configure as configure_memory_writer,
+        start as start_memory_writer,
+        flush as flush_memory_writer,
+        shutdown as shutdown_memory_writer,
+    )
+    configure_memory_writer(session_id=session_id, model=getattr(args, 'model', None))
+    start_memory_writer()
+
     cdp_url = getattr(args, 'cdp_url', None) or None
     cdp_port = getattr(args, 'cdp_port', None)
     if cdp_port is not None:
@@ -1518,3 +1560,7 @@ async def run_session(args):
             sys.stderr.flush()
         sys.stderr.write("[session] Browser closed, exiting\n")
         sys.stderr.flush()
+
+    # P0：退出前冲刷记忆队列（不等待太久，避免拖慢关闭）
+    flush_memory_writer(timeout=2.0)
+    shutdown_memory_writer(timeout=2.0)

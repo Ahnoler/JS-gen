@@ -8,7 +8,7 @@ import * as systemDao from '../dao/system-dao.js';
 import * as execSession from '../executor-session-client.js';
 import { state } from '../state.js';
 import { broadcast } from '../ws-server.js';
-import { USE_EXECUTOR } from '../../config/config.js';
+import { AI_MEMORY_FACT_PACK, USE_EXECUTOR } from '../../config/config.js';
 import * as remoteBridge from '../cdp/remote-bridge.js';
 import {
   buildLoginInstruction,
@@ -297,6 +297,26 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         max_steps: 30,
         phase_number: phase.phaseNumber,
       };
+      // P1：记忆事实包注入（AI_MEMORY_FACT_PACK 默认关）——权威值/已保存值
+      // 检索可能滞后（Python 异步批量上报），失败仅告警，不阻塞录制主链路。
+      try {
+        if (AI_MEMORY_FACT_PACK) {
+          const { retrieveFactPack } = await import('../memory/memory-service.js');
+          const factPack = await retrieveFactPack({
+            trajectoryId: tid,
+            phaseNumber: phase.phaseNumber,
+            maxChars: 1500,
+          });
+          if (factPack?.facts?.length) {
+            stepData.fact_pack = factPack;
+            console.log(`[record] fact-pack phase=${phase.phaseNumber} facts=${factPack.facts.length}`);
+          }
+        }
+      } catch (err) {
+        console.warn('[record] fact-pack skipped:', err?.message || err);
+      }
+      // P1：Python 记忆 writer 需要 trajectory_id（否则 case_saved 等事件无归属）
+      stepData.trajectory_id = tid;
       if (prior_phases.length) stepData.prior_phases = prior_phases;
       // 版本V2.2：不再注入 case_data / case_data_file 到 Python case_data_store
       // （业务场景案例数据已写在 phase.description 内，供 AI 填表参考）
@@ -642,12 +662,18 @@ export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phas
     }
   }
 
-  execSession.forwardStdin({
-    nodeUuid: runtime.executorNodeUuid,
-    sessionId: runtime.sessionId,
-    event: enabled ? 'manual_record_start' : 'manual_record_stop',
-    data: {},
-  });
+  try {
+    execSession.forwardStdin({
+      nodeUuid: runtime.executorNodeUuid,
+      sessionId: runtime.sessionId,
+      event: enabled ? 'manual_record_start' : 'manual_record_stop',
+      data: {},
+    });
+  } catch (err) {
+    const e = new Error(err?.message || 'Executor not connected');
+    e.statusCode = 503;
+    throw e;
+  }
   // Manual recording also needs before/after capture when steps will persist
   try {
     execSession.forwardStdin({
@@ -657,8 +683,10 @@ export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phas
       data: { enabled: !!enabled },
     });
   } catch {}
-  const status = await execSession.waitForSessionEvent(runtime.sessionId, 'manual_record_status', 10000)
-    .catch(() => ({ enabled: !!enabled }));
+  // Short wait for ack; do not block HTTP long — agent may be mid-step.
+  // On timeout, optimistically apply the requested enabled state.
+  const status = await execSession.waitForSessionEvent(runtime.sessionId, 'manual_record_status', 8000)
+    .catch(() => ({ enabled: !!enabled, timedOut: true }));
   runtime.manualRecording = !!status.enabled;
   // Manual activity resets idle timer
   if (runtime.manualRecording) touchTrajectoryRuntimeActivity(tid);
