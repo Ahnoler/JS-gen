@@ -33,6 +33,7 @@ export const FACT_SOURCES = new Set([
   'system',
   'human',
   'agent',
+  'history', // P2-2 同 function 历史成功交易复用（低权重，stance=inferred）
 ]);
 
 /** 事实立场。 */
@@ -60,6 +61,7 @@ export const EVENT_SOURCES = new Set([
   'rule',
   'user',
   'system',
+  'history', // P2-2 历史交易复用
 ]);
 
 /** 规范化事件类型：空/超长回退 'system'，其余原样保留（允许未来新增类型）。 */

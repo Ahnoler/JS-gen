@@ -28,6 +28,7 @@ export default function registerMemory(app) {
         entity = '',
         limit = 50,
         maxChars = 2000,
+        functionId = null,
       } = req.body || {};
       if (!trajectoryId) return badRequest(res, 'trajectoryId is required');
       const pack = await memoryService.retrieveFactPack({
@@ -36,6 +37,7 @@ export default function registerMemory(app) {
         entity,
         limit,
         maxChars,
+        functionId,
       });
       res.json(pack);
     } catch (err) {

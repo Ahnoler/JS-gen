@@ -17,6 +17,7 @@ export const SOURCE_BASE_WEIGHT = {
   user: 1.0,        // 与 requirement 同源语义
   agent: 0.7,       // agent 动作结果
   system: 0.6,      // 系统注入（context_drop 等）
+  history: 0.4,     // P2-2 历史交易复用（必须可被本交易 requirement 覆盖）
 };
 
 /** stance 系数（方案 §5.3.1）。 */

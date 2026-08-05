@@ -390,6 +390,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
             trajectoryId: tid,
             phaseNumber: phase.phaseNumber,
             maxChars: 1500,
+            functionId: trajRow?.functionId ?? null,
           });
           if (factPack?.facts?.length) {
             stepData.fact_pack = factPack;

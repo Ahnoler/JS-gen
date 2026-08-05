@@ -246,6 +246,8 @@ async function getDBTransaction(fn) {
 
 /**
  * 检索事实包（P0：结构化过滤 + 权重排序 + 预算裁剪）。
+ * P2-2：传 functionId 且 AI_MEMORY_HISTORY 开启时，并入同功能历史成功交易
+ * 的当前版本事实（source=history, stance=inferred, weight×0.5，排序自然靠后）。
  */
 export async function retrieveFactPack({
   trajectoryId,
@@ -253,6 +255,7 @@ export async function retrieveFactPack({
   entity = '',
   limit = 50,
   maxChars = 2000,
+  functionId = null,
 } = {}) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) {
@@ -264,9 +267,20 @@ export async function retrieveFactPack({
     entity,
     limit: Math.min(Number(limit) || 50, 200),
   });
+
+  let historyFacts = [];
+  try {
+    const { AI_MEMORY_HISTORY } = await import('../../config/config.js');
+    if (AI_MEMORY_HISTORY && Number.isFinite(Number(functionId)) && Number(functionId) > 0) {
+      historyFacts = await memoryDao.listFactsByFunctionHistory(Number(functionId), tid, { limit: 20 });
+    }
+  } catch (err) {
+    console.warn('[memory] history fact-pack skipped:', err?.message || err);
+  }
+
   // P1：effective weight（存储权重 × 时间衰减 × 冲突惩罚）排序，事实包带出
   const now = Date.now();
-  const ranked = facts
+  const ranked = [...facts, ...historyFacts]
     .map((f) => ({ ...f, effectiveWeight: weightEngine.computeWeight(f, now) }))
     .sort((a, b) => Number(b.effectiveWeight) - Number(a.effectiveWeight));
   return buildFactPack(ranked, { maxChars, limit });

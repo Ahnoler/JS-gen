@@ -123,5 +123,6 @@ export const BATCH_ITEM_LEASE_MS = Math.max(
 // ── AI 记忆系统（P0 旁路摄取：事件写默认开、事实包读默认关）──
 export const AI_MEMORY_EVENTS = _resolve('AI_MEMORY_EVENTS', 'true').toLowerCase() !== 'false';
 export const AI_MEMORY_FACT_PACK = _resolve('AI_MEMORY_FACT_PACK', 'false').toLowerCase() === 'true';
+export const AI_MEMORY_HISTORY = _resolve('AI_MEMORY_HISTORY', 'false').toLowerCase() === 'true';
 export const AI_MEMORY_DECISIONS = _resolve('AI_MEMORY_DECISIONS', 'true').toLowerCase() !== 'false';
 export const AI_MEMORY_AUDIT_STRICT = _resolve('AI_MEMORY_AUDIT_STRICT', 'false').toLowerCase() === 'true';

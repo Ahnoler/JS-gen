@@ -230,6 +230,38 @@ export async function listFactsByIds(ids) {
   return nums.map((n) => map.get(n)).filter(Boolean);
 }
 
+/**
+ * P2-2：同 function 历史成功交易的当前版本事实（跨交易复用）。
+ * 仅取 is_successful=1 的其它交易；返回时打上 source='history' + stance='inferred'
+ * + weight ×0.5，绝不参与本交易冲突 supersede（调用方负责排序靠后）。
+ */
+export async function listFactsByFunctionHistory(functionId, excludeTrajectoryId, { limit = 20 } = {}) {
+  const fid = Number(functionId);
+  const exTid = Number(excludeTrajectoryId);
+  if (!Number.isFinite(fid) || fid <= 0 || !Number.isFinite(exTid) || exTid <= 0) return [];
+  const db = getDB();
+  const trajRows = await db('trajectory')
+    .where({ function_id: fid, is_successful: 1 })
+    .whereNot({ id: exTid })
+    .orderBy('id', 'desc')
+    .limit(5)
+    .select('id');
+  const trajIds = trajRows.map((r) => Number(r.id));
+  if (!trajIds.length) return [];
+  const rows = await db(FACT_TABLE)
+    .whereIn('trajectory_id', trajIds)
+    .whereNull('superseded_by')
+    .orderBy('weight', 'desc')
+    .orderBy('created_at', 'desc')
+    .limit(Math.min(Number(limit) || 20, 100));
+  return fromDbRows(rows).map((f) => ({
+    ...f,
+    source: 'history',
+    stance: 'inferred',
+    weight: Number((Number(f.weight || 0) * 0.5).toFixed(4)),
+  }));
+}
+
 /** 交易审计汇总。 */
 export async function auditSummary(trajectoryId) {
   const tid = Number(trajectoryId);

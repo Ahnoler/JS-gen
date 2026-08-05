@@ -1161,8 +1161,9 @@ export const API_GROUPS = [
     id: 'memory',
     name: '记忆 / 审计',
     description:
-      'AI 记忆系统（P0/P1）：事件摄取、Fact Pack 检索、决策记录与审计汇总。外部 Vue 审计页据此渲染。'
-      + '决策类型：form_value / scenario_summary / heal（回放自愈）/ analyze_phase；agent_step 本迭代不做。',
+      'AI 记忆系统（P0/P1/P2）：事件摄取、Fact Pack 检索（可含同功能历史复用）、决策记录与审计汇总。外部 Vue 审计页据此渲染。'
+      + '决策类型：form_value / scenario_summary / heal（回放自愈）/ analyze_phase；agent_step 本迭代不做。'
+      + 'AI_MEMORY_HISTORY 默认关；开启后 retrieve 传 functionId 并入历史事实（低权重）。',
     endpoints: [
       {
         method: 'POST', path: '/api/v2/memory/events',
@@ -1181,9 +1182,13 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/memory/retrieve',
         summary: '检索 Fact Pack（阶段开始前注入用）',
-        reqExample: J({ trajectoryId: 42, phaseNumber: 2, entity: '', limit: 50, maxChars: 2000 }),
+        desc: '传 functionId 且 AI_MEMORY_HISTORY=true 时，并入同功能历史成功交易的当前版本事实（source=history, stance=inferred, weight×0.5，排序靠后，绝不覆盖本交易 requirement 事实）。',
+        reqExample: J({ trajectoryId: 42, phaseNumber: 2, entity: '', limit: 50, maxChars: 2000, functionId: 7 }),
         respExample: J({
-          facts: [{ id: 7, entity: '客户名称', attribute: 'value', value: '某某公司', source: 'requirement', stance: 'authoritative', effectiveWeight: 1.2 }],
+          facts: [
+            { id: 7, entity: '客户名称', attribute: 'value', value: '某某公司', source: 'requirement', stance: 'authoritative', effectiveWeight: 1.2 },
+            { id: 99, entity: '联系人', attribute: 'value', value: '历史联系人', source: 'history', stance: 'inferred', effectiveWeight: 0.3 },
+          ],
           dropped: [],
           budget: { used: 800, max: 2000, limit: 50 },
         }),
