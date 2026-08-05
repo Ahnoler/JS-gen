@@ -76,6 +76,16 @@ export default function registerSpecialElement(app) {
     }
   });
 
+  app.post('/api/v2/special-elements/:id/steps', async (req, res) => {
+    try {
+      const data = await specialElementService.createStep(req.params.id, req.body || {});
+      res.status(201).json(data);
+    } catch (err) {
+      res.status(statusOf(err)).json({ error: err.message });
+    }
+  });
+
+
   app.patch('/api/v2/special-element-steps/:id', async (req, res) => {
     try {
       const data = await specialElementService.updateStep(req.params.id, req.body || {});

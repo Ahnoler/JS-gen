@@ -244,6 +244,41 @@ export async function updateStep(stepId, body = {}) {
   return updated;
 }
 
+export async function createStep(specialElementId, body = {}) {
+  const id = Number(specialElementId);
+  if (!Number.isFinite(id) || id <= 0) throw httpError(400, 'Invalid special element id');
+  const parent = await specialElementDao.getById(id);
+  if (!parent) throw httpError(404, 'Special element not found');
+
+  const actionType = String(body.actionType || '').trim();
+  if (!actionType) throw httpError(400, 'actionType is required');
+
+  const current = await specialElementStepDao.listByElement(id);
+  const nextNumber = current.reduce((max, s) => Math.max(max, Number(s.stepNumber) || 0), 0) + 1;
+
+  const db = getDB();
+  return db.transaction(async (trx) => {
+    const created = await specialElementStepDao.batchCreate([{
+      specialElementId: id,
+      stepNumber: nextNumber,
+      actionIndex: Number(body.actionIndex) || 0,
+      actionType,
+      paramsJson: body.paramsJson ?? body.params ?? null,
+      elementJson: body.elementJson ?? body.element ?? null,
+    }], trx);
+    const parentPatch = {
+      stepCount: current.length + 1,
+    };
+    if (parent.embeddingStatus === 'ready') {
+      parentPatch.embeddingStatus = 'stale';
+      parentPatch.embeddingContentHash = '';
+    }
+    await specialElementDao.update(id, parentPatch, trx);
+    const row = created.find((s) => Number(s.specialElementId) === id);
+    return row ?? created[created.length - 1];
+  });
+}
+
 export async function deleteStep(stepId) {
   const step = await specialElementStepDao.getById(stepId);
   if (!step) throw httpError(404, 'Special element step not found');
