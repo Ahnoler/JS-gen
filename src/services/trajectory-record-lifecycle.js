@@ -23,17 +23,53 @@ import {
 
 /**
  * P1 恢复（V2.2 停用后）：案例数据 KV 注入 Python case_data_store。
- * 只注入结构化 KV（case_data_entry 表，analyze/前端录入的 {fieldKey: fieldValue}），
- * 不注入 raw 文本块（raw 文本仍拼在 phase 描述内供参考）。
+ * 只注入结构化 KV（{fieldKey: fieldValue}），不注入 raw 文本块。
+ *
+ * 数据来源（两级）：
+ *   1. case_data_entry 表（analyze caseEntries / 前端 POST 的 KV）
+ *   2. 兜底：trajectory.task 里的「关键数据」段（extractCaseEntriesFromRequirement
+ *      规则解析）——前端未透传 caseEntries 时（实锤：交易 35 phases 无案例数据块、
+ *      case_data_entry 0 条），从需求原文提取并落库+摄取，保证模型能拿到权威值。
+ *
  * 效果：Python preamble 的【预设案例数据】hint 生效 —— 放大镜查询/填表
  * 优先采用需求里的权威值（如「法定责任人引入 朱桂武」→ 查询框用「朱桂武」）。
  */
-async function prepareCaseDataInjection(trajectoryId) {
+export async function prepareCaseDataInjection(trajectoryId) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    return { caseDataFile: null, caseData: null };
+  }
   try {
-    const { loadFlatDictByTrajectory } = await import('../dao/case-data-dao.js');
-    const flat = await loadFlatDictByTrajectory(Number(trajectoryId));
+    const { loadFlatDictByTrajectory, replaceEntriesForTrajectory } =
+      await import('../dao/case-data-dao.js');
+    const { extractCaseEntriesFromRequirement } =
+      await import('./trajectory-meta-service.js');
+
+    // 1) 已有落库 KV → 直接注入
+    const flat = await loadFlatDictByTrajectory(tid);
     if (flat && Object.keys(flat).length) {
       return { caseDataFile: null, caseData: flat };
+    }
+
+    // 2) 兜底：从 trajectory.task 解析「关键数据」段（幂等：解析出即落库，
+    //    后续 phase 走第 1 级直接命中，不重复摄取）
+    const trajDao = await import('../dao/trajectory-dao.js');
+    const traj = await trajDao.getById(tid);
+    const entries = extractCaseEntriesFromRequirement(traj?.task || '');
+    if (entries.length) {
+      await replaceEntriesForTrajectory(tid, entries).catch((err) => {
+        console.warn('[record] case-data fallback persist skipped:', err?.message || err);
+      });
+      try {
+        const { ingestCaseEntriesAsFacts } = await import('../memory/memory-service.js');
+        await ingestCaseEntriesAsFacts(tid, entries);
+      } catch (err) {
+        console.warn('[record] case-data fallback fact ingest skipped:', err?.message || err);
+      }
+      const flat2 = {};
+      for (const e of entries) flat2[e.fieldKey] = e.fieldValue ?? '';
+      console.log(`[record] case-data fallback from task: ${entries.length} keys`);
+      return { caseDataFile: null, caseData: flat2 };
     }
   } catch (err) {
     console.warn('[record] case-data injection skipped:', err?.message || err);
@@ -265,11 +301,10 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     data: { enabled: true },
   });
 
-  // 版本V2.2：不注入 case_data 到 Python。case_data_entry 可入库留待后续；
-  // 本期填表靠 phase.description 内【业务场景案例数据】+ LLM 优先对齐。
-  // const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
-  const caseDataFile = null;
-  const caseData = null;
+  // P1 恢复：案例数据 KV 注入 Python（case_data_entry 优先；为空则从
+  // trajectory.task 兜底解析「关键数据」段）。模型 preamble 的【预设案例数据】
+  // hint 生效，放大镜查询/填表优先采用需求权威值。
+  const { caseDataFile, caseData } = await prepareCaseDataInjection(tid);
 
   let recordingSystemId = null;
   try {

@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-05: 案例数据注入链路二次修复（实锤：交易 35 重录后模型仍未拿到案例数据——phase 描述无【业务场景案例数据】块、case_data_entry 0 条、preamble 无【预设案例数据】）：① **恢复 `prepareCaseDataInjection` 调用**（V2.2 停用注释残留 `const caseData = null`，函数实现此前已恢复但调用点未恢复，案例数据从未注入）；② **task 兜底解析**：case_data_entry 为空时从 `trajectory.task` 的「关键数据」段规则解析（`extractCaseEntriesFromRequirement`）→ 落库 case_data_entry + 摄取 memory_fact（requirement/authoritative）→ 注入 Python store。不依赖前端透传 analyze caseEntries（外部 Vue 仓库未透传，Node 侧兜底保证权威值可达模型）。端到端验证：交易 35 task → `{"法定责任人引入":"朱桂武"}` 注入 + 落库 + 摄取全过。
+  影响范围：录制注入链路（startTrajectoryRecording 的 case_data 准备）。
+  文件：src/services/trajectory-record-lifecycle.js
+  Python 同步提示：无强 schema；Python 控制面如镜像录制，可对齐「task 关键数据段 → 案例 KV 注入」语义。
+
 - 2026-08-05: 案例数据「引入」类解析 + 注入链路修复（实锤：交易 35 需求"法定责任人引入 朱桂武"无冒号分隔，KV 解析不出 → 模型在客户放大镜反复用主表单值"测试科技发展有限公司"查询致循环）：① `extractCaseEntriesFromRequirement` 支持无冒号「引入」类格式（`法定责任人引入 朱桂武` / `引入 朱桂武` → KV）；② 修复 analyze 返回 `caseEntries` 误传 raw 文本块（`normalizeCaseEntries` 对非数组返回 []，P1 落库/摄取实际未生效）——改为 KV 数组；③ 恢复 `prepareCaseDataInjection`：case_data_entry KV 注入 Python store → preamble【预设案例数据】hint 生效，放大镜查询/填表优先权威值。
   影响范围：analyze API 返回、轨迹创建/录制注入、案例数据解析。
   文件：src/services/trajectory-meta-service.js, src/services/trajectory-record-lifecycle.js
