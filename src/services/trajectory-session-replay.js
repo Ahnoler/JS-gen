@@ -10,6 +10,7 @@
  */
 import { getDB } from '../../config/database.js';
 import * as execSession from '../executor-session-client.js';
+import * as memoryService from '../memory/memory-service.js';
 import * as formSnapshotDao from '../dao/form-snapshot-dao.js';
 import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
 import {
@@ -1089,6 +1090,27 @@ function buildPayload(tid, doSuppress, rows, allResults, healed, error, counts =
 }
 
 async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, healType = 'step') {
+  // P2-1: record replay-heal decision (deterministic instruction template, not LLM-generated)
+  try {
+    await memoryService.ingestEvents([{
+      eventType: 'decision',
+      trajectoryId: runtime.trajectoryDbId ?? runtime.trajectoryId ?? null,
+      sessionId: runtime.sessionId,
+      payload: { kind: 'heal', healType },
+      decision: {
+        decisionType: 'heal',
+        model: '',
+        temperature: 0.0,
+        inputPreview: String(instruction || '').slice(0, 500),
+        outputJson: { healType, maxSteps },
+        policyChecks: [{ check: 'instruction_present', pass: Boolean(instruction) }],
+        auditStatus: instruction ? 'passed' : 'failed',
+      },
+    }]);
+  } catch (err) {
+    console.warn('[replay] heal decision ingest skipped:', err?.message || err);
+  }
+
   await new Promise((resolve, reject) => {
     let settled = false;
     let sawAgentStopped = false;

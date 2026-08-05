@@ -1158,6 +1158,97 @@ export const API_GROUPS = [
     ],
   },
   {
+    id: 'memory',
+    name: '记忆 / 审计',
+    description:
+      'AI 记忆系统（P0/P1）：事件摄取、Fact Pack 检索、决策记录与审计汇总。外部 Vue 审计页据此渲染。'
+      + '决策类型：form_value / scenario_summary / heal（回放自愈）/ analyze_phase；agent_step 本迭代不做。',
+    endpoints: [
+      {
+        method: 'POST', path: '/api/v2/memory/events',
+        summary: '批量摄取记忆事件（旁路写）',
+        desc: 'Body: { events: [...] } 或直接数组。事件可内嵌 facts[] / decision{}。Agent 主路径不等待落库。',
+        reqExample: J({
+          events: [{
+            eventType: 'case_saved',
+            trajectoryId: 42,
+            phaseNumber: 1,
+            payload: { key: '客户名称', value: '某某公司' },
+          }],
+        }),
+        respExample: J({ inserted: 1, facts: 0, decisions: 0, relations: 0 }),
+      },
+      {
+        method: 'POST', path: '/api/v2/memory/retrieve',
+        summary: '检索 Fact Pack（阶段开始前注入用）',
+        reqExample: J({ trajectoryId: 42, phaseNumber: 2, entity: '', limit: 50, maxChars: 2000 }),
+        respExample: J({
+          facts: [{ id: 7, entity: '客户名称', attribute: 'value', value: '某某公司', source: 'requirement', stance: 'authoritative', effectiveWeight: 1.2 }],
+          dropped: [],
+          budget: { used: 800, max: 2000, limit: 50 },
+        }),
+      },
+      {
+        method: 'GET', path: '/api/v2/memory/decisions',
+        summary: '决策列表（按交易/阶段/类型/状态过滤）',
+        params: [
+          { name: 'trajectoryId', type: 'number', in: 'query', example: '42' },
+          { name: 'phaseNumber', type: 'number', in: 'query', example: '1' },
+          {
+            name: 'decisionType', type: 'string', in: 'query',
+            desc: 'form_value | scenario_summary | heal | analyze_phase', example: 'scenario_summary',
+          },
+          { name: 'auditStatus', type: 'string', in: 'query', desc: 'pending | passed | failed', example: 'passed' },
+          { name: 'limit', type: 'number', in: 'query', example: '50' },
+          { name: 'offset', type: 'number', in: 'query', example: '0' },
+        ],
+      },
+      {
+        method: 'GET', path: '/api/v2/memory/decisions/{id}',
+        summary: '决策详情（含 inputFacts 回填）',
+        desc: 'inputFactIds 为引用事实 id；inputFacts 为对应事实正文（含被 supersede 版本），供审计复现「模型依据了什么」。',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '9' }],
+        respExample: J({
+          id: 9, trajectoryId: 42, decisionType: 'scenario_summary', model: 'deepseek-chat',
+          auditStatus: 'passed', inputFactIds: [7, 8],
+          inputFacts: [
+            { id: 7, entity: '客户名称', attribute: 'value', value: '某某公司', source: 'requirement', stance: 'authoritative', weight: 1.5, phaseNumber: 1 },
+          ],
+        }),
+      },
+      {
+        method: 'GET', path: '/api/v2/memory/audit/summary',
+        summary: '审计汇总（含 topReferencedFacts）',
+        desc: '仅按 trajectoryId 聚合；topReferencedFacts 为该交易决策中被引用最多的事实 Top10。',
+        params: [{ name: 'trajectoryId', type: 'number', required: true, in: 'query', example: '42' }],
+        respExample: J({
+          trajectoryId: 42, total: 12, byStatus: { pending: 0, passed: 11, failed: 1 }, overridden: 0,
+          topReferencedFacts: [
+            { id: 7, refs: 5, entity: '客户名称', attribute: 'value', value: '某某公司' },
+          ],
+        }),
+      },
+      {
+        method: 'POST', path: '/api/v2/memory/audit/run',
+        summary: '离线复检整条交易',
+        reqExample: J({ trajectoryId: 42 }),
+      },
+      {
+        method: 'GET', path: '/api/v2/trajectories/{id}/memory',
+        summary: '交易记忆时间线（events + facts + decisions）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+      },
+      {
+        method: 'GET', path: '/api/v2/memory/stats',
+        summary: '记忆表统计',
+        respExample: J({
+          tables: { memoryEvent: 120, memoryFact: 45, memoryRelation: 30, decisionRecord: 12 },
+          recentEventTypes: [{ eventType: 'case_saved', count: 20 }],
+        }),
+      },
+    ],
+  },
+  {
     id: 'remote-session',
     name: '远程会话 / BiB',
     description: 'CDP 附着与推流状态（录制工作室左侧画布）。多交易并存时以 trajectoryId / remoteSessionId 隔离，勿依赖全局 singleton。',

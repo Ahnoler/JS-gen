@@ -217,12 +217,25 @@ export async function getDecision(id) {
   return row ? fromDbRow(row) : null;
 }
 
+/** 按 id 批量查事实（含被 supersede 的版本，用于审计复现）。 */
+export async function listFactsByIds(ids) {
+  const nums = Array.from(
+    new Set((Array.isArray(ids) ? ids : [])
+      .map((x) => Number(x))
+      .filter((n) => Number.isFinite(n) && n > 0)),
+  );
+  if (!nums.length) return [];
+  const rows = await getDB()(FACT_TABLE).whereIn('id', nums);
+  const map = new Map(rows.map((r) => [Number(r.id), fromDbRow(r)]));
+  return nums.map((n) => map.get(n)).filter(Boolean);
+}
+
 /** 交易审计汇总。 */
 export async function auditSummary(trajectoryId) {
   const tid = Number(trajectoryId);
   const db = getDB();
   if (!Number.isFinite(tid) || tid <= 0) {
-    return { trajectoryId: null, total: 0, byStatus: {}, overridden: 0 };
+    return { trajectoryId: null, total: 0, byStatus: {}, overridden: 0, topReferencedFacts: [] };
   }
   const rows = await db(DECISION_TABLE).where({ trajectory_id: tid });
   const byStatus = { pending: 0, passed: 0, failed: 0 };
@@ -231,7 +244,40 @@ export async function auditSummary(trajectoryId) {
     byStatus[r.audit_status] = (byStatus[r.audit_status] || 0) + 1;
     if (r.overridden) overridden += 1;
   }
-  return { trajectoryId: tid, total: rows.length, byStatus, overridden };
+
+  // P2-1: most-referenced facts across this trajectory's decisions
+  const counts = new Map();
+  for (const r of rows) {
+    const raw = r.input_fact_ids;
+    if (!raw) continue;
+    let ids = raw;
+    if (typeof raw === 'string') {
+      try { ids = JSON.parse(raw); } catch { continue; }
+    }
+    if (!Array.isArray(ids)) continue;
+    for (const fid of ids) {
+      const n = Number(fid);
+      if (!Number.isFinite(n) || n <= 0) continue;
+      counts.set(n, (counts.get(n) || 0) + 1);
+    }
+  }
+  const topIds = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+  let topReferencedFacts = [];
+  if (topIds.length) {
+    const facts = await listFactsByIds(topIds.map(([id]) => id));
+    const factMap = new Map(facts.map((f) => [Number(f.id), f]));
+    topReferencedFacts = topIds.map(([id, refs]) => ({
+      id,
+      refs,
+      entity: factMap.get(id)?.entity ?? null,
+      attribute: factMap.get(id)?.attribute ?? null,
+      value: factMap.get(id)?.value ?? null,
+    }));
+  }
+
+  return { trajectoryId: tid, total: rows.length, byStatus, overridden, topReferencedFacts };
 }
 
 /** 全局统计（P0 简单计数，P1 扩展延迟/命中率）。 */

@@ -33,6 +33,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-05: 记忆 **P2-1 审计产品化**：① 决策覆盖扩展——`scenario_summary` LLM 摘要写 `decision_record`；回放自愈（healType step/form_structure）发起时记 `decisionType:'heal'`（确定性指令模板，model 留空）；**agent_step 决策不做**。② 决策详情回填——`GET /api/v2/memory/decisions/:id` 新增 `inputFacts`（按 `inputFactIds` 查 `memory_fact`，含被 supersede 版本）；`memory-service.ingestEvents` 在决策与事实同事件上报且未传 `inputFactIds` 时自动回填同事件事实 id。③ 审计汇总——`GET /api/v2/memory/audit/summary` 新增 `topReferencedFacts`（仅按 trajectoryId 聚合 Top10）。④ api-docs 补齐缺失的 memory 分组及新字段示例。
+  影响范围：记忆决策 API / 审计汇总 / api-docs；外部 Vue 审计页据此渲染。
+  文件：scripts/actions/_scenario_describer.py, src/services/trajectory-session-replay.js, src/memory/memory-dao.js, src/memory/memory-service.js, src/dashboard/api-docs/catalog.js
+  Python 同步提示：无强 schema；对齐 decisions/:id 响应新增 inputFacts、audit/summary 新增 topReferencedFacts；decision 未传 inputFactIds 时自动回填同事件 facts。
+
 - 2026-08-05: 新建 **system_ref_data / system_ref_entry**（方案 C：旧 `case_data` / `case_data_entry` 保留并标 legacy）。专存目标系统回写、经校验可复用的填表参考值（`source` / `verification_status`）；用户需求**业务数据**仍走 `trajectory.task`【业务数据】块，**禁止**把 analyze/`caseEntries` 写入 system_ref。本迭代提供 CRUD API 地基，录制暂不自动注入 system_ref。
   影响范围：MySQL schema、v2 API、api-docs。
   文件：migrations/20260805220000_system_ref_data.js, schemas/init.sql, src/dao/system-ref-dao.js, src/services/system-ref-service.js, src/routes/v2/system-ref-data.js, src/routes/v2/__init__.js, src/dashboard/api-docs/catalog.js, src/models/entities.js

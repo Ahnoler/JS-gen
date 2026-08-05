@@ -120,7 +120,7 @@ function normalizeDecision(d, event) {
     temperature: toNullableInt(d.temperature),
     promptHash: String(d.promptHash ?? d.prompt_hash ?? ''),
     inputFactIds: Array.isArray(d.inputFactIds ?? d.input_fact_ids)
-      ? JSON.stringify(d.inputFactIds ?? d.input_fact_ids)
+      ? (d.inputFactIds ?? d.input_fact_ids)  // 保持数组，ingest 层再序列化
       : null,
     contextSnapshotId: toNullableInt(d.contextSnapshotId ?? d.context_snapshot_id),
     inputPreview: d.inputPreview ?? d.input_preview ?? null,
@@ -157,12 +157,13 @@ export async function ingestEvents(payload = {}) {
       const [eventId] = await memoryDao.insertEvents([event], trx);
       inserted += 1;
 
+      let insertedFactIds = [];
       if (eventFacts.length) {
         const rows = eventFacts.map((f) => ({ ...f, eventId }));
         await memoryDao.insertFacts(rows, trx);
         // 多行 INSERT 只返回单 insertId，按 event_id 回查真实 id 用于关系建模
-        const ids = await memoryDao.factIdsByEvent(eventId, trx);
-        facts += ids.length;
+        insertedFactIds = await memoryDao.factIdsByEvent(eventId, trx);
+        facts += insertedFactIds.length;
         // P1 冲突版本化：同 (trajectory, entity, attribute) 已有当前值 → 旧值
         // superseded + disputed（审计保留），新值 version = 旧.version + 1。
         // 排除同事件自身（同事件内多条同 entity 由上游去重，不互相覆盖）。
@@ -175,18 +176,18 @@ export async function ingestEvents(payload = {}) {
             trx,
             eventId,
           );
-          if (existing && Number(existing.id) !== Number(ids[i])) {
-            await memoryDao.markFactSuperseded(existing.id, ids[i], trx);
-            await memoryDao.setFactVersion(ids[i], (Number(existing.version) || 1) + 1, trx);
+          if (existing && Number(existing.id) !== Number(insertedFactIds[i])) {
+            await memoryDao.markFactSuperseded(existing.id, insertedFactIds[i], trx);
+            await memoryDao.setFactVersion(insertedFactIds[i], (Number(existing.version) || 1) + 1, trx);
           }
         }
         // P0 关系建模：同事件内两两 co_occur（P1 扩展 fill_before_save 等）
-        for (let i = 0; i < ids.length; i++) {
-          for (let j = i + 1; j < ids.length; j++) {
+        for (let i = 0; i < insertedFactIds.length; i++) {
+          for (let j = i + 1; j < insertedFactIds.length; j++) {
             relations.push({
               trajectoryId: event.trajectoryId,
-              fromFactId: ids[i],
-              toFactId: ids[j],
+              fromFactId: insertedFactIds[i],
+              toFactId: insertedFactIds[j],
               relationType: 'co_occur',
               strength: 0.1,
             });
@@ -195,7 +196,15 @@ export async function ingestEvents(payload = {}) {
       }
 
       if (decisionRecord) {
-        const decisionId = await memoryDao.insertDecision(decisionRecord, trx);
+        // 上游未传 inputFactIds 时，用同事件内插入的事实回填（审计复现「模型依据了什么」）
+        const hasInputFactIds = Array.isArray(decisionRecord.inputFactIds) && decisionRecord.inputFactIds.length;
+        const record = {
+          ...decisionRecord,
+          inputFactIds: hasInputFactIds
+            ? JSON.stringify(decisionRecord.inputFactIds)
+            : (insertedFactIds.length ? JSON.stringify(insertedFactIds) : null),
+        };
+        const decisionId = await memoryDao.insertDecision(record, trx);
         if (decisionId != null) decisions += 1;
       }
 
@@ -268,9 +277,17 @@ export async function listDecisions(filters = {}) {
   return memoryDao.listDecisions(filters);
 }
 
-/** 决策详情。 */
+/** 决策详情（回填 inputFacts 便于审计复现）。 */
 export async function getDecision(id) {
-  return memoryDao.getDecision(Number(id));
+  const decision = await memoryDao.getDecision(Number(id));
+  if (!decision) return null;
+  let inputFactIds = decision.inputFactIds;
+  if (typeof inputFactIds === 'string') {
+    try { inputFactIds = JSON.parse(inputFactIds); } catch { inputFactIds = []; }
+  }
+  if (!Array.isArray(inputFactIds)) inputFactIds = [];
+  const inputFacts = await memoryDao.listFactsByIds(inputFactIds);
+  return { ...decision, inputFactIds, inputFacts };
 }
 
 /** 审计汇总。 */

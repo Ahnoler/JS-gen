@@ -322,6 +322,32 @@ async def inject_scenario_summary(agent, case_data_store: dict | None = None) ->
         if not summary:
             return
 
+        # P2-1: scenario_summary LLM decision record (non-blocking)
+        try:
+            from scripts.memory.writer import emit_memory_event
+            from scripts.feature_flags import memory_decisions_enabled
+            if memory_decisions_enabled():
+                _model = (
+                    getattr(llm, 'model_name', None)
+                    or getattr(llm, 'model', None)
+                    or os.getenv('SCENARIO_LLM_MODEL', '')
+                )
+                emit_memory_event(
+                    'decision',
+                    {'kind': 'scenario_summary', 'n_steps': n_steps},
+                    decision={
+                        'decision_type': 'scenario_summary',
+                        'model': str(_model or ''),
+                        'temperature': 0.0,
+                        'input_preview': str(user_payload)[:500],
+                        'output_json': {'summary': summary},
+                        'policy_checks': [{'check': 'non_empty', 'pass': True}],
+                        'audit_status': 'passed',
+                    },
+                )
+        except Exception:
+            pass
+
         removed = _remove_previous_scenario_messages(agent)
         msg = HumanMessage(content=(
             f'{_SCENARIO_PREFIX}\n{summary}\n\n'
