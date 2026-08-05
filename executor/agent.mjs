@@ -13,6 +13,7 @@ import {
   EXECUTOR_HEARTBEAT_INTERVAL_MS,
   EXECUTOR_RECONNECT_MIN_MS,
   EXECUTOR_RECONNECT_MAX_MS,
+  EXECUTOR_DISCONNECT_TIMEOUT_MS,
   EXECUTOR_WS_URL,
   buildLabels,
 } from './config.js';
@@ -43,6 +44,19 @@ const client = new ExecutorWsClient({
   heartbeatIntervalMs: EXECUTOR_HEARTBEAT_INTERVAL_MS,
   reconnectMinMs: EXECUTOR_RECONNECT_MIN_MS,
   reconnectMaxMs: EXECUTOR_RECONNECT_MAX_MS,
+  disconnectTimeoutMs: EXECUTOR_DISCONNECT_TIMEOUT_MS,
+  // 断线超时：杀掉全部 Python 会话 —— 宁可明确失败，也不让 agent 继续执行
+  // 而事件在断线处静默丢弃（录制"只录到一半"的根因）。
+  onDisconnectTimeout: () => {
+    if (!sessionManager) return;
+    const sessions = sessionManager.list();
+    console.error(`[executor] killing ${sessions.length} session(s) after disconnect timeout`);
+    for (const { sessionId } of sessions) {
+      sessionManager.close(sessionId).catch((err) => {
+        console.error(`[executor] session close failed after disconnect: ${err?.message || err}`);
+      });
+    }
+  },
   getRegisterPayload: () => ({
     nodeUuid: EXECUTOR_NODE_UUID,
     name: EXECUTOR_NAME,

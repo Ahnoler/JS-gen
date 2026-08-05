@@ -22,12 +22,22 @@ import {
 } from './trajectory-runtime.js';
 
 /**
- * 版本V2.2：案例数据注入 Python case_data_store 暂时停用。
- * 本期录制只靠 phase 文本中的【业务场景案例数据】（analyze 附加），由 LLM 读文本优先填写。
- * case_data_entry 仍可经 API 入库，供后续「分块标注 / 接口报文捞取」再用（本期不注入）。
- * （原实现：按 trajectory_id 加载 case_data_entry → traj_{id}.json / inline case_data）
+ * P1 恢复（V2.2 停用后）：案例数据 KV 注入 Python case_data_store。
+ * 只注入结构化 KV（case_data_entry 表，analyze/前端录入的 {fieldKey: fieldValue}），
+ * 不注入 raw 文本块（raw 文本仍拼在 phase 描述内供参考）。
+ * 效果：Python preamble 的【预设案例数据】hint 生效 —— 放大镜查询/填表
+ * 优先采用需求里的权威值（如「法定责任人引入 朱桂武」→ 查询框用「朱桂武」）。
  */
-async function prepareCaseDataInjection(_trajectoryId) {
+async function prepareCaseDataInjection(trajectoryId) {
+  try {
+    const { loadFlatDictByTrajectory } = await import('../dao/case-data-dao.js');
+    const flat = await loadFlatDictByTrajectory(Number(trajectoryId));
+    if (flat && Object.keys(flat).length) {
+      return { caseDataFile: null, caseData: flat };
+    }
+  } catch (err) {
+    console.warn('[record] case-data injection skipped:', err?.message || err);
+  }
   return { caseDataFile: null, caseData: null };
 }
 

@@ -75,7 +75,18 @@ export function extractCaseEntriesFromRequirement(text) {
     if (!inBlock) continue;
 
     const m = t.match(/^(.+?)\s*[:：=]\s*(.+)$/);
-    if (!m) continue;
+    if (!m) {
+      // 无冒号/等号分隔的「引入」类案例数据：
+      // 「法定责任人引入 朱桂武」→ {fieldKey: 法定责任人引入, fieldValue: 朱桂武}
+      // （AI 录制实锤：introduce 放大镜场景模型因解析不出 KV 而用主表单值查询）
+      const intro = t.match(/^(.*?引入)\s+(\S.*)$/);
+      if (intro) {
+        const fk = intro[1].trim();
+        const fv = intro[2].trim();
+        if (fk && fv) raw.push({ fieldKey: fk, fieldValue: fv });
+      }
+      continue;
+    }
     const fieldKey = m[1].trim();
     const fieldValue = m[2].trim();
     if (!fieldKey || !fieldValue) continue;
@@ -229,10 +240,12 @@ export async function analyzeRequirementToPhases({
   // Append raw business-scenario case data to each phase (for AI fill reference)
   phases = appendCaseDataToPhases(phases, caseBlock);
 
-  // P1：analyze 附带结构化 KV（extractCaseDataBlock 规则解析，非 LLM 拆解）。
+  // P1：analyze 附带结构化 KV（extractCaseEntriesFromRequirement 规则解析，非 LLM 拆解）。
   // 前端创建轨迹时透传 → case_data_entry 落库 + memory_fact(requirement/authoritative)
   // 摄取，事实包注入优先采用（权威值不可被 LLM 覆盖）。
-  return { phases, caseEntries: caseBlock };
+  // 注意：必须是 KV 数组（normalizeCaseEntries 对非数组返回 []），raw 文本块
+  // 仅用于 appendCaseDataToPhases，不作为 caseEntries。
+  return { phases, caseEntries: extractCaseEntriesFromRequirement(desc) };
 }
 
 /**

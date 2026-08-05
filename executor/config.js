@@ -114,6 +114,11 @@ export const EXECUTOR_HEARTBEAT_INTERVAL_MS = parseInt(
 );
 export const EXECUTOR_RECONNECT_MIN_MS = parseInt(resolve('EXECUTOR_RECONNECT_MIN_MS', '1000'), 10);
 export const EXECUTOR_RECONNECT_MAX_MS = parseInt(resolve('EXECUTOR_RECONNECT_MAX_MS', '30000'), 10);
+/** WS 断线超过该时长仍未恢复 → 杀全部 Python 会话（防录制事件静默丢失）。 */
+export const EXECUTOR_DISCONNECT_TIMEOUT_MS = parseInt(
+  resolve('EXECUTOR_DISCONNECT_TIMEOUT_MS', '30000'),
+  10,
+);
 
 export function buildLabels() {
   let labels = {};
