@@ -243,14 +243,7 @@ async def _wait_after_tree_node_for_form(page, *, timeout_ms: int = 5000) -> boo
     return False
 
 # Fill an input/textarea resolved by relative xpath (native setter for Element UI).
-_JS_FILL_BY_XPATH = r'''([xpath, val]) => {
-  if (!xpath) return 'xpath-empty';
-  let snap;
-  try {
-    snap = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-  } catch (e) {
-    return 'xpath-invalid';
-  }
+_JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
   const setFn = (t, v) => {
     const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
     const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -266,17 +259,83 @@ _JS_FILL_BY_XPATH = r'''([xpath, val]) => {
     const st = getComputedStyle(el);
     return st.display !== 'none' && st.visibility !== 'hidden';
   };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    return isVis(d) || (wrap && isVis(wrap));
+  };
+  const lastVisibleDialog = () => {
+    const all = [...document.querySelectorAll('.el-dialog, .el-message-box')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const lastVisibleDrawer = () => {
+    const all = [...document.querySelectorAll('.el-drawer')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const findInputFromSnap = (snap, root) => {
+    let target = null;
+    for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+      const n = snap.snapshotItem(i);
+      if (!n || !isVis(n)) continue;
+      if (root && root !== document && !root.contains(n)) continue;
+      const inner = (n.matches && (n.matches('input, textarea') ? n : null))
+        || n.querySelector?.('input:not([type="hidden"]), textarea');
+      target = inner || n;
+      break;
+    }
+    return target;
+  };
+  const tryXpath = (xp, root) => {
+    if (!xp) return null;
+    let s = String(xp);
+    try {
+      const ctx = root || document;
+      if (root && s.startsWith('//')) s = '.' + s;
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      return findInputFromSnap(snap, root);
+    } catch (e) {
+      return null;
+    }
+  };
   let target = null;
-  for (let i = snap.snapshotLength - 1; i >= 0; i--) {
-    const n = snap.snapshotItem(i);
-    if (!n || !isVis(n)) continue;
-    // If xpath hit el-select / date wrapper, prefer inner input.
-    const inner = (n.matches && (n.matches('input, textarea') ? n : null))
-      || n.querySelector?.('input:not([type="hidden"]), textarea');
-    target = inner || n;
-    break;
+  if (xpath) {
+    target = tryXpath(xpath, null);
+    if (!target && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
+      const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
+      const local = m && m[1] ? m[1] : '';
+      const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleDrawer() : lastVisibleDialog();
+      if (dlg && local) target = tryXpath('.//' + local, dlg);
+    }
   }
-  if (!target) return 'xpath-not-found';
+  if (!target && placeholderHint) {
+    const want = String(placeholderHint || '');
+    const scopes = [lastVisibleDrawer(), lastVisibleDialog(), document].filter(Boolean);
+    for (const scope of scopes) {
+      const inputs = scope.querySelectorAll('input:not([type="hidden"]), textarea');
+      for (const inp of inputs) {
+        if (!isVis(inp) || inp.disabled || inp.readOnly) continue;
+        if (inp.closest('.el-date-editor, .tsscdatepicker')) continue;
+        const ph = inp.getAttribute('placeholder') || '';
+        if (ph.includes(want) || want.includes(ph)) {
+          target = inp;
+          break;
+        }
+      }
+      if (target) break;
+    }
+    if (target) {
+      setFn(target, val == null ? '' : String(val));
+      return 'ok-placeholder';
+    }
+  }
+  if (!target) return xpath ? 'xpath-not-found' : 'xpath-empty';
   if (target.disabled || target.readOnly) return 'field-disabled';
   if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return 'xpath-not-input';
   setFn(target, val == null ? '' : String(val));
@@ -342,17 +401,47 @@ def normalize_action_name(action_name: str) -> str:
 
 _CLICK_BY_INDEX = 'click_element_by_index'
 
-# Locate + click by durable cues (xpath_smart → drawer/dialog text → xpath → text).
-# Prefer last visible match — Element UI keeps leftover overlays with same button text.
-_JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
+# Locate + click by durable cues (xpath_smart → semantic → xpath → text).
+# Robustness: stripVolatile tree text, visible dialog (not DOM [last()]),
+# icon class + tooltip (aria-label often empty on ElTooltip toolbars).
+_JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
+  opts = opts || {};
   const norm = (s) => (s || '').replace(/\s+/g, '').trim();
-  const want = norm(text);
+  const stripVolatile = (s) => norm(s)
+    .replace(/\[\s*V[-\d.]+\s*\]$/i, '')
+    .replace(/\(\d+\)$/, '');
+  const wantRaw = String(text || '');
+  const want = norm(wantRaw);
+  const wantBase = stripVolatile(wantRaw);
+  const parentText = String(opts.parentText || opts.parent_text || '');
+  const iconClass = String(opts.iconClass || opts.icon_class || '');
+  const targetKind = String(opts.targetKind || opts.target_kind || '');
   const isVisible = (el) => {
     if (!el) return false;
     const st = getComputedStyle(el);
     const box = el.getBoundingClientRect();
     if (st.display === 'none' || st.visibility === 'hidden' || box.width < 1 || box.height < 1) return false;
     return true;
+  };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    return isVisible(d) || (wrap && isVisible(wrap));
+  };
+  const lastVisibleDialog = () => {
+    const all = [...document.querySelectorAll('.el-dialog, .el-message-box')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const lastVisibleDrawer = () => {
+    const all = [...document.querySelectorAll('.el-drawer')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
   };
   const clickEl = (el, how) => {
     if (!el) return null;
@@ -361,12 +450,19 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
     return how;
   };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const evalXpathAll = (xp) => {
+  const evalXpathAll = (xp, root) => {
     let s = String(xp || '');
     if (!s) return [];
-    if (!s.startsWith('/') && !s.startsWith('(')) s = '/' + s;
     try {
-      const snap = document.evaluate(s, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      const ctx = root || document;
+      if (root && s.startsWith('//')) {
+        s = '.' + s;
+      } else if (root && !s.startsWith('.') && !s.startsWith('/') && !s.startsWith('(')) {
+        s = './/' + s;
+      } else if (!root && !s.startsWith('/') && !s.startsWith('(')) {
+        s = '/' + s;
+      }
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
       const out = [];
       for (let i = 0; i < snap.snapshotLength; i++) out.push(snap.snapshotItem(i));
       return out;
@@ -374,19 +470,145 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
       return [];
     }
   };
-  const clickLastVisibleXpath = (xp, how) => {
-    const nodes = evalXpathAll(xp).filter(isVisible);
+  const clickLastVisibleXpath = (xp, how, root) => {
+    const nodes = evalXpathAll(xp, root).filter(isVisible);
     if (!nodes.length) return null;
     return clickEl(nodes[nodes.length - 1], how);
   };
+  const clickSmartXpath = (xp, how) => {
+    if (!xp) return null;
+    let hit = clickLastVisibleXpath(xp, how);
+    if (hit) return hit;
+    // Dialog/drawer [last()] often points at a hidden leftover — retry under visible overlay
+    if (/el-dialog|el-message-box|el-drawer/.test(xp) && /\[last\(\)\]/.test(xp)) {
+      const m = String(xp).match(/\[last\(\)\](?:\/\/(.+))?$/);
+      const local = m && m[1] ? m[1] : '';
+      const dlg = /el-drawer/.test(xp) ? lastVisibleDrawer() : lastVisibleDialog();
+      if (dlg && local) {
+        hit = clickLastVisibleXpath('.//' + local, how + '-vis-dlg', dlg);
+        if (hit) return hit;
+      }
+      if (dlg && !local) return clickEl(dlg, how + '-vis-dlg-host');
+    }
+    return null;
+  };
+  const pickTreeNode = (rawWant, parentRaw) => {
+    const base = stripVolatile(rawWant);
+    if (!base) return null;
+    let roots = [...document.querySelectorAll('.el-tree-node__content, .el-tree-node__label')].filter(isVisible);
+    const pb = stripVolatile(parentRaw || '');
+    if (pb) {
+      const parentHit = roots.find((el) => {
+        const t = stripVolatile(el.innerText || el.textContent);
+        return t === pb || t.startsWith(pb);
+      });
+      if (parentHit) {
+        const treeNode = parentHit.closest('.el-tree-node');
+        if (treeNode) {
+          roots = [...treeNode.querySelectorAll('.el-tree-node__content, .el-tree-node__label')]
+            .filter(isVisible)
+            .filter((el) => el !== parentHit);
+        }
+      }
+    }
+    const scored = [];
+    for (const el of roots) {
+      const t = stripVolatile(el.innerText || el.textContent);
+      let score = 0;
+      if (t === base) score = 3;
+      else if (t.startsWith(base)) score = 2;
+      else if (t.includes(base) || base.includes(t)) score = 1;
+      if (score) scored.push({ el, t, score, len: t.length });
+    }
+    if (!scored.length) return null;
+    scored.sort((a, b) => b.score - a.score || a.len - b.len);
+    return scored[0].el;
+  };
+  const extractIconClass = () => {
+    if (iconClass && /el-icon-[a-z0-9-]+/i.test(iconClass)) {
+      const m = iconClass.match(/el-icon-[a-z0-9-]+/i);
+      return m ? m[0] : iconClass;
+    }
+    const blob = String(xpathSmart || xpath || '');
+    const m = blob.match(/el-icon-[a-z0-9-]+/i);
+    return m ? m[0] : '';
+  };
+  const clickToolbarIcon = async () => {
+    const cls = extractIconClass();
+    const tipWant = want || wantBase;
+    const anchors = [...document.querySelectorAll(
+      'a.el-tooltip, .el-tooltip[class*="el-icon"], a[class*="el-icon-"], i.el-tooltip, .el-tooltip.item'
+    )].filter(isVisible);
+    // Prefer class match
+    if (cls) {
+      const byClass = anchors.filter((el) => String(el.className || '').includes(cls));
+      if (byClass.length === 1) return clickEl(byClass[0], 'ok-icon-class');
+      if (byClass.length > 1 && tipWant) {
+        for (const el of byClass) {
+          el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+          await sleep(100);
+          const tips = [...document.querySelectorAll('.el-tooltip__popper, [role="tooltip"]')]
+            .filter((p) => {
+              const st = getComputedStyle(p);
+              return st.display !== 'none' && st.visibility !== 'hidden';
+            })
+            .map((p) => norm(p.textContent));
+          const ok = tips.some((t) => t === tipWant || t.includes(tipWant) || tipWant.includes(t));
+          el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+          if (ok) return clickEl(el, 'ok-icon-class-tip');
+        }
+        return clickEl(byClass[byClass.length - 1], 'ok-icon-class-last');
+      }
+      if (byClass.length) return clickEl(byClass[byClass.length - 1], 'ok-icon-class');
+    }
+    if (!tipWant) return null;
+    // aria / title
+    const ariaHits = [...document.querySelectorAll('[aria-label], [title]')].filter(isVisible).filter((el) => {
+      const a = norm(el.getAttribute('aria-label') || '');
+      const t = norm(el.getAttribute('title') || '');
+      return a === tipWant || t === tipWant;
+    });
+    if (ariaHits.length) return clickEl(ariaHits[ariaHits.length - 1], 'ok-aria-label');
+    // hover tip match
+    for (const el of anchors) {
+      el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+      await sleep(80);
+      const poppers = [...document.querySelectorAll('.el-tooltip__popper, [role="tooltip"]')].filter((p) => {
+        const st = getComputedStyle(p);
+        return st.display !== 'none' && st.visibility !== 'hidden' && (p.offsetWidth > 0 || p.offsetHeight > 0);
+      });
+      const hit = poppers.find((p) => {
+        const t = norm(p.textContent);
+        return t === tipWant || t.includes(tipWant) || tipWant.includes(t);
+      });
+      if (hit) {
+        el.click();
+        return 'ok-tooltip-icon';
+      }
+      el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    }
+    return null;
+  };
 
-  // 0) xpath_smart (drawer/dialog scoped text xpath)
+  // 0) xpath_smart (with visible-dialog rewrite)
   if (xpathSmart) {
-    const hit = clickLastVisibleXpath(xpathSmart, 'ok-xpath-smart');
+    const hit = clickSmartXpath(xpathSmart, 'ok-xpath-smart');
     if (hit) return hit;
   }
 
-  // 1a) Custom app menu (tssc / non-ElementUI): li.menu-item — often NO role=menuitem
+  // 0b) Tree node: volatile-stripped match (even when smart failed exact count)
+  if (wantBase && (targetKind === 'tree_node' || /el-tree-node__content/.test(String(xpathSmart || '')))) {
+    const node = pickTreeNode(wantRaw, parentText);
+    if (node) return clickEl(node, 'ok-tree-volatile');
+  }
+
+  // 0c) Icon toolbar (class + tip) — before generic text so "删除" does not hit unrelated nodes
+  if (targetKind === 'icon' || iconClass || /el-icon-/.test(String(xpathSmart || ''))) {
+    const ih = await clickToolbarIcon();
+    if (ih) return ih;
+  }
+
+  // 1a) Custom app menu
   if (want) {
     const customMenu = [...document.querySelectorAll('li.menu-item, .menu-item')].filter(isVisible);
     const exactCustom = customMenu.filter((el) => norm(el.textContent) === want);
@@ -424,66 +646,39 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
     }
   }
 
-  // 1c) Icon / tree / aria-label (click_icon_button replay often stores button_text only)
-  if (want) {
-    const ariaHits = [...document.querySelectorAll('[aria-label], [title], [aria-describedby]')].filter(isVisible).filter((el) => {
-      const a = norm(el.getAttribute('aria-label') || '');
-      const t = norm(el.getAttribute('title') || '');
-      return a === want || t === want;
-    });
-    if (ariaHits.length) return clickEl(ariaHits[ariaHits.length - 1], 'ok-aria-label');
+  // 1c) Icon / tree / aria fallbacks
+  if (want || wantBase) {
+    const ih = await clickToolbarIcon();
+    if (ih) return ih;
 
-    const treeHits = [...document.querySelectorAll('.el-tree-node__content, .el-tree-node__label')].filter(isVisible).filter((el) => {
-      const t = norm(el.innerText || el.textContent);
-      return t === want || t.startsWith(want);
-    });
-    if (treeHits.length) return clickEl(treeHits[treeHits.length - 1], 'ok-tree-content');
-
-    // ElTooltip icon anchors (a.el-tooltip.el-icon-*) — tip text only after hover
-    const tipAnchors = [...document.querySelectorAll(
-      'a.el-tooltip, .el-tooltip[class*="el-icon"], a[class*="el-icon-"], i.el-tooltip, .el-tooltip.item'
-    )].filter(isVisible);
-    for (const el of tipAnchors) {
-      el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-      await sleep(80);
-      const poppers = [...document.querySelectorAll('.el-tooltip__popper, [role="tooltip"]')].filter((p) => {
-        const st = getComputedStyle(p);
-        return st.display !== 'none' && st.visibility !== 'hidden' && (p.offsetWidth > 0 || p.offsetHeight > 0);
-      });
-      const hit = poppers.find((p) => norm(p.textContent) === want);
-      if (hit) {
-        el.click();
-        return 'ok-tooltip-icon';
-      }
-      el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-    }
+    const treeNode = pickTreeNode(wantRaw || wantBase, parentText);
+    if (treeNode) return clickEl(treeNode, 'ok-tree-content');
   }
 
-  // 2) Absolute / recorded xpath (fragile body>div[N] — last resort before text)
+  // 2) Absolute / recorded xpath
   if (xpath) {
-    const hit = clickLastVisibleXpath(xpath, 'ok-xpath');
+    const hit = clickSmartXpath(xpath, 'ok-xpath') || clickLastVisibleXpath(xpath, 'ok-xpath');
     if (hit) return hit;
   }
 
-  // 3) Text: prefer last drawer → last dialog → page; buttons only (not span wrappers)
+  // 3) Text in visible drawer → visible dialog → page
   if (want) {
-    const drawers = [...document.querySelectorAll('.el-drawer')].filter(isVisible);
-    const dialogs = [...document.querySelectorAll('.el-dialog, .el-message-box')].filter(isVisible);
     const scopes = [];
-    if (drawers.length) scopes.push({ el: drawers[drawers.length - 1], how: 'ok-text-drawer' });
-    if (dialogs.length) scopes.push({ el: dialogs[dialogs.length - 1], how: 'ok-text-dialog' });
+    const dr = lastVisibleDrawer();
+    const dg = lastVisibleDialog();
+    if (dr) scopes.push({ el: dr, how: 'ok-text-drawer' });
+    if (dg) scopes.push({ el: dg, how: 'ok-text-dialog' });
     scopes.push({ el: document, how: 'ok-text-exact' });
 
     const btnSel = 'button, button.el-button, a.el-button, a[role="button"], .el-button';
     for (const { el: scope, how } of scopes) {
       const hits = [...scope.querySelectorAll(btnSel)].filter(isVisible).filter((el) => {
         const t = norm(el.innerText || el.textContent || '');
-        return t === want;
+        return t === want || (wantBase && stripVolatile(el.innerText || '') === wantBase);
       });
       if (hits.length) return clickEl(hits[hits.length - 1], how);
     }
 
-    // Broader fuzzy fallback (still prefer last match) — include custom .menu-item
     const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item, li.menu-item, .menu-item, .el-tree-node__content';
     const candidates = [...document.querySelectorAll(sel)].filter(isVisible);
     const exact = candidates.filter(el => norm(el.innerText || el.textContent) === want);
@@ -491,10 +686,15 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
     let best = null;
     let bestLen = Infinity;
     for (const el of candidates) {
-      const t = norm(el.innerText || el.textContent);
+      const t = stripVolatile(el.innerText || el.textContent);
       if (!t || t.length > 40) continue;
-      if (t.includes(want) || want.includes(t)) {
+      if (wantBase && (t === wantBase || t.startsWith(wantBase) || t.includes(wantBase))) {
         if (t.length <= bestLen) { best = el; bestLen = t.length; }
+      } else {
+        const n = norm(el.innerText || el.textContent);
+        if (n.includes(want) || want.includes(n)) {
+          if (n.length <= bestLen) { best = el; bestLen = n.length; }
+        }
       }
     }
     if (best) return clickEl(best, 'ok-text-fuzzy');
@@ -502,7 +702,6 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart]) => {
 
   return 'not-found';
 }'''
-
 
 def _normalize_params(action_name: str, params: dict | None) -> dict:
     """Accept recorded aliases (value/option/label) into controller param names."""
@@ -620,8 +819,37 @@ async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
     if not xpath and target and not target.startswith('//'):
         xpath = target
     tag_hint = str(params.get('tag_name') or entry.get('tagName') or el.get('tag') or '').strip()
-
-    result = await page.evaluate(_JS_CLICK_DURABLE, [text, xpath, tag_hint, xpath_smart])
+    parent_text = str(
+        params.get('parent_text')
+        or el.get('parent_text')
+        or ''
+    ).strip()
+    icon_class = str(
+        params.get('icon_class')
+        or el.get('icon_class')
+        or el.get('className')
+        or el.get('class')
+        or ''
+    ).strip()
+    target_kind = str(
+        params.get('target_kind')
+        or el.get('target_kind')
+        or el.get('kind')
+        or ''
+    ).strip()
+    if not target_kind:
+        blob = (xpath_smart + ' ' + icon_class).lower()
+        action_name = str(entry.get('action') or '').lower()
+        if 'el-tree-node' in blob:
+            target_kind = 'tree_node'
+        elif 'el-icon-' in blob or 'click_icon' in action_name:
+            target_kind = 'icon'
+    opts = {
+        'parentText': parent_text,
+        'iconClass': icon_class,
+        'targetKind': target_kind,
+    }
+    result = await page.evaluate(_JS_CLICK_DURABLE, [text, xpath, tag_hint, xpath_smart, opts])
     if isinstance(result, str) and result.startswith('ok'):
         await _post_click_settle(page, entry, text, xpath_smart, xpath, result)
         return result
@@ -750,21 +978,46 @@ def _element_xpath_full(entry: dict | None) -> str:
 # Click / focus a control resolved by xpath (returns ok-xpath-smart when found).
 _JS_LOCATE_BY_XPATH = r'''([xpath]) => {
   if (!xpath) return 'xpath-empty';
-  let snap;
-  try {
-    snap = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-  } catch (e) {
-    return 'xpath-invalid';
-  }
   const isVis = (el) => {
     if (!el || el.nodeType !== 1) return false;
     if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
     const st = getComputedStyle(el);
     return st.display !== 'none' && st.visibility !== 'hidden';
   };
-  for (let i = snap.snapshotLength - 1; i >= 0; i--) {
-    const n = snap.snapshotItem(i);
-    if (n && isVis(n)) return 'ok-xpath-smart';
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    return isVis(d) || (wrap && isVis(wrap));
+  };
+  const lastVisibleHost = (drawer) => {
+    const sel = drawer ? '.el-drawer' : '.el-dialog, .el-message-box';
+    const all = [...document.querySelectorAll(sel)];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const tryXp = (xp, root) => {
+    let s = String(xp || '');
+    if (!s) return false;
+    try {
+      const ctx = root || document;
+      if (root && s.startsWith('//')) s = '.' + s;
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+        const n = snap.snapshotItem(i);
+        if (n && isVis(n)) return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  };
+  if (tryXp(xpath, null)) return 'ok-xpath-smart';
+  if (/el-dialog|el-message-box|el-drawer/.test(xpath) && /\[last\(\)\]/.test(xpath)) {
+    const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
+    const local = m && m[1] ? m[1] : '';
+    const dlg = /el-drawer/.test(xpath) ? lastVisibleHost(true) : lastVisibleHost(false);
+    if (dlg && local && tryXp('.//' + local, dlg)) return 'ok-xpath-smart-vis-dlg';
   }
   return 'xpath-not-found';
 }'''
@@ -784,9 +1037,20 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
       1) xpath_smart
       2) label/semantic
       3) xpath_full
+      (+ placeholder when no form-item label)
     """
     label = str(params.get('label_text') or '')
     value = str(params.get('value') or params.get('option_text') or '')
+    el = entry.get('element') if isinstance(entry, dict) and isinstance(entry.get('element'), dict) else {}
+    placeholder = str(
+        params.get('placeholder')
+        or el.get('placeholder')
+        or (el.get('attributes') or {}).get('placeholder')
+        or ''
+    ).strip()
+    # Search boxes often have only placeholder (e.g. 搜索关键字) and no el-form-item label
+    if not placeholder and label and ('搜索' in label or '关键字' in label or '请输入' in label):
+        placeholder = label
     use_relative = relative_xpath_primary_enabled()
     xpath_smart = _element_xpath_smart(entry) if use_relative else ''
     xpath_full = _element_xpath_full(entry) if use_relative else ''
@@ -795,7 +1059,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
     if action_name == 'fill_form_field':
         if xpath_smart:
-            result = await page.evaluate(_JS_FILL_BY_XPATH, [xpath_smart, value])
+            result = await page.evaluate(_JS_FILL_BY_XPATH, [xpath_smart, value, placeholder or label])
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(300)
                 return str(result)
@@ -803,8 +1067,18 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         if isinstance(result, str) and result.startswith('ok'):
             await page.wait_for_timeout(300)
             return _annotate_label_result(str(result))
+        if placeholder and placeholder != label:
+            result = await page.evaluate(JS_FILL_FORM_FIELD, [placeholder, value])
+            if isinstance(result, str) and result.startswith('ok'):
+                await page.wait_for_timeout(300)
+                return _annotate_label_result(str(result))
+        if not label and placeholder:
+            result = await page.evaluate(_JS_FILL_BY_XPATH, ['', value, placeholder])
+            if isinstance(result, str) and result.startswith('ok'):
+                await page.wait_for_timeout(300)
+                return str(result)
         if xpath_full:
-            result = await page.evaluate(_JS_FILL_BY_XPATH, [xpath_full, value])
+            result = await page.evaluate(_JS_FILL_BY_XPATH, [xpath_full, value, placeholder or label])
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(300)
                 return 'ok-xpath-full'
@@ -1045,28 +1319,54 @@ async def replay_action_entries(
                     'switch_tab',
                     'close_dialog',
                 ):
-                    # Prefer recorded xpath_smart via durable click path; fall back to controller.
-                    click_params = {**params}
-                    if action_name == 'click_menu_item':
-                        click_params['text'] = params.get('menu_text') or params.get('text') or ''
-                    elif action_name == 'click_icon_button':
-                        click_params['text'] = params.get('button_text') or params.get('text') or ''
-                    elif action_name == 'switch_tab':
-                        click_params['text'] = params.get('tab_name') or params.get('text') or ''
-                    elif action_name == 'click_table_row_button':
-                        click_params['text'] = params.get('button_text') or params.get('text') or ''
-                    elif action_name == 'click_adjacent_button':
-                        click_params['text'] = params.get('text') or params.get('label_text') or ''
-                    if _element_xpath_smart(entry) or click_params.get('text'):
-                        result = await _replay_click_by_index(page, entry, click_params)
-                    else:
-                        act = (controller_actions or {}).get(action_name)
-                        if not act:
-                            result = f'unknown-action:{action_name}'
+                    # Idempotent close: if no visible dialog/drawer/message-box
+                    # remains, the overlay is already gone (a preceding
+                    # 确定/下一步 may have navigated or closed it). Treat as
+                    # success instead of failing the replay and forcing a heal
+                    # step every time the recorded close lands after the dialog
+                    # was already dismissed.
+                    result = None
+                    if action_name == 'close_dialog':
+                        overlay_count = await page.evaluate('''() => {
+                            const isVis = (el) => {
+                                if (el.offsetParent !== null) return true;
+                                const st = getComputedStyle(el);
+                                if (st.display === 'none' || st.visibility === 'hidden') return false;
+                                const r = el.getBoundingClientRect();
+                                return r.width > 0 && r.height > 0;
+                            };
+                            const d = [...document.querySelectorAll('.el-dialog')].filter(isVis).length;
+                            const w = [...document.querySelectorAll('.el-drawer')].filter(isVis).length;
+                            const m = [...document.querySelectorAll('.el-message-box')].filter(isVis).length;
+                            return d + w + m;
+                        }''')
+                        if overlay_count == 0:
+                            result = 'ok (no visible dialog/drawer — already closed)'
+                            sys.stderr.write('[replay] close_dialog idempotent ok (no visible overlay)\n')
+                            sys.stderr.flush()
+                    if result is None:
+                        # Prefer recorded xpath_smart via durable click path; fall back to controller.
+                        click_params = {**params}
+                        if action_name == 'click_menu_item':
+                            click_params['text'] = params.get('menu_text') or params.get('text') or ''
+                        elif action_name == 'click_icon_button':
+                            click_params['text'] = params.get('button_text') or params.get('text') or ''
+                        elif action_name == 'switch_tab':
+                            click_params['text'] = params.get('tab_name') or params.get('text') or ''
+                        elif action_name == 'click_table_row_button':
+                            click_params['text'] = params.get('button_text') or params.get('text') or ''
+                        elif action_name == 'click_adjacent_button':
+                            click_params['text'] = params.get('text') or params.get('label_text') or ''
+                        if _element_xpath_smart(entry) or click_params.get('text'):
+                            result = await _replay_click_by_index(page, entry, click_params)
                         else:
-                            result = await _replay_controller_action(act, params)
-                            await page.wait_for_timeout(400)
-                            await _wait_if_loading(page)
+                            act = (controller_actions or {}).get(action_name)
+                            if not act:
+                                result = f'unknown-action:{action_name}'
+                            else:
+                                result = await _replay_controller_action(act, params)
+                                await page.wait_for_timeout(400)
+                                await _wait_if_loading(page)
                 elif action_name == 'click_table_row_radio':
                     # Prefer semantic row match (handles Element UI fixed-column radios).
                     # Durable xpath often requires name+radio in the same <tr> and fails.

@@ -33,10 +33,21 @@ from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 # ── Container detection (must be defined FIRST — referenced by other snippets) ──
 
 JS_GET_CONTAINER = '''(() => {
-    for (const d of document.querySelectorAll('.el-dialog'))
-        if (d.offsetParent !== null) return d;
-    for (const d of document.querySelectorAll('.el-drawer'))
-        if (d.offsetParent !== null) return d;
+    const wrapOk = (d) => {
+        if (!d) return false;
+        const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+        if (wrap && getComputedStyle(wrap).display === 'none') return false;
+        if (d.offsetParent !== null) return true;
+        const st = getComputedStyle(d);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        const r = d.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+    };
+    // Prefer last visible overlay — DOM order [last] often hits a leftover hidden dialog
+    const dialogs = [...document.querySelectorAll('.el-dialog, .el-message-box')].filter(wrapOk);
+    if (dialogs.length) return dialogs[dialogs.length - 1];
+    const drawers = [...document.querySelectorAll('.el-drawer')].filter(wrapOk);
+    if (drawers.length) return drawers[drawers.length - 1];
     return document;
 })()'''
 
@@ -517,16 +528,25 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     }
     const _allSelects = document.querySelectorAll('.el-select .el-input__inner');
     if (mode === 'check') {
+        // Fallback after container form-item scan: only trust a select whose
+        // placeholder (or its owning .el-form-item label) references the target
+        // label. Without this guard the FIRST visible select — often the
+        // pagination page-size "10条/页" — was reported as the field's value
+        // ('ok-already:10条/页'), silently misdirecting the agent away from the
+        // real field.
         for (const sel of _allSelects) {
-            if (sel.offsetParent !== null) {
-                const v = (sel.value || '').trim();
-                if (v.length > 0) return 'ok-already:' + v;
-                const t = (sel.textContent || '').trim();
-                if (t.length > 0 && !t.includes('请选择')) return 'ok-already:' + t;
-                break;
-            }
+            if (sel.offsetParent === null) continue;
+            const ph = sel.getAttribute('placeholder') || '';
+            const ownerItem = sel.closest('.el-form-item');
+            const ownerLabel = ownerItem ? (ownerItem.querySelector('.el-form-item__label')?.textContent || '').trim() : '';
+            if (!ph.includes(label) && !ownerLabel.includes(label)) continue;
+            const v = (sel.value || '').trim();
+            if (v.length > 0) return 'ok-already:' + v;
+            const t = (sel.textContent || '').trim();
+            if (t.length > 0 && !t.includes('请选择')) return 'ok-already:' + t;
+            return 'not-filled';
         }
-        return 'not-filled';
+        return 'not-found';
     }
     if (mode === 'trigger') {
         // Never click an unrelated select — that opens the wrong dropdown
