@@ -30,7 +30,8 @@ _ALL_FIELDS_SYNONYMS = re.compile(
 )
 
 _INTRODUCE_RE = re.compile(
-    r'引入|选人|选择客户|选择企业|选择法人|联网核查|挑选.*客户|挑选.*企业'
+    r'引入|选人|选择客户|客户选择|选择企业|选择法人|联网核查|'
+    r'挑选.*客户|挑选.*企业|选择.*客户|选择.*企业'
 )
 
 # CRUD verbs that mean the phase goal is form maintain (create/modify), not introduce-only.

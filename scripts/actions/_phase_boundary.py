@@ -18,7 +18,9 @@ from ._phase_context import (
     classify_task_mode,
     force_refill_all_required,
     is_login_task,
+    is_open_page_task,
     is_query_task,
+    is_wizard_nav_task,
 )
 
 Role = Literal['maintain', 'query', 'introduce', 'navigate', 'other']
@@ -32,7 +34,8 @@ CompletionEvidence = Literal[
 ]
 
 _INTRODUCE_RE = re.compile(
-    r'引入|选人|选择客户|选择企业|选择法人|联网核查|挑选.*客户|挑选.*企业'
+    r'引入|选人|选择客户|客户选择|选择企业|选择法人|联网核查|'
+    r'挑选.*客户|挑选.*企业|选择.*客户|选择.*企业'
 )
 _CRUD_PHASE_RE = re.compile(r'新增|创建|录入|新建|添加|修改|编辑|更新|维护')
 _INTRODUCE_COMPLETE_RE = re.compile(
@@ -120,13 +123,6 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
         success_when = ['picker_closed', 'dialog_confirmed', 'introduced_backfilled']
         forbid_index = False
         picker_allowed = True
-    elif is_query_task(t):
-        role = 'query'
-        requires_write = False
-        goals = ['query_filter']
-        success_when = []
-        forbid_index = False
-        picker_allowed = False
     elif task_mode in ('form_fill', 'form_modify'):
         role = 'maintain'
         requires_write = True  # all_editable for recording (current container only)
@@ -146,6 +142,30 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
             success_when = ['toast_ok', 'url_change', 'saved_navigation']
         forbid_index = True
         picker_allowed = True  # nested picker may open during maintain
+    elif is_wizard_nav_task(t):
+        # Non-form wizard:「…搜索为…，点击下一步」— set conditions + next, not list query.
+        # Maintain verbs (新增/填写/修改…) win above so wizard form steps keep refill semantics.
+        role = 'navigate'
+        requires_write = False
+        goals = ['set_conditions', 'click_next']
+        success_when = []
+        forbid_index = False
+        picker_allowed = False
+    elif task_mode == 'other' and is_open_page_task(t):
+        # 「点击评级申请。预期结果：打开评级申请相关页面」— done once page shows.
+        role = 'navigate'
+        requires_write = False
+        goals = ['open_page']
+        success_when = []
+        forbid_index = False
+        picker_allowed = False
+    elif is_query_task(t):
+        role = 'query'
+        requires_write = False
+        goals = ['query_filter']
+        success_when = []
+        forbid_index = False
+        picker_allowed = False
     else:
         role = 'other'
         requires_write = False
@@ -438,8 +458,31 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
             'explicit_all_fields': False,
             '_from_boundary': True,
         }
+    if role == 'navigate':
+        nav_goals = boundary.get('goals') or []
+        return {
+            'mode': 'other',
+            'refill': 'none',
+            'submit': {'required': False, 'via': 'any', 'button_text': '下一步'},
+            'success': {'kinds': [], 'evidence': []},
+            'forbid': [],
+            'recovery': {
+                'next_action': (
+                    'set fields from task then click_element_by_index on 下一步'
+                    if 'click_next' in nav_goals
+                    else 'complete task clicks; when target page/dialog appears, done(success=true)'
+                ),
+                'forbid_reopen_modify_cycle': False,
+                'on_cycle': 'prescribe_once_then_stop_if_deviate',
+                'deviate_actions': [],
+                'allow': ['wait', 'get_page_state', 'wait_for_loading', 'click_element_by_index'],
+            },
+            'task_text_excerpt': boundary.get('task_text_excerpt', ''),
+            'explicit_all_fields': False,
+            '_from_boundary': True,
+        }
     return {
-        'mode': 'other' if role != 'other' else 'other',
+        'mode': 'other',
         'refill': 'none',
         'submit': {'required': False, 'via': 'any', 'button_text': ''},
         'success': {'kinds': [], 'evidence': []},
@@ -473,6 +516,11 @@ def contract_summary_hint_boundary(boundary: dict[str, Any] | None) -> str:
         lines.append('- 收口：保存成功 = 操作成功提示 或 保存后页面跳转。')
     elif role == 'introduce':
         lines.append('- 收口：选人确认 / 弹窗关闭即可，不要求操作成功 toast。')
+    elif role == 'navigate':
+        if 'open_page' in goals:
+            lines.append('- 收口：目标页面/弹窗出现即 done；禁止在新页面内继续操作（填字段/下一步/确定）。')
+        else:
+            lines.append('- 收口：按任务设条件后点「下一步」；勿把点「查询」当阶段结束。')
     if boundary.get('picker_allowed'):
         lines.append('- 引入/选人弹窗内可索引点「确认」；禁止在查询弹窗点「保存/提交」。')
     return '\n'.join(lines) + '\n'
@@ -512,4 +560,15 @@ def next_action_hint(case_data_store: dict | None) -> str:
         )
     if b.get('role') == 'introduce':
         return 'NEXT_ACTION: select row then confirm (index click on 确认 OK).'
+    if b.get('role') == 'navigate':
+        if 'open_page' in (b.get('goals') or []):
+            return (
+                'NEXT_ACTION: finish the clicks described in the task; once the target '
+                'page/dialog appears, done(success=true) — do NOT operate inside the new page '
+                '(no fill / no 下一步 / no 确定).'
+            )
+        return (
+            'NEXT_ACTION: set task fields then click_element_by_index on 下一步 '
+            '(not 查询-as-done); after risk confirm if any, done(success=true).'
+        )
     return ''

@@ -40,6 +40,17 @@ _QUERY_TASK_RE = re.compile(r'查询|搜索|查找')
 _QUERY_EXCLUDE_RE = re.compile(
     r'新增|创建|编辑|修改|保存|提交|删除|录入|校验|导入'
 )
+# Wizard / multi-step pages often say「客户名称搜索为…，点击下一步」— that is NOT
+# list-filter query (must not force「点查询 → done」).
+_WIZARD_NAV_RE = re.compile(r'下一步|上一步|进入下一步|点击下一步')
+# Open-page / navigate phases:「点击评级申请。预期结果：打开评级申请相关页面」—
+# done once the target page/dialog appears; do NOT continue the flow inside it.
+_OPEN_PAGE_EXPECT_RE = re.compile(
+    r'预期结果[:：]?[^。；\n]{0,10}(?:打开|进入)[^。；\n]{0,15}(?:页面|界面|弹窗|对话框)'
+)
+# Save-to-open phases (点击保存。预期结果：保存成功并进入列表页) keep prompt rule 3
+# (click_save → ok-save-navigation → done) — NOT open-page navigation.
+_OPEN_PAGE_EXCLUDE_RE = re.compile(r'保存|提交')
 
 # Form modify (edit existing values) — distinct from blank form_fill.
 _MODIFY_TASK_RE = re.compile(r'修改|编辑|更新|变更|改填|维护')
@@ -59,17 +70,39 @@ def force_refill_all_required(task_text: str) -> bool:
     return bool(_FORCE_REFILL_RE.search(task_text or ''))
 
 
+def is_wizard_nav_task(task_text: str) -> bool:
+    """True when the phase advances a wizard (下一步/上一步), not list query."""
+    return bool(_WIZARD_NAV_RE.search(task_text or ''))
+
+
+def is_open_page_task(task_text: str) -> bool:
+    """True when the expected result is just opening/entering a page or dialog.
+
+    e.g.「选中客户名称…，点击评级申请。预期结果：打开评级申请相关页面。」— the phase
+    ends when the target page/dialog shows; the agent must not run the flow inside.
+    Save-to-open texts (…点击保存。预期结果：…进入列表页面) are excluded — they keep
+    the click_save → ok-save-navigation → done rule.
+    """
+    t = task_text or ''
+    if _OPEN_PAGE_EXCLUDE_RE.search(t):
+        return False
+    return bool(_OPEN_PAGE_EXPECT_RE.search(t))
+
+
 def is_query_task(task_text: str) -> bool:
     """True when the phase is a search/filter task (no form-save semantics).
 
     Matches「查询产品信息」etc. Excludes mixed CRUD tasks that also mention 查询
     (e.g. 查询后新增 / 修改并保存) — those still use form-save when a dialog opens.
+    Also excludes wizard copy like「客户名称搜索为…，点击下一步」(set field + next).
     Main-page query toolbars are additionally detected via DOM (有查询无保存).
     """
     t = (task_text or '').strip()
     if not _QUERY_TASK_RE.search(t):
         return False
     if _QUERY_EXCLUDE_RE.search(t):
+        return False
+    if is_wizard_nav_task(t):
         return False
     return True
 
@@ -150,6 +183,32 @@ def query_task_hint() -> str:
     )
 
 
+def wizard_nav_task_hint() -> str:
+    """Phase preamble: wizard next/prev — set named fields then 下一步."""
+    return (
+        '\n\n【任务类型：向导/下一步】\n'
+        '本阶段是向导页推进，不是列表查询，也不是表单保存。\n'
+        '1. 按任务描述设置条件字段（如「客户名称搜索为…」用 fill_form_field / select_option）。\n'
+        '2. 设完后用 click_element_by_index 点击「下一步」；不要把点「查询」当成阶段结束'
+        '（除非任务明确要求先点查询再点下一步）。\n'
+        '3. 若弹出确认/风险提示，点「确定/确认」后继续；进入下一步后 done(success=true)。\n'
+        '4. 禁止 click_save(保存/提交)；本页无表单保存语义。\n'
+    )
+
+
+def open_page_task_hint() -> str:
+    """Phase preamble: open/navigate to a page — done once the target page shows."""
+    return (
+        '\n\n【任务类型：打开页面/导航】\n'
+        '本阶段只是把目标页面/弹窗打开，不办理页面内的业务流程。\n'
+        '1. 按任务描述完成前置点击（菜单 / 选中行 / 点「评级申请」类按钮）。\n'
+        '2. 目标页面/弹窗出现后，立刻 done(success=true)。\n'
+        '3. 🚨 禁止在新页面/弹窗内继续操作：不要填字段、不要点「下一步/查询/确定/保存」'
+        '——那是后续阶段的任务。\n'
+        '4. 本阶段无表单保存语义，不需要 click_save。\n'
+    )
+
+
 def login_task_hint() -> str:
     return (
         '\n\n【任务类型：登录】\n'
@@ -209,10 +268,20 @@ def task_mode_hint(mode: TaskMode, *, force_refill_all: bool = False) -> str:
     return ''  # other — no form-type cue
 
 
-def recording_refill_hint(mode: TaskMode, *, force_refill_all: bool) -> str:
+def recording_refill_hint(
+    mode: TaskMode,
+    *,
+    force_refill_all: bool = False,
+    task_text: str = '',
+) -> str:
     """Hint when phase intent requires all editable fields recorded."""
     if force_refill_all and mode in ('form_fill', 'form_modify'):
         return force_refill_hint() if mode == 'form_modify' else form_fill_hint()
+    if mode == 'other':
+        if is_wizard_nav_task(task_text):
+            return wizard_nav_task_hint()
+        if is_open_page_task(task_text):
+            return open_page_task_hint()
     return task_mode_hint(mode, force_refill_all=force_refill_all)
 
 

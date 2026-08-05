@@ -137,6 +137,47 @@ def main() -> int:
         'legacy wrapper allow picker confirm',
     )
 
+    wizard = (
+        '对公客户评级申请界面客户名称搜索为（恒通商贸有限公司），点击下一步。'
+        '预期结果：成功进入下一步。'
+    )
+    b_wiz = compile_boundary(wizard)
+    assert_true(b_wiz['role'] == 'navigate', 'wizard 搜索+下一步 → navigate')
+    assert_true('click_next' in b_wiz['goals'], 'wizard goals click_next')
+    assert_true(b_wiz['forbid_index_submit'] is False, 'wizard allow index next')
+
+    # Maintain verbs must win over wizard keywords (wizard form steps keep refill semantics)
+    b_form_wiz = compile_boundary('新增评级申请，填写基本信息，点击下一步，最后保存。')
+    assert_true(b_form_wiz['role'] == 'maintain', 'form wizard step → maintain not navigate')
+    b_mod_wiz = compile_boundary('修改客户信息，点击下一步。')
+    assert_true(b_mod_wiz['role'] == 'maintain', 'modify+下一步 → maintain')
+
+    # Open-page navigate:「点击评级申请。预期结果：打开评级申请相关页面」→ open_and_done
+    open_t = (
+        '进入评级管理-对公客户评级，选中客户名称（恒通商贸有限公司），点击评级申请。'
+        '预期结果：打开评级申请相关页面。'
+    )
+    b_open = compile_boundary(open_t)
+    assert_true(b_open['role'] == 'navigate', 'open-page → navigate role')
+    assert_true('open_page' in b_open['goals'], 'open-page goal open_page')
+    assert_true(b_open['forbid_index_submit'] is False, 'open-page allow index clicks')
+
+    # Customer-picker dialog (评级申请选客户) → introduce, not bare other
+    pick_t = '在客户选择弹窗中选择目标对公客户。预期结果：选中目标客户并进入评级申请流程。'
+    b_pick = compile_boundary(pick_t)
+    assert_true(b_pick['role'] == 'introduce', '客户选择弹窗 → introduce')
+    assert_true(b_pick['picker_allowed'] is True, 'picker allowed')
+
+    # Maintain with「打开详情页面」expectation stays maintain
+    b_m_open = compile_boundary('新增客户并保存。预期结果：保存成功后打开客户详情页面。')
+    assert_true(b_m_open['role'] == 'maintain', 'maintain + open expectation → maintain')
+    # Query with「打开…页面」expectation stays query
+    b_q_open = compile_boundary('按客户名称查询。预期结果：打开查询结果页面。')
+    assert_true(b_q_open['role'] == 'query', 'query + open expectation → query')
+    # Save-to-open keeps 'other' (prompt rule 3: click_save → navigation → done)
+    b_save_open = compile_boundary('确认信息无误，点击保存。预期结果：保存成功并进入列表页面。')
+    assert_true(b_save_open['role'] == 'other', 'save-to-open → other not open_page')
+
     print('characterize-phase-boundary: OK')
     return 0
 

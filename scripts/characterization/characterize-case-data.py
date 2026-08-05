@@ -101,6 +101,14 @@ def test_three_task_modes() -> None:
     assert_true(force_refill_all_required('修改客户状态为潜在') is False, 'not force')
     assert_true(is_query_task('查询后新增客户并保存') is False, 'mixed not pure query')
     assert_true(classify_task_mode('查询后新增客户并保存') == 'form_fill', 'mixed → fill')
+    wizard = (
+        '对公客户评级申请界面客户名称搜索为（恒通商贸有限公司），点击下一步。'
+        '预期结果：成功进入下一步。'
+    )
+    assert_true(is_query_task(wizard) is False, 'wizard 搜索+下一步 not query')
+    assert_true(classify_task_mode(wizard) == 'other', 'wizard → other')
+    assert_true(is_query_task('按客户名称搜索，点击查询') is True, 'pure search+查询 still query')
+
 
     q = {}
     assert_true(apply_task_mode(q, '查询产品信息') == 'query', 'apply query')
