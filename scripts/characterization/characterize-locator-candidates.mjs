@@ -18,6 +18,7 @@ import {
   buildTableRowButtonXPathSmart,
   buildTableRowRadioXPathSmart,
   buildTreeNodeXPathSmart,
+  buildPlaceholderXPathSmart,
   buildXPathSmart,
   classTokenPred,
   enrichLocatorFields,
@@ -180,6 +181,48 @@ function ok(name) {
   assert.ok(xp.includes('@aria-label'));
   assert.ok(xp.includes('刷新'));
   ok('icon xpath_smart');
+}
+
+{
+  const xp = buildIconXPathSmart({
+    text: '删除',
+    className: 'el-tooltip el-icon-delete',
+  });
+  assert.ok(xp.includes("el-icon-delete"));
+  assert.ok(!xp.includes('@aria-label'));
+  ok('icon prefers el-icon class');
+}
+
+{
+  const xp = buildTreeNodeXPathSmart({ text: '贷款(272)' });
+  assert.ok(xp.includes('贷款'));
+  assert.ok(!xp.includes('(272)'));
+  assert.ok(xp.includes('starts-with'));
+  ok('tree strips volatile count');
+}
+
+{
+  const xp = buildTreeNodeXPathSmart({ text: '票据', parentText: '提货担保' });
+  assert.ok(xp.includes('提货担保'));
+  assert.ok(xp.includes('el-tree-node__children'));
+  ok('tree parent axis');
+}
+
+{
+  const xp = buildFormFieldXPathSmart({
+    label: '搜索关键字：',
+    tag: 'input',
+    xpathFull: '/div[1]/div[2]/div[contains(@class,"el-dialog")]/input[1]',
+  });
+  assert.ok(!xp.includes('[last()]'), xp);
+  ok('dialog scope without [last()]');
+}
+
+{
+  const xp = buildPlaceholderXPathSmart({ placeholder: '搜索关键字' });
+  assert.ok(xp.includes('@placeholder'));
+  assert.ok(xp.includes('搜索关键字'));
+  ok('placeholder xpath_smart');
 }
 
 {

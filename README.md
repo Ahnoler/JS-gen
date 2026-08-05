@@ -15,7 +15,7 @@
 | 能力 | 说明 |
 |------|------|
 | **产品录制** | `/api/v2/trajectories/*`：`record/prepare\|start\|stop`、`manual-record`、`attach` / `detach` |
-| **产品回放** | `/api/v2/trajectories/:id/steps/replay`：附着会话内 live `replay_actions`（`_replay.py`）。`/replay/*` 组装 Playwright 全量回放已**弃用**（工程资产，仍可跑） |
+| **产品回放** | `/api/v2/trajectories/:id/steps/replay`：附着会话内 live `replay_actions`（`_replay.py`；优先 `xpath_smart`：语义锚点 + 可见 dialog scope + 树文案剥离 + 图标 class/tooltip）。`/replay/*` 组装 Playwright 全量回放已**弃用**（工程资产，仍可跑） |
 | **系统树** | `/api/v2/system-mgmt/*`：系统 → 模块 → 功能（+ 账号）；交易挂在功能下 |
 | **执行机** | `npm run executor` → WS `/ws/executor`；槽位租约至 `detach`（`EXECUTOR_CAPACITY`） |
 | **Session 调试** | `/api/browser/session` — 工程调试路径，非整条产品录制主线 |

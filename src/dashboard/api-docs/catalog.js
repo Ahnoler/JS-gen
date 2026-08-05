@@ -606,7 +606,7 @@ export const API_GROUPS = [
         }),
         notes: [
           '单目标动作会 prepareElementJson；无可用 xpath_smart/xpath_full 时 400',
-          '优先写入相对 xpath_smart；否则 xpath_full + locator_fallback_reason',
+          '优先写入相对 xpath_smart（语义锚点 + 可见 dialog/drawer scope + 树文案剥 (n)/[V-x] + 图标 el-icon class/tooltip）；否则 xpath_full + locator_fallback_reason',
         ],
       },
       {
@@ -860,7 +860,7 @@ export const API_GROUPS = [
           '可选 actionType + params（menu_text / tab_name / row_text+button_text / …）做动作感知解析',
           '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }] } — 不静默择一',
           '菜单示例：客户管理优先稳定 data-id；否则 class-token + 文案 + occurrence',
-          '表单字段：xpath / xpath_smart 为 label 锚定相对 xpath；xpath_full 绝对兜底',
+          '表单字段：xpath / xpath_smart 为 label 锚定相对 xpath（无 label 时用 placeholder）；xpath_full 绝对兜底',
           'POST/PATCH trajectory-steps：单目标动作无可用 xpath 时 400 locator-capture-error',
           'PATCH 仅在 actionType/params/element 变更时重校验定位器',
           '400：未 attach / BiB 未就绪；404：无匹配',
@@ -1519,7 +1519,7 @@ export const API_GROUPS = [
         notes: [
           '仅映射当前可录制并落库的动作，不枚举传统引擎全部操作类型',
           'locateBy 默认 xpath',
-          'target 优先 xpath_smart；无相对 xpath 时回退 xpath_full，不丢弃步骤',
+          'target 优先 xpath_smart（语义锚点 + 可见 scope + 动态文本剥离 + tooltip 图标）；无相对 xpath 时回退 xpath_full，不丢弃步骤',
           'wait_for_loading / go_to_url 等非落库 UI 步骤跳过',
           'meta 含 element / params（步骤原始 JSON）及 targetSource 等，对接核心 5 字段时可剥离',
         ],
@@ -1597,7 +1597,7 @@ export const API_GROUPS = [
             actionType: 'fill_form_field',
             params: { label_text: '搜索关键字', value: '贷款' },
             element: {
-              xpath_smart: "//div[contains(@class,'el-form-item')][.//label[contains(normalize-space(.),'搜索关键字')]]//input",
+              xpath_smart: "//input[contains(@placeholder,'搜索关键字')]",
             },
           }],
           includeMeta: false,

@@ -156,7 +156,7 @@ Do **not** look for or restore OpenCode skill packages unless the user explicitl
 - **Re-query DOM** before each op — Vue may recreate dialogs/components.
 - **Recording vs detach** — `record/stop` ends recording status but **does not** free the executor slot; `POST .../stream/detach` stops BiB only (`remote_session`→`idle`, `live`→`draft`); `POST .../detach` closes Chrome + Python + slot.
 - **Multi-traj BiB** — Push identity is `remote_session.id`; bindings are 1:1 trajectory ↔ remote_session ↔ agent session. Detach/stream-detach are scoped per trajectory (no global singleton).
-- **Replay (product)** — Attached/live `replay_actions` via `_replay.py` (`POST .../steps/replay`). Prefers recorded `xpath_smart`, then label/semantic, then `xpath_full`.
+- **Replay (product)** — Attached/live `replay_actions` via `_replay.py` (`POST .../steps/replay`). Prefers recorded `xpath_smart` (semantic anchors + visible dialog/drawer scope + volatile tree-text strip + icon class/tooltip), then label/semantic (incl. placeholder), then `xpath_full`.
 - **Replay (deprecated)** — `/api/v2/trajectories/:id/replay/*` assembles Playwright + CTRL; kept runnable as an engineering asset, not product-supported. Assemble/test-run remain engineering APIs.
 - **Executor slots** — `EXECUTOR_CAPACITY` slots per node; control-plane lease until detach / node offline.
 

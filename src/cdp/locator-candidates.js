@@ -53,6 +53,29 @@ export function normalizeFormLabel(text) {
 }
 
 /**
+ * Strip volatile tree suffixes: trailing (count) and [V-x.x.x] version badges.
+ * @param {string} text
+ */
+export function stripVolatileTreeText(text) {
+  return String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\[\s*V[-\d.]+\s*\]$/i, '')
+    .replace(/\(\d+\)\s*$/, '')
+    .trim()
+    .slice(0, 40);
+}
+
+/**
+ * Extract first el-icon-* class token from a className string.
+ * @param {string} className
+ */
+export function extractElIconClass(className) {
+  const m = String(className || '').match(/el-icon-[a-z0-9-]+/i);
+  return m ? m[0] : '';
+}
+
+/**
  * XPath class-token predicate (exact token, not substring).
  * @param {string} token
  */
@@ -139,9 +162,11 @@ export function withOccurrence(expr, occurrence = 0) {
  * @param {'dialog'|'drawer'|'nav'|''} kind
  */
 function scopePrefix(kind) {
-  if (kind === 'drawer') return "(//div[contains(@class,'el-drawer')])[last()]";
+  // Do NOT use [last()] — DOM last is often a leftover hidden dialog.
+  // Replay picks the last visible match among all hits.
+  if (kind === 'drawer') return "//div[contains(@class,'el-drawer')]";
   if (kind === 'dialog') {
-    return "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]";
+    return "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]";
   }
   return '';
 }
@@ -294,7 +319,9 @@ export function buildMenuXPathSmart({
 }
 
 /**
- * Icon button by aria-label / title.
+ * Icon button by el-icon-* class (preferred) or aria-label / title fallback.
+ * Tip text is stored in params.text for replay disambiguation — not only aria-label
+ * (ElTooltip toolbars often leave aria-label empty).
  */
 export function buildIconXPathSmart({
   text = '',
@@ -305,10 +332,15 @@ export function buildIconXPathSmart({
   occurrence = 0,
 } = {}) {
   const attrs = { ...(attributes || {}) };
+  const cls = String(className || attrs.class || '');
+  const iconTok = extractElIconClass(cls);
+  const kind = detectContainerKind(xpathFull, className, container);
+  if (iconTok) {
+    const local = `a[contains(@class,${xpathLiteral(iconTok)})]`;
+    return withOccurrence(scopedXPath(local, kind), occurrence);
+  }
   const t = normalizeControlText(text || attrs['aria-label'] || attrs.title || '');
   if (!t) return '';
-  if (!attrs['aria-label'] && !attrs.title) attrs['aria-label'] = t;
-  const kind = detectContainerKind(xpathFull, className, container);
   const lit = xpathLiteral(t);
   const local = `*[@aria-label=${lit} or @title=${lit}]`;
   return withOccurrence(scopedXPath(local, kind), occurrence);
@@ -426,21 +458,60 @@ export function buildAdjacentButtonXPathSmart({
 }
 
 /**
- * Tree node content by text.
+ * Tree node content by stable base text (strip (n) / [V-x]); optional parent axis.
+ * Never anchors on exact volatile counts like "贷款(272)".
  */
 export function buildTreeNodeXPathSmart({
   text = '',
+  parentText = '',
+  dataKey = '',
   xpathFull = '',
   className = '',
   container = '',
   occurrence = 0,
 } = {}) {
-  const t = normalizeControlText(text);
-  if (!t) return '';
+  const base = stripVolatileTreeText(text);
+  if (!base && !dataKey) return '';
   const kind = detectContainerKind(xpathFull, className, container);
-  const local =
-    `*[${classTokenPred('el-tree-node__content')} and normalize-space()=${xpathLiteral(t)}]`;
+  let local = '';
+  if (dataKey) {
+    local = `*[@data-key=${xpathLiteral(String(dataKey))}]`;
+  } else {
+    const lit = xpathLiteral(base);
+    local =
+      `*[${classTokenPred('el-tree-node__content')} and starts-with(normalize-space(),${lit})]`;
+  }
+  const parentBase = stripVolatileTreeText(parentText);
+  if (parentBase && !dataKey) {
+    const plit = xpathLiteral(parentBase);
+    local =
+      `*[${classTokenPred('el-tree-node__content')} and starts-with(normalize-space(),${plit})]`
+      + `/following-sibling::*[contains(@class,'el-tree-node__children')]`
+      + `//${local}`;
+  }
   return withOccurrence(scopedXPath(local, kind), occurrence);
+}
+
+/**
+ * Input by placeholder when form-item label is absent (e.g. 搜索关键字).
+ */
+export function buildPlaceholderXPathSmart({
+  placeholder = '',
+  tag = '',
+  xpathFull = '',
+  className = '',
+  container = '',
+  occurrence = 0,
+} = {}) {
+  const ph = normalizeControlText(placeholder);
+  if (!ph) return '';
+  const kind = detectContainerKind(xpathFull, className, container);
+  const tagL = String(tag || '').toLowerCase();
+  const leaf = tagL === 'textarea' ? 'textarea' : 'input';
+  return withOccurrence(
+    scopedXPath(`${leaf}[contains(@placeholder,${xpathLiteral(ph)})]`, kind),
+    occurrence,
+  );
 }
 
 /**
@@ -474,6 +545,8 @@ export function buildXPathSmart(opts = {}) {
     optionText = '',
     tabName = '',
     menuText = '',
+    parentText = '',
+    placeholder = '',
     attributes = {},
     occurrence = 0,
   } = opts;
@@ -552,6 +625,8 @@ export function buildXPathSmart(opts = {}) {
   if (kind === 'tree_node') {
     return buildTreeNodeXPathSmart({
       text,
+      parentText,
+      dataKey: (attributes && attributes['data-key']) || '',
       xpathFull,
       className,
       container,
@@ -580,6 +655,19 @@ export function buildXPathSmart(opts = {}) {
       occurrence,
     });
     if (formXp) return formXp;
+  }
+
+  const ph = normalizeControlText(placeholder || (attributes && attributes.placeholder) || '');
+  if (ph && (!formLbl || kind === 'form_input' || !kind)) {
+    const phXp = buildPlaceholderXPathSmart({
+      placeholder: ph,
+      tag,
+      xpathFull,
+      className,
+      container,
+      occurrence,
+    });
+    if (phXp) return phXp;
   }
 
   if (attrXp && !formLbl) return withOccurrence(attrXp, occurrence);
@@ -780,6 +868,16 @@ export const PAGE_LOCATOR_HELPERS = `
   function normalizeFormLabel(text) {
     return String(text || '').replace(/\\s+/g, ' ').trim().replace(/[：:*\\s]+$/g, '').slice(0, 40);
   }
+  function stripVolatileTreeText(text) {
+    return String(text || '').replace(/\\s+/g, ' ').trim()
+      .replace(/\\[\\s*V[-\\d.]+\\s*\\]$/i, '')
+      .replace(/\\(\\d+\\)\\s*$/, '')
+      .trim().slice(0, 40);
+  }
+  function extractElIconClass(className) {
+    const m = String(className || '').match(/el-icon-[a-z0-9-]+/i);
+    return m ? m[0] : '';
+  }
   function classTokenPred(token) {
     const t = String(token || '').trim();
     if (!t) return '';
@@ -853,8 +951,9 @@ export const PAGE_LOCATOR_HELPERS = `
     return 'page';
   }
   function scopePrefix(kind) {
-    if (kind === 'drawer') return "(//div[contains(@class,'el-drawer')])[last()]";
-    if (kind === 'dialog') return "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]";
+    // Do NOT use [last()] — DOM last is often a leftover hidden dialog
+    if (kind === 'drawer') return "//div[contains(@class,'el-drawer')]";
+    if (kind === 'dialog') return "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]";
     return '';
   }
   function scopedXPath(local, kind) {
@@ -983,6 +1082,11 @@ export const PAGE_LOCATOR_HELPERS = `
     }
     if (node.closest('.el-form-item') && (node.matches('input, textarea') || node.closest('.el-input, .el-textarea'))) return 'form_input';
     if ((node.getAttribute && (node.getAttribute('aria-label') || node.getAttribute('title'))) && !(node.innerText || '').trim()) return 'icon';
+    {
+      const clsI = String(node.className || '');
+      const tagI = (node.tagName || '').toLowerCase();
+      if (extractElIconClass(clsI) && (hasClassToken(clsI, 'el-tooltip') || tagI === 'a' || tagI === 'i')) return 'icon';
+    }
     const tagL = (node.tagName || '').toLowerCase();
     const cls = String(node.className || '');
     if (tagL === 'button' || hasClassToken(cls, 'el-button')) return 'button';
@@ -991,6 +1095,16 @@ export const PAGE_LOCATOR_HELPERS = `
   }
   function formFieldXpathSmartOf(node, formLabel) {
     const lbl = normalizeFormLabel(formLabel);
+    const scope = scopeOf(node);
+    const scopeKind = (scope === 'drawer' || scope === 'dialog') ? scope : '';
+    if ((!lbl || !node) && node) {
+      const ph = normalizeControlText((node.getAttribute && node.getAttribute('placeholder')) || '');
+      if (ph) {
+        const tagL0 = (node.tagName || '').toLowerCase();
+        const leaf0 = tagL0 === 'textarea' ? 'textarea' : 'input';
+        return scopedXPath(leaf0 + '[contains(@placeholder,' + xpathLiteral(ph) + ')]', scopeKind);
+      }
+    }
     if (!lbl || !node) return '';
     const lit = xpathLiteral(lbl);
     const itemPred = "div[contains(@class,'el-form-item')][.//label[contains(normalize-space(.)," + lit + ")]]";
@@ -1011,8 +1125,7 @@ export const PAGE_LOCATOR_HELPERS = `
     else if (tagL === 'input' || /(^| )el-input__inner( |$)/.test(cls)) leaf = 'input';
     else if (tagL === 'button' || /(^| )el-button( |$)/.test(cls)) leaf = 'button';
     else leaf = tagL || 'input';
-    const scope = scopeOf(node);
-    return scopedXPath(itemPred + '//' + leaf, scope === 'drawer' || scope === 'dialog' ? scope : '');
+    return scopedXPath(itemPred + '//' + leaf, scopeKind);
   }
   function menuXpathSmartOf(node, text) {
     const t = normalizeControlText(text);
@@ -1158,17 +1271,43 @@ export const PAGE_LOCATOR_HELPERS = `
       }
     }
     if (kind === 'icon') {
+      const iconTok = extractElIconClass(String(node.className || ''));
+      if (iconTok) {
+        return scopedXPath("a[contains(@class," + xpathLiteral(iconTok) + ")]", scopeKind);
+      }
       const t = normalizeControlText(text);
       if (!t) return '';
       return scopedXPath("*[@aria-label=" + xpathLiteral(t) + " or @title=" + xpathLiteral(t) + "]", scopeKind);
     }
     if (kind === 'tree_node') {
-      const t = normalizeControlText(text);
-      if (!t) return '';
-      return scopedXPath(
-        "*[" + classTokenPred('el-tree-node__content') + " and normalize-space()=" + xpathLiteral(t) + "]",
-        scopeKind
-      );
+      const base = stripVolatileTreeText(text) || stripVolatileTreeText(cleanVisibleText(node));
+      if (!base) return '';
+      let local = "*[" + classTokenPred('el-tree-node__content') + " and starts-with(normalize-space()," + xpathLiteral(base) + ")]";
+      // Parent tree-node for duplicate base names
+      try {
+        const treeNode = node.closest && node.closest('.el-tree-node');
+        const parentNode = treeNode && treeNode.parentElement && treeNode.parentElement.closest
+          ? treeNode.parentElement.closest('.el-tree-node')
+          : null;
+        if (parentNode) {
+          const pContent = parentNode.querySelector(':scope > .el-tree-node__content');
+          const pb = stripVolatileTreeText(pContent ? (pContent.innerText || pContent.textContent) : '');
+          if (pb) {
+            local = "*[" + classTokenPred('el-tree-node__content') + " and starts-with(normalize-space()," + xpathLiteral(pb) + ")]"
+              + "/following-sibling::*[contains(@class,'el-tree-node__children')]"
+              + "//" + local;
+          }
+        }
+      } catch (e) { /* ignore */ }
+      return scopedXPath(local, scopeKind);
+    }
+    if (!formLabel) {
+      const ph = normalizeControlText((node.getAttribute && node.getAttribute('placeholder')) || '');
+      if (ph && (kind === 'form_input' || kind === 'generic' || !kind)) {
+        const tagLph = (node.tagName || '').toLowerCase();
+        const leafPh = tagLph === 'textarea' ? 'textarea' : 'input';
+        return scopedXPath(leafPh + '[contains(@placeholder,' + xpathLiteral(ph) + ')]', scopeKind);
+      }
     }
     if (formLabel) {
       const formXp = formFieldXpathSmartOf(node, formLabel);
@@ -1226,6 +1365,21 @@ export const PAGE_LOCATOR_HELPERS = `
     if (smart) candidates.push({ type: 'xpath_smart', value: smart });
     if (abs) candidates.push({ type: 'xpath_full', value: abs });
     if (css) candidates.push({ type: 'css', value: css });
+    let parentText = '';
+    if (kind === 'tree_node') {
+      try {
+        const treeNode = host.closest && host.closest('.el-tree-node');
+        const parentNode = treeNode && treeNode.parentElement && treeNode.parentElement.closest
+          ? treeNode.parentElement.closest('.el-tree-node')
+          : null;
+        if (parentNode) {
+          const pContent = parentNode.querySelector(':scope > .el-tree-node__content');
+          parentText = stripVolatileTreeText(pContent ? (pContent.innerText || pContent.textContent) : '');
+        }
+      } catch (e) { parentText = ''; }
+    }
+    const iconClass = kind === 'icon' ? extractElIconClass(String(host.className || '')) : '';
+    const placeholder = (host.getAttribute && host.getAttribute('placeholder')) || '';
     return {
       xpath: primary,
       xpath_smart: (smart && verified) ? smart : (smart || ''),
@@ -1238,6 +1392,9 @@ export const PAGE_LOCATOR_HELPERS = `
       attributes: collectAttrs(host),
       candidates: candidates,
       target_kind: kind,
+      parent_text: parentText || undefined,
+      icon_class: iconClass || undefined,
+      placeholder: placeholder || undefined,
       locator_scope: scopeOf(host),
       locator_occurrence: occurrence || undefined,
       locator_verified: verified,

@@ -16,6 +16,16 @@ PAGE_LOCATOR_HELPERS = r'''
   function normalizeFormLabel(text) {
     return String(text || '').replace(/\s+/g, ' ').trim().replace(/[：:*\s]+$/g, '').slice(0, 40);
   }
+  function stripVolatileTreeText(text) {
+    return String(text || '').replace(/\s+/g, ' ').trim()
+      .replace(/\[\s*V[-\d.]+\s*\]$/i, '')
+      .replace(/\(\d+\)\s*$/, '')
+      .trim().slice(0, 40);
+  }
+  function extractElIconClass(className) {
+    const m = String(className || '').match(/el-icon-[a-z0-9-]+/i);
+    return m ? m[0] : '';
+  }
   function classTokenPred(token) {
     const t = String(token || '').trim();
     if (!t) return '';
@@ -89,8 +99,9 @@ PAGE_LOCATOR_HELPERS = r'''
     return 'page';
   }
   function scopePrefix(kind) {
-    if (kind === 'drawer') return "(//div[contains(@class,'el-drawer')])[last()]";
-    if (kind === 'dialog') return "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]";
+    // Do NOT use [last()] — DOM last is often a leftover hidden dialog
+    if (kind === 'drawer') return "//div[contains(@class,'el-drawer')]";
+    if (kind === 'dialog') return "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]";
     return '';
   }
   function scopedXPath(local, kind) {
@@ -219,6 +230,11 @@ PAGE_LOCATOR_HELPERS = r'''
     }
     if (node.closest('.el-form-item') && (node.matches('input, textarea') || node.closest('.el-input, .el-textarea'))) return 'form_input';
     if ((node.getAttribute && (node.getAttribute('aria-label') || node.getAttribute('title'))) && !(node.innerText || '').trim()) return 'icon';
+    {
+      const clsI = String(node.className || '');
+      const tagI = (node.tagName || '').toLowerCase();
+      if (extractElIconClass(clsI) && (hasClassToken(clsI, 'el-tooltip') || tagI === 'a' || tagI === 'i')) return 'icon';
+    }
     const tagL = (node.tagName || '').toLowerCase();
     const cls = String(node.className || '');
     if (tagL === 'button' || hasClassToken(cls, 'el-button')) return 'button';
@@ -227,6 +243,16 @@ PAGE_LOCATOR_HELPERS = r'''
   }
   function formFieldXpathSmartOf(node, formLabel) {
     const lbl = normalizeFormLabel(formLabel);
+    const scope = scopeOf(node);
+    const scopeKind = (scope === 'drawer' || scope === 'dialog') ? scope : '';
+    if ((!lbl || !node) && node) {
+      const ph = normalizeControlText((node.getAttribute && node.getAttribute('placeholder')) || '');
+      if (ph) {
+        const tagL0 = (node.tagName || '').toLowerCase();
+        const leaf0 = tagL0 === 'textarea' ? 'textarea' : 'input';
+        return scopedXPath(leaf0 + '[contains(@placeholder,' + xpathLiteral(ph) + ')]', scopeKind);
+      }
+    }
     if (!lbl || !node) return '';
     const lit = xpathLiteral(lbl);
     const itemPred = "div[contains(@class,'el-form-item')][.//label[contains(normalize-space(.)," + lit + ")]]";
@@ -247,8 +273,7 @@ PAGE_LOCATOR_HELPERS = r'''
     else if (tagL === 'input' || /(^| )el-input__inner( |$)/.test(cls)) leaf = 'input';
     else if (tagL === 'button' || /(^| )el-button( |$)/.test(cls)) leaf = 'button';
     else leaf = tagL || 'input';
-    const scope = scopeOf(node);
-    return scopedXPath(itemPred + '//' + leaf, scope === 'drawer' || scope === 'dialog' ? scope : '');
+    return scopedXPath(itemPred + '//' + leaf, scopeKind);
   }
   function menuXpathSmartOf(node, text) {
     const t = normalizeControlText(text);
@@ -394,17 +419,43 @@ PAGE_LOCATOR_HELPERS = r'''
       }
     }
     if (kind === 'icon') {
+      const iconTok = extractElIconClass(String(node.className || ''));
+      if (iconTok) {
+        return scopedXPath("a[contains(@class," + xpathLiteral(iconTok) + ")]", scopeKind);
+      }
       const t = normalizeControlText(text);
       if (!t) return '';
       return scopedXPath("*[@aria-label=" + xpathLiteral(t) + " or @title=" + xpathLiteral(t) + "]", scopeKind);
     }
     if (kind === 'tree_node') {
-      const t = normalizeControlText(text);
-      if (!t) return '';
-      return scopedXPath(
-        "*[" + classTokenPred('el-tree-node__content') + " and normalize-space()=" + xpathLiteral(t) + "]",
-        scopeKind
-      );
+      const base = stripVolatileTreeText(text) || stripVolatileTreeText(cleanVisibleText(node));
+      if (!base) return '';
+      let local = "*[" + classTokenPred('el-tree-node__content') + " and starts-with(normalize-space()," + xpathLiteral(base) + ")]";
+      // Parent tree-node for duplicate base names
+      try {
+        const treeNode = node.closest && node.closest('.el-tree-node');
+        const parentNode = treeNode && treeNode.parentElement && treeNode.parentElement.closest
+          ? treeNode.parentElement.closest('.el-tree-node')
+          : null;
+        if (parentNode) {
+          const pContent = parentNode.querySelector(':scope > .el-tree-node__content');
+          const pb = stripVolatileTreeText(pContent ? (pContent.innerText || pContent.textContent) : '');
+          if (pb) {
+            local = "*[" + classTokenPred('el-tree-node__content') + " and starts-with(normalize-space()," + xpathLiteral(pb) + ")]"
+              + "/following-sibling::*[contains(@class,'el-tree-node__children')]"
+              + "//" + local;
+          }
+        }
+      } catch (e) { /* ignore */ }
+      return scopedXPath(local, scopeKind);
+    }
+    if (!formLabel) {
+      const ph = normalizeControlText((node.getAttribute && node.getAttribute('placeholder')) || '');
+      if (ph && (kind === 'form_input' || kind === 'generic' || !kind)) {
+        const tagLph = (node.tagName || '').toLowerCase();
+        const leafPh = tagLph === 'textarea' ? 'textarea' : 'input';
+        return scopedXPath(leafPh + '[contains(@placeholder,' + xpathLiteral(ph) + ')]', scopeKind);
+      }
     }
     if (formLabel) {
       const formXp = formFieldXpathSmartOf(node, formLabel);
@@ -462,6 +513,21 @@ PAGE_LOCATOR_HELPERS = r'''
     if (smart) candidates.push({ type: 'xpath_smart', value: smart });
     if (abs) candidates.push({ type: 'xpath_full', value: abs });
     if (css) candidates.push({ type: 'css', value: css });
+    let parentText = '';
+    if (kind === 'tree_node') {
+      try {
+        const treeNode = host.closest && host.closest('.el-tree-node');
+        const parentNode = treeNode && treeNode.parentElement && treeNode.parentElement.closest
+          ? treeNode.parentElement.closest('.el-tree-node')
+          : null;
+        if (parentNode) {
+          const pContent = parentNode.querySelector(':scope > .el-tree-node__content');
+          parentText = stripVolatileTreeText(pContent ? (pContent.innerText || pContent.textContent) : '');
+        }
+      } catch (e) { parentText = ''; }
+    }
+    const iconClass = kind === 'icon' ? extractElIconClass(String(host.className || '')) : '';
+    const placeholder = (host.getAttribute && host.getAttribute('placeholder')) || '';
     return {
       xpath: primary,
       xpath_smart: (smart && verified) ? smart : (smart || ''),
@@ -474,6 +540,9 @@ PAGE_LOCATOR_HELPERS = r'''
       attributes: collectAttrs(host),
       candidates: candidates,
       target_kind: kind,
+      parent_text: parentText || undefined,
+      icon_class: iconClass || undefined,
+      placeholder: placeholder || undefined,
       locator_scope: scopeOf(host),
       locator_occurrence: occurrence || undefined,
       locator_verified: verified,
