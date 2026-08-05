@@ -162,6 +162,33 @@ def main() -> int:
     assert_true('open_page' in b_open['goals'], 'open-page goal open_page')
     assert_true(b_open['forbid_index_submit'] is False, 'open-page allow index clicks')
 
+    # 「抵达…页面」+ 【业务数据】suffix must NOT become form_fill / maintain
+    from scripts.actions._phase_context import (
+        classify_task_mode,
+        is_open_page_task,
+        needs_business_data_context,
+        strip_business_data_block,
+    )
+    nav_biz = (
+        '点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理页面。\n\n'
+        '【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n'
+        '关键数据\n对公客户基本信息\n        法定责任人引入 朱桂武'
+    )
+    assert_true(classify_task_mode(nav_biz) == 'other', 'nav+业务数据 → other not form_fill')
+    assert_true(is_open_page_task(nav_biz), '抵达…页面 → open_page')
+    b_nav = compile_boundary(nav_biz)
+    assert_true(b_nav['role'] == 'navigate', 'nav+业务数据 → navigate role')
+    assert_true('open_page' in b_nav['goals'], 'nav+业务数据 → open_page goal')
+    assert_true(not needs_business_data_context(nav_biz), 'nav phase skips 业务数据 hint')
+    assert_true('法定责任人' not in strip_business_data_block(nav_biz), 'strip removes value block')
+
+    fill_biz = (
+        '新增一个信贷潜在客户，点击保存。预期结果：跳转到基本信息页。\n\n'
+        '【业务数据 — x】\n关键数据\n法定责任人引入 朱桂武'
+    )
+    assert_true(classify_task_mode(fill_biz) == 'form_fill', 'fill+业务数据 still form_fill')
+    assert_true(needs_business_data_context(fill_biz), 'fill phase keeps 业务数据')
+
     # Customer-picker dialog (评级申请选客户) → introduce, not bare other
     pick_t = '在客户选择弹窗中选择目标对公客户。预期结果：选中目标客户并进入评级申请流程。'
     b_pick = compile_boundary(pick_t)

@@ -104,7 +104,9 @@ def _requires_introduce_then_save(task_text: str) -> bool:
 
 def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]:
     """Compile NL task into a PhaseBoundary dict (JSON-serializable)."""
-    t = (task_text or '').strip()
+    from ._phase_context import classification_task_text
+
+    t = classification_task_text(task_text).strip()
     task_mode = classify_task_mode(t)
     explicit_all = bool(_ALL_FIELDS_SYNONYMS.search(t)) or force_refill_all_required(t)
     needs_intro_then_save = _requires_introduce_then_save(t)

@@ -46,11 +46,16 @@ _WIZARD_NAV_RE = re.compile(r'下一步|上一步|进入下一步|点击下一�
 # Open-page / navigate phases:「点击评级申请。预期结果：打开评级申请相关页面」—
 # done once the target page/dialog appears; do NOT continue the flow inside it.
 _OPEN_PAGE_EXPECT_RE = re.compile(
-    r'预期结果[:：]?[^。；\n]{0,10}(?:打开|进入)[^。；\n]{0,15}(?:页面|界面|弹窗|对话框)'
+    r'预期结果[:：]?[^。；\n]{0,12}(?:打开|进入|抵达|到达)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框)'
 )
 # Save-to-open phases (点击保存。预期结果：保存成功并进入列表页) keep prompt rule 3
 # (click_save → ok-save-navigation → done) — NOT open-page navigation.
 _OPEN_PAGE_EXCLUDE_RE = re.compile(r'保存|提交')
+
+# Suffixes appended for AI fill context — must NOT affect task-mode / boundary classify.
+_BUSINESS_DATA_MARK_RE = re.compile(
+    r'\n*【(?:业务数据|业务场景案例数据|预设案例数据)[^\n]*】[\s\S]*$',
+)
 
 # Form modify (edit existing values) — distinct from blank form_fill.
 _MODIFY_TASK_RE = re.compile(r'修改|编辑|更新|变更|改填|维护')
@@ -70,9 +75,59 @@ def force_refill_all_required(task_text: str) -> bool:
     return bool(_FORCE_REFILL_RE.search(task_text or ''))
 
 
+def strip_business_data_block(task_text: str) -> str:
+    """Remove trailing 【业务数据】/ legacy case-data blocks from phase text.
+
+    Those blocks are fill *values*, not phase goals. Keeping them in classify
+    text caused navigate phases to become form_fill (boilerplate contains「填写」)
+    or introduce (key data contains「引入」).
+    """
+    t = str(task_text or '')
+    t = _BUSINESS_DATA_MARK_RE.sub('', t)
+    return t.strip()
+
+
+def classification_task_text(task_text: str) -> str:
+    """Phase text used for task_mode / boundary / intent — no business-data suffix."""
+    return strip_business_data_block(task_text)
+
+
+def needs_business_data_context(
+    task_text: str,
+    case_data_store: dict | None = None,
+) -> bool:
+    """Whether to show 【业务数据】to the model for this phase.
+
+    Only fill / modify / introduce (incl. introduce-then-save). Not login,
+    pure open-page navigate, or list query.
+    """
+    t = classification_task_text(task_text)
+    if not t:
+        return False
+    mode = classify_task_mode(t)
+    if mode in ('form_fill', 'form_modify'):
+        return True
+    if case_data_store:
+        boundary = case_data_store.get('_phase_boundary') or {}
+        if boundary.get('role') == 'introduce' or boundary.get('requires_introduce_then_save'):
+            return True
+        contract = case_data_store.get('_phase_intent') or {}
+        if contract.get('mode') == 'introduce_pick':
+            return True
+    if mode in ('login', 'query'):
+        return False
+    # Pure open-page / menu navigate — no value hints
+    if mode == 'other' and is_open_page_task(t):
+        return False
+    # Introduce-only goals often classify as other
+    if re.search(r'引入|选人|客户选择|选择客户|选择.*客户', t):
+        return True
+    return False
+
+
 def is_wizard_nav_task(task_text: str) -> bool:
     """True when the phase advances a wizard (下一步/上一步), not list query."""
-    return bool(_WIZARD_NAV_RE.search(task_text or ''))
+    return bool(_WIZARD_NAV_RE.search(classification_task_text(task_text)))
 
 
 def is_open_page_task(task_text: str) -> bool:
@@ -83,7 +138,7 @@ def is_open_page_task(task_text: str) -> bool:
     Save-to-open texts (…点击保存。预期结果：…进入列表页面) are excluded — they keep
     the click_save → ok-save-navigation → done rule.
     """
-    t = task_text or ''
+    t = classification_task_text(task_text)
     if _OPEN_PAGE_EXCLUDE_RE.search(t):
         return False
     return bool(_OPEN_PAGE_EXPECT_RE.search(t))
@@ -97,7 +152,7 @@ def is_query_task(task_text: str) -> bool:
     Also excludes wizard copy like「客户名称搜索为…，点击下一步」(set field + next).
     Main-page query toolbars are additionally detected via DOM (有查询无保存).
     """
-    t = (task_text or '').strip()
+    t = classification_task_text(task_text)
     if not _QUERY_TASK_RE.search(t):
         return False
     if _QUERY_EXCLUDE_RE.search(t):
@@ -109,7 +164,7 @@ def is_query_task(task_text: str) -> bool:
 
 def is_login_task(task_text: str) -> bool:
     """True when the phase is only sign-in (not login-then-fill in one blob)."""
-    t = (task_text or '').strip()
+    t = classification_task_text(task_text)
     if not t or not _LOGIN_TASK_RE.search(t):
         return False
     if _LOGIN_EXCLUDE_RE.search(t):
@@ -119,7 +174,7 @@ def is_login_task(task_text: str) -> bool:
 
 def is_modify_task(task_text: str) -> bool:
     """True when the phase is editing an existing form (not blank entry, not query)."""
-    t = (task_text or '').strip()
+    t = classification_task_text(task_text)
     if not t or is_query_task(t) or is_login_task(t):
         return False
     if force_refill_all_required(t):
@@ -129,15 +184,18 @@ def is_modify_task(task_text: str) -> bool:
 
 def is_fill_task(task_text: str) -> bool:
     """True when the phase is explicit new/entry form filling."""
-    t = (task_text or '').strip()
+    t = classification_task_text(task_text)
     if not t or is_query_task(t) or is_login_task(t) or is_modify_task(t):
         return False
     return bool(_FILL_TASK_RE.search(t))
 
 
 def classify_task_mode(task_text: str) -> TaskMode:
-    """Classify phase intent. ``form_fill`` only when entry keywords match — never default."""
-    t = task_text or ''
+    """Classify phase intent. ``form_fill`` only when entry keywords match — never default.
+
+    Classification ignores trailing 【业务数据】blocks (value hints, not goals).
+    """
+    t = classification_task_text(task_text)
     if is_login_task(t):
         return 'login'
     if is_query_task(t):

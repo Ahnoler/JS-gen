@@ -109,7 +109,9 @@ def _is_introduce_task(task_text: str) -> bool:
 
 def compile_phase_intent(task_text: str) -> dict[str, Any]:
     """Rule-based compiler (synonym table + task_mode). Returns contract dict."""
-    t = (task_text or '').strip()
+    from ._phase_context import classification_task_text
+
+    t = classification_task_text(task_text).strip()
     task_mode = classify_task_mode(t)
 
     if is_login_task(t):

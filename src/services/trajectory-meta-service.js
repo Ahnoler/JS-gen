@@ -14,6 +14,46 @@ import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-s
 const CASE_DATA_SECTION_RE = /^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]?$/i;
 const CASE_DATA_HEADER_INLINE_RE = /^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]/i;
 
+/** Trailing AI value-hint blocks — must not drive phase-type classification. */
+const BUSINESS_DATA_MARK_RE = /\n*【(?:业务数据|业务场景案例数据|预设案例数据)[^\n]*】[\s\S]*$/;
+
+/**
+ * Strip trailing 【业务数据】/ legacy case-data blocks from phase text.
+ * @param {string} text
+ * @returns {string}
+ */
+export function stripBusinessDataBlock(text) {
+  return String(text || '').replace(BUSINESS_DATA_MARK_RE, '').trim();
+}
+
+/**
+ * Whether this phase goal should receive 业务数据 for the AI.
+ * Fill / modify / introduce only — not login, pure open-page navigate, or list query.
+ * @param {string} phaseText
+ * @returns {boolean}
+ */
+export function phaseNeedsBusinessData(phaseText) {
+  const t = stripBusinessDataBlock(phaseText);
+  if (!t) return false;
+
+  const isLogin = /登录|登入/i.test(t)
+    && !/新增|创建|录入|填写|修改|编辑|引入|校验/.test(t);
+  if (isLogin) return false;
+
+  const openPage = /预期结果[:：]?[^。；\n]{0,12}(?:打开|进入|抵达|到达)[^。；\n]{0,20}(?:页面|界面|弹窗|对话框)/.test(t);
+  const beforeExpect = (t.split(/预期结果/)[0] || t);
+  const actionHasWrite = /新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|维护|引入|选人|选择客户|保存|提交/.test(beforeExpect);
+  if (openPage && !actionHasWrite) return false;
+
+  const isQuery = /查询|搜索|查找/.test(t)
+    && !/新增|创建|录入|填写|修改|编辑|引入|保存|提交|校验/.test(t);
+  if (isQuery) return false;
+
+  if (/新增|创建|录入|填写|新建|添加|校验|开立|修改|编辑|更新|变更|维护/.test(t)) return true;
+  if (/引入|选人|客户选择|选择客户|选择.*客户/.test(t)) return true;
+  return false;
+}
+
 /**
  * Extract the raw「关键数据 / 案例数据 …」block from a *user requirement*.
  *
@@ -111,17 +151,19 @@ export function extractCaseEntriesFromRequirement(text) {
 }
 
 /**
- * Append business-scenario case-data block to each phase description (once).
+ * Append 业务数据 block only to fill / introduce phases (not navigate / login / query).
  * @param {string[]} phases
  * @param {string} caseBlock
  */
 function appendCaseDataToPhases(phases, caseBlock) {
   const block = String(caseBlock || '').trim();
   if (!block || !Array.isArray(phases) || !phases.length) return phases || [];
-  const suffix = `\n\n【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n${block}`;
+  // Avoid「填写」in the mark — that keyword pollutes task_mode if strip ever fails.
+  const suffix = `\n\n【业务数据 — 来自用户需求（非系统回写案例数据）；填表/引入时参考理解，按场景选用关键取值】\n${block}`;
   return phases.map((p) => {
     const text = String(p || '').trim();
     if (!text) return text;
+    if (!phaseNeedsBusinessData(text)) return text;
     if (
       text.includes('【业务数据')
       || text.includes('【业务场景案例数据')

@@ -39,6 +39,8 @@ import {
  *
  * User 业务数据 ≠ system_ref ≠ legacy case_data. Feeding the agent for
  * fill/introduce must prefer 业务数据 as readable context.
+ * Inject 业务数据 only for fill / modify / introduce phases — never for
+ * pure navigate / login / list-query (avoids「填写」polluting task_mode).
  *
  * Historical note: symbols like `case_data_block` / `caseEntries` often carry
  * **业务数据** extracted from the requirement — names predate this split.
@@ -331,14 +333,16 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     data: { enabled: true },
   });
 
-      // 业务数据 (user requirement notes) → agent context for the model to interpret.
-      // Not the same as 案例数据 (system-captured / project-persisted).
-      // Flat KV remains optional; do not rely on key↔form-label matching.
+      // 业务数据：仅填表/引入类阶段注入；导航/登录/查询不挂，避免「填写」污染分类。
       const { caseDataFile, caseData, caseDataBlock } = await prepareCaseDataInjection(tid);
+      const {
+        phaseNeedsBusinessData,
+        stripBusinessDataBlock,
+      } = await import('./trajectory-meta-service.js');
       const CASE_BLOCK_MARK = '【业务数据';
       const CASE_BLOCK_MARK_LEGACY = '【业务场景案例数据';
       const caseBlockSuffix = caseDataBlock
-        ? `\n\n${CASE_BLOCK_MARK} — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n${caseDataBlock}`
+        ? `\n\n${CASE_BLOCK_MARK} — 来自用户需求（非系统回写案例数据）；填表/引入时参考理解，按场景选用关键取值】\n${caseDataBlock}`
         : '';
 
   let recordingSystemId = null;
@@ -398,21 +402,25 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       // P1：Python 记忆 writer 需要 trajectory_id（否则 case_saved 等事件无归属）
       stepData.trajectory_id = tid;
       if (prior_phases.length) stepData.prior_phases = prior_phases;
-      // 原文块：phase 描述缺业务数据时补上，保证 AI 每阶段都能看见
+      // 业务数据仅挂到填表/引入阶段；导航阶段保持干净描述供边界分类。
       let instruction = phase.description || '';
+      const wantBiz = phaseNeedsBusinessData(instruction);
       if (
-        caseBlockSuffix
+        wantBiz
+        && caseBlockSuffix
         && !instruction.includes(CASE_BLOCK_MARK)
         && !instruction.includes(CASE_BLOCK_MARK_LEGACY)
       ) {
         instruction = instruction + caseBlockSuffix;
+      } else if (!wantBiz) {
+        instruction = stripBusinessDataBlock(instruction);
       }
       stepData.instruction = instruction;
-      if (caseDataBlock) {
+      if (wantBiz && caseDataBlock) {
         stepData.case_data_block = caseDataBlock;
       }
-      // Optional flat KV (still named case_data historically); autofill must not hard-match labels
-      if (caseData) {
+      // Optional flat KV only when this phase may use values
+      if (wantBiz && caseData) {
         stepData.case_data = caseData;
         if (caseDataFile) stepData.case_data_file = caseDataFile;
       }

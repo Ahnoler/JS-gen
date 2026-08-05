@@ -118,6 +118,13 @@ def test_three_task_modes() -> None:
     )
     assert_true(is_query_task(wizard) is False, 'wizard 搜索+下一步 not query')
     assert_true(classify_task_mode(wizard) == 'other', 'wizard → other')
+
+    # 业务数据 boilerplate must not flip navigate → form_fill
+    nav_polluted = (
+        '点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理页面。\n\n'
+        '【业务数据 — 来自用户需求；按场景填写关键字段】\n关键数据\n法定责任人引入 朱桂武'
+    )
+    assert_true(classify_task_mode(nav_polluted) == 'other', 'nav polluted → other')
     assert_true(is_query_task('按客户名称搜索，点击查询') is True, 'pure search+查询 still query')
 
 

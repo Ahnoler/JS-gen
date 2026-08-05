@@ -420,12 +420,15 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
 
     agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', task_text, count=1).strip() or task_text
     phase_task_text = agent_task
+    want_biz = False
     try:
         from .actions._phase_context import (
             apply_heal_mode,
             apply_task_mode,
+            classification_task_text,
             detect_heal_mode,
             format_phase_preamble,
+            needs_business_data_context,
             recording_refill_hint,
         )
         from .actions._phase_intent import (
@@ -434,6 +437,8 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         )
         from .actions._state import _CURRENT_PHASE
         heal_mode = detect_heal_mode(instruction, agent_task)
+        # Classify / boundary on goal text only — strip 【业务数据】value blocks first.
+        phase_core = classification_task_text(agent_task)
         if case_data_ref is not None:
             apply_heal_mode(case_data_ref, heal_mode)
             if heal_mode:
@@ -445,8 +450,8 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 )
                 sys.stderr.flush()
             else:
-                mode = apply_task_mode(case_data_ref, agent_task)
-                contract = apply_phase_intent(case_data_ref, agent_task)
+                mode = apply_task_mode(case_data_ref, phase_core)
+                contract = apply_phase_intent(case_data_ref, phase_core)
                 sys.stderr.write(
                     f"[session] task_mode={mode} "
                     f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
@@ -456,6 +461,16 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         else:
             mode = 'other'
             contract = None
+        # Only fill / introduce phases keep 业务数据 in the model-visible task.
+        want_biz = (not heal_mode) and needs_business_data_context(phase_core, case_data_ref)
+        if not want_biz:
+            agent_task = phase_core
+            if case_data_ref is not None:
+                case_data_ref.pop('_case_scenario_text', None)
+        else:
+            sys.stderr.write("[session] business-data context enabled for this phase\n")
+            sys.stderr.flush()
+        phase_task_text = phase_core
         prior_phases = instruction.get('prior_phases') or instruction.get('priorPhases')
         phase_for_preamble = instruction.get('phase_number')
         if phase_for_preamble is None:
@@ -541,11 +556,15 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
     try:
         from .actions._case_data import format_case_data_hint, iter_user_case_entries
-        entries = iter_user_case_entries(case_data_ref)
-        hint = format_case_data_hint(case_data_ref)
-        if hint:
-            agent_task = agent_task + hint
-            sys.stderr.write(f"[session] Appended case data hint ({len(entries)} keys)\n")
+        if want_biz:
+            entries = iter_user_case_entries(case_data_ref)
+            hint = format_case_data_hint(case_data_ref)
+            if hint:
+                agent_task = agent_task + hint
+                sys.stderr.write(f"[session] Appended case data hint ({len(entries)} keys)\n")
+                sys.stderr.flush()
+        else:
+            sys.stderr.write("[session] Skip business-data hint (phase is not fill/introduce)\n")
             sys.stderr.flush()
     except Exception as e:
         sys.stderr.write(f"[session] case data hint skipped: {e}\n")

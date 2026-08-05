@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-05: **导航阶段被【业务数据】误判为 form_fill 导致越界**（实锤：阶段「点击客户管理…抵达对公客户管理页面」却继续新增/保存/引入）。根因：每阶段挂业务数据 boilerplate 含「填写」，且「引入」关键值污染 classify；`抵达…页面` 未进 open_page 规则。修复：① classify/boundary/intent **先剥离【业务数据】**；② **仅填表/修改/引入**阶段注入业务数据（analyze append + record/start + Python hint）；③ open_page 支持「抵达/到达」。
+  影响范围：阶段边界、录制注入、analyze phase 附文。
+  文件：scripts/actions/_phase_context.py, _phase_boundary.py, _phase_intent.py, scripts/session_runner.py, src/services/trajectory-meta-service.js, src/services/trajectory-record-lifecycle.js
+  Python 同步提示：对齐「业务数据仅填表/引入阶段注入；分类忽略业务数据后缀」。
+
 - 2026-08-05: 案例数据注入链路二次修复（实锤：交易 35 重录后模型仍未拿到案例数据——phase 描述无【业务场景案例数据】块、case_data_entry 0 条、preamble 无【预设案例数据】）：① **恢复 `prepareCaseDataInjection` 调用**（V2.2 停用注释残留 `const caseData = null`，函数实现此前已恢复但调用点未恢复，案例数据从未注入）；② **task 兜底解析**：case_data_entry 为空时从 `trajectory.task` 的「关键数据」段规则解析（`extractCaseEntriesFromRequirement`）→ 落库 case_data_entry + 摄取 memory_fact（requirement/authoritative）→ 注入 Python store。不依赖前端透传 analyze caseEntries（外部 Vue 仓库未透传，Node 侧兜底保证权威值可达模型）。端到端验证：交易 35 task → `{"法定责任人引入":"朱桂武"}` 注入 + 落库 + 摄取全过。
   影响范围：录制注入链路（startTrajectoryRecording 的 case_data 准备）。
   文件：src/services/trajectory-record-lifecycle.js
