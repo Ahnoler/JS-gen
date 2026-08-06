@@ -4,6 +4,7 @@ import * as specialElementStepDao from '../dao/special-element-step-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
+import * as systemDao from '../dao/system-dao.js';
 import { assertSpecialElementTag } from './sys-dict-service.js';
 import { resolveAncestorSystemId } from './hierarchy-service.js';
 import {
@@ -47,8 +48,54 @@ async function withSteps(element) {
   return { ...element, steps };
 }
 
+/**
+ * Resolve moduleId → function id list when functionId is absent.
+ */
+async function resolveFunctionScope(query = {}) {
+  const functionId = query.functionId != null && query.functionId !== ''
+    ? Number(query.functionId)
+    : null;
+  if (Number.isFinite(functionId) && functionId > 0) {
+    return { functionId, functionIds: null };
+  }
+  const moduleId = query.moduleId != null && query.moduleId !== ''
+    ? Number(query.moduleId)
+    : null;
+  if (Number.isFinite(moduleId) && moduleId > 0) {
+    const fns = await systemDao.listFunctions(moduleId);
+    return {
+      functionId: null,
+      functionIds: fns.map((f) => Number(f.id)).filter((n) => Number.isFinite(n) && n > 0),
+    };
+  }
+  return { functionId: null, functionIds: null };
+}
+
 export async function listSpecialElements(query = {}) {
-  return specialElementDao.list(query);
+  const { functionId, functionIds } = await resolveFunctionScope(query);
+  // module selected but empty → no rows
+  if (
+    query.moduleId != null && query.moduleId !== ''
+    && !(Number.isFinite(functionId) && functionId > 0)
+    && !(Array.isArray(functionIds) && functionIds.length)
+  ) {
+    return {
+      items: [],
+      total: 0,
+      page: Math.max(1, Number(query.page) || 1),
+      pageSize: Math.min(200, Math.max(1, Number(query.pageSize) || 20)),
+    };
+  }
+  return specialElementDao.list({
+    ...query,
+    functionId,
+    functionIds,
+    keyword: query.keyword || query.description || null,
+    stepDesc: query.stepDesc || query.step_desc || null,
+    createdBy: query.createdBy || query.created_by || null,
+    startTime: query.startTime || query.start_time || null,
+    endTime: query.endTime || query.end_time || null,
+  });
 }
 
 export async function getSpecialElement(id) {

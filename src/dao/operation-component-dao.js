@@ -37,6 +37,7 @@ export async function create(data) {
     sourcePhaseId: data.sourcePhaseId ?? null,
     occurrenceCount: data.occurrenceCount ?? 0,
     confidence: data.confidence ?? null,
+    createdBy: data.createdBy ?? '',
   });
   const [id] = await getDB()(TABLE).insert(row);
   return getById(id);
@@ -61,6 +62,10 @@ export async function list({
   status = null,
   grain = null,
   q = null,
+  functionId = null,
+  functionIds = null,
+  startTime = null,
+  endTime = null,
 } = {}) {
   const db = getDB();
   let query = db(TABLE);
@@ -73,6 +78,31 @@ export async function list({
     const kw = `%${String(q).trim()}%`;
     query = query.andWhere(function likeNameDesc() {
       this.where('name', 'like', kw).orWhere('description', 'like', kw).orWhere('key', 'like', kw);
+    });
+  }
+  if (startTime) {
+    query = query.andWhere('created_at', '>=', `${String(startTime).slice(0, 10)} 00:00:00.000`);
+  }
+  if (endTime) {
+    query = query.andWhere('created_at', '<=', `${String(endTime).slice(0, 10)} 23:59:59.999`);
+  }
+
+  const fnIds = Number.isFinite(Number(functionId)) && Number(functionId) > 0
+    ? [Number(functionId)]
+    : (Array.isArray(functionIds)
+      ? functionIds.map(Number).filter((n) => Number.isFinite(n) && n > 0)
+      : []);
+  if (fnIds.length) {
+    // Match source trajectory OR any occurrence trajectory under the function scope
+    query = query.andWhere(function functionScope() {
+      this.whereIn('source_trajectory_id', function srcTraj() {
+        this.select('id').from('trajectory').whereIn('function_id', fnIds);
+      }).orWhereIn('id', function viaOcc() {
+        this.select('operation_component_occurrence.component_id')
+          .from('operation_component_occurrence')
+          .innerJoin('trajectory', 'operation_component_occurrence.trajectory_id', 'trajectory.id')
+          .whereIn('trajectory.function_id', fnIds);
+      });
     });
   }
 

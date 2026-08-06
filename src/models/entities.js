@@ -152,6 +152,7 @@
  * @property {number|null} [sourcePhaseId]
  * @property {number} [occurrenceCount]
  * @property {number|null} [confidence]
+ * @property {string} [createdBy] 入库人（暂可空串）
  * @property {string} [createdAt]
  * @property {string} [updatedAt]
  * @property {OperationComponentOccurrence[]} [occurrences]

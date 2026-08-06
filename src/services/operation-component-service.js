@@ -85,6 +85,27 @@ export async function refreshOccurrenceCount(componentId) {
 }
 
 export async function listComponents(query = {}) {
+  const functionId = query.functionId != null && query.functionId !== ''
+    ? Number(query.functionId)
+    : null;
+  let functionIds = null;
+  if (!(Number.isFinite(functionId) && functionId > 0)
+    && query.moduleId != null && query.moduleId !== '') {
+    const moduleId = Number(query.moduleId);
+    if (Number.isFinite(moduleId) && moduleId > 0) {
+      const fns = await systemDao.listFunctions(moduleId);
+      functionIds = fns.map((f) => Number(f.id)).filter((n) => Number.isFinite(n) && n > 0);
+      if (!functionIds.length) {
+        return {
+          rows: [],
+          total: 0,
+          page: +query.page || 1,
+          pageSize: +query.pageSize || 20,
+        };
+      }
+    }
+  }
+
   return componentDao.list({
     page: +query.page || 1,
     pageSize: +query.pageSize || 20,
@@ -92,6 +113,10 @@ export async function listComponents(query = {}) {
     status: query.status || null,
     grain: query.grain || null,
     q: query.q || query.keyword || null,
+    functionId: Number.isFinite(functionId) && functionId > 0 ? functionId : null,
+    functionIds,
+    startTime: query.startTime || query.start_time || null,
+    endTime: query.endTime || query.end_time || null,
   });
 }
 

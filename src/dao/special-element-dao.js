@@ -30,16 +30,25 @@ export async function getById(id, trx = null) {
 export async function list({
   systemId,
   functionId,
+  functionIds,
   tagDictCode,
   keyword,
+  stepDesc,
+  createdBy,
   enabled,
+  startTime,
+  endTime,
   page = 1,
   pageSize = 20,
 } = {}) {
   const db = getDB();
   let q = db(TABLE);
   if (systemId != null && systemId !== '') q = q.where({ system_id: Number(systemId) });
-  if (functionId != null && functionId !== '') q = q.where({ function_id: Number(functionId) });
+  if (functionId != null && functionId !== '') {
+    q = q.where({ function_id: Number(functionId) });
+  } else if (Array.isArray(functionIds) && functionIds.length) {
+    q = q.whereIn('function_id', functionIds.map(Number).filter((n) => Number.isFinite(n)));
+  }
   if (tagDictCode != null && tagDictCode !== '') q = q.where({ tag_dict_code: Number(tagDictCode) });
   if (enabled != null && enabled !== '') {
     q = q.where({ enabled: enabled === true || enabled === '1' || enabled === 1 ? 1 : 0 });
@@ -52,6 +61,27 @@ export async function list({
         .orWhere('remark', 'like', kw)
         .orWhere('search_text', 'like', kw);
     });
+  }
+  if (stepDesc && String(stepDesc).trim()) {
+    const kw = `%${String(stepDesc).trim()}%`;
+    q = q.whereExists(function stepExists() {
+      this.select(db.raw('1'))
+        .from('special_element_step')
+        .whereRaw('special_element_step.special_element_id = special_element.id')
+        .andWhere((qb) => {
+          qb.where('action_type', 'like', kw)
+            .orWhereRaw('CAST(params_json AS CHAR) LIKE ?', [kw]);
+        });
+    });
+  }
+  if (createdBy && String(createdBy).trim()) {
+    q = q.andWhere('created_by', 'like', `%${String(createdBy).trim()}%`);
+  }
+  if (startTime) {
+    q = q.andWhere('created_at', '>=', `${String(startTime).slice(0, 10)} 00:00:00.000`);
+  }
+  if (endTime) {
+    q = q.andWhere('created_at', '<=', `${String(endTime).slice(0, 10)} 23:59:59.999`);
   }
 
   const countRow = await q.clone().clearOrder().count({ c: '*' }).first();
@@ -88,6 +118,8 @@ export async function create(data, trx = null) {
     embeddingStatus: data.embeddingStatus ?? 'pending',
     embeddingModel: data.embeddingModel ?? '',
     embeddingContentHash: data.embeddingContentHash ?? '',
+    createdBy: data.createdBy ?? '',
+    updatedBy: data.updatedBy ?? '',
   });
   const [id] = await db(TABLE).insert(row);
   return getById(id, trx);
