@@ -519,27 +519,38 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                         sys.stderr.flush()
 
                     if (error_notifs or form_errors) and not navigated_ok and not save_ok and not introduce_ok:
+                        if overlay_blocks_done(contract):
+                            sys.stderr.write(
+                                f"[recorder] ⚠ Premature done() — visible errors at step {agent.state.n_steps}: "
+                                f"notifs={error_notifs[:2]} formErrors={form_errors[:3]}, forcing continue\n"
+                            )
+                            sys.stderr.flush()
+                            for h in agent.state.history.history:
+                                if h.result:
+                                    for r in h.result:
+                                        r.is_done = False
+                                        r.error = (
+                                            'Premature done() rejected: visible validation errors remain. '
+                                            f'Errors={form_errors[:3] or error_notifs[:2]}. '
+                                            f'Fix fields then call click_save() again.'
+                                        )
+                                        try:
+                                            from scripts.feature_flags import memory_whitelist_enabled
+                                            if memory_whitelist_enabled():
+                                                r.include_in_memory = True
+                                        except Exception:
+                                            pass
+                            return
+                        from .actions._phase_reviewer import coerce_bool
+                        submit = (contract or {}).get('submit') or {}
+                        kinds = ((contract or {}).get('success') or {}).get('kinds') or []
                         sys.stderr.write(
-                            f"[recorder] ⚠ Premature done() — visible errors at step {agent.state.n_steps}: "
-                            f"notifs={error_notifs[:2]} formErrors={form_errors[:3]}, forcing continue\n"
+                            f"[recorder] visible errors present (notifs={error_notifs[:2]} "
+                            f"formErrors={form_errors[:3]}) but contract allows done "
+                            f"(submit.required={coerce_bool(submit.get('required'))}, kinds={list(kinds)}) "
+                            f"at step {agent.state.n_steps}\n"
                         )
                         sys.stderr.flush()
-                        for h in agent.state.history.history:
-                            if h.result:
-                                for r in h.result:
-                                    r.is_done = False
-                                    r.error = (
-                                        'Premature done() rejected: visible validation errors remain. '
-                                        f'Errors={form_errors[:3] or error_notifs[:2]}. '
-                                        f'Fix fields then call click_save() again.'
-                                    )
-                                    try:
-                                        from scripts.feature_flags import memory_whitelist_enabled
-                                        if memory_whitelist_enabled():
-                                            r.include_in_memory = True
-                                    except Exception:
-                                        pass
-                        return
 
                     if navigated_ok or save_ok or introduce_ok:
                         reason = 'introduce' if introduce_ok else ('save-ok' if save_ok else 'navigation')

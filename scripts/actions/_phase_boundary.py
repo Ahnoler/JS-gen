@@ -556,6 +556,20 @@ def next_action_hint(case_data_store: dict | None) -> str:
             'click_adjacent_button → 查询 → 选行 → 确认), then click_save(保存).'
         )
     if b.get('role') == 'maintain':
+        # Single-field / no-submit phases must not nudge click_save (burns steps +
+        # plants validation errors). Same contract signal as overlay_blocks_done.
+        c = (case_data_store or {}).get('_phase_intent')
+        if isinstance(c, dict):
+            from ._phase_reviewer import coerce_bool
+            submit = c.get('submit') if isinstance(c.get('submit'), dict) else {}
+            kinds = (c.get('success') or {}).get('kinds') or []
+            if not isinstance(kinds, (list, tuple)):
+                kinds = []
+            if not coerce_bool(submit.get('required')) and len(kinds) == 0:
+                return (
+                    'NEXT_ACTION: done(success=true) | this phase does not require save. '
+                    'Do NOT call click_save(). Confirm the field change then done().'
+                )
         return (
             'NEXT_ACTION: click_save() | fillable pending=0. '
             'Call click_save() NOW. Do NOT re-fill already-filled fields.'

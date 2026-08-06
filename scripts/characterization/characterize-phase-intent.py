@@ -189,7 +189,73 @@ def main() -> int:
         overlay_blocks_done({'submit': {'required': 'false'}, 'success': {'kinds': []}}) is False,
         'coerce_bool string false allows',
     )
+    # Same predicate gates visible-errors hard-reject in recorder (contract-first).
+    assert_true(
+        overlay_blocks_done({'submit': {'required': False}, 'success': {'kinds': []}}) is False,
+        'errors gate shares allow signal',
+    )
+    assert_true(
+        overlay_blocks_done({'submit': {'required': True}, 'success': {'kinds': ['toast_ok']}}) is True,
+        'errors gate shares block signal on save phases',
+    )
 
+    # Single-field phase: submit.required=false → must NOT nudge click_save
+    from scripts.actions._phase_boundary import next_action_hint
+    from scripts.actions._form import _submit_ready_hint, _with_submit_cue
+
+    store_field: dict = {}
+    apply_phase_contract(
+        store_field,
+        {
+            'mode': 'modify',
+            'refill': 'none',
+            'allow_form_assistant': False,
+            'goal': '选择对公客户类型为企业类',
+            'in_scope': ['选择对公客户类型'],
+            'out_of_scope': ['保存'],
+            'done_when': '对公客户类型已选企业类',
+            'submit': {'required': False, 'via': 'any', 'button_text': ''},
+            'success': {'kinds': [], 'evidence': []},
+            'source': 'llm',
+        },
+    )
+    # Simulate one field written: empty pending task_list
+    store_field['task_list'] = {'pending': [], 'done': [{'label': '对公客户类型', 'value': '企业类'}]}
+    hint_field = next_action_hint(store_field)
+    assert_true(
+        'NEXT_ACTION: click_save()' not in hint_field,
+        'single-field next_action no click_save',
+    )
+    assert_true('done(success=true)' in hint_field, 'single-field next_action nudges done')
+    assert_true(
+        'NEXT_ACTION: click_save()' not in _submit_ready_hint(store_field),
+        'single-field submit hint no click_save',
+    )
+    cued = _with_submit_cue('ok | 企业类', store_field)
+    assert_true('NEXT_ACTION: click_save()' not in cued, 'single-field with_submit_cue no click_save')
+    assert_true(store_field.get('_submit_ready') is not True, 'single-field does not arm recorder save inject')
+
+    store_save: dict = {}
+    apply_phase_contract(
+        store_save,
+        {
+            'mode': 'create',
+            'refill': 'none',
+            'allow_form_assistant': False,
+            'goal': '点击保存',
+            'in_scope': ['保存'],
+            'out_of_scope': [],
+            'done_when': '出现成功提示',
+            'submit': {'required': True, 'via': 'click_save', 'button_text': '保存'},
+            'success': {'kinds': ['toast_ok'], 'evidence': []},
+            'source': 'llm',
+        },
+    )
+    store_save['task_list'] = {'pending': [], 'done': [{'label': '客户名称', 'value': 'x'}]}
+    assert_true(
+        'NEXT_ACTION: click_save()' in next_action_hint(store_save),
+        'save phase still nudges click_save',
+    )
     print('characterize-phase-intent: OK')
     return 0
 

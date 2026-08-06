@@ -432,10 +432,14 @@ def is_introduce_phase(contract: dict[str, Any] | None) -> bool:
 
 
 def overlay_blocks_done(contract: dict | None) -> bool:
-    """True → hard-reject done while overlay open; False → do not block for overlay alone.
+    """True → DOM done-heuristics (open overlay / visible errors) hard-reject.
 
-    Inverted default: with a contract, allow unless submit.required or non-empty success.kinds.
-    No contract → block (conservative).
+    False → do not block done for those heuristics alone.
+
+    Inverted default: with a contract, allow unless submit.required or non-empty
+    success.kinds. No contract → block (conservative).
+
+    Shared by recorder overlay gate and visible-errors gate.
     """
     if not isinstance(contract, dict):
         return True

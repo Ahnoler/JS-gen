@@ -298,6 +298,21 @@ def _submit_ready_hint(case_data_store: dict) -> str:
             f'Do NOT re-select already-filled fields.'
         )
     if tl.total > 0:
+        c = case_data_store.get('_phase_intent')
+        if isinstance(c, dict):
+            try:
+                from ._phase_reviewer import coerce_bool
+                submit = c.get('submit') if isinstance(c.get('submit'), dict) else {}
+                kinds = (c.get('success') or {}).get('kinds') or []
+                if not isinstance(kinds, (list, tuple)):
+                    kinds = []
+                if not coerce_bool(submit.get('required')) and len(kinds) == 0:
+                    return (
+                        'NEXT_ACTION: done(success=true) | this phase does not require save. '
+                        'Do NOT call click_save(). Confirm the field change then done().'
+                    )
+            except Exception:
+                pass
         return (
             'NEXT_ACTION: click_save() | fillable pending=0. '
             'Call click_save() NOW (auto-finds 保存/提交, scrolls into view). '
@@ -349,7 +364,11 @@ def _with_submit_cue(result: str, case_data_store: dict) -> str:
     cue = _submit_ready_hint(case_data_store)
     if cue:
         parts.append(cue)
-        case_data_store['_submit_ready'] = True
+        # Only arm recorder's click_save HumanMessage inject for real save cues.
+        if 'NEXT_ACTION: click_save()' in cue:
+            case_data_store['_submit_ready'] = True
+        else:
+            case_data_store.pop('_submit_ready', None)
     return ' | '.join(parts)
 
 
