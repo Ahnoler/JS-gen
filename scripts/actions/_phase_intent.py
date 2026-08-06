@@ -224,7 +224,12 @@ def contract_allows_form_assistant(case_data_store: dict | None) -> bool:
     return c.get('refill') == 'all_editable' and c.get('mode') in ('create', 'modify')
 
 
-def apply_phase_contract(case_data_store: dict | None, contract: dict[str, Any]) -> dict[str, Any]:
+def apply_phase_contract(
+    case_data_store: dict | None,
+    contract: dict[str, Any],
+    *,
+    boundary_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Authoritative write of task_mode + force_refill + boundary + intent."""
     clear_phase_intent(case_data_store)  # also clears boundary via existing clear
     if case_data_store is None:
@@ -238,22 +243,31 @@ def apply_phase_contract(case_data_store: dict | None, contract: dict[str, Any])
         )
     role = _MODE_TO_ROLE.get(mode, 'other')
     requires_write = refill == 'all_editable'
-    boundary = {
-        'role': role,
-        'requires_write_all_editable': requires_write,
-        'goals': list(c.get('in_scope') or []),
-        'success_when': list((c.get('success') or {}).get('kinds') or []),
-        'task_mode': _MODE_TO_TASK.get(mode, 'other'),
-        'source': c.get('source') or 'llm',
-        # preserve keys compile_boundary callers expect with safe defaults:
-        'forbid_index_submit': mode in ('create', 'modify'),
-        'picker_allowed': mode in ('create', 'modify', 'introduce_pick'),
-    }
+    task_mode = _MODE_TO_TASK.get(mode, 'other')
+    source = c.get('source') or 'llm'
+    if boundary_override is not None:
+        boundary = dict(boundary_override)
+        boundary['role'] = role
+        boundary['requires_write_all_editable'] = requires_write
+        boundary['task_mode'] = task_mode
+        boundary['source'] = source
+    else:
+        boundary = {
+            'role': role,
+            'requires_write_all_editable': requires_write,
+            'goals': list(c.get('in_scope') or []),
+            'success_when': list((c.get('success') or {}).get('kinds') or []),
+            'task_mode': task_mode,
+            'source': source,
+            # preserve keys compile_boundary callers expect with safe defaults:
+            'forbid_index_submit': mode in ('create', 'modify'),
+            'picker_allowed': mode in ('create', 'modify', 'introduce_pick'),
+        }
     case_data_store['_phase_boundary'] = boundary
     case_data_store['_phase_boundary_flag_locked'] = True
     case_data_store['_phase_intent'] = c
     case_data_store['_phase_intent_flag_locked'] = True
-    case_data_store['_task_mode'] = _MODE_TO_TASK.get(mode, 'other')
+    case_data_store['_task_mode'] = task_mode
     case_data_store['_query_task'] = mode == 'query'
     case_data_store['_force_refill_all'] = requires_write
     case_data_store['_evidence_observed'] = []
@@ -292,7 +306,7 @@ def apply_phase_intent(case_data_store: dict | None, task_text: str) -> dict[str
         contract['source'] = 'rules_fallback'
         if boundary.get('goals'):
             contract.setdefault('in_scope', list(boundary['goals']))
-        return apply_phase_contract(case_data_store, contract)
+        return apply_phase_contract(case_data_store, contract, boundary_override=boundary)
 
     enabled = phase_intent_contract_enabled()
     if not enabled:

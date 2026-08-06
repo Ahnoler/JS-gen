@@ -115,6 +115,15 @@ def main() -> int:
     assert_true(c and c.get('mode') == 'create', 'adapter create mode')
     assert_true(store3.get('_phase_boundary') is not None, 'boundary written')
     assert_true(c.get('_from_boundary') is True, 'from boundary flag')
+    b_applied = store3.get('_phase_boundary') or {}
+    assert_true(
+        b_applied.get('requires_introduce_then_save') is True,
+        'adapter preserves intro+save flag',
+    )
+    assert_true(
+        'introduce_legal_person' in (b_applied.get('goals') or []),
+        'adapter preserves intro+save goals',
+    )
 
     # Write gate via adapter
     store3['task_list'] = {
