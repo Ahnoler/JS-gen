@@ -88,3 +88,13 @@ def memory_decisions_enabled() -> bool:
 def memory_audit_strict_enabled() -> bool:
     """AI_MEMORY_AUDIT_STRICT — 审计严格模式（默认关）。"""
     return _env_flag('AI_MEMORY_AUDIT_STRICT', False)
+
+
+def form_batch_heartbeat_enabled() -> bool:
+    """AI_FORM_BATCH_HEARTBEAT — 表单批量 LLM 生成期间发 form_batch_started/done 占位事件（默认开）。
+
+    100+ 表单项的长批量生成会让 WS 链路长时间空闲，易被 NAT/LB 空闲回收掐成半开连接
+    （executor 侧 readyState 仍 OPEN、事件进黑洞）。占位事件保持事件流活跃，
+    从源头降低 WS 空闲回收触发概率。
+    """
+    return _env_flag('AI_FORM_BATCH_HEARTBEAT', True)

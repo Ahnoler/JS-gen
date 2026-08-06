@@ -16,6 +16,7 @@ If unset, falls back to the agent's LLM (the `llm` parameter).
 import json
 import os
 import re
+import time
 
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -34,6 +35,22 @@ def _resolve_directives(text):
                 return _f.read().strip()
         return m.group(0)
     return _DIRECTIVE_RE.sub(_replacer, text)
+
+def _emit_form_batch_event(event, payload):
+    """form_batch_started/done 占位事件（AI_FORM_BATCH_HEARTBEAT，默认开）。
+
+    批量 LLM 生成期间保持事件流活跃，降低 WS 链路空闲被 NAT/LB 回收成半开连接的
+    概率（长阶段静默丢事件的源头缓解）。失败静默，不阻塞填表。
+    """
+    try:
+        from ..agent_utils import emit_json
+        from ..feature_flags import form_batch_heartbeat_enabled
+        if not form_batch_heartbeat_enabled():
+            return
+        emit_json({"event": event, "data": payload})
+    except Exception:
+        pass
+
 
 def _load_fill_form_prompt():
     """Load the form LLM system prompt from prompts/form-prompt.md."""
@@ -194,6 +211,14 @@ def _llm_generate_values(llm, items, case_data_store=None,
 
     prompt = f'当前表单字段：\n{chr(10).join(field_lines)}\n\n指令：{instruction}'
 
+    # 批量生成开始：占位事件（防空闲，见 _emit_form_batch_event）
+    _batch_start = time.time()
+    _emit_form_batch_event('form_batch_started', {
+        'fields': len(llm_fields),
+        'labels': [f.get('label') for f in llm_fields],
+        'at': _batch_start,
+    })
+
     def _record_decision(status, output, error=None):
         # P1：LLM 表单值决策留痕（AI_MEMORY_DECISIONS 默认开）——
         # 回答「这个测试值是谁、依据什么生成的」；失败不阻塞填表。
@@ -242,9 +267,20 @@ def _llm_generate_values(llm, items, case_data_store=None,
             parsed = parsed['actions']
         llm_result = parsed if isinstance(parsed, list) else []
         _record_decision('passed', llm_result)
+        _emit_form_batch_event('form_batch_done', {
+            'fields': len(llm_fields),
+            'status': 'ok',
+            'duration_ms': int((time.time() - _batch_start) * 1000),
+        })
         return actions + llm_result  # P1+P2 + LLM result
     except Exception as e:
         _record_decision('failed', [], error=str(e)[:300])
+        _emit_form_batch_event('form_batch_done', {
+            'fields': len(llm_fields),
+            'status': 'error',
+            'error': str(e)[:200],
+            'duration_ms': int((time.time() - _batch_start) * 1000),
+        })
         # Fallback — preserve P1+P2 actions, fill remaining with defaults
         for item in llm_fields:
             label = item['label'] if isinstance(item, dict) else item
