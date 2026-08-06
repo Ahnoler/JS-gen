@@ -8,7 +8,10 @@ agent-api.config.json
 .DS_Store
 Thumbs.db
 start.ps1
+.claude/
 .opencode/
+.reasonix/
+.vscode/
 node_modules/
 tmp/
 report/
