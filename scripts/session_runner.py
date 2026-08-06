@@ -1168,9 +1168,16 @@ async def _resolve_chromium_executable() -> str | None:
         return None
 
 
+def _chrome_headless_enabled() -> bool:
+    """CHROME_HEADLESS=1|true|yes|on — no OS window; BiB uses CDP screencast only."""
+    raw = (os.environ.get('CHROME_HEADLESS') or '').strip().lower()
+    return raw in ('1', 'true', 'yes', 'on')
+
+
 def _chrome_automation_args() -> list[str]:
     """Flags that suppress Chrome chrome UI prompts agents cannot click."""
     # NOT incognito — Incognito enables stricter HTTPS-First by default.
+    headless = _chrome_headless_enabled()
     args = [
         '--no-first-run',
         '--no-default-browser-check',
@@ -1215,6 +1222,9 @@ def _chrome_automation_args() -> list[str]:
             'BlockInsecurePrivateNetworkRequests'
         ),
     ]
+    if headless:
+        # New headless: full compositor + screencast; avoids minimize/occlusion throttling.
+        args.append('--headless=new')
     # Linux root (typical cloud executor): Chrome exits immediately without these.
     if sys.platform != 'win32' and hasattr(os, 'geteuid') and os.geteuid() == 0:
         args.extend(['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
@@ -1379,6 +1389,7 @@ async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
     profile_dir.mkdir(parents=True, exist_ok=True)
     _seed_chrome_profile(profile_dir)
 
+    headless = _chrome_headless_enabled()
     extra_args = [
         f'--user-data-dir={profile_dir.resolve()}',
         *_chrome_automation_args(),
@@ -1387,12 +1398,13 @@ async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
     if exe:
         sys.stderr.write(
             f"[session] Launching Chromium via browser_binary_path for CDP "
-            f"port={port} exe={exe}\n"
+            f"port={port} exe={exe} headless={headless}\n"
         )
         sys.stderr.flush()
         browser = Browser(config=BrowserConfig(
             browser_binary_path=exe,
             chrome_remote_debugging_port=port,
+            headless=headless,
             disable_security=True,  # ignore cert / CORS blockers for internal systems
             extra_browser_args=extra_args,
         ))
@@ -1400,11 +1412,13 @@ async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
 
     # Fallback: builtin launch (may drop CDP port — BiB may be unavailable)
     sys.stderr.write(
-        f"[session] WARN: no Chromium exe — fallback builtin launch port={port}\n"
+        f"[session] WARN: no Chromium exe — fallback builtin launch "
+        f"port={port} headless={headless}\n"
     )
     sys.stderr.flush()
     browser = Browser(config=BrowserConfig(
         chrome_remote_debugging_port=port,
+        headless=headless,
         disable_security=True,
         extra_browser_args=extra_args,
     ))

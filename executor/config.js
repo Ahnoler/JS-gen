@@ -133,9 +133,11 @@ export function buildLabels() {
       labels = JSON.parse(raw);
     } catch {}
   }
+  const headlessRaw = String(resolve('CHROME_HEADLESS', '')).trim().toLowerCase();
+  const headless = ['1', 'true', 'yes', 'on'].includes(headlessRaw);
   return {
     os: process.platform,
-    headed: true,
+    headed: !headless,
     ...labels,
   };
 }
@@ -176,5 +178,10 @@ export function buildPythonSubprocessEnv(extraEnv = {}) {
   env.PYTHONIOENCODING = 'utf-8';
   env.PYTHONUNBUFFERED = '1';
   env.PYTHONPATH = PROJECT_ROOT;
+  // Propagate from executor/.env / config/.env when not already in process.env
+  const headless = resolve('CHROME_HEADLESS', '');
+  if (headless && !env.CHROME_HEADLESS) {
+    env.CHROME_HEADLESS = headless;
+  }
   return { ...env, ...extraEnv };
 }

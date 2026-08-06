@@ -9,6 +9,7 @@
 # Env overrides:
 #   JS_GEN_DIR=/data/app/JS-gen
 #   FRONTEND_DIR=/data/app/ui-auto-recording-agent-vue-master/vue-project
+#   CHROME_HEADLESS=true          # skip Xvfb; Session Chrome --headless=new
 #   DISPLAY_NUM=99
 #   XVFB_RESOLUTION=1920x1080x24
 
@@ -24,6 +25,28 @@ FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 
 log() { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*"; }
 die() { log "ERROR: $*"; exit 1; }
+
+# Prefer process env, then executor/.env, then config/.env
+read_env_file_val() {
+  local key="$1" file="$2"
+  [[ -f "$file" ]] || return 0
+  local line
+  line="$(grep -E "^[[:space:]]*${key}=" "$file" 2>/dev/null | tail -1 || true)"
+  [[ -n "$line" ]] || return 0
+  printf '%s' "${line#*=}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//'
+}
+
+chrome_headless_enabled() {
+  local raw="${CHROME_HEADLESS:-}"
+  if [[ -z "$raw" ]]; then
+    raw="$(read_env_file_val CHROME_HEADLESS "${JS_GEN_DIR}/executor/.env")"
+  fi
+  if [[ -z "$raw" ]]; then
+    raw="$(read_env_file_val CHROME_HEADLESS "${JS_GEN_DIR}/config/.env")"
+  fi
+  raw="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  [[ "$raw" == "1" || "$raw" == "true" || "$raw" == "yes" || "$raw" == "on" ]]
+}
 
 kill_port() {
   local port="$1"
@@ -99,10 +122,16 @@ start_executor() {
     log "WARN: executor/.env missing — copy executor/.env.example and set EXECUTOR_TOKEN"
   fi
 
-  ensure_xvfb
   kill_pattern "node executor/agent.mjs"
-  log "Starting executor agent (DISPLAY=${DISPLAY})"
-  nohup env DISPLAY="${DISPLAY}" npm run executor > logs/executor.log 2>&1 &
+  if chrome_headless_enabled(); then
+    log "CHROME_HEADLESS on — starting executor without Xvfb (Session Chrome --headless=new)"
+    # Ensure Python child sees the flag even if only set in this shell
+    nohup env CHROME_HEADLESS=true npm run executor > logs/executor.log 2>&1 &
+  else
+    ensure_xvfb
+    log "Starting executor agent (DISPLAY=${DISPLAY})"
+    nohup env DISPLAY="${DISPLAY}" npm run executor > logs/executor.log 2>&1 &
+  fi
   sleep 2
   if pgrep -f "node executor/agent.mjs" >/dev/null 2>&1; then
     log "Executor process is up"
@@ -139,7 +168,11 @@ print_status() {
   lsof -i ":${CONTROL_PORT}" 2>/dev/null || log "control plane: not listening"
   lsof -i ":${FRONTEND_PORT}" 2>/dev/null || log "frontend: not listening"
   pgrep -af "node executor/agent.mjs" 2>/dev/null || log "executor: not running"
-  pgrep -af "Xvfb :${DISPLAY_NUM}" 2>/dev/null || true
+  if chrome_headless_enabled(); then
+    log "CHROME_HEADLESS=true (Xvfb not required)"
+  else
+    pgrep -af "Xvfb :${DISPLAY_NUM}" 2>/dev/null || true
+  fi
   log "logs:"
   log "  tail -f ${JS_GEN_DIR}/logs/server.log"
   log "  tail -f ${JS_GEN_DIR}/logs/executor.log"

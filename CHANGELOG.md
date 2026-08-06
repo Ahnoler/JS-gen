@@ -9,6 +9,13 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ## [Unreleased]
 
+### Added
+
+- 2026-08-07: Session Chrome 可选无头：`CHROME_HEADLESS=true`（config/.env 或 executor/.env）。无实体窗口，BiB 仍走 CDP screencast，便于规避最小化/失焦节流。
+  影响范围：config、executor 子进程 env、Python 启动参数。
+  文件：config/.env.example, executor/.env.example, executor/config.js, src/runtime/agent-process.js, scripts/session_runner.py
+  Python 同步提示：无（仅 JS-gen Session Chrome 启动）。
+
 ### Changed
 
 - 2026-08-07: AI 录制阶段结果 **`prior_outcome.success` 缺省改为未知（`null`）**，不再把「未收到明确 done(success)」当成成功。`phase_done` 无 outcome 时 Python 显式发 `success: null`；控制面仅在 `true`/`false` 时写入成败，文案走「未知」。

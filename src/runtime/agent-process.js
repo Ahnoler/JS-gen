@@ -5,7 +5,7 @@ import { spawn, execSync } from 'child_process';
 import { writeFileSync, unlinkSync } from 'fs';
 import path from 'path';
 import os from 'os';
-import { PROJECT_DIR, PYTHON_EXE as PYTHON_EXE_CONFIG } from '../../config/config.js';
+import { PROJECT_DIR, PYTHON_EXE as PYTHON_EXE_CONFIG, resolve as resolveConfig } from '../../config/config.js';
 
 export const PYTHON_EXE = PYTHON_EXE_CONFIG;
 export const AGENT_SCRIPT = path.join(PROJECT_DIR, 'scripts', 'browser-use-agent.py');
@@ -95,15 +95,20 @@ export function isProcessAlive(proc) {
 }
 
 export function spawnAgent(args, extraEnv = {}) {
+  const env = {
+    ...process.env,
+    PYTHONIOENCODING: 'utf-8',
+    PYTHONUNBUFFERED: '1',
+    PYTHONPATH: PROJECT_DIR,
+    ...extraEnv,
+  };
+  const headless = resolveConfig('CHROME_HEADLESS', '');
+  if (headless && !env.CHROME_HEADLESS) {
+    env.CHROME_HEADLESS = headless;
+  }
   return spawn(PYTHON_EXE, ['-m', 'scripts.main', ...args], {
     cwd: PROJECT_DIR,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      PYTHONIOENCODING: 'utf-8',
-      PYTHONUNBUFFERED: '1',
-      PYTHONPATH: PROJECT_DIR,
-      ...extraEnv,
-    },
+    env,
   });
 }
