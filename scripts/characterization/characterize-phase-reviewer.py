@@ -10,7 +10,15 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.actions._phase_reviewer import normalize_reviewer_payload  # noqa: E402
+from scripts.actions._phase_reviewer import (  # noqa: E402
+    contract_debug_line,
+    normalize_reviewer_payload,
+    sanitize_contract_for_mode,
+)
+from scripts.actions._phase_intent import (  # noqa: E402
+    apply_phase_contract,
+    has_contract_success,
+)
 
 
 def main() -> None:
@@ -30,6 +38,51 @@ def main() -> None:
     )['allow_form_assistant'] is False
     assert normalize_reviewer_payload('not json') is None
     assert normalize_reviewer_payload('{"mode":"nope"}') is None  # invalid mode
+
+    # LLM invents maintain tokens on login → sanitize clears them
+    polluted = normalize_reviewer_payload(
+        '{"mode":"login","allow_form_assistant":true,"refill":"all_editable",'
+        '"goal":"登录","in_scope":[],"out_of_scope":[],"done_when":"进入首页",'
+        '"submit":{"required":true,"via":"any","button_text":""},'
+        '"success":{"kinds":["toast_ok","url_change"],"evidence":[]}}'
+    )
+    assert polluted is not None
+    assert polluted['submit']['required'] is False
+    assert polluted['success']['kinds'] == []
+    assert polluted['allow_form_assistant'] is False
+    assert polluted['refill'] == 'none'
+
+    store = {}
+    apply_phase_contract(store, {
+        'mode': 'login',
+        'allow_form_assistant': True,
+        'refill': 'all_editable',
+        'goal': '登录',
+        'in_scope': [],
+        'out_of_scope': [],
+        'done_when': '进入首页',
+        'submit': {'required': True, 'via': 'any', 'button_text': ''},
+        'success': {'kinds': ['toast_ok', 'url_change'], 'evidence': []},
+        'source': 'llm',
+    })
+    assert store['_phase_intent']['submit']['required'] is False
+    assert store['_phase_intent']['success']['kinds'] == []
+    assert store['_phase_boundary']['success_when'] == []
+    assert has_contract_success(store) is True
+    assert 'submit.required=False' in contract_debug_line(store['_phase_intent'])
+    assert 'success.kinds=[]' in contract_debug_line(store['_phase_intent'])
+
+    # create keeps submit tokens
+    kept = sanitize_contract_for_mode({
+        'mode': 'create',
+        'submit': {'required': True, 'via': 'click_save', 'button_text': '保存'},
+        'success': {'kinds': ['toast_ok'], 'evidence': []},
+        'refill': 'all_editable',
+        'allow_form_assistant': True,
+    })
+    assert kept['submit']['required'] is True
+    assert kept['success']['kinds'] == ['toast_ok']
+
     print('PASS characterize-phase-reviewer')
 
 

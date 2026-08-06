@@ -13,6 +13,9 @@ _VALID_MODES = frozenset({
 })
 _VALID_REFILL = frozenset({'none', 'touched', 'all_editable'})
 
+# Modes that must not require form-submit success tokens (done() after login/nav/query).
+_NO_SUBMIT_TOKEN_MODES = frozenset({'login', 'navigate', 'query'})
+
 
 def coerce_bool(value: Any) -> bool:
     """Only True / \"true\" / \"1\" / 1 are True; all else (incl. \"false\") → False."""
@@ -21,6 +24,56 @@ def coerce_bool(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in ('true', '1')
     return False
+
+
+def sanitize_contract_for_mode(contract: dict[str, Any]) -> dict[str, Any]:
+    """Force non-maintain modes to not require submit success tokens.
+
+    LLM reviewers often invent submit.required=true + toast_ok/url_change for
+    login/navigate; recorder then rejects every done() (no token is ever recorded).
+    """
+    c = dict(contract)
+    mode = c.get('mode') or 'other'
+    if mode not in _NO_SUBMIT_TOKEN_MODES:
+        return c
+    submit = dict(c.get('submit') or {})
+    submit['required'] = False
+    if not submit.get('via'):
+        submit['via'] = 'any'
+    if 'button_text' not in submit:
+        submit['button_text'] = ''
+    c['submit'] = submit
+    success = dict(c.get('success') or {})
+    success['kinds'] = []
+    success['evidence'] = list(success.get('evidence') or [])[:8]
+    c['success'] = success
+    c['allow_form_assistant'] = False
+    if c.get('refill') not in _VALID_REFILL:
+        c['refill'] = 'none'
+    elif mode in _NO_SUBMIT_TOKEN_MODES and c.get('refill') == 'all_editable':
+        c['refill'] = 'none'
+    return c
+
+
+def contract_debug_line(contract: dict[str, Any] | None) -> str:
+    """One-line stderr-friendly contract summary for AI recording debug."""
+    if not contract:
+        return 'contract=None'
+    submit = contract.get('submit') or {}
+    success = contract.get('success') or {}
+    kinds = success.get('kinds') or []
+    goal = str(contract.get('goal') or '').replace('\n', ' ').strip()
+    if len(goal) > 60:
+        goal = goal[:57] + '...'
+    return (
+        f"mode={contract.get('mode')} "
+        f"allow_assistant={bool(contract.get('allow_form_assistant'))} "
+        f"refill={contract.get('refill')} "
+        f"submit.required={bool(submit.get('required'))} "
+        f"success.kinds={list(kinds)} "
+        f"source={contract.get('source')} "
+        f"goal={goal!r}"
+    )
 
 
 def _load_prompt() -> str:
@@ -64,7 +117,7 @@ def normalize_reviewer_payload(raw: str) -> dict[str, Any] | None:
         },
         'source': 'llm',
     }
-    return out
+    return sanitize_contract_for_mode(out)
 
 
 def _build_user_payload(

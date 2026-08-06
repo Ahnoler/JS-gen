@@ -258,7 +258,11 @@ def apply_phase_contract(
     clear_phase_intent(case_data_store)  # also clears boundary via existing clear
     if case_data_store is None:
         return contract
-    c = dict(contract)
+    try:
+        from ._phase_reviewer import sanitize_contract_for_mode
+        c = sanitize_contract_for_mode(dict(contract))
+    except Exception:
+        c = dict(contract)
     mode = c.get('mode') or 'other'
     refill = c.get('refill') or 'none'
     if 'allow_form_assistant' not in c:
@@ -277,17 +281,25 @@ def apply_phase_contract(
         boundary['task_mode'] = task_mode
         boundary['source'] = source
     else:
+        success_when = list((c.get('success') or {}).get('kinds') or [])
+        # Keep boundary in sync with sanitized intent (login/nav/query → []).
+        if mode in ('login', 'navigate', 'query'):
+            success_when = []
         boundary = {
             'role': role,
             'requires_write_all_editable': requires_write,
             'goals': list(c.get('in_scope') or []),
-            'success_when': list((c.get('success') or {}).get('kinds') or []),
+            'success_when': success_when,
             'task_mode': task_mode,
             'source': source,
             # preserve keys compile_boundary callers expect with safe defaults:
             'forbid_index_submit': mode in ('create', 'modify'),
             'picker_allowed': mode in ('create', 'modify', 'introduce_pick'),
         }
+    if boundary_override is not None and mode in ('login', 'navigate', 'query'):
+        # Even with override, never require maintain tokens on non-maintain modes.
+        boundary['success_when'] = []
+        boundary['requires_write_all_editable'] = False
     case_data_store['_phase_boundary'] = boundary
     case_data_store['_phase_boundary_flag_locked'] = True
     case_data_store['_phase_intent'] = c

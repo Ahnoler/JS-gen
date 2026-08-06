@@ -32,7 +32,13 @@
 4. **部分修改**（只改个别字段）：`mode=modify`，`allow_form_assistant=false`，`refill=none` 或 `touched`。
 5. **查询/检索**：`mode=query`，`allow_form_assistant=false`，`refill=none`。
 6. **引入/选人/客户选择弹窗**：`mode=introduce_pick`，`allow_form_assistant=false`，`refill=none`。
-7. **登录**：`mode=login`，`allow_form_assistant=false`，`refill=none`。
+7. **登录**：`mode=login`，`allow_form_assistant=false`，`refill=none`，**必须** `submit.required=false`，`success.kinds=[]`（登录不走表单保存 token）。
+8. **navigate / query**：同样 **必须** `submit.required=false`，`success.kinds=[]`（完成条件用 `done_when` 自然语言即可，不要填 toast_ok/url_change）。
+
+## submit / success 约束
+
+- 仅 `create` / `modify`（需保存）或 `introduce_pick`（需确认）才应设置 `submit.required=true` 与非空 `success.kinds`。
+- `login` / `navigate` / `query`：**禁止** `submit.required=true`，**禁止** `success.kinds` 含 `toast_ok` / `url_change` / `saved_navigation`。
 
 ## 跨阶段边界
 

@@ -476,20 +476,22 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 if reviewed:
                     contract = apply_phase_contract(case_data_ref, reviewed)
                     mode = case_data_ref.get('_task_mode') or 'other'
+                    from .actions._phase_reviewer import contract_debug_line
                     sys.stderr.write(
                         f"[session] phase_reviewer ok task_mode={mode} "
                         f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
-                        f"phase_intent=True source={reviewed.get('source')}\n"
+                        f"phase_intent=True {contract_debug_line(contract)}\n"
                     )
                     sys.stderr.flush()
                 else:
                     mode = apply_task_mode(case_data_ref, phase_core)
                     contract = apply_phase_intent(case_data_ref, phase_core)
                     mode = case_data_ref.get('_task_mode') or mode
+                    from .actions._phase_reviewer import contract_debug_line
                     sys.stderr.write(
                         f"[session] phase_reviewer fallback task_mode={mode} "
                         f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
-                        f"phase_intent={bool(contract)}\n"
+                        f"phase_intent={bool(contract)} {contract_debug_line(contract)}\n"
                     )
                     sys.stderr.flush()
         else:

@@ -417,12 +417,32 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                     )
                     if needs_token and done_success and not has_contract_success(case_data_store):
                         if not (introduce_ok and contract and is_introduce_phase(contract)):
+                            missing_hint = ''
+                            try:
+                                from scripts.actions._phase_boundary import (
+                                    get_phase_boundary,
+                                    observed_kinds,
+                                    phase_done_ok,
+                                )
+                                ok_b, missing = phase_done_ok(case_data_store)
+                                b = get_phase_boundary(case_data_store) or {}
+                                missing_hint = (
+                                    f" success_when={list(b.get('success_when') or [])}"
+                                    f" observed={sorted(observed_kinds(case_data_store))}"
+                                    f" missing={missing} ok={ok_b}"
+                                )
+                            except Exception:
+                                missing_hint = ''
+                            submit = (contract or {}).get('submit') or {}
                             recovery = recovery_prescription_message(
                                 contract,
                                 reason='Premature done() rejected: missing success token.',
                             )
                             sys.stderr.write(
-                                f"[recorder] ⚠ Premature done() — no success token at step {agent.state.n_steps}\n"
+                                f"[recorder] ⚠ Premature done() — no success token at step "
+                                f"{agent.state.n_steps} mode={(contract or {}).get('mode')} "
+                                f"submit.required={bool(submit.get('required'))}"
+                                f"{missing_hint}\n"
                             )
                             sys.stderr.flush()
                             for h in agent.state.history.history:
