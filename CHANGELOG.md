@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-06: AI 录制 step instruction 增加 **`all_phases`**（当前录制集全量阶段 id/序号/标题/描述）与 **`prior_outcome`**（上一阶段一句结果）；不再依赖 prior 0–2 段全文注入执行 Agent。
+  影响范围：录制生命周期 → Python session instruction。
+  文件：src/services/trajectory-record-lifecycle.js
+  Python 同步提示：session step 消费 `all_phases` / `prior_outcome`；执行 Agent 用短目录，评审器用全文 description。
+
 - 2026-08-06: 组件库列表展示 **入库人**（`created_by`，暂可空串显示「—」）；`special_element` 同步预留 `updated_by`。
   影响范围：schema、列表 UI。
   文件：migrations/20260806123000_library_created_by.js, schemas/init.sql, src/dao/operation-component-dao.js, src/models/entities.js

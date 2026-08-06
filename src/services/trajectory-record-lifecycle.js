@@ -366,6 +366,14 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     recordingSystemId = null;
   }
 
+  const all_phases = phases.map((p) => ({
+    id: p.id,
+    phaseNumber: p.phaseNumber,
+    title: (p.title || p.name || '').trim() || String(p.description || '').split('\n')[0].slice(0, 80),
+    description: p.description || '',
+  }));
+  if (!runtime.phaseOutcomes) runtime.phaseOutcomes = {};
+
   try {
     for (let i = 0; i < phases.length; i++) {
       const phase = phases[i];
@@ -380,17 +388,21 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', 300000);
       const errP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000)
         .then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
-      // Prior 0–2 phases by array position (not phaseNumber±1 — phaseIds filter may skip).
-      const priorSlice = phases.slice(Math.max(0, i - 2), i);
-      const prior_phases = priorSlice.map((p) => ({
-        phaseNumber: p.phaseNumber,
-        description: p.description || '',
-      }));
       const stepData = {
         instruction: phase.description,
         max_steps: 30,
         phase_number: phase.phaseNumber,
       };
+      stepData.all_phases = all_phases;
+      if (i > 0) {
+        const prev = phases[i - 1];
+        const prevOutcome = runtime.phaseOutcomes?.[prev.id] || runtime.phaseOutcomes?.[prev.phaseNumber];
+        stepData.prior_outcome = {
+          phaseNumber: prev.phaseNumber,
+          success: prevOutcome?.success ?? true,
+          text: prevOutcome?.text || prevOutcome?.summary || '见页面当前状态',
+        };
+      }
       // P1：记忆事实包注入（AI_MEMORY_FACT_PACK 默认关）——权威值/已保存值
       // 检索可能滞后（Python 异步批量上报），失败仅告警，不阻塞录制主链路。
       try {
@@ -412,7 +424,6 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       }
       // P1：Python 记忆 writer 需要 trajectory_id（否则 case_saved 等事件无归属）
       stepData.trajectory_id = tid;
-      if (prior_phases.length) stepData.prior_phases = prior_phases;
       // 业务数据仅挂到填表/引入阶段；导航阶段保持干净描述供边界分类。
       let instruction = phase.description || '';
       const wantBiz = phaseNeedsBusinessData(instruction);
@@ -466,11 +477,19 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         event: 'step',
         data: stepData,
       });
-      await Promise.race([doneP, errP]);
+      const donePayload = await Promise.race([doneP, errP]);
       if (runtime.abortRecording) {
         await trajectoryPhaseDao.updateStatus(phase.id, 'failed').catch(() => {});
         throw new Error('Recording aborted');
       }
+      const phaseOutcome = {
+        success: donePayload?.success !== false,
+        text: String(
+          donePayload?.text || donePayload?.summary || donePayload?.name || '',
+        ).trim() || '见页面当前状态',
+      };
+      runtime.phaseOutcomes[phase.id] = phaseOutcome;
+      runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcome;
       await trajectoryPhaseDao.updateStatus(phase.id, 'completed');
       events.push({ type: 'phase_done', phaseNumber: phase.phaseNumber, description: phase.description });
     }
