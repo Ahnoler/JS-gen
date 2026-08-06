@@ -309,6 +309,8 @@ export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
       specialElementCandidates:
         data.special_element_candidates ?? data.specialElementCandidates,
       priorPhases: data.prior_phases ?? data.priorPhases,
+      allPhases: data.all_phases ?? data.allPhases,
+      priorOutcome: data.prior_outcome ?? data.priorOutcome,
       // P1：记忆事件归属 —— Python writer 需要 trajectory_id + fact_pack
       trajectoryId: data.trajectory_id,
       factPack: data.fact_pack,

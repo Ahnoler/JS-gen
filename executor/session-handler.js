@@ -73,6 +73,8 @@ export function createSessionHandler(manager) {
             ?? null,
           prior_phases:
             payload.priorPhases ?? payload.prior_phases ?? null,
+          all_phases: payload.allPhases ?? payload.all_phases ?? null,
+          prior_outcome: payload.priorOutcome ?? payload.prior_outcome ?? null,
           trajectory_id: payload.trajectoryId ?? payload.trajectory_id,
           fact_pack: payload.factPack ?? payload.fact_pack,
         });

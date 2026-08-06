@@ -372,7 +372,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     title: (p.title || p.name || '').trim() || String(p.description || '').split('\n')[0].slice(0, 80),
     description: p.description || '',
   }));
-  if (!runtime.phaseOutcomes) runtime.phaseOutcomes = {};
+  runtime.phaseOutcomes = {};
 
   try {
     for (let i = 0; i < phases.length; i++) {
