@@ -153,6 +153,7 @@ CREATE TABLE `trajectory_step` (
   `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
   `source`              ENUM('agent','manual','cdp','special_element') NOT NULL DEFAULT 'agent'
     COMMENT '动作来源：agent|manual|cdp|special_element',
+  `action_id`           VARCHAR(64) DEFAULT NULL COMMENT 'Python ActionEntry.id（UUID v4）；控制面重启后幂等去重；历史行为 NULL',
   `confirmed`           TINYINT(1) NOT NULL DEFAULT 1 COMMENT '回放确认',
   `confirmed_at`        DATETIME(3) DEFAULT NULL COMMENT '回放确认时间',
   `is_replay`           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=回放执行产生，不计入阶段步骤列表',
@@ -164,6 +165,7 @@ CREATE TABLE `trajectory_step` (
   KEY `idx_traj_phase_id` (`trajectory_phase_id`),
   KEY `idx_source` (`source`),
   KEY `idx_step_is_replay` (`trajectory_id`, `is_replay`),
+  UNIQUE KEY `uk_traj_action` (`trajectory_id`, `action_id`),
   CONSTRAINT `fk_step_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_step_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='轨迹步骤';

@@ -71,6 +71,7 @@ export function stepFromActionLog(step, context = {}) {
     extractedContent: step.result ?? step.extractedContent ?? '',
     trajectoryPhaseId: step.trajectoryPhaseId ?? null,
     source: context.source ?? step.source ?? 'agent',
+    actionId: step.id || null,
   };
 }
 

@@ -22,6 +22,7 @@ export async function batchSave(steps) {
       extractedContent: s.extractedContent ?? s.result ?? '',
       trajectoryPhaseId: s.trajectoryPhaseId ?? null,
       source: s.source ?? 'agent',
+      actionId: s.actionId ?? null,
       isReplay: !!s.isReplay,
     });
     // JSON columns: prefer already-named *_json, else serialize params/element

@@ -425,11 +425,16 @@ export async function resolvePhaseIdForPersist(trajectoryId, {
   fallbackLast = true,
 } = {}) {
   const tid = Number(trajectoryId);
-  if (!Number.isFinite(tid) || tid <= 0) return null;
+  if (!Number.isFinite(tid) || tid <= 0) return { id: null, phaseNumber: null };
 
   if (phaseId != null && Number.isFinite(Number(phaseId)) && Number(phaseId) > 0) {
     const p = await trajectoryPhaseDao.getById(+phaseId);
-    if (p && Number(p.trajectoryId) === tid) return p.id;
+    if (p && Number(p.trajectoryId) === tid) {
+      return {
+        id: p.id,
+        phaseNumber: p.phaseNumber != null ? Number(p.phaseNumber) : null,
+      };
+    }
   }
 
   const pn = Number(phaseNumber);
@@ -437,7 +442,9 @@ export async function resolvePhaseIdForPersist(trajectoryId, {
     const row = await getDB()('trajectory_phase')
       .where({ trajectory_id: tid, phase_number: pn })
       .first();
-    if (row?.id) return row.id;
+    if (row?.id) {
+      return { id: row.id, phaseNumber: Number(row.phase_number) };
+    }
   }
 
   if (fallbackLast) {
@@ -445,9 +452,11 @@ export async function resolvePhaseIdForPersist(trajectoryId, {
       .where({ trajectory_id: tid })
       .orderBy('phase_number', 'desc')
       .first();
-    return last?.id ?? null;
+    if (last?.id) {
+      return { id: last.id, phaseNumber: Number(last.phase_number) };
+    }
   }
-  return null;
+  return { id: null, phaseNumber: null };
 }
 
 /**
@@ -465,22 +474,36 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
     return appendRecordedFormSnapshot(tid, entry, { source, trajectoryPhaseId });
   }
 
+  const actionId = entry.id ? String(entry.id).trim() : null;
+  if (actionId) {
+    const existing = await getDB()('trajectory_step')
+      .where({ trajectory_id: tid, action_id: actionId })
+      .first();
+    if (existing) {
+      return {
+        stepNumber: Number(existing.step_number),
+        actionId,
+        trajectoryPhaseId: existing.trajectory_phase_id != null
+          ? Number(existing.trajectory_phase_id)
+          : null,
+        dbId: Number(existing.id),
+      };
+    }
+  }
+
   const resolvedSource = source || entry.source || 'agent';
   const phaseNumberHint = Number(entry.phase ?? entry.phaseNumber ?? 0) || 0;
   const maxStep = await trajectoryDao.getMaxStepNumber(tid);
   const stepNumber = maxStep + 1;
 
-  const resolvedPhaseId = await resolvePhaseIdForPersist(tid, {
+  const { id: resolvedPhaseId, phaseNumber: resolvedPhaseNumber } = await resolvePhaseIdForPersist(tid, {
     phaseId: trajectoryPhaseId ?? entry.trajectoryPhaseId ?? null,
     phaseNumber: phaseNumberHint || null,
     fallbackLast: true,
   });
 
   let phaseNumber = phaseNumberHint;
-  if (resolvedPhaseId) {
-    const phase = await trajectoryPhaseDao.getById(resolvedPhaseId);
-    if (phase?.phaseNumber != null) phaseNumber = Number(phase.phaseNumber);
-  }
+  if (resolvedPhaseNumber != null) phaseNumber = resolvedPhaseNumber;
 
   const step = stepFromActionLog(entry, {
     trajectoryId: tid,
@@ -492,7 +515,26 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
   step.stepNumber = stepNumber;
   step.trajectoryPhaseId = resolvedPhaseId;
 
-  await trajectoryStepDao.batchSave([step]);
+  try {
+    await trajectoryStepDao.batchSave([step]);
+  } catch (err) {
+    if (err?.code === 'ER_DUP_ENTRY' && actionId) {
+      const dup = await getDB()('trajectory_step')
+        .where({ trajectory_id: tid, action_id: actionId })
+        .first();
+      if (dup) {
+        return {
+          stepNumber: Number(dup.step_number),
+          actionId,
+          trajectoryPhaseId: dup.trajectory_phase_id != null
+            ? Number(dup.trajectory_phase_id)
+            : null,
+          dbId: Number(dup.id),
+        };
+      }
+    }
+    throw err;
+  }
 
   const row = await getDB()('trajectory_step')
     .where({ trajectory_id: tid, step_number: stepNumber })
@@ -535,7 +577,7 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
   const actionIndex = params.action_index ?? params.actionIndex ?? 0;
 
   const phaseNumberHint = Number(entry.phase ?? entry.phaseNumber ?? 0) || 0;
-  const resolvedPhaseId = await resolvePhaseIdForPersist(tid, {
+  const { id: resolvedPhaseId, phaseNumber: resolvedPhaseNumber } = await resolvePhaseIdForPersist(tid, {
     phaseId: trajectoryPhaseId ?? entry.trajectoryPhaseId ?? null,
     phaseNumber: phaseNumberHint || null,
     fallbackLast: true,
@@ -584,10 +626,7 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
 
   const resolvedSource = source || entry.source || 'agent';
   let phaseNumber = phaseNumberHint;
-  if (resolvedPhaseId) {
-    const phase = await trajectoryPhaseDao.getById(resolvedPhaseId);
-    if (phase?.phaseNumber != null) phaseNumber = Number(phase.phaseNumber);
-  }
+  if (resolvedPhaseNumber != null) phaseNumber = resolvedPhaseNumber;
 
   const maxStep = await trajectoryDao.getMaxStepNumber(tid);
   const stepNumber = maxStep + 1;

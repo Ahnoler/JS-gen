@@ -302,25 +302,35 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       // Manual/CDP have dedicated persist paths; skip to avoid double-write with action_log_sync
       const src = entry?.source || 'agent';
       if (src === 'manual' || src === 'cdp') continue;
-      runtime.persistedActionIds.add(id);
-      const persisted = await appendRecordedStep(tid, entry, {
-        source: src === 'special_element' ? 'special_element' : 'agent',
-        trajectoryPhaseId: Number.isFinite(phaseIdHint) ? phaseIdHint : undefined,
-      }).catch(() => null);
-      if (persisted) {
-        runtime._lastPersistByActionId.set(id, persisted);
-        session?._lastPersistByActionId?.set(id, persisted);
-        if (persisted.dbId != null) {
-          await flushPendingStepScreenshot(runtime, id, persisted.dbId, tid);
+      try {
+        runtime.persistedActionIds.add(id);
+        const persisted = await appendRecordedStep(tid, entry, {
+          source: src === 'special_element' ? 'special_element' : 'agent',
+          trajectoryPhaseId: Number.isFinite(phaseIdHint) ? phaseIdHint : undefined,
+        }).catch(() => null);
+        if (persisted) {
+          runtime._lastPersistByActionId.set(id, persisted);
+          session?._lastPersistByActionId?.set(id, persisted);
+          if (persisted.dbId != null) {
+            await flushPendingStepScreenshot(runtime, id, persisted.dbId, tid);
+          }
+          broadcast('action_persisted', {
+            trajectoryDbId: tid,
+            sessionId: runtime.sessionId,
+            ...persisted,
+            entry,
+          });
+        } else {
+          runtime.persistedActionIds.delete(id);
         }
-        broadcast('action_persisted', {
-          trajectoryDbId: tid,
-          sessionId: runtime.sessionId,
-          ...persisted,
-          entry,
-        });
-      } else {
-        runtime.persistedActionIds.delete(id);
+      } catch (err) {
+        console.error(
+          `[record] action_log_sync entry failed: trajectoryDbId=${tid} actionId=${id}`,
+          err?.message || err,
+          err?.stack || '',
+        );
+        // appendRecordedStep uses .catch(() => null); failures here are post-persist
+        // (screenshot flush / broadcast) — keep id in persistedActionIds
       }
     }
   });
