@@ -5,7 +5,7 @@ Feature flags: see ``scripts.feature_flags`` (re-exported here for callers).
 Task modes:
   - login       — sign-in only; use login(); no form-fill cues
   - query       — filter/search; AI sets conditions; NO auto-fill; click 查询
-  - form_fill   — new/entry form (explicit 新增/录入…); implicit auto-fill; click_save
+  - form_fill   — new/entry form (explicit 新增/录入…); run_form_assistant when allowed; click_save
   - form_modify — edit existing; all-fields OR partial per task text; click_save
   - other       — navigate / delete / misc; no form-fill auto-fill or form-type hint
 
@@ -312,6 +312,7 @@ def form_modify_partial_hint() -> str:
         '\n\n【任务类型：表单修改】\n'
         '本阶段是修改已有表单，不是查询。\n'
         '1. 录制须对每个可编辑字段执行写动作（可同值重填），以采集可操作元素。\n'
+        '1a. 禁止调用 run_form_assistant；只改任务点名的字段，其余保留原值。\n'
         '2. 禁止仅 check_field_value / 核对回显就点确认。\n'
         '3. 改完后 click_save(button_text="确认"或"保存")；成功 = 操作成功 或 页面跳转。\n'
     )

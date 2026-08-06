@@ -125,10 +125,11 @@
 
 **工作流程（表单填写 / 改全部）：**
 1. **批量填写：** 合约 `allow_form_assistant=true` 时调用 `run_form_assistant()` 扫描并批量填写/覆盖。
-2. **检查：** `get_pending_tasks()`。若 `NEXT_ACTION: click_save()` 或 `pending:[]` → **立刻 `click_save()`**。若返回 `not_form_fill` → 按查询处理。
-3. **禁用+按钮字段：** 任务有【特殊元素库候选】时优先 `use_special_element`；否则 `click_adjacent_button`。无法自动处理时通过人工录制纠正。
-4. **提交后：** 仅 `ok-save-success` → `done(success=true)`。
-5. **错误处理：** `err-save-validation` / `sync_tasks_from_errors()` 只修报错字段，再 `click_save()`。
+2. **业务数据覆盖：** `run_form_assistant` 之后，对【业务数据】或任务点名字段用显式 `fill_form_field` / `select_option` / `click_radio` 写入场景要求值（覆盖助手随机值），再进入保存。
+3. **检查：** `get_pending_tasks()`。若 `NEXT_ACTION: click_save()` 或 `pending:[]` → **立刻 `click_save()`**。若返回 `not_form_fill` → 按查询处理。
+4. **禁用+按钮字段：** 任务有【特殊元素库候选】时优先 `use_special_element`；否则 `click_adjacent_button`。无法自动处理时通过人工录制纠正。
+5. **提交后：** 仅 `ok-save-success` → `done(success=true)`。
+6. **错误处理：** `err-save-validation` / `sync_tasks_from_errors()` 只修报错字段，再 `click_save()`。
 
 **表单修改：** 对每个可编辑字段执行写动作（**可同值重填**，为录制可操作元素）→ `click_save` → ok-save-success **或** ok-save-navigation → `done`。
 
