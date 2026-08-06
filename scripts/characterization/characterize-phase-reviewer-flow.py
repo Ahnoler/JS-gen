@@ -19,7 +19,8 @@ from scripts.actions._phase_intent import (  # noqa: E402
 def main() -> int:
     store: dict = {}
     c = apply_phase_intent(store, '进入对公客户管理页面。预期结果：打开对公客户管理列表页面。')
-    assert c and store.get('_phase_boundary', {}).get('role') == 'navigate'
+    assert c and c.get('mode') == 'navigate'
+    assert store.get('_phase_boundary', {}).get('role') == 'navigate'
     assert contract_allows_form_assistant(store) is False
 
     store2: dict = {}

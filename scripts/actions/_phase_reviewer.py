@@ -14,6 +14,15 @@ _VALID_MODES = frozenset({
 _VALID_REFILL = frozenset({'none', 'touched', 'all_editable'})
 
 
+def coerce_bool(value: Any) -> bool:
+    """Only True / \"true\" / \"1\" / 1 are True; all else (incl. \"false\") → False."""
+    if value is True or value == 1:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in ('true', '1')
+    return False
+
+
 def _load_prompt() -> str:
     p = Path(__file__).resolve().parents[1] / 'prompts' / 'phase-reviewer-prompt.md'
     return p.read_text(encoding='utf-8')
@@ -41,7 +50,7 @@ def normalize_reviewer_payload(raw: str) -> dict[str, Any] | None:
         return None
     out = {
         'mode': mode,
-        'allow_form_assistant': bool(data.get('allow_form_assistant')),
+        'allow_form_assistant': coerce_bool(data.get('allow_form_assistant')),
         'refill': refill,
         'goal': str(data.get('goal') or '')[:300],
         'in_scope': [str(x) for x in (data.get('in_scope') or [])][:12],

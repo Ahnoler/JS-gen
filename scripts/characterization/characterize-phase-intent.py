@@ -153,6 +153,15 @@ def main() -> int:
     assert_true(store3.get('_phase_intent', {}).get('mode') == 'navigate', 'intent mode')
     assert_true(store3.get('_phase_boundary', {}).get('role') == 'navigate', 'boundary role')
     assert_true(contract_allows_form_assistant(store3) is False, 'assistant denied')
+    assert_true('task_list' not in store3, 'navigate clears task_list')
+
+    # open-page via apply_phase_intent → mode navigate
+    store_nav: dict = {}
+    c_open = apply_phase_intent(
+        store_nav,
+        '进入对公客户管理页面。预期结果：打开对公客户管理列表页面。',
+    )
+    assert_true(c_open and c_open.get('mode') == 'navigate', 'open-page intent mode navigate')
 
     print('characterize-phase-intent: OK')
     return 0

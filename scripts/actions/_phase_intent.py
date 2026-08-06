@@ -220,8 +220,32 @@ def contract_allows_form_assistant(case_data_store: dict | None) -> bool:
     if not c:
         return False
     if 'allow_form_assistant' in c:
-        return bool(c.get('allow_form_assistant'))
+        from ._phase_reviewer import coerce_bool
+        return coerce_bool(c.get('allow_form_assistant'))
     return c.get('refill') == 'all_editable' and c.get('mode') in ('create', 'modify')
+
+
+def _clear_phase_form_state(case_data_store: dict | None, *, mode: str, task_mode: str) -> None:
+    """Drop phase-scoped form/query flags when a new contract is applied."""
+    if not case_data_store:
+        return
+    for key in ('_query_ui', '_query_ready', '_submit_ready'):
+        case_data_store.pop(key, None)
+    clear_form = (
+        mode in ('navigate', 'query', 'login', 'other')
+        or task_mode in ('query', 'login', 'other')
+    )
+    if not clear_form:
+        return
+    for key in (
+        'task_list',
+        '_scan_fields',
+        '_autofill_summary',
+        '_task_lists_by_container',
+        '_active_container',
+        '_parent_container_before_picker',
+    ):
+        case_data_store.pop(key, None)
 
 
 def apply_phase_contract(
@@ -272,6 +296,7 @@ def apply_phase_contract(
     case_data_store['_query_task'] = mode == 'query'
     case_data_store['_force_refill_all'] = requires_write
     case_data_store['_evidence_observed'] = []
+    _clear_phase_form_state(case_data_store, mode=mode, task_mode=task_mode)
     return c
 
 

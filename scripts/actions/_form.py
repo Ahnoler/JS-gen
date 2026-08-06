@@ -429,14 +429,59 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         _switch_task_list_container(case_data_store, container_id)
 
+        async def _rebuild_task_list_from_dom(*, autofill: bool) -> None:
+            raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
+            try:
+                result = json.loads(raw) if isinstance(raw, str) else raw
+                raw_fields = result.get('fields') if isinstance(result, dict) else result
+            except Exception:
+                return
+            dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields]
+            cid = result.get('container', container_id) if isinstance(result, dict) else container_id
+            _switch_task_list_container(case_data_store, cid)
+            _save_form_snapshot(cid, [f.model_dump() for f in dom_fields], case_data_store)
+            session_filled = set(case_data_store.get('_autofilled_labels') or [])
+            tl = TaskList.from_scan(
+                [f.model_dump() for f in dom_fields],
+                force_refill=_force_refill_flag(case_data_store),
+                session_filled_labels=session_filled,
+            )
+            case_data_store['task_list'] = tl.to_store()
+            case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
+            by = case_data_store.setdefault('_task_lists_by_container', {})
+            if isinstance(by, dict):
+                by[cid] = {
+                    'task_list': case_data_store.get('task_list'),
+                    '_scan_fields': case_data_store.get('_scan_fields'),
+                }
+            if autofill and tl.pending:
+                await _auto_fill_pending()
+                tl_after = TaskList.from_store(case_data_store.get('task_list'))
+                fillable_left = sum(1 for i in tl_after.pending if not i.needs_intervention)
+                intervene_left = [i.label for i in tl_after.pending if i.needs_intervention]
+                case_data_store['_autofill_summary'] = (
+                    f'auto-fill-complete done={len(tl_after.done)} '
+                    f'fillable_pending={fillable_left} intervene={intervene_left or []}'
+                )
+                if fillable_left == 0:
+                    case_data_store['_submit_ready'] = True
+                if isinstance(by, dict):
+                    by[cid] = {
+                        'task_list': case_data_store.get('task_list'),
+                        '_scan_fields': case_data_store.get('_scan_fields'),
+                    }
+
         # Force rescan when parent marked stale after picker close
         stale = case_data_store.get('_form_stale')
         if stale and stale == container_id:
-            case_data_store.pop('task_list', None)
-            case_data_store.pop('_scan_fields', None)
             case_data_store.pop('_form_stale', None)
             sys.stderr.write(f'[form] force rescan stale container={container_id}\n')
             sys.stderr.flush()
+            if not allow_autofill:
+                await _rebuild_task_list_from_dom(autofill=False)
+                return
+            case_data_store.pop('task_list', None)
+            case_data_store.pop('_scan_fields', None)
 
         if await _mark_query_ui_if_needed(page, case_data_store, container_id):
             return  # query/filter UI
@@ -458,53 +503,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             f'tl.total={tl.total} force_refill={_force_refill_flag(case_data_store)}\n'
         )
         sys.stderr.flush()
-
-        # Scan form in current container
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
-        try:
-            result = json.loads(raw) if isinstance(raw, str) else raw
-            raw_fields = result.get('fields') if isinstance(result, dict) else result
-        except Exception:
-            return
-        dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields]
-        container_id = result.get('container', container_id) if isinstance(result, dict) else container_id
-        _switch_task_list_container(case_data_store, container_id)
-
-        # Save form structure snapshot BEFORE auto-fill (captures original state)
-        _save_form_snapshot(container_id, [f.model_dump() for f in dom_fields], case_data_store)
-
-        # Store scan data + auto-fill
-        session_filled = set(case_data_store.get('_autofilled_labels') or [])
-        tl = TaskList.from_scan(
-            [f.model_dump() for f in dom_fields],
-            force_refill=_force_refill_flag(case_data_store),
-            session_filled_labels=session_filled,
-        )
-        case_data_store['task_list'] = tl.to_store()
-        case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
-        # Persist into by-container map
-        by = case_data_store.setdefault('_task_lists_by_container', {})
-        if isinstance(by, dict):
-            by[container_id] = {
-                'task_list': case_data_store.get('task_list'),
-                '_scan_fields': case_data_store.get('_scan_fields'),
-            }
-        if tl.pending:
-            await _auto_fill_pending()
-            tl_after = TaskList.from_store(case_data_store.get('task_list'))
-            fillable_left = sum(1 for i in tl_after.pending if not i.needs_intervention)
-            intervene_left = [i.label for i in tl_after.pending if i.needs_intervention]
-            case_data_store['_autofill_summary'] = (
-                f'auto-fill-complete done={len(tl_after.done)} '
-                f'fillable_pending={fillable_left} intervene={intervene_left or []}'
-            )
-            if fillable_left == 0:
-                case_data_store['_submit_ready'] = True
-            if isinstance(by, dict):
-                by[container_id] = {
-                    'task_list': case_data_store.get('task_list'),
-                    '_scan_fields': case_data_store.get('_scan_fields'),
-                }
+        await _rebuild_task_list_from_dom(autofill=True)
 
     @controller.action('Expand ALL el-tree nodes recursively (up to 10 rounds).')
     async def expand_all_el_tree():

@@ -22,6 +22,12 @@ def main() -> None:
 ```'''
     c = normalize_reviewer_payload(raw)
     assert c and c['mode'] == 'navigate' and c['allow_form_assistant'] is False
+    assert normalize_reviewer_payload(
+        '{"mode":"create","allow_form_assistant":"false","refill":"all_editable",'
+        '"goal":"","in_scope":[],"out_of_scope":[],"done_when":"",'
+        '"submit":{"required":true,"via":"click_save","button_text":"保存"},'
+        '"success":{"kinds":[],"evidence":[]}}'
+    )['allow_form_assistant'] is False
     assert normalize_reviewer_payload('not json') is None
     assert normalize_reviewer_payload('{"mode":"nope"}') is None  # invalid mode
     print('PASS characterize-phase-reviewer')

@@ -1522,10 +1522,27 @@ async def run_session(args):
             return
         # Native AgentHistory accumulate disabled (scripts/trajectories/*.json no longer saved).
         # Temp per-step history files may still exist under %TEMP%; not copied to repo.
+        phase_done_data: dict = {
+            "phase": phase_num,
+            "total": -1,
+            "name": task_text[:60],
+            "trajectory_file": str(output_path),
+            "cumulative_file": str(cumulative_path),
+            "step_index": step_idx,
+        }
+        try:
+            from .actions._phase_context import _outcome_for
+            outcome = _outcome_for(case_data_store, phase_num)
+            if outcome:
+                if 'success' in outcome:
+                    phase_done_data['success'] = outcome['success']
+                if outcome.get('text'):
+                    phase_done_data['text'] = outcome['text']
+        except Exception:
+            pass
         emit_json({
             "event": "phase_done",
-            "data": {"phase": phase_num, "total": -1, "name": task_text[:60], "trajectory_file": str(output_path),
-                     "cumulative_file": str(cumulative_path), "step_index": step_idx},
+            "data": phase_done_data,
         })
         sys.stderr.write(f"[session] Step {step_idx} done (phase={phase_num})\n")
         sys.stderr.flush()

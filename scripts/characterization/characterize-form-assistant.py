@@ -66,6 +66,13 @@ def main() -> int:
         ),
         'run_form_assistant triggers scan with allow_autofill=True',
     )
+    assert_true(
+        re.search(
+            r"if not allow_autofill:\s*\n\s*await _rebuild_task_list_from_dom\(autofill=False\)",
+            form_py,
+        ),
+        'stale container scan-only rebuild when allow_autofill=False',
+    )
     for fn in ('fill_form_field', 'fill_date_field', 'select_option', 'click_radio', 'select_tree_option'):
         m = re.search(rf'async def {fn}\(.*?\n(?:.*?\n)*?.*?await _ensure_scanned\(label_text\)', form_py)
         assert_true(m is not None, f'{fn} calls _ensure_scanned without allow_autofill=True')

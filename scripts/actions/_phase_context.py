@@ -443,6 +443,64 @@ def _outcome_for(case_data_store: dict | None, phase_number: int) -> dict | None
     return hit if isinstance(hit, dict) else None
 
 
+def _looks_like_truncated_echo(text: str) -> bool:
+    """True when text is likely a truncated task instruction echo, not a done summary."""
+    t = (text or '').strip()
+    if not t:
+        return True
+    if t.endswith('…'):
+        return True
+    if len(t) >= 58 and not any(
+        kw in t for kw in ('成功', '失败', '完成', '错误', '无法', '已保存', '已打开', 'ok', 'fail')
+    ):
+        return True
+    return False
+
+
+def merge_prior_outcome(
+    prior_outcome: dict | None,
+    *,
+    case_data_store: dict | None,
+    current_phase: int,
+) -> dict | None:
+    """Prefer richer local _phase_outcomes when control-plane text is a weak echo."""
+    if not isinstance(prior_outcome, dict):
+        pn = current_phase - 1
+        if pn < 1:
+            return prior_outcome
+        local = _outcome_for(case_data_store, pn)
+        if not local:
+            return prior_outcome
+        return {
+            'phaseNumber': pn,
+            'success': local.get('success'),
+            'text': local.get('text'),
+        }
+
+    merged = dict(prior_outcome)
+    try:
+        pn = int(prior_outcome.get('phaseNumber') or prior_outcome.get('phase_number') or 0)
+    except (TypeError, ValueError):
+        pn = 0
+    if pn < 1:
+        pn = current_phase - 1
+    local = _outcome_for(case_data_store, pn) if pn >= 1 else None
+    if not local:
+        return merged
+
+    prior_text = str(prior_outcome.get('text') or '').strip()
+    local_text = str(local.get('text') or '').strip()
+    if prior_outcome.get('success') is None and 'success' in local:
+        merged['success'] = local.get('success')
+    if local_text and (
+        not prior_text
+        or len(local_text) > len(prior_text) + 8
+        or _looks_like_truncated_echo(prior_text)
+    ):
+        merged['text'] = local_text
+    return merged
+
+
 def _build_prior_entries(
     *,
     current_phase: int,
@@ -581,7 +639,13 @@ def format_phase_preamble(
         catalog = format_phase_catalog(catalog_phases, cur)
         if catalog:
             blocks.append(catalog)
-        prior_line = format_prior_outcome_line(prior_outcome)
+        prior_line = format_prior_outcome_line(
+            merge_prior_outcome(
+                prior_outcome,
+                case_data_store=case_data_store,
+                current_phase=cur,
+            )
+        )
         if not prior_line:
             prior_line = _legacy_prior_outcome_line(
                 current_phase=cur,
@@ -591,7 +655,13 @@ def format_phase_preamble(
         if prior_line:
             blocks.append(prior_line)
     else:
-        prior_line = format_prior_outcome_line(prior_outcome)
+        prior_line = format_prior_outcome_line(
+            merge_prior_outcome(
+                prior_outcome,
+                case_data_store=case_data_store,
+                current_phase=cur,
+            )
+        )
         if not prior_line:
             prior_line = _legacy_prior_outcome_line(
                 current_phase=cur,

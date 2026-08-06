@@ -463,7 +463,7 @@ def boundary_to_legacy_intent(boundary: dict[str, Any] | None) -> dict[str, Any]
     if role == 'navigate':
         nav_goals = boundary.get('goals') or []
         return {
-            'mode': 'other',
+            'mode': 'navigate',
             'refill': 'none',
             'submit': {'required': False, 'via': 'any', 'button_text': '下一步'},
             'success': {'kinds': [], 'evidence': []},
