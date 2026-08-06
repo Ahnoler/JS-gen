@@ -59,7 +59,10 @@ class TaskItem(BaseModel):
     )
     needs_intervention: bool = Field(
         default=False,
-        description="True when field is disabled but has adjacent button — requires human-designed fill workflow.",
+        description=(
+            "Legacy flag (human-intervention path retired). New scans never set True; "
+            "disabled+button introduce fields are omitted from assistant pending."
+        ),
     )
 
     # ── Status checks ────────────────────────────────────────────────────
@@ -82,24 +85,19 @@ class TaskItem(BaseModel):
 
         Returns None if the field should be skipped:
         - Already filled (has currentValue)
-        - Disabled / read-only
+        - Disabled / read-only (incl. introduce disabled+adjacent-button)
 
-        Fields with hasButton are kept in pending — their handling is
-        determined by the caller (agent or auto-fill engine).
+        Introduce flows are agent / special-element / manual-recording — not
+        assistant task_list intervene items.
         """
         label = field.get("label", "")
         has_value = (field.get("currentValue", "") or "").strip() != ""
         is_disabled = field.get("disabled", False)
         has_button = field.get("hasButton", "") or ""
 
-        # Filter: already filled → skip
-        # Filter: disabled without button → truly unfillable → skip
-        # Filter: disabled + not required → optional read-only, no need to fill
         if has_value:
             return None
-        if is_disabled and not has_button:
-            return None
-        if is_disabled and not field.get("required", False):
+        if is_disabled:
             return None
 
         return cls(
@@ -111,7 +109,7 @@ class TaskItem(BaseModel):
             disabled=field.get("disabled", False),
             required=field.get("required", False),
             hasButton=has_button,
-            needs_intervention=is_disabled and bool(has_button),
+            needs_intervention=False,
         )
 
 
@@ -320,8 +318,9 @@ class TaskList(BaseModel):
                 ))
             else:
                 item = TaskItem.from_scanned(f)
-                if item is None and force_refill and has_value:
+                if item is None and force_refill and has_value and not is_disabled:
                     # from_scanned skips already-filled; rebuild for overwrite
+                    # (never force-refill disabled / introduce fields)
                     item = TaskItem(
                         label=f.get("label", ""),
                         kind=f.get("kind", "input"),
@@ -331,7 +330,7 @@ class TaskList(BaseModel):
                         disabled=is_disabled,
                         required=f.get("required", False),
                         hasButton=has_button,
-                        needs_intervention=is_disabled and bool(has_button),
+                        needs_intervention=False,
                     )
                 if item is not None:
                     pending.append(item)

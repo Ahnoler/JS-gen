@@ -541,13 +541,6 @@ def next_action_hint(case_data_store: dict | None) -> str:
     have = observed_kinds(case_data_store)
     intro_kinds = {'picker_closed', 'dialog_confirmed', 'introduced_backfilled'}
 
-    if intervene and b.get('picker_allowed'):
-        return (
-            f'NEXT_ACTION: resolve disabled+button fields first={intervene}. '
-            f'Prefer use_special_element(id) when candidates listed; else '
-            f'click_adjacent_button(label) to open引入/选择, complete picker, then save. '
-            f'Do NOT click_save() while introduce fields are empty.'
-        )
     if fillable:
         return ''
     if b.get('requires_introduce_then_save') and not (have & intro_kinds):

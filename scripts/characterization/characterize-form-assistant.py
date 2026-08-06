@@ -53,6 +53,48 @@ def main() -> int:
     })
     assert_true(contract_allows_form_assistant(store2) is True, 'create allows assistant')
 
+    # Disabled+adjacent-button (introduce) must NOT enter assistant pending / intervene.
+    from scripts.models.task import TaskItem, TaskList
+
+    intro = TaskItem.from_scanned({
+        'label': '法定代表人/负责人证件号码',
+        'kind': 'input',
+        'currentValue': '',
+        'options': [],
+        'placeholder': '',
+        'disabled': True,
+        'required': True,
+        'hasButton': '引入',
+    })
+    assert_true(intro is None, 'introduce disabled+button skipped by from_scanned')
+
+    tl = TaskList.from_scan([
+        {
+            'label': '客户名称',
+            'kind': 'input',
+            'currentValue': '',
+            'options': [],
+            'placeholder': '',
+            'disabled': False,
+            'required': True,
+            'hasButton': '',
+        },
+        {
+            'label': '法定代表人/负责人证件号码',
+            'kind': 'input',
+            'currentValue': '',
+            'options': [],
+            'placeholder': '',
+            'disabled': True,
+            'required': True,
+            'hasButton': '引入',
+        },
+    ], force_refill=True)
+    labels = [i.label for i in tl.pending]
+    assert_true('客户名称' in labels, 'normal field still pending')
+    assert_true('法定代表人/负责人证件号码' not in labels, 'introduce not in assistant pending')
+    assert_true(all(not i.needs_intervention for i in tl.pending), 'no intervene flags on pending')
+
     form_py = (ROOT / 'scripts/actions/_form.py').read_text(encoding='utf-8')
     assert_true('async def run_form_assistant' in form_py, 'run_form_assistant action exists')
     assert_true(

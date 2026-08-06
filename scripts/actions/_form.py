@@ -289,14 +289,8 @@ def _submit_ready_hint(case_data_store: dict) -> str:
     fillable = [i for i in tl.pending if not i.needs_intervention]
     if fillable:
         return ''
-    if intervene:
-        return (
-            f'NEXT_ACTION: resolve disabled+button fields first={intervene}. '
-            f'Prefer use_special_element(id) when candidates listed; else '
-            f'click_adjacent_button(label) to open引入/选择, complete picker, then click_save(). '
-            f'Do NOT call click_save() while these introduce fields are still empty. '
-            f'Do NOT re-select already-filled fields.'
-        )
+    # Legacy needs_intervention pending (old stores): do not block save cues —
+    # introduce is agent/special-element/manual, not assistant intervene.
     if tl.total > 0:
         c = case_data_store.get('_phase_intent')
         if isinstance(c, dict):
@@ -477,10 +471,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 await _auto_fill_pending()
                 tl_after = TaskList.from_store(case_data_store.get('task_list'))
                 fillable_left = sum(1 for i in tl_after.pending if not i.needs_intervention)
-                intervene_left = [i.label for i in tl_after.pending if i.needs_intervention]
                 case_data_store['_autofill_summary'] = (
                     f'auto-fill-complete done={len(tl_after.done)} '
-                    f'fillable_pending={fillable_left} intervene={intervene_left or []}'
+                    f'fillable_pending={fillable_left}'
                 )
                 if fillable_left == 0:
                     case_data_store['_submit_ready'] = True
@@ -1226,15 +1219,14 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if not f.label or f.label in known_labels or f.currentValue.strip():
                 continue
             if f.disabled:
-                if not f.hasButton or not f.required:
-                    continue
+                # Disabled / introduce (disabled+button) — not assistant pending.
+                continue
             new_pending.append(f.model_dump())
         if new_pending:
             new_labels = [d.get('label', '') for d in new_pending]
             for d in new_pending:
                 item = TaskItem(**{k: v for k, v in d.items() if k != 'commandValue'})
-                if d.get('disabled') and d.get('hasButton'):
-                    item.needs_intervention = True
+                item.needs_intervention = False
                 tl.pending.append(item)
             case_data_store['task_list'] = tl.to_store()
             # Debug: verify store has the items
@@ -1351,7 +1343,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             await _execute_round(page, new_pending3, label_kind3, all_results, 'round3 ')
 
         # ═══════════════════════════════════════════════════════════════════
-        # Step 4-6: 完成、干预、同步
+        # Step 4-6: 完成、同步（introduce disabled+button 不再入 pending / 不滚动干预）
         # ═══════════════════════════════════════════════════════════════════
         ok_count = sum(1 for r in all_results if _is_ok_result(r['result']))
         failed_count = len(all_results) - ok_count
@@ -1359,26 +1351,6 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             'd => console.log("[AI填表] 执行完成 ======\\n" + JSON.stringify(d))',
             all_results,
         )
-
-        # Step 5: needs_intervention 字段 — 全部入队，跳转到第一个
-        tl_final = TaskList.from_store(case_data_store.get('task_list'))
-        intervene_items = [item for item in tl_final.pending if item.needs_intervention]
-        if intervene_items:
-            first = intervene_items[0]
-            await page.evaluate('''([label]) => {
-                const container = ''' + JS_GET_CONTAINER + ''';
-                const items = container.querySelectorAll('.el-form-item');
-                for (const item of items) {
-                    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                    if (lbl.includes(label)) {
-                        item.scrollIntoView({ block: 'center', behavior: 'instant' });
-                        break;
-                    }
-                }
-            }''', [first.label])
-            sys.stderr.write(f'[auto-fill] disabled+button fields ({len(intervene_items)}): {[i.label for i in intervene_items]}\n')
-            sys.stderr.write(f'[auto-fill] Scrolled to first: "{first.label}" — prefer special-element candidates\n')
-            sys.stderr.flush()
 
         # Step 6: full scan sync — 移除不在 DOM 的 pending 字段
         try:
