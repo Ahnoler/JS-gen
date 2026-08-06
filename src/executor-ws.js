@@ -150,6 +150,31 @@ async function handleMessage(ws, msg) {
   // Agent → control plane (session events, stdout relay)
   routeExecutorInbound(msg);
   if (payload?.sessionId) {
+    if (type === 'action_resync') {
+      // 断线重连补拉审计：executor 已对 session 重新下发 get_action_log（全量快照幂等补写），
+      // 旁路记 memory_event(connection_resync)，失败不影响主链路。
+      import('./memory/memory-service.js')
+        .then(({ ingestEvents }) =>
+          ingestEvents({
+            events: [
+              {
+                eventType: 'connection_resync',
+                source: 'executor',
+                sessionId: payload.sessionId,
+                payload: {
+                  sessionIds: payload.sessionIds || [],
+                  nodeUuid: payload.nodeUuid || null,
+                  at: payload.at || null,
+                },
+              },
+            ],
+          }),
+        )
+        .catch((err) =>
+          console.warn('[executor-ws] memory connection_resync event failed:', err?.message || err),
+        );
+      return;
+    }
     if (type === 'action_log_sync' || type === 'manual_action_recorded') {
       broadcast(type, { ...payload, sessionId: payload.sessionId });
     }
@@ -224,6 +249,8 @@ export function initExecutorWs() {
     bindConnectionHandlers(ws);
   });
 
+  // 心跳周期 10s：NAT/LB 空闲回收窗口内尽快发现半开连接（配合 executor 侧
+  // heartbeat ack 超时检测，感知窗口从 30–60s 缩到 ~10–20s）。
   const heartbeat = setInterval(() => {
     if (!wss) {
       clearInterval(heartbeat);
@@ -231,13 +258,17 @@ export function initExecutorWs() {
     }
     wss.clients.forEach((ws) => {
       if (!ws._alive) {
+        console.warn(
+          '[executor-ws] half-open detected (pong missing), terminated',
+          ws._nodeUuid || 'unknown',
+        );
         ws.terminate();
         return;
       }
       ws._alive = false;
       ws.ping();
     });
-  }, 30000);
+  }, 10000);
 
   wss.on('close', () => clearInterval(heartbeat));
 

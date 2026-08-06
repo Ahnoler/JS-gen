@@ -122,4 +122,9 @@ export function relayAgentEvent(send, msg) {
     ...rest,
   };
   send(event, payload);
+  // 断线补拉：get_action_log_result 是 _ACTION_LOG 全量快照，同时以 action_log_sync
+  // 发出 → 控制面录制持久化（persistedActionIds 幂等去重）自动补写断线窗口丢失的步骤。
+  if (event === 'get_action_log_result') {
+    send('action_log_sync', payload);
+  }
 }

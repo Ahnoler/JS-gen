@@ -112,6 +112,11 @@ export const EXECUTOR_HEARTBEAT_INTERVAL_MS = parseInt(
   resolve('EXECUTOR_HEARTBEAT_INTERVAL_MS', '20000'),
   10,
 );
+/** heartbeat ack 超过该时长未收到 → 判定半开连接，主动 terminate 强制重连（默认 2×心跳间隔）。 */
+export const EXECUTOR_HEARTBEAT_ACK_TIMEOUT_MS = parseInt(
+  resolve('EXECUTOR_HEARTBEAT_ACK_TIMEOUT_MS', '40000'),
+  10,
+);
 export const EXECUTOR_RECONNECT_MIN_MS = parseInt(resolve('EXECUTOR_RECONNECT_MIN_MS', '1000'), 10);
 export const EXECUTOR_RECONNECT_MAX_MS = parseInt(resolve('EXECUTOR_RECONNECT_MAX_MS', '30000'), 10);
 /** WS 断线超过该时长仍未恢复 → 杀全部 Python 会话（防录制事件静默丢失）。 */

@@ -62,7 +62,7 @@ async function main() {
   let booted = false;
   server.stdout.on('data', (d) => {
     const s = d.toString();
-    if (s.includes('Agent API listening')) booted = true;
+    if (s.includes('control plane listening') || s.includes('Agent API listening')) booted = true;
   });
   server.stderr.on('data', (d) => process.stderr.write(d));
 
@@ -95,7 +95,8 @@ async function main() {
   // 3. GET list with inUse
   const listRes = await fetch(`${BASE}/api/v2/executors`);
   const list = await listRes.json();
-  const node = list.nodes.find((n) => n.nodeUuid === NODE_UUID);
+  const listNodes = list.data?.nodes || list.nodes || [];
+  const node = listNodes.find((n) => n.nodeUuid === NODE_UUID);
   if (!node || node.status !== 'online') throw new Error('node not online in list');
   if (typeof node.inUse !== 'number') throw new Error('inUse missing');
   console.log('OK list inUse=', node.inUse);
@@ -122,7 +123,8 @@ async function main() {
   await unregP;
   await sleep(300);
   const one = await fetch(`${BASE}/api/v2/executors/${NODE_UUID}`);
-  const oneNode = await one.json();
+  const oneBody = await one.json();
+  const oneNode = oneBody.data || oneBody;
   if (oneNode.status !== 'offline') throw new Error('expected offline after unregister');
   console.log('OK unregister offline');
 

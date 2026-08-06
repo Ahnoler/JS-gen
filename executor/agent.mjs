@@ -11,6 +11,7 @@ import {
   EXECUTOR_CAPACITY,
   EXECUTOR_AGENT_VERSION,
   EXECUTOR_HEARTBEAT_INTERVAL_MS,
+  EXECUTOR_HEARTBEAT_ACK_TIMEOUT_MS,
   EXECUTOR_RECONNECT_MIN_MS,
   EXECUTOR_RECONNECT_MAX_MS,
   EXECUTOR_DISCONNECT_TIMEOUT_MS,
@@ -38,10 +39,13 @@ console.log('[executor] capacity:', EXECUTOR_CAPACITY);
 let sessionManager = null;
 /** @type {ReturnType<typeof createSessionHandler>|null} */
 let handleSession = null;
+/** 最近一次 WS 断开标志：重连注册成功后触发 _ACTION_LOG 全量补拉（恢复断线窗口丢失的步骤）。 */
+let hadDisconnect = false;
 
 const client = new ExecutorWsClient({
   url: wsUrlWithToken(),
   heartbeatIntervalMs: EXECUTOR_HEARTBEAT_INTERVAL_MS,
+  heartbeatAckTimeoutMs: EXECUTOR_HEARTBEAT_ACK_TIMEOUT_MS,
   reconnectMinMs: EXECUTOR_RECONNECT_MIN_MS,
   reconnectMaxMs: EXECUTOR_RECONNECT_MAX_MS,
   disconnectTimeoutMs: EXECUTOR_DISCONNECT_TIMEOUT_MS,
@@ -54,6 +58,35 @@ const client = new ExecutorWsClient({
     for (const { sessionId } of sessions) {
       sessionManager.close(sessionId).catch((err) => {
         console.error(`[executor] session close failed after disconnect: ${err?.message || err}`);
+      });
+    }
+  },
+  onDisconnected: () => {
+    hadDisconnect = true;
+  },
+  // 重连注册成功：若期间断过线，对所有活跃 session 补拉 _ACTION_LOG 全量快照。
+  // Python 回 get_action_log_result → relayAgentEvent 同步发 action_log_sync →
+  // 控制面录制持久化（persistedActionIds 幂等）自动补写断线窗口丢失的步骤。
+  onRegistered: () => {
+    if (!hadDisconnect) return;
+    hadDisconnect = false;
+    if (!sessionManager) return;
+    const sessions = sessionManager.list();
+    console.log(
+      `[executor] ws reconnected after disconnect — resyncing ${sessions.length} session(s) via action_log_sync`,
+    );
+    for (const { sessionId } of sessions) {
+      handleSession?.('session.get_action_log', { sessionId }).catch((err) => {
+        console.warn(`[executor] resync get_action_log failed for ${sessionId}: ${err?.message || err}`);
+      });
+    }
+    if (sessions.length) {
+      // 审计打点：控制面写 memory_event(connection_resync)
+      client.send('action_resync', {
+        sessionId: sessions[0].sessionId,
+        nodeUuid: EXECUTOR_NODE_UUID,
+        sessionIds: sessions.map((s) => s.sessionId),
+        at: new Date().toISOString(),
       });
     }
   },

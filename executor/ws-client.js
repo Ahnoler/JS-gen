@@ -13,6 +13,7 @@ import WebSocket from 'ws';
  * @property {() => void} [onDisconnectTimeout] 断线超时（调用方应杀会话，防静默丢事件）
  * @property {number} [disconnectTimeoutMs] 断线超时阈值（默认 30s）
  * @property {number} [heartbeatIntervalMs]
+ * @property {number} [heartbeatAckTimeoutMs] heartbeat ack 超时阈值（默认 40s = 2×心跳间隔）
  * @property {number} [reconnectMinMs]
  * @property {number} [reconnectMaxMs]
  */
@@ -28,6 +29,8 @@ export class ExecutorWsClient {
     this.onDisconnectTimeout = options.onDisconnectTimeout;
     this.disconnectTimeoutMs = options.disconnectTimeoutMs ?? 30000;
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 20000;
+    /** 连续多久未收到 heartbeat ack 视为半开连接（NAT/LB 静默掐断，readyState 仍为 OPEN）。 */
+    this.heartbeatAckTimeoutMs = options.heartbeatAckTimeoutMs ?? 40000;
     this.reconnectMinMs = options.reconnectMinMs ?? 1000;
     this.reconnectMaxMs = options.reconnectMaxMs ?? 30000;
 
@@ -49,6 +52,8 @@ export class ExecutorWsClient {
     this.pendingMaxBytes = 32 * 1024 * 1024; // 缓冲上限 32MB（防内存膨胀）
     /** @type {ReturnType<typeof setTimeout>|null} 断线超时看门狗 */
     this.disconnectWatchdog = null;
+    /** 最近一次 heartbeat ack（或注册成功）时间戳；半开连接检测基准。 */
+    this.lastAckAt = 0;
   }
 
   connect() {
@@ -99,6 +104,7 @@ export class ExecutorWsClient {
     switch (type) {
       case 'executor.registered':
         this.registered = true;
+        this.lastAckAt = Date.now(); // 注册成功即视为链路可达
         console.log('[executor] registered', payload);
         this.onRegistered?.(payload);
         this.startHeartbeat();
@@ -106,6 +112,7 @@ export class ExecutorWsClient {
         this.flushPending();
         return;
       case 'executor.heartbeat.ack':
+        this.lastAckAt = Date.now();
         return;
       case 'executor.drain':
         this.draining = true;
@@ -199,6 +206,17 @@ export class ExecutorWsClient {
   heartbeat() {
     if (!this.registered) return;
     this.send('executor.heartbeat', {});
+    // 半开连接检测（NAT/LB 静默掐断时 readyState 仍为 OPEN，close 永不触发）：
+    // heartbeat 照发但 ack 收不到 → 超过阈值主动 terminate，强制走 close →
+    // 断线缓冲 + 看门狗 + 重连路径，事件不再进黑洞。
+    if (this.lastAckAt && Date.now() - this.lastAckAt > this.heartbeatAckTimeoutMs) {
+      console.error(
+        `[executor] no heartbeat ack for ${Date.now() - this.lastAckAt}ms (threshold ${this.heartbeatAckTimeoutMs}ms) — half-open connection suspected, terminating ws to force reconnect`,
+      );
+      try {
+        this.ws?.terminate?.();
+      } catch {}
+    }
   }
 
   startHeartbeat() {
