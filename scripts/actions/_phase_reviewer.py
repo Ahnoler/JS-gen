@@ -16,6 +16,37 @@ _VALID_REFILL = frozenset({'none', 'touched', 'all_editable'})
 # Modes that must not require form-submit success tokens (done() after login/nav/query).
 _NO_SUBMIT_TOKEN_MODES = frozenset({'login', 'navigate', 'query'})
 
+_EFFORT_STEPS = {'short': 5, 'medium': 15, 'long': 30}
+_MAX_STEPS_FLOOR = 3
+_MAX_STEPS_BUFFER = 1
+_VALID_EFFORT = frozenset(_EFFORT_STEPS)
+
+
+def resolve_phase_max_steps(ceiling: int, contract: dict | None) -> int:
+    try:
+        ceil = int(ceiling)
+    except (TypeError, ValueError):
+        ceil = 40
+    if ceil < 1:
+        ceil = 40
+    if not isinstance(contract, dict):
+        return ceil
+    raw = None
+    est = contract.get('estimated_steps')
+    try:
+        est_i = int(est)
+    except (TypeError, ValueError):
+        est_i = 0
+    if est_i > 0:
+        raw = est_i + _MAX_STEPS_BUFFER
+    else:
+        effort = str(contract.get('effort') or '').strip().lower()
+        if effort in _EFFORT_STEPS:
+            raw = _EFFORT_STEPS[effort]
+    if raw is None:
+        return ceil
+    return min(ceil, max(_MAX_STEPS_FLOOR, int(raw)))
+
 
 def coerce_bool(value: Any) -> bool:
     """Only True / \"true\" / \"1\" / 1 are True; all else (incl. \"false\") → False."""
@@ -117,6 +148,23 @@ def normalize_reviewer_payload(raw: str) -> dict[str, Any] | None:
         },
         'source': 'llm',
     }
+    brief_plan = [
+        str(x).strip() for x in (data.get('brief_plan') or [])
+        if str(x).strip()
+    ][:4]
+    if not brief_plan:
+        goal = out['goal'].strip()
+        brief_plan = [goal] if goal else ['完成本阶段任务']
+    out['brief_plan'] = brief_plan
+    effort = str(data.get('effort') or '').strip().lower()
+    if effort in _VALID_EFFORT:
+        out['effort'] = effort
+    try:
+        est_i = int(data.get('estimated_steps'))
+    except (TypeError, ValueError):
+        est_i = 0
+    if est_i > 0:
+        out['estimated_steps'] = est_i
     return sanitize_contract_for_mode(out)
 
 

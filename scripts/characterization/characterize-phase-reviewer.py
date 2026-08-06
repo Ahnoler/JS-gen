@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 from scripts.actions._phase_reviewer import (  # noqa: E402
     contract_debug_line,
     normalize_reviewer_payload,
+    resolve_phase_max_steps,
     sanitize_contract_for_mode,
 )
 from scripts.actions._phase_intent import (  # noqa: E402
@@ -82,6 +83,35 @@ def main() -> None:
     })
     assert kept['submit']['required'] is True
     assert kept['success']['kinds'] == ['toast_ok']
+
+    assert resolve_phase_max_steps(30, {'effort': 'short'}) == 5
+    assert resolve_phase_max_steps(30, {'effort': 'medium'}) == 15
+    assert resolve_phase_max_steps(30, {'effort': 'long'}) == 30
+    assert resolve_phase_max_steps(10, {'effort': 'long'}) == 10
+    assert resolve_phase_max_steps(30, {'estimated_steps': 2}) == 3  # 2+1 floor
+    assert resolve_phase_max_steps(30, {'estimated_steps': 4}) == 5
+    assert resolve_phase_max_steps(30, {'estimated_steps': 4, 'effort': 'long'}) == 5  # int wins
+    assert resolve_phase_max_steps(30, {}) == 30
+    assert resolve_phase_max_steps(30, None) == 30
+
+    raw_plan = (
+        '{"mode":"navigate","allow_form_assistant":false,"refill":"none",'
+        '"goal":"进列表","in_scope":[],"out_of_scope":[],"done_when":"列表可见",'
+        '"submit":{"required":false,"via":"any","button_text":""},'
+        '"success":{"kinds":[],"evidence":[]},"effort":"short",'
+        '"brief_plan":["点客户管理","点对公客户管理","确认列表"]}'
+    )
+    c_plan = normalize_reviewer_payload(raw_plan)
+    assert c_plan and c_plan.get('effort') == 'short' and len(c_plan.get('brief_plan') or []) == 3
+
+    # missing brief_plan → backfill from goal
+    c2 = normalize_reviewer_payload(
+        '{"mode":"navigate","allow_form_assistant":false,"refill":"none",'
+        '"goal":"打开新增抽屉","in_scope":[],"out_of_scope":[],"done_when":"抽屉可见",'
+        '"submit":{"required":false,"via":"any","button_text":""},'
+        '"success":{"kinds":[],"evidence":[]},"effort":"short"}'
+    )
+    assert c2 and c2['brief_plan'] == ['打开新增抽屉']
 
     print('PASS characterize-phase-reviewer')
 
