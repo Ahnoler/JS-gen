@@ -12,6 +12,7 @@ start.ps1
 .claude/
 .opencode/
 .reasonix/
+.superpowers/
 .vscode/
 node_modules/
 tmp/
@@ -19,15 +20,6 @@ report/
 report2/
 atp-record/
 docs/
-scripts/action/
-scripts/log/
-scripts/screenshots/
-scripts/trace/
-scripts/case_data/
-scripts/data/
-scripts/forms/
-scripts/generated/
-scripts/trajectories/
 # Local scratch probes / temp outputs (do not match scripts/__init__.py)
 scripts/_probe_*
 scripts/_tmp_*
