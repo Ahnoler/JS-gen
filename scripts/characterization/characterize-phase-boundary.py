@@ -37,6 +37,10 @@ def assert_true(cond: bool, msg: str) -> None:
 
 
 def main() -> int:
+    b = compile_boundary('进入对公客户管理页面。预期结果：打开对公客户管理列表页面。')
+    assert_true(b.get('role') == 'navigate', 'boundary navigate for open-page')
+    assert_true(b.get('requires_write_all_editable') is False, 'no write-all on navigate')
+
     mixed = (
         '新增一个信贷潜在客户，点击保存。（如果出现法定代表人/负责人证件号码的引入按钮，'
         '那么该法定责任人的客户名称填写朱桂武，点击查询，选择一个客户，点击确认。'

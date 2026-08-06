@@ -200,6 +200,8 @@ def classify_task_mode(task_text: str) -> TaskMode:
         return 'login'
     if is_query_task(t):
         return 'query'
+    if is_open_page_task(t):
+        return 'other'
     if is_modify_task(t):
         return 'form_modify'
     if is_fill_task(t):

@@ -34,6 +34,7 @@ from scripts.actions._phase_context import (  # noqa: E402
     apply_task_mode,
     classify_task_mode,
     force_refill_all_required,
+    is_open_page_task,
     is_query_task,
     task_mode_hint,
 )
@@ -127,6 +128,14 @@ def test_three_task_modes() -> None:
     assert_true(classify_task_mode(nav_polluted) == 'other', 'nav polluted → other')
     assert_true(is_query_task('按客户名称搜索，点击查询') is True, 'pure search+查询 still query')
 
+    nav = '进入对公客户管理页面。预期结果：打开对公客户管理列表页面。'
+    assert_true(classify_task_mode(nav) == 'other', 'open-page → other not form_modify')
+    assert_true(is_open_page_task(nav) is True, 'open-page detect')
+    assert_true(classify_task_mode('修改客户状态为潜在') == 'form_modify', 'partial modify still')
+    # 「维护」triggers modify today; open-page expect must win
+    nav_maintain = '进入客户信息维护列表。预期结果：打开客户信息维护列表页面。'
+    assert_true(is_open_page_task(nav_maintain), 'open-page with 维护 in title')
+    assert_true(classify_task_mode(nav_maintain) == 'other', 'open-page wins over 维护 keyword')
 
     q = {}
     assert_true(apply_task_mode(q, '查询产品信息') == 'query', 'apply query')

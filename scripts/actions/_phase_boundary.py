@@ -125,6 +125,21 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
         success_when = ['picker_closed', 'dialog_confirmed', 'introduced_backfilled']
         forbid_index = False
         picker_allowed = True
+    elif is_query_task(t):
+        role = 'query'
+        requires_write = False
+        goals = ['query_filter']
+        success_when = []
+        forbid_index = False
+        picker_allowed = False
+    elif is_open_page_task(t):
+        # Open-page expect wins over incidental 维护/修改 in navigation titles.
+        role = 'navigate'
+        requires_write = False
+        goals = ['open_page']
+        success_when = []
+        forbid_index = False
+        picker_allowed = False
     elif task_mode in ('form_fill', 'form_modify'):
         role = 'maintain'
         requires_write = True  # all_editable for recording (current container only)
@@ -150,21 +165,6 @@ def compile_boundary(task_text: str, container_kind: str = '') -> dict[str, Any]
         role = 'navigate'
         requires_write = False
         goals = ['set_conditions', 'click_next']
-        success_when = []
-        forbid_index = False
-        picker_allowed = False
-    elif task_mode == 'other' and is_open_page_task(t):
-        # 「点击评级申请。预期结果：打开评级申请相关页面」— done once page shows.
-        role = 'navigate'
-        requires_write = False
-        goals = ['open_page']
-        success_when = []
-        forbid_index = False
-        picker_allowed = False
-    elif is_query_task(t):
-        role = 'query'
-        requires_write = False
-        goals = ['query_filter']
         success_when = []
         forbid_index = False
         picker_allowed = False
