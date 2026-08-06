@@ -35,6 +35,16 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-06: **表单结构 Type B 护栏**：expected/actual 数量崩塌或 missing 过半（错容器扫描特征）时检查点失败，禁止删 missing 步骤、禁止改 form_snapshot；与 `container_not_found` 同路径。
+  影响范围：live steps/replay Type B。
+  文件：src/services/trajectory-session-replay.js, src/dashboard/api-docs/catalog.js
+  Python 同步提示：对齐 Type B「unsafe diff 不删步/不改快照」语义。
+
+- 2026-08-06: **表单结构校验按录制 container 选根**（实锤：main 检查点在抽屉仍开时用 getContainer 扫到抽屉 6 字段 → Type B 误删主表步骤）。`verifyFormStructure(fields, containerId)` / live `_replay_verify_form_structure` 传入 `main|drawer:…|dialog:…`；`main` 排除可见 overlay 内字段；容器找不到返回 `error:container_not_found` 且 Type B 不删步/不改 snapshot。
+  影响范围：live steps/replay Type B、assemble 注入的 FORM-CHECK、CTRL.verifyFormStructure。
+  文件：src/ctrl-actions.js, scripts/actions/_js_snippets.py, scripts/actions/_replay.py, scripts/script_assembler.py, src/services/trajectory-session-replay.js, src/dashboard/api-docs/catalog.js
+  Python 同步提示：若镜像 verifyFormStructure / steps replay Type B，对齐按 container 选根与 container_not_found 失败语义。
+
 - 2026-08-06: **action_log_sync 单条 entry 后处理抛错导致整批循环中断、录制步骤永久卡死**（实锤：交易 35 阶段 2 在 trajectory_step 第 118 行后不再前进，Python `_ACTION_LOG` 已到 337 条且 `done(success=true)`）。根因：`appendRecordedStep` 成功后 `flushPendingStepScreenshot` / `broadcast` 无 try/catch，异常冲出 `for (const entry of entries)` 循环，后续 entry 全部跳过；下一条全量快照在同一位置再次中断。修复：① 单条 entry 处理（含截图 flush / broadcast）包 try/catch 并打 `[record] action_log_sync entry failed` 日志，循环继续；② `resolvePhaseIdForPersist` 返回 `{ id, phaseNumber }` 消除 phase 重复查询；③ `trajectory_step.action_id` 列 + `(trajectory_id, action_id)` 唯一索引，`appendRecordedStep` 插入前查重（`ER_DUP_ENTRY` 兜底），控制面重启后 DB 级幂等。
   影响范围：录制落库管道（action_log_sync）、MySQL schema、appendRecordedStep。
   文件：src/services/trajectory-record-lifecycle.js, src/services/trajectory-persist-service.js, src/models/helpers.js, src/dao/trajectory-step-dao.js, migrations/20260806130000_trajectory_step_action_id.js, schemas/init.sql, scripts/smoke/smoke-trajectory-step-idempotent.mjs
