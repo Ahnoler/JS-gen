@@ -964,7 +964,8 @@ export const API_GROUPS = [
           + 'HTTP **202 Accepted**；v2 信封 **body.code 仍为 200**，data={ trajectoryId, trajectoryDbId, accepted:true, stepIds }。'
           + '进度只走 WS：replay:started → replay:step / replay:form_structure → replay:finished。'
           + '普通步：success → confirmed=1；failed → confirmed=0 后【单步自愈 healType=step】，自愈成功不改回 confirmed，并继续后续步。'
-          + 'action_type=save_form_snapshot 为表单结构检查点：verifyFormStructure；有 diff 时走【表单结构变化自愈 healType=form_structure】'
+          + 'action_type=save_form_snapshot 为表单结构检查点：verifyFormStructure 按录制 container（main/drawer:/dialog:）选根；有 diff 时走 Type B。'
+          + '护栏：container 找不到或 expected/actual 差异过大（错容器扫描）→ 检查点失败，禁止删步/改 snapshot'
           + '（删 missing 同 phase+label 步骤、AI 填 adding、控制面结构化插入 confirmed=0 的新步，本批不执行新步）。'
           + 'payload 含 trajectoryId（及 trajectoryDbId，同值）便于前端过滤。',
         params: [

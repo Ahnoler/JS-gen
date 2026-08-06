@@ -111,6 +111,7 @@ function parseFormStructureResult(raw) {
 
 function needsTypeB(report) {
   if (!report) return false;
+  if (report.error === 'container_not_found') return false;
   return !!(
     report.hasRequiredChange
     || (Array.isArray(report.missing_required) && report.missing_required.length)
@@ -118,6 +119,41 @@ function needsTypeB(report) {
     || (Array.isArray(report.added_optional) && report.added_optional.length)
     || (Array.isArray(report.missing_optional) && report.missing_optional.length)
   );
+}
+
+/**
+ * Guard Type B mutations: wrong-scope / collapsed scans must not delete steps or rewrite snapshots.
+ * Classic failure: expected main ~70 fields, scanned drawer ~6 → mass missing → wipe trajectory.
+ * @returns {{ unsafe: boolean, reason?: string }}
+ */
+function assessFormStructureDiffSafety(report, snap) {
+  if (!report) return { unsafe: true, reason: 'no_report' };
+  if (report.error === 'container_not_found') {
+    return { unsafe: true, reason: 'container_not_found' };
+  }
+  const expected = Number(report.expected_count);
+  const actual = Number(report.count);
+  const exp = Number.isFinite(expected) && expected > 0
+    ? expected
+    : (Array.isArray(snap?.fields) ? snap.fields.length : 0);
+  const act = Number.isFinite(actual) && actual >= 0 ? actual : 0;
+  const missingN = (report.missing_required?.length || 0)
+    + (report.missing_optional?.length || 0);
+
+  if (exp >= 8) {
+    if (act === 0) return { unsafe: true, reason: 'empty_scan' };
+    if (act / exp < 0.4) return { unsafe: true, reason: 'count_collapse' };
+    if (exp - act >= 15) return { unsafe: true, reason: 'count_gap' };
+    if (missingN / exp >= 0.5) return { unsafe: true, reason: 'missing_mass' };
+  }
+  // Either direction: sets look like different forms (drawer vs main)
+  if (exp >= 5 && act >= 5) {
+    const ratio = Math.min(exp, act) / Math.max(exp, act);
+    if (ratio < 0.4 && Math.abs(exp - act) >= 10) {
+      return { unsafe: true, reason: 'count_mismatch' };
+    }
+  }
+  return { unsafe: false };
 }
 
 /**
@@ -741,6 +777,38 @@ async function handleFormStructureCheckpoint({
   const batchResults = Array.isArray(result?.results) ? result.results : [];
   const row = batchResults[0] || null;
   const report = parseFormStructureResult(row?.result || '');
+
+  // Unsafe scan (missing container / count collapse / mass missing) — fail; never delete or rewrite snapshot
+  const safety = assessFormStructureDiffSafety(report, snap);
+  if (safety.unsafe) {
+    const msg = safety.reason === 'container_not_found'
+      ? `form structure: container not found (${report?.container || snap.container || 'unknown'})`
+      : `form structure: unsafe diff (${safety.reason}; expected=${report?.expected_count ?? '?'} actual=${report?.count ?? '?'}) — skip mutate`;
+    if (stepId != null) {
+      try { await markStepReplayFailed(stepId); } catch { /* ignore */ }
+    }
+    emitReplay('replay:step', tid, {
+      stepId,
+      status: 'failed',
+      error: msg,
+      index: stepNum,
+      total,
+      action: entry.action,
+      healType: 'form_structure',
+      reason: safety.reason,
+    });
+    results.push({
+      index: stepNum,
+      action: entry.action,
+      params: entry.params,
+      result: msg,
+      ok: false,
+      id: entry.id,
+      healType: 'form_structure',
+      reason: safety.reason,
+    });
+    return { ok: false, aborted: true, error: msg, results, healed };
+  }
 
   if (!needsTypeB(report)) {
     if (stepId != null) {
