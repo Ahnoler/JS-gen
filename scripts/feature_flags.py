@@ -90,6 +90,21 @@ def memory_audit_strict_enabled() -> bool:
     return _env_flag('AI_MEMORY_AUDIT_STRICT', False)
 
 
+def phase_reviewer_enabled() -> bool:
+    """AI_PHASE_REVIEWER — per-phase LLM contract (default on)."""
+    return _env_flag('AI_PHASE_REVIEWER', True)
+
+
+def phase_reviewer_timeout_s() -> float:
+    raw = os.environ.get('AI_PHASE_REVIEWER_TIMEOUT_S')
+    if raw is None or str(raw).strip() == '':
+        return 20.0
+    try:
+        return max(1.0, float(str(raw).strip()))
+    except (TypeError, ValueError):
+        return 20.0
+
+
 def form_batch_heartbeat_enabled() -> bool:
     """AI_FORM_BATCH_HEARTBEAT — 表单批量 LLM 生成期间发 form_batch_started/done 占位事件（默认开）。
 
