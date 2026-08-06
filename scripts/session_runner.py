@@ -1110,8 +1110,6 @@ def _chrome_automation_args() -> list[str]:
         '--use-mock-keychain',
         '--metrics-recording-only',
         '--no-service-autorun',
-        # Cut image decode / GPU work on BiB cloud executors (pages still usable for form ops).
-        '--blink-settings=imagesEnabled=false',
         # Match BiB default viewport (1600×900); do not start maximized.
         '--window-size=1600,900',
         '--window-position=0,0',
