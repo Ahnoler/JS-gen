@@ -203,6 +203,24 @@ def test_phase_preamble_catalog_and_prior() -> None:
         'text': '已登录系统',
     })
     assert_true('【上一阶段结果】阶段1：成功 — 已登录系统' == prior, 'prior line')
+    prior_unknown = format_prior_outcome_line({
+        'phaseNumber': 3,
+        'success': None,
+        'text': '见页面当前状态',
+    })
+    assert_true(
+        '【上一阶段结果】阶段3：未知 — 见页面当前状态' == prior_unknown,
+        'prior unknown when success is null',
+    )
+    prior_fail = format_prior_outcome_line({
+        'phaseNumber': 2,
+        'success': False,
+        'text': '未选中字段',
+    })
+    assert_true(
+        '【上一阶段结果】阶段2：失败 — 未选中字段' == prior_fail,
+        'prior failure line',
+    )
 
     preamble = format_phase_preamble(
         current_phase=2,

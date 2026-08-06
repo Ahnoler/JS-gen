@@ -399,7 +399,10 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         const prevOutcome = runtime.phaseOutcomes?.[prev.id] || runtime.phaseOutcomes?.[prev.phaseNumber];
         stepData.prior_outcome = {
           phaseNumber: prev.phaseNumber,
-          success: prevOutcome?.success ?? true,
+          // Missing outcome → unknown (null), never default to success.
+          success: prevOutcome?.success === true || prevOutcome?.success === false
+            ? prevOutcome.success
+            : null,
           text: prevOutcome?.text || prevOutcome?.summary || '见页面当前状态',
         };
       }
@@ -482,11 +485,17 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         await trajectoryPhaseDao.updateStatus(phase.id, 'failed').catch(() => {});
         throw new Error('Recording aborted');
       }
+      const explicitSuccess = donePayload?.success === true
+        || donePayload?.success === false
+        ? donePayload.success
+        : null;
+      const textFromDone = String(donePayload?.text || donePayload?.summary || '').trim();
       const phaseOutcome = {
-        success: donePayload?.success !== false,
-        text: String(
-          donePayload?.text || donePayload?.summary || donePayload?.name || '',
-        ).trim() || '见页面当前状态',
+        // Only explicit true/false; missing success on phase_done → unknown (null).
+        success: explicitSuccess,
+        text: textFromDone
+          || (explicitSuccess == null ? '见页面当前状态' : String(donePayload?.name || '').trim())
+          || '见页面当前状态',
       };
       runtime.phaseOutcomes[phase.id] = phaseOutcome;
       runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcome;

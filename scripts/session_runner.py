@@ -1583,6 +1583,10 @@ async def run_session(args):
                     phase_done_data['success'] = outcome['success']
                 if outcome.get('text'):
                     phase_done_data['text'] = outcome['text']
+            else:
+                # No accepted done() → unknown (not success). Control plane must not
+                # coerce missing success to true.
+                phase_done_data['success'] = None
         except Exception:
             pass
         emit_json({

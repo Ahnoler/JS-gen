@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-07: AI 录制阶段结果 **`prior_outcome.success` 缺省改为未知（`null`）**，不再把「未收到明确 done(success)」当成成功。`phase_done` 无 outcome 时 Python 显式发 `success: null`；控制面仅在 `true`/`false` 时写入成败，文案走「未知」。
+  影响范围：录制生命周期 prior 注入、session `phase_done`。
+  文件：src/services/trajectory-record-lifecycle.js, scripts/session_runner.py
+  Python 同步提示：对齐 prior_outcome.success 三态（true/false/null）；勿再 `?? true` / `!== false`。
+
 - 2026-08-06: AI 录制 step instruction 增加 **`all_phases`**（当前录制集全量阶段 id/序号/标题/描述）与 **`prior_outcome`**（上一阶段一句结果）；不再依赖 prior 0–2 段全文注入执行 Agent。
   影响范围：录制生命周期 → Python session instruction。
   文件：src/services/trajectory-record-lifecycle.js, src/executor-session-client.js, executor/session-handler.js
