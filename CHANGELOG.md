@@ -9,6 +9,23 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ## [Unreleased]
 
+### Changed
+
+- 2026-08-06: 组件库列表展示 **入库人**（`created_by`，暂可空串显示「—」）；`special_element` 同步预留 `updated_by`。
+  影响范围：schema、列表 UI。
+  文件：migrations/20260806123000_library_created_by.js, schemas/init.sql, src/dao/operation-component-dao.js, src/models/entities.js
+  Python 同步提示：对齐 `operation_component.created_by`、`special_element.created_by/updated_by`。
+
+- 2026-08-06: 特殊元素库保留筛选：**入库说明 / 步骤说明 / 入库人**（与系统/模块/功能/入库时间并存）；后端支持 `keyword`/`stepDesc`/`createdBy`。
+  影响范围：特殊元素列表 API、Vue UI。
+  文件：src/dao/special-element-dao.js, src/services/special-element-service.js, src/dashboard/api-docs/catalog.js
+  Python 同步提示：对齐 special-elements list 的 stepDesc/createdBy 查询参数。
+
+- 2026-08-06: 组件库列表筛选对齐：`GET /api/v2/operation-components` 与 `GET /api/v2/special-elements` 支持 **systemId / moduleId / functionId** 三级联查 + **startTime/endTime**（按 created_at 入库时间）。moduleId 展开下属功能；functionId 优先。
+  影响范围：列表 API 查询参数、api-docs、Vue UI资产库两 Tab。
+  文件：src/dao/operation-component-dao.js, src/services/operation-component-service.js, src/dao/special-element-dao.js, src/services/special-element-service.js, src/dashboard/api-docs/catalog.js
+  Python 同步提示：对齐 list 查询参数 moduleId/functionId/startTime/endTime。
+
 ### Added
 
 - 2026-08-06: **操作步骤原子化组件库 Phase 1（沉淀）**：新建 `operation_component` / `operation_component_occurrence`；`trajectory_phase.component_id` 预留列（业务不写）。v2 API：`/api/v2/operation-components`（list/get/create/patch/confirm/deprecate/delete）+ `POST .../mine`（按 systemId/functionId/trajectoryIds 扫轨迹三表，签名含 label_text 等稳定语义；已存在组件只加 occurrence 不改文案）。api-docs 归入分组 **「组件库管理」**（`id: component-library`）。本阶段不碰 login、不接录制/回放引用。
@@ -52,6 +69,15 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   影响范围：executor 进程（ws-client / agent / config）。
   文件：executor/ws-client.js, executor/agent.mjs, executor/config.js, config/.env.example
   Python 同步提示：无（executor Node 侧）。
+
+- 2026-08-06: **WS 半开连接静默丢事件完整修复**（实锤场景：100+ 表单项长阶段内表单填写助手一次 LLM 批量生成（`_llm_values.py` invoke）数十秒无 stdout → WS 空闲被 NAT/LB 静默掐断，executor `readyState` 仍 OPEN，事件进内核黑洞——不发送成功、不进断线缓冲、无任何报错；表单助手填表动作无法入库）。三层修复：
+  ① **executor 主动侦测半开**：`EXECUTOR_HEARTBEAT_ACK_TIMEOUT_MS`（默认 40000 = 2×心跳间隔）未收到 `executor.heartbeat.ack` → console.error 明确报错 + `ws.terminate()` 强制触发 close → 复用断线缓冲/看门狗/重连路径，事件不再进黑洞；
+  ② **服务端心跳加速 + 断线可见**：`src/executor-ws.js` ping 周期 30s → 10s（感知窗口缩到 ~10–20s），pong 缺失 terminate 时输出 `[executor-ws] half-open detected, terminated <nodeUuid>`（此前静默）；
+  ③ **重连后快照补拉（恢复断线窗口数据）**：executor 重连注册成功后若断过线，对全部活跃 session 触发 `get_action_log`；`relayAgentEvent` 把 `get_action_log_result`（_ACTION_LOG 全量快照）同时以 `action_log_sync` 上送，控制面 `trajectory-record-lifecycle` 的 `persistedActionIds` 幂等消费**自动补写缺失步骤、不重复**；并发 `action_resync` 事件 → 控制面旁路落 `memory_event(connection_resync)` 审计（sessionId 自动关联 trajectory_id）。
+  ④ **表单批量占位事件（源头缓解）**：`AI_FORM_BATCH_HEARTBEAT`（默认 on）——`_llm_values.py` 批量生成前发 `form_batch_started`、成功/异常两路径发 `form_batch_done`，LLM 长调用期间事件流不再静默。
+  影响范围：executor 进程、控制面 WS、Python 表单值生成；无 schema 变更、无新依赖。
+  文件：executor/ws-client.js, executor/agent.mjs, executor/config.js, executor/session-handler.js, executor/.env.example, src/executor-ws.js, scripts/actions/_llm_values.py, scripts/feature_flags.py, config/.env.example, scripts/smoke/smoke-executor-halfopen.mjs（新）, scripts/smoke/smoke-resync-log.mjs（新）
+  Python 同步提示：对齐 `AI_FORM_BATCH_HEARTBEAT` 开关与 form_batch_started/done 事件（若 Python 控制面镜像表单助手）；executor/WS 侧为 Node 独有。
 
 ### Added
 
