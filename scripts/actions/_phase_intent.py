@@ -247,7 +247,8 @@ def apply_phase_contract(
     source = c.get('source') or 'llm'
     if boundary_override is not None:
         boundary = dict(boundary_override)
-        boundary['role'] = role
+        if not boundary.get('role'):
+            boundary['role'] = role
         boundary['requires_write_all_editable'] = requires_write
         boundary['task_mode'] = task_mode
         boundary['source'] = source

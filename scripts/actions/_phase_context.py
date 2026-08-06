@@ -104,6 +104,18 @@ def needs_business_data_context(
     t = classification_task_text(task_text)
     if not t:
         return False
+    if case_data_store:
+        contract = case_data_store.get('_phase_intent') or {}
+        mode = contract.get('mode')
+        if mode in ('navigate', 'login', 'query'):
+            return False
+        if mode in ('create', 'modify', 'introduce_pick'):
+            return True
+        boundary = case_data_store.get('_phase_boundary') or {}
+        if boundary.get('role') == 'navigate':
+            return False
+        if boundary.get('role') in ('maintain', 'introduce'):
+            return True
     mode = classify_task_mode(t)
     if mode in ('form_fill', 'form_modify'):
         return True

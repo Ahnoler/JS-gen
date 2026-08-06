@@ -432,13 +432,20 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             recording_refill_hint,
         )
         from .actions._phase_intent import (
+            apply_phase_contract,
             apply_phase_intent,
             contract_summary_hint,
         )
+        from .actions._phase_reviewer import review_phase_contract
         from .actions._state import _CURRENT_PHASE
         heal_mode = detect_heal_mode(instruction, agent_task)
         # Classify / boundary on goal text only — strip 【业务数据】value blocks first.
         phase_core = classification_task_text(agent_task)
+        phase_for_preamble = instruction.get('phase_number')
+        if phase_for_preamble is None:
+            phase_for_preamble = instruction.get('phaseNumber')
+        if phase_for_preamble is None:
+            phase_for_preamble = _CURRENT_PHASE
         if case_data_ref is not None:
             apply_heal_mode(case_data_ref, heal_mode)
             if heal_mode:
@@ -450,14 +457,41 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 )
                 sys.stderr.flush()
             else:
-                mode = apply_task_mode(case_data_ref, phase_core)
-                contract = apply_phase_intent(case_data_ref, phase_core)
-                sys.stderr.write(
-                    f"[session] task_mode={mode} "
-                    f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
-                    f"phase_intent={bool(contract)}\n"
+                all_phases = instruction.get('all_phases') or instruction.get('allPhases') or []
+                prior_outcome = instruction.get('prior_outcome') or instruction.get('priorOutcome')
+                scenario_summary = ''
+                if isinstance(prior_outcome, dict):
+                    scenario_summary = str(prior_outcome.get('text') or '').strip()
+                try:
+                    cur_phase = int(phase_for_preamble) if phase_for_preamble is not None else 0
+                except (TypeError, ValueError):
+                    cur_phase = 0
+                reviewed = await review_phase_contract(
+                    task_text=phase_core,
+                    all_phases=all_phases if isinstance(all_phases, list) else [],
+                    current_phase_number=cur_phase,
+                    scenario_summary=scenario_summary,
+                    llm=llm,
                 )
-                sys.stderr.flush()
+                if reviewed:
+                    contract = apply_phase_contract(case_data_ref, reviewed)
+                    mode = case_data_ref.get('_task_mode') or 'other'
+                    sys.stderr.write(
+                        f"[session] phase_reviewer ok task_mode={mode} "
+                        f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
+                        f"phase_intent=True source={reviewed.get('source')}\n"
+                    )
+                    sys.stderr.flush()
+                else:
+                    mode = apply_task_mode(case_data_ref, phase_core)
+                    contract = apply_phase_intent(case_data_ref, phase_core)
+                    mode = case_data_ref.get('_task_mode') or mode
+                    sys.stderr.write(
+                        f"[session] phase_reviewer fallback task_mode={mode} "
+                        f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
+                        f"phase_intent={bool(contract)}\n"
+                    )
+                    sys.stderr.flush()
         else:
             mode = 'other'
             contract = None
@@ -472,11 +506,6 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             sys.stderr.flush()
         phase_task_text = phase_core
         prior_phases = instruction.get('prior_phases') or instruction.get('priorPhases')
-        phase_for_preamble = instruction.get('phase_number')
-        if phase_for_preamble is None:
-            phase_for_preamble = instruction.get('phaseNumber')
-        if phase_for_preamble is None:
-            phase_for_preamble = _CURRENT_PHASE
         if not heal_mode:
             agent_task = format_phase_preamble(
                 current_phase=int(phase_for_preamble) if phase_for_preamble is not None else 0,
@@ -518,6 +547,8 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                     "phase_intent": contract,
                     "phase_boundary": boundary,
                     "recovery": (contract or {}).get('recovery') if contract else None,
+                    "source": (contract or {}).get('source'),
+                    "allow_form_assistant": (contract or {}).get('allow_form_assistant'),
                 },
             })
             if boundary:
