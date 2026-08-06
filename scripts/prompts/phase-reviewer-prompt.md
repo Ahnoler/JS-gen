@@ -23,6 +23,16 @@
 | `done_when` | string | 阶段完成判定（≤300 字） |
 | `submit` | object | `{ "required": bool, "via": string, "button_text": string }` |
 | `success` | object | `{ "kinds": string[], "evidence": string[] }` |
+| `brief_plan` | string[] | 本阶段执行步骤概要（2–4 条），仅描述当前阶段 |
+| `effort` | string | 可选：`short` \| `medium` \| `long`；步数估算档位 |
+| `estimated_steps` | number | 可选：正整数；与 `effort` 同时给出时运行时以该整数为准 |
+
+## 步数估算（brief_plan / effort）
+
+- `brief_plan`：列出本阶段 2–4 条可执行步骤，**仅本阶段**；禁止把后续阶段操作写进 `brief_plan`。
+- `effort` 档位参考：打开页面 / 单次点击 / 单字段填写 → `short`；多字段表单 / 整表维护 → `medium` 或 `long`。
+- 可选 `estimated_steps`（正整数）给出更精确的步数预期；与 `effort` 同时给出时，**运行时以 `estimated_steps` 为准**。
+- 运行时实际步数上限为 `min(控制面上限, 估算值)`，估算仅作本阶段预算提示。
 
 ## 模式判定规则
 

@@ -414,6 +414,12 @@ def contract_summary_hint(contract: dict[str, Any] | None) -> str:
         )
     if mode == 'introduce_pick':
         lines.append('- 引入/选人：选行后点确认即成功，不要求操作成功 toast。')
+    if contract.get('brief_plan'):
+        lines.append('- 【阶段计划】')
+        for i, step in enumerate(list(contract.get('brief_plan') or [])[:4], 1):
+            text = str(step).strip()
+            if text:
+                lines.append(f'  {i}. {text[:80]}')
     return '\n'.join(lines) + '\n'
 
 
