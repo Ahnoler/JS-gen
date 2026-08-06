@@ -292,12 +292,13 @@ def login_task_hint() -> str:
 
 
 def form_fill_hint() -> str:
-    """Phase preamble: blank/new form entry — use auto-fill."""
+    """Phase preamble: blank/new form entry — use run_form_assistant."""
     return (
         '\n\n【任务类型：表单填写】\n'
         '本阶段是新增/录入类填写。\n'
         '1. 对每个可编辑字段须执行写动作（可同值重填），以录制可操作元素；不要仅 check_field_value 跳过。\n'
-        '2. 第一次 fill_form_field / select_option 会触发自动填写助手覆盖其余待办。\n'
+        '2. 合约 allow_form_assistant=true 时，先调用 run_form_assistant() 批量填写其余待办；'
+        '单字段 fill/select 不会触发助手。\n'
         '3. pending≈0 后立刻 click_save()，不要重选已填字段。\n'
         '4. click_save 成功 = 操作成功提示 或 保存后页面跳转。\n'
         '5. 若保存后跳转到同阶段的详情/大表（仍有大量待填字段），继续填写后再保存；'
@@ -321,6 +322,8 @@ def force_refill_hint() -> str:
         '\n\n【任务类型：表单修改 — 全部字段】\n'
         '本阶段要求覆盖表单中所有可编辑字段（含编号类主键，可同值重填）。\n'
         '1. 禁止只 check_field_value / 核对回显就点确认。\n'
+        '1a. 合约 allow_form_assistant=true 时，可先 run_form_assistant() 批量覆盖，'
+        '再逐字段写入确保录制完整。\n'
         '2. 对每个可编辑字段必须执行覆盖写入：input→fill_form_field，'
         'select→select_option，radio→click_radio（可用 match_form_rule / 案例数据生成新值）。\n'
         '3. 仅 disabled 且无旁边按钮的只读字段可跳过。\n'

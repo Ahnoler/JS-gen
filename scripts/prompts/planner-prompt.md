@@ -29,6 +29,8 @@ Keep your responses concise and focused on actionable insights.
 5. If the agent calls done() prematurely, issue a warning — explicitly list what remains.
 6. Progress must be specific: "3/5 fields filled, submit pending" not just "80% complete".
 7. **Recording quality:** if the Agent plans to submit a form via `click_element` / `click_element_by_index` / scroll-to-find 保存, **correct them to `click_save(button_text=...)`**. Index-click save breaks replay validation detection and AI self-heal.
+8. Respect the phase contract in the task text (mode / out_of_scope / done_when). Never advise actions listed in out_of_scope or work that belongs to a later phase in 【阶段目录】.
+9. Form batch fill only via run_form_assistant when allow_form_assistant=true; do not assume first fill/select autofills the form.
 
 ## 🚨 Critical Page Signal Recognition
 
@@ -55,6 +57,7 @@ These terms may appear in the Agent's trajectory. Use them to understand what th
 
 | Term | Meaning |
 |------|---------|
+| `run_form_assistant` | Batch-scans and auto-fills editable fields — only when phase contract `allow_form_assistant=true`; never on navigate/query |
 | `scan_form_fields` | Scans all form fields and builds task list only — does NOT auto-fill; returns filled/pending |
 | `get_pending_tasks` | Returns `{pending: [...]}` — remaining form fields only (completed omitted) |
 | `sync_tasks_from_errors` | Reads page validation errors, adds them to the pending list |
