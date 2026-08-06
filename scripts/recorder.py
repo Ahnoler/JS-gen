@@ -220,6 +220,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                     has_contract_success,
                     is_introduce_phase,
                     mark_quality_failed,
+                    overlay_blocks_done,
                     recovery_prescription_message,
                 )
                 from .actions._phase_context import is_heal_mode
@@ -486,26 +487,36 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                         return
 
                     if open_overlay and not navigated_ok and not save_ok and not introduce_ok:
+                        if overlay_blocks_done(contract):
+                            sys.stderr.write(
+                                f"[recorder] ⚠ Premature done() — visible overlay {open_overlay} "
+                                f"at step {agent.state.n_steps}, forcing continue\n"
+                            )
+                            sys.stderr.flush()
+                            for h in agent.state.history.history:
+                                if h.result:
+                                    for r in h.result:
+                                        r.is_done = False
+                                        r.error = (
+                                            f'Premature done() rejected: {open_overlay} still open. '
+                                            f'Finish or close it, then click submit / call done() again.'
+                                        )
+                                        try:
+                                            from scripts.feature_flags import memory_whitelist_enabled
+                                            if memory_whitelist_enabled():
+                                                r.include_in_memory = True
+                                        except Exception:
+                                            pass
+                            return
+                        from .actions._phase_reviewer import coerce_bool
+                        submit = (contract or {}).get('submit') or {}
+                        kinds = ((contract or {}).get('success') or {}).get('kinds') or []
                         sys.stderr.write(
-                            f"[recorder] ⚠ Premature done() — visible overlay {open_overlay} "
-                            f"at step {agent.state.n_steps}, forcing continue\n"
+                            f"[recorder] overlay present ({open_overlay}) but contract allows done "
+                            f"(submit.required={coerce_bool(submit.get('required'))}, kinds={list(kinds)}) "
+                            f"at step {agent.state.n_steps}\n"
                         )
                         sys.stderr.flush()
-                        for h in agent.state.history.history:
-                            if h.result:
-                                for r in h.result:
-                                    r.is_done = False
-                                    r.error = (
-                                        f'Premature done() rejected: {open_overlay} still open. '
-                                        f'Finish or close it, then click submit / call done() again.'
-                                    )
-                                    try:
-                                        from scripts.feature_flags import memory_whitelist_enabled
-                                        if memory_whitelist_enabled():
-                                            r.include_in_memory = True
-                                    except Exception:
-                                        pass
-                        return
 
                     if (error_notifs or form_errors) and not navigated_ok and not save_ok and not introduce_ok:
                         sys.stderr.write(
