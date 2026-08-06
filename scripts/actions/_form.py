@@ -413,8 +413,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     async def _ensure_scanned(label_text: str, *, allow_autofill: bool = False):
         """Container touch; optional batch scan + auto-fill.
 
-        Single-field actions call with allow_autofill=False (default) — only
-        updates container context and query detection, no scan/autofill.
+        Single-field actions call with allow_autofill=False (default) — update
+        container context / query detection. On first touch of a container
+        (no ``_scan_fields`` yet) also scan + save_form_snapshot, without autofill.
 
         run_form_assistant calls with allow_autofill=True to batch-scan and
         auto-fill when the phase contract allows.
@@ -498,7 +499,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if await _mark_query_ui_if_needed(page, case_data_store, container_id):
             return  # query/filter UI
         if not allow_autofill:
-            return  # single-field path: container touch only
+            # First touch of this container (fresh switch clears _scan_fields;
+            # restored containers keep it) — scan + structure checkpoint only.
+            if not case_data_store.get('_scan_fields'):
+                sys.stderr.write(
+                    f'[form] first-touch structure scan container={container_id!r}\n'
+                )
+                sys.stderr.flush()
+                await _rebuild_task_list_from_dom(autofill=False)
+            return
         if _skip_auto_fill(case_data_store):
             # form_modify partial (or query flagged without DOM yet)
             return
@@ -686,7 +695,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         notification = Notification(**raw_notification) if raw_notification else None
 
         # Browse/list scan: task list only — do NOT save form structure checkpoint.
-        # Structure is saved on run_form_assistant path or explicit save_form_snapshot().
+        # Structure is saved on: run_form_assistant, single-field first-touch
+        # container scan, or explicit save_form_snapshot().
 
         # Build task list only — no auto-fill (avoids filling on browse/list pages).
         # Preserve existing done items — from_scan filters fields with values,
@@ -905,7 +915,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         snap = _save_form_snapshot(container_id, fields, case_data_store)
         return _ok(f'form-snapshot | container:{container_id} | count:{snap.count}')
 
-    # 内部函数 — 仅由 run_form_assistant → _ensure_scanned(allow_autofill=True) 触发。
+    # 内部函数 — 由 run_form_assistant → _ensure_scanned(allow_autofill=True) 触发自动填；
+    # 单字段 first-touch / stale 仅走 _rebuild(autofill=False) 落结构。
     # 按 kind 分组（date→select→input→radio→checkbox→tree-select）多次调用 LLM，
     # 失败字段保留在 pending 供 agent 手动处理，成功字段记录 action + task_done。
     # ── 辅助闭包（共享 page / llm / case_data_store）──

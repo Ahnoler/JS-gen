@@ -115,6 +115,16 @@ def main() -> int:
         ),
         'stale container scan-only rebuild when allow_autofill=False',
     )
+    # Single-field first touch of a new container must scan + save_form_snapshot
+    # (via _rebuild autofill=False), not early-return with container touch only.
+    assert_true(
+        "first-touch structure scan" in form_py,
+        'single-field path logs first-touch structure scan',
+    )
+    assert_true(
+        form_py.count("await _rebuild_task_list_from_dom(autofill=False)") >= 2,
+        'rebuild autofill=False used for stale + first-touch paths',
+    )
     for fn in ('fill_form_field', 'fill_date_field', 'select_option', 'click_radio', 'select_tree_option'):
         m = re.search(rf'async def {fn}\(.*?\n(?:.*?\n)*?.*?await _ensure_scanned\(label_text\)', form_py)
         assert_true(m is not None, f'{fn} calls _ensure_scanned without allow_autofill=True')
