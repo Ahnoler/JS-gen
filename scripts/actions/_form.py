@@ -261,6 +261,11 @@ def _task_done_impl(label_text, case_data_store, value=None):
         else:
             sys.stderr.write(f'[task-done] ALREADY: "{label_text}"\n')
     case_data_store['task_list'] = tl.to_store()
+    if value is not None and str(value).strip():
+        labels = case_data_store.setdefault('_autofilled_labels', [])
+        if label_text not in labels:
+            labels.append(label_text)
+        case_data_store.setdefault('_generated_value_cache', {})[label_text] = str(value)
 
 
 def _submit_ready_hint(case_data_store: dict) -> str:
@@ -447,6 +452,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if label_text in pending_labels or label_text in done_labels:
                 return  # already scanned for this form
 
+        sys.stderr.write(
+            f'[form] rescan triggered label_text={label_text!r} container={container_id!r} '
+            f'tl.total={tl.total} force_refill={_force_refill_flag(case_data_store)}\n'
+        )
+        sys.stderr.flush()
+
         # Scan form in current container
         raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
         try:
@@ -462,9 +473,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         _save_form_snapshot(container_id, [f.model_dump() for f in dom_fields], case_data_store)
 
         # Store scan data + auto-fill
+        session_filled = set(case_data_store.get('_autofilled_labels') or [])
         tl = TaskList.from_scan(
             [f.model_dump() for f in dom_fields],
             force_refill=_force_refill_flag(case_data_store),
+            session_filled_labels=session_filled,
         )
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
@@ -670,9 +683,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         prev_done_labels = {d.label for d in prev_tl.done}
         prev_intervene = {item.label for item in prev_tl.pending if item.needs_intervention}
 
+        session_filled = set(case_data_store.get('_autofilled_labels') or [])
         tl = TaskList.from_scan(
             [f.model_dump() for f in dom_fields],
             force_refill=_force_refill_flag(case_data_store),
+            session_filled_labels=session_filled,
         )
         # Restore previously-done items — add directly to done since they won't be in pending.
         # from_scan now puts pre-filled fields in done[], so check both lists to avoid duplicates.
@@ -843,9 +858,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return _err('invalid-json')
         fields = data.get('fields') if isinstance(data, dict) else data
 
+        session_filled = set(case_data_store.get('_autofilled_labels') or [])
         tl = TaskList.from_scan(
             fields,
             force_refill=_force_refill_flag(case_data_store),
+            session_filled_labels=session_filled,
         )
         case_data_store['task_list'] = tl.to_store()
         case_data_store['_scan_fields'] = fields
@@ -943,6 +960,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                     )
                                     sys.stderr.flush()
                                 break
+
+            cache = case_data_store.get('_generated_value_cache', {})
+            for d in sub:
+                lbl = d.get('label', '') or ''
+                if lbl in cache and not (d.get('commandValue') and str(d.get('commandValue')).strip()):
+                    d['commandValue'] = cache[lbl]
 
             actions = _llm_generate_values(llm, sub, case_data_store=case_data_store)
             await page.evaluate(
@@ -1195,7 +1218,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         tl = TaskList.from_store(case_data_store.get('task_list'))
-        pending = [item for item in tl.pending if not item.needs_intervention]
+        autofilled = set(case_data_store.get('_autofilled_labels') or [])
+        pending = [
+            item for item in tl.pending
+            if not item.needs_intervention
+            and not (item.label in autofilled and (item.currentValue or '').strip())
+        ]
 
         if not pending:
             return _ok('nothing-pending')

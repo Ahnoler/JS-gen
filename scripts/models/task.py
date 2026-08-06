@@ -262,7 +262,8 @@ class TaskList(BaseModel):
     # ── Factory ──────────────────────────────────────────────────────────
 
     @classmethod
-    def from_scan(cls, fields: list[dict], *, force_refill: bool = False) -> "TaskList":
+    def from_scan(cls, fields: list[dict], *, force_refill: bool = False,
+                  session_filled_labels: set[str] | None = None) -> "TaskList":
         """Build a TaskList from raw scan fields, auto-filtering filled/disabled.
 
         Fields with a currentValue are placed directly in done[] so the task
@@ -275,20 +276,28 @@ class TaskList(BaseModel):
         overwrite them (same value allowed for element capture). Truly disabled
         fields (no adjacent button) stay in done[].
 
+        When ``session_filled_labels`` is set, labels in that set are kept in
+        done[] even under ``force_refill`` (this-session auto-fill values should
+        not be requeued on stale-container or unknown-label rescans).
+
         Args:
             fields: Raw field dicts from scan_form_fields() result.
             force_refill: Treat pre-filled editable fields as still pending.
+            session_filled_labels: Labels filled in this session — exempt from
+                force_refill requeue.
         """
+        session_filled = session_filled_labels or set()
         pending: list[TaskItem] = []
         done: list[TaskItem] = []
         for f in fields:
             has_value = (f.get("currentValue", "") or "").strip() != ""
             is_disabled = bool(f.get("disabled", False))
             has_button = (f.get("hasButton", "") or "").strip()
+            label = f.get("label", "")
             # Readonly: cannot overwrite → done (even under force_refill)
             if is_disabled and not has_button:
                 done.append(TaskItem(
-                    label=f.get("label", ""),
+                    label=label,
                     kind=f.get("kind", "input"),
                     currentValue=f.get("currentValue", ""),
                     options=f.get("options", []),
@@ -298,9 +307,9 @@ class TaskList(BaseModel):
                     hasButton="",
                 ))
                 continue
-            if has_value and not force_refill:
+            if has_value and (not force_refill or label in session_filled):
                 done.append(TaskItem(
-                    label=f.get("label", ""),
+                    label=label,
                     kind=f.get("kind", "input"),
                     currentValue=f.get("currentValue", ""),
                     options=f.get("options", []),

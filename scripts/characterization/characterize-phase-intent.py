@@ -124,6 +124,13 @@ def main() -> int:
     assert_true(len(tl.pending) == 1, 'force_refill pending')
     assert_true(len(tl.done) == 0, 'no done under force_refill')
 
+    # force_refill keeps this-session-filled fields in done, not pending
+    fields2 = [{'label': '编号', 'kind': 'input', 'currentValue': 'X001', 'disabled': False,
+                'required': True, 'options': [], 'placeholder': '', 'hasButton': ''}]
+    tl2 = TaskList.from_scan(fields2, force_refill=True, session_filled_labels={'编号'})
+    assert_true(len(tl2.done) == 1, 'session-filled label stays done under force_refill')
+    assert_true(len(tl2.pending) == 0, 'session-filled label not requeued to pending')
+
     print('characterize-phase-intent: OK')
     return 0
 

@@ -18,6 +18,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-06: **force_refill 重扫把本会话刚填字段打回 pending 导致整表重复填 3 遍**（实锤：交易 35 122 字段表单 337 条 auto-fill；法定代表人引入弹窗关闭后 stale 容器重扫 + agent 请求不存在字段「婚姻状况」触发未知 label 重扫）。根因：`TaskList.from_scan(force_refill=True)` 无差别把 DOM 有值字段打回 pending，值生成无缓存每次随机不同。修复：① `session_filled_labels` 豁免本会话已填字段；② `_task_done_impl` 记录 `_autofilled_labels` / `_generated_value_cache`；③ `_execute_round` 经 `commandValue` 复用缓存值；④ `_auto_fill_pending` 兜底过滤。
+  影响范围：表单填写 agent（录制新增场景 auto-fill 状态机）
+  文件：scripts/models/task.py, scripts/actions/_form.py, scripts/characterization/characterize-phase-intent.py
+  Python 同步提示：无强 schema 变更；纯 agent 运行时状态机逻辑，Python 控制面若有独立镜像的表单填写状态机可参考同步。
+
 - 2026-08-06: **click_save 非白名单 toast 被静默丢弃后误判失败**（实锤：交易 35 保存成功 toast「已提交创建！保存的客户，客户状态为【信贷正式客户】」无「成功」关键词，agent 连续点击保存 3 次）。toast 分类改为 fail 优先、其余默认 success；无 toast/校验/跳转反馈时降级为 `_ok` 提示 agent 自行二次确认，不再机械重试。
   影响范围：表单填写 agent（click_save 判定）
   文件：scripts/actions/_form.py, scripts/actions/_js_snippets.py, scripts/characterization/characterize-save-toast.mjs
