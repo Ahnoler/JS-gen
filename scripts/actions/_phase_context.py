@@ -488,14 +488,76 @@ def _build_prior_entries(
     return entries[-2:]
 
 
+def format_phase_catalog(all_phases: list | None, current_phase: int) -> str:
+    if not all_phases:
+        return ''
+    lines = ['【阶段目录】']
+    for p in all_phases:
+        if not isinstance(p, dict):
+            continue
+        n = p.get('phaseNumber') if p.get('phaseNumber') is not None else p.get('phase_number')
+        title = (p.get('title') or p.get('name') or '').strip()
+        if not title:
+            desc = (p.get('description') or '').strip().split('\n', 1)[0]
+            title = truncate_text(desc, 40)
+        mark = ''
+        if n is not None:
+            try:
+                if int(n) == int(current_phase):
+                    mark = ' ←当前'
+            except (TypeError, ValueError):
+                pass
+        lines.append(f'{n}. {title}{mark}')
+    return '\n'.join(lines) if len(lines) > 1 else ''
+
+
+def format_prior_outcome_line(prior_outcome: dict | None) -> str:
+    if not isinstance(prior_outcome, dict):
+        return ''
+    pn = prior_outcome.get('phaseNumber') or prior_outcome.get('phase_number') or ''
+    ok = prior_outcome.get('success')
+    label = '成功' if ok else ('失败' if ok is False else '未知')
+    text = truncate_text(str(prior_outcome.get('text') or ''), 120)
+    if text:
+        return f'【上一阶段结果】阶段{pn}：{label} — {text}'
+    return f'【上一阶段结果】阶段{pn}：{label}'
+
+
+def _legacy_prior_outcome_line(
+    *,
+    current_phase: int,
+    prior_phases: list | None,
+    case_data_store: dict | None,
+) -> str:
+    """One-line prior from last prior entry outcome only (no description dump)."""
+    priors = _build_prior_entries(
+        current_phase=current_phase,
+        prior_phases=prior_phases,
+        case_data_store=case_data_store,
+    )
+    if not priors:
+        return ''
+    last = priors[-1]
+    outcome = last.get('outcome')
+    if outcome:
+        return format_prior_outcome_line({
+            'phaseNumber': last['phaseNumber'],
+            'success': outcome.get('success'),
+            'text': outcome.get('text'),
+        })
+    return format_prior_outcome_line({'phaseNumber': last['phaseNumber']})
+
+
 def format_phase_preamble(
     *,
     current_phase: int,
     current_task: str,
     prior_phases: list | None,
     case_data_store: dict | None,
+    all_phases: list | None = None,
+    prior_outcome: dict | None = None,
 ) -> str:
-    """Return 【业务场景】+【当前任务】 block, or just current task if no priors / disabled.
+    """Return short catalog + one-line prior + 【当前任务】, or just task if disabled / empty.
 
     Does NOT append case-data hint — caller still uses format_case_data_hint.
     """
@@ -508,64 +570,36 @@ def format_phase_preamble(
     except (TypeError, ValueError):
         cur = 0
 
-    priors = _build_prior_entries(
-        current_phase=cur,
-        prior_phases=prior_phases,
-        case_data_store=case_data_store,
-    )
-    if not priors:
+    blocks: list[str] = []
+    catalog_phases = all_phases if isinstance(all_phases, list) and all_phases else None
+
+    if catalog_phases:
+        catalog = format_phase_catalog(catalog_phases, cur)
+        if catalog:
+            blocks.append(catalog)
+        prior_line = format_prior_outcome_line(prior_outcome)
+        if not prior_line:
+            prior_line = _legacy_prior_outcome_line(
+                current_phase=cur,
+                prior_phases=prior_phases,
+                case_data_store=case_data_store,
+            )
+        if prior_line:
+            blocks.append(prior_line)
+    else:
+        prior_line = format_prior_outcome_line(prior_outcome)
+        if not prior_line:
+            prior_line = _legacy_prior_outcome_line(
+                current_phase=cur,
+                prior_phases=prior_phases,
+                case_data_store=case_data_store,
+            )
+        if prior_line:
+            blocks.append(prior_line)
+
+    if not blocks:
         return task
 
-    lines = ['【业务场景】', '（此前阶段）']
-    had_failure = False
-    for e in priors:
-        pn = e['phaseNumber']
-        desc = truncate_text(e.get('description') or '', _PRIOR_DESC_MAX)
-        if desc:
-            lines.append(f'- 阶段{pn}：{desc}')
-        else:
-            lines.append(f'- 阶段{pn}：')
-        outcome = e.get('outcome')
-        if outcome:
-            ok = bool(outcome.get('success'))
-            label = '成功' if ok else '失败'
-            otext = truncate_text(str(outcome.get('text') or ''), _OUTCOME_TEXT_MAX)
-            if otext:
-                lines.append(f'  结果：{label} — {otext}')
-            else:
-                lines.append(f'  结果：{label}')
-            if not ok:
-                had_failure = True
-        else:
-            lines.append('  结果：见页面当前状态')
-
-    if had_failure:
-        lines.append('（勿重复上阶段已尝试且失败的做法）')
-
-    scenario = '\n'.join(lines)
-    if len(scenario) > _PREAMBLE_TOTAL_MAX and len(priors) >= 2:
-        # Prefer keeping the most recent prior (last entry); rebuild once without recursion risk
-        last = priors[-1]
-        slim = [
-            '【业务场景】',
-            '（此前阶段）',
-        ]
-        pn = last['phaseNumber']
-        desc = truncate_text(last.get('description') or '', _PRIOR_DESC_MAX)
-        slim.append(f'- 阶段{pn}：{desc}' if desc else f'- 阶段{pn}：')
-        outcome = last.get('outcome')
-        if outcome:
-            ok = bool(outcome.get('success'))
-            label = '成功' if ok else '失败'
-            otext = truncate_text(str(outcome.get('text') or ''), _OUTCOME_TEXT_MAX)
-            slim.append(f'  结果：{label} — {otext}' if otext else f'  结果：{label}')
-            if not ok:
-                slim.append('（勿重复上阶段已尝试且失败的做法）')
-        else:
-            slim.append('  结果：见页面当前状态')
-        scenario = truncate_text('\n'.join(slim), _PREAMBLE_TOTAL_MAX)
-    elif len(scenario) > _PREAMBLE_TOTAL_MAX:
-        scenario = truncate_text(scenario, _PREAMBLE_TOTAL_MAX)
-
+    preamble = truncate_text('\n\n'.join(blocks), _PREAMBLE_TOTAL_MAX)
     current_block = f'【当前任务 — 阶段{cur}】\n{task}' if cur else f'【当前任务】\n{task}'
-    return f'{scenario}\n\n{current_block}'
+    return f'{preamble}\n\n{current_block}'

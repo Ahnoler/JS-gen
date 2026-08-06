@@ -34,6 +34,9 @@ from scripts.actions._phase_context import (  # noqa: E402
     apply_task_mode,
     classify_task_mode,
     force_refill_all_required,
+    format_phase_catalog,
+    format_phase_preamble,
+    format_prior_outcome_line,
     is_open_page_task,
     is_query_task,
     task_mode_hint,
@@ -186,11 +189,45 @@ def test_three_task_modes() -> None:
     assert_true('click_save()' in _submit_ready_hint(save_store), 'save cue')
 
 
+def test_phase_preamble_catalog_and_prior() -> None:
+    cat = format_phase_catalog([
+        {'phaseNumber': 1, 'title': '登录'},
+        {'phaseNumber': 2, 'title': '进入对公客户管理'},
+    ], 2)
+    assert_true('【阶段目录】' in cat, 'catalog header')
+    assert_true('2. 进入对公客户管理 ←当前' in cat, 'catalog marks current')
+
+    prior = format_prior_outcome_line({
+        'phaseNumber': 1,
+        'success': True,
+        'text': '已登录系统',
+    })
+    assert_true('【上一阶段结果】阶段1：成功 — 已登录系统' == prior, 'prior line')
+
+    preamble = format_phase_preamble(
+        current_phase=2,
+        current_task='打开客户列表',
+        prior_phases=None,
+        case_data_store=None,
+        all_phases=[
+            {'phaseNumber': 1, 'title': '登录'},
+            {'phaseNumber': 2, 'title': '进入对公客户管理'},
+        ],
+        prior_outcome={'phaseNumber': 1, 'success': True, 'text': '已登录系统'},
+    )
+    assert_true('【阶段目录】' in preamble, 'preamble has catalog')
+    assert_true('【上一阶段结果】' in preamble, 'preamble has prior')
+    assert_true('【当前任务 — 阶段2】' in preamble, 'preamble has current task')
+    assert_true('打开客户列表' in preamble, 'preamble keeps task text')
+    assert_true('【业务场景】' not in preamble, 'no legacy scenario dump')
+
+
 def main() -> None:
     test_lookup_exact_and_fuzzy()
     test_hint_lists_user_keys_only()
     test_search_dialog_heuristic()
     test_three_task_modes()
+    test_phase_preamble_catalog_and_prior()
     print('characterize-case-data: OK')
 
 

@@ -506,11 +506,15 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             sys.stderr.flush()
         phase_task_text = phase_core
         prior_phases = instruction.get('prior_phases') or instruction.get('priorPhases')
+        all_phases_for_preamble = instruction.get('all_phases') or instruction.get('allPhases')
+        prior_outcome_for_preamble = instruction.get('prior_outcome') or instruction.get('priorOutcome')
         if not heal_mode:
             agent_task = format_phase_preamble(
                 current_phase=int(phase_for_preamble) if phase_for_preamble is not None else 0,
                 current_task=agent_task,
                 prior_phases=prior_phases if isinstance(prior_phases, list) else None,
+                prior_outcome=prior_outcome_for_preamble if isinstance(prior_outcome_for_preamble, dict) else None,
+                all_phases=all_phases_for_preamble if isinstance(all_phases_for_preamble, list) else None,
                 case_data_store=case_data_ref,
             )
         # P1：记忆事实包注入（AI_MEMORY_FACT_PACK 默认关）——权威值/已保存值
@@ -578,7 +582,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         if heal_mode:
             phase_start_payload["heal_mode"] = heal_mode
         emit_json({"event": "phase_start", "data": phase_start_payload})
-        if agent_task.startswith('【业务场景】'):
+        if agent_task.startswith(('【阶段目录】', '【上一阶段结果】', '【当前任务')):
             sys.stderr.write(f"[session] agent_task preview: {agent_task[:400]}\n")
             sys.stderr.flush()
     except Exception as e:
