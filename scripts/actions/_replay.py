@@ -764,14 +764,27 @@ def _result_ok(action_name: str, result: str) -> bool:
 
 
 async def _replay_verify_form_structure(page, params: dict) -> str:
-    """Run verifyFormStructure; always return form-structure:<json> on success."""
+    """Run verifyFormStructure; always return form-structure:<json> on success.
+
+    Passes recorded ``container`` (main / drawer:… / dialog:…) so scan does not
+    prefer an unrelated visible overlay via getContainer().
+    """
     await _wait_if_loading(page)
     fields = params.get('fields') if isinstance(params, dict) else None
     if not isinstance(fields, list):
         fields = []
-    raw = await page.evaluate(JS_VERIFY_FORM_STRUCTURE, [fields])
+    container = 'main'
+    if isinstance(params, dict) and params.get('container') not in (None, ''):
+        container = str(params.get('container')).strip() or 'main'
+    # Single Playwright arg: { fields, container } — do NOT wrap fields as [fields].
+    raw = await page.evaluate(
+        JS_VERIFY_FORM_STRUCTURE,
+        {'fields': fields, 'container': container},
+    )
     if isinstance(raw, dict):
         return 'form-structure:' + json.dumps(raw, ensure_ascii=False)
+    if isinstance(raw, str) and raw.startswith('{'):
+        return 'form-structure:' + raw
     return 'form-structure:' + str(raw or '{}')
 
 

@@ -811,8 +811,12 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
         fields_json = json.dumps(fields, ensure_ascii=False)
         container_label = container or 'main'
         v = f'__fc{idx}'  # unique variable name per check
+        cont_json = json.dumps(container_label, ensure_ascii=False)
         body.append(f'    console.log("[FORM-CHECK] Verifying container: {container_label}");')
-        body.append(f'    const {v} = await page.evaluate((f) => JSON.parse(CTRL.verifyFormStructure(f)), {fields_json});')
+        body.append(
+            f'    const {v} = await page.evaluate(([f, c]) => JSON.parse(CTRL.verifyFormStructure(f, c)), '
+            f'[{fields_json}, {cont_json}]);'
+        )
         # P2: required field change → error, stop script
         body.append(f'    if ({v}.hasRequiredChange) {{')
         body.append(f'      const _m = {v}.missing_required.join(",");')

@@ -1867,16 +1867,90 @@ JS_SCENARIO_PAGE_SNAPSHOT = r'''() => {
   };
 }'''
 
-# Align with src/ctrl-actions.js CTRL.verifyFormStructure
-JS_VERIFY_FORM_STRUCTURE = '''(expectedFields) => {
-    const container = ''' + JS_GET_CONTAINER + ''';
-    const items = container.querySelectorAll('.el-form-item');
+# Align with src/ctrl-actions.js CTRL.verifyFormStructure(fields, containerId)
+# Arg: fields[] (legacy) OR { fields|expectedFields, container }
+JS_VERIFY_FORM_STRUCTURE = '''(arg) => {
+    const wrapOk = (d) => {
+        if (!d) return false;
+        const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+        if (wrap && getComputedStyle(wrap).display === 'none') return false;
+        if (d.offsetParent !== null) return true;
+        const st = getComputedStyle(d);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        const r = d.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+    };
+    const matchTitle = (el, want) => {
+        const w = String(want || '').trim();
+        if (!w || !el) return false;
+        const aria = (el.getAttribute('aria-label') || '').trim();
+        const header = (el.querySelector('.el-drawer__title, .el-drawer__header, .el-dialog__title')?.textContent || '').trim();
+        return aria === w || header === w
+            || (aria && (aria.includes(w) || w.includes(aria)))
+            || (header && (header.includes(w) || w.includes(header)));
+    };
+    const expected = Array.isArray(arg)
+        ? arg
+        : (Array.isArray(arg?.fields) ? arg.fields
+            : (Array.isArray(arg?.expectedFields) ? arg.expectedFields : []));
+    const idRaw = Array.isArray(arg)
+        ? null
+        : ((arg?.container == null || arg?.container === '') ? 'main' : String(arg.container).trim());
+    let root = null;
+    let scopeMode = 'legacy';
+    if (!idRaw) {
+        root = ''' + JS_GET_CONTAINER + ''';
+        scopeMode = 'legacy';
+    } else if (idRaw === 'main') {
+        root = document;
+        scopeMode = 'main';
+    } else if (idRaw.startsWith('drawer:')) {
+        const want = idRaw.slice(7);
+        root = [...document.querySelectorAll('.el-drawer')].filter(wrapOk).find((d) => matchTitle(d, want)) || null;
+        scopeMode = 'drawer';
+    } else if (idRaw.startsWith('dialog:')) {
+        const want = idRaw.slice(7);
+        root = [...document.querySelectorAll('.el-dialog, .el-message-box')].filter(wrapOk).find((d) => matchTitle(d, want)) || null;
+        scopeMode = 'dialog';
+    } else {
+        root = ''' + JS_GET_CONTAINER + ''';
+        scopeMode = 'legacy';
+    }
+    if (!root) {
+        return JSON.stringify({
+            ok: false,
+            error: 'container_not_found',
+            container: idRaw,
+            count: 0,
+            expected_count: expected.length,
+            required_count: 0,
+            optional_count: 0,
+            missing_required: [],
+            missing_optional: [],
+            added_required: [],
+            added_optional: [],
+            hasRequiredChange: false,
+            hasOptionalChange: false,
+            reordered: false,
+            fields: [],
+        });
+    }
+    let itemList = [...root.querySelectorAll('.el-form-item')];
+    if (scopeMode === 'main') {
+        itemList = itemList.filter((item) => {
+            const dr = item.closest('.el-drawer');
+            if (dr && wrapOk(dr)) return false;
+            const dg = item.closest('.el-dialog, .el-message-box');
+            if (dg && wrapOk(dg)) return false;
+            return true;
+        });
+    }
+    const items = itemList;
     const actualLabels = [];
     for (const item of items) {
         const lbl = item.querySelector('.el-form-item__label');
         if (lbl) actualLabels.push(lbl.textContent.trim());
     }
-    const expected = Array.isArray(expectedFields) ? expectedFields : [];
     const expectedLabels = expected.map(f => f.label || f);
     const requiredLabels = expected.filter(f => f.is_required || f.isRequired).map(f => f.label);
     const optionalLabels = expected.filter(f => !(f.is_required || f.isRequired)).map(f => f.label);
@@ -1909,6 +1983,7 @@ JS_VERIFY_FORM_STRUCTURE = '''(expectedFields) => {
     }
     return JSON.stringify({
         ok: !hasRequiredChange,
+        container: idRaw || scopeMode,
         count: actualLabels.length,
         expected_count: expectedLabels.length,
         required_count: requiredLabels.length,
