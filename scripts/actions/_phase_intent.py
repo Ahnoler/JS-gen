@@ -23,6 +23,26 @@ ContractMode = Literal[
     'create', 'modify', 'query', 'navigate', 'verify', 'introduce_pick', 'login', 'other'
 ]
 
+_MODE_TO_TASK = {
+    'create': 'form_fill',
+    'modify': 'form_modify',
+    'query': 'query',
+    'login': 'login',
+    'navigate': 'other',
+    'introduce_pick': 'other',
+    'other': 'other',
+}
+MODE_TO_TASK_MODE = _MODE_TO_TASK
+_MODE_TO_ROLE = {
+    'create': 'maintain',
+    'modify': 'maintain',
+    'query': 'query',
+    'navigate': 'navigate',
+    'introduce_pick': 'introduce',
+    'login': 'other',
+    'other': 'other',
+}
+
 # Synonyms for explicit all-fields modify (boosts confidence; default is all_editable anyway).
 _ALL_FIELDS_SYNONYMS = re.compile(
     r'修改表单中所有字段|修改所有字段|改所有字段|全部字段.*修改|修改.*全部字段'
@@ -195,13 +215,57 @@ def compile_phase_intent(task_text: str) -> dict[str, Any]:
     }
 
 
+def contract_allows_form_assistant(case_data_store: dict | None) -> bool:
+    c = get_phase_intent(case_data_store)
+    if not c:
+        return False
+    if 'allow_form_assistant' in c:
+        return bool(c.get('allow_form_assistant'))
+    return c.get('refill') == 'all_editable' and c.get('mode') in ('create', 'modify')
+
+
+def apply_phase_contract(case_data_store: dict | None, contract: dict[str, Any]) -> dict[str, Any]:
+    """Authoritative write of task_mode + force_refill + boundary + intent."""
+    clear_phase_intent(case_data_store)  # also clears boundary via existing clear
+    if case_data_store is None:
+        return contract
+    c = dict(contract)
+    mode = c.get('mode') or 'other'
+    refill = c.get('refill') or 'none'
+    if 'allow_form_assistant' not in c:
+        c['allow_form_assistant'] = (
+            refill == 'all_editable' and mode in ('create', 'modify')
+        )
+    role = _MODE_TO_ROLE.get(mode, 'other')
+    requires_write = refill == 'all_editable'
+    boundary = {
+        'role': role,
+        'requires_write_all_editable': requires_write,
+        'goals': list(c.get('in_scope') or []),
+        'success_when': list((c.get('success') or {}).get('kinds') or []),
+        'task_mode': _MODE_TO_TASK.get(mode, 'other'),
+        'source': c.get('source') or 'llm',
+        # preserve keys compile_boundary callers expect with safe defaults:
+        'forbid_index_submit': mode in ('create', 'modify'),
+        'picker_allowed': mode in ('create', 'modify', 'introduce_pick'),
+    }
+    case_data_store['_phase_boundary'] = boundary
+    case_data_store['_phase_boundary_flag_locked'] = True
+    case_data_store['_phase_intent'] = c
+    case_data_store['_phase_intent_flag_locked'] = True
+    case_data_store['_task_mode'] = _MODE_TO_TASK.get(mode, 'other')
+    case_data_store['_query_task'] = mode == 'query'
+    case_data_store['_force_refill_all'] = requires_write
+    case_data_store['_evidence_observed'] = []
+    return c
+
+
 def apply_phase_intent(case_data_store: dict | None, task_text: str) -> dict[str, Any] | None:
     """Clear old contract, compile if flag on, write store. Returns contract or None.
 
     When AI_PHASE_BOUNDARY is on, compiles PhaseBoundary first and adapts it
     into the legacy intent dict so existing callers keep working.
     """
-    clear_phase_intent(case_data_store)
     if case_data_store is None:
         return None
 
@@ -209,26 +273,35 @@ def apply_phase_intent(case_data_store: dict | None, task_text: str) -> dict[str
 
     if phase_boundary_enabled():
         from ._phase_boundary import (
-            apply_phase_boundary,
             boundary_to_legacy_intent,
+            compile_boundary,
         )
-        boundary = apply_phase_boundary(case_data_store, task_text)
-        case_data_store['_phase_intent_flag_locked'] = True
-        if not boundary:
-            return None
+        boundary = compile_boundary(task_text)
         contract = boundary_to_legacy_intent(boundary)
-        case_data_store['_phase_intent'] = contract
-        case_data_store['_force_refill_all'] = bool(boundary.get('requires_write_all_editable'))
-        return contract
+        if not contract:
+            clear_phase_intent(case_data_store)
+            case_data_store['_phase_intent_flag_locked'] = True
+            case_data_store['_phase_boundary_flag_locked'] = True
+            return None
+        if 'allow_form_assistant' not in contract:
+            mode = contract.get('mode')
+            refill = contract.get('refill')
+            contract['allow_form_assistant'] = (
+                refill == 'all_editable' and mode in ('create', 'modify')
+            )
+        contract['source'] = 'rules_fallback'
+        if boundary.get('goals'):
+            contract.setdefault('in_scope', list(boundary['goals']))
+        return apply_phase_contract(case_data_store, contract)
 
     enabled = phase_intent_contract_enabled()
-    case_data_store['_phase_intent_flag_locked'] = enabled
     if not enabled:
+        clear_phase_intent(case_data_store)
+        case_data_store['_phase_intent_flag_locked'] = enabled
         return None
     contract = compile_phase_intent(task_text)
-    case_data_store['_phase_intent'] = contract
-    case_data_store['_force_refill_all'] = contract.get('refill') == 'all_editable'
-    return contract
+    contract['source'] = 'rules_fallback'
+    return apply_phase_contract(case_data_store, contract)
 
 
 def contract_force_refill(case_data_store: dict | None) -> bool:
@@ -260,6 +333,20 @@ def contract_summary_hint(contract: dict[str, Any] | None) -> str:
         '\n\n【阶段意图合约】',
         f'- mode={mode} refill={refill}',
     ]
+    if 'allow_form_assistant' in contract:
+        lines.append(f'- allow_form_assistant={contract.get("allow_form_assistant")}')
+    goal = contract.get('goal')
+    if goal:
+        lines.append(f'- goal: {goal}')
+    out_of_scope = contract.get('out_of_scope') or []
+    for item in out_of_scope:
+        lines.append(f'- out_of_scope: {item}')
+    done_when = contract.get('done_when')
+    if done_when:
+        lines.append(f'- done_when: {done_when}')
+    source = contract.get('source')
+    if source:
+        lines.append(f'- source: {source}')
     if submit.get('required'):
         lines.append(f'- submit: via={submit.get("via")} button={submit.get("button_text")}')
     if kinds:

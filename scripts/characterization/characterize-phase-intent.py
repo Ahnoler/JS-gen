@@ -11,10 +11,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.actions._phase_intent import (  # noqa: E402
+    apply_phase_contract,
     apply_phase_intent,
     check_pending_write_gate,
     clear_phase_intent,
     compile_phase_intent,
+    contract_allows_form_assistant,
     contract_force_refill,
     is_cycle_deviate_fingerprint,
     is_introduce_phase,
@@ -130,6 +132,27 @@ def main() -> int:
     tl2 = TaskList.from_scan(fields2, force_refill=True, session_filled_labels={'编号'})
     assert_true(len(tl2.done) == 1, 'session-filled label stays done under force_refill')
     assert_true(len(tl2.pending) == 0, 'session-filled label not requeued to pending')
+
+    # atomic apply_phase_contract writer
+    store3: dict = {}
+    c_nav = {
+        'mode': 'navigate',
+        'allow_form_assistant': False,
+        'refill': 'none',
+        'goal': '进入列表页',
+        'in_scope': ['打开菜单', '确认列表可见'],
+        'out_of_scope': ['点击修改', '填写表单', '保存'],
+        'done_when': '列表页已打开',
+        'submit': {'required': False, 'via': 'any', 'button_text': ''},
+        'success': {'kinds': [], 'evidence': []},
+        'source': 'llm',
+    }
+    apply_phase_contract(store3, c_nav)
+    assert_true(store3.get('_task_mode') == 'other', 'task_mode other')
+    assert_true(store3.get('_force_refill_all') is False, 'no force refill')
+    assert_true(store3.get('_phase_intent', {}).get('mode') == 'navigate', 'intent mode')
+    assert_true(store3.get('_phase_boundary', {}).get('role') == 'navigate', 'boundary role')
+    assert_true(contract_allows_form_assistant(store3) is False, 'assistant denied')
 
     print('characterize-phase-intent: OK')
     return 0
