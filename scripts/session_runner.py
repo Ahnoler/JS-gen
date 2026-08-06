@@ -421,6 +421,8 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', task_text, count=1).strip() or task_text
     phase_task_text = agent_task
     want_biz = False
+    heal_mode = False
+    max_steps_resolved = False
     try:
         from .actions._phase_context import (
             apply_heal_mode,
@@ -537,6 +539,24 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         except Exception as e:
             sys.stderr.write(f"[session] fact pack skipped: {e}\n")
             sys.stderr.flush()
+        from .actions._phase_reviewer import resolve_phase_max_steps
+        ceiling = max_steps
+        try:
+            ceiling = int(max_steps)
+        except (TypeError, ValueError):
+            ceiling = 40
+        if contract and not heal_mode:
+            max_steps = resolve_phase_max_steps(ceiling, contract)
+        else:
+            max_steps = ceiling
+        sys.stderr.write(
+            f"[session] max_steps ceiling={ceiling} chosen={max_steps} "
+            f"effort={(contract or {}).get('effort')} "
+            f"estimated_steps={(contract or {}).get('estimated_steps')} "
+            f"plan_n={len((contract or {}).get('brief_plan') or [])}\n"
+        )
+        sys.stderr.flush()
+        max_steps_resolved = True
         if case_data_ref is not None and not heal_mode:
             agent_task = agent_task + recording_refill_hint(
                 mode,
@@ -555,6 +575,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                     "recovery": (contract or {}).get('recovery') if contract else None,
                     "source": (contract or {}).get('source'),
                     "allow_form_assistant": (contract or {}).get('allow_form_assistant'),
+                    "brief_plan": (contract or {}).get("brief_plan"),
+                    "effort": (contract or {}).get("effort"),
+                    "estimated_steps": (contract or {}).get("estimated_steps"),
+                    "max_steps_ceiling": ceiling,
+                    "max_steps_chosen": max_steps,
                 },
             })
             if boundary:
@@ -591,6 +616,24 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         sys.stderr.write(f"[session] phase preamble skipped: {e}\n")
         sys.stderr.flush()
         emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
+    if not max_steps_resolved:
+        from .actions._phase_reviewer import resolve_phase_max_steps
+        ceiling = max_steps
+        try:
+            ceiling = int(max_steps)
+        except (TypeError, ValueError):
+            ceiling = 40
+        if contract and not heal_mode:
+            max_steps = resolve_phase_max_steps(ceiling, contract)
+        else:
+            max_steps = ceiling
+        sys.stderr.write(
+            f"[session] max_steps ceiling={ceiling} chosen={max_steps} "
+            f"effort={(contract or {}).get('effort')} "
+            f"estimated_steps={(contract or {}).get('estimated_steps')} "
+            f"plan_n={len((contract or {}).get('brief_plan') or [])}\n"
+        )
+        sys.stderr.flush()
     try:
         from .actions._case_data import format_case_data_hint, iter_user_case_entries
         if want_biz:
