@@ -1590,10 +1590,9 @@ JS_SCAN_SAVE_OUTCOME = r'''() => {
     if (!isVisible(el)) return;
     const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
     if (!t) return;
-    if (successRe.test(t) && !failRe.test(t)) successNotifs.push(t.slice(0, 160));
-    else if (failRe.test(t) || /el-notification--error|el-message--error|el-message--warning/.test(el.className || ''))
+    if (failRe.test(t) || /el-notification--error|el-message--error|el-message--warning/.test(el.className || ''))
       errorNotifs.push(t.slice(0, 160));
-    else if (el.classList && (el.classList.contains('el-notification--success') || el.classList.contains('el-message--success')))
+    else
       successNotifs.push(t.slice(0, 160));
   };
   for (const el of document.querySelectorAll('.el-notification, .el-message')) collect(el);

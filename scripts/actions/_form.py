@@ -1460,10 +1460,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
           const take = (el) => {
             const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
             if (!t) return;
-            if (successRe.test(t) && !failRe.test(t)) window.__saveWatch.successNotifs.push(t.slice(0, 160));
-            else if (failRe.test(t) || /el-notification--error|el-message--error/.test(el.className || ''))
+            if (failRe.test(t) || /el-notification--error|el-message--error/.test(el.className || ''))
               window.__saveWatch.errorNotifs.push(t.slice(0, 160));
-            else if (el.classList && (el.classList.contains('el-notification--success') || el.classList.contains('el-message--success')))
+            else
               window.__saveWatch.successNotifs.push(t.slice(0, 160));
           };
           for (const el of document.querySelectorAll('.el-notification, .el-message')) take(el);
@@ -1692,10 +1691,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         sys.stderr.write('[click_save] no feedback (no toast, no form errors, no navigation)\n')
         sys.stderr.flush()
-        return _err(
-            'err-save-no-feedback: no 操作成功 notification and no .el-form-item__error. '
-            'no-notification is NOT success. Check overlays (close_dialog), then retry click_save(). '
-            'Do NOT call done(success=true).',
+        return _ok(
+            'ok-save-no-feedback: save click completed but no toast, form error, or navigation detected. '
+            'Verify outcome yourself — check_field_value / scan_visible_fields, URL change, or form reset — '
+            'before calling done(success=true). Do NOT retry click_save() mechanically on this result alone.',
             include_in_memory=True,
         )
 

@@ -18,6 +18,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-06: **click_save 非白名单 toast 被静默丢弃后误判失败**（实锤：交易 35 保存成功 toast「已提交创建！保存的客户，客户状态为【信贷正式客户】」无「成功」关键词，agent 连续点击保存 3 次）。toast 分类改为 fail 优先、其余默认 success；无 toast/校验/跳转反馈时降级为 `_ok` 提示 agent 自行二次确认，不再机械重试。
+  影响范围：表单填写 agent（click_save 判定）
+  文件：scripts/actions/_form.py, scripts/actions/_js_snippets.py, scripts/characterization/characterize-save-toast.mjs
+  Python 同步提示：无强 schema 变更；纯 agent 运行时逻辑，Python 控制面若有独立镜像的 click_save 判定逻辑可参考同步。
+
 - 2026-08-05: **导航阶段被【业务数据】误判为 form_fill 导致越界**（实锤：阶段「点击客户管理…抵达对公客户管理页面」却继续新增/保存/引入）。根因：每阶段挂业务数据 boilerplate 含「填写」，且「引入」关键值污染 classify；`抵达…页面` 未进 open_page 规则。修复：① classify/boundary/intent **先剥离【业务数据】**；② **仅填表/修改/引入**阶段注入业务数据（analyze append + record/start + Python hint）；③ open_page 支持「抵达/到达」。
   影响范围：阶段边界、录制注入、analyze phase 附文。
   文件：scripts/actions/_phase_context.py, _phase_boundary.py, _phase_intent.py, scripts/session_runner.py, src/services/trajectory-meta-service.js, src/services/trajectory-record-lifecycle.js
