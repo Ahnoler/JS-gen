@@ -80,7 +80,7 @@ def _is_query_mode(case_data_store: dict | None) -> bool:
 
 
 def _skip_auto_fill(case_data_store: dict | None) -> bool:
-    """True when implicit auto-fill must not run.
+    """True when run_form_assistant auto-fill must not run.
 
     Auto-fill only for form_fill and form_modify+force_refill_all.
     login / query / other / partial modify → skip.
@@ -397,17 +397,16 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     def _button_keywords():
         return get_has_button_keywords(case_data_store)
 
-    async def _ensure_scanned(label_text: str):
-        """Auto-scan + auto-fill if label is not in the current task_list.
+    async def _ensure_scanned(label_text: str, *, allow_autofill: bool = False):
+        """Container touch; optional batch scan + auto-fill.
 
-        Deterministic trigger — no LLM dependency.  Two conditions:
-        1. task_list doesn't exist → first form on this task
-        2. task_list exists but label not in pending/done → new form
+        Single-field actions call with allow_autofill=False (default) — only
+        updates container context and query detection, no scan/autofill.
 
-        Triggers for main-page, drawers, and data-entry dialogs when task_mode
-        is form_fill (or form_modify with force_refill_all).
+        run_form_assistant calls with allow_autofill=True to batch-scan and
+        auto-fill when the phase contract allows.
 
-        Skipped (no auto-fill):
+        Auto-fill skipped when:
         - query / search toolbar (有查询无保存)
         - form_modify partial — AI changes only task-named fields
         - _watcher_mode (CDP quick actions)
@@ -441,6 +440,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         if await _mark_query_ui_if_needed(page, case_data_store, container_id):
             return  # query/filter UI
+        if not allow_autofill:
+            return  # single-field path: container touch only
         if _skip_auto_fill(case_data_store):
             # form_modify partial (or query flagged without DOM yet)
             return
@@ -643,7 +644,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return _ok(f'verified:{current}')
         return _err(f'mismatch | current:{current} | expected:{expected}')
 
-    @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Builds task list + form snapshot only — does NOT auto-fill (auto-fill is triggered implicitly by fill/select on main/drawer). Returns summary {total, filled, pending, ...}.')
+    @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Builds task list + form snapshot only — does NOT auto-fill (use run_form_assistant for batch auto-fill). Returns summary {total, filled, pending, ...}.')
     async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -674,7 +675,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         notification = Notification(**raw_notification) if raw_notification else None
 
         # Browse/list scan: task list only — do NOT save form structure checkpoint.
-        # Structure is saved on fill path (_ensure_scanned) or explicit save_form_snapshot().
+        # Structure is saved on run_form_assistant path or explicit save_form_snapshot().
 
         # Build task list only — no auto-fill (avoids filling on browse/list pages).
         # Preserve existing done items — from_scan filters fields with values,
@@ -736,6 +737,21 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if notification:
             summary['notification'] = {'visible': notification.visible, 'text': (notification.text or '')[:200]}
         return json.dumps(summary, ensure_ascii=False)
+
+    @controller.action(
+        'Batch-scan and auto-fill editable form fields in the current container. '
+        'Call only when the phase contract allows form assistant (create / full modify). '
+        'Do not use on navigate/query phases.'
+    )
+    async def run_form_assistant():
+        from ._phase_intent import contract_allows_form_assistant
+        if not contract_allows_form_assistant(case_data_store):
+            return 'err-form-assistant-forbidden: phase contract allow_form_assistant=false'
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        await _ensure_scanned('__run_form_assistant__', allow_autofill=True)
+        summary = case_data_store.get('_autofill_summary') or 'auto-fill-complete'
+        return _ok(summary)
 
     @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Excludes fields already filled by auto-fill. Returns {fields: [...], notification: {visible, text}|null}.')
     async def scan_visible_fields():
@@ -878,7 +894,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         snap = _save_form_snapshot(container_id, fields, case_data_store)
         return _ok(f'form-snapshot | container:{container_id} | count:{snap.count}')
 
-    # 内部函数 — 仅由 _ensure_scanned（隐式）触发的 _auto_fill_pending 调用。
+    # 内部函数 — 仅由 run_form_assistant → _ensure_scanned(allow_autofill=True) 触发。
     # 按 kind 分组（date→select→input→radio→checkbox→tree-select）多次调用 LLM，
     # 失败字段保留在 pending 供 agent 手动处理，成功字段记录 action + task_done。
     # ── 辅助闭包（共享 page / llm / case_data_store）──

@@ -152,7 +152,7 @@ def test_three_task_modes() -> None:
     f = {}
     assert_true(apply_task_mode(f, '新增客户') == 'form_fill', 'apply fill')
     assert_true(f['_force_refill_all'] is True, 'fill force refill for recording')
-    assert_true(_skip_auto_fill(f) is False, 'fill allows autofill')
+    assert_true(_skip_auto_fill(f) is False, 'fill allows assistant autofill')
     assert_true('表单填写' in task_mode_hint('form_fill'), 'fill hint')
 
     mp = {}
@@ -164,7 +164,7 @@ def test_three_task_modes() -> None:
     ma = {}
     assert_true(apply_task_mode(ma, '修改表单中所有字段') == 'form_modify', 'apply all')
     assert_true(ma['_force_refill_all'] is True, 'all force')
-    assert_true(_skip_auto_fill(ma) is False, 'all allows autofill')
+    assert_true(_skip_auto_fill(ma) is False, 'all allows assistant autofill')
     assert_true('全部字段' in task_mode_hint('form_modify', force_refill_all=True), 'all hint')
 
     store = {
