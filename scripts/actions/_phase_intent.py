@@ -431,6 +431,27 @@ def is_introduce_phase(contract: dict[str, Any] | None) -> bool:
     return bool(contract and contract.get('mode') == 'introduce_pick')
 
 
+def overlay_blocks_done(contract: dict | None) -> bool:
+    """True → hard-reject done while overlay open; False → do not block for overlay alone.
+
+    Inverted default: with a contract, allow unless submit.required or non-empty success.kinds.
+    No contract → block (conservative).
+    """
+    if not isinstance(contract, dict):
+        return True
+    from ._phase_reviewer import coerce_bool
+    submit = contract.get('submit')
+    if not isinstance(submit, dict):
+        submit = {}
+    required = coerce_bool(submit.get('required'))
+    kinds = (contract.get('success') or {}).get('kinds') or []
+    if not isinstance(kinds, (list, tuple)):
+        kinds = []
+    if required or len(kinds) > 0:
+        return True
+    return False
+
+
 def should_block_index_submit(
     contract: dict[str, Any] | None,
     btn_label: str,

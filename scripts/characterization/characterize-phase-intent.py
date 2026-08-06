@@ -20,6 +20,7 @@ from scripts.actions._phase_intent import (  # noqa: E402
     contract_force_refill,
     is_cycle_deviate_fingerprint,
     is_introduce_phase,
+    overlay_blocks_done,
     should_block_index_submit,
 )
 from scripts.models.task import TaskList  # noqa: E402
@@ -162,6 +163,32 @@ def main() -> int:
         '进入对公客户管理页面。预期结果：打开对公客户管理列表页面。',
     )
     assert_true(c_open and c_open.get('mode') == 'navigate', 'open-page intent mode navigate')
+
+    assert_true(overlay_blocks_done(None) is True, 'no contract blocks')
+    assert_true(
+        overlay_blocks_done({'submit': {'required': True}, 'success': {'kinds': []}}) is True,
+        'required=True blocks',
+    )
+    assert_true(
+        overlay_blocks_done({'submit': {'required': False}, 'success': {'kinds': ['toast_ok']}}) is True,
+        'non-empty kinds blocks',
+    )
+    assert_true(
+        overlay_blocks_done({'submit': {'required': False}, 'success': {'kinds': []}}) is False,
+        'required=false empty kinds allows',
+    )
+    assert_true(
+        overlay_blocks_done({'mode': 'modify'}) is False,
+        'mode-only contract allows (inverted default)',
+    )
+    assert_true(
+        overlay_blocks_done({'submit': {'required': 'true'}, 'success': {'kinds': []}}) is True,
+        'coerce_bool string true blocks',
+    )
+    assert_true(
+        overlay_blocks_done({'submit': {'required': 'false'}, 'success': {'kinds': []}}) is False,
+        'coerce_bool string false allows',
+    )
 
     print('characterize-phase-intent: OK')
     return 0
