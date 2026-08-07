@@ -96,6 +96,25 @@ def test_submit_hint_section_scoped() -> None:
     assert_true("click_save()" in cue, "empty section-local pending gets save cue")
 
 
+def test_run_form_assistant_section_signature() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    chunk = form.split("async def run_form_assistant", 1)[1][:800]
+    assert_true("section" in chunk, "run_form_assistant accepts section")
+    assert_true(
+        "_assistant_section_filter" in form,
+        "autofill path uses _assistant_section_filter",
+    )
+
+
+def test_run_form_assistant_autofill_section_filter() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    assert_true(
+        "section_matches" in form.split("async def _auto_fill_pending", 1)[1]
+        or "section_matches" in form.split("async def _execute_round", 1)[1],
+        "autofill path filters by section_matches",
+    )
+
+
 def main() -> int:
     test_section_matches()
     test_filter_pending_excludes_other_section()
@@ -104,6 +123,8 @@ def main() -> int:
     test_form_has_err_section_required()
     test_get_pending_signature()
     test_submit_hint_section_scoped()
+    test_run_form_assistant_section_signature()
+    test_run_form_assistant_autofill_section_filter()
     print("characterize-phase-section-scope: OK")
     return 0
 

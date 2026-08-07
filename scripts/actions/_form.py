@@ -1000,24 +1000,31 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'Call only when the phase contract allows form assistant (create / full modify). '
         'Do not use on navigate/query phases.'
     )
-    async def run_form_assistant():
+    async def run_form_assistant(section: str = ''):
         from ._phase_intent import contract_allows_form_assistant
         if not contract_allows_form_assistant(case_data_store):
             return 'err-form-assistant-forbidden: phase contract allow_form_assistant=false'
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        await _ensure_scanned('__run_form_assistant__', allow_autofill=True)
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        pending_labels = {item.label for item in tl.pending}
-        payload = {
-            'status': case_data_store.get('_autofill_summary') or 'auto-fill-complete',
-            **_build_section_summary(
-                case_data_store.get('_scan_fields') or [],
-                case_data_store.get('_scan_buttons') or [],
-                pending_labels=pending_labels,
-            ),
-        }
-        return _ok(json.dumps(payload, ensure_ascii=False))
+        sec = (section or '').strip()
+        if sec:
+            case_data_store['_assistant_section_filter'] = sec
+        try:
+            await _ensure_scanned('__run_form_assistant__', allow_autofill=True)
+            tl = TaskList.from_store(case_data_store.get('task_list'))
+            pending_labels = {item.label for item in tl.pending}
+            payload = {
+                'status': case_data_store.get('_autofill_summary') or 'auto-fill-complete',
+                'section_filter': sec or None,
+                **_build_section_summary(
+                    case_data_store.get('_scan_fields') or [],
+                    case_data_store.get('_scan_buttons') or [],
+                    pending_labels=pending_labels,
+                ),
+            }
+            return _ok(json.dumps(payload, ensure_ascii=False))
+        finally:
+            case_data_store.pop('_assistant_section_filter', None)
 
     @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Excludes fields already filled by auto-fill. Returns {fields: [...], notification: {visible, text}|null}.')
     async def scan_visible_fields():
@@ -1171,6 +1178,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     async def _execute_round(page, items, label_kind, all_results, round_tag):
         """分组 → LLM 规划 → 逐个执行。round_tag: '' | 'round2 ' | 'round3 '"""
+        from ._section_scope import section_matches
+
+        filt = (case_data_store.get('_assistant_section_filter') or '').strip()
 
         def _field_dict_for_action(sub, action, action_index):
             action_xp = (action.get('xpath_smart') or '').strip()
@@ -1228,6 +1238,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         KIND_ORDER = {'date': 0, 'select': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
         groups: dict[int, list[dict]] = {}
         for d in items:
+            if filt and not section_matches(filt, d.get('section_id', ''), d.get('section_title', '')):
+                continue
             # Skip needs_intervention — only auto-fill fillable fields
             if d.get('disabled') and d.get('hasButton'):
                 continue
@@ -1555,10 +1567,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     def _scan_new_fields(dom_fields, tl):
         """扫描新字段：差值过滤 + TaskItem 创建。返回 new_pending dicts。"""
+        from ._section_scope import section_matches
+
+        filt = (case_data_store.get('_assistant_section_filter') or '').strip()
         known_labels = {d.label for d in tl.pending} | {d.label for d in tl.done}
         new_pending: list[dict] = []
         for f in dom_fields:
             if not f.label or f.label in known_labels or f.currentValue.strip():
+                continue
+            if filt and not section_matches(filt, f.section_id, f.section_title):
                 continue
             if f.disabled:
                 # Disabled / introduce (disabled+button) — not assistant pending.
@@ -1583,14 +1600,18 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     # Round 1: 初始 pending → 分组 → LLM → 执行
     # ═══════════════════════════════════════════════════════════════════════
     async def _auto_fill_pending():
+        from ._section_scope import section_matches
+
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         tl = TaskList.from_store(case_data_store.get('task_list'))
         autofilled = set(case_data_store.get('_autofilled_labels') or [])
+        filt = (case_data_store.get('_assistant_section_filter') or '').strip()
         pending = [
             item for item in tl.pending
             if not item.needs_intervention
             and not (item.label in autofilled and (item.currentValue or '').strip())
+            and section_matches(filt, item.section_id, item.section_title)
         ]
 
         if not pending:
