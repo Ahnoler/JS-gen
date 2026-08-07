@@ -742,7 +742,7 @@ export const API_GROUPS = [
   {
     id: 'batch-import',
     name: '批量导入管理',
-    description: 'Excel 批量导入交易并自动录制。主接口一站式：analyze → 草稿 → prepare → record/start → detach；模板 / 状态查询 / 取消为辅助。进度可通过 WS batch:* 或轮询获取。',
+    description: 'Excel 批量导入交易。mode=record 时一站式自动录制（analyze → 草稿 → prepare → record/start → detach）；mode=draft 仅 analyze 并保存草稿。模板 / 状态查询 / 取消为辅助。进度可通过 WS batch:* 或轮询获取。',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/trajectories/batch/template',
@@ -757,24 +757,29 @@ export const API_GROUPS = [
       {
         method: 'POST', path: '/api/v2/trajectories/batch/import',
         summary: '批量导入 Excel 并自动录制（一站式）',
-        desc: 'multipart 上传 .xlsx；服务端对每行自动执行 analyze → 保存草稿 → prepare → record/start → detach。'
-          + ' 立即返回 HTTP 202；后台并行录制（全局 FIFO，受执行机槽位限制）。'
-          + ' 需 USE_EXECUTOR=true；须带 Idempotency-Key。functionId / systemAccountId 由页面上下文随表单提交。',
-        reqExample: 'form-data: file=@batch.xlsx; functionId=3; systemAccountId=10; model=deepseek-v4-flash\nHeader: Idempotency-Key: <uuid>',
+        desc: 'multipart 上传 .xlsx；mode=record 时对每行自动执行 analyze → 保存草稿 → prepare → record/start → detach；'
+          + 'mode=draft 时仅 analyze 并保存草稿（itemStatus=drafted，不占执行机）。'
+          + ' 立即返回 HTTP 202；record 模式后台并行录制（全局 FIFO，受执行机槽位限制）。'
+          + ' 须带 Idempotency-Key。functionId / systemAccountId 由页面上下文随表单提交。',
+        reqExample: 'form-data: file=@batch.xlsx; functionId=3; systemAccountId=10; model=deepseek-v4-flash; mode=draft|record\nHeader: Idempotency-Key: <uuid>',
         respExample: J({
           batchId: 'uuid',
           status: 'accepted',
+          mode: 'draft',
           functionId: 3,
           systemAccountId: 10,
-          summary: { total: 5, accepted: 4, rejected: 1, recorded: 0, failed: 0 },
+          summary: { total: 5, accepted: 4, rejected: 1, recorded: 0, drafted: 0, failed: 0 },
           items: [{ id: 1, rowNumber: 2, name: '开户交易', status: 'pending' }],
         }),
         notes: [
           'HTTP 202 Accepted；v2 信封 body.code 仍为 200',
+          'mode 默认 record；可选 draft（仅 analyze+草稿，跳过 prepare/record/detach）',
+          'mode=draft 不要求 USE_EXECUTOR；mode=record 且 USE_EXECUTOR=false → 503',
+          'mode 非法（非 record|draft）→ 400',
+          'requestHash / 幂等校验包含 mode（同 Key 不同 mode → 409）',
           '仅 .xlsx；无效行记 rejected，有效行继续；无有效行则 400',
           '同 Idempotency-Key + 同内容 → 返回原任务当前状态；内容不一致 → 409',
-          'USE_EXECUTOR=false → 503',
-          'WS: batch:progress / batch:done',
+          'WS: batch:progress / batch:done（payload 含 mode）',
         ],
       },
       {
@@ -787,7 +792,8 @@ export const API_GROUPS = [
         ],
         notes: [
           '非终态 HTTP 202；终态 HTTP 200',
-          'itemStatus: pending|analyzing|analyzed|queued|waiting_executor|preparing|recording|recorded|failed|rejected|cancelled',
+          'itemStatus: pending|analyzing|analyzed|queued|waiting_executor|preparing|recording|recorded|drafted|failed|rejected|cancelled',
+          '响应含 mode（record|draft）；summary 含 drafted 计数',
           'jobStatus: accepted|running|waiting_executor|cancelling|cancelled|completed|completed_with_errors|failed',
         ],
       },
@@ -806,16 +812,18 @@ export const API_GROUPS = [
           type: 'batch:progress',
           payload: {
             batchId: 'uuid',
+            mode: 'draft',
             itemId: 1,
             row: 2,
             trajectoryId: 42,
-            itemStatus: 'recording',
+            itemStatus: 'drafted',
             jobStatus: 'running',
             version: 3,
-            summary: { total: 5, recorded: 1, failed: 0 },
+            summary: { total: 5, recorded: 0, drafted: 1, failed: 0 },
           },
         }),
         notes: [
+          'payload 含 mode（record|draft）',
           '先写库再广播；允许丢失/乱序，前端用 version 去重并以 GET 状态为事实源',
           '批量页只需订阅 batch:*，无需编排 recording:*',
           '连接通道仍为 ws://<host>/ws',
@@ -829,11 +837,12 @@ export const API_GROUPS = [
           type: 'batch:done',
           payload: {
             batchId: 'uuid',
+            mode: 'record',
             jobStatus: 'completed_with_errors',
-            summary: { total: 5, recorded: 4, failed: 1, rejected: 0 },
+            summary: { total: 5, recorded: 4, drafted: 0, failed: 1, rejected: 0 },
           },
         }),
-        notes: ['连接通道仍为 ws://<host>/ws'],
+        notes: ['payload 含 mode（record|draft）', '连接通道仍为 ws://<host>/ws'],
       },
     ],
   },
@@ -1967,8 +1976,9 @@ export const RECORDING_FLOW = [
 
 export const BATCH_RECORDING_FLOW = [
   'GET /trajectories/batch/template → 填写 交易名称 / 需求描述',
-  'POST /trajectories/batch/import（file + functionId + systemAccountId + Idempotency-Key）→ HTTP 202',
-  '后台：analyze → 草稿 → prepare → record/start → detach（并行，全局 FIFO）',
+  'POST /trajectories/batch/import（file + functionId + systemAccountId + mode? + Idempotency-Key）→ HTTP 202',
+  'mode=record：analyze → 草稿 → prepare → record/start → detach（并行，全局 FIFO）',
+  'mode=draft：analyze → 草稿（itemStatus=drafted，不占执行机）',
   'WS batch:progress / batch:done；或 GET /trajectories/batch/{batchId} 轮询',
   '可选 POST .../batch/{batchId}/cancel',
 ];
