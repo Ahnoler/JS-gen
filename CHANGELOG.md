@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-07: **control-ops 分块闭环（section + buttons + xpath-first 写路径）**：`JS_SCAN_FORM_FIELDS` 为字段/按钮挂 `section_id`/`section_title`（collapse/tab/card）；Source B 对齐 `date`/`radio`/`checkbox`；扫描结果含 `buttons[]`；`run_form_assistant` / `scan_form_fields` 摘要返回 `sections[]` 与 `ambiguous_buttons[]`（同名按钮跨块时提示）。`fill_form_field`/`select_option`/`click_radio` 及 date/radio/checkbox 在 pending 项带 `xpath_smart` 时 xpath-first 执行；`click_save(button_text, section='')` 按区块定位保存，多处可见「保存」且无 `section` 时返回 `err-save-ambiguous` 不盲点。
+  影响范围：表单扫描、助手、live replay 写路径、保存按钮定位。
+  文件：scripts/actions/_js_snippets.py, scripts/actions/_form.py, scripts/actions/_replay.py, scripts/models/field.py, scripts/models/task.py, scripts/characterization/characterize-control-ops-closed-loop.py, scripts/characterization/characterize-form-scan-control-first.py, scripts/characterization/characterize-form-assistant.py, scripts/characterization/characterize-xpath-fill-select.py, scripts/prompts/agent-prompt.md
+  Python 同步提示：无（scripts 子进程行为；控制面 API 不变）。
+
 - 2026-08-07: 删除 `trajectory_step.is_replay` 列及 `idx_step_is_replay` 索引；列表/计数/组件签名不再按该列过滤。`POST .../steps/replay` 请求体 `isReplay` 仍为运行时抑制入库。
   影响范围：schema、trajectory step DAO/计数、operation-component 签名、api-docs。
   文件：migrations/20260807160000_drop_trajectory_step_is_replay.js, schemas/init.sql, src/dao/trajectory-step-dao.js, src/dao/trajectory-dao.js, src/services/trajectory-step-service.js, src/services/operation-component-signature.js, src/services/operation-component-service.js, src/services/trajectory-persist-service.js, src/dashboard/api-docs/catalog.js

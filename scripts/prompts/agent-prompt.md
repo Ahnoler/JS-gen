@@ -37,7 +37,7 @@
 - click_radio(label_text, option_text) — el-radio 单选组
 - **select_tree_option(label_text, option_text) — 仅用于真正的 TsscMultiTree 树形选择器（如行业代码、分类目录）。三段式匹配：P0 精确匹配（label/id）→ 非叶节点 DFS 取第一个叶后代；P1 UI关键词搜索 → 过滤列表下非叶节点 DFS 取第一个叶后代；P2 兜底取全树第一个叶节点。** **`option_text="first"` 会直接选第一片叶子（`ok-fallback:first`），是正常结果。`ok-fallback` 同理——系统已选最接近的叶节点。信任该结果，不要重新填写。** **🚨 若返回 `disabled`：字段只读（如新增弹窗里由侧栏树带出的「分类目录」）——禁止再 select/fill，跳过即可。** **🚨 若返回 `no-tree-component`：字段不是 TsscMultiTree（页面侧栏 `.el-tree` 也会误导）——禁止再次调用 `select_tree_option` / 禁止 check↔select 空转。立刻改用 `fill_form_field(label, 具体值)`（不要用 `"first"`），或若是 el-select 则用 `select_option`。`ok-fill-fallback` 表示系统已自动改用 fill 并成功，视为已完成。**
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
-- **click_save(button_text='保存') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
+- **click_save(button_text='保存', section='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `section=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections`）；无 `section` 且多匹配 → `err-save-ambiguous`。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
 - close_dialog() — 关闭最上层的 el-dialog 或 el-drawer。**不适用于通知 — 请使用 close_notification()。**
 - close_notification() — 关闭可见的 el-notification 弹窗，读取并返回其文本。如果没有则返回 "no-notification"。**用于处理服务端校验错误。`no-notification` ≠ 保存成功。**
 - expand_all_el_tree() — 完全展开 el-tree
@@ -56,7 +56,7 @@
 - click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。成功返回 `"ok-clicked"`；如果字段已有值则返回 `"already-filled"`（不以 ok 开头）— 跳过、不录制。
 
 ## 任务列表动作
-- **`run_form_assistant()` — 批量扫描并自动填写当前容器内可编辑字段。** 仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok | auto-fill-complete …` 及 `NEXT_ACTION: click_save()` 提示。
+- **`run_form_assistant()` — 批量扫描并自动填写当前容器内可编辑字段。** 仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok |` 后接 JSON：`status`（如 `auto-fill-complete`）、`sections[]`（各区块 `fields`/`buttons`/`pending` 计数）、可选 `ambiguous_buttons[]`（跨区块同名按钮）；`get_pending_tasks()` 仍含 `NEXT_ACTION: click_save()`。
 - **`scan_form_fields()` — 仅扫描并初始化任务列表 / 摘要，不自动填写。** 不要在列表页或不需要填表的页面调用。后续检查用 `scan_visible_fields`。
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
 - **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要）。**
@@ -103,7 +103,7 @@
 **你需要的纪律：**
 - **🚨 修改所有字段（CRITICAL）：** 若任务类型为「表单修改—全部字段」（或写明「修改表单中所有字段」），先 `run_form_assistant()`（合约允许时），再**覆盖每一个可编辑字段为新值**。**禁止**只 `check_field_value` 核对回显后就 `click_save`/`done`。
 - **表单修改—部分字段：** 只改任务点名的字段；**禁止**调用 `run_form_assistant` / 盲目重选未提及字段。
-- **`run_form_assistant` 完成后（pending≈0）：直接调用 `click_save()`。** 不要再用 `select_option(..., "first")` 批量重选。不要 `scroll_down` 找保存按钮。
+- **`run_form_assistant` 完成后（pending≈0）：直接调用 `click_save()`。** 若 `ambiguous_buttons` 含「保存」等多处同名按钮，须 `click_save('保存', section='…')` 指定区块标题。不要再用 `select_option(..., "first")` 批量重选。不要 `scroll_down` 找保存按钮。
 - **每步最多 2～3 个 select_option**，不要一次并行十几个 — 下拉残留会串选项。
 - **性别等 radio 字段用 `click_radio`，不要用 `select_option`。**
 - **只填写/修改任务明确提到的字段**（表单填写时其余交给助手；部分修改时未提及的保留）。
@@ -143,8 +143,8 @@
 ```
 # 主页面/抽屉 — 显式调用 run_form_assistant
 run_form_assistant()
-→ "ok | auto-fill-complete done=58 fillable_pending=0 | NEXT_ACTION: click_save()"
-→ 立即 click_save()——不要再 fill/select
+→ ok | {"status":"auto-fill-complete","sections":[{"section_title":"评级等级测算","fields":40,"pending":0},…],"ambiguous_buttons":[{"text":"保存","sections":[{"section_title":"系统评级结论"},…]}]}
+→ 无 ambiguous 时 click_save()；有则 click_save('保存', section='系统评级结论')
 
 get_pending_tasks() → {"pending":[],"NEXT_ACTION":"click_save()",...}
 → click_save()
