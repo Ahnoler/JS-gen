@@ -612,7 +612,16 @@ JS_CLICK_RADIO_BY_XPATH = r'''([xpath, option]) => {
       }
       return 'option-not-found';
     };
-    const hostEl = host.closest?.('.el-form-item') || host;
+    const resolveGroupHost = (node) => {
+      if (!node) return null;
+      return node.closest?.('.el-radio-group')
+        || node.closest?.('.el-checkbox-group')
+        || node.closest?.('td, .el-table__cell')
+        || node.closest?.('tr')
+        || node.closest?.('.el-form-item')
+        || node;
+    };
+    const hostEl = resolveGroupHost(host);
     const radios = hostEl.querySelectorAll('.el-radio');
     if (radios.length) return pick(radios);
     const boxes = hostEl.querySelectorAll('.el-checkbox');
@@ -1646,14 +1655,8 @@ JS_READ_CURRENT_VALUE = '''(inputEl, trigger, item) => {
 
 # ── Form field scanning ──
 
-JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
-''' + PAGE_LOCATOR_HELPERS + '''
-    const container = ''' + JS_GET_CONTAINER + ''';
-    const classify = ''' + JS_CLASSIFY_FIELD + ''';
-    const isDisabled = ''' + JS_FIELD_DISABLED + ''';
-    const isRequired = ''' + JS_FIELD_REQUIRED + ''';
-    const readValue = ''' + JS_READ_CURRENT_VALUE + ''';
-    /* SECTION_ATTACH */
+# Shared collapse/tab/card section attach (scan + click_save use same title#n dedupe).
+JS_SECTION_ATTACH_BLOCK = r'''
     const sectionAssignments = new WeakMap();
     const sectionTitleCounts = new Map();
     const sectionOf = (el) => {
@@ -1661,7 +1664,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         const collapse = el.closest && el.closest('.el-collapse-item');
         if (collapse) {
             const header = collapse.querySelector('.el-collapse-item__header');
-            let title = (header && (header.innerText || header.textContent) || '').replace(/\\s+/g, ' ').trim();
+            let title = (header && (header.innerText || header.textContent) || '').replace(/\s+/g, ' ').trim();
             title = title.slice(0, 40);
             const id = title || '__collapse__';
             return { section_id: id, section_title: title };
@@ -1675,7 +1678,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
                 if (paneId) {
                     const tabItem = tabs.querySelector('.el-tabs__item[aria-controls="' + paneId + '"]');
                     if (tabItem) {
-                        tabLabel = (tabItem.innerText || tabItem.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+                        tabLabel = (tabItem.innerText || tabItem.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
                     }
                 }
                 if (!tabLabel) {
@@ -1683,7 +1686,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
                     const items = tabs.querySelectorAll('.el-tabs__item');
                     for (let pi = 0; pi < panes.length; pi++) {
                         if (panes[pi] === pane && items[pi]) {
-                            tabLabel = (items[pi].innerText || items[pi].textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+                            tabLabel = (items[pi].innerText || items[pi].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
                             break;
                         }
                     }
@@ -1695,7 +1698,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         const card = el.closest && el.closest('.el-card');
         if (card) {
             const h = card.querySelector('.el-card__header');
-            const title = (h && (h.innerText || h.textContent || '') || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+            const title = (h && (h.innerText || h.textContent || '') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
             if (title) return { section_id: title, section_title: title };
         }
         return { section_id: '__root__', section_title: '' };
@@ -1728,6 +1731,17 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         sectionAssignments.set(anchor, assigned);
         Object.assign(field, assigned);
     };
+'''
+
+JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
+''' + PAGE_LOCATOR_HELPERS + '''
+    const container = ''' + JS_GET_CONTAINER + ''';
+    const classify = ''' + JS_CLASSIFY_FIELD + ''';
+    const isDisabled = ''' + JS_FIELD_DISABLED + ''';
+    const isRequired = ''' + JS_FIELD_REQUIRED + ''';
+    const readValue = ''' + JS_READ_CURRENT_VALUE + ''';
+    /* SECTION_ATTACH */
+''' + JS_SECTION_ATTACH_BLOCK + '''
     const getRowLeadingText = (row) => {
         const cells = row.querySelectorAll('td, .el-table__cell');
         for (let i = 0; i < cells.length; i++) {
@@ -2193,55 +2207,16 @@ JS_CLICK_SAVE_BUTTON = r'''(buttonArg) => {
     }
     return '/' + parts.join('/');
   };
-  const sectionOf = (el) => {
-    if (!el) return { section_id: '__root__', section_title: '' };
-    const collapse = el.closest && el.closest('.el-collapse-item');
-    if (collapse) {
-      const header = collapse.querySelector('.el-collapse-item__header');
-      let title = (header && (header.innerText || header.textContent) || '').replace(/\s+/g, ' ').trim();
-      title = title.slice(0, 40);
-      const id = title || '__collapse__';
-      return { section_id: id, section_title: title };
-    }
-    const pane = el.closest && el.closest('.el-tab-pane');
-    if (pane) {
-      const tabs = pane.closest && pane.closest('.el-tabs');
-      if (tabs) {
-        const paneId = pane.getAttribute('id') || '';
-        let tabLabel = '';
-        if (paneId) {
-          const tabItem = tabs.querySelector('.el-tabs__item[aria-controls="' + paneId + '"]');
-          if (tabItem) {
-            tabLabel = (tabItem.innerText || tabItem.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-          }
-        }
-        if (!tabLabel) {
-          const panes = tabs.querySelectorAll('.el-tab-pane');
-          const items = tabs.querySelectorAll('.el-tabs__item');
-          for (let pi = 0; pi < panes.length; pi++) {
-            if (panes[pi] === pane && items[pi]) {
-              tabLabel = (items[pi].innerText || items[pi].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-              break;
-            }
-          }
-        }
-        if (tabLabel) return { section_id: tabLabel, section_title: tabLabel };
-      }
-      return { section_id: '__root__', section_title: '' };
-    }
-    const card = el.closest && el.closest('.el-card');
-    if (card) {
-      const h = card.querySelector('.el-card__header');
-      const title = (h && (h.innerText || h.textContent || '') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-      if (title) return { section_id: title, section_title: title };
-    }
-    return { section_id: '__root__', section_title: '' };
-  };
+''' + JS_SECTION_ATTACH_BLOCK + r'''
+  const stripSecSuffix = (s) => normSec(s).replace(/#\d+$/, '');
   const secMatches = (m) => {
     if (!wantNorm) return true;
     const id = normSec(m.section_id);
     const title = normSec(m.section_title);
-    return id === wantNorm || title === wantNorm;
+    const wantBase = stripSecSuffix(wantNorm);
+    return id === wantNorm || title === wantNorm
+      || stripSecSuffix(id) === wantNorm || stripSecSuffix(id) === wantBase
+      || title === wantBase;
   };
   const toCandidate = (m) => ({
     section_title: m.section_title || '',
@@ -2273,13 +2248,14 @@ JS_CLICK_SAVE_BUTTON = r'''(buttonArg) => {
     if (!text || text.length > 40) continue;
     const sc = scoreBtn(el, text);
     if (sc < 0) continue;
-    const sec = sectionOf(el);
+    const secField = {};
+    attachSection(secField, el);
     matches.push({
       el,
       text,
       score: sc,
-      section_id: sec.section_id,
-      section_title: sec.section_title,
+      section_id: secField.section_id,
+      section_title: secField.section_title,
     });
   }
   const filtered = wantNorm ? matches.filter(secMatches) : matches;

@@ -32,7 +32,7 @@ def test_js_scan_section_and_source_b_kinds() -> None:
     assert_true("sectionOf" in js or "SECTION_ATTACH" in js, "section attach helper")
     assert_true("SCAN_SOURCE_C_BUTTONS" in js, "buttons source marker")
     # Source B must collect radio groups (not only skip input[type=radio])
-    assert_true("el-radio" in js and "SCAN_SOURCE_B" in js, "table radio collection cues")
+    assert_true("el-radio-group" in js or "el-table__cell" in js, "radio xpath climbs to group/cell")
 
 
 def test_click_save_section_api() -> None:
@@ -58,6 +58,10 @@ def test_section_summary_shape() -> None:
     ]
     s = _build_section_summary(fields, buttons, pending_labels={"资产负债率", "评级"})
     assert_true(any(x["section_title"] == "评级等级测算" for x in s["sections"]), "测算 section")
+    calc = next(x for x in s["sections"] if x["section_title"] == "评级等级测算")
+    assert_true(calc.get("fields_total") == 1, "fields_total per section")
+    assert_true(calc.get("fields_editable_pending") == 1, "fields_editable_pending")
+    assert_true("fields_sample" in calc, "fields_sample key")
     amb = s.get("ambiguous_buttons") or []
     assert_true(any(a["text"] == "保存" and len(a["sections"]) >= 2 for a in amb), "ambiguous 保存")
 

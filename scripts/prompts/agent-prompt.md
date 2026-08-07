@@ -56,7 +56,7 @@
 - click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。成功返回 `"ok-clicked"`；如果字段已有值则返回 `"already-filled"`（不以 ok 开头）— 跳过、不录制。
 
 ## 任务列表动作
-- **`run_form_assistant()` — 批量扫描并自动填写当前容器内可编辑字段。** 仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok |` 后接 JSON：`status`（如 `auto-fill-complete`）、`sections[]`（各区块 `fields`/`buttons`/`pending` 计数）、可选 `ambiguous_buttons[]`（跨区块同名按钮）；`get_pending_tasks()` 仍含 `NEXT_ACTION: click_save()`。
+- **`run_form_assistant()` — 批量扫描并自动填写当前容器内可编辑字段。** 仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok |` 后接 JSON：`status`（如 `auto-fill-complete`）、`sections[]`（各区块含 `section_id`/`section_title`、`fields_total`、`fields_editable_pending`、`fields_sample`、`buttons`）、可选 `ambiguous_buttons[]`（跨区块同名按钮）；`get_pending_tasks()` 仍含 `NEXT_ACTION: click_save()`。
 - **`scan_form_fields()` — 仅扫描并初始化任务列表 / 摘要，不自动填写。** 不要在列表页或不需要填表的页面调用。后续检查用 `scan_visible_fields`。
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
 - **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要）。**
@@ -143,7 +143,7 @@
 ```
 # 主页面/抽屉 — 显式调用 run_form_assistant
 run_form_assistant()
-→ ok | {"status":"auto-fill-complete","sections":[{"section_title":"评级等级测算","fields":40,"pending":0},…],"ambiguous_buttons":[{"text":"保存","sections":[{"section_title":"系统评级结论"},…]}]}
+→ ok | {"status":"auto-fill-complete","sections":[{"section_id":"评级等级测算","section_title":"评级等级测算","fields_total":40,"fields_editable_pending":0,"fields_sample":["资产负债率"],"buttons":["暂存"]},…],"ambiguous_buttons":[{"text":"保存","sections":[{"section_id":"系统评级结论","section_title":"系统评级结论"},…]}]}
 → 无 ambiguous 时 click_save()；有则 click_save('保存', section='系统评级结论')
 
 get_pending_tasks() → {"pending":[],"NEXT_ACTION":"click_save()",...}

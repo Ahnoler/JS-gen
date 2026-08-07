@@ -102,6 +102,7 @@ def _build_section_summary(
     """Group scan fields/buttons by section for model-facing summaries.
 
     fields_sample: up to 5 labels per section (pending first).
+    fields_total / fields_editable_pending: per-section counts (pending ∩ labels, disabled-aware).
     ambiguous_buttons: same label in >=2 distinct section_id groups.
     """
     pending = set(pending_labels or [])
@@ -116,7 +117,7 @@ def _build_section_summary(
                 'section_title': (section_title or '').strip(),
                 'fields_sample': [],
                 'buttons': [],
-                '_labels': [],
+                '_field_entries': [],
             }
             order.append(key)
         return by_key[key]
@@ -127,7 +128,10 @@ def _build_section_summary(
         sec = _ensure(f.get('section_id') or '', f.get('section_title') or '')
         label = (f.get('label') or '').strip()
         if label:
-            sec['_labels'].append(label)
+            sec['_field_entries'].append({
+                'label': label,
+                'disabled': bool(f.get('disabled')),
+            })
 
     for b in buttons:
         if not isinstance(b, dict):
@@ -139,7 +143,20 @@ def _build_section_summary(
 
     for key in order:
         sec = by_key[key]
-        labels = sec.pop('_labels')
+        entries = sec.pop('_field_entries')
+        label_meta: dict[str, bool] = {}
+        for entry in entries:
+            lbl = entry['label']
+            dis = entry['disabled']
+            if lbl not in label_meta:
+                label_meta[lbl] = dis
+            else:
+                label_meta[lbl] = label_meta[lbl] and dis
+        labels = list(label_meta.keys())
+        sec['fields_total'] = len(label_meta)
+        sec['fields_editable_pending'] = sum(
+            1 for lbl, dis in label_meta.items() if lbl in pending and not dis
+        )
         seen: set[str] = set()
         sample: list[str] = []
         for label in labels:
@@ -1294,6 +1311,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                             result = await page.evaluate(
                                 JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
                             )
+                            if not _is_ok_result(result):
+                                result = await page.evaluate(JS_CLICK_RADIO, [label, value])
                         else:
                             result = await page.evaluate(JS_CLICK_RADIO, [label, value])
                     elif field_kind == 'checkbox' or kind == 'checkbox':
@@ -1301,6 +1320,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                             result = await page.evaluate(
                                 JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
                             )
+                            if not _is_ok_result(result):
+                                result = await _select_by_label(page, label, value, field_kind)
                         else:
                             result = await _select_by_label(page, label, value, field_kind)
                     elif field_kind == 'tree-select' or kind in (
@@ -2235,6 +2256,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         xp = _task_xpath_smart(case_data_store, label_text)
         if xp:
             result = await page.evaluate(JS_CLICK_RADIO_BY_XPATH, [xp, option_text])
+            if not _is_ok_result(result):
+                result = await page.evaluate(JS_CLICK_RADIO, [label_text, option_text])
         else:
             result = await page.evaluate(JS_CLICK_RADIO, [label_text, option_text])
         if _is_ok_result(result):
