@@ -18,6 +18,16 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-07: **表单扫描 control-first + el-table（Source B）**：`JS_SCAN_FORM_FIELDS` 在 Source A（`.el-form-item`）之外发现可见 `el-table` 可编辑单元格；每条字段输出相对 `xpath_smart`；按 xpath 去重（冲突时保留 form-item 元数据）；`ScannedField` / `TaskItem` / `form_snapshot.fields_fingerprint` 携带 xpath；无 label 仅有 placeholder 的控件纳入扫描（displayName=placeholder）。表单助手与 `save_form_snapshot` 共用同一扫描结果。
+  影响范围：run_form_assistant 批量填写、录制 form_snapshot、live replay 定位语义。
+  文件：scripts/actions/_js_snippets.py, scripts/models/field.py, scripts/models/task.py, scripts/models/form_snapshot.py, scripts/characterization/characterize-form-scan-control-first.py
+  Python 同步提示：无（scripts 子进程扫描语义；控制面 API 不变）。
+
+- 2026-08-07: **表单助手 xpath-first 执行**：pending 项带 `xpath_smart` 时 `_auto_fill_pending` / `_execute_round` 优先 `JS_FILL_BY_XPATH` / `JS_SELECT_TRIGGER_BY_XPATH`；`TaskList.mark_done` 按 xpath 消歧同名 label；xpath fill/select 从 `_replay.py` 抽到 `_js_snippets.py` 供助手与回放共用。legacy 轨迹无 xpath 时仍走 label 回退。
+  影响范围：run_form_assistant、live replay fill/select。
+  文件：scripts/actions/_form.py, scripts/actions/_js_snippets.py, scripts/actions/_replay.py, scripts/characterization/characterize-form-assistant.py, scripts/characterization/characterize-xpath-fill-select.py
+  Python 同步提示：无（scripts 子进程）。
+
 - 2026-08-07: AI 录制阶段结果 **`prior_outcome.success` 缺省改为未知（`null`）**，不再把「未收到明确 done(success)」当成成功。`phase_done` 无 outcome 时 Python 显式发 `success: null`；控制面仅在 `true`/`false` 时写入成败，文案走「未知」。
   影响范围：录制生命周期 prior 注入、session `phase_done`。
   文件：src/services/trajectory-record-lifecycle.js, scripts/session_runner.py
@@ -51,6 +61,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：对齐新表 schema + `/api/v2/operation-components*`；`trajectory_phase.component_id` 可空预留；mine/CRUD 语义见 CHANGELOG。
 
 ### Fixed
+
+- 2026-08-07: **el-table 页面表单助手仅扫到少量 `.el-form-item` 字段**（实锤：评级等级测算 ~40 个可编辑表格单元格不可见，仅 3 项进入 pending）。根因：扫描仅 form-item-centric。现 control-first 扫描 + el-table Source B + xpath 去重；同名控件（如不同折叠区两个「保存」）靠 xpath 区分，不靠 displayName 合并。
+  影响范围：表单助手扫描与批量填写。
+  文件：scripts/actions/_js_snippets.py, scripts/models/field.py, scripts/models/task.py, scripts/models/form_snapshot.py, scripts/actions/_form.py
+  Python 同步提示：无（scripts 子进程）。**未修复**：`click_save` 多「保存」按钮仍只点第一个；主 Agent 全页 DOM 仍为 Future TODO（见 spec）。
 
 - 2026-08-07: **`close_dialog` 关不了 el-drawer**（轨迹 36 回归）。根因：`el-dialog__close` icon class 被误判为 dialog 容器，xpath_smart 只挂 dialog；live replay 死磕 xpath 失败也不回退控制器。现：`detectContainerKind` 不再把 `el-dialog__*` 当容器；close 默认 `overlay`（dialog+message-box+drawer）；replay xpath 失败则 CTRL/controller 回退。
   影响范围：CDP/录制定位、live steps/replay。
