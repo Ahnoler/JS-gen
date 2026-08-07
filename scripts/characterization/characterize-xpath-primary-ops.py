@@ -68,12 +68,26 @@ def test_resolve_duplicate_same_xpath() -> None:
     assert_true(r.error == "" and r.xpath_smart == xp, "identical xpath not ambiguous")
 
 
+def test_scan_display_label_markers() -> None:
+    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    assert_true(
+        "const displayLabel = label || placeholder || ''" in js
+        or "displayLabel = label || placeholder" in js,
+        "Source A synthesizes displayLabel from placeholder",
+    )
+    assert_true(
+        "buildTableDisplayName" in js and "placeholder" in js,
+        "table display name can use placeholder",
+    )
+
+
 def main() -> int:
     test_resolve_hint_wins()
     test_resolve_unique_label()
     test_resolve_not_found()
     test_resolve_ambiguous()
     test_resolve_duplicate_same_xpath()
+    test_scan_display_label_markers()
     form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
     assert_true("def _resolve_control" in form, "_resolve_control defined")
     print("characterize-xpath-primary-ops: OK")
