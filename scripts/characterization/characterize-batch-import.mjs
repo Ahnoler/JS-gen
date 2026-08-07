@@ -4,6 +4,9 @@
  * Usage: node scripts/characterization/characterize-batch-import.mjs
  */
 import assert from 'assert';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import {
   buildTemplateBuffer,
   parseBatchExcelBuffer,
@@ -173,6 +176,27 @@ function testConstantsAndTerminal() {
   ok('job terminal derivation');
 }
 
+function testDraftPumpReclaimsAnalyzed() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const src = readFileSync(
+    join(here, '../../src/services/trajectory-batch-service.js'),
+    'utf8',
+  );
+  assert.match(src, /async function pumpDraft\(/, 'pumpDraft defined');
+  assert.match(src, /pumpDraft\(\)\.catch/, 'kickScheduler invokes pumpDraft');
+  assert.match(
+    src,
+    /async function pumpDraft\(\)[\s\S]*?statuses:\s*\['analyzed'\]/,
+    'pumpDraft claims analyzed orphans',
+  );
+  assert.match(
+    src,
+    /async function pumpRecord\(\)[\s\S]*?statuses:\s*\['queued',\s*'waiting_executor'\]/,
+    'pumpRecord claims queued/waiting_executor only',
+  );
+  ok('draft pump reclaims analyzed orphans');
+}
+
 async function main() {
   console.log('\n=== characterize-batch-import ===\n');
   for (const [name, fn] of [
@@ -182,6 +206,7 @@ async function main() {
     ['maxRows', testMaxRows],
     ['requestHash', testRequestHash],
     ['constantsAndTerminal', testConstantsAndTerminal],
+    ['draftPumpReclaimsAnalyzed', testDraftPumpReclaimsAnalyzed],
   ]) {
     try {
       await fn();

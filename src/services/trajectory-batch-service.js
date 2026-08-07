@@ -34,6 +34,7 @@ import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../models/constants.js';
 const cancelledAnalyzeTokens = new Set();
 
 let analyzeWorkers = 0;
+let draftWorkers = 0;
 let recordWorkers = 0;
 let schedulerTimer = null;
 let kicking = false;
@@ -320,6 +321,7 @@ export function kickScheduler() {
   setImmediate(() => {
     kicking = false;
     pumpAnalyze().catch((err) => console.error('[batch] analyze pump:', err));
+    pumpDraft().catch((err) => console.error('[batch] draft pump:', err));
     pumpRecord().catch((err) => console.error('[batch] record pump:', err));
   });
 }
@@ -448,7 +450,7 @@ async function runAnalyze(item, token) {
 }
 
 /**
- * Atomic: create trajectory+phases+case + bind item → queued.
+ * Create trajectory+phases+case from analyzed item; draft → drafted, record → queued.
  */
 async function createDraftFromAnalyzed(item) {
   const job = await batchDao.getJobById(item.batchId);
@@ -539,6 +541,37 @@ async function computeClusterFreeSlots() {
   return free;
 }
 
+/**
+ * Claim analyzed items lacking trajectoryId (draft + record) and bind trajectory.
+ * No executor slots; survives restart via kickScheduler / recovery lease clear.
+ */
+async function pumpDraft() {
+  while (draftWorkers < BATCH_ANALYZE_CONCURRENCY) {
+    const token = randomUUID();
+    const item = await batchDao.claimNextItem({
+      statuses: ['analyzed'],
+      workerToken: token,
+      leaseMs: BATCH_ITEM_LEASE_MS,
+      jobStatuses: ['accepted', 'running', 'waiting_executor'],
+    });
+    if (!item) break;
+
+    if (item.trajectoryId) {
+      await batchDao.transitionItem(item.id, ['analyzed'], 'analyzed', {
+        version: item.version,
+        clearLease: true,
+      });
+      continue;
+    }
+
+    draftWorkers += 1;
+    createDraftFromAnalyzed(item).finally(() => {
+      draftWorkers -= 1;
+      kickScheduler();
+    });
+  }
+}
+
 async function pumpRecord() {
   // Dynamic: start as many workers as free slots (at least try one if waiting)
   const free = await computeClusterFreeSlots();
@@ -546,23 +579,13 @@ async function pumpRecord() {
   while (recordWorkers < want) {
     const token = randomUUID();
     const item = await batchDao.claimNextItem({
-      statuses: ['queued', 'waiting_executor', 'analyzed'],
+      statuses: ['queued', 'waiting_executor'],
       workerToken: token,
       leaseMs: BATCH_ITEM_LEASE_MS,
       jobStatuses: ['accepted', 'running', 'waiting_executor'],
       jobModes: ['record'],
     });
     if (!item) break;
-
-    // analyzed without trajectory should go to draft create first
-    if (item.status === 'analyzed' && !item.trajectoryId) {
-      recordWorkers += 1;
-      createDraftFromAnalyzed(item).finally(() => {
-        recordWorkers -= 1;
-        kickScheduler();
-      });
-      continue;
-    }
 
     if (!item.trajectoryId) {
       await batchDao.markItemFailed(item.id, [item.status], {
