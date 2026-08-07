@@ -986,6 +986,96 @@ JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath]) => {
   return 'ok-triggered';
 }'''
 
+# Read current el-select display value by xpath (no click). Same resolve path as trigger.
+# Returns: ok-already:<value> | empty | xpath-miss | xpath-empty | no-select-found
+JS_SELECT_VALUE_BY_XPATH = r'''([xpath]) => {
+  if (!xpath) return 'xpath-empty';
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    return isVis(d) || (wrap && isVis(wrap));
+  };
+  const lastVisibleHost = (drawer) => {
+    const sel = drawer ? '.el-drawer' : '.el-dialog, .el-message-box';
+    const all = [...document.querySelectorAll(sel)];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const findNodeFromSnap = (snap, root) => {
+    for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+      const n = snap.snapshotItem(i);
+      if (!n || !isVis(n)) continue;
+      if (root && root !== document && !root.contains(n)) continue;
+      return n;
+    }
+    return null;
+  };
+  const tryXpath = (xp, root) => {
+    if (!xp) return null;
+    let s = String(xp);
+    try {
+      const ctx = root || document;
+      if (root && s.startsWith('//')) s = '.' + s;
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      return findNodeFromSnap(snap, root);
+    } catch (e) {
+      return null;
+    }
+  };
+  const findSelectHost = (node) => {
+    if (!node) return null;
+    if (node.matches && node.matches('.el-select')) return node;
+    const host = node.closest?.('.el-select');
+    if (host) return host;
+    const nested = node.querySelector?.('.el-select');
+    return nested || null;
+  };
+  const readSelected = (select) => {
+    if (!select) return '';
+    const trigger = select.querySelector('.el-input__inner');
+    if (trigger) {
+      const v = (trigger.value || '').trim();
+      if (v && !v.includes('请选择')) return v;
+      // Do not trust attribute alone when DOM property is empty (Vue clear leaves stale attr).
+      const aria = (trigger.getAttribute('aria-label') || trigger.getAttribute('title') || '').trim();
+      if (aria && !aria.includes('请选择')) return aria;
+    }
+    const tag = select.querySelector('.el-select__tags-text');
+    if (tag) {
+      const t = (tag.textContent || '').trim();
+      if (t && !t.includes('请选择')) return t;
+    }
+    const single = select.querySelector('.el-select__selected-item, .el-select__placeholder');
+    if (single) {
+      const t = (single.textContent || '').trim();
+      if (t && !t.includes('请选择') && !single.classList?.contains('el-select__placeholder')) return t;
+    }
+    return '';
+  };
+  let node = tryXpath(xpath, null);
+  if (!node && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
+    const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
+    const local = m && m[1] ? m[1] : '';
+    const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleHost(true) : lastVisibleHost(false);
+    if (dlg && local) node = tryXpath('.//' + local, dlg);
+  }
+  if (!node) return 'xpath-miss';
+  const select = findSelectHost(node);
+  if (!select) return 'no-select-found';
+  const cur = readSelected(select);
+  if (cur) return 'ok-already:' + cur;
+  return 'empty';
+}'''
+
 JS_SELECT_OPTION = '''async (arg) => {
     // arg: string option text, or [option, exactOnly]
     // exactOnly=true → only exact label match (replay must not drift from recorded value)

@@ -29,7 +29,7 @@ from ._js_snippets import (
     JS_FILL_FORM_FIELD, JS_FILL_BY_XPATH,
     JS_FILL_DATE_BY_XPATH,
     JS_FIND_LABELED_SELECT, JS_SELECT_OPTION,
-    JS_SELECT_TRIGGER_BY_XPATH, JS_LOCATOR,
+    JS_SELECT_TRIGGER_BY_XPATH, JS_SELECT_VALUE_BY_XPATH, JS_LOCATOR,
     JS_CLICK_RADIO_BY_XPATH,
     JS_SELECT_TREE_OPTION,
     JS_SCROLL_TO_FIRST_ERROR,
@@ -1186,6 +1186,17 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             xp = (xpath_smart or '').strip()
             if not xp:
                 return 'xpath-not-found'
+            _FIRST = ('first', '1st', '第一个', '第一项')
+            already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+            if str(already).startswith('ok-already:'):
+                cur_val = already.split(':', 1)[1]
+                if (
+                    (value or '').strip().lower() in _FIRST
+                    or cur_val == value
+                    or value in cur_val
+                    or cur_val in value
+                ):
+                    return already
             trigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
             if not str(trigger).startswith('ok'):
                 return trigger
@@ -1193,6 +1204,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             result = await page.evaluate(JS_SELECT_OPTION, value)
             if str(result).startswith('option-not-found:'):
                 result = await page.evaluate(JS_SELECT_OPTION, 'first')
+            if str(result) == 'no-items':
+                recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+                if str(recheck).startswith('ok-already:'):
+                    return recheck
             return result
 
         KIND_ORDER = {'date': 0, 'select': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
@@ -2129,8 +2144,34 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         element = await _capture_element(page, label_text, target_kind='form_select')
 
-        # Phase A: no JS_FIND_LABELED_SELECT already-matched short-circuit —
-        # proceed via xpath trigger only (see task-3 report concern).
+        # Xpath-only already-matched (no JS_FIND_LABELED_SELECT).
+        already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+        if str(already).startswith('ok-already:'):
+            cur_val = already.split(':', 1)[1]
+            _FIRST = ('first', '1st', '第一个', '第一项')
+            # "first" means "any existing value is fine" — do NOT re-open the
+            # dropdown (re-selecting first can cascade-reset dependent fields).
+            if (
+                (option_text or '').strip().lower() in _FIRST
+                or cur_val == option_text
+                or option_text in cur_val
+                or cur_val in option_text
+            ):
+                params, element = await _pack_select_record(
+                    page, case_data_store, label_text, option_text, element,
+                )
+                params['xpath_smart'] = xp
+                _record_action('select_option', params, already, element=element)
+                _task_done_impl(
+                    label_text, case_data_store, value=cur_val or option_text, xpath_smart=xp,
+                )
+                streak = int(case_data_store.get('_already_matched_streak', 0) or 0) + 1
+                case_data_store['_already_matched_streak'] = streak
+                return _ok(_with_submit_cue(
+                    already + ' | already-matched | SKIP — field already set; do not re-select',
+                    case_data_store,
+                ))
+
         case_data_store['_already_matched_streak'] = 0
 
         # Close any leftover open dropdowns before opening the target select
@@ -2170,7 +2211,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             )
             return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
         elif select_result == 'no-items':
-            # Phase A: no labeled recheck — surface no-items directly
+            # Xpath recheck — treat already-set field as success (no labeled JS).
+            recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+            if str(recheck).startswith('ok-already:'):
+                cur = recheck.split(':', 1)[1]
+                _task_done_impl(label_text, case_data_store, value=cur, xpath_smart=xp)
+                _record_action('select_option', params, recheck, element=element)
+                return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', case_data_store))
             return _err('no-items')
         elif select_result.startswith('option-not-found:'):
             # Fuzzy: pick listed option that contains / is contained by option_text
