@@ -20,11 +20,9 @@ report/
 report2/
 atp-record/
 docs/
-# Local scratch probes / temp outputs (do not match scripts/__init__.py)
-scripts/_probe_*
-scripts/_tmp_*
-scripts/_verify_*
-scripts/_traj*
+# Local scratch probes / temp outputs (single folder, no longer matches scripts/__init__.py)
+scripts/_scratch/
+scripts/smoke/
 chorme-devtools-mcp/
 playwright-cli/
 browser/
