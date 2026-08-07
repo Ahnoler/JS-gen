@@ -8,6 +8,7 @@ Element UI form interaction.
 import json
 import re
 import sys
+from dataclasses import dataclass
 
 from ..agent_utils import emit_json
 from ._state import (
@@ -372,21 +373,61 @@ def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store
     return snapshot
 
 
-def _task_xpath_smart(case_data_store, label_text: str, xpath_hint: str = "") -> str:
-    """Resolve xpath_smart for a label from hint, task list, or last scan."""
-    xp = (xpath_hint or "").strip()
-    if xp:
-        return xp
+@dataclass(frozen=True)
+class ResolvedControl:
+    xpath_smart: str
+    label: str
+    error: str = ""
+
+
+def _resolve_control(case_data_store, label_text: str, xpath_hint: str = "") -> ResolvedControl:
+    label = (label_text or "").strip()
+    hint = (xpath_hint or "").strip()
+    if hint:
+        resolved_label = label
+        for f in case_data_store.get("_scan_fields") or []:
+            if isinstance(f, dict) and (f.get("xpath_smart") or "").strip() == hint:
+                resolved_label = (f.get("label") or label).strip() or label
+                break
+        if resolved_label == label:
+            tl = TaskList.from_store(case_data_store.get("task_list"))
+            for item in list(tl.pending) + list(tl.done):
+                if (item.xpath_smart or "").strip() == hint and (item.label or "").strip():
+                    resolved_label = item.label.strip()
+                    break
+        return ResolvedControl(xpath_smart=hint, label=resolved_label or label, error="")
+
+    matches: list[tuple[str, str]] = []
+    seen_xp: set[str] = set()
     tl = TaskList.from_store(case_data_store.get("task_list"))
-    for item in tl.pending:
+    for item in list(tl.pending) + list(tl.done):
         if item.label == label_text and (item.xpath_smart or "").strip():
-            return item.xpath_smart.strip()
+            xp = item.xpath_smart.strip()
+            if xp not in seen_xp:
+                seen_xp.add(xp)
+                matches.append((xp, item.label))
     for f in case_data_store.get("_scan_fields") or []:
-        if isinstance(f, dict) and f.get("label") == label_text:
-            fx = (f.get("xpath_smart") or "").strip()
-            if fx:
-                return fx
-    return ""
+        if not isinstance(f, dict):
+            continue
+        if f.get("label") != label_text:
+            continue
+        xp = (f.get("xpath_smart") or "").strip()
+        if xp and xp not in seen_xp:
+            seen_xp.add(xp)
+            matches.append((xp, str(f.get("label") or label_text)))
+
+    if not matches:
+        return ResolvedControl(xpath_smart="", label=label_text or "", error="xpath-not-found")
+    if len(matches) == 1:
+        xp, lab = matches[0]
+        return ResolvedControl(xpath_smart=xp, label=lab, error="")
+    return ResolvedControl(xpath_smart="", label=label_text or "", error="ambiguous-label")
+
+
+def _task_xpath_smart(case_data_store, label_text: str, xpath_hint: str = "") -> str:
+    """Compat wrapper — prefer _resolve_control; returns xpath or '' (not error codes)."""
+    r = _resolve_control(case_data_store, label_text, xpath_hint)
+    return r.xpath_smart if not r.error else ""
 
 
 def _task_done_impl(label_text, case_data_store, value=None, xpath_smart=""):
