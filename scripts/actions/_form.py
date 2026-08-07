@@ -1524,10 +1524,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'then scan the whole page for .el-form-item__error and success/error notifications. '
         'Prefer this over scroll_down + click_element_by_index for form submit (including '
         'maintain/edit dialog 确认). '
+        'Optional section scopes to a collapse/tab/card block when multiple同名按钮 exist. '
         'Returns ok-save-success when 操作成功 toast appears, or ok-save-navigation when URL changes after save. '
         'no-notification without navigation is NOT success. On validation errors returns err-save-validation.'
     )
-    async def click_save(button_text: str = '保存'):
+    async def click_save(button_text: str = '保存', section: str = ''):
         from ._phase_intent import check_pending_write_gate, record_success_token
 
         page = await browser_context.get_current_page()
@@ -1541,7 +1542,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         )
         query_ui = await _mark_query_ui_if_needed(page, case_data_store, container_id)
         sys.stderr.write(
-            f'[click_save] enter button={button_text!r} compact={compact_btn!r} '
+            f'[click_save] enter button={button_text!r} section={section!r} compact={compact_btn!r} '
             f'query_ui={query_ui} picker_confirm={is_picker_confirm}\n'
         )
         sys.stderr.flush()
@@ -1630,7 +1631,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
           window.__saveWatchObs = obs;
         }''')
 
-        raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, button_text or '保存')
+        raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, [button_text or '保存', section or ''])
         try:
             info = json.loads(raw) if isinstance(raw, str) else (raw or {})
         except Exception:
@@ -1642,11 +1643,25 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 pass
             reason = info.get('reason') or 'button-not-found'
             needle = info.get('needle') or (button_text or '保存')
-            sys.stderr.write(f'[click_save] NOT FOUND: "{needle}" ({reason})\n')
+            candidates = info.get('candidates') or []
+            cand_json = json.dumps(candidates[:12], ensure_ascii=False)
+            sys.stderr.write(
+                f'[click_save] NOT CLICKED: "{needle}" reason={reason} section={section!r} '
+                f'candidates={cand_json[:200]}\n'
+            )
             sys.stderr.flush()
+            if reason == 'ambiguous':
+                return _err(
+                    f'err-save-ambiguous:{needle} | candidates={cand_json} | '
+                    f'Multiple visible "{needle}" buttons — pass section= to click_save '
+                    f'(collapse/tab/card title from scan sections).',
+                    include_in_memory=True,
+                )
+            sec_hint = f' section={section!r}' if (section or '').strip() else ''
             return _err(
-                f'err-save-button-not-found:{needle}. '
-                f'Close interfering dialogs (查询/返回) with close_dialog, then retry click_save().',
+                f'err-save-button-not-found:{needle}{sec_hint}. '
+                f'candidates={cand_json}. '
+                f'Close interfering dialogs (查询/返回) with close_dialog, or pass section= for scoped save.',
                 include_in_memory=True,
             )
 

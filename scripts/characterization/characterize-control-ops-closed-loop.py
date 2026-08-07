@@ -35,9 +35,19 @@ def test_js_scan_section_and_source_b_kinds() -> None:
     assert_true("el-radio" in js and "SCAN_SOURCE_B" in js, "table radio collection cues")
 
 
+def test_click_save_section_api() -> None:
+    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    assert_true("ambiguous" in js or "candidates" in js, "save returns candidates when ambiguous")
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    assert_true("section" in form and "click_save" in form, "click_save accepts section")
+    # Exact 暂存 must not be rejected when needle is 暂存
+    assert_true("rejectRe" in js, "rejectRe still present for non-exact noise")
+
+
 def main() -> int:
     test_models_section()
     test_js_scan_section_and_source_b_kinds()
+    test_click_save_section_api()
     print("characterize-control-ops-closed-loop: OK")
     return 0
 

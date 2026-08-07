@@ -2155,9 +2155,14 @@ JS_SCROLL_TO_FIRST_ERROR = '''() => {
 }'''
 
 # Find 保存/提交 (or custom text), scrollIntoView, click. Prefer footer / primary.
-# Arg: buttonText string (default 保存). Returns JSON {ok, text, xpath, reason}.
-JS_CLICK_SAVE_BUTTON = r'''(buttonText) => {
-  const needle = String(buttonText || '保存').trim() || '保存';
+# Args: buttonText string or [buttonText, section]. Section scopes search; no section + ≥2
+# matches → ambiguous (no click). Returns JSON {ok, text, section, xpath, reason, candidates}.
+JS_CLICK_SAVE_BUTTON = r'''(buttonArg) => {
+  const args = Array.isArray(buttonArg) ? buttonArg : [buttonArg, ''];
+  const needle = String(args[0] || '保存').trim() || '保存';
+  const wantSec = String(args[1] || '').trim();
+  const normSec = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+  const wantNorm = normSec(wantSec);
   const rejectRe = /查询|返回|取消|关闭|重置|清空|删除|导出|引入|核查|上传|下载|暂存/;
   const isVisible = (el) => {
     if (!el || el.offsetParent === null && el.tagName !== 'BODY') {
@@ -2188,6 +2193,61 @@ JS_CLICK_SAVE_BUTTON = r'''(buttonText) => {
     }
     return '/' + parts.join('/');
   };
+  const sectionOf = (el) => {
+    if (!el) return { section_id: '__root__', section_title: '' };
+    const collapse = el.closest && el.closest('.el-collapse-item');
+    if (collapse) {
+      const header = collapse.querySelector('.el-collapse-item__header');
+      let title = (header && (header.innerText || header.textContent) || '').replace(/\s+/g, ' ').trim();
+      title = title.slice(0, 40);
+      const id = title || '__collapse__';
+      return { section_id: id, section_title: title };
+    }
+    const pane = el.closest && el.closest('.el-tab-pane');
+    if (pane) {
+      const tabs = pane.closest && pane.closest('.el-tabs');
+      if (tabs) {
+        const paneId = pane.getAttribute('id') || '';
+        let tabLabel = '';
+        if (paneId) {
+          const tabItem = tabs.querySelector('.el-tabs__item[aria-controls="' + paneId + '"]');
+          if (tabItem) {
+            tabLabel = (tabItem.innerText || tabItem.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+          }
+        }
+        if (!tabLabel) {
+          const panes = tabs.querySelectorAll('.el-tab-pane');
+          const items = tabs.querySelectorAll('.el-tabs__item');
+          for (let pi = 0; pi < panes.length; pi++) {
+            if (panes[pi] === pane && items[pi]) {
+              tabLabel = (items[pi].innerText || items[pi].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+              break;
+            }
+          }
+        }
+        if (tabLabel) return { section_id: tabLabel, section_title: tabLabel };
+      }
+      return { section_id: '__root__', section_title: '' };
+    }
+    const card = el.closest && el.closest('.el-card');
+    if (card) {
+      const h = card.querySelector('.el-card__header');
+      const title = (h && (h.innerText || h.textContent || '') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      if (title) return { section_id: title, section_title: title };
+    }
+    return { section_id: '__root__', section_title: '' };
+  };
+  const secMatches = (m) => {
+    if (!wantNorm) return true;
+    const id = normSec(m.section_id);
+    const title = normSec(m.section_title);
+    return id === wantNorm || title === wantNorm;
+  };
+  const toCandidate = (m) => ({
+    section_title: m.section_title || '',
+    section_id: m.section_id || '',
+    text: m.text || '',
+  });
   const scoreBtn = (el, text) => {
     let s = 0;
     if (text === needle) s += 100;
@@ -2198,7 +2258,6 @@ JS_CLICK_SAVE_BUTTON = r'''(buttonText) => {
     if (el.classList.contains('el-button--primary') || el.classList.contains('el-button--success')) s += 30;
     if (el.closest('.el-dialog__footer, .el-drawer__footer, .el-message-box__btns, .dialog-footer, .form-footer, .footer-btns, [class*="footer"]')) s += 40;
     if (el.closest('.el-dialog, .el-drawer, .el-message-box')) s += 10;
-    // Prefer page-level 保存 over nested utility dialogs (查询/返回)
     const overlay = el.closest('.el-dialog, .el-drawer, .el-message-box');
     if (overlay && /查询|返回|核查|核验/.test(btnText(overlay.querySelector('.el-dialog__title, .el-drawer__title, .el-message-box__title') || overlay))) {
       if (text === needle) s -= 5;
@@ -2206,33 +2265,58 @@ JS_CLICK_SAVE_BUTTON = r'''(buttonText) => {
     return s;
   };
   const selectors = 'button, .el-button, [role="button"], a.el-button';
-  let best = null;
-  let bestScore = -1;
-  let bestText = '';
+  const matches = [];
   for (const el of document.querySelectorAll(selectors)) {
     if (!isVisible(el)) continue;
     if (el.disabled || el.getAttribute('disabled') != null || el.classList.contains('is-disabled')) continue;
     const text = btnText(el);
     if (!text || text.length > 40) continue;
     const sc = scoreBtn(el, text);
-    if (sc > bestScore) {
-      bestScore = sc;
-      best = el;
-      bestText = text;
-    }
+    if (sc < 0) continue;
+    const sec = sectionOf(el);
+    matches.push({
+      el,
+      text,
+      score: sc,
+      section_id: sec.section_id,
+      section_title: sec.section_title,
+    });
   }
-  if (!best || bestScore < 0) {
-    return JSON.stringify({ ok: false, reason: 'button-not-found', needle });
+  const filtered = wantNorm ? matches.filter(secMatches) : matches;
+  if (filtered.length === 0) {
+    return JSON.stringify({
+      ok: false,
+      reason: 'not-found',
+      needle,
+      section: wantSec,
+      candidates: matches.map(toCandidate),
+    });
   }
+  if (!wantNorm && filtered.length > 1) {
+    return JSON.stringify({
+      ok: false,
+      reason: 'ambiguous',
+      needle,
+      candidates: filtered.map(toCandidate),
+    });
+  }
+  let best = filtered[0];
+  for (const m of filtered) {
+    if (m.score > best.score) best = m;
+  }
+  const bestEl = best.el;
+  const bestText = best.text;
+  const bestSection = best.section_title || best.section_id || '';
   try {
-    best.scrollIntoView({ block: 'center', behavior: 'instant' });
+    bestEl.scrollIntoView({ block: 'center', behavior: 'instant' });
   } catch (e) {}
-  best.click();
+  bestEl.click();
   return JSON.stringify({
     ok: true,
     text: bestText,
-    xpath: absXPath(best),
-    tag: (best.tagName || '').toLowerCase(),
+    section: bestSection,
+    xpath: absXPath(bestEl),
+    tag: (bestEl.tagName || '').toLowerCase(),
   });
 }'''
 
