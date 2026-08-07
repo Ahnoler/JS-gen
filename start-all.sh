@@ -123,7 +123,7 @@ start_executor() {
   fi
 
   kill_pattern "node executor/agent.mjs"
-  if chrome_headless_enabled(); then
+  if chrome_headless_enabled; then
     log "CHROME_HEADLESS on — starting executor without Xvfb (Session Chrome --headless=new)"
     # Ensure Python child sees the flag even if only set in this shell
     nohup env CHROME_HEADLESS=true npm run executor > logs/executor.log 2>&1 &
@@ -168,7 +168,7 @@ print_status() {
   lsof -i ":${CONTROL_PORT}" 2>/dev/null || log "control plane: not listening"
   lsof -i ":${FRONTEND_PORT}" 2>/dev/null || log "frontend: not listening"
   pgrep -af "node executor/agent.mjs" 2>/dev/null || log "executor: not running"
-  if chrome_headless_enabled(); then
+  if chrome_headless_enabled; then
     log "CHROME_HEADLESS=true (Xvfb not required)"
   else
     pgrep -af "Xvfb :${DISPLAY_NUM}" 2>/dev/null || true
