@@ -41,6 +41,8 @@ def test_xpath_date_radio_helpers() -> None:
     form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
     assert_true("JS_FILL_DATE_BY_XPATH" in form, "fill_date uses xpath helper")
     assert_true("JS_CLICK_RADIO_BY_XPATH" in form, "click_radio uses xpath helper")
+    assert_true("JS_SELECT_TRIGGER_BY_XPATH" in form, "select uses xpath trigger")
+    assert_true("_resolve_control" in form, "write paths resolve via _resolve_control")
 
 
 def main() -> int:

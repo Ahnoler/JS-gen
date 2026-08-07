@@ -81,6 +81,20 @@ def test_scan_display_label_markers() -> None:
     )
 
 
+def test_phase_a_hardcut_markers() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    assert_true(
+        "ambiguous-label" in form and "xpath-not-found" in form,
+        "write paths surface resolve errors",
+    )
+    assert_true("JS_FILL_BY_XPATH" in form, "xpath fill used")
+
+
+def test_llm_actions_carry_xpath() -> None:
+    src = (ROOT / "scripts/actions/_llm_values.py").read_text(encoding="utf-8")
+    assert_true("xpath_smart" in src, "_llm_values attaches xpath_smart to actions")
+
+
 def main() -> int:
     test_resolve_hint_wins()
     test_resolve_unique_label()
@@ -88,6 +102,8 @@ def main() -> int:
     test_resolve_ambiguous()
     test_resolve_duplicate_same_xpath()
     test_scan_display_label_markers()
+    test_phase_a_hardcut_markers()
+    test_llm_actions_carry_xpath()
     form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
     assert_true("def _resolve_control" in form, "_resolve_control defined")
     print("characterize-xpath-primary-ops: OK")

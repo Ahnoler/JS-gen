@@ -108,6 +108,17 @@ def _llm_generate_values(llm, items, case_data_store=None,
     actions = []
     llm_fields = []
 
+    def _xpath_of(item) -> str:
+        if isinstance(item, dict):
+            return (item.get('xpath_smart') or '') or ''
+        return getattr(item, 'xpath_smart', '') or ''
+
+    def _append_action(payload: dict, item) -> None:
+        xp = _xpath_of(item)
+        payload = dict(payload)
+        payload['xpath_smart'] = xp or ''
+        actions.append(payload)
+
     # —— Cross-field dependency detection: postal code ↔ address ——
     # When both an address field and a postal code field exist in the same batch,
     # skip the P2 postal code rule so both go to the LLM together.  The LLM
@@ -138,10 +149,10 @@ def _llm_generate_values(llm, items, case_data_store=None,
                     pass  # Fall through if user value isn't in current options
                 else:
                     action_name = 'click_radio' if kind == 'radio' else 'select_option'
-                    actions.append({'action': action_name, 'label': label, 'option': val})
+                    _append_action({'action': action_name, 'label': label, 'option': val}, item)
                     continue
             else:
-                actions.append({'action': 'fill_input', 'label': label, 'value': val})
+                _append_action({'action': 'fill_input', 'label': label, 'value': val}, item)
                 continue
 
         # —— Priority 2: form_rules.py generators (input only) ——
@@ -150,7 +161,7 @@ def _llm_generate_values(llm, items, case_data_store=None,
         if kind == 'input' and not (_has_address and _is_postal_code(label)):
             generated = match_rule(label)
             if generated:
-                actions.append({'action': 'fill_input', 'label': label, 'value': generated})
+                _append_action({'action': 'fill_input', 'label': label, 'value': generated}, item)
                 continue
 
         # —— Priority 3: Defer to LLM ——
@@ -181,14 +192,14 @@ def _llm_generate_values(llm, items, case_data_store=None,
                         picked = o; break
                 if not picked and opts: picked = opts[0]
                 action_name = 'click_radio' if kind == 'radio' else 'select_option'
-                actions.append({'action': action_name, 'label': label, 'option': picked or '测试'})
+                _append_action({'action': action_name, 'label': label, 'option': picked or '测试'}, item)
             elif kind == 'tree-select':
                 # Tree-select needs tree navigation via JS_SELECT_TREE_OPTION.
-                actions.append({'action': 'select_tree_option', 'label': label, 'option': 'first'})
+                _append_action({'action': 'select_tree_option', 'label': label, 'option': 'first'}, item)
             elif kind == 'date':
-                actions.append({'action': 'fill_input', 'label': label, 'value': _date_val})
+                _append_action({'action': 'fill_input', 'label': label, 'value': _date_val}, item)
             else:
-                actions.append({'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'})
+                _append_action({'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'}, item)
         return actions
 
     # —— Build prompt for LLM ——
@@ -266,6 +277,25 @@ def _llm_generate_values(llm, items, case_data_store=None,
         if isinstance(parsed, dict) and 'actions' in parsed:
             parsed = parsed['actions']
         llm_result = parsed if isinstance(parsed, list) else []
+        # Attach xpath_smart from source fields when LLM omitted it
+        by_label = {}
+        for item in llm_fields:
+            lbl = item['label'] if isinstance(item, dict) else item
+            by_label.setdefault(lbl, item)
+        enriched = []
+        for a in llm_result:
+            if not isinstance(a, dict):
+                enriched.append(a)
+                continue
+            a2 = dict(a)
+            if not (a2.get('xpath_smart') or '').strip():
+                src = by_label.get(a2.get('label', ''))
+                if src is not None:
+                    a2['xpath_smart'] = _xpath_of(src) or ''
+                else:
+                    a2['xpath_smart'] = ''
+            enriched.append(a2)
+        llm_result = enriched
         _record_decision('passed', llm_result)
         _emit_form_batch_event('form_batch_done', {
             'fields': len(llm_fields),
@@ -287,7 +317,13 @@ def _llm_generate_values(llm, items, case_data_store=None,
             kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
             if kind == 'select':
                 opts = item.get('options', []) if isinstance(item, dict) else []
-                actions.append({'action': 'select_option', 'label': label, 'option': opts[0] if opts else '测试'})
+                _append_action(
+                    {'action': 'select_option', 'label': label, 'option': opts[0] if opts else '测试'},
+                    item,
+                )
             else:
-                actions.append({'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'})
+                _append_action(
+                    {'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'},
+                    item,
+                )
         return actions
