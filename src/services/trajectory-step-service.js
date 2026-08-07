@@ -3,7 +3,11 @@
  */
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
+import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import { getDB } from '../../config/database.js';
+import { planStepMove } from './trajectory-step-move.js';
+import { getTrajectoryRuntime } from './trajectory-runtime.js';
+import { state } from '../state.js';
 import {
   isSingleTargetAction,
   LOCATOR_EXEMPT_ACTIONS,
@@ -222,4 +226,75 @@ export async function removeTrajectoryStep(stepId) {
     phaseCount: counts.phaseCount,
   });
   return { removed: true, trajectoryId: existing.trajectoryId };
+}
+
+function assertNotBusyForStepEdit(trajectoryId, traj) {
+  const tid = Number(trajectoryId);
+  if (traj?.recordStatus === 'recording') {
+    const err = new Error('Cannot move steps while AI recording');
+    err.statusCode = 409;
+    throw err;
+  }
+  const runtime = getTrajectoryRuntime(tid);
+  if (runtime?.manualRecording) {
+    const err = new Error('Cannot move steps while manual recording');
+    err.statusCode = 409;
+    throw err;
+  }
+  const session = runtime?.sessionId ? state.sessions.get(runtime.sessionId) : null;
+  if (session?.busy) {
+    const err = new Error('Cannot move steps while session is busy');
+    err.statusCode = 409;
+    throw err;
+  }
+}
+
+export async function moveTrajectoryStep(trajectoryId, input = {}) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    const err = new Error('Invalid trajectory id');
+    err.statusCode = 400;
+    throw err;
+  }
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  assertNotBusyForStepEdit(tid, traj);
+
+  const steps = await trajectoryStepDao.listByTrajectory(tid);
+  const phases = await trajectoryPhaseDao.listByTrajectory(tid);
+  const planned = planStepMove({
+    steps,
+    phases,
+    stepId: input.stepId,
+    targetPhaseId: input.targetPhaseId,
+    beforeStepId: input.beforeStepId,
+  });
+  if (!planned.ok) {
+    const err = new Error(planned.message || planned.code);
+    err.statusCode = 400;
+    err.code = planned.code;
+    throw err;
+  }
+
+  const same = steps.length === planned.ordered.length && steps.every((s, i) => {
+    const o = planned.ordered[i];
+    return Number(s.id) === o.id
+      && Number(s.stepNumber) === o.stepNumber
+      && Number(s.trajectoryPhaseId) === Number(o.trajectoryPhaseId);
+  });
+  if (!same) {
+    await trajectoryStepDao.applyPlannedOrder(tid, planned.ordered);
+  }
+
+  const counts = await refreshTrajectoryCounts(tid);
+  await trajectoryDao.updateMeta(tid, {
+    stepCount: counts.stepCount,
+    phaseCount: counts.phaseCount,
+  });
+
+  return trajectoryStepDao.getById(Number(input.stepId));
 }

@@ -573,4 +573,20 @@ export default function (app) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  app.post('/api/v2/trajectories/:id/steps/move', async (req, res) => {
+    try {
+      const row = await trajectoryService.moveTrajectoryStep(+req.params.id, {
+        stepId: req.body?.stepId,
+        targetPhaseId: req.body?.targetPhaseId ?? req.body?.trajectoryPhaseId,
+        beforeStepId: req.body?.beforeStepId !== undefined
+          ? req.body.beforeStepId
+          : null,
+      });
+      if (!row) return res.status(404).json({ error: 'Trajectory step not found' });
+      res.json(row);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message, code: err.code });
+    }
+  });
 }

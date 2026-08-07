@@ -719,6 +719,24 @@ export const API_GROUPS = [
         summary: '删除步骤',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '501' }],
       },
+      {
+        method: 'POST', path: '/api/v2/trajectories/{id}/steps/move',
+        summary: '拖拽改序 / 跨阶段移动单步',
+        desc:
+          '将 stepId 移到 targetPhaseId；beforeStepId 有值则插入到该步之前，省略/null 则追加到该阶段末尾。'
+          + '事务内重写全局 step_number。AI 录制 / 人工录制 / session.busy（回放等）时 409；不因 recordStatus=completed 拒绝。',
+        params: [
+          { name: 'id', type: 'number', required: true, in: 'path' },
+          { name: 'stepId', type: 'number', required: true, in: 'body' },
+          { name: 'targetPhaseId', type: 'number', required: true, in: 'body' },
+          { name: 'beforeStepId', type: 'number|null', in: 'body', desc: '省略=阶段末尾' },
+        ],
+        reqExample: J({ stepId: 123, targetPhaseId: 7, beforeStepId: 456 }),
+        notes: [
+          '排序字段 step_number；阶段归集 trajectory_phase_id',
+          '截图绑 trajectory_step.id，无需迁移',
+        ],
+      },
     ],
   },
   {
