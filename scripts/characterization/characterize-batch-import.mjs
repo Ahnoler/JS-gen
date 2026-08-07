@@ -194,6 +194,11 @@ function testDraftPumpReclaimsAnalyzed() {
     /async function pumpRecord\(\)[\s\S]*?statuses:\s*\['queued',\s*'waiting_executor'\]/,
     'pumpRecord claims queued/waiting_executor only',
   );
+  assert.match(
+    src,
+    /async function pumpRecord\(\)[\s\S]*?jobModes:\s*\['record'\]/,
+    'pumpRecord scoped to record jobs only',
+  );
   ok('draft pump reclaims analyzed orphans');
 }
 

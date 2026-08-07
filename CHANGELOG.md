@@ -11,10 +11,10 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
-- 2026-08-07: 批量导入草稿模式 schema：`batch_recording_job.mode`（`record`|`draft`，默认 `record`）；`batch_recording_item.status` 新增终端态 `drafted`；常量 `BATCH_JOB_MODES`、`BATCH_ITEM_STATUSES` / `BATCH_ITEM_TERMINAL` 含 `drafted`。
-  影响范围：migrations、batch 常量；后续 Task 2–3 将接 DAO/服务。
-  文件：migrations/20260807120000_batch_job_mode_and_drafted.js, src/models/constants.js, scripts/characterization/characterize-batch-import.mjs
-  Python 同步提示：对齐 `batch_recording_job.mode` 列与 item status enum `drafted`。
+- 2026-08-07: **批量导入草稿模式（`mode=record|draft`）**：`POST .../trajectories/batch/import` 接受 `mode`（默认 `record`；非法值 → 400）。`mode=draft` 仅 analyze+建草稿（`bindTrajectoryAsDrafted` → item `drafted`），跳过 prepare/record/detach，不要求 `USE_EXECUTOR`；`mode=record` 保持原一站式录制语义，`USE_EXECUTOR=false` → 503。`request_hash` / 幂等键含 `mode`；`summary.drafted` 计数；取消 job 仅 `cancelOpenItems` 未决项，已 `drafted`/`recorded` 保留。状态查询与 WS `batch:*` payload 含 `mode`；`pumpDraft` 独立认领 `analyzed` 且无 `trajectoryId` 的孤儿项（重启 `kickScheduler` 可恢复）；`pumpRecord` 仅 `queued`/`waiting_executor` + `jobModes: ['record']`。schema：`batch_recording_job.mode`；item 终端态 `drafted`；常量 `BATCH_JOB_MODES`、`BATCH_ITEM_STATUSES` / `BATCH_ITEM_TERMINAL` 含 `drafted`。
+  影响范围：batch import API、调度、DAO、api-docs、Vue 批量导入 UI。
+  文件：migrations/20260807120000_batch_job_mode_and_drafted.js, src/models/constants.js, src/dao/batch-recording-dao.js, src/services/trajectory-batch-service.js, src/dashboard/api-docs/catalog.js, scripts/characterization/characterize-batch-import.mjs
+  Python 同步提示：对齐 `mode` 参数（默认 record、非法 400）、item `drafted`、summary.drafted、状态/WS `mode` 字段；`mode=draft` 不校验 executor；取消保留已 drafted。
 
 - 2026-08-07: **`POST /api/v2/trajectories/{id}/steps/move`**：拖拽改序 / 跨阶段移动单步；`beforeStepId` 省略或 null 表示目标阶段末尾；AI 录制 / 人工录制 / `session.busy` 时 409。
   影响范围：v2 trajectories API、step DAO、api-docs。
@@ -27,11 +27,6 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：无（仅 JS-gen Session Chrome 启动）。
 
 ### Changed
-
-- 2026-08-07: 批量导入调度：`pumpDraft` 独立认领 `analyzed` 且无 `trajectoryId` 的 item（draft/record 均覆盖），重启后 `kickScheduler` 可持续恢复；`pumpRecord` 仅 `queued`/`waiting_executor` + `jobModes: ['record']`。
-  影响范围：batch 调度恢复语义。
-  文件：src/services/trajectory-batch-service.js, scripts/characterization/characterize-batch-import.mjs
-  Python 同步提示：无（仅 Node batch 调度）。
 
 - 2026-08-07: 删除 `trajectory_step.is_replay` 列及 `idx_step_is_replay` 索引；列表/计数/组件签名不再按该列过滤。`POST .../steps/replay` 请求体 `isReplay` 仍为运行时抑制入库。
   影响范围：schema、trajectory step DAO/计数、operation-component 签名、api-docs。
