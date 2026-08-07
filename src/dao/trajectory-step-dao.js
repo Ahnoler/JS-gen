@@ -115,3 +115,22 @@ export async function reorderByTrajectory(trajectoryId) {
   }
   return listByTrajectory(trajectoryId);
 }
+
+/**
+ * Apply planned order: update phase binding + step_number for each row in one transaction.
+ * @param {number} trajectoryId
+ * @param {Array<{ id: number, trajectoryPhaseId: number|null, phaseNumber: number, stepNumber: number }>} ordered
+ */
+export async function applyPlannedOrder(trajectoryId, ordered) {
+  const db = getDB();
+  const tid = Number(trajectoryId);
+  await db.transaction(async (trx) => {
+    for (const s of ordered) {
+      await trx(TABLE).where({ id: s.id, trajectory_id: tid }).update({
+        trajectory_phase_id: s.trajectoryPhaseId,
+        phase_number: s.phaseNumber,
+        step_number: s.stepNumber,
+      });
+    }
+  });
+}

@@ -27,6 +27,7 @@ export {
   createTrajectoryStep,
   updateTrajectoryStep,
   removeTrajectoryStep,
+  moveTrajectoryStep,
   insertStepsAfter,
 } from './trajectory-step-service.js';
 
