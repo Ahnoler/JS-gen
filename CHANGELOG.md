@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-07: 批量导入草稿模式 schema：`batch_recording_job.mode`（`record`|`draft`，默认 `record`）；`batch_recording_item.status` 新增终端态 `drafted`；常量 `BATCH_JOB_MODES`、`BATCH_ITEM_STATUSES` / `BATCH_ITEM_TERMINAL` 含 `drafted`。
+  影响范围：migrations、batch 常量；后续 Task 2–3 将接 DAO/服务。
+  文件：migrations/20260807120000_batch_job_mode_and_drafted.js, src/models/constants.js, scripts/characterization/characterize-batch-import.mjs
+  Python 同步提示：对齐 `batch_recording_job.mode` 列与 item status enum `drafted`。
+
 - 2026-08-07: **`POST /api/v2/trajectories/{id}/steps/move`**：拖拽改序 / 跨阶段移动单步；`beforeStepId` 省略或 null 表示目标阶段末尾；AI 录制 / 人工录制 / `session.busy` 时 409。
   影响范围：v2 trajectories API、step DAO、api-docs。
   文件：src/dao/trajectory-step-dao.js, src/services/trajectory-step-move.js, src/services/trajectory-step-service.js, src/services/trajectory-service.js, src/routes/v2/trajectory.js, src/dashboard/api-docs/catalog.js

@@ -12,6 +12,7 @@ import {
 } from '../../src/services/trajectory-batch-excel.js';
 import { buildRequestHash } from '../../src/services/trajectory-batch-service.js';
 import {
+  BATCH_JOB_MODES,
   BATCH_JOB_STATUSES,
   BATCH_ITEM_STATUSES,
   BATCH_ITEM_RESUMABLE,
@@ -119,10 +120,14 @@ function testRequestHash() {
 }
 
 function testConstantsAndTerminal() {
+  assert.ok(BATCH_JOB_MODES.includes('draft'));
+  assert.ok(BATCH_JOB_MODES.includes('record'));
   assert.ok(BATCH_JOB_STATUSES.includes('completed_with_errors'));
   assert.ok(BATCH_ITEM_STATUSES.includes('waiting_executor'));
+  assert.ok(BATCH_ITEM_STATUSES.includes('drafted'));
   assert.ok(BATCH_ITEM_RESUMABLE.includes('analyzed'));
   assert.ok(BATCH_ITEM_TERMINAL.includes('rejected'));
+  assert.ok(BATCH_ITEM_TERMINAL.includes('drafted'));
 
   assert.strictEqual(
     deriveJobTerminalStatus({
