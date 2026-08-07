@@ -26,9 +26,10 @@ from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR,
     JS_CHECK_SINGLE_FIELD, JS_SCAN_FORM_FIELDS,
     JS_FILL_FORM_FIELD, JS_FILL_BY_XPATH, JS_FILL_DATE_FIELD,
+    JS_FILL_DATE_BY_XPATH,
     JS_FIND_LABELED_SELECT, JS_FIND_OPTION, JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH, JS_LOCATOR,
-    JS_CLICK_RADIO,
+    JS_CLICK_RADIO, JS_CLICK_RADIO_BY_XPATH,
     JS_SELECT_TREE_OPTION,
     JS_SCROLL_TO_FIRST_ERROR,
     JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME,
@@ -679,11 +680,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         element = await _capture_element(page, label_text, target_kind='form_date')
-        result = await page.evaluate(JS_FILL_DATE_FIELD, [label_text, value])
+        xp = _task_xpath_smart(case_data_store, label_text)
+        if xp:
+            result = await page.evaluate(JS_FILL_DATE_BY_XPATH, [xp, value])
+        else:
+            result = await page.evaluate(JS_FILL_DATE_FIELD, [label_text, value])
         if _is_ok_result(result):
             _record_action('fill_date_field', {'label_text': label_text, 'value': value}, result, element=element)
             if not _is_query_mode(case_data_store):
-                _task_done_impl(label_text, case_data_store, value=value)
+                _task_done_impl(label_text, case_data_store, value=value, xpath_smart=xp)
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
 
@@ -1154,7 +1159,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 try:
                     if kind in ('fill_input', 'fill', 'input'):
                         if field_kind == 'date':
-                            result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
+                            if xpath_smart:
+                                result = await page.evaluate(
+                                    JS_FILL_DATE_BY_XPATH, [xpath_smart, value],
+                                )
+                            else:
+                                result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
                         elif xpath_smart:
                             result = await page.evaluate(
                                 JS_FILL_BY_XPATH, [xpath_smart, value, placeholder],
@@ -1162,7 +1172,19 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         else:
                             result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
                     elif field_kind == 'radio' or kind in ('click_radio', 'radio'):
-                        result = await page.evaluate(JS_CLICK_RADIO, [label, value])
+                        if xpath_smart:
+                            result = await page.evaluate(
+                                JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
+                            )
+                        else:
+                            result = await page.evaluate(JS_CLICK_RADIO, [label, value])
+                    elif field_kind == 'checkbox' or kind == 'checkbox':
+                        if xpath_smart:
+                            result = await page.evaluate(
+                                JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
+                            )
+                        else:
+                            result = await _select_by_label(page, label, value, field_kind)
                     elif field_kind == 'tree-select' or kind in (
                         'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
                     ):
@@ -2077,10 +2099,14 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         element = await _capture_element(page, label_text, target_kind='form_radio')
-        result = await page.evaluate(JS_CLICK_RADIO, [label_text, option_text])
+        xp = _task_xpath_smart(case_data_store, label_text)
+        if xp:
+            result = await page.evaluate(JS_CLICK_RADIO_BY_XPATH, [xp, option_text])
+        else:
+            result = await page.evaluate(JS_CLICK_RADIO, [label_text, option_text])
         if _is_ok_result(result):
             _record_action('click_radio', {'label_text': label_text, 'option_text': option_text}, result, element=element)
-            _task_done_impl(label_text, case_data_store, value=option_text)
+            _task_done_impl(label_text, case_data_store, value=option_text, xpath_smart=xp)
             return _ok(result)
         return result
 

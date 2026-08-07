@@ -12,6 +12,8 @@ CTRL.* ↔ primary JS_* (or action) mapping:
     fillFormField      → JS_FILL_FORM_FIELD
     selectOption       → JS_SELECT_OPTION (+ JS_FIND_LABELED_SELECT, JS_SELECT_TRIGGER_BY_XPATH)
     fillByXpath        → JS_FILL_BY_XPATH
+    fillDateByXpath    → JS_FILL_DATE_BY_XPATH
+    clickRadioByXpath  → JS_CLICK_RADIO_BY_XPATH
     selectDate         → JS_FILL_DATE_FIELD
     clickRadio         → JS_CLICK_RADIO
     selectTreeOption   → JS_SELECT_TREE_OPTION
@@ -439,6 +441,201 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
   if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return 'xpath-not-input';
   setFn(target, val == null ? '' : String(val));
   return 'ok-xpath-smart';
+}'''
+
+# Fill date picker resolved by relative xpath (native setter + ElDatePicker Vue sync).
+JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
+  const setFn = (t, v) => {
+    const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
+    setter.call(t, v);
+    t.setAttribute('value', v);
+    t.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: v }));
+    t.dispatchEvent(new Event('change', { bubbles: true }));
+    t.dispatchEvent(new Event('blur', { bubbles: true }));
+  };
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    return isVis(d) || (wrap && isVis(wrap));
+  };
+  const lastVisibleDialog = () => {
+    const all = [...document.querySelectorAll('.el-dialog, .el-message-box')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const lastVisibleDrawer = () => {
+    const all = [...document.querySelectorAll('.el-drawer')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const findDateInputFromSnap = (snap, root) => {
+    for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+      const n = snap.snapshotItem(i);
+      if (!n || !isVis(n)) continue;
+      if (root && root !== document && !root.contains(n)) continue;
+      const candidates = [];
+      if (n.matches && n.matches('input')) candidates.push(n);
+      const inner = n.querySelector?.('input:not([type="hidden"])');
+      if (inner) candidates.push(inner);
+      for (const inp of candidates) {
+        if (inp.closest('.el-date-editor, .tsscdatepicker')) return inp;
+      }
+      const dateInp = n.querySelector?.('.el-date-editor input, .tsscdatepicker input');
+      if (dateInp && isVis(dateInp)) return dateInp;
+    }
+    return null;
+  };
+  const tryXpath = (xp, root) => {
+    if (!xp) return null;
+    let s = String(xp);
+    try {
+      const ctx = root || document;
+      if (root && s.startsWith('//')) s = '.' + s;
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      return findDateInputFromSnap(snap, root);
+    } catch (e) {
+      return null;
+    }
+  };
+  if (!xpath) return 'xpath-empty';
+  if (isNaN(new Date(val).getTime())) return 'invalid-date:' + val;
+  let target = tryXpath(xpath, null);
+  if (!target && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
+    const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
+    const local = m && m[1] ? m[1] : '';
+    const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleDrawer() : lastVisibleDialog();
+    if (dlg && local) target = tryXpath('.//' + local, dlg);
+  }
+  if (!target) return 'xpath-not-found';
+  if (target.disabled || target.readOnly) return 'field-disabled';
+  target.focus();
+  try {
+    let w = target.closest('.el-date-editor');
+    if (w) {
+      let vm = w.__vue__;
+      while (vm && vm.$options && vm.$options.name !== 'ElDatePicker') vm = vm.$parent;
+      if (vm) {
+        vm.value = val;
+        vm.$emit('input', val);
+        vm.$emit('change', val);
+        vm.date = new Date(val);
+        vm.$emit('pick', new Date(val));
+      }
+    }
+  } catch (e) {}
+  setFn(target, val);
+  target.blur();
+  document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x => {
+    x.style.display = 'none';
+    x.classList.add('is-hidden');
+  });
+  return 'ok-date-xpath-smart';
+}'''
+
+# Click el-radio / el-checkbox option resolved by relative xpath.
+JS_CLICK_RADIO_BY_XPATH = r'''([xpath, option]) => {
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    return isVis(d) || (wrap && isVis(wrap));
+  };
+  const lastVisibleDialog = () => {
+    const all = [...document.querySelectorAll('.el-dialog, .el-message-box')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const lastVisibleDrawer = () => {
+    const all = [...document.querySelectorAll('.el-drawer')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const findNodeFromSnap = (snap, root) => {
+    for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+      const n = snap.snapshotItem(i);
+      if (!n || !isVis(n)) continue;
+      if (root && root !== document && !root.contains(n)) continue;
+      return n;
+    }
+    return null;
+  };
+  const tryXpath = (xp, root) => {
+    if (!xp) return null;
+    let s = String(xp);
+    try {
+      const ctx = root || document;
+      if (root && s.startsWith('//')) s = '.' + s;
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      return findNodeFromSnap(snap, root);
+    } catch (e) {
+      return null;
+    }
+  };
+  const clickInHost = (host, want) => {
+    if (!host) return 'xpath-not-found';
+    const pick = (items) => {
+      for (const item of items) {
+        if (item.classList.contains('is-disabled')) continue;
+        if (item.textContent.trim() === want && item.offsetParent !== null) {
+          item.click();
+          return 'ok';
+        }
+      }
+      for (const item of items) {
+        if (item.classList.contains('is-disabled')) continue;
+        if (item.textContent.trim().includes(want) && item.offsetParent !== null) {
+          item.click();
+          return 'ok';
+        }
+      }
+      return 'option-not-found';
+    };
+    const hostEl = host.closest?.('.el-form-item') || host;
+    const radios = hostEl.querySelectorAll('.el-radio');
+    if (radios.length) return pick(radios);
+    const boxes = hostEl.querySelectorAll('.el-checkbox');
+    if (boxes.length) return pick(boxes);
+    if (host.matches?.('.el-radio, .el-checkbox')) {
+      if (!host.classList.contains('is-disabled') && host.textContent.trim().includes(want)) {
+        host.click();
+        return 'ok';
+      }
+    }
+    return 'option-not-found';
+  };
+  if (!xpath) return 'xpath-empty';
+  const want = String(option || '');
+  let node = tryXpath(xpath, null);
+  if (!node && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
+    const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
+    const local = m && m[1] ? m[1] : '';
+    const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleDrawer() : lastVisibleDialog();
+    if (dlg && local) node = tryXpath('.//' + local, dlg);
+  }
+  if (!node) return 'xpath-not-found';
+  return clickInHost(node, want);
 }'''
 
 JS_FILL_DATE_FIELD = '''([label, val]) => {

@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.actions import _js_snippets as sn  # noqa: E402
 from scripts.actions._js_snippets import (  # noqa: E402
     JS_FILL_BY_XPATH,
     JS_SELECT_TRIGGER_BY_XPATH,
@@ -28,8 +29,17 @@ def test_snippet_markers() -> None:
     assert_true("__last_select_trigger" in JS_SELECT_TRIGGER_BY_XPATH, "select trigger sets global for JS_SELECT_OPTION")
 
 
+def test_xpath_date_radio_helpers() -> None:
+    assert_true(hasattr(sn, "JS_FILL_DATE_BY_XPATH"), "JS_FILL_DATE_BY_XPATH")
+    assert_true(hasattr(sn, "JS_CLICK_RADIO_BY_XPATH"), "JS_CLICK_RADIO_BY_XPATH")
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    assert_true("JS_FILL_DATE_BY_XPATH" in form, "fill_date uses xpath helper")
+    assert_true("JS_CLICK_RADIO_BY_XPATH" in form, "click_radio uses xpath helper")
+
+
 def main() -> int:
     test_snippet_markers()
+    test_xpath_date_radio_helpers()
     print("characterize-xpath-fill-select: OK")
     return 0
 
