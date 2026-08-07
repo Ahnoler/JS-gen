@@ -984,7 +984,7 @@ JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath]) => {
   return 'ok-triggered';
 }'''
 
-JS_SELECT_OPTION = '''(arg) => {
+JS_SELECT_OPTION = '''async (arg) => {
     // arg: string option text, or [option, exactOnly]
     // exactOnly=true → only exact label match (replay must not drift from recorded value)
     let option = arg;
@@ -1025,22 +1025,28 @@ JS_SELECT_OPTION = '''(arg) => {
     if (!dropdown) {
         dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
     }
-    let items = dropdown && dropdown !== document
-        ? dropdown.querySelectorAll('.el-select-dropdown__item')
-        : [];
-    // Do NOT fall back to all document items — that mixes 国籍/行业/性别 options.
-    if (items.length === 0) {
-        const vis = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
-        if (vis && vis !== document) items = vis.querySelectorAll('.el-select-dropdown__item');
-    }
-    const visibleItems = [...items].filter(i => {
-        if (i.classList.contains('is-disabled')) return false;
-        const style = getComputedStyle(i);
-        if (style.display === 'none' || style.visibility === 'hidden') return false;
-        const r = i.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-    });
-    const pickPool = visibleItems.length > 0 ? visibleItems : [...items];
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const collectItems = () => {
+        let items = dropdown && dropdown !== document
+            ? dropdown.querySelectorAll('.el-select-dropdown__item')
+            : [];
+        // Do NOT fall back to all document items — that mixes 国籍/行业/性别 options.
+        if (items.length === 0) {
+            const vis = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
+            if (vis && vis !== document) items = vis.querySelectorAll('.el-select-dropdown__item');
+        }
+        return items;
+    };
+    const buildPool = (items) => {
+        const visibleItems = [...items].filter(i => {
+            if (i.classList.contains('is-disabled')) return false;
+            const style = getComputedStyle(i);
+            if (style.display === 'none' || style.visibility === 'hidden') return false;
+            const r = i.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+        });
+        return visibleItems.length > 0 ? visibleItems : [...items];
+    };
     const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
     const tryClick = (item) => {
         item.scrollIntoView({ block: 'nearest' });
@@ -1056,18 +1062,72 @@ JS_SELECT_OPTION = '''(arg) => {
         }
         return 'ok:' + t;
     };
-    if (pickPool.length === 0) return 'no-items';
-    if (!exactOnly && FIRST_ALIASES.includes(option.toLowerCase().trim())) {
-        return tryClick(pickPool[0]);
-    }
-    for (const item of pickPool) {
-        if (item.textContent.trim() === option) return tryClick(item);
-    }
-    if (!exactOnly) {
-        for (const item of pickPool) {
-            if (item.textContent.trim().includes(option)) return tryClick(item);
+    const matchInPool = (pickPool) => {
+        if (!exactOnly && FIRST_ALIASES.includes(option.toLowerCase().trim())) {
+            return tryClick(pickPool[0]);
         }
+        for (const item of pickPool) {
+            if (item.textContent.trim() === option) return tryClick(item);
+        }
+        if (!exactOnly) {
+            for (const item of pickPool) {
+                if (item.textContent.trim().includes(option)) return tryClick(item);
+            }
+        }
+        return null;
+    };
+    let items = collectItems();
+    let pickPool = buildPool(items);
+    if (pickPool.length === 0) return 'no-items';
+    let hit = matchInPool(pickPool);
+    if (hit) return hit;
+
+    /* SELECT_LAZY_LOAD_ON_MISS */
+    const findWrap = (dd) => {
+        if (!dd || dd === document) return null;
+        const w1 = dd.querySelector('.el-select-dropdown__wrap');
+        if (w1 && w1.scrollHeight > w1.clientHeight + 2) return w1;
+        const w2 = dd.querySelector('.el-scrollbar__wrap');
+        if (w2 && w2.scrollHeight > w2.clientHeight + 2) return w2;
+        for (const n of dd.querySelectorAll('*')) {
+            const s = getComputedStyle(n);
+            if ((s.overflowY === 'auto' || s.overflowY === 'scroll')
+                && n.scrollHeight > n.clientHeight + 2) return n;
+        }
+        return null;
+    };
+    try {
+        const wrap = findWrap(dropdown);
+        if (wrap) {
+            let stableStreak = 0;
+            let prevCount = pickPool.length;
+            let prevHeight = wrap.scrollHeight;
+            for (let i = 0; i < 8; i++) {
+                wrap.scrollTop = wrap.scrollHeight;
+                await sleep(250);
+                items = collectItems();
+                pickPool = buildPool(items);
+                const h = wrap.scrollHeight;
+                const c = pickPool.length;
+                if (c === prevCount && h === prevHeight) {
+                    stableStreak += 1;
+                } else {
+                    stableStreak = 0;
+                    prevCount = c;
+                    prevHeight = h;
+                }
+                if (stableStreak >= 2) break;
+            }
+            hit = matchInPool(pickPool);
+            if (hit) return hit;
+        }
+    } catch (e) {
+        items = collectItems();
+        pickPool = buildPool(items);
+        hit = matchInPool(pickPool);
+        if (hit) return hit;
     }
+
     const hasEmpty = (dropdown && dropdown !== document)
         ? dropdown.querySelector('.el-select-dropdown__empty')
         : document.querySelector('.el-select-dropdown__empty');
