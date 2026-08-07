@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **XPath-primary 控件操作：** 写路径经 `_resolve_control` 后仅用相对 `xpath_smart` 定位；语义名 `label||placeholder` 仅用于取值/规则/录制。同 label 多 xpath → `ambiguous-label`。Agent 动作可选 `xpath_smart`；prompt 要求优先带 xpath。
+  影响范围：Agent fill/select/date/radio、run_form_assistant、scan 语义名。
+  文件：scripts/actions/_form.py, scripts/actions/_llm_values.py, scripts/prompts/agent-prompt.md, scripts/characterization/characterize-xpath-primary-ops.py
+  Python 同步提示：无（scripts 子进程）；若控制面复述 Agent 工具 schema 需增加可选 xpath_smart。
+
 - 2026-08-07: **el-select 懒加载选项：** `JS_SELECT_OPTION` 首轮未命中时，对下拉滚动容器稳态滚底加载更多选项后再匹配（Agent `select_option` 与 live `_replay.py` 共用）。不改 `CTRL.selectOption`。
   影响范围：Agent select_option、live replay fill/select。
   文件：scripts/actions/_js_snippets.py（调用方 `_form.py` / `_replay.py` 无接口变更）

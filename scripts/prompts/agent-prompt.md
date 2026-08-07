@@ -32,9 +32,9 @@
 - 弹窗内「查询」等非提交按钮可用索引或其它专用动作；**凡会触发「操作成功」的表单提交一律 `click_save`。**
 - 若 `done()` 被拒且提示无 ok-save-success：**不要**重新选表格行、不要再点「修改」；弹窗若仍开着直接 `click_save(button_text='确认')`。
 - **login(username, password, captcha='', sms_code='') — 🚨 登录系统。填写用户名+密码+验证码(可选)+短信验证码(可选)、点击登录按钮、等待跳转。有验证码时传入 captcha='1111' sms_code='1111'。不要手动逐字段填写登录表单。**
-- select_option(label_text, option_text) — el-select 下拉框。"first" 选择第一个选项。**🚨 这是选择 el-select 选项的唯一正确方式。不要使用 click_element 来选择下拉选项。**
-- fill_form_field(label_text, value) — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 通过标签文本、placeholder 或输入类型匹配。如果输入框被禁用则返回 "field-disabled" — 跳过它。
-- click_radio(label_text, option_text) — el-radio 单选组
+- select_option(label_text, option_text, xpath_smart='') — el-select 下拉框。"first" 选择第一个选项。**🚨 这是选择 el-select 选项的唯一正确方式。不要使用 click_element 来选择下拉选项。** 扫描/`get_pending_tasks` 返回的字段含 `label` 与相对 `xpath_smart`；**优先传入 `xpath_smart`** 定位控件。`label_text` 仅用于语义（规则/取值/录制），须用扫描里的**完整**名称，勿缩写猜测。
+- fill_form_field(label_text, value, xpath_smart='') — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 扫描/`get_pending_tasks` 含 `xpath_smart` + `label`；**优先传 `xpath_smart`**。`label_text` 为语义名（规则/取值/录制），用扫描原文勿猜。若返回 `"field-disabled"` — 跳过。
+- click_radio(label_text, option_text, xpath_smart='') — el-radio 单选组；**优先传 `xpath_smart`**（同 fill/select）。
 - **select_tree_option(label_text, option_text) — 仅用于真正的 TsscMultiTree 树形选择器（如行业代码、分类目录）。三段式匹配：P0 精确匹配（label/id）→ 非叶节点 DFS 取第一个叶后代；P1 UI关键词搜索 → 过滤列表下非叶节点 DFS 取第一个叶后代；P2 兜底取全树第一个叶节点。** **`option_text="first"` 会直接选第一片叶子（`ok-fallback:first`），是正常结果。`ok-fallback` 同理——系统已选最接近的叶节点。信任该结果，不要重新填写。** **🚨 若返回 `disabled`：字段只读（如新增弹窗里由侧栏树带出的「分类目录」）——禁止再 select/fill，跳过即可。** **🚨 若返回 `no-tree-component`：字段不是 TsscMultiTree（页面侧栏 `.el-tree` 也会误导）——禁止再次调用 `select_tree_option` / 禁止 check↔select 空转。立刻改用 `fill_form_field(label, 具体值)`（不要用 `"first"`），或若是 el-select 则用 `select_option`。`ok-fill-fallback` 表示系统已自动改用 fill 并成功，视为已完成。**
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
 - **click_save(button_text='保存', section='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `section=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections`）；无 `section` 且多匹配 → `err-save-ambiguous`。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
@@ -111,13 +111,16 @@
 - **不要**在不需要填表的页面调用 `scan_form_fields` 或 `run_form_assistant`。
 
 # 🚨 表单字段规则（CRITICAL — 不可忽略）
-1. **`input_text` 不可用。** 所有 el-form-item 内的文本/密码/多行输入框，请使用 `fill_form_field(label_text, value)`。
-2. `fill_form_field` 会自动处理自定义包装组件（如 `tsscInput`）— 它通过标签文本查找输入框。
-3. **如果 `fill_form_field` 返回 `"field-disabled"`：** 检查字段是否已有值。如果 `getAttribute('value')` 或 `placeholder` 非空且不是"请选择"/"请输入" → 跳过，说明已填写。如果字段为空 → 寻找旁边的按钮来填充。
-4. **如果 `select_option` 返回 `"select-disabled"`：跳过** — 选择框被禁用（已预填）。
-5. **禁用字段 + 空值 + 无旁边按钮** → 跳过（真正的只读字段）。
+1. **`input_text` 不可用。** 所有 el-form-item 内的文本/密码/多行输入框，请使用 `fill_form_field(label_text, value, xpath_smart='')`。
+2. `fill_form_field` 通过相对 `xpath_smart` 定位控件；`label_text` 仅语义（规则/取值/录制），须与扫描/`get_pending_tasks` 中的 `label` **完全一致**（含 placeholder 作 displayName 时照抄）。
+3. **写路径 xpath 优先：** `fill_form_field` / `select_option` / `click_radio` / 日期填写均支持可选 `xpath_smart`；扫描或 pending 项有 `xpath_smart` 时**务必带上**，勿只靠 label。
+4. **若返回 `ambiguous-label`：** 同 label 对应多个 xpath — 从扫描/pending 复制**精确** `xpath_smart` 重试，勿换猜别的 label。
+5. **若返回 `xpath-not-found`：** 重新 `scan_visible_fields` / `get_pending_tasks`，或从扫描复制精确 `label`（勿模糊猜测）。
+6. **如果 `fill_form_field` 返回 `"field-disabled"`：** 检查字段是否已有值。如果 `getAttribute('value')` 或 `placeholder` 非空且不是"请选择"/"请输入" → 跳过，说明已填写。如果字段为空 → 寻找旁边的按钮来填充。
+7. **如果 `select_option` 返回 `"select-disabled"`：跳过** — 选择框被禁用（已预填）。
+8. **禁用字段 + 空值 + 无旁边按钮** → 跳过（真正的只读字段）。
    **禁用字段 + 空值 + 有旁边按钮（hasButton!=""）** → 若任务列出【特殊元素库候选】则优先 `use_special_element(special_element_id)`；否则 `click_adjacent_button(label_text)`。纠错走人工录制。
-6. **日期选择器字段（tsscdatepicker / el-date-editor）：** `fill_form_field` 现在支持日期字段 — 直接设置值。如果日期字段已有值（通过 `check_field_value` 检查），跳过。
+9. **日期选择器字段（tsscdatepicker / el-date-editor）：** `fill_form_field` 现在支持日期字段 — 直接设置值。如果日期字段已有值（通过 `check_field_value` 检查），跳过。
 
 
 # 🚨 任务列表规则（CRITICAL — 跟踪表单填写进度）

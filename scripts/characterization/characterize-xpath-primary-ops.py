@@ -102,6 +102,15 @@ def test_phase_b_action_signatures() -> None:
         assert_true("xpath_smart" in chunk, f"{name} accepts xpath_smart")
 
 
+def test_agent_prompt_xpath_primary() -> None:
+    prompt = (ROOT / "scripts/prompts/agent-prompt.md").read_text(encoding="utf-8")
+    assert_true("xpath_smart" in prompt, "prompt mentions xpath_smart")
+    assert_true(
+        "ambiguous-label" in prompt or "相对 xpath" in prompt,
+        "prompt steers Agent to xpath / ambiguity",
+    )
+
+
 def main() -> int:
     test_resolve_hint_wins()
     test_resolve_unique_label()
@@ -112,6 +121,7 @@ def main() -> int:
     test_phase_a_hardcut_markers()
     test_llm_actions_carry_xpath()
     test_phase_b_action_signatures()
+    test_agent_prompt_xpath_primary()
     form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
     assert_true("def _resolve_control" in form, "_resolve_control defined")
     print("characterize-xpath-primary-ops: OK")
