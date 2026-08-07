@@ -76,6 +76,10 @@ class ScannedField(BaseModel):
         default="",
         description="Button text if this .el-form-item contains an action button (e.g. '引入', '选择', '验证', '获取地址'), empty string otherwise",
     )
+    xpath_smart: str = Field(
+        default="",
+        description="Relative xpath for the operable control (dedup + execute key)",
+    )
     filled: bool = Field(
         default=False,
         description="True if this field was already filled by auto-fill (label is in task_list.done)",

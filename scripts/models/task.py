@@ -57,6 +57,10 @@ class TaskItem(BaseModel):
         default="",
         description="Button text if this field has an adjacent action button (引入/选择/验证/获取/获取地址), empty string otherwise.",
     )
+    xpath_smart: str = Field(
+        default="",
+        description="Relative xpath for the operable control (dedup + execute key)",
+    )
     needs_intervention: bool = Field(
         default=False,
         description=(
@@ -109,6 +113,7 @@ class TaskItem(BaseModel):
             disabled=field.get("disabled", False),
             required=field.get("required", False),
             hasButton=has_button,
+            xpath_smart=field.get("xpath_smart", ""),
             needs_intervention=False,
         )
 
@@ -330,6 +335,7 @@ class TaskList(BaseModel):
                         disabled=is_disabled,
                         required=f.get("required", False),
                         hasButton=has_button,
+                        xpath_smart=f.get("xpath_smart", ""),
                         needs_intervention=False,
                     )
                 if item is not None:
