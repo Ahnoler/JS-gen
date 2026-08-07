@@ -1456,6 +1456,81 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const isRequired = ''' + JS_FIELD_REQUIRED + ''';
     const readValue = ''' + JS_READ_CURRENT_VALUE + ''';
+    /* SECTION_ATTACH */
+    const sectionAssignments = new WeakMap();
+    const sectionTitleCounts = new Map();
+    const sectionOf = (el) => {
+        if (!el) return { section_id: '__root__', section_title: '' };
+        const collapse = el.closest && el.closest('.el-collapse-item');
+        if (collapse) {
+            const header = collapse.querySelector('.el-collapse-item__header');
+            let title = (header && (header.innerText || header.textContent) || '').replace(/\\s+/g, ' ').trim();
+            title = title.slice(0, 40);
+            const id = title || '__collapse__';
+            return { section_id: id, section_title: title };
+        }
+        const pane = el.closest && el.closest('.el-tab-pane');
+        if (pane) {
+            const tabs = pane.closest && pane.closest('.el-tabs');
+            if (tabs) {
+                const paneId = pane.getAttribute('id') || '';
+                let tabLabel = '';
+                if (paneId) {
+                    const tabItem = tabs.querySelector('.el-tabs__item[aria-controls="' + paneId + '"]');
+                    if (tabItem) {
+                        tabLabel = (tabItem.innerText || tabItem.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+                    }
+                }
+                if (!tabLabel) {
+                    const panes = tabs.querySelectorAll('.el-tab-pane');
+                    const items = tabs.querySelectorAll('.el-tabs__item');
+                    for (let pi = 0; pi < panes.length; pi++) {
+                        if (panes[pi] === pane && items[pi]) {
+                            tabLabel = (items[pi].innerText || items[pi].textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+                            break;
+                        }
+                    }
+                }
+                if (tabLabel) return { section_id: tabLabel, section_title: tabLabel };
+            }
+            return { section_id: '__root__', section_title: '' };
+        }
+        const card = el.closest && el.closest('.el-card');
+        if (card) {
+            const h = card.querySelector('.el-card__header');
+            const title = (h && (h.innerText || h.textContent || '') || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+            if (title) return { section_id: title, section_title: title };
+        }
+        return { section_id: '__root__', section_title: '' };
+    };
+    const attachSection = (field, el) => {
+        if (!el) {
+            Object.assign(field, { section_id: '__root__', section_title: '' });
+            return;
+        }
+        const collapse = el.closest && el.closest('.el-collapse-item');
+        const pane = el.closest && el.closest('.el-tab-pane');
+        const card = el.closest && el.closest('.el-card');
+        const anchor = collapse || pane || card || null;
+        if (!anchor) {
+            Object.assign(field, { section_id: '__root__', section_title: '' });
+            return;
+        }
+        if (sectionAssignments.has(anchor)) {
+            Object.assign(field, sectionAssignments.get(anchor));
+            return;
+        }
+        const sec = sectionOf(el);
+        const dedupeKey = sec.section_title || sec.section_id;
+        if (dedupeKey && dedupeKey !== '__root__' && dedupeKey !== '__collapse__') {
+            const n = (sectionTitleCounts.get(dedupeKey) || 0) + 1;
+            sectionTitleCounts.set(dedupeKey, n);
+            if (n > 1) sec.section_id = (sec.section_title || dedupeKey) + '#' + n;
+        }
+        const assigned = { section_id: sec.section_id, section_title: sec.section_title };
+        sectionAssignments.set(anchor, assigned);
+        Object.assign(field, assigned);
+    };
     const getRowLeadingText = (row) => {
         const cells = row.querySelectorAll('td, .el-table__cell');
         for (let i = 0; i < cells.length; i++) {
@@ -1488,24 +1563,71 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         return 'unknown';
     };
     const collectTableControls = (row) => {
+        /* SOURCE_B_KIND_PARITY */
         const controls = [];
         const cells = row.querySelectorAll('td, .el-table__cell');
+        const dateSeen = new Set();
+        const groupSeen = new Set();
         for (let ci = 0; ci < cells.length; ci++) {
             const cell = cells[ci];
+            const dateEls = cell.querySelectorAll('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]');
+            for (let di = 0; di < dateEls.length; di++) {
+                const de = dateEls[di];
+                if (dateSeen.has(de)) continue;
+                dateSeen.add(de);
+                if (quick && !isVisible(de)) continue;
+                const operable = de.querySelector('input:not([type="hidden"])') || de;
+                controls.push({ cell, el: operable, kind: 'date', options: [] });
+            }
+            const radioHosts = cell.querySelectorAll('.el-radio-group');
+            const radioContainers = radioHosts.length ? [...radioHosts] : (cell.querySelectorAll('.el-radio').length ? [cell] : []);
+            for (let rgi = 0; rgi < radioContainers.length; rgi++) {
+                const host = radioContainers[rgi];
+                const gkey = host === cell ? ('cell-radio:' + ci) : host;
+                if (groupSeen.has(gkey)) continue;
+                const radios = host.querySelectorAll('.el-radio');
+                if (!radios.length) continue;
+                groupSeen.add(gkey);
+                if (quick && !isVisible(radios[0])) continue;
+                const options = [...radios].map(r => {
+                    const lab = r.querySelector('.el-radio__label');
+                    return ((lab && lab.textContent) || r.textContent || '').replace(/\\s+/g, ' ').trim();
+                }).filter(Boolean);
+                const clickEl = radios[0].querySelector('.el-radio__input, input[type="radio"]') || radios[0];
+                controls.push({ cell, el: clickEl, kind: 'radio', options });
+            }
+            const cbHosts = cell.querySelectorAll('.el-checkbox-group');
+            const cbContainers = cbHosts.length ? [...cbHosts] : (cell.querySelectorAll('.el-checkbox').length ? [cell] : []);
+            for (let cgi = 0; cgi < cbContainers.length; cgi++) {
+                const host = cbContainers[cgi];
+                const gkey = host === cell ? ('cell-cb:' + ci) : host;
+                if (groupSeen.has(gkey)) continue;
+                const boxes = host.querySelectorAll('.el-checkbox');
+                if (!boxes.length) continue;
+                groupSeen.add(gkey);
+                if (quick && !isVisible(boxes[0])) continue;
+                const options = [...boxes].map(c => {
+                    const lab = c.querySelector('.el-checkbox__label');
+                    return ((lab && lab.textContent) || c.textContent || '').replace(/\\s+/g, ' ').trim();
+                }).filter(Boolean);
+                const clickEl = boxes[0].querySelector('.el-checkbox__input, input[type="checkbox"]') || boxes[0];
+                controls.push({ cell, el: clickEl, kind: 'checkbox', options });
+            }
             const inputs = cell.querySelectorAll('input:not([type="hidden"])');
             for (let ii = 0; ii < inputs.length; ii++) {
                 const input = inputs[ii];
                 const t = (input.type || '').toLowerCase();
                 if (t === 'checkbox' || t === 'radio') continue;
+                if (input.closest && input.closest('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]')) continue;
                 if (input.closest && input.closest('.el-pagination')) continue;
                 if (quick && !isVisible(input)) continue;
-                controls.push({ cell, el: input, kind: classifyTableCell(cell) });
+                controls.push({ cell, el: input, kind: classifyTableCell(cell), options: [] });
             }
             const textareas = cell.querySelectorAll('textarea');
             for (let ti = 0; ti < textareas.length; ti++) {
                 const ta = textareas[ti];
                 if (quick && !isVisible(ta)) continue;
-                controls.push({ cell, el: ta, kind: 'input' });
+                controls.push({ cell, el: ta, kind: 'input', options: [] });
             }
             const selects = cell.querySelectorAll('.el-select');
             for (let si = 0; si < selects.length; si++) {
@@ -1513,7 +1635,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
                 const trigger = sel.querySelector('.el-input__inner');
                 if (!trigger) continue;
                 if (quick && !isVisible(sel)) continue;
-                controls.push({ cell, el: trigger, kind: 'select' });
+                controls.push({ cell, el: trigger, kind: 'select', options: [] });
             }
         }
         return controls;
@@ -1531,6 +1653,10 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
             leaf = 'textarea';
         } else if (controlEl.closest && controlEl.closest('.el-date-editor, .tsscdatepicker')) {
             leaf = "div[contains(@class,'el-date-editor')]";
+        } else if (controlEl.closest && controlEl.closest('.el-radio, .el-radio-group')) {
+            leaf = "div[contains(@class,'el-radio')]";
+        } else if (controlEl.closest && controlEl.closest('.el-checkbox, .el-checkbox-group')) {
+            leaf = "div[contains(@class,'el-checkbox')]";
         }
         const local = "tr[.//*[normalize-space()=" + lit + "]]//" + leaf;
         let xp = scopedXPath(local, scopeKind);
@@ -1621,6 +1747,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
             return '';
         })();
         const field = { label: displayLabel, kind, currentValue, options: [], placeholder, required, disabled, selected, hasButton, xpath_smart };
+        attachSection(field, operable || item);
         pushField(field);
         if (kind === 'select') {
             const t = trigger || item.querySelector('input:not([type="hidden"])');
@@ -1673,7 +1800,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
                     label: displayName,
                     kind,
                     currentValue,
-                    options: [],
+                    options: ctrl.options || [],
                     placeholder,
                     required: false,
                     disabled,
@@ -1681,6 +1808,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
                     hasButton: '',
                     xpath_smart,
                 };
+                attachSection(field, el);
                 if (!pushField(field)) continue;
                 if (kind === 'select' && trigger) {
                     selectFields.push({ field, trigger });
@@ -1736,7 +1864,23 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         }
         return 'unknown';
     })();
-    const result = { container: containerId, fields, notification };
+    /* SCAN_SOURCE_C_BUTTONS */
+    const buttons = [];
+    const btnSeen = new Set();
+    for (const el of container.querySelectorAll('button, .el-button')) {
+        if (quick && !isVisible(el)) continue;
+        if (el.disabled || el.classList.contains('is-disabled')) continue;
+        const label = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+        if (!label || label.length > 40) continue;
+        const btnSec = {};
+        attachSection(btnSec, el);
+        const xpath_smart = xpathSmartOf(el, label, '', 'button') || '';
+        const key = xpath_smart || (btnSec.section_id + '|' + label);
+        if (btnSeen.has(key)) continue;
+        btnSeen.add(key);
+        buttons.push({ label, xpath_smart, section_id: btnSec.section_id, section_title: btnSec.section_title, disabled: false });
+    }
+    const result = { container: containerId, fields, buttons, notification };
     const json = JSON.stringify(result, null, 2);
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');

@@ -39,6 +39,7 @@ from ..models import (
     FormSnapshot, FormSnapshotCollection,
     TaskItem, TaskList,
 )
+from ..models.field import ScannedButton
 from .form_rules import (
     match_rule, match_cert_number, get_has_button_keywords,
     _gen_name,
@@ -66,6 +67,20 @@ def _is_search_dialog(container_id: str) -> bool:
 def _force_refill_flag(case_data_store: dict | None) -> bool:
     from ._phase_intent import contract_force_refill
     return contract_force_refill(case_data_store)
+
+
+def _scan_buttons_from_result(result) -> list[dict]:
+    """Parse standalone buttons from JS_SCAN_FORM_FIELDS JSON (not TaskList fields)."""
+    if not isinstance(result, dict):
+        return []
+    raw = result.get('buttons') or []
+    out: list[dict] = []
+    for b in raw:
+        if isinstance(b, dict):
+            out.append(ScannedButton(**b).model_dump())
+        elif isinstance(b, ScannedButton):
+            out.append(b.model_dump())
+    return out
 
 
 def _is_query_mode(case_data_store: dict | None) -> bool:
@@ -477,6 +492,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             cid = result.get('container', container_id) if isinstance(result, dict) else container_id
             _switch_task_list_container(case_data_store, cid)
             _save_form_snapshot(cid, [f.model_dump() for f in dom_fields], case_data_store)
+            case_data_store['_scan_buttons'] = _scan_buttons_from_result(result)
             session_filled = set(case_data_store.get('_autofilled_labels') or [])
             tl = TaskList.from_scan(
                 [f.model_dump() for f in dom_fields],
@@ -720,6 +736,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
         raw_notification = result.get('notification') if isinstance(result, dict) else None
         notification = Notification(**raw_notification) if raw_notification else None
+        case_data_store['_scan_buttons'] = _scan_buttons_from_result(result)
 
         # Browse/list scan: task list only — do NOT save form structure checkpoint.
         # Structure is saved on: run_form_assistant, single-field first-touch
@@ -757,6 +774,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     required=prev.required if prev else False,
                     hasButton=prev.hasButton if prev else '',
                     xpath_smart=prev.xpath_smart if prev else '',
+                    section_id=prev.section_id if prev else '',
+                    section_title=prev.section_title if prev else '',
                 ))
         # Restore needs_intervention flags on items that ended up in pending
         for item in tl.pending:

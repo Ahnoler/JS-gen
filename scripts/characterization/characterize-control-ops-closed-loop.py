@@ -27,9 +27,18 @@ def test_models_section() -> None:
                 "FormScanResult.buttons")
 
 
+def test_js_scan_section_and_source_b_kinds() -> None:
+    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    assert_true("sectionOf" in js or "SECTION_ATTACH" in js, "section attach helper")
+    assert_true("SCAN_SOURCE_C_BUTTONS" in js, "buttons source marker")
+    # Source B must collect radio groups (not only skip input[type=radio])
+    assert_true("el-radio" in js and "SCAN_SOURCE_B" in js, "table radio collection cues")
+
+
 def main() -> int:
     test_models_section()
-    print("characterize-control-ops-closed-loop models: OK")
+    test_js_scan_section_and_source_b_kinds()
+    print("characterize-control-ops-closed-loop: OK")
     return 0
 
 
