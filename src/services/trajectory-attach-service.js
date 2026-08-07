@@ -22,6 +22,7 @@ import {
 } from './trajectory-runtime.js';
 import { runDefaultLogin } from './trajectory-record-lifecycle.js';
 import { USE_EXECUTOR } from '../../config/config.js';
+import { resolveModelId } from '../runtime/resolve-model.js';
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
@@ -337,7 +338,8 @@ export async function attachTrajectoryLive(trajectoryId) {
   } catch {}
 
   const sessionId = randomUUID();
-  const model = traj.model || 'deepseek-v4-flash';
+  // Empty traj.model → agent-api.json defaultModel; explicit value kept as-is.
+  const model = resolveModelId(traj.model);
   let opened;
   try {
     opened = await execSession.openSession({
