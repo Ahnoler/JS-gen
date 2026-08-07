@@ -28,7 +28,7 @@ import {
 import * as registry from '../executor-registry.js';
 import * as executorNodeDao from '../dao/executor-node-dao.js';
 import * as slotLease from '../executor-slot-lease.js';
-import { BATCH_JOB_TERMINAL } from '../models/constants.js';
+import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../models/constants.js';
 
 /** @type {Set<string>} in-flight cancel tokens for analyzing items */
 const cancelledAnalyzeTokens = new Set();
@@ -44,6 +44,7 @@ export function buildRequestHash({
   functionId,
   systemAccountId,
   model = '',
+  mode = 'record',
 }) {
   const h = createHash('sha256');
   h.update(Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer || ''));
@@ -53,7 +54,20 @@ export function buildRequestHash({
   h.update(String(systemAccountId));
   h.update('|');
   h.update(String(model || ''));
+  h.update('|');
+  h.update(mode === 'draft' ? 'draft' : 'record');
   return h.digest('hex');
+}
+
+function normalizeBatchMode(raw) {
+  if (raw == null || raw === '') return 'record';
+  const m = String(raw).trim().toLowerCase();
+  if (!BATCH_JOB_MODES.includes(m)) {
+    const err = new Error('mode must be record or draft');
+    err.statusCode = 400;
+    throw err;
+  }
+  return m;
 }
 
 async function emitProgress(batchId, item = null, extra = {}) {
@@ -61,6 +75,7 @@ async function emitProgress(batchId, item = null, extra = {}) {
   const summary = await batchDao.summarizeJob(batchId);
   const payload = {
     batchId,
+    mode: job?.mode || 'record',
     jobStatus: job?.status || null,
     summary,
     itemId: item?.id ?? null,
@@ -94,7 +109,12 @@ async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
     await batchDao.forceUpdateJob(batchId, { status: 'cancelled' });
     const summary = await batchDao.summarizeJob(batchId);
     try {
-      broadcast('batch:done', { batchId, jobStatus: 'cancelled', summary });
+      broadcast('batch:done', {
+        batchId,
+        mode: job.mode || 'record',
+        jobStatus: 'cancelled',
+        summary,
+      });
     } catch {}
     return batchDao.getJobById(batchId);
   }
@@ -119,7 +139,12 @@ async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
 
   await batchDao.forceUpdateJob(batchId, { status: terminal });
   try {
-    broadcast('batch:done', { batchId, jobStatus: terminal, summary });
+    broadcast('batch:done', {
+      batchId,
+      mode: job.mode || 'record',
+      jobStatus: terminal,
+      summary,
+    });
   } catch {}
   return batchDao.getJobById(batchId);
 }
@@ -139,6 +164,7 @@ export async function getBatchJobView(batchId, {
   return {
     batchId: job.id,
     status: job.status,
+    mode: job.mode || 'record',
     functionId: job.functionId,
     systemAccountId: job.systemAccountId,
     model: job.model,
@@ -162,8 +188,11 @@ export async function importBatchFromExcel({
   systemAccountId,
   model = '',
   idempotencyKey,
+  mode: rawMode,
 } = {}) {
-  if (!USE_EXECUTOR) {
+  const mode = normalizeBatchMode(rawMode);
+
+  if (mode === 'record' && !USE_EXECUTOR) {
     const err = new Error('Batch import requires USE_EXECUTOR=true');
     err.statusCode = 503;
     throw err;
@@ -187,6 +216,7 @@ export async function importBatchFromExcel({
     functionId: validated.functionId,
     systemAccountId: validated.systemAccountId,
     model: modelId,
+    mode,
   });
 
   const existing = await batchDao.getJobByIdempotencyKey(key);
@@ -244,6 +274,7 @@ export async function importBatchFromExcel({
       functionId: validated.functionId,
       systemAccountId: validated.systemAccountId,
       model: modelId,
+      mode,
       originalFilename: String(originalFilename || ''),
       status: 'accepted',
     }, items);
@@ -455,17 +486,31 @@ async function createDraftFromAnalyzed(item) {
         requireFunctionId: true,
         trx,
       });
-      const bound = await batchDao.bindTrajectoryAndQueue(item.id, trajId, {
-        version: item.version,
-        trx,
-      });
-      if (!bound) {
-        throw Object.assign(new Error('Lost CAS while binding trajectory'), { code: 'CAS' });
+      if (job.mode === 'draft') {
+        const bound = await batchDao.bindTrajectoryAsDrafted(item.id, trajId, {
+          version: item.version,
+          trx,
+        });
+        if (!bound) {
+          throw Object.assign(new Error('Lost CAS while binding trajectory'), { code: 'CAS' });
+        }
+      } else {
+        const bound = await batchDao.bindTrajectoryAndQueue(item.id, trajId, {
+          version: item.version,
+          trx,
+        });
+        if (!bound) {
+          throw Object.assign(new Error('Lost CAS while binding trajectory'), { code: 'CAS' });
+        }
       }
     });
     const fresh = await batchDao.getItemById(item.id);
     await emitProgress(item.batchId, fresh);
-    kickScheduler();
+    if (job.mode === 'draft') {
+      await maybeFinalizeJob(item.batchId);
+    } else {
+      kickScheduler();
+    }
   } catch (err) {
     if (err.code === 'CAS') return;
     const fresh = await batchDao.getItemById(item.id);
@@ -505,6 +550,7 @@ async function pumpRecord() {
       workerToken: token,
       leaseMs: BATCH_ITEM_LEASE_MS,
       jobStatuses: ['accepted', 'running', 'waiting_executor'],
+      jobModes: ['record'],
     });
     if (!item) break;
 

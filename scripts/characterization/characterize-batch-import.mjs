@@ -96,27 +96,20 @@ async function testMaxRows() {
 }
 
 function testRequestHash() {
-  const a = buildRequestHash({
+  const base = {
     fileBuffer: Buffer.from('abc'),
     functionId: 1,
     systemAccountId: 2,
     model: 'm',
-  });
-  const b = buildRequestHash({
-    fileBuffer: Buffer.from('abc'),
-    functionId: 1,
-    systemAccountId: 2,
-    model: 'm',
-  });
-  const c = buildRequestHash({
-    fileBuffer: Buffer.from('abd'),
-    functionId: 1,
-    systemAccountId: 2,
-    model: 'm',
-  });
+  };
+  const a = buildRequestHash({ ...base, mode: 'record' });
+  const b = buildRequestHash({ ...base, mode: 'record' });
+  const c = buildRequestHash({ ...base, mode: 'draft' });
+  const d = buildRequestHash({ ...base }); // default record
   assert.strictEqual(a, b);
+  assert.strictEqual(a, d);
   assert.notStrictEqual(a, c);
-  ok('request hash stable');
+  ok('request hash stable + mode-sensitive');
 }
 
 function testConstantsAndTerminal() {

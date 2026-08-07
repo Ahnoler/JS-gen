@@ -2,7 +2,6 @@
  * Batch Excel import + auto-recording routes.
  * Registered BEFORE /api/v2/trajectories/:id so "batch" is not captured as id.
  */
-import { USE_EXECUTOR } from '../../../config/config.js';
 import { uploadXlsxSingle, multerHttpStatus, XLSX_MIME } from '../../http/upload-xlsx.js';
 import * as batchService from '../../services/trajectory-batch-service.js';
 import { BATCH_JOB_TERMINAL } from '../../models/constants.js';
@@ -45,9 +44,6 @@ export default function registerTrajectoryBatch(app) {
         return res.status(status).json({ error: err.message });
       }
       try {
-        if (!USE_EXECUTOR) {
-          return res.status(503).json({ error: 'Batch import requires USE_EXECUTOR=true' });
-        }
         if (!req.file?.buffer) {
           return res.status(400).json({ error: 'file is required' });
         }
@@ -61,6 +57,7 @@ export default function registerTrajectoryBatch(app) {
           systemAccountId: req.body?.systemAccountId ?? req.body?.accountId,
           model: req.body?.model || '',
           idempotencyKey,
+          mode: req.body?.mode,
         });
         const httpStatus = result._httpStatus || 202;
         delete result._httpStatus;
