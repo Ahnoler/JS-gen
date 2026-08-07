@@ -27,6 +27,12 @@ def test_snippet_markers() -> None:
     assert_true("JS_SELECT_TRIGGER_BY_XPATH" in js, "JS_SELECT_TRIGGER_BY_XPATH exported")
     assert_true("el-table__fixed" in JS_FILL_BY_XPATH, "fill-by-xpath handles fixed table columns")
     assert_true("__last_select_trigger" in JS_SELECT_TRIGGER_BY_XPATH, "select trigger sets global for JS_SELECT_OPTION")
+    # el-select inner input is often readOnly while still editable — must not treat as disabled
+    # (table Source B selects have no .el-form-item; xpath path is the only open path).
+    assert_true(
+        "trigger.readOnly" not in JS_SELECT_TRIGGER_BY_XPATH,
+        "JS_SELECT_TRIGGER_BY_XPATH must not treat trigger.readOnly as field-disabled",
+    )
 
 
 def test_xpath_date_radio_helpers() -> None:

@@ -92,6 +92,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-07: **表单助手表格内 el-select 不填**（实锤：评级等级测算 input 能填、下拉 pending 残留；`select_option`/`JS_SELECT_TRIGGER_BY_XPATH` 对表格控件返回 `field-disabled`）。根因：xpath 开下拉把 `input.readOnly` 当禁用，而 Element UI 可编辑 select 的 trigger 常为 readOnly；无 `.el-form-item` 时又无法 label 回退。现：xpath trigger **不再**因 readOnly 拒绝（与 `JS_FIELD_DISABLED` 约定一致）。
+  影响范围：Agent `run_form_assistant` / `select_option`、live replay 的 xpath 开下拉。
+  文件：scripts/actions/_js_snippets.py, scripts/characterization/characterize-xpath-fill-select.py
+  Python 同步提示：无（scripts 子进程）。
+
 - 2026-08-07: **el-table 页面表单助手仅扫到少量 `.el-form-item` 字段**（实锤：评级等级测算 ~40 个可编辑表格单元格不可见，仅 3 项进入 pending）。根因：扫描仅 form-item-centric。现 control-first 扫描 + el-table Source B + xpath 去重；同名控件（如不同折叠区两个「保存」）靠 xpath 区分，不靠 displayName 合并。
   影响范围：表单助手扫描与批量填写。
   文件：scripts/actions/_js_snippets.py, scripts/models/field.py, scripts/models/task.py, scripts/models/form_snapshot.py, scripts/actions/_form.py

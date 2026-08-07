@@ -974,9 +974,11 @@ JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath]) => {
   if (!node) return 'xpath-not-found';
   const trigger = findSelectTrigger(node);
   if (!trigger) return 'no-select-found';
-  if (trigger.disabled || trigger.readOnly) return 'field-disabled';
+  // Do NOT treat readOnly as disabled - Element UI el-select triggers are often
+  // readOnly while still openable (table Source B selects rely on this path).
+  if (trigger.disabled) return 'field-disabled';
   const item = trigger.closest('.el-form-item');
-  item?.scrollIntoView?.({ block: 'center', behavior: 'instant' });
+  (item || trigger.closest('.el-select') || trigger)?.scrollIntoView?.({ block: 'center', behavior: 'instant' });
   trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   trigger.click();
