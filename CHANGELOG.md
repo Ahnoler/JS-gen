@@ -52,6 +52,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-07: **`close_dialog` 关不了 el-drawer**（轨迹 36 回归）。根因：`el-dialog__close` icon class 被误判为 dialog 容器，xpath_smart 只挂 dialog；live replay 死磕 xpath 失败也不回退控制器。现：`detectContainerKind` 不再把 `el-dialog__*` 当容器；close 默认 `overlay`（dialog+message-box+drawer）；replay xpath 失败则 CTRL/controller 回退。
+  影响范围：CDP/录制定位、live steps/replay。
+  文件：src/cdp/locator-candidates.js, scripts/actions/_locator_helpers_js.py, scripts/actions/_replay.py
+  Python 同步提示：无（scripts 子进程 + CDP 辅助；控制面 API 不变）。
+
 - 2026-08-06: **表单结构 Type B 护栏**：expected/actual 数量崩塌或 missing 过半（错容器扫描特征）时检查点失败，禁止删 missing 步骤、禁止改 form_snapshot；与 `container_not_found` 同路径。
   影响范围：live steps/replay Type B。
   文件：src/services/trajectory-session-replay.js, src/dashboard/api-docs/catalog.js
