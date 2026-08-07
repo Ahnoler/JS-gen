@@ -61,6 +61,14 @@ class TaskItem(BaseModel):
         default="",
         description="Relative xpath for the operable control (dedup + execute key)",
     )
+    section_id: str = Field(
+        default="",
+        description="Stable section key",
+    )
+    section_title: str = Field(
+        default="",
+        description="Readable section title",
+    )
     needs_intervention: bool = Field(
         default=False,
         description=(
@@ -114,6 +122,8 @@ class TaskItem(BaseModel):
             required=field.get("required", False),
             hasButton=has_button,
             xpath_smart=field.get("xpath_smart", ""),
+            section_id=field.get("section_id", ""),
+            section_title=field.get("section_title", ""),
             needs_intervention=False,
         )
 

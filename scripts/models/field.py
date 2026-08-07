@@ -80,10 +80,29 @@ class ScannedField(BaseModel):
         default="",
         description="Relative xpath for the operable control (dedup + execute key)",
     )
+    section_id: str = Field(
+        default="",
+        description="Stable section key",
+    )
+    section_title: str = Field(
+        default="",
+        description="Readable section title",
+    )
     filled: bool = Field(
         default=False,
         description="True if this field was already filled by auto-fill (label is in task_list.done)",
     )
+
+
+# ── Scanned action button (outside .el-form-item) ─────────────────────────
+class ScannedButton(BaseModel):
+    """A standalone button in the scan container (not an .el-form-item field)."""
+
+    label: str = ""
+    xpath_smart: str = ""
+    section_id: str = ""
+    section_title: str = ""
+    disabled: bool = False
 
 
 # ── Scan result (top-level) ────────────────────────────────────────────────
@@ -101,6 +120,10 @@ class FormScanResult(BaseModel):
     fields: list[ScannedField] = Field(
         default_factory=list,
         description="All .el-form-item elements found in the container",
+    )
+    buttons: list[ScannedButton] = Field(
+        default_factory=list,
+        description="Standalone action buttons in the container (not form fields)",
     )
     notification: Optional[Notification] = Field(
         default=None,
