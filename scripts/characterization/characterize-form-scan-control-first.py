@@ -8,12 +8,25 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.models.field import ScannedField
+from scripts.models.form_snapshot import FormSnapshot
 from scripts.models.task import TaskItem, TaskList
 
 
 def assert_true(cond: bool, msg: str) -> None:
     if not cond:
         raise AssertionError(msg)
+
+
+def test_fingerprint_distinguishes_same_label() -> None:
+    a = FormSnapshot.from_scan_fields("main", [
+        {"label": "保存", "required": False, "xpath_smart": "//div[@id='a']//button"},
+        {"label": "保存", "required": False, "xpath_smart": "//div[@id='b']//button"},
+    ])
+    assert_true(len(a.fields) == 2, "same-label fields with distinct xpath both kept")
+    assert_true(
+        a.fields_fingerprint[0] != a.fields_fingerprint[1],
+        "fields_fingerprint distinguishes same label by xpath_smart",
+    )
 
 
 def main() -> int:
@@ -30,6 +43,7 @@ def main() -> int:
         "xpath_smart": "//input[@placeholder='请输入账号']",
     })
     assert_true(item is not None and item.xpath_smart.startswith("//"), "TaskItem carries xpath_smart")
+    test_fingerprint_distinguishes_same_label()
     print("characterize-form-scan-control-first models: OK")
     return 0
 

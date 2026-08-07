@@ -14,15 +14,19 @@ from pydantic import BaseModel, Field
 class SnapshotField(BaseModel):
     """Minimal per-field metadata for structure comparison.
 
-    Only stores label and required status — enough to detect added/removed
-    fields and required/optional status changes without recording all DOM
-    details.
+    Stores label, required status, and optional xpath_smart — enough to detect
+    added/removed fields, required/optional changes, and duplicate labels that
+    differ by DOM location.
     """
 
-    label: str = Field(description="The .el-form-item__label text")
+    label: str = Field(description="The .el-form-item__label text (or placeholder fallback)")
     is_required: bool = Field(
         default=False,
         description="True if the field was marked required at scan time",
+    )
+    xpath_smart: str = Field(
+        default="",
+        description="Stable xpath anchor when label alone is ambiguous",
     )
 
 
@@ -70,14 +74,14 @@ class FormSnapshot(BaseModel):
     # ── Fingerprint (for dedup-by-content) ─────────────────────────────────
 
     @property
-    def fields_fingerprint(self) -> tuple[tuple[str, bool], ...]:
-        """Ordered fingerprint: one (label, is_required) tuple per field.
+    def fields_fingerprint(self) -> tuple[tuple[str, bool, str], ...]:
+        """Ordered fingerprint: one (label, is_required, xpath_smart) tuple per field.
 
         Two snapshots with the same fingerprint represent the same form —
         later scans replace earlier ones.  Different fingerprints mean
         different forms, even if they share the same container name.
         """
-        return tuple((f.label, f.is_required) for f in self.fields)
+        return tuple((f.label, f.is_required, f.xpath_smart) for f in self.fields)
 
     @staticmethod
     def _root_container(container: str) -> str:
@@ -106,11 +110,12 @@ class FormSnapshot(BaseModel):
         optional_count = 0
 
         for f in scan_fields:
-            label = (f.get("label", "") or "").strip()
-            if not label:
+            label = (f.get("label") or f.get("placeholder") or "").strip()
+            xpath = (f.get("xpath_smart") or "").strip()
+            if not label and not xpath:
                 continue
             is_req = f.get("required", False)
-            entries.append(SnapshotField(label=label, is_required=is_req))
+            entries.append(SnapshotField(label=label, is_required=is_req, xpath_smart=xpath))
             if is_req:
                 required_count += 1
             else:
@@ -130,8 +135,8 @@ class FormSnapshot(BaseModel):
 class FormSnapshotCollection:
     """Utility for managing the form_snapshots list in case_data_store.
 
-    Dedup-by-content: compares fields_fingerprint (ordered (label, is_required)
-    tuples).  Same fingerprint → replace (newer scan of same form).  Different
+    Dedup-by-content: compares fields_fingerprint (ordered (label, is_required,
+    xpath_smart) tuples).  Same fingerprint → replace (newer scan of same form).  Different
     fingerprint → new entry.  When multiple snapshots share the same container
     base name (e.g. "main"), later ones get "#2", "#3", etc. suffixes.
 
