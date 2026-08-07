@@ -18,6 +18,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-07: 删除 `trajectory_step.is_replay` 列及 `idx_step_is_replay` 索引；列表/计数/组件签名不再按该列过滤。`POST .../steps/replay` 请求体 `isReplay` 仍为运行时抑制入库。
+  影响范围：schema、trajectory step DAO/计数、operation-component 签名、api-docs。
+  文件：migrations/20260807160000_drop_trajectory_step_is_replay.js, schemas/init.sql, src/dao/trajectory-step-dao.js, src/dao/trajectory-dao.js, src/services/trajectory-step-service.js, src/services/operation-component-signature.js, src/services/operation-component-service.js, src/services/trajectory-persist-service.js, src/dashboard/api-docs/catalog.js
+  Python 同步提示：对齐 schema 删除 `is_replay`；勿再读写该列。
+
 - 2026-08-07: **表单扫描 control-first + el-table（Source B）**：`JS_SCAN_FORM_FIELDS` 在 Source A（`.el-form-item`）之外发现可见 `el-table` 可编辑单元格；每条字段输出相对 `xpath_smart`；按 xpath 去重（冲突时保留 form-item 元数据）；`ScannedField` / `TaskItem` / `form_snapshot.fields_fingerprint` 携带 xpath；无 label 仅有 placeholder 的控件纳入扫描（displayName=placeholder）。表单助手与 `save_form_snapshot` 共用同一扫描结果。
   影响范围：run_form_assistant 批量填写、录制 form_snapshot、live replay 定位语义。
   文件：scripts/actions/_js_snippets.py, scripts/models/field.py, scripts/models/task.py, scripts/models/form_snapshot.py, scripts/characterization/characterize-form-scan-control-first.py

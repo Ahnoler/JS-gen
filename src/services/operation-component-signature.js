@@ -100,13 +100,12 @@ export function stepSignatureFragment(step) {
 }
 
 /**
- * @param {Array<{ actionType?: string, action?: string, params?: object|null, paramsJson?: object|null, isReplay?: boolean, stepNumber?: number }>} steps
+ * @param {Array<{ actionType?: string, action?: string, params?: object|null, paramsJson?: object|null, stepNumber?: number }>} steps
  * @returns {{ signature: string, fragments: object[] }}
  */
 export function computePhaseSignature(steps) {
   const list = Array.isArray(steps) ? steps : [];
   const usable = list
-    .filter((s) => !s?.isReplay)
     .slice()
     .sort((a, b) => {
       const an = Number(a.stepNumber) || 0;
@@ -127,7 +126,6 @@ export function computePhaseSignature(steps) {
 export function stepsToSnapshot(steps) {
   const list = Array.isArray(steps) ? steps : [];
   return list
-    .filter((s) => !s?.isReplay)
     .slice()
     .sort((a, b) => (Number(a.stepNumber) || 0) - (Number(b.stepNumber) || 0))
     .map((s) => {

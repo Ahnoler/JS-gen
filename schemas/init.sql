@@ -156,7 +156,6 @@ CREATE TABLE `trajectory_step` (
   `action_id`           VARCHAR(64) DEFAULT NULL COMMENT 'Python ActionEntry.id（UUID v4）；控制面重启后幂等去重；历史行为 NULL',
   `confirmed`           TINYINT(1) NOT NULL DEFAULT 1 COMMENT '回放确认',
   `confirmed_at`        DATETIME(3) DEFAULT NULL COMMENT '回放确认时间',
-  `is_replay`           TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=回放执行产生，不计入阶段步骤列表',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_trajectory_id` (`trajectory_id`),
   KEY `idx_step_number` (`trajectory_id`, `step_number`),
@@ -164,7 +163,6 @@ CREATE TABLE `trajectory_step` (
   KEY `idx_action_type` (`action_type`),
   KEY `idx_traj_phase_id` (`trajectory_phase_id`),
   KEY `idx_source` (`source`),
-  KEY `idx_step_is_replay` (`trajectory_id`, `is_replay`),
   UNIQUE KEY `uk_traj_action` (`trajectory_id`, `action_id`),
   CONSTRAINT `fk_step_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_step_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL

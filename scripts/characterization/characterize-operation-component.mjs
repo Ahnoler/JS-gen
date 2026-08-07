@@ -57,16 +57,6 @@ const sigC = computePhaseSignature([
 ]);
 assert.strictEqual(sigA.signature, sigC.signature);
 
-section('is_replay steps excluded');
-const withReplay = computePhaseSignature([
-  { stepNumber: 1, actionType: 'fill_form_field', params: { label_text: '账号', text: 'a' }, isReplay: true },
-  { stepNumber: 2, actionType: 'click_button', params: { button_text: '登录' } },
-]);
-const onlyClick = computePhaseSignature([
-  { stepNumber: 2, actionType: 'click_button', params: { button_text: '登录' } },
-]);
-assert.strictEqual(withReplay.signature, onlyClick.signature);
-
 section('select option_text in semantics');
 const sel = extractStableSemantics('select_option', { label_text: '证件类型', option_text: '身份证', value: '01' });
 assert.strictEqual(sel.label_text, '证件类型');

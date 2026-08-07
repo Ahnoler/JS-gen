@@ -973,7 +973,7 @@ export const API_GROUPS = [
           { name: 'stepIds', type: 'number[]', required: true, in: 'body', desc: '已落库 trajectory_step.id 列表', example: '[501, 502]' },
           {
             name: 'isReplay', type: 'boolean', in: 'body',
-            desc: '执行时是否抑制入库（默认 true）。与表字段 is_replay 不同。Type B 结构化插入绕过此抑制。',
+            desc: '执行时是否抑制入库（默认 true）。Type B 结构化插入绕过此抑制。',
             example: 'true',
           },
         ],
@@ -987,7 +987,7 @@ export const API_GROUPS = [
         notes: [
           'HTTP 202；信封 code=200（勿用 body.code=202）',
           '以 WS replay:finished 为批次结束信号；勿仅用 HTTP 收尾',
-          '表字段 is_replay ≠ 请求参数 isReplay',
+          '请求体 isReplay 仅为运行时抑制入库；表字段 is_replay 已删除',
           'trajectory_step.confirmed（回放确认）：1=通过，0=不通过（含触发自愈）',
           '两种自愈：healType=step（单步）vs healType=form_structure（表单结构）— 勿混淆',
           '用户可 POST .../steps/replay/stop 中断自愈/批次 → WS replay:finished { aborted:true, reason:"user_stop", error:null }',

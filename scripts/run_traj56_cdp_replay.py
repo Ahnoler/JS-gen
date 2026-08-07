@@ -82,7 +82,7 @@ async def main() -> int:
                 """
                 SELECT id, step_number, action_type, params_json, element_json
                 FROM trajectory_step
-                WHERE trajectory_id=%s AND (is_replay=0 OR is_replay IS NULL)
+                WHERE trajectory_id=%s
                 ORDER BY step_number, action_index
                 """,
                 (56,),
