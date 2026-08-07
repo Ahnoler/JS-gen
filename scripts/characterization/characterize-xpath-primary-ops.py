@@ -10,6 +10,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.actions._form import ResolvedControl, _resolve_control  # noqa: E402
+from scripts.actions._llm_values import (  # noqa: E402
+    _enrich_llm_actions_xpath,
+    _llm_generate_values,
+)
 from scripts.models.task import TaskItem, TaskList  # noqa: E402
 
 
@@ -68,6 +72,94 @@ def test_resolve_duplicate_same_xpath() -> None:
     assert_true(r.error == "" and r.xpath_smart == xp, "identical xpath not ambiguous")
 
 
+def test_enrich_duplicate_label_omits_xpath() -> None:
+    """Fix 1: same semantic label, ≥2 distinct xpaths → do not first-win bind."""
+    fields = [
+        {"label": "评级", "kind": "select", "xpath_smart": "//div[@id='a']//div[contains(@class,'el-select')]"},
+        {"label": "评级", "kind": "select", "xpath_smart": "//div[@id='b']//div[contains(@class,'el-select')]"},
+    ]
+    # Non-1:1 action list (single action) → cannot index-match → omit
+    llm_out = [{"action": "select_option", "label": "评级", "option": "AAA"}]
+    enriched = _enrich_llm_actions_xpath(llm_out, fields)
+    assert_true(len(enriched) == 1, "one action")
+    assert_true(
+        not (enriched[0].get("xpath_smart") or "").strip(),
+        "ambiguous label must not inherit first xpath",
+    )
+    # Resolve path still reports ambiguous when xpath empty
+    store = {
+        "task_list": TaskList(
+            pending=[
+                TaskItem(label="评级", kind="select", xpath_smart=fields[0]["xpath_smart"]),
+                TaskItem(label="评级", kind="select", xpath_smart=fields[1]["xpath_smart"]),
+            ]
+        ).to_store(),
+        "_scan_fields": fields,
+    }
+    r = _resolve_control(store, "评级", "")
+    assert_true(r.error == "ambiguous-label", "resolve still ambiguous without xpath")
+
+
+def test_enrich_index_align_keeps_per_field_xpath() -> None:
+    """1:1 LLM actions ↔ llm_fields → bind each action to its index xpath."""
+    fields = [
+        {"label": "评级", "kind": "select", "xpath_smart": "//div[@id='a']//select"},
+        {"label": "评级", "kind": "select", "xpath_smart": "//div[@id='b']//select"},
+    ]
+    llm_out = [
+        {"action": "select_option", "label": "评级", "option": "A"},
+        {"action": "select_option", "label": "评级", "option": "B"},
+    ]
+    enriched = _enrich_llm_actions_xpath(llm_out, fields)
+    assert_true(enriched[0]["xpath_smart"] == fields[0]["xpath_smart"], "index0 xpath")
+    assert_true(enriched[1]["xpath_smart"] == fields[1]["xpath_smart"], "index1 xpath")
+
+
+def test_enrich_keeps_existing_action_xpath() -> None:
+    fields = [
+        {"label": "评级", "kind": "select", "xpath_smart": "//div[@id='a']"},
+        {"label": "评级", "kind": "select", "xpath_smart": "//div[@id='b']"},
+    ]
+    llm_out = [
+        {"action": "select_option", "label": "评级", "option": "B", "xpath_smart": "//div[@id='b']"},
+    ]
+    enriched = _enrich_llm_actions_xpath(llm_out, fields)
+    assert_true(enriched[0]["xpath_smart"] == "//div[@id='b']", "existing xpath kept")
+
+
+def test_append_action_per_item_xpath() -> None:
+    """P1/P2/_append_action keeps each field's own xpath (no by-label map)."""
+    items = [
+        {"label": "评级", "kind": "select", "options": ["A"], "commandValue": "A",
+         "xpath_smart": "//div[@id='a']"},
+        {"label": "评级", "kind": "select", "options": ["B"], "commandValue": "B",
+         "xpath_smart": "//div[@id='b']"},
+    ]
+    out = _llm_generate_values(None, items)
+    assert_true(len(out) == 2, "two P1 actions")
+    assert_true(out[0]["xpath_smart"] == "//div[@id='a']", "first item xpath")
+    assert_true(out[1]["xpath_smart"] == "//div[@id='b']", "second item xpath")
+
+
+def test_execute_round_surfaces_ambiguous_label() -> None:
+    """Fix 2: batch path must record resolve_error, not collapse to xpath-not-found."""
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    assert_true(
+        "resolve_error = resolved.error" in form,
+        "plumb resolved.error into resolve_error",
+    )
+    assert_true(
+        "result = resolve_error or 'xpath-not-found'" in form
+        or 'result = resolve_error or "xpath-not-found"' in form,
+        "batch uses resolve_error before xpath-not-found fallback",
+    )
+    # Ambiguous label must not first-win via field_dict label scan
+    assert_true(
+        "len(xps) <= 1" in form,
+        "_field_dict_for_action skips ambiguous multi-xpath labels",
+    )
+
+
 def test_scan_display_label_markers() -> None:
     js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
     assert_true(
@@ -93,6 +185,11 @@ def test_phase_a_hardcut_markers() -> None:
 def test_llm_actions_carry_xpath() -> None:
     src = (ROOT / "scripts/actions/_llm_values.py").read_text(encoding="utf-8")
     assert_true("xpath_smart" in src, "_llm_values attaches xpath_smart to actions")
+    assert_true(
+        "def _enrich_llm_actions_xpath" in src,
+        "enrich helper exists (no by_label first-wins)",
+    )
+    assert_true("by_label.setdefault" not in src, "first-wins by_label removed")
 
 
 def test_phase_b_action_signatures() -> None:
@@ -117,6 +214,11 @@ def main() -> int:
     test_resolve_not_found()
     test_resolve_ambiguous()
     test_resolve_duplicate_same_xpath()
+    test_enrich_duplicate_label_omits_xpath()
+    test_enrich_index_align_keeps_per_field_xpath()
+    test_enrich_keeps_existing_action_xpath()
+    test_append_action_per_item_xpath()
+    test_execute_round_surfaces_ambiguous_label()
     test_scan_display_label_markers()
     test_phase_a_hardcut_markers()
     test_llm_actions_carry_xpath()

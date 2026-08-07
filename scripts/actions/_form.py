@@ -1176,9 +1176,19 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if action_index < len(sub) and sub[action_index].get('label') == action.get('label'):
                 return sub[action_index]
             label = action.get('label', '')
-            for d in sub:
-                if d.get('label') == label:
-                    return d
+            matches = [d for d in sub if d.get('label') == label]
+            if len(matches) == 1:
+                return matches[0]
+            if len(matches) > 1:
+                xps = {
+                    (d.get('xpath_smart') or '').strip()
+                    for d in matches
+                    if (d.get('xpath_smart') or '').strip()
+                }
+                # Identical xpath (or none) → safe; ≥2 distinct → omit (ambiguous)
+                if len(xps) <= 1:
+                    return matches[0]
+                return {}
             return {}
 
         async def _select_by_xpath(page, value, xpath_smart):
@@ -1310,12 +1320,16 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 xpath_smart = (
                     a.get('xpath_smart') or field_dict.get('xpath_smart') or ''
                 ).strip()
+                resolve_error = ''
                 if not xpath_smart:
                     resolved = _resolve_control(case_data_store, label, '')
                     if not resolved.error:
                         xpath_smart = resolved.xpath_smart
                         if resolved.label:
                             label = resolved.label
+                    else:
+                        # Plumb ambiguous-label / xpath-not-found (do not collapse)
+                        resolve_error = resolved.error
                 placeholder = field_dict.get('placeholder') or label
                 step_num = i + 1
                 # Pre-mutation locator snapshot (same contract as explicit fill/select/radio actions)
@@ -1343,7 +1357,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
                     )
                     if not xpath_smart and not is_tree:
-                        result = 'xpath-not-found'
+                        result = resolve_error or 'xpath-not-found'
                     elif kind in ('fill_input', 'fill', 'input'):
                         if field_kind == 'date':
                             result = await page.evaluate(

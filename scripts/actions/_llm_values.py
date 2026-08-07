@@ -98,6 +98,75 @@ def _get_form_llm(agent_llm=None):
     return _FORM_LLM
 
 
+def _xpath_of_field(item) -> str:
+    """Per-item xpath only — never a global by-label map."""
+    if isinstance(item, dict):
+        return (item.get('xpath_smart') or '') or ''
+    return getattr(item, 'xpath_smart', '') or ''
+
+
+def _label_of_field(item) -> str:
+    if isinstance(item, dict):
+        return item.get('label') or ''
+    return item if isinstance(item, str) else ''
+
+
+def _enrich_llm_actions_xpath(llm_result, llm_fields):
+    """Attach xpath_smart from source fields when the LLM omitted it.
+
+    Prefer (in order):
+      1) existing action xpath_smart (kept as-is)
+      2) 1:1 index into llm_fields when labels align at that index
+      3) unique label among sources (≤1 distinct xpath) → bind that xpath
+      4) label maps to ≥2 distinct xpaths → leave xpath empty (ambiguous)
+    """
+    # Distinct non-empty xpaths per label among source fields
+    label_xpaths: dict[str, set[str]] = {}
+    label_items: dict[str, list] = {}
+    for item in llm_fields:
+        lbl = _label_of_field(item)
+        label_items.setdefault(lbl, []).append(item)
+        xp = (_xpath_of_field(item) or '').strip()
+        if xp:
+            label_xpaths.setdefault(lbl, set()).add(xp)
+
+    enriched = []
+    for ai, a in enumerate(llm_result):
+        if not isinstance(a, dict):
+            enriched.append(a)
+            continue
+        a2 = dict(a)
+        existing = (a2.get('xpath_smart') or '').strip()
+        if existing:
+            enriched.append(a2)
+            continue
+
+        lbl = a2.get('label', '')
+        src = None
+        # Index alignment when LLM returned one action per llm_field in order
+        if len(llm_result) == len(llm_fields) and ai < len(llm_fields):
+            cand = llm_fields[ai]
+            if _label_of_field(cand) == lbl:
+                src = cand
+
+        if src is None:
+            distinct = label_xpaths.get(lbl) or set()
+            items_for = label_items.get(lbl) or []
+            if len(distinct) >= 2:
+                src = None  # ambiguous — omit xpath
+            elif len(items_for) == 1:
+                src = items_for[0]
+            elif len(distinct) == 1:
+                # Same xpath on all duplicates — safe to bind
+                src = items_for[0] if items_for else None
+            else:
+                src = None
+
+        a2['xpath_smart'] = _xpath_of_field(src) if src is not None else ''
+        enriched.append(a2)
+    return enriched
+
+
 def _llm_generate_values(llm, items, case_data_store=None,
                          instruction="生成合理的测试数据"):
     """Generate values for form fields with three-tier priority:
@@ -108,15 +177,10 @@ def _llm_generate_values(llm, items, case_data_store=None,
     actions = []
     llm_fields = []
 
-    def _xpath_of(item) -> str:
-        if isinstance(item, dict):
-            return (item.get('xpath_smart') or '') or ''
-        return getattr(item, 'xpath_smart', '') or ''
-
     def _append_action(payload: dict, item) -> None:
-        xp = _xpath_of(item)
+        # Keep this concrete field's xpath (per-item), never a by-label map.
         payload = dict(payload)
-        payload['xpath_smart'] = xp or ''
+        payload['xpath_smart'] = _xpath_of_field(item) or ''
         actions.append(payload)
 
     # —— Cross-field dependency detection: postal code ↔ address ——
@@ -277,25 +341,7 @@ def _llm_generate_values(llm, items, case_data_store=None,
         if isinstance(parsed, dict) and 'actions' in parsed:
             parsed = parsed['actions']
         llm_result = parsed if isinstance(parsed, list) else []
-        # Attach xpath_smart from source fields when LLM omitted it
-        by_label = {}
-        for item in llm_fields:
-            lbl = item['label'] if isinstance(item, dict) else item
-            by_label.setdefault(lbl, item)
-        enriched = []
-        for a in llm_result:
-            if not isinstance(a, dict):
-                enriched.append(a)
-                continue
-            a2 = dict(a)
-            if not (a2.get('xpath_smart') or '').strip():
-                src = by_label.get(a2.get('label', ''))
-                if src is not None:
-                    a2['xpath_smart'] = _xpath_of(src) or ''
-                else:
-                    a2['xpath_smart'] = ''
-            enriched.append(a2)
-        llm_result = enriched
+        llm_result = _enrich_llm_actions_xpath(llm_result, llm_fields)
         _record_decision('passed', llm_result)
         _emit_form_batch_event('form_batch_done', {
             'fields': len(llm_fields),
