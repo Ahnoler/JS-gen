@@ -1751,11 +1751,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'no-notification without navigation is NOT success. On validation errors returns err-save-validation.'
     )
     async def click_save(button_text: str = '保存', section: str = ''):
-        from ._phase_intent import check_pending_write_gate, record_success_token
+        from ._phase_intent import check_pending_write_gate, contract_force_refill, record_success_token
 
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         compact_btn = re.sub(r'\s+', '', (button_text or '保存').strip()) or '保存'
+        sec = (section or "").strip()
         # 确认/确定 = dialog/picker confirm (never treat as form-save blocked by query toolbar)
         is_picker_confirm = bool(
             compact_btn.startswith(('确认', '确定'))
@@ -1783,7 +1784,28 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             sys.stderr.flush()
             gate_ok, pending_labels = True, []
         else:
-            gate_ok, pending_labels = check_pending_write_gate(case_data_store)
+            if not is_picker_confirm:
+                from ._phase_boundary import phase_boundary_active, get_phase_boundary
+                from ._section_scope import pending_by_section
+
+                needs_gate = False
+                if phase_boundary_active(case_data_store):
+                    b = get_phase_boundary(case_data_store) or {}
+                    needs_gate = bool(b.get("requires_write_all_editable"))
+                else:
+                    needs_gate = contract_force_refill(case_data_store)
+                if needs_gate and not sec:
+                    tl0 = TaskList.from_store((case_data_store or {}).get("task_list"))
+                    by = pending_by_section(tl0)
+                    if len(by) >= 2:
+                        return _err(
+                            "err-section-required | pending_by_section="
+                            + json.dumps(by, ensure_ascii=False)
+                            + " | Pass section= for the phase block (judge from 阶段任务 / 阶段目录).",
+                            include_in_memory=True,
+                        )
+
+            gate_ok, pending_labels = check_pending_write_gate(case_data_store, section=sec)
         if not gate_ok:
             # Live-prune: fields wrongly left in pending because scan missed Vue disabled
             btn_kw = _button_keywords()
@@ -1811,7 +1833,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     case_data_store['task_list'] = tl.to_store()
                 sys.stderr.write(f'[click_save] pruned disabled pending: {pruned}\n')
                 sys.stderr.flush()
-                gate_ok, pending_labels = check_pending_write_gate(case_data_store)
+                gate_ok, pending_labels = check_pending_write_gate(case_data_store, section=sec)
         if not gate_ok:
             return _err(
                 f'err-pending-fields:{json.dumps(pending_labels[:12], ensure_ascii=False)} | '

@@ -273,15 +273,16 @@ def phase_done_ok(case_data_store: dict | None) -> tuple[bool, list[str]]:
     return False, [f'missing_any_of:{needed}']
 
 
-def can_submit_writes(case_data_store: dict | None) -> tuple[bool, list[str]]:
+def can_submit_writes(case_data_store: dict | None, section: str = "") -> tuple[bool, list[str]]:
     """Write gate: maintain + requires_write → no fillable pending in current container."""
     b = get_phase_boundary(case_data_store)
     if not b or not b.get('requires_write_all_editable'):
         return True, []
     from scripts.models.task import TaskList
+    from scripts.actions._section_scope import filter_pending_labels
 
     tl = TaskList.from_store((case_data_store or {}).get('task_list'))
-    pending = [i.label for i in tl.pending if not i.needs_intervention and i.label]
+    pending = filter_pending_labels(tl, section)
     return len(pending) == 0, pending
 
 

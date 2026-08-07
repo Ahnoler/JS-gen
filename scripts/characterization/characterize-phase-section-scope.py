@@ -43,9 +43,44 @@ def test_filter_pending_excludes_other_section() -> None:
     assert_true("征信信息" in by and "借款企业" in by["征信信息"], "by_section map")
 
 
+def test_gate_scoped_ignores_credit() -> None:
+    from scripts.actions._phase_intent import check_pending_write_gate
+
+    tl = TaskList(
+        pending=[
+            TaskItem(label="借款企业", kind="radio", section_title="征信信息", section_id="征信信息"),
+            TaskItem(label="法定代表人", kind="radio", section_title="征信信息", section_id="征信信息"),
+        ]
+    )
+    store = {"task_list": tl.to_store(), "_force_refill_all": True}
+    ok, labels = check_pending_write_gate(store, section="系统评级结论")
+    assert_true(ok and labels == [], f"scoped gate should pass, got {ok} {labels}")
+    ok2, labels2 = check_pending_write_gate(store, section="")
+    assert_true(not ok2 and set(labels2) == {"借款企业", "法定代表人"}, "unscoped sees 征信")
+
+
+def test_multi_section_map() -> None:
+    tl = TaskList(
+        pending=[
+            TaskItem(label="借款企业", kind="radio", section_title="征信信息", section_id="征信信息"),
+            TaskItem(label="综合评价", kind="input", section_title="客户综合评价", section_id="客户综合评价"),
+        ]
+    )
+    by = pending_by_section(tl)
+    assert_true(len(by) >= 2, "multi-section pending")
+
+
+def test_form_has_err_section_required() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    assert_true("err-section-required" in form, "click_save surfaces err-section-required")
+
+
 def main() -> int:
     test_section_matches()
     test_filter_pending_excludes_other_section()
+    test_gate_scoped_ignores_credit()
+    test_multi_section_map()
+    test_form_has_err_section_required()
     print("characterize-phase-section-scope: OK")
     return 0
 
