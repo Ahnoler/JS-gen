@@ -102,6 +102,7 @@ PAGE_LOCATOR_HELPERS = r'''
     // Do NOT use [last()] — DOM last is often a leftover hidden dialog
     if (kind === 'drawer') return "//div[contains(@class,'el-drawer')]";
     if (kind === 'dialog') return "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]";
+    if (kind === 'overlay') return "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box') or contains(@class,'el-drawer')]";
     return '';
   }
   function scopedXPath(local, kind) {
@@ -346,7 +347,7 @@ PAGE_LOCATOR_HELPERS = r'''
       return scopedXPath(
         "*[" + classTokenPred('el-dialog__headerbtn') + " or " + classTokenPred('el-drawer__close-btn')
           + " or " + classTokenPred('el-message-box__headerbtn') + " or " + classTokenPred('el-dialog__close') + "]",
-        scopeKind || 'dialog'
+        scopeKind || 'overlay'
       );
     }
     if (formLabel && String(kind).indexOf('form_') === 0) {

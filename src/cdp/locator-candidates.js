@@ -135,8 +135,25 @@ export function detectContainerKind(xpathFull = '', className = '', container = 
   if (container === 'dialog' || container === 'drawer' || container === 'nav') return container;
   const full = String(xpathFull || '');
   const cls = String(className || '');
-  if (/el-drawer/i.test(full) || /el-drawer/i.test(cls)) return 'drawer';
-  if (/el-dialog|el-message-box/i.test(full) || /el-dialog|el-message-box/i.test(cls)) return 'dialog';
+  // Drawer first. Match container tokens / el-drawer__* — not icon classes alone.
+  if (
+    /el-drawer/i.test(full)
+    || hasClassToken(cls, 'el-drawer')
+    || /(^|\s)el-drawer__/i.test(` ${cls}`)
+  ) {
+    return 'drawer';
+  }
+  // Dialog container only — do NOT treat el-dialog__close / el-dialog__headerbtn as dialog.
+  // Those icon/headerbtn classes appear inside drawers too (Element UI reuses them).
+  if (
+    /el-dialog(?!__)/i.test(full)
+    || /el-message-box/i.test(full)
+    || hasClassToken(cls, 'el-dialog')
+    || hasClassToken(cls, 'el-message-box')
+    || /(^|\s)el-message-box__/i.test(` ${cls}`)
+  ) {
+    return 'dialog';
+  }
   if (/\/nav\//i.test(full) || /\/aside\//i.test(full) || /el-aside|el-menu|sidebar|side-menu|nav-menu|menu-wrap/i.test(cls)) {
     return 'nav';
   }
@@ -159,7 +176,7 @@ export function withOccurrence(expr, occurrence = 0) {
 
 /**
  * Scope prefix for relative xpath.
- * @param {'dialog'|'drawer'|'nav'|''} kind
+ * @param {'dialog'|'drawer'|'overlay'|'nav'|''} kind
  */
 function scopePrefix(kind) {
   // Do NOT use [last()] — DOM last is often a leftover hidden dialog.
@@ -168,13 +185,17 @@ function scopePrefix(kind) {
   if (kind === 'dialog') {
     return "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]";
   }
+  // Ambiguous close / overlay: cover dialog + message-box + drawer (traj36).
+  if (kind === 'overlay') {
+    return "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box') or contains(@class,'el-drawer')]";
+  }
   return '';
 }
 
 /**
  * Join scope + local relative path.
  * @param {string} local — starts without leading //
- * @param {'dialog'|'drawer'|'nav'|''} kind
+ * @param {'dialog'|'drawer'|'overlay'|'nav'|''} kind
  */
 function scopedXPath(local, kind) {
   const loc = String(local || '').replace(/^\/+/, '');
@@ -417,19 +438,20 @@ export function buildCloseXPathSmart({
   container = '',
   occurrence = 0,
 } = {}) {
-  const kind = detectContainerKind(xpathFull, className, container)
-    || (targetKind === 'notification_close' ? '' : 'dialog');
-  let local = '';
+  let kind = detectContainerKind(xpathFull, className, container);
   if (targetKind === 'notification_close') {
-    local =
+    const local =
       `div[${classTokenPred('el-notification')}]`
       + `//*[${classTokenPred('el-notification__closeBtn')}]`;
     return withOccurrence(`//${local}`, occurrence);
   }
-  local =
+  // Icon-only close (i.el-dialog__close) is ambiguous — Element UI drawers reuse
+  // that class. Prefer overlay scope so replay hits visible drawer closes too.
+  if (!kind) kind = 'overlay';
+  const local =
     `*[${classTokenPred('el-dialog__headerbtn')} or ${classTokenPred('el-drawer__close-btn')}`
     + ` or ${classTokenPred('el-message-box__headerbtn')} or ${classTokenPred('el-dialog__close')}]`;
-  return withOccurrence(scopedXPath(local, kind || 'dialog'), occurrence);
+  return withOccurrence(scopedXPath(local, kind), occurrence);
 }
 
 /**
@@ -954,6 +976,7 @@ export const PAGE_LOCATOR_HELPERS = `
     // Do NOT use [last()] — DOM last is often a leftover hidden dialog
     if (kind === 'drawer') return "//div[contains(@class,'el-drawer')]";
     if (kind === 'dialog') return "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]";
+    if (kind === 'overlay') return "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box') or contains(@class,'el-drawer')]";
     return '';
   }
   function scopedXPath(local, kind) {
@@ -1198,7 +1221,7 @@ export const PAGE_LOCATOR_HELPERS = `
       return scopedXPath(
         "*[" + classTokenPred('el-dialog__headerbtn') + " or " + classTokenPred('el-drawer__close-btn')
           + " or " + classTokenPred('el-message-box__headerbtn') + " or " + classTokenPred('el-dialog__close') + "]",
-        scopeKind || 'dialog'
+        scopeKind || 'overlay'
       );
     }
     if (formLabel && String(kind).indexOf('form_') === 0) {

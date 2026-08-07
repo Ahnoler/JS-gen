@@ -1372,6 +1372,25 @@ async def replay_action_entries(
                             click_params['text'] = params.get('text') or params.get('label_text') or ''
                         if _element_xpath_smart(entry) or click_params.get('text'):
                             result = await _replay_click_by_index(page, entry, click_params)
+                            # close_dialog: dialog-scoped xpath often misses drawers
+                            # (Element UI reuses i.el-dialog__close inside drawer).
+                            # Fall back to CTRL/controller close which handles drawer.
+                            if (
+                                action_name == 'close_dialog'
+                                and not _result_ok(action_name, result)
+                            ):
+                                act = (controller_actions or {}).get(action_name)
+                                if act:
+                                    fb = await _replay_controller_action(act, params)
+                                    await page.wait_for_timeout(400)
+                                    await _wait_if_loading(page)
+                                    if _result_ok(action_name, fb):
+                                        sys.stderr.write(
+                                            f'[replay] close_dialog ctrl-fallback ok '
+                                            f'(xpath failed: {result})\n'
+                                        )
+                                        sys.stderr.flush()
+                                        result = fb
                         else:
                             act = (controller_actions or {}).get(action_name)
                             if not act:

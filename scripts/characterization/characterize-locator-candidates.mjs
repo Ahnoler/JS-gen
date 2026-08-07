@@ -21,6 +21,7 @@ import {
   buildPlaceholderXPathSmart,
   buildXPathSmart,
   classTokenPred,
+  detectContainerKind,
   enrichLocatorFields,
   isGeneratedId,
   xpathLiteral,
@@ -255,6 +256,41 @@ function ok(name) {
   assert.ok(xp.includes('el-dialog'));
   assert.ok(xp.includes(classTokenPred('el-dialog__headerbtn')));
   ok('dialog close');
+}
+
+{
+  // Element UI drawer close uses inner i.el-dialog__close — must NOT scope to dialog only.
+  assert.notEqual(
+    detectContainerKind('/div[4]/header[1]/button[1]/i[1]', 'el-dialog__close el-icon el-icon-close'),
+    'dialog',
+    'el-dialog__close icon class must not detect as dialog container',
+  );
+  ok('detectContainerKind ignores el-dialog__close icon');
+}
+
+{
+  const xp = buildCloseXPathSmart({
+    targetKind: 'dialog_close',
+    className: 'el-dialog__close el-icon el-icon-close',
+    xpathFull: '/div[4]/div[1]/div[1]/header[1]/button[1]/i[1]',
+  });
+  assert.ok(
+    xp.includes("contains(@class,'el-drawer')"),
+    'icon-only close xpath must include el-drawer scope (traj36 regression)',
+  );
+  assert.ok(xp.includes('el-dialog') || xp.includes('el-message-box'), 'still covers dialog');
+  ok('close xpath covers drawer when only icon class known');
+}
+
+{
+  const xp = buildCloseXPathSmart({
+    targetKind: 'dialog_close',
+    className: 'el-drawer__close-btn',
+    container: 'drawer',
+  });
+  assert.ok(xp.includes("contains(@class,'el-drawer')"));
+  assert.ok(!xp.startsWith("//div[contains(@class,'el-dialog')"));
+  ok('explicit drawer close scopes to drawer');
 }
 
 {
