@@ -53,3 +53,8 @@ def pending_by_section(tl: "TaskList") -> dict[str, list[str]]:
         key = (i.section_title or i.section_id or "__root__").strip() or "__root__"
         out.setdefault(key, []).append(i.label)
     return out
+
+
+def requires_section_declaration(tl: "TaskList") -> bool:
+    """True when click_save must receive section= (pending spans ≥2 blocks)."""
+    return len(pending_by_section(tl)) >= 2

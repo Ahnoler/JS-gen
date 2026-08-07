@@ -1823,7 +1823,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         else:
             if not is_picker_confirm:
                 from ._phase_boundary import phase_boundary_active, get_phase_boundary
-                from ._section_scope import pending_by_section
+                from ._section_scope import pending_by_section, requires_section_declaration
 
                 needs_gate = False
                 if phase_boundary_active(case_data_store):
@@ -1834,7 +1834,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 if needs_gate and not sec:
                     tl0 = TaskList.from_store((case_data_store or {}).get("task_list"))
                     by = pending_by_section(tl0)
-                    if len(by) >= 2:
+                    if requires_section_declaration(tl0):
                         return _err(
                             "err-section-required | pending_by_section="
                             + json.dumps(by, ensure_ascii=False)

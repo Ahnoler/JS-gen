@@ -13,6 +13,7 @@ from scripts.actions._section_scope import (  # noqa: E402
     section_matches,
     pending_by_section,
     filter_pending_labels,
+    requires_section_declaration,
 )
 from scripts.models.task import TaskItem, TaskList  # noqa: E402
 
@@ -70,9 +71,46 @@ def test_multi_section_map() -> None:
     assert_true(len(by) >= 2, "multi-section pending")
 
 
+def test_err_section_required_trigger_condition() -> None:
+    """Behavioral gate: multi-section pending + empty section → err-section-required."""
+    tl = TaskList(
+        pending=[
+            TaskItem(label="借款企业", kind="radio", section_title="征信信息", section_id="征信信息"),
+            TaskItem(label="综合评价", kind="input", section_title="客户综合评价", section_id="客户综合评价"),
+        ]
+    )
+    by = pending_by_section(tl)
+    assert_true(len(by) >= 2, f"multi-section pending, got {by}")
+    assert_true(requires_section_declaration(tl), "requires_section_declaration when ≥2 sections")
+    all_labels = filter_pending_labels(tl, "")
+    assert_true(
+        "借款企业" in all_labels and "综合评价" in all_labels,
+        f"unscoped filter sees both sections, got {all_labels}",
+    )
+    scoped = filter_pending_labels(tl, "客户综合评价")
+    assert_true(
+        scoped == ["综合评价"] and "借款企业" not in scoped,
+        f"scoped filter excludes other section, got {scoped}",
+    )
+    assert_true(
+        not requires_section_declaration(
+            TaskList(
+                pending=[
+                    TaskItem(label="借款企业", kind="radio", section_title="征信信息", section_id="征信信息"),
+                ]
+            )
+        ),
+        "single-section pending does not require section declaration",
+    )
+
+
 def test_form_has_err_section_required() -> None:
     form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
     assert_true("err-section-required" in form, "click_save surfaces err-section-required")
+    assert_true(
+        "requires_section_declaration" in form,
+        "click_save uses requires_section_declaration helper",
+    )
 
 
 def test_get_pending_signature() -> None:
@@ -126,6 +164,7 @@ def main() -> int:
     test_filter_pending_excludes_other_section()
     test_gate_scoped_ignores_credit()
     test_multi_section_map()
+    test_err_section_required_trigger_condition()
     test_form_has_err_section_required()
     test_get_pending_signature()
     test_submit_hint_section_scoped()
