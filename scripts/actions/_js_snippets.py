@@ -1272,11 +1272,102 @@ JS_READ_CURRENT_VALUE = '''(inputEl, trigger, item) => {
 # ── Form field scanning ──
 
 JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
+''' + PAGE_LOCATOR_HELPERS + '''
     const container = ''' + JS_GET_CONTAINER + ''';
     const classify = ''' + JS_CLASSIFY_FIELD + ''';
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const isRequired = ''' + JS_FIELD_REQUIRED + ''';
     const readValue = ''' + JS_READ_CURRENT_VALUE + ''';
+    const getRowLeadingText = (row) => {
+        const cells = row.querySelectorAll('td, .el-table__cell');
+        for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            const ct = normalizeControlText(cell.innerText || cell.textContent || '');
+            const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
+            if (hasSelect && !ct) continue;
+            if (ct) return ct;
+        }
+        return '';
+    };
+    const getColumnHeader = (table, cell) => {
+        const tableEl = table.closest ? (table.closest('.el-table') || table) : table;
+        const headerRow = tableEl.querySelector('.el-table__header thead tr, thead tr');
+        if (!headerRow || cell.cellIndex < 0) return '';
+        const th = headerRow.children[cell.cellIndex];
+        return th ? normalizeControlText(th.innerText || th.textContent || '') : '';
+    };
+    const isPagerRow = (row) => {
+        if (row.closest && row.closest('.el-pagination')) return true;
+        const txt = (row.innerText || row.textContent || '').replace(/\\s+/g, ' ');
+        if (/每页|条\\/页|前往|页码|pagination/i.test(txt) && row.querySelector('.el-pagination, .el-select, .el-input')) return true;
+        return false;
+    };
+    const classifyTableCell = (cell) => {
+        if (cell.querySelector('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]')) return 'date';
+        if (cell.querySelector('.el-select')) return 'select';
+        if (cell.querySelector('textarea')) return 'input';
+        if (cell.querySelector('input:not([type="hidden"])')) return 'input';
+        return 'unknown';
+    };
+    const collectTableControls = (row) => {
+        const controls = [];
+        const cells = row.querySelectorAll('td, .el-table__cell');
+        for (let ci = 0; ci < cells.length; ci++) {
+            const cell = cells[ci];
+            const inputs = cell.querySelectorAll('input:not([type="hidden"])');
+            for (let ii = 0; ii < inputs.length; ii++) {
+                const input = inputs[ii];
+                const t = (input.type || '').toLowerCase();
+                if (t === 'checkbox' || t === 'radio') continue;
+                if (input.closest && input.closest('.el-pagination')) continue;
+                if (quick && !isVisible(input)) continue;
+                controls.push({ cell, el: input, kind: classifyTableCell(cell) });
+            }
+            const textareas = cell.querySelectorAll('textarea');
+            for (let ti = 0; ti < textareas.length; ti++) {
+                const ta = textareas[ti];
+                if (quick && !isVisible(ta)) continue;
+                controls.push({ cell, el: ta, kind: 'input' });
+            }
+            const selects = cell.querySelectorAll('.el-select');
+            for (let si = 0; si < selects.length; si++) {
+                const sel = selects[si];
+                const trigger = sel.querySelector('.el-input__inner');
+                if (!trigger) continue;
+                if (quick && !isVisible(sel)) continue;
+                controls.push({ cell, el: trigger, kind: 'select' });
+            }
+        }
+        return controls;
+    };
+    const tableFieldXpathSmartOf = (rowText, controlEl, occurrence) => {
+        const rowT = normalizeControlText(rowText);
+        if (!rowT || !controlEl) return '';
+        const scope = scopeOf(controlEl);
+        const scopeKind = (scope === 'drawer' || scope === 'dialog') ? scope : '';
+        const lit = xpathLiteral(rowT);
+        let leaf = 'input';
+        if (controlEl.closest && controlEl.closest('.el-select')) {
+            leaf = "div[contains(@class,'el-select')]";
+        } else if (controlEl.tagName && controlEl.tagName.toLowerCase() === 'textarea') {
+            leaf = 'textarea';
+        } else if (controlEl.closest && controlEl.closest('.el-date-editor, .tsscdatepicker')) {
+            leaf = "div[contains(@class,'el-date-editor')]";
+        }
+        const local = "tr[.//*[normalize-space()=" + lit + "]]//" + leaf;
+        let xp = scopedXPath(local, scopeKind);
+        const n = Number(occurrence) || 0;
+        if (n > 1) xp = withOccurrence(xp, n);
+        return xp;
+    };
+    const buildTableDisplayName = (rowText, controls, idx, colHeader, placeholder) => {
+        const rowT = normalizeControlText(rowText);
+        if (!rowT) return '';
+        if (controls.length <= 1) return rowT;
+        if (colHeader) return rowT + '|' + normalizeControlText(colHeader);
+        if (placeholder) return rowT + '|' + normalizeControlText(placeholder);
+        return rowT + '|#' + (idx + 1);
+    };
     // 从 el-select 的 Vue 组件实例读取 options（不操作 DOM，不受下拉框位置影响）。
     // Element UI 的 Vue 实例挂载在 .el-select 的容器 DIV 上（不是内部 input）。
     const readVueOptions = (trigger) => {
@@ -1309,6 +1400,14 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
     // Phase 1: 扫描 container 内的所有 .el-form-item
     const allItems = container.querySelectorAll('.el-form-item');
     const fields = [];
+    const seenXpaths = new Set();
+    const pushField = (field) => {
+        const xp = String(field.xpath_smart || '').trim();
+        if (xp && seenXpaths.has(xp)) return false;
+        if (xp) seenXpaths.add(xp);
+        fields.push(field);
+        return true;
+    };
     const selectFields = [];  // [{field, trigger}] — Phase 2 从这里读取 options
     for (const item of allItems) {
         // Prefer getBoundingClientRect over offsetParent — Element UI drawers
@@ -1328,6 +1427,9 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         const inputEl = input || textarea;
         let currentValue = readValue(inputEl, trigger, item);
         const placeholder = (inputEl || trigger)?.getAttribute?.('placeholder') || '';
+        const displayLabel = label || placeholder || '';
+        const operable = trigger || inputEl;
+        const xpath_smart = operable ? (formFieldXpathSmartOf(operable, label) || '') : '';
         // Two-level disabled detection (DOM native → ARIA on element itself)
         const disabled = isDisabled(inputEl, trigger, item);
         const required = isRequired(item, label, inputEl);
@@ -1340,8 +1442,8 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
             }
             return '';
         })();
-        const field = { label, kind, currentValue, options: [], placeholder, required, disabled, selected, hasButton };
-        fields.push(field);
+        const field = { label: displayLabel, kind, currentValue, options: [], placeholder, required, disabled, selected, hasButton, xpath_smart };
+        pushField(field);
         if (kind === 'select') {
             const t = trigger || item.querySelector('input:not([type="hidden"])');
             selectFields.push({ field, trigger: t });
@@ -1357,6 +1459,58 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
             }).filter(Boolean);
         }
     }
+    /* SCAN_SOURCE_B_EL_TABLE */
+    const tables = container.querySelectorAll('.el-table');
+    for (let ti = 0; ti < tables.length; ti++) {
+        const table = tables[ti];
+        if (quick && !isVisible(table)) continue;
+        const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr, tbody tr');
+        for (let ri = 0; ri < bodyRows.length; ri++) {
+            const row = bodyRows[ri];
+            if (isPagerRow(row)) continue;
+            if (quick) {
+                const style = getComputedStyle(row);
+                if (style.display === 'none' || style.visibility === 'hidden') continue;
+                const rect = row.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) continue;
+            }
+            const rowText = getRowLeadingText(row);
+            if (!rowText) continue;
+            const controls = collectTableControls(row);
+            for (let ci = 0; ci < controls.length; ci++) {
+                const ctrl = controls[ci];
+                const cell = ctrl.cell;
+                const el = ctrl.el;
+                const kind = ctrl.kind;
+                const colHeader = getColumnHeader(table, cell);
+                const placeholder = (el.getAttribute && el.getAttribute('placeholder')) || '';
+                const displayName = buildTableDisplayName(rowText, controls, ci, colHeader, placeholder);
+                if (!displayName) continue;
+                const inputEl = kind === 'select' ? null : el;
+                const trigger = kind === 'select' ? el : null;
+                const currentValue = readValue(inputEl, trigger, cell);
+                const disabled = isDisabled(inputEl, trigger, cell);
+                const xpath_smart = tableFieldXpathSmartOf(rowText, el, ci + 1);
+                const field = {
+                    label: displayName,
+                    kind,
+                    currentValue,
+                    options: [],
+                    placeholder,
+                    required: false,
+                    disabled,
+                    selected: !!(trigger && cell.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text')),
+                    hasButton: '',
+                    xpath_smart,
+                };
+                if (!pushField(field)) continue;
+                if (kind === 'select' && trigger) {
+                    selectFields.push({ field, trigger });
+                }
+            }
+        }
+    }
+    /* SCAN_DEDUP_BY_XPATH */
     // Phase 2: 从 Vue 组件实例读取每个 select 的 options。
     // 不打开下拉框——Vue 组件实例存储了完整的 options 数据，精准无污染，
     // 避免读到表格分页下拉、相邻 select 下拉、body 级别残留等无关选项。

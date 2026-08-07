@@ -17,6 +17,13 @@ def assert_true(cond: bool, msg: str) -> None:
         raise AssertionError(msg)
 
 
+def test_js_scan_cues() -> None:
+    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    assert_true("el-table" in js and "xpath_smart" in js, "scan references el-table and xpath_smart")
+    assert_true("SCAN_SOURCE_B_EL_TABLE" in js, "SCAN_SOURCE_B_EL_TABLE marker")
+    assert_true("SCAN_DEDUP_BY_XPATH" in js, "SCAN_DEDUP_BY_XPATH marker")
+
+
 def test_fingerprint_distinguishes_same_label() -> None:
     a = FormSnapshot.from_scan_fields("main", [
         {"label": "保存", "required": False, "xpath_smart": "//div[@id='a']//button"},
@@ -43,8 +50,9 @@ def main() -> int:
         "xpath_smart": "//input[@placeholder='请输入账号']",
     })
     assert_true(item is not None and item.xpath_smart.startswith("//"), "TaskItem carries xpath_smart")
+    test_js_scan_cues()
     test_fingerprint_distinguishes_same_label()
-    print("characterize-form-scan-control-first models: OK")
+    print("characterize-form-scan-control-first: OK")
     return 0
 
 
