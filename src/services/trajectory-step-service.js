@@ -15,9 +15,6 @@ export async function refreshTrajectoryCounts(trajectoryDbId) {
   const db = getDB();
   const [{ steps }] = await db('trajectory_step')
     .where({ trajectory_id: trajectoryDbId })
-    .andWhere((qb) => {
-      qb.where({ is_replay: false }).orWhereNull('is_replay');
-    })
     .count('* as steps');
   const [{ phases }] = await db('trajectory_phase')
     .where({ trajectory_id: trajectoryDbId })

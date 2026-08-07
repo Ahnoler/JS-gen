@@ -69,14 +69,13 @@ function parseStepParams(step) {
     paramsJson: params,
     element,
     elementJson: element,
-    isReplay: !!step.isReplay,
     stepNumber: step.stepNumber,
   };
 }
 
 export async function loadPhaseSteps(phaseId) {
   const steps = await trajectoryStepDao.listByPhase(phaseId);
-  return steps.map(parseStepParams).filter((s) => !s.isReplay);
+  return steps.map(parseStepParams);
 }
 
 export async function refreshOccurrenceCount(componentId) {

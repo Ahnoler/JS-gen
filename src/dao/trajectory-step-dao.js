@@ -23,7 +23,6 @@ export async function batchSave(steps) {
       trajectoryPhaseId: s.trajectoryPhaseId ?? null,
       source: s.source ?? 'agent',
       actionId: s.actionId ?? null,
-      isReplay: !!s.isReplay,
     });
     // JSON columns: prefer already-named *_json, else serialize params/element
     row.params_json = s.paramsJson ?? s.params ?? null;
@@ -35,12 +34,9 @@ export async function batchSave(steps) {
   }
 }
 
-export async function listByTrajectory(trajectoryId, { source, includeReplay = false } = {}) {
+export async function listByTrajectory(trajectoryId, { source } = {}) {
   let query = getDB()(TABLE).where({ trajectory_id: trajectoryId });
   if (source) query = query.where({ source });
-  if (!includeReplay) query = query.andWhere((qb) => {
-    qb.where({ is_replay: false }).orWhereNull('is_replay');
-  });
   const rows = await query.orderBy(['step_number', 'action_index']);
   return fromDbRows(rows);
 }

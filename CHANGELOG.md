@@ -18,6 +18,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-07: 删除 `trajectory_step.is_replay` 列及 `idx_step_is_replay` 索引；列表/计数/组件签名不再按该列过滤。`POST .../steps/replay` 请求体 `isReplay` 仍为运行时抑制入库。
+  影响范围：schema、trajectory step DAO/计数、operation-component 签名、api-docs。
+  文件：migrations/20260807160000_drop_trajectory_step_is_replay.js, schemas/init.sql, src/dao/trajectory-step-dao.js, src/dao/trajectory-dao.js, src/services/trajectory-step-service.js, src/services/operation-component-signature.js, src/services/operation-component-service.js, src/services/trajectory-persist-service.js, src/dashboard/api-docs/catalog.js
+  Python 同步提示：对齐 schema 删除 `is_replay`；勿再读写该列。
+
 - 2026-08-07: AI 录制阶段结果 **`prior_outcome.success` 缺省改为未知（`null`）**，不再把「未收到明确 done(success)」当成成功。`phase_done` 无 outcome 时 Python 显式发 `success: null`；控制面仅在 `true`/`false` 时写入成败，文案走「未知」。
   影响范围：录制生命周期 prior 注入、session `phase_done`。
   文件：src/services/trajectory-record-lifecycle.js, scripts/session_runner.py

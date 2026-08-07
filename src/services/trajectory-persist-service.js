@@ -670,7 +670,6 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
       trajectory_phase_id: resolvedPhaseId,
       source: resolvedSource,
       confirmed: true,
-      is_replay: false,
     };
     const [stepId] = await trx('trajectory_step').insert(stepRow);
     const [snapId] = await trx('form_snapshot').insert({
