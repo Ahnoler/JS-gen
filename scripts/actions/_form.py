@@ -84,6 +84,108 @@ def _scan_buttons_from_result(result) -> list[dict]:
     return out
 
 
+def _section_group_key(section_id: str, section_title: str) -> str:
+    sid = (section_id or '').strip()
+    if sid:
+        return sid
+    title = (section_title or '').strip()
+    if title:
+        return title
+    return '__root__'
+
+
+def _build_section_summary(
+    fields: list[dict],
+    buttons: list[dict],
+    pending_labels: set[str] | list[str] | None = None,
+) -> dict:
+    """Group scan fields/buttons by section for model-facing summaries.
+
+    fields_sample: up to 5 labels per section (pending first).
+    ambiguous_buttons: same label in >=2 distinct section_id groups.
+    """
+    pending = set(pending_labels or [])
+    order: list[str] = []
+    by_key: dict[str, dict] = {}
+
+    def _ensure(section_id: str, section_title: str) -> dict:
+        key = _section_group_key(section_id, section_title)
+        if key not in by_key:
+            by_key[key] = {
+                'section_id': (section_id or '').strip() or key,
+                'section_title': (section_title or '').strip(),
+                'fields_sample': [],
+                'buttons': [],
+                '_labels': [],
+            }
+            order.append(key)
+        return by_key[key]
+
+    for f in fields:
+        if not isinstance(f, dict):
+            continue
+        sec = _ensure(f.get('section_id') or '', f.get('section_title') or '')
+        label = (f.get('label') or '').strip()
+        if label:
+            sec['_labels'].append(label)
+
+    for b in buttons:
+        if not isinstance(b, dict):
+            continue
+        sec = _ensure(b.get('section_id') or '', b.get('section_title') or '')
+        label = (b.get('label') or '').strip()
+        if label and label not in sec['buttons']:
+            sec['buttons'].append(label)
+
+    for key in order:
+        sec = by_key[key]
+        labels = sec.pop('_labels')
+        seen: set[str] = set()
+        sample: list[str] = []
+        for label in labels:
+            if label in pending and label not in seen:
+                seen.add(label)
+                sample.append(label)
+                if len(sample) >= 5:
+                    break
+        if len(sample) < 5:
+            for label in labels:
+                if label not in seen:
+                    seen.add(label)
+                    sample.append(label)
+                    if len(sample) >= 5:
+                        break
+        sec['fields_sample'] = sample
+
+    label_sections: dict[str, dict[str, dict]] = {}
+    for b in buttons:
+        if not isinstance(b, dict):
+            continue
+        text = (b.get('label') or '').strip()
+        if not text:
+            continue
+        sid = (b.get('section_id') or '').strip()
+        title = (b.get('section_title') or '').strip()
+        key = _section_group_key(sid, title)
+        if text not in label_sections:
+            label_sections[text] = {}
+        label_sections[text][key] = {
+            'section_id': sid or key,
+            'section_title': title,
+        }
+
+    ambiguous_buttons = [
+        {'text': text, 'sections': list(sec_map.values())}
+        for text, sec_map in label_sections.items()
+        if len(sec_map) >= 2
+    ]
+
+    out: dict = {'sections': [by_key[k] for k in order]}
+    if ambiguous_buttons:
+        out['ambiguous_buttons'] = ambiguous_buttons
+    return out
+
+
 def _is_query_mode(case_data_store: dict | None) -> bool:
     """True when this phase/UI is query-filter (no form-save / no auto-fill)."""
     if not case_data_store:
@@ -809,6 +911,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             summary['disabled_button_fields'] = intervene
         if notification:
             summary['notification'] = {'visible': notification.visible, 'text': (notification.text or '')[:200]}
+        summary.update(
+            _build_section_summary(
+                [f.model_dump() for f in dom_fields],
+                case_data_store.get('_scan_buttons') or [],
+                pending_labels=set(pending_labels),
+            )
+        )
         return json.dumps(summary, ensure_ascii=False)
 
     @controller.action(
@@ -823,8 +932,17 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned('__run_form_assistant__', allow_autofill=True)
-        summary = case_data_store.get('_autofill_summary') or 'auto-fill-complete'
-        return _ok(summary)
+        tl = TaskList.from_store(case_data_store.get('task_list'))
+        pending_labels = {item.label for item in tl.pending}
+        payload = {
+            'status': case_data_store.get('_autofill_summary') or 'auto-fill-complete',
+            **_build_section_summary(
+                case_data_store.get('_scan_fields') or [],
+                case_data_store.get('_scan_buttons') or [],
+                pending_labels=pending_labels,
+            ),
+        }
+        return _ok(json.dumps(payload, ensure_ascii=False))
 
     @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Excludes fields already filled by auto-fill. Returns {fields: [...], notification: {visible, text}|null}.')
     async def scan_visible_fields():

@@ -44,10 +44,29 @@ def test_click_save_section_api() -> None:
     assert_true("rejectRe" in js, "rejectRe still present for non-exact noise")
 
 
+def test_section_summary_shape() -> None:
+    from scripts.actions._form import _build_section_summary
+
+    fields = [
+        {"label": "资产负债率", "disabled": False, "section_id": "评级等级测算", "section_title": "评级等级测算"},
+        {"label": "评级", "disabled": False, "section_id": "系统评级结论", "section_title": "系统评级结论"},
+    ]
+    buttons = [
+        {"label": "暂存", "section_id": "评级等级测算", "section_title": "评级等级测算"},
+        {"label": "保存", "section_id": "系统评级结论", "section_title": "系统评级结论"},
+        {"label": "保存", "section_id": "客户综合评价", "section_title": "客户综合评价"},
+    ]
+    s = _build_section_summary(fields, buttons, pending_labels={"资产负债率", "评级"})
+    assert_true(any(x["section_title"] == "评级等级测算" for x in s["sections"]), "测算 section")
+    amb = s.get("ambiguous_buttons") or []
+    assert_true(any(a["text"] == "保存" and len(a["sections"]) >= 2 for a in amb), "ambiguous 保存")
+
+
 def main() -> int:
     test_models_section()
     test_js_scan_section_and_source_b_kinds()
     test_click_save_section_api()
+    test_section_summary_shape()
     print("characterize-control-ops-closed-loop: OK")
     return 0
 
