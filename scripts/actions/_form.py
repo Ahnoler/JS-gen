@@ -237,7 +237,24 @@ def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store
     return snapshot
 
 
-def _task_done_impl(label_text, case_data_store, value=None):
+def _task_xpath_smart(case_data_store, label_text: str, xpath_hint: str = "") -> str:
+    """Resolve xpath_smart for a label from hint, task list, or last scan."""
+    xp = (xpath_hint or "").strip()
+    if xp:
+        return xp
+    tl = TaskList.from_store(case_data_store.get("task_list"))
+    for item in tl.pending:
+        if item.label == label_text and (item.xpath_smart or "").strip():
+            return item.xpath_smart.strip()
+    for f in case_data_store.get("_scan_fields") or []:
+        if isinstance(f, dict) and f.get("label") == label_text:
+            fx = (f.get("xpath_smart") or "").strip()
+            if fx:
+                return fx
+    return ""
+
+
+def _task_done_impl(label_text, case_data_store, value=None, xpath_smart=""):
     """Mark a field as completed in the task list.
 
     Extracted from closure so the form module can share it internally
@@ -247,16 +264,21 @@ def _task_done_impl(label_text, case_data_store, value=None):
     TaskItem.currentValue so scan_form_fields summaries are not empty after
     auto-fill.
 
+    When ``xpath_smart`` is set, disambiguates duplicate labels in mark_done.
+
     Query/filter UI is not form-fill — skip task_list tracking entirely.
     """
     if _is_query_mode(case_data_store):
         return
+    xp = _task_xpath_smart(case_data_store, label_text, xpath_smart)
     tl = TaskList.from_store(case_data_store.get('task_list'))
-    found = tl.mark_done(label_text, value=value)
+    found = tl.mark_done(label_text, value=value, xpath_smart=xp)
     if found is not None:
         sys.stderr.write(f'[task-done] OK: "{label_text}" → done={len(tl.done)}\n')
     else:
         already = tl.find_done(label_text)
+        if already is None and xp:
+            already = next((d for d in tl.done if d.xpath_smart == xp), None)
         if already is None:
             sys.stderr.write(f'[task-done] NOT FOUND: "{label_text}"\n')
         else:
@@ -623,11 +645,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         element = await _capture_element(page, label_text, target_kind='form_input')
-        result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
+        xp = _task_xpath_smart(case_data_store, label_text)
+        if xp:
+            result = await page.evaluate(JS_FILL_BY_XPATH, [xp, value, label_text])
+        else:
+            result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
         if _is_ok_result(result):
             _record_action('fill_form_field', {'label_text': label_text, 'value': value}, result, element=element)
             if not _is_query_mode(case_data_store):
-                _task_done_impl(label_text, case_data_store, value=value)
+                _task_done_impl(label_text, case_data_store, value=value, xpath_smart=xp)
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
 
@@ -730,6 +756,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     disabled=prev.disabled if prev else False,
                     required=prev.required if prev else False,
                     hasButton=prev.hasButton if prev else '',
+                    xpath_smart=prev.xpath_smart if prev else '',
                 ))
         # Restore needs_intervention flags on items that ended up in pending
         for item in tl.pending:
@@ -927,6 +954,64 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     async def _execute_round(page, items, label_kind, all_results, round_tag):
         """分组 → LLM 规划 → 逐个执行。round_tag: '' | 'round2 ' | 'round3 '"""
+
+        def _field_dict_for_action(sub, action, action_index):
+            if action_index < len(sub) and sub[action_index].get('label') == action.get('label'):
+                return sub[action_index]
+            label = action.get('label', '')
+            for d in sub:
+                if d.get('label') == label:
+                    return d
+            return {}
+
+        async def _select_by_label(page, label, value, field_kind):
+            if field_kind == 'radio':
+                return await page.evaluate(JS_CLICK_RADIO, [label, value])
+            already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
+            if already.startswith('ok-already:'):
+                cur_val = already.split(':', 1)[1]
+                if cur_val == value or value in cur_val or cur_val in value:
+                    return already
+                await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+                await page.wait_for_timeout(350)
+                result = await page.evaluate(JS_SELECT_OPTION, value)
+                if result.startswith('option-not-found:'):
+                    result = await page.evaluate(JS_SELECT_OPTION, 'first')
+                if result.startswith('ok'):
+                    confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                    if not confirmed.startswith('ok-confirmed:'):
+                        await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                        await page.wait_for_timeout(200)
+                        confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                        result = confirmed2 if confirmed2.startswith('ok-confirmed:') else 'not-synced:' + confirmed
+                return result
+            await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+            await page.wait_for_timeout(350)
+            result = await page.evaluate(JS_SELECT_OPTION, value)
+            if result.startswith('option-not-found:'):
+                result = await page.evaluate(JS_SELECT_OPTION, 'first')
+            if result.startswith('ok'):
+                confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                if not confirmed.startswith('ok-confirmed:'):
+                    await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
+                    await page.wait_for_timeout(200)
+                    confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
+                    result = confirmed2 if confirmed2.startswith('ok-confirmed:') else 'not-synced:' + confirmed
+            return result
+
+        async def _select_by_xpath_or_label(page, label, value, field_kind, xpath_smart):
+            xp = (xpath_smart or '').strip()
+            if xp and field_kind != 'radio':
+                trigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
+                if str(trigger).startswith('ok'):
+                    await page.wait_for_timeout(350)
+                    result = await page.evaluate(JS_SELECT_OPTION, value)
+                    if str(result).startswith('option-not-found:'):
+                        result = await page.evaluate(JS_SELECT_OPTION, 'first')
+                    if str(result).startswith('ok'):
+                        return result
+            return await _select_by_label(page, label, value, field_kind)
+
         KIND_ORDER = {'date': 0, 'select': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
         groups: dict[int, list[dict]] = {}
         for d in items:
@@ -1023,6 +1108,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 kind = (a.get('action') or '').lower().replace('-', '_')
                 value = a.get('value', '') or a.get('option', '')
                 field_kind = label_kind.get(label, kind)
+                field_dict = _field_dict_for_action(sub, a, i)
+                xpath_smart = (field_dict.get('xpath_smart') or '').strip()
+                placeholder = field_dict.get('placeholder') or label
                 step_num = i + 1
                 # Pre-mutation locator snapshot (same contract as explicit fill/select/radio actions)
                 if field_kind == 'radio' or kind in ('click_radio', 'radio'):
@@ -1048,6 +1136,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     if kind in ('fill_input', 'fill', 'input'):
                         if field_kind == 'date':
                             result = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
+                        elif xpath_smart:
+                            result = await page.evaluate(
+                                JS_FILL_BY_XPATH, [xpath_smart, value, placeholder],
+                            )
                         else:
                             result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
                     elif field_kind == 'radio' or kind in ('click_radio', 'radio'):
@@ -1084,41 +1176,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                             page, label, target_kind='form_select',
                                         )
                     elif kind in ('select_option', 'select', 'option'):
-                        # LLM may emit select_option for radio — route correctly
-                        if field_kind == 'radio':
-                            result = await page.evaluate(JS_CLICK_RADIO, [label, value])
-                        else:
-                            already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
-                            if already.startswith('ok-already:'):
-                                cur_val = already.split(':', 1)[1]
-                                if cur_val == value or value in cur_val or cur_val in value:
-                                    result = already
-                                else:
-                                    await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-                                    await page.wait_for_timeout(350)
-                                    result = await page.evaluate(JS_SELECT_OPTION, value)
-                                    if result.startswith('option-not-found:'):
-                                        result = await page.evaluate(JS_SELECT_OPTION, 'first')
-                                    if result.startswith('ok'):
-                                        confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                        if not confirmed.startswith('ok-confirmed:'):
-                                            await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
-                                            await page.wait_for_timeout(200)
-                                            confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                            result = confirmed2 if confirmed2.startswith('ok-confirmed:') else 'not-synced:' + confirmed
-                            else:
-                                await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-                                await page.wait_for_timeout(350)
-                                result = await page.evaluate(JS_SELECT_OPTION, value)
-                                if result.startswith('option-not-found:'):
-                                    result = await page.evaluate(JS_SELECT_OPTION, 'first')
-                                if result.startswith('ok'):
-                                    confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                    if not confirmed.startswith('ok-confirmed:'):
-                                        await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
-                                        await page.wait_for_timeout(200)
-                                        confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
-                                        result = confirmed2 if confirmed2.startswith('ok-confirmed:') else 'not-synced:' + confirmed
+                        result = await _select_by_xpath_or_label(
+                            page, label, value, field_kind, xpath_smart,
+                        )
                     else:
                         result = f'unknown-action:{kind}'
                 except Exception as e:
@@ -1181,7 +1241,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                 element=element,
                                 before_b64=before_b64,
                             )
-                    _task_done_impl(label, case_data_store, value=value)
+                    _task_done_impl(
+                        label, case_data_store, value=value, xpath_smart=xpath_smart,
+                    )
                     # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
                     btn = has_button_map.get(label, '')
                     if '验证' in btn and kind in ('fill_input', 'fill', 'input'):
@@ -1810,6 +1872,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
+        xp = _task_xpath_smart(case_data_store, label_text)
 
         element = await _capture_element(page, label_text, target_kind='form_select')
 
@@ -1829,7 +1892,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     page, case_data_store, label_text, option_text, element,
                 )
                 _record_action('select_option', params, already, element=element)
-                _task_done_impl(label_text, case_data_store, value=cur_val or option_text)
+                _task_done_impl(
+                    label_text, case_data_store, value=cur_val or option_text, xpath_smart=xp,
+                )
                 # Count consecutive already-matched for recorder loop-break
                 streak = int(case_data_store.get('_already_matched_streak', 0) or 0) + 1
                 case_data_store['_already_matched_streak'] = streak
@@ -1850,7 +1915,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         }''')
         await page.wait_for_timeout(100)
 
-        trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'trigger'])
+        trigger_result = (
+            await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
+            if xp
+            else await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'trigger'])
+        )
         if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled'):
             if trigger_result == 'no-select-found':
                 return _err('no-select-found | field may be radio — use click_radio')
@@ -1870,14 +1939,16 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             params['option_text'] = matched_text or option_text
             params, element = attach_select_options(params, element, params.get('options'))
             _record_action('select_option', params, matched_text, element=element)
-            _task_done_impl(label_text, case_data_store, value=matched_text or option_text)
+            _task_done_impl(
+                label_text, case_data_store, value=matched_text or option_text, xpath_smart=xp,
+            )
             return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
         elif select_result == 'no-items':
             # Dropdown empty — if field already has a value, treat as done
             recheck = await page.evaluate(JS_FIND_LABELED_SELECT, [label_text, 'check'])
             if recheck.startswith('ok-already:'):
                 cur = recheck.split(':', 1)[1]
-                _task_done_impl(label_text, case_data_store, value=cur)
+                _task_done_impl(label_text, case_data_store, value=cur, xpath_smart=xp)
                 _record_action('select_option', params, recheck, element=element)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', case_data_store))
             return _err('no-items')
@@ -1902,7 +1973,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
                     params['option_text'] = matched_text
                     _record_action('select_option', params, matched_text, element=element)
-                    _task_done_impl(label_text, case_data_store, value=matched_text)
+                    _task_done_impl(label_text, case_data_store, value=matched_text, xpath_smart=xp)
                     return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', case_data_store))
             retry_key = f'_sel_retry_{label_text}'
             retries = case_data_store.get(retry_key, 0) + 1
@@ -1914,7 +1985,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
                     params['option_text'] = matched_text or option_text
                     _record_action('select_option', params, matched_text, element=element)
-                    _task_done_impl(label_text, case_data_store, value=matched_text or option_text)
+                    _task_done_impl(
+                label_text, case_data_store, value=matched_text or option_text, xpath_smart=xp,
+            )
                     return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
                 return _err(first_result)
             return _err(select_result)

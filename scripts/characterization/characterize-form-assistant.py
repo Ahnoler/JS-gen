@@ -129,6 +129,27 @@ def main() -> int:
         m = re.search(rf'async def {fn}\(.*?\n(?:.*?\n)*?.*?await _ensure_scanned\(label_text\)', form_py)
         assert_true(m is not None, f'{fn} calls _ensure_scanned without allow_autofill=True')
 
+    assert_true('JS_FILL_BY_XPATH' in form_py, 'auto-fill uses JS_FILL_BY_XPATH')
+    assert_true(
+        re.search(r'async def _execute_round\(.*?xpath_smart', form_py, re.S),
+        'xpath_smart used in _execute_round',
+    )
+
+    tl_dup = TaskList()
+    tl_dup.pending = [
+        TaskItem(label='评级', kind='select', xpath_smart='//div[@id="a"]//div[contains(@class,"el-select")]'),
+        TaskItem(label='评级', kind='select', xpath_smart='//div[@id="b"]//div[contains(@class,"el-select")]'),
+    ]
+    moved = tl_dup.mark_done('评级', value='AAA', xpath_smart='//div[@id="b"]//div[contains(@class,"el-select")]')
+    assert_true(
+        moved is not None and 'id="b"' in moved.xpath_smart,
+        'mark_done matches by xpath_smart first',
+    )
+    assert_true(
+        len(tl_dup.pending) == 1 and 'id="a"' in tl_dup.pending[0].xpath_smart,
+        'mark_done leaves other duplicate label pending',
+    )
+
     print('characterize-form-assistant: OK')
     return 0
 

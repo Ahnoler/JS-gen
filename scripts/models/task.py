@@ -171,22 +171,47 @@ class TaskList(BaseModel):
             return ("done", item)
         return None
 
-    def mark_done(self, label: str, value: str | None = None) -> Optional[TaskItem]:
+    def mark_done(
+        self,
+        label: str,
+        value: str | None = None,
+        xpath_smart: str = "",
+    ) -> Optional[TaskItem]:
         """Move a task from pending to done. Returns the moved item or None.
+
+        When ``xpath_smart`` is non-empty, match pending items by xpath first
+        (disambiguates duplicate displayNames). Falls back to label match.
 
         When ``value`` is provided, write it onto ``currentValue`` so summaries
         (e.g. scan_form_fields filled_fields) reflect what was actually filled
         rather than the empty pre-fill scan snapshot.
         """
+        xp = (xpath_smart or "").strip()
+
+        def _apply_value(item: TaskItem) -> TaskItem:
+            if value is not None and str(value).strip() != "":
+                item.currentValue = str(value)
+            return item
+
+        if xp:
+            for i, item in enumerate(self.pending):
+                if item.xpath_smart == xp:
+                    self.pending.pop(i)
+                    self.done.append(_apply_value(item))
+                    return item
+
         for i, item in enumerate(self.pending):
             if item.label == label:
                 self.pending.pop(i)
-                if value is not None and str(value).strip() != "":
-                    item.currentValue = str(value)
-                self.done.append(item)
+                self.done.append(_apply_value(item))
                 return item
         # Already done — still refresh currentValue if a new value was provided
         if value is not None and str(value).strip() != "":
+            if xp:
+                for item in self.done:
+                    if item.xpath_smart == xp:
+                        item.currentValue = str(value)
+                        return item
             already = self.find_done(label)
             if already is not None:
                 already.currentValue = str(value)
@@ -308,6 +333,7 @@ class TaskList(BaseModel):
                     disabled=True,
                     required=f.get("required", False),
                     hasButton="",
+                    xpath_smart=f.get("xpath_smart", ""),
                 ))
                 continue
             if has_value and (not force_refill or label in session_filled):
@@ -320,6 +346,7 @@ class TaskList(BaseModel):
                     disabled=is_disabled,
                     required=f.get("required", False),
                     hasButton=has_button,
+                    xpath_smart=f.get("xpath_smart", ""),
                 ))
             else:
                 item = TaskItem.from_scanned(f)
