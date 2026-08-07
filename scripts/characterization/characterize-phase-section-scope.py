@@ -115,6 +115,12 @@ def test_run_form_assistant_autofill_section_filter() -> None:
     )
 
 
+def test_prompt_section_scope() -> None:
+    prompt = (ROOT / "scripts/prompts/agent-prompt.md").read_text(encoding="utf-8")
+    assert_true("err-section-required" in prompt, "prompt documents err-section-required")
+    assert_true("section=" in prompt or "section='" in prompt, "prompt steers section=")
+
+
 def main() -> int:
     test_section_matches()
     test_filter_pending_excludes_other_section()
@@ -125,6 +131,7 @@ def main() -> int:
     test_submit_hint_section_scoped()
     test_run_form_assistant_section_signature()
     test_run_form_assistant_autofill_section_filter()
+    test_prompt_section_scope()
     print("characterize-phase-section-scope: OK")
     return 0
 

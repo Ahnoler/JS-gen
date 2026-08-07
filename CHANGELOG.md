@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **阶段保存闸门按 LLM 声明的 section 收窄：** `click_save`/`get_pending_tasks`/`run_form_assistant` 可选 `section=`；只校验/填写该折叠块 pending。无 section 且 pending 跨多块 → `err-section-required`。不再因征信等无关块挡住「系统评级结论」保存。
+  影响范围：录制表单阶段提交闸门、助手、pending 摘要、agent-prompt。
+  文件：scripts/actions/_section_scope.py, scripts/actions/_form.py, scripts/actions/_phase_intent.py, scripts/actions/_phase_boundary.py, scripts/prompts/agent-prompt.md, scripts/characterization/characterize-phase-section-scope.py
+  Python 同步提示：无（scripts 子进程）；若控制面复述工具 schema 需为三动作增加可选 section。
+
 - 2026-08-08: **XPath-primary 控件操作：** 写路径经 `_resolve_control` 后仅用相对 `xpath_smart` 定位；语义名 `label||placeholder` 仅用于取值/规则/录制。同 label 多 xpath → `ambiguous-label`。Agent 动作可选 `xpath_smart`；prompt 要求优先带 xpath。
   影响范围：Agent fill/select/date/radio、run_form_assistant、scan 语义名。
   文件：scripts/actions/_form.py, scripts/actions/_llm_values.py, scripts/prompts/agent-prompt.md, scripts/characterization/characterize-xpath-primary-ops.py

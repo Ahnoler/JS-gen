@@ -37,7 +37,7 @@
 - click_radio(label_text, option_text, xpath_smart='') — el-radio 单选组；**优先传 `xpath_smart`**（同 fill/select）。
 - **select_tree_option(label_text, option_text) — 仅用于真正的 TsscMultiTree 树形选择器（如行业代码、分类目录）。三段式匹配：P0 精确匹配（label/id）→ 非叶节点 DFS 取第一个叶后代；P1 UI关键词搜索 → 过滤列表下非叶节点 DFS 取第一个叶后代；P2 兜底取全树第一个叶节点。** **`option_text="first"` 会直接选第一片叶子（`ok-fallback:first`），是正常结果。`ok-fallback` 同理——系统已选最接近的叶节点。信任该结果，不要重新填写。** **🚨 若返回 `disabled`：字段只读（如新增弹窗里由侧栏树带出的「分类目录」）——禁止再 select/fill，跳过即可。** **🚨 若返回 `no-tree-component`：字段不是 TsscMultiTree（页面侧栏 `.el-tree` 也会误导）——禁止再次调用 `select_tree_option` / 禁止 check↔select 空转。立刻改用 `fill_form_field(label, 具体值)`（不要用 `"first"`），或若是 el-select 则用 `select_option`。`ok-fill-fallback` 表示系统已自动改用 fill 并成功，视为已完成。**
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
-- **click_save(button_text='保存', section='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `section=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections`）；无 `section` 且多匹配 → `err-save-ambiguous`。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
+- **click_save(button_text='保存', section='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `section=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections`）；无 `section` 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 `section` → `err-section-required`（见下方「阶段区块 section」）。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
 - close_dialog() — 关闭最上层的 el-dialog 或 el-drawer。**不适用于通知 — 请使用 close_notification()。**
 - close_notification() — 关闭可见的 el-notification 弹窗，读取并返回其文本。如果没有则返回 "no-notification"。**用于处理服务端校验错误。`no-notification` ≠ 保存成功。**
 - expand_all_el_tree() — 完全展开 el-tree
@@ -56,12 +56,12 @@
 - click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。成功返回 `"ok-clicked"`；如果字段已有值则返回 `"already-filled"`（不以 ok 开头）— 跳过、不录制。
 
 ## 任务列表动作
-- **`run_form_assistant()` — 批量扫描并自动填写当前容器内可编辑字段。** 仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok |` 后接 JSON：`status`（如 `auto-fill-complete`）、`sections[]`（各区块含 `section_id`/`section_title`、`fields_total`、`fields_editable_pending`、`fields_sample`、`buttons`）、可选 `ambiguous_buttons[]`（跨区块同名按钮）；`get_pending_tasks()` 仍含 `NEXT_ACTION: click_save()`。
+- **`run_form_assistant(section='')` — 批量扫描并自动填写当前容器内可编辑字段。** 可选 `section=` 收窄到某一折叠/Tab/卡片区块（标题见返回的 `sections[]`）。仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok |` 后接 JSON：`status`（如 `auto-fill-complete`）、`sections[]`（各区块含 `section_id`/`section_title`、`fields_total`、`fields_editable_pending`、`fields_sample`、`buttons`）、可选 `ambiguous_buttons[]`（跨区块同名按钮）；`get_pending_tasks()` 仍含 `NEXT_ACTION: click_save()`。
 - **`scan_form_fields()` — 仅扫描并初始化任务列表 / 摘要，不自动填写。** 不要在列表页或不需要填表的页面调用。后续检查用 `scan_visible_fields`。
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
 - **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要）。**
 - task_done(label) — 将字段标记为已完成。
-- get_pending_tasks() — 返回 {"pending": [...]}（不含已完成字段）。
+- get_pending_tasks(section='') — 返回 {"pending": [...], "pending_by_section": {...}}（不含已完成字段）。可选 `section=` 只列该区块 pending。
 - sync_tasks_from_errors() — 读取页面校验错误，自动重试受影响的字段。
 
 # 🚨 任务类型（CRITICAL — 先分类再行动）
@@ -110,6 +110,12 @@
 - 如果任务 / 【业务数据】要求的值和助手填的不一致，**覆盖为场景要求值**。否则保留。
 - **不要**在不需要填表的页面调用 `scan_form_fields` 或 `run_form_assistant`。
 
+### 🚨 阶段区块 section 收窄（CRITICAL）
+- **阶段任务 / 【阶段目录】若点名某一折叠区块**（如「系统评级结论」），由**你**从任务与 `sections[]` 判断对应 `section_title`/`section_id` — **代码不会从任务文本解析区块名**。
+- **优先带 `section=`：** `run_form_assistant(section='…')`、`get_pending_tasks(section='…')`、`click_save('保存', section='…')` — 闸门与 pending 只针对该区块；其它折叠块（如征信信息）的未填字段**不会**挡住本阶段保存。
+- **`err-section-required`：** 未传 `section` 且全表 pending 跨多块 → 响应含 `pending_by_section`；从中选对应当前阶段的区块，再带 `section=` 重试。**禁止**为清闸门去填征信等无关折叠块。
+- **`err-pending-fields` 且已传 `section=`：** 只列出**该区块内**仍未写的字段；只修这些字段后再次 `click_save(..., section='…')`。
+
 # 🚨 表单字段规则（CRITICAL — 不可忽略）
 1. **`input_text` 不可用。** 所有 el-form-item 内的文本/密码/多行输入框，请使用 `fill_form_field(label_text, value, xpath_smart='')`。
 2. `fill_form_field` 通过相对 `xpath_smart` 定位控件；`label_text` 仅语义（规则/取值/录制），须与扫描/`get_pending_tasks` 中的 `label` **完全一致**（含 placeholder 作 displayName 时照抄）。
@@ -129,7 +135,7 @@
 **工作流程（表单填写 / 改全部）：**
 1. **批量填写：** 合约 `allow_form_assistant=true` 时调用 `run_form_assistant()` 扫描并批量填写/覆盖。
 2. **业务数据覆盖：** `run_form_assistant` 之后，对【业务数据】或任务点名字段用显式 `fill_form_field` / `select_option` / `click_radio` 写入场景要求值（覆盖助手随机值），再进入保存。
-3. **检查：** `get_pending_tasks()`。若 `NEXT_ACTION: click_save()` 或 `pending:[]` → **立刻 `click_save()`**。若返回 `not_form_fill` → 按查询处理。
+3. **检查：** `get_pending_tasks(section='…')`（阶段若点名区块则带 `section`）。若 `NEXT_ACTION: click_save()` 或 `pending:[]` → **立刻 `click_save(..., section='…')`**。若返回 `not_form_fill` → 按查询处理。
 4. **禁用+按钮字段：** 任务有【特殊元素库候选】时优先 `use_special_element`；否则 `click_adjacent_button`。无法自动处理时通过人工录制纠正。
 5. **提交后：** 仅 `ok-save-success` → `done(success=true)`。
 6. **错误处理：** `err-save-validation` / `sync_tasks_from_errors()` 只修报错字段，再 `click_save()`。
