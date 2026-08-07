@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-07: **el-select 懒加载选项：** `JS_SELECT_OPTION` 首轮未命中时，对下拉滚动容器稳态滚底加载更多选项后再匹配（Agent `select_option` 与 live `_replay.py` 共用）。不改 `CTRL.selectOption`。
+  影响范围：Agent select_option、live replay fill/select。
+  文件：scripts/actions/_js_snippets.py（调用方 `_form.py` / `_replay.py` 无接口变更）
+  Python 同步提示：无（scripts 子进程）；若 Python 控制面自带同源 snippets 需对齐。
+
 - 2026-08-07: **执行机会话模型缺省解析**：`attachTrajectoryLive` 不再硬编码 `deepseek-v4-flash` 兜底，改为 `resolveModelId(traj.model)` —— `traj.model` 为空 → `agent-api.json` 的 `defaultModel`，显式值保持不变。
   影响范围：录制 attach 的执行机会话模型选择。
   文件：src/services/trajectory-attach-service.js
