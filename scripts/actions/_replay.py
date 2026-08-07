@@ -31,6 +31,7 @@ from ._helpers import (
 from ._js_snippets import (
     JS_CHECK_LOADING,
     JS_FILL_FORM_FIELD,
+    JS_FILL_BY_XPATH,
     JS_FILL_DATE_FIELD,
     JS_FIND_LABELED_SELECT,
     JS_SELECT_OPTION,
@@ -241,107 +242,6 @@ async def _wait_after_tree_node_for_form(page, *, timeout_ms: int = 5000) -> boo
             pass
         await page.wait_for_timeout(100)
     return False
-
-# Fill an input/textarea resolved by relative xpath (native setter for Element UI).
-_JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
-  const setFn = (t, v) => {
-    const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
-    const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
-    setter.call(t, v);
-    t.setAttribute('value', v);
-    t.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: v }));
-    t.dispatchEvent(new Event('change', { bubbles: true }));
-    t.dispatchEvent(new Event('blur', { bubbles: true }));
-  };
-  const isVis = (el) => {
-    if (!el || el.nodeType !== 1) return false;
-    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
-    const st = getComputedStyle(el);
-    return st.display !== 'none' && st.visibility !== 'hidden';
-  };
-  const wrapVisible = (d) => {
-    if (!d) return false;
-    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
-    if (wrap && getComputedStyle(wrap).display === 'none') return false;
-    return isVis(d) || (wrap && isVis(wrap));
-  };
-  const lastVisibleDialog = () => {
-    const all = [...document.querySelectorAll('.el-dialog, .el-message-box')];
-    for (let i = all.length - 1; i >= 0; i--) {
-      if (wrapVisible(all[i])) return all[i];
-    }
-    return null;
-  };
-  const lastVisibleDrawer = () => {
-    const all = [...document.querySelectorAll('.el-drawer')];
-    for (let i = all.length - 1; i >= 0; i--) {
-      if (wrapVisible(all[i])) return all[i];
-    }
-    return null;
-  };
-  const findInputFromSnap = (snap, root) => {
-    let target = null;
-    for (let i = snap.snapshotLength - 1; i >= 0; i--) {
-      const n = snap.snapshotItem(i);
-      if (!n || !isVis(n)) continue;
-      if (root && root !== document && !root.contains(n)) continue;
-      const inner = (n.matches && (n.matches('input, textarea') ? n : null))
-        || n.querySelector?.('input:not([type="hidden"]), textarea');
-      target = inner || n;
-      break;
-    }
-    return target;
-  };
-  const tryXpath = (xp, root) => {
-    if (!xp) return null;
-    let s = String(xp);
-    try {
-      const ctx = root || document;
-      if (root && s.startsWith('//')) s = '.' + s;
-      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-      return findInputFromSnap(snap, root);
-    } catch (e) {
-      return null;
-    }
-  };
-  let target = null;
-  if (xpath) {
-    target = tryXpath(xpath, null);
-    if (!target && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
-      const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
-      const local = m && m[1] ? m[1] : '';
-      const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleDrawer() : lastVisibleDialog();
-      if (dlg && local) target = tryXpath('.//' + local, dlg);
-    }
-  }
-  if (!target && placeholderHint) {
-    const want = String(placeholderHint || '');
-    const scopes = [lastVisibleDrawer(), lastVisibleDialog(), document].filter(Boolean);
-    for (const scope of scopes) {
-      const inputs = scope.querySelectorAll('input:not([type="hidden"]), textarea');
-      for (const inp of inputs) {
-        if (!isVis(inp) || inp.disabled || inp.readOnly) continue;
-        if (inp.closest('.el-date-editor, .tsscdatepicker')) continue;
-        const ph = inp.getAttribute('placeholder') || '';
-        if (ph.includes(want) || want.includes(ph)) {
-          target = inp;
-          break;
-        }
-      }
-      if (target) break;
-    }
-    if (target) {
-      setFn(target, val == null ? '' : String(val));
-      return 'ok-placeholder';
-    }
-  }
-  if (!target) return xpath ? 'xpath-not-found' : 'xpath-empty';
-  if (target.disabled || target.readOnly) return 'field-disabled';
-  if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return 'xpath-not-input';
-  setFn(target, val == null ? '' : String(val));
-  return 'ok-xpath-smart';
-}'''
-
 
 # Form actions that auto-fill owns — replay via JS, not controller (avoids _ensure_scanned).
 _FORM_ACTIONS = {
@@ -1072,7 +972,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
     if action_name == 'fill_form_field':
         if xpath_smart:
-            result = await page.evaluate(_JS_FILL_BY_XPATH, [xpath_smart, value, placeholder or label])
+            result = await page.evaluate(JS_FILL_BY_XPATH, [xpath_smart, value, placeholder or label])
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(300)
                 return str(result)
@@ -1086,12 +986,12 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                 await page.wait_for_timeout(300)
                 return _annotate_label_result(str(result))
         if not label and placeholder:
-            result = await page.evaluate(_JS_FILL_BY_XPATH, ['', value, placeholder])
+            result = await page.evaluate(JS_FILL_BY_XPATH, ['', value, placeholder])
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(300)
                 return str(result)
         if xpath_full:
-            result = await page.evaluate(_JS_FILL_BY_XPATH, [xpath_full, value, placeholder or label])
+            result = await page.evaluate(JS_FILL_BY_XPATH, [xpath_full, value, placeholder or label])
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(300)
                 return 'ok-xpath-full'

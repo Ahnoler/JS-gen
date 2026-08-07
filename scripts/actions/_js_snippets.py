@@ -10,7 +10,8 @@ not byte-identical (more helpers than CTRL). Parity check:
 CTRL.* ↔ primary JS_* (or action) mapping:
     getContainer       → JS_GET_CONTAINER
     fillFormField      → JS_FILL_FORM_FIELD
-    selectOption       → JS_SELECT_OPTION (+ JS_FIND_LABELED_SELECT)
+    selectOption       → JS_SELECT_OPTION (+ JS_FIND_LABELED_SELECT, JS_SELECT_TRIGGER_BY_XPATH)
+    fillByXpath        → JS_FILL_BY_XPATH
     selectDate         → JS_FILL_DATE_FIELD
     clickRadio         → JS_CLICK_RADIO
     selectTreeOption   → JS_SELECT_TREE_OPTION
@@ -339,6 +340,107 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
     return 'label-not-found';
 }'''
 
+# Fill input/textarea resolved by relative xpath (native setter for Element UI).
+# Handles el-table fixed columns (offsetParent null) and dialog/drawer [last()] scopes.
+JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
+  const setFn = (t, v) => {
+    const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
+    setter.call(t, v);
+    t.setAttribute('value', v);
+    t.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: v }));
+    t.dispatchEvent(new Event('change', { bubbles: true }));
+    t.dispatchEvent(new Event('blur', { bubbles: true }));
+  };
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    return isVis(d) || (wrap && isVis(wrap));
+  };
+  const lastVisibleDialog = () => {
+    const all = [...document.querySelectorAll('.el-dialog, .el-message-box')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const lastVisibleDrawer = () => {
+    const all = [...document.querySelectorAll('.el-drawer')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const findInputFromSnap = (snap, root) => {
+    let target = null;
+    for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+      const n = snap.snapshotItem(i);
+      if (!n || !isVis(n)) continue;
+      if (root && root !== document && !root.contains(n)) continue;
+      const inner = (n.matches && (n.matches('input, textarea') ? n : null))
+        || n.querySelector?.('input:not([type="hidden"]), textarea');
+      target = inner || n;
+      break;
+    }
+    return target;
+  };
+  const tryXpath = (xp, root) => {
+    if (!xp) return null;
+    let s = String(xp);
+    try {
+      const ctx = root || document;
+      if (root && s.startsWith('//')) s = '.' + s;
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      return findInputFromSnap(snap, root);
+    } catch (e) {
+      return null;
+    }
+  };
+  let target = null;
+  if (xpath) {
+    target = tryXpath(xpath, null);
+    if (!target && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
+      const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
+      const local = m && m[1] ? m[1] : '';
+      const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleDrawer() : lastVisibleDialog();
+      if (dlg && local) target = tryXpath('.//' + local, dlg);
+    }
+  }
+  if (!target && placeholderHint) {
+    const want = String(placeholderHint || '');
+    const scopes = [lastVisibleDrawer(), lastVisibleDialog(), document].filter(Boolean);
+    for (const scope of scopes) {
+      const inputs = scope.querySelectorAll('input:not([type="hidden"]), textarea');
+      for (const inp of inputs) {
+        if (!isVis(inp) || inp.disabled || inp.readOnly) continue;
+        if (inp.closest('.el-date-editor, .tsscdatepicker')) continue;
+        const ph = inp.getAttribute('placeholder') || '';
+        if (ph.includes(want) || want.includes(ph)) {
+          target = inp;
+          break;
+        }
+      }
+      if (target) break;
+    }
+    if (target) {
+      setFn(target, val == null ? '' : String(val));
+      return 'ok-placeholder';
+    }
+  }
+  if (!target) return xpath ? 'xpath-not-found' : 'xpath-empty';
+  if (target.disabled || target.readOnly) return 'field-disabled';
+  if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return 'xpath-not-input';
+  setFn(target, val == null ? '' : String(val));
+  return 'ok-xpath-smart';
+}'''
+
 JS_FILL_DATE_FIELD = '''([label, val]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const setFn = (t, v) => {
@@ -599,6 +701,82 @@ JS_FIND_VISIBLE_DROPDOWN = '''(() => {
     }
     return document;
 })()'''
+
+# Open an el-select dropdown resolved by xpath; sets window.__last_select_trigger for JS_SELECT_OPTION.
+JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath]) => {
+  if (!xpath) return 'xpath-empty';
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    return isVis(d) || (wrap && isVis(wrap));
+  };
+  const lastVisibleHost = (drawer) => {
+    const sel = drawer ? '.el-drawer' : '.el-dialog, .el-message-box';
+    const all = [...document.querySelectorAll(sel)];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const findNodeFromSnap = (snap, root) => {
+    for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+      const n = snap.snapshotItem(i);
+      if (!n || !isVis(n)) continue;
+      if (root && root !== document && !root.contains(n)) continue;
+      return n;
+    }
+    return null;
+  };
+  const tryXpath = (xp, root) => {
+    if (!xp) return null;
+    let s = String(xp);
+    try {
+      const ctx = root || document;
+      if (root && s.startsWith('//')) s = '.' + s;
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      return findNodeFromSnap(snap, root);
+    } catch (e) {
+      return null;
+    }
+  };
+  const findSelectTrigger = (node) => {
+    if (!node) return null;
+    if (node.matches && node.matches('.el-select .el-input__inner')) return node;
+    const inner = node.querySelector?.('.el-select .el-input__inner');
+    if (inner && isVis(inner)) return inner;
+    const owner = node.closest?.('.el-select');
+    if (owner) {
+      const tr = owner.querySelector('.el-input__inner');
+      if (tr && isVis(tr)) return tr;
+    }
+    return null;
+  };
+  let node = tryXpath(xpath, null);
+  if (!node && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
+    const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
+    const local = m && m[1] ? m[1] : '';
+    const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleHost(true) : lastVisibleHost(false);
+    if (dlg && local) node = tryXpath('.//' + local, dlg);
+  }
+  if (!node) return 'xpath-not-found';
+  const trigger = findSelectTrigger(node);
+  if (!trigger) return 'no-select-found';
+  if (trigger.disabled || trigger.readOnly) return 'field-disabled';
+  const item = trigger.closest('.el-form-item');
+  item?.scrollIntoView?.({ block: 'center', behavior: 'instant' });
+  trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  trigger.click();
+  window.__last_select_trigger = trigger;
+  return 'ok-triggered';
+}'''
 
 JS_SELECT_OPTION = '''(arg) => {
     // arg: string option text, or [option, exactOnly]
