@@ -467,7 +467,7 @@ def _task_done_impl(label_text, case_data_store, value=None, xpath_smart=""):
         case_data_store.setdefault('_generated_value_cache', {})[label_text] = str(value)
 
 
-def _submit_ready_hint(case_data_store: dict) -> str:
+def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
     """Return a short NEXT_ACTION cue when fillable pending is empty.
 
     Query/filter UI is never form-fill — no click_save / pending-form cues.
@@ -484,8 +484,13 @@ def _submit_ready_hint(case_data_store: dict) -> str:
     except Exception:
         pass
     tl = TaskList.from_store(case_data_store.get('task_list'))
-    intervene = [i.label for i in tl.pending if i.needs_intervention]
-    fillable = [i for i in tl.pending if not i.needs_intervention]
+    from ._section_scope import section_matches
+    sec = (section or '').strip()
+    fillable = [
+        i for i in tl.pending
+        if not i.needs_intervention
+        and section_matches(sec, i.section_id, i.section_title)
+    ]
     if fillable:
         return ''
     # Legacy needs_intervention pending (old stores): do not block save cues —
@@ -1721,18 +1726,29 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
     @controller.action('Get the current pending task list. Returns {"pending": [...], NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 保存 — do not re-fill fields.')
-    async def get_pending_tasks():
+    async def get_pending_tasks(section: str = ''):
         if _is_query_mode(case_data_store):
             return _ok(_query_not_form_payload(), include_in_memory=True)
+        from ._section_scope import section_matches, pending_by_section
         tl = TaskList.from_store(case_data_store.get('task_list'))
-        pending_labels = [item for item in tl.to_store()['pending'] if not item.get('needs_intervention')]
-        sys.stderr.write(f'[get-pending] done={len(tl.done)} pending={len(tl.pending)}\n')
+        sec = (section or '').strip()
+        pending_items = [
+            i for i in tl.pending
+            if not i.needs_intervention
+            and section_matches(sec, i.section_id, i.section_title)
+        ]
+        pending_payload = [i.model_dump() for i in pending_items]
+        sys.stderr.write(
+            f'[get-pending] done={len(tl.done)} pending={len(tl.pending)} section={sec!r}\n'
+        )
         sys.stderr.flush()
         result = {
-            'pending': pending_labels,
+            'pending': pending_payload,
             'done': len(tl.done),
+            'pending_by_section': pending_by_section(tl),
+            'section_filter': sec or None,
         }
-        cue = _submit_ready_hint(case_data_store)
+        cue = _submit_ready_hint(case_data_store, section=sec)
         if cue:
             if cue.startswith('NEXT_ACTION:'):
                 result['NEXT_ACTION'] = cue.split('|', 1)[0].replace('NEXT_ACTION:', '').strip()

@@ -75,12 +75,35 @@ def test_form_has_err_section_required() -> None:
     assert_true("err-section-required" in form, "click_save surfaces err-section-required")
 
 
+def test_get_pending_signature() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    chunk = form.split("async def get_pending_tasks", 1)[1][:600]
+    assert_true("section" in chunk, "get_pending_tasks accepts section")
+    assert_true("pending_by_section" in form, "includes pending_by_section")
+
+
+def test_submit_hint_section_scoped() -> None:
+    from scripts.actions._form import _submit_ready_hint
+
+    tl = TaskList(
+        pending=[
+            TaskItem(label="借款企业", kind="radio", section_title="征信信息", section_id="征信信息"),
+        ]
+    )
+    store = {"task_list": tl.to_store()}
+    assert_true(_submit_ready_hint(store) == "", "global still has pending")
+    cue = _submit_ready_hint(store, section="系统评级结论")
+    assert_true("click_save()" in cue, "empty section-local pending gets save cue")
+
+
 def main() -> int:
     test_section_matches()
     test_filter_pending_excludes_other_section()
     test_gate_scoped_ignores_credit()
     test_multi_section_map()
     test_form_has_err_section_required()
+    test_get_pending_signature()
+    test_submit_hint_section_scoped()
     print("characterize-phase-section-scope: OK")
     return 0
 
