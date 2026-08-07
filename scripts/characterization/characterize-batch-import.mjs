@@ -161,6 +161,22 @@ function testConstantsAndTerminal() {
     }),
     null,
   );
+  assert.strictEqual(
+    deriveJobTerminalStatus({
+      accepted: 2, recorded: 0, drafted: 2, failed: 0, rejected: 0, cancelled: 0,
+      pending: 0, analyzing: 0, analyzed: 0, queued: 0, waitingExecutor: 0,
+      preparing: 0, recording: 0,
+    }),
+    'completed',
+  );
+  assert.strictEqual(
+    deriveJobTerminalStatus({
+      accepted: 2, recorded: 0, drafted: 1, failed: 1, rejected: 0, cancelled: 0,
+      pending: 0, analyzing: 0, analyzed: 0, queued: 0, waitingExecutor: 0,
+      preparing: 0, recording: 0,
+    }),
+    'completed_with_errors',
+  );
   ok('job terminal derivation');
 }
 

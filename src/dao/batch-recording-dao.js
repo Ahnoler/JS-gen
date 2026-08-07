@@ -45,6 +45,7 @@ export async function createJob(job, items = [], trx = null) {
       systemAccountId: job.systemAccountId,
       model: job.model || '',
       originalFilename: job.originalFilename || '',
+      mode: job.mode === 'draft' ? 'draft' : 'record',
       status: job.status || 'accepted',
       cancelRequestedAt: job.cancelRequestedAt ?? null,
       errorMessage: job.errorMessage ?? null,
@@ -204,6 +205,7 @@ export async function claimNextItem({
   workerToken,
   leaseMs,
   jobStatuses = null,
+  jobModes = null,
 } = {}) {
   const db = getDB();
   return db.transaction(async (trx) => {
@@ -223,15 +225,17 @@ export async function claimNextItem({
     const candidates = await q.limit(20).forUpdate();
     let row = null;
     for (const cand of candidates) {
-      if (!jobStatuses?.length) {
-        row = cand;
-        break;
+      if (jobStatuses?.length || jobModes?.length) {
+        const job = await trx(JOB_TABLE).where({ id: cand.batch_id }).first();
+        if (!job) continue;
+        if (jobStatuses?.length && !jobStatuses.includes(job.status)) continue;
+        if (jobModes?.length) {
+          const mode = job.mode || 'record';
+          if (!jobModes.includes(mode)) continue;
+        }
       }
-      const job = await trx(JOB_TABLE).where({ id: cand.batch_id }).first();
-      if (job && jobStatuses.includes(job.status)) {
-        row = cand;
-        break;
-      }
+      row = cand;
+      break;
     }
     if (!row) return null;
 
@@ -247,6 +251,22 @@ export async function claimNextItem({
       });
     if (!n) return null;
     return getItemById(row.id, trx);
+  });
+}
+
+export async function bindTrajectoryAsDrafted(itemId, trajectoryId, {
+  version,
+  trx = null,
+} = {}) {
+  return transitionItem(itemId, ['analyzed'], 'drafted', {
+    version,
+    clearLease: true,
+    extra: {
+      trajectoryId: Number(trajectoryId),
+      errorCode: null,
+      errorMessage: null,
+    },
+    trx,
   });
 }
 
@@ -397,6 +417,7 @@ export async function summarizeJob(batchId) {
     preparing: counts.preparing || 0,
     recording: counts.recording || 0,
     recorded: counts.recorded || 0,
+    drafted: counts.drafted || 0,
     failed: counts.failed || 0,
     cancelled: counts.cancelled || 0,
   };
@@ -405,7 +426,7 @@ export async function summarizeJob(batchId) {
 export function deriveJobTerminalStatus(summary, { cancelled = false } = {}) {
   if (cancelled) return 'cancelled';
   const effective = (summary.accepted || 0) - (summary.cancelled || 0);
-  const success = summary.recorded || 0;
+  const success = (summary.recorded || 0) + (summary.drafted || 0);
   const failed = summary.failed || 0;
   const rejected = summary.rejected || 0;
   const unfinished = (summary.pending || 0)
