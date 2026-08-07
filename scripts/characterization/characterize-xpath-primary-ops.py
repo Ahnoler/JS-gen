@@ -95,6 +95,13 @@ def test_llm_actions_carry_xpath() -> None:
     assert_true("xpath_smart" in src, "_llm_values attaches xpath_smart to actions")
 
 
+def test_phase_b_action_signatures() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    for name in ("fill_form_field", "fill_date_field", "select_option", "click_radio"):
+        chunk = form.split(f"async def {name}", 1)[1][:400]
+        assert_true("xpath_smart" in chunk, f"{name} accepts xpath_smart")
+
+
 def main() -> int:
     test_resolve_hint_wins()
     test_resolve_unique_label()
@@ -104,6 +111,7 @@ def main() -> int:
     test_scan_display_label_markers()
     test_phase_a_hardcut_markers()
     test_llm_actions_carry_xpath()
+    test_phase_b_action_signatures()
     form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
     assert_true("def _resolve_control" in form, "_resolve_control defined")
     print("characterize-xpath-primary-ops: OK")
