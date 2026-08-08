@@ -163,3 +163,49 @@ def resolve_phase_section(store: dict | None, *, task_text: str = "") -> str:
     if sum(1 for t in hits if len(t) == len(longest)) == 1:
         return longest
     return ""
+
+
+def is_empty_effective_actions(actions_raw, *, next_goal: str = "") -> bool:
+    goal = (next_goal or "").strip()
+    if not actions_raw:
+        return True
+    actives = []
+    for a in actions_raw:
+        try:
+            d = a.model_dump(exclude_none=True) if hasattr(a, "model_dump") else {}
+        except Exception:
+            d = {}
+        active = {k: v for k, v in (d or {}).items() if v is not None}
+        if active:
+            actives.append(active)
+    if not actives:
+        return True
+    # treat unknown sole key AgentOutput as empty
+    if len(actives) == 1 and set(actives[0].keys()) <= {"AgentOutput"}:
+        return True
+    if goal.startswith("Execute AgentOutput") and not any(
+        k != "AgentOutput" for a in actives for k in a
+    ):
+        return True
+    return False
+
+
+def empty_act_prescription_message(store, *, last_step: bool, save_ok: bool) -> str:
+    if last_step:
+        ok = bool(save_ok or (store or {}).get("_last_save_ok"))
+        return (
+            f'[SYSTEM] Empty action on last step. NEXT_ACTION: done(success={"true" if ok else "false"}). '
+            'No other actions allowed this step.'
+        )
+    if save_ok or (store or {}).get("_last_save_ok"):
+        return (
+            '[SYSTEM] Empty action but save already succeeded. '
+            'NEXT_ACTION: done(success=true). Do NOT click_save again.'
+        )
+    sec = resolve_phase_section(store)
+    sec_part = f", section='{sec}'" if sec else ""
+    return (
+        '[SYSTEM] Empty/invalid action. Return exactly one tool call. '
+        f"NEXT_ACTION: click_save(button_text='保存'{sec_part}). "
+        'Do not return empty actions.'
+    )

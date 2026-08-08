@@ -143,6 +143,30 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
         )
         sys.stderr.flush()
 
+        from .actions._section_scope import (
+            is_empty_effective_actions,
+            empty_act_prescription_message,
+        )
+        if case_data_store is not None and is_empty_effective_actions(
+            _actions_raw, next_goal=_next_goal or ''
+        ):
+            streak = int(case_data_store.get('_empty_act_streak') or 0) + 1
+            case_data_store['_empty_act_streak'] = streak
+            max_s = int((case_data_store or {}).get('_phase_max_steps') or 0)
+            last_step = bool(max_s and agent.state.n_steps >= max_s)
+            save_ok = bool(case_data_store.get('_last_save_ok'))
+            msg = HumanMessage(content=empty_act_prescription_message(
+                case_data_store, last_step=last_step, save_ok=save_ok,
+            ))
+            agent._message_manager._add_message_with_tokens(msg)
+            sys.stderr.write(
+                f'[recorder] Injected empty-act cue (streak={streak} '
+                f'last_step={last_step} save_ok={save_ok})\n'
+            )
+            sys.stderr.flush()
+        elif case_data_store is not None:
+            case_data_store['_empty_act_streak'] = 0
+
         # P1：动作事件打点（fill_before_save 建模用）——异步旁路，失败不阻塞
         try:
             from .actions._state import _CURRENT_PHASE

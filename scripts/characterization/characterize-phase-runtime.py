@@ -120,6 +120,42 @@ def test_scoped_pending_gate_ignores_other_section() -> None:
 def test_recorder_wires_resolve_phase_section() -> None:
     rec = (ROOT / "scripts/recorder.py").read_text(encoding="utf-8")
     assert_true("resolve_phase_section" in rec, "recorder uses resolve_phase_section")
+    assert_true("is_empty_effective_actions" in rec, "recorder uses is_empty_effective_actions")
+    assert_true("empty_act_prescription_message" in rec, "recorder uses empty_act_prescription_message")
+    assert_true("_empty_act_streak" in rec, "recorder tracks _empty_act_streak")
+    assert_true("_phase_max_steps" in rec, "recorder reads _phase_max_steps for last_step")
+
+
+def test_empty_effective_and_prescription() -> None:
+    from scripts.actions._section_scope import (
+        is_empty_effective_actions,
+        empty_act_prescription_message,
+    )
+
+    assert_true(is_empty_effective_actions([], next_goal="Execute AgentOutput"), "empty list")
+    assert_true(
+        "done(" in empty_act_prescription_message({"_last_save_ok": True}, last_step=False, save_ok=True),
+        "save_ok → done",
+    )
+    assert_true(
+        "done(" in empty_act_prescription_message({}, last_step=True, save_ok=False),
+        "last_step → done only",
+    )
+    msg = empty_act_prescription_message(
+        {"_phase_section": "系统评级结论", "_phase_intent": {"submit": {"required": True}}},
+        last_step=False,
+        save_ok=False,
+    )
+    assert_true("click_save" in msg and "系统评级结论" in msg, f"scoped save cue: {msg}")
+    assert_true(
+        "click_save" not in empty_act_prescription_message({}, last_step=True, save_ok=False),
+        "no click_save on last step",
+    )
+
+
+def test_session_runner_sets_phase_max_steps() -> None:
+    sr = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
+    assert_true("_phase_max_steps" in sr, "session_runner sets _phase_max_steps")
 
 
 def test_empty_act_buffer_on_submit_required() -> None:
@@ -171,6 +207,8 @@ def main() -> None:
     test_click_save_section_order_in_source()
     test_scoped_pending_gate_ignores_other_section()
     test_recorder_wires_resolve_phase_section()
+    test_empty_effective_and_prescription()
+    test_session_runner_sets_phase_max_steps()
     test_empty_act_buffer_on_submit_required()
     test_session_runner_logs_empty_buffer()
     test_resolve_infer_unique_and_longest()

@@ -710,6 +710,8 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     try:
         sys.stderr.write(f"[session] Calling agent.run() with max_steps={max_steps}\n");
         sys.stderr.flush()
+        if case_data_ref is not None:
+            case_data_ref['_phase_max_steps'] = int(max_steps)
         await agent.run(max_steps=max_steps, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
         sys.stderr.write(f"[session] Agent run completed\n");
         sys.stderr.flush()
