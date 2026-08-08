@@ -888,6 +888,107 @@ def _element_xpath_full(entry: dict | None) -> str:
     return ''
 
 
+def _params_xpath_smart(entry, params) -> str:
+    p = params if isinstance(params, dict) else {}
+    xp = str(p.get('xpath_smart') or '').strip()
+    if xp.startswith('//') or xp.startswith('('):
+        return xp
+    return ''
+
+
+def _resolve_replay_xpath(entry, params) -> tuple[str, str]:
+    if not relative_xpath_primary_enabled():
+        full = _element_xpath_full(entry)
+        return (full, 'full') if full else ('', '')
+    px = _params_xpath_smart(entry, params)
+    if px:
+        return px, 'params'
+    ex = _element_xpath_smart(entry)
+    if ex:
+        return ex, 'element'
+    full = _element_xpath_full(entry)
+    if full:
+        return full, 'full'
+    return '', ''
+
+
+def _norm_replay_value(s) -> str:
+    """Strip all whitespace for read-back compare."""
+    return re.sub(r'\s+', '', str(s or '').strip())
+
+
+def _classify_fill_result(action_ok: bool, expected: str, actual: str) -> str:
+    if not action_ok:
+        return 'xpath_miss:action-failed'
+    exp = _norm_replay_value(expected)
+    act = _norm_replay_value(actual)
+    if exp == act:
+        return 'ok'
+    return f'false_ok:expected={exp},actual={act}'
+
+
+_JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
+  if (!xpath) return '';
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const findNode = (xp, root) => {
+    try {
+      let s = String(xp || '');
+      if (!s) return null;
+      const ctx = root || document;
+      if (root && s.startsWith('//')) s = '.' + s;
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+        const n = snap.snapshotItem(i);
+        if (n && isVis(n)) return n;
+      }
+    } catch (e) { /* ignore */ }
+    return null;
+  };
+  const readControl = (node) => {
+    if (!node) return '';
+    const tag = (node.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return (node.value || '').trim();
+    const inp = node.querySelector && node.querySelector('input:not([type="hidden"]), textarea');
+    if (inp) return (inp.value || '').trim();
+    const sel = (node.matches && node.matches('.el-select'))
+      ? node
+      : (node.closest && node.closest('.el-select'));
+    if (sel) {
+      const trigger = sel.querySelector('.el-input__inner');
+      if (trigger) {
+        const v = (trigger.value || '').trim();
+        if (v && !v.includes('请选择')) return v;
+      }
+      const tagEl = sel.querySelector('.el-select__tags-text');
+      if (tagEl) {
+        const t = (tagEl.textContent || '').trim();
+        if (t && !t.includes('请选择')) return t;
+      }
+      const single = sel.querySelector('.el-select__selected-item');
+      if (single) {
+        const t = (single.textContent || '').trim();
+        if (t && !t.includes('请选择')) return t;
+      }
+    }
+    return '';
+  };
+  const node = findNode(xpath, null);
+  return node ? readControl(node) : '';
+}'''
+
+
+async def _read_value_by_xpath(page, xpath: str) -> str:
+    if not xpath:
+        return ''
+    result = await page.evaluate(_JS_READ_VALUE_BY_XPATH, [xpath])
+    return str(result or '').strip()
+
+
 # Click / focus a control resolved by xpath (returns ok-xpath-smart when found).
 _JS_LOCATE_BY_XPATH = r'''([xpath]) => {
   if (!xpath) return 'xpath-empty';
