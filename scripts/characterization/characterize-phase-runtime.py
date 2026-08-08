@@ -99,6 +99,25 @@ def test_recorder_wires_resolve_phase_section() -> None:
     assert_true("resolve_phase_section" in rec, "recorder uses resolve_phase_section")
 
 
+def test_empty_act_buffer_on_submit_required() -> None:
+    assert_true(
+        resolve_phase_max_steps(30, {
+            'estimated_steps': 4,
+            'submit': {'required': True},
+        }) == 11,
+        'submit.required adds +3 empty-act buffer after floor',
+    )
+    assert_true(
+        resolve_phase_max_steps(30, {'effort': 'short', 'submit': {'required': False}}) == 5,
+        'no submit → no empty buffer',
+    )
+
+
+def test_session_runner_logs_empty_buffer() -> None:
+    sr = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
+    assert_true("empty_buffer=" in sr, "session_runner logs empty_buffer=")
+
+
 def test_resolve_infer_unique_and_longest() -> None:
     store = {
         "_phase_intent": {
@@ -128,6 +147,8 @@ def main() -> None:
     test_form_wires_remember()
     test_scoped_pending_gate_ignores_other_section()
     test_recorder_wires_resolve_phase_section()
+    test_empty_act_buffer_on_submit_required()
+    test_session_runner_logs_empty_buffer()
     test_resolve_infer_unique_and_longest()
     print("PASS characterize-phase-runtime")
 

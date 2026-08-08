@@ -22,6 +22,8 @@ _MAX_STEPS_FLOOR = 3
 _MAX_STEPS_BUFFER = 2
 # submit.required phases need room for assistant + empties/retries + click_save + done.
 _SUBMIT_STEPS_FLOOR = 8
+# Extra headroom when submit.required for empty-act / retry steps before click_save.
+_EMPTY_ACT_BUFFER = 3
 _VALID_EFFORT = frozenset(_EFFORT_STEPS)
 
 
@@ -33,7 +35,8 @@ def resolve_phase_max_steps(ceiling: int, contract: dict | None) -> int:
     click_save/暂存 *and* the browser-use done-only final step.
 
     When ``submit.required`` is true, also enforce ``_SUBMIT_STEPS_FLOOR`` so
-    optimistic estimates (e.g. est=4 → 6) cannot starve click_save.
+    optimistic estimates (e.g. est=4 → 6) cannot starve click_save, then add
+    ``_EMPTY_ACT_BUFFER`` for empty-act retries before submit.
     """
     try:
         ceil = int(ceiling)
@@ -61,7 +64,10 @@ def resolve_phase_max_steps(ceiling: int, contract: dict | None) -> int:
         floor = max(floor, _SUBMIT_STEPS_FLOOR)
     if raw is None:
         return ceil
-    return min(ceil, max(floor, int(raw)))
+    chosen = min(ceil, max(floor, int(raw)))
+    if coerce_bool(submit.get('required')):
+        chosen = min(ceil, chosen + _EMPTY_ACT_BUFFER)
+    return chosen
 
 
 def coerce_bool(value: Any) -> bool:

@@ -540,7 +540,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         except Exception as e:
             sys.stderr.write(f"[session] fact pack skipped: {e}\n")
             sys.stderr.flush()
-        from .actions._phase_reviewer import resolve_phase_max_steps
+        from .actions._phase_reviewer import (
+            _EMPTY_ACT_BUFFER,
+            coerce_bool,
+            resolve_phase_max_steps,
+        )
         ceiling = max_steps
         try:
             ceiling = int(max_steps)
@@ -549,8 +553,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         # Reviewer effort/estimated_steps force-cap below ceiling (buffer=2
         # covers done-only last step + save/final-check).
         max_steps = resolve_phase_max_steps(ceiling, contract if not heal_mode else None)
+        submit_req = (contract or {}).get('submit') or {}
+        empty_buffer = _EMPTY_ACT_BUFFER if coerce_bool(submit_req.get('required')) else 0
         sys.stderr.write(
             f"[session] max_steps ceiling={ceiling} chosen={max_steps} "
+            f"empty_buffer={empty_buffer} "
             f"effort={(contract or {}).get('effort')} "
             f"estimated_steps={(contract or {}).get('estimated_steps')} "
             f"plan_n={len((contract or {}).get('brief_plan') or [])}\n"
@@ -617,7 +624,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         sys.stderr.flush()
         emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
     if not max_steps_resolved:
-        from .actions._phase_reviewer import resolve_phase_max_steps
+        from .actions._phase_reviewer import (
+            _EMPTY_ACT_BUFFER,
+            coerce_bool,
+            resolve_phase_max_steps,
+        )
         ceiling = max_steps
         try:
             ceiling = int(max_steps)
@@ -626,8 +637,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         max_steps = resolve_phase_max_steps(
             ceiling, contract if (contract and not heal_mode) else None
         )
+        submit_req = (contract or {}).get('submit') or {}
+        empty_buffer = _EMPTY_ACT_BUFFER if coerce_bool(submit_req.get('required')) else 0
         sys.stderr.write(
             f"[session] max_steps ceiling={ceiling} chosen={max_steps} "
+            f"empty_buffer={empty_buffer} "
             f"effort={(contract or {}).get('effort')} "
             f"estimated_steps={(contract or {}).get('estimated_steps')} "
             f"plan_n={len((contract or {}).get('brief_plan') or [])}\n"
