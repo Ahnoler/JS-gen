@@ -98,9 +98,16 @@ function loadAgentCorpus() {
 }
 
 function loadAssemblerCorpus() {
+  // codegen/ holds the per-action code-generation extracted from
+  // script_assembler.py (facade re-exports the same names).
+  const codegenDir = join(here, '..', 'codegen');
+  const codegenFiles = readdirSync(codegenDir)
+    .filter((f) => f.endsWith('.py'))
+    .map((f) => readFileSync(join(codegenDir, f), 'utf8'));
   const parts = [
     readFileSync(join(here, '..', 'script_assembler.py'), 'utf8'),
     readFileSync(join(here, '..', 'models', 'form_snapshot.py'), 'utf8'),
+    ...codegenFiles,
   ];
   return parts.join('\n');
 }
