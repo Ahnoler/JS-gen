@@ -136,11 +136,15 @@ Executor ops notes: `docs/执行机解耦与操作总结.md` (gitignored docs/).
 
 | Prompt / code | Role |
 |---------------|------|
-| `scripts/prompts/agent-prompt.md` | Main agent system prompt (Element UI actions, response JSON) |
+| `scripts/prompts/agent-core.md` | Core role, JSON, CRITICAL checklist, phase boundary, case-data |
+| `scripts/prompts/agent-tools-common.md` | Generic browser/Element UI actions |
+| `scripts/prompts/agent-tools-form.md` | Form fill/select/assistant/needs_agent/final-check/section |
+| `scripts/prompts/agent-tools-table.md` | Table row buttons, icon buttons |
+| `scripts/prompts/agent-tools-tree.md` | Tree selector details |
+| `scripts/prompts/agent-prompt.md` | Shim: full assembly (backward compat) |
 | `scripts/prompts/planner-prompt.md` | Planner prompt (preferred over inline section) |
 | `scripts/prompts/agent-field-rules.md` | Field-filling guidance for the agent |
 | `scripts/prompts/form-prompt.md` | Form-oriented prompt fragments |
-| `scripts/prompts/agent-special-prompt.md` | Special-case agent guidance |
 | `scripts/prompts/heal-prompt.md` | Self-heal / repair prompts |
 | `scripts/actions/form_rules.py` | Executable value generators (former atp-rule behavior) |
 | `src/ctrl-actions.js` + Python CTRL | Executable Element UI ops (former atp-ui “how to click” as code) |
