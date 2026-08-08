@@ -190,8 +190,9 @@ def test_empty_effective_and_prescription() -> None:
 
 
 def test_session_runner_sets_phase_max_steps() -> None:
-    sr = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
-    assert_true("_phase_max_steps" in sr, "session_runner sets _phase_max_steps")
+    # Per-phase agent execution lives in scripts/agent/service.py.
+    sr = (ROOT / "scripts/agent/service.py").read_text(encoding="utf-8")
+    assert_true("_phase_max_steps" in sr, "session runner sets _phase_max_steps")
 
 
 def test_empty_act_buffer_on_submit_required() -> None:
@@ -209,12 +210,12 @@ def test_empty_act_buffer_on_submit_required() -> None:
 
 
 def test_session_runner_logs_empty_buffer() -> None:
-    sr = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
-    assert_true("empty_buffer=" in sr, "session_runner logs empty_buffer=")
+    sr = (ROOT / "scripts/agent/service.py").read_text(encoding="utf-8")
+    assert_true("empty_buffer=" in sr, "session runner logs empty_buffer=")
 
 
 def test_quality_fail_logging_in_session_runner() -> None:
-    src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
+    src = (ROOT / "scripts/agent/service.py").read_text(encoding="utf-8")
     assert_true("QUALITY FAIL" in src, "stderr marker present")
 
 

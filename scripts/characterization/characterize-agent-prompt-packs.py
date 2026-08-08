@@ -96,9 +96,11 @@ def test_planner_synced_with_final_check() -> None:
 
 
 def test_session_runner_uses_contract_assembly() -> None:
-    src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
-    assert_true("build_agent_system_message" in src, "session_runner imports assembler")
-    assert_true("get_phase_intent" in src, "session_runner reads phase intent")
+    # Per-phase agent execution moved to scripts/agent/service.py (session_runner
+    # is now a facade re-exporting run_session).
+    src = (ROOT / "scripts/agent/service.py").read_text(encoding="utf-8")
+    assert_true("build_agent_system_message" in src, "session runner imports assembler")
+    assert_true("get_phase_intent" in src, "session runner reads phase intent")
     agent_block = src.split("agent = Agent(", 1)[1][:500]
     assert_true(
         "OVERRIDE_SYSTEM_MESSAGE" not in agent_block,
