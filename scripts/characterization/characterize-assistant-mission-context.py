@@ -119,6 +119,27 @@ def test_format_human_message_orders_context_before_fields() -> None:
     assert_true("系统评级等级" in msg and "A" in msg, "snapshot in message")
 
 
+def test_form_prompt_mission_first() -> None:
+    p = (ROOT / "scripts/prompts/form-prompt.md").read_text(encoding="utf-8")
+    assert_true("needs_agent" in p, "documents needs_agent")
+    assert_true("跳过" in p or "不确定" in p, "skip when unsure")
+    assert_true("猜测" in p or "禁止" in p, "forbid unjustified guesses")
+
+
+def test_agent_prompt_final_check_and_hygiene() -> None:
+    p = (ROOT / "scripts/prompts/agent-prompt.md").read_text(encoding="utf-8")
+    assert_true("needs_agent" in p or "终检" in p or "最终检查" in p, "final check")
+    assert_true(
+        "草稿" in p or "不可默认" in p or "不默认" in p or "不可信" in p,
+        "assistant not trusted by default",
+    )
+    assert_true(
+        "完成后（pending≈0）：直接调用 `click_save()`" not in p
+        and "完成后（pending≈0）：直接调用 click_save()" not in p,
+        "obsolete direct click_save after assistant removed",
+    )
+
+
 def main() -> int:
     test_build_context_includes_task_business_snapshot()
     test_parse_form_llm_response_split()
@@ -126,6 +147,8 @@ def main() -> int:
     test_run_form_assistant_payload_mentions_needs_agent()
     test_dedupe_needs_agent_last_reason_wins()
     test_format_human_message_orders_context_before_fields()
+    test_form_prompt_mission_first()
+    test_agent_prompt_final_check_and_hygiene()
     print("characterize-assistant-mission-context: OK")
     return 0
 
