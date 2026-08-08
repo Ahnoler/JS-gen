@@ -2544,14 +2544,26 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if fill_val and fill_val.lower() != 'first':
                 resolved_fill = _resolve_control(case_data_store, label_text, '')
                 fill_xpath = '' if resolved_fill.error else resolved_fill.xpath_smart
-                fill_el = await _capture_element(
-                    page, label_text, target_kind='form_input', xpath_smart=fill_xpath,
-                )
-                fill_result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, fill_val])
+                if fill_xpath:
+                    fill_el = await _capture_element(
+                        page, label_text, target_kind='form_input', xpath_smart=fill_xpath,
+                    )
+                    fill_result = await page.evaluate(
+                        JS_FILL_BY_XPATH, [fill_xpath, fill_val, label_text],
+                    )
+                    record_params = {
+                        'label_text': label_text,
+                        'value': fill_val,
+                        'xpath_smart': fill_xpath,
+                    }
+                else:
+                    fill_el = None
+                    fill_result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, fill_val])
+                    record_params = {'label_text': label_text, 'value': fill_val}
                 if _is_ok_result(fill_result):
                     _record_action(
                         'fill_form_field',
-                        {'label_text': label_text, 'value': fill_val},
+                        record_params,
                         fill_result,
                         element=fill_el,
                     )

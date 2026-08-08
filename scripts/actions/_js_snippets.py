@@ -519,6 +519,29 @@ JS_CAPTURE_FROM_XPATH = r'''([xpath_smart, label, target_kind]) => {
     if (dlg && local) node = tryXpath('.//' + local, dlg);
   }
   if (!node) return null;
+  const kind = String(target_kind || '').trim();
+  const drillWriteHit = (n, k) => {
+    if (!n) return n;
+    if (k === 'form_date') {
+      const candidates = [];
+      if (n.matches && n.matches('input')) candidates.push(n);
+      const inner = n.querySelector?.('input:not([type="hidden"])');
+      if (inner) candidates.push(inner);
+      for (const inp of candidates) {
+        if (inp.closest('.el-date-editor, .tsscdatepicker')) return inp;
+      }
+      const dateInp = n.querySelector?.('.el-date-editor input, .tsscdatepicker input');
+      if (dateInp && isVis(dateInp)) return dateInp;
+      return n;
+    }
+    if (k === 'form_input') {
+      const inner = (n.matches && (n.matches('input, textarea') ? n : null))
+        || n.querySelector?.('input:not([type="hidden"]), textarea');
+      return inner || n;
+    }
+    return n;
+  };
+  node = drillWriteHit(node, kind);
   const abs = absXPath(node);
   const tag = (node.tagName || '').toLowerCase();
   const attrs = {};

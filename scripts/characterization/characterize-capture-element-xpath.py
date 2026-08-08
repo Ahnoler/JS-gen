@@ -25,6 +25,23 @@ def test_snippet_exported() -> None:
     assert_true("xpath_abs:" not in js.replace(" ", ""), "do not write xpath_abs")
 
 
+def test_capture_snippet_drills_form_input() -> None:
+    from scripts.actions import _js_snippets as sn
+
+    js = sn.JS_CAPTURE_FROM_XPATH
+    norm = _norm(js)
+    assert_true("target_kind" in norm, "capture snippet reads target_kind")
+    assert_true("form_input" in js, "form_input branch for write-hit drill")
+    assert_true(
+        "input:not([type=\"hidden\"]), textarea" in js or "input, textarea" in js,
+        "drills to input/textarea like findInputFromSnap",
+    )
+    assert_true(
+        "form_date" in js,
+        "form_date branch for date write-hit drill",
+    )
+
+
 def test_helpers_source_no_smart_on_xpath_path() -> None:
     src = (ROOT / "scripts/actions/_helpers.py").read_text(encoding="utf-8")
     # After rewrite: body must call JS_CAPTURE_FROM_XPATH; must not call JS_SMART_LOCATOR
@@ -101,7 +118,7 @@ def test_execute_round_passes_xpath_to_capture() -> None:
 
 def test_tree_fallback_xpath_captures_pass_xpath() -> None:
     form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
-    # xpath branch fill fallback capture
+    # xpath branch fill fallback capture (_execute_round)
     idx = form.find("JS_FILL_BY_XPATH, [xpath_smart, fill_val, label]")
     assert_true(idx >= 0, "tree fill xpath branch found")
     chunk = form[idx:idx + 1200]
@@ -119,6 +136,32 @@ def test_tree_fallback_xpath_captures_pass_xpath() -> None:
     )
 
 
+def test_select_tree_option_fill_fallback_xpath_parity() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    chunk = form.split("async def select_tree_option", 1)[1].split("async def ", 1)[0]
+    norm = _norm(chunk)
+    assert_true(
+        "no-tree-component" in chunk,
+        "select_tree_option no-tree fallback block present",
+    )
+    assert_true(
+        "JS_FILL_BY_XPATH" in chunk and "fill_xpath" in chunk,
+        "no-tree fill fallback writes via JS_FILL_BY_XPATH when fill_xpath set",
+    )
+    assert_true(
+        "xpath_smart=fill_xpath" in norm,
+        "no-tree fill fallback capture passes fill_xpath",
+    )
+    assert_true(
+        "'xpath_smart':fill_xpath" in norm or "'xpath_smart': fill_xpath" in chunk,
+        "no-tree fill fallback records xpath_smart in params",
+    )
+    assert_true(
+        "JS_FILL_FORM_FIELD" in chunk,
+        "no-tree fill fallback still has label fill when no xpath",
+    )
+
+
 def main() -> int:
     test_snippet_exported()
     test_helpers_source_no_smart_on_xpath_path()
@@ -129,6 +172,8 @@ def main() -> int:
     test_click_radio_passes_xpath_to_capture()
     test_execute_round_passes_xpath_to_capture()
     test_tree_fallback_xpath_captures_pass_xpath()
+    test_capture_snippet_drills_form_input()
+    test_select_tree_option_fill_fallback_xpath_parity()
     print("characterize-capture-element-xpath: OK")
     return 0
 
