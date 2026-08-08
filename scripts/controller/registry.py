@@ -39,9 +39,7 @@ def registered_actions(controller: Any = None, *, exclude_actions: list[str] | N
     build path performs no browser access, so this is safe for tooling.
     """
     if controller is None:
-        # Canonical home is scripts.controller.service once build_controller
-        # migrates there; until then the compat shim re-exports the same name.
-        from scripts.actions._builder import build_controller
+        from .service import build_controller
         controller = build_controller(None, exclude_actions=exclude_actions)
     registry = getattr(controller, 'registry', None)
     actions = getattr(registry, 'registry', None)
