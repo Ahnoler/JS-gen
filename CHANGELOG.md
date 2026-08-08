@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **Agent prompt 分册装配 + 特殊元素按需 hint：** `agent-prompt.md` 拆为 `agent-core` + `agent-tools-common/form/table/tree`；`build_agent_system_message(contract)` 按 `_phase_intent.mode` 装配；`session_runner` 创建 Agent 时传入合约。删除 `agent-special-prompt.md`（内容不迁移）；`format_special_element_hint` 加厚 `phaseDescription`/`remark`/`stepSummary`；`toDisplayCandidates` 透传新字段。Planner 同步终检后保存口径。
+  影响范围：Agent system prompt 装配、特殊元素 hint、planner-prompt、表征。
+  文件：scripts/prompts/agent-*.md, scripts/agent_utils.py, scripts/session_runner.py, scripts/actions/_special_element.py, src/services/special-element-search-service.js, scripts/prompts/planner-prompt.md, scripts/characterization/characterize-agent-prompt-packs.py, scripts/characterization/characterize-special-element-hint.py, AGENTS.md, CLAUDE.md
+  Python 同步提示：无（scripts 子进程）；若 Python 控制面复述 Agent 工具 schema 需对齐分册结构。
+
 - 2026-08-08: **表单助手注入阶段任务/业务数据/只读快照；不确定字段 `needs_agent` 交主 Agent：** `_llm_generate_values` 带使命上下文；吃不准不写入。`run_form_assistant` 返回 `needs_agent[]`。主 Agent prompt 要求终检后再保存，并清理「助手完直接 click_save」过时句。
   影响范围：run_form_assistant、form/agent prompts、自动填值。
   文件：scripts/actions/_llm_values.py, scripts/actions/_form.py, scripts/prompts/form-prompt.md, scripts/prompts/agent-prompt.md, scripts/characterization/characterize-assistant-mission-context.py
@@ -106,6 +111,16 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：对齐新表 schema + `/api/v2/operation-components*`；`trajectory_phase.component_id` 可空预留；mine/CRUD 语义见 CHANGELOG。
 
 ### Fixed
+
+- 2026-08-08: **`click_save` 漏传 section 时唯一「保存」自动补区块：** pending 跨多块且 `section=` 为空时，若 `_scan_buttons` 中匹配按钮只属于一个 `section_title`/`section_id`，自动用该区块做写闸门与点击（日志 `[click_save] auto section=`）；多「保存」仍 `err-section-required`。`NEXT_ACTION` / agent-prompt 改为带 `section=`，不再暗示「无 ambiguous 就裸 click_save」。
+  影响范围：录制阶段保存闸门、pending 提示、agent-prompt。
+  文件：scripts/actions/_section_scope.py, scripts/actions/_form.py, scripts/prompts/agent-prompt.md, scripts/characterization/characterize-phase-section-scope.py
+  Python 同步提示：无（scripts 子进程）。
+
+- 2026-08-08: **`force_refill` 重建 TaskItem 丢失 section_* 打成假 `__root__`：** 已有值字段在 `from_scan(force_refill=True)` 手工重建时未拷贝 `section_id`/`section_title`，`pending_by_section` 误报 `__root__`，放大 `err-section-required`。现三处 TaskItem 构造均保留扫描区块元数据。
+  影响范围：force_refill 任务列表、section 闸门。
+  文件：scripts/models/task.py, scripts/characterization/characterize-phase-section-scope.py
+  Python 同步提示：无（scripts 子进程）。
 
 - 2026-08-07: **表单助手表格内 el-select 不填**（实锤：评级等级测算 input 能填、下拉 pending 残留；`select_option`/`JS_SELECT_TRIGGER_BY_XPATH` 对表格控件返回 `field-disabled`）。根因：xpath 开下拉把 `input.readOnly` 当禁用，而 Element UI 可编辑 select 的 trigger 常为 readOnly；无 `.el-form-item` 时又无法 label 回退。现：xpath trigger **不再**因 readOnly 拒绝（与 `JS_FIELD_DISABLED` 约定一致）。
   影响范围：Agent `run_form_assistant` / `select_option`、live replay 的 xpath 开下拉。
