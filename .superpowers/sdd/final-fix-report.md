@@ -139,9 +139,7 @@ characterize-phase-section-scope: OK
 
 ### Commit
 
-*(SHA filled after commit)*
-
-`fix: empty-act non-submit cue and submit-ready section resolve`
+`d881379b893bc79297aab0d2c08b627074e0aa19` — `fix: empty-act non-submit cue and submit-ready section resolve`
 
 ### Verification
 

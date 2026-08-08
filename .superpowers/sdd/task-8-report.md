@@ -1,65 +1,44 @@
-# Task 8 Report: Prompt redesign (agent + planner)
+# Task 8 Report: CHANGELOG + full characterization sweep
 
-## Status
+**Date:** 2026-08-08  
+**Status:** PASS
 
-DONE
+## Summary
 
-## Commits
+Added consolidated `[Unreleased]` Fixed entry documenting phase runtime hardening from Tasks 1–7. Ran all three related characterizations; all passed without code fixes.
 
-| SHA | Message |
-|-----|---------|
-| a30c2b7 | docs: rewrite agent/planner prompts for explicit form assistant and phase contract |
+## CHANGELOG
 
-## What was implemented
+Added under `### Fixed`:
 
-### `scripts/prompts/agent-prompt.md`
+- **阶段运行时加固** — covers:
+  - `remember_phase_section` / `resolve_phase_section` section memory + inference
+  - `click_save`: `_phase_section` → `refresh_scan_buttons` → `unique_button_section`
+  - `submit.required` empty-act buffer `+3` on top of `max(8, est+2)` (est=4 → 11)
+  - `recorder` empty/invalid act → legal `NEXT_ACTION` prescription
+  - `done()` scoped pending gate via `resolve_phase_section` for `all_editable`
+  - `QUALITY FAIL` stderr + `phase_end` `quality_failed` / `quality_failed_reasons`
 
-- Replaced implicit first-fill autofill with explicit `run_form_assistant()` gated by 【阶段意图合约】`allow_form_assistant=true`.
-- Documented that single-field `fill_*` / `select_*` never trigger batch scan.
-- Added 【阶段目录】 / `out_of_scope` discipline for navigate/query phases.
-- Updated task-type table, task-list actions, form-assistant section, workflow example, and stage-boundary wording.
-- Removed `fill_form_fields_batch` / implicit-trigger references.
+Python sync: 无（scripts 子进程）
 
-### `scripts/prompts/planner-prompt.md`
+## Characterization results
 
-- Added evaluation rules 8 (phase contract / 【阶段目录】) and 9 (`run_form_assistant` only when allowed).
-- Added `run_form_assistant` to Domain Vocabulary table.
+| Script | Result |
+|--------|--------|
+| `characterize-phase-runtime.py` | PASS |
+| `characterize-phase-reviewer.py` | PASS |
+| `characterize-phase-section-scope.py` | OK |
 
-### `scripts/actions/_phase_context.py` (hint fix)
+No characterization fixes required.
 
-- `form_fill_hint()` — `run_form_assistant()` instead of first fill/select trigger.
-- `force_refill_hint()` — optional `run_form_assistant()` when contract allows.
+## Commit
 
-## Tests / verification
-
-```bash
-python scripts/characterization/characterize-form-assistant.py
-# characterize-form-assistant: OK
-
-python scripts/characterization/characterize-case-data.py
-# characterize-case-data: OK
+```
+70ab8e5 docs: CHANGELOG phase runtime hardening
 ```
 
-Manual grep: no remaining「第一次 fill」「隐式」in agent-prompt / planner-prompt / `_phase_context.py` hints.
+Files committed: `CHANGELOG.md` only.
 
-## Concerns / follow-ups
+## Concerns
 
-1. ~~**`heal-prompt.md`** still mentions implicit fill/select autofill~~ — resolved in follow-up commit.
-2. **Recording quality vs assistant** — agent prompt still requires per-field write actions for recording; `run_form_assistant` batch fill may need follow-up tuning if traces lack per-field steps.
-3. No CHANGELOG (scripts-only per brief).
-
-## Review follow-up (Task 8)
-
-| SHA | Message |
-|-----|---------|
-| 2eb82ca | docs: align heal-prompt and hints with explicit form assistant |
-
-- `heal-prompt.md` — implicit fill/select → explicit `run_form_assistant()` when contract allows, else per-field fill.
-- `_phase_context.py` — module docstring `form_fill` mode + `form_modify_partial_hint()` forbids `run_form_assistant`.
-- `agent-prompt.md` — workflow step: after `run_form_assistant`, override 【业务数据】/task-named fields before `click_save`.
-
-## Files touched
-
-- `scripts/prompts/agent-prompt.md` (modified)
-- `scripts/prompts/planner-prompt.md` (modified)
-- `scripts/actions/_phase_context.py` (modified)
+None. Prior task commits already landed implementation; this task is docs + verification only.
