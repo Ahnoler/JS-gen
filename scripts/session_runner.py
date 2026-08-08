@@ -546,10 +546,9 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             ceiling = int(max_steps)
         except (TypeError, ValueError):
             ceiling = 40
-        if contract and not heal_mode:
-            max_steps = resolve_phase_max_steps(ceiling, contract)
-        else:
-            max_steps = ceiling
+        # Reviewer effort/estimated_steps force-cap below ceiling (buffer=2
+        # covers done-only last step + save/final-check).
+        max_steps = resolve_phase_max_steps(ceiling, contract if not heal_mode else None)
         sys.stderr.write(
             f"[session] max_steps ceiling={ceiling} chosen={max_steps} "
             f"effort={(contract or {}).get('effort')} "
@@ -624,10 +623,9 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             ceiling = int(max_steps)
         except (TypeError, ValueError):
             ceiling = 40
-        if contract and not heal_mode:
-            max_steps = resolve_phase_max_steps(ceiling, contract)
-        else:
-            max_steps = ceiling
+        max_steps = resolve_phase_max_steps(
+            ceiling, contract if (contract and not heal_mode) else None
+        )
         sys.stderr.write(
             f"[session] max_steps ceiling={ceiling} chosen={max_steps} "
             f"effort={(contract or {}).get('effort')} "

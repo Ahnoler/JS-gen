@@ -18,11 +18,18 @@ _NO_SUBMIT_TOKEN_MODES = frozenset({'login', 'navigate', 'query'})
 
 _EFFORT_STEPS = {'short': 5, 'medium': 15, 'long': 30}
 _MAX_STEPS_FLOOR = 3
-_MAX_STEPS_BUFFER = 1
+# +2: one for browser-use done-only last step, one for save/final-check action.
+_MAX_STEPS_BUFFER = 2
 _VALID_EFFORT = frozenset(_EFFORT_STEPS)
 
 
 def resolve_phase_max_steps(ceiling: int, contract: dict | None) -> int:
+    """Force-cap agent max_steps from reviewer estimate, never above ceiling.
+
+    Prefer ``estimated_steps + buffer`` when present; else ``effort`` bucket;
+    else ceiling. Buffer is 2 so a correct estimate still leaves room for
+    click_save/暂存 *and* the browser-use done-only final step.
+    """
     try:
         ceil = int(ceiling)
     except (TypeError, ValueError):

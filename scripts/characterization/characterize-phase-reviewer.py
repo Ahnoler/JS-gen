@@ -84,13 +84,14 @@ def main() -> None:
     assert kept['submit']['required'] is True
     assert kept['success']['kinds'] == ['toast_ok']
 
+    # force-cap: effort buckets / estimated_steps+buffer=2, never above ceiling
     assert resolve_phase_max_steps(30, {'effort': 'short'}) == 5
     assert resolve_phase_max_steps(30, {'effort': 'medium'}) == 15
     assert resolve_phase_max_steps(30, {'effort': 'long'}) == 30
     assert resolve_phase_max_steps(10, {'effort': 'long'}) == 10
-    assert resolve_phase_max_steps(30, {'estimated_steps': 2}) == 3  # 2+1 floor
-    assert resolve_phase_max_steps(30, {'estimated_steps': 4}) == 5
-    assert resolve_phase_max_steps(30, {'estimated_steps': 4, 'effort': 'long'}) == 5  # int wins
+    assert resolve_phase_max_steps(30, {'estimated_steps': 2}) == 4  # 2+2 buffer
+    assert resolve_phase_max_steps(30, {'estimated_steps': 4}) == 6
+    assert resolve_phase_max_steps(30, {'estimated_steps': 4, 'effort': 'long'}) == 6  # int wins
     assert resolve_phase_max_steps(30, {}) == 30
     assert resolve_phase_max_steps(30, None) == 30
 

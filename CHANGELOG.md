@@ -112,6 +112,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-08: **阶段评审器步数强制截断保留，buffer 1→2：** `estimated_steps + 2`（1 步留给 browser-use done-only 末步，1 步留给保存/终检）；评审器 prompt 要求估算含「终检 + 保存/提交」。避免过小预算吞掉 `click_save`/暂存，同时仍用估算控阶段漂移。
+  影响范围：录制 Agent 步数上限、评审器 prompt。
+  文件：scripts/actions/_phase_reviewer.py, scripts/session_runner.py, scripts/prompts/phase-reviewer-prompt.md, scripts/characterization/characterize-phase-reviewer.py
+  Python 同步提示：无（scripts 子进程）。
+
 - 2026-08-08: **`click_save` 漏传 section 时唯一「保存」自动补区块：** pending 跨多块且 `section=` 为空时，若 `_scan_buttons` 中匹配按钮只属于一个 `section_title`/`section_id`，自动用该区块做写闸门与点击（日志 `[click_save] auto section=`）；多「保存」仍 `err-section-required`。`NEXT_ACTION` / agent-prompt 改为带 `section=`，不再暗示「无 ambiguous 就裸 click_save」。
   影响范围：录制阶段保存闸门、pending 提示、agent-prompt。
   文件：scripts/actions/_section_scope.py, scripts/actions/_form.py, scripts/prompts/agent-prompt.md, scripts/characterization/characterize-phase-section-scope.py
