@@ -95,6 +95,23 @@ def _section_group_key(section_id: str, section_title: str) -> str:
     return '__root__'
 
 
+def _dedupe_needs_agent(needs: list) -> list:
+    """Dedupe needs_agent entries by label; last reason wins."""
+    by_label: dict[str, dict] = {}
+    order: list[str] = []
+    for n in needs or []:
+        if not isinstance(n, dict):
+            continue
+        label = (n.get('label') or '').strip()
+        if not label:
+            continue
+        if label in by_label:
+            order.remove(label)
+        order.append(label)
+        by_label[label] = n
+    return [by_label[lbl] for lbl in order]
+
+
 def _build_section_summary(
     fields: list[dict],
     buttons: list[dict],
@@ -1016,6 +1033,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             payload = {
                 'status': case_data_store.get('_autofill_summary') or 'auto-fill-complete',
                 'section_filter': sec or None,
+                'needs_agent': _dedupe_needs_agent(
+                    case_data_store.get('_assistant_needs_agent') or []
+                ),
                 **_build_section_summary(
                     case_data_store.get('_scan_fields') or [],
                     case_data_store.get('_scan_buttons') or [],

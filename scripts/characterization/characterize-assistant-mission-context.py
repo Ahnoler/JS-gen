@@ -84,6 +84,26 @@ def test_llm_generate_uses_mission_context_in_prompt() -> None:
     assert_true("parse_form_llm_response" in src or "needs_agent" in src, "needs_agent path")
 
 
+def test_run_form_assistant_payload_mentions_needs_agent() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    chunk = form.split("async def run_form_assistant", 1)[1][:1200]
+    assert_true("needs_agent" in chunk, "run_form_assistant returns needs_agent")
+
+
+def test_dedupe_needs_agent_last_reason_wins() -> None:
+    from scripts.actions._form import _dedupe_needs_agent
+
+    out = _dedupe_needs_agent([
+        {"label": "字段A", "reason": "first"},
+        {"label": "字段B", "reason": "only"},
+        {"label": "字段A", "reason": "last"},
+    ])
+    assert_true(len(out) == 2, f"expected 2 entries, got {out!r}")
+    by_label = {n["label"]: n["reason"] for n in out}
+    assert_true(by_label.get("字段A") == "last", "last reason wins for duplicate label")
+    assert_true(by_label.get("字段B") == "only", "unique label preserved")
+
+
 def test_format_human_message_orders_context_before_fields() -> None:
     ctx = {
         "phase_task": "根据系统评级等级选择建议评级",
@@ -103,6 +123,8 @@ def main() -> int:
     test_build_context_includes_task_business_snapshot()
     test_parse_form_llm_response_split()
     test_llm_generate_uses_mission_context_in_prompt()
+    test_run_form_assistant_payload_mentions_needs_agent()
+    test_dedupe_needs_agent_last_reason_wins()
     test_format_human_message_orders_context_before_fields()
     print("characterize-assistant-mission-context: OK")
     return 0
