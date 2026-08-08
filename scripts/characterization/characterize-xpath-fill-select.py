@@ -45,6 +45,15 @@ def test_snippet_markers() -> None:
     )
 
 
+def test_fill_by_xpath_rejects_empty_placeholder_match() -> None:
+    js = JS_FILL_BY_XPATH
+    assert_true("want.includes(ph)" not in js, "must not use want.includes(ph) (empty ph false ok)")
+    assert_true(
+        "ph.includes(want)" in js,
+        "placeholder match must use ph.includes(want)",
+    )
+
+
 def test_xpath_date_radio_helpers() -> None:
     assert_true(hasattr(sn, "JS_FILL_DATE_BY_XPATH"), "JS_FILL_DATE_BY_XPATH")
     assert_true(hasattr(sn, "JS_CLICK_RADIO_BY_XPATH"), "JS_CLICK_RADIO_BY_XPATH")
@@ -68,6 +77,7 @@ def test_xpath_date_radio_helpers() -> None:
 
 def main() -> int:
     test_snippet_markers()
+    test_fill_by_xpath_rejects_empty_placeholder_match()
     test_xpath_date_radio_helpers()
     print("characterize-xpath-fill-select: OK")
     return 0

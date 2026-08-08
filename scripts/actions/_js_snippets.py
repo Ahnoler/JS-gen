@@ -416,20 +416,23 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
     }
   }
   if (!target && placeholderHint) {
-    const want = String(placeholderHint || '');
-    const scopes = [lastVisibleDrawer(), lastVisibleDialog(), document].filter(Boolean);
-    for (const scope of scopes) {
-      const inputs = scope.querySelectorAll('input:not([type="hidden"]), textarea');
-      for (const inp of inputs) {
-        if (!isVis(inp) || inp.disabled || inp.readOnly) continue;
-        if (inp.closest('.el-date-editor, .tsscdatepicker')) continue;
-        const ph = inp.getAttribute('placeholder') || '';
-        if (ph.includes(want) || want.includes(ph)) {
-          target = inp;
-          break;
+    const want = String(placeholderHint || '').trim();
+    if (want) {
+      const scopes = [lastVisibleDrawer(), lastVisibleDialog(), document].filter(Boolean);
+      for (const scope of scopes) {
+        const inputs = scope.querySelectorAll('input:not([type="hidden"]), textarea');
+        for (const inp of inputs) {
+          if (!isVis(inp) || inp.disabled || inp.readOnly) continue;
+          if (inp.closest('.el-date-editor, .tsscdatepicker')) continue;
+          const ph = String(inp.getAttribute('placeholder') || '').trim();
+          if (!ph) continue;
+          if (ph.includes(want)) {
+            target = inp;
+            break;
+          }
         }
+        if (target) break;
       }
-      if (target) break;
     }
     if (target) {
       setFn(target, val == null ? '' : String(val));
