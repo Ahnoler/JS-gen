@@ -41,6 +41,16 @@ E2E (CDP `:9242`, traj **102** phase **4**, 对公评级「评级等级测算」
 | Dual-write params≠element | **Read unify now**; write unify later |
 | Implementation approach | Replay-layer hot fix (not full record/replay dual-end unify in one PR) |
 
+### Conflict resolutions (2026-08-08 review)
+
+| # | Topic | Choice |
+|---|-------|--------|
+| 1 | Shared `JS_FILL_BY_XPATH` | **1A** — Fix shared JS empty-placeholder false match (`want.includes(ph)` removed). Replay call sites: never pass label as `placeholderHint`. Assistant may still pass label this cut; empty `ph` must not match. |
+| 2 | `select_option` execution | **2A** — Rewrite replay: params/element xpath → `JS_SELECT_TRIGGER_BY_XPATH` + exact `option_text`; label path is fallback only. Do **not** keep `_with_xpath_first` “locate then label-mutate” for select. |
+| 3 | Phase-4 `option_text=first` (7 steps) | **3B** — Must clean DB / re-record those steps before phase acceptance. Not excused as “out of pass bar.” |
+| 4 | Audit mutation | **4A** (reconfirmed) — **Dry-run only**: xpath hit counts + read-back of *existing* values; no click/fill. Wet proof via product replay / E2E only. |
+| 5 | `wrong_control` | **5A** — This cut: target unchanged after purported ok → classify **`false_ok`**. `wrong_control` best-effort/optional only. |
+
 ## Architecture
 
 ```mermaid
@@ -83,12 +93,14 @@ Params do **not** always carry relative xpath (e.g. some tree selects / clicks /
 | `pass` | Chosen xpath hits; read-back matches expected |
 | `xpath_miss` | Chosen xpath visible hits = 0 (no usable fallback) |
 | `false_ok` | Would/did return `ok*`, but params-xpath target unchanged / ≠ expected |
-| `wrong_control` | Write landed on a non-target control |
+| `wrong_control` | Optional/best-effort this cut; prefer folding into `false_ok` when target unchanged (decision **5A**) |
 | `params_absent` | No params smart (stats only) |
 | `skip` | Non-DOM write without bind (e.g. unbound `save_form_snapshot`) |
-| `bad_option_text` | e.g. `option_text=first` |
+| `bad_option_text` | e.g. `option_text=first` — must be cleaned before phase acceptance (**3B**) |
 
 **Action policy:** code-change + green for `fill_form_field` / `select_option`; **report-only** for date/radio/tree/click/snapshot/others. Output: console + optional JSON (not persisted to MySQL).
+
+**Audit mode (**4A**, reconfirmed):** dry-run only — evaluate xpath hit/visibility and read current values; **do not** click or fill. Full `false_ok` / read-back-after-write proof belongs to product `steps/replay` and E2E (verification §), not the audit script.
 
 ## Replay contract — fill / select (§3)
 
@@ -101,16 +113,17 @@ Params do **not** always carry relative xpath (e.g. some tree selects / clicks /
 
 ### fill_form_field
 
-1. Call shared `JS_FILL_BY_XPATH` with resolved xpath; **third arg = real placeholder only** (never pass label as placeholderHint).  
-2. Placeholder fallback: hint non-empty **and** `ph` non-empty **and** `ph.includes(hint)` — remove `want.includes(ph)`.  
+1. Call shared `JS_FILL_BY_XPATH` with resolved xpath; **replay third arg = real placeholder only** (never pass label as placeholderHint).  
+2. Shared JS (**1A**): placeholder fallback requires hint non-empty **and** `ph` non-empty **and** `ph.includes(hint)` — remove `want.includes(ph)`. Assistant may still pass label this cut.  
 3. On xpath miss → label → xpath_full.  
-4. **Read-back** via params xpath (else the xpath actually written); normalize-compare to expected. Map mismatches to typed failures.
+4. **Read-back** via params xpath (else the xpath actually written); normalize-compare to expected. Target unchanged after purported ok → `false_ok` (**5A**).
 
 ### select_option
 
-1. Same xpath priority; prefer `JS_SELECT_TRIGGER_BY_XPATH` + exact `option_text`.  
-2. Reject `option_text=first` (and similar sentinels) as `bad_option_text`.  
-3. Read-back selected label; mismatch → `false_ok` / `wrong_control`.
+1. Same xpath priority; **execute** via `JS_SELECT_TRIGGER_BY_XPATH` + exact `option_text` (not `_with_xpath_first` label-mutate).  
+2. Label/`JS_FIND_LABELED_SELECT` only if no usable xpath.  
+3. Reject `option_text=first` (and similar sentinels) as `bad_option_text`.  
+4. Read-back selected label; mismatch → `false_ok` (wrong_control optional per **5A**).
 
 ### `_result_ok`
 
@@ -132,7 +145,7 @@ Only true `ok*` prefixes count as success. `false_ok` / `wrong_control` / `xpath
 2. CDP audit script: default traj 102 / phase 4.  
 3. Point E2E on rating page: `资产负债率` no false ok on element-only path; params path read-back OK; `业务往来及使用` params `//tr…//el-select` triggerable.  
 4. Keep `characterize-locator-candidates` / `characterize-ctrl` / replay import smoke green.  
-5. Acceptance: phase-4 fill+select with **valid** `params.xpath_smart` → matrix `pass`; `option_text=first` and params-absent listed separately.
+5. Acceptance: after **cleaning** phase-4 steps with `option_text=first` (**3B**), fill+select with valid `params.xpath_smart` → matrix `pass` / product replay confirmed. Dirty `first` steps must not remain.
 
 ## Follow-up
 
