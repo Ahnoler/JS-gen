@@ -25,7 +25,7 @@ scripts/_scratch/
 scripts/smoke/
 chorme-devtools-mcp/
 playwright-cli/
-browser/
+/browser/
 python/
 nodejs/
 __pycache__/
