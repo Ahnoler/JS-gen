@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **拆分 trajectory-attach-service.js**：`prepareTrajectoryRecordingUnlocked`（录制准备主流程：session/browser/stream/login 分阶段 + BiB 挂载 + 默认登录）移入 `src/services/trajectory/trajectory-attach-runner.js`；原文件保留全部公开导出（`prepareTrajectoryRecording` / `attachTrajectoryLive` / `detachTrajectoryStream` / `detachTrajectoryLive` / `bindTrajectoryManualPersist` / `cleanupPersistedTrajectoryResources`），`prepareTrajectoryRecording` 改为调用新模块（内部函数，非公开导出）。代码块逐字移动，无逻辑变更。
+  影响范围：record/prepare 路径（阶段事件语义不变）。
+  文件：src/services/trajectory-attach-service.js, src/services/trajectory/trajectory-attach-runner.js
+  Python 同步提示：无（纯结构移动，无协议变更）。
+
 - 2026-08-08: **拆分 trajectory-persist-service.js**：实时步骤追加块（`appendRecordedStep` + `appendRecordedFormSnapshot` 快照双写/指纹去重）移入 `src/services/trajectory/form-snapshot-append.js`；原文件保留其余公开导出（`buildStepsFromActionFile` / `buildStepsFromFlow` / `readOperationLogText` / `persistSessionTrajectory` / `saveFullTrajectory` / `resolvePhaseIdForPersist` / `removeRecordedStepsByDbIds`），被移动的 2 个导出改为 re-export（同一函数身份），`resolvePhaseIdForPersist` 供新模块复用。代码块逐字移动，无逻辑变更。
   影响范围：实时 step append / save_form_snapshot 双写路径（语义不变）。
   文件：src/services/trajectory-persist-service.js, src/services/trajectory/form-snapshot-append.js
