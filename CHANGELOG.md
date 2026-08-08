@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **拆分 trajectory-record-lifecycle.js**：`startTrajectoryRecording`（AI 分阶段录制主循环 + action_log_sync 持久化 + 截图存取 lazy accessor）移入 `src/services/trajectory/trajectory-recording-runner.js`，`toggleTrajectoryManualRecord` 移入 `src/services/trajectory/trajectory-manual-record.js`；原文件保留其余 5 个公开导出（`prepareCaseDataInjection` / `runDefaultLogin` / `stopTrajectoryRecording` / `stopTrajectoryRecordingSafe` / `resolveTrajectoryElement`），被移动的 2 个导出改为 re-export（同一函数身份，facade 与表征校验不变）。代码块逐字移动，无逻辑变更。
+  影响范围：record/start、manual-record toggle 路径（语义不变）。
+  文件：src/services/trajectory-record-lifecycle.js, src/services/trajectory/trajectory-recording-runner.js, src/services/trajectory/trajectory-manual-record.js
+  Python 同步提示：无（纯结构移动，无协议变更）。
+
 - 2026-08-08: **拆分 trajectory-batch-service.js**：analyze 流水线（`pumpAnalyze` / `runAnalyze` / `createDraftFromAnalyzed` / `pumpDraft` + worker 计数）移入 `src/services/trajectory/batch-analyze.js`，record 流水线（`computeClusterFreeSlots` / `pumpRecord` / `runRecord` + worker 计数）移入 `src/services/trajectory/batch-record.js`；原文件保留全部公开 API（`buildRequestHash` / `getBatchJobView` / `importBatchFromExcel` / `startBatchScheduler` / `kickScheduler` / `cancelBatch` / `recoverBatchJobsOnStartup` / `buildTemplateBuffer`）与调度器，`cancelledAnalyzeTokens` / `emitProgress` / `maybeFinalizeJob` 改为导出供抽取模块复用（纯新增导出，无消费者破坏）。代码块逐字移动，无逻辑变更。
   影响范围：批量导入调度（analyze/draft/record pump 语义不变）。
   文件：src/services/trajectory-batch-service.js, src/services/trajectory/batch-analyze.js, src/services/trajectory/batch-record.js
