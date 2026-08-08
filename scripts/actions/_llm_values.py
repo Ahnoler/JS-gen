@@ -21,6 +21,88 @@ import time
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from .form_rules import match_rule
+from ._section_scope import section_matches
+
+_ASSISTANT_MISSION_INSTRUCTION = (
+    '按任务背景与相关字段快照填写；无法判断则跳过并申报 needs_agent，禁止无依据猜测。'
+)
+_RELATED_SNAPSHOT_CAP = 40
+
+
+def _resolve_phase_task(store: dict) -> str:
+    intent = store.get('_phase_intent')
+    if isinstance(intent, dict):
+        goal = (intent.get('goal') or '').strip()
+        if goal:
+            return goal
+        excerpt = (intent.get('task_text_excerpt') or '').strip()
+        if excerpt:
+            return excerpt
+    return ''
+
+
+def _build_related_snapshot(scan_fields: list, section: str = '') -> list[dict]:
+    out: list[dict] = []
+    for fld in scan_fields:
+        if not isinstance(fld, dict):
+            continue
+        label = (fld.get('label') or '').strip()
+        if not label:
+            continue
+        sid = fld.get('section_id') or ''
+        stitle = fld.get('section_title') or ''
+        if section and not section_matches(section, sid, stitle):
+            continue
+        disabled = bool(fld.get('disabled'))
+        value = fld.get('currentValue')
+        value_str = str(value).strip() if value is not None else ''
+        if not disabled and not value_str:
+            continue
+        out.append({'label': label, 'value': value_str, 'disabled': disabled})
+        if len(out) >= _RELATED_SNAPSHOT_CAP:
+            break
+    return out
+
+
+def build_assistant_mission_context(case_data_store: dict | None, section: str = '') -> dict:
+    """Assemble mission context for the form assistant LLM."""
+    store = case_data_store or {}
+    phase_task = _resolve_phase_task(store)
+    business_data = store.get('_case_scenario_text') or ''
+    if not isinstance(business_data, str):
+        business_data = str(business_data)
+    scan_fields = store.get('_scan_fields') or []
+    if not isinstance(scan_fields, list):
+        scan_fields = []
+    return {
+        'phase_task': phase_task,
+        'business_data': business_data,
+        'related_snapshot': _build_related_snapshot(scan_fields, section),
+        'instruction': _ASSISTANT_MISSION_INSTRUCTION,
+    }
+
+
+def format_assistant_human_message(ctx: dict, fields_block: str) -> str:
+    """Format mission context + field list for the form assistant HumanMessage."""
+    phase_task = (ctx.get('phase_task') or '').strip()
+    business_data = (ctx.get('business_data') or '').strip()
+    snapshot_lines: list[str] = []
+    for row in ctx.get('related_snapshot') or []:
+        if not isinstance(row, dict):
+            continue
+        lbl = (row.get('label') or '').strip()
+        val = row.get('value')
+        val_str = str(val).strip() if val is not None else ''
+        if lbl:
+            snapshot_lines.append(f'{lbl}={val_str}')
+    instruction = (ctx.get('instruction') or _ASSISTANT_MISSION_INSTRUCTION).strip()
+    return '\n\n'.join([
+        f'【阶段任务】\n{phase_task}',
+        f'【业务数据】\n{business_data}',
+        '【相关字段快照】\n' + '\n'.join(snapshot_lines),
+        f'当前表单待填字段：\n{fields_block}',
+        f'指令：{instruction}',
+    ])
 
 # ── Load form LLM system prompt from external file ──────────────────────────
 _DIRECTIVE_RE = re.compile(r'\{\{([^}]+\.md)\}\}')
