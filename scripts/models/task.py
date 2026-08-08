@@ -344,6 +344,8 @@ class TaskList(BaseModel):
                     required=f.get("required", False),
                     hasButton="",
                     xpath_smart=f.get("xpath_smart", ""),
+                    section_id=f.get("section_id", ""),
+                    section_title=f.get("section_title", ""),
                 ))
                 continue
             if has_value and (not force_refill or label in session_filled):
@@ -357,12 +359,16 @@ class TaskList(BaseModel):
                     required=f.get("required", False),
                     hasButton=has_button,
                     xpath_smart=f.get("xpath_smart", ""),
+                    section_id=f.get("section_id", ""),
+                    section_title=f.get("section_title", ""),
                 ))
             else:
                 item = TaskItem.from_scanned(f)
                 if item is None and force_refill and has_value and not is_disabled:
                     # from_scanned skips already-filled; rebuild for overwrite
-                    # (never force-refill disabled / introduce fields)
+                    # (never force-refill disabled / introduce fields).
+                    # Keep section_* so pending_by_section / click_save(section=)
+                    # do not invent a fake __root__ bucket.
                     item = TaskItem(
                         label=f.get("label", ""),
                         kind=f.get("kind", "input"),
@@ -373,6 +379,8 @@ class TaskList(BaseModel):
                         required=f.get("required", False),
                         hasButton=has_button,
                         xpath_smart=f.get("xpath_smart", ""),
+                        section_id=f.get("section_id", ""),
+                        section_title=f.get("section_title", ""),
                         needs_intervention=False,
                     )
                 if item is not None:

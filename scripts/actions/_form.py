@@ -528,8 +528,19 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
                     )
             except Exception:
                 pass
+        # Auto-bind unique save section when not explicitly scoped
+        if not sec:
+            try:
+                from ._section_scope import unique_button_section
+                auto_sec = unique_button_section(case_data_store.get('_scan_buttons'), '保存')
+                if auto_sec:
+                    sec = auto_sec
+            except Exception:
+                pass
+        # Include section= when scoped so caller can pass it through to click_save
+        sec_part = f", section='{sec}'" if sec else ''
         return (
-            'NEXT_ACTION: click_save() | fillable pending=0. '
+            f'NEXT_ACTION: click_save(button_text=\'保存\'{sec_part}) | fillable pending=0. '
             'Call click_save() NOW (auto-finds 保存/提交, scrolls into view). '
             'Do NOT scroll_down / click_element_by_index to hunt for 保存. '
             'Do NOT re-fill or re-select already-filled fields.'
@@ -1819,6 +1830,17 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         compact_btn = re.sub(r'\s+', '', (button_text or '保存').strip()) or '保存'
         sec = (section or "").strip()
+        # Auto-bind unique save section when not explicitly scoped
+        if not sec:
+            try:
+                from ._section_scope import unique_button_section
+                auto_sec = unique_button_section(case_data_store.get('_scan_buttons'), compact_btn)
+                if auto_sec:
+                    sec = auto_sec
+                    sys.stderr.write(f'[click_save] auto section={auto_sec!r} from unique button\n')
+                    sys.stderr.flush()
+            except Exception:
+                pass
         # 确认/确定 = dialog/picker confirm (never treat as form-save blocked by query toolbar)
         is_picker_confirm = bool(
             compact_btn.startswith(('确认', '确定'))
