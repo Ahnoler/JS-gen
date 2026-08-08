@@ -20,6 +20,8 @@ _EFFORT_STEPS = {'short': 5, 'medium': 15, 'long': 30}
 _MAX_STEPS_FLOOR = 3
 # +2: one for browser-use done-only last step, one for save/final-check action.
 _MAX_STEPS_BUFFER = 2
+# submit.required phases need room for assistant + empties/retries + click_save + done.
+_SUBMIT_STEPS_FLOOR = 8
 _VALID_EFFORT = frozenset(_EFFORT_STEPS)
 
 
@@ -29,6 +31,9 @@ def resolve_phase_max_steps(ceiling: int, contract: dict | None) -> int:
     Prefer ``estimated_steps + buffer`` when present; else ``effort`` bucket;
     else ceiling. Buffer is 2 so a correct estimate still leaves room for
     click_save/暂存 *and* the browser-use done-only final step.
+
+    When ``submit.required`` is true, also enforce ``_SUBMIT_STEPS_FLOOR`` so
+    optimistic estimates (e.g. est=4 → 6) cannot starve click_save.
     """
     try:
         ceil = int(ceiling)
@@ -50,9 +55,13 @@ def resolve_phase_max_steps(ceiling: int, contract: dict | None) -> int:
         effort = str(contract.get('effort') or '').strip().lower()
         if effort in _EFFORT_STEPS:
             raw = _EFFORT_STEPS[effort]
+    floor = _MAX_STEPS_FLOOR
+    submit = contract.get('submit') or {}
+    if coerce_bool(submit.get('required')):
+        floor = max(floor, _SUBMIT_STEPS_FLOOR)
     if raw is None:
         return ceil
-    return min(ceil, max(_MAX_STEPS_FLOOR, int(raw)))
+    return min(ceil, max(floor, int(raw)))
 
 
 def coerce_bool(value: Any) -> bool:

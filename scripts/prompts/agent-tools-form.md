@@ -7,7 +7,7 @@
 - fill_form_field(label_text, value, xpath_smart='') — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 扫描/`get_pending_tasks` 含 `xpath_smart` + `label`；**优先传 `xpath_smart`**。`label_text` 为语义名（规则/取值/录制），用扫描原文勿猜。若返回 `"field-disabled"` — 跳过。
 - click_radio(label_text, option_text, xpath_smart='') — el-radio 单选组；**优先传 `xpath_smart`**（同 fill/select）。
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
-- **click_save(button_text='保存', section='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `section=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections`）；无 `section` 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 `section` → `err-section-required`（见 core「阶段区块 section」）。返回 `ok-save-success` 仅当出现「操作成功」类提示；`err-save-validation` / `err-save-no-feedback` / `err-save-notification` 均不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
+- **click_save(button_text='保存', section='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `section=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections`）；无 `section` 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 `section` → `err-section-required`（见 core「阶段区块 section」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
 
 ## 任务列表动作
 - **`run_form_assistant(section='')` — 批量扫描并自动填写当前容器内可编辑字段。** 可选 `section=` 收窄到某一折叠/Tab/卡片区块（标题见返回的 `sections[]`）。仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok |` 后接 JSON：`status`（如 `auto-fill-complete`）、可选 `needs_agent[]`（`{label, reason}` — 助手跳过、须你亲自填）、`sections[]`（各区块含 `section_id`/`section_title`、`fields_total`、`fields_editable_pending`、`fields_sample`、`buttons`）、可选 `ambiguous_buttons[]`（跨区块同名按钮）。助手结果是草稿：先处理 `needs_agent` 并终检，再保存。`get_pending_tasks()` 仍可含 `NEXT_ACTION: click_save(..., section='…')`（有唯一保存块或你已传 section 时）。
@@ -73,10 +73,10 @@
 3. **终检：** 对照阶段任务、业务数据与页面只读/关联字段做最终检查（必要时 `check_field_value`）。不要默认助手已填对。
 4. **pending / NEXT_ACTION：** `get_pending_tasks(section='…')`（阶段若点名区块则带 `section`）。终检通过且 `NEXT_ACTION: click_save(...` 或 `pending:[]` → **按 NEXT_ACTION / 带 section 调用 `click_save`**。若返回 `not_form_fill` → 按查询处理。
 5. **禁用+按钮字段：** 任务有【特殊元素库候选】时优先 `use_special_element`；否则 `click_adjacent_button`。无法自动处理时通过人工录制纠正。
-6. **提交后：** 仅 `ok-save-success` → `done(success=true)`。
+6. **提交后：** `ok-save-success` / `ok-save-navigation` / `ok-save-no-feedback` → `done(success=true)`。
 7. **错误处理：** `err-save-validation` / `sync_tasks_from_errors()` 只修报错字段，再 `click_save()`。
 
-**表单修改：** 对每个可编辑字段执行写动作（**可同值重填**，为录制可操作元素）→ `click_save` → ok-save-success **或** ok-save-navigation → `done`。
+**表单修改：** 对每个可编辑字段执行写动作（**可同值重填**，为录制可操作元素）→ `click_save` → ok-save-success **或** ok-save-navigation **或** ok-save-no-feedback → `done`。
 
 **🚨 严禁：** 在 `already-matched` / `pending:[]` / `NEXT_ACTION: click_save` 之后继续逐个重选民族/学历/婚姻状况等。浪费步数且会改坏级联表单。
 **🚨 严禁：** 用 `scroll_down`/`scroll_up` + `click_element_by_index` 盲目寻找「保存」——必须用 `click_save()`。
@@ -94,14 +94,14 @@ run_form_assistant(section='系统评级结论')
 → get_pending_tasks(section='系统评级结论') → {"pending":[],"NEXT_ACTION":"click_save(button_text='保存', section='系统评级结论')",...}
 → 终检通过后再照抄 NEXT_ACTION 调用 click_save（勿改成裸 click_save()；勿在助手返回后立刻保存）
 → ok-save-success:操作成功 → done(success=true)
+→ ok-save-no-feedback → 静默保存成功 → done(success=true)（勿重试 click_save）
 → err-save-validation:[...] → 修字段后再次 click_save()
-→ err-save-no-feedback → 不是成功；检查弹窗后重试 click_save()
 ```
 
 # 🚨 EL-NOTIFICATION 规则（关键）
 在执行操作前若页面已有可见 el-notification，先 `close_notification()` 读取文本。
 - **`"ok-notification: ..."`**：服务端错误 → 修复字段后调用 `click_save()`。
-- **`"no-notification"`**：当前没有弹窗 — **不等于保存成功**。保存是否成功只看 `click_save()` 是否返回 `ok-save-success`。
+- **`"no-notification"`**：当前没有弹窗 — **不等于保存成功**。保存是否成功只看 `click_save()` 是否返回 `ok-save-success` / `ok-save-navigation` / `ok-save-no-feedback`。
 
 # 🚨 EL-SELECT 规则（关键 — 不可忽略）
 1. 对于 el-select 下拉框，必须使用 `select_option(label_text, option_text)`。
@@ -117,9 +117,10 @@ run_form_assistant(section='系统评级结论')
 2. **`click_save()` 结果：**
    - `ok-save-success:...` → 出现「操作成功」类提示 → `done(success=true)`（若本阶段目标即保存）。
    - `ok-save-navigation:...` → 保存后页面/抽屉跳转 → 同样视为保存成功 → `done(success=true)`。
+   - `ok-save-no-feedback:...` → 已点击且无校验错误/错误 toast/跳转 → **静默保存成功** → `done(success=true)`，**勿重试** click_save。
    - `err-save-validation:[...]` → 前端校验失败（已扫描全页 `.el-form-item__error`）→ 按标签修字段 → 再次 `click_save()`。可用 `scroll_to_first_error()` / `sync_tasks_from_errors()`。
    - `err-save-notification:...` → 服务端错误 toast → 按文案修字段 → 再次 `click_save()`。
-   - `err-save-no-feedback` / `err-save-button-not-found` → **不是成功**。关干扰弹窗（`close_dialog`）后重试。**禁止**因 `no-notification` 而 `done(success=true)`。
+   - `err-save-button-not-found` / `err-save-ambiguous` → **不是成功**。关干扰弹窗（`close_dialog`）或补 `section=` 后重试。**禁止**仅因 `close_notification`→`no-notification` 而 `done(success=true)`。
 3. **如果发生服务端错误（el-notification 弹窗）且你未走 `click_save`：**
    - 先 `close_notification()` 读错误文本，修字段后 **`click_save()`**。
 4. **如果服务端错误提示"已存在""重复"等：** `match_form_rule` 重新生成冲突字段值，填写后再次 `click_save()`。不要改无关字段。
@@ -128,4 +129,4 @@ run_form_assistant(section='系统评级结论')
 7. 验证表单是否正确的唯一方法是 `click_save()` 并检查返回码。
 8. **成功通知会在2-3秒内自动消失** — 故必须用 `click_save()`（内部轮询捕获），不要先点索引再慢慢 `close_notification()` 指望还在。
 9. **在任意弹窗/抽屉交互后**（如法人引入、客户搜索等），向导表单可能已被刷新/重置。录制阶段仍须对每个可编辑字段执行写动作（可同值）；不要用 `check_field_value` 代替写动作。
-10. **录制质量：** 表单维护类保存优先 `click_save`；引入/选人可用索引点「确认」。维护类成功 = `ok-save-success` 或 `ok-save-navigation`。
+10. **录制质量：** 表单维护类保存优先 `click_save`；引入/选人可用索引点「确认」。维护类成功 = `ok-save-success` 或 `ok-save-navigation` 或 `ok-save-no-feedback`。

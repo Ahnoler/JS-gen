@@ -92,6 +92,19 @@ def main() -> None:
     assert resolve_phase_max_steps(30, {'estimated_steps': 2}) == 4  # 2+2 buffer
     assert resolve_phase_max_steps(30, {'estimated_steps': 4}) == 6
     assert resolve_phase_max_steps(30, {'estimated_steps': 4, 'effort': 'long'}) == 6  # int wins
+    # submit.required raises floor to 8 (phase5 log: est=4 → was 6, starved click_save)
+    assert resolve_phase_max_steps(30, {
+        'estimated_steps': 4,
+        'submit': {'required': True},
+    }) == 8
+    assert resolve_phase_max_steps(30, {
+        'effort': 'short',
+        'submit': {'required': True},
+    }) == 8
+    assert resolve_phase_max_steps(30, {
+        'estimated_steps': 8,
+        'submit': {'required': True},
+    }) == 10  # est+buffer still wins when above floor
     assert resolve_phase_max_steps(30, {}) == 30
     assert resolve_phase_max_steps(30, None) == 30
 

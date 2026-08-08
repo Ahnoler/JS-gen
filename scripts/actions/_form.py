@@ -1820,8 +1820,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'Prefer this over scroll_down + click_element_by_index for form submit (including '
         'maintain/edit dialog 确认). '
         'Optional section scopes to a collapse/tab/card block when multiple同名按钮 exist. '
-        'Returns ok-save-success when 操作成功 toast appears, or ok-save-navigation when URL changes after save. '
-        'no-notification without navigation is NOT success. On validation errors returns err-save-validation.'
+        'Returns ok-save-success when 操作成功 toast appears, ok-save-navigation when URL changes, '
+        'or ok-save-no-feedback when the click completes with no toast/error/navigation '
+        '(silent save — still success). On validation errors returns err-save-validation.'
     )
     async def click_save(button_text: str = '保存', section: str = ''):
         from ._phase_intent import check_pending_write_gate, contract_force_refill, record_success_token
@@ -1849,7 +1850,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         )
         query_ui = await _mark_query_ui_if_needed(page, case_data_store, container_id)
         sys.stderr.write(
-            f'[click_save] enter button={button_text!r} section={section!r} compact={compact_btn!r} '
+            f'[click_save] enter button={button_text!r} section={sec!r} compact={compact_btn!r} '
             f'query_ui={query_ui} picker_confirm={is_picker_confirm}\n'
         )
         sys.stderr.flush()
@@ -1959,7 +1960,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
           window.__saveWatchObs = obs;
         }''')
 
-        raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, [button_text or '保存', section or ''])
+        raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, [button_text or '保存', sec])
         try:
             info = json.loads(raw) if isinstance(raw, str) else (raw or {})
         except Exception:
@@ -1974,7 +1975,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             candidates = info.get('candidates') or []
             cand_json = json.dumps(candidates[:12], ensure_ascii=False)
             sys.stderr.write(
-                f'[click_save] NOT CLICKED: "{needle}" reason={reason} section={section!r} '
+                f'[click_save] NOT CLICKED: "{needle}" reason={reason} section={sec!r} '
                 f'candidates={cand_json[:200]}\n'
             )
             sys.stderr.flush()
@@ -1985,7 +1986,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     f'(collapse/tab/card title from scan sections).',
                     include_in_memory=True,
                 )
-            sec_hint = f' section={section!r}' if (section or '').strip() else ''
+            sec_hint = f' section={sec!r}' if sec else ''
             return _err(
                 f'err-save-button-not-found:{needle}{sec_hint}. '
                 f'candidates={cand_json}. '
@@ -2181,12 +2182,18 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     include_in_memory=True,
                 )
 
-        sys.stderr.write('[click_save] no feedback (no toast, no form errors, no navigation)\n')
+        # Silent save: button clicked, no validation errors, no error toast, no URL
+        # change — some SUTs (e.g. section 保存) persist without 操作成功 toast.
+        if case_data_store is not None:
+            case_data_store['_last_save_ok'] = True
+            case_data_store.pop('_submit_ready', None)
+        record_success_token(case_data_store, 'toast_ok', 'ok-save-no-feedback')
+        sys.stderr.write('[click_save] SUCCESS via no-feedback (silent save)\n')
         sys.stderr.flush()
         return _ok(
-            'ok-save-no-feedback: save click completed but no toast, form error, or navigation detected. '
-            'Verify outcome yourself — check_field_value / scan_visible_fields, URL change, or form reset — '
-            'before calling done(success=true). Do NOT retry click_save() mechanically on this result alone.',
+            'ok-save-no-feedback: save click completed with no toast, form error, or navigation. '
+            'Treated as save success (silent persist). Call done(success=true) if phase goal is save. '
+            'Do NOT retry click_save() on this result.',
             include_in_memory=True,
         )
 

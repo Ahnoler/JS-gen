@@ -32,7 +32,7 @@
 - `brief_plan`：列出本阶段 2–4 条可执行步骤，**仅本阶段**；禁止把后续阶段操作写进 `brief_plan`。
 - `effort` 档位参考：打开页面 / 单次点击 / 单字段填写 → `short`；多字段表单 / 整表维护 → `medium` 或 `long`。
 - 可选 `estimated_steps`（正整数）给出更精确的步数预期；与 `effort` 同时给出时以 `estimated_steps` 为准。
-- **`estimated_steps` / `brief_plan` 必须包含「终检 + 保存/提交/暂存」步骤**，勿系统性低估；运行时会用估算强制截断 `max_steps`（另留 buffer：browser-use 末步只能 `done`，再留一步给提交动作）。
+- **`estimated_steps` / `brief_plan` 必须包含「终检 + 保存/提交/暂存」步骤**，勿系统性低估；运行时会用估算强制截断 `max_steps`（另留 buffer：browser-use 末步只能 `done`，再留一步给提交动作）。`submit.required=true` 时运行时另有下限（至少 8 步），但估算仍应写全，勿依赖下限。
 
 ## 模式判定规则
 

@@ -112,6 +112,21 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-08: **`ok-save-no-feedback` 视为保存成功：** 已点击保存且无校验错误/错误 toast/跳转时，记 `_last_save_ok` + success token，并提示立刻 `done`（适配被测系统区块保存无「操作成功」提示）。同步 agent/recorder 文案，避免机械重试。
+  影响范围：录制 click_save 成功判定、agent prompts。
+  文件：scripts/actions/_form.py, scripts/recorder.py, scripts/prompts/agent-tools-form.md, scripts/prompts/agent-core.md, scripts/characterization/characterize-phase-section-scope.py
+  Python 同步提示：无（scripts 子进程）。
+
+- 2026-08-08: **`click_save` 自动补 section 后未传入 JS：** `unique_button_section` 已写入 `sec`，但 `JS_CLICK_SAVE_BUTTON` 仍用空的入参 `section`，多「保存」时误报 `err-save-ambiguous`（日志：auto section=系统评级结论 后仍 section=''）。改为传 `sec`。
+  影响范围：录制阶段 scoped 保存。
+  文件：scripts/actions/_form.py, scripts/characterization/characterize-phase-section-scope.py
+  Python 同步提示：无（scripts 子进程）。
+
+- 2026-08-08: **`submit.required` 阶段 `max_steps` 下限 8：** 在 `estimated_steps+2` 强制截断之外，需保存/提交的阶段至少 8 步，避免乐观估算（如 est=4→6）叠空 `act={}` 后饿死 `click_save`。
+  影响范围：录制 Agent 步数上限。
+  文件：scripts/actions/_phase_reviewer.py, scripts/prompts/phase-reviewer-prompt.md, scripts/characterization/characterize-phase-reviewer.py
+  Python 同步提示：无（scripts 子进程）。
+
 - 2026-08-08: **阶段评审器步数强制截断保留，buffer 1→2：** `estimated_steps + 2`（1 步留给 browser-use done-only 末步，1 步留给保存/终检）；评审器 prompt 要求估算含「终检 + 保存/提交」。避免过小预算吞掉 `click_save`/暂存，同时仍用估算控阶段漂移。
   影响范围：录制 Agent 步数上限、评审器 prompt。
   文件：scripts/actions/_phase_reviewer.py, scripts/session_runner.py, scripts/prompts/phase-reviewer-prompt.md, scripts/characterization/characterize-phase-reviewer.py

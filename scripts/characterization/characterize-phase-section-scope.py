@@ -215,6 +215,31 @@ def test_click_save_auto_section_from_unique_button() -> None:
     assert_true("unique_button_section" in form, "click_save uses unique_button_section")
     assert_true("auto section" in form or "auto_section" in form or "[click_save] auto" in form,
                 "logs or marks auto section bind")
+    # Regression: auto-bound `sec` must reach JS — not the empty param `section`
+    assert_true(
+        "JS_CLICK_SAVE_BUTTON, [button_text or '保存', sec]" in form
+        or 'JS_CLICK_SAVE_BUTTON, [button_text or "保存", sec]' in form,
+        "JS_CLICK_SAVE_BUTTON must receive auto-bound sec",
+    )
+    assert_true(
+        "JS_CLICK_SAVE_BUTTON, [button_text or '保存', section or '']" not in form,
+        "must not pass empty section param after auto-bind",
+    )
+
+
+def test_click_save_no_feedback_counts_as_success() -> None:
+    """Silent SUT save (no toast) must set _last_save_ok and tell agent to done."""
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    idx = form.find("SUCCESS via no-feedback")
+    assert_true(idx > 0, "logs silent-save success")
+    # Bindings are set just above the log line
+    chunk = form[max(0, idx - 400) : idx + 500]
+    assert_true("_last_save_ok" in chunk, "sets _last_save_ok on no-feedback")
+    assert_true("record_success_token" in chunk, "records success token on no-feedback")
+    assert_true("Call done(success=true)" in chunk, "instructs done after silent save")
+    tools = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
+    assert_true("ok-save-no-feedback" in tools and "静默" in tools,
+                "agent form tools treat no-feedback as success")
 
 
 def test_force_refill_preserves_section_on_valued_fields() -> None:
@@ -277,6 +302,7 @@ def main() -> int:
     test_unique_button_section()
     test_submit_hint_includes_unique_save_section()
     test_click_save_auto_section_from_unique_button()
+    test_click_save_no_feedback_counts_as_success()
     test_prompt_section_scope()
     test_force_refill_preserves_section_on_valued_fields()
     print("characterize-phase-section-scope: OK")

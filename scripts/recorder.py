@@ -77,9 +77,10 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                     'Do NOT call select_option / fill_form_field on fields that already have values.\n'
                     'If 联网核查结果 is required and empty, click_adjacent_button(联网核查) first, '
                     'wait_for_loading, then click_save().\n'
-                    'click_save() returns ok-save-success (操作成功) OR ok-save-navigation (URL change) — '
-                    'either counts as save success; then done(success=true). '
-                    'err-save-validation / err-save-no-feedback = NOT success.'
+                    'click_save() returns ok-save-success (操作成功) OR ok-save-navigation (URL change) '
+                    'OR ok-save-no-feedback (clicked, no toast/error — silent save OK) — '
+                    'any of these counts as save success; then done(success=true). '
+                    'err-save-validation / err-save-notification = NOT success.'
                 ))
                 agent._message_manager._add_message_with_tokens(msg)
                 sys.stderr.write('[recorder] Injected submit-ready cue\n')

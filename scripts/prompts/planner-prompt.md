@@ -70,5 +70,5 @@ These terms may appear in the Agent's trajectory. Use them to understand what th
 | `Import` button (引入) | Opens a customer lookup dialog; selecting a customer backfills the associated disabled fields |
 | `formErrors` | `{label, error}[]` from `.el-form-item__error` — `label` is the field's `.el-form-item__label`, `error` is the validation message |
 | `notification` | el-notification popup — server-side validation errors or success messages |
-| `click_save(button_text='保存')` | **Required** for form submit during recording. Find/scroll/click 保存·提交, then scan form errors + toasts. `ok-save-success` only if 操作成功 appears. **Never** advise scroll+index click / `click_element` for 保存. |
+| `click_save(button_text='保存')` | **Required** for form submit during recording. Find/scroll/click 保存·提交, then scan form errors + toasts. Success = 操作成功 toast **or** post-save navigation **or** silent (`ok-save-no-feedback`). **Never** advise scroll+index click / `click_element` for 保存. |
 | `close_notification()` | Closes a notification and returns its text. `"ok-notification: ..."` = error toast text. `"no-notification"` = no toast (NOT save success). |
