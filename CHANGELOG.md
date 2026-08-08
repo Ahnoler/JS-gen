@@ -112,6 +112,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-08: **录制 `element.xpath_smart` 与写入 `params.xpath_smart` 对齐：** `_capture_element` 改为 `JS_CAPTURE_FROM_XPATH` 从写入命中节点取 `xpath_full`，不再调用 `JS_SMART_LOCATOR` 覆盖为 form-item xpath；fill/select/date/radio/round 写路径传入 `resolved.xpath_smart`。
+  影响范围：录制 element 快照、xpath-primary 写路径。
+  文件：scripts/actions/_js_snippets.py, scripts/actions/_form.py, scripts/characterization/characterize-capture-element-xpath.py
+  Python 同步提示：无。
+
 - 2026-08-08: **阶段运行时加固（section 记忆、空 act 缓冲与处方、done 闸门收窄、质量可观测）：** `remember_phase_section` / `resolve_phase_section` 记忆与推断当前区块；`click_save` 先读 `_phase_section` 再 `refresh_scan_buttons` + `unique_button_section` 消歧。`submit.required` 在 `max(8, est+2)` 之上再 `+3` 空 act 缓冲（est=4→11）；`recorder` 检测空/无效 `act={}` 注入合法 `NEXT_ACTION`（末步仅 `done`、已保存则 `done(success=true)`、否则 scoped `click_save`）。`done()` 在 `refill=all_editable` 时经 `resolve_phase_section` 收窄 pending 写闸门，不再被其他折叠块挡住。阶段结束写 stderr `QUALITY FAIL` 并在 `phase_end` 事件附带 `quality_failed` / `quality_failed_reasons`。
   影响范围：录制 Agent 步数预算、空 act 恢复、scoped 保存/done 闸门、阶段结束可观测性。
   文件：scripts/actions/_section_scope.py, scripts/actions/_form.py, scripts/actions/_phase_reviewer.py, scripts/actions/_phase_intent.py, scripts/recorder.py, scripts/session_runner.py, scripts/characterization/characterize-phase-runtime.py, scripts/characterization/characterize-phase-reviewer.py

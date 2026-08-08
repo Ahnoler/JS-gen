@@ -1,7 +1,7 @@
 # Design: Capture element from write xpath (element ≡ params)
 
 **Date:** 2026-08-08  
-**Status:** Approved — plan at `docs/superpowers/plans/2026-08-08-capture-element-from-xpath.md`  
+**Status:** Implemented — plan at `docs/superpowers/plans/2026-08-08-capture-element-from-xpath.md`  
 **Backlog:** T3 in `docs/superpowers/backlog-visible-editable-controls.md`  
 **Related:** xpath-primary Phase A/B (done); params-first replay (done); form-scan Source B (done)
 
