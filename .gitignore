@@ -20,6 +20,9 @@ report/
 report2/
 atp-record/
 docs/
+# Probation daily reports (automation); keep other docs/ local-only
+!docs/report/
+!docs/report/**
 # Local scratch probes / temp outputs (do not match scripts/__init__.py)
 scripts/_probe_*
 scripts/_tmp_*
