@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **拆分 trajectory-session-replay.js**：`runReplayBatch`（Type A 单步 heal 批处理）移入 `src/services/trajectory/replay-batch-runner.js`，`handleFormStructureCheckpoint`（Type B 表单结构检查点）移入 `src/services/trajectory/form-structure-heal.js`；原文件保留 3 个公开导出（`acceptTrajectoryStepsReplay` / `replayTrajectorySteps` / `stopTrajectoryStepsReplay`）与 `prepareReplayBatch`，仅新增对抽取模块的 import。代码块逐字移动，无逻辑变更。
+  影响范围：steps/replay 路径（Type A/B heal 语义不变）。
+  文件：src/services/trajectory-session-replay.js, src/services/trajectory/replay-batch-runner.js, src/services/trajectory/form-structure-heal.js
+  Python 同步提示：无（纯结构移动，无协议变更）。
+
 - 2026-08-08: **Agent prompt 分册装配 + 特殊元素按需 hint：** `agent-prompt.md` 拆为 `agent-core` + `agent-tools-common/form/table/tree`；`build_agent_system_message(contract)` 按 `_phase_intent.mode` 装配；`session_runner` 创建 Agent 时传入合约。删除 `agent-special-prompt.md`（内容不迁移）；`format_special_element_hint` 加厚 `phaseDescription`/`remark`/`stepSummary`；`toDisplayCandidates` 透传新字段。Planner 同步终检后保存口径。
   影响范围：Agent system prompt 装配、特殊元素 hint、planner-prompt、表征。
   文件：scripts/prompts/agent-*.md, scripts/agent_utils.py, scripts/session_runner.py, scripts/actions/_special_element.py, src/services/special-element-search-service.js, scripts/prompts/planner-prompt.md, scripts/characterization/characterize-agent-prompt-packs.py, scripts/characterization/characterize-special-element-hint.py, AGENTS.md, CLAUDE.md
