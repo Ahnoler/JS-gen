@@ -51,8 +51,9 @@ assert(/replay:form_structure/.test(replay), 'emits replay:form_structure');
 const fsh = readFileSync(path.join(root, 'src/services/trajectory/form-structure-heal.js'), 'utf-8');
 assert(/insertStepsAfter/.test(fsh), 'Type B uses insertStepsAfter');
 
-const formPy = readFileSync(path.join(root, 'scripts/actions/_form.py'), 'utf-8');
-assert(/emit_checkpoint/.test(formPy), 'Python _save_form_snapshot has emit_checkpoint');
+const formPy = readFileSync(path.join(root, 'scripts/controller/actions/_form.py'), 'utf-8');
+const formScanPy = readFileSync(path.join(root, 'scripts/controller/actions/form_scan_utils.py'), 'utf-8');
+assert(/emit_checkpoint/.test(formScanPy), 'Python _save_form_snapshot has emit_checkpoint');
 // scan_form_fields must not call _save_form_snapshot immediately after container_id
 const scanIdx = formPy.indexOf("async def scan_form_fields");
 const nextDef = formPy.indexOf('\n    @controller.action', scanIdx + 10);

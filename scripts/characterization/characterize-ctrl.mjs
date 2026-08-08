@@ -36,7 +36,7 @@
  *   verifyFormStructure   → verifyFormStructure   (form_snapshot.py / script_assembler.py; replay-only)
  * ---------------------------------------------------------------------------
  */
-import { readdirSync, readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -89,12 +89,21 @@ function parseCtrlMethods(ctrlObjectSrc) {
 }
 
 function loadAgentCorpus() {
-  const snippets = readFileSync(join(here, '..', 'actions', '_js_snippets.py'), 'utf8');
-  const actionsDir = join(here, '..', 'actions');
-  const actionFiles = readdirSync(actionsDir)
-    .filter((f) => f.endsWith('.py'))
-    .map((f) => readFileSync(join(actionsDir, f), 'utf8'));
-  return [snippets, ...actionFiles].join('\n');
+  // Agent-side Python corpus: legacy scripts/actions/ shims + the canonical
+  // scripts/controller/actions/ tree (incl. the js_snippets package).
+  const parts = [];
+  const readPy = (dir) => {
+    if (!existsSync(dir)) return;
+    parts.push(
+      ...readdirSync(dir)
+        .filter((f) => f.endsWith('.py'))
+        .map((f) => readFileSync(join(dir, f), 'utf8')),
+    );
+  };
+  readPy(join(here, '..', 'actions'));
+  readPy(join(here, '..', 'controller', 'actions'));
+  readPy(join(here, '..', 'controller', 'actions', 'js_snippets'));
+  return parts.join('\n');
 }
 
 function loadAssemblerCorpus() {
