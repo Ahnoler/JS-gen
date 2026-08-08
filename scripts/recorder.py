@@ -152,8 +152,18 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
         ):
             streak = int(case_data_store.get('_empty_act_streak') or 0) + 1
             case_data_store['_empty_act_streak'] = streak
+            # Design §3.3: final browser-use iteration is done-only (DoneAgentOutput).
             max_s = int((case_data_store or {}).get('_phase_max_steps') or 0)
-            last_step = bool(max_s and agent.state.n_steps >= max_s)
+            n = int(getattr(agent.state, 'n_steps', 0) or 0)
+            last_step = bool(max_s and n >= max_s)
+            flag = getattr(agent.state, 'is_last_step', None)
+            if callable(flag):
+                try:
+                    last_step = bool(flag()) or last_step
+                except Exception:
+                    pass
+            elif isinstance(flag, bool):
+                last_step = flag or last_step
             save_ok = bool(case_data_store.get('_last_save_ok'))
             msg = HumanMessage(content=empty_act_prescription_message(
                 case_data_store, last_step=last_step, save_ok=save_ok,

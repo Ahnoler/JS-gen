@@ -513,7 +513,7 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
     except Exception:
         pass
     tl = TaskList.from_store(case_data_store.get('task_list'))
-    from ._section_scope import section_matches
+    from ._section_scope import resolve_phase_section, section_matches
     sec = (section or '').strip()
     fillable = [
         i for i in tl.pending
@@ -540,11 +540,13 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
                     )
             except Exception:
                 pass
-        # Auto-bind unique save section when not explicitly scoped
+        # Auto-bind section when not explicitly scoped: memory/infer then unique save button
         if not sec:
             try:
                 from ._section_scope import unique_button_section
-                auto_sec = unique_button_section(case_data_store.get('_scan_buttons'), '保存')
+                auto_sec = resolve_phase_section(case_data_store)
+                if not auto_sec:
+                    auto_sec = unique_button_section(case_data_store.get('_scan_buttons'), '保存')
                 if auto_sec:
                     sec = auto_sec
             except Exception:

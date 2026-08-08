@@ -44,6 +44,14 @@ def test_form_wires_remember() -> None:
     assert_true("remember_phase_section" in form, "form remembers section")
 
 
+def test_submit_ready_hint_uses_resolve_phase_section() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    hint = form.find("def _submit_ready_hint")
+    assert_true(hint >= 0, "_submit_ready_hint present")
+    body = form[hint : hint + 2500]
+    assert_true("resolve_phase_section" in body, "_submit_ready_hint uses resolve_phase_section")
+
+
 def test_click_save_section_order_in_source() -> None:
     form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
     # memory before unique; refresh when no section
@@ -151,6 +159,34 @@ def test_empty_effective_and_prescription() -> None:
         "click_save" not in empty_act_prescription_message({}, last_step=True, save_ok=False),
         "no click_save on last step",
     )
+    non_submit_msg = empty_act_prescription_message(
+        {
+            "_phase_intent": {
+                "mode": "modify",
+                "submit": {"required": False},
+                "success": {"kinds": []},
+            },
+        },
+        last_step=False,
+        save_ok=False,
+    )
+    assert_true(
+        "done(" in non_submit_msg
+        and "NEXT_ACTION: click_save" not in non_submit_msg,
+        f"non-submit phase → done not click_save: {non_submit_msg}",
+    )
+    scoped_msg = empty_act_prescription_message(
+        {
+            "_phase_section": "系统评级结论",
+            "_phase_intent": {"submit": {"required": True}},
+        },
+        last_step=False,
+        save_ok=False,
+    )
+    assert_true(
+        "click_save" in scoped_msg and "section=" in scoped_msg,
+        f"submit required + section → scoped click_save: {scoped_msg}",
+    )
 
 
 def test_session_runner_sets_phase_max_steps() -> None:
@@ -209,6 +245,7 @@ def main() -> None:
     test_remember_and_resolve_memory()
     test_clear_phase_intent_clears_section()
     test_form_wires_remember()
+    test_submit_ready_hint_uses_resolve_phase_section()
     test_click_save_section_order_in_source()
     test_scoped_pending_gate_ignores_other_section()
     test_recorder_wires_resolve_phase_section()

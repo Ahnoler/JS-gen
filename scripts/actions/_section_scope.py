@@ -190,6 +190,27 @@ def is_empty_effective_actions(actions_raw, *, next_goal: str = "") -> bool:
     return False
 
 
+def _phase_submit_not_required(store: dict | None) -> bool:
+    """True when contract says no save/submit, or phase mode is non-maintain."""
+    if not store:
+        return False
+    if store.get("_task_mode") == "query" or store.get("_query_task"):
+        return True
+    c = store.get("_phase_intent")
+    if not isinstance(c, dict):
+        return False
+    mode = c.get("mode") or ""
+    if mode in ("query", "navigate", "login"):
+        return True
+    try:
+        from ._phase_reviewer import coerce_bool
+
+        submit = c.get("submit") if isinstance(c.get("submit"), dict) else {}
+        return not coerce_bool(submit.get("required"))
+    except Exception:
+        return False
+
+
 def empty_act_prescription_message(store, *, last_step: bool, save_ok: bool) -> str:
     if last_step:
         ok = bool(save_ok or (store or {}).get("_last_save_ok"))
@@ -201,6 +222,11 @@ def empty_act_prescription_message(store, *, last_step: bool, save_ok: bool) -> 
         return (
             '[SYSTEM] Empty action but save already succeeded. '
             'NEXT_ACTION: done(success=true). Do NOT click_save again.'
+        )
+    if _phase_submit_not_required(store):
+        return (
+            '[SYSTEM] Empty/invalid action. This phase does not require save. '
+            'NEXT_ACTION: done(success=true). Do NOT click_save().'
         )
     sec = resolve_phase_section(store)
     sec_part = f", section='{sec}'" if sec else ""
