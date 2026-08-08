@@ -35,6 +35,8 @@ from ._js_snippets import (
     JS_FILL_DATE_FIELD,
     JS_FIND_LABELED_SELECT,
     JS_SELECT_OPTION,
+    JS_SELECT_TRIGGER_BY_XPATH,
+    JS_SELECT_VALUE_BY_XPATH,
     JS_SELECT_TREE_OPTION,
     JS_CLICK_RADIO,
     JS_VERIFY_FORM_STRUCTURE,
@@ -1195,34 +1197,75 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         # params.options / element.options are inventory for export & downstream products
         # (reference only; never used to substitute a different value).
         pick = str(value or '').strip()
+        if not pick:
+            return 'error:missing-option_text'
+        if pick.lower() in ('first', 'any', 'random'):
+            return f'bad_option_text:{pick}'
 
-        async def _select():
-            if not pick:
-                return 'error:missing-option_text'
+        _JS_CLOSE_SELECT_POPPERS = '''() => {
+            document.querySelectorAll('.el-select-dropdown:not(.is-hidden)').forEach(dd => {
+                dd.style.display = 'none';
+                dd.classList.add('is-hidden');
+            });
+            document.body.click();
+        }'''
 
+        async def _close_select_poppers():
+            await page.evaluate(_JS_CLOSE_SELECT_POPPERS)
+            await page.wait_for_timeout(100)
+
+        async def _select_by_xpath(xpath: str, locate_src: str) -> str | None:
+            already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xpath])
+            if isinstance(already, str) and already.startswith('ok-already:'):
+                cur_val = already.split(':', 1)[1].strip()
+                if cur_val == pick:
+                    await page.wait_for_timeout(200)
+                    return f'ok-already:{pick}|locate={locate_src}'
+
+            await _close_select_poppers()
+            trig = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath])
+            if not _is_ok_result(str(trig)):
+                return None
+
+            result = 'no-items'
+            for attempt in range(3):
+                await page.wait_for_timeout(500 if attempt == 0 else 400)
+                result = await page.evaluate(JS_SELECT_OPTION, [pick, True])
+                if isinstance(result, str) and result.startswith('ok'):
+                    break
+                if isinstance(result, str) and result.startswith('option-not-found:'):
+                    break
+                if result != 'no-items':
+                    break
+                await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath])
+
+            if isinstance(result, str) and result.startswith('ok'):
+                got = result.split(':', 1)[1].strip() if ':' in result else ''
+                if got and got != pick:
+                    return f'option-mismatch:want={pick}|got={got}'
+                actual = await _read_value_by_xpath(page, xpath)
+                classified = _classify_fill_result(True, pick, actual)
+                await page.wait_for_timeout(500)
+                if classified.startswith('false_ok'):
+                    return classified
+                return f'ok:locate={locate_src}'
+
+            return str(result)
+
+        async def _select_by_label() -> str:
             already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
             if isinstance(already, str) and already.startswith('ok-already:'):
                 cur_val = already.split(':', 1)[1].strip()
-                # Exact match only — do not accept a different label as "already done"
                 if cur_val == pick:
                     await page.wait_for_timeout(200)
                     return already
 
-            # Close leftover poppers (same as live select_option)
-            await page.evaluate('''() => {
-                document.querySelectorAll('.el-select-dropdown:not(.is-hidden)').forEach(dd => {
-                    dd.style.display = 'none';
-                    dd.classList.add('is-hidden');
-                });
-                document.body.click();
-            }''')
-            await page.wait_for_timeout(100)
+            await _close_select_poppers()
 
             trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
             if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled'):
                 return str(trigger_result)
 
-            # Wait for dropdown items (remote dict / drawer mount); still pick `pick` only
             result = 'no-items'
             for attempt in range(3):
                 await page.wait_for_timeout(500 if attempt == 0 else 400)
@@ -1237,7 +1280,6 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
             if isinstance(result, str) and result.startswith('ok'):
                 got = result.split(':', 1)[1].strip() if ':' in result else ''
-                # JS_SELECT_OPTION may includes()-match; reject drift from recorded value
                 if got and got != pick:
                     return f'option-mismatch:want={pick}|got={got}'
                 confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
@@ -1246,7 +1288,6 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                     if cur and cur != pick:
                         return f'option-mismatch:want={pick}|got={cur}'
                 elif not (isinstance(confirmed, str) and confirmed.startswith('ok-confirmed:')):
-                    # Force native path with exact recorded text, then re-check
                     await page.evaluate(JS_FILL_FORM_FIELD, [label, pick])
                     await page.wait_for_timeout(200)
                     confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
@@ -1257,10 +1298,26 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                         result = confirmed2
                     else:
                         return f'option-not-synced:want={pick}|confirm={confirmed2}'
-            # no-items / option-not-found / other → fail as-is (never pick "first")
             await page.wait_for_timeout(500)
-            return result
-        return await _with_xpath_first(_select)
+            return str(result)
+
+        xp, src = _resolve_replay_xpath(entry, params)
+        if xp:
+            xpath_result = await _select_by_xpath(xp, src)
+            if xpath_result is not None:
+                return xpath_result
+
+        label_result = await _select_by_label()
+        if isinstance(label_result, str) and label_result.startswith('ok'):
+            return _annotate_label_result(label_result)
+
+        xpath_full = _element_xpath_full(entry) if use_relative else ''
+        if xpath_full and xpath_full != xp:
+            xpath_result = await _select_by_xpath(xpath_full, 'full')
+            if xpath_result is not None:
+                return xpath_result
+
+        return _annotate_label_result(label_result)
 
     return f'unknown-form-action:{action_name}'
 

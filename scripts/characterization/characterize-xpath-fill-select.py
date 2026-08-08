@@ -54,6 +54,26 @@ def test_fill_by_xpath_rejects_empty_placeholder_match() -> None:
     )
 
 
+def test_replay_select_uses_trigger_by_xpath() -> None:
+    src = (ROOT / "scripts/actions/_replay.py").read_text(encoding="utf-8")
+    select_fn = src.split("if action_name == 'select_option':", 1)[1].split(
+        "return f'unknown-form-action", 1
+    )[0]
+    assert_true("JS_SELECT_TRIGGER_BY_XPATH" in select_fn, "replay select uses xpath trigger")
+    assert_true(
+        "bad_option_text" in select_fn,
+        "replay select rejects first/any/random option_text",
+    )
+    assert_true(
+        "_with_xpath_first" not in select_fn,
+        "replay select must not use _with_xpath_first locate-then-label",
+    )
+    assert_true(
+        "JS_SELECT_VALUE_BY_XPATH" in select_fn,
+        "replay select already-matched via xpath value read",
+    )
+
+
 def test_xpath_date_radio_helpers() -> None:
     assert_true(hasattr(sn, "JS_FILL_DATE_BY_XPATH"), "JS_FILL_DATE_BY_XPATH")
     assert_true(hasattr(sn, "JS_CLICK_RADIO_BY_XPATH"), "JS_CLICK_RADIO_BY_XPATH")
@@ -78,6 +98,7 @@ def test_xpath_date_radio_helpers() -> None:
 def main() -> int:
     test_snippet_markers()
     test_fill_by_xpath_rejects_empty_placeholder_match()
+    test_replay_select_uses_trigger_by_xpath()
     test_xpath_date_radio_helpers()
     print("characterize-xpath-fill-select: OK")
     return 0
