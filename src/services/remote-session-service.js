@@ -10,6 +10,7 @@ import { state } from '../state.js';
 import { sendToExecutor, waitForSessionEvent } from '../executor-session-client.js';
 import {
   bindingToStatus,
+  liveByRemoteSessionId,
   getLiveBindingByTrajectory,
   resolveLiveBinding,
   clearLiveBinding,

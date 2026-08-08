@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **修复重构回归——`liveByRemoteSessionId` 裸引用**：remote-session-service 拆分 state 后未导入该 Map（仅 re-export，不会引入模块作用域），BiB attach 时 ReferenceError → `[trajectory] BiB attach failed`。已在导入块补回。
+  影响范围：录制 attach（attachTrajectoryLive / stream attach）与 live 状态绑定。
+  文件：src/services/remote-session-service.js
+  Python 同步提示：无（JS 侧回归修复，协议不变）。
+
 - 2026-08-08: **拆分 cdp/remote-bridge.js 为包**：`src/cdp/remote-bridge/` 下拆出 `state.js`（共享可变状态 `bridge` 对象 + 常量 + `getRemoteStatus` / `broadcastStatus` / `broadcastInspect` / `pushAgentEvent`）、`screencast.js`（startScreencast/restartScreencast/onScreencastFrame/stall watchdog/viewport override）、`cdp-input.js`（handleAck/flushFillRecord/handleInput/handleViewport）、`ws-router.js`（ensureWsHook WS 路由 + BiB target 解析 `resolveBibTarget`）；`index.js` 保留全部 10 个公开导出与模块状态，`src/cdp/remote-bridge.js` 改为 10 名字的 re-export shim（同一函数身份），消费者导入路径零变化。`wsHooked` 注册语义与 `ensureWsHook` 调用时机不变（`attachLive` 以参数注入 ws-router 避免 import 环）。全部函数逐字比对一致（仅 `bridge.` 前缀改写与 shorthand→显式属性等价变换），无逻辑变更。
   影响范围：BiB 远程桥（CDP screencast/input、remote:* WS、resolveBibTarget、resolveElementByLabelText）语义不变。
   文件：src/cdp/remote-bridge.js, src/cdp/remote-bridge/{index,state,screencast,cdp-input,ws-router}.js
