@@ -16,9 +16,9 @@ import {
   clearStaleTrajectoryRuntime,
   getTrajectoryRuntime,
 } from '../trajectory-runtime.js';
-import { runDefaultLogin } from '../trajectory-record-lifecycle.js';
+import { runDefaultLogin } from './trajectory-record-lifecycle.js';
 import { USE_EXECUTOR } from '../../../config/config.js';
-import { attachTrajectoryLive } from '../trajectory-attach-service.js';
+import { attachTrajectoryLive } from './trajectory-attach-service.js';
 
 export async function prepareTrajectoryRecordingUnlocked(tid) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);

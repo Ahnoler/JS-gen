@@ -3,7 +3,7 @@
  * Registered BEFORE /api/v2/trajectories/:id so "batch" is not captured as id.
  */
 import { uploadXlsxSingle, multerHttpStatus, XLSX_MIME } from '../../http/upload-xlsx.js';
-import * as batchService from '../../services/trajectory-batch-service.js';
+import * as batchService from '../../services/trajectory/trajectory-batch-service.js';
 import { BATCH_JOB_TERMINAL } from '../../models/constants.js';
 
 function sendErr(res, err, fallback = 500) {

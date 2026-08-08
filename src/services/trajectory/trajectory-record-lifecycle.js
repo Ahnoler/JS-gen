@@ -2,24 +2,24 @@
  * AI / manual recording lifecycle: start, stop, toggle, resolve, default login.
  */
 import { randomUUID } from 'crypto';
-import * as trajectoryDao from '../dao/trajectory-dao.js';
-import * as systemDao from '../dao/system-dao.js';
-import * as execSession from '../executor-session-client.js';
-import { state } from '../state.js';
-import { USE_EXECUTOR } from '../../config/config.js';
-import * as remoteBridge from '../cdp/remote-bridge.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as systemDao from '../../dao/system-dao.js';
+import * as execSession from '../../executor-session-client.js';
+import { state } from '../../state.js';
+import { USE_EXECUTOR } from '../../../config/config.js';
+import * as remoteBridge from '../../cdp/remote-bridge.js';
 import {
   buildLoginInstruction,
   resolveTrajectoryAccount,
-} from './trajectory-account-service.js';
-import { getTrajectoryTree } from './trajectory-query-service.js';
+} from '../trajectory-account-service.js';
+import { getTrajectoryTree } from '../trajectory-query-service.js';
 import {
   getTrajectoryRuntime,
   markConsumedActionLog,
-} from './trajectory-runtime.js';
+} from '../trajectory-runtime.js';
 
-export { startTrajectoryRecording } from './trajectory/trajectory-recording-runner.js';
-export { toggleTrajectoryManualRecord } from './trajectory/trajectory-manual-record.js';
+export { startTrajectoryRecording } from './trajectory-recording-runner.js';
+export { toggleTrajectoryManualRecord } from './trajectory-manual-record.js';
 
 /**
  * Terminology (do not conflate):
@@ -64,13 +64,13 @@ export async function prepareCaseDataInjection(trajectoryId) {
   }
   try {
     const { loadFlatDictByTrajectory, replaceEntriesForTrajectory } =
-      await import('../dao/case-data-dao.js');
+      await import('../../dao/case-data-dao.js');
     const {
       extractCaseEntriesFromRequirement,
       extractCaseDataBlock,
     } = await import('./trajectory-meta-service.js');
 
-    const trajDao = await import('../dao/trajectory-dao.js');
+    const trajDao = await import('../../dao/trajectory-dao.js');
     const traj = await trajDao.getById(tid);
     const taskText = traj?.task || '';
     const caseDataBlock = extractCaseDataBlock(taskText) || '';
@@ -84,7 +84,7 @@ export async function prepareCaseDataInjection(trajectoryId) {
           console.warn('[record] case-data fallback persist skipped:', err?.message || err);
         });
         try {
-          const { ingestCaseEntriesAsFacts } = await import('../memory/memory-service.js');
+          const { ingestCaseEntriesAsFacts } = await import('../../memory/memory-service.js');
           await ingestCaseEntriesAsFacts(tid, entries);
         } catch (err) {
           console.warn('[record] case-data fallback fact ingest skipped:', err?.message || err);
@@ -149,7 +149,7 @@ export async function runDefaultLogin(runtime, account, system = null) {
       session.activePhaseId = null;
     }
     try {
-      const { broadcastWatcherStatus } = await import('../routes/browser-session/broadcasts.js');
+      const { broadcastWatcherStatus } = await import('../../routes/browser-session/broadcasts.js');
       broadcastWatcherStatus();
     } catch {}
   }

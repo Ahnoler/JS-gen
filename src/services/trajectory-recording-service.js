@@ -16,7 +16,7 @@ export {
   detachTrajectoryStream,
   bindTrajectoryManualPersist,
   cleanupPersistedTrajectoryResources,
-} from './trajectory-attach-service.js';
+} from './trajectory/trajectory-attach-service.js';
 
 export {
   startTrajectoryRecording,
@@ -25,10 +25,10 @@ export {
   resolveTrajectoryElement,
   toggleTrajectoryManualRecord,
   runDefaultLogin,
-} from './trajectory-record-lifecycle.js';
+} from './trajectory/trajectory-record-lifecycle.js';
 
 export {
   replayTrajectorySteps,
   acceptTrajectoryStepsReplay,
   stopTrajectoryStepsReplay,
-} from './trajectory-session-replay.js';
+} from './trajectory/trajectory-session-replay.js';

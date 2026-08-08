@@ -1,6 +1,6 @@
 import { broadcast } from '../../ws-server.js';
 import { appendRecordedStep } from '../../services/trajectory-service.js';
-import { removeRecordedStepsByDbIds } from '../../services/trajectory-persist-service.js';
+import { removeRecordedStepsByDbIds } from '../../services/trajectory/trajectory-persist-service.js';
 import * as screenshotService from '../../services/screenshot-service.js';
 
 const PENDING_SHOT_TTL_MS = 2 * 60 * 1000;

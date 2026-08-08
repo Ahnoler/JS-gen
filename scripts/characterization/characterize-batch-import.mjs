@@ -13,7 +13,7 @@ import {
   BATCH_EXCEL_HEADERS,
   sampleTemplateRows,
 } from '../../src/services/trajectory-batch-excel.js';
-import { buildRequestHash } from '../../src/services/trajectory-batch-service.js';
+import { buildRequestHash } from '../../src/services/trajectory/trajectory-batch-service.js';
 import {
   BATCH_JOB_MODES,
   BATCH_JOB_STATUSES,
@@ -178,24 +178,32 @@ function testConstantsAndTerminal() {
 
 function testDraftPumpReclaimsAnalyzed() {
   const here = dirname(fileURLToPath(import.meta.url));
-  const src = readFileSync(
-    join(here, '../../src/services/trajectory-batch-service.js'),
+  const serviceSrc = readFileSync(
+    join(here, '../../src/services/trajectory/trajectory-batch-service.js'),
     'utf8',
   );
-  assert.match(src, /async function pumpDraft\(/, 'pumpDraft defined');
-  assert.match(src, /pumpDraft\(\)\.catch/, 'kickScheduler invokes pumpDraft');
+  const analyzeSrc = readFileSync(
+    join(here, '../../src/services/trajectory/batch-analyze.js'),
+    'utf8',
+  );
+  const recordSrc = readFileSync(
+    join(here, '../../src/services/trajectory/batch-record.js'),
+    'utf8',
+  );
+  assert.match(analyzeSrc, /async function pumpDraft\(/, 'pumpDraft defined');
+  assert.match(serviceSrc, /pumpDraft\(\)\.catch/, 'kickScheduler invokes pumpDraft');
   assert.match(
-    src,
+    analyzeSrc,
     /async function pumpDraft\(\)[\s\S]*?statuses:\s*\['analyzed'\]/,
     'pumpDraft claims analyzed orphans',
   );
   assert.match(
-    src,
+    recordSrc,
     /async function pumpRecord\(\)[\s\S]*?statuses:\s*\['queued',\s*'waiting_executor'\]/,
     'pumpRecord claims queued/waiting_executor only',
   );
   assert.match(
-    src,
+    recordSrc,
     /async function pumpRecord\(\)[\s\S]*?jobModes:\s*\['record'\]/,
     'pumpRecord scoped to record jobs only',
   );

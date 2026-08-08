@@ -40,7 +40,7 @@ export {
   resolvePhaseIdForPersist,
   appendRecordedStep,
   appendRecordedFormSnapshot,
-} from './trajectory-persist-service.js';
+} from './trajectory/trajectory-persist-service.js';
 
 export {
   upsertPhaseDescription,
@@ -58,7 +58,7 @@ export {
   extractCaseDataBlock,
   extractCaseEntriesFromRequirement,
   confirmTrajectory,
-} from './trajectory-meta-service.js';
+} from './trajectory/trajectory-meta-service.js';
 
 export {
   getTrajectoryRuntime,

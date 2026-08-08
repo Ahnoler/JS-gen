@@ -19,16 +19,16 @@ import { getTrajectoryTree } from '../trajectory-query-service.js';
 import {
   runDefaultLogin,
   prepareCaseDataInjection,
-} from '../trajectory-record-lifecycle.js';
+} from './trajectory-record-lifecycle.js';
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
-  const mod = await import('../trajectory-persist-service.js');
+  const mod = await import('./trajectory-persist-service.js');
   return mod.appendRecordedStep(...args);
 }
 
 async function removeRecordedStepsByDbIds(...args) {
-  const mod = await import('../trajectory-persist-service.js');
+  const mod = await import('./trajectory-persist-service.js');
   return mod.removeRecordedStepsByDbIds(...args);
 }
 
@@ -215,7 +215,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       const {
         phaseNeedsBusinessData,
         stripBusinessDataBlock,
-      } = await import('../trajectory-meta-service.js');
+      } = await import('./trajectory-meta-service.js');
       const CASE_BLOCK_MARK = '【业务数据';
       const CASE_BLOCK_MARK_LEGACY = '【业务场景案例数据';
       const caseBlockSuffix = caseDataBlock

@@ -8,15 +8,15 @@
  * - Type B: save_form_snapshot checkpoint → verifyFormStructure → delete missing /
  *   AI-fill adding + structured insert (confirmed=0, next batch) — healType=form_structure
  */
-import { getDB } from '../../config/database.js';
-import * as execSession from '../executor-session-client.js';
-import * as formSnapshotDao from '../dao/form-snapshot-dao.js';
-import { state } from '../state.js';
-import { broadcast } from '../ws-server.js';
+import { getDB } from '../../../config/database.js';
+import * as execSession from '../../executor-session-client.js';
+import * as formSnapshotDao from '../../dao/form-snapshot-dao.js';
+import { state } from '../../state.js';
+import { broadcast } from '../../ws-server.js';
 import {
   getTrajectoryRuntime,
-} from './trajectory-runtime.js';
-import { runReplayBatch } from './trajectory/replay-batch-runner.js';
+} from '../trajectory-runtime.js';
+import { runReplayBatch } from './replay-batch-runner.js';
 
 function fromDbRowCompat(row) {
   if (!row) return null;
@@ -182,7 +182,7 @@ async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true 
     throw err;
   }
 
-  const { trajectoryStepToActionEntry } = await import('../models/element.js');
+  const { trajectoryStepToActionEntry } = await import('../../models/element.js');
   const actions = rows.map((r) => {
     const step = fromDbRowCompat(r);
     const entry = trajectoryStepToActionEntry(step);

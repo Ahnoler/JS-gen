@@ -2,26 +2,26 @@
  * Trajectory shell / transaction meta: create empty, create with phases, LLM analyze, confirm.
  */
 import { randomUUID } from 'crypto';
-import * as trajectoryDao from '../dao/trajectory-dao.js';
-import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
-import * as systemDao from '../dao/system-dao.js';
-import * as caseDataDao from '../dao/case-data-dao.js';
-import { callLLM } from '../llm-utils.js';
-import { getDB } from '../../config/database.js';
-import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
+import * as systemDao from '../../dao/system-dao.js';
+import * as caseDataDao from '../../dao/case-data-dao.js';
+import { callLLM } from '../../llm-utils.js';
+import { getDB } from '../../../config/database.js';
+import { getTrajectoryTree, getTrajectoryWithPhases } from '../trajectory-query-service.js';
 import {
   CASE_DATA_SECTION_RE,
   extractCaseDataBlock,
   extractCaseEntriesFromRequirement,
   appendCaseDataToPhases,
-} from './trajectory/trajectory-text-extract.js';
+} from './trajectory-text-extract.js';
 
 export {
   stripBusinessDataBlock,
   phaseNeedsBusinessData,
   extractCaseDataBlock,
   extractCaseEntriesFromRequirement,
-} from './trajectory/trajectory-text-extract.js';
+} from './trajectory-text-extract.js';
 
 function parseAnalyzePayload(raw) {
   const text = String(raw || '').trim();
@@ -238,7 +238,7 @@ export async function createTransactionWithPhases({
 
     let systemId = null;
     try {
-      const { resolveAncestorSystemId } = await import('./hierarchy-service.js');
+      const { resolveAncestorSystemId } = await import('../hierarchy-service.js');
       systemId = await resolveAncestorSystemId(resolvedFunctionId);
     } catch {
       systemId = null;
@@ -248,7 +248,7 @@ export async function createTransactionWithPhases({
       let candidates = null;
       if (systemId) {
         try {
-          const { fetchDisplayCandidatesForDescription } = await import('./special-element-service.js');
+          const { fetchDisplayCandidatesForDescription } = await import('../special-element-service.js');
           candidates = await fetchDisplayCandidatesForDescription(systemId, parsed[i], 3);
         } catch {
           candidates = [];
@@ -273,7 +273,7 @@ export async function createTransactionWithPhases({
     // 独立连接摄取（不参与本事务原子性），失败仅告警不阻塞创建。
     if (Array.isArray(rawEntries) && rawEntries.length) {
       try {
-        const { ingestCaseEntriesAsFacts } = await import('../memory/memory-service.js');
+        const { ingestCaseEntriesAsFacts } = await import('../../memory/memory-service.js');
         await ingestCaseEntriesAsFacts(trajId, rawEntries);
       } catch (err) {
         console.warn('[trajectory] case-entry fact ingest skipped:', err?.message || err);
@@ -316,7 +316,7 @@ export async function setTrajectoryCaseEntries(trajectoryId, entries) {
   await caseDataDao.replaceEntriesForTrajectory(tid, entries);
   // P1：同步摄取为 authoritative 事实（事实包注入用）
   try {
-    const { ingestCaseEntriesAsFacts } = await import('../memory/memory-service.js');
+    const { ingestCaseEntriesAsFacts } = await import('../../memory/memory-service.js');
     await ingestCaseEntriesAsFacts(tid, entries);
   } catch (err) {
     console.warn('[trajectory] case-entry fact ingest skipped:', err?.message || err);

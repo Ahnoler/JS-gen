@@ -3,19 +3,19 @@
  */
 import { randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
-import * as trajectoryDao from '../dao/trajectory-dao.js';
-import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
-import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
-import * as systemDao from '../dao/system-dao.js';
-import { getDB } from '../../config/database.js';
-import { stepFromActionLog } from '../models/helpers.js';
-import { touchTrajectoryRuntimeActivity } from './trajectory-runtime.js';
-import { refreshTrajectoryCounts } from './trajectory-step-service.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
+import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
+import * as systemDao from '../../dao/system-dao.js';
+import { getDB } from '../../../config/database.js';
+import { stepFromActionLog } from '../../models/helpers.js';
+import { touchTrajectoryRuntimeActivity } from '../trajectory-runtime.js';
+import { refreshTrajectoryCounts } from '../trajectory-step-service.js';
 
 export {
   appendRecordedStep,
   appendRecordedFormSnapshot,
-} from './trajectory/form-snapshot-append.js';
+} from './form-snapshot-append.js';
 
 /**
  * Build trajectory_step rows from action_{ts}.json commands.

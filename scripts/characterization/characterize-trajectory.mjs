@@ -82,13 +82,13 @@ function testFacadeSurface() {
 }
 
 async function testFocusedModules() {
-  const persist = await import('../../src/services/trajectory-persist-service.js');
+  const persist = await import('../../src/services/trajectory/trajectory-persist-service.js');
   const phase = await import('../../src/services/trajectory-phase-service.js');
-  const meta = await import('../../src/services/trajectory-meta-service.js');
+  const meta = await import('../../src/services/trajectory/trajectory-meta-service.js');
   const recording = await import('../../src/services/trajectory-recording-service.js');
-  const lifecycle = await import('../../src/services/trajectory-record-lifecycle.js');
+  const lifecycle = await import('../../src/services/trajectory/trajectory-record-lifecycle.js');
   const runtime = await import('../../src/services/trajectory-runtime.js');
-  const attach = await import('../../src/services/trajectory-attach-service.js');
+  const attach = await import('../../src/services/trajectory/trajectory-attach-service.js');
   for (const name of [
     'buildStepsFromActionFile',
     'buildStepsFromFlow',

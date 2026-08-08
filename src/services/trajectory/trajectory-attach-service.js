@@ -3,21 +3,21 @@
  * Lifecycle is 1:1 trajectory ↔ remote_session ↔ agent session.
  */
 import { randomUUID } from 'crypto';
-import * as trajectoryDao from '../dao/trajectory-dao.js';
-import * as remoteSessionDao from '../dao/remote-session-dao.js';
-import * as execSession from '../executor-session-client.js';
-import * as slotLease from '../executor-slot-lease.js';
-import * as remoteSessionService from './remote-session-service.js';
-import { state } from '../state.js';
-import { broadcast } from '../ws-server.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as remoteSessionDao from '../../dao/remote-session-dao.js';
+import * as execSession from '../../executor-session-client.js';
+import * as slotLease from '../../executor-slot-lease.js';
+import * as remoteSessionService from '../remote-session-service.js';
+import { state } from '../../state.js';
+import { broadcast } from '../../ws-server.js';
 import {
   clearStaleTrajectoryRuntime,
   deleteTrajectoryRuntime,
   getTrajectoryRuntime,
   registerTrajectorySession,
-} from './trajectory-runtime.js';
-import { resolveModelId } from '../runtime/resolve-model.js';
-import { prepareTrajectoryRecordingUnlocked } from './trajectory/trajectory-attach-runner.js';
+} from '../trajectory-runtime.js';
+import { resolveModelId } from '../../runtime/resolve-model.js';
+import { prepareTrajectoryRecordingUnlocked } from './trajectory-attach-runner.js';
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
@@ -141,7 +141,7 @@ export async function attachTrajectoryLive(trajectoryId) {
   await remoteSessionService.supersedeStaleForTrajectory(tid).catch(() => {});
 
   try {
-    const live = (await import('../executor-registry.js')).list().filter((n) => n.connected);
+    const live = (await import('../../executor-registry.js')).list().filter((n) => n.connected);
     await Promise.all(
       live.map((n) => execSession.reconcileLeasesWithExecutor(n.nodeUuid).catch(() => {})),
     );

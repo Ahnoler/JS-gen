@@ -5,7 +5,7 @@
 import { randomUUID } from 'crypto';
 import '../../config/config.js';
 import { getDB, closeDB } from '../../config/database.js';
-import { appendRecordedStep } from '../../src/services/trajectory-persist-service.js';
+import { appendRecordedStep } from '../../src/services/trajectory/trajectory-persist-service.js';
 import * as systemDao from '../../src/dao/system-dao.js';
 
 const ACTION_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';

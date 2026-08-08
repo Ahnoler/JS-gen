@@ -11,13 +11,13 @@ import {
 } from '../../../config/config.js';
 import { getDB } from '../../../config/database.js';
 import * as batchDao from '../../dao/batch-recording-dao.js';
-import { analyzeRequirementToPhases, createTransactionWithPhases } from '../trajectory-meta-service.js';
+import { analyzeRequirementToPhases, createTransactionWithPhases } from './trajectory-meta-service.js';
 import {
   cancelledAnalyzeTokens,
   emitProgress,
   maybeFinalizeJob,
   kickScheduler,
-} from '../trajectory-batch-service.js';
+} from './trajectory-batch-service.js';
 
 let analyzeWorkers = 0;
 let draftWorkers = 0;

@@ -7,20 +7,20 @@ import {
   USE_EXECUTOR,
   BATCH_SCHEDULER_INTERVAL_MS,
   BATCH_IMPORT_MAX_ROWS,
-} from '../../config/config.js';
-import * as batchDao from '../dao/batch-recording-dao.js';
-import * as trajectoryDao from '../dao/trajectory-dao.js';
-import { broadcast } from '../ws-server.js';
-import { validateFunctionAndAccount } from './trajectory-account-service.js';
-import { parseBatchExcelBuffer, buildTemplateBuffer } from './trajectory-batch-excel.js';
+} from '../../../config/config.js';
+import * as batchDao from '../../dao/batch-recording-dao.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import { broadcast } from '../../ws-server.js';
+import { validateFunctionAndAccount } from '../trajectory-account-service.js';
+import { parseBatchExcelBuffer, buildTemplateBuffer } from '../trajectory-batch-excel.js';
 import {
   stopTrajectoryRecordingSafe,
   detachTrajectoryLive,
   cleanupPersistedTrajectoryResources,
-} from './trajectory-recording-service.js';
-import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../models/constants.js';
-import { pumpAnalyze, pumpDraft } from './trajectory/batch-analyze.js';
-import { pumpRecord } from './trajectory/batch-record.js';
+} from '../trajectory-recording-service.js';
+import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../../models/constants.js';
+import { pumpAnalyze, pumpDraft } from './batch-analyze.js';
+import { pumpRecord } from './batch-record.js';
 
 /** @type {Set<string>} in-flight cancel tokens for analyzing items */
 export const cancelledAnalyzeTokens = new Set();

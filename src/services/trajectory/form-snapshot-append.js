@@ -11,7 +11,7 @@ import { getDB } from '../../../config/database.js';
 import { stepFromActionLog } from '../../models/helpers.js';
 import { touchTrajectoryRuntimeActivity } from '../trajectory-runtime.js';
 import { refreshTrajectoryCounts } from '../trajectory-step-service.js';
-import { resolvePhaseIdForPersist } from '../trajectory-persist-service.js';
+import { resolvePhaseIdForPersist } from './trajectory-persist-service.js';
 
 /**
  * Append a single recorded action (CDP/manual/agent) to an existing trajectory immediately.

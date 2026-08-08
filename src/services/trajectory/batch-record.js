@@ -19,7 +19,7 @@ import {
   emitProgress,
   maybeFinalizeJob,
   kickScheduler,
-} from '../trajectory-batch-service.js';
+} from './trajectory-batch-service.js';
 
 let recordWorkers = 0;
 

@@ -39,15 +39,17 @@ assert(/export async function updateFields/.test(dao), 'DAO updateFields');
 assert(/export async function findForDedupe/.test(dao), 'DAO findForDedupe');
 assert(/triggerStepId/.test(dao), 'DAO persists triggerStepId');
 
-const persist = readFileSync(path.join(root, 'src/services/trajectory-persist-service.js'), 'utf-8');
+const persist = readFileSync(path.join(root, 'src/services/trajectory/trajectory-persist-service.js'), 'utf-8');
 assert(/appendRecordedFormSnapshot/.test(persist), 'persist appendRecordedFormSnapshot');
-assert(/save_form_snapshot/.test(persist), 'persist special-cases save_form_snapshot');
+const fsa = readFileSync(path.join(root, 'src/services/trajectory/form-snapshot-append.js'), 'utf-8');
+assert(/save_form_snapshot/.test(fsa), 'persist special-cases save_form_snapshot');
 
-const replay = readFileSync(path.join(root, 'src/services/trajectory-session-replay.js'), 'utf-8');
+const replay = readFileSync(path.join(root, 'src/services/trajectory/trajectory-session-replay.js'), 'utf-8');
 assert(/healType: 'form_structure'/.test(replay) || /healType: \"form_structure\"/.test(replay)
   || /form_structure/.test(replay), 'replay has form_structure heal');
 assert(/replay:form_structure/.test(replay), 'emits replay:form_structure');
-assert(/insertStepsAfter/.test(replay), 'Type B uses insertStepsAfter');
+const fsh = readFileSync(path.join(root, 'src/services/trajectory/form-structure-heal.js'), 'utf-8');
+assert(/insertStepsAfter/.test(fsh), 'Type B uses insertStepsAfter');
 
 const formPy = readFileSync(path.join(root, 'scripts/actions/_form.py'), 'utf-8');
 assert(/emit_checkpoint/.test(formPy), 'Python _save_form_snapshot has emit_checkpoint');
