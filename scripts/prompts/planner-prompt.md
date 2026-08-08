@@ -43,10 +43,10 @@ If `get_page_state` returns `formErrors: []` after the Agent's last action (and 
 A dialog has closed. Advise the Agent to check whether the target fields were backfilled (`check_field_value`). If backfilled, **`click_save()`** immediately — **do NOT reopen the dialog**.
 
 ### Signal 3: get_pending_tasks returns pending=[]
-All fillable fields are done. The Agent should **`click_save()`** immediately — do not scan or check again; do not advise index-click on 保存.
+All fillable fields are done (`pending: []`). **If the Agent used `run_form_assistant`, verify it handled `needs_agent` and performed final check before advising `click_save()`.** Only after final check passes (or if the assistant was not used), advise **`click_save()`** — do not scan or re-check fields unnecessarily; do not advise index-click on 保存.
 
 ### Signal 4: Agent plan contradicts page state
-If the Agent's next_goal mentions "open import dialog" / disabled field with adjacent button, check whether the task lists special element candidates — advise `use_special_element` or `click_adjacent_button` as appropriate. If `pending=[]` AND `formErrors=[]`, advise **`click_save()`**.
+If the Agent's next_goal mentions "open import dialog" / disabled field with adjacent button, check whether the task lists special element candidates — advise `use_special_element` or `click_adjacent_button` as appropriate. If `pending=[]` AND `formErrors=[]`, advise **`click_save()`** only after final check — especially if `run_form_assistant` was used, confirm `needs_agent` was handled first.
 
 ### Signal 5: Same action repeated 3+ times
 If the Agent repeatedly clicks the same button (e.g. "Import", "Confirm") with no material change in page state, it is stuck in a loop. Advise the Agent to change strategy or save directly.
@@ -58,6 +58,7 @@ These terms may appear in the Agent's trajectory. Use them to understand what th
 | Term | Meaning |
 |------|---------|
 | `run_form_assistant` | Batch-scans and auto-fills editable fields — only when phase contract `allow_form_assistant=true`; never on navigate/query |
+| `needs_agent` | Fields the assistant skipped (`{label, reason}` from `run_form_assistant` return) — Agent must fill these manually, then final-check, before `click_save` |
 | `scan_form_fields` | Scans all form fields and builds task list only — does NOT auto-fill; returns filled/pending |
 | `get_pending_tasks` | Returns `{pending: [...]}` — remaining form fields only (completed omitted) |
 | `sync_tasks_from_errors` | Reads page validation errors, adds them to the pending list |

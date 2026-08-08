@@ -77,6 +77,24 @@ def test_special_prompt_deleted() -> None:
     )
 
 
+def test_planner_synced_with_final_check() -> None:
+    p = (ROOT / "scripts/prompts/planner-prompt.md").read_text(encoding="utf-8")
+    assert_true(
+        "终检" in p or "最终检查" in p or "final check" in p.lower(),
+        "planner mentions final check",
+    )
+    assert_true("needs_agent" in p, "planner documents needs_agent")
+    signal3 = p.split("### Signal 3:")[1].split("### Signal 4:")[0]
+    assert_true(
+        "终检" in signal3 or "最终检查" in signal3 or "final check" in signal3.lower(),
+        "signal 3 mentions final check",
+    )
+    assert_true(
+        "immediately" not in signal3.lower(),
+        "signal 3 no bare immediate click_save after pending empty",
+    )
+
+
 def test_session_runner_uses_contract_assembly() -> None:
     src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
     assert_true("build_agent_system_message" in src, "session_runner imports assembler")
@@ -95,6 +113,7 @@ def main() -> int:
     test_introduce_pick_includes_full_form()
     test_agent_prompt_shim_is_full_assembly()
     test_special_prompt_deleted()
+    test_planner_synced_with_final_check()
     test_session_runner_uses_contract_assembly()
     print("characterize-agent-prompt-packs: OK")
     return 0
