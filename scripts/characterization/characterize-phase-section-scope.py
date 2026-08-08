@@ -9,12 +9,15 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.agent_utils import build_agent_system_message  # noqa: E402
 from scripts.actions._section_scope import (  # noqa: E402
     section_matches,
     pending_by_section,
     filter_pending_labels,
     requires_section_declaration,
+    unique_button_section,
 )
+from scripts.actions._form import _submit_ready_hint  # noqa: E402
 from scripts.models.task import TaskItem, TaskList  # noqa: E402
 
 
@@ -131,7 +134,8 @@ def test_submit_hint_section_scoped() -> None:
     store = {"task_list": tl.to_store()}
     assert_true(_submit_ready_hint(store) == "", "global still has pending")
     cue = _submit_ready_hint(store, section="系统评级结论")
-    assert_true("click_save()" in cue, "empty section-local pending gets save cue")
+    assert_true("click_save" in cue, "empty section-local pending gets save cue")
+    assert_true("section=" in cue or "section='" in cue, "scoped cue includes section=")
 
 
 def test_run_form_assistant_section_signature() -> None:
@@ -154,9 +158,109 @@ def test_run_form_assistant_autofill_section_filter() -> None:
 
 
 def test_prompt_section_scope() -> None:
-    prompt = (ROOT / "scripts/prompts/agent-prompt.md").read_text(encoding="utf-8")
+    prompt = build_agent_system_message(None)
     assert_true("err-section-required" in prompt, "prompt documents err-section-required")
     assert_true("section=" in prompt or "section='" in prompt, "prompt steers section=")
+    assert_true(
+        "唯一" in prompt,
+        "prompt mentions unique-save auto section behavior",
+    )
+
+
+def test_unique_button_section() -> None:
+    assert_true(
+        unique_button_section(
+            [{"label": "保存", "section_id": "系统评级结论", "section_title": "系统评级结论"}],
+            "保存",
+        )
+        == "系统评级结论",
+        "single save → that section",
+    )
+    assert_true(
+        unique_button_section(
+            [
+                {"label": "保存", "section_id": "系统评级结论", "section_title": "系统评级结论"},
+                {"label": "保存", "section_id": "客户综合评价", "section_title": "客户综合评价"},
+            ],
+            "保存",
+        )
+        is None,
+        "two saves → no auto section",
+    )
+    assert_true(
+        unique_button_section(
+            [{"label": "暂存", "section_id": "评级等级测算", "section_title": "评级等级测算"}],
+            "保存",
+        )
+        is None,
+        "no matching save button",
+    )
+
+
+def test_submit_hint_includes_unique_save_section() -> None:
+    tl = TaskList(pending=[], done=[TaskItem(label="理由说明", kind="input")])
+    store = {
+        "task_list": tl.to_store(),
+        "_scan_buttons": [
+            {"label": "保存", "section_id": "系统评级结论", "section_title": "系统评级结论"},
+        ],
+    }
+    cue = _submit_ready_hint(store)
+    assert_true("section=" in cue or "section='" in cue, f"hint must include section: {cue}")
+    assert_true("系统评级结论" in cue, f"hint must name unique save section: {cue}")
+
+
+def test_click_save_auto_section_from_unique_button() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    assert_true("unique_button_section" in form, "click_save uses unique_button_section")
+    assert_true("auto section" in form or "auto_section" in form or "[click_save] auto" in form,
+                "logs or marks auto section bind")
+
+
+def test_force_refill_preserves_section_on_valued_fields() -> None:
+    """force_refill must keep scan section_* — else valued fields fake __root__ and
+    block click_save with err-section-required even when the phase only needs one block.
+    """
+    fields = [
+        {
+            "label": "此次评级建议等级",
+            "kind": "select",
+            "currentValue": "",
+            "section_id": "系统评级结论",
+            "section_title": "系统评级结论",
+            "xpath_smart": "//sel",
+        },
+        {
+            "label": "资产负债率",
+            "kind": "input",
+            "currentValue": "35%",
+            "section_id": "评级等级测算",
+            "section_title": "评级等级测算",
+            "xpath_smart": "//ratio",
+        },
+        {
+            "label": "综合评价",
+            "kind": "input",
+            "currentValue": "已有评价",
+            "section_id": "客户综合评价",
+            "section_title": "客户综合评价",
+            "xpath_smart": "//eval",
+        },
+    ]
+    tl = TaskList.from_scan(fields, force_refill=True)
+    by = pending_by_section(tl)
+    assert_true("__root__" not in by, f"valued force_refill must not invent __root__: {by}")
+    assert_true("评级等级测算" in by and "资产负债率" in by["评级等级测算"], f"got {by}")
+    assert_true("客户综合评价" in by and "综合评价" in by["客户综合评价"], f"got {by}")
+    ratio = next(i for i in tl.pending if i.label == "资产负债率")
+    assert_true(ratio.section_title == "评级等级测算", f"section_title={ratio.section_title!r}")
+    assert_true(ratio.section_id == "评级等级测算", f"section_id={ratio.section_id!r}")
+
+    # After writing the phase block, scoped gate must ignore other sections
+    item = next(i for i in tl.pending if i.label == "此次评级建议等级")
+    tl.mark_done("此次评级建议等级", value="未评级", xpath_smart=item.xpath_smart)
+    assert_true(filter_pending_labels(tl, "系统评级结论") == [], "scoped pending empty after fill")
+    assert_true(requires_section_declaration(tl), "other sections still pending → need section=")
 
 
 def main() -> int:
@@ -170,7 +274,11 @@ def main() -> int:
     test_submit_hint_section_scoped()
     test_run_form_assistant_section_signature()
     test_run_form_assistant_autofill_section_filter()
+    test_unique_button_section()
+    test_submit_hint_includes_unique_save_section()
+    test_click_save_auto_section_from_unique_button()
     test_prompt_section_scope()
+    test_force_refill_preserves_section_on_valued_fields()
     print("characterize-phase-section-scope: OK")
     return 0
 

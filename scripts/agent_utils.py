@@ -121,7 +121,7 @@ def build_agent_system_message(contract: dict | None = None) -> str:
 # Backward-compatible default: full assembly (all packs)
 OVERRIDE_SYSTEM_MESSAGE = build_agent_system_message(None)
 
-# Legacy shim file (Task 3 will convert to thin include chain)
+# Legacy shim file (thin include chain → full assembly via _resolve_directives)
 with open(_PROMPT_PATH, 'r', encoding='utf-8') as _f:
     _prompt_content = _resolve_directives(_f.read()).strip()
 

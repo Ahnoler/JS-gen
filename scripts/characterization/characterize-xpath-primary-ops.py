@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.actions._form import ResolvedControl, _resolve_control  # noqa: E402
+from scripts.agent_utils import build_agent_system_message  # noqa: E402
 from scripts.actions._llm_values import (  # noqa: E402
     _enrich_llm_actions_xpath,
     _llm_generate_values,
@@ -200,7 +201,7 @@ def test_phase_b_action_signatures() -> None:
 
 
 def test_agent_prompt_xpath_primary() -> None:
-    prompt = (ROOT / "scripts/prompts/agent-prompt.md").read_text(encoding="utf-8")
+    prompt = build_agent_system_message(None)
     assert_true("xpath_smart" in prompt, "prompt mentions xpath_smart")
     assert_true(
         "ambiguous-label" in prompt or "相对 xpath" in prompt,

@@ -10,7 +10,10 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.agent_utils import build_agent_system_message  # noqa: E402
+from scripts.agent_utils import (  # noqa: E402
+    _resolve_directives,
+    build_agent_system_message,
+)
 
 
 def assert_true(cond: bool, msg: str) -> None:
@@ -57,6 +60,23 @@ def test_introduce_pick_includes_full_form() -> None:
     assert_true("needs_agent" in intro, "introduce_pick gets needs_agent rules")
 
 
+def test_agent_prompt_shim_is_full_assembly() -> None:
+    raw = (ROOT / "scripts/prompts/agent-prompt.md").read_text(encoding="utf-8")
+    assert_true("agent-special-prompt" not in raw, "no special-prompt include in shim")
+    shim = _resolve_directives(raw).strip()
+    full = build_agent_system_message(None)
+    assert_true("run_form_assistant" in shim, "shim must include form assistant")
+    assert_true("select_tree_option" in shim, "shim must include tree")
+    assert_true(len(shim) >= len(full) * 0.9, "shim approximates full assembly")
+
+
+def test_special_prompt_deleted() -> None:
+    assert_true(
+        not (ROOT / "scripts/prompts/agent-special-prompt.md").exists(),
+        "special prompt deleted",
+    )
+
+
 def test_session_runner_uses_contract_assembly() -> None:
     src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
     assert_true("build_agent_system_message" in src, "session_runner imports assembler")
@@ -73,6 +93,8 @@ def main() -> int:
     test_navigate_shorter_than_full()
     test_no_special_prompt_references()
     test_introduce_pick_includes_full_form()
+    test_agent_prompt_shim_is_full_assembly()
+    test_special_prompt_deleted()
     test_session_runner_uses_contract_assembly()
     print("characterize-agent-prompt-packs: OK")
     return 0

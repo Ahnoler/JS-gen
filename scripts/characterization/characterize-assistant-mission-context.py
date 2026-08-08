@@ -14,6 +14,7 @@ from scripts.actions._llm_values import (  # noqa: E402
     format_assistant_human_message,
     parse_form_llm_response,
 )
+from scripts.agent_utils import build_agent_system_message  # noqa: E402
 
 
 def assert_true(cond: bool, msg: str) -> None:
@@ -127,7 +128,7 @@ def test_form_prompt_mission_first() -> None:
 
 
 def test_agent_prompt_final_check_and_hygiene() -> None:
-    p = (ROOT / "scripts/prompts/agent-prompt.md").read_text(encoding="utf-8")
+    p = build_agent_system_message({"mode": "create", "allow_form_assistant": True})
     assert_true("needs_agent" in p or "终检" in p or "最终检查" in p, "final check")
     assert_true(
         "草稿" in p or "不可默认" in p or "不默认" in p or "不可信" in p,
@@ -138,6 +139,10 @@ def test_agent_prompt_final_check_and_hygiene() -> None:
         and "完成后（pending≈0）：直接调用 click_save()" not in p,
         "obsolete direct click_save after assistant removed",
     )
+    # Tool blurb + submit rules stay aligned with final-check (polish)
+    assist_blurb = p.split("run_form_assistant(section='')", 1)[1][:500]
+    assert_true("needs_agent" in assist_blurb, "tool blurb documents needs_agent")
+    assert_true("终检" in p and "无意义重填" in p, "submit rules allow final-check fills")
 
 
 def main() -> int:
