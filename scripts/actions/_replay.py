@@ -978,7 +978,31 @@ _JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
     return '';
   };
   const node = findNode(xpath, null);
-  return node ? readControl(node) : '';
+  if (node) return readControl(node);
+  if (/el-dialog|el-message-box|el-drawer/.test(xpath) && /\[last\(\)\]/.test(xpath)) {
+    const wrapVisible = (d) => {
+      if (!d) return false;
+      const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+      if (wrap && getComputedStyle(wrap).display === 'none') return false;
+      return isVis(d) || (wrap && isVis(wrap));
+    };
+    const lastVisibleHost = (drawer) => {
+      const sel = drawer ? '.el-drawer' : '.el-dialog, .el-message-box';
+      const all = [...document.querySelectorAll(sel)];
+      for (let i = all.length - 1; i >= 0; i--) {
+        if (wrapVisible(all[i])) return all[i];
+      }
+      return null;
+    };
+    const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
+    const local = m && m[1] ? m[1] : '';
+    const dlg = /el-drawer/.test(xpath) ? lastVisibleHost(true) : lastVisibleHost(false);
+    if (dlg && local) {
+      const scoped = findNode('.//' + local, dlg);
+      if (scoped) return readControl(scoped);
+    }
+  }
+  return '';
 }'''
 
 
@@ -1072,30 +1096,62 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
     await _wait_if_loading(page)
 
     if action_name == 'fill_form_field':
-        if xpath_smart:
-            result = await page.evaluate(JS_FILL_BY_XPATH, [xpath_smart, value, placeholder or label])
-            if isinstance(result, str) and result.startswith('ok'):
+        ph = placeholder
+        params_xp = _params_xpath_smart(entry, params)
+
+        async def _try_xpath_fill(xpath: str, locate_src: str) -> str | None:
+            result = await page.evaluate(JS_FILL_BY_XPATH, [xpath, value, ph])
+            action_ok = isinstance(result, str) and result.startswith('ok')
+            read_xp = params_xp or xpath
+            actual = await _read_value_by_xpath(page, read_xp) if read_xp else ''
+            classified = _classify_fill_result(action_ok, value, actual)
+            if classified == 'ok':
                 await page.wait_for_timeout(300)
-                return str(result)
+                return f'ok:locate={locate_src}'
+            if classified.startswith('false_ok'):
+                await page.wait_for_timeout(300)
+                return classified
+            return None
+
+        xp, src = _resolve_replay_xpath(entry, params)
+        if xp:
+            xpath_result = await _try_xpath_fill(xp, src)
+            if xpath_result:
+                return xpath_result
+
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
         if isinstance(result, str) and result.startswith('ok'):
             await page.wait_for_timeout(300)
+            if params_xp:
+                actual = await _read_value_by_xpath(page, params_xp)
+                classified = _classify_fill_result(True, value, actual)
+                if classified.startswith('false_ok'):
+                    return classified
+                if classified == 'ok':
+                    return 'ok:locate=label'
             return _annotate_label_result(str(result))
         if placeholder and placeholder != label:
             result = await page.evaluate(JS_FILL_FORM_FIELD, [placeholder, value])
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(300)
+                if params_xp:
+                    actual = await _read_value_by_xpath(page, params_xp)
+                    classified = _classify_fill_result(True, value, actual)
+                    if classified.startswith('false_ok'):
+                        return classified
+                    if classified == 'ok':
+                        return 'ok:locate=label'
                 return _annotate_label_result(str(result))
         if not label and placeholder:
             result = await page.evaluate(JS_FILL_BY_XPATH, ['', value, placeholder])
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(300)
                 return str(result)
-        if xpath_full:
-            result = await page.evaluate(JS_FILL_BY_XPATH, [xpath_full, value, placeholder or label])
-            if isinstance(result, str) and result.startswith('ok'):
-                await page.wait_for_timeout(300)
-                return 'ok-xpath-full'
+        xpath_full = _element_xpath_full(entry) if use_relative else ''
+        if xpath_full and xpath_full != xp:
+            xpath_result = await _try_xpath_fill(xpath_full, 'full')
+            if xpath_result:
+                return xpath_result
         return _annotate_label_result(str(result))
 
     # Widget ops: prefer confirming xpath_smart host, then label JS, then xpath_full confirm.

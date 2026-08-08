@@ -41,10 +41,19 @@ def test_norm_replay_value_strips_spaces() -> None:
     assert R._norm_replay_value("45 . 50") == "45.50"
 
 
+def test_replay_fill_does_not_pass_label_as_placeholder_hint() -> None:
+    src = (ROOT / "scripts/actions/_replay.py").read_text(encoding="utf-8")
+    fill_block = src.split("if action_name == 'fill_form_field'")[1].split(
+        "if action_name == 'fill_date_field'"
+    )[0]
+    assert "placeholder or label" not in fill_block
+
+
 def main() -> int:
     test_resolve_prefers_params()
     test_classify_false_ok()
     test_norm_replay_value_strips_spaces()
+    test_replay_fill_does_not_pass_label_as_placeholder_hint()
     print("characterize-replay-params-xpath: OK")
     return 0
 
