@@ -42,7 +42,7 @@ def test_norm_replay_value_strips_spaces() -> None:
 
 
 def test_replay_fill_does_not_pass_label_as_placeholder_hint() -> None:
-    src = (ROOT / "scripts/actions/_replay.py").read_text(encoding="utf-8")
+    src = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
     fill_block = src.split("if action_name == 'fill_form_field'")[1].split(
         "if action_name == 'fill_date_field'"
     )[0]

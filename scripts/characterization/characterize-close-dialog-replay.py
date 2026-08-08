@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-replay = (ROOT / "scripts/actions/_replay.py").read_text(encoding="utf-8")
+replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
 
 
 def assert_true(cond: bool, msg: str) -> None:

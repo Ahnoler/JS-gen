@@ -28,7 +28,13 @@ def test_models_section() -> None:
 
 
 def test_js_scan_section_and_source_b_kinds() -> None:
-    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    js = (
+        (ROOT / "scripts/controller/actions/_js_snippets.py").read_text(encoding="utf-8")
+        + "".join(
+            p.read_text(encoding="utf-8")
+            for p in sorted((ROOT / "scripts/controller/actions/js_snippets").glob("*.py"))
+        )
+    )
     assert_true("sectionOf" in js or "SECTION_ATTACH" in js, "section attach helper")
     assert_true("SCAN_SOURCE_C_BUTTONS" in js, "buttons source marker")
     # Source B must collect radio groups (not only skip input[type=radio])
@@ -36,9 +42,15 @@ def test_js_scan_section_and_source_b_kinds() -> None:
 
 
 def test_click_save_section_api() -> None:
-    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    js = (
+        (ROOT / "scripts/controller/actions/_js_snippets.py").read_text(encoding="utf-8")
+        + "".join(
+            p.read_text(encoding="utf-8")
+            for p in sorted((ROOT / "scripts/controller/actions/js_snippets").glob("*.py"))
+        )
+    )
     assert_true("ambiguous" in js or "candidates" in js, "save returns candidates when ambiguous")
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     assert_true("section" in form and "click_save" in form, "click_save accepts section")
     # Exact 暂存 must not be rejected when needle is 暂存
     assert_true("rejectRe" in js, "rejectRe still present for non-exact noise")

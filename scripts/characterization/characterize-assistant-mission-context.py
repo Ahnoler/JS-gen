@@ -79,14 +79,14 @@ def test_parse_form_llm_response_split() -> None:
 
 
 def test_llm_generate_uses_mission_context_in_prompt() -> None:
-    src = (ROOT / "scripts/actions/_llm_values.py").read_text(encoding="utf-8")
+    src = (ROOT / "scripts/controller/actions/_llm_values.py").read_text(encoding="utf-8")
     assert_true("build_assistant_mission_context" in src, "wired")
     assert_true("format_assistant_human_message" in src, "wired")
     assert_true("parse_form_llm_response" in src or "needs_agent" in src, "needs_agent path")
 
 
 def test_run_form_assistant_payload_mentions_needs_agent() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     chunk = form.split("async def run_form_assistant", 1)[1][:1200]
     assert_true("needs_agent" in chunk, "run_form_assistant returns needs_agent")
 

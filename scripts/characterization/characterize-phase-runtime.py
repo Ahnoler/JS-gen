@@ -40,12 +40,18 @@ def test_clear_phase_intent_clears_section() -> None:
 
 
 def test_form_wires_remember() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     assert_true("remember_phase_section" in form, "form remembers section")
 
 
 def test_submit_ready_hint_uses_resolve_phase_section() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     hint = form.find("def _submit_ready_hint")
     assert_true(hint >= 0, "_submit_ready_hint present")
     body = form[hint : hint + 2500]
@@ -53,7 +59,10 @@ def test_submit_ready_hint_uses_resolve_phase_section() -> None:
 
 
 def test_click_save_section_order_in_source() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     # memory before unique; refresh when no section
     assert_true("_phase_section" in form and "unique_button_section" in form, "order ingredients present")
     assert_true(

@@ -108,7 +108,10 @@ def test_err_section_required_trigger_condition() -> None:
 
 
 def test_form_has_err_section_required() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     assert_true("err-section-required" in form, "click_save surfaces err-section-required")
     assert_true(
         "requires_section_declaration" in form,
@@ -117,7 +120,10 @@ def test_form_has_err_section_required() -> None:
 
 
 def test_get_pending_signature() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def get_pending_tasks", 1)[1][:600]
     assert_true("section" in chunk, "get_pending_tasks accepts section")
     assert_true("pending_by_section" in form, "includes pending_by_section")
@@ -139,7 +145,10 @@ def test_submit_hint_section_scoped() -> None:
 
 
 def test_run_form_assistant_section_signature() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def run_form_assistant", 1)[1][:800]
     assert_true("section" in chunk, "run_form_assistant accepts section")
     assert_true(
@@ -149,7 +158,10 @@ def test_run_form_assistant_section_signature() -> None:
 
 
 def test_run_form_assistant_autofill_section_filter() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     assert_true(
         "section_matches" in form.split("async def _auto_fill_pending", 1)[1]
         or "section_matches" in form.split("async def _execute_round", 1)[1],
@@ -211,7 +223,10 @@ def test_submit_hint_includes_unique_save_section() -> None:
 
 
 def test_click_save_auto_section_from_unique_button() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     assert_true("unique_button_section" in form, "click_save uses unique_button_section")
     assert_true("auto section" in form or "auto_section" in form or "[click_save] auto" in form,
                 "logs or marks auto section bind")
@@ -229,7 +244,10 @@ def test_click_save_auto_section_from_unique_button() -> None:
 
 def test_click_save_no_feedback_counts_as_success() -> None:
     """Silent SUT save (no toast) must set _last_save_ok and tell agent to done."""
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     idx = form.find("SUCCESS via no-feedback")
     assert_true(idx > 0, "logs silent-save success")
     # Bindings are set just above the log line

@@ -144,7 +144,10 @@ def test_append_action_per_item_xpath() -> None:
 
 def test_execute_round_surfaces_ambiguous_label() -> None:
     """Fix 2: batch path must record resolve_error, not collapse to xpath-not-found."""
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     assert_true(
         "resolve_error = resolved.error" in form,
         "plumb resolved.error into resolve_error",
@@ -162,7 +165,13 @@ def test_execute_round_surfaces_ambiguous_label() -> None:
 
 
 def test_scan_display_label_markers() -> None:
-    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    js = (
+        (ROOT / "scripts/controller/actions/_js_snippets.py").read_text(encoding="utf-8")
+        + "".join(
+            p.read_text(encoding="utf-8")
+            for p in sorted((ROOT / "scripts/controller/actions/js_snippets").glob("*.py"))
+        )
+    )
     assert_true(
         "const displayLabel = label || placeholder || ''" in js
         or "displayLabel = label || placeholder" in js,
@@ -175,7 +184,10 @@ def test_scan_display_label_markers() -> None:
 
 
 def test_phase_a_hardcut_markers() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     assert_true(
         "ambiguous-label" in form and "xpath-not-found" in form,
         "write paths surface resolve errors",
@@ -184,7 +196,7 @@ def test_phase_a_hardcut_markers() -> None:
 
 
 def test_llm_actions_carry_xpath() -> None:
-    src = (ROOT / "scripts/actions/_llm_values.py").read_text(encoding="utf-8")
+    src = (ROOT / "scripts/controller/actions/_llm_values.py").read_text(encoding="utf-8")
     assert_true("xpath_smart" in src, "_llm_values attaches xpath_smart to actions")
     assert_true(
         "def _enrich_llm_actions_xpath" in src,
@@ -194,7 +206,10 @@ def test_llm_actions_carry_xpath() -> None:
 
 
 def test_phase_b_action_signatures() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     for name in ("fill_form_field", "fill_date_field", "select_option", "click_radio"):
         chunk = form.split(f"async def {name}", 1)[1][:400]
         assert_true("xpath_smart" in chunk, f"{name} accepts xpath_smart")
@@ -225,7 +240,10 @@ def main() -> int:
     test_llm_actions_carry_xpath()
     test_phase_b_action_signatures()
     test_agent_prompt_xpath_primary()
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+    )
     assert_true("def _resolve_control" in form, "_resolve_control defined")
     print("characterize-xpath-primary-ops: OK")
     return 0

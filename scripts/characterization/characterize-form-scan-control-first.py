@@ -18,7 +18,13 @@ def assert_true(cond: bool, msg: str) -> None:
 
 
 def test_js_scan_cues() -> None:
-    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    js = (
+        (ROOT / "scripts/controller/actions/_js_snippets.py").read_text(encoding="utf-8")
+        + "".join(
+            p.read_text(encoding="utf-8")
+            for p in sorted((ROOT / "scripts/controller/actions/js_snippets").glob("*.py"))
+        )
+    )
     assert_true("el-table" in js and "xpath_smart" in js, "scan references el-table and xpath_smart")
     assert_true("SCAN_SOURCE_B_EL_TABLE" in js, "SCAN_SOURCE_B_EL_TABLE marker")
     assert_true("SCAN_DEDUP_BY_XPATH" in js, "SCAN_DEDUP_BY_XPATH marker")

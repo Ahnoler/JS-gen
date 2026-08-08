@@ -35,7 +35,13 @@ def test_table_collect_skips_select_inner_input() -> None:
     Otherwise occurrence=2 invents fake (...el-select)[2] xpaths while the DOM
     has only one select — Agent select_option then returns xpath-not-found.
     """
-    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    js = (
+        (ROOT / "scripts/controller/actions/_js_snippets.py").read_text(encoding="utf-8")
+        + "".join(
+            p.read_text(encoding="utf-8")
+            for p in sorted((ROOT / "scripts/controller/actions/js_snippets").glob("*.py"))
+        )
+    )
     loop = _collect_table_controls_input_loop(js)
     assert_true(
         "el-date-editor" in loop and "el-pagination" in loop,
@@ -50,7 +56,13 @@ def test_table_collect_skips_select_inner_input() -> None:
 
 def test_no_fake_occurrence_comment_or_marker() -> None:
     """Sanity: select push still exists after input loop."""
-    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    js = (
+        (ROOT / "scripts/controller/actions/_js_snippets.py").read_text(encoding="utf-8")
+        + "".join(
+            p.read_text(encoding="utf-8")
+            for p in sorted((ROOT / "scripts/controller/actions/js_snippets").glob("*.py"))
+        )
+    )
     assert_true(
         "cell.querySelectorAll('.el-select')" in js
         or 'cell.querySelectorAll(".el-select")' in js,

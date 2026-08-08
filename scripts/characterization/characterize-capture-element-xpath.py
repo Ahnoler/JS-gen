@@ -43,7 +43,7 @@ def test_capture_snippet_drills_form_input() -> None:
 
 
 def test_helpers_source_no_smart_on_xpath_path() -> None:
-    src = (ROOT / "scripts/actions/_helpers.py").read_text(encoding="utf-8")
+    src = (ROOT / "scripts/controller/actions/_helpers.py").read_text(encoding="utf-8")
     # After rewrite: body must call JS_CAPTURE_FROM_XPATH; must not call JS_SMART_LOCATOR
     assert_true("JS_CAPTURE_FROM_XPATH" in src, "helpers uses CAPTURE_FROM_XPATH")
     assert_true(
@@ -66,7 +66,7 @@ def _norm(s: str) -> str:
 
 
 def test_form_fill_passes_xpath_to_capture() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     chunk = form.split("async def fill_form_field", 1)[1].split("async def fill_date_field", 1)[0]
     assert_true(
         "xpath_smart=resolved.xpath_smart" in _norm(chunk),
@@ -75,7 +75,7 @@ def test_form_fill_passes_xpath_to_capture() -> None:
 
 
 def test_form_date_passes_xpath_to_capture() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     chunk = form.split("async def fill_date_field", 1)[1].split(
         "async def check_field_value", 1
     )[0]
@@ -86,7 +86,7 @@ def test_form_date_passes_xpath_to_capture() -> None:
 
 
 def test_select_option_passes_xpath_to_capture() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     chunk = form.split("async def select_option", 1)[1].split("async def ", 1)[0]
     assert_true(
         "xpath_smart=resolved.xpath_smart" in _norm(chunk)
@@ -96,7 +96,7 @@ def test_select_option_passes_xpath_to_capture() -> None:
 
 
 def test_click_radio_passes_xpath_to_capture() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     chunk = form.split("async def click_radio", 1)[1].split("async def ", 1)[0]
     assert_true(
         "xpath_smart=resolved.xpath_smart" in _norm(chunk),
@@ -105,7 +105,7 @@ def test_click_radio_passes_xpath_to_capture() -> None:
 
 
 def test_execute_round_passes_xpath_to_capture() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
   # _execute_round body: first capture after capture_kind assignment
     idx = form.find("capture_kind = 'form_input'")
     assert_true(idx >= 0, "_execute_round capture_kind block found")
@@ -117,7 +117,7 @@ def test_execute_round_passes_xpath_to_capture() -> None:
 
 
 def test_tree_fallback_xpath_captures_pass_xpath() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     # xpath branch fill fallback capture (_execute_round)
     idx = form.find("JS_FILL_BY_XPATH, [xpath_smart, fill_val, label]")
     assert_true(idx >= 0, "tree fill xpath branch found")
@@ -137,7 +137,7 @@ def test_tree_fallback_xpath_captures_pass_xpath() -> None:
 
 
 def test_select_tree_option_fill_fallback_xpath_parity() -> None:
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     chunk = form.split("async def select_tree_option", 1)[1].split("async def ", 1)[0]
     norm = _norm(chunk)
     assert_true(

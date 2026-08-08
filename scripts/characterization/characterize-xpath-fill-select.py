@@ -23,7 +23,13 @@ def assert_true(cond: bool, msg: str) -> None:
 
 
 def test_snippet_markers() -> None:
-    js = (ROOT / "scripts/actions/_js_snippets.py").read_text(encoding="utf-8")
+    js = (
+        (ROOT / "scripts/controller/actions/_js_snippets.py").read_text(encoding="utf-8")
+        + "".join(
+            p.read_text(encoding="utf-8")
+            for p in sorted((ROOT / "scripts/controller/actions/js_snippets").glob("*.py"))
+        )
+    )
     assert_true("JS_FILL_BY_XPATH" in js, "JS_FILL_BY_XPATH exported in _js_snippets.py")
     assert_true("JS_SELECT_TRIGGER_BY_XPATH" in js, "JS_SELECT_TRIGGER_BY_XPATH exported")
     assert_true("JS_SELECT_VALUE_BY_XPATH" in js, "JS_SELECT_VALUE_BY_XPATH exported")
@@ -55,7 +61,7 @@ def test_fill_by_xpath_rejects_empty_placeholder_match() -> None:
 
 
 def test_replay_select_uses_trigger_by_xpath() -> None:
-    src = (ROOT / "scripts/actions/_replay.py").read_text(encoding="utf-8")
+    src = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
     select_fn = src.split("if action_name == 'select_option':", 1)[1].split(
         "return f'unknown-form-action", 1
     )[0]
@@ -77,7 +83,7 @@ def test_replay_select_uses_trigger_by_xpath() -> None:
 def test_xpath_date_radio_helpers() -> None:
     assert_true(hasattr(sn, "JS_FILL_DATE_BY_XPATH"), "JS_FILL_DATE_BY_XPATH")
     assert_true(hasattr(sn, "JS_CLICK_RADIO_BY_XPATH"), "JS_CLICK_RADIO_BY_XPATH")
-    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     assert_true("JS_FILL_DATE_BY_XPATH" in form, "fill_date uses xpath helper")
     assert_true("JS_CLICK_RADIO_BY_XPATH" in form, "click_radio uses xpath helper")
     assert_true("JS_SELECT_TRIGGER_BY_XPATH" in form, "select uses xpath trigger")

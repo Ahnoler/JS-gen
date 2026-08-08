@@ -95,7 +95,7 @@ def main() -> int:
     assert_true('法定代表人/负责人证件号码' not in labels, 'introduce not in assistant pending')
     assert_true(all(not i.needs_intervention for i in tl.pending), 'no intervene flags on pending')
 
-    form_py = (ROOT / 'scripts/actions/_form.py').read_text(encoding='utf-8')
+    form_py = (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
     assert_true('async def run_form_assistant' in form_py, 'run_form_assistant action exists')
     assert_true(
         'allow_autofill: bool = False' in form_py,
