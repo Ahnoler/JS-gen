@@ -5,6 +5,7 @@ import * as trajectoryService from '../../services/trajectory-service.js';
 import { trajectoryStepToActionEntry } from '../../models/element.js';
 import { TRAJECTORY_RECORD_STATUSES } from '../../models/constants.js';
 import { PROJECT_DIR } from '../../../config/config.js';
+import { sendErr } from './trajectory-shared.js';
 
 /** Normalize DAO step → assembler command (DAO returns elementJson, not element). */
 function stepsToActionCommands(steps) {
@@ -25,13 +26,6 @@ function stepsToActionCommands(steps) {
 }
 
 export default function (app) {
-  function sendErr(res, err, fallback = 500) {
-    const status = err.statusCode || fallback;
-    const body = { error: err.message };
-    if (err.holders) body.holders = err.holders;
-    res.status(status).json(body);
-  }
-
   /** AI 分析：需求描述 -> { phases }（不落库；阶段数跟用户分步；案例数据附在各阶段描述后） */
   app.post('/api/v2/trajectories/analyze', async (req, res) => {
     try {
@@ -227,34 +221,6 @@ export default function (app) {
     }
   });
 
-  app.post('/api/v2/trajectories/:id/attach', async (req, res) => {
-    try {
-      const result = await trajectoryService.attachTrajectoryLive(+req.params.id);
-      res.status(201).json(result);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
-
-  app.post('/api/v2/trajectories/:id/detach', async (req, res) => {
-    try {
-      const result = await trajectoryService.detachTrajectoryLive(+req.params.id);
-      res.json(result);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
-
-  /** Disconnect BiB stream only — keep agent session + browser idle. */
-  app.post('/api/v2/trajectories/:id/stream/detach', async (req, res) => {
-    try {
-      const result = await trajectoryService.detachTrajectoryStream(+req.params.id);
-      res.json(result);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
-
   /** Phase-step tree: { phases:[{...phase, steps:[...]}, ...] } */
   app.get('/api/v2/trajectories/:id/tree', async (req, res) => {
     try {
@@ -372,22 +338,6 @@ export default function (app) {
   });
 
   /**
-   * One-shot enter recording studio (requires bound systemAccountId):
-   * 1) session create  2) allocate browser  3) BiB stream  4) navigate/login
-   * Broadcasts recording:prepare { stage, status } over /ws. Stream may be degraded
-   * without failing the critical path (session + login). Idempotent when already live.
-   * POST /api/v2/trajectories/:id/record/prepare
-   */
-  app.post('/api/v2/trajectories/:id/record/prepare', async (req, res) => {
-    try {
-      const result = await trajectoryService.prepareTrajectoryRecording(+req.params.id);
-      res.json(result);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
-
-  /**
    * Login context: owning system + accounts for AI recording pre-login.
    * GET /api/v2/trajectories/:id/login-context
    */
@@ -397,196 +347,6 @@ export default function (app) {
       res.json(ctx);
     } catch (err) {
       sendErr(res, err);
-    }
-  });
-
-  /**
-   * Start AI recording for all phases or subset.
-   * Body: { phaseIds?: number[], accountId?: number }
-   * Login/navigate is done in record/prepare (not stored as steps).
-   * accountId optional — defaults to trajectory.systemAccountId.
-   */
-  app.post('/api/v2/trajectories/:id/record/start', async (req, res) => {
-    try {
-      const phaseIds = req.body?.phaseIds;
-      const accountId = req.body?.accountId ?? req.body?.systemAccountId;
-      const result = await trajectoryService.startTrajectoryRecording(+req.params.id, {
-        phaseIds: Array.isArray(phaseIds) ? phaseIds : null,
-        accountId,
-      });
-      res.json(result);
-    } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
-    }
-  });
-
-  /**
-   * Re-run selected steps in the live session (async).
-   * Body: { stepIds: number[], isReplay?: boolean }
-   * HTTP 202 Accepted; v2 envelope body.code remains 200 with
-   * { trajectoryId, accepted: true, stepIds }. Progress via WS:
-   * replay:started → replay:step (running|success|failed) → replay:finished.
-   * Failure → confirmed=0 + single-step AI heal → continue remaining steps.
-   */
-  app.post('/api/v2/trajectories/:id/steps/replay', async (req, res) => {
-    try {
-      const accepted = await trajectoryService.acceptTrajectoryStepsReplay(+req.params.id, {
-        stepIds: req.body?.stepIds,
-        isReplay: req.body?.isReplay !== false && req.body?.is_replay !== false,
-      });
-      // HTTP 202; envelope middleware wraps as { code: 200, data: accepted }
-      res.status(202).json(accepted);
-    } catch (err) {
-      if (err.payload) {
-        return res.status(err.statusCode || 500).json({
-          error: err.message,
-          ...err.payload,
-        });
-      }
-      sendErr(res, err);
-    }
-  });
-
-  /**
-   * Stop in-flight steps/replay (including Type A/B heal). Does not change recordStatus.
-   * Sends cancel_step; batch ends with WS replay:finished { aborted:true, reason:'user_stop' }.
-   */
-  app.post('/api/v2/trajectories/:id/steps/replay/stop', async (req, res) => {
-    try {
-      const result = await trajectoryService.stopTrajectoryStepsReplay(+req.params.id);
-      res.json(result);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
-
-  /**
-   * Explicit end of recording (does not detach BiB).
-   * Body: { success?: boolean } default true → recorded; false → draft
-   */
-  app.post('/api/v2/trajectories/:id/record/stop', async (req, res) => {
-    try {
-      const success = req.body?.success !== false && req.body?.success !== 0;
-      const result = await trajectoryService.stopTrajectoryRecording(+req.params.id, { success });
-      res.json(result);
-    } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
-    }
-  });
-
-  /**
-   * Human confirm / cancel-confirm a trajectory (transaction-level).
-   * Body: { confirmed: boolean } — true → recordStatus=completed; false → draft.
-   * Does not modify trajectory_step.confirmed (回放确认).
-   */
-  app.post('/api/v2/trajectories/:id/confirm', async (req, res) => {
-    try {
-      const confirmed = req.body?.confirmed !== false && req.body?.confirmed !== 0;
-      const result = await trajectoryService.confirmTrajectory(+req.params.id, confirmed);
-      res.json(result);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
-
-  /**
-   * Resolve Element UI control by label_text / actionType+params on attached BiB page.
-   * Body: { labelText?, actionType?, params? }
-   * Returns { element, matchedLabel } or { ambiguous:true, matches:[] }.
-   */
-  app.post('/api/v2/trajectories/:id/resolve-element', async (req, res) => {
-    try {
-      const body = req.body || {};
-      const result = await trajectoryService.resolveTrajectoryElement(+req.params.id, {
-        labelText: body.labelText ?? body.label_text ?? '',
-        actionType: body.actionType ?? body.action ?? '',
-        params: body.params || {},
-      });
-      res.json(result);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
-
-  /**
-   * Toggle manual recording. Body: { enabled, phaseId? }
-   * phaseId omitted → append to last phase of trajectory.
-   */
-  app.post('/api/v2/trajectories/:id/manual-record', async (req, res) => {
-    try {
-      const result = await trajectoryService.toggleTrajectoryManualRecord(
-        +req.params.id,
-        !!req.body?.enabled,
-        { phaseId: req.body?.phaseId ?? req.body?.trajectoryPhaseId ?? null },
-      );
-      res.json(result);
-    } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
-    }
-  });
-
-  /** Steps for a trajectory_phase (by numeric phase.id). */
-  app.get('/api/v2/trajectory-phases/:id/steps', async (req, res) => {
-    try {
-      const steps = await trajectoryService.listStepsByPhase(+req.params.id);
-      res.json({ phaseId: +req.params.id, steps });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.patch('/api/v2/trajectory-steps/:id/confirm', async (req, res) => {
-    try {
-      const row = await trajectoryService.confirmTrajectoryStep(+req.params.id, !!req.body?.confirmed);
-      if (!row) return res.status(404).json({ error: 'Trajectory step not found' });
-      res.json(row);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.post('/api/v2/trajectory-steps', async (req, res) => {
-    try {
-      const row = await trajectoryService.createTrajectoryStep(req.body || {});
-      res.status(201).json(row);
-    } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message, code: err.code });
-    }
-  });
-
-  app.patch('/api/v2/trajectory-steps/:id', async (req, res) => {
-    try {
-      const row = await trajectoryService.updateTrajectoryStep(+req.params.id, req.body || {});
-      if (!row) return res.status(404).json({ error: 'Trajectory step not found' });
-      res.json(row);
-    } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message, code: err.code });
-    }
-  });
-
-  app.delete('/api/v2/trajectory-steps/:id', async (req, res) => {
-    try {
-      const result = await trajectoryService.removeTrajectoryStep(+req.params.id);
-      if (!result.removed) return res.status(404).json({ error: 'Trajectory step not found' });
-      res.json(result);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.post('/api/v2/trajectories/:id/steps/move', async (req, res) => {
-    try {
-      const row = await trajectoryService.moveTrajectoryStep(+req.params.id, {
-        stepId: req.body?.stepId,
-        targetPhaseId: req.body?.targetPhaseId ?? req.body?.trajectoryPhaseId,
-        beforeStepId: req.body?.beforeStepId !== undefined
-          ? req.body.beforeStepId
-          : null,
-      });
-      if (!row) return res.status(404).json({ error: 'Trajectory step not found' });
-      res.json(row);
-    } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message, code: err.code });
     }
   });
 }

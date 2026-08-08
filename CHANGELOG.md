@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **拆分 v2/trajectory.js 路由注册**：单一注册函数按资源拆为三个模块——`trajectory.js`（trajectory CRUD / phases / case-data / login-context / clear / assemble-file）、`trajectory-record.js`（record prepare/start/stop、attach/detach/stream-detach、manual-record、resolve-element、confirm）、`trajectory-steps.js`（steps CRUD、steps/replay start+stop、step-move）；共享 `sendErr` 助手移入 `trajectory-shared.js`。`__init__.js` 在 `registerTrajectory(app)` 后依次调用三个注册函数；32 条路由的方法/路径/处理器逐字不变（每块逐字比对一致），各模块内注册顺序不变。跨模块间路由互不遮蔽（各路径字面段/段数互异），Express 匹配行为不变。
+  影响范围：/api/v2/trajectories* 全部路由（语义不变）。
+  文件：src/routes/v2/trajectory.js, src/routes/v2/trajectory-record.js, src/routes/v2/trajectory-steps.js, src/routes/v2/trajectory-shared.js, src/routes/v2/__init__.js
+  Python 同步提示：无（纯结构移动，端点路径/响应零变化）。
+
 - 2026-08-08: **拆分 browser-session/register.js 路由处理器**：`POST /api/browser/session/:id/trajectory` 持久化编排块（~200 行）移入 `src/routes/browser-session/trajectory-persist.js`；`POST /api/browser/watcher/action` 处理器 + `session:step` WS 消息路由移入 `src/routes/browser-session/watcher-actions.js`。register.js 保留路由表，handler 体改为调用导入函数；WS 处理器注册顺序不变（仍为注册函数末尾）。代码块逐字移动，无逻辑变更。
   影响范围：/api/browser/session/:id/trajectory、/api/browser/watcher/action、WS session:step（语义不变）。
   文件：src/routes/browser-session/register.js, src/routes/browser-session/trajectory-persist.js, src/routes/browser-session/watcher-actions.js

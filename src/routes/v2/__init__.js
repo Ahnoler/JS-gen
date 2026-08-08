@@ -11,6 +11,8 @@ import registerSysDict from './sys-dict.js';
 import registerSpecialElement from './special-element.js';
 import registerTrajectoryBatch from './trajectory-batch.js';
 import registerTrajectory from './trajectory.js';
+import registerTrajectoryRecord from './trajectory-record.js';
+import registerTrajectorySteps from './trajectory-steps.js';
 import registerScreenshot from './screenshot.js';
 import registerCaseData from './case-data.js';
 import registerSystemRefData from './system-ref-data.js';
@@ -32,6 +34,8 @@ export default function (app) {
   // batch/* before trajectories/:id
   registerTrajectoryBatch(app);
   registerTrajectory(app);
+  registerTrajectoryRecord(app);
+  registerTrajectorySteps(app);
   registerScreenshot(app);
   registerCaseData(app);
   registerSystemRefData(app);
