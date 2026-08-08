@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **拆分 browser-session/register.js 路由处理器**：`POST /api/browser/session/:id/trajectory` 持久化编排块（~200 行）移入 `src/routes/browser-session/trajectory-persist.js`；`POST /api/browser/watcher/action` 处理器 + `session:step` WS 消息路由移入 `src/routes/browser-session/watcher-actions.js`。register.js 保留路由表，handler 体改为调用导入函数；WS 处理器注册顺序不变（仍为注册函数末尾）。代码块逐字移动，无逻辑变更。
+  影响范围：/api/browser/session/:id/trajectory、/api/browser/watcher/action、WS session:step（语义不变）。
+  文件：src/routes/browser-session/register.js, src/routes/browser-session/trajectory-persist.js, src/routes/browser-session/watcher-actions.js
+  Python 同步提示：无（纯结构移动，端点路径/响应零变化）。
+
 - 2026-08-08: **trajectory 服务迁入 `src/services/trajectory/`**：六个服务文件（`trajectory-session-replay` / `trajectory-batch-service` / `trajectory-record-lifecycle` / `trajectory-persist-service` / `trajectory-attach-service` / `trajectory-meta-service`）git mv 到 `src/services/trajectory/`，与 batch 2 各抽取模块同目录；新增 `src/services/trajectory/index.js` barrel re-export 六个服务的全部公开导出（45 个名字）。所有引用方（facade `trajectory-recording-service` / `trajectory-service`、路由、scripts 表征/smoke）导入路径同步更新；表征脚本按新模块位置断言同一不变量。纯目录移动 + 路径修正，无逻辑变更、无协议变更。
   影响范围：模块导入路径（服务行为不变）。
   文件：src/services/trajectory/index.js, src/services/trajectory/trajectory-{session-replay,batch-service,record-lifecycle,persist-service,attach-service,meta-service}.js, src/services/trajectory-recording-service.js, src/services/trajectory-service.js, src/routes/v2/trajectory-batch.js, src/routes/browser-session/persist-live.js, scripts/characterization/characterize-trajectory.mjs, scripts/characterization/characterize-analyze-case-data.mjs, scripts/characterization/characterize-batch-import.mjs, scripts/characterization/characterize-form-snapshot-trigger.mjs, scripts/smoke/smoke-trajectory-step-idempotent.mjs
