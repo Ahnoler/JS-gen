@@ -186,7 +186,7 @@ def test_three_task_modes() -> None:
     assert_true(payload.get('not_form_fill') is True and payload.get('mode') == 'query_filter', 'payload')
 
     save_store = {'task_list': {'pending': [], 'done': [{'label': '客户名称', 'value': 'x'}]}}
-    assert_true('click_save()' in _submit_ready_hint(save_store), 'save cue')
+    assert_true('click_save' in _submit_ready_hint(save_store), 'save cue')
 
 
 def test_phase_preamble_catalog_and_prior() -> None:

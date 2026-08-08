@@ -1982,6 +1982,9 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
                 const t = (input.type || '').toLowerCase();
                 if (t === 'checkbox' || t === 'radio') continue;
                 if (input.closest && input.closest('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]')) continue;
+                // el-select owns .el-input__inner — do not also push it here, or
+                // occurrence=2 invents fake (...el-select)[2] xpaths (DOM has one).
+                if (input.closest && input.closest('.el-select')) continue;
                 if (input.closest && input.closest('.el-pagination')) continue;
                 if (quick && !isVisible(input)) continue;
                 controls.push({ cell, el: input, kind: classifyTableCell(cell), options: [] });

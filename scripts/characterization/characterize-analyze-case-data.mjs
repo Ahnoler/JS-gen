@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
- * Characterization: extractCaseEntriesFromRequirement (no LLM).
+ * Characterization: extractCaseEntriesFromRequirement + extractCaseDataBlock (no LLM).
  *   node scripts/characterization/characterize-analyze-case-data.mjs
  */
-import { extractCaseEntriesFromRequirement } from '../../src/services/trajectory-meta-service.js';
+import {
+  extractCaseDataBlock,
+  extractCaseEntriesFromRequirement,
+} from '../../src/services/trajectory-meta-service.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -29,5 +32,25 @@ assert(empty.length === 0, 'no case block → empty');
 const inline = extractCaseEntriesFromRequirement('案例数据：客户名称：ACME\n手机号=13800138000');
 assert(inline.some((e) => e.fieldKey === '客户名称' && e.fieldValue === 'ACME'), 'inline header');
 assert(inline.some((e) => e.fieldKey === '手机号' && e.fieldValue === '13800138000'), 'eq form');
+
+// extractCaseDataBlock (append-to-phase path): block extraction keeps header/label lines, excludes steps.
+const blockSample = [
+  '1、点击客户管理，点击对公客户管理。',
+  '2、新增一个对公潜在客户。',
+  '',
+  '关键数据',
+  '对公客户基本信息：',
+  '           法定责任人的客户名称：朱桂武',
+  '客户标签：',
+].join('\n');
+
+const block = extractCaseDataBlock(blockSample);
+assert(block.includes('关键数据'), 'block header');
+assert(block.includes('法定责任人的客户名称：朱桂武'), 'block name line');
+assert(block.includes('客户标签：'), 'block empty label line kept');
+assert(!block.includes('点击客户管理'), 'block steps excluded');
+
+const emptyBlock = extractCaseDataBlock('1. 登录系统\n2. 查询客户');
+assert(emptyBlock === '', 'no case block');
 
 console.log('characterize-analyze-case-data: OK');
