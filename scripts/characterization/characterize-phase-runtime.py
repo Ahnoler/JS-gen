@@ -30,6 +30,20 @@ def test_remember_and_resolve_memory() -> None:
     assert_true(not store.get("_phase_section"), "clear removes")
 
 
+def test_clear_phase_intent_clears_section() -> None:
+    from scripts.actions._phase_intent import clear_phase_intent
+
+    store = {"_phase_section": "系统评级结论", "_empty_act_streak": 2}
+    clear_phase_intent(store)
+    assert_true("_phase_section" not in store, "clear_phase_intent drops section")
+    assert_true("_empty_act_streak" not in store, "clear_phase_intent drops empty streak")
+
+
+def test_form_wires_remember() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    assert_true("remember_phase_section" in form, "form remembers section")
+
+
 def test_resolve_infer_unique_and_longest() -> None:
     store = {
         "_phase_intent": {
@@ -55,8 +69,10 @@ def test_resolve_infer_unique_and_longest() -> None:
 
 def main() -> None:
     test_remember_and_resolve_memory()
+    test_clear_phase_intent_clears_section()
+    test_form_wires_remember()
     test_resolve_infer_unique_and_longest()
-    print("PASS characterize-phase-runtime (partial task1)")
+    print("PASS characterize-phase-runtime")
 
 
 if __name__ == "__main__":

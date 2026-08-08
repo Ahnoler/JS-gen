@@ -1036,6 +1036,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         await _wait_if_loading(page)
         sec = (section or '').strip()
         if sec:
+            from ._section_scope import remember_phase_section
+            remember_phase_section(case_data_store, sec)
             case_data_store['_assistant_section_filter'] = sec
         try:
             await _ensure_scanned('__run_form_assistant__', allow_autofill=True)
@@ -1842,6 +1844,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     sys.stderr.flush()
             except Exception:
                 pass
+        if sec:
+            from ._section_scope import remember_phase_section
+            remember_phase_section(case_data_store, sec)
         # 确认/确定 = dialog/picker confirm (never treat as form-save blocked by query toolbar)
         is_picker_confirm = bool(
             compact_btn.startswith(('确认', '确定'))
