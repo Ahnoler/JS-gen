@@ -1,7 +1,7 @@
 """
 StepEntry model — recorded controller action aligned with `trajectory_step` table.
 
-Each entry is created by `_record_action()` in `_state.py` and stored in `_STEP_LOG`.
+Each entry is created by `_record_action()` in `scripts/state.py` and stored in `_STEP_LOG`.
 The format directly maps to `trajectory_step` columns for database persistence.
 
 This model coexists with `ActionEntry` for backward compatibility:
@@ -21,7 +21,7 @@ StepSource = Literal['agent', 'manual', 'cdp']
 class StepEntry(BaseModel):
     """One recorded controller action, aligned with `trajectory_step` table columns.
 
-    Stored in `_STEP_LOG` (list[StepEntry]) in `_state.py`.
+    Stored in `_STEP_LOG` (list[StepEntry]) in `scripts/state.py`.
     Every field maps 1:1 to a `trajectory_step` column.
     """
 

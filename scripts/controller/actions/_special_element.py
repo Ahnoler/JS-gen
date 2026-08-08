@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ._helpers import _ok, _err
-from scripts.actions._state import _record_action
+from scripts.state import _record_action
 
 
 def format_special_element_hint(candidates_store: dict | None) -> str:

@@ -124,7 +124,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
         try:
             # Per-action watcher mode — skip _ensure_scanned, no auto-fill
             # Tag recorded actions as source=cdp for DB persistence
-            from .actions._state import set_current_source
+            from .state import set_current_source
             case_data_store['_watcher_mode'] = True
             set_current_source('cdp')
             try:
@@ -140,7 +140,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
                 set_current_source('agent')
             sys.stderr.write(f"[cdp-watcher] {action_name}{params} -> {result_str}\n")
             sys.stderr.flush()
-            from .actions._state import _ACTION_LOG
+            from .state import _ACTION_LOG
             last_entry = _ACTION_LOG[-1] if _ACTION_LOG else None
             # Always tag CDP result entry so control-plane never treats it as agent
             if isinstance(last_entry, dict):
@@ -158,7 +158,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
             sys.stderr.write(f"[cdp-watcher] Error: {action_name}{params} -> {err_str}\n")
             sys.stderr.flush()
             try:
-                from .actions._state import set_current_source
+                from .state import set_current_source
                 set_current_source('agent')
                 case_data_store['_watcher_mode'] = False
             except Exception:
@@ -299,7 +299,7 @@ async def run_session(args):
     async def _run_step(data, step_idx):
         """Execute one agent step with the given data."""
         nonlocal cumulative_path
-        from .actions._state import set_current_phase
+        from .state import set_current_phase
         # Prefer client-provided phase_number (matches 【阶段N】); fallback to step_idx
         phase_num = data.get("phase_number")
         if phase_num is None:

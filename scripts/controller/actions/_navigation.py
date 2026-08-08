@@ -1,6 +1,6 @@
 """Navigation actions: switch tab, click menu item."""
 
-from scripts.actions._state import _record_action
+from scripts.state import _record_action
 from ._helpers import _ok, _is_ok_result, _enrich_click_element
 
 

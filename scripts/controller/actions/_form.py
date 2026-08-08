@@ -11,7 +11,7 @@ import sys
 from dataclasses import dataclass
 
 from ...agent_utils import emit_json
-from scripts.actions._state import (
+from scripts.state import (
     _ACTION_LOG,
     _record_action,
     capture_page_png_b64_from_page,

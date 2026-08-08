@@ -153,7 +153,7 @@ def _register_case_data_actions(controller, case_data_store):
             case_data_store[key] = value
             # P1：带 phase_number 归属（事实包按阶段检索；P0 缺省导致检索不到）
             try:
-                from ._state import _CURRENT_PHASE
+                from ...state import _CURRENT_PHASE
                 emit_memory_event(
                     'case_saved',
                     {'key': key, 'value': str(value)[:500]},

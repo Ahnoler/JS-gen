@@ -2,11 +2,11 @@
 Shared mutable state for the controller module.
 
 Holds _ACTION_LOG and _TRAJECTORY_URL. All internal reads/writes
-go through this module. The controller.py facade re-exports these
+go through this module. The controller facade re-exports these
 for external callers (session_runner, recorder, agent_utils).
 """
 
-from ..models import ActionEntry
+from .models import ActionEntry
 import base64
 import re
 
@@ -110,7 +110,7 @@ def emit_step_screenshot(entry_id: str, before_b64: str | None, after_b64: str |
     if not before_b64 and not after_b64:
         return
     try:
-        from ..agent_utils import emit_json
+        from .agent_utils import emit_json
         emit_json({
             "event": "step_screenshot",
             "data": {
@@ -152,7 +152,7 @@ async def record_action_with_screenshots(
 def _emit_action_log_sync(removed_ids=None):
     """Push the full _ACTION_LOG to the Dashboard (optional removedIds for live-persist cleanup)."""
     try:
-        from ..agent_utils import emit_json
+        from .agent_utils import emit_json
         data = {
             "entries": list(_ACTION_LOG),
             "count": len(_ACTION_LOG),

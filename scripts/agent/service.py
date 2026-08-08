@@ -161,7 +161,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             contract_summary_hint,
         )
         from ..controller.actions.phase.reviewer import review_phase_contract
-        from ..actions._state import _CURRENT_PHASE
+        from ..state import _CURRENT_PHASE
         heal_mode = detect_heal_mode(instruction, agent_task)
         # Classify / boundary on goal text only — strip 【业务数据】value blocks first.
         phase_core = classification_task_text(agent_task)

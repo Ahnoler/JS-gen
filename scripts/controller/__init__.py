@@ -12,7 +12,7 @@ All consumer forms (`from scripts.controller import build_controller`,
 ``scripts.controller.build_controller``, ``import *``, ``dir()``) behave
 identically to an eager binding.
 """
-from ..actions._state import _ACTION_LOG, _TRAJECTORY_URL, _ACTION_TO_COMMAND, _record_action
+from scripts.state import _ACTION_LOG, _TRAJECTORY_URL, _ACTION_TO_COMMAND, _record_action
 
 __all__ = [
     'build_controller',

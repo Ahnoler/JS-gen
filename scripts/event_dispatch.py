@@ -44,7 +44,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         return 'continue'
 
     if event == "get_action_log":
-        from .actions._state import _ACTION_LOG
+        from .state import _ACTION_LOG
         emit_json({
             "event": "get_action_log_result",
             "data": {
@@ -99,7 +99,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         return 'continue'
 
     if event == "capture_screenshots":
-        from .actions._state import set_capture_screenshots
+        from .state import set_capture_screenshots
         data = msg.get("data") or {}
         enabled = bool(data.get("enabled", True))
         set_capture_screenshots(enabled)
@@ -247,7 +247,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         # subsequent agent recording can be saved as a complete trajectory (prefix + fix).
         if seed_action_log:
             try:
-                from .actions import _state as action_state
+                from . import state as action_state
                 action_state._ACTION_LOG.clear()
                 for entry in filtered:
                     action_name = entry.get("action") or ""

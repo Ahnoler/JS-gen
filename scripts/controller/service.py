@@ -12,7 +12,7 @@ from .actions._navigation import _register_navigation_actions
 from .actions._table import _register_table_actions
 from .actions._misc import _register_misc_actions
 from .actions._special_element import _register_special_element_actions
-from ..actions._state import (
+from ..state import (
     _ACTION_LOG,
     capture_page_png_b64,
     capture_screenshots_enabled,

@@ -113,7 +113,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
         log_count = len(rec_log_snapshot)
         _ACTION_LOG.clear()
         _recorder_log.clear()
-        from .actions._state import _emit_action_log_sync
+        from .state import _emit_action_log_sync
         _emit_action_log_sync()
 
         emit_json({
@@ -169,7 +169,7 @@ def _handle_reset_trajectory(session_id, case_data_store=None):
     _recorder_log.clear()
     clear_phase_outcomes(case_data_store)
     clear_phase_intent(case_data_store)
-    from .actions._state import _emit_action_log_sync
+    from .state import _emit_action_log_sync
     _emit_action_log_sync()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"

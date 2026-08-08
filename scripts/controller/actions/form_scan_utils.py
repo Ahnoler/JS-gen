@@ -9,7 +9,7 @@ import re
 import sys
 from dataclasses import dataclass
 
-from scripts.actions._state import _ACTION_LOG, _record_action
+from scripts.state import _ACTION_LOG, _record_action
 from ._helpers import (
     attach_select_options,
     options_from_scan_store,

@@ -29,7 +29,7 @@ import json
 import sys
 from typing import Callable, Optional
 
-from ..actions._state import (
+from ..state import (
     _ACTION_LOG,
     _record_action,
     capture_page_png_b64,

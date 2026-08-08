@@ -225,7 +225,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
             # stops like ['click:查询','click:'] when re-running a query phase.
             try:
                 from .controller import _ACTION_LOG as _ctrl_log
-                from .actions._state import _CURRENT_PHASE
+                from .state import _CURRENT_PHASE
                 from .controller.actions._phase_intent import (
                     get_phase_intent,
                     is_cycle_deviate_fingerprint,

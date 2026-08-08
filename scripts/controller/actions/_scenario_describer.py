@@ -156,7 +156,7 @@ def _collect_action_log_summary() -> str:
     """Prefer controller _ACTION_LOG; fall back / supplement with recorder plain log."""
     lines: list[str] = []
     try:
-        from scripts.actions import _state as action_state
+        from scripts import state as action_state
         ctrl_log = list(action_state._ACTION_LOG or [])
         for entry in ctrl_log[-_ACTION_LOG_MAX_ENTRIES:]:
             line = _format_ctrl_entry(entry)

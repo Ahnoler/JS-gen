@@ -12,7 +12,7 @@ import re
 import sys
 from datetime import datetime
 
-from scripts.actions import _state
+from scripts import state as _state
 from ._helpers import _ok, _err, _enrich_click_element, _is_ok_result, _wait_if_loading
 from ._js_snippets import (
     JS_CHECK_LOADING,

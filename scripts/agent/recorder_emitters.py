@@ -50,7 +50,7 @@ def _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal):
 def _emit_memory_action_event(agent, _actions, _last_result_str):
         # P1：动作事件打点（fill_before_save 建模用）——异步旁路，失败不阻塞
         try:
-            from ..actions._state import _CURRENT_PHASE
+            from ..state import _CURRENT_PHASE
             from scripts.memory.writer import emit_memory_event
             action_payload = []
             fill_labels = []
@@ -150,7 +150,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                     sys.stderr.flush()
                     if case_data_store is not None:
                         try:
-                            from ..actions import _state as action_state
+                            from .. import state as action_state
                             from ..controller.actions._phase_context import record_phase_outcome
                             record_phase_outcome(
                                 case_data_store,
@@ -476,7 +476,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                     # Persist done() outcome for next-phase business-scenario preamble
                     if case_data_store is not None:
                         try:
-                            from ..actions import _state as action_state
+                            from .. import state as action_state
                             from ..controller.actions._phase_context import record_phase_outcome
                             record_phase_outcome(
                                 case_data_store,
