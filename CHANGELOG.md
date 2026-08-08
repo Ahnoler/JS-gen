@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **拆分 hierarchy-service.js**：树导出/导入块（`exportTree` / `getTreeTemplate` / `getTreeTemplateExcel` / `exportTreeExcel` / `importTreeExcel` + `EXPORT_VERSION`）移入 `src/services/hierarchy-excel.js`；原文件保留树查询/CRUD（`getTree` / `nestToChildrenTree` / `createSystem` / `createModule` / `createFunction` / `resolveAncestorSystemId` / `importTree` 等），5 个被移动的公开导出改为 re-export（同一函数身份），`getTree` 供新模块的 `importTreeExcel` 复用。代码块逐字移动，无逻辑变更。
+  影响范围：系统管理树导出/导入端点（JSON/Excel 语义不变）。
+  文件：src/services/hierarchy-service.js, src/services/hierarchy-excel.js
+  Python 同步提示：无（纯结构移动，无协议变更）。
+
 - 2026-08-08: **拆分 remote-session-service.js**：模块级状态枢纽（`liveByRemoteSessionId` 活绑定 Map + `trajLocks` 每轨迹串行锁）与全部状态访问器（`withTrajectoryLock` / `bindingToStatus` / `getLiveBindingBy*` / `resolveLiveBinding` / `clearExecutorLive*` / `clearLiveBinding` / `restoreLiveBindingFromRow` / `listLiveBindings`）移入 `src/services/remote-session-state.js`；原文件保留 BiB 生命周期操作（`openSession` / `attachLive` / `detachLive` / `getLiveStatus` / `mountTrajectoryRemoteSession` / `supersedeStaleForTrajectory` 等），11 个被移动的公开导出改为 re-export（同一函数身份），`liveByRemoteSessionId` 导出供状态模块使用（ESM 活绑定，Map 变更跨模块可见）。代码块逐字移动，无逻辑变更。
   影响范围：BiB 绑定查询/状态序列（语义不变）。
   文件：src/services/remote-session-service.js, src/services/remote-session-state.js
