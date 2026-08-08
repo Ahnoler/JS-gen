@@ -25,7 +25,7 @@ __all__ = [
 
 def __getattr__(name):
     if name == 'build_controller':
-        from ..actions._builder import build_controller
+        from .service import build_controller
         return build_controller
     raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
