@@ -24,4 +24,4 @@ from .js_snippets.save import JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME
 from .js_snippets.enrich import JS_ENRICH_CLICK_LOCATOR
 from .js_snippets.icons import _JS_ICON_BUTTON_HELPERS, JS_STAMP_ICON_ARIA_LABELS, JS_COLLECT_ICON_BUTTONS, JS_CLICK_ICON_BUTTON
 from .js_snippets.misc import JS_SCENARIO_PAGE_SNAPSHOT, JS_VERIFY_FORM_STRUCTURE
-from scripts.actions._locator_helpers_js import PAGE_LOCATOR_HELPERS
+from scripts.controller.actions.js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS

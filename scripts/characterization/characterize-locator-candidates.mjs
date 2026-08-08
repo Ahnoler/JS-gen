@@ -373,7 +373,7 @@ function ok(name) {
 
 {
   // Python mirror must contain the same page helpers.
-  const py = readFileSync(join(__dirname, '..', 'actions', '_locator_helpers_js.py'), 'utf8');
+  const py = readFileSync(join(__dirname, '..', 'controller', 'actions', 'js_snippets', '_locator_helpers_js.py'), 'utf8');
   assert.ok(py.includes('buildLocatorSnap'));
   assert.ok(py.includes('normalizeTargetRoot'));
   assert.ok(py.includes('classTokenPred'));

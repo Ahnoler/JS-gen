@@ -145,5 +145,5 @@ export function enrichLocatorFields(meta = {}) {
 
 /**
  * Page-side helper source (injected into CDP Runtime.evaluate strings).
- * Keep in sync with Node builders above and scripts/actions/_locator_helpers_js.py.
+ * Keep in sync with Node builders above and scripts/controller/actions/js_snippets/_locator_helpers_js.py.
  */

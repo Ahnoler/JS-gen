@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from scripts.controller.actions._js_snippets import _JS_ICON_BUTTON_HELPERS
-from scripts.actions._locator_helpers_js import PAGE_LOCATOR_HELPERS
+from scripts.controller.actions.js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from .js_parts.a import JS_MANUAL_PART_A
 from .js_parts.b import JS_MANUAL_PART_B
 

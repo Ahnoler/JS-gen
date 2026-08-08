@@ -1,5 +1,5 @@
 /**
- * One-shot: emit scripts/actions/_locator_helpers_js.py from PAGE_LOCATOR_HELPERS.
+ * One-shot: emit scripts/controller/actions/js_snippets/_locator_helpers_js.py from PAGE_LOCATOR_HELPERS.
  *   node scripts/_gen_locator_helpers_py.mjs
  */
 import { writeFileSync } from 'node:fs';
@@ -13,10 +13,10 @@ if (!body.includes('buildLocatorSnap')) {
 
 const out = `# Auto-generated / keep in sync with src/cdp/locator-candidates.js PAGE_LOCATOR_HELPERS.
 # Regenerate: node scripts/_gen_locator_helpers_py.mjs
-# Used by scripts/actions/_js_snippets.py and scripts/manual_recorder/js.py.
+# Used by scripts/controller/actions/_js_snippets.py and scripts/manual_recorder/js.py.
 
 PAGE_LOCATOR_HELPERS = r'''${body}'''
 `;
 
-writeFileSync(new URL('./actions/_locator_helpers_js.py', import.meta.url), out, 'utf8');
+writeFileSync(new URL('./controller/actions/js_snippets/_locator_helpers_js.py', import.meta.url), out, 'utf8');
 console.log(`ok: wrote _locator_helpers_js.py (${body.length} helper chars)`);

@@ -8,7 +8,7 @@ from .scan_utils import JS_FIELD_REQUIRED
 from .container import JS_GET_CONTAINER
 from .scan_utils import JS_READ_CURRENT_VALUE
 from .scan_utils import JS_SECTION_ATTACH_BLOCK
-from scripts.actions._locator_helpers_js import PAGE_LOCATOR_HELPERS
+from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 
 JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
 ''' + PAGE_LOCATOR_HELPERS + '''

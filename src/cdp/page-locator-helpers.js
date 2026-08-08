@@ -1,6 +1,6 @@
 /**
  * PAGE_LOCATOR_HELPERS — extracted from locator-candidates.js.
- * Injected into CDP Runtime.evaluate; keep in sync with scripts/actions/_locator_helpers_js.py.
+ * Injected into CDP Runtime.evaluate; keep in sync with scripts/controller/actions/js_snippets/_locator_helpers_js.py.
  */
 export const PAGE_LOCATOR_HELPERS = `
   function xpathLiteral(text) {
