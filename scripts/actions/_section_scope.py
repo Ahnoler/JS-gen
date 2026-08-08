@@ -88,3 +88,78 @@ def unique_button_section(buttons: list | None, button_text: str = "保存") -> 
     if len(keys) == 1:
         return keys[0]
     return None
+
+
+def remember_phase_section(store: dict | None, section: str) -> None:
+    if store is None:
+        return
+    sec = norm_sec(section)
+    if sec:
+        store["_phase_section"] = sec
+
+
+def clear_phase_section(store: dict | None) -> None:
+    if store is None:
+        return
+    store.pop("_phase_section", None)
+
+
+def resolve_phase_section(store: dict | None, *, task_text: str = "") -> str:
+    """Return phase section scope or '' (full-table gate).
+
+    Order: memory → unique/longest NL infer against button/task titles → ''.
+    """
+    if not store:
+        return ""
+    mem = norm_sec(str(store.get("_phase_section") or ""))
+    if mem:
+        return mem
+
+    titles: list[str] = []
+    seen: set[str] = set()
+    for b in store.get("_scan_buttons") or []:
+        if not isinstance(b, dict):
+            continue
+        t = norm_sec(b.get("section_title") or "") or norm_sec(b.get("section_id") or "")
+        if t and t != "__root__" and t not in seen:
+            seen.add(t)
+            titles.append(t)
+    try:
+        from scripts.models.task import TaskList
+        tl = TaskList.from_store(store.get("task_list"))
+        for i in list(tl.pending) + list(tl.done):
+            t = norm_sec(getattr(i, "section_title", "") or "") or norm_sec(
+                getattr(i, "section_id", "") or ""
+            )
+            if t and t != "__root__" and t not in seen:
+                seen.add(t)
+                titles.append(t)
+    except Exception:
+        pass
+    if not titles:
+        return ""
+
+    blob_parts: list[str] = []
+    try:
+        from ._phase_intent import get_phase_intent
+        c = get_phase_intent(store) or {}
+        blob_parts.append(str(c.get("goal") or ""))
+        for x in c.get("in_scope") or []:
+            blob_parts.append(str(x))
+    except Exception:
+        pass
+    blob_parts.append(task_text or "")
+    blob = norm_sec(" ".join(blob_parts))
+    if not blob:
+        return ""
+
+    hits = [t for t in titles if t and t in blob]
+    if not hits:
+        return ""
+    if len(hits) == 1:
+        return hits[0]
+    # nested substring: uniquely longest wins
+    longest = max(hits, key=len)
+    if sum(1 for t in hits if len(t) == len(longest)) == 1:
+        return longest
+    return ""
