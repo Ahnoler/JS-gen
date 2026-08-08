@@ -14,7 +14,7 @@ if str(ROOT) not in sys.path:
 # Force boundary on for this smoke
 os.environ['AI_PHASE_BOUNDARY'] = '1'
 
-from scripts.actions._phase_boundary import (  # noqa: E402
+from scripts.controller.actions._phase_boundary import (  # noqa: E402
     apply_phase_boundary,
     compile_boundary,
     is_picker_context,
@@ -23,7 +23,7 @@ from scripts.actions._phase_boundary import (  # noqa: E402
     record_evidence,
     should_block_index_submit_boundary,
 )
-from scripts.actions._phase_intent import (  # noqa: E402
+from scripts.controller.actions._phase_intent import (  # noqa: E402
     apply_phase_intent,
     check_pending_write_gate,
     has_contract_success,
@@ -183,7 +183,7 @@ def main() -> int:
     assert_true(b_open['forbid_index_submit'] is False, 'open-page allow index clicks')
 
     # 「抵达…页面」+ 【业务数据】suffix must NOT become form_fill / maintain
-    from scripts.actions._phase_context import (
+    from scripts.controller.actions._phase_context import (
         classify_task_mode,
         is_open_page_task,
         needs_business_data_context,

@@ -15,7 +15,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from scripts.actions._special_element import format_special_element_hint  # noqa: E402
+from scripts.controller.actions._special_element import format_special_element_hint  # noqa: E402
 
 
 def assert_true(cond: bool, msg: str) -> None:

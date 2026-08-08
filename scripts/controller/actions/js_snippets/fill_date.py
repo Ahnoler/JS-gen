@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_FILL_DATE_BY_XPATH, JS_CLICK_RADIO_BY_XPATH, JS_FILL_DATE_FIELD (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .base import JS_FIELD_DISABLED
 from .container import JS_GET_CONTAINER

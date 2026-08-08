@@ -1,6 +1,6 @@
 # Auto-generated / keep in sync with src/cdp/locator-candidates.js PAGE_LOCATOR_HELPERS.
 # Regenerate: node scripts/_gen_locator_helpers_py.mjs
-# Used by scripts/actions/_js_snippets.py and scripts/manual_recorder/js.py.
+# Used by scripts/controller/actions/_js_snippets.py and scripts/manual_recorder/js.py.
 
 PAGE_LOCATOR_HELPERS = r'''
   function xpathLiteral(text) {

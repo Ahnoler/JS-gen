@@ -100,7 +100,7 @@ def _register_special_element_actions(
         from ._replay import replay_action_entries
 
         # Build a fresh controller registry for nested replay (same pattern as session_runner)
-        from ._builder import build_controller
+        from ..service import build_controller
         nested = build_controller(
             browser_context,
             case_data_store=case_data_store,

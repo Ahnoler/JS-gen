@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.actions._phase_intent import (  # noqa: E402
+from scripts.controller.actions._phase_intent import (  # noqa: E402
     apply_phase_contract,
     apply_phase_intent,
     check_pending_write_gate,
@@ -200,8 +200,8 @@ def main() -> int:
     )
 
     # Single-field phase: submit.required=false → must NOT nudge click_save
-    from scripts.actions._phase_boundary import next_action_hint
-    from scripts.actions._form import _submit_ready_hint, _with_submit_cue
+    from scripts.controller.actions._phase_boundary import next_action_hint
+    from scripts.controller.actions._form import _submit_ready_hint, _with_submit_cue
 
     store_field: dict = {}
     apply_phase_contract(

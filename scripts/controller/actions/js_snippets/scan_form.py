@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_SCAN_FORM_FIELDS, JS_CHECK_SINGLE_FIELD (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .scan_utils import JS_CLASSIFY_FIELD
 from .base import JS_FIELD_DISABLED

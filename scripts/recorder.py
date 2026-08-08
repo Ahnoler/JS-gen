@@ -7,7 +7,7 @@ import re
 import sys
 from langchain_core.messages import HumanMessage
 from . import controller as ctrl_mod
-from .actions._js_snippets import JS_SMART_LOCATOR
+from .controller.actions._js_snippets import JS_SMART_LOCATOR
 from .agent.recorder_emitters import (  # noqa: E402
     _capture_step_url,
     _emit_empty_act_cue,
@@ -63,7 +63,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
 
         # Business-scenario summary (non-mandatory background) — before force cues
         try:
-            from .actions._scenario_describer import inject_scenario_summary
+            from .controller.actions._scenario_describer import inject_scenario_summary
             await inject_scenario_summary(agent, case_data_store)
         except Exception as e:
             sys.stderr.write(f"[recorder] scenario_describer error: {e}\n")
@@ -226,7 +226,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
             try:
                 from .controller import _ACTION_LOG as _ctrl_log
                 from .actions._state import _CURRENT_PHASE
-                from .actions._phase_intent import (
+                from .controller.actions._phase_intent import (
                     get_phase_intent,
                     is_cycle_deviate_fingerprint,
                     recovery_prescription_message,

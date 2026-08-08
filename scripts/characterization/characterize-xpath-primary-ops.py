@@ -9,9 +9,9 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.actions._form import ResolvedControl, _resolve_control  # noqa: E402
+from scripts.controller.actions._form import ResolvedControl, _resolve_control  # noqa: E402
 from scripts.agent_utils import build_agent_system_message  # noqa: E402
-from scripts.actions._llm_values import (  # noqa: E402
+from scripts.controller.actions._llm_values import (  # noqa: E402
     _enrich_llm_actions_xpath,
     _llm_generate_values,
 )

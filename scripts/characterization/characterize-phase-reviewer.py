@@ -16,7 +16,7 @@ from scripts.actions._phase_reviewer import (  # noqa: E402
     resolve_phase_max_steps,
     sanitize_contract_for_mode,
 )
-from scripts.actions._phase_intent import (  # noqa: E402
+from scripts.controller.actions._phase_intent import (  # noqa: E402
     apply_phase_contract,
     has_contract_success,
 )

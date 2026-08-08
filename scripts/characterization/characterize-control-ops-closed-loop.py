@@ -57,7 +57,7 @@ def test_click_save_section_api() -> None:
 
 
 def test_section_summary_shape() -> None:
-    from scripts.actions._form import _build_section_summary
+    from scripts.controller.actions._form import _build_section_summary
 
     fields = [
         {"label": "资产负债率", "disabled": False, "section_id": "评级等级测算", "section_title": "评级等级测算"},

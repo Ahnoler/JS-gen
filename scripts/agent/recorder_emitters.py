@@ -106,7 +106,7 @@ def _capture_step_url(agent):
 
 async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
             try:
-                from ..actions._phase_intent import (
+                from ..controller.actions._phase_intent import (
                     check_pending_write_gate,
                     get_phase_intent,
                     has_contract_success,
@@ -115,7 +115,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                     overlay_blocks_done,
                     recovery_prescription_message,
                 )
-                from ..actions._phase_context import is_heal_mode
+                from ..controller.actions._phase_context import is_heal_mode
                 page = await agent.browser_context.get_current_page()
                 # Prefer explicit success from the done() action
                 done_success = False
@@ -151,7 +151,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                     if case_data_store is not None:
                         try:
                             from ..actions import _state as action_state
-                            from ..actions._phase_context import record_phase_outcome
+                            from ..controller.actions._phase_context import record_phase_outcome
                             record_phase_outcome(
                                 case_data_store,
                                 action_state._CURRENT_PHASE,
@@ -320,7 +320,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                         if not (introduce_ok and contract and is_introduce_phase(contract)):
                             missing_hint = ''
                             try:
-                                from scripts.actions._phase_boundary import (
+                                from scripts.controller.actions._phase_boundary import (
                                     get_phase_boundary,
                                     observed_kinds,
                                     phase_done_ok,
@@ -477,7 +477,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                     if case_data_store is not None:
                         try:
                             from ..actions import _state as action_state
-                            from ..actions._phase_context import record_phase_outcome
+                            from ..controller.actions._phase_context import record_phase_outcome
                             record_phase_outcome(
                                 case_data_store,
                                 action_state._CURRENT_PHASE,

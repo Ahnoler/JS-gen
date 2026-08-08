@@ -22,7 +22,7 @@ from ._js_snippets import (
 )
 from ...models import ActionFile, FormSnapshot, FormSnapshotCollection
 
-# Path helper: __file__ is scripts/actions/_misc.py, so go up 2 levels
+# Path helper: __file__ is scripts/controller/actions/_misc.py, so go up 3 levels
 _SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Consecutive get_page_state while mask still visible after wait (blocks idle spin).
@@ -328,7 +328,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
         if _is_ok_result(result):
             _state._record_action('close_dialog', {}, result, element=element)
             try:
-                from scripts.actions._phase_boundary import maybe_record_picker_closed
+                from scripts.controller.actions._phase_boundary import maybe_record_picker_closed
                 from ._js_snippets import JS_IS_QUERY_TOOLBAR
                 still = False
                 try:
@@ -447,7 +447,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                             is_picker_ui = True
 
                 try:
-                    from scripts.actions._phase_intent import (
+                    from scripts.controller.actions._phase_intent import (
                         get_phase_intent,
                         should_block_index_submit,
                     )
@@ -516,8 +516,8 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     'text': (element_info or {}).get('text') or elem_text or '',
                 }, f'ok-clicked-{index}', element=element_info)
                 try:
-                    from scripts.actions._phase_intent import record_success_token
-                    from scripts.actions._phase_boundary import maybe_record_picker_closed
+                    from scripts.controller.actions._phase_intent import record_success_token
+                    from scripts.controller.actions._phase_boundary import maybe_record_picker_closed
                     compact2 = re.sub(r'\s+', '', btn_label)
                     if compact2.startswith(('确认', '确定')):
                         record_success_token(case_data_store, 'confirm_click', btn_label)

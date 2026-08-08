@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_SCENARIO_PAGE_SNAPSHOT, JS_VERIFY_FORM_STRUCTURE (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .container import JS_GET_CONTAINER
 

@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from scripts.actions._js_snippets import JS_SELECT_OPTION
+from scripts.controller.actions._js_snippets import JS_SELECT_OPTION
 
 
 def assert_true(cond: bool, msg: str) -> None:

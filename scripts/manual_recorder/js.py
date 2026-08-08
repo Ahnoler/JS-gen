@@ -1,7 +1,7 @@
 """Injected page script for manual DOM recording."""
 from __future__ import annotations
 
-from scripts.actions._js_snippets import _JS_ICON_BUTTON_HELPERS
+from scripts.controller.actions._js_snippets import _JS_ICON_BUTTON_HELPERS
 from scripts.actions._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from .js_parts.a import JS_MANUAL_PART_A
 from .js_parts.b import JS_MANUAL_PART_B

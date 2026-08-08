@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_ENRICH_CLICK_LOCATOR (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from scripts.actions._locator_helpers_js import PAGE_LOCATOR_HELPERS
 

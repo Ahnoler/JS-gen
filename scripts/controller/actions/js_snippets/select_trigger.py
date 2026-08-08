@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_FIND_LABELED_SELECT, JS_FIND_VISIBLE_DROPDOWN, JS_SELECT_TRIGGER_BY_XPATH, JS_SELECT_VALUE_BY_XPATH (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .base import JS_FIELD_DISABLED
 

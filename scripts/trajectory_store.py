@@ -163,8 +163,8 @@ def _handle_save_case_data(case_data_store, session_id):
 def _handle_reset_trajectory(session_id, case_data_store=None):
     from .controller import _ACTION_LOG
     from .recorder import _ACTION_LOG as _recorder_log
-    from .actions._phase_context import clear_phase_outcomes
-    from .actions._phase_intent import clear_phase_intent
+    from .controller.actions._phase_context import clear_phase_outcomes
+    from .controller.actions._phase_intent import clear_phase_intent
     _ACTION_LOG.clear()
     _recorder_log.clear()
     clear_phase_outcomes(case_data_store)

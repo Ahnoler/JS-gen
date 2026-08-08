@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_GET_CONTAINER (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 
 JS_GET_CONTAINER = '''(() => {

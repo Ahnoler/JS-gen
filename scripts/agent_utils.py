@@ -36,7 +36,7 @@ def extract_first_url(task):
 
 async def do_navigate(page, url):
     from . import controller as ctrl_mod
-    from .actions._helpers import dismiss_https_first_interstitial
+    from .controller.actions._helpers import dismiss_https_first_interstitial
     ctrl_mod._TRAJECTORY_URL = url
     emit_json({"event": "nav_step", "data": {"step": 0, "label": "Navigating to target URL"}})
     try:
@@ -307,7 +307,7 @@ def patch_icon_tooltip_labels():
     aria-label lets the agent recognize buttons like 「新增产品」.
     """
     from browser_use.browser.context import BrowserContext
-    from .actions._js_snippets import JS_STAMP_ICON_ARIA_LABELS
+    from .controller.actions._js_snippets import JS_STAMP_ICON_ARIA_LABELS
 
     _original_get_state = BrowserContext.get_state
 

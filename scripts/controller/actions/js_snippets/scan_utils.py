@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_CLASSIFY_FIELD, JS_FIELD_REQUIRED, JS_READ_CURRENT_VALUE, JS_SECTION_ATTACH_BLOCK, JS_SCROLL_TO_FIRST_ERROR (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .container import JS_GET_CONTAINER
 

@@ -97,7 +97,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
     executed through this watcher are recorded for script assembly.
     No separate CDP connection needed — actions run on the same Playwright context.
     """
-    from .actions._builder import build_controller
+    from .controller.service import build_controller
 
     # TODO: 如果将来改用 raw Playwright context（如从 CDP 连接），
     #       必须手动注入 get_current_page()，否则 controller action 会报错。
@@ -332,7 +332,7 @@ async def run_session(args):
             "step_index": step_idx,
         }
         try:
-            from .actions._phase_context import _outcome_for
+            from .controller.actions._phase_context import _outcome_for
             outcome = _outcome_for(case_data_store, phase_num)
             if outcome:
                 if 'success' in outcome:

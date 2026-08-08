@@ -15,7 +15,7 @@ def assert_true(cond: bool, msg: str) -> None:
 
 
 def test_snippet_exported() -> None:
-    from scripts.actions import _js_snippets as sn
+    from scripts.controller.actions import _js_snippets as sn
 
     assert_true(hasattr(sn, "JS_CAPTURE_FROM_XPATH"), "JS_CAPTURE_FROM_XPATH exported")
     js = sn.JS_CAPTURE_FROM_XPATH
@@ -26,7 +26,7 @@ def test_snippet_exported() -> None:
 
 
 def test_capture_snippet_drills_form_input() -> None:
-    from scripts.actions import _js_snippets as sn
+    from scripts.controller.actions import _js_snippets as sn
 
     js = sn.JS_CAPTURE_FROM_XPATH
     norm = _norm(js)
@@ -55,7 +55,7 @@ def test_helpers_source_no_smart_on_xpath_path() -> None:
 def test_capture_signature_has_xpath_smart() -> None:
     import inspect
 
-    from scripts.actions._helpers import _capture_element
+    from scripts.controller.actions._helpers import _capture_element
 
     sig = inspect.signature(_capture_element)
     assert_true("xpath_smart" in sig.parameters, "xpath_smart kw-only param")

@@ -154,7 +154,7 @@ async def _ignore_certificate_errors(browser_context) -> None:
 async def _bypass_ssl_interstitial_if_any(browser_context) -> None:
     """Click 「继续访问网站」 on HTTPS-First / SSL interstitial if present."""
     try:
-        from ..actions._helpers import dismiss_https_first_interstitial
+        from ..controller.actions._helpers import dismiss_https_first_interstitial
         page = await browser_context.get_current_page()
         result = await dismiss_https_first_interstitial(page)
         if result and result != 'none':

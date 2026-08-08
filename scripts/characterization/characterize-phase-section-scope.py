@@ -17,7 +17,7 @@ from scripts.actions._section_scope import (  # noqa: E402
     requires_section_declaration,
     unique_button_section,
 )
-from scripts.actions._form import _submit_ready_hint  # noqa: E402
+from scripts.controller.actions._form import _submit_ready_hint  # noqa: E402
 from scripts.models.task import TaskItem, TaskList  # noqa: E402
 
 
@@ -48,7 +48,7 @@ def test_filter_pending_excludes_other_section() -> None:
 
 
 def test_gate_scoped_ignores_credit() -> None:
-    from scripts.actions._phase_intent import check_pending_write_gate
+    from scripts.controller.actions._phase_intent import check_pending_write_gate
 
     tl = TaskList(
         pending=[
@@ -130,7 +130,7 @@ def test_get_pending_signature() -> None:
 
 
 def test_submit_hint_section_scoped() -> None:
-    from scripts.actions._form import _submit_ready_hint
+    from scripts.controller.actions._form import _submit_ready_hint
 
     tl = TaskList(
         pending=[

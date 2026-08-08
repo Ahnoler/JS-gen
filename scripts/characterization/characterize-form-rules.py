@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Characterization: scripts/actions/form_rules.py (match_rule + generators).
+Characterization: scripts/controller/actions/form_rules.py (match_rule + generators).
 
 Run:
   python scripts/characterization/characterize-form-rules.py
@@ -16,7 +16,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from scripts.actions.form_rules import (  # noqa: E402
+from scripts.controller.actions.form_rules import (  # noqa: E402
     FIELD_RULES,
     get_has_button_keywords,
     match_rule,

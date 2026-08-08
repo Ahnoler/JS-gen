@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.actions._phase_intent import (  # noqa: E402
+from scripts.controller.actions._phase_intent import (  # noqa: E402
     apply_phase_contract,
     contract_allows_form_assistant,
 )

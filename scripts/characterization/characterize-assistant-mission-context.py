@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.actions._llm_values import (  # noqa: E402
+from scripts.controller.actions._llm_values import (  # noqa: E402
     build_assistant_mission_context,
     format_assistant_human_message,
     parse_form_llm_response,
@@ -92,7 +92,7 @@ def test_run_form_assistant_payload_mentions_needs_agent() -> None:
 
 
 def test_dedupe_needs_agent_last_reason_wins() -> None:
-    from scripts.actions._form import _dedupe_needs_agent
+    from scripts.controller.actions._form import _dedupe_needs_agent
 
     out = _dedupe_needs_agent([
         {"label": "字段A", "reason": "first"},

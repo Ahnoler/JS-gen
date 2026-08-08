@@ -1,7 +1,7 @@
 /**
  * Characterization: click_save toast classification (fail-first, else success).
  *
- * Parses successRe / failRe from scripts/actions/_js_snippets.py (JS_SCAN_SAVE_OUTCOME)
+ * Parses successRe / failRe from scripts/controller/actions/js_snippets/save.py (JS_SCAN_SAVE_OUTCOME)
  * so regex drift fails loudly instead of a stale copy in this file.
  *
  * Run:
@@ -17,7 +17,7 @@ function assert(cond, msg) {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, '..', '..');
-const SNIPPETS = join(ROOT, 'scripts', 'actions', '_js_snippets.py');
+const SNIPPETS = join(ROOT, 'scripts', 'controller', 'actions', 'js_snippets', 'save.py');
 
 const source = readFileSync(SNIPPETS, 'utf8');
 

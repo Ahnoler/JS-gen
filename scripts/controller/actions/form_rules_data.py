@@ -1,4 +1,4 @@
-"""Field-rule registry data (extracted verbatim from scripts/actions/form_rules.py).
+"""Field-rule registry data (extracted verbatim from scripts/controller/actions/form_rules.py).
 
 FIELD_RULES is built here; form_rules.py imports it back at the end of the
 module (generators / FieldRule stay in form_rules.py).

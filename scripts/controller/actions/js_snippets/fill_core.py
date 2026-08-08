@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_FILL_FORM_FIELD, JS_FILL_BY_XPATH, JS_CAPTURE_FROM_XPATH (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .base import JS_FIELD_DISABLED
 from .container import JS_GET_CONTAINER

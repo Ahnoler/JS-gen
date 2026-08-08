@@ -13,7 +13,7 @@ sys.path.insert(0, ".")
 
 from playwright.async_api import async_playwright
 
-from scripts.actions._js_snippets import (
+from scripts.controller.actions._js_snippets import (
     JS_CLICK_ICON_BUTTON,
     JS_COLLECT_ICON_BUTTONS,
     JS_STAMP_ICON_ARIA_LABELS,

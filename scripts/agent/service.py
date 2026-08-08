@@ -13,7 +13,7 @@ from pathlib import Path
 
 from browser_use import Agent
 
-from ..actions._phase_intent import get_phase_intent
+from ..controller.actions._phase_intent import get_phase_intent
 from ..agent_utils import (
     PLANNER_SYSTEM_PROMPT,
     build_agent_system_message,
@@ -97,7 +97,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
 
     # Replace per-phase special-element candidates (do not accumulate across phases)
     try:
-        from ..actions._special_element import replace_special_element_candidates
+        from ..controller.actions._special_element import replace_special_element_candidates
         raw_cands = (
             instruction.get('special_element_candidates')
             or instruction.get('specialElementCandidates')
@@ -146,7 +146,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     heal_mode = False
     max_steps_resolved = False
     try:
-        from ..actions._phase_context import (
+        from ..controller.actions._phase_context import (
             apply_heal_mode,
             apply_task_mode,
             classification_task_text,
@@ -155,7 +155,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             needs_business_data_context,
             recording_refill_hint,
         )
-        from ..actions._phase_intent import (
+        from ..controller.actions._phase_intent import (
             apply_phase_contract,
             apply_phase_intent,
             contract_summary_hint,
@@ -369,7 +369,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         )
         sys.stderr.flush()
     try:
-        from ..actions._case_data import format_case_data_hint, iter_user_case_entries
+        from ..controller.actions._case_data import format_case_data_hint, iter_user_case_entries
         if want_biz:
             entries = iter_user_case_entries(case_data_ref)
             hint = format_case_data_hint(case_data_ref)
@@ -385,7 +385,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         sys.stderr.flush()
 
     try:
-        from ..actions._special_element import format_special_element_hint
+        from ..controller.actions._special_element import format_special_element_hint
         se_hint = format_special_element_hint(special_element_candidates_store)
         if se_hint:
             agent_task = agent_task + se_hint
@@ -450,7 +450,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     # Phase-end observability + soft quality gate
     try:
         if case_data_ref is not None:
-            from ..actions._phase_intent import (
+            from ..controller.actions._phase_intent import (
                 check_pending_write_gate,
                 emit_phase_observability,
                 has_contract_success,

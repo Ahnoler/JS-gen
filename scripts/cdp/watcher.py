@@ -33,7 +33,7 @@ def _build_ctrl(ctx, case_data_store=None):
         ctx: Playwright browser context with get_current_page injected.
         case_data_store: Optional shared dict (in-process watcher passes the Agent's store).
     """
-    from scripts.actions._builder import build_controller
+    from scripts.controller.service import build_controller
 
     store = case_data_store if case_data_store is not None else {}
     ctrl = build_controller(ctx, case_data_store=store)

@@ -31,7 +31,7 @@ def test_remember_and_resolve_memory() -> None:
 
 
 def test_clear_phase_intent_clears_section() -> None:
-    from scripts.actions._phase_intent import clear_phase_intent
+    from scripts.controller.actions._phase_intent import clear_phase_intent
 
     store = {"_phase_section": "系统评级结论", "_empty_act_streak": 2}
     clear_phase_intent(store)
@@ -86,7 +86,7 @@ def test_click_save_section_order_in_source() -> None:
 
 def test_scoped_pending_gate_ignores_other_section() -> None:
     from scripts.models.task import TaskItem, TaskList
-    from scripts.actions._phase_intent import apply_phase_contract, check_pending_write_gate
+    from scripts.controller.actions._phase_intent import apply_phase_contract, check_pending_write_gate
 
     tl = TaskList(
         pending=[

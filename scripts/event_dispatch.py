@@ -215,10 +215,10 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
             emit_json({"event": "replay_done", "data": {"count": 0, "error": "no browser_context or empty actions"}})
             return 'continue'
 
-        # Self-heal / trajectory replay: sequential ops via scripts/actions/_replay.py
+        # Self-heal / trajectory replay: sequential ops via scripts/controller/actions/_replay.py
         # (form JS + durable click + controller) — not LLM, not Playwright assemble_partial.
-        from .actions._builder import build_controller
-        from .actions._replay import replay_action_entries
+        from .controller.service import build_controller
+        from .controller.actions._replay import replay_action_entries
 
         controller = build_controller(browser_context, case_data_store=case_data_store)
         registry_actions = controller.registry.registry.actions

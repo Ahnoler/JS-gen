@@ -1,4 +1,4 @@
-"""Form scan/classify helpers (extracted verbatim from scripts/actions/_form.py).
+"""Form scan/classify helpers (extracted verbatim from scripts/controller/actions/_form.py).
 
 Scan, section grouping, query-mode detection, snapshot persistence, task
 completion and submit cues. ``_register_form_actions`` lives in _form.py.
@@ -40,7 +40,7 @@ def _is_search_dialog(container_id: str) -> bool:
 
 
 def _force_refill_flag(case_data_store: dict | None) -> bool:
-    from scripts.actions._phase_intent import contract_force_refill
+    from scripts.controller.actions._phase_intent import contract_force_refill
     return contract_force_refill(case_data_store)
 
 
@@ -478,7 +478,7 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
     if _is_query_mode(case_data_store):
         return ''
     try:
-        from scripts.actions._phase_boundary import next_action_hint, phase_boundary_active
+        from scripts.controller.actions._phase_boundary import next_action_hint, phase_boundary_active
         if phase_boundary_active(case_data_store):
             cue = next_action_hint(case_data_store)
             if cue:

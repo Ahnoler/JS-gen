@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_SELECT_OPTION, JS_READ_SELECT_OPTIONS, JS_FIND_OPTION (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .select_trigger import JS_FIND_VISIBLE_DROPDOWN
 

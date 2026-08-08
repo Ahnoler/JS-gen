@@ -247,7 +247,7 @@ async def pick_page(browser):
 
 
 async def audit_entries(page, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    from scripts.actions._replay import (
+    from scripts.controller.actions._replay import (
         _element_xpath_smart,
         _norm_replay_value,
         _params_xpath_smart,

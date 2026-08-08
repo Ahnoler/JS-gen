@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.actions import _replay as R  # noqa: E402
+from scripts.controller.actions import _replay as R  # noqa: E402
 
 
 def test_resolve_prefers_params() -> None:

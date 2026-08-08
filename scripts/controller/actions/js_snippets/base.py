@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR, JS_WAIT_LOADING, JS_CHECK_LOADING, JS_NATIVE_SETTER, JS_LOCATOR, JS_SMART_LOCATOR, JS_FIELD_DISABLED (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .container import JS_GET_CONTAINER
 from scripts.actions._locator_helpers_js import PAGE_LOCATOR_HELPERS

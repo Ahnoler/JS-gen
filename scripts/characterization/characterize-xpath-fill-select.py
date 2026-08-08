@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.actions import _js_snippets as sn  # noqa: E402
-from scripts.actions._js_snippets import (  # noqa: E402
+from scripts.controller.actions import _js_snippets as sn  # noqa: E402
+from scripts.controller.actions._js_snippets import (  # noqa: E402
     JS_FILL_BY_XPATH,
     JS_SELECT_TRIGGER_BY_XPATH,
     JS_SELECT_VALUE_BY_XPATH,

@@ -3,7 +3,7 @@
 """
 Playwright script assembler.
 
-DEPRECATED for product replay: prefer live scripts/actions/_replay.py
+DEPRECATED for product replay: prefer live scripts/controller/actions/_replay.py
 (replay_actions). This assembler + CTRL injection remains an engineering
 asset (test/assemble, legacy /replay/*) and must not be functionally removed
 without an explicit migration.

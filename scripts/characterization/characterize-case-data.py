@@ -16,12 +16,12 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from scripts.actions._case_data import (  # noqa: E402
+from scripts.controller.actions._case_data import (  # noqa: E402
     format_case_data_hint,
     iter_user_case_entries,
     lookup_case_value,
 )
-from scripts.actions._form import (  # noqa: E402
+from scripts.controller.actions._form import (  # noqa: E402
     _is_query_mode,
     _is_search_dialog,
     _query_not_form_payload,
@@ -30,7 +30,7 @@ from scripts.actions._form import (  # noqa: E402
     _task_done_impl,
     _with_submit_cue,
 )
-from scripts.actions._phase_context import (  # noqa: E402
+from scripts.controller.actions._phase_context import (  # noqa: E402
     apply_task_mode,
     classify_task_mode,
     force_refill_all_required,

@@ -1,6 +1,6 @@
 """
 JS snippet constants: JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME (extracted from _js_snippets.py).
-Re-exported by scripts/actions/_js_snippets.py for backward compat.
+Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .scan_utils import JS_SECTION_ATTACH_BLOCK
 

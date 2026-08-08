@@ -42,8 +42,8 @@ class _PageCtx:
 
 async def run_probes(page, sample_fill: dict, sample_select: dict) -> list[dict]:
     """Regression probes for the original false-ok / params-miss bugs."""
-    from scripts.actions._js_snippets import JS_FILL_BY_XPATH
-    from scripts.actions._replay import (
+    from scripts.controller.actions._js_snippets import JS_FILL_BY_XPATH
+    from scripts.controller.actions._replay import (
         _element_xpath_smart,
         _params_xpath_smart,
         _read_value_by_xpath,
@@ -119,7 +119,7 @@ async def run_probes(page, sample_fill: dict, sample_select: dict) -> list[dict]
 
 async def main_async(traj: int, phase: int | None, cdp: str, limit: int | None) -> int:
     from playwright.async_api import async_playwright
-    from scripts.actions._replay import replay_action_entries
+    from scripts.controller.actions._replay import replay_action_entries
 
     audit = _load_audit_mod()
     audit._load_env()

@@ -64,7 +64,7 @@ async def _pre_nav(page, click_js: str) -> None:
 async def main() -> int:
     import pymysql
     from playwright.async_api import async_playwright
-    from scripts.actions._replay import _JS_CLICK_DURABLE, replay_action_entries
+    from scripts.controller.actions._replay import _JS_CLICK_DURABLE, replay_action_entries
 
     host = os.environ.get('DB_HOST', '127.0.0.1')
     port = int(os.environ.get('DB_PORT', '3306'))

@@ -29,7 +29,7 @@ async def report_page_state(browser):
 async def scan_pending(browser):
     """Run scan_form_fields + get_pending_tasks on the agent's browser."""
     sys.path.insert(0, '.')
-    from scripts.actions._builder import build_controller
+    from scripts.controller.service import build_controller
 
     ctx = browser.contexts[0]
 
@@ -76,9 +76,9 @@ async def quick_snapshot(browser):
     """Quick DOM scan — count filled/empty/disabled fields."""
     import json as _json
     try:
-        from scripts.actions.form_rules import get_has_button_keywords
+        from scripts.controller.actions.form_rules import get_has_button_keywords
     except ImportError:
-        from scripts.actions.form_rules import get_has_button_keywords
+        from scripts.controller.actions.form_rules import get_has_button_keywords
     has_btn_kw_json = _json.dumps(get_has_button_keywords(), ensure_ascii=False)
 
     for pg in browser.contexts[0].pages:
