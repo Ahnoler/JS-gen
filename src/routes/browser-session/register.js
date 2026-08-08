@@ -122,7 +122,7 @@ export default function registerBrowserSessionRoutes(app) {
       const url = actionData.url || '';
       const commands = actionData?.tests?.[0]?.commands || actionData?.actions || [];
 
-      // ── Reproduce failure scene via scripts/actions/_replay.py ──
+      // ── Reproduce failure scene via scripts/controller/actions/_replay.py ──
       // Replay failedStep 之前的操作（必要时先 go_to_url），重建页面状态后再交给 Agent 修复。
       const SKIP_REPLAY = new Set([
         'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',

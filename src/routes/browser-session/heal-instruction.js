@@ -131,7 +131,7 @@ export function buildRerunResumeInstruction({ actionData, failedStep, log_file, 
 
     // Build URL section
     const replayNote = replayedCount > 0
-      ? `当前页面已通过 _replay（scripts/actions/_replay.py）自动回放了前 ${replayedCount} 步操作，处于第 ${failedStep} 步的待操作状态。无需重复导航和登录，直接从第 ${failedStep} 步继续；若需填表，对主页面/抽屉字段调用 fill/select 以触发隐式 auto-fill。\n\n`
+      ? `当前页面已通过 _replay（scripts/controller/actions/_replay.py）自动回放了前 ${replayedCount} 步操作，处于第 ${failedStep} 步的待操作状态。无需重复导航和登录，直接从第 ${failedStep} 步继续；若需填表，对主页面/抽屉字段调用 fill/select 以触发隐式 auto-fill。\n\n`
       : '';
     const urlSection = replayedCount > 0
       ? replayNote

@@ -139,6 +139,6 @@
 | 单位 | 常见计量单位 | 个、套、元、万元 |
 | 方向、流向 | 取常见方向 | 流入、流出、转入、转出 |
 
-> **注意**：动态生成器规则已迁移至 `scripts/actions/form_rules.py` 的 `FIELD_RULES` 声明式注册表。
+> **注意**：动态生成器规则已迁移至 `scripts/controller/actions/form_rules.py` 的 `FIELD_RULES` 声明式注册表。
 > Agent 运行时直接调用 `match_rule(label_text)` 即可，无需加载本文件。
 > 本文档仅保留语义说明供人类参考。

@@ -8,7 +8,7 @@
  *
  * `CTRL_OBJECT` + `getInjectionCode()` are the single source of truth for the
  * CTRL.* surface injected into Playwright scripts. Agent-side duplicates live
- * in scripts/actions/_js_snippets.py and inline evaluate in actions/*.py —
+ * in scripts/controller/actions/_js_snippets.py and inline evaluate in controller/actions/*.py —
  * keep name-level parity via `node scripts/characterization/characterize-ctrl.mjs` (not
  * byte-identical; agent has extra JS beyond CTRL).
  *

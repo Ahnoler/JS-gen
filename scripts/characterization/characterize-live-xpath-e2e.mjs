@@ -101,7 +101,7 @@ const FIXTURE = `<!doctype html>
 </div>
 </body></html>`;
 
-/** AI capture snippet — mirrors scripts/actions/_js_snippets.JS_SMART_LOCATOR core. */
+/** AI capture snippet — mirrors scripts/controller/actions/_js_snippets.JS_SMART_LOCATOR core. */
 function aiSmartLocatorExpr(label) {
   const lit = JSON.stringify(label);
   return `(() => {

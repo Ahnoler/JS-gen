@@ -109,8 +109,8 @@ Node.js Express (server.mjs, :4097)
 
 | 语言 | 文件 | 用途 |
 |------|------|------|
-| Python | `scripts/controller.py` + `scripts/actions/*` | Agent 运行时 |
-| Python JS 字符串 | `scripts/actions/_js_snippets.py` | `page.evaluate` 注入 |
+| Python | `scripts/controller/` + `scripts/controller/actions/*` | Agent 运行时 |
+| Python JS 字符串 | `scripts/controller/actions/_js_snippets.py` | `page.evaluate` 注入 |
 | JavaScript | `src/ctrl-actions.js` | 注入生成的 Playwright 脚本 |
 
 同一套表面：`fillFormField`、`selectOption`、`selectDate`、`clickMenuItem`、`clickTableRowAction`、`closeDialog` 等。改一处必须改其余。
@@ -145,7 +145,7 @@ Node.js Express (server.mjs, :4097)
 | 位置 | 角色 |
 |------|------|
 | `scripts/prompts/agent-prompt.md` 等 | Agent / Planner / 字段 / 修复提示词 |
-| `scripts/actions/form_rules.py` | 可执行填表规则（身份证、手机号等） |
+| `scripts/controller/actions/form_rules.py` | 可执行填表规则（身份证、手机号等） |
 | `src/ctrl-actions.js` + Python CTRL | 控件怎么点 / 怎么填 |
 
 不要再按旧文档去找 `atp-ui` / `atp-rule` skill 包。

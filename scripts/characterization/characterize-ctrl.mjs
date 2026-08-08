@@ -2,8 +2,8 @@
  * Characterization: src/ctrl-actions.js is the canonical CTRL.* surface
  * (replay / assemble inject via getInjectionCode → window.CTRL).
  *
- * Agent-side JS lives in scripts/actions/_js_snippets.py and inline
- * page.evaluate in scripts/actions/*.py — intentionally not byte-identical.
+ * Agent-side JS lives in scripts/controller/actions/_js_snippets.py and inline
+ * page.evaluate in scripts/controller/actions/*.py — intentionally not byte-identical.
  * This script asserts name-level parity so drift is caught loudly.
  *
  * Run:
@@ -13,7 +13,7 @@
  * Mapping: CTRL method → cue(s) that must appear in Python (or assembler)
  *
  * Cue may be a JS_* constant name, an async def / action name, or a
- * distinctive string. Search roots: _js_snippets.py, actions/*.py,
+ * distinctive string. Search roots: _js_snippets.py, controller/actions/*.py,
  * and (assembler-only methods) script_assembler.py / models/form_snapshot.py.
  *
  *   getContainer          → JS_GET_CONTAINER
@@ -89,8 +89,8 @@ function parseCtrlMethods(ctrlObjectSrc) {
 }
 
 function loadAgentCorpus() {
-  // Agent-side Python corpus: legacy scripts/actions/ shims + the canonical
-  // scripts/controller/actions/ tree (incl. the js_snippets package).
+  // Agent-side Python corpus: the canonical scripts/controller/actions/ tree
+  // (incl. the js_snippets package).
   const parts = [];
   const readPy = (dir) => {
     if (!existsSync(dir)) return;
@@ -100,7 +100,6 @@ function loadAgentCorpus() {
         .map((f) => readFileSync(join(dir, f), 'utf8')),
     );
   };
-  readPy(join(here, '..', 'actions'));
   readPy(join(here, '..', 'controller', 'actions'));
   readPy(join(here, '..', 'controller', 'actions', 'js_snippets'));
   return parts.join('\n');

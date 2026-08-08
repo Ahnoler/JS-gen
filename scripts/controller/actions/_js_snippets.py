@@ -7,7 +7,7 @@ not byte-identical (more helpers than CTRL). Parity check:
 
     node scripts/characterization/characterize-ctrl.mjs
 
-Implementation split into scripts/actions/js_snippets/ by widget domain;
+Implementation split into scripts/controller/actions/js_snippets/ by widget domain;
 this module re-exports every constant so existing importers are unchanged.
 """
 

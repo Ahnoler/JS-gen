@@ -46,8 +46,8 @@ Element UI CTRL helpers: **`src/ctrl-actions.js` is canonical** for `window.CTRL
 | Language | File | Used by |
 |----------|------|---------|
 | JavaScript (canonical) | `src/ctrl-actions.js` | Injected into generated Playwright scripts (`getInjectionCode`) |
-| Python JS strings | `scripts/actions/_js_snippets.py` | `page.evaluate` injection from Python agent |
-| Python | `scripts/controller.py` + `scripts/actions/*` | Browser Use agent at runtime |
+| Python JS strings | `scripts/controller/actions/_js_snippets.py` | `page.evaluate` injection from Python agent |
+| Python | `scripts/controller/` + `scripts/controller/actions/*` | Browser Use agent at runtime |
 
 Same CTRL surface (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem`, `clickTableRowButton`, `closeDialog`, etc.). Edit canonical first; keep Python cues in sync — `node scripts/characterization/characterize-ctrl.mjs` fails on missing methods.
 
@@ -93,7 +93,7 @@ Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps
 | `src/runtime/script-runner.js` | Shared Playwright execute (test-run + replay) |
 | `src/services/assemble-service.js` | action JSON → Playwright script |
 | `src/services/replay-service.js` | **DEPRECATED** assembled Playwright replay (engineering asset) |
-| Live replay | `scripts/actions/_replay.py` via `/steps/replay` — **product-supported** |
+| Live replay | `scripts/controller/actions/_replay.py` via `/steps/replay` — **product-supported** |
 
 | `src/executor-slot-lease.js` | Executor slot exclusive leases until `detach` |
 | `src/executor-*.js` | Executor WS registry, session client, event hub |
@@ -151,7 +151,7 @@ Layout follows browser_use's package structure (agent/ + controller/); see `docs
 | `scripts/prompts/agent-field-rules.md` | Field-filling guidance for the agent |
 | `scripts/prompts/form-prompt.md` | Form-oriented prompt fragments |
 | `scripts/prompts/heal-prompt.md` | Self-heal / repair prompts |
-| `scripts/actions/form_rules.py` | Executable value generators (former atp-rule behavior) |
+| `scripts/controller/actions/form_rules.py` | Executable value generators (former atp-rule behavior) |
 | `src/ctrl-actions.js` + Python CTRL | Executable Element UI ops (former atp-ui “how to click” as code) |
 
 Do **not** look for or restore OpenCode skill packages unless the user explicitly asks. Update prompts under `scripts/prompts/` and keep CTRL / `form_rules` in sync instead.

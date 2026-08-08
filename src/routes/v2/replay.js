@@ -2,7 +2,7 @@
  * Trajectory replay APIs (assemble → run → WS step/screenshot progress).
  *
  * Legacy: Product-supported replay is attached/live `replay_actions` via
- * `scripts/actions/_replay.py` (e.g. `/steps/replay`). This `/replay/*` path
+ * `scripts/controller/actions/_replay.py` (e.g. `/steps/replay`). This `/replay/*` path
  * remains runnable as an engineering asset (assembled Playwright + CTRL) but
  * is no longer the product-supported path. Do not remove without a migration.
  */
