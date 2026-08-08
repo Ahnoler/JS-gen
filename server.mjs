@@ -139,12 +139,12 @@ async function main() {
         console.warn('[server] stale remote mount reconcile skipped:', err.message);
       }
       try {
-        const batchService = await import('./src/services/trajectory-batch-service.js');
+        const batchService = await import('./src/services/trajectory/index.js');
         await batchService.recoverBatchJobsOnStartup();
       } catch (err) {
         console.warn('[server] batch recovery skipped:', err.message);
         try {
-          const batchService = await import('./src/services/trajectory-batch-service.js');
+          const batchService = await import('./src/services/trajectory/index.js');
           batchService.startBatchScheduler();
         } catch {}
       }
