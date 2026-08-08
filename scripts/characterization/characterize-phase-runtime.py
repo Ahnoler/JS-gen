@@ -126,7 +126,9 @@ def test_scoped_pending_gate_ignores_other_section() -> None:
 
 
 def test_recorder_wires_resolve_phase_section() -> None:
-    rec = (ROOT / "scripts/recorder.py").read_text(encoding="utf-8")
+    # Emission helpers moved to scripts/agent/recorder_emitters.py (recorder.py
+    # keeps build_recording_hooks and calls them).
+    rec = (ROOT / "scripts/agent/recorder_emitters.py").read_text(encoding="utf-8")
     assert_true("resolve_phase_section" in rec, "recorder uses resolve_phase_section")
     assert_true("is_empty_effective_actions" in rec, "recorder uses is_empty_effective_actions")
     assert_true("empty_act_prescription_message" in rec, "recorder uses empty_act_prescription_message")
