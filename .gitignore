@@ -28,4 +28,5 @@ playwright-cli/
 browser/
 python/
 nodejs/
-*/__pycache__/
+__pycache__/
+.idea/dbnavigator.xml
