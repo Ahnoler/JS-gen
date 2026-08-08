@@ -25,8 +25,29 @@ def test_snippet_exported() -> None:
     assert_true("xpath_abs:" not in js.replace(" ", ""), "do not write xpath_abs")
 
 
+def test_helpers_source_no_smart_on_xpath_path() -> None:
+    src = (ROOT / "scripts/actions/_helpers.py").read_text(encoding="utf-8")
+    # After rewrite: body must call JS_CAPTURE_FROM_XPATH; must not call JS_SMART_LOCATOR
+    assert_true("JS_CAPTURE_FROM_XPATH" in src, "helpers uses CAPTURE_FROM_XPATH")
+    assert_true(
+        "JS_SMART_LOCATOR" not in src.split("async def _capture_element")[1].split("\nasync def ")[0],
+        "_capture_element must not use JS_SMART_LOCATOR",
+    )
+
+
+def test_capture_signature_has_xpath_smart() -> None:
+    import inspect
+
+    from scripts.actions._helpers import _capture_element
+
+    sig = inspect.signature(_capture_element)
+    assert_true("xpath_smart" in sig.parameters, "xpath_smart kw-only param")
+
+
 def main() -> int:
     test_snippet_exported()
+    test_helpers_source_no_smart_on_xpath_path()
+    test_capture_signature_has_xpath_smart()
     print("characterize-capture-element-xpath: OK")
     return 0
 

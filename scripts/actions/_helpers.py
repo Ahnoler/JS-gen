@@ -12,7 +12,6 @@ from browser_use.agent.views import ActionResult
 
 from ._js_snippets import (
     JS_CHECK_LOADING, JS_WAIT_LOADING,
-    JS_SMART_LOCATOR,
     JS_ENRICH_CLICK_LOCATOR,
     JS_READ_SELECT_OPTIONS,
 )
@@ -209,38 +208,36 @@ async def _wait_if_loading(page):
     await dismiss_https_first_interstitial(page)
 
 
-async def _capture_element(page, label_text, *, target_kind=''):
-    """Capture element info for a labeled form field (pre-mutation)."""
-    result = {}
+async def _capture_element(page, label_text, *, xpath_smart: str = "", target_kind: str = ""):
+    """Capture element info from a write xpath (pre-mutation)."""
+    xp = (xpath_smart or "").strip()
+    if not xp:
+        return None
     try:
-        raw = await page.evaluate(JS_SMART_LOCATOR, [label_text])
-        if raw:
-            info = json.loads(raw) if isinstance(raw, str) else raw
-            if not isinstance(info, dict):
-                return None
-            if info.get('xpath') or info.get('xpath_smart') or info.get('xpath_full'):
-                result = {
-                    'xpath': info.get('xpath') or info.get('xpath_smart') or info.get('xpath_full') or '',
-                    'css_selector': info.get('css_sel') or info.get('css_selector') or info.get('cssSelector') or '',
-                    'tag_name': info.get('tag') or info.get('tag_name') or 'input',
-                    'attributes': info.get('attrs') or info.get('attributes') or {},
-                    'text': info.get('text') or '',
-                    'xpath_smart': info.get('xpath_smart') or '',
-                    'xpath_full': info.get('xpath_full') or info.get('xpath_abs') or '',
-                    'xpath_abs': info.get('xpath_abs') or info.get('xpath_full') or '',
-                    'candidates': info.get('candidates') if isinstance(info.get('candidates'), list) else [],
-                    'formLabel': info.get('formLabel') or label_text or '',
-                    'target_kind': info.get('target_kind') or target_kind or '',
-                    'locator_scope': info.get('locator_scope') or '',
-                    'locator_occurrence': info.get('locator_occurrence') or 0,
-                    'locator_verified': bool(info.get('locator_verified')),
-                    'locator_strategy': info.get('locator_strategy') or '',
-                }
-                if info.get('locator_fallback_reason'):
-                    result['locator_fallback_reason'] = info['locator_fallback_reason']
+        from ._js_snippets import JS_CAPTURE_FROM_XPATH
+
+        raw = await page.evaluate(JS_CAPTURE_FROM_XPATH, [xp, label_text or "", target_kind or ""])
+        if not raw:
+            return None
+        info = json.loads(raw) if isinstance(raw, str) else raw
+        if not isinstance(info, dict):
+            return None
+        if not (info.get("xpath_smart") or info.get("xpath_full")):
+            return None
+        return {
+            "xpath": info.get("xpath") or info.get("xpath_smart") or "",
+            "css_selector": info.get("css_sel") or info.get("css_selector") or "",
+            "tag_name": info.get("tag") or info.get("tag_name") or "input",
+            "attributes": info.get("attrs") or info.get("attributes") or {},
+            "text": info.get("text") or "",
+            "xpath_smart": info.get("xpath_smart") or xp,
+            "xpath_full": info.get("xpath_full") or "",
+            "candidates": info.get("candidates") if isinstance(info.get("candidates"), list) else [],
+            "formLabel": info.get("formLabel") or label_text or "",
+            "target_kind": info.get("target_kind") or target_kind or "",
+        }
     except Exception:
-        pass
-    return result if result else None
+        return None
 
 
 async def _enrich_click_element(
