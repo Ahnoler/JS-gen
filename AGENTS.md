@@ -76,8 +76,8 @@ Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps
 
 ### Route modules (`src/routes/`)
 
-- **`v2/`** — Primary product APIs: system-mgmt, trajectories (+ recording), replay, executors, case-data, screenshots, remote-session, accounts.
-- **`browser-session.js`** — Long-lived session debug path; trajectory/case save prefers MySQL.
+- **`v2/`** — Primary product APIs: system-mgmt, trajectories (+ recording), replay, executors, case-data, screenshots, remote-session, accounts. `trajectory.js` registration split by resource into `trajectory-record.js` / `trajectory-steps.js` (routes unchanged).
+- **`browser-session/`** — Long-lived session debug path (register.js + persist-live / watcher-actions / trajectory-persist / step-execution / heal-instruction / …); trajectory/case save prefers MySQL.
 - **`test-assemble.js`** — Thin HTTP over `assemble-service` (dedup → assembler).
 - **`test-run.js`** — Thin HTTP/WS over `script-runner` (`execution:*` events).
 - **`llm-proxy.js`** — OpenAI-compatible `/v1/chat/completions` and `/v1/models`.
@@ -89,6 +89,7 @@ Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps
 
 | Module | Role |
 |--------|------|
+| `src/services/trajectory/` | trajectory-* services + extracted runners (replay-batch-runner, form-structure-heal, recording-runner, batch-analyze/batch-record, form-snapshot-append, attach-runner, text-extract); `index.js` re-exports all public names |
 | `src/runtime/script-runner.js` | Shared Playwright execute (test-run + replay) |
 | `src/services/assemble-service.js` | action JSON → Playwright script |
 | `src/services/replay-service.js` | **DEPRECATED** assembled Playwright replay (engineering asset) |
@@ -121,12 +122,16 @@ Executor ops notes: `docs/执行机解耦与操作总结.md` (gitignored docs/).
 
 ### Python agent (`scripts/`)
 
+Layout follows browser_use's package structure (agent/ + controller/); see `docs/refactor-plan.md` for the mapping.
+
 - **`main.py`** — Session CLI (`--session`, stdin-driven).
-- **`controller.py` / `actions/`** — Custom Element UI actions; `_record_action()` → `_ACTION_LOG`.
-- **`session_runner.py`** — Stdin JSON → agent steps → stdout events; intervention buffer.
-- **`script_assembler.py`** — Action entries → Playwright JS + CTRL injection; emits `__REPLAY_STEP__` markers for replay WS.
+- **`controller/`** — Tool registry + dispatch (browser_use-style): `service.py` (build_controller), `registry.py` (registered actions schema view), `actions/` (per-control action registration: `_form`/`_misc`/`_navigation`/`_table`/`_special_element`/`_replay`/`phase/`/`js_snippets/`…). `controller.py` + `actions/*` are compatibility shims re-exporting the same names.
+- **`agent/`** — `service.py` (per-phase agent step execution), `recorder_emitters.py` (on_step_end phase/intent/quality-gate emission).
+- **`browser/`** — `factory.py` (Chrome launch / window / seed profile).
+- **`session_runner.py`** — Stdin JSON → agent steps → stdout events; intervention buffer (thin orchestrator; helpers split into `cdp_ports.py` / `trajectory_store.py` / `event_dispatch.py`).
+- **`script_assembler.py`** — Thin facade; code generation lives in `codegen/` (`actions.py` + `js_escaping.py`).
 - **`agent_utils.py`** — LLM + context trim; loads prompts from `scripts/prompts/`.
-- **`recorder.py`** — Session/phase action + log files.
+- **`recorder.py`** — Session/phase action + log files (hooks; emitters in `agent/recorder_emitters.py`).
 - **`actions/form_rules.py`** — `match_rule(label_text)` → valid random values (ID card, phone, credit code, …). Used by the **agent** auto-fill path, not a user-facing plugin yet.
 - **`browser-use-agent.py`** — Thin wrapper around `main()`.
 
