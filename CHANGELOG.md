@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-08: **拆分 cdp/remote-bridge.js 为包**：`src/cdp/remote-bridge/` 下拆出 `state.js`（共享可变状态 `bridge` 对象 + 常量 + `getRemoteStatus` / `broadcastStatus` / `broadcastInspect` / `pushAgentEvent`）、`screencast.js`（startScreencast/restartScreencast/onScreencastFrame/stall watchdog/viewport override）、`cdp-input.js`（handleAck/flushFillRecord/handleInput/handleViewport）、`ws-router.js`（ensureWsHook WS 路由 + BiB target 解析 `resolveBibTarget`）；`index.js` 保留全部 10 个公开导出与模块状态，`src/cdp/remote-bridge.js` 改为 10 名字的 re-export shim（同一函数身份），消费者导入路径零变化。`wsHooked` 注册语义与 `ensureWsHook` 调用时机不变（`attachLive` 以参数注入 ws-router 避免 import 环）。全部函数逐字比对一致（仅 `bridge.` 前缀改写与 shorthand→显式属性等价变换），无逻辑变更。
+  影响范围：BiB 远程桥（CDP screencast/input、remote:* WS、resolveBibTarget、resolveElementByLabelText）语义不变。
+  文件：src/cdp/remote-bridge.js, src/cdp/remote-bridge/{index,state,screencast,cdp-input,ws-router}.js
+  Python 同步提示：无（纯结构移动，端点路径/响应零变化）。
+
 - 2026-08-08: **拆分 v2/trajectory.js 路由注册**：单一注册函数按资源拆为三个模块——`trajectory.js`（trajectory CRUD / phases / case-data / login-context / clear / assemble-file）、`trajectory-record.js`（record prepare/start/stop、attach/detach/stream-detach、manual-record、resolve-element、confirm）、`trajectory-steps.js`（steps CRUD、steps/replay start+stop、step-move）；共享 `sendErr` 助手移入 `trajectory-shared.js`。`__init__.js` 在 `registerTrajectory(app)` 后依次调用三个注册函数；32 条路由的方法/路径/处理器逐字不变（每块逐字比对一致），各模块内注册顺序不变。跨模块间路由互不遮蔽（各路径字面段/段数互异），Express 匹配行为不变。
   影响范围：/api/v2/trajectories* 全部路由（语义不变）。
   文件：src/routes/v2/trajectory.js, src/routes/v2/trajectory-record.js, src/routes/v2/trajectory-steps.js, src/routes/v2/trajectory-shared.js, src/routes/v2/__init__.js
