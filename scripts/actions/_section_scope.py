@@ -203,7 +203,7 @@ def _phase_submit_not_required(store: dict | None) -> bool:
     if mode in ("query", "navigate", "login"):
         return True
     try:
-        from ._phase_reviewer import coerce_bool
+        from ..controller.actions.phase.reviewer import coerce_bool
 
         submit = c.get("submit") if isinstance(c.get("submit"), dict) else {}
         return not coerce_bool(submit.get("required"))

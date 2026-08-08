@@ -1,7 +1,7 @@
 """Phase boundary gates + evidence — extracted from phase/boundary.py.
 
 Evidence recording, done-ok evaluation, picker/context detection, submit
-blocking and NEXT_ACTION cues. Lazy-imports _phase_reviewer only.
+blocking and NEXT_ACTION cues. Lazy-imports phase.reviewer only.
 """
 
 from __future__ import annotations
@@ -212,7 +212,7 @@ def next_action_hint(case_data_store: dict | None) -> str:
         # plants validation errors). Same contract signal as overlay_blocks_done.
         c = (case_data_store or {}).get('_phase_intent')
         if isinstance(c, dict):
-            from scripts.actions._phase_reviewer import coerce_bool
+            from scripts.controller.actions.phase.reviewer import coerce_bool
             submit = c.get('submit') if isinstance(c.get('submit'), dict) else {}
             kinds = (c.get('success') or {}).get('kinds') or []
             if not isinstance(kinds, (list, tuple)):

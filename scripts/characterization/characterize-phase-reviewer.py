@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.actions._phase_reviewer import (  # noqa: E402
+from scripts.controller.actions.phase.reviewer import (  # noqa: E402
     contract_debug_line,
     normalize_reviewer_payload,
     resolve_phase_max_steps,

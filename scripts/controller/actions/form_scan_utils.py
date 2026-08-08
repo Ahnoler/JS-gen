@@ -501,7 +501,7 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
         c = case_data_store.get('_phase_intent')
         if isinstance(c, dict):
             try:
-                from scripts.actions._phase_reviewer import coerce_bool
+                from scripts.controller.actions.phase.reviewer import coerce_bool
                 submit = c.get('submit') if isinstance(c.get('submit'), dict) else {}
                 kinds = (c.get('success') or {}).get('kinds') or []
                 if not isinstance(kinds, (list, tuple)):

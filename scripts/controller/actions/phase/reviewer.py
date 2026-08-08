@@ -130,7 +130,7 @@ def contract_debug_line(contract: dict[str, Any] | None) -> str:
 
 
 def _load_prompt() -> str:
-    p = Path(__file__).resolve().parents[1] / 'prompts' / 'phase-reviewer-prompt.md'
+    p = Path(__file__).resolve().parents[3] / 'prompts' / 'phase-reviewer-prompt.md'
     return p.read_text(encoding='utf-8')
 
 

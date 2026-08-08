@@ -160,7 +160,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             apply_phase_intent,
             contract_summary_hint,
         )
-        from ..actions._phase_reviewer import review_phase_contract
+        from ..controller.actions.phase.reviewer import review_phase_contract
         from ..actions._state import _CURRENT_PHASE
         heal_mode = detect_heal_mode(instruction, agent_task)
         # Classify / boundary on goal text only — strip 【业务数据】value blocks first.
@@ -200,7 +200,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 if reviewed:
                     contract = apply_phase_contract(case_data_ref, reviewed)
                     mode = case_data_ref.get('_task_mode') or 'other'
-                    from ..actions._phase_reviewer import contract_debug_line
+                    from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(
                         f"[session] phase_reviewer ok task_mode={mode} "
                         f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
@@ -211,7 +211,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                     mode = apply_task_mode(case_data_ref, phase_core)
                     contract = apply_phase_intent(case_data_ref, phase_core)
                     mode = case_data_ref.get('_task_mode') or mode
-                    from ..actions._phase_reviewer import contract_debug_line
+                    from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(
                         f"[session] phase_reviewer fallback task_mode={mode} "
                         f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
@@ -261,7 +261,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         except Exception as e:
             sys.stderr.write(f"[session] fact pack skipped: {e}\n")
             sys.stderr.flush()
-        from ..actions._phase_reviewer import (
+        from ..controller.actions.phase.reviewer import (
             _EMPTY_ACT_BUFFER,
             coerce_bool,
             resolve_phase_max_steps,
@@ -345,7 +345,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         sys.stderr.flush()
         emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
     if not max_steps_resolved:
-        from ..actions._phase_reviewer import (
+        from ..controller.actions.phase.reviewer import (
             _EMPTY_ACT_BUFFER,
             coerce_bool,
             resolve_phase_max_steps,

@@ -1,7 +1,7 @@
 """Phase intent gates + observability — extracted from phase/intent.py.
 
 Assistant-permission, done/submit gates, success tokens, quality marks and
-observability emission. Lazy-imports _phase_boundary and _phase_reviewer.
+observability emission. Lazy-imports _phase_boundary and phase.reviewer.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ def contract_allows_form_assistant(case_data_store: dict | None) -> bool:
     if not c:
         return False
     if 'allow_form_assistant' in c:
-        from scripts.actions._phase_reviewer import coerce_bool
+        from scripts.controller.actions.phase.reviewer import coerce_bool
         return coerce_bool(c.get('allow_form_assistant'))
     return c.get('refill') == 'all_editable' and c.get('mode') in ('create', 'modify')
 
@@ -94,7 +94,7 @@ def overlay_blocks_done(contract: dict | None) -> bool:
     """
     if not isinstance(contract, dict):
         return True
-    from scripts.actions._phase_reviewer import coerce_bool
+    from scripts.controller.actions.phase.reviewer import coerce_bool
     submit = contract.get('submit')
     if not isinstance(submit, dict):
         submit = {}

@@ -252,7 +252,7 @@ def apply_phase_contract(
     if case_data_store is None:
         return contract
     try:
-        from scripts.actions._phase_reviewer import sanitize_contract_for_mode
+        from scripts.controller.actions.phase.reviewer import sanitize_contract_for_mode
         c = sanitize_contract_for_mode(dict(contract))
     except Exception:
         c = dict(contract)

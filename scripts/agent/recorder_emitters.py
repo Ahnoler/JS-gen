@@ -408,7 +408,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                                         except Exception:
                                             pass
                             return
-                        from ..actions._phase_reviewer import coerce_bool
+                        from ..controller.actions.phase.reviewer import coerce_bool
                         submit = (contract or {}).get('submit') or {}
                         kinds = ((contract or {}).get('success') or {}).get('kinds') or []
                         sys.stderr.write(
@@ -441,7 +441,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                                         except Exception:
                                             pass
                             return
-                        from ..actions._phase_reviewer import coerce_bool
+                        from ..controller.actions.phase.reviewer import coerce_bool
                         submit = (contract or {}).get('submit') or {}
                         kinds = ((contract or {}).get('success') or {}).get('kinds') or []
                         sys.stderr.write(

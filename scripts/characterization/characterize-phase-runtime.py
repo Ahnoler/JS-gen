@@ -13,7 +13,7 @@ from scripts.actions._section_scope import (  # noqa: E402
     clear_phase_section,
     resolve_phase_section,
 )
-from scripts.actions._phase_reviewer import resolve_phase_max_steps  # noqa: E402
+from scripts.controller.actions.phase.reviewer import resolve_phase_max_steps  # noqa: E402
 
 
 def assert_true(cond: bool, msg: str) -> None:
