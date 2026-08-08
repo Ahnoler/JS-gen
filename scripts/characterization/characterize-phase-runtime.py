@@ -177,6 +177,11 @@ def test_session_runner_logs_empty_buffer() -> None:
     assert_true("empty_buffer=" in sr, "session_runner logs empty_buffer=")
 
 
+def test_quality_fail_logging_in_session_runner() -> None:
+    src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
+    assert_true("QUALITY FAIL" in src, "stderr marker present")
+
+
 def test_resolve_infer_unique_and_longest() -> None:
     store = {
         "_phase_intent": {
@@ -211,6 +216,7 @@ def main() -> None:
     test_session_runner_sets_phase_max_steps()
     test_empty_act_buffer_on_submit_required()
     test_session_runner_logs_empty_buffer()
+    test_quality_fail_logging_in_session_runner()
     test_resolve_infer_unique_and_longest()
     print("PASS characterize-phase-runtime")
 

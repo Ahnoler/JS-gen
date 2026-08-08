@@ -753,10 +753,13 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             if c:
                 phase_payload["phase_intent"] = c
             if case_data_ref.get('_quality_failed'):
-                phase_payload["quality_failed"] = True
-                phase_payload["quality_failed_reasons"] = list(
-                    case_data_ref.get('_quality_failed_reasons') or []
+                reasons = list(case_data_ref.get('_quality_failed_reasons') or [])
+                sys.stderr.write(
+                    f"[session] QUALITY FAIL phase={step_index} reasons={reasons}\n"
                 )
+                sys.stderr.flush()
+                phase_payload["quality_failed"] = True
+                phase_payload["quality_failed_reasons"] = reasons
             emit_json({"event": "phase_end", "data": phase_payload})
     except Exception as e:
         sys.stderr.write(f"[session] phase_end observability skipped: {e}\n")
