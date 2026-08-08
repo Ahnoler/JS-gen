@@ -59,15 +59,14 @@ async def do_navigate(page, url):
     emit_json({"event": "nav_step", "data": {"step": 1, "label": "Page loaded"}})
 
 # ========== Load system prompts from external markdown file ==========
-# Edit agent-prompt.md instead of this file to change prompts.
+# Edit pack files under prompts/ or agent-prompt.md shim to change prompts.
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROMPT_PATH = os.path.join(_SCRIPT_DIR, 'prompts', 'agent-prompt.md')
-
-with open(_PROMPT_PATH, 'r', encoding='utf-8') as _f:
-    _prompt_content = _f.read()
+_PACK_DIR = os.path.join(_SCRIPT_DIR, 'prompts')
+_PROMPT_PATH = os.path.join(_PACK_DIR, 'agent-prompt.md')
 
 # Resolve {{include}} directives — replace {{filename.md}} with file content
 _DIRECTIVE_RE = re.compile(r'\{\{([^}]+\.md)\}\}')
+
 def _resolve_directives(text):
     def _replacer(m):
         fname = m.group(1)
@@ -78,8 +77,52 @@ def _resolve_directives(text):
         return m.group(0)  # fallback: leave unchanged
     return _DIRECTIVE_RE.sub(_replacer, text)
 
-_prompt_content = _resolve_directives(_prompt_content)
-OVERRIDE_SYSTEM_MESSAGE = _prompt_content.strip()
+
+def _read_pack(name: str) -> str:
+    path = os.path.join(_PACK_DIR, name)
+    with open(path, 'r', encoding='utf-8') as f:
+        return f.read().strip()
+
+
+def build_agent_system_message(contract: dict | None = None) -> str:
+    """Assemble system prompt from packs based on phase intent contract."""
+    mode = (contract or {}).get('mode') if contract else None
+    allow_assistant = bool((contract or {}).get('allow_form_assistant')) if contract else False
+
+    packs = ['agent-core.md', 'agent-tools-common.md']
+
+    # Table tools for navigate/query/introduce (row selection, icon buttons)
+    if mode in ('navigate', 'query', 'introduce_pick', 'login', None):
+        packs.append('agent-tools-table.md')
+
+    # Form pack for introduce_pick and create/modify
+    if mode in ('introduce_pick', 'create', 'modify') or allow_assistant:
+        packs.append('agent-tools-form.md')
+
+    # Tree pack for create/modify (default)
+    if mode in ('create', 'modify'):
+        packs.append('agent-tools-tree.md')
+
+    # Full fallback: unknown mode or None contract
+    if mode not in ('login', 'navigate', 'query', 'introduce_pick', 'create', 'modify'):
+        packs = [
+            'agent-core.md',
+            'agent-tools-common.md',
+            'agent-tools-form.md',
+            'agent-tools-table.md',
+            'agent-tools-tree.md',
+        ]
+
+    parts = [_read_pack(p) for p in packs]
+    return '\n\n'.join(parts)
+
+
+# Backward-compatible default: full assembly (all packs)
+OVERRIDE_SYSTEM_MESSAGE = build_agent_system_message(None)
+
+# Legacy shim file (Task 3 will convert to thin include chain)
+with open(_PROMPT_PATH, 'r', encoding='utf-8') as _f:
+    _prompt_content = _resolve_directives(_f.read()).strip()
 
 # Planner prompt: prefer standalone file, fall back to inline section in agent-prompt.md
 _PLANNER_PATH = os.path.join(_SCRIPT_DIR, 'prompts', 'planner-prompt.md')
