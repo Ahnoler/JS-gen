@@ -82,6 +82,35 @@ def build_assistant_mission_context(case_data_store: dict | None, section: str =
     }
 
 
+def parse_form_llm_response(parsed) -> tuple[list, list]:
+    """Split LLM JSON into actions and needs_agent; skip wins over actions."""
+    if isinstance(parsed, dict):
+        actions = parsed.get('actions') or []
+        needs_agent = parsed.get('needs_agent') or []
+    elif isinstance(parsed, list):
+        actions = parsed
+        needs_agent = []
+    else:
+        actions = []
+        needs_agent = []
+
+    if not isinstance(actions, list):
+        actions = []
+    if not isinstance(needs_agent, list):
+        needs_agent = []
+
+    needs_labels = {
+        (n.get('label') or '').strip()
+        for n in needs_agent
+        if isinstance(n, dict) and (n.get('label') or '').strip()
+    }
+    filtered_actions = [
+        a for a in actions
+        if isinstance(a, dict) and (a.get('label') or '').strip() not in needs_labels
+    ]
+    return filtered_actions, needs_agent
+
+
 def format_assistant_human_message(ctx: dict, fields_block: str) -> str:
     """Format mission context + field list for the form assistant HumanMessage."""
     phase_task = (ctx.get('phase_task') or '').strip()
@@ -250,7 +279,8 @@ def _enrich_llm_actions_xpath(llm_result, llm_fields):
 
 
 def _llm_generate_values(llm, items, case_data_store=None,
-                         instruction="生成合理的测试数据"):
+                         instruction: str | None = None,
+                         section: str = ''):
     """Generate values for form fields with three-tier priority:
     1. User-provided data (from case_data_store)
     2. form_rules.py generators — match_rule() for input/date fields
@@ -314,7 +344,7 @@ def _llm_generate_values(llm, items, case_data_store=None,
         llm_fields.append(item)
 
     if not llm_fields:
-        return actions
+        return actions, []
 
     # Resolve form-specific LLM (env vars or agent's LLM)
     form_llm = _get_form_llm(agent_llm=llm)
@@ -346,7 +376,7 @@ def _llm_generate_values(llm, items, case_data_store=None,
                 _append_action({'action': 'fill_input', 'label': label, 'value': _date_val}, item)
             else:
                 _append_action({'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'}, item)
-        return actions
+        return actions, []
 
     # —— Build prompt for LLM ——
     field_lines = []
@@ -366,7 +396,11 @@ def _llm_generate_values(llm, items, case_data_store=None,
                 line += f', placeholder: "{item["placeholder"]}"'
         field_lines.append(line)
 
-    prompt = f'当前表单字段：\n{chr(10).join(field_lines)}\n\n指令：{instruction}'
+    fields_block = '\n'.join(field_lines)
+    ctx = build_assistant_mission_context(case_data_store, section=section)
+    if instruction is None:
+        instruction = (ctx.get('instruction') or _ASSISTANT_MISSION_INSTRUCTION).strip()
+    prompt = format_assistant_human_message(ctx, fields_block)
 
     # 批量生成开始：占位事件（防空闲，见 _emit_form_batch_event）
     _batch_start = time.time()
@@ -420,17 +454,15 @@ def _llm_generate_values(llm, items, case_data_store=None,
         if text.startswith('```'):
             text = text.split('\n', 1)[1].rsplit('```', 1)[0]
         parsed = json.loads(text)
-        if isinstance(parsed, dict) and 'actions' in parsed:
-            parsed = parsed['actions']
-        llm_result = parsed if isinstance(parsed, list) else []
-        llm_result = _enrich_llm_actions_xpath(llm_result, llm_fields)
+        llm_actions, needs_agent = parse_form_llm_response(parsed)
+        llm_result = _enrich_llm_actions_xpath(llm_actions, llm_fields)
         _record_decision('passed', llm_result)
         _emit_form_batch_event('form_batch_done', {
             'fields': len(llm_fields),
             'status': 'ok',
             'duration_ms': int((time.time() - _batch_start) * 1000),
         })
-        return actions + llm_result  # P1+P2 + LLM result
+        return actions + llm_result, needs_agent  # P1+P2 + LLM result
     except Exception as e:
         _record_decision('failed', [], error=str(e)[:300])
         _emit_form_batch_event('form_batch_done', {
@@ -454,4 +486,4 @@ def _llm_generate_values(llm, items, case_data_store=None,
                     {'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'},
                     item,
                 )
-        return actions
+        return actions, []

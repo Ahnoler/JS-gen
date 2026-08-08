@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
 from scripts.actions._llm_values import (  # noqa: E402
     build_assistant_mission_context,
     format_assistant_human_message,
+    parse_form_llm_response,
 )
 
 
@@ -61,6 +62,28 @@ def test_build_context_includes_task_business_snapshot() -> None:
                 "instruction must not be bare 生成合理的测试数据")
 
 
+def test_parse_form_llm_response_split() -> None:
+    actions, needs = parse_form_llm_response({
+        "actions": [
+            {"action": "select_option", "label": "理由说明", "option": "x"},
+            {"action": "select_option", "label": "此次评级建议等级", "option": "AA"},
+        ],
+        "needs_agent": [
+            {"label": "此次评级建议等级", "reason": "应对齐系统评级等级"},
+        ],
+    })
+    labels = [a.get("label") for a in actions]
+    assert_true("此次评级建议等级" not in labels, "needs_agent label must not remain in actions")
+    assert_true(any(n.get("label") == "此次评级建议等级" for n in needs), "needs_agent kept")
+
+
+def test_llm_generate_uses_mission_context_in_prompt() -> None:
+    src = (ROOT / "scripts/actions/_llm_values.py").read_text(encoding="utf-8")
+    assert_true("build_assistant_mission_context" in src, "wired")
+    assert_true("format_assistant_human_message" in src, "wired")
+    assert_true("parse_form_llm_response" in src or "needs_agent" in src, "needs_agent path")
+
+
 def test_format_human_message_orders_context_before_fields() -> None:
     ctx = {
         "phase_task": "根据系统评级等级选择建议评级",
@@ -78,6 +101,8 @@ def test_format_human_message_orders_context_before_fields() -> None:
 
 def main() -> int:
     test_build_context_includes_task_business_snapshot()
+    test_parse_form_llm_response_split()
+    test_llm_generate_uses_mission_context_in_prompt()
     test_format_human_message_orders_context_before_fields()
     print("characterize-assistant-mission-context: OK")
     return 0

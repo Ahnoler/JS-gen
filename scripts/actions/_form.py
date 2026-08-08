@@ -1316,7 +1316,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 if lbl in cache and not (d.get('commandValue') and str(d.get('commandValue')).strip()):
                     d['commandValue'] = cache[lbl]
 
-            actions = _llm_generate_values(llm, sub, case_data_store=case_data_store)
+            actions, needs = _llm_generate_values(
+                llm, sub, case_data_store=case_data_store, section=filt,
+            )
+            if needs:
+                case_data_store.setdefault('_assistant_needs_agent', []).extend(needs)
             await page.evaluate(
                 'd => console.log("[AI填表] 所有动作(" + d.length + "): " + JSON.stringify(d.map(a => a.label + "=" + (a.value||a.option||""))))',
                 actions,
@@ -1602,6 +1606,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     async def _auto_fill_pending():
         from ._section_scope import section_matches
 
+        case_data_store['_assistant_needs_agent'] = []
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         tl = TaskList.from_store(case_data_store.get('task_list'))

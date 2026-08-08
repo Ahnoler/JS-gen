@@ -135,7 +135,7 @@ def test_append_action_per_item_xpath() -> None:
         {"label": "评级", "kind": "select", "options": ["B"], "commandValue": "B",
          "xpath_smart": "//div[@id='b']"},
     ]
-    out = _llm_generate_values(None, items)
+    out, _needs = _llm_generate_values(None, items)
     assert_true(len(out) == 2, "two P1 actions")
     assert_true(out[0]["xpath_smart"] == "//div[@id='a']", "first item xpath")
     assert_true(out[1]["xpath_smart"] == "//div[@id='b']", "second item xpath")
