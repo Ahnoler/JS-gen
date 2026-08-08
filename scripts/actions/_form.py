@@ -871,7 +871,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
         if resolved.error:
             return resolved.error
-        element = await _capture_element(page, resolved.label, target_kind='form_input')
+        element = await _capture_element(
+            page, resolved.label, target_kind='form_input', xpath_smart=resolved.xpath_smart,
+        )
         result = await page.evaluate(JS_FILL_BY_XPATH, [resolved.xpath_smart, value, resolved.label])
         if _is_ok_result(result):
             _record_action(
@@ -895,7 +897,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
         if resolved.error:
             return resolved.error
-        element = await _capture_element(page, resolved.label, target_kind='form_date')
+        element = await _capture_element(
+            page, resolved.label, target_kind='form_date', xpath_smart=resolved.xpath_smart,
+        )
         result = await page.evaluate(JS_FILL_DATE_BY_XPATH, [resolved.xpath_smart, value])
         if _is_ok_result(result):
             _record_action(
@@ -1413,7 +1417,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     capture_kind = 'form_select'
                 else:
                     capture_kind = 'form_input'
-                element = await _capture_element(page, label, target_kind=capture_kind)
+                element = await _capture_element(
+                    page, label, target_kind=capture_kind, xpath_smart=xpath_smart,
+                )
                 # before shot must precede DOM mutation (auto-fill bypasses controller.action wrap)
                 before_b64 = None
                 try:
@@ -1462,6 +1468,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                     capture_kind = 'form_input'
                                     element = await _capture_element(
                                         page, label, target_kind='form_input',
+                                        xpath_smart=xpath_smart,
                                     )
                             if not _is_ok_result(result):
                                 if xpath_smart:
@@ -1479,6 +1486,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                             capture_kind = 'form_select'
                                             element = await _capture_element(
                                                 page, label, target_kind='form_select',
+                                                xpath_smart=xpath_smart,
                                             )
                                 else:
                                     sel_try = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
@@ -2300,7 +2308,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         xp = resolved.xpath_smart
         label_text = resolved.label or label_text
 
-        element = await _capture_element(page, label_text, target_kind='form_select')
+        element = await _capture_element(
+            page, label_text, target_kind='form_select', xpath_smart=resolved.xpath_smart,
+        )
 
         # Xpath-only already-matched (no JS_FIND_LABELED_SELECT).
         already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
@@ -2488,7 +2498,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
         if resolved.error:
             return resolved.error
-        element = await _capture_element(page, resolved.label, target_kind='form_radio')
+        element = await _capture_element(
+            page, resolved.label, target_kind='form_radio', xpath_smart=resolved.xpath_smart,
+        )
         result = await page.evaluate(JS_CLICK_RADIO_BY_XPATH, [resolved.xpath_smart, option_text])
         if _is_ok_result(result):
             _record_action(
@@ -2530,7 +2542,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if res_s.startswith('no-tree-component'):
             fill_val = (option_text or '').strip()
             if fill_val and fill_val.lower() != 'first':
-                fill_el = await _capture_element(page, label_text, target_kind='form_input')
+                resolved_fill = _resolve_control(case_data_store, label_text, '')
+                fill_xpath = '' if resolved_fill.error else resolved_fill.xpath_smart
+                fill_el = await _capture_element(
+                    page, label_text, target_kind='form_input', xpath_smart=fill_xpath,
+                )
                 fill_result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, fill_val])
                 if _is_ok_result(fill_result):
                     _record_action(

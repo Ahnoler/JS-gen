@@ -44,10 +44,91 @@ def test_capture_signature_has_xpath_smart() -> None:
     assert_true("xpath_smart" in sig.parameters, "xpath_smart kw-only param")
 
 
+def _norm(s: str) -> str:
+    return s.replace(" ", "").replace("\n", "")
+
+
+def test_form_fill_passes_xpath_to_capture() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    chunk = form.split("async def fill_form_field", 1)[1].split("async def fill_date_field", 1)[0]
+    assert_true(
+        "xpath_smart=resolved.xpath_smart" in _norm(chunk),
+        "fill_form_field passes resolved xpath into capture",
+    )
+
+
+def test_form_date_passes_xpath_to_capture() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    chunk = form.split("async def fill_date_field", 1)[1].split(
+        "async def check_field_value", 1
+    )[0]
+    assert_true(
+        "xpath_smart=resolved.xpath_smart" in _norm(chunk),
+        "fill_date_field passes resolved xpath into capture",
+    )
+
+
+def test_select_option_passes_xpath_to_capture() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    chunk = form.split("async def select_option", 1)[1].split("async def ", 1)[0]
+    assert_true(
+        "xpath_smart=resolved.xpath_smart" in _norm(chunk)
+        or "xpath_smart=xp" in _norm(chunk),
+        "select_option passes xpath into capture",
+    )
+
+
+def test_click_radio_passes_xpath_to_capture() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    chunk = form.split("async def click_radio", 1)[1].split("async def ", 1)[0]
+    assert_true(
+        "xpath_smart=resolved.xpath_smart" in _norm(chunk),
+        "click_radio passes resolved xpath into capture",
+    )
+
+
+def test_execute_round_passes_xpath_to_capture() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+  # _execute_round body: first capture after capture_kind assignment
+    idx = form.find("capture_kind = 'form_input'")
+    assert_true(idx >= 0, "_execute_round capture_kind block found")
+    chunk = form[idx:idx + 800]
+    assert_true(
+        "xpath_smart=xpath_smart" in _norm(chunk),
+        "_execute_round passes round xpath into capture",
+    )
+
+
+def test_tree_fallback_xpath_captures_pass_xpath() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    # xpath branch fill fallback capture
+    idx = form.find("JS_FILL_BY_XPATH, [xpath_smart, fill_val, label]")
+    assert_true(idx >= 0, "tree fill xpath branch found")
+    chunk = form[idx:idx + 1200]
+    assert_true(
+        "xpath_smart=xpath_smart" in _norm(chunk),
+        "tree fill fallback capture passes xpath_smart",
+    )
+    # xpath branch select fallback capture
+    idx2 = form.find("JS_SELECT_TRIGGER_BY_XPATH, [xpath_smart]")
+    assert_true(idx2 >= 0, "tree select xpath branch found")
+    chunk2 = form[idx2:idx2 + 1200]
+    assert_true(
+        "xpath_smart=xpath_smart" in _norm(chunk2),
+        "tree select fallback capture passes xpath_smart",
+    )
+
+
 def main() -> int:
     test_snippet_exported()
     test_helpers_source_no_smart_on_xpath_path()
     test_capture_signature_has_xpath_smart()
+    test_form_fill_passes_xpath_to_capture()
+    test_form_date_passes_xpath_to_capture()
+    test_select_option_passes_xpath_to_capture()
+    test_click_radio_passes_xpath_to_capture()
+    test_execute_round_passes_xpath_to_capture()
+    test_tree_fallback_xpath_captures_pass_xpath()
     print("characterize-capture-element-xpath: OK")
     return 0
 
