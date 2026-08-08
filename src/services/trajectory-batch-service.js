@@ -5,37 +5,26 @@
 import { createHash, randomUUID } from 'crypto';
 import {
   USE_EXECUTOR,
-  BATCH_ANALYZE_CONCURRENCY,
   BATCH_SCHEDULER_INTERVAL_MS,
-  BATCH_ANALYZE_MAX_ATTEMPTS,
-  BATCH_ITEM_LEASE_MS,
   BATCH_IMPORT_MAX_ROWS,
 } from '../../config/config.js';
-import { getDB } from '../../config/database.js';
 import * as batchDao from '../dao/batch-recording-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import { broadcast } from '../ws-server.js';
-import { analyzeRequirementToPhases, createTransactionWithPhases } from './trajectory-meta-service.js';
 import { validateFunctionAndAccount } from './trajectory-account-service.js';
 import { parseBatchExcelBuffer, buildTemplateBuffer } from './trajectory-batch-excel.js';
 import {
-  prepareTrajectoryRecording,
-  startTrajectoryRecording,
   stopTrajectoryRecordingSafe,
   detachTrajectoryLive,
   cleanupPersistedTrajectoryResources,
 } from './trajectory-recording-service.js';
-import * as registry from '../executor-registry.js';
-import * as executorNodeDao from '../dao/executor-node-dao.js';
-import * as slotLease from '../executor-slot-lease.js';
 import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../models/constants.js';
+import { pumpAnalyze, pumpDraft } from './trajectory/batch-analyze.js';
+import { pumpRecord } from './trajectory/batch-record.js';
 
 /** @type {Set<string>} in-flight cancel tokens for analyzing items */
-const cancelledAnalyzeTokens = new Set();
+export const cancelledAnalyzeTokens = new Set();
 
-let analyzeWorkers = 0;
-let draftWorkers = 0;
-let recordWorkers = 0;
 let schedulerTimer = null;
 let kicking = false;
 let started = false;
@@ -71,7 +60,7 @@ function normalizeBatchMode(raw) {
   return m;
 }
 
-async function emitProgress(batchId, item = null, extra = {}) {
+export async function emitProgress(batchId, item = null, extra = {}) {
   const job = await batchDao.getJobById(batchId);
   const summary = await batchDao.summarizeJob(batchId);
   const payload = {
@@ -93,7 +82,7 @@ async function emitProgress(batchId, item = null, extra = {}) {
   return payload;
 }
 
-async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
+export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
   const job = await batchDao.getJobById(batchId);
   if (!job || BATCH_JOB_TERMINAL.includes(job.status)) return job;
 
@@ -326,418 +315,6 @@ export function kickScheduler() {
   });
 }
 
-async function pumpAnalyze() {
-  while (analyzeWorkers < BATCH_ANALYZE_CONCURRENCY) {
-    const token = randomUUID();
-    const item = await batchDao.claimNextItem({
-      statuses: ['pending', 'analyzing'],
-      workerToken: token,
-      leaseMs: BATCH_ITEM_LEASE_MS,
-      jobStatuses: ['accepted', 'running', 'waiting_executor'],
-    });
-    if (!item) break;
-    // If claimed while already analyzing (restart), reset to analyzing
-    if (item.status === 'pending') {
-      const moved = await batchDao.transitionItem(item.id, ['pending'], 'analyzing', {
-        version: item.version,
-        expectedWorkerToken: token,
-        workerToken: token,
-        extra: { leaseExpiresAt: new Date(Date.now() + BATCH_ITEM_LEASE_MS) },
-      });
-      if (!moved) continue;
-      analyzeWorkers += 1;
-      runAnalyze(moved, token).finally(() => {
-        analyzeWorkers -= 1;
-        kickScheduler();
-      });
-    } else {
-      analyzeWorkers += 1;
-      runAnalyze(item, token).finally(() => {
-        analyzeWorkers -= 1;
-        kickScheduler();
-      });
-    }
-  }
-}
-
-async function runAnalyze(item, token) {
-  const batchId = item.batchId;
-  const job = await batchDao.getJobById(batchId);
-  if (!job || job.status === 'cancelling' || job.status === 'cancelled') {
-    cancelledAnalyzeTokens.add(token);
-    await batchDao.markItemCancelled(item.id, ['analyzing', 'pending'], {
-      version: item.version,
-      errorMessage: 'Cancelled during analyze',
-    });
-    await emitProgress(batchId);
-    await maybeFinalizeJob(batchId, { cancelled: true });
-    return;
-  }
-
-  await emitProgress(batchId, { ...item, status: 'analyzing' });
-
-  try {
-    const result = await analyzeRequirementToPhases({
-      description: item.requirement,
-      model: job.model || undefined,
-    });
-
-    if (cancelledAnalyzeTokens.has(token)
-      || (await batchDao.getJobById(batchId))?.status === 'cancelling') {
-      cancelledAnalyzeTokens.delete(token);
-      await batchDao.markItemCancelled(item.id, ['analyzing'], {
-        errorMessage: 'Cancelled — analyze result discarded',
-      });
-      await emitProgress(batchId);
-      await maybeFinalizeJob(batchId, { cancelled: true });
-      return;
-    }
-
-    const phases = Array.isArray(result?.phases) ? result.phases.filter(Boolean) : [];
-    if (!phases.length) {
-      const fresh = await batchDao.getItemById(item.id);
-      await batchDao.markItemFailed(item.id, ['analyzing'], {
-        version: fresh?.version,
-        expectedWorkerToken: token,
-        errorCode: 'EMPTY_PHASES',
-        errorMessage: `Row ${item.rowNumber}: analyze returned no phases`,
-      });
-      await emitProgress(batchId);
-      await maybeFinalizeJob(batchId);
-      return;
-    }
-
-    const analysis = {
-      phases,
-      caseEntries: Array.isArray(result.caseEntries) ? result.caseEntries : [],
-    };
-    const fresh = await batchDao.getItemById(item.id);
-    const saved = await batchDao.transitionItem(item.id, ['analyzing'], 'analyzed', {
-      version: fresh?.version,
-      expectedWorkerToken: token,
-      clearLease: true,
-      extra: { analysisJson: JSON.stringify(analysis), errorCode: null, errorMessage: null },
-    });
-    if (!saved) return;
-    await emitProgress(batchId, saved);
-    await createDraftFromAnalyzed(saved);
-  } catch (err) {
-    const fresh = await batchDao.getItemById(item.id);
-    const attempts = Number(fresh?.attemptCount || item.attemptCount || 1);
-    if (attempts < BATCH_ANALYZE_MAX_ATTEMPTS
-      && !(await batchDao.getJobById(batchId))?.status?.startsWith('cancel')) {
-      await batchDao.transitionItem(item.id, ['analyzing'], 'pending', {
-        version: fresh?.version,
-        expectedWorkerToken: token,
-        clearLease: true,
-        extra: {
-          errorCode: 'ANALYZE_RETRY',
-          errorMessage: String(err.message || err).slice(0, 2000),
-          nextAttemptAt: new Date(Date.now() + Math.min(60000, 2000 * attempts)),
-        },
-      });
-    } else {
-      await batchDao.markItemFailed(item.id, ['analyzing', 'pending'], {
-        version: fresh?.version,
-        expectedWorkerToken: token,
-        errorCode: 'ANALYZE_FAILED',
-        errorMessage: String(err.message || err).slice(0, 4000),
-      });
-      await emitProgress(batchId);
-      await maybeFinalizeJob(batchId);
-    }
-  }
-}
-
-/**
- * Create trajectory+phases+case from analyzed item; draft → drafted, record → queued.
- */
-async function createDraftFromAnalyzed(item) {
-  const job = await batchDao.getJobById(item.batchId);
-  if (!job || job.status === 'cancelling' || job.status === 'cancelled') {
-    await batchDao.markItemCancelled(item.id, ['analyzed'], {
-      version: item.version,
-      errorMessage: 'Cancelled before draft create',
-    });
-    await maybeFinalizeJob(item.batchId, { cancelled: true });
-    return;
-  }
-
-  const analysis = item.analysisJson || {};
-  const phases = analysis.phases || [];
-  if (!phases.length) {
-    await batchDao.markItemFailed(item.id, ['analyzed'], {
-      version: item.version,
-      errorCode: 'EMPTY_PHASES',
-      errorMessage: `Row ${item.rowNumber}: empty phases`,
-    });
-    await maybeFinalizeJob(item.batchId);
-    return;
-  }
-
-  try {
-    await getDB().transaction(async (trx) => {
-      const trajId = await createTransactionWithPhases({
-        functionId: Number(job.functionId),
-        name: item.name,
-        requirement: item.requirement,
-        phases,
-        caseEntries: analysis.caseEntries || [],
-        model: job.model || '',
-        systemAccountId: Number(job.systemAccountId),
-        requireFunctionId: true,
-        trx,
-      });
-      if (job.mode === 'draft') {
-        const bound = await batchDao.bindTrajectoryAsDrafted(item.id, trajId, {
-          version: item.version,
-          trx,
-        });
-        if (!bound) {
-          throw Object.assign(new Error('Lost CAS while binding trajectory'), { code: 'CAS' });
-        }
-      } else {
-        const bound = await batchDao.bindTrajectoryAndQueue(item.id, trajId, {
-          version: item.version,
-          trx,
-        });
-        if (!bound) {
-          throw Object.assign(new Error('Lost CAS while binding trajectory'), { code: 'CAS' });
-        }
-      }
-    });
-    const fresh = await batchDao.getItemById(item.id);
-    await emitProgress(item.batchId, fresh);
-    if (job.mode === 'draft') {
-      await maybeFinalizeJob(item.batchId);
-    } else {
-      kickScheduler();
-    }
-  } catch (err) {
-    if (err.code === 'CAS') return;
-    const fresh = await batchDao.getItemById(item.id);
-    await batchDao.markItemFailed(item.id, ['analyzed'], {
-      version: fresh?.version,
-      errorCode: 'DRAFT_FAILED',
-      errorMessage: String(err.message || err).slice(0, 4000),
-    });
-    await emitProgress(item.batchId);
-    await maybeFinalizeJob(item.batchId);
-  }
-}
-
-async function computeClusterFreeSlots() {
-  const dbNodes = await executorNodeDao.list().catch(() => []);
-  const byUuid = new Map(dbNodes.map((n) => [n.nodeUuid, n]));
-  const live = registry.list().filter((n) => n.connected);
-  let free = 0;
-  for (const n of live) {
-    const row = byUuid.get(n.nodeUuid);
-    if (row?.status === 'draining' || row?.status === 'offline') continue;
-    const capacity = Math.max(1, Number(row?.capacity) || 1);
-    const inUse = slotLease.countInUse(n.nodeUuid);
-    free += Math.max(0, capacity - inUse);
-  }
-  return free;
-}
-
-/**
- * Claim analyzed items lacking trajectoryId (draft + record) and bind trajectory.
- * No executor slots; survives restart via kickScheduler / recovery lease clear.
- */
-async function pumpDraft() {
-  while (draftWorkers < BATCH_ANALYZE_CONCURRENCY) {
-    const token = randomUUID();
-    const item = await batchDao.claimNextItem({
-      statuses: ['analyzed'],
-      workerToken: token,
-      leaseMs: BATCH_ITEM_LEASE_MS,
-      jobStatuses: ['accepted', 'running', 'waiting_executor'],
-    });
-    if (!item) break;
-
-    if (item.trajectoryId) {
-      await batchDao.transitionItem(item.id, ['analyzed'], 'analyzed', {
-        version: item.version,
-        clearLease: true,
-      });
-      continue;
-    }
-
-    draftWorkers += 1;
-    createDraftFromAnalyzed(item).finally(() => {
-      draftWorkers -= 1;
-      kickScheduler();
-    });
-  }
-}
-
-async function pumpRecord() {
-  // Dynamic: start as many workers as free slots (at least try one if waiting)
-  const free = await computeClusterFreeSlots();
-  const want = Math.max(free, recordWorkers > 0 ? 0 : (free > 0 ? free : 1));
-  while (recordWorkers < want) {
-    const token = randomUUID();
-    const item = await batchDao.claimNextItem({
-      statuses: ['queued', 'waiting_executor'],
-      workerToken: token,
-      leaseMs: BATCH_ITEM_LEASE_MS,
-      jobStatuses: ['accepted', 'running', 'waiting_executor'],
-      jobModes: ['record'],
-    });
-    if (!item) break;
-
-    if (!item.trajectoryId) {
-      await batchDao.markItemFailed(item.id, [item.status], {
-        errorCode: 'NO_TRAJECTORY',
-        errorMessage: 'Missing trajectoryId',
-      });
-      continue;
-    }
-
-    const moved = await batchDao.transitionItem(
-      item.id,
-      ['queued', 'waiting_executor'],
-      'preparing',
-      {
-        version: item.version,
-        expectedWorkerToken: token,
-        workerToken: token,
-        extra: { leaseExpiresAt: new Date(Date.now() + BATCH_ITEM_LEASE_MS) },
-      },
-    );
-    if (!moved) continue;
-
-    recordWorkers += 1;
-    runRecord(moved, token).finally(() => {
-      recordWorkers -= 1;
-      kickScheduler();
-    });
-  }
-}
-
-async function runRecord(item, token) {
-  const batchId = item.batchId;
-  const tid = Number(item.trajectoryId);
-  let prepared = false;
-
-  const job = await batchDao.getJobById(batchId);
-  if (!job || job.status === 'cancelling' || job.status === 'cancelled') {
-    try {
-      await detachTrajectoryLive(tid, { reason: 'batch_cancel' });
-    } catch {}
-    await batchDao.markItemCancelled(item.id, ['preparing', 'recording'], {
-      errorMessage: 'Cancelled before/during record',
-    });
-    await emitProgress(batchId);
-    await maybeFinalizeJob(batchId, { cancelled: true });
-    return;
-  }
-
-  await emitProgress(batchId, { ...item, status: 'preparing' });
-
-  try {
-    await prepareTrajectoryRecording(tid);
-    prepared = true;
-
-    // Cancel may have arrived during prepare
-    const job2 = await batchDao.getJobById(batchId);
-    if (!job2 || job2.status === 'cancelling' || job2.status === 'cancelled') {
-      try {
-        await detachTrajectoryLive(tid, { reason: 'batch_cancel' });
-      } catch {}
-      await batchDao.markItemCancelled(item.id, ['preparing'], {
-        errorMessage: 'Cancelled after prepare',
-      });
-      await emitProgress(batchId);
-      await maybeFinalizeJob(batchId, { cancelled: true });
-      return;
-    }
-
-    const fresh = await batchDao.getItemById(item.id);
-    const recording = await batchDao.transitionItem(item.id, ['preparing'], 'recording', {
-      version: fresh?.version,
-      expectedWorkerToken: token,
-      workerToken: token,
-      extra: { leaseExpiresAt: new Date(Date.now() + BATCH_ITEM_LEASE_MS) },
-    });
-    if (!recording) {
-      try {
-        await detachTrajectoryLive(tid, { reason: 'batch_cas_lost' });
-      } catch {}
-      return;
-    }
-    await emitProgress(batchId, recording);
-
-    await startTrajectoryRecording(tid);
-
-    const after = await batchDao.getItemById(item.id);
-    const marked = await batchDao.markItemRecorded(item.id, {
-      version: after?.version,
-      expectedWorkerToken: token,
-    });
-    if (marked) await emitProgress(batchId, marked);
-
-    try {
-      await detachTrajectoryLive(tid, { reason: 'batch_complete' });
-    } catch (err) {
-      console.warn('[batch] detach after success failed:', err.message);
-      // do not fail the item — business already recorded
-    }
-
-    await maybeFinalizeJob(batchId);
-  } catch (err) {
-    const msg = String(err.message || err);
-    const isNoSlot = err.statusCode === 409
-      || /no free|无可用执行资源|No executor agent online/i.test(msg);
-
-    if (isNoSlot && !(await batchDao.getJobById(batchId))?.status?.startsWith('cancel')) {
-      if (prepared) {
-        try {
-          await detachTrajectoryLive(tid, { reason: 'batch_wait_slot' });
-        } catch {}
-      }
-      const fresh = await batchDao.getItemById(item.id);
-      await batchDao.markItemWaiting(item.id, ['preparing', 'recording', 'queued'], {
-        version: fresh?.version,
-        errorMessage: msg,
-      });
-      await batchDao.updateJobStatus(batchId, ['accepted', 'running'], 'waiting_executor');
-      await emitProgress(batchId);
-      return;
-    }
-
-    try {
-      await detachTrajectoryLive(tid, { reason: 'batch_failed' });
-    } catch {}
-
-    const fresh = await batchDao.getItemById(item.id);
-    // If trajectory already recorded, reconcile success
-    const traj = await trajectoryDao.getById(tid).catch(() => null);
-    if (traj?.recordStatus === 'recorded' || traj?.recordStatus === 'completed') {
-      await batchDao.markItemRecorded(item.id, {
-        version: fresh?.version,
-        expectedWorkerToken: token,
-      }).catch(async () => {
-        await batchDao.transitionItem(item.id, ['preparing', 'recording', 'failed'], 'recorded', {
-          clearLease: true,
-        });
-      });
-      await emitProgress(batchId);
-      await maybeFinalizeJob(batchId);
-      return;
-    }
-
-    await batchDao.markItemFailed(item.id, ['preparing', 'recording'], {
-      version: fresh?.version,
-      expectedWorkerToken: token,
-      errorCode: err.statusCode === 400 ? 'RECORD_BAD_REQUEST' : 'RECORD_FAILED',
-      errorMessage: msg.slice(0, 4000),
-    });
-    await emitProgress(batchId);
-    await maybeFinalizeJob(batchId);
-  }
-}
 
 export async function cancelBatch(batchId) {
   const job = await batchDao.getJobById(batchId);
