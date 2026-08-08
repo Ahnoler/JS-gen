@@ -92,7 +92,8 @@ def build_agent_system_message(contract: dict | None = None) -> str:
     packs = ['agent-core.md', 'agent-tools-common.md']
 
     # Table tools for navigate/query/introduce (row selection, icon buttons)
-    if mode in ('navigate', 'query', 'introduce_pick', 'login', None):
+    # and create/modify (row edit/delete, toolbar icons)
+    if mode in ('navigate', 'query', 'introduce_pick', 'login', 'create', 'modify', None):
         packs.append('agent-tools-table.md')
 
     # Form pack for introduce_pick and create/modify
