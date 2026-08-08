@@ -12,6 +12,7 @@ CTRL.* ↔ primary JS_* (or action) mapping:
     fillFormField      → JS_FILL_FORM_FIELD
     selectOption       → JS_SELECT_OPTION (+ JS_FIND_LABELED_SELECT, JS_SELECT_TRIGGER_BY_XPATH)
     fillByXpath        → JS_FILL_BY_XPATH
+    captureFromXpath   → JS_CAPTURE_FROM_XPATH
     fillDateByXpath    → JS_FILL_DATE_BY_XPATH
     clickRadioByXpath  → JS_CLICK_RADIO_BY_XPATH
     selectDate         → JS_FILL_DATE_FIELD
@@ -444,6 +445,100 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
   if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return 'xpath-not-input';
   setFn(target, val == null ? '' : String(val));
   return 'ok-xpath-smart';
+}'''
+
+# Stamp element metadata from a write-path xpath (no label→SMART_LOCATOR generation).
+JS_CAPTURE_FROM_XPATH = r'''([xpath_smart, label, target_kind]) => {
+  const xp = String(xpath_smart || '').trim();
+  if (!xp) return null;
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    return isVis(d) || (wrap && isVis(wrap));
+  };
+  const lastVisibleHost = (drawer) => {
+    const sel = drawer ? '.el-drawer' : '.el-dialog, .el-message-box';
+    const all = [...document.querySelectorAll(sel)];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const findNodeFromSnap = (snap, root) => {
+    for (let i = snap.snapshotLength - 1; i >= 0; i--) {
+      const n = snap.snapshotItem(i);
+      if (!n || !isVis(n)) continue;
+      if (root && root !== document && !root.contains(n)) continue;
+      return n;
+    }
+    return null;
+  };
+  const tryXpath = (xpath, root) => {
+    if (!xpath) return null;
+    let s = String(xpath);
+    try {
+      const ctx = root || document;
+      if (root && s.startsWith('//')) s = '.' + s;
+      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      return findNodeFromSnap(snap, root);
+    } catch (e) {
+      return null;
+    }
+  };
+  const absXPath = (node) => {
+    if (!node || node.nodeType !== 1) return '';
+    const parts = [];
+    let cur = node;
+    while (cur && cur.nodeType === 1) {
+      const tag = cur.tagName.toLowerCase();
+      const parent = cur.parentNode;
+      if (!parent) break;
+      const sibs = [...parent.children].filter(c => c.tagName === cur.tagName);
+      const idx = sibs.indexOf(cur) + 1;
+      parts.unshift(tag + '[' + idx + ']');
+      cur = parent;
+      if (cur === document.documentElement) {
+        parts.unshift('html[1]');
+        break;
+      }
+    }
+    return '/' + parts.join('/');
+  };
+  let node = tryXpath(xp, null);
+  if (!node && /el-dialog|el-message-box|el-drawer/.test(xp) && /\[last\(\)\]/.test(xp)) {
+    const m = xp.match(/\[last\(\)\](?:\/\/(.+))?$/);
+    const local = m && m[1] ? m[1] : '';
+    const dlg = /el-drawer/.test(xp) ? lastVisibleHost(true) : lastVisibleHost(false);
+    if (dlg && local) node = tryXpath('.//' + local, dlg);
+  }
+  if (!node) return null;
+  const abs = absXPath(node);
+  const tag = (node.tagName || '').toLowerCase();
+  const attrs = {};
+  for (const a of node.attributes || []) attrs[a.name] = a.value;
+  const text = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  return {
+    xpath: xp,
+    xpath_smart: xp,
+    xpath_full: abs,
+    css_sel: '',
+    tag,
+    attrs,
+    text,
+    formLabel: String(label || ''),
+    target_kind: String(target_kind || ''),
+    candidates: [
+      { type: 'xpath_smart', value: xp },
+      { type: 'xpath_full', value: abs },
+    ],
+  };
 }'''
 
 # Fill date picker resolved by relative xpath (native setter + ElDatePicker Vue sync).
