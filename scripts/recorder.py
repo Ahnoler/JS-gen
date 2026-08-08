@@ -370,7 +370,12 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
 
                     # Write gate on done for all_editable
                     if case_data_store and contract and contract.get('refill') == 'all_editable':
-                        ok_pending, pending_labels = check_pending_write_gate(case_data_store)
+                        from .actions._section_scope import resolve_phase_section
+
+                        _sec = resolve_phase_section(case_data_store)
+                        ok_pending, pending_labels = check_pending_write_gate(
+                            case_data_store, section=_sec
+                        )
                         if not ok_pending:
                             mark_quality_failed(
                                 case_data_store,
@@ -386,8 +391,11 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                                         r.is_done = False
                                         r.error = (
                                             f'Premature done() rejected: pending fields remain '
-                                            f'{pending_labels[:8]}. Write each editable field '
-                                            f'(same value OK) then click_save().'
+                                            f'{pending_labels[:8]}'
+                                            + (f' in section={_sec!r}' if _sec else '')
+                                            + '. Write each editable field then click_save(button_text="保存"'
+                                            + (f', section={_sec!r}' if _sec else '')
+                                            + ').'
                                         )
                                         try:
                                             from scripts.feature_flags import memory_whitelist_enabled

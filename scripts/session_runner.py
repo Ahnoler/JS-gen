@@ -719,7 +719,10 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 has_contract_success,
                 mark_quality_failed,
             )
-            ok_pending, labels = check_pending_write_gate(case_data_ref)
+            from .actions._section_scope import resolve_phase_section
+
+            _sec = resolve_phase_section(case_data_ref)
+            ok_pending, labels = check_pending_write_gate(case_data_ref, section=_sec)
             contract = get_phase_intent(case_data_ref)
             if contract and contract.get('refill') == 'all_editable' and not ok_pending:
                 mark_quality_failed(case_data_ref, f'pending_fields:{",".join(labels[:8])}')

@@ -44,6 +44,61 @@ def test_form_wires_remember() -> None:
     assert_true("remember_phase_section" in form, "form remembers section")
 
 
+def test_scoped_pending_gate_ignores_other_section() -> None:
+    from scripts.models.task import TaskItem, TaskList
+    from scripts.actions._phase_intent import apply_phase_contract, check_pending_write_gate
+
+    tl = TaskList(
+        pending=[
+            TaskItem(
+                label="理由说明",
+                kind="input",
+                section_title="系统评级结论",
+                section_id="系统评级结论",
+            ),
+            TaskItem(
+                label="综合评价",
+                kind="input",
+                section_title="客户综合评价",
+                section_id="客户综合评价",
+            ),
+        ],
+        done=[],
+    )
+    store = {
+        "task_list": tl.to_store(),
+        "_force_refill_all": True,
+        "_phase_section": "系统评级结论",
+    }
+    apply_phase_contract(
+        store,
+        {
+            "mode": "modify",
+            "allow_form_assistant": True,
+            "refill": "all_editable",
+            "goal": "系统评级结论",
+            "in_scope": [],
+            "out_of_scope": [],
+            "done_when": "",
+            "submit": {"required": True, "via": "click_save", "button_text": "保存"},
+            "success": {"kinds": ["toast_ok"], "evidence": []},
+            "source": "test",
+        },
+    )
+    store["_phase_section"] = "系统评级结论"  # re-set after apply clears
+    tl2 = TaskList.from_store(store["task_list"])
+    tl2.mark_done("理由说明", value="x")
+    store["task_list"] = tl2.to_store()
+    sec = resolve_phase_section(store)
+    ok, labels = check_pending_write_gate(store, section=sec)
+    assert_true(ok and labels == [], f"scoped gate ok got {ok} {labels}")
+
+
+def test_recorder_wires_resolve_phase_section() -> None:
+    rec = (ROOT / "scripts/recorder.py").read_text(encoding="utf-8")
+    assert_true("resolve_phase_section" in rec, "recorder uses resolve_phase_section")
+
+
 def test_resolve_infer_unique_and_longest() -> None:
     store = {
         "_phase_intent": {
@@ -71,6 +126,8 @@ def main() -> None:
     test_remember_and_resolve_memory()
     test_clear_phase_intent_clears_section()
     test_form_wires_remember()
+    test_scoped_pending_gate_ignores_other_section()
+    test_recorder_wires_resolve_phase_section()
     test_resolve_infer_unique_and_longest()
     print("PASS characterize-phase-runtime")
 
