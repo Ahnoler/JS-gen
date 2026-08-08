@@ -488,7 +488,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         await _wait_if_loading(page)
         sec = (section or '').strip()
         if sec:
-            from ._section_scope import remember_phase_section
+            from .section_scope import remember_phase_section
             remember_phase_section(case_data_store, sec)
             case_data_store['_assistant_section_filter'] = sec
         try:
@@ -663,7 +663,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     async def _execute_round(page, items, label_kind, all_results, round_tag):
         """分组 → LLM 规划 → 逐个执行。round_tag: '' | 'round2 ' | 'round3 '"""
-        from ._section_scope import section_matches
+        from .section_scope import section_matches
 
         filt = (case_data_store.get('_assistant_section_filter') or '').strip()
 
@@ -1060,7 +1060,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     def _scan_new_fields(dom_fields, tl):
         """扫描新字段：差值过滤 + TaskItem 创建。返回 new_pending dicts。"""
-        from ._section_scope import section_matches
+        from .section_scope import section_matches
 
         filt = (case_data_store.get('_assistant_section_filter') or '').strip()
         known_labels = {d.label for d in tl.pending} | {d.label for d in tl.done}
@@ -1093,7 +1093,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     # Round 1: 初始 pending → 分组 → LLM → 执行
     # ═══════════════════════════════════════════════════════════════════════
     async def _auto_fill_pending():
-        from ._section_scope import section_matches
+        from .section_scope import section_matches
 
         case_data_store['_assistant_needs_agent'] = []
         page = await browser_context.get_current_page()
@@ -1244,7 +1244,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     async def get_pending_tasks(section: str = ''):
         if _is_query_mode(case_data_store):
             return _ok(_query_not_form_payload(), include_in_memory=True)
-        from ._section_scope import section_matches, pending_by_section
+        from .section_scope import section_matches, pending_by_section
         tl = TaskList.from_store(case_data_store.get('task_list'))
         sec = (section or '').strip()
         pending_items = [
@@ -1293,7 +1293,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         # Resolve section: explicit → _phase_section memory → rescan+unique → ""
         if not sec:
             try:
-                from ._section_scope import norm_sec
+                from .section_scope import norm_sec
                 mem = norm_sec(str(case_data_store.get("_phase_section") or ""))
                 if mem:
                     sec = mem
@@ -1304,7 +1304,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if not sec and not explicit_sec:
             try:
                 await refresh_scan_buttons(page, case_data_store)
-                from ._section_scope import unique_button_section
+                from .section_scope import unique_button_section
                 auto_sec = unique_button_section(case_data_store.get('_scan_buttons'), compact_btn)
                 if auto_sec:
                     sec = auto_sec
@@ -1313,7 +1313,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             except Exception:
                 pass
         if sec:
-            from ._section_scope import remember_phase_section
+            from .section_scope import remember_phase_section
             remember_phase_section(case_data_store, sec)
         # 确认/确定 = dialog/picker confirm (never treat as form-save blocked by query toolbar)
         is_picker_confirm = bool(
@@ -1344,7 +1344,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         else:
             if not is_picker_confirm:
                 from ._phase_boundary import phase_boundary_active, get_phase_boundary
-                from ._section_scope import pending_by_section, requires_section_declaration
+                from .section_scope import pending_by_section, requires_section_declaration
 
                 needs_gate = False
                 if phase_boundary_active(case_data_store):

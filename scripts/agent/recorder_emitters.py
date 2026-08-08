@@ -11,7 +11,7 @@ import sys
 
 
 def _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal):
-        from ..actions._section_scope import (
+        from ..controller.actions.section_scope import (
             is_empty_effective_actions,
             empty_act_prescription_message,
         )
@@ -261,7 +261,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
 
                     # Write gate on done for all_editable
                     if case_data_store and contract and contract.get('refill') == 'all_editable':
-                        from ..actions._section_scope import resolve_phase_section
+                        from ..controller.actions.section_scope import resolve_phase_section
 
                         _sec = resolve_phase_section(case_data_store)
                         ok_pending, pending_labels = check_pending_write_gate(

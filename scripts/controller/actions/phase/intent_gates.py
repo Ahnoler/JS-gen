@@ -173,7 +173,7 @@ def check_pending_write_gate(case_data_store: dict | None, section: str = "") ->
     if not contract_force_refill(case_data_store):
         return True, []
     from scripts.models.task import TaskList
-    from scripts.actions._section_scope import filter_pending_labels
+    from scripts.controller.actions.section_scope import filter_pending_labels
 
     tl = TaskList.from_store((case_data_store or {}).get('task_list'))
     pending = filter_pending_labels(tl, section)

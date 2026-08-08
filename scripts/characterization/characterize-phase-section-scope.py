@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.agent_utils import build_agent_system_message  # noqa: E402
-from scripts.actions._section_scope import (  # noqa: E402
+from scripts.controller.actions.section_scope import (  # noqa: E402
     section_matches,
     pending_by_section,
     filter_pending_labels,

@@ -141,7 +141,7 @@ def resolve_phase_section(store: dict | None, *, task_text: str = "") -> str:
 
     blob_parts: list[str] = []
     try:
-        from ..controller.actions._phase_intent import get_phase_intent
+        from ._phase_intent import get_phase_intent
         c = get_phase_intent(store) or {}
         blob_parts.append(str(c.get("goal") or ""))
         for x in c.get("in_scope") or []:
@@ -203,7 +203,7 @@ def _phase_submit_not_required(store: dict | None) -> bool:
     if mode in ("query", "navigate", "login"):
         return True
     try:
-        from ..controller.actions.phase.reviewer import coerce_bool
+        from .phase.reviewer import coerce_bool
 
         submit = c.get("submit") if isinstance(c.get("submit"), dict) else {}
         return not coerce_bool(submit.get("required"))

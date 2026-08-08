@@ -21,7 +21,7 @@ import time
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from .form_rules import match_rule
-from scripts.actions._section_scope import section_matches
+from scripts.controller.actions.section_scope import section_matches
 
 _ASSISTANT_MISSION_INSTRUCTION = (
     '按任务背景与相关字段快照填写；无法判断则跳过并申报 needs_agent，禁止无依据猜测。'

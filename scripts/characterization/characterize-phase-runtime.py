@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.actions._section_scope import (  # noqa: E402
+from scripts.controller.actions.section_scope import (  # noqa: E402
     remember_phase_section,
     clear_phase_section,
     resolve_phase_section,
@@ -146,7 +146,7 @@ def test_recorder_wires_resolve_phase_section() -> None:
 
 
 def test_empty_effective_and_prescription() -> None:
-    from scripts.actions._section_scope import (
+    from scripts.controller.actions.section_scope import (
         is_empty_effective_actions,
         empty_act_prescription_message,
     )
