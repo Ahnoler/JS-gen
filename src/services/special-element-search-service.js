@@ -133,6 +133,7 @@ export async function searchSpecialElements({
         dictValue,
         tagDictCode: el.tagDictCode,
         phaseDescription: el.phaseDescription,
+        remark: el.remark,
         stepCount: el.stepCount,
         score: 1,
         tagScore: 0,
@@ -150,6 +151,7 @@ export async function searchSpecialElements({
       dictValue,
       tagDictCode: el.tagDictCode,
       phaseDescription: el.phaseDescription,
+      remark: el.remark,
       stepCount: el.stepCount,
       score: total,
       tagScore,
@@ -203,5 +205,7 @@ export function toDisplayCandidates(candidates = []) {
     score: c.score,
     matchReasons: c.matchReasons,
     stepSummary: c.stepSummary,
+    phaseDescription: c.phaseDescription,
+    remark: c.remark,
   }));
 }

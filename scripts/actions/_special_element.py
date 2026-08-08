@@ -7,7 +7,7 @@ from ._state import _record_action
 
 
 def format_special_element_hint(candidates_store: dict | None) -> str:
-    """Lightweight prompt hint listing current-phase special-element candidates."""
+    """Enriched prompt hint listing current-phase special-element candidates."""
     if not candidates_store:
         return ''
     lines = []
@@ -16,18 +16,28 @@ def format_special_element_hint(candidates_store: dict | None) -> str:
         label = c.get('dictLabel') or c.get('dict_label') or ''
         reasons = c.get('matchReasons') or c.get('match_reasons') or []
         step_count = c.get('stepCount') or c.get('step_count') or len(c.get('steps') or [])
-        reason_txt = '；'.join(str(r) for r in reasons[:3]) if reasons else ''
-        lines.append(
-            f"- id={cid} name={name}"
-            + (f" tag={label}" if label else '')
-            + f" steps={step_count}"
-            + (f" reasons={reason_txt}" if reason_txt else '')
-        )
+        reason_txt = '；'.join(str(r) for r in reasons[:5]) if reasons else ''
+        desc = c.get('phaseDescription') or c.get('phase_description') or ''
+        remark = c.get('remark') or ''
+        step_summary = c.get('stepSummary') or c.get('step_summary') or ''
+        parts = [f"- id={cid} name={name}"]
+        if label:
+            parts.append(f" tag={label}")
+        parts.append(f" steps={step_count}")
+        if reason_txt:
+            parts.append(f" reasons={reason_txt}")
+        if desc:
+            parts.append(f" desc={desc}")
+        if remark:
+            parts.append(f" remark={remark}")
+        if step_summary:
+            parts.append(f" summary={step_summary}")
+        lines.append(''.join(parts))
     if not lines:
         return ''
     return (
         '\n\n【特殊元素库候选 — 仅可对下列 id 调用 use_special_element；'
-        '不要编造未列出的 id；页面状态匹配时优先复用】\n'
+        '不要编造未列出的 id；页面状态匹配时优先 use_special_element(id)，不要手写逐步引入】\n'
         + '\n'.join(lines)
     )
 
