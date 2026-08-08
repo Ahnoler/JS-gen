@@ -17,10 +17,11 @@ from browser_use.browser.context import BrowserContextConfig
 
 from .agent_utils import (
     emit_json, extract_first_url, do_navigate,
-    OVERRIDE_SYSTEM_MESSAGE, PLANNER_SYSTEM_PROMPT,
+    build_agent_system_message, OVERRIDE_SYSTEM_MESSAGE, PLANNER_SYSTEM_PROMPT,
     patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, create_llm,
     make_step_callback, make_done_callback,
 )
+from .actions._phase_intent import get_phase_intent
 from .controller import build_controller
 from .recorder import build_recording_hooks
 
@@ -678,9 +679,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
 
     sys.stderr.write(f"[session] Creating Agent...\n");
     sys.stderr.flush()
+    contract = get_phase_intent(case_data_ref) if case_data_ref else None
+    system_msg = build_agent_system_message(contract)
     agent = Agent(
         task=agent_task, llm=llm, controller=controller, browser_context=browser_context,
-        override_system_message=OVERRIDE_SYSTEM_MESSAGE,
+        override_system_message=system_msg,
         use_vision=False, enable_memory=False,
         max_failures=5, retry_delay=10,
         planner_llm=llm, planner_interval=3,
@@ -715,7 +718,6 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             from .actions._phase_intent import (
                 check_pending_write_gate,
                 emit_phase_observability,
-                get_phase_intent,
                 has_contract_success,
                 mark_quality_failed,
             )

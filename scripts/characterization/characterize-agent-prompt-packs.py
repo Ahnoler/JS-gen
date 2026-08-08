@@ -57,11 +57,23 @@ def test_introduce_pick_includes_full_form() -> None:
     assert_true("needs_agent" in intro, "introduce_pick gets needs_agent rules")
 
 
+def test_session_runner_uses_contract_assembly() -> None:
+    src = (ROOT / "scripts/session_runner.py").read_text(encoding="utf-8")
+    assert_true("build_agent_system_message" in src, "session_runner imports assembler")
+    assert_true("get_phase_intent" in src, "session_runner reads phase intent")
+    agent_block = src.split("agent = Agent(", 1)[1][:500]
+    assert_true(
+        "OVERRIDE_SYSTEM_MESSAGE" not in agent_block,
+        "Agent uses contract assembly",
+    )
+
+
 def main() -> int:
     test_build_agent_system_message_assembles_by_mode()
     test_navigate_shorter_than_full()
     test_no_special_prompt_references()
     test_introduce_pick_includes_full_form()
+    test_session_runner_uses_contract_assembly()
     print("characterize-agent-prompt-packs: OK")
     return 0
 
