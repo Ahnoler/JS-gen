@@ -1196,6 +1196,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         # Recorded selection is authoritative — replay MUST pick the same option_text.
         # params.options / element.options are inventory for export & downstream products
         # (reference only; never used to substitute a different value).
+        params_xp = _params_xpath_smart(entry, params)
         pick = str(value or '').strip()
         if not pick:
             return 'error:missing-option_text'
@@ -1309,6 +1310,13 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
         label_result = await _select_by_label()
         if isinstance(label_result, str) and label_result.startswith('ok'):
+            if params_xp:
+                actual = await _read_value_by_xpath(page, params_xp)
+                classified = _classify_fill_result(True, pick, actual)
+                if classified.startswith('false_ok'):
+                    return classified
+                if classified == 'ok':
+                    return 'ok:locate=label'
             return _annotate_label_result(label_result)
 
         xpath_full = _element_xpath_full(entry) if use_relative else ''
