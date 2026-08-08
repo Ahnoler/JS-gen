@@ -44,6 +44,29 @@ def test_form_wires_remember() -> None:
     assert_true("remember_phase_section" in form, "form remembers section")
 
 
+def test_click_save_section_order_in_source() -> None:
+    form = (ROOT / "scripts/actions/_form.py").read_text(encoding="utf-8")
+    # memory before unique; refresh when no section
+    assert_true("_phase_section" in form and "unique_button_section" in form, "order ingredients present")
+    assert_true(
+        "refresh_scan_buttons" in form or "rescan" in form.lower() or "_scan_buttons" in form,
+        "rescan path present",
+    )
+    # _phase_section memory must be consulted before unique_button_section in click_save
+    cs = form.find("async def click_save")
+    assert_true(cs >= 0, "click_save present")
+    body = form[cs : cs + 4000]
+    mem_pos = body.find("_phase_section")
+    uniq_pos = body.find("unique_button_section")
+    assert_true(mem_pos >= 0 and uniq_pos >= 0, "click_save uses memory and unique")
+    assert_true(mem_pos < uniq_pos, "memory before unique_button_section in click_save")
+    refresh_pos = body.find("refresh_scan_buttons")
+    if refresh_pos < 0:
+        refresh_pos = body.lower().find("rescan")
+    assert_true(refresh_pos >= 0, "click_save has refresh/rescan path")
+    assert_true(refresh_pos < uniq_pos or refresh_pos < mem_pos + 200, "refresh near resolve block")
+
+
 def test_scoped_pending_gate_ignores_other_section() -> None:
     from scripts.models.task import TaskItem, TaskList
     from scripts.actions._phase_intent import apply_phase_contract, check_pending_write_gate
@@ -145,6 +168,7 @@ def main() -> None:
     test_remember_and_resolve_memory()
     test_clear_phase_intent_clears_section()
     test_form_wires_remember()
+    test_click_save_section_order_in_source()
     test_scoped_pending_gate_ignores_other_section()
     test_recorder_wires_resolve_phase_section()
     test_empty_act_buffer_on_submit_required()

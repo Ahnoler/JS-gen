@@ -85,6 +85,18 @@ def _scan_buttons_from_result(result) -> list[dict]:
     return out
 
 
+async def refresh_scan_buttons(page, case_data_store) -> list[dict]:
+    """Rescan DOM buttons into ``case_data_store['_scan_buttons']``; return button list."""
+    raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, get_has_button_keywords(case_data_store)])
+    try:
+        result = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return list(case_data_store.get('_scan_buttons') or [])
+    buttons = _scan_buttons_from_result(result)
+    case_data_store['_scan_buttons'] = buttons
+    return buttons
+
+
 def _section_group_key(section_id: str, section_title: str) -> str:
     sid = (section_id or '').strip()
     if sid:
@@ -1833,9 +1845,21 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         compact_btn = re.sub(r'\s+', '', (button_text or '保存').strip()) or '保存'
         sec = (section or "").strip()
-        # Auto-bind unique save section when not explicitly scoped
+        explicit_sec = bool((section or "").strip())
+        # Resolve section: explicit → _phase_section memory → rescan+unique → ""
         if not sec:
             try:
+                from ._section_scope import norm_sec
+                mem = norm_sec(str(case_data_store.get("_phase_section") or ""))
+                if mem:
+                    sec = mem
+                    sys.stderr.write(f'[click_save] phase section={sec!r} from memory\n')
+                    sys.stderr.flush()
+            except Exception:
+                pass
+        if not sec and not explicit_sec:
+            try:
+                await refresh_scan_buttons(page, case_data_store)
                 from ._section_scope import unique_button_section
                 auto_sec = unique_button_section(case_data_store.get('_scan_buttons'), compact_btn)
                 if auto_sec:
