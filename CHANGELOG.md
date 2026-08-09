@@ -16,6 +16,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   文件：scripts/controller/actions/_form.py, scripts/controller/actions/form_scan_utils.py, scripts/prompts/agent-tools-form.md, scripts/characterization/characterize-scan-editable-summary.py
   Python 同步提示：无
 
+- 2026-08-09: **`scan_editable_summary` 多根扫描（T4-P1）**：`JS_SCAN_FORM_FIELDS` 新增 `opts.mode:'multi'`；`scan_editable_summary` 传入多根模式，合并可见 overlay 或 `.el-main` 主内容区（去壳），跨根 `xpath_smart` 去重；默认无 `opts` 时行为不变。
+  影响范围：Python agent `scripts/controller/actions/_form.py`、`js_snippets/scan_form.py`。
+  文件：scripts/controller/actions/_form.py, scripts/controller/actions/js_snippets/scan_form.py
+  Python 同步提示：无
+
 - 2026-08-07: **批量导入草稿模式（`mode=record|draft`）**：`POST .../trajectories/batch/import` 接受 `mode`（默认 `record`；非法值 → 400）。`mode=draft` 仅 analyze+建草稿（`bindTrajectoryAsDrafted` → item `drafted`），跳过 prepare/record/detach，不要求 `USE_EXECUTOR`；`mode=record` 保持原一站式录制语义，`USE_EXECUTOR=false` → 503。`request_hash` / 幂等键含 `mode`；`summary.drafted` 计数；取消 job 仅 `cancelOpenItems` 未决项，已 `drafted`/`recorded` 保留。状态查询与 WS `batch:*` payload 含 `mode`；`pumpDraft` 独立认领 `analyzed` 且无 `trajectoryId` 的孤儿项（重启 `kickScheduler` 可恢复）；`pumpRecord` 仅 `queued`/`waiting_executor` + `jobModes: ['record']`。schema：`batch_recording_job.mode`；item 终端态 `drafted`；常量 `BATCH_JOB_MODES`、`BATCH_ITEM_STATUSES` / `BATCH_ITEM_TERMINAL` 含 `drafted`。
   影响范围：batch import API、调度、DAO、api-docs、Vue 批量导入 UI。
   文件：migrations/20260807120000_batch_job_mode_and_drafted.js, src/models/constants.js, src/dao/batch-recording-dao.js, src/services/trajectory-batch-service.js, src/dashboard/api-docs/catalog.js, scripts/characterization/characterize-batch-import.mjs

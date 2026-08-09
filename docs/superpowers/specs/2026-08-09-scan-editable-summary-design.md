@@ -1,8 +1,8 @@
 # Design: `scan_editable_summary`（T4-P0 — 业务控件视野）
 
 **Date:** 2026-08-09  
-**Status:** Implemented (P0 — single-root via `JS_GET_CONTAINER`; multi-root overlay merge → T4-P1)  
-**Backlog:** T4（拆为 P0–P4；本 spec = **P0**）  
+**Status:** **Implemented P0+P1** — plan `docs/superpowers/plans/2026-08-09-scan-editable-summary-p1-multiroot.md`  
+**Backlog:** T4（P0+P1 done；下一刀 **P2** Fact Pack）  
 **Related:** [archive form-scan](../archive/specs/2026-08-07-form-scan-control-first-design.md) Source A/B/C；[xpath-primary](../archive/specs/2026-08-07-xpath-primary-control-ops-design.md)；[T3 capture](../archive/specs/2026-08-08-capture-element-from-xpath-design.md)；记忆系统；三大问题分析；MCP/灰度计划
 
 ## Problem
@@ -80,8 +80,8 @@ scan_editable_summary()
 
 | Phase | Deliverable | Status |
 |-------|-------------|--------|
-| **P0** | `scan_editable_summary` + prompt + 表征（本 spec） | **已实施**（单根；多根 → P1） |
-| **P1** | 多 overlay 合并去重做实；主内容去壳根加固；可选活页冒烟 | 后续 |
+| **P0** | `scan_editable_summary` + prompt + 表征（本 spec） | **已实施** |
+| **P1** | 多 overlay 合并去重做实；主内容去壳根加固；`JS_SCAN_FORM_FIELDS mode:'multi'` | **已实施** |
 | **P2** | 摘要旁路 → memory / Fact Pack（不阻塞主录制） | 后续 |
 | **P3** | T5/T6 + 分类扩展；写路径残余（T1r/T8）扩大「可操作∩已分类」 | 后续 |
 | **P4** | Playwright MCP a11y 对照/诊断（灰度开关，不替换主路径） | 后续 |
