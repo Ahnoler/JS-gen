@@ -1,9 +1,9 @@
 # Design: xpath params-first replay + ops audit
 
 **Date:** 2026-08-08  
-**Status:** Approved (brainstorm)  
+**Status:** Implemented — recording dual-write follow-up closed by T3 (`2026-08-08-capture-element-from-xpath`)  
 **Scope cut:** Read-path unify for replay; audit matrix; fix `fill_form_field` + `select_option` only  
-**Out of scope this cut:** Recording write-path unify (`element ≡ params`); other action behaviors; `RELATIVE_XPATH_PRIMARY` default; bulk `element_json` backfill
+**Out of scope this cut (historical):** Recording write-path unify — **later done as T3**. Still out: other action behaviors; `RELATIVE_XPATH_PRIMARY` default; bulk `element_json` backfill
 
 ## Problem
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 agent (`scripts/actions/_helpers.py`, `_form.py`), `_js_snippets.py`, characterization scripts.
 
-**Spec:** `docs/superpowers/specs/2026-08-08-capture-element-from-xpath-design.md`
+**Spec:** `docs/superpowers/archive/specs/2026-08-08-capture-element-from-xpath-design.md`
 
 ## Global Constraints
 
@@ -16,7 +16,7 @@
 - `_capture_element` with non-empty xpath must **not** call `JS_SMART_LOCATOR`.
 - Empty `xpath_smart` → return `None` (no blind smart generation).
 - Absolute field is **`xpath_full` only** — do **not** write `xpath_abs`.
-- No DB backfill; no replay read-order changes; no T4 full-page DOM; no action renames.
+- No DB backfill; no replay read-order changes; no T4 inventory in this cut（T4 另开 `scan_editable-summary`）；no action renames.
 - TDD: characterization red → green per task.
 - Commit only `scripts/` (+ optional CHANGELOG); `docs/` gitignored unless user asks `git add -f`.
 

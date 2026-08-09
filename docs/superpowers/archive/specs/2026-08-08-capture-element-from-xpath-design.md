@@ -1,7 +1,7 @@
 # Design: Capture element from write xpath (element ≡ params)
 
 **Date:** 2026-08-08  
-**Status:** Implemented — plan at `docs/superpowers/plans/2026-08-08-capture-element-from-xpath.md`  
+**Status:** Implemented — plan at `docs/superpowers/archive/plans/2026-08-08-capture-element-from-xpath.md`  
 **Backlog:** T3 in `docs/superpowers/backlog-visible-editable-controls.md`  
 **Related:** xpath-primary Phase A/B (done); params-first replay (done); form-scan Source B (done)
 
@@ -19,7 +19,7 @@ On successful fill/select (especially table Source B), **params** store the corr
 
 - Historical MySQL/DB backfill of old `element_json`
 - Changing product replay read order (already params-first)
-- Full-page Agent DOM inventory (T4)
+- Full-page **α 业务控件** inventory（T4 → `2026-08-09-scan-editable-summary`；不是裸 DOM）
 - Renaming actions to `control_*`
 - Writing both `xpath_full` and `xpath_abs` (canonical absolute field is **`xpath_full` only**)
 
@@ -103,6 +103,6 @@ Pass the xpath used for the write into capture:
 
 ## Follow-ups (out of this cut)
 
-- T4 full-page Agent DOM inventory
+- T4 inventory（α；见 `2026-08-09-scan-editable-summary`）
 - T1r tree/`no-tree-component` label fallbacks
 - Optional later: stop reading `xpath_abs` entirely once writers are clean
