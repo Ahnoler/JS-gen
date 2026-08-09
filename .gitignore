@@ -23,6 +23,10 @@ docs/*
 # Probation daily reports (automation); keep other docs/ local-only
 !docs/report/
 !docs/report/**
+# Design specs (brainstorming → plans)
+!docs/superpowers/
+!docs/superpowers/specs/
+!docs/superpowers/specs/**
 # Local scratch probes / temp outputs (single folder, no longer matches scripts/__init__.py)
 scripts/_scratch/
 scripts/smoke/
