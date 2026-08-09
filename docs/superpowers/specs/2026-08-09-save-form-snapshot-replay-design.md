@@ -1,7 +1,7 @@
 # Design: T10 — `save_form_snapshot` replay (form-structure checkpoint)
 
 **Date:** 2026-08-09  
-**Status:** Implemented P0 — plan at `docs/superpowers/plans/2026-08-09-save-form-snapshot-replay-p0.md` (P1 still pending)  
+**Status:** Implemented P0+P1 — plans at `docs/superpowers/plans/2026-08-09-save-form-snapshot-replay-p0.md` and `docs/superpowers/plans/2026-08-09-save-form-snapshot-replay-p1.md`  
 **Backlog:** T10  
 **Related:** `form-structure-heal.js` Type B；`JS_VERIFY_FORM_STRUCTURE`；`replay-batch-runner.js`；T4 Source B inventory
 
@@ -18,12 +18,12 @@ Root causes stack:
 
 1. **P0:** Unsafe / `container_not_found` checkpoints mark the step failed (`confirmed=0`) but **do not abort** the replay batch (A2).
 2. **P0:** Still never mutate trajectory/snapshot on unsafe paths.
-3. **P1 (spec only this cycle):** Align verify field set with recording scan (Source A+B at minimum) so false unsafes drop; implement in a later plan.
+3. **P1:** Align verify field set with recording scan (Source A+B at minimum) so false unsafes drop.
 4. Keep user abort, transport timeout, and Type B heal-failure abort behavior unchanged in P0.
 
 ## Non-goals (P0)
 
-- Changing `JS_VERIFY_FORM_STRUCTURE` / CTRL `verifyFormStructure` scan surface (→ P1)
+- Changing safety thresholds as a substitute for better scans (P1 widens scan only)
 - Relaxing `assessFormStructureDiffSafety` thresholds
 - Skipping Type B heal when diff is safe and `needsTypeB`
 - Treating unsafe as success / `confirmed=1`
@@ -36,7 +36,7 @@ Root causes stack:
 | Delivery | **2** — one T10 spec with **P0=A / P1=B**; implement **P0 only** this round |
 | Soft-fail semantics | **A2** — `confirmed=0` / failed step, batch continues |
 | P0 approach | **1** — only unsafe / `container_not_found` stop aborting; heal fail / timeout / userAbort still abort |
-| P1 | Document intent; separate implementation plan later |
+| P1 | Verify scan ≡ record (A+B); Agent + CTRL parity |
 
 ## Architecture
 
@@ -61,12 +61,12 @@ replay-batch-runner (save_form_snapshot branch)
   if typeB.ok → successCount++; continue
 ```
 
-### P1 — verify alignment (later)
+### P1 — verify alignment (implemented)
 
-- Live actual labels from same control surface as recording: Source A (`.el-form-item`) **+ Source B** (`el-table` editable cells / display names).
+- Live actual labels from same control surface as recording: Source A (`.el-form-item`) **+ Source B** (`el-table` editable cells / `row#N` display names).
 - Keep container scoping (`main` / `drawer:` / `dialog:`).
 - Keep safety guards; do not widen thresholds as a substitute for better scans.
-- Parity: Agent `JS_VERIFY_FORM_STRUCTURE` and CTRL `verifyFormStructure`.
+- Parity: Agent `JS_VERIFY_FORM_STRUCTURE` and CTRL `verifyFormStructure` (`VERIFY_SOURCE_B_EL_TABLE`; commits `db38d9a`, `2337537`).
 
 ## Verification (P0)
 
@@ -93,9 +93,9 @@ replay-batch-runner (save_form_snapshot branch)
 | Phase | Deliverable | This cycle |
 |-------|-------------|------------|
 | **P0** | Abort-on-unsafe → A2 continue | **Yes** |
-| **P1** | Verify scan ≡ record (A+B) | Spec only |
+| **P1** | Verify scan ≡ record (A+B) | **Yes** |
 
 ## Follow-ups
 
-- Implement P1 after P0 ships and false-unsafe rate is measured
 - Optional: product UI copy distinguishing soft checkpoint fail vs hard abort
+- Optional: wet CDP proof of false-unsafe rate drop post-P1

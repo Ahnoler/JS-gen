@@ -38,6 +38,7 @@
 | **T6** | Source B 空行首表格行命名 `row#N` | `SOURCE_B_EMPTY_LEADING` / `SOURCE_B_ROW_INDEX_XPATH`；[plan](plans/2026-08-09-t4-p3-t6-t8.md) |
 | **T8** | CTRL `selectOption` 懒加载对齐 Agent | `SELECT_LAZY_LOAD_ON_MISS` in `src/ctrl-actions/select.js`；[plan](plans/2026-08-09-t4-p3-t6-t8.md) |
 | **T10-P0** | unsafe checkpoint `confirmed=0` 但不 abort 批次 | `form-structure-heal.js` / `replay-batch-runner.js`；[spec](specs/2026-08-09-save-form-snapshot-replay-design.md) · [plan](plans/2026-08-09-save-form-snapshot-replay-p0.md) · commit `6b0bf7f` |
+| **T10-P1** | verify Source A+B（`JS_VERIFY_FORM_STRUCTURE` / CTRL `verifyFormStructure`） | `misc.py` / `structure.js` `VERIFY_SOURCE_B_EL_TABLE`；[spec](specs/2026-08-09-save-form-snapshot-replay-design.md) · [plan](plans/2026-08-09-save-form-snapshot-replay-p1.md) · commits `db38d9a`…`2337537` |
 
 ---
 
@@ -62,7 +63,7 @@
 | **T7** | 不做 | API 改名 `control_*` | P3 |
 | **T8** | **已实施** | CTRL `selectOption` 懒加载对齐 | — |
 | **T9** | 部分 | 产品 `steps/replay` 常态验收 | 运维 |
-| **T10** | **P0 已实施** / **P1 未做** | `save_form_snapshot` 回放；P1=verify 扫描对齐 Source A+B | [spec](specs/2026-08-09-save-form-snapshot-replay-design.md) |
+| **T10** | **P0+P1 已实施** | `save_form_snapshot` 回放；P0=soft-fail continue；P1=verify Source A+B | [spec](specs/2026-08-09-save-form-snapshot-replay-design.md) |
 | **T1r** | 残余 | tree / replay label 兜底 | T4-P3 后 |
 | **T3r** | 残余 | T3 活录 CDP 对拍 | P2 |
 
@@ -81,9 +82,10 @@
 
 ## 推荐下一刀
 
-1. **T10-P1** — verify 扫描对齐 Source A+B（[spec](specs/2026-08-09-save-form-snapshot-replay-design.md)）  
-2. **T5** / **T1r**  
-3. 或三大问题①已填跳过（质量，非视野）
+1. **T5** — 非 `el-table` 自定义网格（需产品确认）  
+2. **T1r** — tree / replay label 兜底  
+3. **T4-P4** — Playwright MCP a11y 对照/诊断（灰度）  
+4. 或三大问题①已填跳过（质量，非视野）
 
 ## 文档交叉
 

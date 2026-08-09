@@ -11,6 +11,10 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-09: **T10-P1:** `JS_VERIFY_FORM_STRUCTURE` / CTRL `verifyFormStructure` collect Source B `el-table` labels (same `row#N` naming as scan) so snapshot verify matches recording surface.
+  影响范围: `scripts/controller/actions/js_snippets/misc.py`, `src/ctrl-actions/structure.js`
+  Python 同步提示：无
+
 - 2026-08-09: **T4-P3:** Source B keeps empty-leading `el-table` rows (`row#N` + index xpath); `CTRL.selectOption` ports `SELECT_LAZY_LOAD_ON_MISS`.
   影响范围: `scripts/controller/actions/js_snippets/scan_form.py`, `scripts/prompts/agent-tools-form.md`, `src/ctrl-actions/select.js`
   Python 同步提示：无
