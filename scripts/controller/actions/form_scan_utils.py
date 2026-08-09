@@ -97,6 +97,126 @@ def _dedupe_needs_agent(needs: list) -> list:
     return [by_label[lbl] for lbl in order]
 
 
+KNOWN_EDITABLE_FIELD_KINDS = frozenset({
+    'input', 'select', 'date', 'radio', 'checkbox', 'tree-select', 'tree',
+})
+
+
+def _field_is_filled(field: dict) -> bool:
+    """True when scan field has a value (select: selected or currentValue)."""
+    kind = (field.get('kind') or '').strip()
+    if kind == 'select' and field.get('selected'):
+        return True
+    return bool((field.get('currentValue') or '').strip())
+
+
+def _field_is_pending(field: dict) -> bool:
+    """Empty, enabled, known-kind fields count toward pending_labels."""
+    kind = (field.get('kind') or '').strip()
+    if kind not in KNOWN_EDITABLE_FIELD_KINDS:
+        return False
+    if field.get('disabled'):
+        return False
+    return not _field_is_filled(field)
+
+
+def _merge_scan_fields(scan_results: list[dict]) -> list[dict]:
+    """Merge fields across scan dicts; dedupe by non-empty xpath_smart (first wins)."""
+    merged: list[dict] = []
+    seen_xpath: set[str] = set()
+    for result in scan_results:
+        if not isinstance(result, dict):
+            continue
+        for f in result.get('fields') or []:
+            if not isinstance(f, dict):
+                continue
+            xp = (f.get('xpath_smart') or '').strip()
+            if xp:
+                if xp in seen_xpath:
+                    continue
+                seen_xpath.add(xp)
+            merged.append(f)
+    return merged
+
+
+def _merge_scan_buttons(scan_results: list[dict]) -> list[dict]:
+    merged: list[dict] = []
+    for result in scan_results:
+        if not isinstance(result, dict):
+            continue
+        for b in result.get('buttons') or []:
+            if isinstance(b, dict):
+                merged.append(b)
+    return merged
+
+
+def _project_summary_buttons(buttons: list[dict]) -> list[dict]:
+    """Source C buttons → {text, section} only (no kind/xpath)."""
+    out: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for b in buttons:
+        text = (b.get('label') or '').strip()
+        if not text:
+            continue
+        section = (b.get('section_title') or '').strip()
+        key = (text, section)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({'text': text, 'section': section})
+    return out
+
+
+def build_editable_summary(
+    scan_results: list[dict],
+    *,
+    primary_container: str,
+) -> dict:
+    """Merge A/B/C scan JSON dicts → read-only editable summary. No store side effects."""
+    fields = _merge_scan_fields(scan_results)
+    raw_buttons = _merge_scan_buttons(scan_results)
+    known_fields = [
+        f for f in fields
+        if (f.get('kind') or '').strip() in KNOWN_EDITABLE_FIELD_KINDS
+    ]
+
+    pending_labels: list[str] = []
+    seen_pending: set[str] = set()
+    for f in known_fields:
+        if not _field_is_pending(f):
+            continue
+        label = (f.get('label') or '').strip()
+        if label and label not in seen_pending:
+            seen_pending.add(label)
+            pending_labels.append(label)
+
+    filled = sum(1 for f in known_fields if _field_is_filled(f))
+    section_block = _build_section_summary(
+        known_fields,
+        raw_buttons,
+        pending_labels=set(pending_labels),
+    )
+    sections = [
+        {
+            'id': s.get('section_id', ''),
+            'title': s.get('section_title', ''),
+            'pending': s.get('fields_editable_pending', 0),
+        }
+        for s in section_block.get('sections', [])
+    ]
+
+    return {
+        'container': (primary_container or 'main').strip() or 'main',
+        'scope': 'active+visible-overlays',
+        'total': len(known_fields),
+        'filled': filled,
+        'pending': len(pending_labels),
+        'pending_labels': pending_labels,
+        'sections': sections,
+        'buttons': _project_summary_buttons(raw_buttons),
+    }
+
+
 def _build_section_summary(
     fields: list[dict],
     buttons: list[dict],
