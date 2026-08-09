@@ -10,6 +10,10 @@
 - **click_save(button_text='保存', section='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `section=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections`）；无 `section` 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 `section` → `err-section-required`（见 core「阶段区块 section」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
 
 ## 任务列表动作
+- **`scan_editable_summary()`** — 了解当前可见可编辑控件时调用（只读摘要，不填表、不建任务列表）。
+- 用返回的 `pending_labels` 与 `buttons[{text,section}]` 决定下一步 fill/select/click_save。
+- **壳层导航**（侧栏/顶栏菜单）不要依赖本清单。
+- 需要建任务列表时仍用 **`scan_form_fields()`**；批量填仍用 **`run_form_assistant()`**（合约 `allow_form_assistant=true` 时）。
 - **`run_form_assistant(section='')` — 批量扫描并自动填写当前容器内可编辑字段。** 可选 `section=` 收窄到某一折叠/Tab/卡片区块（标题见返回的 `sections[]`）。仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok |` 后接 JSON：`status`（如 `auto-fill-complete`）、可选 `needs_agent[]`（`{label, reason}` — 助手跳过、须你亲自填）、`sections[]`（各区块含 `section_id`/`section_title`、`fields_total`、`fields_editable_pending`、`fields_sample`、`buttons`）、可选 `ambiguous_buttons[]`（跨区块同名按钮）。助手结果是草稿：先处理 `needs_agent` 并终检，再保存。`get_pending_tasks()` 仍可含 `NEXT_ACTION: click_save(..., section='…')`（有唯一保存块或你已传 section 时）。
 - **`scan_form_fields()` — 仅扫描并初始化任务列表 / 摘要，不自动填写。** 不要在列表页或不需要填表的页面调用。后续检查用 `scan_visible_fields`。
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
