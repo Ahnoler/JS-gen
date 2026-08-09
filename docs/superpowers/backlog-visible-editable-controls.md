@@ -35,6 +35,8 @@
 | **D6** | 回放 params-first fill/select + 回读 | `_resolve_replay_xpath`；湿跑 25/25 |
 | **D7（产品侧）** | `JS_SELECT_OPTION` 懒加载滚底 | `SELECT_LAZY_LOAD_ON_MISS` |
 | **T3** | 录制 `element ≡ params` xpath | `JS_CAPTURE_FROM_XPATH`；commits `a35d7d1`…`ffac550`；[archive spec](archive/specs/2026-08-08-capture-element-from-xpath-design.md) |
+| **T6** | Source B 空行首表格行命名 `row#N` | `SOURCE_B_EMPTY_LEADING` / `SOURCE_B_ROW_INDEX_XPATH`；[plan](plans/2026-08-09-t4-p3-t6-t8.md) |
+| **T8** | CTRL `selectOption` 懒加载对齐 Agent | `SELECT_LAZY_LOAD_ON_MISS` in `src/ctrl-actions/select.js`；[plan](plans/2026-08-09-t4-p3-t6-t8.md) |
 
 ---
 
@@ -45,7 +47,7 @@
 | **T4-P0** | **已实施** | `scan_editable_summary`：只读摘要；`buttons[{text,section}]`；不写 store；不 auto-fill；单根扫描（`JS_GET_CONTAINER`） | [spec](specs/2026-08-09-scan-editable-summary-design.md) · [plan](plans/2026-08-09-scan-editable-summary.md) · commit `0b1105e` |
 | **T4-P1** | **已实施** | 多 overlay 根合并去重；主内容去壳（`JS_SCAN_FORM_FIELDS mode:'multi'`）；`scan_editable_summary` 接线 | [plan](plans/2026-08-09-scan-editable-summary-p1-multiroot.md) · commits `d1696f2`… |
 | **T4-P2** | **已实施** | 摘要旁路 → memory（`form_state` + `form_inventory` 聚合 facts；helper `inventory_emit.py`） | [spec](specs/2026-08-09-inventory-memory-factpack-design.md) · [plan](plans/2026-08-09-inventory-memory-factpack.md) |
-| **T4-P3** | 未做 | 分类扩展（T5/T6）+ 写路径残余（T1r/T8） | 见下表 |
+| **T4-P3** | **已实施**（T6+T8） | Source B 空行首命名 + CTRL `selectOption` 懒加载 | [spec](specs/2026-08-09-t4-p3-t6-t8-design.md) · [plan](plans/2026-08-09-t4-p3-t6-t8.md) |
 | **T4-P4** | 未做 | Playwright MCP a11y **对照/诊断**（灰度，不替换 Element 主路径） | MCP/灰度计划 |
 
 ---
@@ -54,12 +56,13 @@
 
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
-| **T5** | 未做 | 非 `el-table` 自定义网格 | P2（需产品确认）→ 归 T4-P3 |
-| **T6** | 未做 | Source B 空行首表格行命名 | P2 → 归 T4-P3 |
+| **T5** | 未做 | 非 `el-table` 自定义网格 | 需产品确认；T4-P3 后 |
+| **T6** | **已实施** | Source B 空行首表格行命名 | — |
 | **T7** | 不做 | API 改名 `control_*` | P3 |
-| **T8** | 未做 | CTRL `selectOption` 懒加载对齐 | P2 → 可并行小刀或 T4-P3 |
+| **T8** | **已实施** | CTRL `selectOption` 懒加载对齐 | — |
 | **T9** | 部分 | 产品 `steps/replay` 常态验收 | 运维 |
-| **T1r** | 残余 | tree / replay label 兜底 | P2 → 归 T4-P3 |
+| **T10** | 未做 | `save_form_snapshot` 回放 / form-structure checkpoint 修复 | **T4 收口后回访** |
+| **T1r** | 残余 | tree / replay label 兜底 | T4-P3 后 |
 | **T3r** | 残余 | T3 活录 CDP 对拍 | P2 |
 
 ---
@@ -77,8 +80,9 @@
 
 ## 推荐下一刀
 
-1. **T4-P3** — 分类扩展（T5/T6）+ 写路径残余（T1r）  
-2. 并行小刀：**T8** CTRL `selectOption` 懒加载对齐，或三大问题①已填跳过（质量，非视野）
+1. **T10** — `save_form_snapshot` 回放 / form-structure checkpoint 修复  
+2. 其后：**T5** 非 `el-table` 自定义网格，或 **T1r** tree / replay label 兜底  
+3. 或三大问题①已填跳过（质量，非视野）
 
 ## 文档交叉
 

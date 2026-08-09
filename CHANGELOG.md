@@ -11,6 +11,10 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-09: **T4-P3:** Source B keeps empty-leading `el-table` rows (`row#N` + index xpath); `CTRL.selectOption` ports `SELECT_LAZY_LOAD_ON_MISS`.
+  影响范围: `scripts/controller/actions/js_snippets/scan_form.py`, `scripts/prompts/agent-tools-form.md`, `src/ctrl-actions/select.js`
+  Python 同步提示：无
+
 - 2026-08-09: **`scan_editable_summary` 旁路记忆（T4-P2）**：成功摘要后 best-effort 上报 `form_state` 事件与 `form_inventory` 聚合 facts（`container`/`pending_count`/`pending_labels`/`buttons`）；`AI_MEMORY_EVENTS` 开关；不阻塞 action 返回。
   影响范围：Python agent `scripts/controller/actions/_form.py`、`scripts/memory/inventory_emit.py`。
   文件：scripts/controller/actions/_form.py, scripts/memory/inventory_emit.py, scripts/characterization/characterize-inventory-memory.py
