@@ -51,6 +51,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-09: **Overlay 容器命名带触发按钮（`dialog:<按钮>|<标题>`）。** 录制用最近成功点击文案合成 display id（无标题 → `|unnamed`）；`verifyFormStructure` / `JS_VERIFY_FORM_STRUCTURE` 只匹配 `|` 后标题，兼容旧 `dialog:标题` / `dialog:unnamed`。
+  影响范围：录制 snapshot container、steps/replay Type B 校验、assembled CTRL。
+  文件：scripts/controller/actions/container_naming.py, _form.py, form_scan_utils.py, _misc.py, _table.py, js_snippets/misc.py, src/ctrl-actions/structure.js
+  Python 同步提示：无（scripts + CTRL；Python 控制面无对等逻辑）。
+
 - 2026-08-08: **修复重构回归——`liveByRemoteSessionId` 裸引用**：remote-session-service 拆分 state 后未导入该 Map（仅 re-export，不会引入模块作用域），BiB attach 时 ReferenceError → `[trajectory] BiB attach failed`。已在导入块补回。
   影响范围：录制 attach（attachTrajectoryLive / stream attach）与 live 状态绑定。
   文件：src/services/remote-session-service.js
@@ -199,6 +204,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：对齐新表 schema + `/api/v2/operation-components*`；`trajectory_phase.component_id` 可空预留；mine/CRUD 语义见 CHANGELOG。
 
 ### Fixed
+
+- 2026-08-09: **`dialog:unnamed` / `drawer:unnamed` 表单结构校验误报 `container_not_found`。** 录制对无标题弹窗写入哨兵 `unnamed`；`verifyFormStructure` 原先按字面标题匹配「unnamed」找不到容器，引入弹窗后紧接着的结构检查点失败。现改为匹配空 title/aria 的可见 overlay。
+  影响范围：`steps/replay` Type B `save_form_snapshot`、assembled CTRL verify。
+  文件：src/ctrl-actions/structure.js, scripts/controller/actions/js_snippets/misc.py, scripts/characterization/characterize-verify-form-structure.mjs
+  Python 同步提示：无（scripts 子进程 + CTRL；Python 控制面无对等逻辑）。
 
 - 2026-08-09: **T10-P0: unsafe form-structure checkpoint fails step but continues replay batch (A2).** `handleFormStructureCheckpoint` unsafe/`container_not_found` returns `aborted: false`; `replay-batch-runner` continues on `!ok && !aborted` (records `failedStepIds`, no batch abort). Transport timeout / heal fail / userAbort still `aborted: true`; no snapshot mutate on unsafe.
   影响范围：`steps/replay` Type B checkpoint、WS `replay:step` failed 语义。
