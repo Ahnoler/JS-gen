@@ -693,6 +693,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     async def save_form_snapshot():
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
+        from scripts.controller.actions.container_naming import resolve_display_container
+        container_id = resolve_display_container(container_id, case_data_store)
         fields = case_data_store.get('_scan_fields', [])
 
         snap = _save_form_snapshot(container_id, fields, case_data_store)

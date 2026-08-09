@@ -48,6 +48,8 @@ def compose_overlay_container(raw_id: str, trigger: str | None) -> str:
         prefix, rest = _split_type(raw_id)
         if not prefix:
             return (raw_id or '').strip() or 'main'
+        if OVERLAY_SEP in rest:
+            return (raw_id or '').strip()
         btn = normalize_trigger_button(trigger)
         title = (rest or '').strip() or 'unnamed'
         if not btn:

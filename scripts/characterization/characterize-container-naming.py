@@ -16,6 +16,7 @@ from scripts.controller.actions.container_naming import (  # noqa: E402
     clear_trigger_button,
     resolve_display_container,
 )
+from scripts.controller.actions.form_scan_utils import _is_search_dialog  # noqa: E402
 
 
 def assert_true(cond: bool, msg: str) -> None:
@@ -95,6 +96,25 @@ def test_normalize_and_remember() -> None:
     assert_true('_overlay_container_alias' not in store, 'clear alias')
 
 
+def test_search_dialog_title_parse() -> None:
+    assert_true(
+        not _is_search_dialog('dialog:引入|unnamed'),
+        'trigger segment 引入 must not classify as search dialog',
+    )
+    assert_true(
+        _is_search_dialog('dialog:选择客户'),
+        'legacy title-only id still search dialog',
+    )
+
+
+def test_compose_no_double_pipe() -> None:
+    raw = 'dialog:新增|unnamed'
+    assert_true(
+        compose_overlay_container(raw, '引入') == raw,
+        'already-composed id must not double-pipe',
+    )
+
+
 def test_alias_freeze() -> None:
     store = {'_last_trigger_button': '新增'}
     a = resolve_display_container('dialog:unnamed', store)
@@ -126,6 +146,8 @@ def main() -> None:
     test_compose_truth()
     test_title_extract()
     test_normalize_and_remember()
+    test_search_dialog_title_parse()
+    test_compose_no_double_pipe()
     test_alias_freeze()
     test_source_wires()
     print('PASS characterize-container-naming')

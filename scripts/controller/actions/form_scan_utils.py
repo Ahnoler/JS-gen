@@ -18,6 +18,7 @@ from ._helpers import (
 from ._js_snippets import JS_SCAN_FORM_FIELDS, JS_IS_QUERY_TOOLBAR, JS_GET_CONTAINER
 from ...models import FormSnapshot, FormSnapshotCollection, TaskList
 from ...models.field import ScannedButton
+from .container_naming import overlay_title_from_container_id
 from .form_rules import get_has_button_keywords
 
 # Search/picker dialogs — agent must control which query fields to fill.
@@ -35,7 +36,7 @@ _QUERY_NEXT_HINT = (
 def _is_search_dialog(container_id: str) -> bool:
     if not (container_id or '').startswith('dialog:'):
         return False
-    title = container_id[7:]
+    title = overlay_title_from_container_id(container_id)
     return any(h in title for h in _SEARCH_DIALOG_HINTS)
 
 
