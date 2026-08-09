@@ -50,7 +50,8 @@ from .form_rules import (
 from .form_scan_utils import (
     _SEARCH_DIALOG_HINTS, _QUERY_NEXT_HINT, _is_search_dialog, _force_refill_flag,
     _scan_buttons_from_result, refresh_scan_buttons, _section_group_key, _dedupe_needs_agent,
-    _build_section_summary, _is_query_mode, _skip_auto_fill, _mark_query_ui_if_needed,
+    _build_section_summary, build_editable_summary, _is_query_mode, _skip_auto_fill,
+    _mark_query_ui_if_needed,
     _pack_select_record, _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
     ResolvedControl, _resolve_control, _task_xpath_smart, _task_done_impl,
     _submit_ready_hint, _switch_task_list_container, _with_submit_cue, _query_not_form_payload,
@@ -473,6 +474,31 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 pending_labels=set(pending_labels),
             )
         )
+        return json.dumps(summary, ensure_ascii=False)
+
+    @controller.action(
+        'Read-only summary of visible classified business controls (quick scan). '
+        'Returns {container, scope, total, filled, pending, pending_labels, sections, '
+        'buttons[{text, section}]} — no kind/xpath on buttons. '
+        'Does NOT build task_list, auto-fill, or run form assistant.'
+    )
+    async def scan_editable_summary():
+        page = await browser_context.get_current_page()
+        await _wait_if_loading(page)
+        # P0 single-root: JS_SCAN_FORM_FIELDS embeds JS_GET_CONTAINER (last visible
+        # overlay or document). scope "active+visible-overlays" in the summary means
+        # that GET_CONTAINER root for P0 — true multi-root (overlays ∪ main sans shell)
+        # is deferred to T4-P1 (no container override on JS_SCAN_FORM_FIELDS yet).
+        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [True, _button_keywords()])
+        try:
+            result = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            return raw
+        if not isinstance(result, dict):
+            return _err('invalid-scan-result')
+        primary_container = (result.get('container') or 'main').strip() or 'main'
+        # build_editable_summary → buttons[{text, section}] (no kind/xpath).
+        summary = build_editable_summary([result], primary_container=primary_container)
         return json.dumps(summary, ensure_ascii=False)
 
     @controller.action(
