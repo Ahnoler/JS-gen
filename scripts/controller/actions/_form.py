@@ -485,11 +485,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     async def scan_editable_summary():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        # P0 single-root: JS_SCAN_FORM_FIELDS embeds JS_GET_CONTAINER (last visible
-        # overlay or document). scope "active+visible-overlays" in the summary means
-        # that GET_CONTAINER root for P0 — true multi-root (overlays ∪ main sans shell)
-        # is deferred to T4-P1 (no container override on JS_SCAN_FORM_FIELDS yet).
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [True, _button_keywords()])
+        # Multi-root: visible overlays or main content (sans shell) via JS_SCAN_FORM_FIELDS
+        # mode:'multi'; scope "active+visible-overlays" in summary reflects merged roots.
+        raw = await page.evaluate(
+            JS_SCAN_FORM_FIELDS,
+            [True, _button_keywords(), {'mode': 'multi'}],
+        )
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
         except Exception:
