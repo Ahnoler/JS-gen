@@ -10,9 +10,8 @@ from .scan_utils import JS_READ_CURRENT_VALUE
 from .scan_utils import JS_SECTION_ATTACH_BLOCK
 from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 
-JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
+JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
 ''' + PAGE_LOCATOR_HELPERS + '''
-    const container = ''' + JS_GET_CONTAINER + ''';
     const classify = ''' + JS_CLASSIFY_FIELD + ''';
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const isRequired = ''' + JS_FIELD_REQUIRED + ''';
@@ -192,8 +191,29 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         } catch (e) {}
         return [];
     };
-    // Phase 1: 扫描 container 内的所有 .el-form-item
-    const allItems = container.querySelectorAll('.el-form-item');
+    const wrapOk = (d) => {
+        if (!d) return false;
+        const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+        if (wrap && getComputedStyle(wrap).display === 'none') return false;
+        if (d.offsetParent !== null) return true;
+        const st = getComputedStyle(d);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        const r = d.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+    };
+    const getMainContentRoot = () => {
+        const main = document.querySelector('.el-main');
+        if (main) return main;
+        const host = document.querySelector('#app, .app-main, .el-container, main');
+        return host || document;
+    };
+    const getMultiRoots = () => {
+        const overlays = [...document.querySelectorAll('.el-dialog, .el-message-box, .el-drawer')].filter(wrapOk);
+        if (overlays.length) return overlays;
+        return [getMainContentRoot()];
+    };
+    const isMulti = !!(opts && opts.mode === 'multi');
+    const scanRoots = isMulti ? getMultiRoots() : [''' + JS_GET_CONTAINER + '''];
     const fields = [];
     const seenXpaths = new Set();
     const pushField = (field) => {
@@ -204,6 +224,12 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         return true;
     };
     const selectFields = [];  // [{field, trigger}] — Phase 2 从这里读取 options
+    const buttons = [];
+    const btnSeen = new Set();
+    for (let _ri = 0; _ri < scanRoots.length; _ri++) {
+    const container = scanRoots[_ri];
+    // Phase 1: 扫描 container 内的所有 .el-form-item
+    const allItems = container.querySelectorAll('.el-form-item');
     for (const item of allItems) {
         // Prefer getBoundingClientRect over offsetParent — Element UI drawers
         // use position:fixed wrappers where offsetParent is often null while visible.
@@ -233,7 +259,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
             const btns = item.querySelectorAll('button');
             for (let i = 0; i < btns.length; i++) {
                 const t = btns[i].textContent.trim();
-                if (buttonKeywords.some(k => t.includes(k))) return t;
+                if (buttonkeywords.some(k => t.includes(k))) return t;
             }
             return '';
         })();
@@ -307,6 +333,21 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
             }
         }
     }
+    /* SCAN_SOURCE_C_BUTTONS */
+    for (const el of container.querySelectorAll('button, .el-button')) {
+        if (quick && !isVisible(el)) continue;
+        if (el.disabled || el.classList.contains('is-disabled')) continue;
+        const label = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+        if (!label || label.length > 40) continue;
+        const btnSec = {};
+        attachSection(btnSec, el);
+        const xpath_smart = xpathSmartOf(el, label, '', 'button') || '';
+        const key = xpath_smart || (btnSec.section_id + '|' + label);
+        if (btnSeen.has(key)) continue;
+        btnSeen.add(key);
+        buttons.push({ label, xpath_smart, section_id: btnSec.section_id, section_title: btnSec.section_title, disabled: false });
+    }
+    } /* end scanRoots */
     /* SCAN_DEDUP_BY_XPATH */
     // Phase 2: 从 Vue 组件实例读取每个 select 的 options。
     // 不打开下拉框——Vue 组件实例存储了完整的 options 数据，精准无污染，
@@ -355,22 +396,6 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonKeywords]) => {
         }
         return 'unknown';
     })();
-    /* SCAN_SOURCE_C_BUTTONS */
-    const buttons = [];
-    const btnSeen = new Set();
-    for (const el of container.querySelectorAll('button, .el-button')) {
-        if (quick && !isVisible(el)) continue;
-        if (el.disabled || el.classList.contains('is-disabled')) continue;
-        const label = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
-        if (!label || label.length > 40) continue;
-        const btnSec = {};
-        attachSection(btnSec, el);
-        const xpath_smart = xpathSmartOf(el, label, '', 'button') || '';
-        const key = xpath_smart || (btnSec.section_id + '|' + label);
-        if (btnSeen.has(key)) continue;
-        btnSeen.add(key);
-        buttons.push({ label, xpath_smart, section_id: btnSec.section_id, section_title: btnSec.section_title, disabled: false });
-    }
     const result = { container: containerId, fields, buttons, notification };
     const json = JSON.stringify(result, null, 2);
     const now = new Date();

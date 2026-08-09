@@ -288,11 +288,20 @@ def main() -> int:
         action='store_true',
         help='Run build_editable_summary unit tests only (Task 2 green path)',
     )
+    parser.add_argument(
+        '--js-cues-only',
+        action='store_true',
+        help='Run JS_SCAN_FORM_FIELDS multi-root source cues only (Task 2 green path)',
+    )
     args = parser.parse_args()
 
     run_aggregator_tests()
     if args.aggregator_only:
         print('characterize-scan-editable-summary (aggregator): OK')
+        return 0
+    if args.js_cues_only:
+        test_js_scan_form_fields_multi_root_cues()
+        print('characterize-scan-editable-summary (js-cues): OK')
         return 0
 
     try:
