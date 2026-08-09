@@ -37,6 +37,7 @@
 | **T3** | 录制 `element ≡ params` xpath | `JS_CAPTURE_FROM_XPATH`；commits `a35d7d1`…`ffac550`；[archive spec](archive/specs/2026-08-08-capture-element-from-xpath-design.md) |
 | **T6** | Source B 空行首表格行命名 `row#N` | `SOURCE_B_EMPTY_LEADING` / `SOURCE_B_ROW_INDEX_XPATH`；[plan](plans/2026-08-09-t4-p3-t6-t8.md) |
 | **T8** | CTRL `selectOption` 懒加载对齐 Agent | `SELECT_LAZY_LOAD_ON_MISS` in `src/ctrl-actions/select.js`；[plan](plans/2026-08-09-t4-p3-t6-t8.md) |
+| **T10-P0** | unsafe checkpoint `confirmed=0` 但不 abort 批次 | `form-structure-heal.js` / `replay-batch-runner.js`；[spec](specs/2026-08-09-save-form-snapshot-replay-design.md) · [plan](plans/2026-08-09-save-form-snapshot-replay-p0.md) · commit `6b0bf7f` |
 
 ---
 
@@ -61,7 +62,7 @@
 | **T7** | 不做 | API 改名 `control_*` | P3 |
 | **T8** | **已实施** | CTRL `selectOption` 懒加载对齐 | — |
 | **T9** | 部分 | 产品 `steps/replay` 常态验收 | 运维 |
-| **T10** | 未做 | `save_form_snapshot` 回放 / form-structure checkpoint 修复 | **T4 收口后回访** |
+| **T10** | **P0 已实施** / **P1 未做** | `save_form_snapshot` 回放；P1=verify 扫描对齐 Source A+B | [spec](specs/2026-08-09-save-form-snapshot-replay-design.md) |
 | **T1r** | 残余 | tree / replay label 兜底 | T4-P3 后 |
 | **T3r** | 残余 | T3 活录 CDP 对拍 | P2 |
 
@@ -80,8 +81,8 @@
 
 ## 推荐下一刀
 
-1. **T10** — `save_form_snapshot` 回放 / form-structure checkpoint 修复  
-2. 其后：**T5** 非 `el-table` 自定义网格，或 **T1r** tree / replay label 兜底  
+1. **T10-P1** — verify 扫描对齐 Source A+B（[spec](specs/2026-08-09-save-form-snapshot-replay-design.md)）  
+2. **T5** / **T1r**  
 3. 或三大问题①已填跳过（质量，非视野）
 
 ## 文档交叉
