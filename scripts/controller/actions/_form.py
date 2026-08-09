@@ -500,6 +500,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         primary_container = (result.get('container') or 'main').strip() or 'main'
         # build_editable_summary → buttons[{text, section}] (no kind/xpath).
         summary = build_editable_summary([result], primary_container=primary_container)
+        try:
+            from ...state import _CURRENT_PHASE
+            from scripts.memory.inventory_emit import emit_editable_summary_memory
+            emit_editable_summary_memory(
+                summary,
+                phase_number=_CURRENT_PHASE if _CURRENT_PHASE else None,
+            )
+        except Exception:
+            pass
         return json.dumps(summary, ensure_ascii=False)
 
     @controller.action(
