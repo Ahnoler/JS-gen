@@ -44,7 +44,7 @@
 |------|------|------|-----------|
 | **T4-P0** | **已实施** | `scan_editable_summary`：只读摘要；`buttons[{text,section}]`；不写 store；不 auto-fill；单根扫描（`JS_GET_CONTAINER`） | [spec](specs/2026-08-09-scan-editable-summary-design.md) · [plan](plans/2026-08-09-scan-editable-summary.md) · commit `0b1105e` |
 | **T4-P1** | **已实施** | 多 overlay 根合并去重；主内容去壳（`JS_SCAN_FORM_FIELDS mode:'multi'`）；`scan_editable_summary` 接线 | [plan](plans/2026-08-09-scan-editable-summary-p1-multiroot.md) · commits `d1696f2`… |
-| **T4-P2** | **下一刀** | 摘要旁路 → memory / Fact Pack（不阻塞主录制） | 记忆进度文档 |
+| **T4-P2** | **已实施** | 摘要旁路 → memory（`form_state` + `form_inventory` 聚合 facts；helper `inventory_emit.py`） | [spec](specs/2026-08-09-inventory-memory-factpack-design.md) · [plan](plans/2026-08-09-inventory-memory-factpack.md) |
 | **T4-P3** | 未做 | 分类扩展（T5/T6）+ 写路径残余（T1r/T8） | 见下表 |
 | **T4-P4** | 未做 | Playwright MCP a11y **对照/诊断**（灰度，不替换 Element 主路径） | MCP/灰度计划 |
 
@@ -77,8 +77,8 @@
 
 ## 推荐下一刀
 
-1. **T4-P2** — 摘要旁路 → memory / Fact Pack（不阻塞主录制）  
-2. 并行小刀：T8 或三大问题①已填跳过（质量，非视野）
+1. **T4-P3** — 分类扩展（T5/T6）+ 写路径残余（T1r）  
+2. 并行小刀：**T8** CTRL `selectOption` 懒加载对齐，或三大问题①已填跳过（质量，非视野）
 
 ## 文档交叉
 

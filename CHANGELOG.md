@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-09: **`scan_editable_summary` 旁路记忆（T4-P2）**：成功摘要后 best-effort 上报 `form_state` 事件与 `form_inventory` 聚合 facts（`container`/`pending_count`/`pending_labels`/`buttons`）；`AI_MEMORY_EVENTS` 开关；不阻塞 action 返回。
+  影响范围：Python agent `scripts/controller/actions/_form.py`、`scripts/memory/inventory_emit.py`。
+  文件：scripts/controller/actions/_form.py, scripts/memory/inventory_emit.py, scripts/characterization/characterize-inventory-memory.py
+  Python 同步提示：无
+
 - 2026-08-09: **`scan_editable_summary` Agent 动作（T4-P0）**：只读可见可编辑控件摘要（`pending_labels`、`buttons[{text,section}]`、`sections`）；不写 `task_list` / `_scan_fields`、不触发 auto-fill。P0 单根扫描（复用 `JS_GET_CONTAINER` + `quick=true`）；多 overlay 根合并去壳 → T4-P1。Prompt 引导填表/找按钮前先摘要。
   影响范围：Python agent `scripts/controller/actions/_form.py`、`form_scan_utils.py`、`scripts/prompts/agent-tools-form.md`。
   文件：scripts/controller/actions/_form.py, scripts/controller/actions/form_scan_utils.py, scripts/prompts/agent-tools-form.md, scripts/characterization/characterize-scan-editable-summary.py

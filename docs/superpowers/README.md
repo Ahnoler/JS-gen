@@ -7,7 +7,8 @@
 
 | 项 | Spec | Plan | Status |
 |----|------|------|--------|
-| T4-P0 `scan_editable_summary` | [spec](specs/2026-08-09-scan-editable-summary-design.md) | [plan](plans/2026-08-09-scan-editable-summary.md) | **Approved — ready to implement** |
+| T4-P2 inventory → memory | [spec](specs/2026-08-09-inventory-memory-factpack-design.md) | [plan](plans/2026-08-09-inventory-memory-factpack.md) | Implemented |
+| T4-P0/P1 `scan_editable_summary` | [spec](specs/2026-08-09-scan-editable-summary-design.md) | [P0](plans/2026-08-09-scan-editable-summary.md) · [P1](plans/2026-08-09-scan-editable-summary-p1-multiroot.md) | Implemented |
 
 ## 已归档 Implemented（`archive/`）
 
