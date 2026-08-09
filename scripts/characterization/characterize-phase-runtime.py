@@ -143,6 +143,20 @@ def test_recorder_wires_resolve_phase_section() -> None:
     assert_true("empty_act_prescription_message" in rec, "recorder uses empty_act_prescription_message")
     assert_true("_empty_act_streak" in rec, "recorder tracks _empty_act_streak")
     assert_true("_phase_max_steps" in rec, "recorder reads _phase_max_steps for last_step")
+    assert_true(
+        "from langchain_core.messages import HumanMessage" in rec,
+        "empty-act emitter imports HumanMessage (NameError regression)",
+    )
+    fn = rec.find("def _emit_empty_act_cue")
+    assert_true(fn >= 0, "_emit_empty_act_cue present")
+    body = rec[fn : fn + 2800]
+    assert_true("except Exception" in body, "empty-act cue swallows failures")
+    assert_true("empty-act cue skipped" in body, "empty-act failures stay on stderr")
+    hook = (ROOT / "scripts/recorder.py").read_text(encoding="utf-8")
+    call = hook.find("_emit_empty_act_cue(")
+    assert_true(call >= 0, "recorder calls _emit_empty_act_cue")
+    wrap = hook[max(0, call - 120) : call + 200]
+    assert_true("try:" in wrap and "except Exception" in wrap, "call site wraps empty-act")
 
 
 def test_empty_effective_and_prescription() -> None:
@@ -198,6 +212,27 @@ def test_empty_effective_and_prescription() -> None:
         "click_save" in scoped_msg and "section=" in scoped_msg,
         f"submit required + section → scoped click_save: {scoped_msg}",
     )
+
+
+def test_empty_act_cue_never_raises() -> None:
+    """Empty-act steering must not abort on_step_end / surface to FE."""
+    from scripts.agent.recorder_emitters import _emit_empty_act_cue
+
+    class _BoomMM:
+        def _add_message_with_tokens(self, _msg):
+            raise RuntimeError("simulated inject failure")
+
+    class _State:
+        n_steps = 3
+
+    class _Agent:
+        state = _State()
+        _message_manager = _BoomMM()
+
+    store = {}
+    # Empty effective actions → would inject cue → inject boom → must swallow
+    _emit_empty_act_cue(store, _Agent(), [], "Execute AgentOutput")
+    assert_true(store.get("_empty_act_streak") == 1, "streak set before inject attempt")
 
 
 def test_session_runner_sets_phase_max_steps() -> None:
@@ -262,6 +297,7 @@ def main() -> None:
     test_scoped_pending_gate_ignores_other_section()
     test_recorder_wires_resolve_phase_section()
     test_empty_effective_and_prescription()
+    test_empty_act_cue_never_raises()
     test_session_runner_sets_phase_max_steps()
     test_empty_act_buffer_on_submit_required()
     test_session_runner_logs_empty_buffer()

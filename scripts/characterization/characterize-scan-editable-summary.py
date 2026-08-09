@@ -81,10 +81,13 @@ def test_summary_buttons_shape() -> None:
     from scripts.controller.actions.form_scan_utils import build_editable_summary
 
     buttons = build_editable_summary(
-        [{'fields': [], 'buttons': [{'label': '保存', 'section_title': '区块'}]}],
+        [{'fields': [], 'buttons': [{'label': '保存', 'section_title': '区块', 'xpath_smart': "//button[normalize-space()='保存']"}]}],
         primary_container='main',
     )['buttons']
-    assert_true(buttons == [{'text': '保存', 'section': '区块'}], 'buttons projected as text+section')
+    assert_true(
+        buttons == [{'text': '保存', 'section': '区块', 'xpath_smart': "//button[normalize-space()='保存']"}],
+        'buttons projected as text+section+xpath_smart',
+    )
     assert_true('kind' not in buttons[0], 'buttons must not project kind')
 
 
@@ -108,7 +111,26 @@ def test_js_scan_form_fields_multi_root_cues() -> None:
     )
 
 
-def test_scan_editable_summary_multi_root_wired() -> None:
+def test_fullpage_l2_l1_cues() -> None:
+    from scripts.controller.actions._js_snippets import JS_SCAN_FORM_FIELDS
+
+    scan_form_src = SCAN_FORM_PY.read_text(encoding="utf-8")
+    combined = scan_form_src + JS_SCAN_FORM_FIELDS
+    assert_true(
+        "mode === 'fullpage'" in combined or "mode=='fullpage'" in combined.replace(" ", ""),
+        "fullpage mode branch present",
+    )
+    assert_true("FULLPAGE_L2_POOL" in combined, "FULLPAGE_L2_POOL marker")
+    assert_true("L2_ADMIT" in combined, "L2_ADMIT marker")
+    assert_true("L2_NO_CONTAINER_GATE" in combined, "L2_NO_CONTAINER_GATE marker")
+    assert_true("L1_FEATURE_CARD" in combined, "L1_FEATURE_CARD marker")
+    assert_true(
+        "ASSIGN_L2_TO_L1" in combined or "assignRegion" in combined,
+        "assign L2→L1 cue",
+    )
+
+
+def test_scan_editable_summary_fullpage_wired() -> None:
     form = FORM_PY.read_text(encoding="utf-8")
     body = _scan_editable_summary_body(form)
     assert_true(
@@ -117,19 +139,30 @@ def test_scan_editable_summary_multi_root_wired() -> None:
     )
     norm = _norm(body)
     assert_true(
-        "mode" in body and "multi" in body,
-        "scan_editable_summary passes mode multi to JS_SCAN_FORM_FIELDS",
+        "mode" in body and "fullpage" in body,
+        "scan_editable_summary passes mode fullpage to JS_SCAN_FORM_FIELDS",
     )
     assert_true(
-        "[true,_button_keywords(),{'mode':'multi'}]" in norm
-        or "[true,_button_keywords(),{\"mode\":\"multi\"}]" in norm
-        or "'mode':'multi'" in norm.replace(" ", "")
-        or '"mode":"multi"' in norm,
-        "scan_editable_summary evaluate call includes {'mode': 'multi'} 3rd arg",
+        "[true,_button_keywords(),{'mode':'fullpage'}]" in norm
+        or "[true,_button_keywords(),{\"mode\":\"fullpage\"}]" in norm
+        or "'mode':'fullpage'" in norm.replace(" ", "")
+        or '"mode":"fullpage"' in norm,
+        "scan_editable_summary evaluate call includes {'mode': 'fullpage'} 3rd arg",
     )
     assert_true(
         _norm("await page.evaluate(JS_SCAN_FORM_FIELDS, [True, _button_keywords()])") not in norm,
-        "scan_editable_summary must not use bare [True, _button_keywords()] without mode multi",
+        "scan_editable_summary must not use bare [True, _button_keywords()] without mode",
+    )
+
+
+def test_scan_editable_summary_multi_root_wired() -> None:
+    """Legacy multi still supported in JS; summary action prefers fullpage."""
+    from scripts.controller.actions._js_snippets import JS_SCAN_FORM_FIELDS
+
+    combined = SCAN_FORM_PY.read_text(encoding="utf-8") + JS_SCAN_FORM_FIELDS
+    assert_true(
+        "mode === 'multi'" in combined or "mode=='multi'" in combined.replace(" ", ""),
+        "JS still supports mode multi for non-summary callers",
     )
 
 
@@ -138,6 +171,14 @@ def test_prompt_mentions_action() -> None:
     assert_true(
         "scan_editable_summary" in prompt,
         "agent-tools-form.md mentions scan_editable_summary",
+    )
+    assert_true(
+        "readonly_labels" in prompt,
+        "agent-tools-form.md mentions readonly_labels",
+    )
+    assert_true(
+        "pending_items" in prompt and "xpath_smart" in prompt,
+        "agent-tools-form.md mentions pending_items xpath_smart",
     )
 
 
@@ -176,6 +217,15 @@ def test_aggregator_dedupe_by_xpath_smart() -> None:
     summary = build_editable_summary([scan_a, scan_b], primary_container='dialog:编辑')
     assert_true(summary['total'] == 1, 'dedupe by xpath_smart keeps first scan field')
     assert_true(summary['pending_labels'] == ['客户名称'], 'first field wins after dedupe')
+    assert_true(
+        summary['pending_items'] == [{
+            'label': '客户名称',
+            'xpath_smart': xp,
+            'kind': 'input',
+            'section': '基本信息',
+        }],
+        'pending_items carries relative xpath_smart from first scan',
+    )
 
 
 def test_aggregator_pending_labels() -> None:
@@ -220,8 +270,85 @@ def test_aggregator_pending_labels() -> None:
         summary['pending_labels'] == ['资产负债率'],
         'pending_labels: empty non-disabled known kinds only',
     )
-    assert_true(summary['pending'] == 1, 'pending count matches pending_labels')
+    assert_true(summary['pending'] == 1, 'pending count matches pending_items')
+    assert_true(
+        summary['pending_items'][0]['xpath_smart'] == '//input[@id="a"]',
+        'pending_items include relative xpath_smart',
+    )
+    assert_true(
+        summary['readonly_labels'] == ['内部评级'],
+        'readonly_labels: disabled known-kind fields for reference',
+    )
+    assert_true(
+        summary['readonly_items'][0]['xpath_smart'] == '//input[@id="b"]',
+        'readonly_items include relative xpath_smart',
+    )
     assert_true(summary['total'] == 3, 'unknown kind excluded from total')
+
+
+def test_aggregator_readonly_labels() -> None:
+    from scripts.controller.actions.form_scan_utils import build_editable_summary
+
+    scan = {
+        'fields': [
+            {
+                'label': '业务编号',
+                'kind': 'input',
+                'currentValue': 'PJ001',
+                'disabled': True,
+                'xpath_smart': '//input[@id="biz"]',
+                'section_title': '评级基本情况',
+            },
+            {
+                'label': '客户名称',
+                'kind': 'input',
+                'currentValue': '某某公司',
+                'disabled': True,
+                'xpath_smart': '//input[@id="name"]',
+                'section_title': '评级基本情况',
+            },
+            {
+                'label': '资产负债率',
+                'kind': 'input',
+                'currentValue': '',
+                'disabled': False,
+                'xpath_smart': '//input[@id="ratio"]',
+                'section_title': '评级等级测算',
+            },
+            {
+                'label': '客户名称',
+                'kind': 'input',
+                'currentValue': 'dup',
+                'disabled': True,
+                'xpath_smart': '//input[@id="name2"]',
+                'section_title': '其它',
+            },
+        ],
+        'buttons': [],
+    }
+    summary = build_editable_summary([scan], primary_container='main')
+    assert_true(
+        summary['readonly_labels'] == ['业务编号', '客户名称'],
+        'readonly_labels lists unique disabled labels in scan order',
+    )
+    assert_true(
+        len(summary['readonly_items']) == 3,
+        'readonly_items keeps same-label different xpath entries',
+    )
+    assert_true(
+        summary['pending_labels'] == ['资产负债率'],
+        'pending excludes readonly',
+    )
+    assert_true(
+        summary['pending_items'][0] == {
+            'label': '资产负债率',
+            'xpath_smart': '//input[@id="ratio"]',
+            'kind': 'input',
+            'section': '评级等级测算',
+        },
+        'pending_items carries xpath for ops',
+    )
+    assert_true('客户名称' not in summary['pending_labels'], 'disabled not pending')
 
 
 def test_aggregator_buttons_shape() -> None:
@@ -239,6 +366,7 @@ def test_aggregator_buttons_shape() -> None:
             {
                 'label': '暂存',
                 'section_title': '评级等级测算',
+                'xpath_smart': "//button[normalize-space()='暂存']",
             },
         ],
     }
@@ -246,13 +374,17 @@ def test_aggregator_buttons_shape() -> None:
     buttons = summary['buttons']
     assert_true(len(buttons) == 2, 'buttons merged from scan')
     assert_true(
-        buttons[0] == {'text': '保存', 'section': '系统评级结论'},
-        'button text from label, section from section_title',
+        buttons[0] == {'text': '保存', 'section': '系统评级结论', 'xpath_smart': '//button[1]'},
+        'button text/section/xpath_smart projected',
     )
-    assert_true('kind' not in buttons[0] and 'xpath_smart' not in buttons[0], 'no kind/xpath on buttons')
+    assert_true('kind' not in buttons[0], 'no kind on buttons')
     assert_true(
-        buttons[1] == {'text': '暂存', 'section': '评级等级测算'},
-        'second button projected',
+        buttons[1] == {
+            'text': '暂存',
+            'section': '评级等级测算',
+            'xpath_smart': "//button[normalize-space()='暂存']",
+        },
+        'second button projected with xpath',
     )
 
 
@@ -263,11 +395,18 @@ def test_aggregator_scope_and_container() -> None:
     assert_true(summary['container'] == 'drawer:详情', 'container from primary_container')
     assert_true(summary['scope'] == 'active+visible-overlays', 'scope constant present')
     assert_true('sections' in summary, 'sections key present')
+    summary_fp = build_editable_summary(
+        [{'fields': [], 'buttons': [], 'scope': 'fullpage', 'regions': [{'id': 'main', 'role': 'main', 'title': '', 'band': 'center'}]}],
+        primary_container='main',
+    )
+    assert_true(summary_fp['scope'] == 'fullpage', 'fullpage scope propagated')
+    assert_true(isinstance(summary_fp.get('regions'), list) and summary_fp['regions'][0]['role'] == 'main', 'regions propagated')
 
 
 def run_aggregator_tests() -> None:
     test_aggregator_dedupe_by_xpath_smart()
     test_aggregator_pending_labels()
+    test_aggregator_readonly_labels()
     test_aggregator_buttons_shape()
     test_aggregator_scope_and_container()
 
@@ -278,6 +417,8 @@ def run_action_tests() -> None:
     test_action_no_store_writes()
     test_summary_buttons_shape()
     test_js_scan_form_fields_multi_root_cues()
+    test_fullpage_l2_l1_cues()
+    test_scan_editable_summary_fullpage_wired()
     test_scan_editable_summary_multi_root_wired()
 
 

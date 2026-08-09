@@ -116,6 +116,16 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
   const evalXpathAll = (xp, root) => {
     let s = String(xp || '');
     if (!s) return [];
+    const run = (expr, ctx) => {
+      try {
+        const snap = document.evaluate(expr, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        const out = [];
+        for (let i = 0; i < snap.snapshotLength; i++) out.push(snap.snapshotItem(i));
+        return out;
+      } catch (e) {
+        return [];
+      }
+    };
     try {
       const ctx = root || document;
       if (root && s.startsWith('//')) {
@@ -125,9 +135,12 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
       } else if (!root && !s.startsWith('/') && !s.startsWith('(')) {
         s = '/' + s;
       }
-      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-      const out = [];
-      for (let i = 0; i < snap.snapshotLength; i++) out.push(snap.snapshotItem(i));
+      let out = run(s, ctx);
+      // Recording often stores body-relative abs paths as /div[1]/… (no /html/body).
+      // document.evaluate('/div[1]/…') misses; retry under /html/body.
+      if (!out.length && !root && s.startsWith('/') && !s.startsWith('/html')) {
+        out = run('/html/body' + s, document);
+      }
       return out;
     } catch (e) {
       return [];
@@ -342,12 +355,14 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
       if (hits.length) return clickEl(hits[hits.length - 1], how);
     }
 
-    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item, li.menu-item, .menu-item, .el-tree-node__content';
+    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item, li.menu-item, .menu-item, .el-tree-node__content, .plugin-nav-list, .plugin-nav-outer, .nav-content';
     const candidates = [...document.querySelectorAll(sel)].filter(isVisible);
     const exact = candidates.filter(el => norm(el.innerText || el.textContent) === want);
     if (exact.length) return clickEl(exact[exact.length - 1], 'ok-text-exact');
     let best = null;
     let bestLen = Infinity;
+    // Substring-of-want (测算 ⊂ 3.评级等级测算) is unsafe unless nearly as long as want.
+    const minSubLen = Math.max(4, Math.ceil((wantBase || want).length * 0.6));
     for (const el of candidates) {
       const t = stripVolatile(el.innerText || el.textContent);
       if (!t || t.length > 40) continue;
@@ -355,7 +370,8 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
         if (t.length <= bestLen) { best = el; bestLen = t.length; }
       } else {
         const n = norm(el.innerText || el.textContent);
-        if (n.includes(want) || want.includes(n)) {
+        const subOfWant = want.includes(n) && n.length >= minSubLen;
+        if (n.includes(want) || subOfWant) {
           if (n.length <= bestLen) { best = el; bestLen = n.length; }
         }
       }

@@ -220,8 +220,12 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         if (overlays.length) return overlays;
         return [getMainContentRoot()];
     };
+    const isFullpage = !!(opts && opts.mode === 'fullpage');
     const isMulti = !!(opts && opts.mode === 'multi');
-    const scanRoots = isMulti ? getMultiRoots() : [''' + JS_GET_CONTAINER + '''];
+    /* FULLPAGE_L2_POOL — document root includes shell; multi keeps overlay/main sans forced shell strip */
+    const scanRoots = isFullpage
+        ? [document]
+        : (isMulti ? getMultiRoots() : [''' + JS_GET_CONTAINER + ''']);
     const fields = [];
     const seenXpaths = new Set();
     const pushField = (field) => {
@@ -361,10 +365,184 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         buttons.push({ label, xpath_smart, section_id: btnSec.section_id, section_title: btnSec.section_title, disabled: false });
     }
     } /* end scanRoots */
-    /* SCAN_DEDUP_BY_XPATH */
+    /* SCAN_DEDUP_BY_XPATH — pushField uses seenXpaths */
+    /* L2_ADMIT / L2_NO_CONTAINER_GATE — fullpage extras outside form-item / el-table gates */
+    if (isFullpage) {
+        /* CHROME_NOISE_FILTER — hard-exclude portal chrome menus / decorative icons */
+        const isChromeMenuLabel = (label) => {
+            const t = String(label || '').trim();
+            if (!t) return false;
+            if (t.includes('布局')) return true;
+            if (t.includes('主题')) return true;
+            if (t.includes('页签') && (t.includes('关闭') || t.includes('固定'))) return true;
+            return false;
+        };
+        const isChromeHost = (el) => {
+            if (!el || !el.closest) return false;
+            // Chrome-scoped only — NOT every .el-dropdown-menu on the page
+            if (el.closest('.tags-view-wrapper .contextmenu, .tags-view-item .el-dropdown-menu, .tags-view .contextmenu')) return true;
+            if (el.closest('.navbar-right, .right-menu, .header-setting, .layout-setting, .theme-picker')) return true;
+            const dd = el.closest('.el-dropdown-menu');
+            if (dd && dd.closest && dd.closest('.right-menu, .navbar-right, .header-setting, .layout-setting')) return true;
+            return false;
+        };
+        const isChromeNoise = (el, kind, label) => {
+            if (isChromeMenuLabel(label)) return true;
+            if (isChromeHost(el)) return true;
+            if (kind === 'icon') {
+                const cls = String(el && el.className || '');
+                if (/arrow|caret|close|loading/i.test(cls)) return true;
+            }
+            return false;
+        };
+        const menuSels = [
+            '.el-menu-item',
+            '.el-submenu__title',
+            '.el-dropdown-menu__item',
+            'nav a',
+            '.navbar a',
+            '.sidebar-item',
+            '.el-aside .el-menu-item',
+            '.tags-view-item',
+        ];
+        for (const sel of menuSels) {
+            for (const el of document.querySelectorAll(sel)) {
+                if (quick && !isVisible(el)) continue;
+                const label = (el.innerText || el.textContent || el.getAttribute('aria-label') || '')
+                    .replace(/\\s+/g, ' ').trim();
+                if (!label || label.length > 40) continue;
+                if (isChromeNoise(el, 'menu_item', label)) continue;
+                const xpath_smart = xpathSmartOf(el, label, '', 'menu_item') || '';
+                const field = {
+                    label,
+                    kind: 'menu_item',
+                    currentValue: '',
+                    options: [],
+                    placeholder: '',
+                    required: false,
+                    disabled: !!(el.classList && el.classList.contains('is-disabled')),
+                    selected: !!(el.classList && el.classList.contains('is-active')),
+                    hasButton: '',
+                    xpath_smart,
+                };
+                attachSection(field, el);
+                pushField(field);
+            }
+        }
+        for (const el of document.querySelectorAll('[aria-label], a.el-tooltip, i.el-tooltip')) {
+            if (quick && !isVisible(el)) continue;
+            if (el.closest && el.closest('button, .el-button, .el-menu-item, .el-form-item')) continue;
+            const label = (el.getAttribute('aria-label') || el.getAttribute('title') || '')
+                .replace(/\\s+/g, ' ').trim();
+            if (!label || label.length > 40) continue;
+            if (isChromeNoise(el, 'icon', label)) continue;
+            const xpath_smart = xpathSmartOf(el, label, '', 'icon') || '';
+            const field = {
+                label,
+                kind: 'icon',
+                currentValue: '',
+                options: [],
+                placeholder: '',
+                required: false,
+                disabled: false,
+                selected: false,
+                hasButton: '',
+                xpath_smart,
+            };
+            attachSection(field, el);
+            pushField(field);
+        }
+    }
+    /* L1_FEATURE_CARD + ASSIGN_L2_TO_L1 */
+    const regions = [];
+    const assignRegion = (el) => {
+        if (!el || !el.closest) return { region_role: 'page', region_id: 'page' };
+        if (el.closest('.el-dialog, .el-drawer, .el-message-box')) {
+            const o = el.closest('.el-dialog, .el-drawer, .el-message-box');
+            const title = (o.querySelector('.el-dialog__title')?.textContent
+                || o.getAttribute('aria-label') || 'overlay').replace(/\\s+/g, ' ').trim().slice(0, 40);
+            return { region_role: 'overlay', region_id: 'overlay:' + title };
+        }
+        if (el.closest('.el-table, .tssc-multiple-table-content, .myTable')) {
+            return { region_role: 'table', region_id: 'table' };
+        }
+        if (el.closest('.el-collapse-item')) {
+            const it = el.closest('.el-collapse-item');
+            const t = (it.querySelector('.el-collapse-item__header')?.innerText || 'section')
+                .replace(/\\s+/g, ' ').trim().slice(0, 40);
+            return { region_role: 'section', region_id: 'section:' + t };
+        }
+        if (el.closest('.el-aside, .sidebar, aside, .el-menu')) {
+            return { region_role: 'shell-aside', region_id: 'shell-aside' };
+        }
+        if (el.closest('.el-header, .navbar, header, .tags-view-container')) {
+            return { region_role: 'shell-header', region_id: 'shell-header' };
+        }
+        if (el.closest('.el-main, .app-main, .plugin-content, main')) {
+            return { region_role: 'main', region_id: 'main' };
+        }
+        return { region_role: 'other', region_id: 'other' };
+    };
+    if (isFullpage) {
+        const candSels = [
+            { sel: '.el-header, .navbar, header', role: 'shell-header' },
+            { sel: '.el-aside, .sidebar, aside', role: 'shell-aside' },
+            { sel: '.el-dialog, .el-drawer', role: 'overlay' },
+            { sel: '.el-table', role: 'table' },
+            { sel: '.tssc-multiple-table-content, .myTable', role: 'custom:tssc-table' },
+            { sel: '.el-collapse-item', role: 'section' },
+            { sel: '.el-main, .app-main, main', role: 'main' },
+        ];
+        const seenReg = new Set();
+        for (const { sel, role } of candSels) {
+            for (const el of document.querySelectorAll(sel)) {
+                if (!isVisible(el) && role !== 'shell-header' && role !== 'shell-aside') {
+                    const r = el.getBoundingClientRect();
+                    if (r.width < 1 || r.height < 1) continue;
+                }
+                const rect = el.getBoundingClientRect();
+                const title = (el.getAttribute('aria-label')
+                    || el.querySelector?.('.el-dialog__title, .el-collapse-item__header, .el-menu-item.is-active')?.textContent
+                    || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+                const classTokens = String(el.className || '').split(/\\s+/).filter(Boolean).slice(0, 8);
+                const id = role + ':' + classTokens.slice(0, 2).join('.') + ':' + Math.round(rect.y);
+                if (seenReg.has(id)) continue;
+                seenReg.add(id);
+                /* L1_FEATURE_CARD */
+                regions.push({
+                    id,
+                    role,
+                    title,
+                    classTokens,
+                    band: rect.y < 80 ? 'top' : (rect.x < 120 ? 'side' : 'center'),
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height),
+                    childHint: {
+                        formItems: el.querySelectorAll('.el-form-item').length,
+                        tables: el.querySelectorAll('.el-table').length,
+                        buttons: el.querySelectorAll('button, .el-button').length,
+                    },
+                });
+            }
+        }
+        for (const f of fields) {
+            // Best-effort: re-find by xpath is heavy; attach region via section / heuristics on label path
+            const roleGuess = (f.kind === 'menu_item')
+                ? { region_role: 'shell-aside', region_id: 'shell-aside' }
+                : (f.section_title
+                    ? { region_role: 'section', region_id: 'section:' + String(f.section_title).slice(0, 40) }
+                    : { region_role: 'main', region_id: 'main' });
+            f.region_role = roleGuess.region_role;
+            f.region_id = roleGuess.region_id;
+        }
+        /* ASSIGN_L2_TO_L1 */
+        for (const b of buttons) {
+            b.region_role = b.section_title ? 'section' : 'main';
+            b.region_id = b.section_title ? ('section:' + String(b.section_title).slice(0, 40)) : 'main';
+        }
+    }
     // Phase 2: 从 Vue 组件实例读取每个 select 的 options。
-    // 不打开下拉框——Vue 组件实例存储了完整的 options 数据，精准无污染，
-    // 避免读到表格分页下拉、相邻 select 下拉、body 级别残留等无关选项。
+    // 不打开下拉框——Vue 组件实例存储了完整的 options 数据，精准无污染。
     for (const { field, trigger } of selectFields) {
         if (!trigger) continue;
         let opts = readVueOptions(trigger);
@@ -409,7 +587,14 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         }
         return 'unknown';
     })();
-    const result = { container: containerId, fields, buttons, notification };
+    const result = {
+        container: containerId,
+        fields,
+        buttons,
+        notification,
+        scope: isFullpage ? 'fullpage' : (isMulti ? 'active+visible-overlays' : 'container'),
+        regions: isFullpage ? regions.slice(0, 40) : undefined,
+    };
     const json = JSON.stringify(result, null, 2);
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');

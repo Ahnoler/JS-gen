@@ -122,8 +122,8 @@ def main() -> int:
         'single-field path logs first-touch structure scan',
     )
     assert_true(
-        form_py.count("await _rebuild_task_list_from_dom(autofill=False)") >= 2,
-        'rebuild autofill=False used for stale + first-touch paths',
+        form_py.count("await _rebuild_task_list_from_dom(autofill=False)") >= 3,
+        'rebuild autofill=False used for stale + first-touch + query-ui paths',
     )
     for fn in ('fill_form_field', 'fill_date_field', 'select_option', 'click_radio', 'select_tree_option'):
         m = re.search(rf'async def {fn}\(.*?\n(?:.*?\n)*?.*?await _ensure_scanned\(label_text\)', form_py)

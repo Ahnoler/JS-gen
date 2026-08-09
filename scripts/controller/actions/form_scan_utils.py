@@ -40,6 +40,20 @@ def _is_search_dialog(container_id: str) -> bool:
     return any(h in title for h in _SEARCH_DIALOG_HINTS)
 
 
+def is_chrome_menu_label(text: str | None) -> bool:
+    """True when label matches portal chrome menu noise (layout/theme/close-tab)."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    if "布局" in t:
+        return True
+    if "主题" in t:
+        return True
+    if "页签" in t and ("关闭" in t or "固定" in t):
+        return True
+    return False
+
+
 def _force_refill_flag(case_data_store: dict | None) -> bool:
     from scripts.controller.actions._phase_intent import contract_force_refill
     return contract_force_refill(case_data_store)
@@ -102,6 +116,42 @@ KNOWN_EDITABLE_FIELD_KINDS = frozenset({
     'input', 'select', 'date', 'radio', 'checkbox', 'tree-select', 'tree',
 })
 
+_SHELL_ROLES = frozenset({'shell-header', 'shell-aside'})
+_NON_FILL_KINDS = frozenset({'menu_item', 'icon'})
+_SCANNED_FIELD_KINDS = frozenset({
+    'input', 'select', 'date', 'radio', 'checkbox', 'tree-select', 'unknown',
+})
+
+
+def filter_fillable_scan_fields(fields: list | None) -> list[dict]:
+    """Fields eligible for TaskList / autofill (exclude shell + menu_item/icon)."""
+    out: list[dict] = []
+    for f in fields or []:
+        if not isinstance(f, dict):
+            continue
+        kind = (f.get('kind') or '').strip()
+        if kind in _NON_FILL_KINDS:
+            continue
+        role = (f.get('region_role') or '').strip()
+        if role in _SHELL_ROLES:
+            continue
+        out.append(f)
+    return out
+
+
+def prepare_scan_fields_for_tasklist(fields: list | None) -> list[dict]:
+    """Filter shell noise then normalize kinds for ScannedField / TaskList.from_scan."""
+    prepared: list[dict] = []
+    for f in filter_fillable_scan_fields(fields):
+        d = dict(f)
+        kind = (d.get('kind') or '').strip()
+        if kind == 'tree':
+            d['kind'] = 'tree-select'
+        elif kind not in _SCANNED_FIELD_KINDS:
+            d['kind'] = 'unknown'
+        prepared.append(d)
+    return prepared
+
 
 def _field_is_filled(field: dict) -> bool:
     """True when scan field has a value (select: selected or currentValue)."""
@@ -119,6 +169,14 @@ def _field_is_pending(field: dict) -> bool:
     if field.get('disabled'):
         return False
     return not _field_is_filled(field)
+
+
+def _field_is_readonly(field: dict) -> bool:
+    """Known-kind fields with disabled=True — keep for model reference, not fill targets."""
+    kind = (field.get('kind') or '').strip()
+    if kind not in KNOWN_EDITABLE_FIELD_KINDS:
+        return False
+    return bool(field.get('disabled'))
 
 
 def _merge_scan_fields(scan_results: list[dict]) -> list[dict]:
@@ -151,20 +209,31 @@ def _merge_scan_buttons(scan_results: list[dict]) -> list[dict]:
     return merged
 
 
+def _project_summary_field(field: dict) -> dict:
+    """Project scan field → model-facing {label, xpath_smart, kind, section}."""
+    return {
+        'label': (field.get('label') or '').strip(),
+        'xpath_smart': (field.get('xpath_smart') or '').strip(),
+        'kind': (field.get('kind') or '').strip(),
+        'section': (field.get('section_title') or '').strip(),
+    }
+
+
 def _project_summary_buttons(buttons: list[dict]) -> list[dict]:
-    """Source C buttons → {text, section} only (no kind/xpath)."""
+    """Source C buttons → {text, section, xpath_smart} for ops without a second scan."""
     out: list[dict] = []
-    seen: set[tuple[str, str]] = set()
+    seen: set[tuple[str, str, str]] = set()
     for b in buttons:
         text = (b.get('label') or '').strip()
         if not text:
             continue
         section = (b.get('section_title') or '').strip()
-        key = (text, section)
+        xp = (b.get('xpath_smart') or '').strip()
+        key = (text, section, xp)
         if key in seen:
             continue
         seen.add(key)
-        out.append({'text': text, 'section': section})
+        out.append({'text': text, 'section': section, 'xpath_smart': xp})
     return out
 
 
@@ -181,15 +250,45 @@ def build_editable_summary(
         if (f.get('kind') or '').strip() in KNOWN_EDITABLE_FIELD_KINDS
     ]
 
+    pending_items: list[dict] = []
     pending_labels: list[str] = []
-    seen_pending: set[str] = set()
+    seen_pending_xp: set[str] = set()
+    seen_pending_label: set[str] = set()
+    readonly_items: list[dict] = []
+    readonly_labels: list[str] = []
+    seen_readonly_xp: set[str] = set()
+    seen_readonly_label: set[str] = set()
+
     for f in known_fields:
+        label = (f.get('label') or '').strip()
+        if not label:
+            continue
+        xp = (f.get('xpath_smart') or '').strip()
+        if _field_is_readonly(f):
+            # Prefer xpath identity so same label / different controls both appear.
+            if xp:
+                if xp in seen_readonly_xp:
+                    continue
+                seen_readonly_xp.add(xp)
+            elif label in seen_readonly_label:
+                continue
+            if label not in seen_readonly_label:
+                seen_readonly_label.add(label)
+                readonly_labels.append(label)
+            readonly_items.append(_project_summary_field(f))
+            continue
         if not _field_is_pending(f):
             continue
-        label = (f.get('label') or '').strip()
-        if label and label not in seen_pending:
-            seen_pending.add(label)
+        if xp:
+            if xp in seen_pending_xp:
+                continue
+            seen_pending_xp.add(xp)
+        elif label in seen_pending_label:
+            continue
+        if label not in seen_pending_label:
+            seen_pending_label.add(label)
             pending_labels.append(label)
+        pending_items.append(_project_summary_field(f))
 
     filled = sum(1 for f in known_fields if _field_is_filled(f))
     section_block = _build_section_summary(
@@ -206,16 +305,73 @@ def build_editable_summary(
         for s in section_block.get('sections', [])
     ]
 
+    projected_buttons = _project_summary_buttons(raw_buttons)
+    # Fullpage L2: surface shell/menu/icon as button-like entries (text+section+xpath).
+    for f in fields:
+        if not isinstance(f, dict):
+            continue
+        kind = (f.get('kind') or '').strip()
+        if kind not in ('menu_item', 'icon'):
+            continue
+        text = (f.get('label') or '').strip()
+        if not text or len(text) > 40:
+            continue
+        if is_chrome_menu_label(text):
+            continue
+        projected_buttons.append({
+            'text': text,
+            'section': (f.get('region_role') or f.get('section_title') or '')[:40],
+            'xpath_smart': (f.get('xpath_smart') or '').strip(),
+        })
+        if len(projected_buttons) >= 80:
+            break
+
     return {
         'container': (primary_container or 'main').strip() or 'main',
-        'scope': 'active+visible-overlays',
+        'scope': _summary_scope(scan_results),
         'total': len(known_fields),
         'filled': filled,
-        'pending': len(pending_labels),
+        'pending': len(pending_items),
         'pending_labels': pending_labels,
+        'pending_items': pending_items,
+        'readonly_labels': readonly_labels,
+        'readonly_items': readonly_items,
         'sections': sections,
-        'buttons': _project_summary_buttons(raw_buttons),
+        'buttons': projected_buttons,
+        **_summary_regions(scan_results),
     }
+
+
+def _summary_scope(scan_results: list[dict]) -> str:
+    for r in scan_results or []:
+        if isinstance(r, dict) and (r.get('scope') or '').strip() == 'fullpage':
+            return 'fullpage'
+    return 'active+visible-overlays'
+
+
+def _summary_regions(scan_results: list[dict]) -> dict:
+    regions: list[dict] = []
+    seen: set[str] = set()
+    for r in scan_results or []:
+        if not isinstance(r, dict):
+            continue
+        for reg in r.get('regions') or []:
+            if not isinstance(reg, dict):
+                continue
+            rid = str(reg.get('id') or '')
+            if rid and rid in seen:
+                continue
+            if rid:
+                seen.add(rid)
+            regions.append({
+                'id': rid,
+                'role': reg.get('role') or '',
+                'title': (reg.get('title') or '')[:40],
+                'band': reg.get('band') or '',
+            })
+            if len(regions) >= 30:
+                return {'regions': regions}
+    return {'regions': regions} if regions else {}
 
 
 def _build_section_summary(
@@ -583,6 +739,16 @@ def _task_done_impl(label_text, case_data_store, value=None, xpath_smart=""):
         else:
             sys.stderr.write(f'[task-done] ALREADY: "{label_text}"\n')
     case_data_store['task_list'] = tl.to_store()
+    # Write-through active container slot so same/cross-container switch
+    # does not restore a pre-mark_done snapshot.
+    active = case_data_store.get('_active_container')
+    if active:
+        by = case_data_store.setdefault('_task_lists_by_container', {})
+        if isinstance(by, dict):
+            by[active] = {
+                'task_list': case_data_store.get('task_list'),
+                '_scan_fields': case_data_store.get('_scan_fields'),
+            }
     if value is not None and str(value).strip():
         labels = case_data_store.setdefault('_autofilled_labels', [])
         if label_text not in labels:
@@ -663,6 +829,14 @@ def _switch_task_list_container(case_data_store: dict, container_id: str) -> Non
         by = {}
         case_data_store['_task_lists_by_container'] = by
     active = case_data_store.get('_active_container')
+    # Same container: keep live flat view (mark_done progress). Do not
+    # restore a stale first-touch snapshot from the slot.
+    if active and active == container_id:
+        by[container_id] = {
+            'task_list': case_data_store.get('task_list'),
+            '_scan_fields': case_data_store.get('_scan_fields'),
+        }
+        return
     if active and active != container_id:
         # Save current flat view
         by[active] = {

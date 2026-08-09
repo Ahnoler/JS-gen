@@ -148,7 +148,12 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
             f"{_compact_last_result(_last_result)}\n"
         )
         sys.stderr.flush()
-        _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal)
+        # Empty-act cue is internal steering only — never abort on_step_end / agent.run
+        try:
+            _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal)
+        except Exception as e:
+            sys.stderr.write(f'[recorder] empty-act cue error: {e}\n')
+            sys.stderr.flush()
 
         # P1：动作事件打点（fill_before_save 建模用）——异步旁路，失败不阻塞
         _emit_memory_action_event(agent, _actions, _last_result_str)

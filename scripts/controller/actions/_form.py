@@ -52,6 +52,7 @@ from .form_scan_utils import (
     _scan_buttons_from_result, refresh_scan_buttons, _section_group_key, _dedupe_needs_agent,
     _build_section_summary, build_editable_summary, _is_query_mode, _skip_auto_fill,
     _mark_query_ui_if_needed,
+    filter_fillable_scan_fields, prepare_scan_fields_for_tasklist,
     _pack_select_record, _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
     ResolvedControl, _resolve_control, _task_xpath_smart, _task_done_impl,
     _submit_ready_hint, _switch_task_list_container, _with_submit_cue, _query_not_form_payload,
@@ -134,13 +135,17 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         _switch_task_list_container(case_data_store, container_id)
 
         async def _rebuild_task_list_from_dom(*, autofill: bool) -> None:
-            raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
+            raw = await page.evaluate(
+                JS_SCAN_FORM_FIELDS,
+                [False, _button_keywords(), {'mode': 'fullpage'}],
+            )
             try:
                 result = json.loads(raw) if isinstance(raw, str) else raw
                 raw_fields = result.get('fields') if isinstance(result, dict) else result
             except Exception:
                 return
-            dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields]
+            fillable = prepare_scan_fields_for_tasklist(raw_fields)
+            dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable]
             raw_cid = result.get('container', container_id) if isinstance(result, dict) else container_id
             cid = resolve_display_container(raw_cid, case_data_store)
             _switch_task_list_container(case_data_store, cid)
@@ -188,8 +193,19 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             case_data_store.pop('task_list', None)
             case_data_store.pop('_scan_fields', None)
 
-        if await _mark_query_ui_if_needed(page, case_data_store, container_id):
-            return  # query/filter UI
+        is_query_ui = await _mark_query_ui_if_needed(page, case_data_store, container_id)
+        if is_query_ui:
+            # Introduce/picker/search still needs _scan_fields so fill_form_field
+            # can resolve xpath (traj #38 phase 3: 客户名称 → xpath-not-found
+            # when query-toolbar early-return skipped the inventory scan).
+            # Never auto-fill query UI — agent chooses which filters to write.
+            if not case_data_store.get('_scan_fields'):
+                sys.stderr.write(
+                    f'[form] first-touch query-ui scan container={container_id!r}\n'
+                )
+                sys.stderr.flush()
+                await _rebuild_task_list_from_dom(autofill=False)
+            return
         if not allow_autofill:
             # First touch of this container (fresh switch clears _scan_fields;
             # restored containers keep it) — scan + structure checkpoint only.
@@ -314,8 +330,27 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
-        if resolved.error:
+        use_label_fallback = bool(resolved.error) and not (xpath_smart or '').strip()
+        if resolved.error and not use_label_fallback:
             return resolved.error
+        if use_label_fallback:
+            # Query/introduce picker: scan may still miss; label DOM fill in
+            # the active container (JS_GET_CONTAINER) is the recording path.
+            result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
+            if _is_ok_result(result):
+                element = await _capture_element(
+                    page, label_text, target_kind='form_input', xpath_smart='',
+                )
+                _record_action(
+                    'fill_form_field',
+                    {'label_text': label_text, 'value': value, 'xpath_smart': ''},
+                    result,
+                    element=element,
+                )
+                if not _is_query_mode(case_data_store):
+                    _task_done_impl(label_text, case_data_store, value=value)
+                return _ok(_with_submit_cue(result, case_data_store))
+            return _with_submit_cue(result or resolved.error, case_data_store)
         element = await _capture_element(
             page, resolved.label, target_kind='form_input', xpath_smart=resolved.xpath_smart,
         )
@@ -387,16 +422,20 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         if await _mark_query_ui_if_needed(page, case_data_store, container_id):
             return _query_not_form_payload(container_id)
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
+        raw = await page.evaluate(
+            JS_SCAN_FORM_FIELDS,
+            [False, _button_keywords(), {'mode': 'fullpage'}],
+        )
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             raw_fields = result.get('fields') if isinstance(result, dict) else result
         except Exception:
             return raw
 
+        fillable = prepare_scan_fields_for_tasklist(raw_fields)
         dom_fields: list[ScannedField] = [
             ScannedField(**f) if isinstance(f, dict) else f
-            for f in raw_fields
+            for f in fillable
         ]
 
         try:
@@ -487,19 +526,21 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         return json.dumps(summary, ensure_ascii=False)
 
     @controller.action(
-        'Read-only summary of visible classified business controls (quick scan). '
-        'Returns {container, scope, total, filled, pending, pending_labels, sections, '
-        'buttons[{text, section}]} — no kind/xpath on buttons. '
-        'Does NOT build task_list, auto-fill, or run form assistant.'
+        'Read-only summary of visible classified operable controls (quick full-page scan). '
+        'Returns {container, scope, total, filled, pending, pending_labels, pending_items'
+        '[{label, xpath_smart, kind, section}], readonly_labels, readonly_items[…], '
+        'sections, buttons[{text, section, xpath_smart}], regions?}. '
+        'Use xpath_smart from pending_items/buttons on fill/select/click — do not re-scan for locator. '
+        'readonly_items = disabled known-kind fields for reference (do not fill). '
+        'Includes shell nav when present. Does NOT build task_list, auto-fill, or run form assistant.'
     )
     async def scan_editable_summary():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        # Multi-root: visible overlays or main content (sans shell) via JS_SCAN_FORM_FIELDS
-        # mode:'multi'; scope "active+visible-overlays" in summary reflects merged roots.
+        # Full-page L2 pool + L1 feature cards (shell included). See fullpage scan design.
         raw = await page.evaluate(
             JS_SCAN_FORM_FIELDS,
-            [True, _button_keywords(), {'mode': 'multi'}],
+            [True, _button_keywords(), {'mode': 'fullpage'}],
         )
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
@@ -564,16 +605,20 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         if await _mark_query_ui_if_needed(page, case_data_store, container_id):
             return _query_not_form_payload(container_id)
-        raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [True, _button_keywords()])
+        raw = await page.evaluate(
+            JS_SCAN_FORM_FIELDS,
+            [True, _button_keywords(), {'mode': 'fullpage'}],
+        )
         try:
             result = json.loads(raw) if isinstance(raw, str) else raw
             raw_fields = result.get('fields') if isinstance(result, dict) else result
         except Exception:
             return raw
 
+        fillable = prepare_scan_fields_for_tasklist(raw_fields)
         dom_fields: list[ScannedField] = [
             ScannedField(**f) if isinstance(f, dict) else f
-            for f in raw_fields
+            for f in fillable
         ]
 
         try:
@@ -1210,12 +1255,16 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         # ═══════════════════════════════════════════════════════════════════
         round1_count = len(all_results)
         try:
-            raw2 = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
+            raw2 = await page.evaluate(
+                JS_SCAN_FORM_FIELDS,
+                [False, _button_keywords(), {'mode': 'fullpage'}],
+            )
             result2 = json.loads(raw2) if isinstance(raw2, str) else raw2
             raw_fields2 = result2.get('fields') if isinstance(result2, dict) else result2
         except Exception:
             raw_fields2 = []
-        dom_fields2 = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields2]
+        fillable2 = prepare_scan_fields_for_tasklist(raw_fields2)
+        dom_fields2 = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable2]
         tl = TaskList.from_store(case_data_store.get('task_list'))
         new_pending2 = _scan_new_fields(dom_fields2, tl)
         if new_pending2:
@@ -1231,12 +1280,16 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         # ═══════════════════════════════════════════════════════════════════
         round2_count = len(all_results)
         try:
-            raw3 = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
+            raw3 = await page.evaluate(
+                JS_SCAN_FORM_FIELDS,
+                [False, _button_keywords(), {'mode': 'fullpage'}],
+            )
             result3 = json.loads(raw3) if isinstance(raw3, str) else raw3
             raw_fields3 = result3.get('fields') if isinstance(result3, dict) else result3
         except Exception:
             raw_fields3 = []
-        dom_fields3 = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields3]
+        fillable3 = prepare_scan_fields_for_tasklist(raw_fields3)
+        dom_fields3 = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable3]
         tl = TaskList.from_store(case_data_store.get('task_list'))
         new_pending3 = _scan_new_fields(dom_fields3, tl)
         if new_pending3:
@@ -1259,9 +1312,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         # Step 6: full scan sync — 移除不在 DOM 的 pending 字段
         try:
-            raw_sync = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, _button_keywords()])
+            raw_sync = await page.evaluate(
+                JS_SCAN_FORM_FIELDS,
+                [False, _button_keywords(), {'mode': 'fullpage'}],
+            )
             sync_result = json.loads(raw_sync) if isinstance(raw_sync, str) else raw_sync
             sync_fields = sync_result.get('fields') if isinstance(sync_result, dict) else sync_result
+            sync_fields = prepare_scan_fields_for_tasklist(sync_fields)
             dom_labels = {f.get('label', '') for f in sync_fields}
         except Exception:
             dom_labels = set()

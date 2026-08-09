@@ -2,16 +2,18 @@
 
 > 本文件记录「目标线」待办。**状态以代码/表征为准**，不以计划 checkbox 为准。
 
-## 目标定稿（2026-08-09）
+## 目标定稿（2026-08-10 修订）
 
-> AI 拥有**当前业务表面上所有可见、已分类、可编辑控件**的确定性清单，并由**主 Agent**决定操作。  
-> **不是**裸全 DOM；**不是**清单触发 auto-fill；**壳层导航不进清单**。
+> AI 拥有**当前页面上所有可见、已分类、可操作控件**的确定性清单（含顶栏/左侧导航），并由**主 Agent**决定操作。  
+> **不是**裸全 DOM；**不是**清单触发 auto-fill。  
+> **扫描结构**：L1 区域/容器 → L2 全页可见可操作控件 → 按位置归位（见 [fullpage scan design](specs/2026-08-10-fullpage-visible-controls-scan-design.md)）。
 
 | 锁定项 | 选择 |
 |--------|------|
-| 「全 DOM」语义 | **α** 业务控件全集（Source A/B/C + 后续扩展） |
-| 可操作边界 | 仅已分类：input / select / date / radio / checkbox / button / tree |
-| 壳层 | 不进清单（侧栏/顶栏导航另做） |
+| 「全 DOM」语义 | **α** 已分类可操作控件全集（非整棵 HTML 树） |
+| 可操作边界 | input / select / date / radio / checkbox / button / icon / tree / **menu_item** |
+| 壳层（顶栏/侧栏） | **进入清单**（2026-08-10 改；旧「不进清单」作废） |
+| 容器 | 仅作 L1 归位，**不作** L2 准入门槛 |
 | 与 auto-fill | **永不**由清单触发；主 Agent 控制填写 |
 | 消费者 | **C**：先 Agent 工具，记忆 Fact Pack 第二刀 |
 
@@ -58,7 +60,7 @@
 
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
-| **T5** | 未做 | 非 `el-table` 自定义网格 | 需产品确认；T4-P3 后 |
+| **T5** | 未做（本页漏扫后暂缓） | 非 `el-table` 自定义网格 | 对公评级页无 vxe/ag → [gap spec](specs/2026-08-10-t5-credit-scan-gap-design.md)；需另页证据 |
 | **T6** | **已实施** | Source B 空行首表格行命名 | — |
 | **T7** | 不做 | API 改名 `control_*` | P3 |
 | **T8** | **已实施** | CTRL `selectOption` 懒加载对齐 | — |
@@ -75,17 +77,19 @@
 |------|------|
 | 「要先做全 DOM」 | 定稿为 **α 业务控件**；裸 DOM 非目标 |
 | 「清单会自动填表」 | **禁止**；与三大问题①解耦 |
-| 「表格还不能操作」 | 扫描+xpath 写+回放+T3 已通；缺的是 **Agent 只读摘要工具**（T4-P0） |
+| 「壳层不进清单」仍有效 | **2026-08-10 已改**：顶栏/侧栏进清单；见 fullpage scan design |
 | 「element 双写还在」 | **T3 已修** |
 
 ---
 
 ## 推荐下一刀
 
-1. **T5** — 非 `el-table` 自定义网格（需产品确认）  
-2. **T1r** — tree / replay label 兜底  
-3. **T4-P4** — Playwright MCP a11y 对照/诊断（灰度）  
-4. 或三大问题①已填跳过（质量，非视野）
+1. ~~全页两层扫描 P0~~ — **已实施 + 湿跑**（列表/编辑页）；`readonly_labels` 已进 summary（[spec](specs/2026-08-10-fullpage-visible-controls-scan-design.md) · [plan](plans/2026-08-10-fullpage-visible-controls-scan-p0.md)）  
+2. ~~**P1** — Source A/B/C → L2~~ — **已实施 + 湿跑**（[plan](plans/2026-08-10-fullpage-visible-controls-scan-p1.md)）  
+3. ~~**P2** — icon / chrome 菜单硬剔除降噪~~ — **已实施 + 湿跑**（布局/主题/关*页签*已清；残留「关闭所有标签(含固定)」因用「标签」非「页签」）（[spec](specs/2026-08-10-fullpage-p2-icon-chrome-noise-design.md) · [plan](plans/2026-08-10-fullpage-p2-icon-chrome-noise.md)）；命名 / Fact Pack 另排
+4. **T1r** / **T4-P4** / 三大问题①  / 可选扩黑名单「标签」对齐「页签」
+
+> 参照：Cursor browser MCP / Playwright MCP（先控件池，后区域标签）。
 
 ## 文档交叉
 
