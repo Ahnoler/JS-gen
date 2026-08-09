@@ -66,6 +66,26 @@ assert(
 const heal = readFileSync(path.join(root, 'src/routes/browser-session/heal-instruction.js'), 'utf-8');
 assert(/buildFormStructureHealInstruction/.test(heal), 'buildFormStructureHealInstruction exists');
 
+assert(
+  /safety\.unsafe[\s\S]{0,800}?aborted:\s*false/.test(fsh)
+  || /FORM_STRUCTURE_UNSAFE_CONTINUE/.test(fsh),
+  'unsafe form-structure path returns aborted: false (P0 continue)',
+);
+assert(
+  !/if \(safety\.unsafe\) \{[\s\S]{0,600}?return \{ ok: false, aborted: true/.test(fsh),
+  'unsafe path must not return aborted: true',
+);
+
+const runner = readFileSync(
+  path.join(root, 'src/services/trajectory/replay-batch-runner.js'),
+  'utf-8',
+);
+assert(
+  /!typeB\.ok\s*&&\s*!typeB\.aborted/.test(runner)
+  || /FORM_STRUCTURE_SOFT_FAIL_CONTINUE/.test(runner),
+  'runner continues on Type B soft-fail (!ok && !aborted)',
+);
+
 if (failed) {
   console.error(`\n${failed} assertion(s) failed`);
   process.exit(1);

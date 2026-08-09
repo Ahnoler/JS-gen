@@ -158,6 +158,13 @@ export async function runReplayBatch({
             failedStepIds: [...new Set(failedStepIds)],
           });
         }
+        /* FORM_STRUCTURE_SOFT_FAIL_CONTINUE */
+        if (!typeB.ok && !typeB.aborted) {
+          if (stepId != null) failedStepIds.push(stepId);
+          allResults.push(...typeB.results);
+          if (typeB.healed) healed.push(...typeB.healed);
+          continue;
+        }
         if (typeB.ok) successCount += 1;
         allResults.push(...typeB.results);
         if (typeB.healed) healed.push(...typeB.healed);

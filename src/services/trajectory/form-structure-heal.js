@@ -255,7 +255,8 @@ export async function handleFormStructureCheckpoint({
       healType: 'form_structure',
       reason: safety.reason,
     });
-    return { ok: false, aborted: true, error: msg, results, healed };
+    /* FORM_STRUCTURE_UNSAFE_CONTINUE */
+    return { ok: false, aborted: false, error: msg, results, healed };
   }
 
   if (!needsTypeB(report)) {

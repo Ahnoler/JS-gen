@@ -196,6 +196,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-09: **T10-P0: unsafe form-structure checkpoint fails step but continues replay batch (A2).** `handleFormStructureCheckpoint` unsafe/`container_not_found` returns `aborted: false`; `replay-batch-runner` continues on `!ok && !aborted` (records `failedStepIds`, no batch abort). Transport timeout / heal fail / userAbort still `aborted: true`; no snapshot mutate on unsafe.
+  影响范围：`steps/replay` Type B checkpoint、WS `replay:step` failed 语义。
+  文件：src/services/trajectory/form-structure-heal.js, src/services/trajectory/replay-batch-runner.js, scripts/characterization/characterize-form-snapshot-trigger.mjs
+  Python 同步提示：无（replay 语义在 JS-gen 控制面；Python 执行机 verify 不变）。
+
 - 2026-08-08: **录制 `element.xpath_smart` 与写入 `params.xpath_smart` 对齐：** `_capture_element` 改为 `JS_CAPTURE_FROM_XPATH` 从写入命中节点取 `xpath_full`，不再调用 `JS_SMART_LOCATOR` 覆盖为 form-item xpath；fill/select/date/radio/round 写路径传入 `resolved.xpath_smart`。
   影响范围：录制 element 快照、xpath-primary 写路径。
   文件：scripts/actions/_js_snippets.py, scripts/actions/_form.py, scripts/characterization/characterize-capture-element-xpath.py
