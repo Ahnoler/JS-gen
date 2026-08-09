@@ -67,13 +67,26 @@ JS_VERIFY_FORM_STRUCTURE = '''(arg) => {
         return r.width > 0 && r.height > 0;
     };
     const matchTitle = (el, want) => {
+        // Recording uses sentinel "unnamed" when title/aria is empty (JS_IDENTIFY_CONTAINER).
+        // Do NOT look for the literal text "unnamed" in the DOM.
         const w = String(want || '').trim();
-        if (!w || !el) return false;
+        if (!el) return false;
         const aria = (el.getAttribute('aria-label') || '').trim();
         const header = (el.querySelector('.el-drawer__title, .el-drawer__header, .el-dialog__title')?.textContent || '').trim();
+        if (!w || w === 'unnamed') return !aria && !header;
         return aria === w || header === w
             || (aria && (aria.includes(w) || w.includes(aria)))
             || (header && (header.includes(w) || w.includes(header)));
+    };
+    const overlayTitleFromContainerId = (id) => {
+        const s = String(id || '').trim();
+        let rest = s;
+        if (s.startsWith('dialog:')) rest = s.slice(7);
+        else if (s.startsWith('drawer:')) rest = s.slice(7);
+        else return s;
+        const i = rest.indexOf('|');
+        if (i >= 0) return rest.slice(i + 1).trim();
+        return rest.trim();
     };
     const expected = Array.isArray(arg)
         ? arg
@@ -91,11 +104,11 @@ JS_VERIFY_FORM_STRUCTURE = '''(arg) => {
         root = document;
         scopeMode = 'main';
     } else if (idRaw.startsWith('drawer:')) {
-        const want = idRaw.slice(7);
+        const want = overlayTitleFromContainerId(idRaw);
         root = [...document.querySelectorAll('.el-drawer')].filter(wrapOk).find((d) => matchTitle(d, want)) || null;
         scopeMode = 'drawer';
     } else if (idRaw.startsWith('dialog:')) {
-        const want = idRaw.slice(7);
+        const want = overlayTitleFromContainerId(idRaw);
         root = [...document.querySelectorAll('.el-dialog, .el-message-box')].filter(wrapOk).find((d) => matchTitle(d, want)) || null;
         scopeMode = 'dialog';
     } else {
