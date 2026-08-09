@@ -148,7 +148,15 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         } else if (controlEl.closest && controlEl.closest('.el-checkbox, .el-checkbox-group')) {
             leaf = "div[contains(@class,'el-checkbox')]";
         }
-        const local = "tr[.//*[normalize-space()=" + lit + "]]//" + leaf;
+        let local;
+        const syn = /^row#(\\d+)$/.exec(rowT);
+        if (syn) {
+            /* SOURCE_B_ROW_INDEX_XPATH */
+            const idx = syn[1];
+            local = "(tbody/tr)[" + idx + "]//" + leaf;
+        } else {
+            local = "tr[.//*[normalize-space()=" + lit + "]]//" + leaf;
+        }
         let xp = scopedXPath(local, scopeKind);
         const n = Number(occurrence) || 0;
         if (n > 1) xp = withOccurrence(xp, n);
@@ -287,6 +295,8 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         const table = tables[ti];
         if (quick && !isVisible(table)) continue;
         const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr, tbody tr');
+        /* SOURCE_B_EMPTY_LEADING */
+        let visibleRowIndex = 0;
         for (let ri = 0; ri < bodyRows.length; ri++) {
             const row = bodyRows[ri];
             if (isPagerRow(row)) continue;
@@ -296,8 +306,11 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
                 const rect = row.getBoundingClientRect();
                 if (rect.width <= 0 || rect.height <= 0) continue;
             }
-            const rowText = getRowLeadingText(row);
-            if (!rowText) continue;
+            visibleRowIndex += 1;
+            let rowText = getRowLeadingText(row);
+            if (!rowText) {
+                rowText = 'row#' + visibleRowIndex;
+            }
             const controls = collectTableControls(row);
             for (let ci = 0; ci < controls.length; ci++) {
                 const ctrl = controls[ci];

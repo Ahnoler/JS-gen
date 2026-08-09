@@ -11,6 +11,7 @@
 
 ## 任务列表动作
 - **`scan_editable_summary()`** — 了解当前可见可编辑控件时调用（只读摘要，不填表、不建任务列表）。
+- 表格空行首字段可能显示为 `row#N` / `row#N|列名` 等机器锚点：按业务与页面结构理解语义，**操作仍优先传扫描给出的 `xpath_smart`**，不要靠改 label 改名后去定位。
 - 用返回的 `pending_labels` 与 `buttons[{text,section}]` 决定下一步 fill/select/click_save。
 - **壳层导航**（侧栏/顶栏菜单）不要依赖本清单。
 - 需要建任务列表时仍用 **`scan_form_fields()`**；批量填仍用 **`run_form_assistant()`**（合约 `allow_form_assistant=true` 时）。
