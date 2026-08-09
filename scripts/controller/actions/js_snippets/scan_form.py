@@ -296,20 +296,20 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         if (quick && !isVisible(table)) continue;
         const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr, tbody tr');
         /* SOURCE_B_EMPTY_LEADING */
-        let visibleRowIndex = 0;
+        let domRowIndex = 0;
         for (let ri = 0; ri < bodyRows.length; ri++) {
             const row = bodyRows[ri];
             if (isPagerRow(row)) continue;
+            domRowIndex += 1;
             if (quick) {
                 const style = getComputedStyle(row);
                 if (style.display === 'none' || style.visibility === 'hidden') continue;
                 const rect = row.getBoundingClientRect();
                 if (rect.width <= 0 || rect.height <= 0) continue;
             }
-            visibleRowIndex += 1;
             let rowText = getRowLeadingText(row);
             if (!rowText) {
-                rowText = 'row#' + visibleRowIndex;
+                rowText = 'row#' + domRowIndex;
             }
             const controls = collectTableControls(row);
             for (let ci = 0; ci < controls.length; ci++) {
