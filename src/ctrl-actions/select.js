@@ -6,6 +6,75 @@
  */
 export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
     const c = CTRL.getContainer();
+    const first = ['first','1st','第一个','第一项'];
+    const findTarget = (opts) => {
+      const list = [...opts];
+      if (first.includes(option.toLowerCase().trim()))
+        return list.find(it => it.offsetParent !== null) || list[0];
+      return list.find(it => it.textContent.trim() === option) || list.find(it => it.textContent.trim().includes(option));
+    };
+    const clickTarget = (t) => {
+      t.scrollIntoView({block:'nearest'});
+      t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+      t.click();
+    };
+    const pickFromOpen = () => {
+      const opts = document.querySelectorAll('.el-select-dropdown__item');
+      let t = findTarget(opts);
+      if (t) { clickTarget(t); return; }
+      /* SELECT_LAZY_LOAD_ON_MISS */
+      const findWrap = (dd) => {
+        if (!dd) return null;
+        const w1 = dd.querySelector('.el-select-dropdown__wrap');
+        if (w1 && w1.scrollHeight > w1.clientHeight + 2) return w1;
+        const w2 = dd.querySelector('.el-scrollbar__wrap');
+        if (w2 && w2.scrollHeight > w2.clientHeight + 2) return w2;
+        for (const n of dd.querySelectorAll('*')) {
+          const s = getComputedStyle(n);
+          if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && n.scrollHeight > n.clientHeight + 2) return n;
+        }
+        return null;
+      };
+      const findDropdown = () => {
+        for (const dd of document.querySelectorAll('.el-select-dropdown')) {
+          if (dd.classList.contains('is-hidden')) continue;
+          const style = getComputedStyle(dd);
+          if (style.display === 'none' || style.visibility === 'hidden') continue;
+          const rect = dd.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) return dd;
+        }
+        return null;
+      };
+      const dropdown = findDropdown();
+      const wrap = findWrap(dropdown);
+      if (!wrap) return;
+      let round = 0, stableStreak = 0, prevCount = opts.length, prevHeight = wrap.scrollHeight;
+      const scrollRound = () => {
+        if (round >= 8) {
+          t = findTarget(document.querySelectorAll('.el-select-dropdown__item'));
+          if (t) clickTarget(t);
+          return;
+        }
+        wrap.scrollTop = wrap.scrollHeight;
+        setTimeout(() => {
+          const opts2 = document.querySelectorAll('.el-select-dropdown__item');
+          t = findTarget(opts2);
+          if (t) { clickTarget(t); return; }
+          const h = wrap.scrollHeight;
+          const c = opts2.length;
+          if (c === prevCount && h === prevHeight) stableStreak += 1;
+          else { stableStreak = 0; prevCount = c; prevHeight = h; }
+          round += 1;
+          if (stableStreak >= 2) {
+            t = findTarget(document.querySelectorAll('.el-select-dropdown__item'));
+            if (t) clickTarget(t);
+            return;
+          }
+          scrollRound();
+        }, 250);
+      };
+      scrollRound();
+    };
     for (const item of c.querySelectorAll('.el-form-item')) {
       const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
       if (!lbl.includes(label)) continue;
@@ -16,17 +85,7 @@ export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
       trigger.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
       trigger.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
       trigger.click();
-      setTimeout(() => {
-        const opts = document.querySelectorAll('.el-select-dropdown__item');
-        const first = ['first','1st','第一个','第一项'];
-        const t = first.includes(option.toLowerCase().trim())
-          ? [...opts].find(it => it.offsetParent !== null) || opts[0]
-          : [...opts].find(it => it.textContent.trim() === option) || [...opts].find(it => it.textContent.trim().includes(option));
-        if (!t) return;
-        t.scrollIntoView({block:'nearest'});
-        t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-        t.click();
-      }, 200);
+      setTimeout(() => pickFromOpen(), 200);
       return 'ok-triggered';
     }
     // Fallback: match by placeholder (for forms without .el-form-item__label)
@@ -37,17 +96,7 @@ export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
         sel.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
         sel.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
         sel.click();
-        setTimeout(() => {
-          const opts = document.querySelectorAll('.el-select-dropdown__item');
-          const first = ['first','1st','第一个','第一项'];
-          const t = first.includes(option.toLowerCase().trim())
-            ? [...opts].find(it => it.offsetParent !== null) || opts[0]
-            : [...opts].find(it => it.textContent.trim() === option) || [...opts].find(it => it.textContent.trim().includes(option));
-          if (!t) return;
-          t.scrollIntoView({block:'nearest'});
-          t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-          t.click();
-        }, 200);
+        setTimeout(() => pickFromOpen(), 200);
         return 'ok-triggered-placeholder';
       }
     }

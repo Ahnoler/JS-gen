@@ -35,6 +35,21 @@ def main() -> int:
         "SELECT_LAZY_LOAD_ON_MISS" in js,
         "SELECT_LAZY_LOAD_ON_MISS marker on miss path only",
     )
+
+    ctrl_path = ROOT / "src" / "ctrl-actions" / "select.js"
+    ctrl = ctrl_path.read_text(encoding="utf-8")
+    assert_true(
+        "SELECT_LAZY_LOAD_ON_MISS" in ctrl,
+        "CTRL select.js must include SELECT_LAZY_LOAD_ON_MISS",
+    )
+    assert_true(
+        "el-select-dropdown__wrap" in ctrl or "el-scrollbar__wrap" in ctrl,
+        "CTRL lazy-load finds dropdown wrap",
+    )
+    assert_true(
+        "stableStreak" in ctrl or "scrollHeight" in ctrl,
+        "CTRL lazy-load uses stable scroll cues",
+    )
     print("characterize-select-lazy-load: OK")
     return 0
 
