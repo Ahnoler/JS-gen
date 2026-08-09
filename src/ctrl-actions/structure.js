@@ -83,6 +83,157 @@ export const CTRL_PART_STRUCTURE = `  verifyFormStructure: (expectedFields, cont
       const lbl = item.querySelector('.el-form-item__label');
       if (lbl) actualLabels.push(lbl.textContent.trim());
     }
+    /* VERIFY_SOURCE_B_EL_TABLE */
+    const normalizeControlText = (text) => String(text || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+    const getRowLeadingText = (row) => {
+      const cells = row.querySelectorAll('td, .el-table__cell');
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        const ct = normalizeControlText(cell.innerText || cell.textContent || '');
+        const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
+        if (hasSelect && !ct) continue;
+        if (ct) return ct;
+      }
+      return '';
+    };
+    const getColumnHeader = (table, cell) => {
+      const tableEl = table.closest ? (table.closest('.el-table') || table) : table;
+      const headerRow = tableEl.querySelector('.el-table__header thead tr, thead tr');
+      if (!headerRow || cell.cellIndex < 0) return '';
+      const th = headerRow.children[cell.cellIndex];
+      return th ? normalizeControlText(th.innerText || th.textContent || '') : '';
+    };
+    const isPagerRow = (row) => {
+      if (row.closest && row.closest('.el-pagination')) return true;
+      const txt = (row.innerText || row.textContent || '').replace(/\\s+/g, ' ');
+      if (/每页|条\\/页|前往|页码|pagination/i.test(txt) && row.querySelector('.el-pagination, .el-select, .el-input')) return true;
+      return false;
+    };
+    const classifyTableCell = (cell) => {
+      if (cell.querySelector('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]')) return 'date';
+      if (cell.querySelector('.el-select')) return 'select';
+      if (cell.querySelector('textarea')) return 'input';
+      if (cell.querySelector('input:not([type="hidden"])')) return 'input';
+      return 'unknown';
+    };
+    const collectTableControls = (row) => {
+      const controls = [];
+      const cells = row.querySelectorAll('td, .el-table__cell');
+      const dateSeen = new Set();
+      const groupSeen = new Set();
+      for (let ci = 0; ci < cells.length; ci++) {
+        const cell = cells[ci];
+        const dateEls = cell.querySelectorAll('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]');
+        for (let di = 0; di < dateEls.length; di++) {
+          const de = dateEls[di];
+          if (dateSeen.has(de)) continue;
+          dateSeen.add(de);
+          const operable = de.querySelector('input:not([type="hidden"])') || de;
+          controls.push({ cell, el: operable, kind: 'date', options: [] });
+        }
+        const radioHosts = cell.querySelectorAll('.el-radio-group');
+        const radioContainers = radioHosts.length ? [...radioHosts] : (cell.querySelectorAll('.el-radio').length ? [cell] : []);
+        for (let rgi = 0; rgi < radioContainers.length; rgi++) {
+          const host = radioContainers[rgi];
+          const gkey = host === cell ? ('cell-radio:' + ci) : host;
+          if (groupSeen.has(gkey)) continue;
+          const radios = host.querySelectorAll('.el-radio');
+          if (!radios.length) continue;
+          groupSeen.add(gkey);
+          const clickEl = radios[0].querySelector('.el-radio__input, input[type="radio"]') || radios[0];
+          controls.push({ cell, el: clickEl, kind: 'radio', options: [] });
+        }
+        const cbHosts = cell.querySelectorAll('.el-checkbox-group');
+        const cbContainers = cbHosts.length ? [...cbHosts] : (cell.querySelectorAll('.el-checkbox').length ? [cell] : []);
+        for (let cgi = 0; cgi < cbContainers.length; cgi++) {
+          const host = cbContainers[cgi];
+          const gkey = host === cell ? ('cell-cb:' + ci) : host;
+          if (groupSeen.has(gkey)) continue;
+          const boxes = host.querySelectorAll('.el-checkbox');
+          if (!boxes.length) continue;
+          groupSeen.add(gkey);
+          const clickEl = boxes[0].querySelector('.el-checkbox__input, input[type="checkbox"]') || boxes[0];
+          controls.push({ cell, el: clickEl, kind: 'checkbox', options: [] });
+        }
+        const inputs = cell.querySelectorAll('input:not([type="hidden"])');
+        for (let ii = 0; ii < inputs.length; ii++) {
+          const input = inputs[ii];
+          const t = (input.type || '').toLowerCase();
+          if (t === 'checkbox' || t === 'radio') continue;
+          if (input.closest && input.closest('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]')) continue;
+          if (input.closest && input.closest('.el-select')) continue;
+          if (input.closest && input.closest('.el-pagination')) continue;
+          controls.push({ cell, el: input, kind: classifyTableCell(cell), options: [] });
+        }
+        const textareas = cell.querySelectorAll('textarea');
+        for (let ti = 0; ti < textareas.length; ti++) {
+          controls.push({ cell, el: textareas[ti], kind: 'input', options: [] });
+        }
+        const selects = cell.querySelectorAll('.el-select');
+        for (let si = 0; si < selects.length; si++) {
+          const sel = selects[si];
+          const trigger = sel.querySelector('.el-input__inner');
+          if (!trigger) continue;
+          controls.push({ cell, el: trigger, kind: 'select', options: [] });
+        }
+      }
+      return controls;
+    };
+    const buildTableDisplayName = (rowText, controls, idx, colHeader, placeholder) => {
+      const rowT = normalizeControlText(rowText);
+      if (!rowT) return '';
+      if (controls.length <= 1) return rowT;
+      if (colHeader) return rowT + '|' + normalizeControlText(colHeader);
+      if (placeholder) return rowT + '|' + normalizeControlText(placeholder);
+      return rowT + '|#' + (idx + 1);
+    };
+    let tableList = [...root.querySelectorAll('.el-table')];
+    if (scopeMode === 'main') {
+      tableList = tableList.filter((table) => {
+        const dr = table.closest('.el-drawer');
+        if (dr && wrapOk(dr)) return false;
+        const dg = table.closest('.el-dialog, .el-message-box');
+        if (dg && wrapOk(dg)) return false;
+        return true;
+      });
+    }
+    for (let ti = 0; ti < tableList.length; ti++) {
+      const table = tableList[ti];
+      const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr, tbody tr');
+      /* SOURCE_B_EMPTY_LEADING */
+      let domRowIndex = 0;
+      for (let ri = 0; ri < bodyRows.length; ri++) {
+        const row = bodyRows[ri];
+        if (isPagerRow(row)) continue;
+        domRowIndex += 1;
+        let rowText = getRowLeadingText(row);
+        if (!rowText) {
+          rowText = 'row#' + domRowIndex;
+        }
+        const controls = collectTableControls(row);
+        for (let ci = 0; ci < controls.length; ci++) {
+          const ctrl = controls[ci];
+          const cell = ctrl.cell;
+          const el = ctrl.el;
+          const colHeader = getColumnHeader(table, cell);
+          const placeholder = (el.getAttribute && el.getAttribute('placeholder')) || '';
+          const displayName = buildTableDisplayName(rowText, controls, ci, colHeader, placeholder);
+          if (displayName) actualLabels.push(displayName);
+        }
+      }
+    }
+    {
+      const seen = new Set();
+      const deduped = [];
+      for (let i = 0; i < actualLabels.length; i++) {
+        const lbl = actualLabels[i];
+        if (seen.has(lbl)) continue;
+        seen.add(lbl);
+        deduped.push(lbl);
+      }
+      actualLabels.length = 0;
+      for (let i = 0; i < deduped.length; i++) actualLabels.push(deduped[i]);
+    }
 
     const expectedLabels = fieldsIn.map(f => f.label);
     const requiredLabels = fieldsIn.filter(f => f.is_required).map(f => f.label);
