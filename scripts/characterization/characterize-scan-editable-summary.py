@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Characterize scan_editable_summary (T4-P0 read-only inventory action)."""
+"""Characterize scan_editable_summary (T4-P0 aggregator + T4-P1 multi-root wiring)."""
 from __future__ import annotations
 
 import argparse
@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 FORM_PY = ROOT / "scripts/controller/actions/_form.py"
+SCAN_FORM_PY = ROOT / "scripts/controller/actions/js_snippets/scan_form.py"
 PROMPT_MD = ROOT / "scripts/prompts/agent-tools-form.md"
 
 
@@ -87,16 +88,48 @@ def test_summary_buttons_shape() -> None:
     assert_true('kind' not in buttons[0], 'buttons must not project kind')
 
 
-def test_single_root_p1_deferral() -> None:
+def test_js_scan_form_fields_multi_root_cues() -> None:
+    from scripts.controller.actions._js_snippets import JS_SCAN_FORM_FIELDS
+
+    scan_form_src = SCAN_FORM_PY.read_text(encoding="utf-8")
+    combined = scan_form_src + JS_SCAN_FORM_FIELDS
+    norm = _norm(combined)
+    assert_true(
+        "opts" in combined,
+        "JS_SCAN_FORM_FIELDS accepts 3rd arg opts",
+    )
+    assert_true(
+        "mode" in combined and "multi" in combined,
+        "JS_SCAN_FORM_FIELDS handles opts.mode multi",
+    )
+    assert_true(
+        "buttonkeywords,opts" in norm or "[quick,buttonkeywords,opts]" in norm,
+        "JS_SCAN_FORM_FIELDS signature includes opts as 3rd parameter",
+    )
+
+
+def test_scan_editable_summary_multi_root_wired() -> None:
     form = FORM_PY.read_text(encoding="utf-8")
     body = _scan_editable_summary_body(form)
     assert_true(
-        "T4-P1" in body or "P1" in body,
-        "scan_editable_summary documents multi-root deferred to T4-P1",
-    )
-    assert_true(
         "build_editable_summary" in body,
         "scan_editable_summary aggregates via build_editable_summary",
+    )
+    norm = _norm(body)
+    assert_true(
+        "mode" in body and "multi" in body,
+        "scan_editable_summary passes mode multi to JS_SCAN_FORM_FIELDS",
+    )
+    assert_true(
+        "[true,_button_keywords(),{'mode':'multi'}]" in norm
+        or "[true,_button_keywords(),{\"mode\":\"multi\"}]" in norm
+        or "'mode':'multi'" in norm.replace(" ", "")
+        or '"mode":"multi"' in norm,
+        "scan_editable_summary evaluate call includes {'mode': 'multi'} 3rd arg",
+    )
+    assert_true(
+        _norm("await page.evaluate(JS_SCAN_FORM_FIELDS, [True, _button_keywords()])") not in norm,
+        "scan_editable_summary must not use bare [True, _button_keywords()] without mode multi",
     )
 
 
@@ -244,7 +277,8 @@ def run_action_tests() -> None:
     test_action_no_autofill()
     test_action_no_store_writes()
     test_summary_buttons_shape()
-    test_single_root_p1_deferral()
+    test_js_scan_form_fields_multi_root_cues()
+    test_scan_editable_summary_multi_root_wired()
 
 
 def main() -> int:
