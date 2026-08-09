@@ -251,6 +251,43 @@ def compose_overlay_container(raw_id: str, trigger: str | None) -> str:
         return f'{prefix}{btn}{OVERLAY_SEP}{title}'
     except Exception:
         return (raw_id or '').strip() or 'main'
+
+
+def remember_trigger_button(store: dict | None, text: str | None) -> None:
+    if not isinstance(store, dict):
+        return
+    btn = normalize_trigger_button(text)
+    if not btn:
+        return
+    store[_TRIGGER_KEY] = btn
+
+
+def clear_trigger_button(store: dict | None) -> None:
+    if not isinstance(store, dict):
+        return
+    store.pop(_TRIGGER_KEY, None)
+    store.pop(_ALIAS_KEY, None)
+
+
+def resolve_display_container(raw_id: str, store: dict | None) -> str:
+    """Compose once per raw root; freeze in store alias map."""
+    raw = (raw_id or '').strip() or 'main'
+    if not isinstance(store, dict):
+        return compose_overlay_container(raw, None)
+    prefix, _rest = _split_type(raw)
+    if not prefix:
+        return raw
+    aliases = store.setdefault(_ALIAS_KEY, {})
+    if not isinstance(aliases, dict):
+        aliases = {}
+        store[_ALIAS_KEY] = aliases
+    if raw in aliases:
+        return aliases[raw]
+    composed = compose_overlay_container(raw, store.get(_TRIGGER_KEY))
+    aliases[raw] = composed
+    return composed
+```
+
 - [ ] **Step 4: Run characterization — expect PASS**
 
 Run: `python scripts/characterization/characterize-container-naming.py`  
