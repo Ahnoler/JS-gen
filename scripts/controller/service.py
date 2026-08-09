@@ -105,7 +105,7 @@ def build_controller(browser_context, case_data_store=None,
     _register_case_data_actions(controller, case_data_store)
     _register_form_actions(controller, browser_context, case_data_store, llm)
     _register_navigation_actions(controller, browser_context)
-    _register_table_actions(controller, browser_context)
+    _register_table_actions(controller, browser_context, case_data_store)
     _register_misc_actions(controller, browser_context, case_data_store)
     _register_special_element_actions(
         controller,

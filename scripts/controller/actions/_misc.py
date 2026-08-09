@@ -206,6 +206,9 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 result,
                 element=element,
             )
+            if case_data_store is not None:
+                from scripts.controller.actions.container_naming import remember_trigger_button
+                remember_trigger_button(case_data_store, button_text)
             return _ok(result)
         return result
 
@@ -327,6 +330,9 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
         await page.wait_for_timeout(500)
         if _is_ok_result(result):
             _state._record_action('close_dialog', {}, result, element=element)
+            if case_data_store is not None:
+                from scripts.controller.actions.container_naming import clear_trigger_button
+                clear_trigger_button(case_data_store)
             try:
                 from scripts.controller.actions._phase_boundary import maybe_record_picker_closed
                 from ._js_snippets import JS_IS_QUERY_TOOLBAR
@@ -515,6 +521,12 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     'tag_name': element_info.get('tag_name') if element_info else tag_name,
                     'text': (element_info or {}).get('text') or elem_text or '',
                 }, f'ok-clicked-{index}', element=element_info)
+                if case_data_store is not None:
+                    from scripts.controller.actions.container_naming import remember_trigger_button
+                    remember_trigger_button(
+                        case_data_store,
+                        (element_info or {}).get('text') or elem_text or '',
+                    )
                 try:
                     from scripts.controller.actions._phase_intent import record_success_token
                     from scripts.controller.actions._phase_boundary import maybe_record_picker_closed

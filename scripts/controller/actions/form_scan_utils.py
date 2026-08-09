@@ -668,7 +668,15 @@ def _switch_task_list_container(case_data_store: dict, container_id: str) -> Non
             'task_list': case_data_store.get('task_list'),
             '_scan_fields': case_data_store.get('_scan_fields'),
         }
+    prev = active
     case_data_store['_active_container'] = container_id
+    if (
+        prev
+        and str(prev).startswith(('dialog:', 'drawer:'))
+        and not str(container_id).startswith(('dialog:', 'drawer:'))
+    ):
+        from scripts.controller.actions.container_naming import clear_trigger_button
+        clear_trigger_button(case_data_store)
     saved = by.get(container_id)
     if isinstance(saved, dict):
         if saved.get('task_list') is not None:

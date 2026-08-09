@@ -104,11 +104,30 @@ def test_alias_freeze() -> None:
     assert_true(b == a, f'alias freeze got {b}')
 
 
+def test_source_wires() -> None:
+    misc = (ROOT / 'scripts/controller/actions/_misc.py').read_text(encoding='utf-8')
+    form = (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
+    scan = (ROOT / 'scripts/controller/actions/form_scan_utils.py').read_text(encoding='utf-8')
+    table = (ROOT / 'scripts/controller/actions/_table.py').read_text(encoding='utf-8')
+    assert_true('remember_trigger_button' in misc, 'misc remembers trigger')
+    assert_true('clear_trigger_button' in misc, 'misc clears on close_dialog')
+    assert_true('remember_trigger_button' in table, 'table remembers trigger')
+    assert_true(
+        'resolve_display_container' in form or 'resolve_display_container' in scan,
+        'compose on scan/save path',
+    )
+    assert_true(
+        'clear_trigger_button' in scan or 'clear_trigger_button' in form,
+        'clear on main switch',
+    )
+
+
 def main() -> None:
     test_compose_truth()
     test_title_extract()
     test_normalize_and_remember()
     test_alias_freeze()
+    test_source_wires()
     print('PASS characterize-container-naming')
 
 

@@ -110,6 +110,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return  # CDP watcher: single-field action, no auto-scan
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
+        from scripts.controller.actions.container_naming import (
+            resolve_display_container,
+            clear_trigger_button,
+        )
+        display_id = resolve_display_container(container_id, case_data_store)
+        if display_id == 'main' or not str(display_id).startswith(('dialog:', 'drawer:')):
+            if (case_data_store.get('_active_container') or '').startswith(('dialog:', 'drawer:')):
+                clear_trigger_button(case_data_store)
+        container_id = display_id
 
         # Remember parent before entering search/picker dialog
         if _is_search_dialog(container_id) or (
@@ -132,7 +141,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             except Exception:
                 return
             dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in raw_fields]
-            cid = result.get('container', container_id) if isinstance(result, dict) else container_id
+            raw_cid = result.get('container', container_id) if isinstance(result, dict) else container_id
+            cid = resolve_display_container(raw_cid, case_data_store)
             _switch_task_list_container(case_data_store, cid)
             _save_form_snapshot(cid, [f.model_dump() for f in dom_fields], case_data_store)
             case_data_store['_scan_buttons'] = _scan_buttons_from_result(result)
