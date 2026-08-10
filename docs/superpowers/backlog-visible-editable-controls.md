@@ -71,8 +71,8 @@
 | **L1-picker** | **代码已实施；湿测挂起** | 歧义 `resolve-element`：L1 `region_*` 预览 + Vue 选择器；表征 PASS；CDP 对拍过顶栏/主区。**BiB 重载 + 多「新增」UI 冒烟**等执行机空闲 | 挂起 · [spec](specs/2026-08-10-resolve-ambiguous-section-preview-design.md) · [plan](plans/2026-08-10-resolve-ambiguous-l1-region-preview.md) |
 | **L1-titlebox** | **代码已实施**（`b207372`） | 同 needle 同粗 L1 碰撞 → titlebox 细化 `region_*` + 锚定 xpath；算法 B | [spec](specs/2026-08-10-resolve-collision-finer-l1-titlebox-design.md) · [TODO 后续 AG](todos/2026-08-10-auto-grab-fullpage-same-name.md) |
 | **AG-fullpage** | **代码已实施；湿测按需** | **自动抓取** fullpage inventory：`mode=inventory` + 可选 `actionType`/`labelText` 过滤；无 label 必弹选择器；选中后 infer `actionType`；同名 L1/titlebox + `xpath_smart`。表征 inventory + titlebox PASS；**BiB 重载 + UI 冒烟**按需 | [spec](specs/2026-08-10-auto-grab-fullpage-inventory-design.md) · [plan](plans/2026-08-10-auto-grab-fullpage-inventory.md) |
-| **L1c-LLM** | **规格 Draft** | 动态 L1：低置信度 / other·custom **feature card → 控制面 LLM**；同步 + **L1d** 同刀；scan + resolve 共用 `classifyRegions` | P1 · [spec](specs/2026-08-10-l1c-llm-region-classify-design.md) · [fullpage §Dynamic L1](specs/2026-08-10-fullpage-visible-controls-scan-design.md) |
-| **L1d-cache** | **含于 L1c 同刀** | `systemId` + 特征签名 → `region_role` | 见 L1c spec |
+| **L1c-LLM** | **代码已实施** | 动态 L1：低置信度 / other·custom **feature card → 控制面 LLM**；`POST /api/v2/regions/classify` + resolve 内联；`L1C_LLM` 默认关；scan Python 接入待跟进 | P1 · [spec](specs/2026-08-10-l1c-llm-region-classify-design.md) · [fullpage §Dynamic L1](specs/2026-08-10-fullpage-visible-controls-scan-design.md) |
+| **L1d-cache** | **代码已实施**（含于 L1c） | `systemId` + 特征签名 → `region_role`（进程内 TTL） | 见 L1c spec |
 | **L1-vision** | 未做 | Vision：仅对争议容器裁图辅助定角色 | P2+ |
 | **T4-P4** | 未做 | Playwright MCP a11y ⟷ 我方 L2 **对拍诊断**（灰度） | 可与 L1c 并行；非写路径 |
 | **T5** | 未做（本页漏扫后暂缓） | 非 `el-table` 自定义网格 | 对公评级页无 vxe/ag → [gap spec](specs/2026-08-10-t5-credit-scan-gap-design.md)；需另页证据 |
@@ -83,7 +83,7 @@
 | **T10** | **P0+P1 已实施** | `save_form_snapshot` 回放；P0=soft-fail continue；P1=verify Source A+B | [spec](specs/2026-08-09-save-form-snapshot-replay-design.md) |
 | **T1r** | 残余 | tree / replay label 兜底 | 可穿插 |
 | **T3r** | 残余 | T3 活录 CDP 对拍 | P2 |
-| **page-state-gen** | **规格 Draft** | 凡「相对 xpath 同、页态不同」的**碰撞可点击**套 page-state 锚（步骤条→dialog→主区标题）；唯一者不包；录制+resolve | P1 · [spec](specs/2026-08-10-page-state-gen-clickable-anchor-design.md) · wizard [§4](specs/2026-08-10-wizard-next-page-state-xpath-design.md) |
+| **page-state-gen** | **规格 Approved；计划已写** | 碰撞可点击 page-state 锚；[spec](specs/2026-08-10-page-state-gen-clickable-anchor-design.md) · [plan](plans/2026-08-11-page-state-gen-clickable-anchor.md) |
 | **P2-noise+** | **已实施** | 黑名单「标签」对齐「页签」（关所有标签含固定） | [spec](specs/2026-08-10-fullpage-p2-icon-chrome-noise-design.md)；表征 `characterize-scan-fullpage-p2` |
 
 ---
