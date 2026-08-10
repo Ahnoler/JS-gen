@@ -404,6 +404,69 @@ PAGE_LOCATOR_HELPERS = r'''
       }
       return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
     }
+    function buildFeatureCard(el, regionHint) {
+      var region = regionHint || assignRegion(el);
+      var cls = String((el && el.getAttribute && el.getAttribute('class')) || '').trim();
+      var classTokens = cls.split(/s+/).filter(Boolean).slice(0, 12);
+      var title = '';
+      if (el && el.getAttribute) {
+        var rawTitle = el.getAttribute('aria-label') || el.getAttribute('title') || '';
+        title = String(rawTitle || '').replace(/s+/g, ' ').trim().slice(0, 80);
+      }
+      if (!title && el && el.closest) {
+        var card = el.closest('.el-card');
+        if (card) {
+          var h = card.querySelector('.el-card__header');
+          title = String((h && (h.innerText || h.textContent)) || '').replace(/s+/g, ' ').trim().slice(0, 80);
+        }
+        if (!title) {
+          var collapse = el.closest('.el-collapse-item');
+          if (collapse) {
+            var ch = collapse.querySelector('.el-collapse-item__header');
+            title = String((ch && (ch.innerText || ch.textContent)) || '').replace(/s+/g, ' ').trim().slice(0, 80);
+          }
+        }
+        if (!title) {
+          var tb = el.closest('.titlebox');
+          if (tb) title = titleboxTitleText(tb).slice(0, 80);
+        }
+      }
+      var band = 'center';
+      if (el && el.getBoundingClientRect) {
+        var rect = el.getBoundingClientRect();
+        var cy = rect.top + rect.height / 2;
+        var vh = window.innerHeight || 800;
+        band = cy < vh * 0.25 ? 'top'
+          : (cy > vh * 0.75 ? 'bottom' : (rect.left < 120 ? 'side' : 'center'));
+      }
+      var childCounts = { button: 0, input: 0, menu: 0 };
+      if (el && el.querySelectorAll) {
+        childCounts.button = Math.min(el.querySelectorAll('button, .el-button').length, 50);
+        childCounts.input = Math.min(el.querySelectorAll(
+          'input:not([type="hidden"]), textarea, .el-input__inner'
+        ).length, 50);
+        childCounts.menu = Math.min(el.querySelectorAll(
+          '.el-menu-item, .el-submenu__title, [role="menuitem"]'
+        ).length, 50);
+      }
+      var role = region && region.region_role ? region.region_role : 'other';
+      var conf = role === 'other' ? 0.4 : 0.9;
+      return {
+        tag: (el && el.tagName ? el.tagName : '').toLowerCase(),
+        classTokens: classTokens,
+        title: title,
+        band: band,
+        childCounts: childCounts,
+        flags: {
+          overlay: role === 'overlay',
+          tableLike: role === 'table',
+          menuLike: role === 'shell-aside' || role === 'menu',
+          titledPanel: !!title,
+        },
+        ruleRole: role,
+        ruleConfidence: conf,
+      };
+    }
     /* SHARED_COLLISION_REFINE — titlebox finer L1 on region_id collision */
     function isActionOnlyTitle(t) {
       const s = String(t || '').replace(/\s+/g, ' ').trim();
@@ -668,6 +731,20 @@ PAGE_LOCATOR_HELPERS = r'''
           if (title) return { kind: 'wizard_step', title: title };
         }
       }
+      const dialogs = document.querySelectorAll('.el-dialog');
+      for (let i = 0; i < dialogs.length; i++) {
+        if (!isVisible(dialogs[i])) continue;
+        const titleEl = dialogs[i].querySelector('.el-dialog__title');
+        const title = normalizeControlText((titleEl && titleEl.textContent) || '');
+        if (title) return { kind: 'dialog', title: title.slice(0, 40) };
+      }
+      const drawers = document.querySelectorAll('.el-drawer');
+      for (let j = 0; j < drawers.length; j++) {
+        if (!isVisible(drawers[j])) continue;
+        const titleEl = drawers[j].querySelector('.el-drawer__title, .el-drawer__header');
+        const title = normalizeControlText((titleEl && titleEl.textContent) || '');
+        if (title) return { kind: 'drawer', title: title.slice(0, 40) };
+      }
       const bc = document.querySelector('.el-breadcrumb');
       if (bc) {
         const title = normalizeControlText(bc.innerText || bc.textContent || '');
@@ -680,7 +757,7 @@ PAGE_LOCATOR_HELPERS = r'''
     const t = normalizeControlText(text);
     return t === '下一步' || t === '上一步';
   }
-  function pageStateNavXPath(host, leafLocal, pageState) {
+  function pageStateAnchorXPath(host, leafLocal, pageState) {
     const leaf = String(leafLocal || '').replace(/^\/+/, '');
     if (!host || !leaf || !pageState || !pageState.title) return '';
     const lit = xpathLiteral(pageState.title);
@@ -688,11 +765,33 @@ PAGE_LOCATOR_HELPERS = r'''
       return "//*[" + classTokenPred('el-steps') + "][.//*[(contains(@class,'is-process') or contains(@class,'is-active')) and contains(normalize-space(.)," + lit + ")]]"
         + "/ancestor::*[.//" + leaf + "][1]//" + leaf;
     }
+    if (pageState.kind === 'dialog') {
+      return "//*[" + classTokenPred('el-dialog') + "][.//*[" + classTokenPred('el-dialog__title')
+        + " and contains(normalize-space(.)," + lit + ")]]/ancestor-or-self::*[.//" + leaf + "][1]//" + leaf;
+    }
+    if (pageState.kind === 'drawer') {
+      return "//*[" + classTokenPred('el-drawer') + "][.//*[(" + classTokenPred('el-drawer__title')
+        + " or " + classTokenPred('el-drawer__header') + ") and contains(normalize-space(.)," + lit + ")]]"
+        + "/ancestor-or-self::*[.//" + leaf + "][1]//" + leaf;
+    }
     if (pageState.kind === 'breadcrumb') {
       return "//*[" + classTokenPred('el-breadcrumb') + " and contains(normalize-space(.)," + lit + ")]"
         + "/ancestor::*[.//" + leaf + "][1]//" + leaf;
     }
     return '';
+  }
+  function pageStateNavXPath(host, leafLocal, pageState) {
+    return pageStateAnchorXPath(host, leafLocal, pageState);
+  }
+  /* PAGE_STATE_GEN — collision-only page-state wrap for clickables */
+  function tryPageStateAnchor(host, leaf, text) {
+    const ps = pageStateOf();
+    if (!ps) return null;
+    const xp = pageStateAnchorXPath(host, leaf, ps);
+    if (!xp) return null;
+    const nodes = evalXpathAll(xp);
+    if (nodes.length === 1 && nodes[0] === host) return xp;
+    return null;
   }
   /** Relative leaf after the last // in a smart xpath (for section anchoring). */
   function leafFromSmartExpr(expr) {
@@ -913,29 +1012,11 @@ PAGE_LOCATOR_HELPERS = r'''
         return 'button[normalize-space()=' + lit + ']';
       })();
       if (isWizardNavLabel(t)) {
-        const ps = pageStateOf();
-        const leafNav = (function () {
-          const lit = xpathLiteral(t);
-          const tagL = (host.tagName || '').toLowerCase();
-          const cls = String(host.className || '');
-          if (tagL === 'a') return 'a[normalize-space()=' + lit + ']';
-          if (/(^| )el-button( |$)/.test(cls) && tagL !== 'button') {
-            return '*[' + classTokenPred('el-button') + ' and normalize-space()=' + lit + ']';
-          }
-          return 'button[normalize-space()=' + lit + ']';
-        })();
-        const navXp = pageStateNavXPath(host, leafNav, ps);
+        const navXp = tryPageStateAnchor(host, localLeaf, t);
         if (navXp) {
-          const nodes = evalXpathAll(navXp);
-          let idx = -1;
-          for (let i = 0; i < nodes.length; i++) {
-            if (nodes[i] === host) { idx = i; break; }
-          }
-          if (nodes.length === 1 && idx === 0) {
-            smart = navXp;
-            occurrence = 0;
-            verified = true;
-          }
+          smart = navXp;
+          occurrence = 0;
+          verified = true;
         }
       }
       let leafForAnchor = localLeaf;
@@ -982,6 +1063,17 @@ PAGE_LOCATOR_HELPERS = r'''
             occurrence = 0;
             verified = true;
           }
+        }
+      }
+      const stillMulti = !!(smart && evalXpathAll(smart).length >= 2);
+      const leafCollision = evalXpathAll('//' + (leafForAnchor || localLeaf)).length >= 2;
+      const skipPageStateWrap = String(kind).indexOf('form_') === 0;
+      if ((stillMulti || leafCollision) && !skipPageStateWrap && t) {
+        const psXp = tryPageStateAnchor(host, leafForAnchor || localLeaf, t);
+        if (psXp) {
+          smart = psXp;
+          occurrence = 0;
+          verified = true;
         }
       }
       if (!verified && smart) {
@@ -1044,6 +1136,7 @@ PAGE_LOCATOR_HELPERS = r'''
       region_role: region.region_role,
       region_id: region.region_id,
       region_label: region.region_label,
+      feature_card: buildFeatureCard(host, region),
     };
   }
 '''

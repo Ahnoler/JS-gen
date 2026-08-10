@@ -1,7 +1,7 @@
 # Page-state-gen: collision-only clickable anchors — Design
 
 **Date:** 2026-08-10  
-**Status:** Approved 2026-08-11 — plan `docs/superpowers/plans/2026-08-11-page-state-gen-clickable-anchor.md`  
+**Status:** Implemented 2026-08-11 — plan `docs/superpowers/plans/2026-08-11-page-state-gen-clickable-anchor.md`  
 **Backlog ID:** **page-state-gen**  
 **Related:** [wizard 下一步 page-state](2026-08-10-wizard-next-page-state-xpath-design.md) (§4 TODO); [dual-save section xpath](2026-08-10-dual-save-section-xpath-design.md); [titlebox collision L1](2026-08-10-resolve-collision-finer-l1-titlebox-design.md); [AG-fullpage inventory](2026-08-10-auto-grab-fullpage-inventory-design.md)
 
