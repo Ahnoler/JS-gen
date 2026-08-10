@@ -8,8 +8,6 @@ import * as execSession from '../../executor-session-client.js';
 import { state } from '../../state.js';
 import { USE_EXECUTOR } from '../../../config/config.js';
 import * as remoteBridge from '../../cdp/remote-bridge.js';
-import { SUPPORTED_RESOLVE_ACTIONS } from '../../cdp/resolve-by-label.js';
-import { normalizeActionName } from '../../models/action-name.js';
 import {
   buildLoginInstruction,
   resolveTrajectoryAccount,
@@ -300,19 +298,10 @@ export async function resolveTrajectoryElement(trajectoryId, {
 } = {}) {
   const tid = Number(trajectoryId);
   const label = String(labelText || '').trim();
-  const act = normalizeActionName(actionType || action || '');
+  const act = String(actionType || action || '').trim();
   const p = params && typeof params === 'object' ? params : {};
-  if (!SUPPORTED_RESOLVE_ACTIONS.includes(act)) {
-    const err = new Error(
-      `resolve-element requires actionType in ${SUPPORTED_RESOLVE_ACTIONS.join('|')} (got: ${act || '(empty)'})`,
-    );
-    err.statusCode = 400;
-    throw err;
-  }
-  const needle = label
-    || String(p.label_text || p.text || p.menu_text || p.button_text || '').trim();
-  if (!needle) {
-    const err = new Error('labelText or params.text / params.label_text is required');
+  if (!label && !act && !Object.keys(p).length) {
+    const err = new Error('labelText or actionType/params is required');
     err.statusCode = 400;
     throw err;
   }

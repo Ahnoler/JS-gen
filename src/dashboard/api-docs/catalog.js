@@ -52,7 +52,7 @@ export const RECORDING_FLOW = [
   'POST .../record/start（可选 phaseIds；可关页后台继续）',
   'POST .../record/stop（不释放槽位）',
   'POST .../confirm（人工确认 → completed；取消 → draft）',
-  'POST .../resolve-element（可选：actionType+params 从已附着页面抓 xpath_smart 写入步骤 element_json）',
+  'POST .../resolve-element（可选：按 label 抓定位器写入步骤 element_json）',
   'POST .../stream/detach（断开画面；或 .../detach 释放执行资源关浏览器）',
 ];
 
