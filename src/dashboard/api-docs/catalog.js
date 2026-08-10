@@ -18,6 +18,7 @@ import { GROUP_MEMORY } from './groups/memory.js';
 import { GROUP_REMOTE } from './groups/remote.js';
 import { GROUP_WEBSOCKET } from './groups/websocket.js';
 import { GROUP_EXPORT } from './groups/export-mgmt.js';
+import { GROUP_REGIONS } from './groups/regions.js';
 
 /** @type {TagGroup[]} */
 export const API_GROUPS = [
@@ -26,6 +27,7 @@ export const API_GROUPS = [
   ...GROUP_COMPONENTS,
   ...GROUP_TRAJECTORY,
   ...GROUP_RECORDING,
+  ...GROUP_REGIONS,
   ...GROUP_MEMORY,
   ...GROUP_REMOTE,
   ...GROUP_WEBSOCKET,

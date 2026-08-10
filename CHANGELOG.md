@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-11: **L1c 区域分类 `POST /api/v2/regions/classify` + `L1C_LLM` 灰度**：批量对 feature card 做规则 → L1d 缓存 → 可选 LLM 分类；`resolve-element` 已在 lifecycle 内联 `classifyRegions`；scan/fullpage 可经 HTTP 调用同一服务。
+  影响范围：`POST /api/v2/regions/classify` 请求体 `{ systemId?, cards }` → `{ items }`；env `L1C_LLM`（默认关）、`L1C_LLM_TIMEOUT_MS`。
+  文件：src/routes/v2/regions.js, src/services/region-classify.js, src/services/trajectory/trajectory-record-lifecycle.js, config/config.js, config/.env.example, src/dashboard/api-docs/groups/regions.js
+  Python 同步提示：代理 `POST /api/v2/regions/classify`；对齐 `items[].role|label|confidence|source` 与 `L1C_LLM` 开关语义；`scan_editable_summary` 接入可后续跟进。
+
 - 2026-08-10: **`resolve-element` inventory 模式端到端贯通**：HTTP body / executor WS `session.bib_resolve_element` 支持 `mode`（产品默认 `inventory`）；inventory 无 label/action 不 400，无 labelText 时始终返回 ambiguous 列表；可选 `truncated` 表示命中 INVENTORY_CAP。
   影响范围：`POST .../resolve-element` 请求体 `mode`；executor WS `session.bib_resolve_element` payload；响应可含 `truncated`。
   文件：src/routes/v2/trajectory-record.js, src/services/trajectory/trajectory-record-lifecycle.js, src/cdp/remote-bridge/index.js, executor/session-handler.js, executor/session-manager.js, executor/bib-bridge.js, src/dashboard/api-docs/groups/recording.js
@@ -22,6 +27,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：若代理 resolve-element，对齐碰撞细化后的 `preview.region_label` / `xpath_smart`（无 schema 变更）。
 
 ### Fixed
+
+- 2026-08-11: **L1c final review hardening**：`callLLMWithTimeout` 在 race 结束后 `clearTimeout`，避免 LLM 先返回后超时 rejection 未处理；`L1C_LLM=false` 时不 L1d 缓存 `shouldLlmClassify` 规则结果（仅缓存最终规则命中如高置信 `main`）；`resolve-element` 的 `resolveSystemIdForTrajectory` / `applyL1cRegionClassify` 软失败（warn + 原 payload），不因分类 500。
+  影响范围：`classifyRegions` L1d 命中条件；`POST .../resolve-element` 稳定性。
+  文件：src/services/region-classify.js, src/services/trajectory/trajectory-record-lifecycle.js
+  Python 同步提示：无 API 变更；若本地缓存 L1d，对齐「LLM 关闭时不缓存待 LLM 卡片」语义。
 
 - 2026-08-10: **`prepareElementJson` / `enrichLocatorFields` 保留已抓取相对 xpath**：缺 `xpath_smart` 但 `xpath` 已是 `//…`（含 titlebox 锚定）时不再按按钮文案发明裸 leaf 覆盖。
   影响范围：步骤创建/更新 element 归一化；与 Vue `buildElement` 持久化 `xpath_smart` 互补。
@@ -99,6 +109,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：无（仅 JS-gen Session Chrome 启动）。
 
 ### Changed
+
+- 2026-08-11: **page-state-gen**：可点击 leaf 在相对 xpath 多命中时，用页态（步骤条→dialog/drawer→breadcrumb）锚定 `xpath_smart`；唯一控件不包。推广原 wizard 下一步逻辑。
+  影响范围：CDP locator helpers / 录制 snap / resolve inventory。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py
+  Python 同步提示：无 API 变更；若 Python 侧自建 xpath enrich 可对齐碰撞才包 page-state。
 
 - 2026-08-10: **批量推送（Batch Push）端到端**：api-docs 分组改为「批量推送管理」；新增对方项目/系统代理（`GET /export/partner/projects|systems`）；`POST /export/transactions` 组装后代调 importDemand，仅对方成功才 `markExported`；`systemId`/`projectId` 缺省 98/31；`access_token` 从头/body/env 转发。Vue 弹窗改为项目→系统级联。
   影响范围：批量推送产品流、partner 代理、importDemand 代推。

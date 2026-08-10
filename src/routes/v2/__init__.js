@@ -23,6 +23,7 @@ import registerReplay from './replay.js';
 import registerExportMgmt from './export-mgmt.js';
 import registerMemory from './memory.js';
 import registerOperationComponent from './operation-component.js';
+import registerRegions from './regions.js';
 
 export default function (app) {
   app.use('/api/v2', v2ResponseEnvelope);
@@ -46,4 +47,5 @@ export default function (app) {
   registerReplay(app);
   registerExportMgmt(app);
   registerMemory(app);
+  registerRegions(app);
 }

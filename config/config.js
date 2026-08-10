@@ -126,3 +126,7 @@ export const AI_MEMORY_FACT_PACK = _resolve('AI_MEMORY_FACT_PACK', 'false').toLo
 export const AI_MEMORY_HISTORY = _resolve('AI_MEMORY_HISTORY', 'false').toLowerCase() === 'true';
 export const AI_MEMORY_DECISIONS = _resolve('AI_MEMORY_DECISIONS', 'true').toLowerCase() !== 'false';
 export const AI_MEMORY_AUDIT_STRICT = _resolve('AI_MEMORY_AUDIT_STRICT', 'false').toLowerCase() === 'true';
+
+// L1c: low-confidence region classify via LLM (default off → rules + L1d read only)
+export const L1C_LLM = _resolve('L1C_LLM', 'false').toLowerCase() === 'true';
+export const L1C_LLM_TIMEOUT_MS = Number(_resolve('L1C_LLM_TIMEOUT_MS', '8000')) || 8000;

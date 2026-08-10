@@ -125,6 +125,7 @@ ${PAGE_LOCATOR_HELPERS}
         region_role: loc.region_role || '',
         region_id: loc.region_id || '',
         region_label: loc.region_label || '',
+        feature_card: loc.feature_card || undefined,
       };
     }
     function textExact(a, b) {
@@ -570,10 +571,17 @@ export async function resolveElementByLabel(client, opts = {}) {
       enriched.locator_strategy = 'xpath_smart';
       enriched.xpath = enriched.xpath_smart;
     }
+    const featureCard = raw.feature_card && typeof raw.feature_card === 'object'
+      ? raw.feature_card
+      : undefined;
+    const element = normalizeElementJson(enriched);
+    if (featureCard) element.feature_card = featureCard;
+    const preview = toPreview(enriched);
+    if (featureCard) preview.feature_card = featureCard;
     return {
       matchedLabel: String(raw.matchedLabel || labelText || ''),
-      element: normalizeElementJson(enriched),
-      preview: toPreview(enriched),
+      element,
+      preview,
     };
   }
 
