@@ -131,6 +131,20 @@ export async function updateMeta(trajectoryDbId, fields, trx = null) {
   return db(TABLE).where({ id: trajectoryDbId }).update(patch);
 }
 
+export async function markExportDirty(trajectoryId, trx = null) {
+  const id = Number(trajectoryId);
+  if (!Number.isFinite(id) || id <= 0) return 0;
+  const db = trx || getDB();
+  return db(TABLE).where({ id }).update({ is_export: 0 });
+}
+
+export async function markExported(trajectoryId, trx = null) {
+  const id = Number(trajectoryId);
+  if (!Number.isFinite(id) || id <= 0) return 0;
+  const db = trx || getDB();
+  return db(TABLE).where({ id }).update({ is_export: 1 });
+}
+
 /**
  * Clear trajectory.remote_session_id rows pointing at a remote_session.
  * Used for exclusive mount + close/idle sweeps (prevents ghost "occupancy").
@@ -253,6 +267,7 @@ export async function getById(id) {
   const row = await db(TABLE).where({ id }).first();
   if (!row) return null;
   const entity = fromDbRow(row);
+  entity.isExport = Number(entity.isExport) ? 1 : 0;
   entity.steps = await db('trajectory_step')
     .where({ trajectory_id: row.id })
     .orderBy(['step_number', 'action_index'])
@@ -279,6 +294,7 @@ export async function listByFunction(functionId, {
 
   // Attach phase counts for hierarchy UI
   for (const e of entities) {
+    e.isExport = Number(e.isExport) ? 1 : 0;
     const [{ phases }] = await db('trajectory_phase')
       .where({ trajectory_id: e.id })
       .count('* as phases');
@@ -301,6 +317,7 @@ export async function list({
   const rows = await query.orderBy(sortCol, sortOrder).limit(pageSize).offset(offset);
   const entities = fromDbRows(rows);
   for (const e of entities) {
+    e.isExport = Number(e.isExport) ? 1 : 0;
     const [{ phases }] = await db('trajectory_phase')
       .where({ trajectory_id: e.id })
       .count('* as phases');

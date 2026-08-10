@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-10: **`trajectory.is_export` 脏标记列 + DAO helpers**：迁移新增 `is_export TINYINT(1) NOT NULL DEFAULT 0`（1=最近一次全量导出成功，0=有变更或未导出）；`markExportDirty` / `markExported` 更新标志；`getById` / `list` / `listByFunction` 返回 `isExport` 为 `0|1` 数字。
+  影响范围：trajectory 表 schema、trajectory DAO。
+  文件：migrations/20260810120000_trajectory_is_export.js, src/dao/trajectory-dao.js
+  Python 同步提示：对齐 `trajectory.is_export` 列及 `isExport` 字段语义；后续 export API 任务再对齐路由。
+
 - 2026-08-09: **T10-P1:** `JS_VERIFY_FORM_STRUCTURE` / CTRL `verifyFormStructure` collect Source B `el-table` labels (same `row#N` naming as scan) so snapshot verify matches recording surface.
   影响范围: `scripts/controller/actions/js_snippets/misc.py`, `src/ctrl-actions/structure.js`
   Python 同步提示：无
