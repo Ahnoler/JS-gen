@@ -1,8 +1,8 @@
 # Backlog: 可见可编辑控件 / Agent 视野（核实版 2026-08-11）
 
 > 本文件记录「目标线」待办。**状态以代码/表征为准**，不以计划 checkbox 为准。  
-> **下一刀（优先）：** **legacy-section-retire**（移除旧分块双轨）· **L1c / page-state-gen 聚焦提交**（工作树未提交）· 执行机空闲时 **L1-picker / AG-fullpage BiB 湿测**。  
-> 2026-08-11 已落地（代码/表征；部分未 commit）：L1c-LLM + L1d；page-state-gen（碰撞才包）；引入确认后 `_submit_ready` + create 预算缓冲 + 质量门不因 introduce 误过最终保存。
+> **下一刀（优先）：** **legacy-section-retire** 实现（盘点已写入 TODO）· 执行机空闲时 **湿测**（L1-picker / AG / L1c / page-state dialog）。  
+> 2026-08-11 已提交：`d12a515` agent-final-save · `441a228` page-state-gen · `c87b448` L1c API · `277866d` backlog/TODO。
 
 ## 目标定稿（2026-08-10 修订）
 
@@ -52,11 +52,11 @@
 | **L1-picker** | 歧义 resolve：`region_*` 预览 + Vue 选择器 | [spec](specs/2026-08-10-resolve-ambiguous-section-preview-design.md)；**BiB 湿测挂起** |
 | **L1-titlebox** | 同 needle 碰撞 → titlebox `region_*` + 锚定 xpath | `b207372` · [spec](specs/2026-08-10-resolve-collision-finer-l1-titlebox-design.md) |
 | **AG-fullpage** | 自动抓取 inventory + 可选过滤 + infer actionType | [spec](specs/2026-08-10-auto-grab-fullpage-inventory-design.md)；**UI/BiB 湿测按需** |
-| **L1c-LLM** | feature card → 控制面 LLM；`POST /api/v2/regions/classify`；`L1C_LLM` 默认关 | [spec](specs/2026-08-10-l1c-llm-region-classify-design.md) · [plan](plans/2026-08-11-l1c-llm-region-classify.md)；**未聚焦 commit**；scan Python / LLM 湿测待跟进 |
+| **L1c-LLM** | feature card → 控制面 LLM；`POST /api/v2/regions/classify`；`L1C_LLM` 默认关 | `c87b448` · [spec](specs/2026-08-10-l1c-llm-region-classify-design.md)；scan Python / LLM 湿测待跟进 |
 | **L1d-cache** | `systemId` + signature → role（进程内 TTL；含于 L1c） | 见 L1c spec |
-| **page-state-gen** | 碰撞可点击：步骤条→dialog/drawer→breadcrumb 锚 `xpath_smart` | [spec](specs/2026-08-10-page-state-gen-clickable-anchor-design.md) · [plan](plans/2026-08-11-page-state-gen-clickable-anchor.md)；char OK；**未聚焦 commit**；dialog 碰撞湿测待做 |
+| **page-state-gen** | 碰撞可点击：步骤条→dialog/drawer→breadcrumb 锚 `xpath_smart` | `441a228` · [spec](specs/2026-08-10-page-state-gen-clickable-anchor-design.md)；dialog 碰撞湿测待做 |
 | **P2-noise+** | 黑名单「标签」对齐「页签」 | `characterize-scan-fullpage-p2` |
-| **agent-final-save** | 引入确认（含 index「确认」）→ `_submit_ready`；create/modify +4 步；倒二步 urgency；缺 toast_ok 不再被 introduce_ok 放过 | `characterize-phase-runtime` PASS；修 log「引入后未点保存」 |
+| **agent-final-save** | 引入确认（含 index「确认」）→ `_submit_ready`；create/modify +4 步；倒二步 urgency；缺 toast_ok 不再被 introduce_ok 放过 | `d12a515` · `characterize-phase-runtime` PASS |
 
 ---
 
@@ -73,12 +73,11 @@
 
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
-| **legacy-section-retire** | **Open** | 移除旧分块判断（D3 `sectionOf` / `section_title` 双轨）→ 统一 L1 `region_*`（+ titlebox / page-state 锚） | **P1** · [TODO](todos/2026-08-11-remove-legacy-section-chunking.md) |
+| **legacy-section-retire** | **盘点完成 / 实现 Open** | 移除旧分块判断 → L1 `region_*`；库存表已写入 TODO | **P1** · [TODO](todos/2026-08-11-remove-legacy-section-chunking.md) |
 | **L1c-wet / scan-py** | 挂起 | L1c：`L1C_LLM=1` BiB 湿测；Python scan 接入 classify | P1 |
-| **page-state-wet** | 挂起 | dialog/drawer 同文案按钮碰撞湿测；聚焦 commit 与 L1c 拆开 | P1 |
-| **L1-picker-wet** | 挂起 | BiB 重载 + 多「新增」Vue 选择器冒烟 | 挂起 · 等执行机 |
+| **page-state-wet** | 挂起 | dialog/drawer 同文案按钮碰撞湿测 | P1 |
+| **L1-picker-wet** | 挂起 | BiB 重载 + 多「新增」Vue 选择器冒烟 | 挂起 · 等执行机（CDP 9242 当前不可用） |
 | **AG-fullpage-wet** | 按需 | BiB / UI 自动抓取冒烟 | 按需 |
-| **commit-hygiene** | Open | 工作树混有 L1c + page-state-gen + agent-final-save + 无关 WIP → **分刀聚焦提交** | 运维 |
 | **L1-vision** | 未做 | 争议容器裁图辅助定角色 | P2+ |
 | **T4-P4** | 未做 | a11y ⟷ L2 对拍诊断 | P2 |
 | **T5** | 暂缓 | 非 `el-table` 自定义网格 | 需另页证据 · [gap](specs/2026-08-10-t5-credit-scan-gap-design.md) |
