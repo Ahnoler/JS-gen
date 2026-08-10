@@ -71,6 +71,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-10: **Partner transaction 导出对齐 importDemand 定稿**：外层 `transcationEventTypeList`；轨内步骤为 `transcationProperties`；`testFrame=playwright`；`propertiesName` 无分隔符且同轨去重（重复追加 2、3…）；`raw`/`forImport`/`download` 返回可直接 POST 的导入体；批量 raw 合并多轨。
+  影响范围：`/api/v2/export/trajectories/:id/transaction`、`/api/v2/export/transactions`、transaction schema/docs。
+  文件：src/services/transaction-export.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-transaction-export.mjs, scripts/export-transaction-raw.mjs
+  Python 同步提示：无（导出为 Node 侧）。
+
 - 2026-08-09: **Overlay 容器命名带触发按钮（`dialog:<按钮>|<标题>`）。** 录制用最近成功点击文案合成 display id（无标题 → `|unnamed`）；`verifyFormStructure` / `JS_VERIFY_FORM_STRUCTURE` 只匹配 `|` 后标题，兼容旧 `dialog:标题` / `dialog:unnamed`。
   影响范围：录制 snapshot container、steps/replay Type B 校验、assembled CTRL。
   文件：scripts/controller/actions/container_naming.py, _form.py, form_scan_utils.py, _misc.py, _table.py, js_snippets/misc.py, src/ctrl-actions/structure.js
