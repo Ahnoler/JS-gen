@@ -16,20 +16,28 @@ def strip_sec_suffix(s: str) -> str:
     return re.sub(r"#\d+$", "", norm_sec(s))
 
 
-def section_matches(want: str, section_id: str = "", section_title: str = "") -> bool:
-    """Align with JS_CLICK_SAVE_BUTTON secMatches (exact id/title; strip #n)."""
+def section_matches(
+    want: str,
+    section_id: str = "",
+    section_title: str = "",
+    region_label: str = "",
+) -> bool:
+    """Align with JS_CLICK_SAVE_BUTTON secMatches; also accept L1 region_label."""
     want_norm = norm_sec(want)
     if not want_norm:
         return True
     sid = norm_sec(section_id)
     title = norm_sec(section_title)
+    region = norm_sec(region_label)
     want_base = strip_sec_suffix(want_norm)
     return (
         sid == want_norm
         or title == want_norm
+        or region == want_norm
         or strip_sec_suffix(sid) == want_norm
         or strip_sec_suffix(sid) == want_base
         or title == want_base
+        or region == want_base
     )
 
 
@@ -42,7 +50,12 @@ def filter_pending_labels(tl: "TaskList", section: str = "") -> list[str]:
     if norm_sec(section):
         items = [
             i for i in items
-            if section_matches(section, i.section_id, i.section_title)
+            if section_matches(
+                section,
+                i.section_id,
+                i.section_title,
+                getattr(i, "region_label", "") or "",
+            )
         ]
     return [i.label for i in items]
 
@@ -50,7 +63,12 @@ def filter_pending_labels(tl: "TaskList", section: str = "") -> list[str]:
 def pending_by_section(tl: "TaskList") -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for i in pending_fillable_items(tl):
-        key = (i.section_title or i.section_id or "__root__").strip() or "__root__"
+        key = (
+            (getattr(i, "region_label", None) or "")
+            or i.section_title
+            or i.section_id
+            or "__root__"
+        ).strip() or "__root__"
         out.setdefault(key, []).append(i.label)
     return out
 
@@ -76,7 +94,11 @@ def same_label_section_keys(buttons: list | None, button_text: str = "保存") -
             continue
         if needle not in lab and lab not in needle:
             continue
-        key = norm_sec(b.get("section_title") or "") or norm_sec(b.get("section_id") or "")
+        key = (
+            norm_sec(b.get("region_label") or "")
+            or norm_sec(b.get("section_title") or "")
+            or norm_sec(b.get("section_id") or "")
+        )
         if not key or key == "__root__":
             continue
         if key not in seen:
@@ -86,10 +108,10 @@ def same_label_section_keys(buttons: list | None, button_text: str = "保存") -
 
 
 def unique_button_section(buttons: list | None, button_text: str = "保存") -> str | None:
-    """If exactly one distinct section among buttons matching ``button_text``, return it.
+    """If exactly one distinct region/section among buttons matching ``button_text``, return it.
 
-    Uses DOM scan buttons (not phase NL). Prefer ``section_title``, else ``section_id``.
-    Returns None when 0 or ≥2 matching sections (LLM must declare section=).
+    Prefer ``region_label``, then ``section_title`` / ``section_id``.
+    Returns None when 0 or ≥2 matching keys (LLM must declare section=).
     """
     keys = same_label_section_keys(buttons, button_text)
     if len(keys) == 1:
@@ -112,7 +134,12 @@ def preferred_submit_button(store: dict | None, section: str = "") -> str:
         lab = norm_sec(b.get("label") or "")
         if not lab:
             continue
-        if sec and not section_matches(sec, b.get("section_id") or "", b.get("section_title") or ""):
+        if sec and not section_matches(
+            sec,
+            b.get("section_id") or "",
+            b.get("section_title") or "",
+            b.get("region_label") or "",
+        ):
             continue
         labels.append(lab)
     for prefer in ("暂存", "保存", "提交"):
@@ -141,7 +168,12 @@ def preferred_submit_cue(store: dict | None, section: str = "") -> str:
         if not isinstance(b, dict):
             continue
         lab = norm_sec(b.get("label") or "")
-        if sec and not section_matches(sec, b.get("section_id") or "", b.get("section_title") or ""):
+        if sec and not section_matches(
+            sec,
+            b.get("section_id") or "",
+            b.get("section_title") or "",
+            b.get("region_label") or "",
+        ):
             continue
         if "测算" in lab and "等级测算" not in lab:  # button 测算, not section title alone
             has_calc = True

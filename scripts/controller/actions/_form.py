@@ -502,6 +502,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     xpath_smart=prev.xpath_smart if prev else '',
                     section_id=prev.section_id if prev else '',
                     section_title=prev.section_title if prev else '',
+                    region_label=getattr(prev, 'region_label', '') if prev else '',
                 ))
         # Restore needs_intervention flags on items that ended up in pending
         for item in tl.pending:
@@ -543,7 +544,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'Read-only summary of visible classified operable controls (quick full-page scan). '
         'Returns {container, scope, total, filled, pending, pending_labels, pending_items'
         '[{label, xpath_smart, kind, section}], readonly_labels, readonly_items[…], '
-        'sections, buttons[{text, section, xpath_smart}], regions?}. '
+        'sections, buttons[{text, region_label, section, xpath_smart}], regions?}. '
         'Use xpath_smart from pending_items/buttons on fill/select/click — do not re-scan for locator. '
         'readonly_items = disabled known-kind fields for reference (do not fill). '
         'Includes shell nav when present. Does NOT build task_list, auto-fill, or run form assistant.'
@@ -830,7 +831,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         KIND_ORDER = {'date': 0, 'select': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
         groups: dict[int, list[dict]] = {}
         for d in items:
-            if filt and not section_matches(filt, d.get('section_id', ''), d.get('section_title', '')):
+            if filt and not section_matches(filt, d.get('section_id', ''), d.get('section_title', ''), d.get('region_label', '')):
                 continue
             # Skip needs_intervention — only auto-fill fillable fields
             if d.get('disabled') and d.get('hasButton'):
@@ -1175,7 +1176,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         for f in dom_fields:
             if not f.label or f.label in known_labels or f.currentValue.strip():
                 continue
-            if filt and not section_matches(filt, f.section_id, f.section_title):
+            if filt and not section_matches(filt, f.section_id, f.section_title, getattr(f, 'region_label', '') or ''):
                 continue
             if f.disabled:
                 # Disabled / introduce (disabled+button) — not assistant pending.
@@ -1212,7 +1213,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             item for item in tl.pending
             if not item.needs_intervention
             and not (item.label in autofilled and (item.currentValue or '').strip())
-            and section_matches(filt, item.section_id, item.section_title)
+            and section_matches(filt, item.section_id, item.section_title, getattr(item, 'region_label', '') or '')
         ]
 
         if not pending:
@@ -1369,7 +1370,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         pending_items = [
             i for i in tl.pending
             if not i.needs_intervention
-            and section_matches(sec, i.section_id, i.section_title)
+            and section_matches(sec, i.section_id, i.section_title, getattr(i, 'region_label', '') or '')
         ]
         pending_payload = [i.model_dump() for i in pending_items]
         sys.stderr.write(

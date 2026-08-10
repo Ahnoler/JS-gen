@@ -31,6 +31,14 @@ def test_section_matches() -> None:
     assert_true(section_matches("系统评级结论", "系统评级结论", "系统评级结论"), "exact")
     assert_true(section_matches("系统评级结论", "系统评级结论#2", "系统评级结论"), "#n id")
     assert_true(not section_matches("系统评级结论", "征信信息", "征信信息"), "other section")
+    assert_true(
+        section_matches("主区·基本信息", "", "旧分块", "主区·基本信息"),
+        "region_label match when section_title differs",
+    )
+    assert_true(
+        not section_matches("主区·基本信息", "", "旧分块", "其它区"),
+        "region_label miss",
+    )
 
 
 def test_filter_pending_excludes_other_section() -> None:

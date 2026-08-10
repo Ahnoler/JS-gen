@@ -250,31 +250,48 @@ def _merge_scan_buttons(scan_results: list[dict]) -> list[dict]:
 
 
 def _project_summary_field(field: dict) -> dict:
-    """Project scan field → model-facing {label, xpath_smart, kind, section}."""
+    """Project scan field → model-facing shape; region_label primary, section alias."""
+    region = _region_display_label(field)
     return {
         'label': (field.get('label') or '').strip(),
         'xpath_smart': (field.get('xpath_smart') or '').strip(),
         'kind': (field.get('kind') or '').strip(),
-        'section': (field.get('section_title') or '').strip(),
+        'region_label': region,
+        'section': region,  # legacy alias — prefer region_label
     }
 
 
 def _project_summary_buttons(buttons: list[dict]) -> list[dict]:
-    """Source C buttons → {text, section, xpath_smart} for ops without a second scan."""
+    """Source C buttons → {text, region_label, section, xpath_smart}."""
     out: list[dict] = []
     seen: set[tuple[str, str, str]] = set()
     for b in buttons:
         text = (b.get('label') or '').strip()
         if not text:
             continue
-        section = (b.get('section_title') or '').strip()
+        region = _region_display_label(b)
         xp = (b.get('xpath_smart') or '').strip()
-        key = (text, section, xp)
+        key = (text, region, xp)
         if key in seen:
             continue
         seen.add(key)
-        out.append({'text': text, 'section': section, 'xpath_smart': xp})
+        out.append({
+            'text': text,
+            'region_label': region,
+            'section': region,  # legacy alias
+            'xpath_smart': xp,
+        })
     return out
+
+
+def _region_display_label(field: dict | None) -> str:
+    """Prefer L1 region_label; fall back to legacy section_title for compat."""
+    if not isinstance(field, dict):
+        return ''
+    return (
+        (field.get('region_label') or '').strip()
+        or (field.get('section_title') or '').strip()
+    )
 
 
 def build_editable_summary(
@@ -360,7 +377,8 @@ def build_editable_summary(
             continue
         projected_buttons.append({
             'text': text,
-            'section': (f.get('region_role') or f.get('section_title') or '')[:40],
+            'region_label': _region_display_label(f) or (f.get('region_role') or '')[:40],
+            'section': _region_display_label(f) or (f.get('region_role') or '')[:40],
             'xpath_smart': (f.get('xpath_smart') or '').strip(),
         })
         if len(projected_buttons) >= 80:
@@ -818,7 +836,7 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
     fillable = [
         i for i in tl.pending
         if not i.needs_intervention
-        and section_matches(sec, i.section_id, i.section_title)
+        and section_matches(sec, i.section_id, i.section_title, getattr(i, 'region_label', '') or '')
     ]
     if fillable:
         return ''

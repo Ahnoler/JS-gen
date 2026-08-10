@@ -51,7 +51,8 @@ def _build_related_snapshot(scan_fields: list, section: str = '') -> list[dict]:
             continue
         sid = fld.get('section_id') or ''
         stitle = fld.get('section_title') or ''
-        if section and not section_matches(section, sid, stitle):
+        rlabel = fld.get('region_label') or ''
+        if section and not section_matches(section, sid, stitle, rlabel):
             continue
         disabled = bool(fld.get('disabled'))
         value = fld.get('currentValue')

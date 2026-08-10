@@ -73,7 +73,7 @@
 
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
-| **legacy-section-retire** | **盘点完成 / 实现 Open** | 移除旧分块判断 → L1 `region_*`；库存表已写入 TODO | **P1** · [TODO](todos/2026-08-11-remove-legacy-section-chunking.md) |
+| **legacy-section-retire** | **进行中（slice-1）** | summary/TaskList 已双写 `region_label`（`section` 别名）；锚 xpath 仍保留 D3 实现 | **P1** · [TODO](todos/2026-08-11-remove-legacy-section-chunking.md) |
 | **L1c-wet / scan-py** | 挂起 | L1c：`L1C_LLM=1` BiB 湿测；Python scan 接入 classify | P1 |
 | **page-state-wet** | 挂起 | dialog/drawer 同文案按钮碰撞湿测 | P1 |
 | **L1-picker-wet** | 挂起 | BiB 重载 + 多「新增」Vue 选择器冒烟 | 挂起 · 等执行机（CDP 9242 当前不可用） |
@@ -105,11 +105,15 @@
 
 ## 推荐下一刀（2026-08-11）
 
-1. **legacy-section-retire** — 调研表 → 读路径去旧 section → `click_save`/TaskList 兼容期 → 删死代码（[TODO](todos/2026-08-11-remove-legacy-section-chunking.md)）  
-2. **分刀 commit** — page-state-gen / L1c / agent-final-save 各自聚焦，勿与无关 WIP 混提  
-3. **湿测（执行机空闲）：** L1-picker 多「新增」· AG-fullpage · L1c（`L1C_LLM`）· page-state dialog 碰撞  
-4. ~~全页扫描 / dual-save / wizard-next / titlebox / inventory / page-state-gen 代码 / L1c 代码~~ — **已实施**（见上表）  
-5. 穿插：T1r；三大问题①；T5（另页证据）；T4-P4 / L1-vision  
+1. **legacy-section-retire 实现** — 盘点已完成 → resolve/summary 双读 region → 再删旧产品语义（[TODO](todos/2026-08-11-remove-legacy-section-chunking.md)）  
+2. **湿测（执行机 + CDP 9242 起来后）：**  
+   - L1-picker：多「新增」歧义选择器  
+   - AG-fullpage：无 label inventory  
+   - L1c：`L1C_LLM=1` 低置信区域  
+   - page-state：dialog 内/外同文案按钮  
+   - agent-final-save：引入法定代表人后必须再点保存  
+3. ~~分刀 commit~~ — **已完成**（`d12a515` / `441a228` / `c87b448` / `277866d`）  
+4. 穿插：T1r；三大问题①；T5；T4-P4 / L1-vision  
 
 > 参照：Cursor browser MCP / Playwright MCP（先控件池，后区域标签）。T4-P4 = 对照，非主路径。
 
@@ -124,4 +128,4 @@
 
 ## 分支
 
-- 保持 `V2.1_dev`。L1c / page-state-gen / agent-final-save 等在工作树；提交前按刀拆分。
+- `V2.1_dev`。聚焦提交已落；残留 WIP：`select.js` / `select_option.py` / `phase/prompts.py` / `_tmp_*` 探针（勿混入上表功能）。
