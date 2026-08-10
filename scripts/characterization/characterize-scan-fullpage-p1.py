@@ -86,18 +86,20 @@ def test_rebuild_or_assistant_uses_fullpage() -> None:
     )
     if "async def _rebuild_task_list_from_dom" in form:
         chunk = form.split("async def _rebuild_task_list_from_dom", 1)[1][:2500]
+        # Overlay TaskList uses tasklist_scan_mode (multi for dialog/drawer;
+        # fullpage only for main). Summary/scan_form_fields stay fullpage.
         assert_true(
-            "fullpage" in chunk and "prepare_scan_fields_for_tasklist" in chunk,
-            "_rebuild_task_list_from_dom must use mode fullpage + fillable prepare",
+            "tasklist_scan_mode" in chunk and "prepare_scan_fields_for_tasklist" in chunk,
+            "_rebuild_task_list_from_dom must use tasklist_scan_mode + fillable prepare",
         )
     if "async def run_form_assistant" in form:
         chunk = form.split("async def run_form_assistant", 1)[1]
         end = chunk.find("\n    @controller.action")
         chunk = chunk[: end if end >= 0 else 4000]
-        # Assistant batches via _ensure_scanned → _rebuild (fullpage); body may not re-evaluate.
+        # Assistant batches via _ensure_scanned → _rebuild; body may not re-evaluate.
         assert_true(
-            "_ensure_scanned" in chunk or "fullpage" in chunk or "filter_fillable_scan_fields" in chunk,
-            "run_form_assistant must go through _ensure_scanned (fullpage rebuild) or scan itself",
+            "_ensure_scanned" in chunk or "tasklist_scan_mode" in chunk or "filter_fillable_scan_fields" in chunk,
+            "run_form_assistant must go through _ensure_scanned (scoped rebuild) or scan itself",
         )
 
 

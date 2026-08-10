@@ -124,6 +124,41 @@ _NON_FILL_KINDS = frozenset({'menu_item', 'icon'})
 _SCANNED_FIELD_KINDS = frozenset({
     'input', 'select', 'date', 'radio', 'checkbox', 'tree-select', 'unknown',
 })
+_TREE_FILTER_LABEL_RE = re.compile(r'关键字|过滤|搜索')
+
+
+def tasklist_scan_mode(container_id: str = '') -> str:
+    """Scan mode for TaskList / write-gate inventory (not summary-only).
+
+    Visible dialog/drawer maintain forms must use ``multi`` so list-page query
+    fields and page tree filters are not mixed into the overlay TaskList.
+    ``fullpage`` remains for main-page inventory.
+    """
+    cid = (container_id or '').strip()
+    if cid.startswith(('dialog:', 'drawer:')):
+        return 'multi'
+    return 'fullpage'
+
+
+def is_tasklist_noise_field(field: dict | None) -> bool:
+    """True for controls that must not block click_save / premature-done gates."""
+    if not isinstance(field, dict):
+        return True
+    label = (field.get('label') or '').strip()
+    if not label:
+        return True
+    ph = (field.get('placeholder') or '').strip()
+    kind = (field.get('kind') or '').strip()
+    xp = (field.get('xpath_smart') or '').strip()
+    # Tree / search filter: placeholder used as label (e.g. 输入关键字进行过滤)
+    if ph and label == ph and _TREE_FILTER_LABEL_RE.search(label):
+        return True
+    if kind in ('tree-select', 'tree') and _TREE_FILTER_LABEL_RE.search(label):
+        return True
+    # Source B table-row radio option text (e.g. label=对公) — not a form-item field
+    if kind == 'radio' and '//tr[' in xp and 'el-form-item' not in xp:
+        return True
+    return False
 
 
 def filter_fillable_scan_fields(fields: list | None) -> list[dict]:
@@ -137,6 +172,8 @@ def filter_fillable_scan_fields(fields: list | None) -> list[dict]:
             continue
         role = (f.get('region_role') or '').strip()
         if role in _SHELL_ROLES:
+            continue
+        if is_tasklist_noise_field(f):
             continue
         out.append(f)
     return out

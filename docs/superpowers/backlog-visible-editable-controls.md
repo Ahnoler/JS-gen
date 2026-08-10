@@ -1,7 +1,8 @@
 # Backlog: 可见可编辑控件 / Agent 视野（核实版 2026-08-10）
 
 > 本文件记录「目标线」待办。**状态以代码/表征为准**，不以计划 checkbox 为准。  
-> 下一刀：执行机空闲后再做 **L1-picker BiB/UI 冒烟**；并行可选 **page-state-gen** / **L1c-LLM** 规格。
+> 下一刀：执行机空闲后再做 **L1-picker BiB/UI 冒烟**；并行可选 **page-state-gen** / **L1c-LLM** 规格。  
+> 2026-08-10 已修：弹窗 TaskList 重建用 `multi`（勿 fullpage 混入列表/树过滤）+ `mark_done` 同 label 全清。
 
 ## 目标定稿（2026-08-10 修订）
 
@@ -47,6 +48,7 @@
 | **FP-P2** | icon / chrome 菜单硬剔除降噪 | [spec](specs/2026-08-10-fullpage-p2-icon-chrome-noise-design.md) · [plan](plans/2026-08-10-fullpage-p2-icon-chrome-noise.md) |
 | **dual-save** | 双「保存」section-anchored xpath + sticky 门禁 | [spec](specs/2026-08-10-dual-save-section-xpath-design.md)；湿跑 PASS |
 | **wizard-next** | 「下一步/上一步」page-state 相对 xpath（防 coalesce） | [spec](specs/2026-08-10-wizard-next-page-state-xpath-design.md)；湿跑 PASS；commits `4ff7233`…`99b2946` |
+| **dialog-TL** | 弹窗 `_rebuild_task_list` → `tasklist_scan_mode`=`multi`；滤树过滤/行内 radio；`mark_done` 同 label 全清 | `characterize-dialog-tasklist-scope` OK；9242 湿跑 fullpage fillable=8(含列表双份) → multi=6 干净 |
 
 ---
 

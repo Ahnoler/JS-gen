@@ -203,18 +203,23 @@ class TaskList(BaseModel):
                 item.currentValue = str(value)
             return item
 
-        if xp:
-            for i, item in enumerate(self.pending):
-                if item.xpath_smart == xp:
-                    self.pending.pop(i)
-                    self.done.append(_apply_value(item))
-                    return item
-
-        for i, item in enumerate(self.pending):
-            if item.label == label:
+        # Clear ALL pending with the same label (and/or matching xpath). Overlay
+        # rebuild historically mixed list+dialog twins; one write must not leave
+        # a same-label sibling pending for click_save / done gates.
+        moved: Optional[TaskItem] = None
+        i = 0
+        while i < len(self.pending):
+            item = self.pending[i]
+            match = item.label == label or (bool(xp) and item.xpath_smart == xp)
+            if match:
                 self.pending.pop(i)
                 self.done.append(_apply_value(item))
-                return item
+                if moved is None or (xp and item.xpath_smart == xp):
+                    moved = item
+            else:
+                i += 1
+        if moved is not None:
+            return moved
         # Already done — still refresh currentValue if a new value was provided
         if value is not None and str(value).strip() != "":
             if xp:

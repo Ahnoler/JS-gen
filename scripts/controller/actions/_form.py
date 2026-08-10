@@ -52,7 +52,7 @@ from .form_scan_utils import (
     _scan_buttons_from_result, refresh_scan_buttons, _section_group_key, _dedupe_needs_agent,
     _build_section_summary, build_editable_summary, _is_query_mode, _skip_auto_fill,
     _mark_query_ui_if_needed,
-    filter_fillable_scan_fields, prepare_scan_fields_for_tasklist,
+    filter_fillable_scan_fields, prepare_scan_fields_for_tasklist, tasklist_scan_mode,
     _pack_select_record, _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
     ResolvedControl, _resolve_control, _task_xpath_smart, _task_done_impl,
     _submit_ready_hint, _switch_task_list_container, _with_submit_cue, _query_not_form_payload,
@@ -135,9 +135,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         _switch_task_list_container(case_data_store, container_id)
 
         async def _rebuild_task_list_from_dom(*, autofill: bool) -> None:
+            # Overlay TaskList uses multi (not fullpage) so list/tree query noise
+            # is not mixed into dialog/drawer pending — see tasklist_scan_mode.
+            scan_mode = tasklist_scan_mode(container_id)
             raw = await page.evaluate(
                 JS_SCAN_FORM_FIELDS,
-                [False, _button_keywords(), {'mode': 'fullpage'}],
+                [False, _button_keywords(), {'mode': scan_mode}],
             )
             try:
                 result = json.loads(raw) if isinstance(raw, str) else raw
