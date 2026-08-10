@@ -58,4 +58,27 @@ const after = findScreenshotForStep(2, [
 ], 'after');
 assert(after?.kind === 'after', 'findScreenshotForStep after kind failed');
 
+const nextA = {
+  action: 'click_element_by_index',
+  params: { text: '下一步' },
+  element: {
+    xpath_smart:
+      "//*[contains(concat(' ',normalize-space(@class),' '),' el-steps ')][.//*[(contains(@class,'is-process') or contains(@class,'is-active')) and contains(normalize-space(.),'基本信息')]]/ancestor::*[.//button[normalize-space()='下一步']][1]//button[normalize-space()='下一步']",
+  },
+};
+const nextB = {
+  action: 'click_element_by_index',
+  params: { text: '下一步' },
+  element: {
+    xpath_smart:
+      "//*[contains(concat(' ',normalize-space(@class),' '),' el-steps ')][.//*[(contains(@class,'is-process') or contains(@class,'is-active')) and contains(normalize-space(.),'影像资料')]]/ancestor::*[.//button[normalize-space()='下一步']][1]//button[normalize-space()='下一步']",
+  },
+};
+const keptNext = deduplicateByXPath([nextA, nextB]);
+assert(keptNext.length === 2, 'consecutive next with different page-state xpath must both keep');
+assert(
+  elementDedupKey(nextA) !== elementDedupKey(nextB),
+  'page-state next keys must differ',
+);
+
 console.log('ok: characterization dedup + replay markers');
