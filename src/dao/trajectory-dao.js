@@ -120,7 +120,9 @@ export async function appendSteps(trajectoryDbId, steps, { stepNumberOffset = 0 
   if (!steps?.length) return 0;
   const db = getDB();
   return db.transaction(async (trx) => {
-    return insertStepRows(trx, trajectoryDbId, steps, stepNumberOffset);
+    const count = await insertStepRows(trx, trajectoryDbId, steps, stepNumberOffset);
+    await markExportDirty(trajectoryDbId, trx);
+    return count;
   });
 }
 

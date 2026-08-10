@@ -135,6 +135,7 @@ export async function reorderByTrajectory(trajectoryId) {
   for (let i = 0; i < rows.length; i += 1) {
     await getDB()(TABLE).where({ id: rows[i].id }).update({ step_number: i + 1 });
   }
+  await dirtyParent(trajectoryId);
   return listByTrajectory(trajectoryId);
 }
 

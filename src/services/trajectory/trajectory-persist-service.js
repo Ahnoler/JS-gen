@@ -365,6 +365,7 @@ async function ensurePhasesWithDescriptions(
  * @param {Set<number>|null} onlyPhaseNumbers when set, only those phase_numbers are updated
  */
 async function syncPhaseDescriptions(trajectoryDbId, phaseDescriptions = {}, onlyPhaseNumbers = null) {
+  let updated = false;
   for (const [k, desc] of Object.entries(phaseDescriptions || {})) {
     if (!desc) continue;
     const n = Number(k);
@@ -373,7 +374,9 @@ async function syncPhaseDescriptions(trajectoryDbId, phaseDescriptions = {}, onl
     await getDB()('trajectory_phase')
       .where({ trajectory_id: trajectoryDbId, phase_number: n })
       .update({ description: String(desc) });
+    updated = true;
   }
+  if (updated) await trajectoryDao.markExportDirty(trajectoryDbId);
 }
 
 export async function saveFullTrajectory({ trajectory, phases, functionId, remoteSessionId }) {

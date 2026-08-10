@@ -34,6 +34,7 @@ export async function upsertPhaseDescription(trajectoryDbId, phaseNumber, descri
         status: 'running',
         completed_at: null,
       });
+    await trajectoryDao.markExportDirty(tid);
     return existing.id;
   }
 
@@ -134,6 +135,7 @@ export async function clearTrajectory(trajectoryDbId, { phaseIds = null } = {}) 
     meta.isSuccessful = null;
   }
   await trajectoryDao.updateMeta(tid, meta);
+  await trajectoryDao.markExportDirty(tid);
 
   return getTrajectoryTree(tid);
 }
@@ -327,6 +329,7 @@ export async function syncTrajectoryPhaseDescriptions(trajectoryDbId, descriptio
     phaseCount: counts.phaseCount,
     stepCount: counts.stepCount,
   });
+  await trajectoryDao.markExportDirty(tid);
 
   return getTrajectoryWithPhases(tid);
 }

@@ -243,6 +243,7 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
         is_required: f.isRequired ?? f.is_required ?? false,
       })));
     }
+    await trajectoryDao.markExportDirty(tid, trx);
     return { stepId, snapId };
   });
 
