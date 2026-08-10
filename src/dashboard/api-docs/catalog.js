@@ -42,7 +42,7 @@ export const ENUMS = [
   { name: '节点 type', values: '1 系统 / 2 模块 / 3 功能' },
   { name: 'legacy-engine type', values: 'click / input / select:click / select:tree / radio / date（仅当前可录制动作）' },
   { name: 'legacy-engine locateBy', values: 'xpath（默认）' },
-  { name: 'isExport', values: '0（未导出或有变更）/ 1（最近一次全量 partner transaction 导出成功）' },
+  { name: 'isExport', values: '0（未推送/有变更）/ 1（最近一次成功推送到自动化平台）' },
 ];
 
 export const RECORDING_FLOW = [

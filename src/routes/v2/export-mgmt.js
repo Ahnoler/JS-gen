@@ -1,5 +1,5 @@
 /**
- * Export management — adapters for external consumers (traditional execution engine, …).
+ * Export / batch-push management — legacy-engine + partner transaction push.
  *
  * Prefix: /api/v2/export/*
  */
@@ -17,6 +17,13 @@ import {
   TRANSACTION_ENVELOPE_FIELDS,
   EVENT_TYPE_NAME,
 } from '../../services/transaction-export.js';
+import {
+  requireAccessToken,
+  resolveSystemProject,
+  listPartnerProjects,
+  listPartnerSystems,
+  pushImportDemand,
+} from '../../services/partner-platform.js';
 
 function parseIdList(raw) {
   if (raw == null || raw === '') return [];
@@ -33,30 +40,24 @@ function parseBool(raw, defaultValue = false) {
   return !['0', 'false', 'no', 'off'].includes(String(raw).trim().toLowerCase());
 }
 
-function requireSystemProject(src) {
-  const systemId = src.systemId ?? src.system_id;
-  const projectId = src.projectId ?? src.project_id;
-  if (systemId == null || systemId === '' || projectId == null || projectId === '') {
-    const err = new Error('systemId and projectId are required');
-    err.statusCode = 400;
-    throw err;
-  }
-  return { systemId, projectId };
-}
-
-async function exportOneTrajectory(traj, { systemId, projectId }) {
+/** Assemble only — do not mark is_export. */
+function buildOneTrajectory(traj, { systemId, projectId }) {
   const built = buildTransactionPayload(traj, { systemId, projectId });
-  await trajectoryDao.markExported(traj.id);
   return {
     trajectoryId: traj.id,
-    isExport: 1,
     schemaVersion: 1,
     ...built,
   };
 }
 
+async function markBuiltExported(trajIds = []) {
+  for (const id of trajIds) {
+    if (id != null) await trajectoryDao.markExported(id);
+  }
+}
+
 export default function (app) {
-  /** Partner transaction envelope schema (参数.txt) */
+  /** Partner transaction envelope schema */
   app.get('/api/v2/export/transaction/schema', (_req, res) => {
     res.json({
       schemaVersion: 1,
@@ -88,8 +89,6 @@ export default function (app) {
 
   /**
    * Export trajectory steps for traditional engine.
-   * GET: full trajectory (query filters).
-   * Query: stepIds, phaseIds, includeMeta
    */
   app.get('/api/v2/export/trajectories/:id/legacy-engine', async (req, res) => {
     try {
@@ -110,10 +109,6 @@ export default function (app) {
     }
   });
 
-  /**
-   * Same export with JSON body filters (preferred for long stepId lists).
-   * Body: { stepIds?, phaseIds?, includeMeta? }
-   */
   app.post('/api/v2/export/trajectories/:id/legacy-engine', async (req, res) => {
     try {
       const traj = await trajectoryDao.getById(+req.params.id);
@@ -134,10 +129,6 @@ export default function (app) {
     }
   });
 
-  /**
-   * Dry-run: map an in-memory steps array (no DB). For SPA preview / contract tests.
-   * Body: { steps: [...], includeMeta? }
-   */
   app.post('/api/v2/export/legacy-engine/preview', (req, res) => {
     try {
       const body = req.body || {};
@@ -155,9 +146,18 @@ export default function (app) {
   });
 
   /**
-   * True when caller wants the bare partner envelope (for importDemand 联调).
-   * Accepts download | raw | forImport (query or body).
+   * True when caller wants bare envelope only (no partner push).
+   * Accepts download | raw | forImport | dryRun.
    */
+  function wantDryRun(src = {}) {
+    return parseBool(src.download, false)
+      || parseBool(src.raw, false)
+      || parseBool(src.forImport, false)
+      || parseBool(src.for_import, false)
+      || parseBool(src.dryRun, false)
+      || parseBool(src.dry_run, false);
+  }
+
   function wantBarePayload(src = {}) {
     return parseBool(src.download, false)
       || parseBool(src.raw, false)
@@ -165,80 +165,122 @@ export default function (app) {
       || parseBool(src.for_import, false);
   }
 
-  function sendTransactionExport(res, traj, result, src = {}) {
+  /** Partner projects for batch-push dialog. */
+  app.get('/api/v2/export/partner/projects', async (req, res) => {
+    try {
+      const accessToken = requireAccessToken(req);
+      const projects = await listPartnerProjects({ accessToken });
+      res.json({ projects, count: projects.length });
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message, partner: err.partner });
+    }
+  });
+
+  /** Partner systems under a project (lazy tree). */
+  app.get('/api/v2/export/partner/systems', async (req, res) => {
+    try {
+      const accessToken = requireAccessToken(req);
+      const projectId = req.query.projectId ?? req.query.project_id;
+      const parentId = req.query.parentId ?? req.query.parent_id;
+      if (projectId == null || projectId === '') {
+        return res.status(400).json({ error: 'projectId is required' });
+      }
+      const systems = await listPartnerSystems({ accessToken, projectId, parentId });
+      res.json({ projectId: String(projectId), systems, count: systems.length });
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message, partner: err.partner });
+    }
+  });
+
+  async function maybePushSingle(req, res, traj, src) {
+    const { systemId, projectId } = resolveSystemProject(src);
+    const result = buildOneTrajectory(traj, { systemId, projectId });
+    const dry = wantDryRun(src);
+    const push = parseBool(src.push, false);
+
     if (wantBarePayload(src)) {
       if (parseBool(src.download, false)) {
         res.setHeader('Content-Disposition', `attachment; filename="transaction_${traj.id}.json"`);
       }
-      // Bare envelope only — matches POST …/importDemand body shape (single object).
       return res.json(result.payload);
     }
-    return res.json(result);
+
+    if (!push || dry) {
+      // Export-only path (no mark unless historically expected) — mark only when pushed.
+      // For non-push export, keep previous behavior of markExported so raw 联调 still flips flag.
+      if (!push) {
+        await trajectoryDao.markExported(traj.id);
+        return res.json({ ...result, isExport: 1, pushed: false });
+      }
+      return res.json({ ...result, isExport: 0, pushed: false });
+    }
+
+    const accessToken = requireAccessToken(req);
+    const partner = await pushImportDemand(result.payload, { accessToken });
+    await trajectoryDao.markExported(traj.id);
+    return res.json({
+      ...result,
+      isExport: 1,
+      pushed: true,
+      partner,
+    });
   }
 
   /**
-   * Export trajectory as partner transaction envelope.
-   * Query: systemId, projectId, download|raw|forImport?
+   * Export / optional push single trajectory.
+   * Query: systemId?, projectId?, download|raw|forImport|push?
    */
   app.get('/api/v2/export/trajectories/:id/transaction', async (req, res) => {
     try {
-      const { systemId, projectId } = requireSystemProject(req.query);
       const traj = await trajectoryDao.getById(+req.params.id);
       if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
-      const result = await exportOneTrajectory(traj, { systemId, projectId });
-      return sendTransactionExport(res, traj, result, req.query);
+      return maybePushSingle(req, res, traj, req.query);
     } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message, partner: err.partner });
     }
   });
 
-  /**
-   * Same export; systemId/projectId in body or query.
-   * Body: { systemId?, projectId?, download|raw|forImport? }
-   * raw/forImport=1 → response body is the envelope object only (联调 importDemand).
-   */
   app.post('/api/v2/export/trajectories/:id/transaction', async (req, res) => {
     try {
       const body = req.body || {};
       const src = { ...req.query, ...body };
-      const { systemId, projectId } = requireSystemProject(src);
       const traj = await trajectoryDao.getById(+req.params.id);
       if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
-      const result = await exportOneTrajectory(traj, { systemId, projectId });
-      return sendTransactionExport(res, traj, result, src);
+      return maybePushSingle(req, res, traj, src);
     } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message, partner: err.partner });
     }
   });
 
   /**
-   * Batch export trajectories as partner transaction envelopes.
-   * Body: { trajectoryIds, systemId, projectId, raw|forImport|download? }
-   * raw/forImport → single importDemand body with transcationEventTypeList of all OK items.
+   * Batch push trajectories to partner importDemand.
+   * Body: { trajectoryIds, systemId?, projectId?, raw|forImport|dryRun|download? }
+   * Product path: assemble + push; dry-run/raw returns envelope only.
    */
   app.post('/api/v2/export/transactions', async (req, res) => {
     try {
       const body = req.body || {};
-      const { systemId, projectId } = requireSystemProject(body);
+      const { systemId, projectId } = resolveSystemProject(body);
       const ids = parseIdList(body.trajectoryIds ?? body.trajectory_ids);
       if (!ids.length) {
         return res.status(400).json({ error: 'trajectoryIds[] is required' });
       }
+
       const items = [];
       const okBuilt = [];
-      let ok = 0;
-      let failed = 0;
+      let buildOk = 0;
+      let buildFailed = 0;
+
       for (const id of ids) {
         try {
           const traj = await trajectoryDao.getById(id);
           if (!traj) {
-            failed += 1;
+            buildFailed += 1;
             items.push({ trajectoryId: id, ok: false, error: 'Trajectory not found' });
             continue;
           }
-          const result = await exportOneTrajectory(traj, { systemId, projectId });
-          ok += 1;
-          // Each single payload is { transcationEventTypeList: [entry] }
+          const result = buildOneTrajectory(traj, { systemId, projectId });
+          buildOk += 1;
           const entry = result.payload?.transcationEventTypeList?.[0];
           if (entry) {
             okBuilt.push({
@@ -246,42 +288,100 @@ export default function (app) {
               count: result.count,
               skipped: result.skipped,
               stats: result.stats,
+              trajectoryId: id,
             });
           }
           items.push({
             trajectoryId: id,
             ok: true,
-            isExport: 1,
+            isExport: 0,
             payload: result.payload,
             count: result.count,
             skipped: result.skipped,
             stats: result.stats,
           });
         } catch (e) {
-          failed += 1;
+          buildFailed += 1;
           items.push({ trajectoryId: id, ok: false, error: e.message });
         }
       }
-      if (wantBarePayload(body)) {
-        const merged = wrapTransactionList(okBuilt);
+
+      const merged = wrapTransactionList(okBuilt);
+
+      if (wantBarePayload(body) || parseBool(body.dryRun, false) || parseBool(body.dry_run, false)) {
         if (parseBool(body.download, false)) {
           res.setHeader('Content-Disposition', 'attachment; filename="transactions_import.json"');
         }
-        return res.json(merged.payload);
+        if (wantBarePayload(body)) {
+          return res.json(merged.payload);
+        }
+        return res.json({
+          schemaVersion: 1,
+          systemId: String(systemId),
+          projectId: String(projectId),
+          pushed: false,
+          items,
+          summary: { ok: buildOk, failed: buildFailed },
+          payload: merged.payload,
+        });
       }
+
+      if (!okBuilt.length) {
+        return res.status(422).json({
+          error: 'No exportable trajectories to push',
+          schemaVersion: 1,
+          systemId: String(systemId),
+          projectId: String(projectId),
+          pushed: false,
+          items,
+          summary: { ok: 0, failed: buildFailed },
+        });
+      }
+
+      const accessToken = requireAccessToken({
+        headers: req.headers,
+        body,
+        query: req.query,
+      });
+
+      let partner;
+      try {
+        partner = await pushImportDemand(merged.payload, { accessToken });
+      } catch (e) {
+        return res.status(e.statusCode || 502).json({
+          error: e.message,
+          schemaVersion: 1,
+          systemId: String(systemId),
+          projectId: String(projectId),
+          pushed: false,
+          partner: e.partner || null,
+          items,
+          summary: { ok: 0, failed: buildOk + buildFailed, buildOk, buildFailed },
+        });
+      }
+
+      const pushedIds = okBuilt.map((b) => b.trajectoryId);
+      await markBuiltExported(pushedIds);
+      for (const it of items) {
+        if (it.ok && pushedIds.includes(it.trajectoryId)) {
+          it.isExport = 1;
+        }
+      }
+
       res.json({
         schemaVersion: 1,
         systemId: String(systemId),
         projectId: String(projectId),
+        pushed: true,
+        partner,
         items,
-        summary: { ok, failed },
+        summary: { ok: buildOk, failed: buildFailed },
       });
     } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message, partner: err.partner });
     }
   });
 
-  /** Map a single step (debug) */
   app.post('/api/v2/export/legacy-engine/map-step', (req, res) => {
     try {
       const step = req.body?.step ?? req.body;
