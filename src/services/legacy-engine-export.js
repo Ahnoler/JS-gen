@@ -40,7 +40,7 @@ export const LEGACY_ENGINE_EMITTED_TYPES = Object.freeze(
 );
 
 /** Meta / scan / memory / non-recorded-UI actions — not exported */
-const SKIP_ACTIONS = new Set([
+export const SKIP_ACTIONS = new Set([
   'scroll_down',
   'scroll_up',
   'get_page_state',
