@@ -1395,28 +1395,45 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         compact_btn = re.sub(r'\s+', '', (button_text or '保存').strip()) or '保存'
         sec = (section or "").strip()
         explicit_sec = bool((section or "").strip())
-        # Resolve section: explicit → _phase_section memory → rescan+unique → ""
-        if not sec:
-            try:
-                from .section_scope import norm_sec
-                mem = norm_sec(str(case_data_store.get("_phase_section") or ""))
-                if mem:
-                    sec = mem
-                    sys.stderr.write(f'[click_save] phase section={sec!r} from memory\n')
-                    sys.stderr.flush()
-            except Exception:
-                pass
+        # Resolve: explicit → multi-save gate → sticky memory → unique → ""
         if not sec and not explicit_sec:
             try:
                 await refresh_scan_buttons(page, case_data_store)
-                from .section_scope import unique_button_section
-                auto_sec = unique_button_section(case_data_store.get('_scan_buttons'), compact_btn)
-                if auto_sec:
-                    sec = auto_sec
-                    sys.stderr.write(f'[click_save] auto section={auto_sec!r} from unique button\n')
-                    sys.stderr.flush()
             except Exception:
                 pass
+            try:
+                from .section_scope import same_label_section_keys, norm_sec
+                keys = same_label_section_keys(
+                    case_data_store.get("_scan_buttons"), compact_btn
+                )
+                if len(keys) >= 2:
+                    sys.stderr.write(
+                        f'[click_save] skip sticky; multi-section {compact_btn!r} keys={keys!r}\n'
+                    )
+                    sys.stderr.flush()
+                    # leave sec empty → JS_CLICK_SAVE_BUTTON returns ambiguous
+                else:
+                    mem = norm_sec(str(case_data_store.get("_phase_section") or ""))
+                    if mem:
+                        sec = mem
+                        sys.stderr.write(f'[click_save] phase section={sec!r} from memory\n')
+                        sys.stderr.flush()
+                    if not sec:
+                        from .section_scope import unique_button_section
+                        auto_sec = unique_button_section(
+                            case_data_store.get("_scan_buttons"), compact_btn
+                        )
+                        if auto_sec:
+                            sec = auto_sec
+                            sys.stderr.write(
+                                f'[click_save] auto section={auto_sec!r} from unique button\n'
+                            )
+                            sys.stderr.flush()
+            except Exception:
+                pass
+        elif not sec:
+            # explicit empty string already handled; keep legacy memory only if caller omitted?
+            pass
         if sec:
             from .section_scope import remember_phase_section
             remember_phase_section(case_data_store, sec)

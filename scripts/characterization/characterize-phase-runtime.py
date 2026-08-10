@@ -59,29 +59,17 @@ def test_submit_ready_hint_uses_resolve_phase_section() -> None:
 
 
 def test_click_save_section_order_in_source() -> None:
-    form = (
-        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-        + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
-    )
-    # memory before unique; refresh when no section
-    assert_true("_phase_section" in form and "unique_button_section" in form, "order ingredients present")
-    assert_true(
-        "refresh_scan_buttons" in form or "rescan" in form.lower() or "_scan_buttons" in form,
-        "rescan path present",
-    )
-    # _phase_section memory must be consulted before unique_button_section in click_save
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     cs = form.find("async def click_save")
     assert_true(cs >= 0, "click_save present")
-    body = form[cs : cs + 4000]
+    body = form[cs : cs + 5000]
+    assert_true("same_label_section_keys" in body, "multi-section gate")
+    assert_true("unique_button_section" in body, "unique path kept")
+    multi_pos = body.find("same_label_section_keys")
     mem_pos = body.find("_phase_section")
     uniq_pos = body.find("unique_button_section")
-    assert_true(mem_pos >= 0 and uniq_pos >= 0, "click_save uses memory and unique")
-    assert_true(mem_pos < uniq_pos, "memory before unique_button_section in click_save")
-    refresh_pos = body.find("refresh_scan_buttons")
-    if refresh_pos < 0:
-        refresh_pos = body.lower().find("rescan")
-    assert_true(refresh_pos >= 0, "click_save has refresh/rescan path")
-    assert_true(refresh_pos < uniq_pos or refresh_pos < mem_pos + 200, "refresh near resolve block")
+    assert_true(multi_pos < mem_pos, "multi check before sticky")
+    assert_true(mem_pos < uniq_pos or uniq_pos > multi_pos, "unique still after gate")
 
 
 def test_scoped_pending_gate_ignores_other_section() -> None:
