@@ -1,7 +1,7 @@
 # L1c LLM region classify (+ L1d cache) — Design
 
 **Date:** 2026-08-10  
-**Status:** Draft — brainstorm approved (路径甲); awaiting user review of this file  
+**Status:** Approved 2026-08-11 — user chose implement first; plan `docs/superpowers/plans/2026-08-11-l1c-llm-region-classify.md`  
 **Backlog ID:** **L1c-LLM** (+ **L1d-cache** in same cut)  
 **Related:** [fullpage visible controls §Dynamic L1](2026-08-10-fullpage-visible-controls-scan-design.md); [resolve ambiguous L1 preview](2026-08-10-resolve-ambiguous-section-preview-design.md); [AG-fullpage inventory](2026-08-10-auto-grab-fullpage-inventory-design.md)
 
