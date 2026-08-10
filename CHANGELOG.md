@@ -11,6 +11,16 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-10: **`GET /api/v2/export/transaction/schema` partner envelope 字段契约**：返回 `schemaVersion`、`fields`（transcId / transcationName / …）、`eventTypeName` 中文映射与 `actionTypeMap`；拼写（transcation*、mothed）为对接约定。
+  影响范围：`/api/v2/export/transaction/schema` 新增端点。
+  文件：src/routes/v2/export-mgmt.js, src/services/transaction-export.js, src/dashboard/api-docs/groups/export-mgmt.js
+  Python 同步提示：对齐 partner transaction schema 响应结构与字段说明。
+
+- 2026-08-10: **`GET|POST /api/v2/export/trajectories/:id/transaction` 单条交易导出**：query/body 必填 `systemId`、`projectId`；全量导出 trajectory_step 为 partner envelope，成功 `markExported`（`isExport=1`）；`download=1` 时响应体仅为 payload。轨迹不存在 → 404；缺 id → 400。
+  影响范围：`/api/v2/export/trajectories/:id/transaction` 新增端点。
+  文件：src/routes/v2/export-mgmt.js, src/services/transaction-export.js, src/dashboard/api-docs/groups/export-mgmt.js
+  Python 同步提示：对齐单条交易导出路由、必填参数与 download 语义。
+
 - 2026-08-10: **`POST /api/v2/export/transactions` 批量交易导出**：body 传 `trajectoryIds`、`systemId`、`projectId`；逐条独立 ok/fail，成功项返回 partner envelope 并 `markExported`，失败项（不存在/异常）不翻转 `isExport`；响应含 `items[]` 与 `summary.{ok,failed}`。
   影响范围：`/api/v2/export/transactions` 新增端点。
   文件：src/routes/v2/export-mgmt.js
@@ -19,7 +29,7 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 - 2026-08-10: **`trajectory.is_export` 脏标记列 + DAO helpers**：迁移新增 `is_export TINYINT(1) NOT NULL DEFAULT 0`（1=最近一次全量导出成功，0=有变更或未导出）；`markExportDirty` / `markExported` 更新标志；`getById` / `list` / `listByFunction` 返回 `isExport` 为 `0|1` 数字。
   影响范围：trajectory 表 schema、trajectory DAO。
   文件：migrations/20260810120000_trajectory_is_export.js, src/dao/trajectory-dao.js
-  Python 同步提示：对齐 `trajectory.is_export` 列及 `isExport` 字段语义；后续 export API 任务再对齐路由。
+  Python 同步提示：对齐 `trajectory.is_export` 列及 `isExport` 字段语义；导出成功由 transaction export 路由调用 `markExported`。
 
 - 2026-08-09: **T10-P1:** `JS_VERIFY_FORM_STRUCTURE` / CTRL `verifyFormStructure` collect Source B `el-table` labels (same `row#N` naming as scan) so snapshot verify matches recording surface.
   影响范围: `scripts/controller/actions/js_snippets/misc.py`, `src/ctrl-actions/structure.js`
