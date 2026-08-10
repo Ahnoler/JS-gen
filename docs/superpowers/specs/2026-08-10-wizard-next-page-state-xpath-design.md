@@ -1,7 +1,7 @@
 # Wizard 下一步 / 上一步：page-state relative xpath — Design
 
 **Date:** 2026-08-10  
-**Status:** Draft for user review  
+**Status:** Implemented 2026-08-10  
 **Related:** [dual-save section-anchored xpath](2026-08-10-dual-save-section-xpath-design.md); traj 73 missing multi-page「下一步」; live CDP 9242 wizard (基本信息 → 影像资料)  
 **Trigger:** 两页各点「下一步」，录制因连续同 `xpath_smart` coalesce 只留一步。
 
