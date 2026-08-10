@@ -7,7 +7,7 @@
 - fill_form_field(label_text, value, xpath_smart='') — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 扫描/`get_pending_tasks` 含 `xpath_smart` + `label`；**优先传 `xpath_smart`**。`label_text` 为语义名（规则/取值/录制），用扫描原文勿猜。若返回 `"field-disabled"` — 跳过。
 - click_radio(label_text, option_text, xpath_smart='') — el-radio 单选组；**优先传 `xpath_smart`**（同 fill/select）。
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
-- **click_save(button_text='保存', section='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `section=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections`）；无 `section` 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 `section` → `err-section-required`（见 core「阶段区块 section」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。**
+- **click_save(button_text='保存', section='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `section=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections`）；无 `section` 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 `section` → `err-section-required`（见 core「阶段区块 section」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。无 section 时若页上多区块同名保存按钮，系统不会使用上一区块记忆自动点保存，会返回 err-save-ambiguous — 必须显式 section=。**
 
 ## 任务列表动作
 - **`scan_form_fields()` / `run_form_assistant()`** 现与摘要一样走 **全页 L2（`mode:fullpage`）**；壳层/menu/icon **不会**进入 TaskList 待填，勿对侧栏顶栏做 fill。
@@ -114,7 +114,7 @@ run_form_assistant(section='系统评级结论')
 # 🚨 EL-SELECT 规则（关键 — 不可忽略）
 1. 对于 el-select 下拉框，必须使用 `select_option(label_text, option_text)`。
 2. **绝不使用 `click_element(index)` 点击下拉选项** — 它会点击内部的 `<span>` 文本，而不是 Vue 监听的 `<li>` 项。
-3. **`scroll(down|up)` 可用于页面滚动，但不适用于 `tssc-multi-select` 下拉弹窗** — 它们是固定定位的，页面滚动不会移动它们。使用 `select_option`，它能在文档级别查找选项，不受滚动位置影响。
+3. **`scroll(down|up)` 可用于页面滚动，但不适用于 `tssc-multi-select` 下拉弹窗** — 它们是固定定位的，页面滚动不会移动它们。使用 `select_option`，它能在文档级别查找选项，不受滚动位置影响。远程表格型下拉（弹层内是 `el-table` 行，如评级申请「客户名称」）同样只能用 `select_option`，不要 `click_element_by_index` 点行。
 4. 如果 `select_option` 返回 `"ok-already:XXX"` — 字段已有值 XXX。**停止。不要再次尝试选择。**
 5. **如果 `select_option` 返回 `"no-items"`：** 下拉列表为空（无级联数据）。**立即跳过。**
 6. 选择后，通过检查返回值确认值已更改。

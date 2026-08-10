@@ -46,6 +46,13 @@ def test_preferred_submit_cue() -> None:
     # After Task 3/5 cue may still include memory section; dual-save prompt task covers explicit section=
     assert_true("click_save" in cue, "cue mentions click_save")
 
+    cue2 = preferred_submit_cue(
+        {"_scan_buttons": buttons, "_phase_section": "系统评级结论"},
+        section="",
+    )
+    assert_true("err-save-ambiguous" in cue2 or "section=" in cue2, f"multi cue: {cue2}")
+    assert_true("sticky" in cue2.lower() or "不会" in cue2 or "Multiple" in cue2, f"warn multi: {cue2}")
+
 
 def test_click_save_wiring() -> None:
     """Source: click_save must count same-label sections before applying sticky memory."""
