@@ -57,6 +57,7 @@ export function createSessionHandler(manager) {
           labelText: payload.labelText || payload.label_text,
           actionType: payload.actionType || payload.action || '',
           params: payload.params || {},
+          mode: payload.mode || 'inventory',
           requestId: payload.requestId,
         });
       case 'session.step':

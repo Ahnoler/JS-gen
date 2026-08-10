@@ -538,6 +538,113 @@ export const PAGE_LOCATOR_HELPERS = `
         }
       }
     }
+    /* SHARED_INVENTORY_COLLECT — AG-fullpage; keep in sync with _locator_helpers_js.py */
+    var INVENTORY_CAP = 120;
+    var INVENTORY_COLLECT_LIMIT = 2000;
+    function inventoryNorm(s) {
+      return String(s || '').replace(/\\s+/g, ' ').trim();
+    }
+    function inventoryKindOf(el) {
+      if (!el) return '';
+      if (el.closest && el.closest('.el-checkbox-group, .el-checkbox')) return 'form_checkbox';
+      const k = detectTargetKind(el);
+      if (k === 'form_input' || k === 'form_select' || k === 'form_date' || k === 'form_radio'
+        || k === 'form_checkbox' || k === 'form_tree_select') return k;
+      if (k === 'menu' || k === 'submenu') return 'menu';
+      if (k === 'icon') return 'icon';
+      if (k === 'button' || k === 'adjacent_button' || k === 'link' || k === 'table_row_button'
+        || k === 'tab' || k === 'generic') return 'button';
+      return '';
+    }
+    function inventoryPickControl(item) {
+      if (!item) return null;
+      const candidates = [
+        item.querySelector('.el-tree-select'),
+        item.querySelector('.el-cascader'),
+        item.querySelector('span.my-popover, .my-popover'),
+        item.querySelector('.el-select'),
+        item.querySelector('.el-date-editor'),
+        item.querySelector('.el-radio-group'),
+        item.querySelector('.el-checkbox-group'),
+        item.querySelector('.el-textarea__inner'),
+        item.querySelector('textarea'),
+        Array.from(item.querySelectorAll('.el-input__inner, input:not([type="hidden"])'))
+          .find(function (inp) { return !inp.closest('.el-popover, .tree-popover'); }),
+        item.querySelector('button'),
+        item.querySelector('a'),
+      ].filter(Boolean);
+      return candidates[0] || item;
+    }
+    function inventoryTextOf(el, kind) {
+      if (!el) return '';
+      if (kind.indexOf('form_') === 0) {
+        const item = el.closest && el.closest('.el-form-item');
+        const lbl = item && item.querySelector('.el-form-item__label');
+        const t = normalizeFormLabel(lbl && lbl.textContent);
+        if (t) return t;
+        return inventoryNorm(el.getAttribute && el.getAttribute('placeholder'));
+      }
+      return cleanVisibleText(el);
+    }
+    function collectInventoryHosts() {
+      const sel = [
+        '.el-form-item input:not([type="hidden"])',
+        '.el-form-item textarea',
+        '.el-form-item .el-select .el-input__inner',
+        '.el-form-item .el-date-editor',
+        '.el-form-item .el-radio, .el-form-item .el-radio-group .el-radio',
+        '.el-form-item .el-checkbox, .el-form-item .el-checkbox-group .el-checkbox',
+        'button.el-button, .el-button, button',
+        '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"]',
+        '[class*="el-icon"][aria-label], .el-tooltip[class*="el-icon"], a[class*="el-icon"]',
+      ].join(',');
+      const nodes = document.querySelectorAll(sel);
+      const out = [];
+      const seen = typeof WeakSet !== 'undefined' ? new WeakSet() : null;
+      for (let i = 0; i < nodes.length; i++) {
+        const el = nodes[i];
+        if (!isVisible(el)) continue;
+        let host = normalizeTargetRoot(el) || el;
+        const formItem = host.closest && host.closest('.el-form-item');
+        if (formItem && host === formItem) host = inventoryPickControl(formItem) || host;
+        if (seen) {
+          if (seen.has(host)) continue;
+          seen.add(host);
+        }
+        const kind = inventoryKindOf(host);
+        if (!kind) continue;
+        let operable = host;
+        if (kind.indexOf('form_') === 0 && formItem) {
+          operable = inventoryPickControl(formItem) || host;
+        }
+        const text = inventoryTextOf(operable, kind);
+        out.push({ el: operable, text: text, kind: kind });
+        if (out.length >= INVENTORY_COLLECT_LIMIT) break;
+      }
+      return out;
+    }
+    function kindsForAction(action) {
+      const a = String(action || '');
+      if (a === 'fill_form_field') {
+        return { form_input: 1, form_date: 1, form_radio: 1, form_checkbox: 1, form_tree_select: 1 };
+      }
+      if (a === 'select_option') return { form_select: 1 };
+      if (a === 'click_menu_item') return { menu: 1 };
+      if (a === 'click_element_by_index') return { button: 1, icon: 1, menu: 1 };
+      return null;
+    }
+    function filterInventoryByKind(list, action) {
+      const allow = kindsForAction(action);
+      if (!allow) return list.slice();
+      return list.filter(function (it) { return !!allow[it.kind]; });
+    }
+    function filterInventoryByText(list, needle) {
+      const n = inventoryNorm(needle).toLowerCase();
+      if (!n) return list.slice();
+      return list.filter(function (it) {
+        return inventoryNorm(it.text).toLowerCase().indexOf(n) >= 0;
+      });
+    }
   function sectionAnchorXPath(host, leafLocal) {
     const leaf = String(leafLocal || '').replace(/^\\/+/, '');
     if (!host || !leaf) return '';

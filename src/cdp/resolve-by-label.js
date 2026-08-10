@@ -49,14 +49,17 @@ export function buildResolveExpression({
   labelText = '',
   actionType = '',
   params = {},
+  mode = 'needle',
 } = {}) {
   const labelJs = JSON.stringify(String(labelText || '').trim());
   const actionJs = JSON.stringify(String(actionType || '').trim());
   const paramsJs = JSON.stringify(params && typeof params === 'object' ? params : {});
+  const modeJs = JSON.stringify(String(mode || 'needle').trim() || 'needle');
   return `(() => {
     const want = ${labelJs};
     const actionType = ${actionJs};
     const params = ${paramsJs};
+    const mode = ${modeJs};
 
 ${PAGE_LOCATOR_HELPERS}
 
@@ -177,6 +180,50 @@ ${PAGE_LOCATOR_HELPERS}
         if (out.some((x) => x.xpath_abs === absXPath(it.el))) continue;
         out.push(snap(it.el, matchedLabel || needle, asForm, kind || kindForClickable(it.el), it.region));
       }
+    }
+
+    if (mode === 'inventory') {
+      var inv = collectInventoryHosts();
+      inv = filterInventoryByKind(inv, action);
+      inv = filterInventoryByText(inv, needle);
+      var truncated = false;
+      if (inv.length > INVENTORY_CAP) {
+        truncated = true;
+        inv = inv.slice(0, INVENTORY_CAP);
+      }
+      var invGroups = {};
+      for (var ii = 0; ii < inv.length; ii++) {
+        var it0 = inv[ii];
+        var gk = it0.text || '';
+        if (!invGroups[gk]) invGroups[gk] = [];
+        invGroups[gk].push(it0);
+      }
+      var gkeys = Object.keys(invGroups);
+      for (var gi = 0; gi < gkeys.length; gi++) {
+        var gkey = gkeys[gi];
+        var gitems = invGroups[gkey];
+        var refineItems = [];
+        var seenInvAbs = {};
+        for (var jj = 0; jj < gitems.length; jj++) {
+          var hit = gitems[jj];
+          var host = hit.el;
+          if (!host || !isVisible(host)) continue;
+          var root = normalizeTargetRoot(host) || host;
+          var abs0 = absXPath(root);
+          if (seenInvAbs[abs0]) continue;
+          seenInvAbs[abs0] = true;
+          refineItems.push({ el: root, region: assignRegion(root), kind: hit.kind, text: hit.text });
+        }
+        refineCollidingRegions(refineItems, gkey);
+        for (var kk = 0; kk < refineItems.length; kk++) {
+          var rit = refineItems[kk];
+          var asForm = rit.kind.indexOf('form_') === 0;
+          var abs1 = absXPath(rit.el);
+          if (out.some(function (x) { return x.xpath_abs === abs1; })) continue;
+          out.push(snap(rit.el, rit.text, asForm, rit.kind, rit.region));
+        }
+      }
+      return { matches: out, truncated: truncated };
     }
 
     // Close controls
@@ -439,15 +486,16 @@ ${PAGE_LOCATOR_HELPERS}
 
 /**
  * @param {import('./client.js').CdpClient} client
- * @param {{ labelText?: string, actionType?: string, params?: object }} opts
- * @returns {Promise<{ element?: object, matchedLabel?: string, ambiguous?: boolean, matches?: object[] }>}
+ * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string }} opts
+ * @returns {Promise<{ element?: object, matchedLabel?: string, ambiguous?: boolean, matches?: object[], truncated?: boolean }>}
  */
 export async function resolveElementByLabel(client, opts = {}) {
+  const mode = String(opts.mode || 'needle').trim() || 'needle';
   const labelText = String(opts.labelText || opts.label_text || '').trim();
   const actionType = normalizeActionName(opts.actionType || opts.action || '');
   const params = opts.params && typeof opts.params === 'object' ? opts.params : {};
 
-  if (!labelText && !actionType && !Object.keys(params).length) {
+  if (mode !== 'inventory' && !labelText && !actionType && !Object.keys(params).length) {
     const err = new Error('labelText or actionType/params is required');
     err.statusCode = 400;
     throw err;
@@ -459,12 +507,23 @@ export async function resolveElementByLabel(client, opts = {}) {
   }
 
   const result = await client.send('Runtime.evaluate', {
-    expression: buildResolveExpression({ labelText, actionType, params }),
+    expression: buildResolveExpression({ labelText, actionType, params, mode }),
     returnByValue: true,
     awaitPromise: false,
   });
   const value = result?.result?.value;
-  const list = Array.isArray(value) ? value : (value && typeof value === 'object' ? [value] : []);
+  let list;
+  let pageTruncated = false;
+  if (Array.isArray(value)) {
+    list = value;
+  } else if (value && typeof value === 'object' && Array.isArray(value.matches)) {
+    list = value.matches;
+    pageTruncated = value.truncated === true;
+  } else if (value && typeof value === 'object') {
+    list = [value];
+  } else {
+    list = [];
+  }
 
   if (!list.length) {
     const hint = labelText || params.menu_text || params.tab_name || params.button_text || actionType || 'target';
@@ -519,6 +578,15 @@ export async function resolveElementByLabel(client, opts = {}) {
   }
 
   const matches = list.map(enrichOne);
+  const truncated = pageTruncated;
+  const forceAmbiguous = mode === 'inventory' && !labelText && matches.length >= 1;
+  if (forceAmbiguous) {
+    return {
+      ambiguous: true,
+      matches,
+      ...(truncated ? { truncated: true } : {}),
+    };
+  }
   if (matches.length === 1) {
     return {
       element: matches[0].element,
@@ -528,5 +596,6 @@ export async function resolveElementByLabel(client, opts = {}) {
   return {
     ambiguous: true,
     matches,
+    ...(truncated ? { truncated: true } : {}),
   };
 }

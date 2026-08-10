@@ -1,8 +1,8 @@
 # Backlog: 可见可编辑控件 / Agent 视野（核实版 2026-08-10）
 
 > 本文件记录「目标线」待办。**状态以代码/表征为准**，不以计划 checkbox 为准。  
-> 下一刀：执行机空闲后再做 **L1-picker BiB/UI 冒烟**；并行可选 **page-state-gen** / **L1c-LLM** 规格。  
-> 2026-08-10 已修：弹窗 TaskList 重建用 `multi`（勿 fullpage 混入列表/树过滤）+ `mark_done` 同 label 全清。
+> 下一刀：执行机空闲后再做 **L1-picker / AG-fullpage BiB/UI 湿测**（按需）。并行可选 **page-state-gen** / **L1c-LLM** 规格。  
+> 2026-08-10 已修：弹窗 TaskList 重建用 `multi`（勿 fullpage 混入列表/树过滤）+ `mark_done` 同 label 全清；collision titlebox 细化 + 保存保留 `xpath_smart`。
 
 ## 目标定稿（2026-08-10 修订）
 
@@ -69,6 +69,8 @@
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
 | **L1-picker** | **代码已实施；湿测挂起** | 歧义 `resolve-element`：L1 `region_*` 预览 + Vue 选择器；表征 PASS；CDP 对拍过顶栏/主区。**BiB 重载 + 多「新增」UI 冒烟**等执行机空闲 | 挂起 · [spec](specs/2026-08-10-resolve-ambiguous-section-preview-design.md) · [plan](plans/2026-08-10-resolve-ambiguous-l1-region-preview.md) |
+| **L1-titlebox** | **代码已实施**（`b207372`） | 同 needle 同粗 L1 碰撞 → titlebox 细化 `region_*` + 锚定 xpath；算法 B | [spec](specs/2026-08-10-resolve-collision-finer-l1-titlebox-design.md) · [TODO 后续 AG](todos/2026-08-10-auto-grab-fullpage-same-name.md) |
+| **AG-fullpage** | **代码已实施；湿测按需** | **自动抓取** fullpage inventory：`mode=inventory` + 可选 `actionType`/`labelText` 过滤；无 label 必弹选择器；选中后 infer `actionType`；同名 L1/titlebox + `xpath_smart`。表征 inventory + titlebox PASS；**BiB 重载 + UI 冒烟**按需 | [spec](specs/2026-08-10-auto-grab-fullpage-inventory-design.md) · [plan](plans/2026-08-10-auto-grab-fullpage-inventory.md) |
 | **L1c-LLM** | 未做 | 动态 L1：低置信度 **feature card → LLM 分类** `region_role`（不喂 raw HTML；不得删 L2） | P1 · [fullpage design §Dynamic L1](specs/2026-08-10-fullpage-visible-controls-scan-design.md) |
 | **L1d-cache** | 未做 | L1 角色缓存：`systemId` + 特征签名 → `region_role`（避免每步重问） | P1（跟 L1c） |
 | **L1-vision** | 未做 | Vision：仅对争议容器裁图辅助定角色 | P2+ |
@@ -102,10 +104,11 @@
 
 1. ~~全页两层扫描 P0 / P1 / P2~~ — **已实施 + 湿跑**  
 2. ~~双保存 section-xpath / wizard 下一步 page-state xpath~~ — **已实施 + 湿跑**  
-3. ~~**L1-picker** 代码~~ — **已实施**（表征 PASS；Vue 选择器已接）；**湿测挂起**（等 BiB 可重载）  
+3. ~~**L1-picker** / **L1-titlebox** 代码~~ — **已实施**；**湿测挂起**（等 BiB 可重载）  
 4. **执行机空闲时：** L1-picker BiB 重载 + 多「新增」UI 冒烟  
-5. **不依赖执行机时可并行：** ~~**P2-noise+**~~（已实施）· **page-state-gen** 规格 · **L1c-LLM** 规格；随后 L1d / Vision；**T4-P4** 对照  
-6. 穿插：T1r；三大问题①；T5（另页证据）
+5. ~~**AG-fullpage** — 自动抓取 fullpage inventory + infer actionType~~ — **代码已实施**；湿测按需（[spec](specs/2026-08-10-auto-grab-fullpage-inventory-design.md)）  
+6. **不依赖执行机时可并行：** ~~**P2-noise+**~~（已实施）· **page-state-gen** 规格 · **L1c-LLM** 规格；随后 L1d / Vision；**T4-P4** 对照  
+7. 穿插：T1r；三大问题①；T5（另页证据）
 
 > 参照：Cursor browser MCP / Playwright MCP（先控件池，后区域标签）。T4-P4 = 对照，非主路径。
 

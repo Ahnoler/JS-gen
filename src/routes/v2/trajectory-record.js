@@ -97,7 +97,7 @@ export default function (app) {
 
   /**
    * Resolve Element UI control by label_text / actionType+params on attached BiB page.
-   * Body: { labelText?, actionType?, params? }
+   * Body: { labelText?, actionType?, params?, mode? } — default mode=inventory
    * Returns { element, matchedLabel } or { ambiguous:true, matches:[] }.
    */
   app.post('/api/v2/trajectories/:id/resolve-element', async (req, res) => {
@@ -107,6 +107,7 @@ export default function (app) {
         labelText: body.labelText ?? body.label_text ?? '',
         actionType: body.actionType ?? body.action ?? '',
         params: body.params || {},
+        mode: body.mode ?? 'inventory',
       });
       res.json(result);
     } catch (err) {

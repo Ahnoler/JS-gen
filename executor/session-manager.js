@@ -373,9 +373,9 @@ export class SessionManager {
   /**
    * Resolve form element by label / actionType+params on the attached BiB page.
    * @param {string} sessionId
-   * @param {{ labelText?: string, actionType?: string, params?: object, requestId?: string }} [opts]
+   * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string, requestId?: string }} [opts]
    */
-  async bibResolveElement(sessionId, { labelText, actionType, params, requestId } = {}) {
+  async bibResolveElement(sessionId, { labelText, actionType, params, mode, requestId } = {}) {
     try {
       const bib = this.bibs.get(sessionId);
       if (!bib) {
@@ -389,7 +389,7 @@ export class SessionManager {
           error: 'BiB not attached - call record/prepare (stream) first',
         };
       }
-      const resolved = await bib.resolveByLabel(labelText, { actionType, params });
+      const resolved = await bib.resolveByLabel(labelText, { actionType, params, mode });
       if (resolved?.ambiguous) {
         return {
           requestId: requestId || null,
@@ -398,6 +398,7 @@ export class SessionManager {
           matchedLabel: null,
           ambiguous: true,
           matches: resolved.matches || [],
+          ...(resolved.truncated ? { truncated: true } : {}),
           error: null,
         };
       }

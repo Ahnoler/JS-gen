@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-10: **`resolve-element` inventory 模式端到端贯通**：HTTP body / executor WS `session.bib_resolve_element` 支持 `mode`（产品默认 `inventory`）；inventory 无 label/action 不 400，无 labelText 时始终返回 ambiguous 列表；可选 `truncated` 表示命中 INVENTORY_CAP。
+  影响范围：`POST .../resolve-element` 请求体 `mode`；executor WS `session.bib_resolve_element` payload；响应可含 `truncated`。
+  文件：src/routes/v2/trajectory-record.js, src/services/trajectory/trajectory-record-lifecycle.js, src/cdp/remote-bridge/index.js, executor/session-handler.js, executor/session-manager.js, executor/bib-bridge.js, src/dashboard/api-docs/groups/recording.js
+  Python 同步提示：代理 resolve-element / bib_resolve_element 时透传 `mode`（默认 `inventory`）；对齐 ambiguous + `truncated` 响应字段。
+
 - 2026-08-10: **`resolve-element` 同区碰撞后 titlebox 细化 L1**：歧义匹配按 `(needle, region_id)` 碰撞组再发现 `div.titlebox`/`span.title`，刷新 `region_*` 并尝试 titlebox 锚定 `xpath_smart`（算法 B 不丢匹配）。湿测多「新增」可区分面板标签。
   影响范围：`POST .../resolve-element` 歧义 matches 的 `region_*` / `xpath_smart`；CDP helpers 与 Python `_locator_helpers_js` 同步。
   文件：src/cdp/page-locator-helpers.js, src/cdp/resolve-by-label.js, src/models/element.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-resolve-collision-titlebox.mjs

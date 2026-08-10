@@ -430,7 +430,7 @@ export class BibBridge {
   /**
    * Resolve Element UI control by form label / actionType+params via CDP.
    * @param {string} labelText
-   * @param {{ actionType?: string, params?: object }} [opts]
+   * @param {{ actionType?: string, params?: object, mode?: string }} [opts]
    */
   async resolveByLabel(labelText, opts = {}) {
     if (!this.client || this._disposed) {
@@ -440,6 +440,7 @@ export class BibBridge {
       labelText,
       actionType: opts.actionType || opts.action || '',
       params: opts.params || {},
+      mode: opts.mode || 'inventory',
     });
   }
 

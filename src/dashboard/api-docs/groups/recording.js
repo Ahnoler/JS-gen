@@ -96,9 +96,10 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/resolve-element',
         summary: '按 label / actionType+params 从已附着页面解析定位器',
-        desc: '需 record/prepare 且 BiB 已附着。单匹配返回 element；多匹配返回 ambiguous+matches[] 供用户选择后写入 add-step。',
+        desc: '需 record/prepare 且 BiB 已附着。默认 `mode: inventory`（全页可操作控件池，可选 label/action 过滤）；`mode: needle` 为旧版按 label 针搜。无 labelText 且命中 ≥1 时 inventory 始终返回 ambiguous 列表供 UI 选择；0 命中 → 404。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
+          mode: 'inventory',
           labelText: '客户名称',
           actionType: 'fill_form_field',
           params: { label_text: '客户名称' },
@@ -125,13 +126,17 @@ export const GROUP_RECORDING = [
           },
         }),
         notes: [
+          '默认 mode=inventory：全页可操作控件池；可选 labelText / actionType+params 过滤',
+          '无 labelText 且命中 ≥1：inventory 始终 { ambiguous:true, matches }；0 命中 → 404',
+          'mode=needle：旧版按 label 针搜；无 label/action 时 400',
           '可选 actionType + params（menu_text / tab_name / row_text+button_text / …）做动作感知解析',
-          '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }] } — 不静默择一',
+          '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }], truncated? } — 不静默择一',
+          'truncated:true 表示命中 INVENTORY_CAP（120）上限，列表可能被截断',
           '菜单示例：客户管理优先稳定 data-id；否则 class-token + 文案 + occurrence',
           '表单字段：xpath / xpath_smart 为 label 锚定相对 xpath（无 label 时用 placeholder）；xpath_full 绝对兜底',
           'POST/PATCH trajectory-steps：单目标动作无可用 xpath 时 400 locator-capture-error',
           'PATCH 仅在 actionType/params/element 变更时重校验定位器',
-          '400：未 attach / BiB 未就绪；404：无匹配',
+          '400：未 attach / BiB 未就绪（inventory 无 label 不 400）；404：无匹配',
         ],
       },
       {

@@ -295,12 +295,20 @@ export async function resolveTrajectoryElement(trajectoryId, {
   actionType,
   action,
   params,
+  mode,
 } = {}) {
   const tid = Number(trajectoryId);
   const label = String(labelText || '').trim();
   const act = String(actionType || action || '').trim();
-  const p = params && typeof params === 'object' ? params : {};
-  if (!label && !act && !Object.keys(p).length) {
+  const p = { ...(params && typeof params === 'object' ? params : {}) };
+  const resolveMode = String(mode || 'inventory').trim() || 'inventory';
+  // click_element_by_index often targets sidebar .menu-item; older resolve only
+  // searched menus when action=click_menu_item or params.menu_text — mirror text.
+  if (act === 'click_element_by_index') {
+    const t = String(p.text || label || '').trim();
+    if (t && !String(p.menu_text || '').trim()) p.menu_text = t;
+  }
+  if (resolveMode !== 'inventory' && !label && !act && !Object.keys(p).length) {
     const err = new Error('labelText or actionType/params is required');
     err.statusCode = 400;
     throw err;
@@ -329,6 +337,7 @@ export async function resolveTrajectoryElement(trajectoryId, {
       labelText: label,
       actionType: act,
       params: p,
+      mode: resolveMode,
       requestId,
     });
     const payload = await resultP;
@@ -343,6 +352,7 @@ export async function resolveTrajectoryElement(trajectoryId, {
         trajectoryId: tid,
         ambiguous: true,
         matches: payload.matches,
+        ...(payload.truncated ? { truncated: true } : {}),
       };
     }
     if (!payload?.element) {
@@ -360,12 +370,14 @@ export async function resolveTrajectoryElement(trajectoryId, {
   const resolved = await remoteBridge.resolveElementByLabelText(label, {
     actionType: act,
     params: p,
+    mode: resolveMode,
   });
   if (resolved?.ambiguous) {
     return {
       trajectoryId: tid,
       ambiguous: true,
       matches: resolved.matches,
+      ...(resolved.truncated ? { truncated: true } : {}),
     };
   }
   return {
