@@ -193,6 +193,57 @@ export default function (app) {
     }
   });
 
+  /**
+   * Batch export trajectories as partner transaction envelopes.
+   * Body: { trajectoryIds, systemId, projectId }
+   */
+  app.post('/api/v2/export/transactions', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const { systemId, projectId } = requireSystemProject(body);
+      const ids = parseIdList(body.trajectoryIds ?? body.trajectory_ids);
+      if (!ids.length) {
+        return res.status(400).json({ error: 'trajectoryIds[] is required' });
+      }
+      const items = [];
+      let ok = 0;
+      let failed = 0;
+      for (const id of ids) {
+        try {
+          const traj = await trajectoryDao.getById(id);
+          if (!traj) {
+            failed += 1;
+            items.push({ trajectoryId: id, ok: false, error: 'Trajectory not found' });
+            continue;
+          }
+          const result = await exportOneTrajectory(traj, { systemId, projectId });
+          ok += 1;
+          items.push({
+            trajectoryId: id,
+            ok: true,
+            isExport: 1,
+            payload: result.payload,
+            count: result.count,
+            skipped: result.skipped,
+            stats: result.stats,
+          });
+        } catch (e) {
+          failed += 1;
+          items.push({ trajectoryId: id, ok: false, error: e.message });
+        }
+      }
+      res.json({
+        schemaVersion: 1,
+        systemId: String(systemId),
+        projectId: String(projectId),
+        items,
+        summary: { ok, failed },
+      });
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
+
   /** Map a single step (debug) */
   app.post('/api/v2/export/legacy-engine/map-step', (req, res) => {
     try {

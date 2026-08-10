@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-10: **`POST /api/v2/export/transactions` 批量交易导出**：body 传 `trajectoryIds`、`systemId`、`projectId`；逐条独立 ok/fail，成功项返回 partner envelope 并 `markExported`，失败项（不存在/异常）不翻转 `isExport`；响应含 `items[]` 与 `summary.{ok,failed}`。
+  影响范围：`/api/v2/export/transactions` 新增端点。
+  文件：src/routes/v2/export-mgmt.js
+  Python 同步提示：对齐批量交易导出路由与 per-item 响应格式。
+
 - 2026-08-10: **`trajectory.is_export` 脏标记列 + DAO helpers**：迁移新增 `is_export TINYINT(1) NOT NULL DEFAULT 0`（1=最近一次全量导出成功，0=有变更或未导出）；`markExportDirty` / `markExported` 更新标志；`getById` / `list` / `listByFunction` 返回 `isExport` 为 `0|1` 数字。
   影响范围：trajectory 表 schema、trajectory DAO。
   文件：migrations/20260810120000_trajectory_is_export.js, src/dao/trajectory-dao.js
