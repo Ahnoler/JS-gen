@@ -83,7 +83,7 @@
 | **T10** | **P0+P1 已实施** | `save_form_snapshot` 回放；P0=soft-fail continue；P1=verify Source A+B | [spec](specs/2026-08-09-save-form-snapshot-replay-design.md) |
 | **T1r** | 残余 | tree / replay label 兜底 | 可穿插 |
 | **T3r** | 残余 | T3 活录 CDP 对拍 | P2 |
-| **page-state-gen** | 推迟 | 凡「相对 xpath 同、页态不同」的可点击都锚（不止下一步/上一步） | wizard [spec §4](specs/2026-08-10-wizard-next-page-state-xpath-design.md) |
+| **page-state-gen** | **规格 Draft** | 凡「相对 xpath 同、页态不同」的**碰撞可点击**套 page-state 锚（步骤条→dialog→主区标题）；唯一者不包；录制+resolve | P1 · [spec](specs/2026-08-10-page-state-gen-clickable-anchor-design.md) · wizard [§4](specs/2026-08-10-wizard-next-page-state-xpath-design.md) |
 | **P2-noise+** | **已实施** | 黑名单「标签」对齐「页签」（关所有标签含固定） | [spec](specs/2026-08-10-fullpage-p2-icon-chrome-noise-design.md)；表征 `characterize-scan-fullpage-p2` |
 
 ---
