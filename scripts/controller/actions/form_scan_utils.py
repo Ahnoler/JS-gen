@@ -899,8 +899,10 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
                     sec = auto_sec
             except Exception:
                 pass
-        # Include section= when scoped so caller can pass it through to click_save
-        sec_part = f", section='{sec}'" if sec else ''
+        # Prefer region= (section= still accepted) so caller passes scope to click_save
+        from scripts.controller.actions.section_scope import scope_kw_cue
+
+        sec_part = scope_kw_cue(sec)
         return (
             f"NEXT_ACTION: click_save(button_text='{btn}'{sec_part}) | fillable pending=0. "
             f"Call click_save(button_text='{btn}'{sec_part}) NOW "

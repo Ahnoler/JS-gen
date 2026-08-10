@@ -170,7 +170,10 @@ def test_submit_hint_section_scoped() -> None:
     assert_true(_submit_ready_hint(store) == "", "global still has pending")
     cue = _submit_ready_hint(store, section="系统评级结论")
     assert_true("click_save" in cue, "empty section-local pending gets save cue")
-    assert_true("section=" in cue or "section='" in cue, "scoped cue includes section=")
+    assert_true(
+        "region=" in cue or "section=" in cue,
+        "scoped cue includes region= (or section=)",
+    )
 
 
 def test_run_form_assistant_section_signature() -> None:
@@ -201,7 +204,10 @@ def test_run_form_assistant_autofill_section_filter() -> None:
 def test_prompt_section_scope() -> None:
     prompt = build_agent_system_message(None)
     assert_true("err-section-required" in prompt, "prompt documents err-section-required")
-    assert_true("section=" in prompt or "section='" in prompt, "prompt steers section=")
+    assert_true(
+        "region=" in prompt or "section=" in prompt,
+        "prompt steers region= (section= compat)",
+    )
     assert_true(
         "唯一" in prompt,
         "prompt mentions unique-save auto section behavior",
@@ -247,7 +253,10 @@ def test_submit_hint_includes_unique_save_section() -> None:
         ],
     }
     cue = _submit_ready_hint(store)
-    assert_true("section=" in cue or "section='" in cue, f"hint must include section: {cue}")
+    assert_true(
+        "region=" in cue or "section=" in cue,
+        f"hint must include region= (or section=): {cue}",
+    )
     assert_true("系统评级结论" in cue, f"hint must name unique save section: {cue}")
 
 

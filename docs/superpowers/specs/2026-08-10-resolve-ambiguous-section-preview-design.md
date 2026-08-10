@@ -102,10 +102,10 @@ Types: `preview.region_role`, `preview.region_id`, `preview.region_label` (prefe
 
 | | D3 `sectionAnchorOf` | Fullpage L1 (this spec) |
 |--|----------------------|-------------------------|
-| Product face | `section` for `click_save` | `region_role` / `region_label` for inventory + picker |
+| Product face | `section` / `click_save(section)` — **Removed 产品主路径**（2026-08-11 slice-3：agent / NEXT_ACTION 优先 `region=`；`section=` 仅兼容别名；xpath 锚 `sectionAnchor*` **仍保留**；见 [legacy-section-retire](../todos/2026-08-11-remove-legacy-section-chunking.md)） | `region_role` / `region_label` for inventory + picker |
 | Shell | ignored | first-class |
 | Resolve picker | insufficient alone | **required** |
-| Xpath bake-in | collapse/tab/card prefixes | role-specific; **section role reuses D3 helpers** |
+| Xpath bake-in | collapse/tab/card prefixes（**锚实现仍保留**） | role-specific; **section role reuses D3 helpers** |
 
 ## Out of scope reminders
 

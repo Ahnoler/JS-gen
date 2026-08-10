@@ -217,7 +217,7 @@ def test_empty_effective_and_prescription() -> None:
         save_ok=False,
     )
     assert_true(
-        "click_save" in scoped_msg and "section=" in scoped_msg,
+        "click_save" in scoped_msg and ("region=" in scoped_msg or "section=" in scoped_msg),
         f"submit required + section → scoped click_save: {scoped_msg}",
     )
 

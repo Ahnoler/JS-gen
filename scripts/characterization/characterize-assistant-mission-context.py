@@ -140,7 +140,10 @@ def test_agent_prompt_final_check_and_hygiene() -> None:
         "obsolete direct click_save after assistant removed",
     )
     # Tool blurb + submit rules stay aligned with final-check (polish)
-    assist_blurb = p.split("run_form_assistant(section='')", 1)[1][:500]
+    marker = "run_form_assistant(region='')"
+    if marker not in p:
+        marker = "run_form_assistant(section='')"
+    assist_blurb = p.split(marker, 1)[1][:500]
     assert_true("needs_agent" in assist_blurb, "tool blurb documents needs_agent")
     assert_true("终检" in p and "无意义重填" in p, "submit rules allow final-check fills")
 

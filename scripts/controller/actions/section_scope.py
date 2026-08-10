@@ -150,8 +150,16 @@ def preferred_submit_button(store: dict | None, section: str = "") -> str:
     return "保存"
 
 
+def scope_kw_cue(scope: str = "") -> str:
+    """Emit preferred tool kw for phase/block scope: region= (section= still accepted)."""
+    sec = norm_sec(scope)
+    if not sec:
+        return ""
+    return f", region='{sec}'"
+
+
 def preferred_submit_cue(store: dict | None, section: str = "") -> str:
-    """Human/agent cue: click_save with preferred button + section when known."""
+    """Human/agent cue: click_save with preferred button + region when known."""
     explicit_sec = norm_sec(section)
     sec = explicit_sec or (resolve_phase_section(store) if store else "")
     btn = preferred_submit_button(store, section=sec)
@@ -159,10 +167,11 @@ def preferred_submit_cue(store: dict | None, section: str = "") -> str:
     if len(keys) >= 2:
         return (
             f"Multiple '{btn}' buttons in {keys!r}. "
-            f"Call click_save(button_text='{btn}', section='…') with the phase block title. "
-            f"Do NOT call bare click_save() — sticky section is ignored when ambiguous."
+            f"Call click_save(button_text='{btn}', region='…') with the phase block / region_label. "
+            f"Do NOT call bare click_save() — sticky scope is ignored when ambiguous. "
+            f"(section= still accepted as alias.)"
         )
-    sec_part = f", section='{sec}'" if sec else ""
+    sec_part = scope_kw_cue(sec)
     has_calc = False
     for b in (store or {}).get("_scan_buttons") or []:
         if not isinstance(b, dict):
@@ -334,8 +343,7 @@ def final_save_urgency_message(store: dict | None) -> str | None:
     try:
         cue = preferred_submit_cue(store, section=sec)
     except Exception:
-        sec_part = f", section='{sec}'" if sec else ""
-        cue = f"click_save(button_text='保存'{sec_part})"
+        cue = f"click_save(button_text='保存'{scope_kw_cue(sec)})"
     return (
         "[SYSTEM] Final save still required before the done-only last step. "
         f"NEXT_ACTION: {cue}. Do NOT only check_field_value / re-fill. "
@@ -362,15 +370,13 @@ def empty_act_prescription_message(store, *, last_step: bool, save_ok: bool) -> 
         )
     sec = resolve_phase_section(store)
     try:
-        from scripts.controller.actions.section_scope import preferred_submit_cue
         return (
             '[SYSTEM] Empty/invalid action. Return exactly one tool call. '
             f'NEXT_ACTION: {preferred_submit_cue(store, section=sec)}'
         )
     except Exception:
-        sec_part = f", section='{sec}'" if sec else ""
         return (
             '[SYSTEM] Empty/invalid action. Return exactly one tool call. '
-            f"NEXT_ACTION: click_save(button_text='保存'{sec_part}). "
+            f"NEXT_ACTION: click_save(button_text='保存'{scope_kw_cue(sec)}). "
             'Do not return empty actions.'
         )

@@ -1494,7 +1494,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         return _err(
                             "err-section-required | pending_by_section="
                             + json.dumps(by, ensure_ascii=False)
-                            + " | Pass section= for the phase block (judge from 阶段任务 / 阶段目录).",
+                            + " | Pass region= (or section=) for the phase block "
+                            "(judge from 阶段任务 / 阶段目录 / region_label).",
                             include_in_memory=True,
                         )
 
@@ -1590,15 +1591,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if reason == 'ambiguous':
                 return _err(
                     f'err-save-ambiguous:{needle} | candidates={cand_json} | '
-                    f'Multiple visible "{needle}" buttons — pass section= to click_save '
-                    f'(collapse/tab/card title from scan sections).',
+                    f'Multiple visible "{needle}" buttons — pass region= (or section=) to click_save '
+                    f'(region_label / collapse/tab/card title from scan).',
                     include_in_memory=True,
                 )
-            sec_hint = f' section={sec!r}' if sec else ''
+            sec_hint = f' region={sec!r}' if sec else ''
             return _err(
                 f'err-save-button-not-found:{needle}{sec_hint}. '
                 f'candidates={cand_json}. '
-                f'Close interfering dialogs (查询/返回) with close_dialog, or pass section= for scoped save.',
+                f'Close interfering dialogs (查询/返回) with close_dialog, or pass region= for scoped save.',
                 include_in_memory=True,
             )
 
