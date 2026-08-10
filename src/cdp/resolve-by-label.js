@@ -2,50 +2,20 @@
  * Resolve Element UI control by label_text / actionType+params via CDP Runtime.evaluate.
  * Returns ElementJson-compatible shape for trajectory_step.element_json.
  *
- * Product API (resolveElementByLabel) supports only SUPPORTED_RESOLVE_ACTIONS and returns
- * **only** verified xpath_smart relative locators.
+ * Match order (action-aware when actionType provided):
+ * 1) form item by label
+ * 2) menu / tab / icon / table / adjacent / close / tree / button by params
  *
  * Responses:
  * - 1 match → { element, matchedLabel }
  * - N matches → { ambiguous: true, matches: [{ matchedLabel, element, preview }] }
  * - 0 → 404
+ *
+ * Primary xpath is xpath_smart when verified; else xpath_full + strategy.
  */
 import { normalizeElementJson } from '../models/helpers.js';
 import { PAGE_LOCATOR_HELPERS, enrichLocatorFields } from './locator-candidates.js';
 import { normalizeActionName } from '../models/action-name.js';
-
-export const SUPPORTED_RESOLVE_ACTIONS = Object.freeze([
-  'fill_form_field',
-  'select_option',
-  'click_element_by_index',
-]);
-
-/**
- * @param {Array<{ matchedLabel?: string, element?: object, preview?: object }>} matches
- * @returns {typeof matches}
- */
-export function filterVerifiedRelativeMatches(matches) {
-  const list = Array.isArray(matches) ? matches : [];
-  const out = [];
-  for (const m of list) {
-    const el = m?.element && typeof m.element === 'object' ? { ...m.element } : null;
-    if (!el) continue;
-    const smart = String(el.xpath_smart || '').trim();
-    if (!smart || el.locator_verified !== true) continue;
-    el.xpath_smart = smart;
-    el.xpath = smart;
-    el.locator_strategy = 'xpath_smart';
-    el.locator_verified = true;
-    out.push({
-      matchedLabel: m.matchedLabel,
-      element: el,
-      preview: m.preview
-        ? { ...m.preview, xpath_smart: smart, locator_strategy: 'xpath_smart' }
-        : toPreview(el),
-    });
-  }
-  return out;
-}
 
 /**
  * Sanitize preview (never expose form values / secrets).
@@ -173,89 +143,6 @@ ${PAGE_LOCATOR_HELPERS}
       out.push(snap(root, matchedLabel || needle, asForm, kind));
     }
 
-    function matchFormFieldsByLabel() {
-      if (!needle) return;
-      const items = Array.from(document.querySelectorAll('.el-form-item'));
-      const exactItems = [];
-      const fuzzyItems = [];
-      for (const item of items) {
-        if (!isVisible(item) && item.offsetParent === null) continue;
-        const label = formItemLabel(item);
-        if (!label) continue;
-        if (textExact(label, needle)) exactItems.push({ item, label });
-        else if (textFuzzy(label, needle)) fuzzyItems.push({ item, label });
-      }
-      let chosen = exactItems.length ? exactItems : fuzzyItems;
-      const overlays = Array.from(document.querySelectorAll('.el-dialog, .el-drawer')).filter((d) => {
-        try {
-          const s = getComputedStyle(d);
-          return s.display !== 'none' && s.visibility !== 'hidden' && d.getClientRects().length > 0;
-        } catch (e) { return false; }
-      });
-      if (overlays.length && chosen.length > 1) {
-        const top = overlays[overlays.length - 1];
-        const inOverlay = chosen.filter((m) => top.contains(m.item));
-        if (inOverlay.length) chosen = inOverlay;
-      }
-      for (const m of chosen) {
-        const el = pickControl(m.item);
-        if (el) {
-          let kind = 'form_input';
-          if (action === 'select_option' || (el.closest && el.closest('.el-select'))) kind = 'form_select';
-          else if (el.closest && el.closest('.el-date-editor')) kind = 'form_date';
-          else if (el.closest && el.closest('.el-radio-group')) kind = 'form_radio';
-          else if (el.closest && el.closest('.el-tree-select, .el-cascader')) kind = 'form_tree_select';
-          else if (m.item.querySelector && m.item.querySelector('.tsscTree, .tree-popover, .el-tree-select, .el-cascader')) {
-            kind = 'form_tree_select';
-          }
-          pushUnique(el, m.label, true, kind);
-        }
-      }
-    }
-
-    // Product actions — form-only (no menu/button fallthrough)
-    if (action === 'fill_form_field' || action === 'select_option') {
-      matchFormFieldsByLabel();
-      return out;
-    }
-
-    // Product action — clickables + sidebar/menu (no form-field matching)
-    if (action === 'click_element_by_index') {
-      const name = String(params.text || needle || '').trim();
-      const nodes = document.querySelectorAll(
-        '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"], aside li, nav li, ' +
-        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content'
-      );
-      const exact = [];
-      const fuzzy = [];
-      for (const el of nodes) {
-        const t = cleanVisibleText(el) || normLabel(el.getAttribute && el.getAttribute('title'));
-        if (!t) continue;
-        const visible = isVisible(el);
-        if (textExact(t, name)) {
-          if (visible || el.getAttribute('title') === name || (el.textContent || '').includes(name)) exact.push(el);
-        } else if (visible && textFuzzy(t, name)) {
-          fuzzy.push(el);
-        }
-      }
-      for (const el of (exact.length ? exact : fuzzy)) {
-        const kind = el.closest && el.closest('.el-tree-node__content') ? 'tree_node'
-          : (el.closest && (el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, aside, nav') || el.matches('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title')))
-            ? 'menu' : 'button';
-        pushUnique(el, name, false, kind);
-      }
-      if (!out.length && exact.length) {
-        for (const el of exact) {
-          const root = normalizeTargetRoot(el) || el;
-          const abs = absXPath(root);
-          if (out.some((x) => x.xpath_abs === abs)) continue;
-          const kind = el.closest && el.closest('.el-tree-node__content') ? 'tree_node' : 'menu';
-          out.push(snap(root, name, false, kind));
-        }
-      }
-      return out;
-    }
-
     // Close controls
     if (action === 'close_dialog' || params.target_kind === 'dialog_close') {
       const closes = document.querySelectorAll(
@@ -345,7 +232,7 @@ ${PAGE_LOCATOR_HELPERS}
       if (out.length) return out;
     }
 
-    // Form fields by label (legacy callers)
+    // Form fields by label
     if (needle) {
       const items = Array.from(document.querySelectorAll('.el-form-item'));
       const exactItems = [];
@@ -358,6 +245,7 @@ ${PAGE_LOCATOR_HELPERS}
         else if (textFuzzy(label, needle)) fuzzyItems.push({ item, label });
       }
       let chosen = exactItems.length ? exactItems : fuzzyItems;
+      // Prefer fields inside the topmost visible drawer/dialog when both list+overlay exist
       const overlays = Array.from(document.querySelectorAll('.el-dialog, .el-drawer')).filter((d) => {
         try {
           const s = getComputedStyle(d);
@@ -427,17 +315,8 @@ export async function resolveElementByLabel(client, opts = {}) {
   const actionType = normalizeActionName(opts.actionType || opts.action || '');
   const params = opts.params && typeof opts.params === 'object' ? opts.params : {};
 
-  if (!SUPPORTED_RESOLVE_ACTIONS.includes(actionType)) {
-    const err = new Error(
-      `resolve-element requires actionType in ${SUPPORTED_RESOLVE_ACTIONS.join('|')} (got: ${actionType || '(empty)'})`,
-    );
-    err.statusCode = 400;
-    throw err;
-  }
-  const needle = labelText
-    || String(params.label_text || params.text || params.menu_text || params.button_text || '').trim();
-  if (!needle) {
-    const err = new Error('labelText or params.text / params.label_text is required');
+  if (!labelText && !actionType && !Object.keys(params).length) {
+    const err = new Error('labelText or actionType/params is required');
     err.statusCode = 400;
     throw err;
   }
@@ -453,10 +332,11 @@ export async function resolveElementByLabel(client, opts = {}) {
     awaitPromise: false,
   });
   const value = result?.result?.value;
-  const rawList = Array.isArray(value) ? value : (value && typeof value === 'object' ? [value] : []);
+  const list = Array.isArray(value) ? value : (value && typeof value === 'object' ? [value] : []);
 
-  if (!rawList.length) {
-    const err = new Error(`页上找不到「${needle}」对应的控件（请确认弹窗已打开且目标可见）`);
+  if (!list.length) {
+    const hint = labelText || params.menu_text || params.tab_name || params.button_text || actionType || 'target';
+    const err = new Error(`页上找不到「${hint}」对应的控件（请确认弹窗已打开且目标可见）`);
     err.statusCode = 404;
     throw err;
   }
@@ -503,14 +383,7 @@ export async function resolveElementByLabel(client, opts = {}) {
     };
   }
 
-  const matches = filterVerifiedRelativeMatches(rawList.map(enrichOne));
-  if (!matches.length) {
-    const err = new Error(
-      `页上找到「${needle}」但无可用相对定位（xpath_smart 未通过校验）`,
-    );
-    err.statusCode = 404;
-    throw err;
-  }
+  const matches = list.map(enrichOne);
   if (matches.length === 1) {
     return {
       element: matches[0].element,
