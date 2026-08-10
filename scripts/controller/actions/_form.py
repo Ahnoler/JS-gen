@@ -330,8 +330,19 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
-        use_label_fallback = bool(resolved.error) and not (xpath_smart or '').strip()
+        from scripts.feature_flags import xpath_smart_fill_only_enabled
+        strict_xpath = xpath_smart_fill_only_enabled()
+        use_label_fallback = (
+            (not strict_xpath)
+            and bool(resolved.error)
+            and not (xpath_smart or '').strip()
+        )
         if resolved.error and not use_label_fallback:
+            if strict_xpath and not (resolved.xpath_smart or xpath_smart or '').strip():
+                return _with_submit_cue(
+                    resolved.error or 'err-xpath-smart-required',
+                    case_data_store,
+                )
             return resolved.error
         if use_label_fallback:
             # Query/introduce picker: scan may still miss; label DOM fill in

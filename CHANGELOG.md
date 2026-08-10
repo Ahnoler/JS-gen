@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-10: **灰度开关 `XPATH_SMART_FILL_ONLY`（默认关）**：开则 `fill_form_field` 仅允许 `xpath_smart` 定位；关则无 xpath 时保留 label DOM 兜底（测试人员）。入口 `scripts/feature_flags.py` / `config/.env.example`。
+  影响范围：Agent 填表行为开关。
+  文件：scripts/feature_flags.py, scripts/controller/actions/_form.py, config/.env.example
+  Python 同步提示：无（scripts 侧；若 Python 控制面另有填表代理可对齐同名 env）。
+
 - 2026-08-10: **`resolve-element` 歧义匹配附带 L1 区域预览**：`matches[].preview` / element 增加 `region_role`、`region_id`、`region_label`（与全页扫描 `assignRegion` 同源规则）；Vue 选择器主行展示区域标签。算法 B：归位失败不丢匹配。BiB 需重载执行机后做多「新增」冒烟（湿测挂起）。
   影响范围：`POST .../resolve-element` 响应预览字段；CDP `PAGE_LOCATOR_HELPERS` / `resolve-by-label`。
   文件：src/cdp/page-locator-helpers.js, src/cdp/resolve-by-label.js, scripts/controller/actions/js_snippets/scan_form.py, scripts/controller/actions/js_snippets/_locator_helpers_js.py
@@ -75,6 +80,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：无（仅 JS-gen Session Chrome 启动）。
 
 ### Changed
+
+- 2026-08-10: **批量推送（Batch Push）端到端**：api-docs 分组改为「批量推送管理」；新增对方项目/系统代理（`GET /export/partner/projects|systems`）；`POST /export/transactions` 组装后代调 importDemand，仅对方成功才 `markExported`；`systemId`/`projectId` 缺省 98/31；`access_token` 从头/body/env 转发。Vue 弹窗改为项目→系统级联。
+  影响范围：批量推送产品流、partner 代理、importDemand 代推。
+  文件：src/services/partner-platform.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, config/.env.example；Vue：api/export.ts、BatchPushDialog.vue、ui-recording/index.vue
+  Python 同步提示：无（导出/推送为 Node 侧）。
 
 - 2026-08-10: **Partner transaction 导出对齐 importDemand 定稿**：外层 `transcationEventTypeList`；轨内步骤为 `transcationProperties`；`testFrame=playwright`；`propertiesName` 无分隔符且同轨去重（重复追加 2、3…）；`raw`/`forImport`/`download` 返回可直接 POST 的导入体；批量 raw 合并多轨。
   影响范围：`/api/v2/export/trajectories/:id/transaction`、`/api/v2/export/transactions`、transaction schema/docs。

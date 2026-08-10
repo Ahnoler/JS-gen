@@ -29,6 +29,15 @@ def relative_xpath_primary_enabled() -> bool:
     return _env_flag('RELATIVE_XPATH_PRIMARY', True)
 
 
+def xpath_smart_fill_only_enabled() -> bool:
+    """XPATH_SMART_FILL_ONLY — grayscale: fill/select write path requires xpath_smart (default off).
+
+    When false (default): testers keep label-DOM fallback if scan/resolve miss xpath.
+    When true: ``fill_form_field`` / similar refuse label-only fill — xpath_smart required.
+    """
+    return _env_flag('XPATH_SMART_FILL_ONLY', False)
+
+
 def phase_preamble_enabled() -> bool:
     """AI_PHASE_PREAMBLE — assemble 【业务场景】 prior-phase block (default on)."""
     return _env_flag('AI_PHASE_PREAMBLE', True)
