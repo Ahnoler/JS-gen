@@ -60,15 +60,12 @@ def requires_section_declaration(tl: "TaskList") -> bool:
     return len(pending_by_section(tl)) >= 2
 
 
-def unique_button_section(buttons: list | None, button_text: str = "保存") -> str | None:
-    """If exactly one distinct section among buttons matching ``button_text``, return it.
+def same_label_section_keys(buttons: list | None, button_text: str = "保存") -> list[str]:
+    """Distinct section titles/ids for visible scan buttons matching ``button_text``.
 
-    Uses DOM scan buttons (not phase NL). Prefer ``section_title``, else ``section_id``.
-    Returns None when 0 or ≥2 matching sections (LLM must declare section=).
+    Empty / __root__ sections omitted. Order = first-seen in ``buttons``.
     """
-    needle = re.sub(r"\s+", "", norm_sec(button_text) or "保存")
-    if not needle:
-        needle = "保存"
+    needle = re.sub(r"\s+", "", norm_sec(button_text) or "保存") or "保存"
     keys: list[str] = []
     seen: set[str] = set()
     for b in buttons or []:
@@ -85,9 +82,73 @@ def unique_button_section(buttons: list | None, button_text: str = "保存") -> 
         if key not in seen:
             seen.add(key)
             keys.append(key)
+    return keys
+
+
+def unique_button_section(buttons: list | None, button_text: str = "保存") -> str | None:
+    """If exactly one distinct section among buttons matching ``button_text``, return it.
+
+    Uses DOM scan buttons (not phase NL). Prefer ``section_title``, else ``section_id``.
+    Returns None when 0 or ≥2 matching sections (LLM must declare section=).
+    """
+    keys = same_label_section_keys(buttons, button_text)
     if len(keys) == 1:
         return keys[0]
     return None
+
+
+def preferred_submit_button(store: dict | None, section: str = "") -> str:
+    """Pick submit/save button text for this phase/section from scanned buttons.
+
+    Prefer ``暂存`` (评级等级测算) over ``保存``/``提交`` so already-matched loop
+    breaks and NEXT_ACTION do not send the agent hunting a non-existent 保存.
+    """
+    sec = norm_sec(section) or (resolve_phase_section(store) if store else "")
+    buttons = (store or {}).get("_scan_buttons") or []
+    labels: list[str] = []
+    for b in buttons:
+        if not isinstance(b, dict):
+            continue
+        lab = norm_sec(b.get("label") or "")
+        if not lab:
+            continue
+        if sec and not section_matches(sec, b.get("section_id") or "", b.get("section_title") or ""):
+            continue
+        labels.append(lab)
+    for prefer in ("暂存", "保存", "提交"):
+        for lab in labels:
+            compact = re.sub(r"\s+", "", lab)
+            if prefer == compact or prefer in compact:
+                return prefer
+    return "保存"
+
+
+def preferred_submit_cue(store: dict | None, section: str = "") -> str:
+    """Human/agent cue: click_save with preferred button + section when known."""
+    sec = norm_sec(section) or (resolve_phase_section(store) if store else "")
+    btn = preferred_submit_button(store, section=sec)
+    sec_part = f", section='{sec}'" if sec else ""
+    has_calc = False
+    for b in (store or {}).get("_scan_buttons") or []:
+        if not isinstance(b, dict):
+            continue
+        lab = norm_sec(b.get("label") or "")
+        if sec and not section_matches(sec, b.get("section_id") or "", b.get("section_title") or ""):
+            continue
+        if "测算" in lab and "等级测算" not in lab:  # button 测算, not section title alone
+            has_calc = True
+            break
+        if lab == "测算":
+            has_calc = True
+            break
+    prefix = ""
+    if has_calc and btn == "暂存":
+        prefix = "If 测算 is required and not yet done, click 测算 once; then "
+    return (
+        f"{prefix}click_save(button_text='{btn}'{sec_part}). "
+        f"Do NOT click_element_by_index for {btn}. "
+        "Do NOT re-select already-matched fields."
+    )
 
 
 def remember_phase_section(store: dict | None, section: str) -> None:
@@ -229,9 +290,16 @@ def empty_act_prescription_message(store, *, last_step: bool, save_ok: bool) -> 
             'NEXT_ACTION: done(success=true). Do NOT click_save().'
         )
     sec = resolve_phase_section(store)
-    sec_part = f", section='{sec}'" if sec else ""
-    return (
-        '[SYSTEM] Empty/invalid action. Return exactly one tool call. '
-        f"NEXT_ACTION: click_save(button_text='保存'{sec_part}). "
-        'Do not return empty actions.'
-    )
+    try:
+        from scripts.controller.actions.section_scope import preferred_submit_cue
+        return (
+            '[SYSTEM] Empty/invalid action. Return exactly one tool call. '
+            f'NEXT_ACTION: {preferred_submit_cue(store, section=sec)}'
+        )
+    except Exception:
+        sec_part = f", section='{sec}'" if sec else ""
+        return (
+            '[SYSTEM] Empty/invalid action. Return exactly one tool call. '
+            f"NEXT_ACTION: click_save(button_text='保存'{sec_part}). "
+            'Do not return empty actions.'
+        )
