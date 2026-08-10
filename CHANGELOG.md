@@ -225,11 +225,6 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
-- 2026-08-10: **新增步骤自动抓取 `resolve-element` 动作感知 + 严格相对 xpath：** 请求需 `actionType`∈{fill_form_field|select_option|click_element_by_index} 与 `params`；点击元素搜索含侧栏菜单；仅返回已校验 `xpath_smart`；多匹配 `ambiguous+matches` 供前端自选。Vue 需同步传 actionType/params。
-  影响范围：`POST /api/v2/trajectories/:id/resolve-element`、BiB resolve、产品新增步骤自动抓取。
-  文件：src/cdp/resolve-by-label.js, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-resolve-element-auto-grab.mjs
-  Python 同步提示：无（可选对齐请求体 actionType/params；scripts 不涉及）。
-
 - 2026-08-09: **`dialog:unnamed` / `drawer:unnamed` 表单结构校验误报 `container_not_found`。** 录制对无标题弹窗写入哨兵 `unnamed`；`verifyFormStructure` 原先按字面标题匹配「unnamed」找不到容器，引入弹窗后紧接着的结构检查点失败。现改为匹配空 title/aria 的可见 overlay。
   影响范围：`steps/replay` Type B `save_form_snapshot`、assembled CTRL verify。
   文件：src/ctrl-actions/structure.js, scripts/controller/actions/js_snippets/misc.py, scripts/characterization/characterize-verify-form-structure.mjs
