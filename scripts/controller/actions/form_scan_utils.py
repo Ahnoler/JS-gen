@@ -51,6 +51,9 @@ def is_chrome_menu_label(text: str | None) -> bool:
         return True
     if "页签" in t and ("关闭" in t or "固定" in t):
         return True
+    # Portal synonym: 标签 ≈ 页签 (e.g. 关闭所有标签(含固定))
+    if "标签" in t and ("关闭" in t or "固定" in t):
+        return True
     return False
 
 

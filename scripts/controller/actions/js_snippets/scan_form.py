@@ -375,6 +375,8 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
             if (t.includes('布局')) return true;
             if (t.includes('主题')) return true;
             if (t.includes('页签') && (t.includes('关闭') || t.includes('固定'))) return true;
+            // Portal synonym: 标签 ≈ 页签 (e.g. 关闭所有标签(含固定))
+            if (t.includes('标签') && (t.includes('关闭') || t.includes('固定'))) return true;
             return false;
         };
         const isChromeHost = (el) => {

@@ -1,7 +1,7 @@
 # Backlog: 可见可编辑控件 / Agent 视野（核实版 2026-08-10）
 
 > 本文件记录「目标线」待办。**状态以代码/表征为准**，不以计划 checkbox 为准。  
-> 下一刀：执行机空闲后再做 **L1-picker BiB/UI 冒烟**；并行可选 **P2-noise+** / **page-state-gen** / **L1c-LLM** 规格。
+> 下一刀：执行机空闲后再做 **L1-picker BiB/UI 冒烟**；并行可选 **page-state-gen** / **L1c-LLM** 规格。
 
 ## 目标定稿（2026-08-10 修订）
 
@@ -80,7 +80,7 @@
 | **T1r** | 残余 | tree / replay label 兜底 | 可穿插 |
 | **T3r** | 残余 | T3 活录 CDP 对拍 | P2 |
 | **page-state-gen** | 推迟 | 凡「相对 xpath 同、页态不同」的可点击都锚（不止下一步/上一步） | wizard [spec §4](specs/2026-08-10-wizard-next-page-state-xpath-design.md) |
-| **P2-noise+** | 可选 | 黑名单「标签」对齐「页签」（关所有标签含固定） | 小修 |
+| **P2-noise+** | **已实施** | 黑名单「标签」对齐「页签」（关所有标签含固定） | [spec](specs/2026-08-10-fullpage-p2-icon-chrome-noise-design.md)；表征 `characterize-scan-fullpage-p2` |
 
 ---
 
@@ -102,7 +102,7 @@
 2. ~~双保存 section-xpath / wizard 下一步 page-state xpath~~ — **已实施 + 湿跑**  
 3. ~~**L1-picker** 代码~~ — **已实施**（表征 PASS；Vue 选择器已接）；**湿测挂起**（等 BiB 可重载）  
 4. **执行机空闲时：** L1-picker BiB 重载 + 多「新增」UI 冒烟  
-5. **不依赖执行机时可并行：** **P2-noise+**（「标签」黑名单）· **page-state-gen** 规格 · **L1c-LLM** 规格；随后 L1d / Vision；**T4-P4** 对照  
+5. **不依赖执行机时可并行：** ~~**P2-noise+**~~（已实施）· **page-state-gen** 规格 · **L1c-LLM** 规格；随后 L1d / Vision；**T4-P4** 对照  
 6. 穿插：T1r；三大问题①；T5（另页证据）
 
 > 参照：Cursor browser MCP / Playwright MCP（先控件池，后区域标签）。T4-P4 = 对照，非主路径。

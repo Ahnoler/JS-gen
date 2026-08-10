@@ -41,6 +41,7 @@ P0/P1 fullpage L2 admits shell `menu_item` / `icon` into inventory (correct). On
 - contains `布局` (e.g. 水平布局 / 垂直布局)  
 - contains `主题` (e.g. 白色主题)  
 - matches close-tab chrome: `关闭` + `页签`, or `固定页签` / `非固定页签` style ops  
+- **P2-noise+ (2026-08-10):** same with synonym **`标签`** (e.g. `关闭所有标签(含固定)`) — do **not** exclude bare business labels that merely contain `标签` without `关闭`/`固定`
 
 **Structural hosts (implement with `closest`; prefer chrome chrome, not all dropdowns):**
 
