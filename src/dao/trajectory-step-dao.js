@@ -1,7 +1,13 @@
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
+import * as trajectoryDao from './trajectory-dao.js';
 
 const TABLE = 'trajectory_step';
+
+async function dirtyParent(trajectoryId, trx = null) {
+  if (trajectoryId == null) return;
+  await trajectoryDao.markExportDirty(trajectoryId, trx);
+}
 
 /**
  * Batch insert steps. Accepts camelCase fields including:
@@ -32,6 +38,10 @@ export async function batchSave(steps) {
   for (let i = 0; i < rows.length; i += 100) {
     await db(TABLE).insert(rows.slice(i, i + 100));
   }
+  const trajectoryIds = [...new Set(steps.map((s) => s.trajectoryId).filter((id) => id != null))];
+  for (const tid of trajectoryIds) {
+    await dirtyParent(tid);
+  }
 }
 
 export async function listByTrajectory(trajectoryId, { source } = {}) {
@@ -53,7 +63,9 @@ export async function listBySource(trajectoryId, source) {
 }
 
 export async function removeByTrajectory(trajectoryId) {
-  return getDB()(TABLE).where({ trajectory_id: trajectoryId }).del();
+  const result = await getDB()(TABLE).where({ trajectory_id: trajectoryId }).del();
+  await dirtyParent(trajectoryId);
+  return result;
 }
 
 export async function getById(id) {
@@ -79,6 +91,7 @@ export async function create(step) {
   row.params_json = step.paramsJson ?? step.params ?? null;
   row.element_json = step.elementJson ?? step.element ?? null;
   const [id] = await getDB()(TABLE).insert(row);
+  await dirtyParent(step.trajectoryId);
   return getById(id);
 }
 
@@ -98,12 +111,21 @@ export async function update(id, fields) {
     patch.element_json = raw == null || typeof raw === 'string' ? raw : JSON.stringify(raw);
   }
   if (!Object.keys(patch).length) return getById(id);
+  let trajectoryId = fields.trajectoryId;
+  if (trajectoryId == null) {
+    const cur = await getById(id);
+    trajectoryId = cur?.trajectoryId;
+  }
   await getDB()(TABLE).where({ id }).update(patch);
+  await dirtyParent(trajectoryId);
   return getById(id);
 }
 
 export async function removeById(id) {
-  return getDB()(TABLE).where({ id }).del();
+  const cur = await getById(id);
+  const result = await getDB()(TABLE).where({ id }).del();
+  await dirtyParent(cur?.trajectoryId);
+  return result;
 }
 
 export async function reorderByTrajectory(trajectoryId) {
@@ -133,4 +155,5 @@ export async function applyPlannedOrder(trajectoryId, ordered) {
       });
     }
   });
+  await dirtyParent(tid);
 }
