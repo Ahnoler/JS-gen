@@ -95,13 +95,13 @@ export const GROUP_RECORDING = [
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/resolve-element',
-        summary: '按 label / actionType+params 从已附着页面解析定位器',
-        desc: '需 record/prepare 且 BiB 已附着。单匹配返回 element；多匹配返回 ambiguous+matches[] 供用户选择后写入 add-step。',
+        summary: '按 actionType + params 从已附着页面解析相对 xpath_smart',
+        desc: '需 record/prepare 且 BiB 已附着。actionType 仅限 fill_form_field | select_option | click_element_by_index，须传 params；其它 actionType → 400。单匹配返回 element；仅返回已校验 locator_verified 的 xpath_smart 相对定位器。多匹配 HTTP 200 { ambiguous:true, matches[] } 供前端自选后写入 add-step。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
-          labelText: '客户名称',
-          actionType: 'fill_form_field',
-          params: { label_text: '客户名称' },
+          labelText: '对公客户管理',
+          actionType: 'click_element_by_index',
+          params: { text: '对公客户管理', index: -1 },
         }),
         respExample: J({
           trajectoryId: 42,
@@ -125,13 +125,14 @@ export const GROUP_RECORDING = [
           },
         }),
         notes: [
-          '可选 actionType + params（menu_text / tab_name / row_text+button_text / …）做动作感知解析',
+          'actionType 仅限 fill_form_field | select_option | click_element_by_index；其它 → 400',
+          '必填 params；fill 示例：{ label_text: "客户名称" }；select/click 见各动作 params 约定',
+          '仅返回 locator_verified=true 的 xpath_smart 相对 xpath；无可用校验定位器 → 404',
+          'click_element_by_index 搜索含侧栏菜单项（不限于表单区）',
           '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }] } — 不静默择一',
-          '菜单示例：客户管理优先稳定 data-id；否则 class-token + 文案 + occurrence',
-          '表单字段：xpath / xpath_smart 为 label 锚定相对 xpath（无 label 时用 placeholder）；xpath_full 绝对兜底',
           'POST/PATCH trajectory-steps：单目标动作无可用 xpath 时 400 locator-capture-error',
           'PATCH 仅在 actionType/params/element 变更时重校验定位器',
-          '400：未 attach / BiB 未就绪；404：无匹配',
+          '400：未 attach / BiB 未就绪 / 非法 actionType；404：无匹配',
         ],
       },
       {
