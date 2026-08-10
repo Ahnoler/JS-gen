@@ -307,6 +307,60 @@ export const PAGE_LOCATOR_HELPERS = `
       return [];
     }
   }
+  function sectionAnchorOf(host) {
+    if (!host || !host.closest) return null;
+    const collapse = host.closest('.el-collapse-item');
+    if (collapse) {
+      const header = collapse.querySelector('.el-collapse-item__header');
+      const title = normalizeControlText((header && (header.innerText || header.textContent)) || '');
+      if (!title) return null;
+      return {
+        kind: 'collapse',
+        title: title,
+        prefix: "//div[" + classTokenPred('el-collapse-item') + "][.//*[ " + classTokenPred('el-collapse-item__header') + " and contains(normalize-space(.)," + xpathLiteral(title) + ")]]",
+      };
+    }
+    const pane = host.closest('.el-tab-pane');
+    if (pane) {
+      const tabs = pane.closest && pane.closest('.el-tabs');
+      let tabLabel = '';
+      if (tabs) {
+        const paneId = pane.getAttribute('id') || '';
+        if (paneId) {
+          const tabItem = tabs.querySelector('.el-tabs__item[aria-controls="' + paneId + '"]');
+          if (tabItem) tabLabel = normalizeControlText(tabItem.innerText || tabItem.textContent || '');
+        }
+      }
+      if (!tabLabel) return null;
+      // Best-effort: tab/card anchors are secondary to collapse (P0 dual-save fixture).
+      return {
+        kind: 'tab',
+        title: tabLabel,
+        prefix: "//*[ " + classTokenPred('el-tabs') + "][.//*[ " + classTokenPred('el-tabs__item')
+          + " and normalize-space()=" + xpathLiteral(tabLabel) + "]]//*[ "
+          + classTokenPred('el-tab-pane') + "]",
+      };
+    }
+    const card = host.closest('.el-card');
+    if (card) {
+      const h = card.querySelector('.el-card__header');
+      const title = normalizeControlText((h && (h.innerText || h.textContent)) || '');
+      if (!title) return null;
+      return {
+        kind: 'card',
+        title: title,
+        prefix: "//div[" + classTokenPred('el-card') + "][.//*[ " + classTokenPred('el-card__header') + " and contains(normalize-space(.)," + xpathLiteral(title) + ")]]",
+      };
+    }
+    return null;
+  }
+  function sectionAnchorXPath(host, leafLocal) {
+    const leaf = String(leafLocal || '').replace(/^\\/+/, '');
+    if (!host || !leaf) return '';
+    const sec = sectionAnchorOf(host);
+    if (!sec || !sec.prefix) return '';
+    return sec.prefix + '//' + leaf;
+  }
   function pinOccurrence(expr, host) {
     if (!expr || !host) return { xpath: expr || '', occurrence: 0, verified: false };
     const nodes = evalXpathAll(expr);
@@ -501,11 +555,53 @@ export const PAGE_LOCATOR_HELPERS = `
     let smart = xpathSmartOf(host, t, formLbl, kind);
     let occurrence = 0;
     let verified = false;
-    if (smart) {
-      const pinned = pinOccurrence(smart, host);
-      smart = pinned.xpath;
-      occurrence = pinned.occurrence;
-      verified = pinned.verified;
+    if (smart || t) {
+      const localLeaf = (function () {
+        const tagL = (host.tagName || '').toLowerCase();
+        const lit = xpathLiteral(t);
+        const cls = String(host.className || '');
+        if (tagL === 'a') return 'a[normalize-space()=' + lit + ']';
+        if (/(^| )el-button( |$)/.test(cls) && tagL !== 'button') {
+          return '*[' + classTokenPred('el-button') + ' and normalize-space()=' + lit + ']';
+        }
+        return 'button[normalize-space()=' + lit + ']';
+      })();
+      let trySectionAnchor = false;
+      if (sectionAnchorOf(host) && t) {
+        const labelNodes = evalXpathAll('//' + localLeaf);
+        if (labelNodes.length >= 2) trySectionAnchor = true;
+      }
+      if (smart) {
+        const nodes = evalXpathAll(smart);
+        if (nodes.length >= 2) trySectionAnchor = true;
+      }
+      if (trySectionAnchor) {
+        const anchored = sectionAnchorXPath(host, localLeaf);
+        if (anchored) {
+          const anodes = evalXpathAll(anchored);
+          let idx = -1;
+          for (let i = 0; i < anodes.length; i++) {
+            if (anodes[i] === host) { idx = i; break; }
+          }
+          if (anodes.length === 1 && idx === 0) {
+            smart = anchored;
+            occurrence = 0;
+            verified = true;
+          }
+        }
+      }
+      if (!verified && smart) {
+        const pinned = pinOccurrence(smart, host);
+        smart = pinned.xpath;
+        occurrence = pinned.occurrence;
+        verified = pinned.verified;
+        // Do not export global [n] when section anchor exists but uniqueness failed.
+        if (occurrence >= 1 && sectionAnchorOf(host)) {
+          smart = '';
+          verified = false;
+          occurrence = 0;
+        }
+      }
     }
     const css = cssOfSimple(host);
     const primary = (smart && verified) ? smart : (abs || smart);
