@@ -1,7 +1,7 @@
 # Dual / duplicate controls: section-anchored relative xpath — Design
 
 **Date:** 2026-08-10  
-**Status:** Draft for user review  
+**Status:** Implemented 2026-08-10 (SDD Tasks 1–6 + final cue fix `27a91fd`)  
 **Related:** [phase-section-scope](2026-08-08-phase-section-scope-design.md) (deferred “duplicate 保存 xpath dedupe”); traj 73 phase 6 dual「保存」; Playwright export locators  
 **Trigger:** 对公评级编辑页两 region 各有「保存」；录制/导出 xpath 为 `(//button[normalize-space()='保存'])[1]` → 永远点「系统评级结论」。
 
