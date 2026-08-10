@@ -96,7 +96,7 @@ function ok(name) {
 
 {
   assert.match(SRC, /SUPPORTED_RESOLVE_ACTIONS|unsupported|out-of-scope|not supported/i);
-  assert.match(SRC, /鏃犲彲鐢ㄧ浉瀵瑰畾浣峾xpath_smart/);
+  assert.match(SRC, /无可用相对定位.*xpath_smart/);
   ok('source mentions unsupported action + relative xpath failure copy');
 }
 
