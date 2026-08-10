@@ -71,8 +71,8 @@
 | **L1-picker** | **代码已实施；湿测挂起** | 歧义 `resolve-element`：L1 `region_*` 预览 + Vue 选择器；表征 PASS；CDP 对拍过顶栏/主区。**BiB 重载 + 多「新增」UI 冒烟**等执行机空闲 | 挂起 · [spec](specs/2026-08-10-resolve-ambiguous-section-preview-design.md) · [plan](plans/2026-08-10-resolve-ambiguous-l1-region-preview.md) |
 | **L1-titlebox** | **代码已实施**（`b207372`） | 同 needle 同粗 L1 碰撞 → titlebox 细化 `region_*` + 锚定 xpath；算法 B | [spec](specs/2026-08-10-resolve-collision-finer-l1-titlebox-design.md) · [TODO 后续 AG](todos/2026-08-10-auto-grab-fullpage-same-name.md) |
 | **AG-fullpage** | **代码已实施；湿测按需** | **自动抓取** fullpage inventory：`mode=inventory` + 可选 `actionType`/`labelText` 过滤；无 label 必弹选择器；选中后 infer `actionType`；同名 L1/titlebox + `xpath_smart`。表征 inventory + titlebox PASS；**BiB 重载 + UI 冒烟**按需 | [spec](specs/2026-08-10-auto-grab-fullpage-inventory-design.md) · [plan](plans/2026-08-10-auto-grab-fullpage-inventory.md) |
-| **L1c-LLM** | 未做 | 动态 L1：低置信度 **feature card → LLM 分类** `region_role`（不喂 raw HTML；不得删 L2） | P1 · [fullpage design §Dynamic L1](specs/2026-08-10-fullpage-visible-controls-scan-design.md) |
-| **L1d-cache** | 未做 | L1 角色缓存：`systemId` + 特征签名 → `region_role`（避免每步重问） | P1（跟 L1c） |
+| **L1c-LLM** | **规格 Draft** | 动态 L1：低置信度 / other·custom **feature card → 控制面 LLM**；同步 + **L1d** 同刀；scan + resolve 共用 `classifyRegions` | P1 · [spec](specs/2026-08-10-l1c-llm-region-classify-design.md) · [fullpage §Dynamic L1](specs/2026-08-10-fullpage-visible-controls-scan-design.md) |
+| **L1d-cache** | **含于 L1c 同刀** | `systemId` + 特征签名 → `region_role` | 见 L1c spec |
 | **L1-vision** | 未做 | Vision：仅对争议容器裁图辅助定角色 | P2+ |
 | **T4-P4** | 未做 | Playwright MCP a11y ⟷ 我方 L2 **对拍诊断**（灰度） | 可与 L1c 并行；非写路径 |
 | **T5** | 未做（本页漏扫后暂缓） | 非 `el-table` 自定义网格 | 对公评级页无 vxe/ag → [gap spec](specs/2026-08-10-t5-credit-scan-gap-design.md)；需另页证据 |
