@@ -11,6 +11,11 @@ import {
   exportStepsToLegacyEngine,
   mapStepToLegacyEngineOp,
 } from '../../services/legacy-engine-export.js';
+import {
+  buildTransactionPayload,
+  TRANSACTION_ENVELOPE_FIELDS,
+  EVENT_TYPE_NAME,
+} from '../../services/transaction-export.js';
 
 function parseIdList(raw) {
   if (raw == null || raw === '') return [];
@@ -27,7 +32,44 @@ function parseBool(raw, defaultValue = false) {
   return !['0', 'false', 'no', 'off'].includes(String(raw).trim().toLowerCase());
 }
 
+function requireSystemProject(src) {
+  const systemId = src.systemId ?? src.system_id;
+  const projectId = src.projectId ?? src.project_id;
+  if (systemId == null || systemId === '' || projectId == null || projectId === '') {
+    const err = new Error('systemId and projectId are required');
+    err.statusCode = 400;
+    throw err;
+  }
+  return { systemId, projectId };
+}
+
+async function exportOneTrajectory(traj, { systemId, projectId }) {
+  const built = buildTransactionPayload(traj, { systemId, projectId });
+  await trajectoryDao.markExported(traj.id);
+  return {
+    trajectoryId: traj.id,
+    isExport: 1,
+    schemaVersion: 1,
+    ...built,
+  };
+}
+
 export default function (app) {
+  /** Partner transaction envelope schema (参数.txt) */
+  app.get('/api/v2/export/transaction/schema', (_req, res) => {
+    res.json({
+      schemaVersion: 1,
+      fields: TRANSACTION_ENVELOPE_FIELDS,
+      eventTypeName: EVENT_TYPE_NAME,
+      actionTypeMap: ACTION_TO_ENGINE_TYPE,
+      notes: [
+        'Partner envelope spellings (transcation*, mothed) are intentional',
+        // TODO: partial export (stepIds/phaseIds) + export coverage
+        // TODO: placeholder
+      ],
+    });
+  });
+
   /** Field contract + recorded-action → engine type map */
   app.get('/api/v2/export/legacy-engine/schema', (_req, res) => {
     res.json({
@@ -108,6 +150,46 @@ export default function (app) {
       res.json(payload);
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * Export trajectory as partner transaction envelope.
+   * Query: systemId, projectId, download?
+   */
+  app.get('/api/v2/export/trajectories/:id/transaction', async (req, res) => {
+    try {
+      const { systemId, projectId } = requireSystemProject(req.query);
+      const traj = await trajectoryDao.getById(+req.params.id);
+      if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
+      const result = await exportOneTrajectory(traj, { systemId, projectId });
+      if (parseBool(req.query.download, false)) {
+        res.setHeader('Content-Disposition', `attachment; filename="transaction_${traj.id}.json"`);
+        return res.json(result.payload);
+      }
+      res.json(result);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * Same export; systemId/projectId in body or query. Body: { systemId?, projectId?, download? }
+   */
+  app.post('/api/v2/export/trajectories/:id/transaction', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const { systemId, projectId } = requireSystemProject({ ...req.query, ...body });
+      const traj = await trajectoryDao.getById(+req.params.id);
+      if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
+      const result = await exportOneTrajectory(traj, { systemId, projectId });
+      if (parseBool(body.download ?? req.query.download, false)) {
+        res.setHeader('Content-Disposition', `attachment; filename="transaction_${traj.id}.json"`);
+        return res.json(result.payload);
+      }
+      res.json(result);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
     }
   });
 

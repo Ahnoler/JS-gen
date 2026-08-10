@@ -80,6 +80,13 @@ function testEnvelope() {
   assert.ok(!('attributes' in payload.transcationEventType[0]));
 }
 
+function testRequireIds() {
+  assert.throws(
+    () => buildTransactionPayload({ id: 1, steps: [] }, {}),
+    (err) => err.statusCode === 400 && /systemId and projectId/.test(err.message),
+  );
+}
+
 function testAbsoluteFallbackStat() {
   const { stats, payload } = buildTransactionPayload(
     {
@@ -101,5 +108,6 @@ testFillInput();
 testSelectOptionsJson();
 testSkipMeta();
 testEnvelope();
+testRequireIds();
 testAbsoluteFallbackStat();
 console.log('characterize-transaction-export: OK');
