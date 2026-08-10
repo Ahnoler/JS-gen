@@ -221,7 +221,11 @@ def resolve_phase_section(store: dict | None, *, task_text: str = "") -> str:
     for b in store.get("_scan_buttons") or []:
         if not isinstance(b, dict):
             continue
-        t = norm_sec(b.get("section_title") or "") or norm_sec(b.get("section_id") or "")
+        t = (
+            norm_sec(b.get("region_label") or "")
+            or norm_sec(b.get("section_title") or "")
+            or norm_sec(b.get("section_id") or "")
+        )
         if t and t != "__root__" and t not in seen:
             seen.add(t)
             titles.append(t)
@@ -229,8 +233,10 @@ def resolve_phase_section(store: dict | None, *, task_text: str = "") -> str:
         from scripts.models.task import TaskList
         tl = TaskList.from_store(store.get("task_list"))
         for i in list(tl.pending) + list(tl.done):
-            t = norm_sec(getattr(i, "section_title", "") or "") or norm_sec(
-                getattr(i, "section_id", "") or ""
+            t = (
+                norm_sec(getattr(i, "region_label", "") or "")
+                or norm_sec(getattr(i, "section_title", "") or "")
+                or norm_sec(getattr(i, "section_id", "") or "")
             )
             if t and t != "__root__" and t not in seen:
                 seen.add(t)

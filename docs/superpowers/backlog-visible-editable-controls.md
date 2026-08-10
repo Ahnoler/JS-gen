@@ -73,7 +73,7 @@
 
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
-| **legacy-section-retire** | **进行中（slice-1）** | summary/TaskList 已双写 `region_label`（`section` 别名）；锚 xpath 仍保留 D3 实现 | **P1** · [TODO](todos/2026-08-11-remove-legacy-section-chunking.md) |
+| **legacy-section-retire** | **进行中（slice-1+2）** | summary/TaskList/scan-attach 双写 `region_*`；`click_save(region=)` 别名；D3 锚 xpath 仍保留 | **P1** · [TODO](todos/2026-08-11-remove-legacy-section-chunking.md) |
 | **L1c-wet / scan-py** | 挂起 | L1c：`L1C_LLM=1` BiB 湿测；Python scan 接入 classify | P1 |
 | **page-state-wet** | 挂起 | dialog/drawer 同文案按钮碰撞湿测 | P1 |
 | **L1-picker-wet** | 挂起 | BiB 重载 + 多「新增」Vue 选择器冒烟 | 挂起 · 等执行机（CDP 9242 当前不可用） |

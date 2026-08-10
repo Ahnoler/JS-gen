@@ -41,6 +41,27 @@ def test_section_matches() -> None:
     )
 
 
+def test_section_attach_dual_writes_region() -> None:
+    from scripts.controller.actions.js_snippets.scan_utils import JS_SECTION_ATTACH_BLOCK
+
+    assert_true("LEGACY_SECTION_RETIRE" in JS_SECTION_ATTACH_BLOCK, "retire marker")
+    assert_true("region_label" in JS_SECTION_ATTACH_BLOCK, "attach writes region_label")
+    assert_true("withRegionMirror" in JS_SECTION_ATTACH_BLOCK, "mirror helper present")
+
+
+def test_click_save_accepts_region_alias() -> None:
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    assert_true(
+        "async def click_save(button_text: str = '保存', section: str = '', region: str = '')" in form
+        or 'async def click_save(button_text: str = "保存", section: str = "", region: str = "")' in form
+        or "region: str = ''" in form and "async def click_save" in form,
+        "click_save exposes region= alias",
+    )
+    fn = form.find("async def click_save")
+    body = form[fn : fn + 800]
+    assert_true("section or region" in body, "click_save prefers section|region")
+
+
 def test_filter_pending_excludes_other_section() -> None:
     tl = TaskList(
         pending=[
@@ -316,6 +337,8 @@ def test_force_refill_preserves_section_on_valued_fields() -> None:
 
 def main() -> int:
     test_section_matches()
+    test_section_attach_dual_writes_region()
+    test_click_save_accepts_region_alias()
     test_filter_pending_excludes_other_section()
     test_gate_scoped_ignores_credit()
     test_multi_section_map()

@@ -582,13 +582,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'Call only when the phase contract allows form assistant (create / full modify). '
         'Do not use on navigate/query phases.'
     )
-    async def run_form_assistant(section: str = ''):
+    async def run_form_assistant(section: str = '', region: str = ''):
         from ._phase_intent import contract_allows_form_assistant
         if not contract_allows_form_assistant(case_data_store):
             return 'err-form-assistant-forbidden: phase contract allow_form_assistant=false'
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        sec = (section or '').strip()
+        sec = (section or region or '').strip()
         if sec:
             from .section_scope import remember_phase_section
             remember_phase_section(case_data_store, sec)
@@ -1361,12 +1361,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
     @controller.action('Get the current pending task list. Returns {"pending": [...], NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 保存 — do not re-fill fields.')
-    async def get_pending_tasks(section: str = ''):
+    async def get_pending_tasks(section: str = '', region: str = ''):
         if _is_query_mode(case_data_store):
             return _ok(_query_not_form_payload(), include_in_memory=True)
         from .section_scope import section_matches, pending_by_section
         tl = TaskList.from_store(case_data_store.get('task_list'))
-        sec = (section or '').strip()
+        sec = (section or region or '').strip()
         pending_items = [
             i for i in tl.pending
             if not i.needs_intervention
@@ -1397,19 +1397,20 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'then scan the whole page for .el-form-item__error and success/error notifications. '
         'Prefer this over scroll_down + click_element_by_index for form submit (including '
         'maintain/edit dialog 确认). '
-        'Optional section scopes to a collapse/tab/card block when multiple同名按钮 exist. '
+        'Optional section (or region alias) scopes to a collapse/tab/card / L1 block when multiple同名按钮 exist. '
         'Returns ok-save-success when 操作成功 toast appears, ok-save-navigation when URL changes, '
         'or ok-save-no-feedback when the click completes with no toast/error/navigation '
         '(silent save — still success). On validation errors returns err-save-validation.'
     )
-    async def click_save(button_text: str = '保存', section: str = ''):
+    async def click_save(button_text: str = '保存', section: str = '', region: str = ''):
         from ._phase_intent import check_pending_write_gate, contract_force_refill, record_success_token
 
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         compact_btn = re.sub(r'\s+', '', (button_text or '保存').strip()) or '保存'
-        sec = (section or "").strip()
-        explicit_sec = bool((section or "").strip())
+        # LEGACY_SECTION_RETIRE: region= preferred alias; section= kept for compat.
+        sec = (section or region or "").strip()
+        explicit_sec = bool(sec)
         # Resolve: explicit → multi-save gate → sticky memory → unique → ""
         if not sec and not explicit_sec:
             try:

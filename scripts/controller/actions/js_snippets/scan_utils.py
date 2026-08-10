@@ -131,9 +131,37 @@ JS_SECTION_ATTACH_BLOCK = r'''
         }
         return { section_id: '__root__', section_title: '' };
     };
+    const emptySectionAssign = () => ({
+        section_id: '__root__',
+        section_title: '',
+        region_label: '',
+        region_role: '',
+        region_id: '',
+    });
+    const withRegionMirror = (sec) => {
+        const title = (sec && sec.section_title) ? String(sec.section_title) : '';
+        const sid = (sec && sec.section_id) ? String(sec.section_id) : '__root__';
+        if (!title || sid === '__root__') {
+            return {
+                section_id: sid || '__root__',
+                section_title: title,
+                region_label: '',
+                region_role: '',
+                region_id: '',
+            };
+        }
+        // LEGACY_SECTION_RETIRE: dual-write L1 region_* from D3 section title (compat).
+        return {
+            section_id: sid,
+            section_title: title,
+            region_label: title,
+            region_role: 'section',
+            region_id: 'section:' + sid.slice(0, 40),
+        };
+    };
     const attachSection = (field, el) => {
         if (!el) {
-            Object.assign(field, { section_id: '__root__', section_title: '' });
+            Object.assign(field, emptySectionAssign());
             return;
         }
         const collapse = el.closest && el.closest('.el-collapse-item');
@@ -141,7 +169,7 @@ JS_SECTION_ATTACH_BLOCK = r'''
         const card = el.closest && el.closest('.el-card');
         const anchor = collapse || pane || card || null;
         if (!anchor) {
-            Object.assign(field, { section_id: '__root__', section_title: '' });
+            Object.assign(field, emptySectionAssign());
             return;
         }
         if (sectionAssignments.has(anchor)) {
@@ -155,7 +183,7 @@ JS_SECTION_ATTACH_BLOCK = r'''
             sectionTitleCounts.set(dedupeKey, n);
             if (n > 1) sec.section_id = (sec.section_title || dedupeKey) + '#' + n;
         }
-        const assigned = { section_id: sec.section_id, section_title: sec.section_title };
+        const assigned = withRegionMirror(sec);
         sectionAssignments.set(anchor, assigned);
         Object.assign(field, assigned);
     };

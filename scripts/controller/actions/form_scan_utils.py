@@ -356,7 +356,8 @@ def build_editable_summary(
     sections = [
         {
             'id': s.get('section_id', ''),
-            'title': s.get('section_title', ''),
+            'title': s.get('region_label') or s.get('section_title', ''),
+            'region_label': s.get('region_label') or s.get('section_title', ''),
             'pending': s.get('fields_editable_pending', 0),
         }
         for s in section_block.get('sections', [])
@@ -447,23 +448,31 @@ def _build_section_summary(
     order: list[str] = []
     by_key: dict[str, dict] = {}
 
-    def _ensure(section_id: str, section_title: str) -> dict:
-        key = _section_group_key(section_id, section_title)
+    def _ensure(section_id: str, section_title: str, region_label: str = '') -> dict:
+        title = (region_label or section_title or '').strip()
+        key = _section_group_key(section_id, title)
         if key not in by_key:
             by_key[key] = {
                 'section_id': (section_id or '').strip() or key,
-                'section_title': (section_title or '').strip(),
+                'section_title': (section_title or title).strip(),
+                'region_label': title,
                 'fields_sample': [],
                 'buttons': [],
                 '_field_entries': [],
             }
             order.append(key)
+        elif title and not by_key[key].get('region_label'):
+            by_key[key]['region_label'] = title
         return by_key[key]
 
     for f in fields:
         if not isinstance(f, dict):
             continue
-        sec = _ensure(f.get('section_id') or '', f.get('section_title') or '')
+        sec = _ensure(
+            f.get('section_id') or '',
+            f.get('section_title') or '',
+            f.get('region_label') or '',
+        )
         label = (f.get('label') or '').strip()
         if label:
             sec['_field_entries'].append({
@@ -474,7 +483,11 @@ def _build_section_summary(
     for b in buttons:
         if not isinstance(b, dict):
             continue
-        sec = _ensure(b.get('section_id') or '', b.get('section_title') or '')
+        sec = _ensure(
+            b.get('section_id') or '',
+            b.get('section_title') or '',
+            b.get('region_label') or '',
+        )
         label = (b.get('label') or '').strip()
         if label and label not in sec['buttons']:
             sec['buttons'].append(label)

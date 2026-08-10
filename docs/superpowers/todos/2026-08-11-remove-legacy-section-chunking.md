@@ -1,6 +1,6 @@
 # TODO: 移除旧分块判断
 
-**Status:** In progress — slice-1 已落地（summary/TaskList `region_label` 双写；`section` 别名）  
+**Status:** In progress — slice-1+2 已落地（双写 region；`region=` 工具别名；scan attach 镜像）  
 **Date:** 2026-08-11  
 **Backlog ID:** **legacy-section-retire**  
 **Related:** [L1 region preview](../specs/2026-08-10-resolve-ambiguous-section-preview-design.md)（§ Relationship to older「分块」）; [dual-save section xpath](../specs/2026-08-10-dual-save-section-xpath-design.md); [phase section scope](../specs/2026-08-08-phase-section-scope-design.md); D3 `sectionOf` / `click_save(section)`
@@ -93,19 +93,17 @@ L1 / titlebox / page-state-gen 落地后，旧分块在 **消歧与展示** 上�
 
 ### F. 本刀下一步（实现）
 
-1. ~~盘点~~（本表）  
-2. ~~resolve/inventory：picker 已用 `region_*`（`resolve-by-label.js`）；无 sectionOf-only 文案回退~~  
-3. ~~`scan_editable_summary` / TaskList：输出 `region_label`（`section` 只读别名）~~ — 2026-08-11 已实施  
-4. 再开子刀：删 `sectionOf` 独立产品语义 / 参数改名；Vue 写路径只写 region_*  
+1. ~~盘点~~  
+2. ~~resolve/inventory `region_*`~~  
+3. ~~summary/TaskList `region_label`（section 别名）~~ — slice-1  
+4. ~~scan attach 双写 region_*；`click_save/get_pending/run_form_assistant` 接受 `region=`~~ — slice-2  
+5. 再开子刀：Vue 写路径只写 region_*；删 `sectionOf` 独立产品语义；文档 Removed  
 
 **不删：** dual-save / wizard / page-state 已验证 xpath 形状（可换函数名，不可丢验收）。
 
-### G. 实现记录（2026-08-11 slice-1）
+### G. 实现记录
 
-| 改动 | 文件 |
-|------|------|
-| summary 投影 `region_label` + `section` 别名 | `form_scan_utils.py` |
-| `section_matches(..., region_label=)`；pending/submit 认 region | `section_scope.py` |
-| TaskItem.`region_label` + `_region_fields` | `scripts/models/task.py` |
-| 过滤调用传 region | `_form.py` / `_llm_values.py` |
-| 表征 | `characterize-scan-editable-summary.py` / `characterize-phase-section-scope.py` |
+| Slice | 改动 | 文件 |
+|------|------|------|
+| 1 | summary/TaskList 双写；`section_matches` 认 region | `form_scan_utils` / `task.py` / `section_scope` |
+| 2 | `JS_SECTION_ATTACH_BLOCK` 镜像 region_*；工具 `region=` 别名；resolve_phase_section 优先 region | `scan_utils.py` / `_form.py` / `section_scope.py` |
