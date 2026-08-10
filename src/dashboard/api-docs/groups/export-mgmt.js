@@ -1,6 +1,6 @@
 /**
- * API group(s): export-mgmt — extracted from catalog.js.
- * Keep in sync with src/routes/v2/*.js
+ * API group(s): export-mgmt (V1 legacy-engine) + batch-export (V2 partner transaction).
+ * Keep in sync with src/routes/v2/export-mgmt.js
  */
 import { J } from './_j.js';
 
@@ -9,7 +9,7 @@ export const GROUP_EXPORT = [
   {
     id: 'export-mgmt',
     name: '导出管理',
-    description: '对外导出：传统执行引擎 5 字段（legacy-engine）与 partner transaction envelope（transcation* 拼写 intentional）。',
+    description: 'V1 传统执行引擎 5 字段导出（legacy-engine）。产品对接请用「批量导出管理」。',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/export/legacy-engine/schema',
@@ -154,6 +154,13 @@ export const GROUP_EXPORT = [
           },
         }),
       },
+    ],
+  },
+  {
+    id: 'batch-export',
+    name: '批量导出管理',
+    description: 'Partner transaction 导出（单轨 / 批量）。信封字段拼写（transcation*、mothed）为对接约定。成功导出后 trajectory.is_export=1；phase/step 变更置 0。',
+    endpoints: [
       {
         method: 'GET', path: '/api/v2/export/transaction/schema',
         summary: 'Partner transaction 字段契约',
