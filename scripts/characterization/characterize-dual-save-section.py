@@ -12,12 +12,30 @@ sys.path.insert(0, str(ROOT))
 from scripts.controller.actions.section_scope import (  # noqa: E402
     same_label_section_keys,
     preferred_submit_cue,
+    resolve_phase_section,
 )
+from scripts.controller.actions.form_scan_utils import _submit_ready_hint  # noqa: E402
+from scripts.models.task import TaskItem, TaskList  # noqa: E402
 
 
 def assert_true(cond: bool, msg: str) -> None:
     if not cond:
         raise AssertionError(msg)
+
+
+def _dual_save_store() -> dict:
+    buttons = [
+        {"label": "保存", "section_id": "系统评级结论", "section_title": "系统评级结论"},
+        {"label": "保存", "section_id": "客户综合评价", "section_title": "客户综合评价"},
+    ]
+    return {
+        "_scan_buttons": buttons,
+        "_phase_section": "系统评级结论",
+        "task_list": TaskList(
+            pending=[],
+            done=[TaskItem(label="理由说明", kind="input", section_title="系统评级结论")],
+        ).to_store(),
+    }
 
 
 def test_same_label_section_keys() -> None:
@@ -34,24 +52,39 @@ def test_same_label_section_keys() -> None:
 
 
 def test_preferred_submit_cue() -> None:
-    buttons = [
-        {"label": "保存", "section_id": "系统评级结论", "section_title": "系统评级结论"},
-        {"label": "保存", "section_id": "客户综合评价", "section_title": "客户综合评价"},
-    ]
-    store = {
-        "_scan_buttons": buttons,
-        "_phase_section": "系统评级结论",
-    }
+    store = _dual_save_store()
     cue = preferred_submit_cue(store, section="")
-    # After Task 3/5 cue may still include memory section; dual-save prompt task covers explicit section=
-    assert_true("click_save" in cue, "cue mentions click_save")
+    assert_true("Multiple" in cue, f"multi cue must say Multiple: {cue}")
+    assert_true("section='…'" in cue or "section=" in cue, f"multi cue must require section=: {cue}")
+    assert_true("sticky" in cue.lower() or "ambiguous" in cue.lower(), f"warn sticky: {cue}")
+    assert_true("section='系统评级结论'" not in cue, f"must not inject sticky section: {cue}")
 
-    cue2 = preferred_submit_cue(
-        {"_scan_buttons": buttons, "_phase_section": "系统评级结论"},
-        section="",
+    # Callers pass sticky via resolve_phase_section — gate must still fire
+    sticky = resolve_phase_section(store)
+    assert_true(sticky == "系统评级结论", f"fixture sticky: {sticky!r}")
+    cue_sticky = preferred_submit_cue(store, section=sticky)
+    assert_true("Multiple" in cue_sticky, f"sticky arg must not bypass gate: {cue_sticky}")
+    assert_true(
+        "section='系统评级结论'" not in cue_sticky,
+        f"must not emit click_save with sticky section: {cue_sticky}",
     )
-    assert_true("err-save-ambiguous" in cue2 or "section=" in cue2, f"multi cue: {cue2}")
-    assert_true("sticky" in cue2.lower() or "不会" in cue2 or "Multiple" in cue2, f"warn multi: {cue2}")
+
+
+def test_submit_ready_hint_dual_save() -> None:
+    store = _dual_save_store()
+    hint = _submit_ready_hint(store)
+    assert_true("Multiple" in hint, f"_submit_ready_hint must gate dual save: {hint}")
+    assert_true(
+        "section='系统评级结论'" not in hint,
+        f"must not inject sticky section in hint: {hint}",
+    )
+    sticky = resolve_phase_section(store)
+    hint_sticky = _submit_ready_hint(store, section=sticky)
+    assert_true("Multiple" in hint_sticky, f"explicit sticky section must gate: {hint_sticky}")
+    assert_true(
+        "section='系统评级结论'" not in hint_sticky,
+        f"must not pass sticky as section= in hint: {hint_sticky}",
+    )
 
 
 def test_click_save_wiring() -> None:
@@ -83,6 +116,7 @@ def test_click_save_records_section() -> None:
 def main(include_form_wiring: bool = False) -> int:
     test_same_label_section_keys()
     test_preferred_submit_cue()
+    test_submit_ready_hint_dual_save()
     test_click_save_records_section()
     if include_form_wiring:
         test_click_save_wiring()

@@ -128,14 +128,13 @@ def preferred_submit_cue(store: dict | None, section: str = "") -> str:
     explicit_sec = norm_sec(section)
     sec = explicit_sec or (resolve_phase_section(store) if store else "")
     btn = preferred_submit_button(store, section=sec)
-    if not explicit_sec:
-        keys = same_label_section_keys((store or {}).get("_scan_buttons"), btn)
-        if len(keys) >= 2:
-            return (
-                f"Multiple '{btn}' buttons in {keys!r}. "
-                f"Call click_save(button_text='{btn}', section='…') with the phase block title. "
-                f"Do NOT call bare click_save() — sticky section is ignored when ambiguous."
-            )
+    keys = same_label_section_keys((store or {}).get("_scan_buttons"), btn)
+    if len(keys) >= 2:
+        return (
+            f"Multiple '{btn}' buttons in {keys!r}. "
+            f"Call click_save(button_text='{btn}', section='…') with the phase block title. "
+            f"Do NOT call bare click_save() — sticky section is ignored when ambiguous."
+        )
     sec_part = f", section='{sec}'" if sec else ""
     has_calc = False
     for b in (store or {}).get("_scan_buttons") or []:

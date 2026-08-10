@@ -361,6 +361,14 @@ PAGE_LOCATOR_HELPERS = r'''
     if (!sec || !sec.prefix) return '';
     return sec.prefix + '//' + leaf;
   }
+  /** Relative leaf after the last // in a smart xpath (for section anchoring). */
+  function leafFromSmartExpr(expr) {
+    const s = String(expr || '').trim();
+    if (!s) return '';
+    const idx = s.lastIndexOf('//');
+    if (idx < 0) return s.replace(/^\/+/, '');
+    return s.slice(idx + 2);
+  }
   function pinOccurrence(expr, host) {
     if (!expr || !host) return { xpath: expr || '', occurrence: 0, verified: false };
     const nodes = evalXpathAll(expr);
@@ -556,6 +564,8 @@ PAGE_LOCATOR_HELPERS = r'''
     let occurrence = 0;
     let verified = false;
     if (smart || t) {
+      // Button-oriented default leaf; non-button duplicate hosts without smart multi-hit
+      // fall back to xpath_full until a follow-up generalizes leaf extraction.
       const localLeaf = (function () {
         const tagL = (host.tagName || '').toLowerCase();
         const lit = xpathLiteral(t);
@@ -566,6 +576,7 @@ PAGE_LOCATOR_HELPERS = r'''
         }
         return 'button[normalize-space()=' + lit + ']';
       })();
+      let leafForAnchor = localLeaf;
       let trySectionAnchor = false;
       if (sectionAnchorOf(host) && t) {
         const labelNodes = evalXpathAll('//' + localLeaf);
@@ -573,10 +584,14 @@ PAGE_LOCATOR_HELPERS = r'''
       }
       if (smart) {
         const nodes = evalXpathAll(smart);
-        if (nodes.length >= 2) trySectionAnchor = true;
+        if (nodes.length >= 2) {
+          trySectionAnchor = true;
+          const fromSmart = leafFromSmartExpr(smart);
+          if (fromSmart) leafForAnchor = fromSmart;
+        }
       }
       if (trySectionAnchor) {
-        const anchored = sectionAnchorXPath(host, localLeaf);
+        const anchored = sectionAnchorXPath(host, leafForAnchor);
         if (anchored) {
           const anodes = evalXpathAll(anchored);
           let idx = -1;

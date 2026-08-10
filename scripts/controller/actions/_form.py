@@ -1431,9 +1431,6 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                             sys.stderr.flush()
             except Exception:
                 pass
-        elif not sec:
-            # explicit empty string already handled; keep legacy memory only if caller omitted?
-            pass
         if sec:
             from .section_scope import remember_phase_section
             remember_phase_section(case_data_store, sec)

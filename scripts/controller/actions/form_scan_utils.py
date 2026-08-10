@@ -801,12 +801,29 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
             except Exception:
                 pass
         # Auto-bind section when not explicitly scoped: memory/infer then unique save button
+        from scripts.controller.actions.section_scope import (
+            preferred_submit_button,
+            preferred_submit_cue,
+            same_label_section_keys,
+            unique_button_section,
+        )
+        try:
+            btn = preferred_submit_button(case_data_store, section=sec)
+        except Exception:
+            btn = '保存'
+        keys = same_label_section_keys(case_data_store.get('_scan_buttons'), btn)
+        if len(keys) >= 2:
+            return f'NEXT_ACTION: {preferred_submit_cue(case_data_store, section="")}'
         if not sec:
             try:
-                from scripts.controller.actions.section_scope import unique_button_section
                 auto_sec = resolve_phase_section(case_data_store)
                 if not auto_sec:
-                    auto_sec = unique_button_section(case_data_store.get('_scan_buttons'), '保存')
+                    prefer = preferred_submit_button(case_data_store, section='')
+                    auto_sec = unique_button_section(
+                        case_data_store.get('_scan_buttons'), prefer,
+                    ) or unique_button_section(
+                        case_data_store.get('_scan_buttons'), '保存',
+                    )
                 if auto_sec:
                     sec = auto_sec
             except Exception:
@@ -814,9 +831,10 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
         # Include section= when scoped so caller can pass it through to click_save
         sec_part = f", section='{sec}'" if sec else ''
         return (
-            f'NEXT_ACTION: click_save(button_text=\'保存\'{sec_part}) | fillable pending=0. '
-            'Call click_save() NOW (auto-finds 保存/提交, scrolls into view). '
-            'Do NOT scroll_down / click_element_by_index to hunt for 保存. '
+            f"NEXT_ACTION: click_save(button_text='{btn}'{sec_part}) | fillable pending=0. "
+            f"Call click_save(button_text='{btn}'{sec_part}) NOW "
+            f"(auto-finds {btn}, scrolls into view). "
+            f'Do NOT scroll_down / click_element_by_index to hunt for {btn}. '
             'Do NOT re-fill or re-select already-filled fields.'
         )
     return ''
