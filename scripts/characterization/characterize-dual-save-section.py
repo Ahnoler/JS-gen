@@ -60,9 +60,23 @@ def test_click_save_wiring() -> None:
     assert_true(multi_pos < mem_pos, "multi-section check before sticky memory read")
 
 
+def test_click_save_records_section() -> None:
+    """Source: successful click_save must persist section in recorded params."""
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    cs = form.find("async def click_save")
+    assert_true(cs >= 0, "click_save present")
+    end = form.find("    @controller.action", cs + 1)
+    body = form[cs : end if end > cs else cs + 16000]
+    rec = body.find("_record_action")
+    assert_true(rec >= 0, "records action")
+    rec_block = body[rec : rec + 600]
+    assert_true("section" in rec_block, "params include section")
+
+
 def main(include_form_wiring: bool = False) -> int:
     test_same_label_section_keys()
     test_preferred_submit_cue()
+    test_click_save_records_section()
     if include_form_wiring:
         test_click_save_wiring()
     else:

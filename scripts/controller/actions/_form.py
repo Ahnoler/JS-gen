@@ -1601,6 +1601,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 'index': -1,
                 'tag_name': (element_info or {}).get('tag_name') or tag_name,
                 'text': btn_text,
+                'section': sec or info.get('section') or '',
             },
             f'ok-clicked-save:{btn_text}',
             element=element_info,
