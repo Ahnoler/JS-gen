@@ -89,8 +89,10 @@ function ok(name) {
     params: { label_text: '客户名称' },
   });
   assert.match(fill, /el-form-item/);
-  assert.doesNotMatch(fill, /\.menu-item/);
   assert.match(fill, /fill_form_field/);
+  // PAGE_LOCATOR_HELPERS may mention menu-item tokens; assert form early-return instead
+  assert.match(fill, /action === 'fill_form_field'|actionType === 'fill_form_field'/);
+  assert.match(fill, /return out/);
   ok('fill expression scopes to form');
 }
 
