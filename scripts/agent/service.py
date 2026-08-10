@@ -465,9 +465,10 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 mark_quality_failed(case_data_ref, f'pending_fields:{",".join(labels[:8])}')
             submit = (contract or {}).get('submit') or {}
             if submit.get('required') and not has_contract_success(case_data_ref):
+                # has_contract_success already respects success.kinds — do not waive
+                # missing toast_ok just because an introduce picker confirmed.
                 if contract and contract.get('mode') not in ('introduce_pick',):
-                    if not case_data_ref.get('_last_save_ok') and not case_data_ref.get('_last_introduce_ok'):
-                        mark_quality_failed(case_data_ref, 'missing_success_token')
+                    mark_quality_failed(case_data_ref, 'missing_success_token')
             emit_phase_observability(case_data_ref, emit_json)
             phase_payload = {"phase": step_index, "name": task_text[:60]}
             c = get_phase_intent(case_data_ref)

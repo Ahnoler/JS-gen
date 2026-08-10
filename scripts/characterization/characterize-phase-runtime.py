@@ -160,7 +160,7 @@ def test_empty_effective_and_prescription() -> None:
     )
     assert_true(
         "done(" in empty_act_prescription_message({}, last_step=True, save_ok=False),
-        "last_step → done only",
+        "last_step → done only (DoneAgentOutput)",
     )
     msg = empty_act_prescription_message(
         {"_phase_section": "系统评级结论", "_phase_intent": {"submit": {"required": True}}},
@@ -168,9 +168,29 @@ def test_empty_effective_and_prescription() -> None:
         save_ok=False,
     )
     assert_true("click_save" in msg and "系统评级结论" in msg, f"scoped save cue: {msg}")
+    # Last step remains done-only even when submit.required (schema has no click_save).
     assert_true(
-        "click_save" not in empty_act_prescription_message({}, last_step=True, save_ok=False),
-        "no click_save on last step",
+        "click_save" not in empty_act_prescription_message(
+            {"_phase_intent": {"submit": {"required": True}}},
+            last_step=True,
+            save_ok=False,
+        ),
+        "no click_save on last step even if submit.required",
+    )
+    # Penultimate / introduce-recovery: urgency cue must prescribe click_save.
+    from scripts.controller.actions.section_scope import final_save_urgency_message
+
+    urg = final_save_urgency_message(
+        {
+            "_phase_intent": {"submit": {"required": True}, "mode": "create"},
+            "_phase_section": "",
+        }
+    )
+    assert_true(urg and "click_save" in urg, f"near-last urgency → click_save: {urg}")
+    assert_true(
+        final_save_urgency_message({"_last_save_ok": True, "_phase_intent": {"submit": {"required": True}}})
+        is None,
+        "no urgency after save ok",
     )
     non_submit_msg = empty_act_prescription_message(
         {
@@ -251,6 +271,31 @@ def test_session_runner_logs_empty_buffer() -> None:
 def test_quality_fail_logging_in_session_runner() -> None:
     src = (ROOT / "scripts/agent/service.py").read_text(encoding="utf-8")
     assert_true("QUALITY FAIL" in src, "stderr marker present")
+    # introduce_ok must not waive missing_success_token when kinds need toast_ok
+    assert_true(
+        "has_contract_success" in src or "missing_success_token" in src,
+        "phase-end quality uses success token check",
+    )
+    gate = (ROOT / "scripts/controller/actions/phase/intent_gates.py").read_text(encoding="utf-8")
+    # Source cue: waive introduce_ok only when confirm kinds are accepted
+    assert_true(
+        "confirm_click" in gate and "picker_closed" in gate,
+        "introduce token kinds are defined",
+    )
+
+
+def test_create_submit_budget_includes_recovery_buffer() -> None:
+    """create+submit needs headroom for validation → introduce → final save."""
+    base = resolve_phase_max_steps(
+        30,
+        {"estimated_steps": 12, "effort": "long", "submit": {"required": True}, "mode": "other"},
+    )
+    create = resolve_phase_max_steps(
+        30,
+        {"estimated_steps": 12, "effort": "long", "submit": {"required": True}, "mode": "create"},
+    )
+    assert_true(create > base, f"create recovery buffer: base={base} create={create}")
+    assert_true(create <= 30, "still capped by ceiling")
 
 
 def test_resolve_infer_unique_and_longest() -> None:
@@ -290,6 +335,7 @@ def main() -> None:
     test_empty_act_buffer_on_submit_required()
     test_session_runner_logs_empty_buffer()
     test_quality_fail_logging_in_session_runner()
+    test_create_submit_budget_includes_recovery_buffer()
     test_resolve_infer_unique_and_longest()
     print("PASS characterize-phase-runtime")
 

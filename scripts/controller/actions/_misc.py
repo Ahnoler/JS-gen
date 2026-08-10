@@ -544,6 +544,14 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         maybe_record_picker_closed(
                             case_data_store, still_query_ui=still, parent_container=parent,
                         )
+                        if not still:
+                            # Parent maintain form still needs toast_ok via click_save.
+                            case_data_store['_submit_ready'] = True
+                            case_data_store.pop('_query_ui', None)
+                            sys.stderr.write(
+                                '[click] picker confirm closed → submit-ready for parent save\n'
+                            )
+                            sys.stderr.flush()
                 except Exception:
                     pass
             return _ok(f'ok-clicked-{index}')

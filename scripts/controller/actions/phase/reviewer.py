@@ -24,6 +24,8 @@ _MAX_STEPS_BUFFER = 2
 _SUBMIT_STEPS_FLOOR = 8
 # Extra headroom when submit.required for empty-act / retry steps before click_save.
 _EMPTY_ACT_BUFFER = 3
+# create/modify often hit validation → introduce → final save after the estimate.
+_CREATE_RECOVERY_BUFFER = 4
 _VALID_EFFORT = frozenset(_EFFORT_STEPS)
 
 
@@ -36,7 +38,8 @@ def resolve_phase_max_steps(ceiling: int, contract: dict | None) -> int:
 
     When ``submit.required`` is true, also enforce ``_SUBMIT_STEPS_FLOOR`` so
     optimistic estimates (e.g. est=4 → 6) cannot starve click_save, then add
-    ``_EMPTY_ACT_BUFFER`` for empty-act retries before submit.
+    ``_EMPTY_ACT_BUFFER`` for empty-act retries before submit. create/modify
+    get ``_CREATE_RECOVERY_BUFFER`` for validation→introduce→final-save paths.
     """
     try:
         ceil = int(ceiling)
@@ -67,6 +70,9 @@ def resolve_phase_max_steps(ceiling: int, contract: dict | None) -> int:
     chosen = min(ceil, max(floor, int(raw)))
     if coerce_bool(submit.get('required')):
         chosen = min(ceil, chosen + _EMPTY_ACT_BUFFER)
+        mode = str(contract.get('mode') or '').strip().lower()
+        if mode in ('create', 'modify'):
+            chosen = min(ceil, chosen + _CREATE_RECOVERY_BUFFER)
     return chosen
 
 

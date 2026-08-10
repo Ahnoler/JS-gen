@@ -1783,9 +1783,14 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         case_data_store.pop('_query_ui', None)
                 sys.stderr.write('[click_save] SUCCESS picker confirm (dialog closed)\n')
                 sys.stderr.flush()
+                if case_data_store is not None:
+                    # Parent form still needs final 保存 after introduce (toast_ok).
+                    case_data_store['_submit_ready'] = True
+                    case_data_store.pop('_query_ui', None)
                 return _ok(
                     'ok-introduce-confirm | Picker confirmed; introduce fields should be backfilled. '
-                    'Continue filling remaining form fields then click_save(button_text="保存").',
+                    'Call click_save(button_text="保存") NOW on the parent form. '
+                    'Do NOT only check_field_value.',
                     include_in_memory=True,
                 )
 

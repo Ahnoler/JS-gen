@@ -280,6 +280,31 @@ def _phase_submit_not_required(store: dict | None) -> bool:
         return False
 
 
+def final_save_urgency_message(store: dict | None) -> str | None:
+    """Penultimate-step / post-introduce cue: force click_save while tools still exist.
+
+    Last browser-use step is DoneAgentOutput-only — never prescribe click_save there.
+    Call this on near-last actionable steps or when picker/query UI just closed.
+    """
+    if not store:
+        return None
+    if store.get("_last_save_ok") or store.get("_query_ui") or store.get("_query_task"):
+        return None
+    if _phase_submit_not_required(store):
+        return None
+    sec = resolve_phase_section(store)
+    try:
+        cue = preferred_submit_cue(store, section=sec)
+    except Exception:
+        sec_part = f", section='{sec}'" if sec else ""
+        cue = f"click_save(button_text='保存'{sec_part})"
+    return (
+        "[SYSTEM] Final save still required before the done-only last step. "
+        f"NEXT_ACTION: {cue}. Do NOT only check_field_value / re-fill. "
+        "Do NOT call done(success=true) until click_save returns ok-save-*."
+    )
+
+
 def empty_act_prescription_message(store, *, last_step: bool, save_ok: bool) -> str:
     if last_step:
         ok = bool(save_ok or (store or {}).get("_last_save_ok"))
