@@ -57,7 +57,7 @@ export const GROUP_TRAJECTORY = [
         respExample: J({
           rows: [{
             id: 42, name: '开户交易', task: '需求描述',
-            recordStatus: 'draft', stepCount: 0, phaseCount: 3,
+            recordStatus: 'draft', isExport: 0, stepCount: 0, phaseCount: 3,
             functionId: 3, systemAccountId: 10, model: 'deepseek-v4-flash',
           }],
           total: 1, page: 1, pageSize: 20,
@@ -88,7 +88,7 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}',
         summary: '交易详情（含 phases、caseEntries）',
-        desc: 'caseEntries 为交易级 legacy KV（case_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。',
+        desc: 'caseEntries 为交易级 legacy KV（case_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {
