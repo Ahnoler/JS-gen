@@ -27,6 +27,8 @@ docs/*
 !docs/superpowers/
 !docs/superpowers/specs/
 !docs/superpowers/specs/**
+!docs/superpowers/plans/
+!docs/superpowers/plans/**
 # Local scratch probes / temp outputs (single folder, no longer matches scripts/__init__.py)
 scripts/_scratch/
 scripts/smoke/
