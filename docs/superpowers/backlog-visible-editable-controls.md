@@ -1,6 +1,7 @@
-# Backlog: 可见可编辑控件 / Agent 视野（核实版 2026-08-09）
+# Backlog: 可见可编辑控件 / Agent 视野（核实版 2026-08-10）
 
-> 本文件记录「目标线」待办。**状态以代码/表征为准**，不以计划 checkbox 为准。
+> 本文件记录「目标线」待办。**状态以代码/表征为准**，不以计划 checkbox 为准。  
+> 下一刀：执行机空闲后再做 **L1-picker BiB/UI 冒烟**；并行可选 **P2-noise+** / **page-state-gen** / **L1c-LLM** 规格。
 
 ## 目标定稿（2026-08-10 修订）
 
@@ -41,6 +42,11 @@
 | **T8** | CTRL `selectOption` 懒加载对齐 Agent | `SELECT_LAZY_LOAD_ON_MISS` in `src/ctrl-actions/select.js`；[plan](plans/2026-08-09-t4-p3-t6-t8.md) |
 | **T10-P0** | unsafe checkpoint `confirmed=0` 但不 abort 批次 | `form-structure-heal.js` / `replay-batch-runner.js`；[spec](specs/2026-08-09-save-form-snapshot-replay-design.md) · [plan](plans/2026-08-09-save-form-snapshot-replay-p0.md) · commit `6b0bf7f` |
 | **T10-P1** | verify Source A+B（`JS_VERIFY_FORM_STRUCTURE` / CTRL `verifyFormStructure`） | `misc.py` / `structure.js` `VERIFY_SOURCE_B_EL_TABLE`；[spec](specs/2026-08-09-save-form-snapshot-replay-design.md) · [plan](plans/2026-08-09-save-form-snapshot-replay-p1.md) · commits `db38d9a`…`2337537` |
+| **FP-P0** | 全页 L2 + 规则 L1 + `mode:'fullpage'` → summary | [spec](specs/2026-08-10-fullpage-visible-controls-scan-design.md) · [plan](plans/2026-08-10-fullpage-visible-controls-scan-p0.md) |
+| **FP-P1** | Source A/B/C rebase → fullpage；壳层不进 fillable | [plan](plans/2026-08-10-fullpage-visible-controls-scan-p1.md) |
+| **FP-P2** | icon / chrome 菜单硬剔除降噪 | [spec](specs/2026-08-10-fullpage-p2-icon-chrome-noise-design.md) · [plan](plans/2026-08-10-fullpage-p2-icon-chrome-noise.md) |
+| **dual-save** | 双「保存」section-anchored xpath + sticky 门禁 | [spec](specs/2026-08-10-dual-save-section-xpath-design.md)；湿跑 PASS |
+| **wizard-next** | 「下一步/上一步」page-state 相对 xpath（防 coalesce） | [spec](specs/2026-08-10-wizard-next-page-state-xpath-design.md)；湿跑 PASS；commits `4ff7233`…`99b2946` |
 
 ---
 
@@ -52,7 +58,7 @@
 | **T4-P1** | **已实施** | 多 overlay 根合并去重；主内容去壳（`JS_SCAN_FORM_FIELDS mode:'multi'`）；`scan_editable_summary` 接线 | [plan](plans/2026-08-09-scan-editable-summary-p1-multiroot.md) · commits `d1696f2`… |
 | **T4-P2** | **已实施** | 摘要旁路 → memory（`form_state` + `form_inventory` 聚合 facts；helper `inventory_emit.py`） | [spec](specs/2026-08-09-inventory-memory-factpack-design.md) · [plan](plans/2026-08-09-inventory-memory-factpack.md) |
 | **T4-P3** | **已实施**（T6+T8） | Source B 空行首命名 + CTRL `selectOption` 懒加载 | [spec](specs/2026-08-09-t4-p3-t6-t8-design.md) · [plan](plans/2026-08-09-t4-p3-t6-t8.md) |
-| **T4-P4** | 未做 | Playwright MCP a11y **对照/诊断**（灰度，不替换 Element 主路径） | MCP/灰度计划 |
+| **T4-P4** | 未做 | Playwright MCP a11y **对照/诊断**（灰度，不替换 Element 主路径） | MCP/灰度计划 · 见下方「动态 L1 / 诊断」 |
 
 ---
 
@@ -60,14 +66,21 @@
 
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
+| **L1-picker** | **代码已实施；湿测挂起** | 歧义 `resolve-element`：L1 `region_*` 预览 + Vue 选择器；表征 PASS；CDP 对拍过顶栏/主区。**BiB 重载 + 多「新增」UI 冒烟**等执行机空闲 | 挂起 · [spec](specs/2026-08-10-resolve-ambiguous-section-preview-design.md) · [plan](plans/2026-08-10-resolve-ambiguous-l1-region-preview.md) |
+| **L1c-LLM** | 未做 | 动态 L1：低置信度 **feature card → LLM 分类** `region_role`（不喂 raw HTML；不得删 L2） | P1 · [fullpage design §Dynamic L1](specs/2026-08-10-fullpage-visible-controls-scan-design.md) |
+| **L1d-cache** | 未做 | L1 角色缓存：`systemId` + 特征签名 → `region_role`（避免每步重问） | P1（跟 L1c） |
+| **L1-vision** | 未做 | Vision：仅对争议容器裁图辅助定角色 | P2+ |
+| **T4-P4** | 未做 | Playwright MCP a11y ⟷ 我方 L2 **对拍诊断**（灰度） | 可与 L1c 并行；非写路径 |
 | **T5** | 未做（本页漏扫后暂缓） | 非 `el-table` 自定义网格 | 对公评级页无 vxe/ag → [gap spec](specs/2026-08-10-t5-credit-scan-gap-design.md)；需另页证据 |
 | **T6** | **已实施** | Source B 空行首表格行命名 | — |
 | **T7** | 不做 | API 改名 `control_*` | P3 |
 | **T8** | **已实施** | CTRL `selectOption` 懒加载对齐 | — |
 | **T9** | 部分 | 产品 `steps/replay` 常态验收 | 运维 |
 | **T10** | **P0+P1 已实施** | `save_form_snapshot` 回放；P0=soft-fail continue；P1=verify Source A+B | [spec](specs/2026-08-09-save-form-snapshot-replay-design.md) |
-| **T1r** | 残余 | tree / replay label 兜底 | T4-P3 后 |
+| **T1r** | 残余 | tree / replay label 兜底 | 可穿插 |
 | **T3r** | 残余 | T3 活录 CDP 对拍 | P2 |
+| **page-state-gen** | 推迟 | 凡「相对 xpath 同、页态不同」的可点击都锚（不止下一步/上一步） | wizard [spec §4](specs/2026-08-10-wizard-next-page-state-xpath-design.md) |
+| **P2-noise+** | 可选 | 黑名单「标签」对齐「页签」（关所有标签含固定） | 小修 |
 
 ---
 
@@ -79,27 +92,30 @@
 | 「清单会自动填表」 | **禁止**；与三大问题①解耦 |
 | 「壳层不进清单」仍有效 | **2026-08-10 已改**：顶栏/侧栏进清单；见 fullpage scan design |
 | 「element 双写还在」 | **T3 已修** |
+| 「L1 预览 = 勾选控件给 LLM 填」 | **否**：仅 `resolve-element` 多匹配时给人看区域标签消歧 |
 
 ---
 
-## 推荐下一刀
+## 推荐下一刀（2026-08-10 修订）
 
-1. ~~全页两层扫描 P0~~ — **已实施 + 湿跑**（列表/编辑页）；`readonly_labels` 已进 summary（[spec](specs/2026-08-10-fullpage-visible-controls-scan-design.md) · [plan](plans/2026-08-10-fullpage-visible-controls-scan-p0.md)）  
-2. ~~**P1** — Source A/B/C → L2~~ — **已实施 + 湿跑**（[plan](plans/2026-08-10-fullpage-visible-controls-scan-p1.md)）  
-3. ~~**P2** — icon / chrome 菜单硬剔除降噪~~ — **已实施 + 湿跑**（布局/主题/关*页签*已清；残留「关闭所有标签(含固定)」因用「标签」非「页签」）（[spec](specs/2026-08-10-fullpage-p2-icon-chrome-noise-design.md) · [plan](plans/2026-08-10-fullpage-p2-icon-chrome-noise.md)）；命名 / Fact Pack 另排
-4. **T1r** / **T4-P4** / 三大问题①  / 可选扩黑名单「标签」对齐「页签」
+1. ~~全页两层扫描 P0 / P1 / P2~~ — **已实施 + 湿跑**  
+2. ~~双保存 section-xpath / wizard 下一步 page-state xpath~~ — **已实施 + 湿跑**  
+3. ~~**L1-picker** 代码~~ — **已实施**（表征 PASS；Vue 选择器已接）；**湿测挂起**（等 BiB 可重载）  
+4. **执行机空闲时：** L1-picker BiB 重载 + 多「新增」UI 冒烟  
+5. **不依赖执行机时可并行：** **P2-noise+**（「标签」黑名单）· **page-state-gen** 规格 · **L1c-LLM** 规格；随后 L1d / Vision；**T4-P4** 对照  
+6. 穿插：T1r；三大问题①；T5（另页证据）
 
-> 参照：Cursor browser MCP / Playwright MCP（先控件池，后区域标签）。
+> 参照：Cursor browser MCP / Playwright MCP（先控件池，后区域标签）。T4-P4 = 对照，非主路径。
 
 ## 文档交叉
 
 | 文档 | 启示 |
 |------|------|
-| `AI记忆系统初始化进度.md` | P2 再接 Fact Pack；勿拖慢主录制 |
+| `AI记忆系统初始化进度.md` | Fact Pack / 命名另排；勿拖慢主录制 |
 | `AI录制三大问题分析.md` | 摘要化、禁清单 auto-fill；入库/toast 正交另排 |
 | `JS-gen学习Codex与PlaywrightMCP集成计划.md` | a11y = P4 对照，非 P0 主路径 |
 | `JS-gen灰度测试开发计划.md` | 只新增、可开关 |
 
 ## 分支
 
-- 保持 `V2.1_dev`；T3 已在长支；继续其上实施 T4-P0。
+- 保持 `V2.1_dev`；L1-picker 代码已合入本支；湿测与可选小刀并行。

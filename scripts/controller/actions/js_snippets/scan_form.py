@@ -455,33 +455,55 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
     }
     /* L1_FEATURE_CARD + ASSIGN_L2_TO_L1 */
     const regions = [];
+    /* SHARED_ASSIGN_REGION — keep in sync with page-locator-helpers.js assignRegion */
+    const regionLabelOf = (role, title) => {
+        const t = String(title || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+        if (role === 'overlay') return t || '弹层';
+        if (role === 'table') return t || '表格';
+        if (role === 'section') return t || '区块';
+        if (role === 'shell-aside') return '侧栏';
+        if (role === 'shell-header') return '顶栏';
+        if (role === 'main') return '主区';
+        if (role === 'page') return '页面';
+        return t || '其他';
+    };
     const assignRegion = (el) => {
-        if (!el || !el.closest) return { region_role: 'page', region_id: 'page' };
+        if (!el || !el.closest) {
+            return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
+        }
         if (el.closest('.el-dialog, .el-drawer, .el-message-box')) {
             const o = el.closest('.el-dialog, .el-drawer, .el-message-box');
-            const title = (o.querySelector('.el-dialog__title')?.textContent
-                || o.getAttribute('aria-label') || 'overlay').replace(/\\s+/g, ' ').trim().slice(0, 40);
-            return { region_role: 'overlay', region_id: 'overlay:' + title };
+            const title = (o.querySelector('.el-dialog__title, .el-drawer__title')
+                && (o.querySelector('.el-dialog__title, .el-drawer__title').textContent || ''))
+                || o.getAttribute('aria-label') || '';
+            const id = 'overlay:' + String(title || 'overlay').replace(/\\s+/g, ' ').trim().slice(0, 40);
+            return { region_role: 'overlay', region_id: id, region_label: regionLabelOf('overlay', title) };
         }
         if (el.closest('.el-table, .tssc-multiple-table-content, .myTable')) {
-            return { region_role: 'table', region_id: 'table' };
+            return { region_role: 'table', region_id: 'table', region_label: regionLabelOf('table') };
         }
         if (el.closest('.el-collapse-item')) {
             const it = el.closest('.el-collapse-item');
-            const t = (it.querySelector('.el-collapse-item__header')?.innerText || 'section')
-                .replace(/\\s+/g, ' ').trim().slice(0, 40);
-            return { region_role: 'section', region_id: 'section:' + t };
+            const t = (it.querySelector('.el-collapse-item__header')
+                && (it.querySelector('.el-collapse-item__header').innerText || ''))
+                || '';
+            const title = String(t).replace(/\\s+/g, ' ').trim().slice(0, 40);
+            return {
+                region_role: 'section',
+                region_id: 'section:' + (title || 'section'),
+                region_label: regionLabelOf('section', title),
+            };
         }
         if (el.closest('.el-aside, .sidebar, aside, .el-menu')) {
-            return { region_role: 'shell-aside', region_id: 'shell-aside' };
+            return { region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') };
         }
         if (el.closest('.el-header, .navbar, header, .tags-view-container')) {
-            return { region_role: 'shell-header', region_id: 'shell-header' };
+            return { region_role: 'shell-header', region_id: 'shell-header', region_label: regionLabelOf('shell-header') };
         }
         if (el.closest('.el-main, .app-main, .plugin-content, main')) {
-            return { region_role: 'main', region_id: 'main' };
+            return { region_role: 'main', region_id: 'main', region_label: regionLabelOf('main') };
         }
-        return { region_role: 'other', region_id: 'other' };
+        return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
     };
     if (isFullpage) {
         const candSels = [
@@ -528,17 +550,23 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         for (const f of fields) {
             // Best-effort: re-find by xpath is heavy; attach region via section / heuristics on label path
             const roleGuess = (f.kind === 'menu_item')
-                ? { region_role: 'shell-aside', region_id: 'shell-aside' }
+                ? { region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') }
                 : (f.section_title
-                    ? { region_role: 'section', region_id: 'section:' + String(f.section_title).slice(0, 40) }
-                    : { region_role: 'main', region_id: 'main' });
+                    ? {
+                        region_role: 'section',
+                        region_id: 'section:' + String(f.section_title).slice(0, 40),
+                        region_label: regionLabelOf('section', f.section_title),
+                    }
+                    : { region_role: 'main', region_id: 'main', region_label: regionLabelOf('main') });
             f.region_role = roleGuess.region_role;
             f.region_id = roleGuess.region_id;
+            f.region_label = roleGuess.region_label;
         }
         /* ASSIGN_L2_TO_L1 */
         for (const b of buttons) {
             b.region_role = b.section_title ? 'section' : 'main';
             b.region_id = b.section_title ? ('section:' + String(b.section_title).slice(0, 40)) : 'main';
+            b.region_label = b.section_title ? regionLabelOf('section', b.section_title) : regionLabelOf('main');
         }
     }
     // Phase 2: 从 Vue 组件实例读取每个 select 的 options。

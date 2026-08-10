@@ -354,6 +354,56 @@ export const PAGE_LOCATOR_HELPERS = `
     }
     return null;
   }
+    /* SHARED_ASSIGN_REGION — keep in sync with scan_form.py assignRegion */
+    function regionLabelOf(role, title) {
+      const t = String(title || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+      if (role === 'overlay') return t || '弹层';
+      if (role === 'table') return t || '表格';
+      if (role === 'section') return t || '区块';
+      if (role === 'shell-aside') return '侧栏';
+      if (role === 'shell-header') return '顶栏';
+      if (role === 'main') return '主区';
+      if (role === 'page') return '页面';
+      return t || '其他';
+    }
+    function assignRegion(el) {
+      if (!el || !el.closest) {
+        return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
+      }
+      if (el.closest('.el-dialog, .el-drawer, .el-message-box')) {
+        const o = el.closest('.el-dialog, .el-drawer, .el-message-box');
+        const title = (o.querySelector('.el-dialog__title, .el-drawer__title')
+          && (o.querySelector('.el-dialog__title, .el-drawer__title').textContent || ''))
+          || o.getAttribute('aria-label') || '';
+        const id = 'overlay:' + String(title || 'overlay').replace(/\\s+/g, ' ').trim().slice(0, 40);
+        return { region_role: 'overlay', region_id: id, region_label: regionLabelOf('overlay', title) };
+      }
+      if (el.closest('.el-table, .tssc-multiple-table-content, .myTable')) {
+        return { region_role: 'table', region_id: 'table', region_label: regionLabelOf('table') };
+      }
+      if (el.closest('.el-collapse-item')) {
+        const it = el.closest('.el-collapse-item');
+        const t = (it.querySelector('.el-collapse-item__header')
+          && (it.querySelector('.el-collapse-item__header').innerText || ''))
+          || '';
+        const title = String(t).replace(/\\s+/g, ' ').trim().slice(0, 40);
+        return {
+          region_role: 'section',
+          region_id: 'section:' + (title || 'section'),
+          region_label: regionLabelOf('section', title),
+        };
+      }
+      if (el.closest('.el-aside, .sidebar, aside, .el-menu')) {
+        return { region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') };
+      }
+      if (el.closest('.el-header, .navbar, header, .tags-view-container')) {
+        return { region_role: 'shell-header', region_id: 'shell-header', region_label: regionLabelOf('shell-header') };
+      }
+      if (el.closest('.el-main, .app-main, .plugin-content, main')) {
+        return { region_role: 'main', region_id: 'main', region_label: regionLabelOf('main') };
+      }
+      return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
+    }
   function sectionAnchorXPath(host, leafLocal) {
     const leaf = String(leafLocal || '').replace(/^\\/+/, '');
     if (!host || !leaf) return '';
@@ -598,6 +648,7 @@ export const PAGE_LOCATOR_HELPERS = `
   function buildLocatorSnap(node, text, xpathFull, formLabel, opts) {
     opts = opts || {};
     const host = normalizeTargetRoot(node) || node;
+    const region = assignRegion(host);
     const kind = opts.targetKind || detectTargetKind(host);
     const t = normalizeControlText(text) || cleanVisibleText(host);
     const abs = String(xpathFull || absXPath(host) || '');
@@ -730,6 +781,9 @@ export const PAGE_LOCATOR_HELPERS = `
       locator_fallback_reason: strategy === 'xpath_full'
         ? (smart ? 'smart_missed_host' : (t || formLbl ? 'no_smart_predicate' : 'empty_anchor_text'))
         : undefined,
+      region_role: region.region_role,
+      region_id: region.region_id,
+      region_label: region.region_label,
     };
   }
 `;

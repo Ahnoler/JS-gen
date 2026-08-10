@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-10: **`resolve-element` 歧义匹配附带 L1 区域预览**：`matches[].preview` / element 增加 `region_role`、`region_id`、`region_label`（与全页扫描 `assignRegion` 同源规则）；Vue 选择器主行展示区域标签。算法 B：归位失败不丢匹配。BiB 需重载执行机后做多「新增」冒烟（湿测挂起）。
+  影响范围：`POST .../resolve-element` 响应预览字段；CDP `PAGE_LOCATOR_HELPERS` / `resolve-by-label`。
+  文件：src/cdp/page-locator-helpers.js, src/cdp/resolve-by-label.js, scripts/controller/actions/js_snippets/scan_form.py, scripts/controller/actions/js_snippets/_locator_helpers_js.py
+  Python 同步提示：对齐 resolve-element 歧义 `matches[].preview.region_*`（若 Python 控制面代理该接口）。
+
 - 2026-08-10: **`GET /api/v2/export/transaction/schema` partner envelope 字段契约**：返回 `schemaVersion`、`fields`（transcId / transcationName / …）、`eventTypeName` 中文映射与 `actionTypeMap`；拼写（transcation*、mothed）为对接约定。
   影响范围：`/api/v2/export/transaction/schema` 新增端点。
   文件：src/routes/v2/export-mgmt.js, src/services/transaction-export.js, src/dashboard/api-docs/groups/export-mgmt.js

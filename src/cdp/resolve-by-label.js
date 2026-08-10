@@ -35,6 +35,9 @@ function toPreview(el) {
     locator_strategy: el?.locator_strategy || '',
     target_kind: el?.target_kind || '',
     attributes: attrs,
+    region_role: el?.region_role || '',
+    region_id: el?.region_id || '',
+    region_label: el?.region_label || '',
   };
 }
 
@@ -113,6 +116,9 @@ ${PAGE_LOCATOR_HELPERS}
         locator_verified: loc.locator_verified,
         locator_strategy: loc.locator_strategy,
         locator_fallback_reason: loc.locator_fallback_reason,
+        region_role: loc.region_role || '',
+        region_id: loc.region_id || '',
+        region_label: loc.region_label || '',
       };
     }
     function textExact(a, b) {
@@ -168,9 +174,93 @@ ${PAGE_LOCATOR_HELPERS}
       if (out.length) return out;
     }
 
-    // Menu — include custom sidebar tokens (menu-item / submenu-item), not only Element UI.
-    if (action === 'click_menu_item' || params.menu_text) {
-      const name = String(params.menu_text || needle || '').trim();
+    // Form-only actions: never fall through to menu/generic clickables.
+    if (action === 'fill_form_field' || action === 'select_option') {
+      if (needle) {
+        const items = Array.from(document.querySelectorAll('.el-form-item'));
+        const exactItems = [];
+        const fuzzyItems = [];
+        for (const item of items) {
+          if (!isVisible(item) && item.offsetParent === null) continue;
+          const label = formItemLabel(item);
+          if (!label) continue;
+          if (textExact(label, needle)) exactItems.push({ item, label });
+          else if (textFuzzy(label, needle)) fuzzyItems.push({ item, label });
+        }
+        let chosen = exactItems.length ? exactItems : fuzzyItems;
+        const overlays = Array.from(document.querySelectorAll('.el-dialog, .el-drawer')).filter((d) => {
+          try {
+            const s = getComputedStyle(d);
+            return s.display !== 'none' && s.visibility !== 'hidden' && d.getClientRects().length > 0;
+          } catch (e) { return false; }
+        });
+        if (overlays.length && chosen.length > 1) {
+          const top = overlays[overlays.length - 1];
+          const inOverlay = chosen.filter((m) => top.contains(m.item));
+          if (inOverlay.length) chosen = inOverlay;
+        }
+        for (const m of chosen) {
+          const el = pickControl(m.item);
+          if (!el) continue;
+          let kind = 'form_input';
+          if (el.closest && el.closest('.el-date-editor')) kind = 'form_date';
+          else if (el.closest && el.closest('.el-select')) kind = 'form_select';
+          else if (el.closest && el.closest('.el-radio-group')) kind = 'form_radio';
+          else if (el.closest && el.closest('.el-tree-select, .el-cascader')) kind = 'form_tree_select';
+          else if (m.item.querySelector && m.item.querySelector('.tsscTree, .tree-popover, .el-tree-select, .el-cascader')) {
+            kind = 'form_tree_select';
+          }
+          if (action === 'select_option') kind = 'form_select';
+          pushUnique(el, m.label, true, kind);
+        }
+      }
+      return out;
+    }
+
+    // Click-by-index / menu: sidebar + buttons (fixes labelText-only / 点击元素 for 对公客户管理).
+    if (action === 'click_element_by_index' || action === 'click_menu_item' || params.menu_text || params.text) {
+      const name = String(params.menu_text || params.text || needle || '').trim();
+      const nodes = document.querySelectorAll(
+        '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"], aside li, nav li, ' +
+        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content'
+      );
+      const exact = [];
+      const fuzzy = [];
+      for (const el of nodes) {
+        const t = cleanVisibleText(el) || normLabel(el.getAttribute && el.getAttribute('title'));
+        if (!t) continue;
+        const visible = isVisible(el);
+        if (textExact(t, name)) {
+          if (visible || el.getAttribute('title') === name || (el.textContent || '').includes(name)) exact.push(el);
+        } else if (visible && textFuzzy(t, name)) {
+          fuzzy.push(el);
+        }
+      }
+      for (const el of (exact.length ? exact : fuzzy)) {
+        const kind = (el.closest && el.closest('.el-tree-node__content'))
+          ? 'tree_node'
+          : (el.closest && el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, [role="menuitem"]'))
+            ? 'menu'
+            : 'button';
+        pushUnique(el, name, false, kind);
+      }
+      if (!out.length && exact.length) {
+        for (const el of exact) {
+          const root = normalizeTargetRoot(el) || el;
+          const abs = absXPath(root);
+          if (out.some((x) => x.xpath_abs === abs)) continue;
+          const kind = (el.closest && el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, [role="menuitem"]'))
+            ? 'menu'
+            : 'button';
+          out.push(snap(root, name, false, kind));
+        }
+      }
+      if (out.length) return out;
+    }
+
+    // Menu — legacy gate (click_menu_item / menu_text already handled above; keep for empty-action needle menus).
+    if (!action && needle) {
+      const name = needle;
       const nodes = document.querySelectorAll(
         '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"], aside li, nav li'
       );
@@ -281,9 +371,10 @@ ${PAGE_LOCATOR_HELPERS}
       if (out.length) return out;
     }
 
-    // Generic clickables by text
+    // Generic clickables by text (includes sidebar menus — defense for {labelText}-only)
     if (needle) {
       const clickables = Array.from(document.querySelectorAll(
+        '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"], aside li, nav li, ' +
         '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content'
       ));
       const exact = [];
@@ -296,7 +387,11 @@ ${PAGE_LOCATOR_HELPERS}
         else if (textFuzzy(t, needle)) fuzzy.push(el);
       }
       for (const el of (exact.length ? exact : fuzzy)) {
-        const kind = el.closest && el.closest('.el-tree-node__content') ? 'tree_node' : 'button';
+        const kind = el.closest && el.closest('.el-tree-node__content')
+          ? 'tree_node'
+          : (el.closest && el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, [role="menuitem"]'))
+            ? 'menu'
+            : 'button';
         pushUnique(el, needle, false, kind);
       }
     }
@@ -369,6 +464,9 @@ export async function resolveElementByLabel(client, opts = {}) {
       buttonText: params.button_text,
       menuText: params.menu_text,
       tabName: params.tab_name,
+      region_role: raw.region_role || '',
+      region_id: raw.region_id || '',
+      region_label: raw.region_label || '',
     });
     // Preserve DOM-verified flag from page snap
     if (raw.locator_verified === true && enriched.xpath_smart) {
