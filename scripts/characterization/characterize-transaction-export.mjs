@@ -22,7 +22,7 @@ function testFillInput() {
   });
   assert.equal(ev.eventTypeValue, 'input');
   assert.equal(ev.eventTypeName, '文本框输入');
-  assert.equal(ev.propertiesName, '填写:用户名');
+  assert.equal(ev.propertiesName, '填写用户名');
   assert.equal(ev.objectValue, '701994');
   assert.equal(ev.elementType, '//input[@placeholder="请输入您的用户名"]');
   assert.equal(ev.options, '');
@@ -68,16 +68,20 @@ function testEnvelope() {
     },
     { systemId: 1, projectId: '7' },
   );
-  assert.equal(payload.transcId, '99');
-  assert.equal(payload.transcationName, '登录');
-  assert.equal(payload.systemId, '1');
-  assert.equal(payload.projectId, '7');
-  assert.equal(payload.transcationType, 'web');
-  assert.equal(payload.testFrame, 'selenium');
+  assert.ok(Array.isArray(payload.transcationEventTypeList));
+  assert.equal(payload.transcationEventTypeList.length, 1);
+  const entry = payload.transcationEventTypeList[0];
+  assert.equal(entry.transcId, '99');
+  assert.equal(entry.transcationName, '登录');
+  assert.equal(entry.systemId, '1');
+  assert.equal(entry.projectId, '7');
+  assert.equal(entry.transcationType, 'web');
+  assert.equal(entry.testFrame, 'playwright');
   assert.equal(count, 1);
-  assert.equal(payload.transcationEventType.length, 1);
+  assert.equal(entry.transcationProperties.length, 1);
   assert.equal(skipped.metaActions, 1);
-  assert.ok(!('attributes' in payload.transcationEventType[0]));
+  assert.ok(!('attributes' in entry.transcationProperties[0]));
+  assert.ok(!('transcationEventType' in entry));
 }
 
 function testRequireIds() {
@@ -100,8 +104,38 @@ function testAbsoluteFallbackStat() {
     },
     { systemId: '1', projectId: '1' },
   );
-  assert.equal(payload.transcationEventType[0].elementType, '/html/body/button');
+  assert.equal(payload.transcationEventTypeList[0].transcationProperties[0].elementType, '/html/body/button');
   assert.equal(stats.absoluteFallback, 1);
+}
+
+function testUniquePropertiesName() {
+  const { payload } = buildTransactionPayload(
+    {
+      id: 2,
+      name: 'dup',
+      steps: [
+        {
+          actionType: 'fill_form_field',
+          params: { label_text: '客户名称', value: 'a' },
+          element: { xpath_smart: '//input[@name="a"]' },
+        },
+        {
+          actionType: 'fill_form_field',
+          params: { label_text: '客户名称', value: 'b' },
+          element: { xpath_smart: '//input[@name="b"]' },
+        },
+        {
+          actionType: 'fill_form_field',
+          params: { label_text: '客户名称', value: 'c' },
+          element: { xpath_smart: '//input[@name="c"]' },
+        },
+      ],
+    },
+    { systemId: '1', projectId: '1' },
+  );
+  const names = payload.transcationEventTypeList[0].transcationProperties.map((p) => p.propertiesName);
+  assert.deepEqual(names, ['填写客户名称', '填写客户名称2', '填写客户名称3']);
+  assert.equal(new Set(names).size, names.length);
 }
 
 testFillInput();
@@ -110,4 +144,5 @@ testSkipMeta();
 testEnvelope();
 testRequireIds();
 testAbsoluteFallbackStat();
+testUniquePropertiesName();
 console.log('characterize-transaction-export: OK');
