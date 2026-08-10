@@ -404,6 +404,140 @@ PAGE_LOCATOR_HELPERS = r'''
       }
       return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
     }
+    /* SHARED_COLLISION_REFINE — titlebox finer L1 on region_id collision */
+    function isActionOnlyTitle(t) {
+      const s = String(t || '').replace(/\s+/g, ' ').trim();
+      if (!s) return true;
+      return /^(新增|修改|查看|删除|保存|\+\s*新增)$/.test(s);
+    }
+    function titleboxTitleText(box) {
+      if (!box) return '';
+      const span = box.querySelector && box.querySelector('span.title');
+      let raw = '';
+      if (span) raw = span.innerText || span.textContent || '';
+      else raw = box.innerText || box.textContent || '';
+      return String(raw).replace(/\s+/g, ' ').trim().slice(0, 40);
+    }
+    function pickNearestTitlebox(boxes, host) {
+      if (!boxes || !boxes.length || !host || !host.getBoundingClientRect) return boxes && boxes[0];
+      const hr = host.getBoundingClientRect();
+      const hostCx = hr.left + hr.width / 2;
+      const hostCy = hr.top + hr.height / 2;
+      let bestAbove = null;
+      let bestAboveGap = Infinity;
+      let bestDist = null;
+      let bestDistSq = Infinity;
+      for (let i = 0; i < boxes.length; i++) {
+        const box = boxes[i];
+        const br = box.getBoundingClientRect && box.getBoundingClientRect();
+        if (!br || br.width <= 0 || br.height <= 0) continue;
+        const boxBottom = br.bottom;
+        const boxCx = br.left + br.width / 2;
+        const boxCy = br.top + br.height / 2;
+        if (boxBottom <= hr.top) {
+          const gap = hr.top - boxBottom;
+          if (gap < bestAboveGap) {
+            bestAboveGap = gap;
+            bestAbove = box;
+          }
+        }
+        const dx = boxCx - hostCx;
+        const dy = boxCy - hostCy;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          bestDist = box;
+        }
+      }
+      return bestAbove || bestDist || boxes[0];
+    }
+    function findTitleboxRegion(host, needle) {
+      if (!host || !host.closest) return null;
+      const want = String(needle || '').replace(/\s+/g, ' ').trim();
+      const inside = host.closest('.titlebox');
+      if (inside) {
+        const title = titleboxTitleText(inside);
+        if (title && !isActionOnlyTitle(title) && title !== want) {
+          return {
+            region_role: 'section',
+            region_id: 'section:' + title,
+            region_label: title,
+            title: title,
+          };
+        }
+      }
+      let n = host;
+      for (let d = 0; d < 14 && n; d++) {
+        if (n.querySelector) {
+          const candidates = [];
+          const boxes = n.querySelectorAll('.titlebox');
+          for (let bi = 0; bi < boxes.length; bi++) {
+            const box = boxes[bi];
+            if (!n.contains(host)) continue;
+            if (box.contains(host)) continue;
+            const title = titleboxTitleText(box);
+            if (title && !isActionOnlyTitle(title) && title !== want) {
+              candidates.push({ box: box, title: title });
+            }
+          }
+          if (candidates.length > 0) {
+            const picked = pickNearestTitlebox(
+              candidates.map(function (c) { return c.box; }),
+              host
+            );
+            for (let ci = 0; ci < candidates.length; ci++) {
+              if (candidates[ci].box === picked) {
+                const t = candidates[ci].title;
+                return {
+                  region_role: 'section',
+                  region_id: 'section:' + t,
+                  region_label: t,
+                  title: t,
+                };
+              }
+            }
+            const fallback = candidates[0];
+            return {
+              region_role: 'section',
+              region_id: 'section:' + fallback.title,
+              region_label: fallback.title,
+              title: fallback.title,
+            };
+          }
+        }
+        n = n.parentElement;
+      }
+      return null;
+    }
+    function titleboxAnchorXPath(host, title, leafLocal) {
+      const leaf = String(leafLocal || '').replace(/^\/+/, '');
+      const t = String(title || '').replace(/\s+/g, ' ').trim();
+      if (!host || !leaf || !t) return '';
+      const lit = xpathLiteral(t);
+      return "//div[contains(concat(' ',normalize-space(@class),' '),' titlebox ')]"
+        + "[.//*[contains(concat(' ',normalize-space(@class),' '),' title ') and normalize-space()=" + lit + "]"
+        + " or normalize-space()=" + lit + "]"
+        + "/ancestor::*[.//" + leaf + "][1]//" + leaf;
+    }
+    function refineCollidingRegions(items, needle) {
+      if (!items || items.length < 2) return;
+      const byId = {};
+      for (let i = 0; i < items.length; i++) {
+        const id = String((items[i].region && items[i].region.region_id) || 'other');
+        if (!byId[id]) byId[id] = [];
+        byId[id].push(i);
+      }
+      const ids = Object.keys(byId);
+      for (let k = 0; k < ids.length; k++) {
+        const idxs = byId[ids[k]];
+        if (idxs.length < 2) continue;
+        for (let j = 0; j < idxs.length; j++) {
+          const it = items[idxs[j]];
+          const finer = findTitleboxRegion(it.el, needle);
+          if (finer) it.region = finer;
+        }
+      }
+    }
   function sectionAnchorXPath(host, leafLocal) {
     const leaf = String(leafLocal || '').replace(/^\/+/, '');
     if (!host || !leaf) return '';
@@ -648,7 +782,9 @@ PAGE_LOCATOR_HELPERS = r'''
   function buildLocatorSnap(node, text, xpathFull, formLabel, opts) {
     opts = opts || {};
     const host = normalizeTargetRoot(node) || node;
-    const region = assignRegion(host);
+    const region = (opts && opts.region && opts.region.region_id)
+      ? opts.region
+      : assignRegion(host);
     const kind = opts.targetKind || detectTargetKind(host);
     const t = normalizeControlText(text) || cleanVisibleText(host);
     const abs = String(xpathFull || absXPath(host) || '');
@@ -697,6 +833,7 @@ PAGE_LOCATOR_HELPERS = r'''
       }
       let leafForAnchor = localLeaf;
       let trySectionAnchor = false;
+      let nodesMulti = false;
       if (sectionAnchorOf(host) && t) {
         const labelNodes = evalXpathAll('//' + localLeaf);
         if (labelNodes.length >= 2) trySectionAnchor = true;
@@ -704,6 +841,7 @@ PAGE_LOCATOR_HELPERS = r'''
       if (smart) {
         const nodes = evalXpathAll(smart);
         if (nodes.length >= 2) {
+          nodesMulti = true;
           trySectionAnchor = true;
           const fromSmart = leafFromSmartExpr(smart);
           if (fromSmart) leafForAnchor = fromSmart;
@@ -724,13 +862,28 @@ PAGE_LOCATOR_HELPERS = r'''
           }
         }
       }
+      if ((!verified || nodesMulti) && region && region.title) {
+        const tbXp = titleboxAnchorXPath(host, region.title, leafForAnchor || localLeaf);
+        if (tbXp) {
+          const tnodes = evalXpathAll(tbXp);
+          let tidx = -1;
+          for (let i = 0; i < tnodes.length; i++) {
+            if (tnodes[i] === host) { tidx = i; break; }
+          }
+          if (tnodes.length === 1 && tidx === 0) {
+            smart = tbXp;
+            occurrence = 0;
+            verified = true;
+          }
+        }
+      }
       if (!verified && smart) {
         const pinned = pinOccurrence(smart, host);
         smart = pinned.xpath;
         occurrence = pinned.occurrence;
         verified = pinned.verified;
-        // Do not export global [n] when section anchor exists but uniqueness failed.
-        if (occurrence >= 1 && sectionAnchorOf(host)) {
+        // Do not export global [n] when section/titlebox anchor exists but uniqueness failed.
+        if (occurrence >= 1 && (sectionAnchorOf(host) || (opts.region && opts.region.title))) {
           smart = '';
           verified = false;
           occurrence = 0;

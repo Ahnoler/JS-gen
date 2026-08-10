@@ -92,11 +92,14 @@ ${PAGE_LOCATOR_HELPERS}
       ].filter(Boolean);
       return candidates[0] || item;
     }
-    function snap(el, matchedLabel, asFormField, kindHint) {
+    function snap(el, matchedLabel, asFormField, kindHint, regionOverride) {
       const abs = xpathOf(el);
       const rawText = cleanVisibleText(el);
       const formLabel = asFormField ? matchedLabel : '';
-      const loc = buildLocatorSnap(el, rawText, abs, formLabel, { targetKind: kindHint || undefined });
+      const loc = buildLocatorSnap(el, rawText, abs, formLabel, {
+        targetKind: kindHint || undefined,
+        region: regionOverride || undefined,
+      });
       return {
         matchedLabel,
         formLabel: formLabel || loc.formLabel || '',
@@ -147,6 +150,33 @@ ${PAGE_LOCATOR_HELPERS}
       const abs = absXPath(root);
       if (out.some((x) => x.xpath_abs === abs)) return;
       out.push(snap(root, matchedLabel || needle, asForm, kind));
+    }
+    function kindForClickable(el) {
+      return (el.closest && el.closest('.el-tree-node__content'))
+        ? 'tree_node'
+        : (el.closest && el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, [role="menuitem"]'))
+          ? 'menu'
+          : 'button';
+    }
+    /* COLLISION_REFINE */
+    function pushHostsRefined(hostList, matchedLabel, asForm, kind) {
+      const items = [];
+      const seenAbs = {};
+      for (let i = 0; i < hostList.length; i++) {
+        const host = hostList[i];
+        if (!host || !isVisible(host)) continue;
+        const root = normalizeTargetRoot(host) || host;
+        const abs = absXPath(root);
+        if (seenAbs[abs]) continue;
+        seenAbs[abs] = true;
+        items.push({ el: root, region: assignRegion(root) });
+      }
+      refineCollidingRegions(items, matchedLabel || needle);
+      for (let j = 0; j < items.length; j++) {
+        const it = items[j];
+        if (out.some((x) => x.xpath_abs === absXPath(it.el))) continue;
+        out.push(snap(it.el, matchedLabel || needle, asForm, kind || kindForClickable(it.el), it.region));
+      }
     }
 
     // Close controls
@@ -236,13 +266,13 @@ ${PAGE_LOCATOR_HELPERS}
           fuzzy.push(el);
         }
       }
-      for (const el of (exact.length ? exact : fuzzy)) {
-        const kind = (el.closest && el.closest('.el-tree-node__content'))
-          ? 'tree_node'
-          : (el.closest && el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, [role="menuitem"]'))
-            ? 'menu'
-            : 'button';
-        pushUnique(el, name, false, kind);
+      const matched = exact.length ? exact : fuzzy;
+      const hostList = [];
+      for (const el of matched) hostList.push(el);
+      if (hostList.length >= 2) {
+        pushHostsRefined(hostList, name, false, null);
+      } else if (hostList.length === 1) {
+        pushUnique(hostList[0], name, false, kindForClickable(hostList[0]));
       }
       if (!out.length && exact.length) {
         for (const el of exact) {
@@ -278,7 +308,14 @@ ${PAGE_LOCATOR_HELPERS}
           fuzzy.push(el);
         }
       }
-      for (const el of (exact.length ? exact : fuzzy)) pushUnique(el, name, false, 'menu');
+      const matched = exact.length ? exact : fuzzy;
+      const hostList = [];
+      for (const el of matched) hostList.push(el);
+      if (hostList.length >= 2) {
+        pushHostsRefined(hostList, name, false, 'menu');
+      } else if (hostList.length === 1) {
+        pushUnique(hostList[0], name, false, 'menu');
+      }
       // pushUnique skips invisible — for exact submenu hits, force snap even if collapsed
       if (!out.length && exact.length) {
         for (const el of exact) {
@@ -386,13 +423,13 @@ ${PAGE_LOCATOR_HELPERS}
         if (textExact(t, needle)) exact.push(el);
         else if (textFuzzy(t, needle)) fuzzy.push(el);
       }
-      for (const el of (exact.length ? exact : fuzzy)) {
-        const kind = el.closest && el.closest('.el-tree-node__content')
-          ? 'tree_node'
-          : (el.closest && el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, [role="menuitem"]'))
-            ? 'menu'
-            : 'button';
-        pushUnique(el, needle, false, kind);
+      const matched = exact.length ? exact : fuzzy;
+      const hostList = [];
+      for (const el of matched) hostList.push(el);
+      if (hostList.length >= 2) {
+        pushHostsRefined(hostList, needle, false, null);
+      } else if (hostList.length === 1) {
+        pushUnique(hostList[0], needle, false, kindForClickable(hostList[0]));
       }
     }
 

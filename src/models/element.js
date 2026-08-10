@@ -116,6 +116,9 @@ function copyLocatorMeta(target, source) {
     'locator_fallback_reason',
     'formLabel',
     'bu_xpath',
+    'region_role',
+    'region_id',
+    'region_label',
   ]) {
     if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
       target[key] = source[key];

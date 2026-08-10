@@ -1,7 +1,7 @@
 # Resolve ambiguous: collision-driven finer L1 (titlebox) — Design
 
 **Date:** 2026-08-10  
-**Status:** Spec draft — awaiting user review of this file  
+**Status:** Approved + Implemented 2026-08-10 — plan `docs/superpowers/plans/2026-08-10-resolve-collision-finer-l1-titlebox.md`. Characterization PASS; CDP wet: resolve「新增」→ 7 matches, 7 distinct titlebox `region_label`. **Recommended follow-up:** restart BiB executor so attached sessions inject collision-refine helpers; Vue ambiguous-picker UI smoke on attached traj (not run this session).  
 **Related:** [fullpage visible controls scan](2026-08-10-fullpage-visible-controls-scan-design.md) (algorithm B + dynamic L1); [resolve ambiguous L1 region preview](2026-08-10-resolve-ambiguous-section-preview-design.md); dual-save section-anchored xpath  
 **Trigger:** 对公客户编辑页 7 个真「新增」被压成「股东及关联人信息」/「经营情况 保存」两个粗 collapse；选择器 xpath 全是裸 `//button[normalize-space()='新增']`。现场 CDP：子块在 `div.titlebox` / `span.title`；collapse 锚仍命中 3 个按钮；`关联人信息` 面板锚命中 1。
 
@@ -110,3 +110,14 @@ No new vocabulary: still `{region_label} · {label} · {kind}`. After refine, du
 - Executor restart ops for BiB.  
 - Full dynamic L1a feature-card LLM.  
 - Deduplicating matches that are the same DOM node (not observed; 7 hosts are distinct).
+
+## Verification (2026-08-10)
+
+| Check | Result |
+|-------|--------|
+| `characterize-resolve-collision-titlebox.mjs` | PASS (Tasks 1–4) |
+| `characterize-resolve-ambiguous-region.mjs` | PASS |
+| `characterize-resolve-element-auto-grab.mjs` | PASS |
+| CDP wet `:9242` resolve「新增」(`crtCpctInf` edit) | PASS — 7 matches, 7 distinct titlebox `region_label` (关联人信息, 与其他客户关联信息, 受益人信息, 客户资质信息, 参与项目情况, 企业债券发行情况, 对外投资信息) |
+| BiB attached traj ambiguous「新增」 | **Not verified** — executor reload may still be needed |
+| Vue OperationDialog multi-picker UI | **Deferred** — not run this session |

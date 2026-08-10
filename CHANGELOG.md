@@ -11,6 +11,20 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-10: **`resolve-element` 同区碰撞后 titlebox 细化 L1**：歧义匹配按 `(needle, region_id)` 碰撞组再发现 `div.titlebox`/`span.title`，刷新 `region_*` 并尝试 titlebox 锚定 `xpath_smart`（算法 B 不丢匹配）。湿测多「新增」可区分面板标签。
+  影响范围：`POST .../resolve-element` 歧义 matches 的 `region_*` / `xpath_smart`；CDP helpers 与 Python `_locator_helpers_js` 同步。
+  文件：src/cdp/page-locator-helpers.js, src/cdp/resolve-by-label.js, src/models/element.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-resolve-collision-titlebox.mjs
+  Python 同步提示：若代理 resolve-element，对齐碰撞细化后的 `preview.region_label` / `xpath_smart`（无 schema 变更）。
+
+### Fixed
+
+- 2026-08-10: **`prepareElementJson` / `enrichLocatorFields` 保留已抓取相对 xpath**：缺 `xpath_smart` 但 `xpath` 已是 `//…`（含 titlebox 锚定）时不再按按钮文案发明裸 leaf 覆盖。
+  影响范围：步骤创建/更新 element 归一化；与 Vue `buildElement` 持久化 `xpath_smart` 互补。
+  文件：src/cdp/locator-builders/candidates.js
+  Python 同步提示：若 Python 控制面有同源 enrich，对齐「已有相对 xpath 优先于 text 发明」。
+
+### Added
+
 - 2026-08-10: **灰度开关 `XPATH_SMART_FILL_ONLY`（默认关）**：开则 `fill_form_field` 仅允许 `xpath_smart` 定位；关则无 xpath 时保留 label DOM 兜底（测试人员）。入口 `scripts/feature_flags.py` / `config/.env.example`。
   影响范围：Agent 填表行为开关。
   文件：scripts/feature_flags.py, scripts/controller/actions/_form.py, config/.env.example
