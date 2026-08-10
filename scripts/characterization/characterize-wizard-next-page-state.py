@@ -86,6 +86,7 @@ def main() -> int:
     assert_true("影像资料" in sb, f"B must anchor 影像资料: {sb!r}")
     assert_true(sa != sb, "page-state xpaths must differ")
     assert_true(sa != "//button[normalize-space()='下一步']", "A must not be bare next xpath")
+    assert_true(sb != "//button[normalize-space()='下一步']", "B must not be bare next xpath")
     assert_true(
         a["eval_count"] == 1 and b["eval_count"] == 1,
         f"eval counts {a['eval_count']},{b['eval_count']}",

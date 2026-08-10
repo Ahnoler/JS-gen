@@ -361,6 +361,48 @@ export const PAGE_LOCATOR_HELPERS = `
     if (!sec || !sec.prefix) return '';
     return sec.prefix + '//' + leaf;
   }
+  function pageStateOf() {
+    try {
+      const stepsRoot = document.querySelector('.el-steps');
+      if (stepsRoot) {
+        const steps = stepsRoot.querySelectorAll('.el-step');
+        for (let i = 0; i < steps.length; i++) {
+          const s = steps[i];
+          const process = s.classList.contains('is-process')
+            || s.classList.contains('is-active')
+            || !!(s.querySelector && s.querySelector('.is-process, .is-active, .el-step__head.is-process'));
+          if (!process) continue;
+          const titleEl = s.querySelector('.el-step__title');
+          const title = normalizeControlText((titleEl && (titleEl.innerText || titleEl.textContent)) || s.innerText || '');
+          if (title) return { kind: 'wizard_step', title: title };
+        }
+      }
+      const bc = document.querySelector('.el-breadcrumb');
+      if (bc) {
+        const title = normalizeControlText(bc.innerText || bc.textContent || '');
+        if (title) return { kind: 'breadcrumb', title: title.slice(0, 40) };
+      }
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+  function isWizardNavLabel(text) {
+    const t = normalizeControlText(text);
+    return t === '下一步' || t === '上一步';
+  }
+  function pageStateNavXPath(host, leafLocal, pageState) {
+    const leaf = String(leafLocal || '').replace(/^\\/+/, '');
+    if (!host || !leaf || !pageState || !pageState.title) return '';
+    const lit = xpathLiteral(pageState.title);
+    if (pageState.kind === 'wizard_step') {
+      return "//*[" + classTokenPred('el-steps') + "][.//*[(contains(@class,'is-process') or contains(@class,'is-active')) and contains(normalize-space(.)," + lit + ")]]"
+        + "/ancestor::*[.//" + leaf + "][1]//" + leaf;
+    }
+    if (pageState.kind === 'breadcrumb') {
+      return "//*[" + classTokenPred('el-breadcrumb') + " and contains(normalize-space(.)," + lit + ")]"
+        + "/ancestor::*[.//" + leaf + "][1]//" + leaf;
+    }
+    return '';
+  }
   /** Relative leaf after the last // in a smart xpath (for section anchoring). */
   function leafFromSmartExpr(expr) {
     const s = String(expr || '').trim();
@@ -576,6 +618,32 @@ export const PAGE_LOCATOR_HELPERS = `
         }
         return 'button[normalize-space()=' + lit + ']';
       })();
+      if (isWizardNavLabel(t)) {
+        const ps = pageStateOf();
+        const leafNav = (function () {
+          const lit = xpathLiteral(t);
+          const tagL = (host.tagName || '').toLowerCase();
+          const cls = String(host.className || '');
+          if (tagL === 'a') return 'a[normalize-space()=' + lit + ']';
+          if (/(^| )el-button( |$)/.test(cls) && tagL !== 'button') {
+            return '*[' + classTokenPred('el-button') + ' and normalize-space()=' + lit + ']';
+          }
+          return 'button[normalize-space()=' + lit + ']';
+        })();
+        const navXp = pageStateNavXPath(host, leafNav, ps);
+        if (navXp) {
+          const nodes = evalXpathAll(navXp);
+          let idx = -1;
+          for (let i = 0; i < nodes.length; i++) {
+            if (nodes[i] === host) { idx = i; break; }
+          }
+          if (nodes.length === 1 && idx === 0) {
+            smart = navXp;
+            occurrence = 0;
+            verified = true;
+          }
+        }
+      }
       let leafForAnchor = localLeaf;
       let trySectionAnchor = false;
       if (sectionAnchorOf(host) && t) {
