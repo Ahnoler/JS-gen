@@ -177,37 +177,58 @@ def test_stamp_rejects_weak_fallback() -> None:
     )
 
 
-def test_form_resolved_paths_stamp_xpath_smart() -> None:
-    """Contract: resolved write paths stamp capture xpath into params (not raw inventory)."""
+def test_form_record_params_omit_xpath_smart() -> None:
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    # After this task: no params dict literal should stamp xpath_smart into _record_action
+    # Allow inventory/task_done xpath_smart= kwargs; forbid params['xpath_smart'] and
+    # 'xpath_smart': xp_out inside record payloads.
+    assert_true(
+        "params['xpath_smart']" not in form and 'params["xpath_smart"]' not in form,
+        "no params['xpath_smart'] assignment",
+    )
+  # Count remaining "'xpath_smart': xp_out" near _record_action — must be 0
+    import re
+
+    hits = re.findall(
+        r"_record_action\([\s\S]{0,400}?'xpath_smart'\s*:\s*xp_out",
+        form,
+    )
+    assert_true(len(hits) == 0, f"_record_action still stamps xp_out: {len(hits)}")
+
+
+def test_form_resolved_paths_record_with_element() -> None:
+    """Resolved write paths capture element and pass element= to _record_action (no params xpath)."""
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
 
     fill = form.split("async def fill_form_field", 1)[1].split("async def fill_date_field", 1)[0]
+    assert_true("_capture_element" in fill, "fill_form_field captures element")
     idx = fill.find("JS_FILL_BY_XPATH")
-    assert_true(idx >= 0, "fill_form_field resolved xpath path")
-    seg = fill[idx : fill.find("_record_action", idx)]
-    assert_true("stamp_recorded_xpath_smart" in seg, "fill_form_field resolved path stamps")
-    assert_true(
-        "'xpath_smart':resolved.xpath_smart" not in _norm(seg),
-        "fill_form_field resolved path must not record raw resolved.xpath_smart",
-    )
+    rec = fill.find("_record_action(", idx)
+    seg = fill[rec : rec + 200]
+    assert_true("element=element" in seg, "fill_form_field _record_action gets element=")
 
     date = form.split("async def fill_date_field", 1)[1].split("async def check_field_value", 1)[0]
+    assert_true("_capture_element" in date, "fill_date_field captures element")
     idx2 = date.find("JS_FILL_DATE_BY_XPATH")
-    seg2 = date[idx2 : date.find("_record_action", idx2)]
-    assert_true("stamp_recorded_xpath_smart" in seg2, "fill_date_field resolved path stamps")
+    rec2 = date.find("_record_action(", idx2)
+    seg2 = date[rec2 : rec2 + 200]
+    assert_true("element=element" in seg2, "fill_date_field _record_action gets element=")
 
     radio = form.split("async def click_radio", 1)[1].split("async def ", 1)[0]
+    assert_true("_capture_element" in radio, "click_radio captures element")
     idx3 = radio.find("JS_CLICK_RADIO_BY_XPATH")
-    seg3 = radio[idx3 : radio.find("_record_action", idx3)]
-    assert_true("stamp_recorded_xpath_smart" in seg3, "click_radio resolved path stamps")
+    rec3 = radio.find("_record_action(", idx3)
+    seg3 = radio[rec3 : rec3 + 280]
+    assert_true("element=element" in seg3, "click_radio _record_action gets element=")
 
 
-def test_select_option_stamps_xpath_smart() -> None:
+def test_select_option_records_with_element() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     chunk = form.split("async def select_option(", 1)[1].split("async def click_adjacent_button", 1)[0]
+    assert_true("_capture_element" in chunk, "select_option captures element")
     assert_true(
-        chunk.count("stamp_recorded_xpath_smart") >= 2,
-        "select_option stamps xpath at record sites",
+        chunk.count("element=element") >= 1,
+        "select_option _record_action passes element=",
     )
 
 
@@ -228,8 +249,8 @@ def test_select_tree_option_fill_fallback_xpath_parity() -> None:
         "no-tree fill fallback capture passes fill_xpath",
     )
     assert_true(
-        "stamp_recorded_xpath_smart" in chunk,
-        "no-tree fill fallback stamps xpath_smart before record",
+        "_record_action" in chunk and "element=fill_el" in chunk,
+        "no-tree fill fallback records with element=",
     )
     assert_true(
         "JS_FILL_FORM_FIELD" in chunk,
@@ -250,8 +271,9 @@ def main() -> int:
     test_capture_snippet_rebuilds_not_echo()
     test_capture_snippet_drills_form_input()
     test_stamp_rejects_weak_fallback()
-    test_form_resolved_paths_stamp_xpath_smart()
-    test_select_option_stamps_xpath_smart()
+    test_form_record_params_omit_xpath_smart()
+    test_form_resolved_paths_record_with_element()
+    test_select_option_records_with_element()
     test_select_tree_option_fill_fallback_xpath_parity()
     print("characterize-capture-element-xpath: OK")
     return 0
