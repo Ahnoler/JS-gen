@@ -7,6 +7,8 @@ import { BATCH_IMPORT_MAX_ROWS } from '../../config/config.js';
 import { XLSX_MIME } from '../http/upload-xlsx.js';
 
 export const BATCH_EXCEL_HEADERS = Object.freeze(['交易名称', '需求描述']);
+/** Download name for GET /api/v2/trajectories/batch/template */
+export const BATCH_TEMPLATE_FILENAME = '批量录制导入模板.xlsx';
 export { XLSX_MIME };
 
 /**

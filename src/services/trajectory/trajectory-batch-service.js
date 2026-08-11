@@ -194,7 +194,7 @@ export async function importBatchFromExcel({
     throw err;
   }
   if (!fileBuffer?.length) {
-    const err = new Error('file is required');
+    const err = new Error('请上传 Excel 文件');
     err.statusCode = 400;
     throw err;
   }
@@ -230,8 +230,8 @@ export async function importBatchFromExcel({
   if (!parsed.valid.length) {
     const err = new Error(
       parsed.rejected.length
-        ? 'No valid rows in Excel'
-        : 'Excel has no data rows',
+        ? 'Excel 中没有有效数据行'
+        : '导入文件为空，请至少填写一行交易',
     );
     err.statusCode = 400;
     err.rejected = parsed.rejected;

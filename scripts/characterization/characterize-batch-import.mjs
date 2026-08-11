@@ -11,6 +11,7 @@ import {
   buildTemplateBuffer,
   parseBatchExcelBuffer,
   BATCH_EXCEL_HEADERS,
+  BATCH_TEMPLATE_FILENAME,
   sampleTemplateRows,
 } from '../../src/services/trajectory-batch-excel.js';
 import { buildRequestHash } from '../../src/services/trajectory/trajectory-batch-service.js';
@@ -35,6 +36,7 @@ function fail(name, err) {
 }
 
 async function testTemplateRoundTrip() {
+  assert.strictEqual(BATCH_TEMPLATE_FILENAME, '批量录制导入模板.xlsx');
   const buf = await buildTemplateBuffer();
   assert.ok(Buffer.isBuffer(buf) && buf.length > 100, 'template buffer');
   const parsed = await parseBatchExcelBuffer(buf);

@@ -3,6 +3,7 @@
  * Registered BEFORE /api/v2/trajectories/:id so "batch" is not captured as id.
  */
 import { uploadXlsxSingle, multerHttpStatus, XLSX_MIME } from '../../http/upload-xlsx.js';
+import { BATCH_TEMPLATE_FILENAME } from '../../services/trajectory-batch-excel.js';
 import * as batchService from '../../services/trajectory/trajectory-batch-service.js';
 import { BATCH_JOB_TERMINAL } from '../../models/constants.js';
 
@@ -15,8 +16,13 @@ function sendErr(res, err, fallback = 500) {
 }
 
 function sendExcel(res, buffer, filename) {
+  const encoded = encodeURIComponent(filename);
   res.setHeader('Content-Type', XLSX_MIME);
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  // ASCII fallback + RFC 5987 so Chinese names survive browser download
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="batch-import-template.xlsx"; filename*=UTF-8''${encoded}`,
+  );
   res.setHeader('Content-Length', Buffer.byteLength(buffer));
   res.send(buffer);
 }
@@ -26,7 +32,7 @@ export default function registerTrajectoryBatch(app) {
   app.get('/api/v2/trajectories/batch/template', async (_req, res) => {
     try {
       const buf = await batchService.buildTemplateBuffer();
-      sendExcel(res, buf, 'trajectory-batch-template.xlsx');
+      sendExcel(res, buf, BATCH_TEMPLATE_FILENAME);
     } catch (err) {
       sendErr(res, err);
     }
@@ -44,8 +50,8 @@ export default function registerTrajectoryBatch(app) {
         return res.status(status).json({ error: err.message });
       }
       try {
-        if (!req.file?.buffer) {
-          return res.status(400).json({ error: 'file is required' });
+        if (!req.file?.buffer?.length) {
+          return res.status(400).json({ error: '请上传 Excel 文件' });
         }
         const idempotencyKey = req.get('Idempotency-Key')
           || req.get('idempotency-key')
