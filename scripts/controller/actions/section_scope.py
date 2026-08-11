@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,6 +15,26 @@ def norm_sec(s: str) -> str:
 
 def strip_sec_suffix(s: str) -> str:
     return re.sub(r"#\d+$", "", norm_sec(s))
+
+
+def resolve_scope(region: str = "", section: str = "", *, warn: bool = True) -> str:
+    """Agent-facing scope: prefer region; section is legacy alias.
+
+    When both are set and differ, region wins. Empty strings are ignored.
+    """
+    r = norm_sec(region)
+    s = norm_sec(section)
+    if warn and s and not r:
+        sys.stderr.write(
+            f"[deprecate] section= is deprecated; use region= instead (got {s!r})\n"
+        )
+        sys.stderr.flush()
+    if warn and r and s and r != s:
+        sys.stderr.write(
+            f"[deprecate] both region={r!r} and section={s!r} set; using region\n"
+        )
+        sys.stderr.flush()
+    return r or s
 
 
 def section_matches(

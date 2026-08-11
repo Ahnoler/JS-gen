@@ -1,7 +1,7 @@
-"""
+﻿"""
 Form-related actions: scan, fill, select, task list, validation.
 
-The largest action group — registers 18 controller actions for
+The largest action group 鈥?registers 18 controller actions for
 Element UI form interaction.
 """
 
@@ -90,14 +90,14 @@ async def _clear_field_value(page, label_text):
 
 
 def _register_form_actions(controller, browser_context, case_data_store, llm=None):
-    # Lazily read hasButton keywords — supports runtime override via case_data_store
+    # Lazily read hasButton keywords 鈥?supports runtime override via case_data_store
     def _button_keywords():
         return get_has_button_keywords(case_data_store)
 
     async def _ensure_scanned(label_text: str, *, allow_autofill: bool = False):
         """Container touch; optional batch scan + auto-fill.
 
-        Single-field actions call with allow_autofill=False (default) — update
+        Single-field actions call with allow_autofill=False (default) 鈥?update
         container context / query detection. On first touch of a container
         (no ``_scan_fields`` yet) also scan + save_form_snapshot, without autofill.
 
@@ -105,8 +105,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         auto-fill when the phase contract allows.
 
         Auto-fill skipped when:
-        - query / search toolbar (有查询无保存)
-        - form_modify partial — AI changes only task-named fields
+        - query / search toolbar (鏈夋煡璇㈡棤淇濆瓨)
+        - form_modify partial 鈥?AI changes only task-named fields
         - _watcher_mode (CDP quick actions)
         """
         if case_data_store.get('_watcher_mode'):
@@ -138,7 +138,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         async def _rebuild_task_list_from_dom(*, autofill: bool) -> None:
             # Overlay TaskList uses multi (not fullpage) so list/tree query noise
-            # is not mixed into dialog/drawer pending — see tasklist_scan_mode.
+            # is not mixed into dialog/drawer pending 鈥?see tasklist_scan_mode.
             scan_mode = tasklist_scan_mode(container_id)
             raw = await page.evaluate(
                 JS_SCAN_FORM_FIELDS,
@@ -201,9 +201,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         is_query_ui = await _mark_query_ui_if_needed(page, case_data_store, container_id)
         if is_query_ui:
             # Introduce/picker/search still needs _scan_fields so fill_form_field
-            # can resolve xpath (traj #38 phase 3: 客户名称 → xpath-not-found
+            # can resolve xpath (traj #38 phase 3: 瀹㈡埛鍚嶇О 鈫?xpath-not-found
             # when query-toolbar early-return skipped the inventory scan).
-            # Never auto-fill query UI — agent chooses which filters to write.
+            # Never auto-fill query UI 鈥?agent chooses which filters to write.
             if not case_data_store.get('_scan_fields'):
                 sys.stderr.write(
                     f'[form] first-touch query-ui scan container={container_id!r}\n'
@@ -213,7 +213,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return
         if not allow_autofill:
             # First touch of this container (fresh switch clears _scan_fields;
-            # restored containers keep it) — scan + structure checkpoint only.
+            # restored containers keep it) 鈥?scan + structure checkpoint only.
             if not case_data_store.get('_scan_fields'):
                 sys.stderr.write(
                     f'[form] first-touch structure scan container={container_id!r}\n'
@@ -270,27 +270,27 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         results = []
 
         # Fill username (try common labels)
-        u_r = await page.evaluate(JS_FILL_FORM_FIELD, ['用户名', username])
+        u_r = await page.evaluate(JS_FILL_FORM_FIELD, ['鐢ㄦ埛鍚?, username])
         if u_r == 'label-not-found':
-            u_r = await page.evaluate(JS_FILL_FORM_FIELD, ['账号', username])
+            u_r = await page.evaluate(JS_FILL_FORM_FIELD, ['璐﹀彿', username])
         results.append(f'user:{u_r}')
 
         # Fill password
-        p_r = await page.evaluate(JS_FILL_FORM_FIELD, ['密码', password])
+        p_r = await page.evaluate(JS_FILL_FORM_FIELD, ['瀵嗙爜', password])
         results.append(f'pass:{p_r}')
 
         # Optionally fill captcha
         if captcha:
-            c_r = await page.evaluate(JS_FILL_FORM_FIELD, ['验证码', captcha])
+            c_r = await page.evaluate(JS_FILL_FORM_FIELD, ['楠岃瘉鐮?, captcha])
             if c_r == 'label-not-found':
-                c_r = await page.evaluate(JS_FILL_FORM_FIELD, ['图形验证码', captcha])
+                c_r = await page.evaluate(JS_FILL_FORM_FIELD, ['鍥惧舰楠岃瘉鐮?, captcha])
             results.append(f'captcha:{c_r}')
 
         # Optionally fill SMS code
         if sms_code:
-            s_r = await page.evaluate(JS_FILL_FORM_FIELD, ['短信验证码', sms_code])
+            s_r = await page.evaluate(JS_FILL_FORM_FIELD, ['鐭俊楠岃瘉鐮?, sms_code])
             if s_r == 'label-not-found':
-                s_r = await page.evaluate(JS_FILL_FORM_FIELD, ['手机验证码', sms_code])
+                s_r = await page.evaluate(JS_FILL_FORM_FIELD, ['鎵嬫満楠岃瘉鐮?, sms_code])
             results.append(f'sms:{s_r}')
 
         # Click login button
@@ -298,7 +298,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             const container = ''' + JS_GET_CONTAINER + ''';
             for (const btn of container.querySelectorAll('button')) {
                 const t = btn.textContent.trim().replace(/\\s/g, '');
-                if ((t === '登录' || t === '登錄' || t === 'Login') && btn.offsetParent !== null && !btn.disabled) {
+                if ((t === '鐧诲綍' || t === '鐧婚寗' || t === 'Login') && btn.offsetParent !== null && !btn.disabled) {
                     btn.click();
                     return 'ok';
                 }
@@ -312,18 +312,17 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         _record_action('login', {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code}, 'ok-login')
         return _ok('ok-login | ' + ' '.join(results), include_in_memory=True)
 
-    @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code). Prefers case_data_store presets when present.')
+    @controller.action('Get a value for a form field by its label using form rules. For 璇佷欢鍙风爜, reads 璇佷欢绫诲瀷 from the page and generates the matching format (韬唤璇?鈫?ID card, 缁熶竴绀句細淇＄敤浠ｇ爜/钀ヤ笟鎵х収 鈫?credit code). Prefers case_data_store presets when present.')
     async def match_form_rule(label_text: str):
-        # 业务数据（用户需求）仅作原文提示给 AI；不用 label↔key 硬匹配灌值
-        t = (label_text or '').replace(' ', '')
-        if '证件号码' in t or (t.endswith('证件号') and '类型' not in t):
+        # 涓氬姟鏁版嵁锛堢敤鎴烽渶姹傦級浠呬綔鍘熸枃鎻愮ず缁?AI锛涗笉鐢?label鈫攌ey 纭尮閰嶇亴鍊?        t = (label_text or '').replace(' ', '')
+        if '璇佷欢鍙风爜' in t or (t.endswith('璇佷欢鍙?) and '绫诲瀷' not in t):
             page = await browser_context.get_current_page()
             try:
-                cert_type = await page.evaluate(_JS_READ_CERT_TYPE, ['证件类型', '证照类型', '证件种类'])
+                cert_type = await page.evaluate(_JS_READ_CERT_TYPE, ['璇佷欢绫诲瀷', '璇佺収绫诲瀷', '璇佷欢绉嶇被'])
             except Exception:
                 cert_type = ''
             val = match_cert_number(cert_type or '')
-            sys.stderr.write(f'[match-form-rule] cert_type={cert_type!r} → {val}\n')
+            sys.stderr.write(f'[match-form-rule] cert_type={cert_type!r} 鈫?{val}\n')
             sys.stderr.flush()
             return val
         val = match_rule(label_text)
@@ -434,7 +433,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return _ok(f'verified:{current}')
         return _err(f'mismatch | current:{current} | expected:{expected}')
 
-    @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Builds task list + form snapshot only — does NOT auto-fill (use run_form_assistant for batch auto-fill). Returns summary {total, filled, pending, ...}.')
+    @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Builds task list + form snapshot only 鈥?does NOT auto-fill (use run_form_assistant for batch auto-fill). Returns summary {total, filled, pending, ...}.')
     async def scan_form_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -469,12 +468,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         notification = Notification(**raw_notification) if raw_notification else None
         case_data_store['_scan_buttons'] = _scan_buttons_from_result(result)
 
-        # Browse/list scan: task list only — do NOT save form structure checkpoint.
+        # Browse/list scan: task list only 鈥?do NOT save form structure checkpoint.
         # Structure is saved on: run_form_assistant, single-field first-touch
         # container scan, or explicit save_form_snapshot().
 
-        # Build task list only — no auto-fill (avoids filling on browse/list pages).
-        # Preserve existing done items — from_scan filters fields with values,
+        # Build task list only 鈥?no auto-fill (avoids filling on browse/list pages).
+        # Preserve existing done items 鈥?from_scan filters fields with values,
         # so mark_done() won't find them in pending. Create TaskItems directly.
         prev_tl = TaskList.from_store(case_data_store.get('task_list'))
         prev_done_labels = {d.label for d in prev_tl.done}
@@ -486,7 +485,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             force_refill=_force_refill_flag(case_data_store),
             session_filled_labels=session_filled,
         )
-        # Restore previously-done items — add directly to done since they won't be in pending.
+        # Restore previously-done items 鈥?add directly to done since they won't be in pending.
         # from_scan now puts pre-filled fields in done[], so check both lists to avoid duplicates.
         # Preserve currentValue from prior done items so re-scan summaries stay accurate.
         new_pending_labels = {item.label for item in tl.pending}
@@ -521,7 +520,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         for f in dom_fields:
             f.filled = f.label in done_labels
 
-        # Build summary instead of returning all fields (~40KB → <1KB)
+        # Build summary instead of returning all fields (~40KB 鈫?<1KB)
         pending_labels = [item.label for item in tl.pending]
         intervene = [item.label for item in tl.pending if item.needs_intervention]
         summary = {
@@ -548,9 +547,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     @controller.action(
         'Read-only summary of visible classified operable controls (quick full-page scan). '
         'Returns {container, scope, total, filled, pending, pending_labels, pending_items'
-        '[{label, xpath_smart, kind, section}], readonly_labels, readonly_items[…], '
+        '[{label, xpath_smart, kind, section}], readonly_labels, readonly_items[鈥, '
         'sections, buttons[{text, region_label, section, xpath_smart}], regions?}. '
-        'Use xpath_smart from pending_items/buttons on fill/select/click — do not re-scan for locator. '
+        'Use xpath_smart from pending_items/buttons on fill/select/click 鈥?do not re-scan for locator. '
         'readonly_items = disabled known-kind fields for reference (do not fill). '
         'Includes shell nav when present. Does NOT build task_list, auto-fill, or run form assistant.'
     )
@@ -569,7 +568,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if not isinstance(result, dict):
             return _err('invalid-scan-result')
         primary_container = (result.get('container') or 'main').strip() or 'main'
-        # build_editable_summary → buttons[{text, section}] (no kind/xpath).
+        # build_editable_summary 鈫?buttons[{text, section}] (no kind/xpath).
         summary = build_editable_summary([result], primary_container=primary_container)
         try:
             from ...state import _CURRENT_PHASE
@@ -618,7 +617,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         finally:
             case_data_store.pop('_assistant_section_filter', None)
 
-    @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Excludes fields already filled by auto-fill. Returns {fields: [...], notification: {visible, text}|null}.')
+    @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks 鈥?much smaller output, saves context. Excludes fields already filled by auto-fill. Returns {fields: [...], notification: {visible, text}|null}.')
     async def scan_visible_fields():
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -650,7 +649,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         tl = TaskList.from_store(case_data_store.get('task_list'))
 
-        # ── 扫描校验错误：将报错字段从 done[] 移回 pending[]，清空值 ──
+        # 鈹€鈹€ 鎵弿鏍￠獙閿欒锛氬皢鎶ラ敊瀛楁浠?done[] 绉诲洖 pending[]锛屾竻绌哄€?鈹€鈹€
         try:
             error_labels = await page.evaluate(_JS_EXTRACT_ERROR_LABELS)
             error_labels_parsed = json.loads(error_labels) if isinstance(error_labels, str) else error_labels
@@ -662,10 +661,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 case_data_store['task_list'] = tl.to_store()
                 for item in retried:
                     await _clear_field_value(page, item.label)
-                sys.stderr.write(f'[scan-visible] Validation errors: {error_labels_parsed} → retried {len(retried)} field(s)\n')
+                sys.stderr.write(f'[scan-visible] Validation errors: {error_labels_parsed} 鈫?retried {len(retried)} field(s)\n')
                 sys.stderr.flush()
 
-        # Only show fields that still need filling (pending) — keeps failed/error fields.
+        # Only show fields that still need filling (pending) 鈥?keeps failed/error fields.
         # Also keeps fields not yet tracked (safe default for dynamically shown fields).
         pending_labels = {d.label for d in tl.pending}
         done_labels = {d.label for d in tl.done}
@@ -674,7 +673,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         for f in dom_fields:
             if f.label in done_labels and f.label not in pending_labels:
                 continue
-            # Drop optional disabled fields with no adjacent button (内部评级等只读噪音)
+            # Drop optional disabled fields with no adjacent button (鍐呴儴璇勭骇绛夊彧璇诲櫔闊?
             if f.disabled and not f.hasButton and not f.required:
                 continue
             # Drop disabled fields that already have a value and no button
@@ -719,23 +718,23 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         else:
             payload['hint'] = (
                 f'fillable:{len(fillable)} pending:{len(pending_labels)} '
-                f'disabled_button:{len(intervene_labels)} — do NOT re-select already-filled fields; '
+                f'disabled_button:{len(intervene_labels)} 鈥?do NOT re-select already-filled fields; '
                 f'handle disabled+button via click_adjacent_button / special-element candidates'
             )
-        # Required disabled "联网核查" with empty value — nudge button click before save
+        # Required disabled "鑱旂綉鏍告煡" with empty value 鈥?nudge button click before save
         for f in payload.get('fields') or []:
             if (
                 f.get('required') and f.get('disabled') and not (f.get('currentValue') or '').strip()
-                and ('核查' in (f.get('label') or '') or '联网' in (f.get('label') or ''))
+                and ('鏍告煡' in (f.get('label') or '') or '鑱旂綉' in (f.get('label') or ''))
             ):
                 payload['hint'] = (
-                    f'Click adjacent 联网核查 button for "{f.get("label")}", wait_for_loading, '
-                    f'then click 保存. ' + payload.get('hint', '')
+                    f'Click adjacent 鑱旂綉鏍告煡 button for "{f.get("label")}", wait_for_loading, '
+                    f'then click 淇濆瓨. ' + payload.get('hint', '')
                 )
                 break
         return json.dumps(payload, ensure_ascii=False, indent=2)
 
-    @controller.action('Rebuild the task list from scan results (utility — does not auto-fill).')
+    @controller.action('Rebuild the task list from scan results (utility 鈥?does not auto-fill).')
     async def init_task_list(fields_json: str):
         try:
             data = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
@@ -765,17 +764,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         snap = _save_form_snapshot(container_id, fields, case_data_store)
         return _ok(f'form-snapshot | container:{container_id} | count:{snap.count}')
 
-    # 内部函数 — 由 run_form_assistant → _ensure_scanned(allow_autofill=True) 触发自动填；
-    # 单字段 first-touch / stale 仅走 _rebuild(autofill=False) 落结构。
-    # 按 kind 分组（date→select→input→radio→checkbox→tree-select）多次调用 LLM，
-    # 失败字段保留在 pending 供 agent 手动处理，成功字段记录 action + task_done。
-    # ── 辅助闭包（共享 page / llm / case_data_store）──
+    # 鍐呴儴鍑芥暟 鈥?鐢?run_form_assistant 鈫?_ensure_scanned(allow_autofill=True) 瑙﹀彂鑷姩濉紱
+    # 鍗曞瓧娈?first-touch / stale 浠呰蛋 _rebuild(autofill=False) 钀界粨鏋勩€?    # 鎸?kind 鍒嗙粍锛坉ate鈫抯elect鈫抜nput鈫抮adio鈫抍heckbox鈫抰ree-select锛夊娆¤皟鐢?LLM锛?    # 澶辫触瀛楁淇濈暀鍦?pending 渚?agent 鎵嬪姩澶勭悊锛屾垚鍔熷瓧娈佃褰?action + task_done銆?    # 鈹€鈹€ 杈呭姪闂寘锛堝叡浜?page / llm / case_data_store锛夆攢鈹€
     #
-    # _execute_round: 分组 → LLM → 逐个执行，三轮回合共用。
-    # _scan_new_fields: 全量扫描 → 差值过滤 → TaskItem 创建，Round 2/3 共用。
-
+    # _execute_round: 鍒嗙粍 鈫?LLM 鈫?閫愪釜鎵ц锛屼笁杞洖鍚堝叡鐢ㄣ€?    # _scan_new_fields: 鍏ㄩ噺鎵弿 鈫?宸€艰繃婊?鈫?TaskItem 鍒涘缓锛孯ound 2/3 鍏辩敤銆?
     async def _execute_round(page, items, label_kind, all_results, round_tag):
-        """分组 → LLM 规划 → 逐个执行。round_tag: '' | 'round2 ' | 'round3 '"""
+        """鍒嗙粍 鈫?LLM 瑙勫垝 鈫?閫愪釜鎵ц銆俽ound_tag: '' | 'round2 ' | 'round3 '"""
         from .section_scope import section_matches
 
         filt = (case_data_store.get('_assistant_section_filter') or '').strip()
@@ -798,18 +792,18 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     for d in matches
                     if (d.get('xpath_smart') or '').strip()
                 }
-                # Identical xpath (or none) → safe; ≥2 distinct → omit (ambiguous)
+                # Identical xpath (or none) 鈫?safe; 鈮? distinct 鈫?omit (ambiguous)
                 if len(xps) <= 1:
                     return matches[0]
                 return {}
             return {}
 
         async def _select_by_xpath(page, value, xpath_smart):
-            """Xpath-only select open+pick (Phase A hard-cut — no labeled fallback)."""
+            """Xpath-only select open+pick (Phase A hard-cut 鈥?no labeled fallback)."""
             xp = (xpath_smart or '').strip()
             if not xp:
                 return 'xpath-not-found'
-            _FIRST = ('first', '1st', '第一个', '第一项')
+            _FIRST = ('first', '1st', '绗竴涓?, '绗竴椤?)
             reset_diag = await reset_select_ui(page)
             if not reset_diag.get('closed', False):
                 sys.stderr.write(
@@ -879,7 +873,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         for d in items:
             if filt and not section_matches(filt, d.get('section_id', ''), d.get('section_title', ''), d.get('region_label', '')):
                 continue
-            # Skip needs_intervention — only auto-fill fillable fields
+            # Skip needs_intervention 鈥?only auto-fill fillable fields
             if d.get('disabled') and d.get('hasButton'):
                 continue
             idx = KIND_ORDER.get(label_kind.get(d['label'], 'input'), 99)
@@ -891,26 +885,26 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 continue
             kind_name = {0: 'date', 1: 'select', 2: 'input', 3: 'radio', 4: 'checkbox', 5: 'tree-select'}.get(idx, 'other')
             await page.evaluate(
-                's => console.log("[AI填表] 分组 " + s)',
-                f'{kind_name}: {len(sub)}个字段',
+                's => console.log("[AI濉〃] 鍒嗙粍 " + s)',
+                f'{kind_name}: {len(sub)}涓瓧娈?,
             )
 
             # ---- Cross-field: cert type -> cert number / customer name ----
-            # Only fill gaps — never overwrite user case_data presets (commandValue).
+            # Only fill gaps 鈥?never overwrite user case_data presets (commandValue).
             if idx == KIND_ORDER['input']:
                 _has_cert_num = any(
-                    '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or '')
+                    '璇佷欢鍙风爜' in (d.get('label', '') or '') or '璇佷欢鍙? in (d.get('label', '') or '')
                     for d in sub
                 )
                 if _has_cert_num:
                     try:
-                        _ct = await page.evaluate(_JS_READ_CERT_TYPE, ['证件类型', '证照类型', '证件种类'])
+                        _ct = await page.evaluate(_JS_READ_CERT_TYPE, ['璇佷欢绫诲瀷', '璇佺収绫诲瀷', '璇佷欢绉嶇被'])
                     except Exception:
                         _ct = ''
                     _ov = match_cert_number(_ct or '')
                     for d in sub:
                         lbl = d.get('label', '') or ''
-                        if '证件号码' in lbl or '证件号' in lbl:
+                        if '璇佷欢鍙风爜' in lbl or '璇佷欢鍙? in lbl:
                             if d.get('commandValue') and str(d.get('commandValue')).strip():
                                 sys.stderr.write(
                                     f'[cert-detect] keep case_data cert_number={d["commandValue"]!r}\n'
@@ -925,17 +919,17 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                             break
                     # ---- Cross-field: cert type -> customer name ----
                     _has_cust_name = any(
-                        '客户名称' in (d.get('label', '') or '') or '客户姓名' in (d.get('label', '') or '')
+                        '瀹㈡埛鍚嶇О' in (d.get('label', '') or '') or '瀹㈡埛濮撳悕' in (d.get('label', '') or '')
                         for d in sub
                     )
                     if _has_cust_name:
-                        if _ct and ('统一社会信用代码' in _ct or '营业执照' in _ct):
-                            _name_ov = '测试科技发展有限公司'
+                        if _ct and ('缁熶竴绀句細淇＄敤浠ｇ爜' in _ct or '钀ヤ笟鎵х収' in _ct):
+                            _name_ov = '娴嬭瘯绉戞妧鍙戝睍鏈夐檺鍏徃'
                         else:
                             _name_ov = _gen_name()
                         for d_name in sub:
                             nlbl = d_name.get('label', '') or ''
-                            if '客户名称' in nlbl or '客户姓名' in nlbl:
+                            if '瀹㈡埛鍚嶇О' in nlbl or '瀹㈡埛濮撳悕' in nlbl:
                                 if d_name.get('commandValue') and str(d_name.get('commandValue')).strip():
                                     sys.stderr.write(
                                         f'[cert-detect] keep case_data name={d_name["commandValue"]!r}\n'
@@ -961,7 +955,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if needs:
                 case_data_store.setdefault('_assistant_needs_agent', []).extend(needs)
             await page.evaluate(
-                'd => console.log("[AI填表] 所有动作(" + d.length + "): " + JSON.stringify(d.map(a => a.label + "=" + (a.value||a.option||""))))',
+                'd => console.log("[AI濉〃] 鎵€鏈夊姩浣?" + d.length + "): " + JSON.stringify(d.map(a => a.label + "=" + (a.value||a.option||""))))',
                 actions,
             )
 
@@ -1165,9 +1159,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     _task_done_impl(
                         label, case_data_store, value=value, xpath_smart=xp_inv,
                     )
-                    # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
-                    btn = has_button_map.get(label, '')
-                    if '验证' in btn and kind in ('fill_input', 'fill', 'input'):
+                    # Phone verify: fill_input 鎴愬姛鍚庡鏋滄湁"楠岃瘉"鎸夐挳锛岃嚜鍔ㄧ偣鍑?                    btn = has_button_map.get(label, '')
+                    if '楠岃瘉' in btn and kind in ('fill_input', 'fill', 'input'):
                         try:
                             await page.evaluate('''([lbl]) => {
                                 const container = ''' + JS_GET_CONTAINER + ''';
@@ -1175,7 +1168,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                     const t = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
                                     if (!t.includes(lbl)) continue;
                                     for (const b of item.querySelectorAll('button')) {
-                                        if (b.offsetParent !== null && b.textContent.includes('验证')) {
+                                        if (b.offsetParent !== null && b.textContent.includes('楠岃瘉')) {
                                             b.click(); return 'ok-verify-clicked';
                                         }
                                     }
@@ -1189,25 +1182,25 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     sys.stderr.flush()
                     status = 'ok' if ok else f'FAILED:{result}'
                     await page.evaluate(
-                        'o => console.log("[AI填表] 执行进度 ======\\n" + o)',
-                        f'{step_num}/{total} {kind} "{label}" → {status}',
+                        'o => console.log("[AI濉〃] 鎵ц杩涘害 ======\\n" + o)',
+                        f'{step_num}/{total} {kind} "{label}" 鈫?{status}',
                     )
                 else:
                     fail_in_group += 1
                     await page.evaluate(
-                        'o => console.log("[AI填表] FAIL: " + o)',
-                        f'{step_num}/{total} {kind} "{label}" → {result}',
+                        'o => console.log("[AI濉〃] FAIL: " + o)',
+                        f'{step_num}/{total} {kind} "{label}" 鈫?{result}',
                     )
 
                 await page.wait_for_timeout(500 if kind in ('select_option', 'select', 'option') else 300)
 
             await page.evaluate(
-                's => console.log("[AI填表] 本组完成: " + s)',
-                f'{total}个动作 | ok:{ok_in_group} failed:{fail_in_group}',
+                's => console.log("[AI濉〃] 鏈粍瀹屾垚: " + s)',
+                f'{total}涓姩浣?| ok:{ok_in_group} failed:{fail_in_group}',
             )
 
     def _scan_new_fields(dom_fields, tl):
-        """扫描新字段：差值过滤 + TaskItem 创建。返回 new_pending dicts。"""
+        """鎵弿鏂板瓧娈碉細宸€艰繃婊?+ TaskItem 鍒涘缓銆傝繑鍥?new_pending dicts銆?""
         from .section_scope import section_matches
 
         filt = (case_data_store.get('_assistant_section_filter') or '').strip()
@@ -1219,7 +1212,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if filt and not section_matches(filt, f.section_id, f.section_title, getattr(f, 'region_label', '') or ''):
                 continue
             if f.disabled:
-                # Disabled / introduce (disabled+button) — not assistant pending.
+                # Disabled / introduce (disabled+button) 鈥?not assistant pending.
                 continue
             new_pending.append(f.model_dump())
         if new_pending:
@@ -1237,10 +1230,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             sys.stderr.flush()
         return new_pending
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # Round 1: 初始 pending → 分组 → LLM → 执行
-    # ═══════════════════════════════════════════════════════════════════════
-    async def _auto_fill_pending():
+    # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?    # Round 1: 鍒濆 pending 鈫?鍒嗙粍 鈫?LLM 鈫?鎵ц
+    # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?    async def _auto_fill_pending():
         from .section_scope import section_matches
 
         case_data_store['_assistant_needs_agent'] = []
@@ -1259,8 +1250,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if not pending:
             return _ok('nothing-pending')
 
-        # 构建待填字段列表（不再用案例 KV 硬匹配灌 commandValue；场景原文由 preamble 提示）
-        pending_dicts: list[dict] = []
+        # 鏋勫缓寰呭～瀛楁鍒楄〃锛堜笉鍐嶇敤妗堜緥 KV 纭尮閰嶇亴 commandValue锛涘満鏅師鏂囩敱 preamble 鎻愮ず锛?        pending_dicts: list[dict] = []
         for item in pending:
             d = item.model_dump()
             pending_dicts.append(d)
@@ -1270,7 +1260,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         # Extract reference date from page
         try:
             ref_date = await page.evaluate('''() => {
-                const dateLabels = ['成立日期', '登记日期', '注册日期', '营业起始日期', '营业开始日期'];
+                const dateLabels = ['鎴愮珛鏃ユ湡', '鐧昏鏃ユ湡', '娉ㄥ唽鏃ユ湡', '钀ヤ笟璧峰鏃ユ湡', '钀ヤ笟寮€濮嬫棩鏈?];
                 const items = document.querySelectorAll('.el-form-item');
                 for (const el of items) {
                     const lbl = el.querySelector('.el-form-item__label');
@@ -1287,28 +1277,24 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             }''')
             if ref_date:
                 case_data_store['_ref_date'] = ref_date
-                await page.evaluate('s => console.log("[AI填表] 参考日期: " + s)', ref_date)
+                await page.evaluate('s => console.log("[AI濉〃] 鍙傝€冩棩鏈? " + s)', ref_date)
         except Exception:
             pass
 
-        # 打印待填写统计
-        kind_counts: dict[str, int] = {}
+        # 鎵撳嵃寰呭～鍐欑粺璁?        kind_counts: dict[str, int] = {}
         for item in pending:
             k = item.kind
             kind_counts[k] = kind_counts.get(k, 0) + 1
         summary_parts = ' '.join(f'{k}:{v}' for k, v in sorted(kind_counts.items()))
         await page.evaluate(
-            's => console.log("[AI填表] 预计填写: " + s)',
-            f'{len(pending)}个字段 | {summary_parts}',
+            's => console.log("[AI濉〃] 棰勮濉啓: " + s)',
+            f'{len(pending)}涓瓧娈?| {summary_parts}',
         )
 
         all_results = []
         await _execute_round(page, pending_dicts, label_kind, all_results, '')
 
-        # ═══════════════════════════════════════════════════════════════════
-        # Round 2: 级联扫描 — select 赋值后可能 reveal 新字段
-        # ═══════════════════════════════════════════════════════════════════
-        round1_count = len(all_results)
+        # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?        # Round 2: 绾ц仈鎵弿 鈥?select 璧嬪€煎悗鍙兘 reveal 鏂板瓧娈?        # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?        round1_count = len(all_results)
         try:
             raw2 = await page.evaluate(
                 JS_SCAN_FORM_FIELDS,
@@ -1324,16 +1310,14 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         new_pending2 = _scan_new_fields(dom_fields2, tl)
         if new_pending2:
             await page.evaluate(
-                's => console.log("[AI填表] 第二轮(联动): " + s)',
-                f'{len(new_pending2)}个新字段',
+                's => console.log("[AI濉〃] 绗簩杞?鑱斿姩): " + s)',
+                f'{len(new_pending2)}涓柊瀛楁',
             )
             label_kind2 = {d['label']: d.get('kind', 'input') for d in new_pending2}
             await _execute_round(page, new_pending2, label_kind2, all_results, 'round2 ')
 
-        # ═══════════════════════════════════════════════════════════════════
-        # Round 3: 深层联动扫描
-        # ═══════════════════════════════════════════════════════════════════
-        round2_count = len(all_results)
+        # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?        # Round 3: 娣卞眰鑱斿姩鎵弿
+        # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?        round2_count = len(all_results)
         try:
             raw3 = await page.evaluate(
                 JS_SCAN_FORM_FIELDS,
@@ -1349,23 +1333,21 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         new_pending3 = _scan_new_fields(dom_fields3, tl)
         if new_pending3:
             await page.evaluate(
-                's => console.log("[AI填表] 第三轮(深层联动): " + s)',
-                f'{len(new_pending3)}个新字段',
+                's => console.log("[AI濉〃] 绗笁杞?娣卞眰鑱斿姩): " + s)',
+                f'{len(new_pending3)}涓柊瀛楁',
             )
             label_kind3 = {d['label']: d.get('kind', 'input') for d in new_pending3}
             await _execute_round(page, new_pending3, label_kind3, all_results, 'round3 ')
 
-        # ═══════════════════════════════════════════════════════════════════
-        # Step 4-6: 完成、同步（introduce disabled+button 不再入 pending / 不滚动干预）
-        # ═══════════════════════════════════════════════════════════════════
-        ok_count = sum(1 for r in all_results if _is_ok_result(r['result']))
+        # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?        # Step 4-6: 瀹屾垚銆佸悓姝ワ紙introduce disabled+button 涓嶅啀鍏?pending / 涓嶆粴鍔ㄥ共棰勶級
+        # 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?        ok_count = sum(1 for r in all_results if _is_ok_result(r['result']))
         failed_count = len(all_results) - ok_count
         await page.evaluate(
-            'd => console.log("[AI填表] 执行完成 ======\\n" + JSON.stringify(d))',
+            'd => console.log("[AI濉〃] 鎵ц瀹屾垚 ======\\n" + JSON.stringify(d))',
             all_results,
         )
 
-        # Step 6: full scan sync — 移除不在 DOM 的 pending 字段
+        # Step 6: full scan sync 鈥?绉婚櫎涓嶅湪 DOM 鐨?pending 瀛楁
         try:
             raw_sync = await page.evaluate(
                 JS_SCAN_FORM_FIELDS,
@@ -1400,7 +1382,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         tl = TaskList.from_store(case_data_store.get('task_list'))
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
-    @controller.action('Get the current pending task list. Returns {"pending": [...], NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 保存 — do not re-fill fields.')
+    @controller.action('Get the current pending task list. Returns {"pending": [...], NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 淇濆瓨 鈥?do not re-fill fields.')
     async def get_pending_tasks(section: str = '', region: str = ''):
         if _is_query_mode(case_data_store):
             return _ok(_query_not_form_payload(), include_in_memory=True)
@@ -1433,25 +1415,25 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         return json.dumps(result, ensure_ascii=False)
 
     @controller.action(
-        'Find the 保存/提交/确认/确定 button, scroll it into view, click it, wait for loading, '
+        'Find the 淇濆瓨/鎻愪氦/纭/纭畾 button, scroll it into view, click it, wait for loading, '
         'then scan the whole page for .el-form-item__error and success/error notifications. '
         'Prefer this over scroll_down + click_element_by_index for form submit (including '
-        'maintain/edit dialog 确认). '
-        'Optional section (or region alias) scopes to a collapse/tab/card / L1 block when multiple同名按钮 exist. '
-        'Returns ok-save-success when 操作成功 toast appears, ok-save-navigation when URL changes, '
+        'maintain/edit dialog 纭). '
+        'Optional section (or region alias) scopes to a collapse/tab/card / L1 block when multiple鍚屽悕鎸夐挳 exist. '
+        'Returns ok-save-success when 鎿嶄綔鎴愬姛 toast appears, ok-save-navigation when URL changes, '
         'or ok-save-no-feedback when the click completes with no toast/error/navigation '
-        '(silent save — still success). On validation errors returns err-save-validation.'
+        '(silent save 鈥?still success). On validation errors returns err-save-validation.'
     )
-    async def click_save(button_text: str = '保存', section: str = '', region: str = ''):
+    async def click_save(button_text: str = '淇濆瓨', section: str = '', region: str = ''):
         from ._phase_intent import check_pending_write_gate, contract_force_refill, record_success_token
 
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
-        compact_btn = re.sub(r'\s+', '', (button_text or '保存').strip()) or '保存'
+        compact_btn = re.sub(r'\s+', '', (button_text or '淇濆瓨').strip()) or '淇濆瓨'
         # LEGACY_SECTION_RETIRE: region= preferred alias; section= kept for compat.
         sec = (section or region or "").strip()
         explicit_sec = bool(sec)
-        # Resolve: explicit → multi-save gate → sticky memory → unique → ""
+        # Resolve: explicit 鈫?multi-save gate 鈫?sticky memory 鈫?unique 鈫?""
         if not sec and not explicit_sec:
             try:
                 await refresh_scan_buttons(page, case_data_store)
@@ -1467,7 +1449,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         f'[click_save] skip sticky; multi-section {compact_btn!r} keys={keys!r}\n'
                     )
                     sys.stderr.flush()
-                    # leave sec empty → JS_CLICK_SAVE_BUTTON returns ambiguous
+                    # leave sec empty 鈫?JS_CLICK_SAVE_BUTTON returns ambiguous
                 else:
                     mem = norm_sec(str(case_data_store.get("_phase_section") or ""))
                     if mem:
@@ -1490,11 +1472,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if sec:
             from .section_scope import remember_phase_section
             remember_phase_section(case_data_store, sec)
-        # 确认/确定 = dialog/picker confirm (never treat as form-save blocked by query toolbar)
+        # 纭/纭畾 = dialog/picker confirm (never treat as form-save blocked by query toolbar)
         is_picker_confirm = bool(
-            compact_btn.startswith(('确认', '确定'))
-            or ('确认' in compact_btn)
-            or ('确定' in compact_btn)
+            compact_btn.startswith(('纭', '纭畾'))
+            or ('纭' in compact_btn)
+            or ('纭畾' in compact_btn)
         )
         query_ui = await _mark_query_ui_if_needed(page, case_data_store, container_id)
         sys.stderr.write(
@@ -1504,13 +1486,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         sys.stderr.flush()
         if query_ui and not is_picker_confirm:
             return _err(
-                'not-form-save | query/filter UI — NOT a form-fill submit. '
-                'Click 查询 via click_element_by_index; '
-                'for picker 确认 use click_element_by_index or click_save(button_text="确认").',
+                'not-form-save | query/filter UI 鈥?NOT a form-fill submit. '
+                'Click 鏌ヨ via click_element_by_index; '
+                'for picker 纭 use click_element_by_index or click_save(button_text="纭").',
                 include_in_memory=True,
             )
         if is_picker_confirm and query_ui:
-            # Magnifier/picker: 确认 is introduce confirm, not maintain click_save.
+            # Magnifier/picker: 纭 is introduce confirm, not maintain click_save.
             sys.stderr.write(
                 f'[click_save] picker confirm via click_save({button_text!r}) on query UI\n'
             )
@@ -1535,7 +1517,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                             "err-section-required | pending_by_section="
                             + json.dumps(by, ensure_ascii=False)
                             + " | Pass region= (or section=) for the phase block "
-                            "(judge from 阶段任务 / 阶段目录 / region_label).",
+                            "(judge from 闃舵浠诲姟 / 闃舵鐩綍 / region_label).",
                             include_in_memory=True,
                         )
 
@@ -1582,8 +1564,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         # Capture short-lived success toasts that may vanish between polls
         await page.evaluate(r'''() => {
-          const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功/;
-          const failRe = /失败|错误|异常|不能|不允许|已存在|重复|校验|必填|不通过/;
+          const successRe = /鎿嶄綔鎴愬姛|淇濆瓨鎴愬姛|鎻愪氦鎴愬姛|鏂板缓鎴愬姛|淇敼鎴愬姛|鍒犻櫎鎴愬姛/;
+          const failRe = /澶辫触|閿欒|寮傚父|涓嶈兘|涓嶅厑璁竱宸插瓨鍦▅閲嶅|鏍￠獙|蹇呭～|涓嶉€氳繃/;
           window.__saveWatch = { successNotifs: [], errorNotifs: [] };
           const take = (el) => {
             const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
@@ -1609,7 +1591,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
           window.__saveWatchObs = obs;
         }''')
 
-        raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, [button_text or '保存', sec])
+        raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, [button_text or '淇濆瓨', sec])
         try:
             info = json.loads(raw) if isinstance(raw, str) else (raw or {})
         except Exception:
@@ -1620,7 +1602,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             except Exception:
                 pass
             reason = info.get('reason') or 'button-not-found'
-            needle = info.get('needle') or (button_text or '保存')
+            needle = info.get('needle') or (button_text or '淇濆瓨')
             candidates = info.get('candidates') or []
             cand_json = json.dumps(candidates[:12], ensure_ascii=False)
             sys.stderr.write(
@@ -1631,7 +1613,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if reason == 'ambiguous':
                 return _err(
                     f'err-save-ambiguous:{needle} | candidates={cand_json} | '
-                    f'Multiple visible "{needle}" buttons — pass region= (or section=) to click_save '
+                    f'Multiple visible "{needle}" buttons 鈥?pass region= (or section=) to click_save '
                     f'(region_label / collapse/tab/card title from scan).',
                     include_in_memory=True,
                 )
@@ -1639,11 +1621,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return _err(
                 f'err-save-button-not-found:{needle}{sec_hint}. '
                 f'candidates={cand_json}. '
-                f'Close interfering dialogs (查询/返回) with close_dialog, or pass region= for scoped save.',
+                f'Close interfering dialogs (鏌ヨ/杩斿洖) with close_dialog, or pass region= for scoped save.',
                 include_in_memory=True,
             )
 
-        btn_text = info.get('text') or (button_text or '保存')
+        btn_text = info.get('text') or (button_text or '淇濆瓨')
         xpath = info.get('xpath') or ''
         tag_name = info.get('tag') or 'button'
         element_info = await _enrich_click_element(
@@ -1666,7 +1648,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         await page.wait_for_timeout(150)
         await _wait_if_loading(page)
 
-        # Poll briefly — success toasts auto-dismiss in ~2–3s
+        # Poll briefly 鈥?success toasts auto-dismiss in ~2鈥?s
         outcome = {'formErrors': [], 'successNotifs': [], 'errorNotifs': [], 'url': page.url}
         for _ in range(20):  # ~3s at 150ms
             scanned = await page.evaluate(JS_SCAN_SAVE_OUTCOME)
@@ -1751,7 +1733,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             sys.stderr.flush()
             return _ok(
                 f'ok-save-success:{toast} | '
-                f'Save confirmed (操作成功). Call done(success=true) if phase goal is save.',
+                f'Save confirmed (鎿嶄綔鎴愬姛). Call done(success=true) if phase goal is save.',
                 include_in_memory=True,
             )
 
@@ -1782,7 +1764,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 include_in_memory=True,
             )
 
-        # Picker confirm: no toast expected — dialog close counts as success
+        # Picker confirm: no toast expected 鈥?dialog close counts as success
         if is_picker_confirm and query_ui:
             still_query = False
             try:
@@ -1790,7 +1772,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             except Exception:
                 still_query = False
             if not still_query:
-                record_success_token(case_data_store, 'confirm_click', button_text or '确认')
+                record_success_token(case_data_store, 'confirm_click', button_text or '纭')
                 try:
                     from ._phase_boundary import maybe_record_picker_closed, record_evidence
                     parent = (case_data_store or {}).get('_parent_container_before_picker') or 'main'
@@ -1827,18 +1809,18 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 sys.stderr.write('[click_save] SUCCESS picker confirm (dialog closed)\n')
                 sys.stderr.flush()
                 if case_data_store is not None:
-                    # Parent form still needs final 保存 after introduce (toast_ok).
+                    # Parent form still needs final 淇濆瓨 after introduce (toast_ok).
                     case_data_store['_submit_ready'] = True
                     case_data_store.pop('_query_ui', None)
                 return _ok(
                     'ok-introduce-confirm | Picker confirmed; introduce fields should be backfilled. '
-                    'Call click_save(button_text="保存") NOW on the parent form. '
+                    'Call click_save(button_text="淇濆瓨") NOW on the parent form. '
                     'Do NOT only check_field_value.',
                     include_in_memory=True,
                 )
 
         # Silent save: button clicked, no validation errors, no error toast, no URL
-        # change — some SUTs (e.g. section 保存) persist without 操作成功 toast.
+        # change 鈥?some SUTs (e.g. section 淇濆瓨) persist without 鎿嶄綔鎴愬姛 toast.
         if case_data_store is not None:
             case_data_store['_last_save_ok'] = True
             case_data_store.pop('_submit_ready', None)
@@ -1864,11 +1846,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         error = (info.get('error') or '').strip()
         if not label and not error:
             return _ok('no-error-found')
-        sys.stderr.write(f'[scroll-to-error] jumped to: "{label}" → {error}\n')
+        sys.stderr.write(f'[scroll-to-error] jumped to: "{label}" 鈫?{error}\n')
         sys.stderr.flush()
         return _ok(f'scrolled-to:{label} | {error}')
 
-    @controller.action('Sync task list from current page validation errors. Reads .el-form-item__error text, extracts field labels (strips 请选择/请输入/请上传 prefix), re-adds them to pending. Also scrolls to first error. Call this after a failed submit attempt.')
+    @controller.action('Sync task list from current page validation errors. Reads .el-form-item__error text, extracts field labels (strips 璇烽€夋嫨/璇疯緭鍏?璇蜂笂浼?prefix), re-adds them to pending. Also scrolls to first error. Call this after a failed submit attempt.')
     async def sync_tasks_from_errors():
         page = await browser_context.get_current_page()
         errors = await page.evaluate(_JS_EXTRACT_ERROR_LABELS)
@@ -1880,7 +1862,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         retried = tl.sync_from_errors(error_labels)
         case_data_store['task_list'] = tl.to_store()
 
-        # 分离 disabled+旁钮字段（靠特殊元素流程，不入干预队列）
+        # 鍒嗙 disabled+鏃侀挳瀛楁锛堥潬鐗规畩鍏冪礌娴佺▼锛屼笉鍏ュ共棰勯槦鍒楋級
         intervene = [item for item in retried if item.needs_intervention]
         fillable = [item for item in retried if not item.needs_intervention]
         if intervene:
@@ -1900,10 +1882,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             jumped_label = (scroll_info.get('label') or '').strip()
             jumped_error = (scroll_info.get('error') or '').strip()
             if jumped_label:
-                sys.stderr.write(f'[sync-errors] auto-scrolled to: "{jumped_label}" → {jumped_error}\n')
+                sys.stderr.write(f'[sync-errors] auto-scrolled to: "{jumped_label}" 鈫?{jumped_error}\n')
                 sys.stderr.flush()
 
-        # 构建返回消息
+        # 鏋勫缓杩斿洖娑堟伅
         msg = f'sync-errors | retried:{len(retried)}'
         if fillable:
             msg += ' | fillable:' + json.dumps([item.label for item in fillable], ensure_ascii=False)
@@ -1949,8 +1931,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
         if str(already).startswith('ok-already:'):
             cur_val = already.split(':', 1)[1]
-            _FIRST = ('first', '1st', '第一个', '第一项')
-            # "first" means "any existing value is fine" — do NOT re-open the
+            _FIRST = ('first', '1st', '绗竴涓?, '绗竴椤?)
+            # "first" means "any existing value is fine" 鈥?do NOT re-open the
             # dropdown (re-selecting first can cascade-reset dependent fields).
             if (
                 (option_text or '').strip().lower() in _FIRST
@@ -1971,7 +1953,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 streak = int(case_data_store.get('_already_matched_streak', 0) or 0) + 1
                 case_data_store['_already_matched_streak'] = streak
                 return _ok(_with_submit_cue(
-                    already + ' | already-matched | SKIP — field already set; do not re-select',
+                    already + ' | already-matched | SKIP 鈥?field already set; do not re-select',
                     case_data_store,
                 ))
 
@@ -2013,7 +1995,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         ):
             failed = await _final_select_failure(str(trigger_result), xp)
             if trigger_result == 'no-select-found':
-                return _err(failed + ' | field may be radio — use click_radio')
+                return _err(failed + ' | field may be radio 鈥?use click_radio')
             return failed
 
         await page.wait_for_timeout(500)
@@ -2037,7 +2019,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             )
             return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
         elif select_result == 'no-items':
-            # Xpath recheck — treat already-set field as success (no labeled JS).
+            # Xpath recheck 鈥?treat already-set field as success (no labeled JS).
             recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
             if str(recheck).startswith('ok-already:'):
                 cur = recheck.split(':', 1)[1]
@@ -2059,9 +2041,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             params, element = attach_select_options(params, element, stored)
             want = (option_text or '').strip()
             fuzzy = next((o for o in stored if want and (want in o or o in want)), None)
-            # Common alias: 中国 → 中华人民共和国
-            if not fuzzy and want in ('中国', '中国大陆'):
-                fuzzy = next((o for o in stored if '中国' in o), None)
+            # Common alias: 涓浗 鈫?涓崕浜烘皯鍏卞拰鍥?            if not fuzzy and want in ('涓浗', '涓浗澶ч檰'):
+                fuzzy = next((o for o in stored if '涓浗' in o), None)
             if fuzzy:
                 fuzzy_result = await page.evaluate(JS_SELECT_OPTION, fuzzy)
                 if _is_ok_result(fuzzy_result):
@@ -2094,19 +2075,19 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             failed = await _final_select_failure(str(select_result), xp)
             return _err(failed)
 
-    # ── Adjacent button / radio (moved from misc for logical grouping) ──
+    # 鈹€鈹€ Adjacent button / radio (moved from misc for logical grouping) 鈹€鈹€
 
-    @controller.action('Click an adjacent button (选择/引入/上传) to fill a field, but only if the field is empty. Returns "already-filled" (non-ok skip) if field has value.')
+    @controller.action('Click an adjacent button (閫夋嫨/寮曞叆/涓婁紶) to fill a field, but only if the field is empty. Returns "already-filled" (non-ok skip) if field has value.')
     async def click_adjacent_button(label_text: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        # First check if field already has a value — skip if so
+        # First check if field already has a value 鈥?skip if so
         check_info = await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
         if check_info != 'label-not-found':
             try:
                 info = json.loads(check_info)
-                if (info.get('currentValue', '').strip() != '' or info.get('selected', False)) and label_text not in ('查询', '搜索', '确定', '提交', '保存'):
-                    # Non-recordable skip — must NOT use ok prefix
+                if (info.get('currentValue', '').strip() != '' or info.get('selected', False)) and label_text not in ('鏌ヨ', '鎼滅储', '纭畾', '鎻愪氦', '淇濆瓨'):
+                    # Non-recordable skip 鈥?must NOT use ok prefix
                     return _ok(f'already-filled | {info.get("currentValue", "")}')
             except Exception:
                 pass
@@ -2126,7 +2107,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     for (const btn of btns) {
                         if (btn.offsetParent === null) continue;
                         const t = btn.textContent.trim();
-                        if (t && (t.includes('选择') || t.includes('引入') || t.includes('上传') || t.includes('添加') || t.includes('导入') || t.includes('新增'))) {
+                        if (t && (t.includes('閫夋嫨') || t.includes('寮曞叆') || t.includes('涓婁紶') || t.includes('娣诲姞') || t.includes('瀵煎叆') || t.includes('鏂板'))) {
                             btn.click(); return 'ok-clicked';
                         }
                     }
@@ -2181,14 +2162,14 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return _ok(result)
         return result
 
-    @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover. If result starts with no-tree-component, do NOT retry — use fill_form_field with a concrete value (not "first") or select_option.')
+    @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 琛屼笟浠ｇ爜). Opens popover, searches tree data by label, selects matching node, closes popover. If result starts with no-tree-component, do NOT retry 鈥?use fill_form_field with a concrete value (not "first") or select_option.')
     async def select_tree_option(label_text: str, option_text: str):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
         element = await _capture_element(page, label_text, target_kind='form_tree_select')
         result = await page.evaluate(JS_SELECT_TREE_OPTION, [label_text, option_text])
-        # P0/P1/P2 success codes all use ok prefix → recordable via _is_ok_result
+        # P0/P1/P2 success codes all use ok prefix 鈫?recordable via _is_ok_result
         if _is_ok_result(result):
             _record_action('select_tree_option', {'label_text': label_text, 'option_text': option_text}, result, element=element)
             _task_done_impl(label_text, case_data_store, value=option_text)
@@ -2197,8 +2178,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if res_s == 'disabled' or res_s.startswith('disabled'):
             return (
                 f'disabled | Field "{label_text}" is read-only '
-                f'(TsscMultiTree/component disabled; e.g. 分类目录 prefilled from sidebar). '
-                f'Do NOT retry select_tree_option or fill_form_field — skip this field.'
+                f'(TsscMultiTree/component disabled; e.g. 鍒嗙被鐩綍 prefilled from sidebar). '
+                f'Do NOT retry select_tree_option or fill_form_field 鈥?skip this field.'
             )
         # Misclassified / non-Tssc field: concrete values often work via native fill
         if res_s.startswith('no-tree-component'):
