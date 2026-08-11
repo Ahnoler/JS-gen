@@ -1,7 +1,8 @@
 # Backlog: 可见可编辑控件 / Agent 视野（核实版 2026-08-11）
 
-> 本文件记录「目标线」待办。**状态以代码/表征为准**，不以计划 checkbox 为准。  
-> **下一刀（优先）：** 其余湿测（L1-picker / AG / L1c / page-state）；未提交的 `option_text=first` 盖章可聚焦 commit。`legacy-section-retire` 产品面 Done。  
+> 本文件记录「目标线」地图与已实施证据。**状态以代码/表征为准**，不以计划 checkbox 为准。  
+> **未闭环执行清单：** 已迁到 [`todo-list.md`](todo-list.md)（湿测 / 工程债 / 穿插项）；本文件「其它未闭环」作对照，改状态时两边同步。  
+> **下一刀（优先）：** 见 todo-list — 湿测（L1-picker / AG / L1c / page-state / session-lifecycle）；聚焦 commit（`option_text=first`、session-lifecycle）。`legacy-section-retire` 产品面 Done。  
 > 2026-08-11 湿测：`log.txt` **agent-final-save 通过**（阶段2 引入袁玲 → `picker confirm → submit-ready` → `ok-save-success` → `done() accepted after introduce`）。  
 > 已提交：`d12a515` agent-final-save · `441a228` page-state-gen · `c87b448` L1c · legacy-section slices · `dfb2293` slice-3。
 
@@ -70,7 +71,7 @@
 
 ---
 
-## 其它未闭环
+## 其它未闭环（对照表 → 执行跟踪见 [todo-list.md](todo-list.md)）
 
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
@@ -78,8 +79,9 @@
 | **legacy-section-retire** | **Done（slice-1–3）** | 产品面优先 `region=`；`section=` 兼容；Vue 写 region_*；D3 锚 xpath 仍保留 | **P1 完成** · [TODO](todos/2026-08-11-remove-legacy-section-chunking.md) |
 | **L1c-wet / scan-py** | 挂起 | L1c：`L1C_LLM=1` BiB 湿测；Python scan 接入 classify | P1 |
 | **page-state-wet** | 挂起 | dialog/drawer 同文案按钮碰撞湿测 | P1 |
-| **L1-picker-wet** | 挂起 | BiB 重载 + 多「新增」Vue 选择器冒烟 | 挂起 · 等执行机（CDP 9242 当前不可用） |
+| **L1-picker-wet** | 挂起 | BiB 重载 + 多「新增」Vue 选择器冒烟 | 挂起 · 等执行机 |
 | **AG-fullpage-wet** | 按需 | BiB / UI 自动抓取冒烟 | 按需 |
+| **session-lifecycle** | 代码未提交 / 湿测挂起 | `grace_until` + SessionLifecycle；A→B 409 湿测 | 见 todo-list |
 | **L1-vision** | 未做 | 争议容器裁图辅助定角色 | P2+ |
 | **T4-P4** | 未做 | a11y ⟷ L2 对拍诊断 | P2 |
 | **T5** | 暂缓 | 非 `el-table` 自定义网格 | 需另页证据 · [gap](specs/2026-08-10-t5-credit-scan-gap-design.md) |
@@ -105,18 +107,13 @@
 
 ---
 
-## 推荐下一刀（2026-08-11）
+## 推荐下一刀
 
-1. **湿测（部分）：**  
-   - ~~agent-final-save：引入法定代表人后必须再点保存~~ — **2026-08-11 `log.txt` PASS**（`ok-save-success` + `done() accepted after introduce`）  
-   - L1-picker：多「新增」歧义选择器（Vue）  
-   - AG-fullpage：无 label inventory  
-   - L1c：`L1C_LLM=1` 低置信区域  
-   - page-state：dialog 内/外同文案按钮  
-2. （可选）删死代码里仅作产品猜归属的 `sectionOf` 调用；**勿删**锚 xpath 函数本身  
-3. 聚焦 commit：`option_text=first` 盖章（未入库）+ `form-actions-split` TODO（P2）  
-4. ~~分刀 commit~~ — **已完成**（含 legacy-section slices）  
-5. 穿插：T1r；三大问题①；T5；T4-P4 / L1-vision；**form-actions-split**（P2，不挡湿测）  
+> **以 [`todo-list.md`](todo-list.md) 为准**（2026-08-12 已转入）。摘要：  
+> 1. 湿测：L1-picker / AG-fullpage / L1c(+scan-py) / page-state / **session-lifecycle**  
+> 2. 聚焦 commit：`session-lifecycle` · `option_text=first`  
+> 3. （可选）`sectionOf` 死调用清理；穿插 T1r / 三大问题① / T5 / T4-P4 / L1-vision / form-actions-split  
+> ~~agent-final-save~~ PASS · ~~legacy-section 分刀 commit~~ Done
 
 > 参照：Cursor browser MCP / Playwright MCP（先控件池，后区域标签）。T4-P4 = 对照，非主路径。
 

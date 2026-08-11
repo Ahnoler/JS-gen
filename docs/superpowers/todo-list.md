@@ -27,15 +27,30 @@
 | **1448054** | 【AI录制】连续多元素只录一个（较重） | 去重原则，非缺陷 |
 | **1448053** | 【AI录制】同元素点第一个（较重） | L1-picker / page-state 消歧已落地；湿测可按需验 |
 | **1448057** | 【列表】占用中 `live` 状态名改中文（低） | **转前端** |
+| **1448059** | 【AI录制】无法优先识别客户名称（较重） | **已解决（产品用法）**：用户提供的数据直接写进任务说明，助手优先读任务/业务数据原文 |
+| **slot-log** | 多 slot 浏览器日志隔离/可检索 | **已落地**：[plan](plans/2026-08-11-multi-slot-stderr-isolation.md) / [spec](specs/2026-08-11-multi-slot-stderr-isolation-design.md)（1448052 前置已解除） |
 
 ## 挂起 / 待优化
 
 | ID | 项 | 处理说明 |
 |----|----|----------|
-| **1448052** | 【AI录制】循环重复操作（较重） | 全页 DOM 合约待调；**等新缺陷 + 日志**再改 |
-| **slot-log** | 多 slot 浏览器日志隔离/可检索 | **1448052 前置**；见 [plan](plans/2026-08-11-multi-slot-stderr-isolation.md) |
-| **1448059** | 【AI录制】无法优先识别客户名称（较重） | 优化「业务场景描述助手」+「任务分析助手」 |
+| **1448052** | 【AI录制】循环重复操作（较重） | 全页 DOM 合约待调；slot-log 已就绪，**等新缺陷 + 可检索日志**再改 |
 | **heal-locate** | 【回放自愈】禁止/少用 `scroll_down` 找字段；高效定位与级联缺席判定 | 部分落地：`label-not-found`→`ok-skip`（回放成功跳过、录制不写步）；其余定位序仍待做。见专节 |
+| **tree-select-kind** | 【AI录制】行业代码等树选择器录成 `tree_node` 而非树选择器 | **已修**（2026-08-12）：`select_tree_option`+`form_tree_select`；popover 回绑；侧栏仍 `tree_node`。见专节 |
+| **select-substr** | 【AI录制】下拉子串误配（国民经济部门类别→非金融…） | **已修**（2026-08-12）：exact/`match_select_option_candidate`；禁止 `o in want` |
+| **manual-table-radio** | 【人工录制】弹窗表格 radio 不落步 | **已修**（2026-08-12）：`data-row-key`/`row-index` 回退，禁静默 return |
+
+### tree-select-kind — 行业代码录成树节点（已修 2026-08-12）
+
+**现象：** AI 录制「行业代码」一类自定义树选择时，落库成 **树节点**（`tree_node`），而不是 **树选择器**（`select_tree_option` + `form_tree_select`）。
+
+**已落地：**  
+1. `select_tree_option`：`_resolve_control` + `_capture_element(..., form_tree_select, xpath)`  
+2. `prepareElementJson`：`select_tree_option` → `form_tree_select`  
+3. `resolveFormTreeSelectHostFromPopoverTree`：popover 树节点回绑表单控件；侧栏仍 `tree_node`  
+4. AI `click_element_by_index` / 手动录制：表单树 popover 升级为 `select_tree_option`  
+
+**验收：** 新录「行业代码」→ `action=select_tree_option`，`target_kind=form_tree_select`；表征 `characterize-tree-select-record.py`。
 
 ### heal-locate — 回放自愈定位效率（TODO）
 
@@ -109,8 +124,9 @@
 ## 交叉关系
 
 - **1448053** ↔ L1-picker / page-state / L1-titlebox（同文案消歧；产品面已关，湿测另验）。
-- **1448052** ↔ 全页 DOM 合约 + **多 slot 日志**（先能定位，再按新缺陷调合约）。
-- **1448059** ↔ Agent 助手设计（非控件扫描主路径）。
+- **1448052** ↔ 全页 DOM 合约（**slot-log 已落地**；按新缺陷 + 可检索日志再调合约）。
+- **1448059** ↔ 已关：任务说明内嵌用户数据（非助手扫描主路径改造）。
+- **slot-log** ↔ 已关：多 slot stderr 隔离/可检索（1448052 前置）。
 - **ai-case-select** ↔ **ai-case-half-fill**：案例/业务数据统一软文本；主 Agent（agent_task）与 form assistant（`business_data`）都读 block+flat KV，不硬绑 `commandValue`。
 - **1448055** ↔ Type B `save_form_snapshot`：产品隐藏 ≠ 删除；回放仍依赖入库检查点。
 - **heal-locate** ↔ 级联脏录制（关系类型/实际控制人块）+ 单步自愈；先判定缺席再修闸门，禁止 scroll 猎场。
@@ -129,3 +145,5 @@
 | 2026-08-11 | **1448055** 本仓库已修：meta 步骤产品侧过滤 + 回放区间自动补检查点 |
 | 2026-08-12 | 待优化加 **heal-locate**：回放自愈禁 scroll 猎场；级联缺席判定 + 高效定位序（traj#33 实际控制人单位电话） |
 | 2026-08-12 | 自 backlog 转入未闭环：湿测状态对齐（挂起/P1）；补 **L1c-scan-py** / **session-lifecycle-wet|commit** / **sectionOf-dead-calls** / **T9** / **三大问题①** / **T7(不做)** |
+| 2026-08-12 | **1448059** 已解决（产品用法）：用户数据直接写入任务说明，不再挂「优化场景/任务分析助手」 |
+| 2026-08-12 | **slot-log** 已落地：多 slot 日志隔离（1448052 前置解除） |
