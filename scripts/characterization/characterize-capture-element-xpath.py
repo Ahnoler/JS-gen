@@ -152,6 +152,31 @@ def test_tree_fallback_xpath_captures_pass_xpath() -> None:
     )
 
 
+def test_stamp_rejects_weak_fallback() -> None:
+    from scripts.controller.actions._helpers import stamp_recorded_xpath_smart, is_weak_xpath_smart
+
+    weak = "//input[@placeholder='???'][1]"
+    durable = (
+        "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+        "//div[contains(@class,'el-form-item')]"
+        "[.//label[contains(normalize-space(.),'??????')]]//input"
+    )
+    assert_true(is_weak_xpath_smart(weak), "placeholder occurrence is weak")
+    assert_true(not is_weak_xpath_smart(durable), "dialog+label is durable")
+    assert_true(
+        stamp_recorded_xpath_smart({"xpath_smart": durable}, weak) == durable,
+        "capture durable wins",
+    )
+    assert_true(
+        stamp_recorded_xpath_smart(None, weak) == "",
+        "weak fallback alone ? empty",
+    )
+    assert_true(
+        stamp_recorded_xpath_smart({"xpath_smart": weak}, durable) == durable,
+        "weak capture loses to durable inventory fallback when capture weak",
+    )
+
+
 def test_select_tree_option_fill_fallback_xpath_parity() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     chunk = form.split("async def select_tree_option", 1)[1].split("async def ", 1)[0]
@@ -190,6 +215,7 @@ def main() -> int:
     test_tree_fallback_xpath_captures_pass_xpath()
     test_capture_snippet_rebuilds_not_echo()
     test_capture_snippet_drills_form_input()
+    test_stamp_rejects_weak_fallback()
     test_select_tree_option_fill_fallback_xpath_parity()
     print("characterize-capture-element-xpath: OK")
     return 0

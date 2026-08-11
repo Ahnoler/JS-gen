@@ -21,6 +21,37 @@ from ...models import ScannedField
 _SELECT_OPTION_PLACEHOLDERS = frozenset({'请选择', '请选择…', '请选择...', ''})
 
 
+def is_weak_xpath_smart(xp: str) -> bool:
+    s = (xp or "").strip()
+    if not s:
+        return True
+    if "el-form-item" in s and "label" in s:
+        return False
+    if "placeholder" in s.lower() and "el-form-item" not in s:
+        return True
+    if re.fullmatch(r"//input(\[@placeholder=[^\]]+\])?(\[\d+\])?", s, re.I):
+        return True
+    return False
+
+
+def stamp_recorded_xpath_smart(element, fallback: str = "") -> str:
+    """Prefer capture-rebuilt relative xpath for params (replay is params-first).
+
+    Capture rebuilds durable dialog/drawer + label xpath via formFieldXpathSmartOf;
+    inventory/resolved fallback is used only when capture missed or is weak.
+    Weak placeholder-only xpaths are rejected — prefer empty over invented hints.
+    """
+    cap = ""
+    if isinstance(element, dict):
+        cap = (element.get("xpath_smart") or "").strip()
+    fb = (fallback or "").strip()
+    if cap and not is_weak_xpath_smart(cap):
+        return cap
+    if fb and not is_weak_xpath_smart(fb):
+        return fb
+    return ""
+
+
 def normalize_select_options(raw) -> list[str]:
     """Dedupe / clean option label lists for params.options / element.options."""
     if not isinstance(raw, list):

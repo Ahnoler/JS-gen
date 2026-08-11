@@ -23,6 +23,7 @@ from ._helpers import (
     _enrich_click_element,
     attach_select_options, options_from_scan_store, read_select_options,
     reset_select_ui,
+    stamp_recorded_xpath_smart,
 )
 from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR,
@@ -356,11 +357,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 element = await _capture_element(
                     page, label_text, target_kind='form_input', xpath_smart='',
                 )
-                xp_out = (
-                    (element.get("xpath_smart") or "").strip()
-                    if isinstance(element, dict)
-                    else ""
-                )
+                xp_out = stamp_recorded_xpath_smart(element, "")
                 _record_action(
                     'fill_form_field',
                     {'label_text': label_text, 'value': value, 'xpath_smart': xp_out},
