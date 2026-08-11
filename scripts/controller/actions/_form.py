@@ -19,6 +19,7 @@ from scripts.state import (
 )
 from ._helpers import (
     _ok, _err, _is_ok_result,
+    is_absent_field_result, absent_field_skip_result, should_record_result,
     _wait_if_loading, _capture_element, _merge_ax_text,
     _enrich_click_element,
     attach_select_options, options_from_scan_store, read_select_options,
@@ -336,6 +337,14 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         await _ensure_scanned(label_text)
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
         from scripts.feature_flags import xpath_smart_fill_only_enabled
+
+        def _absent_skip(lbl: str):
+            if not _is_query_mode(case_data_store):
+                _task_done_impl(lbl or label_text, case_data_store)
+            sys.stderr.write(f'[form] skip absent fill label={(lbl or label_text)!r}\n')
+            sys.stderr.flush()
+            return _ok(_with_submit_cue(absent_field_skip_result(), case_data_store))
+
         strict_xpath = xpath_smart_fill_only_enabled()
         use_label_fallback = (
             (not strict_xpath)
@@ -343,6 +352,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             and not (resolved.xpath_smart or "").strip()
         )
         if resolved.error and not use_label_fallback:
+            if is_absent_field_result(resolved.error):
+                return _absent_skip(label_text)
             if strict_xpath and not (resolved.xpath_smart or xpath_smart or '').strip():
                 return _with_submit_cue(
                     resolved.error or 'err-xpath-smart-required',
@@ -353,7 +364,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             # Query/introduce picker: scan may still miss; label DOM fill in
             # the active container (JS_GET_CONTAINER) is the recording path.
             result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
-            if _is_ok_result(result):
+            if is_absent_field_result(result):
+                return _absent_skip(label_text)
+            if _is_ok_result(result) and should_record_result(result):
                 element = await _capture_element(
                     page, label_text, target_kind='form_input', xpath_smart='',
                 )
@@ -367,12 +380,16 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 if not _is_query_mode(case_data_store):
                     _task_done_impl(label_text, case_data_store, value=value, xpath_smart=xp_inv)
                 return _ok(_with_submit_cue(result, case_data_store))
+            if _is_ok_result(result):
+                return _ok(_with_submit_cue(result, case_data_store))
             return _with_submit_cue(result or resolved.error, case_data_store)
         element = await _capture_element(
             page, resolved.label, target_kind='form_input', xpath_smart=resolved.xpath_smart,
         )
         result = await page.evaluate(JS_FILL_BY_XPATH, [resolved.xpath_smart, value, resolved.label])
-        if _is_ok_result(result):
+        if is_absent_field_result(result):
+            return _absent_skip(resolved.label or label_text)
+        if _is_ok_result(result) and should_record_result(result):
             xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
                 'fill_form_field',
@@ -384,6 +401,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 _task_done_impl(
                     resolved.label, case_data_store, value=value, xpath_smart=xp_inv,
                 )
+            return _ok(_with_submit_cue(result, case_data_store))
+        if _is_ok_result(result):
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
 
@@ -399,7 +418,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             page, resolved.label, target_kind='form_date', xpath_smart=resolved.xpath_smart,
         )
         result = await page.evaluate(JS_FILL_DATE_BY_XPATH, [resolved.xpath_smart, value])
-        if _is_ok_result(result):
+        if is_absent_field_result(result):
+            if not _is_query_mode(case_data_store):
+                _task_done_impl(resolved.label, case_data_store)
+            sys.stderr.write(f'[form] skip absent date label={resolved.label!r}\n')
+            sys.stderr.flush()
+            return _ok(_with_submit_cue(absent_field_skip_result(), case_data_store))
+        if _is_ok_result(result) and should_record_result(result):
             xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
                 'fill_date_field',
@@ -411,6 +436,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 _task_done_impl(
                     resolved.label, case_data_store, value=value, xpath_smart=xp_inv,
                 )
+            return _ok(_with_submit_cue(result, case_data_store))
+        if _is_ok_result(result):
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
 
@@ -1090,10 +1117,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     result = f'error:{e}'
 
                 ok = _is_ok_result(result)
+                if is_absent_field_result(result):
+                    result = absent_field_skip_result()
+                    ok = True
                 entry = {'index': step_num, 'action': kind, 'label': label, 'value': value, 'result': result}
                 all_results.append(entry)
 
-                if ok:
+                if ok and should_record_result(result):
                     ok_in_group += 1
                     xp_inv = stamp_recorded_xpath_smart(element, xpath_smart)
                     if field_kind == 'radio' or kind in ('click_radio', 'radio'):
@@ -1194,6 +1224,18 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     await page.evaluate(
                         'o => console.log("[AI填表] 执行进度 ======\\n" + o)',
                         f'{step_num}/{total} {kind} "{label}" → {status}',
+                    )
+                elif ok:
+                    # ok-skip:label-not-found — clear pending, do not write trajectory
+                    ok_in_group += 1
+                    _task_done_impl(label, case_data_store)
+                    sys.stderr.write(
+                        f'[auto-fill] {round_tag}skip-absent: "{label}" ({result})\n'
+                    )
+                    sys.stderr.flush()
+                    await page.evaluate(
+                        'o => console.log("[AI填表] 执行进度 ======\\n" + o)',
+                        f'{step_num}/{total} {kind} "{label}" → skip-absent',
                     )
                 else:
                     fail_in_group += 1
@@ -2179,6 +2221,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             page, resolved.label, target_kind='form_radio', xpath_smart=resolved.xpath_smart,
         )
         result = await page.evaluate(JS_CLICK_RADIO_BY_XPATH, [resolved.xpath_smart, option_text])
+        if is_absent_field_result(result):
+            if not _is_query_mode(case_data_store):
+                _task_done_impl(resolved.label, case_data_store)
+            sys.stderr.write(f'[form] skip absent radio label={resolved.label!r}\n')
+            sys.stderr.flush()
+            return _ok(_with_submit_cue(absent_field_skip_result(), case_data_store))
         if _is_ok_result(result):
             xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(

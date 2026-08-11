@@ -181,9 +181,35 @@ def _is_ok_result(result) -> bool:
     Convention: every successful, recordable action returns a string starting with
     ``ok`` (``ok``, ``ok:…``, ``ok-date``, ``ok-clicked``, ``ok-already:…``, …).
     Skip / non-recordable codes (e.g. ``already-filled``, ``not-filled``) must NOT
-    use the ``ok`` prefix.
+    use the ``ok`` prefix — except ``ok-skip:…`` (absent-field skip; see
+    ``should_record_result``).
     """
     return isinstance(result, str) and result.startswith('ok')
+
+
+def is_absent_field_result(result) -> bool:
+    """Field not in DOM (cascade/gate) — treat as skip, not failure."""
+    s = str(result or '').strip()
+    if not s:
+        return False
+    if s == 'label-not-found' or s.startswith('label-not-found'):
+        return True
+    if s.startswith('ok-skip:label-not-found'):
+        return True
+    return False
+
+
+def absent_field_skip_result(code: str = 'label-not-found') -> str:
+    """Agent/replay success string: skip fill; do not record a write step."""
+    return f'ok-skip:{code} | field absent — skip; do not scroll or retry'
+
+
+def should_record_result(result) -> bool:
+    """Whether a successful result should be written to the trajectory action log."""
+    if not _is_ok_result(result):
+        return False
+    # ok-skip:* = intentional non-write (absent cascade field, etc.)
+    return not str(result).startswith('ok-skip:')
 
 
 async def dismiss_https_first_interstitial(page) -> str:

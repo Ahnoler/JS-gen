@@ -27,6 +27,8 @@ import time
 from ._helpers import (
     _wait_if_loading,
     _is_ok_result,
+    is_absent_field_result,
+    absent_field_skip_result,
     reset_select_ui,
 )
 from ._js_snippets import (
@@ -107,12 +109,16 @@ def _result_ok(action_name: str, result: str) -> bool:
     """Unified success check: recordable/successful CTRL results use ``ok`` prefix.
 
     ``already-filled`` (skip) intentionally does NOT start with ``ok``.
+    ``label-not-found`` / ``ok-skip:label-not-found`` = cascade field absent → skip OK
+    (do not fail replay / do not enter heal).
     Checkpoint verify (`save_form_snapshot`) returns JSON; transport always ok when
     evaluate succeeded (prefix `form-structure:`).
     """
     if not isinstance(result, str) or not result:
         return False
     if action_name == 'save_form_snapshot' and result.startswith('form-structure:'):
+        return True
+    if is_absent_field_result(result):
         return True
     if result.startswith('error:') or result.startswith('unknown-') or result.startswith('err'):
         return False
@@ -123,7 +129,7 @@ def _result_ok(action_name: str, result: str) -> bool:
     # Compound messages from ActionResult wrappers: "ok-login | …"
     if ' | ' in result and not result.lower().startswith('fail'):
         head = result.split(' | ', 1)[0].strip()
-        if _is_ok_result(head):
+        if _is_ok_result(head) or is_absent_field_result(head):
             return True
     return False
 
@@ -380,6 +386,10 @@ def _norm_replay_value(s) -> str:
 def _classify_fill_result(action_ok: bool, expected: str, actual: str) -> str:
     if not action_ok:
         return 'xpath_miss:action-failed'
+    from scripts.controller.actions.form_scan_utils import field_values_equivalent
+
+    if field_values_equivalent(actual, expected):
+        return 'ok'
     exp = _norm_replay_value(expected)
     act = _norm_replay_value(actual)
     if exp == act:
@@ -388,10 +398,10 @@ def _classify_fill_result(action_ok: bool, expected: str, actual: str) -> str:
 
 
 
-async def _read_value_by_xpath(page, xpath: str) -> str:
+async def _read_value_by_xpath(page, xpath: str, label_hint: str = '') -> str:
     if not xpath:
         return ''
-    result = await page.evaluate(_JS_READ_VALUE_BY_XPATH, [xpath])
+    result = await page.evaluate(_JS_READ_VALUE_BY_XPATH, [xpath, label_hint or ''])
     return str(result or '').strip()
 
 
@@ -485,10 +495,11 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         async def _try_xpath_fill(xpath: str, locate_src: str) -> str | None:
             # Prefer label_text so shared placeholder xpaths disambiguate form-items
             # (traj 130: //input[@placeholder='请输入'][1] + last-visible → 名称).
+            # Also exact-match prefix labels (财务部联系人 vs …手机号码).
             hint = label or ph
             result = await page.evaluate(JS_FILL_BY_XPATH, [xpath, value, hint])
             action_ok = isinstance(result, str) and result.startswith('ok')
-            actual = await _read_value_by_xpath(page, xpath) if xpath else ''
+            actual = await _read_value_by_xpath(page, xpath, hint) if xpath else ''
             classified = _classify_fill_result(action_ok, value, actual)
             if classified == 'ok':
                 await page.wait_for_timeout(300)
@@ -508,7 +519,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         if isinstance(result, str) and result.startswith('ok'):
             await page.wait_for_timeout(300)
             if element_xp:
-                actual = await _read_value_by_xpath(page, element_xp)
+                actual = await _read_value_by_xpath(page, element_xp, label)
                 classified = _classify_fill_result(True, value, actual)
                 if classified.startswith('false_ok'):
                     return classified
@@ -520,7 +531,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(300)
                 if element_xp:
-                    actual = await _read_value_by_xpath(page, element_xp)
+                    actual = await _read_value_by_xpath(page, element_xp, label)
                     classified = _classify_fill_result(True, value, actual)
                     if classified.startswith('false_ok'):
                         return classified
@@ -537,7 +548,14 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             xpath_result = await _try_xpath_fill(xpath_full, 'full')
             if xpath_result:
                 return xpath_result
-        return _annotate_label_result(str(result))
+        final = _annotate_label_result(str(result))
+        if is_absent_field_result(final) or is_absent_field_result(result):
+            sys.stderr.write(
+                f'[replay-fill] skip absent label={label!r} result={result!r}\n'
+            )
+            sys.stderr.flush()
+            return absent_field_skip_result()
+        return final
 
     # Widget ops: prefer confirming xpath_smart host, then label JS, then xpath_full confirm.
     async def _with_xpath_first(label_js_coro):
@@ -583,6 +601,12 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         pick = str(value or '').strip()
 
         async def _replay_select_final_failure(result_text: str) -> str:
+            if is_absent_field_result(result_text):
+                sys.stderr.write(
+                    f'[replay-select] skip absent label={label!r} option={pick!r}\n'
+                )
+                sys.stderr.flush()
+                return absent_field_skip_result()
             diag = await reset_select_ui(page)
             sys.stderr.write(
                 f'[replay-select] final failure label={label!r} option={pick!r} '
@@ -608,7 +632,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         if pick.lower() in _SENT or pick in _SENT:
             xp_s, src_s = _resolve_replay_xpath(entry, params)
             if xp_s:
-                already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp_s])
+                already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp_s, label])
                 if isinstance(already, str) and already.startswith('ok-already:'):
                     cur = already.split(':', 1)[1].strip()
                     if cur:
@@ -632,14 +656,14 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                 sys.stderr.flush()
                 return await _replay_select_final_failure('no-items')
 
-            already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xpath])
+            already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xpath, label])
             if isinstance(already, str) and already.startswith('ok-already:'):
                 cur_val = already.split(':', 1)[1].strip()
                 if cur_val == pick:
                     await page.wait_for_timeout(200)
                     return f'ok-already:{pick}|locate={locate_src}'
 
-            trig = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath])
+            trig = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath, label])
             if not _is_ok_result(str(trig)):
                 return None
 
@@ -662,7 +686,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                         sys.stderr.flush()
                         result = 'no-items'
                         break
-                    retrigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath])
+                    retrigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath, label])
                     if not _is_ok_result(str(retrigger)):
                         result = str(retrigger)
                         break
@@ -671,7 +695,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                 got = result.split(':', 1)[1].strip() if ':' in result else ''
                 if got and got != pick:
                     return await _replay_select_final_failure(f'option-mismatch:want={pick}|got={got}')
-                actual = await _read_value_by_xpath(page, xpath)
+                actual = await _read_value_by_xpath(page, xpath, label)
                 classified = _classify_fill_result(True, pick, actual)
                 await page.wait_for_timeout(500)
                 if classified.startswith('false_ok'):
@@ -760,7 +784,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         label_result = await _select_by_label()
         if isinstance(label_result, str) and label_result.startswith('ok'):
             if element_xp:
-                actual = await _read_value_by_xpath(page, element_xp)
+                actual = await _read_value_by_xpath(page, element_xp, label)
                 classified = _classify_fill_result(True, pick, actual)
                 if classified.startswith('false_ok'):
                     return await _replay_select_final_failure(classified)
