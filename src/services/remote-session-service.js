@@ -97,18 +97,10 @@ export async function unmountTrajectoriesFromRemoteSession(remoteSessionId, {
   return cleared;
 }
 
-/** Mount remote_session exclusively onto one trajectory (clears other traj FKs first). */
+/** Mount remote_session exclusively onto one trajectory (truth + cache via lifecycle). */
 export async function mountTrajectoryRemoteSession(trajectoryId, remoteSessionId) {
-  const tid = Number(trajectoryId);
-  const rid = Number(remoteSessionId);
-  if (!Number.isFinite(tid) || tid <= 0 || !Number.isFinite(rid) || rid <= 0) return [];
-  const cleared = await unmountTrajectoriesFromRemoteSession(rid, {
-    exceptTrajectoryId: tid,
-    demoteLive: true,
-  });
-  const trajectoryDao = await import('../dao/trajectory-dao.js');
-  await trajectoryDao.updateMeta(tid, { remoteSessionId: rid });
-  return cleared;
+  const { syncMount } = await import('./session-lifecycle.js');
+  return syncMount(trajectoryId, remoteSessionId);
 }
 
 /** One-shot repair for ghost occupancy (stale trajectory.remote_session_id). */
@@ -131,9 +123,9 @@ export async function reconcileStaleTrajectoryRemoteMounts() {
 
 export async function closeSession(id, { crashed = false } = {}) {
   const session = await remoteSessionDao.getById(id);
-  clearLiveBinding(id);
+  const { clearOwnershipOnClose } = await import('./session-lifecycle.js');
   // Always sweep traj FKs — even if row already closed (repairs ghost mounts).
-  await unmountTrajectoriesFromRemoteSession(id, { demoteLive: true }).catch(() => {});
+  await clearOwnershipOnClose(id).catch(() => {});
   if (!session) return null;
   if (session.status === 'closed' || session.status === 'crashed') return session;
   return remoteSessionDao.close(id, { crashed });
@@ -239,6 +231,10 @@ export async function attachLive(opts = {}) {
   // Reuse idle remote row for same agent session when possible
   let remoteSession = await remoteSessionDao.getOccupiedByAgentSession(sessionId);
   if (remoteSession && remoteSession.status === 'idle') {
+    if (Number.isFinite(trajectoryId)) {
+      const { assertClaimable } = await import('./session-lifecycle.js');
+      assertClaimable(remoteSession, trajectoryId);
+    }
     remoteSession = await remoteSessionDao.markActive(remoteSession.id, {
       trajectoryId: trajectoryId || remoteSession.trajectoryId,
     });
@@ -416,25 +412,27 @@ export async function detachLive(opts = {}) {
     }
   }
 
-  clearLiveBinding(remoteSessionId);
+  const sessionLifecycle = await import('./session-lifecycle.js');
 
   if (opts.crashed) {
     await remoteSessionDao.close(remoteSessionId, { crashed: true });
+    await sessionLifecycle.clearOwnershipOnClose(remoteSessionId).catch((err) => {
+      console.warn('[remote] clearOwnershipOnClose after crash detach:', err.message);
+    });
   } else if (remote.status === 'active' || remote.status === 'idle') {
-    await remoteSessionDao.markIdle(remoteSessionId);
+    // Ownership write gate: idle + grace + clear caches (not Chrome)
+    await sessionLifecycle.streamDetachOwnership(remoteSessionId, { trajectoryId });
+  } else {
+    clearLiveBinding(remoteSessionId);
+    await unmountTrajectoriesFromRemoteSession(remoteSessionId, {
+      demoteLive: true,
+    }).catch((err) => {
+      console.warn('[remote] clear traj mounts after stream detach:', err.message);
+    });
   }
 
-  // Clear ALL traj FKs pointing at this remote_session (not only the caller tid).
-  const cleared = await unmountTrajectoriesFromRemoteSession(remoteSessionId, {
-    demoteLive: true,
-  }).catch((err) => {
-    console.warn('[remote] clear traj mounts after stream detach:', err.message);
-    return [];
-  });
-
   const tid = trajectoryId
-    || (remote.trajectoryId != null ? Number(remote.trajectoryId) : null)
-    || (cleared[0] != null ? Number(cleared[0]) : null);
+    || (remote.trajectoryId != null ? Number(remote.trajectoryId) : null);
 
   return {
     closedId: remoteSessionId,
@@ -508,7 +506,9 @@ export async function getLiveStatus(opts = {}) {
         const trajectoryDao = await import('../dao/trajectory-dao.js');
         const traj = await trajectoryDao.getById(tid);
         if (traj && Number(traj.remoteSessionId) !== Number(binding.remoteSessionId)) {
-          await mountTrajectoryRemoteSession(tid, binding.remoteSessionId);
+          // Rewrite via syncMount (truth + cache), never cache-only updateMeta
+          const { syncMount } = await import('./session-lifecycle.js');
+          await syncMount(tid, binding.remoteSessionId);
         }
       } catch (err) {
         console.warn('[remote] rewrite traj.remote_session_id failed:', err.message);

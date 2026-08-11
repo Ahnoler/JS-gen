@@ -69,7 +69,8 @@ CREATE TABLE `remote_session` (
   `slot_index`          INT UNSIGNED DEFAULT NULL COMMENT '执行机内槽位号',
   `client_key`          VARCHAR(64) DEFAULT NULL COMMENT '前端会话/用户标识，用于亲和调度',
   `agent_session_id`    VARCHAR(64) DEFAULT NULL COMMENT 'Python/执行机 agent session UUID',
-  `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '当前挂载交易 → trajectory.id；断开画面后可置 NULL',
+  `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '当前挂载交易；idle 宽限期内仍非空；到期或 detach/close 后 NULL',
+  `grace_until`         DATETIME(3) DEFAULT NULL COMMENT 'streamDetach 宽限截止；期内仍属 trajectory_id；到期后清空归属',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `closed_at`           DATETIME(3) DEFAULT NULL,
   UNIQUE KEY `uk_session_uuid` (`session_uuid`),
@@ -78,7 +79,8 @@ CREATE TABLE `remote_session` (
   KEY `idx_executor_node_id` (`executor_node_id`),
   KEY `idx_client_key` (`client_key`),
   KEY `idx_rs_agent_session` (`agent_session_id`),
-  KEY `idx_rs_trajectory` (`trajectory_id`)
+  KEY `idx_rs_trajectory` (`trajectory_id`),
+  KEY `idx_rs_grace_until` (`grace_until`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='远程浏览器操控/录制会话（BrowserContext 隔离、视口、Target、生命周期）';
 

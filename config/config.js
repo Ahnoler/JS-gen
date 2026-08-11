@@ -87,6 +87,10 @@ export const EXECUTOR_DISCONNECT_GRACE_MS = parseInt(
   _resolve('EXECUTOR_DISCONNECT_GRACE_MS', String(EXECUTOR_HEARTBEAT_TIMEOUT_MS)),
   10,
 );
+export const REMOTE_SESSION_GRACE_MS = parseInt(
+  _resolve('REMOTE_SESSION_GRACE_MS', '900000'),
+  10,
+);
 
 /** Route browser sessions to online executor agent instead of local globalBrowser */
 export const USE_EXECUTOR = _resolve('USE_EXECUTOR', 'false').toLowerCase() === 'true';
@@ -130,3 +134,6 @@ export const AI_MEMORY_AUDIT_STRICT = _resolve('AI_MEMORY_AUDIT_STRICT', 'false'
 // L1c: low-confidence region classify via LLM (default off → rules + L1d read only)
 export const L1C_LLM = _resolve('L1C_LLM', 'false').toLowerCase() === 'true';
 export const L1C_LLM_TIMEOUT_MS = Number(_resolve('L1C_LLM_TIMEOUT_MS', '8000')) || 8000;
+
+export const AGENT_STDERR_LOG_DIR = _resolve('AGENT_STDERR_LOG_DIR')
+  || path.join(PROJECT_DIR, 'logs', 'agent-stderr');

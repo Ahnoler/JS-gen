@@ -1,7 +1,7 @@
 # Browser / remote_session lifecycle — Design
 
 **Date:** 2026-08-11  
-**Status:** Approved (brainstorm) — awaiting implementation plan  
+**Status:** Approved + plan docs/superpowers/plans/2026-08-11-browser-session-lifecycle.md  
 **Related:** `src/services/remote-session-service.js`, `src/services/remote-session-state.js`, `src/services/trajectory/trajectory-attach-service.js`, `src/services/trajectory-idle-reaper.js`, AGENTS.md multi-traj BiB notes; prior dirty-pointer fix (2026-08-04, still regressing)
 
 **Trigger:** Live DB showed broken bidirectional mounts — e.g. traj `112` → `remote_session` `576` while `576.trajectory_id = 129`; half-empty mounts (`traj.remote_session_id` set, `rs.trajectory_id` NULL); same `remote_session` ownership drifting across trajs.

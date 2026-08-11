@@ -137,6 +137,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
       runtime.bibError = null;
       bibError = null;
     } catch (err) {
+      if (err?.statusCode === 409 || err?.code === 'grace_owned') throw err;
       bibError = err?.message || String(err);
       runtime.bibError = bibError;
     }

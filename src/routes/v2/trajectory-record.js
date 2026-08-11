@@ -62,7 +62,7 @@ export default function (app) {
       });
       res.json(result);
     } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
+      sendErr(res, err);
     }
   });
 
@@ -76,7 +76,7 @@ export default function (app) {
       const result = await trajectoryService.stopTrajectoryRecording(+req.params.id, { success });
       res.json(result);
     } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
+      sendErr(res, err);
     }
   });
 

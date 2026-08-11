@@ -139,6 +139,12 @@ async function main() {
         console.warn('[server] stale remote mount reconcile skipped:', err.message);
       }
       try {
+        const sessionLifecycle = await import('./src/services/session-lifecycle.js');
+        await sessionLifecycle.expireAllDueGrace().catch(() => {});
+      } catch (err) {
+        console.warn('[server] grace expiry on boot skipped:', err.message);
+      }
+      try {
         const batchService = await import('./src/services/trajectory/index.js');
         await batchService.recoverBatchJobsOnStartup();
       } catch (err) {

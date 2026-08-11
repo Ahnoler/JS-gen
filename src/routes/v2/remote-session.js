@@ -17,7 +17,11 @@ export default function (app) {
     } catch (err) {
       const code = err.statusCode
         || (/not ready|unavailable|No page/i.test(err.message) ? 503 : 500);
-      res.status(code).json({ error: err.message });
+      const body = { error: err.message };
+      if (err.code) body.code = err.code;
+      if (err.ownerTrajectoryId != null) body.ownerTrajectoryId = err.ownerTrajectoryId;
+      if (err.graceUntil != null) body.graceUntil = err.graceUntil;
+      res.status(code).json(body);
     }
   });
 
@@ -142,7 +146,12 @@ export default function (app) {
       });
       res.json(result);
     } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({
+        error: err.message,
+        ...(err.code ? { code: err.code } : {}),
+        ...(err.ownerTrajectoryId != null ? { ownerTrajectoryId: err.ownerTrajectoryId } : {}),
+        ...(err.graceUntil != null ? { graceUntil: err.graceUntil } : {}),
+      });
     }
   });
 

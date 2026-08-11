@@ -62,6 +62,13 @@ export async function list({ status, page = 1, pageSize = 20 } = {}) {
   return { rows: fromDbRows(rows), total, page, pageSize };
 }
 
+export async function listOccupied(statuses = [...REMOTE_SESSION_OCCUPIED]) {
+  const rows = await getDB()(TABLE)
+    .whereIn('status', statuses)
+    .orderBy([{ column: 'slot_index', order: 'asc' }, { column: 'id', order: 'desc' }]);
+  return fromDbRows(rows);
+}
+
 export async function listByNode(nodeId, statuses = [...REMOTE_SESSION_OCCUPIED]) {
   if (nodeId == null) return [];
   const rows = await getDB()(TABLE)
@@ -91,15 +98,38 @@ export async function update(id, data) {
   return getById(id);
 }
 
-export async function markIdle(id) {
-  return update(id, {
+export async function markIdle(id, { graceUntil = null, trajectoryId } = {}) {
+  const patch = {
     status: 'idle',
+    graceUntil: graceUntil ?? null,
+  };
+  // Keep existing trajectory_id unless explicitly overridden.
+  if (trajectoryId !== undefined) {
+    patch.trajectoryId = trajectoryId == null ? null : Number(trajectoryId);
+  }
+  return update(id, patch);
+}
+
+export async function clearGraceOwnership(id) {
+  return update(id, {
     trajectoryId: null,
+    graceUntil: null,
   });
 }
 
+export async function listGraceExpired({ now = new Date() } = {}) {
+  const rows = await getDB()(TABLE)
+    .where({ status: 'idle' })
+    .whereNotNull('trajectory_id')
+    .whereNotNull('grace_until')
+    .andWhere('grace_until', '<=', now)
+    .orderBy('id', 'asc');
+  return fromDbRows(rows);
+}
+
 export async function markActive(id, { trajectoryId = null } = {}) {
-  const patch = { status: 'active' };
+  // Owner reclaim / attach: drop stale grace window immediately
+  const patch = { status: 'active', graceUntil: null };
   if (trajectoryId != null) patch.trajectoryId = Number(trajectoryId);
   return update(id, patch);
 }
@@ -109,6 +139,7 @@ export async function close(id, { crashed = false } = {}) {
     status: crashed ? 'crashed' : 'closed',
     closedAt: new Date(),
     trajectoryId: null,
+    graceUntil: null,
   });
 }
 
