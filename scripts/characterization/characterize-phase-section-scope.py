@@ -58,8 +58,10 @@ def test_click_save_accepts_region_alias() -> None:
         "click_save exposes region= alias",
     )
     fn = form.find("async def click_save")
-    body = form[fn : fn + 800]
-    assert_true("section or region" in body, "click_save prefers section|region")
+    body = form[fn : fn + 1200]
+    assert_true("resolve_scope(region, section)" in body, "click_save prefers region via resolve_scope")
+    assert_true("err-region-required" in form, "click_save surfaces err-region-required")
+    assert_true("auto region=" in form, "unique-button log uses auto region=")
 
 
 def test_filter_pending_excludes_other_section() -> None:
@@ -141,10 +143,10 @@ def test_form_has_err_section_required() -> None:
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
-    assert_true("err-section-required" in form, "click_save surfaces err-section-required")
+    assert_true("err-region-required" in form, "click_save surfaces err-region-required")
     assert_true(
-        "requires_section_declaration" in form,
-        "click_save uses requires_section_declaration helper",
+        "requires_region_declaration" in form,
+        "click_save uses requires_region_declaration helper",
     )
 
 
@@ -153,9 +155,10 @@ def test_get_pending_signature() -> None:
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
-    chunk = form.split("async def get_pending_tasks", 1)[1][:600]
-    assert_true("section" in chunk, "get_pending_tasks accepts section")
-    assert_true("pending_by_section" in form, "includes pending_by_section")
+    chunk = form.split("async def get_pending_tasks", 1)[1][:900]
+    assert_true("region" in chunk, "get_pending_tasks accepts region")
+    assert_true("pending_by_region" in chunk or "pending_by_region" in form, "includes pending_by_region")
+    assert_true("pending_by_section" in form, "keeps pending_by_section compat")
 
 
 def test_submit_hint_section_scoped() -> None:
@@ -203,7 +206,7 @@ def test_run_form_assistant_autofill_section_filter() -> None:
 
 def test_prompt_section_scope() -> None:
     prompt = build_agent_system_message(None)
-    assert_true("err-section-required" in prompt, "prompt documents err-section-required")
+    assert_true("err-region-required" in prompt, "prompt documents err-region-required")
     assert_true(
         "region=" in prompt or "section=" in prompt,
         "prompt steers region= (section= compat)",
@@ -266,8 +269,10 @@ def test_click_save_auto_section_from_unique_button() -> None:
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
     assert_true("unique_button_section" in form, "click_save uses unique_button_section")
-    assert_true("auto section" in form or "auto_section" in form or "[click_save] auto" in form,
-                "logs or marks auto section bind")
+    assert_true(
+        "auto region=" in form or "[click_save] auto" in form,
+        "logs or marks auto region bind",
+    )
     # Regression: auto-bound `sec` must reach JS — not the empty param `section`
     assert_true(
         "JS_CLICK_SAVE_BUTTON, [button_text or '保存', sec]" in form

@@ -1404,7 +1404,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     async def get_pending_tasks(section: str = '', region: str = ''):
         if _is_query_mode(case_data_store):
             return _ok(_query_not_form_payload(), include_in_memory=True)
-        from .section_scope import section_matches, pending_by_section, resolve_scope
+        from .section_scope import section_matches, pending_by_section, pending_by_region, resolve_scope
         tl = TaskList.from_store(case_data_store.get('task_list'))
         sec = resolve_scope(region, section)
         pending_items = [
@@ -1413,15 +1413,18 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             and section_matches(sec, i.section_id, i.section_title, getattr(i, 'region_label', '') or '')
         ]
         pending_payload = [i.model_dump() for i in pending_items]
+        by_region = pending_by_region(tl)
         sys.stderr.write(
-            f'[get-pending] done={len(tl.done)} pending={len(tl.pending)} section={sec!r}\n'
+            f'[get-pending] done={len(tl.done)} pending={len(tl.pending)} region={sec!r}\n'
         )
         sys.stderr.flush()
         result = {
             'pending': pending_payload,
             'done': len(tl.done),
-            'pending_by_section': pending_by_section(tl),
-            'section_filter': sec or None,
+            'pending_by_region': by_region,
+            'pending_by_section': pending_by_section(tl),  # legacy alias
+            'region_filter': sec or None,
+            'section_filter': sec or None,  # legacy alias
         }
         cue = _submit_ready_hint(case_data_store, section=sec)
         if cue:
@@ -1484,7 +1487,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         if auto_sec:
                             sec = auto_sec
                             sys.stderr.write(
-                                f'[click_save] auto section={auto_sec!r} from unique button\n'
+                                f'[click_save] auto region={auto_sec!r} from unique button\n'
                             )
                             sys.stderr.flush()
             except Exception:
@@ -1521,7 +1524,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         else:
             if not is_picker_confirm:
                 from ._phase_boundary import phase_boundary_active, get_phase_boundary
-                from .section_scope import pending_by_section, requires_section_declaration
+                from .section_scope import pending_by_region, requires_region_declaration
 
                 needs_gate = False
                 if phase_boundary_active(case_data_store):
@@ -1531,12 +1534,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     needs_gate = contract_force_refill(case_data_store)
                 if needs_gate and not sec:
                     tl0 = TaskList.from_store((case_data_store or {}).get("task_list"))
-                    by = pending_by_section(tl0)
-                    if requires_section_declaration(tl0):
+                    by = pending_by_region(tl0)
+                    if requires_region_declaration(tl0):
                         return _err(
-                            "err-section-required | pending_by_section="
+                            "err-region-required | pending_by_region="
                             + json.dumps(by, ensure_ascii=False)
-                            + " | Pass region= (or section=) for the phase block "
+                            + " | Pass region= for the phase block "
                             "(judge from 阶段任务 / 阶段目录 / region_label).",
                             include_in_memory=True,
                         )

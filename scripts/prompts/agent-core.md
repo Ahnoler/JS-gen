@@ -39,8 +39,8 @@
 ### 🚨 阶段区域 region 收窄（CRITICAL）
 - **阶段任务 / 【阶段目录】若点名某一折叠/卡片区域**（如「系统评级结论」），由**你**从任务与 `sections[]` / `region_label` 判断对应标题 — **代码不会从任务文本解析区域名**。
 - **优先带 `region=`：** `run_form_assistant(region='…')`、`get_pending_tasks(region='…')`、`click_save('保存', region='…')` — 闸门与 pending 只针对该区域；其它折叠块（如征信信息）的未填字段**不会**挡住本阶段保存。
-- **唯一「保存」兜底：** 若扫描到的「保存」按钮只属于**一个**区域，即使你漏传 `region=`，`click_save` 也会自动用该区域做闸门与点击（日志 `[click_save] auto section=…`）。**多个同名「保存」时仍必须显式传 `region=`**，不会自动猜。
-- **`err-section-required`：** 未传 scope、pending 跨多块、且无法从唯一保存按钮推断 → 响应含 `pending_by_section`；选对应当前阶段的区域再带 `region=` 重试。**禁止**为清闸门去填征信等无关折叠块。勿把「无 ambiguous_buttons」当成可以裸 `click_save()`——pending 跨块同样需要 scope（或依赖上面的唯一保存兜底）。
+- **唯一「保存」兜底：** 若扫描到的「保存」按钮只属于**一个**区域，即使你漏传 `region=`，`click_save` 也会自动用该区域做闸门与点击（日志 `[click_save] auto region=…`）。**多个同名「保存」时仍必须显式传 `region=`**，不会自动猜。
+- **`err-region-required`：** 未传 scope、pending 跨多块、且无法从唯一保存按钮推断 → 响应含 `pending_by_region`；选对应当前阶段的区域再带 `region=` 重试。**禁止**为清闸门去填征信等无关折叠块。勿把「无 ambiguous_buttons」当成可以裸 `click_save()`——pending 跨块同样需要 scope（或依赖上面的唯一保存兜底）。
 - **`err-pending-fields` 且已传 `region=`：** 只列出**该区域内**仍未写的字段；只修这些字段后再次 `click_save(..., region='…')`。
 - **`NEXT_ACTION`：** 可能是 `click_save(button_text='保存', region='系统评级结论')` — **照抄参数调用**，不要改成裸 `click_save()`。
 

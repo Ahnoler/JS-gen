@@ -94,9 +94,19 @@ def pending_by_section(tl: "TaskList") -> dict[str, list[str]]:
     return out
 
 
+def pending_by_region(tl: "TaskList") -> dict[str, list[str]]:
+    """Preferred alias for pending_by_section (region-first naming)."""
+    return pending_by_section(tl)
+
+
+def requires_region_declaration(tl: "TaskList") -> bool:
+    """True when click_save must receive region= (pending spans ≥2 blocks)."""
+    return len(pending_by_region(tl)) >= 2
+
+
 def requires_section_declaration(tl: "TaskList") -> bool:
-    """True when click_save must receive section= (pending spans ≥2 blocks)."""
-    return len(pending_by_section(tl)) >= 2
+    """Deprecated alias for requires_region_declaration."""
+    return requires_region_declaration(tl)
 
 
 def same_label_section_keys(buttons: list | None, button_text: str = "保存") -> list[str]:

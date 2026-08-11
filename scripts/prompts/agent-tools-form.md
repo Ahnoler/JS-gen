@@ -7,13 +7,13 @@
 - fill_form_field(label_text, value, xpath_smart='') — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 扫描/`get_pending_tasks` 含 `xpath_smart` + `label`；**优先传 `xpath_smart`**。`label_text` 为语义名（规则/取值/录制），用扫描原文勿猜。若返回 `"field-disabled"` — 跳过。
 - click_radio(label_text, option_text, xpath_smart='') — el-radio 单选组；**优先传 `xpath_smart`**（同 fill/select）。
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
-- **click_save(button_text='保存', region='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `region=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections[]` / `region_label`）；无 scope 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 scope → `err-section-required`（见 core「阶段区域 region」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。无 scope 时若页上多区块同名保存按钮，系统不会使用上一区块记忆自动点保存，会返回 err-save-ambiguous — 必须显式 `region=`。**
+- **click_save(button_text='保存', region='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `region=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections[]` / `region_label`）；无 scope 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 scope → `err-region-required`（见 core「阶段区域 region」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。无 scope 时若页上多区块同名保存按钮，系统不会使用上一区块记忆自动点保存，会返回 err-save-ambiguous — 必须显式 `region=`。**
 
 ## 任务列表动作
 - **`scan_form_fields()` / `run_form_assistant()`** 现与摘要一样走 **全页 L2（`mode:fullpage`）**；壳层/menu/icon **不会**进入 TaskList 待填，勿对侧栏顶栏做 fill。
 - **`scan_editable_summary()`** — 了解当前可见可编辑控件时调用（只读摘要，不填表、不建任务列表）。
 - 表格空行首字段可能显示为 `row#N` / `row#N|列名` 等机器锚点：按业务与页面结构理解语义，**操作仍优先传扫描给出的 `xpath_smart`**，不要靠改 label 改名后去定位。
-- 用返回的 **`pending_items[{label, xpath_smart, kind, region_label, section}]`** 与 **`buttons[{text, region_label, section, xpath_smart}]`** 决定下一步（选 scope 时用 `region_label`；返回 JSON 中 `section` 为兼容字段，优先读 `region_label`）；`fill_*` / `select_*` / `click_*` **必须带上条目里的 `xpath_smart`**，勿再等另一次扫描取定位。
+- 用返回的 **`pending_items[{label, xpath_smart, kind, region_label}]`** 与 **`buttons[{text, region_label, xpath_smart}]`** 决定下一步（选 scope 时用 `region_label`；若仍见 `section` 字段则为兼容别名，优先读 `region_label`）；`fill_*` / `select_*` / `click_*` **必须带上条目里的 `xpath_smart`**，勿再等另一次扫描取定位。
 - `pending_labels` / `readonly_labels` 仅为短名单；完整定位以 `pending_items` / `readonly_items` 为准。
 - **`readonly_items` / `readonly_labels`**：已禁用字段（常有值），作业务参考，**不要** fill/select。
 - **壳层导航**（侧栏/顶栏菜单）不要依赖本清单。
@@ -23,7 +23,7 @@
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
 - **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要）。**
 - task_done(label) — 将字段标记为已完成。
-- get_pending_tasks(region='') — 返回 {"pending": [...], "pending_by_section": {...}}（不含已完成字段）。可选 `region=` 只列该区域 pending。
+- get_pending_tasks(region='') — 返回 {"pending": [...], "pending_by_region": {...}}（不含已完成字段；`pending_by_section` 为兼容别名）。可选 `region=` 只列该区域 pending。
 - sync_tasks_from_errors() — 读取页面校验错误，自动重试受影响的字段。
 
 # 🚨 表单填写助手（CRITICAL — 草稿协作，不可默认信任）
