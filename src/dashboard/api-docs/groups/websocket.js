@@ -121,7 +121,7 @@ export const GROUP_WEBSOCKET = [
         tryable: false,
         respExample: J({ type: 'remote:status', payload: { attached: true, remoteSessionId: 7 } }),
         notes: [
-          '推流为二进制 RSCF JPEG；执行端约 30fps 上限、默认编码 1600×900 / quality≈65；画布显示默认自适应容器；编码跟视口走（不再强制抬到 1080p）',
+          '推流为二进制 RSCF JPEG；执行端约 10–12fps 上限（可用 BIB_STREAM_MIN_FORWARD_MS / BIB_STREAM_EVERY_NTH_FRAME 调整）。默认编码跟视口（常见 1600×900 / quality≈65；画布显示默认自适应容器；编码不强制抬到 1080p）',
           'Chrome screencast 在执行端即时 ack；客户端无需每帧 remote:ack',
           '控制面 / 客户端在 WS 积压时丢弃旧帧，优先最新画面',
         ],

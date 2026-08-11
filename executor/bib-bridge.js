@@ -12,6 +12,7 @@
  */
 import { CdpClient } from '../src/cdp/client.js';
 import { discoverCdpWithRetry } from '../src/cdp/discover.js';
+import { resolveScreencastTiming } from '../src/cdp/screencast-timing.js';
 import { resolveElementByLabel } from '../src/cdp/resolve-by-label.js';
 
 const MAGIC = Buffer.from('RSCF');
@@ -19,8 +20,6 @@ const DEFAULT_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
 /** Screencast encode cap (optional upscale ceiling; default stream is 1600×900). */
 const STREAM_MAX_W = 1920;
 const STREAM_MAX_H = 1080;
-/** Min interval between forwarded JPEG frames (CDP ack is always immediate). */
-const MIN_FORWARD_MS = 33;
 /** If no CDP frame for this long while attached, restart screencast. */
 const STALL_RESTART_MS = 2500;
 
@@ -56,6 +55,8 @@ export class BibBridge {
     this._disposed = false;
     this._lastForwardAt = 0;
     this._lastFrameAt = 0;
+    this._minForwardMs = 90;
+    this._everyNthFrame = 2;
     this._stallTimer = null;
     this._restarting = false;
     /** @type {string|null} */
@@ -195,6 +196,9 @@ export class BibBridge {
 
   async startScreencast() {
     if (!this.client || this._disposed) return;
+    const timing = resolveScreencastTiming();
+    this._minForwardMs = timing.minForwardMs;
+    this._everyNthFrame = timing.everyNthFrame;
     // Encode at current viewport; never upscale beyond STREAM_MAX_* (do not floor to 1080p).
     const maxW = Math.min(Math.max(320, Number(this.viewport.w) || DEFAULT_VIEWPORT.w), STREAM_MAX_W);
     const maxH = Math.min(Math.max(240, Number(this.viewport.h) || DEFAULT_VIEWPORT.h), STREAM_MAX_H);
@@ -203,7 +207,7 @@ export class BibBridge {
       quality: this.quality,
       maxWidth: maxW,
       maxHeight: maxH,
-      everyNthFrame: 1,
+      everyNthFrame: this._everyNthFrame,
     });
     this.screencastOn = true;
     this._lastFrameAt = Date.now();
@@ -377,7 +381,7 @@ export class BibBridge {
     if (!dataB64) return;
 
     const now = Date.now();
-    if (now - this._lastForwardAt < MIN_FORWARD_MS) return;
+    if (now - this._lastForwardAt < this._minForwardMs) return;
     this._lastForwardAt = now;
 
     const metadata = params.metadata || {};

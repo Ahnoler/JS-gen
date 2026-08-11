@@ -5,6 +5,11 @@
  */
 import { broadcast } from '../../ws-server.js';
 import { state } from '../../state.js';
+import {
+  DEFAULT_MIN_FORWARD_MS,
+  DEFAULT_EVERY_NTH_FRAME,
+  resolveScreencastTiming,
+} from '../screencast-timing.js';
 
 /** Binary frame magic: Remote ScreenCast Frame */
 export const MAGIC = Buffer.from('RSCF');
@@ -13,7 +18,9 @@ export const MAGIC = Buffer.from('RSCF');
 export const SESSION_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
 export const STREAM_MAX_W = 1920;
 export const STREAM_MAX_H = 1080;
-export const MIN_FORWARD_MS = 33;
+// Re-export default for readers; runtime throttle should use bridge.minForwardMs.
+export const MIN_FORWARD_MS = DEFAULT_MIN_FORWARD_MS;
+export { resolveScreencastTiming };
 export const STALL_RESTART_MS = 2500;
 
 /** Mutable state shared by all remote-bridge modules. */
@@ -35,6 +42,8 @@ export const bridge = {
   pendingDateDayPick: null,
   lastFrameAt: 0,
   lastForwardAt: 0,
+  minForwardMs: DEFAULT_MIN_FORWARD_MS,
+  everyNthFrame: DEFAULT_EVERY_NTH_FRAME,
   stallTimer: null,
   restartingCast: false,
   /** @type {WeakMap<import('ws').WebSocket, { trajectoryId: number|null, sessionId: string|null, remoteSessionId: number|null, remoteSessionUuid: string|null }>} */

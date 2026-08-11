@@ -110,6 +110,10 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-11: BiB 画面推流默认限帧约 10–12fps（分辨率/quality 不变），降低公网观看延迟与卡顿。可通过 `BIB_STREAM_MIN_FORWARD_MS`、`BIB_STREAM_EVERY_NTH_FRAME` 调整。
+  - 影响：执行机 `bib-bridge`、控制面 `remote-bridge` screencast、`/api/docs` WS 说明。
+  - Python 同步提示：无 schema/路由变更；若 Python 控制面有独立 screencast 旁路，对齐限帧默认值即可。
+
 - 2026-08-11: **page-state-gen**：可点击 leaf 在相对 xpath 多命中时，用页态（步骤条→dialog/drawer→breadcrumb）锚定 `xpath_smart`；唯一控件不包。推广原 wizard 下一步逻辑。
   影响范围：CDP locator helpers / 录制 snap / resolve inventory。
   文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py

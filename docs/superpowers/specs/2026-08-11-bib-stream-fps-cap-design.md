@@ -1,7 +1,7 @@
 # BiB 画面推流限帧（保分辨率）设计
 
 **日期：** 2026-08-11  
-**状态：** Draft — 待实现计划  
+**状态：** Implemented 2026-08-11 — plan docs/superpowers/plans/2026-08-11-bib-stream-fps-cap.md  
 **范围：** 执行机 `BibBridge` + 控制面 `remote-bridge` screencast 转发节奏与背压；不改点击坐标协议。
 
 ## 1. 背景与问题
