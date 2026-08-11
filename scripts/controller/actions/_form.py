@@ -373,15 +373,16 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         )
         result = await page.evaluate(JS_FILL_BY_XPATH, [resolved.xpath_smart, value, resolved.label])
         if _is_ok_result(result):
+            xp_out = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
                 'fill_form_field',
-                {'label_text': resolved.label, 'value': value, 'xpath_smart': resolved.xpath_smart},
+                {'label_text': resolved.label, 'value': value, 'xpath_smart': xp_out},
                 result,
                 element=element,
             )
             if not _is_query_mode(case_data_store):
                 _task_done_impl(
-                    resolved.label, case_data_store, value=value, xpath_smart=resolved.xpath_smart,
+                    resolved.label, case_data_store, value=value, xpath_smart=xp_out,
                 )
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
@@ -399,15 +400,16 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         )
         result = await page.evaluate(JS_FILL_DATE_BY_XPATH, [resolved.xpath_smart, value])
         if _is_ok_result(result):
+            xp_out = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
                 'fill_date_field',
-                {'label_text': resolved.label, 'value': value, 'xpath_smart': resolved.xpath_smart},
+                {'label_text': resolved.label, 'value': value, 'xpath_smart': xp_out},
                 result,
                 element=element,
             )
             if not _is_query_mode(case_data_store):
                 _task_done_impl(
-                    resolved.label, case_data_store, value=value, xpath_smart=resolved.xpath_smart,
+                    resolved.label, case_data_store, value=value, xpath_smart=xp_out,
                 )
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
@@ -1090,6 +1092,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
                 if ok:
                     ok_in_group += 1
+                    xp_out = stamp_recorded_xpath_smart(element, xpath_smart)
                     if field_kind == 'radio' or kind in ('click_radio', 'radio'):
                         await record_action_with_screenshots(
                             page,
@@ -1097,7 +1100,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                             {
                                 'label_text': label,
                                 'option_text': value,
-                                'xpath_smart': xpath_smart,
+                                'xpath_smart': xp_out,
                             },
                             result,
                             element=element,
@@ -1110,7 +1113,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                             {
                                 'label_text': label,
                                 'value': value,
-                                'xpath_smart': xpath_smart,
+                                'xpath_smart': xp_out,
                             },
                             result,
                             element=element,
@@ -1135,7 +1138,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                 {
                                     'label_text': label,
                                     'option_text': value,
-                                    'xpath_smart': xpath_smart,
+                                    'xpath_smart': xp_out,
                                 },
                                 result,
                                 element=element,
@@ -1154,8 +1157,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                 page, case_data_store, label, stamped, element,
                             )
                             params['option_text'] = stamped
-                            if xpath_smart:
-                                params['xpath_smart'] = xpath_smart
+                            if xp_out:
+                                params['xpath_smart'] = xp_out
                             await record_action_with_screenshots(
                                 page,
                                 'select_option',
@@ -1165,7 +1168,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                 before_b64=before_b64,
                             )
                     _task_done_impl(
-                        label, case_data_store, value=value, xpath_smart=xpath_smart,
+                        label, case_data_store, value=value, xpath_smart=xp_out,
                     )
                     # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
                     btn = has_button_map.get(label, '')
@@ -1964,11 +1967,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 params, element = await _pack_select_record(
                     page, case_data_store, label_text, stamped, element,
                 )
-                params['xpath_smart'] = xp
+                xp_out = stamp_recorded_xpath_smart(element, xp)
+                params['xpath_smart'] = xp_out
                 params['option_text'] = stamped
                 _record_action('select_option', params, already, element=element)
                 _task_done_impl(
-                    label_text, case_data_store, value=cur_val or stamped, xpath_smart=xp,
+                    label_text, case_data_store, value=cur_val or stamped, xpath_smart=xp_out,
                 )
                 streak = int(case_data_store.get('_already_matched_streak', 0) or 0) + 1
                 case_data_store['_already_matched_streak'] = streak
@@ -2024,7 +2028,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         params, element = await _pack_select_record(
             page, case_data_store, label_text, option_text, element,
         )
-        params['xpath_smart'] = xp
+        xp_out = stamp_recorded_xpath_smart(element, xp)
+        params['xpath_smart'] = xp_out
 
         select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
         if _is_ok_result(select_result):
@@ -2033,10 +2038,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             stamped = resolve_recorded_option_text(option_text, matched_text)
             params['option_text'] = stamped
             params, element = attach_select_options(params, element, params.get('options'))
-            params['xpath_smart'] = xp
+            params['xpath_smart'] = xp_out
             _record_action('select_option', params, matched_text, element=element)
             _task_done_impl(
-                label_text, case_data_store, value=stamped or option_text, xpath_smart=xp,
+                label_text, case_data_store, value=stamped or option_text, xpath_smart=xp_out,
             )
             return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
         elif select_result == 'no-items':
@@ -2046,7 +2051,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 cur = recheck.split(':', 1)[1]
                 stamped = resolve_recorded_option_text(option_text, cur)
                 params['option_text'] = stamped
-                _task_done_impl(label_text, case_data_store, value=cur or stamped, xpath_smart=xp)
+                _task_done_impl(label_text, case_data_store, value=cur or stamped, xpath_smart=xp_out)
                 _record_action('select_option', params, recheck, element=element)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', case_data_store))
             failed = await _final_select_failure('no-items', xp)
@@ -2060,7 +2065,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 if x not in stored:
                     stored.append(x)
             params, element = attach_select_options(params, element, stored)
-            params['xpath_smart'] = xp
+            params['xpath_smart'] = xp_out
             want = (option_text or '').strip()
             fuzzy = next((o for o in stored if want and (want in o or o in want)), None)
             # Common alias: 中国 → 中华人民共和国
@@ -2072,9 +2077,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     matched_text = fuzzy_result.split(':', 1)[1] if ':' in fuzzy_result else fuzzy_result
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
                     params['option_text'] = matched_text
-                    params['xpath_smart'] = xp
+                    params['xpath_smart'] = xp_out
                     _record_action('select_option', params, matched_text, element=element)
-                    _task_done_impl(label_text, case_data_store, value=matched_text, xpath_smart=xp)
+                    _task_done_impl(label_text, case_data_store, value=matched_text, xpath_smart=xp_out)
                     return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', case_data_store))
             retry_key = f'_sel_retry_{label_text}'
             retries = case_data_store.get(retry_key, 0) + 1
@@ -2086,10 +2091,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
                     stamped = resolve_recorded_option_text(option_text, matched_text)
                     params['option_text'] = stamped
-                    params['xpath_smart'] = xp
+                    params['xpath_smart'] = xp_out
                     _record_action('select_option', params, matched_text, element=element)
                     _task_done_impl(
-                        label_text, case_data_store, value=stamped or matched_text, xpath_smart=xp,
+                        label_text, case_data_store, value=stamped or matched_text, xpath_smart=xp_out,
                     )
                     return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
                 failed = await _final_select_failure(str(first_result), xp)
@@ -2171,18 +2176,19 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         )
         result = await page.evaluate(JS_CLICK_RADIO_BY_XPATH, [resolved.xpath_smart, option_text])
         if _is_ok_result(result):
+            xp_out = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
                 'click_radio',
                 {
                     'label_text': resolved.label,
                     'option_text': option_text,
-                    'xpath_smart': resolved.xpath_smart,
+                    'xpath_smart': xp_out,
                 },
                 result,
                 element=element,
             )
             _task_done_impl(
-                resolved.label, case_data_store, value=option_text, xpath_smart=resolved.xpath_smart,
+                resolved.label, case_data_store, value=option_text, xpath_smart=xp_out,
             )
             return _ok(result)
         return result
@@ -2219,10 +2225,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     fill_result = await page.evaluate(
                         JS_FILL_BY_XPATH, [fill_xpath, fill_val, label_text],
                     )
+                    xp_out = stamp_recorded_xpath_smart(fill_el, fill_xpath)
                     record_params = {
                         'label_text': label_text,
                         'value': fill_val,
-                        'xpath_smart': fill_xpath,
+                        'xpath_smart': xp_out,
                     }
                 else:
                     fill_el = None
@@ -2235,7 +2242,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         fill_result,
                         element=fill_el,
                     )
-                    _task_done_impl(label_text, case_data_store, value=fill_val)
+                    _task_done_impl(
+                        label_text, case_data_store, value=fill_val,
+                        xpath_smart=record_params.get('xpath_smart', ''),
+                    )
                     return _ok(
                         f'ok-fill-fallback:{fill_val} | was no-tree-component; '
                         f'recorded as fill_form_field (do not retry select_tree_option)'
