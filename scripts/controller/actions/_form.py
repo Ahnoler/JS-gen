@@ -958,6 +958,9 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             actions, needs = _llm_generate_values(
                 llm, sub, case_data_store=case_data_store, section=filt,
             )
+            if idx == KIND_ORDER['select']:
+                from .cascade_fill import append_select_first_fallbacks
+                actions, needs = append_select_first_fallbacks(actions, needs, sub)
             if needs:
                 case_data_store.setdefault('_assistant_needs_agent', []).extend(needs)
             await page.evaluate(
@@ -1305,55 +1308,62 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         all_results = []
         await _execute_round(page, pending_dicts, label_kind, all_results, '')
 
-        # ═══════════════════════════════════════════════════════════════════
-        # Round 2: 级联扫描 — select 赋值后可能 reveal 新字段
-        # ═══════════════════════════════════════════════════════════════════
-        round1_count = len(all_results)
-        try:
-            raw2 = await page.evaluate(
-                JS_SCAN_FORM_FIELDS,
-                [False, _button_keywords(), {'mode': 'fullpage'}],
+        async def _cascade_round(round_tag: str, console_label: str) -> None:
+            """Wait → fullpage scan → new∪still-empty worklist → execute (may be empty)."""
+            from .cascade_fill import (
+                filled_ok_keys_from_results,
+                merge_cascade_worklist,
+                still_empty_pending_dicts,
             )
-            result2 = json.loads(raw2) if isinstance(raw2, str) else raw2
-            raw_fields2 = result2.get('fields') if isinstance(result2, dict) else result2
-        except Exception:
-            raw_fields2 = []
-        fillable2 = prepare_scan_fields_for_tasklist(raw_fields2)
-        dom_fields2 = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable2]
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        new_pending2 = _scan_new_fields(dom_fields2, tl)
-        if new_pending2:
-            await page.evaluate(
-                's => console.log("[AI填表] 第二轮(联动): " + s)',
-                f'{len(new_pending2)}个新字段',
-            )
-            label_kind2 = {d['label']: d.get('kind', 'input') for d in new_pending2}
-            await _execute_round(page, new_pending2, label_kind2, all_results, 'round2 ')
 
-        # ═══════════════════════════════════════════════════════════════════
-        # Round 3: 深层联动扫描
-        # ═══════════════════════════════════════════════════════════════════
-        round2_count = len(all_results)
-        try:
-            raw3 = await page.evaluate(
-                JS_SCAN_FORM_FIELDS,
-                [False, _button_keywords(), {'mode': 'fullpage'}],
+            try:
+                await page.wait_for_timeout(700)
+                await _wait_if_loading(page)
+            except Exception:
+                pass
+            try:
+                raw = await page.evaluate(
+                    JS_SCAN_FORM_FIELDS,
+                    [False, _button_keywords(), {'mode': 'fullpage'}],
+                )
+                result = json.loads(raw) if isinstance(raw, str) else raw
+                raw_fields = result.get('fields') if isinstance(result, dict) else result
+            except Exception:
+                raw_fields = []
+            fillable = prepare_scan_fields_for_tasklist(raw_fields)
+            dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable]
+            tl_c = TaskList.from_store(case_data_store.get('task_list'))
+            new_pending = _scan_new_fields(dom_fields, tl_c)
+            # Refresh tl after _scan_new_fields may have mutated store
+            tl_c = TaskList.from_store(case_data_store.get('task_list'))
+            ok_keys = filled_ok_keys_from_results(all_results)
+            still = still_empty_pending_dicts(
+                tl_c.pending,
+                section_filter=filt,
+                filled_ok_keys=ok_keys,
             )
-            result3 = json.loads(raw3) if isinstance(raw3, str) else raw3
-            raw_fields3 = result3.get('fields') if isinstance(result3, dict) else result3
-        except Exception:
-            raw_fields3 = []
-        fillable3 = prepare_scan_fields_for_tasklist(raw_fields3)
-        dom_fields3 = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable3]
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        new_pending3 = _scan_new_fields(dom_fields3, tl)
-        if new_pending3:
+            work = merge_cascade_worklist(new_pending, still)
+            sys.stderr.write(
+                f'[auto-fill] {round_tag}cascade: new={len(new_pending)} '
+                f'still_empty={len(still)} work={len(work)}\n'
+            )
+            sys.stderr.flush()
+            if not work:
+                await page.evaluate(
+                    's => console.log("[AI填表] " + s)',
+                    f'{console_label}: 0个字段（无新字段/无剩余空项）',
+                )
+                return
             await page.evaluate(
-                's => console.log("[AI填表] 第三轮(深层联动): " + s)',
-                f'{len(new_pending3)}个新字段',
+                's => console.log("[AI填表] " + s)',
+                f'{console_label}: {len(work)}个字段 (new={len(new_pending)} retry={len(still)})',
             )
-            label_kind3 = {d['label']: d.get('kind', 'input') for d in new_pending3}
-            await _execute_round(page, new_pending3, label_kind3, all_results, 'round3 ')
+            lk = {d['label']: d.get('kind', 'input') for d in work}
+            await _execute_round(page, work, lk, all_results, round_tag)
+
+        # Round 2 / 3: cascade — new DOM fields ∪ still-empty pending
+        await _cascade_round('round2 ', '第二轮(联动)')
+        await _cascade_round('round3 ', '第三轮(深层联动)')
 
         # ═══════════════════════════════════════════════════════════════════
         # Step 4-6: 完成、同步（introduce disabled+button 不再入 pending / 不滚动干预）
