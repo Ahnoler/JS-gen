@@ -21,8 +21,24 @@ def test_snippet_exported() -> None:
     js = sn.JS_CAPTURE_FROM_XPATH
     assert_true("absXPath" in js or "xpath_full" in js, "computes xpath_full")
     assert_true("JS_SMART_LOCATOR" not in js, "snippet must not embed SMART_LOCATOR")
-    # Returned object must not set xpath_abs key (absXPath function name is OK).
-    assert_true("xpath_abs:" not in js.replace(" ", ""), "do not write xpath_abs")
+    # Returned object must not set xpath_abs key (helpers may reference xpath_abs internally).
+    tail = js.split("node = drillWriteHit", 1)[-1] if "node = drillWriteHit" in js else js
+    assert_true("xpath_abs:" not in tail.replace(" ", ""), "capture return must not write xpath_abs")
+
+
+def test_capture_snippet_rebuilds_not_echo() -> None:
+    from scripts.controller.actions import _js_snippets as sn
+
+    js = sn.JS_CAPTURE_FROM_XPATH
+    assert_true("PAGE_LOCATOR_HELPERS" in js or "formFieldXpathSmartOf" in js, "helpers embedded for rebuild")
+    assert_true("formFieldXpathSmartOf" in js, "rebuild via formFieldXpathSmartOf")
+    assert_true(
+        "xpath_smart: smart" in js.replace(" ", "")
+        or "xpath_smart:smart" in js.replace(" ", "")
+        or "xpath_smart: rebuilt" in js.replace(" ", "")
+        or "xpath_smart:rebuilt" in js.replace(" ", ""),
+        "return rebuilt smart, not echo xp alone",
+    )
 
 
 def test_capture_snippet_drills_form_input() -> None:
@@ -87,7 +103,7 @@ def test_form_date_passes_xpath_to_capture() -> None:
 
 def test_select_option_passes_xpath_to_capture() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    chunk = form.split("async def select_option", 1)[1].split("async def ", 1)[0]
+    chunk = form.split("async def select_option(", 1)[1].split("async def click_adjacent_button", 1)[0]
     assert_true(
         "xpath_smart=resolved.xpath_smart" in _norm(chunk)
         or "xpath_smart=xp" in _norm(chunk),
@@ -126,10 +142,10 @@ def test_tree_fallback_xpath_captures_pass_xpath() -> None:
         "xpath_smart=xpath_smart" in _norm(chunk),
         "tree fill fallback capture passes xpath_smart",
     )
-    # xpath branch select fallback capture
-    idx2 = form.find("JS_SELECT_TRIGGER_BY_XPATH, [xpath_smart]")
+    # tree ? select fallback re-captures with xpath_smart=
+    idx2 = form.find("sel_result = await _select_by_xpath(page, fill_val, xpath_smart)")
     assert_true(idx2 >= 0, "tree select xpath branch found")
-    chunk2 = form[idx2:idx2 + 1200]
+    chunk2 = form[idx2:idx2 + 900]
     assert_true(
         "xpath_smart=xpath_smart" in _norm(chunk2),
         "tree select fallback capture passes xpath_smart",
@@ -172,6 +188,7 @@ def main() -> int:
     test_click_radio_passes_xpath_to_capture()
     test_execute_round_passes_xpath_to_capture()
     test_tree_fallback_xpath_captures_pass_xpath()
+    test_capture_snippet_rebuilds_not_echo()
     test_capture_snippet_drills_form_input()
     test_select_tree_option_fill_fallback_xpath_parity()
     print("characterize-capture-element-xpath: OK")
