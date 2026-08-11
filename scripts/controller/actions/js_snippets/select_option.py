@@ -17,6 +17,13 @@ JS_SELECT_OPTION = '''async (arg) => {
     // Prefer the dropdown tied to the trigger we just opened.
     const triggerInput = window.__last_select_trigger || null;
     let dropdown = null;
+    const ddUsable = (dd) => {
+        if (!dd || dd.classList.contains('is-hidden')) return false;
+        const style = getComputedStyle(dd);
+        if (style.display === 'none' || style.visibility === 'hidden') return false;
+        // Accept width>0 even when height is still 0 (enter animation / remote table).
+        return dd.getBoundingClientRect().width > 0;
+    };
     if (triggerInput) {
         // Element UI often sets aria-owns / aria-controls on the input wrapper
         const owned = triggerInput.getAttribute('aria-controls')
@@ -24,20 +31,22 @@ JS_SELECT_OPTION = '''async (arg) => {
             || triggerInput.closest('.el-select')?.getAttribute('aria-owns');
         if (owned) {
             const byId = document.getElementById(owned);
-            if (byId) dropdown = byId;
+            if (ddUsable(byId)) dropdown = byId;
         }
         // Popper may sit next to the select; pick the visible dropdown nearest the trigger
         if (!dropdown) {
             const tr = triggerInput.getBoundingClientRect();
             let best = null, bestDist = Infinity;
             for (const dd of document.querySelectorAll('.el-select-dropdown')) {
-                if (dd.classList.contains('is-hidden')) continue;
-                const style = getComputedStyle(dd);
-                if (style.display === 'none' || style.visibility === 'hidden') continue;
+                if (!ddUsable(dd)) continue;
                 const rect = dd.getBoundingClientRect();
-                if (rect.width <= 0 || rect.height <= 0) continue;
                 const dist = Math.abs(rect.top - tr.bottom) + Math.abs(rect.left - tr.left);
-                if (dist < bestDist) { bestDist = dist; best = dd; }
+                // Prefer dropdown that already has options / table rows
+                const rich = dd.querySelectorAll(
+                    '.el-select-dropdown__item, tr.el-table__row'
+                ).length;
+                const score = dist - (rich ? 10000 : 0);
+                if (score < bestDist) { bestDist = score; best = dd; }
             }
             dropdown = best;
         }
@@ -46,16 +55,56 @@ JS_SELECT_OPTION = '''async (arg) => {
         dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
     }
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    /* SELECT_TABLE_ROW_OPTIONS — TsscMultiSelect remote picker uses el-table rows */
+    const collectTableRows = (root) => {
+        if (!root || root === document) return [];
+        return root.querySelectorAll(
+            '.el-table__body-wrapper tr.el-table__row, .el-table__body tr.el-table__row, tr.el-table__row'
+        );
+    };
+    const openDropdownRoots = () => {
+        const roots = [];
+        const push = (dd) => {
+            if (!dd || dd === document || roots.includes(dd)) return;
+            if (dd.classList.contains('is-hidden')) return;
+            const st = getComputedStyle(dd);
+            if (st.display === 'none' || st.visibility === 'hidden') return;
+            // Opening animation often has width>0 but height=0 — still accept.
+            if (dd.getBoundingClientRect().width <= 0) return;
+            roots.push(dd);
+        };
+        push(dropdown);
+        for (const dd of document.querySelectorAll('.el-select-dropdown')) push(dd);
+        return roots;
+    };
     const collectItems = () => {
-        let items = dropdown && dropdown !== document
-            ? dropdown.querySelectorAll('.el-select-dropdown__item')
-            : [];
-        // Do NOT fall back to all document items — that mixes 国籍/行业/性别 options.
-        if (items.length === 0) {
-            const vis = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
-            if (vis && vis !== document) items = vis.querySelectorAll('.el-select-dropdown__item');
+        for (const root of openDropdownRoots()) {
+            // Prefer table rows when present (TsscMultiSelect); plain el-option second.
+            const rows = collectTableRows(root);
+            if (rows.length) return rows;
+            const items = root.querySelectorAll('.el-select-dropdown__item');
+            if (items.length) return items;
         }
-        return items;
+        return [];
+    };
+    const optionLabel = (el) => {
+        if (!el) return '';
+        // Prefer first non-numeric body cell (客户名称); skip 客户编号-only cells.
+        const cells = el.querySelectorAll ? el.querySelectorAll('td .cell, td') : [];
+        for (const cell of cells) {
+            const cellText = String(cell.textContent || '').replace(/\\s+/g, ' ').trim();
+            if (cellText && !/^\\d+$/.test(cellText)) return cellText;
+        }
+        return String(el.textContent || '').replace(/\\s+/g, ' ').trim();
+    };
+    const labelMatches = (lab, want) => {
+        if (!want) return false;
+        if (lab === want) return true;
+        // Table-select often glues name+id in textContent: 国讯网络有限公司260807…
+        if (lab.startsWith(want) && lab.length > want.length && /^\\d/.test(lab.slice(want.length))) {
+            return true;
+        }
+        return false;
     };
     const buildPool = (items) => {
         const visibleItems = [...items].filter(i => {
@@ -63,16 +112,26 @@ JS_SELECT_OPTION = '''async (arg) => {
             const style = getComputedStyle(i);
             if (style.display === 'none' || style.visibility === 'hidden') return false;
             const r = i.getBoundingClientRect();
-            return r.width > 0 && r.height > 0;
+            if (r.width > 0 && r.height > 0) return true;
+            // Opening popper: rows may report 0×0 while parent already has width.
+            if (i.tagName === 'TR') {
+                const dd = i.closest && i.closest('.el-select-dropdown');
+                if (dd && dd.getBoundingClientRect().width > 0) return true;
+            }
+            return false;
         });
         return visibleItems.length > 0 ? visibleItems : [...items];
     };
     const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
     const tryClick = (item) => {
         item.scrollIntoView({ block: 'nearest' });
-        const t = item.textContent.trim();
-        item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-        item.click();
+        const t = optionLabel(item);
+        const clickEl = (item.tagName === 'TR')
+            ? (item.querySelector('td .cell, td') || item)
+            : item;
+        clickEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        clickEl.click();
+        if (item.tagName === 'TR' && clickEl !== item) item.click();
         if (triggerInput) {
             setTimeout(() => {
                 triggerInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -87,17 +146,26 @@ JS_SELECT_OPTION = '''async (arg) => {
             return tryClick(pickPool[0]);
         }
         for (const item of pickPool) {
-            if (item.textContent.trim() === option) return tryClick(item);
+            if (labelMatches(optionLabel(item), option)) return tryClick(item);
         }
         if (!exactOnly) {
             for (const item of pickPool) {
-                if (item.textContent.trim().includes(option)) return tryClick(item);
+                if (optionLabel(item).includes(option)) return tryClick(item);
             }
         }
         return null;
     };
     let items = collectItems();
     let pickPool = buildPool(items);
+    // Remote TsscMultiSelect: dropdown may open before rows arrive.
+    if (pickPool.length === 0) {
+        for (let i = 0; i < 12; i++) {
+            await sleep(250);
+            items = collectItems();
+            pickPool = buildPool(items);
+            if (pickPool.length) break;
+        }
+    }
     if (pickPool.length === 0) return 'no-items';
     let hit = matchInPool(pickPool);
     if (hit) return hit;
@@ -152,7 +220,7 @@ JS_SELECT_OPTION = '''async (arg) => {
         ? dropdown.querySelector('.el-select-dropdown__empty')
         : document.querySelector('.el-select-dropdown__empty');
     if (hasEmpty) return 'no-items';
-    const preview = pickPool.slice(0, 30).map(i => i.textContent.trim()).filter(Boolean);
+    const preview = pickPool.slice(0, 30).map(i => optionLabel(i)).filter(Boolean);
     return 'option-not-found:' + preview.join(', ');
 }'''
 
@@ -301,23 +369,39 @@ JS_FIND_OPTION = '''(option) => {
     if (items.length === 0 || dropdown === document) {
         items = document.querySelectorAll('.el-select-dropdown__item');
     }
+    /* SELECT_TABLE_ROW_OPTIONS */
+    if (items.length === 0) {
+        const root = (dropdown && dropdown !== document) ? dropdown : document;
+        items = root.querySelectorAll(
+            '.el-select-dropdown .el-table__body-wrapper tr.el-table__row, .el-select-dropdown tr.el-table__row, tr.el-table__row'
+        );
+    }
+    const optionLabel = (el) => {
+        if (!el) return '';
+        if (el.tagName === 'TR' || (el.classList && el.classList.contains('el-table__row'))) {
+            const cell = el.querySelector('td .cell, td');
+            return String((cell && cell.textContent) || el.textContent || '')
+                .replace(/\\s+/g, ' ').trim();
+        }
+        return String(el.textContent || '').replace(/\\s+/g, ' ').trim();
+    };
     const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
     if (FIRST_ALIASES.includes(option.toLowerCase().trim())) {
         for (const item of items) {
-            if (item.offsetParent !== null) return item.textContent.trim();
+            if (item.offsetParent !== null) return optionLabel(item);
         }
-        if (items.length > 0) return items[0].textContent.trim();
+        if (items.length > 0) return optionLabel(items[0]);
         return 'NO_ITEMS';
     }
     for (const item of items) {
-        if (item.textContent.trim() === option) return option;
+        if (optionLabel(item) === option) return option;
     }
     for (const item of items) {
-        if (item.textContent.trim().includes(option)) return item.textContent.trim();
+        if (optionLabel(item).includes(option)) return optionLabel(item);
     }
     const hasEmpty = document.querySelector('.el-select-dropdown__empty');
     if (hasEmpty) return 'NO_ITEMS';
-    return 'NOT_FOUND:' + [...items].map(i => i.textContent.trim()).join(', ');
+    return 'NOT_FOUND:' + [...items].map(i => optionLabel(i)).join(', ');
 }'''
 
 # ── Radio ──

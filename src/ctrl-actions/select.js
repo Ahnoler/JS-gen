@@ -7,19 +7,55 @@
 export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
     const c = CTRL.getContainer();
     const first = ['first','1st','第一个','第一项'];
+    const optionLabel = (el) => {
+      if (!el) return '';
+      const cells = el.querySelectorAll ? el.querySelectorAll('td .cell, td') : [];
+      for (const cell of cells) {
+        const cellText = String(cell.textContent || '').replace(/\\s+/g, ' ').trim();
+        if (cellText && !/^\\d+$/.test(cellText)) return cellText;
+      }
+      return String(el.textContent || '').replace(/\\s+/g, ' ').trim();
+    };
+    const labelMatches = (lab, want) => {
+      if (!want) return false;
+      if (lab === want) return true;
+      if (lab.startsWith(want) && lab.length > want.length && /^\\d/.test(lab.slice(want.length))) return true;
+      return false;
+    };
     const findTarget = (opts) => {
       const list = [...opts];
       if (first.includes(option.toLowerCase().trim()))
         return list.find(it => it.offsetParent !== null) || list[0];
-      return list.find(it => it.textContent.trim() === option) || list.find(it => it.textContent.trim().includes(option));
+      return list.find(it => labelMatches(optionLabel(it), option))
+        || list.find(it => optionLabel(it).includes(option));
     };
     const clickTarget = (t) => {
       t.scrollIntoView({block:'nearest'});
-      t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-      t.click();
+      const clickEl = (t.tagName === 'TR') ? (t.querySelector('td .cell, td') || t) : t;
+      clickEl.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+      clickEl.click();
+      if (t.tagName === 'TR' && clickEl !== t) t.click();
+    };
+    /* SELECT_TABLE_ROW_OPTIONS — TsscMultiSelect remote picker uses el-table rows */
+    const collectOpenOptions = () => {
+      const roots = [...document.querySelectorAll('.el-select-dropdown')].filter(dd => {
+        if (dd.classList.contains('is-hidden')) return false;
+        const st = getComputedStyle(dd);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        return dd.getBoundingClientRect().width > 0;
+      });
+      for (const root of roots) {
+        const rows = root.querySelectorAll(
+          '.el-table__body-wrapper tr.el-table__row, .el-table__body tr.el-table__row, tr.el-table__row'
+        );
+        if (rows.length) return rows;
+        const items = root.querySelectorAll('.el-select-dropdown__item');
+        if (items.length) return items;
+      }
+      return [];
     };
     const pickFromOpen = () => {
-      const opts = document.querySelectorAll('.el-select-dropdown__item');
+      let opts = collectOpenOptions();
       let t = findTarget(opts);
       if (t) { clickTarget(t); return; }
       /* SELECT_LAZY_LOAD_ON_MISS */
@@ -36,28 +72,47 @@ export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
         return null;
       };
       const findDropdown = () => {
+        let best = null, bestScore = Infinity;
         for (const dd of document.querySelectorAll('.el-select-dropdown')) {
           if (dd.classList.contains('is-hidden')) continue;
           const style = getComputedStyle(dd);
           if (style.display === 'none' || style.visibility === 'hidden') continue;
           const rect = dd.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) return dd;
+          if (rect.width <= 0) continue;
+          const rich = dd.querySelectorAll('.el-select-dropdown__item, tr.el-table__row').length;
+          const score = rect.height > 0 ? -rich : (1000 - rich);
+          if (score < bestScore) { bestScore = score; best = dd; }
         }
-        return null;
+        return best;
       };
       const dropdown = findDropdown();
       const wrap = findWrap(dropdown);
-      if (!wrap) return;
+      if (!wrap) {
+        // Remote table select: rows may still be loading — brief retry without scroll.
+        let round = 0;
+        const waitRows = () => {
+          if (round >= 12) return;
+          setTimeout(() => {
+            opts = collectOpenOptions();
+            t = findTarget(opts);
+            if (t) { clickTarget(t); return; }
+            round += 1;
+            waitRows();
+          }, 250);
+        };
+        waitRows();
+        return;
+      }
       let round = 0, stableStreak = 0, prevCount = opts.length, prevHeight = wrap.scrollHeight;
       const scrollRound = () => {
         if (round >= 8) {
-          t = findTarget(document.querySelectorAll('.el-select-dropdown__item'));
+          t = findTarget(collectOpenOptions());
           if (t) clickTarget(t);
           return;
         }
         wrap.scrollTop = wrap.scrollHeight;
         setTimeout(() => {
-          const opts2 = document.querySelectorAll('.el-select-dropdown__item');
+          const opts2 = collectOpenOptions();
           t = findTarget(opts2);
           if (t) { clickTarget(t); return; }
           const h = wrap.scrollHeight;
@@ -66,7 +121,7 @@ export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
           else { stableStreak = 0; prevCount = c; prevHeight = h; }
           round += 1;
           if (stableStreak >= 2) {
-            t = findTarget(document.querySelectorAll('.el-select-dropdown__item'));
+            t = findTarget(collectOpenOptions());
             if (t) clickTarget(t);
             return;
           }

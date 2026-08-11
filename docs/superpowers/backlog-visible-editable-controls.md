@@ -1,8 +1,9 @@
 # Backlog: 可见可编辑控件 / Agent 视野（核实版 2026-08-11）
 
 > 本文件记录「目标线」待办。**状态以代码/表征为准**，不以计划 checkbox 为准。  
-> **下一刀（优先）：** 执行机空闲时 **湿测**（L1-picker / AG / L1c / page-state dialog）。`legacy-section-retire` 产品面已 Done（`section=` 兼容别名；D3 锚保留）。  
-> 2026-08-11 已提交：`d12a515` agent-final-save · `441a228` page-state-gen · `c87b448` L1c API · `277866d` backlog/TODO · slice-1/2 legacy-section-retire。
+> **下一刀（优先）：** 其余湿测（L1-picker / AG / L1c / page-state）；未提交的 `option_text=first` 盖章可聚焦 commit。`legacy-section-retire` 产品面 Done。  
+> 2026-08-11 湿测：`log.txt` **agent-final-save 通过**（阶段2 引入袁玲 → `picker confirm → submit-ready` → `ok-save-success` → `done() accepted after introduce`）。  
+> 已提交：`d12a515` agent-final-save · `441a228` page-state-gen · `c87b448` L1c · legacy-section slices · `dfb2293` slice-3。
 
 ## 目标定稿（2026-08-10 修订）
 
@@ -73,6 +74,7 @@
 
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
+| **form-actions-split** | **Open** | 拆 `_form.py`（~2k）注册仓：select / click_save / autofill 分文件；行为零 diff | **P2** · [TODO](todos/2026-08-11-split-form-actions.md) |
 | **legacy-section-retire** | **Done（slice-1–3）** | 产品面优先 `region=`；`section=` 兼容；Vue 写 region_*；D3 锚 xpath 仍保留 | **P1 完成** · [TODO](todos/2026-08-11-remove-legacy-section-chunking.md) |
 | **L1c-wet / scan-py** | 挂起 | L1c：`L1C_LLM=1` BiB 湿测；Python scan 接入 classify | P1 |
 | **page-state-wet** | 挂起 | dialog/drawer 同文案按钮碰撞湿测 | P1 |
@@ -105,15 +107,16 @@
 
 ## 推荐下一刀（2026-08-11）
 
-1. **湿测（执行机 + CDP 9242 起来后）：**  
+1. **湿测（部分）：**  
+   - ~~agent-final-save：引入法定代表人后必须再点保存~~ — **2026-08-11 `log.txt` PASS**（`ok-save-success` + `done() accepted after introduce`）  
    - L1-picker：多「新增」歧义选择器（Vue）  
    - AG-fullpage：无 label inventory  
    - L1c：`L1C_LLM=1` 低置信区域  
    - page-state：dialog 内/外同文案按钮  
-   - agent-final-save：引入法定代表人后必须再点保存  
 2. （可选）删死代码里仅作产品猜归属的 `sectionOf` 调用；**勿删**锚 xpath 函数本身  
-3. ~~分刀 commit~~ — **已完成**（`d12a515` / `441a228` / `c87b448` / `277866d` + legacy-section slices）  
-4. 穿插：T1r；三大问题①；T5；T4-P4 / L1-vision  
+3. 聚焦 commit：`option_text=first` 盖章（未入库）+ `form-actions-split` TODO（P2）  
+4. ~~分刀 commit~~ — **已完成**（含 legacy-section slices）  
+5. 穿插：T1r；三大问题①；T5；T4-P4 / L1-vision；**form-actions-split**（P2，不挡湿测）  
 
 > 参照：Cursor browser MCP / Playwright MCP（先控件池，后区域标签）。T4-P4 = 对照，非主路径。
 
