@@ -10,9 +10,14 @@ import {
   DEFAULT_PARTNER_PROJECT_ID,
 } from '../../src/services/partner-platform.js';
 
-assert.equal(resolveAccessToken({ headers: { access_token: ' abc ' } }), 'abc');
-assert.equal(resolveAccessToken({ body: { accessToken: 'from-body' } }), 'from-body');
-assert.equal(resolveAccessToken({ headers: {}, body: {} }), process.env.PARTNER_ACCESS_TOKEN?.trim() || null);
+const EXPECTED = (
+  process.env.PARTNER_ACCESS_TOKEN
+  || 'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjE1MTAwNzY4MTA1Nzg2NDQ5OTIsImlhdCI6MTc4MTc0NjMyNCwianRpIjoidG9rZW5JZCJ9.RC81sU9-7mQ7HHxz47dBqIXg0ZWfPGL_uPN0vt-p4qI'
+).trim();
+
+// Configured / default partner token wins (not Vue SSO header)
+assert.equal(resolveAccessToken({ headers: { access_token: 'vue-sso' } }), EXPECTED);
+assert.equal(resolveAccessToken({ headers: {}, body: {} }), EXPECTED);
 
 const d = resolveSystemProject({});
 assert.equal(d.systemId, DEFAULT_PARTNER_SYSTEM_ID);

@@ -78,12 +78,13 @@ export function mapStepToTransactionEvent(step) {
   const propertiesName = String(buildOperationName(action, params, element) || '')
     .replace(/[\\/:*?"<>|']/g, '');
 
+  // elementType=xpath、eventTypeValue=click 等：ATP 历史字段语义，按对方约定保持
   return {
     options,
     elementType: target || null,
     eventTypeName: EVENT_TYPE_NAME[eventTypeValue] || eventTypeValue,
     eventTypeValue,
-    transcationType: 'selenium',
+    transcationType: 'playwright',
     objectValue: pickOperationValue(action, params),
     propertiesName,
     mothed: 'By.XPATH',

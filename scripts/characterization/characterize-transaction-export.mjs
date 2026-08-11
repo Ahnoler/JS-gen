@@ -27,7 +27,7 @@ function testFillInput() {
   assert.equal(ev.elementType, '//input[@placeholder="请输入您的用户名"]');
   assert.equal(ev.options, '');
   assert.equal(ev.mothed, 'By.XPATH');
-  assert.equal(ev.transcationType, 'selenium');
+  assert.equal(ev.transcationType, 'playwright');
   assert.equal(Object.prototype.hasOwnProperty.call(ev, 'placeholder'), false);
 }
 

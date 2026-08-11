@@ -1,39 +1,62 @@
 /**
  * Partner automation platform HTTP client.
- * - System/project APIs (PARTNER_SYSTEM_BASE_URL)
- * - importDemand push (PARTNER_IMPORT_DEMAND_URL)
- * Auth: access_token header (same as partner + Vue request.ts).
+ * Default prefix: http://test.atp.tansun.com.cn/api/
+ * Outbound auth: PARTNER_ACCESS_TOKEN（三个接口共用），缺省用联调 JWT。
+ * Override: PARTNER_API_BASE / PARTNER_SYSTEM_BASE_URL / PARTNER_IMPORT_DEMAND_URL
  */
+import { resolve as configResolve } from '../../config/config.js';
 
-const DEFAULT_SYSTEM_BASE = 'http://172.19.87.169';
-const DEFAULT_IMPORT_URL =
-  'http://172.20.101.63:11002/api/demand/demandtranscation/importDemand';
+const DEFAULT_API_BASE = 'http://test.atp.tansun.com.cn/api';
+/** 联调默认 token（项目 / 系统树 / importDemand 共用）；可用 PARTNER_ACCESS_TOKEN 覆盖 */
+// TODO: 去掉硬编码，改为动态伙伴 token（见 resolveAccessToken）
+const DEFAULT_PARTNER_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjE1MTAwNzY4MTA1Nzg2NDQ5OTIsImlhdCI6MTc4MTc0NjMyNCwianRpIjoidG9rZW5JZCJ9.RC81sU9-7mQ7HHxz47dBqIXg0ZWfPGL_uPN0vt-p4qI';
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 export const DEFAULT_PARTNER_SYSTEM_ID = '98';
 export const DEFAULT_PARTNER_PROJECT_ID = '31';
 
+function envOrConfig(key, fallback = '') {
+  return String(configResolve(key, fallback) || '').trim();
+}
+
+function partnerApiBase() {
+  const raw = envOrConfig('PARTNER_API_BASE')
+    || envOrConfig('PARTNER_SYSTEM_BASE_URL')
+    || DEFAULT_API_BASE;
+  return String(raw).replace(/\/$/, '');
+}
+
 function systemBaseUrl() {
-  return String(process.env.PARTNER_SYSTEM_BASE_URL || DEFAULT_SYSTEM_BASE).replace(/\/$/, '');
+  return partnerApiBase();
 }
 
 function importDemandUrl() {
-  return String(process.env.PARTNER_IMPORT_DEMAND_URL || DEFAULT_IMPORT_URL).trim();
+  const override = envOrConfig('PARTNER_IMPORT_DEMAND_URL');
+  if (override) return override;
+  return `${partnerApiBase()}/demand/demandtranscation/importDemand`;
 }
 
 /**
- * Resolve partner access_token from Express req, then env.
+ * Token for partner outbound calls (projects / systems / importDemand).
+ * Prefer dedicated PARTNER_ACCESS_TOKEN；其次请求头/body；最后联调默认 JWT。
+ *
+ * TODO: 当前为联调硬编码 / PARTNER_ACCESS_TOKEN，故意不转发前端 SSO 的 access_token。
+ *       后续改为动态取伙伴平台 token（登录换票 / 前端显式传入 partner token 等）。
+ *
  * @param {import('express').Request | { headers?: object, body?: object, query?: object }} req
  */
 export function resolveAccessToken(req = {}) {
+  const configured = envOrConfig('PARTNER_ACCESS_TOKEN', DEFAULT_PARTNER_ACCESS_TOKEN);
+  if (configured) return configured;
+
   const headers = req.headers || {};
   const body = req.body || {};
   const query = req.query || {};
   const fromHeader = headers.access_token || headers['access-token'] || headers.Access_Token;
   const fromBody = body.access_token ?? body.accessToken;
   const fromQuery = query.access_token ?? query.accessToken;
-  const fromEnv = process.env.PARTNER_ACCESS_TOKEN;
-  const raw = fromHeader ?? fromBody ?? fromQuery ?? fromEnv;
+  const raw = fromHeader ?? fromBody ?? fromQuery;
   const token = raw == null ? '' : String(raw).trim();
   return token || null;
 }
@@ -139,7 +162,7 @@ function normalizeProjectRow(row) {
  * @returns {Promise<{ id: number|string, name: string }[]>}
  */
 export async function listPartnerProjects({ accessToken } = {}) {
-  const url = `${systemBaseUrl()}/api/system/systemproject/list`;
+  const url = `${systemBaseUrl()}/system/systemproject/list`;
   const { json, text, httpStatus } = await partnerFetch(url, {
     method: 'POST',
     accessToken,
@@ -188,7 +211,7 @@ export async function listPartnerSystems({ accessToken, projectId, parentId } = 
     searchName: '',
   });
   if (parentId != null && parentId !== '') qs.set('parentId', String(parentId));
-  const url = `${systemBaseUrl()}/api/system/system/lazySystemTree?${qs.toString()}`;
+  const url = `${systemBaseUrl()}/system/system/lazySystemTree?${qs.toString()}`;
   const { json, text, httpStatus } = await partnerFetch(url, {
     method: 'GET',
     accessToken,
