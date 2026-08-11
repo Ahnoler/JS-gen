@@ -143,6 +143,53 @@ PAGE_LOCATOR_HELPERS = r'''
       return normalizeControlText(node.innerText || node.textContent || '');
     }
   }
+  /**
+   * Popover / dropdown tree belonging to a form tree-select (TsscMultiTree etc.).
+   * Sidebar page trees must stay tree_node — only upgrade when in tree-popover or
+   * Vue ancestry reaches TsscMultiTree with a form-item host.
+   */
+  function resolveFormTreeSelectHostFromPopoverTree(node) {
+    if (!node || !node.closest) return null;
+    const content = node.closest('.el-tree-node__content');
+    if (!content) return null;
+    const inTreePop = content.closest('.tree-popover');
+    const inPop = inTreePop || content.closest(
+      '.el-popover, .el-popper, .el-select-dropdown, .el-cascader__dropdown, .el-tree-select__popper'
+    );
+    if (!inPop) return null;
+    const pickHost = (fi, fallbackEl) => {
+      if (!fi) return fallbackEl || null;
+      return fi.querySelector(
+        '.el-tree-select, .el-cascader, span.my-popover, .my-popover, [class*="tsscmultitree"]'
+      ) || fallbackEl || fi;
+    };
+    const isTssc = (v) => !!(v && v.$options && v.$options.name
+      && String(v.$options.name).includes('TsscMultiTree'));
+    let start = null;
+    const treeEl = content.closest('.el-tree');
+    if (treeEl && treeEl.__vue__) start = treeEl.__vue__;
+    else if (content.__vue__) start = content.__vue__;
+    let v = start;
+    while (v) {
+      if (isTssc(v) && v.$el) {
+        const fi = v.$el.closest && v.$el.closest('.el-form-item');
+        return pickHost(fi, v.$el);
+      }
+      v = v.$parent;
+    }
+    if (inTreePop) {
+      const items = document.querySelectorAll('.el-form-item');
+      const hits = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.querySelector(
+          '.tsscTree, .tree-popover, .el-tree-select, .el-cascader, [class*="tsscmultitree"], span.my-popover'
+        )) hits.push(item);
+      }
+      if (hits.length === 1) return pickHost(hits[0], null);
+    }
+    return null;
+  }
   function normalizeTargetRoot(node) {
     if (!node || node.nodeType !== 1) return null;
     if (!node.closest) return node;
@@ -177,7 +224,11 @@ PAGE_LOCATOR_HELPERS = r'''
     );
     if (tableRadio) return tableRadio;
     const tree = node.closest('.el-tree-node__content');
-    if (tree) return tree;
+    if (tree) {
+      const formHost = resolveFormTreeSelectHostFromPopoverTree(tree);
+      if (formHost) return formHost;
+      return tree;
+    }
     // Custom tsscTree / popover tree: host is the clickable trigger, not the search input inside popover
     const formItemForTree = node.closest('.el-form-item');
     if (formItemForTree && formItemForTree.querySelector('.tsscTree, .tree-popover, .el-tree-select, .el-cascader')) {
@@ -214,7 +265,10 @@ PAGE_LOCATOR_HELPERS = r'''
     if (node.closest('.el-tabs__item, [role="tab"]')) return 'tab';
     if (node.closest('.el-table__body .el-radio, .el-table__row .el-radio, .el-table__fixed .el-radio')) return 'table_row_radio';
     if (node.closest('.el-table__body .el-button, .el-table__body button, .el-table__body a')) return 'table_row_button';
-    if (node.closest('.el-tree-node__content')) return 'tree_node';
+    if (node.closest('.el-tree-node__content')) {
+      if (resolveFormTreeSelectHostFromPopoverTree(node)) return 'form_tree_select';
+      return 'tree_node';
+    }
     if (node.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"]')) {
       return node.closest('.el-submenu__title') ? 'submenu' : 'menu';
     }
@@ -225,8 +279,11 @@ PAGE_LOCATOR_HELPERS = r'''
     if (node.closest('.el-select')) return 'form_select';
     if (node.closest('.el-radio-group')) return 'form_radio';
     if (node.closest('.el-tree-select, .el-cascader')) return 'form_tree_select';
+    if (node.closest('[class*="tsscmultitree"], [class*="TsscMultiTree"]')) return 'form_tree_select';
     const fiTree = node.closest('.el-form-item');
-    if (fiTree && fiTree.querySelector('.tsscTree, .tree-popover, .el-tree-select, .el-cascader')) {
+    if (fiTree && fiTree.querySelector(
+      '.tsscTree, .tree-popover, .el-tree-select, .el-cascader, [class*="tsscmultitree"], span.my-popover, .my-popover'
+    )) {
       return 'form_tree_select';
     }
     if (node.closest('.el-form-item') && (node.matches('input, textarea') || node.closest('.el-input, .el-textarea'))) return 'form_input';
@@ -256,7 +313,17 @@ PAGE_LOCATOR_HELPERS = r'''
     }
     if (!lbl || !node) return '';
     const lit = xpathLiteral(lbl);
-    const itemPred = "div[contains(@class,'el-form-item')][.//label[contains(normalize-space(.)," + lit + ")]]";
+    // Exact label (+ Element UI * / colon suffixes). contains() wrongly hits
+    // prefix siblings (财务部联系人 → 财务部联系人手机号码).
+    const itemPred = "div[contains(@class,'el-form-item')][.//label["
+      + "normalize-space(.)=" + lit
+      + " or normalize-space(.)=concat(" + lit + ", ':')"
+      + " or normalize-space(.)=concat(" + lit + ", '：')"
+      + " or normalize-space(.)=concat(" + lit + ", '*')"
+      + " or normalize-space(.)=concat('*', " + lit + ")"
+      + " or normalize-space(.)=concat('*', " + lit + ", ':')"
+      + " or normalize-space(.)=concat('*', " + lit + ", '：')"
+      + "]]";
     const tagL = (node.tagName || '').toLowerCase();
     const cls = String(node.className || '');
     let leaf = 'input';
@@ -994,7 +1061,12 @@ PAGE_LOCATOR_HELPERS = r'''
     const kind = opts.targetKind || detectTargetKind(host);
     const t = normalizeControlText(text) || cleanVisibleText(host);
     const abs = String(xpathFull || absXPath(host) || '');
-    const formLbl = normalizeFormLabel(formLabel || '');
+    let formLbl = normalizeFormLabel(formLabel || '');
+    if (!formLbl && host && host.closest) {
+      const item = host.closest('.el-form-item');
+      const lbl = item && item.querySelector('.el-form-item__label, label');
+      formLbl = normalizeFormLabel(lbl && lbl.textContent);
+    }
     let smart = xpathSmartOf(host, t, formLbl, kind);
     let occurrence = 0;
     let verified = false;

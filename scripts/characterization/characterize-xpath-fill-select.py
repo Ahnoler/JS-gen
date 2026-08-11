@@ -60,6 +60,51 @@ def test_fill_by_xpath_rejects_empty_placeholder_match() -> None:
     )
 
 
+def test_fill_by_xpath_prefers_form_label_hint() -> None:
+    """Traj 130 / shared 请输入: multi-match must prefer .el-form-item label hint.
+
+    ``//input[@placeholder='请输入'][1]`` matches many nodes; last-visible alone
+    writes 核心产品名称 while the step label is 核心产品编号.
+    """
+    js = JS_FILL_BY_XPATH
+    assert_true(
+        "el-form-item" in js and ("formItemLabel" in js or "formLabel" in js or "labelHint" in js),
+        "fill-by-xpath must read form-item label for disambiguation",
+    )
+    assert_true(
+        "labelHint" in js or "formLabelHint" in js or "lab.includes" in js or "includes(want)" in js,
+        "fill-by-xpath must match label hint against form-item label",
+    )
+    # findInputFromSnap must accept the third-arg hint (not ignore it)
+    assert_true(
+        "findInputFromSnap(snap, root" in js.replace(" ", "")
+        or "findInputFromSnap(snap,root" in js.replace(" ", ""),
+        "findInputFromSnap call site present",
+    )
+    # Prefer label-matched node over bare last-visible
+    assert_true(
+        "LABEL_HINT_DISAMBIG" in js or ("labelMatch" in js) or ("hintMatch" in js),
+        "marker/var for label-preferred pick among xpath hits",
+    )
+
+
+def test_replay_fill_passes_label_as_xpath_hint() -> None:
+    src = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    chunk = src.split("if action_name == 'fill_form_field':", 1)[1].split(
+        "if action_name == 'fill_date_field':", 1
+    )[0]
+    assert_true("JS_FILL_BY_XPATH" in chunk, "replay fill uses JS_FILL_BY_XPATH")
+    assert_true(
+        "hint = label or ph" in chunk or "hint=label or ph" in chunk.replace(" ", ""),
+        "replay fill builds hint from label_text before placeholder",
+    )
+    assert_true(
+        "JS_FILL_BY_XPATH, [xpath, value, hint]" in chunk
+        or "JS_FILL_BY_XPATH,[xpath,value,hint]" in chunk.replace(" ", ""),
+        "replay fill third arg is label-preferring hint",
+    )
+
+
 def test_replay_select_uses_trigger_by_xpath() -> None:
     src = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
     select_fn = src.split("if action_name == 'select_option':", 1)[1].split(
@@ -108,6 +153,8 @@ def test_xpath_date_radio_helpers() -> None:
 def main() -> int:
     test_snippet_markers()
     test_fill_by_xpath_rejects_empty_placeholder_match()
+    test_fill_by_xpath_prefers_form_label_hint()
+    test_replay_fill_passes_label_as_xpath_hint()
     test_replay_select_uses_trigger_by_xpath()
     test_xpath_date_radio_helpers()
     print("characterize-xpath-fill-select: OK")

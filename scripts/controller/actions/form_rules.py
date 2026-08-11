@@ -260,6 +260,34 @@ def _gen_amount() -> str:
     return f"{_random.randint(100000, 9999999)}.{_random.randint(0, 99):02d}"
 
 
+def _gen_longitude() -> str:
+    """China longitude ≈ 73–135, product forms often validate to 2 decimals."""
+    return f"{_random.uniform(73.0, 135.0):.2f}"
+
+
+def _gen_latitude() -> str:
+    """China latitude ≈ 18–53, product forms often validate to 2 decimals."""
+    return f"{_random.uniform(18.0, 53.0):.2f}"
+
+
+def normalize_lat_lng_value(label_text: str, value: str) -> str:
+    """Round 经度/纬度 fills to 2 decimal places (page validators reject 4+)."""
+    t = (label_text or '').replace(' ', '').replace('\t', '')
+    tl = t.lower()
+    if not (
+        '经度' in t or '纬度' in t
+        or 'longitude' in tl or 'latitude' in tl
+    ):
+        return value if value is not None else ''
+    s = str(value or '').strip()
+    if not s:
+        return s
+    try:
+        return f"{float(s):.2f}"
+    except ValueError:
+        return s
+
+
 def _gen_name() -> str:
     return _random.choice(['张', '李', '王', '刘', '陈', '杨', '赵', '黄', '周', '吴']) + \
         _random.choice(['伟', '芳', '敏', '静', '丽', '强', '磊', '洋', '涛', '明']) + \

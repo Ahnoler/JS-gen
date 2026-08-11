@@ -72,6 +72,15 @@ def test_classify_false_ok() -> None:
     assert R._classify_fill_result(False, "45.50", "").startswith("xpath_miss") or True
 
 
+def test_classify_amount_display_equivalent() -> None:
+    """Replay must not false_ok thousand-separator / trailing .00 (log slot1)."""
+    assert R._classify_fill_result(True, "2026", "2,026.00") == "ok"
+    assert R._classify_fill_result(True, "478282.54", "478,282.54") == "ok"
+    assert R._classify_fill_result(True, "500", "500.00") == "ok"
+    assert R._classify_fill_result(True, "120000.00", "120,000.00") == "ok"
+    assert R._classify_fill_result(True, "2026", "2027").startswith("false_ok")
+
+
 def test_norm_replay_value_strips_spaces() -> None:
     assert R._norm_replay_value(" 45.50 ") == "45.50"
     assert R._norm_replay_value("45 . 50") == "45.50"
@@ -94,6 +103,7 @@ def main() -> int:
     test_resolve_ignores_wrong_params_label_xpath()
     test_resolve_falls_back_to_full_when_no_element_smart()
     test_classify_false_ok()
+    test_classify_amount_display_equivalent()
     test_norm_replay_value_strips_spaces()
     test_replay_fill_does_not_pass_label_as_placeholder_hint()
     test_params_xpath_helper_removed()

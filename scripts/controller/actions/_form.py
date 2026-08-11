@@ -48,6 +48,7 @@ from ...models.field import ScannedButton
 from .form_rules import (
     match_rule, match_cert_number, get_has_button_keywords,
     _gen_name,
+    normalize_lat_lng_value,
 )
 
 from .form_scan_utils import (
@@ -56,7 +57,10 @@ from .form_scan_utils import (
     _build_section_summary, build_editable_summary, _is_query_mode, _skip_auto_fill,
     _mark_query_ui_if_needed,
     filter_fillable_scan_fields, prepare_scan_fields_for_tasklist, tasklist_scan_mode,
-    _pack_select_record, resolve_recorded_option_text, _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
+    field_values_equivalent, enrich_field_value_check,
+    _pack_select_record, resolve_recorded_option_text, select_option_already_matched,
+    match_select_option_candidate,
+    _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
     ResolvedControl, _resolve_control, resolve_select_fallback, _task_xpath_smart, _task_done_impl,
     _submit_ready_hint, _switch_task_list_container, _with_submit_cue, _query_not_form_payload,
 )
@@ -335,6 +339,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
+        value = normalize_lat_lng_value(label_text, value)
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
         from scripts.feature_flags import xpath_smart_fill_only_enabled
 
@@ -444,7 +449,17 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
         page = await browser_context.get_current_page()
-        return await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
+        raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
+        if raw == 'label-not-found':
+            return raw
+        try:
+            info = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            return raw
+        if isinstance(info, dict):
+            enrich_field_value_check(info)
+            return json.dumps(info, ensure_ascii=False)
+        return raw
 
     @controller.action('Verify that a form field has an expected value. Calls check_field_value and compares currentValue with expected. Returns ok if match, err if mismatch. Use this to confirm a field was filled correctly.')
     async def verify_field_value(label_text: str, expected: str):
@@ -457,7 +472,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         except Exception:
             return raw
         current = info.get('currentValue', '')
-        if current and (current == expected or expected in current or current in expected):
+        if field_values_equivalent(current, expected):
             return _ok(f'verified:{current}')
         return _err(f'mismatch | current:{current} | expected:{expected}')
 
@@ -831,12 +846,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 return {}
             return {}
 
-        async def _select_by_xpath(page, value, xpath_smart):
+        async def _select_by_xpath(page, value, xpath_smart, label=''):
             """Xpath-only select open+pick (Phase A hard-cut — no labeled fallback)."""
             xp = (xpath_smart or '').strip()
             if not xp:
                 return 'xpath-not-found'
-            _FIRST = ('first', '1st', '第一个', '第一项')
+            hint = (label or '').strip()
             reset_diag = await reset_select_ui(page)
             if not reset_diag.get('closed', False):
                 sys.stderr.write(
@@ -844,17 +859,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 )
                 sys.stderr.flush()
                 return 'no-items'
-            already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+            already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, hint])
             if str(already).startswith('ok-already:'):
                 cur_val = already.split(':', 1)[1]
-                if (
-                    (value or '').strip().lower() in _FIRST
-                    or cur_val == value
-                    or value in cur_val
-                    or cur_val in value
-                ):
+                if select_option_already_matched(value, cur_val):
                     return already
-            trigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
+            trigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, hint])
             if not str(trigger).startswith('ok'):
                 diag = await reset_select_ui(page)
                 sys.stderr.write(
@@ -867,7 +877,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if str(result).startswith('option-not-found:'):
                 result = await page.evaluate(JS_SELECT_OPTION, 'first')
             if str(result) == 'no-items':
-                recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+                recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, hint])
                 if str(recheck).startswith('ok-already:'):
                     return recheck
             if not _is_ok_result(str(result)):
@@ -1022,6 +1032,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         resolve_error = resolved.error
                 placeholder = field_dict.get('placeholder') or label
                 step_num = i + 1
+                value = normalize_lat_lng_value(label, value)
                 # Pre-mutation locator snapshot (same contract as explicit fill/select/radio actions)
                 if field_kind == 'radio' or kind in ('click_radio', 'radio'):
                     capture_kind = 'form_radio'
@@ -1090,7 +1101,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                     )
                             if not _is_ok_result(result):
                                 if xpath_smart:
-                                    sel_result = await _select_by_xpath(page, fill_val, xpath_smart)
+                                    sel_result = await _select_by_xpath(page, fill_val, xpath_smart, label)
                                     if _is_ok_result(sel_result):
                                         result = sel_result
                                         kind = 'select_option'
@@ -1110,7 +1121,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                             page, label, target_kind='form_select',
                                         )
                     elif kind in ('select_option', 'select', 'option'):
-                        result = await _select_by_xpath(page, value, xpath_smart)
+                        result = await _select_by_xpath(page, value, xpath_smart, label)
                     else:
                         result = f'unknown-action:{kind}'
                 except Exception as e:
@@ -2003,18 +2014,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         )
 
         # Xpath-only already-matched (no JS_FIND_LABELED_SELECT).
-        already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+        already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, label_text])
         if str(already).startswith('ok-already:'):
             cur_val = already.split(':', 1)[1]
-            _FIRST = ('first', '1st', '第一个', '第一项')
             # "first" means "any existing value is fine" — do NOT re-open the
             # dropdown (re-selecting first can cascade-reset dependent fields).
-            if (
-                (option_text or '').strip().lower() in _FIRST
-                or cur_val == option_text
-                or option_text in cur_val
-                or cur_val in option_text
-            ):
+            # Exact match only — substring (非金融 ⊂ 其他非金融) must re-select.
+            if select_option_already_matched(option_text, cur_val):
                 stamped = resolve_recorded_option_text(option_text, cur_val)
                 params, element = await _pack_select_record(
                     page, case_data_store, label_text, stamped, element,
@@ -2034,7 +2040,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         case_data_store['_already_matched_streak'] = 0
 
-        trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
+        trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
         if trigger_result == 'xpath-not-found':
             fallback = resolve_select_fallback(case_data_store, label_text, xp)
             if fallback is not None:
@@ -2048,7 +2054,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     return _err(failed)
                 xp = fallback.xpath_smart
                 label_text = fallback.label or label_text
-                trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
+                trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
                 if _is_ok_result(str(trigger_result)):
                     element = await _capture_element(
                         page,
@@ -2068,6 +2074,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             'xpath-empty',
             'field-disabled',
         ):
+            if is_absent_field_result(trigger_result):
+                if not _is_query_mode(case_data_store):
+                    _task_done_impl(label_text, case_data_store)
+                sys.stderr.write(f'[select] skip absent label={label_text!r}\n')
+                sys.stderr.flush()
+                return _ok(_with_submit_cue(absent_field_skip_result(), case_data_store))
             failed = await _final_select_failure(str(trigger_result), xp)
             if trigger_result == 'no-select-found':
                 return _err(failed + ' | field may be radio — use click_radio')
@@ -2095,7 +2107,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
         elif select_result == 'no-items':
             # Xpath recheck — treat already-set field as success (no labeled JS).
-            recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+            recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, label_text])
             if str(recheck).startswith('ok-already:'):
                 cur = recheck.split(':', 1)[1]
                 stamped = resolve_recorded_option_text(option_text, cur)
@@ -2115,7 +2127,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     stored.append(x)
             params, element = attach_select_options(params, element, stored)
             want = (option_text or '').strip()
-            fuzzy = next((o for o in stored if want and (want in o or o in want)), None)
+            fuzzy = match_select_option_candidate(want, stored)
             # Common alias: 中国 → 中华人民共和国
             if not fuzzy and want in ('中国', '中国大陆'):
                 fuzzy = next((o for o in stored if '中国' in o), None)
@@ -2245,16 +2257,47 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         return result
 
     @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover. If result starts with no-tree-component, do NOT retry — use fill_form_field with a concrete value (not "first") or select_option.')
-    async def select_tree_option(label_text: str, option_text: str):
+    async def select_tree_option(label_text: str, option_text: str, xpath_smart: str = ""):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
-        element = await _capture_element(page, label_text, target_kind='form_tree_select')
+        resolved = _resolve_control(case_data_store, label_text, xpath_smart)
+        # Soft resolve: tree-select can still run via label JS when scan miss;
+        # capture uses resolved xpath when present so steps stamp form_tree_select.
+        label_text = (resolved.label or label_text or '').strip() or label_text
+        xp = '' if resolved.error else (resolved.xpath_smart or '').strip()
+        element = await _capture_element(
+            page, label_text, target_kind='form_tree_select', xpath_smart=xp,
+        )
         result = await page.evaluate(JS_SELECT_TREE_OPTION, [label_text, option_text])
         # P0/P1/P2 success codes all use ok prefix → recordable via _is_ok_result
         if _is_ok_result(result):
-            _record_action('select_tree_option', {'label_text': label_text, 'option_text': option_text}, result, element=element)
-            _task_done_impl(label_text, case_data_store, value=option_text)
+            if element is None and xp:
+                element = await _capture_element(
+                    page, label_text, target_kind='form_tree_select', xpath_smart=xp,
+                )
+            if element is None:
+                # Last resort: stamp label-only meta so persist has form_tree_select
+                element = {
+                    'tag_name': 'div',
+                    'xpath': xp or '',
+                    'xpath_smart': xp or '',
+                    'formLabel': label_text,
+                    'target_kind': 'form_tree_select',
+                    'text': (option_text or '')[:80],
+                    'attributes': {},
+                    'candidates': (
+                        [{'type': 'xpath_smart', 'value': xp}] if xp else []
+                    ),
+                }
+            xp_inv = stamp_recorded_xpath_smart(element, xp)
+            _record_action(
+                'select_tree_option',
+                {'label_text': label_text, 'option_text': option_text},
+                result,
+                element=element,
+            )
+            _task_done_impl(label_text, case_data_store, value=option_text, xpath_smart=xp_inv)
             return _ok(result)
         res_s = str(result or '')
         if res_s == 'disabled' or res_s.startswith('disabled'):

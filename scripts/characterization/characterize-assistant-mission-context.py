@@ -63,6 +63,27 @@ def test_build_context_includes_task_business_snapshot() -> None:
                 "instruction must not be bare 生成合理的测试数据")
 
 
+def test_build_context_includes_flat_case_kv_when_no_scenario_block() -> None:
+    """UI case panel stores flat KV only — form assistant must still see full values.
+
+    Regression for ai-case-half-fill: empty _case_scenario_text used to yield empty
+    【业务数据】, so the form LLM invented truncated ids (PJ20260811) instead of
+    copying PJ20260811012049.
+    """
+    store = {
+        "业务主键": "PJ20260811012049",
+        "创建时间": "2026-08-11",
+        "_phase_intent": {"goal": "按业务主键、创建时间查询待办任务"},
+    }
+    ctx = build_assistant_mission_context(store)
+    bd = ctx.get("business_data") or ""
+    assert_true("PJ20260811012049" in bd, f"full 业务主键 must appear in business_data, got {bd!r}")
+    assert_true("业务主键" in bd, f"key label must appear, got {bd!r}")
+    assert_true("2026-08-11" in bd, f"创建时间 value must appear, got {bd!r}")
+    msg = format_assistant_human_message(ctx, '1. label: "业务主键", kind: input')
+    assert_true("PJ20260811012049" in msg, "human message must carry full value for form LLM")
+
+
 def test_parse_form_llm_response_split() -> None:
     actions, needs = parse_form_llm_response({
         "actions": [
@@ -125,6 +146,7 @@ def test_form_prompt_mission_first() -> None:
     assert_true("needs_agent" in p, "documents needs_agent")
     assert_true("跳过" in p or "不确定" in p, "skip when unsure")
     assert_true("猜测" in p or "禁止" in p, "forbid unjustified guesses")
+    assert_true("原样" in p or "截断" in p, "forbid truncating 业务数据 values")
 
 
 def test_agent_prompt_final_check_and_hygiene() -> None:
@@ -150,6 +172,7 @@ def test_agent_prompt_final_check_and_hygiene() -> None:
 
 def main() -> int:
     test_build_context_includes_task_business_snapshot()
+    test_build_context_includes_flat_case_kv_when_no_scenario_block()
     test_parse_form_llm_response_split()
     test_llm_generate_uses_mission_context_in_prompt()
     test_run_form_assistant_payload_mentions_needs_agent()

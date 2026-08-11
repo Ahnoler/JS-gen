@@ -130,8 +130,11 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
     }
     return null;
   };
-  // LABEL_HINT_DISAMBIG: when xpath hits multiple inputs (shared placeholder),
-  // prefer the visible node whose .el-form-item label contains labelHint.
+  // LABEL_HINT_DISAMBIG: when xpath hits multiple inputs (shared placeholder /
+  // prefix labels like 财务部联系人 → 财务部联系人手机号码), prefer EXACT
+  // normalized form-item label, then includes(), then last-visible fallback.
+  const normFormLab = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+    .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
   const formItemLabel = (el) => {
     const item = el && el.closest && el.closest('.el-form-item');
     if (!item) return '';
@@ -140,8 +143,10 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
   };
   const findInputFromSnap = (snap, root, labelHint) => {
     const want = String(labelHint || '').trim();
+    const wantN = normFormLab(want);
     let fallback = null;
-    let labelMatch = null;
+    let exactMatch = null;
+    let includesMatch = null;
     for (let i = snap.snapshotLength - 1; i >= 0; i--) {
       const n = snap.snapshotItem(i);
       if (!n || !isVis(n)) continue;
@@ -150,15 +155,16 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
         || n.querySelector?.('input:not([type="hidden"]), textarea');
       const target = inner || n;
       if (!fallback) fallback = target;
-      if (want) {
-        const lab = formItemLabel(target);
-        if (lab && lab.includes(want)) {
-          labelMatch = target;
+      if (wantN) {
+        const labN = normFormLab(formItemLabel(target));
+        if (labN === wantN) {
+          exactMatch = target;
           break;
         }
+        if (!includesMatch && labN && labN.includes(wantN)) includesMatch = target;
       }
     }
-    return labelMatch || fallback;
+    return exactMatch || includesMatch || fallback;
   };
   const tryXpath = (xp, root, labelHint) => {
     if (!xp) return null;
@@ -244,26 +250,31 @@ JS_CAPTURE_FROM_XPATH = (
     return null;
   };
   const findNodeFromSnap = (snap, root, labelHint) => {
-    // LABEL_HINT_DISAMBIG — same rule as JS_FILL_BY_XPATH
+    // LABEL_HINT_DISAMBIG — same rule as JS_FILL_BY_XPATH (exact > includes)
     const want = String(labelHint || '').trim();
+    const wantN = String(want || '').replace(/\s+/g, ' ').trim()
+      .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
     let fallback = null;
-    let labelMatch = null;
+    let exactMatch = null;
+    let includesMatch = null;
     for (let i = snap.snapshotLength - 1; i >= 0; i--) {
       const n = snap.snapshotItem(i);
       if (!n || !isVis(n)) continue;
       if (root && root !== document && !root.contains(n)) continue;
       if (!fallback) fallback = n;
-      if (want) {
+      if (wantN) {
         const item = n.closest && n.closest('.el-form-item');
         const lbl = item && item.querySelector('.el-form-item__label, label');
-        const lab = String((lbl && lbl.textContent) || '').replace(/\s+/g, ' ').trim();
-        if (lab && lab.includes(want)) {
-          labelMatch = n;
+        const labN = String((lbl && lbl.textContent) || '').replace(/\s+/g, ' ').trim()
+          .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+        if (labN === wantN) {
+          exactMatch = n;
           break;
         }
+        if (!includesMatch && labN && labN.includes(wantN)) includesMatch = n;
       }
     }
-    return labelMatch || fallback;
+    return exactMatch || includesMatch || fallback;
   };
   const tryXpath = (xpath, root, labelHint) => {
     if (!xpath) return null;

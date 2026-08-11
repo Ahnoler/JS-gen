@@ -384,7 +384,7 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
 
 
 
-_JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
+_JS_READ_VALUE_BY_XPATH = r'''([xpath, labelHint]) => {
   if (!xpath) return '';
   const isVis = (el) => {
     if (!el || el.nodeType !== 1) return false;
@@ -392,17 +392,40 @@ _JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
     const st = getComputedStyle(el);
     return st.display !== 'none' && st.visibility !== 'hidden';
   };
-  const findNode = (xp, root) => {
+  // LABEL_HINT_DISAMBIG (exact > includes): prefix labels must not read siblings.
+  const normFormLab = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+    .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+  const formItemLabel = (el) => {
+    const item = el && el.closest && el.closest('.el-form-item');
+    if (!item) return '';
+    const lbl = item.querySelector('.el-form-item__label, label');
+    return String((lbl && lbl.textContent) || '').replace(/\s+/g, ' ').trim();
+  };
+  const findNode = (xp, root, hint) => {
     try {
       let s = String(xp || '');
       if (!s) return null;
       const ctx = root || document;
       if (root && s.startsWith('//')) s = '.' + s;
       const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      const wantN = normFormLab(hint);
+      let fallback = null;
+      let exactMatch = null;
+      let includesMatch = null;
       for (let i = snap.snapshotLength - 1; i >= 0; i--) {
         const n = snap.snapshotItem(i);
-        if (n && isVis(n)) return n;
+        if (!n || !isVis(n)) continue;
+        if (!fallback) fallback = n;
+        if (wantN) {
+          const labN = normFormLab(formItemLabel(n));
+          if (labN === wantN) {
+            exactMatch = n;
+            break;
+          }
+          if (!includesMatch && labN && labN.includes(wantN)) includesMatch = n;
+        }
       }
+      return exactMatch || includesMatch || fallback;
     } catch (e) { /* ignore */ }
     return null;
   };
@@ -434,7 +457,8 @@ _JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
     }
     return '';
   };
-  const node = findNode(xpath, null);
+  const hint = labelHint == null ? '' : String(labelHint);
+  const node = findNode(xpath, null, hint);
   if (node) return readControl(node);
   if (/el-dialog|el-message-box|el-drawer/.test(xpath) && /\[last\(\)\]/.test(xpath)) {
     const wrapVisible = (d) => {
@@ -455,7 +479,7 @@ _JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
     const local = m && m[1] ? m[1] : '';
     const dlg = /el-drawer/.test(xpath) ? lastVisibleHost(true) : lastVisibleHost(false);
     if (dlg && local) {
-      const scoped = findNode('.//' + local, dlg);
+      const scoped = findNode('.//' + local, dlg, hint);
       if (scoped) return readControl(scoped);
     }
   }

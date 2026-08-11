@@ -142,8 +142,8 @@ def test_tree_fallback_xpath_captures_pass_xpath() -> None:
         "xpath_smart=xpath_smart" in _norm(chunk),
         "tree fill fallback capture passes xpath_smart",
     )
-    # tree ? select fallback re-captures with xpath_smart=
-    idx2 = form.find("sel_result = await _select_by_xpath(page, fill_val, xpath_smart)")
+    # tree → select fallback re-captures with xpath_smart=
+    idx2 = form.find("sel_result = await _select_by_xpath(page, fill_val, xpath_smart")
     assert_true(idx2 >= 0, "tree select xpath branch found")
     chunk2 = form[idx2:idx2 + 900]
     assert_true(

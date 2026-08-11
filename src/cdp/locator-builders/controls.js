@@ -63,9 +63,18 @@ export function buildFormFieldXPathSmart({
   if (!lbl) return '';
 
   const lit = xpathLiteral(lbl);
+  // Exact label (+ * / colon suffixes). Avoid contains() prefix collisions.
   const itemPred =
     `div[contains(@class,'el-form-item')]`
-    + `[.//label[contains(normalize-space(.),${lit})]]`;
+    + `[.//label[`
+    + `normalize-space(.)=${lit}`
+    + ` or normalize-space(.)=concat(${lit}, ':')`
+    + ` or normalize-space(.)=concat(${lit}, '：')`
+    + ` or normalize-space(.)=concat(${lit}, '*')`
+    + ` or normalize-space(.)=concat('*', ${lit})`
+    + ` or normalize-space(.)=concat('*', ${lit}, ':')`
+    + ` or normalize-space(.)=concat('*', ${lit}, '：')`
+    + `]]`;
 
   const tagL = String(tag || '').toLowerCase();
   const cls = String(className || '');
@@ -300,9 +309,19 @@ export function buildAdjacentButtonXPathSmart({
   const btn = normalizeControlText(buttonText || text);
   if (!lbl) return '';
   const lit = xpathLiteral(lbl);
+  // Exact form label (same as buildFormFieldXPathSmart) — adjacent buttons sit
+  // under the same form-item; contains() would bind the wrong item for prefixes.
   const itemPred =
     `div[contains(@class,'el-form-item')]`
-    + `[.//label[contains(normalize-space(.),${lit})]]`;
+    + `[.//label[`
+    + `normalize-space(.)=${lit}`
+    + ` or normalize-space(.)=concat(${lit}, ':')`
+    + ` or normalize-space(.)=concat(${lit}, '：')`
+    + ` or normalize-space(.)=concat(${lit}, '*')`
+    + ` or normalize-space(.)=concat('*', ${lit})`
+    + ` or normalize-space(.)=concat('*', ${lit}, ':')`
+    + ` or normalize-space(.)=concat('*', ${lit}, '：')`
+    + `]]`;
   const kind = detectContainerKind(xpathFull, className, container);
   let leaf = `*[self::button or ${classTokenPred('el-button')}]`;
   if (btn) leaf += `[normalize-space()=${xpathLiteral(btn)}]`;
