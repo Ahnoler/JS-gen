@@ -34,3 +34,5 @@
 | 2026-08-06 | [2026-08-06.md](./2026-08-06.md) | 操作组件库 Phase 1；库列表筛选与 created_by 占位。 |
 | 2026-08-07 | [2026-08-07.md](./2026-08-07.md) | 阶段契约 Done 闸门；control-first/xpath-first 扫描与 section 闭环。 |
 | 2026-08-08 | [2026-08-08.md](./2026-08-08.md) | xpath-primary 字段写入与 section 作用域闸门。 |
+| 2026-08-09 | [2026-08-09.md](./2026-08-09.md) | T4 可编辑盘点扫描；T10 表单结构软失败；overlay trigger\|title 命名。 |
+| 2026-08-10 | [2026-08-10.md](./2026-08-10.md) | 全页 L2 扫描；section 双保存 xpath；交易导出 V2；resolve-element L1/inventory。 |
