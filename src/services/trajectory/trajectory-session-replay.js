@@ -172,15 +172,43 @@ async function prepareReplayBatch(trajectoryId, { stepIds = [], isReplay = true 
   }
 
   const db = getDB();
-  const rows = await db('trajectory_step')
+  const selectedRows = await db('trajectory_step')
     .where({ trajectory_id: tid })
     .whereIn('id', ids)
     .orderBy(['step_number', 'action_index']);
-  if (!rows.length) {
+  if (!selectedRows.length) {
     const err = new Error('No matching steps for stepIds');
     err.statusCode = 404;
     throw err;
   }
+
+  // Auto-include meta checkpoints (e.g. save_form_snapshot) between the selected
+  // business range so Type B still runs when the product UI hides meta steps.
+  const { META_STEP_ACTIONS } = await import('../../models/meta-step-actions.js');
+  const stepNumbers = selectedRows
+    .map((r) => Number(r.step_number))
+    .filter((n) => Number.isFinite(n));
+  const minSn = Math.min(...stepNumbers);
+  const maxSn = Math.max(...stepNumbers);
+  const selectedIdSet = new Set(selectedRows.map((r) => Number(r.id)));
+  let metaRows = [];
+  if (META_STEP_ACTIONS.length && Number.isFinite(minSn) && Number.isFinite(maxSn)) {
+    metaRows = await db('trajectory_step')
+      .where({ trajectory_id: tid })
+      .whereIn('action_type', META_STEP_ACTIONS)
+      .andWhere('step_number', '>=', minSn)
+      .andWhere('step_number', '<=', maxSn)
+      .orderBy(['step_number', 'action_index']);
+  }
+  const rows = [...selectedRows];
+  for (const r of metaRows) {
+    if (!selectedIdSet.has(Number(r.id))) rows.push(r);
+  }
+  rows.sort((a, b) => {
+    const sn = Number(a.step_number) - Number(b.step_number);
+    if (sn !== 0) return sn;
+    return Number(a.action_index || 0) - Number(b.action_index || 0);
+  });
 
   const { trajectoryStepToActionEntry } = await import('../../models/element.js');
   const actions = rows.map((r) => {

@@ -5,9 +5,15 @@ import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
 import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
 import * as caseDataDao from '../dao/case-data-dao.js';
+import { filterMetaSteps, isMetaStep } from '../models/meta-step-actions.js';
 
 function safeJson(str) {
   try { return JSON.parse(str); } catch { return {}; }
+}
+
+function annotateStep(step) {
+  if (!step || typeof step !== 'object') return step;
+  return { ...step, isMeta: isMetaStep(step) };
 }
 
 export function stepsToActionEntries(steps) {
@@ -45,11 +51,12 @@ export function stepsToActionEntries(steps) {
       persisted: true,
       source: s.source || 'agent',
       stepNumber: s.stepNumber,
+      isMeta: isMetaStep(s),
     };
   });
 }
 
-export async function getTrajectoryTree(trajectoryDbId) {
+export async function getTrajectoryTree(trajectoryDbId, { includeMeta = false } = {}) {
   const tid = Number(trajectoryDbId);
   if (!Number.isFinite(tid) || tid <= 0) return null;
 
@@ -57,7 +64,8 @@ export async function getTrajectoryTree(trajectoryDbId) {
   if (!traj) return null;
 
   const phases = await trajectoryPhaseDao.listByTrajectory(tid);
-  const allSteps = await trajectoryStepDao.listByTrajectory(tid);
+  const allStepsRaw = await trajectoryStepDao.listByTrajectory(tid);
+  const allSteps = filterMetaSteps(allStepsRaw, { includeMeta }).map(annotateStep);
 
   const assigned = new Set();
   const phasesWithSteps = phases.map((p) => {
@@ -139,8 +147,9 @@ export async function listPhasesByTrajectory(trajectoryDbId) {
   return trajectoryPhaseDao.listByTrajectory(+trajectoryDbId);
 }
 
-export async function listStepsByPhase(phaseDbId) {
-  return trajectoryStepDao.listByPhase(+phaseDbId);
+export async function listStepsByPhase(phaseDbId, { includeMeta = false } = {}) {
+  const steps = await trajectoryStepDao.listByPhase(+phaseDbId);
+  return filterMetaSteps(steps, { includeMeta }).map(annotateStep);
 }
 
 export async function listByFunction(functionId, pagination) {

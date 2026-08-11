@@ -128,8 +128,11 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/tree',
         summary: '阶段 + 步骤二级树',
-        desc: '含 caseEntries（交易级案例 KV）。',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        desc: '含 caseEntries（交易级案例 KV）。默认隐藏内部 meta 步骤（如 save_form_snapshot）；`includeMeta=1` 返回全部。步骤带 `isMeta`。',
+        params: [
+          { name: 'id', type: 'number', required: true, in: 'path', example: '42' },
+          { name: 'includeMeta', type: 'boolean', in: 'query', desc: 'true/1 时包含 save_form_snapshot 等内部步骤', example: 'false' },
+        ],
         respExample: J({
           trajectoryId: 42, name: '...', recordStatus: 'draft',
           caseEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
@@ -137,12 +140,17 @@ export const GROUP_TRAJECTORY = [
             id: 101, phaseNumber: 1, description: '登录系统', status: 'pending',
             steps: [{
               id: 501, stepNumber: 1, actionType: 'click_element_by_index',
-              source: 'agent', confirmed: true,
+              source: 'agent', confirmed: true, isMeta: false,
               params: {}, trajectoryPhaseId: 101,
             }],
           }],
           orphanSteps: [],
         }),
+        notes: [
+          '默认过滤 META_STEP_ACTIONS（save_form_snapshot / scan_* / task_* 等）',
+          'stepCount 亦只计业务步骤；meta 仍入库供 Type B 回放',
+          'steps/replay 会在选中业务步区间自动补入 meta 检查点',
+        ],
       },
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/phases',
@@ -184,7 +192,11 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectory-phases/{id}/steps',
         summary: '某阶段下步骤',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', desc: 'phaseId', example: '101' }],
+        desc: '默认隐藏内部 meta 步骤；`includeMeta=1` 返回全部。每步含 `isMeta`。',
+        params: [
+          { name: 'id', type: 'number', required: true, in: 'path', desc: 'phaseId', example: '101' },
+          { name: 'includeMeta', type: 'boolean', in: 'query', desc: 'true/1 时包含内部步骤', example: 'false' },
+        ],
       },
       {
         method: 'POST', path: '/api/v2/trajectory-steps',
@@ -267,7 +279,7 @@ export const GROUP_TRAJECTORY = [
         tryable: false,
         notes: [
           'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'filename=trajectory-batch-template.xlsx',
+          'filename*=UTF-8\'\'批量录制导入模板.xlsx（ASCII 回退 batch-import-template.xlsx）',
         ],
       },
       {

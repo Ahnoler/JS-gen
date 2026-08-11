@@ -2,6 +2,7 @@ import { broadcast } from '../../ws-server.js';
 import { appendRecordedStep } from '../../services/trajectory-service.js';
 import { removeRecordedStepsByDbIds } from '../../services/trajectory/trajectory-persist-service.js';
 import * as screenshotService from '../../services/screenshot-service.js';
+import { isMetaStepAction } from '../../models/meta-step-actions.js';
 
 const PENDING_SHOT_TTL_MS = 2 * 60 * 1000;
 
@@ -193,18 +194,24 @@ export async function persistLiveActionEntries(session, entries, { source } = {}
         trajectoryPhaseId: Number.isFinite(phaseIdOverride) ? phaseIdOverride : undefined,
       });
       if (persisted) {
-        const evt = entrySource === 'manual'
-          ? 'manual_action_persisted'
-          : entrySource === 'cdp'
-            ? 'cdp_action_persisted'
-            : 'action_persisted';
-        broadcast(evt, {
-          trajectoryDbId: trajId,
-          sessionId: session.sessionId,
-          ...persisted,
-          entry,
-        });
-        const result = { ...persisted, trajectoryId: trajId, entry };
+        const actionName = String(entry.action || entry.actionType || '').trim();
+        const isMeta = isMetaStepAction(actionName);
+        // Meta checkpoints stay in DB for Type B replay, but do not push live UI noise
+        if (!isMeta) {
+          const evt = entrySource === 'manual'
+            ? 'manual_action_persisted'
+            : entrySource === 'cdp'
+              ? 'cdp_action_persisted'
+              : 'action_persisted';
+          broadcast(evt, {
+            trajectoryDbId: trajId,
+            sessionId: session.sessionId,
+            ...persisted,
+            entry,
+            isMeta: false,
+          });
+        }
+        const result = { ...persisted, trajectoryId: trajId, entry, isMeta };
         if (aid) session._lastPersistByActionId.set(aid, result);
         if (aid && persisted.dbId != null) {
           await flushPendingStepScreenshot(session, aid, persisted.dbId, trajId);

@@ -224,7 +224,10 @@ export default function (app) {
   /** Phase-step tree: { phases:[{...phase, steps:[...]}, ...] } */
   app.get('/api/v2/trajectories/:id/tree', async (req, res) => {
     try {
-      const tree = await trajectoryService.getTrajectoryTree(+req.params.id);
+      const includeMeta = req.query?.includeMeta === '1'
+        || req.query?.includeMeta === 'true'
+        || req.query?.include_meta === '1';
+      const tree = await trajectoryService.getTrajectoryTree(+req.params.id, { includeMeta });
       if (!tree) return res.status(404).json({ error: 'Trajectory not found' });
       res.json(tree);
     } catch (err) {

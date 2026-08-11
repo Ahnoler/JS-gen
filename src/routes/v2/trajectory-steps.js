@@ -45,7 +45,10 @@ export default function (app) {
   /** Steps for a trajectory_phase (by numeric phase.id). */
   app.get('/api/v2/trajectory-phases/:id/steps', async (req, res) => {
     try {
-      const steps = await trajectoryService.listStepsByPhase(+req.params.id);
+      const includeMeta = req.query?.includeMeta === '1'
+        || req.query?.includeMeta === 'true'
+        || req.query?.include_meta === '1';
+      const steps = await trajectoryService.listStepsByPhase(+req.params.id, { includeMeta });
       res.json({ phaseId: +req.params.id, steps });
     } catch (err) {
       res.status(500).json({ error: err.message });
