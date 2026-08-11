@@ -7,23 +7,23 @@
 - fill_form_field(label_text, value, xpath_smart='') — **el-form-item 内的文本/密码输入框以及日期字段。用于所有文本和日期输入。** 扫描/`get_pending_tasks` 含 `xpath_smart` + `label`；**优先传 `xpath_smart`**。`label_text` 为语义名（规则/取值/录制），用扫描原文勿猜。若返回 `"field-disabled"` — 跳过。
 - click_radio(label_text, option_text, xpath_smart='') — el-radio 单选组；**优先传 `xpath_smart`**（同 fill/select）。
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
-- **click_save(button_text='保存', region='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `region=`（优先；`section=` 仍兼容 — 折叠/Tab/卡片/`region_label`，见 `run_form_assistant` 返回的 `sections`）；无 scope 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 scope → `err-section-required`（见 core「阶段区域 region」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。无 scope 时若页上多区块同名保存按钮，系统不会使用上一区块记忆自动点保存，会返回 err-save-ambiguous — 必须显式 `region=`。**
+- **click_save(button_text='保存', region='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `region=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections[]` / `region_label`）；无 scope 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 scope → `err-section-required`（见 core「阶段区域 region」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。无 scope 时若页上多区块同名保存按钮，系统不会使用上一区块记忆自动点保存，会返回 err-save-ambiguous — 必须显式 `region=`。**
 
 ## 任务列表动作
 - **`scan_form_fields()` / `run_form_assistant()`** 现与摘要一样走 **全页 L2（`mode:fullpage`）**；壳层/menu/icon **不会**进入 TaskList 待填，勿对侧栏顶栏做 fill。
 - **`scan_editable_summary()`** — 了解当前可见可编辑控件时调用（只读摘要，不填表、不建任务列表）。
 - 表格空行首字段可能显示为 `row#N` / `row#N|列名` 等机器锚点：按业务与页面结构理解语义，**操作仍优先传扫描给出的 `xpath_smart`**，不要靠改 label 改名后去定位。
-- 用返回的 **`pending_items[{label, xpath_smart, kind, region_label, section}]`** 与 **`buttons[{text, region_label, section, xpath_smart}]`** 决定下一步；`fill_*` / `select_*` / `click_*` **必须带上条目里的 `xpath_smart`**，勿再等另一次扫描取定位。
+- 用返回的 **`pending_items[{label, xpath_smart, kind, region_label, section}]`** 与 **`buttons[{text, region_label, section, xpath_smart}]`** 决定下一步（选 scope 时用 `region_label`；返回 JSON 中 `section` 为兼容字段，优先读 `region_label`）；`fill_*` / `select_*` / `click_*` **必须带上条目里的 `xpath_smart`**，勿再等另一次扫描取定位。
 - `pending_labels` / `readonly_labels` 仅为短名单；完整定位以 `pending_items` / `readonly_items` 为准。
 - **`readonly_items` / `readonly_labels`**：已禁用字段（常有值），作业务参考，**不要** fill/select。
 - **壳层导航**（侧栏/顶栏菜单）不要依赖本清单。
 - 需要建任务列表时仍用 **`scan_form_fields()`**；批量填仍用 **`run_form_assistant()`**（合约 `allow_form_assistant=true` 时）。
-- **`run_form_assistant(region='')` — 批量扫描并自动填写当前容器内可编辑字段。** 可选 `region=`（或兼容 `section=`）收窄到某一折叠/Tab/卡片区域（标题见返回的 `sections[]` / `region_label`）。仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok |` 后接 JSON：`status`（如 `auto-fill-complete`）、可选 `needs_agent[]`（`{label, reason}` — 助手跳过、须你亲自填）、`sections[]`（各区块含 `section_id`/`section_title`/`region_label`、`fields_total`、`fields_editable_pending`、`fields_sample`、`buttons`）、可选 `ambiguous_buttons[]`（跨区域同名按钮）。助手结果是草稿：先处理 `needs_agent` 并终检，再保存。`get_pending_tasks()` 仍可含 `NEXT_ACTION: click_save(..., region='…')`（有唯一保存块或你已传 scope 时）。
+- **`run_form_assistant(region='')` — 批量扫描并自动填写当前容器内可编辑字段。** 可选 `region=` 收窄到某一折叠/Tab/卡片区域（标题见返回的 `sections[]` / `region_label`）。仅在【阶段意图合约】`allow_form_assistant=true` 时调用（典型：表单填写、表单修改—全部字段）。导航/查询阶段禁止调用；单字段 `fill_*` / `select_*` 不会触发助手。返回 `ok |` 后接 JSON：`status`（如 `auto-fill-complete`）、可选 `needs_agent[]`（`{label, reason}` — 助手跳过、须你亲自填）、`sections[]`（各区块含 `section_id`/`section_title`/`region_label`、`fields_total`、`fields_editable_pending`、`fields_sample`、`buttons`）、可选 `ambiguous_buttons[]`（跨区域同名按钮）。助手结果是草稿：先处理 `needs_agent` 并终检，再保存。`get_pending_tasks()` 仍可含 `NEXT_ACTION: click_save(..., region='…')`（有唯一保存块或你已传 scope 时）。
 - **`scan_form_fields()` — 仅扫描并初始化任务列表 / 摘要，不自动填写。** 不要在列表页或不需要填表的页面调用。后续检查用 `scan_visible_fields`。
 - **`scan_visible_fields()` — 可见字段扫描，仅扫描当前可见的字段。用于所有后续检查（填写后、提交后）。输出量小得多。**
 - **init_task_list(scan_json) — 从已有的扫描 JSON 重建任务列表（一般不需要）。**
 - task_done(label) — 将字段标记为已完成。
-- get_pending_tasks(region='') — 返回 {"pending": [...], "pending_by_section": {...}}（不含已完成字段）。可选 `region=`（或 `section=`）只列该区域 pending。
+- get_pending_tasks(region='') — 返回 {"pending": [...], "pending_by_section": {...}}（不含已完成字段）。可选 `region=` 只列该区域 pending。
 - sync_tasks_from_errors() — 读取页面校验错误，自动重试受影响的字段。
 
 # 🚨 表单填写助手（CRITICAL — 草稿协作，不可默认信任）
@@ -79,7 +79,7 @@
 1. **批量填写：** 合约 `allow_form_assistant=true` 时调用 `run_form_assistant()` 扫描并批量填写/覆盖。
 2. **needs_agent + 业务数据：** 读助手返回的 `needs_agent`，亲自填写这些字段；再对【业务数据】或任务点名字段用显式 `fill_form_field` / `select_option` / `click_radio` 写入场景要求值（覆盖助手草稿）。
 3. **终检：** 对照阶段任务、业务数据与页面只读/关联字段做最终检查（必要时 `check_field_value`）。不要默认助手已填对。
-4. **pending / NEXT_ACTION：** `get_pending_tasks(region='…')`（阶段若点名区域则带 `region`；`section=` 仍兼容）。终检通过且 `NEXT_ACTION: click_save(...` 或 `pending:[]` → **按 NEXT_ACTION / 带 region 调用 `click_save`**。若返回 `not_form_fill` → 按查询处理。
+4. **pending / NEXT_ACTION：** `get_pending_tasks(region='…')`（阶段若点名区域则带 `region`）。终检通过且 `NEXT_ACTION: click_save(...` 或 `pending:[]` → **按 NEXT_ACTION / 带 region 调用 `click_save`**。若返回 `not_form_fill` → 按查询处理。
 5. **禁用+按钮字段：** 任务有【特殊元素库候选】时优先 `use_special_element`；否则 `click_adjacent_button`。无法自动处理时通过人工录制纠正。
 6. **提交后：** `ok-save-success` / `ok-save-navigation` / `ok-save-no-feedback` → `done(success=true)`。
 7. **错误处理：** `err-save-validation` / `sync_tasks_from_errors()` 只修报错字段，再 `click_save()`。
@@ -91,6 +91,8 @@
 
 **🚨 核心纪律（AI 录制）：** 对每个可编辑字段须有写动作记录（fill/select/radio）；允许填入与回显相同值。不要仅 `check_field_value` 后提交。引入/选人弹窗点「确认」即成功，不要求操作成功 toast。
 **⚠️ 切换 Tab 前必须点击"暂存"：el-tabs 切换会导致未保存数据丢失。**
+
+**弃用说明：** 工具参数 `section=` 为历史别名，请一律使用 `region=`；勿在新调用中传入 `section=`。
 
 **示例：**
 ```

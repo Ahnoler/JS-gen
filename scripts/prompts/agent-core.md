@@ -19,7 +19,7 @@
 2. **xpath 优先** — 扫描/pending 有 `xpath_smart` 时，`fill_form_field` / `select_option` / `click_radio` 必须传入；**禁止自造任何 `xpath_smart`**（只能从扫描/pending 逐字复制）。
 3. **助手草稿须终检** — `run_form_assistant` 后先处理 `needs_agent`、对照业务数据终检，再 `click_save`；不可助手返回后立刻保存。
 4. **阶段边界** — 打开页面/保存跳转达成预期即 `done`；禁止在本阶段继续填表或点下一阶段按钮。
-5. **region 收窄** — 阶段点名折叠/区域时，`run_form_assistant` / `get_pending_tasks` / `click_save` 须带 `region=`（`section=` 仍兼容）。
+5. **region 收窄** — 阶段点名折叠/区域时，`run_form_assistant` / `get_pending_tasks` / `click_save` 须带 `region=`（折叠/Tab/卡片标题，见 `sections[].region_label`）。勿再传 `section=`（已弃用别名）。
 6. **特殊元素优先** — 任务含【特殊元素库候选】且页面匹配时，优先 `use_special_element(id)`，勿手写逐步引入；勿编造未列出的 id。
 
 # 🚨 任务类型（CRITICAL — 先分类再行动）
@@ -38,10 +38,10 @@
 
 ### 🚨 阶段区域 region 收窄（CRITICAL）
 - **阶段任务 / 【阶段目录】若点名某一折叠/卡片区域**（如「系统评级结论」），由**你**从任务与 `sections[]` / `region_label` 判断对应标题 — **代码不会从任务文本解析区域名**。
-- **优先带 `region=`：** `run_form_assistant(region='…')`、`get_pending_tasks(region='…')`、`click_save('保存', region='…')` — 闸门与 pending 只针对该区域；其它折叠块（如征信信息）的未填字段**不会**挡住本阶段保存。`section=` 仍是同义别名。
-- **唯一「保存」兜底：** 若扫描到的「保存」按钮只属于**一个**区域，即使你漏传 `region=`，`click_save` 也会自动用该区域做闸门与点击（日志 `[click_save] auto section=…`）。**多个同名「保存」时仍必须显式传 `region=`（或 `section=`）**，不会自动猜。
+- **优先带 `region=`：** `run_form_assistant(region='…')`、`get_pending_tasks(region='…')`、`click_save('保存', region='…')` — 闸门与 pending 只针对该区域；其它折叠块（如征信信息）的未填字段**不会**挡住本阶段保存。
+- **唯一「保存」兜底：** 若扫描到的「保存」按钮只属于**一个**区域，即使你漏传 `region=`，`click_save` 也会自动用该区域做闸门与点击（日志 `[click_save] auto section=…`）。**多个同名「保存」时仍必须显式传 `region=`**，不会自动猜。
 - **`err-section-required`：** 未传 scope、pending 跨多块、且无法从唯一保存按钮推断 → 响应含 `pending_by_section`；选对应当前阶段的区域再带 `region=` 重试。**禁止**为清闸门去填征信等无关折叠块。勿把「无 ambiguous_buttons」当成可以裸 `click_save()`——pending 跨块同样需要 scope（或依赖上面的唯一保存兜底）。
-- **`err-pending-fields` 且已传 `region=`/`section=`：** 只列出**该区域内**仍未写的字段；只修这些字段后再次 `click_save(..., region='…')`。
+- **`err-pending-fields` 且已传 `region=`：** 只列出**该区域内**仍未写的字段；只修这些字段后再次 `click_save(..., region='…')`。
 - **`NEXT_ACTION`：** 可能是 `click_save(button_text='保存', region='系统评级结论')` — **照抄参数调用**，不要改成裸 `click_save()`。
 
 # 🚨 跨阶段数据流转（通用规则）
