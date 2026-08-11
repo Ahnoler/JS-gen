@@ -35,11 +35,12 @@ def is_weak_xpath_smart(xp: str) -> bool:
 
 
 def stamp_recorded_xpath_smart(element, fallback: str = "") -> str:
-    """Prefer capture-rebuilt relative xpath for params (replay is params-first).
+    """Pick durable xpath_smart for task_list inventory (_task_done_impl).
 
-    Capture rebuilds durable dialog/drawer + label xpath via formFieldXpathSmartOf;
-    inventory/resolved fallback is used only when capture missed or is weak.
-    Weak placeholder-only xpaths are rejected — prefer empty over invented hints.
+    Prefers capture-rebuilt element.xpath_smart (dialog/drawer + label via
+    formFieldXpathSmartOf); resolved/agent fallback only when capture missed or
+    is weak. Weak placeholder-only xpaths are rejected — prefer empty over hints.
+    Not used for params_json (recorded steps use element_json only).
     """
     cap = ""
     if isinstance(element, dict):
