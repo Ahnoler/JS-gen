@@ -353,19 +353,6 @@ def _element_xpath_full(entry: dict | None) -> str:
     return ''
 
 
-def _params_xpath_smart(entry, params) -> str:
-    """Read params.xpath_smart if present.
-
-    Not used by ``_resolve_replay_xpath`` (element-first; params xpath abandoned
-    for locate). Kept for diagnostics / ops tooling that still inspect params.
-    """
-    p = params if isinstance(params, dict) else {}
-    xp = str(p.get('xpath_smart') or '').strip()
-    if xp.startswith('//') or xp.startswith('('):
-        return xp
-    return ''
-
-
 def _resolve_replay_xpath(entry, params) -> tuple[str, str]:
     """Pick replay xpath: element.xpath_smart → xpath_full.
 

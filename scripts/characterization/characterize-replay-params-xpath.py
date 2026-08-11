@@ -85,6 +85,10 @@ def test_replay_fill_does_not_pass_label_as_placeholder_hint() -> None:
     assert "placeholder or label" not in fill_block
 
 
+def test_params_xpath_helper_removed() -> None:
+    assert not hasattr(R, "_params_xpath_smart"), "_params_xpath_smart must be deleted"
+
+
 def main() -> int:
     test_resolve_prefers_element_over_params()
     test_resolve_ignores_wrong_params_label_xpath()
@@ -92,6 +96,7 @@ def main() -> int:
     test_classify_false_ok()
     test_norm_replay_value_strips_spaces()
     test_replay_fill_does_not_pass_label_as_placeholder_hint()
+    test_params_xpath_helper_removed()
     print("characterize-replay-params-xpath: OK")
     return 0
 

@@ -120,7 +120,7 @@ def _expected_value(action: str, params: dict) -> str:
 def classify_dry(
     action: str,
     params: dict,
-    params_xp: str,
+    element_xp: str,
     chosen_hit: int,
     expected: str,
     actual: str,
@@ -140,18 +140,17 @@ def classify_dry(
     if action not in FILL_SELECT:
         return "report-only", action
 
-    if not params_xp:
-        note = "no params.xpath_smart"
+    if not element_xp:
+        note = "no element.xpath_smart"
         if chosen_hit == 0:
             return "xpath_miss", note
-        # params absent but element/full xpath visible — stats class
         if expected:
             exp = norm_fn(expected)
             act = norm_fn(actual)
             if exp != act:
                 return "value_mismatch", f"expected={expected},actual={actual}; {note}"
-            return "params_absent", f"read-back ok; {note}"
-        return "params_absent", note
+            return "element_absent", f"read-back ok; {note}"
+        return "element_absent", note
 
     if chosen_hit == 0:
         return "xpath_miss", "chosen xpath visible hits = 0"
@@ -248,9 +247,9 @@ async def pick_page(browser):
 
 async def audit_entries(page, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     from scripts.controller.actions._replay import (
+        _element_xpath_full,
         _element_xpath_smart,
         _norm_replay_value,
-        _params_xpath_smart,
         _read_value_by_xpath,
         _resolve_replay_xpath,
     )
@@ -262,22 +261,25 @@ async def audit_entries(page, entries: list[dict[str, Any]]) -> list[dict[str, A
         element = entry.get("element") if isinstance(entry.get("element"), dict) else {}
         wrapped = {"element": element, "params": params}
 
-        params_xp = _params_xpath_smart(wrapped, params)
+        # Diagnostic only — params xpath not used for locate/readback.
+        params_xp = str(params.get("xpath_smart") or "").strip()
         element_xp = _element_xpath_smart(wrapped)
+        element_full_xp = _element_xpath_full(wrapped)
         chosen_xp, chosen_src = _resolve_replay_xpath(wrapped, params)
 
         params_hit = await count_xpath_hits(page, params_xp)
         element_hit = await count_xpath_hits(page, element_xp)
+        element_full_hit = await count_xpath_hits(page, element_full_xp)
         chosen_hit = await count_xpath_hits(page, chosen_xp)
 
-        read_xp = params_xp or chosen_xp
+        read_xp = element_xp or chosen_xp
         actual = await _read_value_by_xpath(page, read_xp) if read_xp else ""
         expected = _expected_value(action, params)
 
         cls, note = classify_dry(
             action,
             params,
-            params_xp,
+            element_xp,
             chosen_hit,
             expected,
             actual,
@@ -292,6 +294,7 @@ async def audit_entries(page, entries: list[dict[str, Any]]) -> list[dict[str, A
             "element_xs": _short_xpath(element_xp),
             "params_hit": params_hit,
             "element_hit": element_hit,
+            "element_full_hit": element_full_hit,
             "chosen_source": chosen_src or "",
             "chosen_hit": chosen_hit,
             "expected": expected,
