@@ -1,16 +1,22 @@
 {
   "name": "opencode-agent-api",
   "version": "1.0.0",
-  "description": "Agent API service - exposes opencode agent capabilities via HTTP/JSON",
+  "description": "Browser automation control plane: v2 trajectory record/replay, MySQL, executor, Playwright assemble/run",
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "dev": "node --watch server.mjs"
+    "dev": "node --watch server.mjs",
+    "executor": "node executor/agent.mjs",
+    "executor:dev": "node --watch executor/agent.mjs"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "^1.14.40",
+    "exceljs": "^4.4.0",
     "express": "^4.21.0",
-    "playwright-core": "^1.60.0",
-    "undici": "^8.3.0"
+    "knex": "^3.3.0",
+    "multer": "^2.2.0",
+    "mysql2": "^3.22.6",
+    "playwright": "1.58.0",
+    "undici": "^8.3.0",
+    "ws": "^8.21.0"
   }
 }

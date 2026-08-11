@@ -1,11 +1,20 @@
 /**
- * Deduplicate action entries by (action + params).
+ * Deduplicate action entries by page-element identity.
  *
- * Only removes CONSECUTIVE duplicates — identical entries that appear
- * back-to-back with no different-type action between them.
+ * Only coalesces CONSECUTIVE duplicates — identical targets that appear
+ * back-to-back with no different element between them.
+ * Keeps the LATER entry (so a later fill value / select wins).
  * Does NOT remove non-consecutive duplicates (e.g. same fill before
  * and after a click), because they represent different semantic steps.
  */
+
+const FIELD_ACTIONS = new Set([
+  'fill_form_field',
+  'fill_date_field',
+  'select_option',
+  'select_tree_option',
+  'click_radio',
+]);
 
 function dedupKey(entry) {
   const action = entry?.action || '';
@@ -17,14 +26,44 @@ function dedupKey(entry) {
   return action + '|' + JSON.stringify(sorted);
 }
 
+/** Same-page-element key; falls back to full action+params key. */
+export function elementDedupKey(entry) {
+  const action = entry?.action || '';
+  const params = entry?.params || {};
+  const label = String(params.label_text || '').trim();
+  if (FIELD_ACTIONS.has(action) && label) return `field:${label}`;
+
+  const el = entry?.element && typeof entry.element === 'object' ? entry.element : {};
+  const xpath = String(el.xpath || el.xpath_smart || entry?.target || '').trim();
+  if (xpath) return `xpath:${xpath}`;
+
+  if (action === 'click_icon_button') {
+    const t = String(params.button_text || '').trim();
+    if (t) return `icon:${t}`;
+  }
+  if (action === 'click_menu_item') {
+    const t = String(params.menu_text || '').trim();
+    if (t) return `menu:${t}`;
+  }
+  if (action === 'switch_tab') {
+    const t = String(params.tab_name || '').trim();
+    if (t) return `tab:${t}`;
+  }
+  if (action === 'click_adjacent_button' && label) return `adjacent:${label}`;
+
+  return dedupKey(entry);
+}
+
 export function deduplicateByXPath(entries) {
   if (!entries || !Array.isArray(entries)) return [];
   const result = [];
   for (let i = 0; i < entries.length; i++) {
-    if (i > 0 && dedupKey(entries[i - 1]) === dedupKey(entries[i])) {
-      continue; // skip consecutive duplicate
+    const cur = entries[i];
+    if (result.length && elementDedupKey(result[result.length - 1]) === elementDedupKey(cur)) {
+      result[result.length - 1] = cur; // keep later
+      continue;
     }
-    result.push(entries[i]);
+    result.push(cur);
   }
   return result;
 }

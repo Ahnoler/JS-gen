@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { TRAJECTORIES_DIR } from './config.js';
+import { TRAJECTORIES_DIR } from '../config/config.js';
 import { extractFlowFromTrajectory } from './script-utils.js';
 
 function extractNextGoals(trajectory, limit = 50) {
@@ -36,7 +36,13 @@ export function saveTrajectoryIndex(list) {
 }
 
 export function createTrajectoryId() {
-  return 'traj_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex');
+  const now = new Date();
+  const pad = (n, d = 2) => String(n).padStart(d, '0');
+  const ts = [
+    now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate()),
+    '_', pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds()),
+  ].join('');
+  return 'traj_' + ts;
 }
 
 export function saveTrajectoryRecord({ trajectoryId, task, model, sourcePath, exploreMeta }) {
@@ -44,9 +50,14 @@ export function saveTrajectoryRecord({ trajectoryId, task, model, sourcePath, ex
   const fileName = `${trajectoryId}.json`;
   const destPath = path.join(TRAJECTORIES_DIR, fileName);
 
-  const trajectoryJson = readFileSync(sourcePath, 'utf-8');
-  const trajectory = JSON.parse(trajectoryJson);
-  writeFileSync(destPath, JSON.stringify(trajectory, null, 2), 'utf-8');
+  let trajectory;
+  if (path.resolve(sourcePath) === path.resolve(destPath)) {
+    // Already saved to trajectories/ by session_runner — no copy needed
+    trajectory = JSON.parse(readFileSync(destPath, 'utf-8'));
+  } else {
+    trajectory = JSON.parse(readFileSync(sourcePath, 'utf-8'));
+    writeFileSync(destPath, JSON.stringify(trajectory, null, 2), 'utf-8');
+  }
 
   const flow = extractFlowFromTrajectory(trajectory);
   const actionCount = flow.filter(s => s.type !== 'done' && !s.error).length;
@@ -67,7 +78,13 @@ export function saveTrajectoryRecord({ trajectoryId, task, model, sourcePath, ex
   };
 
   const list = loadTrajectoryIndex();
-  list.unshift(record);
+  const existingIdx = list.findIndex((r) => r.trajectoryId === trajectoryId);
+  if (existingIdx >= 0) {
+    // Same session → replace index entry (do not stack duplicates)
+    list[existingIdx] = { ...list[existingIdx], ...record, createdAt: list[existingIdx].createdAt };
+  } else {
+    list.unshift(record);
+  }
   saveTrajectoryIndex(list);
 
   return { record, trajectory, flow };

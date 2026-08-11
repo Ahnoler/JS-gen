@@ -1,0 +1,12 @@
+# Python agent runtime dependencies (minimal — 5 packages vs web-ui's 10)
+# These are the direct imports used by scripts/agent_utils.py, scripts/session_runner.py,
+# scripts/controller.py, scripts/models/*.py, scripts/actions/*.py, and scripts/cdp/*.py
+#
+# playwright version must match package.json (Node) so Session + replay share the same
+# Chromium revision under PLAYWRIGHT_BROWSERS_PATH / default ms-playwright cache.
+# browser-use==0.1.48 requires playwright>=1.52.0; pin to the resolved runtime version.
+browser-use==0.1.48
+langchain-openai
+langchain-core
+playwright==1.58.0
+pyperclip>=1.9.0

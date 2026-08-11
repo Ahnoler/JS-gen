@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>产品 API 文档 · JS-gen</title>
+  <link rel="stylesheet" href="/src/dashboard/api-docs/api-docs.css" />
+</head>
+<body>
+  <aside class="docs-sidebar">
+    <div class="docs-brand">
+      <h1>JS-gen API</h1>
+      <p>产品接口文档（/api/v2 + WebSocket）<br />面向前端对接</p>
+    </div>
+    <div class="docs-nav-label">分组</div>
+    <nav id="docsNav"></nav>
+    <div class="docs-side-links">
+      <a href="/api/health">健康检查</a>
+    </div>
+  </aside>
+
+  <main class="docs-main">
+    <div class="docs-topbar">
+      <h2>接口参考</h2>
+      <span class="docs-badge">Base URL <code id="baseUrlDisplay">—</code></span>
+      <input id="docsSearch" class="docs-search" type="search" placeholder="搜索 path / 摘要 / 方法…" />
+    </div>
+    <div id="docsContent"></div>
+  </main>
+
+  <script type="module" src="/src/dashboard/api-docs/app.js"></script>
+</body>
+</html>

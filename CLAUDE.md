@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Start the server (standalone LLM mode — skips OpenCode SDK)
+# Start the control-plane server (standalone LLM — no OpenCode SDK)
 npm start
 
 # Start via PowerShell launcher (sets env vars)
@@ -14,93 +14,160 @@ npm start
 # Dev mode with file watching
 npm run dev
 
+# Executor agent (connects out to control plane WS /ws/executor)
+npm run executor
+
 # Install dependencies (first time)
 npm install
 
 # Run Python script assembler directly
 python scripts/script_assembler.py <action_file.json> [output.js]
+
+# Lightweight characterization / import smokes (not a full test suite)
+node scripts/characterization/characterize-dedup.mjs
+node scripts/smoke/accept-replay-apis.mjs
+python scripts/characterization/characterize-assembler-click.py
+python scripts/characterization/characterize-form-rules.py
+node scripts/characterization/characterize-ctrl.mjs
+# ↑ CTRL parity: parses CTRL_OBJECT methods vs _js_snippets / actions/*.py cues
+node scripts/characterization/characterize-trajectory.mjs
 ```
 
-No test suite exists. Manual verification is done via the dashboard at `http://localhost:4097/api/test` after starting the server.
+Manual verification: product API docs at `http://localhost:4097/api/docs` after starting the server (`src/dashboard/api-docs/catalog.js` — sole frontend contract). Product APIs are under `/api/v2/*`. Human-oriented overview: `README.md` (keep in sync with this file’s architecture section). Legacy engineering HTML (`/api/test`, record-console/studio) redirects to `/api/docs`.
 
 ## Architecture
 
-This is a **browser automation service** for Element UI / Vue web applications. It provides AI-driven browser control, Playwright script generation, test data management, and a web dashboard — all served from a Node.js Express server (port 4097) that spawns a Python `browser_use` agent subprocess.
+This is a **browser automation service** for Element UI / Vue web applications. It provides AI-driven browser control, Playwright script generation, MySQL-backed trajectory recording/replay, and an optional remote **executor** process — served from a Node.js Express control plane (port 4097). Product UI lives in a separate Vue repo; this repo exposes APIs and `/api/docs`.
 
 ### Two-Language Architecture
 
-Code that drives Element UI interaction exists in **two synchronized copies** that must be kept in sync:
+Element UI CTRL helpers: **`src/ctrl-actions.js` is canonical** for `window.CTRL` (replay/assemble). Agent-side copies are dual (not byte-identical):
 
 | Language | File | Used by |
 |----------|------|---------|
-| Python | `scripts/controller.py` (~87KB) | Browser Use agent at runtime |
-| JavaScript | `src/ctrl-actions.js` | Injected into generated Playwright scripts |
+| JavaScript (canonical) | `src/ctrl-actions.js` | Injected into generated Playwright scripts (`getInjectionCode`) |
+| Python JS strings | `scripts/actions/_js_snippets.py` | `page.evaluate` injection from Python agent |
+| Python | `scripts/controller.py` + `scripts/actions/*` | Browser Use agent at runtime |
 
-Both implement the same CTRL helpers (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem`, `clickTableRowAction`, `closeDialog`, etc.). When modifying one, update the other.
+Same CTRL surface (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem`, `clickTableRowButton`, `closeDialog`, etc.). Edit canonical first; keep Python cues in sync — `node scripts/characterization/characterize-ctrl.mjs` fails on missing methods.
 
-### Server → Python Agent Pipeline
+### Control plane pipelines
 
 ```
 Node.js Express (server.mjs)
-  ├─ POST /api/browser-use/explore  → spawns python scripts/browser-use-agent.py --task/--workflow
-  ├─ POST /api/browser/session/:id/step → spawns python ...  --session
-  └─ POST /api/test/assemble        → execSync python scripts/script_assembler.py
+  ├─ Product recording (preferred)
+  │     /api/v2/trajectories/*  record/prepare|start|stop, stream/detach, manual-record, attach|detach
+  │     → executor session (USE_EXECUTOR) or local browser session
+  ├─ Product replay (supported)
+  │     /api/v2/trajectories/:id/steps/replay → live replay_actions → _replay.py
+  ├─ Assembled full replay (DEPRECATED engineering asset)
+  │     /api/v2/trajectories/:id/replay/*  → assemble (server-side) → script-runner
+  ├─ Session debug (engineering; secondary)
+  │     POST /api/browser/session (+ /step, …)
+  │     → python scripts/browser-use-agent.py --session  and/or executor
+  └─ Assemble / run (engineering)
+        POST /api/test/assemble  → assemble-service → script_assembler.py
+        POST /api/test/run       → src/runtime/script-runner.js → playwright-runner/run.cjs
 ```
 
-The Python agent process communicates via JSON Lines on stdout (each line is `{"event": "step"|"done"|"nav_step", "data": {...}}`). Routes parse this line-by-line and forward as SSE to the client.
+One-shot Explore/Workflow and the legacy engineering HTML dashboard / record-console / record-studio pages are removed (product SPA is external). Product AI recording uses v2 `record/start` (optional `phaseIds`).
 
-### Route Modules (`src/routes/`)
+Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps also persist live to MySQL when `autoPersist` / trajectory binding is on.
 
-- **`agent.js`** — Generic AI agent execution (sync/async/SSE), session management. Dispatches to OpenCode SDK or standalone LLM.
-- **`browser-use-explore.js`** — Workflow mode: parses multi-phase task text, spawns Python agent, streams progress via SSE, saves trajectories and case data on completion.
-- **`browser-session.js`** — Session mode: maintains a long-lived browser via `state.globalBrowser`, supports multi-turn interaction with human intervention.
-- **`test-gen.js`** — LLM-based Playwright script generation. Calls `buildScriptPrompt()` from `script-utils.js`, sends to LLM, parses response.
-- **`test-assemble.js`** — Assembler pipeline: reads action JSON → `dedup.js` (consecutive-only dedup) → Python `script_assembler.py` → returns Playwright JS script.
-- **`test-run.js`** + **`sse.js`** — Execute generated Playwright scripts, streaming output.
-- **`llm-proxy.js`** — OpenAI-compatible `/v1/chat/completions` and `/v1/models` endpoints.
-- **`explore-utils.js`** — Shared spawn/kill/SSE utilities for browser routes (not a route module, but imported by routes).
+### Route modules (`src/routes/`)
 
-### Stores (JSON File Persistence)
+- **`v2/`** — Primary product APIs: system-mgmt, trajectories (+ recording), replay, executors, case-data, screenshots, remote-session, accounts.
+- **`browser-session.js`** — Long-lived session debug path; trajectory/case save prefers MySQL.
+- **`test-assemble.js`** — Thin HTTP over `assemble-service` (dedup → assembler).
+- **`test-run.js`** — Thin HTTP/WS over `script-runner` (`execution:*` events).
+- **`llm-proxy.js`** — OpenAI-compatible `/v1/chat/completions` and `/v1/models`.
+- **`setup.js`** — `/api/setup*`, `/` redirect, `/api/docs`, legacy 301 redirects (extracted from `server.mjs`).
+- **`legacy-gone.js`** — `/api/trajectory` and `/api/case-data` → **410 Gone**.
+- **`agent.js`** — Generic LLM agent HTTP (standalone LLM).
 
-All use the same pattern: `index.json` for metadata + individual JSON files for content, all under `scripts/`:
+### Runtime / services (recent extractions)
 
-| Store | Module | Directory |
-|-------|--------|-----------|
-| Trajectories | `src/trajectory-store.js` | `scripts/trajectories/` |
-| Case data | `src/case-data-store.js` | `scripts/case_data/` |
-| Generated scripts | `src/script-utils.js` | `scripts/generated/` |
+| Module | Role |
+|--------|------|
+| `src/runtime/script-runner.js` | Shared Playwright execute (test-run + replay) |
+| `src/services/assemble-service.js` | action JSON → Playwright script |
+| `src/services/replay-service.js` | **DEPRECATED** assembled Playwright replay (engineering asset) |
+| Live replay | `scripts/actions/_replay.py` via `/steps/replay` — **product-supported** |
 
-### Dashboard (`src/dashboard/`, `test-dashboard.html`)
+| `src/executor-slot-lease.js` | Executor slot exclusive leases until `detach` |
+| `src/executor-*.js` | Executor WS registry, session client, event hub |
 
-Single-page web dashboard with 11 ESM modules. Key panels: script generation pipeline, execution history, trajectory viewer, case data manager, browser session controller. Served statically from project root.
+### Persistence
 
-### Python Agent Internals (`scripts/`)
+**Primary:** MySQL via Knex (`/api/v2/*`).
 
-- **`main.py`** — CLI entry point. Three modes: `--task` (single run), `--workflow` (multi-phase from JSON), `--session` (stdin-driven interactive).
-- **`controller.py`** — Registers ~20 custom `browser_use` controller actions for Element UI components. Records every action call via `_record_action()` into `_ACTION_LOG` (used later by the action recorder and assembler).
-- **`session_runner.py`** — Reads JSON instructions from stdin, runs agent steps, emits JSON events on stdout. Supports human intervention via a pending buffer.
-- **`workflow_runner.py`** — Executes phased tasks, saves per-phase trajectories.
-- **`script_assembler.py`** — Reads recorded action entries (`{action, params, element}`) and generates a complete Playwright JS script with injected CTRL helpers. No LLM involved — pure mapping from action+params to CTRL calls.
-- **`agent_utils.py`** — LLM creation (langchain `ChatOpenAI`), message context trimming (keeps last 12 messages, patches `browser_use`'s `MessageManager`), system prompt loading from `agent-prompt.md`.
-- **`recorder.py`** — Builds recording hooks that write `action_{ts}.json` and `log_{ts}.txt` files per session/phase.
-- **`form_rules.py`** — Python port of `atp-rule` skill: `match_rule(label_text)` → valid random value for form fields.
+**Legacy offline:** `/api/trajectory`、`/api/case-data` → **410**. JSON catalog stores are best-effort / optional.
 
-### OpenCode Skills (`.opencode/skills/`)
+| Store | Module | Directory | Status |
+|-------|--------|-----------|--------|
+| Generated scripts | `script-utils.js` | `scripts/generated/` | active (gitignored) |
+| Action dump | assemble-file / replay prepare | `scripts/action/` | ephemeral |
+| Trajectories / case JSON | `*-store.js` | `scripts/trajectories/` etc. | optional bypass |
 
-7 custom skills that inject domain knowledge into AI prompts:
-- **`atp-ui`** — The canonical Element UI interaction knowledge base (~900 lines). Covers el-form, el-table, el-dialog, el-tree, el-menu, el-select, el-date-picker, el-cascader, el-tabs, el-upload. Agent and script generation both pull rules from here.
-- **`atp-rule`** — Smart form value generators (ID card with checksum, phone, credit code, etc.) via the `matchSpecialRule(label)` pattern.
-- **`atp-step-gen`** — Test case generation from requirement documents.
-- **`atp-fix`** — Failed script error classification and auto-repair rules.
-- **`playwright-skill`** — Rewritten Playwright automation skill with custom Element UI actions.
-- **`cdp-agent`** — CDP-based browser automation for legacy bank cabinet systems.
-- **`clarification-protocol`** — Structured requirement clarification templates.
+Frontend delivery contract: `/api/docs` only (do not maintain separate product API markdown). Refactor status: `docs/REFACTOR_INSIGHT.md` (local/gitignore).
 
-### Key Design Decisions
+### Product frontend & docs
 
-- **`STANDALONE_LLM=true`** is the default mode — bypasses OpenCode SDK, calls LLM API directly via `src/llm-utils.js`. The SDK mode is fallback.
-- **Consecutive-only dedup** (`src/dedup.js`): only removes back-to-back identical `(action, params)` pairs. Non-consecutive duplicates (e.g., same fill before and after a click) are preserved — they represent distinct semantic steps.
-- **Native setter pattern**: Element UI forms require `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, val)` followed by bubbling `input`/`change`/`blur` events. Never use `page.fill()`.
-- **`el-select` requires custom handling**: dropdown items are `<li>` elements that need specific click targeting. The `selectOption` action handles this; using generic click-by-index on `<span>` children silently fails.
-- **DOM references must be re-queried** before each operation — Vue can asynchronously destroy and recreate components (especially in el-dialog).
-- **`agent-prompt.md`** contains the system prompt for the Python agent, split into main prompt and planner prompt by `---` and `# PLANNER SYSTEM PROMPT` markers.
+Product SPA is external (Vue). In-repo UI is only **`/api/docs`** (`api-docs.html` + `src/dashboard/api-docs/`). Former `test-dashboard.html` / `record-console.html` / `record-studio.html` are deleted; `GET /api/test`, `/api/test/record-console`, `/api/test/record-studio` **301 → `/api/docs`**. Engineering APIs `/api/test/assemble` and `/api/test/run` remain. Root `/` redirects to `/api/docs` when configured.
+
+Executor BiB uses per-slot CDP ports (`9242+slotIndex`) to avoid `CDP WebSocket not found`.
+
+Executor ops notes: `docs/执行机解耦与操作总结.md` (gitignored docs/).
+
+### Python agent (`scripts/`)
+
+- **`main.py`** — Session CLI (`--session`, stdin-driven).
+- **`controller.py` / `actions/`** — Custom Element UI actions; `_record_action()` → `_ACTION_LOG`.
+- **`session_runner.py`** — Stdin JSON → agent steps → stdout events; intervention buffer.
+- **`script_assembler.py`** — Action entries → Playwright JS + CTRL injection; emits `__REPLAY_STEP__` markers for replay WS.
+- **`agent_utils.py`** — LLM + context trim; loads prompts from `scripts/prompts/`.
+- **`recorder.py`** — Session/phase action + log files.
+- **`actions/form_rules.py`** — `match_rule(label_text)` → valid random values (ID card, phone, credit code, …). Used by the **agent** auto-fill path, not a user-facing plugin yet.
+- **`browser-use-agent.py`** — Thin wrapper around `main()`.
+
+### Prompts (not OpenCode skills)
+
+**There is no active `.opencode/skills/` tree in this repo** (`.opencode/` is gitignored). Former “skill” knowledge was folded into **markdown prompts** and **code**:
+
+| Prompt / code | Role |
+|---------------|------|
+| `scripts/prompts/agent-core.md` | Core role, JSON, CRITICAL checklist, phase boundary, case-data |
+| `scripts/prompts/agent-tools-common.md` | Generic browser/Element UI actions |
+| `scripts/prompts/agent-tools-form.md` | Form fill/select/assistant/needs_agent/final-check/section |
+| `scripts/prompts/agent-tools-table.md` | Table row buttons, icon buttons |
+| `scripts/prompts/agent-tools-tree.md` | Tree selector details |
+| `scripts/prompts/agent-prompt.md` | Shim: full assembly (backward compat) |
+| `scripts/prompts/planner-prompt.md` | Planner prompt (preferred over inline section) |
+| `scripts/prompts/agent-field-rules.md` | Field-filling guidance for the agent |
+| `scripts/prompts/form-prompt.md` | Form-oriented prompt fragments |
+| `scripts/prompts/heal-prompt.md` | Self-heal / repair prompts |
+| `scripts/actions/form_rules.py` | Executable value generators (former atp-rule behavior) |
+| `src/ctrl-actions.js` + Python CTRL | Executable Element UI ops (former atp-ui “how to click” as code) |
+
+Do **not** look for or restore OpenCode skill packages unless the user explicitly asks. Update prompts under `scripts/prompts/` and keep CTRL / `form_rules` in sync instead.
+
+### Key design decisions
+
+- **LLM standalone mode** — Default; LLM via `src/llm-utils.js`. OpenCode SDK is not the product path.
+- **Consecutive-only dedup** (`src/dedup.js`) — Only back-to-back identical `(action, params)`; non-consecutive duplicates kept.
+- **Native setter pattern** for Element UI inputs — never rely on Playwright `page.fill()` alone for el-form.
+- **`el-select`** — Use `selectOption`; generic click-by-index on option spans fails silently.
+- **Re-query DOM** before each op — Vue may recreate dialogs/components.
+- **Recording vs detach** — `record/stop` ends recording status but **does not** free the executor slot; `POST .../stream/detach` stops BiB only (`remote_session`→`idle`, `live`→`draft`); `POST .../detach` closes Chrome + Python + slot.
+- **Multi-traj BiB** — Push identity is `remote_session.id`; bindings are 1:1 trajectory ↔ remote_session ↔ agent session. Detach/stream-detach are scoped per trajectory (no global singleton).
+- **Replay (product)** — Attached/live `replay_actions` via `_replay.py` (`POST .../steps/replay`). Prefers recorded `xpath_smart` (semantic anchors + visible dialog/drawer scope + volatile tree-text strip + icon class/tooltip), then label/semantic (incl. placeholder), then `xpath_full`.
+- **Replay (deprecated)** — `/api/v2/trajectories/:id/replay/*` assembles Playwright + CTRL; kept runnable as an engineering asset, not product-supported. Assemble/test-run remain engineering APIs.
+- **Executor slots** — `EXECUTOR_CAPACITY` slots per node; control-plane lease until detach / node offline.
+
+## 同步约定（Python 控制面对齐）
+
+本项目（JS-gen）与 `d:\dev\ui-auto-recording-agent-python`（Python FastAPI 控制面）并行开发。Python 端对齐 JS-gen 的 schema / 接口 / WS 协议。
+
+**强制规则**：每次修改 JS-gen，必须同步更新 `CHANGELOG.md` 的 `[Unreleased]` 区段，按 Keep a Changelog 分类追加条目。条目需说明影响范围和 Python 同步提示。详见 `AGENTS.md` 的"同步约定"章节与 `CHANGELOG.md` 顶部的"条目格式约定"。
+
+**Git post-commit hook**：仓库提供 `scripts/hooks/post-commit`，commit 后若改了 `migrations/` / `schemas/init.sql` / `src/routes/` / `src/services/` / `server.mjs` / `config/`，自动跑 Python 同步检查脚本。首次需安装：`cp scripts/hooks/post-commit .git/hooks/post-commit && chmod +x .git/hooks/post-commit`。详见 `AGENTS.md`。

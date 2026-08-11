@@ -1,0 +1,3 @@
+- **click_table_row_button(row_text, button_text)** — 点击 el-table 行中的操作按钮。`row_text` 匹配行内容，`button_text` 匹配按钮文本或图标类名。支持 `"edit"/"编辑"` 和 `"delete"/"删除"` 快捷方式。无匹配时自动点击第一个可见按钮作为兜底。
+- **click_table_row_radio(row_text)** — 选中 el-table 行中的单选按钮（`label.el-radio`）。`row_text` 匹配行内容。
+- **click_icon_button(button_text)** — 点击**仅有图标、文案在 el-tooltip / ElTooltip content 中**的按钮（`el-icon-*`）。`button_text` 为 tooltip 文案（如「新增一级分类」「新增产品」）。任务若点名这类工具栏图标，**直接调用本动作**，不要用 `click_element_by_index` 点空 `<a>`。可用 `get_page_state().iconButtons` 核对清单；表格行内操作仍用 `click_table_row_button`。不要为找图标去调 `scan_form_fields`。

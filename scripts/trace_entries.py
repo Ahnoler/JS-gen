@@ -9,7 +9,7 @@ entries = d['tests'][0]['commands']
 print(f'Total entries: {len(entries)}')
 for i in range(2, 7):
     e = entries[i]
-    label = e.get('propertiesName', '')
+    label = (e.get('params', {}) or {}).get('label_text', '')
     is_generic = (label.lower() in GENERIC_TAGS or bool(re.match(r'^[a-z]+(?:\[\d+\])?$', label)))
     attrs = e.get('attributes', {}) or {}
     cls = (attrs.get('class') or '') if isinstance(attrs, dict) else ''

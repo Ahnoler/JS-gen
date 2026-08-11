@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Fill System — 首次配置</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    color: #e0e0e0;
+  }
+  .card {
+    background: #1e1e2f; border: 1px solid #2a2a4a;
+    border-radius: 12px; padding: 40px; width: 480px; max-width: 95vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 8px; color: #fff; }
+  .subtitle { font-size: 0.9rem; color: #888; margin-bottom: 28px; }
+  .form-group { margin-bottom: 20px; }
+  label { display: block; font-size: 0.85rem; margin-bottom: 6px; color: #aaa; font-weight: 500; }
+  input, select {
+    width: 100%; padding: 10px 14px;
+    background: #12121f; border: 1px solid #333; border-radius: 6px;
+    color: #e0e0e0; font-size: 0.95rem; outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus { border-color: #4fc3f7; }
+  input::placeholder { color: #555; }
+  .hint { font-size: 0.8rem; color: #666; margin-top: 4px; }
+  .btn {
+    width: 100%; padding: 12px; margin-top: 12px;
+    background: linear-gradient(135deg, #0f3460, #1a5a9a);
+    border: 1px solid #2a5a8a; border-radius: 6px;
+    color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn:hover { background: linear-gradient(135deg, #1a5a9a, #2672b5); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .toast {
+    padding: 10px 16px; border-radius: 6px; margin-bottom: 16px;
+    font-size: 0.9rem; display: none;
+  }
+  .toast.error { display: block; background: #3a1a1a; border: 1px solid #6a2a2a; color: #f88; }
+  .toast.success { display: block; background: #1a3a1a; border: 1px solid #2a6a2a; color: #8f8; }
+  .divider { border-top: 1px solid #2a2a4a; margin: 24px 0; }
+  .section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: #555; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⚡ 首次运行配置</h1>
+  <p class="subtitle">请填写 LLM API 连接信息以启动系统</p>
+
+  <div id="toast" class="toast"></div>
+
+  <form id="setupForm">
+    <div class="section-title">必需配置</div>
+
+    <div class="form-group">
+      <label for="apiKey">API Key *</label>
+      <input type="password" id="apiKey" placeholder="sk-..." required autofocus>
+      <div class="hint">DeepSeek、OpenAI 或其他兼容的 API Key</div>
+    </div>
+
+    <div class="form-group">
+      <label for="baseUrl">API 地址</label>
+      <input type="url" id="baseUrl" value="https://api.deepseek.com" placeholder="https://api.deepseek.com">
+      <div class="hint">OpenAI 兼容的 API 端点地址</div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-title">可选配置</div>
+
+    <div class="form-group">
+      <label for="model">表单填写模型</label>
+      <select id="model">
+        <option value="deepseek-v4-flash" selected>deepseek-v4-flash（推荐 — 快速便宜）</option>
+        <option value="deepseek-v3">deepseek-v3</option>
+        <option value="deepseek-r1">deepseek-r1</option>
+        <option value="gpt-4o">gpt-4o</option>
+        <option value="gpt-4o-mini">gpt-4o-mini</option>
+        <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+        <option value="qwen-plus">qwen-plus</option>
+      </select>
+      <div class="hint">表单字段智能填写的默认模型</div>
+    </div>
+
+    <button type="submit" class="btn" id="submitBtn">保存配置并启动</button>
+  </form>
+</div>
+
+<script>
+const form = document.getElementById('setupForm');
+const toast = document.getElementById('toast');
+const submitBtn = document.getElementById('submitBtn');
+
+function showToast(msg, type) {
+  toast.textContent = msg;
+  toast.className = 'toast ' + type;
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) {
+    showToast('请填写 API Key', 'error');
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = '正在保存...';
+
+  try {
+    const res = await fetch('/api/setup/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        LLM_API_KEY: apiKey,
+        LLM_BASE_URL: document.getElementById('baseUrl').value.trim(),
+        FORM_LLM_MODEL: document.getElementById('model').value,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('配置已保存，即将跳转...', 'success');
+      setTimeout(() => { location.href = '/api/docs'; }, 1500);
+    } else {
+      showToast(data.error || '保存失败', 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = '保存配置并启动';
+    }
+  } catch (err) {
+    showToast('请求失败: ' + err.message, 'error');
+    submitBtn.disabled = false;
+    submitBtn.textContent = '保存配置并启动';
+  }
+});
+</script>
+</body>
+</html>

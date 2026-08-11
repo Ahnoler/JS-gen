@@ -1,0 +1,160 @@
+/**
+ * API group(s): remote-session, screenshot, api-override — extracted from catalog.js.
+ * Keep in sync with src/routes/v2/*.js
+ */
+import { J } from './_j.js';
+
+/** @type {TagGroup[]} */
+export const GROUP_REMOTE = [
+  {
+    id: 'remote-session',
+    name: '远程会话 / BiB',
+    description: 'CDP 附着与推流状态（录制工作室左侧画布）。多交易并存时以 trajectoryId / remoteSessionId 隔离，勿依赖全局 singleton。',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/v2/remote-sessions/live/status',
+        summary: '当前 live 状态',
+        desc: '推荐带 trajectoryId 查询本交易推流；省略时返回任一已附着绑定（工程调试）。',
+        params: [
+          { name: 'trajectoryId', type: 'number', in: 'query', example: '42' },
+          { name: 'remoteSessionId', type: 'number', in: 'query', example: '7' },
+          { name: 'sessionId', type: 'string', in: 'query', example: 'uuid' },
+        ],
+        respExample: J({
+          attached: true, remoteSessionId: 7, remoteSessionUuid: 'uuid',
+          sessionId: 'uuid', trajectoryId: 42,
+          cdpReady: true, inputEnabled: true, agentBusy: false,
+          viewportW: 1600, viewportH: 900, manualRecording: false,
+        }),
+      },
+      {
+        method: 'POST', path: '/api/v2/remote-sessions/attach-live',
+        summary: '附着 CDP + 推流',
+        reqExample: J({ sessionId: 'uuid', trajectoryId: 42, quality: 0.65, viewportW: 1600, viewportH: 900 }),
+        respExample: J({ remoteSession: { id: 7 }, status: { attached: true, remoteSessionId: 7, trajectoryId: 42 } }),
+        notes: ['503：CDP/页面未就绪', '须传 sessionId；按 trajectoryId 写入 live 映射'],
+      },
+      {
+        method: 'GET', path: '/api/v2/remote-sessions',
+        summary: '分页列表',
+        params: [
+          { name: 'page', type: 'number', in: 'query', example: '1' },
+          { name: 'pageSize', type: 'number', in: 'query', example: '20' },
+        ],
+      },
+      {
+        method: 'POST', path: '/api/v2/remote-sessions',
+        summary: '新建会话记录',
+        reqExample: J({ sessionId: 'uuid', viewportW: 1600, viewportH: 900 }),
+      },
+      {
+        method: 'GET', path: '/api/v2/remote-sessions/{id}',
+        summary: '详情（id 或 uuid）',
+        params: [{ name: 'id', type: 'string', required: true, in: 'path', example: '7' }],
+      },
+      {
+        method: 'PATCH', path: '/api/v2/remote-sessions/{id}',
+        summary: '更新视口等',
+        params: [{ name: 'id', type: 'string', required: true, in: 'path', example: '7' }],
+        reqExample: J({ viewportW: 1600, viewportH: 900 }),
+      },
+      {
+        method: 'POST', path: '/api/v2/remote-sessions/{id}/detach',
+        summary: '断开画面推流（不停浏览器）',
+        desc: 'remote_session → idle；可选 body.trajectoryId 做归属校验。Chrome 与 Agent 会话仍存活。产品路径优先用 POST /trajectories/{id}/stream/detach。与 trajectories/:id/detach（释放执行资源、关浏览器）不同。',
+        params: [{ name: 'id', type: 'string', required: true, in: 'path', example: '7' }],
+        reqExample: J({ trajectoryId: 42 }),
+      },
+      {
+        method: 'POST', path: '/api/v2/remote-sessions/{id}/close',
+        summary: '关闭会话',
+        params: [{ name: 'id', type: 'string', required: true, in: 'path', example: '7' }],
+      },
+      {
+        method: 'DELETE', path: '/api/v2/remote-sessions/{id}',
+        summary: '删除记录',
+        params: [{ name: 'id', type: 'string', required: true, in: 'path', example: '7' }],
+      },
+    ],
+  },
+  {
+    id: 'screenshot',
+    name: '截图管理',
+    description: '按 trajectory_step 绑定的 before/after 截图；回放中亦可经 WS replay:screenshot 获取临时 URL',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/v2/trajectories/{trajectoryId}/screenshots',
+        summary: '交易关联截图列表',
+        params: [{ name: 'trajectoryId', type: 'number', required: true, in: 'path', example: '42' }],
+        respExample: J([{
+          id: 1, fileSize: 12345,
+          mimeType: 'image/png', trajectoryStepId: 501, stepNumber: 1, kind: 'before',
+        }]),
+      },
+      {
+        method: 'GET', path: '/api/v2/screenshots/{id}/image',
+        summary: '原始 PNG 二进制',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+        tryable: false,
+        respExample: '(binary image/png)',
+      },
+    ],
+  },
+  {
+    id: 'api-override',
+    name: 'API 覆盖',
+    description: 'CDP Fetch 层 mock HTTP 响应',
+    endpoints: [
+      {
+        method: 'GET', path: '/api/v2/api-overrides',
+        summary: '分页列表',
+        params: [
+          { name: 'page', type: 'number', in: 'query', example: '1' },
+          { name: 'pageSize', type: 'number', in: 'query', example: '20' },
+        ],
+      },
+      {
+        method: 'GET', path: '/api/v2/api-overrides/applicable',
+        summary: '按作用域解析生效规则',
+        params: [
+          { name: 'scope', type: 'string', in: 'query', desc: 'global|system|process|function' },
+          { name: 'scopeRefId', type: 'number', in: 'query' },
+        ],
+      },
+      {
+        method: 'GET', path: '/api/v2/api-overrides/{id}',
+        summary: '详情',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+      {
+        method: 'POST', path: '/api/v2/api-overrides',
+        summary: '创建覆盖规则',
+        reqExample: J({
+          name: 'mock登录',
+          urlPattern: '/api/login',
+          matchType: 'prefix',
+          httpMethod: 'POST',
+          enabled: true,
+          respStatus: 200,
+          respHeaders: { 'Content-Type': 'application/json' },
+          respBody: '{"code":0}',
+          scope: 'global',
+          scopeRefId: null,
+          sortOrder: 0,
+        }),
+        notes: ['matchType: exact | prefix | regex', 'scope: global | system | process | function'],
+      },
+      {
+        method: 'PUT', path: '/api/v2/api-overrides/{id}',
+        summary: '更新',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+        reqExample: J({ enabled: false }),
+      },
+      {
+        method: 'DELETE', path: '/api/v2/api-overrides/{id}',
+        summary: '删除',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+      },
+    ],
+  },
+];

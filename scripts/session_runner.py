@@ -5,247 +5,59 @@ Reads JSON instructions from stdin, runs agent steps with SSE output.
 import sys
 import asyncio
 import json
-import uuid
 import tempfile
-import re
-from datetime import datetime
 from pathlib import Path
 
-from browser_use import Agent, Browser
 from browser_use.browser.context import BrowserContextConfig
 
 from .agent_utils import (
-    emit_json, extract_first_url, do_navigate,
-    OVERRIDE_SYSTEM_MESSAGE, PLANNER_SYSTEM_PROMPT,
-    patch_message_manager, create_llm,
-    make_step_callback, make_done_callback,
+    emit_json,
+    patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, create_llm,
 )
 from .controller import build_controller
 from .recorder import build_recording_hooks
-from .form_rules import load_rules
 
-_TRACE_DIR = str(Path(__file__).parent / "trace")
+from .agent.service import (
+    _close_agent,  # noqa: F401  (re-exported for compat)
+    _request_agent_stop,  # noqa: F401
+    _run_agent_step,  # noqa: F401
+)
+from .browser.factory import (  # noqa: F401  (re-exported for compat)
+    _build_browser,
+    _bypass_ssl_interstitial_if_any,
+    _chrome_automation_args,
+    _chrome_headless_enabled,
+    _dismiss_native_js_dialogs,
+    _fit_browser_window,
+    _ignore_certificate_errors,
+    _resolve_chromium_executable,
+    _seed_chrome_profile,
+    _session_window_size,
+)
+from .cdp_ports import (  # noqa: F401  (re-exported for compat)
+    _pick_free_cdp_port,
+    _port_is_connectable,
+    _probe_cdp_ws_url,
+    _wait_cdp_http,
+    wait_cdp_http,
+)
+from .event_dispatch import _convert_action_params, _dispatch_event  # noqa: F401
+from .trajectory_store import (  # noqa: F401  (re-exported for compat)
+    _accumulate_trajectory,
+    _handle_reset_trajectory,
+    _handle_save_case_data,
+    _handle_save_trajectory,
+)
 
-
-_last_agent = None
-
-
-def _close_agent():
-    global _last_agent
-    if _last_agent is not None:
-        try:
-            for t in getattr(_last_agent, '_tasks', []):
-                t.cancel()
-        except Exception:
-            pass
-        _last_agent = None
-
-
-def _handle_save_trajectory(cumulative_path, session_id, browser_context=None):
-    """Save two files: action_{ts}.json (recorded actions) + log_{ts}.txt (operation log)."""
-    from .controller import _ACTION_LOG, _TRAJECTORY_URL
-    from .recorder import _ACTION_LOG as _recorder_log
-    from .controller import _ACTION_LOG as _controller_log
-    # Try to extract URL from go_to_url action or _TRAJECTORY_URL
-    url = _TRAJECTORY_URL or ''
-    if not url:
-        for entry in (list(_controller_log) if _controller_log else []):
-            if entry.get('action') == 'go_to_url':
-                url = entry.get('params', {}).get('url', '') or ''
-                if url:
-                    break
-    if not url:
-        url = 'http://unknown'
-    entries = list(_ACTION_LOG) if _ACTION_LOG else []
-    if not entries and not _recorder_log:
-        emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": "No trajectory data available"}})
-        return
-    try:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        snapshots_dir = Path(__file__).parent / 'snapshots'
-        snapshots_dir.mkdir(parents=True, exist_ok=True)
-        action_path = None
-        log_path = None
-
-        # File 1: action_{ts}.json — recorded action calls (script generation source)
-        if entries:
-            action_path = snapshots_dir / f"action_{ts}.json"
-            action_json = {
-                'id': str(uuid.uuid4()),
-                'name': 'browser-use-session',
-                'url': url,
-                'tests': [{
-                    'id': str(uuid.uuid4()),
-                    'name': 'browser-use-session',
-                    'commands': entries,
-                }],
-            }
-            with open(action_path, 'w', encoding='utf-8') as f:
-                json.dump(action_json, f, ensure_ascii=False, indent=2)
-
-        # File 2: log_{ts}.txt — plain text operation log (LLM context only)
-        if _recorder_log:
-            log_path = snapshots_dir / f"log_{ts}.txt"
-            with open(log_path, 'w', encoding='utf-8') as f:
-                f.write(f"URL: {url}\n")
-                f.write(f"Total steps: {len(_recorder_log)}\n")
-                f.write("=" * 60 + "\n")
-                for line in _recorder_log:
-                    f.write(line + "\n")
-
-        # Clear both
-        action_count = len(entries)
-        log_count = len(_recorder_log)
-        _ACTION_LOG.clear()
-        _recorder_log.clear()
-
-        emit_json({
-            "event": "save_trajectory_result",
-            "data": {
-                "success": True,
-                "action_file": str(action_path) if action_path else None,
-                "trajectory_file": str(action_path) if action_path else None,
-                "log_file": str(log_path) if log_path else None,
-                "action_count": action_count,
-                "log_count": log_count,
-                "url": url,
-            },
-        })
-        sys.stderr.write(f"[session] Saved: action({action_count}) log({log_count})\n")
-        sys.stderr.flush()
-    except Exception as e:
-        emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
-        emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
+# Actions recorded by the custom controller (subset of all browser_use actions)
+_CUSTOM_ACTIONS = {
+    'fill_form_field', 'select_option', 'click_element_by_index',
+    'click_menu_item', 'click_table_row_button', 'click_table_row_radio', 'click_radio',
+    'fill_date_field', 'click_adjacent_button', 'switch_tab', 'close_dialog',
+}
 
 
-def _handle_save_case_data(case_data_store, session_id):
-    try:
-        data_dir = Path(__file__).parent / 'data'
-        data_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        case_data_path = data_dir / f"case_data_{ts}.json"
-        import json as _json
-        with open(case_data_path, 'w', encoding='utf-8') as f:
-            _json.dump(case_data_store, f, ensure_ascii=False, indent=2)
-        sys.stderr.write(f"[session] Case data saved on demand: {case_data_path}\n")
-        sys.stderr.flush()
-        emit_json({
-            "event": "save_case_data_result",
-            "data": {"success": True, "case_data_file": str(case_data_path), "keys": len(case_data_store)},
-        })
-    except Exception as e:
-        emit_json({"event": "save_case_data_result", "data": {"success": False, "message": str(e)}})
-
-
-def _handle_reset_trajectory(session_id):
-    from .controller import _ACTION_LOG
-    from .recorder import _ACTION_LOG as _recorder_log
-    _ACTION_LOG.clear()
-    _recorder_log.clear()
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"
-    sys.stderr.write(f"[session] ATP trajectory reset ({ts})\n")
-    sys.stderr.flush()
-    emit_json({"event": "reset_trajectory_ready", "data": {"session_id": session_id, "format": "atp-record", "cumulative_file": str(cumulative_path)}})
-    return cumulative_path
-
-
-def _accumulate_trajectory(output_path, cumulative_path):
-    if not output_path.exists():
-        return
-    try:
-        with open(output_path, 'r', encoding='utf-8') as _f:
-            _step = json.load(_f)
-        _step_history = _step.get('history', [])
-        if not _step_history:
-            return
-        if cumulative_path.exists():
-            with open(cumulative_path, 'r', encoding='utf-8') as _f:
-                _cum = json.load(_f)
-        else:
-            _cum = {'history': []}
-        _cum['history'].extend(_step_history)
-        cumulative_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(cumulative_path, 'w', encoding='utf-8') as _f:
-            json.dump(_cum, _f, ensure_ascii=False, indent=2)
-        sys.stderr.write(f"[session] Accumulated {len(_step_history)} actions to case trajectory ({len(_cum['history'])} total)\n")
-        sys.stderr.flush()
-    except Exception as _e:
-        sys.stderr.write(f"[session] Accumulate error: {_e}\n")
-        sys.stderr.flush()
-
-
-async def _run_agent_step(instruction, step_index, session_id, args, llm, browser_context,
-                          controller, goal_tracker, cancel_flag_path,
-                          on_step_start_hook, on_step_end_hook, case_data_ref, cumulative_path):
-    global _last_agent
-    max_steps = instruction.get("max_steps", 40)
-    task_text = instruction.get("instruction", "")
-    if not task_text:
-        emit_json({"event": "error", "data": {"message": "instruction is required"}})
-        return None, None
-
-    # Close previous agent before creating new one
-    _close_agent()
-
-    if cancel_flag_path.exists():
-        try:
-            cancel_flag_path.unlink(missing_ok=True)
-        except Exception:
-            pass
-
-    emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
-    sys.stderr.write(f"[session] Step {step_index}: {task_text[:80]} (max_steps={max_steps})\n")
-    sys.stderr.flush()
-
-    nav_url = extract_first_url(task_text)
-    if nav_url:
-        try:
-            page = await browser_context.get_current_page()
-            sys.stderr.write(f"[session] Navigating to {nav_url}\n"); sys.stderr.flush()
-            await do_navigate(page, nav_url)
-            sys.stderr.write(f"[session] Navigation done\n"); sys.stderr.flush()
-        except Exception as e:
-            sys.stderr.write(f"[session navigate] Error: {e}\n"); sys.stderr.flush()
-
-    agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', task_text, count=1).strip() or task_text
-
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_step{step_index}_{ts}.json"
-    goal_tracker['goals'] = []
-    goal_tracker['stopped'] = False
-
-    sys.stderr.write(f"[session] Creating Agent...\n"); sys.stderr.flush()
-    agent = Agent(
-        task=agent_task, llm=llm, controller=controller, browser_context=browser_context,
-        override_system_message=OVERRIDE_SYSTEM_MESSAGE,
-        use_vision=False, enable_memory=False,
-        max_failures=5, retry_delay=10,
-        planner_llm=llm, planner_interval=3,
-        extend_planner_system_message=PLANNER_SYSTEM_PROMPT,
-        register_new_step_callback=make_step_callback(step_index * 100),
-        register_done_callback=make_done_callback(output_path),
-    )
-    _last_agent = agent
-    sys.stderr.write(f"[session] Agent created, starting run...\n"); sys.stderr.flush()
-
-    try:
-        sys.stderr.write(f"[session] Calling agent.run() with max_steps={max_steps}\n"); sys.stderr.flush()
-        await agent.run(max_steps=max_steps, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
-        sys.stderr.write(f"[session] Agent run completed\n"); sys.stderr.flush()
-        if not hasattr(agent, '_done_fired') and hasattr(agent, 'history'):
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            agent.history.save_to_file(str(output_path))
-    except asyncio.CancelledError:
-        sys.stderr.write("[session] Agent run cancelled\n"); sys.stderr.flush()
-        emit_json({"event": "phase_error", "data": {"phase": step_index, "name": task_text[:60], "message": "Agent run cancelled"}})
-    except Exception as e:
-        emit_json({"event": "phase_error", "data": {"phase": step_index, "name": task_text[:60], "message": str(e)}})
-
-    return output_path, task_text
-
-
-async def _stdin_reader(loop, stdin_queue, agent_running_ref):
+async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=None, goal_tracker=None):
     while True:
         try:
             line = await loop.run_in_executor(None, sys.stdin.readline)
@@ -268,84 +80,207 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref):
             continue
         event = msg.get("event")
         if event == "close":
-            await stdin_queue.put(None)
+            # Pass close msg through so main loop can read keep_browser
+            await stdin_queue.put(msg)
             break
-        if agent_running_ref['value'] and event in ("reset_trajectory", "cancel_step"):
+        # Stop immediately even while agent.run() is blocking the main loop.
+        if event == "cancel_step":
+            _request_agent_stop(cancel_flag_path, goal_tracker, reason='cancel_step')
             continue
         await stdin_queue.put(msg)
 
 
-def _dispatch_event(msg, session_state, intervention_queue=None, agent_running_ref=None):
-    event = msg.get("event")
+async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
+    """In-process quick-action executor — uses the same browser_context as the Agent.
 
-    if event == "save_trajectory":
-        _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'])
-        return 'continue'
+    Shares _ACTION_LOG and case_data_store with the main Agent, so all actions
+    executed through this watcher are recorded for script assembly.
+    No separate CDP connection needed — actions run on the same Playwright context.
+    """
+    from .controller.service import build_controller
 
-    if event == "save_case_data":
-        _handle_save_case_data(session_state['case_data_store'], session_state['session_id'])
-        return 'continue'
+    # TODO: 如果将来改用 raw Playwright context（如从 CDP 连接），
+    #       必须手动注入 get_current_page()，否则 controller action 会报错。
+    #       参考 scripts/cdp/watcher.py:69-70:
+    #         ctx = browser.contexts[0]
+    #         ctx.get_current_page = _get_page
+    # Self-heal scene reproduce uses replay_actions → _replay.replay_action_entries
+    # (see browser-session.js /rerun), not this CDP watcher loop.
+    ctrl = build_controller(browser_context, case_data_store=case_data_store)
+    actions = ctrl.registry.registry.actions
 
-    if event == "reset_trajectory":
-        cum_path = _handle_reset_trajectory(session_state['session_id'])
-        session_state['cumulative_path'] = cum_path
-        session_state['case_data_store'].clear()
-        return 'continue'
+    while True:
+        msg = await action_queue.get()
+        action_name = msg.get("action", "")
+        params = msg.get("params", [])
+        req_id = msg.get("id", "")
 
-    if event == "intervene":
-        instruction = msg.get("data", {}).get("instruction", "")
-        if instruction:
-            if agent_running_ref and not agent_running_ref.get('value'):
-                sys.stderr.write(f"[session] Intervention immediate: {instruction[:80]}\n")
-                sys.stderr.flush()
-                return ('intervene', instruction)
-            if intervention_queue is not None:
-                intervention_queue.put_nowait(instruction)
-                sys.stderr.write(f"[session] Intervention queued for running agent: {instruction[:80]}\n")
-                sys.stderr.flush()
-        return 'continue'
-
-    if event != "step":
-        if event:
-            sys.stderr.write(f"[session] Unknown event: {event}\n")
+        act = actions.get(action_name)
+        if not act:
+            sys.stderr.write(f"[cdp-watcher] Unknown action: {action_name}\n")
             sys.stderr.flush()
-        return 'continue'
+            continue
 
-    return 'step'
+        try:
+            # Per-action watcher mode — skip _ensure_scanned, no auto-fill
+            # Tag recorded actions as source=cdp for DB persistence
+            from .state import set_current_source
+            case_data_store['_watcher_mode'] = True
+            set_current_source('cdp')
+            try:
+                if isinstance(params, list):
+                    result = await act.function(*params)
+                elif isinstance(params, dict):
+                    result = await act.function(**params)
+                else:
+                    result = await act.function()
+                result_str = str(result)
+            finally:
+                case_data_store['_watcher_mode'] = False
+                set_current_source('agent')
+            sys.stderr.write(f"[cdp-watcher] {action_name}{params} -> {result_str}\n")
+            sys.stderr.flush()
+            from .state import _ACTION_LOG
+            last_entry = _ACTION_LOG[-1] if _ACTION_LOG else None
+            # Always tag CDP result entry so control-plane never treats it as agent
+            if isinstance(last_entry, dict):
+                last_entry = {**last_entry, "source": "cdp"}
+            if req_id:
+                emit_json({
+                    "event": "cdp_action_result",
+                    "id": req_id,
+                    "result": result_str,
+                    "error": None,
+                    "entry": last_entry,
+                })
+        except Exception as e:
+            err_str = str(e)
+            sys.stderr.write(f"[cdp-watcher] Error: {action_name}{params} -> {err_str}\n")
+            sys.stderr.flush()
+            try:
+                from .state import set_current_source
+                set_current_source('agent')
+                case_data_store['_watcher_mode'] = False
+            except Exception:
+                pass
+            if req_id:
+                emit_json({"event": "cdp_action_result", "id": req_id, "result": None, "error": err_str, "entry": None})
 
 
 async def run_session(args):
     patch_message_manager()
+    patch_planner_prompt()
+    patch_icon_tooltip_labels()
     llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
-    form_rules = load_rules()
 
-    browser = Browser()
+    session_id = args.session_id or "unknown"
 
+    # P0：初始化外部记忆 writer（异步批量上报，失败不阻塞 Agent）
+    from scripts.memory.writer import (
+        configure as configure_memory_writer,
+        start as start_memory_writer,
+        flush as flush_memory_writer,
+        shutdown as shutdown_memory_writer,
+    )
+    configure_memory_writer(session_id=session_id, model=getattr(args, 'model', None))
+    start_memory_writer()
+
+    cdp_url = getattr(args, 'cdp_url', None) or None
+    cdp_port = getattr(args, 'cdp_port', None)
+    if cdp_port is not None:
+        try:
+            cdp_port = int(cdp_port)
+        except (TypeError, ValueError):
+            cdp_port = None
+
+    browser, cdp_port, _ = await _build_browser(
+        cdp_url=cdp_url,
+        cdp_port=cdp_port,
+        session_id=session_id,
+    )
+
+    # window_width/height (not viewport_*) — browser_use ignores unknown fields.
+    # Keep normal window at BiB default size (do not maximize to screen).
+    win_w, win_h = _session_window_size()
     config = BrowserContextConfig(
-        viewport_width=1920, viewport_height=1080,
+        window_width=win_w,
+        window_height=win_h,
+        no_viewport=True,
         wait_for_network_idle_page_load_time=3.0,
-        trace_path=_TRACE_DIR,
+        # trace_path disabled: Playwright traces under scripts/trace/ are no longer needed.
     )
     browser_context = await browser.new_context(config)
 
-    session_id = args.session_id or "unknown"
+    # Eagerly launch Chrome BEFORE CDP readiness check / BiB attach.
+    # Previously launch was lazy (first agent step), so prepare often saw cdp_ready=false.
+    await browser_context.get_session()
+    await _ignore_certificate_errors(browser_context)
+    await _fit_browser_window(browser_context, win_w, win_h)
+    await _dismiss_native_js_dialogs(browser_context)
+    await _bypass_ssl_interstitial_if_any(browser_context)
+
     case_data_store = {}  # process-level in-memory store, persists across steps
+    special_element_candidates_store = {}  # replaced each phase; AI may only use these ids
     cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
     goal_tracker = {'goals': [], 'stopped': False}
-    intervention_queue = asyncio.Queue()  # human intervention messages
 
-    on_step_start_hook, on_step_end_hook = build_recording_hooks(goal_tracker, cancel_flag_path, intervention_queue)
-    controller = build_controller(browser_context, form_rules, case_data_store, llm=llm)
+    on_step_start_hook, on_step_end_hook = build_recording_hooks(
+        goal_tracker, cancel_flag_path, case_data_store,
+    )
+    controller = build_controller(
+        browser_context,
+        case_data_store=case_data_store,
+        llm=llm,
+        special_element_candidates_store=special_element_candidates_store,
+    )
 
-    emit_json({"event": "ready", "session_id": session_id})
-    sys.stderr.write(f"[session] Ready, session_id={session_id}\n")
+    # Start CDP watcher — runs in-process, shares _ACTION_LOG and case_data_store
+    cdp_action_queue = asyncio.Queue()
+    cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, case_data_store))
+
+    # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
+    cdp_ready = False
+    cdp_ws_url = None
+    if cdp_url:
+        cdp_ready = True
+        cdp_ws_url = cdp_url
+    elif cdp_port:
+        cdp_ready = await _wait_cdp_http(int(cdp_port), timeout_s=45)
+        if cdp_ready:
+            cdp_ws_url = await _probe_cdp_ws_url(int(cdp_port))
+        else:
+            sys.stderr.write(
+                f"[session] WARN: CDP HTTP still not ready on port {cdp_port} after launch. "
+                "BiB canvas unavailable; AI/manual recording can still run.\n"
+            )
+            sys.stderr.flush()
+
+    ready_payload = {
+        "event": "ready",
+        "session_id": session_id,
+        "cdp_ready": bool(cdp_ready),
+    }
+    if cdp_port and not cdp_url:
+        ready_payload["cdp_port"] = int(cdp_port)
+        ready_payload["cdp_http"] = f"http://127.0.0.1:{int(cdp_port)}"
+    if cdp_ws_url:
+        ready_payload["cdp_ws_url"] = cdp_ws_url
+    emit_json(ready_payload)
+    sys.stderr.write(
+        f"[session] Ready, session_id={session_id}"
+        + (f", cdp_port={cdp_port}" if cdp_port and not cdp_url else "")
+        + f", cdp_ready={bool(cdp_ready)}"
+        + "\n"
+    )
     sys.stderr.flush()
 
     loop = asyncio.get_event_loop()
     stdin_queue = asyncio.Queue()
     agent_running_ref = {'value': False}
 
-    reader_task = asyncio.create_task(_stdin_reader(loop, stdin_queue, agent_running_ref))
+    reader_task = asyncio.create_task(
+        _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path, goal_tracker)
+    )
 
     step_index = 0
     cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_cumulative.json"
@@ -354,46 +289,81 @@ async def run_session(args):
         'session_id': session_id,
         'cumulative_path': cumulative_path,
         'case_data_store': case_data_store,
+        'special_element_candidates_store': special_element_candidates_store,
+        'browser_context': browser_context,
     }
 
     case_data_loaded = False
+    keep_browser = False  # 「释放资源」默认关浏览器；keep_browser=True 才留 CDP
 
     async def _run_step(data, step_idx):
         """Execute one agent step with the given data."""
         nonlocal cumulative_path
+        from .state import set_current_phase
+        # Prefer client-provided phase_number (matches 【阶段N】); fallback to step_idx
+        phase_num = data.get("phase_number")
+        if phase_num is None:
+            phase_num = data.get("phaseNumber")
+        try:
+            phase_num = int(phase_num) if phase_num is not None else int(step_idx)
+        except (TypeError, ValueError):
+            phase_num = step_idx
+        set_current_phase(phase_num)
         agent_running_ref['value'] = True
         try:
             output_path, task_text = await _run_agent_step(
                 data, step_idx, session_id, args, llm, browser_context,
                 controller, goal_tracker, cancel_flag_path,
                 on_step_start_hook, on_step_end_hook, case_data_store, cumulative_path,
+                special_element_candidates_store=special_element_candidates_store,
             )
         finally:
             agent_running_ref['value'] = False
         if output_path is None:
             return
-        _accumulate_trajectory(output_path, cumulative_path)
+        # Native AgentHistory accumulate disabled (scripts/trajectories/*.json no longer saved).
+        # Temp per-step history files may still exist under %TEMP%; not copied to repo.
+        phase_done_data: dict = {
+            "phase": phase_num,
+            "total": -1,
+            "name": task_text[:60],
+            "trajectory_file": str(output_path),
+            "cumulative_file": str(cumulative_path),
+            "step_index": step_idx,
+        }
+        try:
+            from .controller.actions._phase_context import _outcome_for
+            outcome = _outcome_for(case_data_store, phase_num)
+            if outcome:
+                if 'success' in outcome:
+                    phase_done_data['success'] = outcome['success']
+                if outcome.get('text'):
+                    phase_done_data['text'] = outcome['text']
+            else:
+                # No accepted done() → unknown (not success). Control plane must not
+                # coerce missing success to true.
+                phase_done_data['success'] = None
+        except Exception:
+            pass
         emit_json({
             "event": "phase_done",
-            "data": {"phase": step_idx, "total": -1, "name": task_text[:60], "trajectory_file": str(output_path), "cumulative_file": str(cumulative_path), "step_index": step_idx},
+            "data": phase_done_data,
         })
-        sys.stderr.write(f"[session] Step {step_idx} done\n")
+        sys.stderr.write(f"[session] Step {step_idx} done (phase={phase_num})\n")
         sys.stderr.flush()
 
     while True:
         msg = await stdin_queue.get()
         if msg is None:
             break
+        if isinstance(msg, dict) and msg.get("event") == "close":
+            data = msg.get("data") or {}
+            keep_browser = data.get("keep_browser", data.get("keepBrowser", False)) is True
+            break
 
         try:
-            action = _dispatch_event(msg, session_state, intervention_queue, agent_running_ref)
+            action = await _dispatch_event(msg, session_state, agent_running_ref, cdp_action_queue)
             cumulative_path = session_state['cumulative_path']
-
-            # Handle immediate intervention when agent is idle
-            if isinstance(action, tuple) and action[0] == 'intervene':
-                step_index += 1
-                await _run_step({"instruction": action[1], "max_steps": 20}, step_index)
-                continue
 
             if action != 'step':
                 continue
@@ -401,16 +371,32 @@ async def run_session(args):
             step_index += 1
             data = msg.get("data", {})
 
-            # Import case data from file on first step
+            # 业务数据 from the user requirement (soft NL), not 案例数据 from the system.
+            # Prefer case_data_block → _case_scenario_text for the agent; flat case_data
+            # is optional. See prepareCaseDataInjection terminology note.
+            case_data_inline = data.get("case_data")
             case_data_file = data.get("case_data_file")
-            if case_data_file and not case_data_loaded:
+            case_data_block = data.get("case_data_block") or data.get("caseDataBlock")
+            if isinstance(case_data_block, str) and case_data_block.strip():
+                case_data_store['_case_scenario_text'] = case_data_block.strip()
+                sys.stderr.write(
+                    f"[session] Case scenario text ready ({len(case_data_block.strip())} chars)\n"
+                )
+                sys.stderr.flush()
+            if not case_data_loaded and (case_data_inline or case_data_file):
                 try:
-                    with open(case_data_file, 'r', encoding='utf-8') as f:
-                        imported = json.load(f)
-                    case_data_store.update(imported)
-                    case_data_loaded = True
-                    sys.stderr.write(f"[session] Imported case data ({len(imported)} keys) from {case_data_file}\n")
-                    sys.stderr.flush()
+                    imported = {}
+                    if isinstance(case_data_inline, dict):
+                        imported = case_data_inline
+                    elif case_data_file:
+                        with open(case_data_file, 'r', encoding='utf-8') as f:
+                            imported = json.load(f)
+                    if isinstance(imported, dict) and imported:
+                        case_data_store.update(imported)
+                        case_data_loaded = True
+                        src = "inline" if isinstance(case_data_inline, dict) else case_data_file
+                        sys.stderr.write(f"[session] Imported case data ({len(imported)} keys) from {src}\n")
+                        sys.stderr.flush()
                 except Exception as e:
                     sys.stderr.write(f"[session] Failed to import case data: {e}\n")
                     sys.stderr.flush()
@@ -418,20 +404,45 @@ async def run_session(args):
             await _run_step(data, step_index)
 
         except asyncio.CancelledError:
-            sys.stderr.write("[session] Main loop cancelled, exiting\n"); sys.stderr.flush()
+            sys.stderr.write("[session] Main loop cancelled, exiting\n");
+            sys.stderr.flush()
             break
         except SystemExit:
-            sys.stderr.write("[session] SystemExit received, exiting\n"); sys.stderr.flush()
+            sys.stderr.write("[session] SystemExit received, exiting\n");
+            sys.stderr.flush()
             break
         except BaseException as e:
             agent_running_ref['value'] = False
-            sys.stderr.write(f"[session] Unexpected error in main loop: {type(e).__name__}: {e}\n"); sys.stderr.flush()
+            sys.stderr.write(f"[session] Unexpected error in main loop: {type(e).__name__}: {e}\n");
+            sys.stderr.flush()
             emit_json({"event": "error", "data": {"message": f"Unexpected error: {type(e).__name__}: {e}"}})
 
     reader_task.cancel()
     try:
-        await browser_context.close()
-    except:
+        cdp_task.cancel()
+    except Exception:
         pass
-    sys.stderr.write("[session] Browser closed, exiting\n")
-    sys.stderr.flush()
+    try:
+        await browser_context.close()
+    except Exception:
+        pass
+    if keep_browser:
+        # Soft close — leave Chromium on CDP (not the normal「释放资源」path).
+        sys.stderr.write(
+            f"[session] Leaving Chrome idle"
+            + (f" on CDP port={cdp_port}" if cdp_port and not cdp_url else "")
+            + (f" via {cdp_url}" if cdp_url else "")
+            + "\n"
+        )
+        sys.stderr.flush()
+    else:
+        try:
+            await browser.close()
+        except Exception as e:
+            sys.stderr.write(f"[session] WARN: browser.close failed: {e}\n")
+            sys.stderr.flush()
+        sys.stderr.write("[session] Browser closed, exiting\n")
+        sys.stderr.flush()
+
+    # P0：退出前冲刷记忆队列（不等待太久，避免拖慢关闭）
+    flush_memory_writer(timeout=2.0)

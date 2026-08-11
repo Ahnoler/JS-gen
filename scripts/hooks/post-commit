@@ -1,0 +1,55 @@
+#!/bin/sh
+# JS-gen post-commit hook：检测 schema/接口/WS 变更时自动跑 Python 控制面同步检查
+#
+# 安装（首次或换机器后）：
+#   cp scripts/hooks/post-commit .git/hooks/post-commit
+#   chmod +x .git/hooks/post-commit
+#
+# 触发条件：本次 commit 修改了以下任一路径
+#   - migrations/                    （schema 变更）
+#   - schemas/init.sql               （建库真相源变更）
+#   - src/routes/                    （端点变更）
+#   - src/services/                  （业务逻辑变更）
+#   - server.mjs                     （WebSocket 协议变更）
+#   - config/                        （配置项变更）
+#
+# 行为：自动跑 d:/dev/ui-auto-recording-agent-python/scripts/check_jsgen_sync.py
+#       打印报告；不阻塞 commit。跟进完同步工作后跑 --mark-synced 重置基线。
+
+# 获取本次 commit 修改的文件（首次 commit 时 HEAD~1 不存在，跳过）
+files=$(git diff --no-color --name-only HEAD~1 HEAD 2>/dev/null)
+if [ -z "$files" ]; then
+    exit 0
+fi
+
+# 检测是否含需要同步的路径
+need_sync=0
+echo "$files" | grep -E '^(migrations/|schemas/init\.sql$|src/routes/|src/services/|server\.mjs$|config/)' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+    need_sync=1
+fi
+
+if [ $need_sync -eq 0 ]; then
+    exit 0
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  检测到 schema/接口/WS 变更，自动跑 Python 控制面同步检查"
+echo "  （post-commit hook，不阻塞 commit）"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# 跑 Python 同步检查脚本
+PY_SCRIPT="d:/dev/ui-auto-recording-agent-python/scripts/check_jsgen_sync.py"
+if [ -f "$PY_SCRIPT" ]; then
+    python "$PY_SCRIPT" 2>&1 | head -80
+    echo ""
+    echo "提示："
+    echo "  1. 按报告 [0] 增量对比 + [5] Python 同步提示跟进 Python 端变更"
+    echo "  2. 跟进完后跑 'python scripts/check_jsgen_sync.py --mark-synced' 重置基线"
+    echo "  3. 已知表清单差异（batch_recording_*/executor_node）可忽略"
+else
+    echo "⚠ 未找到 Python 同步检查脚本：$PY_SCRIPT"
+    echo "  请确认 d:/dev/ui-auto-recording-agent-python 仓库已 clone 到该路径"
+fi
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

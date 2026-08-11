@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import path from 'path';
-import crypto from 'crypto';
-import { CASE_DATA_DIR } from './config.js';
+
+import { CASE_DATA_DIR } from '../config/config.js';
 
 function indexPath() {
   return path.join(CASE_DATA_DIR, 'index.json');
@@ -22,19 +22,14 @@ function saveCaseDataIndex(list) {
   writeFileSync(indexPath(), JSON.stringify(list, null, 2), 'utf-8');
 }
 
-function createCaseDataId() {
-  return 'cdata_' + Date.now() + '_' + crypto.randomBytes(3).toString('hex');
-}
 
-export function saveCaseDataRecord({ sourcePath, sessionId, model, description }) {
+export function saveCaseDataRecord({ caseDataPath, sessionId, model, description }) {
   ensureCaseDataDir();
-  const recordId = createCaseDataId();
-  const fileName = `${recordId}.json`;
-  const destPath = path.join(CASE_DATA_DIR, fileName);
+  // Python already wrote the file to scripts/case_data/, no copy needed
+  const fileName = path.basename(caseDataPath);
+  const recordId = fileName.replace(/\.json$/, '');
 
-  const content = readFileSync(sourcePath, 'utf-8');
-  writeFileSync(destPath, content, 'utf-8');
-
+  const content = readFileSync(caseDataPath, 'utf-8');
   const data = JSON.parse(content);
   const keyCount = Object.keys(data).length;
 

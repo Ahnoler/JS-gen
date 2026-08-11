@@ -3,8 +3,34 @@
 """
 Playwright script assembler.
 
+DEPRECATED for product replay: prefer live scripts/controller/actions/_replay.py
+(replay_actions). This assembler + CTRL injection remains an engineering
+asset (test/assemble, legacy /replay/*) and must not be functionally removed
+without an explicit migration.
+
 Reads an action JSON file (with {action, params, element} entries) and generates
 a Playwright JS script with proper CTRL helpers for Element UI components.
+
+Features:
+  - Multi-tier selector degradation (ID → class → XPath → text → fuzzy)
+  - Identity field auto-generation (credit code, mobile, etc.)
+  - Error collection + structured error report for self-healing
+  - Per-tier error diagnostics (CTRL | Playwright | absolute XPath → English hint)
+
+Verified (detection + self-healing):
+  ✅ fill_form_field       — 2-tier: CTRL → Playwright hasText
+  ✅ select_option         — 2-tier: CTRL → Playwright native
+  ✅ click_element_by_index — button: role/text/xpath_smart; menu: xpath/text/menu-item/fuzzy
+
+TODO — remaining operations lack multi-tier degradation + structured error reporting:
+  ☐ click_menu_item        — single-tier CTRL, error: 'not-found'
+  ☐ click_table_row_button — multi-tier
+  ☐ click_table_row_radio  — single-tier CTRL, error: returns CTRL string
+  ☐ click_radio            — single-tier CTRL, error: returns CTRL string
+  ☐ fill_date_field        — no fallback, direct CTRL call
+  ☐ click_adjacent_button  — no fallback, direct CTRL call
+  ☐ switch_tab             — no fallback
+  ☐ close_dialog           — no fallback
 
 Usage:
     python script_assembler.py <action_file.json> [output_path.js]
@@ -16,422 +42,146 @@ import sys
 import re
 from datetime import datetime
 
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_THIS_DIR)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
-# ========================== CTRL Injection Template ==========================
+from scripts.models import ActionEntry, ActionFile, FormSnapshot, ElementInfo
 
-CTRL_API_CODE = '''const { chromium } = require('playwright');
+from .codegen.actions import (  # noqa: F401  (re-exported for compat)
+    FILL_RETRY_ACTIONS,
+    _IDENTITY_EXCLUDE,
+    _IDENTITY_KEYWORDS,
+    _SKIP_ACTIONS,
+    _click_kind,
+    _generate_action_code,
+    _is_identity_field,
+)
+from .codegen.js_escaping import (  # noqa: F401  (re-exported for compat)
+    _escape,
+    _escape_js_string,
+    _xpath_literal_py,
+)
+
+# ========================== Script Bootstrap ==========================
+
+SCRIPT_PREAMBLE = '''const { chromium } = require('playwright');
+const path = require('path');
+const fs = require('fs');
+
+const _TMP = process.env.TMPDIR || process.env.TMP || process.env.TEMP || '/tmp';
+const _CDP_PORT = 0;
+const _errors = [];
+function _recordError(step, action, label, value, error, details, severity) {
+  _errors.push({ step, action, label, value, error, details, severity: severity || 'error' });
+}
+
+// Identity field generators
+function genCreditCode() { const s='0123456789ABCDEFGHJKLMNPQRTUWXY'; let r=''; for(let i=0;i<18;i++) r+=s[Math.floor(Math.random()*s.length)]; return r; }
+function genValidIdCard() { const a=[110101,110102,110105,120103,310101,320102,440103]; let r=String(a[Math.floor(Math.random()*a.length)]); for(let i=0;i<12;i++) r+=Math.floor(Math.random()*10); let w=[7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2], s=0; for(let i=0;i<17;i++) s+=parseInt(r[i])*w[i]; let c=['1','0','X','9','8','7','6','5','4','3','2']; r+=c[s%11]; return r; }
+function genMobile() { const p=['138','139','150','151','152','157','158','159','186','187','188']; let r=p[Math.floor(Math.random()*p.length)]; for(let i=0;i<8;i++) r+=Math.floor(Math.random()*10); return r; }
+function genEmail() { const n=['test','admin','user','demo','info']; const d=['example.com','test.com','demo.cn']; return n[Math.floor(Math.random()*n.length)]+Math.floor(Math.random()*1000)+'@'+d[Math.floor(Math.random()*d.length)]; }
+function genBankCard() { let r='62'; for(let i=0;i<17;i++) r+=Math.floor(Math.random()*10); return r; }
+function genName() { const s=['张','王','李','赵','陈','刘','杨','黄','周','吴']; const m=['伟','芳','娜','敏','静','强','磊','洋','勇','艳']; return s[Math.floor(Math.random()*s.length)]+m[Math.floor(Math.random()*m.length)]+m[Math.floor(Math.random()*m.length)]; }
+function genAmount() { return String(Math.floor(Math.random()*9000000+1000000)); }
+function genAddress() { const c=['北京市朝阳区','上海市浦东新区','广州市天河区','深圳市南山区','杭州市西湖区']; return c[Math.floor(Math.random()*c.length)]+'某某路'+Math.floor(Math.random()*200+1)+'号'; }
 
 (async () => {
-  const browser = await chromium.launch({ headless: false, slowMo: 100, args: ['--window-position=-8,0'] });
-  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
-
-  await context.addInitScript(() => {
-    window.CTRL = {
-      getContainer: () => {
-        for (const d of document.querySelectorAll('.el-dialog')) if (d.offsetParent !== null) return d;
-        for (const d of document.querySelectorAll('.el-drawer')) if (d.offsetParent !== null) return d;
-        return document;
-      },
-      fillFormField: (label, val) => {
-        const c = window.CTRL.getContainer();
-        const setFn = (t, v) => {
-          const TagProto = t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
-          const setter = Object.getOwnPropertyDescriptor(TagProto.prototype,'value').set;
-          setter.call(t, v);
-          t.setAttribute('value', v);
-          t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:v}));
-          t.dispatchEvent(new Event('change',{bubbles:true}));
-          t.dispatchEvent(new Event('blur',{bubbles:true}));
-        };
-        // Pass 1: label substring match
-        for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
-          if (!lbl.includes(label)) continue;
-          const t = item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea');
-          if (!t) return 'no-input-found';
-          if (t.disabled||t.readOnly) return 'field-disabled';
-          if (t.closest('.el-date-editor,.tsscdatepicker')) { t.focus(); setFn(t,val); try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){} (t.parentNode?.querySelector('input')||t).click(); return new Promise(resolve=>{setTimeout(()=>{const d=new Date(val).getDate();for(const p of document.querySelectorAll('.el-picker-panel')){if(!p.offsetParent||p.style.display==='none')continue;for(const c of p.querySelectorAll('td.available:not(.prev-month):not(.next-month)')){if(parseInt(c.textContent.trim())===d&&!c.disabled){c.click();break}}}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});resolve('ok-date')},200)}); } setFn(t,val); return 'ok'; }
-        // Pass 2: character-set match (handles word order variations like 登记注册地址 vs 注册登记地址)
-        const _labelChars = [...new Set(label.replace(/[\\s,，、]/g,''))];
-        if (_labelChars.length >= 2) {
-          for (const item of c.querySelectorAll('.el-form-item')) {
-            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
-            if (!_labelChars.every(ch=>lbl.includes(ch))) continue;
-            const t = item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea');
-            if (!t) return 'no-input-found';
-            if (t.disabled||t.readOnly) return 'field-disabled';
-            if (t.closest('.el-date-editor,.tsscdatepicker')) { t.focus(); setFn(t,val); try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){} (t.parentNode?.querySelector('input')||t).click(); return new Promise(resolve=>{setTimeout(()=>{const d=new Date(val).getDate();for(const p of document.querySelectorAll('.el-picker-panel')){if(!p.offsetParent||p.style.display==='none')continue;for(const c of p.querySelectorAll('td.available:not(.prev-month):not(.next-month)')){if(parseInt(c.textContent.trim())===d&&!c.disabled){c.click();break}}}document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});resolve('ok-date')},200)}); } setFn(t,val); return 'ok'; }
-        }
-        // Pass 3: placeholder match
-        for (const inp of c.querySelectorAll('input:not([type="hidden"]),textarea')) {
-          if (inp.closest('.el-date-editor,.tsscdatepicker')) continue;
-          const ph = inp.getAttribute('placeholder')||'';
-          if (ph.includes(label) && !inp.disabled && !inp.readOnly && inp.offsetParent!==null) { setFn(inp,val); return 'ok-placeholder'; }
-        }
-        // Pass 4: fuzzy match — pick the label with highest character overlap
-        let bestScore = 0, bestItem = null;
-        const _items = c.querySelectorAll('.el-form-item');
-        for (var _i = 0; _i < _items.length; _i++) {
-          const _item = _items[_i], _lbl = _item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
-          if (!_lbl) continue;
-          const _a = [...new Set(label.replace(/[\\s,，、]/g,''))];
-          const _b = [...new Set(_lbl.replace(/[\\s,，、]/g,''))];
-          const _common = _a.filter(ch=>_b.includes(ch)).length;
-          const _score = _common / Math.max(_a.length,_b.length,1);
-          if (_score > bestScore) { bestScore = _score; bestItem = _item; }
-        }
-        if (bestItem && bestScore >= 0.4) {
-          const _t = bestItem.querySelector('input:not([type="hidden"])') || bestItem.querySelector('textarea');
-          if (_t && !_t.disabled && !_t.readOnly) { setFn(_t,val); return 'ok-fuzzy'; }
-        }
-        return 'label-not-found';
-      },
-      selectOption: (label, option) => {
-        const c = window.CTRL.getContainer();
-        for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-          if (!lbl.includes(label)) continue;
-          const trigger = item.querySelector('.el-select .el-input__inner');
-          if (!trigger) return 'no-select-found';
-          trigger.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-          trigger.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
-          trigger.click();
-          setTimeout(() => {
-            const opts = document.querySelectorAll('.el-select-dropdown__item');
-            const FIRST = ['first','1st','\u7b2c\u4e00\u4e2a','\u7b2c\u4e00\u9879'];
-            const t = FIRST.includes(option.toLowerCase().trim())
-              ? [...opts].find(it => it.offsetParent !== null) || opts[0]
-              : [...opts].find(it => it.textContent.trim() === option) || [...opts].find(it => it.textContent.trim().includes(option));
-            if (t) { t.scrollIntoView({block:'nearest'}); t.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); t.click(); }
-          }, 200);
-          return 'triggered';
-        }
-        return 'label-not-found';
-      },
-      selectDate: (label, dateStr) => {
-        const c = window.CTRL.getContainer();
-        for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-          if (!lbl.includes(label)) continue;
-          const input = item.querySelector('.el-date-editor input, .tsscdatepicker input');
-          if (!input) continue;
-          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-          setter.call(input, dateStr);
-          input.dispatchEvent(new Event('input',{bubbles:true}));
-          input.dispatchEvent(new Event('change',{bubbles:true}));
-          input.dispatchEvent(new Event('blur',{bubbles:true}));
-          input.blur();
-          try{let vm=input.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=dateStr;p.$emit('input',dateStr);p.$emit('change',dateStr);p.$emit('pick',new Date(dateStr));}}}catch(e){}
-          document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
-          return 'selected';
-        }
-        return 'label-not-found';
-      },
-      clickMenuItem: (text) => {
-        for (const item of [...document.querySelectorAll('.el-menu-item')].filter(i=>i.textContent.trim()===text&&i.offsetParent)) { item.click(); return 'ok'; }
-        for (const sm of document.querySelectorAll('.el-submenu')) {
-          const title = sm.querySelector('.el-submenu__title');
-          if (title) title.click();
-          for (const si of sm.querySelectorAll('.el-menu-item')) { if (si.textContent.trim()===text) { setTimeout(()=>si.click(),300); return 'ok-expanded'; } }
-        }
-        return 'not-found';
-      },
-      fillAddressFields: (addr) => {
-        let count = 0;
-        const items = window.CTRL.getContainer().querySelectorAll('.el-form-item');
-        for (const item of items) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-          if (!lbl.includes('地址')) continue;
-          const t = item.querySelector('input:not([type="hidden"]):not([disabled]):not([readOnly]),textarea:not([disabled]):not([readOnly])');
-          if (!t) continue;
-          const TagProto = t.tagName==='TEXTAREA'?HTMLTextAreaElement:HTMLInputElement;
-          const setter = Object.getOwnPropertyDescriptor(TagProto.prototype,'value').set;
-          setter.call(t, addr);
-          t.setAttribute('value', addr);
-          t.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:addr}));
-          t.dispatchEvent(new Event('change',{bubbles:true}));
-          t.dispatchEvent(new Event('blur',{bubbles:true}));
-          count++;
-        }
-        return count > 0 ? 'ok:' + count : 'no-address-fields';
-      },
-      clickTableRowAction: (rowText, btnText) => {
-        for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
-          if (!row.textContent.includes(rowText)) continue;
-          for (const btn of row.querySelectorAll('button,.el-button')) { const t=btn.textContent?.trim()||''; if(t.includes(btnText)&&btn.offsetParent){btn.click();return 'ok';} }
-          return 'button-not-found';
-        }
-        return 'row-not-found';
-      },
-      clickRadio: (label, option) => {
-        const c = window.CTRL.getContainer();
-        for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
-          if (!lbl.includes(label)) continue;
-          for (const radio of item.querySelectorAll('.el-radio')) { if(radio.textContent.trim()===option&&radio.offsetParent){radio.click();return 'ok';} }
-          return 'option-not-found';
-        }
-        return 'label-not-found';
-      },
-      clickAdjacentButton: (label) => {
-        const c = window.CTRL.getContainer();
-        for (const item of c.querySelectorAll('.el-form-item')) {
-          const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim()||'';
-          if (!lbl.includes(label)) continue;
-          const inp = item.querySelector('.el-input__inner');
-          if (inp&&inp.value&&inp.value.trim()!=='') return 'already-filled';
-          const btn = item.querySelector('button.el-button--primary.is-plain');
-          if (btn&&btn.offsetParent){btn.click();return 'clicked';}
-          return 'no-button-found';
-        }
-        return 'label-not-found';
-      },
-      closeDialog: () => {
-        for (const d of [...document.querySelectorAll('.el-dialog')].reverse()) { if(d.offsetParent) { const cb=d.querySelector('.el-dialog__headerbtn .el-icon-close'); if(cb){cb.click();return 'ok';} return 'no-close-button'; } }
-        return 'no-overlay-open';
-      },
-      switchTab: (name) => {
-        for (const tab of document.querySelectorAll('.el-tabs__item')) { if(tab.textContent.trim()===name&&tab.offsetParent){tab.click();return 'ok';} }
-        return 'tab-not-found';
-      },
-      waitForLoading: () => new Promise(resolve => { let el=0; const ck=()=>{ if(el>=30000){resolve('timeout');return; } const m=document.querySelector('.el-loading-mask:not(.el-loading-mask--hidden)'); if(!m||m.offsetParent===null) resolve(); else { el+=200; setTimeout(ck,200); } }; ck(); }),
-      checkFieldValue: (label) => {
-        const c = window.CTRL.getContainer();
-        for (const item of c.querySelectorAll('.el-form-item')) { const lbl=item.querySelector('.el-form-item__label')?.textContent?.trim()||''; if(!lbl.includes(label)) continue; const inp=item.querySelector('input:not([type="hidden"])')||item.querySelector('textarea'); return inp?.value||'empty'; }
-        return 'label-not-found';
-      },
-      expandAllTreeNodes: () => { let t=0; for(let r=0;r<10;r++){ const n=document.querySelectorAll('.el-tree-node:not(.is-expanded)'); if(n.length===0)break; n.forEach(node=>{const i=node.querySelector(':scope>.el-tree-node__content>.el-tree-node__expand-icon');if(i){i.click();t++;}}); } return t; },
-    };
-  });
-
-  const page = await context.newPage();
-
+  const browser = await chromium.launch({ headless: false, args: ['--start-maximized'] });
+  const page = await browser.newPage();
+  await page.setViewportSize({ width: 1920, height: 1080 });
   try {
 '''
 
+# ========================== CTRL Injection Template ==========================
+
+_ctrl_injection_path = None
+
+SCRIPT_POSTAMBLE = '''})().catch(err => { console.error(err); process.exit(1); });
+'''
+
+def _load_ctrl_injection():
+    global _ctrl_injection_path
+    if not _ctrl_injection_path or not os.path.exists(_ctrl_injection_path):
+        sys.stderr.write("[assembler] WARNING: No CTRL injection file. Use --ctrl-injection.\n")
+        sys.stderr.flush()
+        return "// CTRL helpers not loaded — provide --ctrl-injection path\n"
+    with open(_ctrl_injection_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+def _get_ctrl_header():
+    injection = _load_ctrl_injection()
+    return f"// CTRL helpers — loaded from src/ctrl-actions.js\n{injection}\n"
+
+
 CTRL_FOOTER = '''  } catch (err) {
-    console.error('Test failed:', err.message);
-    try { await page.screenshot({ path: '/tmp/error.png' }); } catch {}
-    throw err;
+    console.error('FATAL:', err.message);
+    _recordError(0, 'fatal', '', '', err.message, 'Script-level crash');
   } finally {
+    // Write error report
+    if (_errors.length > 0) {
+      const reportPath = require('path').join(_TMP, 'script-errors.json');
+      try { fs.writeFileSync(reportPath, JSON.stringify(_errors, null, 2)); } catch {}
+      const errCount = _errors.filter(e => e.severity !== 'warning').length;
+      const warnCount = _errors.filter(e => e.severity === 'warning').length;
+      var summary = '=====';
+      if (errCount > 0) summary += ' ' + errCount + ' ERROR(S)';
+      if (warnCount > 0) summary += (errCount > 0 ? ', ' : ' ') + warnCount + ' WARNING(S)';
+      summary += ' =====';
+      console.error(summary);
+      _errors.forEach((e, i) => {
+        var tag = e.severity === 'warning' ? 'WARN' : 'ERROR';
+        console.error('[' + (i+1) + '] ' + tag + ' Step ' + e.step + ': ' + e.action + ' - ' + e.error + (e.details ? ' | ' + e.details : ''));
+      });
+      process.exit(errCount > 0 ? 1 : 0);
+    } else {
+      console.log('===== SUCCESS =====');
+    }
     console.log('Waiting 30s before closing browser...');
     await page.waitForTimeout(30000);
     await browser.close();
+  }
+'''
+
+# Footer for partial replay: keeps browser open, prints CDP endpoint for agent hand-off
+PARTIAL_CTRL_FOOTER = '''  } catch (err) {
+    console.error('FATAL:', err.message);
+    _recordError(0, 'fatal', '', '', err.message, 'Script-level crash');
+  } finally {
+    if (_errors.length > 0) {
+      const reportPath = require('path').join(_TMP, 'script-errors.json');
+      try { fs.writeFileSync(reportPath, JSON.stringify(_errors, null, 2)); } catch {}
+      const errCount = _errors.filter(e => e.severity !== 'warning').length;
+      const warnCount = _errors.filter(e => e.severity === 'warning').length;
+      var summary = '=====';
+      if (errCount > 0) summary += ' ' + errCount + ' ERROR(S)';
+      if (warnCount > 0) summary += (errCount > 0 ? ', ' : ' ') + warnCount + ' WARNING(S)';
+      summary += ' =====';
+      console.error(summary);
+      _errors.forEach((e, i) => {
+        var tag = e.severity === 'warning' ? 'WARN' : 'ERROR';
+        console.error('[' + (i+1) + '] ' + tag + ' Step ' + e.step + ': ' + e.action + ' - ' + e.error + (e.details ? ' | ' + e.details : ''));
+      });
+    } else {
+      console.log('===== PARTIAL REPLAY OK =====');
+    }
+    console.log('CDP_PORT:' + _CDP_PORT);
+    console.log('READY_FOR_AGENT: browser stays open');
   }
 })().catch(err => { console.error(err); process.exit(1); });
 '''
 
 
-# ========================== Action-to-Code Mapping ==========================
-
-def _escape(s):
-    """Escape single quotes for JS strings."""
-    return s.replace('\\', '\\\\').replace("'", "\\'") if s else ''
-
-
-FILL_RETRY_ACTIONS = {'fill_form_field', 'fill_date_field'}
-
-def _generate_action_code(entry, step_num, url, is_first_fill=False):
-    """Generate Playwright JS code from a recorded action entry."""
-    action = entry.get('action', '')
-    params = entry.get('params', {}) or {}
-    element = entry.get('element', None)
-
-    def pre():
-        return "    await page.evaluate(() => CTRL.waitForLoading());"
-
-    lines = [f'    // [{step_num}] {action}']
-
-    def p(k, default=''):
-        v = params.get(k, default)
-        return str(v) if v else default
-
-    if action == 'go_to_url':
-        return ''  # skip, URL already handled in header
-
-    if action == 'fill_form_field':
-        l, v = p('label_text'), p('value')
-        lines.append(f"    console.log('[{step_num}] Fill \"{l}\"');")
-        lines.append(pre())
-        # Ensure form DOM is rendered before interacting
-        lines.append("    await page.waitForSelector('.el-form-item', { timeout: 10000 }).catch(() => {});")
-        if '地址' in l or '址' in l or 'address' in l.lower():
-            lines.append(f"    const _r{step_num} = await page.evaluate((addr) => CTRL.fillAddressFields(addr), '{_escape(v)}');")
-            lines.append(f"    if (_r{step_num} === 'no-address-fields') {{")
-            lines.append(f"      console.log('[{step_num}] address fill result:', _r{step_num});")
-            lines.append(f"      const _a{step_num} = await page.locator('.el-form-item:has-text(\"地址\")').locator('input, textarea').all();")
-            lines.append(f"      for (const _el of _a{step_num}) {{ await _el.fill('{_escape(v)}'); }}")
-            lines.append(f"    }}")
-        else:
-            lines.append(f"    const _r{step_num} = await page.evaluate(() => CTRL.fillFormField('{_escape(l)}', '{_escape(v)}'));")
-            lines.append(f"    if (_r{step_num} !== 'ok' && _r{step_num} !== 'ok-date' && _r{step_num} !== 'ok-placeholder' && _r{step_num} !== 'ok-fuzzy') {{")
-            lines.append(f"      console.log('[{step_num}] fill result:', _r{step_num});")
-            lines.append(f"      const _a{step_num} = await page.locator('.el-form-item:has-text(\"{_escape(l)}\")').locator('input, textarea').first();")
-            lines.append(f"      if (await _a{step_num}.count() > 0) await _a{step_num}.fill('{_escape(v)}');")
-            lines.append(f"    }}")
-        lines.append('    await page.waitForTimeout(300);')
-        # First fill in a new block: retry once after 300ms
-        if is_first_fill:
-            lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
-            if '地址' in l or '址' in l or 'address' in l.lower():
-                lines.append(f"    await page.evaluate((addr) => CTRL.fillAddressFields(addr), '{_escape(v)}');")
-            else:
-                lines.append(f"    await page.evaluate(() => CTRL.fillFormField('{_escape(l)}', '{_escape(v)}'));")
-            lines.append('    await page.waitForTimeout(300);')
-        return '\n'.join(lines)
-
-    if action == 'select_option':
-        l, o = p('label_text'), p('option_text')
-        lines.append(f"    console.log('[{step_num}] Select \"{l}\"');")
-        lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.selectOption('{_escape(l)}', '{_escape(o)}'));")
-        lines.append('    await page.waitForTimeout(300);')
-        return '\n'.join(lines)
-
-    if action == 'fill_date_field':
-        l, v = p('label_text'), p('value')
-        lines.append(f"    console.log('[{step_num}] Set date \"{l}\"');")
-        lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
-        lines.append('    await page.waitForTimeout(300);')
-        # First fill in a new block: retry once after 300ms
-        if is_first_fill:
-            lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
-            lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
-            lines.append('    await page.waitForTimeout(300);')
-        return '\n'.join(lines)
-
-    if action == 'click_menu_item':
-        t = p('menu_text')
-        lines.append(f"    console.log('[{step_num}] Menu \"{t}\"');")
-        lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.clickMenuItem('{_escape(t)}'));")
-        lines.append('    await page.waitForTimeout(300);')
-        lines.append("    await page.evaluate(() => CTRL.waitForLoading());")
-        return '\n'.join(lines)
-
-    if action == 'click_table_row_action':
-        r, b = p('row_text'), p('button_text')
-        lines.append(f"    console.log('[{step_num}] Table action');")
-        lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.clickTableRowAction('{_escape(r)}', '{_escape(b)}'));")
-        lines.append('    await page.waitForTimeout(300);')
-        return '\n'.join(lines)
-
-    if action == 'click_adjacent_button':
-        l = p('label_text')
-        lines.append(f"    console.log('[{step_num}] Adjacent \"{l}\"');")
-        lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.clickAdjacentButton('{_escape(l)}'));")
-        lines.append('    await page.evaluate(() => CTRL.waitForLoading());')
-        lines.append('    await page.waitForTimeout(300);')
-        return '\n'.join(lines)
-
-    if action == 'click_radio':
-        l, o = p('label_text'), p('option_text')
-        lines.append(f"    console.log('[{step_num}] Radio \"{l}\"');")
-        lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.clickRadio('{_escape(l)}', '{_escape(o)}'));")
-        lines.append('    await page.waitForTimeout(300);')
-        return '\n'.join(lines)
-
-    if action == 'click_element_by_index':
-        idx = p('index')
-        xp = ''
-        if element:
-            xp = (element.get('xpath') or '')
-        if not xp:
-            xp = entry.get('target', '') or ''
-        txt = ''
-        if element:
-            txt = (element.get('text') or '')
-        if not txt:
-            txt = entry.get('propertiesName', '') or p('text', '')
-        if xp:
-            if not xp.startswith('/') and not xp.startswith('//'):
-                xp = '/' + xp
-            lines.append(f"    console.log('[{step_num}] Click [{idx}]');")
-            lines.append("    await page.waitForFunction(before => location.href !== before, page.url(), { timeout: 5000 }).catch(() => {});")
-            lines.append('    await page.evaluate(() => CTRL.waitForLoading());')
-            lines.append('    try {')
-            lines.append(f"      await page.locator('xpath={_escape(xp)}').first().click({{ timeout: 3000 }});")
-            lines.append('    } catch (e) {')
-            lines.append('      try {')
-            if txt:
-                lines.append(f"        await page.locator(':text-is(\"{_escape(txt)}\")').first().click({{ timeout: 5000 }});")
-            else:
-                lines.append(f"        await page.locator('xpath={_escape(xp)}').first().click({{ timeout: 5000, force: true }});")
-            lines.append('      } catch (e2) {')
-            lines.append(f"        // Final fallback: JS dispatchEvent bypasses visibility/pointer-events checks")
-            lines.append(f"        await page.evaluate((xp) => {{")
-            lines.append(f"          const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;")
-            lines.append(f"          if (el) el.dispatchEvent(new MouseEvent('click', {{ bubbles: true }}));")
-            lines.append(f"        }}, '{_escape(xp)}');")
-            lines.append('      }')
-            if txt:
-                lines.append(f"      // Text-fuzzy fallback: search page elements by text similarity")
-                lines.append(f"      try {{")
-                lines.append(f"        await page.evaluate((text) => {{")
-                lines.append(f"          const candidates = [...document.querySelectorAll('button, a, span, li, label, .el-button, .el-menu-item')].filter(el => el.offsetParent !== null);")
-                lines.append(f"          let best = null, bestScore = 0;")
-                lines.append(f"          const t = [...new Set(text.replace(/\\s/g,''))];")
-                lines.append(f"          for (const el of candidates) {{")
-                lines.append(f"            const elText = el.textContent?.trim() || '';")
-                lines.append(f"            if (!elText) continue;")
-                lines.append(f"            const e = [...new Set(elText.replace(/\\s/g,''))];")
-                lines.append(f"            const common = t.filter(ch => e.includes(ch)).length;")
-                lines.append(f"            const score = common / Math.max(t.length, e.length, 1);")
-                lines.append(f"            if (score > bestScore) {{ bestScore = score; best = el; }}")
-                lines.append(f"          }}")
-                lines.append(f"          if (best && bestScore >= 0.4) best.click();")
-                lines.append(f"        }}, '{_escape(txt)}');")
-                lines.append(f"      }} catch (e3) {{}}")
-            lines.append('    }')
-            lines.append('    await page.waitForTimeout(300);')
-            return '\n'.join(lines)
-        lines.append(f"    console.log('[{step_num}] Click [{idx}] (no XPath)');")
-        return '\n'.join(lines)
-
-    if action == 'switch_tab':
-        n = p('tab_name')
-        lines.append(f"    console.log('[{step_num}] Tab \"{n}\"');")
-        lines.append(f"    await page.evaluate(() => CTRL.switchTab('{_escape(n)}'));")
-        lines.append('    await page.waitForTimeout(500);')
-        return '\n'.join(lines)
-
-    if action == 'close_dialog':
-        lines.append(f"    console.log('[{step_num}] Close dialog');")
-        lines.append('    await page.evaluate(() => CTRL.closeDialog());')
-        lines.append('    await page.waitForTimeout(500);')
-        return '\n'.join(lines)
-
-    if action == 'wait_for_loading':
-        lines.append('    await page.evaluate(() => CTRL.waitForLoading());')
-        return '\n'.join(lines)
-
-    if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
-                  'check_field_value', 'verify_field_value', 'take_screenshot',
-                  'save_trajectory', 'save_case_data', 'read_case_data',
-                  'match_form_rule', 'init_task_list', 'get_pending_tasks', 'sync_tasks_from_errors',
-                  'expand_all_el_tree', 'task_done', 'task_retry'):
-        # Skip internal/exploratory actions
-        return ''
-
-    if action in ('fill_form_fields_batch', 'fill_pending_batch'):
-        # Batch operations expanded as individual actions in the recording
-        return ''
-
-    lines.append(f'    // skipped: {action}')
-    return '\n'.join(lines)
-
-
 # ========================== Assembly ==========================
 
-FILL_ACTIONS = {'fill_form_field', 'fill_date_field', 'select_option', 'click_radio'}
-BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'switch_tab', 'close_dialog', 'go_to_url'}
+FILL_ACTIONS = {'fill_form_field', 'fill_date_field', 'select_option', 'click_radio', 'select_tree_option'}
+BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'click_icon_button', 'switch_tab', 'close_dialog', 'go_to_url'}
 
-def assemble_script(action_entries, target_url=None):
-    """Assemble a complete Playwright script from recorded action entries."""
+def assemble_script(action_entries, target_url=None, form_snapshots=None):
+    """Assemble a complete Playwright script from recorded action entries.
+    form_snapshots: list of {container, fields, action_index} — one per scanned container.
+    """
     body = []
     step = 1
     in_block = False
@@ -439,44 +189,244 @@ def assemble_script(action_entries, target_url=None):
     url = target_url or ''
     if not url or 'unknown' in url.lower():
         url = 'http://target-url-placeholder'
-    body.append(f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});')
+    goto_line = f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});'
+    body.append("    const _RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;")
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
 
+    # Sort snapshots by action_index so checks inject at the right points
+    # Normalize to FormSnapshot if raw dicts
+    _raw_checks = form_snapshots or []
+    _norm_checks = [FormSnapshot(**s) if isinstance(s, dict) else s for s in _raw_checks]
+    pending_checks = sorted(_norm_checks, key=lambda s: s.action_index)
+    action_counter = 0  # counts through ALL entries to find injection point
+    _check_idx = [0]  # mutable counter for unique variable names
+
+    def _inject_form_check(fields, container, action_index):
+        """Inject a verifyFormStructure call for one container."""
+        nonlocal step
+        idx = _check_idx[0]
+        _check_idx[0] += 1
+        fields_json = json.dumps(fields, ensure_ascii=False)
+        container_label = container or 'main'
+        v = f'__fc{idx}'  # unique variable name per check
+        cont_json = json.dumps(container_label, ensure_ascii=False)
+        body.append(f'    console.log("[FORM-CHECK] Verifying container: {container_label}");')
+        body.append(
+            f'    const {v} = await page.evaluate(([f, c]) => JSON.parse(CTRL.verifyFormStructure(f, c)), '
+            f'[{fields_json}, {cont_json}]);'
+        )
+        # P2: required field change → error, stop script
+        body.append(f'    if ({v}.hasRequiredChange) {{')
+        body.append(f'      const _m = {v}.missing_required.join(",");')
+        body.append(f'      const _a = {v}.added_required.join(",");')
+        body.append(f'      _recordError({step}, "form_structure_changed", "", "", "missing=[" + _m + "] added=[" + _a + "]", JSON.stringify({{')
+        body.append(f'        container: "{container_label}",')
+        body.append(f'        missing_required: {v}.missing_required,')
+        body.append(f'        added_required: {v}.added_required,')
+        body.append(f'        missing_optional: {v}.missing_optional,')
+        body.append(f'        added_optional: {v}.added_optional,')
+        body.append(f'        expected_required: {v}.required_count,')
+        body.append(f'        expected_optional: {v}.optional_count,')
+        body.append(f'        action_index: {action_index or 0}')
+        body.append(f'      }}));')
+        body.append(f'      throw new Error("Form required fields changed: missing=[" + _m + "] added=[" + _a + "]");')
+        body.append(f'    }}')
+        # P3: optional field change → warning, continue
+        body.append(f'    if ({v}.hasOptionalChange) {{')
+        body.append(f'      _recordError({step}, "form_warning", "", "", "optional fields changed", JSON.stringify({{')
+        body.append(f'        container: "{container_label}",')
+        body.append(f'        missing_optional: {v}.missing_optional,')
+        body.append(f'        added_optional: {v}.added_optional,')
+        body.append(f'      }}), "warning");')
+        body.append(f'      console.log("[FORM-CHECK P3] WARN: Optional fields changed | missing:", JSON.stringify({v}.missing_optional), "| added:", JSON.stringify({v}.added_optional));')
+        body.append(f'    }}')
+        # P4: field order change → warning, continue
+        body.append(f'    if ({v}.reordered && !{v}.hasRequiredChange && !{v}.hasOptionalChange) {{')
+        body.append(f'      _recordError({step}, "form_warning", "", "", "field order changed", JSON.stringify({{')
+        body.append(f'        container: "{container_label}",')
+        body.append(f'        reordered: true,')
+        body.append(f'      }}), "warning");')
+        body.append(f'      console.log("[FORM-CHECK P4] WARN: Field order changed, all fields present");')
+        body.append(f'    }}')
+        body.append(f'    console.log("[FORM-CHECK] Verification passed for container: {container_label}");')
+
     for entry in action_entries:
-        action = entry.get('action', '')
-        if action in ('scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
-                      'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
-                      'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
-                      'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree',
-                      'task_done', 'task_retry', 'fill_form_fields_batch', 'fill_pending_batch'):
+        # Normalize entry to dict
+        _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
+        action = _e.get('action', '')
+        action_counter += 1
+
+        # Inject any pending form checks whose action_index has been passed.
+        # Runs for EVERY entry (including SKIP_ACTIONS) so checks land at
+        # the correct position regardless of fill-block boundaries.
+        while pending_checks and action_counter > pending_checks[0].action_index:
+            check = pending_checks.pop(0)
+            if check.fields:  # skip empty snapshots (avoids false-positive "added" warnings)
+                _inject_form_check(
+                    [f.model_dump() for f in check.fields],
+                    check.container,
+                    check.action_index,
+                )
+
+        if action in _SKIP_ACTIONS:
             continue
 
-        # Block boundary: exit current fill block
         if action in BOUNDARY_ACTIONS:
             in_block = False
 
-        # First fill in a new block: generate twice (300ms apart)
         is_first_fill = action in FILL_ACTIONS and not in_block
         if is_first_fill:
             in_block = True
 
         code = _generate_action_code(entry, step, url, is_first_fill)
         if code:
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-before-${{_RUN_ID}}.png`), fullPage: true }});')
             body.append(code)
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-after-${{_RUN_ID}}.png`), fullPage: true }});')
+            # Machine-readable marker for trajectory replay WS (step id/phase from action JSON)
+            _sid = _e.get('id') or _e.get('stepId') or ''
+            _pid = _e.get('phaseId') or _e.get('trajectoryPhaseId') or ''
+            _marker = json.dumps({'step': step, 'ok': True, 'id': _sid, 'phaseId': _pid}, ensure_ascii=False)
+            body.append(f"    console.log('__REPLAY_STEP__' + {repr(_marker)});")
             step += 1
 
-    return CTRL_API_CODE + '\n'.join(body) + '\n\n' + CTRL_FOOTER
+    return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
 
 
+# ========================== Part 2: Partial assembly (for self-healing) ==========================
+
+def assemble_partial_script(action_entries, target_url=None, stop_before_step=None):
+    """Assemble script up to (but not including) the specified step number.
+    Used to reproduce error state for self-healing diagnostics."""
+    if stop_before_step is None:
+        return assemble_script(action_entries, target_url)
+
+    # Only include entries before the failing step
+    partial_entries = action_entries[:stop_before_step - 1] if stop_before_step > 1 else []
+    body = []
+    step = 1
+    in_block = False
+
+    url = target_url or ''
+    if not url or 'unknown' in url.lower():
+        url = 'http://target-url-placeholder'
+    goto_line = f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});'
+    body.append("    const _RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;")
+    body.append("    await page.evaluate(() => CTRL.waitForLoading());")
+
+    for entry in partial_entries:
+        _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
+        action = _e.get('action', '')
+        if action in _SKIP_ACTIONS:
+            continue
+
+        if action in BOUNDARY_ACTIONS:
+            in_block = False
+
+        is_first_fill = action in FILL_ACTIONS and not in_block
+        if is_first_fill:
+            in_block = True
+
+        code = _generate_action_code(entry, step, url, is_first_fill)
+        if code:
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-before-${{_RUN_ID}}.png`), fullPage: true }});')
+            body.append(code)
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-after-${{_RUN_ID}}.png`), fullPage: true }});')
+            step += 1
+
+    return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
+
+
+def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=None):
+    """Like assemble_partial_script, but keeps browser open with CDP for agent hand-off."""
+    if stop_before_step is None:
+        return assemble_script(action_entries, target_url)
+    partial_entries = action_entries[:stop_before_step - 1] if stop_before_step > 1 else []
+    body = []
+    step = 1
+    in_block = False
+    url = target_url or ''
+    if not url or 'unknown' in url.lower():
+        url = 'http://target-url-placeholder'
+    goto_line = f'    await page.goto(\'{url}\', {{ waitUntil: \'networkidle\', timeout: 60000 }});'
+    body.append("    const _RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;")
+    body.append("    await page.evaluate(() => CTRL.waitForLoading());")
+    for entry in partial_entries:
+        _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
+        action = _e.get('action', '')
+        if action in _SKIP_ACTIONS:
+            continue
+        if action in BOUNDARY_ACTIONS:
+            in_block = False
+        is_first_fill = action in FILL_ACTIONS and not in_block
+        if is_first_fill:
+            in_block = True
+        code = _generate_action_code(entry, step, url, is_first_fill)
+        if code:
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-before-${{_RUN_ID}}.png`), fullPage: true }});')
+            body.append(code)
+            body.append(f'    await page.screenshot({{ path: path.join(_TMP, `step-{step}-after-${{_RUN_ID}}.png`), fullPage: true }});')
+            step += 1
+    return SCRIPT_PREAMBLE + '\n' + goto_line + '\n' + _get_ctrl_header() + '\n'.join(body) + '\n\n' + PARTIAL_CTRL_FOOTER + '\n' + SCRIPT_POSTAMBLE
+
+
+def apply_changes(commands, changes):
+    """Apply LLM-recommended changes to the commands array.
+
+    Args:
+        commands: List of action entry dicts
+        changes: List of {step: int, action: 'modify'|'delete'|'insert', entry: dict?}
+
+    Returns:
+        Modified commands list
+    """
+    cmds = list(commands)  # shallow copy
+    # Sort in reverse step order so indices don't shift when applying
+    for change in sorted(changes, key=lambda c: c['step'], reverse=True):
+        step_num = change['step']
+        action = change.get('action', 'modify')
+        idx = step_num - 1  # convert to 0-based index
+
+        if action == 'modify':
+            if 0 <= idx < len(cmds):
+                cmds[idx] = change.get('entry', cmds[idx])
+        elif action == 'delete':
+            if 0 <= idx < len(cmds):
+                del cmds[idx]
+        elif action == 'insert':
+            entry = change.get('entry')
+            if entry:
+                cmds.insert(min(idx, len(cmds)), entry)
+    return cmds
 # ========================== Main ==========================
 
 def main():
+    global _ctrl_injection_path
     if len(sys.argv) < 2:
-        print('Usage: python script_assembler.py <action_file.json> [output.js]', file=sys.stderr)
+        print('Usage: python script_assembler.py <action_file.json> [output.js] [--partial-stop N] [--partial-cdp N]', file=sys.stderr)
         sys.exit(1)
 
     input_path = sys.argv[1]
-    output_path = sys.argv[2] if len(sys.argv) > 2 else None
+    output_path = None
+    stop_before_step = None
+    cdp_mode = False
+    form_snapshot_path = None
+
+    # Parse remaining args
+    remaining = sys.argv[2:]
+    while remaining:
+        arg = remaining.pop(0)
+        if arg == '--partial-stop' and remaining:
+            stop_before_step = int(remaining.pop(0))
+        elif arg == '--partial-cdp' and remaining:
+            stop_before_step = int(remaining.pop(0))
+            cdp_mode = True
+        elif arg == '--ctrl-injection' and remaining:
+            _ctrl_injection_path = remaining.pop(0)
+        elif arg == '--form-snapshot' and remaining:
+            form_snapshot_path = remaining.pop(0)
+        elif not output_path:
+            output_path = arg
 
     if input_path == '-':
         data = json.load(sys.stdin)
@@ -486,7 +436,6 @@ def main():
 
     # Read commands from either format
     raw_cmds = data.get('actions', []) or (data.get('tests', [{}])[0].get('commands', []) if data.get('tests') else [])
-    # If entries already have action field, use directly; otherwise convert old format
     has_new = raw_cmds and any(c.get('action') for c in raw_cmds if isinstance(c, dict))
     if not has_new:
         actions = []
@@ -494,30 +443,65 @@ def main():
             c = cmd.get('command', '')
             if c == 'input':
                 actions.append({'action': 'fill_form_field', 'params': {'label_text': cmd.get('propertiesName', ''), 'value': cmd.get('value', '')},
-                    'element': {'xpath': cmd.get('target', ''), 'tag_name': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})}})
+                    'target': cmd.get('target', ''), 'cssSelector': cmd.get('cssSelector', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
             elif c == 'select':
                 actions.append({'action': 'select_option', 'params': {'label_text': cmd.get('propertiesName', ''), 'option_text': cmd.get('value', '')},
-                    'element': {'xpath': cmd.get('target', ''), 'tag_name': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})}})
+                    'target': cmd.get('target', ''), 'cssSelector': cmd.get('cssSelector', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
             elif c == 'click':
                 actions.append({'action': 'click_element_by_index', 'params': {'index': cmd.get('value', '0'), 'tag_name': cmd.get('tagName', ''), 'text': cmd.get('propertiesName', '')},
-                    'element': {'xpath': cmd.get('target', ''), 'tag_name': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})}})
+                    'target': cmd.get('target', ''), 'cssSelector': cmd.get('cssSelector', ''), 'tagName': cmd.get('tagName', ''), 'attributes': cmd.get('attributes', {})})
     else:
         actions = raw_cmds
+
+    # Normalize to ActionEntry model objects
+    actions = [
+        ActionEntry(**a) if isinstance(a, dict) else a
+        for a in (actions if isinstance(actions, list) else [])
+    ]
+
     url = data.get('url', '') or ''
     if not url or 'unknown' in url.lower():
-        for entry in actions if isinstance(actions, list) else []:
-            if entry.get('action') == 'go_to_url':
-                url = entry.get('params', {}).get('url', '') or ''
+        for entry in actions:
+            ae = entry if isinstance(entry, ActionEntry) else ActionEntry(**entry) if isinstance(entry, dict) else None
+            if ae and ae.action == 'go_to_url':
+                url = ae.params.get('url', '') or ''
                 if url:
                     break
 
-    script = assemble_script(actions, url)
+    # Read form snapshots array (from --form-snapshot arg, or match by action filename)
+    form_snapshots = None
+    if form_snapshot_path:
+        if os.path.exists(form_snapshot_path):
+            with open(form_snapshot_path, 'r', encoding='utf-8') as _f:
+                _fs = json.load(_f)
+            if isinstance(_fs, list):
+                form_snapshots = _fs
+    else:
+        import re as _re
+        _m = _re.search(r'action_(\d{8}_\d{6})\.json', input_path)
+        if _m:
+            _ts = _m.group(1)
+            _form_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'forms', f'form_{_ts}.json')
+            if os.path.exists(_form_path):
+                with open(_form_path, 'r', encoding='utf-8') as _f:
+                    _fs = json.load(_f)
+                if isinstance(_fs, list):
+                    form_snapshots = _fs
+
+    if stop_before_step is not None:
+        if cdp_mode:
+            script = assemble_partial_for_cdp(actions, url, stop_before_step)
+        else:
+            script = assemble_partial_script(actions, url, stop_before_step)
+    else:
+        script = assemble_script(actions, url, form_snapshots=form_snapshots)
 
     if output_path:
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(script)
         print(f'Script written: {output_path}')
-        print(f'Steps: {len([a for a in actions if a.get("action","") not in ("scroll_down","scroll_up","get_page_state","scan_form_fields","scan_visible_fields","check_field_value","verify_field_value","take_screenshot","save_trajectory","save_case_data","read_case_data","match_form_rule","init_task_list","get_pending_tasks","sync_tasks_from_errors","expand_all_el_tree","task_done","task_retry")])}')
+        visible_actions = [a for a in actions if (a.action if isinstance(a, ActionEntry) else a.get("action","")) not in _SKIP_ACTIONS]
+        print(f'Steps: {len(visible_actions)}')
     else:
         print(script)
 
