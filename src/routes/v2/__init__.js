@@ -10,6 +10,7 @@ import registerSystemMgmt from './system-mgmt.js';
 import registerSysDict from './sys-dict.js';
 import registerSpecialElement from './special-element.js';
 import registerTrajectoryBatch from './trajectory-batch.js';
+import registerAgentStderr from './agent-stderr.js';
 import registerTrajectory from './trajectory.js';
 import registerTrajectoryRecord from './trajectory-record.js';
 import registerTrajectorySteps from './trajectory-steps.js';
@@ -34,6 +35,7 @@ export default function (app) {
   registerSpecialElement(app);
   // batch/* before trajectories/:id
   registerTrajectoryBatch(app);
+  registerAgentStderr(app);
   registerTrajectory(app);
   registerTrajectoryRecord(app);
   registerTrajectorySteps(app);

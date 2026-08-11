@@ -2,6 +2,7 @@
  * One executor slot = one Python session subprocess + stdin/stdout bridge.
  */
 import { spawnAgent, waitForReady, isProcessAlive, killTree, killProcessOnly, killListenerOnPort } from './spawn-agent.js';
+import { createStderrLineBuffer } from './stderr-prefix.js';
 import { LLM_API_KEY, LLM_BASE_URL, CONTROL_PLANE_HTTP, EXECUTOR_CDP_PORT_BASE } from './config.js';
 import net from 'net';
 
@@ -98,13 +99,32 @@ export class SessionSlot {
     this.busy = false;
     this._stdoutBuf = '';
 
-    child.stderr.on('data', (chunk) => {
-      process.stderr.write(`[slot:${this.slotIndex}] ${chunk}`);
+    this._stderrBuf?.dispose?.();
+    this._stderrBuf = createStderrLineBuffer({
+      slotIndex: this.slotIndex,
+      sessionId,
+      onFlush: (lines) => {
+        for (const line of lines) {
+          process.stderr.write(`${line}\n`);
+        }
+        this.onAgentEvent({
+          event: 'session.agent_stderr',
+          session_id: sessionId,
+          data: {
+            sessionId,
+            slotIndex: this.slotIndex,
+            lines,
+          },
+        });
+      },
     });
+    child.stderr.on('data', (chunk) => this._stderrBuf.push(chunk));
 
     child.stdout.on('data', (chunk) => this._onStdout(chunk));
 
     child.on('exit', (code) => {
+      this._stderrBuf?.flush?.({ end: true });
+      this._stderrBuf?.dispose?.();
       this.ready = false;
       this.busy = false;
       this.process = null;
@@ -136,6 +156,8 @@ export class SessionSlot {
         cdpReady: readyFlag,
       };
     } catch (err) {
+      this._stderrBuf?.flush?.({ end: true });
+      this._stderrBuf?.dispose?.();
       // Agent died / timed out before ready — reclaim slot and kill orphans.
       if (this.process && isProcessAlive(this.process)) {
         killTree(this.process.pid);
@@ -215,6 +237,8 @@ export class SessionSlot {
       }
     }
     if (!keepBrowser && cdpPort != null) killListenerOnPort(cdpPort);
+    this._stderrBuf?.flush?.({ end: true });
+    this._stderrBuf?.dispose?.();
     this.process = null;
     this.ready = false;
     this.busy = false;

@@ -149,6 +149,12 @@ async function handleMessage(ws, msg) {
 
   // Agent → control plane (session events, stdout relay)
   routeExecutorInbound(msg);
+  if (type === 'session.agent_stderr' && Array.isArray(payload?.lines) && payload.sessionId) {
+    import('./services/agent-stderr-log-service.js')
+      .then(({ appendLines }) => appendLines(payload.sessionId, payload.lines))
+      .catch((err) => console.warn('[executor-ws] agent_stderr append failed:', err?.message || err));
+    return;
+  }
   if (payload?.sessionId) {
     if (type === 'action_resync') {
       // 断线重连补拉审计：executor 已对 session 重新下发 get_action_log（全量快照幂等补写），

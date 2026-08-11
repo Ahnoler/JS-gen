@@ -172,12 +172,16 @@ export class SessionManager {
     };
   }
 
+  /**
+   * All capacity slots (free + occupied) with current CDP port.
+   * Free slots still report preferred/base port (`EXECUTOR_CDP_PORT_BASE + slotIndex`).
+   */
   list() {
-    return [...this.sessions.entries()].map(([sessionId, slot]) => ({
-      sessionId,
+    return this.slots.map((slot) => ({
+      sessionId: slot.sessionId || null,
       slotIndex: slot.slotIndex,
-      ready: slot.ready,
-      busy: slot.busy,
+      ready: !!slot.ready,
+      busy: !!slot.busy,
       cdpPort: slot.cdpPort ?? null,
     }));
   }
