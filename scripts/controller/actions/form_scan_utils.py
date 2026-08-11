@@ -125,6 +125,61 @@ _SCANNED_FIELD_KINDS = frozenset({
     'input', 'select', 'date', 'radio', 'checkbox', 'tree-select', 'unknown',
 })
 _TREE_FILTER_LABEL_RE = re.compile(r'关键字|过滤|搜索')
+_NUMERIC_DISPLAY_RE = re.compile(r'^-?\d+(\.\d+)?$')
+
+
+def parse_numeric_display(value: str | None) -> float | None:
+    """Parse amount-like display text (strips thousand commas). None if not numeric."""
+    t = (value or '').strip().replace(',', '').replace(' ', '').replace('\u00a0', '')
+    if not t or not _NUMERIC_DISPLAY_RE.fullmatch(t):
+        return None
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+
+def field_values_equivalent(current: str | None, expected: str | None) -> bool:
+    """True when DOM display value matches filled/expected (amount format tolerant).
+
+    ``2026`` ≡ ``2,026.00``. When either side is numeric, do not fall back to
+    substring (avoids ``12`` matching ``1,234.00``). Non-numeric keeps exact /
+    containment for units / suffixes.
+    """
+    a = (current or '').strip()
+    b = (expected or '').strip()
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    na, nb = parse_numeric_display(a), parse_numeric_display(b)
+    if na is not None and nb is not None:
+        return abs(na - nb) < 1e-9
+    if na is not None or nb is not None:
+        return False
+    return b in a or a in b
+
+
+def enrich_field_value_check(info: dict) -> dict:
+    """Annotate check_field_value JSON so agents don't loop on amount formatting."""
+    if not isinstance(info, dict):
+        return info
+    cv = (info.get('currentValue') or '').strip()
+    n = parse_numeric_display(cv)
+    if n is None:
+        return info
+    if ',' in cv or ('.' in cv and cv.split('.')[-1].strip('0') == ''):
+        if abs(n - round(n)) < 1e-9:
+            bare = str(int(round(n)))
+        else:
+            bare = ('%f' % n).rstrip('0').rstrip('.')
+        info['normalizedValue'] = bare
+        info['valueNote'] = (
+            '金额/数字字段可能显示千分位与小数位；'
+            f'normalizedValue={bare} 与填入的裸数字等价时勿反复重填。'
+            '核对请用 verify_field_value。'
+        )
+    return info
 
 
 def tasklist_scan_mode(container_id: str = '') -> str:
@@ -649,6 +704,49 @@ def resolve_recorded_option_text(requested: str, actual: str = '') -> str:
     if req.lower() in _SELECT_OPTION_SENTINELS or req in _SELECT_OPTION_SENTINELS:
         return act or req
     return req or act
+
+
+def select_option_already_matched(requested: str, current: str) -> bool:
+    """True when the field already has the desired option — exact / sentinel only.
+
+    Substring checks (``cur in want`` / ``want in cur``) wrongly skip re-select when
+    国民经济部门类别 wants 其他非金融企业部门 but still shows 非金融企业部门.
+    """
+    req = (requested or '').strip()
+    cur = (current or '').strip()
+    if not cur:
+        return False
+    if req.lower() in _SELECT_OPTION_SENTINELS or req in _SELECT_OPTION_SENTINELS:
+        return True
+    return bool(req) and cur == req
+
+
+def match_select_option_candidate(want: str, options) -> str | None:
+    """Pick a dropdown option for fuzzy recovery — never shorter substring of want.
+
+    Order: exact → shortest option that contains want as a substring.
+    Does **not** use ``o in want`` (that mapped 其他非金融企业部门 → 非金融企业部门).
+    """
+    w = (want or '').strip()
+    if not w:
+        return None
+    opts: list[str] = []
+    seen: set[str] = set()
+    for raw in options or []:
+        if not isinstance(raw, str):
+            continue
+        o = raw.strip()
+        if not o or o == '请选择' or o in seen:
+            continue
+        seen.add(o)
+        opts.append(o)
+    for o in opts:
+        if o == w:
+            return o
+    contained = [o for o in opts if w in o]
+    if contained:
+        return min(contained, key=len)
+    return None
 
 
 # Read current 证件类型 / 证照类型 display value from the open form.

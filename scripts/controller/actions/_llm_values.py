@@ -21,6 +21,7 @@ import time
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from .form_rules import match_rule
+from ._case_data import iter_user_case_entries
 from scripts.controller.actions.section_scope import section_matches
 
 _ASSISTANT_MISSION_INSTRUCTION = (
@@ -69,9 +70,20 @@ def build_assistant_mission_context(case_data_store: dict | None, section: str =
     """Assemble mission context for the form assistant LLM."""
     store = case_data_store or {}
     phase_task = _resolve_phase_task(store)
-    business_data = store.get('_case_scenario_text') or ''
-    if not isinstance(business_data, str):
-        business_data = str(business_data)
+    # Soft text only (same as agent_task): prose block + flat UI case KV.
+    # Omitting flat KV left 【业务数据】 empty when the panel had no scenario
+    # block, so the form LLM invented truncated ids (ai-case-half-fill).
+    block = store.get('_case_scenario_text') or ''
+    if not isinstance(block, str):
+        block = str(block)
+    block = block.strip()
+    parts = []
+    if block:
+        parts.append(block)
+    entries = iter_user_case_entries(store)
+    if entries:
+        parts.append('\n'.join(f'- {k}：{v}' for k, v in entries))
+    business_data = '\n'.join(parts)
     scan_fields = store.get('_scan_fields') or []
     if not isinstance(scan_fields, list):
         scan_fields = []
@@ -323,7 +335,16 @@ def _llm_generate_values(llm, items, case_data_store=None,
             val = str(cmd_val).strip()
             if kind in ('select', 'radio', 'checkbox'):
                 if kind == 'select' and opts and val not in opts:
-                    pass  # Fall through if user value isn't in current options
+                    # Fuzzy containment before falling through to LLM / first-option
+                    from scripts.controller.actions.form_scan_utils import (
+                        match_select_option_candidate,
+                    )
+                    fuzzy = match_select_option_candidate(val, opts)
+                    if fuzzy:
+                        action_name = 'click_radio' if kind == 'radio' else 'select_option'
+                        _append_action({'action': action_name, 'label': label, 'option': fuzzy}, item)
+                        continue
+                    # else fall through — value not in current options
                 else:
                     action_name = 'click_radio' if kind == 'radio' else 'select_option'
                     _append_action({'action': action_name, 'label': label, 'option': val}, item)

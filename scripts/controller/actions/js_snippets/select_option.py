@@ -149,9 +149,18 @@ JS_SELECT_OPTION = '''async (arg) => {
             if (labelMatches(optionLabel(item), option)) return tryClick(item);
         }
         if (!exactOnly) {
+            // Prefer shortest lab that contains want — avoids 非金融 matching 其他非金融
+            // when want is the short label; when want is the long label only the long lab matches.
+            let best = null;
+            let bestLen = Infinity;
             for (const item of pickPool) {
-                if (optionLabel(item).includes(option)) return tryClick(item);
+                const lab = optionLabel(item);
+                if (lab.includes(option) && lab.length < bestLen) {
+                    best = item;
+                    bestLen = lab.length;
+                }
             }
+            if (best) return tryClick(best);
         }
         return null;
     };
@@ -331,19 +340,24 @@ JS_READ_SELECT_OPTIONS = '''([label]) => {
     let selectEl = null;
     if (want) {
         for (const c of containers) {
-            for (let pass = 1; pass <= 2 && !trigger; pass++) {
-                const exact = pass === 1;
-                for (const item of c.querySelectorAll('.el-form-item')) {
-                    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                    if (exact) { if (lbl !== want) continue; }
-                    else { if (lbl === want || !lbl.includes(want)) continue; }
-                    const t = item.querySelector('.el-select .el-input__inner');
-                    const sel = item.querySelector('.el-select');
-                    if (t || sel) {
-                        trigger = t;
-                        selectEl = sel || (t && t.closest('.el-select'));
-                        break;
-                    }
+            const wantN = String(want || '').replace(/\s+/g, ' ').trim()
+                .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+            let exactItem = null;
+            let includesItem = null;
+            for (const item of c.querySelectorAll('.el-form-item')) {
+                const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                const labN = String(lbl || '').replace(/\s+/g, ' ').trim()
+                    .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+                if (wantN && labN === wantN) { exactItem = item; break; }
+                if (wantN && !includesItem && labN && labN.includes(wantN)) includesItem = item;
+            }
+            const item = exactItem || includesItem;
+            if (item) {
+                const t = item.querySelector('.el-select .el-input__inner');
+                const sel = item.querySelector('.el-select');
+                if (t || sel) {
+                    trigger = t;
+                    selectEl = sel || (t && t.closest('.el-select'));
                 }
             }
             if (trigger || selectEl) break;
@@ -396,9 +410,16 @@ JS_FIND_OPTION = '''(option) => {
     for (const item of items) {
         if (optionLabel(item) === option) return option;
     }
+    let bestLab = '';
+    let bestLen = Infinity;
     for (const item of items) {
-        if (optionLabel(item).includes(option)) return optionLabel(item);
+        const lab = optionLabel(item);
+        if (lab.includes(option) && lab.length < bestLen) {
+            bestLab = lab;
+            bestLen = lab.length;
+        }
     }
+    if (bestLab) return bestLab;
     const hasEmpty = document.querySelector('.el-select-dropdown__empty');
     if (hasEmpty) return 'NO_ITEMS';
     return 'NOT_FOUND:' + [...items].map(i => optionLabel(i)).join(', ');
