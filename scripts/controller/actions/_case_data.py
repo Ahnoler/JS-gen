@@ -23,6 +23,7 @@ often hold **业务数据** from the requirement; rename carefully if you touch 
 
 Design for 业务数据: tolerate wording drift; never hard-match fieldKey to form
 labels for autofill (that caused magnifier queries to reuse main-form names).
+Ship raw block + flat KV as text on ``agent_task`` via ``format_case_data_hint``.
 """
 
 from ._helpers import _ok, _err
@@ -124,6 +125,9 @@ def format_case_data_hint(case_data_store: dict | None) -> str:
     This hint is **业务数据**, not system-captured 案例数据. Users write soft
     notes (「法定责任人引入 朱桂武」); the agent maps them to controls. Do not
     hard-match keys to form labels.
+
+    Always attach both the prose block (if any) and flat KV entries (if any) so
+    ``agent_task`` preview carries usable values for the LLM.
     """
     if not case_data_store:
         return ''
@@ -138,7 +142,7 @@ def format_case_data_hint(case_data_store: dict | None) -> str:
     ]
     if block:
         parts.append(block)
-    elif entries:
+    if entries:
         parts.append('\n'.join(f'- {k}：{v}' for k, v in entries))
     return '\n'.join(parts) + '\n'
 

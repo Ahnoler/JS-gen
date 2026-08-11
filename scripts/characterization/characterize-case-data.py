@@ -64,6 +64,36 @@ def test_lookup_exact_and_fuzzy() -> None:
     assert_true(lookup_case_value(store, '不存在') is None, 'missing')
 
 
+def test_hint_includes_block_and_flat_kv() -> None:
+    """agent_task 业务数据：原文 block 与扁平 KV 同时附上（不再 elif 互斥）。"""
+    store = {
+        '_case_scenario_text': '关键数据\n法定责任人引入 朱桂武',
+        '客户类型': '正式客户',
+        '证件类型': '营业执照',
+    }
+    hint = format_case_data_hint(store)
+    assert_true('法定责任人引入 朱桂武' in hint, 'prose block present')
+    assert_true('客户类型：正式客户' in hint or '客户类型' in hint, 'flat KV key')
+    assert_true('正式客户' in hint, 'flat KV value')
+    assert_true('营业执照' in hint, 'second KV')
+    assert_true('业务数据' in hint, 'header')
+
+
+def test_auto_fill_does_not_hard_bind_case_presets() -> None:
+    """Product: case KV is agent_task text only — not commandValue hard-bind."""
+    from pathlib import Path
+    form = (Path(_ROOT) / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
+    case = (Path(_ROOT) / 'scripts/controller/actions/_case_data.py').read_text(encoding='utf-8')
+    assert_true(
+        'apply_case_presets_to_fields' not in form,
+        '_form must not hard-bind case presets',
+    )
+    assert_true(
+        'def apply_case_presets_to_fields' not in case,
+        'apply_case_presets_to_fields removed',
+    )
+
+
 def test_hint_lists_user_keys_only() -> None:
     store = {
         '客户名称': 'UI录制',
@@ -77,7 +107,7 @@ def test_hint_lists_user_keys_only() -> None:
     assert_true('业务数据' in hint, 'hint header')
     assert_true(format_case_data_hint({}) == '', 'empty store')
 
-    # Prefer raw scenario text over KV hard-match messaging
+    # Prefer raw scenario text; flat KV still listed alongside when present
     with_block = {
         '_case_scenario_text': '关键数据\n法定责任人引入 朱桂武',
         '客户名称': '测试科技发展有限公司',
@@ -87,6 +117,7 @@ def test_hint_lists_user_keys_only() -> None:
     assert_true('自行判断' in hint2, 'AI-judge cue')
     assert_true('非系统回写' in hint2 or '不是系统回写' in hint2, '业务 vs 案例 distinction')
     assert_true('必须优先使用这些值' not in hint2, 'no hard-match mandate')
+    assert_true('测试科技发展有限公司' in hint2, 'flat KV alongside block')
 
 
 def test_search_dialog_heuristic() -> None:
@@ -239,13 +270,51 @@ def test_phase_preamble_catalog_and_prior() -> None:
     assert_true('打开客户列表' in preamble, 'preamble keeps task text')
     assert_true('【业务场景】' not in preamble, 'no legacy scenario dump')
 
+    # Full trajectory catalog (not only selected recording subset)
+    full = format_phase_preamble(
+        current_phase=3,
+        current_task='新增客户',
+        prior_phases=None,
+        case_data_store=None,
+        all_phases=[
+            {'phaseNumber': 1, 'title': '登录系统'},
+            {'phaseNumber': 2, 'title': '进入客户管理'},
+            {'phaseNumber': 3, 'title': '新增客户'},
+            {'phaseNumber': 4, 'title': '保存校验'},
+        ],
+        prior_outcome={'phaseNumber': 2, 'success': True, 'text': '已打开列表'},
+    )
+    assert_true('1. 登录系统' in full, 'catalog phase 1')
+    assert_true('2. 进入客户管理' in full, 'catalog phase 2')
+    assert_true('3. 新增客户 ←当前' in full, 'catalog marks current')
+    assert_true('4. 保存校验' in full, 'catalog includes unselected later phase')
+
+
+def test_recording_runner_all_phases_from_full_trajectory() -> None:
+    """Source: stepData.all_phases maps allPhases, not filtered phases."""
+    from pathlib import Path
+    src = (Path(_ROOT) / 'src/services/trajectory/trajectory-recording-runner.js').read_text(
+        encoding='utf-8',
+    )
+    assert_true(
+        'const all_phases = allPhases.map' in src.replace('\r\n', '\n'),
+        'all_phases must map from allPhases (full trajectory)',
+    )
+    assert_true(
+        'const all_phases = phases.map' not in src.replace('\r\n', '\n'),
+        'must not map filtered phases into catalog',
+    )
+
 
 def main() -> None:
     test_lookup_exact_and_fuzzy()
+    test_hint_includes_block_and_flat_kv()
+    test_auto_fill_does_not_hard_bind_case_presets()
     test_hint_lists_user_keys_only()
     test_search_dialog_heuristic()
     test_three_task_modes()
     test_phase_preamble_catalog_and_prior()
+    test_recording_runner_all_phases_from_full_trajectory()
     print('characterize-case-data: OK')
 
 

@@ -233,7 +233,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     recordingSystemId = null;
   }
 
-  const all_phases = phases.map((p) => ({
+  // Catalog for agent_task 【阶段目录】must list EVERY trajectory phase,
+  // not only the phaseIds subset being recorded this run.
+  const all_phases = allPhases.map((p) => ({
     id: p.id,
     phaseNumber: p.phaseNumber,
     title: (p.title || p.name || '').trim() || String(p.description || '').split('\n')[0].slice(0, 80),
