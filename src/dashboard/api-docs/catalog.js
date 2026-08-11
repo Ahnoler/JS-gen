@@ -20,9 +20,19 @@ import { GROUP_WEBSOCKET } from './groups/websocket.js';
 import { GROUP_EXPORT } from './groups/export-mgmt.js';
 import { GROUP_REGIONS } from './groups/regions.js';
 
+/** Live slot occupancy board (not an HTTP endpoint group). */
+export const GROUP_SLOT_MONITOR = [{
+  id: 'slot-monitor',
+  name: '执行机监视',
+  description: '按执行机拆分槽位占用；断开画面 / 释放浏览器',
+  endpoints: [],
+  monitor: true,
+}];
+
 /** @type {TagGroup[]} */
 export const API_GROUPS = [
   ...GROUP_OVERVIEW,
+  ...GROUP_SLOT_MONITOR,
   ...GROUP_HIERARCHY,
   ...GROUP_COMPONENTS,
   ...GROUP_TRAJECTORY,
