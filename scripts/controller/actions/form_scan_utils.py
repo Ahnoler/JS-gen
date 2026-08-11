@@ -753,18 +753,37 @@ def _resolve_control(case_data_store, label_text: str, xpath_hint: str = "") -> 
     hint = (xpath_hint or "").strip()
     if hint:
         resolved_label = label
+        in_inventory = False
         for f in case_data_store.get("_scan_fields") or []:
             if isinstance(f, dict) and (f.get("xpath_smart") or "").strip() == hint:
                 resolved_label = (f.get("label") or label).strip() or label
+                in_inventory = True
                 break
-        if resolved_label == label:
+        if not in_inventory:
             tl = TaskList.from_store(case_data_store.get("task_list"))
             for item in list(tl.pending) + list(tl.done):
                 if (item.xpath_smart or "").strip() == hint and (item.label or "").strip():
                     resolved_label = item.label.strip()
+                    in_inventory = True
                     break
-        return ResolvedControl(xpath_smart=hint, label=resolved_label or label, error="")
+        if in_inventory:
+            return ResolvedControl(xpath_smart=hint, label=resolved_label or label, error="")
+        # Invented / stale hint (traj 130 placeholder[1]): prefer unique inventory
+        # for this label when available; keep hint only as last resort.
+        by_label = _resolve_control_by_label(case_data_store, label_text)
+        if not by_label.error and by_label.xpath_smart:
+            return by_label
+        # Spec: never return invented hint for write/persist.
+        return ResolvedControl(
+            xpath_smart="",
+            label=label or label_text or "",
+            error="xpath-not-found",
+        )
 
+    return _resolve_control_by_label(case_data_store, label_text)
+
+
+def _resolve_control_by_label(case_data_store, label_text: str) -> ResolvedControl:
     matches: list[tuple[str, str]] = []
     seen_xp: set[str] = set()
     tl = TaskList.from_store(case_data_store.get("task_list"))

@@ -339,7 +339,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         use_label_fallback = (
             (not strict_xpath)
             and bool(resolved.error)
-            and not (xpath_smart or '').strip()
+            and not (resolved.xpath_smart or "").strip()
         )
         if resolved.error and not use_label_fallback:
             if strict_xpath and not (resolved.xpath_smart or xpath_smart or '').strip():
@@ -356,14 +356,19 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 element = await _capture_element(
                     page, label_text, target_kind='form_input', xpath_smart='',
                 )
+                xp_out = (
+                    (element.get("xpath_smart") or "").strip()
+                    if isinstance(element, dict)
+                    else ""
+                )
                 _record_action(
                     'fill_form_field',
-                    {'label_text': label_text, 'value': value, 'xpath_smart': ''},
+                    {'label_text': label_text, 'value': value, 'xpath_smart': xp_out},
                     result,
                     element=element,
                 )
                 if not _is_query_mode(case_data_store):
-                    _task_done_impl(label_text, case_data_store, value=value)
+                    _task_done_impl(label_text, case_data_store, value=value, xpath_smart=xp_out)
                 return _ok(_with_submit_cue(result, case_data_store))
             return _with_submit_cue(result or resolved.error, case_data_store)
         element = await _capture_element(

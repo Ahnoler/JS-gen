@@ -67,11 +67,82 @@ def test_select_runtime_fallback_rejects_same_or_ambiguous() -> None:
     )
 
 
-def test_resolve_hint_wins() -> None:
+def test_resolve_invented_hint_without_inventory_is_not_found() -> None:
+    """Lookup-only: invented hint must not become resolved.xpath_smart."""
+    store = {"task_list": TaskList().to_store(), "_scan_fields": []}
+    invented = "//input[@placeholder='请输入'][1]"
+    r = _resolve_control(store, "核心产品编号", invented)
+    assert_true(r.xpath_smart == "", f"must not keep invented hint, got {r.xpath_smart!r}")
+    assert_true(r.error == "xpath-not-found", f"expected xpath-not-found, got {r.error!r}")
+
+
+def test_resolve_hint_wins_still_requires_inventory() -> None:
+    """Rename/retire test_resolve_hint_wins: empty inventory + hint → not-found."""
     store = {"task_list": TaskList().to_store(), "_scan_fields": []}
     r = _resolve_control(store, "任意", xpath_hint="//div[@id='x']//input")
-    assert_true(r.error == "" and r.xpath_smart.endswith("input"), "hint wins")
-    assert_true(isinstance(r, ResolvedControl), "ResolvedControl type")
+    assert_true(r.xpath_smart == "" and r.error == "xpath-not-found", "no last-resort hint")
+
+
+def test_resolve_invented_hint_falls_back_to_inventory() -> None:
+    """Traj 130: LLM placeholder[1] must not override unique label inventory.
+
+    Shared placeholder 「请输入」 + ``//input[@placeholder='请输入'][1]`` would
+    always hit the first input; prefer scan/task xpath for the named label.
+    """
+    xp_code = (
+        "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+        "//div[contains(@class,'el-form-item')]"
+        "[.//label[contains(normalize-space(.),'核心产品编号')]]//input"
+    )
+    xp_name = (
+        "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+        "//div[contains(@class,'el-form-item')]"
+        "[.//label[contains(normalize-space(.),'核心产品名称')]]//input"
+    )
+    invented = "//input[@placeholder='请输入'][1]"
+    fields = [
+        {"label": "核心产品编号", "kind": "input", "xpath_smart": xp_code},
+        {"label": "核心产品名称", "kind": "input", "xpath_smart": xp_name},
+    ]
+    store = {
+        "task_list": TaskList(
+            pending=[
+                TaskItem(label="核心产品编号", kind="input", xpath_smart=xp_code),
+                TaskItem(label="核心产品名称", kind="input", xpath_smart=xp_name),
+            ]
+        ).to_store(),
+        "_scan_fields": fields,
+    }
+    r_code = _resolve_control(store, "核心产品编号", invented)
+    assert_true(r_code.error == "", "编号 resolve ok")
+    assert_true(r_code.xpath_smart == xp_code, "编号 discards invented placeholder hint")
+    r_name = _resolve_control(store, "核心产品名称", invented)
+    assert_true(r_name.error == "", "名称 resolve ok")
+    assert_true(r_name.xpath_smart == xp_name, "名称 discards same invented hint")
+    assert_true(r_code.xpath_smart != r_name.xpath_smart, "编号/名称 stay distinct")
+
+
+def test_resolve_inventory_hint_still_wins() -> None:
+    """Hint that matches scan inventory stays authoritative (agent copied correctly)."""
+    xp = (
+        "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+        "//div[contains(@class,'el-form-item')]"
+        "[.//label[contains(normalize-space(.),'核心产品编号')]]//input"
+    )
+    store = {
+        "task_list": TaskList().to_store(),
+        "_scan_fields": [
+            {"label": "核心产品编号", "kind": "input", "xpath_smart": xp},
+            {
+                "label": "核心产品名称",
+                "kind": "input",
+                "xpath_smart": xp.replace("核心产品编号", "核心产品名称"),
+            },
+        ],
+    }
+    r = _resolve_control(store, "核心产品编号", xp)
+    assert_true(r.error == "" and r.xpath_smart == xp, "inventory hint kept")
+    assert_true(r.label == "核心产品编号", "label from inventory")
 
 
 def test_resolve_unique_label() -> None:
@@ -271,7 +342,10 @@ def test_agent_prompt_xpath_primary() -> None:
 def main() -> int:
     test_select_runtime_fallback_unique_inventory()
     test_select_runtime_fallback_rejects_same_or_ambiguous()
-    test_resolve_hint_wins()
+    test_resolve_invented_hint_without_inventory_is_not_found()
+    test_resolve_hint_wins_still_requires_inventory()
+    test_resolve_invented_hint_falls_back_to_inventory()
+    test_resolve_inventory_hint_still_wins()
     test_resolve_unique_label()
     test_resolve_not_found()
     test_resolve_ambiguous()
