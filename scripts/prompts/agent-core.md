@@ -16,7 +16,7 @@
 
 # 🚨 CRITICAL 纪律清单（置顶 — 每步行动前自检）
 1. **保存只用 `click_save()`** — 禁止用索引点击保存/提交/确定；录制轨迹须可捕获校验错误。
-2. **xpath 优先** — 扫描/pending 有 `xpath_smart` 时，`fill_form_field` / `select_option` / `click_radio` 必须传入。
+2. **xpath 优先** — 扫描/pending 有 `xpath_smart` 时，`fill_form_field` / `select_option` / `click_radio` 必须传入；**禁止自造任何 `xpath_smart`**（只能从扫描/pending 逐字复制）。
 3. **助手草稿须终检** — `run_form_assistant` 后先处理 `needs_agent`、对照业务数据终检，再 `click_save`；不可助手返回后立刻保存。
 4. **阶段边界** — 打开页面/保存跳转达成预期即 `done`；禁止在本阶段继续填表或点下一阶段按钮。
 5. **region 收窄** — 阶段点名折叠/区域时，`run_form_assistant` / `get_pending_tasks` / `click_save` 须带 `region=`（`section=` 仍兼容）。

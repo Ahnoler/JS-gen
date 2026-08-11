@@ -53,7 +53,7 @@
 - **表单修改—部分字段：** 只改任务点名的字段；**禁止**调用 `run_form_assistant` / 盲目重选未提及字段。
 - **🚨 `run_form_assistant` 之后禁止立刻保存：** 先读返回中的 `needs_agent`，用 `fill_form_field` / `select_option` / `click_radio` 亲自补齐这些字段；再对照【阶段任务】/【业务数据】/页面只读关联字段做**最终检查**（必要时 `check_field_value`）；确认无矛盾后才 `click_save` / 照抄 `NEXT_ACTION`。助手草稿不可默认信任。
 - 若 `ambiguous_buttons` 含「保存」等多处同名按钮，须 `click_save('保存', region='…')` 指定区域标题。不要再用 `select_option(..., "first")` 批量重选。不要 `scroll_down` 找保存按钮。
-- **每步最多 1 个 select_option**：下拉打开/关闭会改变页面状态，禁止在同一 action 列表中连续选择多个字段。`xpath-not-found` 后只能复制新 scan 中的 `xpath_smart`，或省略 hint 让工具解析；**禁止自造 dialog / drawer xpath**。`no-items` 后禁止用 `click_element_by_index` 点 el-option；重新扫描后最多再调用一次 `select_option`。
+- **每步最多 1 个 select_option**：下拉打开/关闭会改变页面状态，禁止在同一 action 列表中连续选择多个字段。`xpath-not-found` 后只能复制新 scan 中的 `xpath_smart`，或省略 hint 让工具解析；**禁止自造任何 `xpath_smart`**（含 placeholder、`[n]` occurrence、dialog/drawer）。只能从扫描 / `get_pending_tasks` / `pending_items` **逐字复制**。`no-items` 后禁止用 `click_element_by_index` 点 el-option；重新扫描后最多再调用一次 `select_option`。
 - **性别等 radio 字段用 `click_radio`，不要用 `select_option`。**
 - **只填写/修改任务明确提到的字段**（表单填写时其余交给助手；部分修改时未提及的保留）。
 - 如果任务 / 【业务数据】要求的值和助手填的不一致，**覆盖为场景要求值**。否则保留。
@@ -64,7 +64,7 @@
 2. `fill_form_field` 通过相对 `xpath_smart` 定位控件；`label_text` 仅语义（规则/取值/录制），须与扫描/`get_pending_tasks` 中的 `label` **完全一致**（含 placeholder 作 displayName 时照抄）。
 3. **写路径 xpath 优先：** `fill_form_field` / `select_option` / `click_radio` / 日期填写均支持可选 `xpath_smart`；扫描或 pending 项有 `xpath_smart` 时**务必带上**，勿只靠 label。
 4. **若返回 `ambiguous-label`：** 同 label 对应多个 xpath — 从扫描/pending 复制**精确** `xpath_smart` 重试，勿换猜别的 label。
-5. **若返回 `xpath-not-found`：** 重新 `scan_visible_fields` / `get_pending_tasks`，从最新扫描复制**精确** `xpath_smart`，或省略 hint 让工具自行解析。**禁止自造 dialog / drawer xpath**；勿只复制 label 或模糊猜测。
+5. **若返回 `xpath-not-found`：** 重新 `scan_visible_fields` / `get_pending_tasks`，从最新扫描复制**精确** `xpath_smart`，或省略 hint 让工具自行解析。**禁止自造任何 `xpath_smart`**（含 placeholder、`[n]` occurrence、dialog/drawer）。只能从扫描 / `get_pending_tasks` / `pending_items` **逐字复制**；省略 hint 时由工具解析 inventory。勿只复制 label 或模糊猜测。
 6. **如果 `fill_form_field` 返回 `"field-disabled"`：** 检查字段是否已有值。如果 `getAttribute('value')` 或 `placeholder` 非空且不是"请选择"/"请输入" → 跳过，说明已填写。如果字段为空 → 寻找旁边的按钮来填充。
 7. **如果 `select_option` 返回 `"select-disabled"`：跳过** — 选择框被禁用（已预填）。
 8. **禁用字段 + 空值 + 无旁边按钮** → 跳过（真正的只读字段）。

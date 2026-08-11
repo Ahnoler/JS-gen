@@ -330,6 +330,18 @@ def test_phase_b_action_signatures() -> None:
         assert_true("xpath_smart" in chunk, f"{name} accepts xpath_smart")
 
 
+def test_prompt_forbids_invented_xpath() -> None:
+    text = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
+    assert_true(
+        "禁止自造任何" in text or "禁止自造任何 `xpath_smart`" in text,
+        "forbid all invented xpath",
+    )
+    assert_true(
+        "placeholder" in text.lower() or "逐字复制" in text,
+        "mentions copy-verbatim / placeholder",
+    )
+
+
 def test_agent_prompt_xpath_primary() -> None:
     prompt = build_agent_system_message(None)
     assert_true("xpath_smart" in prompt, "prompt mentions xpath_smart")
@@ -359,6 +371,7 @@ def main() -> int:
     test_phase_a_hardcut_markers()
     test_llm_actions_carry_xpath()
     test_phase_b_action_signatures()
+    test_prompt_forbids_invented_xpath()
     test_agent_prompt_xpath_primary()
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
