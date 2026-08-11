@@ -354,6 +354,11 @@ def _element_xpath_full(entry: dict | None) -> str:
 
 
 def _params_xpath_smart(entry, params) -> str:
+    """Read params.xpath_smart if present.
+
+    Not used by ``_resolve_replay_xpath`` (element-first; params xpath abandoned
+    for locate). Kept for diagnostics / ops tooling that still inspect params.
+    """
     p = params if isinstance(params, dict) else {}
     xp = str(p.get('xpath_smart') or '').strip()
     if xp.startswith('//') or xp.startswith('('):
@@ -362,12 +367,15 @@ def _params_xpath_smart(entry, params) -> str:
 
 
 def _resolve_replay_xpath(entry, params) -> tuple[str, str]:
+    """Pick replay xpath: element.xpath_smart → xpath_full.
+
+    ``params.xpath_smart`` is intentionally ignored (abandoned for locate).
+    Dirty/wrong params historically beat correct ``element_json`` under
+    params-first (traj 130 step 23: label 名称, params pointed at 编号).
+    """
     if not relative_xpath_primary_enabled():
         full = _element_xpath_full(entry)
         return (full, 'full') if full else ('', '')
-    px = _params_xpath_smart(entry, params)
-    if px:
-        return px, 'params'
     ex = _element_xpath_smart(entry)
     if ex:
         return ex, 'element'
@@ -460,7 +468,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
     """One form field op using the same JS path as `_execute_round`.
 
     Locator order when RELATIVE_XPATH_PRIMARY:
-      1) xpath_smart
+      1) element.xpath_smart (params.xpath_smart ignored for locate)
       2) label/semantic
       3) xpath_full
       (+ placeholder when no form-item label)
@@ -485,13 +493,15 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
     if action_name == 'fill_form_field':
         ph = placeholder
-        params_xp = _params_xpath_smart(entry, params)
+        element_xp = _element_xpath_smart(entry) if use_relative else ''
 
         async def _try_xpath_fill(xpath: str, locate_src: str) -> str | None:
-            result = await page.evaluate(JS_FILL_BY_XPATH, [xpath, value, ph])
+            # Prefer label_text so shared placeholder xpaths disambiguate form-items
+            # (traj 130: //input[@placeholder='请输入'][1] + last-visible → 名称).
+            hint = label or ph
+            result = await page.evaluate(JS_FILL_BY_XPATH, [xpath, value, hint])
             action_ok = isinstance(result, str) and result.startswith('ok')
-            read_xp = params_xp or xpath
-            actual = await _read_value_by_xpath(page, read_xp) if read_xp else ''
+            actual = await _read_value_by_xpath(page, xpath) if xpath else ''
             classified = _classify_fill_result(action_ok, value, actual)
             if classified == 'ok':
                 await page.wait_for_timeout(300)
@@ -510,8 +520,8 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
         if isinstance(result, str) and result.startswith('ok'):
             await page.wait_for_timeout(300)
-            if params_xp:
-                actual = await _read_value_by_xpath(page, params_xp)
+            if element_xp:
+                actual = await _read_value_by_xpath(page, element_xp)
                 classified = _classify_fill_result(True, value, actual)
                 if classified.startswith('false_ok'):
                     return classified
@@ -522,8 +532,8 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             result = await page.evaluate(JS_FILL_FORM_FIELD, [placeholder, value])
             if isinstance(result, str) and result.startswith('ok'):
                 await page.wait_for_timeout(300)
-                if params_xp:
-                    actual = await _read_value_by_xpath(page, params_xp)
+                if element_xp:
+                    actual = await _read_value_by_xpath(page, element_xp)
                     classified = _classify_fill_result(True, value, actual)
                     if classified.startswith('false_ok'):
                         return classified
@@ -582,7 +592,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         # Recorded selection is authoritative — replay MUST pick the same option_text.
         # params.options / element.options are inventory for export & downstream products
         # (reference only; never used to substitute a different value).
-        params_xp = _params_xpath_smart(entry, params)
+        element_xp = _element_xpath_smart(entry) if use_relative else ''
         pick = str(value or '').strip()
 
         async def _replay_select_final_failure(result_text: str) -> str:
@@ -762,8 +772,8 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
         label_result = await _select_by_label()
         if isinstance(label_result, str) and label_result.startswith('ok'):
-            if params_xp:
-                actual = await _read_value_by_xpath(page, params_xp)
+            if element_xp:
+                actual = await _read_value_by_xpath(page, element_xp)
                 classified = _classify_fill_result(True, pick, actual)
                 if classified.startswith('false_ok'):
                     return await _replay_select_final_failure(classified)
