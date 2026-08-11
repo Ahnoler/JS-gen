@@ -27,6 +27,7 @@ import time
 from ._helpers import (
     _wait_if_loading,
     _is_ok_result,
+    reset_select_ui,
 )
 from ._js_snippets import (
     JS_CHECK_LOADING,
@@ -583,24 +584,57 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         # (reference only; never used to substitute a different value).
         params_xp = _params_xpath_smart(entry, params)
         pick = str(value or '').strip()
+
+        async def _replay_select_final_failure(result_text: str) -> str:
+            diag = await reset_select_ui(page)
+            sys.stderr.write(
+                f'[replay-select] final failure label={label!r} option={pick!r} '
+                f'result={result_text!r} reset={diag}\n'
+            )
+            sys.stderr.flush()
+            return str(result_text)
+
+        branch_reset_diag = await reset_select_ui(page)
+        if not branch_reset_diag.get('closed', False):
+            sys.stderr.write(
+                f'[replay-select] branch preflight reset incomplete label={label!r} reset={branch_reset_diag}\n'
+            )
+            sys.stderr.flush()
+            return await _replay_select_final_failure('no-items')
+
         if not pick:
             return 'error:missing-option_text'
-        if pick.lower() in ('first', 'any', 'random'):
+        # Legacy dirty steps may still store option_text=first (recording used to skip
+        # stamping). "first" meant "any existing value is fine" — if the control already
+        # has a value, accept ok-already. Never invent options[0]. Empty → still fail.
+        _SENT = frozenset({'first', 'any', 'random', '1st', '第一个', '第一项'})
+        if pick.lower() in _SENT or pick in _SENT:
+            xp_s, src_s = _resolve_replay_xpath(entry, params)
+            if xp_s:
+                already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp_s])
+                if isinstance(already, str) and already.startswith('ok-already:'):
+                    cur = already.split(':', 1)[1].strip()
+                    if cur:
+                        await page.wait_for_timeout(200)
+                        return f'ok-already:{cur}|locate={src_s}|legacy-sentinel:{pick}'
+            if label:
+                already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
+                if isinstance(already, str) and already.startswith('ok-already:'):
+                    cur = already.split(':', 1)[1].strip()
+                    if cur:
+                        await page.wait_for_timeout(200)
+                        return f'ok-already:{cur}|locate=label|legacy-sentinel:{pick}'
             return f'bad_option_text:{pick}'
 
-        _JS_CLOSE_SELECT_POPPERS = '''() => {
-            document.querySelectorAll('.el-select-dropdown:not(.is-hidden)').forEach(dd => {
-                dd.style.display = 'none';
-                dd.classList.add('is-hidden');
-            });
-            document.body.click();
-        }'''
-
-        async def _close_select_poppers():
-            await page.evaluate(_JS_CLOSE_SELECT_POPPERS)
-            await page.wait_for_timeout(100)
-
         async def _select_by_xpath(xpath: str, locate_src: str) -> str | None:
+            reset_diag = await reset_select_ui(page)
+            if not reset_diag.get('closed', False):
+                sys.stderr.write(
+                    f'[replay-select] xpath preflight reset incomplete xpath={xpath!r} reset={reset_diag}\n'
+                )
+                sys.stderr.flush()
+                return await _replay_select_final_failure('no-items')
+
             already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xpath])
             if isinstance(already, str) and already.startswith('ok-already:'):
                 cur_val = already.split(':', 1)[1].strip()
@@ -608,7 +642,6 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                     await page.wait_for_timeout(200)
                     return f'ok-already:{pick}|locate={locate_src}'
 
-            await _close_select_poppers()
             trig = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath])
             if not _is_ok_result(str(trig)):
                 return None
@@ -623,22 +656,42 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                     break
                 if result != 'no-items':
                     break
-                await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath])
+                if result == 'no-items' and attempt < 2:
+                    reset_diag = await reset_select_ui(page)
+                    if not reset_diag.get('closed', False):
+                        sys.stderr.write(
+                            f'[replay-select] retrigger reset incomplete xpath={xpath!r} reset={reset_diag}\n'
+                        )
+                        sys.stderr.flush()
+                        result = 'no-items'
+                        break
+                    retrigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath])
+                    if not _is_ok_result(str(retrigger)):
+                        result = str(retrigger)
+                        break
 
             if isinstance(result, str) and result.startswith('ok'):
                 got = result.split(':', 1)[1].strip() if ':' in result else ''
                 if got and got != pick:
-                    return f'option-mismatch:want={pick}|got={got}'
+                    return await _replay_select_final_failure(f'option-mismatch:want={pick}|got={got}')
                 actual = await _read_value_by_xpath(page, xpath)
                 classified = _classify_fill_result(True, pick, actual)
                 await page.wait_for_timeout(500)
                 if classified.startswith('false_ok'):
-                    return classified
+                    return await _replay_select_final_failure(classified)
                 return f'ok:locate={locate_src}'
 
-            return str(result)
+            return await _replay_select_final_failure(str(result))
 
         async def _select_by_label() -> str:
+            reset_diag = await reset_select_ui(page)
+            if not reset_diag.get('closed', False):
+                sys.stderr.write(
+                    f'[replay-select] label preflight reset incomplete label={label!r} reset={reset_diag}\n'
+                )
+                sys.stderr.flush()
+                return await _replay_select_final_failure('no-items')
+
             already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
             if isinstance(already, str) and already.startswith('ok-already:'):
                 cur_val = already.split(':', 1)[1].strip()
@@ -646,11 +699,9 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                     await page.wait_for_timeout(200)
                     return already
 
-            await _close_select_poppers()
-
             trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
             if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled'):
-                return str(trigger_result)
+                return await _replay_select_final_failure(str(trigger_result))
 
             result = 'no-items'
             for attempt in range(3):
@@ -662,17 +713,29 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                     break
                 if result != 'no-items':
                     break
-                await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+                if result == 'no-items' and attempt < 2:
+                    reset_diag = await reset_select_ui(page)
+                    if not reset_diag.get('closed', False):
+                        sys.stderr.write(
+                            f'[replay-select] retrigger reset incomplete label={label!r} reset={reset_diag}\n'
+                        )
+                        sys.stderr.flush()
+                        result = 'no-items'
+                        break
+                    retrigger = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+                    if not _is_ok_result(str(retrigger)):
+                        result = str(retrigger)
+                        break
 
             if isinstance(result, str) and result.startswith('ok'):
                 got = result.split(':', 1)[1].strip() if ':' in result else ''
                 if got and got != pick:
-                    return f'option-mismatch:want={pick}|got={got}'
+                    return await _replay_select_final_failure(f'option-mismatch:want={pick}|got={got}')
                 confirmed = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
                 if isinstance(confirmed, str) and confirmed.startswith('ok-confirmed:'):
                     cur = confirmed.split(':', 1)[1].strip()
                     if cur and cur != pick:
-                        return f'option-mismatch:want={pick}|got={cur}'
+                        return await _replay_select_final_failure(f'option-mismatch:want={pick}|got={cur}')
                 elif not (isinstance(confirmed, str) and confirmed.startswith('ok-confirmed:')):
                     await page.evaluate(JS_FILL_FORM_FIELD, [label, pick])
                     await page.wait_for_timeout(200)
@@ -680,12 +743,16 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                     if isinstance(confirmed2, str) and confirmed2.startswith('ok-confirmed:'):
                         cur = confirmed2.split(':', 1)[1].strip()
                         if cur != pick:
-                            return f'option-mismatch:want={pick}|got={cur}'
+                            return await _replay_select_final_failure(f'option-mismatch:want={pick}|got={cur}')
                         result = confirmed2
                     else:
-                        return f'option-not-synced:want={pick}|confirm={confirmed2}'
+                        return await _replay_select_final_failure(
+                            f'option-not-synced:want={pick}|confirm={confirmed2}'
+                        )
             await page.wait_for_timeout(500)
-            return str(result)
+            if isinstance(result, str) and result.startswith('ok'):
+                return str(result)
+            return await _replay_select_final_failure(str(result))
 
         xp, src = _resolve_replay_xpath(entry, params)
         if xp:
@@ -699,7 +766,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                 actual = await _read_value_by_xpath(page, params_xp)
                 classified = _classify_fill_result(True, pick, actual)
                 if classified.startswith('false_ok'):
-                    return classified
+                    return await _replay_select_final_failure(classified)
                 if classified == 'ok':
                     return 'ok:locate=label'
             return _annotate_label_result(label_result)

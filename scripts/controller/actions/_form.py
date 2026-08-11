@@ -22,6 +22,7 @@ from ._helpers import (
     _wait_if_loading, _capture_element, _merge_ax_text,
     _enrich_click_element,
     attach_select_options, options_from_scan_store, read_select_options,
+    reset_select_ui,
 )
 from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR,
@@ -53,8 +54,8 @@ from .form_scan_utils import (
     _build_section_summary, build_editable_summary, _is_query_mode, _skip_auto_fill,
     _mark_query_ui_if_needed,
     filter_fillable_scan_fields, prepare_scan_fields_for_tasklist, tasklist_scan_mode,
-    _pack_select_record, _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
-    ResolvedControl, _resolve_control, _task_xpath_smart, _task_done_impl,
+    _pack_select_record, resolve_recorded_option_text, _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
+    ResolvedControl, _resolve_control, resolve_select_fallback, _task_xpath_smart, _task_done_impl,
     _submit_ready_hint, _switch_task_list_container, _with_submit_cue, _query_not_form_payload,
 )
 
@@ -805,6 +806,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if not xp:
                 return 'xpath-not-found'
             _FIRST = ('first', '1st', '第一个', '第一项')
+            reset_diag = await reset_select_ui(page)
+            if not reset_diag.get('closed', False):
+                sys.stderr.write(
+                    f'[auto-fill] select preflight reset incomplete xpath={xp!r} reset={reset_diag}\n'
+                )
+                sys.stderr.flush()
+                return 'no-items'
             already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
             if str(already).startswith('ok-already:'):
                 cur_val = already.split(':', 1)[1]
@@ -817,6 +825,11 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     return already
             trigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
             if not str(trigger).startswith('ok'):
+                diag = await reset_select_ui(page)
+                sys.stderr.write(
+                    f'[auto-fill] select failure xpath={xp!r} result={trigger!r} reset={diag}\n'
+                )
+                sys.stderr.flush()
                 return trigger
             await page.wait_for_timeout(350)
             result = await page.evaluate(JS_SELECT_OPTION, value)
@@ -826,7 +839,36 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
                 if str(recheck).startswith('ok-already:'):
                     return recheck
+            if not _is_ok_result(str(result)):
+                diag = await reset_select_ui(page)
+                sys.stderr.write(
+                    f'[auto-fill] select failure xpath={xp!r} result={result!r} reset={diag}\n'
+                )
+                sys.stderr.flush()
             return result
+
+        async def _select_by_label_autofill(page, value, label):
+            """Labeled select open+pick for tree-select xpath-less fallback."""
+            reset_diag = await reset_select_ui(page)
+            if not reset_diag.get('closed', False):
+                sys.stderr.write(
+                    f'[auto-fill] select preflight reset incomplete label={label!r} reset={reset_diag}\n'
+                )
+                sys.stderr.flush()
+                return 'no-items'
+            sel_try = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
+            if not sel_try or str(sel_try).startswith('label-not-found'):
+                return sel_try or 'label-not-found'
+            await page.wait_for_timeout(350)
+            opt = value if (value or '').strip() and (value or '').strip().lower() != 'first' else 'first'
+            sel_result = await page.evaluate(JS_SELECT_OPTION, opt)
+            if not _is_ok_result(str(sel_result)):
+                diag = await reset_select_ui(page)
+                sys.stderr.write(
+                    f'[auto-fill] select failure label={label!r} result={sel_result!r} reset={diag}\n'
+                )
+                sys.stderr.flush()
+            return sel_result
 
         KIND_ORDER = {'date': 0, 'select': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
         groups: dict[int, list[dict]] = {}
@@ -1014,36 +1056,25 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                     )
                             if not _is_ok_result(result):
                                 if xpath_smart:
-                                    sel_try = await page.evaluate(
-                                        JS_SELECT_TRIGGER_BY_XPATH, [xpath_smart],
-                                    )
-                                    if str(sel_try).startswith('ok'):
-                                        await page.wait_for_timeout(350)
-                                        opt = fill_val if fill_val and fill_val.lower() != 'first' else 'first'
-                                        sel_result = await page.evaluate(JS_SELECT_OPTION, opt)
-                                        if _is_ok_result(sel_result):
-                                            result = sel_result
-                                            kind = 'select_option'
-                                            field_kind = 'select'
-                                            capture_kind = 'form_select'
-                                            element = await _capture_element(
-                                                page, label, target_kind='form_select',
-                                                xpath_smart=xpath_smart,
-                                            )
+                                    sel_result = await _select_by_xpath(page, fill_val, xpath_smart)
+                                    if _is_ok_result(sel_result):
+                                        result = sel_result
+                                        kind = 'select_option'
+                                        field_kind = 'select'
+                                        capture_kind = 'form_select'
+                                        element = await _capture_element(
+                                            page, label, target_kind='form_select', xpath_smart=xpath_smart,
+                                        )
                                 else:
-                                    sel_try = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-                                    if sel_try and not str(sel_try).startswith('label-not-found'):
-                                        await page.wait_for_timeout(350)
-                                        opt = fill_val if fill_val and fill_val.lower() != 'first' else 'first'
-                                        sel_result = await page.evaluate(JS_SELECT_OPTION, opt)
-                                        if _is_ok_result(sel_result):
-                                            result = sel_result
-                                            kind = 'select_option'
-                                            field_kind = 'select'
-                                            capture_kind = 'form_select'
-                                            element = await _capture_element(
-                                                page, label, target_kind='form_select',
-                                            )
+                                    sel_result = await _select_by_label_autofill(page, fill_val, label)
+                                    if _is_ok_result(sel_result):
+                                        result = sel_result
+                                        kind = 'select_option'
+                                        field_kind = 'select'
+                                        capture_kind = 'form_select'
+                                        element = await _capture_element(
+                                            page, label, target_kind='form_select',
+                                        )
                     elif kind in ('select_option', 'select', 'option'):
                         result = await _select_by_xpath(page, value, xpath_smart)
                     else:
@@ -1109,9 +1140,18 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                                 before_b64=before_b64,
                             )
                         else:
+                            # Stamp concrete option from result (ok:X / ok-already:X)
+                            actual = ''
+                            rs = str(result or '')
+                            if rs.startswith('ok-already:'):
+                                actual = rs.split(':', 1)[1].split('|', 1)[0].strip()
+                            elif rs.startswith('ok:') or (rs.startswith('ok') and ':' in rs):
+                                actual = rs.split(':', 1)[1].split('|', 1)[0].strip()
+                            stamped = resolve_recorded_option_text(value, actual)
                             params, element = await _pack_select_record(
-                                page, case_data_store, label, value, element,
+                                page, case_data_store, label, stamped, element,
                             )
+                            params['option_text'] = stamped
                             if xpath_smart:
                                 params['xpath_smart'] = xpath_smart
                             await record_action_with_screenshots(
@@ -1878,6 +1918,23 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
+
+        async def _final_select_failure(result_text: str, xpath_for_log: str = '') -> str:
+            diag = await reset_select_ui(page)
+            sys.stderr.write(
+                f'[select] final failure label={label_text!r} option={option_text!r} '
+                f'xpath={xpath_for_log!r} result={result_text!r} reset={diag}\n'
+            )
+            sys.stderr.flush()
+            return result_text
+
+        reset_diag = await reset_select_ui(page)
+        if not reset_diag.get('closed', False):
+            sys.stderr.write(f'[select] preflight reset incomplete: {reset_diag}\n')
+            sys.stderr.flush()
+            failed = await _final_select_failure('no-items')
+            return _err(failed)
+
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
         if resolved.error:
             return resolved.error
@@ -1901,13 +1958,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 or option_text in cur_val
                 or cur_val in option_text
             ):
+                stamped = resolve_recorded_option_text(option_text, cur_val)
                 params, element = await _pack_select_record(
-                    page, case_data_store, label_text, option_text, element,
+                    page, case_data_store, label_text, stamped, element,
                 )
                 params['xpath_smart'] = xp
+                params['option_text'] = stamped
                 _record_action('select_option', params, already, element=element)
                 _task_done_impl(
-                    label_text, case_data_store, value=cur_val or option_text, xpath_smart=xp,
+                    label_text, case_data_store, value=cur_val or stamped, xpath_smart=xp,
                 )
                 streak = int(case_data_store.get('_already_matched_streak', 0) or 0) + 1
                 case_data_store['_already_matched_streak'] = streak
@@ -1918,21 +1977,44 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         case_data_store['_already_matched_streak'] = 0
 
-        # Close any leftover open dropdowns before opening the target select
-        await page.evaluate('''() => {
-            document.querySelectorAll('.el-select-dropdown:not(.is-hidden)').forEach(dd => {
-                dd.style.display = 'none';
-                dd.classList.add('is-hidden');
-            });
-            document.body.click();
-        }''')
-        await page.wait_for_timeout(100)
-
         trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
-        if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled', 'xpath-not-found', 'xpath-empty', 'field-disabled'):
+        if trigger_result == 'xpath-not-found':
+            fallback = resolve_select_fallback(case_data_store, label_text, xp)
+            if fallback is not None:
+                reset_diag = await reset_select_ui(page)
+                if not reset_diag.get('closed', False):
+                    sys.stderr.write(
+                        f'[select] fallback preflight reset incomplete: {reset_diag}\n'
+                    )
+                    sys.stderr.flush()
+                    failed = await _final_select_failure('no-items', xp)
+                    return _err(failed)
+                xp = fallback.xpath_smart
+                label_text = fallback.label or label_text
+                trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
+                if _is_ok_result(str(trigger_result)):
+                    element = await _capture_element(
+                        page,
+                        label_text,
+                        target_kind='form_select',
+                        xpath_smart=xp,
+                    )
+                    sys.stderr.write(
+                        f'[select] xpath fallback success label={label_text!r} xpath={xp!r}\n'
+                    )
+                    sys.stderr.flush()
+        if trigger_result in (
+            'label-not-found',
+            'no-select-found',
+            'select-disabled',
+            'xpath-not-found',
+            'xpath-empty',
+            'field-disabled',
+        ):
+            failed = await _final_select_failure(str(trigger_result), xp)
             if trigger_result == 'no-select-found':
-                return _err('no-select-found | field may be radio — use click_radio')
-            return trigger_result
+                return _err(failed + ' | field may be radio — use click_radio')
+            return failed
 
         await page.wait_for_timeout(500)
 
@@ -1946,12 +2028,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         if _is_ok_result(select_result):
             matched_text = select_result.split(':', 1)[1] if ':' in select_result else select_result
             case_data_store.pop(f'_sel_retry_{label_text}', None)
-            params['option_text'] = matched_text or option_text
+            stamped = resolve_recorded_option_text(option_text, matched_text)
+            params['option_text'] = stamped
             params, element = attach_select_options(params, element, params.get('options'))
             params['xpath_smart'] = xp
             _record_action('select_option', params, matched_text, element=element)
             _task_done_impl(
-                label_text, case_data_store, value=matched_text or option_text, xpath_smart=xp,
+                label_text, case_data_store, value=stamped or option_text, xpath_smart=xp,
             )
             return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
         elif select_result == 'no-items':
@@ -1959,10 +2042,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
             if str(recheck).startswith('ok-already:'):
                 cur = recheck.split(':', 1)[1]
-                _task_done_impl(label_text, case_data_store, value=cur, xpath_smart=xp)
+                stamped = resolve_recorded_option_text(option_text, cur)
+                params['option_text'] = stamped
+                _task_done_impl(label_text, case_data_store, value=cur or stamped, xpath_smart=xp)
                 _record_action('select_option', params, recheck, element=element)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', case_data_store))
-            return _err('no-items')
+            failed = await _final_select_failure('no-items', xp)
+            return _err(failed)
         elif select_result.startswith('option-not-found:'):
             # Fuzzy: pick listed option that contains / is contained by option_text
             listed = [x.strip() for x in select_result.split(':', 1)[1].split(',') if x.strip()]
@@ -1996,17 +2082,21 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 if _is_ok_result(first_result):
                     matched_text = first_result.split(':', 1)[1] if ':' in first_result else first_result
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
-                    params['option_text'] = matched_text or option_text
+                    stamped = resolve_recorded_option_text(option_text, matched_text)
+                    params['option_text'] = stamped
                     params['xpath_smart'] = xp
                     _record_action('select_option', params, matched_text, element=element)
                     _task_done_impl(
-                        label_text, case_data_store, value=matched_text or option_text, xpath_smart=xp,
+                        label_text, case_data_store, value=stamped or matched_text, xpath_smart=xp,
                     )
                     return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
-                return _err(first_result)
-            return _err(select_result)
+                failed = await _final_select_failure(str(first_result), xp)
+                return _err(failed)
+            failed = await _final_select_failure(str(select_result), xp)
+            return _err(failed)
         else:
-            return _err(select_result)
+            failed = await _final_select_failure(str(select_result), xp)
+            return _err(failed)
 
     # ── Adjacent button / radio (moved from misc for logical grouping) ──
 

@@ -14,6 +14,7 @@ from ._js_snippets import (
     JS_CHECK_LOADING, JS_WAIT_LOADING,
     JS_ENRICH_CLICK_LOCATOR,
     JS_READ_SELECT_OPTIONS,
+    JS_RESET_SELECT_UI,
 )
 from ...models import ScannedField
 
@@ -76,6 +77,28 @@ async def read_select_options(page, label_text: str) -> list[str]:
         return normalize_select_options(raw if isinstance(raw, list) else [])
     except Exception:
         return []
+
+
+async def reset_select_ui(page) -> dict:
+    """Close Element UI select state without issuing a business click."""
+
+    async def _eval_once() -> dict:
+        try:
+            raw = await page.evaluate(JS_RESET_SELECT_UI)
+            if isinstance(raw, dict):
+                return {
+                    'before': int(raw.get('before', 0) or 0),
+                    'after': int(raw.get('after', 0) or 0),
+                    'closed': bool(raw.get('closed')),
+                }
+            return {'before': -1, 'after': -1, 'closed': False, 'error': 'invalid-reset-result'}
+        except Exception as exc:
+            return {'before': -1, 'after': -1, 'closed': False, 'error': str(exc)}
+
+    result = await _eval_once()
+    if not result.get('closed', False):
+        result = await _eval_once()
+    return result
 
 
 def resolve_option_against_list(want: str, options: list[str] | None) -> str:

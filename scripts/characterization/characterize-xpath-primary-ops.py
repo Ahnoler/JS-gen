@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.controller.actions._form import ResolvedControl, _resolve_control  # noqa: E402
+from scripts.controller.actions.form_scan_utils import resolve_select_fallback  # noqa: E402
 from scripts.agent_utils import build_agent_system_message  # noqa: E402
 from scripts.controller.actions._llm_values import (  # noqa: E402
     _enrich_llm_actions_xpath,
@@ -21,6 +22,49 @@ from scripts.models.task import TaskItem, TaskList  # noqa: E402
 def assert_true(cond: bool, msg: str) -> None:
     if not cond:
         raise AssertionError(msg)
+
+
+def test_select_runtime_fallback_unique_inventory() -> None:
+    drawer_xp = (
+        "//div[contains(@class,'el-drawer')]"
+        "//div[contains(@class,'el-form-item')][.//label[contains(.,'证件类型')]]"
+        "//div[contains(@class,'el-select')]"
+    )
+    bad_dialog_xp = drawer_xp.replace("el-drawer", "el-dialog")
+    store = {
+        "task_list": TaskList(
+            pending=[TaskItem(label="证件类型", kind="select", xpath_smart=drawer_xp)]
+        ).to_store(),
+        "_scan_fields": [],
+    }
+    fallback = resolve_select_fallback(store, "证件类型", bad_dialog_xp)
+    assert_true(fallback is not None, "unique inventory fallback")
+    assert_true(fallback.xpath_smart == drawer_xp, "drawer xpath returned")
+
+
+def test_select_runtime_fallback_rejects_same_or_ambiguous() -> None:
+    xp = "//form//div[contains(@class,'el-select')]"
+    same_store = {
+        "task_list": TaskList(
+            pending=[TaskItem(label="证件类型", kind="select", xpath_smart=xp)]
+        ).to_store(),
+        "_scan_fields": [],
+    }
+    assert_true(resolve_select_fallback(same_store, "证件类型", xp) is None, "same xpath")
+
+    ambiguous_store = {
+        "task_list": TaskList(
+            pending=[
+                TaskItem(label="证件类型", kind="select", xpath_smart=xp + "[1]"),
+                TaskItem(label="证件类型", kind="select", xpath_smart=xp + "[2]"),
+            ]
+        ).to_store(),
+        "_scan_fields": [],
+    }
+    assert_true(
+        resolve_select_fallback(ambiguous_store, "证件类型", "//bad") is None,
+        "ambiguous inventory",
+    )
 
 
 def test_resolve_hint_wins() -> None:
@@ -225,6 +269,8 @@ def test_agent_prompt_xpath_primary() -> None:
 
 
 def main() -> int:
+    test_select_runtime_fallback_unique_inventory()
+    test_select_runtime_fallback_rejects_same_or_ambiguous()
     test_resolve_hint_wins()
     test_resolve_unique_label()
     test_resolve_not_found()

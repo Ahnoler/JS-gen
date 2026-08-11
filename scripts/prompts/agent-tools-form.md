@@ -53,7 +53,7 @@
 - **表单修改—部分字段：** 只改任务点名的字段；**禁止**调用 `run_form_assistant` / 盲目重选未提及字段。
 - **🚨 `run_form_assistant` 之后禁止立刻保存：** 先读返回中的 `needs_agent`，用 `fill_form_field` / `select_option` / `click_radio` 亲自补齐这些字段；再对照【阶段任务】/【业务数据】/页面只读关联字段做**最终检查**（必要时 `check_field_value`）；确认无矛盾后才 `click_save` / 照抄 `NEXT_ACTION`。助手草稿不可默认信任。
 - 若 `ambiguous_buttons` 含「保存」等多处同名按钮，须 `click_save('保存', region='…')` 指定区域标题。不要再用 `select_option(..., "first")` 批量重选。不要 `scroll_down` 找保存按钮。
-- **每步最多 2～3 个 select_option**，不要一次并行十几个 — 下拉残留会串选项。
+- **每步最多 1 个 select_option**：下拉打开/关闭会改变页面状态，禁止在同一 action 列表中连续选择多个字段。`xpath-not-found` 后只能复制新 scan 中的 `xpath_smart`，或省略 hint 让工具解析；**禁止自造 dialog / drawer xpath**。`no-items` 后禁止用 `click_element_by_index` 点 el-option；重新扫描后最多再调用一次 `select_option`。
 - **性别等 radio 字段用 `click_radio`，不要用 `select_option`。**
 - **只填写/修改任务明确提到的字段**（表单填写时其余交给助手；部分修改时未提及的保留）。
 - 如果任务 / 【业务数据】要求的值和助手填的不一致，**覆盖为场景要求值**。否则保留。
@@ -64,7 +64,7 @@
 2. `fill_form_field` 通过相对 `xpath_smart` 定位控件；`label_text` 仅语义（规则/取值/录制），须与扫描/`get_pending_tasks` 中的 `label` **完全一致**（含 placeholder 作 displayName 时照抄）。
 3. **写路径 xpath 优先：** `fill_form_field` / `select_option` / `click_radio` / 日期填写均支持可选 `xpath_smart`；扫描或 pending 项有 `xpath_smart` 时**务必带上**，勿只靠 label。
 4. **若返回 `ambiguous-label`：** 同 label 对应多个 xpath — 从扫描/pending 复制**精确** `xpath_smart` 重试，勿换猜别的 label。
-5. **若返回 `xpath-not-found`：** 重新 `scan_visible_fields` / `get_pending_tasks`，或从扫描复制精确 `label`（勿模糊猜测）。
+5. **若返回 `xpath-not-found`：** 重新 `scan_visible_fields` / `get_pending_tasks`，从最新扫描复制**精确** `xpath_smart`，或省略 hint 让工具自行解析。**禁止自造 dialog / drawer xpath**；勿只复制 label 或模糊猜测。
 6. **如果 `fill_form_field` 返回 `"field-disabled"`：** 检查字段是否已有值。如果 `getAttribute('value')` 或 `placeholder` 非空且不是"请选择"/"请输入" → 跳过，说明已填写。如果字段为空 → 寻找旁边的按钮来填充。
 7. **如果 `select_option` 返回 `"select-disabled"`：跳过** — 选择框被禁用（已预填）。
 8. **禁用字段 + 空值 + 无旁边按钮** → 跳过（真正的只读字段）。
@@ -113,10 +113,10 @@ run_form_assistant(region='系统评级结论')
 
 # 🚨 EL-SELECT 规则（关键 — 不可忽略）
 1. 对于 el-select 下拉框，必须使用 `select_option(label_text, option_text)`。
-2. **绝不使用 `click_element(index)` 点击下拉选项** — 它会点击内部的 `<span>` 文本，而不是 Vue 监听的 `<li>` 项。
+2. **绝不使用 `click_element_by_index(index)` 点击下拉选项** — 它会点击内部的 `<span>` 文本，而不是 Vue 监听的 `<li>` 项。
 3. **`scroll(down|up)` 可用于页面滚动，但不适用于 `tssc-multi-select` 下拉弹窗** — 它们是固定定位的，页面滚动不会移动它们。使用 `select_option`，它能在文档级别查找选项，不受滚动位置影响。远程表格型下拉（弹层内是 `el-table` 行，如评级申请「客户名称」）同样只能用 `select_option`，不要 `click_element_by_index` 点行。
 4. 如果 `select_option` 返回 `"ok-already:XXX"` — 字段已有值 XXX。**停止。不要再次尝试选择。**
-5. **如果 `select_option` 返回 `"no-items"`：** 下拉列表为空（无级联数据）。**立即跳过。**
+5. **如果 `select_option` 返回 `"no-items"`：** 工具已重置下拉状态。重新 `scan_visible_fields` / `get_pending_tasks`，确认该字段仍可操作后，**最多再调用一次** `select_option`。**禁止**用 `click_element_by_index` 点 el-option 或下拉行。仅当第二次仍返回 `"no-items"` 且新扫描中该字段确无可用选项时，才可视为真实空级联并跳过。
 6. 选择后，通过检查返回值确认值已更改。
 7. **如果 `select_option` 返回 `"option-not-found:..."` 且列出的项明显来自其他字段**（如"企业类"、"营业执照"），说明级联数据为空（如"乡镇/街道"、"行政村/社区"无数据）。**跳过此字段。**
 

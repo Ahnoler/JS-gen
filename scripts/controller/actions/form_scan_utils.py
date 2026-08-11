@@ -633,6 +633,24 @@ async def _pack_select_record(page, case_data_store, label_text, option_text, el
     return attach_select_options(params, element, opts)
 
 
+_SELECT_OPTION_SENTINELS = frozenset({
+    'first', '1st', 'any', 'random', '第一个', '第一项',
+})
+
+
+def resolve_recorded_option_text(requested: str, actual: str = '') -> str:
+    """Replay contract: never persist first/any/random — stamp concrete display value.
+
+    Recording may accept sentinel option_text at runtime; the step persisted for
+    replay must carry the real selected (or already-matched) label.
+    """
+    req = (requested or '').strip()
+    act = (actual or '').strip()
+    if req.lower() in _SELECT_OPTION_SENTINELS or req in _SELECT_OPTION_SENTINELS:
+        return act or req
+    return req or act
+
+
 # Read current 证件类型 / 证照类型 display value from the open form.
 _JS_READ_CERT_TYPE = '''(kw) => {
     const items = document.querySelectorAll('.el-form-item');
@@ -772,6 +790,21 @@ def _resolve_control(case_data_store, label_text: str, xpath_hint: str = "") -> 
         xp, lab = matches[0]
         return ResolvedControl(xpath_smart=xp, label=lab, error="")
     return ResolvedControl(xpath_smart="", label=label_text or "", error="ambiguous-label")
+
+
+def resolve_select_fallback(
+    case_data_store,
+    label_text: str,
+    failed_xpath: str,
+) -> ResolvedControl | None:
+    """Return one inventory xpath after an explicit xpath actually missed."""
+    failed = (failed_xpath or "").strip()
+    candidate = _resolve_control(case_data_store, label_text, "")
+    if candidate.error or not candidate.xpath_smart:
+        return None
+    if candidate.xpath_smart.strip() == failed:
+        return None
+    return candidate
 
 
 def _task_xpath_smart(case_data_store, label_text: str, xpath_hint: str = "") -> str:

@@ -68,7 +68,11 @@ def test_replay_select_uses_trigger_by_xpath() -> None:
     assert_true("JS_SELECT_TRIGGER_BY_XPATH" in select_fn, "replay select uses xpath trigger")
     assert_true(
         "bad_option_text" in select_fn,
-        "replay select rejects first/any/random option_text",
+        "replay select still emits bad_option_text when sentinel and empty",
+    )
+    assert_true(
+        "legacy-sentinel" in select_fn or "ok-already" in select_fn.split("bad_option_text")[0],
+        "replay select soft-accepts sentinel when field already has a value",
     )
     assert_true(
         "_with_xpath_first" not in select_fn,

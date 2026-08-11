@@ -190,6 +190,47 @@ JS_FIND_VISIBLE_DROPDOWN = '''(() => {
     return document;
 })()'''
 
+JS_RESET_SELECT_UI = r'''async () => {
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const visibleDropdowns = () => [...document.querySelectorAll('.el-select-dropdown')]
+    .filter((dd) => {
+      if (dd.classList.contains('is-hidden')) return false;
+      const style = getComputedStyle(dd);
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
+      const rect = dd.getBoundingClientRect();
+      return rect.width > 0;
+    });
+
+  const before = visibleDropdowns().length;
+  const trigger = window.__last_select_trigger || null;
+  if (trigger) {
+    try {
+      trigger.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Escape',
+        code: 'Escape',
+        keyCode: 27,
+        which: 27,
+        bubbles: false,
+        cancelable: true,
+      }));
+    } catch (e) {}
+    try { trigger.blur(); } catch (e) {}
+  }
+
+  const outside = document.body || document.documentElement;
+  if (outside) {
+    outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    outside.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  }
+  window.__last_select_trigger = null;
+
+  for (let i = 0; i < 10 && visibleDropdowns().length > 0; i += 1) {
+    await sleep(50);
+  }
+  const after = visibleDropdowns().length;
+  return { before, after, closed: after === 0 };
+}'''
+
 # Open an el-select dropdown resolved by xpath; sets window.__last_select_trigger for JS_SELECT_OPTION.
 
 JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath]) => {
