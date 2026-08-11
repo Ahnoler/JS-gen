@@ -331,6 +331,21 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
             return None
         return 'click_radio', _stamp_params({'label_text': label, 'option_text': option}), element
 
+    if kind == 'select_tree_option':
+        label = (payload.get('label_text') or payload.get('formLabel') or '').strip()
+        option = (payload.get('option_text') or payload.get('text') or '').strip()
+        if not label or not option:
+            return None
+        if not element.get('target_kind'):
+            element['target_kind'] = 'form_tree_select'
+        if label and not element.get('formLabel'):
+            element['formLabel'] = label
+        return (
+            'select_tree_option',
+            _stamp_params({'label_text': label, 'option_text': option}),
+            element,
+        )
+
     if kind == 'switch_tab':
         name = (payload.get('tab_name') or '').strip()
         if not name:

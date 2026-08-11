@@ -230,10 +230,11 @@ export function prepareElementJson({
             : action === 'click_table_row_radio' ? 'table_row_radio'
               : action === 'click_adjacent_button' ? 'adjacent_button'
                 : action === 'close_dialog' ? 'dialog_close'
-                  : action.startsWith('fill_') || action === 'select_option'
-                    || action === 'select_tree_option' || action === 'click_radio'
-                    ? 'form_input'
-                    : '');
+                  : action === 'select_tree_option' ? 'form_tree_select'
+                    : action.startsWith('fill_') || action === 'select_option'
+                      || action === 'click_radio'
+                      ? 'form_input'
+                      : '');
 
   const hadVerified = raw.locator_verified === true;
   const enriched = enrichLocatorFields({

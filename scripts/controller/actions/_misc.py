@@ -516,11 +516,40 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             if download_path:
                 return _ok(f'downloaded:{download_path}')
             if element_node:
-                _state._record_action('click_element_by_index', {
-                    'index': index,
-                    'tag_name': element_info.get('tag_name') if element_info else tag_name,
-                    'text': (element_info or {}).get('text') or elem_text or '',
-                }, f'ok-clicked-{index}', element=element_info)
+                raw_xp = str(getattr(element_node, 'xpath', None) or '')
+                raw_cls = str((element_node.attributes or {}).get('class')
+                              or (element_node.attributes or {}).get('className')
+                              or '')
+                is_tree_node_click = (
+                    'el-tree-node' in raw_xp
+                    or 'el-tree-node__content' in raw_cls
+                    or 'el-tree-node__label' in raw_cls
+                )
+                form_label = str((element_info or {}).get('formLabel') or '').strip()
+                tree_opt = (elem_text or '').strip()
+                if (
+                    is_tree_node_click
+                    and (element_info or {}).get('target_kind') == 'form_tree_select'
+                    and form_label
+                    and tree_opt
+                ):
+                    if element_info is not None:
+                        element_info = dict(element_info)
+                        element_info['text'] = tree_opt[:80]
+                        element_info['target_kind'] = 'form_tree_select'
+                        element_info['formLabel'] = form_label
+                    _state._record_action(
+                        'select_tree_option',
+                        {'label_text': form_label, 'option_text': tree_opt},
+                        f'ok-clicked-{index}',
+                        element=element_info,
+                    )
+                else:
+                    _state._record_action('click_element_by_index', {
+                        'index': index,
+                        'tag_name': element_info.get('tag_name') if element_info else tag_name,
+                        'text': (element_info or {}).get('text') or elem_text or '',
+                    }, f'ok-clicked-{index}', element=element_info)
                 if case_data_store is not None:
                     from scripts.controller.actions.container_naming import remember_trigger_button
                     remember_trigger_button(
