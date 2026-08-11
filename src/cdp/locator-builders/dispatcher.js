@@ -143,6 +143,7 @@ export function buildXPathSmart(opts = {}) {
       xpathFull,
       container,
       occurrence,
+      targetKind: kind,
     });
     if (formXp) return formXp;
   }
