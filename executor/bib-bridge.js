@@ -14,6 +14,10 @@ import { CdpClient } from '../src/cdp/client.js';
 import { discoverCdpWithRetry } from '../src/cdp/discover.js';
 import { resolveScreencastTiming } from '../src/cdp/screencast-timing.js';
 import { resolveElementByLabel } from '../src/cdp/resolve-by-label.js';
+import {
+  CLIPBOARD_GET_SELECTION_EXPRESSION,
+  normalizeClipboardSelectionResult,
+} from '../src/cdp/clipboard-selection.js';
 
 const MAGIC = Buffer.from('RSCF');
 const DEFAULT_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
@@ -249,7 +253,18 @@ export class BibBridge {
   }
 
   async handleInput(payload = {}) {
-    if (!this.client || this._disposed) return { ok: false, reason: 'not attached' };
+    if (!this.client || this._disposed) {
+      if (payload.kind === 'clipboard') {
+        return {
+          clipboard: true,
+          requestId: payload.requestId || null,
+          ok: false,
+          text: '',
+          reason: 'not_attached',
+        };
+      }
+      return { ok: false, reason: 'not attached' };
+    }
 
     const kind = payload.kind;
     const xNorm = Number(payload.x);
@@ -361,6 +376,36 @@ export class BibBridge {
         return { ok: true };
       }
       return { ok: false, reason: 'unknown_navigate_action' };
+    }
+
+    if (kind === 'clipboard') {
+      const action = String(payload.action || '');
+      const requestId = payload.requestId || null;
+      if (action !== 'getSelection') {
+        return {
+          clipboard: true,
+          requestId,
+          ok: false,
+          text: '',
+          reason: 'unknown_clipboard_action',
+        };
+      }
+      try {
+        const evaluated = await this.client.send('Runtime.evaluate', {
+          expression: CLIPBOARD_GET_SELECTION_EXPRESSION,
+          returnByValue: true,
+        });
+        const normalized = normalizeClipboardSelectionResult(evaluated?.result?.value);
+        return { clipboard: true, requestId, ...normalized };
+      } catch (e) {
+        return {
+          clipboard: true,
+          requestId,
+          ok: false,
+          text: '',
+          reason: 'evaluate_error',
+        };
+      }
     }
 
     return { ok: false, reason: 'unknown input kind' };

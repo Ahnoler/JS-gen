@@ -15,6 +15,10 @@ import {
   restartScreencast, startScreencast, applyViewportOverride,
   syncViewportFromPage, persistViewport,
 } from './screencast.js';
+import {
+  CLIPBOARD_GET_SELECTION_EXPRESSION,
+  normalizeClipboardSelectionResult,
+} from '../clipboard-selection.js';
 
 /** Drop misclassified focus/open-picker clicks that slipped past BUILD_PAYLOAD. */
 function isSpuriousFocusClickPayload(payload) {
@@ -81,9 +85,55 @@ export async function flushFillRecord() {
 }
 
 export async function handleInput(payload) {
+  const kind = payload?.kind;
+
+  if (kind === 'clipboard') {
+    const requestId = payload.requestId || null;
+    if (!bridge.client) {
+      return {
+        ok: false,
+        clipboard: true,
+        requestId,
+        text: '',
+        reason: 'not_attached',
+      };
+    }
+    const action = String(payload.action || '');
+    if (action !== 'getSelection') {
+      return {
+        clipboard: true,
+        requestId,
+        ok: false,
+        text: '',
+        reason: 'unknown_clipboard_action',
+      };
+    }
+    try {
+      const evaluated = await bridge.client.send('Runtime.evaluate', {
+        expression: CLIPBOARD_GET_SELECTION_EXPRESSION,
+        returnByValue: true,
+      });
+      const normalized = normalizeClipboardSelectionResult(evaluated?.result?.value);
+      return {
+        ok: normalized.ok,
+        clipboard: true,
+        requestId,
+        text: normalized.text,
+        reason: normalized.reason,
+      };
+    } catch (e) {
+      return {
+        clipboard: true,
+        requestId,
+        ok: false,
+        text: '',
+        reason: 'evaluate_error',
+      };
+    }
+  }
+
   if (!bridge.client) return { ok: false, reason: 'not_attached' };
 
-  const kind = payload?.kind;
   const gb = state.globalBrowser;
 
   try {

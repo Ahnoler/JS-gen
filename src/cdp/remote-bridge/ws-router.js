@@ -322,6 +322,18 @@ export function ensureWsHook(attachLive) {
       if (!result.ok && result.reason === 'agent_busy') {
         ws.send(JSON.stringify({ type: 'remote:status', payload: getRemoteStatus() }));
       }
+      if (result?.clipboard) {
+        ws.send(JSON.stringify({
+          type: 'remote:clipboard',
+          payload: {
+            sessionId: msg.payload?.sessionId || null,
+            requestId: result.requestId || msg.payload?.requestId || null,
+            ok: !!result.ok,
+            text: result.text == null ? '' : String(result.text),
+            reason: result.reason || null,
+          },
+        }));
+      }
       return;
     }
     if (type === 'remote:inspect') {

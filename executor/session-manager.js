@@ -436,7 +436,18 @@ export class SessionManager {
 
   async bibInput(sessionId, payload = {}) {
     const bib = this.bibs.get(sessionId);
-    if (!bib) return;
+    if (!bib) {
+      if (payload?.kind === 'clipboard') {
+        return {
+          clipboard: true,
+          requestId: payload.requestId || null,
+          ok: false,
+          text: '',
+          reason: 'not_attached',
+        };
+      }
+      return;
+    }
     return bib.handleInput(payload);
   }
 }

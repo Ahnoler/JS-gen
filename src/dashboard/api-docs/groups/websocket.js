@@ -104,15 +104,31 @@ export const GROUP_WEBSOCKET = [
           },
         }),
         notes: [
-          'kind: mouse | key | text | navigate',
+          'kind: mouse | key | text | navigate | clipboard',
           'mouse：{ type: mousePressed|mouseReleased|mouseMoved|mouseWheel, x, y }（x/y 为 0~1 归一化）',
           'key：{ type: keyDown|keyUp, key, code, keyCode, modifiers } — Backspace / Enter / 方向键等控制键',
           'text：{ text, replace?: boolean } — CDP Input.insertText；replace:true 时先选中 activeElement 再写入（空 text 则清空）',
           'navigate：{ action: back|forward|reload }',
+          'clipboard：{ action: getSelection, requestId } — 取远端选区；结果见 remote:clipboard',
+          'Ctrl/Cmd+C/V 由 SPA 拦截：V→kind:text；C→kind:clipboard（勿再 kind:key 透传）',
           'IME 约定：SPA 在画布上盖透明本机 input；composition 期间不发 key/text；compositionend / 已确认增量发 kind:text；控制键仍走 kind:key',
           '打字前先 mouse 点中远程输入框，保证 remote activeElement 正确',
           'agentBusy / inputEnabled=false 时控制面拒绝写入（hover 检查可例外）',
           '路由字段：trajectoryId / sessionId / remoteSessionId 与其它 remote:* 一致',
+        ],
+      },
+      {
+        method: 'WS', path: 'remote:clipboard',
+        summary: 'BiB 远端选区文本（供本机 Ctrl+C）',
+        tryable: false,
+        respExample: J({
+          type: 'remote:clipboard',
+          payload: { requestId: 'uuid', ok: true, text: 'selected', sessionId: 'uuid' },
+        }),
+        notes: [
+          '响应 remote:input kind:clipboard action:getSelection',
+          '执行机 session.bib_clipboard → 控制面广播 remote:clipboard',
+          '空选区 ok:true text:"" — 前端不得 writeText 空串覆盖本机剪贴板',
         ],
       },
       {

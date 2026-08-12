@@ -195,6 +195,15 @@ async function handleMessage(ws, msg) {
         switched: !!payload.switched,
       });
     }
+    if (type === 'session.bib_clipboard') {
+      broadcast('remote:clipboard', {
+        sessionId: payload.sessionId,
+        requestId: payload.requestId || null,
+        ok: !!payload.ok,
+        text: payload.text == null ? '' : String(payload.text),
+        reason: payload.reason || null,
+      });
+    }
   }
 }
 

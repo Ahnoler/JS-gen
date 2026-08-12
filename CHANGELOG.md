@@ -53,6 +53,15 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-12: **BiB 画布本机剪贴板**：
+emote:input 新增 kind:clipboard（getSelection）；下行 
+emote:clipboard；产品画布 Ctrl/Cmd+C/V 走本机剪贴板语义（不再把 C/V 当远端键透传）。
+  影响范围：/ws BiB 协议；executor session.bib_clipboard；Vue useRemoteCanvas
+  文件：src/cdp/clipboard-selection.js, src/cdp/remote-bridge/ws-router.js, executor/bib-bridge.js, src/dashboard/api-docs/groups/websocket.js, scripts/characterization/characterize-clipboard-selection.mjs
+  Python 同步提示：若 Python 控制面转发 BiB 
+emote:input，对齐 clipboard 与 
+emote:clipboard 广播
+
 - 2026-08-12: **Agent stderr 导出剥前缀**：`GET|POST .../agent-stderr` 与 traj 快捷导出返回正文时去掉 `[slot:N sid:…]`（落盘仍保留前缀供过滤）；监视面板「日志」同步干净正文。
   影响范围：导出 text/json 的 `lines` 内容。
   文件：src/services/agent-stderr-log-service.js, src/routes/v2/agent-stderr.js, src/dashboard/api-docs/groups/recording.js
