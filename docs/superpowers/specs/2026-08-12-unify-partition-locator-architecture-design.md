@@ -1,7 +1,7 @@
 # Design: Unify partition & locator architecture (manual / auto-grab / AI)
 
 **Date:** 2026-08-12  
-**Status:** Approved (brainstorm) — pending implementation plan  
+**Status:** Approved — plan at `docs/superpowers/plans/2026-08-12-unify-partition-locator-architecture.md`  
 **Trigger:** 待办「处理」人工可录可回放，自动抓取曾漏抓；修复后能列出全部「处理」，但歧义列表分区不可读（20×「处理 / button」，仅靠截断 xpath）  
 **Related:** [retire A/B/C + D3 → L1/L2 regionAnchor](2026-08-12-retire-abc-d3-favor-l1l2-regionanchor-design.md); [retire section favor region](2026-08-12-retire-section-favor-region-design.md); [L1c LLM region classify](2026-08-10-l1c-llm-region-classify-design.md); [AG-fullpage inventory](2026-08-10-auto-grab-fullpage-inventory-design.md)
 

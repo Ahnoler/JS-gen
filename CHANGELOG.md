@@ -11,6 +11,46 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-12: **`uniquifyDisplayGroups` 撞车键优先 formLabel**：el-select 可见值常相同（如「否」），不可当 label；仅 `(display_group, formLabel|matchedLabel)` 双撞车才追加 xpath 后缀。修复「对公客户概况」被拆成 `… · ins(@class,'el-select')]`。
+  影响范围：自动抓取/歧义选择器分组。
+  文件：src/cdp/display-group.js, scripts/characterization/characterize-l1c-region-classify.mjs
+  Python 同步提示：同名去重键用表单项 label，勿用控件当前显示值。
+
+- 2026-08-12: **`uniquifyDisplayGroups` 仅在「分区 + label」双撞车时细化**：同一 `display_group` 下不同控件文案（客户编号/客户名称）不再追加 xpath 后缀；仅同区同文案（多「处理」/「新增」）才加后缀。对齐「先粗分区，撞车再细化」。
+  影响范围：自动抓取/歧义选择器分组标题。
+  文件：src/cdp/display-group.js, scripts/characterization/characterize-l1c-region-classify.mjs
+  Python 同步提示：若代理侧有同名 display_group 去重，按 (region, label) 键，勿按 region  alone。
+
+- 2026-08-12: **撞车细化后 L1c 不得回写粗 collapse 标签**：`assignRegion` 仍先粗分区；`refineCollidingRegions` 升到 titlebox 后，`patchRegionFields` 保留已有可读 `region_label`/`region_id`（不再被 feature-card 外层「股东及关联人信息」覆盖）；`buildFeatureCard` 取 title 时 titlebox 优先于 collapse。
+  影响范围：`resolve-element` 多「新增」歧义选择器分组。
+  文件：src/services/trajectory/trajectory-record-lifecycle.js, src/cdp/page-locator-helpers.js, scripts/characterization/characterize-l1c-region-classify.mjs, characterize-resolve-collision-titlebox.mjs
+  Python 同步提示：无 API；代理侧若有 L1c 回写，勿覆盖 resolve 已细化的 `region_label`。
+
+- 2026-08-12: **L1c 改写 region 后同步 `display_group`**：`patchRegionFields` 经共享 `displayGroupOf` 重算分组键；**禁止用 taxonomy 角色名（`section`）覆盖可读 `region_label`（PJ/DGSX/卡片标题）**；歧义多命中同名时 `uniquifyDisplayGroups` 追加短 xpath/id 后缀，并可从 xpath 找回业务键。
+  影响范围：`resolve-element` ambiguous matches（含 L1c）、自动抓取选择器分组。
+  文件：src/cdp/display-group.js, src/cdp/resolve-by-label.js, src/cdp/page-locator-helpers.js, src/services/region-classify.js, src/services/trajectory/trajectory-record-lifecycle.js, scripts/characterization/characterize-l1c-region-classify.mjs
+  Python 同步提示：透传 `display_group`；L1c 回写后勿用 `section` 等角色名覆盖业务 `region_label`。
+
+- 2026-08-12: **待办「处理」假成功回放 + 自动抓取漏抓**：`normalizeTargetRoot` / `inventoryKindOf` 均优先 `.todo-item-action`（先于 `.el-checkbox-group`），避免录成 checkbox-group xpath、以及 inventory 误标 `form_checkbox` 被 `click_element` 过滤掉；durable 在 `want` 文本存在时拒绝「xpath 命中祖先但文案非精确匹配」的 `ok-xpath-smart`；inventory 收录 `.todo-item-action`。
+  影响范围：手动录制 xpath_smart、steps/replay 点击、resolve-element / 自动抓取 inventory。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/replay_js.py, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-todo-item-action.py
+  Python 同步提示：无 API；执行机需重载含上述 helpers / replay_js 的会话后再用「自动抓取」点「处理」。
+
+- 2026-08-12: **待办卡片「处理」自动抓取/分区（1448067 延伸）**：L2 `collectL2Buttons` 收录 `div.todo-item-action`（非 button 标签亦准入）；L1 经 `assignRegion` 按 `.todo-item` 卡片赋 `region_label`（如 PJ…）；xpath 消歧经 `regionAnchor*` / 类 leaf；`resolve-by-label` 候选同步。人工录制/回放此前已补。
+  影响范围：`scan_editable_summary` / `JS_SCAN_FORM_FIELDS` L2 buttons + L1 regions、resolve-element 文本匹配、locator helpers。
+  文件：scripts/controller/actions/js_snippets/scan_form.py, scan_utils.py, src/cdp/page-locator-helpers.js, resolve-by-label.js, locator-builders/dispatcher.js, scripts/characterization/characterize-todo-item-action.py
+  Python 同步提示：若代理侧有全页扫描/resolve 按钮白名单，对齐 L2 准入 `.todo-item-action` + L1 `assignRegion` 卡片分区。
+
+- 2026-08-12: **Partner 代理网络失败文案**：projects/systems/importDemand 遇 nginx 502、超时、非 JSON 时统一返回「网络异常，自动化平台无法连接」（技术细节打 warn 日志，不塞进 `error`）。
+  影响范围：`GET /api/v2/export/partner/projects|systems`、推送 importDemand 502/504 message。
+  文件：src/services/partner-platform.js, src/dashboard/api-docs/groups/export-mgmt.js
+  Python 同步提示：对齐同文案；对方业务 `msg` 仍透传。
+
+- 2026-08-12: **草稿交易不可推送（1448068）**：partner 真实推送仅允许 `recordStatus=recorded|completed`；单轨 `push=true` → 409 `not_pushable_status`；批量跳过 draft/live/recording（item 带同 code）。dryRun/raw 仍可组装。批量无可推送时文案改为中文「没有可推送的交易…」。
+  影响范围：export 推送闸门、api-docs、产品 toast 文案。
+  文件：src/services/export-push-gate.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-export-push-gate.mjs
+  Python 同步提示：对齐 push 前校验录制状态；409 body 含 `code`/`recordStatus`；空推送 error 用中文。
+
 - 2026-08-12: **下拉选项子串误匹配（国民经济部门类别）**：`already-matched` / fuzzy / JS `includes` 不再用「短选项 ⊆ 长 want」把「其他非金融企业部门」录成「非金融企业部门」；exact 优先，contains 取最短合法项。
   影响范围：AI/`select_option` 录制与 autofill、`_llm_values` commandValue fuzzy。
   文件：scripts/controller/actions/form_scan_utils.py, _form.py, _llm_values.py, js_snippets/select_option.py, scripts/characterization/characterize-select-option-substring.py
@@ -53,18 +93,29 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
-- 2026-08-12: **BiB 画布本机剪贴板**：
-emote:input 新增 kind:clipboard（getSelection）；下行 
-emote:clipboard；产品画布 Ctrl/Cmd+C/V 走本机剪贴板语义（不再把 C/V 当远端键透传）。
-  影响范围：/ws BiB 协议；executor session.bib_clipboard；Vue useRemoteCanvas
-  文件：src/cdp/clipboard-selection.js, src/cdp/remote-bridge/ws-router.js, executor/bib-bridge.js, src/dashboard/api-docs/groups/websocket.js, scripts/characterization/characterize-clipboard-selection.mjs
-  Python 同步提示：若 Python 控制面转发 BiB 
-emote:input，对齐 clipboard 与 
-emote:clipboard 广播
+- 2026-08-12: **分区/定位统一 U2（inventory = L2 投影）**：`collectL2Hosts` 为唯一 host 选择器表；`collectInventoryHosts` 委托之；循环内 `normalizeHost` + `classifyOperable`（无并行 collector 表）。`collectL2Buttons` 仍保留 button-only 投影但继续 `classifyOperable` 准入。
+  影响范围：PAGE_LOCATOR_HELPERS、resolve-element inventory、自动抓取。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-unify-partition-locator.py
+  Python 同步提示：无 API；SPA/执行机需重载 helpers 后再用 inventory / 自动抓取。
 
-- 2026-08-12: **Agent stderr 导出剥前缀**：`GET|POST .../agent-stderr` 与 traj 快捷导出返回正文时去掉 `[slot:N sid:…]`（落盘仍保留前缀供过滤）；监视面板「日志」同步干净正文。
-  影响范围：导出 text/json 的 `lines` 内容。
-  文件：src/services/agent-stderr-log-service.js, src/routes/v2/agent-stderr.js, src/dashboard/api-docs/groups/recording.js
+- 2026-08-12: **分区/定位统一 U1（自动抓取可读分区）**：`classifyOperable`/`normalizeHost` 为唯一准入/host 内核；resolve-element 歧义项增加 `display_group`（= `region_label`），待办多「处理」须带互异卡片业务键。
+  影响范围：PAGE_LOCATOR_HELPERS、resolve-element ambiguous matches、api-docs。
+  文件：src/cdp/page-locator-helpers.js, src/cdp/resolve-by-label.js, src/dashboard/api-docs/groups/recording.js, …
+  Python 同步提示：透传 `display_group`；产品 SPA「选择匹配的控件」按 `display_group`/`region_label` 分组，勿用 `region_role`。
+
+- 2026-08-12: **BiB 画布本机剪贴板**：`remote:input` 新增 `kind:clipboard`（`getSelection`）；下行 `remote:clipboard`；产品画布 Ctrl/Cmd+C/V 走本机剪贴板语义（不再把 C/V 当远端键透传）。
+  影响范围：`/ws` BiB 协议；executor `session.bib_clipboard`；Vue `useRemoteCanvas`
+  文件：src/cdp/clipboard-selection.js, src/cdp/remote-bridge/ws-router.js, executor/bib-bridge.js, src/dashboard/api-docs/groups/websocket.js, scripts/characterization/characterize-clipboard-selection.mjs
+  Python 同步提示：若 Python 控制面转发 BiB `remote:input`，对齐 `clipboard` 与 `remote:clipboard` 广播
+
+- 2026-08-12: **xpath 消歧 helpers 统一为 `regionAnchor*`（R4）**：`sectionAnchorOf` / `sectionAnchorXPath` 别名已删除；仅保留 `regionAnchorOf` / `regionAnchorXPath`，注释标明 xpath 消歧（非产品 L1 分块 / `section=`）。产品区域请用 `region_*` / `assignRegion`。
+  影响范围：CDP locator helpers、Python 镜像 `_locator_helpers_js.py`、region-anchored xpath 导出/回放。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-section-anchored-xpath.py
+  Python 同步提示：控制面若不镜像 `page-locator-helpers` 可跳过；代理侧若注入同名 helpers，仅使用 `regionAnchor*`（勿再引用 `sectionAnchor*`）。
+
+- 2026-08-12: **Agent stderr 导出剥前缀**：`GET|POST .../agent-stderr` 与 traj 快捷导出返回正文时去掉 `[slot:N sid:…]` 与 `[session]`（落盘 slot 前缀仍保留供过滤）；监视面板「日志」同步干净正文。
+  影响范围：导出 text/json 的 `lines` 内容；Python agent 源日志不再写 `[session]`，阶段结束为 `Phase N done` + 空行。
+  文件：src/services/agent-stderr-log-service.js, src/routes/v2/agent-stderr.js, scripts/session_runner.py, scripts/agent/service.py, scripts/browser/factory.py, scripts/event_dispatch.py, scripts/trajectory_store.py, scripts/cdp_ports.py
   Python 同步提示：若代理导出接口，对齐剥前缀后的正文（或自行 strip）。
 
 - 2026-08-12: **`GET /api/v2/recording/agent-stderr/active` 附带 CDP 端口**：对在线执行机拉 `session.list`，`rows[].cdpPort` + `slotPorts[]`（含空闲槽默认口）；执行机 `list()` 改为返回全容量槽。监视面板新增 CDP 列。
