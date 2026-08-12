@@ -16,6 +16,7 @@
 import { normalizeElementJson } from '../models/helpers.js';
 import { PAGE_LOCATOR_HELPERS, enrichLocatorFields } from './locator-candidates.js';
 import { normalizeActionName } from '../models/action-name.js';
+import { displayGroupOf, uniquifyDisplayGroups } from './display-group.js';
 
 /**
  * Sanitize preview (never expose form values / secrets).
@@ -38,6 +39,7 @@ function toPreview(el) {
     region_role: el?.region_role || '',
     region_id: el?.region_id || '',
     region_label: el?.region_label || '',
+    display_group: displayGroupOf(el),
   };
 }
 
@@ -300,7 +302,7 @@ ${PAGE_LOCATOR_HELPERS}
       const name = String(params.menu_text || params.text || needle || '').trim();
       const nodes = document.querySelectorAll(
         '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"], aside li, nav li, ' +
-        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content'
+        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content, .todo-item-action'
       );
       const exact = [];
       const fuzzy = [];
@@ -460,7 +462,7 @@ ${PAGE_LOCATOR_HELPERS}
     if (needle) {
       const clickables = Array.from(document.querySelectorAll(
         '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"], aside li, nav li, ' +
-        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content'
+        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content, .todo-item-action'
       ));
       const exact = [];
       const fuzzy = [];
@@ -574,7 +576,9 @@ export async function resolveElementByLabel(client, opts = {}) {
     const featureCard = raw.feature_card && typeof raw.feature_card === 'object'
       ? raw.feature_card
       : undefined;
+    const displayGroup = displayGroupOf(enriched);
     const element = normalizeElementJson(enriched);
+    if (displayGroup) element.display_group = displayGroup;
     if (featureCard) element.feature_card = featureCard;
     const preview = toPreview(enriched);
     if (featureCard) preview.feature_card = featureCard;
@@ -585,7 +589,7 @@ export async function resolveElementByLabel(client, opts = {}) {
     };
   }
 
-  const matches = list.map(enrichOne);
+  const matches = uniquifyDisplayGroups(list.map(enrichOne));
   const truncated = pageTruncated;
   const forceAmbiguous = mode === 'inventory' && !labelText && matches.length >= 1;
   if (forceAmbiguous) {

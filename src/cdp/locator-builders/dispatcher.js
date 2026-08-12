@@ -179,6 +179,12 @@ export function buildXPathSmart(opts = {}) {
   if (!t) return '';
   const tagL = String(tag || '').toLowerCase();
   const cls = String(className || '');
+  if (/(?:^|\s)todo-item-action(?:\s|$)/.test(cls)) {
+    const lit = xpathLiteral(t);
+    const local = `div[${classTokenPred('todo-item-action')} and normalize-space()=${lit}]`;
+    const scopeKind = detectContainerKind(xpathFull, cls, container);
+    return withOccurrence(scopedXPath(local, scopeKind), occurrence);
+  }
   const clickable =
     tagL === 'button'
     || tagL === 'a'

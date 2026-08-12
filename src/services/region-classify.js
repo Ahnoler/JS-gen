@@ -175,10 +175,12 @@ export async function classifyRegions(cards = [], { systemId = '' } = {}) {
 
     const role = String(card.ruleRole || 'other');
     const confidence = Number(card.ruleConfidence ?? 0.4);
+    const title = String(card.title || '').trim();
     const base = {
       ...card,
       role,
-      label: card.title || role,
+      // Never use taxonomy role as human label (SPA would show "section").
+      label: title || '',
       confidence,
       source: 'rule',
       signature: sig,

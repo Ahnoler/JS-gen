@@ -147,8 +147,16 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
     }
   };
   const clickLastVisibleXpath = (xp, how, root) => {
-    const nodes = evalXpathAll(xp, root).filter(isVisible);
+    let nodes = evalXpathAll(xp, root).filter(isVisible);
     if (!nodes.length) return null;
+    // Guard false ok-xpath-smart: recorded xpath may point at an ancestor
+    // (e.g. el-checkbox-group[aria-label=checkbox-group] wrapping 待办 cards)
+    // whose descendant text includes want but is not the control.
+    if (want) {
+      const exact = nodes.filter((el) => norm(el.innerText || el.textContent) === want);
+      if (!exact.length) return null;
+      nodes = exact;
+    }
     return clickEl(nodes[nodes.length - 1], how);
   };
   const clickSmartXpath = (xp, how) => {
@@ -291,6 +299,24 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
     if (exactCustom.length) return clickEl(exactCustom[exactCustom.length - 1], 'ok-menu-item-custom');
   }
 
+  // 1a2) Todo / workflow card actions (待办「处理」= div.todo-item-action, not button)
+  if (want) {
+    const actions = [...document.querySelectorAll('.todo-item-action')].filter(isVisible)
+      .filter((el) => norm(el.innerText || el.textContent) === want);
+    if (actions.length) {
+      const pb = stripVolatile(parentText || '');
+      if (pb) {
+        const scoped = actions.filter((el) => {
+          const card = el.closest('.todo-item');
+          const blob = stripVolatile(card && (card.innerText || card.textContent));
+          return blob && (blob.includes(pb) || pb.includes(blob.slice(0, pb.length)));
+        });
+        if (scoped.length) return clickEl(scoped[scoped.length - 1], 'ok-todo-action-scoped');
+      }
+      return clickEl(actions[actions.length - 1], 'ok-todo-action');
+    }
+  }
+
   // 1b) Element UI menu
   if (want) {
     const menuItems = [...document.querySelectorAll('.el-menu-item')];
@@ -355,7 +381,7 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
       if (hits.length) return clickEl(hits[hits.length - 1], how);
     }
 
-    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item, li.menu-item, .menu-item, .el-tree-node__content, .plugin-nav-list, .plugin-nav-outer, .nav-content';
+    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item, li.menu-item, .menu-item, .el-tree-node__content, .plugin-nav-list, .plugin-nav-outer, .nav-content, .todo-item-action';
     const candidates = [...document.querySelectorAll(sel)].filter(isVisible);
     const exact = candidates.filter(el => norm(el.innerText || el.textContent) === want);
     if (exact.length) return clickEl(exact[exact.length - 1], 'ok-text-exact');

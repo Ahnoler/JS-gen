@@ -32,6 +32,17 @@ JS_MANUAL_PART_B = r'''
     };
     if (loc.locator_fallback_reason) meta.locator_fallback_reason = loc.locator_fallback_reason;
     if (hi != null) meta.highlight_index = hi;
+    // Todo card actions (处理/转交/…) — stamp card business key / title for replay scope
+    const todoCard = el.closest && el.closest('.todo-item');
+    if (todoCard) {
+      const blob = String(todoCard.innerText || todoCard.textContent || '');
+      const keyM = blob.match(/\b(?:PJ|DGSX)\d+\b/);
+      if (keyM) meta.parent_text = keyM[0];
+      else {
+        const titleLine = blob.split(/[\n\r]+/).map((s) => s.trim()).filter(Boolean)[0] || '';
+        if (titleLine) meta.parent_text = titleLine.slice(0, 80);
+      }
+    }
     return meta;
   }
 
@@ -343,6 +354,16 @@ JS_MANUAL_PART_B = r'''
       }
     }
 
+    // Todo / workflow card action links (待办「处理」「转交」…) — plain div, not button/a
+    const todoAction = el.closest('.todo-item-action');
+    if (todoAction && !isInIgnore(todoAction)) {
+      const text = shortLabel(todoAction);
+      if (text && text.length <= 20) {
+        emit(Object.assign({ kind: 'click' }, elMeta(todoAction, text)));
+        return;
+      }
+    }
+
     // generic button / link / clickable
     const btn = el.closest('button, .el-button, a.el-link, a[href], [role="button"]');
     if (btn && !isInIgnore(btn)) {
@@ -397,7 +418,10 @@ JS_MANUAL_PART_B = r'''
     // Last-resort: any element with short visible text that looks like a control
     // (covers custom sidebar spans that are not inside known nav roots)
     if (!isInIgnore(el)) {
-      const host = el.closest('[onclick], [ng-click], [class*="menu"], [class*="nav-item"], [class*="NavItem"]');
+      const host = el.closest(
+        '[onclick], [ng-click], [class*="menu"], [class*="nav-item"], [class*="NavItem"],'
+        + ' [class*="item-action"], [class*="todo-item-action"]'
+      );
       if (host) {
         const text = shortLabel(host);
         if (text && text.length <= 20) {

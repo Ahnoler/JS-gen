@@ -156,6 +156,26 @@ def test_js_scan_form_fields_multi_root_cues() -> None:
     )
 
 
+def test_collect_l2_named() -> None:
+    scan = SCAN_FORM_PY.read_text(encoding="utf-8")
+    assert_true(
+        "function collectL2" in scan or "const collectL2" in scan or "collectL2(" in scan,
+        "fullpage must expose named collectL2 (not only SOURCE_* loops)",
+    )
+    assert_true(
+        "COLLECT_L2" in scan,
+        "COLLECT_L2 marker for characterization",
+    )
+    assert_true(
+        "function discoverL1" in scan or "const discoverL1" in scan or "discoverL1(" in scan,
+        "fullpage must expose named discoverL1",
+    )
+    assert_true(
+        "ASSIGN_VIA_ASSIGN_REGION" in scan or "assignRegion(el)" in scan,
+        "L2→L1 must call assignRegion(el), not only section_title projection",
+    )
+
+
 def test_fullpage_l2_l1_cues() -> None:
     from scripts.controller.actions._js_snippets import JS_SCAN_FORM_FIELDS
 
@@ -471,6 +491,7 @@ def run_action_tests() -> None:
     test_action_no_store_writes()
     test_summary_buttons_shape()
     test_js_scan_form_fields_multi_root_cues()
+    test_collect_l2_named()
     test_fullpage_l2_l1_cues()
     test_scan_editable_summary_fullpage_wired()
     test_scan_editable_summary_multi_root_wired()

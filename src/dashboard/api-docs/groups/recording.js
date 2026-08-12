@@ -132,6 +132,7 @@ export const GROUP_RECORDING = [
           'mode=needle：旧版按 label 针搜；无 label/action 时 400',
           '可选 actionType + params（menu_text / tab_name / row_text+button_text / …）做动作感知解析',
           '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }], truncated? } — 不静默择一',
+          '多命中选择器必须按 `preview.display_group`（= `region_label`）分组/展示；禁止用 `region_role`（常为 `section`）作为唯一分组标题',
           'truncated:true 表示命中 INVENTORY_CAP（120）上限，列表可能被截断',
           '菜单示例：客户管理优先稳定 data-id；否则 class-token + 文案 + occurrence',
           '表单字段：xpath / xpath_smart 为 label 锚定相对 xpath（无 label 时用 placeholder）；xpath_full 绝对兜底',

@@ -36,6 +36,16 @@ function ok(n) { console.log(`ok: ${n}`); }
 }
 
 {
+  // Contract: coarse assignRegion first, refine only on region_id collision (≥2).
+  assert.match(helpers, /function refineCollidingRegions\s*\(/);
+  assert.match(helpers, /idxs\.length < 2/);
+  assert.match(helpers, /findTitleboxRegion/);
+  const life = readFileSync(join(root, 'src/services/trajectory/trajectory-record-lifecycle.js'), 'utf8');
+  assert.match(life, /keepPrevLabel|collision-refine|titlebox refine/);
+  ok('contract: coarse then collision-refine; L1c must not clobber refine labels');
+}
+
+{
   const expr = buildResolveExpression({
     labelText: '新增',
     actionType: 'click_element_by_index',

@@ -191,6 +191,9 @@ PAGE_LOCATOR_HELPERS = r'''
     return null;
   }
   function normalizeTargetRoot(node) {
+    return normalizeHost(node);
+  }
+  function normalizeHost(node) {
     if (!node || node.nodeType !== 1) return null;
     if (!node.closest) return node;
     const close = node.closest(
@@ -241,6 +244,10 @@ PAGE_LOCATOR_HELPERS = r'''
         if (!displayInputs[i].closest('.el-popover, .tree-popover')) return displayInputs[i];
       }
     }
+    // Todo card actions before form widgets — portal 待办 wraps cards in el-checkbox-group;
+    // climbing to the group yields //div[@aria-label='checkbox-group'] and false ok-xpath-smart.
+    const todoAction = node.closest('.todo-item-action');
+    if (todoAction) return todoAction;
     const formWidget = node.closest(
       '.el-select, .el-date-editor, .el-cascader, .el-tree-select, .el-radio-group, .el-checkbox-group, .tsscdatepicker'
     );
@@ -295,6 +302,7 @@ PAGE_LOCATOR_HELPERS = r'''
     }
     const tagL = (node.tagName || '').toLowerCase();
     const cls = String(node.className || '');
+    if (hasClassToken(cls, 'todo-item-action') || node.closest('.todo-item-action')) return 'button';
     if (tagL === 'button' || hasClassToken(cls, 'el-button')) return 'button';
     if (tagL === 'a') return 'link';
     return 'generic';
@@ -374,7 +382,9 @@ PAGE_LOCATOR_HELPERS = r'''
       return [];
     }
   }
-  function sectionAnchorOf(host) {
+  /* regionAnchor* — xpath 消歧：为同名 leaf 加 titled host 前缀，导出唯一相对 xpath。
+   * 不是产品「分块/section=」；产品区域请用 region_* / L1。 */
+  function regionAnchorOf(host) {
     if (!host || !host.closest) return null;
     const collapse = host.closest('.el-collapse-item');
     if (collapse) {
@@ -419,6 +429,28 @@ PAGE_LOCATOR_HELPERS = r'''
         prefix: "//div[" + classTokenPred('el-card') + "][.//*[ " + classTokenPred('el-card__header') + " and contains(normalize-space(.)," + xpathLiteral(title) + ")]]",
       };
     }
+    const todo = host.closest('.todo-item');
+    if (todo) {
+      const blob = String(todo.innerText || todo.textContent || '');
+      const keyM = blob.match(/\b(?:PJ|DGSX)\d+\b/);
+      let title = keyM ? keyM[0] : '';
+      if (!title) {
+        const header = todo.querySelector('.todo-item__header');
+        let ht = header ? normalizeControlText(header.innerText || header.textContent || '') : '';
+        const actions = header && header.querySelector('.todo-item-actions');
+        if (actions) {
+          const at = normalizeControlText(actions.innerText || actions.textContent || '');
+          if (at) ht = normalizeControlText(ht.replace(at, ''));
+        }
+        title = ht || normalizeControlText(blob.split(/[\n\r]+/).map(function (s) { return s.trim(); }).filter(Boolean)[0] || '');
+      }
+      if (!title) return null;
+      return {
+        kind: 'todo',
+        title: title,
+        prefix: "//div[" + classTokenPred('todo-item') + "][contains(normalize-space(.)," + xpathLiteral(title) + ")]",
+      };
+    }
     return null;
   }
     /* SHARED_ASSIGN_REGION — keep in sync with scan_form.py assignRegion */
@@ -460,6 +492,27 @@ PAGE_LOCATOR_HELPERS = r'''
           region_label: regionLabelOf('section', title),
         };
       }
+      if (el.closest('.todo-item')) {
+        const todo = el.closest('.todo-item');
+        const blob = String(todo.innerText || todo.textContent || '');
+        const keyM = blob.match(/\b(?:PJ|DGSX)\d+\b/);
+        let title = keyM ? keyM[0] : '';
+        if (!title) {
+          const header = todo.querySelector('.todo-item__header');
+          let ht = header ? String(header.innerText || '').replace(/\s+/g, ' ').trim() : '';
+          const actions = header && header.querySelector('.todo-item-actions');
+          if (actions) {
+            const at = String(actions.innerText || '').replace(/\s+/g, ' ').trim();
+            if (at) ht = ht.replace(at, '').replace(/\s+/g, ' ').trim();
+          }
+          title = (ht || blob.split(/[\n\r]+/).map(function (s) { return s.trim(); }).filter(Boolean)[0] || '').slice(0, 40);
+        }
+        return {
+          region_role: 'section',
+          region_id: 'section:' + (title || 'todo'),
+          region_label: regionLabelOf('section', title),
+        };
+      }
       if (el.closest('.el-aside, .sidebar, aside, .el-menu')) {
         return { region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') };
       }
@@ -486,6 +539,12 @@ PAGE_LOCATOR_HELPERS = r'''
           var h = card.querySelector('.el-card__header');
           title = String((h && (h.innerText || h.textContent)) || '').replace(/s+/g, ' ').trim().slice(0, 80);
         }
+        // Prefer nearer titlebox over outer collapse — coarse assignRegion stays
+        // collapse-first; feature_card / L1c should reflect finer panel when present.
+        if (!title) {
+          var tb = el.closest('.titlebox');
+          if (tb) title = titleboxTitleText(tb).slice(0, 80);
+        }
         if (!title) {
           var collapse = el.closest('.el-collapse-item');
           if (collapse) {
@@ -493,9 +552,13 @@ PAGE_LOCATOR_HELPERS = r'''
             title = String((ch && (ch.innerText || ch.textContent)) || '').replace(/s+/g, ' ').trim().slice(0, 80);
           }
         }
-        if (!title) {
-          var tb = el.closest('.titlebox');
-          if (tb) title = titleboxTitleText(tb).slice(0, 80);
+        if (!title && region && region.region_label) {
+          var rl = String(region.region_label || '').replace(/s+/g, ' ').trim();
+          // Skip taxonomy tokens (section/main/…) — keep readable card keys only.
+          if (rl && rl !== '区块' && rl !== '主区' && rl !== '其他' && rl !== '弹层' && rl !== '表格'
+            && rl !== '侧栏' && rl !== '顶栏' && rl !== '页面') {
+            title = rl.slice(0, 80);
+          }
         }
       }
       var band = 'center';
@@ -675,7 +738,12 @@ PAGE_LOCATOR_HELPERS = r'''
       return String(s || '').replace(/\s+/g, ' ').trim();
     }
     function inventoryKindOf(el) {
+      return classifyOperable(el);
+    }
+    function classifyOperable(el) {
       if (!el) return '';
+      // Todo card actions before form checkbox — portal 待办 wraps cards in el-checkbox-group.
+      if (el.closest && el.closest('.todo-item-action')) return 'button';
       if (el.closest && el.closest('.el-checkbox-group, .el-checkbox')) return 'form_checkbox';
       const k = detectTargetKind(el);
       if (k === 'form_input' || k === 'form_select' || k === 'form_date' || k === 'form_radio'
@@ -716,7 +784,7 @@ PAGE_LOCATOR_HELPERS = r'''
       }
       return cleanVisibleText(el);
     }
-    function collectInventoryHosts() {
+    function collectL2Hosts() {
       const sel = [
         '.el-form-item input:not([type="hidden"])',
         '.el-form-item textarea',
@@ -725,6 +793,7 @@ PAGE_LOCATOR_HELPERS = r'''
         '.el-form-item .el-radio, .el-form-item .el-radio-group .el-radio',
         '.el-form-item .el-checkbox, .el-form-item .el-checkbox-group .el-checkbox',
         'button.el-button, .el-button, button',
+        '.todo-item-action',
         '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"]',
         '[class*="el-icon"][aria-label], .el-tooltip[class*="el-icon"], a[class*="el-icon"]',
       ].join(',');
@@ -734,14 +803,14 @@ PAGE_LOCATOR_HELPERS = r'''
       for (let i = 0; i < nodes.length; i++) {
         const el = nodes[i];
         if (!isVisible(el)) continue;
-        let host = normalizeTargetRoot(el) || el;
+        let host = normalizeHost(el) || el;
         const formItem = host.closest && host.closest('.el-form-item');
         if (formItem && host === formItem) host = inventoryPickControl(formItem) || host;
         if (seen) {
           if (seen.has(host)) continue;
           seen.add(host);
         }
-        const kind = inventoryKindOf(host);
+        const kind = classifyOperable(host);
         if (!kind) continue;
         let operable = host;
         if (kind.indexOf('form_') === 0 && formItem) {
@@ -752,6 +821,9 @@ PAGE_LOCATOR_HELPERS = r'''
         if (out.length >= INVENTORY_COLLECT_LIMIT) break;
       }
       return out;
+    }
+    function collectInventoryHosts() {
+      return collectL2Hosts();
     }
     function kindsForAction(action) {
       const a = String(action || '');
@@ -775,10 +847,11 @@ PAGE_LOCATOR_HELPERS = r'''
         return inventoryNorm(it.text).toLowerCase().indexOf(n) >= 0;
       });
     }
-  function sectionAnchorXPath(host, leafLocal) {
+  /* regionAnchorXPath — xpath 消歧：regionAnchorOf(host).prefix + '//' + leaf */
+  function regionAnchorXPath(host, leafLocal) {
     const leaf = String(leafLocal || '').replace(/^\/+/, '');
     if (!host || !leaf) return '';
-    const sec = sectionAnchorOf(host);
+    const sec = regionAnchorOf(host);
     if (!sec || !sec.prefix) return '';
     return sec.prefix + '//' + leaf;
   }
@@ -1027,6 +1100,13 @@ PAGE_LOCATOR_HELPERS = r'''
     if (!t) return '';
     const tagL = (node.tagName || '').toLowerCase();
     const cls = String(node.className || '');
+    if (hasClassToken(cls, 'todo-item-action') || (node.closest && node.closest('.todo-item-action'))) {
+      const lit = xpathLiteral(t);
+      const local = "div[" + classTokenPred('todo-item-action') + " and normalize-space()=" + lit + "]";
+      const anchored = regionAnchorXPath(node, local);
+      if (anchored) return anchored;
+      return scopedXPath(local, scopeKind);
+    }
     const clickable = tagL === 'button' || tagL === 'a' || /(^| )el-button( |$)/.test(cls) || kind === 'button' || kind === 'link' || kind === 'adjacent_button';
     if (!clickable) {
       if (kind === 'menu' || kind === 'submenu') return menuXpathSmartOf(node, t);
@@ -1094,7 +1174,7 @@ PAGE_LOCATOR_HELPERS = r'''
       let leafForAnchor = localLeaf;
       let trySectionAnchor = false;
       let nodesMulti = false;
-      if (sectionAnchorOf(host) && t) {
+      if (regionAnchorOf(host) && t) {
         const labelNodes = evalXpathAll('//' + localLeaf);
         if (labelNodes.length >= 2) trySectionAnchor = true;
       }
@@ -1108,7 +1188,7 @@ PAGE_LOCATOR_HELPERS = r'''
         }
       }
       if (trySectionAnchor) {
-        const anchored = sectionAnchorXPath(host, leafForAnchor);
+        const anchored = regionAnchorXPath(host, leafForAnchor);
         if (anchored) {
           const anodes = evalXpathAll(anchored);
           let idx = -1;
@@ -1154,7 +1234,7 @@ PAGE_LOCATOR_HELPERS = r'''
         occurrence = pinned.occurrence;
         verified = pinned.verified;
         // Do not export global [n] when section/titlebox anchor exists but uniqueness failed.
-        if (occurrence >= 1 && (sectionAnchorOf(host) || (opts.region && opts.region.title))) {
+        if (occurrence >= 1 && (regionAnchorOf(host) || (opts.region && opts.region.title))) {
           smart = '';
           verified = false;
           occurrence = 0;

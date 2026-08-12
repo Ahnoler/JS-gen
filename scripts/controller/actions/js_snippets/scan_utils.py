@@ -85,52 +85,6 @@ JS_READ_CURRENT_VALUE = '''(inputEl, trigger, item) => {
 # Shared collapse/tab/card section attach (scan + click_save use same title#n dedupe).
 
 JS_SECTION_ATTACH_BLOCK = r'''
-    const sectionAssignments = new WeakMap();
-    const sectionTitleCounts = new Map();
-    const sectionOf = (el) => {
-        if (!el) return { section_id: '__root__', section_title: '' };
-        const collapse = el.closest && el.closest('.el-collapse-item');
-        if (collapse) {
-            const header = collapse.querySelector('.el-collapse-item__header');
-            let title = (header && (header.innerText || header.textContent) || '').replace(/\s+/g, ' ').trim();
-            title = title.slice(0, 40);
-            const id = title || '__collapse__';
-            return { section_id: id, section_title: title };
-        }
-        const pane = el.closest && el.closest('.el-tab-pane');
-        if (pane) {
-            const tabs = pane.closest && pane.closest('.el-tabs');
-            if (tabs) {
-                const paneId = pane.getAttribute('id') || '';
-                let tabLabel = '';
-                if (paneId) {
-                    const tabItem = tabs.querySelector('.el-tabs__item[aria-controls="' + paneId + '"]');
-                    if (tabItem) {
-                        tabLabel = (tabItem.innerText || tabItem.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-                    }
-                }
-                if (!tabLabel) {
-                    const panes = tabs.querySelectorAll('.el-tab-pane');
-                    const items = tabs.querySelectorAll('.el-tabs__item');
-                    for (let pi = 0; pi < panes.length; pi++) {
-                        if (panes[pi] === pane && items[pi]) {
-                            tabLabel = (items[pi].innerText || items[pi].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-                            break;
-                        }
-                    }
-                }
-                if (tabLabel) return { section_id: tabLabel, section_title: tabLabel };
-            }
-            return { section_id: '__root__', section_title: '' };
-        }
-        const card = el.closest && el.closest('.el-card');
-        if (card) {
-            const h = card.querySelector('.el-card__header');
-            const title = (h && (h.innerText || h.textContent || '') || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-            if (title) return { section_id: title, section_title: title };
-        }
-        return { section_id: '__root__', section_title: '' };
-    };
     const emptySectionAssign = () => ({
         section_id: '__root__',
         section_title: '',
@@ -138,25 +92,22 @@ JS_SECTION_ATTACH_BLOCK = r'''
         region_role: '',
         region_id: '',
     });
-    const withRegionMirror = (sec) => {
-        const title = (sec && sec.section_title) ? String(sec.section_title) : '';
-        const sid = (sec && sec.section_id) ? String(sec.section_id) : '__root__';
-        if (!title || sid === '__root__') {
-            return {
-                section_id: sid || '__root__',
-                section_title: title,
-                region_label: '',
-                region_role: '',
-                region_id: '',
-            };
+    const withRegionMirror = (reg) => {
+        if (!reg || typeof reg !== 'object') {
+            return emptySectionAssign();
         }
-        // LEGACY_SECTION_RETIRE: dual-write L1 region_* from D3 section title (compat).
+        const label = String(reg.region_label || '').trim();
+        const rid = String(reg.region_id || '').trim();
+        if (!label && !rid) {
+            return emptySectionAssign();
+        }
+        // LEGACY_SECTION_RETIRE: mirror L1 region_* → section_* for dual-read compat (click_save).
         return {
-            section_id: sid,
-            section_title: title,
-            region_label: title,
-            region_role: 'section',
-            region_id: 'section:' + sid.slice(0, 40),
+            section_id: rid || '__root__',
+            section_title: label,
+            region_label: label,
+            region_role: reg.region_role || '',
+            region_id: rid,
         };
     };
     const attachSection = (field, el) => {
@@ -164,28 +115,11 @@ JS_SECTION_ATTACH_BLOCK = r'''
             Object.assign(field, emptySectionAssign());
             return;
         }
-        const collapse = el.closest && el.closest('.el-collapse-item');
-        const pane = el.closest && el.closest('.el-tab-pane');
-        const card = el.closest && el.closest('.el-card');
-        const anchor = collapse || pane || card || null;
-        if (!anchor) {
+        if (typeof assignRegion !== 'function') {
             Object.assign(field, emptySectionAssign());
             return;
         }
-        if (sectionAssignments.has(anchor)) {
-            Object.assign(field, sectionAssignments.get(anchor));
-            return;
-        }
-        const sec = sectionOf(el);
-        const dedupeKey = sec.section_title || sec.section_id;
-        if (dedupeKey && dedupeKey !== '__root__' && dedupeKey !== '__collapse__') {
-            const n = (sectionTitleCounts.get(dedupeKey) || 0) + 1;
-            sectionTitleCounts.set(dedupeKey, n);
-            if (n > 1) sec.section_id = (sec.section_title || dedupeKey) + '#' + n;
-        }
-        const assigned = withRegionMirror(sec);
-        sectionAssignments.set(anchor, assigned);
-        Object.assign(field, assigned);
+        Object.assign(field, withRegionMirror(assignRegion(el)));
     };
 '''
 

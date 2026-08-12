@@ -114,6 +114,13 @@ def _offline_xpath_smart_fallback(
     # Only rebuild button/link text xpath offline — never menu from absolute path alone
     tag_l = (tag or '').lower()
     cls = class_name or ''
+    if re.search(r'(?:^|\s)todo-item-action(?:\s|$)', cls):
+        lit = _xpath_literal(t)
+        local = (
+            "div[contains(concat(' ',normalize-space(@class),' '),' todo-item-action ')]"
+            f"[normalize-space()={lit}]"
+        )
+        return _with_overlay_scope(f'//{local}', overlay) if overlay else f'//{local}'
     clickable = (
         tag_l in ('button', 'a')
         or bool(re.search(r'(?:^|\s)el-button(?:\s|$)', cls))
@@ -224,6 +231,9 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         element['locator_occurrence'] = payload['locator_occurrence']
     if payload.get('locator_fallback_reason'):
         element['locator_fallback_reason'] = payload['locator_fallback_reason']
+    parent_text = re.sub(r'\s+', ' ', str(payload.get('parent_text') or '')).strip()
+    if parent_text:
+        element['parent_text'] = parent_text[:80]
 
     def _stamp_params(params: dict) -> dict:
         """Params must not carry xpath_smart; element snap holds the locator."""
@@ -292,11 +302,15 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
                 return None
         if t and not element.get('text'):
             element['text'] = t
-        return 'click_element_by_index', {
+        params = {
             'index': -1,
             'tag_name': element.get('tag_name') or '',
             'text': t,
-        }, element
+        }
+        pt = (element.get('parent_text') or '').strip()
+        if pt:
+            params['parent_text'] = pt
+        return 'click_element_by_index', params, element
 
     if kind == 'click_menu_item':
         return _as_click_by_index(payload.get('menu_text') or payload.get('text') or '')

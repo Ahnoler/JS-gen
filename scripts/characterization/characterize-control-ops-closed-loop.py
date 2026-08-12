@@ -36,7 +36,8 @@ def test_js_scan_section_and_source_b_kinds() -> None:
         )
     )
     assert_true("sectionOf" in js or "SECTION_ATTACH" in js, "section attach helper")
-    assert_true("SCAN_SOURCE_C_BUTTONS" in js, "buttons source marker")
+    assert_true("collectL2Buttons" in js, "L2 button collector")
+    assert_true("COLLECT_L2" in js, "COLLECT_L2 narrative marker")
     # Source B must collect radio groups (not only skip input[type=radio])
     assert_true("el-radio-group" in js or "el-table__cell" in js, "radio xpath climbs to group/cell")
 

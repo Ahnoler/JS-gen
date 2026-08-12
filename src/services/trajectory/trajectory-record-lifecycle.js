@@ -18,6 +18,7 @@ import {
   markConsumedActionLog,
 } from '../trajectory-runtime.js';
 import { classifyRegions } from '../region-classify.js';
+import { displayGroupOf, isTaxonomyRegionToken, uniquifyDisplayGroups } from '../../cdp/display-group.js';
 
 async function resolveSystemIdForTrajectory(tid) {
   try {
@@ -54,9 +55,31 @@ function patchRegionFields(target, classified) {
   if (!target || !classified) return;
   const role = String(classified.role || target.region_role || 'other');
   target.region_role = role;
-  target.region_label = String(classified.label || target.region_label || role).trim() || role;
-  target.region_id = regionIdFromClassified(classified, target);
+  const prevLabel = String(target.region_label || '').trim();
+  const prevId = String(target.region_id || '').trim();
+  let nextLabel = String(classified.label || '').trim();
+  // Coarse→refine contract: assignRegion / collision-refine labels win.
+  // L1c feature-card title often echoes outer collapse and would undo titlebox refine
+  // (e.g.「关联人信息」→「股东及关联人信息」). Only fill empty/taxonomy labels.
+  const keepPrevLabel = !!(prevLabel && !isTaxonomyRegionToken(prevLabel));
+  if (keepPrevLabel) {
+    nextLabel = prevLabel;
+  } else if (!nextLabel || isTaxonomyRegionToken(nextLabel)) {
+    nextLabel = prevLabel;
+  }
+  if (!nextLabel && !isTaxonomyRegionToken(role)) nextLabel = role;
+  target.region_label = nextLabel || prevLabel;
+  if (keepPrevLabel && prevId) {
+    // Preserve collision-refined region_id (section:<titlebox title>).
+    target.region_id = prevId;
+  } else {
+    target.region_id = regionIdFromClassified(classified, target);
+  }
   if (classified.confidence != null) target.region_confidence = classified.confidence;
+  // Keep AG picker group key in sync when L1c rewrites region_* (show A == save A).
+  const group = displayGroupOf(target);
+  if (group) target.display_group = group;
+  else delete target.display_group;
 }
 
 function stripFeatureCard(target) {
@@ -96,6 +119,9 @@ async function applyL1cRegionClassify(payload, { systemId = '' } = {}) {
       if (ref.preview) patchRegionFields(ref.preview, c);
       if (ref.element) stripFeatureCard(ref.element);
       if (ref.preview) stripFeatureCard(ref.preview);
+    }
+    if (payload.ambiguous && Array.isArray(payload.matches)) {
+      uniquifyDisplayGroups(payload.matches);
     }
     return payload;
   } catch (err) {
