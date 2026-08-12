@@ -18,9 +18,13 @@ export { shortSid };
 
 const LINE_PREFIX_RE = /^\[slot:(\d+)\s+sid:([a-z0-9]+)\]/;
 
-/** Strip `[slot:N sid:…]` (and following space) for human export; keep raw on disk. */
+/** Strip executor/session tags for human export; keep raw on disk for filtering. */
 export function stripLinePrefix(line) {
-  return String(line).replace(/^\[slot:\d+\s+sid:[a-z0-9]+\]\s?/, '');
+  let s = String(line)
+    .replace(/^\[slot:\d+\s+sid:[a-z0-9]+\]\s?/, '');
+  // Historical / live: [session] … or [session navigate] …
+  s = s.replace(/^\[session(?:\s+[^\]]*)?\]\s?/, '');
+  return s;
 }
 
 export function stripLinePrefixes(lines) {

@@ -49,7 +49,7 @@ def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel
         if cancel_flag_path is not None:
             Path(cancel_flag_path).write_text('cancel', encoding='utf-8')
     except Exception as e:
-        sys.stderr.write(f"[session] cancel flag write failed: {e}\n")
+        sys.stderr.write(f"cancel flag write failed: {e}\n")
         sys.stderr.flush()
 
     if isinstance(goal_tracker, dict):
@@ -71,7 +71,7 @@ def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel
         except Exception:
             pass
 
-    sys.stderr.write(f"[session] Stop requested ({reason}) — agent will not take further steps\n")
+    sys.stderr.write(f"Stop requested ({reason}) — agent will not take further steps\n")
     sys.stderr.flush()
     emit_json({"event": "agent_stopped", "data": {"reason": reason}})
 
@@ -106,11 +106,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         if special_element_candidates_store is not None:
             replace_special_element_candidates(special_element_candidates_store, raw_cands)
             sys.stderr.write(
-                f"[session] special_element_candidates loaded: {len(special_element_candidates_store)}\n"
+                f"special_element_candidates loaded: {len(special_element_candidates_store)}\n"
             )
             sys.stderr.flush()
     except Exception as e:
-        sys.stderr.write(f"[session] special_element_candidates skipped: {e}\n")
+        sys.stderr.write(f"special_element_candidates skipped: {e}\n")
         sys.stderr.flush()
 
     # P1：记忆事件携带 trajectory_id（Node step 指令透传；writer 自 P0 支持）
@@ -120,24 +120,24 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         if tid:
             configure_memory_writer(trajectory_id=int(tid))
     except Exception as e:
-        sys.stderr.write(f"[session] memory trajectory_id skipped: {e}\n")
+        sys.stderr.write(f"memory trajectory_id skipped: {e}\n")
         sys.stderr.flush()
 
     contract = None
-    sys.stderr.write(f"[session] Step {step_index}: {task_text[:80]} (max_steps={max_steps})\n")
+    sys.stderr.write(f"Phase {step_index}: {task_text[:80]} (max_steps={max_steps})\n")
     sys.stderr.flush()
 
     nav_url = extract_first_url(task_text)
     if nav_url:
         try:
             page = await browser_context.get_current_page()
-            sys.stderr.write(f"[session] Navigating to {nav_url}\n");
+            sys.stderr.write(f"Navigating to {nav_url}\n");
             sys.stderr.flush()
             await do_navigate(page, nav_url)
-            sys.stderr.write(f"[session] Navigation done\n");
+            sys.stderr.write(f"Navigation done\n");
             sys.stderr.flush()
         except Exception as e:
-            sys.stderr.write(f"[session navigate] Error: {e}\n");
+            sys.stderr.write(f"navigate: Error: {e}\n");
             sys.stderr.flush()
 
     agent_task = re.sub(r'^【目标URL】\s*\n\s*https?://[^\s\n]+[\s\n]*', '', task_text, count=1).strip() or task_text
@@ -176,7 +176,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 mode = 'other'
                 contract = None
                 sys.stderr.write(
-                    f"[session] task_mode=other force_refill_all=False "
+                    f"task_mode=other force_refill_all=False "
                     f"heal_mode={heal_mode} phase_intent=False\n"
                 )
                 sys.stderr.flush()
@@ -202,7 +202,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                     mode = case_data_ref.get('_task_mode') or 'other'
                     from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(
-                        f"[session] phase_reviewer ok task_mode={mode} "
+                        f"phase_reviewer ok task_mode={mode} "
                         f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
                         f"phase_intent=True {contract_debug_line(contract)}\n"
                     )
@@ -213,7 +213,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                     mode = case_data_ref.get('_task_mode') or mode
                     from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(
-                        f"[session] phase_reviewer fallback task_mode={mode} "
+                        f"phase_reviewer fallback task_mode={mode} "
                         f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
                         f"phase_intent={bool(contract)} {contract_debug_line(contract)}\n"
                     )
@@ -228,7 +228,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             if case_data_ref is not None:
                 case_data_ref.pop('_case_scenario_text', None)
         else:
-            sys.stderr.write("[session] business-data context enabled for this phase\n")
+            sys.stderr.write("business-data context enabled for this phase\n")
             sys.stderr.flush()
         phase_task_text = phase_core
         prior_phases = instruction.get('prior_phases') or instruction.get('priorPhases')
@@ -255,11 +255,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 if fp_text:
                     agent_task = agent_task + '\n\n' + fp_text
                     sys.stderr.write(
-                        f"[session] fact pack injected: {len((parsed or {}).get('facts') or [])} facts\n"
+                        f"fact pack injected: {len((parsed or {}).get('facts') or [])} facts\n"
                     )
                     sys.stderr.flush()
         except Exception as e:
-            sys.stderr.write(f"[session] fact pack skipped: {e}\n")
+            sys.stderr.write(f"fact pack skipped: {e}\n")
             sys.stderr.flush()
         from ..controller.actions.phase.reviewer import (
             _EMPTY_ACT_BUFFER,
@@ -277,7 +277,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         submit_req = (contract or {}).get('submit') or {}
         empty_buffer = _EMPTY_ACT_BUFFER if coerce_bool(submit_req.get('required')) else 0
         sys.stderr.write(
-            f"[session] max_steps ceiling={ceiling} chosen={max_steps} "
+            f"max_steps ceiling={ceiling} chosen={max_steps} "
             f"empty_buffer={empty_buffer} "
             f"effort={(contract or {}).get('effort')} "
             f"estimated_steps={(contract or {}).get('estimated_steps')} "
@@ -338,10 +338,10 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             phase_start_payload["heal_mode"] = heal_mode
         emit_json({"event": "phase_start", "data": phase_start_payload})
         if agent_task.startswith(('【阶段目录】', '【上一阶段结果】', '【当前任务')):
-            sys.stderr.write(f"[session] agent_task preview: {agent_task[:400]}\n")
+            sys.stderr.write(f"agent_task preview: {agent_task[:400]}\n")
             sys.stderr.flush()
     except Exception as e:
-        sys.stderr.write(f"[session] phase preamble skipped: {e}\n")
+        sys.stderr.write(f"phase preamble skipped: {e}\n")
         sys.stderr.flush()
         emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
     if not max_steps_resolved:
@@ -361,7 +361,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         submit_req = (contract or {}).get('submit') or {}
         empty_buffer = _EMPTY_ACT_BUFFER if coerce_bool(submit_req.get('required')) else 0
         sys.stderr.write(
-            f"[session] max_steps ceiling={ceiling} chosen={max_steps} "
+            f"max_steps ceiling={ceiling} chosen={max_steps} "
             f"empty_buffer={empty_buffer} "
             f"effort={(contract or {}).get('effort')} "
             f"estimated_steps={(contract or {}).get('estimated_steps')} "
@@ -375,13 +375,13 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             hint = format_case_data_hint(case_data_ref)
             if hint:
                 agent_task = agent_task + hint
-                sys.stderr.write(f"[session] Appended case data hint ({len(entries)} keys)\n")
+                sys.stderr.write(f"Appended case data hint ({len(entries)} keys)\n")
                 sys.stderr.flush()
         else:
-            sys.stderr.write("[session] Skip business-data hint (phase is not fill/introduce)\n")
+            sys.stderr.write("Skip business-data hint (phase is not fill/introduce)\n")
             sys.stderr.flush()
     except Exception as e:
-        sys.stderr.write(f"[session] case data hint skipped: {e}\n")
+        sys.stderr.write(f"case data hint skipped: {e}\n")
         sys.stderr.flush()
 
     try:
@@ -390,12 +390,12 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         if se_hint:
             agent_task = agent_task + se_hint
             sys.stderr.write(
-                f"[session] Appended special-element hint "
+                f"Appended special-element hint "
                 f"({len(special_element_candidates_store or {})} candidates)\n"
             )
             sys.stderr.flush()
     except Exception as e:
-        sys.stderr.write(f"[session] special-element hint skipped: {e}\n")
+        sys.stderr.write(f"special-element hint skipped: {e}\n")
         sys.stderr.flush()
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -410,7 +410,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     except Exception:
         goal_tracker['cycle_baseline'] = 0
 
-    sys.stderr.write(f"[session] Creating Agent...\n");
+    sys.stderr.write(f"Creating Agent...\n");
     sys.stderr.flush()
     contract = get_phase_intent(case_data_ref) if case_data_ref else None
     system_msg = build_agent_system_message(contract)
@@ -425,22 +425,22 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         register_done_callback=make_done_callback(output_path),
     )
     _last_agent = agent
-    sys.stderr.write(f"[session] Agent created, starting run...\n");
+    sys.stderr.write(f"Agent created, starting run...\n");
     sys.stderr.flush()
 
     try:
-        sys.stderr.write(f"[session] Calling agent.run() with max_steps={max_steps}\n");
+        sys.stderr.write(f"Calling agent.run() with max_steps={max_steps}\n");
         sys.stderr.flush()
         if case_data_ref is not None:
             case_data_ref['_phase_max_steps'] = int(max_steps)
         await agent.run(max_steps=max_steps, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
-        sys.stderr.write(f"[session] Agent run completed\n");
+        sys.stderr.write(f"Agent run completed\n");
         sys.stderr.flush()
         if not hasattr(agent, '_done_fired') and hasattr(agent, 'history'):
             output_path.parent.mkdir(parents=True, exist_ok=True)
             agent.history.save_to_file(str(output_path))
     except asyncio.CancelledError:
-        sys.stderr.write("[session] Agent run cancelled\n");
+        sys.stderr.write("Agent run cancelled\n");
         sys.stderr.flush()
         emit_json({"event": "phase_error",
                    "data": {"phase": step_index, "name": task_text[:60], "message": "Agent run cancelled"}})
@@ -477,14 +477,14 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             if case_data_ref.get('_quality_failed'):
                 reasons = list(case_data_ref.get('_quality_failed_reasons') or [])
                 sys.stderr.write(
-                    f"[session] QUALITY FAIL phase={step_index} reasons={reasons}\n"
+                    f"QUALITY FAIL phase={step_index} reasons={reasons}\n"
                 )
                 sys.stderr.flush()
                 phase_payload["quality_failed"] = True
                 phase_payload["quality_failed_reasons"] = reasons
             emit_json({"event": "phase_end", "data": phase_payload})
     except Exception as e:
-        sys.stderr.write(f"[session] phase_end observability skipped: {e}\n")
+        sys.stderr.write(f"phase_end observability skipped: {e}\n")
         sys.stderr.flush()
 
     return output_path, task_text

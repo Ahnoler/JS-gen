@@ -285,7 +285,7 @@ export function mountSlotMonitor(wrap) {
         <label class="mon-label">槽位
           <select class="mon-filter-slot">
             <option value="all">全部</option>
-            <option value="occupied">仅占用</option>
+            <option value="occupied" selected>仅占用</option>
             <option value="free">仅空闲</option>
           </select>
         </label>
@@ -426,6 +426,7 @@ export function mountSlotMonitor(wrap) {
       });
       const text = await res.text();
       logBox.hidden = false;
+      logBox.open = true;
       if (!res.ok) {
         let msg = text;
         try {
@@ -447,6 +448,7 @@ export function mountSlotMonitor(wrap) {
       logPre.textContent = display || '(空日志)';
       lastLogSessionId = sessionId || '';
       setStatus(`日志 ${display ? `${display.split('\n').filter(Boolean).length} 行` : '空'}`);
+      logBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (err) {
       setStatus(`日志失败：${err.message}`, true);
     }

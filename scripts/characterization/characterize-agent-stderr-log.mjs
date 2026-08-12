@@ -133,6 +133,8 @@ async function main() {
         '[slot:0 sid:sessaaaa] C',
       ]);
       assert.equal(stripLinePrefix('[slot:0 sid:4588fafc] hello'), 'hello');
+      assert.equal(stripLinePrefix('[session] Agent run completed'), 'Agent run completed');
+      assert.equal(stripLinePrefix('[slot:0 sid:aaaa] [session] Ready'), 'Ready');
       assert.deepEqual(stripLinePrefixes(all), ['A', 'C']);
       const bySid = filterLines({ sid: 'sessaaaa' });
       assert.ok(bySid.every((l) => l.includes('sid:sessaaaa')));
