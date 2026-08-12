@@ -108,7 +108,7 @@ export const GROUP_EXPORT = [
           projects: [{ id: 31, name: '示例项目' }],
           count: 1,
         }),
-        notes: ['缺 token → 400；对方失败 → 502'],
+        notes: ['缺 token → 400；对方网关/不可达 → 502「网络异常，自动化平台无法连接」'],
       },
       {
         method: 'GET', path: '/api/v2/export/partner/systems',
@@ -140,25 +140,25 @@ export const GROUP_EXPORT = [
       {
         method: 'GET', path: '/api/v2/export/trajectories/{id}/transaction',
         summary: '导出/可选推送单轨',
-        desc: '默认只组装并 markExported；push=true 时代调 importDemand（成功才 mark）。raw/forImport 返回裸 envelope。systemId/projectId 缺省 98/31。',
+        desc: '默认只组装并 markExported；push=true 时代调 importDemand（成功才 mark）。仅 recordStatus=recorded|completed（录制完成/已确认）可推送；draft/live/recording → 409 not_pushable_status。raw/forImport 返回裸 envelope。systemId/projectId 缺省 98/31。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', desc: '轨迹 id', example: '36' },
           { name: 'systemId', type: 'string', in: 'query', desc: '缺省 98', example: '98' },
           { name: 'projectId', type: 'string', in: 'query', desc: '缺省 31', example: '31' },
-          { name: 'push', type: 'boolean', in: 'query', desc: 'true 时代推 importDemand', example: 'false' },
+          { name: 'push', type: 'boolean', in: 'query', desc: 'true 时代推 importDemand（需录制完成）', example: 'false' },
           { name: 'raw', type: 'boolean', in: 'query', desc: '仅返回 envelope', example: 'true' },
         ],
       },
       {
         method: 'POST', path: '/api/v2/export/trajectories/{id}/transaction',
         summary: '导出/可选推送单轨（body）',
-        desc: '与 GET 相同；参数可写 body。',
+        desc: '与 GET 相同；参数可写 body。push=true 时草稿等非录制完成状态 → 409。',
         reqExample: J({ systemId: '98', projectId: '31', push: true }),
       },
       {
         method: 'POST', path: '/api/v2/export/transactions',
         summary: '批量推送（组装 + 代调 importDemand）',
-        desc: '产品确认推送入口。逐条组装后合并为一条 importDemand body；对方成功后才 markExported。raw/dryRun 只组装不代推。缺 systemId/projectId 时默认 98/31。',
+        desc: '产品确认推送入口。逐条组装后合并为一条 importDemand body；对方成功后才 markExported。真实推送时跳过 draft/live/recording（item.code=not_pushable_status）；raw/dryRun 只组装不代推、不按状态拦截。缺 systemId/projectId 时默认 98/31。',
         params: [
           { name: 'trajectoryIds', type: 'number[]', required: true, in: 'body', desc: '勾选的轨迹 id', example: '[36]' },
           { name: 'systemId', type: 'string', in: 'body', desc: '对方系统 id（弹窗选择；缺省 98）', example: '98' },
@@ -181,6 +181,7 @@ export const GROUP_EXPORT = [
           '前端：先 GET partner/projects，再按项目 GET partner/systems；项目变更清空系统',
           '无 access_token（头/body/env）→ 400',
           '对方业务失败 → 502，不翻转 isExport',
+          '仅 recorded/completed 可推送；draft 等 → item 失败 code=not_pushable_status（单轨 push → 409）',
         ],
       },
     ],

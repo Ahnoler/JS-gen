@@ -24,6 +24,11 @@ import {
   listPartnerSystems,
   pushImportDemand,
 } from '../../services/partner-platform.js';
+import {
+  assertPushableForPartner,
+  getRecordStatus,
+  isPushableRecordStatus,
+} from '../../services/export-push-gate.js';
 
 function parseIdList(raw) {
   if (raw == null || raw === '') return [];
@@ -215,6 +220,9 @@ export default function (app) {
       return res.json({ ...result, isExport: 0, pushed: false });
     }
 
+    // Real partner push: draft / live / recording are not 「录制完成」.
+    assertPushableForPartner(traj);
+
     const accessToken = requireAccessToken(req);
     const partner = await pushImportDemand(result.payload, { accessToken });
     await trajectoryDao.markExported(traj.id);
@@ -236,7 +244,12 @@ export default function (app) {
       if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
       return maybePushSingle(req, res, traj, req.query);
     } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message, partner: err.partner });
+      res.status(err.statusCode || 500).json({
+        error: err.message,
+        partner: err.partner,
+        ...(err.code ? { code: err.code } : {}),
+        ...(err.recordStatus !== undefined ? { recordStatus: err.recordStatus } : {}),
+      });
     }
   });
 
@@ -248,7 +261,12 @@ export default function (app) {
       if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
       return maybePushSingle(req, res, traj, src);
     } catch (err) {
-      res.status(err.statusCode || 500).json({ error: err.message, partner: err.partner });
+      res.status(err.statusCode || 500).json({
+        error: err.message,
+        partner: err.partner,
+        ...(err.code ? { code: err.code } : {}),
+        ...(err.recordStatus !== undefined ? { recordStatus: err.recordStatus } : {}),
+      });
     }
   });
 
@@ -263,8 +281,14 @@ export default function (app) {
       const { systemId, projectId } = resolveSystemProject(body);
       const ids = parseIdList(body.trajectoryIds ?? body.trajectory_ids);
       if (!ids.length) {
-        return res.status(400).json({ error: 'trajectoryIds[] is required' });
+        return res.status(400).json({ error: '请选择要推送的交易' });
       }
+
+      const dryOrBare =
+        wantBarePayload(body) ||
+        parseBool(body.dryRun, false) ||
+        parseBool(body.dry_run, false);
+      const willPush = !dryOrBare;
 
       const items = [];
       const okBuilt = [];
@@ -276,7 +300,19 @@ export default function (app) {
           const traj = await trajectoryDao.getById(id);
           if (!traj) {
             buildFailed += 1;
-            items.push({ trajectoryId: id, ok: false, error: 'Trajectory not found' });
+            items.push({ trajectoryId: id, ok: false, error: '交易不存在' });
+            continue;
+          }
+          if (willPush && !isPushableRecordStatus(getRecordStatus(traj))) {
+            buildFailed += 1;
+            const status = getRecordStatus(traj);
+            items.push({
+              trajectoryId: id,
+              ok: false,
+              error: `只能推送状态为「录制完成」的交易（当前: ${status ?? 'unknown'}）`,
+              code: 'not_pushable_status',
+              recordStatus: status,
+            });
             continue;
           }
           const result = buildOneTrajectory(traj, { systemId, projectId });
@@ -308,7 +344,7 @@ export default function (app) {
 
       const merged = wrapTransactionList(okBuilt);
 
-      if (wantBarePayload(body) || parseBool(body.dryRun, false) || parseBool(body.dry_run, false)) {
+      if (dryOrBare) {
         if (parseBool(body.download, false)) {
           res.setHeader('Content-Disposition', 'attachment; filename="transactions_import.json"');
         }
@@ -328,7 +364,7 @@ export default function (app) {
 
       if (!okBuilt.length) {
         return res.status(422).json({
-          error: 'No exportable trajectories to push',
+          error: '没有可推送的交易（需为录制完成/已确认，且含可导出步骤）',
           schemaVersion: 1,
           systemId: String(systemId),
           projectId: String(projectId),
