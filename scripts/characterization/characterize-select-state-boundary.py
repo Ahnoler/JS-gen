@@ -335,7 +335,10 @@ def test_recording_and_replay_use_reset_boundary() -> None:
 def test_prompt_serializes_select_and_forbids_invented_xpath() -> None:
     prompt = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
     assert_true("每步最多 1 个 select_option" in prompt, "one select per step")
-    assert_true("禁止自造 dialog / drawer xpath" in prompt, "no invented container xpath")
+    assert_true(
+        "禁止自造任何 `xpath_smart`" in prompt,
+        "no invented xpath_smart (incl. dialog/drawer)",
+    )
     assert_true("禁止用 `click_element_by_index` 点 el-option" in prompt, "no index option")
     assert_true(
         "重新 `scan_visible_fields` / `get_pending_tasks`" in prompt,

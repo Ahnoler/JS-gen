@@ -2,9 +2,11 @@
 JS snippet constants: JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME (extracted from _js_snippets.py).
 Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
+from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from .scan_utils import JS_SECTION_ATTACH_BLOCK
 
 JS_CLICK_SAVE_BUTTON = r'''(buttonArg) => {
+''' + PAGE_LOCATOR_HELPERS + r'''
   const args = Array.isArray(buttonArg) ? buttonArg : [buttonArg, ''];
   const needle = String(args[0] || '保存').trim() || '保存';
   const wantSec = String(args[1] || '').trim();

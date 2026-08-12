@@ -1,9 +1,9 @@
 # Select option 状态边界闭环设计
 
-**Status:** Approved  
+**Status:** Implemented 2026-08-11 — landed on `V2.1_dev` as `79a8e92` (`fix: close select_option state and stamp concrete options`); leftover worktree branch `fix/select-option-state-boundary` retired 2026-08-12 (duplicate history, do not merge)  
 **Date:** 2026-08-11  
 **Scope:** 录制/回放 `select_option` 状态复位、单 select 约束、录制期 xpath 定向回退  
-**Isolation:** 基于当前 `HEAD` 的独立 worktree 实施；不带入父工作树 table-row / first-stamp WIP
+**Isolation:** 原基于 `8ba0d02` 独立 worktree；功能已 squash 入主线，专题分支勿再合入
 
 ## 问题
 

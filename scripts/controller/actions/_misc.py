@@ -385,6 +385,51 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     attributes=element_node.attributes or {},
                 )
 
+            # Forbid index-click on el-select dropdown surfaces (option li / table-in-select
+            # rows / dropdown body). Agents otherwise record 点击元素 with concatenated
+            # company names (对公评级申请「客户名称」TsscMultiSelect) then still call
+            # select_option — duplicate junk step. Same rule as prompt EL-SELECT §2–3.
+            try:
+                gate_xp = str(
+                    (element_info or {}).get('xpath')
+                    or getattr(element_node, 'xpath', None)
+                    or ''
+                )
+                dd_gate = await page.evaluate(
+                    '''(xpath) => {
+                        let node = null;
+                        if (xpath) {
+                            try {
+                                node = document.evaluate(
+                                    xpath, document, null,
+                                    XPathResult.FIRST_ORDERED_NODE_TYPE, null
+                                ).singleNodeValue;
+                            } catch (e) {}
+                        }
+                        if (!node || node.nodeType !== 1) return { hit: false };
+                        const dd = node.closest && node.closest('.el-select-dropdown');
+                        if (!dd) return { hit: false };
+                        const inItem = !!(node.closest('.el-select-dropdown__item'));
+                        const inRow = !!(node.closest('tr.el-table__row, .el-table__row'));
+                        return {
+                            hit: true,
+                            kind: inRow ? 'table-row' : (inItem ? 'option' : 'dropdown'),
+                        };
+                    }''',
+                    gate_xp,
+                )
+                if isinstance(dd_gate, dict) and dd_gate.get('hit'):
+                    kind = str(dd_gate.get('kind') or 'dropdown')
+                    return _err(
+                        f'use-select-option | Index click on el-select dropdown ({kind}) '
+                        f'is forbidden — do not record 点击元素. '
+                        f'Call select_option(label_text=..., option_text=...) only '
+                        f'(table-in-select / 客户名称 remote rows included).',
+                        include_in_memory=True,
+                    )
+            except Exception:
+                pass
+
             # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
             # select→修改→确认 loops after premature done() rejection.
             # Exception: customer-magnifier / query-toolbar pickers — allow 确认.

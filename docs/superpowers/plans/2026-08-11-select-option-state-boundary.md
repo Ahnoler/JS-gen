@@ -1,5 +1,7 @@
 # Select Option State Boundary Implementation Plan
 
+> **Status:** Done 2026-08-11 on `V2.1_dev` (`79a8e92`). Branch `fix/select-option-state-boundary` was parallel granular history — **do not merge** (would regress later xpath/region/select-substr work). Retired 2026-08-12.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prevent an `option-not-found` select attempt from leaking open Element UI state into the next action, and recover once from a runtime-missing explicit xpath by using the unique scanned xpath.
