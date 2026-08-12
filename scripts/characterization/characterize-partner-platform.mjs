@@ -8,7 +8,10 @@ import {
   resolveSystemProject,
   DEFAULT_PARTNER_SYSTEM_ID,
   DEFAULT_PARTNER_PROJECT_ID,
+  PARTNER_NETWORK_ERROR_MSG,
 } from '../../src/services/partner-platform.js';
+
+assert.equal(PARTNER_NETWORK_ERROR_MSG, '网络异常，自动化平台无法连接');
 
 const EXPECTED = (
   process.env.PARTNER_ACCESS_TOKEN

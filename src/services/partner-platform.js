@@ -13,6 +13,9 @@ const DEFAULT_PARTNER_ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjE1MTAwNzY4MTA1Nzg2NDQ5OTIsImlhdCI6MTc4MTc0NjMyNCwianRpIjoidG9rZW5JZCJ9.RC81sU9-7mQ7HHxz47dBqIXg0ZWfPGL_uPN0vt-p4qI';
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+/** User-facing copy when partner nginx/upstream is unreachable or returns non-JSON. */
+export const PARTNER_NETWORK_ERROR_MSG = '网络异常，自动化平台无法连接';
+
 export const DEFAULT_PARTNER_SYSTEM_ID = '98';
 export const DEFAULT_PARTNER_PROJECT_ID = '31';
 
@@ -119,19 +122,23 @@ async function partnerFetch(url, { method = 'GET', accessToken, body, timeoutMs 
     return { httpStatus: res.status, ok: res.ok, json, text };
   } catch (e) {
     if (e?.name === 'AbortError') {
-      const err = new Error(`Partner request timed out after ${timeoutMs}ms`);
+      console.warn(`[partner] timeout ${timeoutMs}ms url=${url}`);
+      const err = new Error(PARTNER_NETWORK_ERROR_MSG);
       err.statusCode = 504;
+      err.partnerDetail = `timed out after ${timeoutMs}ms`;
       throw err;
     }
-    const err = new Error(e?.message || 'Partner request failed');
+    console.warn(`[partner] fetch failed url=${url}:`, e?.message || e);
+    const err = new Error(PARTNER_NETWORK_ERROR_MSG);
     err.statusCode = 502;
+    err.partnerDetail = e?.message || 'Partner request failed';
     throw err;
   } finally {
     clearTimeout(timer);
   }
 }
 
-function assertPartnerBusinessOk(json, fallbackMsg = 'Partner API error') {
+function assertPartnerBusinessOk(json, fallbackMsg = PARTNER_NETWORK_ERROR_MSG) {
   if (json == null || typeof json !== 'object') {
     const err = new Error(fallbackMsg);
     err.statusCode = 502;
@@ -169,11 +176,16 @@ export async function listPartnerProjects({ accessToken } = {}) {
     body: {},
   });
   if (!json) {
-    const err = new Error(`Partner projects failed (HTTP ${httpStatus}): ${String(text).slice(0, 200)}`);
+    console.warn(
+      `[partner] projects non-JSON HTTP ${httpStatus}:`,
+      String(text).slice(0, 200),
+    );
+    const err = new Error(PARTNER_NETWORK_ERROR_MSG);
     err.statusCode = 502;
+    err.partnerDetail = { httpStatus, preview: String(text).slice(0, 200) };
     throw err;
   }
-  assertPartnerBusinessOk(json, 'Partner projects error');
+  assertPartnerBusinessOk(json, PARTNER_NETWORK_ERROR_MSG);
   const rows = json.rows ?? json.data?.rows ?? json.data ?? json.list ?? [];
   const list = Array.isArray(rows) ? rows : [];
   return list.map(normalizeProjectRow).filter(Boolean);
@@ -217,11 +229,16 @@ export async function listPartnerSystems({ accessToken, projectId, parentId } = 
     accessToken,
   });
   if (!json) {
-    const err = new Error(`Partner systems failed (HTTP ${httpStatus}): ${String(text).slice(0, 200)}`);
+    console.warn(
+      `[partner] systems non-JSON HTTP ${httpStatus}:`,
+      String(text).slice(0, 200),
+    );
+    const err = new Error(PARTNER_NETWORK_ERROR_MSG);
     err.statusCode = 502;
+    err.partnerDetail = { httpStatus, preview: String(text).slice(0, 200) };
     throw err;
   }
-  assertPartnerBusinessOk(json, 'Partner systems error');
+  assertPartnerBusinessOk(json, PARTNER_NETWORK_ERROR_MSG);
   const raw = json.data ?? json.rows ?? json.list ?? json;
   const list = Array.isArray(raw) ? raw : (Array.isArray(raw?.children) ? raw.children : []);
   return list.map(normalizeSystemNode).filter(Boolean);
@@ -239,11 +256,16 @@ export async function pushImportDemand(payload, { accessToken } = {}) {
     body: payload,
   });
   if (!json) {
-    const err = new Error(`importDemand failed (HTTP ${httpStatus}): ${String(text).slice(0, 200)}`);
+    console.warn(
+      `[partner] importDemand non-JSON HTTP ${httpStatus}:`,
+      String(text).slice(0, 200),
+    );
+    const err = new Error(PARTNER_NETWORK_ERROR_MSG);
     err.statusCode = 502;
+    err.partnerDetail = { httpStatus, preview: String(text).slice(0, 200) };
     throw err;
   }
-  assertPartnerBusinessOk(json, 'importDemand rejected');
+  assertPartnerBusinessOk(json, PARTNER_NETWORK_ERROR_MSG);
   return {
     code: json.code ?? 200,
     msg: json.msg || json.message || 'ok',
