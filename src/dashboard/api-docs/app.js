@@ -274,10 +274,13 @@ function renderGroup(group) {
   wrap.dataset.group = group.id;
 
   if (group.id === 'overview') {
-    wrap.innerHTML = `<h2 class="docs-section-title">概览</h2>`;
-    const box = document.createElement('div');
-    renderOverview(box);
-    wrap.appendChild(box);
+    wrap.innerHTML = `
+      <details class="docs-overview-fold">
+        <summary class="docs-section-title docs-overview-summary">概览</summary>
+        <div class="docs-overview-body"></div>
+      </details>
+    `;
+    renderOverview($('.docs-overview-body', wrap));
     return wrap;
   }
 

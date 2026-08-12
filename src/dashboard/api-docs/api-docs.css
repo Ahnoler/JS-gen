@@ -201,6 +201,29 @@ a:hover { text-decoration: underline; }
   font-size: 18px;
   font-weight: 700;
 }
+.docs-overview-fold {
+  margin: 28px 0 12px;
+}
+.docs-overview-fold > .docs-overview-summary {
+  margin: 0;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.docs-overview-fold > .docs-overview-summary::-webkit-details-marker { display: none; }
+.docs-overview-fold > .docs-overview-summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 1em;
+  color: var(--docs-muted);
+  transition: transform .15s ease;
+}
+.docs-overview-fold[open] > .docs-overview-summary::before {
+  transform: rotate(90deg);
+}
+.docs-overview-body {
+  margin-top: 12px;
+}
 .docs-section-desc {
   margin: -6px 0 14px;
   font-size: 13px;

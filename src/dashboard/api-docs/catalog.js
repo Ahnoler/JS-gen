@@ -31,8 +31,9 @@ export const GROUP_SLOT_MONITOR = [{
 
 /** @type {TagGroup[]} */
 export const API_GROUPS = [
-  ...GROUP_OVERVIEW,
+  GROUP_OVERVIEW[0], // 概览
   ...GROUP_SLOT_MONITOR,
+  ...GROUP_OVERVIEW.slice(1), // 系统管理 …
   ...GROUP_HIERARCHY,
   ...GROUP_COMPONENTS,
   ...GROUP_TRAJECTORY,
