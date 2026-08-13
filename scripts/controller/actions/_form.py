@@ -312,10 +312,21 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         }''')
         results.append(f'btn:{clicked}')
 
-        # Wait for post-login navigation
+        summary = ' '.join(results)
+        if (
+            not _is_ok_result(str(u_r))
+            or not _is_ok_result(str(p_r))
+            or clicked != 'ok'
+        ):
+            return _err('err-login | ' + summary)
+
         await page.wait_for_timeout(3000)
-        _record_action('login', {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code}, 'ok-login')
-        return _ok('ok-login | ' + ' '.join(results), include_in_memory=True)
+        _record_action(
+            'login',
+            {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code},
+            'ok-login',
+        )
+        return _ok('ok-login | ' + summary, include_in_memory=True)
 
     @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code). Prefers case_data_store presets when present.')
     async def match_form_rule(label_text: str):
