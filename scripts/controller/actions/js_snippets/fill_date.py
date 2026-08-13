@@ -5,7 +5,70 @@ Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 from .base import JS_FIELD_DISABLED
 from .container import JS_GET_CONTAINER
 
+# Shared Vue commit: ElDatePicker AND TsscMultiDatePicker (.tsscdatepicker).
+# Walking only to name==='ElDatePicker' skips Tssc → form.model stays empty.
+JS_COMMIT_DATE_VUE_BODY = r'''
+    const commitDateVue = (target, val) => {
+      if (!target) return;
+      const isDateVm = (vm) => {
+        const n = (vm && vm.$options && vm.$options.name) || '';
+        return n === 'ElDatePicker' || n === 'TsscMultiDatePicker' || /DatePicker/i.test(n);
+      };
+      const emitValOf = (vm, raw) => {
+        const s = String(raw == null ? '' : raw).trim();
+        try {
+          const vf = (vm && (vm.valueFormat || (vm.$props && vm.$props.valueFormat))) || '';
+          if (/H|h|m|s/.test(String(vf)) && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s + ' 00:00:00';
+        } catch (e) {}
+        return s;
+      };
+      try {
+        const w = target.closest && target.closest('.el-date-editor, .tsscdatepicker');
+        let vm = (w && w.__vue__) || target.__vue__;
+        let guard = 0;
+        while (vm && vm.$options && !isDateVm(vm) && guard < 12) {
+          vm = vm.$parent;
+          guard += 1;
+        }
+        if (vm && isDateVm(vm)) {
+          const out = emitValOf(vm, val);
+          vm.value = out;
+          vm.$emit('input', out);
+          vm.$emit('change', out);
+          try { vm.date = new Date(val); } catch (e) {}
+          try { vm.$emit('pick', new Date(val)); } catch (e) {}
+        }
+        const item = target.closest && target.closest('.el-form-item');
+        let fivm = item && item.__vue__;
+        guard = 0;
+        while (fivm && fivm.$options && fivm.$options.name !== 'ElFormItem' && guard < 8) {
+          fivm = fivm.$parent;
+          guard += 1;
+        }
+        if (fivm && fivm.prop && fivm.form && fivm.form.model) {
+          const parts = String(fivm.prop).split('.');
+          let cur = fivm.form.model;
+          for (let i = 0; i < parts.length - 1; i++) {
+            if (cur[parts[i]] == null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {};
+            cur = cur[parts[i]];
+          }
+          const key = parts[parts.length - 1];
+          let modelVal = String(val == null ? '' : val).trim();
+          const existing = cur[key];
+          if (typeof existing === 'string' && / 00:00:00$/.test(existing) && /^\d{4}-\d{2}-\d{2}$/.test(modelVal)) {
+            modelVal = modelVal + ' 00:00:00';
+          } else if (vm && isDateVm(vm)) {
+            modelVal = emitValOf(vm, val);
+          }
+          cur[key] = modelVal;
+          try { fivm.$emit('el.form.change', modelVal); } catch (e) {}
+        }
+      } catch (e) {}
+    };
+'''
+
 JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
+''' + JS_COMMIT_DATE_VUE_BODY + r'''
   const setFn = (t, v) => {
     const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
     const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -80,22 +143,9 @@ JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
     if (dlg && local) target = tryXpath('.//' + local, dlg);
   }
   if (!target) return 'xpath-not-found';
-  if (target.disabled || target.readOnly) return 'field-disabled';
+  if (target.disabled) return 'field-disabled';
   target.focus();
-  try {
-    let w = target.closest('.el-date-editor');
-    if (w) {
-      let vm = w.__vue__;
-      while (vm && vm.$options && vm.$options.name !== 'ElDatePicker') vm = vm.$parent;
-      if (vm) {
-        vm.value = val;
-        vm.$emit('input', val);
-        vm.$emit('change', val);
-        vm.date = new Date(val);
-        vm.$emit('pick', new Date(val));
-      }
-    }
-  } catch (e) {}
+  commitDateVue(target, val);
   setFn(target, val);
   target.blur();
   document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x => {
@@ -212,6 +262,7 @@ JS_CLICK_RADIO_BY_XPATH = r'''([xpath, option]) => {
 
 JS_FILL_DATE_FIELD = '''([label, val]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
+''' + JS_COMMIT_DATE_VUE_BODY + '''
     const setFn = (t, v) => {
         const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
         const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -277,7 +328,7 @@ JS_FILL_DATE_FIELD = '''([label, val]) => {
     // level, ElForm.model.fdDt reflects the new value and save validation
     // passes.  Without this walk-up, save clears the date fields.
     target.focus();
-    try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
+    commitDateVue(target, val);
     setFn(target, val);
     target.blur();
     document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});

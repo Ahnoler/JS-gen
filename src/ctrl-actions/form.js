@@ -53,7 +53,7 @@ export const CTRL_PART_FORM = `{
       if (t.closest('.el-date-editor, .tsscdatepicker')) {
         t.focus();
         setFn(t, val);
-        try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){}
+        try{let w=t.closest('.el-date-editor,.tsscdatepicker');let vm=(w&&w.__vue__)||t.__vue__;let g=0;while(vm&&vm.$options&&g++<12){const n=vm.$options.name||'';if(n==='ElDatePicker'||n==='TsscMultiDatePicker'||/DatePicker/i.test(n)){let out=val;try{const vf=vm.valueFormat||'';if(/H|h|m|s/.test(String(vf))&&/^\d{4}-\d{2}-\d{2}$/.test(String(val)))out=val+' 00:00:00';}catch(e){}vm.value=out;vm.$emit('input',out);vm.$emit('change',out);try{vm.date=new Date(val);}catch(e){}try{vm.$emit('pick',new Date(val));}catch(e){}break;}vm=vm.$parent;}}catch(e){}
         (t.parentNode?.querySelector('input')||t).click();
         return new Promise(resolve => {
           setTimeout(() => {
@@ -87,7 +87,7 @@ export const CTRL_PART_FORM = `{
       if (t.closest('.el-date-editor, .tsscdatepicker')) {
         t.focus();
         setFn(t, val);
-        try{let vm=t.__vue__;if(vm){let p=vm.$parent;if(p&&p.$options&&p.$options.name==='ElDatePicker'){p.value=val;p.$emit('input',val);p.$emit('change',val);p.date=new Date(val);p.$emit('pick',new Date(val));}}}catch(e){}
+        try{let w=t.closest('.el-date-editor,.tsscdatepicker');let vm=(w&&w.__vue__)||t.__vue__;let g=0;while(vm&&vm.$options&&g++<12){const n=vm.$options.name||'';if(n==='ElDatePicker'||n==='TsscMultiDatePicker'||/DatePicker/i.test(n)){let out=val;try{const vf=vm.valueFormat||'';if(/H|h|m|s/.test(String(vf))&&/^\d{4}-\d{2}-\d{2}$/.test(String(val)))out=val+' 00:00:00';}catch(e){}vm.value=out;vm.$emit('input',out);vm.$emit('change',out);try{vm.date=new Date(val);}catch(e){}try{vm.$emit('pick',new Date(val));}catch(e){}break;}vm=vm.$parent;}}catch(e){}
         (t.parentNode?.querySelector('input')||t).click();
         return new Promise(resolve => {
           setTimeout(() => {

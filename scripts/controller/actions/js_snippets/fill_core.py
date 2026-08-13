@@ -5,9 +5,11 @@ Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 from .base import JS_FIELD_DISABLED
 from .container import JS_GET_CONTAINER
 from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
+from .fill_date import JS_COMMIT_DATE_VUE_BODY
 
 JS_FILL_FORM_FIELD = '''([label, val]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
+''' + JS_COMMIT_DATE_VUE_BODY + '''
     const setFn = (t, v) => {
         const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
         const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -37,7 +39,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         )) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
             target.focus();
-            try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
+            commitDateVue(target, val);
             setFn(target, val);
             target.blur();
             document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
@@ -62,7 +64,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
         )) return 'field-disabled';
         if (target.closest('.el-date-editor, .tsscdatepicker')) {
             target.focus();
-            try{let w=target.closest('.el-date-editor');if(w){let vm=w.__vue__;while(vm&&vm.$options&&vm.$options.name!=='ElDatePicker')vm=vm.$parent;if(vm){vm.value=val;vm.$emit('input',val);vm.$emit('change',val);vm.date=new Date(val);vm.$emit('pick',new Date(val));}}}catch(e){}
+            commitDateVue(target, val);
             setFn(target, val);
             target.blur();
             document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
@@ -95,6 +97,7 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
 # Handles el-table fixed columns (offsetParent null) and dialog/drawer [last()] scopes.
 
 JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
+''' + JS_COMMIT_DATE_VUE_BODY + r'''
   const setFn = (t, v) => {
     const TagProto = t.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
     const setter = Object.getOwnPropertyDescriptor(TagProto.prototype, 'value').set;
@@ -214,7 +217,22 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
     }
   }
   if (!target) return xpath ? 'xpath-not-found' : 'xpath-empty';
-  if (target.disabled || target.readOnly) return 'field-disabled';
+  const isDate = !!(target.closest && target.closest('.el-date-editor, .tsscdatepicker'));
+  if (target.disabled || (target.readOnly && !isDate)) return 'field-disabled';
+  if (isDate) {
+    if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+      const inp = target.querySelector && target.querySelector('input:not([type="hidden"])');
+      if (inp) target = inp;
+    }
+    commitDateVue(target, val);
+    setFn(target, val == null ? '' : String(val));
+    try { target.blur(); } catch (e) {}
+    document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach((x) => {
+      x.style.display = 'none';
+      x.classList.add('is-hidden');
+    });
+    return 'ok-date';
+  }
   if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return 'xpath-not-input';
   setFn(target, val == null ? '' : String(val));
   return 'ok-xpath-smart';
@@ -352,4 +370,4 @@ JS_CAPTURE_FROM_XPATH = (
 }'''
 )
 
-# Fill date picker resolved by relative xpath (native setter + ElDatePicker Vue sync).
+# Fill date picker resolved by relative xpath (native setter + date Vue commit).

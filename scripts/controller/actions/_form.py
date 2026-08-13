@@ -198,7 +198,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         val = match_rule(label_text)
         return val if val else 'NO-RULE'
 
-    @controller.action('Fill a form field using Element UI native DOM setter. Works for text inputs AND date fields (sets value directly).')
+    @controller.action('Fill a form field using Element UI native DOM setter. Works for text inputs AND date pickers (commits Vue v-model, including TsscMultiDatePicker).')
     async def fill_form_field(label_text: str, value: str, xpath_smart: str = ""):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)

@@ -30,6 +30,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-13: **日期填表与文本合并为 `fill_form_field`**：`el-date-editor` / `tsscdatepicker`（含 TsscMultiDatePicker）走同一填值动作，写入 Vue `v-model`（不再只改 input 显示）。`fill_date_field` 仍可用（同一提交逻辑）。回放历史 `fill_form_field` 日期步骤不再假成功。
+  影响范围：CTRL fillFormField、Python fill/replay 日期提交。
+  文件：src/ctrl-actions/form.js, scripts/controller/actions/js_snippets/fill_core.py, fill_date.py
+  Python 同步提示：无 HTTP/schema。日期控件须同步 Vue 模型，勿只 set input.value。
+
 - 2026-08-13: **分区逻辑收口后端**：`displayGroupOf` / `uniquifyDisplayGroups` 产出可直接展示的 `display_group`（中文 `region_label`；撞车后缀仅业务主键或 `#n`，禁止 xpath 碎片）；产品 SPA 选择器按该字段原样分组，不再从 xpath / 中文启发式重算分区。
   影响范围：resolve-element ambiguous matches、自动抓取选择器。
   文件：src/cdp/display-group.js, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-l1c-region-classify.mjs
