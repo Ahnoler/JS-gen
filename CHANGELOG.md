@@ -16,7 +16,29 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   文件：src/services/trajectory/trajectory-record-lifecycle.js, scripts/controller/actions/_form.py, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-trajectory.mjs, characterize-login-action.py
   Python 同步提示：无 HTTP/schema。若代理侧 prepare 登录仍发 session.step，改为 replay_actions（go_to_url + login，不传验证码）。
 
+### Added
+
+- 2026-08-13: **批量行进度 + 阶段 done 说明**：`trajectory_phase.done_logs` JSON 数组 `[{text, at, source}]`；`phase_done.data.text` 追加写入（空 text 跳过；`phase_error` 为 `source=fail`）。`GET` 交易树 `phases[].doneLogs`；`GET/WS` 批量 item 计算 `progressPercent` / `phaseCompleted` / `phaseTotal` / `phaseName` / `lastDoneText`（不落 batch_item）。`trajectory.trajectory_log` 语义不变。
+  影响范围：trajectory_phase schema、录制 runner、batch GET/WS、api-docs。
+  文件：migrations/20260813120000_phase_done_logs.js, src/models/phase-done-logs.js, src/services/trajectory/batch-item-progress.js, src/services/trajectory-phase-service.js, trajectory-recording-runner.js, trajectory-batch-service.js
+  Python 同步提示：对齐 `trajectory_phase.done_logs`；透传 tree 的 `doneLogs` 与 batch item 五个计算字段；**不**改 batch URL。
+
+- 2026-08-13: **AI 阶段结束长图（控件高亮）**：`phase_done` 后对本阶段产品树步骤在当前页描边并滚主滚动区拼接 1 张 PNG，写入 `screenshot.kind=phase_highlight` 与 `trajectory_phase.stitch_screenshot_id`。失败不影响录制。交易树 phase 带 `stitchScreenshotId` / `stitchScreenshotUrl`。
+  影响范围：screenshot / trajectory_phase schema、录制 runner、tree、BiB executor `session.bib_phase_highlight_capture`。
+  文件：migrations/20260813100000_phase_highlight_screenshot.js, schemas/init.sql, src/cdp/phase-highlight-*.js, src/services/trajectory/phase-highlight-screenshot.js, executor/bib-bridge.js
+  Python 同步提示：对齐 `screenshot.kind` 新枚举与 `trajectory_phase.stitch_screenshot_id`；透传 tree 的 `stitchScreenshotUrl`；执行机需实现 `session.bib_phase_highlight_capture`（JS-gen executor 已加）。
+
 ### Fixed
+
+- 2026-08-13: **分区逻辑收口后端**：`displayGroupOf` / `uniquifyDisplayGroups` 产出可直接展示的 `display_group`（中文 `region_label`；撞车后缀仅业务主键或 `#n`，禁止 xpath 碎片）；产品 SPA 选择器按该字段原样分组，不再从 xpath / 中文启发式重算分区。
+  影响范围：resolve-element ambiguous matches、自动抓取选择器。
+  文件：src/cdp/display-group.js, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-l1c-region-classify.mjs
+  Python 同步提示：透传 `display_group` 原样展示；勿在代理/前端再解析 xpath 当分组标题。
+
+- 2026-08-13: **待办 region 优先中文标题**：`assignRegion(.todo-item)` 的 `region_label` 用卡片头中文（如【对公授信申请】信贷调查），`region_id` 用业务主键（PJ/DGSX/YXPC…）；同标题撞车时 `uniquifyDisplayGroups` 追加主键后缀。scan L1 todo title 同步。
+  影响范围：resolve-element / 自动抓取选择器分组。
+  文件：src/cdp/page-locator-helpers.js, src/cdp/display-group.js, scripts/controller/actions/js_snippets/scan_form.py, scripts/characterization/characterize-unify-partition-locator.py, characterize-todo-item-action.py
+  Python 同步提示：透传 `region_label` 中文优先；勿把业务主键当唯一展示名。
 
 - 2026-08-12: **`uniquifyDisplayGroups` 撞车键优先 formLabel**：el-select 可见值常相同（如「否」），不可当 label；仅 `(display_group, formLabel|matchedLabel)` 双撞车才追加 xpath 后缀。修复「对公客户概况」被拆成 `… · ins(@class,'el-select')]`。
   影响范围：自动抓取/歧义选择器分组。
@@ -99,6 +121,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：无 API 变更；若本地缓存 L1d，对齐「LLM 关闭时不缓存待 LLM 卡片」语义。
 
 ### Changed
+
+- 2026-08-13: **v2 行为保持去重：steps→commands 映射合并 + sendErr/asyncHandler 统一**：`stepsToActionCommands` 收拢到 `src/models/element.js`（replay-service `prepareReplay` 传 `{ preferEntryPhase: true }` 保留原 `phaseNumber ?? entry.phase ?? 0` 语义；`/assemble-file` 默认 `phaseNumber ?? 0` 不变）；v2 `sendErr` 统一到 `trajectory-shared.js`（canonical 增补可选 `rejected` 字段，其余字段不变），并新增 `asyncHandler`；replay / regions / operation-component / system-ref-data / trajectory-batch 5 个路由文件删除本地 sendErr 副本与手写 try/catch（batch/import 的 multipart 回调除外）。
+  影响范围：错误响应 body 为兼容性扩张（错误对象若带 `code`/`ownerTrajectoryId`/`graceUntil`/`holders`/`rejected` 时多透传，此前部分模块不返回）；路由路径/方法、成功响应字段、WS 协议均不变。
+  文件：src/models/element.js, src/services/replay-service.js, src/routes/v2/trajectory.js, src/routes/v2/trajectory-shared.js, src/routes/v2/replay.js, src/routes/v2/regions.js, src/routes/v2/operation-component.js, src/routes/v2/system-ref-data.js, src/routes/v2/trajectory-batch.js
+  Python 同步提示：错误响应扩展字段均为可选透传；Python 端转发 v2 错误 body 时透传即可，无需强制。
 
 - 2026-08-12: **分区/定位统一 U2（inventory = L2 投影）**：`collectL2Hosts` 为唯一 host 选择器表；`collectInventoryHosts` 委托之；循环内 `normalizeHost` + `classifyOperable`（无并行 collector 表）。`collectL2Buttons` 仍保留 button-only 投影但继续 `classifyOperable` 准入。
   影响范围：PAGE_LOCATOR_HELPERS、resolve-element inventory、自动抓取。

@@ -23,6 +23,10 @@ import { ensureWsHook, resolveBibTarget } from './ws-router.js';
 
 export { getRemoteStatus, resolveBibTarget };
 
+export function getAttachedCdpClient() {
+  return bridge.client || null;
+}
+
 /** Called when Dashboard toggles manual recording — suppress page inject briefly. */
 export function notifyManualRecordingChanged(enabled) {
   if (!enabled) return;

@@ -495,22 +495,31 @@ export const PAGE_LOCATOR_HELPERS = `
       if (el.closest('.todo-item')) {
         const todo = el.closest('.todo-item');
         const blob = String(todo.innerText || todo.textContent || '');
+        // Prefer 业务主键：XXX (covers DGSX/PJ/YXPC/VALT/…); fall back to PJ|DGSX regex.
+        const bizM = blob.match(/业务主键[：:]\\s*([A-Za-z0-9]+)/);
         const keyM = blob.match(/\\b(?:PJ|DGSX)\\d+\\b/);
-        let title = keyM ? keyM[0] : '';
-        if (!title) {
-          const header = todo.querySelector('.todo-item__header');
-          let ht = header ? String(header.innerText || '').replace(/\\s+/g, ' ').trim() : '';
-          const actions = header && header.querySelector('.todo-item-actions');
-          if (actions) {
-            const at = String(actions.innerText || '').replace(/\\s+/g, ' ').trim();
-            if (at) ht = ht.replace(at, '').replace(/\\s+/g, ' ').trim();
-          }
-          title = (ht || blob.split(/[\\n\\r]+/).map(function (s) { return s.trim(); }).filter(Boolean)[0] || '').slice(0, 40);
+        const bizKey = (bizM && bizM[1]) || (keyM ? keyM[0] : '');
+        const header = todo.querySelector('.todo-item__header');
+        let ht = header ? String(header.innerText || '').replace(/\\s+/g, ' ').trim() : '';
+        const actions = header && header.querySelector('.todo-item-actions');
+        if (actions) {
+          const at = String(actions.innerText || '').replace(/\\s+/g, ' ').trim();
+          if (at) ht = ht.replace(at, '').replace(/\\s+/g, ' ').trim();
         }
+        // Human-facing label: Chinese header title first; never prefer bare biz key.
+        let human = ht;
+        if (bizKey && human) {
+          human = human.split(bizKey).join('').replace(/\\s+/g, ' ').trim();
+        }
+        human = human.replace(/^[\\s\\-_|/·.]+|[\\s\\-_|/·.]+$/g, '').trim();
+        const firstLine = blob.split(/[\\n\\r]+/).map(function (s) { return s.trim(); }).filter(Boolean)[0] || '';
+        const label = (human || ht || bizKey || firstLine || 'todo').slice(0, 40);
+        // Stable id prefers biz key so same Chinese title across cards still collide-refine cleanly.
+        const idKey = bizKey || label || 'todo';
         return {
           region_role: 'section',
-          region_id: 'section:' + (title || 'todo'),
-          region_label: regionLabelOf('section', title),
+          region_id: 'section:' + idKey,
+          region_label: regionLabelOf('section', label),
         };
       }
       if (el.closest('.el-aside, .sidebar, aside, .el-menu')) {

@@ -75,7 +75,10 @@ def main() -> int:
     )
     assert_true("配偶姓名" in keys and "坏" not in keys, keys)
 
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+    )
     assert_true("_cascade_round" in form, "wired cascade round helper")
     assert_true("append_select_first_fallbacks" in form, "select first fallback wired")
     assert_true("still_empty" in form or "still_empty_pending" in form, "still_empty wired")

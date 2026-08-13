@@ -21,6 +21,15 @@ from ...models import ScannedField
 _SELECT_OPTION_PLACEHOLDERS = frozenset({'请选择', '请选择…', '请选择...', ''})
 
 
+def _as_dict(raw):
+    """Parse a page.evaluate result that may arrive as a JSON string.
+
+    Shared by the ~15 call sites that repeat
+    ``json.loads(raw) if isinstance(raw, str) else raw``.
+    """
+    return json.loads(raw) if isinstance(raw, str) else raw
+
+
 def is_weak_xpath_smart(xp: str) -> bool:
     s = (xp or "").strip()
     if not s:
@@ -300,7 +309,7 @@ async def _capture_element(page, label_text, *, xpath_smart: str = "", target_ki
         raw = await page.evaluate(JS_CAPTURE_FROM_XPATH, [xp, label_text or "", target_kind or ""])
         if not raw:
             return None
-        info = json.loads(raw) if isinstance(raw, str) else raw
+        info = _as_dict(raw)
         if not isinstance(info, dict):
             return None
         if not (info.get("xpath_smart") or info.get("xpath_full")):
@@ -350,7 +359,7 @@ async def _enrich_click_element(
         )
         if not raw:
             return base
-        info = json.loads(raw) if isinstance(raw, str) else raw
+        info = _as_dict(raw)
         if not isinstance(info, dict) or not (info.get('xpath') or info.get('xpath_smart')):
             return base
         attrs = info.get('attributes') if isinstance(info.get('attributes'), dict) else {}

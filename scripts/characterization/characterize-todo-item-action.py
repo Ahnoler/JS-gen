@@ -83,9 +83,12 @@ def test_scan_admits_todo_item_action_buttons() -> None:
 
 def test_assign_region_knows_todo_item() -> None:
     helpers = (ROOT / "src/cdp/page-locator-helpers.js").read_text(encoding="utf-8")
-    body = helpers.split("function assignRegion", 1)[1][:2500]
+    body = helpers.split("function assignRegion", 1)[1][:3500]
     assert_true(".todo-item" in body, "assignRegion must partition .todo-item cards")
-    assert_true("PJ" in body or "DGSX" in body, "todo region title prefers business key")
+    assert_true("业务主键" in body or "header_title" in body or "todo-item__header" in body,
+                "todo region extracts card header / 业务主键")
+    assert_true("human" in body or "Chinese" in body or "bizKey" in body,
+                "todo region prefers human title over bare biz key")
 
 
 def test_l1_partitions_todo_item_via_assign_region() -> None:

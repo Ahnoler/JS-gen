@@ -8,6 +8,7 @@ import sys
 from langchain_core.messages import HumanMessage
 from . import controller as ctrl_mod
 from .controller.actions._js_snippets import JS_SMART_LOCATOR
+from .controller.actions._helpers import _as_dict
 from .agent.recorder_emitters import (  # noqa: E402
     _capture_step_url,
     _emit_empty_act_cue,
@@ -370,7 +371,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                         continue
                     raw = await page.evaluate(JS_SMART_LOCATOR, [label_text])
                     if raw:
-                        info = json.loads(raw) if isinstance(raw, str) else raw
+                        info = _as_dict(raw)
                         css = info.get('css_sel', '')
                         if css:
                             entry['cssSelector'] = css

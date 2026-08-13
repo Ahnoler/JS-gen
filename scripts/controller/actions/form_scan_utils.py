@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from scripts.state import _ACTION_LOG, _record_action
 from ._helpers import (
+    _as_dict,
     attach_select_options,
     options_from_scan_store,
     read_select_options,
@@ -80,7 +81,7 @@ async def refresh_scan_buttons(page, case_data_store) -> list[dict]:
     """Rescan DOM buttons into ``case_data_store['_scan_buttons']``; return button list."""
     raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, get_has_button_keywords(case_data_store)])
     try:
-        result = json.loads(raw) if isinstance(raw, str) else raw
+        result = _as_dict(raw)
     except Exception:
         return list(case_data_store.get('_scan_buttons') or [])
     buttons = _scan_buttons_from_result(result)

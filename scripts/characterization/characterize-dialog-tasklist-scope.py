@@ -77,7 +77,10 @@ def test_mark_done_clears_all_same_label() -> None:
 
 
 def test_rebuild_uses_tasklist_scan_mode() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+    )
     assert_true("tasklist_scan_mode" in form, "_rebuild must call tasklist_scan_mode")
     # rebuild block must not hardcode only fullpage for evaluate args
     rebuild = form.split("async def _rebuild_task_list_from_dom", 1)[1].split(

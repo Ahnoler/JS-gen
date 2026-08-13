@@ -26,6 +26,24 @@ export async function replaceStepScreenshot(trajectoryStepId, {
   });
 }
 
+export async function replacePhaseHighlightScreenshot(trajectoryPhaseId, {
+  trajectoryId = null,
+  buffer,
+  mimeType = 'image/png',
+} = {}) {
+  const phaseId = Number(trajectoryPhaseId);
+  if (!Number.isFinite(phaseId) || phaseId <= 0) throw new Error('trajectoryPhaseId required');
+  if (!buffer || !buffer.length) throw new Error('buffer required');
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+  return screenshotDao.replaceForPhase({
+    trajectoryPhaseId: phaseId,
+    trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
+    imageData: buf,
+    fileSize: buf.length,
+    mimeType,
+  });
+}
+
 export async function getScreenshotImage(id) {
   return screenshotDao.getImage(id);
 }

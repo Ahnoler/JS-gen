@@ -1,4 +1,4 @@
-import { markPhaseStatus } from '../../services/trajectory-service.js';
+import { markPhaseStatus, appendPhaseDoneLog } from '../../services/trajectory-service.js';
 import { broadcastSessions, broadcastWatcherStatus } from './broadcasts.js';
 
 export function handleSessionMessage(channel, session, stepIndex, cleanupListener) {
@@ -12,6 +12,15 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
       if (!Number.isFinite(phaseId) || phaseId <= 0) return;
       markPhaseStatus(phaseId, status).catch((err) => {
         console.warn('[session] markPhaseStatus failed:', err.message);
+      });
+    };
+
+    const appendFromEvent = (source, text) => {
+      const phaseId = session.activePhaseId != null ? Number(session.activePhaseId) : null;
+      const t = String(text || '').trim();
+      if (!Number.isFinite(phaseId) || phaseId <= 0 || !t) return;
+      appendPhaseDoneLog(phaseId, { text: t, source }).catch((err) => {
+        console.warn('[session] appendPhaseDoneLog failed:', err.message);
       });
     };
 
@@ -29,6 +38,7 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
         session.stepIndex = data?.step_index || stepIndex;
         session.trajectories.push({ step: session.stepIndex, path: trajectoryFile || '', time: new Date().toISOString() });
         finalizePhaseStatus('completed');
+        appendFromEvent('agent', data?.text);
         send('phase_done', data);
         send('status', { phase: 'step_done', label: `Step ${session.stepIndex} completed` });
         session.busy = false;
@@ -41,6 +51,7 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
       }
       case 'phase_error':
         finalizePhaseStatus('failed');
+        appendFromEvent('fail', data?.message);
         send('status', { phase: 'error', label: `Step failed: ${data.message}` });
         send('phase_error', data);
         session.busy = false;
@@ -51,6 +62,7 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
         break;
       case 'error':
         finalizePhaseStatus('failed');
+        appendFromEvent('fail', data?.message);
         send('error', data);
         session.busy = false;
         broadcastWatcherStatus();

@@ -127,12 +127,15 @@ CREATE TABLE `trajectory_phase` (
   `special_element_candidates_json` JSON NULL COMMENT '阶段创建/同步时标记的候选特殊元素快照',
   `status`         ENUM('pending','running','completed','failed') DEFAULT 'pending',
   `component_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '预留 → operation_component.id；Phase1 业务不写入',
+  `stitch_screenshot_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '阶段展示长图 → screenshot.id',
+  `done_logs`        JSON NULL COMMENT '阶段结束说明 [{text, at, source}]；trajectory.trajectory_log 仍为 agent 全文',
   `created_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `completed_at`   DATETIME(3) DEFAULT NULL,
   UNIQUE KEY `uk_phase_id` (`phase_id`),
   KEY `idx_trajectory_id` (`trajectory_id`),
   KEY `idx_phase_number` (`trajectory_id`, `phase_number`),
   KEY `idx_phase_component` (`component_id`),
+  KEY `idx_phase_stitch_screenshot` (`stitch_screenshot_id`),
   CONSTRAINT `fk_phase_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='轨迹执行阶段';
 
@@ -433,12 +436,15 @@ CREATE TABLE `screenshot` (
   `mime_type`           VARCHAR(64) DEFAULT 'image/png' COMMENT 'MIME 类型',
   `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id',
   `trajectory_step_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_step.id',
-  `kind`                ENUM('before','after') NOT NULL DEFAULT 'after' COMMENT '执行前/执行后截图',
+  `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
+  `kind`                ENUM('before','after','phase_highlight') NOT NULL DEFAULT 'after' COMMENT 'before/after=步骤; phase_highlight=阶段长图',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_trajectory_id` (`trajectory_id`),
   UNIQUE KEY `uk_ss_step_kind` (`trajectory_step_id`, `kind`),
+  UNIQUE KEY `uk_ss_phase_kind` (`trajectory_phase_id`, `kind`),
   CONSTRAINT `fk_ss_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_ss_trajectory_step` FOREIGN KEY (`trajectory_step_id`) REFERENCES `trajectory_step` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_ss_trajectory_step` FOREIGN KEY (`trajectory_step_id`) REFERENCES `trajectory_step` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ss_trajectory_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='截图';
 
 -- ─────────────────────────────────────────────────────────────

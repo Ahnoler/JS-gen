@@ -372,3 +372,30 @@ export function trajectoryStepToActionEntry(step) {
     phase: step.phaseNumber ?? step.phase ?? 0,
   };
 }
+
+/**
+ * Map trajectory_step rows to assembler command entries (action_{ts}.json shape).
+ * Shared by v2 trajectories assemble-file and replay-service prepareReplay.
+ *
+ * @param {Array} steps
+ * @param {Object} [opts]
+ * @param {boolean} [opts.preferEntryPhase=false] — when step.phaseNumber is missing,
+ *   fall back to entry.phase (step.phase) instead of 0 (replay-service behavior).
+ * @returns {Object[]}
+ */
+export function stepsToActionCommands(steps, { preferEntryPhase = false } = {}) {
+  return (steps || []).map((s) => {
+    const entry = trajectoryStepToActionEntry(s);
+    const rawEl = s.element ?? s.elementJson ?? null;
+    const el = typeof rawEl === 'string'
+      ? (() => { try { return JSON.parse(rawEl); } catch { return {}; } })()
+      : (rawEl || {});
+    return {
+      ...entry,
+      // Ensure target from either shape
+      target: entry.target || el.xpath || el.target || '',
+      phase: preferEntryPhase ? (s.phaseNumber ?? entry.phase ?? 0) : (s.phaseNumber ?? 0),
+      source: s.source || 'agent',
+    };
+  });
+}

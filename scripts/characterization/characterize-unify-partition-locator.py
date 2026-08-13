@@ -77,12 +77,16 @@ def test_multi_todo_inventory_region_labels_distinct() -> None:
 
     html = """<!DOCTYPE html><html><body>
 <div class="el-checkbox-group" aria-label="checkbox-group">
-  <div class="todo-item"><div class="todo-item__header">【对公】DGSX20260812056002
+  <div class="todo-item"><div class="todo-item__header">【对公授信申请】信贷调查
     <div class="todo-item-actions"><div class="todo-item-action">处理</div></div>
-  </div></div>
-  <div class="todo-item"><div class="todo-item__header">评级 PJ20260807012042
+  </div>
+  <div>业务主键： DGSX20260812056002</div>
+  </div>
+  <div class="todo-item"><div class="todo-item__header">【对公客户评级】二次调查
     <div class="todo-item-actions"><div class="todo-item-action">处理</div></div>
-  </div></div>
+  </div>
+  <div>业务主键： PJ20260807012042</div>
+  </div>
 </div>
 </body></html>"""
 
@@ -102,6 +106,7 @@ def test_multi_todo_inventory_region_labels_distinct() -> None:
     return {
       kind: h.kind,
       region_label: loc.region_label || reg.region_label || '',
+      region_id: loc.region_id || reg.region_id || '',
       region_role: loc.region_role || reg.region_role || '',
     };
   });
@@ -121,15 +126,23 @@ def test_multi_todo_inventory_region_labels_distinct() -> None:
         assert_true(r.get("kind") == "button", f"kind button required, got {r!r}")
         assert_true(r.get("region_role") != "main", f"must not dump to main, got {r!r}")
     labels = [str(r.get("region_label") or "") for r in rows]
+    ids = [str(r.get("region_id") or "") for r in rows]
     assert_true(all(labels), f"region_label must be non-empty, got {rows!r}")
     assert_true(
-        len(set(labels)) == len(labels),
-        f"region_label must be pairwise distinct, got {labels!r}",
+        all(("【" in lab) or ("对公" in lab) or ("评级" in lab) for lab in labels),
+        f"region_label must prefer Chinese titles, got {labels!r}",
     )
-    blob = " ".join(labels)
     assert_true(
-        ("DGSX20260812056002" in blob) and ("PJ20260807012042" in blob),
-        f"labels must carry business keys, got {labels!r}",
+        not any(lab.startswith("DGSX") or lab.startswith("PJ") for lab in labels),
+        f"region_label must not be bare biz key, got {labels!r}",
+    )
+    assert_true(
+        ("DGSX20260812056002" in " ".join(ids)) and ("PJ20260807012042" in " ".join(ids)),
+        f"region_id must carry business keys, got {ids!r}",
+    )
+    assert_true(
+        len(set(ids)) == len(ids),
+        f"region_id must be pairwise distinct, got {ids!r}",
     )
 
 

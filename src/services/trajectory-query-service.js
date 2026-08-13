@@ -84,7 +84,14 @@ export async function getTrajectoryTree(trajectoryDbId, { includeMeta = false } 
       }
       return false;
     });
-    return { ...p, steps };
+    return {
+      ...p,
+      steps,
+      stitchScreenshotId: p.stitchScreenshotId || null,
+      stitchScreenshotUrl: p.stitchScreenshotId
+        ? `/api/v2/screenshots/${p.stitchScreenshotId}/image`
+        : null,
+    };
   });
 
   const orphanSteps = allSteps.filter((s) => !assigned.has(s.id));

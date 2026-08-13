@@ -303,18 +303,24 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
                     || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
                 if (!title && role === 'section' && el.classList && el.classList.contains('todo-item')) {
                     const blob = String(el.innerText || el.textContent || '');
+                    const bizM = blob.match(/业务主键[：:]\\s*([A-Za-z0-9]+)/);
                     const keyM = blob.match(/\\b(?:PJ|DGSX)\\d+\\b/);
-                    if (keyM) title = keyM[0];
-                    else {
-                        const header = el.querySelector('.todo-item__header');
-                        let ht = header ? String(header.innerText || '').replace(/\\s+/g, ' ').trim() : '';
-                        const actions = header && header.querySelector('.todo-item-actions');
-                        if (actions) {
-                            const at = String(actions.innerText || '').replace(/\\s+/g, ' ').trim();
-                            if (at) ht = ht.replace(at, '').replace(/\\s+/g, ' ').trim();
-                        }
-                        title = (ht || blob.split(/[\\n\\r]+/).map((s) => s.trim()).filter(Boolean)[0] || '').slice(0, 40);
+                    const bizKey = (bizM && bizM[1]) || (keyM ? keyM[0] : '');
+                    const header = el.querySelector('.todo-item__header');
+                    let ht = header ? String(header.innerText || '').replace(/\\s+/g, ' ').trim() : '';
+                    const actions = header && header.querySelector('.todo-item-actions');
+                    if (actions) {
+                        const at = String(actions.innerText || '').replace(/\\s+/g, ' ').trim();
+                        if (at) ht = ht.replace(at, '').replace(/\\s+/g, ' ').trim();
                     }
+                    let human = ht;
+                    if (bizKey && human) {
+                        human = human.split(bizKey).join('').replace(/\\s+/g, ' ').trim();
+                    }
+                    human = human.replace(/^[\\s\\-_|/·.]+|[\\s\\-_|/·.]+$/g, '').trim();
+                    title = (human || ht || bizKey
+                        || blob.split(/[\\n\\r]+/).map((s) => s.trim()).filter(Boolean)[0]
+                        || '').slice(0, 40);
                 }
                 const classTokens = String(el.className || '').split(/\\s+/).filter(Boolean).slice(0, 8);
                 const id = role + ':' + classTokens.slice(0, 2).join('.') + ':' + Math.round(rect.y);

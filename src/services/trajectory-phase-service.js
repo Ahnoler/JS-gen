@@ -4,6 +4,7 @@
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
+import { appendDoneLogEntry } from '../models/phase-done-logs.js';
 import { getDB } from '../../config/database.js';
 import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
 import { refreshTrajectoryCounts } from './trajectory-step-service.js';
@@ -59,6 +60,21 @@ export async function markPhaseStatus(phaseDbId, status) {
   return trajectoryPhaseDao.updateStatus(id, status);
 }
 
+export async function appendPhaseDoneLog(phaseDbId, { text, source } = {}) {
+  const id = Number(phaseDbId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  try {
+    const row = await trajectoryPhaseDao.getById(id);
+    if (!row) return null;
+    const next = appendDoneLogEntry(row.doneLogs, { text, source });
+    if (next.length === (row.doneLogs || []).length) return row;
+    return trajectoryPhaseDao.update(id, { doneLogs: next });
+  } catch (err) {
+    console.warn('[phase] appendPhaseDoneLog failed:', err?.message || err);
+    return null;
+  }
+}
+
 /**
  * Clear recorded steps.
  * - No phaseIds / empty: clear all steps; reset all phases to pending.
@@ -106,13 +122,13 @@ export async function clearTrajectory(trajectoryDbId, { phaseIds = null } = {}) 
     await db('trajectory_phase')
       .where({ trajectory_id: tid })
       .whereIn('id', ownedIds)
-      .update({ status: 'pending', completed_at: null });
+      .update({ status: 'pending', completed_at: null, done_logs: JSON.stringify([]) });
   } else {
     // Delete all steps; keep phase descriptions but reset statuses.
     await db('trajectory_step').where({ trajectory_id: tid }).del();
     await db('trajectory_phase')
       .where({ trajectory_id: tid })
-      .update({ status: 'pending', completed_at: null });
+      .update({ status: 'pending', completed_at: null, done_logs: JSON.stringify([]) });
   }
 
   const [{ phases }] = await db('trajectory_phase')

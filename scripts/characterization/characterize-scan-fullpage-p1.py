@@ -79,7 +79,10 @@ def test_form_scan_callers_use_fullpage_mode() -> None:
 
 
 def test_rebuild_or_assistant_uses_fullpage() -> None:
-    form = FORM_PY.read_text(encoding="utf-8")
+    form = (
+        FORM_PY.read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+    )
     assert_true(
         "_rebuild_task_list_from_dom" in form or "run_form_assistant" in form,
         "rebuild or assistant path present",

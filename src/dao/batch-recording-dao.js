@@ -114,6 +114,16 @@ export async function getItemById(id, trx = null) {
   return shapeItem(row);
 }
 
+export async function findItemByTrajectoryId(trajectoryId) {
+  const tid = Number(trajectoryId);
+  if (!Number.isFinite(tid) || tid <= 0) return null;
+  const row = await getDB()(ITEM_TABLE)
+    .where({ trajectory_id: tid })
+    .orderBy('id', 'desc')
+    .first();
+  return shapeItem(row);
+}
+
 export async function listItemsByBatch(batchId, {
   page = 1,
   pageSize = 50,

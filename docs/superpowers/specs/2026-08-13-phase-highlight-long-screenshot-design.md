@@ -1,7 +1,7 @@
 # Design: Phase highlight long-page screenshot (AI record)
 
 **Date:** 2026-08-13  
-**Status:** Approved (dialogue 2026-08-13); implementation plan not yet written  
+**Status:** Approved — plan at `docs/superpowers/plans/2026-08-13-phase-highlight-long-screenshot.md`  
 **Trigger:** 产品要在 AI 录制阶段结束后，把本阶段操作过的控件高亮，再滚屏拼成一张长图给用户看。清单原 **PR-LOC**（phase stitch）与 **PR-LOC-HL**（操作后高亮）在本刀合并为「阶段 done 时控件描边 + 长页拼接」，不是逐步截图。  
 **Related:** [product brief](2026-08-12-product-requirements-miaoyi-brief.md) PR-LOC / PR-LOC-HL; [todo-list](../todo-list.md); [unify partition](2026-08-12-unify-partition-locator-architecture-design.md); `filterMetaSteps` (`src/models/meta-step-actions.js`)
 

@@ -493,6 +493,13 @@ export class BibBridge {
     });
   }
 
+  async capturePhaseHighlight(targets) {
+    const { runPhaseHighlightCapture } = await import('../src/cdp/phase-highlight-capture.js');
+    if (!this.client) throw new Error('BiB not attached');
+    const { buffer, hitCount } = await runPhaseHighlightCapture(this.client, targets || []);
+    return { pngBase64: buffer.toString('base64'), hitCount };
+  }
+
   async detach() {
     this._disposed = true;
     this._clearStallWatch();

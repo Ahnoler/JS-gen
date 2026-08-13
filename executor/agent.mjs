@@ -147,6 +147,14 @@ const client = new ExecutorWsClient({
           matches: result.matches || null,
           error: result.error || null,
         });
+      } else if (msg.type === 'session.bib_phase_highlight_capture' && result) {
+        client.send('session.bib_phase_highlight_capture_result', {
+          sessionId: msg.payload?.sessionId,
+          requestId: result.requestId || msg.payload?.requestId,
+          pngBase64: result.pngBase64 || null,
+          hitCount: result.hitCount ?? 0,
+          error: result.error || null,
+        });
       } else if (msg.type === 'session.bib_input' && result?.clipboard) {
         client.send('session.bib_clipboard', {
           sessionId: msg.payload?.sessionId,

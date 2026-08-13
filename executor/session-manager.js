@@ -428,6 +428,37 @@ export class SessionManager {
     }
   }
 
+  async bibPhaseHighlightCapture(sessionId, { targets, requestId } = {}) {
+    try {
+      const bib = this.bibs.get(sessionId);
+      if (!bib) {
+        return {
+          requestId: requestId || null,
+          sessionId,
+          pngBase64: null,
+          hitCount: 0,
+          error: 'BiB not attached - call record/prepare (stream) first',
+        };
+      }
+      const captured = await bib.capturePhaseHighlight(targets || []);
+      return {
+        requestId: requestId || null,
+        sessionId,
+        pngBase64: captured.pngBase64,
+        hitCount: captured.hitCount,
+        error: null,
+      };
+    } catch (err) {
+      return {
+        requestId: requestId || null,
+        sessionId,
+        pngBase64: null,
+        hitCount: 0,
+        error: err?.message || String(err),
+      };
+    }
+  }
+
   async bibAck(sessionId, payload = {}) {
     const bib = this.bibs.get(sessionId);
     if (!bib) return;

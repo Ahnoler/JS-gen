@@ -10,6 +10,7 @@ import {
 } from '../../../config/config.js';
 import * as batchDao from '../../dao/batch-recording-dao.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import { broadcast } from '../../ws-server.js';
 import { validateFunctionAndAccount } from '../trajectory-account-service.js';
 import { parseBatchExcelBuffer, buildTemplateBuffer } from '../trajectory-batch-excel.js';
@@ -21,6 +22,7 @@ import {
 import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../../models/constants.js';
 import { pumpAnalyze, pumpDraft } from './batch-analyze.js';
 import { pumpRecord } from './batch-record.js';
+import { computeBatchItemProgress, PHASE_LOOKUP_STATUSES } from './batch-item-progress.js';
 
 /** @type {Set<string>} in-flight cancel tokens for analyzing items */
 export const cancelledAnalyzeTokens = new Set();
@@ -60,9 +62,44 @@ function normalizeBatchMode(raw) {
   return m;
 }
 
+export async function enrichBatchItems(items, mode = 'record') {
+  const list = Array.isArray(items) ? items : [];
+  const ids = [...new Set(list
+    .filter((it) => Number(it?.trajectoryId) > 0 && PHASE_LOOKUP_STATUSES.has(String(it.status)))
+    .map((it) => Number(it.trajectoryId)))];
+  const phases = await trajectoryPhaseDao.listByTrajectoryIds(ids);
+  const byTid = new Map();
+  for (const p of phases) {
+    const tid = Number(p.trajectoryId);
+    if (!byTid.has(tid)) byTid.set(tid, []);
+    byTid.get(tid).push(p);
+  }
+  return list.map((it) => {
+    const extra = computeBatchItemProgress({
+      status: it.status,
+      mode,
+      trajectoryId: it.trajectoryId,
+      phases: byTid.get(Number(it.trajectoryId)) || [],
+    });
+    return { ...it, ...extra };
+  });
+}
+
 export async function emitProgress(batchId, item = null, extra = {}) {
   const job = await batchDao.getJobById(batchId);
   const summary = await batchDao.summarizeJob(batchId);
+  let progress = {};
+  if (item) {
+    const [enriched] = await enrichBatchItems([item], job?.mode || 'record');
+    progress = {
+      progressPercent: enriched.progressPercent,
+      phaseCompleted: enriched.phaseCompleted,
+      phaseTotal: enriched.phaseTotal,
+      phaseName: enriched.phaseName,
+      lastDoneText: enriched.lastDoneText,
+      itemStatus: enriched.status ?? item.status,
+    };
+  }
   const payload = {
     batchId,
     mode: job?.mode || 'record',
@@ -75,6 +112,7 @@ export async function emitProgress(batchId, item = null, extra = {}) {
     version: item?.version ?? null,
     error: item?.errorMessage || null,
     ...extra,
+    ...progress,
   };
   try {
     broadcast('batch:progress', payload);
@@ -150,6 +188,7 @@ export async function getBatchJobView(batchId, {
     throw err;
   }
   const items = await batchDao.listItemsByBatch(batchId, { page, pageSize });
+  const enriched = await enrichBatchItems(items.rows, job.mode || 'record');
   const summary = await batchDao.summarizeJob(batchId);
   return {
     batchId: job.id,
@@ -164,7 +203,7 @@ export async function getBatchJobView(batchId, {
     updatedAt: job.updatedAt,
     cancelRequestedAt: job.cancelRequestedAt,
     summary,
-    items: items.rows,
+    items: enriched,
     page: items.page,
     pageSize: items.pageSize,
     total: items.total,

@@ -60,6 +60,11 @@ export function createSessionHandler(manager) {
           mode: payload.mode || 'inventory',
           requestId: payload.requestId,
         });
+      case 'session.bib_phase_highlight_capture':
+        return manager.bibPhaseHighlightCapture(sessionId, {
+          targets: payload.targets || [],
+          requestId: payload.requestId,
+        });
       case 'session.step':
         return manager.forward(sessionId, 'step', {
           instruction: payload.task || payload.instruction,

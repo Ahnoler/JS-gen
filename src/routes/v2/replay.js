@@ -8,64 +8,38 @@
  */
 import * as replayService from '../../services/replay-service.js';
 import { onWsMessage } from '../../ws-server.js';
-
-function sendErr(res, err, fallback = 500) {
-  const status = err.statusCode || fallback;
-  const body = { error: err.message };
-  if (err.holders) body.holders = err.holders;
-  res.status(status).json(body);
-}
+import { sendErr, asyncHandler } from './trajectory-shared.js';
 
 export default function (app) {
   /** Prepare: materialize + assemble + step map */
-  app.post('/api/v2/trajectories/:id/replay/prepare', async (req, res) => {
-    try {
-      const result = await replayService.prepareReplay(+req.params.id);
-      res.json(result);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
+  app.post('/api/v2/trajectories/:id/replay/prepare', asyncHandler(async (req, res) => {
+    const result = await replayService.prepareReplay(+req.params.id);
+    res.json(result);
+  }));
 
   /** Start Playwright replay; progress on WS replay:* */
-  app.post('/api/v2/trajectories/:id/replay/start', async (req, res) => {
-    try {
-      const result = await replayService.startReplay(+req.params.id, {
-        replayPlanId: req.body?.replayPlanId || null,
-      });
-      res.json(result);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
+  app.post('/api/v2/trajectories/:id/replay/start', asyncHandler(async (req, res) => {
+    const result = await replayService.startReplay(+req.params.id, {
+      replayPlanId: req.body?.replayPlanId || null,
+    });
+    res.json(result);
+  }));
 
-  app.post('/api/v2/trajectories/:id/replay/stop', async (req, res) => {
-    try {
-      res.json(replayService.stopReplay(+req.params.id));
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
+  app.post('/api/v2/trajectories/:id/replay/stop', asyncHandler(async (req, res) => {
+    res.json(replayService.stopReplay(+req.params.id));
+  }));
 
-  app.get('/api/v2/trajectories/:id/replay/latest', async (req, res) => {
-    try {
-      const latest = replayService.getLatestReplay(+req.params.id);
-      if (!latest) return res.status(404).json({ error: 'No replay found for trajectory' });
-      res.json(latest);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
+  app.get('/api/v2/trajectories/:id/replay/latest', asyncHandler(async (req, res) => {
+    const latest = replayService.getLatestReplay(+req.params.id);
+    if (!latest) return res.status(404).json({ error: 'No replay found for trajectory' });
+    res.json(latest);
+  }));
 
-  app.get('/api/v2/replays/:replayId', async (req, res) => {
-    try {
-      const replay = replayService.getReplay(req.params.replayId);
-      if (!replay) return res.status(404).json({ error: 'Replay not found' });
-      res.json(replay);
-    } catch (err) {
-      sendErr(res, err);
-    }
-  });
+  app.get('/api/v2/replays/:replayId', asyncHandler(async (req, res) => {
+    const replay = replayService.getReplay(req.params.replayId);
+    if (!replay) return res.status(404).json({ error: 'Replay not found' });
+    res.json(replay);
+  }));
 
   // Optional: start via WS with same payload
   onWsMessage((ws, msg) => {

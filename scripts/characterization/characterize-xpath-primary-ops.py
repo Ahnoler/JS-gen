@@ -262,6 +262,7 @@ def test_execute_round_surfaces_ambiguous_label() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
     )
     assert_true(
         "resolve_error = resolved.error" in form,

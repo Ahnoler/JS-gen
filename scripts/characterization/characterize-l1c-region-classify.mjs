@@ -105,6 +105,17 @@ function ok(n) { console.log(`ok: ${n}`); }
     'PJ20260806012032',
   );
   assert.equal(
+    displayGroupOf({
+      region_label: '【对公授信申请】信贷调查',
+      region_id: 'section:DGSX20260812056005',
+    }),
+    '【对公授信申请】信贷调查',
+  );
+  assert.equal(
+    displayGroupOf({ region_label: '', xpath_smart: "//div[contains(@class,'el-select')]" }),
+    '',
+  );
+  assert.equal(
     displayGroupOf({ region_role: 'section', region_label: 'section' }),
     '',
   );
@@ -112,14 +123,24 @@ function ok(n) { console.log(`ok: ${n}`); }
     displayGroupOf({ region_role: 'section', region_label: '' }),
     '',
   );
-  // Same partition + same label → uniquify
+  // Same partition + same label → uniquify with biz key or #n, never xpath
   const dup = uniquifyDisplayGroups([
     {
-      preview: { display_group: '同标题卡片', text: '处理', xpath_smart: "//div[.='A']", region_id: 'section:a' },
+      preview: {
+        display_group: '同标题卡片',
+        text: '处理',
+        xpath_smart: "//div[.='A']",
+        region_id: 'section:PJ20260807012042',
+      },
       element: { display_group: '同标题卡片', text: '处理', xpath_smart: "//div[.='A']" },
     },
     {
-      preview: { display_group: '同标题卡片', text: '处理', xpath_smart: "//div[.='B']", region_id: 'section:b' },
+      preview: {
+        display_group: '同标题卡片',
+        text: '处理',
+        xpath_smart: "//div[.='B']",
+        region_id: 'section:DGSX20260812056005',
+      },
       element: { display_group: '同标题卡片', text: '处理', xpath_smart: "//div[.='B']" },
     },
     {
@@ -127,8 +148,8 @@ function ok(n) { console.log(`ok: ${n}`); }
       element: { display_group: 'PJ1', text: '处理' },
     },
   ]);
-  assert.notEqual(dup[0].preview.display_group, dup[1].preview.display_group);
-  assert.match(dup[0].preview.display_group, /同标题卡片 · /);
+  assert.equal(dup[0].preview.display_group, '同标题卡片 · PJ20260807012042');
+  assert.equal(dup[1].preview.display_group, '同标题卡片 · DGSX20260812056005');
   assert.equal(dup[2].preview.display_group, 'PJ1');
 
   // Same partition + different labels → keep coarse group (no xpath suffix)
@@ -190,6 +211,28 @@ function ok(n) { console.log(`ok: ${n}`); }
   assert.equal(sameValueSelects[1].preview.display_group, '对公客户概况');
   assert.equal(sameValueSelects[2].preview.display_group, '对公客户概况');
   assert.ok(!sameValueSelects[0].preview.display_group.includes('el-select'));
+
+  // Collision without biz key → #n, never xpath tail
+  const hashSuffix = uniquifyDisplayGroups([
+    {
+      preview: {
+        display_group: '对公客户概况',
+        formLabel: '异地客户标志',
+        xpath_smart: "//div[contains(@class,'el-select')]",
+      },
+      element: { display_group: '对公客户概况', formLabel: '异地客户标志' },
+    },
+    {
+      preview: {
+        display_group: '对公客户概况',
+        formLabel: '异地客户标志',
+        xpath_smart: "//div[contains(@class,'el-form-item')]",
+      },
+      element: { display_group: '对公客户概况', formLabel: '异地客户标志' },
+    },
+  ]);
+  assert.equal(hashSuffix[0].preview.display_group, '对公客户概况 · #1');
+  assert.equal(hashSuffix[1].preview.display_group, '对公客户概况 · #2');
 
   // L1c wiped label to "section" — recover from xpath
   const wiped = uniquifyDisplayGroups([

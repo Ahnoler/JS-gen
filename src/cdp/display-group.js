@@ -32,23 +32,36 @@ function bizKeyFromText(s) {
   return m ? m[0] : '';
 }
 
+function isBizKey(s) {
+  const t = String(s || '').trim();
+  return /^(?:PJ|DGSX)\d+$/i.test(t) || /^[A-Z]{2,}\d{6,}$/i.test(t);
+}
+
+function bizKeyFromRegionId(rid) {
+  const raw = String(rid || '').trim();
+  if (!raw) return '';
+  const rest = raw.includes(':') ? raw.slice(raw.indexOf(':') + 1).trim() : raw;
+  return isBizKey(rest) ? rest : '';
+}
+
 export function displayGroupOf(el) {
   const label = String(el?.region_label || '').trim();
   if (label && !isTaxonomyRegionToken(label)) return label;
 
-  const smart = String(el?.xpath_smart || '').trim();
-  const fromSmart = bizKeyFromText(smart);
+  // Recover a business key from xpath / region_id — never emit xpath fragments
+  // as picker group titles (SPA must display display_group as-is).
+  const fromSmart = bizKeyFromText(el?.xpath_smart);
   if (fromSmart) return fromSmart;
-  if (smart) return smart.slice(0, 64);
+
+  const fromId = bizKeyFromRegionId(el?.region_id);
+  if (fromId) return fromId;
 
   const rid = String(el?.region_id || '').trim();
   if (rid) {
     const rest = rid.includes(':') ? rid.slice(rid.indexOf(':') + 1).trim() : rid;
-    const fromId = bizKeyFromText(rest) || rest;
-    if (fromId && !isTaxonomyRegionToken(fromId)) return fromId;
+    if (rest && !isTaxonomyRegionToken(rest)) return rest;
   }
 
-  // Do not return bare region_role (e.g. "section") — SPA would show a useless bucket.
   return '';
 }
 
@@ -65,12 +78,13 @@ function matchControlLabel(m) {
 
 /**
  * When multiple matches share the same display_group AND the same control label
- * (e.g. several「处理」/「新增」under one coarse region), append a short xpath/id
- * suffix so the picker stays usable.
+ * (e.g. several「处理」/「新增」under one coarse region), append a business-key
+ * or #n suffix so the picker stays usable.
  *
  * Same partition + different labels (客户编号 vs 客户名称) must NOT be split —
  * only (region, label) collisions need further disambiguation.
  * Mutates match.preview / match.element in place.
+ * SPA displays display_group as-is — never emit xpath fragments here.
  * @param {Array<{ preview?: object, element?: object, matchedLabel?: string }>} matches
  */
 export function uniquifyDisplayGroups(matches) {
@@ -123,15 +137,8 @@ export function uniquifyDisplayGroups(matches) {
     seen.set(key, n);
     const smart = String(prev?.xpath_smart || el?.xpath_smart || '').trim();
     const rid = String(prev?.region_id || el?.region_id || '').trim();
-    let suffix = '';
-    if (smart) {
-      const keyM = smart.match(/\b(?:PJ|DGSX)\d+\b/);
-      suffix = keyM ? keyM[0] : smart.replace(/\s+/g, ' ').slice(-24);
-    } else if (rid) {
-      suffix = rid.slice(-24);
-    } else {
-      suffix = `#${n}`;
-    }
+    // Collision suffix is a business key or #n — never an xpath/CSS fragment.
+    const suffix = bizKeyFromRegionId(rid) || bizKeyFromText(smart) || `#${n}`;
     const next = `${base} · ${suffix}`;
     if (prev) prev.display_group = next;
     if (el) el.display_group = next;
