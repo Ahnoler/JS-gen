@@ -8,10 +8,6 @@ import * as execSession from '../../executor-session-client.js';
 import { state } from '../../state.js';
 import { USE_EXECUTOR } from '../../../config/config.js';
 import * as remoteBridge from '../../cdp/remote-bridge.js';
-import {
-  buildLoginInstruction,
-  resolveTrajectoryAccount,
-} from '../trajectory-account-service.js';
 import { getTrajectoryTree } from '../trajectory-query-service.js';
 import {
   getTrajectoryRuntime,
@@ -224,6 +220,7 @@ export async function prepareCaseDataInjection(trajectoryId) {
 
 /**
  * Default login/navigate — NOT written to trajectory_step (is_replay / suppress persist).
+ * Hardcoded go_to_url + login via replay_actions (no browser-use Agent).
  */
 export async function runDefaultLogin(runtime, account, system = null) {
   const session = state.sessions.get(runtime.sessionId);
@@ -235,21 +232,34 @@ export async function runDefaultLogin(runtime, account, system = null) {
     if (!sys?.url && account?.systemId) {
       sys = await systemDao.getById(Number(account.systemId));
     }
-    const instruction = buildLoginInstruction(account, sys || {});
-    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', 300000);
-    const errP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000)
-      .then((p) => Promise.reject(new Error(p?.message || 'login phase_error')));
+    const url = String(sys?.url || account?.loginUrl || '').trim();
+    const username = String(account?.username || '').trim();
+    const password = String(account?.password || '').trim();
+    if (!url) {
+      const err = new Error('System url is empty — set system.url (or legacy account.loginUrl)');
+      err.statusCode = 400;
+      throw err;
+    }
+    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 90000);
     execSession.forwardStdin({
       nodeUuid: runtime.executorNodeUuid,
       sessionId: runtime.sessionId,
-      event: 'step',
+      event: 'replay_actions',
       data: {
-        instruction,
-        max_steps: 10,
-        phase_number: 0,
+        actions: [
+          { action: 'go_to_url', params: { url } },
+          { action: 'login', params: { username, password } },
+        ],
+        is_replay: true,
+        stop_on_fail: true,
       },
     });
-    await Promise.race([doneP, errP]);
+    const result = await doneP;
+    const failed = Number(result?.failed || 0);
+    const okCount = Number(result?.ok || 0);
+    if (result?.error || failed > 0 || okCount < 2) {
+      throw new Error(result?.error || `login replay failed (ok=${okCount} failed=${failed})`);
+    }
     await markConsumedActionLog(runtime);
     runtime.loginDone = true;
     runtime.loginAccountId = Number(account.id);

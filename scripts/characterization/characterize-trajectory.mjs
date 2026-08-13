@@ -43,6 +43,7 @@ import {
   clearTrajectory,
   confirmTrajectory,
 } from '../../src/services/trajectory-service.js';
+import { runDefaultLogin } from '../../src/services/trajectory/trajectory-record-lifecycle.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -317,6 +318,22 @@ function testBuildLoginInstruction() {
   assert(task.includes('Click the login/submit button'));
 }
 
+function testRunDefaultLoginHardcoded() {
+  const body = Function.prototype.toString.call(runDefaultLogin);
+  assert(/replay_actions/.test(body), 'runDefaultLogin sends replay_actions');
+  assert(/go_to_url/.test(body), 'runDefaultLogin includes go_to_url');
+  assert(/['"]login['"]/.test(body), 'runDefaultLogin includes login action');
+  assert(/replay_done/.test(body), 'runDefaultLogin waits for replay_done');
+  assert(/90000/.test(body), 'login replay timeout is 90000ms');
+  assert(/stop_on_fail:\s*true/.test(body), 'login replay stop_on_fail');
+  assert(!/event:\s*['"]step['"]/.test(body), 'must not send Agent step event');
+  assert(!/max_steps:\s*10/.test(body), 'must not start Agent with max_steps 10');
+  assert(!/phase_done/.test(body), 'must not wait phase_done');
+  assert(!/buildLoginInstruction/.test(body), 'must not build NL login instruction');
+  assert(/suppressStepPersist/.test(body), 'still suppress persist');
+  assert(/loginDone/.test(body), 'sets loginDone');
+}
+
 function testBuildStepsHelpers() {
   const fromFlow = buildStepsFromFlow([
     { type: 'go_to_url', params: { url: 'https://x' } },
@@ -370,6 +387,7 @@ async function main() {
     ['stepsToActionEntries', testStepsToActionEntries],
     ['trajectoryStepToActionEntry', testTrajectoryStepToActionEntry],
     ['buildLoginInstruction', testBuildLoginInstruction],
+    ['runDefaultLogin hardcoded', testRunDefaultLoginHardcoded],
     ['buildSteps helpers', testBuildStepsHelpers],
   ];
   let failed = 0;
