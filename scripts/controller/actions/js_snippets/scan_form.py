@@ -7,7 +7,6 @@ from .base import JS_FIELD_DISABLED
 from .scan_utils import JS_FIELD_REQUIRED
 from .container import JS_GET_CONTAINER
 from .scan_utils import JS_READ_CURRENT_VALUE
-from .scan_utils import JS_SECTION_ATTACH_BLOCK
 from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 
 JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
@@ -16,8 +15,6 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const isRequired = ''' + JS_FIELD_REQUIRED + ''';
     const readValue = ''' + JS_READ_CURRENT_VALUE + ''';
-    /* SECTION_ATTACH */
-''' + JS_SECTION_ATTACH_BLOCK + '''
     const getRowLeadingText = (row) => {
         const cells = row.querySelectorAll('td, .el-table__cell');
         for (let i = 0; i < cells.length; i++) {
@@ -50,7 +47,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         return 'unknown';
     };
     const collectTableControls = (row) => {
-        /* SOURCE_B_KIND_PARITY */
+        /* COLLECT_L2_TABLE_KIND_PARITY */
         const controls = [];
         const cells = row.querySelectorAll('td, .el-table__cell');
         const dateSeen = new Set();
@@ -151,7 +148,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         let local;
         const syn = /^row#(\\d+)$/.exec(rowT);
         if (syn) {
-            /* SOURCE_B_ROW_INDEX_XPATH */
+            /* COLLECT_L2_TABLE_ROW_INDEX_XPATH */
             const idx = syn[1];
             local = "(tbody/tr)[" + idx + "]//" + leaf;
         } else {
@@ -238,9 +235,120 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
     const selectFields = [];  // [{field, trigger}] — Phase 2 从这里读取 options
     const buttons = [];
     const btnSeen = new Set();
+    /* COLLECT_L2 — taxonomy button pool; NO form-item/table gate */
+    function collectL2Buttons(root, quick) {
+        const out = [];
+        const seen = new Set();
+        const sels = 'button, .el-button, .todo-item-action';
+        for (const el of (root || document).querySelectorAll(sels)) {
+            if (quick && !isVisible(el)) continue;
+            if (el.disabled || (el.classList && el.classList.contains('is-disabled'))) continue;
+            const kind = (typeof classifyOperable === 'function')
+              ? classifyOperable(el)
+              : 'button';
+            if (!kind || (kind !== 'button' && kind !== 'icon' && kind !== 'menu')) continue;
+            const label = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+            if (!label || label.length > 40) continue;
+            const xpath_smart = xpathSmartOf(el, label, '', 'button') || '';
+            const reg = (typeof assignRegion === 'function') ? assignRegion(el) : null;
+            const key = xpath_smart || ((reg && reg.region_id) || '') + '|' + label;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push({
+                label,
+                xpath_smart,
+                disabled: false,
+                region_role: reg ? reg.region_role : '',
+                region_id: reg ? reg.region_id : '',
+                region_label: reg ? reg.region_label : '',
+                section_id: (reg && reg.region_id) ? reg.region_id : '__root__',
+                section_title: (reg && reg.region_label) ? reg.region_label : '',
+            });
+        }
+        return out;
+    }
+    const stampRegionAndLegacyMirror = (field, el) => {
+        /* ASSIGN_VIA_ASSIGN_REGION — LEGACY mirror section_* until favor-region Phase E */
+        if (!el || typeof assignRegion !== 'function') return;
+        const reg = assignRegion(el);
+        field.region_role = reg.region_role;
+        field.region_id = reg.region_id;
+        field.region_label = reg.region_label;
+        field.section_id = reg.region_id || '__root__';
+        field.section_title = reg.region_label || '';
+    };
+    /* DISCOVER_L1 — feature cards; seed selectors OK for P0 */
+    function discoverL1() {
+        const regions = [];
+        const candSels = [
+            { sel: '.el-header, .navbar, header', role: 'shell-header' },
+            { sel: '.el-aside, .sidebar, aside', role: 'shell-aside' },
+            { sel: '.el-dialog, .el-drawer', role: 'overlay' },
+            { sel: '.el-table', role: 'table' },
+            { sel: '.tssc-multiple-table-content, .myTable', role: 'custom:tssc-table' },
+            { sel: '.el-collapse-item', role: 'section' },
+            { sel: '.todo-item', role: 'section' },
+            { sel: '.el-main, .app-main, main', role: 'main' },
+        ];
+        const seenReg = new Set();
+        for (const { sel, role } of candSels) {
+            for (const el of document.querySelectorAll(sel)) {
+                if (!isVisible(el) && role !== 'shell-header' && role !== 'shell-aside') {
+                    const r = el.getBoundingClientRect();
+                    if (r.width < 1 || r.height < 1) continue;
+                }
+                const rect = el.getBoundingClientRect();
+                let title = (el.getAttribute('aria-label')
+                    || el.querySelector?.('.el-dialog__title, .el-collapse-item__header, .el-menu-item.is-active')?.textContent
+                    || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
+                if (!title && role === 'section' && el.classList && el.classList.contains('todo-item')) {
+                    const blob = String(el.innerText || el.textContent || '');
+                    const bizM = blob.match(/业务主键[：:]\\s*([A-Za-z0-9]+)/);
+                    const keyM = blob.match(/\\b(?:PJ|DGSX)\\d+\\b/);
+                    const bizKey = (bizM && bizM[1]) || (keyM ? keyM[0] : '');
+                    const header = el.querySelector('.todo-item__header');
+                    let ht = header ? String(header.innerText || '').replace(/\\s+/g, ' ').trim() : '';
+                    const actions = header && header.querySelector('.todo-item-actions');
+                    if (actions) {
+                        const at = String(actions.innerText || '').replace(/\\s+/g, ' ').trim();
+                        if (at) ht = ht.replace(at, '').replace(/\\s+/g, ' ').trim();
+                    }
+                    let human = ht;
+                    if (bizKey && human) {
+                        human = human.split(bizKey).join('').replace(/\\s+/g, ' ').trim();
+                    }
+                    human = human.replace(/^[\\s\\-_|/·.]+|[\\s\\-_|/·.]+$/g, '').trim();
+                    title = (human || ht || bizKey
+                        || blob.split(/[\\n\\r]+/).map((s) => s.trim()).filter(Boolean)[0]
+                        || '').slice(0, 40);
+                }
+                const classTokens = String(el.className || '').split(/\\s+/).filter(Boolean).slice(0, 8);
+                const id = role + ':' + classTokens.slice(0, 2).join('.') + ':' + Math.round(rect.y);
+                if (seenReg.has(id)) continue;
+                seenReg.add(id);
+                /* L1_FEATURE_CARD */
+                regions.push({
+                    id,
+                    role,
+                    title,
+                    classTokens,
+                    band: rect.y < 80 ? 'top' : (rect.x < 120 ? 'side' : 'center'),
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height),
+                    childHint: {
+                        formItems: el.querySelectorAll('.el-form-item').length,
+                        tables: el.querySelectorAll('.el-table').length,
+                        buttons: el.querySelectorAll('button, .el-button, .todo-item-action').length,
+                    },
+                });
+            }
+        }
+        return regions;
+    }
     for (let _ri = 0; _ri < scanRoots.length; _ri++) {
     const container = scanRoots[_ri];
     // Phase 1: 扫描 container 内的所有 .el-form-item
+    /* COLLECT_L2_FORM */
     const allItems = container.querySelectorAll('.el-form-item');
     for (const item of allItems) {
         // Prefer getBoundingClientRect over offsetParent — Element UI drawers
@@ -276,7 +384,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
             return '';
         })();
         const field = { label: displayLabel, kind, currentValue, options: [], placeholder, required, disabled, selected, hasButton, xpath_smart };
-        attachSection(field, operable || item);
+        stampRegionAndLegacyMirror(field, operable || item);
         pushField(field);
         if (kind === 'select') {
             const t = trigger || item.querySelector('input:not([type="hidden"])');
@@ -293,13 +401,13 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
             }).filter(Boolean);
         }
     }
-    /* SCAN_SOURCE_B_EL_TABLE */
+    /* COLLECT_L2_TABLE */
     const tables = container.querySelectorAll('.el-table');
     for (let ti = 0; ti < tables.length; ti++) {
         const table = tables[ti];
         if (quick && !isVisible(table)) continue;
         const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr, tbody tr');
-        /* SOURCE_B_EMPTY_LEADING */
+        /* COLLECT_L2_TABLE_EMPTY_LEADING */
         let domRowIndex = 0;
         for (let ri = 0; ri < bodyRows.length; ri++) {
             const row = bodyRows[ri];
@@ -342,7 +450,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
                     hasButton: '',
                     xpath_smart,
                 };
-                attachSection(field, el);
+                stampRegionAndLegacyMirror(field, el);
                 if (!pushField(field)) continue;
                 if (kind === 'select' && trigger) {
                     selectFields.push({ field, trigger });
@@ -350,21 +458,25 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
             }
         }
     }
-    /* SCAN_SOURCE_C_BUTTONS */
-    for (const el of container.querySelectorAll('button, .el-button')) {
-        if (quick && !isVisible(el)) continue;
-        if (el.disabled || el.classList.contains('is-disabled')) continue;
-        const label = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
-        if (!label || label.length > 40) continue;
-        const btnSec = {};
-        attachSection(btnSec, el);
-        const xpath_smart = xpathSmartOf(el, label, '', 'button') || '';
-        const key = xpath_smart || (btnSec.section_id + '|' + label);
-        if (btnSeen.has(key)) continue;
-        btnSeen.add(key);
-        buttons.push({ label, xpath_smart, section_id: btnSec.section_id, section_title: btnSec.section_title, disabled: false });
+    /* COLLECT_L2 — buttons within scan root (non-fullpage) */
+    if (!isFullpage) {
+        for (const b of collectL2Buttons(container, quick)) {
+            const key = b.xpath_smart || ((b.section_id || b.region_id || '') + '|' + b.label);
+            if (btnSeen.has(key)) continue;
+            btnSeen.add(key);
+            buttons.push(b);
+        }
     }
     } /* end scanRoots */
+    /* COLLECT_L2 call site */
+    if (isFullpage) {
+        for (const b of collectL2Buttons(document, quick)) {
+            const key = b.xpath_smart || ((b.region_id || '') + '|' + b.label);
+            if (btnSeen.has(key)) continue;
+            btnSeen.add(key);
+            buttons.push(b);
+        }
+    }
     /* SCAN_DEDUP_BY_XPATH — pushField uses seenXpaths */
     /* L2_ADMIT / L2_NO_CONTAINER_GATE — fullpage extras outside form-item / el-table gates */
     if (isFullpage) {
@@ -375,6 +487,8 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
             if (t.includes('布局')) return true;
             if (t.includes('主题')) return true;
             if (t.includes('页签') && (t.includes('关闭') || t.includes('固定'))) return true;
+            // Portal synonym: 标签 ≈ 页签 (e.g. 关闭所有标签(含固定))
+            if (t.includes('标签') && (t.includes('关闭') || t.includes('固定'))) return true;
             return false;
         };
         const isChromeHost = (el) => {
@@ -425,7 +539,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
                     hasButton: '',
                     xpath_smart,
                 };
-                attachSection(field, el);
+                stampRegionAndLegacyMirror(field, el);
                 pushField(field);
             }
         }
@@ -449,105 +563,17 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
                 hasButton: '',
                 xpath_smart,
             };
-            attachSection(field, el);
+            stampRegionAndLegacyMirror(field, el);
             pushField(field);
         }
     }
-    /* L1_FEATURE_CARD + ASSIGN_L2_TO_L1 */
-    const regions = [];
-    /* SHARED_ASSIGN_REGION — keep in sync with page-locator-helpers.js assignRegion */
-    const regionLabelOf = (role, title) => {
-        const t = String(title || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
-        if (role === 'overlay') return t || '弹层';
-        if (role === 'table') return t || '表格';
-        if (role === 'section') return t || '区块';
-        if (role === 'shell-aside') return '侧栏';
-        if (role === 'shell-header') return '顶栏';
-        if (role === 'main') return '主区';
-        if (role === 'page') return '页面';
-        return t || '其他';
-    };
-    const assignRegion = (el) => {
-        if (!el || !el.closest) {
-            return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
-        }
-        if (el.closest('.el-dialog, .el-drawer, .el-message-box')) {
-            const o = el.closest('.el-dialog, .el-drawer, .el-message-box');
-            const title = (o.querySelector('.el-dialog__title, .el-drawer__title')
-                && (o.querySelector('.el-dialog__title, .el-drawer__title').textContent || ''))
-                || o.getAttribute('aria-label') || '';
-            const id = 'overlay:' + String(title || 'overlay').replace(/\\s+/g, ' ').trim().slice(0, 40);
-            return { region_role: 'overlay', region_id: id, region_label: regionLabelOf('overlay', title) };
-        }
-        if (el.closest('.el-table, .tssc-multiple-table-content, .myTable')) {
-            return { region_role: 'table', region_id: 'table', region_label: regionLabelOf('table') };
-        }
-        if (el.closest('.el-collapse-item')) {
-            const it = el.closest('.el-collapse-item');
-            const t = (it.querySelector('.el-collapse-item__header')
-                && (it.querySelector('.el-collapse-item__header').innerText || ''))
-                || '';
-            const title = String(t).replace(/\\s+/g, ' ').trim().slice(0, 40);
-            return {
-                region_role: 'section',
-                region_id: 'section:' + (title || 'section'),
-                region_label: regionLabelOf('section', title),
-            };
-        }
-        if (el.closest('.el-aside, .sidebar, aside, .el-menu')) {
-            return { region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') };
-        }
-        if (el.closest('.el-header, .navbar, header, .tags-view-container')) {
-            return { region_role: 'shell-header', region_id: 'shell-header', region_label: regionLabelOf('shell-header') };
-        }
-        if (el.closest('.el-main, .app-main, .plugin-content, main')) {
-            return { region_role: 'main', region_id: 'main', region_label: regionLabelOf('main') };
-        }
-        return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
-    };
+    /* L1_FEATURE_CARD + ASSIGN_L2_TO_L1
+     * regionLabelOf / assignRegion come from PAGE_LOCATOR_HELPERS (SHARED_ASSIGN_REGION).
+     * Do NOT redeclare here — duplicate const/function → SyntaxError in page.evaluate. */
+    const regions = isFullpage ? discoverL1() : [];
     if (isFullpage) {
-        const candSels = [
-            { sel: '.el-header, .navbar, header', role: 'shell-header' },
-            { sel: '.el-aside, .sidebar, aside', role: 'shell-aside' },
-            { sel: '.el-dialog, .el-drawer', role: 'overlay' },
-            { sel: '.el-table', role: 'table' },
-            { sel: '.tssc-multiple-table-content, .myTable', role: 'custom:tssc-table' },
-            { sel: '.el-collapse-item', role: 'section' },
-            { sel: '.el-main, .app-main, main', role: 'main' },
-        ];
-        const seenReg = new Set();
-        for (const { sel, role } of candSels) {
-            for (const el of document.querySelectorAll(sel)) {
-                if (!isVisible(el) && role !== 'shell-header' && role !== 'shell-aside') {
-                    const r = el.getBoundingClientRect();
-                    if (r.width < 1 || r.height < 1) continue;
-                }
-                const rect = el.getBoundingClientRect();
-                const title = (el.getAttribute('aria-label')
-                    || el.querySelector?.('.el-dialog__title, .el-collapse-item__header, .el-menu-item.is-active')?.textContent
-                    || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
-                const classTokens = String(el.className || '').split(/\\s+/).filter(Boolean).slice(0, 8);
-                const id = role + ':' + classTokens.slice(0, 2).join('.') + ':' + Math.round(rect.y);
-                if (seenReg.has(id)) continue;
-                seenReg.add(id);
-                /* L1_FEATURE_CARD */
-                regions.push({
-                    id,
-                    role,
-                    title,
-                    classTokens,
-                    band: rect.y < 80 ? 'top' : (rect.x < 120 ? 'side' : 'center'),
-                    width: Math.round(rect.width),
-                    height: Math.round(rect.height),
-                    childHint: {
-                        formItems: el.querySelectorAll('.el-form-item').length,
-                        tables: el.querySelectorAll('.el-table').length,
-                        buttons: el.querySelectorAll('button, .el-button').length,
-                    },
-                });
-            }
-        }
         for (const f of fields) {
+            if (f.region_label) continue;
             // Best-effort: re-find by xpath is heavy; attach region via section / heuristics on label path
             const roleGuess = (f.kind === 'menu_item')
                 ? { region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') }
@@ -564,6 +590,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         }
         /* ASSIGN_L2_TO_L1 */
         for (const b of buttons) {
+            if (b.region_label) continue;
             b.region_role = b.section_title ? 'section' : 'main';
             b.region_id = b.section_title ? ('section:' + String(b.section_title).slice(0, 40)) : 'main';
             b.region_label = b.section_title ? regionLabelOf('section', b.section_title) : regionLabelOf('main');

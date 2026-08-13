@@ -9,9 +9,17 @@
  */
 import { getDB } from '../../../config/database.js';
 import * as execSession from '../../executor-session-client.js';
-import * as memoryService from '../../memory/memory-service.js';
 import * as formSnapshotDao from '../../dao/form-snapshot-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
+import {
+  REPLAY_TIMEOUT_MS,
+  USER_ABORT_CODE,
+  isUserAbort,
+  trajScope,
+  emitReplay,
+  toNumericStepId,
+  runHealStep,
+} from './replay-heal-shared.js';
 import {
   buildFormStructureHealInstruction,
 } from '../../routes/browser-session/heal-instruction.js';
@@ -27,28 +35,8 @@ import {
 } from '../trajectory-step-service.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 
-const REPLAY_TIMEOUT_MS = 300000;
-const HEAL_TIMEOUT_MS = 300000;
-/** Enough room to redo one failed action only (no extra form diagnosis). */
-const HEAL_MAX_STEPS = 12;
 /** Type B may fill several new fields. */
 const FORM_STRUCTURE_HEAL_MAX_STEPS = 24;
-
-/** Sentinel: user stopped replay/heal via cancel_step / steps/replay/stop. */
-const USER_ABORT_CODE = 'USER_ABORT';
-
-function makeUserAbortError() {
-  const err = new Error(USER_ABORT_CODE);
-  err.code = USER_ABORT_CODE;
-  return err;
-}
-
-function isUserAbort(err) {
-  if (!err) return false;
-  if (err.code === USER_ABORT_CODE) return true;
-  const msg = String(err.message || err || '');
-  return msg === USER_ABORT_CODE || /USER_ABORT|Replay aborted/i.test(msg);
-}
 
 const FILL_ACTION_TYPES = new Set([
   'fill_form_field',
@@ -57,20 +45,6 @@ const FILL_ACTION_TYPES = new Set([
   'click_radio',
   'select_tree_option',
 ]);
-
-function trajScope(tid) {
-  return { trajectoryId: tid, trajectoryDbId: tid };
-}
-
-function emitReplay(type, tid, extra = {}) {
-  broadcast(type, { ...trajScope(tid), ...extra });
-}
-
-function toNumericStepId(id) {
-  if (id == null || id === '') return null;
-  const n = Number(id);
-  return Number.isFinite(n) ? n : null;
-}
 
 function parseFormStructureResult(raw) {
   const s = String(raw || '');
@@ -582,98 +556,4 @@ async function fetchActionLogEntries(runtime) {
   } catch {
     return [];
   }
-}
-
-async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, healType = 'step') {
-  // P2-1: record replay-heal decision (deterministic instruction template, not LLM-generated)
-  try {
-    await memoryService.ingestEvents([{
-      eventType: 'decision',
-      trajectoryId: runtime.trajectoryDbId ?? runtime.trajectoryId ?? null,
-      sessionId: runtime.sessionId,
-      payload: { kind: 'heal', healType },
-      decision: {
-        decisionType: 'heal',
-        model: '',
-        temperature: 0.0,
-        inputPreview: String(instruction || '').slice(0, 500),
-        outputJson: { healType, maxSteps },
-        policyChecks: [{ check: 'instruction_present', pass: Boolean(instruction) }],
-        auditStatus: instruction ? 'passed' : 'failed',
-      },
-    }]);
-  } catch (err) {
-    console.warn('[replay] heal decision ingest skipped:', err?.message || err);
-  }
-
-  await new Promise((resolve, reject) => {
-    let settled = false;
-    let sawAgentStopped = false;
-
-    const rejectAbort = () => {
-      cleanup();
-      reject(makeUserAbortError());
-    };
-
-    const unsubDone = execSession.onSessionEvent(runtime.sessionId, 'phase_done', () => {
-      if (settled) return;
-      if (runtime.abortReplay || sawAgentStopped) {
-        rejectAbort();
-        return;
-      }
-      cleanup();
-      resolve();
-    });
-    const unsubErr = execSession.onSessionEvent(runtime.sessionId, 'phase_error', (payload) => {
-      if (settled) return;
-      if (runtime.abortReplay || sawAgentStopped) {
-        rejectAbort();
-        return;
-      }
-      cleanup();
-      reject(new Error(payload?.message || 'phase_error'));
-    });
-    const unsubStopped = execSession.onSessionEvent(runtime.sessionId, 'agent_stopped', () => {
-      if (settled) return;
-      sawAgentStopped = true;
-      runtime.abortReplay = true;
-      rejectAbort();
-    });
-    const timer = setTimeout(() => {
-      if (settled) return;
-      if (runtime.abortReplay || sawAgentStopped) {
-        rejectAbort();
-        return;
-      }
-      cleanup();
-      reject(new Error('Timeout waiting for heal phase_done'));
-    }, HEAL_TIMEOUT_MS);
-
-    function cleanup() {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      try { unsubDone(); } catch { /* ignore */ }
-      try { unsubErr(); } catch { /* ignore */ }
-      try { unsubStopped(); } catch { /* ignore */ }
-    }
-
-    if (runtime.abortReplay) {
-      rejectAbort();
-      return;
-    }
-
-    execSession.forwardStdin({
-      nodeUuid: runtime.executorNodeUuid,
-      sessionId: runtime.sessionId,
-      event: 'step',
-      data: {
-        instruction,
-        max_steps: maxSteps,
-        phase_number: 0,
-        heal_type: healType,
-        healType,
-      },
-    });
-  });
 }

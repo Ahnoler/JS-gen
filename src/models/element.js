@@ -116,6 +116,9 @@ function copyLocatorMeta(target, source) {
     'locator_fallback_reason',
     'formLabel',
     'bu_xpath',
+    'region_role',
+    'region_id',
+    'region_label',
   ]) {
     if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
       target[key] = source[key];
@@ -227,10 +230,11 @@ export function prepareElementJson({
             : action === 'click_table_row_radio' ? 'table_row_radio'
               : action === 'click_adjacent_button' ? 'adjacent_button'
                 : action === 'close_dialog' ? 'dialog_close'
-                  : action.startsWith('fill_') || action === 'select_option'
-                    || action === 'select_tree_option' || action === 'click_radio'
-                    ? 'form_input'
-                    : '');
+                  : action === 'select_tree_option' ? 'form_tree_select'
+                    : action.startsWith('fill_') || action === 'select_option'
+                      || action === 'click_radio'
+                      ? 'form_input'
+                      : '');
 
   const hadVerified = raw.locator_verified === true;
   const enriched = enrichLocatorFields({
@@ -367,4 +371,31 @@ export function trajectoryStepToActionEntry(step) {
     phaseId: step.trajectoryPhaseId ?? step.phaseId ?? null,
     phase: step.phaseNumber ?? step.phase ?? 0,
   };
+}
+
+/**
+ * Map trajectory_step rows to assembler command entries (action_{ts}.json shape).
+ * Shared by v2 trajectories assemble-file and replay-service prepareReplay.
+ *
+ * @param {Array} steps
+ * @param {Object} [opts]
+ * @param {boolean} [opts.preferEntryPhase=false] — when step.phaseNumber is missing,
+ *   fall back to entry.phase (step.phase) instead of 0 (replay-service behavior).
+ * @returns {Object[]}
+ */
+export function stepsToActionCommands(steps, { preferEntryPhase = false } = {}) {
+  return (steps || []).map((s) => {
+    const entry = trajectoryStepToActionEntry(s);
+    const rawEl = s.element ?? s.elementJson ?? null;
+    const el = typeof rawEl === 'string'
+      ? (() => { try { return JSON.parse(rawEl); } catch { return {}; } })()
+      : (rawEl || {});
+    return {
+      ...entry,
+      // Ensure target from either shape
+      target: entry.target || el.xpath || el.target || '',
+      phase: preferEntryPhase ? (s.phaseNumber ?? entry.phase ?? 0) : (s.phaseNumber ?? 0),
+      source: s.source || 'agent',
+    };
+  });
 }

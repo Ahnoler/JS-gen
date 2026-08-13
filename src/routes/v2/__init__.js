@@ -10,6 +10,7 @@ import registerSystemMgmt from './system-mgmt.js';
 import registerSysDict from './sys-dict.js';
 import registerSpecialElement from './special-element.js';
 import registerTrajectoryBatch from './trajectory-batch.js';
+import registerAgentStderr from './agent-stderr.js';
 import registerTrajectory from './trajectory.js';
 import registerTrajectoryRecord from './trajectory-record.js';
 import registerTrajectorySteps from './trajectory-steps.js';
@@ -23,6 +24,7 @@ import registerReplay from './replay.js';
 import registerExportMgmt from './export-mgmt.js';
 import registerMemory from './memory.js';
 import registerOperationComponent from './operation-component.js';
+import registerRegions from './regions.js';
 
 export default function (app) {
   app.use('/api/v2', v2ResponseEnvelope);
@@ -33,6 +35,7 @@ export default function (app) {
   registerSpecialElement(app);
   // batch/* before trajectories/:id
   registerTrajectoryBatch(app);
+  registerAgentStderr(app);
   registerTrajectory(app);
   registerTrajectoryRecord(app);
   registerTrajectorySteps(app);
@@ -46,4 +49,5 @@ export default function (app) {
   registerReplay(app);
   registerExportMgmt(app);
   registerMemory(app);
+  registerRegions(app);
 }

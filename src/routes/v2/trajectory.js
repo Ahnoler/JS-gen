@@ -2,28 +2,10 @@ import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import path from 'path';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryService from '../../services/trajectory-service.js';
-import { trajectoryStepToActionEntry } from '../../models/element.js';
+import { stepsToActionCommands } from '../../models/element.js';
 import { TRAJECTORY_RECORD_STATUSES } from '../../models/constants.js';
 import { PROJECT_DIR } from '../../../config/config.js';
 import { sendErr } from './trajectory-shared.js';
-
-/** Normalize DAO step → assembler command (DAO returns elementJson, not element). */
-function stepsToActionCommands(steps) {
-  return (steps || []).map((s) => {
-    const entry = trajectoryStepToActionEntry(s);
-    const rawEl = s.element ?? s.elementJson ?? null;
-    const el = typeof rawEl === 'string'
-      ? (() => { try { return JSON.parse(rawEl); } catch { return {}; } })()
-      : (rawEl || {});
-    return {
-      ...entry,
-      // Ensure target from either shape
-      target: entry.target || el.xpath || el.target || '',
-      phase: s.phaseNumber ?? 0,
-      source: s.source || 'agent',
-    };
-  });
-}
 
 export default function (app) {
   /** AI 分析：需求描述 -> { phases }（不落库；阶段数跟用户分步；案例数据附在各阶段描述后） */
@@ -224,7 +206,10 @@ export default function (app) {
   /** Phase-step tree: { phases:[{...phase, steps:[...]}, ...] } */
   app.get('/api/v2/trajectories/:id/tree', async (req, res) => {
     try {
-      const tree = await trajectoryService.getTrajectoryTree(+req.params.id);
+      const includeMeta = req.query?.includeMeta === '1'
+        || req.query?.includeMeta === 'true'
+        || req.query?.include_meta === '1';
+      const tree = await trajectoryService.getTrajectoryTree(+req.params.id, { includeMeta });
       if (!tree) return res.status(404).json({ error: 'Trajectory not found' });
       res.json(tree);
     } catch (err) {

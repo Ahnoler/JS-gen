@@ -14,6 +14,7 @@ import { state } from '../state.js';
 import * as remoteSessionDao from '../dao/remote-session-dao.js';
 import * as executorNodeDao from '../dao/executor-node-dao.js';
 import { clearLiveBinding, unmountTrajectoriesFromRemoteSession } from './remote-session-service.js';
+import { expireAllDueGrace } from './session-lifecycle.js';
 import * as execSession from '../executor-session-client.js';
 import * as slotLease from '../executor-slot-lease.js';
 
@@ -90,9 +91,16 @@ export async function reapOrphanIdleRemoteSessions() {
 }
 
 /**
- * @returns {Promise<{ checked: number, detached: number[], orphanClosed: number[] }>}
+ * @returns {Promise<{ checked: number, graceExpired: number[], detached: number[], orphanClosed: number[] }>}
  */
 export async function reapIdleTrajectoryRuntimes() {
+  let graceExpired = [];
+  try {
+    graceExpired = await expireAllDueGrace();
+  } catch (err) {
+    console.warn('[idle-reaper] grace expire failed:', err.message);
+  }
+
   const map = getAllTrajectoryRuntimes();
   const now = Date.now();
   const detached = [];
@@ -139,7 +147,7 @@ export async function reapIdleTrajectoryRuntimes() {
     console.warn('[idle-reaper] orphan idle pass failed:', err.message);
   }
 
-  return { checked: map.size, detached, orphanClosed };
+  return { checked: map.size, graceExpired, detached, orphanClosed };
 }
 
 export function startTrajectoryIdleReaper() {

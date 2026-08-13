@@ -53,7 +53,7 @@ async def _wait_cdp_http(port: int, timeout_s: float = 20.0) -> bool:
         except Exception:
             pass
         await asyncio.sleep(0.4)
-    sys.stderr.write(f'[session] WARN: CDP HTTP not ready on port {port} after {timeout_s}s\n')
+    sys.stderr.write(f'WARN: CDP HTTP not ready on port {port} after {timeout_s}s\n')
     sys.stderr.flush()
     return False
 

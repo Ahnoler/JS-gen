@@ -12,15 +12,18 @@
  */
 import { CdpClient } from '../src/cdp/client.js';
 import { discoverCdpWithRetry } from '../src/cdp/discover.js';
+import { resolveScreencastTiming } from '../src/cdp/screencast-timing.js';
 import { resolveElementByLabel } from '../src/cdp/resolve-by-label.js';
+import {
+  CLIPBOARD_GET_SELECTION_EXPRESSION,
+  normalizeClipboardSelectionResult,
+} from '../src/cdp/clipboard-selection.js';
 
 const MAGIC = Buffer.from('RSCF');
 const DEFAULT_VIEWPORT = { w: 1600, h: 900, dpr: 1 };
 /** Screencast encode cap (optional upscale ceiling; default stream is 1600×900). */
 const STREAM_MAX_W = 1920;
 const STREAM_MAX_H = 1080;
-/** Min interval between forwarded JPEG frames (CDP ack is always immediate). */
-const MIN_FORWARD_MS = 33;
 /** If no CDP frame for this long while attached, restart screencast. */
 const STALL_RESTART_MS = 2500;
 
@@ -56,6 +59,8 @@ export class BibBridge {
     this._disposed = false;
     this._lastForwardAt = 0;
     this._lastFrameAt = 0;
+    this._minForwardMs = 90;
+    this._everyNthFrame = 2;
     this._stallTimer = null;
     this._restarting = false;
     /** @type {string|null} */
@@ -195,6 +200,9 @@ export class BibBridge {
 
   async startScreencast() {
     if (!this.client || this._disposed) return;
+    const timing = resolveScreencastTiming();
+    this._minForwardMs = timing.minForwardMs;
+    this._everyNthFrame = timing.everyNthFrame;
     // Encode at current viewport; never upscale beyond STREAM_MAX_* (do not floor to 1080p).
     const maxW = Math.min(Math.max(320, Number(this.viewport.w) || DEFAULT_VIEWPORT.w), STREAM_MAX_W);
     const maxH = Math.min(Math.max(240, Number(this.viewport.h) || DEFAULT_VIEWPORT.h), STREAM_MAX_H);
@@ -203,7 +211,7 @@ export class BibBridge {
       quality: this.quality,
       maxWidth: maxW,
       maxHeight: maxH,
-      everyNthFrame: 1,
+      everyNthFrame: this._everyNthFrame,
     });
     this.screencastOn = true;
     this._lastFrameAt = Date.now();
@@ -245,7 +253,18 @@ export class BibBridge {
   }
 
   async handleInput(payload = {}) {
-    if (!this.client || this._disposed) return { ok: false, reason: 'not attached' };
+    if (!this.client || this._disposed) {
+      if (payload.kind === 'clipboard') {
+        return {
+          clipboard: true,
+          requestId: payload.requestId || null,
+          ok: false,
+          text: '',
+          reason: 'not_attached',
+        };
+      }
+      return { ok: false, reason: 'not attached' };
+    }
 
     const kind = payload.kind;
     const xNorm = Number(payload.x);
@@ -359,6 +378,36 @@ export class BibBridge {
       return { ok: false, reason: 'unknown_navigate_action' };
     }
 
+    if (kind === 'clipboard') {
+      const action = String(payload.action || '');
+      const requestId = payload.requestId || null;
+      if (action !== 'getSelection') {
+        return {
+          clipboard: true,
+          requestId,
+          ok: false,
+          text: '',
+          reason: 'unknown_clipboard_action',
+        };
+      }
+      try {
+        const evaluated = await this.client.send('Runtime.evaluate', {
+          expression: CLIPBOARD_GET_SELECTION_EXPRESSION,
+          returnByValue: true,
+        });
+        const normalized = normalizeClipboardSelectionResult(evaluated?.result?.value);
+        return { clipboard: true, requestId, ...normalized };
+      } catch (e) {
+        return {
+          clipboard: true,
+          requestId,
+          ok: false,
+          text: '',
+          reason: 'evaluate_error',
+        };
+      }
+    }
+
     return { ok: false, reason: 'unknown input kind' };
   }
 
@@ -377,7 +426,7 @@ export class BibBridge {
     if (!dataB64) return;
 
     const now = Date.now();
-    if (now - this._lastForwardAt < MIN_FORWARD_MS) return;
+    if (now - this._lastForwardAt < this._minForwardMs) return;
     this._lastForwardAt = now;
 
     const metadata = params.metadata || {};
@@ -430,7 +479,7 @@ export class BibBridge {
   /**
    * Resolve Element UI control by form label / actionType+params via CDP.
    * @param {string} labelText
-   * @param {{ actionType?: string, params?: object }} [opts]
+   * @param {{ actionType?: string, params?: object, mode?: string }} [opts]
    */
   async resolveByLabel(labelText, opts = {}) {
     if (!this.client || this._disposed) {
@@ -440,7 +489,15 @@ export class BibBridge {
       labelText,
       actionType: opts.actionType || opts.action || '',
       params: opts.params || {},
+      mode: opts.mode || 'inventory',
     });
+  }
+
+  async capturePhaseHighlight(targets) {
+    const { runPhaseHighlightCapture } = await import('../src/cdp/phase-highlight-capture.js');
+    if (!this.client) throw new Error('BiB not attached');
+    const { buffer, hitCount } = await runPhaseHighlightCapture(this.client, targets || []);
+    return { pngBase64: buffer.toString('base64'), hitCount };
   }
 
   async detach() {

@@ -69,7 +69,8 @@ CREATE TABLE `remote_session` (
   `slot_index`          INT UNSIGNED DEFAULT NULL COMMENT '执行机内槽位号',
   `client_key`          VARCHAR(64) DEFAULT NULL COMMENT '前端会话/用户标识，用于亲和调度',
   `agent_session_id`    VARCHAR(64) DEFAULT NULL COMMENT 'Python/执行机 agent session UUID',
-  `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '当前挂载交易 → trajectory.id；断开画面后可置 NULL',
+  `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '当前挂载交易；idle 宽限期内仍非空；到期或 detach/close 后 NULL',
+  `grace_until`         DATETIME(3) DEFAULT NULL COMMENT 'streamDetach 宽限截止；期内仍属 trajectory_id；到期后清空归属',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `closed_at`           DATETIME(3) DEFAULT NULL,
   UNIQUE KEY `uk_session_uuid` (`session_uuid`),
@@ -78,7 +79,8 @@ CREATE TABLE `remote_session` (
   KEY `idx_executor_node_id` (`executor_node_id`),
   KEY `idx_client_key` (`client_key`),
   KEY `idx_rs_agent_session` (`agent_session_id`),
-  KEY `idx_rs_trajectory` (`trajectory_id`)
+  KEY `idx_rs_trajectory` (`trajectory_id`),
+  KEY `idx_rs_grace_until` (`grace_until`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='远程浏览器操控/录制会话（BrowserContext 隔离、视口、Target、生命周期）';
 
@@ -125,12 +127,15 @@ CREATE TABLE `trajectory_phase` (
   `special_element_candidates_json` JSON NULL COMMENT '阶段创建/同步时标记的候选特殊元素快照',
   `status`         ENUM('pending','running','completed','failed') DEFAULT 'pending',
   `component_id`   BIGINT UNSIGNED DEFAULT NULL COMMENT '预留 → operation_component.id；Phase1 业务不写入',
+  `stitch_screenshot_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '阶段展示长图 → screenshot.id',
+  `done_logs`        JSON NULL COMMENT '阶段结束说明 [{text, at, source}]；trajectory.trajectory_log 仍为 agent 全文',
   `created_at`     DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `completed_at`   DATETIME(3) DEFAULT NULL,
   UNIQUE KEY `uk_phase_id` (`phase_id`),
   KEY `idx_trajectory_id` (`trajectory_id`),
   KEY `idx_phase_number` (`trajectory_id`, `phase_number`),
   KEY `idx_phase_component` (`component_id`),
+  KEY `idx_phase_stitch_screenshot` (`stitch_screenshot_id`),
   CONSTRAINT `fk_phase_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='轨迹执行阶段';
 
@@ -431,12 +436,15 @@ CREATE TABLE `screenshot` (
   `mime_type`           VARCHAR(64) DEFAULT 'image/png' COMMENT 'MIME 类型',
   `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id',
   `trajectory_step_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_step.id',
-  `kind`                ENUM('before','after') NOT NULL DEFAULT 'after' COMMENT '执行前/执行后截图',
+  `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
+  `kind`                ENUM('before','after','phase_highlight') NOT NULL DEFAULT 'after' COMMENT 'before/after=步骤; phase_highlight=阶段长图',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_trajectory_id` (`trajectory_id`),
   UNIQUE KEY `uk_ss_step_kind` (`trajectory_step_id`, `kind`),
+  UNIQUE KEY `uk_ss_phase_kind` (`trajectory_phase_id`, `kind`),
   CONSTRAINT `fk_ss_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_ss_trajectory_step` FOREIGN KEY (`trajectory_step_id`) REFERENCES `trajectory_step` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_ss_trajectory_step` FOREIGN KEY (`trajectory_step_id`) REFERENCES `trajectory_step` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_ss_trajectory_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='截图';
 
 -- ─────────────────────────────────────────────────────────────

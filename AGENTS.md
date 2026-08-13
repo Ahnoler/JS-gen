@@ -2,6 +2,26 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+## AI 协作分工约定（multi-agent workflow）
+
+本仓库多智能体的默认分工：
+
+| 角色 | 职责 |
+|------|------|
+| **主模型（main）** | 计划与设计：plan mode 定方案与拆分粒度、AskUserQuestion 让用户拍板关键取舍；审查子智能体产出、跑最终整体验证、向用户如实汇报 |
+| **Explore 子智能体** | 只读调研：大文件/长函数/重复代码/死代码普查、characterization 脚本耦合矩阵；输出带 `file:line` 证据的优先级清单。**绝不改文件** |
+| **general-purpose 子智能体** | 干活实现：按自包含指令做行为保持的代码改动，跑验证并回传原始输出。**不提交 git** |
+
+执行规则：
+
+- 给子智能体的 prompt 必须自包含：文件路径+行号、允许/禁止改动清单、验证命令（`node --check` / import smoke / characterize 脚本）、报告格式。
+- 并行子智能体必须分配**无交集**的文件集，避免并发编辑冲突。
+- 子智能体网络超时先重试一次，仍失败由主线程兜底执行。
+- 子智能体完成后，主线程必须：重跑关键验证 + 审查是否有越出允许范围的改动（如 CHANGELOG 追加）；合规的越界改动如实告知用户。
+- 改 `src/` 时子智能体可能按下方"同步约定"追加 CHANGELOG 条目；主线程审查其格式与是否覆盖用户未提交条目。
+
+重构专用约束：`scripts/characterization/*` 会用 `read_text` 断言源码子串，钉死函数名 / 闭包相对顺序 / 精确字符串（`_form.py` 被约 30 个脚本固定）。拆分文件时必须保留这些标记，并把相关测试改为拼接多文件读取（参照 `_form.py` → `form_autofill.py` 的做法）。
+
 ## Commands
 
 ```bash
@@ -31,9 +51,12 @@ python scripts/characterization/characterize-form-rules.py
 node scripts/characterization/characterize-ctrl.mjs
 # ↑ CTRL parity: parses CTRL_OBJECT methods vs _js_snippets / actions/*.py cues
 node scripts/characterization/characterize-trajectory.mjs
+
+# Refactor gate — run after every refactoring micro-step (CTRL parity + core smokes)
+bash scripts/refactor/verify-all.sh
 ```
 
-Manual verification: product API docs at `http://localhost:4097/api/docs` after starting the server (`src/dashboard/api-docs/catalog.js` — sole frontend contract). Product APIs are under `/api/v2/*`. Human-oriented overview: `README.md` (keep in sync with this file’s architecture section). Legacy engineering HTML (`/api/test`, record-console/studio) redirects to `/api/docs`.
+Manual verification: product API docs at `http://localhost:4097/api/docs` after starting the server (`src/dashboard/api-docs/catalog.js` — sole frontend contract). Product APIs are under `/api/v2/*`. Human-oriented overview: `README.md` (quick start / API cheat-sheet / FAQ — human-facing only). Architecture details are documented here; README links here instead of duplicating them. Legacy engineering HTML (`/api/test`, record-console/studio) redirects to `/api/docs`.
 
 ## Architecture
 
@@ -41,15 +64,15 @@ This is a **browser automation service** for Element UI / Vue web applications. 
 
 ### Two-Language Architecture
 
-Element UI CTRL helpers: **`src/ctrl-actions.js` is canonical** for `window.CTRL` (replay/assemble). Agent-side copies are dual (not byte-identical):
+Element UI CTRL helpers: **`src/ctrl-actions/` is canonical** (`index.js` re-exports per-control modules) for `window.CTRL` (replay/assemble). Agent-side copies are dual (not byte-identical):
 
 | Language | File | Used by |
 |----------|------|---------|
-| JavaScript (canonical) | `src/ctrl-actions.js` | Injected into generated Playwright scripts (`getInjectionCode`) |
+| JavaScript (canonical) | `src/ctrl-actions/` (`index.js` re-exports form/nav/select/structure/table) | Injected into generated Playwright scripts (`getInjectionCode`) |
 | Python JS strings | `scripts/controller/actions/_js_snippets.py` | `page.evaluate` injection from Python agent |
 | Python | `scripts/controller/` + `scripts/controller/actions/*` | Browser Use agent at runtime |
 
-Same CTRL surface (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem`, `clickTableRowButton`, `closeDialog`, etc.). Edit canonical first; keep Python cues in sync — `node scripts/characterization/characterize-ctrl.mjs` fails on missing methods.
+Same CTRL surface (`fillFormField`, `selectOption`, `selectDate`, `clickMenuItem`, `clickTableRowButton`, `closeDialog`, etc.). Edit canonical first; keep Python cues in sync — `node scripts/characterization/characterize-ctrl.mjs` fails on missing methods. Generated file: `scripts/controller/actions/js_snippets/_locator_helpers_js.py` is produced by `node scripts/_gen_locator_helpers_py.mjs` from `src/cdp/locator-candidates.js` — do not hand-edit it.
 
 ### Control plane pipelines
 
@@ -89,7 +112,7 @@ Agent I/O: JSON Lines on stdout (`{"event":"step"|"done"|…}`). Recording steps
 
 | Module | Role |
 |--------|------|
-| `src/services/trajectory/` | trajectory-* services + extracted runners (replay-batch-runner, form-structure-heal, recording-runner, batch-analyze/batch-record, form-snapshot-append, attach-runner, text-extract); `index.js` re-exports all public names |
+| `src/services/trajectory/` | trajectory-* services + extracted runners (replay-batch-runner, form-structure-heal, replay-heal-shared, recording-runner, batch-analyze/batch-record, form-snapshot-append, attach-runner, text-extract); `index.js` re-exports all public names |
 | `src/runtime/script-runner.js` | Shared Playwright execute (test-run + replay) |
 | `src/services/assemble-service.js` | action JSON → Playwright script |
 | `src/services/replay-service.js` | **DEPRECATED** assembled Playwright replay (engineering asset) |
@@ -116,16 +139,12 @@ Frontend delivery contract: `/api/docs` only (do not maintain separate product A
 
 Product SPA is external (Vue). In-repo UI is only **`/api/docs`** (`api-docs.html` + `src/dashboard/api-docs/`). Former `test-dashboard.html` / `record-console.html` / `record-studio.html` are deleted; `GET /api/test`, `/api/test/record-console`, `/api/test/record-studio` **301 → `/api/docs`**. Engineering APIs `/api/test/assemble` and `/api/test/run` remain. Root `/` redirects to `/api/docs` when configured.
 
-Executor BiB uses per-slot CDP ports (`9242+slotIndex`) to avoid `CDP WebSocket not found`.
-
-Executor ops notes: `docs/执行机解耦与操作总结.md` (gitignored docs/).
-
 ### Python agent (`scripts/`)
 
-Layout follows browser_use's package structure (agent/ + controller/); see `docs/refactor-plan.md` for the mapping.
+Layout follows browser_use's package structure (agent/ + controller/); the module mapping is listed below.
 
 - **`main.py`** — Session CLI (`--session`, stdin-driven).
-- **`controller/`** — Tool registry + dispatch (browser_use-style): `service.py` (build_controller), `registry.py` (registered actions schema view), `actions/` (per-control action registration: `_form`/`_misc`/`_navigation`/`_table`/`_special_element`/`_replay`/`phase/`/`js_snippets/`…). `controller.py` + `actions/*` are compatibility shims re-exporting the same names.
+- **`controller/`** — Tool registry + dispatch (browser_use-style): `service.py` (build_controller), `registry.py` (registered actions schema view), `actions/` (per-control action registration: `_form`/`_misc`/`_navigation`/`_table`/`_special_element`/`_replay`/`phase/`/`js_snippets/`…; extracted helpers: `form_autofill` (auto-fill engine), `form_scan_utils`, `cascade_fill`, `section_scope`, `container_naming`). `controller.py` + `actions/*` are compatibility shims re-exporting the same names.
 - **`agent/`** — `service.py` (per-phase agent step execution), `recorder_emitters.py` (on_step_end phase/intent/quality-gate emission).
 - **`browser/`** — `factory.py` (Chrome launch / window / seed profile).
 - **`session_runner.py`** — Stdin JSON → agent steps → stdout events; intervention buffer (thin orchestrator; helpers split into `cdp_ports.py` / `trajectory_store.py` / `event_dispatch.py`).
@@ -152,7 +171,7 @@ Layout follows browser_use's package structure (agent/ + controller/); see `docs
 | `scripts/prompts/form-prompt.md` | Form-oriented prompt fragments |
 | `scripts/prompts/heal-prompt.md` | Self-heal / repair prompts |
 | `scripts/controller/actions/form_rules.py` | Executable value generators (former atp-rule behavior) |
-| `src/ctrl-actions.js` + Python CTRL | Executable Element UI ops (former atp-ui “how to click” as code) |
+| `src/ctrl-actions/*` + Python CTRL | Executable Element UI ops (former atp-ui “how to click” as code) |
 
 Do **not** look for or restore OpenCode skill packages unless the user explicitly asks. Update prompts under `scripts/prompts/` and keep CTRL / `form_rules` in sync instead.
 
@@ -167,7 +186,8 @@ Do **not** look for or restore OpenCode skill packages unless the user explicitl
 - **Multi-traj BiB** — Push identity is `remote_session.id`; bindings are 1:1 trajectory ↔ remote_session ↔ agent session. Detach/stream-detach are scoped per trajectory (no global singleton).
 - **Replay (product)** — Attached/live `replay_actions` via `_replay.py` (`POST .../steps/replay`). Prefers recorded `xpath_smart` (semantic anchors + visible dialog/drawer scope + volatile tree-text strip + icon class/tooltip), then label/semantic (incl. placeholder), then `xpath_full`.
 - **Replay (deprecated)** — `/api/v2/trajectories/:id/replay/*` assembles Playwright + CTRL; kept runnable as an engineering asset, not product-supported. Assemble/test-run remain engineering APIs.
-- **Executor slots** — `EXECUTOR_CAPACITY` slots per node; control-plane lease until detach / node offline.
+- **Executor slots** — `EXECUTOR_CAPACITY` slots per node; control-plane lease until detach / node offline. Executor BiB uses per-slot CDP ports (`9242+slotIndex`) to avoid `CDP WebSocket not found`.
+- **Executor ops notes** — `docs/执行机解耦与操作总结.md` (gitignored docs/).
 
 ## 同步约定（Python 控制面对齐）
 

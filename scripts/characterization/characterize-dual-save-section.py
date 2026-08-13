@@ -55,9 +55,15 @@ def test_preferred_submit_cue() -> None:
     store = _dual_save_store()
     cue = preferred_submit_cue(store, section="")
     assert_true("Multiple" in cue, f"multi cue must say Multiple: {cue}")
-    assert_true("section='…'" in cue or "section=" in cue, f"multi cue must require section=: {cue}")
+    assert_true(
+        "region=" in cue or "section=" in cue,
+        f"multi cue must require region=/section=: {cue}",
+    )
     assert_true("sticky" in cue.lower() or "ambiguous" in cue.lower(), f"warn sticky: {cue}")
-    assert_true("section='系统评级结论'" not in cue, f"must not inject sticky section: {cue}")
+    assert_true(
+        "region='系统评级结论'" not in cue and "section='系统评级结论'" not in cue,
+        f"must not inject sticky section: {cue}",
+    )
 
     # Callers pass sticky via resolve_phase_section — gate must still fire
     sticky = resolve_phase_section(store)
@@ -65,7 +71,7 @@ def test_preferred_submit_cue() -> None:
     cue_sticky = preferred_submit_cue(store, section=sticky)
     assert_true("Multiple" in cue_sticky, f"sticky arg must not bypass gate: {cue_sticky}")
     assert_true(
-        "section='系统评级结论'" not in cue_sticky,
+        "region='系统评级结论'" not in cue_sticky and "section='系统评级结论'" not in cue_sticky,
         f"must not emit click_save with sticky section: {cue_sticky}",
     )
 
@@ -75,14 +81,14 @@ def test_submit_ready_hint_dual_save() -> None:
     hint = _submit_ready_hint(store)
     assert_true("Multiple" in hint, f"_submit_ready_hint must gate dual save: {hint}")
     assert_true(
-        "section='系统评级结论'" not in hint,
+        "region='系统评级结论'" not in hint and "section='系统评级结论'" not in hint,
         f"must not inject sticky section in hint: {hint}",
     )
     sticky = resolve_phase_section(store)
     hint_sticky = _submit_ready_hint(store, section=sticky)
     assert_true("Multiple" in hint_sticky, f"explicit sticky section must gate: {hint_sticky}")
     assert_true(
-        "section='系统评级结论'" not in hint_sticky,
+        "region='系统评级结论'" not in hint_sticky and "section='系统评级结论'" not in hint_sticky,
         f"must not pass sticky as section= in hint: {hint_sticky}",
     )
 

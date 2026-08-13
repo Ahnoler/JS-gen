@@ -45,7 +45,6 @@ async def run_probes(page, sample_fill: dict, sample_select: dict) -> list[dict]
     from scripts.controller.actions._js_snippets import JS_FILL_BY_XPATH
     from scripts.controller.actions._replay import (
         _element_xpath_smart,
-        _params_xpath_smart,
         _read_value_by_xpath,
         _replay_form_action,
         _resolve_replay_xpath,
@@ -60,9 +59,9 @@ async def run_probes(page, sample_fill: dict, sample_select: dict) -> list[dict]
     label = str(fill_params.get("label_text") or "")
     value = str(fill_params.get("value") or "wet-probe")
     if el_xp and label:
-        before = await _read_value_by_xpath(page, _params_xpath_smart(fill_entry, fill_params) or el_xp)
+        before = await _read_value_by_xpath(page, el_xp) if el_xp else ""
         raw = await page.evaluate(JS_FILL_BY_XPATH, [el_xp, value, label])
-        after = await _read_value_by_xpath(page, _params_xpath_smart(fill_entry, fill_params) or el_xp)
+        after = await _read_value_by_xpath(page, el_xp) if el_xp else ""
         ok_placeholder = isinstance(raw, str) and "ok-placeholder" in raw
         out.append(
             {
@@ -77,24 +76,24 @@ async def run_probes(page, sample_fill: dict, sample_select: dict) -> list[dict]
             }
         )
 
-    # --- Probe B: replay fill uses params locate + read-back ---
+    # --- Probe B: replay fill uses element locate + read-back ---
     if sample_fill:
         res = await _replay_form_action(page, "fill_form_field", fill_params, fill_entry)
         xp, src = _resolve_replay_xpath(fill_entry, fill_params)
         out.append(
             {
-                "probe": "B_replay_fill_params",
+                "probe": "B_replay_fill_element",
                 "label": label,
                 "resolve_src": src,
                 "result": res,
                 "pass": isinstance(res, str)
                 and res.startswith("ok")
-                and ("locate=params" in res or src == "params"),
-                "note": "fill must succeed via params xpath",
+                and (src == "element" or "locate=element" in res),
+                "note": "fill must succeed via element xpath",
             }
         )
 
-    # --- Probe C: replay select uses xpath trigger ---
+    # --- Probe C: replay select uses element xpath trigger ---
     sel_params = sample_select.get("params") or {}
     sel_entry = {"element": sample_select.get("element") or {}, "params": sel_params}
     sel_label = str(sel_params.get("label_text") or "")
@@ -103,14 +102,18 @@ async def run_probes(page, sample_fill: dict, sample_select: dict) -> list[dict]
         xp, src = _resolve_replay_xpath(sel_entry, sel_params)
         out.append(
             {
-                "probe": "C_replay_select_params",
+                "probe": "C_replay_select_element",
                 "label": sel_label,
                 "resolve_src": src,
                 "result": res,
                 "pass": isinstance(res, str)
                 and res.startswith("ok")
-                and ("locate=params" in res or "ok-already" in res or src == "params"),
-                "note": "select must succeed via params xpath trigger (or already matched)",
+                and (
+                    src == "element"
+                    or "locate=element" in res
+                    or "ok-already" in res
+                ),
+                "note": "select must succeed via element xpath trigger (or already matched)",
             }
         )
 

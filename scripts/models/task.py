@@ -67,7 +67,11 @@ class TaskItem(BaseModel):
     )
     section_title: str = Field(
         default="",
-        description="Readable section title",
+        description="Readable section title (legacy D3; prefer region_label)",
+    )
+    region_label: str = Field(
+        default="",
+        description="L1 region display label (preferred over section_title)",
     )
     needs_intervention: bool = Field(
         default=False,
@@ -90,6 +94,16 @@ class TaskItem(BaseModel):
         return not self.is_filled and not self.disabled
 
     # ── Factory ──────────────────────────────────────────────────────────
+
+    @classmethod
+    def _region_fields(cls, field: dict) -> dict:
+        """Prefer L1 region_label; keep section_* as legacy aliases."""
+        rl = (field.get("region_label") or field.get("section_title") or "").strip()
+        return {
+            "section_id": (field.get("section_id") or field.get("region_id") or "").strip(),
+            "section_title": (field.get("section_title") or rl).strip(),
+            "region_label": rl,
+        }
 
     @classmethod
     def from_scanned(cls, field: dict) -> Optional["TaskItem"]:
@@ -122,9 +136,8 @@ class TaskItem(BaseModel):
             required=field.get("required", False),
             hasButton=has_button,
             xpath_smart=field.get("xpath_smart", ""),
-            section_id=field.get("section_id", ""),
-            section_title=field.get("section_title", ""),
             needs_intervention=False,
+            **cls._region_fields(field),
         )
 
 
@@ -203,18 +216,23 @@ class TaskList(BaseModel):
                 item.currentValue = str(value)
             return item
 
-        if xp:
-            for i, item in enumerate(self.pending):
-                if item.xpath_smart == xp:
-                    self.pending.pop(i)
-                    self.done.append(_apply_value(item))
-                    return item
-
-        for i, item in enumerate(self.pending):
-            if item.label == label:
+        # Clear ALL pending with the same label (and/or matching xpath). Overlay
+        # rebuild historically mixed list+dialog twins; one write must not leave
+        # a same-label sibling pending for click_save / done gates.
+        moved: Optional[TaskItem] = None
+        i = 0
+        while i < len(self.pending):
+            item = self.pending[i]
+            match = item.label == label or (bool(xp) and item.xpath_smart == xp)
+            if match:
                 self.pending.pop(i)
                 self.done.append(_apply_value(item))
-                return item
+                if moved is None or (xp and item.xpath_smart == xp):
+                    moved = item
+            else:
+                i += 1
+        if moved is not None:
+            return moved
         # Already done — still refresh currentValue if a new value was provided
         if value is not None and str(value).strip() != "":
             if xp:
@@ -344,8 +362,7 @@ class TaskList(BaseModel):
                     required=f.get("required", False),
                     hasButton="",
                     xpath_smart=f.get("xpath_smart", ""),
-                    section_id=f.get("section_id", ""),
-                    section_title=f.get("section_title", ""),
+                    **TaskItem._region_fields(f),
                 ))
                 continue
             if has_value and (not force_refill or label in session_filled):
@@ -359,8 +376,7 @@ class TaskList(BaseModel):
                     required=f.get("required", False),
                     hasButton=has_button,
                     xpath_smart=f.get("xpath_smart", ""),
-                    section_id=f.get("section_id", ""),
-                    section_title=f.get("section_title", ""),
+                    **TaskItem._region_fields(f),
                 ))
             else:
                 item = TaskItem.from_scanned(f)
@@ -379,9 +395,8 @@ class TaskList(BaseModel):
                         required=f.get("required", False),
                         hasButton=has_button,
                         xpath_smart=f.get("xpath_smart", ""),
-                        section_id=f.get("section_id", ""),
-                        section_title=f.get("section_title", ""),
                         needs_intervention=False,
+                        **TaskItem._region_fields(f),
                     )
                 if item is not None:
                     pending.append(item)

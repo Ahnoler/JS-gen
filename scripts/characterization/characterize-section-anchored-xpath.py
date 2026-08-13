@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Exported xpath_smart must section-anchor duplicate buttons (Playwright-only locate)."""
+"""Exported xpath_smart must region-anchor duplicate buttons (xpath 消歧; Playwright-only locate)."""
 from __future__ import annotations
 
 import json
@@ -46,8 +46,26 @@ SNAP_JS = (
 
 def main() -> int:
     helpers = (ROOT / "src/cdp/page-locator-helpers.js").read_text(encoding="utf-8")
-    assert_true("sectionAnchorXPath" in helpers, "canonical helpers define sectionAnchorXPath")
-    assert_true("sectionAnchorXPath" in PAGE_LOCATOR_HELPERS, "Python mirror regenerated")
+    assert_true("regionAnchorXPath" in helpers, "canonical helpers define regionAnchorXPath")
+    assert_true("regionAnchorOf" in helpers, "canonical helpers define regionAnchorOf")
+    assert_true("xpath 消歧" in helpers, "regionAnchor comments document xpath 消歧")
+    assert_true("regionAnchorXPath" in PAGE_LOCATOR_HELPERS, "Python mirror regenerated")
+    assert_true(
+        "function sectionAnchorOf" not in helpers,
+        "sectionAnchorOf alias removed",
+    )
+    assert_true(
+        "function sectionAnchorXPath" not in helpers,
+        "sectionAnchorXPath alias removed",
+    )
+    assert_true(
+        "function sectionAnchorOf" not in PAGE_LOCATOR_HELPERS,
+        "sectionAnchorOf alias removed from Python mirror",
+    )
+    assert_true(
+        "function sectionAnchorXPath" not in PAGE_LOCATOR_HELPERS,
+        "sectionAnchorXPath alias removed from Python mirror",
+    )
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -60,7 +78,7 @@ def main() -> int:
     assert_true(smart, f"xpath_smart missing: {loc!r}")
     assert_true(
         "el-collapse-item" in smart and "客户综合评价" in smart,
-        f"must section-anchor 客户综合评价, got {smart!r}",
+        f"must region-anchor 客户综合评价, got {smart!r}",
     )
     assert_true(
         "[1]" not in smart and "[2]" not in smart,

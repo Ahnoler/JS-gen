@@ -25,7 +25,7 @@ async def _resolve_chromium_executable() -> str | None:
         finally:
             await pw.stop()
     except Exception as e:
-        sys.stderr.write(f'[session] WARN: cannot resolve Playwright Chromium: {e}\n')
+        sys.stderr.write(f'WARN: cannot resolve Playwright Chromium: {e}\n')
         sys.stderr.flush()
         return None
 
@@ -129,7 +129,7 @@ def _seed_chrome_profile(profile_dir: Path) -> None:
         local_state.setdefault('profile', {})['exited_cleanly'] = True
         local_state_path.write_text(json.dumps(local_state), encoding='utf-8')
     except Exception as e:
-        sys.stderr.write(f'[session] WARN: seed chrome profile failed: {e}\n')
+        sys.stderr.write(f'WARN: seed chrome profile failed: {e}\n')
         sys.stderr.flush()
 
 
@@ -142,12 +142,12 @@ async def _ignore_certificate_errors(browser_context) -> None:
         try:
             await cdp.send('Security.enable')
             await cdp.send('Security.setIgnoreCertificateErrors', {'ignore': True})
-            sys.stderr.write('[session] CDP Security.setIgnoreCertificateErrors=true\n')
+            sys.stderr.write('CDP Security.setIgnoreCertificateErrors=true\n')
             sys.stderr.flush()
         finally:
             await cdp.detach()
     except Exception as e:
-        sys.stderr.write(f'[session] WARN: ignore certificate errors failed: {e}\n')
+        sys.stderr.write(f'WARN: ignore certificate errors failed: {e}\n')
         sys.stderr.flush()
 
 
@@ -158,10 +158,10 @@ async def _bypass_ssl_interstitial_if_any(browser_context) -> None:
         page = await browser_context.get_current_page()
         result = await dismiss_https_first_interstitial(page)
         if result and result != 'none':
-            sys.stderr.write(f'[session] HTTPS-First interstitial bypass: {result} url={page.url}\n')
+            sys.stderr.write(f'HTTPS-First interstitial bypass: {result} url={page.url}\n')
             sys.stderr.flush()
     except Exception as e:
-        sys.stderr.write(f'[session] WARN: SSL interstitial bypass failed: {e}\n')
+        sys.stderr.write(f'WARN: SSL interstitial bypass failed: {e}\n')
         sys.stderr.flush()
 
 
@@ -196,12 +196,12 @@ async def _fit_browser_window(browser_context, width: int = 1600, height: int = 
                     },
                 },
             )
-            sys.stderr.write(f'[session] Browser window fitted {width}x{height} (normal)\n')
+            sys.stderr.write(f'Browser window fitted {width}x{height} (normal)\n')
             sys.stderr.flush()
         finally:
             await cdp.detach()
     except Exception as e:
-        sys.stderr.write(f'[session] WARN: fit window failed: {e}\n')
+        sys.stderr.write(f'WARN: fit window failed: {e}\n')
         sys.stderr.flush()
 
 
@@ -212,7 +212,7 @@ async def _dismiss_native_js_dialogs(browser_context) -> None:
 
         async def _on_dialog(dialog):
             try:
-                sys.stderr.write(f'[session] Auto-accept JS dialog: {dialog.type} {dialog.message[:80]!r}\n')
+                sys.stderr.write(f'Auto-accept JS dialog: {dialog.type} {dialog.message[:80]!r}\n')
                 sys.stderr.flush()
                 await dialog.accept()
             except Exception:
@@ -220,7 +220,7 @@ async def _dismiss_native_js_dialogs(browser_context) -> None:
 
         page.on('dialog', lambda d: asyncio.create_task(_on_dialog(d)))
     except Exception as e:
-        sys.stderr.write(f'[session] WARN: dialog handler setup failed: {e}\n')
+        sys.stderr.write(f'WARN: dialog handler setup failed: {e}\n')
         sys.stderr.flush()
 
 
@@ -236,14 +236,14 @@ async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
     from browser_use.browser.browser import BrowserConfig
 
     if cdp_url:
-        sys.stderr.write(f"[session] Connecting to existing browser via CDP: {cdp_url}\n")
+        sys.stderr.write(f"Connecting to existing browser via CDP: {cdp_url}\n")
         sys.stderr.flush()
         return Browser(config=BrowserConfig(cdp_url=cdp_url)), None, True
 
     preferred = int(cdp_port) if cdp_port else 9242
     port = _pick_free_cdp_port(preferred)
     if port != preferred:
-        sys.stderr.write(f"[session] CDP port {preferred} busy — using free port {port}\n")
+        sys.stderr.write(f"CDP port {preferred} busy — using free port {port}\n")
         sys.stderr.flush()
 
     exe = await _resolve_chromium_executable()
@@ -259,7 +259,7 @@ async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
 
     if exe:
         sys.stderr.write(
-            f"[session] Launching Chromium via browser_binary_path for CDP "
+            f"Launching Chromium via browser_binary_path for CDP "
             f"port={port} exe={exe} headless={headless}\n"
         )
         sys.stderr.flush()
@@ -274,7 +274,7 @@ async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
 
     # Fallback: builtin launch (may drop CDP port — BiB may be unavailable)
     sys.stderr.write(
-        f"[session] WARN: no Chromium exe — fallback builtin launch "
+        f"WARN: no Chromium exe — fallback builtin launch "
         f"port={port} headless={headless}\n"
     )
     sys.stderr.flush()

@@ -1,7 +1,7 @@
 # superpowers：规格与计划索引
 
 > 状态以表为准。已落地文档在 [`archive/`](archive/README.md)。  
-> 活待办：[`backlog-visible-editable-controls.md`](backlog-visible-editable-controls.md)
+> 活待办：[`backlog-visible-editable-controls.md`](backlog-visible-editable-controls.md)（控件视野主线）· [`todo-list.md`](todo-list.md)（缺陷 + backlog 总清单，跨会话）
 
 ## 当前主线（勿归档）
 

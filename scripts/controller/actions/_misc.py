@@ -385,6 +385,51 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     attributes=element_node.attributes or {},
                 )
 
+            # Forbid index-click on el-select dropdown surfaces (option li / table-in-select
+            # rows / dropdown body). Agents otherwise record 点击元素 with concatenated
+            # company names (对公评级申请「客户名称」TsscMultiSelect) then still call
+            # select_option — duplicate junk step. Same rule as prompt EL-SELECT §2–3.
+            try:
+                gate_xp = str(
+                    (element_info or {}).get('xpath')
+                    or getattr(element_node, 'xpath', None)
+                    or ''
+                )
+                dd_gate = await page.evaluate(
+                    '''(xpath) => {
+                        let node = null;
+                        if (xpath) {
+                            try {
+                                node = document.evaluate(
+                                    xpath, document, null,
+                                    XPathResult.FIRST_ORDERED_NODE_TYPE, null
+                                ).singleNodeValue;
+                            } catch (e) {}
+                        }
+                        if (!node || node.nodeType !== 1) return { hit: false };
+                        const dd = node.closest && node.closest('.el-select-dropdown');
+                        if (!dd) return { hit: false };
+                        const inItem = !!(node.closest('.el-select-dropdown__item'));
+                        const inRow = !!(node.closest('tr.el-table__row, .el-table__row'));
+                        return {
+                            hit: true,
+                            kind: inRow ? 'table-row' : (inItem ? 'option' : 'dropdown'),
+                        };
+                    }''',
+                    gate_xp,
+                )
+                if isinstance(dd_gate, dict) and dd_gate.get('hit'):
+                    kind = str(dd_gate.get('kind') or 'dropdown')
+                    return _err(
+                        f'use-select-option | Index click on el-select dropdown ({kind}) '
+                        f'is forbidden — do not record 点击元素. '
+                        f'Call select_option(label_text=..., option_text=...) only '
+                        f'(table-in-select / 客户名称 remote rows included).',
+                        include_in_memory=True,
+                    )
+            except Exception:
+                pass
+
             # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
             # select→修改→确认 loops after premature done() rejection.
             # Exception: customer-magnifier / query-toolbar pickers — allow 确认.
@@ -516,11 +561,40 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             if download_path:
                 return _ok(f'downloaded:{download_path}')
             if element_node:
-                _state._record_action('click_element_by_index', {
-                    'index': index,
-                    'tag_name': element_info.get('tag_name') if element_info else tag_name,
-                    'text': (element_info or {}).get('text') or elem_text or '',
-                }, f'ok-clicked-{index}', element=element_info)
+                raw_xp = str(getattr(element_node, 'xpath', None) or '')
+                raw_cls = str((element_node.attributes or {}).get('class')
+                              or (element_node.attributes or {}).get('className')
+                              or '')
+                is_tree_node_click = (
+                    'el-tree-node' in raw_xp
+                    or 'el-tree-node__content' in raw_cls
+                    or 'el-tree-node__label' in raw_cls
+                )
+                form_label = str((element_info or {}).get('formLabel') or '').strip()
+                tree_opt = (elem_text or '').strip()
+                if (
+                    is_tree_node_click
+                    and (element_info or {}).get('target_kind') == 'form_tree_select'
+                    and form_label
+                    and tree_opt
+                ):
+                    if element_info is not None:
+                        element_info = dict(element_info)
+                        element_info['text'] = tree_opt[:80]
+                        element_info['target_kind'] = 'form_tree_select'
+                        element_info['formLabel'] = form_label
+                    _state._record_action(
+                        'select_tree_option',
+                        {'label_text': form_label, 'option_text': tree_opt},
+                        f'ok-clicked-{index}',
+                        element=element_info,
+                    )
+                else:
+                    _state._record_action('click_element_by_index', {
+                        'index': index,
+                        'tag_name': element_info.get('tag_name') if element_info else tag_name,
+                        'text': (element_info or {}).get('text') or elem_text or '',
+                    }, f'ok-clicked-{index}', element=element_info)
                 if case_data_store is not None:
                     from scripts.controller.actions.container_naming import remember_trigger_button
                     remember_trigger_button(
@@ -544,6 +618,14 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         maybe_record_picker_closed(
                             case_data_store, still_query_ui=still, parent_container=parent,
                         )
+                        if not still:
+                            # Parent maintain form still needs toast_ok via click_save.
+                            case_data_store['_submit_ready'] = True
+                            case_data_store.pop('_query_ui', None)
+                            sys.stderr.write(
+                                '[click] picker confirm closed → submit-ready for parent save\n'
+                            )
+                            sys.stderr.flush()
                 except Exception:
                     pass
             return _ok(f'ok-clicked-{index}')

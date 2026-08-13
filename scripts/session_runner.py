@@ -75,7 +75,7 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=N
         try:
             msg = json.loads(line)
         except json.JSONDecodeError:
-            sys.stderr.write(f"[session] Invalid JSON: {line[:100]}\n")
+            sys.stderr.write(f"Invalid JSON: {line[:100]}\n")
             sys.stderr.flush()
             continue
         event = msg.get("event")
@@ -250,7 +250,7 @@ async def run_session(args):
             cdp_ws_url = await _probe_cdp_ws_url(int(cdp_port))
         else:
             sys.stderr.write(
-                f"[session] WARN: CDP HTTP still not ready on port {cdp_port} after launch. "
+                f"WARN: CDP HTTP still not ready on port {cdp_port} after launch. "
                 "BiB canvas unavailable; AI/manual recording can still run.\n"
             )
             sys.stderr.flush()
@@ -267,7 +267,7 @@ async def run_session(args):
         ready_payload["cdp_ws_url"] = cdp_ws_url
     emit_json(ready_payload)
     sys.stderr.write(
-        f"[session] Ready, session_id={session_id}"
+        f"Ready, session_id={session_id}"
         + (f", cdp_port={cdp_port}" if cdp_port and not cdp_url else "")
         + f", cdp_ready={bool(cdp_ready)}"
         + "\n"
@@ -349,7 +349,9 @@ async def run_session(args):
             "event": "phase_done",
             "data": phase_done_data,
         })
-        sys.stderr.write(f"[session] Step {step_idx} done (phase={phase_num})\n")
+        # Human log: Phase N (【阶段N】); fall back to step ordinal when phase unset/0.
+        display_phase = phase_num if isinstance(phase_num, int) and phase_num > 0 else step_idx
+        sys.stderr.write(f"Phase {display_phase} done\n\n")
         sys.stderr.flush()
 
     while True:
@@ -380,7 +382,7 @@ async def run_session(args):
             if isinstance(case_data_block, str) and case_data_block.strip():
                 case_data_store['_case_scenario_text'] = case_data_block.strip()
                 sys.stderr.write(
-                    f"[session] Case scenario text ready ({len(case_data_block.strip())} chars)\n"
+                    f"Case scenario text ready ({len(case_data_block.strip())} chars)\n"
                 )
                 sys.stderr.flush()
             if not case_data_loaded and (case_data_inline or case_data_file):
@@ -395,25 +397,25 @@ async def run_session(args):
                         case_data_store.update(imported)
                         case_data_loaded = True
                         src = "inline" if isinstance(case_data_inline, dict) else case_data_file
-                        sys.stderr.write(f"[session] Imported case data ({len(imported)} keys) from {src}\n")
+                        sys.stderr.write(f"Imported case data ({len(imported)} keys) from {src}\n")
                         sys.stderr.flush()
                 except Exception as e:
-                    sys.stderr.write(f"[session] Failed to import case data: {e}\n")
+                    sys.stderr.write(f"Failed to import case data: {e}\n")
                     sys.stderr.flush()
 
             await _run_step(data, step_index)
 
         except asyncio.CancelledError:
-            sys.stderr.write("[session] Main loop cancelled, exiting\n");
+            sys.stderr.write("Main loop cancelled, exiting\n");
             sys.stderr.flush()
             break
         except SystemExit:
-            sys.stderr.write("[session] SystemExit received, exiting\n");
+            sys.stderr.write("SystemExit received, exiting\n");
             sys.stderr.flush()
             break
         except BaseException as e:
             agent_running_ref['value'] = False
-            sys.stderr.write(f"[session] Unexpected error in main loop: {type(e).__name__}: {e}\n");
+            sys.stderr.write(f"Unexpected error in main loop: {type(e).__name__}: {e}\n");
             sys.stderr.flush()
             emit_json({"event": "error", "data": {"message": f"Unexpected error: {type(e).__name__}: {e}"}})
 
@@ -429,7 +431,7 @@ async def run_session(args):
     if keep_browser:
         # Soft close — leave Chromium on CDP (not the normal「释放资源」path).
         sys.stderr.write(
-            f"[session] Leaving Chrome idle"
+            f"Leaving Chrome idle"
             + (f" on CDP port={cdp_port}" if cdp_port and not cdp_url else "")
             + (f" via {cdp_url}" if cdp_url else "")
             + "\n"
@@ -439,9 +441,9 @@ async def run_session(args):
         try:
             await browser.close()
         except Exception as e:
-            sys.stderr.write(f"[session] WARN: browser.close failed: {e}\n")
+            sys.stderr.write(f"WARN: browser.close failed: {e}\n")
             sys.stderr.flush()
-        sys.stderr.write("[session] Browser closed, exiting\n")
+        sys.stderr.write("Browser closed, exiting\n")
         sys.stderr.flush()
 
     # P0：退出前冲刷记忆队列（不等待太久，避免拖慢关闭）

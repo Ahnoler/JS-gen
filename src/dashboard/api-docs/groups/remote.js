@@ -32,7 +32,11 @@ export const GROUP_REMOTE = [
         summary: '附着 CDP + 推流',
         reqExample: J({ sessionId: 'uuid', trajectoryId: 42, quality: 0.65, viewportW: 1600, viewportH: 900 }),
         respExample: J({ remoteSession: { id: 7 }, status: { attached: true, remoteSessionId: 7, trajectoryId: 42 } }),
-        notes: ['503：CDP/页面未就绪', '须传 sessionId；按 trajectoryId 写入 live 映射'],
+        notes: [
+          '503：CDP/页面未就绪',
+          '须传 sessionId；按 trajectoryId 写入 live 映射',
+          '409 `grace_owned`：宽限期内他交易 idle Chrome 仍归属原 traj — `{ error, code: "grace_owned", ownerTrajectoryId: 42, graceUntil: "2026-08-11T12:00:00.000Z" }`',
+        ],
       },
       {
         method: 'GET', path: '/api/v2/remote-sessions',
@@ -61,9 +65,13 @@ export const GROUP_REMOTE = [
       {
         method: 'POST', path: '/api/v2/remote-sessions/{id}/detach',
         summary: '断开画面推流（不停浏览器）',
-        desc: 'remote_session → idle；可选 body.trajectoryId 做归属校验。Chrome 与 Agent 会话仍存活。产品路径优先用 POST /trajectories/{id}/stream/detach。与 trajectories/:id/detach（释放执行资源、关浏览器）不同。',
+        desc: 'remote_session → idle 并设 grace_until；可选 body.trajectoryId 做归属校验。Chrome 与 Agent 会话仍存活。产品路径优先用 POST /trajectories/{id}/stream/detach。与 trajectories/:id/detach（释放执行资源、关浏览器）不同。',
         params: [{ name: 'id', type: 'string', required: true, in: 'path', example: '7' }],
         reqExample: J({ trajectoryId: 42 }),
+        notes: [
+          '409：body.trajectoryId 与 remote_session.trajectory_id 不一致',
+          'streamDetach 后 grace 内保留归属；他交易 attach 同 session → 409 `grace_owned`（见 attach-live）',
+        ],
       },
       {
         method: 'POST', path: '/api/v2/remote-sessions/{id}/close',
@@ -80,7 +88,7 @@ export const GROUP_REMOTE = [
   {
     id: 'screenshot',
     name: '截图管理',
-    description: '按 trajectory_step 绑定的 before/after 截图；回放中亦可经 WS replay:screenshot 获取临时 URL',
+    description: '按 trajectory_step 绑定的 before/after 截图；`kind=phase_highlight` 行绑定 trajectory_phase（`trajectoryPhaseId` 有值、`trajectoryStepId` 为 null）；回放中亦可经 WS replay:screenshot 获取临时 URL',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/trajectories/{trajectoryId}/screenshots',
@@ -89,6 +97,9 @@ export const GROUP_REMOTE = [
         respExample: J([{
           id: 1, fileSize: 12345,
           mimeType: 'image/png', trajectoryStepId: 501, stepNumber: 1, kind: 'before',
+        }, {
+          id: 88, fileSize: 456789,
+          mimeType: 'image/png', trajectoryPhaseId: 101, trajectoryStepId: null, kind: 'phase_highlight',
         }]),
       },
       {

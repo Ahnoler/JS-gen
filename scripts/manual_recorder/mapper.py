@@ -20,6 +20,51 @@ def _xpath_literal(text: str) -> str:
     return 'concat(' + ', "\'", '.join(f"'{p}'" for p in parts) + ')'
 
 
+def _overlay_scope_kind(
+    xpath_abs: str = '',
+    class_name: str = '',
+    locator_scope: str = '',
+) -> str:
+    """Resolve dialog/drawer overlay kind (prefer explicit locator_scope).
+
+    Absolute xpath is usually positional (no class tokens), so ``locator_scope``
+    from the live snap is authoritative — same contract as auto-capture
+    ``scopeOf`` / ``scopedXPath`` (no ``[last()]``).
+    """
+    scope = str(locator_scope or '').strip().lower()
+    if scope in ('dialog', 'drawer'):
+        return scope
+    abs_l = xpath_abs or ''
+    cls = class_name or ''
+    if re.search(r'el-drawer', abs_l, re.I) or re.search(r'(?:^|\s)el-drawer(?:\s|$)', cls, re.I):
+        return 'drawer'
+    if re.search(r'el-dialog|el-message-box', abs_l, re.I) or re.search(
+        r'(?:^|\s)el-dialog(?:\s|$)|(?:^|\s)el-message-box(?:\s|$)', cls, re.I
+    ):
+        return 'dialog'
+    return ''
+
+
+def _with_overlay_scope(xpath: str, kind: str) -> str:
+    """Wrap relative xpath with dialog/drawer prefix (auto-capture aligned)."""
+    s = str(xpath or '').strip()
+    if not s or not kind:
+        return s
+    if kind == 'drawer' and 'el-drawer' in s:
+        return s
+    if kind == 'dialog' and ('el-dialog' in s or 'el-message-box' in s):
+        return s
+    local = s.lstrip('/')
+    if kind == 'drawer':
+        return f"//div[contains(@class,'el-drawer')]//{local}"
+    if kind == 'dialog':
+        return (
+            "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+            f"//{local}"
+        )
+    return s
+
+
 def _offline_xpath_smart_fallback(
     tag: str,
     text: str,
@@ -27,11 +72,13 @@ def _offline_xpath_smart_fallback(
     class_name: str = '',
     form_label: str = '',
     target_kind: str = '',
+    locator_scope: str = '',
 ) -> str:
     """Safe offline rebuild from supplied cues only (no menu inference from /ul/li/)."""
     form_lbl = re.sub(r'\s+', ' ', str(form_label or '')).strip()
     form_lbl = re.sub(r'[：:*\s]+$', '', form_lbl)[:40]
     kind = str(target_kind or '').strip()
+    overlay = _overlay_scope_kind(xpath_abs, class_name, locator_scope)
 
     if form_lbl and (kind.startswith('form_') or kind in ('', 'generic', 'adjacent_button') or not kind):
         lit = _xpath_literal(form_lbl)
@@ -56,14 +103,7 @@ def _offline_xpath_smart_fallback(
         else:
             leaf = 'input' if tag_l in ('', 'input') or 'el-input__inner' in cls else tag_l
         local = f"{item}//{leaf}"
-        if re.search(r'el-drawer', abs_l, re.I) or re.search(r'el-drawer', cls, re.I):
-            return f"(//div[contains(@class,'el-drawer')])[last()]//{local}"
-        if re.search(r'el-dialog|el-message-box', abs_l, re.I):
-            return (
-                "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]"
-                f"//{local}"
-            )
-        return f"//{local}"
+        return _with_overlay_scope(f"//{local}", overlay) if overlay else f"//{local}"
 
     t = re.sub(r'\s+', ' ', str(text or '')).strip()[:40]
     if not t:
@@ -74,6 +114,13 @@ def _offline_xpath_smart_fallback(
     # Only rebuild button/link text xpath offline — never menu from absolute path alone
     tag_l = (tag or '').lower()
     cls = class_name or ''
+    if re.search(r'(?:^|\s)todo-item-action(?:\s|$)', cls):
+        lit = _xpath_literal(t)
+        local = (
+            "div[contains(concat(' ',normalize-space(@class),' '),' todo-item-action ')]"
+            f"[normalize-space()={lit}]"
+        )
+        return _with_overlay_scope(f'//{local}', overlay) if overlay else f'//{local}'
     clickable = (
         tag_l in ('button', 'a')
         or bool(re.search(r'(?:^|\s)el-button(?:\s|$)', cls))
@@ -83,15 +130,7 @@ def _offline_xpath_smart_fallback(
         return ''
     lit = _xpath_literal(t)
     local = f'a[normalize-space()={lit}]' if tag_l == 'a' else f'button[normalize-space()={lit}]'
-    abs_l = xpath_abs or ''
-    if re.search(r'el-drawer', abs_l, re.I):
-        return f"(//div[contains(@class,'el-drawer')])[last()]//{local}"
-    if re.search(r'el-dialog|el-message-box', abs_l, re.I):
-        return (
-            "(//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')])[last()]"
-            f"//{local}"
-        )
-    return f'//{local}'
+    return _with_overlay_scope(f'//{local}', overlay) if overlay else f'//{local}'
 
 
 # Backward-compatible alias (tests / __init__ re-exports)
@@ -116,6 +155,8 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
     cls = str(attrs.get('class') or attrs.get('className') or '')
     form_label = (payload.get('label_text') or payload.get('formLabel') or '').strip()
     target_kind = str(payload.get('target_kind') or '').strip()
+    locator_scope = str(payload.get('locator_scope') or '').strip()
+    overlay = _overlay_scope_kind(abs_xp or str(payload.get('xpath') or ''), cls, locator_scope)
 
     # Trust DOM snapshot; offline rebuild only when smart missing
     if not smart:
@@ -134,7 +175,11 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
                 'dialog_close' if kind == 'close_dialog' else
                 ''
             ),
+            locator_scope=locator_scope,
         )
+    elif overlay:
+        # Align with auto-capture: keep label xpath but add dialog/drawer scope
+        smart = _with_overlay_scope(smart, overlay)
 
     css = payload.get('cssSelector') or payload.get('css_selector') or ''
     strategy = payload.get('locator_strategy') or ('xpath_smart' if smart else 'xpath_full')
@@ -152,6 +197,15 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
             candidates.append({'type': 'xpath_full', 'value': primary})
         if css:
             candidates.append({'type': 'css', 'value': css})
+    elif smart:
+        # Keep candidates in sync when we wrap smart with overlay scope
+        refreshed = []
+        for c in candidates:
+            if isinstance(c, dict) and c.get('type') == 'xpath_smart':
+                refreshed.append({**c, 'value': smart})
+            else:
+                refreshed.append(c)
+        candidates = refreshed
 
     element = {
         'xpath': primary,
@@ -171,12 +225,19 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         element['formLabel'] = form_label
     if target_kind:
         element['target_kind'] = target_kind
-    if payload.get('locator_scope'):
-        element['locator_scope'] = payload['locator_scope']
+    if locator_scope:
+        element['locator_scope'] = locator_scope
     if payload.get('locator_occurrence'):
         element['locator_occurrence'] = payload['locator_occurrence']
     if payload.get('locator_fallback_reason'):
         element['locator_fallback_reason'] = payload['locator_fallback_reason']
+    parent_text = re.sub(r'\s+', ' ', str(payload.get('parent_text') or '')).strip()
+    if parent_text:
+        element['parent_text'] = parent_text[:80]
+
+    def _stamp_params(params: dict) -> dict:
+        """Params must not carry xpath_smart; element snap holds the locator."""
+        return params
 
     if kind == 'fill':
         label = (payload.get('label_text') or '').strip()
@@ -186,22 +247,22 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         if not label and not element['xpath']:
             return None
         if label:
-            return 'fill_form_field', {'label_text': label, 'value': value}, element
-        return 'fill_form_field', {'label_text': label or element['xpath'], 'value': value}, element
+            return 'fill_form_field', _stamp_params({'label_text': label, 'value': value}), element
+        return 'fill_form_field', _stamp_params({'label_text': label or element['xpath'], 'value': value}), element
 
     if kind == 'fill_date':
         label = (payload.get('label_text') or '').strip()
         value = (payload.get('value') or '').strip()
         if not label or not value:
             return None
-        return 'fill_date_field', {'label_text': label, 'value': value}, element
+        return 'fill_date_field', _stamp_params({'label_text': label, 'value': value}), element
 
     if kind == 'select_option':
         label = (payload.get('label_text') or '').strip()
         option = (payload.get('option_text') or '').strip()
         if not option:
             return None
-        params = {'label_text': label or option, 'option_text': option}
+        params = _stamp_params({'label_text': label or option, 'option_text': option})
         raw_opts = payload.get('options')
         if isinstance(raw_opts, list):
             opts = []
@@ -241,11 +302,15 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
                 return None
         if t and not element.get('text'):
             element['text'] = t
-        return 'click_element_by_index', {
+        params = {
             'index': -1,
             'tag_name': element.get('tag_name') or '',
             'text': t,
-        }, element
+        }
+        pt = (element.get('parent_text') or '').strip()
+        if pt:
+            params['parent_text'] = pt
+        return 'click_element_by_index', params, element
 
     if kind == 'click_menu_item':
         return _as_click_by_index(payload.get('menu_text') or payload.get('text') or '')
@@ -278,7 +343,22 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         option = (payload.get('option_text') or '').strip()
         if not option:
             return None
-        return 'click_radio', {'label_text': label, 'option_text': option}, element
+        return 'click_radio', _stamp_params({'label_text': label, 'option_text': option}), element
+
+    if kind == 'select_tree_option':
+        label = (payload.get('label_text') or payload.get('formLabel') or '').strip()
+        option = (payload.get('option_text') or payload.get('text') or '').strip()
+        if not label or not option:
+            return None
+        if not element.get('target_kind'):
+            element['target_kind'] = 'form_tree_select'
+        if label and not element.get('formLabel'):
+            element['formLabel'] = label
+        return (
+            'select_tree_option',
+            _stamp_params({'label_text': label, 'option_text': option}),
+            element,
+        )
 
     if kind == 'switch_tab':
         name = (payload.get('tab_name') or '').strip()

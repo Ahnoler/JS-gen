@@ -1,6 +1,6 @@
 """TrajectoryPhase entity — maps to `trajectory_phase` table."""
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 from pydantic import BaseModel, Field
 
 
@@ -13,6 +13,7 @@ class TrajectoryPhaseEntity(BaseModel):
     status: str = "completed"  # running | completed | failed
     created_at: datetime = Field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
+    done_logs: Optional[Any] = None
 
     class Config:
         from_attributes = True

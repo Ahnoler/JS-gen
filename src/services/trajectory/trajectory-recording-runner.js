@@ -20,6 +20,8 @@ import {
   runDefaultLogin,
   prepareCaseDataInjection,
 } from './trajectory-record-lifecycle.js';
+import { appendPhaseDoneLog } from '../trajectory-phase-service.js';
+import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
@@ -95,7 +97,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   // action_log_sync → appendRecordedStep. Separate from bindExecutorSessionEvents (#1),
   // which focuses on manual/cdp (+ optional agent autoPersist). Both must handle
   // step_screenshot or AI-recording shots would be dropped.
-  const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, async (type, payload) => {
+  const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, (type, payload) => {
+    const work = (async () => {
     if (type === 'phase_intent_obs' || type === 'phase_boundary_obs' || type === 'phase_end') {
       events.push({
         type,
@@ -200,6 +203,14 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         // (screenshot flush / broadcast) — keep id in persistedActionIds
       }
     }
+    })();
+    if (type === 'action_log_sync' || type === 'step_screenshot') {
+      runtime._persistDrain = Promise.resolve(runtime._persistDrain)
+        .catch(() => {})
+        .then(() => work)
+        .catch((err) => console.warn('[record] persist drain failed:', err?.message || err));
+    }
+    return work;
   });
 
   // Enable per-step before/after screenshots for this recording session
@@ -233,7 +244,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     recordingSystemId = null;
   }
 
-  const all_phases = phases.map((p) => ({
+  // Catalog for agent_task 【阶段目录】must list EVERY trajectory phase,
+  // not only the phaseIds subset being recorded this run.
+  const all_phases = allPhases.map((p) => ({
     id: p.id,
     phaseNumber: p.phaseNumber,
     title: (p.title || p.name || '').trim() || String(p.description || '').split('\n')[0].slice(0, 80),
@@ -366,7 +379,24 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       };
       runtime.phaseOutcomes[phase.id] = phaseOutcome;
       runtime.phaseOutcomes[phase.phaseNumber] = phaseOutcome;
+      const rawDoneText = String(donePayload?.text || '').trim();
+      if (rawDoneText) {
+        await appendPhaseDoneLog(phase.id, { text: rawDoneText, source: 'agent' });
+      }
       await trajectoryPhaseDao.updateStatus(phase.id, 'completed');
+      await notifyBatchProgressForTrajectory(tid);
+      await Promise.resolve(runtime._persistDrain).catch(() => {});
+      try {
+        const { capturePhaseHighlightScreenshot } = await import('./phase-highlight-screenshot.js');
+        await capturePhaseHighlightScreenshot({
+          trajectoryId: tid,
+          phaseId: phase.id,
+          sessionId: runtime.sessionId,
+          executorNodeUuid: runtime.executorNodeUuid,
+        });
+      } catch (err) {
+        console.warn('[record] phase highlight screenshot skipped:', err?.message || err);
+      }
       events.push({ type: 'phase_done', phaseNumber: phase.phaseNumber, description: phase.description });
     }
 
@@ -382,6 +412,11 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       isDone: false,
       isSuccessful: false,
     });
+    const failText = String(err?.message || err || '').trim();
+    if (failText && session?.activePhaseId) {
+      await appendPhaseDoneLog(session.activePhaseId, { text: failText, source: 'fail' });
+    }
+    await notifyBatchProgressForTrajectory(tid);
     throw err;
   } finally {
     if (session) {

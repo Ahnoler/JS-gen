@@ -18,14 +18,27 @@ import { GROUP_MEMORY } from './groups/memory.js';
 import { GROUP_REMOTE } from './groups/remote.js';
 import { GROUP_WEBSOCKET } from './groups/websocket.js';
 import { GROUP_EXPORT } from './groups/export-mgmt.js';
+import { GROUP_REGIONS } from './groups/regions.js';
+
+/** Live slot occupancy board (not an HTTP endpoint group). */
+export const GROUP_SLOT_MONITOR = [{
+  id: 'slot-monitor',
+  name: '执行机监视',
+  description: '按执行机拆分槽位占用；断开画面 / 释放浏览器',
+  endpoints: [],
+  monitor: true,
+}];
 
 /** @type {TagGroup[]} */
 export const API_GROUPS = [
-  ...GROUP_OVERVIEW,
+  GROUP_OVERVIEW[0], // 概览
+  ...GROUP_SLOT_MONITOR,
+  ...GROUP_OVERVIEW.slice(1), // 系统管理 …
   ...GROUP_HIERARCHY,
   ...GROUP_COMPONENTS,
   ...GROUP_TRAJECTORY,
   ...GROUP_RECORDING,
+  ...GROUP_REGIONS,
   ...GROUP_MEMORY,
   ...GROUP_REMOTE,
   ...GROUP_WEBSOCKET,
@@ -42,7 +55,7 @@ export const ENUMS = [
   { name: '节点 type', values: '1 系统 / 2 模块 / 3 功能' },
   { name: 'legacy-engine type', values: 'click / input / select:click / select:tree / radio / date（仅当前可录制动作）' },
   { name: 'legacy-engine locateBy', values: 'xpath（默认）' },
-  { name: 'isExport', values: '0（未导出或有变更）/ 1（最近一次全量 partner transaction 导出成功）' },
+  { name: 'isExport', values: '0（未推送/有变更）/ 1（最近一次成功推送到自动化平台）' },
 ];
 
 export const RECORDING_FLOW = [

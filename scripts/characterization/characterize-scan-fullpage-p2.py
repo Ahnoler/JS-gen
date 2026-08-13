@@ -26,8 +26,13 @@ def test_is_chrome_menu_label() -> None:
     assert_true(is_chrome_menu_label("关闭当前页签") is True, "关闭+页签")
     assert_true(is_chrome_menu_label("关闭其他页签") is True, "关闭+页签")
     assert_true(is_chrome_menu_label("关闭非固定页签") is True, "关页签")
+    # P2-noise+: portal uses 标签 as synonym of 页签
+    assert_true(is_chrome_menu_label("关闭所有标签(含固定)") is True, "关闭+标签")
+    assert_true(is_chrome_menu_label("关闭其他标签") is True, "关闭+标签")
+    assert_true(is_chrome_menu_label("固定标签") is True, "固定+标签")
     assert_true(is_chrome_menu_label("客户管理") is False, "business nav")
     assert_true(is_chrome_menu_label("新增") is False, "toolbar")
+    assert_true(is_chrome_menu_label("标签页名称") is False, "business 标签 without close/fix")
     assert_true(is_chrome_menu_label("") is False, "empty")
 
 
@@ -41,6 +46,12 @@ def test_summary_skips_chrome_projected_buttons() -> None:
                 "kind": "menu_item",
                 "xpath_smart": "//a[1]",
                 "region_role": "shell-aside",
+            },
+            {
+                "label": "关闭所有标签(含固定)",
+                "kind": "menu_item",
+                "xpath_smart": "//a[1b]",
+                "region_role": "shell-header",
             },
             {
                 "label": "客户管理",
@@ -61,6 +72,7 @@ def test_summary_skips_chrome_projected_buttons() -> None:
     summary = build_editable_summary([scan], primary_container="main")
     texts = [b["text"] for b in summary["buttons"]]
     assert_true("水平布局" not in texts, "chrome excluded from buttons")
+    assert_true("关闭所有标签(含固定)" not in texts, "标签 chrome excluded")
     assert_true("客户管理" in texts, "business menu kept")
     assert_true("新增" in texts, "named icon kept")
 
@@ -69,6 +81,7 @@ def test_js_noise_gate_cues() -> None:
     src = SCAN_FORM.read_text(encoding="utf-8")
     assert_true("CHROME_NOISE_FILTER" in src or "isChromeNoise" in src, "JS noise gate marker")
     assert_true("布局" in src or "主题" in src, "JS label seed present")
+    assert_true("页签" in src and "标签" in src, "JS 页签/标签 synonym seed")
     assert_true(
         "isChromeNoise(el, 'menu_item', label)" in src,
         "menu_item collector calls isChromeNoise before pushField",

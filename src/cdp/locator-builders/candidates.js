@@ -69,22 +69,29 @@ export function enrichLocatorFields(meta = {}) {
 
   let xpathSmart = String(meta.xpath_smart || '').trim();
   if (!xpathSmart) {
-    xpathSmart = buildXPathSmart({
-      tag,
-      text,
-      formLabel,
-      xpathFull: abs || xpathFull,
-      className,
-      container,
-      targetKind,
-      rowText: meta.rowText || meta.row_text || '',
-      buttonText: meta.buttonText || meta.button_text || '',
-      optionText: meta.optionText || meta.option_text || '',
-      tabName: meta.tabName || meta.tab_name || '',
-      menuText: meta.menuText || meta.menu_text || '',
-      attributes,
-      occurrence,
-    });
+    // Prefer an already-captured relative xpath (e.g. titlebox-anchored) over
+    // inventing a bare leaf from button/label text — clients that only send
+    // `xpath` would otherwise lose section uniqueness on prepareElementJson.
+    if (existing.startsWith('//')) {
+      xpathSmart = existing;
+    } else {
+      xpathSmart = buildXPathSmart({
+        tag,
+        text,
+        formLabel,
+        xpathFull: abs || xpathFull,
+        className,
+        container,
+        targetKind,
+        rowText: meta.rowText || meta.row_text || '',
+        buttonText: meta.buttonText || meta.button_text || '',
+        optionText: meta.optionText || meta.option_text || '',
+        tabName: meta.tabName || meta.tab_name || '',
+        menuText: meta.menuText || meta.menu_text || '',
+        attributes,
+        occurrence,
+      });
+    }
   }
 
   // Only DOM-evaluated snaps may claim verified uniqueness.

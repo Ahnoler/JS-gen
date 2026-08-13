@@ -212,6 +212,7 @@ def _record_action(action_name, params, result, element=None, source=None):
     """Record a controller action call using ActionEntry model."""
     global _TRAJECTORY_URL
     params_dict = dict(params) if params else {}
+    params_dict.pop("xpath_smart", None)
     resolved_source = source or _CURRENT_SOURCE or 'agent'
 
     entry = ActionEntry.from_record(

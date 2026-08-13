@@ -6,7 +6,7 @@ import { broadcastBinary } from '../../ws-server.js';
 import * as remoteSessionService from '../../services/remote-session-service.js';
 import {
   bridge, MAGIC, MIN_FORWARD_MS, STALL_RESTART_MS, SESSION_VIEWPORT,
-  STREAM_MAX_W, STREAM_MAX_H,
+  STREAM_MAX_W, STREAM_MAX_H, resolveScreencastTiming,
 } from './state.js';
 
 /**
@@ -126,6 +126,9 @@ export async function restartScreencast() {
 
 export async function startScreencast() {
   if (!bridge.client) return;
+  const timing = resolveScreencastTiming();
+  bridge.minForwardMs = timing.minForwardMs;
+  bridge.everyNthFrame = timing.everyNthFrame;
   // Encode at current viewport; never upscale beyond STREAM_MAX_* (do not floor to 1080p).
   const maxW = Math.min(Math.max(320, Number(bridge.viewport.w) || SESSION_VIEWPORT.w), STREAM_MAX_W);
   const maxH = Math.min(Math.max(240, Number(bridge.viewport.h) || SESSION_VIEWPORT.h), STREAM_MAX_H);
@@ -134,7 +137,7 @@ export async function startScreencast() {
     quality: bridge.quality,
     maxWidth: maxW,
     maxHeight: maxH,
-    everyNthFrame: 1,
+    everyNthFrame: timing.everyNthFrame,
   });
   bridge.screencastOn = true;
   bridge.lastFrameAt = Date.now();
@@ -154,7 +157,8 @@ export function onScreencastFrame(params) {
   if (!dataB64) return;
 
   const now = Date.now();
-  if (now - bridge.lastForwardAt < MIN_FORWARD_MS) return;
+  const minForward = bridge.minForwardMs ?? MIN_FORWARD_MS;
+  if (now - bridge.lastForwardAt < minForward) return;
   bridge.lastForwardAt = now;
 
   const metadata = params.metadata || {};

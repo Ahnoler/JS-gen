@@ -16,6 +16,7 @@
 import { normalizeElementJson } from '../models/helpers.js';
 import { PAGE_LOCATOR_HELPERS, enrichLocatorFields } from './locator-candidates.js';
 import { normalizeActionName } from '../models/action-name.js';
+import { displayGroupOf, uniquifyDisplayGroups } from './display-group.js';
 
 /**
  * Sanitize preview (never expose form values / secrets).
@@ -38,6 +39,7 @@ function toPreview(el) {
     region_role: el?.region_role || '',
     region_id: el?.region_id || '',
     region_label: el?.region_label || '',
+    display_group: displayGroupOf(el),
   };
 }
 
@@ -49,14 +51,17 @@ export function buildResolveExpression({
   labelText = '',
   actionType = '',
   params = {},
+  mode = 'needle',
 } = {}) {
   const labelJs = JSON.stringify(String(labelText || '').trim());
   const actionJs = JSON.stringify(String(actionType || '').trim());
   const paramsJs = JSON.stringify(params && typeof params === 'object' ? params : {});
+  const modeJs = JSON.stringify(String(mode || 'needle').trim() || 'needle');
   return `(() => {
     const want = ${labelJs};
     const actionType = ${actionJs};
     const params = ${paramsJs};
+    const mode = ${modeJs};
 
 ${PAGE_LOCATOR_HELPERS}
 
@@ -92,11 +97,14 @@ ${PAGE_LOCATOR_HELPERS}
       ].filter(Boolean);
       return candidates[0] || item;
     }
-    function snap(el, matchedLabel, asFormField, kindHint) {
+    function snap(el, matchedLabel, asFormField, kindHint, regionOverride) {
       const abs = xpathOf(el);
       const rawText = cleanVisibleText(el);
       const formLabel = asFormField ? matchedLabel : '';
-      const loc = buildLocatorSnap(el, rawText, abs, formLabel, { targetKind: kindHint || undefined });
+      const loc = buildLocatorSnap(el, rawText, abs, formLabel, {
+        targetKind: kindHint || undefined,
+        region: regionOverride || undefined,
+      });
       return {
         matchedLabel,
         formLabel: formLabel || loc.formLabel || '',
@@ -119,6 +127,7 @@ ${PAGE_LOCATOR_HELPERS}
         region_role: loc.region_role || '',
         region_id: loc.region_id || '',
         region_label: loc.region_label || '',
+        feature_card: loc.feature_card || undefined,
       };
     }
     function textExact(a, b) {
@@ -147,6 +156,77 @@ ${PAGE_LOCATOR_HELPERS}
       const abs = absXPath(root);
       if (out.some((x) => x.xpath_abs === abs)) return;
       out.push(snap(root, matchedLabel || needle, asForm, kind));
+    }
+    function kindForClickable(el) {
+      return (el.closest && el.closest('.el-tree-node__content'))
+        ? 'tree_node'
+        : (el.closest && el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, [role="menuitem"]'))
+          ? 'menu'
+          : 'button';
+    }
+    /* COLLISION_REFINE */
+    function pushHostsRefined(hostList, matchedLabel, asForm, kind) {
+      const items = [];
+      const seenAbs = {};
+      for (let i = 0; i < hostList.length; i++) {
+        const host = hostList[i];
+        if (!host || !isVisible(host)) continue;
+        const root = normalizeTargetRoot(host) || host;
+        const abs = absXPath(root);
+        if (seenAbs[abs]) continue;
+        seenAbs[abs] = true;
+        items.push({ el: root, region: assignRegion(root) });
+      }
+      refineCollidingRegions(items, matchedLabel || needle);
+      for (let j = 0; j < items.length; j++) {
+        const it = items[j];
+        if (out.some((x) => x.xpath_abs === absXPath(it.el))) continue;
+        out.push(snap(it.el, matchedLabel || needle, asForm, kind || kindForClickable(it.el), it.region));
+      }
+    }
+
+    if (mode === 'inventory') {
+      var inv = collectInventoryHosts();
+      inv = filterInventoryByKind(inv, action);
+      inv = filterInventoryByText(inv, needle);
+      var truncated = false;
+      if (inv.length > INVENTORY_CAP) {
+        truncated = true;
+        inv = inv.slice(0, INVENTORY_CAP);
+      }
+      var invGroups = {};
+      for (var ii = 0; ii < inv.length; ii++) {
+        var it0 = inv[ii];
+        var gk = it0.text || '';
+        if (!invGroups[gk]) invGroups[gk] = [];
+        invGroups[gk].push(it0);
+      }
+      var gkeys = Object.keys(invGroups);
+      for (var gi = 0; gi < gkeys.length; gi++) {
+        var gkey = gkeys[gi];
+        var gitems = invGroups[gkey];
+        var refineItems = [];
+        var seenInvAbs = {};
+        for (var jj = 0; jj < gitems.length; jj++) {
+          var hit = gitems[jj];
+          var host = hit.el;
+          if (!host || !isVisible(host)) continue;
+          var root = normalizeTargetRoot(host) || host;
+          var abs0 = absXPath(root);
+          if (seenInvAbs[abs0]) continue;
+          seenInvAbs[abs0] = true;
+          refineItems.push({ el: root, region: assignRegion(root), kind: hit.kind, text: hit.text });
+        }
+        refineCollidingRegions(refineItems, gkey);
+        for (var kk = 0; kk < refineItems.length; kk++) {
+          var rit = refineItems[kk];
+          var asForm = rit.kind.indexOf('form_') === 0;
+          var abs1 = absXPath(rit.el);
+          if (out.some(function (x) { return x.xpath_abs === abs1; })) continue;
+          out.push(snap(rit.el, rit.text, asForm, rit.kind, rit.region));
+        }
+      }
+      return { matches: out, truncated: truncated };
     }
 
     // Close controls
@@ -222,7 +302,7 @@ ${PAGE_LOCATOR_HELPERS}
       const name = String(params.menu_text || params.text || needle || '').trim();
       const nodes = document.querySelectorAll(
         '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"], aside li, nav li, ' +
-        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content'
+        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content, .todo-item-action'
       );
       const exact = [];
       const fuzzy = [];
@@ -236,13 +316,13 @@ ${PAGE_LOCATOR_HELPERS}
           fuzzy.push(el);
         }
       }
-      for (const el of (exact.length ? exact : fuzzy)) {
-        const kind = (el.closest && el.closest('.el-tree-node__content'))
-          ? 'tree_node'
-          : (el.closest && el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, [role="menuitem"]'))
-            ? 'menu'
-            : 'button';
-        pushUnique(el, name, false, kind);
+      const matched = exact.length ? exact : fuzzy;
+      const hostList = [];
+      for (const el of matched) hostList.push(el);
+      if (hostList.length >= 2) {
+        pushHostsRefined(hostList, name, false, null);
+      } else if (hostList.length === 1) {
+        pushUnique(hostList[0], name, false, kindForClickable(hostList[0]));
       }
       if (!out.length && exact.length) {
         for (const el of exact) {
@@ -278,7 +358,14 @@ ${PAGE_LOCATOR_HELPERS}
           fuzzy.push(el);
         }
       }
-      for (const el of (exact.length ? exact : fuzzy)) pushUnique(el, name, false, 'menu');
+      const matched = exact.length ? exact : fuzzy;
+      const hostList = [];
+      for (const el of matched) hostList.push(el);
+      if (hostList.length >= 2) {
+        pushHostsRefined(hostList, name, false, 'menu');
+      } else if (hostList.length === 1) {
+        pushUnique(hostList[0], name, false, 'menu');
+      }
       // pushUnique skips invisible — for exact submenu hits, force snap even if collapsed
       if (!out.length && exact.length) {
         for (const el of exact) {
@@ -375,7 +462,7 @@ ${PAGE_LOCATOR_HELPERS}
     if (needle) {
       const clickables = Array.from(document.querySelectorAll(
         '.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, .el-dropdown-menu__item, [role="menuitem"], aside li, nav li, ' +
-        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content'
+        '.el-dialog__footer button, .el-dialog__footer .el-button, .el-message-box__btns button, button.el-button, .el-button, button, a, .el-tree-node__content, .todo-item-action'
       ));
       const exact = [];
       const fuzzy = [];
@@ -386,13 +473,13 @@ ${PAGE_LOCATOR_HELPERS}
         if (textExact(t, needle)) exact.push(el);
         else if (textFuzzy(t, needle)) fuzzy.push(el);
       }
-      for (const el of (exact.length ? exact : fuzzy)) {
-        const kind = el.closest && el.closest('.el-tree-node__content')
-          ? 'tree_node'
-          : (el.closest && el.closest('.menu-item, .submenu-item, .el-menu-item, .el-submenu__title, [role="menuitem"]'))
-            ? 'menu'
-            : 'button';
-        pushUnique(el, needle, false, kind);
+      const matched = exact.length ? exact : fuzzy;
+      const hostList = [];
+      for (const el of matched) hostList.push(el);
+      if (hostList.length >= 2) {
+        pushHostsRefined(hostList, needle, false, null);
+      } else if (hostList.length === 1) {
+        pushUnique(hostList[0], needle, false, kindForClickable(hostList[0]));
       }
     }
 
@@ -402,15 +489,16 @@ ${PAGE_LOCATOR_HELPERS}
 
 /**
  * @param {import('./client.js').CdpClient} client
- * @param {{ labelText?: string, actionType?: string, params?: object }} opts
- * @returns {Promise<{ element?: object, matchedLabel?: string, ambiguous?: boolean, matches?: object[] }>}
+ * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string }} opts
+ * @returns {Promise<{ element?: object, matchedLabel?: string, ambiguous?: boolean, matches?: object[], truncated?: boolean }>}
  */
 export async function resolveElementByLabel(client, opts = {}) {
+  const mode = String(opts.mode || 'needle').trim() || 'needle';
   const labelText = String(opts.labelText || opts.label_text || '').trim();
   const actionType = normalizeActionName(opts.actionType || opts.action || '');
   const params = opts.params && typeof opts.params === 'object' ? opts.params : {};
 
-  if (!labelText && !actionType && !Object.keys(params).length) {
+  if (mode !== 'inventory' && !labelText && !actionType && !Object.keys(params).length) {
     const err = new Error('labelText or actionType/params is required');
     err.statusCode = 400;
     throw err;
@@ -422,12 +510,23 @@ export async function resolveElementByLabel(client, opts = {}) {
   }
 
   const result = await client.send('Runtime.evaluate', {
-    expression: buildResolveExpression({ labelText, actionType, params }),
+    expression: buildResolveExpression({ labelText, actionType, params, mode }),
     returnByValue: true,
     awaitPromise: false,
   });
   const value = result?.result?.value;
-  const list = Array.isArray(value) ? value : (value && typeof value === 'object' ? [value] : []);
+  let list;
+  let pageTruncated = false;
+  if (Array.isArray(value)) {
+    list = value;
+  } else if (value && typeof value === 'object' && Array.isArray(value.matches)) {
+    list = value.matches;
+    pageTruncated = value.truncated === true;
+  } else if (value && typeof value === 'object') {
+    list = [value];
+  } else {
+    list = [];
+  }
 
   if (!list.length) {
     const hint = labelText || params.menu_text || params.tab_name || params.button_text || actionType || 'target';
@@ -474,14 +573,32 @@ export async function resolveElementByLabel(client, opts = {}) {
       enriched.locator_strategy = 'xpath_smart';
       enriched.xpath = enriched.xpath_smart;
     }
+    const featureCard = raw.feature_card && typeof raw.feature_card === 'object'
+      ? raw.feature_card
+      : undefined;
+    const displayGroup = displayGroupOf(enriched);
+    const element = normalizeElementJson(enriched);
+    if (displayGroup) element.display_group = displayGroup;
+    if (featureCard) element.feature_card = featureCard;
+    const preview = toPreview(enriched);
+    if (featureCard) preview.feature_card = featureCard;
     return {
       matchedLabel: String(raw.matchedLabel || labelText || ''),
-      element: normalizeElementJson(enriched),
-      preview: toPreview(enriched),
+      element,
+      preview,
     };
   }
 
-  const matches = list.map(enrichOne);
+  const matches = uniquifyDisplayGroups(list.map(enrichOne));
+  const truncated = pageTruncated;
+  const forceAmbiguous = mode === 'inventory' && !labelText && matches.length >= 1;
+  if (forceAmbiguous) {
+    return {
+      ambiguous: true,
+      matches,
+      ...(truncated ? { truncated: true } : {}),
+    };
+  }
   if (matches.length === 1) {
     return {
       element: matches[0].element,
@@ -491,5 +608,6 @@ export async function resolveElementByLabel(client, opts = {}) {
   return {
     ambiguous: true,
     matches,
+    ...(truncated ? { truncated: true } : {}),
   };
 }

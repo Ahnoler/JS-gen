@@ -81,7 +81,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
             form_path = forms_dir / f"form_{ts}.json"
             with open(form_path, 'w', encoding='utf-8') as f:
                 json.dump(snapshots, f, ensure_ascii=False, indent=2)
-            sys.stderr.write(f"[session] Form snapshots saved: {form_path}\n")
+            sys.stderr.write(f"Form snapshots saved: {form_path}\n")
             sys.stderr.flush()
 
         # File 1: action_{ts}.json
@@ -134,7 +134,7 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
         })
         _fcounts = [s.get('count', 0) for s in snapshots] if snapshots else []
         _fstr = ', '.join(str(c) for c in _fcounts) if _fcounts else '0'
-        sys.stderr.write(f"[session] Saved: action({action_count}) log({log_count}) form({_fstr})\n")
+        sys.stderr.write(f"Saved: action({action_count}) log({log_count}) form({_fstr})\n")
         sys.stderr.flush()
     except Exception as e:
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
@@ -150,7 +150,7 @@ def _handle_save_case_data(case_data_store, session_id):
         import json as _json
         with open(case_data_path, 'w', encoding='utf-8') as f:
             _json.dump(case_data_store, f, ensure_ascii=False, indent=2)
-        sys.stderr.write(f"[session] Case data saved on demand: {case_data_path}\n")
+        sys.stderr.write(f"Case data saved on demand: {case_data_path}\n")
         sys.stderr.flush()
         emit_json({
             "event": "save_case_data_result",
@@ -173,7 +173,7 @@ def _handle_reset_trajectory(session_id, case_data_store=None):
     _emit_action_log_sync()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     cumulative_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_case_{ts}.json"
-    sys.stderr.write(f"[session] ATP trajectory reset ({ts})\n")
+    sys.stderr.write(f"ATP trajectory reset ({ts})\n")
     sys.stderr.flush()
     emit_json({"event": "reset_trajectory_ready",
                "data": {"session_id": session_id, "format": "atp-record", "cumulative_file": str(cumulative_path)}})
@@ -205,8 +205,8 @@ def _accumulate_trajectory(output_path, cumulative_path, phase_number=None):
         with open(cumulative_path, 'w', encoding='utf-8') as _f:
             json.dump(_cum, _f, ensure_ascii=False, indent=2)
         sys.stderr.write(
-            f"[session] Accumulated: step({len(_step_history)}) action({len(_action_log)}) log({len(_recorder_log)}) trajectory({len(_cum['history'])} total)\n")
+            f"Accumulated: step({len(_step_history)}) action({len(_action_log)}) log({len(_recorder_log)}) trajectory({len(_cum['history'])} total)\n")
         sys.stderr.flush()
     except Exception as _e:
-        sys.stderr.write(f"[session] Accumulate error: {_e}\n")
+        sys.stderr.write(f"Accumulate error: {_e}\n")
         sys.stderr.flush()

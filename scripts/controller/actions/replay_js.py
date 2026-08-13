@@ -147,8 +147,16 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
     }
   };
   const clickLastVisibleXpath = (xp, how, root) => {
-    const nodes = evalXpathAll(xp, root).filter(isVisible);
+    let nodes = evalXpathAll(xp, root).filter(isVisible);
     if (!nodes.length) return null;
+    // Guard false ok-xpath-smart: recorded xpath may point at an ancestor
+    // (e.g. el-checkbox-group[aria-label=checkbox-group] wrapping 待办 cards)
+    // whose descendant text includes want but is not the control.
+    if (want) {
+      const exact = nodes.filter((el) => norm(el.innerText || el.textContent) === want);
+      if (!exact.length) return null;
+      nodes = exact;
+    }
     return clickEl(nodes[nodes.length - 1], how);
   };
   const clickSmartXpath = (xp, how) => {
@@ -291,6 +299,24 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
     if (exactCustom.length) return clickEl(exactCustom[exactCustom.length - 1], 'ok-menu-item-custom');
   }
 
+  // 1a2) Todo / workflow card actions (待办「处理」= div.todo-item-action, not button)
+  if (want) {
+    const actions = [...document.querySelectorAll('.todo-item-action')].filter(isVisible)
+      .filter((el) => norm(el.innerText || el.textContent) === want);
+    if (actions.length) {
+      const pb = stripVolatile(parentText || '');
+      if (pb) {
+        const scoped = actions.filter((el) => {
+          const card = el.closest('.todo-item');
+          const blob = stripVolatile(card && (card.innerText || card.textContent));
+          return blob && (blob.includes(pb) || pb.includes(blob.slice(0, pb.length)));
+        });
+        if (scoped.length) return clickEl(scoped[scoped.length - 1], 'ok-todo-action-scoped');
+      }
+      return clickEl(actions[actions.length - 1], 'ok-todo-action');
+    }
+  }
+
   // 1b) Element UI menu
   if (want) {
     const menuItems = [...document.querySelectorAll('.el-menu-item')];
@@ -355,7 +381,7 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
       if (hits.length) return clickEl(hits[hits.length - 1], how);
     }
 
-    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item, li.menu-item, .menu-item, .el-tree-node__content, .plugin-nav-list, .plugin-nav-outer, .nav-content';
+    const sel = 'button, a, .el-button, .el-menu-item, .el-submenu__title, [role="menuitem"], .el-tabs__item, li.menu-item, .menu-item, .el-tree-node__content, .plugin-nav-list, .plugin-nav-outer, .nav-content, .todo-item-action';
     const candidates = [...document.querySelectorAll(sel)].filter(isVisible);
     const exact = candidates.filter(el => norm(el.innerText || el.textContent) === want);
     if (exact.length) return clickEl(exact[exact.length - 1], 'ok-text-exact');
@@ -384,7 +410,7 @@ _JS_CLICK_DURABLE = r'''async ([text, xpath, tagHint, xpathSmart, opts]) => {
 
 
 
-_JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
+_JS_READ_VALUE_BY_XPATH = r'''([xpath, labelHint]) => {
   if (!xpath) return '';
   const isVis = (el) => {
     if (!el || el.nodeType !== 1) return false;
@@ -392,17 +418,40 @@ _JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
     const st = getComputedStyle(el);
     return st.display !== 'none' && st.visibility !== 'hidden';
   };
-  const findNode = (xp, root) => {
+  // LABEL_HINT_DISAMBIG (exact > includes): prefix labels must not read siblings.
+  const normFormLab = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+    .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+  const formItemLabel = (el) => {
+    const item = el && el.closest && el.closest('.el-form-item');
+    if (!item) return '';
+    const lbl = item.querySelector('.el-form-item__label, label');
+    return String((lbl && lbl.textContent) || '').replace(/\s+/g, ' ').trim();
+  };
+  const findNode = (xp, root, hint) => {
     try {
       let s = String(xp || '');
       if (!s) return null;
       const ctx = root || document;
       if (root && s.startsWith('//')) s = '.' + s;
       const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      const wantN = normFormLab(hint);
+      let fallback = null;
+      let exactMatch = null;
+      let includesMatch = null;
       for (let i = snap.snapshotLength - 1; i >= 0; i--) {
         const n = snap.snapshotItem(i);
-        if (n && isVis(n)) return n;
+        if (!n || !isVis(n)) continue;
+        if (!fallback) fallback = n;
+        if (wantN) {
+          const labN = normFormLab(formItemLabel(n));
+          if (labN === wantN) {
+            exactMatch = n;
+            break;
+          }
+          if (!includesMatch && labN && labN.includes(wantN)) includesMatch = n;
+        }
       }
+      return exactMatch || includesMatch || fallback;
     } catch (e) { /* ignore */ }
     return null;
   };
@@ -434,7 +483,8 @@ _JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
     }
     return '';
   };
-  const node = findNode(xpath, null);
+  const hint = labelHint == null ? '' : String(labelHint);
+  const node = findNode(xpath, null, hint);
   if (node) return readControl(node);
   if (/el-dialog|el-message-box|el-drawer/.test(xpath) && /\[last\(\)\]/.test(xpath)) {
     const wrapVisible = (d) => {
@@ -455,7 +505,7 @@ _JS_READ_VALUE_BY_XPATH = r'''([xpath]) => {
     const local = m && m[1] ? m[1] : '';
     const dlg = /el-drawer/.test(xpath) ? lastVisibleHost(true) : lastVisibleHost(false);
     if (dlg && local) {
-      const scoped = findNode('.//' + local, dlg);
+      const scoped = findNode('.//' + local, dlg, hint);
       if (scoped) return readControl(scoped);
     }
   }

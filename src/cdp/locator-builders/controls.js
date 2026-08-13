@@ -48,7 +48,7 @@ export function buildStableAttrXPathSmart({
 
 /**
  * Relative xpath for an Element UI form control by its label.
- * @param {{ label?: string, tag?: string, className?: string, xpathFull?: string, container?: string, occurrence?: number }} opts
+ * @param {{ label?: string, tag?: string, className?: string, xpathFull?: string, container?: string, occurrence?: number, targetKind?: string }} opts
  */
 export function buildFormFieldXPathSmart({
   label = '',
@@ -57,31 +57,65 @@ export function buildFormFieldXPathSmart({
   xpathFull = '',
   container = '',
   occurrence = 0,
+  targetKind = '',
 } = {}) {
   const lbl = normalizeFormLabel(label);
   if (!lbl) return '';
 
   const lit = xpathLiteral(lbl);
+  // Exact label (+ * / colon suffixes). Avoid contains() prefix collisions.
   const itemPred =
     `div[contains(@class,'el-form-item')]`
-    + `[.//label[contains(normalize-space(.),${lit})]]`;
+    + `[.//label[`
+    + `normalize-space(.)=${lit}`
+    + ` or normalize-space(.)=concat(${lit}, ':')`
+    + ` or normalize-space(.)=concat(${lit}, '：')`
+    + ` or normalize-space(.)=concat(${lit}, '*')`
+    + ` or normalize-space(.)=concat('*', ${lit})`
+    + ` or normalize-space(.)=concat('*', ${lit}, ':')`
+    + ` or normalize-space(.)=concat('*', ${lit}, '：')`
+    + `]]`;
 
   const tagL = String(tag || '').toLowerCase();
   const cls = String(className || '');
   const full = String(xpathFull || '');
+  const tk = String(targetKind || '').trim();
   let leaf = 'input';
   if (tagL === 'textarea' || /el-textarea/i.test(cls) || /textarea/i.test(full)) {
     leaf = 'textarea';
-  } else if (/el-select/i.test(cls) || /el-select/i.test(full) || (tagL === 'div' && /el-select/i.test(cls))) {
+  } else if (
+    tk === 'form_select'
+    || /el-select/i.test(cls)
+    || /el-select/i.test(full)
+    || (tagL === 'div' && /el-select/i.test(cls))
+  ) {
     leaf = "div[contains(@class,'el-select')]";
-  } else if (/el-date-editor|tsscdatepicker/i.test(cls) || /el-date-editor/i.test(full)) {
+  } else if (
+    tk === 'form_date'
+    || /el-date-editor|tsscdatepicker/i.test(cls)
+    || /el-date-editor/i.test(full)
+  ) {
     leaf = "div[contains(@class,'el-date-editor')]";
-  } else if (/el-radio-group/i.test(cls) || /el-radio-group/i.test(full)) {
+  } else if (
+    tk === 'form_radio'
+    || /el-radio-group/i.test(cls)
+    || /el-radio-group/i.test(full)
+  ) {
     leaf = "div[contains(@class,'el-radio-group')]";
-  } else if (/el-checkbox-group/i.test(cls) || /el-checkbox-group/i.test(full)) {
+  } else if (
+    tk === 'form_checkbox'
+    || /el-checkbox-group/i.test(cls)
+    || /el-checkbox-group/i.test(full)
+  ) {
     leaf = "div[contains(@class,'el-checkbox-group')]";
   } else if (/el-cascader/i.test(cls) || /el-cascader/i.test(full)) {
     leaf = "div[contains(@class,'el-cascader')]";
+  } else if (
+    tk === 'form_tree_select'
+    || /el-tree-select|tsscmultitree/i.test(cls)
+    || /el-tree-select|tsscmultitree/i.test(full)
+  ) {
+    leaf = "div[contains(@class,'el-tree-select') or contains(@class,'tsscmultitree')]";
   } else if (
     /el-tree-select|tsscmultitree|tsscTree|tree-popover|my-popover/i.test(cls)
     || /el-tree-select|tsscmultitree|tsscTree|tree-popover|my-popover/i.test(full)
@@ -275,9 +309,19 @@ export function buildAdjacentButtonXPathSmart({
   const btn = normalizeControlText(buttonText || text);
   if (!lbl) return '';
   const lit = xpathLiteral(lbl);
+  // Exact form label (same as buildFormFieldXPathSmart) — adjacent buttons sit
+  // under the same form-item; contains() would bind the wrong item for prefixes.
   const itemPred =
     `div[contains(@class,'el-form-item')]`
-    + `[.//label[contains(normalize-space(.),${lit})]]`;
+    + `[.//label[`
+    + `normalize-space(.)=${lit}`
+    + ` or normalize-space(.)=concat(${lit}, ':')`
+    + ` or normalize-space(.)=concat(${lit}, '：')`
+    + ` or normalize-space(.)=concat(${lit}, '*')`
+    + ` or normalize-space(.)=concat('*', ${lit})`
+    + ` or normalize-space(.)=concat('*', ${lit}, ':')`
+    + ` or normalize-space(.)=concat('*', ${lit}, '：')`
+    + `]]`;
   const kind = detectContainerKind(xpathFull, className, container);
   let leaf = `*[self::button or ${classTokenPred('el-button')}]`;
   if (btn) leaf += `[normalize-space()=${xpathLiteral(btn)}]`;

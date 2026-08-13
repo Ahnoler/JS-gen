@@ -8,15 +8,123 @@ import * as execSession from '../../executor-session-client.js';
 import { state } from '../../state.js';
 import { USE_EXECUTOR } from '../../../config/config.js';
 import * as remoteBridge from '../../cdp/remote-bridge.js';
-import {
-  buildLoginInstruction,
-  resolveTrajectoryAccount,
-} from '../trajectory-account-service.js';
 import { getTrajectoryTree } from '../trajectory-query-service.js';
 import {
   getTrajectoryRuntime,
   markConsumedActionLog,
 } from '../trajectory-runtime.js';
+import { classifyRegions } from '../region-classify.js';
+import { displayGroupOf, isTaxonomyRegionToken, uniquifyDisplayGroups } from '../../cdp/display-group.js';
+
+async function resolveSystemIdForTrajectory(tid) {
+  try {
+    const traj = await trajectoryDao.getById(tid);
+    if (!traj?.functionId) return '';
+    const { resolveAncestorSystemId } = await import('../hierarchy-service.js');
+    const systemId = await resolveAncestorSystemId(traj.functionId);
+    return systemId != null ? String(systemId) : '';
+  } catch (err) {
+    console.warn('[record] resolve systemId skipped:', err?.message || err);
+    return '';
+  }
+}
+
+function regionIdFromClassified(classified, existing = {}) {
+  const role = String(classified.role || 'other');
+  const prevId = String(existing.region_id || '');
+  if (role === 'overlay') {
+    const t = String(classified.title || classified.label || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (t) return `overlay:${t}`;
+    if (prevId.startsWith('overlay:')) return prevId;
+    return 'overlay';
+  }
+  if (role === 'section') {
+    const t = String(classified.title || classified.label || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (t) return `section:${t}`;
+    if (prevId.startsWith('section:')) return prevId;
+    return 'section';
+  }
+  return role;
+}
+
+function patchRegionFields(target, classified) {
+  if (!target || !classified) return;
+  const role = String(classified.role || target.region_role || 'other');
+  target.region_role = role;
+  const prevLabel = String(target.region_label || '').trim();
+  const prevId = String(target.region_id || '').trim();
+  let nextLabel = String(classified.label || '').trim();
+  // Coarse→refine contract: assignRegion / collision-refine labels win.
+  // L1c feature-card title often echoes outer collapse and would undo titlebox refine
+  // (e.g.「关联人信息」→「股东及关联人信息」). Only fill empty/taxonomy labels.
+  const keepPrevLabel = !!(prevLabel && !isTaxonomyRegionToken(prevLabel));
+  if (keepPrevLabel) {
+    nextLabel = prevLabel;
+  } else if (!nextLabel || isTaxonomyRegionToken(nextLabel)) {
+    nextLabel = prevLabel;
+  }
+  if (!nextLabel && !isTaxonomyRegionToken(role)) nextLabel = role;
+  target.region_label = nextLabel || prevLabel;
+  if (keepPrevLabel && prevId) {
+    // Preserve collision-refined region_id (section:<titlebox title>).
+    target.region_id = prevId;
+  } else {
+    target.region_id = regionIdFromClassified(classified, target);
+  }
+  if (classified.confidence != null) target.region_confidence = classified.confidence;
+  // Keep AG picker group key in sync when L1c rewrites region_* (show A == save A).
+  const group = displayGroupOf(target);
+  if (group) target.display_group = group;
+  else delete target.display_group;
+}
+
+function stripFeatureCard(target) {
+  if (target && typeof target === 'object' && 'feature_card' in target) {
+    delete target.feature_card;
+  }
+}
+
+async function applyL1cRegionClassify(payload, { systemId = '' } = {}) {
+  if (!payload || typeof payload !== 'object') return payload;
+  try {
+    const refs = [];
+    const cards = [];
+    if (payload.ambiguous && Array.isArray(payload.matches)) {
+      for (const match of payload.matches) {
+        const fc = match?.element?.feature_card || match?.preview?.feature_card;
+        if (fc && typeof fc === 'object') {
+          cards.push({ ...fc });
+          refs.push(match);
+        }
+      }
+    } else if (payload.element) {
+      const fc = payload.element.feature_card;
+      if (fc && typeof fc === 'object') {
+        cards.push({ ...fc });
+        refs.push({ element: payload.element, preview: null });
+      }
+    }
+    if (!cards.length) return payload;
+
+    const classified = await classifyRegions(cards, { systemId });
+    for (let i = 0; i < refs.length; i++) {
+      const c = classified[i];
+      if (!c) continue;
+      const ref = refs[i];
+      if (ref.element) patchRegionFields(ref.element, c);
+      if (ref.preview) patchRegionFields(ref.preview, c);
+      if (ref.element) stripFeatureCard(ref.element);
+      if (ref.preview) stripFeatureCard(ref.preview);
+    }
+    if (payload.ambiguous && Array.isArray(payload.matches)) {
+      uniquifyDisplayGroups(payload.matches);
+    }
+    return payload;
+  } catch (err) {
+    console.warn('[record] L1c region classify skipped:', err?.message || err);
+    return payload;
+  }
+}
 
 export { startTrajectoryRecording } from './trajectory-recording-runner.js';
 export { toggleTrajectoryManualRecord } from './trajectory-manual-record.js';
@@ -112,6 +220,7 @@ export async function prepareCaseDataInjection(trajectoryId) {
 
 /**
  * Default login/navigate — NOT written to trajectory_step (is_replay / suppress persist).
+ * Hardcoded go_to_url + login via replay_actions (no browser-use Agent).
  */
 export async function runDefaultLogin(runtime, account, system = null) {
   const session = state.sessions.get(runtime.sessionId);
@@ -123,21 +232,34 @@ export async function runDefaultLogin(runtime, account, system = null) {
     if (!sys?.url && account?.systemId) {
       sys = await systemDao.getById(Number(account.systemId));
     }
-    const instruction = buildLoginInstruction(account, sys || {});
-    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', 300000);
-    const errP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000)
-      .then((p) => Promise.reject(new Error(p?.message || 'login phase_error')));
+    const url = String(sys?.url || account?.loginUrl || '').trim();
+    const username = String(account?.username || '').trim();
+    const password = String(account?.password || '').trim();
+    if (!url) {
+      const err = new Error('System url is empty — set system.url (or legacy account.loginUrl)');
+      err.statusCode = 400;
+      throw err;
+    }
+    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 180000);
     execSession.forwardStdin({
       nodeUuid: runtime.executorNodeUuid,
       sessionId: runtime.sessionId,
-      event: 'step',
+      event: 'replay_actions',
       data: {
-        instruction,
-        max_steps: 10,
-        phase_number: 0,
+        actions: [
+          { action: 'go_to_url', params: { url } },
+          { action: 'login', params: { username, password } },
+        ],
+        is_replay: true,
+        stop_on_fail: true,
       },
     });
-    await Promise.race([doneP, errP]);
+    const result = await doneP;
+    const failed = Number(result?.failed || 0);
+    const okCount = Number(result?.ok || 0);
+    if (result?.error || failed > 0 || okCount < 2) {
+      throw new Error(result?.error || `login replay failed (ok=${okCount} failed=${failed})`);
+    }
     await markConsumedActionLog(runtime);
     runtime.loginDone = true;
     runtime.loginAccountId = Number(account.id);
@@ -295,12 +417,20 @@ export async function resolveTrajectoryElement(trajectoryId, {
   actionType,
   action,
   params,
+  mode,
 } = {}) {
   const tid = Number(trajectoryId);
   const label = String(labelText || '').trim();
   const act = String(actionType || action || '').trim();
-  const p = params && typeof params === 'object' ? params : {};
-  if (!label && !act && !Object.keys(p).length) {
+  const p = { ...(params && typeof params === 'object' ? params : {}) };
+  const resolveMode = String(mode || 'inventory').trim() || 'inventory';
+  // click_element_by_index often targets sidebar .menu-item; older resolve only
+  // searched menus when action=click_menu_item or params.menu_text — mirror text.
+  if (act === 'click_element_by_index') {
+    const t = String(p.text || label || '').trim();
+    if (t && !String(p.menu_text || '').trim()) p.menu_text = t;
+  }
+  if (resolveMode !== 'inventory' && !label && !act && !Object.keys(p).length) {
     const err = new Error('labelText or actionType/params is required');
     err.statusCode = 400;
     throw err;
@@ -311,6 +441,7 @@ export async function resolveTrajectoryElement(trajectoryId, {
     err.statusCode = 400;
     throw err;
   }
+  const systemId = await resolveSystemIdForTrajectory(tid);
 
   if (USE_EXECUTOR) {
     if (!runtime.executorNodeUuid) {
@@ -329,6 +460,7 @@ export async function resolveTrajectoryElement(trajectoryId, {
       labelText: label,
       actionType: act,
       params: p,
+      mode: resolveMode,
       requestId,
     });
     const payload = await resultP;
@@ -339,39 +471,42 @@ export async function resolveTrajectoryElement(trajectoryId, {
       throw err;
     }
     if (payload?.ambiguous && Array.isArray(payload.matches)) {
-      return {
+      return applyL1cRegionClassify({
         trajectoryId: tid,
         ambiguous: true,
         matches: payload.matches,
-      };
+        ...(payload.truncated ? { truncated: true } : {}),
+      }, { systemId });
     }
     if (!payload?.element) {
       const err = new Error(`No form field found for label: ${label || act}`);
       err.statusCode = 404;
       throw err;
     }
-    return {
+    return applyL1cRegionClassify({
       trajectoryId: tid,
       matchedLabel: payload.matchedLabel || label,
       element: payload.element,
-    };
+    }, { systemId });
   }
 
   const resolved = await remoteBridge.resolveElementByLabelText(label, {
     actionType: act,
     params: p,
+    mode: resolveMode,
   });
   if (resolved?.ambiguous) {
-    return {
+    return applyL1cRegionClassify({
       trajectoryId: tid,
       ambiguous: true,
       matches: resolved.matches,
-    };
+      ...(resolved.truncated ? { truncated: true } : {}),
+    }, { systemId });
   }
-  return {
+  return applyL1cRegionClassify({
     trajectoryId: tid,
     matchedLabel: resolved.matchedLabel,
     element: resolved.element,
-  };
+  }, { systemId });
 }
 

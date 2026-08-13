@@ -14,10 +14,52 @@ from ._js_snippets import (
     JS_CHECK_LOADING, JS_WAIT_LOADING,
     JS_ENRICH_CLICK_LOCATOR,
     JS_READ_SELECT_OPTIONS,
+    JS_RESET_SELECT_UI,
 )
 from ...models import ScannedField
 
 _SELECT_OPTION_PLACEHOLDERS = frozenset({'请选择', '请选择…', '请选择...', ''})
+
+
+def _as_dict(raw):
+    """Parse a page.evaluate result that may arrive as a JSON string.
+
+    Shared by the ~15 call sites that repeat
+    ``json.loads(raw) if isinstance(raw, str) else raw``.
+    """
+    return json.loads(raw) if isinstance(raw, str) else raw
+
+
+def is_weak_xpath_smart(xp: str) -> bool:
+    s = (xp or "").strip()
+    if not s:
+        return True
+    if "el-form-item" in s and "label" in s:
+        return False
+    if "placeholder" in s.lower() and "el-form-item" not in s:
+        return True
+    if re.fullmatch(r"//input(\[@placeholder=[^\]]+\])?(\[\d+\])?", s, re.I):
+        return True
+    return False
+
+
+def stamp_recorded_xpath_smart(element, fallback: str = "") -> str:
+    """Pick durable xpath_smart for task_list inventory (_task_done_impl).
+
+    Prefers capture-rebuilt element.xpath_smart (dialog/drawer + label via
+    formFieldXpathSmartOf); resolved/agent fallback only when capture missed or
+    is weak. Weak placeholder-only xpaths are rejected — prefer empty over hints.
+    Not used for params_json (recorded steps use element_json only).
+    """
+    cap = ""
+    if isinstance(element, dict):
+        cap = (element.get("xpath_smart") or "").strip()
+    fb = (fallback or "").strip()
+    if cap and not is_weak_xpath_smart(cap):
+        return cap
+    if fb and not is_weak_xpath_smart(fb):
+        return fb
+    return ""
 
 
 def normalize_select_options(raw) -> list[str]:
@@ -78,6 +120,28 @@ async def read_select_options(page, label_text: str) -> list[str]:
         return []
 
 
+async def reset_select_ui(page) -> dict:
+    """Close Element UI select state without issuing a business click."""
+
+    async def _eval_once() -> dict:
+        try:
+            raw = await page.evaluate(JS_RESET_SELECT_UI)
+            if isinstance(raw, dict):
+                return {
+                    'before': int(raw.get('before', 0) or 0),
+                    'after': int(raw.get('after', 0) or 0),
+                    'closed': bool(raw.get('closed')),
+                }
+            return {'before': -1, 'after': -1, 'closed': False, 'error': 'invalid-reset-result'}
+        except Exception as exc:
+            return {'before': -1, 'after': -1, 'closed': False, 'error': str(exc)}
+
+    result = await _eval_once()
+    if not result.get('closed', False):
+        result = await _eval_once()
+    return result
+
+
 def resolve_option_against_list(want: str, options: list[str] | None) -> str:
     """Map a desired label onto a catalog list (recording / agent assist only).
 
@@ -126,9 +190,35 @@ def _is_ok_result(result) -> bool:
     Convention: every successful, recordable action returns a string starting with
     ``ok`` (``ok``, ``ok:…``, ``ok-date``, ``ok-clicked``, ``ok-already:…``, …).
     Skip / non-recordable codes (e.g. ``already-filled``, ``not-filled``) must NOT
-    use the ``ok`` prefix.
+    use the ``ok`` prefix — except ``ok-skip:…`` (absent-field skip; see
+    ``should_record_result``).
     """
     return isinstance(result, str) and result.startswith('ok')
+
+
+def is_absent_field_result(result) -> bool:
+    """Field not in DOM (cascade/gate) — treat as skip, not failure."""
+    s = str(result or '').strip()
+    if not s:
+        return False
+    if s == 'label-not-found' or s.startswith('label-not-found'):
+        return True
+    if s.startswith('ok-skip:label-not-found'):
+        return True
+    return False
+
+
+def absent_field_skip_result(code: str = 'label-not-found') -> str:
+    """Agent/replay success string: skip fill; do not record a write step."""
+    return f'ok-skip:{code} | field absent — skip; do not scroll or retry'
+
+
+def should_record_result(result) -> bool:
+    """Whether a successful result should be written to the trajectory action log."""
+    if not _is_ok_result(result):
+        return False
+    # ok-skip:* = intentional non-write (absent cascade field, etc.)
+    return not str(result).startswith('ok-skip:')
 
 
 async def dismiss_https_first_interstitial(page) -> str:
@@ -219,7 +309,7 @@ async def _capture_element(page, label_text, *, xpath_smart: str = "", target_ki
         raw = await page.evaluate(JS_CAPTURE_FROM_XPATH, [xp, label_text or "", target_kind or ""])
         if not raw:
             return None
-        info = json.loads(raw) if isinstance(raw, str) else raw
+        info = _as_dict(raw)
         if not isinstance(info, dict):
             return None
         if not (info.get("xpath_smart") or info.get("xpath_full")):
@@ -269,7 +359,7 @@ async def _enrich_click_element(
         )
         if not raw:
             return base
-        info = json.loads(raw) if isinstance(raw, str) else raw
+        info = _as_dict(raw)
         if not isinstance(info, dict) or not (info.get('xpath') or info.get('xpath_smart')):
             return base
         attrs = info.get('attributes') if isinstance(info.get('attributes'), dict) else {}

@@ -45,6 +45,7 @@ export {
 export {
   upsertPhaseDescription,
   markPhaseStatus,
+  appendPhaseDoneLog,
   clearTrajectory,
   addPhaseToTrajectory,
   syncTrajectoryPhaseDescriptions,

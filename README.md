@@ -6,7 +6,7 @@
 > **LLM 默认走独立模式**（经 `src/llm-utils.js`），不依赖 OpenCode SDK。
 > **没有活跃的 `.opencode/skills/`**；知识在 `scripts/prompts/*.md` + CTRL / `form_rules` 代码中。
 
-更细的 Agent 工作约定见 [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md)。前端契约以 `/api/docs` 为准（`src/dashboard/api-docs/catalog.js`），不再维护单独产品 API markdown。
+更细的 Agent 工作约定见 [`AGENTS.md`](./AGENTS.md)（唯一事实源；[`CLAUDE.md`](./CLAUDE.md) 仅作指向）。前端契约以 `/api/docs` 为准（`src/dashboard/api-docs/catalog.js`），不再维护单独产品 API markdown。
 
 ---
 
@@ -107,26 +107,22 @@ Node.js Express (server.mjs, :4097)
 
 ### 双语言 CTRL（必须同步）
 
-| 语言 | 文件 | 用途 |
-|------|------|------|
-| Python | `scripts/controller/` + `scripts/controller/actions/*` | Agent 运行时 |
-| Python JS 字符串 | `scripts/controller/actions/_js_snippets.py` | `page.evaluate` 注入 |
-| JavaScript | `src/ctrl-actions.js` | 注入生成的 Playwright 脚本 |
-
-同一套表面：`fillFormField`、`selectOption`、`selectDate`、`clickMenuItem`、`clickTableRowAction`、`closeDialog` 等。改一处必须改其余。
+JS canonical（`src/ctrl-actions/`）↔ Python JS 字符串（`scripts/controller/actions/_js_snippets.py`）↔ Python（`scripts/controller/actions/`）三处同一表面：`fillFormField`、`selectOption`、`selectDate`、`clickMenuItem`、`clickTableRowButton`、`closeDialog` 等，改一处必须同步其余。同步规则、文件明细与生成文件约束见 [AGENTS.md](./AGENTS.md)，勿两处重复维护。
 
 ### 关键模块
 
 | 区域 | 路径 | 说明 |
 |------|------|------|
 | 产品 API | `src/routes/v2/` | system-mgmt、trajectories、replay、executors、case-data、… |
-| Session | `src/routes/browser-session.js` | 调试会话 |
-| 组装 / 运行 | `test-assemble.js` / `test-run.js` | 薄 HTTP；内核在 services/runtime |
+| Session | `src/routes/browser-session/` | 调试会话 |
+| 组装 / 运行 | `src/routes/test-assemble.js` / `test-run.js` | 薄 HTTP；内核在 services/runtime |
 | 遗留 | `legacy-gone.js` | `/api/trajectory`、`/api/case-data` → 410 |
 | 运行时 | `src/runtime/script-runner.js` | 共享 Playwright 执行 |
 | 服务 | `assemble-service` / `replay-service` / `executor-slot-lease` | 组装、回放、槽位租约 |
 | Agent | `scripts/` | `main.py`、`session_runner.py`、`script_assembler.py`、`form_rules.py` |
 | 提示词 | `scripts/prompts/*.md` | **不是** OpenCode skills |
+
+> 模块 / 服务 / 路由明细以 [AGENTS.md](./AGENTS.md) 为准，这里只是速览。
 
 ---
 
@@ -146,7 +142,7 @@ Node.js Express (server.mjs, :4097)
 |------|------|
 | `scripts/prompts/agent-prompt.md` 等 | Agent / Planner / 字段 / 修复提示词 |
 | `scripts/controller/actions/form_rules.py` | 可执行填表规则（身份证、手机号等） |
-| `src/ctrl-actions.js` + Python CTRL | 控件怎么点 / 怎么填 |
+| `src/ctrl-actions/*` + Python CTRL | 控件怎么点 / 怎么填 |
 
 不要再按旧文档去找 `atp-ui` / `atp-rule` skill 包。
 

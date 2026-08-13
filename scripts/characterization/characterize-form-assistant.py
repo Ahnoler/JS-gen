@@ -95,7 +95,10 @@ def main() -> int:
     assert_true('法定代表人/负责人证件号码' not in labels, 'introduce not in assistant pending')
     assert_true(all(not i.needs_intervention for i in tl.pending), 'no intervene flags on pending')
 
-    form_py = (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
+    form_py = (
+        (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
+        + (ROOT / 'scripts/controller/actions/form_autofill.py').read_text(encoding='utf-8')
+    )
     assert_true('async def run_form_assistant' in form_py, 'run_form_assistant action exists')
     assert_true(
         'allow_autofill: bool = False' in form_py,
@@ -135,10 +138,14 @@ def main() -> int:
         'xpath_smart used in _execute_round',
     )
 
+    # 228bb5c: overlay rebuild can mix list+dialog twins; one write clears every
+    # same-label pending so click_save / done gates are not blocked by a sibling.
+    # xpath_smart still selects which item is returned (and which xpath is preferred).
     tl_dup = TaskList()
     tl_dup.pending = [
         TaskItem(label='评级', kind='select', xpath_smart='//div[@id="a"]//div[contains(@class,"el-select")]'),
         TaskItem(label='评级', kind='select', xpath_smart='//div[@id="b"]//div[contains(@class,"el-select")]'),
+        TaskItem(label='客户名称', kind='input', xpath_smart='//input[@id="name"]'),
     ]
     moved = tl_dup.mark_done('评级', value='AAA', xpath_smart='//div[@id="b"]//div[contains(@class,"el-select")]')
     assert_true(
@@ -146,8 +153,15 @@ def main() -> int:
         'mark_done matches by xpath_smart first',
     )
     assert_true(
-        len(tl_dup.pending) == 1 and 'id="a"' in tl_dup.pending[0].xpath_smart,
-        'mark_done leaves other duplicate label pending',
+        len(tl_dup.pending) == 1 and tl_dup.pending[0].label == '客户名称',
+        'mark_done clears all same-label pending, keeps other labels',
+    )
+    assert_true(
+        len(tl_dup.done) == 2
+        and all(i.label == '评级' for i in tl_dup.done)
+        and any('id="a"' in i.xpath_smart for i in tl_dup.done)
+        and any('id="b"' in i.xpath_smart for i in tl_dup.done),
+        'both duplicate-label items moved to done',
     )
 
     print('characterize-form-assistant: OK')

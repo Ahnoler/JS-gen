@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Characterize params-first xpath resolve + read-back helpers in _replay.py."""
+"""Characterize element-first xpath resolve + read-back helpers in _replay.py."""
 from __future__ import annotations
 
 import sys
@@ -12,7 +12,8 @@ if str(ROOT) not in sys.path:
 from scripts.controller.actions import _replay as R  # noqa: E402
 
 
-def test_resolve_prefers_params() -> None:
+def test_resolve_prefers_element_over_params() -> None:
+    """params.xpath_smart is abandoned for locate — element wins even when both present."""
     entry = {
         "element": {
             "xpath_smart": (
@@ -26,14 +27,58 @@ def test_resolve_prefers_params() -> None:
         "value": "1",
     }
     xp, src = R._resolve_replay_xpath(entry, params)
-    assert xp.startswith("//tr"), xp
-    assert src == "params"
+    assert "el-form-item" in xp, xp
+    assert src == "element"
+
+
+def test_resolve_ignores_wrong_params_label_xpath() -> None:
+    """Traj 130 step 23: params pointed at 编号 while element (and label) are 名称."""
+    entry = {
+        "element": {
+            "xpath_smart": (
+                "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+                "//div[contains(@class,'el-form-item')]"
+                "[.//label[contains(normalize-space(.),'核心产品名称')]]//input"
+            ),
+            "formLabel": "核心产品名称",
+        }
+    }
+    params = {
+        "label_text": "核心产品名称",
+        "value": "对公核心产品错误定位",
+        "xpath_smart": (
+            "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]"
+            "//div[contains(@class,'el-form-item')]"
+            "[.//label[contains(normalize-space(.),'核心产品编号')]]//input"
+        ),
+    }
+    xp, src = R._resolve_replay_xpath(entry, params)
+    assert "核心产品名称" in xp, xp
+    assert "核心产品编号" not in xp, xp
+    assert src == "element"
+
+
+def test_resolve_falls_back_to_full_when_no_element_smart() -> None:
+    entry = {"element": {"xpath_full": "/html/body/div[1]/input"}}
+    params = {"xpath_smart": "//input[@placeholder='请输入'][1]"}
+    xp, src = R._resolve_replay_xpath(entry, params)
+    assert xp.startswith("/html"), xp
+    assert src == "full"
 
 
 def test_classify_false_ok() -> None:
     assert R._classify_fill_result(True, "45.50", "45.50").startswith("ok")
     assert R._classify_fill_result(True, "45.50", "10.20").startswith("false_ok")
     assert R._classify_fill_result(False, "45.50", "").startswith("xpath_miss") or True
+
+
+def test_classify_amount_display_equivalent() -> None:
+    """Replay must not false_ok thousand-separator / trailing .00 (log slot1)."""
+    assert R._classify_fill_result(True, "2026", "2,026.00") == "ok"
+    assert R._classify_fill_result(True, "478282.54", "478,282.54") == "ok"
+    assert R._classify_fill_result(True, "500", "500.00") == "ok"
+    assert R._classify_fill_result(True, "120000.00", "120,000.00") == "ok"
+    assert R._classify_fill_result(True, "2026", "2027").startswith("false_ok")
 
 
 def test_norm_replay_value_strips_spaces() -> None:
@@ -49,11 +94,19 @@ def test_replay_fill_does_not_pass_label_as_placeholder_hint() -> None:
     assert "placeholder or label" not in fill_block
 
 
+def test_params_xpath_helper_removed() -> None:
+    assert not hasattr(R, "_params_xpath_smart"), "_params_xpath_smart must be deleted"
+
+
 def main() -> int:
-    test_resolve_prefers_params()
+    test_resolve_prefers_element_over_params()
+    test_resolve_ignores_wrong_params_label_xpath()
+    test_resolve_falls_back_to_full_when_no_element_smart()
     test_classify_false_ok()
+    test_classify_amount_display_equivalent()
     test_norm_replay_value_strips_spaces()
     test_replay_fill_does_not_pass_label_as_placeholder_hint()
+    test_params_xpath_helper_removed()
     print("characterize-replay-params-xpath: OK")
     return 0
 

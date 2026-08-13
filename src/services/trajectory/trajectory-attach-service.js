@@ -5,9 +5,12 @@
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as remoteSessionDao from '../../dao/remote-session-dao.js';
+import * as executorNodeDao from '../../dao/executor-node-dao.js';
 import * as execSession from '../../executor-session-client.js';
 import * as slotLease from '../../executor-slot-lease.js';
 import * as remoteSessionService from '../remote-session-service.js';
+import { assertClaimable, clearOwnershipOnClose } from '../session-lifecycle.js';
+import { isWithinGrace } from '../session-lifecycle-rules.js';
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
 import {
@@ -23,6 +26,108 @@ import { prepareTrajectoryRecordingUnlocked } from './trajectory-attach-runner.j
 async function appendRecordedStep(...args) {
   const mod = await import('./trajectory-persist-service.js');
   return mod.appendRecordedStep(...args);
+}
+
+/**
+ * Whether an occupied row is tied to the Chrome we just opened (or ambiguous).
+ * Skip rows with a proven different slotIndex; fail-closed for idle grace/owned
+ * when slot cannot be proven different (incl. opened.slotIndex null).
+ */
+function rowTiedToReusedChrome(row, opened) {
+  const openedSlot = opened?.slotIndex != null && Number.isFinite(Number(opened.slotIndex))
+    ? Number(opened.slotIndex)
+    : null;
+  const rowSlot = row?.slotIndex != null && Number.isFinite(Number(row.slotIndex))
+    ? Number(row.slotIndex)
+    : null;
+  const openedCdp = opened?.cdpPort != null && Number.isFinite(Number(opened.cdpPort))
+    ? Number(opened.cdpPort)
+    : null;
+  const rowCdp = row?.cdpPort != null && Number.isFinite(Number(row.cdpPort))
+    ? Number(row.cdpPort)
+    : null;
+
+  // Proven different Chrome on another slot → skip (avoids multi-slot false 409)
+  if (openedSlot != null && rowSlot != null && openedSlot !== rowSlot) {
+    return false;
+  }
+
+  // Same slot → tied
+  if (openedSlot != null && rowSlot != null && openedSlot === rowSlot) {
+    return true;
+  }
+
+  // CDP port match when row stores it
+  if (openedCdp != null && rowCdp != null && openedCdp === rowCdp) {
+    return true;
+  }
+
+  // Idle grace / owned + cannot prove different slot → fail closed
+  if (row?.status === 'idle') {
+    const ownedOrGrace = isWithinGrace(row) || row?.trajectoryId != null;
+    if (ownedOrGrace) return true;
+  }
+
+  return false;
+}
+
+/**
+ * When preferIdleChrome reused a Chrome, deny if that Chrome is tied to a
+ * foreign grace-owned remote_session (before registerRuntime / BiB).
+ * Slot-aware: different non-null slotIndex rows are skipped; same/unknown
+ * slot + idle grace still gated. Runs whenever reusedChrome (cdpPort optional).
+ */
+async function assertNoForeignGraceOnNodeSlot(tid, opened) {
+  if (!opened?.reusedChrome) return;
+  const node = opened.nodeUuid
+    ? await executorNodeDao.getByUuid(opened.nodeUuid).catch(() => null)
+    : null;
+  if (!node?.id) return;
+  const rows = await remoteSessionDao.listByNode(node.id, ['idle', 'active']);
+  for (const row of rows) {
+    if (!rowTiedToReusedChrome(row, opened)) continue;
+    assertClaimable(row, tid);
+  }
+}
+
+/** Resolve remote_session id after streamDetach cleared cache/runtime. */
+async function resolveHardDetachRemoteSessionId(tid, { traj, runtime, sessionId }) {
+  let remoteSessionId = traj?.remoteSessionId
+    || runtime?.remoteSessionId
+    || null;
+  if (remoteSessionId) return Number(remoteSessionId);
+
+  const byTraj = await remoteSessionDao.getByTrajectory(tid).catch(() => null);
+  if (byTraj && (byTraj.status === 'idle' || byTraj.status === 'active')) {
+    return Number(byTraj.id);
+  }
+  if (sessionId) {
+    const occupied = await remoteSessionDao.getOccupiedByAgentSession(sessionId).catch(() => null);
+    if (occupied) return Number(occupied.id);
+  }
+  return null;
+}
+
+async function hardCloseRemoteSession(remoteSessionId) {
+  if (!remoteSessionId) return;
+  try {
+    await clearOwnershipOnClose(remoteSessionId);
+    await remoteSessionDao.close(remoteSessionId, { crashed: false });
+    remoteSessionService.clearLiveBinding(remoteSessionId);
+  } catch {}
+}
+
+async function releaseOpenedSessionBestEffort(sessionId, opened) {
+  try {
+    await execSession.closeSession({
+      nodeUuid: opened?.nodeUuid,
+      sessionId,
+      // Reused Chrome belongs to the grace owner — leave it idle, drop our lease only.
+      keepBrowser: !!opened?.reusedChrome,
+    });
+  } catch {
+    slotLease.releaseBySession(sessionId);
+  }
 }
 
 async function attachBibBestEffort(tid, sessionId, runtime) {
@@ -43,14 +148,17 @@ async function attachBibBestEffort(tid, sessionId, runtime) {
         viewportH: 900,
       });
     } catch (err) {
+      // Claim denials must surface as HTTP 409, not soft bibError.
+      if (err?.statusCode === 409 || err?.code === 'grace_owned') throw err;
       bibError = err?.message || String(err);
       console.warn(`[trajectory] BiB attach failed (session kept): ${bibError}`);
     }
   }
   const remoteSessionId = attached?.remoteSession?.id ?? attached?.status?.remoteSessionId ?? null;
   if (remoteSessionId) {
-    await remoteSessionService.mountTrajectoryRemoteSession(tid, remoteSessionId).catch(async () => {
-      await trajectoryDao.updateMeta(tid, { remoteSessionId });
+    // syncMount-only — no cache-only updateMeta fallback on mount failure
+    await remoteSessionService.mountTrajectoryRemoteSession(tid, remoteSessionId).catch((err) => {
+      console.warn(`[trajectory] syncMount failed for traj #${tid} rs=${remoteSessionId}:`, err?.message || err);
     });
   }
   if (runtime) {
@@ -182,9 +290,25 @@ export async function attachTrajectoryLive(trajectoryId) {
     console.log(`[trajectory] launching new Chrome for traj #${tid}`);
   }
 
+  try {
+    await assertNoForeignGraceOnNodeSlot(tid, opened);
+  } catch (err) {
+    await releaseOpenedSessionBestEffort(sessionId, opened);
+    throw err;
+  }
+
   const runtime = registerTrajectorySession(tid, sessionId, { ...opened, model }, {});
   bindTrajectoryManualPersist(tid, sessionId, runtime);
-  const bib = await attachBibBestEffort(tid, sessionId, runtime);
+  let bib;
+  try {
+    bib = await attachBibBestEffort(tid, sessionId, runtime);
+  } catch (err) {
+    if (err?.statusCode === 409 || err?.code === 'grace_owned') {
+      deleteTrajectoryRuntime(tid);
+      await releaseOpenedSessionBestEffort(sessionId, opened);
+    }
+    throw err;
+  }
 
   return {
     trajectoryId: tid,
@@ -272,9 +396,12 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     }
 
     const sessionId = runtime?.sessionId || null;
-    const remoteSessionId = traj?.remoteSessionId
-      || runtime?.remoteSessionId
-      || null;
+    // Cache/runtime may be null after streamDetach — resolve via truth
+    const remoteSessionId = await resolveHardDetachRemoteSessionId(tid, {
+      traj,
+      runtime,
+      sessionId,
+    });
 
     // Stop BiB for THIS traj only (never clear global map blindly)
     try {
@@ -285,24 +412,14 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
       });
     } catch {}
 
-    // Close remote_session row (browser released)
-    if (remoteSessionId) {
-      try {
-        await remoteSessionDao.close(remoteSessionId, { crashed: false });
-        remoteSessionService.clearLiveBinding(remoteSessionId);
-        await remoteSessionService.unmountTrajectoriesFromRemoteSession(remoteSessionId).catch(() => {});
-      } catch {}
-    }
+    // Hard detach: clear ownership immediately via lifecycle, then close row
+    await hardCloseRemoteSession(remoteSessionId);
 
     // Also close any occupied remote row still bound to this agent session
     if (sessionId) {
       const occupied = await remoteSessionDao.getOccupiedByAgentSession(sessionId).catch(() => null);
-      if (occupied) {
-        try {
-          await remoteSessionDao.close(occupied.id, { crashed: false });
-          remoteSessionService.clearLiveBinding(occupied.id);
-          await remoteSessionService.unmountTrajectoriesFromRemoteSession(occupied.id).catch(() => {});
-        } catch {}
+      if (occupied && Number(occupied.id) !== Number(remoteSessionId)) {
+        await hardCloseRemoteSession(occupied.id);
       }
     }
 

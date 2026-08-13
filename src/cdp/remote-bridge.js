@@ -5,5 +5,5 @@
 export {
   notifyManualRecordingChanged, getRemoteStatus, refreshCdpEndpoints, clearCdpEndpoints,
   attachLive, detachLive, parseRemoteFrame, resolveBibTarget, initRemoteBridgeWs,
-  resolveElementByLabelText,
+  resolveElementByLabelText, getAttachedCdpClient,
 } from './remote-bridge/index.js';

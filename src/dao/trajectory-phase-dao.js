@@ -1,5 +1,6 @@
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
+import { parseDoneLogs } from '../models/phase-done-logs.js';
 import * as trajectoryDao from './trajectory-dao.js';
 
 const TABLE = 'trajectory_phase';
@@ -29,6 +30,15 @@ export async function listByTrajectory(trajectoryId) {
   return rows.map(parseCandidates);
 }
 
+export async function listByTrajectoryIds(ids) {
+  const nums = [...new Set((ids || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+  if (!nums.length) return [];
+  const rows = await getDB()(TABLE)
+    .whereIn('trajectory_id', nums)
+    .orderBy('phase_number');
+  return rows.map(parseCandidates);
+}
+
 export async function updateStatus(phaseId, status) {
   const existing = await getById(phaseId);
   const data = { status };
@@ -54,6 +64,7 @@ function parseCandidates(row) {
       /* keep string */
     }
   }
+  obj.doneLogs = parseDoneLogs(obj.doneLogs);
   return obj;
 }
 
@@ -70,6 +81,13 @@ export async function update(phaseId, fields, trx = null) {
       ? raw
       : JSON.stringify(raw);
     delete patch.specialElementCandidatesJson;
+  }
+  if ('doneLogs' in fields || 'done_logs' in fields) {
+    const raw = fields.doneLogs ?? fields.done_logs ?? null;
+    patch.done_logs = raw == null || typeof raw === 'string'
+      ? raw
+      : JSON.stringify(raw);
+    delete patch.doneLogs;
   }
   if (!Object.keys(patch).length) return getById(phaseId, trx);
   await db(TABLE).where({ id: phaseId }).update(patch);

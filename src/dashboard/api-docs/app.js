@@ -3,6 +3,7 @@
  * Open: /api/docs
  */
 import { API_GROUPS, ENUMS, RECORDING_FLOW, BATCH_RECORDING_FLOW } from './catalog.js';
+import { mountSlotMonitor } from './slot-monitor.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 
@@ -273,10 +274,18 @@ function renderGroup(group) {
   wrap.dataset.group = group.id;
 
   if (group.id === 'overview') {
-    wrap.innerHTML = `<h2 class="docs-section-title">概览</h2>`;
-    const box = document.createElement('div');
-    renderOverview(box);
-    wrap.appendChild(box);
+    wrap.innerHTML = `
+      <details class="docs-overview-fold">
+        <summary class="docs-section-title docs-overview-summary">概览</summary>
+        <div class="docs-overview-body"></div>
+      </details>
+    `;
+    renderOverview($('.docs-overview-body', wrap));
+    return wrap;
+  }
+
+  if (group.monitor || group.id === 'slot-monitor') {
+    mountSlotMonitor(wrap);
     return wrap;
   }
 
@@ -298,8 +307,9 @@ function initNav() {
     btn.type = 'button';
     btn.className = 'docs-nav-item';
     btn.dataset.target = g.id;
-    const count = g.endpoints.length;
-    btn.innerHTML = `${escapeHtml(g.name)}${count ? `<span class="count">${count}</span>` : ''}`;
+    const count = g.endpoints?.length || 0;
+    const badge = g.monitor ? '<span class="count">live</span>' : (count ? `<span class="count">${count}</span>` : '');
+    btn.innerHTML = `${escapeHtml(g.name)}${badge}`;
     btn.addEventListener('click', () => {
       document.querySelectorAll('.docs-nav-item').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');

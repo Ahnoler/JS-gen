@@ -32,6 +32,17 @@ JS_MANUAL_PART_B = r'''
     };
     if (loc.locator_fallback_reason) meta.locator_fallback_reason = loc.locator_fallback_reason;
     if (hi != null) meta.highlight_index = hi;
+    // Todo card actions (处理/转交/…) — stamp card business key / title for replay scope
+    const todoCard = el.closest && el.closest('.todo-item');
+    if (todoCard) {
+      const blob = String(todoCard.innerText || todoCard.textContent || '');
+      const keyM = blob.match(/\b(?:PJ|DGSX)\d+\b/);
+      if (keyM) meta.parent_text = keyM[0];
+      else {
+        const titleLine = blob.split(/[\n\r]+/).map((s) => s.trim()).filter(Boolean)[0] || '';
+        if (titleLine) meta.parent_text = titleLine.slice(0, 80);
+      }
+    }
     return meta;
   }
 
@@ -243,19 +254,33 @@ JS_MANUAL_PART_B = r'''
       return;
     }
 
-    // table row radio (e.g. 客户列表) — identify row by main-body cell text, not fixed-column shell
+    // table row radio (e.g. 客户列表 / dialog picker) — identify row by main-body cell text
     const tableRadio = el.closest(
       '.el-table__body .el-radio, .el-table__body .el-radio-button, .el-table__row .el-radio, .el-table__row .el-radio-button,' +
       '.el-table__fixed .el-radio, .el-table__fixed-body-wrapper .el-radio, .el-table__fixed-left .el-radio'
     );
     if (tableRadio) {
-      const rowText = tableRowIdentityText(tableRadio);
-      if (!rowText) return; // cannot replay without a durable row key
-      emit(Object.assign({
-        kind: 'click_table_row_radio',
-        row_text: rowText,
-      }, elMeta(tableRadio, rowText)));
-      return;
+      let rowText = tableRowIdentityText(tableRadio);
+      if (!rowText) {
+        const row = tableRadio.closest('.el-table__row, tr');
+        const key = row && row.getAttribute && (row.getAttribute('data-row-key') || row.getAttribute('data-key'));
+        if (key) rowText = String(key);
+        else if (row && row.parentElement) {
+          const sibs = Array.from(row.parentElement.children).filter(
+            (r) => r.nodeType === 1 && ((r.classList && r.classList.contains('el-table__row')) || r.tagName === 'TR')
+          );
+          const idx = sibs.indexOf(row);
+          if (idx >= 0) rowText = 'row-index:' + idx;
+        }
+      }
+      if (rowText) {
+        emit(Object.assign({
+          kind: 'click_table_row_radio',
+          row_text: rowText,
+        }, elMeta(tableRadio, rowText)));
+        return;
+      }
+      // Still no identity — fall through to enriched click rather than drop the step
     }
 
     // radio in form
@@ -329,6 +354,16 @@ JS_MANUAL_PART_B = r'''
       }
     }
 
+    // Todo / workflow card action links (待办「处理」「转交」…) — plain div, not button/a
+    const todoAction = el.closest('.todo-item-action');
+    if (todoAction && !isInIgnore(todoAction)) {
+      const text = shortLabel(todoAction);
+      if (text && text.length <= 20) {
+        emit(Object.assign({ kind: 'click' }, elMeta(todoAction, text)));
+        return;
+      }
+    }
+
     // generic button / link / clickable
     const btn = el.closest('button, .el-button, a.el-link, a[href], [role="button"]');
     if (btn && !isInIgnore(btn)) {
@@ -342,9 +377,26 @@ JS_MANUAL_PART_B = r'''
       return;
     }
 
-    // tree node
+    // tree node — form tree-select popover → select_tree_option; sidebar stays click
     const tree = el.closest('.el-tree-node__content');
     if (tree) {
+      const formHost = (typeof resolveFormTreeSelectHostFromPopoverTree === 'function')
+        ? resolveFormTreeSelectHostFromPopoverTree(tree)
+        : null;
+      if (formHost) {
+        const optionText = stripVolatileTreeText(shortLabel(tree) || cleanVisibleText(tree));
+        const item = formHost.closest && formHost.closest('.el-form-item');
+        const lblEl = item && item.querySelector('.el-form-item__label, label');
+        const labelText = normalizeFormLabel(lblEl && lblEl.textContent);
+        if (labelText && optionText) {
+          emit(Object.assign({
+            kind: 'select_tree_option',
+            label_text: labelText,
+            option_text: optionText,
+          }, elMeta(formHost, optionText)));
+          return;
+        }
+      }
       emit(Object.assign({ kind: 'click' }, elMeta(tree)));
       return;
     }
@@ -366,7 +418,10 @@ JS_MANUAL_PART_B = r'''
     // Last-resort: any element with short visible text that looks like a control
     // (covers custom sidebar spans that are not inside known nav roots)
     if (!isInIgnore(el)) {
-      const host = el.closest('[onclick], [ng-click], [class*="menu"], [class*="nav-item"], [class*="NavItem"]');
+      const host = el.closest(
+        '[onclick], [ng-click], [class*="menu"], [class*="nav-item"], [class*="NavItem"],'
+        + ' [class*="item-action"], [class*="todo-item-action"]'
+      );
       if (host) {
         const text = shortLabel(host);
         if (text && text.length <= 20) {

@@ -88,7 +88,7 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}',
         summary: '交易详情（含 phases、caseEntries）',
-        desc: 'caseEntries 为交易级 legacy KV（case_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。',
+        desc: 'caseEntries 为交易级 legacy KV（case_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。phases[].doneLogs 为 `{ text, at, source }[]`（`agent`|`fail`）；trajectoryLog 仍为 agent 全文。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {
@@ -128,21 +128,32 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/tree',
         summary: '阶段 + 步骤二级树',
-        desc: '含 caseEntries（交易级案例 KV）。',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
+        desc: '含 caseEntries（交易级案例 KV）。默认隐藏内部 meta 步骤（如 save_form_snapshot）；`includeMeta=1` 返回全部。步骤带 `isMeta`。',
+        params: [
+          { name: 'id', type: 'number', required: true, in: 'path', example: '42' },
+          { name: 'includeMeta', type: 'boolean', in: 'query', desc: 'true/1 时包含 save_form_snapshot 等内部步骤', example: 'false' },
+        ],
         respExample: J({
           trajectoryId: 42, name: '...', recordStatus: 'draft',
           caseEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
           phases: [{
             id: 101, phaseNumber: 1, description: '登录系统', status: 'pending',
+            stitchScreenshotId: 88,
+            stitchScreenshotUrl: '/api/v2/screenshots/88/image',
             steps: [{
               id: 501, stepNumber: 1, actionType: 'click_element_by_index',
-              source: 'agent', confirmed: true,
+              source: 'agent', confirmed: true, isMeta: false,
               params: {}, trajectoryPhaseId: 101,
             }],
           }],
           orphanSteps: [],
         }),
+        notes: [
+          '默认过滤 META_STEP_ACTIONS（save_form_snapshot / scan_* / task_* 等）',
+          'stepCount 亦只计业务步骤；meta 仍入库供 Type B 回放',
+          'steps/replay 会在选中业务步区间自动补入 meta 检查点',
+          '阶段 `stitchScreenshotUrl` 指向 AI 阶段结束长图（`kind=phase_highlight`）',
+        ],
       },
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/phases',
@@ -184,7 +195,11 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectory-phases/{id}/steps',
         summary: '某阶段下步骤',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', desc: 'phaseId', example: '101' }],
+        desc: '默认隐藏内部 meta 步骤；`includeMeta=1` 返回全部。每步含 `isMeta`。',
+        params: [
+          { name: 'id', type: 'number', required: true, in: 'path', desc: 'phaseId', example: '101' },
+          { name: 'includeMeta', type: 'boolean', in: 'query', desc: 'true/1 时包含内部步骤', example: 'false' },
+        ],
       },
       {
         method: 'POST', path: '/api/v2/trajectory-steps',
@@ -267,7 +282,7 @@ export const GROUP_TRAJECTORY = [
         tryable: false,
         notes: [
           'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'filename=trajectory-batch-template.xlsx',
+          'filename*=UTF-8\'\'批量录制导入模板.xlsx（ASCII 回退 batch-import-template.xlsx）',
         ],
       },
       {
@@ -306,11 +321,34 @@ export const GROUP_TRAJECTORY = [
           { name: 'page', type: 'number', in: 'query', example: '1' },
           { name: 'pageSize', type: 'number', in: 'query', example: '50' },
         ],
+        respExample: J({
+          batchId: 'uuid',
+          status: 'running',
+          mode: 'record',
+          jobStatus: 'running',
+          summary: { total: 5, recorded: 1, drafted: 0, failed: 0, rejected: 0 },
+          items: [{
+            id: 1,
+            rowNumber: 2,
+            name: '开户交易',
+            status: 'recording',
+            trajectoryId: 42,
+            progressPercent: 53,
+            phaseCompleted: 1,
+            phaseTotal: 4,
+            phaseName: '查询客户',
+            lastDoneText: '进了列表',
+          }],
+          page: 1,
+          pageSize: 50,
+          total: 5,
+        }),
         notes: [
           '非终态 HTTP 202；终态 HTTP 200',
           'itemStatus: pending|analyzing|analyzed|queued|waiting_executor|preparing|recording|recorded|drafted|failed|rejected|cancelled',
           '响应含 mode（record|draft）；summary 含 drafted 计数',
           'jobStatus: accepted|running|waiting_executor|cancelling|cancelled|completed|completed_with_errors|failed',
+          'items[] 含计算字段 progressPercent / phaseCompleted / phaseTotal / phaseName / lastDoneText（不落 batch_item 表）',
         ],
       },
       {
@@ -336,6 +374,11 @@ export const GROUP_TRAJECTORY = [
             jobStatus: 'running',
             version: 3,
             summary: { total: 5, recorded: 0, drafted: 1, failed: 0 },
+            progressPercent: 53,
+            phaseCompleted: 1,
+            phaseTotal: 4,
+            phaseName: '查询客户',
+            lastDoneText: '进了列表',
           },
         }),
         notes: [

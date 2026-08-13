@@ -23,6 +23,10 @@ import { ensureWsHook, resolveBibTarget } from './ws-router.js';
 
 export { getRemoteStatus, resolveBibTarget };
 
+export function getAttachedCdpClient() {
+  return bridge.client || null;
+}
+
 /** Called when Dashboard toggles manual recording — suppress page inject briefly. */
 export function notifyManualRecordingChanged(enabled) {
   if (!enabled) return;
@@ -189,7 +193,7 @@ export function initRemoteBridgeWs() {
 /**
  * Resolve form control by label_text / actionType+params on the attached local BiB CDP page.
  * @param {string} labelText
- * @param {{ actionType?: string, action?: string, params?: object }} [opts]
+ * @param {{ actionType?: string, action?: string, params?: object, mode?: string }} [opts]
  */
 export async function resolveElementByLabelText(labelText, opts = {}) {
   if (!bridge.client) {
@@ -201,5 +205,6 @@ export async function resolveElementByLabelText(labelText, opts = {}) {
     labelText,
     actionType: opts.actionType || opts.action || '',
     params: opts.params || {},
+    mode: opts.mode || 'inventory',
   });
 }

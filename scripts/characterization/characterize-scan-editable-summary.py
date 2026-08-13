@@ -85,11 +85,56 @@ def test_summary_buttons_shape() -> None:
         primary_container='main',
     )['buttons']
     assert_true(
-        buttons == [{'text': '保存', 'section': '区块', 'xpath_smart': "//button[normalize-space()='保存']"}],
-        'buttons projected as text+section+xpath_smart',
+        buttons == [{
+            'text': '保存',
+            'region_label': '区块',
+            'section': '区块',
+            'xpath_smart': "//button[normalize-space()='保存']",
+        }],
+        'buttons projected as text+region_label+section+xpath_smart',
     )
     assert_true('kind' not in buttons[0], 'buttons must not project kind')
 
+
+def test_summary_prefers_region_label_over_section_title() -> None:
+    from scripts.controller.actions.form_scan_utils import build_editable_summary
+
+    buttons = build_editable_summary(
+        [{
+            'fields': [{
+                'label': '客户名称',
+                'kind': 'input',
+                'currentValue': '',
+                'disabled': False,
+                'xpath_smart': '//input[1]',
+                'section_title': '旧分块',
+                'region_label': '主区·基本信息',
+            }],
+            'buttons': [{
+                'label': '保存',
+                'section_title': '旧分块',
+                'region_label': '主区·基本信息',
+                'xpath_smart': '//button[1]',
+            }],
+        }],
+        primary_container='main',
+    )
+    assert_true(
+        buttons['buttons'][0]['region_label'] == '主区·基本信息',
+        'button region_label wins',
+    )
+    assert_true(
+        buttons['buttons'][0]['section'] == '主区·基本信息',
+        'section alias mirrors region_label',
+    )
+    assert_true(
+        buttons['pending_items'][0]['region_label'] == '主区·基本信息',
+        'pending_items expose region_label',
+    )
+    assert_true(
+        buttons['pending_items'][0]['section'] == '主区·基本信息',
+        'pending section alias mirrors region',
+    )
 
 def test_js_scan_form_fields_multi_root_cues() -> None:
     from scripts.controller.actions._js_snippets import JS_SCAN_FORM_FIELDS
@@ -108,6 +153,26 @@ def test_js_scan_form_fields_multi_root_cues() -> None:
     assert_true(
         "buttonkeywords,opts" in norm or "[quick,buttonkeywords,opts]" in norm,
         "JS_SCAN_FORM_FIELDS signature includes opts as 3rd parameter",
+    )
+
+
+def test_collect_l2_named() -> None:
+    scan = SCAN_FORM_PY.read_text(encoding="utf-8")
+    assert_true(
+        "function collectL2" in scan or "const collectL2" in scan or "collectL2(" in scan,
+        "fullpage must expose named collectL2 (not only SOURCE_* loops)",
+    )
+    assert_true(
+        "COLLECT_L2" in scan,
+        "COLLECT_L2 marker for characterization",
+    )
+    assert_true(
+        "function discoverL1" in scan or "const discoverL1" in scan or "discoverL1(" in scan,
+        "fullpage must expose named discoverL1",
+    )
+    assert_true(
+        "ASSIGN_VIA_ASSIGN_REGION" in scan or "assignRegion(el)" in scan,
+        "L2→L1 must call assignRegion(el), not only section_title projection",
     )
 
 
@@ -222,6 +287,7 @@ def test_aggregator_dedupe_by_xpath_smart() -> None:
             'label': '客户名称',
             'xpath_smart': xp,
             'kind': 'input',
+            'region_label': '基本信息',
             'section': '基本信息',
         }],
         'pending_items carries relative xpath_smart from first scan',
@@ -344,6 +410,7 @@ def test_aggregator_readonly_labels() -> None:
             'label': '资产负债率',
             'xpath_smart': '//input[@id="ratio"]',
             'kind': 'input',
+            'region_label': '评级等级测算',
             'section': '评级等级测算',
         },
         'pending_items carries xpath for ops',
@@ -374,13 +441,19 @@ def test_aggregator_buttons_shape() -> None:
     buttons = summary['buttons']
     assert_true(len(buttons) == 2, 'buttons merged from scan')
     assert_true(
-        buttons[0] == {'text': '保存', 'section': '系统评级结论', 'xpath_smart': '//button[1]'},
-        'button text/section/xpath_smart projected',
+        buttons[0] == {
+            'text': '保存',
+            'region_label': '系统评级结论',
+            'section': '系统评级结论',
+            'xpath_smart': '//button[1]',
+        },
+        'button text/region_label/section/xpath_smart projected',
     )
     assert_true('kind' not in buttons[0], 'no kind on buttons')
     assert_true(
         buttons[1] == {
             'text': '暂存',
+            'region_label': '评级等级测算',
             'section': '评级等级测算',
             'xpath_smart': "//button[normalize-space()='暂存']",
         },
@@ -408,6 +481,7 @@ def run_aggregator_tests() -> None:
     test_aggregator_pending_labels()
     test_aggregator_readonly_labels()
     test_aggregator_buttons_shape()
+    test_summary_prefers_region_label_over_section_title()
     test_aggregator_scope_and_container()
 
 
@@ -417,6 +491,7 @@ def run_action_tests() -> None:
     test_action_no_store_writes()
     test_summary_buttons_shape()
     test_js_scan_form_fields_multi_root_cues()
+    test_collect_l2_named()
     test_fullpage_l2_l1_cues()
     test_scan_editable_summary_fullpage_wired()
     test_scan_editable_summary_multi_root_wired()

@@ -1,7 +1,7 @@
 """
 Form-related actions: scan, fill, select, task list, validation.
 
-The largest action group — registers 18 controller actions for
+The largest action group — registers 22 controller actions for
 Element UI form interaction.
 """
 
@@ -11,31 +11,28 @@ import sys
 from dataclasses import dataclass
 
 from ...agent_utils import emit_json
-from scripts.state import (
-    _ACTION_LOG,
-    _record_action,
-    capture_page_png_b64_from_page,
-    record_action_with_screenshots,
-)
+from scripts.state import _record_action
 from ._helpers import (
-    _ok, _err, _is_ok_result,
+    _as_dict, _ok, _err, _is_ok_result,
+    is_absent_field_result, absent_field_skip_result, should_record_result,
     _wait_if_loading, _capture_element, _merge_ax_text,
     _enrich_click_element,
     attach_select_options, options_from_scan_store, read_select_options,
+    reset_select_ui,
+    stamp_recorded_xpath_smart,
 )
 from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR,
     JS_CHECK_SINGLE_FIELD, JS_SCAN_FORM_FIELDS,
     JS_FILL_FORM_FIELD, JS_FILL_BY_XPATH,
     JS_FILL_DATE_BY_XPATH,
-    JS_FIND_LABELED_SELECT, JS_SELECT_OPTION,
+    JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH, JS_SELECT_VALUE_BY_XPATH, JS_LOCATOR,
     JS_CLICK_RADIO_BY_XPATH,
     JS_SELECT_TREE_OPTION,
     JS_SCROLL_TO_FIRST_ERROR,
     JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME,
 )
-from ._llm_values import _llm_generate_values
 from ...models import (
     ScannedField, FormScanResult, Notification,
     FormSnapshot, FormSnapshotCollection,
@@ -44,7 +41,7 @@ from ...models import (
 from ...models.field import ScannedButton
 from .form_rules import (
     match_rule, match_cert_number, get_has_button_keywords,
-    _gen_name,
+    normalize_lat_lng_value,
 )
 
 from .form_scan_utils import (
@@ -52,11 +49,16 @@ from .form_scan_utils import (
     _scan_buttons_from_result, refresh_scan_buttons, _section_group_key, _dedupe_needs_agent,
     _build_section_summary, build_editable_summary, _is_query_mode, _skip_auto_fill,
     _mark_query_ui_if_needed,
-    filter_fillable_scan_fields, prepare_scan_fields_for_tasklist,
-    _pack_select_record, _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
-    ResolvedControl, _resolve_control, _task_xpath_smart, _task_done_impl,
+    filter_fillable_scan_fields, prepare_scan_fields_for_tasklist, tasklist_scan_mode,
+    field_values_equivalent, enrich_field_value_check,
+    _pack_select_record, resolve_recorded_option_text, select_option_already_matched,
+    match_select_option_candidate,
+    _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS, _save_form_snapshot,
+    ResolvedControl, _resolve_control, resolve_select_fallback, _task_xpath_smart, _task_done_impl,
     _submit_ready_hint, _switch_task_list_container, _with_submit_cue, _query_not_form_payload,
 )
+
+from .form_autofill import FormAutofillEngine
 
 async def _clear_field_value(page, label_text):
     """Clear a form field's input value by label.
@@ -92,147 +94,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     def _button_keywords():
         return get_has_button_keywords(case_data_store)
 
-    async def _ensure_scanned(label_text: str, *, allow_autofill: bool = False):
-        """Container touch; optional batch scan + auto-fill.
-
-        Single-field actions call with allow_autofill=False (default) — update
-        container context / query detection. On first touch of a container
-        (no ``_scan_fields`` yet) also scan + save_form_snapshot, without autofill.
-
-        run_form_assistant calls with allow_autofill=True to batch-scan and
-        auto-fill when the phase contract allows.
-
-        Auto-fill skipped when:
-        - query / search toolbar (有查询无保存)
-        - form_modify partial — AI changes only task-named fields
-        - _watcher_mode (CDP quick actions)
-        """
-        if case_data_store.get('_watcher_mode'):
-            return  # CDP watcher: single-field action, no auto-scan
-        page = await browser_context.get_current_page()
-        container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
-        from scripts.controller.actions.container_naming import (
-            resolve_display_container,
-            clear_trigger_button,
-        )
-        display_id = resolve_display_container(container_id, case_data_store)
-        if display_id == 'main' or not str(display_id).startswith(('dialog:', 'drawer:')):
-            if (case_data_store.get('_active_container') or '').startswith(('dialog:', 'drawer:')):
-                clear_trigger_button(case_data_store)
-        container_id = display_id
-
-        # Remember parent before entering search/picker dialog
-        if _is_search_dialog(container_id) or (
-            container_id.startswith(('dialog:', 'drawer:'))
-            and case_data_store.get('_active_container')
-            and not str(case_data_store.get('_active_container')).startswith(('dialog:', 'drawer:'))
-        ):
-            if not case_data_store.get('_parent_container_before_picker'):
-                case_data_store['_parent_container_before_picker'] = (
-                    case_data_store.get('_active_container') or 'main'
-                )
-
-        _switch_task_list_container(case_data_store, container_id)
-
-        async def _rebuild_task_list_from_dom(*, autofill: bool) -> None:
-            raw = await page.evaluate(
-                JS_SCAN_FORM_FIELDS,
-                [False, _button_keywords(), {'mode': 'fullpage'}],
-            )
-            try:
-                result = json.loads(raw) if isinstance(raw, str) else raw
-                raw_fields = result.get('fields') if isinstance(result, dict) else result
-            except Exception:
-                return
-            fillable = prepare_scan_fields_for_tasklist(raw_fields)
-            dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable]
-            raw_cid = result.get('container', container_id) if isinstance(result, dict) else container_id
-            cid = resolve_display_container(raw_cid, case_data_store)
-            _switch_task_list_container(case_data_store, cid)
-            _save_form_snapshot(cid, [f.model_dump() for f in dom_fields], case_data_store)
-            case_data_store['_scan_buttons'] = _scan_buttons_from_result(result)
-            session_filled = set(case_data_store.get('_autofilled_labels') or [])
-            tl = TaskList.from_scan(
-                [f.model_dump() for f in dom_fields],
-                force_refill=_force_refill_flag(case_data_store),
-                session_filled_labels=session_filled,
-            )
-            case_data_store['task_list'] = tl.to_store()
-            case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
-            by = case_data_store.setdefault('_task_lists_by_container', {})
-            if isinstance(by, dict):
-                by[cid] = {
-                    'task_list': case_data_store.get('task_list'),
-                    '_scan_fields': case_data_store.get('_scan_fields'),
-                }
-            if autofill and tl.pending:
-                await _auto_fill_pending()
-                tl_after = TaskList.from_store(case_data_store.get('task_list'))
-                fillable_left = sum(1 for i in tl_after.pending if not i.needs_intervention)
-                case_data_store['_autofill_summary'] = (
-                    f'auto-fill-complete done={len(tl_after.done)} '
-                    f'fillable_pending={fillable_left}'
-                )
-                if fillable_left == 0:
-                    case_data_store['_submit_ready'] = True
-                if isinstance(by, dict):
-                    by[cid] = {
-                        'task_list': case_data_store.get('task_list'),
-                        '_scan_fields': case_data_store.get('_scan_fields'),
-                    }
-
-        # Force rescan when parent marked stale after picker close
-        stale = case_data_store.get('_form_stale')
-        if stale and stale == container_id:
-            case_data_store.pop('_form_stale', None)
-            sys.stderr.write(f'[form] force rescan stale container={container_id}\n')
-            sys.stderr.flush()
-            if not allow_autofill:
-                await _rebuild_task_list_from_dom(autofill=False)
-                return
-            case_data_store.pop('task_list', None)
-            case_data_store.pop('_scan_fields', None)
-
-        is_query_ui = await _mark_query_ui_if_needed(page, case_data_store, container_id)
-        if is_query_ui:
-            # Introduce/picker/search still needs _scan_fields so fill_form_field
-            # can resolve xpath (traj #38 phase 3: 客户名称 → xpath-not-found
-            # when query-toolbar early-return skipped the inventory scan).
-            # Never auto-fill query UI — agent chooses which filters to write.
-            if not case_data_store.get('_scan_fields'):
-                sys.stderr.write(
-                    f'[form] first-touch query-ui scan container={container_id!r}\n'
-                )
-                sys.stderr.flush()
-                await _rebuild_task_list_from_dom(autofill=False)
-            return
-        if not allow_autofill:
-            # First touch of this container (fresh switch clears _scan_fields;
-            # restored containers keep it) — scan + structure checkpoint only.
-            if not case_data_store.get('_scan_fields'):
-                sys.stderr.write(
-                    f'[form] first-touch structure scan container={container_id!r}\n'
-                )
-                sys.stderr.flush()
-                await _rebuild_task_list_from_dom(autofill=False)
-            return
-        if _skip_auto_fill(case_data_store):
-            # form_modify partial (or query flagged without DOM yet)
-            return
-
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        if tl.total > 0:
-            pending_labels = {d.label for d in tl.pending}
-            done_labels = {d.label for d in tl.done}
-            if label_text in pending_labels or label_text in done_labels:
-                return  # already scanned for this form
-
-        sys.stderr.write(
-            f'[form] rescan triggered label_text={label_text!r} container={container_id!r} '
-            f'tl.total={tl.total} force_refill={_force_refill_flag(case_data_store)}\n'
-        )
-        sys.stderr.flush()
-        await _rebuild_task_list_from_dom(autofill=True)
+    engine = FormAutofillEngine(browser_context, case_data_store, llm, _button_keywords)
+    _ensure_scanned = engine.ensure_scanned
 
     @controller.action('Expand ALL el-tree nodes recursively (up to 10 rounds).')
     async def expand_all_el_tree():
@@ -302,10 +165,21 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         }''')
         results.append(f'btn:{clicked}')
 
-        # Wait for post-login navigation
+        summary = ' '.join(results)
+        if (
+            not _is_ok_result(str(u_r))
+            or not _is_ok_result(str(p_r))
+            or clicked != 'ok'
+        ):
+            return _err('err-login | ' + summary)
+
         await page.wait_for_timeout(3000)
-        _record_action('login', {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code}, 'ok-login')
-        return _ok('ok-login | ' + ' '.join(results), include_in_memory=True)
+        _record_action(
+            'login',
+            {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code},
+            'ok-login',
+        )
+        return _ok('ok-login | ' + summary, include_in_memory=True)
 
     @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code). Prefers case_data_store presets when present.')
     async def match_form_rule(label_text: str):
@@ -329,43 +203,75 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
+        value = normalize_lat_lng_value(label_text, value)
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
-        use_label_fallback = bool(resolved.error) and not (xpath_smart or '').strip()
+        from scripts.feature_flags import xpath_smart_fill_only_enabled
+
+        def _absent_skip(lbl: str):
+            if not _is_query_mode(case_data_store):
+                _task_done_impl(lbl or label_text, case_data_store)
+            sys.stderr.write(f'[form] skip absent fill label={(lbl or label_text)!r}\n')
+            sys.stderr.flush()
+            return _ok(_with_submit_cue(absent_field_skip_result(), case_data_store))
+
+        strict_xpath = xpath_smart_fill_only_enabled()
+        use_label_fallback = (
+            (not strict_xpath)
+            and bool(resolved.error)
+            and not (resolved.xpath_smart or "").strip()
+        )
         if resolved.error and not use_label_fallback:
+            if is_absent_field_result(resolved.error):
+                return _absent_skip(label_text)
+            if strict_xpath and not (resolved.xpath_smart or xpath_smart or '').strip():
+                return _with_submit_cue(
+                    resolved.error or 'err-xpath-smart-required',
+                    case_data_store,
+                )
             return resolved.error
         if use_label_fallback:
             # Query/introduce picker: scan may still miss; label DOM fill in
             # the active container (JS_GET_CONTAINER) is the recording path.
             result = await page.evaluate(JS_FILL_FORM_FIELD, [label_text, value])
-            if _is_ok_result(result):
+            if is_absent_field_result(result):
+                return _absent_skip(label_text)
+            if _is_ok_result(result) and should_record_result(result):
                 element = await _capture_element(
                     page, label_text, target_kind='form_input', xpath_smart='',
                 )
+                xp_inv = stamp_recorded_xpath_smart(element, "")
                 _record_action(
                     'fill_form_field',
-                    {'label_text': label_text, 'value': value, 'xpath_smart': ''},
+                    {'label_text': label_text, 'value': value},
                     result,
                     element=element,
                 )
                 if not _is_query_mode(case_data_store):
-                    _task_done_impl(label_text, case_data_store, value=value)
+                    _task_done_impl(label_text, case_data_store, value=value, xpath_smart=xp_inv)
+                return _ok(_with_submit_cue(result, case_data_store))
+            if _is_ok_result(result):
                 return _ok(_with_submit_cue(result, case_data_store))
             return _with_submit_cue(result or resolved.error, case_data_store)
         element = await _capture_element(
             page, resolved.label, target_kind='form_input', xpath_smart=resolved.xpath_smart,
         )
         result = await page.evaluate(JS_FILL_BY_XPATH, [resolved.xpath_smart, value, resolved.label])
-        if _is_ok_result(result):
+        if is_absent_field_result(result):
+            return _absent_skip(resolved.label or label_text)
+        if _is_ok_result(result) and should_record_result(result):
+            xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
                 'fill_form_field',
-                {'label_text': resolved.label, 'value': value, 'xpath_smart': resolved.xpath_smart},
+                {'label_text': resolved.label, 'value': value},
                 result,
                 element=element,
             )
             if not _is_query_mode(case_data_store):
                 _task_done_impl(
-                    resolved.label, case_data_store, value=value, xpath_smart=resolved.xpath_smart,
+                    resolved.label, case_data_store, value=value, xpath_smart=xp_inv,
                 )
+            return _ok(_with_submit_cue(result, case_data_store))
+        if _is_ok_result(result):
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
 
@@ -381,24 +287,43 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             page, resolved.label, target_kind='form_date', xpath_smart=resolved.xpath_smart,
         )
         result = await page.evaluate(JS_FILL_DATE_BY_XPATH, [resolved.xpath_smart, value])
-        if _is_ok_result(result):
+        if is_absent_field_result(result):
+            if not _is_query_mode(case_data_store):
+                _task_done_impl(resolved.label, case_data_store)
+            sys.stderr.write(f'[form] skip absent date label={resolved.label!r}\n')
+            sys.stderr.flush()
+            return _ok(_with_submit_cue(absent_field_skip_result(), case_data_store))
+        if _is_ok_result(result) and should_record_result(result):
+            xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
                 'fill_date_field',
-                {'label_text': resolved.label, 'value': value, 'xpath_smart': resolved.xpath_smart},
+                {'label_text': resolved.label, 'value': value},
                 result,
                 element=element,
             )
             if not _is_query_mode(case_data_store):
                 _task_done_impl(
-                    resolved.label, case_data_store, value=value, xpath_smart=resolved.xpath_smart,
+                    resolved.label, case_data_store, value=value, xpath_smart=xp_inv,
                 )
+            return _ok(_with_submit_cue(result, case_data_store))
+        if _is_ok_result(result):
             return _ok(_with_submit_cue(result, case_data_store))
         return _with_submit_cue(result, case_data_store)
 
     @controller.action('Check the current value of a single form field by its label. Returns JSON with label/kind/currentValue/placeholder/disabled/selected/required. Use this to verify a field was filled correctly by checking currentValue.')
     async def check_field_value(label_text: str):
         page = await browser_context.get_current_page()
-        return await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
+        raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, [label_text, _button_keywords()])
+        if raw == 'label-not-found':
+            return raw
+        try:
+            info = _as_dict(raw)
+        except Exception:
+            return raw
+        if isinstance(info, dict):
+            enrich_field_value_check(info)
+            return json.dumps(info, ensure_ascii=False)
+        return raw
 
     @controller.action('Verify that a form field has an expected value. Calls check_field_value and compares currentValue with expected. Returns ok if match, err if mismatch. Use this to confirm a field was filled correctly.')
     async def verify_field_value(label_text: str, expected: str):
@@ -411,7 +336,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         except Exception:
             return raw
         current = info.get('currentValue', '')
-        if current and (current == expected or expected in current or current in expected):
+        if field_values_equivalent(current, expected):
             return _ok(f'verified:{current}')
         return _err(f'mismatch | current:{current} | expected:{expected}')
 
@@ -427,7 +352,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             [False, _button_keywords(), {'mode': 'fullpage'}],
         )
         try:
-            result = json.loads(raw) if isinstance(raw, str) else raw
+            result = _as_dict(raw)
             raw_fields = result.get('fields') if isinstance(result, dict) else result
         except Exception:
             return raw
@@ -488,6 +413,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     xpath_smart=prev.xpath_smart if prev else '',
                     section_id=prev.section_id if prev else '',
                     section_title=prev.section_title if prev else '',
+                    region_label=getattr(prev, 'region_label', '') if prev else '',
                 ))
         # Restore needs_intervention flags on items that ended up in pending
         for item in tl.pending:
@@ -529,7 +455,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'Read-only summary of visible classified operable controls (quick full-page scan). '
         'Returns {container, scope, total, filled, pending, pending_labels, pending_items'
         '[{label, xpath_smart, kind, section}], readonly_labels, readonly_items[…], '
-        'sections, buttons[{text, section, xpath_smart}], regions?}. '
+        'sections, buttons[{text, region_label, section, xpath_smart}], regions?}. '
         'Use xpath_smart from pending_items/buttons on fill/select/click — do not re-scan for locator. '
         'readonly_items = disabled known-kind fields for reference (do not fill). '
         'Includes shell nav when present. Does NOT build task_list, auto-fill, or run form assistant.'
@@ -543,7 +469,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             [True, _button_keywords(), {'mode': 'fullpage'}],
         )
         try:
-            result = json.loads(raw) if isinstance(raw, str) else raw
+            result = _as_dict(raw)
         except Exception:
             return raw
         if not isinstance(result, dict):
@@ -567,15 +493,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'Call only when the phase contract allows form assistant (create / full modify). '
         'Do not use on navigate/query phases.'
     )
-    async def run_form_assistant(section: str = ''):
+    async def run_form_assistant(section: str = '', region: str = ''):
         from ._phase_intent import contract_allows_form_assistant
         if not contract_allows_form_assistant(case_data_store):
             return 'err-form-assistant-forbidden: phase contract allow_form_assistant=false'
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
-        sec = (section or '').strip()
+        from .section_scope import resolve_scope, remember_phase_section
+        sec = resolve_scope(region, section)
         if sec:
-            from .section_scope import remember_phase_section
             remember_phase_section(case_data_store, sec)
             case_data_store['_assistant_section_filter'] = sec
         try:
@@ -610,7 +536,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             [True, _button_keywords(), {'mode': 'fullpage'}],
         )
         try:
-            result = json.loads(raw) if isinstance(raw, str) else raw
+            result = _as_dict(raw)
             raw_fields = result.get('fields') if isinstance(result, dict) else result
         except Exception:
             return raw
@@ -745,600 +671,6 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         snap = _save_form_snapshot(container_id, fields, case_data_store)
         return _ok(f'form-snapshot | container:{container_id} | count:{snap.count}')
 
-    # 内部函数 — 由 run_form_assistant → _ensure_scanned(allow_autofill=True) 触发自动填；
-    # 单字段 first-touch / stale 仅走 _rebuild(autofill=False) 落结构。
-    # 按 kind 分组（date→select→input→radio→checkbox→tree-select）多次调用 LLM，
-    # 失败字段保留在 pending 供 agent 手动处理，成功字段记录 action + task_done。
-    # ── 辅助闭包（共享 page / llm / case_data_store）──
-    #
-    # _execute_round: 分组 → LLM → 逐个执行，三轮回合共用。
-    # _scan_new_fields: 全量扫描 → 差值过滤 → TaskItem 创建，Round 2/3 共用。
-
-    async def _execute_round(page, items, label_kind, all_results, round_tag):
-        """分组 → LLM 规划 → 逐个执行。round_tag: '' | 'round2 ' | 'round3 '"""
-        from .section_scope import section_matches
-
-        filt = (case_data_store.get('_assistant_section_filter') or '').strip()
-
-        def _field_dict_for_action(sub, action, action_index):
-            action_xp = (action.get('xpath_smart') or '').strip()
-            if action_xp:
-                for d in sub:
-                    if (d.get('xpath_smart') or '').strip() == action_xp:
-                        return d
-            if action_index < len(sub) and sub[action_index].get('label') == action.get('label'):
-                return sub[action_index]
-            label = action.get('label', '')
-            matches = [d for d in sub if d.get('label') == label]
-            if len(matches) == 1:
-                return matches[0]
-            if len(matches) > 1:
-                xps = {
-                    (d.get('xpath_smart') or '').strip()
-                    for d in matches
-                    if (d.get('xpath_smart') or '').strip()
-                }
-                # Identical xpath (or none) → safe; ≥2 distinct → omit (ambiguous)
-                if len(xps) <= 1:
-                    return matches[0]
-                return {}
-            return {}
-
-        async def _select_by_xpath(page, value, xpath_smart):
-            """Xpath-only select open+pick (Phase A hard-cut — no labeled fallback)."""
-            xp = (xpath_smart or '').strip()
-            if not xp:
-                return 'xpath-not-found'
-            _FIRST = ('first', '1st', '第一个', '第一项')
-            already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
-            if str(already).startswith('ok-already:'):
-                cur_val = already.split(':', 1)[1]
-                if (
-                    (value or '').strip().lower() in _FIRST
-                    or cur_val == value
-                    or value in cur_val
-                    or cur_val in value
-                ):
-                    return already
-            trigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
-            if not str(trigger).startswith('ok'):
-                return trigger
-            await page.wait_for_timeout(350)
-            result = await page.evaluate(JS_SELECT_OPTION, value)
-            if str(result).startswith('option-not-found:'):
-                result = await page.evaluate(JS_SELECT_OPTION, 'first')
-            if str(result) == 'no-items':
-                recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
-                if str(recheck).startswith('ok-already:'):
-                    return recheck
-            return result
-
-        KIND_ORDER = {'date': 0, 'select': 1, 'input': 2, 'radio': 3, 'checkbox': 4, 'tree-select': 5}
-        groups: dict[int, list[dict]] = {}
-        for d in items:
-            if filt and not section_matches(filt, d.get('section_id', ''), d.get('section_title', '')):
-                continue
-            # Skip needs_intervention — only auto-fill fillable fields
-            if d.get('disabled') and d.get('hasButton'):
-                continue
-            idx = KIND_ORDER.get(label_kind.get(d['label'], 'input'), 99)
-            groups.setdefault(idx, []).append(d)
-
-        for idx in sorted(groups.keys()):
-            sub = groups[idx]
-            if not sub:
-                continue
-            kind_name = {0: 'date', 1: 'select', 2: 'input', 3: 'radio', 4: 'checkbox', 5: 'tree-select'}.get(idx, 'other')
-            await page.evaluate(
-                's => console.log("[AI填表] 分组 " + s)',
-                f'{kind_name}: {len(sub)}个字段',
-            )
-
-            # ---- Cross-field: cert type -> cert number / customer name ----
-            # Only fill gaps — never overwrite user case_data presets (commandValue).
-            if idx == KIND_ORDER['input']:
-                _has_cert_num = any(
-                    '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or '')
-                    for d in sub
-                )
-                if _has_cert_num:
-                    try:
-                        _ct = await page.evaluate(_JS_READ_CERT_TYPE, ['证件类型', '证照类型', '证件种类'])
-                    except Exception:
-                        _ct = ''
-                    _ov = match_cert_number(_ct or '')
-                    for d in sub:
-                        lbl = d.get('label', '') or ''
-                        if '证件号码' in lbl or '证件号' in lbl:
-                            if d.get('commandValue') and str(d.get('commandValue')).strip():
-                                sys.stderr.write(
-                                    f'[cert-detect] keep case_data cert_number={d["commandValue"]!r}\n'
-                                )
-                                sys.stderr.flush()
-                            else:
-                                d['commandValue'] = _ov
-                                sys.stderr.write(
-                                    f'[cert-detect] cert_type="{_ct}" -> cert_number override: {_ov}\n'
-                                )
-                                sys.stderr.flush()
-                            break
-                    # ---- Cross-field: cert type -> customer name ----
-                    _has_cust_name = any(
-                        '客户名称' in (d.get('label', '') or '') or '客户姓名' in (d.get('label', '') or '')
-                        for d in sub
-                    )
-                    if _has_cust_name:
-                        if _ct and ('统一社会信用代码' in _ct or '营业执照' in _ct):
-                            _name_ov = '测试科技发展有限公司'
-                        else:
-                            _name_ov = _gen_name()
-                        for d_name in sub:
-                            nlbl = d_name.get('label', '') or ''
-                            if '客户名称' in nlbl or '客户姓名' in nlbl:
-                                if d_name.get('commandValue') and str(d_name.get('commandValue')).strip():
-                                    sys.stderr.write(
-                                        f'[cert-detect] keep case_data name={d_name["commandValue"]!r}\n'
-                                    )
-                                    sys.stderr.flush()
-                                else:
-                                    d_name['commandValue'] = _name_ov
-                                    sys.stderr.write(
-                                        f'[cert-detect] cert_type="{_ct}" -> customer name: {_name_ov}\n'
-                                    )
-                                    sys.stderr.flush()
-                                break
-
-            cache = case_data_store.get('_generated_value_cache', {})
-            for d in sub:
-                lbl = d.get('label', '') or ''
-                if lbl in cache and not (d.get('commandValue') and str(d.get('commandValue')).strip()):
-                    d['commandValue'] = cache[lbl]
-
-            actions, needs = _llm_generate_values(
-                llm, sub, case_data_store=case_data_store, section=filt,
-            )
-            if needs:
-                case_data_store.setdefault('_assistant_needs_agent', []).extend(needs)
-            await page.evaluate(
-                'd => console.log("[AI填表] 所有动作(" + d.length + "): " + JSON.stringify(d.map(a => a.label + "=" + (a.value||a.option||""))))',
-                actions,
-            )
-
-            # Build hasButton lookup for post-fill actions (e.g. phone verify)
-            has_button_map = {d.get('label', ''): d.get('hasButton', '') for d in items}
-
-            total = len(actions)
-            ok_in_group = 0
-            fail_in_group = 0
-            for i, a in enumerate(actions):
-                label = a.get('label', '')
-                kind = (a.get('action') or '').lower().replace('-', '_')
-                value = a.get('value', '') or a.get('option', '')
-                field_kind = label_kind.get(label, kind)
-                field_dict = _field_dict_for_action(sub, a, i)
-                xpath_smart = (
-                    a.get('xpath_smart') or field_dict.get('xpath_smart') or ''
-                ).strip()
-                resolve_error = ''
-                if not xpath_smart:
-                    resolved = _resolve_control(case_data_store, label, '')
-                    if not resolved.error:
-                        xpath_smart = resolved.xpath_smart
-                        if resolved.label:
-                            label = resolved.label
-                    else:
-                        # Plumb ambiguous-label / xpath-not-found (do not collapse)
-                        resolve_error = resolved.error
-                placeholder = field_dict.get('placeholder') or label
-                step_num = i + 1
-                # Pre-mutation locator snapshot (same contract as explicit fill/select/radio actions)
-                if field_kind == 'radio' or kind in ('click_radio', 'radio'):
-                    capture_kind = 'form_radio'
-                elif field_kind == 'tree-select' or kind in (
-                    'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
-                ):
-                    capture_kind = 'form_tree_select'
-                elif field_kind == 'date':
-                    capture_kind = 'form_date'
-                elif kind in ('select_option', 'select', 'option'):
-                    capture_kind = 'form_select'
-                else:
-                    capture_kind = 'form_input'
-                element = await _capture_element(
-                    page, label, target_kind=capture_kind, xpath_smart=xpath_smart,
-                )
-                # before shot must precede DOM mutation (auto-fill bypasses controller.action wrap)
-                before_b64 = None
-                try:
-                    before_b64 = await capture_page_png_b64_from_page(page)
-                except Exception:
-                    before_b64 = None
-                try:
-                    is_tree = field_kind == 'tree-select' or kind in (
-                        'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
-                    )
-                    if not xpath_smart and not is_tree:
-                        result = resolve_error or 'xpath-not-found'
-                    elif kind in ('fill_input', 'fill', 'input'):
-                        if field_kind == 'date':
-                            result = await page.evaluate(
-                                JS_FILL_DATE_BY_XPATH, [xpath_smart, value],
-                            )
-                        else:
-                            result = await page.evaluate(
-                                JS_FILL_BY_XPATH, [xpath_smart, value, placeholder],
-                            )
-                    elif field_kind == 'radio' or kind in ('click_radio', 'radio'):
-                        result = await page.evaluate(
-                            JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
-                        )
-                    elif field_kind == 'checkbox' or kind == 'checkbox':
-                        result = await page.evaluate(
-                            JS_CLICK_RADIO_BY_XPATH, [xpath_smart, value],
-                        )
-                    elif is_tree:
-                        result = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
-                        # Non-Tssc "tree-looking" fields: prefer resolve+xpath when store has xpath
-                        if not _is_ok_result(result) and str(result or '').startswith('no-tree-component'):
-                            fill_val = (value or '').strip()
-                            if fill_val and fill_val.lower() != 'first':
-                                if xpath_smart:
-                                    fill_try = await page.evaluate(
-                                        JS_FILL_BY_XPATH, [xpath_smart, fill_val, label],
-                                    )
-                                else:
-                                    fill_try = await page.evaluate(JS_FILL_FORM_FIELD, [label, fill_val])
-                                if _is_ok_result(fill_try):
-                                    result = fill_try
-                                    kind = 'fill_input'
-                                    field_kind = 'input'
-                                    capture_kind = 'form_input'
-                                    element = await _capture_element(
-                                        page, label, target_kind='form_input',
-                                        xpath_smart=xpath_smart,
-                                    )
-                            if not _is_ok_result(result):
-                                if xpath_smart:
-                                    sel_try = await page.evaluate(
-                                        JS_SELECT_TRIGGER_BY_XPATH, [xpath_smart],
-                                    )
-                                    if str(sel_try).startswith('ok'):
-                                        await page.wait_for_timeout(350)
-                                        opt = fill_val if fill_val and fill_val.lower() != 'first' else 'first'
-                                        sel_result = await page.evaluate(JS_SELECT_OPTION, opt)
-                                        if _is_ok_result(sel_result):
-                                            result = sel_result
-                                            kind = 'select_option'
-                                            field_kind = 'select'
-                                            capture_kind = 'form_select'
-                                            element = await _capture_element(
-                                                page, label, target_kind='form_select',
-                                                xpath_smart=xpath_smart,
-                                            )
-                                else:
-                                    sel_try = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
-                                    if sel_try and not str(sel_try).startswith('label-not-found'):
-                                        await page.wait_for_timeout(350)
-                                        opt = fill_val if fill_val and fill_val.lower() != 'first' else 'first'
-                                        sel_result = await page.evaluate(JS_SELECT_OPTION, opt)
-                                        if _is_ok_result(sel_result):
-                                            result = sel_result
-                                            kind = 'select_option'
-                                            field_kind = 'select'
-                                            capture_kind = 'form_select'
-                                            element = await _capture_element(
-                                                page, label, target_kind='form_select',
-                                            )
-                    elif kind in ('select_option', 'select', 'option'):
-                        result = await _select_by_xpath(page, value, xpath_smart)
-                    else:
-                        result = f'unknown-action:{kind}'
-                except Exception as e:
-                    result = f'error:{e}'
-
-                ok = _is_ok_result(result)
-                entry = {'index': step_num, 'action': kind, 'label': label, 'value': value, 'result': result}
-                all_results.append(entry)
-
-                if ok:
-                    ok_in_group += 1
-                    if field_kind == 'radio' or kind in ('click_radio', 'radio'):
-                        await record_action_with_screenshots(
-                            page,
-                            'click_radio',
-                            {
-                                'label_text': label,
-                                'option_text': value,
-                                'xpath_smart': xpath_smart,
-                            },
-                            result,
-                            element=element,
-                            before_b64=before_b64,
-                        )
-                    elif kind in ('fill_input', 'fill', 'input') and field_kind != 'tree-select':
-                        await record_action_with_screenshots(
-                            page,
-                            'fill_form_field',
-                            {
-                                'label_text': label,
-                                'value': value,
-                                'xpath_smart': xpath_smart,
-                            },
-                            result,
-                            element=element,
-                            before_b64=before_b64,
-                        )
-                    elif field_kind == 'tree-select' or kind in (
-                        'fill_tree', 'select_tree_option', 'tree_select', 'treeselect',
-                    ):
-                        await record_action_with_screenshots(
-                            page,
-                            'select_tree_option',
-                            {'label_text': label, 'option_text': value},
-                            result,
-                            element=element,
-                            before_b64=before_b64,
-                        )
-                    elif kind in ('select_option', 'select', 'option'):
-                        if field_kind == 'radio':
-                            await record_action_with_screenshots(
-                                page,
-                                'click_radio',
-                                {
-                                    'label_text': label,
-                                    'option_text': value,
-                                    'xpath_smart': xpath_smart,
-                                },
-                                result,
-                                element=element,
-                                before_b64=before_b64,
-                            )
-                        else:
-                            params, element = await _pack_select_record(
-                                page, case_data_store, label, value, element,
-                            )
-                            if xpath_smart:
-                                params['xpath_smart'] = xpath_smart
-                            await record_action_with_screenshots(
-                                page,
-                                'select_option',
-                                params,
-                                result,
-                                element=element,
-                                before_b64=before_b64,
-                            )
-                    _task_done_impl(
-                        label, case_data_store, value=value, xpath_smart=xpath_smart,
-                    )
-                    # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
-                    btn = has_button_map.get(label, '')
-                    if '验证' in btn and kind in ('fill_input', 'fill', 'input'):
-                        try:
-                            await page.evaluate('''([lbl]) => {
-                                const container = ''' + JS_GET_CONTAINER + ''';
-                                for (const item of container.querySelectorAll('.el-form-item')) {
-                                    const t = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                                    if (!t.includes(lbl)) continue;
-                                    for (const b of item.querySelectorAll('button')) {
-                                        if (b.offsetParent !== null && b.textContent.includes('验证')) {
-                                            b.click(); return 'ok-verify-clicked';
-                                        }
-                                    }
-                                }
-                                return 'no-verify-btn';
-                            }''', [label])
-                        except Exception:
-                            pass
-                    prefix = f'[auto-fill] {round_tag}recorded:' if round_tag else '[auto-fill] recorded:'
-                    sys.stderr.write(f'{prefix} {kind} "{label}" = {value} (total: {len(_ACTION_LOG)})\n')
-                    sys.stderr.flush()
-                    status = 'ok' if ok else f'FAILED:{result}'
-                    await page.evaluate(
-                        'o => console.log("[AI填表] 执行进度 ======\\n" + o)',
-                        f'{step_num}/{total} {kind} "{label}" → {status}',
-                    )
-                else:
-                    fail_in_group += 1
-                    await page.evaluate(
-                        'o => console.log("[AI填表] FAIL: " + o)',
-                        f'{step_num}/{total} {kind} "{label}" → {result}',
-                    )
-
-                await page.wait_for_timeout(500 if kind in ('select_option', 'select', 'option') else 300)
-
-            await page.evaluate(
-                's => console.log("[AI填表] 本组完成: " + s)',
-                f'{total}个动作 | ok:{ok_in_group} failed:{fail_in_group}',
-            )
-
-    def _scan_new_fields(dom_fields, tl):
-        """扫描新字段：差值过滤 + TaskItem 创建。返回 new_pending dicts。"""
-        from .section_scope import section_matches
-
-        filt = (case_data_store.get('_assistant_section_filter') or '').strip()
-        known_labels = {d.label for d in tl.pending} | {d.label for d in tl.done}
-        new_pending: list[dict] = []
-        for f in dom_fields:
-            if not f.label or f.label in known_labels or f.currentValue.strip():
-                continue
-            if filt and not section_matches(filt, f.section_id, f.section_title):
-                continue
-            if f.disabled:
-                # Disabled / introduce (disabled+button) — not assistant pending.
-                continue
-            new_pending.append(f.model_dump())
-        if new_pending:
-            new_labels = [d.get('label', '') for d in new_pending]
-            for d in new_pending:
-                item = TaskItem(**{k: v for k, v in d.items() if k != 'commandValue'})
-                item.needs_intervention = False
-                tl.pending.append(item)
-            case_data_store['task_list'] = tl.to_store()
-            # Debug: verify store has the items
-            verify = TaskList.from_store(case_data_store.get('task_list'))
-            verify_labels = {i.label for i in verify.pending}
-            sys.stderr.write(f'[auto-fill] _scan_new_fields: +{len(new_pending)} new={new_labels}, done={len(tl.done)} pending={len(tl.pending)}\n')
-            sys.stderr.write(f'[auto-fill] _scan_new_fields verify: store pending has {len(verify.pending)} items, labels={list(verify_labels)[:3]}...\n')
-            sys.stderr.flush()
-        return new_pending
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # Round 1: 初始 pending → 分组 → LLM → 执行
-    # ═══════════════════════════════════════════════════════════════════════
-    async def _auto_fill_pending():
-        from .section_scope import section_matches
-
-        case_data_store['_assistant_needs_agent'] = []
-        page = await browser_context.get_current_page()
-        await _wait_if_loading(page)
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        autofilled = set(case_data_store.get('_autofilled_labels') or [])
-        filt = (case_data_store.get('_assistant_section_filter') or '').strip()
-        pending = [
-            item for item in tl.pending
-            if not item.needs_intervention
-            and not (item.label in autofilled and (item.currentValue or '').strip())
-            and section_matches(filt, item.section_id, item.section_title)
-        ]
-
-        if not pending:
-            return _ok('nothing-pending')
-
-        # 构建待填字段列表（不再用案例 KV 硬匹配灌 commandValue；场景原文由 preamble 提示）
-        pending_dicts: list[dict] = []
-        for item in pending:
-            d = item.model_dump()
-            pending_dicts.append(d)
-
-        label_kind: dict[str, str] = {item.label: item.kind for item in pending}
-
-        # Extract reference date from page
-        try:
-            ref_date = await page.evaluate('''() => {
-                const dateLabels = ['成立日期', '登记日期', '注册日期', '营业起始日期', '营业开始日期'];
-                const items = document.querySelectorAll('.el-form-item');
-                for (const el of items) {
-                    const lbl = el.querySelector('.el-form-item__label');
-                    if (!lbl) continue;
-                    const t = lbl.textContent.trim();
-                    if (dateLabels.some(d => t.includes(d))) {
-                        const inp = el.querySelector('input');
-                        if (inp && inp.value && /\\d{4}-\\d{2}-\\d{2}/.test(inp.value)) {
-                            return inp.value;
-                        }
-                    }
-                }
-                return '';
-            }''')
-            if ref_date:
-                case_data_store['_ref_date'] = ref_date
-                await page.evaluate('s => console.log("[AI填表] 参考日期: " + s)', ref_date)
-        except Exception:
-            pass
-
-        # 打印待填写统计
-        kind_counts: dict[str, int] = {}
-        for item in pending:
-            k = item.kind
-            kind_counts[k] = kind_counts.get(k, 0) + 1
-        summary_parts = ' '.join(f'{k}:{v}' for k, v in sorted(kind_counts.items()))
-        await page.evaluate(
-            's => console.log("[AI填表] 预计填写: " + s)',
-            f'{len(pending)}个字段 | {summary_parts}',
-        )
-
-        all_results = []
-        await _execute_round(page, pending_dicts, label_kind, all_results, '')
-
-        # ═══════════════════════════════════════════════════════════════════
-        # Round 2: 级联扫描 — select 赋值后可能 reveal 新字段
-        # ═══════════════════════════════════════════════════════════════════
-        round1_count = len(all_results)
-        try:
-            raw2 = await page.evaluate(
-                JS_SCAN_FORM_FIELDS,
-                [False, _button_keywords(), {'mode': 'fullpage'}],
-            )
-            result2 = json.loads(raw2) if isinstance(raw2, str) else raw2
-            raw_fields2 = result2.get('fields') if isinstance(result2, dict) else result2
-        except Exception:
-            raw_fields2 = []
-        fillable2 = prepare_scan_fields_for_tasklist(raw_fields2)
-        dom_fields2 = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable2]
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        new_pending2 = _scan_new_fields(dom_fields2, tl)
-        if new_pending2:
-            await page.evaluate(
-                's => console.log("[AI填表] 第二轮(联动): " + s)',
-                f'{len(new_pending2)}个新字段',
-            )
-            label_kind2 = {d['label']: d.get('kind', 'input') for d in new_pending2}
-            await _execute_round(page, new_pending2, label_kind2, all_results, 'round2 ')
-
-        # ═══════════════════════════════════════════════════════════════════
-        # Round 3: 深层联动扫描
-        # ═══════════════════════════════════════════════════════════════════
-        round2_count = len(all_results)
-        try:
-            raw3 = await page.evaluate(
-                JS_SCAN_FORM_FIELDS,
-                [False, _button_keywords(), {'mode': 'fullpage'}],
-            )
-            result3 = json.loads(raw3) if isinstance(raw3, str) else raw3
-            raw_fields3 = result3.get('fields') if isinstance(result3, dict) else result3
-        except Exception:
-            raw_fields3 = []
-        fillable3 = prepare_scan_fields_for_tasklist(raw_fields3)
-        dom_fields3 = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable3]
-        tl = TaskList.from_store(case_data_store.get('task_list'))
-        new_pending3 = _scan_new_fields(dom_fields3, tl)
-        if new_pending3:
-            await page.evaluate(
-                's => console.log("[AI填表] 第三轮(深层联动): " + s)',
-                f'{len(new_pending3)}个新字段',
-            )
-            label_kind3 = {d['label']: d.get('kind', 'input') for d in new_pending3}
-            await _execute_round(page, new_pending3, label_kind3, all_results, 'round3 ')
-
-        # ═══════════════════════════════════════════════════════════════════
-        # Step 4-6: 完成、同步（introduce disabled+button 不再入 pending / 不滚动干预）
-        # ═══════════════════════════════════════════════════════════════════
-        ok_count = sum(1 for r in all_results if _is_ok_result(r['result']))
-        failed_count = len(all_results) - ok_count
-        await page.evaluate(
-            'd => console.log("[AI填表] 执行完成 ======\\n" + JSON.stringify(d))',
-            all_results,
-        )
-
-        # Step 6: full scan sync — 移除不在 DOM 的 pending 字段
-        try:
-            raw_sync = await page.evaluate(
-                JS_SCAN_FORM_FIELDS,
-                [False, _button_keywords(), {'mode': 'fullpage'}],
-            )
-            sync_result = json.loads(raw_sync) if isinstance(raw_sync, str) else raw_sync
-            sync_fields = sync_result.get('fields') if isinstance(sync_result, dict) else sync_result
-            sync_fields = prepare_scan_fields_for_tasklist(sync_fields)
-            dom_labels = {f.get('label', '') for f in sync_fields}
-        except Exception:
-            dom_labels = set()
-
-        if dom_labels:
-            tl_sync = TaskList.from_store(case_data_store.get('task_list'))
-            stale = [item for item in tl_sync.pending
-                     if item.label not in dom_labels and not item.needs_intervention]
-            for item in stale:
-                tl_sync.pending.remove(item)
-                sys.stderr.write(f'[auto-fill] Removed stale pending: "{item.label}" (not in DOM)\n')
-            if stale:
-                case_data_store['task_list'] = tl_sync.to_store()
-                sys.stderr.flush()
-
-        tl_debug = TaskList.from_store(case_data_store.get('task_list'))
-        sys.stderr.write(f'[auto-fill] DEBUG done={len(tl_debug.done)} pending={len(tl_debug.pending)}\n')
-        sys.stderr.flush()
-        return _ok(f'auto-fill-done | ok:{ok_count} failed:{failed_count} | ' + json.dumps(all_results, ensure_ascii=False))
-
     @controller.action('Mark a form field as completed in the task list. Use this after successfully filling a field.')
     async def task_done(label_text: str):
         _task_done_impl(label_text, case_data_store)
@@ -1346,27 +678,30 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
     @controller.action('Get the current pending task list. Returns {"pending": [...], NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 保存 — do not re-fill fields.')
-    async def get_pending_tasks(section: str = ''):
+    async def get_pending_tasks(section: str = '', region: str = ''):
         if _is_query_mode(case_data_store):
             return _ok(_query_not_form_payload(), include_in_memory=True)
-        from .section_scope import section_matches, pending_by_section
+        from .section_scope import section_matches, pending_by_section, pending_by_region, resolve_scope
         tl = TaskList.from_store(case_data_store.get('task_list'))
-        sec = (section or '').strip()
+        sec = resolve_scope(region, section)
         pending_items = [
             i for i in tl.pending
             if not i.needs_intervention
-            and section_matches(sec, i.section_id, i.section_title)
+            and section_matches(sec, i.section_id, i.section_title, getattr(i, 'region_label', '') or '')
         ]
         pending_payload = [i.model_dump() for i in pending_items]
+        by_region = pending_by_region(tl)
         sys.stderr.write(
-            f'[get-pending] done={len(tl.done)} pending={len(tl.pending)} section={sec!r}\n'
+            f'[get-pending] done={len(tl.done)} pending={len(tl.pending)} region={sec!r}\n'
         )
         sys.stderr.flush()
         result = {
             'pending': pending_payload,
             'done': len(tl.done),
-            'pending_by_section': pending_by_section(tl),
-            'section_filter': sec or None,
+            'pending_by_region': by_region,
+            'pending_by_section': pending_by_section(tl),  # legacy alias
+            'region_filter': sec or None,
+            'section_filter': sec or None,  # legacy alias
         }
         cue = _submit_ready_hint(case_data_store, section=sec)
         if cue:
@@ -1382,19 +717,22 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'then scan the whole page for .el-form-item__error and success/error notifications. '
         'Prefer this over scroll_down + click_element_by_index for form submit (including '
         'maintain/edit dialog 确认). '
-        'Optional section scopes to a collapse/tab/card block when multiple同名按钮 exist. '
+        'Optional region= scopes to a collapse/tab/card / L1 block when multiple同名按钮 exist '
+        '(section= is a deprecated alias). '
         'Returns ok-save-success when 操作成功 toast appears, ok-save-navigation when URL changes, '
         'or ok-save-no-feedback when the click completes with no toast/error/navigation '
         '(silent save — still success). On validation errors returns err-save-validation.'
     )
-    async def click_save(button_text: str = '保存', section: str = ''):
+    async def click_save(button_text: str = '保存', section: str = '', region: str = ''):
         from ._phase_intent import check_pending_write_gate, contract_force_refill, record_success_token
+        from .section_scope import resolve_scope
 
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         compact_btn = re.sub(r'\s+', '', (button_text or '保存').strip()) or '保存'
-        sec = (section or "").strip()
-        explicit_sec = bool((section or "").strip())
+        # LEGACY_SECTION_RETIRE: region= preferred; section= kept for compat.
+        sec = resolve_scope(region, section)
+        explicit_sec = bool(sec)
         # Resolve: explicit → multi-save gate → sticky memory → unique → ""
         if not sec and not explicit_sec:
             try:
@@ -1426,7 +764,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         if auto_sec:
                             sec = auto_sec
                             sys.stderr.write(
-                                f'[click_save] auto section={auto_sec!r} from unique button\n'
+                                f'[click_save] auto region={auto_sec!r} from unique button\n'
                             )
                             sys.stderr.flush()
             except Exception:
@@ -1463,7 +801,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         else:
             if not is_picker_confirm:
                 from ._phase_boundary import phase_boundary_active, get_phase_boundary
-                from .section_scope import pending_by_section, requires_section_declaration
+                from .section_scope import pending_by_region, requires_region_declaration
 
                 needs_gate = False
                 if phase_boundary_active(case_data_store):
@@ -1473,12 +811,13 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     needs_gate = contract_force_refill(case_data_store)
                 if needs_gate and not sec:
                     tl0 = TaskList.from_store((case_data_store or {}).get("task_list"))
-                    by = pending_by_section(tl0)
-                    if requires_section_declaration(tl0):
+                    by = pending_by_region(tl0)
+                    if requires_region_declaration(tl0):
                         return _err(
-                            "err-section-required | pending_by_section="
+                            "err-region-required | pending_by_region="
                             + json.dumps(by, ensure_ascii=False)
-                            + " | Pass section= for the phase block (judge from 阶段任务 / 阶段目录).",
+                            + " | Pass region= for the phase block "
+                            "(judge from 阶段任务 / 阶段目录 / region_label).",
                             include_in_memory=True,
                         )
 
@@ -1574,15 +913,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             if reason == 'ambiguous':
                 return _err(
                     f'err-save-ambiguous:{needle} | candidates={cand_json} | '
-                    f'Multiple visible "{needle}" buttons — pass section= to click_save '
-                    f'(collapse/tab/card title from scan sections).',
+                    f'Multiple visible "{needle}" buttons — pass region= (or section=) to click_save '
+                    f'(region_label / collapse/tab/card title from scan).',
                     include_in_memory=True,
                 )
-            sec_hint = f' section={sec!r}' if sec else ''
+            sec_hint = f' region={sec!r}' if sec else ''
             return _err(
                 f'err-save-button-not-found:{needle}{sec_hint}. '
                 f'candidates={cand_json}. '
-                f'Close interfering dialogs (查询/返回) with close_dialog, or pass section= for scoped save.',
+                f'Close interfering dialogs (查询/返回) with close_dialog, or pass region= for scoped save.',
                 include_in_memory=True,
             )
 
@@ -1747,7 +1086,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     backfilled = []
                     try:
                         raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, btn_kw])
-                        result = json.loads(raw) if isinstance(raw, str) else raw
+                        result = _as_dict(raw)
                         fields = result.get('fields') if isinstance(result, dict) else result
                         for f in fields or []:
                             if not isinstance(f, dict):
@@ -1769,9 +1108,14 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         case_data_store.pop('_query_ui', None)
                 sys.stderr.write('[click_save] SUCCESS picker confirm (dialog closed)\n')
                 sys.stderr.flush()
+                if case_data_store is not None:
+                    # Parent form still needs final 保存 after introduce (toast_ok).
+                    case_data_store['_submit_ready'] = True
+                    case_data_store.pop('_query_ui', None)
                 return _ok(
                     'ok-introduce-confirm | Picker confirmed; introduce fields should be backfilled. '
-                    'Continue filling remaining form fields then click_save(button_text="保存").',
+                    'Call click_save(button_text="保存") NOW on the parent form. '
+                    'Do NOT only check_field_value.',
                     include_in_memory=True,
                 )
 
@@ -1795,7 +1139,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         page = await browser_context.get_current_page()
         raw = await page.evaluate(JS_SCROLL_TO_FIRST_ERROR)
         try:
-            info = json.loads(raw) if isinstance(raw, str) else raw
+            info = _as_dict(raw)
         except Exception:
             return _ok('no-error-found')
         label = (info.get('label') or '').strip()
@@ -1856,6 +1200,23 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
+
+        async def _final_select_failure(result_text: str, xpath_for_log: str = '') -> str:
+            diag = await reset_select_ui(page)
+            sys.stderr.write(
+                f'[select] final failure label={label_text!r} option={option_text!r} '
+                f'xpath={xpath_for_log!r} result={result_text!r} reset={diag}\n'
+            )
+            sys.stderr.flush()
+            return result_text
+
+        reset_diag = await reset_select_ui(page)
+        if not reset_diag.get('closed', False):
+            sys.stderr.write(f'[select] preflight reset incomplete: {reset_diag}\n')
+            sys.stderr.flush()
+            failed = await _final_select_failure('no-items')
+            return _err(failed)
+
         resolved = _resolve_control(case_data_store, label_text, xpath_smart)
         if resolved.error:
             return resolved.error
@@ -1867,25 +1228,22 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         )
 
         # Xpath-only already-matched (no JS_FIND_LABELED_SELECT).
-        already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+        already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, label_text])
         if str(already).startswith('ok-already:'):
             cur_val = already.split(':', 1)[1]
-            _FIRST = ('first', '1st', '第一个', '第一项')
             # "first" means "any existing value is fine" — do NOT re-open the
             # dropdown (re-selecting first can cascade-reset dependent fields).
-            if (
-                (option_text or '').strip().lower() in _FIRST
-                or cur_val == option_text
-                or option_text in cur_val
-                or cur_val in option_text
-            ):
+            # Exact match only — substring (非金融 ⊂ 其他非金融) must re-select.
+            if select_option_already_matched(option_text, cur_val):
+                stamped = resolve_recorded_option_text(option_text, cur_val)
                 params, element = await _pack_select_record(
-                    page, case_data_store, label_text, option_text, element,
+                    page, case_data_store, label_text, stamped, element,
                 )
-                params['xpath_smart'] = xp
+                xp_inv = stamp_recorded_xpath_smart(element, xp)
+                params['option_text'] = stamped
                 _record_action('select_option', params, already, element=element)
                 _task_done_impl(
-                    label_text, case_data_store, value=cur_val or option_text, xpath_smart=xp,
+                    label_text, case_data_store, value=cur_val or stamped, xpath_smart=xp_inv,
                 )
                 streak = int(case_data_store.get('_already_matched_streak', 0) or 0) + 1
                 case_data_store['_already_matched_streak'] = streak
@@ -1896,21 +1254,50 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
         case_data_store['_already_matched_streak'] = 0
 
-        # Close any leftover open dropdowns before opening the target select
-        await page.evaluate('''() => {
-            document.querySelectorAll('.el-select-dropdown:not(.is-hidden)').forEach(dd => {
-                dd.style.display = 'none';
-                dd.classList.add('is-hidden');
-            });
-            document.body.click();
-        }''')
-        await page.wait_for_timeout(100)
-
-        trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp])
-        if trigger_result in ('label-not-found', 'no-select-found', 'select-disabled', 'xpath-not-found', 'xpath-empty', 'field-disabled'):
+        trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
+        if trigger_result == 'xpath-not-found':
+            fallback = resolve_select_fallback(case_data_store, label_text, xp)
+            if fallback is not None:
+                reset_diag = await reset_select_ui(page)
+                if not reset_diag.get('closed', False):
+                    sys.stderr.write(
+                        f'[select] fallback preflight reset incomplete: {reset_diag}\n'
+                    )
+                    sys.stderr.flush()
+                    failed = await _final_select_failure('no-items', xp)
+                    return _err(failed)
+                xp = fallback.xpath_smart
+                label_text = fallback.label or label_text
+                trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
+                if _is_ok_result(str(trigger_result)):
+                    element = await _capture_element(
+                        page,
+                        label_text,
+                        target_kind='form_select',
+                        xpath_smart=xp,
+                    )
+                    sys.stderr.write(
+                        f'[select] xpath fallback success label={label_text!r} xpath={xp!r}\n'
+                    )
+                    sys.stderr.flush()
+        if trigger_result in (
+            'label-not-found',
+            'no-select-found',
+            'select-disabled',
+            'xpath-not-found',
+            'xpath-empty',
+            'field-disabled',
+        ):
+            if is_absent_field_result(trigger_result):
+                if not _is_query_mode(case_data_store):
+                    _task_done_impl(label_text, case_data_store)
+                sys.stderr.write(f'[select] skip absent label={label_text!r}\n')
+                sys.stderr.flush()
+                return _ok(_with_submit_cue(absent_field_skip_result(), case_data_store))
+            failed = await _final_select_failure(str(trigger_result), xp)
             if trigger_result == 'no-select-found':
-                return _err('no-select-found | field may be radio — use click_radio')
-            return trigger_result
+                return _err(failed + ' | field may be radio — use click_radio')
+            return failed
 
         await page.wait_for_timeout(500)
 
@@ -1918,29 +1305,32 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         params, element = await _pack_select_record(
             page, case_data_store, label_text, option_text, element,
         )
-        params['xpath_smart'] = xp
+        xp_inv = stamp_recorded_xpath_smart(element, xp)
 
         select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
         if _is_ok_result(select_result):
             matched_text = select_result.split(':', 1)[1] if ':' in select_result else select_result
             case_data_store.pop(f'_sel_retry_{label_text}', None)
-            params['option_text'] = matched_text or option_text
+            stamped = resolve_recorded_option_text(option_text, matched_text)
+            params['option_text'] = stamped
             params, element = attach_select_options(params, element, params.get('options'))
-            params['xpath_smart'] = xp
             _record_action('select_option', params, matched_text, element=element)
             _task_done_impl(
-                label_text, case_data_store, value=matched_text or option_text, xpath_smart=xp,
+                label_text, case_data_store, value=stamped or option_text, xpath_smart=xp_inv,
             )
             return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
         elif select_result == 'no-items':
             # Xpath recheck — treat already-set field as success (no labeled JS).
-            recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp])
+            recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, label_text])
             if str(recheck).startswith('ok-already:'):
                 cur = recheck.split(':', 1)[1]
-                _task_done_impl(label_text, case_data_store, value=cur, xpath_smart=xp)
+                stamped = resolve_recorded_option_text(option_text, cur)
+                params['option_text'] = stamped
+                _task_done_impl(label_text, case_data_store, value=cur or stamped, xpath_smart=xp_inv)
                 _record_action('select_option', params, recheck, element=element)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', case_data_store))
-            return _err('no-items')
+            failed = await _final_select_failure('no-items', xp)
+            return _err(failed)
         elif select_result.startswith('option-not-found:'):
             # Fuzzy: pick listed option that contains / is contained by option_text
             listed = [x.strip() for x in select_result.split(':', 1)[1].split(',') if x.strip()]
@@ -1950,9 +1340,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 if x not in stored:
                     stored.append(x)
             params, element = attach_select_options(params, element, stored)
-            params['xpath_smart'] = xp
             want = (option_text or '').strip()
-            fuzzy = next((o for o in stored if want and (want in o or o in want)), None)
+            fuzzy = match_select_option_candidate(want, stored)
             # Common alias: 中国 → 中华人民共和国
             if not fuzzy and want in ('中国', '中国大陆'):
                 fuzzy = next((o for o in stored if '中国' in o), None)
@@ -1962,9 +1351,8 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     matched_text = fuzzy_result.split(':', 1)[1] if ':' in fuzzy_result else fuzzy_result
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
                     params['option_text'] = matched_text
-                    params['xpath_smart'] = xp
                     _record_action('select_option', params, matched_text, element=element)
-                    _task_done_impl(label_text, case_data_store, value=matched_text, xpath_smart=xp)
+                    _task_done_impl(label_text, case_data_store, value=matched_text, xpath_smart=xp_inv)
                     return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', case_data_store))
             retry_key = f'_sel_retry_{label_text}'
             retries = case_data_store.get(retry_key, 0) + 1
@@ -1974,17 +1362,20 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                 if _is_ok_result(first_result):
                     matched_text = first_result.split(':', 1)[1] if ':' in first_result else first_result
                     case_data_store.pop(f'_sel_retry_{label_text}', None)
-                    params['option_text'] = matched_text or option_text
-                    params['xpath_smart'] = xp
+                    stamped = resolve_recorded_option_text(option_text, matched_text)
+                    params['option_text'] = stamped
                     _record_action('select_option', params, matched_text, element=element)
                     _task_done_impl(
-                        label_text, case_data_store, value=matched_text or option_text, xpath_smart=xp,
+                        label_text, case_data_store, value=stamped or matched_text, xpath_smart=xp_inv,
                     )
                     return _ok(_with_submit_cue(f'ok | {matched_text}', case_data_store))
-                return _err(first_result)
-            return _err(select_result)
+                failed = await _final_select_failure(str(first_result), xp)
+                return _err(failed)
+            failed = await _final_select_failure(str(select_result), xp)
+            return _err(failed)
         else:
-            return _err(select_result)
+            failed = await _final_select_failure(str(select_result), xp)
+            return _err(failed)
 
     # ── Adjacent button / radio (moved from misc for logical grouping) ──
 
@@ -2056,34 +1447,71 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             page, resolved.label, target_kind='form_radio', xpath_smart=resolved.xpath_smart,
         )
         result = await page.evaluate(JS_CLICK_RADIO_BY_XPATH, [resolved.xpath_smart, option_text])
+        if is_absent_field_result(result):
+            if not _is_query_mode(case_data_store):
+                _task_done_impl(resolved.label, case_data_store)
+            sys.stderr.write(f'[form] skip absent radio label={resolved.label!r}\n')
+            sys.stderr.flush()
+            return _ok(_with_submit_cue(absent_field_skip_result(), case_data_store))
         if _is_ok_result(result):
+            xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
                 'click_radio',
                 {
                     'label_text': resolved.label,
                     'option_text': option_text,
-                    'xpath_smart': resolved.xpath_smart,
                 },
                 result,
                 element=element,
             )
             _task_done_impl(
-                resolved.label, case_data_store, value=option_text, xpath_smart=resolved.xpath_smart,
+                resolved.label, case_data_store, value=option_text, xpath_smart=xp_inv,
             )
             return _ok(result)
         return result
 
     @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover. If result starts with no-tree-component, do NOT retry — use fill_form_field with a concrete value (not "first") or select_option.')
-    async def select_tree_option(label_text: str, option_text: str):
+    async def select_tree_option(label_text: str, option_text: str, xpath_smart: str = ""):
         page = await browser_context.get_current_page()
         await _wait_if_loading(page)
         await _ensure_scanned(label_text)
-        element = await _capture_element(page, label_text, target_kind='form_tree_select')
+        resolved = _resolve_control(case_data_store, label_text, xpath_smart)
+        # Soft resolve: tree-select can still run via label JS when scan miss;
+        # capture uses resolved xpath when present so steps stamp form_tree_select.
+        label_text = (resolved.label or label_text or '').strip() or label_text
+        xp = '' if resolved.error else (resolved.xpath_smart or '').strip()
+        element = await _capture_element(
+            page, label_text, target_kind='form_tree_select', xpath_smart=xp,
+        )
         result = await page.evaluate(JS_SELECT_TREE_OPTION, [label_text, option_text])
         # P0/P1/P2 success codes all use ok prefix → recordable via _is_ok_result
         if _is_ok_result(result):
-            _record_action('select_tree_option', {'label_text': label_text, 'option_text': option_text}, result, element=element)
-            _task_done_impl(label_text, case_data_store, value=option_text)
+            if element is None and xp:
+                element = await _capture_element(
+                    page, label_text, target_kind='form_tree_select', xpath_smart=xp,
+                )
+            if element is None:
+                # Last resort: stamp label-only meta so persist has form_tree_select
+                element = {
+                    'tag_name': 'div',
+                    'xpath': xp or '',
+                    'xpath_smart': xp or '',
+                    'formLabel': label_text,
+                    'target_kind': 'form_tree_select',
+                    'text': (option_text or '')[:80],
+                    'attributes': {},
+                    'candidates': (
+                        [{'type': 'xpath_smart', 'value': xp}] if xp else []
+                    ),
+                }
+            xp_inv = stamp_recorded_xpath_smart(element, xp)
+            _record_action(
+                'select_tree_option',
+                {'label_text': label_text, 'option_text': option_text},
+                result,
+                element=element,
+            )
+            _task_done_impl(label_text, case_data_store, value=option_text, xpath_smart=xp_inv)
             return _ok(result)
         res_s = str(result or '')
         if res_s == 'disabled' or res_s.startswith('disabled'):
@@ -2105,10 +1533,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     fill_result = await page.evaluate(
                         JS_FILL_BY_XPATH, [fill_xpath, fill_val, label_text],
                     )
+                    xp_inv = stamp_recorded_xpath_smart(fill_el, fill_xpath)
                     record_params = {
                         'label_text': label_text,
                         'value': fill_val,
-                        'xpath_smart': fill_xpath,
                     }
                 else:
                     fill_el = None
@@ -2121,7 +1549,10 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                         fill_result,
                         element=fill_el,
                     )
-                    _task_done_impl(label_text, case_data_store, value=fill_val)
+                    _task_done_impl(
+                        label_text, case_data_store, value=fill_val,
+                        xpath_smart=xp_inv if fill_xpath else '',
+                    )
                     return _ok(
                         f'ok-fill-fallback:{fill_val} | was no-tree-component; '
                         f'recorded as fill_form_field (do not retry select_tree_option)'

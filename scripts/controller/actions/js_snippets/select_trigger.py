@@ -63,16 +63,33 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         if (_isVisibleContainer(d)) _containers.push(d);
     _containers.push(document);
 
+    function _normFormLab(s) {
+        return String(s || '').replace(/\s+/g, ' ').trim()
+            .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+    }
     function _tryItems(items, label, mode) {
-        for (let pass = 1; pass <= 2; pass++) {
-            const exact = pass === 1;
-            for (const item of items) {
-                const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                if (exact) { if (lbl !== label) continue; }
-                else { if (lbl === label || !lbl.includes(label)) continue; }
+        // Exact normalized label first (strips Element UI * / colon). Pass-2
+        // includes() alone wrongly preferred 国民经济部门类别 over 国民经济部门
+        // when pass-1 raw equality failed on leading '*'.
+        const wantN = _normFormLab(label);
+        let exactItem = null;
+        let includesItem = null;
+        for (const item of items) {
+            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+            const labN = _normFormLab(lbl);
+            if (wantN && labN === wantN) {
+                exactItem = item;
+                break;
+            }
+            if (wantN && !includesItem && labN && labN.includes(wantN)) includesItem = item;
+        }
+        const picked = exactItem || includesItem;
+        if (!picked) return null;
+        {
+            const item = picked;
             const trigger = item.querySelector('.el-select .el-input__inner');
             if (!trigger && mode === 'trigger') return {skip: true, reason: 'no-select-found'};
-            if (!trigger) continue;
+            if (!trigger) return null;
             if (mode === 'check') {
                 const cur = getSelectedLabel(item);
                 if (cur) return {done: true, result: 'ok-already:' + cur};
@@ -94,8 +111,6 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
             }
             return {done: true, result: 'unknown-mode'};
         }
-        }
-        return null;
     }
 
     for (const c of _containers) {
@@ -123,12 +138,23 @@ JS_FIND_LABELED_SELECT = '''([label, mode]) => {
         // pagination page-size "10条/页" — was reported as the field's value
         // ('ok-already:10条/页'), silently misdirecting the agent away from the
         // real field.
+        // Prefer exact owner label, then includes / placeholder (prefix-safe).
+        const wantN = _normFormLab(label);
+        let exactSel = null;
+        let includesSel = null;
         for (const sel of _allSelects) {
             if (sel.offsetParent === null) continue;
             const ph = sel.getAttribute('placeholder') || '';
             const ownerItem = sel.closest('.el-form-item');
             const ownerLabel = ownerItem ? (ownerItem.querySelector('.el-form-item__label')?.textContent || '').trim() : '';
-            if (!ph.includes(label) && !ownerLabel.includes(label)) continue;
+            const ownerN = _normFormLab(ownerLabel);
+            if (wantN && ownerN === wantN) { exactSel = sel; break; }
+            if (!includesSel && ((wantN && ownerN && ownerN.includes(wantN)) || (ph && ph.includes(label)))) {
+                includesSel = sel;
+            }
+        }
+        const sel = exactSel || includesSel;
+        if (sel) {
             const v = (sel.value || '').trim();
             if (v.length > 0) return 'ok-already:' + v;
             const t = (sel.textContent || '').trim();
@@ -190,15 +216,64 @@ JS_FIND_VISIBLE_DROPDOWN = '''(() => {
     return document;
 })()'''
 
+JS_RESET_SELECT_UI = r'''async () => {
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const visibleDropdowns = () => [...document.querySelectorAll('.el-select-dropdown')]
+    .filter((dd) => {
+      if (dd.classList.contains('is-hidden')) return false;
+      const style = getComputedStyle(dd);
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
+      const rect = dd.getBoundingClientRect();
+      return rect.width > 0;
+    });
+
+  const before = visibleDropdowns().length;
+  const trigger = window.__last_select_trigger || null;
+  if (trigger) {
+    try {
+      trigger.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Escape',
+        code: 'Escape',
+        keyCode: 27,
+        which: 27,
+        bubbles: false,
+        cancelable: true,
+      }));
+    } catch (e) {}
+    try { trigger.blur(); } catch (e) {}
+  }
+
+  const outside = document.body || document.documentElement;
+  if (outside) {
+    outside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    outside.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  }
+  window.__last_select_trigger = null;
+
+  for (let i = 0; i < 10 && visibleDropdowns().length > 0; i += 1) {
+    await sleep(50);
+  }
+  const after = visibleDropdowns().length;
+  return { before, after, closed: after === 0 };
+}'''
+
 # Open an el-select dropdown resolved by xpath; sets window.__last_select_trigger for JS_SELECT_OPTION.
 
-JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath]) => {
+JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath, labelHint]) => {
   if (!xpath) return 'xpath-empty';
   const isVis = (el) => {
     if (!el || el.nodeType !== 1) return false;
     if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
     const st = getComputedStyle(el);
     return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const normFormLab = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+    .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+  const formItemLabel = (el) => {
+    const item = el && el.closest && el.closest('.el-form-item');
+    if (!item) return '';
+    const lbl = item.querySelector('.el-form-item__label, label');
+    return String((lbl && lbl.textContent) || '').replace(/\s+/g, ' ').trim();
   };
   const wrapVisible = (d) => {
     if (!d) return false;
@@ -214,23 +289,32 @@ JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath]) => {
     }
     return null;
   };
-  const findNodeFromSnap = (snap, root) => {
+  const findNodeFromSnap = (snap, root, hint) => {
+    const wantN = normFormLab(hint);
+    let fallback = null;
+    let exactMatch = null;
+    let includesMatch = null;
     for (let i = snap.snapshotLength - 1; i >= 0; i--) {
       const n = snap.snapshotItem(i);
       if (!n || !isVis(n)) continue;
       if (root && root !== document && !root.contains(n)) continue;
-      return n;
+      if (!fallback) fallback = n;
+      if (wantN) {
+        const labN = normFormLab(formItemLabel(n));
+        if (labN === wantN) { exactMatch = n; break; }
+        if (!includesMatch && labN && labN.includes(wantN)) includesMatch = n;
+      }
     }
-    return null;
+    return exactMatch || includesMatch || fallback;
   };
-  const tryXpath = (xp, root) => {
+  const tryXpath = (xp, root, hint) => {
     if (!xp) return null;
     let s = String(xp);
     try {
       const ctx = root || document;
       if (root && s.startsWith('//')) s = '.' + s;
       const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-      return findNodeFromSnap(snap, root);
+      return findNodeFromSnap(snap, root, hint);
     } catch (e) {
       return null;
     }
@@ -247,12 +331,13 @@ JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath]) => {
     }
     return null;
   };
-  let node = tryXpath(xpath, null);
+  const hint = labelHint == null ? '' : String(labelHint);
+  let node = tryXpath(xpath, null, hint);
   if (!node && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
     const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
     const local = m && m[1] ? m[1] : '';
     const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleHost(true) : lastVisibleHost(false);
-    if (dlg && local) node = tryXpath('.//' + local, dlg);
+    if (dlg && local) node = tryXpath('.//' + local, dlg, hint);
   }
   if (!node) return 'xpath-not-found';
   const trigger = findSelectTrigger(node);
@@ -272,13 +357,21 @@ JS_SELECT_TRIGGER_BY_XPATH = r'''([xpath]) => {
 # Read current el-select display value by xpath (no click). Same resolve path as trigger.
 # Returns: ok-already:<value> | empty | xpath-miss | xpath-empty | no-select-found
 
-JS_SELECT_VALUE_BY_XPATH = r'''([xpath]) => {
+JS_SELECT_VALUE_BY_XPATH = r'''([xpath, labelHint]) => {
   if (!xpath) return 'xpath-empty';
   const isVis = (el) => {
     if (!el || el.nodeType !== 1) return false;
     if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
     const st = getComputedStyle(el);
     return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const normFormLab = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+    .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+  const formItemLabel = (el) => {
+    const item = el && el.closest && el.closest('.el-form-item');
+    if (!item) return '';
+    const lbl = item.querySelector('.el-form-item__label, label');
+    return String((lbl && lbl.textContent) || '').replace(/\s+/g, ' ').trim();
   };
   const wrapVisible = (d) => {
     if (!d) return false;
@@ -294,23 +387,32 @@ JS_SELECT_VALUE_BY_XPATH = r'''([xpath]) => {
     }
     return null;
   };
-  const findNodeFromSnap = (snap, root) => {
+  const findNodeFromSnap = (snap, root, hint) => {
+    const wantN = normFormLab(hint);
+    let fallback = null;
+    let exactMatch = null;
+    let includesMatch = null;
     for (let i = snap.snapshotLength - 1; i >= 0; i--) {
       const n = snap.snapshotItem(i);
       if (!n || !isVis(n)) continue;
       if (root && root !== document && !root.contains(n)) continue;
-      return n;
+      if (!fallback) fallback = n;
+      if (wantN) {
+        const labN = normFormLab(formItemLabel(n));
+        if (labN === wantN) { exactMatch = n; break; }
+        if (!includesMatch && labN && labN.includes(wantN)) includesMatch = n;
+      }
     }
-    return null;
+    return exactMatch || includesMatch || fallback;
   };
-  const tryXpath = (xp, root) => {
+  const tryXpath = (xp, root, hint) => {
     if (!xp) return null;
     let s = String(xp);
     try {
       const ctx = root || document;
       if (root && s.startsWith('//')) s = '.' + s;
       const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-      return findNodeFromSnap(snap, root);
+      return findNodeFromSnap(snap, root, hint);
     } catch (e) {
       return null;
     }
@@ -345,12 +447,13 @@ JS_SELECT_VALUE_BY_XPATH = r'''([xpath]) => {
     }
     return '';
   };
-  let node = tryXpath(xpath, null);
+  const hint = labelHint == null ? '' : String(labelHint);
+  let node = tryXpath(xpath, null, hint);
   if (!node && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
     const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
     const local = m && m[1] ? m[1] : '';
     const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleHost(true) : lastVisibleHost(false);
-    if (dlg && local) node = tryXpath('.//' + local, dlg);
+    if (dlg && local) node = tryXpath('.//' + local, dlg, hint);
   }
   if (!node) return 'xpath-miss';
   const select = findSelectHost(node);

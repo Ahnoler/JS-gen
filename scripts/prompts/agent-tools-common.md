@@ -8,7 +8,7 @@
 - done(text, success) — 仅在任务完全完成时调用
 
 ## Element UI 自定义动作（用于 Element UI 组件）
-**成功可录制约定：** 动作结果字符串以 `ok` 开头（`ok` / `ok:` / `ok-clicked` / `ok-already:…` 等）才视为成功并写入轨迹；`already-filled`、`label-not-found` 等不以 `ok` 开头的码表示跳过或失败。
+**成功可录制约定：** 动作结果字符串以 `ok` 开头（`ok` / `ok:` / `ok-clicked` / `ok-already:…` 等）才视为成功并写入轨迹。`ok-skip:label-not-found` 表示字段已不在 DOM（级联卸掉）——**视为成功跳过：不写入轨迹、不要滚动重试、不要自愈猎场**。`already-filled`、裸 `label-not-found`（旧码）等亦表示跳过或失败；新路径统一返回 `ok-skip:label-not-found`。
 
 - close_dialog() — 关闭最上层的 el-dialog 或 el-drawer。**不适用于通知 — 请使用 close_notification()。**
 - close_notification() — 关闭可见的 el-notification 弹窗，读取并返回其文本。如果没有则返回 "no-notification"。**用于处理服务端校验错误。`no-notification` ≠ 保存成功。**
@@ -20,7 +20,7 @@
 - save_case_data(key, value) — 将值保存到进程级 case data 存储（跨步骤/阶段持久化）
 - read_case_data(key) — 从 case data 存储中读取值
 - **use_special_element(special_element_id) — 执行当前阶段下发的特殊元素操作组。仅可使用任务中【特殊元素库候选】列出的 id；成功后步骤会以特殊元素来源写入轨迹。页面状态匹配复杂组件流程时优先调用，不要编造未提供的 id。**
-- check_field_value(label_text) — 返回包含 label/kind/currentValue/placeholder/disabled/selected/required 的 JSON。**kind 为：input/select/date/radio/checkbox 之一。** 用于验证字段是否正确填写。
-- verify_field_value(label_text, expected) — 调用 check_field_value 并将 currentValue 与 expected 比较。匹配返回 ok，不匹配返回 err。填写后用于确认值已正确设置。
+- check_field_value(label_text) — 返回包含 label/kind/currentValue/placeholder/disabled/selected/required 的 JSON。**kind 为：input/select/date/radio/checkbox 之一。** 用于验证字段是否正确填写。**金额/数字字段**可能回显为千分位+小数（如填入 `2026` → `2,026.00`）；若返回 `normalizedValue`/`valueNote`，视为已填对，**禁止反复重填**。优先用 `verify_field_value` 做数值等价核对。
+- verify_field_value(label_text, expected) — 调用 check_field_value 并将 currentValue 与 expected 比较（**金额格式等价**：`2026` ≡ `2,026.00`）。匹配返回 ok，不匹配返回 err。填写后用于确认值已正确设置。
 - click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。成功返回 `"ok-clicked"`；如果字段已有值则返回 `"already-filled"`（不以 ok 开头）— 跳过、不录制。
 - **login(username, password, captcha='', sms_code='') — 🚨 登录系统。填写用户名+密码+验证码(可选)+短信验证码(可选)、点击登录按钮、等待跳转。有验证码时传入 captcha='1111' sms_code='1111'。不要手动逐字段填写登录表单。**

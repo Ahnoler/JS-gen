@@ -28,6 +28,8 @@ def _make_field_rules() -> List[FieldRule]:
         _gen_email,
         _gen_bankcard,
         _gen_amount,
+        _gen_longitude,
+        _gen_latitude,
         _gen_name,
         _gen_address,
         _gen_qq,
@@ -69,6 +71,10 @@ def _make_field_rules() -> List[FieldRule]:
                   "16-19位，34种BIN前缀，含Luhm校验位"),
         FieldRule(["金额", "价格", "费用", "工资", "收入"], _gen_amount, 80, "dynamic",
                   "10000.00～9999999.99随机金额"),
+        FieldRule(["经度", "GPS经度", "地理经度", "longitude"], _gen_longitude, 85, "dynamic",
+                  "中国经度范围，保留2位小数"),
+        FieldRule(["纬度", "GPS纬度", "地理纬度", "latitude"], _gen_latitude, 85, "dynamic",
+                  "中国纬度范围，保留2位小数"),
 
         # ── Personal (priority 75-80) ──
         FieldRule(["姓名", "用户名", "联系人"], _gen_name, 80, "dynamic",

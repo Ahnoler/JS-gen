@@ -8,6 +8,7 @@ import sys
 from langchain_core.messages import HumanMessage
 from . import controller as ctrl_mod
 from .controller.actions._js_snippets import JS_SMART_LOCATOR
+from .controller.actions._helpers import _as_dict
 from .agent.recorder_emitters import (  # noqa: E402
     _capture_step_url,
     _emit_empty_act_cue,
@@ -79,6 +80,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                 msg = HumanMessage(content=(
                     '[SYSTEM] Fillable form fields are done (pending≈0).\n'
                     'NEXT_ACTION: Call click_save() NOW (finds 保存/提交 and scrolls into view).\n'
+                    'Do NOT only check_field_value — that does not submit.\n'
                     'Do NOT scroll_down / scroll_up hunting for 保存.\n'
                     'Do NOT call select_option / fill_form_field on fields that already have values.\n'
                     'If 联网核查结果 is required and empty, click_adjacent_button(联网核查) first, '
@@ -113,9 +115,18 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                         f'STOP re-selecting. Call click_save() if fields are written.'
                     ))
                 else:
+                    try:
+                        from scripts.controller.actions.section_scope import (
+                            preferred_submit_cue,
+                            resolve_phase_section,
+                        )
+                        sec = resolve_phase_section(case_data_store)
+                        cue = preferred_submit_cue(case_data_store, section=sec)
+                    except Exception:
+                        cue = 'Call click_save() immediately.'
                     msg = HumanMessage(content=(
                         f'[SYSTEM] You received already-matched {streak}+ times in a row. '
-                        f'STOP re-selecting fields. Call click_save() immediately. '
+                        f'STOP re-selecting fields. {cue} '
                         f'Only fix fields that sync_tasks_from_errors / formErrors / err-save-validation report.'
                     ))
                 agent._message_manager._add_message_with_tokens(msg)
@@ -360,7 +371,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                         continue
                     raw = await page.evaluate(JS_SMART_LOCATOR, [label_text])
                     if raw:
-                        info = json.loads(raw) if isinstance(raw, str) else raw
+                        info = _as_dict(raw)
                         css = info.get('css_sel', '')
                         if css:
                             entry['cssSelector'] = css

@@ -28,7 +28,10 @@ def assert_true(cond: bool, msg: str) -> None:
 
 
 def main() -> int:
-    form_py = (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
+    form_py = (
+        (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
+        + (ROOT / 'scripts/controller/actions/form_autofill.py').read_text(encoding='utf-8')
+    )
 
     assert_true(
         'first-touch query-ui scan' in form_py,

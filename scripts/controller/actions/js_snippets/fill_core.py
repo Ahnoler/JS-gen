@@ -4,6 +4,7 @@ Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .base import JS_FIELD_DISABLED
 from .container import JS_GET_CONTAINER
+from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 
 JS_FILL_FORM_FIELD = '''([label, val]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
@@ -129,43 +130,67 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
     }
     return null;
   };
-  const findInputFromSnap = (snap, root) => {
-    let target = null;
+  // LABEL_HINT_DISAMBIG: when xpath hits multiple inputs (shared placeholder /
+  // prefix labels like 财务部联系人 → 财务部联系人手机号码), prefer EXACT
+  // normalized form-item label, then includes(), then last-visible fallback.
+  const normFormLab = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+    .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+  const formItemLabel = (el) => {
+    const item = el && el.closest && el.closest('.el-form-item');
+    if (!item) return '';
+    const lbl = item.querySelector('.el-form-item__label, label');
+    return String((lbl && lbl.textContent) || '').replace(/\s+/g, ' ').trim();
+  };
+  const findInputFromSnap = (snap, root, labelHint) => {
+    const want = String(labelHint || '').trim();
+    const wantN = normFormLab(want);
+    let fallback = null;
+    let exactMatch = null;
+    let includesMatch = null;
     for (let i = snap.snapshotLength - 1; i >= 0; i--) {
       const n = snap.snapshotItem(i);
       if (!n || !isVis(n)) continue;
       if (root && root !== document && !root.contains(n)) continue;
       const inner = (n.matches && (n.matches('input, textarea') ? n : null))
         || n.querySelector?.('input:not([type="hidden"]), textarea');
-      target = inner || n;
-      break;
+      const target = inner || n;
+      if (!fallback) fallback = target;
+      if (wantN) {
+        const labN = normFormLab(formItemLabel(target));
+        if (labN === wantN) {
+          exactMatch = target;
+          break;
+        }
+        if (!includesMatch && labN && labN.includes(wantN)) includesMatch = target;
+      }
     }
-    return target;
+    return exactMatch || includesMatch || fallback;
   };
-  const tryXpath = (xp, root) => {
+  const tryXpath = (xp, root, labelHint) => {
     if (!xp) return null;
     let s = String(xp);
     try {
       const ctx = root || document;
       if (root && s.startsWith('//')) s = '.' + s;
       const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-      return findInputFromSnap(snap, root);
+      return findInputFromSnap(snap, root, labelHint);
     } catch (e) {
       return null;
     }
   };
+  const labelHint = String(placeholderHint || '').trim();
   let target = null;
   if (xpath) {
-    target = tryXpath(xpath, null);
+    target = tryXpath(xpath, null, labelHint);
     if (!target && /el-dialog|el-message-box|el-drawer/.test(String(xpath)) && /\[last\(\)\]/.test(String(xpath))) {
       const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
       const local = m && m[1] ? m[1] : '';
       const dlg = /el-drawer/.test(String(xpath)) ? lastVisibleDrawer() : lastVisibleDialog();
-      if (dlg && local) target = tryXpath('.//' + local, dlg);
+      if (dlg && local) target = tryXpath('.//' + local, dlg, labelHint);
     }
   }
-  if (!target && placeholderHint) {
-    const want = String(placeholderHint || '').trim();
+  if (!target && labelHint) {
+    const want = labelHint;
     if (want) {
       const scopes = [lastVisibleDrawer(), lastVisibleDialog(), document].filter(Boolean);
       for (const scope of scopes) {
@@ -195,9 +220,13 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
   return 'ok-xpath-smart';
 }'''
 
-# Stamp element metadata from a write-path xpath (no label→SMART_LOCATOR generation).
+# Stamp element metadata from a write-path xpath; rebuild durable xpath_smart via helpers.
 
-JS_CAPTURE_FROM_XPATH = r'''([xpath_smart, label, target_kind]) => {
+JS_CAPTURE_FROM_XPATH = (
+    r'''([xpath_smart, label, target_kind]) => {
+'''
+    + PAGE_LOCATOR_HELPERS
+    + r'''
   const xp = String(xpath_smart || '').trim();
   if (!xp) return null;
   const isVis = (el) => {
@@ -220,52 +249,51 @@ JS_CAPTURE_FROM_XPATH = r'''([xpath_smart, label, target_kind]) => {
     }
     return null;
   };
-  const findNodeFromSnap = (snap, root) => {
+  const findNodeFromSnap = (snap, root, labelHint) => {
+    // LABEL_HINT_DISAMBIG — same rule as JS_FILL_BY_XPATH (exact > includes)
+    const want = String(labelHint || '').trim();
+    const wantN = String(want || '').replace(/\s+/g, ' ').trim()
+      .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+    let fallback = null;
+    let exactMatch = null;
+    let includesMatch = null;
     for (let i = snap.snapshotLength - 1; i >= 0; i--) {
       const n = snap.snapshotItem(i);
       if (!n || !isVis(n)) continue;
       if (root && root !== document && !root.contains(n)) continue;
-      return n;
+      if (!fallback) fallback = n;
+      if (wantN) {
+        const item = n.closest && n.closest('.el-form-item');
+        const lbl = item && item.querySelector('.el-form-item__label, label');
+        const labN = String((lbl && lbl.textContent) || '').replace(/\s+/g, ' ').trim()
+          .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+        if (labN === wantN) {
+          exactMatch = n;
+          break;
+        }
+        if (!includesMatch && labN && labN.includes(wantN)) includesMatch = n;
+      }
     }
-    return null;
+    return exactMatch || includesMatch || fallback;
   };
-  const tryXpath = (xpath, root) => {
+  const tryXpath = (xpath, root, labelHint) => {
     if (!xpath) return null;
     let s = String(xpath);
     try {
       const ctx = root || document;
       if (root && s.startsWith('//')) s = '.' + s;
       const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-      return findNodeFromSnap(snap, root);
+      return findNodeFromSnap(snap, root, labelHint);
     } catch (e) {
       return null;
     }
   };
-  const absXPath = (node) => {
-    if (!node || node.nodeType !== 1) return '';
-    const parts = [];
-    let cur = node;
-    while (cur && cur.nodeType === 1) {
-      const tag = cur.tagName.toLowerCase();
-      const parent = cur.parentNode;
-      if (!parent) break;
-      const sibs = [...parent.children].filter(c => c.tagName === cur.tagName);
-      const idx = sibs.indexOf(cur) + 1;
-      parts.unshift(tag + '[' + idx + ']');
-      cur = parent;
-      if (cur === document.documentElement) {
-        parts.unshift('html[1]');
-        break;
-      }
-    }
-    return '/' + parts.join('/');
-  };
-  let node = tryXpath(xp, null);
+  let node = tryXpath(xp, null, String(label || '').trim());
   if (!node && /el-dialog|el-message-box|el-drawer/.test(xp) && /\[last\(\)\]/.test(xp)) {
     const m = xp.match(/\[last\(\)\](?:\/\/(.+))?$/);
     const local = m && m[1] ? m[1] : '';
     const dlg = /el-drawer/.test(xp) ? lastVisibleHost(true) : lastVisibleHost(false);
-    if (dlg && local) node = tryXpath('.//' + local, dlg);
+    if (dlg && local) node = tryXpath('.//' + local, dlg, String(label || '').trim());
   }
   if (!node) return null;
   const kind = String(target_kind || '').trim();
@@ -291,26 +319,37 @@ JS_CAPTURE_FROM_XPATH = r'''([xpath_smart, label, target_kind]) => {
     return n;
   };
   node = drillWriteHit(node, kind);
-  const abs = absXPath(node);
-  const tag = (node.tagName || '').toLowerCase();
+  const formLbl = normalizeFormLabel(String(label || '')) || (function () {
+    const item = node.closest && node.closest('.el-form-item');
+    const lbl = item && item.querySelector('.el-form-item__label, label');
+    return normalizeFormLabel(lbl && lbl.textContent);
+  })();
+  const host = (typeof normalizeTargetRoot === 'function' ? (normalizeTargetRoot(node) || node) : node);
+  const smart = (typeof formFieldXpathSmartOf === 'function'
+    ? (formFieldXpathSmartOf(host, formLbl) || '')
+    : '');
+  const abs = absXPath(host);
+  const primary = smart || abs;
+  const tag = (host.tagName || '').toLowerCase();
   const attrs = {};
-  for (const a of node.attributes || []) attrs[a.name] = a.value;
-  const text = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  for (const a of host.attributes || []) attrs[a.name] = a.value;
+  const text = (host.innerText || host.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
   return {
-    xpath: xp,
-    xpath_smart: xp,
+    xpath: primary,
+    xpath_smart: smart,
     xpath_full: abs,
     css_sel: '',
     tag,
     attrs,
     text,
-    formLabel: String(label || ''),
+    formLabel: formLbl || String(label || ''),
     target_kind: String(target_kind || ''),
     candidates: [
-      { type: 'xpath_smart', value: xp },
-      { type: 'xpath_full', value: abs },
+      ...(smart ? [{ type: 'xpath_smart', value: smart }] : []),
+      ...(abs ? [{ type: 'xpath_full', value: abs }] : []),
     ],
   };
 }'''
+)
 
 # Fill date picker resolved by relative xpath (native setter + ElDatePicker Vue sync).

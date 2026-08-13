@@ -172,12 +172,16 @@ export class SessionManager {
     };
   }
 
+  /**
+   * All capacity slots (free + occupied) with current CDP port.
+   * Free slots still report preferred/base port (`EXECUTOR_CDP_PORT_BASE + slotIndex`).
+   */
   list() {
-    return [...this.sessions.entries()].map(([sessionId, slot]) => ({
-      sessionId,
+    return this.slots.map((slot) => ({
+      sessionId: slot.sessionId || null,
       slotIndex: slot.slotIndex,
-      ready: slot.ready,
-      busy: slot.busy,
+      ready: !!slot.ready,
+      busy: !!slot.busy,
       cdpPort: slot.cdpPort ?? null,
     }));
   }
@@ -373,9 +377,9 @@ export class SessionManager {
   /**
    * Resolve form element by label / actionType+params on the attached BiB page.
    * @param {string} sessionId
-   * @param {{ labelText?: string, actionType?: string, params?: object, requestId?: string }} [opts]
+   * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string, requestId?: string }} [opts]
    */
-  async bibResolveElement(sessionId, { labelText, actionType, params, requestId } = {}) {
+  async bibResolveElement(sessionId, { labelText, actionType, params, mode, requestId } = {}) {
     try {
       const bib = this.bibs.get(sessionId);
       if (!bib) {
@@ -389,7 +393,7 @@ export class SessionManager {
           error: 'BiB not attached - call record/prepare (stream) first',
         };
       }
-      const resolved = await bib.resolveByLabel(labelText, { actionType, params });
+      const resolved = await bib.resolveByLabel(labelText, { actionType, params, mode });
       if (resolved?.ambiguous) {
         return {
           requestId: requestId || null,
@@ -398,6 +402,7 @@ export class SessionManager {
           matchedLabel: null,
           ambiguous: true,
           matches: resolved.matches || [],
+          ...(resolved.truncated ? { truncated: true } : {}),
           error: null,
         };
       }
@@ -423,6 +428,37 @@ export class SessionManager {
     }
   }
 
+  async bibPhaseHighlightCapture(sessionId, { targets, requestId } = {}) {
+    try {
+      const bib = this.bibs.get(sessionId);
+      if (!bib) {
+        return {
+          requestId: requestId || null,
+          sessionId,
+          pngBase64: null,
+          hitCount: 0,
+          error: 'BiB not attached - call record/prepare (stream) first',
+        };
+      }
+      const captured = await bib.capturePhaseHighlight(targets || []);
+      return {
+        requestId: requestId || null,
+        sessionId,
+        pngBase64: captured.pngBase64,
+        hitCount: captured.hitCount,
+        error: null,
+      };
+    } catch (err) {
+      return {
+        requestId: requestId || null,
+        sessionId,
+        pngBase64: null,
+        hitCount: 0,
+        error: err?.message || String(err),
+      };
+    }
+  }
+
   async bibAck(sessionId, payload = {}) {
     const bib = this.bibs.get(sessionId);
     if (!bib) return;
@@ -431,7 +467,18 @@ export class SessionManager {
 
   async bibInput(sessionId, payload = {}) {
     const bib = this.bibs.get(sessionId);
-    if (!bib) return;
+    if (!bib) {
+      if (payload?.kind === 'clipboard') {
+        return {
+          clipboard: true,
+          requestId: payload.requestId || null,
+          ok: false,
+          text: '',
+          reason: 'not_attached',
+        };
+      }
+      return;
+    }
     return bib.handleInput(payload);
   }
 }

@@ -18,24 +18,38 @@ def _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal):
             from ..controller.actions.section_scope import (
                 is_empty_effective_actions,
                 empty_act_prescription_message,
+                final_save_urgency_message,
             )
+
+            max_s = int((case_data_store or {}).get('_phase_max_steps') or 0)
+            n = int(getattr(agent.state, 'n_steps', 0) or 0)
+            last_step = bool(max_s and n >= max_s)
+            flag = getattr(agent.state, 'is_last_step', None)
+            if callable(flag):
+                try:
+                    last_step = bool(flag()) or last_step
+                except Exception:
+                    pass
+            elif isinstance(flag, bool):
+                last_step = flag or last_step
+
+            # Penultimate urgency: tools still available; last step is done-only.
+            near_last = bool(max_s and n >= (max_s - 1) and not last_step)
+            if case_data_store is not None and near_last:
+                urg = final_save_urgency_message(case_data_store)
+                if urg:
+                    agent._message_manager._add_message_with_tokens(HumanMessage(content=urg))
+                    sys.stderr.write(
+                        f'[recorder] Injected final-save urgency (n={n} max={max_s})\n'
+                    )
+                    sys.stderr.flush()
+
             if case_data_store is not None and is_empty_effective_actions(
                 _actions_raw, next_goal=_next_goal or ''
             ):
                 streak = int(case_data_store.get('_empty_act_streak') or 0) + 1
                 case_data_store['_empty_act_streak'] = streak
                 # Design §3.3: final browser-use iteration is done-only (DoneAgentOutput).
-                max_s = int((case_data_store or {}).get('_phase_max_steps') or 0)
-                n = int(getattr(agent.state, 'n_steps', 0) or 0)
-                last_step = bool(max_s and n >= max_s)
-                flag = getattr(agent.state, 'is_last_step', None)
-                if callable(flag):
-                    try:
-                        last_step = bool(flag()) or last_step
-                    except Exception:
-                        pass
-                elif isinstance(flag, bool):
-                    last_step = flag or last_step
                 save_ok = bool(case_data_store.get('_last_save_ok'))
                 msg = HumanMessage(content=empty_act_prescription_message(
                     case_data_store, last_step=last_step, save_ok=save_ok,

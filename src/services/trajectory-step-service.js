@@ -14,12 +14,16 @@ import {
   prepareElementJson,
 } from '../models/element.js';
 import { normalizeActionName } from '../models/action-name.js';
+import { META_STEP_ACTIONS } from '../models/meta-step-actions.js';
 
 export async function refreshTrajectoryCounts(trajectoryDbId) {
   const db = getDB();
-  const [{ steps }] = await db('trajectory_step')
-    .where({ trajectory_id: trajectoryDbId })
-    .count('* as steps');
+  // Product stepCount = business steps only (hide meta like save_form_snapshot)
+  let stepsQ = db('trajectory_step').where({ trajectory_id: trajectoryDbId });
+  if (META_STEP_ACTIONS.length) {
+    stepsQ = stepsQ.whereNotIn('action_type', META_STEP_ACTIONS);
+  }
+  const [{ steps }] = await stepsQ.count('* as steps');
   const [{ phases }] = await db('trajectory_phase')
     .where({ trajectory_id: trajectoryDbId })
     .count('* as phases');

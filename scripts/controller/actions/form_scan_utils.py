@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from scripts.state import _ACTION_LOG, _record_action
 from ._helpers import (
+    _as_dict,
     attach_select_options,
     options_from_scan_store,
     read_select_options,
@@ -51,6 +52,9 @@ def is_chrome_menu_label(text: str | None) -> bool:
         return True
     if "页签" in t and ("关闭" in t or "固定" in t):
         return True
+    # Portal synonym: 标签 ≈ 页签 (e.g. 关闭所有标签(含固定))
+    if "标签" in t and ("关闭" in t or "固定" in t):
+        return True
     return False
 
 
@@ -77,7 +81,7 @@ async def refresh_scan_buttons(page, case_data_store) -> list[dict]:
     """Rescan DOM buttons into ``case_data_store['_scan_buttons']``; return button list."""
     raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, get_has_button_keywords(case_data_store)])
     try:
-        result = json.loads(raw) if isinstance(raw, str) else raw
+        result = _as_dict(raw)
     except Exception:
         return list(case_data_store.get('_scan_buttons') or [])
     buttons = _scan_buttons_from_result(result)
@@ -121,6 +125,96 @@ _NON_FILL_KINDS = frozenset({'menu_item', 'icon'})
 _SCANNED_FIELD_KINDS = frozenset({
     'input', 'select', 'date', 'radio', 'checkbox', 'tree-select', 'unknown',
 })
+_TREE_FILTER_LABEL_RE = re.compile(r'关键字|过滤|搜索')
+_NUMERIC_DISPLAY_RE = re.compile(r'^-?\d+(\.\d+)?$')
+
+
+def parse_numeric_display(value: str | None) -> float | None:
+    """Parse amount-like display text (strips thousand commas). None if not numeric."""
+    t = (value or '').strip().replace(',', '').replace(' ', '').replace('\u00a0', '')
+    if not t or not _NUMERIC_DISPLAY_RE.fullmatch(t):
+        return None
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+
+def field_values_equivalent(current: str | None, expected: str | None) -> bool:
+    """True when DOM display value matches filled/expected (amount format tolerant).
+
+    ``2026`` ≡ ``2,026.00``. When either side is numeric, do not fall back to
+    substring (avoids ``12`` matching ``1,234.00``). Non-numeric keeps exact /
+    containment for units / suffixes.
+    """
+    a = (current or '').strip()
+    b = (expected or '').strip()
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    na, nb = parse_numeric_display(a), parse_numeric_display(b)
+    if na is not None and nb is not None:
+        return abs(na - nb) < 1e-9
+    if na is not None or nb is not None:
+        return False
+    return b in a or a in b
+
+
+def enrich_field_value_check(info: dict) -> dict:
+    """Annotate check_field_value JSON so agents don't loop on amount formatting."""
+    if not isinstance(info, dict):
+        return info
+    cv = (info.get('currentValue') or '').strip()
+    n = parse_numeric_display(cv)
+    if n is None:
+        return info
+    if ',' in cv or ('.' in cv and cv.split('.')[-1].strip('0') == ''):
+        if abs(n - round(n)) < 1e-9:
+            bare = str(int(round(n)))
+        else:
+            bare = ('%f' % n).rstrip('0').rstrip('.')
+        info['normalizedValue'] = bare
+        info['valueNote'] = (
+            '金额/数字字段可能显示千分位与小数位；'
+            f'normalizedValue={bare} 与填入的裸数字等价时勿反复重填。'
+            '核对请用 verify_field_value。'
+        )
+    return info
+
+
+def tasklist_scan_mode(container_id: str = '') -> str:
+    """Scan mode for TaskList / write-gate inventory (not summary-only).
+
+    Visible dialog/drawer maintain forms must use ``multi`` so list-page query
+    fields and page tree filters are not mixed into the overlay TaskList.
+    ``fullpage`` remains for main-page inventory.
+    """
+    cid = (container_id or '').strip()
+    if cid.startswith(('dialog:', 'drawer:')):
+        return 'multi'
+    return 'fullpage'
+
+
+def is_tasklist_noise_field(field: dict | None) -> bool:
+    """True for controls that must not block click_save / premature-done gates."""
+    if not isinstance(field, dict):
+        return True
+    label = (field.get('label') or '').strip()
+    if not label:
+        return True
+    ph = (field.get('placeholder') or '').strip()
+    kind = (field.get('kind') or '').strip()
+    xp = (field.get('xpath_smart') or '').strip()
+    # Tree / search filter: placeholder used as label (e.g. 输入关键字进行过滤)
+    if ph and label == ph and _TREE_FILTER_LABEL_RE.search(label):
+        return True
+    if kind in ('tree-select', 'tree') and _TREE_FILTER_LABEL_RE.search(label):
+        return True
+    # Source B table-row radio option text (e.g. label=对公) — not a form-item field
+    if kind == 'radio' and '//tr[' in xp and 'el-form-item' not in xp:
+        return True
+    return False
 
 
 def filter_fillable_scan_fields(fields: list | None) -> list[dict]:
@@ -134,6 +228,8 @@ def filter_fillable_scan_fields(fields: list | None) -> list[dict]:
             continue
         role = (f.get('region_role') or '').strip()
         if role in _SHELL_ROLES:
+            continue
+        if is_tasklist_noise_field(f):
             continue
         out.append(f)
     return out
@@ -210,31 +306,48 @@ def _merge_scan_buttons(scan_results: list[dict]) -> list[dict]:
 
 
 def _project_summary_field(field: dict) -> dict:
-    """Project scan field → model-facing {label, xpath_smart, kind, section}."""
+    """Project scan field → model-facing shape; region_label primary, section alias."""
+    region = _region_display_label(field)
     return {
         'label': (field.get('label') or '').strip(),
         'xpath_smart': (field.get('xpath_smart') or '').strip(),
         'kind': (field.get('kind') or '').strip(),
-        'section': (field.get('section_title') or '').strip(),
+        'region_label': region,
+        'section': region,  # legacy alias — prefer region_label
     }
 
 
 def _project_summary_buttons(buttons: list[dict]) -> list[dict]:
-    """Source C buttons → {text, section, xpath_smart} for ops without a second scan."""
+    """Source C buttons → {text, region_label, section, xpath_smart}."""
     out: list[dict] = []
     seen: set[tuple[str, str, str]] = set()
     for b in buttons:
         text = (b.get('label') or '').strip()
         if not text:
             continue
-        section = (b.get('section_title') or '').strip()
+        region = _region_display_label(b)
         xp = (b.get('xpath_smart') or '').strip()
-        key = (text, section, xp)
+        key = (text, region, xp)
         if key in seen:
             continue
         seen.add(key)
-        out.append({'text': text, 'section': section, 'xpath_smart': xp})
+        out.append({
+            'text': text,
+            'region_label': region,
+            'section': region,  # legacy alias
+            'xpath_smart': xp,
+        })
     return out
+
+
+def _region_display_label(field: dict | None) -> str:
+    """Prefer L1 region_label; fall back to legacy section_title for compat."""
+    if not isinstance(field, dict):
+        return ''
+    return (
+        (field.get('region_label') or '').strip()
+        or (field.get('section_title') or '').strip()
+    )
 
 
 def build_editable_summary(
@@ -299,7 +412,8 @@ def build_editable_summary(
     sections = [
         {
             'id': s.get('section_id', ''),
-            'title': s.get('section_title', ''),
+            'title': s.get('region_label') or s.get('section_title', ''),
+            'region_label': s.get('region_label') or s.get('section_title', ''),
             'pending': s.get('fields_editable_pending', 0),
         }
         for s in section_block.get('sections', [])
@@ -320,7 +434,8 @@ def build_editable_summary(
             continue
         projected_buttons.append({
             'text': text,
-            'section': (f.get('region_role') or f.get('section_title') or '')[:40],
+            'region_label': _region_display_label(f) or (f.get('region_role') or '')[:40],
+            'section': _region_display_label(f) or (f.get('region_role') or '')[:40],
             'xpath_smart': (f.get('xpath_smart') or '').strip(),
         })
         if len(projected_buttons) >= 80:
@@ -389,23 +504,31 @@ def _build_section_summary(
     order: list[str] = []
     by_key: dict[str, dict] = {}
 
-    def _ensure(section_id: str, section_title: str) -> dict:
-        key = _section_group_key(section_id, section_title)
+    def _ensure(section_id: str, section_title: str, region_label: str = '') -> dict:
+        title = (region_label or section_title or '').strip()
+        key = _section_group_key(section_id, title)
         if key not in by_key:
             by_key[key] = {
                 'section_id': (section_id or '').strip() or key,
-                'section_title': (section_title or '').strip(),
+                'section_title': (section_title or title).strip(),
+                'region_label': title,
                 'fields_sample': [],
                 'buttons': [],
                 '_field_entries': [],
             }
             order.append(key)
+        elif title and not by_key[key].get('region_label'):
+            by_key[key]['region_label'] = title
         return by_key[key]
 
     for f in fields:
         if not isinstance(f, dict):
             continue
-        sec = _ensure(f.get('section_id') or '', f.get('section_title') or '')
+        sec = _ensure(
+            f.get('section_id') or '',
+            f.get('section_title') or '',
+            f.get('region_label') or '',
+        )
         label = (f.get('label') or '').strip()
         if label:
             sec['_field_entries'].append({
@@ -416,7 +539,11 @@ def _build_section_summary(
     for b in buttons:
         if not isinstance(b, dict):
             continue
-        sec = _ensure(b.get('section_id') or '', b.get('section_title') or '')
+        sec = _ensure(
+            b.get('section_id') or '',
+            b.get('section_title') or '',
+            b.get('region_label') or '',
+        )
         label = (b.get('label') or '').strip()
         if label and label not in sec['buttons']:
             sec['buttons'].append(label)
@@ -562,6 +689,67 @@ async def _pack_select_record(page, case_data_store, label_text, option_text, el
     return attach_select_options(params, element, opts)
 
 
+_SELECT_OPTION_SENTINELS = frozenset({
+    'first', '1st', 'any', 'random', '第一个', '第一项',
+})
+
+
+def resolve_recorded_option_text(requested: str, actual: str = '') -> str:
+    """Replay contract: never persist first/any/random — stamp concrete display value.
+
+    Recording may accept sentinel option_text at runtime; the step persisted for
+    replay must carry the real selected (or already-matched) label.
+    """
+    req = (requested or '').strip()
+    act = (actual or '').strip()
+    if req.lower() in _SELECT_OPTION_SENTINELS or req in _SELECT_OPTION_SENTINELS:
+        return act or req
+    return req or act
+
+
+def select_option_already_matched(requested: str, current: str) -> bool:
+    """True when the field already has the desired option — exact / sentinel only.
+
+    Substring checks (``cur in want`` / ``want in cur``) wrongly skip re-select when
+    国民经济部门类别 wants 其他非金融企业部门 but still shows 非金融企业部门.
+    """
+    req = (requested or '').strip()
+    cur = (current or '').strip()
+    if not cur:
+        return False
+    if req.lower() in _SELECT_OPTION_SENTINELS or req in _SELECT_OPTION_SENTINELS:
+        return True
+    return bool(req) and cur == req
+
+
+def match_select_option_candidate(want: str, options) -> str | None:
+    """Pick a dropdown option for fuzzy recovery — never shorter substring of want.
+
+    Order: exact → shortest option that contains want as a substring.
+    Does **not** use ``o in want`` (that mapped 其他非金融企业部门 → 非金融企业部门).
+    """
+    w = (want or '').strip()
+    if not w:
+        return None
+    opts: list[str] = []
+    seen: set[str] = set()
+    for raw in options or []:
+        if not isinstance(raw, str):
+            continue
+        o = raw.strip()
+        if not o or o == '请选择' or o in seen:
+            continue
+        seen.add(o)
+        opts.append(o)
+    for o in opts:
+        if o == w:
+            return o
+    contained = [o for o in opts if w in o]
+    if contained:
+        return min(contained, key=len)
+    return None
+
+
 # Read current 证件类型 / 证照类型 display value from the open form.
 _JS_READ_CERT_TYPE = '''(kw) => {
     const items = document.querySelectorAll('.el-form-item');
@@ -664,18 +852,37 @@ def _resolve_control(case_data_store, label_text: str, xpath_hint: str = "") -> 
     hint = (xpath_hint or "").strip()
     if hint:
         resolved_label = label
+        in_inventory = False
         for f in case_data_store.get("_scan_fields") or []:
             if isinstance(f, dict) and (f.get("xpath_smart") or "").strip() == hint:
                 resolved_label = (f.get("label") or label).strip() or label
+                in_inventory = True
                 break
-        if resolved_label == label:
+        if not in_inventory:
             tl = TaskList.from_store(case_data_store.get("task_list"))
             for item in list(tl.pending) + list(tl.done):
                 if (item.xpath_smart or "").strip() == hint and (item.label or "").strip():
                     resolved_label = item.label.strip()
+                    in_inventory = True
                     break
-        return ResolvedControl(xpath_smart=hint, label=resolved_label or label, error="")
+        if in_inventory:
+            return ResolvedControl(xpath_smart=hint, label=resolved_label or label, error="")
+        # Invented / stale hint (traj 130 placeholder[1]): prefer unique inventory
+        # for this label when available; keep hint only as last resort.
+        by_label = _resolve_control_by_label(case_data_store, label_text)
+        if not by_label.error and by_label.xpath_smart:
+            return by_label
+        # Spec: never return invented hint for write/persist.
+        return ResolvedControl(
+            xpath_smart="",
+            label=label or label_text or "",
+            error="xpath-not-found",
+        )
 
+    return _resolve_control_by_label(case_data_store, label_text)
+
+
+def _resolve_control_by_label(case_data_store, label_text: str) -> ResolvedControl:
     matches: list[tuple[str, str]] = []
     seen_xp: set[str] = set()
     tl = TaskList.from_store(case_data_store.get("task_list"))
@@ -701,6 +908,21 @@ def _resolve_control(case_data_store, label_text: str, xpath_hint: str = "") -> 
         xp, lab = matches[0]
         return ResolvedControl(xpath_smart=xp, label=lab, error="")
     return ResolvedControl(xpath_smart="", label=label_text or "", error="ambiguous-label")
+
+
+def resolve_select_fallback(
+    case_data_store,
+    label_text: str,
+    failed_xpath: str,
+) -> ResolvedControl | None:
+    """Return one inventory xpath after an explicit xpath actually missed."""
+    failed = (failed_xpath or "").strip()
+    candidate = _resolve_control(case_data_store, label_text, "")
+    if candidate.error or not candidate.xpath_smart:
+        return None
+    if candidate.xpath_smart.strip() == failed:
+        return None
+    return candidate
 
 
 def _task_xpath_smart(case_data_store, label_text: str, xpath_hint: str = "") -> str:
@@ -778,7 +1000,7 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
     fillable = [
         i for i in tl.pending
         if not i.needs_intervention
-        and section_matches(sec, i.section_id, i.section_title)
+        and section_matches(sec, i.section_id, i.section_title, getattr(i, 'region_label', '') or '')
     ]
     if fillable:
         return ''
@@ -828,8 +1050,10 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
                     sec = auto_sec
             except Exception:
                 pass
-        # Include section= when scoped so caller can pass it through to click_save
-        sec_part = f", section='{sec}'" if sec else ''
+        # Prefer region= (section= still accepted) so caller passes scope to click_save
+        from scripts.controller.actions.section_scope import scope_kw_cue
+
+        sec_part = scope_kw_cue(sec)
         return (
             f"NEXT_ACTION: click_save(button_text='{btn}'{sec_part}) | fillable pending=0. "
             f"Call click_save(button_text='{btn}'{sec_part}) NOW "

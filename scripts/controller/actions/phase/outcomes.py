@@ -12,7 +12,8 @@ from scripts.feature_flags import phase_preamble_enabled
 
 _OUTCOME_TEXT_MAX = 400
 _PRIOR_DESC_MAX = 200
-_PREAMBLE_TOTAL_MAX = 1200
+# Soft cap only for pathological dumps — never trim 【阶段目录】lines.
+_PREAMBLE_TOTAL_MAX = 8000
 
 def truncate_text(text: str, max_len: int) -> str:
     t = (text or '').strip()
@@ -283,6 +284,9 @@ def format_phase_preamble(
     if not blocks:
         return task
 
-    preamble = truncate_text('\n\n'.join(blocks), _PREAMBLE_TOTAL_MAX)
+    # Keep full catalog (all trajectory phases). Only truncate if absurdly large.
+    preamble = '\n\n'.join(blocks)
+    if len(preamble) > _PREAMBLE_TOTAL_MAX:
+        preamble = truncate_text(preamble, _PREAMBLE_TOTAL_MAX)
     current_block = f'【当前任务 — 阶段{cur}】\n{task}' if cur else f'【当前任务】\n{task}'
     return f'{preamble}\n\n{current_block}'

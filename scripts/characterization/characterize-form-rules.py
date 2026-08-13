@@ -49,12 +49,30 @@ def test_match_rule_labels() -> None:
         ('电子邮箱', r'^[^@]+@[^@]+\.[^@]+$'),
         ('详细地址', r'.+'),
         ('姓名', r'^[\u4e00-\u9fff]{2,4}$'),
+        ('经度', r'^\d{2,3}\.\d{2}$'),
+        ('纬度', r'^\d{2}\.\d{2}$'),
     ]
     for label, pattern in cases:
         val = match_rule(label)
         assert_true(val is not None, f'{label!r} should match a rule')
         assert_true(bool(re.search(pattern, str(val))), f'{label!r} → {val!r} vs {pattern}')
 
+
+def test_normalize_lat_lng_value() -> None:
+    from scripts.controller.actions.form_rules import normalize_lat_lng_value
+
+    assert_true(
+        normalize_lat_lng_value('经度', '121.5427') == '121.54',
+        'longitude rounds to 2 decimals',
+    )
+    assert_true(
+        normalize_lat_lng_value('纬度', '31.2224') == '31.22',
+        'latitude rounds to 2 decimals',
+    )
+    assert_true(
+        normalize_lat_lng_value('客户名称', '121.5427') == '121.5427',
+        'non-geo labels unchanged',
+    )
 
 def test_idcard_checksum() -> None:
     for _ in range(5):
@@ -111,6 +129,7 @@ def test_has_button_keywords() -> None:
 
 def main() -> None:
     test_match_rule_labels()
+    test_normalize_lat_lng_value()
     test_idcard_checksum()
     test_unmatched_label()
     test_keyword_specificity()

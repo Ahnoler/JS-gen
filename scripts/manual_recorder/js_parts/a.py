@@ -184,6 +184,8 @@ JS_MANUAL_PART_A = r'''(() => {
       );
       if (idx >= 0 && bodyRows[idx]) dataRow = bodyRows[idx];
     }
+    const key = (dataRow.getAttribute && (dataRow.getAttribute('data-row-key')
+      || dataRow.getAttribute('data-key'))) || '';
     const cells = dataRow.querySelectorAll('td');
     const parts = [];
     for (const td of cells) {
@@ -194,12 +196,13 @@ JS_MANUAL_PART_A = r'''(() => {
       parts.push(t);
     }
     if (!parts.length) {
+      if (key) return String(key).slice(0, 80);
       const raw = (dataRow.innerText || dataRow.textContent || '').trim().replace(/\s+/g, ' ');
       if (!raw || raw === 'radio' || raw === 'checkbox') return '';
       return raw.slice(0, 80);
     }
     const best = parts.find((p) => p.length >= 2 && !/^(操作|编辑|删除|修改|查看|详情)$/.test(p)) || parts[0];
-    return String(best || '').slice(0, 80);
+    return String(best || key || '').slice(0, 80);
   }
 
   function attrs(el) {

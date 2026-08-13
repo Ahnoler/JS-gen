@@ -9,7 +9,209 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ## [Unreleased]
 
+### Changed
+
+- 2026-08-13: **prepare 登录硬编码**：`record/prepare`（及 `record/start` 未登录兜底）改为 `replay_actions`：`go_to_url` + `login(username, password)`，不再发 `session.step` 启动 browser-use；失败（导航/填表/按钮）使 prepare 失败。登录仍不写入 `trajectory_step`。
+  影响范围：service（prepare/start 登录）、scripts（`login()` 失败返回 `err-login`）、api-docs。
+  文件：src/services/trajectory/trajectory-record-lifecycle.js, scripts/controller/actions/_form.py, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-trajectory.mjs, characterize-login-action.py
+  Python 同步提示：无 HTTP/schema。若代理侧 prepare 登录仍发 session.step，改为 replay_actions（go_to_url + login，不传验证码）。
+
 ### Added
+
+- 2026-08-13: **批量行进度 + 阶段 done 说明**：`trajectory_phase.done_logs` JSON 数组 `[{text, at, source}]`；`phase_done.data.text` 追加写入（空 text 跳过；`phase_error` 为 `source=fail`）。`GET` 交易树 `phases[].doneLogs`；`GET/WS` 批量 item 计算 `progressPercent` / `phaseCompleted` / `phaseTotal` / `phaseName` / `lastDoneText`（不落 batch_item）。`trajectory.trajectory_log` 语义不变。
+  影响范围：trajectory_phase schema、录制 runner、batch GET/WS、api-docs。
+  文件：migrations/20260813120000_phase_done_logs.js, src/models/phase-done-logs.js, src/services/trajectory/batch-item-progress.js, src/services/trajectory-phase-service.js, trajectory-recording-runner.js, trajectory-batch-service.js
+  Python 同步提示：对齐 `trajectory_phase.done_logs`；透传 tree 的 `doneLogs` 与 batch item 五个计算字段；**不**改 batch URL。
+
+- 2026-08-13: **AI 阶段结束长图（控件高亮）**：`phase_done` 后对本阶段产品树步骤在当前页描边并滚主滚动区拼接 1 张 PNG，写入 `screenshot.kind=phase_highlight` 与 `trajectory_phase.stitch_screenshot_id`。失败不影响录制。交易树 phase 带 `stitchScreenshotId` / `stitchScreenshotUrl`。
+  影响范围：screenshot / trajectory_phase schema、录制 runner、tree、BiB executor `session.bib_phase_highlight_capture`。
+  文件：migrations/20260813100000_phase_highlight_screenshot.js, schemas/init.sql, src/cdp/phase-highlight-*.js, src/services/trajectory/phase-highlight-screenshot.js, executor/bib-bridge.js
+  Python 同步提示：对齐 `screenshot.kind` 新枚举与 `trajectory_phase.stitch_screenshot_id`；透传 tree 的 `stitchScreenshotUrl`；执行机需实现 `session.bib_phase_highlight_capture`（JS-gen executor 已加）。
+
+### Fixed
+
+- 2026-08-13: **分区逻辑收口后端**：`displayGroupOf` / `uniquifyDisplayGroups` 产出可直接展示的 `display_group`（中文 `region_label`；撞车后缀仅业务主键或 `#n`，禁止 xpath 碎片）；产品 SPA 选择器按该字段原样分组，不再从 xpath / 中文启发式重算分区。
+  影响范围：resolve-element ambiguous matches、自动抓取选择器。
+  文件：src/cdp/display-group.js, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-l1c-region-classify.mjs
+  Python 同步提示：透传 `display_group` 原样展示；勿在代理/前端再解析 xpath 当分组标题。
+
+- 2026-08-13: **待办 region 优先中文标题**：`assignRegion(.todo-item)` 的 `region_label` 用卡片头中文（如【对公授信申请】信贷调查），`region_id` 用业务主键（PJ/DGSX/YXPC…）；同标题撞车时 `uniquifyDisplayGroups` 追加主键后缀。scan L1 todo title 同步。
+  影响范围：resolve-element / 自动抓取选择器分组。
+  文件：src/cdp/page-locator-helpers.js, src/cdp/display-group.js, scripts/controller/actions/js_snippets/scan_form.py, scripts/characterization/characterize-unify-partition-locator.py, characterize-todo-item-action.py
+  Python 同步提示：透传 `region_label` 中文优先；勿把业务主键当唯一展示名。
+
+- 2026-08-12: **`uniquifyDisplayGroups` 撞车键优先 formLabel**：el-select 可见值常相同（如「否」），不可当 label；仅 `(display_group, formLabel|matchedLabel)` 双撞车才追加 xpath 后缀。修复「对公客户概况」被拆成 `… · ins(@class,'el-select')]`。
+  影响范围：自动抓取/歧义选择器分组。
+  文件：src/cdp/display-group.js, scripts/characterization/characterize-l1c-region-classify.mjs
+  Python 同步提示：同名去重键用表单项 label，勿用控件当前显示值。
+
+- 2026-08-12: **`uniquifyDisplayGroups` 仅在「分区 + label」双撞车时细化**：同一 `display_group` 下不同控件文案（客户编号/客户名称）不再追加 xpath 后缀；仅同区同文案（多「处理」/「新增」）才加后缀。对齐「先粗分区，撞车再细化」。
+  影响范围：自动抓取/歧义选择器分组标题。
+  文件：src/cdp/display-group.js, scripts/characterization/characterize-l1c-region-classify.mjs
+  Python 同步提示：若代理侧有同名 display_group 去重，按 (region, label) 键，勿按 region  alone。
+
+- 2026-08-12: **撞车细化后 L1c 不得回写粗 collapse 标签**：`assignRegion` 仍先粗分区；`refineCollidingRegions` 升到 titlebox 后，`patchRegionFields` 保留已有可读 `region_label`/`region_id`（不再被 feature-card 外层「股东及关联人信息」覆盖）；`buildFeatureCard` 取 title 时 titlebox 优先于 collapse。
+  影响范围：`resolve-element` 多「新增」歧义选择器分组。
+  文件：src/services/trajectory/trajectory-record-lifecycle.js, src/cdp/page-locator-helpers.js, scripts/characterization/characterize-l1c-region-classify.mjs, characterize-resolve-collision-titlebox.mjs
+  Python 同步提示：无 API；代理侧若有 L1c 回写，勿覆盖 resolve 已细化的 `region_label`。
+
+- 2026-08-12: **L1c 改写 region 后同步 `display_group`**：`patchRegionFields` 经共享 `displayGroupOf` 重算分组键；**禁止用 taxonomy 角色名（`section`）覆盖可读 `region_label`（PJ/DGSX/卡片标题）**；歧义多命中同名时 `uniquifyDisplayGroups` 追加短 xpath/id 后缀，并可从 xpath 找回业务键。
+  影响范围：`resolve-element` ambiguous matches（含 L1c）、自动抓取选择器分组。
+  文件：src/cdp/display-group.js, src/cdp/resolve-by-label.js, src/cdp/page-locator-helpers.js, src/services/region-classify.js, src/services/trajectory/trajectory-record-lifecycle.js, scripts/characterization/characterize-l1c-region-classify.mjs
+  Python 同步提示：透传 `display_group`；L1c 回写后勿用 `section` 等角色名覆盖业务 `region_label`。
+
+- 2026-08-12: **待办「处理」假成功回放 + 自动抓取漏抓**：`normalizeTargetRoot` / `inventoryKindOf` 均优先 `.todo-item-action`（先于 `.el-checkbox-group`），避免录成 checkbox-group xpath、以及 inventory 误标 `form_checkbox` 被 `click_element` 过滤掉；durable 在 `want` 文本存在时拒绝「xpath 命中祖先但文案非精确匹配」的 `ok-xpath-smart`；inventory 收录 `.todo-item-action`。
+  影响范围：手动录制 xpath_smart、steps/replay 点击、resolve-element / 自动抓取 inventory。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/replay_js.py, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-todo-item-action.py
+  Python 同步提示：无 API；执行机需重载含上述 helpers / replay_js 的会话后再用「自动抓取」点「处理」。
+
+- 2026-08-12: **待办卡片「处理」自动抓取/分区（1448067 延伸）**：L2 `collectL2Buttons` 收录 `div.todo-item-action`（非 button 标签亦准入）；L1 经 `assignRegion` 按 `.todo-item` 卡片赋 `region_label`（如 PJ…）；xpath 消歧经 `regionAnchor*` / 类 leaf；`resolve-by-label` 候选同步。人工录制/回放此前已补。
+  影响范围：`scan_editable_summary` / `JS_SCAN_FORM_FIELDS` L2 buttons + L1 regions、resolve-element 文本匹配、locator helpers。
+  文件：scripts/controller/actions/js_snippets/scan_form.py, scan_utils.py, src/cdp/page-locator-helpers.js, resolve-by-label.js, locator-builders/dispatcher.js, scripts/characterization/characterize-todo-item-action.py
+  Python 同步提示：若代理侧有全页扫描/resolve 按钮白名单，对齐 L2 准入 `.todo-item-action` + L1 `assignRegion` 卡片分区。
+
+- 2026-08-12: **Partner 代理网络失败文案**：projects/systems/importDemand 遇 nginx 502、超时、非 JSON 时统一返回「网络异常，自动化平台无法连接」（技术细节打 warn 日志，不塞进 `error`）。
+  影响范围：`GET /api/v2/export/partner/projects|systems`、推送 importDemand 502/504 message。
+  文件：src/services/partner-platform.js, src/dashboard/api-docs/groups/export-mgmt.js
+  Python 同步提示：对齐同文案；对方业务 `msg` 仍透传。
+
+- 2026-08-12: **草稿交易不可推送（1448068）**：partner 真实推送仅允许 `recordStatus=recorded|completed`；单轨 `push=true` → 409 `not_pushable_status`；批量跳过 draft/live/recording（item 带同 code）。dryRun/raw 仍可组装。批量无可推送时文案改为中文「没有可推送的交易…」。
+  影响范围：export 推送闸门、api-docs、产品 toast 文案。
+  文件：src/services/export-push-gate.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-export-push-gate.mjs
+  Python 同步提示：对齐 push 前校验录制状态；409 body 含 `code`/`recordStatus`；空推送 error 用中文。
+
+- 2026-08-12: **下拉选项子串误匹配（国民经济部门类别）**：`already-matched` / fuzzy / JS `includes` 不再用「短选项 ⊆ 长 want」把「其他非金融企业部门」录成「非金融企业部门」；exact 优先，contains 取最短合法项。
+  影响范围：AI/`select_option` 录制与 autofill、`_llm_values` commandValue fuzzy。
+  文件：scripts/controller/actions/form_scan_utils.py, _form.py, _llm_values.py, js_snippets/select_option.py, scripts/characterization/characterize-select-option-substring.py
+  Python 同步提示：无 API 变更；若代理侧有同类 fuzzy，对齐「禁止 o in want 短串」。
+
+- 2026-08-12: **人工录制弹窗表格 radio 不落步**：`tableRadio` 在 `rowText` 空时不再静默 `return`；回退 `data-row-key` / `row-index:N`，仍无身份则 fall through 到普通 click。
+  影响范围：手动录制 dialog/picker 表行单选。
+  文件：scripts/manual_recorder/js_parts/a.py, b.py, scripts/characterization/characterize-manual-table-radio.py
+  Python 同步提示：无；仅 executor 手动录制脚本。
+
+- 2026-08-12: **AI 录制行业代码等树选择器落成树节点**：`select_tree_option` 按 label 解析 xpath 并 stamp `form_tree_select`；`prepareElementJson` 对 `select_tree_option` 推断 `form_tree_select`（不再误成 `form_input`）；popover 内树节点回绑表单树选择控件（侧栏 `.el-tree` 仍为 `tree_node`）；AI `click_element_by_index` / 手动录制在表单树 popover 上升级为 `select_tree_option`。
+  影响范围：录制步骤 `action`/`target_kind`、回放定位、手动录制 mapper。
+  文件：scripts/controller/actions/_form.py, _misc.py, src/models/element.js, src/cdp/page-locator-helpers.js, scripts/manual_recorder/*, scripts/characterization/characterize-tree-select-record.py
+  Python 同步提示：对齐 `select_tree_option`→`form_tree_select` 元素元数据；产品 UI 操作类型应对「树选择器」而非「树节点」。
+
+- 2026-08-11: **browser-session-lifecycle final review**：`assertNoForeignGraceOnNodeSlot` 改为 slot 感知（不同 `slotIndex` 跳过，同槽/未知槽 + idle grace 仍 gate）；`reusedChrome` 时即使无 `cdpPort` 也跑 claim；`detachTrajectoryLive` 在 streamDetach 清缓存后经 `getByTrajectory`/`getOccupiedByAgentSession` 解析 remote_session，并以 `clearOwnershipOnClose` 立即清归属；`markActive`/`syncMount` 清 `grace_until`。
+  影响范围：多槽 attach 409 误拒修复；硬 detach 在 streamDetach 后仍能关 idle Chrome；owner reclaim 不再残留 grace。
+  文件：src/services/trajectory/trajectory-attach-service.js, src/services/session-lifecycle.js, src/dao/remote-session-dao.js, scripts/characterization/characterize-session-lifecycle.mjs
+  Python 同步提示：对齐 attach claim gate 按 slot 过滤（勿 node 全表 false-deny）；硬 detach 走 truth `trajectory_id` 查找并立即清归属；`markActive`/`syncMount` 清 `grace_until`。
+
+- 2026-08-11: **remote_session 归属真相源 + streamDetach 宽限**：`trajectory_id` 为唯一归属；`trajectory.remote_session_id` 仅为门面缓存；`streamDetach` 进入 idle 时保留归属并设 `grace_until`（默认 15min）；宽限期内他交易认领 → 409 `grace_owned`；reaper 先到期清归属再关孤儿。修复 `markIdle` 清空 `trajectory_id` 导致交叉挂载/易主；`attachLive` / `attachTrajectoryLive`（含 `reusedChrome` slot 感知 claim gate）在宽限内拒绝他交易复用 idle Chrome。
+  影响范围：schema（`grace_until`）、attach/streamDetach/detach/reaper 语义、409 响应可含 `code`/`ownerTrajectoryId`/`graceUntil`；env `REMOTE_SESSION_GRACE_MS`。
+  文件：migrations/20260811200000_remote_session_grace_until.js, schemas/init.sql, config/config.js, src/services/session-lifecycle*.js, src/dao/remote-session-dao.js, src/services/remote-session-service.js, src/services/trajectory-idle-reaper.js, src/services/trajectory/trajectory-attach-service.js, src/routes/v2/remote-session.js, src/routes/v2/trajectory-shared.js, scripts/characterization/characterize-session-lifecycle.mjs
+  Python 同步提示：对齐 `remote_session.grace_until`；代理 attach/stream-detach 时透传 409 `code=grace_owned` 与 `ownerTrajectoryId`/`graceUntil`；勿在宽限期内把 idle Chrome 当无主复用。
+
+- 2026-08-11: **产品步骤列表过滤内部 meta（Bug-1448055）**：`save_form_snapshot` 等仍入库供 Type B 回放，但默认不出现在 `GET .../tree` / `GET .../phases/:id/steps`；`includeMeta=1` 可看全量；步骤带 `isMeta`；`stepCount` 只计业务步；live `action_persisted` 不对 meta 广播；`steps/replay` 在选中业务步 `step_number` 区间自动补入 meta 检查点。
+  影响范围：轨迹树/阶段步骤列表、stepCount、live WS、steps/replay 选步扩展。
+  文件：src/models/meta-step-actions.js, src/services/trajectory-query-service.js, src/services/trajectory-step-service.js, src/routes/browser-session/persist-live.js, src/services/trajectory/trajectory-session-replay.js, src/routes/v2/trajectory.js, src/routes/v2/trajectory-steps.js, src/dashboard/api-docs/groups/trajectory.js, scripts/characterization/characterize-meta-step-filter.mjs
+  Python 同步提示：代理 tree/phase-steps 透传 `includeMeta`；对齐默认隐藏 meta + `isMeta`；回放若只传业务 stepIds，应对齐「区间内自动补 save_form_snapshot」或依赖本控制面扩展。
+
+- 2026-08-11: **批量导入中文提示与模板文件名**：未上传/空 buffer →「请上传 Excel 文件」；无数据行 →「导入文件为空，请至少填写一行交易」；无有效行 →「Excel 中没有有效数据行」。模板下载 `Content-Disposition` 中文名「批量录制导入模板.xlsx」（RFC 5987 `filename*` + ASCII 回退）。
+  影响范围：`GET /api/v2/trajectories/batch/template`、`POST /api/v2/trajectories/batch/import` 错误文案与下载文件名。
+  文件：src/routes/v2/trajectory-batch.js, src/services/trajectory/trajectory-batch-service.js, src/services/trajectory-batch-excel.js, src/dashboard/api-docs/groups/trajectory.js
+  Python 同步提示：对齐空文件/无数据行中文 error 文案；模板下载按 `filename*` 展示中文名（或同步改代理侧 Content-Disposition）。
+
+- 2026-08-11: **L1c final review hardening**：`callLLMWithTimeout` 在 race 结束后 `clearTimeout`，避免 LLM 先返回后超时 rejection 未处理；`L1C_LLM=false` 时不 L1d 缓存 `shouldLlmClassify` 规则结果（仅缓存最终规则命中如高置信 `main`）；`resolve-element` 的 `resolveSystemIdForTrajectory` / `applyL1cRegionClassify` 软失败（warn + 原 payload），不因分类 500。
+  影响范围：`classifyRegions` L1d 命中条件；`POST .../resolve-element` 稳定性。
+  文件：src/services/region-classify.js, src/services/trajectory/trajectory-record-lifecycle.js
+  Python 同步提示：无 API 变更；若本地缓存 L1d，对齐「LLM 关闭时不缓存待 LLM 卡片」语义。
+
+### Changed
+
+- 2026-08-13: **v2 行为保持去重：steps→commands 映射合并 + sendErr/asyncHandler 统一**：`stepsToActionCommands` 收拢到 `src/models/element.js`（replay-service `prepareReplay` 传 `{ preferEntryPhase: true }` 保留原 `phaseNumber ?? entry.phase ?? 0` 语义；`/assemble-file` 默认 `phaseNumber ?? 0` 不变）；v2 `sendErr` 统一到 `trajectory-shared.js`（canonical 增补可选 `rejected` 字段，其余字段不变），并新增 `asyncHandler`；replay / regions / operation-component / system-ref-data / trajectory-batch 5 个路由文件删除本地 sendErr 副本与手写 try/catch（batch/import 的 multipart 回调除外）。
+  影响范围：错误响应 body 为兼容性扩张（错误对象若带 `code`/`ownerTrajectoryId`/`graceUntil`/`holders`/`rejected` 时多透传，此前部分模块不返回）；路由路径/方法、成功响应字段、WS 协议均不变。
+  文件：src/models/element.js, src/services/replay-service.js, src/routes/v2/trajectory.js, src/routes/v2/trajectory-shared.js, src/routes/v2/replay.js, src/routes/v2/regions.js, src/routes/v2/operation-component.js, src/routes/v2/system-ref-data.js, src/routes/v2/trajectory-batch.js
+  Python 同步提示：错误响应扩展字段均为可选透传；Python 端转发 v2 错误 body 时透传即可，无需强制。
+
+- 2026-08-12: **分区/定位统一 U2（inventory = L2 投影）**：`collectL2Hosts` 为唯一 host 选择器表；`collectInventoryHosts` 委托之；循环内 `normalizeHost` + `classifyOperable`（无并行 collector 表）。`collectL2Buttons` 仍保留 button-only 投影但继续 `classifyOperable` 准入。
+  影响范围：PAGE_LOCATOR_HELPERS、resolve-element inventory、自动抓取。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-unify-partition-locator.py
+  Python 同步提示：无 API；SPA/执行机需重载 helpers 后再用 inventory / 自动抓取。
+
+- 2026-08-12: **分区/定位统一 U1（自动抓取可读分区）**：`classifyOperable`/`normalizeHost` 为唯一准入/host 内核；resolve-element 歧义项增加 `display_group`（= `region_label`），待办多「处理」须带互异卡片业务键。
+  影响范围：PAGE_LOCATOR_HELPERS、resolve-element ambiguous matches、api-docs。
+  文件：src/cdp/page-locator-helpers.js, src/cdp/resolve-by-label.js, src/dashboard/api-docs/groups/recording.js, …
+  Python 同步提示：透传 `display_group`；产品 SPA「选择匹配的控件」按 `display_group`/`region_label` 分组，勿用 `region_role`。
+
+- 2026-08-12: **BiB 画布本机剪贴板**：`remote:input` 新增 `kind:clipboard`（`getSelection`）；下行 `remote:clipboard`；产品画布 Ctrl/Cmd+C/V 走本机剪贴板语义（不再把 C/V 当远端键透传）。
+  影响范围：`/ws` BiB 协议；executor `session.bib_clipboard`；Vue `useRemoteCanvas`
+  文件：src/cdp/clipboard-selection.js, src/cdp/remote-bridge/ws-router.js, executor/bib-bridge.js, src/dashboard/api-docs/groups/websocket.js, scripts/characterization/characterize-clipboard-selection.mjs
+  Python 同步提示：若 Python 控制面转发 BiB `remote:input`，对齐 `clipboard` 与 `remote:clipboard` 广播
+
+- 2026-08-12: **xpath 消歧 helpers 统一为 `regionAnchor*`（R4）**：`sectionAnchorOf` / `sectionAnchorXPath` 别名已删除；仅保留 `regionAnchorOf` / `regionAnchorXPath`，注释标明 xpath 消歧（非产品 L1 分块 / `section=`）。产品区域请用 `region_*` / `assignRegion`。
+  影响范围：CDP locator helpers、Python 镜像 `_locator_helpers_js.py`、region-anchored xpath 导出/回放。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-section-anchored-xpath.py
+  Python 同步提示：控制面若不镜像 `page-locator-helpers` 可跳过；代理侧若注入同名 helpers，仅使用 `regionAnchor*`（勿再引用 `sectionAnchor*`）。
+
+- 2026-08-12: **Agent stderr 导出剥前缀**：`GET|POST .../agent-stderr` 与 traj 快捷导出返回正文时去掉 `[slot:N sid:…]` 与 `[session]`（落盘 slot 前缀仍保留供过滤）；监视面板「日志」同步干净正文。
+  影响范围：导出 text/json 的 `lines` 内容；Python agent 源日志不再写 `[session]`，阶段结束为 `Phase N done` + 空行。
+  文件：src/services/agent-stderr-log-service.js, src/routes/v2/agent-stderr.js, scripts/session_runner.py, scripts/agent/service.py, scripts/browser/factory.py, scripts/event_dispatch.py, scripts/trajectory_store.py, scripts/cdp_ports.py
+  Python 同步提示：若代理导出接口，对齐剥前缀后的正文（或自行 strip）。
+
+- 2026-08-12: **`GET /api/v2/recording/agent-stderr/active` 附带 CDP 端口**：对在线执行机拉 `session.list`，`rows[].cdpPort` + `slotPorts[]`（含空闲槽默认口）；执行机 `list()` 改为返回全容量槽。监视面板新增 CDP 列。
+  影响范围：`/active` 响应扩字段；executor WS `session.list_result.sessions` 可含 `sessionId: null` 的空闲槽。
+  文件：executor/session-manager.js, src/services/agent-stderr-log-service.js, src/dashboard/api-docs/slot-monitor.js, src/dashboard/api-docs/groups/recording.js
+  Python 同步提示：若代理 `/active`，透传 `cdpPort` 与 `slotPorts`；解析 `session.list` 时忽略无 sessionId 的槽即可。
+
+- 2026-08-11: **AI 录制 agent_task：案例 KV 仅文本注入 + 【阶段目录】全量阶段**：`format_case_data_hint` 同时附原文 block 与扁平 `- 键：值`（不再互斥）；撤回 select `commandValue` 硬绑。`stepData.all_phases` 来自交易全部 phase（`allPhases`），执行仍只跑勾选 `phaseIds`。
+  影响范围：`[session] agent_task preview` 内容；录制 `all_phases` 载荷。
+  文件：scripts/controller/actions/_case_data.py, scripts/controller/actions/_form.py, scripts/controller/actions/phase/outcomes.py, src/services/trajectory/trajectory-recording-runner.js
+  Python 同步提示：若代理录制 step 载荷，透传全量 `all_phases`；业务数据以 task 文本为准，勿再依赖 case_data_store 硬灌 select。
+
+### Added
+
+- 2026-08-12: **`POST /api/v2/recording/agent-stderr/clear` + 监视面板「清空日志」**：按 session 删除控面 `logs/agent-stderr/{sessionId}.log`（仅该文件）。Body 同 /active 行；监视占用行与日志面板均可触发。
+  影响范围：新路由；`/api/docs` 执行机监视 UX。
+  文件：src/services/agent-stderr-log-service.js, src/routes/v2/agent-stderr.js, src/dashboard/api-docs/slot-monitor.js, src/dashboard/api-docs/groups/recording.js
+  Python 同步提示：若代理录制相关 API，对齐 `POST /api/v2/recording/agent-stderr/clear`（body 透传 sessionId/trajectoryId/sid）。
+
+- 2026-08-12: **`/api/docs` 执行机监视面板**：侧栏「执行机监视」按节点拆分槽位（空闲/占用、交易、session、CDP）；支持刷新/筛选/自动刷新；占用行可「断开画面」「释放浏览器」「日志」「清空日志」。
+  影响范围：仅 `/api/docs` 前端；清空走 `POST .../agent-stderr/clear`；CDP 来自 `/active.slotPorts`。
+  文件：src/dashboard/api-docs/slot-monitor.js, src/dashboard/api-docs/app.js, src/dashboard/api-docs/catalog.js, src/dashboard/api-docs/api-docs.css
+  Python 同步提示：无
+
+- 2026-08-12: **`POST /api/v2/recording/agent-stderr` 粘贴 /active 行导出**：请求体可直接粘贴活动目录 `rows[]` 一项（识别 `slotIndex`/`sid`/`sessionId`/`trajectoryId`，其余字段忽略）。
+  影响范围：新增 POST；`/api/docs` Try 示例为 active 行 JSON。
+  文件：src/routes/v2/agent-stderr.js, src/dashboard/api-docs/groups/recording.js
+  Python 同步提示：代理 `POST /api/v2/recording/agent-stderr`，body 透传 active 行字段。
+
+- 2026-08-11: **多 slot Agent stderr 隔离与导出**：执行机行前缀 `[slot:N sid:…]` 经 WS `session.agent_stderr` 落盘控面；交易录制分组新增 `GET /api/v2/recording/agent-stderr/active`、`GET|POST /api/v2/recording/agent-stderr`、`GET /api/v2/trajectories/:id/agent-stderr`。
+  影响范围：新路由 + executor stderr 前缀；env `AGENT_STDERR_LOG_DIR`。
+  文件：executor/stderr-prefix.js, executor/session-slot.js, src/services/agent-stderr-log-service.js, src/routes/v2/agent-stderr.js, src/executor-ws.js, src/dashboard/api-docs/groups/recording.js, config/config.js
+  Python 同步提示：若代理录制相关 API，对齐 active GET + recording agent-stderr GET/POST + traj 快捷 GET；WS `session.agent_stderr` 可忽略（控面落盘）。
+
+- 2026-08-11: **L1c 区域分类 `POST /api/v2/regions/classify` + `L1C_LLM` 灰度**：批量对 feature card 做规则 → L1d 缓存 → 可选 LLM 分类；`resolve-element` 已在 lifecycle 内联 `classifyRegions`；scan/fullpage 可经 HTTP 调用同一服务。
+  影响范围：`POST /api/v2/regions/classify` 请求体 `{ systemId?, cards }` → `{ items }`；env `L1C_LLM`（默认关）、`L1C_LLM_TIMEOUT_MS`。
+  文件：src/routes/v2/regions.js, src/services/region-classify.js, src/services/trajectory/trajectory-record-lifecycle.js, config/config.js, config/.env.example, src/dashboard/api-docs/groups/regions.js
+  Python 同步提示：代理 `POST /api/v2/regions/classify`；对齐 `items[].role|label|confidence|source` 与 `L1C_LLM` 开关语义；`scan_editable_summary` 接入可后续跟进。
+
+- 2026-08-10: **`resolve-element` inventory 模式端到端贯通**：HTTP body / executor WS `session.bib_resolve_element` 支持 `mode`（产品默认 `inventory`）；inventory 无 label/action 不 400，无 labelText 时始终返回 ambiguous 列表；可选 `truncated` 表示命中 INVENTORY_CAP。
+  影响范围：`POST .../resolve-element` 请求体 `mode`；executor WS `session.bib_resolve_element` payload；响应可含 `truncated`。
+  文件：src/routes/v2/trajectory-record.js, src/services/trajectory/trajectory-record-lifecycle.js, src/cdp/remote-bridge/index.js, executor/session-handler.js, executor/session-manager.js, executor/bib-bridge.js, src/dashboard/api-docs/groups/recording.js
+  Python 同步提示：代理 resolve-element / bib_resolve_element 时透传 `mode`（默认 `inventory`）；对齐 ambiguous + `truncated` 响应字段。
+
+- 2026-08-10: **`resolve-element` 同区碰撞后 titlebox 细化 L1**：歧义匹配按 `(needle, region_id)` 碰撞组再发现 `div.titlebox`/`span.title`，刷新 `region_*` 并尝试 titlebox 锚定 `xpath_smart`（算法 B 不丢匹配）。湿测多「新增」可区分面板标签。
+  影响范围：`POST .../resolve-element` 歧义 matches 的 `region_*` / `xpath_smart`；CDP helpers 与 Python `_locator_helpers_js` 同步。
+  文件：src/cdp/page-locator-helpers.js, src/cdp/resolve-by-label.js, src/models/element.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-resolve-collision-titlebox.mjs
+  Python 同步提示：若代理 resolve-element，对齐碰撞细化后的 `preview.region_label` / `xpath_smart`（无 schema 变更）。
+
+### Fixed
+
+- 2026-08-10: **`prepareElementJson` / `enrichLocatorFields` 保留已抓取相对 xpath**：缺 `xpath_smart` 但 `xpath` 已是 `//…`（含 titlebox 锚定）时不再按按钮文案发明裸 leaf 覆盖。
+  影响范围：步骤创建/更新 element 归一化；与 Vue `buildElement` 持久化 `xpath_smart` 互补。
+  文件：src/cdp/locator-builders/candidates.js
+  Python 同步提示：若 Python 控制面有同源 enrich，对齐「已有相对 xpath 优先于 text 发明」。
+
+### Added
+
+- 2026-08-10: **灰度开关 `XPATH_SMART_FILL_ONLY`（默认关）**：开则 `fill_form_field` 仅允许 `xpath_smart` 定位；关则无 xpath 时保留 label DOM 兜底（测试人员）。入口 `scripts/feature_flags.py` / `config/.env.example`。
+  影响范围：Agent 填表行为开关。
+  文件：scripts/feature_flags.py, scripts/controller/actions/_form.py, config/.env.example
+  Python 同步提示：无（scripts 侧；若 Python 控制面另有填表代理可对齐同名 env）。
 
 - 2026-08-10: **`resolve-element` 歧义匹配附带 L1 区域预览**：`matches[].preview` / element 增加 `region_role`、`region_id`、`region_label`（与全页扫描 `assignRegion` 同源规则）；Vue 选择器主行展示区域标签。算法 B：归位失败不丢匹配。BiB 需重载执行机后做多「新增」冒烟（湿测挂起）。
   影响范围：`POST .../resolve-element` 响应预览字段；CDP `PAGE_LOCATOR_HELPERS` / `resolve-by-label`。
@@ -75,6 +277,20 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：无（仅 JS-gen Session Chrome 启动）。
 
 ### Changed
+
+- 2026-08-11: BiB 画面推流默认限帧约 10–12fps（分辨率/quality 不变），降低公网观看延迟与卡顿。可通过 `BIB_STREAM_MIN_FORWARD_MS`、`BIB_STREAM_EVERY_NTH_FRAME` 调整。
+  - 影响：执行机 `bib-bridge`、控制面 `remote-bridge` screencast、`/api/docs` WS 说明。
+  - Python 同步提示：无 schema/路由变更；若 Python 控制面有独立 screencast 旁路，对齐限帧默认值即可。
+
+- 2026-08-11: **page-state-gen**：可点击 leaf 在相对 xpath 多命中时，用页态（步骤条→dialog/drawer→breadcrumb）锚定 `xpath_smart`；唯一控件不包。推广原 wizard 下一步逻辑。
+  影响范围：CDP locator helpers / 录制 snap / resolve inventory。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py
+  Python 同步提示：无 API 变更；若 Python 侧自建 xpath enrich 可对齐碰撞才包 page-state。
+
+- 2026-08-10: **批量推送（Batch Push）端到端**：api-docs 分组改为「批量推送管理」；新增对方项目/系统代理（`GET /export/partner/projects|systems`）；`POST /export/transactions` 组装后代调 importDemand，仅对方成功才 `markExported`；`systemId`/`projectId` 缺省 98/31；`access_token` 从头/body/env 转发。Vue 弹窗改为项目→系统级联。
+  影响范围：批量推送产品流、partner 代理、importDemand 代推。
+  文件：src/services/partner-platform.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, config/.env.example；Vue：api/export.ts、BatchPushDialog.vue、ui-recording/index.vue
+  Python 同步提示：无（导出/推送为 Node 侧）。
 
 - 2026-08-10: **Partner transaction 导出对齐 importDemand 定稿**：外层 `transcationEventTypeList`；轨内步骤为 `transcationProperties`；`testFrame=playwright`；`propertiesName` 无分隔符且同轨去重（重复追加 2、3…）；`raw`/`forImport`/`download` 返回可直接 POST 的导入体；批量 raw 合并多轨。
   影响范围：`/api/v2/export/trajectories/:id/transaction`、`/api/v2/export/transactions`、transaction schema/docs。

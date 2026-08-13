@@ -104,7 +104,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         enabled = bool(data.get("enabled", True))
         set_capture_screenshots(enabled)
         emit_json({"event": "capture_screenshots_status", "data": {"enabled": enabled}})
-        sys.stderr.write(f"[session] capture_screenshots={enabled}\n")
+        sys.stderr.write(f"capture_screenshots={enabled}\n")
         sys.stderr.flush()
         return 'continue'
 
@@ -196,11 +196,11 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
                     "url": getattr(cur, 'url', '') or url,
                 },
             })
-            sys.stderr.write(f"[session] switch_tab -> pageId={page_id} url={getattr(cur, 'url', '')}\n")
+            sys.stderr.write(f"switch_tab -> pageId={page_id} url={getattr(cur, 'url', '')}\n")
             sys.stderr.flush()
         except Exception as e:
             emit_json({"event": "switch_tab_result", "data": {"ok": False, "error": str(e)}})
-            sys.stderr.write(f"[session] switch_tab failed: {e}\n")
+            sys.stderr.write(f"switch_tab failed: {e}\n")
             sys.stderr.flush()
         return 'continue'
 
@@ -294,13 +294,13 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
                 "code": 410,
             },
         })
-        sys.stderr.write("[session] intervene rejected (410 Gone — use manual recording)\n")
+        sys.stderr.write("intervene rejected (410 Gone — use manual recording)\n")
         sys.stderr.flush()
         return 'continue'
 
     if event != "step":
         if event:
-            sys.stderr.write(f"[session] Unknown event: {event}\n")
+            sys.stderr.write(f"Unknown event: {event}\n")
             sys.stderr.flush()
         return 'continue'
 

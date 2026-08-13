@@ -10,7 +10,7 @@ import path from 'path';
 import { PROJECT_DIR } from '../../config/config.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import { getTrajectoryTree } from './trajectory-service.js';
-import { trajectoryStepToActionEntry } from '../models/element.js';
+import { stepsToActionCommands } from '../models/element.js';
 import { assembleActionToScript } from './assemble-service.js';
 import {
   executeScript,
@@ -31,22 +31,6 @@ const latestPlanByTrajectory = new Map();
 const replaysById = new Map();
 /** @type {Map<number, string>} */
 const latestReplayByTrajectory = new Map();
-
-function stepsToReplayCommands(steps) {
-  return (steps || []).map((s) => {
-    const entry = trajectoryStepToActionEntry(s);
-    const rawEl = s.element ?? s.elementJson ?? null;
-    const el = typeof rawEl === 'string'
-      ? (() => { try { return JSON.parse(rawEl); } catch { return {}; } })()
-      : (rawEl || {});
-    return {
-      ...entry,
-      target: entry.target || el.xpath || el.target || '',
-      phase: s.phaseNumber ?? entry.phase ?? 0,
-      source: s.source || 'agent',
-    };
-  });
-}
 
 function assertNotRecording(traj) {
   if (traj.recordStatus === 'recording') {
@@ -106,13 +90,13 @@ export async function prepareReplay(trajectoryId) {
   }
 
   const dbSteps = traj.steps || [];
-  const commands = stepsToReplayCommands(dbSteps.length ? dbSteps : flatSteps.map((s) => ({
+  const commands = stepsToActionCommands(dbSteps.length ? dbSteps : flatSteps.map((s) => ({
     id: s.stepId,
     trajectoryPhaseId: s.phaseId,
     phaseNumber: s.phaseNumber,
     stepNumber: s.stepNumber,
     actionType: s.actionType,
-  })));
+  })), { preferEntryPhase: true });
 
   const actionDir = path.join(PROJECT_DIR, 'scripts', 'action');
   if (!existsSync(actionDir)) mkdirSync(actionDir, { recursive: true });

@@ -26,25 +26,25 @@ def test_js_scan_cues() -> None:
         )
     )
     assert_true("el-table" in js and "xpath_smart" in js, "scan references el-table and xpath_smart")
-    assert_true("SCAN_SOURCE_B_EL_TABLE" in js, "SCAN_SOURCE_B_EL_TABLE marker")
+    assert_true("COLLECT_L2_TABLE" in js, "COLLECT_L2_TABLE marker")
     assert_true("SCAN_DEDUP_BY_XPATH" in js, "SCAN_DEDUP_BY_XPATH marker")
 
 
-def test_source_b_empty_leading_row_cues() -> None:
+def test_l2_table_empty_leading_row_cues() -> None:
     from scripts.controller.actions._js_snippets import JS_SCAN_FORM_FIELDS
     js = JS_SCAN_FORM_FIELDS
-    assert_true("SCAN_SOURCE_B_EL_TABLE" in js, "SCAN_SOURCE_B_EL_TABLE marker")
+    assert_true("COLLECT_L2_TABLE" in js, "COLLECT_L2_TABLE marker")
     assert_true(
         "row#" in js,
         "synthetic row#N cue present for empty-leading rows",
     )
     assert_true(
-        "SOURCE_B_EMPTY_LEADING" in js,
-        "SOURCE_B_EMPTY_LEADING marker on empty-leading path",
+        "COLLECT_L2_TABLE_EMPTY_LEADING" in js,
+        "COLLECT_L2_TABLE_EMPTY_LEADING marker on empty-leading path",
     )
     assert_true(
-        "SOURCE_B_ROW_INDEX_XPATH" in js,
-        "SOURCE_B_ROW_INDEX_XPATH marker for synthetic row xpath",
+        "COLLECT_L2_TABLE_ROW_INDEX_XPATH" in js,
+        "COLLECT_L2_TABLE_ROW_INDEX_XPATH marker for synthetic row xpath",
     )
 
 
@@ -75,7 +75,7 @@ def main() -> int:
     })
     assert_true(item is not None and item.xpath_smart.startswith("//"), "TaskItem carries xpath_smart")
     test_js_scan_cues()
-    test_source_b_empty_leading_row_cues()
+    test_l2_table_empty_leading_row_cues()
     test_fingerprint_distinguishes_same_label()
     print("characterize-form-scan-control-first: OK")
     return 0

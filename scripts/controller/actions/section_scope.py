@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -16,20 +17,48 @@ def strip_sec_suffix(s: str) -> str:
     return re.sub(r"#\d+$", "", norm_sec(s))
 
 
-def section_matches(want: str, section_id: str = "", section_title: str = "") -> bool:
-    """Align with JS_CLICK_SAVE_BUTTON secMatches (exact id/title; strip #n)."""
+def resolve_scope(region: str = "", section: str = "", *, warn: bool = True) -> str:
+    """Agent-facing scope: prefer region; section is legacy alias.
+
+    When both are set and differ, region wins. Empty strings are ignored.
+    """
+    r = norm_sec(region)
+    s = norm_sec(section)
+    if warn and s and not r:
+        sys.stderr.write(
+            f"[deprecate] section= is deprecated; use region= instead (got {s!r})\n"
+        )
+        sys.stderr.flush()
+    if warn and r and s and r != s:
+        sys.stderr.write(
+            f"[deprecate] both region={r!r} and section={s!r} set; using region\n"
+        )
+        sys.stderr.flush()
+    return r or s
+
+
+def section_matches(
+    want: str,
+    section_id: str = "",
+    section_title: str = "",
+    region_label: str = "",
+) -> bool:
+    """Align with JS_CLICK_SAVE_BUTTON secMatches; also accept L1 region_label."""
     want_norm = norm_sec(want)
     if not want_norm:
         return True
     sid = norm_sec(section_id)
     title = norm_sec(section_title)
+    region = norm_sec(region_label)
     want_base = strip_sec_suffix(want_norm)
     return (
         sid == want_norm
         or title == want_norm
+        or region == want_norm
         or strip_sec_suffix(sid) == want_norm
         or strip_sec_suffix(sid) == want_base
         or title == want_base
+        or region == want_base
     )
 
 
@@ -42,7 +71,12 @@ def filter_pending_labels(tl: "TaskList", section: str = "") -> list[str]:
     if norm_sec(section):
         items = [
             i for i in items
-            if section_matches(section, i.section_id, i.section_title)
+            if section_matches(
+                section,
+                i.section_id,
+                i.section_title,
+                getattr(i, "region_label", "") or "",
+            )
         ]
     return [i.label for i in items]
 
@@ -50,14 +84,29 @@ def filter_pending_labels(tl: "TaskList", section: str = "") -> list[str]:
 def pending_by_section(tl: "TaskList") -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for i in pending_fillable_items(tl):
-        key = (i.section_title or i.section_id or "__root__").strip() or "__root__"
+        key = (
+            (getattr(i, "region_label", None) or "")
+            or i.section_title
+            or i.section_id
+            or "__root__"
+        ).strip() or "__root__"
         out.setdefault(key, []).append(i.label)
     return out
 
 
+def pending_by_region(tl: "TaskList") -> dict[str, list[str]]:
+    """Preferred alias for pending_by_section (region-first naming)."""
+    return pending_by_section(tl)
+
+
+def requires_region_declaration(tl: "TaskList") -> bool:
+    """True when click_save must receive region= (pending spans ≥2 blocks)."""
+    return len(pending_by_region(tl)) >= 2
+
+
 def requires_section_declaration(tl: "TaskList") -> bool:
-    """True when click_save must receive section= (pending spans ≥2 blocks)."""
-    return len(pending_by_section(tl)) >= 2
+    """Deprecated alias for requires_region_declaration."""
+    return requires_region_declaration(tl)
 
 
 def same_label_section_keys(buttons: list | None, button_text: str = "保存") -> list[str]:
@@ -76,7 +125,11 @@ def same_label_section_keys(buttons: list | None, button_text: str = "保存") -
             continue
         if needle not in lab and lab not in needle:
             continue
-        key = norm_sec(b.get("section_title") or "") or norm_sec(b.get("section_id") or "")
+        key = (
+            norm_sec(b.get("region_label") or "")
+            or norm_sec(b.get("section_title") or "")
+            or norm_sec(b.get("section_id") or "")
+        )
         if not key or key == "__root__":
             continue
         if key not in seen:
@@ -86,10 +139,10 @@ def same_label_section_keys(buttons: list | None, button_text: str = "保存") -
 
 
 def unique_button_section(buttons: list | None, button_text: str = "保存") -> str | None:
-    """If exactly one distinct section among buttons matching ``button_text``, return it.
+    """If exactly one distinct region/section among buttons matching ``button_text``, return it.
 
-    Uses DOM scan buttons (not phase NL). Prefer ``section_title``, else ``section_id``.
-    Returns None when 0 or ≥2 matching sections (LLM must declare section=).
+    Prefer ``region_label``, then ``section_title`` / ``section_id``.
+    Returns None when 0 or ≥2 matching keys (LLM must declare section=).
     """
     keys = same_label_section_keys(buttons, button_text)
     if len(keys) == 1:
@@ -112,7 +165,12 @@ def preferred_submit_button(store: dict | None, section: str = "") -> str:
         lab = norm_sec(b.get("label") or "")
         if not lab:
             continue
-        if sec and not section_matches(sec, b.get("section_id") or "", b.get("section_title") or ""):
+        if sec and not section_matches(
+            sec,
+            b.get("section_id") or "",
+            b.get("section_title") or "",
+            b.get("region_label") or "",
+        ):
             continue
         labels.append(lab)
     for prefer in ("暂存", "保存", "提交"):
@@ -123,8 +181,16 @@ def preferred_submit_button(store: dict | None, section: str = "") -> str:
     return "保存"
 
 
+def scope_kw_cue(scope: str = "") -> str:
+    """Emit preferred tool kw for phase/block scope: region= (section= still accepted)."""
+    sec = norm_sec(scope)
+    if not sec:
+        return ""
+    return f", region='{sec}'"
+
+
 def preferred_submit_cue(store: dict | None, section: str = "") -> str:
-    """Human/agent cue: click_save with preferred button + section when known."""
+    """Human/agent cue: click_save with preferred button + region when known."""
     explicit_sec = norm_sec(section)
     sec = explicit_sec or (resolve_phase_section(store) if store else "")
     btn = preferred_submit_button(store, section=sec)
@@ -132,16 +198,22 @@ def preferred_submit_cue(store: dict | None, section: str = "") -> str:
     if len(keys) >= 2:
         return (
             f"Multiple '{btn}' buttons in {keys!r}. "
-            f"Call click_save(button_text='{btn}', section='…') with the phase block title. "
-            f"Do NOT call bare click_save() — sticky section is ignored when ambiguous."
+            f"Call click_save(button_text='{btn}', region='…') with the phase block / region_label. "
+            f"Do NOT call bare click_save() — sticky scope is ignored when ambiguous. "
+            f"(section= still accepted as alias.)"
         )
-    sec_part = f", section='{sec}'" if sec else ""
+    sec_part = scope_kw_cue(sec)
     has_calc = False
     for b in (store or {}).get("_scan_buttons") or []:
         if not isinstance(b, dict):
             continue
         lab = norm_sec(b.get("label") or "")
-        if sec and not section_matches(sec, b.get("section_id") or "", b.get("section_title") or ""):
+        if sec and not section_matches(
+            sec,
+            b.get("section_id") or "",
+            b.get("section_title") or "",
+            b.get("region_label") or "",
+        ):
             continue
         if "测算" in lab and "等级测算" not in lab:  # button 测算, not section title alone
             has_calc = True
@@ -189,7 +261,11 @@ def resolve_phase_section(store: dict | None, *, task_text: str = "") -> str:
     for b in store.get("_scan_buttons") or []:
         if not isinstance(b, dict):
             continue
-        t = norm_sec(b.get("section_title") or "") or norm_sec(b.get("section_id") or "")
+        t = (
+            norm_sec(b.get("region_label") or "")
+            or norm_sec(b.get("section_title") or "")
+            or norm_sec(b.get("section_id") or "")
+        )
         if t and t != "__root__" and t not in seen:
             seen.add(t)
             titles.append(t)
@@ -197,8 +273,10 @@ def resolve_phase_section(store: dict | None, *, task_text: str = "") -> str:
         from scripts.models.task import TaskList
         tl = TaskList.from_store(store.get("task_list"))
         for i in list(tl.pending) + list(tl.done):
-            t = norm_sec(getattr(i, "section_title", "") or "") or norm_sec(
-                getattr(i, "section_id", "") or ""
+            t = (
+                norm_sec(getattr(i, "region_label", "") or "")
+                or norm_sec(getattr(i, "section_title", "") or "")
+                or norm_sec(getattr(i, "section_id", "") or "")
             )
             if t and t != "__root__" and t not in seen:
                 seen.add(t)
@@ -280,6 +358,30 @@ def _phase_submit_not_required(store: dict | None) -> bool:
         return False
 
 
+def final_save_urgency_message(store: dict | None) -> str | None:
+    """Penultimate-step / post-introduce cue: force click_save while tools still exist.
+
+    Last browser-use step is DoneAgentOutput-only — never prescribe click_save there.
+    Call this on near-last actionable steps or when picker/query UI just closed.
+    """
+    if not store:
+        return None
+    if store.get("_last_save_ok") or store.get("_query_ui") or store.get("_query_task"):
+        return None
+    if _phase_submit_not_required(store):
+        return None
+    sec = resolve_phase_section(store)
+    try:
+        cue = preferred_submit_cue(store, section=sec)
+    except Exception:
+        cue = f"click_save(button_text='保存'{scope_kw_cue(sec)})"
+    return (
+        "[SYSTEM] Final save still required before the done-only last step. "
+        f"NEXT_ACTION: {cue}. Do NOT only check_field_value / re-fill. "
+        "Do NOT call done(success=true) until click_save returns ok-save-*."
+    )
+
+
 def empty_act_prescription_message(store, *, last_step: bool, save_ok: bool) -> str:
     if last_step:
         ok = bool(save_ok or (store or {}).get("_last_save_ok"))
@@ -299,15 +401,13 @@ def empty_act_prescription_message(store, *, last_step: bool, save_ok: bool) -> 
         )
     sec = resolve_phase_section(store)
     try:
-        from scripts.controller.actions.section_scope import preferred_submit_cue
         return (
             '[SYSTEM] Empty/invalid action. Return exactly one tool call. '
             f'NEXT_ACTION: {preferred_submit_cue(store, section=sec)}'
         )
     except Exception:
-        sec_part = f", section='{sec}'" if sec else ""
         return (
             '[SYSTEM] Empty/invalid action. Return exactly one tool call. '
-            f"NEXT_ACTION: click_save(button_text='保存'{sec_part}). "
+            f"NEXT_ACTION: click_save(button_text='保存'{scope_kw_cue(sec)}). "
             'Do not return empty actions.'
         )
