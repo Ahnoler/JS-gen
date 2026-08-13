@@ -4,12 +4,6 @@
 > 来源：`c:\Users\water\Downloads\缺陷管理.xlsx`（2026-08-12 同步）+ [`backlog-visible-editable-controls.md`](backlog-visible-editable-controls.md)。  
 > 本文件只跟踪未闭环项。已修/已关条目已清出（历史见 git）。
 
-## 进行中
-
-| ID | 项 | 备注 |
-|----|----|------|
-| **1448062** | 【AI录制】未抓取到 xpath 时没产生步骤（较重/高） | Excel 已分配；工程侧已在修 |
-
 ## 挂起 / 待优化
 
 | ID | 项 | 处理说明 |
@@ -61,7 +55,6 @@
 | **L1c-scan-py** | P1 挂起 | Python scan 接入 `classify` / regions classify（与 L1c-wet 可同刀） |
 | **AG-fullpage-wet** | 按需 | 无 label inventory BiB/UI 冒烟 |
 | **session-lifecycle-wet** | 挂起 | A attach → streamDetach → B 同 Chrome 409 `grace_owned`；短 grace 后再认领；需在线执行机 + 已加载新控制面 |
-| **PR-LOC-wet** | 待做 | 对公长表单 / BiB：阶段长图描边拼接（实现已合 V2.1） |
 
 ## Backlog 工程债 / 未做（自 backlog 转入）
 
@@ -97,9 +90,9 @@
 
 | ID | 状态 | 工作内容 | 已锁定要点 | 关联工程项 |
 |----|------|----------|------------|------------|
-| **PR-PART** | **本仓库已落地（V2.1）** | 元素分区算法完善 | 后端 `display_group`/`region_label` 可直接展示（中文；撞车后缀主键/`#n`）；SPA 原样分组。湿测 L1-picker/L1c 仍挂起 | unify-partition · L1c · picker · regionAnchor |
+| **PR-PART** | **本仓库已落地（V2.1）+ 第一刀 spec** | 元素分区算法完善 | V2.1：`display_group`/`region_label`。下一刀：tab+向导+titlebox 拼接 — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) | unify-partition · L1c · picker · regionAnchor |
 | **PR-LAYER** | 待办 | 元素分层树（分区之后） | `页面→tab/向导/弹窗→功能分区→控件`；效果图已附 | 依赖 PR-PART；L1 `region_*` 产品展示 |
-| **PR-LOC** | **本仓库已落地（V2.1）** | 阶段长图 + 控件高亮 | AI `phase_done` 后 1 张 PNG；控件描边；滚主滚动区拼接；`kind=phase_highlight` + `stitchScreenshotUrl`。失败不影响录制。湿测见 **PR-LOC-wet** | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · [plan](plans/2026-08-13-phase-highlight-long-screenshot.md) |
+| **PR-LOC** | **本仓库已落地（V2.1）** | 阶段长图 + 控件高亮 | AI `phase_done` 后 1 张 PNG；浅蓝蒙层 + 描边；滚主滚动区拼接。**湿测已完成**（对公长表单 / BiB） | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · [plan](plans/2026-08-13-phase-highlight-long-screenshot.md) |
 | **PR-LOC-HL** | 挂起 | 步骤级高亮截图 | 操作**完成后**逐步高亮再截 | 逐步截仍挂起；阶段级高亮已并入 **PR-LOC** |
 | **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data 软文本底座；**需专刀 design** |
 | **PR-BATCH** | **部分完成** | 批量导入：用户只看自己任务 | ① 仍待办（等 **PR-USER**）。②行进度 + ③phase `done_logs` 已合 V2.1 | Vue BatchImport 另仓 |
@@ -114,7 +107,7 @@
 - **heal-locate** ↔ 级联脏录制 + 单步自愈；先判定缺席再修闸门，禁止 scroll 猎场。
 - **PR-PART** ↔ 后端分区已合 V2.1；湿测仍见 L1-picker / L1c。
 - **PR-LAYER** ↔ 分区之后的产品树；依赖 **PR-PART**。
-- **PR-LOC** ↔ 阶段长图本仓库已落地；湿测见 **PR-LOC-wet**。**PR-LOC-HL** 逐步截仍后置。
+- **PR-LOC** ↔ 阶段长图本仓库已落地；**湿测已完成**。**PR-LOC-HL** 逐步截仍后置。
 - **PR-PUSH** ↔ 推送/导出闸门已完成。
 - **PR-BATCH** ↔ ① 用户隔离与 **PR-USER** 同源，未做。
 - **PR-SSO-ADMIN** ↔ 阻塞 **PR-SSO** / **PR-USER** 权限实现；等 2026-08-13 会议。
@@ -123,8 +116,9 @@
 
 ## 更新记录
 
-| 日期 | 变更 |
-|------|------|
+| 2026-08-13 | **PR-PART 第一刀 spec：** tab + 向导 + titlebox 拼接分区；表格/分层树后置 — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) |
+| 2026-08-13 | **PR-LOC-wet 完成**（对公长表单 / BiB + 浅蓝蒙层） |
+| 2026-08-13 | **1448062 本仓库已修**：AI 活录 `_record_action` 不因 capture 失败丢步；`stepEntryToTrajectoryStep` `requireUsable:false`。残余：REST 手工建步仍 400 `LOCATOR_REQUIRED` |
 | 2026-08-13 | **fill-date-shell 收尾**：SQL 已迁 7 行；删 `fill_date_field` 动作；别名归一；前端去掉「填写日期」 |
 | 2026-08-13 | 产品表加回 **PR-LOC** / **PR-PART** / **PR-PUSH**（状态仍为已落地/已完成） |
 | 2026-08-13 | 清出已修缺陷与空待修表；session-lifecycle-commit、T7(不做)；**PR-BATCH** 只留 ①；湿测补 **PR-LOC-wet** |
