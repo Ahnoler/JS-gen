@@ -13,18 +13,22 @@ export function summarizePhases(phases = []) {
     .filter((p) => p.status === 'completed')
     .sort((a, b) => (Number(a.phaseNumber) || 0) - (Number(b.phaseNumber) || 0));
   const named = running || completed[completed.length - 1];
-  let last = null;
-  for (const p of list) {
-    for (const e of parseDoneLogs(p.doneLogs ?? p.done_logs)) {
-      if (!last || String(e.at) >= String(last.at)) last = e;
-    }
-  }
+  const latestCompleted = completed[completed.length - 1] || null;
   return {
     phaseCompleted,
     phaseTotal,
     phaseName: named ? String(named.description || '').trim() : '',
-    lastDoneText: last?.text || '',
+    lastDoneText: latestCompletedDoneText(latestCompleted),
   };
+}
+
+function latestCompletedDoneText(phase) {
+  if (!phase) return '';
+  const logs = parseDoneLogs(phase.doneLogs ?? phase.done_logs);
+  const fromLog = logs.length ? String(logs[logs.length - 1].text || '').trim() : '';
+  if (fromLog) return fromLog;
+  const n = Number(phase.phaseNumber) || 0;
+  return n > 0 ? `阶段${n}已完成` : '';
 }
 
 function recordingRatioPercent(phaseCompleted, phaseTotal) {

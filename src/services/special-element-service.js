@@ -406,7 +406,11 @@ export async function replaySpecialElement(id, {
   } finally {
     runtime.suppressStepPersist = false;
     runtime.isReplay = false;
-    if (session) session.busy = false;
+    if (session && !session.aiRecording && !runtime.aiRecording) {
+      session.busy = false;
+    } else if (session && (session.aiRecording || runtime.aiRecording)) {
+      session.busy = true;
+    }
   }
 }
 

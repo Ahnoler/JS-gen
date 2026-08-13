@@ -34,6 +34,23 @@ def test_scan_form_fields_single_assign_region_decl() -> None:
     assert_true("regionLabelOf(" in JS_SCAN_FORM_FIELDS, "scan still calls regionLabelOf")
 
 
+def test_click_save_no_redeclare_helpers() -> None:
+    from scripts.controller.actions.js_snippets.save import JS_CLICK_SAVE_BUTTON
+
+    decls = re.findall(r"(?:function|const)\s+(isVisible|absXPath)\b", JS_CLICK_SAVE_BUTTON)
+    assert_true(
+        decls.count("isVisible") == 1,
+        f"isVisible declared once in JS_CLICK_SAVE_BUTTON, got {decls.count('isVisible')}: {decls}",
+    )
+    assert_true(
+        decls.count("absXPath") == 1,
+        f"absXPath declared once in JS_CLICK_SAVE_BUTTON, got {decls.count('absXPath')}: {decls}",
+    )
+    assert_true("function isVisible" in JS_CLICK_SAVE_BUTTON, "helpers isVisible present")
+    assert_true("if (!isVisible(el)) continue" in JS_CLICK_SAVE_BUTTON, "click_save still filters visible")
+    assert_true("xpath: absXPath(bestEl)" in JS_CLICK_SAVE_BUTTON, "click_save still records xpath")
+
+
 def test_xpath_smart_fill_only_flag() -> None:
     import os
     from scripts import feature_flags as ff
@@ -61,6 +78,7 @@ def test_xpath_smart_fill_only_flag() -> None:
 def main() -> int:
     try:
         test_scan_form_fields_single_assign_region_decl()
+        test_click_save_no_redeclare_helpers()
         test_xpath_smart_fill_only_flag()
     except Exception as exc:
         print(f"characterize-scan-assign-region-once: FAIL {exc}")

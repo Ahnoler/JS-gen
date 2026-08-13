@@ -13,35 +13,7 @@ JS_CLICK_SAVE_BUTTON = r'''(buttonArg) => {
   const normSec = (s) => String(s || '').replace(/\s+/g, ' ').trim();
   const wantNorm = normSec(wantSec);
   const rejectRe = /查询|返回|取消|关闭|重置|清空|删除|导出|引入|核查|上传|下载|暂存/;
-  const isVisible = (el) => {
-    if (!el || el.offsetParent === null && el.tagName !== 'BODY') {
-      const r0 = el.getBoundingClientRect();
-      if (!(r0.width > 0 && r0.height > 0)) return false;
-    }
-    const r = el.getBoundingClientRect();
-    const cs = getComputedStyle(el);
-    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && cs.opacity !== '0';
-  };
   const btnText = (el) => (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
-  const absXPath = (node) => {
-    if (!node || node.nodeType !== 1) return '';
-    const parts = [];
-    let cur = node;
-    while (cur && cur.nodeType === 1) {
-      const tag = cur.tagName.toLowerCase();
-      const parent = cur.parentNode;
-      if (!parent) break;
-      const sibs = [...parent.children].filter(c => c.tagName === cur.tagName);
-      const idx = sibs.indexOf(cur) + 1;
-      parts.unshift(tag + '[' + idx + ']');
-      cur = parent;
-      if (cur === document.documentElement) {
-        parts.unshift('html[1]');
-        break;
-      }
-    }
-    return '/' + parts.join('/');
-  };
 ''' + JS_SECTION_ATTACH_BLOCK + r'''
   const stripSecSuffix = (s) => normSec(s).replace(/#\d+$/, '');
   const secMatches = (m) => {

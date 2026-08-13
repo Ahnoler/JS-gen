@@ -57,16 +57,28 @@ export function onSessionEvent(sessionId, type, handler) {
  * @param {number} [timeoutMs]
  */
 export function waitForSessionEvent(sessionId, type, timeoutMs = 120000) {
-  return new Promise((resolve, reject) => {
+  let cancel = () => {};
+  const promise = new Promise((resolve, reject) => {
     const hub = getSessionHub(sessionId);
-    const timer = setTimeout(() => {
+    let settled = false;
+    let timer = null;
+    function finish(fn) {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
       hub.off(type, onEvent);
-      reject(new Error(`Timeout waiting for ${type}`));
-    }, timeoutMs);
-    function onEvent(payload) {
-      clearTimeout(timer);
-      resolve(payload);
+      fn();
     }
+    function onEvent(payload) {
+      finish(() => resolve(payload));
+    }
+    timer = setTimeout(() => {
+      finish(() => reject(new Error(`Timeout waiting for ${type}`)));
+    }, timeoutMs);
     hub.once(type, onEvent);
+    // Drop the loser of Promise.race without rejecting (avoids unhandled timeout).
+    cancel = () => finish(() => {});
   });
+  promise.cancel = cancel;
+  return promise;
 }

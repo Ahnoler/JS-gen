@@ -41,6 +41,8 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
         appendFromEvent('agent', data?.text);
         send('phase_done', data);
         send('status', { phase: 'step_done', label: `Step ${session.stepIndex} completed` });
+        // Product AI record holds busy across phases; one phase_done is not session idle.
+        if (session.aiRecording) break;
         session.busy = false;
         broadcastSessions();
         broadcastWatcherStatus();
@@ -54,6 +56,7 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
         appendFromEvent('fail', data?.message);
         send('status', { phase: 'error', label: `Step failed: ${data.message}` });
         send('phase_error', data);
+        if (session.aiRecording) break;
         session.busy = false;
         broadcastWatcherStatus();
         send('done', { stepIndex, success: false, error: data.message });
@@ -64,6 +67,7 @@ export function handleSessionMessage(channel, session, stepIndex, cleanupListene
         finalizePhaseStatus('failed');
         appendFromEvent('fail', data?.message);
         send('error', data);
+        if (session.aiRecording) break;
         session.busy = false;
         broadcastWatcherStatus();
         send('done', { stepIndex, success: false, error: data.message || 'Agent error' });

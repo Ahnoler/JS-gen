@@ -23,6 +23,21 @@ import {
 import { appendPhaseDoneLog } from '../trajectory-phase-service.js';
 import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 
+async function broadcastRecordingLock() {
+  try {
+    const { broadcastWatcherStatus } = await import('../../routes/browser-session/broadcasts.js');
+    broadcastWatcherStatus();
+  } catch {}
+}
+
+function lockAiRecording(runtime, session, locked) {
+  runtime.aiRecording = !!locked;
+  if (session) {
+    session.aiRecording = !!locked;
+    session.busy = !!locked;
+  }
+}
+
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
   const mod = await import('./trajectory-persist-service.js');
@@ -74,9 +89,21 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   }
 
   // Login is a prepare-time default op (not in step table). Ensure browser is logged in.
+  // Hold the AI-recording lock before login so nested login cannot unlock the canvas.
+  const session = state.sessions.get(runtime.sessionId);
+  lockAiRecording(runtime, session, true);
+  if (session) session.dbTrajectoryId = tid;
+  await broadcastRecordingLock();
+
   const { account, accountId: acctId } = await resolveTrajectoryAccount(tid, accountId);
-  if (!(runtime.loginDone && Number(runtime.loginAccountId) === Number(acctId))) {
-    await runDefaultLogin(runtime, account);
+  try {
+    if (!(runtime.loginDone && Number(runtime.loginAccountId) === Number(acctId))) {
+      await runDefaultLogin(runtime, account);
+    }
+  } catch (err) {
+    lockAiRecording(runtime, session, false);
+    await broadcastRecordingLock();
+    throw err;
   }
 
   runtime.abortRecording = false;
@@ -85,11 +112,12 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   await trajectoryDao.updateMeta(tid, { recordStatus: 'recording', systemAccountId: acctId });
   for (const p of phases) await trajectoryPhaseDao.updateStatus(p.id, 'pending');
 
-  const session = state.sessions.get(runtime.sessionId);
   if (session) {
     session.dbTrajectoryId = tid;
+    session.aiRecording = true;
     session.busy = true;
   }
+  await broadcastRecordingLock();
 
   const events = [];
   // Listener #3 of 3 for step_screenshot (product AI record/start):
@@ -266,8 +294,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       if (session) session.activePhaseId = phase.id;
 
       const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', 300000);
-      const errP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000)
-        .then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
+      const errRaw = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000);
+      const errP = errRaw.then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
+      errP.catch(() => {});
       const stepData = {
         instruction: phase.description,
         max_steps: 30,
@@ -360,7 +389,13 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         event: 'step',
         data: stepData,
       });
-      const donePayload = await Promise.race([doneP, errP]);
+      let donePayload;
+      try {
+        donePayload = await Promise.race([doneP, errP]);
+      } finally {
+        doneP.cancel?.();
+        errRaw.cancel?.();
+      }
       if (runtime.abortRecording) {
         await trajectoryPhaseDao.updateStatus(phase.id, 'failed').catch(() => {});
         throw new Error('Recording aborted');
@@ -385,6 +420,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       }
       await trajectoryPhaseDao.updateStatus(phase.id, 'completed');
       await notifyBatchProgressForTrajectory(tid);
+      lockAiRecording(runtime, session, true);
+      await broadcastRecordingLock();
       await Promise.resolve(runtime._persistDrain).catch(() => {});
       try {
         const { capturePhaseHighlightScreenshot } = await import('./phase-highlight-screenshot.js');
@@ -421,10 +458,13 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   } finally {
     if (session) {
       session.busy = false;
+      session.aiRecording = false;
       session.activePhaseId = null;
     }
     runtime.abortRecording = false;
+    runtime.aiRecording = false;
     unsubscribe?.();
+    await broadcastRecordingLock();
   }
 
   const tree = await getTrajectoryTree(tid);

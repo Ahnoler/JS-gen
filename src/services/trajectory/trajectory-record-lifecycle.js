@@ -267,8 +267,14 @@ export async function runDefaultLogin(runtime, account, system = null) {
     runtime.suppressStepPersist = false;
     runtime.isReplay = false;
     if (session) {
-      session.busy = false;
-      session.activePhaseId = null;
+      // Product AI record holds the lock across all phases; login is only a
+      // nested op and must not unlock the canvas / demote to 占用中.
+      if (runtime.aiRecording) {
+        session.busy = true;
+      } else {
+        session.busy = false;
+        session.activePhaseId = null;
+      }
     }
     try {
       const { broadcastWatcherStatus } = await import('../../routes/browser-session/broadcasts.js');
@@ -290,6 +296,7 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
 
   if (runtime) {
     runtime.abortRecording = true;
+    runtime.aiRecording = false;
     const session = state.sessions.get(runtime.sessionId);
     // Always ask agent to stop — do not wait for busy flag (may be stale).
     try {
@@ -302,6 +309,7 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
     } catch {}
     if (session) {
       session.busy = false;
+      session.aiRecording = false;
       session.selectedPhaseId = null;
     }
     // Stop manual recording if on
@@ -358,6 +366,7 @@ export async function stopTrajectoryRecordingSafe(trajectoryId, {
 
   if (runtime) {
     runtime.abortRecording = true;
+    runtime.aiRecording = false;
     const session = state.sessions.get(runtime.sessionId);
     try {
       execSession.forwardStdin({
@@ -369,6 +378,7 @@ export async function stopTrajectoryRecordingSafe(trajectoryId, {
     } catch {}
     if (session) {
       session.busy = false;
+      session.aiRecording = false;
       session.selectedPhaseId = null;
     }
     try {

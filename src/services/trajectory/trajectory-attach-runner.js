@@ -161,7 +161,10 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
     });
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
-    await trajectoryDao.updateMeta(tid, { recordStatus: 'live' }).catch(() => {});
+    const currentStatus = (await trajectoryDao.getById(tid).catch(() => null))?.recordStatus;
+    if (currentStatus !== 'recording') {
+      await trajectoryDao.updateMeta(tid, { recordStatus: 'live' }).catch(() => {});
+    }
   }
 
   emitStage('login', 'running', { accountId });

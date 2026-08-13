@@ -30,6 +30,14 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-13: **批量行 lastDoneText 取最新已完成阶段**：不再跨阶段按 `at` 取全局最新日志（后续阶段常无 `done().text` 时会一直停在阶段1）。有该阶段 `done_logs` 用末条；没有则显示 `阶段N已完成`。不落库、不写「见页面当前状态」。
+  影响范围：batch GET/WS 计算字段 `lastDoneText`。
+  文件：src/services/trajectory/batch-item-progress.js
+  Python 同步提示：若代理展示 lastDoneText，按最新 completed 阶段取，勿用全局 max(at)。`phase_done` 只结束当前阶段，整段 `record/start` 保持 `recordStatus=recording` 与 `session.busy`（画布仅观看）。prepare 不得把正在 recording 的交易打回 `live`（占用中）。`waitForSessionEvent` 的 phase_error 等待在本阶段结束后取消，避免误杀下一阶段。
+  影响范围：录制 runner、prepare attach、debug session-message、画布 remote:status。
+  文件：src/services/trajectory/trajectory-recording-runner.js, trajectory-record-lifecycle.js, trajectory-attach-runner.js, src/routes/browser-session/session-message.js, src/executor-event-hub.js
+  Python 同步提示：无 HTTP/schema。代理侧若同样在 phase_done 时把会话标 idle / 允许画布输入，应对齐为整段录制锁。
+
 - 2026-08-13: **日期填表与文本合并为 `fill_form_field`**：`el-date-editor` / `tsscdatepicker`（含 TsscMultiDatePicker）走同一填值动作，写入 Vue `v-model`（不再只改 input 显示）。`fill_date_field` 仍可用（同一提交逻辑）。回放历史 `fill_form_field` 日期步骤不再假成功。
   影响范围：CTRL fillFormField、Python fill/replay 日期提交。
   文件：src/ctrl-actions/form.js, scripts/controller/actions/js_snippets/fill_core.py, fill_date.py
