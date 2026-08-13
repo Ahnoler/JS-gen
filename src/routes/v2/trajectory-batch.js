@@ -3,6 +3,7 @@
  * Registered BEFORE /api/v2/trajectories/:id so "batch" is not captured as id.
  */
 import { uploadXlsxSingle, multerHttpStatus, XLSX_MIME } from '../../http/upload-xlsx.js';
+import { decodeUploadFilename } from '../../http/decode-upload-filename.js';
 import { BATCH_TEMPLATE_FILENAME } from '../../services/trajectory-batch-excel.js';
 import * as batchService from '../../services/trajectory/trajectory-batch-service.js';
 import { BATCH_JOB_TERMINAL } from '../../models/constants.js';
@@ -47,7 +48,7 @@ export default function registerTrajectoryBatch(app) {
           || req.body?.idempotencyKey;
         const result = await batchService.importBatchFromExcel({
           fileBuffer: req.file.buffer,
-          originalFilename: req.file.originalname || '',
+          originalFilename: decodeUploadFilename(req.file.originalname || ''),
           functionId: req.body?.functionId,
           systemAccountId: req.body?.systemAccountId ?? req.body?.accountId,
           model: req.body?.model || '',

@@ -19,6 +19,7 @@ import {
   formatMsgCreateTime,
   shapeSysMsgApi,
 } from '../../src/services/sys-msg-compose.js';
+import { decodeUploadFilename } from '../../src/http/decode-upload-filename.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -87,6 +88,34 @@ const xss = composeBatchImportMsgContent({
 });
 assert.equal(xss.includes('<script>'), false);
 assert.match(xss, /a&lt;script&gt;\.xlsx/);
+
+const garbledFilename = Buffer.from('批量导入模板.xlsx', 'utf8').toString('latin1');
+assert.match(garbledFilename, /æ/);
+assert.doesNotMatch(garbledFilename, /批量导入模板/);
+assert.equal(decodeUploadFilename(garbledFilename), '批量导入模板.xlsx');
+assert.equal(decodeUploadFilename('批量导入模板.xlsx'), '批量导入模板.xlsx');
+assert.equal(decodeUploadFilename('batch.xlsx'), 'batch.xlsx');
+assert.equal(decodeUploadFilename('café.xlsx'), 'café.xlsx');
+assert.equal(decodeUploadFilename(''), '');
+
+const repairedCompose = composeBatchImportMsgContent({
+  functionName: '对公客户管理',
+  filename: garbledFilename,
+  jobStatus: 'completed',
+  summary: { total: 3, accepted: 3, rejected: 0, drafted: 0, recorded: 3, failed: 0 },
+});
+assert.equal(repairedCompose, full.replace('客户导入.xlsx', '批量导入模板.xlsx'));
+assert.doesNotMatch(repairedCompose, /æ/);
+
+const oldStored = [
+  `对公客户管理 · ${garbledFilename} · 已完成`,
+  '共 3 条 · 受理 3 · 拒绝 0 · 已存草稿 0 · 已录制 3 · 失败 0',
+].join('<br>');
+const listed = shapeSysMsgApi({ id: 9, msgContent: oldStored, msgStatus: 2 });
+assert.match(listed.msgContent, /对公客户管理/);
+assert.match(listed.msgContent, /批量导入模板\.xlsx/);
+assert.match(listed.msgContent, /已完成/);
+assert.doesNotMatch(listed.msgContent, /æ/);
 
 assert.equal(
   batchImportLinkUrl('11111111-2222-3333-4444-555555555555'),
@@ -202,5 +231,23 @@ const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf-8');
 assert.match(changelog, /sys_msg/);
 assert.match(changelog, /sys_msg_type/);
 assert.match(changelog, /\/api\/v2\/messages/);
+assert.match(changelog, /中文文件名乱码/);
+
+const decodeSrc = readFileSync(join(ROOT, 'src/http/decode-upload-filename.js'), 'utf-8');
+assert.match(decodeSrc, /export function decodeUploadFilename/);
+assert.match(decodeSrc, /latin1/);
+
+const uploadSrc = readFileSync(join(ROOT, 'src/http/upload-xlsx.js'), 'utf-8');
+assert.match(uploadSrc, /defParamCharset:\s*['"]utf8['"]/);
+assert.match(uploadSrc, /decodeUploadFilename/);
+
+const batchRouteSrc = readFileSync(join(ROOT, 'src/routes/v2/trajectory-batch.js'), 'utf-8');
+assert.match(batchRouteSrc, /decodeUploadFilename/);
+
+const composeSrc = readFileSync(join(ROOT, 'src/services/sys-msg-compose.js'), 'utf-8');
+assert.match(composeSrc, /decodeUploadFilename/);
+assert.match(composeSrc, /repairMojibakeText/);
+
+assert.match(batchSrc, /decodeUploadFilename/);
 
 console.log('characterize-sys-msg: ok');

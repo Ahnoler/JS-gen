@@ -3,6 +3,7 @@
  * Intentionally separate from system-mgmt (which still accepts .xls extension).
  */
 import multer from 'multer';
+import { decodeUploadFilename } from './decode-upload-filename.js';
 
 export const XLSX_MIME =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -10,7 +11,10 @@ export const XLSX_MIME =
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
+  // Browsers send UTF-8 Content-Disposition filenames; busboy defaults to latin1.
+  defParamCharset: 'utf8',
   fileFilter(_req, file, cb) {
+    file.originalname = decodeUploadFilename(file.originalname);
     const name = String(file.originalname || '').toLowerCase();
     const mime = String(file.mimetype || '').toLowerCase();
     const ok = name.endsWith('.xlsx')

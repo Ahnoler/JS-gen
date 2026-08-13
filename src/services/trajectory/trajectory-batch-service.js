@@ -24,6 +24,7 @@ import { pumpAnalyze, pumpDraft } from './batch-analyze.js';
 import { pumpRecord } from './batch-record.js';
 import { computeBatchItemProgress, PHASE_LOOKUP_STATUSES } from './batch-item-progress.js';
 import { insertSysMsgFromBatchJob } from '../sys-msg-service.js';
+import { decodeUploadFilename } from '../../http/decode-upload-filename.js';
 
 /** @type {Set<string>} in-flight cancel tokens for analyzing items */
 export const cancelledAnalyzeTokens = new Set();
@@ -210,7 +211,7 @@ export async function getBatchJobView(batchId, {
     functionId: job.functionId,
     systemAccountId: job.systemAccountId,
     model: job.model,
-    originalFilename: job.originalFilename,
+    originalFilename: decodeUploadFilename(job.originalFilename),
     idempotencyKey: job.idempotencyKey,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
@@ -317,7 +318,7 @@ export async function importBatchFromExcel({
       systemAccountId: validated.systemAccountId,
       model: modelId,
       mode,
-      originalFilename: String(originalFilename || ''),
+      originalFilename: decodeUploadFilename(originalFilename),
       status: 'accepted',
     }, items);
   } catch (err) {

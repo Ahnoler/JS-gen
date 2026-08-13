@@ -52,6 +52,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-13: **批量导入中文文件名乱码**：multipart `filename` 按 UTF-8 解码（multer `defParamCharset`）；latin1 误读的已存文件名在落库、通知拼装、消息列表、batch GET 按段修复。勿把整段 `msgContent` 当 latin1。
+  影响范围：upload、batch import、sys_msg 列表回显。
+  文件：src/http/decode-upload-filename.js, src/http/upload-xlsx.js, src/routes/v2/trajectory-batch.js, src/services/sys-msg-compose.js, src/services/trajectory/trajectory-batch-service.js
+  Python 同步提示：上传文件名按 UTF-8；已存乱码只修文件名段。无 schema。
+
 - 2026-08-13: **批量行 lastDoneText 取最新已完成阶段**：不再跨阶段按 `at` 取全局最新日志（后续阶段常无 `done().text` 时会一直停在阶段1）。有该阶段 `done_logs` 用末条；没有则显示 `阶段N已完成`。不落库、不写「见页面当前状态」。
   影响范围：batch GET/WS 计算字段 `lastDoneText`。
   文件：src/services/trajectory/batch-item-progress.js

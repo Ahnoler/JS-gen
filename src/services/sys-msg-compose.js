@@ -13,6 +13,10 @@ import {
   MSG_STATUS_UNREAD,
   MSG_STATUS_READ,
 } from '../models/sys-msg.js';
+import {
+  decodeUploadFilename,
+  repairMojibakeText,
+} from '../http/decode-upload-filename.js';
 
 const JOB_STATUS_LABEL = {
   completed: '已完成',
@@ -50,7 +54,7 @@ export function composeBatchImportMsgContent({
 } = {}) {
   const line1 = [
     escapeHtml(String(functionName || '').trim()),
-    escapeHtml(String(filename || '').trim()),
+    escapeHtml(decodeUploadFilename(String(filename || '')).trim()),
     String(jobStatusLabel(jobStatus) || '').trim(),
   ]
     .filter(Boolean)
@@ -88,7 +92,7 @@ export function shapeSysMsgApi(row, { msgTypeLabel } = {}) {
     msgId: r.id,
     msgTitle: title,
     workItemName: title,
-    msgContent: r.msgContent || '',
+    msgContent: repairMojibakeText(r.msgContent || ''),
     msgType: Number(r.msgType) || MSG_TYPE_BATCH_IMPORT,
     msgTypeLabel: msgTypeLabel || title,
     msgStatus: status,
