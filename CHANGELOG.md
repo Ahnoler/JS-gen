@@ -9,6 +9,13 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ## [Unreleased]
 
+### Changed
+
+- 2026-08-13: **prepare 登录硬编码**：`record/prepare`（及 `record/start` 未登录兜底）改为 `replay_actions`：`go_to_url` + `login(username, password)`，不再发 `session.step` 启动 browser-use；失败（导航/填表/按钮）使 prepare 失败。登录仍不写入 `trajectory_step`。
+  影响范围：service（prepare/start 登录）、scripts（`login()` 失败返回 `err-login`）、api-docs。
+  文件：src/services/trajectory/trajectory-record-lifecycle.js, scripts/controller/actions/_form.py, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-trajectory.mjs, characterize-login-action.py
+  Python 同步提示：无 HTTP/schema。若代理侧 prepare 登录仍发 session.step，改为 replay_actions（go_to_url + login，不传验证码）。
+
 ### Fixed
 
 - 2026-08-12: **`uniquifyDisplayGroups` 撞车键优先 formLabel**：el-select 可见值常相同（如「否」），不可当 label；仅 `(display_group, formLabel|matchedLabel)` 双撞车才追加 xpath 后缀。修复「对公客户概况」被拆成 `… · ins(@class,'el-select')]`。

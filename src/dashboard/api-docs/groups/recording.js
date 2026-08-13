@@ -24,7 +24,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/prepare',
         summary: '一键准备（占槽 + 登录 + 推流）',
-        desc: '幂等。① 复用本交易已存活 session（含「断开画面」后空闲浏览器）；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录/导航不写入 trajectory_step。画面推流成功时将 recordStatus 置为 live（占用，非 AI 录制）。通过 WS 广播 recording:prepare。推流身份以 remote_session.id 为准，按 trajectory 隔离。',
+        desc: '幂等。① 复用本交易已存活 session（含「断开画面」后空闲浏览器）；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录为硬编码 go_to_url + login（不启动 Agent），不写入 trajectory_step。画面推流成功时将 recordStatus 置为 live（占用，非 AI 录制）。通过 WS 广播 recording:prepare。推流身份以 remote_session.id 为准，按 trajectory 隔离。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
