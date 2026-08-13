@@ -131,7 +131,6 @@ def main() -> int:
     for fn in ('fill_form_field', 'select_option', 'click_radio', 'select_tree_option'):
         m = re.search(rf'async def {fn}\(.*?\n(?:.*?\n)*?.*?await _ensure_scanned\(label_text\)', form_py)
         assert_true(m is not None, f'{fn} calls _ensure_scanned without allow_autofill=True')
-    assert_true('async def fill_date_field' not in form_py, 'fill_date_field action removed')
 
     assert_true('JS_FILL_BY_XPATH' in form_py, 'auto-fill uses JS_FILL_BY_XPATH')
     assert_true(

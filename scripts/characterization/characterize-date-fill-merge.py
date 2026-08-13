@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Date fill is merged into fill_form_field (same Vue commit as fill_date_field).
+"""Date fill goes through fill_form_field + commitDateVue (Tssc + ElDatePicker).
 
 TsscMultiDatePicker (class tsscdatepicker) is not ElDatePicker — native input
 set without Vue commit leaves form.model empty → save '请选择' and click clears.
+Legacy fill_date_field is alias-only (SQL already migrated).
 """
 from __future__ import annotations
 

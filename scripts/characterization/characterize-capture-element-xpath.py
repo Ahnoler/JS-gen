@@ -90,11 +90,6 @@ def test_form_fill_passes_xpath_to_capture() -> None:
     )
 
 
-def test_form_date_action_removed() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    assert_true("async def fill_date_field" not in form, "fill_date_field action removed")
-
-
 def test_select_option_passes_xpath_to_capture() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
     chunk = form.split("async def select_option(", 1)[1].split("async def click_adjacent_button", 1)[0]
@@ -256,7 +251,6 @@ def main() -> int:
     test_helpers_source_no_smart_on_xpath_path()
     test_capture_signature_has_xpath_smart()
     test_form_fill_passes_xpath_to_capture()
-    test_form_date_action_removed()
     test_select_option_passes_xpath_to_capture()
     test_click_radio_passes_xpath_to_capture()
     test_execute_round_passes_xpath_to_capture()

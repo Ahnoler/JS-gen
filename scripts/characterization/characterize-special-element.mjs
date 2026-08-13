@@ -89,7 +89,8 @@ const sIntro = scoreCandidate(
 );
 assert.ok(sIntro >= 40, `introduce synonym+hint should score high (${sIntro})`);
 
-// Hint formatting (inline equivalent of Python format_special_element_hint)
+// Toy hint shape for scoring tests only. Production prompt hint is Python
+// format_special_element_hint (see characterize-special-element-hint.py).
 function formatHint(store) {
   if (!store || !Object.keys(store).length) return '';
   const lines = Object.entries(store).map(([cid, c]) => `- id=${cid} name=${c.name}`);

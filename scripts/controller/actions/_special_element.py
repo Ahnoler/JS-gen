@@ -1,7 +1,5 @@
 """Special-element library reuse: execute pre-approved operation groups."""
 
-from __future__ import annotations
-
 from ._helpers import _ok, _err
 from scripts.state import _record_action
 

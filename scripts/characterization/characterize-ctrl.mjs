@@ -19,7 +19,8 @@
  *   getContainer          → JS_GET_CONTAINER
  *   fillFormField         → JS_FILL_FORM_FIELD
  *   selectOption          → JS_SELECT_OPTION
- *   selectDate            → JS_FILL_DATE_FIELD  (agent date path; CTRL.selectDate for replay)
+ *   selectDate            → JS_FILL_DATE_FIELD  (CTRL.selectDate / assembled replay;
+ *                           agent recording fills dates via fill_form_field)
  *   clickRadio            → JS_CLICK_RADIO
  *   selectTreeOption      → JS_SELECT_TREE_OPTION
  *   waitForLoading        → JS_WAIT_LOADING  (+ wait_for_loading in _misc.py)
