@@ -240,7 +240,7 @@ export async function runDefaultLogin(runtime, account, system = null) {
       err.statusCode = 400;
       throw err;
     }
-    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 90000);
+    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 180000);
     execSession.forwardStdin({
       nodeUuid: runtime.executorNodeUuid,
       sessionId: runtime.sessionId,

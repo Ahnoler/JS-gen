@@ -324,7 +324,7 @@ function testRunDefaultLoginHardcoded() {
   assert(/go_to_url/.test(body), 'runDefaultLogin includes go_to_url');
   assert(/['"]login['"]/.test(body), 'runDefaultLogin includes login action');
   assert(/replay_done/.test(body), 'runDefaultLogin waits for replay_done');
-  assert(/90000/.test(body), 'login replay timeout is 90000ms');
+  assert(/180000/.test(body), 'login replay timeout is 180000ms');
   assert(/stop_on_fail:\s*true/.test(body), 'login replay stop_on_fail');
   assert(!/event:\s*['"]step['"]/.test(body), 'must not send Agent step event');
   assert(!/max_steps:\s*10/.test(body), 'must not start Agent with max_steps 10');
