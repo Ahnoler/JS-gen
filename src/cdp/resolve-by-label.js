@@ -39,6 +39,9 @@ function toPreview(el) {
     region_role: el?.region_role || '',
     region_id: el?.region_id || '',
     region_label: el?.region_label || '',
+    region_chrome: el?.region_chrome,
+    region_section: el?.region_section || '',
+    region_block: el?.region_block || '',
     display_group: displayGroupOf(el),
   };
 }
@@ -127,6 +130,9 @@ ${PAGE_LOCATOR_HELPERS}
         region_role: loc.region_role || '',
         region_id: loc.region_id || '',
         region_label: loc.region_label || '',
+        region_chrome: loc.region_chrome,
+        region_section: loc.region_section || '',
+        region_block: loc.region_block || '',
         feature_card: loc.feature_card || undefined,
       };
     }
@@ -566,6 +572,9 @@ export async function resolveElementByLabel(client, opts = {}) {
       region_role: raw.region_role || '',
       region_id: raw.region_id || '',
       region_label: raw.region_label || '',
+      region_chrome: raw.region_chrome,
+      region_section: raw.region_section || '',
+      region_block: raw.region_block || '',
     });
     // Preserve DOM-verified flag from page snap
     if (raw.locator_verified === true && enriched.xpath_smart) {

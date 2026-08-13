@@ -36,13 +36,23 @@ function ok(n) { console.log(`ok: ${n}`); }
 }
 
 {
-  // Contract: coarse assignRegion first, refine only on region_id collision (≥2).
+  // Contract: compose path first; on region_id collision merge titlebox into the
+  // path. Never replace region_* with a titlebox-only object.
   assert.match(helpers, /function refineCollidingRegions\s*\(/);
   assert.match(helpers, /idxs\.length < 2/);
   assert.match(helpers, /findTitleboxRegion/);
+  assert.match(helpers, /function mergeTitleboxIntoRegion\s*\(/);
+  assert.match(helpers, /indexOf\('titlebox:'\)/);
+  const refineStart = helpers.indexOf('function refineCollidingRegions');
+  const refineEnd = helpers.indexOf('function titleboxAnchorXPath') > refineStart
+    ? helpers.indexOf('SHARED_INVENTORY_COLLECT', refineStart)
+    : helpers.indexOf('SHARED_INVENTORY_COLLECT', refineStart);
+  const refineBody = helpers.slice(refineStart, refineEnd > refineStart ? refineEnd : refineStart + 1200);
+  assert.match(refineBody, /mergeTitleboxIntoRegion/);
+  assert.equal(/it\.region\s*=\s*finer\s*;/.test(refineBody), false);
   const life = readFileSync(join(root, 'src/services/trajectory/trajectory-record-lifecycle.js'), 'utf8');
   assert.match(life, /keepPrevLabel|collision-refine|titlebox refine/);
-  ok('contract: coarse then collision-refine; L1c must not clobber refine labels');
+  ok('contract: compose then merge-on-collision; never titlebox-only replace');
 }
 
 {

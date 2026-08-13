@@ -459,6 +459,8 @@ PAGE_LOCATOR_HELPERS = r'''
       if (role === 'overlay') return t || '弹层';
       if (role === 'table') return t || '表格';
       if (role === 'section') return t || '区块';
+      if (role === 'tab') return t || '页签';
+      if (role === 'wizard') return t || '向导';
       if (role === 'shell-aside') return '侧栏';
       if (role === 'shell-header') return '顶栏';
       if (role === 'main') return '主区';
@@ -479,18 +481,6 @@ PAGE_LOCATOR_HELPERS = r'''
       }
       if (el.closest('.el-table, .tssc-multiple-table-content, .myTable')) {
         return { region_role: 'table', region_id: 'table', region_label: regionLabelOf('table') };
-      }
-      if (el.closest('.el-collapse-item')) {
-        const it = el.closest('.el-collapse-item');
-        const t = (it.querySelector('.el-collapse-item__header')
-          && (it.querySelector('.el-collapse-item__header').innerText || ''))
-          || '';
-        const title = String(t).replace(/\s+/g, ' ').trim().slice(0, 40);
-        return {
-          region_role: 'section',
-          region_id: 'section:' + (title || 'section'),
-          region_label: regionLabelOf('section', title),
-        };
       }
       if (el.closest('.todo-item')) {
         const todo = el.closest('.todo-item');
@@ -528,6 +518,8 @@ PAGE_LOCATOR_HELPERS = r'''
       if (el.closest('.el-header, .navbar, header, .tags-view-container')) {
         return { region_role: 'shell-header', region_id: 'shell-header', region_label: regionLabelOf('shell-header') };
       }
+      const composed = composeContentRegion(el);
+      if (composed && composed.region_id) return composed;
       if (el.closest('.el-main, .app-main, .plugin-content, main')) {
         return { region_role: 'main', region_id: 'main', region_label: regionLabelOf('main') };
       }
@@ -653,6 +645,204 @@ PAGE_LOCATOR_HELPERS = r'''
       }
       return bestAbove || bestDist || boxes[0];
     }
+    function isShellChromeNode(node) {
+      if (!node || !node.closest) return false;
+      return !!node.closest('.tags-view-container, header, .el-header, .navbar');
+    }
+    function nearestContentTabs(el) {
+      let n = el;
+      while (n && n.closest) {
+        const tabs = n.closest('.el-tabs');
+        if (!tabs) break;
+        if (!isShellChromeNode(tabs)) return tabs;
+        n = tabs.parentElement;
+      }
+      return null;
+    }
+    function activeTabLabel(tabs) {
+      if (!tabs || !tabs.querySelector) return '';
+      const item = tabs.querySelector('.el-tabs__item.is-active');
+      return String((item && (item.innerText || item.textContent)) || '')
+        .replace(/\s+/g, ' ').trim().slice(0, 40);
+    }
+    function nearestPageSteps(el) {
+      if (!el) return null;
+      if (el.closest) {
+        const inside = el.closest('.el-steps');
+        if (inside && !isShellChromeNode(inside)) return inside;
+      }
+      let n = el.parentElement;
+      while (n && n !== document.body && n !== document.documentElement) {
+        if (n.matches && n.matches('.el-steps') && !isShellChromeNode(n)) return n;
+        if (n.querySelector) {
+          const direct = n.querySelectorAll(':scope > .el-steps');
+          for (let i = 0; i < direct.length; i++) {
+            if (!isShellChromeNode(direct[i])) return direct[i];
+          }
+          const nested = n.querySelectorAll(
+            ':scope > * > .el-steps, :scope > * > * > .el-steps, :scope > * > * > * > .el-steps'
+          );
+          for (let i = 0; i < nested.length; i++) {
+            if (isShellChromeNode(nested[i])) continue;
+            const wrap = nested[i].parentElement;
+            if (!/step/i.test(String((wrap && wrap.className) || ''))) continue;
+            return nested[i];
+          }
+        }
+        n = n.parentElement;
+      }
+      return null;
+    }
+    function stepTitle(step) {
+      if (!step) return '';
+      const t = step.querySelector && (
+        step.querySelector('.el-step__title') || step.querySelector('.el-step__head')
+      );
+      return String((t && (t.innerText || t.textContent)) || step.innerText || '')
+        .replace(/\s+/g, ' ').trim().slice(0, 40);
+    }
+    function stepStatusClass(step) {
+      const bits = [String((step && step.className) || '')];
+      if (step && step.querySelector) {
+        const head = step.querySelector('.el-step__head');
+        const title = step.querySelector('.el-step__title');
+        if (head) bits.push(String(head.className || ''));
+        if (title) bits.push(String(title.className || ''));
+      }
+      return bits.join(' ');
+    }
+    function currentStepLabel(steps) {
+      if (!steps || !steps.querySelectorAll) return '';
+      const items = Array.from(steps.querySelectorAll('.el-step'));
+      if (!items.length) return '';
+      for (let i = 0; i < items.length; i++) {
+        const cls = stepStatusClass(items[i]);
+        if (/\bis-process\b|\bprocess\b/.test(cls)
+          && !/\bis-wait\b/.test(cls)
+          && !/\bis-finish\b/.test(cls)) {
+          const t = stepTitle(items[i]);
+          if (t) return t;
+        }
+      }
+      let lastFinish = -1;
+      for (let i = 0; i < items.length; i++) {
+        if (/\bis-finish\b|\bis-success\b/.test(stepStatusClass(items[i]))) {
+          lastFinish = i;
+        }
+      }
+      if (lastFinish >= 0 && lastFinish + 1 < items.length) {
+        const t = stepTitle(items[lastFinish + 1]);
+        if (t) return t;
+      }
+      for (let i = 0; i < items.length; i++) {
+        const t = stepTitle(items[i]);
+        if (t) return t;
+      }
+      return '';
+    }
+    function readChrome(el) {
+      const tabs = nearestContentTabs(el);
+      if (tabs) {
+        const label = activeTabLabel(tabs);
+        if (label) return { role: 'tab', label: label };
+      }
+      const steps = nearestPageSteps(el);
+      if (steps) {
+        const label = currentStepLabel(steps);
+        if (label) return { role: 'wizard', label: label };
+      }
+      return null;
+    }
+    function stripActionTail(title) {
+      let s = String(title || '').replace(/\s+/g, ' ').trim();
+      s = s.replace(/\s+(新增|修改|查看|删除|保存|\+\s*新增)$/g, '').trim();
+      return s.slice(0, 40);
+    }
+    function collapseSectionTitle(el) {
+      if (!el || !el.closest) return '';
+      const it = el.closest('.el-collapse-item');
+      if (!it) return '';
+      const h = it.querySelector && it.querySelector('.el-collapse-item__header');
+      return stripActionTail((h && (h.innerText || h.textContent)) || '');
+    }
+    function composeTitleboxTitle(el, scope) {
+      if (!el || !scope) return '';
+      const want = String((el.innerText || el.textContent || '')).replace(/\s+/g, ' ').trim().slice(0, 40);
+      const inside = el.closest && el.closest('.titlebox');
+      if (inside && (!scope.contains || scope.contains(inside))) {
+        const t = titleboxTitleText(inside);
+        if (t && !isActionOnlyTitle(t) && t !== want) return t;
+      }
+      const nodeList = scope.querySelectorAll ? scope.querySelectorAll('.titlebox') : [];
+      const boxes = [];
+      for (let i = 0; i < nodeList.length; i++) boxes.push(nodeList[i]);
+      const picked = pickNearestTitlebox(boxes, el);
+      const title = titleboxTitleText(picked);
+      if (!title || isActionOnlyTitle(title) || title === want) return '';
+      return title;
+    }
+    function finishCompose(chrome, section, block) {
+      const parts = [];
+      const ids = [];
+      if (chrome && chrome.label) {
+        parts.push(chrome.label);
+        ids.push((chrome.role === 'wizard' ? 'wizard:' : 'tab:') + chrome.label);
+      }
+      if (section) {
+        parts.push(section);
+        ids.push('section:' + section);
+      }
+      if (block) {
+        parts.push(block);
+        ids.push('titlebox:' + block);
+      }
+      if (!parts.length) return null;
+      let role = 'section';
+      if (block || section) role = 'section';
+      else if (chrome && chrome.role === 'wizard') role = 'wizard';
+      else role = 'tab';
+      const out = {
+        region_role: role,
+        region_id: ids.join('|'),
+        region_label: parts.join(' / '),
+      };
+      if (chrome && chrome.label) out.region_chrome = { role: chrome.role, label: chrome.label };
+      if (section) out.region_section = section;
+      if (block) {
+        out.region_block = block;
+        out.title = block;
+      }
+      return out;
+    }
+    function composeContentRegion(el) {
+      if (!el || !el.closest) return null;
+      const chrome = readChrome(el);
+      const section = collapseSectionTitle(el);
+      let scope = null;
+      if (el.closest('.el-collapse-item')) scope = el.closest('.el-collapse-item');
+      else if (el.closest('.el-tab-pane')) scope = el.closest('.el-tab-pane');
+      else if (el.closest('.el-main, .app-main, .plugin-content, main')) {
+        scope = el.closest('.el-main, .app-main, .plugin-content, main');
+      } else {
+        scope = (typeof document !== 'undefined' && document.body) ? document.body : el;
+      }
+      const block = composeTitleboxTitle(el, scope);
+      try {
+        return finishCompose(chrome, section, block);
+      } catch (e) {
+        return finishCompose(chrome, section, '');
+      }
+    }
+    function mergeTitleboxIntoRegion(region, finer) {
+      const title = finer && (finer.title || finer.region_label);
+      if (!title) return region;
+      const rid = String((region && region.region_id) || '');
+      if (rid.indexOf('titlebox:') >= 0) return region;
+      const chrome = region && region.region_chrome ? region.region_chrome : null;
+      const section = (region && region.region_section) || '';
+      const next = finishCompose(chrome, section, String(title));
+      return next || region;
+    }
     function findTitleboxRegion(host, needle) {
       if (!host || !host.closest) return null;
       const want = String(needle || '').replace(/\s+/g, ' ').trim();
@@ -735,8 +925,11 @@ PAGE_LOCATOR_HELPERS = r'''
         if (idxs.length < 2) continue;
         for (let j = 0; j < idxs.length; j++) {
           const it = items[idxs[j]];
+          const role = String((it.region && it.region.region_role) || '');
+          if (role === 'overlay' || role === 'table'
+            || role === 'shell-aside' || role === 'shell-header') continue;
           const finer = findTitleboxRegion(it.el, needle);
-          if (finer) it.region = finer;
+          if (finer) it.region = mergeTitleboxIntoRegion(it.region, finer);
         }
       }
     }
@@ -1211,8 +1404,9 @@ PAGE_LOCATOR_HELPERS = r'''
           }
         }
       }
-      if ((!verified || nodesMulti) && region && region.title) {
-        const tbXp = titleboxAnchorXPath(host, region.title, leafForAnchor || localLeaf);
+      if ((!verified || nodesMulti) && region && (region.title || region.region_block)) {
+        const tbTitle = region.title || region.region_block;
+        const tbXp = titleboxAnchorXPath(host, tbTitle, leafForAnchor || localLeaf);
         if (tbXp) {
           const tnodes = evalXpathAll(tbXp);
           let tidx = -1;
@@ -1243,7 +1437,7 @@ PAGE_LOCATOR_HELPERS = r'''
         occurrence = pinned.occurrence;
         verified = pinned.verified;
         // Do not export global [n] when section/titlebox anchor exists but uniqueness failed.
-        if (occurrence >= 1 && (regionAnchorOf(host) || (opts.region && opts.region.title))) {
+        if (occurrence >= 1 && (regionAnchorOf(host) || (region && (region.title || region.region_block)))) {
           smart = '';
           verified = false;
           occurrence = 0;
@@ -1297,6 +1491,9 @@ PAGE_LOCATOR_HELPERS = r'''
       region_role: region.region_role,
       region_id: region.region_id,
       region_label: region.region_label,
+      region_chrome: region.region_chrome,
+      region_section: region.region_section,
+      region_block: region.region_block,
       feature_card: buildFeatureCard(host, region),
     };
   }

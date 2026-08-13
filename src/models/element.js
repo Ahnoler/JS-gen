@@ -118,6 +118,9 @@ function copyLocatorMeta(target, source) {
     'region_role',
     'region_id',
     'region_label',
+    'region_chrome',
+    'region_section',
+    'region_block',
   ]) {
     if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
       target[key] = source[key];

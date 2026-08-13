@@ -90,7 +90,7 @@
 
 | ID | 状态 | 工作内容 | 已锁定要点 | 关联工程项 |
 |----|------|----------|------------|------------|
-| **PR-PART** | **本仓库已落地（V2.1）+ 第一刀 spec** | 元素分区算法完善 | V2.1：`display_group`/`region_label`。下一刀：tab+向导+titlebox 拼接 — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) | unify-partition · L1c · picker · regionAnchor |
+| **PR-PART** | **第一刀已实现** | 元素分区算法完善 | V2.1：`display_group`/`region_label`。第一刀：tab+向导+titlebox 拼接已落地 — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) · [plan](plans/2026-08-13-partition-tab-wizard-titlebox.md)；9242 湿测已跑（对公客户修改；评级向导） | unify-partition · L1c · picker · regionAnchor |
 | **PR-LAYER** | 待办 | 元素分层树（分区之后） | `页面→tab/向导/弹窗→功能分区→控件`；效果图已附 | 依赖 PR-PART；L1 `region_*` 产品展示 |
 | **PR-LOC** | **本仓库已落地（V2.1）** | 阶段长图 + 控件高亮 | AI `phase_done` 后 1 张 PNG；浅蓝蒙层 + 描边；滚主滚动区拼接。**湿测已完成**（对公长表单 / BiB） | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · [plan](plans/2026-08-13-phase-highlight-long-screenshot.md) |
 | **PR-LOC-HL** | 挂起 | 步骤级高亮截图 | 操作**完成后**逐步高亮再截 | 逐步截仍挂起；阶段级高亮已并入 **PR-LOC** |
@@ -105,7 +105,7 @@
 
 - **1448052** ↔ 全页 DOM 合约；slot-log 已就绪，等新缺陷 + 可检索日志再改。
 - **heal-locate** ↔ 级联脏录制 + 单步自愈；先判定缺席再修闸门，禁止 scroll 猎场。
-- **PR-PART** ↔ 后端分区已合 V2.1；湿测仍见 L1-picker / L1c。
+- **PR-PART** ↔ 第一刀 tab/向导/titlebox 拼接已落地；9242 湿测已跑（对公客户修改；评级向导）。
 - **PR-LAYER** ↔ 分区之后的产品树；依赖 **PR-PART**。
 - **PR-LOC** ↔ 阶段长图本仓库已落地；**湿测已完成**。**PR-LOC-HL** 逐步截仍后置。
 - **PR-PUSH** ↔ 推送/导出闸门已完成。
@@ -116,6 +116,8 @@
 
 ## 更新记录
 
+| 2026-08-13 | **PR-PART 第一刀落地**：tab + 向导 + titlebox 拼接（CI fixture） — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) · [plan](plans/2026-08-13-partition-tab-wizard-titlebox.md) |
+| 2026-08-13 | **PR-PART 第一刀 plan：** tab + 向导 + titlebox 拼接 — [plan](plans/2026-08-13-partition-tab-wizard-titlebox.md) |
 | 2026-08-13 | **PR-PART 第一刀 spec：** tab + 向导 + titlebox 拼接分区；表格/分层树后置 — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) |
 | 2026-08-13 | **PR-LOC-wet 完成**（对公长表单 / BiB + 浅蓝蒙层） |
 | 2026-08-13 | **1448062 本仓库已修**：AI 活录 `_record_action` 不因 capture 失败丢步；`stepEntryToTrajectoryStep` `requireUsable:false`。残余：REST 手工建步仍 400 `LOCATOR_REQUIRED` |

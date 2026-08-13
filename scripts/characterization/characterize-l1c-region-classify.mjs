@@ -96,6 +96,13 @@ function ok(n) { console.log(`ok: ${n}`); }
 {
   const { displayGroupOf, uniquifyDisplayGroups, isTaxonomyRegionToken } = await import('../../src/cdp/display-group.js');
   assert.equal(isTaxonomyRegionToken('section'), true);
+  assert.equal(isTaxonomyRegionToken('tab'), true);
+  assert.equal(isTaxonomyRegionToken('wizard'), true);
+  assert.equal(isTaxonomyRegionToken('客户基本信息 / 对公客户概况'), false);
+  assert.equal(
+    displayGroupOf({ region_label: '客户基本信息 / 对公客户概况 / 法定代表人/负责人信息' }),
+    '客户基本信息 / 对公客户概况 / 法定代表人/负责人信息',
+  );
   assert.equal(
     displayGroupOf({ region_label: 'DGSX20260812056002', region_role: 'section' }),
     'DGSX20260812056002',

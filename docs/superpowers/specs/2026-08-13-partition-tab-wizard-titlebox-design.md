@@ -1,7 +1,7 @@
 # Design: Partition compose — tab / wizard / titlebox (PR-PART 第一刀)
 
 **Date:** 2026-08-13  
-**Status:** Approved (brainstorming) — implementation plan not written yet  
+**Status:** Implemented (CI fixtures green) — [plan](../plans/2026-08-13-partition-tab-wizard-titlebox.md)  
 **Trigger:** PR-LAYER 分层树依赖分区质量。V2.1 `assignRegion` 只认 collapse / overlay / 待办卡 / 壳，对公客户修改把 143 个控件糊在「对公客户概况」；评级向导第二步整页掉进「主区」。  
 **Related:** [product brief](2026-08-12-product-requirements-miaoyi-brief.md) PR-PART / PR-LAYER; [unify partition](2026-08-12-unify-partition-locator-architecture-design.md); [titlebox collision refine](2026-08-10-resolve-collision-finer-l1-titlebox-design.md); [todo-list](../todo-list.md)  
 **E2E (9242, 2026-08-13):** 对公客户管理 → 正式客户 MBP → 修改；对公客户评级 → 待发起「测试科技发展有限公司」→ 修改 → 下一步影像资料。

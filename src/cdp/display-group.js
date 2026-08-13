@@ -8,6 +8,8 @@
 
 const TAXONOMY_ROLES = new Set([
   'section',
+  'tab',
+  'wizard',
   'main',
   'other',
   'overlay',

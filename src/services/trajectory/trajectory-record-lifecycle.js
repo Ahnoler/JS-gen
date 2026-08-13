@@ -49,8 +49,8 @@ function regionIdFromClassified(classified, existing = {}) {
 
 function patchRegionFields(target, classified) {
   if (!target || !classified) return;
-  const role = String(classified.role || target.region_role || 'other');
-  target.region_role = role;
+  const prevRole = String(target.region_role || '');
+  const role = String(classified.role || prevRole || 'other');
   const prevLabel = String(target.region_label || '').trim();
   const prevId = String(target.region_id || '').trim();
   let nextLabel = String(classified.label || '').trim();
@@ -58,6 +58,11 @@ function patchRegionFields(target, classified) {
   // L1c feature-card title often echoes outer collapse and would undo titlebox refine
   // (e.g.「关联人信息」→「股东及关联人信息」). Only fill empty/taxonomy labels.
   const keepPrevLabel = !!(prevLabel && !isTaxonomyRegionToken(prevLabel));
+  if (keepPrevLabel && (prevRole === 'tab' || prevRole === 'wizard' || prevRole === 'section')) {
+    target.region_role = prevRole;
+  } else {
+    target.region_role = role;
+  }
   if (keepPrevLabel) {
     nextLabel = prevLabel;
   } else if (!nextLabel || isTaxonomyRegionToken(nextLabel)) {
