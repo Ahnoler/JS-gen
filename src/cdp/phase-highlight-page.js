@@ -49,7 +49,7 @@ export function buildPhaseHighlightMarkExpression(targets) {
     if (!document.getElementById('jsgen-phase-hl-style')) {
       const st = document.createElement('style');
       st.id = 'jsgen-phase-hl-style';
-      st.textContent = '[data-jsgen-phase-hl="1"]{outline:3px solid #1677ff;outline-offset:2px;}';
+      st.textContent = '[data-jsgen-phase-hl="1"]{outline:2px solid #1a73e8;outline-offset:0;box-shadow:inset 0 0 0 9999px rgba(111,168,220,.45);}';
       document.documentElement.appendChild(st);
     }
     for (let j = 0; j < hits.length; j++) hits[j].setAttribute('data-jsgen-phase-hl', '1');
