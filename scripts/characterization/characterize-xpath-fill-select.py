@@ -91,7 +91,7 @@ def test_fill_by_xpath_prefers_form_label_hint() -> None:
 def test_replay_fill_passes_label_as_xpath_hint() -> None:
     src = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
     chunk = src.split("if action_name == 'fill_form_field':", 1)[1].split(
-        "if action_name == 'fill_date_field':", 1
+        "if action_name == 'select_tree_option':", 1
     )[0]
     assert_true("JS_FILL_BY_XPATH" in chunk, "replay fill uses JS_FILL_BY_XPATH")
     assert_true(
@@ -133,7 +133,8 @@ def test_xpath_date_radio_helpers() -> None:
     assert_true(hasattr(sn, "JS_FILL_DATE_BY_XPATH"), "JS_FILL_DATE_BY_XPATH")
     assert_true(hasattr(sn, "JS_CLICK_RADIO_BY_XPATH"), "JS_CLICK_RADIO_BY_XPATH")
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    assert_true("JS_FILL_DATE_BY_XPATH" in form, "fill_date uses xpath helper")
+    autofill = (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+    assert_true("JS_FILL_DATE_BY_XPATH" in autofill, "assistant date fill uses xpath helper")
     assert_true("JS_CLICK_RADIO_BY_XPATH" in form, "click_radio uses xpath helper")
     assert_true("JS_SELECT_TRIGGER_BY_XPATH" in form, "select uses xpath trigger")
     assert_true("JS_SELECT_VALUE_BY_XPATH" in form, "select already-matched via xpath value read")

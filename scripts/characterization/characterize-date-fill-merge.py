@@ -46,8 +46,35 @@ def test_fill_by_xpath_commits_date_host() -> None:
 def test_fill_form_field_and_date_share_commit() -> None:
     assert_true("commitDateVue" in JS_FILL_FORM_FIELD, "label fill commits date Vue")
     assert_true("commitDateVue" in JS_FILL_DATE_BY_XPATH, "date-by-xpath commits Vue")
-    assert_true("commitDateVue" in JS_FILL_DATE_FIELD, "fill_date_field commits Vue")
+    assert_true("commitDateVue" in JS_FILL_DATE_FIELD, "legacy JS_FILL_DATE_FIELD commits Vue")
     assert_true("TsscMultiDatePicker" in JS_FILL_DATE_BY_XPATH, "xpath date fill knows Tssc")
+
+
+def test_fill_date_field_is_alias_only() -> None:
+    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    assert_true("async def fill_date_field" not in form, "fill_date_field controller action removed")
+
+    from scripts.controller.actions.replay_names import normalize_action_name
+    assert_true(
+        normalize_action_name("fill_date_field") == "fill_form_field",
+        "Python alias maps fill_date_field → fill_form_field",
+    )
+    assert_true(
+        normalize_action_name("fillDateField") == "fill_form_field",
+        "Python alias maps fillDateField → fill_form_field",
+    )
+
+    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    fn = replay.split("async def _replay_form_action", 1)[1]
+    assert_true(
+        "action_name == 'fill_date_field'" not in fn.split("async def _replay_controller_action", 1)[0],
+        "replay must not special-case fill_date_field after alias normalize",
+    )
+
+    names = (ROOT / "src/models/action-name.js").read_text(encoding="utf-8")
+    assert_true("fill_date_field: 'fill_form_field'" in names, "JS alias maps fill_date_field")
+    assert_true("'fill_date_field'" not in names.split("CANONICAL", 1)[1].split("export function", 1)[0],
+                "fill_date_field is not canonical")
 
 
 def test_ctrl_form_commits_tssc_date() -> None:
@@ -69,6 +96,7 @@ def main() -> int:
     test_commit_helper_covers_tssc()
     test_fill_by_xpath_commits_date_host()
     test_fill_form_field_and_date_share_commit()
+    test_fill_date_field_is_alias_only()
     test_ctrl_form_commits_tssc_date()
     test_prompts_unified_fill()
     print("characterize-date-fill-merge: OK")

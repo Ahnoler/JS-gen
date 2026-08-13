@@ -83,22 +83,16 @@ def _norm(s: str) -> str:
 
 def test_form_fill_passes_xpath_to_capture() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    chunk = form.split("async def fill_form_field", 1)[1].split("async def fill_date_field", 1)[0]
+    chunk = form.split("async def fill_form_field", 1)[1].split("async def check_field_value", 1)[0]
     assert_true(
         "xpath_smart=resolved.xpath_smart" in _norm(chunk),
         "fill_form_field passes resolved xpath into capture",
     )
 
 
-def test_form_date_passes_xpath_to_capture() -> None:
+def test_form_date_action_removed() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    chunk = form.split("async def fill_date_field", 1)[1].split(
-        "async def check_field_value", 1
-    )[0]
-    assert_true(
-        "xpath_smart=resolved.xpath_smart" in _norm(chunk),
-        "fill_date_field passes resolved xpath into capture",
-    )
+    assert_true("async def fill_date_field" not in form, "fill_date_field action removed")
 
 
 def test_select_option_passes_xpath_to_capture() -> None:
@@ -206,19 +200,12 @@ def test_form_resolved_paths_record_with_element() -> None:
     """Resolved write paths capture element and pass element= to _record_action (no params xpath)."""
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
 
-    fill = form.split("async def fill_form_field", 1)[1].split("async def fill_date_field", 1)[0]
+    fill = form.split("async def fill_form_field", 1)[1].split("async def check_field_value", 1)[0]
     assert_true("_capture_element" in fill, "fill_form_field captures element")
     idx = fill.find("JS_FILL_BY_XPATH")
     rec = fill.find("_record_action(", idx)
     seg = fill[rec : rec + 200]
     assert_true("element=element" in seg, "fill_form_field _record_action gets element=")
-
-    date = form.split("async def fill_date_field", 1)[1].split("async def check_field_value", 1)[0]
-    assert_true("_capture_element" in date, "fill_date_field captures element")
-    idx2 = date.find("JS_FILL_DATE_BY_XPATH")
-    rec2 = date.find("_record_action(", idx2)
-    seg2 = date[rec2 : rec2 + 200]
-    assert_true("element=element" in seg2, "fill_date_field _record_action gets element=")
 
     radio = form.split("async def click_radio", 1)[1].split("async def ", 1)[0]
     assert_true("_capture_element" in radio, "click_radio captures element")
@@ -269,7 +256,7 @@ def main() -> int:
     test_helpers_source_no_smart_on_xpath_path()
     test_capture_signature_has_xpath_smart()
     test_form_fill_passes_xpath_to_capture()
-    test_form_date_passes_xpath_to_capture()
+    test_form_date_action_removed()
     test_select_option_passes_xpath_to_capture()
     test_click_radio_passes_xpath_to_capture()
     test_execute_round_passes_xpath_to_capture()

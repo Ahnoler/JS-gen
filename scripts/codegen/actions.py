@@ -7,6 +7,7 @@ these names.
 import re
 
 from scripts.models import ActionEntry
+from scripts.controller.actions.replay_names import normalize_action_name
 
 from .js_escaping import _escape, _escape_js_string, _xpath_literal_py
 
@@ -135,7 +136,7 @@ def _click_kind(tag, attrs, xp_smart, xp_full, xp_primary):
     return 'generic'
 
 
-FILL_RETRY_ACTIONS = {'fill_form_field', 'fill_date_field'}
+FILL_RETRY_ACTIONS = {'fill_form_field'}
 
 def _generate_action_code(entry, step_num, url, is_first_fill=False):
     """Generate Playwright JS code from a recorded action entry.
@@ -149,7 +150,7 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         _e = entry
     else:
         _e = {}
-    action = _e.get('action', '')
+    action = normalize_action_name(_e.get('action', ''))
     params = _e.get('params', {}) or {}
 
     def pre():
@@ -301,18 +302,6 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append(f"    }}")
 
         lines.append('')
-        return '\n'.join(lines)
-
-    # ---- fill_date_field ----
-    if action == 'fill_date_field':
-        l, v = p('label_text'), p('value')
-        lines.append(f"    console.log('[{step_num}] Set date \"{l}\" = \"{v}\"');")
-        lines.append(pre())
-        lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
-        lines.append('')
-        if is_first_fill:
-            lines.append(f'    // Retry "{l}" (first fill in this block may fail on new form)')
-            lines.append(f"    await page.evaluate(() => CTRL.selectDate('{_escape(l)}', '{_escape(v)}'));")
         return '\n'.join(lines)
 
     # ---- click_menu_item ----

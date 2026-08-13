@@ -255,7 +255,7 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
         value = (payload.get('value') or '').strip()
         if not label or not value:
             return None
-        return 'fill_date_field', _stamp_params({'label_text': label, 'value': value}), element
+        return 'fill_form_field', _stamp_params({'label_text': label, 'value': value}), element
 
     if kind == 'select_option':
         label = (payload.get('label_text') or '').strip()

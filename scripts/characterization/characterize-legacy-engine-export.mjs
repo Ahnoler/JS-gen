@@ -24,7 +24,7 @@ function testSchema() {
     ['click', 'date', 'input', 'radio', 'select:click', 'select:tree'],
   );
   assert.equal(ACTION_TO_ENGINE_TYPE.select_option, 'select:click');
-  assert.equal(ACTION_TO_ENGINE_TYPE.fill_date_field, 'date');
+  assert.ok(!('fill_date_field' in ACTION_TO_ENGINE_TYPE));
   assert.equal(ACTION_TO_ENGINE_TYPE.click_radio, 'radio');
   assert.ok(!('wait_for_loading' in ACTION_TO_ENGINE_TYPE));
   assert.ok(!('go_to_url' in ACTION_TO_ENGINE_TYPE));
@@ -87,11 +87,18 @@ function testEngineTypeVariants() {
   assert.equal(tree.type, 'select:tree');
 
   const date = mapStepToLegacyEngineOp({
-    actionType: 'fill_date_field',
+    actionType: 'fill_form_field',
     params: { label_text: '申请日期', value: '2026-01-01' },
     element: { xpath_smart: "//div[contains(@class,'el-date-editor')]//input" },
   });
   assert.equal(date.type, 'date');
+  const dateAlias = mapStepToLegacyEngineOp({
+    actionType: 'fill_date_field',
+    params: { label_text: '申请日期', value: '2026-01-01' },
+    element: { xpath_smart: "//div[contains(@class,'el-date-editor')]//input" },
+  });
+  assert.equal(dateAlias.type, 'date');
+  assert.equal(dateAlias.meta.action, 'fill_form_field');
 
   const radio = mapStepToLegacyEngineOp({
     actionType: 'click_radio',

@@ -326,7 +326,7 @@ def test_phase_b_action_signatures() -> None:
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
-    for name in ("fill_form_field", "fill_date_field", "select_option", "click_radio"):
+    for name in ("fill_form_field", "select_option", "click_radio"):
         chunk = form.split(f"async def {name}", 1)[1][:400]
         assert_true("xpath_smart" in chunk, f"{name} accepts xpath_smart")
 

@@ -14,7 +14,6 @@ from .trajectory_store import (
 
 _REPLAY_ACTION_SIGNATURES = {
     "fill_form_field": {"label_text", "value"},
-    "fill_date_field": {"label_text", "value"},
     "select_option": {"label_text", "option_text"},
     "click_element_by_index": {"index"},
     "click_menu_item": {"menu_text"},

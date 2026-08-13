@@ -69,7 +69,7 @@ export function buildFormStructureHealInstruction(report = {}) {
   }
   lines.push('');
   lines.push('约束：');
-  lines.push('- 仅填写上述新增字段（fill_form_field / select_option / fill_date_field / click_radio 等）。');
+  lines.push('- 仅填写上述新增字段（fill_form_field / select_option / click_radio 等）。日期也用 fill_form_field。');
   lines.push('- 不要点保存/提交/确认；不要导航；不要处理其它业务步骤。');
   lines.push('- 禁止整表 auto-fill / sync_tasks_from_errors。');
   lines.push('- 完成后立即 done(success=true)。系统对表单结构自愈的 done 使用单独判定，不会因弹窗仍开着而拒绝。');
@@ -80,14 +80,13 @@ function describeActionIntent(action, params) {
   const p = params || {};
   switch (action) {
     case 'fill_form_field':
-      return `填写 "${p.label_text || ''}" = "${p.value ?? ''}"`;
+    case 'fill_date_field':
+    case 'select_date':
+      return `填写 "${p.label_text || ''}" = "${p.value ?? p.date ?? ''}"`;
     case 'select_option':
       return `在 "${p.label_text || ''}" 中选择 "${p.option_text || ''}"`;
     case 'select_tree_option':
       return `在树选择 "${p.label_text || ''}" 中选择 "${p.option_text || p.node_text || ''}"`;
-    case 'fill_date_field':
-    case 'select_date':
-      return `填写日期 "${p.label_text || ''}" = "${p.value || p.date || ''}"`;
     case 'click_save':
       return `点击保存/提交（${p.button_text || p.text || '保存'}）`;
     case 'click_element_by_index':

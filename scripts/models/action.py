@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 # Actions that are recorded in _ACTION_LOG and appear in generated scripts.
 ActionType = Literal[
     "fill_form_field",
-    "fill_date_field",
     "select_option",
     "click_element_by_index",
     "click_menu_item",
@@ -65,7 +64,6 @@ CommandType = Literal[
 # Mapping from action → command (must stay in sync with controller._ACTION_TO_COMMAND)
 ACTION_TO_COMMAND: dict[str, CommandType] = {
     "fill_form_field": "input",
-    "fill_date_field": "input",
     "select_option": "select",
     "select_tree_option": "select",
     "click_element_by_index": "click",
@@ -187,7 +185,7 @@ class ActionEntry(BaseModel):
         default_factory=dict,
         description=(
             "Action-specific parameters. Keys vary by action:\n"
-            "  fill_form_field / fill_date_field: {label_text, value}\n"
+            "  fill_form_field: {label_text, value}\n"
             "  select_option / click_radio:        {label_text, option_text, options?}\n"
             "    option_text: value selected at record time (replay MUST use this exact value)\n"
             "    options: full dropdown inventory for export / other products (reference only)\n"
@@ -251,7 +249,7 @@ class ActionEntry(BaseModel):
     @property
     def value(self) -> str:
         """Legacy alias: the fill value or click index."""
-        if self.action in ("fill_form_field", "fill_date_field"):
+        if self.action == "fill_form_field":
             return self.params.get("value", "")
         if self.action == "click_element_by_index":
             return str(self.params.get("index", ""))

@@ -1,48 +1,14 @@
-# 总 TODO：缺陷 + Backlog（2026-08-12）
+# 总 TODO：缺陷 + Backlog（2026-08-13）
 
 > **跨会话共享清单。** Cursor 会话内 TodoWrite 不跨聊天；以本文件为准。  
 > 来源：`c:\Users\water\Downloads\缺陷管理.xlsx`（2026-08-12 同步）+ [`backlog-visible-editable-controls.md`](backlog-visible-editable-controls.md)。  
-> Excel「当前状态」多为 **已分配**；本文件工程状态：`进行中` / `待办` / `挂起` / `已解决` / `转前端` / `本仓库已修`。
+> 本文件只跟踪未闭环项。已修/已关条目已清出（历史见 git）。
 
 ## 进行中
 
 | ID | 项 | 备注 |
 |----|----|------|
 | **1448062** | 【AI录制】未抓取到 xpath 时没产生步骤（较重/高） | Excel 已分配；工程侧已在修 |
-
-## 缺陷待修（开着 · 对照最新 Excel）
-
-| ID | 优先级 | 项 |
-|----|--------|-----|
-
-## 本仓库已修（缺陷）
-
-| ID | 项 | 备注 |
-|----|----|------|
-| **1448060** | 【人工录制】下拉选项未进步骤，只录点击按钮 | 2026-08-12：对公客户评级「新增」弹窗内 **下拉含表格**；`fedbd6f` table-row select 落 `select_option`+option。残余：AI 仍可能先 `click_element_by_index` 点下拉行 → 多一条「点击元素」；已加 `use-select-option` 硬闸（拒点下拉面/表格行，不落步） |
-| **1448068** | 【UI录制】草稿交易被推送成功 | 2026-08-12：push 仅 `recorded`/`completed`；409 `not_pushable_status` |
-| **1448067** | 【UI录制】回放提示成功但未点到元素 | 正确相对 xpath 未写入 params（部分已修）。**待办卡片「处理」**：`div.todo-item-action` 非 button → 人工不入库 + 回放漏选 + **自动抓取/分区不收录**；2026-08-12 已补录制/回放/L2 `collectL2Buttons` + L1 `assignRegion` + resolve |
-| **1448061** | 【批量导入】空文件接口提示语改中文（一般） | Excel 仍「已分配」；工程：`请上传 Excel 文件` / 无数据行中文文案 |
-| **1448050** | 【批量导入】下载模板文件名改中文（低） | 2026-08-12：根因在 Vue `a.download` 写死英文；已改 `批量录制导入模板.xlsx`（JS-gen Content-Disposition 此前已中文） |
-| **1448055** | 【AI录制】录到 `save_form_snapshot` 等非业务步骤 | Excel 仍「已分配」；工程：产品树/步骤默认过滤 meta；仍入库 + 回放区间自动补检查点 |
-| **1448066** / **ai-case-select** | 【UI录制】AI录制下拉忽略案例数据、默认选第一项 | Excel 仍「已分配」；工程：业务数据仅软文本；撤回 commandValue 硬绑；【阶段目录】全量 phase |
-| **1448064** / **ai-case-half-fill** | 【UI录制】案例 KV 填值只填一半 | Excel 仍「已分配」；工程：form assistant 读案例面板 flat KV；prompt 原样填写 |
-| **tree-select-kind** | 行业代码等录成 `tree_node` 而非树选择器 | 2026-08-12：`select_tree_option`+`form_tree_select`；popover 回绑 |
-| **select-substr** | 下拉子串误配（国民经济部门类别→非金融…） | 2026-08-12：exact/`match_select_option_candidate`；禁止 `o in want` |
-| **manual-table-radio** | 【人工录制】弹窗表格 radio 不落步 | 2026-08-12：`data-row-key`/`row-index` 回退，禁静默 return |
-| **canvas-copy** | 【前端画布】本机剪贴板 C/V | 2026-08-12：JS-gen 协议/执行机/控制面已落地；Vue `useRemoteCanvas.ts`（`d:/dev/ui-auto-recording-agent-vue-master/vue-project/src/composables/useRemoteCanvas.ts`）Task 4 完成；[design](specs/2026-08-12-bib-canvas-clipboard-design.md) 已实现 |
-
-## 已解决 / 非本侧
-
-| ID | 项 | 结论 |
-|----|----|------|
-| **1448054** | 【AI录制】连续多元素只录一个（较重） | 去重原则，非缺陷；Excel 仍「已分配」 |
-| **1448053** | 【AI录制】同元素点第一个（较重） | L1-picker / page-state 消歧已落地；湿测可按需验 |
-| **1448057** | 【列表】占用中 `live` 状态名改中文（低） | **转前端** |
-| **1448059** | 【AI录制】无法优先识别客户名称（较重） | **已解决（产品用法）**：用户数据直接写进任务说明 |
-| **slot-log** | 多 slot 浏览器日志隔离/可检索 | **已落地**：[plan](plans/2026-08-11-multi-slot-stderr-isolation.md) |
-| **select-state** | 下拉状态边界（reset / 单步 / xpath 回退） | **已落地**（`79a8e92`）；专题分支勿再 merge |
-| **1448056** | 【批量导入】存草稿有步骤但界面显示步骤为 0 | **不在 2026-08-12 Excel 表中**（疑已关或未导出）；从待修移出 |
 
 ## 挂起 / 待优化
 
@@ -95,14 +61,15 @@
 | **L1c-scan-py** | P1 挂起 | Python scan 接入 `classify` / regions classify（与 L1c-wet 可同刀） |
 | **AG-fullpage-wet** | 按需 | 无 label inventory BiB/UI 冒烟 |
 | **session-lifecycle-wet** | 挂起 | A attach → streamDetach → B 同 Chrome 409 `grace_owned`；短 grace 后再认领；需在线执行机 + 已加载新控制面 |
+| **PR-LOC-wet** | 待做 | 对公长表单 / BiB：阶段长图描边拼接（实现已合 V2.1） |
 
 ## Backlog 工程债 / 未做（自 backlog 转入）
 
 | ID | 优先级 | 项 |
 |----|--------|-----|
-| **session-lifecycle-commit** | — | 聚焦 commit：remote_session `grace_until` + SessionLifecycle 门面（工作树未提交；勿与 stderr/Partner WIP 混提） |
+| **fill-date-shell** | **已收尾** | 库内 7 行已 SQL 迁成 `fill_form_field`；控制器壳已删；别名归一；前端去掉「填写日期」 |
 | **option-first-commit** | — | 聚焦 commit：`option_text=first` 盖章（未入库 WIP） |
-| **form-actions-split** | P2 | 拆 `_form.py`；[TODO](todos/2026-08-11-split-form-actions.md) |
+| **form-actions-split** | 部分 | `form_autofill.py` 已拆出；其余 select/click_save 分文件仍见 [TODO](todos/2026-08-11-split-form-actions.md) |
 | **sectionOf-dead-calls** | 可选 | 删死代码里仅作产品猜归属的 `sectionOf` 调用；**勿删** D3 锚 xpath 函数 |
 | **T1r** | 穿插 | tree / replay label 兜底残余 |
 | **T3r** | P2 | 活录 CDP 对拍残余 |
@@ -111,11 +78,14 @@
 | **T5** | 暂缓 | 非 `el-table` 自定义网格；需另页证据 · [gap](specs/2026-08-10-t5-credit-scan-gap-design.md) |
 | **T9** | 部分 | 产品 `steps/replay` 常态验收（运维） |
 | **三大问题①** | 穿插 | 摘要化 / 禁清单 auto-fill 等；见 `AI录制三大问题分析.md`（与控件清单解耦） |
-| **T7** | 不做 | API 改名 `control_*`（明确不做，仅登记） |
+
+### fill-date-shell — 已收尾（2026-08-13）
+
+`js_gen`：`trajectory_step` 7 行 `fill_date_field`→`fill_form_field`；`special_element_step` 0 行。控制器动作已删；`fill_date_field` / `fillDateField` 仅作别名。前端 `vue-project/src` 已去掉独立「填写日期」。
 
 ## 产品排期（淼一协作 · 需求已梳理 2026-08-12）
 
-> 权威需求纪要：[product-requirements-miaoyi-brief](specs/2026-08-12-product-requirements-miaoyi-brief.md)。工程映射见 [roadmap](plans/2026-08-12-miaoyi-workstream-roadmap.md)。原 MY-* 已迁为 **PR-***。
+> 权威需求纪要：[product-requirements-miaoyi-brief](specs/2026-08-12-product-requirements-miaoyi-brief.md)。工程映射见 [roadmap](plans/2026-08-12-miaoyi-workstream-roadmap.md)。
 
 ### 挂起 · 等会议
 
@@ -127,60 +97,35 @@
 
 | ID | 状态 | 工作内容 | 已锁定要点 | 关联工程项 |
 |----|------|----------|------------|------------|
-| **PR-PART** | 进行中 | 元素分区算法完善 | 同页同名可分；分层之前 | unify-partition · L1c · picker · page-state · **1448067** · regionAnchor |
+| **PR-PART** | **本仓库已落地（V2.1）** | 元素分区算法完善 | 后端 `display_group`/`region_label` 可直接展示（中文；撞车后缀主键/`#n`）；SPA 原样分组。湿测 L1-picker/L1c 仍挂起 | unify-partition · L1c · picker · regionAnchor |
 | **PR-LAYER** | 待办 | 元素分层树（分区之后） | `页面→tab/向导/弹窗→功能分区→控件`；效果图已附 | 依赖 PR-PART；L1 `region_*` 产品展示 |
-| **PR-LOC** | 设计已批 | 阶段长图 + 控件高亮 | AI `phase_done` 后 1 张；当前页定位本阶段产品树步骤并描边；滚主滚动区拼接；绑 `trajectory_phase.stitch_screenshot_id` | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md)；步骤 before/after 不动 |
-| **PR-LOC-HL** | 挂起 | 步骤级高亮截图 | 操作**完成后**逐步高亮再截（本刀不做） | 逐步截仍挂起；阶段级高亮已并入 **PR-LOC** |
-| **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data · 1448066/64 底座；**需专刀 design** |
-| **PR-BATCH** | 待办 | 批量导入增强 | ①用户只看自己任务 ②按行进度条 ③phase `done`→`trajectory_log` 数组 | Vue BatchImport · batch API · trajectory_log |
+| **PR-LOC** | **本仓库已落地（V2.1）** | 阶段长图 + 控件高亮 | AI `phase_done` 后 1 张 PNG；控件描边；滚主滚动区拼接；`kind=phase_highlight` + `stitchScreenshotUrl`。失败不影响录制。湿测见 **PR-LOC-wet** | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · [plan](plans/2026-08-13-phase-highlight-long-screenshot.md) |
+| **PR-LOC-HL** | 挂起 | 步骤级高亮截图 | 操作**完成后**逐步高亮再截 | 逐步截仍挂起；阶段级高亮已并入 **PR-LOC** |
+| **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data 软文本底座；**需专刀 design** |
+| **PR-BATCH** | **部分完成** | 批量导入：用户只看自己任务 | ① 仍待办（等 **PR-USER**）。②行进度 + ③phase `done_logs` 已合 V2.1 | Vue BatchImport 另仓 |
 | **PR-USER** | 待办 | 用户/系统树权限 | 树共享；交易本人可见；仅管理员删树 | 等 **PR-SSO-ADMIN** |
 | **PR-SSO** | 待办 | 接入公司账号中心 HTTP API | 用户名密码或 token 换会话 | 等 **PR-SSO-ADMIN** |
-| **PR-PUSH** | **已完成** | 推送到自动化 | 拒草稿；仅 recorded/completed | **1448068** · export-push-gate |
-| **PR-EXEC** | **挂起** | 脚本执行（引擎/执行机） | 本侧只提供浏览器操作与 actions 设计；暂不排调度产品 | 原 MY-08/09；T9/session-lifecycle 工程债另跟 |
+| **PR-PUSH** | **已完成** | 推送到自动化 | 拒草稿；仅 recorded/completed | export-push-gate |
+| **PR-EXEC** | **挂起** | 脚本执行（引擎/执行机） | 本侧只提供浏览器操作与 actions 设计；暂不排调度产品 | T9 / session-lifecycle 湿测另跟 |
 
 ## 交叉关系
 
-- **1448053** ↔ L1-picker / page-state / L1-titlebox（同文案消歧；产品面已关，湿测另验）。
-- **1448052** ↔ 全页 DOM 合约（**slot-log 已落地**；按新缺陷 + 可检索日志再调合约）。
-- **1448059** ↔ 已关：任务说明内嵌用户数据（非助手扫描主路径改造）。
-- **slot-log** ↔ 已关：多 slot stderr 隔离/可检索（1448052 前置）。
-- **1448060** ↔ 对公客户评级新增弹窗：下拉面板内嵌表格选行；须落 `select_option`；AI 禁止 `click_element_by_index` 点下拉面（`use-select-option` 闸）。
-- **1448066** ↔ **ai-case-select**；**1448064** ↔ **ai-case-half-fill**：案例/业务数据统一软文本。↔ **PR-DATA** 软文本底座。
-- **1448055** ↔ Type B `save_form_snapshot`：产品隐藏 ≠ 删除；回放仍依赖入库检查点。
-- **1448068** ↔ 推送/导出闸门。↔ **PR-PUSH 已完成**。
-- **1448067** ↔ 待办「处理」L2/L1。↔ **PR-PART**。
+- **1448052** ↔ 全页 DOM 合约；slot-log 已就绪，等新缺陷 + 可检索日志再改。
 - **heal-locate** ↔ 级联脏录制 + 单步自愈；先判定缺席再修闸门，禁止 scroll 猎场。
-- **session-lifecycle-*** ↔ session lifecycle spec/plan；湿测与 commit 待办（**PR-EXEC 挂起**时作工程债，不升产品排期）。
-- **PR-LOC** ↔ phase stitch 字段；**PR-LOC-HL** 后置。
-- **PR-LAYER** ↔ 分区之后的产品树（效果图已确认形态）。
-- **PR-BATCH** ↔ 用户隔离与 **PR-USER** 同源；done→`trajectory_log`。
+- **PR-PART** ↔ 后端分区已合 V2.1；湿测仍见 L1-picker / L1c。
+- **PR-LAYER** ↔ 分区之后的产品树；依赖 **PR-PART**。
+- **PR-LOC** ↔ 阶段长图本仓库已落地；湿测见 **PR-LOC-wet**。**PR-LOC-HL** 逐步截仍后置。
+- **PR-PUSH** ↔ 推送/导出闸门已完成。
+- **PR-BATCH** ↔ ① 用户隔离与 **PR-USER** 同源，未做。
 - **PR-SSO-ADMIN** ↔ 阻塞 **PR-SSO** / **PR-USER** 权限实现；等 2026-08-13 会议。
-- 控件视野主线细节仍以 [`backlog-visible-editable-controls.md`](backlog-visible-editable-controls.md) 为准；**未闭环跟踪以本文件为准**；需求纪要见 [brief](specs/2026-08-12-product-requirements-miaoyi-brief.md)。
+- **session-lifecycle-wet** ↔ 湿测仍挂起（**PR-EXEC 挂起**时作工程债）。
+- 控件视野主线细节仍以 [`backlog-visible-editable-controls.md`](backlog-visible-editable-controls.md) 为准；需求纪要见 [brief](specs/2026-08-12-product-requirements-miaoyi-brief.md)。
 
 ## 更新记录
 
 | 日期 | 变更 |
 |------|------|
-| 2026-08-12 | 产品需求梳理：MY→**PR-***；锁定 stitch/DATA/BATCH/分层等；**PR-SSO-ADMIN 挂起等 8.13 会议**；纪要 [brief](specs/2026-08-12-product-requirements-miaoyi-brief.md) |
-| 2026-08-12 | 录入淼一协作产品排期 **MY-01..09**；**MY-06 推送到自动化 = 已完成**；交叉关系与 [roadmap](plans/2026-08-12-miaoyi-workstream-roadmap.md) |
-| 2026-08-11 | 初建：缺陷表 + backlog 合并；标 1448054/53 已解决、1448057 转前端、1448061/50 本仓库已修、1448062 进行中 |
-| 2026-08-11 | 待修加 `ai-case-select`：AI录制下拉忽略案例数据、默认选第一项 |
-| 2026-08-11 | `ai-case-select`：agent_task 挂 KV 文本 + 全量阶段目录；撤回硬绑 |
-| 2026-08-11 | 待修加 `ai-case-half-fill`：案例步骤设置后 AI 录制只填一半 |
-| 2026-08-11 | `ai-case-half-fill`：form assistant 补 flat KV + 原样填写 prompt；确认助手应读案例面板 KV；交叉关系补 select↔half-fill |
-| 2026-08-11 | **1448055** 本仓库已修：meta 步骤产品侧过滤 + 回放区间自动补检查点 |
-| 2026-08-12 | 待优化加 **heal-locate**：回放自愈禁 scroll 猎场；级联缺席判定 + 高效定位序（traj#33 实际控制人单位电话） |
-| 2026-08-12 | 自 backlog 转入未闭环：湿测状态对齐（挂起/P1）；补 **L1c-scan-py** / **session-lifecycle-wet|commit** / **sectionOf-dead-calls** / **T9** / **三大问题①** / **T7(不做)** |
-| 2026-08-12 | **1448059** 已解决（产品用法）：用户数据直接写入任务说明，不再挂「优化场景/任务分析助手」 |
-| 2026-08-12 | **slot-log** 已落地：多 slot 日志隔离（1448052 前置解除） |
-| 2026-08-12 | **select-state** 收尾：确认已在 `V2.1_dev@79a8e92`；对齐 char 断言；退役 `fix/select-option-state-boundary` worktree（勿 merge） |
-| 2026-08-12 | 同步 `缺陷管理.xlsx`（14 条均「已分配」）：**新增待修 1448068 / 1448067**；**1448066/1448064** 对齐正式编号；**1448056** 不在表中移出待修；tree-select / select-substr / manual-table-radio 归入本仓库已修 |
-| 2026-08-12 | **1448060** 本仓库已修：对公客户评级新增弹窗「下拉含表格」；table-row select 落选项步 |
-| 2026-08-12 | **1448060** 残余：AI `click_element_by_index` 点下拉表格行仍落「点击元素」→ `use-select-option` 硬闸 |
-| 2026-08-12 | **1448067**/待办「处理」：`div.todo-item-action` 人工录制入库 + 回放 durable/parent_text 消歧 |
-| 2026-08-12 | **自动抓取/分区**：L2 `collectL2Buttons` 收录 `.todo-item-action`；L1 `assignRegion` 按 `.todo-item` 卡片分区；`regionAnchor*` / resolve 同步 |
-| 2026-08-12 | **regionAnchor R4**：`sectionAnchor*` 别名已删；xpath 消歧仅用 `regionAnchor*` — [design](specs/2026-08-12-retire-abc-d3-favor-l1l2-regionanchor-design.md) |
-| 2026-08-12 | 待修加 **canvas-copy**：前端 BiB 画布本机剪贴板；设计稿 [bib-canvas-clipboard](specs/2026-08-12-bib-canvas-clipboard-design.md) |
-| 2026-08-12 | **canvas-copy** 实现计划：[plans/2026-08-12-bib-canvas-clipboard.md](plans/2026-08-12-bib-canvas-clipboard.md) |
-| 2026-08-12 | **canvas-copy** 本仓库已修：BiB `kind:clipboard` / `remote:clipboard` + Vue `useRemoteCanvas` C/V 拦截 |
-| 2026-08-13 | **PR-LOC** 设计已批：AI 阶段 done 后控件描边 + 长页拼接（非逐步截）；[design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) |
+| 2026-08-13 | **fill-date-shell 收尾**：SQL 已迁 7 行；删 `fill_date_field` 动作；别名归一；前端去掉「填写日期」 |
+| 2026-08-13 | 产品表加回 **PR-LOC** / **PR-PART** / **PR-PUSH**（状态仍为已落地/已完成） |
+| 2026-08-13 | 清出已修缺陷与空待修表；session-lifecycle-commit、T7(不做)；**PR-BATCH** 只留 ①；湿测补 **PR-LOC-wet** |
+| 2026-08-13 | V2.1 冻结：`master@8a50413`；下一线 `uara_V1.2` |

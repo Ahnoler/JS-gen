@@ -25,7 +25,6 @@ from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR,
     JS_CHECK_SINGLE_FIELD, JS_SCAN_FORM_FIELDS,
     JS_FILL_FORM_FIELD, JS_FILL_BY_XPATH,
-    JS_FILL_DATE_BY_XPATH,
     JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH, JS_SELECT_VALUE_BY_XPATH, JS_LOCATOR,
     JS_CLICK_RADIO_BY_XPATH,
@@ -262,41 +261,6 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
                 'fill_form_field',
-                {'label_text': resolved.label, 'value': value},
-                result,
-                element=element,
-            )
-            if not _is_query_mode(case_data_store):
-                _task_done_impl(
-                    resolved.label, case_data_store, value=value, xpath_smart=xp_inv,
-                )
-            return _ok(_with_submit_cue(result, case_data_store))
-        if _is_ok_result(result):
-            return _ok(_with_submit_cue(result, case_data_store))
-        return _with_submit_cue(result, case_data_store)
-
-    @controller.action('Fill an Element UI date picker by label text. Value should be in YYYY-MM-DD format.')
-    async def fill_date_field(label_text: str, value: str, xpath_smart: str = ""):
-        page = await browser_context.get_current_page()
-        await _wait_if_loading(page)
-        await _ensure_scanned(label_text)
-        resolved = _resolve_control(case_data_store, label_text, xpath_smart)
-        if resolved.error:
-            return resolved.error
-        element = await _capture_element(
-            page, resolved.label, target_kind='form_date', xpath_smart=resolved.xpath_smart,
-        )
-        result = await page.evaluate(JS_FILL_DATE_BY_XPATH, [resolved.xpath_smart, value])
-        if is_absent_field_result(result):
-            if not _is_query_mode(case_data_store):
-                _task_done_impl(resolved.label, case_data_store)
-            sys.stderr.write(f'[form] skip absent date label={resolved.label!r}\n')
-            sys.stderr.flush()
-            return _ok(_with_submit_cue(absent_field_skip_result(), case_data_store))
-        if _is_ok_result(result) and should_record_result(result):
-            xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
-            _record_action(
-                'fill_date_field',
                 {'label_text': resolved.label, 'value': value},
                 result,
                 element=element,

@@ -274,7 +274,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                         return f'click:{text}'
                     if a == 'click_save':
                         return f'save:{(p.get("button_text") or "保存").strip()}'
-                    if a in ('fill_form_field', 'fill_date_field', 'select_option', 'click_radio'):
+                    if a in ('fill_form_field', 'select_option', 'click_radio'):
                         lab = (p.get('label_text') or '').strip()
                         return f'{a}:{lab}' if lab else None
                     # Read-only no-progress actions: repeated identical calls
@@ -356,7 +356,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
 
             # ── Capture CSS selectors for action entries missing them ──
             # 在 on_step_end 时，有些 controller action 可能没有传入 element
-            #（如 fill_date_field、click_adjacent_button 等），导致 cssSelector 为空。
+            #（如 click_adjacent_button 等），导致 cssSelector 为空。
             # 这里用 JS_SMART_LOCATOR 在页面上按 label_text 实时抓取，补填缺失的 cssSelector。
             try:
                 page = await agent.browser_context.get_current_page()

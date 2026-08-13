@@ -11,7 +11,8 @@ const ALIASES = Object.freeze({
   fill_tree: 'select_tree_option',
   fillTree: 'select_tree_option',
   fillFormField: 'fill_form_field',
-  fillDateField: 'fill_date_field',
+  fill_date_field: 'fill_form_field',
+  fillDateField: 'fill_form_field',
   selectOption: 'select_option',
   clickRadio: 'click_radio',
   clickMenuItem: 'click_menu_item',
@@ -26,7 +27,6 @@ const ALIASES = Object.freeze({
 
 const CANONICAL = new Set([
   'fill_form_field',
-  'fill_date_field',
   'select_option',
   'select_tree_option',
   'click_radio',

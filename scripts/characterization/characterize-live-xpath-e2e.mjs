@@ -193,7 +193,7 @@ async function runOnPage(page) {
     ['客户名称', ['el-form-item', '客户名称', 'input'], 'fill_form_field', { label_text: '客户名称' }],
     ['备注', ['el-form-item', '备注', 'textarea'], 'fill_form_field', { label_text: '备注' }],
     ['状态', ['el-form-item', '状态', 'el-select'], 'select_option', { label_text: '状态' }],
-    ['生效日期', ['el-form-item', '生效日期'], 'fill_date_field', { label_text: '生效日期' }],
+    ['生效日期', ['el-form-item', '生效日期'], 'fill_form_field', { label_text: '生效日期' }],
     ['客户类型', ['el-form-item', '客户类型'], 'click_radio', { label_text: '客户类型' }],
   ]) {
     const loc = await page.evaluate(aiSmartLocatorExpr(label));

@@ -181,6 +181,8 @@ function testStopDoesNotDetach() {
 function testNormalizeActionName() {
   assert(normalizeActionName('clickElementByIndex') === 'click_element_by_index');
   assert(normalizeActionName('fillFormField') === 'fill_form_field');
+  assert(normalizeActionName('fill_date_field') === 'fill_form_field');
+  assert(normalizeActionName('fillDateField') === 'fill_form_field');
   assert(normalizeActionName('clickMenuItem') === 'click_menu_item');
   assert(normalizeActionName('select_option') === 'select_option');
 }

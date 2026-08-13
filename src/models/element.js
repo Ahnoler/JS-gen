@@ -39,7 +39,6 @@ import { enrichLocatorFields, sanitizeAttributes } from '../cdp/locator-candidat
 /** Single-target DOM actions that require a usable xpath on write. */
 export const SINGLE_TARGET_ACTIONS = Object.freeze([
   'fill_form_field',
-  'fill_date_field',
   'select_option',
   'select_tree_option',
   'click_radio',

@@ -30,7 +30,6 @@ export const GROUP_EXPORT = [
             types: ['click', 'date', 'input', 'radio', 'select:click', 'select:tree'],
             actionTypeMap: {
               fill_form_field: 'input',
-              fill_date_field: 'date',
               select_option: 'select:click',
               select_tree_option: 'select:tree',
               click_radio: 'radio',

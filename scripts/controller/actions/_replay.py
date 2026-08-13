@@ -35,7 +35,6 @@ from ._js_snippets import (
     JS_CHECK_LOADING,
     JS_FILL_FORM_FIELD,
     JS_FILL_BY_XPATH,
-    JS_FILL_DATE_FIELD,
     JS_FIND_LABELED_SELECT,
     JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH,
@@ -77,7 +76,7 @@ def _normalize_params(action_name: str, params: dict | None) -> dict:
     if label and 'label_text' not in p:
         p['label_text'] = label
 
-    if action_name in ('fill_form_field', 'fill_date_field'):
+    if action_name == 'fill_form_field':
         if not p.get('value'):
             p['value'] = p.get('option_text') or p.get('option') or p.get('text') or ''
     elif action_name in ('select_option', 'select_tree_option', 'click_radio'):
@@ -571,13 +570,6 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             if isinstance(result2, str) and result2.startswith('ok'):
                 return 'ok-xpath-full' if result2 == 'ok' else f'ok-xpath-full:{result2[3:]}'
         return _annotate_label_result(str(result))
-
-    if action_name == 'fill_date_field':
-        async def _date():
-            r = await page.evaluate(JS_FILL_DATE_FIELD, [label, value])
-            await page.wait_for_timeout(300)
-            return r
-        return await _with_xpath_first(_date)
 
     if action_name == 'select_tree_option':
         async def _tree():

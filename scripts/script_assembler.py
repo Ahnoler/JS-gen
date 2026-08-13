@@ -27,7 +27,6 @@ TODO — remaining operations lack multi-tier degradation + structured error rep
   ☐ click_table_row_button — multi-tier
   ☐ click_table_row_radio  — single-tier CTRL, error: returns CTRL string
   ☐ click_radio            — single-tier CTRL, error: returns CTRL string
-  ☐ fill_date_field        — no fallback, direct CTRL call
   ☐ click_adjacent_button  — no fallback, direct CTRL call
   ☐ switch_tab             — no fallback
   ☐ close_dialog           — no fallback
@@ -48,6 +47,7 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from scripts.models import ActionEntry, ActionFile, FormSnapshot, ElementInfo
+from scripts.controller.actions.replay_names import normalize_action_name
 
 from .codegen.actions import (  # noqa: F401  (re-exported for compat)
     FILL_RETRY_ACTIONS,
@@ -175,7 +175,7 @@ PARTIAL_CTRL_FOOTER = '''  } catch (err) {
 
 # ========================== Assembly ==========================
 
-FILL_ACTIONS = {'fill_form_field', 'fill_date_field', 'select_option', 'click_radio', 'select_tree_option'}
+FILL_ACTIONS = {'fill_form_field', 'select_option', 'click_radio', 'select_tree_option'}
 BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'click_icon_button', 'switch_tab', 'close_dialog', 'go_to_url'}
 
 def assemble_script(action_entries, target_url=None, form_snapshots=None):
@@ -253,7 +253,7 @@ def assemble_script(action_entries, target_url=None, form_snapshots=None):
     for entry in action_entries:
         # Normalize entry to dict
         _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
-        action = _e.get('action', '')
+        action = normalize_action_name(_e.get('action', ''))
         action_counter += 1
 
         # Inject any pending form checks whose action_index has been passed.
@@ -316,7 +316,7 @@ def assemble_partial_script(action_entries, target_url=None, stop_before_step=No
 
     for entry in partial_entries:
         _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
-        action = _e.get('action', '')
+        action = normalize_action_name(_e.get('action', ''))
         if action in _SKIP_ACTIONS:
             continue
 
@@ -353,7 +353,7 @@ def assemble_partial_for_cdp(action_entries, target_url=None, stop_before_step=N
     body.append("    await page.evaluate(() => CTRL.waitForLoading());")
     for entry in partial_entries:
         _e = entry.model_dump() if isinstance(entry, ActionEntry) else (entry if isinstance(entry, dict) else {})
-        action = _e.get('action', '')
+        action = normalize_action_name(_e.get('action', ''))
         if action in _SKIP_ACTIONS:
             continue
         if action in BOUNDARY_ACTIONS:

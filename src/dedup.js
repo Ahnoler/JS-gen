@@ -10,7 +10,6 @@
 
 const FIELD_ACTIONS = new Set([
   'fill_form_field',
-  'fill_date_field',
   'select_option',
   'select_tree_option',
   'click_radio',

@@ -32,7 +32,7 @@ _SKIP_SCREENSHOT_ACTIONS = frozenset({
 
 # Action → old-format command mapping (legacy, mirrors models/action.py:ACTION_TO_COMMAND)
 _ACTION_TO_COMMAND = {
-    'fill_form_field': 'input', 'fill_date_field': 'input',
+    'fill_form_field': 'input',
     'select_option': 'select', 'select_tree_option': 'select',
     'click_element_by_index': 'click', 'click_menu_item': 'click',
     'click_table_row_button': 'click', 'click_table_row_radio': 'click',
@@ -45,7 +45,7 @@ _ACTION_TO_COMMAND = {
 
 # Consecutive ops on the same page element coalesce → keep the later step.
 _FIELD_COALESCE_ACTIONS = frozenset({
-    'fill_form_field', 'fill_date_field',
+    'fill_form_field',
     'select_option', 'select_tree_option', 'click_radio',
 })
 
@@ -235,15 +235,22 @@ def _record_action(action_name, params, result, element=None, source=None):
     ):
         click_text = str(params_dict.get('text') or '').strip()
         last = _ACTION_LOG[-1]
-        if last.get('action') == 'fill_date_field' and last.get('source') in ('manual', None):
+        if last.get('action') == 'fill_form_field' and last.get('source') in ('manual', None):
             last_val = str((last.get('params') or {}).get('value') or '').strip()
-            if click_text and (click_text == last_val or re.match(r'^\d{4}-\d{2}-\d{2}$', click_text)):
+            if click_text and last_val and (
+                click_text == last_val
+                or (
+                    re.match(r'^\d{4}-\d{2}-\d{2}', last_val)
+                    and re.match(r'^\d{4}-\d{2}-\d{2}$', click_text)
+                )
+            ):
                 return None  # skip reopen noise; do not append / emit
 
     # Manual only: before coalescing fills, drop a junk click left from date-picker UI
     if (
         resolved_source == 'manual'
-        and action_name == 'fill_date_field'
+        and action_name == 'fill_form_field'
+        and re.match(r'^\d{4}-\d{2}-\d{2}', str(params_dict.get('value') or '').strip())
         and _ACTION_LOG
     ):
         last = _ACTION_LOG[-1]

@@ -40,7 +40,6 @@ const FORM_STRUCTURE_HEAL_MAX_STEPS = 24;
 
 const FILL_ACTION_TYPES = new Set([
   'fill_form_field',
-  'fill_date_field',
   'select_option',
   'click_radio',
   'select_tree_option',

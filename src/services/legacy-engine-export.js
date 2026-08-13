@@ -19,7 +19,6 @@ import { trajectoryStepToActionEntry } from '../models/element.js';
  */
 export const ACTION_TO_ENGINE_TYPE = Object.freeze({
   fill_form_field: 'input',
-  fill_date_field: 'date',
   select_option: 'select:click',
   select_tree_option: 'select:tree',
   click_element_by_index: 'click',
@@ -36,7 +35,7 @@ export const ACTION_TO_ENGINE_TYPE = Object.freeze({
 
 /** Types we emit today (derived from ACTION_TO_ENGINE_TYPE). */
 export const LEGACY_ENGINE_EMITTED_TYPES = Object.freeze(
-  [...new Set(Object.values(ACTION_TO_ENGINE_TYPE))].sort(),
+  [...new Set([...Object.values(ACTION_TO_ENGINE_TYPE), 'date'])].sort(),
 );
 
 /** Meta / scan / memory / non-recorded-UI actions — not exported */
@@ -161,7 +160,6 @@ export function buildOperationName(action, params = {}, element = {}) {
 
   switch (action) {
     case 'fill_form_field':
-    case 'fill_date_field':
       return label ? `填写:${label}` : `填写:${action}`;
     case 'select_option':
     case 'select_tree_option':
@@ -203,7 +201,6 @@ export function pickOperationValue(action, params = {}) {
   const p = params || {};
   switch (action) {
     case 'fill_form_field':
-    case 'fill_date_field':
       return String(p.value ?? p.option_text ?? p.text ?? '');
     case 'select_option':
     case 'select_tree_option':
@@ -214,6 +211,22 @@ export function pickOperationValue(action, params = {}) {
     default:
       return '';
   }
+}
+
+function resolveEngineType(action, element = {}) {
+  const mapped = ACTION_TO_ENGINE_TYPE[action];
+  if (!mapped) return null;
+  if (action !== 'fill_form_field') return mapped;
+  const blob = [
+    element.target_kind,
+    element.xpath_smart,
+    element.xpath,
+    element.xpath_full,
+    element.cssSelector,
+    JSON.stringify(element.attributes || {}),
+  ].join(' ');
+  if (/el-date-editor|tsscdatepicker|form_date|DatePicker/i.test(blob)) return 'date';
+  return mapped;
 }
 
 /**
@@ -228,7 +241,7 @@ export function mapStepToLegacyEngineOp(step) {
   const action = normalizeActionName(entry.action || step?.actionType || '');
   if (!action || SKIP_ACTIONS.has(action)) return null;
 
-  const engineType = ACTION_TO_ENGINE_TYPE[action];
+  const engineType = resolveEngineType(action, entry.element || {});
   if (!engineType) return null;
   const params = entry.params || {};
   const element = entry.element || {};

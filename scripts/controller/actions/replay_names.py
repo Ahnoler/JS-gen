@@ -6,7 +6,6 @@ import re
 # Form actions that auto-fill owns — replay via JS, not controller (avoids _ensure_scanned).
 _FORM_ACTIONS = {
     'fill_form_field',
-    'fill_date_field',
     'select_option',
     'select_tree_option',
     'click_radio',
@@ -21,7 +20,8 @@ _ACTION_NAME_ALIASES = {
     'fill_tree': 'select_tree_option',
     'fillTree': 'select_tree_option',
     'fillFormField': 'fill_form_field',
-    'fillDateField': 'fill_date_field',
+    'fill_date_field': 'fill_form_field',
+    'fillDateField': 'fill_form_field',
     'selectOption': 'select_option',
     'clickRadio': 'click_radio',
     'clickMenuItem': 'click_menu_item',
