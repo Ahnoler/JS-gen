@@ -10,10 +10,12 @@ Thumbs.db
 start.ps1
 .mcp.json
 .claude/
+.codex/
 .opencode/
 .reasonix/
 .superpowers/
 .vscode/
+.zcode/
 node_modules/
 tmp/
 report/
