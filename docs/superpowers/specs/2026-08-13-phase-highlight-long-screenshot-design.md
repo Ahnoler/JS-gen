@@ -90,7 +90,7 @@ AI record phase_done
    同一 DOM 节点多步操作只描一次。
 
 2. **描边**  
-   命中加 `data-jsgen-phase-hl="1"` + 页内一次性 stylesheet（`outline: 3px solid #1677ff; outline-offset: 2px`），不改 layout、不改业务 class。截完删除属性与 stylesheet。
+   命中加 `data-jsgen-phase-hl="1"` + 页内一次性 stylesheet（Chrome 审查风：`outline: 2px solid #1a73e8` + `box-shadow: inset 0 0 0 9999px rgba(111,168,220,.45)`），不改 layout、不改业务 class。截完删除属性与 stylesheet。
 
 3. **滚动根**  
    优先可见 `.el-main` / `.app-main` 且 `overflow` 为 auto/scroll 且 `scrollHeight > clientHeight`；否则文档根。粘性顶栏允许切片重叠（例如 48px）。

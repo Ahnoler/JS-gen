@@ -18,7 +18,7 @@
 - Zero hits still save a current-page long screenshot.
 - Capture failure = `console.warn` only; recording continues.
 - P0 size cap: shrink/truncate **PNG** (no JPEG encoder / no `sharp`). Target `< 12_000_000` bytes (under MEDIUMBLOB 16MB).
-- Outline: `3px solid #1677ff`, `outline-offset: 2px`; attribute `data-jsgen-phase-hl="1"`; stylesheet id `jsgen-phase-hl-style`.
+- Highlight: Chrome-inspect fill (`outline: 2px solid #1a73e8` + inset `rgba(111,168,220,.45)`); attribute `data-jsgen-phase-hl="1"`; stylesheet id `jsgen-phase-hl-style`.
 - Scroll overlap `48`; max slices `30`; restore scrollTop after capture.
 - Regen locator helpers if `page-locator-helpers.js` changes: `node scripts/_gen_locator_helpers_py.mjs`.
 - Schema / routes / services → `CHANGELOG.md` `[Unreleased]` with Python 同步提示.
@@ -474,7 +474,7 @@ Page contract (inside evaluate):
 - Reuse `isVisible` / `assignRegion` from helpers.
 - Resolve order: unique visible `xpath_smart` → multi + region_id/label match → `xpath_full`.
 - Dedupe by element (Set).
-- Mark: `data-jsgen-phase-hl="1"` + style tag `#jsgen-phase-hl-style` with `outline: 3px solid #1677ff; outline-offset: 2px`.
+- Mark: `data-jsgen-phase-hl="1"` + style tag `#jsgen-phase-hl-style` with Chrome-inspect fill (`outline: 2px solid #1a73e8` + inset `rgba(111,168,220,.45)`).
 - Scroll root: visible `.el-main` / `.app-main` with `overflow` auto/scroll and `scrollHeight > clientHeight`; else `document.scrollingElement`.
 - Return `{ hitCount, scroll: { top, clientHeight, scrollHeight, overlap: 48 } }`.
 
@@ -569,7 +569,7 @@ export function buildPhaseHighlightMarkExpression(targets) {
     if (!document.getElementById('jsgen-phase-hl-style')) {
       const st = document.createElement('style');
       st.id = 'jsgen-phase-hl-style';
-      st.textContent = '[data-jsgen-phase-hl="1"]{outline:3px solid #1677ff;outline-offset:2px;}';
+      st.textContent = '[data-jsgen-phase-hl="1"]{outline:2px solid #1a73e8;outline-offset:0;box-shadow:inset 0 0 0 9999px rgba(111,168,220,.45);}';
       document.documentElement.appendChild(st);
     }
     for (let j = 0; j < hits.length; j++) hits[j].setAttribute('data-jsgen-phase-hl', '1');

@@ -11,6 +11,12 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-13: **阶段长图控件高亮**：由纯描边改为 Chrome 审查元素风格（框内浅蓝色半透明蒙层 + 蓝色 outline）。不改 layout。
+  影响范围：phase_done 拼接截图观感。
+  文件：src/cdp/phase-highlight-page.js
+  Python 同步提示：无 HTTP/schema。执行机若自带 mark CSS，应对齐 inset `rgba(111,168,220,.45)`。
+
+
 - 2026-08-13: **prepare 登录硬编码**：`record/prepare`（及 `record/start` 未登录兜底）改为 `replay_actions`：`go_to_url` + `login(username, password)`，不再发 `session.step` 启动 browser-use；失败（导航/填表/按钮）使 prepare 失败。登录仍不写入 `trajectory_step`。
   影响范围：service（prepare/start 登录）、scripts（`login()` 失败返回 `err-login`）、api-docs。
   文件：src/services/trajectory/trajectory-record-lifecycle.js, scripts/controller/actions/_form.py, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-trajectory.mjs, characterize-login-action.py

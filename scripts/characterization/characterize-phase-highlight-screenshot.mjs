@@ -84,6 +84,9 @@ function ok(n) { console.log(`ok: ${n}`); }
   const marked = await page.evaluate(markExpr);
   assert.equal(marked.hitCount, 1);
   assert.equal(await page.locator('[data-jsgen-phase-hl="1"]').count(), 1);
+  const hlCss = await page.locator('#jsgen-phase-hl-style').evaluate((el) => el.textContent);
+  assert.match(hlCss, /rgba\(111,\s*168,\s*220/);
+  assert.match(hlCss, /box-shadow/);
   await page.evaluate(buildPhaseHighlightUnmarkExpression());
   assert.equal(await page.locator('[data-jsgen-phase-hl="1"]').count(), 0);
   await browser.close();
