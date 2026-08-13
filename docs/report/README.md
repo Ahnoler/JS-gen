@@ -36,3 +36,5 @@
 | 2026-08-08 | [2026-08-08.md](./2026-08-08.md) | xpath-primary 字段写入与 section 作用域闸门。 |
 | 2026-08-09 | [2026-08-09.md](./2026-08-09.md) | T4 可编辑盘点扫描；T10 表单结构软失败；overlay trigger\|title 命名。 |
 | 2026-08-10 | [2026-08-10.md](./2026-08-10.md) | 全页 L2 扫描；section 双保存 xpath；交易导出 V2；resolve-element L1/inventory。 |
+| 2026-08-11 | [2026-08-11.md](./2026-08-11.md) | L1c/page-state-gen；legacy-section-retire；xpath_smart 仅存 element；BiB ~11fps。 |
+| 2026-08-12 | [2026-08-12.md](./2026-08-12.md) | region= 作用域；remote_session grace；stderr 隔离；BiB 剪贴板；xpath-first 填表。 |
