@@ -11,6 +11,7 @@
 
 import { GROUP_OVERVIEW } from './groups/overview.js';
 import { GROUP_HIERARCHY } from './groups/hierarchy.js';
+import { GROUP_MESSAGES } from './groups/messages.js';
 import { GROUP_COMPONENTS } from './groups/components.js';
 import { GROUP_TRAJECTORY } from './groups/trajectory.js';
 import { GROUP_RECORDING } from './groups/recording.js';
@@ -35,6 +36,7 @@ export const API_GROUPS = [
   ...GROUP_SLOT_MONITOR,
   ...GROUP_OVERVIEW.slice(1), // 系统管理 …
   ...GROUP_HIERARCHY,
+  ...GROUP_MESSAGES,
   ...GROUP_COMPONENTS,
   ...GROUP_TRAJECTORY,
   ...GROUP_RECORDING,

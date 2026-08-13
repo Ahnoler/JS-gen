@@ -18,6 +18,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-13: **产品消息表（批量导入终态）**：新建 `sys_msg`；字典 `sys_msg_type`（`1`=批量导入任务）。批量任务第一次进入终态插入一条；标题「批量导入任务」；正文两行（功能·文件·状态 / 共N条统计）；`linkUrl=/ui-recording?batchId=`。`GET /api/v2/messages`（`pageNum`）/ `unread-count` / `POST :id/read` / `read-all`。`user_id` 挂起，全员同一列表与已读。
+  影响范围：schema、字典种子、batch finalize、v2 消息 API、api-docs。
+  文件：migrations/20260813160000_sys_msg.js, schemas/init.sql, src/services/sys-msg-compose.js, src/services/sys-msg-service.js, src/dao/sys-msg-dao.js, src/routes/v2/messages.js, src/services/trajectory/trajectory-batch-service.js
+  Python 同步提示：对齐表 `sys_msg` 与字典 `sys_msg_type`；透传 `/api/v2/messages*`（无用户过滤）；勿从 batch 表虚拟拼消息。
+
 - 2026-08-13: **批量行进度 + 阶段 done 说明**：`trajectory_phase.done_logs` JSON 数组 `[{text, at, source}]`；`phase_done.data.text` 追加写入（空 text 跳过；`phase_error` 为 `source=fail`）。`GET` 交易树 `phases[].doneLogs`；`GET/WS` 批量 item 计算 `progressPercent` / `phaseCompleted` / `phaseTotal` / `phaseName` / `lastDoneText`（不落 batch_item）。`trajectory.trajectory_log` 语义不变。
   影响范围：trajectory_phase schema、录制 runner、batch GET/WS、api-docs。
   文件：migrations/20260813120000_phase_done_logs.js, src/models/phase-done-logs.js, src/services/trajectory/batch-item-progress.js, src/services/trajectory-phase-service.js, trajectory-recording-runner.js, trajectory-batch-service.js

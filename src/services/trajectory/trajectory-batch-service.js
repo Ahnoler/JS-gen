@@ -23,6 +23,7 @@ import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../../models/constants.js';
 import { pumpAnalyze, pumpDraft } from './batch-analyze.js';
 import { pumpRecord } from './batch-record.js';
 import { computeBatchItemProgress, PHASE_LOOKUP_STATUSES } from './batch-item-progress.js';
+import { insertSysMsgFromBatchJob } from '../sys-msg-service.js';
 
 /** @type {Set<string>} in-flight cancel tokens for analyzing items */
 export const cancelledAnalyzeTokens = new Set();
@@ -120,6 +121,14 @@ export async function emitProgress(batchId, item = null, extra = {}) {
   return payload;
 }
 
+async function notifyBatchTerminalMessage(job, summary) {
+  try {
+    await insertSysMsgFromBatchJob(job, summary);
+  } catch (err) {
+    console.warn('[sys-msg] insert skipped:', err?.message || err);
+  }
+}
+
 export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
   const job = await batchDao.getJobById(batchId);
   if (!job || BATCH_JOB_TERMINAL.includes(job.status)) return job;
@@ -136,6 +145,8 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
     }
     await batchDao.forceUpdateJob(batchId, { status: 'cancelled' });
     const summary = await batchDao.summarizeJob(batchId);
+    const cancelledJob = await batchDao.getJobById(batchId);
+    await notifyBatchTerminalMessage(cancelledJob, summary);
     try {
       broadcast('batch:done', {
         batchId,
@@ -144,7 +155,7 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
         summary,
       });
     } catch {}
-    return batchDao.getJobById(batchId);
+    return cancelledJob;
   }
 
   const summary = await batchDao.summarizeJob(batchId);
@@ -166,6 +177,8 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
   }
 
   await batchDao.forceUpdateJob(batchId, { status: terminal });
+  const doneJob = await batchDao.getJobById(batchId);
+  await notifyBatchTerminalMessage(doneJob, summary);
   try {
     broadcast('batch:done', {
       batchId,
@@ -174,7 +187,7 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
       summary,
     });
   } catch {}
-  return batchDao.getJobById(batchId);
+  return doneJob;
 }
 
 export async function getBatchJobView(batchId, {

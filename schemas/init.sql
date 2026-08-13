@@ -260,6 +260,33 @@ CREATE TABLE `sys_dict_data` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字典数据表';
 
 -- ─────────────────────────────────────────────────────────────
+-- 产品消息（批量导入终态等）
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE `sys_msg` (
+  `id`               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `msg_title`        VARCHAR(128) NOT NULL DEFAULT '' COMMENT '展示标题；第一种=批量导入任务',
+  `msg_content`      TEXT NOT NULL COMMENT '两行 HTML：功能·文件·状态 / 统计；用户字段已转义',
+  `msg_type`         INT NOT NULL COMMENT 'sys_dict_data.dict_value (sys_msg_type)',
+  `msg_status`       TINYINT NOT NULL DEFAULT 0 COMMENT '0未读 2已读（现阶段全局）',
+  `link_url`         VARCHAR(512) NOT NULL DEFAULT '',
+  `belong_item_name` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '功能名',
+  `belong_item_id`   BIGINT UNSIGNED NULL COMMENT 'system.id type=3',
+  `source_type`      VARCHAR(32) NOT NULL DEFAULT '' COMMENT 'batch_import',
+  `source_id`        VARCHAR(64) NOT NULL DEFAULT '' COMMENT 'batch UUID',
+  `product_code`     VARCHAR(64) NULL COMMENT '挂起',
+  `create_by`        VARCHAR(64) NOT NULL DEFAULT '系统',
+  `user_id`          BIGINT UNSIGNED NULL COMMENT '挂起',
+  `user_flag`        TINYINT NULL COMMENT '挂起',
+  `rule_id`          BIGINT UNSIGNED NULL COMMENT '挂起',
+  `remark`           VARCHAR(500) NULL,
+  `create_time`      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `update_time`      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY `uk_sys_msg_source` (`source_type`, `source_id`),
+  KEY `idx_sys_msg_created` (`create_time`),
+  KEY `idx_sys_msg_status` (`msg_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='产品消息';
+
+-- ─────────────────────────────────────────────────────────────
 -- 特殊元素库
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE `special_element` (
@@ -475,6 +502,12 @@ CREATE TABLE `api_override` (
 -- 默认数据（根 id=0 + type 1/2/3 三级未分类）
 -- ============================================================
 SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_AUTO_VALUE_ON_ZERO');
+
+INSERT INTO `sys_dict_type` (`dict_name`, `dict_type`, `status`, `create_by`, `update_by`, `remark`) VALUES
+  ('消息类型', 'sys_msg_type', '0', '', '', '产品消息抽屉 msgType');
+
+INSERT INTO `sys_dict_data` (`dict_sort`, `dict_label`, `dict_value`, `dict_type`, `status`, `is_default`, `create_by`, `update_by`) VALUES
+  (1, '批量导入任务', '1', 'sys_msg_type', '0', 'N', '', '');
 
 INSERT INTO `system` (`id`, `system_id`, `type`, `parent_id`, `name`, `description`, `sort_order`) VALUES
   (0, '00000000-0000-0000-0000-000000000000', 0, 0, '根', '系统树根节点（不可删除）', 0);

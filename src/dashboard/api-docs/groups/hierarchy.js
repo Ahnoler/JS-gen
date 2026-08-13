@@ -126,7 +126,7 @@ export const GROUP_HIERARCHY = [
   {
     id: 'sys-dict',
     name: '字典管理',
-    description: '通用字典类型与数据（sys_dict_type / sys_dict_data）；特殊元素分类用 dict_type=special_element_tag',
+    description: '通用字典类型与数据（sys_dict_type / sys_dict_data）；特殊元素分类用 dict_type=special_element_tag；消息类型 dict_type=sys_msg_type（1=批量导入任务）',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/system/dict/type',

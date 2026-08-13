@@ -1,7 +1,7 @@
 # Design: 批量导入终态消息（sys_msg，第一种消息类型）
 
 **Date:** 2026-08-13  
-**Status:** Awaiting user review before implementation plan  
+**Status:** Approved — plan at `docs/superpowers/plans/2026-08-13-batch-import-sys-msg.md`  
 **Trigger:** Vue 消息抽屉已接 `message.ts`（`GET /v2/messages`、未读数、全部已读）；批量导入提示改到消息模块。用户管理未做，相关字段挂起。  
 **Related:** [batch draft mode](2026-08-07-batch-draft-mode-design.md)；[batch task progress](2026-08-13-batch-task-progress-phase-done-design.md)；Vue `vue-project/src/api/message.ts`、`messageDrawer.vue`；公司消息样例（`msgType` 字典、`belongItemName`）
 

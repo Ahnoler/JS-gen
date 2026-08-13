@@ -8,6 +8,7 @@ import { v2ResponseEnvelope } from '../../http/api-response.js';
 import registerHierarchy from './hierarchy.js';
 import registerSystemMgmt from './system-mgmt.js';
 import registerSysDict from './sys-dict.js';
+import registerMessages from './messages.js';
 import registerSpecialElement from './special-element.js';
 import registerTrajectoryBatch from './trajectory-batch.js';
 import registerAgentStderr from './agent-stderr.js';
@@ -32,6 +33,7 @@ export default function (app) {
   registerHierarchy(app);
   registerSystemMgmt(app);
   registerSysDict(app);
+  registerMessages(app);
   registerSpecialElement(app);
   // batch/* before trajectories/:id
   registerTrajectoryBatch(app);
