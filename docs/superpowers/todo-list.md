@@ -129,8 +129,8 @@
 |----|------|----------|------------|------------|
 | **PR-PART** | 进行中 | 元素分区算法完善 | 同页同名可分；分层之前 | unify-partition · L1c · picker · page-state · **1448067** · regionAnchor |
 | **PR-LAYER** | 待办 | 元素分层树（分区之后） | `页面→tab/向导/弹窗→功能分区→控件`；效果图已附 | 依赖 PR-PART；L1 `region_*` 产品展示 |
-| **PR-LOC** | 待办 | 整页 stitch（phase 绑定） | 停录/阶段结束自动 1 张；`trajectory_phase` 新字段存 URL/id；**非** step screenshot | screenshots · phase 模型；步骤高亮截图 → **PR-LOC-HL** |
-| **PR-LOC-HL** | 挂起 | 步骤级高亮截图 | 操作**完成后**高亮再截 | stitch / 分区稳定后 |
+| **PR-LOC** | 设计已批 | 阶段长图 + 控件高亮 | AI `phase_done` 后 1 张；当前页定位本阶段产品树步骤并描边；滚主滚动区拼接；绑 `trajectory_phase.stitch_screenshot_id` | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md)；步骤 before/after 不动 |
+| **PR-LOC-HL** | 挂起 | 步骤级高亮截图 | 操作**完成后**逐步高亮再截（本刀不做） | 逐步截仍挂起；阶段级高亮已并入 **PR-LOC** |
 | **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data · 1448066/64 底座；**需专刀 design** |
 | **PR-BATCH** | 待办 | 批量导入增强 | ①用户只看自己任务 ②按行进度条 ③phase `done`→`trajectory_log` 数组 | Vue BatchImport · batch API · trajectory_log |
 | **PR-USER** | 待办 | 用户/系统树权限 | 树共享；交易本人可见；仅管理员删树 | 等 **PR-SSO-ADMIN** |
@@ -183,3 +183,4 @@
 | 2026-08-12 | 待修加 **canvas-copy**：前端 BiB 画布本机剪贴板；设计稿 [bib-canvas-clipboard](specs/2026-08-12-bib-canvas-clipboard-design.md) |
 | 2026-08-12 | **canvas-copy** 实现计划：[plans/2026-08-12-bib-canvas-clipboard.md](plans/2026-08-12-bib-canvas-clipboard.md) |
 | 2026-08-12 | **canvas-copy** 本仓库已修：BiB `kind:clipboard` / `remote:clipboard` + Vue `useRemoteCanvas` C/V 拦截 |
+| 2026-08-13 | **PR-LOC** 设计已批：AI 阶段 done 后控件描边 + 长页拼接（非逐步截）；[design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) |

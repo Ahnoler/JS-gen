@@ -7,11 +7,10 @@
 ## 已锁定
 
 ### PR-LOC 录制定位 / 整页 stitch
-- **现在做**：长页滚动拼接成一张整页长图（stitch）。
-- **触发**：每次录制停止 / 阶段结束自动生成 **1** 张。
-- **归属**：绑定 **phase**（与 step 级 screenshot 不同）。
-- **存储**：`trajectory_phase` 新字段（如 `stitchScreenshotId` / URL）。
-- **以后做**：操作**完成之后**，按页上操作元素高亮再截图（步骤级；挂起）。
+- **现在做**：AI 阶段 `phase_done` 后，对本阶段产品树步骤在当前页定位到的控件描边，再滚主滚动区拼成 **1** 张长图。
+- **归属**：绑定 **phase**（`stitch_screenshot_id`；与 step 级 before/after 不同）。
+- **设计：** [phase-highlight-long-screenshot](2026-08-13-phase-highlight-long-screenshot-design.md)。
+- **以后做（PR-LOC-HL）**：操作**完成之后**逐步高亮再截（步骤级；仍挂起）。
 
 ### PR-PART 元素分区
 - 完善现有元素分区算法（同页同名可区分）。
