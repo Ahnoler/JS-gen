@@ -329,7 +329,7 @@ export async function setTrajectoryCaseEntries(trajectoryId, entries) {
 /**
  * Human confirmation of a trajectory (transaction-level).
  * confirmed=true  → recordStatus=completed
- * confirmed=false → recordStatus=draft (cancel confirmation)
+ * confirmed=false → recordStatus=recorded (cancel confirmation)
  * Does NOT touch trajectory_step.confirmed (回放确认 flag, not trajectory confirm).
  */
 export async function confirmTrajectory(trajectoryId, confirmed = true) {

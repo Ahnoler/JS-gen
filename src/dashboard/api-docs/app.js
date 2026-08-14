@@ -65,7 +65,7 @@ function renderOverview(container) {
       <h3 style="margin-top:16px">关键语义</h3>
       <ul>
         <li><code>record/stop</code> 只改 <code>recordStatus</code>，<strong>不</strong>释放执行机槽位。</li>
-        <li>断开画面 <code>POST .../stream/detach</code> 只停推流（remote_session→idle，live→draft），<strong>不</strong>关浏览器。</li>
+        <li>断开画面 <code>POST .../stream/detach</code> 只停推流（remote_session→idle；非 AI 录制中 recording→draft），<strong>不</strong>关浏览器。</li>
         <li>离开录制工作室<strong>不</strong>自动 detach；AI 可后台继续录。无步骤写入超过 2 小时由服务端自动回收。</li>
         <li><code>POST .../detach</code> 关闭会话并杀死 Chrome、释放槽位（手动释放执行资源）。</li>
         <li>多交易并行：推流按 <code>trajectoryId</code> / <code>remote_session.id</code> 隔离，互不串扰。</li>

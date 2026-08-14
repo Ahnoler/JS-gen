@@ -355,7 +355,7 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
 
 /**
  * Batch-safe stop: never downgrade recorded/completed; failed only retries via record/start.
- * Sends cancel_step when a runtime exists; CAS-updates only live/recording.
+ * Sends cancel_step when a runtime exists; CAS-updates only recording/failed（success 含 draft）.
  */
 export async function stopTrajectoryRecordingSafe(trajectoryId, {
   success = false,

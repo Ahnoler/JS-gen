@@ -48,7 +48,7 @@ export const GROUP_TRAJECTORY = [
           { name: 'keyword', type: 'string', in: 'query', desc: '名称模糊' },
           {
             name: 'recordStatus', type: 'string', in: 'query',
-            desc: '按录制状态筛选；支持单个或逗号分隔多值：draft | live | recording | recorded | completed。别名 status',
+            desc: '按录制状态筛选；支持单个或逗号分隔多值：draft | recording | failed | recorded | completed。别名 status',
             example: 'draft,recorded',
           },
           { name: 'sortBy', type: 'string', in: 'query', desc: 'created_at | name | step_count | record_status' },
@@ -63,7 +63,7 @@ export const GROUP_TRAJECTORY = [
             batchTaskName: '批量录制导入模板_0814-1251',
           }],
           total: 42, page: 1, pageSize: 20,
-          stats: { total: 42, draft: 8, live: 2, recording: 5, recorded: 20, completed: 7 },
+          stats: { total: 42, draft: 8, recording: 7, failed: 0, recorded: 20, completed: 7 },
         }),
       },
       {

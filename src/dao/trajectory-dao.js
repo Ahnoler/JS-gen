@@ -55,11 +55,11 @@ function applyBatchTaskNameFilter(query, batchTaskName) {
   return query;
 }
 
-const RECORD_STATUS_STATS = ['draft', 'live', 'recording', 'recorded', 'completed'];
+const RECORD_STATUS_STATS = ['draft', 'recording', 'failed', 'recorded', 'completed'];
 
 /**
  * 五档统计：与行查询同基准过滤（functionId/keyword/batchTaskName），忽略 recordStatus。
- * @returns {Promise<{ total: number, draft: number, live: number, recording: number, recorded: number, completed: number }>}
+ * @returns {Promise<{ total: number, draft: number, recording: number, failed: number, recorded: number, completed: number }>}
  */
 export async function countByRecordStatus({ functionId = null, keyword = null, batchTaskName = null } = {}) {
   const db = getDB();

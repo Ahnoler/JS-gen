@@ -24,13 +24,13 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/prepare',
         summary: '一键准备（占槽 + 登录 + 推流）',
-        desc: '幂等。① 复用本交易已存活 session（含「断开画面」后空闲浏览器）；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录为硬编码 go_to_url + login（不启动 Agent），不写入 trajectory_step。画面推流成功时将 recordStatus 置为 live（占用，非 AI 录制）。通过 WS 广播 recording:prepare。推流身份以 remote_session.id 为准，按 trajectory 隔离。',
+        desc: '幂等。① 复用本交易已存活 session（含「断开画面」后空闲浏览器）；② 否则优先复用执行机上空闲孤儿 CDP Chrome；③ 再新建浏览器。无空闲槽位则 409。登录为硬编码 go_to_url + login（不启动 Agent），不写入 trajectory_step。画面推流成功时将 recordStatus 置为 recording（录制中；纯推流占用，非 AI 录制）。通过 WS 广播 recording:prepare。推流身份以 remote_session.id 为准，按 trajectory 隔离。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
           trajectoryId: 42, sessionId: 'uuid', executorNodeUuid: 'node-uuid',
           remoteSessionId: 7, ready: true, attached: true, reused: false, reusedChrome: true,
-          recordStatus: 'live',
+          recordStatus: 'recording',
           login: { skipped: false, done: true, accountId: 10 },
           stream: { ok: true, remoteSessionId: 7 },
           stages: {
@@ -43,8 +43,8 @@ export const GROUP_RECORDING = [
           '409 `grace_owned`：宽限期内他交易 idle Chrome 仍归属原 traj — body 含 `code`、`ownerTrajectoryId`、`graceUntil`（见 attach / attach-live）',
           '503：会话/执行机其它不可用',
           '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
-          'stream.ok=true → recordStatus=live（列表可见占用中；人工录制可用）',
-          'record/start → recording；stop → recorded；stream/detach(live) → draft；detach(live|recording) → draft',
+          'stream.ok=true → recordStatus=recording（列表可见录制中；人工录制可用）',
+          'record/start(draft|failed) → recording；stop(success) → recorded；stop(!success)/失败/中断 → failed；detach/stream-detach（非 AI 录制）→ draft；detach（AI 录制中）→ failed',
         ],
       },
       {
@@ -86,7 +86,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/confirm',
         summary: '人工确认 / 取消确认（交易级）',
-        desc: 'confirmed=true → recordStatus=completed；false → draft。不修改 trajectory_step.confirmed。live/recording 时 409。',
+        desc: 'confirmed=true → recordStatus=completed；false → recorded。不修改 trajectory_step.confirmed。recording/failed 时 409。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ confirmed: true }),
         respExample: J({
@@ -146,7 +146,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/manual-record',
         summary: '开关人工录制',
-        desc: 'AI 录制中（recordStatus=recording）时开启会 409。live（推流占用）下可开人工录制。phaseId 省略则追加到最后阶段。',
+        desc: 'AI 录制活跃时开启会 409。recording（纯推流占用，非 AI 录制）下可开人工录制。phaseId 省略则追加到最后阶段。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ enabled: true, phaseId: 102 }),
         respExample: J({ trajectoryId: 42, enabled: true, phaseId: 102 }),
@@ -223,7 +223,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/stream/detach',
         summary: '断开画面（只停推流）',
-        desc: 'remote_session → idle 并设 `grace_until`（默认 15min，env `REMOTE_SESSION_GRACE_MS`）；清 `trajectory.remote_session_id` 缓存但 grace 内保留 `remote_session.trajectory_id`；若 recordStatus=live 则改回 draft。Agent 会话与 Chrome 仍存活；宽限内原 traj 可再附着，他交易认领同 Chrome → 409 `grace_owned`。与 detach（释放执行资源）不同。广播 recording:stream_detached + remote:status。',
+        desc: 'remote_session → idle 并设 `grace_until`（默认 15min，env `REMOTE_SESSION_GRACE_MS`）；清 `trajectory.remote_session_id` 缓存但 grace 内保留 `remote_session.trajectory_id`；若 recordStatus=recording 且非 AI 录制中则改回 draft。Agent 会话与 Chrome 仍存活；宽限内原 traj 可再附着，他交易认领同 Chrome → 409 `grace_owned`。与 detach（释放执行资源）不同。广播 recording:stream_detached + remote:status。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({
@@ -235,7 +235,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/detach',
         summary: '释放执行资源（关闭浏览器）',
-        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 live 或 recording，则改回 draft（不覆盖 recorded/completed）。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 2 小时会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
+        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 recording：AI 录制活跃 → failed，非 AI（纯推流占用）→ draft（不覆盖 recorded/completed）。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 2 小时会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({ trajectoryId: 42, detached: true, recordStatus: 'draft' }),
@@ -251,7 +251,7 @@ export const GROUP_RECORDING = [
             sessionId: '72d5d9b4-9fad-4d96-956f-af44e9f7b4ee',
             trajectoryId: 33,
             trajectoryName: '1对公客户转正',
-            recordStatus: 'live',
+            recordStatus: 'recording',
             remoteSessionId: 632,
             remoteStatus: 'active',
             executorNodeId: 2,
@@ -284,7 +284,7 @@ export const GROUP_RECORDING = [
           sessionId: '72d5d9b4-9fad-4d96-956f-af44e9f7b4ee',
           trajectoryId: 33,
           trajectoryName: '1对公客户转正',
-          recordStatus: 'live',
+          recordStatus: 'recording',
           remoteSessionId: 632,
           remoteStatus: 'active',
           executorNodeId: 2,
@@ -365,7 +365,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/replay/prepare',
         summary: '[DEPRECATED] 组装回放计划',
-        desc: '已弃用。recordStatus 为 live 或 recording 时 409。脚本不返回给客户端。产品请改用 /steps/replay。',
+        desc: '已弃用。recordStatus 为 recording 时 409。脚本不返回给客户端。产品请改用 /steps/replay。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({

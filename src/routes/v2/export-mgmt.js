@@ -220,7 +220,7 @@ export default function (app) {
       return res.json({ ...result, isExport: 0, pushed: false });
     }
 
-    // Real partner push: draft / live / recording are not 「录制完成」.
+    // Real partner push: gate-driven — only completed (已确认) may push.
     assertPushableForPartner(traj);
 
     const accessToken = requireAccessToken(req);

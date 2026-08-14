@@ -1,9 +1,9 @@
 /**
  * Partner push eligibility by trajectory.recordStatus.
- * Product: only 「录制完成」 (recorded) and confirmed (completed) may push.
+ * Product: only confirmed (completed) may push.
  */
 
-export const PUSHABLE_RECORD_STATUSES = Object.freeze(['recorded', 'completed']);
+export const PUSHABLE_RECORD_STATUSES = Object.freeze(['completed']);
 
 const PUSHABLE = new Set(PUSHABLE_RECORD_STATUSES);
 

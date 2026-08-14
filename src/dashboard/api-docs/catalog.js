@@ -48,7 +48,7 @@ export const API_GROUPS = [
 ];
 
 export const ENUMS = [
-  { name: 'recordStatus', values: 'draft / live / recording / recorded / completed' },
+  { name: 'recordStatus', values: 'draft(未录制) / recording(录制中) / failed(录制异常) / recorded(待确认) / completed(已确认)' },
   { name: 'remote_session.status', values: 'active（推流中）/ idle（断开画面浏览器仍在）/ closed / crashed' },
   { name: 'phase.status', values: 'pending / running / completed / failed' },
   { name: 'step.source', values: 'agent / manual' },
@@ -66,7 +66,7 @@ export const RECORDING_FLOW = [
   'POST .../record/prepare（复用空闲资源 / 占槽 + 登录，幂等）',
   'POST .../record/start（可选 phaseIds；可关页后台继续）',
   'POST .../record/stop（不释放槽位）',
-  'POST .../confirm（人工确认 → completed；取消 → draft）',
+  'POST .../confirm（人工确认 → completed；取消 → recorded）',
   'POST .../resolve-element（可选：按 label 抓定位器写入步骤 element_json）',
   'POST .../stream/detach（断开画面；或 .../detach 释放执行资源关浏览器）',
 ];

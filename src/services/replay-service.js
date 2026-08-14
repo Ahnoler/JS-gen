@@ -38,11 +38,6 @@ function assertNotRecording(traj) {
     err.statusCode = 409;
     throw err;
   }
-  if (traj.recordStatus === 'live') {
-    const err = new Error('Trajectory is live (prepared); detach before replay');
-    err.statusCode = 409;
-    throw err;
-  }
 }
 
 /**
