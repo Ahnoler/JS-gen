@@ -60,7 +60,7 @@
 
 ### 挂载点（两处共用同一函数）
 
-- **扫描/resolve 列表**：接口响应加 `regionTree`（PR-LAYER TODO 补上；每项已带 `layers`）。
+- **扫描/resolve 列表**：inventory 扫描（`resolve-by-label` `mode=inventory` 响应）与全页可见控件扫描的列表响应加 `regionTree`（PR-LAYER TODO 补上；每项已带 `layers`）。
 - **phase_done**：全量扫描结果 + `assembleRegionTree` → 阶段树与截图元数据同写 `screenshot.metadata_json`（§3 形状），不另建表。
 
 ### 遵守 PR-LAYER 已锁规则
@@ -151,7 +151,7 @@ phases: [{
 
 ## 6. 实现草图（供 writing-plans 展开）
 
-- 迁移：`migrations/2026****_screenshot_metadata_json.js`（`ALTER TABLE screenshot ADD COLUMN metadata_json JSON NULL`）。
+- 迁移：`migrations/20260814100000_screenshot_metadata_json.js`（`ALTER TABLE screenshot ADD COLUMN metadata_json JSON NULL`；具体时间戳以执行日为准，遵守仓库 YYYYMMDDHHmmss 命名）。
 - 新 `src/services/region-tree.js`：`assembleRegionTree(items, { pageLabel })`。
 - 改 `src/cdp/phase-screenshot-page.js`（删 mark/unmark；加 rect 收集表达式）、`phase-screenshot-capture.js`（逐片收集+去重+坐标换算）、`png-stitch` 侧取 IHDR 宽高。
 - 改 `src/services/trajectory/phase-highlight-screenshot.js`（全量扫描 + 树 + 元数据写入；沿用 replaceForPhase 入口扩展）。
