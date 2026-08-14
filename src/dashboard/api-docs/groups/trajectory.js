@@ -295,9 +295,10 @@ export const GROUP_TRAJECTORY = [
           + 'mode=draft 时仅 analyze 并保存草稿（itemStatus=drafted，不占执行机）。'
           + ' 立即返回 HTTP 202；record 模式后台并行录制（全局 FIFO，受执行机槽位限制）。'
           + ' 须带 Idempotency-Key。functionId / systemAccountId 由页面上下文随表单提交。',
-        reqExample: 'form-data: file=@batch.xlsx; functionId=3; systemAccountId=10; model=deepseek-v4-flash; mode=draft|record\nHeader: Idempotency-Key: <uuid>',
+        reqExample: 'form-data: file=@batch.xlsx; functionId=3; systemAccountId=10; model=deepseek-v4-flash; mode=draft|record; name=<任务名>\nHeader: Idempotency-Key: <uuid>',
         respExample: J({
           batchId: 'uuid',
+          name: '批量录制导入模板_0814-1251',
           status: 'accepted',
           mode: 'draft',
           functionId: 3,
@@ -308,6 +309,7 @@ export const GROUP_TRAJECTORY = [
         notes: [
           'HTTP 202 Accepted；v2 信封 body.code 仍为 200',
           'mode 默认 record；可选 draft（仅 analyze+草稿，跳过 prepare/record/detach）',
+          'name 可选，缺省按 文件名_MMDD-HHmm 生成；创建后不可改',
           'mode=draft 不要求 USE_EXECUTOR；mode=record 且 USE_EXECUTOR=false → 503',
           'mode 非法（非 record|draft）→ 400',
           'requestHash / 幂等校验包含 mode（同 Key 不同 mode → 409）',
@@ -326,6 +328,7 @@ export const GROUP_TRAJECTORY = [
         ],
         respExample: J({
           batchId: 'uuid',
+          name: '批量录制导入模板_0814-1251',
           status: 'running',
           mode: 'record',
           jobStatus: 'running',
