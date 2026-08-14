@@ -4,6 +4,8 @@
  * Prefix: /api/v2/export/*
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
+import * as screenshotDao from '../../dao/screenshot-dao.js';
 import {
   LEGACY_ENGINE_FIELD_SCHEMA,
   LEGACY_ENGINE_EMITTED_TYPES,
@@ -14,6 +16,7 @@ import {
 import {
   buildTransactionPayload,
   wrapTransactionList,
+  TRANSACTION_SCHEMA_VERSION,
   TRANSACTION_ENVELOPE_FIELDS,
   EVENT_TYPE_NAME,
 } from '../../services/transaction-export.js';
@@ -46,11 +49,15 @@ function parseBool(raw, defaultValue = false) {
 }
 
 /** Assemble only — do not mark is_export. */
-function buildOneTrajectory(traj, { systemId, projectId }) {
-  const built = buildTransactionPayload(traj, { systemId, projectId });
+async function buildOneTrajectory(traj, { systemId, projectId }) {
+  const [phases, phaseScreenshots] = await Promise.all([
+    trajectoryPhaseDao.listByTrajectory(traj.id),
+    screenshotDao.listPhaseHighlightsByTrajectory(traj.id),
+  ]);
+  const built = buildTransactionPayload(traj, { systemId, projectId, phases, phaseScreenshots });
   return {
     trajectoryId: traj.id,
-    schemaVersion: 1,
+    schemaVersion: TRANSACTION_SCHEMA_VERSION,
     ...built,
   };
 }
@@ -65,12 +72,13 @@ export default function (app) {
   /** Partner transaction envelope schema */
   app.get('/api/v2/export/transaction/schema', (_req, res) => {
     res.json({
-      schemaVersion: 1,
+      schemaVersion: TRANSACTION_SCHEMA_VERSION,
       fields: TRANSACTION_ENVELOPE_FIELDS,
       eventTypeName: EVENT_TYPE_NAME,
       actionTypeMap: ACTION_TO_ENGINE_TYPE,
       notes: [
         'Partner envelope spellings (transcation*, mothed) are intentional',
+        'V2: 每步 regionId/parentRegionId（层级作证）；每交易 phases[]（截图引用 + metadata）。旧字段拼写不变',
         // TODO: partial export (stepIds/phaseIds) + export coverage
         // TODO: placeholder
       ],
@@ -199,7 +207,7 @@ export default function (app) {
 
   async function maybePushSingle(req, res, traj, src) {
     const { systemId, projectId } = resolveSystemProject(src);
-    const result = buildOneTrajectory(traj, { systemId, projectId });
+    const result = await buildOneTrajectory(traj, { systemId, projectId });
     const dry = wantDryRun(src);
     const push = parseBool(src.push, false);
 
@@ -315,7 +323,7 @@ export default function (app) {
             });
             continue;
           }
-          const result = buildOneTrajectory(traj, { systemId, projectId });
+          const result = await buildOneTrajectory(traj, { systemId, projectId });
           buildOk += 1;
           const entry = result.payload?.transcationEventTypeList?.[0];
           if (entry) {
@@ -352,7 +360,7 @@ export default function (app) {
           return res.json(merged.payload);
         }
         return res.json({
-          schemaVersion: 1,
+          schemaVersion: TRANSACTION_SCHEMA_VERSION,
           systemId: String(systemId),
           projectId: String(projectId),
           pushed: false,
@@ -365,7 +373,7 @@ export default function (app) {
       if (!okBuilt.length) {
         return res.status(422).json({
           error: '没有可推送的交易（需为已确认 completed，且含可导出步骤）',
-          schemaVersion: 1,
+          schemaVersion: TRANSACTION_SCHEMA_VERSION,
           systemId: String(systemId),
           projectId: String(projectId),
           pushed: false,
@@ -386,7 +394,7 @@ export default function (app) {
       } catch (e) {
         return res.status(e.statusCode || 502).json({
           error: e.message,
-          schemaVersion: 1,
+          schemaVersion: TRANSACTION_SCHEMA_VERSION,
           systemId: String(systemId),
           projectId: String(projectId),
           pushed: false,
@@ -405,7 +413,7 @@ export default function (app) {
       }
 
       res.json({
-        schemaVersion: 1,
+        schemaVersion: TRANSACTION_SCHEMA_VERSION,
         systemId: String(systemId),
         projectId: String(projectId),
         pushed: true,

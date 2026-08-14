@@ -59,4 +59,27 @@ function ok(n) { console.log(`ok: ${n}`); }
   ok('mapStepToTransactionEvent region evidence');
 }
 
+{
+  const { buildTransactionEntry, buildTransactionPhases } =
+    await import('../../src/services/transaction-export.js');
+  const phases = buildTransactionPhases(
+    [{ id: 7, phaseNumber: 1 }, { id: 8, phaseNumber: 2 }],
+    [{ id: 55, trajectoryPhaseId: 7, metadataJson: { imageWidth: 1280, imageHeight: 3200, elements: [], regionTree: { pageLabel: '', roots: [] } } }],
+  );
+  assert.equal(phases.length, 2);
+  assert.equal(phases[0].screenshotId, 55);
+  assert.equal(phases[0].stitchScreenshotUrl, '/api/v2/screenshots/55/image');
+  assert.equal(phases[0].metadata.imageWidth, 1280);
+  assert.equal(phases[1].screenshotId, null);
+  assert.equal(phases[1].metadata, null);
+
+  const built = buildTransactionEntry(
+    { id: 3, name: 't', steps: [] },
+    { systemId: '98', projectId: '31', phases: [{ id: 7, phaseNumber: 1 }], phaseScreenshots: [] },
+  );
+  assert.equal(built.entry.phases.length, 1);
+  assert.equal(built.entry.phases[0].screenshotId, null);
+  ok('buildTransactionPhases + entry phases');
+}
+
 console.log('characterize-transaction-export-region: ok');

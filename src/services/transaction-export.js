@@ -46,6 +46,7 @@ export const TRANSACTION_ENVELOPE_FIELDS = Object.freeze([
   { key: 'transcationProperties', zh: '步骤/事件数组' },
   { key: 'regionId', zh: '步骤所属区域节点 id（最内层 region_id 段 role:label）' },
   { key: 'parentRegionId', zh: '父区域节点 id（上一层段；根为空串）' },
+  { key: 'phases', zh: '阶段数组（截图引用 + 元数据；旧截图 metadata 为 null）' },
 ]);
 
 function resolveOptions(entry) {
@@ -124,10 +125,36 @@ export function uniquifyPropertiesNames(properties) {
 }
 
 /**
+ * Build phases[] for one transaction: per-phase screenshot reference + metadata.
+ * @param {Array<{ id: number, phaseNumber: number }>} [phases]
+ * @param {Array<{ id: number, trajectoryPhaseId: number, metadataJson?: object|null }>} [phaseScreenshots]
+ * @returns {Array<{ phaseId: number|null, phaseNumber: number, screenshotId: number|null, stitchScreenshotUrl: string|null, metadata: object|null }>}
+ */
+export function buildTransactionPhases(phases = [], phaseScreenshots = []) {
+  const byPhase = new Map();
+  for (const s of phaseScreenshots || []) {
+    if (s?.trajectoryPhaseId != null && !byPhase.has(Number(s.trajectoryPhaseId))) {
+      byPhase.set(Number(s.trajectoryPhaseId), s);
+    }
+  }
+  return (phases || []).map((p) => {
+    const shot = p?.id != null ? byPhase.get(Number(p.id)) || null : null;
+    const screenshotId = shot ? Number(shot.id) : null;
+    return {
+      phaseId: p?.id != null ? Number(p.id) : null,
+      phaseNumber: p?.phaseNumber != null ? Number(p.phaseNumber) : 0,
+      screenshotId,
+      stitchScreenshotUrl: screenshotId ? `/api/v2/screenshots/${screenshotId}/image` : null,
+      metadata: shot?.metadataJson ?? null,
+    };
+  });
+}
+
+/**
  * Build one transaction entry (inside transcationEventTypeList).
  * @returns {{ entry: object, count: number, skipped: object, stats: object }}
  */
-export function buildTransactionEntry(traj, { systemId, projectId } = {}) {
+export function buildTransactionEntry(traj, { systemId, projectId, phases, phaseScreenshots } = {}) {
   if (systemId == null || systemId === '' || projectId == null || projectId === '') {
     const err = new Error('systemId and projectId are required');
     err.statusCode = 400;
@@ -163,6 +190,7 @@ export function buildTransactionEntry(traj, { systemId, projectId } = {}) {
       transcationType: 'web',
       testFrame: 'playwright',
       transcationProperties: properties,
+      phases: buildTransactionPhases(phases, phaseScreenshots),
     },
     count: properties.length,
     skipped: { metaActions },

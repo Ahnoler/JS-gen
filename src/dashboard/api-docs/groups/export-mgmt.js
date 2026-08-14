@@ -128,11 +128,14 @@ export const GROUP_EXPORT = [
         summary: 'Partner transaction 字段契约',
         desc: '返回导入体字段说明（外层 transcationEventTypeList；轨内 transcationProperties 等）。',
         respExample: J({
-          schemaVersion: 1,
+          schemaVersion: 2,
           fields: [
             { key: 'transcationEventTypeList', zh: '交易列表（单轨也包一层数组）' },
             { key: 'transcationProperties', zh: '事件步骤数组' },
             { key: 'testFrame', zh: '框架（默认 playwright）' },
+            { key: 'regionId', zh: '步骤所属区域节点 id' },
+            { key: 'parentRegionId', zh: '父区域节点 id' },
+            { key: 'phases', zh: '阶段数组（截图引用 + 元数据）' },
           ],
         }),
       },
@@ -168,7 +171,7 @@ export const GROUP_EXPORT = [
         ],
         reqExample: J({ trajectoryIds: [36], systemId: '98', projectId: '31' }),
         respExample: J({
-          schemaVersion: 1,
+          schemaVersion: 2,
           systemId: '98',
           projectId: '31',
           pushed: true,
@@ -181,6 +184,7 @@ export const GROUP_EXPORT = [
           '无 access_token（头/body/env）→ 400',
           '对方业务失败 → 502，不翻转 isExport',
           '仅 completed（已确认）可推送；draft/recording/failed 等 → item 失败 code=not_pushable_status（单轨 push → 409）',
+          '每交易含 phases[]：阶段截图引用 + metadata（imageWidth/imageHeight/elements/regionTree）；前端经 stitchScreenshotUrl 拉图后按坐标动态高亮',
         ],
       },
     ],
