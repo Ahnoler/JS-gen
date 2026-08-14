@@ -436,16 +436,16 @@ export class SessionManager {
           requestId: requestId || null,
           sessionId,
           pngBase64: null,
-          hitCount: 0,
+          meta: null,
           error: 'BiB not attached - call record/prepare (stream) first',
         };
       }
-      const captured = await bib.capturePhaseHighlight(targets || []);
+      const captured = await bib.capturePhaseHighlight();
       return {
         requestId: requestId || null,
         sessionId,
         pngBase64: captured.pngBase64,
-        hitCount: captured.hitCount,
+        meta: captured.meta || null,
         error: null,
       };
     } catch (err) {
@@ -453,7 +453,7 @@ export class SessionManager {
         requestId: requestId || null,
         sessionId,
         pngBase64: null,
-        hitCount: 0,
+        meta: null,
         error: err?.message || String(err),
       };
     }

@@ -215,11 +215,15 @@ function ok(n) { console.log(`ok: ${n}`); }
 }
 
 {
-  const runner = readFileSync(join(root, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf8');
-  assert.match(runner, /capturePhaseHighlightScreenshot/);
   const handler = readFileSync(join(root, 'executor/session-handler.js'), 'utf8');
   assert.match(handler, /bib_phase_highlight_capture/);
-  ok('runner + executor wire cues');
+  const manager = readFileSync(join(root, 'executor/session-manager.js'), 'utf8');
+  assert.match(manager, /meta: captured\.meta/);
+  const agent = readFileSync(join(root, 'executor/agent.mjs'), 'utf8');
+  assert.match(agent, /meta: result\.meta/);
+  const bib = readFileSync(join(root, 'executor/bib-bridge.js'), 'utf8');
+  assert.match(bib, /runPhaseScreenshotCapture/);
+  ok('executor wire meta cues');
 }
 
 {

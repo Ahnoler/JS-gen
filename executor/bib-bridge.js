@@ -494,11 +494,11 @@ export class BibBridge {
     });
   }
 
-  async capturePhaseHighlight(targets) {
-    const { runPhaseHighlightCapture } = await import('../src/cdp/phase-highlight-capture.js');
+  async capturePhaseHighlight() {
+    const { runPhaseScreenshotCapture } = await import('../src/cdp/phase-screenshot-capture.js');
     if (!this.client) throw new Error('BiB not attached');
-    const { buffer, hitCount } = await runPhaseHighlightCapture(this.client, targets || []);
-    return { pngBase64: buffer.toString('base64'), hitCount };
+    const { buffer, meta } = await runPhaseScreenshotCapture(this.client);
+    return { pngBase64: buffer.toString('base64'), meta };
   }
 
   async detach() {

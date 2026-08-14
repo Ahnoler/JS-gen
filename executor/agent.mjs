@@ -152,7 +152,7 @@ const client = new ExecutorWsClient({
           sessionId: msg.payload?.sessionId,
           requestId: result.requestId || msg.payload?.requestId,
           pngBase64: result.pngBase64 || null,
-          hitCount: result.hitCount ?? 0,
+          meta: result.meta || null,
           error: result.error || null,
         });
       } else if (msg.type === 'session.bib_input' && result?.clipboard) {
