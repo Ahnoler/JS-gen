@@ -324,7 +324,7 @@ export async function attachTrajectoryLive(trajectoryId) {
 }
 
 /**
- * Disconnect stream only (浏览器置 idle，清 FK，live→draft). Agent session kept.
+ * Disconnect stream only (浏览器置 idle，清 FK，录制中(非AI)→draft). Agent session kept.
  * Idempotent when already disconnected.
  */
 export async function detachTrajectoryStream(trajectoryId) {
@@ -486,7 +486,7 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
 
 /**
  * Best-effort cleanup after control-plane restart using DB bindings only
- * (runtime map may be empty). Corrects live/recording → draft when requested.
+ * (runtime map may be empty). 录制中(非AI)→draft；AI活跃→failed when requested.
  */
 export async function cleanupPersistedTrajectoryResources(trajectoryId, {
   demoteLive = true,

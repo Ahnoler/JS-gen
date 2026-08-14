@@ -137,7 +137,7 @@ const sess = readFileSync(join(ROOT, 'src/routes/browser-session/session-message
 assert.match(sess, /appendPhaseDoneLog/);
 assert.match(sess, /session\.aiRecording/);
 const attach = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-attach-runner.js'), 'utf-8');
-assert.match(attach, /currentStatus !== 'recording'/);
+assert.match(attach, /isAiRecordingActive\(tid\)/);
 const hub = readFileSync(join(ROOT, 'src/executor-event-hub.js'), 'utf-8');
 assert.match(hub, /promise\.cancel = cancel/);
 

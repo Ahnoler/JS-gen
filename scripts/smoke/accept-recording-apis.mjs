@@ -3,13 +3,13 @@
  *
  * Product path contract:
  *   analyze → POST /trajectories (name, requirement, phases[])
- *   → POST /trajectories/:id/record/prepare   (idempotent attach + phases + live status)
+ *   → POST /trajectories/:id/record/prepare   (idempotent attach + phases + recording status)
  *   → POST /trajectories/:id/record/start     ({ phaseIds? })  // login already in prepare
  *   → POST /trajectories/:id/steps/replay     ({ stepIds, isReplay })
  *   → POST /trajectories/:id/clear
  *   → PATCH /trajectories/:id                 ({ systemAccountId })
  *   → POST /trajectories/:id/manual-record    ({ enabled, phaseId? } empty phaseId = last phase)
- *   → POST /trajectories/:id/record/stop      ({ success? } → recorded|draft; does not detach)
+ *   → POST /trajectories/:id/record/stop      ({ success? } → recorded|failed; does not detach)
  *   → POST /trajectories/:id/stream/detach    (disconnect BiB only; browser idle)
  *   → PATCH /trajectory-steps/:id/confirm
  *   → GET /trajectories/:id/tree
@@ -235,8 +235,8 @@ async function main() {
     const { getDB, closeDB } = await import('../config/database.js');
     const knex = getDB();
 
-    // R5/R8: recording 门控 409
-    await knex('trajectory').where({ id: trajId }).update({ record_status: 'recording' });
+    // R5/R8: AI 录制中门控 409（活跃判定=phase.status='running'）
+    await knex('trajectory_phase').where({ trajectory_id: trajId }).update({ status: 'running' });
     const manual409 = await req('POST', `/api/v2/trajectories/${trajId}/manual-record`, {
       enabled: true,
       phaseId: phaseIds[0],
@@ -246,7 +246,7 @@ async function main() {
     } else {
       fail('manual-record 409 门控', `status=${manual409.status}`);
     }
-    await knex('trajectory').where({ id: trajId }).update({ record_status: 'draft' });
+    await knex('trajectory_phase').where({ trajectory_id: trajId }).update({ status: 'pending' });
 
     // R8: manual with phaseId
     const targetPhase = phaseIds[1] || phaseIds[0];
@@ -343,8 +343,8 @@ async function main() {
         if (trajRow?.record_status === 'recording') {
           pass('POST record/start + phaseIds 已进入 recording', '超时 → record/stop');
           const stopAbort = await req('POST', `/api/v2/trajectories/${trajId}/record/stop`, { success: false });
-          if (stopAbort.status === 200 && stopAbort.json?.recordStatus === 'draft') {
-            pass('POST record/stop 取消 AI', 'recordStatus=draft');
+          if (stopAbort.status === 200 && stopAbort.json?.recordStatus === 'failed') {
+            pass('POST record/stop 取消 AI', 'recordStatus=failed');
           } else {
             fail('POST record/stop 取消', `status=${stopAbort.status}`);
           }

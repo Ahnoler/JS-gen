@@ -4,7 +4,7 @@
  * Covers:
  *   - facade module surface (query / step / account / recording / persist / phase / meta re-exports)
  *   - focused modules loadable directly (persist / phase / meta)
- *   - recordStatus enum + stop → recorded|draft, detached:false (≠ detach)
+ *   - recordStatus enum + stop → recorded|failed, detached:false (≠ detach)
  *   - action log → stepFromActionLog → element xpath_smart preference
  *   - stepsToActionEntries / trajectoryStepToActionEntry for assemble/replay
  *   - buildLoginInstruction / buildStepsFromFlow / buildStepsFromActionFile
@@ -50,7 +50,7 @@ function assert(cond, msg) {
 }
 
 function testStatusEnums() {
-  for (const s of ['draft', 'live', 'recording', 'recorded', 'completed']) {
+  for (const s of ['draft', 'recording', 'failed', 'recorded', 'completed']) {
     assert(TRAJECTORY_RECORD_STATUSES.includes(s), `missing recordStatus: ${s}`);
   }
   for (const s of ['pending', 'running', 'completed', 'failed']) {
@@ -164,9 +164,9 @@ function testStopDoesNotDetach() {
     'stopTrajectoryRecording must return detached: false',
   );
   assert(
-    /recordStatus\s*=\s*success\s*\?\s*'recorded'\s*:\s*'draft'/.test(src)
-      || (src.includes("'recorded'") && src.includes("'draft'")),
-    'stop must map success→recorded / !success→draft',
+    /recordStatus\s*=\s*success\s*\?\s*'recorded'\s*:\s*'failed'/.test(src)
+      || (src.includes("'recorded'") && src.includes("'failed'")),
+    'stop must map success→recorded / !success→failed',
   );
   assert(
     !/\bdetachTrajectoryLive\b/.test(src),

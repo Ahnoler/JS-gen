@@ -309,7 +309,7 @@ export default function (app) {
             items.push({
               trajectoryId: id,
               ok: false,
-              error: `只能推送状态为「录制完成」的交易（当前: ${status ?? 'unknown'}）`,
+              error: `只能推送状态为「已确认」的交易（当前: ${status ?? 'unknown'}）`,
               code: 'not_pushable_status',
               recordStatus: status,
             });
@@ -364,7 +364,7 @@ export default function (app) {
 
       if (!okBuilt.length) {
         return res.status(422).json({
-          error: '没有可推送的交易（需为录制完成/已确认，且含可导出步骤）',
+          error: '没有可推送的交易（需为已确认 completed，且含可导出步骤）',
           schemaVersion: 1,
           systemId: String(systemId),
           projectId: String(projectId),

@@ -23,7 +23,7 @@ export function assertPushableForPartner(traj) {
   const status = getRecordStatus(traj);
   if (!isPushableRecordStatus(status)) {
     const err = new Error(
-      `只能推送状态为「录制完成」的交易（当前: ${status ?? 'unknown'}）`,
+      `只能推送状态为「已确认」的交易（当前: ${status ?? 'unknown'}）`,
     );
     err.statusCode = 409;
     err.code = 'not_pushable_status';

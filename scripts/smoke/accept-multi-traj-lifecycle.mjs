@@ -122,7 +122,8 @@ async function main() {
   console.log('\n[API] stream/detach idempotent');
   for (const tid of [t1, t2]) {
     const det = await req('POST', `/api/v2/trajectories/${tid}/stream/detach`, {});
-    if (det.status === 200 && det.json?.streamDetached === true && det.json?.sessionKept === true) {
+    if (det.status === 200 && det.json?.streamDetached === true && det.json?.sessionKept === true
+        && det.json?.recordStatus === 'draft') {
       pass(`stream/detach traj #${tid}`, `recordStatus=${det.json.recordStatus}`);
     } else if (det.status === 200) {
       pass(`stream/detach traj #${tid} (200)`, JSON.stringify(det.json).slice(0, 120));

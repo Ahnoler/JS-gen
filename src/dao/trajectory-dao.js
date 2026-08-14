@@ -247,7 +247,7 @@ export async function listStaleRemoteMounts() {
 }
 
 /**
- * Repair stale trajectory.remote_session_id pointers (and demote live→draft).
+ * Repair stale trajectory.remote_session_id pointers (and demote 非AI录制中→draft).
  * @returns {Promise<number[]>} cleared trajectory ids
  */
 export async function repairStaleRemoteMounts(trx = null) {
