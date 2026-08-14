@@ -11,6 +11,7 @@ const META_COLS = [
   'screenshot.trajectory_step_id',
   'screenshot.trajectory_phase_id',
   'screenshot.kind',
+  'screenshot.metadata_json',
   'screenshot.created_at',
 ];
 
@@ -73,6 +74,7 @@ export async function replaceForPhase(screenshot) {
   const fileSize = screenshot.fileSize || (imageData ? imageData.length : 0);
   const mimeType = screenshot.mimeType || 'image/png';
   const trajectoryId = screenshot.trajectoryId != null ? Number(screenshot.trajectoryId) : null;
+  const metadataJson = screenshot.metadataJson ?? null;
 
   const db = getDB();
   const phaseExists = await db('trajectory_phase').where({ id: phaseId }).first('id');
@@ -84,14 +86,15 @@ export async function replaceForPhase(screenshot) {
 
   await db.raw(
     `INSERT INTO \`${TABLE}\`
-      (image_data, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind)
-     VALUES (?, ?, ?, ?, NULL, ?, ?)
+      (image_data, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind, metadata_json)
+     VALUES (?, ?, ?, ?, NULL, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
       image_data = VALUES(image_data),
       file_size = VALUES(file_size),
       mime_type = VALUES(mime_type),
-      trajectory_id = VALUES(trajectory_id)`,
-    [imageData, fileSize, mimeType, trajectoryId, phaseId, kind],
+      trajectory_id = VALUES(trajectory_id),
+      metadata_json = VALUES(metadata_json)`,
+    [imageData, fileSize, mimeType, trajectoryId, phaseId, kind, metadataJson],
   );
 
   const row = await db(TABLE)
@@ -99,6 +102,21 @@ export async function replaceForPhase(screenshot) {
     .where({ trajectory_phase_id: phaseId, kind })
     .first();
   return row?.id != null ? Number(row.id) : null;
+}
+
+export async function listPhaseHighlightsByTrajectory(trajectoryId) {
+  const rows = await getDB()(TABLE)
+    .select('id', 'trajectory_phase_id', 'metadata_json')
+    .where({ trajectory_id: trajectoryId, kind: 'phase_highlight' });
+  return fromDbRows(rows).map((r) => {
+    let metadataJson = null;
+    if (r.metadataJson != null && typeof r.metadataJson === 'string') {
+      try { metadataJson = JSON.parse(r.metadataJson); } catch { metadataJson = null; }
+    } else if (r.metadataJson != null) {
+      metadataJson = r.metadataJson;
+    }
+    return { id: r.id, trajectoryPhaseId: r.trajectoryPhaseId, metadataJson };
+  });
 }
 
 export async function getImage(id) {

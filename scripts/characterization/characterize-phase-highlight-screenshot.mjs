@@ -37,33 +37,12 @@ function ok(n) { console.log(`ok: ${n}`); }
   assert.match(dao, /export async function replaceForPhase/);
   assert.match(dao, /uk_ss_phase_kind|trajectory_phase_id/);
   assert.match(dao, /phase_highlight/);
+  assert.match(dao, /metadata_json/);
+  assert.match(dao, /listPhaseHighlightsByTrajectory/);
   const svc = readFileSync(join(root, 'src/services/screenshot-service.js'), 'utf8');
   assert.match(svc, /replacePhaseHighlightScreenshot/);
+  assert.match(svc, /metadataJson/);
   ok('dao+service replaceForPhase');
-}
-
-{
-  const { collectHighlightTargets } = await import('../../src/models/phase-highlight-targets.js');
-  const out = collectHighlightTargets([
-    { actionType: 'save_form_snapshot', element: { xpath_smart: '//meta' } },
-    {
-      actionType: 'fill_form_field',
-      element: {
-        xpath_smart: "//input[@id='a']",
-        xpath_full: '/html/body/input',
-        region_id: 'section:概况',
-        region_label: '对公客户概况',
-      },
-    },
-    { actionType: 'click_element_by_index', elementJson: { xpath_smart: "//button[.='保存']" } },
-    { actionType: 'fill_form_field', element: {} },
-  ]);
-  assert.equal(out.length, 2);
-  assert.equal(out[0].xpath_smart, "//input[@id='a']");
-  assert.equal(out[0].region_label, '对公客户概况');
-  assert.equal(out[1].xpath_smart, "//button[.='保存']");
-  assert.ok(!out.some((t) => t.xpath_smart === '//meta'));
-  ok('collectHighlightTargets drops meta and empty xpath');
 }
 
 {
@@ -199,10 +178,11 @@ function ok(n) { console.log(`ok: ${n}`); }
 
 {
   const src = readFileSync(join(root, 'src/services/trajectory/phase-highlight-screenshot.js'), 'utf8');
-  assert.match(src, /export async function capturePhaseHighlightScreenshot/);
-  assert.match(src, /collectHighlightTargets/);
-  assert.match(src, /runPhaseHighlightCapture/);
-  assert.match(src, /replacePhaseHighlightScreenshot/);
+  assert.match(src, /export async function capturePhaseScreenshot/);
+  assert.match(src, /runPhaseScreenshotCapture/);
+  assert.match(src, /deriveRegionRef/);
+  assert.match(src, /assembleRegionTree/);
+  assert.match(src, /metadataJson: JSON\.stringify\(metadata\)/);
   assert.match(src, /stitchScreenshotId/);
   assert.match(src, /console\.warn/);
   ok('orchestrator fail-soft cues');
@@ -229,7 +209,7 @@ function ok(n) { console.log(`ok: ${n}`); }
 {
   const runner = readFileSync(join(root, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf8');
   assert.match(runner, /_persistDrain/);
-  assert.match(runner, /capturePhaseHighlightScreenshot/);
+  assert.match(runner, /capturePhaseScreenshot/);
   ok('runner drains persist before phase highlight');
 }
 

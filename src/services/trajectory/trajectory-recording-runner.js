@@ -435,15 +435,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       await broadcastRecordingLock();
       await Promise.resolve(runtime._persistDrain).catch(() => {});
       try {
-        const { capturePhaseHighlightScreenshot } = await import('./phase-highlight-screenshot.js');
-        await capturePhaseHighlightScreenshot({
+        const { capturePhaseScreenshot } = await import('./phase-highlight-screenshot.js');
+        await capturePhaseScreenshot({
           trajectoryId: tid,
           phaseId: phase.id,
           sessionId: runtime.sessionId,
           executorNodeUuid: runtime.executorNodeUuid,
         });
       } catch (err) {
-        console.warn('[record] phase highlight screenshot skipped:', err?.message || err);
+        console.warn('[record] phase screenshot skipped:', err?.message || err);
       }
       events.push({ type: 'phase_done', phaseNumber: phase.phaseNumber, description: phase.description });
     }

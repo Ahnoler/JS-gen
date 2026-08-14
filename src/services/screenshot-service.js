@@ -30,6 +30,7 @@ export async function replacePhaseHighlightScreenshot(trajectoryPhaseId, {
   trajectoryId = null,
   buffer,
   mimeType = 'image/png',
+  metadataJson = null,
 } = {}) {
   const phaseId = Number(trajectoryPhaseId);
   if (!Number.isFinite(phaseId) || phaseId <= 0) throw new Error('trajectoryPhaseId required');
@@ -41,6 +42,7 @@ export async function replacePhaseHighlightScreenshot(trajectoryPhaseId, {
     imageData: buf,
     fileSize: buf.length,
     mimeType,
+    metadataJson,
   });
 }
 

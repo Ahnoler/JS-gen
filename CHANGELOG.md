@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-15: 阶段截图 V2：phase_done 长图不再烘焙元素高亮；`screenshot.metadata_json` 记录截图长宽 + 全部可见 L2 控件坐标（拼接图内容坐标）+ region_tree；录制链路 `capturePhaseHighlightScreenshot` → `capturePhaseScreenshot`。
+  影响范围：src/services/trajectory 录制链路、executor `session.bib_phase_highlight_capture`（消息名不变，payload `hitCount` → `meta`）。
+  文件：src/dao/screenshot-dao.js, src/services/screenshot-service.js, src/services/trajectory/phase-highlight-screenshot.js, src/services/trajectory/trajectory-recording-runner.js, src/models/phase-highlight-targets.js（删除）, scripts/characterization/characterize-phase-highlight-screenshot.mjs
+  Python 同步提示：executor 桥接为 JS-gen executor 内部实现，Python 控制面无需改动；前端契约见 /api/v2/export/transaction/schema（Task 6）。
+
 - 2026-08-13: **分区拼接（tab / 向导 / titlebox）**：`assignRegion` 在 overlay/表格/待办/壳短路之后，把内容 tab 或向导当前步、collapse、最近 titlebox 拼成 `region_label`（` / `）与 `region_id`（`|`）；collapse 标题剥尾部动作字。撞车 refine 不再把路径打回单独 titlebox。`display_group` 仍等于中文路径。
   影响范围：扫描 / resolve / 录制 `element_json` 的 `region_*` 与 `display_group`；无 schema。
   文件：src/cdp/page-locator-helpers.js, src/cdp/display-group.js, src/cdp/resolve-by-label.js, src/models/element.js
