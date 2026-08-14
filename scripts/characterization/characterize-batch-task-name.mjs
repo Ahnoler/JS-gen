@@ -55,6 +55,17 @@ async function main() {
     assert.ok(mig.includes("from '../src/services/trajectory/batch-job-name.js'"), 'shared module import');
   });
 
+  run('migration 2: trajectory.batch_job_id (UUID, FK) + init.sql column only', () => {
+    const mig = readFileSync(join(ROOT, 'migrations', '20260814110000_trajectory_batch_job.js'), 'utf8');
+    assert.ok(mig.includes("t.string('batch_job_id', 36)"), 'batch_job_id VARCHAR(36)');
+    assert.ok(mig.includes('fk_traj_batch_job'), 'FK constraint');
+    assert.ok(mig.includes('ON DELETE SET NULL'), 'FK on delete set null');
+    const init = readFileSync(join(ROOT, 'schemas', 'init.sql'), 'utf8');
+    assert.ok(init.includes('`batch_job_id`       VARCHAR(36)'), 'init.sql column');
+    assert.ok(init.includes('KEY `idx_batch_job_id`'), 'init.sql index');
+    assert.ok(!init.includes('fk_traj_batch_job'), 'init.sql must NOT contain the FK');
+  });
+
   const failedCount = failed;
   console.log(failedCount ? `\n${failedCount} failed` : '\nall ok');
   process.exit(failedCount ? 1 : 0);
