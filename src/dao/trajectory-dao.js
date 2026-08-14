@@ -37,28 +37,66 @@ function applyListFilters(query, { keyword, recordStatus } = {}) {
   if (keyword && String(keyword).trim()) {
     const kw = `%${String(keyword).trim()}%`;
     query.where(function () {
-      this.where('name', 'like', kw).orWhere('task', 'like', kw);
+      this.where('t.name', 'like', kw).orWhere('t.task', 'like', kw);
     });
   }
   const statuses = parseRecordStatuses(recordStatus);
   if (statuses) {
-    query.whereIn('record_status', statuses);
+    query.whereIn('t.record_status', statuses);
   }
   return query;
 }
 
+function applyBatchTaskNameFilter(query, batchTaskName) {
+  const v = batchTaskName == null ? '' : String(batchTaskName).trim();
+  if (v) {
+    query.where('bj.name', 'like', `%${v}%`);
+  }
+  return query;
+}
+
+const RECORD_STATUS_STATS = ['draft', 'live', 'recording', 'recorded', 'completed'];
+
+/**
+ * 五档统计：与行查询同基准过滤（functionId/keyword/batchTaskName），忽略 recordStatus。
+ * @returns {Promise<{ total: number, draft: number, live: number, recording: number, recorded: number, completed: number }>}
+ */
+export async function countByRecordStatus({ functionId = null, keyword = null, batchTaskName = null } = {}) {
+  const db = getDB();
+  const base = db({ t: TABLE })
+    .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
+  if (functionId != null && Number.isFinite(Number(functionId))) {
+    base.where('t.function_id', Number(functionId));
+  }
+  applyListFilters(base, { keyword, recordStatus: null });
+  applyBatchTaskNameFilter(base, batchTaskName);
+  const rows = await base
+    .select('t.record_status as recordStatus')
+    .count('* as cnt')
+    .groupBy('t.record_status');
+  const stats = { total: 0 };
+  for (const s of RECORD_STATUS_STATS) stats[s] = 0;
+  for (const r of rows) {
+    const key = String(r.recordStatus);
+    const n = Number(r.cnt) || 0;
+    stats.total += n;
+    if (key in stats) stats[key] = n;
+  }
+  return stats;
+}
+
 const SORT_COL_MAP = {
-  created_at: 'created_at',
-  createdAt: 'created_at',
-  updated_at: 'updated_at',
-  updatedAt: 'updated_at',
-  name: 'name',
-  step_count: 'step_count',
-  stepCount: 'step_count',
-  phase_count: 'phase_count',
-  phaseCount: 'phase_count',
-  record_status: 'record_status',
-  recordStatus: 'record_status',
+  created_at: 't.created_at',
+  createdAt: 't.created_at',
+  updated_at: 't.updated_at',
+  updatedAt: 't.updated_at',
+  name: 't.name',
+  step_count: 't.step_count',
+  stepCount: 't.step_count',
+  phase_count: 't.phase_count',
+  phaseCount: 't.phase_count',
+  record_status: 't.record_status',
+  recordStatus: 't.record_status',
 };
 
 /**
@@ -279,20 +317,25 @@ export async function getById(id) {
 }
 
 export async function listByFunction(functionId, {
-  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus,
+  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null,
 } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
-  const query = applyListFilters(db(TABLE).where({ function_id: functionId }), {
-    keyword,
-    recordStatus,
-  });
+  const base = db({ t: TABLE })
+    .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id')
+    .where('t.function_id', functionId);
+  const query = applyListFilters(base, { keyword, recordStatus });
+  applyBatchTaskNameFilter(query, batchTaskName);
 
-  const sortCol = SORT_COL_MAP[sortBy] || 'created_at';
+  const sortCol = SORT_COL_MAP[sortBy] || 't.created_at';
   const sortOrder = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
 
   const [{ total }] = await query.clone().count('* as total');
-  const rows = await query.clone().orderBy(sortCol, sortOrder).limit(pageSize).offset(offset);
+  const rows = await query.clone()
+    .select('t.*', 'bj.name as batchTaskName')
+    .orderBy(sortCol, sortOrder)
+    .limit(pageSize)
+    .offset(offset);
   const entities = fromDbRows(rows);
 
   // Attach phase counts for hierarchy UI
@@ -303,21 +346,29 @@ export async function listByFunction(functionId, {
       .count('* as phases');
     e.phaseCount = Number(phases) || 0;
   }
-  return { rows: entities, total, page, pageSize };
+  const stats = await countByRecordStatus({ functionId, keyword, batchTaskName });
+  return { rows: entities, total, page, pageSize, stats };
 }
 
 export async function list({
-  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus,
+  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null,
 } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
-  const query = applyListFilters(db(TABLE), { keyword, recordStatus });
+  const base = db({ t: TABLE })
+    .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
+  const query = applyListFilters(base, { keyword, recordStatus });
+  applyBatchTaskNameFilter(query, batchTaskName);
 
-  const sortCol = SORT_COL_MAP[sortBy] || 'created_at';
+  const sortCol = SORT_COL_MAP[sortBy] || 't.created_at';
   const sortOrder = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
 
   const [{ total }] = await query.clone().count('* as total');
-  const rows = await query.orderBy(sortCol, sortOrder).limit(pageSize).offset(offset);
+  const rows = await query.clone()
+    .select('t.*', 'bj.name as batchTaskName')
+    .orderBy(sortCol, sortOrder)
+    .limit(pageSize)
+    .offset(offset);
   const entities = fromDbRows(rows);
   for (const e of entities) {
     e.isExport = Number(e.isExport) ? 1 : 0;
@@ -326,7 +377,8 @@ export async function list({
       .count('* as phases');
     e.phaseCount = Number(phases) || 0;
   }
-  return { rows: entities, total, page, pageSize };
+  const stats = await countByRecordStatus({ keyword, batchTaskName });
+  return { rows: entities, total, page, pageSize, stats };
 }
 
 export async function remove(id) {

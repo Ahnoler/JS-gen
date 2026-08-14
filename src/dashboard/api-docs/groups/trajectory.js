@@ -53,14 +53,17 @@ export const GROUP_TRAJECTORY = [
           },
           { name: 'sortBy', type: 'string', in: 'query', desc: 'created_at | name | step_count | record_status' },
           { name: 'order', type: 'string', in: 'query', desc: 'asc | desc' },
+          { name: 'batchTaskName', type: 'string', in: 'query', desc: '按所属批量导入任务名模糊筛选（空=不过滤；LIKE %值%）', example: '批量录制导入模板' },
         ],
         respExample: J({
           rows: [{
             id: 42, name: '开户交易', task: '需求描述',
             recordStatus: 'draft', isExport: 0, stepCount: 0, phaseCount: 3,
             functionId: 3, systemAccountId: 10, model: 'deepseek-v4-flash',
+            batchTaskName: '批量录制导入模板_0814-1251',
           }],
-          total: 1, page: 1, pageSize: 20,
+          total: 42, page: 1, pageSize: 20,
+          stats: { total: 42, draft: 8, live: 2, recording: 5, recorded: 20, completed: 7 },
         }),
       },
       {

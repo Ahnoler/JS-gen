@@ -65,6 +65,7 @@ export default function (app) {
         order,
         recordStatus,
         status,
+        batchTaskName,
       } = req.query;
       const statusRaw = recordStatus ?? status;
       const bad = trajectoryDao.invalidRecordStatuses(statusRaw);
@@ -81,6 +82,7 @@ export default function (app) {
         sortBy,
         order,
         recordStatus: statusRaw,
+        batchTaskName: batchTaskName ?? null,
       };
       const result = functionId
         ? await trajectoryService.listByFunction(+functionId, pagination)

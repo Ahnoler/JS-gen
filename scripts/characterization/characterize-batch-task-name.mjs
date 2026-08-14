@@ -86,6 +86,21 @@ async function main() {
     assert.ok(analyze.includes('batchJobId: job.id'), 'analyze passes job.id');
   });
 
+  run('trajectory list: join / fuzzy filter / stats', () => {
+    const dao = readFileSync(join(ROOT, 'src', 'dao', 'trajectory-dao.js'), 'utf8');
+    assert.ok(dao.includes("leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id')"), 'left join');
+    assert.ok(dao.includes("query.where('bj.name', 'like', `%${v}%`)"), 'fuzzy filter');
+    assert.ok(dao.includes("select('t.*', 'bj.name as batchTaskName')"), 'row field');
+    assert.ok(dao.includes('countByRecordStatus({ functionId, keyword, batchTaskName })'), 'stats by function');
+    assert.ok(dao.includes('countByRecordStatus({ keyword, batchTaskName })'), 'stats without function');
+    assert.ok(dao.includes("const stats = { total: 0 };"), 'stats shape');
+    const route = readFileSync(join(ROOT, 'src', 'routes', 'v2', 'trajectory.js'), 'utf8');
+    assert.ok(route.includes('batchTaskName: batchTaskName ?? null'), 'route passes param');
+    const docs = readFileSync(join(ROOT, 'src', 'dashboard', 'api-docs', 'groups', 'trajectory.js'), 'utf8');
+    assert.ok(docs.includes("name: 'batchTaskName', type: 'string'"), 'api-docs param');
+    assert.ok(docs.includes('batchTaskName: \'批量录制导入模板_0814-1251\''), 'api-docs example');
+  });
+
   const failedCount = failed;
   console.log(failedCount ? `\n${failedCount} failed` : '\nall ok');
   process.exit(failedCount ? 1 : 0);
