@@ -35,6 +35,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-15: **region-tree 服务**：新增 `src/services/region-tree.js`——整页大树 `assembleRegionTree`（前缀合并 / other 桶 / PR-LAYER page 只当根）+ 每步层级推导 `deriveRegionRef`（回退链：layers → region_id 按 `|` 拆 → region_label/display_group 按 ` / ` 拆 → 空串），为批量推送 V2.0 层级作证与阶段截图元数据组树提供公共依赖；`scripts/characterization/characterize-region-tree.mjs` 作证。
+  影响范围：Node 侧新增纯函数服务；无 schema、无路由、无 HTTP 变更。
+  文件：src/services/region-tree.js, scripts/characterization/characterize-region-tree.mjs
+  Python 同步提示：无（纯 Node 服务；Python 不迁 scripts）；导出 envelope 形状变化在后续任务条目覆盖。
+
 - 2026-08-15: `migrations/20260815090000_screenshot_metadata_json`：`screenshot` 表新增 `metadata_json` JSON 列（阶段长图元数据：长宽/元素坐标/region_tree）。
   影响范围：screenshot schema、阶段截图捕获链路。
   文件：migrations/20260815090000_screenshot_metadata_json.js, schemas/init.sql
