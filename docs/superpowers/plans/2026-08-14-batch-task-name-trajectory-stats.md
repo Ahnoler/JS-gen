@@ -1116,5 +1116,4 @@ git commit -m "fix: message drawer batch deep link (define batchIdFromLink)"
 
 ## 已知待定（不影响本计划执行）
 
-- 用户承诺补充的第 3 条需求尚未收到；收到后可能新增任务。
-- `record_status` 五态 → 未录制/录制中/录制异常/待确认/已确认 的演进为 spec Future work TODO，本次不实现。
+- 需求清单第 3 条 = **轨迹状态二次开发 TODO**（用户已确认）：`record_status` 五态 → 未录制/录制中/录制异常/待确认/已确认；具体流转需求在实际开发时阐明，本次沿用现有流转。见 spec Future work。收到后另立 spec/plan。
