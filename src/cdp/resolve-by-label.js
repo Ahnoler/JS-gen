@@ -18,6 +18,7 @@ import { PAGE_LOCATOR_HELPERS, enrichLocatorFields } from './locator-candidates.
 import { normalizeActionName } from '../models/action-name.js';
 import { displayGroupOf, uniquifyDisplayGroups } from './display-group.js';
 import { prependPageLayer } from './region-layers.js';
+import { assembleRegionTree } from '../services/region-tree.js';
 
 /**
  * Sanitize preview (never expose form values / secrets).
@@ -608,11 +609,16 @@ export async function resolveElementByLabel(client, opts = {}) {
   }
 
   const matches = uniquifyDisplayGroups(list.map(enrichOne));
+  const regionTree = assembleRegionTree(
+    matches.map((m) => ({ layers: (m && m.element && Array.isArray(m.element.layers)) ? m.element.layers : [] })),
+    { pageLabel: pageLabel || '' },
+  );
   const truncated = pageTruncated;
   const forceAmbiguous = mode === 'inventory' && !labelText && matches.length >= 1;
   if (forceAmbiguous) {
     return {
       ambiguous: true,
+      regionTree,
       matches,
       ...(truncated ? { truncated: true } : {}),
     };
@@ -625,6 +631,7 @@ export async function resolveElementByLabel(client, opts = {}) {
   }
   return {
     ambiguous: true,
+    regionTree,
     matches,
     ...(truncated ? { truncated: true } : {}),
   };

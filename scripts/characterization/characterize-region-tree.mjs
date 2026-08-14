@@ -90,4 +90,12 @@ function ok(n) { console.log(`ok: ${n}`); }
   ok('different page labels are different roots');
 }
 
+{
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(join(root, 'src/cdp/resolve-by-label.js'), 'utf8');
+  assert.match(src, /assembleRegionTree/);
+  assert.match(src, /regionTree/);
+  ok('resolve-by-label mounts regionTree');
+}
+
 console.log('characterize-region-tree: ok');
