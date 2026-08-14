@@ -364,6 +364,8 @@ git commit -m "feat: region-tree service (deriveRegionRef + assembleRegionTree)"
 
 ### Task 3: 干净阶段截图捕获 — phase-screenshot-page.js + phase-screenshot-capture.js
 
+> **几何修正记录（2026-08-15 final review I1/I2，已落地 commit 73c3a01）：** 本节 brief 中的公式 `step = clientHeight - OVERLAP`、`y = sliceOffset + rect.top`（sliceOffset = i\*step）已被最终审查发现的两处缺陷推翻——末片 clamp 产生底部重复条带与坐标偏移；滚动根小于视口时每片丢内容带。最终实现：capture 用 `clip` 到滚动根 box（片高==容器高）、每片按**实际 scrollTop** 放置（`stitchPngSlices` 接受 `overlaps` 数组）、坐标 `x = rect.left - box.x`、`y = top_i + rect.top - box.y`（恒为内容坐标）、`contentHeight = top_last + clientHeight`。执行本任务时以最终实现为准，勿再写旧公式。
+
 **Files:**
 - Create: `src/cdp/phase-screenshot-page.js`
 - Create: `src/cdp/phase-screenshot-capture.js`

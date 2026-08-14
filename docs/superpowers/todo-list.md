@@ -106,7 +106,7 @@
 - **1448052** ↔ 全页 DOM 合约；slot-log 已就绪，等新缺陷 + 可检索日志再改。
 - **heal-locate** ↔ 级联脏录制 + 单步自愈；先判定缺席再修闸门，禁止 scroll 猎场。
 - **PR-PART** ↔ 第一刀 tab/向导/titlebox 拼接已落地；9242 湿测已跑（对公客户修改；评级向导）。
-- **PR-LAYER** ↔ 第一刀 `layers[]` 已落地；整页大树 TODO；Vue 另刀。依赖 **PR-PART**。
+- **PR-LAYER** ↔ 第一刀 `layers[]` 已落地；**整页大树已落地**（`assembleRegionTree` + 扫描/阶段树）；Vue 另刀。依赖 **PR-PART**。
 - **PR-LOC** ↔ 阶段长图本仓库已落地；**湿测已完成**。**PR-LOC-HL** 逐步截仍后置。
 - **PR-PUSH** ↔ 推送/导出闸门已完成。
 - **PR-BATCH** ↔ ① 用户隔离与 **PR-USER** 同源，未做。
