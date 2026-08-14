@@ -23,6 +23,8 @@ run() {
 run "characterize-dedup"       node scripts/characterization/characterize-dedup.mjs
 run "characterize-ctrl"        node scripts/characterization/characterize-ctrl.mjs
 run "characterize-trajectory"  node scripts/characterization/characterize-trajectory.mjs
+run "characterize-region-tree" node scripts/characterization/characterize-region-tree.mjs
+run "characterize-transaction-export-region" node scripts/characterization/characterize-transaction-export-region.mjs
 run "characterize-assembler"   python scripts/characterization/characterize-assembler-click.py
 run "characterize-form-rules"  python scripts/characterization/characterize-form-rules.py
 run "accept-replay-apis"       node scripts/smoke/accept-replay-apis.mjs

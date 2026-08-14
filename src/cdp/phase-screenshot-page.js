@@ -12,7 +12,20 @@ export function buildPhaseScreenshotScrollExpression({ top }) {
       if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 8) { root = el; break; }
     }
     root.scrollTop = ${y};
-    return { top: root.scrollTop, clientHeight: root.clientHeight, scrollHeight: root.scrollHeight };
+    const isDoc = root === document.scrollingElement || root === document.documentElement;
+    const box = isDoc
+      ? { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }
+      : (() => {
+          const r = root.getBoundingClientRect();
+          return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+        })();
+    return {
+      top: root.scrollTop,
+      clientHeight: root.clientHeight,
+      scrollHeight: root.scrollHeight,
+      box,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+    };
   })()`;
 }
 
@@ -30,6 +43,13 @@ export function buildPhaseScreenshotCollectExpression() {
       return document.scrollingElement || document.documentElement;
     }
     const root = pickScrollRoot();
+    const isDoc = root === document.scrollingElement || root === document.documentElement;
+    const box = isDoc
+      ? { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }
+      : (() => {
+          const r = root.getBoundingClientRect();
+          return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+        })();
     const hosts = collectL2Hosts();
     const out = [];
     for (let i = 0; i < hosts.length; i++) {
@@ -38,7 +58,7 @@ export function buildPhaseScreenshotCollectExpression() {
       if (host.hasAttribute('data-jsgen-rect')) continue;
       const rect = host.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) continue;
-      if (rect.bottom <= 0 || rect.top >= window.innerHeight) continue;
+      if (rect.bottom <= box.y || rect.top >= box.y + box.height) continue;
       const region = assignRegion(host);
       host.setAttribute('data-jsgen-rect', '1');
       out.push({

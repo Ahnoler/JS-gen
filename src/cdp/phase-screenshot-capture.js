@@ -21,39 +21,56 @@ async function cdpEval(client, expression) {
   return result?.result?.value;
 }
 
-async function cdpPng(client) {
-  const shot = await client.send('Page.captureScreenshot', {
+async function cdpPng(client, clip, viewport) {
+  const box = clip && typeof clip === 'object' ? clip : null;
+  const vw = viewport && typeof viewport === 'object' ? viewport : null;
+  // 滚动根 box 比视口小时 clip 到 box（片高 == clientHeight，不再把根外页面带进图）
+  const needsClip = !!box && !!vw &&
+    ((Number(vw.height) && Number(box.height) < Number(vw.height)) ||
+     (Number(vw.width) && Number(box.width) < Number(vw.width)));
+  const params = {
     format: 'png',
     fromSurface: true,
     captureBeyondViewport: false,
-  });
+  };
+  if (needsClip) {
+    params.clip = {
+      x: Number(box.x) || 0,
+      y: Number(box.y) || 0,
+      width: Number(box.width) || 0,
+      height: Number(box.height) || 0,
+      scale: 1,
+    };
+  }
+  const shot = await client.send('Page.captureScreenshot', params);
   return Buffer.from(shot.data, 'base64');
 }
 
 /**
  * 干净阶段长图：无 mark/unmark；同一遍滚动里逐片收集可见 L2 控件 rect。
- * 坐标 = 拼接图像素坐标，与 stitchPngSlices 几何完全一致：
- *   片 0：y = rect.top（片内像素行 == rect.top）；
- *   片 i>=1：sliceOffset = h0 + (i-1) * (h0 - OVERLAP)（该片在拼接图中的起始行），
- *   该片前 OVERLAP 行被 stitch 裁掉 → y = sliceOffset + rect.top - OVERLAP。
- * 滚动步长 step = h0 - OVERLAP（由真实片高驱动，而非 clientHeight）。
+ * 坐标 = 内容坐标（相对滚动根内容区，document 根时 box=(0,0)）：
+ *   片 i 元素 x = rect.left - box.x；y = top_i + (rect.top - box.y)。
+ * top_i 为 scroll eval 返回的实际 scrollTop（末片被 clamp 到 maxScroll 时即 clamp 值）；
+ * stitch 用每片实际 overlap（overlaps[i] = h0 - (top_i - top_{i-1})），clamp 片自然 > OVERLAP。
  */
 export async function runPhaseScreenshotCapture(client) {
   let scroll = { top: 0, clientHeight: 0, scrollHeight: 0 };
   let started = false;
   let origTop = 0;
   const elements = [];
-  const pushCollected = (collected, offsetY) => {
+  const pushCollected = (collected, topI, box) => {
+    const bx = Number(box?.x) || 0;
+    const by = Number(box?.y) || 0;
     for (const el of Array.isArray(collected) ? collected : []) {
       if (!el || !el.rect) continue;
       elements.push({
         kind: el.kind || '',
         text: el.text || '',
         rect: {
-          left: Number(el.rect.left) || 0,
-          top: (Number(el.rect.top) || 0) + offsetY,
-          right: Number(el.rect.right) || 0,
-          bottom: (Number(el.rect.bottom) || 0) + offsetY,
+          left: (Number(el.rect.left) || 0) - bx,
+          top: topI + ((Number(el.rect.top) || 0) - by),
+          right: (Number(el.rect.right) || 0) - bx,
+          bottom: topI + ((Number(el.rect.bottom) || 0) - by),
         },
         layers: Array.isArray(el.layers) ? el.layers : [],
         region_id: el.region_id || '',
@@ -69,36 +86,42 @@ export async function runPhaseScreenshotCapture(client) {
     origTop = Number(scroll.top) || 0;
     const clientHeight = Number(scroll.clientHeight) || 0;
     const scrollHeight = Number(scroll.scrollHeight) || 0;
+    const box = scroll.box || { x: 0, y: 0, width: 0, height: 0 };
+    const viewport = scroll.viewport || { width: 0, height: 0 };
     const slices = [];
+    const tops = [Number(scroll.top) || 0];
     let truncated = false;
-    let top = 0;
 
-    // 片 0：scroll top 0 → collect → capture；以真实 PNG 高 h0 定步长与坐标
-    await cdpEval(client, buildPhaseScreenshotScrollExpression({ top }));
-    pushCollected(await cdpEval(client, buildPhaseScreenshotCollectExpression()), 0);
-    slices.push(await cdpPng(client));
+    // 片 0：scroll top 0 → 记录实际 top_0（必为 0）→ collect → capture；h0 = PNG 实际高
+    pushCollected(await cdpEval(client, buildPhaseScreenshotCollectExpression()), tops[0], box);
+    slices.push(await cdpPng(client, box, viewport));
     const h0 = PNG.sync.read(slices[0]).height;
-    const step = Math.max(1, h0 - OVERLAP);
 
-    // 片 i>=1：先判覆盖完整则 break（不置截断标记）；否则推进、clamp、scroll、collect、capture
+    // 片 i>=1：先判覆盖完整则 break（非截断）；否则按实际 top 推进、clamp、scroll、collect、capture
     for (let i = 1; i < MAX_SLICES; i++) {
-      if (clientHeight <= 0 || top + clientHeight >= scrollHeight - 1) break;
-      top += step;
-      if (top > scrollHeight - clientHeight) top = Math.max(0, scrollHeight - clientHeight);
-      await cdpEval(client, buildPhaseScreenshotScrollExpression({ top }));
-      const sliceOffset = h0 + (i - 1) * (h0 - OVERLAP);
-      pushCollected(await cdpEval(client, buildPhaseScreenshotCollectExpression()), sliceOffset - OVERLAP);
-      slices.push(await cdpPng(client));
-      if (i === MAX_SLICES - 1 && top + clientHeight < scrollHeight - 1) truncated = true;
+      if (clientHeight <= 0 || tops[i - 1] + clientHeight >= scrollHeight - 1) break;
+      const next = Math.min(tops[i - 1] + Math.max(1, h0 - OVERLAP), scrollHeight - clientHeight);
+      const scrolled = await cdpEval(client, buildPhaseScreenshotScrollExpression({ top: next }));
+      const topI = Number(scrolled?.top) || 0;
+      pushCollected(await cdpEval(client, buildPhaseScreenshotCollectExpression()), topI, box);
+      slices.push(await cdpPng(client, box, viewport));
+      tops.push(topI);
+      if (i === MAX_SLICES - 1) truncated = true;
     }
 
-    const buffer = stitchPngSlices(slices, { overlap: OVERLAP });
+    // 每片实际 overlap（i>=1）：clamp 时 > OVERLAP，stitch 按实际值裁
+    const overlaps = [];
+    for (let i = 1; i < tops.length; i++) overlaps[i] = h0 - (tops[i] - tops[i - 1]);
+    const buffer = stitchPngSlices(slices, { overlaps });
     const dims = PNG.sync.read(buffer);
+    const topLast = tops[tops.length - 1] || 0;
+    // imageWidth/imageHeight 为 IHDR 实际值；contentWidth/contentHeight 为内容空间；
+    // stitch 12MB 降采样时二者不同，前端按 imageHeight/contentHeight 比例缩放坐标。
     return {
       buffer,
       meta: {
         contentWidth: dims.width,
-        contentHeight: h0 + (slices.length - 1) * (h0 - OVERLAP),
+        contentHeight: topLast + clientHeight,
         truncated,
         elements,
       },

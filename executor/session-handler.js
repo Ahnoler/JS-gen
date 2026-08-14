@@ -63,7 +63,6 @@ export function createSessionHandler(manager) {
         });
       case 'session.bib_phase_highlight_capture':
         return manager.bibPhaseHighlightCapture(sessionId, {
-          targets: payload.targets || [],
           requestId: payload.requestId,
         });
       case 'session.step':

@@ -428,7 +428,7 @@ export class SessionManager {
     }
   }
 
-  async bibPhaseHighlightCapture(sessionId, { targets, requestId } = {}) {
+  async bibPhaseHighlightCapture(sessionId, { requestId } = {}) {
     try {
       const bib = this.bibs.get(sessionId);
       if (!bib) {

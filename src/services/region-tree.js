@@ -52,7 +52,6 @@ export function deriveRegionRef(element = {}) {
 }
 
 function ensureChild(parent, id, role, label) {
-  const siblings = parent ? parent.children : null;
   if (parent) {
     let n = parent.children.find((c) => c.id === id && c.role === role);
     if (n) return n;

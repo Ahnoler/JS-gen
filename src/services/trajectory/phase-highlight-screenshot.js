@@ -34,10 +34,16 @@ function buildMetadata(buffer, meta) {
       outsideRoot: !!el.outsideRoot,
     };
   });
-  const regionTree = assembleRegionTree(
-    elements.map((e) => ({ layers: e.layers })),
-    { pageLabel: '' },
-  );
+  let regionTree = null;
+  try {
+    regionTree = assembleRegionTree(
+      elements.map((e) => ({ layers: e.layers })),
+      { pageLabel: '' },
+    );
+  } catch (err) {
+    // 树组装失败不丢整张截图：regionTree 落 null，元素坐标仍正常入库
+    console.warn('[record] region tree skipped:', err?.message || err);
+  }
   return {
     imageWidth: dims.width,
     imageHeight: dims.height,
