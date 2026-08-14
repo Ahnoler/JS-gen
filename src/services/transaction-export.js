@@ -13,6 +13,7 @@
  * // TODO: partial export (stepIds/phaseIds) + export coverage
  * // TODO: placeholder — wait for partner / relative xpath guidance
  */
+import { deriveRegionRef } from './region-tree.js';
 import { normalizeActionName } from '../models/action-name.js';
 import { trajectoryStepToActionEntry } from '../models/element.js';
 import {
@@ -22,6 +23,8 @@ import {
   pickOperationValue,
   SKIP_ACTIONS,
 } from './legacy-engine-export.js';
+
+export const TRANSACTION_SCHEMA_VERSION = 2;
 
 export const EVENT_TYPE_NAME = Object.freeze({
   click: '点击',
@@ -41,6 +44,8 @@ export const TRANSACTION_ENVELOPE_FIELDS = Object.freeze([
   { key: 'testFrame', zh: '框架（默认 playwright）' },
   { key: 'transcId', zh: '录制/交易 id（可选）' },
   { key: 'transcationProperties', zh: '步骤/事件数组' },
+  { key: 'regionId', zh: '步骤所属区域节点 id（最内层 region_id 段 role:label）' },
+  { key: 'parentRegionId', zh: '父区域节点 id（上一层段；根为空串）' },
 ]);
 
 function resolveOptions(entry) {
@@ -71,6 +76,7 @@ export function mapStepToTransactionEvent(step) {
 
   const params = entry.params || {};
   const element = entry.element || {};
+  const { regionId, parentRegionId } = deriveRegionRef(element);
   const { target, source } = pickExportTarget(entry);
   const options = resolveOptions(entry);
 
@@ -88,6 +94,8 @@ export function mapStepToTransactionEvent(step) {
     objectValue: pickOperationValue(action, params),
     propertiesName,
     mothed: 'By.XPATH',
+    regionId,
+    parentRegionId,
     _meta: {
       targetSource: source || null,
       missingOptions: options === '' && (eventTypeValue.startsWith('select') || eventTypeValue === 'radio'),
