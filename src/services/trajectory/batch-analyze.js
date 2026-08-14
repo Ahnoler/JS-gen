@@ -181,6 +181,7 @@ async function createDraftFromAnalyzed(item) {
         caseEntries: analysis.caseEntries || [],
         model: job.model || '',
         systemAccountId: Number(job.systemAccountId),
+        batchJobId: job.id,
         requireFunctionId: true,
         trx,
       });

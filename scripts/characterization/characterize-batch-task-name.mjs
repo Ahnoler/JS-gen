@@ -77,6 +77,15 @@ async function main() {
     assert.ok(dao.includes('name: job.name || \'\''), 'dao persists name');
   });
 
+  run('batch trajectory binding: batchJobId through save chain', () => {
+    const meta = readFileSync(join(ROOT, 'src', 'services', 'trajectory', 'trajectory-meta-service.js'), 'utf8');
+    assert.ok(meta.includes('batchJobId = null,'), 'meta accepts batchJobId');
+    const dao = readFileSync(join(ROOT, 'src', 'dao', 'trajectory-dao.js'), 'utf8');
+    assert.ok(dao.includes('batchJobId: trajectory.batchJobId ?? null'), 'dao save batchJobId');
+    const analyze = readFileSync(join(ROOT, 'src', 'services', 'trajectory', 'batch-analyze.js'), 'utf8');
+    assert.ok(analyze.includes('batchJobId: job.id'), 'analyze passes job.id');
+  });
+
   const failedCount = failed;
   console.log(failedCount ? `\n${failedCount} failed` : '\nall ok');
   process.exit(failedCount ? 1 : 0);

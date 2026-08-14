@@ -80,6 +80,7 @@ export async function save(trajectory, trx = null) {
       functionId: trajectory.functionId ?? null,
       systemAccountId: trajectory.systemAccountId ?? null,
       remoteSessionId: trajectory.remoteSessionId ?? null,
+      batchJobId: trajectory.batchJobId ?? null,
       recordStatus: trajectory.recordStatus ?? 'draft',
     }));
 

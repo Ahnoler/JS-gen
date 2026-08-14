@@ -198,6 +198,7 @@ export async function createTransactionWithPhases({
   caseEntries = undefined,
   caseData = undefined,
   requireFunctionId = false,
+  batchJobId = null,
   trx = null,
 } = {}) {
   let resolvedFunctionId;
@@ -233,6 +234,7 @@ export async function createTransactionWithPhases({
       functionId: resolvedFunctionId,
       systemAccountId: systemAccountId != null ? Number(systemAccountId) : null,
       recordStatus: 'draft',
+      batchJobId: batchJobId ?? null,
       steps: [],
     }, client);
 
