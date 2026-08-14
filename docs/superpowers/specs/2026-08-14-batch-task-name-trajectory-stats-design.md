@@ -120,7 +120,7 @@ defaultJobName(originalFilename, createdAt):
 }
 ```
 
-- stats 口径：与行查询**同基准过滤**（functionId / keyword / batchTaskName），**忽略 recordStatus**（切换状态 Tab 时各档计数保持稳定）；单次 `GROUP BY record_status` 查询；`stats.total` = `total`。
+- stats 口径（2026-08-14 拍板 A）：stats **恒为全量五档分布**——与行查询同基准过滤（functionId / keyword / batchTaskName），**忽略 recordStatus**（切换状态 Tab 时各档计数保持稳定）；单次 `GROUP BY record_status` 查询。`stats.total` 为该基准下的**全量总数**：仅当未传 `recordStatus` 时 `stats.total` == 列表 `total`；传了 `recordStatus` 时列表 `total` 是当前筛选行数、`stats.total` 仍是全量总数（二者此时允许不等）。
 - 兼容：旧前端只读 `rows/total`，新增字段零破坏（Vue 调研确认 `index.vue:63-90` 无同名冲突）。
 
 ## Compatibility protections（需求硬约束）
