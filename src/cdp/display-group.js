@@ -14,6 +14,7 @@ const TAXONOMY_ROLES = new Set([
   'other',
   'overlay',
   'table',
+  'todo',
   'page',
   'menu',
   'shell-aside',

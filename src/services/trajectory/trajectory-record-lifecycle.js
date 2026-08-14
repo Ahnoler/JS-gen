@@ -58,7 +58,7 @@ function patchRegionFields(target, classified) {
   // L1c feature-card title often echoes outer collapse and would undo titlebox refine
   // (e.g.「关联人信息」→「股东及关联人信息」). Only fill empty/taxonomy labels.
   const keepPrevLabel = !!(prevLabel && !isTaxonomyRegionToken(prevLabel));
-  if (keepPrevLabel && (prevRole === 'tab' || prevRole === 'wizard' || prevRole === 'section')) {
+  if (keepPrevLabel && (prevRole === 'tab' || prevRole === 'wizard' || prevRole === 'section' || prevRole === 'todo')) {
     target.region_role = prevRole;
   } else {
     target.region_role = role;
@@ -433,6 +433,7 @@ export async function resolveTrajectoryElement(trajectoryId, {
   action,
   params,
   mode,
+  pageLabel,
 } = {}) {
   const tid = Number(trajectoryId);
   const label = String(labelText || '').trim();
@@ -476,6 +477,7 @@ export async function resolveTrajectoryElement(trajectoryId, {
       actionType: act,
       params: p,
       mode: resolveMode,
+      pageLabel: pageLabel || p.pageLabel || p.page_label || '',
       requestId,
     });
     const payload = await resultP;
@@ -509,6 +511,7 @@ export async function resolveTrajectoryElement(trajectoryId, {
     actionType: act,
     params: p,
     mode: resolveMode,
+    pageLabel: pageLabel || p.pageLabel || p.page_label || '',
   });
   if (resolved?.ambiguous) {
     return applyL1cRegionClassify({

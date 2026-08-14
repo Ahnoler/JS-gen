@@ -206,5 +206,6 @@ export async function resolveElementByLabelText(labelText, opts = {}) {
     actionType: opts.actionType || opts.action || '',
     params: opts.params || {},
     mode: opts.mode || 'inventory',
+    pageLabel: opts.pageLabel || opts.page_label || '',
   });
 }

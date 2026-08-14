@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { PAGE_LOCATOR_HELPERS } from '../../src/cdp/page-locator-helpers.js';
 import { displayGroupOf, isTaxonomyRegionToken } from '../../src/cdp/display-group.js';
+import { prependPageLayer as prependNodePageLayer } from '../../src/cdp/region-layers.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 function ok(n) { console.log(`ok: ${n}`); }
@@ -21,6 +22,8 @@ const helpersSrc = readFileSync(join(root, 'src/cdp/page-locator-helpers.js'), '
   assert.match(helpersSrc, /function stripActionTail\s*\(/);
   assert.match(helpersSrc, /function finishCompose\s*\(/);
   assert.match(helpersSrc, /function mergeTitleboxIntoRegion\s*\(/);
+  assert.match(helpersSrc, /function buildRegionLayers\s*\(/);
+  assert.match(helpersSrc, /function prependPageLayer\s*\(/);
   assert.match(helpersSrc, /tags-view-container/);
   assert.match(helpersSrc, /region_chrome:\s*region\.region_chrome/);
   assert.match(helpersSrc, /region_section:\s*region\.region_section/);
@@ -33,12 +36,14 @@ const helpersSrc = readFileSync(join(root, 'src/cdp/page-locator-helpers.js'), '
   assert.match(elSrc, /region_chrome/);
   assert.match(elSrc, /region_section/);
   assert.match(elSrc, /region_block/);
+  assert.match(elSrc, /layers/);
   ok('element_json copies structured region fields');
 }
 
 {
   assert.equal(isTaxonomyRegionToken('tab'), true);
   assert.equal(isTaxonomyRegionToken('wizard'), true);
+  assert.equal(isTaxonomyRegionToken('todo'), true);
   assert.equal(isTaxonomyRegionToken('客户基本信息 / 对公客户概况'), false);
   assert.equal(
     displayGroupOf({
@@ -50,6 +55,10 @@ const helpersSrc = readFileSync(join(root, 'src/cdp/page-locator-helpers.js'), '
   assert.equal(
     displayGroupOf({ region_label: '客户基本信息 / 对公客户概况 / 法定代表人/负责人信息' }),
     '客户基本信息 / 对公客户概况 / 法定代表人/负责人信息',
+  );
+  assert.deepEqual(
+    prependNodePageLayer([{ role: 'tab', label: '客户基本信息' }], '对公客户管理')[0],
+    { role: 'page', label: '对公客户管理' },
   );
   ok('display_group keeps composed Chinese path');
 }
@@ -258,6 +267,11 @@ async function main() {
   assert.equal(legal.region_section, '对公客户概况');
   assert.equal(legal.region_block, '法定代表人/负责人信息');
   assert.doesNotMatch(String(legal.region_label), /对公客户管理/);
+  assert.deepEqual(legal.layers, [
+    { role: 'tab', label: '客户基本信息' },
+    { role: 'section', label: '对公客户概况' },
+    { role: 'titlebox', label: '法定代表人/负责人信息' },
+  ]);
   ok('tab + collapse + titlebox three segments');
 
   const actual = await page.evaluate(assignExpr('#corp-actual'));
@@ -304,6 +318,7 @@ async function main() {
   assert.equal(imgForm.region_label, '影像资料');
   assert.match(String(imgForm.region_id), /^wizard:影像资料$/);
   assert.notEqual(imgForm.region_role, 'main');
+  assert.deepEqual(imgForm.layers, [{ role: 'wizard', label: '影像资料' }]);
   ok('wizard in sibling el-col under form (steps-wrapper two levels down)');
 
   const rate = await page.evaluate(assignExpr('#rate-basic'));
@@ -311,21 +326,29 @@ async function main() {
   assert.match(String(rate.region_label), /基本信息/);
   assert.doesNotMatch(String(rate.region_id), /tab:/);
   assert.doesNotMatch(String(rate.region_id), /wizard:/);
+  assert.equal(rate.layers && rate.layers[0] && rate.layers[0].role, 'section');
+  assert.equal(rate.layers[rate.layers.length - 1].role, 'titlebox');
+  assert.ok(!(rate.layers || []).some((x) => x.role === 'tab' || x.role === 'wizard' || x.role === 'page'));
   ok('no chrome: collapse + titlebox only');
 
   const tbl = await page.evaluate(assignExpr('#tbl-btn'));
   assert.equal(tbl.region_role, 'table');
   assert.equal(tbl.region_id, 'table');
+  assert.deepEqual(tbl.layers, [{ role: 'table', label: '表格' }]);
   ok('table short-circuit');
 
   const dlg = await page.evaluate(assignExpr('#dlg-ok'));
   assert.equal(dlg.region_role, 'overlay');
+  assert.equal(dlg.layers && dlg.layers[0] && dlg.layers[0].role, 'overlay');
+  assert.equal(dlg.layers.length, 1);
   ok('overlay short-circuit');
 
   const todo = await page.evaluate(assignExpr('#todo-handle'));
-  assert.notEqual(todo.region_role, 'main');
+  assert.equal(todo.region_role, 'todo');
   assert.match(String(todo.region_label), /对公授信申请|信贷调查/);
-  ok('todo-item still before compose');
+  assert.equal(todo.layers && todo.layers[0] && todo.layers[0].role, 'todo');
+  assert.equal(todo.layers.length, 1);
+  ok('todo-item still before compose; region_role todo');
 
   const assetSnap = await page.evaluate(snapInTitlebox('资产信息', '新增'));
   const contactSnap = await page.evaluate(snapInTitlebox('客户联系信息', '新增'));
@@ -336,7 +359,40 @@ async function main() {
   assert.match(String(contactSnap.xpath_smart), /titlebox/);
   assert.match(String(assetSnap.xpath_smart), /资产信息/);
   assert.match(String(contactSnap.xpath_smart), /客户联系信息/);
+  assert.ok(
+    (assetSnap.layers || []).some((x) => x.role === 'titlebox' && x.label === '资产信息'),
+  );
+  assert.ok(
+    (contactSnap.layers || []).some((x) => x.role === 'titlebox' && x.label === '客户联系信息'),
+  );
   ok('duplicate 新增 buttons titlebox-anchored xpath_smart');
+
+  const pre = await page.evaluate(`(() => {
+${PAGE_LOCATOR_HELPERS}
+    const a = prependPageLayer(
+      [{ role: 'tab', label: '客户基本信息' }],
+      '对公客户管理'
+    );
+    const b = prependPageLayer(
+      [{ role: 'page', label: '已有页' }, { role: 'page', label: '内层' }, { role: 'tab', label: 'T' }],
+      ''
+    );
+    const c = prependPageLayer(
+      [{ role: 'page', label: '已有页' }, { role: 'tab', label: 'T' }],
+      '对公客户管理'
+    );
+    return { a, b, c };
+  })()`);
+  assert.deepEqual(pre.a, [
+    { role: 'page', label: '对公客户管理' },
+    { role: 'tab', label: '客户基本信息' },
+  ]);
+  assert.equal(pre.b[0].role, 'page');
+  assert.equal(pre.b[0].label, '已有页');
+  assert.ok(!(pre.b || []).slice(1).some((x) => x.role === 'page'));
+  assert.equal(pre.c[0].label, '已有页');
+  assert.equal(pre.c.length, 2);
+  ok('prependPageLayer: head insert; drop inner page; do not double page');
 
   await browser.close();
   console.log('characterize-partition-compose: ok');

@@ -91,6 +91,7 @@ JS_SECTION_ATTACH_BLOCK = r'''
         region_label: '',
         region_role: '',
         region_id: '',
+        layers: [],
     });
     const withRegionMirror = (reg) => {
         if (!reg || typeof reg !== 'object') {
@@ -108,6 +109,7 @@ JS_SECTION_ATTACH_BLOCK = r'''
             region_label: label,
             region_role: reg.region_role || '',
             region_id: rid,
+            layers: Array.isArray(reg.layers) ? reg.layers : [],
         };
     };
     const attachSection = (field, el) => {

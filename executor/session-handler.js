@@ -58,6 +58,7 @@ export function createSessionHandler(manager) {
           actionType: payload.actionType || payload.action || '',
           params: payload.params || {},
           mode: payload.mode || 'inventory',
+          pageLabel: payload.pageLabel || payload.page_label || '',
           requestId: payload.requestId,
         });
       case 'session.bib_phase_highlight_capture':

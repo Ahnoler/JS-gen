@@ -108,6 +108,7 @@ export default function (app) {
         actionType: body.actionType ?? body.action ?? '',
         params: body.params || {},
         mode: body.mode ?? 'inventory',
+        pageLabel: body.pageLabel ?? body.page_label ?? '',
       });
       res.json(result);
     } catch (err) {

@@ -490,6 +490,7 @@ export class BibBridge {
       actionType: opts.actionType || opts.action || '',
       params: opts.params || {},
       mode: opts.mode || 'inventory',
+      pageLabel: opts.pageLabel || opts.page_label || '',
     });
   }
 

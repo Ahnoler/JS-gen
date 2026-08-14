@@ -35,6 +35,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-14: **分区 layers[]**：每个控件 `layers`（`{ role, label }[]`，外→内）由 `region_*` 推导，写入 snap / preview / `element_json`。todo 短路 `region_role` 改为 `todo`。可选 `pageLabel` 头插 `page`（不套 page）。无 schema。
+  影响范围：扫描 / resolve / 录制 `element_json`；`display_group` 仍为中文路径。
+  文件：src/cdp/page-locator-helpers.js, src/cdp/region-layers.js, src/cdp/resolve-by-label.js, src/models/element.js
+  Python 同步提示：无 schema；resolve-element 可选 body `pageLabel`/`page_label`（头插根 page）；可选透传 `layers`；SPA 仍按 `display_group` 原样展示。整页 `region_tree` 未做。
+
 - 2026-08-13: **产品消息表（批量导入终态）**：新建 `sys_msg`；字典 `sys_msg_type`（`1`=批量导入任务）。批量任务第一次进入终态插入一条；标题「批量导入任务」；正文两行（功能·文件·状态 / 共N条统计）；`linkUrl=/ui-recording?batchId=`。`GET /api/v2/messages`（`pageNum`）/ `unread-count` / `POST :id/read` / `read-all`。`user_id` 挂起，全员同一列表与已读。
   影响范围：schema、字典种子、batch finalize、v2 消息 API、api-docs。
   文件：migrations/20260813160000_sys_msg.js, schemas/init.sql, src/services/sys-msg-compose.js, src/services/sys-msg-service.js, src/dao/sys-msg-dao.js, src/routes/v2/messages.js, src/services/trajectory/trajectory-batch-service.js

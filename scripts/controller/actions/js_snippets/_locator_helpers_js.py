@@ -461,15 +461,63 @@ PAGE_LOCATOR_HELPERS = r'''
       if (role === 'section') return t || '区块';
       if (role === 'tab') return t || '页签';
       if (role === 'wizard') return t || '向导';
+      if (role === 'todo') return t || '待办';
       if (role === 'shell-aside') return '侧栏';
       if (role === 'shell-header') return '顶栏';
       if (role === 'main') return '主区';
       if (role === 'page') return '页面';
       return t || '其他';
     }
+    function layerLabel(s) {
+      return String(s || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    }
+    function buildRegionLayers(region) {
+      if (!region) return [];
+      const role = String(region.region_role || '');
+      const label = layerLabel(region.region_label);
+      if (role === 'overlay') {
+        return label ? [{ role: 'overlay', label: label }] : [];
+      }
+      if (role === 'table') {
+        return [{ role: 'table', label: label || '表格' }];
+      }
+      if (role === 'todo') {
+        return label ? [{ role: 'todo', label: label }] : [];
+      }
+      const out = [];
+      const chrome = region.region_chrome;
+      if (chrome && chrome.label && (chrome.role === 'tab' || chrome.role === 'wizard')) {
+        const cl = layerLabel(chrome.label);
+        if (cl) out.push({ role: chrome.role, label: cl });
+      }
+      const section = layerLabel(region.region_section);
+      if (section) out.push({ role: 'section', label: section });
+      const block = layerLabel(region.region_block);
+      if (block) out.push({ role: 'titlebox', label: block });
+      return out;
+    }
+    function prependPageLayer(layers, pageLabel) {
+      const src = Array.isArray(layers) ? layers.slice() : [];
+      let existingPage = '';
+      if (src[0] && src[0].role === 'page') existingPage = layerLabel(src[0].label);
+      const cleaned = [];
+      for (let i = 0; i < src.length; i++) {
+        if (src[i] && src[i].role === 'page') continue;
+        cleaned.push(src[i]);
+      }
+      const incoming = layerLabel(pageLabel);
+      const page = existingPage || incoming;
+      if (page) cleaned.unshift({ role: 'page', label: page });
+      return cleaned;
+    }
+    function withLayers(region) {
+      if (!region) return region;
+      region.layers = buildRegionLayers(region);
+      return region;
+    }
     function assignRegion(el) {
       if (!el || !el.closest) {
-        return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
+        return withLayers({ region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') });
       }
       if (el.closest('.el-dialog, .el-drawer, .el-message-box')) {
         const o = el.closest('.el-dialog, .el-drawer, .el-message-box');
@@ -477,10 +525,10 @@ PAGE_LOCATOR_HELPERS = r'''
           && (o.querySelector('.el-dialog__title, .el-drawer__title').textContent || ''))
           || o.getAttribute('aria-label') || '';
         const id = 'overlay:' + String(title || 'overlay').replace(/\s+/g, ' ').trim().slice(0, 40);
-        return { region_role: 'overlay', region_id: id, region_label: regionLabelOf('overlay', title) };
+        return withLayers({ region_role: 'overlay', region_id: id, region_label: regionLabelOf('overlay', title) });
       }
       if (el.closest('.el-table, .tssc-multiple-table-content, .myTable')) {
-        return { region_role: 'table', region_id: 'table', region_label: regionLabelOf('table') };
+        return withLayers({ region_role: 'table', region_id: 'table', region_label: regionLabelOf('table') });
       }
       if (el.closest('.todo-item')) {
         const todo = el.closest('.todo-item');
@@ -506,24 +554,24 @@ PAGE_LOCATOR_HELPERS = r'''
         const label = (human || ht || bizKey || firstLine || 'todo').slice(0, 40);
         // Stable id prefers biz key so same Chinese title across cards still collide-refine cleanly.
         const idKey = bizKey || label || 'todo';
-        return {
-          region_role: 'section',
+        return withLayers({
+          region_role: 'todo',
           region_id: 'section:' + idKey,
-          region_label: regionLabelOf('section', label),
-        };
+          region_label: regionLabelOf('todo', label),
+        });
       }
       if (el.closest('.el-aside, .sidebar, aside, .el-menu')) {
-        return { region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') };
+        return withLayers({ region_role: 'shell-aside', region_id: 'shell-aside', region_label: regionLabelOf('shell-aside') });
       }
       if (el.closest('.el-header, .navbar, header, .tags-view-container')) {
-        return { region_role: 'shell-header', region_id: 'shell-header', region_label: regionLabelOf('shell-header') };
+        return withLayers({ region_role: 'shell-header', region_id: 'shell-header', region_label: regionLabelOf('shell-header') });
       }
       const composed = composeContentRegion(el);
-      if (composed && composed.region_id) return composed;
+      if (composed && composed.region_id) return withLayers(composed);
       if (el.closest('.el-main, .app-main, .plugin-content, main')) {
-        return { region_role: 'main', region_id: 'main', region_label: regionLabelOf('main') };
+        return withLayers({ region_role: 'main', region_id: 'main', region_label: regionLabelOf('main') });
       }
-      return { region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') };
+      return withLayers({ region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') });
     }
     function buildFeatureCard(el, regionHint) {
       var region = regionHint || assignRegion(el);
@@ -926,10 +974,10 @@ PAGE_LOCATOR_HELPERS = r'''
         for (let j = 0; j < idxs.length; j++) {
           const it = items[idxs[j]];
           const role = String((it.region && it.region.region_role) || '');
-          if (role === 'overlay' || role === 'table'
+          if (role === 'overlay' || role === 'table' || role === 'todo'
             || role === 'shell-aside' || role === 'shell-header') continue;
           const finer = findTitleboxRegion(it.el, needle);
-          if (finer) it.region = mergeTitleboxIntoRegion(it.region, finer);
+          if (finer) it.region = withLayers(mergeTitleboxIntoRegion(it.region, finer));
         }
       }
     }
@@ -1494,6 +1542,7 @@ PAGE_LOCATOR_HELPERS = r'''
       region_chrome: region.region_chrome,
       region_section: region.region_section,
       region_block: region.region_block,
+      layers: region.layers || [],
       feature_card: buildFeatureCard(host, region),
     };
   }

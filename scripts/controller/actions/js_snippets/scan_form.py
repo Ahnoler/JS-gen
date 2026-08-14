@@ -261,6 +261,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
                 region_role: reg ? reg.region_role : '',
                 region_id: reg ? reg.region_id : '',
                 region_label: reg ? reg.region_label : '',
+                layers: reg && Array.isArray(reg.layers) ? reg.layers : [],
                 section_id: (reg && reg.region_id) ? reg.region_id : '__root__',
                 section_title: (reg && reg.region_label) ? reg.region_label : '',
             });
@@ -274,6 +275,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
         field.region_role = reg.region_role;
         field.region_id = reg.region_id;
         field.region_label = reg.region_label;
+        field.layers = Array.isArray(reg.layers) ? reg.layers : [];
         field.section_id = reg.region_id || '__root__';
         field.section_title = reg.region_label || '';
     };
@@ -287,7 +289,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
             { sel: '.el-table', role: 'table' },
             { sel: '.tssc-multiple-table-content, .myTable', role: 'custom:tssc-table' },
             { sel: '.el-collapse-item', role: 'section' },
-            { sel: '.todo-item', role: 'section' },
+            { sel: '.todo-item', role: 'todo' },
             { sel: '.el-main, .app-main, main', role: 'main' },
         ];
         const seenReg = new Set();
@@ -301,7 +303,7 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
                 let title = (el.getAttribute('aria-label')
                     || el.querySelector?.('.el-dialog__title, .el-collapse-item__header, .el-menu-item.is-active')?.textContent
                     || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
-                if (!title && role === 'section' && el.classList && el.classList.contains('todo-item')) {
+                if (!title && role === 'todo' && el.classList && el.classList.contains('todo-item')) {
                     const blob = String(el.innerText || el.textContent || '');
                     const bizM = blob.match(/业务主键[：:]\\s*([A-Za-z0-9]+)/);
                     const keyM = blob.match(/\\b(?:PJ|DGSX)\\d+\\b/);

@@ -101,6 +101,7 @@ export const GROUP_RECORDING = [
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
           mode: 'inventory',
+          pageLabel: '客户管理',
           labelText: '客户名称',
           actionType: 'fill_form_field',
           params: { label_text: '客户名称' },
@@ -128,10 +129,11 @@ export const GROUP_RECORDING = [
         }),
         notes: [
           '默认 mode=inventory：全页可操作控件池；可选 labelText / actionType+params 过滤',
+          '可选 pageLabel / page_label：当 layers[0] 尚未为 page 时，在 layers 头插 { role:\'page\', label }；无 schema',
           '无 labelText 且命中 ≥1：inventory 始终 { ambiguous:true, matches }；0 命中 → 404',
           'mode=needle：旧版按 label 针搜；无 label/action 时 400',
           '可选 actionType + params（menu_text / tab_name / row_text+button_text / …）做动作感知解析',
-          '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }], truncated? } — 不静默择一',
+          '多可见匹配：HTTP 200 { ambiguous:true, matches:[{ matchedLabel, element, preview }], truncated? } — 不静默择一；`preview.layers` 为 `{ role, label }[]`（外→内），缺省时回退 `display_group`，不要拆 `region_id`',
           '分区在后端完成：SPA 按 `preview.display_group` 原样分组展示（空则回退 `region_label`）；`display_group` 可以是 tab / collapse / titlebox 用 ` / ` 连接的中文路径，SPA 仍原样展示、不要拆 `region_id`；禁止用 `region_role` 或从 xpath 再推导分区；待办 `region_label` 为中文标题，业务主键在 `region_id`，同标题撞车时 display_group 带主键后缀',
           'truncated:true 表示命中 INVENTORY_CAP（120）上限，列表可能被截断',
           '菜单示例：客户管理优先稳定 data-id；否则 class-token + 文案 + occurrence',

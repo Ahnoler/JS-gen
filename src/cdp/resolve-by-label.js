@@ -17,6 +17,7 @@ import { normalizeElementJson } from '../models/helpers.js';
 import { PAGE_LOCATOR_HELPERS, enrichLocatorFields } from './locator-candidates.js';
 import { normalizeActionName } from '../models/action-name.js';
 import { displayGroupOf, uniquifyDisplayGroups } from './display-group.js';
+import { prependPageLayer } from './region-layers.js';
 
 /**
  * Sanitize preview (never expose form values / secrets).
@@ -42,6 +43,7 @@ function toPreview(el) {
     region_chrome: el?.region_chrome,
     region_section: el?.region_section || '',
     region_block: el?.region_block || '',
+    layers: Array.isArray(el?.layers) ? el.layers : [],
     display_group: displayGroupOf(el),
   };
 }
@@ -133,6 +135,7 @@ ${PAGE_LOCATOR_HELPERS}
         region_chrome: loc.region_chrome,
         region_section: loc.region_section || '',
         region_block: loc.region_block || '',
+        layers: Array.isArray(loc.layers) ? loc.layers : [],
         feature_card: loc.feature_card || undefined,
       };
     }
@@ -495,7 +498,7 @@ ${PAGE_LOCATOR_HELPERS}
 
 /**
  * @param {import('./client.js').CdpClient} client
- * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string }} opts
+ * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string, pageLabel?: string }} opts
  * @returns {Promise<{ element?: object, matchedLabel?: string, ambiguous?: boolean, matches?: object[], truncated?: boolean }>}
  */
 export async function resolveElementByLabel(client, opts = {}) {
@@ -503,6 +506,7 @@ export async function resolveElementByLabel(client, opts = {}) {
   const labelText = String(opts.labelText || opts.label_text || '').trim();
   const actionType = normalizeActionName(opts.actionType || opts.action || '');
   const params = opts.params && typeof opts.params === 'object' ? opts.params : {};
+  const pageLabel = String(opts.pageLabel || opts.page_label || '').trim();
 
   if (mode !== 'inventory' && !labelText && !actionType && !Object.keys(params).length) {
     const err = new Error('labelText or actionType/params is required');
@@ -575,6 +579,7 @@ export async function resolveElementByLabel(client, opts = {}) {
       region_chrome: raw.region_chrome,
       region_section: raw.region_section || '',
       region_block: raw.region_block || '',
+      layers: Array.isArray(raw.layers) ? raw.layers : [],
     });
     // Preserve DOM-verified flag from page snap
     if (raw.locator_verified === true && enriched.xpath_smart) {
@@ -585,11 +590,15 @@ export async function resolveElementByLabel(client, opts = {}) {
     const featureCard = raw.feature_card && typeof raw.feature_card === 'object'
       ? raw.feature_card
       : undefined;
+    const layers = prependPageLayer(enriched.layers || [], pageLabel);
+    enriched.layers = layers;
     const displayGroup = displayGroupOf(enriched);
     const element = normalizeElementJson(enriched);
+    element.layers = layers;
     if (displayGroup) element.display_group = displayGroup;
     if (featureCard) element.feature_card = featureCard;
     const preview = toPreview(enriched);
+    preview.layers = layers;
     if (featureCard) preview.feature_card = featureCard;
     return {
       matchedLabel: String(raw.matchedLabel || labelText || ''),

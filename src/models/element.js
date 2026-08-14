@@ -126,6 +126,7 @@ function copyLocatorMeta(target, source) {
       target[key] = source[key];
     }
   }
+  if (Array.isArray(source.layers)) target.layers = source.layers;
   if (Array.isArray(source.options)) {
     const opts = [];
     const seen = new Set();
