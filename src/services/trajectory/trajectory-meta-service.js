@@ -345,11 +345,11 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
     err.statusCode = 404;
     throw err;
   }
-  if (traj.recordStatus === 'recording' || traj.recordStatus === 'live') {
+  if (traj.recordStatus === 'recording' || traj.recordStatus === 'failed') {
     const err = new Error(
       traj.recordStatus === 'recording'
-        ? 'Cannot confirm while AI recording'
-        : 'Cannot confirm while live (prepared); detach first',
+        ? 'Cannot confirm while recording'
+        : 'Cannot confirm a failed trajectory — retry or reset first',
     );
     err.statusCode = 409;
     throw err;
@@ -364,7 +364,7 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
     });
   } else {
     await trajectoryDao.updateMeta(tid, {
-      recordStatus: 'draft',
+      recordStatus: 'recorded',
       isDone: null,
       isSuccessful: null,
     });
@@ -373,7 +373,7 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
   const tree = await getTrajectoryTree(tid);
   return {
     trajectoryId: tid,
-    recordStatus: tree?.recordStatus || (want ? 'completed' : 'draft'),
+    recordStatus: tree?.recordStatus || (want ? 'completed' : 'recorded'),
     confirmed: want,
     tree,
   };

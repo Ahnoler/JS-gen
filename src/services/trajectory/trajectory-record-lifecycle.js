@@ -337,7 +337,7 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
     runtime.selectedPhaseId = null;
   }
 
-  const recordStatus = success ? 'recorded' : 'draft';
+  const recordStatus = success ? 'recorded' : 'failed';
   await trajectoryDao.updateMeta(tid, {
     recordStatus,
     isDone: !!success,
@@ -354,7 +354,7 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
 }
 
 /**
- * Batch-safe stop: never downgrade recorded/completed back to draft.
+ * Batch-safe stop: never downgrade recorded/completed; failed only retries via record/start.
  * Sends cancel_step when a runtime exists; CAS-updates only live/recording.
  */
 export async function stopTrajectoryRecordingSafe(trajectoryId, {
@@ -406,16 +406,16 @@ export async function stopTrajectoryRecordingSafe(trajectoryId, {
       recordStatus: 'recorded',
       isDone: true,
       isSuccessful: true,
-    }, { recordStatusIn: ['live', 'recording', 'draft'] });
+    }, { recordStatusIn: ['draft', 'recording', 'failed'] });
     recordStatus = n ? 'recorded' : (await trajectoryDao.getById(tid))?.recordStatus;
   } else {
     const n = await trajectoryDao.updateMetaIf(tid, {
-      recordStatus: 'draft',
+      recordStatus: 'failed',
       isDone: false,
       isSuccessful: false,
-    }, { recordStatusIn: ['live', 'recording'] });
+    }, { recordStatusIn: ['recording', 'failed'] });
     const fresh = await trajectoryDao.getById(tid);
-    recordStatus = n ? 'draft' : (fresh?.recordStatus || traj.recordStatus);
+    recordStatus = n ? 'failed' : (fresh?.recordStatus || traj.recordStatus);
   }
 
   const tree = await getTrajectoryTree(tid);

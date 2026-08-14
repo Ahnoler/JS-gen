@@ -446,6 +446,11 @@ export async function recoverBatchJobsOnStartup() {
             await maybeFinalizeJob(item.batchId);
             continue;
           }
+          await trajectoryDao.updateMetaIf(tid, {
+            recordStatus: 'failed',
+            isDone: false,
+            isSuccessful: false,
+          }, { recordStatusIn: ['recording'] });
           await cleanupPersistedTrajectoryResources(tid, {
             demoteLive: true,
             reason: 'batch_recovery',
@@ -454,7 +459,7 @@ export async function recoverBatchJobsOnStartup() {
         await batchDao.markItemFailed(item.id, ['preparing', 'recording'], {
           version: item.version,
           errorCode: 'INTERRUPTED',
-          errorMessage: 'Interrupted by control-plane restart — draft retained for manual review',
+          errorMessage: 'Interrupted by control-plane restart — trajectory marked failed (录制异常), retry via record/start',
         });
         await maybeFinalizeJob(item.batchId);
         continue;

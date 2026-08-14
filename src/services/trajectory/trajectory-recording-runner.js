@@ -73,6 +73,16 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     err.statusCode = 404;
     throw err;
   }
+  if (traj.recordStatus === 'recording') {
+    const err = new Error('Recording already in progress');
+    err.statusCode = 409;
+    throw err;
+  }
+  if (traj.recordStatus === 'recorded' || traj.recordStatus === 'completed') {
+    const err = new Error('Trajectory already recorded — clear it to record again');
+    err.statusCode = 409;
+    throw err;
+  }
   const allPhases = await trajectoryPhaseDao.listByTrajectory(tid);
   if (!allPhases.length) throw new Error('Trajectory has no phases');
 
@@ -443,9 +453,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       isSuccessful: true,
     });
   } catch (err) {
-    const aborted = runtime.abortRecording || /aborted/i.test(err.message || '');
     await trajectoryDao.updateMeta(tid, {
-      recordStatus: aborted ? 'draft' : 'draft',
+      recordStatus: 'failed',
       isDone: false,
       isSuccessful: false,
     });
