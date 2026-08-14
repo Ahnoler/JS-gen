@@ -102,7 +102,7 @@ CREATE TABLE `trajectory` (
   `system_account_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → system_account.id（录制默认登录账号）',
   `remote_session_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → remote_session.id（远程/人工录制来源，可空）',
   `batch_job_id`       VARCHAR(36) DEFAULT NULL COMMENT '所属批量导入任务（batch_recording_job.id，UUID）；NULL=手动创建',
-  `record_status`     ENUM('draft','live','recording','recorded','completed') NOT NULL DEFAULT 'draft' COMMENT 'draft=空闲; live=推流占用; recording=AI录制中; recorded=录制完成; completed=人工确认',
+  `record_status`     ENUM('draft','recording','failed','recorded','completed') NOT NULL DEFAULT 'draft' COMMENT 'draft=未录制; recording=录制中; failed=录制异常; recorded=待确认; completed=已确认',
   `created_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updated_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   KEY `idx_function_id` (`function_id`),

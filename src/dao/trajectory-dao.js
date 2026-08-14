@@ -294,6 +294,17 @@ export async function getExistingPhaseNumbers(trajectoryDbId) {
   return rows;
 }
 
+/**
+ * AI 录制是否活跃：任一阶段 status='running'（录制 runner 每阶段维护）。
+ * 占用中并入录制中后，用它在 demote/sweep 中区分「真正在录」与「只是观看占用」。
+ */
+export async function hasRunningPhase(trajectoryId) {
+  const row = await getDB()('trajectory_phase')
+    .where({ trajectory_id: Number(trajectoryId), status: 'running' })
+    .first('id');
+  return !!row;
+}
+
 export async function getMaxPhaseNumber(trajectoryDbId) {
   const row = await getDB()('trajectory_phase')
     .where({ trajectory_id: trajectoryDbId })

@@ -10,7 +10,7 @@
 
 /** @typedef {'online'|'draining'|'offline'} ExecutorNodeStatus */
 
-/** @typedef {'draft'|'live'|'recording'|'recorded'|'completed'} TrajectoryRecordStatus */
+/** @typedef {'draft'|'recording'|'failed'|'recorded'|'completed'} TrajectoryRecordStatus */
 
 /** @typedef {'pending'|'running'|'completed'|'failed'} TrajectoryPhaseStatus */
 
@@ -56,7 +56,16 @@ export const LOCATOR_STRATEGIES = Object.freeze(['xpath_smart', 'xpath_full']);
 export const EXECUTOR_NODE_STATUSES = Object.freeze(['online', 'draining', 'offline']);
 
 /** @type {readonly TrajectoryRecordStatus[]} */
-export const TRAJECTORY_RECORD_STATUSES = Object.freeze(['draft', 'live', 'recording', 'recorded', 'completed']);
+export const TRAJECTORY_RECORD_STATUSES = Object.freeze(['draft', 'recording', 'failed', 'recorded', 'completed']);
+
+/** 轨迹状态中文文案（产品/文档/Vue 对齐的单一事实源） */
+export const TRAJECTORY_RECORD_STATUS_LABELS = Object.freeze({
+  draft: '未录制',
+  recording: '录制中',
+  failed: '录制异常',
+  recorded: '待确认',
+  completed: '已确认',
+});
 
 /** @type {readonly TrajectoryPhaseStatus[]} */
 export const TRAJECTORY_PHASE_STATUSES = Object.freeze(['pending', 'running', 'completed', 'failed']);
