@@ -11,6 +11,7 @@ import {
   getTrajectoryRuntime,
   touchTrajectoryRuntimeActivity,
 } from '../trajectory-runtime.js';
+import { isAiRecordingActive } from './trajectory-status-utils.js';
 
 export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phaseId = null } = {}) {
   const tid = Number(trajectoryId);
@@ -26,7 +27,7 @@ export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phas
     err.statusCode = 404;
     throw err;
   }
-  if (traj.recordStatus === 'recording' && enabled) {
+  if (enabled && (await isAiRecordingActive(tid))) {
     const err = new Error('AI recording in progress');
     err.statusCode = 409;
     throw err;

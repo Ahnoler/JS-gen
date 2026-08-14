@@ -17,6 +17,7 @@ import {
   getTrajectoryRuntime,
 } from '../trajectory-runtime.js';
 import { runDefaultLogin } from './trajectory-record-lifecycle.js';
+import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { USE_EXECUTOR } from '../../../config/config.js';
 import { attachTrajectoryLive } from './trajectory-attach-service.js';
 
@@ -161,9 +162,8 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
     });
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
-    const currentStatus = (await trajectoryDao.getById(tid).catch(() => null))?.recordStatus;
-    if (currentStatus !== 'recording') {
-      await trajectoryDao.updateMeta(tid, { recordStatus: 'live' }).catch(() => {});
+    if (!(await isAiRecordingActive(tid))) {
+      await trajectoryDao.updateMeta(tid, { recordStatus: 'recording' }).catch(() => {});
     }
   }
 
@@ -191,7 +191,7 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
   return {
     trajectoryId: tid,
     trajectory: fresh || traj,
-    recordStatus: fresh?.recordStatus || (streamOk ? 'live' : traj?.recordStatus) || null,
+    recordStatus: fresh?.recordStatus || (streamOk ? 'recording' : traj?.recordStatus) || null,
     phases: tree?.phases || [],
     orphanSteps: tree?.orphanSteps || [],
     sessionId: runtime.sessionId,

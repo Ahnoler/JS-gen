@@ -212,7 +212,8 @@ export async function clearMountByRemoteSessionId(remoteSessionId, {
   const cleared = [];
   for (const row of rows) {
     const fields = { remoteSessionId: null };
-    if (demoteLive && row.record_status === 'live') {
+    if (demoteLive && row.record_status === 'recording'
+        && !(await hasRunningPhase(row.id))) {
       fields.recordStatus = 'draft';
     }
     await updateMeta(row.id, fields, db);
@@ -256,7 +257,9 @@ export async function repairStaleRemoteMounts(trx = null) {
   const cleared = [];
   for (const row of stale) {
     const fields = { remoteSessionId: null };
-    if (row.recordStatus === 'live') fields.recordStatus = 'draft';
+    if (row.recordStatus === 'recording' && !(await hasRunningPhase(row.id))) {
+      fields.recordStatus = 'draft';
+    }
     await updateMeta(row.id, fields, db);
     cleared.push(row.id);
   }

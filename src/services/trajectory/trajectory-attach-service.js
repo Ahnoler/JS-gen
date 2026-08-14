@@ -21,6 +21,7 @@ import {
 } from '../trajectory-runtime.js';
 import { resolveModelId } from '../../runtime/resolve-model.js';
 import { prepareTrajectoryRecordingUnlocked } from './trajectory-attach-runner.js';
+import { isAiRecordingActive } from './trajectory-status-utils.js';
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
@@ -444,12 +445,13 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     deleteTrajectoryRuntime(tid);
 
     let recordStatus = traj?.recordStatus || null;
-    const meta = { remoteSessionId: null };
-    if (traj && (traj.recordStatus === 'live' || traj.recordStatus === 'recording')) {
-      meta.recordStatus = 'draft';
-      recordStatus = 'draft';
+    if (traj?.recordStatus === 'recording') {
+      const aiActive = await isAiRecordingActive(tid);
+      await trajectoryDao.updateMetaIf(tid, {
+        recordStatus: aiActive ? 'failed' : 'draft',
+      }, { recordStatusIn: ['recording'] });
+      recordStatus = aiActive ? 'failed' : 'draft';
     }
-    if (traj) await trajectoryDao.updateMeta(tid, meta);
 
     const status = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => ({
       attached: false,
@@ -546,11 +548,11 @@ export async function cleanupPersistedTrajectoryResources(trajectoryId, {
 
   slotLease.releaseByTrajectory(tid);
 
-  if (demoteLive && (traj.recordStatus === 'live' || traj.recordStatus === 'recording')) {
+  if (traj.recordStatus === 'recording') {
+    const aiActive = await isAiRecordingActive(tid);
     await trajectoryDao.updateMetaIf(tid, {
-      recordStatus: 'draft',
-      remoteSessionId: null,
-    }, { recordStatusIn: ['live', 'recording'] });
+      recordStatus: aiActive ? 'failed' : 'draft',
+    }, { recordStatusIn: ['recording'] });
   } else if (traj.remoteSessionId) {
     await trajectoryDao.updateMeta(tid, { remoteSessionId: null });
   }
