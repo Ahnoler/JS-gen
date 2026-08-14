@@ -48,6 +48,12 @@ async function main() {
   run('formats MMDD-HHmm with zero padding', () => {
     assert.strictEqual(formatMonthDayHourMinute(new Date(2026, 0, 5, 8, 5)), '0105-0805');
   });
+  run('migration 1: name column + backfill via shared formula', () => {
+    const mig = readFileSync(join(ROOT, 'migrations', '20260814100000_batch_job_name.js'), 'utf8');
+    assert.ok(mig.includes("t.string('name', 512)"), 'name VARCHAR(512)');
+    assert.ok(mig.includes('defaultJobName(row.original_filename, row.created_at)'), 'backfill formula');
+    assert.ok(mig.includes("from '../src/services/trajectory/batch-job-name.js'"), 'shared module import');
+  });
 
   const failedCount = failed;
   console.log(failedCount ? `\n${failedCount} failed` : '\nall ok');
