@@ -548,7 +548,7 @@ export async function cleanupPersistedTrajectoryResources(trajectoryId, {
 
   slotLease.releaseByTrajectory(tid);
 
-  if (traj.recordStatus === 'recording') {
+  if (demoteLive && traj.recordStatus === 'recording') {
     const aiActive = await isAiRecordingActive(tid);
     await trajectoryDao.updateMetaIf(tid, {
       recordStatus: aiActive ? 'failed' : 'draft',

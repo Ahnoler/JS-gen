@@ -44,7 +44,7 @@ export const GROUP_RECORDING = [
           '503：会话/执行机其它不可用',
           '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
           'stream.ok=true → recordStatus=recording（列表可见录制中；人工录制可用）',
-          'record/start(draft|failed) → recording；stop(success) → recorded；stop(!success)/失败/中断 → failed；detach/stream-detach（非 AI 录制）→ draft；detach（AI 录制中）→ failed',
+          'record/start(draft|failed|纯观看占位) → recording（AI 录制中时 409；已录制/已确认 409）；stop(success) → recorded；stop(!success)/失败/中断 → failed；detach/stream-detach（非 AI 录制）→ draft；detach（AI 录制中）→ failed',
         ],
       },
       {

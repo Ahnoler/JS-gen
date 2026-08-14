@@ -363,11 +363,11 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
       isSuccessful: true,
     });
   } else {
-    await trajectoryDao.updateMeta(tid, {
+    await trajectoryDao.updateMetaIf(tid, {
       recordStatus: 'recorded',
       isDone: null,
       isSuccessful: null,
-    });
+    }, { recordStatusIn: ['completed'] });
   }
 
   const tree = await getTrajectoryTree(tid);

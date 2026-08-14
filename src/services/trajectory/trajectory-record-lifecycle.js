@@ -273,7 +273,7 @@ export async function runDefaultLogin(runtime, account, system = null) {
     runtime.isReplay = false;
     if (session) {
       // Product AI record holds the lock across all phases; login is only a
-      // nested op and must not unlock the canvas / demote to 占用中.
+      // nested op and must not unlock the canvas / demote 到未录制.
       if (runtime.aiRecording) {
         session.busy = true;
       } else {

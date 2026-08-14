@@ -302,8 +302,10 @@ export async function getExistingPhaseNumbers(trajectoryDbId) {
  * 占用中并入录制中后，用它在 demote/sweep 中区分「真正在录」与「只是观看占用」。
  */
 export async function hasRunningPhase(trajectoryId) {
+  const n = Number(trajectoryId);
+  if (!Number.isFinite(n) || n <= 0) return false;
   const row = await getDB()('trajectory_phase')
-    .where({ trajectory_id: Number(trajectoryId), status: 'running' })
+    .where({ trajectory_id: n, status: 'running' })
     .first('id');
   return !!row;
 }

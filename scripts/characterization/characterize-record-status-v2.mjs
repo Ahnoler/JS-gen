@@ -54,6 +54,18 @@ async function main() {
     assert.ok(utils.includes('export async function isAiRecordingActive'), 'wrapper export');
     assert.ok(utils.includes('trajectoryDao.hasRunningPhase(trajectoryId)'), 'wrapper delegates');
   });
+  run('start gate: AI-active recording → 409; pure-occupy can start', () => {
+    const runner = readFileSync(join(ROOT, 'src', 'services', 'trajectory', 'trajectory-recording-runner.js'), 'utf8');
+    assert.ok(runner.includes("traj.recordStatus === 'recording' && (await isAiRecordingActive(tid))"), 'gate uses AI-active check');
+  });
+  run('batch INTERRUPTED: CAS failed before cleanup', () => {
+    const svc = readFileSync(join(ROOT, 'src', 'services', 'trajectory', 'trajectory-batch-service.js'), 'utf8');
+    const iFailed = svc.indexOf("recordStatusIn: ['recording']");
+    const iFirstCleanup = svc.indexOf('cleanupPersistedTrajectoryResources(tid');
+    const iLastCleanup = svc.lastIndexOf('cleanupPersistedTrajectoryResources(tid');
+    assert.ok(iFailed !== -1 && iFirstCleanup !== -1 && iLastCleanup > iFirstCleanup, 'both cleanup branches exist');
+    assert.ok(iFailed > iFirstCleanup && iFailed < iLastCleanup, 'failed CAS must precede its own (INTERRUPTED) cleanup');
+  });
 
   console.log(failed ? `\n${failed} failed` : '\nall ok');
   process.exit(failed ? 1 : 0);

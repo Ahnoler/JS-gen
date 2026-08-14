@@ -92,7 +92,7 @@ ALTER TABLE trajectory MODIFY COLUMN record_status
 |---|---|---|---|
 | 创建轨迹 | →draft | →draft | trajectory-meta-service.js:180,236 |
 | prepare 推流成功（未在 AI 录制） | →live | →recording | trajectory-attach-runner.js:164-167 |
-| record/start | live→recording | draft/failed→recording；recording→409；recorded/completed→409 | trajectory-recording-runner.js:112 |
+| record/start | live→recording | draft/failed→recording；**AI 录制中（recording 且 AI 活跃）→409**；recorded/completed→409；纯观看占位（recording 且非 AI 活跃）→可开始 | trajectory-recording-runner.js:77 |
 | AI 全阶段完成 | recording→recorded | recording→recorded | trajectory-recording-runner.js:440-444 |
 | AI 失败/中止（aborted 与否） | →draft | →failed | trajectory-recording-runner.js:447-451 |
 | record/stop success | any→recorded | →recorded | trajectory-record-lifecycle.js:340-345,404-410 |

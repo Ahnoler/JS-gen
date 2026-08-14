@@ -22,6 +22,7 @@ import {
 } from './trajectory-record-lifecycle.js';
 import { appendPhaseDoneLog } from '../trajectory-phase-service.js';
 import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
+import { isAiRecordingActive } from './trajectory-status-utils.js';
 
 async function broadcastRecordingLock() {
   try {
@@ -73,7 +74,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     err.statusCode = 404;
     throw err;
   }
-  if (traj.recordStatus === 'recording') {
+  if (traj.recordStatus === 'recording' && (await isAiRecordingActive(tid))) {
     const err = new Error('Recording already in progress');
     err.statusCode = 409;
     throw err;
