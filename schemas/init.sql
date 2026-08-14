@@ -463,6 +463,7 @@ CREATE TABLE `screenshot` (
   `image_data`          MEDIUMBLOB NOT NULL COMMENT 'PNG 图片二进制 (MEDIUMBLOB 最大 16MB)',
   `file_size`           INT UNSIGNED DEFAULT 0 COMMENT '文件大小（字节）',
   `mime_type`           VARCHAR(64) DEFAULT 'image/png' COMMENT 'MIME 类型',
+  `metadata_json`       JSON DEFAULT NULL COMMENT '阶段长图元数据（长宽/元素坐标/region_tree）；kind=phase_highlight 时有效',
   `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id',
   `trajectory_step_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_step.id',
   `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',

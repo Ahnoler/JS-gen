@@ -35,6 +35,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-15: `migrations/20260815090000_screenshot_metadata_json`：`screenshot` 表新增 `metadata_json` JSON 列（阶段长图元数据：长宽/元素坐标/region_tree）。
+  影响范围：screenshot schema、阶段截图捕获链路。
+  文件：migrations/20260815090000_screenshot_metadata_json.js, schemas/init.sql
+  Python 同步提示：无（截图捕获在 Node CDP 侧）；`schemas/init.sql` 已同步。
+
 - 2026-08-14: **轨迹状态枚举 v2**：`trajectory.record_status` 由旧五态改为 `ENUM('draft','recording','failed','recorded','completed')`（未录制/录制中/录制异常/待确认/已确认）；`live`（推流占用）并入 `recording`（存量迁移）。录制失败/中断/批次恢复 INTERRUPTED → `failed`（重录走 record/start 或 clear 重置）；取消确认 completed→recorded；推送闸仅 `completed`；`isAiRecordingActive`（phase.status='running'）替换全部旧 live 判定；stats 五档键名与 api-docs/Vue 文案同步。
   影响范围：schema（迁移+init.sql）、录制/占用/清理全部写入点、export push gate、轨迹列表 stats、api-docs。
   文件：migrations/20260814120000_trajectory_record_status_v2.js, schemas/init.sql, src/models/constants.js, src/dao/trajectory-dao.js, src/services/trajectory/trajectory-status-utils.js, trajectory-recording-runner.js, trajectory-record-lifecycle.js, trajectory-meta-service.js, trajectory-batch-service.js, trajectory-attach-runner.js, trajectory-attach-service.js, trajectory-manual-record.js, src/services/export-push-gate.js, src/services/replay-service.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/*, scripts/characterization/characterize-record-status-v2.mjs, characterize-trajectory.mjs, characterize-export-push-gate.mjs, characterize-batch-task-progress.mjs, scripts/smoke/accept-recording-apis.mjs, accept-multi-traj-lifecycle.mjs

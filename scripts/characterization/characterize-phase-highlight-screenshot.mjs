@@ -18,6 +18,8 @@ function ok(n) { console.log(`ok: ${n}`); }
   assert.match(src, /trajectory_phase_id/);
   assert.match(src, /uk_ss_phase_kind/);
   assert.match(src, /stitch_screenshot_id/);
+  const src2 = readFileSync(join(root, 'migrations/20260815090000_screenshot_metadata_json.js'), 'utf8');
+  assert.match(src2, /metadata_json/);
   ok('migration cues');
 }
 
@@ -26,6 +28,7 @@ function ok(n) { console.log(`ok: ${n}`); }
   assert.match(sql, /phase_highlight/);
   assert.match(sql, /stitch_screenshot_id/);
   assert.match(sql, /uk_ss_phase_kind/);
+  assert.match(sql, /metadata_json/);
   ok('init.sql cues');
 }
 
