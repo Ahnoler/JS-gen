@@ -35,6 +35,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-14: **批量导入任务名称 + 轨迹列表统计**：`batch_recording_job` 加 `name VARCHAR(512)`（默认 `文件名_MMDD-HHmm`，存量回填）；`trajectory` 加 `batch_job_id`（VARCHAR(36)，可空，FK→`batch_recording_job.id`，NULL=手动创建；init.sql 只同步列与索引，FK 仍只在迁移）。`POST /v2/trajectories/batch/import` 可选表单字段 `name`（缺省按公式生成）；`GET /v2/trajectories/batch/{batchId}` 响应加 `name`。`GET /api/v2/trajectories` 新增查询参数 `batchTaskName`（模糊），每行返回 `batchTaskName`，响应新增 `stats`（total/draft/live/recording/recorded/completed，与行查询同基准过滤、忽略 recordStatus）。sys_msg 消息链路不变。
+  影响范围：schema（两迁移）、batch import/view、轨迹列表 API、api-docs。
+  文件：migrations/20260814100000_batch_job_name.js, migrations/20260814110000_trajectory_batch_job.js, schemas/init.sql, src/services/trajectory/batch-job-name.js, src/dao/batch-recording-dao.js, src/dao/trajectory-dao.js, src/services/trajectory/trajectory-batch-service.js, src/services/trajectory/trajectory-meta-service.js, src/services/trajectory/batch-analyze.js, src/routes/v2/trajectory-batch.js, src/routes/v2/trajectory.js, src/dashboard/api-docs/groups/trajectory.js, scripts/characterization/characterize-batch-task-name.mjs
+  Python 同步提示：对齐 `batch_recording_job.name` 与 `trajectory.batch_job_id`（UUID，可空，FK SET NULL）；`/v2/trajectories` 透传 `batchTaskName`（模糊）与 `stats`（五档同基准）；批量导入创建时 name 缺省按 `文件名_MMDD-HHmm` 生成；消息正文不含任务名。
+
 - 2026-08-14: **分区 layers[]**：每个控件 `layers`（`{ role, label }[]`，外→内）由 `region_*` 推导，写入 snap / preview / `element_json`。todo 短路 `region_role` 改为 `todo`。可选 `pageLabel` 头插 `page`（不套 page）。无 schema。
   影响范围：扫描 / resolve / 录制 `element_json`；`display_group` 仍为中文路径。
   文件：src/cdp/page-locator-helpers.js, src/cdp/region-layers.js, src/cdp/resolve-by-label.js, src/models/element.js
