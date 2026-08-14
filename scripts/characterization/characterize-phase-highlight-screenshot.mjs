@@ -68,8 +68,8 @@ function ok(n) { console.log(`ok: ${n}`); }
 
 {
   const { chromium } = await import('playwright');
-  const { buildPhaseHighlightMarkExpression, buildPhaseHighlightUnmarkExpression } =
-    await import('../../src/cdp/phase-highlight-page.js');
+  const { buildPhaseScreenshotCollectExpression, buildPhaseScreenshotCleanExpression } =
+    await import('../../src/cdp/phase-screenshot-page.js');
   const html = `<!DOCTYPE html><html><body>
   <div class="el-main" style="height:200px;overflow:auto">
     <div class="el-form-item"><label>客户编号</label><input id="no"></div>
@@ -80,20 +80,21 @@ function ok(n) { console.log(`ok: ${n}`); }
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   await page.setContent(html);
-  const markExpr = buildPhaseHighlightMarkExpression([
-    { xpath_smart: "//input[@id='no']", xpath_full: '', region_id: '', region_label: '' },
-    { xpath_smart: "//button[@id='missing']", xpath_full: '', region_id: '', region_label: '' },
-  ]);
-  const marked = await page.evaluate(markExpr);
-  assert.equal(marked.hitCount, 1);
-  assert.equal(await page.locator('[data-jsgen-phase-hl="1"]').count(), 1);
-  const hlCss = await page.locator('#jsgen-phase-hl-style').evaluate((el) => el.textContent);
-  assert.match(hlCss, /rgba\(111,\s*168,\s*220/);
-  assert.match(hlCss, /box-shadow/);
-  await page.evaluate(buildPhaseHighlightUnmarkExpression());
-  assert.equal(await page.locator('[data-jsgen-phase-hl="1"]').count(), 0);
+  const first = await page.evaluate(buildPhaseScreenshotCollectExpression());
+  assert.ok(Array.isArray(first));
+  const inputHit = first.find((e) => e.kind === 'form_input');
+  assert.ok(inputHit, 'form input collected');
+  assert.equal(typeof inputHit.rect.left, 'number');
+  assert.equal(typeof inputHit.rect.top, 'number');
+  assert.ok(inputHit.rect.right > inputHit.rect.left);
+  assert.ok(Array.isArray(inputHit.layers));
+  assert.equal(await page.locator('[data-jsgen-rect]').count(), first.length);
+  const second = await page.evaluate(buildPhaseScreenshotCollectExpression());
+  assert.equal(second.length, 0, 'marker dedupes across slices');
+  await page.evaluate(buildPhaseScreenshotCleanExpression());
+  assert.equal(await page.locator('[data-jsgen-rect]').count(), 0);
   await browser.close();
-  ok('page mark/unmark via evaluate string');
+  ok('rect collect expression + dedupe + clean');
 }
 
 {
@@ -120,19 +121,20 @@ function ok(n) { console.log(`ok: ${n}`); }
 }
 
 {
-  const capPath = join(root, 'src/cdp/phase-highlight-capture.js');
-  assert.equal(existsSync(capPath), true, 'phase-highlight-capture.js must exist');
+  const capPath = join(root, 'src/cdp/phase-screenshot-capture.js');
+  assert.equal(existsSync(capPath), true, 'phase-screenshot-capture.js must exist');
   const capSrc = readFileSync(capPath, 'utf8');
   assert.match(capSrc, /Page\.captureScreenshot/);
-  assert.match(capSrc, /buildPhaseHighlightMarkExpression/);
+  assert.match(capSrc, /buildPhaseScreenshotCollectExpression/);
   assert.match(capSrc, /stitchPngSlices/);
   assert.match(capSrc, /finally/);
+  assert.match(capSrc, /contentHeight/);
   ok('capture module source cues');
 }
 
 {
   const { chromium } = await import('playwright');
-  const { runPhaseHighlightCapture } = await import('../../src/cdp/phase-highlight-capture.js');
+  const { runPhaseScreenshotCapture } = await import('../../src/cdp/phase-screenshot-capture.js');
   const html = `<!DOCTYPE html><html><body>
   <div class="el-main" style="height:200px;overflow:auto">
     <div class="el-form-item"><label>客户编号</label><input id="no"></div>
@@ -146,17 +148,22 @@ function ok(n) { console.log(`ok: ${n}`); }
   const client = await page.context().newCDPSession(page);
   await client.send('Page.enable');
   await client.send('Runtime.enable');
-  const result = await runPhaseHighlightCapture(client, [
-    { xpath_smart: "//input[@id='no']", xpath_full: '', region_id: '', region_label: '' },
-  ]);
+  const result = await runPhaseScreenshotCapture(client);
   assert.ok(Buffer.isBuffer(result.buffer));
   assert.equal(result.buffer[0], 0x89);
   assert.equal(result.buffer[1], 0x50);
   assert.equal(result.buffer[2], 0x4e);
   assert.equal(result.buffer[3], 0x47);
-  assert.equal(await page.locator('[data-jsgen-phase-hl]').count(), 0);
+  assert.ok(Array.isArray(result.meta?.elements));
+  assert.ok(result.meta.elements.some((e) => e.kind === 'form_input'));
+  assert.ok(result.meta.elements.some((e) => e.kind === 'button'));
+  assert.ok(result.meta.contentHeight > 200, 'long page content height');
+  assert.equal(await page.locator('[data-jsgen-rect]').count(), 0, 'markers cleaned');
+  const { PNG } = await import('pngjs');
+  const dims = PNG.sync.read(result.buffer);
+  assert.equal(dims.width, result.meta.contentWidth);
   await browser.close();
-  ok('runPhaseHighlightCapture PNG magic + unmark');
+  ok('runPhaseScreenshotCapture PNG + elements meta + clean');
 }
 
 {
