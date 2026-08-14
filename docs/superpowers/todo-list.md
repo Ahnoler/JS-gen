@@ -91,7 +91,7 @@
 | ID | 状态 | 工作内容 | 已锁定要点 | 关联工程项 |
 |----|------|----------|------------|------------|
 | **PR-PART** | **第一刀已实现** | 元素分区算法完善 | V2.1：`display_group`/`region_label`。第一刀：tab+向导+titlebox 拼接已落地 — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) · [plan](plans/2026-08-13-partition-tab-wizard-titlebox.md)；9242 湿测已跑（对公客户修改；评级向导） | unify-partition · L1c · picker · regionAnchor |
-| **PR-LAYER** | **第一刀 spec** | 元素分层树（分区之后） | 本刀：每控件 `layers[]` 落 snap/`element_json`。[design](specs/2026-08-14-pr-layer-region-layers-design.md)。**整页大树 TODO**（page 不套 page；其余可互套） | 依赖 PR-PART；Vue 画树另刀 |
+| **PR-LAYER** | **第一刀 plan** | 元素分层树（分区之后） | 本刀：每控件 `layers[]`。[design](specs/2026-08-14-pr-layer-region-layers-design.md) · [plan](plans/2026-08-14-pr-layer-region-layers.md)。**整页大树 TODO** | 依赖 PR-PART；Vue 画树另刀 |
 | **PR-LOC** | **本仓库已落地（V2.1）** | 阶段长图 + 控件高亮 | AI `phase_done` 后 1 张 PNG；浅蓝蒙层 + 描边；滚主滚动区拼接。**湿测已完成**（对公长表单 / BiB） | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · [plan](plans/2026-08-13-phase-highlight-long-screenshot.md) |
 | **PR-LOC-HL** | 挂起 | 步骤级高亮截图 | 操作**完成后**逐步高亮再截 | 逐步截仍挂起；阶段级高亮已并入 **PR-LOC** |
 | **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data 软文本底座；**需专刀 design** |
@@ -116,6 +116,7 @@
 
 ## 更新记录
 
+| 2026-08-14 | **PR-LAYER 第一刀 plan：** 每控件 `layers[]` — [plan](plans/2026-08-14-pr-layer-region-layers.md) |
 | 2026-08-14 | **PR-LAYER 第一刀 spec：** 每控件 `layers[]`；整页大树 TODO — [design](specs/2026-08-14-pr-layer-region-layers-design.md) |
 | 2026-08-13 | **PR-PART 第一刀落地**：tab + 向导 + titlebox 拼接（CI fixture） — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) · [plan](plans/2026-08-13-partition-tab-wizard-titlebox.md) |
 | 2026-08-13 | **PR-PART 第一刀 plan：** tab + 向导 + titlebox 拼接 — [plan](plans/2026-08-13-partition-tab-wizard-titlebox.md) |

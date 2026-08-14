@@ -1,7 +1,7 @@
 # Design: PR-LAYER — per-control `layers[]` (整页树后置)
 
 **Date:** 2026-08-14  
-**Status:** Approved (brainstorming) — implementation plan not written yet  
+**Status:** Approved — [plan](../plans/2026-08-14-pr-layer-region-layers.md)  
 **Trigger:** PR-PART 已把 tab / 向导 / collapse / titlebox 拼进 `region_*`。产品树要 `页面 → tab/向导/弹窗 → 功能分区 → 控件`，但 Vue 是另仓；缺的是本仓稳定契约，不是新 DOM 启发式。  
 **Related:** [PR-PART compose](2026-08-13-partition-tab-wizard-titlebox-design.md); [product brief](2026-08-12-product-requirements-miaoyi-brief.md) PR-LAYER; [todo-list](../todo-list.md)
 
