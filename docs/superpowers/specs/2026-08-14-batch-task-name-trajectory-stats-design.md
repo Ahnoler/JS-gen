@@ -132,9 +132,11 @@ defaultJobName(originalFilename, createdAt):
 
 ## Vue 另仓改动清单（`D:\dev\ui-auto-recording-agent-vue-master\vue-project\src`）
 
-1. `views/ui-recording/components/BatchImportDialog.vue`：可选「任务名称」输入框 → FormData 加 `name`；任务卡显示 `name`（fallback 现有 batchId 截断展示）。
-2. `components/Header/components/messageDrawer.vue:80`：修复 `batchIdFromLink` 未定义 bug（相对 linkUrl 解析 batchId 深链），恢复消息→批量任务跳转。
-3. `api/recording.ts` + `types/index.ts`：类型补 `name` / `batchTaskName` / `stats`（消费可选）。
+1. `views/ui-recording/components/BatchImportDialog.vue`：可选「任务名称」输入框 → FormData 加 `name`；任务卡（`:235-241`）显示 `name`（fallback 现有 `shortBatchId` 截断展示）。
+2. `components/Header/components/messageDrawer.vue:80`：修复 `batchIdFromLink` 未定义 bug（相对 linkUrl 解析 batchId → `openExisting`），恢复消息→批量任务深链。**不得改动** `msgContent`（v-html 直出，`:151`）、`linkUrl`、`belongItemName`、`msgStatus`、`createTime/createBy` 的现有语义。
+3. `api/recording.ts`：`BatchImportStatusResult`（`:544-556`）加 `name`；`Trajectory`（`:12-33`）/`TrajectoryListResult`（`:139-144`）加 `batchTaskName` / `stats`（消费可选）。
+4. `stores/batchImport.ts`：`BatchTask`（`:18-30`）+ `PersistedBatchTask`（`:32-40`）+ `openExisting`（`:424-460`）+ 终态通知文案（`:239-245`）加 `name`；旧 localStorage 数据 `name` undefined 兜底。
+5. 轨迹列表「所属批量任务」展示列（可选/后置）：`utils/recording-mapper.ts:17-35` → `types/index.ts:10-24 TableRecord` → `index.vue:336-389` 加列。本次需求只要求后端返回字段，前端展示列可后置。
 
 ## Verification
 
@@ -155,6 +157,6 @@ defaultJobName(originalFilename, createdAt):
 | B：后端名称链 | `src/services/trajectory/batch-job-name.js`（新）、`src/dao/batch-recording-dao.js`、`src/services/trajectory/trajectory-batch-service.js`、`src/routes/v2/trajectory-batch.js` |
 | C：轨迹绑定 + 列表 join/stats | `src/services/trajectory/trajectory-meta-service.js`、`src/services/trajectory/batch-analyze.js`、`src/dao/trajectory-dao.js`、`src/services/trajectory-service.js`、`src/routes/v2/trajectory.js` |
 | D：验证资产 + CHANGELOG | `scripts/characterization/characterize-batch-task-name.mjs`（新）、`CHANGELOG.md` |
-| E：Vue 另仓 | `BatchImportDialog.vue`、`messageDrawer.vue`、`api/recording.ts`、`types/index.ts` |
+| E：Vue 另仓 | `BatchImportDialog.vue`、`messageDrawer.vue`、`api/recording.ts`、`stores/batchImport.ts`、`types/index.ts`（可选列再加 `utils/recording-mapper.ts`、`index.vue`） |
 
 A–E 文件集无交集可并行；主线程收尾：重跑关键验证、审查 CHANGELOG 格式与越界改动、跑 `verify-all.sh`。
