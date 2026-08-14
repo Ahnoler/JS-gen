@@ -25,6 +25,7 @@ import { pumpRecord } from './batch-record.js';
 import { computeBatchItemProgress, PHASE_LOOKUP_STATUSES } from './batch-item-progress.js';
 import { insertSysMsgFromBatchJob } from '../sys-msg-service.js';
 import { decodeUploadFilename } from '../../http/decode-upload-filename.js';
+import { defaultJobName } from './batch-job-name.js';
 
 /** @type {Set<string>} in-flight cancel tokens for analyzing items */
 export const cancelledAnalyzeTokens = new Set();
@@ -206,6 +207,7 @@ export async function getBatchJobView(batchId, {
   const summary = await batchDao.summarizeJob(batchId);
   return {
     batchId: job.id,
+    name: job.name || '',
     status: job.status,
     mode: job.mode || 'record',
     functionId: job.functionId,
@@ -232,8 +234,12 @@ export async function importBatchFromExcel({
   model = '',
   idempotencyKey,
   mode: rawMode,
+  name: rawName = '',
 } = {}) {
   const mode = normalizeBatchMode(rawMode);
+
+  const taskName = String(rawName || '').trim()
+    || defaultJobName(originalFilename, new Date());
 
   if (mode === 'record' && !USE_EXECUTOR) {
     const err = new Error('Batch import requires USE_EXECUTOR=true');
@@ -319,6 +325,7 @@ export async function importBatchFromExcel({
       model: modelId,
       mode,
       originalFilename: decodeUploadFilename(originalFilename),
+      name: taskName,
       status: 'accepted',
     }, items);
   } catch (err) {

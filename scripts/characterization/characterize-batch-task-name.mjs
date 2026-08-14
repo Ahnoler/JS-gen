@@ -66,6 +66,17 @@ async function main() {
     assert.ok(!init.includes('fk_traj_batch_job'), 'init.sql must NOT contain the FK');
   });
 
+  run('creation chain: route param / service formula / dao persist / view field', () => {
+    const route = readFileSync(join(ROOT, 'src', 'routes', 'v2', 'trajectory-batch.js'), 'utf8');
+    assert.ok(route.includes('name: req.body?.name'), 'route passes name');
+    const svc = readFileSync(join(ROOT, 'src', 'services', 'trajectory', 'trajectory-batch-service.js'), 'utf8');
+    assert.ok(svc.includes('defaultJobName(originalFilename, new Date())'), 'service default formula');
+    assert.ok(svc.includes("import { defaultJobName } from './batch-job-name.js'"), 'service import');
+    assert.ok(svc.includes('name: job.name || \'\''), 'job view returns name');
+    const dao = readFileSync(join(ROOT, 'src', 'dao', 'batch-recording-dao.js'), 'utf8');
+    assert.ok(dao.includes('name: job.name || \'\''), 'dao persists name');
+  });
+
   const failedCount = failed;
   console.log(failedCount ? `\n${failedCount} failed` : '\nall ok');
   process.exit(failedCount ? 1 : 0);

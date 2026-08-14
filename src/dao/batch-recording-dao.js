@@ -45,6 +45,7 @@ export async function createJob(job, items = [], trx = null) {
       systemAccountId: job.systemAccountId,
       model: job.model || '',
       originalFilename: job.originalFilename || '',
+      name: job.name || '',
       mode: job.mode === 'draft' ? 'draft' : 'record',
       status: job.status || 'accepted',
       cancelRequestedAt: job.cancelRequestedAt ?? null,

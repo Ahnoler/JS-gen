@@ -54,6 +54,7 @@ export default function registerTrajectoryBatch(app) {
           model: req.body?.model || '',
           idempotencyKey,
           mode: req.body?.mode,
+          name: req.body?.name,
         });
         const httpStatus = result._httpStatus || 202;
         delete result._httpStatus;
