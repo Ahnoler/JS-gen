@@ -170,10 +170,10 @@ function ok(n) { console.log(`ok: ${n}`); }
   const { chromium } = await import('playwright');
   const { runPhaseScreenshotCapture } = await import('../../src/cdp/phase-screenshot-capture.js');
   const html = `<!DOCTYPE html><html><body style="margin:0">
-  <div class="el-main" style="height:400px;overflow:auto">
-    <button id="save" style="margin-top:790px">保存</button>
+  <div class="el-main" style="height:200px;overflow:auto">
     <div class="el-form-item"><label>客户编号</label><input id="no"></div>
-    <div style="height:400px"></div>
+    <button id="save" style="margin-top:2177px">保存</button>
+    <div style="height:300px"></div>
   </div>
   </body></html>`;
   const browser = await chromium.launch({ headless: true });
@@ -186,15 +186,15 @@ function ok(n) { console.log(`ok: ${n}`); }
   const result = await runPhaseScreenshotCapture(client);
   const { PNG } = await import('pngjs');
   const dims = PNG.sync.read(result.buffer);
-  assert.equal(result.meta.contentHeight, dims.height, 'contentHeight == stitched IHDR height');
+  assert.equal(result.meta.contentHeight, dims.height, 'contentHeight == stitched IHDR height (h0 != clientHeight)');
   const save = result.meta.elements.find((e) => e.kind === 'button');
   assert.ok(save, 'save button collected');
   const y = save.rect.top;
-  assert.ok(Math.abs(y - 790) < 6, `save y=${y} should be ~790 (content position)`);
+  assert.ok(Math.abs(y - 2200) < 6, `save y=${y} should be ~2200 (content position)`);
   assert.ok(save.rect.bottom > save.rect.top);
   assert.equal(await page.locator('[data-jsgen-rect]').count(), 0);
   await browser.close();
-  ok('capture geometry: step=sliceHeight-ov, stitch-consistent y');
+  ok('capture geometry discriminates h0 != clientHeight');
 }
 
 {

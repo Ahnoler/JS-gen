@@ -38,6 +38,7 @@ export function buildPhaseScreenshotCollectExpression() {
       if (host.hasAttribute('data-jsgen-rect')) continue;
       const rect = host.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) continue;
+      if (rect.bottom <= 0 || rect.top >= window.innerHeight) continue;
       const region = assignRegion(host);
       host.setAttribute('data-jsgen-rect', '1');
       out.push({
