@@ -65,7 +65,13 @@ def test_fill_date_field_is_alias_only() -> None:
         "Python alias maps fillDateField → fill_form_field",
     )
 
-    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    replay = (
+        (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
+            encoding="utf-8"
+        )
+    )
     fn = replay.split("async def _replay_form_action", 1)[1]
     assert_true(
         "action_name == 'fill_date_field'" not in fn.split("async def _replay_controller_action", 1)[0],

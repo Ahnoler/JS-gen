@@ -121,7 +121,13 @@ def test_direct_persistent_reset_gates_before_resolve() -> None:
 
 
 def test_replay_persistent_reset_gates_before_pick_validation() -> None:
-    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    replay = (
+        (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
+            encoding="utf-8"
+        )
+    )
     replay_select = replay.split("if action_name == 'select_option':", 1)[1].split(
         "return f'unknown-form-action", 1
     )[0]
@@ -163,7 +169,13 @@ def test_replay_persistent_reset_gates_before_pick_validation() -> None:
 
 
 def test_replay_branch_reset_before_pick_validation() -> None:
-    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    replay = (
+        (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
+            encoding="utf-8"
+        )
+    )
     replay_select = replay.split("if action_name == 'select_option':", 1)[1].split(
         "return f'unknown-form-action", 1
     )[0]
@@ -243,7 +255,13 @@ def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
     autofill_src = (ROOT / "scripts/controller/actions/form_autofill.py").read_text(
         encoding="utf-8"
     )
-    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    replay = (
+        (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
+            encoding="utf-8"
+        )
+    )
 
     autofill = autofill_src.split("async def _select_by_xpath", 1)[1].split("KIND_ORDER", 1)[0]
     replay_select = replay.split("if action_name == 'select_option':", 1)[1].split(
@@ -284,7 +302,13 @@ def test_recording_and_replay_use_reset_boundary() -> None:
     autofill_src = (ROOT / "scripts/controller/actions/form_autofill.py").read_text(
         encoding="utf-8"
     )
-    replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+    replay = (
+        (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/replay_form_action.py").read_text(
+            encoding="utf-8"
+        )
+    )
 
     direct = form.split("async def select_option(", 1)[1].split(
         "async def click_adjacent_button", 1
