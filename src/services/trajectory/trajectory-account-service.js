@@ -3,10 +3,10 @@
  * Kept separate from recording lifecycle to avoid circular imports with
  * trajectory-recording-service ↔ trajectory-service.
  */
-import * as trajectoryDao from '../dao/trajectory-dao.js';
-import * as systemDao from '../dao/system-dao.js';
-import * as systemAccountDao from '../dao/system-account-dao.js';
-import { NODE_TYPE, isRootParentId, isRootNodeId } from '../models/hierarchy-constants.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as systemDao from '../../dao/system-dao.js';
+import * as systemAccountDao from '../../dao/system-account-dao.js';
+import { NODE_TYPE, isRootParentId, isRootNodeId } from '../../models/hierarchy-constants.js';
 
 /** Build agent login instruction (aligned with Dashboard session-mode login).
  * Prefer system.url；兼容旧数据回退 account.loginUrl。

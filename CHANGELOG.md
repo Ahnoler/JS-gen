@@ -11,6 +11,12 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-15: **trajectory-* 服务归位**：9 个平铺服务（account/batch-excel/idle-reaper/phase/query/recording/runtime/step-move/step）迁入 `src/services/trajectory/`；`src/services/trajectory-service.js` 保持纯 re-export facade，所有消费方 import 路径同步更新。
+  影响范围：src/services 组织变化（无路由、无 schema、无响应格式变更）。
+  文件：src/services/trajectory-service.js, src/services/trajectory/*, src/services/special-element-service.js, src/services/session-lifecycle.js, src/services/remote-session-service.js, src/routes/v2/trajectory-batch.js, src/cdp/remote-bridge/ws-router.js, server.mjs, scripts/characterization/*.mjs
+  Python 同步提示：纯路径移动，不改接口语义，Python 控制面无需改动。
+
+
 - 2026-08-15: 阶段截图 V2：phase_done 长图不再烘焙元素高亮；`screenshot.metadata_json` 记录截图长宽 + 全部可见 L2 控件坐标（拼接图内容坐标）+ region_tree；录制链路 `capturePhaseHighlightScreenshot` → `capturePhaseScreenshot`。
   影响范围：src/services/trajectory 录制链路、executor `session.bib_phase_highlight_capture`（消息名不变，payload `hitCount` → `meta`）。
   文件：src/dao/screenshot-dao.js, src/services/screenshot-service.js, src/services/trajectory/phase-highlight-screenshot.js, src/services/trajectory/trajectory-recording-runner.js, src/models/phase-highlight-targets.js（删除）, scripts/characterization/characterize-phase-highlight-screenshot.mjs

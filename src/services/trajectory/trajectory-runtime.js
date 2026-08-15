@@ -1,9 +1,9 @@
 /**
  * In-memory trajectory ↔ executor session runtime map.
  */
-import * as execSession from '../executor-session-client.js';
-import * as slotLease from '../executor-slot-lease.js';
-import { state } from '../state.js';
+import * as execSession from '../../executor-session-client.js';
+import * as slotLease from '../../executor-slot-lease.js';
+import { state } from '../../state.js';
 
 const trajectoryRuntimeMap = new Map();
 

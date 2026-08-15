@@ -26,11 +26,11 @@ import {
 import { broadcast } from '../../ws-server.js';
 import {
   markConsumedActionLog,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import {
   markStepReplayFailed,
   markStepReplayOk,
-} from '../trajectory-step-service.js';
+} from './trajectory-step-service.js';
 import { handleFormStructureCheckpoint } from './form-structure-heal.js';
 
 function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {

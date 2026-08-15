@@ -2,10 +2,10 @@
  * Trajectory phase lifecycle: upsert/status, clear, add, sync descriptions.
  */
 import { randomUUID } from 'crypto';
-import * as trajectoryDao from '../dao/trajectory-dao.js';
-import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
-import { appendDoneLogEntry } from '../models/phase-done-logs.js';
-import { getDB } from '../../config/database.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
+import { appendDoneLogEntry } from '../../models/phase-done-logs.js';
+import { getDB } from '../../../config/database.js';
 import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
 import { refreshTrajectoryCounts } from './trajectory-step-service.js';
 
@@ -184,8 +184,8 @@ export async function addPhaseToTrajectory(trajectoryDbId, { description = '', p
   const desc = String(description || '').trim() || `阶段 ${nextNum}`;
   let candidates = null;
   try {
-    const { resolveAncestorSystemId } = await import('./hierarchy-service.js');
-    const { fetchDisplayCandidatesForDescription } = await import('./special-element-service.js');
+    const { resolveAncestorSystemId } = await import('../hierarchy-service.js');
+    const { fetchDisplayCandidatesForDescription } = await import('../special-element-service.js');
     const systemId = traj.functionId
       ? await resolveAncestorSystemId(traj.functionId)
       : null;
@@ -284,12 +284,12 @@ export async function syncTrajectoryPhaseDescriptions(trajectoryDbId, descriptio
   // Upsert in order and renumber
   let systemId = null;
   try {
-    const { resolveAncestorSystemId } = await import('./hierarchy-service.js');
+    const { resolveAncestorSystemId } = await import('../hierarchy-service.js');
     systemId = traj.functionId ? await resolveAncestorSystemId(traj.functionId) : null;
   } catch {
     systemId = null;
   }
-  const { fetchDisplayCandidatesForDescription } = await import('./special-element-service.js');
+  const { fetchDisplayCandidatesForDescription } = await import('../special-element-service.js');
 
   for (let i = 0; i < items.length; i++) {
     const phaseNumber = i + 1;

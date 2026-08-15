@@ -10,12 +10,12 @@ import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
 import {
   resolveTrajectoryAccount,
-} from '../trajectory-account-service.js';
-import { getTrajectoryTree } from '../trajectory-query-service.js';
+} from './trajectory-account-service.js';
+import { getTrajectoryTree } from './trajectory-query-service.js';
 import {
   clearStaleTrajectoryRuntime,
   getTrajectoryRuntime,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import { runDefaultLogin } from './trajectory-record-lifecycle.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { USE_EXECUTOR } from '../../../config/config.js';

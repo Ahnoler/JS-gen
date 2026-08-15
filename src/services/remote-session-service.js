@@ -84,7 +84,7 @@ export async function unmountTrajectoriesFromRemoteSession(remoteSessionId, {
   });
   if (!cleared.length) return cleared;
   try {
-    const { getTrajectoryRuntime } = await import('./trajectory-runtime.js');
+    const { getTrajectoryRuntime } = await import('./trajectory/trajectory-runtime.js');
     const rid = Number(remoteSessionId);
     for (const tid of cleared) {
       const runtime = getTrajectoryRuntime(tid);
@@ -109,7 +109,7 @@ export async function reconcileStaleTrajectoryRemoteMounts() {
   const cleared = await trajectoryDao.repairStaleRemoteMounts();
   if (!cleared.length) return cleared;
   try {
-    const { getTrajectoryRuntime } = await import('./trajectory-runtime.js');
+    const { getTrajectoryRuntime } = await import('./trajectory/trajectory-runtime.js');
     for (const tid of cleared) {
       const runtime = getTrajectoryRuntime(tid);
       if (runtime) {
@@ -459,7 +459,7 @@ export async function getLiveStatus(opts = {}) {
 
   if (Number.isFinite(tid)) {
     try {
-      const { getTrajectoryRuntime } = await import('./trajectory-runtime.js');
+      const { getTrajectoryRuntime } = await import('./trajectory/trajectory-runtime.js');
       const runtime = getTrajectoryRuntime(tid);
       if (!preferAgentSessionId && runtime?.sessionId) {
         preferAgentSessionId = runtime.sessionId;

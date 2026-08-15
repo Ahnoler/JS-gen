@@ -10,7 +10,7 @@ import { state } from '../../state.js';
 import {
   getTrajectoryRuntime,
   touchTrajectoryRuntimeActivity,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 
 export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phaseId = null } = {}) {

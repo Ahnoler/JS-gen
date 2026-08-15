@@ -114,7 +114,7 @@ async function main() {
   }, Math.max(15000, Math.floor(EXECUTOR_HEARTBEAT_TIMEOUT_MS / 2)));
   sweepInterval.unref?.();
 
-  const { startTrajectoryIdleReaper } = await import('./src/services/trajectory-idle-reaper.js');
+  const { startTrajectoryIdleReaper } = await import('./src/services/trajectory/trajectory-idle-reaper.js');
   startTrajectoryIdleReaper();
 
   // Do NOT crash occupied remote_sessions at raw boot — executor nodes look offline

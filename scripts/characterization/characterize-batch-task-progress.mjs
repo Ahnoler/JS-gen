@@ -17,7 +17,7 @@ import {
 } from '../../src/services/trajectory/batch-item-progress.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const phaseSvc = readFileSync(join(ROOT, 'src/services/trajectory-phase-service.js'), 'utf-8');
+const phaseSvc = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-phase-service.js'), 'utf-8');
 assert.match(phaseSvc, /export async function appendPhaseDoneLog/);
 assert.match(phaseSvc, /done_logs: JSON\.stringify\(\[\]\)/);
 

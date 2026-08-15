@@ -9,8 +9,8 @@ import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import * as formSnapshotDao from '../../dao/form-snapshot-dao.js';
 import { getDB } from '../../../config/database.js';
 import { stepFromActionLog } from '../../models/helpers.js';
-import { touchTrajectoryRuntimeActivity } from '../trajectory-runtime.js';
-import { refreshTrajectoryCounts } from '../trajectory-step-service.js';
+import { touchTrajectoryRuntimeActivity } from './trajectory-runtime.js';
+import { refreshTrajectoryCounts } from './trajectory-step-service.js';
 import { resolvePhaseIdForPersist } from './trajectory-persist-service.js';
 
 /**

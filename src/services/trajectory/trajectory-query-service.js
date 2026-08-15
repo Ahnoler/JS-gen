@@ -1,11 +1,11 @@
 /**
  * Trajectory read/query helpers: tree, lists, action-flow merge.
  */
-import * as trajectoryDao from '../dao/trajectory-dao.js';
-import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
-import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
-import * as caseDataDao from '../dao/case-data-dao.js';
-import { filterMetaSteps, isMetaStep } from '../models/meta-step-actions.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
+import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
+import * as caseDataDao from '../../dao/case-data-dao.js';
+import { filterMetaSteps, isMetaStep } from '../../models/meta-step-actions.js';
 
 function safeJson(str) {
   try { return JSON.parse(str); } catch { return {}; }

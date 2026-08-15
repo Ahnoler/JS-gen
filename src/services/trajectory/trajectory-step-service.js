@@ -1,20 +1,20 @@
 /**
  * Trajectory step CRUD + shared step/phase count refresh.
  */
-import * as trajectoryDao from '../dao/trajectory-dao.js';
-import * as trajectoryStepDao from '../dao/trajectory-step-dao.js';
-import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
-import { getDB } from '../../config/database.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
+import { getDB } from '../../../config/database.js';
 import { planStepMove } from './trajectory-step-move.js';
 import { getTrajectoryRuntime } from './trajectory-runtime.js';
-import { state } from '../state.js';
+import { state } from '../../state.js';
 import {
   isSingleTargetAction,
   LOCATOR_EXEMPT_ACTIONS,
   prepareElementJson,
-} from '../models/element.js';
-import { normalizeActionName } from '../models/action-name.js';
-import { META_STEP_ACTIONS } from '../models/meta-step-actions.js';
+} from '../../models/element.js';
+import { normalizeActionName } from '../../models/action-name.js';
+import { META_STEP_ACTIONS } from '../../models/meta-step-actions.js';
 
 export async function refreshTrajectoryCounts(trajectoryDbId) {
   const db = getDB();

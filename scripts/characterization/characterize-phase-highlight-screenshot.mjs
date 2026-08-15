@@ -305,7 +305,7 @@ function ok(n) { console.log(`ok: ${n}`); }
 }
 
 {
-  const qs = readFileSync(join(root, 'src/services/trajectory-query-service.js'), 'utf8');
+  const qs = readFileSync(join(root, 'src/services/trajectory/trajectory-query-service.js'), 'utf8');
   assert.match(qs, /stitchScreenshotUrl/);
   assert.match(qs, /stitchScreenshotId/);
   const cl = readFileSync(join(root, 'CHANGELOG.md'), 'utf8');

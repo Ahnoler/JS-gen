@@ -14,7 +14,7 @@ import {
   prepareTrajectoryRecording,
   startTrajectoryRecording,
   detachTrajectoryLive,
-} from '../trajectory-recording-service.js';
+} from './trajectory-recording-service.js';
 import {
   emitProgress,
   maybeFinalizeJob,

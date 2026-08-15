@@ -15,7 +15,7 @@ import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
 import {
   getTrajectoryRuntime,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import { runReplayBatch } from './replay-batch-runner.js';
 
 function fromDbRowCompat(row) {

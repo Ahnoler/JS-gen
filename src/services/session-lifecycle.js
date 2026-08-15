@@ -19,7 +19,7 @@ function logLifecycle(event, fields = {}) {
 async function clearRuntimeMounts(cleared, remoteSessionId) {
   if (!cleared?.length) return;
   try {
-    const { getTrajectoryRuntime } = await import('./trajectory-runtime.js');
+    const { getTrajectoryRuntime } = await import('./trajectory/trajectory-runtime.js');
     const rid = Number(remoteSessionId);
     for (const tid of cleared) {
       const runtime = getTrajectoryRuntime(tid);
@@ -150,7 +150,7 @@ export async function reconcileDirtyMounts() {
   const cleared = await trajectoryDao.repairStaleRemoteMounts();
   if (!cleared.length) return cleared;
   try {
-    const { getTrajectoryRuntime } = await import('./trajectory-runtime.js');
+    const { getTrajectoryRuntime } = await import('./trajectory/trajectory-runtime.js');
     for (const tid of cleared) {
       const runtime = getTrajectoryRuntime(tid);
       if (runtime) {

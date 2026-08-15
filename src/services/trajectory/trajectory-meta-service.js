@@ -8,7 +8,7 @@ import * as systemDao from '../../dao/system-dao.js';
 import * as caseDataDao from '../../dao/case-data-dao.js';
 import { callLLM } from '../../llm-utils.js';
 import { getDB } from '../../../config/database.js';
-import { getTrajectoryTree, getTrajectoryWithPhases } from '../trajectory-query-service.js';
+import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
 import {
   CASE_DATA_SECTION_RE,
   extractCaseDataBlock,

@@ -4,7 +4,7 @@
  */
 import { uploadXlsxSingle, multerHttpStatus, XLSX_MIME } from '../../http/upload-xlsx.js';
 import { decodeUploadFilename } from '../../http/decode-upload-filename.js';
-import { BATCH_TEMPLATE_FILENAME } from '../../services/trajectory-batch-excel.js';
+import { BATCH_TEMPLATE_FILENAME } from '../../services/trajectory/trajectory-batch-excel.js';
 import * as batchService from '../../services/trajectory/trajectory-batch-service.js';
 import { BATCH_JOB_TERMINAL } from '../../models/constants.js';
 import { sendErr, asyncHandler } from './trajectory-shared.js';

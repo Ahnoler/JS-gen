@@ -5,18 +5,18 @@
  * Idle traj = no new trajectory_step for IDLE_MS, and session not busy / not manual-recording.
  * Leaving the recording studio does NOT detach — this reaper is the reclaim path.
  */
-import { getDB } from '../../config/database.js';
+import { getDB } from '../../../config/database.js';
 import {
   getAllTrajectoryRuntimes,
   detachTrajectoryLive,
-} from './trajectory-service.js';
-import { state } from '../state.js';
-import * as remoteSessionDao from '../dao/remote-session-dao.js';
-import * as executorNodeDao from '../dao/executor-node-dao.js';
-import { clearLiveBinding, unmountTrajectoriesFromRemoteSession } from './remote-session-service.js';
-import { expireAllDueGrace } from './session-lifecycle.js';
-import * as execSession from '../executor-session-client.js';
-import * as slotLease from '../executor-slot-lease.js';
+} from '../trajectory-service.js';
+import { state } from '../../state.js';
+import * as remoteSessionDao from '../../dao/remote-session-dao.js';
+import * as executorNodeDao from '../../dao/executor-node-dao.js';
+import { clearLiveBinding, unmountTrajectoriesFromRemoteSession } from '../remote-session-service.js';
+import { expireAllDueGrace } from '../session-lifecycle.js';
+import * as execSession from '../../executor-session-client.js';
+import * as slotLease from '../../executor-slot-lease.js';
 
 const IDLE_MS = 2 * 60 * 60 * 1000;
 const TICK_MS = 45 * 1000;

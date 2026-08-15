@@ -7,7 +7,7 @@ export {
   getTrajectoryLoginContext,
   resolveTrajectoryAccount,
   setTrajectoryAccount,
-} from './trajectory-account-service.js';
+} from './trajectory/trajectory-account-service.js';
 
 export {
   stepsToActionEntries,
@@ -17,7 +17,7 @@ export {
   listPhasesByTrajectory,
   listStepsByPhase,
   listByFunction,
-} from './trajectory-query-service.js';
+} from './trajectory/trajectory-query-service.js';
 
 export {
   refreshTrajectoryCounts,
@@ -29,7 +29,7 @@ export {
   removeTrajectoryStep,
   moveTrajectoryStep,
   insertStepsAfter,
-} from './trajectory-step-service.js';
+} from './trajectory/trajectory-step-service.js';
 
 export {
   buildStepsFromActionFile,
@@ -49,7 +49,7 @@ export {
   clearTrajectory,
   addPhaseToTrajectory,
   syncTrajectoryPhaseDescriptions,
-} from './trajectory-phase-service.js';
+} from './trajectory/trajectory-phase-service.js';
 
 export {
   createEmptyTrajectory,
@@ -79,4 +79,4 @@ export {
   stopTrajectoryStepsReplay,
   resolveTrajectoryElement,
   toggleTrajectoryManualRecord,
-} from './trajectory-recording-service.js';
+} from './trajectory/trajectory-recording-service.js';

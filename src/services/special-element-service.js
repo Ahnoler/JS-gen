@@ -13,7 +13,7 @@ import {
 } from './special-element-search-service.js';
 import {
   getTrajectoryRuntime,
-} from './trajectory-runtime.js';
+} from './trajectory/trajectory-runtime.js';
 import * as execSession from '../executor-session-client.js';
 import { state } from '../state.js';
 

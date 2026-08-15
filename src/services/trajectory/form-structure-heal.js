@@ -26,13 +26,13 @@ import {
 import { broadcast } from '../../ws-server.js';
 import {
   markConsumedActionLog,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import {
   markStepReplayFailed,
   markStepReplayOk,
   insertStepsAfter,
   refreshTrajectoryCounts,
-} from '../trajectory-step-service.js';
+} from './trajectory-step-service.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 
 /** Type B may fill several new fields. */

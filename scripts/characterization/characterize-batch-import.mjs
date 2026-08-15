@@ -13,7 +13,7 @@ import {
   BATCH_EXCEL_HEADERS,
   BATCH_TEMPLATE_FILENAME,
   sampleTemplateRows,
-} from '../../src/services/trajectory-batch-excel.js';
+} from '../../src/services/trajectory/trajectory-batch-excel.js';
 import { buildRequestHash } from '../../src/services/trajectory/trajectory-batch-service.js';
 import {
   BATCH_JOB_MODES,

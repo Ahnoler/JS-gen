@@ -18,7 +18,7 @@ import {
   deleteTrajectoryRuntime,
   getTrajectoryRuntime,
   registerTrajectorySession,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import { resolveModelId } from '../../runtime/resolve-model.js';
 import { prepareTrajectoryRecordingUnlocked } from './trajectory-attach-runner.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';

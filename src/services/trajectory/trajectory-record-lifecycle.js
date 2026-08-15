@@ -8,11 +8,11 @@ import * as execSession from '../../executor-session-client.js';
 import { state } from '../../state.js';
 import { USE_EXECUTOR } from '../../../config/config.js';
 import * as remoteBridge from '../../cdp/remote-bridge.js';
-import { getTrajectoryTree } from '../trajectory-query-service.js';
+import { getTrajectoryTree } from './trajectory-query-service.js';
 import {
   getTrajectoryRuntime,
   markConsumedActionLog,
-} from '../trajectory-runtime.js';
+} from './trajectory-runtime.js';
 import { classifyRegions } from '../region-classify.js';
 import { displayGroupOf, isTaxonomyRegionToken, uniquifyDisplayGroups } from '../../cdp/display-group.js';
 

@@ -13,14 +13,14 @@ import { AI_MEMORY_FACT_PACK } from '../../../config/config.js';
 import {
   getTrajectoryRuntime,
   touchTrajectoryRuntimeActivity,
-} from '../trajectory-runtime.js';
-import { resolveTrajectoryAccount } from '../trajectory-account-service.js';
-import { getTrajectoryTree } from '../trajectory-query-service.js';
+} from './trajectory-runtime.js';
+import { resolveTrajectoryAccount } from './trajectory-account-service.js';
+import { getTrajectoryTree } from './trajectory-query-service.js';
 import {
   runDefaultLogin,
   prepareCaseDataInjection,
 } from './trajectory-record-lifecycle.js';
-import { appendPhaseDoneLog } from '../trajectory-phase-service.js';
+import { appendPhaseDoneLog } from './trajectory-phase-service.js';
 import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 

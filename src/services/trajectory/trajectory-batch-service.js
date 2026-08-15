@@ -12,13 +12,13 @@ import * as batchDao from '../../dao/batch-recording-dao.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import { broadcast } from '../../ws-server.js';
-import { validateFunctionAndAccount } from '../trajectory-account-service.js';
-import { parseBatchExcelBuffer, buildTemplateBuffer } from '../trajectory-batch-excel.js';
+import { validateFunctionAndAccount } from './trajectory-account-service.js';
+import { parseBatchExcelBuffer, buildTemplateBuffer } from './trajectory-batch-excel.js';
 import {
   stopTrajectoryRecordingSafe,
   detachTrajectoryLive,
   cleanupPersistedTrajectoryResources,
-} from '../trajectory-recording-service.js';
+} from './trajectory-recording-service.js';
 import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../../models/constants.js';
 import { pumpAnalyze, pumpDraft } from './batch-analyze.js';
 import { pumpRecord } from './batch-record.js';

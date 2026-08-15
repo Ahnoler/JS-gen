@@ -9,8 +9,8 @@ import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import * as systemDao from '../../dao/system-dao.js';
 import { getDB } from '../../../config/database.js';
 import { stepFromActionLog } from '../../models/helpers.js';
-import { touchTrajectoryRuntimeActivity } from '../trajectory-runtime.js';
-import { refreshTrajectoryCounts } from '../trajectory-step-service.js';
+import { touchTrajectoryRuntimeActivity } from './trajectory-runtime.js';
+import { refreshTrajectoryCounts } from './trajectory-step-service.js';
 
 export {
   appendRecordedStep,

@@ -3,7 +3,7 @@
  * Run: node scripts/characterization/characterize-step-move.mjs
  */
 import assert from 'assert';
-import { planStepMove } from '../../src/services/trajectory-step-move.js';
+import { planStepMove } from '../../src/services/trajectory/trajectory-step-move.js';
 
 const phases = [
   { id: 1, phaseNumber: 1 },

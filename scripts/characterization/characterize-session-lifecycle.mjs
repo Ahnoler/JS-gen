@@ -96,7 +96,7 @@ function testConfigExport() {
 }
 
 function testReaperWiresGrace() {
-  const src = readFileSync(join(root, 'src/services/trajectory-idle-reaper.js'), 'utf8');
+  const src = readFileSync(join(root, 'src/services/trajectory/trajectory-idle-reaper.js'), 'utf8');
   assert.match(src, /expireAllDueGrace/);
 }
 
