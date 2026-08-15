@@ -378,12 +378,12 @@ export function trajectoryStepToActionEntry(step) {
 
 /**
  * Map trajectory_step rows to assembler command entries (action_{ts}.json shape).
- * Shared by v2 trajectories assemble-file and replay-service prepareReplay.
+ * Shared by v2 trajectories assemble-file and the legacy assembled-replay prepare path.
  *
  * @param {Array} steps
  * @param {Object} [opts]
  * @param {boolean} [opts.preferEntryPhase=false] — when step.phaseNumber is missing,
- *   fall back to entry.phase (step.phase) instead of 0 (replay-service behavior).
+ *   fall back to entry.phase (step.phase) instead of 0 (legacy assembled-replay behavior).
  * @returns {Object[]}
  */
 export function stepsToActionCommands(steps, { preferEntryPhase = false } = {}) {

@@ -39,7 +39,7 @@ run "characterize-region-tree" node scripts/characterization/characterize-region
 run "characterize-transaction-export-region" node scripts/characterization/characterize-transaction-export-region.mjs
 run "characterize-assembler" "$PY" scripts/characterization/characterize-assembler-click.py
 run "characterize-form-rules" "$PY" scripts/characterization/characterize-form-rules.py
-run "accept-replay-apis"       node scripts/smoke/accept-replay-apis.mjs
+run "accept-engineering-apis" node scripts/smoke/accept-engineering-apis.mjs
 run "characterize-scan-editable-summary" "$PY" scripts/characterization/characterize-scan-editable-summary.py
 run "characterize-scan-fullpage-p1" "$PY" scripts/characterization/characterize-scan-fullpage-p1.py
 run "characterize-phase-section-scope" "$PY" scripts/characterization/characterize-phase-section-scope.py

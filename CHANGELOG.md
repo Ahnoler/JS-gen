@@ -875,6 +875,14 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   文件：migrations/20260803110000_trajectory_step_confirmed_replay.js, migrations/20260803111500_trajectory_step_confirmed_comment.js
   Python 同步提示：更新 sql/init.sql trajectory_step.confirmed DEFAULT 1 + 注释；更新 uara/trajectory/domain/trajectory_step.py 注释 + default=1。
 
+
+### Removed
+
+- 2026-08-15: **废弃组装回放栈下线**：删除 `src/routes/v2/replay.js`（5 个 REST 端点 + WS `replay:start`）与 `src/services/replay-service.js`；`/api/test/assemble`、`/api/test/run` 与产品 live `/steps/replay`（`_replay.py`）保持不变。api-docs 同步删除已弃用 replay 组与 `replay:status/step/screenshot/result/done` 事件（保留 `replay:form_structure`）。
+  影响范围：`/api/v2/trajectories/:id/replay/*`、`/api/v2/replays/:replayId` 与 WS `replay:start` 已移除。
+  文件：src/routes/v2/replay.js（删除）, src/services/replay-service.js（删除）, src/routes/v2/__init__.js, server.mjs, src/dashboard/api-docs/groups/recording.js, websocket.js, app.js, scripts/smoke/accept-engineering-apis.mjs（新增）, scripts/refactor/verify-all.sh
+  Python 同步提示：Python 控制面若有 `/api/v2/replay/*` 组装回放调用需同步移除；live `/steps/replay` 协议不变。
+
 ## 条目格式约定
 
 每次修改本项目必追加到 `[Unreleased]` 区段（发版时再剪切到 `[x.y.z] - YYYY-MM-DD`）：

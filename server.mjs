@@ -167,7 +167,6 @@ async function main() {
     console.log(`  GET  /api/v2/trajectories`);
     console.log(`  POST /api/v2/trajectories/:id/record/prepare|start|stop`);
     console.log(`  POST /api/v2/trajectories/:id/stream/detach | attach|detach`);
-    console.log(`  POST /api/v2/trajectories/:id/replay/prepare|start|stop`);
     console.log(`  GET  /api/v2/executors`);
     console.log(`  GET  /api/v2/case-data`);
     console.log(`  GET  /api/v2/system-ref-data`);

@@ -21,7 +21,6 @@ import registerSystemRefData from './system-ref-data.js';
 import registerRemoteSession from './remote-session.js';
 import registerApiOverride from './api-override.js';
 import registerExecutor from './executor.js';
-import registerReplay from './replay.js';
 import registerExportMgmt from './export-mgmt.js';
 import registerMemory from './memory.js';
 import registerOperationComponent from './operation-component.js';
@@ -48,7 +47,6 @@ export default function (app) {
   registerRemoteSession(app);
   registerApiOverride(app);
   registerExecutor(app);
-  registerReplay(app);
   registerExportMgmt(app);
   registerMemory(app);
   registerRegions(app);

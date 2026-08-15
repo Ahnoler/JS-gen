@@ -358,54 +358,6 @@ export const GROUP_RECORDING = [
     ],
   },
   {
-    id: 'replay',
-    name: '回放（已弃用：组装 Playwright 全量）',
-    description: 'DEPRECATED。产品请用 POST .../steps/replay（live replay_actions / _replay.py）。本路径仍可跑：服务端组装脚本，不向客户端返回 JS 源码；进度走 WS replay:*。',
-    endpoints: [
-      {
-        method: 'POST', path: '/api/v2/trajectories/{id}/replay/prepare',
-        summary: '[DEPRECATED] 组装回放计划',
-        desc: '已弃用。recordStatus 为 recording 时 409。脚本不返回给客户端。产品请改用 /steps/replay。',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
-        reqExample: J({}),
-        respExample: J({
-          replayPlanId: 'uuid', trajectoryId: 42, ready: true, stepCount: 15,
-          steps: [{ stepId: 501, phaseId: 101, phaseNumber: 1, actionType: '...', confirmed: true }],
-          stepMap: [{ assemblerStep: 1, stepId: 501, phaseId: 101, actionType: 'click_element_by_index' }],
-        }),
-        notes: ['DEPRECATED — 工程资产保留，非产品支持路径'],
-      },
-      {
-        method: 'POST', path: '/api/v2/trajectories/{id}/replay/start',
-        summary: '启动 Playwright 回放',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
-        reqExample: J({ replayPlanId: 'uuid' }),
-        respExample: J({ replayId: 'uuid', trajectoryId: 42, replayPlanId: 'uuid' }),
-        notes: ['进度通过 WS：replay:status / replay:step / replay:screenshot / replay:result / replay:done'],
-      },
-      {
-        method: 'POST', path: '/api/v2/trajectories/{id}/replay/stop',
-        summary: '中止回放',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
-        respExample: J({ trajectoryId: 42, replayId: 'uuid', stopped: true }),
-      },
-      {
-        method: 'GET', path: '/api/v2/trajectories/{id}/replay/latest',
-        summary: '最近一次回放状态',
-        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
-        respExample: J({
-          replayId: 'uuid', trajectoryId: 42, status: 'running',
-          completedStepIds: [501, 502], screenshots: [], failedStep: null, success: true,
-        }),
-      },
-      {
-        method: 'GET', path: '/api/v2/replays/{replayId}',
-        summary: '按 replayId 查询',
-        params: [{ name: 'replayId', type: 'string', required: true, in: 'path', example: 'uuid' }],
-      },
-    ],
-  },
-  {
     id: 'executor',
     name: '执行机',
     description: '执行机注册走 WS /ws/executor；HTTP 只读 + drain',

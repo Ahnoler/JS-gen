@@ -70,7 +70,7 @@ function renderOverview(container) {
         <li><code>POST .../detach</code> 关闭会话并杀死 Chrome、释放槽位（手动释放执行资源）。</li>
         <li>多交易并行：推流按 <code>trajectoryId</code> / <code>remote_session.id</code> 隔离，互不串扰。</li>
         <li><code>record/prepare</code> 优先复用 live session / 空闲 CDP Chrome；无资源返回 409 + holders。登录不写入 <code>trajectory_step</code>。</li>
-        <li>回放由服务端组装 Playwright 脚本，客户端只收 <code>replay:*</code> 进度，不拿 JS 源码。</li>
+        <li>产品回放走 <code>/steps/replay</code>（live replay_actions / _replay.py），进度走 WS <code>replay:step</code> / <code>replay:form_structure</code> / <code>replay:finished</code>。</li>
         <li>旧路径 <code>/api/trajectory</code>、<code>/api/case-data</code> → <strong>410 Gone</strong>。</li>
       </ul>
       <h3 style="margin-top:16px">常用枚举</h3>
