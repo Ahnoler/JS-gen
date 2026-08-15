@@ -240,9 +240,12 @@ def test_direct_reset_before_resolve_and_gates_trigger() -> None:
 
 def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    autofill_src = (ROOT / "scripts/controller/actions/form_autofill.py").read_text(
+        encoding="utf-8"
+    )
     replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
 
-    autofill = form.split("async def _select_by_xpath", 1)[1].split("KIND_ORDER", 1)[0]
+    autofill = autofill_src.split("async def _select_by_xpath", 1)[1].split("KIND_ORDER", 1)[0]
     replay_select = replay.split("if action_name == 'select_option':", 1)[1].split(
         "return f'unknown-form-action", 1
     )[0]
@@ -251,7 +254,9 @@ def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
         ("autofill xpath", autofill, "JS_SELECT_TRIGGER_BY_XPATH"),
         (
             "autofill label",
-            form.split("async def _select_by_label_autofill", 1)[1].split("KIND_ORDER", 1)[0],
+            autofill_src.split("async def _select_by_label_autofill", 1)[1].split(
+                "KIND_ORDER", 1
+            )[0],
             "JS_FIND_LABELED_SELECT",
         ),
         (
@@ -276,12 +281,15 @@ def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
 
 def test_recording_and_replay_use_reset_boundary() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    autofill_src = (ROOT / "scripts/controller/actions/form_autofill.py").read_text(
+        encoding="utf-8"
+    )
     replay = (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
 
     direct = form.split("async def select_option(", 1)[1].split(
         "async def click_adjacent_button", 1
     )[0]
-    autofill = form.split("async def _select_by_xpath", 1)[1].split(
+    autofill = autofill_src.split("async def _select_by_xpath", 1)[1].split(
         "KIND_ORDER", 1
     )[0]
     replay_select = replay.split("if action_name == 'select_option':", 1)[1].split(
