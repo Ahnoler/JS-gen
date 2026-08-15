@@ -64,7 +64,13 @@ class _FormActionEngineBase:
         self.case_data_store = case_data_store
         self.autofill_engine = autofill_engine
         self.ensure_scanned = autofill_engine.ensure_scanned
+        # Parity alias: engine action bodies call the underscore name,
+        # e.g. await self._ensure_scanned(label_text).
+        self._ensure_scanned = self.ensure_scanned
         self.button_keywords = button_keywords
+        # Parity alias: fill bodies call the underscore name,
+        # e.g. JS_CHECK_SINGLE_FIELD with self._button_keywords().
+        self._button_keywords = button_keywords
 
 
 class LoginEngine(_FormActionEngineBase):
