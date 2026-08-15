@@ -242,4 +242,4 @@ Type B 表单结构自愈：
 2. H2 发现并处理了 handoff 未明列的两处 `session.step` 白名单（控制面 + 执行机）；旧字段与消息名全部保留。
 3. H3 保持 `_heal_mode` 字符串语义不变，只新增 `_heal_contract`；`detect_heal_mode` 的旧字段与文本关键词兜底未删除。
 4. 门禁在 browser_use Python 环境下 `verify-all.sh` 全绿；本地补齐 Playwright Chromium headless shell（仓库外）。
-5. H4/P2 路由开关未实现；本轮 `suggestedAction` 只进入 instruction 与 contract，不改变 Node 控制流。
+5. H4/P2 路由开关已实现（`heal-decision.js`，默认关闭）：`HEAL_LOCATE_DECISION_ENABLED=1` 时按 suggestedAction 走 skip/fail/retry；关闭时 `suggestedAction` 只进入 instruction 与 contract，不改变 Node 控制流。真实 batch replay live 冒烟仍未运行。

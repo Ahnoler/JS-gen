@@ -16,6 +16,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   文件：src/services/trajectory/missing-reason-analyzer.js, src/services/trajectory/heal-contract.js, src/services/trajectory/replay-batch-runner.js, src/services/trajectory/form-structure-heal.js, src/services/trajectory/replay-heal-shared.js, src/routes/browser-session/heal-instruction.js, src/executor-session-client.js, executor/session-handler.js, scripts/controller/actions/phase/prompts.py, scripts/agent/service.py, scripts/agent_utils.py, scripts/prompts/agent-tools-heal.md, scripts/characterization/characterize-heal-locate.mjs, scripts/characterization/characterize-heal-mode.py, scripts/refactor/verify-all.sh, docs/superpowers/specs/2026-08-15-heal-locate-current-analysis.md
   Python 同步提示：executor/agent 需解析 `instruction.heal_contract`（`mode=='heal'`，`scope` 为 `step | form_structure`，`reason.target` 供定位、`runtime` 供运行时）；heal 模式 system packs 应收敛为 `agent-core + agent-tools-common + agent-tools-heal`，勿再走 full fallback；`heal_type/healType` 与文本关键词兜底必须保留。
 
+- 2026-08-15: **Heal-Locate P2 决策路由（默认关闭）**：新增 `HEAL_LOCATE_DECISION_ENABLED=1` 开关；开启后 Type A 按 `suggestedAction` 走 skip（标记 confirmed=0 后继续）/ fail（不进 AI heal，直接结束批次）/ retry（按 `runtime.retry_count` 有限重放当前步，仍失败再落 AI heal）。默认关闭时控制流与 Phase 1 完全一致。
+  影响范围：仅 `src/services/trajectory/replay-batch-runner.js` Type A 失败路径；无 schema、无路由、无 WS 消息名变更。
+  文件：src/services/trajectory/heal-decision.js, src/services/trajectory/replay-batch-runner.js, scripts/characterization/characterize-heal-decision.mjs, scripts/refactor/verify-all.sh
+  Python 同步提示：无（决策在 Node 控制面；Python 侧仍只消费 `heal_contract` 与 instruction）。
+
 - 2026-08-15: **trajectory-* 服务归位**：9 个平铺服务（account/batch-excel/idle-reaper/phase/query/recording/runtime/step-move/step）迁入 `src/services/trajectory/`；`src/services/trajectory-service.js` 保持纯 re-export facade，所有消费方 import 路径同步更新。
   影响范围：src/services 组织变化（无路由、无 schema、无响应格式变更）。
   文件：src/services/trajectory-service.js, src/services/trajectory/*, src/services/special-element-service.js, src/services/session-lifecycle.js, src/services/remote-session-service.js, src/routes/v2/trajectory-batch.js, src/cdp/remote-bridge/ws-router.js, server.mjs, scripts/characterization/*.mjs

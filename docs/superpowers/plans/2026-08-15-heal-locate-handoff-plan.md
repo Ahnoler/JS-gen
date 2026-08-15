@@ -310,10 +310,11 @@ export function buildHealContract({
   - 加入 verify-all。
 - 验证：`python -m py_compile` 相关文件；`python scripts/characterization/characterize-agent-prompt-packs.py`；新 characterization；全门禁。
 
-### H4 — 可选 P2 预留（不默认执行）
+### H4 — P2 决策路由（代码已实现，默认关闭）
 
-- 环境变量 `HEAL_LOCATE_DECISION_ENABLED=1` 时，Node 按 `suggestedAction` 执行 skip/fail/retry 路由；
-- 必须有专门 characterization 与一次真实 batch replay 冒烟（需要浏览器，单列任务，不在本计划默认范围）。
+- ✅ 环境变量 `HEAL_LOCATE_DECISION_ENABLED=1` 时，Node 按 `suggestedAction` 执行 skip/fail/retry 路由：`src/services/trajectory/heal-decision.js` + `replay-batch-runner.js`；默认关闭时行为与 Phase 1 完全一致。
+- ✅ 专门 characterization：`scripts/characterization/characterize-heal-decision.mjs`（9 断言），已加入 verify-all。
+- ⏸ 真实 batch replay 冒烟：需要浏览器 + 后端 + executor live 环境；本次执行环境没有运行中的服务，不伪造冒烟，单列后续任务。
 
 ### H5 — 文档与汇报
 
@@ -406,11 +407,11 @@ export function buildHealContract({
 - 既有环境基线：WSL 默认 `python` 缺 `pydantic`，门禁必须用 browser_use 环境 Python（通过 PATH 前置 `python -> D:\anaconda3\envs\browser_use\python.exe`）。
 - Playwright Chromium headless shell 1217 本地缺失：已用同版本完整 Chromium（AppData 目录，**仓库外**）补齐 headless-shell 预期路径，`characterize-tree-select-record.py` 恢复绿色；未把任何浏览器文件提交进 git。
 
-### 推迟项（不默认执行）
+### 推迟项（唯一剩余）
 
-- **H4 / P2**：`HEAL_LOCATE_DECISION_ENABLED=1` 的真实 skip/fail/retry 路由。
-- 真实浏览器 wet 实验与单列 batch replay 冒烟。
-- absent-skip 对真实缺字段的误吞重评估（依赖 P2）。
+- **H4 真实 batch replay 冒烟**：路由代码与 characterization 已落地，但 live 冒烟仍需浏览器 + 后端 + executor 环境，本次未运行。
+- 真实浏览器 wet 实验（本计划默认范围外）。
+- absent-skip 对真实缺字段的误吞重评估（依赖真实路由的线上观察）。
 
 ### 纪律确认
 

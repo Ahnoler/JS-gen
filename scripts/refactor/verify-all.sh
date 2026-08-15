@@ -73,6 +73,7 @@ run "characterize-batch-import" node scripts/characterization/characterize-batch
 run "characterize-step-move" node scripts/characterization/characterize-step-move.mjs
 run "characterize-heal-locate" node scripts/characterization/characterize-heal-locate.mjs
 run "characterize-heal-mode" "$PY" scripts/characterization/characterize-heal-mode.py
+run "characterize-heal-decision" node scripts/characterization/characterize-heal-decision.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
