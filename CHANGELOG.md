@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-15: **Heal-Locate Phase 1 MVP**：新增 Node 侧纯函数规则引擎 `missing-reason-analyzer.js` 与 `heal-contract.js`（失败原因分类 → HealContract：mode/scope/strategy/reason/target/runtime，prompt 与 runtime 分离）；Type A/B heal instruction 旧文本末尾追加【失败分析】结构化段落；`runHealStep` forward 载荷新增 `heal_contract`，`instruction/max_steps/phase_number/heal_type/healType` 旧字段原样保留；`session.step` 在控制面与执行机两处白名单同步透传 `heal_contract`；Python 侧解析 contract 并让 heal 模式只装配 `agent-core.md + agent-tools-common.md + agent-tools-heal.md`。
+  影响范围：live replay heal 指令内容（旧文本不变，仅追加分析段）、`session.step` 载荷新增可选字段（WS 事件名与旧字段不变）、Python Agent heal 模式 system prompt 收窄。
+  文件：src/services/trajectory/missing-reason-analyzer.js, src/services/trajectory/heal-contract.js, src/services/trajectory/replay-batch-runner.js, src/services/trajectory/form-structure-heal.js, src/services/trajectory/replay-heal-shared.js, src/routes/browser-session/heal-instruction.js, src/executor-session-client.js, executor/session-handler.js, scripts/controller/actions/phase/prompts.py, scripts/agent/service.py, scripts/agent_utils.py, scripts/prompts/agent-tools-heal.md, scripts/characterization/characterize-heal-locate.mjs, scripts/characterization/characterize-heal-mode.py, scripts/refactor/verify-all.sh, docs/superpowers/specs/2026-08-15-heal-locate-current-analysis.md
+  Python 同步提示：executor/agent 需解析 `instruction.heal_contract`（`mode=='heal'`，`scope` 为 `step | form_structure`，`reason.target` 供定位、`runtime` 供运行时）；heal 模式 system packs 应收敛为 `agent-core + agent-tools-common + agent-tools-heal`，勿再走 full fallback；`heal_type/healType` 与文本关键词兜底必须保留。
+
 - 2026-08-15: **trajectory-* 服务归位**：9 个平铺服务（account/batch-excel/idle-reaper/phase/query/recording/runtime/step-move/step）迁入 `src/services/trajectory/`；`src/services/trajectory-service.js` 保持纯 re-export facade，所有消费方 import 路径同步更新。
   影响范围：src/services 组织变化（无路由、无 schema、无响应格式变更）。
   文件：src/services/trajectory-service.js, src/services/trajectory/*, src/services/special-element-service.js, src/services/session-lifecycle.js, src/services/remote-session-service.js, src/routes/v2/trajectory-batch.js, src/cdp/remote-bridge/ws-router.js, server.mjs, scripts/characterization/*.mjs

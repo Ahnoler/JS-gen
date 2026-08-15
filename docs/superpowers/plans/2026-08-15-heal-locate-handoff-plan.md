@@ -384,3 +384,35 @@ export function buildHealContract({
 3. **不止**。实际 Type B report 还有 `error/count/expected_count/required_count/optional_count/hasRequiredChange/hasOptionalChange/reordered/fields`；analyzer 只依赖 `container/missing_required/added_required/missing_optional/added_optional` 五个稳定字段。
 4. **无 schema 校验，但有两处白名单**。`src/executor-session-client.js`（`session.step`）与 `executor/session-handler.js`（`session.step`）都会丢弃未知字段；两处都必须把 `heal_contract` 显式透传。`executor/session-manager.js` 只透传 JSON，无需改。H2 会相应把这两处纳入接线范围（协议消息名不变）。
 5. **未发现**。文档与 `.superpowers` 中没有 `heal_type=step` 但实为 `changed_structure` 的历史案例；D3 优先级保持不变。
+
+
+---
+
+## 执行结果（2026-08-15 会话）
+
+### 已完成
+
+- **H0**：现状调研收尾完成，产出 `docs/superpowers/specs/2026-08-15-heal-locate-current-analysis.md`；附录 B 五个问题已在 spec §8 回答并写回本计划。
+- **H1**：`missing-reason-analyzer.js` + `heal-contract.js` 纯函数规则引擎落地；`characterize-heal-locate.mjs`（39 项断言）加入 verify-all。
+- **H2**：Type A/B 指令追加【失败分析】；`runHealStep` 第五参转发 `heal_contract`；**H0.4 新发现**——`session.step` 在 `src/executor-session-client.js` 与 `executor/session-handler.js` 各有一处白名单，两处均已透传 `heal_contract`（消息名与旧字段不变）。
+- **H3**：Python `detect_heal_mode` 优先解析 `heal_contract`；`apply_heal_mode` 写/清 `_heal_contract`；`build_agent_system_message` 在 `mode=='heal'` 时只装 `agent-core + agent-tools-common + agent-tools-heal`；`agent-tools-heal.md` 与 `characterize-heal-mode.py` 已落地并加入 verify-all。
+- **H5**：CHANGELOG `[Unreleased]` 已追加 Node 与 Python 同步提示。
+
+### 验证结论
+
+- `node --check`：全部改动 JS 文件通过。
+- `python -m py_compile`：全部改动 Python 文件通过（使用 `D:\anaconda3\envs\browser_use\python.exe`）。
+- `bash scripts/refactor/verify-all.sh`：**ALL GREEN**（含新增两个 characterization）。
+- 既有环境基线：WSL 默认 `python` 缺 `pydantic`，门禁必须用 browser_use 环境 Python（通过 PATH 前置 `python -> D:\anaconda3\envs\browser_use\python.exe`）。
+- Playwright Chromium headless shell 1217 本地缺失：已用同版本完整 Chromium（AppData 目录，**仓库外**）补齐 headless-shell 预期路径，`characterize-tree-select-record.py` 恢复绿色；未把任何浏览器文件提交进 git。
+
+### 推迟项（不默认执行）
+
+- **H4 / P2**：`HEAL_LOCATE_DECISION_ENABLED=1` 的真实 skip/fail/retry 路由。
+- 真实浏览器 wet 实验与单列 batch replay 冒烟。
+- absent-skip 对真实缺字段的误吞重评估（依赖 P2）。
+
+### 纪律确认
+
+- 未修改 `scripts/browser/factory.py` 的未提交改动。
+- 未 push；按 H0/H1/H2/H3/H5 分段 commit。

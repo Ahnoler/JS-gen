@@ -1,7 +1,7 @@
 # Heal-Locate 现状调研（Current Analysis）
 
 - **日期**：2026-08-15
-- **状态**：H0 收尾完成；作为 Phase 1 MVP 的实现依据
+- **状态**：H0 收尾完成；H1-H3 已按本 spec 实现并通过全量门禁
 - **上游计划**：
   - `docs/superpowers/plans/2026-08-15-heal-locate-handoff-plan.md`（执行口径）
   - `docs/superpowers/plans/2026-08-14-heal-locate-phase0-current-analysis-plan.md`（底稿）
@@ -232,3 +232,14 @@ Type B 表单结构自愈：
 | 7 | `unknown` | 无匹配 | `fail` |
 
 > 注意：handoff 原表 `not_visible` 未列 `no-items`。本 spec 从 H0.1 真实返回串补入 `no-items`，使 live replay 的 Type A 失败能被归类；`select-disabled / field-disabled / *-disabled` 按 D3 优先级先命中 `business_locked` 的 `disabled` 信号。characterization 以本表为准。
+
+
+---
+
+## 10. 实施记录（2026-08-15）
+
+1. H1 按 §9 规则表实现纯函数 analyzer/contract；characterization 将每个 category、优先级、contract 字段分离全部钉住。
+2. H2 发现并处理了 handoff 未明列的两处 `session.step` 白名单（控制面 + 执行机）；旧字段与消息名全部保留。
+3. H3 保持 `_heal_mode` 字符串语义不变，只新增 `_heal_contract`；`detect_heal_mode` 的旧字段与文本关键词兜底未删除。
+4. 门禁在 browser_use Python 环境下 `verify-all.sh` 全绿；本地补齐 Playwright Chromium headless shell（仓库外）。
+5. H4/P2 路由开关未实现；本轮 `suggestedAction` 只进入 instruction 与 contract，不改变 Node 控制流。
