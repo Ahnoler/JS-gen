@@ -133,7 +133,7 @@ Python Agent（消费契约）
 | `business_locked` | error 含 `disabled / read-only / readonly / no-permission / locked` | `skip` |
 | `not_loaded` | error 含 `timeout / loading / page-idle / networkidle` 或 `runHealStep` timeout 上下文 | `retry` |
 | `permission_blocked` | error 含 `403 / forbidden / unauthorized / 无权限` | `skip` |
-| `not_visible` | error 含 `label-not-found / xpath-not-found / option-not-found / not-found / no-visible`，且不命中上面更高优先级规则 | `heal` |
+| `not_visible` | error 含 `label-not-found / xpath-not-found / option-not-found / no-items / not-found / no-visible / select-disabled / field-disabled`，且不命中上面更高优先级规则 | `heal` |
 | `unknown` | 无匹配 | `fail` |
 
 优先级从高到低：`changed_structure` → `business_locked` → `permission_blocked` → `conditional_absent` → `not_loaded` → `not_visible` → `unknown`。
@@ -254,14 +254,14 @@ export function buildHealContract({
 
 每个任务执行后把结论写回本计划对应小节，最终汇总进 spec。
 
-- **H0.1 失败信号盘点**：
+- **H0.1 失败信号盘点** ✅：
   - 收集 `_replay.py` / `_helpers.py` / `js_snippets/*` 返回的所有失败串（`label-not-found`、`xpath-not-found`、`option-not-found`、`disabled`、`no-items`、`err-*` 等）。
   - 命令：`grep -R "not-found\|label-not-found\|disabled\|no-items" scripts/controller/actions`，输出 `error → 来源模块` 表。
-- **H0.2 触发条件矩阵**：完成 P0.2，确认哪些 error 实际进入 `replay-batch-runner` 的 Type A 分支、哪些被 absent-skip 提前吞掉。
-- **H0.3 Heal 上下文清单**：完成 P0.3，逐字段记录 `buildStepHealInstruction` 当前可用信息（action/params/error 与 runtime trajectoryId/sessionId）。
-- **H0.4 Locator 能力矩阵**：完成 P0.4，盘点 `xpath_smart / label / placeholder / text / DOM scan / region` 在 replay 与 heal 中的可用性。
-- **H0.5 失败案例收集**：只从 `docs/`、`.superpowers/`、`logs/` 中找已记录案例；**不得**新跑真实浏览器实验。每个案例一行：轨迹/步骤/error/根因/建议分类。
-- **H0.6 输出 spec**：
+- **H0.2 触发条件矩阵** ✅：完成 P0.2，确认哪些 error 实际进入 `replay-batch-runner` 的 Type A 分支、哪些被 absent-skip 提前吞掉。
+- **H0.3 Heal 上下文清单** ✅：完成 P0.3，逐字段记录 `buildStepHealInstruction` 当前可用信息（action/params/error 与 runtime trajectoryId/sessionId）。
+- **H0.4 Locator 能力矩阵** ✅：完成 P0.4，盘点 `xpath_smart / label / placeholder / text / DOM scan / region` 在 replay 与 heal 中的可用性。
+- **H0.5 失败案例收集** ✅：只从 `docs/`、`.superpowers/`、`logs/` 中找已记录案例；**不得**新跑真实浏览器实验。每个案例一行：轨迹/步骤/error/根因/建议分类。
+- **H0.6 输出 spec** ✅：
   - `docs/superpowers/specs/2026-08-15-heal-locate-current-analysis.md`
   - 包含调用链图、模块责任表、失败矩阵、上下文清单、优化缺口。
   - 把 H0 中发现的新 error 串补进 §D3 规则表。
@@ -377,10 +377,10 @@ export function buildHealContract({
 - 单步 heal 与表单结构 heal 的 done 由系统单独判定，弹窗仍打开是允许的。
 ```
 
-## 附录 B：需要执行会话先回答的 H0 问题（如影响 H1，先写进 spec）
+## 附录 B：H0 问题执行答案（已写入 spec，2026-08-15）
 
-1. `replay-batch-runner` 里除 `failedEntry/errorResult` 外，能否低成本拿到前序 steps（用于 evidence）？若不能，MVP 用 `context={}`，不阻塞。
-2. `errorResult` 是否可能不是字符串（对象/JSON）？analyzer 需先归一化。
-3. Type B `report` 的精确字段是否只有 `container/missing_required/added_required/missing_optional/added_optional`？
-4. executor `forwardStdin` 对 data 是否有 schema 校验，新增 `heal_contract` 是否需要 executor/session-manager 同步放行？
-5. 是否存在 `heal_type` 为 `step` 但 error 实为 `changed_structure` 的历史案例？若有，D3 优先级需要重新评估。
+1. **能**。`runReplayBatch` 持有 `actions` 数组，失败步下标 `i` 可用，`actions.slice(0, i)` 低成本可得。MVP 只取 `previousAction` 放入 `context.evidence`，不扩大传输面。
+2. **需要归一化**。Node 侧 `failResult` 当前基本是字符串，但 `result?.error` 未来可能是对象；analyzer 首行统一 `String()`，对象走 `JSON.stringify`。
+3. **不止**。实际 Type B report 还有 `error/count/expected_count/required_count/optional_count/hasRequiredChange/hasOptionalChange/reordered/fields`；analyzer 只依赖 `container/missing_required/added_required/missing_optional/added_optional` 五个稳定字段。
+4. **无 schema 校验，但有两处白名单**。`src/executor-session-client.js`（`session.step`）与 `executor/session-handler.js`（`session.step`）都会丢弃未知字段；两处都必须把 `heal_contract` 显式透传。`executor/session-manager.js` 只透传 JSON，无需改。H2 会相应把这两处纳入接线范围（协议消息名不变）。
+5. **未发现**。文档与 `.superpowers` 中没有 `heal_type=step` 但实为 `changed_structure` 的历史案例；D3 优先级保持不变。
