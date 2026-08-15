@@ -404,7 +404,7 @@ export function buildHealContract({
 - `node --check`：全部改动 JS 文件通过。
 - `python -m py_compile`：全部改动 Python 文件通过（使用 `D:\anaconda3\envs\browser_use\python.exe`）。
 - `bash scripts/refactor/verify-all.sh`：**ALL GREEN**（含新增两个 characterization）。
-- 既有环境基线：WSL 默认 `python` 缺 `pydantic`，门禁必须用 browser_use 环境 Python（通过 PATH 前置 `python -> D:\anaconda3\envs\browser_use\python.exe`）。
+- 环境修复：WSL 默认 `python3` 已补装 pydantic 2.10.6（uv target 安装到 `~/.local/lib/python3.12/site-packages`），并补齐 `scripts/requirements.txt` 全部依赖；默认 `verify-all.sh` 现在仅剩 `characterize-tree-select-record` 因缺 Linux Chromium 失败。完整门禁仍使用 browser_use 环境 Python（PATH 前置 `python -> D:\anaconda3\envs\browser_use\python.exe`）并保持 ALL GREEN。
 - Playwright Chromium headless shell 1217 本地缺失：已用同版本完整 Chromium（AppData 目录，**仓库外**）补齐 headless-shell 预期路径，`characterize-tree-select-record.py` 恢复绿色；未把任何浏览器文件提交进 git。
 
 ### 推迟项（唯一剩余）
