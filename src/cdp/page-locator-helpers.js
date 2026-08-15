@@ -813,19 +813,24 @@ export const PAGE_LOCATOR_HELPERS = `
       const h = it.querySelector && it.querySelector('.el-collapse-item__header');
       return stripActionTail((h && (h.innerText || h.textContent)) || '');
     }
-    function composeTitleboxTitle(el, scope) {
-      if (!el || !scope) return '';
-      const want = String((el.innerText || el.textContent || '')).replace(/\\s+/g, ' ').trim().slice(0, 40);
+    function titleboxAnchorOf(el, scope) {
+      if (!el || !scope) return null;
       const inside = el.closest && el.closest('.titlebox');
       if (inside && (!scope.contains || scope.contains(inside))) {
         const t = titleboxTitleText(inside);
-        if (t && !isActionOnlyTitle(t) && t !== want) return t;
+        if (t && !isActionOnlyTitle(t)) return inside;
       }
       const nodeList = scope.querySelectorAll ? scope.querySelectorAll('.titlebox') : [];
       const boxes = [];
       for (let i = 0; i < nodeList.length; i++) boxes.push(nodeList[i]);
-      const picked = pickNearestTitlebox(boxes, el);
-      const title = titleboxTitleText(picked);
+      return pickNearestTitlebox(boxes, el) || null;
+    }
+    function composeTitleboxTitle(el, scope) {
+      if (!el || !scope) return '';
+      const want = String((el.innerText || el.textContent || '')).replace(/\\s+/g, ' ').trim().slice(0, 40);
+      const anchor = titleboxAnchorOf(el, scope);
+      if (!anchor) return '';
+      const title = titleboxTitleText(anchor);
       if (!title || isActionOnlyTitle(title) || title === want) return '';
       return title;
     }
@@ -864,8 +869,8 @@ export const PAGE_LOCATOR_HELPERS = `
     }
     function composeContentRegion(el) {
       if (!el || !el.closest) return null;
-      const chrome = readChrome(el);
-      const section = collapseSectionTitle(el);
+      let chrome = readChrome(el);
+      let section = collapseSectionTitle(el);
       let scope = null;
       if (el.closest('.el-collapse-item')) scope = el.closest('.el-collapse-item');
       else if (el.closest('.el-tab-pane')) scope = el.closest('.el-tab-pane');
@@ -875,6 +880,17 @@ export const PAGE_LOCATOR_HELPERS = `
         scope = (typeof document !== 'undefined' && document.body) ? document.body : el;
       }
       const block = composeTitleboxTitle(el, scope);
+      // Floating/fixed bars outside tab panes (e.g. bottom action bar): the
+      // element itself has no chrome/section, but its nearest titlebox lives
+      // inside the pane. Inherit that titlebox's own context so the full
+      // region path (tab | section | titlebox) survives for such controls.
+      if (block && !chrome && !section && !(el.closest && el.closest('.titlebox'))) {
+        const anchor = titleboxAnchorOf(el, scope);
+        if (anchor) {
+          chrome = readChrome(anchor);
+          section = collapseSectionTitle(anchor);
+        }
+      }
       try {
         return finishCompose(chrome, section, block);
       } catch (e) {

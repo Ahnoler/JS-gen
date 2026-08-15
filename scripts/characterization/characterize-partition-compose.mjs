@@ -103,6 +103,7 @@ const FIXTURE = `<!doctype html>
     </div>
   </div>
 </div>
+<div id="float-bar"><button id="float-back">返回</button></div>
 <div id="ops" class="el-collapse-item">
   <div class="el-collapse-item__header">经营情况 保存</div>
   <div class="el-collapse-item__wrap">
@@ -278,6 +279,19 @@ async function main() {
   assert.equal(actual.region_block, '实际控制人');
   assert.notEqual(actual.region_id, legal.region_id);
   ok('adjacent titleboxes stay distinct');
+
+  const floatBack = await page.evaluate(assignExpr('#float-back'));
+  assert.equal(floatBack.region_label, '客户基本信息 / 对公客户概况 / 实际控制人');
+  assert.match(
+    String(floatBack.region_id),
+    /tab:客户基本信息\|section:对公客户概况\|titlebox:实际控制人/,
+  );
+  assert.deepEqual(floatBack.layers, [
+    { role: 'tab', label: '客户基本信息' },
+    { role: 'section', label: '对公客户概况' },
+    { role: 'titlebox', label: '实际控制人' },
+  ]);
+  ok('floating bar outside panes inherits nearest titlebox context');
 
   const ops = await page.evaluate(assignExpr('#ops-save'));
   assert.equal(ops.region_section, '经营情况');

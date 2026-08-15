@@ -38,6 +38,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-15: **分区 compose 继承修复**：浮动/固定操作条（如底部「返回」按钮）位于 tab pane 之外时 chrome/section 丢失、region 退化为单 titlebox 段；现在从几何就近 titlebox 自身的上下文继承 chrome+section，得到完整 `tab|section|titlebox` 路径（与同 titlebox 内按钮一致）。
+  影响范围：assignRegion / composeContentRegion（src/cdp）、resolve/扫描/录制 `element_json`、`_locator_helpers_js.py`（重生成）。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-partition-compose.mjs
+  Python 同步提示：无 HTTP/schema；`_locator_helpers_js.py` 为重生成物，Python 端直接使用即可。
+
 - 2026-08-15: **阶段截图坐标几何修正**（final review I1/I2）：捕获 clip 到滚动根 box（片高==容器高，图像=纯主滚动区内容）；每片按实际 scrollTop 放置（`stitchPngSlices` 支持每片 overlap），元素坐标恒为内容坐标（x=rect.left-box.x、y=top_i+rect.top-box.y），无末片 clamp 重复条带、无内容带丢失；树组装失败落 `regionTree:null`（不丢截图）。
   影响范围：阶段长图与 `metadata_json` 坐标契约（前端按 imageWidth/imageHeight 与 contentWidth/contentHeight 比例渲染；12MB 降采样时二者不同）。
   文件：src/cdp/phase-screenshot-capture.js, src/cdp/phase-screenshot-page.js, src/cdp/png-stitch.js, src/services/trajectory/phase-highlight-screenshot.js, executor/session-handler.js, executor/session-manager.js, scripts/characterization/characterize-phase-highlight-screenshot.mjs, scripts/refactor/verify-all.sh
