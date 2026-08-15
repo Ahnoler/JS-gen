@@ -23,6 +23,7 @@ import {
 import {
   buildFormStructureHealInstruction,
 } from '../../routes/browser-session/heal-instruction.js';
+import { buildHealContract } from './heal-contract.js';
 import { broadcast } from '../../ws-server.js';
 import {
   markConsumedActionLog,
@@ -323,13 +324,21 @@ export async function handleFormStructureCheckpoint({
   ];
 
   if (addingLabels.length) {
+    const contract = buildHealContract({
+      failedEntry: entry,
+      errorResult: row?.result || 'form structure changed',
+      healType: 'form_structure',
+      maxSteps: FORM_STRUCTURE_HEAL_MAX_STEPS,
+      retryCount: 1,
+      formStructureReport: report,
+    });
     const instruction = buildFormStructureHealInstruction({
       container,
       added_required: report.added_required || [],
       added_optional: report.added_optional || [],
       missing_required: report.missing_required || [],
       missing_optional: report.missing_optional || [],
-    });
+    }, { contract });
     broadcast('recording:replay_heal', {
       ...trajScope(tid),
       stepId,
@@ -341,7 +350,7 @@ export async function handleFormStructureCheckpoint({
 
     try {
       const beforeIds = await peekActionLogIds(runtime);
-      await runHealStep(runtime, instruction, FORM_STRUCTURE_HEAL_MAX_STEPS, 'form_structure');
+      await runHealStep(runtime, instruction, FORM_STRUCTURE_HEAL_MAX_STEPS, 'form_structure', contract);
       const afterEntries = await fetchActionLogEntries(runtime);
       const newEntries = afterEntries.filter((e) => {
         const id = e?.id != null ? String(e.id) : '';

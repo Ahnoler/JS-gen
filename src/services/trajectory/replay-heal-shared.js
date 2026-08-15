@@ -44,7 +44,7 @@ function toNumericStepId(id) {
   return Number.isFinite(n) ? n : null;
 }
 
-async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, healType = 'step') {
+async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, healType = 'step', healContract = null) {
   // P2-1: record replay-heal decision (deterministic instruction template, not LLM-generated)
   try {
     await memoryService.ingestEvents([{
@@ -57,7 +57,18 @@ async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, heal
         model: '',
         temperature: 0.0,
         inputPreview: String(instruction || '').slice(0, 500),
-        outputJson: { healType, maxSteps },
+        outputJson: {
+          healType,
+          maxSteps,
+          healContract: healContract
+            ? {
+                mode: healContract.mode,
+                scope: healContract.scope,
+                strategy: healContract.strategy,
+                category: healContract.reason?.category || null,
+              }
+            : null,
+        },
         policyChecks: [{ check: 'instruction_present', pass: Boolean(instruction) }],
         auditStatus: instruction ? 'passed' : 'failed',
       },
@@ -133,6 +144,7 @@ async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, heal
         phase_number: 0,
         heal_type: healType,
         healType,
+        ...(healContract ? { heal_contract: healContract } : {}),
       },
     });
   });

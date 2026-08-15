@@ -23,6 +23,7 @@ import {
 import {
   buildStepHealInstruction,
 } from '../../routes/browser-session/heal-instruction.js';
+import { buildHealContract } from './heal-contract.js';
 import { broadcast } from '../../ws-server.js';
 import {
   markConsumedActionLog,
@@ -270,8 +271,17 @@ export async function runReplayBatch({
       });
 
       try {
-        const instruction = buildStepHealInstruction(entry, failResult);
-        await runHealStep(runtime, instruction, HEAL_MAX_STEPS, 'step');
+        const previousAction = i > 0 ? actions[i - 1]?.action || '' : '';
+        const contract = buildHealContract({
+          failedEntry: entry,
+          errorResult: failResult,
+          healType: 'step',
+          maxSteps: HEAL_MAX_STEPS,
+          retryCount: 1,
+          context: { previousAction },
+        });
+        const instruction = buildStepHealInstruction(entry, failResult, { contract });
+        await runHealStep(runtime, instruction, HEAL_MAX_STEPS, 'step', contract);
         await markConsumedActionLog(runtime);
         if (runtime.abortReplay) {
           broadcast('recording:replay_heal', {

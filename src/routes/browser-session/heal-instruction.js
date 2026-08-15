@@ -9,13 +9,13 @@ import path from 'path';
  * @param {string} [errorResult]
  * @returns {string}
  */
-export function buildStepHealInstruction(failedEntry, errorResult = '') {
+export function buildStepHealInstruction(failedEntry, errorResult = '', { reason = null, contract = null } = {}) {
   const action = failedEntry?.action || 'unknown';
   const params = failedEntry?.params || {};
   const intent = describeActionIntent(action, params);
   const err = errorResult ? String(errorResult) : '(unknown)';
 
-  return [
+  const lines = [
     '当前为步骤回放失败后的单步自愈阶段。页面已停在失败步。',
     '请只完成下面这一步的原意图，成功后立即 done(success=true) 停止。',
     '不要做任何额外操作：不要补填其它字段、不要诊断整表、不要点确认/确定/保存（除非原意图本身就是该按钮）、不要执行轨迹下一步。',
@@ -30,7 +30,13 @@ export function buildStepHealInstruction(failedEntry, errorResult = '') {
     '- 不要导航离开当前流程。',
     '- 行选/引入类步骤：选中后弹窗可能仍保持打开——这是正常的；不要点确认/确定去关窗（那是轨迹下一步）。',
     '- 完成后立即 done(success=true)。系统对单步自愈的 done 使用单独判定，不会因弹窗仍开着而拒绝。',
-  ].join('\n');
+  ];
+  const analysis = reason || contract?.reason || null;
+  if (analysis) {
+    lines.push('');
+    lines.push(formatFailureAnalysis(analysis));
+  }
+  return lines.join('\n');
 }
 
 /**
@@ -40,7 +46,7 @@ export function buildStepHealInstruction(failedEntry, errorResult = '') {
  * @param {{ container?: string, added_required?: string[], added_optional?: string[], missing_required?: string[], missing_optional?: string[] }} report
  * @returns {string}
  */
-export function buildFormStructureHealInstruction(report = {}) {
+export function buildFormStructureHealInstruction(report = {}, { reason = null, contract = null } = {}) {
   const container = report.container || 'main';
   const addedReq = Array.isArray(report.added_required) ? report.added_required : [];
   const addedOpt = Array.isArray(report.added_optional) ? report.added_optional : [];
@@ -73,6 +79,37 @@ export function buildFormStructureHealInstruction(report = {}) {
   lines.push('- 不要点保存/提交/确认；不要导航；不要处理其它业务步骤。');
   lines.push('- 禁止整表 auto-fill / sync_tasks_from_errors。');
   lines.push('- 完成后立即 done(success=true)。系统对表单结构自愈的 done 使用单独判定，不会因弹窗仍开着而拒绝。');
+  const analysis = reason
+    || contract?.reason
+    || {
+      category: 'changed_structure',
+      suggestedAction: 'repair',
+      evidence: ['heal_type=form_structure'],
+    };
+  if (analysis) {
+    lines.push('');
+    lines.push(formatFailureAnalysis(analysis));
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Append the structured failure analysis to a legacy instruction without
+ * rewriting the original text (Python text-fallback detection stays intact).
+ */
+function formatFailureAnalysis(reason) {
+  if (!reason || typeof reason !== 'object') return '【失败分析】category=unknown';
+  const category = String(reason.category || 'unknown');
+  const suggestedAction = String(reason.suggestedAction || 'fail');
+  const evidence = Array.isArray(reason.evidence)
+    ? reason.evidence.map((item) => String(item ?? '')).filter(Boolean).join(' | ')
+    : '';
+  const lines = [
+    '【失败分析】',
+    `category=${category}`,
+    `suggestedAction=${suggestedAction}`,
+  ];
+  if (evidence) lines.push(`evidence=${evidence}`);
   return lines.join('\n');
 }
 

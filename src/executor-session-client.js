@@ -315,6 +315,7 @@ export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
       trajectoryId: data.trajectory_id,
       factPack: data.fact_pack,
       caseDataBlock: data.case_data_block ?? data.caseDataBlock,
+      healContract: data.heal_contract ?? data.healContract ?? null,
     });
     return;
   }

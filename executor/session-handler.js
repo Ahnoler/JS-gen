@@ -83,6 +83,7 @@ export function createSessionHandler(manager) {
           prior_outcome: payload.priorOutcome ?? payload.prior_outcome ?? null,
           trajectory_id: payload.trajectoryId ?? payload.trajectory_id,
           fact_pack: payload.factPack ?? payload.fact_pack,
+          heal_contract: payload.healContract ?? payload.heal_contract ?? null,
         });
       case 'session.close':
         return manager.close(sessionId, {

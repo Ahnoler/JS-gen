@@ -10,12 +10,23 @@
  * Usage: node scripts/characterization/characterize-heal-locate.mjs
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { analyzeMissingReason } from '../../src/services/trajectory/missing-reason-analyzer.js';
 import {
   buildHealContract,
   TARGET_KEYS,
   RUNTIME_KEYS,
 } from '../../src/services/trajectory/heal-contract.js';
+import {
+  buildStepHealInstruction,
+  buildFormStructureHealInstruction,
+} from '../../src/routes/browser-session/heal-instruction.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(__dirname, '../..');
+const read = (rel) => readFileSync(path.join(root, rel), 'utf-8');
 
 let passed = 0;
 function check(name, fn) {
@@ -307,6 +318,66 @@ check('contract: old callers without reason still get a valid contract', () => {
   assert.equal(contract.reason.suggestedAction, 'fail');
   assert.equal(contract.reason.confidence, 0.2);
   assert.deepEqual(contract.runtime, { retry_count: 1, max_steps: 12 });
+});
+
+check('instruction: Type A legacy text unchanged + analysis appended', () => {
+  const entry = {
+    action: 'fill_form_field',
+    params: { label_text: '客户名称', value: '张三' },
+  };
+  const legacy = buildStepHealInstruction(entry, 'xpath-not-found');
+  assert.match(legacy, /当前为步骤回放失败后的单步自愈阶段/);
+  assert.match(legacy, /【失败动作】fill_form_field/);
+  assert.doesNotMatch(legacy, /【失败分析】/);
+  const contract = buildHealContract({ failedEntry: entry, errorResult: 'xpath-not-found' });
+  const structured = buildStepHealInstruction(entry, 'xpath-not-found', { contract });
+  assert.match(structured, /当前为步骤回放失败后的单步自愈阶段/);
+  assert.match(structured, /【失败分析】\ncategory=not_visible\nsuggestedAction=heal/);
+  assert.ok(
+    structured.startsWith(legacy),
+    'legacy prefix is byte-for-byte unchanged when analysis is appended',
+  );
+});
+
+check('instruction: Type B appends changed_structure analysis', () => {
+  const report = { container: 'main', added_required: ['新增字段'] };
+  const instruction = buildFormStructureHealInstruction(report);
+  assert.match(instruction, /当前为【表单结构变化自愈】阶段/);
+  assert.match(instruction, /【失败分析】\ncategory=changed_structure\nsuggestedAction=repair/);
+});
+
+check('wiring: Type A builds and forwards heal_contract', () => {
+  const runner = read('src/services/trajectory/replay-batch-runner.js');
+  assert.match(runner, /buildHealContract\(\{/);
+  assert.match(runner, /buildStepHealInstruction\(entry, failResult, \{ contract \}\)/);
+  assert.match(runner, /runHealStep\(runtime, instruction, HEAL_MAX_STEPS, 'step', contract\)/);
+  assert.match(runner, /const previousAction = i > 0 \? actions\[i - 1\]\?\.action/);
+  assert.match(runner, /context: \{ previousAction \}/);
+});
+
+check('wiring: Type B builds and forwards heal_contract', () => {
+  const fsh = read('src/services/trajectory/form-structure-heal.js');
+  assert.match(fsh, /buildHealContract\(\{/);
+  assert.match(fsh, /buildFormStructureHealInstruction\(\{/);
+  assert.match(
+    fsh,
+    /runHealStep\(runtime, instruction, FORM_STRUCTURE_HEAL_MAX_STEPS, 'form_structure', contract\)/,
+  );
+});
+
+check('wiring: runHealStep appends heal_contract and keeps legacy fields', () => {
+  const shared = read('src/services/trajectory/replay-heal-shared.js');
+  assert.match(shared, /healContract = null/);
+  assert.match(shared, /heal_contract: healContract/);
+  assert.match(shared, /heal_type: healType,/);
+  assert.match(shared, /healType,/);
+});
+
+check('wiring: session.step pass-through on both control plane and executor', () => {
+  const client = read('src/executor-session-client.js');
+  const handler = read('executor/session-handler.js');
+  assert.match(client, /healContract: data\.heal_contract \?\? data\.healContract/);
+  assert.match(handler, /heal_contract: payload\.healContract \?\? payload\.heal_contract/);
 });
 
 console.log(`\nAll heal-locate characterizations passed (${passed} checks).`);
