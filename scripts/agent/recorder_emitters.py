@@ -475,7 +475,16 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                         sys.stderr.flush()
 
                     if navigated_ok or save_ok or introduce_ok:
-                        reason = 'introduce' if introduce_ok else ('save-ok' if save_ok else 'navigation')
+                        try:
+                            from ..controller.actions.phase.intent_gates import done_accept_reason
+                            reason = done_accept_reason(
+                                contract,
+                                save_ok=bool(save_ok),
+                                introduce_ok=bool(introduce_ok),
+                                navigated_ok=bool(navigated_ok),
+                            )
+                        except Exception:
+                            reason = 'introduce' if introduce_ok else ('save-ok' if save_ok else 'navigation')
                         sys.stderr.write(
                             f"[recorder] ✓ done() accepted after {reason} "
                             f"(success={done_success}) at step {agent.state.n_steps}\n"

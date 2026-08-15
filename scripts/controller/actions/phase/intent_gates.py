@@ -235,6 +235,32 @@ def has_contract_success(case_data_store: dict | None) -> bool:
             return True
     return False
 
+def done_accept_reason(
+    contract: dict[str, Any] | None,
+    *,
+    save_ok: bool = False,
+    introduce_ok: bool = False,
+    navigated_ok: bool = False,
+) -> str:
+    """Label for the recorder's 'done() accepted after …' log line.
+
+    Prefers the phase contract's own success kinds so a lingering
+    _last_introduce_ok does not relabel a create/modify save acceptance.
+    Falls back to the legacy introduce > save-ok > navigation priority.
+    """
+    kinds = ((contract or {}).get('success') or {}).get('kinds') or []
+    if not isinstance(kinds, (list, tuple)):
+        kinds = []
+    if save_ok and {'toast_ok', 'url_change'} & set(kinds):
+        return 'navigation' if navigated_ok else 'save-ok'
+    if introduce_ok and {'confirm_click', 'picker_closed'} & set(kinds):
+        return 'introduce'
+    if introduce_ok:
+        return 'introduce'
+    if save_ok:
+        return 'save-ok'
+    return 'navigation'
+
 def recovery_prescription_message(contract: dict[str, Any] | None, *, reason: str = '') -> str:
     if not contract:
         return (
