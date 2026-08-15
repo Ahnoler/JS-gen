@@ -85,6 +85,8 @@ def clear_phase_intent(case_data_store: dict | None) -> None:
         '_quality_failed_reasons',
         '_phase_section',
         '_empty_act_streak',
+        '_dup_failure_last',
+        '_dup_failure_cued',
     ):
         case_data_store.pop(key, None)
     try:

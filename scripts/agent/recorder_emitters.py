@@ -68,6 +68,40 @@ def _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal):
             sys.stderr.flush()
 
 
+def _emit_duplicate_failure_cue(case_data_store, agent, _actions, _last_result):
+    """Inject [纠偏] cue when the same action+params failed twice in a row.
+
+    Steering-only: failures must never abort the phase (same contract as
+    _emit_empty_act_cue).
+    """
+    try:
+        from scripts.feature_flags import duplicate_failure_cue_enabled
+        if not duplicate_failure_cue_enabled():
+            return
+        if case_data_store is None:
+            return
+        from ..controller.actions.duplicate_failure_cue import (
+            duplicate_failure_prescription,
+            is_duplicate_failure,
+            result_error_text,
+            step_failed,
+        )
+        failed = step_failed(_last_result)
+        should_cue, sig = is_duplicate_failure(case_data_store, _actions, failed=failed)
+        if should_cue:
+            err_text = result_error_text(_last_result)
+            msg = HumanMessage(content=duplicate_failure_prescription(err_text))
+            agent._message_manager._add_message_with_tokens(msg)
+            sys.stderr.write(
+                f'[recorder] Injected duplicate-failure cue sig={sig[:100]!r} '
+                f'err={err_text[:100]!r}\n'
+            )
+            sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f'[recorder] duplicate-failure cue skipped: {e}\n')
+        sys.stderr.flush()
+
+
 
 def _emit_memory_action_event(agent, _actions, _last_result_str):
         # P1：动作事件打点（fill_before_save 建模用）——异步旁路，失败不阻塞
