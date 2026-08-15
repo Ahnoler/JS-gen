@@ -344,3 +344,32 @@ JS_VERIFY_FORM_STRUCTURE = '''(arg) => {
         fields: actualLabels,
     });
 }'''
+
+
+# Click the login button (登录/登錄/Login) inside the active form container.
+JS_CLICK_LOGIN_BUTTON = '''() => {
+            const container = ''' + JS_GET_CONTAINER + ''';
+            for (const btn of container.querySelectorAll('button')) {
+                const t = btn.textContent.trim().replace(/\\s/g, '');
+                if ((t === '登录' || t === '登錄' || t === 'Login') && btn.offsetParent !== null && !btn.disabled) {
+                    btn.click();
+                    return 'ok';
+                }
+            }
+            return 'not-found';
+        }'''
+
+# Auto-click a 验证 (verify) button inside the labeled form item.
+JS_CLICK_VERIFY_BUTTON = '''([lbl]) => {
+                                const container = ''' + JS_GET_CONTAINER + ''';
+                                for (const item of container.querySelectorAll('.el-form-item')) {
+                                    const t = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                                    if (!t.includes(lbl)) continue;
+                                    for (const b of item.querySelectorAll('button')) {
+                                        if (b.offsetParent !== null && b.textContent.includes('验证')) {
+                                            b.click(); return 'ok-verify-clicked';
+                                        }
+                                    }
+                                }
+                                return 'no-verify-btn';
+                            }'''

@@ -17,6 +17,10 @@ from ._helpers import (
     read_select_options,
 )
 from ._js_snippets import JS_SCAN_FORM_FIELDS, JS_IS_QUERY_TOOLBAR, JS_GET_CONTAINER
+from .js_snippets.scan_utils import (  # noqa: F401  (re-exported for compat)
+    _JS_READ_CERT_TYPE,
+    _JS_EXTRACT_ERROR_LABELS,
+)
 from ...models import FormSnapshot, FormSnapshotCollection, TaskList
 from ...models.field import ScannedButton
 from .container_naming import overlay_title_from_container_id
@@ -750,47 +754,7 @@ def match_select_option_candidate(want: str, options) -> str | None:
     return None
 
 
-# Read current 证件类型 / 证照类型 display value from the open form.
-_JS_READ_CERT_TYPE = '''(kw) => {
-    const items = document.querySelectorAll('.el-form-item');
-    for (const item of items) {
-        const lbl = item.querySelector('.el-form-item__label');
-        if (!lbl) continue;
-        if (kw.some(k => lbl.textContent.trim().includes(k))) {
-            const inp = item.querySelector('input:not([type="hidden"])');
-            if (inp && inp.value) return inp.value;
-            const inner = item.querySelector('.el-input__inner');
-            if (inner && inner.value) return inner.value;
-            const selected = item.querySelector('.el-select__tags-text, .el-radio.is-checked');
-            if (selected && selected.textContent) return selected.textContent.trim();
-        }
-    }
-    return '';
-}'''
 
-# Extract validation-error field labels from parent .el-form-item (not error text).
-_JS_EXTRACT_ERROR_LABELS = '''() => {
-    const container = ''' + JS_GET_CONTAINER + ''';
-    const items = [];
-    const seen = new Set();
-    for (const el of container.querySelectorAll('.el-form-item__error')) {
-        const raw = (el.textContent || '').trim();
-        if (!raw) continue;
-        const formItem = el.closest('.el-form-item');
-        let label = (formItem && formItem.querySelector('.el-form-item__label')
-            ? formItem.querySelector('.el-form-item__label').textContent.trim()
-            : '');
-        if (!label) {
-            // Fallback: strip imperative prefix from error message
-            label = raw.replace(/^(请选择|请?输入|请上传|填写|完善)/, '').replace(/[：:]/g, '').trim();
-        }
-        if (label && label.length > 0 && label.length < 40 && !seen.has(label)) {
-            seen.add(label);
-            items.push(label);
-        }
-    }
-    return JSON.stringify(items);
-}'''
 
 
 def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store: dict, *, emit_checkpoint: bool = True):

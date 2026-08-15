@@ -371,3 +371,24 @@ JS_CAPTURE_FROM_XPATH = (
 )
 
 # Fill date picker resolved by relative xpath (native setter + date Vue commit).
+
+
+# Clear a labeled field's input via native setter so Vue reacts.
+JS_CLEAR_FIELD_VALUE = '''(label) => {
+            const items = document.querySelectorAll('.el-form-item');
+            for (const item of items) {
+                const lbl = item.querySelector('.el-form-item__label');
+                if (!lbl || !lbl.textContent.trim().includes(label)) continue;
+                const trigger = item.querySelector('input, .el-input__inner, textarea');
+                if (!trigger) continue;
+                // Clear via native setter so Vue reacts
+                Object.getOwnPropertyDescriptor(
+                    HTMLInputElement.prototype, 'value'
+                ).set.call(trigger, '');
+                trigger.dispatchEvent(new Event('input', { bubbles: true }));
+                trigger.dispatchEvent(new Event('change', { bubbles: true }));
+                trigger.setAttribute('value', '');
+                return 'cleared';
+            }
+            return 'not-found';
+        }'''

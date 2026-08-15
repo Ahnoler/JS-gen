@@ -560,3 +560,19 @@ _JS_LOCATE_BY_XPATH = r'''([xpath]) => {
   }
   return 'xpath-not-found';
 }'''
+
+
+# Count visible el-dialog / el-drawer / el-message-box overlays (idempotent close_dialog).
+JS_COUNT_OVERLAYS = '''() => {
+                            const isVis = (el) => {
+                                if (el.offsetParent !== null) return true;
+                                const st = getComputedStyle(el);
+                                if (st.display === 'none' || st.visibility === 'hidden') return false;
+                                const r = el.getBoundingClientRect();
+                                return r.width > 0 && r.height > 0;
+                            };
+                            const d = [...document.querySelectorAll('.el-dialog')].filter(isVis).length;
+                            const w = [...document.querySelectorAll('.el-drawer')].filter(isVis).length;
+                            const m = [...document.querySelectorAll('.el-message-box')].filter(isVis).length;
+                            return d + w + m;
+                        }'''

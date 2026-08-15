@@ -50,6 +50,7 @@ from .replay_js import (  # noqa: F401  (re-exported for compat)
     _JS_EDIT_FORM_INPUT_VISIBLE,
     _JS_LOCATE_BY_XPATH,
     _JS_PAGE_BUSY,
+    JS_COUNT_OVERLAYS,
     _JS_READ_VALUE_BY_XPATH,
 )
 from .replay_names import (  # noqa: F401  (re-exported for compat)
@@ -404,52 +405,7 @@ async def _read_value_by_xpath(page, xpath: str, label_hint: str = '') -> str:
     return str(result or '').strip()
 
 
-# Click / focus a control resolved by xpath (returns ok-xpath-smart when found).
-_JS_LOCATE_BY_XPATH = r'''([xpath]) => {
-  if (!xpath) return 'xpath-empty';
-  const isVis = (el) => {
-    if (!el || el.nodeType !== 1) return false;
-    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
-    const st = getComputedStyle(el);
-    return st.display !== 'none' && st.visibility !== 'hidden';
-  };
-  const wrapVisible = (d) => {
-    if (!d) return false;
-    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
-    if (wrap && getComputedStyle(wrap).display === 'none') return false;
-    return isVis(d) || (wrap && isVis(wrap));
-  };
-  const lastVisibleHost = (drawer) => {
-    const sel = drawer ? '.el-drawer' : '.el-dialog, .el-message-box';
-    const all = [...document.querySelectorAll(sel)];
-    for (let i = all.length - 1; i >= 0; i--) {
-      if (wrapVisible(all[i])) return all[i];
-    }
-    return null;
-  };
-  const tryXp = (xp, root) => {
-    let s = String(xp || '');
-    if (!s) return false;
-    try {
-      const ctx = root || document;
-      if (root && s.startsWith('//')) s = '.' + s;
-      const snap = document.evaluate(s, ctx, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-      for (let i = snap.snapshotLength - 1; i >= 0; i--) {
-        const n = snap.snapshotItem(i);
-        if (n && isVis(n)) return true;
-      }
-    } catch (e) { /* ignore */ }
-    return false;
-  };
-  if (tryXp(xpath, null)) return 'ok-xpath-smart';
-  if (/el-dialog|el-message-box|el-drawer/.test(xpath) && /\[last\(\)\]/.test(xpath)) {
-    const m = String(xpath).match(/\[last\(\)\](?:\/\/(.+))?$/);
-    const local = m && m[1] ? m[1] : '';
-    const dlg = /el-drawer/.test(xpath) ? lastVisibleHost(true) : lastVisibleHost(false);
-    if (dlg && local && tryXp('.//' + local, dlg)) return 'ok-xpath-smart-vis-dlg';
-  }
-  return 'xpath-not-found';
-}'''
+
 
 
 async def _try_xpath_locate(page, xpath: str) -> bool:
@@ -929,19 +885,7 @@ async def replay_action_entries(
                     # was already dismissed.
                     result = None
                     if action_name == 'close_dialog':
-                        overlay_count = await page.evaluate('''() => {
-                            const isVis = (el) => {
-                                if (el.offsetParent !== null) return true;
-                                const st = getComputedStyle(el);
-                                if (st.display === 'none' || st.visibility === 'hidden') return false;
-                                const r = el.getBoundingClientRect();
-                                return r.width > 0 && r.height > 0;
-                            };
-                            const d = [...document.querySelectorAll('.el-dialog')].filter(isVis).length;
-                            const w = [...document.querySelectorAll('.el-drawer')].filter(isVis).length;
-                            const m = [...document.querySelectorAll('.el-message-box')].filter(isVis).length;
-                            return d + w + m;
-                        }''')
+                        overlay_count = await page.evaluate(JS_COUNT_OVERLAYS)
                         if overlay_count == 0:
                             result = 'ok (no visible dialog/drawer — already closed)'
                             sys.stderr.write('[replay] close_dialog idempotent ok (no visible overlay)\n')

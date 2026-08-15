@@ -345,3 +345,15 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
 # 设计意图：disabled/required/classify 判断逻辑在多处重复，抽成共享函数通过字符串拼接引用。
 # 修改判断规则时只需改一处，避免 JS_SCAN_FORM_FIELDS 和 JS_CHECK_SINGLE_FIELD 行为不一致。
 
+
+# Expand ALL el-tree nodes recursively (up to 10 rounds).
+JS_EXPAND_ALL_EL_TREE = '''() => {
+                const tree = document.querySelector('.el-tree');
+                if (!tree) return -1;
+                let n = 0;
+                tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node => {
+                    const icon = node.querySelector(':scope > .el-tree-node__content > .el-tree-node__expand-icon');
+                    if (icon) { icon.click(); n++; }
+                });
+                return n;
+            }'''

@@ -147,3 +147,33 @@ JS_SCAN_SAVE_OUTCOME = r'''() => {
 
 # ── Click locator enrichment (AI click_element_by_index → xpath_smart) ──
 # Args: [xpath, text, tagHint] — resolve node BEFORE click; walk up to button/a.
+
+
+# Observe success/error notifications while a save/submit is in flight.
+JS_WATCH_SAVE_NOTIFICATIONS = r'''() => {
+          const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功/;
+          const failRe = /失败|错误|异常|不能|不允许|已存在|重复|校验|必填|不通过/;
+          window.__saveWatch = { successNotifs: [], errorNotifs: [] };
+          const take = (el) => {
+            const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+            if (!t) return;
+            if (failRe.test(t) || /el-notification--error|el-message--error/.test(el.className || ''))
+              window.__saveWatch.errorNotifs.push(t.slice(0, 160));
+            else
+              window.__saveWatch.successNotifs.push(t.slice(0, 160));
+          };
+          for (const el of document.querySelectorAll('.el-notification, .el-message')) take(el);
+          const obs = new MutationObserver((muts) => {
+            for (const m of muts) {
+              for (const n of m.addedNodes || []) {
+                if (!n || n.nodeType !== 1) continue;
+                if (n.matches && (n.matches('.el-notification, .el-message') || n.querySelector?.('.el-notification, .el-message'))) {
+                  if (n.matches?.('.el-notification, .el-message')) take(n);
+                  for (const el of (n.querySelectorAll?.('.el-notification, .el-message') || [])) take(el);
+                }
+              }
+            }
+          });
+          obs.observe(document.body, { childList: true, subtree: true });
+          window.__saveWatchObs = obs;
+        }'''

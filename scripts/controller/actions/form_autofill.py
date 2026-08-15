@@ -39,6 +39,8 @@ from ._js_snippets import (
     JS_CLICK_RADIO_BY_XPATH,
     JS_SELECT_TREE_OPTION,
     JS_FILL_FORM_FIELD,
+    JS_CLICK_VERIFY_BUTTON,
+    JS_READ_REFERENCE_DATE,
 )
 from ._llm_values import _llm_generate_values
 from ...models import ScannedField, TaskList, TaskItem
@@ -623,19 +625,7 @@ class FormAutofillEngine:
                     btn = has_button_map.get(label, '')
                     if '验证' in btn and kind in ('fill_input', 'fill', 'input'):
                         try:
-                            await page.evaluate('''([lbl]) => {
-                                const container = ''' + JS_GET_CONTAINER + ''';
-                                for (const item of container.querySelectorAll('.el-form-item')) {
-                                    const t = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-                                    if (!t.includes(lbl)) continue;
-                                    for (const b of item.querySelectorAll('button')) {
-                                        if (b.offsetParent !== null && b.textContent.includes('验证')) {
-                                            b.click(); return 'ok-verify-clicked';
-                                        }
-                                    }
-                                }
-                                return 'no-verify-btn';
-                            }''', [label])
+                            await page.evaluate(JS_CLICK_VERIFY_BUTTON, [label])
                         except Exception:
                             pass
                     prefix = f'[auto-fill] {round_tag}recorded:' if round_tag else '[auto-fill] recorded:'
@@ -734,22 +724,7 @@ class FormAutofillEngine:
 
         # Extract reference date from page
         try:
-            ref_date = await page.evaluate('''() => {
-                const dateLabels = ['成立日期', '登记日期', '注册日期', '营业起始日期', '营业开始日期'];
-                const items = document.querySelectorAll('.el-form-item');
-                for (const el of items) {
-                    const lbl = el.querySelector('.el-form-item__label');
-                    if (!lbl) continue;
-                    const t = lbl.textContent.trim();
-                    if (dateLabels.some(d => t.includes(d))) {
-                        const inp = el.querySelector('input');
-                        if (inp && inp.value && /\\d{4}-\\d{2}-\\d{2}/.test(inp.value)) {
-                            return inp.value;
-                        }
-                    }
-                }
-                return '';
-            }''')
+            ref_date = await page.evaluate(JS_READ_REFERENCE_DATE)
             if ref_date:
                 self.case_data_store['_ref_date'] = ref_date
                 await page.evaluate('s => console.log("[AI填表] 参考日期: " + s)', ref_date)

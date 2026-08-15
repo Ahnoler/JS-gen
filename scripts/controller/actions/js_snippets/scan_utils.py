@@ -157,3 +157,64 @@ JS_SCROLL_TO_FIRST_ERROR = '''() => {
 # Find 保存/提交 (or custom text), scrollIntoView, click. Prefer footer / primary.
 # Args: buttonText string or [buttonText, section]. Section scopes search; no section + ≥2
 # matches → ambiguous (no click). Returns JSON {ok, text, section, xpath, reason, candidates}.
+
+
+# Read the reference date from date-labeled form items (auto-fill).
+JS_READ_REFERENCE_DATE = '''() => {
+                const dateLabels = ['成立日期', '登记日期', '注册日期', '营业起始日期', '营业开始日期'];
+                const items = document.querySelectorAll('.el-form-item');
+                for (const el of items) {
+                    const lbl = el.querySelector('.el-form-item__label');
+                    if (!lbl) continue;
+                    const t = lbl.textContent.trim();
+                    if (dateLabels.some(d => t.includes(d))) {
+                        const inp = el.querySelector('input');
+                        if (inp && inp.value && /\\d{4}-\\d{2}-\\d{2}/.test(inp.value)) {
+                            return inp.value;
+                        }
+                    }
+                }
+                return '';
+            }'''
+
+# Read current 证件类型 / 证照类型 display value from the open form.
+_JS_READ_CERT_TYPE = '''(kw) => {
+    const items = document.querySelectorAll('.el-form-item');
+    for (const item of items) {
+        const lbl = item.querySelector('.el-form-item__label');
+        if (!lbl) continue;
+        if (kw.some(k => lbl.textContent.trim().includes(k))) {
+            const inp = item.querySelector('input:not([type="hidden"])');
+            if (inp && inp.value) return inp.value;
+            const inner = item.querySelector('.el-input__inner');
+            if (inner && inner.value) return inner.value;
+            const selected = item.querySelector('.el-select__tags-text, .el-radio.is-checked');
+            if (selected && selected.textContent) return selected.textContent.trim();
+        }
+    }
+    return '';
+}'''
+
+# Extract validation-error field labels from parent .el-form-item.
+_JS_EXTRACT_ERROR_LABELS = '''() => {
+    const container = ''' + JS_GET_CONTAINER + ''';
+    const items = [];
+    const seen = new Set();
+    for (const el of container.querySelectorAll('.el-form-item__error')) {
+        const raw = (el.textContent || '').trim();
+        if (!raw) continue;
+        const formItem = el.closest('.el-form-item');
+        let label = (formItem && formItem.querySelector('.el-form-item__label')
+            ? formItem.querySelector('.el-form-item__label').textContent.trim()
+            : '');
+        if (!label) {
+            // Fallback: strip imperative prefix from error message
+            label = raw.replace(/^(请选择|请?输入|请上传|填写|完善)/, '').replace(/[：:]/g, '').trim();
+        }
+        if (label && label.length > 0 && label.length < 40 && !seen.has(label)) {
+            seen.add(label);
+            items.push(label);
+        }
+    }
+    return JSON.stringify(items);
+}'''

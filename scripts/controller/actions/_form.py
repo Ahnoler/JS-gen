@@ -25,12 +25,14 @@ from ._js_snippets import (
     JS_GET_CONTAINER, JS_IDENTIFY_CONTAINER, JS_IS_QUERY_TOOLBAR,
     JS_CHECK_SINGLE_FIELD, JS_SCAN_FORM_FIELDS,
     JS_FILL_FORM_FIELD, JS_FILL_BY_XPATH,
+    JS_CLEAR_FIELD_VALUE,
     JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH, JS_SELECT_VALUE_BY_XPATH, JS_LOCATOR,
     JS_CLICK_RADIO_BY_XPATH,
-    JS_SELECT_TREE_OPTION,
+    JS_SELECT_TREE_OPTION, JS_EXPAND_ALL_EL_TREE,
     JS_SCROLL_TO_FIRST_ERROR,
-    JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME,
+    JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME, JS_WATCH_SAVE_NOTIFICATIONS,
+    JS_CLICK_LOGIN_BUTTON,
 )
 from ...models import (
     ScannedField, FormScanResult, Notification,
@@ -66,24 +68,7 @@ async def _clear_field_value(page, label_text):
     resets its value and dispatches input/change events so Vue picks it up.
     """
     try:
-        await page.evaluate('''(label) => {
-            const items = document.querySelectorAll('.el-form-item');
-            for (const item of items) {
-                const lbl = item.querySelector('.el-form-item__label');
-                if (!lbl || !lbl.textContent.trim().includes(label)) continue;
-                const trigger = item.querySelector('input, .el-input__inner, textarea');
-                if (!trigger) continue;
-                // Clear via native setter so Vue reacts
-                Object.getOwnPropertyDescriptor(
-                    HTMLInputElement.prototype, 'value'
-                ).set.call(trigger, '');
-                trigger.dispatchEvent(new Event('input', { bubbles: true }));
-                trigger.dispatchEvent(new Event('change', { bubbles: true }));
-                trigger.setAttribute('value', '');
-                return 'cleared';
-            }
-            return 'not-found';
-        }''', label_text)
+        await page.evaluate(JS_CLEAR_FIELD_VALUE, label_text)
     except Exception:
         pass
 
@@ -101,16 +86,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         page = await browser_context.get_current_page()
         total = 0
         for _ in range(10):
-            clicked = await page.evaluate('''() => {
-                const tree = document.querySelector('.el-tree');
-                if (!tree) return -1;
-                let n = 0;
-                tree.querySelectorAll('.el-tree-node:not(.is-expanded)').forEach(node => {
-                    const icon = node.querySelector(':scope > .el-tree-node__content > .el-tree-node__expand-icon');
-                    if (icon) { icon.click(); n++; }
-                });
-                return n;
-            }''')
+            clicked = await page.evaluate(JS_EXPAND_ALL_EL_TREE)
             if clicked == -1:
                 return _err('no-el-tree-found')
             if clicked == 0:
@@ -151,17 +127,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             results.append(f'sms:{s_r}')
 
         # Click login button
-        clicked = await page.evaluate('''() => {
-            const container = ''' + JS_GET_CONTAINER + ''';
-            for (const btn of container.querySelectorAll('button')) {
-                const t = btn.textContent.trim().replace(/\\s/g, '');
-                if ((t === '登录' || t === '登錄' || t === 'Login') && btn.offsetParent !== null && !btn.disabled) {
-                    btn.click();
-                    return 'ok';
-                }
-            }
-            return 'not-found';
-        }''')
+        clicked = await page.evaluate(JS_CLICK_LOGIN_BUTTON)
         results.append(f'btn:{clicked}')
 
         summary = ' '.join(results)
@@ -827,33 +793,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             case_data_store['_last_save_ok'] = False
 
         # Capture short-lived success toasts that may vanish between polls
-        await page.evaluate(r'''() => {
-          const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功/;
-          const failRe = /失败|错误|异常|不能|不允许|已存在|重复|校验|必填|不通过/;
-          window.__saveWatch = { successNotifs: [], errorNotifs: [] };
-          const take = (el) => {
-            const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
-            if (!t) return;
-            if (failRe.test(t) || /el-notification--error|el-message--error/.test(el.className || ''))
-              window.__saveWatch.errorNotifs.push(t.slice(0, 160));
-            else
-              window.__saveWatch.successNotifs.push(t.slice(0, 160));
-          };
-          for (const el of document.querySelectorAll('.el-notification, .el-message')) take(el);
-          const obs = new MutationObserver((muts) => {
-            for (const m of muts) {
-              for (const n of m.addedNodes || []) {
-                if (!n || n.nodeType !== 1) continue;
-                if (n.matches && (n.matches('.el-notification, .el-message') || n.querySelector?.('.el-notification, .el-message'))) {
-                  if (n.matches?.('.el-notification, .el-message')) take(n);
-                  for (const el of (n.querySelectorAll?.('.el-notification, .el-message') || [])) take(el);
-                }
-              }
-            }
-          });
-          obs.observe(document.body, { childList: true, subtree: true });
-          window.__saveWatchObs = obs;
-        }''')
+        await page.evaluate(JS_WATCH_SAVE_NOTIFICATIONS)
 
         raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, [button_text or '保存', sec])
         try:
