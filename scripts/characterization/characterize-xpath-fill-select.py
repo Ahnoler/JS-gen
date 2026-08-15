@@ -144,7 +144,11 @@ def test_replay_select_uses_trigger_by_xpath() -> None:
 def test_xpath_date_radio_helpers() -> None:
     assert_true(hasattr(sn, "JS_FILL_DATE_BY_XPATH"), "JS_FILL_DATE_BY_XPATH")
     assert_true(hasattr(sn, "JS_CLICK_RADIO_BY_XPATH"), "JS_CLICK_RADIO_BY_XPATH")
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     autofill = (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
     assert_true("JS_FILL_DATE_BY_XPATH" in autofill, "assistant date fill uses xpath helper")
     assert_true("JS_CLICK_RADIO_BY_XPATH" in form, "click_radio uses xpath helper")

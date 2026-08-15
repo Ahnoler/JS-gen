@@ -96,7 +96,8 @@ def main() -> int:
     assert_true(all(not i.needs_intervention for i in tl.pending), 'no intervene flags on pending')
 
     form_py = (
-        (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
+        (ROOT / 'scripts/controller/actions/form_action_engines.py').read_text(encoding='utf-8')
+        + (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
         + (ROOT / 'scripts/controller/actions/form_autofill.py').read_text(encoding='utf-8')
         + (ROOT / 'scripts/controller/actions/autofill_round.py').read_text(encoding='utf-8')
     )
@@ -130,7 +131,7 @@ def main() -> int:
         'rebuild autofill=False used for stale + first-touch + query-ui paths',
     )
     for fn in ('fill_form_field', 'select_option', 'click_radio', 'select_tree_option'):
-        m = re.search(rf'async def {fn}\(.*?\n(?:.*?\n)*?.*?await _ensure_scanned\(label_text\)', form_py)
+        m = re.search(rf'async def {fn}\(.*?\n(?:.*?\n)*?.*?await (?:self\.)?_ensure_scanned\(label_text\)', form_py)
         assert_true(m is not None, f'{fn} calls _ensure_scanned without allow_autofill=True')
 
     assert_true('JS_FILL_BY_XPATH' in form_py, 'auto-fill uses JS_FILL_BY_XPATH')

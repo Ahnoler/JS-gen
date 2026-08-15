@@ -82,7 +82,11 @@ def _norm(s: str) -> str:
 
 
 def test_form_fill_passes_xpath_to_capture() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def fill_form_field", 1)[1].split("async def check_field_value", 1)[0]
     assert_true(
         "xpath_smart=resolved.xpath_smart" in _norm(chunk),
@@ -91,7 +95,11 @@ def test_form_fill_passes_xpath_to_capture() -> None:
 
 
 def test_select_option_passes_xpath_to_capture() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def select_option(", 1)[1].split("async def click_adjacent_button", 1)[0]
     assert_true(
         "xpath_smart=resolved.xpath_smart" in _norm(chunk)
@@ -101,7 +109,11 @@ def test_select_option_passes_xpath_to_capture() -> None:
 
 
 def test_click_radio_passes_xpath_to_capture() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def click_radio", 1)[1].split("async def ", 1)[0]
     assert_true(
         "xpath_smart=resolved.xpath_smart" in _norm(chunk),
@@ -175,7 +187,11 @@ def test_stamp_rejects_weak_fallback() -> None:
 
 
 def test_form_record_params_omit_xpath_smart() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     # After this task: no params dict literal should stamp xpath_smart into _record_action
     # Allow inventory/task_done xpath_smart= kwargs; forbid params['xpath_smart'] and
     # 'xpath_smart': xp_out inside record payloads.
@@ -195,7 +211,11 @@ def test_form_record_params_omit_xpath_smart() -> None:
 
 def test_form_resolved_paths_record_with_element() -> None:
     """Resolved write paths capture element and pass element= to _record_action (no params xpath)."""
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
 
     fill = form.split("async def fill_form_field", 1)[1].split("async def check_field_value", 1)[0]
     assert_true("_capture_element" in fill, "fill_form_field captures element")
@@ -213,7 +233,11 @@ def test_form_resolved_paths_record_with_element() -> None:
 
 
 def test_select_option_records_with_element() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def select_option(", 1)[1].split("async def click_adjacent_button", 1)[0]
     assert_true("_capture_element" in chunk, "select_option captures element")
     assert_true(
@@ -223,7 +247,11 @@ def test_select_option_records_with_element() -> None:
 
 
 def test_select_tree_option_fill_fallback_xpath_parity() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def select_tree_option", 1)[1].split("async def ", 1)[0]
     norm = _norm(chunk)
     assert_true(

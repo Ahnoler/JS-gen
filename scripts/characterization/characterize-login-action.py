@@ -6,7 +6,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+form = (
+    (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+    + "\n"
+    + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+)
 
 
 def assert_true(cond: bool, msg: str) -> None:

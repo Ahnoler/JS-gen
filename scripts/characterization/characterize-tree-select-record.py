@@ -24,7 +24,11 @@ def _norm(s: str) -> str:
 
 
 def test_select_tree_option_resolves_and_captures_xpath() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form = (
+        (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def select_tree_option", 1)[1].split("async def ", 1)[0]
     norm = _norm(chunk)
     assert_true("_resolve_control" in chunk, "select_tree_option must resolve control xpath")
