@@ -133,7 +133,7 @@ Python Agent（消费契约）
 | `business_locked` | error 含 `disabled / read-only / readonly / no-permission / locked` | `skip` |
 | `not_loaded` | error 含 `timeout / loading / page-idle / networkidle` 或 `runHealStep` timeout 上下文 | `retry` |
 | `permission_blocked` | error 含 `403 / forbidden / unauthorized / 无权限` | `skip` |
-| `not_visible` | error 含 `label-not-found / xpath-not-found / option-not-found / no-items / not-found / no-visible / select-disabled / field-disabled`，且不命中上面更高优先级规则 | `heal` |
+| `not_visible` | error 含 `label-not-found / xpath-not-found / option-not-found / no-items / not-found / no-visible`，且不命中上面更高优先级规则 | `heal` |
 | `unknown` | 无匹配 | `fail` |
 
 优先级从高到低：`changed_structure` → `business_locked` → `permission_blocked` → `conditional_absent` → `not_loaded` → `not_visible` → `unknown`。

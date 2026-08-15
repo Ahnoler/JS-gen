@@ -71,6 +71,7 @@ run "characterize-form-snapshot-trigger" node scripts/characterization/character
 run "characterize-sys-msg" node scripts/characterization/characterize-sys-msg.mjs
 run "characterize-batch-import" node scripts/characterization/characterize-batch-import.mjs
 run "characterize-step-move" node scripts/characterization/characterize-step-move.mjs
+run "characterize-heal-locate" node scripts/characterization/characterize-heal-locate.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

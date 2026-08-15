@@ -228,7 +228,7 @@ Type B 表单结构自愈：
 | 3 | `permission_blocked` | error 含 `403 / forbidden / unauthorized / 无权限` | `skip` |
 | 4 | `conditional_absent` | `ok-skip:` / `label-not-found` 且 context 含 `absent_skip`，或已有 absent-skip 标记 | `skip` |
 | 5 | `not_loaded` | error 含 `timeout / loading / page-idle / networkidle`，或 context.timeout | `retry` |
-| 6 | `not_visible` | error 含 `label-not-found / xpath-not-found / option-not-found / no-items / not-found / no-visible / select-disabled / field-disabled`，且不命中更高优先级 | `heal` |
+| 6 | `not_visible` | error 含 `label-not-found / xpath-not-found / option-not-found / no-items / not-found / no-visible`，且不命中更高优先级 | `heal` |
 | 7 | `unknown` | 无匹配 | `fail` |
 
-> 注意：handoff 原表 `not_visible` 未列 `no-items / select-disabled / field-disabled`。本 spec 从 H0.1 真实返回串补入，使 live replay 的 Type A 失败能被归类；characterization 以本表为准，并同步回 handoff 附录。
+> 注意：handoff 原表 `not_visible` 未列 `no-items`。本 spec 从 H0.1 真实返回串补入 `no-items`，使 live replay 的 Type A 失败能被归类；`select-disabled / field-disabled / *-disabled` 按 D3 优先级先命中 `business_locked` 的 `disabled` 信号。characterization 以本表为准。
