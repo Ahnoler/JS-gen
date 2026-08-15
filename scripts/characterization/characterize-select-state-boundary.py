@@ -252,8 +252,10 @@ def test_direct_reset_before_resolve_and_gates_trigger() -> None:
 
 def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    autofill_src = (ROOT / "scripts/controller/actions/form_autofill.py").read_text(
-        encoding="utf-8"
+    autofill_src = (
+        (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/autofill_round.py").read_text(encoding="utf-8")
     )
     replay = (
         (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")
@@ -299,8 +301,10 @@ def test_autofill_and_replay_gate_trigger_on_reset_failure() -> None:
 
 def test_recording_and_replay_use_reset_boundary() -> None:
     form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
-    autofill_src = (ROOT / "scripts/controller/actions/form_autofill.py").read_text(
-        encoding="utf-8"
+    autofill_src = (
+        (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+        + "\n"
+        + (ROOT / "scripts/controller/actions/autofill_round.py").read_text(encoding="utf-8")
     )
     replay = (
         (ROOT / "scripts/controller/actions/_replay.py").read_text(encoding="utf-8")

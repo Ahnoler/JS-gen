@@ -78,6 +78,8 @@ def main() -> int:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/autofill_pending.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/autofill_round.py").read_text(encoding="utf-8")
     )
     assert_true("_cascade_round" in form, "wired cascade round helper")
     assert_true("append_select_first_fallbacks" in form, "select first fallback wired")

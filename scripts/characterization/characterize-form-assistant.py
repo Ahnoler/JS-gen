@@ -98,6 +98,7 @@ def main() -> int:
     form_py = (
         (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
         + (ROOT / 'scripts/controller/actions/form_autofill.py').read_text(encoding='utf-8')
+        + (ROOT / 'scripts/controller/actions/autofill_round.py').read_text(encoding='utf-8')
     )
     assert_true('async def run_form_assistant' in form_py, 'run_form_assistant action exists')
     assert_true(

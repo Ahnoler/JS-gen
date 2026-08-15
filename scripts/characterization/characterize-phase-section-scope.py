@@ -197,10 +197,12 @@ def test_run_form_assistant_autofill_section_filter() -> None:
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/autofill_pending.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/autofill_round.py").read_text(encoding="utf-8")
     )
     assert_true(
-        "section_matches" in form.split("async def _auto_fill_pending", 1)[1]
-        or "section_matches" in form.split("async def _execute_round", 1)[1],
+        "section_matches" in form.rsplit("async def _auto_fill_pending", 1)[1]
+        or "section_matches" in form.rsplit("async def _execute_round", 1)[1],
         "autofill path filters by section_matches",
     )
 

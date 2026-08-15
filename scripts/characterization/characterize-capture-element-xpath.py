@@ -113,6 +113,7 @@ def test_execute_round_passes_xpath_to_capture() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/autofill_round.py").read_text(encoding="utf-8")
     )
   # _execute_round body: first capture after capture_kind assignment
     idx = form.find("capture_kind = 'form_input'")
@@ -128,6 +129,7 @@ def test_tree_fallback_xpath_captures_pass_xpath() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/autofill_round.py").read_text(encoding="utf-8")
     )
     # xpath branch fill fallback capture (_execute_round)
     idx = form.find("JS_FILL_BY_XPATH, [xpath_smart, fill_val, label]")
