@@ -5,18 +5,18 @@ export {
   MSG_STATUS_UNREAD,
   MSG_STATUS_READ,
   DICT_TYPE_SYS_MSG,
-} from '../models/sys-msg.js';
+} from '../../models/constants.js';
 
 import {
   MSG_TYPE_BATCH_IMPORT,
   MSG_TITLE_BATCH_IMPORT,
   MSG_STATUS_UNREAD,
   MSG_STATUS_READ,
-} from '../models/sys-msg.js';
+} from '../../models/constants.js';
 import {
   decodeUploadFilename,
   repairMojibakeText,
-} from '../http/decode-upload-filename.js';
+} from '../../http/decode-upload-filename.js';
 
 const JOB_STATUS_LABEL = {
   completed: '已完成',

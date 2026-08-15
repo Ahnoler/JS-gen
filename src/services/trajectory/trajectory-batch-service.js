@@ -23,7 +23,7 @@ import { BATCH_JOB_MODES, BATCH_JOB_TERMINAL } from '../../models/constants.js';
 import { pumpAnalyze, pumpDraft } from './batch-analyze.js';
 import { pumpRecord } from './batch-record.js';
 import { computeBatchItemProgress, PHASE_LOOKUP_STATUSES } from './batch-item-progress.js';
-import { insertSysMsgFromBatchJob } from '../sys-msg-service.js';
+import { insertSysMsgFromBatchJob } from '../sys-msg/sys-msg-service.js';
 import { decodeUploadFilename } from '../../http/decode-upload-filename.js';
 import { defaultJobName } from './batch-job-name.js';
 

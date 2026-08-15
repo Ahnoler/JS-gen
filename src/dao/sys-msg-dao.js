@@ -1,6 +1,6 @@
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
-import { MSG_STATUS_READ } from '../models/sys-msg.js';
+import { MSG_STATUS_READ } from '../models/constants.js';
 
 const TABLE = 'sys_msg';
 

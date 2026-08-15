@@ -130,3 +130,11 @@ export const BATCH_JOB_TERMINAL = Object.freeze([
   'completed_with_errors',
   'failed',
 ]);
+
+/** sys_msg message constants (moved from models/sys-msg.js). */
+export const MSG_TYPE_BATCH_IMPORT = 1;
+export const MSG_TITLE_BATCH_IMPORT = '批量导入任务';
+export const SOURCE_TYPE_BATCH_IMPORT = 'batch_import';
+export const MSG_STATUS_UNREAD = 0;
+export const MSG_STATUS_READ = 2;
+export const DICT_TYPE_SYS_MSG = 'sys_msg_type';

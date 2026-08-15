@@ -1,4 +1,4 @@
-import * as sysMsgService from '../../services/sys-msg-service.js';
+import * as sysMsgService from '../../services/sys-msg/sys-msg-service.js';
 
 function statusOf(err) {
   return err?.statusCode || 500;

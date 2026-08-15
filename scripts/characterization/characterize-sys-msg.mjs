@@ -18,7 +18,7 @@ import {
   batchImportLinkUrl,
   formatMsgCreateTime,
   shapeSysMsgApi,
-} from '../../src/services/sys-msg-compose.js';
+} from '../../src/services/sys-msg/sys-msg-compose.js';
 import { decodeUploadFilename } from '../../src/http/decode-upload-filename.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -163,7 +163,11 @@ assert.match(mig, /createTable\('sys_msg'/);
 assert.match(mig, /sys_msg_type/);
 assert.match(mig, /批量导入任务/);
 
-const daoSrc = readFileSync(join(ROOT, 'src/dao/sys-msg-dao.js'), 'utf-8');
+const constantsSrc = readFileSync(join(ROOT, 'src/models/constants.js'), 'utf-8');
+  assert.match(constantsSrc, /export const MSG_TYPE_BATCH_IMPORT = 1/);
+  assert.match(constantsSrc, /export const DICT_TYPE_SYS_MSG = 'sys_msg_type'/);
+
+  const daoSrc = readFileSync(join(ROOT, 'src/dao/sys-msg-dao.js'), 'utf-8');
 assert.match(daoSrc, /export async function insertIgnoreDuplicate/);
 assert.match(daoSrc, /uk_sys_msg_source|ER_DUP_ENTRY|duplicate/i);
 assert.match(daoSrc, /export async function list/);
@@ -172,7 +176,7 @@ assert.match(daoSrc, /whereNot\(\{ msg_status: MSG_STATUS_READ \}\)/);
 assert.match(daoSrc, /export async function markRead/);
 assert.match(daoSrc, /export async function markAllRead/);
 
-const svcSrc = readFileSync(join(ROOT, 'src/services/sys-msg-service.js'), 'utf-8');
+const svcSrc = readFileSync(join(ROOT, 'src/services/sys-msg/sys-msg-service.js'), 'utf-8');
 assert.match(svcSrc, /export async function insertSysMsgFromBatchJob/);
 assert.match(svcSrc, /listByTypeActive\(DICT_TYPE_SYS_MSG\)|listByTypeActive\('sys_msg_type'\)/);
 assert.match(svcSrc, /MSG_TITLE_BATCH_IMPORT/);
@@ -244,7 +248,7 @@ assert.match(uploadSrc, /decodeUploadFilename/);
 const batchRouteSrc = readFileSync(join(ROOT, 'src/routes/v2/trajectory-batch.js'), 'utf-8');
 assert.match(batchRouteSrc, /decodeUploadFilename/);
 
-const composeSrc = readFileSync(join(ROOT, 'src/services/sys-msg-compose.js'), 'utf-8');
+const composeSrc = readFileSync(join(ROOT, 'src/services/sys-msg/sys-msg-compose.js'), 'utf-8');
 assert.match(composeSrc, /decodeUploadFilename/);
 assert.match(composeSrc, /repairMojibakeText/);
 

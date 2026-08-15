@@ -1,6 +1,6 @@
-import * as systemDao from '../dao/system-dao.js';
-import * as dataDao from '../dao/sys-dict-data-dao.js';
-import * as msgDao from '../dao/sys-msg-dao.js';
+import * as systemDao from '../../dao/system-dao.js';
+import * as dataDao from '../../dao/sys-dict-data-dao.js';
+import * as msgDao from '../../dao/sys-msg-dao.js';
 import {
   MSG_TYPE_BATCH_IMPORT,
   MSG_TITLE_BATCH_IMPORT,
