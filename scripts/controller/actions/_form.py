@@ -498,7 +498,12 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     )
     async def click_save(button_text: str = '保存', section: str = '', region: str = ''):
         from ._phase_intent import check_pending_write_gate, contract_force_refill, record_success_token
-        from .section_scope import resolve_scope
+        from .section_scope import (
+            clear_phase_section,
+            remember_phase_section,
+            resolve_scope,
+            save_retry_scope,
+        )
 
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
@@ -643,6 +648,27 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
             info = json.loads(raw) if isinstance(raw, str) else (raw or {})
         except Exception:
             info = {}
+        retry_scope = ''
+        if not info.get('ok'):
+            retry_scope = save_retry_scope(
+                str(info.get('reason') or ''),
+                info.get('candidates') or [],
+                explicit_scope=explicit_sec,
+            )
+            if retry_scope:
+                clear_phase_section(case_data_store)
+                sys.stderr.write(
+                    f'[click_save] stale scope {sec!r} (not-found) → retry region={retry_scope!r}\n'
+                )
+                sys.stderr.flush()
+                raw = await page.evaluate(JS_CLICK_SAVE_BUTTON, [button_text or '保存', retry_scope])
+                try:
+                    info = json.loads(raw) if isinstance(raw, str) else (raw or {})
+                except Exception:
+                    info = {}
+                if info.get('ok'):
+                    sec = retry_scope
+                    remember_phase_section(case_data_store, retry_scope)
         if not info.get('ok'):
             try:
                 await page.evaluate('() => { try { window.__saveWatchObs?.disconnect(); } catch(e) {} }')
@@ -665,10 +691,15 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
                     include_in_memory=True,
                 )
             sec_hint = f' region={sec!r}' if sec else ''
+            stale_hint = (
+                f' | stale scope memory retried region={retry_scope!r} and still missed'
+                if retry_scope else ''
+            )
             return _err(
                 f'err-save-button-not-found:{needle}{sec_hint}. '
                 f'candidates={cand_json}. '
-                f'Close interfering dialogs (查询/返回) with close_dialog, or pass region= for scoped save.',
+                f'Close interfering dialogs (查询/返回) with close_dialog, '
+                f'or pass region= for scoped save.{stale_hint}',
                 include_in_memory=True,
             )
 

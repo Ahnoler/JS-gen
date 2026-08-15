@@ -244,6 +244,34 @@ def clear_phase_section(store: dict | None) -> None:
         return
     store.pop("_phase_section", None)
 
+def save_retry_scope(
+    reason: str,
+    candidates: list | None,
+    *,
+    explicit_scope: bool = False,
+) -> str:
+    """Self-heal scope for click_save when a sticky section missed.
+
+    Returns the unique candidate region to retry with, or '' when:
+      - scope was explicitly passed (never override the agent),
+      - reason is not 'not-found',
+      - candidates are empty / ambiguous.
+    """
+    if explicit_scope or reason != 'not-found':
+        return ''
+    titles: list[str] = []
+    for c in candidates or []:
+        if not isinstance(c, dict):
+            continue
+        t = (
+            norm_sec(c.get('section_title') or '')
+            or norm_sec(c.get('region_label') or '')
+            or norm_sec(c.get('section_id') or '')
+        )
+        if t and t not in titles:
+            titles.append(t)
+    return titles[0] if len(titles) == 1 else ''
+
 
 def resolve_phase_section(store: dict | None, *, task_text: str = "") -> str:
     """Return phase section scope or '' (full-table gate).
