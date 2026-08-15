@@ -91,28 +91,32 @@ def build_agent_system_message(contract: dict | None = None) -> str:
 
     packs = ['agent-core.md', 'agent-tools-common.md']
 
-    # Table tools for navigate/query/introduce (row selection, icon buttons)
-    # and create/modify (row edit/delete, toolbar icons)
-    if mode in ('navigate', 'query', 'introduce_pick', 'login', 'create', 'modify', None):
-        packs.append('agent-tools-table.md')
+    # Heal mode: recovery rules only — no form/table/tree recording packs.
+    if mode == 'heal':
+        packs.append('agent-tools-heal.md')
+    else:
+        # Table tools for navigate/query/introduce (row selection, icon buttons)
+        # and create/modify (row edit/delete, toolbar icons)
+        if mode in ('navigate', 'query', 'introduce_pick', 'login', 'create', 'modify', None):
+            packs.append('agent-tools-table.md')
 
-    # Form pack for introduce_pick and create/modify
-    if mode in ('introduce_pick', 'create', 'modify') or allow_assistant:
-        packs.append('agent-tools-form.md')
+        # Form pack for introduce_pick and create/modify
+        if mode in ('introduce_pick', 'create', 'modify') or allow_assistant:
+            packs.append('agent-tools-form.md')
 
-    # Tree pack for create/modify (default)
-    if mode in ('create', 'modify'):
-        packs.append('agent-tools-tree.md')
+        # Tree pack for create/modify (default)
+        if mode in ('create', 'modify'):
+            packs.append('agent-tools-tree.md')
 
-    # Full fallback: unknown mode or None contract
-    if mode not in ('login', 'navigate', 'query', 'introduce_pick', 'create', 'modify'):
-        packs = [
-            'agent-core.md',
-            'agent-tools-common.md',
-            'agent-tools-form.md',
-            'agent-tools-table.md',
-            'agent-tools-tree.md',
-        ]
+        # Full fallback: unknown mode or None contract
+        if mode not in ('login', 'navigate', 'query', 'introduce_pick', 'create', 'modify'):
+            packs = [
+                'agent-core.md',
+                'agent-tools-common.md',
+                'agent-tools-form.md',
+                'agent-tools-table.md',
+                'agent-tools-tree.md',
+            ]
 
     parts = [_read_pack(p) for p in packs]
     return '\n\n'.join(parts)

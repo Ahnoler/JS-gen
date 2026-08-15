@@ -171,7 +171,12 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         if phase_for_preamble is None:
             phase_for_preamble = _CURRENT_PHASE
         if case_data_ref is not None:
-            apply_heal_mode(case_data_ref, heal_mode)
+            parsed_heal_contract = (
+                instruction.get('_parsed_heal_contract')
+                if isinstance(instruction, dict)
+                else None
+            )
+            apply_heal_mode(case_data_ref, heal_mode, parsed_heal_contract)
             if heal_mode:
                 mode = 'other'
                 contract = None
@@ -412,7 +417,10 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
 
     sys.stderr.write(f"Creating Agent...\n");
     sys.stderr.flush()
-    contract = get_phase_intent(case_data_ref) if case_data_ref else None
+    if heal_mode and case_data_ref and case_data_ref.get('_heal_contract'):
+        contract = {'mode': 'heal', 'heal': case_data_ref['_heal_contract']}
+    else:
+        contract = get_phase_intent(case_data_ref) if case_data_ref else None
     system_msg = build_agent_system_message(contract)
     agent = Agent(
         task=agent_task, llm=llm, controller=controller, browser_context=browser_context,

@@ -134,8 +134,22 @@ def recording_refill_hint(
 
 
 def detect_heal_mode(instruction: dict | None, task_text: str = '') -> str | None:
-    """Return 'step' | 'form_structure' | None for heal agent runs."""
+    """Return 'step' | 'form_structure' | None for heal agent runs.
+
+    Detection priority:
+      1. structured ``heal_contract`` (mode=='heal') from Node;
+      2. legacy ``heal_type`` / ``healType`` fields;
+      3. legacy text keywords (kept as fallback).
+    The parsed contract is cached on ``instruction['_parsed_heal_contract']`` so
+    the caller can pass it to ``apply_heal_mode`` without parsing twice.
+    """
     if isinstance(instruction, dict):
+        instruction.pop('_parsed_heal_contract', None)
+        contract = instruction.get('heal_contract')
+        if isinstance(contract, dict) and contract.get('mode') == 'heal':
+            scope = str(contract.get('scope') or '').strip().lower()
+            instruction['_parsed_heal_contract'] = contract
+            return 'form_structure' if scope == 'form_structure' else 'step'
         raw = instruction.get('heal_type') or instruction.get('healType') or ''
         raw = str(raw).strip().lower()
         if raw in ('step', 'form_structure'):
@@ -150,16 +164,27 @@ def detect_heal_mode(instruction: dict | None, task_text: str = '') -> str | Non
     return None
 
 
-def apply_heal_mode(case_data_store: dict | None, heal_mode: str | None) -> str | None:
-    """Set/clear ``_heal_mode``. Heal never carries a phase-intent contract.
+def apply_heal_mode(
+    case_data_store: dict | None,
+    heal_mode: str | None,
+    heal_contract: dict | None = None,
+) -> str | None:
+    """Set/clear ``_heal_mode`` and ``_heal_contract``.
 
-    Recording phases compile ``_phase_intent``; heal clears it and must not
-    re-apply create/modify submit or recovery→click_save rules.
+    ``_heal_mode`` keeps its legacy string value for recorder/emitter consumers;
+    ``_heal_contract`` is an additive structured field for prompt assembly.
+    Heal never carries a phase-intent contract: recording phases compile
+    ``_phase_intent``; heal clears it and must not re-apply create/modify submit
+    or recovery→click_save rules.
     """
     if case_data_store is None:
         return heal_mode
     if heal_mode:
         case_data_store['_heal_mode'] = heal_mode
+        if heal_contract is not None:
+            case_data_store['_heal_contract'] = heal_contract
+        else:
+            case_data_store.pop('_heal_contract', None)
         try:
             from .._phase_intent import clear_phase_intent
             clear_phase_intent(case_data_store)
@@ -170,6 +195,7 @@ def apply_heal_mode(case_data_store: dict | None, heal_mode: str | None) -> str 
         case_data_store.pop('_success_tokens', None)
     else:
         case_data_store.pop('_heal_mode', None)
+        case_data_store.pop('_heal_contract', None)
     return heal_mode
 
 
