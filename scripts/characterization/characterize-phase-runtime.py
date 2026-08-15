@@ -51,6 +51,7 @@ def test_submit_ready_hint_uses_resolve_phase_section() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/task_completion.py").read_text(encoding="utf-8")
     )
     hint = form.find("def _submit_ready_hint")
     assert_true(hint >= 0, "_submit_ready_hint present")
