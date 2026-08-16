@@ -104,8 +104,8 @@ ALTER TABLE trajectory MODIFY COLUMN record_status
 | confirm(false) | completed→draft | completed→recorded | trajectory-meta-service.js:366-370 |
 | POST clear | →draft | →draft | trajectory-phase-service.js:144-153 |
 | 推送闸 | recorded/completed | **completed only** | export-push-gate.js:6,22-32 |
-| 回放闸 | live/recording 409 | recording 409（failed 可回放） | replay-service.js:36-45 |
-| 步骤移动闸 | recording 409 | recording 409 | trajectory-step-service.js:237 |
+| 回放闸 | live/recording 409 | assembled replay 栈已删（2026-08-16 勘正）：现行 steps/replay 无 recordStatus 闸——未 attach 400、session.busy(AI 录制中) 409 | trajectory-session-replay.js |
+| 步骤编辑/移动闸 | recording 409 | **AI 录制活跃**（recording 且 phase running）→ 409；纯观看占位放开（2026-08-16 勘正） | trajectory-step-service.js assertNotBusyForStepEdit |
 | confirm 闸 | live/recording 409 | recording/failed 409 | trajectory-meta-service.js:348-356 |
 | 人工录制闸 | recording+enabled 409 | isAiRecordingActive+enabled 409 | trajectory-manual-record.js:29 |
 
