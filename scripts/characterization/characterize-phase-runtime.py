@@ -67,7 +67,7 @@ def test_click_save_section_order_in_source() -> None:
     assert_true("same_label_section_keys" in body, "multi-section gate")
     assert_true("unique_button_section" in body, "unique path kept")
     multi_pos = body.find("same_label_section_keys")
-    mem_pos = body.find("_phase_section")
+    mem_pos = body.find('get("_phase_section")')
     uniq_pos = body.find("unique_button_section")
     assert_true(multi_pos < mem_pos, "multi check before sticky")
     assert_true(mem_pos < uniq_pos or uniq_pos > multi_pos, "unique still after gate")
