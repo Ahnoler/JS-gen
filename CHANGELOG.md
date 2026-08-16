@@ -12,9 +12,9 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 ### Added
 
 - 2026-08-16: **步骤编辑/移动闸对齐 AI 活跃**：纯观看占位（recordStatus=recording 且非 AI 录制）放开步骤编辑/移动；后端步骤更新、删除、移动在 AI 录制活跃（phase.status='running'）时 409；清空步骤由前端在 AI 录制中禁用（后端 clear 无闸）。确认/推送/record-start 闸不变。
-  影响范围：步骤更新/删除/移动的闸门语义（纯观看占位从 409 变为放行；新增 AI 活跃 409 覆盖更新/删除路径）。
-  文件：src/services/trajectory/trajectory-step-service.js, src/routes/v2/trajectory-record.js, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-step-move.mjs, scripts/characterization/characterize-record-status-v2.mjs
-  Python 同步提示：无 HTTP/schema。代理侧若实现步骤编辑闸，按「AI 录制活跃才 409」对齐（纯推流占用放行）。
+  影响范围：步骤更新/删除/移动的闸门语义（纯观看占位从 409 变为放行；新增 AI 活跃 409 覆盖更新/删除路径）；步骤 CRUD 路由错误码改为透传 statusCode（原硬编码 500）。
+  文件：src/services/trajectory/trajectory-step-service.js, src/routes/v2/trajectory-steps.js, src/routes/v2/trajectory-record.js, src/dashboard/api-docs/groups/recording.js, scripts/characterization/characterize-step-move.mjs, scripts/characterization/characterize-record-status-v2.mjs
+  Python 同步提示：无 HTTP/schema。代理侧若实现步骤编辑闸，按「AI 录制活跃才 409」对齐（纯推流占用放行）。步骤 CRUD 错误码不再一律 500；步骤创建/插入路径仍无 AI 活跃闸（录制活持久化依赖，勿误判为漏洞）
 
 - 2026-08-16: **AI 录制重复失败动作纠偏开关（Python 侧，默认关闭）**：新增 `AI_DUP_FAILURE_CUE=false`；开启后，连续 2 步「动作+参数完全相同且结果均 err-」时，recorder 向 Agent 注入一条 `[纠偏]` HumanMessage 处方（按错误码给建议，每阶段每签名只注入一次）。默认关闭，现有录制行为不变。
   影响范围：仅 Python 子进程录制运行时的可选行为开关；无路由/schema/WS 变更。
