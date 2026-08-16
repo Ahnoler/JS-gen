@@ -9,6 +9,13 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ## [Unreleased]
 
+### Added
+
+- 2026-08-16: **AI 录制重复失败动作纠偏开关（Python 侧，默认关闭）**：新增 `AI_DUP_FAILURE_CUE=false`；开启后，连续 2 步「动作+参数完全相同且结果均 err-」时，recorder 向 Agent 注入一条 `[纠偏]` HumanMessage 处方（按错误码给建议，每阶段每签名只注入一次）。默认关闭，现有录制行为不变。
+  影响范围：仅 Python 子进程录制运行时的可选行为开关；无路由/schema/WS 变更。
+  文件：config/.env.example, scripts/feature_flags.py, scripts/controller/actions/duplicate_failure_cue.py, scripts/agent/recorder_emitters.py, scripts/recorder.py, scripts/controller/actions/phase/intent_contract.py, scripts/characterization/characterize-duplicate-failure-cue.py, scripts/refactor/verify-all.sh
+  Python 同步提示：无（开关与 cue 均为 Python 子进程内部行为；如需 UI 暴露灰度开关再对齐 Node config）。
+
 ### Changed
 
 - 2026-08-15: **Heal-Locate Phase 1 MVP**：新增 Node 侧纯函数规则引擎 `missing-reason-analyzer.js` 与 `heal-contract.js`（失败原因分类 → HealContract：mode/scope/strategy/reason/target/runtime，prompt 与 runtime 分离）；Type A/B heal instruction 旧文本末尾追加【失败分析】结构化段落；`runHealStep` forward 载荷新增 `heal_contract`，`instruction/max_steps/phase_number/heal_type/healType` 旧字段原样保留；`session.step` 在控制面与执行机两处白名单同步透传 `heal_contract`；Python 侧解析 contract 并让 heal 模式只装配 `agent-core.md + agent-tools-common.md + agent-tools-heal.md`。
