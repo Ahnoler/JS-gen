@@ -51,7 +51,7 @@ export default function (app) {
       const steps = await trajectoryService.listStepsByPhase(+req.params.id, { includeMeta });
       res.json({ phaseId: +req.params.id, steps });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message });
     }
   });
 
@@ -61,7 +61,7 @@ export default function (app) {
       if (!row) return res.status(404).json({ error: 'Trajectory step not found' });
       res.json(row);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message });
     }
   });
 
@@ -90,7 +90,7 @@ export default function (app) {
       if (!result.removed) return res.status(404).json({ error: 'Trajectory step not found' });
       res.json(result);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(err.statusCode || 500).json({ error: err.message });
     }
   });
 

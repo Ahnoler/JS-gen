@@ -74,7 +74,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/stop',
         summary: '结束录制（不 detach）',
-        desc: 'success=true → recordStatus=recorded；false → draft。会向执行机会话发送 cancel_step，当前 Agent 立即停止后续步骤（当前正在执行的一步结束后不再继续）。响应含 detached:false。',
+        desc: 'success=true → recordStatus=recorded；false → failed。会向执行机会话发送 cancel_step，当前 Agent 立即停止后续步骤（当前正在执行的一步结束后不再继续）。响应含 detached:false。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ success: true }),
         respExample: J({

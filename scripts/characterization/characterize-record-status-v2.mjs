@@ -67,6 +67,12 @@ async function main() {
     assert.ok(iFailed > iFirstCleanup && iFailed < iLastCleanup, 'failed CAS must precede its own (INTERRUPTED) cleanup');
   });
 
+  run('step edit/move gate: AI-active only', () => {
+    const svc = readFileSync(join(ROOT, 'src', 'services', 'trajectory', 'trajectory-step-service.js'), 'utf8');
+    assert.ok(svc.includes("traj?.recordStatus === 'recording' && (await isAiRecordingActive(tid))"), 'gate uses AI-active check');
+    assert.ok(svc.includes('await assertNotBusyForStepEdit('), 'call sites await the async guard');
+  });
+
   console.log(failed ? `\n${failed} failed` : '\nall ok');
   process.exit(failed ? 1 : 0);
 }

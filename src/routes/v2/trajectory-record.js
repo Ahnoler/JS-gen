@@ -68,7 +68,7 @@ export default function (app) {
 
   /**
    * Explicit end of recording (does not detach BiB).
-   * Body: { success?: boolean } default true → recorded; false → draft
+   * Body: { success?: boolean } default true → recorded; false → failed
    */
   app.post('/api/v2/trajectories/:id/record/stop', async (req, res) => {
     try {
@@ -82,7 +82,7 @@ export default function (app) {
 
   /**
    * Human confirm / cancel-confirm a trajectory (transaction-level).
-   * Body: { confirmed: boolean } — true → recordStatus=completed; false → draft.
+   * Body: { confirmed: boolean } — true → recordStatus=completed; false → recorded.
    * Does not modify trajectory_step.confirmed (回放确认).
    */
   app.post('/api/v2/trajectories/:id/confirm', async (req, res) => {

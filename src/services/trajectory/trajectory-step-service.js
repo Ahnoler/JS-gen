@@ -7,6 +7,7 @@ import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import { getDB } from '../../../config/database.js';
 import { planStepMove } from './trajectory-step-move.js';
 import { getTrajectoryRuntime } from './trajectory-runtime.js';
+import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { state } from '../../state.js';
 import {
   isSingleTargetAction,
@@ -122,6 +123,15 @@ export async function createTrajectoryStep(input = {}) {
 export async function updateTrajectoryStep(stepId, fields = {}) {
   const existing = await trajectoryStepDao.getById(Number(stepId));
   if (!existing) return null;
+  const tid = Number(existing.trajectoryId);
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  await assertNotBusyForStepEdit(tid, traj);
+
   const patch = { ...fields };
   delete patch.description;
 
@@ -222,6 +232,15 @@ export async function insertStepsAfter(afterStepId, inputs = []) {
 export async function removeTrajectoryStep(stepId) {
   const existing = await trajectoryStepDao.getById(Number(stepId));
   if (!existing) return { removed: false };
+  const tid = Number(existing.trajectoryId);
+  const traj = await trajectoryDao.getById(tid);
+  if (!traj) {
+    const err = new Error('Trajectory not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  await assertNotBusyForStepEdit(tid, traj);
+
   await trajectoryStepDao.removeById(Number(stepId));
   await trajectoryStepDao.reorderByTrajectory(existing.trajectoryId);
   const counts = await refreshTrajectoryCounts(existing.trajectoryId);
@@ -232,9 +251,9 @@ export async function removeTrajectoryStep(stepId) {
   return { removed: true, trajectoryId: existing.trajectoryId };
 }
 
-function assertNotBusyForStepEdit(trajectoryId, traj) {
+async function assertNotBusyForStepEdit(trajectoryId, traj) {
   const tid = Number(trajectoryId);
-  if (traj?.recordStatus === 'recording') {
+  if (traj?.recordStatus === 'recording' && (await isAiRecordingActive(tid))) {
     const err = new Error('Cannot move steps while AI recording');
     err.statusCode = 409;
     throw err;
@@ -266,7 +285,7 @@ export async function moveTrajectoryStep(trajectoryId, input = {}) {
     err.statusCode = 404;
     throw err;
   }
-  assertNotBusyForStepEdit(tid, traj);
+  await assertNotBusyForStepEdit(tid, traj);
 
   const steps = await trajectoryStepDao.listByTrajectory(tid);
   const phases = await trajectoryPhaseDao.listByTrajectory(tid);
