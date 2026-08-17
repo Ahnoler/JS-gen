@@ -87,6 +87,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-17: **批量导入生成的交易漏盖 paasUserId**：`batch-analyze.js` 的 `createDraftFromAnalyzed` 创建交易时未透传 `job.paasUserId`，导致批量导入任务归了用户、任务生成的交易 `paas_user_id` 为 NULL（无主全可见），隔离失效。现在透传 `paasUserId: job.paasUserId || null`，交易与任务归属一致。
+  影响范围：批量导入 analyze 链路新建交易的用户归属（无 schema/HTTP 变更）。
+  文件：src/services/trajectory/batch-analyze.js, scripts/characterization/characterize-sso-auth.mjs
+  Python 同步提示：无 HTTP/schema。若代理侧也有「任务→交易」创建链路，需同步透传任务归属用户 id。
+
 - 2026-08-15: **分区 compose 继承修复**：浮动/固定操作条（如底部「返回」按钮）位于 tab pane 之外时 chrome/section 丢失、region 退化为单 titlebox 段；现在从几何就近 titlebox 自身的上下文继承 chrome+section，得到完整 `tab|section|titlebox` 路径（与同 titlebox 内按钮一致）。
   影响范围：assignRegion / composeContentRegion（src/cdp）、resolve/扫描/录制 `element_json`、`_locator_helpers_js.py`（重生成）。
   文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-partition-compose.mjs

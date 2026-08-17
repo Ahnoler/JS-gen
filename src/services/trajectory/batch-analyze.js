@@ -182,6 +182,8 @@ async function createDraftFromAnalyzed(item) {
         model: job.model || '',
         systemAccountId: Number(job.systemAccountId),
         batchJobId: job.id,
+        // 任务归属用户透传给其生成的交易（否则交易 paas_user_id=NULL 变无主全可见）
+        paasUserId: job.paasUserId || null,
         requireFunctionId: true,
         trx,
       });

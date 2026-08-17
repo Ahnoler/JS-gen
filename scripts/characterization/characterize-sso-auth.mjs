@@ -160,6 +160,11 @@ function main() {
     assert.ok(/job\.paasUserId[\s\S]*?statusCode = 404/.test(svc), 'view 404 on ownership mismatch');
   });
 
+  run('batch analyze threads job.paasUserId into created trajectory', () => {
+    const svc = read('src/services/trajectory/batch-analyze.js');
+    assert.ok(svc.includes('paasUserId: job.paasUserId || null'), 'analyze passes job.paasUserId to createTransactionWithPhases');
+  });
+
   run('routes thread req.paasUserId into trajectory + batch handlers', () => {
     const traj = read('src/routes/v2/trajectory.js');
     assert.ok(traj.includes('paasUserId: req.paasUserId ?? null'), 'trajectory route passes paasUserId');
