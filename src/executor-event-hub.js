@@ -54,7 +54,7 @@ export function onSessionEvent(sessionId, type, handler) {
  * Wait for one event on a session hub.
  * @param {string} sessionId
  * @param {string} type
- * @param {number} [timeoutMs]
+ * @param {number|null} [timeoutMs] pass null to wait indefinitely.
  */
 export function waitForSessionEvent(sessionId, type, timeoutMs = 120000) {
   let cancel = () => {};
@@ -72,9 +72,11 @@ export function waitForSessionEvent(sessionId, type, timeoutMs = 120000) {
     function onEvent(payload) {
       finish(() => resolve(payload));
     }
-    timer = setTimeout(() => {
-      finish(() => reject(new Error(`Timeout waiting for ${type}`)));
-    }, timeoutMs);
+    if (timeoutMs != null && Number.isFinite(Number(timeoutMs))) {
+      timer = setTimeout(() => {
+        finish(() => reject(new Error(`Timeout waiting for ${type}`)));
+      }, Number(timeoutMs));
+    }
     hub.once(type, onEvent);
     // Drop the loser of Promise.race without rejecting (avoids unhandled timeout).
     cancel = () => finish(() => {});

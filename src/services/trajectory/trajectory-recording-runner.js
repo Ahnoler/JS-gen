@@ -24,6 +24,9 @@ import { appendPhaseDoneLog } from './trajectory-phase-service.js';
 import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 
+/** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
+const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+
 async function broadcastRecordingLock() {
   try {
     const { broadcastWatcherStatus } = await import('../../routes/browser-session/broadcasts.js');
@@ -131,12 +134,19 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   await broadcastRecordingLock();
 
   const events = [];
+  /** Called on each agent activity event to keep the phase watchdog alive. */
+  let phaseActivity = null;
+  /** Clears the current phase watchdog (set per phase). */
+  let clearPhaseActivity = () => {};
   // Listener #3 of 3 for step_screenshot (product AI record/start):
   // startTrajectoryRecording opens its own subscribeSessionEvents for this run's agent
   // action_log_sync → appendRecordedStep. Separate from bindExecutorSessionEvents (#1),
   // which focuses on manual/cdp (+ optional agent autoPersist). Both must handle
   // step_screenshot or AI-recording shots would be dropped.
   const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, (type, payload) => {
+    if (type === 'action_log_sync' || type === 'step_screenshot') {
+      try { phaseActivity?.(); } catch {}
+    }
     const work = (async () => {
     if (type === 'phase_intent_obs' || type === 'phase_boundary_obs' || type === 'phase_end') {
       events.push({
@@ -304,8 +314,29 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       await trajectoryPhaseDao.updateStatus(phase.id, 'running');
       if (session) session.activePhaseId = phase.id;
 
-      const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', 300000);
-      const errRaw = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', 300000);
+      let phaseIdleTimer = null;
+      let rejectPhaseIdle = () => {};
+      const idleP = new Promise((_resolve, reject) => { rejectPhaseIdle = reject; });
+      const armPhaseIdle = () => {
+        if (phaseIdleTimer) clearTimeout(phaseIdleTimer);
+        phaseIdleTimer = setTimeout(() => {
+          rejectPhaseIdle(new Error(
+            `Phase ${phase.phaseNumber} idle timeout: no agent activity for ${PHASE_IDLE_TIMEOUT_MS / 60000} minutes`,
+          ));
+        }, PHASE_IDLE_TIMEOUT_MS);
+      };
+      armPhaseIdle();
+      phaseActivity = armPhaseIdle;
+      clearPhaseActivity = () => {
+        if (phaseIdleTimer) clearTimeout(phaseIdleTimer);
+        phaseIdleTimer = null;
+        phaseActivity = null;
+      };
+
+      // phase_done / phase_error have no fixed timeout — the activity watchdog above
+      // is the only timeout, so a long auto-fill phase cannot be killed at 300s.
+      const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'phase_done', null);
+      const errRaw = execSession.waitForSessionEvent(runtime.sessionId, 'phase_error', null);
       const errP = errRaw.then((p) => Promise.reject(new Error(p?.message || 'phase_error')));
       errP.catch(() => {});
       const stepData = {
@@ -402,10 +433,11 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       });
       let donePayload;
       try {
-        donePayload = await Promise.race([doneP, errP]);
+        donePayload = await Promise.race([doneP, errP, idleP]);
       } finally {
         doneP.cancel?.();
         errRaw.cancel?.();
+        clearPhaseActivity();
       }
       if (runtime.abortRecording) {
         await trajectoryPhaseDao.updateStatus(phase.id, 'failed').catch(() => {});
@@ -473,6 +505,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     }
     runtime.abortRecording = false;
     runtime.aiRecording = false;
+    clearPhaseActivity();
     unsubscribe?.();
     await broadcastRecordingLock();
   }
