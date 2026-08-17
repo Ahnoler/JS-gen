@@ -82,7 +82,7 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
   .stage .box { position: absolute; border: 1.5px solid; border-radius: 2px;
                 box-sizing: border-box; cursor: pointer; transition: box-shadow .15s, opacity .15s; }
   .stage .box:hover { box-shadow: 0 0 0 2px #ffeb3b, 0 0 10px rgba(0,0,0,.4); z-index: 5; }
-  .stage .box.acted { border-color: #f44336; box-shadow: 0 0 0 2px #f44336, 0 0 8px rgba(244,67,54,.5); z-index: 4; }
+  .stage .box.acted { border-color: #f44336 !important; box-shadow: 0 0 0 2px #f44336, 0 0 8px rgba(244,67,54,.5); z-index: 4; }
   .stage .box .tag { position: absolute; left: 0; top: 0; transform: translateY(-100%);
                      background: rgba(0,0,0,.75); color: #fff; font-size: 11px; line-height: 1.4;
                      padding: 1px 4px; border-radius: 2px; white-space: nowrap; pointer-events: none;
