@@ -124,6 +124,47 @@
 - 8/18（周二）：开发实现（系统树凭据维护 / 交易列表加任务 / appid 登录 + 数据隔离）。
 - 8/19（周三）：交付 + characterization / 冒烟；更新对应 todo 状态。
 
+### 开发事项对齐（2026-08-17 · 本周 3/4/5 拆解）
+
+#### ① 登录与用户管理（PR-SSO / PR-USER）
+
+| 事项 | 状态 | 说明 / commit |
+|------|------|---------------|
+| SSO 接入：auth 中间件 + `/api/v2/auth/{sso/login-page,sso/logout-page,me,sso/check}` | ✅ 已落地 | `c0503f3`；`SSO_AUTH_REQUIRED` 默认关，仅 `/api/v2/*`，白名单 `/api/v2/auth/*` |
+| JWT 解码（纯解 payload 不验签；19 位 userId 正则提取防精度丢失） | ✅ 已落地 | `c0503f3`（`src/services/sso/jwt-decode.js`） |
+| 前端 SSO 接通：占位接口 → 真实 `/v2/auth/*` + `stores/user.ts` + 401 处理 | ✅ 已落地（另仓） | vue-project dev `75e9562` |
+| 用户名显示（`paasUserId` 替代硬编码 `675310918`） | ✅ 已落地（另仓） | `75e9562` |
+| 前端用户名友好显示（账号中心换 userName/nickName） | ⏳ 待办 | 需账号中心「token 换用户资料」接口，本周未取 |
+| 账号中心 token 校验 / JWT 验签 | ⏳ 待办 | 本周纯解 payload，与已上线产品取法一致 |
+| 管理员角色映射 / 权限闸 | ⏳ 挂起 | **PR-SSO-ADMIN** 等会议结论 |
+
+#### ② 交易管理的用户隔离（PR-BATCH / PR-USER 子集）
+
+| 事项 | 状态 | 说明 / commit |
+|------|------|---------------|
+| schema：`trajectory`/`batch_recording_job` 加 `paas_user_id VARCHAR(32)` + 索引 | ✅ 已落地 | 迁移 `20260818000000`（已跑） |
+| 列表/统计按 `paasUserId` 过滤（`list`/`listByFunction`/`countByRecordStatus`，空=全可见） | ✅ 已落地 | `c0503f3`；A/B 用户实测（B 看不到 A 的） |
+| 手工创建交易盖章（`POST /api/v2/trajectories`） | ✅ 已落地 | `c0503f3` |
+| 批量导入任务盖章 + view 归属校验 404 + 幂等 key 跨用户 409 | ✅ 已落地 | `c0503f3` |
+| 批量导入生成交易透传 `job.paasUserId` | ✅ 已落地（补漏） | `7abf7e8`（analyze 链路曾漏盖，已修 + characterization 断言） |
+| 存量数据回填归 admin（95 交易 + 18 任务） | ✅ 已落地 | `8ab90e0`（迁移 `20260818120000`，幂等） |
+| 前端批量导入任务 key 按 paasUserId 命名空间 | ✅ 已落地（另仓） | `75e9562` |
+| 前端「只看我的」开关 UI | ⏳ 待办 | 后端已按 token 自动过滤；切换「全部/我的」UI 另开 |
+| `messages`/`case-data`/`screenshots` 用户隔离 | ⏳ 未做 | 等 **PR-SSO-ADMIN**（权限部分）后统一收紧 |
+| 单条 `GET /api/v2/trajectories/:id` 归属校验 | ⏳ 未做 | 同上，本周仅列表/创建/批量隔离 |
+
+#### ③ 系统附带多账户 + 新增/编辑接口同步（system-mgmt / 本周任务 3）
+
+| 事项 | 状态 | 说明 / commit |
+|------|------|---------------|
+| `system_account.username` → `account` 更名（迁移 + init.sql + 实体同步） | ✅ 已落地 | `1a46519`（2026-08-17） |
+| 节点 `POST /api/v2/system-mgmt/nodes` type=1 支持 `accounts[]` 批量创建 | ✅ 已落地 | `1a46519` |
+| 节点 `PUT /api/v2/system-mgmt/nodes/{id}` 支持 `accounts[]` 全量替换（按 id 更新 / 无 id 按 name 匹配 / 未出现删除） | ✅ 已落地 | `1a46519` |
+| 账号被 `batch_recording_job` 引用时删除返回 409 | ✅ 已落地 | `1a46519` |
+| account/password 接受数字并落库为字符串 | ✅ 已落地 | `1a46519` |
+| 前端系统树凭据维护 UI（创建/编辑时维护用户名、密码、角色） | ⏳ 进行中（另仓） | 本周任务 3，8/19 |
+| JS-gen ↔ Vue 接口联调（accounts[] 新增/编辑同步） | ⏳ 进行中 | 8/19 |
+
 ## 交叉关系
 
 - **1448052** ↔ 全页 DOM 合约；slot-log 已就绪；2026-08-16 已有 `AI_DUP_FAILURE_CUE` 缓解，主线等新缺陷 + 可检索日志再改。
@@ -139,6 +180,7 @@
 
 ## 更新记录
 
+| 2026-08-17 | **新增「开发事项对齐」区段**：本周 3/4/5 拆解为三块——① 登录与用户管理（SSO 接入/JWT 解码/前端接通已落地；友好用户名、token 校验、权限闸待办或挂起）、② 交易管理用户隔离（列表过滤/盖章/批量透传/存量回填已落地；只看我的 UI、messages 等隔离待办）、③ 系统多账户 + 新增/编辑接口同步（accounts[] 批量维护已落地 `1a46519`；前端凭据维护 UI 与联调进行中 8/19）。补漏 commit `7abf7e8`（批量导入生成交易透传 paasUserId）、存量回填 `8ab90e0` |
 | 2026-08-17 | **任务 5（appid 登录 + 数据隔离）已交付**：后端 `paas_user_id` 列（迁移已跑）+ `/api/v2/auth/*` 四端点 + auth 中间件（`SSO_AUTH_REQUIRED` 默认关）+ 列表/批量导入按 `paasUserId` 过滤与盖章（commit `c0503f3`，verify-all Python 解析修复 `45e0b6a`）；前端 SSO 接通 + user store + 401 处理（另仓 dev `75e9562`）。characterization 20/20 绿（内嵌 Python）；`characterize-tree-select-record` 需 `playwright install`（预存环境，未跑） |
 | 2026-08-17 | 产品周任务表排期：本人负责 3/4/5（系统树凭据维护、交易列表加任务、appid 登录 + 数据隔离），8/19 交付；新增「本周任务」小节；PR-USER/PR-SSO/PR-BATCH 标注本周子项。截图插件任务不归本人（健君 / 淼一、正祥、张奕伟 8/21） |
 | 2026-08-16 | 全量核对 git/CHANGELOG：**option-first-commit、sectionOf-dead-calls、三大问题①** 标为已完成；**form-actions-split** 更新进度；**PR-LAYER/PR-PUSH** 更新为仓库侧已完成并标注测试状态；1448052 补充 `AI_DUP_FAILURE_CUE` 缓解说明 |
