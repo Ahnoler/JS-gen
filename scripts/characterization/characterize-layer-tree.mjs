@@ -144,7 +144,7 @@ async function testRealData() {
     }
     check(normalized.length >= 90, `步骤 >= 90（实际 ${normalized.length}）`);
     const zoned = normalized.filter((s) => s.layers || s.regionId).length;
-    check(zoned === 0, `旧数据全未分区（实际 ${zoned} 分区）——修复后新数据应 >0`);
+    check(zoned >= 100, `重录后分层步骤 >= 100（实际 ${zoned} 分区）`);
   } finally {
     await db.destroy();
   }

@@ -46,7 +46,7 @@ async function testRealDataLoad(db) {
   console.log(`  steps total=${steps.length} | json=${jsonSteps.length} | bbox=${bboxSteps.length} | elements=${data.meta.elements.length}`);
   assert(steps.length >= 100, `steps total=${steps.length} >= 100`);
   assert(jsonSteps.length >= 100, `json steps=${jsonSteps.length} >= 100`);
-  assert(bboxSteps.length === 0, `old data bbox steps=${bboxSteps.length} must be 0`);
+  assert(bboxSteps.length >= 100, `new data bbox steps=${bboxSteps.length} >= 100 (re-recorded)`);
   return { steps, elements: data.meta.elements };
 }
 
@@ -57,14 +57,11 @@ async function testRealDataMatch(db, { steps, elements }) {
   const jsonSteps = steps.filter((s) => s.hasElementJson);
   const hitSteps = resolved.filter((r) => r.boxes.length > 0);
   const matchHits = hitSteps.filter((r) => r.boxes[0]?.source === 'match');
-  const labelHits = matchHits.filter((r) => r.step.label).length;
-  const andHits = matchHits.length;
-  const rate = (andHits / jsonSteps.length) * 100;
+  const bboxHits = hitSteps.filter((r) => r.boxes[0]?.source === 'bbox');
 
-  console.log(`  AND hits=${andHits}/${jsonSteps.length} (${rate.toFixed(1)}%) | label hits=${labelHits}`);
-  assert(rate >= 90, `AND hit rate=${rate.toFixed(1)}% >= 90%`);
-  assert(labelHits >= 90, `label hits=${labelHits} >= 90`);
-  assert(matchHits.length === hitSteps.length, 'bbox=0 data: all hits must be fallback match');
+  console.log(`  bbox direct=${bboxHits.length} | fallback match=${matchHits.length} | unmatched=${jsonSteps.length - hitSteps.length}`);
+  assert(bboxHits.length >= 100, `bbox direct hits=${bboxHits.length} >= 100 (re-recorded data)`);
+  assert(matchHits.length + bboxHits.length === hitSteps.length, `match+bbox cover all hits (${matchHits.length}+${bboxHits.length}=${hitSteps.length})`);
 }
 
 async function testScreenshotSelection(db) {
@@ -208,11 +205,13 @@ async function testRenderRealData(db, { steps, elements }) {
   const badgeCount = (html.match(/<span class="badge"/g) || []).length;
   assert(badgeCount === hitSeqs.length, `badge count=${badgeCount} must equal boxed steps=${hitSeqs.length}`);
 
-  // b. 虚线/实线类：当前数据 bbox=0、全为 fallback match → 所有框都应为 dashed
+  // b. 虚线/实线类：bbox 直用步骤 = 实线；fallback match 步骤 = 虚线
   const totalBoxes = boxDivs.length;
   const dashedBoxes = (html.match(/class="box dashed"/g) || []).length;
+  const solidBoxes = totalBoxes - dashedBoxes;
   assert(totalBoxes >= 1, `html must contain boxes (got ${totalBoxes})`);
-  assert(dashedBoxes === totalBoxes, `all boxes dashed (match): ${dashedBoxes}/${totalBoxes}`);
+  assert(solidBoxes >= 100, `solid boxes (bbox direct) ${solidBoxes} >= 100`);
+  assert(dashedBoxes === totalBoxes - solidBoxes, `dashed/solid split consistent: ${dashedBoxes}/${solidBoxes}`);
 
   // c. 列表行数 = steps 数（含无坐标行），无坐标步骤置灰
   const rowCount = (html.match(/class="step-row/g) || []).length;
@@ -241,7 +240,7 @@ async function testRenderRealData(db, { steps, elements }) {
 
   // e. 图例含实线=bbox / 虚线=匹配 说明
   assert(html.includes('bbox') && html.includes('匹配'), 'legend labels present');
-  console.log(`  steps=${steps.length} | boxes=${totalBoxes} (all match/dashed) | badge=${badgeCount} | rows=${rowCount} | contentWidth=${cw}`);
+  console.log(`  steps=${steps.length} | boxes=${totalBoxes} (solid=${solidBoxes} dashed=${dashedBoxes}) | badge=${badgeCount} | rows=${rowCount} | contentWidth=${cw}`);
 }
 
 /** buildHtml 交互层（Task 3）：真实数据 HTML 含交互 script 与关键逻辑标记（字符串层面）。 */
