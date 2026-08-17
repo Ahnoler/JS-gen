@@ -7,7 +7,7 @@ import * as remoteSessionDao from '../dao/remote-session-dao.js';
 import * as executorNodeDao from '../dao/executor-node-dao.js';
 import { USE_EXECUTOR } from '../../config/config.js';
 import { state } from '../state.js';
-import { sendToExecutor, waitForSessionEvent } from '../executor-session-client.js';
+import { sendToExecutor, waitForSessionEvent, closeSession as closeExecutorSession } from '../executor-session-client.js';
 import {
   bindingToStatus,
   liveByRemoteSessionId,
@@ -184,6 +184,28 @@ export async function supersedeStaleForTrajectory(
         await remoteSessionDao.close(row.id, { crashed: false });
       }
     } catch {}
+    // Close the executor agent session too — otherwise the old slot (Python +
+    // Chrome) stays occupied and its CDP port is excluded from orphan-Chrome
+    // reuse, so a re-attach after control-plane restart opens a brand-new slot
+    // and the old Chrome becomes an unreachable orphan. keepBrowser=true leaves
+    // the Chrome on CDP so the next attach reuses the same browser/page state.
+    if (row.agentSessionId) {
+      try {
+        let nodeUuid = null;
+        if (row.executorNodeId != null) {
+          const node = await executorNodeDao.getById(row.executorNodeId).catch(() => null);
+          nodeUuid = node?.nodeUuid || null;
+        }
+        await closeExecutorSession({
+          nodeUuid,
+          sessionId: row.agentSessionId,
+          keepBrowser: true,
+          timeoutMs: 2000,
+        });
+      } catch (err) {
+        console.warn('[remote] supersede close agent session failed:', row.agentSessionId, err.message);
+      }
+    }
     clearLiveBinding(row.id);
     closed.push(row.id);
   }

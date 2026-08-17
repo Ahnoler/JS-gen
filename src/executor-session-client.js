@@ -281,14 +281,19 @@ export async function reconcileLeasesWithExecutor(nodeUuid) {
   return { released, liveSessionIds: [...liveIds] };
 }
 
-export async function closeSession({ nodeUuid, sessionId, keepBrowser = false } = {}) {
+export async function closeSession({
+  nodeUuid,
+  sessionId,
+  keepBrowser = false,
+  timeoutMs = 15000,
+} = {}) {
   try {
     sendToExecutor(nodeUuid, 'session.close', {
       sessionId,
       // false = kill Chrome（释放资源）；true = leave idle CDP（一般不走这条）
       keepBrowser: keepBrowser === true,
     });
-    await waitForSessionEvent(sessionId, 'session.closed', 15000).catch(() => {});
+    await waitForSessionEvent(sessionId, 'session.closed', timeoutMs).catch(() => {});
   } finally {
     lease.releaseBySession(sessionId);
     removeSessionHub(sessionId);

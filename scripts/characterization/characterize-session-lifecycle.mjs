@@ -188,6 +188,34 @@ function testGraceClearedOnReclaim() {
   assert.match(syncMount, /graceUntil:\s*null/, 'syncMount must clear grace_until on mount');
 }
 
+function testSupersedeClosesAgentSession() {
+  // Root cause regression: control-plane restart → re-prepare → supersede closed the
+  // DB row but left the executor agent session alive (Python + Chrome), so the old
+  // slot stayed occupied, its CDP port was excluded from orphan-Chrome reuse, and a
+  // NEW slot was opened. Supersede must close the executor session, keeping the
+  // browser (keepBrowser=true) so the next attach can reuse the same Chrome.
+  const remote = readFileSync(join(root, 'src/services/remote-session-service.js'), 'utf8');
+  const supersede = remote.match(
+    /export async function supersedeStaleForTrajectory[\s\S]*?(?=\nexport async function |\n\/\*\*)/,
+  )?.[0];
+  assert.ok(supersede, 'supersedeStaleForTrajectory must exist');
+  assert.match(
+    supersede,
+    /closeExecutorSession\(/,
+    'supersede must close the executor agent session (not just the DB row)',
+  );
+  assert.match(
+    supersede,
+    /keepBrowser:\s*true/,
+    'supersede must keep the Chrome alive for orphan reuse (not kill it)',
+  );
+  assert.match(
+    supersede,
+    /executorNodeId|executorNodeDao/,
+    'supersede must resolve the executor node uuid for closeSession',
+  );
+}
+
 testRules();
 testConfigExport();
 testDaoContractSource();
@@ -195,4 +223,5 @@ testReaperWiresGrace();
 testLifecycleSourceContracts();
 testAttachClaimGateSource();
 testGraceClearedOnReclaim();
+testSupersedeClosesAgentSession();
 console.log('characterize-session-lifecycle: rules + dao + lifecycle OK');

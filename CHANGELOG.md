@@ -92,6 +92,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-17: **执行机 slot 复用失效（控制面重启后重连开新 slot）**：`supersedeStaleForTrajectory` 清理旧 remote_session 时只做 DB 侧处理（detachLive 停 BiB + close 行 + unmount），未关闭执行机上对应的 agent session——Python 进程与 Chrome 继续存活、slot 持续占用，`listCdp` 的 `occupiedCdpPorts` 把旧 CDP 端口排除出孤儿 Chrome 扫描，`preferIdleChrome` 复用失败，重新 prepare 时**新开 slot**，旧 Chrome 变成无法接管的孤儿（"连不上之前断开的"）。修复：supersede 关闭 DB 行后补 `closeExecutorSession({nodeUuid, sessionId: agentSessionId, keepBrowser: true, timeoutMs: 2000})`——杀 Python 释放 slot，**保留 Chrome 在 CDP 端口**，下次 attach 的孤儿扫描能发现并复用同一个浏览器（页面/登录态保留）；`closeSession` 新增可选 `timeoutMs` 参数（默认 15000 不变；执行机对未知 session 不发 `session.closed` 事件，supersede 用 2000 短超时避免 prepare 卡顿）。
+  影响范围：src/services/remote-session-service.js（supersede 行为）、src/executor-session-client.js（closeSession 新增可选参数，默认不变）。
+  文件：src/services/remote-session-service.js, src/executor-session-client.js, scripts/characterization/characterize-session-lifecycle.mjs
+  Python 同步提示：无 HTTP/schema。执行机侧 `session.close` 语义不变（`keepBrowser=true` 保留 Chrome 供复用）；代理侧若也有「清理旧绑定→关闭执行机 session」链路，需同步关闭 agent session（保留浏览器）。
+
 - 2026-08-17: **节点详情接口回显系统账号**：`GET /api/v2/system-mgmt/nodes/:id` 此前只返回节点本身（`getNode` 仅 `systemDao.getById`），type=1 系统节点详情不回显 `accounts[]`，编辑表单若用详情接口将拿不到已有账号。现在 type=1 节点详情附带 `accounts[]`（形状与 tree `includeAccounts` 一致：id/name/account/password/loginUrl/remark/sortOrder）。
   影响范围：`GET /api/v2/system-mgmt/nodes/:id` 响应体（type=1 节点新增 accounts 字段；无 schema/HTTP 路径变更）。
   文件：src/services/hierarchy-service.js, scripts/characterization/characterize-system-node-accounts.mjs
