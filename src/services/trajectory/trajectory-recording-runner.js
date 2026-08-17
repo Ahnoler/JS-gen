@@ -9,7 +9,7 @@ import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as execSession from '../../executor-session-client.js';
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
-import { AI_MEMORY_FACT_PACK } from '../../../config/config.js';
+import { AI_MEMORY_FACT_PACK, PHASE_MAX_STEPS } from '../../../config/config.js';
 import {
   getTrajectoryRuntime,
   touchTrajectoryRuntimeActivity,
@@ -310,7 +310,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       errP.catch(() => {});
       const stepData = {
         instruction: phase.description,
-        max_steps: 30,
+        max_steps: PHASE_MAX_STEPS,
         phase_number: phase.phaseNumber,
       };
       stepData.all_phases = all_phases;

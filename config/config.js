@@ -128,6 +128,12 @@ export const BATCH_ITEM_LEASE_MS = Math.max(
   parseInt(_resolve('BATCH_ITEM_LEASE_MS', '600000'), 10) || 600000,
 );
 
+/** 单阶段 AI 录制最大步数上限（长表单如 120 字段需要 >30；短阶段由 reviewer 估算下压，不受影响） */
+export const PHASE_MAX_STEPS = Math.max(
+  1,
+  parseInt(_resolve('PHASE_MAX_STEPS', '300'), 10) || 300,
+);
+
 // 鈹€鈹€ AI 璁板繂绯荤粺锛圥0 鏃佽矾鎽勫彇锛氫簨浠跺啓榛樿寮€銆佷簨瀹炲寘璇婚粯璁ゅ叧锛夆攢鈹€
 
 // ── AI 记忆系统（P0 旁路摄取：事件写默认开、事实包读默认关）──

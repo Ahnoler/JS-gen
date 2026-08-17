@@ -33,6 +33,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-17: **单阶段录制步数上限配置化**：`trajectory-recording-runner` 每阶段 `max_steps` 由硬编码 30 改为 `PHASE_MAX_STEPS`（默认 300，环境变量可调）。长表单（如 120 字段）不再因 ceiling 截断；短阶段仍由 phase reviewer 估算下压（`resolve_phase_max_steps` 不超 ceiling）。
+  影响范围：config（新增 `PHASE_MAX_STEPS`）、src/services/trajectory（录制主循环步数上限）。
+  文件：config/config.js, config/.env.example, src/services/trajectory/trajectory-recording-runner.js
+  Python 同步提示：无 HTTP/schema。代理侧若发 `session.step` 录制，`max_steps` 语义不变（仍为阶段步数上限；reviewer 估算会在此 ceiling 内下压）。
+
 - 2026-08-17: **步骤 element 分层 + 坐标入库**：录制时 `_capture_element`/`_enrich_click_element` 对操作控件 evaluate `assignRegion`（分层）+ `stepBBoxOf`（内容坐标，复用泛化 `pickScrollRoot`），`element_json` 新增 `region_id`/`region_label`/`layers[]`/`bbox{x1,y1,x2,y2}`（内容坐标系，对齐阶段截图 `metadata.rect`）。元素分层可直接读 step；步骤级高亮（PR-LOC-HL）用 bbox 画框。只影响新录制，存量不回填。`PAGE_LOCATOR_HELPERS` 新增 `pickScrollRoot`/`stepBBoxOf`，阶段截图 collect 表达式去重共用。
   影响范围：录制链路（scripts/controller/actions）、`_locator_helpers_js.py`（重生成）、element_json 新增字段（无 schema）。
   文件：src/cdp/page-locator-helpers.js, src/cdp/phase-screenshot-page.js, scripts/controller/actions/js_snippets/{fill_core,enrich}.py, scripts/controller/actions/_helpers.py, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-step-region-bbox.py
