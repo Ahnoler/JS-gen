@@ -5,18 +5,25 @@
 set -u
 
 # Resolve a Python interpreter that works from Git Bash, WSL, or cmd.
-if command -v python >/dev/null 2>&1; then
-  PY=python
-elif command -v python.exe >/dev/null 2>&1; then
-  PY=python.exe
-elif command -v python3 >/dev/null 2>&1; then
-  PY=python3
-else
+# Order mirrors config/config.js _findPython: explicit PYTHON_EXE → project-embedded
+# python (portable install; has browser_use etc.) → system PATH.
+PY=""
+resolve_python() {
+  if [ -n "${PYTHON_EXE:-}" ]; then
+    if command -v "$PYTHON_EXE" >/dev/null 2>&1; then PY="$PYTHON_EXE"; return 0; fi
+    if [ -x "$PYTHON_EXE" ]; then PY="$PYTHON_EXE"; return 0; fi
+  fi
+  if [ -x "./python/python.exe" ]; then PY="./python/python.exe"; return 0; fi
+  if [ -x "./python/python" ]; then PY="./python/python"; return 0; fi
+  if command -v python >/dev/null 2>&1; then PY=python; return 0; fi
+  if command -v python.exe >/dev/null 2>&1; then PY=python.exe; return 0; fi
+  if command -v python3 >/dev/null 2>&1; then PY=python3; return 0; fi
   echo "verify-all: no python interpreter found" >&2
-  exit 1
-fi
+  return 1
+}
 
 cd "$(dirname "$0")/../.."
+resolve_python || exit 1
 FAILED=0
 
 run() {
