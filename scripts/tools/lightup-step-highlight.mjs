@@ -575,7 +575,16 @@ export async function main(argv = process.argv.slice(2)) {
 
   const db = getDB();
   try {
-    const data = await loadPhaseData(db, { trajectoryId, phaseId, screenshotId });
+    // --phase 兼容两种语义：优先按 phase_number 匹配（用户习惯），未命中再按 phase id 兜底。
+    let resolvedPhaseId = phaseId;
+    if (trajectoryId != null && phaseId != null) {
+      const p = await db('trajectory_phase')
+        .select('id')
+        .where({ trajectory_id: trajectoryId, phase_number: phaseId })
+        .first();
+      if (p) resolvedPhaseId = p.id;
+    }
+    const data = await loadPhaseData(db, { trajectoryId, phaseId: resolvedPhaseId, screenshotId });
     if (!data.screenshotId) {
       console.error('未找到阶段截图（--id 无此行，或 --trajectory 无 kind="phase_highlight" 截图）');
       return 1;
