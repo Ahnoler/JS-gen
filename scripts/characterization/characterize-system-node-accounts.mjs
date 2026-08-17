@@ -59,12 +59,24 @@ function testWiring() {
   assert.match(service, /getDB\(\)\.transaction/);
 }
 
+function testGetNodeEcho() {
+  // GET /api/v2/system-mgmt/nodes/:id 详情必须回显系统账号（编辑表单回显前提）
+  const service = readFileSync(join(root, 'src/services/hierarchy-service.js'), 'utf8');
+  const m = service.match(/export async function getNode\(id\) \{[\s\S]*?\n\}/);
+  assert.ok(m, 'getNode present');
+  assert.match(m[0], /NODE_TYPE\.SYSTEM/, 'only system nodes attach accounts');
+  assert.match(m[0], /systemAccountDao\.listBySystem\(node\.id\)/, 'loads accounts by node id');
+  assert.match(m[0], /node\.accounts = accounts\.map/, 'attaches accounts to node');
+  assert.match(m[0], /password: a\.password \|\| ''/, 'same shape as tree includeAccounts');
+}
+
 function main() {
   console.log('\n=== system node accounts characterization ===\n');
   const tests = [
     ['normalize accounts', testNormalize],
     ['payload validation', testValidation],
     ['route/service wiring', testWiring],
+    ['getNode detail echoes accounts', testGetNodeEcho],
   ];
   let failed = 0;
   for (const [name, fn] of tests) {

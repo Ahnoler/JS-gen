@@ -392,7 +392,22 @@ export async function deleteNode(id) {
 }
 
 export async function getNode(id) {
-  return systemDao.getById(id);
+  const node = await systemDao.getById(id);
+  if (node && Number(node.type) === NODE_TYPE.SYSTEM) {
+    // 详情回显系统账号（与 getTree includeAccounts 同形状），供编辑表单回显
+    const accounts = await systemAccountDao.listBySystem(node.id);
+    node.accounts = accounts.map((a) => ({
+      id: a.id,
+      systemId: a.systemId,
+      name: a.name,
+      loginUrl: a.loginUrl || '',
+      account: a.account || '',
+      password: a.password || '',
+      remark: a.remark || null,
+      sortOrder: a.sortOrder ?? 0,
+    }));
+  }
+  return node;
 }
 
 export async function listNodes({ type, parentId } = {}) {

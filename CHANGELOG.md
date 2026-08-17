@@ -87,6 +87,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-17: **节点详情接口回显系统账号**：`GET /api/v2/system-mgmt/nodes/:id` 此前只返回节点本身（`getNode` 仅 `systemDao.getById`），type=1 系统节点详情不回显 `accounts[]`，编辑表单若用详情接口将拿不到已有账号。现在 type=1 节点详情附带 `accounts[]`（形状与 tree `includeAccounts` 一致：id/name/account/password/loginUrl/remark/sortOrder）。
+  影响范围：`GET /api/v2/system-mgmt/nodes/:id` 响应体（type=1 节点新增 accounts 字段；无 schema/HTTP 路径变更）。
+  文件：src/services/hierarchy-service.js, scripts/characterization/characterize-system-node-accounts.mjs
+  Python 同步提示：无 HTTP 路径/schema 变更；若代理侧展示节点详情，可选透传 `accounts[]`（含 id，编辑全量替换按 id 更新依赖回显 id）。
+
 - 2026-08-17: **批量导入生成的交易漏盖 paasUserId**：`batch-analyze.js` 的 `createDraftFromAnalyzed` 创建交易时未透传 `job.paasUserId`，导致批量导入任务归了用户、任务生成的交易 `paas_user_id` 为 NULL（无主全可见），隔离失效。现在透传 `paasUserId: job.paasUserId || null`，交易与任务归属一致。
   影响范围：批量导入 analyze 链路新建交易的用户归属（无 schema/HTTP 变更）。
   文件：src/services/trajectory/batch-analyze.js, scripts/characterization/characterize-sso-auth.mjs
