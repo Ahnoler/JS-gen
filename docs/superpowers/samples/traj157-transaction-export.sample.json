@@ -1,0 +1,4467 @@
+{
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "trajectoryId": 157,
+    "schemaVersion": 2,
+    "payload": {
+      "transcationEventTypeList": [
+        {
+          "transcId": "157",
+          "transcationName": "信贷潜在客户批量新增1.by李淼一",
+          "systemId": "98",
+          "projectId": "31",
+          "transcationType": "web",
+          "testFrame": "playwright",
+          "transcationProperties": [
+            {
+              "options": "",
+              "elementType": "//li[@data-id='RES000000001']",
+              "eventTypeName": "点击",
+              "eventTypeValue": "click",
+              "transcationType": "playwright",
+              "objectValue": "",
+              "propertiesName": "点击客户管理",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//li[@title='对公客户管理']",
+              "eventTypeName": "点击",
+              "eventTypeValue": "click",
+              "transcationType": "playwright",
+              "objectValue": "",
+              "propertiesName": "点击对公客户管理",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//button[normalize-space()='新增']",
+              "eventTypeName": "点击",
+              "eventTypeValue": "click",
+              "transcationType": "playwright",
+              "objectValue": "",
+              "propertiesName": "点击新增",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-drawer')]//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='客户名称' or normalize-space(.)=concat('客户名称', ':') or normalize-space(.)=concat('客户名称', '：') or normalize-space(.)=concat('客户名称', '*') or normalize-space(.)=concat('*', '客户名称') or normalize-space(.)=concat('*', '客户名称', ':') or normalize-space(.)=concat('*', '客户名称', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "瑞云智联科技有限公司",
+              "propertiesName": "填写客户名称",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "[\"信贷正式客户\",\"信贷潜在客户\",\"潜在\"]",
+              "elementType": "//div[contains(@class,'el-drawer')]//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='客户状态' or normalize-space(.)=concat('客户状态', ':') or normalize-space(.)=concat('客户状态', '：') or normalize-space(.)=concat('客户状态', '*') or normalize-space(.)=concat('*', '客户状态') or normalize-space(.)=concat('*', '客户状态', ':') or normalize-space(.)=concat('*', '客户状态', '：')]]//div[contains(@class,'el-select')]",
+              "eventTypeName": "下拉框点击选择",
+              "eventTypeValue": "select:click",
+              "transcationType": "playwright",
+              "objectValue": "潜在",
+              "propertiesName": "选择客户状态",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "[\"企业类\",\"事业类\",\"集体经济组织\",\"国家机关\",\"社会团体\",\"担保公司\"]",
+              "elementType": "//div[contains(@class,'el-drawer')]//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='对公客户类型' or normalize-space(.)=concat('对公客户类型', ':') or normalize-space(.)=concat('对公客户类型', '：') or normalize-space(.)=concat('对公客户类型', '*') or normalize-space(.)=concat('*', '对公客户类型') or normalize-space(.)=concat('*', '对公客户类型', ':') or normalize-space(.)=concat('*', '对公客户类型', '：')]]//div[contains(@class,'el-select')]",
+              "eventTypeName": "下拉框点击选择",
+              "eventTypeValue": "select:click",
+              "transcationType": "playwright",
+              "objectValue": "企业类",
+              "propertiesName": "选择对公客户类型",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "[\"营业执照\",\"财务部门同意其开户的证明\",\"外国驻华新闻机构证\",\"境外非政府组织代表机构登记证书\",\"外国在华文化中心登记证\",\"港澳台地区旅游部门常驻代表机构批准登记证\",\"外国政府旅游部门常驻代表机构批准登记证\",\"宗教活动场所登记证\",\"宗教院校许可证\",\"港澳新闻机构常驻内地记者站登记证\",\"工会法人资格证书\",\"中国国际贸易促进委员会行业委员会统一社会信用代码证书\",\"中华人民共和国全国统一社会信用代码证\",\"中华人民共和国统一社会信用代码证书\",\"政府人事部门登记证书号码\",\"证券业务许可证\",\"企业名称预先核准通知书号码\",\"政府人事部门批文号码\",\"主管部门批文号码\",\"编制委员会登记证书号码\",\"事业单位法人证书\",\"其他\",\"居民身份证\",\"港澳居民来往内地通行证\",\"台湾居民来往大陆通行证\",\"港澳居民居住证\",\"外国人永久居留身份证\",\"中华人民共和国护照\",\"社会团体法人登记证书\",\"基金会法人登记证书\",\"民办非企业单位登记证书\",\"基层群众性自治组织特别法人统一社会信用代码证书\",\"业主大会统一社会信用代码证书\",\"台湾居民居住证\",\"全国组织机构代码\",\"中国人民解放军军人身份证件\",\"中国人民武装警察身份证件\",\"警官证\",\"军官证\",\"统一社会信用代码\"]",
+              "elementType": "//div[contains(@class,'el-drawer')]//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='证件类型' or normalize-space(.)=concat('证件类型', ':') or normalize-space(.)=concat('证件类型', '：') or normalize-space(.)=concat('证件类型', '*') or normalize-space(.)=concat('*', '证件类型') or normalize-space(.)=concat('*', '证件类型', ':') or normalize-space(.)=concat('*', '证件类型', '：')]]//div[contains(@class,'el-select')]",
+              "eventTypeName": "下拉框点击选择",
+              "eventTypeValue": "select:click",
+              "transcationType": "playwright",
+              "objectValue": "统一社会信用代码",
+              "propertiesName": "选择证件类型",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-drawer')]//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='证件号码' or normalize-space(.)=concat('证件号码', ':') or normalize-space(.)=concat('证件号码', '：') or normalize-space(.)=concat('证件号码', '*') or normalize-space(.)=concat('*', '证件号码') or normalize-space(.)=concat('*', '证件号码', ':') or normalize-space(.)=concat('*', '证件号码', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "91330106MA2B0X8X7K",
+              "propertiesName": "填写证件号码",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-drawer')]//button[normalize-space()='保存']",
+              "eventTypeName": "点击",
+              "eventTypeValue": "click",
+              "transcationType": "playwright",
+              "objectValue": "",
+              "propertiesName": "点击保存",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='法定代表人/负责人证件号码' or normalize-space(.)=concat('法定代表人/负责人证件号码', ':') or normalize-space(.)=concat('法定代表人/负责人证件号码', '：') or normalize-space(.)=concat('法定代表人/负责人证件号码', '*') or normalize-space(.)=concat('*', '法定代表人/负责人证件号码') or normalize-space(.)=concat('*', '法定代表人/负责人证件号码', ':') or normalize-space(.)=concat('*', '法定代表人/负责人证件号码', '：')]]//button",
+              "eventTypeName": "点击",
+              "eventTypeValue": "click",
+              "transcationType": "playwright",
+              "objectValue": "",
+              "propertiesName": "点击引入",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='客户名称' or normalize-space(.)=concat('客户名称', ':') or normalize-space(.)=concat('客户名称', '：') or normalize-space(.)=concat('客户名称', '*') or normalize-space(.)=concat('*', '客户名称') or normalize-space(.)=concat('*', '客户名称', ':') or normalize-space(.)=concat('*', '客户名称', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "吴芳军",
+              "propertiesName": "填写客户名称2",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]//button[normalize-space()='查询']",
+              "eventTypeName": "点击",
+              "eventTypeValue": "click",
+              "transcationType": "playwright",
+              "objectValue": "",
+              "propertiesName": "点击查询",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//tr[.//*[normalize-space()='吴芳军']]//*[contains(concat(' ',normalize-space(@class),' '),' el-radio ') or contains(concat(' ',normalize-space(@class),' '),' el-radio-button ')]",
+              "eventTypeName": "单选框选择",
+              "eventTypeValue": "radio",
+              "transcationType": "playwright",
+              "objectValue": "",
+              "propertiesName": "表格单选吴芳军",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-dialog') or contains(@class,'el-message-box')]//button[normalize-space()='确认']",
+              "eventTypeName": "点击",
+              "eventTypeValue": "click",
+              "transcationType": "playwright",
+              "objectValue": "",
+              "propertiesName": "点击确认",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='成立日期' or normalize-space(.)=concat('成立日期', ':') or normalize-space(.)=concat('成立日期', '：') or normalize-space(.)=concat('成立日期', '*') or normalize-space(.)=concat('*', '成立日期') or normalize-space(.)=concat('*', '成立日期', ':') or normalize-space(.)=concat('*', '成立日期', '：')]]//div[contains(@class,'el-date-editor')]",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "2018-01-01",
+              "propertiesName": "填写成立日期",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='注册登记日期' or normalize-space(.)=concat('注册登记日期', ':') or normalize-space(.)=concat('注册登记日期', '：') or normalize-space(.)=concat('注册登记日期', '*') or normalize-space(.)=concat('*', '注册登记日期') or normalize-space(.)=concat('*', '注册登记日期', ':') or normalize-space(.)=concat('*', '注册登记日期', '：')]]//div[contains(@class,'el-date-editor')]",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "2018-01-01",
+              "propertiesName": "填写注册登记日期",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='登记注册失效日期' or normalize-space(.)=concat('登记注册失效日期', ':') or normalize-space(.)=concat('登记注册失效日期', '：') or normalize-space(.)=concat('登记注册失效日期', '*') or normalize-space(.)=concat('*', '登记注册失效日期') or normalize-space(.)=concat('*', '登记注册失效日期', ':') or normalize-space(.)=concat('*', '登记注册失效日期', '：')]]//div[contains(@class,'el-date-editor')]",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "2038-01-01",
+              "propertiesName": "填写登记注册失效日期",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "[\"中华人民共和国\",\"阿鲁巴\",\"阿富汗伊斯兰共和国\",\"安哥拉共和国\",\"安圭拉岛(英)\",\"奥兰群岛(芬兰自治省)\",\"阿尔巴尼亚共和国\",\"安道尔公国\",\"阿拉伯联合酋长国\",\"阿根廷共和国\",\"亚美尼亚共和国\",\"美属萨摩亚\",\"南极洲\",\"法属南部领地\",\"安提瓜和巴布达\",\"澳大利亚\",\"奥地利共和国\",\"阿塞拜疆共和国\",\"布隆迪共和国\",\"比利时王国\",\"贝宁共和国\"]",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='国别' or normalize-space(.)=concat('国别', ':') or normalize-space(.)=concat('国别', '：') or normalize-space(.)=concat('国别', '*') or normalize-space(.)=concat('*', '国别') or normalize-space(.)=concat('*', '国别', ':') or normalize-space(.)=concat('*', '国别', '：')]]//div[contains(@class,'el-select')]",
+              "eventTypeName": "下拉框点击选择",
+              "eventTypeValue": "select:click",
+              "transcationType": "playwright",
+              "objectValue": "中华人民共和国",
+              "propertiesName": "选择国别",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "[\"法人投资\",\"自然人投资\",\"中央政府投资\",\"省级政府投资\",\"地市级政府投资\",\"区县级政府投资\",\"乡镇级政府投资\",\"村级政府投资\",\"其他主体投资\"]",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='投资主体类型' or normalize-space(.)=concat('投资主体类型', ':') or normalize-space(.)=concat('投资主体类型', '：') or normalize-space(.)=concat('投资主体类型', '*') or normalize-space(.)=concat('*', '投资主体类型') or normalize-space(.)=concat('*', '投资主体类型', ':') or normalize-space(.)=concat('*', '投资主体类型', '：')]]//div[contains(@class,'el-select')]",
+              "eventTypeName": "下拉框点击选择",
+              "eventTypeValue": "select:click",
+              "transcationType": "playwright",
+              "objectValue": "法人投资",
+              "propertiesName": "选择投资主体类型",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "[\"核查通过\",\"核查不通过\"]",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='联网核查状态' or normalize-space(.)=concat('联网核查状态', ':') or normalize-space(.)=concat('联网核查状态', '：') or normalize-space(.)=concat('联网核查状态', '*') or normalize-space(.)=concat('*', '联网核查状态') or normalize-space(.)=concat('*', '联网核查状态', ':') or normalize-space(.)=concat('*', '联网核查状态', '：')]]//div[contains(@class,'el-select')]",
+              "eventTypeName": "下拉框点击选择",
+              "eventTypeValue": "select:click",
+              "transcationType": "playwright",
+              "objectValue": "核查通过",
+              "propertiesName": "选择联网核查状态",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='外文名称' or normalize-space(.)=concat('外文名称', ':') or normalize-space(.)=concat('外文名称', '：') or normalize-space(.)=concat('外文名称', '*') or normalize-space(.)=concat('*', '外文名称') or normalize-space(.)=concat('*', '外文名称', ':') or normalize-space(.)=concat('*', '外文名称', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "Test Customer",
+              "propertiesName": "填写外文名称",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='登记注册地址' or normalize-space(.)=concat('登记注册地址', ':') or normalize-space(.)=concat('登记注册地址', '：') or normalize-space(.)=concat('登记注册地址', '*') or normalize-space(.)=concat('*', '登记注册地址') or normalize-space(.)=concat('*', '登记注册地址', ':') or normalize-space(.)=concat('*', '登记注册地址', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "广州市天河区中山路77号",
+              "propertiesName": "填写登记注册地址",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='经度' or normalize-space(.)=concat('经度', ':') or normalize-space(.)=concat('经度', '：') or normalize-space(.)=concat('经度', '*') or normalize-space(.)=concat('*', '经度') or normalize-space(.)=concat('*', '经度', ':') or normalize-space(.)=concat('*', '经度', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "133.23",
+              "propertiesName": "填写经度",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='纬度' or normalize-space(.)=concat('纬度', ':') or normalize-space(.)=concat('纬度', '：') or normalize-space(.)=concat('纬度', '*') or normalize-space(.)=concat('*', '纬度') or normalize-space(.)=concat('*', '纬度', ':') or normalize-space(.)=concat('*', '纬度', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "51.45",
+              "propertiesName": "填写纬度",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='财务部联系人名称' or normalize-space(.)=concat('财务部联系人名称', ':') or normalize-space(.)=concat('财务部联系人名称', '：') or normalize-space(.)=concat('财务部联系人名称', '*') or normalize-space(.)=concat('*', '财务部联系人名称') or normalize-space(.)=concat('*', '财务部联系人名称', ':') or normalize-space(.)=concat('*', '财务部联系人名称', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "吴强林",
+              "propertiesName": "填写财务部联系人名称",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='财务部联系人手机号码（短信通知）' or normalize-space(.)=concat('财务部联系人手机号码（短信通知）', ':') or normalize-space(.)=concat('财务部联系人手机号码（短信通知）', '：') or normalize-space(.)=concat('财务部联系人手机号码（短信通知）', '*') or normalize-space(.)=concat('*', '财务部联系人手机号码（短信通知）') or normalize-space(.)=concat('*', '财务部联系人手机号码（短信通知）', ':') or normalize-space(.)=concat('*', '财务部联系人手机号码（短信通知）', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "13071442365",
+              "propertiesName": "填写财务部联系人手机号码（短信通知）",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='统一社会信用代码' or normalize-space(.)=concat('统一社会信用代码', ':') or normalize-space(.)=concat('统一社会信用代码', '：') or normalize-space(.)=concat('统一社会信用代码', '*') or normalize-space(.)=concat('*', '统一社会信用代码') or normalize-space(.)=concat('*', '统一社会信用代码', ':') or normalize-space(.)=concat('*', '统一社会信用代码', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "911301005605340782",
+              "propertiesName": "填写统一社会信用代码",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='主营业务范围描述' or normalize-space(.)=concat('主营业务范围描述', ':') or normalize-space(.)=concat('主营业务范围描述', '：') or normalize-space(.)=concat('主营业务范围描述', '*') or normalize-space(.)=concat('*', '主营业务范围描述') or normalize-space(.)=concat('*', '主营业务范围描述', ':') or normalize-space(.)=concat('*', '主营业务范围描述', '：')]]//input",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "计算机技术开发、技术服务",
+              "propertiesName": "填写主营业务范围描述",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='经营范围' or normalize-space(.)=concat('经营范围', ':') or normalize-space(.)=concat('经营范围', '：') or normalize-space(.)=concat('经营范围', '*') or normalize-space(.)=concat('*', '经营范围') or normalize-space(.)=concat('*', '经营范围', ':') or normalize-space(.)=concat('*', '经营范围', '：')]]//textarea",
+              "eventTypeName": "文本框输入",
+              "eventTypeValue": "input",
+              "transcationType": "playwright",
+              "objectValue": "计算机技术开发、技术服务",
+              "propertiesName": "填写经营范围",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            },
+            {
+              "options": "",
+              "elementType": "//button[normalize-space()='保存']",
+              "eventTypeName": "点击",
+              "eventTypeValue": "click",
+              "transcationType": "playwright",
+              "objectValue": "",
+              "propertiesName": "点击保存2",
+              "mothed": "By.XPATH",
+              "regionId": "",
+              "parentRegionId": ""
+            }
+          ],
+          "phases": [
+            {
+              "phaseId": 594,
+              "phaseNumber": 1,
+              "screenshotId": 8023,
+              "stitchScreenshotUrl": "/api/v2/screenshots/8023/image",
+              "metadata": {
+                "elements": [
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 16,
+                      "x2": 100,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 0,
+                    "label": "工作台",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 112,
+                      "x2": 196,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 1,
+                    "label": "任务事项",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 208,
+                      "x2": 292,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 2,
+                    "label": "客户管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 304,
+                      "x2": 388,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 3,
+                    "label": "评级管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 400,
+                      "x2": 484,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 4,
+                    "label": "授信管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 496,
+                      "x2": 580,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 5,
+                    "label": "额度管控",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 592,
+                      "x2": 676,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 6,
+                    "label": "用信管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 688,
+                      "x2": 772,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 7,
+                    "label": "合同管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 784,
+                      "x2": 868,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 8,
+                    "label": "放还款管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 880,
+                      "x2": 964,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 9,
+                    "label": "押品管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 976,
+                      "x2": 1060,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 10,
+                    "label": "贷后管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1072,
+                      "x2": 1156,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 11,
+                    "label": "催收管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1168,
+                      "x2": 1252,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 12,
+                    "label": "数字信贷",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1264,
+                      "x2": 1348,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 13,
+                    "label": "风险预警",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1360,
+                      "x2": 1444,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 14,
+                    "label": "档案管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1456,
+                      "x2": 1540,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 15,
+                    "label": "系统管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 16,
+                      "x2": 100,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 16,
+                    "label": "产品管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 112,
+                      "x2": 196,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 17,
+                    "label": "电子文档",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 208,
+                      "x2": 292,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 18,
+                    "label": "工作流",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 304,
+                      "x2": 388,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 19,
+                    "label": "智能控制",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 400,
+                      "x2": 484,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 20,
+                    "label": "智能问答",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 496,
+                      "x2": 580,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 21,
+                    "label": "资产保全",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 592,
+                      "x2": 676,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 22,
+                    "label": "智能财报",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 688,
+                      "x2": 772,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 23,
+                    "label": "综合查询",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 212.1875,
+                      "y2": 244.1875
+                    },
+                    "index": 24,
+                    "label": "客户编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 212.1875,
+                      "y2": 244.1875
+                    },
+                    "index": 25,
+                    "label": "客户分类",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 212.1875,
+                      "y2": 244.1875
+                    },
+                    "index": 26,
+                    "label": "客户名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1187.5,
+                      "x2": 1275.5,
+                      "y1": 212.1875,
+                      "y2": 244.1875
+                    },
+                    "index": 27,
+                    "label": "查询",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1289.5,
+                      "x2": 1377.5,
+                      "y1": 212.1875,
+                      "y2": 244.1875
+                    },
+                    "index": 28,
+                    "label": "重置",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1391.5,
+                      "x2": 1445.5,
+                      "y1": 212.1875,
+                      "y2": 244.1875
+                    },
+                    "index": 29,
+                    "label": "",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 16,
+                      "x2": 104,
+                      "y1": 264.1875,
+                      "y2": 296.1875
+                    },
+                    "index": 30,
+                    "label": "新增",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 108,
+                      "x2": 196,
+                      "y1": 264.1875,
+                      "y2": 296.1875
+                    },
+                    "index": 31,
+                    "label": "修改",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 200,
+                      "x2": 288,
+                      "y1": 264.1875,
+                      "y2": 296.1875
+                    },
+                    "index": 32,
+                    "label": "查看",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 292,
+                      "x2": 408,
+                      "y1": 264.1875,
+                      "y2": 296.1875
+                    },
+                    "index": 33,
+                    "label": "联网核查",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 412,
+                      "x2": 528,
+                      "y1": 264.1875,
+                      "y2": 296.1875
+                    },
+                    "index": 34,
+                    "label": "法院信息",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 532,
+                      "x2": 648,
+                      "y1": 264.1875,
+                      "y2": 296.1875
+                    },
+                    "index": 35,
+                    "label": "影像资料",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 419,
+                      "y1": 348.1875,
+                      "y2": 380.1875
+                    },
+                    "index": 36,
+                    "label": "蔓悦薇美业管理有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 433,
+                      "y1": 385.1875,
+                      "y2": 417.1875
+                    },
+                    "index": 37,
+                    "label": "数融未来信息技术有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 433,
+                      "y1": 422.1875,
+                      "y2": 454.1875
+                    },
+                    "index": 38,
+                    "label": "鑫瑞丰禾农业开发有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 405,
+                      "y1": 459.1875,
+                      "y2": 491.1875
+                    },
+                    "index": 39,
+                    "label": "测试科技发展有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 377,
+                      "y1": 496.1875,
+                      "y2": 528.1875
+                    },
+                    "index": 40,
+                    "label": "建材工程有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 408.03125,
+                      "y1": 533.1875,
+                      "y2": 565.1875
+                    },
+                    "index": 41,
+                    "label": "MBP软件传媒有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 405,
+                      "y1": 570.1875,
+                      "y2": 602.1875
+                    },
+                    "index": 42,
+                    "label": "凌颖信息传媒有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 405,
+                      "y1": 607.1875,
+                      "y2": 639.1875
+                    },
+                    "index": 43,
+                    "label": "东方峻景网络有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 405,
+                      "y1": 644.1875,
+                      "y2": 676.1875
+                    },
+                    "index": 44,
+                    "label": "瑞云智联科技有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 265,
+                      "x2": 433,
+                      "y1": 681.1875,
+                      "y2": 713.1875
+                    },
+                    "index": 45,
+                    "label": "青橙时代文化传媒有限公司",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 786.625,
+                      "x2": 814.625,
+                      "y1": 723.1875,
+                      "y2": 751.1875
+                    },
+                    "index": 46,
+                    "label": "",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1092.625,
+                      "x2": 1120.625,
+                      "y1": 723.1875,
+                      "y2": 751.1875
+                    },
+                    "index": 47,
+                    "label": "",
+                    "layers": [
+                      {
+                        "role": "table",
+                        "label": "表格"
+                      }
+                    ],
+                    "regionId": "table:表格",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  }
+                ],
+                "truncated": false,
+                "imageWidth": 1594,
+                "regionTree": {
+                  "roots": [
+                    {
+                      "id": "other",
+                      "role": "other",
+                      "label": "其他",
+                      "children": [],
+                      "controls": [
+                        {
+                          "elementIndex": 0
+                        },
+                        {
+                          "elementIndex": 1
+                        },
+                        {
+                          "elementIndex": 2
+                        },
+                        {
+                          "elementIndex": 3
+                        },
+                        {
+                          "elementIndex": 4
+                        },
+                        {
+                          "elementIndex": 5
+                        },
+                        {
+                          "elementIndex": 6
+                        },
+                        {
+                          "elementIndex": 7
+                        },
+                        {
+                          "elementIndex": 8
+                        },
+                        {
+                          "elementIndex": 9
+                        },
+                        {
+                          "elementIndex": 10
+                        },
+                        {
+                          "elementIndex": 11
+                        },
+                        {
+                          "elementIndex": 12
+                        },
+                        {
+                          "elementIndex": 13
+                        },
+                        {
+                          "elementIndex": 14
+                        },
+                        {
+                          "elementIndex": 15
+                        },
+                        {
+                          "elementIndex": 16
+                        },
+                        {
+                          "elementIndex": 17
+                        },
+                        {
+                          "elementIndex": 18
+                        },
+                        {
+                          "elementIndex": 19
+                        },
+                        {
+                          "elementIndex": 20
+                        },
+                        {
+                          "elementIndex": 21
+                        },
+                        {
+                          "elementIndex": 22
+                        },
+                        {
+                          "elementIndex": 23
+                        },
+                        {
+                          "elementIndex": 24
+                        },
+                        {
+                          "elementIndex": 25
+                        },
+                        {
+                          "elementIndex": 26
+                        },
+                        {
+                          "elementIndex": 27
+                        },
+                        {
+                          "elementIndex": 28
+                        },
+                        {
+                          "elementIndex": 29
+                        },
+                        {
+                          "elementIndex": 30
+                        },
+                        {
+                          "elementIndex": 31
+                        },
+                        {
+                          "elementIndex": 32
+                        },
+                        {
+                          "elementIndex": 33
+                        },
+                        {
+                          "elementIndex": 34
+                        },
+                        {
+                          "elementIndex": 35
+                        }
+                      ],
+                      "parentId": null
+                    },
+                    {
+                      "id": "table:表格",
+                      "role": "table",
+                      "label": "表格",
+                      "children": [],
+                      "controls": [
+                        {
+                          "elementIndex": 36
+                        },
+                        {
+                          "elementIndex": 37
+                        },
+                        {
+                          "elementIndex": 38
+                        },
+                        {
+                          "elementIndex": 39
+                        },
+                        {
+                          "elementIndex": 40
+                        },
+                        {
+                          "elementIndex": 41
+                        },
+                        {
+                          "elementIndex": 42
+                        },
+                        {
+                          "elementIndex": 43
+                        },
+                        {
+                          "elementIndex": 44
+                        },
+                        {
+                          "elementIndex": 45
+                        },
+                        {
+                          "elementIndex": 46
+                        },
+                        {
+                          "elementIndex": 47
+                        }
+                      ],
+                      "parentId": null
+                    }
+                  ],
+                  "pageLabel": ""
+                },
+                "imageHeight": 890,
+                "contentWidth": 1594,
+                "contentHeight": 890
+              }
+            },
+            {
+              "phaseId": 595,
+              "phaseNumber": 2,
+              "screenshotId": 8223,
+              "stitchScreenshotUrl": "/api/v2/screenshots/8223/image",
+              "metadata": {
+                "elements": [
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 16,
+                      "x2": 100,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 0,
+                    "label": "工作台",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 112,
+                      "x2": 196,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 1,
+                    "label": "任务事项",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 208,
+                      "x2": 292,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 2,
+                    "label": "客户管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 304,
+                      "x2": 388,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 3,
+                    "label": "评级管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 400,
+                      "x2": 484,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 4,
+                    "label": "授信管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 496,
+                      "x2": 580,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 5,
+                    "label": "额度管控",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 592,
+                      "x2": 676,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 6,
+                    "label": "用信管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 688,
+                      "x2": 772,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 7,
+                    "label": "合同管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 784,
+                      "x2": 868,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 8,
+                    "label": "放还款管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 880,
+                      "x2": 964,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 9,
+                    "label": "押品管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 976,
+                      "x2": 1060,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 10,
+                    "label": "贷后管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1072,
+                      "x2": 1156,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 11,
+                    "label": "催收管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1168,
+                      "x2": 1252,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 12,
+                    "label": "数字信贷",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1264,
+                      "x2": 1348,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 13,
+                    "label": "风险预警",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1360,
+                      "x2": 1444,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 14,
+                    "label": "档案管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1456,
+                      "x2": 1540,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 15,
+                    "label": "系统管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 16,
+                      "x2": 100,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 16,
+                    "label": "产品管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 112,
+                      "x2": 196,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 17,
+                    "label": "电子文档",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 208,
+                      "x2": 292,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 18,
+                    "label": "工作流",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 304,
+                      "x2": 388,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 19,
+                    "label": "智能控制",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 400,
+                      "x2": 484,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 20,
+                    "label": "智能问答",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 496,
+                      "x2": 580,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 21,
+                    "label": "资产保全",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 592,
+                      "x2": 676,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 22,
+                    "label": "智能财报",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 688,
+                      "x2": 772,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 23,
+                    "label": "综合查询",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 24,
+                    "label": "客户编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 25,
+                    "label": "客户名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 26,
+                    "label": "对公客户类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 27,
+                    "label": "证件类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 28,
+                    "label": "证件号码",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 29,
+                    "label": "国别",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 30,
+                    "label": "外文名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1486,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 31,
+                    "label": "登记注册地址",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1494,
+                      "x2": 1562,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 32,
+                    "label": "选择",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 33,
+                    "label": "经度",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 34,
+                    "label": "纬度",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 35,
+                    "label": "财务部联系人名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 36,
+                    "label": "财务部联系人手机号码（短信通知）",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 37,
+                    "label": "投资主体类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 38,
+                    "label": "成立日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 39,
+                    "label": "注册登记日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 40,
+                    "label": "登记注册失效日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 41,
+                    "label": "统一社会信用代码",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 42,
+                    "label": "法定代表人/负责人姓名",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 43,
+                    "label": "法定代表人/负责人证件类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1486,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 44,
+                    "label": "法定代表人/负责人证件号码",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1494,
+                      "x2": 1562,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 45,
+                    "label": "引入",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 286.5,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 46,
+                    "label": "联网核查状态",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 294.5,
+                      "x2": 390.5,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 47,
+                    "label": "联网核查",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 48,
+                    "label": "管户机构编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 49,
+                    "label": "管户客户经理编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 50,
+                    "label": "登记日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 616,
+                      "y2": 648
+                    },
+                    "index": 51,
+                    "label": "主营业务范围描述",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 1566,
+                      "y1": 688,
+                      "y2": 739
+                    },
+                    "index": 52,
+                    "label": "经营范围",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 679,
+                      "x2": 747,
+                      "y1": 747,
+                      "y2": 779
+                    },
+                    "index": 53,
+                    "label": "保存",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 761,
+                      "x2": 829,
+                      "y1": 747,
+                      "y2": 779
+                    },
+                    "index": 54,
+                    "label": "暂存",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 843,
+                      "x2": 911,
+                      "y1": 747,
+                      "y2": 779
+                    },
+                    "index": 55,
+                    "label": "返回",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  }
+                ],
+                "truncated": false,
+                "imageWidth": 1594,
+                "regionTree": {
+                  "roots": [
+                    {
+                      "id": "other",
+                      "role": "other",
+                      "label": "其他",
+                      "children": [],
+                      "controls": [
+                        {
+                          "elementIndex": 0
+                        },
+                        {
+                          "elementIndex": 1
+                        },
+                        {
+                          "elementIndex": 2
+                        },
+                        {
+                          "elementIndex": 3
+                        },
+                        {
+                          "elementIndex": 4
+                        },
+                        {
+                          "elementIndex": 5
+                        },
+                        {
+                          "elementIndex": 6
+                        },
+                        {
+                          "elementIndex": 7
+                        },
+                        {
+                          "elementIndex": 8
+                        },
+                        {
+                          "elementIndex": 9
+                        },
+                        {
+                          "elementIndex": 10
+                        },
+                        {
+                          "elementIndex": 11
+                        },
+                        {
+                          "elementIndex": 12
+                        },
+                        {
+                          "elementIndex": 13
+                        },
+                        {
+                          "elementIndex": 14
+                        },
+                        {
+                          "elementIndex": 15
+                        },
+                        {
+                          "elementIndex": 16
+                        },
+                        {
+                          "elementIndex": 17
+                        },
+                        {
+                          "elementIndex": 18
+                        },
+                        {
+                          "elementIndex": 19
+                        },
+                        {
+                          "elementIndex": 20
+                        },
+                        {
+                          "elementIndex": 21
+                        },
+                        {
+                          "elementIndex": 22
+                        },
+                        {
+                          "elementIndex": 23
+                        },
+                        {
+                          "elementIndex": 24
+                        },
+                        {
+                          "elementIndex": 25
+                        },
+                        {
+                          "elementIndex": 26
+                        },
+                        {
+                          "elementIndex": 27
+                        },
+                        {
+                          "elementIndex": 28
+                        },
+                        {
+                          "elementIndex": 29
+                        },
+                        {
+                          "elementIndex": 30
+                        },
+                        {
+                          "elementIndex": 31
+                        },
+                        {
+                          "elementIndex": 32
+                        },
+                        {
+                          "elementIndex": 33
+                        },
+                        {
+                          "elementIndex": 34
+                        },
+                        {
+                          "elementIndex": 35
+                        },
+                        {
+                          "elementIndex": 36
+                        },
+                        {
+                          "elementIndex": 37
+                        },
+                        {
+                          "elementIndex": 38
+                        },
+                        {
+                          "elementIndex": 39
+                        },
+                        {
+                          "elementIndex": 40
+                        },
+                        {
+                          "elementIndex": 41
+                        },
+                        {
+                          "elementIndex": 42
+                        },
+                        {
+                          "elementIndex": 43
+                        },
+                        {
+                          "elementIndex": 44
+                        },
+                        {
+                          "elementIndex": 45
+                        },
+                        {
+                          "elementIndex": 46
+                        },
+                        {
+                          "elementIndex": 47
+                        },
+                        {
+                          "elementIndex": 48
+                        },
+                        {
+                          "elementIndex": 49
+                        },
+                        {
+                          "elementIndex": 50
+                        },
+                        {
+                          "elementIndex": 51
+                        },
+                        {
+                          "elementIndex": 52
+                        },
+                        {
+                          "elementIndex": 53
+                        },
+                        {
+                          "elementIndex": 54
+                        },
+                        {
+                          "elementIndex": 55
+                        }
+                      ],
+                      "parentId": null
+                    }
+                  ],
+                  "pageLabel": ""
+                },
+                "imageHeight": 890,
+                "contentWidth": 1594,
+                "contentHeight": 890
+              }
+            },
+            {
+              "phaseId": 596,
+              "phaseNumber": 3,
+              "screenshotId": 8241,
+              "stitchScreenshotUrl": "/api/v2/screenshots/8241/image",
+              "metadata": {
+                "elements": [
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 16,
+                      "x2": 100,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 0,
+                    "label": "工作台",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 112,
+                      "x2": 196,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 1,
+                    "label": "任务事项",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 208,
+                      "x2": 292,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 2,
+                    "label": "客户管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 304,
+                      "x2": 388,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 3,
+                    "label": "评级管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 400,
+                      "x2": 484,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 4,
+                    "label": "授信管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 496,
+                      "x2": 580,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 5,
+                    "label": "额度管控",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 592,
+                      "x2": 676,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 6,
+                    "label": "用信管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 688,
+                      "x2": 772,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 7,
+                    "label": "合同管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 784,
+                      "x2": 868,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 8,
+                    "label": "放还款管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 880,
+                      "x2": 964,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 9,
+                    "label": "押品管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 976,
+                      "x2": 1060,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 10,
+                    "label": "贷后管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1072,
+                      "x2": 1156,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 11,
+                    "label": "催收管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1168,
+                      "x2": 1252,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 12,
+                    "label": "数字信贷",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1264,
+                      "x2": 1348,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 13,
+                    "label": "风险预警",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1360,
+                      "x2": 1444,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 14,
+                    "label": "档案管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1456,
+                      "x2": 1540,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 15,
+                    "label": "系统管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 16,
+                      "x2": 100,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 16,
+                    "label": "产品管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 112,
+                      "x2": 196,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 17,
+                    "label": "电子文档",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 208,
+                      "x2": 292,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 18,
+                    "label": "工作流",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 304,
+                      "x2": 388,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 19,
+                    "label": "智能控制",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 400,
+                      "x2": 484,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 20,
+                    "label": "智能问答",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 496,
+                      "x2": 580,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 21,
+                    "label": "资产保全",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 592,
+                      "x2": 676,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 22,
+                    "label": "智能财报",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 688,
+                      "x2": 772,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 23,
+                    "label": "综合查询",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 24,
+                    "label": "客户编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 25,
+                    "label": "客户名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 26,
+                    "label": "对公客户类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 27,
+                    "label": "证件类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 28,
+                    "label": "证件号码",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 29,
+                    "label": "国别",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 30,
+                    "label": "外文名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1486,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 31,
+                    "label": "登记注册地址",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1494,
+                      "x2": 1562,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 32,
+                    "label": "选择",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 33,
+                    "label": "经度",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 34,
+                    "label": "纬度",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 35,
+                    "label": "财务部联系人名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 36,
+                    "label": "财务部联系人手机号码（短信通知）",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 37,
+                    "label": "投资主体类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 38,
+                    "label": "成立日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 39,
+                    "label": "注册登记日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 40,
+                    "label": "登记注册失效日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 41,
+                    "label": "统一社会信用代码",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 42,
+                    "label": "法定代表人/负责人姓名",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 43,
+                    "label": "法定代表人/负责人证件类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1486,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 44,
+                    "label": "法定代表人/负责人证件号码",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1494,
+                      "x2": 1562,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 45,
+                    "label": "引入",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 286.5,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 46,
+                    "label": "联网核查状态",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 294.5,
+                      "x2": 390.5,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 47,
+                    "label": "联网核查",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 48,
+                    "label": "管户机构编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 49,
+                    "label": "管户客户经理编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 50,
+                    "label": "登记日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 616,
+                      "y2": 648
+                    },
+                    "index": 51,
+                    "label": "主营业务范围描述",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 1566,
+                      "y1": 688,
+                      "y2": 739
+                    },
+                    "index": 52,
+                    "label": "经营范围",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 679,
+                      "x2": 747,
+                      "y1": 747,
+                      "y2": 779
+                    },
+                    "index": 53,
+                    "label": "保存",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 761,
+                      "x2": 829,
+                      "y1": 747,
+                      "y2": 779
+                    },
+                    "index": 54,
+                    "label": "暂存",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 843,
+                      "x2": 911,
+                      "y1": 747,
+                      "y2": 779
+                    },
+                    "index": 55,
+                    "label": "返回",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  }
+                ],
+                "truncated": false,
+                "imageWidth": 1594,
+                "regionTree": {
+                  "roots": [
+                    {
+                      "id": "other",
+                      "role": "other",
+                      "label": "其他",
+                      "children": [],
+                      "controls": [
+                        {
+                          "elementIndex": 0
+                        },
+                        {
+                          "elementIndex": 1
+                        },
+                        {
+                          "elementIndex": 2
+                        },
+                        {
+                          "elementIndex": 3
+                        },
+                        {
+                          "elementIndex": 4
+                        },
+                        {
+                          "elementIndex": 5
+                        },
+                        {
+                          "elementIndex": 6
+                        },
+                        {
+                          "elementIndex": 7
+                        },
+                        {
+                          "elementIndex": 8
+                        },
+                        {
+                          "elementIndex": 9
+                        },
+                        {
+                          "elementIndex": 10
+                        },
+                        {
+                          "elementIndex": 11
+                        },
+                        {
+                          "elementIndex": 12
+                        },
+                        {
+                          "elementIndex": 13
+                        },
+                        {
+                          "elementIndex": 14
+                        },
+                        {
+                          "elementIndex": 15
+                        },
+                        {
+                          "elementIndex": 16
+                        },
+                        {
+                          "elementIndex": 17
+                        },
+                        {
+                          "elementIndex": 18
+                        },
+                        {
+                          "elementIndex": 19
+                        },
+                        {
+                          "elementIndex": 20
+                        },
+                        {
+                          "elementIndex": 21
+                        },
+                        {
+                          "elementIndex": 22
+                        },
+                        {
+                          "elementIndex": 23
+                        },
+                        {
+                          "elementIndex": 24
+                        },
+                        {
+                          "elementIndex": 25
+                        },
+                        {
+                          "elementIndex": 26
+                        },
+                        {
+                          "elementIndex": 27
+                        },
+                        {
+                          "elementIndex": 28
+                        },
+                        {
+                          "elementIndex": 29
+                        },
+                        {
+                          "elementIndex": 30
+                        },
+                        {
+                          "elementIndex": 31
+                        },
+                        {
+                          "elementIndex": 32
+                        },
+                        {
+                          "elementIndex": 33
+                        },
+                        {
+                          "elementIndex": 34
+                        },
+                        {
+                          "elementIndex": 35
+                        },
+                        {
+                          "elementIndex": 36
+                        },
+                        {
+                          "elementIndex": 37
+                        },
+                        {
+                          "elementIndex": 38
+                        },
+                        {
+                          "elementIndex": 39
+                        },
+                        {
+                          "elementIndex": 40
+                        },
+                        {
+                          "elementIndex": 41
+                        },
+                        {
+                          "elementIndex": 42
+                        },
+                        {
+                          "elementIndex": 43
+                        },
+                        {
+                          "elementIndex": 44
+                        },
+                        {
+                          "elementIndex": 45
+                        },
+                        {
+                          "elementIndex": 46
+                        },
+                        {
+                          "elementIndex": 47
+                        },
+                        {
+                          "elementIndex": 48
+                        },
+                        {
+                          "elementIndex": 49
+                        },
+                        {
+                          "elementIndex": 50
+                        },
+                        {
+                          "elementIndex": 51
+                        },
+                        {
+                          "elementIndex": 52
+                        },
+                        {
+                          "elementIndex": 53
+                        },
+                        {
+                          "elementIndex": 54
+                        },
+                        {
+                          "elementIndex": 55
+                        }
+                      ],
+                      "parentId": null
+                    }
+                  ],
+                  "pageLabel": ""
+                },
+                "imageHeight": 890,
+                "contentWidth": 1594,
+                "contentHeight": 890
+              }
+            },
+            {
+              "phaseId": 597,
+              "phaseNumber": 4,
+              "screenshotId": 8270,
+              "stitchScreenshotUrl": "/api/v2/screenshots/8270/image",
+              "metadata": {
+                "elements": [
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 16,
+                      "x2": 100,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 0,
+                    "label": "工作台",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 112,
+                      "x2": 196,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 1,
+                    "label": "任务事项",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 208,
+                      "x2": 292,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 2,
+                    "label": "客户管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 304,
+                      "x2": 388,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 3,
+                    "label": "评级管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 400,
+                      "x2": 484,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 4,
+                    "label": "授信管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 496,
+                      "x2": 580,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 5,
+                    "label": "额度管控",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 592,
+                      "x2": 676,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 6,
+                    "label": "用信管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 688,
+                      "x2": 772,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 7,
+                    "label": "合同管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 784,
+                      "x2": 868,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 8,
+                    "label": "放还款管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 880,
+                      "x2": 964,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 9,
+                    "label": "押品管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 976,
+                      "x2": 1060,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 10,
+                    "label": "贷后管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1072,
+                      "x2": 1156,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 11,
+                    "label": "催收管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1168,
+                      "x2": 1252,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 12,
+                    "label": "数字信贷",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1264,
+                      "x2": 1348,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 13,
+                    "label": "风险预警",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1360,
+                      "x2": 1444,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 14,
+                    "label": "档案管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 1456,
+                      "x2": 1540,
+                      "y1": 48,
+                      "y2": 80
+                    },
+                    "index": 15,
+                    "label": "系统管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 16,
+                      "x2": 100,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 16,
+                    "label": "产品管理",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 112,
+                      "x2": 196,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 17,
+                    "label": "电子文档",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 208,
+                      "x2": 292,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 18,
+                    "label": "工作流",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 304,
+                      "x2": 388,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 19,
+                    "label": "智能控制",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 400,
+                      "x2": 484,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 20,
+                    "label": "智能问答",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 496,
+                      "x2": 580,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 21,
+                    "label": "资产保全",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 592,
+                      "x2": 676,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 22,
+                    "label": "智能财报",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "menu",
+                    "rect": {
+                      "x1": 688,
+                      "x2": 772,
+                      "y1": 80,
+                      "y2": 112
+                    },
+                    "index": 23,
+                    "label": "综合查询",
+                    "layers": [],
+                    "regionId": "shell-header",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 24,
+                    "label": "客户编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 25,
+                    "label": "客户名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 26,
+                    "label": "对公客户类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 184,
+                      "y2": 216
+                    },
+                    "index": 27,
+                    "label": "证件类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 28,
+                    "label": "证件号码",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 29,
+                    "label": "国别",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 30,
+                    "label": "外文名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1486,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 31,
+                    "label": "登记注册地址",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1494,
+                      "x2": 1562,
+                      "y1": 256,
+                      "y2": 288
+                    },
+                    "index": 32,
+                    "label": "选择",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 33,
+                    "label": "经度",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 34,
+                    "label": "纬度",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 35,
+                    "label": "财务部联系人名称",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 328,
+                      "y2": 360
+                    },
+                    "index": 36,
+                    "label": "财务部联系人手机号码（短信通知）",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 37,
+                    "label": "投资主体类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 38,
+                    "label": "成立日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 39,
+                    "label": "注册登记日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 400,
+                      "y2": 432
+                    },
+                    "index": 40,
+                    "label": "登记注册失效日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 41,
+                    "label": "统一社会信用代码",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 42,
+                    "label": "法定代表人/负责人姓名",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 43,
+                    "label": "法定代表人/负责人证件类型",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1486,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 44,
+                    "label": "法定代表人/负责人证件号码",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 1494,
+                      "x2": 1562,
+                      "y1": 472,
+                      "y2": 504
+                    },
+                    "index": 45,
+                    "label": "引入",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_select",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 286.5,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 46,
+                    "label": "联网核查状态",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 294.5,
+                      "x2": 390.5,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 47,
+                    "label": "联网核查",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 418.5,
+                      "x2": 785,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 48,
+                    "label": "管户机构编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 809,
+                      "x2": 1175.5,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 49,
+                    "label": "管户客户经理编号",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_date",
+                    "rect": {
+                      "x1": 1199.5,
+                      "x2": 1566,
+                      "y1": 544,
+                      "y2": 576
+                    },
+                    "index": 50,
+                    "label": "登记日期",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 394.5,
+                      "y1": 616,
+                      "y2": 648
+                    },
+                    "index": 51,
+                    "label": "主营业务范围描述",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "form_input",
+                    "rect": {
+                      "x1": 28,
+                      "x2": 1566,
+                      "y1": 688,
+                      "y2": 739
+                    },
+                    "index": 52,
+                    "label": "经营范围",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 679,
+                      "x2": 747,
+                      "y1": 747,
+                      "y2": 779
+                    },
+                    "index": 53,
+                    "label": "保存",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 761,
+                      "x2": 829,
+                      "y1": 747,
+                      "y2": 779
+                    },
+                    "index": 54,
+                    "label": "暂存",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  },
+                  {
+                    "kind": "button",
+                    "rect": {
+                      "x1": 843,
+                      "x2": 911,
+                      "y1": 747,
+                      "y2": 779
+                    },
+                    "index": 55,
+                    "label": "返回",
+                    "layers": [],
+                    "regionId": "main",
+                    "outsideRoot": false,
+                    "parentRegionId": ""
+                  }
+                ],
+                "truncated": false,
+                "imageWidth": 1594,
+                "regionTree": {
+                  "roots": [
+                    {
+                      "id": "other",
+                      "role": "other",
+                      "label": "其他",
+                      "children": [],
+                      "controls": [
+                        {
+                          "elementIndex": 0
+                        },
+                        {
+                          "elementIndex": 1
+                        },
+                        {
+                          "elementIndex": 2
+                        },
+                        {
+                          "elementIndex": 3
+                        },
+                        {
+                          "elementIndex": 4
+                        },
+                        {
+                          "elementIndex": 5
+                        },
+                        {
+                          "elementIndex": 6
+                        },
+                        {
+                          "elementIndex": 7
+                        },
+                        {
+                          "elementIndex": 8
+                        },
+                        {
+                          "elementIndex": 9
+                        },
+                        {
+                          "elementIndex": 10
+                        },
+                        {
+                          "elementIndex": 11
+                        },
+                        {
+                          "elementIndex": 12
+                        },
+                        {
+                          "elementIndex": 13
+                        },
+                        {
+                          "elementIndex": 14
+                        },
+                        {
+                          "elementIndex": 15
+                        },
+                        {
+                          "elementIndex": 16
+                        },
+                        {
+                          "elementIndex": 17
+                        },
+                        {
+                          "elementIndex": 18
+                        },
+                        {
+                          "elementIndex": 19
+                        },
+                        {
+                          "elementIndex": 20
+                        },
+                        {
+                          "elementIndex": 21
+                        },
+                        {
+                          "elementIndex": 22
+                        },
+                        {
+                          "elementIndex": 23
+                        },
+                        {
+                          "elementIndex": 24
+                        },
+                        {
+                          "elementIndex": 25
+                        },
+                        {
+                          "elementIndex": 26
+                        },
+                        {
+                          "elementIndex": 27
+                        },
+                        {
+                          "elementIndex": 28
+                        },
+                        {
+                          "elementIndex": 29
+                        },
+                        {
+                          "elementIndex": 30
+                        },
+                        {
+                          "elementIndex": 31
+                        },
+                        {
+                          "elementIndex": 32
+                        },
+                        {
+                          "elementIndex": 33
+                        },
+                        {
+                          "elementIndex": 34
+                        },
+                        {
+                          "elementIndex": 35
+                        },
+                        {
+                          "elementIndex": 36
+                        },
+                        {
+                          "elementIndex": 37
+                        },
+                        {
+                          "elementIndex": 38
+                        },
+                        {
+                          "elementIndex": 39
+                        },
+                        {
+                          "elementIndex": 40
+                        },
+                        {
+                          "elementIndex": 41
+                        },
+                        {
+                          "elementIndex": 42
+                        },
+                        {
+                          "elementIndex": 43
+                        },
+                        {
+                          "elementIndex": 44
+                        },
+                        {
+                          "elementIndex": 45
+                        },
+                        {
+                          "elementIndex": 46
+                        },
+                        {
+                          "elementIndex": 47
+                        },
+                        {
+                          "elementIndex": 48
+                        },
+                        {
+                          "elementIndex": 49
+                        },
+                        {
+                          "elementIndex": 50
+                        },
+                        {
+                          "elementIndex": 51
+                        },
+                        {
+                          "elementIndex": 52
+                        },
+                        {
+                          "elementIndex": 53
+                        },
+                        {
+                          "elementIndex": 54
+                        },
+                        {
+                          "elementIndex": 55
+                        }
+                      ],
+                      "parentId": null
+                    }
+                  ],
+                  "pageLabel": ""
+                },
+                "imageHeight": 890,
+                "contentWidth": 1594,
+                "contentHeight": 890
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "count": 30,
+    "skipped": {
+      "metaActions": 3
+    },
+    "stats": {
+      "absoluteFallback": 0,
+      "missingOptions": 1
+    },
+    "isExport": 1,
+    "pushed": false
+  }
+}
