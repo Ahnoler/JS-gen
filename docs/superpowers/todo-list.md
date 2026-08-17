@@ -105,7 +105,7 @@
 | **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data 软文本底座；**需专刀 design** |
 | **PR-BATCH** | **部分完成**（本周：交易列表加任务 8/19） | 批量导入：用户只看自己任务 | ① 用户隔离与 **PR-USER** appid 隔离同源，本周排 8/19；②行进度 + ③phase `done_logs` 已合 V2.1 | Vue BatchImport 另仓 |
 | **PR-USER** | 待办（本周子项：系统树凭据维护 8/19） | 用户/系统树权限 | 树共享；交易本人可见；仅管理员删树。**本期只做系统树创建时用户名/密码/角色维护，不做权限闸** | 等 **PR-SSO-ADMIN**（权限部分）；凭据维护子项本周可独立推进 |
-| **PR-SSO** | 待办（本周子项：appid 登录 + 数据隔离 8/19） | 接入公司账号中心 HTTP API | 用户名密码或 token 换会话；本周用流水线 appid 做脚本数据用户隔离 | 等 **PR-SSO-ADMIN**（管理员映射）；appid 隔离子项先做 |
+| **PR-SSO** | 子项已落地（2026-08-17：appid 登录 + 数据隔离）；完整登录后置 | 接入公司账号中心 HTTP API | 前端跳账号中心登录，回调 authCode=JWT 当 token；后端纯解 JWT payload 拿 `paasUserId` 做 `/api/v2/*` 用户隔离（`SSO_AUTH_REQUIRED` 默认关，空 `paas_user_id`=全可见）；管理员映射仍挂起 | 等 **PR-SSO-ADMIN**（管理员映射）；换会话/权限后置 |
 | **PR-PUSH** | **已完成**（2026-08-15） · V2.0：每步 regionId/parentRegionId + 每交易 phases[]（截图引用+元数据）— [spec](specs/2026-08-14-batch-push-v2-region-evidence-design.md) | 推送到自动化 | 拒草稿；仅 recorded/completed；`characterize-transaction-export-region.mjs` OK；**未见 live 湿测记录** | export-push-gate |
 | **PR-EXEC** | **挂起** | 脚本执行（引擎/执行机） | 本侧只提供浏览器操作与 actions 设计；暂不排调度产品 | T9 / session-lifecycle 湿测另跟 |
 
@@ -117,7 +117,7 @@
 |------|--------------------|------|----------|------|
 | 3. 系统管理：系统树创建时维护用户名、密码、角色 | PR-USER 子集（不含权限闸） | **本周进行中** | **8.19** | 用作测试数据补充；当前版本不做权限场景，后续版本增加 |
 | 4. 交易列表里增加任务 | PR-BATCH | **本周进行中** | **8.19** | 需求澄清已完成；JS-gen 对齐接口，Vue 另仓联调 |
-| 5. 登录：流水线 appid + 脚本数据用户隔离 | PR-SSO / PR-USER 子集 | **本周进行中** | **8.19** | 用 appid 做用户隔离；PR-SSO-ADMIN 仍挂起，不阻塞本子项 |
+| 5. 登录：流水线 appid + 脚本数据用户隔离 | PR-SSO / PR-USER 子集 | **已交付**（2026-08-17，比排期提前） | **8.19** | 后端 `paas_user_id` 隔离 + `/api/v2/auth/*`（commit `c0503f3`/`45e0b6a`）+ 前端 SSO 接通（另仓 dev `75e9562`）；`SSO_AUTH_REQUIRED` 默认关，联调/冒烟时开；PR-SSO-ADMIN 仍挂起，不阻塞本子项 |
 
 **排期：**
 - 8/17（周一）：对齐 3/4/5 实现方案与接口约定。
@@ -139,6 +139,7 @@
 
 ## 更新记录
 
+| 2026-08-17 | **任务 5（appid 登录 + 数据隔离）已交付**：后端 `paas_user_id` 列（迁移已跑）+ `/api/v2/auth/*` 四端点 + auth 中间件（`SSO_AUTH_REQUIRED` 默认关）+ 列表/批量导入按 `paasUserId` 过滤与盖章（commit `c0503f3`，verify-all Python 解析修复 `45e0b6a`）；前端 SSO 接通 + user store + 401 处理（另仓 dev `75e9562`）。characterization 20/20 绿（内嵌 Python）；`characterize-tree-select-record` 需 `playwright install`（预存环境，未跑） |
 | 2026-08-17 | 产品周任务表排期：本人负责 3/4/5（系统树凭据维护、交易列表加任务、appid 登录 + 数据隔离），8/19 交付；新增「本周任务」小节；PR-USER/PR-SSO/PR-BATCH 标注本周子项。截图插件任务不归本人（健君 / 淼一、正祥、张奕伟 8/21） |
 | 2026-08-16 | 全量核对 git/CHANGELOG：**option-first-commit、sectionOf-dead-calls、三大问题①** 标为已完成；**form-actions-split** 更新进度；**PR-LAYER/PR-PUSH** 更新为仓库侧已完成并标注测试状态；1448052 补充 `AI_DUP_FAILURE_CUE` 缓解说明 |
 | 2026-08-16 | Recording steps hardening E1/E2/E3 合入：done accept reason、click_save sticky retry、`AI_DUP_FAILURE_CUE`（默认关）；对应 characterization 全绿 |
