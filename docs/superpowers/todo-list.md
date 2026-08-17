@@ -26,6 +26,8 @@
 - 验证：`characterize-heal-locate.mjs` 39 项、`characterize-heal-decision.mjs` 9 项、`characterize-heal-mode.py` 全绿；`verify-all.sh` ALL GREEN。
 - **唯一剩余：** 真实浏览器 + 后端 + executor 的 batch replay live 湿测（Phase 7 场景），已登记为 `heal-locate-wet`。
 
+Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
+
 **建议工作项（2026-08-15 已落地，以下为历史底稿）：**
 
 1. **Prompt / 工具纪律（heal 专用）**  
@@ -101,7 +103,7 @@
 | **PR-PART** | **第一刀已实现** | 元素分区算法完善 | V2.1：`display_group`/`region_label`。第一刀：tab+向导+titlebox 拼接已落地 — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) · [plan](plans/2026-08-13-partition-tab-wizard-titlebox.md)；9242 湿测已跑（对公客户修改；评级向导） | unify-partition · L1c · picker · regionAnchor |
 | **PR-LAYER** | **本仓库侧已完成**（2026-08-15） | 元素分层树（分区之后） | 每控件 `layers[]` 已落 snap/resolve preview/扫描/`element_json`；可选 `pageLabel` 只加根 page；todo role 已对齐。**整页大树已落地（assembleRegionTree + 扫描/阶段树）**；`characterize-region-tree.mjs` OK。**本仓库无湿测记录**；Vue 画树另刀 | 依赖 PR-PART；Vue 画树另仓 |
 | **PR-LOC** | **已落地（V2.1）** · 需求变更（2026-08-17）：阶段长图**无元素高亮** | 阶段长图 + 控件坐标 | AI `phase_done` 后 1 张 PNG（滚主滚动区拼接，**不再烘焙高亮**）；`screenshot.metadata_json` 记录截图长宽（image/content 双坐标系）+ **全部可见 L2 控件坐标**（left/top/right/bottom + kind/text/layers/region）+ region_tree。湿测已完成 | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · 阶段截图 V2 已合 V2.1 |
-| **PR-LOC-HL** | **需求变更**（2026-08-17）：由「步骤级高亮截图」改为「**控件坐标点亮**」；**MVP 已定**：只用阶段图 `metadata.elements[]` 控件坐标点亮（不补步骤坐标）；步骤控件坐标（点亮「被操作过」的控件）后置待 design。**探索工具已建**（`scripts/tools/lightup-phase-screenshot.mjs`） | 步骤级控件坐标 → 推送 | 旧方向（操作后逐步高亮再截）**取消**。**MVP（本次）**：阶段长图无元素高亮 + `metadata.elements[]`（index/kind/label/layers/regionId/parentRegionId/rect/outsideRoot，内容坐标系）经推送 V2.0 envelope（`phases[].metadata`）推给公司其他平台，对方按坐标在长图上点亮控件。**探索进度**：点亮 viewer 工具已建（阶段图 56 控件画框 + 「仅显示本阶段操作过的控件」过滤 + 点击详情）；**三维匹配规则验证**：字段标签 `formLabel`→`label`、操作 `target_kind`→`kind`、`regionId`→`regionId`（任维空则跳过）——traj 157 phase 4 实测匹配 **16/16**（原 text 匹配仅 1/4）。**结论**：表单填写型阶段（字段在 phase_done 仍可见）label/kind 匹配可靠；下拉收起/弹窗关闭/tab 切换场景匹配不到，届时需**步骤坐标兜底**（操作当时位置，不依赖匹配）。**后置**：步骤控件坐标入库（`element_json` 无 bbox，需补）+ 推送 `transcationProperties` 加坐标 | 参考 `src/services/transaction-export.js`（V2.0：regionId/parentRegionId + phases[]/metadata）；`buildMetadata`（phase-highlight-screenshot.js）已产出 elements[]；工具 commit `8e9e76d`/`43290ec`/`1e1ecad` |
+| **PR-LOC-HL** | **需求变更**（2026-08-17）：由「步骤级高亮截图」改为「**控件坐标点亮**」；**MVP 已定**：只用阶段图 `metadata.elements[]` 控件坐标点亮（不补步骤坐标）；步骤控件坐标后置待 design。**探索工具已建**（`scripts/tools/`） | 步骤级控件坐标 → 推送 | 旧方向（操作后逐步高亮再截）**取消**。**MVP**：阶段长图无元素高亮 + `metadata.elements[]` 经推送 V2.0 envelope（`phases[].metadata`）推给公司其他平台。**工具（功能分离）**：① 元素高亮 `lightup-phase-screenshot.mjs`（阶段长图点亮 + 操作过红色标记，无分层）；② 元素分层 `layer-tree-from-properties.mjs`（三模式：`--file` 按 `transcationProperties.regionId` / `--shot` 按阶段截图 `metadata.elements.layers` / `--trajectory` **直接按 `trajectory_step.element_json` 分层，不依赖截图**）。**探索结论**：三维匹配（`formLabel`→`label`、`target_kind`→`kind`、`regionId`→`regionId`）traj 157 p4 匹配 16/16；traj 38 p3 截图有 3 层分层（tab→分区→标题栏，63 元素）。**关键缺口（前置项）**：录制步骤 `element_json` 未持久化 region/layers（全库 1796 步仅 10 个单层 `main`），导致 `--trajectory`/`--file` 分层无数据（traj 38 显示未分区 115 步）——**需在录制时把步骤 region/layers 写入 `element_json`**，才能真正「按 step 分层」 | 参考 `src/services/transaction-export.js`（V2.0）；`buildMetadata`（phase-highlight-screenshot.js）已产出 elements[]；工具 commit `8e9e76d`/`43290ec`/`1e1ecad`/`01197ce`/`55f648e`/`8f3d15e` |
 | **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data 软文本底座；**需专刀 design** |
 | **PR-BATCH** | ① 用户隔离**后端已落地**（2026-08-17）；交易列表加任务前端联调进行中（8/19） | 批量导入：用户只看自己任务 | ① 用户隔离与 **PR-USER** appid 隔离同源：`paas_user_id` 列表过滤/盖章/存量回填/批量透传已落地（commit `c0503f3`/`7abf7e8`/`8ab90e0`）；②行进度 + ③phase `done_logs` 已合 V2.1 | Vue BatchImport 另仓联调 8/19 |
 | **PR-USER** | 凭据维护**后端已落地**（2026-08-17）；前端 UI + 联调进行中（8/19） | 用户/系统树权限 | 树共享；交易本人可见；仅管理员删树。**本期只做系统树创建时用户名/密码/角色维护，不做权限闸**：`system_account.username`→`account` 更名 + 节点 POST/PUT `accounts[]` 批量维护（`1a46519`）+ 节点详情回显 `accounts[]`（`d09fc60`） | 等 **PR-SSO-ADMIN**（权限部分）；前端凭据维护 UI 8/19 |
@@ -111,18 +113,24 @@
 
 ### 本周任务（2026-08-17 ~ 08-19 · 本人负责）
 
-> 来源：产品周任务表。截图插件任务（手动截图按钮 / 坐标记录）**不属于本人**，仍由健君 / 淼一、正祥、张奕伟跟进（8.21）。
+> 来源：产品周任务表。截图插件任务（手动截图按钮 / 坐标记录）**不属于本人**，仍由健君 / 淼一、正祥、张奕伟跟进（8.21）。  
+> **进度快照（2026-08-17 EOD）：** 排期时间 **33%**（1/3 天）· 三条主任务综合 **~78%** · 开发事项对齐（本周范围 18 项）**15/18 ≈ 83%** · 较排期**超前约 1.5 天**（后端已于 8/17 集中落地）。
 
-| 任务 | 对应 todo / 工程项 | 状态 | 交付日期 | 备注 |
-|------|--------------------|------|----------|------|
-| 3. 系统管理：系统树创建时维护用户名、密码、角色 | PR-USER 子集（不含权限闸） | **后端已交付**（2026-08-17）；前端 UI + 联调 8/19 | **8.19** | 后端：`account` 更名 + `accounts[]` 批量维护（`1a46519`）+ 节点详情回显（`d09fc60`）；前端凭据维护表单另仓进行中；当前版本不做权限场景 |
-| 4. 交易列表里增加任务 | PR-BATCH | **后端隔离已交付**（2026-08-17）；Vue 联调 8/19 | **8.19** | 后端 `paas_user_id` 过滤/盖章/回填已落地（`c0503f3`/`7abf7e8`/`8ab90e0`）；Vue BatchImport 另仓联调 |
-| 5. 登录：流水线 appid + 脚本数据用户隔离 | PR-SSO / PR-USER 子集 | **已交付**（2026-08-17，比排期提前） | **8.19** | 后端 `paas_user_id` 隔离 + `/api/v2/auth/*`（commit `c0503f3`/`45e0b6a`）+ 前端 SSO 接通（另仓 dev `75e9562`）；`SSO_AUTH_REQUIRED` 默认关，联调/冒烟时开；PR-SSO-ADMIN 仍挂起，不阻塞本子项 |
+| 任务 | 对应 todo / 工程项 | 进度 | 状态 | 交付日期 | 备注 |
+|------|--------------------|------|------|----------|------|
+| 3. 系统管理：系统树创建时维护用户名、密码、角色 | PR-USER 子集（不含权限闸） | **~70%** | **后端已交付**（2026-08-17）；前端 UI + 联调 8/19 | **8.19** | 后端 5/5 ✅：`account` 更名 + `accounts[]` 批量维护（`1a46519`）+ 节点详情回显（`d09fc60`）。待办：另仓凭据 UI + JS-gen↔Vue 联调 |
+| 4. 交易列表里增加任务 | PR-BATCH | **~75%** | **后端隔离已交付**（2026-08-17）；Vue 联调 8/19 | **8.19** | 后端 6/6 ✅：`paas_user_id` 过滤/盖章/回填（`c0503f3`/`7abf7e8`/`8ab90e0`）。待办：BatchImport 另仓联调；「只看我的」UI 后置 |
+| 5. 登录：流水线 appid + 脚本数据用户隔离 | PR-SSO / PR-USER 子集 | **100%** | **已交付**（2026-08-17，比排期提前） | **8.19** | `c0503f3`/`45e0b6a` + 另仓 SSO `75e9562`；`SSO_AUTH_REQUIRED` 默认关，冒烟时开；**PR-SSO-ADMIN** 仍挂起不阻塞 |
 
-**排期：**
-- 8/17（周一）：对齐 3/4/5 实现方案与接口约定。
-- 8/18（周二）：开发实现（系统树凭据维护 / 交易列表加任务 / appid 登录 + 数据隔离）。
-- 8/19（周三）：交付 + characterization / 冒烟；更新对应 todo 状态。
+**排期 vs 实际：**
+
+| 日期 | 计划 | 实际（截至 8/17 14:32） |
+|------|------|-------------------------|
+| 8/17（周一） | 对齐 3/4/5 实现方案与接口约定 | ✅ 方案已对齐；**三条任务本仓后端均已落地**（27 commits） |
+| 8/18（周二） | 开发实现（凭据维护 / 交易列表 / appid 隔离） | ⚠️ 后端提前完成；**剩余主要为另仓前端** |
+| 8/19（周三） | 交付 + characterization / 冒烟 | ⏳ 联调、`SSO_AUTH_REQUIRED=1` 冒烟、更新 todo 为已交付 |
+
+**8/18–8/19 聚焦：** 系统树凭据 UI · BatchImport 任务列表联调 · SSO 冒烟 · 本周任务表标「已交付」。
 
 ### 开发事项对齐（2026-08-17 · 本周 3/4/5 拆解）
 
@@ -180,6 +188,7 @@
 
 ## 更新记录
 
+| 2026-08-17 | **本周任务进度写回**：三条主任务综合 ~78%（任务 5 已交付；任务 3/4 后端已交付待 8/19 联调）；开发事项对齐 15/18；日报见 `docs/report/2026-08-17.md` |
 | 2026-08-17 | **PR-LOC-HL 探索进度**：点亮 viewer 工具 `scripts/tools/lightup-phase-screenshot.mjs` 已建并提交（`8e9e76d` 操作过过滤 / `43290ec` 三维匹配 / `1e1ecad` 移除冗余勾选）——阶段图 56 控件画框 + 「仅显示本阶段操作过的控件」+ 点击详情；**三维匹配验证**：`formLabel`→`label`、`target_kind`→`kind`、`regionId`→`regionId`，traj 157 phase 4 匹配 **16/16**（原 text 匹配 1/4）；结论：表单填写型阶段匹配可靠，下拉/弹窗/切 tab 场景需步骤坐标兜底（后置待 design） |
 | 2026-08-17 | **PR-LOC / PR-LOC-HL 产品需求变更**：阶段长图**无元素高亮**（V2.1 已落地，控件坐标存 `metadata_json`）；**PR-LOC-HL 取消「步骤级高亮截图」**，新方向=所有步骤操作的控件坐标入库（`element_json` 当前无 bbox，需补）+ 经批量推送 V2.0 envelope（`transcationProperties` 当前无坐标字段，需加）推送给公司其他平台。待办（需 design） |
 | 2026-08-17 | **任务 3/4 后端交付、任务 5 已交付**：产品任务表更新——**PR-BATCH** ① 用户隔离后端已落地（`c0503f3`/`7abf7e8`/`8ab90e0`）、**PR-USER** 凭据维护后端已落地（`1a46519`/`d09fc60`）、**PR-SSO** 子项已落地；本周任务 3/4 标「后端已交付，前端 UI + 联调 8/19」，任务 5 标已交付。另：**执行机 slot 复用 bug 修复**（`a9a4d56`）：supersede 补关闭执行机 agent session（keepBrowser 保留 Chrome 复用），根因=控制面重启后重连时旧 slot 占用排除孤儿扫描导致新开 slot |
@@ -203,143 +212,3 @@
 | 2026-08-13 | 清出已修缺陷与空待修表；session-lifecycle-commit、T7(不做)；**PR-BATCH** 只留 ①；湿测补 **PR-LOC-wet** |
 | 2026-08-13 | V2.1 冻结：`master@8a50413`；下一线 `uara_V1.2` |
 
-
-## Heal-Locate Optimization
-
-**状态：** ✅ **开发完成**（2026-08-15 合入 `uara_V1.2`） · characterization 全绿 · **Phase 7 live 湿测待跑**（见 `heal-locate-wet`）
-
-**总目标：**
-
-将当前 Heal-Locate 从「元素不存在 → 盲目寻找 → 重复失败」升级为「定位失败 → 页面状态诊断 → 原因分类 → 自动修复 / 合理跳过 / 有限重试」。
-
-最终目标：Agent 能理解“为什么找不到”，而不是只知道“没找到”。
-
-### Phase 0：现状分析（Current State Analysis） ✅
-
-- [x] 梳理 Replay → Action → Locator → Heal 调用链
-- [x] 确认 Heal 触发条件
-- [x] 分析当前 heal prompt 输入信息
-- [x] 梳理当前 Locator 能力
-- [x] 收集已有失败案例
-- [x] 输出当前 Heal-Locate 架构图
-
-产出：`docs/superpowers/specs/2026-08-15-heal-locate-current-analysis.md`。
-
-### Phase 1：Heal-Locate Design ✅
-
-- [x] 定义 Missing Element 分类体系
-- [x] 定义 Heal Decision Tree
-- [x] 定义定位优先级
-- [x] 定义 Repair / Skip / Retry 策略
-
-核心分类：
-
-- Invisible
-- Collapsed
-- Conditional Hidden
-- Wrong Page State
-- Wrong Region
-- Really Missing
-
-> 分类体系已收敛为 MissingReason categories：`conditional_absent | not_visible | not_loaded | changed_structure | permission_blocked | business_locked | unknown`，并映射 `repair | skip | retry | heal | fail`。
-
-### Phase 2：Locator Pipeline 优化 ✅
-
-- [x] 建立 Locator Priority
-- [x] 增加 semantic locate
-- [x] 增加 region-aware locate
-- [x] 限制 scroll 行为
-- [x] 增加定位证据记录
-
-> H0.4 已确认既有 `xpath_smart` / semantic / region 定位能力；`HealContract.target` 结构化携带 `action/label/xpath_smart/option_text`，`reason.evidence` + decision memory 记录定位证据；反 scroll 猎场禁令保留在 `heal-prompt.md`，live heal 由 strategy 约束。
-
-### Phase 3：Missing Analyzer ✅
-
-- [x] 设计缺席原因 Schema
-- [x] 实现缺席分析器
-- [x] 接入 Replay 流程
-- [x] 增加诊断日志
-
-> 落地为 Unified Missing Reason Analyzer：`src/services/trajectory/missing-reason-analyzer.js`（纯函数规则引擎）→ `heal-contract.js` → `runHealStep` 转发 → Python 解析。
-
-### Phase 4：Heal Prompt 优化 ✅
-
-- [x] 重构 heal prompt
-- [x] 禁止无意义 scroll 搜索
-- [x] 增加诊断流程
-- [x] 增加结构化输出约束
-
-> Type A/B instruction 旧文本不变，末尾追加【失败分析】`category/suggestedAction/evidence`；新增 `scripts/prompts/agent-tools-heal.md`，heal 模式只装配 `agent-core + agent-tools-common + agent-tools-heal`。
-
-### Phase 5：Repair Action 扩展 ✅
-
-- [x] expand section
-- [x] switch tab
-- [x] open dialog
-- [x] select prerequisite option
-- [x] refresh state
-- [x] retry locate
-
-> 既有工具已覆盖（`expand_all_el_tree` / `switch_tab` / `close_dialog` / `select_option` / `wait_for_loading` 等），本轮不新增工具；`agent-tools-heal.md` 的 strategy 约束优先使用等价恢复动作。
-
-### Phase 6：Heal Trace & Memory ✅
-
-- [x] 设计 heal_trace
-- [x] 记录失败 → 原因 → 修复 → 结果链路
-- [x] 关联 trajectory
-- [x] 支持经验复用
-
-> 落地为 decision memory：`runHealStep` 写入 `healType / maxSteps / healContract(mode,scope,strategy,category)` 并关联 `trajectoryId/sessionId`，作为失败→原因→修复→结果的审计沉淀，供经验复用。
-
-### Phase 7：测试与验证 ⏳（live 湿测待跑）
-
-- [ ] 级联隐藏字段测试
-- [ ] 折叠区域测试
-- [ ] Tab 状态错误测试
-- [ ] Dialog 缺失测试
-- [ ] 真实字段不存在测试
-
-> 单元/契约 characterization 已绿（`characterize-heal-locate.mjs` 39 项、`characterize-heal-decision.mjs` 9 项、`characterize-heal-mode.py`）；以下 5 个真实浏览器场景尚未跑，统一登记为 `heal-locate-wet`。
-
-
-## Heal-Locate Optimization TODO Adjustment (2026-08-14)
-
-### Phase 3 调整
-
-原目标：
-- Missing Element Analyzer
-
-调整为：
-- Unified Missing Reason Analyzer
-
-原因：
-- 当前系统已经存在 label-not-found / ok-skip:label-not-found 等缺席字段处理逻辑。
-- 不应重新建设独立缺席分析器，而应统一现有散落规则。
-
-新的目标：
-
-统一处理：
-- label-not-found
-- ok-skip:label-not-found
-- field-disabled
-- option-not-found
-- select-disabled
-- 页面状态导致的定位失败
-
-形成统一决策模型：
-
-MissingReason {
-  type,
-  confidence,
-  evidence,
-  action
-}
-
-决策结果：
-
-- repair
-- skip
-- retry
-- fail
-
-Phase 3 后续以规则收敛和决策统一为主。
