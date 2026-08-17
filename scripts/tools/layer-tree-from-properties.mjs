@@ -16,6 +16,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getDB } from '../../config/database.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -37,6 +38,14 @@ const ACTION_TAG = {
   select_radio: '选单选', click_save: '保存', click_adjacent_button: '点相邻按钮',
 };
 const actionTag = (v) => ACTION_TAG[v] || v || '操作';
+const KIND_TAG = {
+  form_input: '文本框', form_select: '下拉框', form_date: '日期框', form_radio: '单选框',
+  form_checkbox: '复选框', form_tree_select: '树选择', button: '按钮', menu: '菜单', icon: '图标',
+  table_row_button: '行内按钮', tree_node: '树节点', tab: '页签', submenu: '子菜单',
+  breadcrumb: '面包屑', card: '卡片', collapse: '折叠', dialog: '弹窗', drawer: '抽屉',
+  todo: '待办', wizard_step: '向导', form_label: '标签',
+};
+const kindTag = (k) => KIND_TAG[k] || k || '控件';
 
 function esc(s) {
   return String(s ?? '')
@@ -81,6 +90,35 @@ function buildTreeFromProperties(properties) {
   return root;
 }
 
+/** 从阶段截图 metadata.elements[] 按 layers（外→内）聚合分层树；叶 = 控件对象。 */
+function buildTreeFromElements(elements) {
+  const root = { role: 'page', label: '阶段页面', children: [], items: [] };
+  const map = new Map();
+  map.set('', root);
+  (elements || []).forEach((e, i) => {
+    const layers = Array.isArray(e.layers) ? e.layers : [];
+    let parent = root;
+    let key = '';
+    for (const l of layers) {
+      key += '|' + (l.role || '?') + ':' + (l.label || '');
+      if (!map.has(key)) {
+        const n = { role: l.role, label: l.label, children: [], items: [] };
+        map.set(key, n);
+        parent.children.push(n);
+      }
+      parent = map.get(key);
+    }
+    parent.items.push({
+      no: i + 1,
+      name: String(e.label || '').trim() || '(无文本)',
+      action: kindTag(String(e.kind || '').trim()),
+      actionValue: String(e.kind || '').trim(),
+      regionId: String(e.regionId || ''),
+    });
+  });
+  return root;
+}
+
 /** 递归渲染树为 HTML 字符串（fc-tree 风格）。 */
 function treeToHtml(node, depth) {
   const pad = 8 + depth * 18;
@@ -100,14 +138,20 @@ function treeToHtml(node, depth) {
   return html;
 }
 
-function buildHtml({ properties, title }) {
-  const unzoned = (properties || []).filter((p) => !String(p.regionId || '').trim()).length;
-  const treeHtml = treeToHtml(buildTreeFromProperties(properties), 0);
+function buildHtml({ properties, title, elements }) {
+  const useElements = Array.isArray(elements);
+  const list = useElements ? elements : (properties || []);
+  const unzoned = list.filter((p) => !String(p.regionId || '').trim()).length;
+  const treeHtml = treeToHtml(
+    useElements ? buildTreeFromElements(elements) : buildTreeFromProperties(properties),
+    0,
+  );
+  const unit = useElements ? '元素' : '操作';
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>transcationProperties 分层 · ${esc(title)}</title>
+<title>元素分层 · ${esc(title)}</title>
 <style>
   body { margin: 0; background: #f5f5f5; font-family: system-ui, sans-serif; }
   .bar { background: #fff; padding: 8px 16px; border-bottom: 1px solid #e8e8e8;
@@ -139,12 +183,12 @@ function buildHtml({ properties, title }) {
 </head>
 <body>
 <div class="bar">
-  <b>transcationProperties 元素分层</b>
-  <span class="dim">${esc(title)} · 操作 ${(properties || []).length} 步 · 未分区 ${unzoned}</span>
+  <b>元素分层</b>
+  <span class="dim">${esc(title)} · ${unit} ${list.length} · 未分区 ${unzoned}</span>
 </div>
 <div class="wrap">
   <div class="tree-panel">
-    <div class="tree-title">操作步骤（按 regionId 分层）</div>
+    <div class="tree-title">${useElements ? '阶段页面元素（按 layers 分层）' : '操作步骤（按 regionId 分层）'}</div>
     <div class="tree-list" id="treeList">${treeHtml}</div>
   </div>
 </div>
@@ -154,10 +198,16 @@ function buildHtml({ properties, title }) {
 
 function main() {
   const file = argValue('--file');
-  if (!file) {
-    console.error('用法：--file <export.json>（含 transcationProperties[] 的推送导出）');
+  const shot = argValue('--shot');
+  if (!file && !shot) {
+    console.error('用法：--file <export.json>（transcationProperties 分层） 或 --shot <screenshotId>（阶段截图元素分层）');
     process.exit(1);
   }
+
+  if (shot) {
+    return runShotMode(Number(shot));
+  }
+
   let raw;
   try {
     raw = JSON.parse(readFileSync(file, 'utf8'));
@@ -178,6 +228,35 @@ function main() {
   writeFileSync(out, html, 'utf8');
   console.log(`已生成: ${out}`);
   console.log(`交易: ${title} | 操作 ${properties.length} 步 | 未分区 ${properties.filter((p) => !String(p.regionId || '').trim()).length}`);
+}
+
+async function runShotMode(screenshotId) {
+  const db = getDB();
+  const row = await db('screenshot')
+    .select('id', 'trajectory_id', 'trajectory_phase_id', 'metadata_json')
+    .where({ id: screenshotId })
+    .first();
+  if (!row) {
+    console.error(`未找到截图 #${screenshotId}`);
+    await db.destroy();
+    process.exit(1);
+  }
+  const meta = typeof row.metadata_json === 'string' ? JSON.parse(row.metadata_json) : row.metadata_json;
+  const elements = (meta?.elements || []).filter((e) => e && e.rect);
+  if (!elements.length) {
+    console.error(`截图 #${screenshotId} 无 elements`);
+    await db.destroy();
+    process.exit(1);
+  }
+  const title = `截图 #${screenshotId} · traj ${row.trajectory_id} · phase ${row.trajectory_phase_id}`;
+  const props = elements.map((e) => ({ regionId: e.regionId || '' }));
+  const unzoned = props.filter((p) => !String(p.regionId || '').trim()).length;
+  const html = buildHtml({ properties: null, elements, title });
+  const out = join(ROOT, 'tmp', `layer-tree-shot-${screenshotId}.html`);
+  writeFileSync(out, html, 'utf8');
+  console.log(`已生成: ${out}`);
+  console.log(`${title} | 元素 ${elements.length} | 带分层 ${elements.length - unzoned} | 未分区 ${unzoned}`);
+  await db.destroy();
 }
 
 main();
