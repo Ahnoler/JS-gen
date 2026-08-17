@@ -14,6 +14,8 @@
 import { mapStepToTransactionEvent, uniquifyPropertiesNames } from './transaction-export.js';
 import { SKIP_ACTIONS } from './legacy-engine-export.js';
 
+export const TRANSACTION_SCHEMA_VERSION_V3 = 3;
+
 /** action_type → 同事格式的 {command, action}；未映射保留原名。 */
 const ACTION_MAP = Object.freeze({
   fill_form_field: ['input', 'input'],
