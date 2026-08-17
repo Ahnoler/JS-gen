@@ -325,6 +325,10 @@ async def _capture_element(page, label_text, *, xpath_smart: str = "", target_ki
             "candidates": info.get("candidates") if isinstance(info.get("candidates"), list) else [],
             "formLabel": info.get("formLabel") or label_text or "",
             "target_kind": info.get("target_kind") or target_kind or "",
+            "region_id": info.get("region_id") or "",
+            "region_label": info.get("region_label") or "",
+            "layers": info.get("layers") if isinstance(info.get("layers"), list) else [],
+            "bbox": info.get("bbox") if isinstance(info.get("bbox"), dict) else None,
         }
     except Exception:
         return None
@@ -377,6 +381,10 @@ async def _enrich_click_element(
             'candidates': info.get('candidates') if isinstance(info.get('candidates'), list) else [],
             'formLabel': info.get('formLabel') or form_label or '',
             'target_kind': info.get('target_kind') or target_kind or '',
+            'region_id': info.get('region_id') or '',
+            'region_label': info.get('region_label') or '',
+            'layers': info.get('layers') if isinstance(info.get('layers'), list) else [],
+            'bbox': info.get('bbox') if isinstance(info.get('bbox'), dict) else None,
             'locator_scope': info.get('locator_scope') or '',
             'locator_occurrence': info.get('locator_occurrence') or 0,
             'locator_verified': bool(info.get('locator_verified')),
