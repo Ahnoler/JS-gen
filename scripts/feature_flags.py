@@ -126,3 +126,7 @@ def form_batch_heartbeat_enabled() -> bool:
 def duplicate_failure_cue_enabled() -> bool:
     """AI_DUP_FAILURE_CUE — inject [纠偏] cue on repeated identical failed actions (default off)."""
     return _env_flag('AI_DUP_FAILURE_CUE', False)
+
+def click_nav_cue_enabled() -> bool:
+    """AI_CLICK_NAV_CUE — inject [导航] cue when an index click navigated to a new page (default on)."""
+    return _env_flag('AI_CLICK_NAV_CUE', True)

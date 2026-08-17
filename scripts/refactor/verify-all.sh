@@ -88,6 +88,7 @@ run "characterize-form-engine-wiring" "$PY" scripts/characterization/characteriz
 run "characterize-done-accept-reason" "$PY" scripts/characterization/characterize-done-accept-reason.py
 run "characterize-save-retry-scope" "$PY" scripts/characterization/characterize-save-retry-scope.py
 run "characterize-duplicate-failure-cue" "$PY" scripts/characterization/characterize-duplicate-failure-cue.py
+run "characterize-click-navigation-cue" "$PY" scripts/characterization/characterize-click-navigation-cue.py
 run "characterize-step-region-bbox" "$PY" scripts/characterization/characterize-step-region-bbox.py
 
 if [ "$FAILED" -ne 0 ]; then

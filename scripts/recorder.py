@@ -13,6 +13,7 @@ from .agent.recorder_emitters import (  # noqa: E402
     _capture_step_url,
     _emit_duplicate_failure_cue,
     _emit_empty_act_cue,
+    _emit_navigation_cue,
     _emit_memory_action_event,
     _guard_done_on_step_end,
 )
@@ -174,6 +175,13 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
             sys.stderr.write(f'[recorder] duplicate-failure cue error: {e}\n')
             sys.stderr.flush()
 
+        # Navigation cue is internal steering only — never abort on_step_end / agent.run
+        try:
+            _emit_navigation_cue(case_data_store, agent)
+        except Exception as e:
+            sys.stderr.write(f'[recorder] navigation cue error: {e}\n')
+            sys.stderr.flush()
+
         # P1：动作事件打点（fill_before_save 建模用）——异步旁路，失败不阻塞
         _emit_memory_action_event(agent, _actions, _last_result_str)
 
@@ -235,6 +243,17 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                     else:
                         goal_tracker['goals'] = []
                     if len(goal_tracker['goals']) >= 3:
+                        try:
+                            from .controller.actions.click_navigation_cue import goal_loop_nav_hint_message
+                            from scripts.feature_flags import click_nav_cue_enabled
+                            if click_nav_cue_enabled():
+                                agent._message_manager._add_message_with_tokens(
+                                    HumanMessage(content=goal_loop_nav_hint_message())
+                                )
+                                sys.stderr.write('[recorder] Injected goal-loop navigation hint\n')
+                                sys.stderr.flush()
+                        except Exception:
+                            pass
                         goal_tracker['stopped'] = True
                         sys.stderr.write(f"[recorder] Repeated goal detected ({len(goal_tracker['goals'])}x): {last_goal[:80]}...\n")
                         sys.stderr.write(f"[recorder] Stopping agent at step {step_num}\n")

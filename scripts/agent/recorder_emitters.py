@@ -581,3 +581,26 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                 sys.stderr.write(f"[recorder] done-check error: {e}\n")
                 sys.stderr.flush()
             return False
+
+def _emit_navigation_cue(case_data_store, agent):
+    """Inject a [导航] HumanMessage when an index click navigated to a new page (E5).
+
+    Steering-only: never abort the phase. Recorded step stays ok-clicked-N.
+    """
+    try:
+        from scripts.feature_flags import click_nav_cue_enabled
+        if not click_nav_cue_enabled():
+            return
+        nav = (case_data_store or {}).get('_last_click_navigated')
+        if not isinstance(nav, dict) or not nav.get('to'):
+            return
+        if case_data_store is not None:
+            case_data_store.pop('_last_click_navigated', None)
+        from ..controller.actions.click_navigation_cue import navigation_cue_message
+        msg = HumanMessage(content=navigation_cue_message(nav.get('from') or '', nav.get('to') or ''))
+        agent._message_manager._add_message_with_tokens(msg)
+        sys.stderr.write(f"[recorder] Injected navigation cue to={nav.get('to', '')[:80]!r}\n")
+        sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write(f'[recorder] navigation cue skipped: {e}\n')
+        sys.stderr.flush()
