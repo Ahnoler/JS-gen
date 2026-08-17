@@ -33,6 +33,16 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-17: **element_json bbox 落库补全（Node 侧）**：Python 侧 ElementInfo/from_record 已透传 region/layers/bbox，但 Node 侧 `copyLocatorMeta` 漏 bbox，直播录制持久化时步骤坐标被丢弃；补全 bbox 复制。新录制 element_json 完整含 region_id/region_label/layers[]/bbox。
+  影响范围：src/models/element.js（录制落库归一化）；无路由/schema/WS 变更。
+  文件：src/models/element.js, scripts/characterization/characterize-step-region-bbox.py
+  Python 同步提示：element_json bbox 字段语义已确认落库；Python 控制面若自行持久化 element_json 需同样保留 bbox。
+
+- 2026-08-17: **阶段长图 DPR 拼接**：`runPhaseScreenshotCapture` 滚动步进改用 CSS 片高（`box.height - 48`），stitch overlap 按 `h0 / box.height` 把 CSS 位移换成设备像素。修复 Windows DPR=1.5 时把 PNG 高当 scrollTop 导致每片漏 ~0.5 屏、长图错位/重复条带。
+  影响范围：阶段长图捕获几何（Node 控制面与 executor BiB CDP 共用 `src/cdp/phase-screenshot-capture.js`）；无路由/schema/WS 变更。
+  文件：src/cdp/phase-screenshot-capture.js, scripts/characterization/characterize-phase-highlight-screenshot.mjs
+  Python 同步提示：无 HTTP/schema。阶段长图在 Node/executor 侧 CDP 捕获；代理侧不重实现 capture 则无需改动。
+
 - 2026-08-17: **单阶段录制步数上限配置化**：`trajectory-recording-runner` 每阶段 `max_steps` 由硬编码 30 改为 `PHASE_MAX_STEPS`（默认 300，环境变量可调）。长表单（如 120 字段）不再因 ceiling 截断；短阶段仍由 phase reviewer 估算下压（`resolve_phase_max_steps` 不超 ceiling）。
   影响范围：config（新增 `PHASE_MAX_STEPS`）、src/services/trajectory（录制主循环步数上限）。
   文件：config/config.js, config/.env.example, src/services/trajectory/trajectory-recording-runner.js

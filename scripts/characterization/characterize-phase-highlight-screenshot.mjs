@@ -268,6 +268,62 @@ function ok(n) { console.log(`ok: ${n}`); }
 }
 
 {
+  // Chrome 149 headed（Windows DPR=1.5）：Page.captureScreenshot 输出 = CSS * dpr * clip.scale。
+  // Playwright headless 即使 deviceScaleFactor=1.5 仍返回 CSS 像素，无法复现。
+  // 用假 CDP 模拟 Chrome：scale=1 时片高=600；若把 PNG 高当 CSS 步进，拼接高≈1800 且漏缝。
+  const { PNG } = await import('pngjs');
+  const { runPhaseScreenshotCapture } = await import('../../src/cdp/phase-screenshot-capture.js');
+  const dpr = 1.5;
+  const clientHeight = 400;
+  const scrollHeight = 1600;
+  const box = { x: 0, y: 0, width: 400, height: 400 };
+  const viewport = { width: 400, height: 400 };
+  let scrollTop = 0;
+  function solidPng(w, h) {
+    const p = new PNG({ width: w, height: h });
+    p.data.fill(255);
+    return PNG.sync.write(p);
+  }
+  const client = {
+    async send(method, params = {}) {
+      if (method === 'Runtime.evaluate') {
+        const expr = String(params.expression || '');
+        if (expr.includes('root.scrollTop =')) {
+          const m = expr.match(/root\.scrollTop = ([0-9.]+)/);
+          if (m) scrollTop = Number(m[1]);
+          const max = Math.max(0, scrollHeight - clientHeight);
+          if (scrollTop > max) scrollTop = max;
+          if (scrollTop < 0) scrollTop = 0;
+          return {
+            result: {
+              value: { top: scrollTop, clientHeight, scrollHeight, box, viewport },
+            },
+          };
+        }
+        if (expr.includes('removeAttribute')) return { result: { value: { removed: 0 } } };
+        return { result: { value: [] } };
+      }
+      if (method === 'Page.captureScreenshot') {
+        const clip = params.clip;
+        const scale = Number(clip?.scale) > 0 ? Number(clip.scale) : 1;
+        const cssW = Number(clip?.width) > 0 ? Number(clip.width) : viewport.width;
+        const cssH = Number(clip?.height) > 0 ? Number(clip.height) : viewport.height;
+        const w = Math.round(cssW * dpr * scale);
+        const h = Math.round(cssH * dpr * scale);
+        return { data: solidPng(Math.max(1, w), Math.max(1, h)).toString('base64') };
+      }
+      throw new Error(`unexpected ${method}`);
+    },
+  };
+  const result = await runPhaseScreenshotCapture(client);
+  const dims = PNG.sync.read(result.buffer);
+  assert.equal(result.meta.contentHeight, 1600, `DPR contentHeight=${result.meta.contentHeight} must be CSS 1600`);
+  assert.equal(dims.width, 600, `DPR stitched width=${dims.width} must keep Chrome device px (400*1.5)`);
+  assert.equal(dims.height, 2400, `DPR stitched IHDR height=${dims.height} must be 1600*1.5 (not mixed-unit 1800)`);
+  ok('Chrome 149 dpr=1.5 fake CDP: CSS scroll step, device-px stitch');
+}
+
+{
   const src = readFileSync(join(root, 'src/services/trajectory/phase-highlight-screenshot.js'), 'utf8');
   assert.match(src, /export async function capturePhaseScreenshot/);
   assert.match(src, /runPhaseScreenshotCapture/);
