@@ -220,6 +220,7 @@ export const GROUP_EXPORT = [
           '控件 rect 缺失（旧数据无 bbox）时省略该字段，统计在 stats.noRectControls',
           '弹窗第一版无独立截图（screenshots 空），弹窗控件 rect 相对所在阶段长图；未来弹窗独立截图后填充',
           'TODO：同阶段多页面按 URL 区分（当前一张长图=一个页面组）',
+          'TODO：优化传输数据量 + 防信息丢失 + 增强鲁棒性（todo-list v3-payload-size）——评估去 params/压缩 target；构建期字段完整性校验与缺失统计；缺字段降级与超长截断策略',
         ],
       },
     ],

@@ -9,6 +9,7 @@
 | ID | 项 | 处理说明 |
 |----|----|----------|
 | **1448052** | 【AI录制】循环重复操作（较重） | Excel 已分配；slot-log 已就绪。2026-08-16 新增 `AI_DUP_FAILURE_CUE`（默认关）对连续相同失败动作注入纠偏；1448052 主线仍**等新缺陷 + 可检索日志**再改 |
+| **v3-payload-size** | 【V3/V2 接口】优化传输数据量 + 防信息丢失 + 增强鲁棒性 | 2026-08-18 登记。现状：V3 payload（traj 38）紧凑传输 308KB，大头在 target xpath / params / rect（可选字段）；V2 精简后约 90KB。目标：① 精简传输（评估去 `params`、压缩/收敛 target、可选字段裁剪）② 防信息丢失（构建期字段完整性校验/缺失统计，推送前自检）③ 鲁棒性（缺字段降级、超长截断策略、消费方容错）。代码 TODO 已写 `transaction-export-v3.js` 头部 + api-docs notes |
 | **heal-locate** | 【回放自愈】禁止/少用 `scroll_down` 找字段；高效定位与级联缺席判定 | ✅ **开发完成**（2026-08-15，`uara_V1.2`）：H0 调研 + MissingReason/HealContract + heal prompt + P2 决策路由已合入；characterization 全绿。剩余：真实 batch replay / live 湿测（见 `heal-locate-wet`）。见专节 |
 
 ### heal-locate — 回放自愈定位效率（✅ 开发完成 · 待 live 湿测）

@@ -10,6 +10,11 @@
  *
  * TODO: 同阶段多页面区分——当前一张长图=一个页面组（每阶段一个）；未来按步骤 URL
  *       切分同一阶段内的多个页面（需录制时记录步骤 URL）。
+ * TODO: 优化接口传输数据量 + 防信息丢失 + 增强鲁棒性（todo-list `v3-payload-size`）——
+ *       ① 精简传输：评估去 `params`（点亮不需要）、压缩/收敛 target xpath、可选字段裁剪；
+ *       ② 防信息丢失：构建期字段完整性校验/缺失统计（noRectControls 已统计 rect 缺失），
+ *          推送前自检（如 rect/target 缺失率超阈值告警）；
+ *       ③ 鲁棒性：缺字段降级（rect 缺失已省略）、超长字段截断策略、消费方容错约定。
  */
 import { mapStepToTransactionEvent, uniquifyPropertiesNames } from './transaction-export.js';
 import { SKIP_ACTIONS } from './legacy-engine-export.js';
