@@ -13,7 +13,6 @@
  * // TODO: partial export (stepIds/phaseIds) + export coverage
  * // TODO: placeholder — wait for partner / relative xpath guidance
  */
-import { deriveRegionRef } from './region-tree.js';
 import { normalizeActionName } from '../models/action-name.js';
 import { trajectoryStepToActionEntry } from '../models/element.js';
 import {
@@ -44,9 +43,6 @@ export const TRANSACTION_ENVELOPE_FIELDS = Object.freeze([
   { key: 'testFrame', zh: '框架（默认 playwright）' },
   { key: 'transcId', zh: '录制/交易 id（可选）' },
   { key: 'transcationProperties', zh: '步骤/事件数组' },
-  { key: 'regionId', zh: '步骤所属区域节点 id（最内层 region_id 段 role:label）' },
-  { key: 'parentRegionId', zh: '父区域节点 id（上一层段；根为空串）' },
-  { key: 'phases', zh: '阶段数组（截图引用 + 元数据；旧截图 metadata 为 null）' },
 ]);
 
 function resolveOptions(entry) {
@@ -77,7 +73,6 @@ export function mapStepToTransactionEvent(step) {
 
   const params = entry.params || {};
   const element = entry.element || {};
-  const { regionId, parentRegionId } = deriveRegionRef(element);
   const { target, source } = pickExportTarget(entry);
   const options = resolveOptions(entry);
 
@@ -95,8 +90,6 @@ export function mapStepToTransactionEvent(step) {
     objectValue: pickOperationValue(action, params),
     propertiesName,
     mothed: 'By.XPATH',
-    regionId,
-    parentRegionId,
     _meta: {
       targetSource: source || null,
       missingOptions: options === '' && (eventTypeValue.startsWith('select') || eventTypeValue === 'radio'),
@@ -125,36 +118,11 @@ export function uniquifyPropertiesNames(properties) {
 }
 
 /**
- * Build phases[] for one transaction: per-phase screenshot reference + metadata.
- * @param {Array<{ id: number, phaseNumber: number }>} [phases]
- * @param {Array<{ id: number, trajectoryPhaseId: number, metadataJson?: object|null }>} [phaseScreenshots]
- * @returns {Array<{ phaseId: number|null, phaseNumber: number, screenshotId: number|null, stitchScreenshotUrl: string|null, metadata: object|null }>}
- */
-export function buildTransactionPhases(phases = [], phaseScreenshots = []) {
-  const byPhase = new Map();
-  for (const s of phaseScreenshots || []) {
-    if (s?.trajectoryPhaseId != null && !byPhase.has(Number(s.trajectoryPhaseId))) {
-      byPhase.set(Number(s.trajectoryPhaseId), s);
-    }
-  }
-  return (phases || []).map((p) => {
-    const shot = p?.id != null ? byPhase.get(Number(p.id)) || null : null;
-    const screenshotId = shot ? Number(shot.id) : null;
-    return {
-      phaseId: p?.id != null ? Number(p.id) : null,
-      phaseNumber: p?.phaseNumber != null ? Number(p.phaseNumber) : 0,
-      screenshotId,
-      stitchScreenshotUrl: screenshotId ? `/api/v2/screenshots/${screenshotId}/image` : null,
-      metadata: shot?.metadataJson ?? null,
-    };
-  });
-}
-
-/**
  * Build one transaction entry (inside transcationEventTypeList).
+ * 精简版（2026-08-18）：不携带 phases（阶段截图/全量元素 metadata 由 V3.0 result.groups 承担）。
  * @returns {{ entry: object, count: number, skipped: object, stats: object }}
  */
-export function buildTransactionEntry(traj, { systemId, projectId, phases, phaseScreenshots } = {}) {
+export function buildTransactionEntry(traj, { systemId, projectId } = {}) {
   if (systemId == null || systemId === '' || projectId == null || projectId === '') {
     const err = new Error('systemId and projectId are required');
     err.statusCode = 400;
@@ -190,7 +158,6 @@ export function buildTransactionEntry(traj, { systemId, projectId, phases, phase
       transcationType: 'web',
       testFrame: 'playwright',
       transcationProperties: properties,
-      phases: buildTransactionPhases(phases, phaseScreenshots),
     },
     count: properties.length,
     skipped: { metaActions },

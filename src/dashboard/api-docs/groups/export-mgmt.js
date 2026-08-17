@@ -133,16 +133,14 @@ export const GROUP_EXPORT = [
             { key: 'transcationEventTypeList', zh: '交易列表（单轨也包一层数组）' },
             { key: 'transcationProperties', zh: '事件步骤数组' },
             { key: 'testFrame', zh: '框架（默认 playwright）' },
-            { key: 'regionId', zh: '步骤所属区域节点 id' },
-            { key: 'parentRegionId', zh: '父区域节点 id' },
-            { key: 'phases', zh: '阶段数组（截图引用 + 元数据）' },
           ],
+          notes: 'V2 精简版（2026-08-18）：不再携带 phases（阶段截图/全量元素 metadata）与 regionId/parentRegionId——控件点亮能力由 V3.0 result.groups 承担',
         }),
       },
       {
         method: 'GET', path: '/api/v2/export/trajectories/{id}/transaction',
-        summary: '导出/可选推送单轨',
-        desc: '默认只组装并 markExported；push=true 时代调 importDemand（成功才 mark）。仅 recordStatus=completed（已确认）可推送；draft/recording/failed → 409 not_pushable_status。raw/forImport 返回裸 envelope。systemId/projectId 缺省 98/31。',
+        summary: '导出/可选推送单轨（V2 精简）',
+        desc: '默认只组装并 markExported；push=true 时代调 importDemand（成功才 mark）。仅 recordStatus=completed（已确认）可推送；draft/recording/failed → 409 not_pushable_status。raw/forImport 返回裸 envelope。systemId/projectId 缺省 98/31。V2 精简版不含 phases/regionId。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', desc: '轨迹 id', example: '36' },
           { name: 'systemId', type: 'string', in: 'query', desc: '缺省 98', example: '98' },
@@ -184,7 +182,7 @@ export const GROUP_EXPORT = [
           '无 access_token（头/body/env）→ 400',
           '对方业务失败 → 502，不翻转 isExport',
           '仅 completed（已确认）可推送；draft/recording/failed 等 → item 失败 code=not_pushable_status（单轨 push → 409）',
-          '每交易含 phases[]：阶段截图引用 + metadata（imageWidth/imageHeight/elements/regionTree）；前端经 stitchScreenshotUrl 拉图后按坐标动态高亮',
+          'V2 精简版不含 phases（阶段截图/全量元素由 V3.0 result.groups 承担）',
         ],
       },
       {

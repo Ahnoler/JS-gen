@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-18: **V2 批量推送精简（消费方格式对齐）**：`transcationProperties` 条目不再含 `regionId`/`parentRegionId`；entry 不再含 `phases`（阶段截图引用 + 全量元素 metadata）——控件点亮能力由 V3.0 `result.groups` 承担。V2 端点/响应结构其余不变（外层 `payload.transcationEventTypeList`/count/skipped/stats）。
+  影响范围：src/services/transaction-export.js（`mapStepToTransactionEvent` 去 region 字段、`buildTransactionEntry` 去 phases、删除 `buildTransactionPhases`、`TRANSACTION_ENVELOPE_FIELDS` 精简）、src/routes/v2/export-mgmt.js（V2 组装不再查 phase/screenshot）、api-docs、characterize-transaction-export-region 重写为精简断言。无 schema/WS 变更。
+  文件：src/services/transaction-export.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-transaction-export-region.mjs
+  Python 同步提示：V2 推送契约精简（无 phases/regionId/parentRegionId）；若 Python 控制面消费 V2 envelope，去掉对 phases/regionId 的依赖；分层/坐标信息走 V3.0 result.groups。
+
 - 2026-08-18: **批量推送 V3.0（阶段长图控件点亮，对齐消费方 groups 约定）**：新增 `src/services/transaction-export-v3.js` + 3 个端点（`GET/POST /api/v2/export/trajectories/:id/transaction-v3`、`POST /api/v2/export/transactions-v3`，V2.0 保留）。entry 新增 `result`：`{id, name, url, groups[]}`——页面组（**一张长图=一个页面组**，`page-<n>` 平级，`screenshots[]={phaseNumber,url}` 无尺寸字段，前端按图片自然尺寸计算）+ 弹窗组（region_id 含 `overlay:` 段归属，弹窗=独立页面，`key` 带 `@@anchor=<触发按钮xpath>`，anchor 按步骤序推断前置按钮步骤）+ 控件节点（`id=step-<n>` 全局唯一、`rect`=element_json.bbox 内容坐标与长图同根、target/kind/params 映射、pid 树）。`transcationProperties` 保留（控件组语义）。无坐标步骤省略 rect（stats.noRectControls）。
   影响范围：路由（src/routes/v2/export-mgmt.js 新增 3 端点）、服务（新增 src/services/transaction-export-v3.js，复用 V2.0 mapStepToTransactionEvent/uniquifyPropertiesNames）、api-docs（export-mgmt 分组登记 V3 端点）。无 schema/WS 变更。
   文件：src/services/transaction-export-v3.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-export-v3.mjs, scripts/refactor/verify-all.sh

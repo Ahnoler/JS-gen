@@ -53,13 +53,9 @@ function parseBool(raw, defaultValue = false) {
   return !['0', 'false', 'no', 'off'].includes(String(raw).trim().toLowerCase());
 }
 
-/** Assemble only — do not mark is_export. */
+/** Assemble only — do not mark is_export. V2 精简版：不携带 phases（截图/metadata 由 V3 承担）。 */
 async function buildOneTrajectory(traj, { systemId, projectId }) {
-  const [phases, phaseScreenshots] = await Promise.all([
-    trajectoryPhaseDao.listByTrajectory(traj.id),
-    screenshotDao.listPhaseHighlightsByTrajectory(traj.id),
-  ]);
-  const built = buildTransactionPayload(traj, { systemId, projectId, phases, phaseScreenshots });
+  const built = buildTransactionPayload(traj, { systemId, projectId });
   return {
     trajectoryId: traj.id,
     schemaVersion: TRANSACTION_SCHEMA_VERSION,
