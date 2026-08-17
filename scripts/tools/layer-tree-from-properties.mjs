@@ -119,6 +119,48 @@ function buildTreeFromElements(elements) {
   return root;
 }
 
+/** 从步骤（trajectory_step.element_json）构建分层树；叶 = 操作步骤。
+ *  分层路径：优先 el.layers[]（外→内），否则 el.region_id 按 '|' 拆段（role:label）。 */
+function buildTreeFromSteps(steps) {
+  const root = { role: 'page', label: '交易操作', children: [], items: [] };
+  const map = new Map();
+  map.set('', root);
+  (steps || []).forEach((s, i) => {
+    const segs = [];
+    if (Array.isArray(s.layers) && s.layers.length) {
+      for (const l of s.layers) segs.push({ role: String(l.role || 'section').trim(), label: String(l.label || '').trim() });
+    } else {
+      const rid = String(s.regionId || '').trim();
+      for (const seg of rid.split('|').map((x) => x.trim()).filter(Boolean)) {
+        const j = seg.indexOf(':');
+        segs.push(j > 0
+          ? { role: seg.slice(0, j).trim(), label: seg.slice(j + 1).trim() }
+          : { role: 'section', label: seg });
+      }
+    }
+    let parent = root;
+    let key = '';
+    for (const g of segs) {
+      if (!g.label) continue;
+      key += '|' + g.role + ':' + g.label;
+      if (!map.has(key)) {
+        const n = { role: g.role, label: g.label, children: [], items: [] };
+        map.set(key, n);
+        parent.children.push(n);
+      }
+      parent = map.get(key);
+    }
+    parent.items.push({
+      no: i + 1,
+      name: s.label || '(无标签)',
+      action: s.action,
+      actionValue: s.actionValue || s.action,
+      regionId: s.regionId || '',
+    });
+  });
+  return root;
+}
+
 /** 递归渲染树为 HTML 字符串（fc-tree 风格）。 */
 function treeToHtml(node, depth) {
   const pad = 8 + depth * 18;
@@ -138,15 +180,25 @@ function treeToHtml(node, depth) {
   return html;
 }
 
-function buildHtml({ properties, title, elements }) {
-  const useElements = Array.isArray(elements);
-  const list = useElements ? elements : (properties || []);
-  const unzoned = list.filter((p) => !String(p.regionId || '').trim()).length;
-  const treeHtml = treeToHtml(
-    useElements ? buildTreeFromElements(elements) : buildTreeFromProperties(properties),
-    0,
-  );
-  const unit = useElements ? '元素' : '操作';
+function buildHtml({ properties, steps, elements, title }) {
+  let tree;
+  let list;
+  let unit;
+  if (Array.isArray(elements)) {
+    tree = buildTreeFromElements(elements);
+    list = elements;
+    unit = '元素';
+  } else if (Array.isArray(steps)) {
+    tree = buildTreeFromSteps(steps);
+    list = steps;
+    unit = '步骤';
+  } else {
+    tree = buildTreeFromProperties(properties);
+    list = properties || [];
+    unit = '操作';
+  }
+  const unzoned = list.filter((p) => !String(p.regionId || '').trim() && !(Array.isArray(p.layers) && p.layers.length)).length;
+  const treeHtml = treeToHtml(tree, 0);
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -188,7 +240,7 @@ function buildHtml({ properties, title, elements }) {
 </div>
 <div class="wrap">
   <div class="tree-panel">
-    <div class="tree-title">${useElements ? '阶段页面元素（按 layers 分层）' : '操作步骤（按 regionId 分层）'}</div>
+    <div class="tree-title">${unit === '元素' ? '阶段页面元素（按 layers 分层）' : '操作步骤（按 region 分层）'}</div>
     <div class="tree-list" id="treeList">${treeHtml}</div>
   </div>
 </div>
@@ -199,14 +251,15 @@ function buildHtml({ properties, title, elements }) {
 function main() {
   const file = argValue('--file');
   const shot = argValue('--shot');
-  if (!file && !shot) {
-    console.error('用法：--file <export.json>（transcationProperties 分层） 或 --shot <screenshotId>（阶段截图元素分层）');
+  const trajectory = argValue('--trajectory');
+  const phase = argValue('--phase');
+  const modes = [file, shot, trajectory].filter(Boolean).length;
+  if (!modes || modes > 1) {
+    console.error('用法（三选一）：--file <export.json> | --shot <screenshotId> | --trajectory <id> [--phase <phaseNumber>]');
     process.exit(1);
   }
-
-  if (shot) {
-    return runShotMode(Number(shot));
-  }
+  if (shot) return runShotMode(Number(shot));
+  if (trajectory) return runTrajectoryMode(Number(trajectory), phase ? Number(phase) : null);
 
   let raw;
   try {
@@ -228,6 +281,52 @@ function main() {
   writeFileSync(out, html, 'utf8');
   console.log(`已生成: ${out}`);
   console.log(`交易: ${title} | 操作 ${properties.length} 步 | 未分区 ${properties.filter((p) => !String(p.regionId || '').trim()).length}`);
+}
+
+/** 直接按步骤分层（trajectory_step.element_json 的 layers/region_id），不依赖阶段截图。 */
+async function runTrajectoryMode(trajectoryId, phaseNumber) {
+  const db = getDB();
+  const traj = await db('trajectory').select('id', 'name').where({ id: trajectoryId }).first();
+  if (!traj) {
+    console.error(`未找到交易 #${trajectoryId}`);
+    await db.destroy();
+    process.exit(1);
+  }
+  let phaseQuery = db('trajectory_phase').select('id', 'phase_number').where({ trajectory_id: trajectoryId }).orderBy('phase_number');
+  if (phaseNumber != null) phaseQuery = phaseQuery.where({ phase_number: phaseNumber });
+  const phases = await phaseQuery;
+  if (!phases.length) {
+    console.error(`交易 #${trajectoryId} 无阶段${phaseNumber != null ? `（phase ${phaseNumber}）` : ''}`);
+    await db.destroy();
+    process.exit(1);
+  }
+  const steps = [];
+  const phaseIds = phases.map((p) => p.id);
+  const stepRows = await db('trajectory_step')
+    .select('phase_number', 'step_number', 'action_type', 'element_json')
+    .whereIn('trajectory_phase_id', phaseIds)
+    .orderBy('id');
+  for (const s of stepRows) {
+    let el = null;
+    try { el = typeof s.element_json === 'string' ? JSON.parse(s.element_json) : s.element_json; } catch {}
+    const label = String(el?.formLabel ?? el?.label ?? el?.matchedLabel ?? el?.text ?? '').trim();
+    const actionValue = String(el?.target_kind ?? s.action_type ?? '').trim();
+    steps.push({
+      no: s.step_number ?? s.phase_number ?? 0,
+      label: label || '(无标签)',
+      action: actionTag(actionValue),
+      actionValue,
+      regionId: String(el?.region_id ?? '').trim(),
+      layers: Array.isArray(el?.layers) ? el.layers : null,
+    });
+  }
+  const title = `${traj.name} · phase ${phases.map((p) => p.phase_number).join(',')}`;
+  const html = buildHtml({ steps, title });
+  const out = join(ROOT, 'tmp', `layer-tree-traj-${trajectoryId}${phaseNumber != null ? `-p${phaseNumber}` : ''}.html`);
+  writeFileSync(out, html, 'utf8');
+  console.log(`已生成: ${out}`);
+  console.log(`${title} | 步骤 ${steps.length} | 未分区 ${steps.filter((s) => !String(s.regionId || '').trim() && !(s.layers && s.layers.length)).length}`);
+  await db.destroy();
 }
 
 async function runShotMode(screenshotId) {
