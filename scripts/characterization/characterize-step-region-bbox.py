@@ -61,12 +61,49 @@ def test_helpers_passthrough_region_bbox() -> None:
     assert_true('"region_label": info.get("region_label")' in src, "_capture_element passes region_label")
 
 
+def test_model_persists_region_bbox() -> None:
+    """落库模型必须保留 region/bbox：ElementInfo 字段 + to_element_json + from_record 穿透。
+    （根因修复：models/action.py 白名单序列化曾丢弃 _capture_element 的 region/layers/bbox。）"""
+    src = (ROOT / "scripts/models/action.py").read_text(encoding="utf-8")
+    for name in ('region_id', 'region_label', 'layers', 'bbox'):
+        assert_true(f"{name}:" in src, f"ElementInfo declares {name}")
+        assert_true(f"data['{name}']" in src, f"to_element_json emits {name}")
+    assert_true("'region_id', 'region_label'" in src, "from_record passes region keys")
+    assert_true("entry.element['layers']" in src, "from_record passes layers")
+    assert_true("entry.element['bbox']" in src, "from_record passes bbox")
+
+    # 运行时验证：from_record 穿透 + to_element_json 输出
+    from scripts.models.action import ActionEntry, ElementInfo
+
+    elem_dict = {
+        'tag': 'input', 'xpath_smart': '//input[@x]', 'xpath': '//input[@x]',
+        'target_kind': 'form_input', 'formLabel': '客户号',
+        'region_id': 'tab:A|section:B|titlebox:C',
+        'region_label': 'A / B / C',
+        'layers': ['tab:A', 'section:B', 'titlebox:C'],
+        'bbox': {'x1': 1108, 'y1': 5184, 'x2': 1443, 'y2': 5216},
+    }
+    entry = ActionEntry.from_record('fill_form_field', {'label_text': '客户号', 'value': '1'}, 'ok', elem_dict)
+    el = entry.element
+    assert_true(el.get('region_id') == 'tab:A|section:B|titlebox:C', "from_record keeps region_id")
+    assert_true(el.get('region_label') == 'A / B / C', "from_record keeps region_label")
+    assert_true(el.get('layers') == ['tab:A', 'section:B', 'titlebox:C'], "from_record keeps layers")
+    assert_true(el.get('bbox') == {'x1': 1108, 'y1': 5184, 'x2': 1443, 'y2': 5216}, "from_record keeps bbox")
+
+    info = ElementInfo(**elem_dict)
+    j = info.to_element_json()
+    assert_true(j.get('region_id') == 'tab:A|section:B|titlebox:C', "to_element_json keeps region_id")
+    assert_true(j.get('bbox') == {'x1': 1108, 'y1': 5184, 'x2': 1443, 'y2': 5216}, "to_element_json keeps bbox")
+    assert_true(j.get('layers') == ['tab:A', 'section:B', 'titlebox:C'], "to_element_json keeps layers")
+
+
 def main() -> int:
     test_helpers_have_scroll_root_and_bbox()
     test_phase_screenshot_collect_uses_helpers_root()
     test_capture_has_region_bbox()
     test_enrich_has_region_bbox()
     test_helpers_passthrough_region_bbox()
+    test_model_persists_region_bbox()
     print("characterize-step-region-bbox: OK")
     return 0
 

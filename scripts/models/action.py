@@ -125,6 +125,10 @@ class ElementInfo(BaseModel):
     locator_strategy: str = Field(default="", description="xpath_smart | xpath_full")
     locator_fallback_reason: str = Field(default="", description="Why absolute was primary")
     formLabel: str = Field(default="", description="Form label used for smart xpath")
+    region_id: str = Field(default="", description="Element UI region partition id (tab|section|titlebox chain)")
+    region_label: str = Field(default="", description="Human-readable region chain label")
+    layers: list[str] = Field(default_factory=list, description="Region layer stack (tab → section → titlebox)")
+    bbox: dict | None = Field(default=None, description="Content-coordinate bounding box {x1,y1,x2,y2}")
 
     def to_element_json(self) -> dict:
         """Convert to trajectory_step.element_json dict."""
@@ -157,6 +161,14 @@ class ElementInfo(BaseModel):
             data['locator_fallback_reason'] = self.locator_fallback_reason
         if self.formLabel:
             data['formLabel'] = self.formLabel
+        if self.region_id:
+            data['region_id'] = self.region_id
+        if self.region_label:
+            data['region_label'] = self.region_label
+        if self.layers:
+            data['layers'] = list(self.layers)
+        if self.bbox:
+            data['bbox'] = dict(self.bbox)
         return data
 
 
@@ -377,6 +389,13 @@ class ActionEntry(BaseModel):
                     entry.element[meta_key] = elem[meta_key]
                 elif meta_key == 'locator_verified' and elem.get(meta_key) is False:
                     entry.element[meta_key] = False
+            for region_key in ('region_id', 'region_label'):
+                if elem.get(region_key):
+                    entry.element[region_key] = elem[region_key]
+            if isinstance(elem.get('layers'), list) and elem.get('layers'):
+                entry.element['layers'] = list(elem['layers'])
+            if isinstance(elem.get('bbox'), dict) and elem.get('bbox'):
+                entry.element['bbox'] = dict(elem['bbox'])
             if not entry.element.get('locator_strategy'):
                 entry.element['locator_strategy'] = (
                     'xpath_smart' if xpath_smart else ('xpath_full' if (xpath_full or xpath) else '')
