@@ -98,54 +98,18 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
   .side dd { margin: 0; }
   .legend { font-size: 12px; color: #555; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
   .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 2px; vertical-align: -1px; }
-  /* 分层树面板（参考对方平台脚本编辑页 fc-tree 风格） */
-  .app { display: flex; height: 100vh; overflow: hidden; }
-  .tree-panel { width: 300px; flex-shrink: 0; background: #fff; border-right: 1px solid #e8e8e8;
-                display: flex; flex-direction: column; }
-  .tree-title { padding: 10px 12px; font-size: 13px; font-weight: 600; color: #262626;
-                border-bottom: 1px solid #f0f0f0; }
-  .tree-list { flex: 1; overflow: auto; padding: 6px 0; }
-  .tree-node { display: flex; align-items: center; gap: 4px; font-size: 13px; line-height: 22px;
-               cursor: pointer; white-space: nowrap; padding: 2px 8px; }
-  .tree-node:hover, .tree-node.selected { background: #e6f7ff; }
-  .tree-level-type { font-size: 11px; padding: 0 6px; border-radius: 2px; color: #fff;
-                     font-weight: 500; line-height: 18px; flex-shrink: 0; }
-  .tree-level-type.page { background: #1890ff; }
-  .tree-level-type.tab { background: #52c41a; }
-  .tree-level-type.popup { background: #fa8c16; }
-  .tree-level-type.section { background: #722ed1; }
-  .tree-level-type.wizard { background: #13c2c2; }
-  .tree-colon { color: #8c8c8c; flex-shrink: 0; }
-  .tree-name { color: #262626; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .tree-object-tag { font-size: 11px; color: #595959; background: #f5f5f5;
-                     border: 1px solid #e8e8e8; border-radius: 2px; padding: 0 5px;
-                     line-height: 16px; flex-shrink: 0; }
-  .main-col { flex: 1; display: flex; flex-direction: column; overflow: auto; min-width: 0; }
-  .stage .box.tree-hit { animation: treeFlash 1.6s ease-out; z-index: 6; }
-  @keyframes treeFlash {
-    0%, 70% { box-shadow: 0 0 0 3px #faad14, 0 0 14px rgba(250,173,20,.85); }
-    100% { box-shadow: none; }
-  }
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="tree-panel">
-    <div class="tree-title">操作过的控件（分层）</div>
-    <div class="tree-list" id="treeList"></div>
-  </div>
-  <div class="main-col">
-    <div class="bar">
-      <b>阶段长图控件点亮 #${screenshotId}</b>
-      <span class="dim">elements ${elements.length} · 内容 ${cw}×${ch} · 图片 ${meta.imageWidth ?? '?'}×${meta.imageHeight ?? '?'}</span>
-      <label><input type="checkbox" id="showAll" checked> 显示全部</label>
-      <label><input type="checkbox" id="onlyActed"> 仅显示本阶段操作过的控件</label>
-      <span class="dim" id="actedStat"></span>
-      <span class="legend" id="legend"></span>
-    </div>
-    <div class="wrap"><div class="stage" id="stage"></div></div>
-  </div>
+<div class="bar">
+  <b>阶段长图控件点亮 #${screenshotId}</b>
+  <span class="dim">elements ${elements.length} · 内容 ${cw}×${ch} · 图片 ${meta.imageWidth ?? '?'}×${meta.imageHeight ?? '?'}</span>
+  <label><input type="checkbox" id="showAll" checked> 显示全部</label>
+  <label><input type="checkbox" id="onlyActed"> 仅显示本阶段操作过的控件</label>
+  <span class="dim" id="actedStat"></span>
+  <span class="legend" id="legend"></span>
 </div>
+<div class="wrap"><div class="stage" id="stage"></div></div>
 <div class="side" id="side"></div>
 
 <script>
@@ -222,92 +186,6 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
   onlyActed.addEventListener('change', applyFilter);
   applyFilter();
 
-  // ── 操作过的控件分层树（独立展示，与阶段图高亮无关；参考对方平台 fc-tree）──
-  const ROLE_LEVEL = {
-    page: ['page', '页面'], main: ['page', '主区'], shell_header: ['page', '页头'], other: ['page', '其他'],
-    tab: ['tab', 'tab页签'], wizard_step: ['wizard', '步骤向导'],
-    dialog: ['popup', '弹窗'], drawer: ['popup', '抽屉'], overlay: ['popup', '弹层'],
-    titlebox: ['section', '标题栏'], collapse: ['section', '折叠面板'], block: ['section', '区块'],
-    card: ['section', '卡片'], section: ['section', '分区'], table: ['section', '表格'],
-  };
-  const KIND_TAG = {
-    form_input: '文本框', form_select: '下拉框', form_date: '日期框', form_radio: '单选框',
-    form_checkbox: '复选框', form_tree_select: '树选择', button: '按钮', menu: '菜单', icon: '图标',
-    table_row_button: '行内按钮', tree_node: '树节点', tab: '页签', submenu: '子菜单',
-    breadcrumb: '面包屑', card: '卡片', collapse: '折叠', dialog: '弹窗', drawer: '抽屉',
-    todo: '待办', wizard_step: '向导', form_label: '标签',
-  };
-  const roleInfo = (r) => ROLE_LEVEL[r] || ['section', '分区'];
-  const kindTag = (k) => KIND_TAG[k] || k || '控件';
-
-  // 仅操作过的控件，按 layers[]（外→内）聚合分层树；叶 = 控件对象
-  function buildTree(elements) {
-    const root = { role: 'page', label: '阶段页面', children: [], indices: [] };
-    const map = new Map();
-    map.set('', root);
-    elements.forEach((e, i) => {
-      const layers = Array.isArray(e.layers) ? e.layers : [];
-      let parent = root;
-      let key = '';
-      for (const l of layers) {
-        key += '|' + (l.role || '?') + ':' + (l.label || '');
-        if (!map.has(key)) {
-          const n = { role: l.role, label: l.label, children: [], indices: [] };
-          map.set(key, n);
-          parent.children.push(n);
-        }
-        parent = map.get(key);
-      }
-      parent.indices.push(i);
-    });
-    return root;
-  }
-
-  function renderTree(node, container, depth, elements) {
-    const row = document.createElement('div');
-    row.className = 'tree-node';
-    row.style.paddingLeft = (8 + depth * 18) + 'px';
-    const [cls, label] = roleInfo(node.role);
-    const tag = document.createElement('span');
-    tag.className = 'tree-level-type ' + cls;
-    tag.textContent = label;
-    const colon = document.createElement('span');
-    colon.className = 'tree-colon';
-    colon.textContent = '：';
-    const name = document.createElement('span');
-    name.className = 'tree-name';
-    name.textContent = node.label || '(未命名)';
-    row.append(tag, colon, name);
-    container.append(row);
-    // 该节点直接挂的控件对象（indices 为传入 elements 数组的下标）
-    node.indices.forEach((idx) => {
-      const e = elements[idx];
-      const obj = document.createElement('div');
-      obj.className = 'tree-node';
-      obj.style.paddingLeft = (8 + (depth + 1) * 18) + 'px';
-      const otag = document.createElement('span');
-      otag.className = 'tree-object-tag';
-      otag.textContent = kindTag(e.kind);
-      const oname = document.createElement('span');
-      oname.className = 'tree-name';
-      oname.textContent = e.label || '(无文本)';
-      obj.append(otag, oname);
-      container.append(obj);
-    });
-    node.children.forEach((c) => renderTree(c, container, depth + 1, elements));
-  }
-
-  const actedEls = DATA.elements.filter((e, i) => actedIndex.has(i));
-  if (actedEls.length) {
-    renderTree(buildTree(actedEls), document.getElementById('treeList'), 0, actedEls);
-  } else {
-    const empty = document.createElement('div');
-    empty.className = 'tree-node';
-    empty.style.padding = '8px 12px';
-    empty.style.color = '#8c8c8c';
-    empty.textContent = '（本阶段操作控件无匹配）';
-    document.getElementById('treeList').append(empty);
-  }
 
   function showDetail(e) {
     const html = '<h3>' + esc(e.label || '(无文本)') + '</h3><dl>'
