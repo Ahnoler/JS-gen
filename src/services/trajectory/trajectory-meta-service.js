@@ -160,7 +160,7 @@ export async function analyzeRequirementToPhases({
  * Create empty trajectory shell under a function (for long-lived recording).
  */
 export async function createEmptyTrajectory({
-  functionId, task = '', model = '', name = '', systemAccountId = null,
+  functionId, task = '', model = '', name = '', systemAccountId = null, paasUserId = null,
 } = {}) {
   let resolvedFunctionId = typeof functionId === 'number'
     ? functionId
@@ -177,6 +177,7 @@ export async function createEmptyTrajectory({
     url: '',
     functionId: resolvedFunctionId,
     systemAccountId: systemAccountId != null ? Number(systemAccountId) : null,
+    paasUserId,
     recordStatus: 'draft',
     steps: [],
   });
@@ -199,6 +200,7 @@ export async function createTransactionWithPhases({
   caseData = undefined,
   requireFunctionId = false,
   batchJobId = null,
+  paasUserId = null,
   trx = null,
 } = {}) {
   let resolvedFunctionId;
@@ -235,6 +237,7 @@ export async function createTransactionWithPhases({
       systemAccountId: systemAccountId != null ? Number(systemAccountId) : null,
       recordStatus: 'draft',
       batchJobId: batchJobId ?? null,
+      paasUserId,
       steps: [],
     }, client);
 

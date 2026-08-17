@@ -83,6 +83,7 @@ export default function (app) {
         order,
         recordStatus: statusRaw,
         batchTaskName: batchTaskName ?? null,
+        paasUserId: req.paasUserId ?? null,
       };
       const result = functionId
         ? await trajectoryService.listByFunction(+functionId, pagination)
@@ -121,6 +122,7 @@ export default function (app) {
           systemAccountId: boundAccount,
           caseEntries,
           caseData,
+          paasUserId: req.paasUserId ?? null,
         });
         res.status(201).json(traj);
         return;
@@ -132,6 +134,7 @@ export default function (app) {
         task: requirement ?? task ?? '',
         model: model || '',
         systemAccountId: boundAccount,
+        paasUserId: req.paasUserId ?? null,
       });
       const traj = await trajectoryDao.getById(id);
       res.status(201).json(traj);

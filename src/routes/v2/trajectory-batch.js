@@ -55,6 +55,7 @@ export default function registerTrajectoryBatch(app) {
           idempotencyKey,
           mode: req.body?.mode,
           name: req.body?.name,
+          paasUserId: req.paasUserId ?? null,
         });
         const httpStatus = result._httpStatus || 202;
         delete result._httpStatus;
@@ -70,7 +71,11 @@ export default function registerTrajectoryBatch(app) {
   app.get('/api/v2/trajectories/batch/:batchId', asyncHandler(async (req, res) => {
     const page = +req.query.page || 1;
     const pageSize = Math.min(200, +req.query.pageSize || 50);
-    const view = await batchService.getBatchJobView(req.params.batchId, { page, pageSize });
+    const view = await batchService.getBatchJobView(req.params.batchId, {
+      page,
+      pageSize,
+      paasUserId: req.paasUserId ?? null,
+    });
     const httpStatus = BATCH_JOB_TERMINAL.includes(view.status) ? 200 : 202;
     res.status(httpStatus).json(view);
   }));

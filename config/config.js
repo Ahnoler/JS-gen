@@ -92,6 +92,12 @@ export const REMOTE_SESSION_GRACE_MS = parseInt(
   10,
 );
 
+// ── SSO / 账号中心（产品登录 + 用户隔离）──
+export const SSO_APP_KEY = _resolve('SSO_APP_KEY', '1920710182837141505');
+export const SSO_BASE_URL = _resolve('SSO_BASE_URL', 'http://test.paas.tansun.com.cn');
+/** 仅 /api/v2/* 强制鉴权；关闭时 req.paasUserId=null（全可见，向后兼容） */
+export const SSO_AUTH_REQUIRED = _resolve('SSO_AUTH_REQUIRED', 'false').toLowerCase() === 'true';
+
 /** Route browser sessions to online executor agent instead of local globalBrowser */
 export const USE_EXECUTOR = _resolve('USE_EXECUTOR', 'false').toLowerCase() === 'true';
 

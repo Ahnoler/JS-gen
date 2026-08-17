@@ -75,6 +75,7 @@ run "characterize-step-move" node scripts/characterization/characterize-step-mov
 run "characterize-heal-locate" node scripts/characterization/characterize-heal-locate.mjs
 run "characterize-heal-mode" "$PY" scripts/characterization/characterize-heal-mode.py
 run "characterize-heal-decision" node scripts/characterization/characterize-heal-decision.mjs
+run "characterize-sso-auth" node scripts/characterization/characterize-sso-auth.mjs
 
 run "characterize-form-engine-wiring" "$PY" scripts/characterization/characterize-form-engine-wiring.py
 run "characterize-done-accept-reason" "$PY" scripts/characterization/characterize-done-accept-reason.py

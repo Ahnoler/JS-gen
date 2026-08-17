@@ -195,9 +195,15 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
 export async function getBatchJobView(batchId, {
   page = 1,
   pageSize = 50,
+  paasUserId = null,
 } = {}) {
   const job = await batchDao.getJobById(batchId);
   if (!job) {
+    const err = new Error('Batch not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (paasUserId && job.paasUserId && String(job.paasUserId) !== String(paasUserId)) {
     const err = new Error('Batch not found');
     err.statusCode = 404;
     throw err;
@@ -235,6 +241,7 @@ export async function importBatchFromExcel({
   idempotencyKey,
   mode: rawMode,
   name: rawName = '',
+  paasUserId = null,
 } = {}) {
   const mode = normalizeBatchMode(rawMode);
 
@@ -270,6 +277,11 @@ export async function importBatchFromExcel({
 
   const existing = await batchDao.getJobByIdempotencyKey(key);
   if (existing) {
+    if (paasUserId && existing.paasUserId && String(existing.paasUserId) !== String(paasUserId)) {
+      const err = new Error('Idempotency-Key 已被其他用户占用，请重新生成');
+      err.statusCode = 409;
+      throw err;
+    }
     if (existing.requestHash !== requestHash) {
       const err = new Error(
         'Idempotency-Key reused with different request content — generate a new key',
@@ -326,6 +338,7 @@ export async function importBatchFromExcel({
       mode,
       originalFilename: decodeUploadFilename(originalFilename),
       name: taskName,
+      paasUserId,
       status: 'accepted',
     }, items);
   } catch (err) {
@@ -333,6 +346,11 @@ export async function importBatchFromExcel({
     if (/uk_batch_job_idempotency|ER_DUP_ENTRY/i.test(err.message || '')) {
       const again = await batchDao.getJobByIdempotencyKey(key);
       if (again) {
+        if (paasUserId && again.paasUserId && String(again.paasUserId) !== String(paasUserId)) {
+          const conflict = new Error('Idempotency-Key 已被其他用户占用，请重新生成');
+          conflict.statusCode = 409;
+          throw conflict;
+        }
         const view = await getBatchJobView(again.id);
         view._idempotentReplay = true;
         view._httpStatus = BATCH_JOB_TERMINAL.includes(again.status) ? 200 : 202;

@@ -36,6 +36,7 @@ scripts/_scratch/
 scripts/smoke/
 chorme-devtools-mcp/
 playwright-cli/
+.playwright-mcp/
 /browser/
 python/
 nodejs/

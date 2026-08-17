@@ -5,6 +5,8 @@
  * All JSON responses under /api/v2 use envelope: { code, message, data }.
  */
 import { v2ResponseEnvelope } from '../../http/api-response.js';
+import { ssoAuth } from '../../middleware/sso-auth.js';
+import registerAuth from './auth.js';
 import registerHierarchy from './hierarchy.js';
 import registerSystemMgmt from './system-mgmt.js';
 import registerSysDict from './sys-dict.js';
@@ -28,6 +30,8 @@ import registerRegions from './regions.js';
 
 export default function (app) {
   app.use('/api/v2', v2ResponseEnvelope);
+  app.use('/api/v2', ssoAuth);
+  registerAuth(app);
 
   registerHierarchy(app);
   registerSystemMgmt(app);

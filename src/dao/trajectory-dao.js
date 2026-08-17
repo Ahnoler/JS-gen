@@ -61,7 +61,7 @@ const RECORD_STATUS_STATS = ['draft', 'recording', 'failed', 'recorded', 'comple
  * 五档统计：与行查询同基准过滤（functionId/keyword/batchTaskName），忽略 recordStatus。
  * @returns {Promise<{ total: number, draft: number, recording: number, failed: number, recorded: number, completed: number }>}
  */
-export async function countByRecordStatus({ functionId = null, keyword = null, batchTaskName = null } = {}) {
+export async function countByRecordStatus({ functionId = null, keyword = null, batchTaskName = null, paasUserId = null } = {}) {
   const db = getDB();
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
@@ -70,6 +70,7 @@ export async function countByRecordStatus({ functionId = null, keyword = null, b
   }
   applyListFilters(base, { keyword, recordStatus: null });
   applyBatchTaskNameFilter(base, batchTaskName);
+  if (paasUserId) base.where('t.paas_user_id', paasUserId);
   const rows = await base
     .select('t.record_status as recordStatus')
     .count('* as cnt')
@@ -119,6 +120,7 @@ export async function save(trajectory, trx = null) {
       systemAccountId: trajectory.systemAccountId ?? null,
       remoteSessionId: trajectory.remoteSessionId ?? null,
       batchJobId: trajectory.batchJobId ?? null,
+      paasUserId: trajectory.paasUserId ?? null,
       recordStatus: trajectory.recordStatus ?? 'draft',
     }));
 
@@ -333,7 +335,7 @@ export async function getById(id) {
 }
 
 export async function listByFunction(functionId, {
-  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null,
+  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null,
 } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
@@ -342,6 +344,7 @@ export async function listByFunction(functionId, {
     .where('t.function_id', functionId);
   const query = applyListFilters(base, { keyword, recordStatus });
   applyBatchTaskNameFilter(query, batchTaskName);
+  if (paasUserId) query.where('t.paas_user_id', paasUserId);
 
   const sortCol = SORT_COL_MAP[sortBy] || 't.created_at';
   const sortOrder = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
@@ -362,12 +365,12 @@ export async function listByFunction(functionId, {
       .count('* as phases');
     e.phaseCount = Number(phases) || 0;
   }
-  const stats = await countByRecordStatus({ functionId, keyword, batchTaskName });
+  const stats = await countByRecordStatus({ functionId, keyword, batchTaskName, paasUserId });
   return { rows: entities, total, page, pageSize, stats };
 }
 
 export async function list({
-  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null,
+  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null,
 } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
@@ -375,6 +378,7 @@ export async function list({
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
   const query = applyListFilters(base, { keyword, recordStatus });
   applyBatchTaskNameFilter(query, batchTaskName);
+  if (paasUserId) query.where('t.paas_user_id', paasUserId);
 
   const sortCol = SORT_COL_MAP[sortBy] || 't.created_at';
   const sortOrder = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
@@ -393,7 +397,7 @@ export async function list({
       .count('* as phases');
     e.phaseCount = Number(phases) || 0;
   }
-  const stats = await countByRecordStatus({ keyword, batchTaskName });
+  const stats = await countByRecordStatus({ keyword, batchTaskName, paasUserId });
   return { rows: entities, total, page, pageSize, stats };
 }
 
