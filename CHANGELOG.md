@@ -92,6 +92,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-17: **阶段长图内部滚动容器漏截（瀑布流）**：`pickScrollRoot` 只认 `.el-main`/`.app-main`，页面主文档不滚动、内容在非标准 class 的内部滚动容器（如 `.plugin-content-list`，el-scrollbar 内容容器，scrollHeight 6554 / clientHeight 659）时回退 `document`（不滚动）→ 长图只截一屏、瀑布流内容丢失。修复：`pickScrollRoot` 泛化——标准主区优先，否则扫描全页 `div/main/section/article` 中 `overflowY∈{auto,scroll}` 且确实可滚动的容器，选 `scrollHeight` 最大的作为滚动根（`phase-screenshot-page.js` scroll/collect 两处共用同一逻辑）。真实页面湿测：选中 `.plugin-content-list`（6554>659），坐标 box 正确。
+  影响范围：阶段长图拼接（src/cdp）；无 schema/HTTP。
+  文件：src/cdp/phase-screenshot-page.js, scripts/characterization/characterize-phase-highlight-screenshot.mjs
+  Python 同步提示：无 HTTP/schema。执行机注入的 locator helpers 不涉及滚动根（滚动根仅在 Node CDP 截图链路）；若代理侧有类似长图拼接，滚动根选择需覆盖内部滚动容器。
+
 - 2026-08-17: **执行机 slot 复用失效（控制面重启后重连开新 slot）**：`supersedeStaleForTrajectory` 清理旧 remote_session 时只做 DB 侧处理（detachLive 停 BiB + close 行 + unmount），未关闭执行机上对应的 agent session——Python 进程与 Chrome 继续存活、slot 持续占用，`listCdp` 的 `occupiedCdpPorts` 把旧 CDP 端口排除出孤儿 Chrome 扫描，`preferIdleChrome` 复用失败，重新 prepare 时**新开 slot**，旧 Chrome 变成无法接管的孤儿（"连不上之前断开的"）。修复：supersede 关闭 DB 行后补 `closeExecutorSession({nodeUuid, sessionId: agentSessionId, keepBrowser: true, timeoutMs: 2000})`——杀 Python 释放 slot，**保留 Chrome 在 CDP 端口**，下次 attach 的孤儿扫描能发现并复用同一个浏览器（页面/登录态保留）；`closeSession` 新增可选 `timeoutMs` 参数（默认 15000 不变；执行机对未知 session 不发 `session.closed` 事件，supersede 用 2000 短超时避免 prepare 卡顿）。
   影响范围：src/services/remote-session-service.js（supersede 行为）、src/executor-session-client.js（closeSession 新增可选参数，默认不变）。
   文件：src/services/remote-session-service.js, src/executor-session-client.js, scripts/characterization/characterize-session-lifecycle.mjs

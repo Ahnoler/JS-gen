@@ -314,5 +314,15 @@ function ok(n) { console.log(`ok: ${n}`); }
   assert.match(docs, /stitchScreenshotUrl/);
   ok('tree + changelog phase_highlight');
 }
+{
+  // 内部滚动容器泛化：阶段长图滚动根必须覆盖非标准 class 的滚动容器
+  //（如 .plugin-content-list 瀑布流，scrollHeight 6554 / clientHeight 659），
+  // 否则回退 document（不滚动）→ 长图只截一屏、瀑布流内容丢失。
+  const page = readFileSync(join(root, 'src/cdp/phase-screenshot-page.js'), 'utf8');
+  assert.match(page, /querySelectorAll\('div, main, section, article'\)/, 'pickScrollRoot scans generic scroll containers');
+  assert.match(page, /scrollHeight > best\.scrollHeight/, 'picks the tallest scrollable container as root');
+  assert.match(page, /el\.clientHeight < 100/, 'skips tiny containers');
+  ok('pickScrollRoot internal-scroll fallback');
+}
 
 console.log('characterize-phase-highlight-screenshot: ok');
