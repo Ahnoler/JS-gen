@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-17: **存量数据回填 paas_user_id**：`trajectory`（95 行）与 `batch_recording_job`（18 行）中 `paas_user_id IS NULL` 的存量行全部回填为 `1510076810578644992`（账号中心 admin）。迁移 `20260818120000_backfill_trajectory_paas_user_id.js`（幂等：只回填 NULL 行；down 为 no-op，数据回填不可逆）。回填后存量交易/批量导入任务归属 admin，隔离语义从「空=全可见」变为「归 admin」。
+  影响范围：存量数据归属（无 schema 变更）。
+  文件：migrations/20260818120000_backfill_trajectory_paas_user_id.js
+  Python 同步提示：纯数据回填，无 schema/HTTP 变更。Python 控制面无需改动；若代理侧展示归属，存量数据归属为账号中心用户 1510076810578644992。
+
 - 2026-08-17: **system_account.username 更名 account + 系统节点批量账号维护**：`system_account.username` 物理列更名为 `account`（新增迁移，旧库执行 migrate 后生效，新库 init.sql 直接建为 account；API/实体字段同步由 username 改为 account）。`POST /api/v2/system-mgmt/nodes` 在 type=1 时支持 `accounts[]` 一次创建多个系统账号；`PUT /api/v2/system-mgmt/nodes/{id}` 支持 `accounts[]` 全量替换该系统账号（按 id 更新、无 id 按 name 匹配、未出现的老账号删除；不传 accounts 不动账号；账号被 batch_recording_job 引用时删除返回 409）。账号字段 account/password 接受数字并落库为字符串。
   影响范围：system_account 表结构（需跑迁移）、系统账号 API 请求/响应字段 username → account、系统节点 POST/PUT 请求体新增可选 accounts[]（非 type=1 传 accounts 返回 400）。
   文件：migrations/20260817000000_system_account_rename_username_to_account.js, schemas/init.sql, src/services/system-account-service.js, src/services/hierarchy-service.js, src/services/trajectory/trajectory-account-service.js, src/services/trajectory/trajectory-record-lifecycle.js, src/dao/system-dao.js, src/dao/system-account-dao.js, src/models/entities.js, src/routes/v2/system-mgmt.js, src/dashboard/api-docs/groups/overview.js, src/dashboard/api-docs/groups/hierarchy.js, src/dashboard/api-docs/groups/recording.js, scripts/models/entity/system_account_entity.py, scripts/characterization/characterize-system-node-accounts.mjs, scripts/characterization/characterize-trajectory.mjs
