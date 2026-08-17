@@ -53,7 +53,7 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-function buildHtml({ b64, meta, screenshotId }) {
+function buildHtml({ b64, meta, screenshotId, steps }) {
   const elements = (Array.isArray(meta.elements) ? meta.elements : [])
     .filter((e) => e && e.rect
       && Number.isFinite(e.rect.x1) && Number.isFinite(e.rect.y1)
@@ -61,6 +61,8 @@ function buildHtml({ b64, meta, screenshotId }) {
       && e.rect.x2 > e.rect.x1 && e.rect.y2 > e.rect.y1);
   const cw = Number(meta.contentWidth) || 1;
   const ch = Number(meta.contentHeight) || 1;
+  const stepTexts = (Array.isArray(steps) ? steps : [])
+    .map((s) => String(s.text || '').trim()).filter(Boolean);
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -80,6 +82,7 @@ function buildHtml({ b64, meta, screenshotId }) {
   .stage .box { position: absolute; border: 1.5px solid; border-radius: 2px;
                 box-sizing: border-box; cursor: pointer; transition: box-shadow .15s, opacity .15s; }
   .stage .box:hover { box-shadow: 0 0 0 2px #ffeb3b, 0 0 10px rgba(0,0,0,.4); z-index: 5; }
+  .stage .box.acted { border-color: #f44336; box-shadow: 0 0 0 2px #f44336, 0 0 8px rgba(244,67,54,.5); z-index: 4; }
   .stage .box .tag { position: absolute; left: 0; top: 0; transform: translateY(-100%);
                      background: rgba(0,0,0,.75); color: #fff; font-size: 11px; line-height: 1.4;
                      padding: 1px 4px; border-radius: 2px; white-space: nowrap; pointer-events: none;
@@ -103,6 +106,8 @@ function buildHtml({ b64, meta, screenshotId }) {
   <span class="dim">elements ${elements.length} · 内容 ${cw}×${ch} · 图片 ${meta.imageWidth ?? '?'}×${meta.imageHeight ?? '?'}</span>
   <label><input type="checkbox" id="onlyLabel" checked> 仅显示有文本控件</label>
   <label><input type="checkbox" id="showAll" checked> 显示全部</label>
+  <label><input type="checkbox" id="onlyActed"> 仅显示本阶段操作过的控件</label>
+  <span class="dim" id="actedStat"></span>
   <span class="legend" id="legend"></span>
 </div>
 <div class="wrap"><div class="stage" id="stage"></div></div>
@@ -111,11 +116,22 @@ function buildHtml({ b64, meta, screenshotId }) {
 <script>
   const KIND_COLORS = ${JSON.stringify(KIND_COLORS)};
   const KIND_COLOR = (k) => KIND_COLORS[k] || '#607d8b';
-  const DATA = ${JSON.stringify({ elements, cw, ch, imageWidth: meta.imageWidth, imageHeight: meta.imageHeight, b64 })};
+  const DATA = ${JSON.stringify({ elements, cw, ch, imageWidth: meta.imageWidth, imageHeight: meta.imageHeight, b64, stepTexts })};
   const stage = document.getElementById('stage');
   const side = document.getElementById('side');
   const onlyLabel = document.getElementById('onlyLabel');
   const showAll = document.getElementById('showAll');
+  const onlyActed = document.getElementById('onlyActed');
+
+  // 本阶段操作过的控件：以步骤 element.text 精确匹配阶段图 elements.label（调研探索，如实呈现）
+  const actedIndex = new Set();
+  DATA.elements.forEach((e, i) => {
+    if (DATA.stepTexts.includes(String(e.label || ''))) actedIndex.add(i);
+  });
+  document.getElementById('actedStat').textContent =
+    '本阶段操作 ' + DATA.stepTexts.length + ' 步' +
+    (DATA.stepTexts.length ? '（' + DATA.stepTexts.join('、') + '）' : '') +
+    ' · 匹配到 ' + actedIndex.size + ' 个控件';
 
   const W = ${Number(argValue('--width')) || 1400};
   const H = Math.round(W * DATA.ch / DATA.cw);
@@ -155,12 +171,15 @@ function buildHtml({ b64, meta, screenshotId }) {
   function applyFilter() {
     boxes.forEach((div, i) => {
       const e = DATA.elements[i];
-      const hidden = !showAll.checked || (onlyLabel.checked && !e.label);
+      const acted = actedIndex.has(i);
+      div.classList.toggle('acted', acted);
+      const hidden = !showAll.checked || (onlyLabel.checked && !e.label) || (onlyActed.checked && !acted);
       div.style.display = hidden ? 'none' : '';
     });
   }
   onlyLabel.addEventListener('change', applyFilter);
   showAll.addEventListener('change', applyFilter);
+  onlyActed.addEventListener('change', applyFilter);
   applyFilter();
 
   function showDetail(e) {
@@ -216,11 +235,29 @@ async function main() {
   }
 
   const b64 = row.image_data.toString('base64');
-  const html = buildHtml({ b64, meta, screenshotId: row.id });
+
+  // 本阶段操作过的控件（调研探索用）：读取同 phase 的步骤 element.text
+  let steps = [];
+  if (row.trajectory_phase_id) {
+    const stepRows = await db('trajectory_step')
+      .select('action_type', 'element_json')
+      .where({ trajectory_phase_id: row.trajectory_phase_id });
+    for (const s of stepRows) {
+      let el = null;
+      try { el = typeof s.element_json === 'string' ? JSON.parse(s.element_json) : s.element_json; } catch {}
+      if (!el) continue;
+      const text = String(el.text ?? el.label ?? '').trim();
+      if (!text) continue;
+      steps.push({ text, regionId: String(el.region_id ?? ''), actionType: String(s.action_type || '') });
+    }
+  }
+
+  const html = buildHtml({ b64, meta, screenshotId: row.id, steps });
   const out = join(ROOT, 'tmp', `lightup-${row.id}.html`);
   writeFileSync(out, html, 'utf8');
   console.log(`已生成: ${out}`);
   console.log(`screenshot #${row.id} | kind=${row.kind} | elements=${meta.elements.length} | image=${meta.imageWidth}x${meta.imageHeight} | content=${meta.contentWidth}x${meta.contentHeight}`);
+  console.log(`本阶段步骤: ${steps.length}（${steps.map((s) => s.text).join('、') || '无'}）| 匹配到阶段图控件: ${meta.elements.filter((e) => steps.some((s) => s.text === e.label)).length}`);
   await db.destroy();
 }
 
