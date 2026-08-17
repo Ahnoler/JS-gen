@@ -10,6 +10,7 @@ import {
   buildTreeFromProperties,
   buildTreeFromElements,
   buildTreeFromSteps,
+  buildTreeFromGroups,
 } from '../../scripts/tools/layer-tree-from-properties.mjs';
 
 let failures = 0;
@@ -99,6 +100,27 @@ function testPropertiesSynthetic() {
 }
 
 // ── HTML 交互结构（源码断言，buildHtml 为模块内函数）──
+function testGroupsSynthetic() {
+  console.log('[synthetic] buildTreeFromGroups（V3 payload 分层）');
+  const groups = [
+    { id: 'page-1', pid: null, type: 'page', name: '页面1', screenshots: [] },
+    { id: 'step-1', pid: 'page-1', type: 'ele', propertiesName: '客户管理', kind: 'menu', rect: { x1: 1, y1: 2, x2: 30, y2: 20 } },
+    { id: 'page-2', pid: null, type: 'page', name: '页面2', screenshots: [] },
+    { id: 'page-2|dialog:地址选择器@@anchor=//button[1]', pid: 'page-2', type: 'dialog', name: '地址选择器', screenshots: [] },
+    { id: 'step-3', pid: 'page-2|dialog:地址选择器@@anchor=//button[1]', type: 'ele', propertiesName: '省份', kind: 'select', rect: { x1: 100, y1: 200, x2: 300, y2: 220 } },
+    { id: 'step-4', pid: 'page-2', type: 'ele', propertiesName: '保存', kind: 'button' },
+  ];
+  const tree = buildTreeFromGroups(groups);
+  check(countLeaves(tree) === 3, `3 控件全部挂树（实际 ${countLeaves(tree)}）`);
+  check(tree.children.length === 2, `2 个顶层页面组（实际 ${tree.children.length}）`);
+  const p1 = tree.children.find((c) => c.label === '页面1');
+  check(!!p1 && p1.items.length === 1, '页面1 挂 1 个控件');
+  const p2 = tree.children.find((c) => c.label === '页面2');
+  check(!!p2 && p2.children.length === 1 && p2.children[0].role === 'dialog', '弹窗组挂页面2（dialog role）');
+  check(!!p2 && p2.children[0].items.length === 1 && p2.children[0].items[0].hasBbox === true, '弹窗控件挂弹窗组 + hasBbox');
+  check(!!p2 && p2.items.length === 1 && p2.items[0].hasBbox === false, '无 rect 控件 hasBbox=false');
+}
+
 function testHtmlSource() {
   console.log('[html] buildHtml 交互结构（源码）');
   const src = readFileSync(new URL('../../scripts/tools/layer-tree-from-properties.mjs', import.meta.url), 'utf8');
@@ -154,6 +176,7 @@ async function main() {
   testStepsSynthetic();
   testElementsSynthetic();
   testPropertiesSynthetic();
+  testGroupsSynthetic();
   testHtmlSource();
   await testRealData();
   if (failures) {

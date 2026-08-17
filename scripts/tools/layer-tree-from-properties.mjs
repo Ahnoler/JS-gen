@@ -201,11 +201,42 @@ function treeToHtml(node, depth) {
   return html;
 }
 
-function buildHtml({ properties, steps, elements, title }) {
+/** 从 V3 result.groups（扁平 pid 树）构建分层树：page 组为根 → dialog 组/控件挂 pid。 */
+export function buildTreeFromGroups(groups) {
+  const root = { role: 'page', label: '交易页面', children: [], items: [] };
+  const byId = new Map();
+  byId.set('', root);
+  for (const g of groups || []) {
+    if (g.type === 'page') byId.set(g.id, { role: 'page', label: g.name || g.id, children: [], items: [] });
+    else if (g.type === 'dialog') byId.set(g.id, { role: 'dialog', label: g.name || g.id, children: [], items: [] });
+  }
+  for (const g of groups || []) {
+    if (g.type === 'page') root.children.push(byId.get(g.id));
+    else if (g.type === 'dialog') (byId.get(g.pid) || root).children.push(byId.get(g.id));
+  }
+  for (const g of groups || []) {
+    if (g.type !== 'ele') continue;
+    (byId.get(g.pid) || root).items.push({
+      no: String(g.id || '').replace('step-', '') || 0,
+      name: g.propertiesName || g.label || g.id || '(无名称)',
+      action: g.kind || g.action || '操作',
+      actionValue: g.kind || '',
+      regionId: '',
+      hasBbox: !!g.rect,
+    });
+  }
+  return root;
+}
+
+function buildHtml({ properties, steps, elements, groups, title }) {
   let tree;
   let list;
   let unit;
-  if (Array.isArray(elements)) {
+  if (Array.isArray(groups)) {
+    tree = buildTreeFromGroups(groups);
+    list = groups.filter((g) => g.type === 'ele');
+    unit = '控件';
+  } else if (Array.isArray(elements)) {
     tree = buildTreeFromElements(elements);
     list = elements;
     unit = '元素';
@@ -368,9 +399,11 @@ function main() {
   const shot = argValue('--shot');
   const trajectory = argValue('--trajectory');
   const phase = argValue('--phase');
+  const v3File = argValue('--v3');
+  if (v3File) return runV3Mode(v3File);
   const modes = [file, shot, trajectory].filter(Boolean).length;
   if (!modes || modes > 1) {
-    console.error('用法（三选一）：--file <export.json> | --shot <screenshotId> | --trajectory <id> [--phase <phaseNumber>]');
+    console.error('用法（四选一）：--file <export.json> | --shot <screenshotId> | --trajectory <id> [--phase <phaseNumber>] | --v3 <payload.json>');
     process.exit(1);
   }
   if (shot) return runShotMode(Number(shot));
@@ -476,6 +509,34 @@ async function runShotMode(screenshotId) {
   console.log(`已生成: ${out}`);
   console.log(`${title} | 元素 ${elements.length} | 带分层 ${elements.length - unzoned} | 未分区 ${unzoned}`);
   await db.destroy();
+}
+
+/** V3 模式：读 V3 批量推送 payload（result.groups pid 树）渲染分层树。 */
+function runV3Mode(file) {
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    console.error('读取/解析 V3 payload 失败:', err.message);
+    process.exit(1);
+  }
+  const entry = raw?.payload?.transcationEventTypeList?.[0];
+  const result = entry?.result;
+  if (!result || !Array.isArray(result.groups) || !result.groups.length) {
+    console.error('V3 payload 无 result.groups（检查 payload.transcationEventTypeList[0].result）');
+    process.exit(1);
+  }
+  const groups = result.groups;
+  const title = `V3 · ${result.name || entry?.transcationName || result.id || file}`;
+  const html = buildHtml({ groups, title });
+  const base = String(result.id || 'payload').replace(/[^A-Za-z0-9_-]/g, '_');
+  const out = join(ROOT, 'tmp', `layer-tree-v3-${base}.html`);
+  writeFileSync(out, html, 'utf8');
+  const eles = groups.filter((g) => g.type === 'ele');
+  const pages = groups.filter((g) => g.type === 'page');
+  const dialogs = groups.filter((g) => g.type === 'dialog');
+  console.log(`已生成: ${out}`);
+  console.log(`${title} | 页面组 ${pages.length} | 弹窗组 ${dialogs.length} | 控件 ${eles.length}（带 bbox ${eles.filter((e) => e.rect).length}）`);
 }
 
 if (isDirectRun()) {

@@ -17,7 +17,7 @@
  *
  * 输出：tmp/lightup-<screenshotId>.html（浏览器打开即可）
  */
-import { writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getDB } from '../../config/database.js';
@@ -211,9 +211,12 @@ async function main() {
   const id = argValue('--id');
   const trajId = argValue('--trajectory');
   const phaseId = argValue('--phase');
+  const v3File = argValue('--v3');
+
+  if (v3File) return runV3Mode(v3File);
 
   if (!id && !trajId) {
-    console.error('用法：--id <screenshotId> 或 --trajectory <id> [--phase <phaseId>]');
+    console.error('用法：--id <screenshotId> | --trajectory <id> [--phase <phaseId>] | --v3 <payload.json>');
     process.exit(1);
   }
 
@@ -272,6 +275,179 @@ async function main() {
   console.log(`screenshot #${row.id} | kind=${row.kind} | elements=${meta.elements.length} | image=${meta.imageWidth}x${meta.imageHeight} | content=${meta.contentWidth}x${meta.contentHeight}`);
   console.log(`本阶段步骤: ${steps.length}（${steps.map((s) => s.label).join('、') || '无'}）| 匹配到阶段图控件: ${meta.elements.filter((e) => steps.some((s) => String(e.label || '') === s.label && (!s.kind || String(e.kind || '') === s.kind) && (!s.regionId || String(e.regionId || '') === s.regionId))).length}`);
   await db.destroy();
+}
+
+/**
+ * V3 模式：读 V3 批量推送 payload JSON（result.groups），按页面组渲染阶段长图，
+ * 控件直接按 rect 画框，checkbox 任意勾选点亮（V3 数据格式验证）。
+ * 用法：node scripts/tools/lightup-phase-screenshot.mjs --v3 tmp/v3-payload-38.json
+ */
+async function runV3Mode(file) {
+  let payload;
+  try {
+    payload = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    console.error('读取/解析 V3 payload 失败:', err.message);
+    process.exit(1);
+  }
+  const entry = payload?.payload?.transcationEventTypeList?.[0];
+  const result = entry?.result;
+  if (!result || !Array.isArray(result.groups) || !result.groups.length) {
+    console.error('V3 payload 无 result.groups（检查 payload.transcationEventTypeList[0].result）');
+    process.exit(1);
+  }
+  const db = getDB();
+  try {
+    const pages = [];
+    for (const g of result.groups) {
+      if (g.type !== 'page') continue;
+      const shotUrl = String(g.screenshots?.[0]?.url || '');
+      const idMatch = shotUrl.match(/\/screenshots\/(\d+)\/image/);
+      let b64 = '';
+      if (idMatch) {
+        const row = await db('screenshot').where({ id: Number(idMatch[1]) }).first();
+        if (row?.image_data) b64 = row.image_data.toString('base64');
+      }
+      const dialogs = result.groups.filter((c) => c.type === 'dialog' && c.pid === g.id);
+      const dlgIds = new Set(dialogs.map((d) => d.id));
+      const controls = result.groups.filter(
+        (c) => c.type === 'ele' && (c.pid === g.id || dlgIds.has(c.pid)),
+      );
+      pages.push({ id: g.id, name: g.name, screenshots: g.screenshots || [], b64, dialogs, controls });
+    }
+    const html = buildV3Html({ result, pages });
+    const out = join(ROOT, 'tmp', `lightup-v3-${result.id || 'payload'}.html`);
+    writeFileSync(out, html, 'utf8');
+    const eles = result.groups.filter((g) => g.type === 'ele');
+    const withRect = eles.filter((c) => c.rect).length;
+    const noB64 = pages.filter((p) => !p.b64).length;
+    console.log(`已生成: ${out}`);
+    console.log(`交易 ${result.name} | 页面组 ${pages.length} | 控件 ${eles.length}（带 rect ${withRect}）| 无截图页面组 ${noB64}`);
+  } finally {
+    await db.destroy();
+  }
+}
+
+/** V3 渲染：每页面组一个 stage（长图 + 控件框），checkbox 勾选点亮任意子集。 */
+function buildV3Html({ result, pages }) {
+  const ctrlCount = pages.reduce((n, p) => n + p.controls.length, 0);
+  const rectCount = pages.reduce((n, p) => n + p.controls.filter((c) => c.rect).length, 0);
+  const pagesJson = JSON.stringify(pages);
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>V3 控件点亮 · ${esc(result.name || '')}</title>
+<style>
+  body { margin: 0; background: #f5f5f5; font-family: system-ui, sans-serif; }
+  .bar { position: sticky; top: 0; z-index: 20; background: #fff; padding: 8px 14px;
+         border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .bar b { font-size: 14px; }
+  .bar .dim { color: #888; font-size: 12px; }
+  .wrap { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
+  .panel { width: 320px; background: #fff; border: 1px solid #e8e8e8; border-radius: 4px;
+           max-height: calc(100vh - 80px); overflow: auto; flex-shrink: 0; }
+  .panel h4 { margin: 0; padding: 8px 10px; font-size: 13px; border-bottom: 1px solid #f0f0f0;
+              position: sticky; top: 0; background: #fff; }
+  .page-title { padding: 6px 10px; font-size: 12px; font-weight: 600; color: #1890ff;
+                background: #f0f7ff; border-top: 1px solid #f0f0f0; }
+  .ctrl { padding: 4px 10px; font-size: 12px; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .ctrl:hover { background: #e6f7ff; }
+  .ctrl .tag { background: #f5f5f5; border: 1px solid #e8e8e8; border-radius: 2px; padding: 0 4px; color: #595959; flex-shrink: 0; }
+  .ctrl.dlg { padding-left: 26px; }
+  .ctrl.dlg .tag { background: #fff7e6; border-color: #ffd591; color: #d46b08; }
+  .ctrl .no-rect { color: #bfbfbf; font-size: 11px; }
+  .pages { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+  .pg { background: #fff; border: 1px solid #e8e8e8; border-radius: 4px; overflow: hidden; }
+  .pg .pg-head { padding: 8px 12px; font-size: 13px; font-weight: 600; border-bottom: 1px solid #f0f0f0;
+                 display: flex; gap: 10px; align-items: center; }
+  .pg .pg-head .dim { font-weight: 400; color: #888; font-size: 12px; }
+  .pg .stage { position: relative; background: #fff; }
+  .pg .stage img { display: block; width: 100%; height: auto; }
+  .box { position: absolute; border: 2px solid #4caf50; background: rgba(76,175,80,.16);
+         display: none; box-sizing: border-box; cursor: pointer; }
+  .box.on { display: block; }
+  .box.dlg { border-color: #fa8c16; background: rgba(250,140,22,.16); }
+  .box .no { position: absolute; top: -15px; left: -2px; background: #4caf50; color: #fff;
+             font-size: 10px; padding: 0 4px; border-radius: 2px; line-height: 14px; }
+  .box.dlg .no { background: #fa8c16; }
+  .box:hover { box-shadow: 0 0 0 2px #ffeb3b; z-index: 5; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>V3 控件点亮</b>
+  <span class="dim">${esc(result.name || '')} · 页面组 ${pages.length} · 控件 ${ctrlCount}（带 rect ${rectCount}）· 勾选任意子集点亮</span>
+  <button id="all">全部点亮</button><button id="none">全部熄灭</button>
+</div>
+<div class="wrap">
+  <div class="panel"><h4>控件清单</h4><div id="list"></div></div>
+  <div class="pages" id="pages"></div>
+</div>
+<script>
+  const PAGES = ${pagesJson};
+  const list = document.getElementById('list');
+  const pagesEl = document.getElementById('pages');
+  const boxes = {};
+  // 渲染页面组 stage（图片按自然尺寸，rect × 显示宽/自然宽）与控件清单
+  for (const pg of PAGES) {
+    const sec = document.createElement('div');
+    sec.className = 'pg';
+    const head = document.createElement('div');
+    head.className = 'pg-head';
+    head.innerHTML = '<span>' + esc(pg.name || pg.id) + '</span><span class="dim">' + pg.controls.length + ' 控件</span>';
+    const stage = document.createElement('div');
+    stage.className = 'stage';
+    const img = document.createElement('img');
+    img.src = 'data:image/png;base64,' + pg.b64;
+    stage.appendChild(img);
+    sec.appendChild(head);
+    sec.appendChild(stage);
+    pagesEl.appendChild(sec);
+    // 页面标题（清单）
+    const pt = document.createElement('div');
+    pt.className = 'page-title';
+    pt.textContent = '▣ ' + (pg.name || pg.id);
+    list.appendChild(pt);
+    // 控件行（弹窗控件归弹窗组显示）
+    const dlgIds = new Set(pg.dialogs.map(d => d.id));
+    for (const c of pg.controls) {
+      const div = document.createElement('label');
+      div.className = 'ctrl' + (dlgIds.has(c.pid) ? ' dlg' : '');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      const setBox = (on) => { const b = boxes[c.id]; if (b) b.classList.toggle('on', on); };
+      cb.addEventListener('change', () => setBox(cb.checked));
+      div.appendChild(cb);
+      div.appendChild(Object.assign(document.createElement('span'), { className: 'tag', textContent: c.kind || '?' }));
+      div.appendChild(Object.assign(document.createElement('span'), { textContent: c.propertiesName || c.label || c.id }));
+      if (!c.rect) div.appendChild(Object.assign(document.createElement('span'), { className: 'no-rect', textContent: '(无坐标)' }));
+      list.appendChild(div);
+      // 画框（等图片加载后按自然尺寸换算）
+      img.addEventListener('load', () => {
+        if (!c.rect || boxes[c.id]) return;
+        const natW = img.naturalWidth || 1;
+        const dispW = img.getBoundingClientRect().width || natW;
+        const scale = dispW / natW;
+        const b = document.createElement('div');
+        b.className = 'box' + (dlgIds.has(c.pid) ? ' dlg' : '');
+        b.style.left = (c.rect.x1 * scale) + 'px';
+        b.style.top = (c.rect.y1 * scale) + 'px';
+        b.style.width = Math.max(2, (c.rect.x2 - c.rect.x1) * scale) + 'px';
+        b.style.height = Math.max(2, (c.rect.y2 - c.rect.y1) * scale) + 'px';
+        b.innerHTML = '<span class="no">' + String(c.id).replace('step-', '') + '</span>';
+        b.title = (c.propertiesName || c.label || c.id) + ' · ' + (c.kind || '') + ' · rect(' + c.rect.x1 + ',' + c.rect.y1 + ')-(' + c.rect.x2 + ',' + c.rect.y2 + ')';
+        stage.appendChild(b);
+        boxes[c.id] = b;
+      });
+    }
+  }
+  document.getElementById('all').onclick = () => { Object.values(boxes).forEach(b => b.classList.add('on')); document.querySelectorAll('.ctrl input').forEach(c => c.checked = true); };
+  document.getElementById('none').onclick = () => { Object.values(boxes).forEach(b => b.classList.remove('on')); document.querySelectorAll('.ctrl input').forEach(c => c.checked = false); };
+  function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>`;
 }
 
 main().catch((err) => {
