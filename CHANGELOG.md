@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-18: **批量推送 V3.0（阶段长图控件点亮，对齐消费方 groups 约定）**：新增 `src/services/transaction-export-v3.js` + 3 个端点（`GET/POST /api/v2/export/trajectories/:id/transaction-v3`、`POST /api/v2/export/transactions-v3`，V2.0 保留）。entry 新增 `result`：`{id, name, url, groups[]}`——页面组（**一张长图=一个页面组**，`page-<n>` 平级，`screenshots[]={phaseNumber,url}` 无尺寸字段，前端按图片自然尺寸计算）+ 弹窗组（region_id 含 `overlay:` 段归属，弹窗=独立页面，`key` 带 `@@anchor=<触发按钮xpath>`，anchor 按步骤序推断前置按钮步骤）+ 控件节点（`id=step-<n>` 全局唯一、`rect`=element_json.bbox 内容坐标与长图同根、target/kind/params 映射、pid 树）。`transcationProperties` 保留（控件组语义）。无坐标步骤省略 rect（stats.noRectControls）。
+  影响范围：路由（src/routes/v2/export-mgmt.js 新增 3 端点）、服务（新增 src/services/transaction-export-v3.js，复用 V2.0 mapStepToTransactionEvent/uniquifyPropertiesNames）、api-docs（export-mgmt 分组登记 V3 端点）。无 schema/WS 变更。
+  文件：src/services/transaction-export-v3.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-export-v3.mjs, scripts/refactor/verify-all.sh
+  Python 同步提示：V3.0 `result.groups` 结构（页面组/弹窗组/控件 rect 内容坐标）为消费方点亮契约；若 Python 控制面自行组装推送数据，按此结构对齐。控件 rect 语义 = 步骤 element_json.bbox（内容坐标系，与阶段长图同 `pickScrollRoot` 滚动根）；弹窗控件第一版 rect 相对阶段长图（弹窗独立截图 TODO）。
+
 - 2026-08-17: **点击导航识别（AI_CLICK_NAV_CUE，默认开）**：`click_element_by_index` 点击后若 URL 跳转，recorder 注入一条 `[导航]` HumanMessage，提示“已进入目标页、停止找同一按钮、直接填表/保存”；recorder goal 闸门停机前先提示核查 URL 是否已跳转。录制步骤结果仍为 `ok-clicked-N`，不污染轨迹。
   影响范围：仅 Python 子进程录制内的点击导航提示与 goal 停机兜底；无路由/schema/WS 变更。
   文件：config/.env.example, scripts/feature_flags.py, scripts/controller/actions/click_navigation_cue.py, scripts/controller/actions/_misc.py, scripts/agent/recorder_emitters.py, scripts/recorder.py, scripts/controller/actions/phase/intent_contract.py, scripts/characterization/characterize-click-navigation-cue.py

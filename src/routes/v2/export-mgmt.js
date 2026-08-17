@@ -21,6 +21,11 @@ import {
   EVENT_TYPE_NAME,
 } from '../../services/transaction-export.js';
 import {
+  buildTransactionPayloadV3,
+  wrapTransactionListV3,
+  TRANSACTION_SCHEMA_VERSION_V3,
+} from '../../services/transaction-export-v3.js';
+import {
   requireAccessToken,
   resolveSystemProject,
   listPartnerProjects,
@@ -58,6 +63,20 @@ async function buildOneTrajectory(traj, { systemId, projectId }) {
   return {
     trajectoryId: traj.id,
     schemaVersion: TRANSACTION_SCHEMA_VERSION,
+    ...built,
+  };
+}
+
+/** V3.0 组装（groups 控件点亮结构）。 */
+async function buildOneTrajectoryV3(traj, { systemId, projectId }) {
+  const [phases, phaseScreenshots] = await Promise.all([
+    trajectoryPhaseDao.listByTrajectory(traj.id),
+    screenshotDao.listPhaseHighlightsByTrajectory(traj.id),
+  ]);
+  const built = buildTransactionPayloadV3(traj, { systemId, projectId, phases, phaseScreenshots });
+  return {
+    trajectoryId: traj.id,
+    schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
     ...built,
   };
 }
@@ -229,6 +248,41 @@ export default function (app) {
     }
 
     // Real partner push: gate-driven — only completed (已确认) may push.
+    assertPushableForPartner(traj);
+
+    const accessToken = requireAccessToken(req);
+    const partner = await pushImportDemand(result.payload, { accessToken });
+    await trajectoryDao.markExported(traj.id);
+    return res.json({
+      ...result,
+      isExport: 1,
+      pushed: true,
+      partner,
+    });
+  }
+
+  /** V3.0 单交易组装/推送（镜像 maybePushSingle，用 V3 组装）。 */
+  async function maybePushSingleV3(req, res, traj, src) {
+    const { systemId, projectId } = resolveSystemProject(src);
+    const result = await buildOneTrajectoryV3(traj, { systemId, projectId });
+    const dry = wantDryRun(src);
+    const push = parseBool(src.push, false);
+
+    if (wantBarePayload(src)) {
+      if (parseBool(src.download, false)) {
+        res.setHeader('Content-Disposition', `attachment; filename="transaction_v3_${traj.id}.json"`);
+      }
+      return res.json(result.payload);
+    }
+
+    if (!push || dry) {
+      if (!push) {
+        await trajectoryDao.markExported(traj.id);
+        return res.json({ ...result, isExport: 1, pushed: false });
+      }
+      return res.json({ ...result, isExport: 0, pushed: false });
+    }
+
     assertPushableForPartner(traj);
 
     const accessToken = requireAccessToken(req);
@@ -426,9 +480,187 @@ export default function (app) {
     }
   });
 
-  app.post('/api/v2/export/legacy-engine/map-step', (req, res) => {
+  // ── V3.0：阶段长图控件点亮（groups 结果结构，V2.0 保留）──
+  app.get('/api/v2/export/trajectories/:id/transaction-v3', async (req, res) => {
     try {
-      const step = req.body?.step ?? req.body;
+      const traj = await trajectoryDao.getById(+req.params.id);
+      if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
+      return maybePushSingleV3(req, res, traj, req.query);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({
+        error: err.message,
+        partner: err.partner,
+        ...(err.code ? { code: err.code } : {}),
+        ...(err.recordStatus !== undefined ? { recordStatus: err.recordStatus } : {}),
+      });
+    }
+  });
+
+  app.post('/api/v2/export/trajectories/:id/transaction-v3', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const src = { ...req.query, ...body };
+      const traj = await trajectoryDao.getById(+req.params.id);
+      if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
+      return maybePushSingleV3(req, res, traj, src);
+    } catch (err) {
+      res.status(err.statusCode || 500).json({
+        error: err.message,
+        partner: err.partner,
+        ...(err.code ? { code: err.code } : {}),
+        ...(err.recordStatus !== undefined ? { recordStatus: err.recordStatus } : {}),
+      });
+    }
+  });
+
+  /**
+   * V3.0 批量推送。Body 同 V2.0：{ trajectoryIds, systemId?, projectId?, raw|forImport|dryRun|download? }。
+   */
+  app.post('/api/v2/export/transactions-v3', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const { systemId, projectId } = resolveSystemProject(body);
+      const ids = parseIdList(body.trajectoryIds ?? body.trajectory_ids);
+      if (!ids.length) {
+        return res.status(400).json({ error: '请选择要推送的交易' });
+      }
+
+      const dryOrBare =
+        wantBarePayload(body) ||
+        parseBool(body.dryRun, false) ||
+        parseBool(body.dry_run, false);
+      const willPush = !dryOrBare;
+
+      const items = [];
+      const okBuilt = [];
+      let buildOk = 0;
+      let buildFailed = 0;
+
+      for (const id of ids) {
+        try {
+          const traj = await trajectoryDao.getById(id);
+          if (!traj) {
+            buildFailed += 1;
+            items.push({ trajectoryId: id, ok: false, error: '交易不存在' });
+            continue;
+          }
+          if (willPush && !isPushableRecordStatus(getRecordStatus(traj))) {
+            buildFailed += 1;
+            const status = getRecordStatus(traj);
+            items.push({
+              trajectoryId: id,
+              ok: false,
+              error: `只能推送状态为「已确认」的交易（当前: ${status ?? 'unknown'}）`,
+              code: 'not_pushable_status',
+              recordStatus: status,
+            });
+            continue;
+          }
+          const result = await buildOneTrajectoryV3(traj, { systemId, projectId });
+          buildOk += 1;
+          const entry = result.payload?.transcationEventTypeList?.[0];
+          if (entry) {
+            okBuilt.push({
+              entry,
+              count: result.count,
+              skipped: result.skipped,
+              stats: result.stats,
+              trajectoryId: id,
+            });
+          }
+          items.push({
+            trajectoryId: id,
+            ok: true,
+            isExport: 0,
+            payload: result.payload,
+            count: result.count,
+            skipped: result.skipped,
+            stats: result.stats,
+          });
+        } catch (e) {
+          buildFailed += 1;
+          items.push({ trajectoryId: id, ok: false, error: e.message });
+        }
+      }
+
+      const merged = wrapTransactionListV3(okBuilt);
+
+      if (dryOrBare) {
+        if (parseBool(body.download, false)) {
+          res.setHeader('Content-Disposition', 'attachment; filename="transactions_v3_import.json"');
+        }
+        if (wantBarePayload(body)) {
+          return res.json(merged.payload);
+        }
+        return res.json({
+          schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
+          systemId: String(systemId),
+          projectId: String(projectId),
+          pushed: false,
+          items,
+          summary: { ok: buildOk, failed: buildFailed },
+          payload: merged.payload,
+        });
+      }
+
+      if (!okBuilt.length) {
+        return res.status(422).json({
+          error: '没有可推送的交易（需为已确认 completed，且含可导出步骤）',
+          schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
+          systemId: String(systemId),
+          projectId: String(projectId),
+          pushed: false,
+          items,
+          summary: { ok: 0, failed: buildFailed },
+        });
+      }
+
+      const accessToken = requireAccessToken({
+        headers: req.headers,
+        body,
+        query: req.query,
+      });
+
+      let partner;
+      try {
+        partner = await pushImportDemand(merged.payload, { accessToken });
+      } catch (e) {
+        return res.status(e.statusCode || 502).json({
+          error: e.message,
+          schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
+          systemId: String(systemId),
+          projectId: String(projectId),
+          pushed: false,
+          partner: e.partner || null,
+          items,
+          summary: { ok: 0, failed: buildOk + buildFailed, buildOk, buildFailed },
+        });
+      }
+
+      const pushedIds = okBuilt.map((b) => b.trajectoryId);
+      await markBuiltExported(pushedIds);
+      for (const it of items) {
+        if (it.ok && pushedIds.includes(it.trajectoryId)) {
+          it.isExport = 1;
+        }
+      }
+
+      res.json({
+        schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
+        systemId: String(systemId),
+        projectId: String(projectId),
+        pushed: true,
+        partner,
+        items,
+        summary: { ok: buildOk, failed: buildFailed },
+      });
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message, partner: err.partner });
+    }
+  });
+
+  app.post('/api/v2/export/legacy-engine/map-step', (req, res) => {
+    try {      const step = req.body?.step ?? req.body;
       const op = mapStepToLegacyEngineOp(step);
       if (!op) {
         return res.status(422).json({

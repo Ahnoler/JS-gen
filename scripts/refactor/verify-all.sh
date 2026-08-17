@@ -85,6 +85,7 @@ run "characterize-heal-decision" node scripts/characterization/characterize-heal
 run "characterize-sso-auth" node scripts/characterization/characterize-sso-auth.mjs
 run "characterize-step-highlight" node scripts/characterization/characterize-step-highlight.mjs
 run "characterize-layer-tree" node scripts/characterization/characterize-layer-tree.mjs
+run "characterize-export-v3" node scripts/characterization/characterize-export-v3.mjs
 
 run "characterize-form-engine-wiring" "$PY" scripts/characterization/characterize-form-engine-wiring.py
 run "characterize-done-accept-reason" "$PY" scripts/characterization/characterize-done-accept-reason.py

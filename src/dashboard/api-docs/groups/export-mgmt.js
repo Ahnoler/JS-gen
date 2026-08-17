@@ -187,6 +187,43 @@ export const GROUP_EXPORT = [
           '每交易含 phases[]：阶段截图引用 + metadata（imageWidth/imageHeight/elements/regionTree）；前端经 stitchScreenshotUrl 拉图后按坐标动态高亮',
         ],
       },
+      {
+        method: 'GET', path: '/api/v2/export/trajectories/{id}/transaction-v3',
+        summary: '导出/可选推送单轨（V3.0 控件点亮）',
+        desc: 'V3.0：entry 新增 result.groups（对齐消费方约定）——页面组（一张长图=一个页面组，page-<n> 平级）+ 弹窗组（overlay 归属，附触发按钮 anchor）+ 控件节点（rect=element_json.bbox 内容坐标、target/kind/params）；transcationProperties 保留。前端拿长图 + rect 即可任意勾选点亮。参数同 V2.0。',
+        params: [
+          { name: 'id', type: 'number', required: true, in: 'path', desc: '轨迹 id', example: '38' },
+          { name: 'systemId', type: 'string', in: 'query', desc: '缺省 98', example: '98' },
+          { name: 'projectId', type: 'string', in: 'query', desc: '缺省 31', example: '31' },
+          { name: 'push', type: 'boolean', in: 'query', desc: 'true 时代推 importDemand（需已确认 completed）', example: 'false' },
+          { name: 'raw', type: 'boolean', in: 'query', desc: '仅返回 envelope', example: 'true' },
+        ],
+      },
+      {
+        method: 'POST', path: '/api/v2/export/trajectories/{id}/transaction-v3',
+        summary: '导出/可选推送单轨（V3.0，body）',
+        desc: '与 GET transaction-v3 相同；参数可写 body。',
+        reqExample: J({ systemId: '98', projectId: '31', push: true }),
+      },
+      {
+        method: 'POST', path: '/api/v2/export/transactions-v3',
+        summary: '批量推送（V3.0 控件点亮）',
+        desc: '同 V2.0 批量语义（组装/代推/dryRun/raw），entry 使用 V3.0 result.groups 结构。',
+        params: [
+          { name: 'trajectoryIds', type: 'number[]', required: true, in: 'body', desc: '勾选的轨迹 id', example: '[38]' },
+          { name: 'systemId', type: 'string', in: 'body', desc: '对方系统 id（缺省 98）', example: '98' },
+          { name: 'projectId', type: 'string', in: 'body', desc: '对方项目 id（缺省 31）', example: '31' },
+          { name: 'dryRun', type: 'boolean', in: 'body', desc: 'true 时不代推' },
+          { name: 'raw', type: 'boolean', in: 'body', desc: 'true 时仅返回合并 envelope' },
+        ],
+        reqExample: J({ trajectoryIds: [38], systemId: '98', projectId: '31' }),
+        notes: [
+          'result.groups 结构：page 组（screenshots[] = {phaseNumber, url}，无尺寸字段，前端按图片自然尺寸计算）、dialog 组（key 带 @@anchor=<触发按钮xpath>）、ele 控件（id=step-<n> 全局唯一、rect=内容坐标与长图同根）',
+          '控件 rect 缺失（旧数据无 bbox）时省略该字段，统计在 stats.noRectControls',
+          '弹窗第一版无独立截图（screenshots 空），弹窗控件 rect 相对所在阶段长图；未来弹窗独立截图后填充',
+          'TODO：同阶段多页面按 URL 区分（当前一张长图=一个页面组）',
+        ],
+      },
     ],
   },
 ];
