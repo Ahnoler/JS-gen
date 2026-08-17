@@ -1,20 +1,26 @@
 #!/usr/bin/env node
 /**
- * PR-LOC-HL 步骤级高亮工具 — 数据加载 + 三维匹配纯函数（Task 1 数据层）。
+ * PR-LOC-HL 步骤级高亮工具 — 数据加载 + 三维匹配 + 渲染 + CLI。
  *
  * 用途：给定阶段长图（screenshot.kind='phase_highlight'）+ 同 phase 的录制步骤，
- * 把每步操作在长图内容坐标系上对应的控件框找出来，供后续任务在长图上逐步点亮/标注。
+ * 把每步操作在长图内容坐标系上对应的控件框找出来，在长图上逐步点亮/标注。
  * 新数据（element_json.bbox）直接使用步骤自带坐标；旧数据（无 bbox）回退为三维匹配
  * 阶段截图 metadata.elements[] 拿到 rect。
  *
- * 本文件只导出纯函数（数据层），不渲染 HTML，不含 CLI/main（后续任务补充）。
+ * 数据层 / 渲染层为纯函数（可 import，供 characterization 复用）；CLI 仅在直接执行时运行：
+ *   node scripts/tools/lightup-step-highlight.mjs --trajectory 38 [--phase 629] [--width 1400]
+ *   node scripts/tools/lightup-step-highlight.mjs --id 8734 [--width 1400]
+ * 输出 tmp/lightup-steps-<screenshotId>.html 并打印统计。
  *
- * 用法占位（后续任务据此加 CLI/渲染）：
+ * 用法：
  *   const db = getDB();                       // import { getDB } from '../../config/database.js'
  *   const data = await loadPhaseData(db, { trajectoryId: 38, phaseId: 629 });   // 或 { screenshotId }
  *   const resolved = resolveStepBoxes(data.steps, data.meta.elements);
  *   // resolved[i] = { step, boxes: [{ rect, source: 'bbox' | 'match' }] }
  */
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getDB } from '../../config/database.js';
 
 /** JSON 列归一化：MySQL JSON 可能是字符串或已解析对象；null/解析失败 → null。 */
@@ -200,16 +206,17 @@ function stepColor(seq) {
  * （同色边框 + 序号徽标），左侧 sticky 步骤列表列，bar 内含图例。
  *
  * resolved 为 resolveStepBoxes 的返回值：[{ step, boxes: [{ rect, source: 'bbox'|'match' }] }]。
+ * width（可选）：stage 显示宽，默认 1400；坐标为 contentWidth → width 等比换算。
  * seq = resolved 下标 + 1（步骤序号从 1 开始）：
  *   - bbox 框：border 2px solid hsl(...)，徽标 "N"
  *   - match 框（fallback）：border 2px dashed hsl(...)，徽标 "NM"
  *   - boxes 空（无坐标）：不画框，步骤列表行加 no-box 置灰
  */
-export function buildHtml({ b64, meta, resolved }) {
+export function buildHtml({ b64, meta, resolved, width }) {
   const cw = Number(meta?.contentWidth) || 1;
   const ch = Number(meta?.contentHeight) || 1;
   const steps = Array.isArray(resolved) ? resolved : [];
-  const W = 1400;
+  const W = Number(width) > 0 ? Number(width) : 1400;
   const H = Math.max(1, Math.round((W * ch) / cw));
 
   // 每步一组框；记录真正画出来的框数（防御非法 rect 跳过）。
@@ -509,4 +516,112 @@ export function buildHtml({ b64, meta, resolved }) {
 </script>
 </body>
 </html>`;
+}
+
+/* ============================================================
+ * Task 4 — CLI 入口（直接执行时才跑 main，import 复用不触发）。
+ * ============================================================ */
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/** 直接执行判断：node 运行本文件 → true；被 import（如 characterization）→ false。 */
+function isDirectRun() {
+  if (!process.argv[1]) return false;
+  const self = fileURLToPath(import.meta.url);
+  const entry = resolve(process.argv[1]);
+  if (process.platform === 'win32') return self.toLowerCase() === entry.toLowerCase();
+  return self === entry;
+}
+
+/**
+ * CLI 主入口：定位截图 → 加载数据 → 解析步骤框 → 生成 tmp/lightup-steps-<id>.html → 打印统计。
+ *
+ * 参数：
+ *   --id <screenshotId>      直查截图
+ *   --trajectory <id>        kind='phase_highlight' 按 id 倒序取最新一张
+ *   --phase <phaseId>        （可选）配合 --trajectory 限定阶段
+ *   --width <px>             （可选，默认 1400）stage 显示宽，传给 buildHtml
+ *
+ * 无截图 / metadata 无 elements / 参数非法 → 报错返回 1（非 0 退出）。
+ * export 便于 import 复用；返回值即退出码（0 成功 / 1 失败）。
+ */
+export async function main(argv = process.argv.slice(2)) {
+  const opts = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === '--id' || argv[i] === '--trajectory' || argv[i] === '--phase' || argv[i] === '--width') {
+      opts[argv[i].slice(2)] = argv[i + 1];
+      i += 1;
+    }
+  }
+
+  const screenshotId = opts.id != null ? Number(opts.id) : null;
+  const trajectoryId = opts.trajectory != null ? Number(opts.trajectory) : null;
+  const phaseId = opts.phase != null ? Number(opts.phase) : null;
+  const width = opts.width != null ? Number(opts.width) : 1400;
+
+  if (screenshotId == null && trajectoryId == null) {
+    console.error('用法：--id <screenshotId> 或 --trajectory <id> [--phase <phaseId>] [--width <px>]');
+    return 1;
+  }
+  const badNum = [];
+  if (screenshotId != null && !Number.isFinite(screenshotId)) badNum.push('--id');
+  if (trajectoryId != null && !Number.isFinite(trajectoryId)) badNum.push('--trajectory');
+  if (phaseId != null && !Number.isFinite(phaseId)) badNum.push('--phase');
+  if (width != null && !(Number.isFinite(width) && width > 0)) badNum.push('--width');
+  if (badNum.length) {
+    console.error(`参数必须是正数：${badNum.join(' / ')}`);
+    return 1;
+  }
+
+  const db = getDB();
+  try {
+    const data = await loadPhaseData(db, { trajectoryId, phaseId, screenshotId });
+    if (!data.screenshotId) {
+      console.error('未找到阶段截图（--id 无此行，或 --trajectory 无 kind="phase_highlight" 截图）');
+      return 1;
+    }
+    const elements = data.meta?.elements;
+    if (!Array.isArray(elements) || elements.length === 0) {
+      console.error(`screenshot #${data.screenshotId} 无 elements（metadata 为空或非 phase 截图）`);
+      return 1;
+    }
+
+    const row = await db('screenshot').where({ id: data.screenshotId }).first();
+    if (!row || !row.image_data) {
+      console.error(`screenshot #${data.screenshotId} 无 image_data，无法生成 HTML`);
+      return 1;
+    }
+
+    const resolved = resolveStepBoxes(data.steps, elements);
+    const html = buildHtml({ b64: row.image_data.toString('base64'), meta: data.meta, resolved, width });
+
+    const out = join(ROOT, 'tmp', `lightup-steps-${data.screenshotId}.html`);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, html, 'utf8');
+
+    const total = resolved.length;
+    const bboxCount = resolved.filter((r) => r.boxes.some((b) => b.source === 'bbox')).length;
+    const matchCount = resolved.filter((r) => r.boxes.some((b) => b.source === 'match')).length;
+    const noCoordCount = resolved.filter((r) => r.boxes.length === 0).length;
+
+    console.log(`已生成: ${out}`);
+    console.log(`screenshot #${data.screenshotId} | 内容 ${data.meta.contentWidth}×${data.meta.contentHeight} | stage 宽 ${width}px`);
+    console.log(`steps 总数: ${total}`);
+    console.log(`有 bbox 步数: ${bboxCount}`);
+    console.log(`fallback 匹配步数: ${matchCount}`);
+    console.log(`无坐标步数: ${noCoordCount}`);
+    return 0;
+  } finally {
+    await db.destroy();
+  }
+}
+
+if (isDirectRun()) {
+  main().then(
+    (code) => { process.exitCode = code; },
+    (err) => {
+      console.error(err);
+      process.exitCode = 1;
+    },
+  );
 }

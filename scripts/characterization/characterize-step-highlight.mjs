@@ -306,6 +306,18 @@ function testRenderBoundaries() {
   assert(html.includes('border:2px dashed hsl(94, 70%, 45%)'), 'match box: dashed border seq2 color hsl(94,70%,45%)');
   assert(html.includes('class="badge" style="background:hsl(94, 70%, 45%)">2M</span>'), 'match badge NM with M suffix');
   assert(html.includes('class="step-row no-box" data-step="3"'), 'no-coordinate step → no-box row');
+
+  // 4. 可选 width：缺省 1400；传入时 stage 宽与坐标按 width 等比换算
+  assert(html.includes('style="width:1400px;'), 'no width → stage defaults to 1400px');
+  const wide = buildHtml({
+    b64: 'dummy',
+    meta: { contentWidth: 800, contentHeight: 600 },
+    resolved: [{ step: { actionType: 'fill_form_field', label: '姓名' }, boxes: [{ rect: legal, source: 'bbox' }] }],
+    width: 800,
+  });
+  assert(wide.includes('style="width:800px;'), 'width=800 → stage width 800px');
+  assert(wide.includes('width:100px;'), 'width=800 → box width = 100/800*800 = 100px');
+  assert(wide.includes('height:20px;'), 'width=800 → box height = 20/800*800 = 20px');
 }
 
 async function main() {
