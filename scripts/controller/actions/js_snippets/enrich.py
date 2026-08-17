@@ -54,6 +54,7 @@ JS_ENRICH_CLICK_LOCATOR = '''([xpath, text, tagHint, targetKindHint, formLabelHi
   const t = normalizeControlText(text) || cleanVisibleText(el);
   const abs = absXPath(el);
   const loc = buildLocatorSnap(el, t, abs, formLbl, { targetKind: kindHint || undefined });
+  const reg = assignRegion(el);
   return {
     tag_name: loc.tag || (el.tagName || '').toLowerCase(),
     xpath: loc.xpath || abs,
@@ -66,6 +67,10 @@ JS_ENRICH_CLICK_LOCATOR = '''([xpath, text, tagHint, targetKindHint, formLabelHi
     attributes: loc.attributes || {},
     candidates: loc.candidates || [],
     target_kind: loc.target_kind,
+    region_id: reg.region_id || '',
+    region_label: reg.region_label || '',
+    layers: Array.isArray(reg.layers) ? reg.layers : [],
+    bbox: stepBBoxOf(el),
     locator_scope: loc.locator_scope,
     locator_occurrence: loc.locator_occurrence,
     locator_verified: loc.locator_verified,
