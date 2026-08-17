@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-17: **步骤 element 分层 + 坐标入库**：录制时 `_capture_element`/`_enrich_click_element` 对操作控件 evaluate `assignRegion`（分层）+ `stepBBoxOf`（内容坐标，复用泛化 `pickScrollRoot`），`element_json` 新增 `region_id`/`region_label`/`layers[]`/`bbox{x1,y1,x2,y2}`（内容坐标系，对齐阶段截图 `metadata.rect`）。元素分层可直接读 step；步骤级高亮（PR-LOC-HL）用 bbox 画框。只影响新录制，存量不回填。`PAGE_LOCATOR_HELPERS` 新增 `pickScrollRoot`/`stepBBoxOf`，阶段截图 collect 表达式去重共用。
+  影响范围：录制链路（scripts/controller/actions）、`_locator_helpers_js.py`（重生成）、element_json 新增字段（无 schema）。
+  文件：src/cdp/page-locator-helpers.js, src/cdp/phase-screenshot-page.js, scripts/controller/actions/js_snippets/{fill_core,enrich}.py, scripts/controller/actions/_helpers.py, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-step-region-bbox.py
+  Python 同步提示：element_json 新增 region_id/region_label/layers/bbox（内容坐标，滚动根=标准主区或全页最高可滚动容器）；若代理侧有类似录制链路，需在操作控件时取分层与坐标。
+
 - 2026-08-17: **分区算法：页面级裸按钮不再继承 titlebox（PR-PART 修正）**：`composeTitleboxTitle` 新增 `isBareActionButton` 前置判定——`BUTTON`/`.el-button` 且不在 `.el-collapse-item`/`.titlebox`/`.el-table` 内（页面级操作按钮，如向导/页签底部 fixed 操作条）时跳过 titlebox 几何就近继承，保留 chrome（tab/向导）与 collapse section 段。修复对公客户评级页「下一步/返回 被归入 基本信息/征信信息」问题：现为 `wizard:基本信息`（layers 仅 `[{wizard,基本信息}]`）。表单字段行为不变（字段不在 titlebox 内仍几何就近）；collapse/table 内按钮不受影响。
   影响范围：`PAGE_LOCATOR_HELPERS` 的 `assignRegion` 对页面级裸按钮的 `region_label`/`region_id`/`layers` 输出（SPA `display_group` 随之变化）；Python 镜像 `_locator_helpers_js.py` 已重新生成。
   文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py（生成物）, scripts/characterization/characterize-partition-compose.mjs（新增固定底栏按钮用例、`#float-back` 断言改为不继承）, scripts/characterization/characterize-scan-assign-region-once.py（过期断言修正：`xpath_smart_fill_only_enabled` 闸门已从 `_form.py` 移至 `form_action_engines.py`，既有漂移与本次改动无关）
