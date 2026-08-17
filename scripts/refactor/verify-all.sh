@@ -49,6 +49,7 @@ run "characterize-xpath-fill-select" "$PY" scripts/characterization/characterize
 run "characterize-region-section-alias" "$PY" scripts/characterization/characterize-region-section-alias.py
 run "characterize-phase-runtime" "$PY" scripts/characterization/characterize-phase-runtime.py
 run "characterize-select-option-substring" "$PY" scripts/characterization/characterize-select-option-substring.py
+run "characterize-select-option-stamp" "$PY" scripts/characterization/characterize-select-option-stamp.py
 run "characterize-close-dialog-replay" "$PY" scripts/characterization/characterize-close-dialog-replay.py
 run "characterize-cascade-three-round" "$PY" scripts/characterization/characterize-cascade-three-round.py
 run "characterize-dialog-tasklist-scope" "$PY" scripts/characterization/characterize-dialog-tasklist-scope.py
