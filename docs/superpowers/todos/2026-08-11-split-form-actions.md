@@ -1,9 +1,9 @@
 # TODO: 拆分 `_form.py` 巨型注册仓
 
-**Status:** Open  
+**Status:** Partial（2026-08-15/16 大幅推进；剩 `click_save` 与 scan/snapshot 壳未迁）
 **Date:** 2026-08-11  
 **Backlog ID:** **form-actions-split**  
-**Related:** `scripts/controller/actions/_form.py`（~2177 行）；已抽离的 `form_scan_utils.py`（~1009）、`section_scope.py`；表征 `characterize-*-form*` / `characterize-select-option-stamp` / `characterize-phase-section-scope` / `characterize-dual-save-section`
+**Related:** `scripts/controller/actions/_form.py`（2026-08-16 当前 ~990 行，原 ~2177）；已拆出的 `form_scan_utils.py` / `scan_summary.py` / `select_match.py` / `task_completion.py`、`form_autofill.py` / `autofill_round.py` / `autofill_pending.py`、`form_action_engines.py`、`section_scope.py`；表征 `characterize-form-engine-wiring` / `characterize-select-option-stamp` / `characterize-select-option-substring` / `characterize-phase-section-scope` / `characterize-dual-save-section`
 
 ## 背景
 
@@ -18,6 +18,8 @@
 | 其余动作 | 散落 | login / fill / scan / radio / tree / pending…
 
 辅助逻辑已迁到 `form_scan_utils` / `section_scope`，但 **动作实现仍挤在闭包里**，导致：改一点要翻两千行、表征只能整文件断言、review / 并行改动冲突高。
+
+**当前状态（2026-08-16 核对）：** 2026-08-15 重构已把 auto-fill、select/fill/login/radio/tree 引擎与 form_scan_utils 子模块迁出；2026-08-16 补齐 parity aliases 与门禁。`_form.py` 仍保留 `click_save`（约 400 行）和部分 scan/snapshot/sync 动作壳，尚未达验收线 ≲600。验证：`characterize-form-engine-wiring.py`、`characterize-select-option-substring.py` 等已绿并加入 `verify-all.sh`。
 
 ## 要做什么
 
@@ -66,5 +68,10 @@
 
 | Slice | 状态 | 说明 |
 |------|------|------|
-| 0 | 待做 | 依赖图 |
-| 1–6 | 待做 | — |
+| 0 | ✅ 已完成 | 依赖/闭包捕获由 `FormAutofillEngine` + `form_action_engines` 的显式 engine 注入承接（`17b5a42` parity aliases 补齐） |
+| 1 | ✅ 已完成 | `select_option` → `SelectEngine`（`bc97002`），盖章/匹配在 `select_match.py` |
+| 2 | ⬜ 待做 | `click_save` 仍在 `_form.py`（闸门/歧义/toast/region/section） |
+| 3 | ✅ 已完成 | `_auto_fill_pending` / `_execute_round` → `autofill_pending.py` / `autofill_round.py`（`83827f6`） |
+| 4 | ⏳ 部分 | scan/pending/summary 实现已拆到 `scan_summary.py` / `task_completion.py`；动作壳仍在 `_form.py` |
+| 5 | ✅ 已完成 | login/fill/radio/tree/adjacent → `form_action_engines.py`（`bc97002`） |
+| 6 | ⬜ 待做 | `_form.py` 只留注册 + 删死 import；当前 ~990 行 |

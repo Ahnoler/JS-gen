@@ -2,7 +2,7 @@
 
 > 本文件记录「目标线」地图与已实施证据。**状态以代码/表征为准**，不以计划 checkbox 为准。  
 > **未闭环执行清单：** 已迁到 [`todo-list.md`](todo-list.md)（湿测 / 工程债 / 穿插项）；本文件「其它未闭环」作对照，改状态时两边同步。  
-> **下一刀（优先）：** 见 todo-list — 湿测（L1-picker / AG / L1c / page-state / session-lifecycle）；聚焦 commit（`option_text=first`、session-lifecycle）。`legacy-section-retire` 产品面 Done。  
+> **下一刀（优先）：** 见 todo-list — 湿测（L1-picker / AG / L1c / page-state / session-lifecycle / heal-locate-wet）；聚焦 commit（session-lifecycle）。`option_text=first` / `sectionOf` 死调用清理 / 三大问题① 已完成。
 > 2026-08-11 湿测：`log.txt` **agent-final-save 通过**（阶段2 引入袁玲 → `picker confirm → submit-ready` → `ok-save-success` → `done() accepted after introduce`）。  
 > 已提交：`d12a515` agent-final-save · `441a228` page-state-gen · `c87b448` L1c · legacy-section slices · `dfb2293` slice-3。
 
@@ -37,7 +37,7 @@
 |----|----|------|
 | **D1 / T-scan** | Source B `el-table` 扫描 + `xpath_smart` | `SCAN_SOURCE_B_EL_TABLE`；表征 OK |
 | **D2 / T1+T2** | xpath-primary Phase A+B 主路径 | `_resolve_control`；fill/select/date/radio + round xpath-only |
-| **D3** | control-ops 分块 + buttons + `click_save(section)` | `sectionOf` / `SCAN_SOURCE_C_BUTTONS` — **仍在用；退役见 legacy-section-retire** |
+| **D3** | control-ops 分块 + buttons + `click_save(section)` | `SECTION_ATTACH` / `SCAN_SOURCE_C_BUTTONS`；产品面 `region=` 优先、`section=` 兼容；旧 `sectionOf`/`sectionAnchor*` 已删（`8b6863a`） |
 | **D4** | date/radio/checkbox xpath helpers | `JS_FILL_DATE_BY_XPATH` / `JS_CLICK_RADIO_BY_XPATH` |
 | **D5** | Phase Intent `all_editable` | `_phase_intent` / `_phase_context` |
 | **D6** | 回放 params-first fill/select + 回读 | `_resolve_replay_xpath`；湿跑 25/25 |
@@ -75,7 +75,7 @@
 
 | ID | 状态 | 项 | 建议优先级 |
 |----|------|----|------------|
-| **form-actions-split** | **Open** | 拆 `_form.py`（~2k）注册仓：select / click_save / autofill 分文件；行为零 diff | **P2** · [TODO](todos/2026-08-11-split-form-actions.md) |
+| **form-actions-split** | **Partial** | `_form.py` ~2177→990 行：autofill/select/fill/login/radio/tree 已拆；剩 `click_save` + scan/snapshot 壳 | **P2** · [TODO](todos/2026-08-11-split-form-actions.md) |
 | **legacy-section-retire** | **Done（slice-1–3）** | 产品面优先 `region=`；`section=` 兼容；Vue 写 region_*；D3 锚 xpath 仍保留 | **P1 完成** · [TODO](todos/2026-08-11-remove-legacy-section-chunking.md) |
 | **L1c-wet / scan-py** | 挂起 | L1c：`L1C_LLM=1` BiB 湿测；Python scan 接入 classify | P1 |
 | **page-state-wet** | 挂起 | dialog/drawer 同文案按钮碰撞湿测 | P1 |
@@ -110,9 +110,9 @@
 ## 推荐下一刀
 
 > **以 [`todo-list.md`](todo-list.md) 为准**（2026-08-12 已转入）。摘要：  
-> 1. 湿测：L1-picker / AG-fullpage / L1c(+scan-py) / page-state / **session-lifecycle**  
-> 2. 聚焦 commit：`session-lifecycle` · `option_text=first`  
-> 3. （可选）`sectionOf` 死调用清理；穿插 T1r / 三大问题① / T5 / T4-P4 / L1-vision / form-actions-split  
+> 1. 湿测：L1-picker / AG-fullpage / L1c(+scan-py) / page-state / **session-lifecycle** / **heal-locate-wet**
+> 2. 聚焦 commit：`session-lifecycle`（`option_text=first` 已完成 `79a8e92`）
+> 3. 穿插：T1r / T5 / T4-P4 / L1-vision / form-actions-split（`sectionOf` 死调用清理已完成 `8b6863a`；三大问题①已完成 V2.1 `2d5a54d`）
 > ~~agent-final-save~~ PASS · ~~legacy-section 分刀 commit~~ Done
 
 > 参照：Cursor browser MCP / Playwright MCP（先控件池，后区域标签）。T4-P4 = 对照，非主路径。
