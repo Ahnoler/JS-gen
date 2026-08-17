@@ -1,5 +1,5 @@
 /**
- * Characterization: PR-LOC-HL 步骤级高亮数据层（真实 DB 断言）。
+ * Characterization: PR-LOC-HL 步骤级高亮数据层 + 渲染层（真实 DB 断言）。
  *   node scripts/characterization/characterize-step-highlight.mjs
  *
  * 读 traj 38 phase 3（phase id 629）+ screenshot #8734 真实数据，验证：
@@ -7,6 +7,8 @@
  *   - 旧数据（element_json 无 bbox）回退三维匹配的命中率
  *   - 纯函数边界：空 label 仍可因 kind 命中、非法 rect 被滤、region 空维度跳过、
  *     全空维度按未匹配处理、AND 语义（任一非空维度必须全等）
+ *   - buildHtml 渲染：全部步骤框（resolved 数）、badge 数量、虚线/实线类、
+ *     列表行数 = steps 数（含无坐标置灰行）、coordX/coordY 坐标换算手算期望值
  *
  * 注意：traj 38 于 2026-08-17 22:49-22:54 重录，phase 629 现有 101 步（全有 element_json、
  * 0 bbox、0 region_id），与 brief 写稿时（112 步）不同；断言阈值已按当前真实数据调整
@@ -19,6 +21,9 @@ import {
   resolveStepBoxes,
   normalizeStep,
   isLegalRect,
+  buildHtml,
+  coordX,
+  coordY,
 } from '../tools/lightup-step-highlight.mjs';
 
 const TRAJ_ID = 38;
@@ -184,6 +189,95 @@ function testPureBoundaries() {
   assert(ns3.hasElementJson === false && ns3.params === null, 'parse failure → no element json, params null');
 }
 
+/** buildHtml 渲染（真实 DB 数据）。 */
+async function testRenderRealData(db, { steps, elements }) {
+  const resolved = resolveStepBoxes(steps, elements);
+  const shot = await db('screenshot').where({ id: SHOT_ID }).first();
+  const b64 = shot.image_data.toString('base64');
+  const data = await loadPhaseData(db, { trajectoryId: TRAJ_ID, phaseId: PHASE_ID, screenshotId: SHOT_ID });
+  const html = buildHtml({ b64, meta: data.meta, resolved });
+  const cw = Number(data.meta.contentWidth) || 1;
+
+  const hitSeqs = [];
+  resolved.forEach((r, i) => { if (r.boxes.length > 0) hitSeqs.push(i + 1); });
+
+  // a. 每步至少一个 .box；badge 数量 = 有框步骤数
+  const boxDivs = html.match(/<div class="box[^"]*" data-step="(\d+)"/g) || [];
+  const boxSeqs = new Set(boxDivs.map((s) => Number(/data-step="(\d+)"/.exec(s)[1])));
+  for (const seq of hitSeqs) assert(boxSeqs.has(seq), `step ${seq} must have a box`);
+  const badgeCount = (html.match(/<span class="badge"/g) || []).length;
+  assert(badgeCount === hitSeqs.length, `badge count=${badgeCount} must equal boxed steps=${hitSeqs.length}`);
+
+  // b. 虚线/实线类：当前数据 bbox=0、全为 fallback match → 所有框都应为 dashed
+  const totalBoxes = boxDivs.length;
+  const dashedBoxes = (html.match(/class="box dashed"/g) || []).length;
+  assert(totalBoxes >= 1, `html must contain boxes (got ${totalBoxes})`);
+  assert(dashedBoxes === totalBoxes, `all boxes dashed (match): ${dashedBoxes}/${totalBoxes}`);
+
+  // c. 列表行数 = steps 数（含无坐标行），无坐标步骤置灰
+  const rowCount = (html.match(/class="step-row/g) || []).length;
+  assert(rowCount === steps.length, `step rows=${rowCount} must equal steps=${steps.length}`);
+  const noBoxCount = steps.length - hitSeqs.length;
+  if (noBoxCount > 0) {
+    assert(html.includes('class="step-row no-box"'), 'unmatched steps must get no-box rows');
+    const noBoxRows = (html.match(/class="step-row no-box"/g) || []).length;
+    assert(noBoxRows === noBoxCount, `no-box rows=${noBoxRows} must equal unmatched steps=${noBoxCount}`);
+  }
+
+  // d. 坐标换算：buildHtml 框位置与 coordX/coordY（W=1400）一致
+  const firstHit = hitSeqs.length ? resolved[hitSeqs[0] - 1] : null;
+  if (firstHit) {
+    const b = firstHit.boxes[0];
+    const left = coordX(b.rect.x1, cw, 1400);
+    const top = coordY(b.rect.y1, cw, 1400);
+    const width = Math.max(2, coordX(b.rect.x2, cw, 1400) - left);
+    const height = Math.max(2, coordY(b.rect.y2, cw, 1400) - top);
+    const r = (v) => Math.round(v * 100) / 100;
+    assert(html.includes(`left:${r(left)}px`), 'box left uses coordX conversion');
+    assert(html.includes(`top:${r(top)}px`), 'box top uses coordY conversion');
+    assert(html.includes(`width:${r(width)}px`), 'box width converted');
+    assert(html.includes(`height:${r(height)}px`), 'box height converted');
+  }
+
+  // e. 图例含实线=bbox / 虚线=匹配 说明
+  assert(html.includes('bbox') && html.includes('匹配'), 'legend labels present');
+  console.log(`  steps=${steps.length} | boxes=${totalBoxes} (all match/dashed) | badge=${badgeCount} | rows=${rowCount} | contentWidth=${cw}`);
+}
+
+/** buildHtml 渲染（纯函数边界 + 坐标换算手算期望值）。 */
+function testRenderBoundaries() {
+  // 1. 空 resolved → 仍可生成 HTML（不抛错）
+  const empty = buildHtml({ b64: 'dummy', meta: { contentWidth: 800, contentHeight: 600 }, resolved: [] });
+  assert(typeof empty === 'string' && empty.includes('<!doctype html>'), 'empty resolved → html still generated');
+  assert((empty.match(/class="step-row/g) || []).length === 0, 'empty resolved → no step rows');
+
+  // 2. 坐标换算手算期望值
+  assert(Math.abs(coordX(100, 800, 1200) - 150) < 1e-9, 'coordX: 100/800*1200 = 150');
+  assert(Math.abs(coordY(40, 800, 1200) - 60) < 1e-9, 'coordY: 40/800*1200 = 60');
+  assert(Math.abs(coordX(800, 800, 1200) - 1200) < 1e-9, 'coordX: contentWidth → displayWidth edge');
+  assert(Math.abs(coordY(600, 800, 1200) - 900) < 1e-9, 'coordY: contentHeight → displayHeight edge');
+  assert(Math.abs(coordX(0, 800, 1200) - 0) < 1e-9, 'coordX origin = 0');
+
+  // 3. bbox 实线 + 徽标 N / match 虚线 + 徽标 NM / 无坐标 → no-box 行
+  const legal = { x1: 0, y1: 0, x2: 100, y2: 20 };
+  const html = buildHtml({
+    b64: 'dummy',
+    meta: { contentWidth: 800, contentHeight: 600 },
+    resolved: [
+      { step: { actionType: 'fill_form_field', label: '姓名' }, boxes: [{ rect: legal, source: 'bbox' }] },
+      { step: { actionType: 'click_element_by_index', label: '保存' }, boxes: [{ rect: legal, source: 'match' }] },
+      { step: { actionType: 'x', label: '无坐标' }, boxes: [] },
+    ],
+  });
+  assert(html.includes('class="box" data-step="1"'), 'bbox box: no dashed class');
+  assert(html.includes('border:2px solid hsl(47, 70%, 45%)'), 'bbox box: solid border seq1 color hsl(47,70%,45%)');
+  assert(html.includes('class="badge" style="background:hsl(47, 70%, 45%)">1</span>'), 'bbox badge N with same-color background');
+  assert(html.includes('class="box dashed" data-step="2"'), 'match box: dashed class');
+  assert(html.includes('border:2px dashed hsl(94, 70%, 45%)'), 'match box: dashed border seq2 color hsl(94,70%,45%)');
+  assert(html.includes('class="badge" style="background:hsl(94, 70%, 45%)">2M</span>'), 'match badge NM with M suffix');
+  assert(html.includes('class="step-row no-box" data-step="3"'), 'no-coordinate step → no-box row');
+}
+
 async function main() {
   console.log('\n=== step-highlight data layer characterization ===\n');
   const db = getDB();
@@ -206,12 +300,14 @@ async function main() {
     });
     if (ctx) {
       await run('AND match rate + label hits', () => testRealDataMatch(db, ctx));
+      await run('render html (real data)', () => testRenderRealData(db, ctx));
     } else {
       failed += 1;
       console.error('  ✗ AND match rate — load data failed, skipped');
     }
     await run('screenshot selection', () => testScreenshotSelection(db));
     await run('pure function boundaries', testPureBoundaries);
+    await run('render boundaries', testRenderBoundaries);
   } finally {
     await db.destroy();
   }

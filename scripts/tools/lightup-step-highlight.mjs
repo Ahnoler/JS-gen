@@ -150,3 +150,160 @@ export function resolveStepBoxes(steps, elements) {
     return { step, boxes };
   });
 }
+
+/* ============================================================
+ * Task 2 — 渲染层（纯函数）：自包含 HTML 生成。
+ * ============================================================ */
+
+/** 像素格式化：保留 2 位小数，避免超长浮点。 */
+function fmtPx(v) {
+  return Math.round(Number(v) * 100) / 100;
+}
+
+/**
+ * 坐标换算：内容坐标系 → 显示像素。图片按 contentWidth/contentHeight 比例显示
+ * （浏览器等比拉伸），scale = 显示宽 / contentWidth，x/y 同比例。
+ */
+export function coordX(value, contentWidth, displayWidth) {
+  return (Number(value) / Number(contentWidth)) * Number(displayWidth);
+}
+export function coordY(value, contentWidth, displayWidth) {
+  return (Number(value) / Number(contentWidth)) * Number(displayWidth);
+}
+
+/** HTML 转义（步骤列表列文本用）。 */
+function escHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** 步骤序号 → 边框/徽标色：hsl((seq*47)%360, 70%, 45%)。 */
+function stepColor(seq) {
+  return `hsl(${(seq * 47) % 360}, 70%, 45%)`;
+}
+
+/**
+ * 生成自包含 HTML：阶段长图按 contentWidth/contentHeight 比例显示，每步一组绝对定位框
+ * （同色边框 + 序号徽标），左侧 sticky 步骤列表列，bar 内含图例。
+ *
+ * resolved 为 resolveStepBoxes 的返回值：[{ step, boxes: [{ rect, source: 'bbox'|'match' }] }]。
+ * seq = resolved 下标 + 1（步骤序号从 1 开始）：
+ *   - bbox 框：border 2px solid hsl(...)，徽标 "N"
+ *   - match 框（fallback）：border 2px dashed hsl(...)，徽标 "NM"
+ *   - boxes 空（无坐标）：不画框，步骤列表行加 no-box 置灰
+ */
+export function buildHtml({ b64, meta, resolved }) {
+  const cw = Number(meta?.contentWidth) || 1;
+  const ch = Number(meta?.contentHeight) || 1;
+  const steps = Array.isArray(resolved) ? resolved : [];
+  const W = 1400;
+  const H = Math.max(1, Math.round((W * ch) / cw));
+
+  // 每步一组框；记录真正画出来的框数（防御非法 rect 跳过）。
+  const renderedCount = new Array(steps.length).fill(0);
+  const boxParts = [];
+  steps.forEach((r, i) => {
+    const seq = i + 1;
+    const color = stepColor(seq);
+    const boxes = Array.isArray(r.boxes) ? r.boxes : [];
+    for (const b of boxes) {
+      if (!isLegalRect(b.rect)) continue;
+      renderedCount[i] += 1;
+      const dashed = b.source === 'match';
+      const left = coordX(b.rect.x1, cw, W);
+      const top = coordY(b.rect.y1, cw, W);
+      const width = Math.max(2, coordX(b.rect.x2, cw, W) - left);
+      const height = Math.max(2, coordY(b.rect.y2, cw, W) - top);
+      boxParts.push(
+        `<div class="box${dashed ? ' dashed' : ''}" data-step="${seq}" ` +
+        `style="left:${fmtPx(left)}px;top:${fmtPx(top)}px;width:${fmtPx(width)}px;height:${fmtPx(height)}px;` +
+        `border:2px ${dashed ? 'dashed' : 'solid'} ${color};">` +
+        `<span class="badge" style="background:${color}">${seq}${dashed ? 'M' : ''}</span></div>`,
+      );
+    }
+  });
+
+  // 左侧 sticky 步骤列表列：步骤号 + action_type + label，data-step 关联。
+  const listParts = steps.map((r, i) => {
+    const seq = i + 1;
+    const hasBox = renderedCount[i] > 0;
+    const action = escHtml(r.step?.actionType);
+    const label = escHtml(r.step?.label);
+    return (
+      `<div class="step-row${hasBox ? '' : ' no-box'}" data-step="${seq}">` +
+      `<span class="seq" style="background:${stepColor(seq)}">${seq}</span>` +
+      `<span class="action">${action}</span>` +
+      `<span class="label">${label}</span></div>`
+    );
+  });
+
+  // bar 图例：步骤色示例（前 8 个有框步骤的色块）+ 实线=bbox / 虚线=匹配。
+  const sampleSeqs = [];
+  for (let i = 0; i < steps.length && sampleSeqs.length < 8; i += 1) {
+    if (renderedCount[i] > 0) sampleSeqs.push(i + 1);
+  }
+  const legendColors = sampleSeqs.length
+    ? sampleSeqs
+        .map((s) => `<span class="lg-item" title="步骤 ${s}"><i style="background:${stepColor(s)}"></i>${s}</span>`)
+        .join('')
+    : '<span class="dim">无匹配步骤</span>';
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>步骤级高亮</title>
+<style>
+  body { margin: 0; background: #f5f5f5; font-family: system-ui, sans-serif; }
+  .bar { position: sticky; top: 0; z-index: 20; background: #fff; padding: 8px 16px;
+         border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .bar b { font-size: 14px; }
+  .bar .dim { color: #888; font-size: 12px; }
+  .legend { font-size: 12px; color: #555; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .legend .lg-item { display: inline-flex; align-items: center; gap: 3px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
+  .legend .line-s, .legend .line-d { display: inline-block; width: 20px; vertical-align: middle; }
+  .legend .line-s { border-top: 3px solid #666; }
+  .legend .line-d { border-top: 3px dashed #666; }
+  .main { display: flex; align-items: flex-start; }
+  .steps-col { position: sticky; top: 56px; width: 280px; flex: none; background: #fff;
+               border-right: 1px solid #ddd; max-height: calc(100vh - 64px); overflow: auto; }
+  .steps-col h4 { margin: 10px 12px 6px; font-size: 13px; color: #666; }
+  .step-row { display: flex; align-items: center; gap: 8px; padding: 5px 12px; font-size: 12px;
+              border-bottom: 1px solid #f0f0f0; }
+  .step-row .seq { flex: none; width: 20px; height: 20px; border-radius: 3px; color: #fff; font-size: 11px;
+                   display: inline-flex; align-items: center; justify-content: center; }
+  .step-row .action { flex: none; color: #333; font-family: ui-monospace, SFMono-Regular, monospace; }
+  .step-row .label { color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .step-row.no-box { opacity: .45; background: #fafafa; }
+  .wrap { flex: 1; padding: 16px; display: flex; justify-content: center; overflow: auto; }
+  .stage { position: relative; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
+  .stage img { display: block; width: 100%; height: 100%; }
+  .stage .box { position: absolute; box-sizing: border-box; pointer-events: none; }
+  .stage .box .badge { position: absolute; left: -1px; top: -1px; color: #fff; font-size: 11px; line-height: 1;
+                       padding: 2px 4px; border-radius: 0 0 2px 0; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>步骤级高亮</b>
+  <span class="dim">内容 ${cw}×${ch} · 步骤 ${steps.length}</span>
+  <span class="legend">${legendColors}</span>
+  <span class="legend"><span class="line-s"></span> bbox <span class="line-d"></span> 匹配</span>
+</div>
+<div class="main">
+  <div class="steps-col">
+    <h4>步骤列表（${steps.length}）</h4>
+    ${listParts.join('')}
+  </div>
+  <div class="wrap">
+    <div class="stage" style="width:${W}px;height:${H}px;">
+      <img src="data:image/png;base64,${b64 ?? ''}" alt="阶段长图">
+      ${boxParts.join('')}
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+}
