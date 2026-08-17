@@ -103,8 +103,8 @@
 | **PR-LOC** | **本仓库已落地（V2.1）** | 阶段长图 + 控件高亮 | AI `phase_done` 后 1 张 PNG；浅蓝蒙层 + 描边；滚主滚动区拼接。**湿测已完成**（对公长表单 / BiB） | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · [plan](plans/2026-08-13-phase-highlight-long-screenshot.md) |
 | **PR-LOC-HL** | 挂起 | 步骤级高亮截图 | 操作**完成后**逐步高亮再截 | 逐步截仍挂起；阶段级高亮已并入 **PR-LOC** |
 | **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data 软文本底座；**需专刀 design** |
-| **PR-BATCH** | **部分完成**（本周：交易列表加任务 8/19） | 批量导入：用户只看自己任务 | ① 用户隔离与 **PR-USER** appid 隔离同源，本周排 8/19；②行进度 + ③phase `done_logs` 已合 V2.1 | Vue BatchImport 另仓 |
-| **PR-USER** | 待办（本周子项：系统树凭据维护 8/19） | 用户/系统树权限 | 树共享；交易本人可见；仅管理员删树。**本期只做系统树创建时用户名/密码/角色维护，不做权限闸** | 等 **PR-SSO-ADMIN**（权限部分）；凭据维护子项本周可独立推进 |
+| **PR-BATCH** | ① 用户隔离**后端已落地**（2026-08-17）；交易列表加任务前端联调进行中（8/19） | 批量导入：用户只看自己任务 | ① 用户隔离与 **PR-USER** appid 隔离同源：`paas_user_id` 列表过滤/盖章/存量回填/批量透传已落地（commit `c0503f3`/`7abf7e8`/`8ab90e0`）；②行进度 + ③phase `done_logs` 已合 V2.1 | Vue BatchImport 另仓联调 8/19 |
+| **PR-USER** | 凭据维护**后端已落地**（2026-08-17）；前端 UI + 联调进行中（8/19） | 用户/系统树权限 | 树共享；交易本人可见；仅管理员删树。**本期只做系统树创建时用户名/密码/角色维护，不做权限闸**：`system_account.username`→`account` 更名 + 节点 POST/PUT `accounts[]` 批量维护（`1a46519`）+ 节点详情回显 `accounts[]`（`d09fc60`） | 等 **PR-SSO-ADMIN**（权限部分）；前端凭据维护 UI 8/19 |
 | **PR-SSO** | 子项已落地（2026-08-17：appid 登录 + 数据隔离）；完整登录后置 | 接入公司账号中心 HTTP API | 前端跳账号中心登录，回调 authCode=JWT 当 token；后端纯解 JWT payload 拿 `paasUserId` 做 `/api/v2/*` 用户隔离（`SSO_AUTH_REQUIRED` 默认关，空 `paas_user_id`=全可见）；管理员映射仍挂起 | 等 **PR-SSO-ADMIN**（管理员映射）；换会话/权限后置 |
 | **PR-PUSH** | **已完成**（2026-08-15） · V2.0：每步 regionId/parentRegionId + 每交易 phases[]（截图引用+元数据）— [spec](specs/2026-08-14-batch-push-v2-region-evidence-design.md) | 推送到自动化 | 拒草稿；仅 recorded/completed；`characterize-transaction-export-region.mjs` OK；**未见 live 湿测记录** | export-push-gate |
 | **PR-EXEC** | **挂起** | 脚本执行（引擎/执行机） | 本侧只提供浏览器操作与 actions 设计；暂不排调度产品 | T9 / session-lifecycle 湿测另跟 |
@@ -115,8 +115,8 @@
 
 | 任务 | 对应 todo / 工程项 | 状态 | 交付日期 | 备注 |
 |------|--------------------|------|----------|------|
-| 3. 系统管理：系统树创建时维护用户名、密码、角色 | PR-USER 子集（不含权限闸） | **本周进行中** | **8.19** | 用作测试数据补充；当前版本不做权限场景，后续版本增加 |
-| 4. 交易列表里增加任务 | PR-BATCH | **本周进行中** | **8.19** | 需求澄清已完成；JS-gen 对齐接口，Vue 另仓联调 |
+| 3. 系统管理：系统树创建时维护用户名、密码、角色 | PR-USER 子集（不含权限闸） | **后端已交付**（2026-08-17）；前端 UI + 联调 8/19 | **8.19** | 后端：`account` 更名 + `accounts[]` 批量维护（`1a46519`）+ 节点详情回显（`d09fc60`）；前端凭据维护表单另仓进行中；当前版本不做权限场景 |
+| 4. 交易列表里增加任务 | PR-BATCH | **后端隔离已交付**（2026-08-17）；Vue 联调 8/19 | **8.19** | 后端 `paas_user_id` 过滤/盖章/回填已落地（`c0503f3`/`7abf7e8`/`8ab90e0`）；Vue BatchImport 另仓联调 |
 | 5. 登录：流水线 appid + 脚本数据用户隔离 | PR-SSO / PR-USER 子集 | **已交付**（2026-08-17，比排期提前） | **8.19** | 后端 `paas_user_id` 隔离 + `/api/v2/auth/*`（commit `c0503f3`/`45e0b6a`）+ 前端 SSO 接通（另仓 dev `75e9562`）；`SSO_AUTH_REQUIRED` 默认关，联调/冒烟时开；PR-SSO-ADMIN 仍挂起，不阻塞本子项 |
 
 **排期：**
@@ -180,6 +180,7 @@
 
 ## 更新记录
 
+| 2026-08-17 | **任务 3/4 后端交付、任务 5 已交付**：产品任务表更新——**PR-BATCH** ① 用户隔离后端已落地（`c0503f3`/`7abf7e8`/`8ab90e0`）、**PR-USER** 凭据维护后端已落地（`1a46519`/`d09fc60`）、**PR-SSO** 子项已落地；本周任务 3/4 标「后端已交付，前端 UI + 联调 8/19」，任务 5 标已交付。另：**执行机 slot 复用 bug 修复**（`a9a4d56`）：supersede 补关闭执行机 agent session（keepBrowser 保留 Chrome 复用），根因=控制面重启后重连时旧 slot 占用排除孤儿扫描导致新开 slot |
 | 2026-08-17 | **新增「开发事项对齐」区段**：本周 3/4/5 拆解为三块——① 登录与用户管理（SSO 接入/JWT 解码/前端接通已落地；友好用户名、token 校验、权限闸待办或挂起）、② 交易管理用户隔离（列表过滤/盖章/批量透传/存量回填已落地；只看我的 UI、messages 等隔离待办）、③ 系统多账户 + 新增/编辑接口同步（accounts[] 批量维护已落地 `1a46519`；前端凭据维护 UI 与联调进行中 8/19）。补漏 commit `7abf7e8`（批量导入生成交易透传 paasUserId）、存量回填 `8ab90e0` |
 | 2026-08-17 | **任务 5（appid 登录 + 数据隔离）已交付**：后端 `paas_user_id` 列（迁移已跑）+ `/api/v2/auth/*` 四端点 + auth 中间件（`SSO_AUTH_REQUIRED` 默认关）+ 列表/批量导入按 `paasUserId` 过滤与盖章（commit `c0503f3`，verify-all Python 解析修复 `45e0b6a`）；前端 SSO 接通 + user store + 401 处理（另仓 dev `75e9562`）。characterization 20/20 绿（内嵌 Python）；`characterize-tree-select-record` 需 `playwright install`（预存环境，未跑） |
 | 2026-08-17 | 产品周任务表排期：本人负责 3/4/5（系统树凭据维护、交易列表加任务、appid 登录 + 数据隔离），8/19 交付；新增「本周任务」小节；PR-USER/PR-SSO/PR-BATCH 标注本周子项。截图插件任务不归本人（健君 / 淼一、正祥、张奕伟 8/21） |
