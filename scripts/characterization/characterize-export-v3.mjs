@@ -144,6 +144,31 @@ function testGroupsSynthetic() {
   check(result.id === 'traj-99' && result.url === 'http://x/', 'result id/url');
 }
 
+// ── 纯函数：弹窗实例区分（同标题不同触发按钮 = 不同弹窗组）──
+function testDialogInstances() {
+  console.log('[pure] 弹窗实例区分');
+  const result = buildGroupsResult({
+    traj: { id: 100, name: '弹窗实例' },
+    phases: [{ id: 1, phaseNumber: 1, description: '' }],
+    phaseScreenshots: [],
+    stepsByPhase: {
+      1: [
+        { stepNumber: 1, actionType: 'click_adjacent_button', source: 'agent', elementJson: { tag: 'button', xpath_smart: '//button[normalize-space()="引入A"]', target_kind: 'button', text: '引入A', region_id: 'tab:T' } },
+        { stepNumber: 2, actionType: 'select_option', source: 'agent', elementJson: { tag: 'input', xpath_smart: '//input[1]', target_kind: 'form_select', formLabel: '客户名称', region_id: 'overlay:客户放大镜选择器' } },
+        { stepNumber: 3, actionType: 'click_adjacent_button', source: 'agent', elementJson: { tag: 'button', xpath_smart: '//button[normalize-space()="引入B"]', target_kind: 'button', text: '引入B', region_id: 'tab:T' } },
+        { stepNumber: 4, actionType: 'select_option', source: 'agent', elementJson: { tag: 'input', xpath_smart: '//input[2]', target_kind: 'form_select', formLabel: '客户名称', region_id: 'overlay:客户放大镜选择器' } },
+      ],
+    },
+  });
+  const dialogs = result.groups.filter((g) => g.type === 'dialog');
+  check(dialogs.length === 2, `同标题不同 anchor → 2 个弹窗组（实际 ${dialogs.length}）`);
+  check(new Set(dialogs.map((d) => d.id)).size === 2, '弹窗组 id 互不相同（key 含 anchor）');
+  check(dialogs[0].id.includes('引入A') && dialogs[1].id.includes('引入B'), '各弹窗组 anchor 对应各自触发按钮');
+  const dlg1Controls = result.groups.filter((g) => g.type === 'ele' && g.pid === dialogs[0].id);
+  const dlg2Controls = result.groups.filter((g) => g.type === 'ele' && g.pid === dialogs[1].id);
+  check(dlg1Controls.length === 1 && dlg2Controls.length === 1, '控件分挂各自弹窗组');
+}
+
 // ── 真实数据（traj 38）──
 async function testRealData() {
   console.log('[real data] traj 38');
@@ -193,6 +218,7 @@ async function main() {
   testOverlay();
   testControlNode();
   testGroupsSynthetic();
+  testDialogInstances();
   await testRealData();
   if (failures) {
     console.error(`\ncharacterize-export-v3: ${failures} FAILURE(S)`);

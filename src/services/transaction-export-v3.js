@@ -196,7 +196,7 @@ export function buildGroupsResult({ traj = {}, phases = [], phaseScreenshots = [
         : [],
     });
 
-    const dialogByTitle = new Map();
+    const dialogByKey = new Map();
     let lastAnchor = null; // 弹窗 anchor 推断：最近的非弹窗 button/click 步骤
     const steps = stepMap[phaseId] || [];
     steps.forEach((step, idx) => {
@@ -208,12 +208,14 @@ export function buildGroupsResult({ traj = {}, phases = [], phaseScreenshots = [
       const params = parseJson(step?.paramsJson);
       if (overlay) {
         const title = overlay.label || 'overlay';
-        let dlg = dialogByTitle.get(title);
+        const anchorXpath = lastAnchor?.xpath ?? '';
+        // 同标题不同触发按钮 = 不同弹窗实例（如两次打开"客户放大镜选择器"）
+        const dlgKey = `${title}@@${anchorXpath}`;
+        let dlg = dialogByKey.get(dlgKey);
         if (!dlg) {
-          const anchorXpath = lastAnchor?.xpath ?? '';
           const key = `${pageId}|dialog:${title}${anchorXpath ? `@@anchor=${anchorXpath}` : ''}`;
           dlg = { id: key, pid: pageId, type: 'dialog', key, name: title, screenshots: [] };
-          dialogByTitle.set(title, dlg);
+          dialogByKey.set(dlgKey, dlg);
           groups.push(dlg);
         }
         groups.push(buildControlNode(step, el, params, {

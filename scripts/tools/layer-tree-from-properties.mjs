@@ -168,13 +168,14 @@ export function buildTreeFromSteps(steps) {
   return root;
 }
 
-/** 递归渲染树为 HTML 字符串（fc-tree 风格，可折叠：层级节点带 chevron + children 容器）。 */
+/** 递归渲染树为 HTML 字符串（fc-tree 风格，可折叠：层级节点带 chevron + children 容器）。
+ *  items（叶子）与 children（子分支）统一包进 .tree-children 容器——所有分支都可折叠。 */
 function treeToHtml(node, depth) {
   const pad = 8 + depth * 18;
   const [cls, label] = roleInfo(node.role);
-  const hasKids = node.children.length > 0;
+  const hasContent = node.items.length > 0 || node.children.length > 0;
   const leafCount = node.items.length + node.children.reduce((n, c) => n + c.items.length, 0);
-  const chev = hasKids
+  const chev = hasContent
     ? `<span class="tree-chevron" data-chevron="1">▾</span>`
     : `<span class="tree-chevron tree-chevron-empty"></span>`;
   let html = `<div class="tree-node tree-branch" data-depth="${depth}" style="padding-left:${pad}px">`
@@ -184,17 +185,17 @@ function treeToHtml(node, depth) {
     + `<span class="tree-name">${esc(node.label || '(未命名)')}</span>`
     + (leafCount ? `<span class="tree-count">${leafCount}</span>` : '')
     + `</div>`;
-  for (const it of node.items) {
-    html += `<div class="tree-node tree-leaf" data-depth="${depth + 1}" style="padding-left:${pad + 26}px" `
-      + `title="${esc('regionId: ' + (it.regionId || '(无)') + ' | eventType: ' + (it.actionValue || it.action))}">`
-      + `<span class="tree-step-no">${it.no}</span>`
-      + `<span class="tree-object-tag">${esc(it.action)}</span>`
-      + `<span class="tree-name">${esc(it.name)}</span>`
-      + (it.hasBbox ? `<span class="tree-bbox-tag">bbox</span>` : '')
-      + `</div>`;
-  }
-  if (hasKids) {
+  if (hasContent) {
     html += `<div class="tree-children">`;
+    for (const it of node.items) {
+      html += `<div class="tree-node tree-leaf" data-depth="${depth + 1}" style="padding-left:${pad + 26}px" `
+        + `title="${esc('regionId: ' + (it.regionId || '(无)') + ' | eventType: ' + (it.actionValue || it.action))}">`
+        + `<span class="tree-step-no">${it.no}</span>`
+        + `<span class="tree-object-tag">${esc(it.action)}</span>`
+        + `<span class="tree-name">${esc(it.name)}</span>`
+        + (it.hasBbox ? `<span class="tree-bbox-tag">bbox</span>` : '')
+        + `</div>`;
+    }
     for (const c of node.children) html += treeToHtml(c, depth + 1);
     html += `</div>`;
   }
