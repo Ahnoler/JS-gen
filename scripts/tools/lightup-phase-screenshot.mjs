@@ -104,7 +104,6 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
 <div class="bar">
   <b>阶段长图控件点亮 #${screenshotId}</b>
   <span class="dim">elements ${elements.length} · 内容 ${cw}×${ch} · 图片 ${meta.imageWidth ?? '?'}×${meta.imageHeight ?? '?'}</span>
-  <label><input type="checkbox" id="onlyLabel" checked> 仅显示有文本控件</label>
   <label><input type="checkbox" id="showAll" checked> 显示全部</label>
   <label><input type="checkbox" id="onlyActed"> 仅显示本阶段操作过的控件</label>
   <span class="dim" id="actedStat"></span>
@@ -119,7 +118,6 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
   const DATA = ${JSON.stringify({ elements, cw, ch, imageWidth: meta.imageWidth, imageHeight: meta.imageHeight, b64, steps })};
   const stage = document.getElementById('stage');
   const side = document.getElementById('side');
-  const onlyLabel = document.getElementById('onlyLabel');
   const showAll = document.getElementById('showAll');
   const onlyActed = document.getElementById('onlyActed');
 
@@ -180,11 +178,10 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
       const e = DATA.elements[i];
       const acted = actedIndex.has(i);
       div.classList.toggle('acted', acted);
-      const hidden = !showAll.checked || (onlyLabel.checked && !e.label) || (onlyActed.checked && !acted);
+      const hidden = !showAll.checked || (onlyActed.checked && !acted);
       div.style.display = hidden ? 'none' : '';
     });
   }
-  onlyLabel.addEventListener('change', applyFilter);
   showAll.addEventListener('change', applyFilter);
   onlyActed.addEventListener('change', applyFilter);
   applyFilter();
