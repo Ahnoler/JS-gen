@@ -573,6 +573,41 @@ PAGE_LOCATOR_HELPERS = r'''
       }
       return withLayers({ region_role: 'other', region_id: 'other', region_label: regionLabelOf('other') });
     }
+    function pickScrollRoot() {
+      const cands = document.querySelectorAll('.el-main, .app-main');
+      for (let k = 0; k < cands.length; k++) {
+        const el = cands[k];
+        const s = getComputedStyle(el);
+        const oy = s.overflowY || s.overflow;
+        if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 8) return el;
+      }
+      let best = null;
+      const all = document.querySelectorAll('div, main, section, article');
+      for (let k = 0; k < all.length; k++) {
+        const el = all[k];
+        if (el.clientHeight < 100) continue;
+        const s = getComputedStyle(el);
+        const oy = s.overflowY || s.overflow;
+        if (oy !== 'auto' && oy !== 'scroll') continue;
+        if (el.scrollHeight <= el.clientHeight + 8) continue;
+        if (!best || el.scrollHeight > best.scrollHeight) best = el;
+      }
+      if (best) return best;
+      return document.scrollingElement || document.documentElement;
+    }
+    function stepBBoxOf(el) {
+      if (!el || !el.getBoundingClientRect) return null;
+      const root = pickScrollRoot();
+      const isDoc = root === document.scrollingElement || root === document.documentElement;
+      const box = isDoc ? { x: 0, y: 0 } : root.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      return {
+        x1: Math.round(r.left - box.x),
+        y1: Math.round(r.top + root.scrollTop - box.y),
+        x2: Math.round(r.right - box.x),
+        y2: Math.round(r.bottom + root.scrollTop - box.y),
+      };
+    }
     function buildFeatureCard(el, regionHint) {
       var region = regionHint || assignRegion(el);
       var cls = String((el && el.getAttribute && el.getAttribute('class')) || '').trim();

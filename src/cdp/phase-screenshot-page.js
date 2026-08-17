@@ -58,7 +58,6 @@ export function buildPhaseScreenshotScrollExpression({ top }) {
 export function buildPhaseScreenshotCollectExpression() {
   return `(() => {
     ${PAGE_LOCATOR_HELPERS}
-    ${PICK_SCROLL_ROOT_FN}
     const root = pickScrollRoot();
     const isDoc = root === document.scrollingElement || root === document.documentElement;
     const box = isDoc
