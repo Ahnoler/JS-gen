@@ -46,6 +46,7 @@ const KIND_MAP = Object.freeze({
   button: 'button',
   menu: 'menu',
   table_row_button: 'button',
+  adjacent_button: 'button',
   tree_node: 'tree',
   tab: 'tab',
   submenu: 'menu',
@@ -149,6 +150,45 @@ export function buildControlNode(step, el, params, { pid, group, anchor, scanInd
   return node;
 }
 
+/**
+ * 重排 groups：每个弹窗组（+其弹窗控件）紧跟触发按钮 ele 之后。
+ * 弹窗控件在 groups 中紧跟在弹窗组后（overlay 步骤连续），整块移动。
+ */
+export function reorderDialogsAfterAnchor(groups = []) {
+  const dlgBlocks = [];
+  const blockById = new Map();
+  for (const g of groups) {
+    if (g.type === 'dialog') {
+      const block = [g];
+      dlgBlocks.push(block);
+      blockById.set(g.id, block);
+    } else if (g.type === 'ele' && g.group?.length && blockById.has(g.pid)) {
+      blockById.get(g.pid).push(g);
+    }
+  }
+  if (!dlgBlocks.length) return groups;
+  const placed = new Set();
+  const ordered = [];
+  for (const g of groups) {
+    if (g.type === 'dialog') continue; // 弹窗组由按钮触发点插入
+    if (g.type === 'ele' && g.group?.length) continue; // 弹窗控件随块插入，避免重复
+    ordered.push(g);
+    if (g.type === 'ele') {
+      for (const block of dlgBlocks) {
+        const dlg = block[0];
+        if (!placed.has(dlg.id) && dlg._anchorEle === g) {
+          ordered.push(...block);
+          placed.add(dlg.id);
+        }
+      }
+    }
+  }
+  for (const block of dlgBlocks) {
+    if (!placed.has(block[0].id)) ordered.push(...block); // anchor 未找到 → 追加末尾
+  }
+  return ordered;
+}
+
 function groupStepsByPhase(steps = []) {
   const byPhase = {};
   for (const s of steps) {
@@ -198,6 +238,7 @@ export function buildGroupsResult({ traj = {}, phases = [], phaseScreenshots = [
 
     const dialogByKey = new Map();
     let lastAnchor = null; // 弹窗 anchor 推断：最近的非弹窗 button/click 步骤
+    let lastAnchorEle = null; // 对应 ele 节点引用（弹窗组重排：紧跟触发按钮）
     const steps = stepMap[phaseId] || [];
     steps.forEach((step, idx) => {
       const el = parseStepElement(step);
@@ -214,7 +255,10 @@ export function buildGroupsResult({ traj = {}, phases = [], phaseScreenshots = [
         let dlg = dialogByKey.get(dlgKey);
         if (!dlg) {
           const key = `${pageId}|dialog:${title}${anchorXpath ? `@@anchor=${anchorXpath}` : ''}`;
-          dlg = { id: key, pid: pageId, type: 'dialog', key, name: title, screenshots: [] };
+          dlg = {
+            id: key, pid: pageId, type: 'dialog', key, name: title, screenshots: [],
+            _anchorEle: lastAnchorEle || null, // 重排用：弹窗组紧跟触发按钮
+          };
           dialogByKey.set(dlgKey, dlg);
           groups.push(dlg);
         }
@@ -226,12 +270,14 @@ export function buildGroupsResult({ traj = {}, phases = [], phaseScreenshots = [
         }));
       } else {
         // TODO: 同阶段多页面区分——当前一张长图=一个页面组；未来按步骤 URL 切分页面组
-        groups.push(buildControlNode(step, el, params, { pid: pageId, group: [], anchor: null, scanIndex: idx }));
+        const node = buildControlNode(step, el, params, { pid: pageId, group: [], anchor: null, scanIndex: idx });
+        groups.push(node);
         if ((actionType === 'click' || actionType.startsWith('click_')) && step?.success !== false) {
           lastAnchor = {
             xpath: String(el.xpath_smart ?? el.xpath_full ?? el.xpath ?? '').trim(),
             name: String(el.formLabel ?? el.text ?? el.matchedLabel ?? '').trim(),
           };
+          lastAnchorEle = node;
         }
       }
     });
@@ -241,7 +287,7 @@ export function buildGroupsResult({ traj = {}, phases = [], phaseScreenshots = [
     id: traj.id != null ? `traj-${traj.id}` : '',
     name: String(traj.name ?? '').trim() || `trajectory-${traj.id}`,
     url: String(traj.url ?? '').trim() || '',
-    groups,
+    groups: reorderDialogsAfterAnchor(groups),
   };
 }
 

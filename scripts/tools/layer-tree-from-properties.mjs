@@ -169,7 +169,8 @@ export function buildTreeFromSteps(steps) {
 }
 
 /** 递归渲染树为 HTML 字符串（fc-tree 风格，可折叠：层级节点带 chevron + children 容器）。
- *  items（叶子）与 children（子分支）统一包进 .tree-children 容器——所有分支都可折叠。 */
+ *  items（叶子）与 children（子分支）统一包进 .tree-children 容器——所有分支都可折叠。
+ *  有 node.entries（V3 groups 时间线顺序）时按 entries 交错渲染（弹窗组紧跟触发按钮）。 */
 function treeToHtml(node, depth) {
   const pad = 8 + depth * 18;
   const [cls, label] = roleInfo(node.role);
@@ -178,6 +179,13 @@ function treeToHtml(node, depth) {
   const chev = hasContent
     ? `<span class="tree-chevron" data-chevron="1">▾</span>`
     : `<span class="tree-chevron tree-chevron-empty"></span>`;
+  const leafHtml = (it) => `<div class="tree-node tree-leaf" data-depth="${depth + 1}" style="padding-left:${pad + 26}px" `
+    + `title="${esc('regionId: ' + (it.regionId || '(无)') + ' | eventType: ' + (it.actionValue || it.action))}">`
+    + `<span class="tree-step-no">${it.no}</span>`
+    + `<span class="tree-object-tag">${esc(it.action)}</span>`
+    + `<span class="tree-name">${esc(it.name)}</span>`
+    + (it.hasBbox ? `<span class="tree-bbox-tag">bbox</span>` : '')
+    + `</div>`;
   let html = `<div class="tree-node tree-branch" data-depth="${depth}" style="padding-left:${pad}px">`
     + chev
     + `<span class="tree-level-type ${cls}">${esc(label)}</span>`
@@ -187,22 +195,23 @@ function treeToHtml(node, depth) {
     + `</div>`;
   if (hasContent) {
     html += `<div class="tree-children">`;
-    for (const it of node.items) {
-      html += `<div class="tree-node tree-leaf" data-depth="${depth + 1}" style="padding-left:${pad + 26}px" `
-        + `title="${esc('regionId: ' + (it.regionId || '(无)') + ' | eventType: ' + (it.actionValue || it.action))}">`
-        + `<span class="tree-step-no">${it.no}</span>`
-        + `<span class="tree-object-tag">${esc(it.action)}</span>`
-        + `<span class="tree-name">${esc(it.name)}</span>`
-        + (it.hasBbox ? `<span class="tree-bbox-tag">bbox</span>` : '')
-        + `</div>`;
+    if (Array.isArray(node.entries) && node.entries.length) {
+      for (const e of node.entries) {
+        if (e.kind === 'item') html += leafHtml(node.items[e.index]);
+        else if (e.kind === 'child' && node.children[e.index]) html += treeToHtml(node.children[e.index], depth + 1);
+      }
+    } else {
+      for (const it of node.items) html += leafHtml(it);
+      for (const c of node.children) html += treeToHtml(c, depth + 1);
     }
-    for (const c of node.children) html += treeToHtml(c, depth + 1);
     html += `</div>`;
   }
   return html;
 }
 
-/** 从 V3 result.groups（扁平 pid 树）构建分层树：page 组为根 → dialog 组/控件挂 pid。 */
+/** 从 V3 result.groups（扁平 pid 树）构建分层树：page 组为根 → dialog 组/控件挂 pid。
+ *  控件与弹窗组按 groups 数组顺序（= 操作时间线）记录在 node.entries，
+ *  渲染时弹窗组紧跟其触发按钮之后（而非全部排在控件末尾）。 */
 export function buildTreeFromGroups(groups) {
   const root = { role: 'page', label: '交易页面', children: [], items: [] };
   const byId = new Map();
@@ -215,16 +224,25 @@ export function buildTreeFromGroups(groups) {
     if (g.type === 'page') root.children.push(byId.get(g.id));
     else if (g.type === 'dialog') (byId.get(g.pid) || root).children.push(byId.get(g.id));
   }
+  // 单循环按 groups 数组顺序（= 时间线）交错记录 items/children entries
   for (const g of groups || []) {
-    if (g.type !== 'ele') continue;
-    (byId.get(g.pid) || root).items.push({
-      no: String(g.id || '').replace('step-', '') || 0,
-      name: g.propertiesName || g.label || g.id || '(无名称)',
-      action: g.kind || g.action || '操作',
-      actionValue: g.kind || '',
-      regionId: '',
-      hasBbox: !!g.rect,
-    });
+    const parent = byId.get(g.pid) || root;
+    if (g.type === 'ele') {
+      const item = {
+        no: String(g.id || '').replace('step-', '') || 0,
+        name: g.propertiesName || g.label || g.id || '(无名称)',
+        action: g.kind || g.action || '操作',
+        actionValue: g.kind || '',
+        regionId: '',
+        hasBbox: !!g.rect,
+      };
+      parent.items.push(item);
+      (parent.entries ||= []).push({ kind: 'item', index: parent.items.length - 1 });
+    } else if (g.type === 'dialog') {
+      const childNode = byId.get(g.id);
+      const childIdx = childNode ? parent.children.indexOf(childNode) : -1;
+      if (childIdx >= 0) (parent.entries ||= []).push({ kind: 'child', index: childIdx });
+    }
   }
   return root;
 }
