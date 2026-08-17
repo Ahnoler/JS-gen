@@ -97,6 +97,33 @@ def test_model_persists_region_bbox() -> None:
     assert_true(j.get('layers') == ['tab:A', 'section:B', 'titlebox:C'], "to_element_json keeps layers")
 
 
+def test_node_copy_locator_meta_persists_bbox() -> None:
+    """Node 侧 copyLocatorMeta 落库必须保留 bbox（直播录制持久化）。
+    （根因修复：src/models/element.js 的 copyLocatorMeta 曾漏 bbox 复制，
+    action_log_sync 带来的 bbox 在 prepareElementJson 归一化时被丢弃。）"""
+    import subprocess
+
+    src = (ROOT / "src/models/element.js").read_text(encoding="utf-8")
+    assert_true("target.bbox" in src, "copyLocatorMeta copies bbox to normalized element")
+
+    code = (
+        "import {toElementJson} from './src/models/element.js';"
+        "const j = toElementJson({tag:'input', text:'x', bbox:{x1:1,y1:2,x2:3,y2:4}, region_id:'r'});"
+        "console.log(JSON.stringify(j.bbox), JSON.stringify(j.region_id));"
+    )
+    proc = subprocess.run(
+        ["node", "--input-type=module", "-e", code],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert_true(proc.returncode == 0, f"node -e toElementJson failed: {proc.stderr}")
+    out = proc.stdout.strip()
+    assert_true('"x1":1' in out and '"y2":4' in out, f"toElementJson output keeps bbox coords: {out}")
+    assert_true('"r"' in out, f"toElementJson output keeps region_id: {out}")
+
+
 def main() -> int:
     test_helpers_have_scroll_root_and_bbox()
     test_phase_screenshot_collect_uses_helpers_root()
@@ -104,6 +131,7 @@ def main() -> int:
     test_enrich_has_region_bbox()
     test_helpers_passthrough_region_bbox()
     test_model_persists_region_bbox()
+    test_node_copy_locator_meta_persists_bbox()
     print("characterize-step-region-bbox: OK")
     return 0
 
