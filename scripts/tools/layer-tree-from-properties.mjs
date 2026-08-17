@@ -14,11 +14,17 @@
  *   node scripts/tools/layer-tree-from-properties.mjs --file <export.json>
  */
 import { readFileSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { getDB } from '../../config/database.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/** 仅直接执行时才跑 CLI（import 用于 characterization 时不触发）。 */
+function isDirectRun() {
+  const entry = process.argv[1] ? resolve(process.argv[1]) : '';
+  return !!entry && fileURLToPath(import.meta.url).toLowerCase() === entry.toLowerCase();
+}
 
 function argValue(name) {
   const i = process.argv.indexOf(name);
@@ -54,7 +60,7 @@ function esc(s) {
 }
 
 /** 从 transcationProperties[] 按 regionId 拆层级建树；叶 = 操作步骤。 */
-function buildTreeFromProperties(properties) {
+export function buildTreeFromProperties(properties) {
   const root = { role: 'page', label: '交易操作', children: [], items: [] };
   const map = new Map();
   map.set('', root);
@@ -91,7 +97,7 @@ function buildTreeFromProperties(properties) {
 }
 
 /** 从阶段截图 metadata.elements[] 按 layers（外→内）聚合分层树；叶 = 控件对象。 */
-function buildTreeFromElements(elements) {
+export function buildTreeFromElements(elements) {
   const root = { role: 'page', label: '阶段页面', children: [], items: [] };
   const map = new Map();
   map.set('', root);
@@ -121,7 +127,7 @@ function buildTreeFromElements(elements) {
 
 /** 从步骤（trajectory_step.element_json）构建分层树；叶 = 操作步骤。
  *  分层路径：优先 el.layers[]（外→内），否则 el.region_id 按 '|' 拆段（role:label）。 */
-function buildTreeFromSteps(steps) {
+export function buildTreeFromSteps(steps) {
   const root = { role: 'page', label: '交易操作', children: [], items: [] };
   const map = new Map();
   map.set('', root);
@@ -156,27 +162,42 @@ function buildTreeFromSteps(steps) {
       action: s.action,
       actionValue: s.actionValue || s.action,
       regionId: s.regionId || '',
+      hasBbox: !!s.hasBbox,
     });
   });
   return root;
 }
 
-/** 递归渲染树为 HTML 字符串（fc-tree 风格）。 */
+/** 递归渲染树为 HTML 字符串（fc-tree 风格，可折叠：层级节点带 chevron + children 容器）。 */
 function treeToHtml(node, depth) {
   const pad = 8 + depth * 18;
   const [cls, label] = roleInfo(node.role);
-  let html = `<div class="tree-node" style="padding-left:${pad}px">`
+  const hasKids = node.children.length > 0;
+  const leafCount = node.items.length + node.children.reduce((n, c) => n + c.items.length, 0);
+  const chev = hasKids
+    ? `<span class="tree-chevron" data-chevron="1">▾</span>`
+    : `<span class="tree-chevron tree-chevron-empty"></span>`;
+  let html = `<div class="tree-node tree-branch" data-depth="${depth}" style="padding-left:${pad}px">`
+    + chev
     + `<span class="tree-level-type ${cls}">${esc(label)}</span>`
     + `<span class="tree-colon">：</span>`
-    + `<span class="tree-name">${esc(node.label || '(未命名)')}</span></div>`;
+    + `<span class="tree-name">${esc(node.label || '(未命名)')}</span>`
+    + (leafCount ? `<span class="tree-count">${leafCount}</span>` : '')
+    + `</div>`;
   for (const it of node.items) {
-    html += `<div class="tree-node" style="padding-left:${pad + 18}px" `
+    html += `<div class="tree-node tree-leaf" data-depth="${depth + 1}" style="padding-left:${pad + 26}px" `
       + `title="${esc('regionId: ' + (it.regionId || '(无)') + ' | eventType: ' + (it.actionValue || it.action))}">`
       + `<span class="tree-step-no">${it.no}</span>`
       + `<span class="tree-object-tag">${esc(it.action)}</span>`
-      + `<span class="tree-name">${esc(it.name)}</span></div>`;
+      + `<span class="tree-name">${esc(it.name)}</span>`
+      + (it.hasBbox ? `<span class="tree-bbox-tag">bbox</span>` : '')
+      + `</div>`;
   }
-  for (const c of node.children) html += treeToHtml(c, depth + 1);
+  if (hasKids) {
+    html += `<div class="tree-children">`;
+    for (const c of node.children) html += treeToHtml(c, depth + 1);
+    html += `</div>`;
+  }
   return html;
 }
 
@@ -218,6 +239,15 @@ function buildHtml({ properties, steps, elements, title }) {
   .tree-node { display: flex; align-items: center; gap: 4px; font-size: 13px; line-height: 22px;
                cursor: default; white-space: nowrap; padding: 2px 8px; }
   .tree-node:hover { background: #e6f7ff; }
+  .tree-branch { cursor: pointer; user-select: none; }
+  .tree-chevron { width: 14px; flex-shrink: 0; color: #8c8c8c; font-size: 11px; text-align: center; }
+  .tree-chevron-empty { visibility: hidden; }
+  .tree-children.collapsed { display: none; }
+  .tree-count { font-size: 11px; color: #bfbfbf; margin-left: 6px; flex-shrink: 0; }
+  .tree-bbox-tag { font-size: 11px; color: #389e0d; background: #f6ffed; border: 1px solid #b7eb8f;
+                   border-radius: 2px; padding: 0 4px; line-height: 16px; flex-shrink: 0; }
+  .tree-leaf.hidden, .tree-branch.hidden { display: none; }
+  .tree-leaf.hit { background: #fffbe6; }
   .tree-level-type { font-size: 11px; padding: 0 6px; border-radius: 2px; color: #fff;
                      font-weight: 500; line-height: 18px; flex-shrink: 0; }
   .tree-level-type.page { background: #1890ff; }
@@ -237,6 +267,10 @@ function buildHtml({ properties, steps, elements, title }) {
 <div class="bar">
   <b>元素分层</b>
   <span class="dim">${esc(title)} · ${unit} ${list.length} · 未分区 ${unzoned}</span>
+  <label class="dim">搜索 <input id="treeSearch" type="text" placeholder="名称 / 动作 / 层级" style="width:180px"></label>
+  <button type="button" id="expandAll">全部展开</button>
+  <button type="button" id="collapseAll">全部收起</button>
+  <span class="dim" id="treeStat"></span>
 </div>
 <div class="wrap">
   <div class="tree-panel">
@@ -244,6 +278,87 @@ function buildHtml({ properties, steps, elements, title }) {
     <div class="tree-list" id="treeList">${treeHtml}</div>
   </div>
 </div>
+<script>
+  (() => {
+    const list = document.getElementById('treeList');
+    const stat = document.getElementById('treeStat');
+    // 折叠：点击分支节点（不点叶子）toggle 其 tree-children 容器
+    list.addEventListener('click', (ev) => {
+      const branch = ev.target.closest('.tree-branch');
+      if (!branch) return;
+      const kids = branch.nextElementSibling;
+      if (!kids || !kids.classList.contains('tree-children')) return;
+      const collapsed = kids.classList.toggle('collapsed');
+      const chev = branch.querySelector('.tree-chevron');
+      if (chev) chev.textContent = collapsed ? '▸' : '▾';
+    });
+    const setAll = (collapsed) => {
+      for (const kids of list.querySelectorAll('.tree-children')) {
+        const collapsedNow = kids.classList.toggle('collapsed', collapsed);
+        const branch = kids.previousElementSibling;
+        const chev = branch && branch.querySelector('.tree-chevron');
+        if (chev) chev.textContent = collapsedNow ? '▸' : '▾';
+      }
+    };
+    document.getElementById('collapseAll').addEventListener('click', () => setAll(true));
+    document.getElementById('expandAll').addEventListener('click', () => setAll(false));
+    // 搜索：过滤叶子（自身文本或任意祖先层级名含关键词），命中高亮并自动展开祖先
+    const search = document.getElementById('treeSearch');
+    search.addEventListener('input', () => {
+      const kw = search.value.trim().toLowerCase();
+      const leaves = [...list.querySelectorAll('.tree-leaf')];
+      const branches = [...list.querySelectorAll('.tree-branch')];
+      const ancestors = (leaf) => {
+        const acc = [];
+        let el = leaf.parentElement;
+        while (el) {
+          if (el.classList.contains('tree-children')) {
+            const br = el.previousElementSibling;
+            if (br && br.classList.contains('tree-branch')) acc.push(br);
+            el = br;
+          } else {
+            el = el.parentElement;
+          }
+        }
+        return acc;
+      };
+      if (!kw) {
+        for (const el of leaves) el.classList.remove('hidden', 'hit');
+        for (const el of branches) el.classList.remove('hidden');
+        setAll(false);
+        stat.textContent = '';
+        return;
+      }
+      for (const el of leaves) {
+        const hit = (el.textContent || '').toLowerCase().includes(kw)
+          || ancestors(el).some((b) => (b.textContent || '').toLowerCase().includes(kw));
+        el.classList.toggle('hidden', !hit);
+        el.classList.toggle('hit', hit);
+      }
+      for (const el of branches) {
+        // 分支在其后代叶子有命中时显示（展开祖先链）
+        let kids = el.nextElementSibling;
+        let hasHit = false;
+        while (kids && kids.classList.contains('tree-children')) {
+          hasHit = hasHit || [...kids.querySelectorAll('.tree-leaf:not(.hidden)')].length > 0;
+          kids = kids.nextElementSibling && kids.nextElementSibling.classList.contains('tree-children')
+            ? kids.nextElementSibling : null;
+        }
+        if (hasHit) {
+          el.classList.remove('hidden');
+          const ch = el.nextElementSibling;
+          if (ch && ch.classList.contains('tree-children')) ch.classList.remove('collapsed');
+          const chev = el.querySelector('.tree-chevron');
+          if (chev) chev.textContent = '▾';
+        } else {
+          el.classList.add('hidden');
+        }
+      }
+      const shown = leaves.filter((l) => !l.classList.contains('hidden')).length;
+      stat.textContent = \`命中 \${shown} / \${leaves.length}\`;
+    });
+  })();
+</script>
 </body>
 </html>`;
 }
@@ -311,6 +426,10 @@ async function runTrajectoryMode(trajectoryId, phaseNumber) {
     try { el = typeof s.element_json === 'string' ? JSON.parse(s.element_json) : s.element_json; } catch {}
     const label = String(el?.formLabel ?? el?.label ?? el?.matchedLabel ?? el?.text ?? '').trim();
     const actionValue = String(el?.target_kind ?? s.action_type ?? '').trim();
+    const bbox = el?.bbox;
+    const hasBbox = !!bbox && typeof bbox === 'object'
+      && Number.isFinite(Number(bbox.x1)) && Number(bbox.x2) > Number(bbox.x1)
+      && Number(bbox.y2) > Number(bbox.y1);
     steps.push({
       no: s.step_number ?? s.phase_number ?? 0,
       label: label || '(无标签)',
@@ -318,6 +437,7 @@ async function runTrajectoryMode(trajectoryId, phaseNumber) {
       actionValue,
       regionId: String(el?.region_id ?? '').trim(),
       layers: Array.isArray(el?.layers) ? el.layers : null,
+      hasBbox,
     });
   }
   const title = `${traj.name} · phase ${phases.map((p) => p.phase_number).join(',')}`;
@@ -358,4 +478,6 @@ async function runShotMode(screenshotId) {
   await db.destroy();
 }
 
-main();
+if (isDirectRun()) {
+  main();
+}
