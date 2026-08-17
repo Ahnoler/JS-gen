@@ -302,6 +302,7 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
   if (runtime) {
     runtime.abortRecording = true;
     runtime.aiRecording = false;
+    runtime.userStop = { success: !!success };
     const session = state.sessions.get(runtime.sessionId);
     // Always ask agent to stop — do not wait for busy flag (may be stale).
     try {
@@ -372,6 +373,7 @@ export async function stopTrajectoryRecordingSafe(trajectoryId, {
   if (runtime) {
     runtime.abortRecording = true;
     runtime.aiRecording = false;
+    runtime.userStop = { success: !!success };
     const session = state.sessions.get(runtime.sessionId);
     try {
       execSession.forwardStdin({

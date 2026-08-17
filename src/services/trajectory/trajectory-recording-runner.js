@@ -121,6 +121,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   }
 
   runtime.abortRecording = false;
+  runtime.userStop = null;
   runtime.recordStartAt = new Date().toISOString();
   touchTrajectoryRuntimeActivity(tid);
   await trajectoryDao.updateMeta(tid, { recordStatus: 'recording', systemAccountId: acctId });
@@ -307,7 +308,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     for (let i = 0; i < phases.length; i++) {
       const phase = phases[i];
       if (runtime.abortRecording) {
-        await trajectoryPhaseDao.updateStatus(phase.id, 'failed').catch(() => {});
+        await trajectoryPhaseDao.updateStatus(phase.id, runtime.userStop?.success ? 'completed' : 'failed').catch(() => {});
         throw new Error('Recording aborted');
       }
       events.push({ type: 'phase_start', phaseNumber: phase.phaseNumber, description: phase.description });
@@ -440,7 +441,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         clearPhaseActivity();
       }
       if (runtime.abortRecording) {
-        await trajectoryPhaseDao.updateStatus(phase.id, 'failed').catch(() => {});
+        await trajectoryPhaseDao.updateStatus(phase.id, runtime.userStop?.success ? 'completed' : 'failed').catch(() => {});
         throw new Error('Recording aborted');
       }
       const explicitSuccess = donePayload?.success === true
@@ -486,11 +487,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       isSuccessful: true,
     });
   } catch (err) {
-    await trajectoryDao.updateMeta(tid, {
-      recordStatus: 'failed',
-      isDone: false,
-      isSuccessful: false,
-    });
+    // A user-initiated record/stop already wrote the final recordStatus
+    // (recorded/failed); don't let the aborted runner overwrite that choice.
+    if (!runtime.userStop) {
+      await trajectoryDao.updateMeta(tid, {
+        recordStatus: 'failed',
+        isDone: false,
+        isSuccessful: false,
+      });
+    }
     const failText = String(err?.message || err || '').trim();
     if (failText && session?.activePhaseId) {
       await appendPhaseDoneLog(session.activePhaseId, { text: failText, source: 'fail' });
@@ -505,6 +510,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     }
     runtime.abortRecording = false;
     runtime.aiRecording = false;
+    runtime.userStop = null;
     clearPhaseActivity();
     unsubscribe?.();
     await broadcastRecordingLock();

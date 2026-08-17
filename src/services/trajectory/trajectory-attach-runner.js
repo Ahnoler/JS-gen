@@ -4,6 +4,7 @@
  * trajectory-attach-service.js — move-only, no logic changes.
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as execSession from '../../executor-session-client.js';
 import * as remoteSessionService from '../remote-session-service.js';
 import { state } from '../../state.js';
@@ -23,6 +24,15 @@ import { attachTrajectoryLive } from './trajectory-attach-service.js';
 
 export async function prepareTrajectoryRecordingUnlocked(tid) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
+
+  // A fresh prepare must not inherit a stale "recording" signal: reset any phase
+  // left as running by a previous interrupted recording.
+  const stalePhases = await trajectoryPhaseDao.listByTrajectory(tid);
+  for (const phase of stalePhases) {
+    if (phase.status === 'running') {
+      await trajectoryPhaseDao.updateStatus(phase.id, 'pending');
+    }
+  }
 
   if (!USE_EXECUTOR) {
     // Local path: single-live only — refuse if another traj already holds a stream.

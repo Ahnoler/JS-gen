@@ -397,6 +397,12 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     }
 
     const sessionId = runtime?.sessionId || null;
+    if (runtime) {
+      // Closing the browser also aborts any in-flight recording, but detach must not
+      // change recordStatus. Mark userStop so the aborted runner keeps the current status.
+      runtime.abortRecording = true;
+      runtime.userStop = { success: false };
+    }
     // Cache/runtime may be null after streamDetach — resolve via truth
     const remoteSessionId = await resolveHardDetachRemoteSessionId(tid, {
       traj,
@@ -444,14 +450,8 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     slotLease.releaseByTrajectory(tid);
     deleteTrajectoryRuntime(tid);
 
+    // Detach only releases executor resources; it must not change recordStatus.
     let recordStatus = traj?.recordStatus || null;
-    if (traj?.recordStatus === 'recording') {
-      const aiActive = await isAiRecordingActive(tid);
-      await trajectoryDao.updateMetaIf(tid, {
-        recordStatus: aiActive ? 'failed' : 'draft',
-      }, { recordStatusIn: ['recording'] });
-      recordStatus = aiActive ? 'failed' : 'draft';
-    }
 
     const status = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => ({
       attached: false,
