@@ -49,6 +49,11 @@ _ERR_PRESCRIPTIONS = (
         'err-save-notification',
         _PREFIX + '先按错误标签修复字段，再 click_save()；禁止原样重试。',
     ),
+    (
+        'err-notification',
+        _PREFIX + '系统返回了报错。先读清错误文本：修正选择/字段后再重试'
+        '（如更换或清除已选人），禁止原样重复点击确认/保存。',
+    ),
 )
 
 

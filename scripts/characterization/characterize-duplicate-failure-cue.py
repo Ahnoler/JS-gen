@@ -72,6 +72,8 @@ def main() -> int:
     assert_true('修复' in p5 and 'click_save' in p5, 'validation mapping')
     p6 = duplicate_failure_prescription('err-save-notification:y')
     assert_true('修复' in p6 and 'click_save' in p6, 'notification mapping')
+    p8 = duplicate_failure_prescription('err-notification:实际控制人和所选配偶的性别相同，引入失败！')
+    assert_true(p8.startswith('[纠偏] ') and '报错' in p8 and '禁止' in p8, 'err-notification mapping')
     p7 = duplicate_failure_prescription('err-unknown-thing')
     assert_true(p7.startswith('[纠偏] ') and '原样重试' in p7, 'generic fallback')
 

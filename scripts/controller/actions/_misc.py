@@ -164,7 +164,11 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 openDropdown,
                 formErrors,
                 messages: [...document.querySelectorAll('.el-message')].map(e => e.textContent.trim()).filter(Boolean),
-                notifications: [...document.querySelectorAll('.el-notification')].filter(e => e.offsetParent !== null).map(e => e.textContent.trim()).filter(Boolean),
+                notifications: [...document.querySelectorAll('.el-notification')].filter(e => {
+                    const r = e.getBoundingClientRect();
+                    const cs = getComputedStyle(e);
+                    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+                }).map(e => e.textContent.trim()).filter(Boolean),
                 activeTab: document.querySelector('.el-tabs__item.is-active')?.textContent?.trim() || null,
                 treeNodes: document.querySelectorAll('.el-tree-node').length || 0,
                 tableRows: document.querySelectorAll('.el-table__body-wrapper .el-table__row').length || 0,
@@ -557,6 +561,12 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         include_in_memory=True,
                     )
 
+            if compact.startswith(('确认', '确定')):
+                try:
+                    from ._js_snippets import JS_WATCH_SAVE_NOTIFICATIONS
+                    await page.evaluate(JS_WATCH_SAVE_NOTIFICATIONS)
+                except Exception:
+                    pass
             url_before = getattr(page, 'url', '') or ''
             download_path = await browser_context._click_element_node(element_node)
             if download_path:
@@ -621,6 +631,33 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     from scripts.controller.actions._phase_boundary import maybe_record_picker_closed
                     compact2 = re.sub(r'\s+', '', btn_label)
                     if compact2.startswith(('确认', '确定')):
+                        await page.wait_for_timeout(450)
+                        note = await page.evaluate(
+                            r'''() => {
+                                const w = window.__saveWatch || { errorNotifs: [] };
+                                const live = [];
+                                for (const el of document.querySelectorAll('.el-notification')) {
+                                    const r = el.getBoundingClientRect();
+                                    if (r.width > 0 && r.height > 0) live.push((el.textContent || '').trim());
+                                }
+                                const seen = new Set();
+                                for (const raw of [...(w.errorNotifs || []), ...live]) {
+                                    const s = String(raw || '').replace(/\s+/g, ' ').trim();
+                                    if (s && !seen.has(s)) seen.add(s);
+                                }
+                                return [...seen];
+                            }'''
+                        )
+                        if isinstance(note, list) and note:
+                            err_text = note[0][:200]
+                            sys.stderr.write(f'[click] confirm error notification: {err_text}\n')
+                            sys.stderr.flush()
+                            return _err(
+                                f'err-notification:{err_text} | 系统报错，本次确认未成功。'
+                                '先按报错修正选择（如更换或清除已选人）再继续，'
+                                '禁止原样重复点击确认。',
+                                include_in_memory=True,
+                            )
                         record_success_token(case_data_store, 'confirm_click', btn_label)
                         await page.wait_for_timeout(400)
                         still = False
