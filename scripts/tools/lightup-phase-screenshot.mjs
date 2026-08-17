@@ -62,7 +62,7 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
   const cw = Number(meta.contentWidth) || 1;
   const ch = Number(meta.contentHeight) || 1;
   const stepTexts = (Array.isArray(steps) ? steps : [])
-    .map((s) => String(s.text || '').trim()).filter(Boolean);
+    .map((s) => String(s.label || '').trim()).filter(Boolean);
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -116,21 +116,28 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
 <script>
   const KIND_COLORS = ${JSON.stringify(KIND_COLORS)};
   const KIND_COLOR = (k) => KIND_COLORS[k] || '#607d8b';
-  const DATA = ${JSON.stringify({ elements, cw, ch, imageWidth: meta.imageWidth, imageHeight: meta.imageHeight, b64, stepTexts })};
+  const DATA = ${JSON.stringify({ elements, cw, ch, imageWidth: meta.imageWidth, imageHeight: meta.imageHeight, b64, steps })};
   const stage = document.getElementById('stage');
   const side = document.getElementById('side');
   const onlyLabel = document.getElementById('onlyLabel');
   const showAll = document.getElementById('showAll');
   const onlyActed = document.getElementById('onlyActed');
 
-  // 本阶段操作过的控件：以步骤 element.text 精确匹配阶段图 elements.label（调研探索，如实呈现）
+  // 本阶段操作过的控件：三维匹配（字段标签→label、操作 target_kind→kind、regionId→regionId）。
+  // 任一维度为空则跳过该维（如实呈现，不做模糊/包含）。
+  const stepKeys = (DATA.steps || []).filter((s) => s.label);
+  function stepMatched(e) {
+    return stepKeys.some((k) =>
+      String(e.label || '') === k.label
+      && (!k.kind || String(e.kind || '') === k.kind)
+      && (!k.regionId || String(e.regionId || '') === k.regionId)
+    );
+  }
   const actedIndex = new Set();
-  DATA.elements.forEach((e, i) => {
-    if (DATA.stepTexts.includes(String(e.label || ''))) actedIndex.add(i);
-  });
+  DATA.elements.forEach((e, i) => { if (stepMatched(e)) actedIndex.add(i); });
   document.getElementById('actedStat').textContent =
-    '本阶段操作 ' + DATA.stepTexts.length + ' 步' +
-    (DATA.stepTexts.length ? '（' + DATA.stepTexts.join('、') + '）' : '') +
+    '本阶段操作 ' + stepKeys.length + ' 步' +
+    (stepKeys.length ? '（' + stepKeys.map((s) => s.label).join('、') + '）' : '') +
     ' · 匹配到 ' + actedIndex.size + ' 个控件';
 
   const W = ${Number(argValue('--width')) || 1400};
@@ -236,7 +243,10 @@ async function main() {
 
   const b64 = row.image_data.toString('base64');
 
-  // 本阶段操作过的控件（调研探索用）：读取同 phase 的步骤 element.text
+  // 本阶段操作过的控件（调研探索用）：读取同 phase 的步骤 element。
+  // 三维匹配键：label = formLabel（字段标签）|| text（按钮/菜单文本）；
+  //            kind = target_kind（操作目标类型，对应 elements.kind）；
+  //            regionId = region_id（步骤无 region 时为空，该维度跳过）。
   let steps = [];
   if (row.trajectory_phase_id) {
     const stepRows = await db('trajectory_step')
@@ -246,9 +256,14 @@ async function main() {
       let el = null;
       try { el = typeof s.element_json === 'string' ? JSON.parse(s.element_json) : s.element_json; } catch {}
       if (!el) continue;
-      const text = String(el.text ?? el.label ?? '').trim();
-      if (!text) continue;
-      steps.push({ text, regionId: String(el.region_id ?? ''), actionType: String(s.action_type || '') });
+      const label = String(el.formLabel ?? el.label ?? el.matchedLabel ?? el.text ?? '').trim();
+      if (!label) continue;
+      steps.push({
+        label,
+        kind: String(el.target_kind ?? ''),
+        regionId: String(el.region_id ?? ''),
+        actionType: String(s.action_type || ''),
+      });
     }
   }
 
@@ -257,7 +272,7 @@ async function main() {
   writeFileSync(out, html, 'utf8');
   console.log(`已生成: ${out}`);
   console.log(`screenshot #${row.id} | kind=${row.kind} | elements=${meta.elements.length} | image=${meta.imageWidth}x${meta.imageHeight} | content=${meta.contentWidth}x${meta.contentHeight}`);
-  console.log(`本阶段步骤: ${steps.length}（${steps.map((s) => s.text).join('、') || '无'}）| 匹配到阶段图控件: ${meta.elements.filter((e) => steps.some((s) => s.text === e.label)).length}`);
+  console.log(`本阶段步骤: ${steps.length}（${steps.map((s) => s.label).join('、') || '无'}）| 匹配到阶段图控件: ${meta.elements.filter((e) => steps.some((s) => String(e.label || '') === s.label && (!s.kind || String(e.kind || '') === s.kind) && (!s.regionId || String(e.regionId || '') === s.regionId))).length}`);
   await db.destroy();
 }
 
