@@ -557,9 +557,24 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         include_in_memory=True,
                     )
 
+            url_before = getattr(page, 'url', '') or ''
             download_path = await browser_context._click_element_node(element_node)
             if download_path:
                 return _ok(f'downloaded:{download_path}')
+            # Navigation detection for page-transitioning clicks (e.g. 客户转正 → new page).
+            # If URL changed after the click, record a flag that recorder_emitters turns
+            # into a [导航] HumanMessage cue — recorded step stays ok-clicked-N.
+            try:
+                await _wait_if_loading(page)
+                url_after = getattr(page, 'url', '') or ''
+                if url_before and url_after and url_before != url_after:
+                    if case_data_store is not None:
+                        case_data_store['_last_click_navigated'] = {
+                            'from': url_before,
+                            'to': url_after,
+                        }
+            except Exception:
+                pass
             if element_node:
                 raw_xp = str(getattr(element_node, 'xpath', None) or '')
                 raw_cls = str((element_node.attributes or {}).get('class')
