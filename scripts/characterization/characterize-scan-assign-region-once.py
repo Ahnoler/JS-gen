@@ -68,7 +68,7 @@ def test_xpath_smart_fill_only_flag() -> None:
         else:
             os.environ["XPATH_SMART_FILL_ONLY"] = prev
 
-    form_src = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    form_src = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
     assert_true(
         "xpath_smart_fill_only_enabled" in form_src,
         "fill_form_field gates on xpath_smart_fill_only_enabled",

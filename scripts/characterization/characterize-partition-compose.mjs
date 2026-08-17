@@ -189,6 +189,30 @@ const FIXTURE = `<!doctype html>
     <input id="rate-basic" class="field" />
   </div>
 </div>
+<div id="rate-bottom-bar" class="app-main">
+  <div class="steps-wrapper">
+    <div class="el-steps">
+      <div class="el-step is-horizontal">
+        <div class="el-step__head is-process"><div class="el-step__title is-process">基本信息</div></div>
+      </div>
+      <div class="el-step is-horizontal">
+        <div class="el-step__head is-wait"><div class="el-step__title is-wait">影像资料</div></div>
+      </div>
+    </div>
+  </div>
+  <main class="el-main">
+    <div class="el-collapse-item">
+      <div class="el-collapse-item__header">征信信息</div>
+      <div class="titlebox"><span class="title">征信信息</span>
+        <input id="rate-credit" class="field" />
+      </div>
+    </div>
+  </main>
+  <div class="bottom-position-btn">
+    <button id="rate-next">下一步</button>
+    <button id="rate-back">返回</button>
+  </div>
+</div>
 <table class="el-table" id="tbl"><tbody><tr><td><button id="tbl-btn">修改</button></td></tr></tbody></table>
 <div class="el-dialog"><div class="el-dialog__title">提示</div><button id="dlg-ok">确定</button></div>
 <div class="todo-item">
@@ -281,17 +305,12 @@ async function main() {
   ok('adjacent titleboxes stay distinct');
 
   const floatBack = await page.evaluate(assignExpr('#float-back'));
-  assert.equal(floatBack.region_label, '客户基本信息 / 对公客户概况 / 实际控制人');
-  assert.match(
-    String(floatBack.region_id),
-    /tab:客户基本信息\|section:对公客户概况\|titlebox:实际控制人/,
-  );
-  assert.deepEqual(floatBack.layers, [
-    { role: 'tab', label: '客户基本信息' },
-    { role: 'section', label: '对公客户概况' },
-    { role: 'titlebox', label: '实际控制人' },
-  ]);
-  ok('floating bar outside panes inherits nearest titlebox context');
+  assert.equal(floatBack.region_role, 'other');
+  assert.equal(floatBack.region_id, 'other');
+  assert.doesNotMatch(String(floatBack.region_label), /实际控制人/);
+  assert.doesNotMatch(String(floatBack.region_label), /对公客户概况/);
+  assert.deepEqual(floatBack.layers, []);
+  ok('bare page-level button outside panes does NOT inherit titlebox');
 
   const ops = await page.evaluate(assignExpr('#ops-save'));
   assert.equal(ops.region_section, '经营情况');
@@ -344,6 +363,28 @@ async function main() {
   assert.equal(rate.layers[rate.layers.length - 1].role, 'titlebox');
   assert.ok(!(rate.layers || []).some((x) => x.role === 'tab' || x.role === 'wizard' || x.role === 'page'));
   ok('no chrome: collapse + titlebox only');
+
+  const rateNext = await page.evaluate(assignExpr('#rate-next'));
+  assert.equal(rateNext.region_role, 'wizard');
+  assert.equal(rateNext.region_label, '基本信息');
+  assert.match(String(rateNext.region_id), /^wizard:基本信息$/);
+  assert.equal(rateNext.region_block, undefined);
+  assert.deepEqual(rateNext.layers, [{ role: 'wizard', label: '基本信息' }]);
+  ok('bottom-bar 下一步 button: wizard-only, no titlebox inheritance');
+
+  const rateBack = await page.evaluate(assignExpr('#rate-back'));
+  assert.equal(rateBack.region_role, 'wizard');
+  assert.equal(rateBack.region_label, '基本信息');
+  assert.equal(rateBack.region_block, undefined);
+  ok('bottom-bar 返回 button: wizard-only too');
+
+  const rateCredit = await page.evaluate(assignExpr('#rate-credit'));
+  assert.equal(rateCredit.region_label, '基本信息 / 征信信息 / 征信信息');
+  assert.match(String(rateCredit.region_id), /wizard:基本信息/);
+  assert.match(String(rateCredit.region_id), /section:征信信息/);
+  assert.match(String(rateCredit.region_id), /titlebox:征信信息/);
+  assert.deepEqual(rateCredit.layers.map((x) => x.role), ['wizard', 'section', 'titlebox']);
+  ok('input in collapse+titlebox keeps full layers (buttons-only rule)');
 
   const tbl = await page.evaluate(assignExpr('#tbl-btn'));
   assert.equal(tbl.region_role, 'table');

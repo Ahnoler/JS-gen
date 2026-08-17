@@ -825,8 +825,19 @@ export const PAGE_LOCATOR_HELPERS = `
       for (let i = 0; i < nodeList.length; i++) boxes.push(nodeList[i]);
       return pickNearestTitlebox(boxes, el) || null;
     }
+    function isBareActionButton(el) {
+      if (!el || !el.closest) return false;
+      const isBtn = el.tagName === 'BUTTON'
+        || (el.classList && typeof el.classList.contains === 'function'
+          && el.classList.contains('el-button'));
+      if (!isBtn) return false;
+      // Page-level action buttons (e.g. fixed wizard/tab bottom bars) are not
+      // part of any content block — never inherit a titlebox by geometry.
+      return !el.closest('.el-collapse-item, .titlebox, .el-table');
+    }
     function composeTitleboxTitle(el, scope) {
       if (!el || !scope) return '';
+      if (isBareActionButton(el)) return '';
       const want = String((el.innerText || el.textContent || '')).replace(/\\s+/g, ' ').trim().slice(0, 40);
       const anchor = titleboxAnchorOf(el, scope);
       if (!anchor) return '';

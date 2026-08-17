@@ -28,6 +28,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-17: **分区算法：页面级裸按钮不再继承 titlebox（PR-PART 修正）**：`composeTitleboxTitle` 新增 `isBareActionButton` 前置判定——`BUTTON`/`.el-button` 且不在 `.el-collapse-item`/`.titlebox`/`.el-table` 内（页面级操作按钮，如向导/页签底部 fixed 操作条）时跳过 titlebox 几何就近继承，保留 chrome（tab/向导）与 collapse section 段。修复对公客户评级页「下一步/返回 被归入 基本信息/征信信息」问题：现为 `wizard:基本信息`（layers 仅 `[{wizard,基本信息}]`）。表单字段行为不变（字段不在 titlebox 内仍几何就近）；collapse/table 内按钮不受影响。
+  影响范围：`PAGE_LOCATOR_HELPERS` 的 `assignRegion` 对页面级裸按钮的 `region_label`/`region_id`/`layers` 输出（SPA `display_group` 随之变化）；Python 镜像 `_locator_helpers_js.py` 已重新生成。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py（生成物）, scripts/characterization/characterize-partition-compose.mjs（新增固定底栏按钮用例、`#float-back` 断言改为不继承）, scripts/characterization/characterize-scan-assign-region-once.py（过期断言修正：`xpath_smart_fill_only_enabled` 闸门已从 `_form.py` 移至 `form_action_engines.py`，既有漂移与本次改动无关）
+  Python 同步提示：`scripts/controller/actions/js_snippets/_locator_helpers_js.py` 由 `node scripts/_gen_locator_helpers_py.mjs` 从 `src/cdp/page-locator-helpers.js` 生成，勿手改；Python 侧无需其他同步（scan_form.py 运行时注入调用）。
+
 - 2026-08-17: **存量数据回填 paas_user_id**：`trajectory`（95 行）与 `batch_recording_job`（18 行）中 `paas_user_id IS NULL` 的存量行全部回填为 `1510076810578644992`（账号中心 admin）。迁移 `20260818120000_backfill_trajectory_paas_user_id.js`（幂等：只回填 NULL 行；down 为 no-op，数据回填不可逆）。回填后存量交易/批量导入任务归属 admin，隔离语义从「空=全可见」变为「归 admin」。
   影响范围：存量数据归属（无 schema 变更）。
   文件：migrations/20260818120000_backfill_trajectory_paas_user_id.js
