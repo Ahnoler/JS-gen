@@ -14,20 +14,101 @@ from browser_use import Browser
 from ..cdp_ports import _pick_free_cdp_port
 
 
+# System browsers used when the Playwright-managed Chromium build is missing.
+_SYSTEM_CHROME_CANDIDATES = [
+    r'C:\Program Files\Google\Chrome\Application\chrome.exe',
+    r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
+    r'C:\Program Files\Microsoft\Edge\Application\msedge.exe',
+    r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+]
+
+# Playwright-managed browser cache roots (Windows / macOS / Linux).
+_PLAYWRIGHT_CACHE_ROOTS = [
+    Path(os.environ.get('LOCALAPPDATA', '')) / 'ms-playwright',
+    Path.home() / 'Library' / 'Caches' / 'ms-playwright',
+    Path('/root/.cache/ms-playwright'),
+]
+
+
+def _is_chromium_exe(p: Path) -> bool:
+    return p.name in ('chrome', 'chrome.exe')
+
+
+def _existing_chromium_builds() -> list[Path]:
+    """Installed ms-playwright chromium-*/ builds, newest first (by build number)."""
+    hits: list[Path] = []
+    for root in _PLAYWRIGHT_CACHE_ROOTS:
+        if not root.exists():
+            continue
+        try:
+            hits.extend(p for p in root.glob('chromium-*/*/chrome*') if _is_chromium_exe(p))
+        except Exception:
+            continue
+
+    def _build_num(p: Path) -> int:
+        try:
+            return int(p.parts[-3].split('-')[1])
+        except Exception:
+            return 0
+
+    return sorted(set(hits), key=_build_num, reverse=True)
+
+
 async def _resolve_chromium_executable() -> str | None:
-    """Playwright-bundled Chromium path (used with browser_binary_path for reliable CDP)."""
+    """Resolve a *real, existing* Chromium executable for browser_binary_path.
+
+    Priority:
+      1. CHROME_PATH env override (explicit user choice)
+      2. Playwright-bundled Chromium — only if the file actually exists
+         (pw.chromium.executable_path is the *expected* path; it can point to a
+         missing build when playwright was upgraded without `playwright install`)
+      3. Any installed ms-playwright chromium-*/ build (covers build mismatch)
+      4. System Chrome / Edge
+
+    Returns None when nothing usable is found (caller falls back to builtin
+    launch, which then surfaces Playwright's own install hint).
+    """
+    override = (os.environ.get('CHROME_PATH') or '').strip()
+    if override:
+        if _is_chromium_exe(Path(override)) and Path(override).is_file():
+            return override
+        sys.stderr.write(f'WARN: CHROME_PATH={override} does not exist; ignoring\n')
+        sys.stderr.flush()
+
     try:
         from playwright.async_api import async_playwright
         pw = await async_playwright().start()
         try:
             exe = pw.chromium.executable_path
-            return str(exe) if exe else None
+            if exe and Path(exe).is_file():
+                return str(exe)
         finally:
             await pw.stop()
     except Exception as e:
         sys.stderr.write(f'WARN: cannot resolve Playwright Chromium: {e}\n')
         sys.stderr.flush()
-        return None
+
+    builds = _existing_chromium_builds()
+    if builds:
+        sys.stderr.write(
+            f'WARN: expected Playwright Chromium build missing — using installed '
+            f'{builds[0].parent.parent.name}\n'
+        )
+        sys.stderr.flush()
+        return str(builds[0])
+
+    for cand in _SYSTEM_CHROME_CANDIDATES:
+        if Path(cand).is_file():
+            sys.stderr.write(f'Using system browser: {cand}\n')
+            sys.stderr.flush()
+            return cand
+
+    sys.stderr.write('WARN: no Chromium executable found on this machine\n')
+    sys.stderr.flush()
+    return None
 
 
 def _chrome_headless_enabled() -> bool:
@@ -275,7 +356,9 @@ async def _build_browser(cdp_url=None, cdp_port=None, session_id='unknown'):
     # Fallback: builtin launch (may drop CDP port — BiB may be unavailable)
     sys.stderr.write(
         f"WARN: no Chromium exe — fallback builtin launch "
-        f"port={port} headless={headless}\n"
+        f"port={port} headless={headless}. "
+        "If this fails with 'Executable doesn't exist', run "
+        "'python -m playwright install chromium' in the agent env.\n"
     )
     sys.stderr.flush()
     browser = Browser(config=BrowserConfig(
