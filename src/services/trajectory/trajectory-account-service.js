@@ -13,7 +13,7 @@ import { NODE_TYPE, isRootParentId, isRootNodeId } from '../../models/hierarchy-
  */
 export function buildLoginInstruction(account = {}, system = {}) {
   const url = String(system.url || account.loginUrl || '').trim();
-  const user = String(account.username || '').trim();
+  const user = String(account.account || '').trim();
   const pass = String(account.password || '').trim();
   if (!url) {
     const err = new Error('System url is empty — set system.url (or legacy account.loginUrl)');
@@ -160,7 +160,7 @@ async function _accountsForSystem(cur) {
     id: a.id,
     name: a.name,
     loginUrl: a.loginUrl || cur.url || '',
-    username: a.username || '',
+    account: a.account || '',
     password: a.password || '',
     remark: a.remark || null,
     sortOrder: a.sortOrder ?? 0,

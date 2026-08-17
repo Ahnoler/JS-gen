@@ -9,7 +9,7 @@ class SystemAccountEntity(BaseModel):
     system_id: int = 0
     name: str = ""
     login_url: str = ""
-    username: str = ""
+    account: str = ""
     password: str = ""
     remark: Optional[str] = None
     sort_order: int = 0

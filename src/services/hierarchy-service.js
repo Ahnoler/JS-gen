@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { getDB } from '../../config/database.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
 import {
@@ -88,7 +89,7 @@ export async function getTree({
         systemId: a.systemId,
         name: a.name,
         loginUrl: a.loginUrl || '',
-        username: a.username || '',
+        account: a.account || '',
         password: a.password || '',
         remark: a.remark || null,
         sortOrder: a.sortOrder ?? 0,
@@ -235,15 +236,155 @@ export async function createFunction(moduleId, name, description, sortOrder) {
   });
 }
 
-/** Unified create: body.type + parentId + name… */
-export async function createNode(input = {}) {
-  return systemDao.create(input);
+/** Normalize/validate the `accounts` array accepted by node POST/PUT. */
+export function normalizeSystemAccounts(input) {
+  if (!Array.isArray(input)) {
+    throw Object.assign(new Error('accounts 必须是数组'), { code: 'VALIDATION' });
+  }
+
+  const seenNames = new Set();
+  const seenIds = new Set();
+  return input.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw Object.assign(new Error(`accounts[${index}] 必须是对象`), { code: 'VALIDATION' });
+    }
+
+    const name = String(item.name ?? '').trim();
+    if (!name) {
+      throw Object.assign(new Error(`accounts[${index}].name is required`), { code: 'VALIDATION' });
+    }
+    const nameKey = name.toLocaleLowerCase();
+    if (seenNames.has(nameKey)) {
+      throw Object.assign(new Error(`accounts 存在重复名称：${name}`), { code: 'VALIDATION' });
+    }
+    seenNames.add(nameKey);
+
+    const id = item.id != null ? Number(item.id) : undefined;
+    if (id !== undefined && (!Number.isFinite(id) || id <= 0)) {
+      throw Object.assign(new Error(`accounts[${index}].id 无效`), { code: 'VALIDATION' });
+    }
+    if (id !== undefined) {
+      if (seenIds.has(id)) {
+        throw Object.assign(new Error(`accounts 存在重复 id：${id}`), { code: 'VALIDATION' });
+      }
+      seenIds.add(id);
+    }
+
+    const sortOrder = item.sortOrder == null ? index : Number(item.sortOrder);
+    if (!Number.isFinite(sortOrder)) {
+      throw Object.assign(new Error(`accounts[${index}].sortOrder 无效`), { code: 'VALIDATION' });
+    }
+
+    return {
+      id,
+      name,
+      account: stringifyCredential(item.account).trim(),
+      password: stringifyCredential(item.password),
+      loginUrl: String(item.loginUrl ?? '').trim(),
+      remark: item.remark ?? null,
+      sortOrder,
+    };
+  });
 }
 
-export async function updateNode(id, patch) {
+function stringifyCredential(value) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') return '';
+  return String(value);
+}
+
+function assertAccountsForSystem(nodeType, accounts) {
+  if (accounts !== undefined && accounts !== null && Number(nodeType) !== NODE_TYPE.SYSTEM) {
+    throw Object.assign(new Error('accounts 仅支持 type=1（系统）节点'), { code: 'VALIDATION' });
+  }
+}
+
+async function syncSystemAccounts(systemId, normalized, trx) {
+  const existing = await systemAccountDao.listBySystem(systemId, trx);
+  const key = (name) => String(name || '').trim().toLocaleLowerCase();
+  const byId = new Map(existing.map((a) => [Number(a.id), a]));
+  const byName = new Map(existing.map((a) => [key(a.name), a]));
+
+  const touchedIds = new Set();
+
+  for (const item of normalized) {
+    let target = null;
+    if (item.id !== undefined) {
+      target = byId.get(item.id);
+      if (!target || Number(target.systemId) !== Number(systemId)) {
+        throw Object.assign(
+          new Error(`accounts 中 id=${item.id} 不存在或不属于当前系统`),
+          { code: 'VALIDATION' },
+        );
+      }
+    } else {
+      target = byName.get(key(item.name));
+    }
+
+    const data = {
+      name: item.name,
+      loginUrl: item.loginUrl,
+      account: item.account,
+      password: item.password,
+      remark: item.remark,
+      sortOrder: item.sortOrder,
+    };
+
+    const saved = target
+      ? await systemAccountDao.update(target.id, data, trx)
+      : await systemAccountDao.create({ systemId: Number(systemId), ...data }, trx);
+    touchedIds.add(Number(saved.id));
+  }
+
+  for (const cur of existing) {
+    if (touchedIds.has(Number(cur.id))) continue;
+    try {
+      await systemAccountDao.remove(cur.id, trx);
+    } catch (err) {
+      if (err?.errno === 1451 || err?.code === 'ER_ROW_IS_REFERENCED_2') {
+        throw Object.assign(
+          new Error(`账号「${cur.name}」已被批量录制任务引用，无法删除`),
+          { code: 'CONFLICT' },
+        );
+      }
+      throw err;
+    }
+  }
+
+  return systemAccountDao.listBySystem(systemId, trx);
+}
+
+/** Unified create: body.type + parentId + name…；type=1 可同时创建 accounts[]。 */
+export async function createNode(input = {}) {
+  const { accounts, ...nodeInput } = input;
+  assertAccountsForSystem(nodeInput.type, accounts);
+  const hasAccounts = accounts !== undefined && accounts !== null;
+  const normalized = hasAccounts ? normalizeSystemAccounts(accounts) : null;
+  if (!normalized) return systemDao.create(nodeInput);
+
+  return getDB().transaction(async (trx) => {
+    const node = await systemDao.create(nodeInput, trx);
+    node.accounts = await syncSystemAccounts(node.id, normalized, trx);
+    return node;
+  });
+}
+
+export async function updateNode(id, patch = {}) {
   const existing = await systemDao.getById(id);
   if (!existing) return null;
-  return systemDao.update(id, patch);
+
+  const { accounts, ...nodePatch } = patch;
+  assertAccountsForSystem(existing.type, accounts);
+  const hasAccounts = accounts !== undefined && accounts !== null;
+  const normalized = hasAccounts ? normalizeSystemAccounts(accounts) : null;
+  if (!normalized) return systemDao.update(id, nodePatch);
+
+  return getDB().transaction(async (trx) => {
+    const node = await systemDao.update(id, nodePatch, trx);
+    if (!node) return null;
+    node.accounts = await syncSystemAccounts(node.id, normalized, trx);
+    return node;
+  });
 }
 
 export async function deleteNode(id) {

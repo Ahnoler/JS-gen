@@ -37,6 +37,7 @@ const upload = multer({
 function httpError(err) {
   if (err.code === 'SEED_PROTECTED' || err.code === 'VALIDATION') return 400;
   if (err.code === 'NOT_FOUND') return 404;
+  if (err.code === 'CONFLICT') return 409;
   if (err instanceof multer.MulterError) return 400;
   return 500;
 }
@@ -165,7 +166,7 @@ export default function (app) {
     }
   });
 
-  /** 2. 新增 — body: { type, parentId?, name, description?, sortOrder?, url? }；url 仅系统节点有效 */
+  /** 2. 新增 — body: { type, parentId?, name, description?, sortOrder?, url?, accounts? }；type=1 可一次创建多个系统账号 */
   app.post('/api/v2/system-mgmt/nodes', async (req, res) => {
     try {
       const body = req.body || {};
@@ -180,6 +181,7 @@ export default function (app) {
         url: body.url,
         sortOrder: body.sortOrder,
         systemId: body.uid || body.systemId,
+        accounts: body.accounts,
       });
       res.status(201).json(node);
     } catch (err) {
@@ -187,7 +189,7 @@ export default function (app) {
     }
   });
 
-  /** 2. 修改 */
+  /** 2. 修改 — type=1 节点可带 accounts[] 全量替换该系统账号 */
   app.put('/api/v2/system-mgmt/nodes/:id', async (req, res) => {
     try {
       const node = await hierarchyService.updateNode(+req.params.id, req.body || {});

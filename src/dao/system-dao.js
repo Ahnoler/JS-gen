@@ -175,13 +175,15 @@ export async function listFunctions(moduleId) {
   return listByType(NODE_TYPE.FUNCTION, { parentId: moduleId });
 }
 
-export async function getById(id) {
-  const row = await getDB()(TABLE).where({ id }).first();
+export async function getById(id, db = null) {
+  const client = db || getDB();
+  const row = await client(TABLE).where({ id }).first();
   return shapeNode(row);
 }
 
-export async function getRawById(id) {
-  const row = await getDB()(TABLE).where({ id }).first();
+export async function getRawById(id, db = null) {
+  const client = db || getDB();
+  const row = await client(TABLE).where({ id }).first();
   return fromRaw(row);
 }
 
@@ -201,7 +203,8 @@ export async function searchByName(keyword, { limit = 50 } = {}) {
   return shapeNodes(rows);
 }
 
-export async function create(data) {
+export async function create(data, db = null) {
+  const client = db || getDB();
   const type = assertType(data.type ?? NODE_TYPE.SYSTEM);
   let parentId = data.parentId;
 
@@ -215,7 +218,7 @@ export async function create(data) {
       throw Object.assign(new Error('模块/功能必须指定有效 parentId'), { code: 'VALIDATION' });
     }
     parentId = +parentId;
-    const parent = await getRawById(parentId);
+    const parent = await getRawById(parentId, client);
     if (!parent) throw Object.assign(new Error('父节点不存在'), { code: 'NOT_FOUND' });
     if (type === NODE_TYPE.MODULE && parent.type !== NODE_TYPE.SYSTEM) {
       throw Object.assign(new Error('模块的父节点必须是系统（type=1）'), { code: 'VALIDATION' });
@@ -241,12 +244,13 @@ export async function create(data) {
     const { randomUUID } = await import('crypto');
     insert.systemId = randomUUID();
   }
-  const [id] = await getDB()(TABLE).insert(toDbRow(insert));
-  return getById(id);
+  const [id] = await client(TABLE).insert(toDbRow(insert));
+  return getById(id, client);
 }
 
-export async function update(id, data) {
-  const existing = await getRawById(id);
+export async function update(id, data, db = null) {
+  const client = db || getDB();
+  const existing = await getRawById(id, client);
   if (!existing) return null;
 
   const allowed = ['name', 'description', 'sortOrder'];
@@ -263,9 +267,9 @@ export async function update(id, data) {
   if (patch.name !== undefined && !patch.name) {
     throw Object.assign(new Error('name is required'), { code: 'VALIDATION' });
   }
-  if (!Object.keys(patch).length) return getById(id);
-  await getDB()(TABLE).where({ id }).update(toDbRow(patch));
-  return getById(id);
+  if (!Object.keys(patch).length) return getById(id, client);
+  await client(TABLE).where({ id }).update(toDbRow(patch));
+  return getById(id, client);
 }
 
 export async function remove(id) {

@@ -26,7 +26,7 @@
  * @property {number} systemId 归属 type=1 的系统节点 id
  * @property {string} name 角色名（管理员/测试人员/…）
  * @property {string} [loginUrl] 登录网址（已迁移到 system.url，保留兼容）
- * @property {string} [username] 测试账号
+ * @property {string} [account] 测试账号
  * @property {string} [password] 测试密码
  * @property {string} [remark] 备注
  * @property {number} [sortOrder]

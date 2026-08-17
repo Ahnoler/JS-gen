@@ -303,7 +303,7 @@ function testTrajectoryStepToActionEntry() {
 function testBuildLoginInstruction() {
   let threw = false;
   try {
-    buildLoginInstruction({ username: 'u' }, {});
+    buildLoginInstruction({ account: 'u' }, {});
   } catch (err) {
     threw = true;
     assert(err.statusCode === 400, 'empty url → 400');
@@ -311,7 +311,7 @@ function testBuildLoginInstruction() {
   assert(threw, 'buildLoginInstruction must require url');
 
   const task = buildLoginInstruction(
-    { username: 'admin', password: 'secret' },
+    { account: 'admin', password: 'secret' },
     { url: 'https://example.com/login' },
   );
   assert(task.includes('Navigate to https://example.com/login'));

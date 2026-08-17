@@ -4,7 +4,7 @@ import { NODE_TYPE } from '../models/hierarchy-constants.js';
 
 function normalizeAccountPatch(input = {}) {
   const data = {};
-  const allowed = ['name', 'loginUrl', 'username', 'password', 'remark', 'sortOrder', 'systemId'];
+  const allowed = ['name', 'loginUrl', 'account', 'password', 'remark', 'sortOrder', 'systemId'];
   for (const key of allowed) {
     if (Object.prototype.hasOwnProperty.call(input, key) && input[key] !== undefined) {
       data[key] = input[key];
@@ -34,7 +34,7 @@ export async function createAccount(systemId, input) {
     systemId: +systemId,
     name,
     loginUrl: input?.loginUrl || '',
-    username: input?.username || '',
+    account: input?.account || '',
     password: input?.password || '',
     remark: input?.remark ?? null,
     sortOrder: input?.sortOrder ?? 0,

@@ -52,14 +52,14 @@ export const GROUP_HIERARCHY = [
         method: 'GET', path: '/api/v2/systems/{systemId}/accounts',
         summary: '系统下账号列表',
         params: [{ name: 'systemId', type: 'number', required: true, in: 'path', example: '1' }],
-        respExample: J([{ id: 10, systemId: 1, name: '测试员', loginUrl: 'https://...', username: 'u' }]),
+        respExample: J([{ id: 10, systemId: 1, name: '测试员', loginUrl: 'https://...', account: 'u' }]),
       },
       {
         method: 'POST', path: '/api/v2/systems/{systemId}/accounts',
         summary: '创建系统账号',
         params: [{ name: 'systemId', type: 'number', required: true, in: 'path', example: '1' }],
-        reqExample: J({ name: '测试员', loginUrl: 'https://example.com/login', username: 'u', password: 'p' }),
-        respExample: J({ id: 10, systemId: 1, name: '测试员', loginUrl: 'https://...', username: 'u', password: 'p' }),
+        reqExample: J({ name: '测试员', loginUrl: 'https://example.com/login', account: 'u', password: 'p' }),
+        respExample: J({ id: 10, systemId: 1, name: '测试员', loginUrl: 'https://...', account: 'u', password: 'p' }),
       },
       {
         method: 'GET', path: '/api/v2/system-accounts/{id}',
@@ -70,7 +70,7 @@ export const GROUP_HIERARCHY = [
         method: 'PUT', path: '/api/v2/system-accounts/{id}',
         summary: '更新账号',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '10' }],
-        reqExample: J({ name: '测试员', loginUrl: 'https://...', username: 'u', password: 'p' }),
+        reqExample: J({ name: '测试员', loginUrl: 'https://...', account: 'u', password: 'p' }),
       },
       {
         method: 'DELETE', path: '/api/v2/system-accounts/{id}',

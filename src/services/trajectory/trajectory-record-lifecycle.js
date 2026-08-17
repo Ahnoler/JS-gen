@@ -238,7 +238,7 @@ export async function runDefaultLogin(runtime, account, system = null) {
       sys = await systemDao.getById(Number(account.systemId));
     }
     const url = String(sys?.url || account?.loginUrl || '').trim();
-    const username = String(account?.username || '').trim();
+    const username = String(account?.account || '').trim();
     const password = String(account?.password || '').trim();
     if (!url) {
       const err = new Error('System url is empty — set system.url (or legacy account.loginUrl)');

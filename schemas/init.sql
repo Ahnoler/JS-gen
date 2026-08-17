@@ -40,7 +40,7 @@ CREATE TABLE `system_account` (
   `system_id`   BIGINT UNSIGNED NOT NULL COMMENT '外键 → system.id（type=1）',
   `name`        VARCHAR(255) NOT NULL COMMENT '角色名：管理员/测试人员/…',
   `login_url`   VARCHAR(2048) DEFAULT '' COMMENT '登录/入口网址',
-  `username`    VARCHAR(255) DEFAULT '' COMMENT '测试账号',
+  `account`     VARCHAR(255) DEFAULT '' COMMENT '测试账号',
   `password`    VARCHAR(255) DEFAULT '' COMMENT '测试密码',
   `remark`      TEXT COMMENT '备注（权限说明等）',
   `sort_order`  INT UNSIGNED DEFAULT 0,

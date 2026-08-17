@@ -18,7 +18,7 @@ export const GROUP_RECORDING = [
         respExample: J({
           trajectoryId: 42, functionId: 3, systemAccountId: 10,
           system: { id: 1, name: '核心系统' },
-          accounts: [{ id: 10, name: '测试员', loginUrl: '...', username: 'u', password: 'p' }],
+          accounts: [{ id: 10, name: '测试员', loginUrl: '...', account: 'u', password: 'p' }],
         }),
       },
       {
