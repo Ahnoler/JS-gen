@@ -131,7 +131,7 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
 <body>
 <div class="app">
   <div class="tree-panel">
-    <div class="tree-title">元素分层</div>
+    <div class="tree-title">操作过的控件（分层）</div>
     <div class="tree-list" id="treeList"></div>
   </div>
   <div class="main-col">
@@ -222,7 +222,7 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
   onlyActed.addEventListener('change', applyFilter);
   applyFilter();
 
-  // ── 分层树面板（参考对方平台脚本编辑页 fc-tree：层级色标签 + 缩进树 + 点击联动）──
+  // ── 操作过的控件分层树（独立展示，与阶段图高亮无关；参考对方平台 fc-tree）──
   const ROLE_LEVEL = {
     page: ['page', '页面'], main: ['page', '主区'], shell_header: ['page', '页头'], other: ['page', '其他'],
     tab: ['tab', 'tab页签'], wizard_step: ['wizard', '步骤向导'],
@@ -240,7 +240,7 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
   const roleInfo = (r) => ROLE_LEVEL[r] || ['section', '分区'];
   const kindTag = (k) => KIND_TAG[k] || k || '控件';
 
-  // 从每控件 layers[]（外→内）聚合树；叶 = 控件对象（记录元素下标）
+  // 仅操作过的控件，按 layers[]（外→内）聚合分层树；叶 = 控件对象
   function buildTree(elements) {
     const root = { role: 'page', label: '阶段页面', children: [], indices: [] };
     const map = new Map();
@@ -262,20 +262,8 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
     });
     return root;
   }
-  const collectIndices = (n) => n.indices.concat(...n.children.map(collectIndices));
 
-  function flashIndices(ids) {
-    ids.forEach((i) => {
-      const b = boxes[i];
-      if (!b) return;
-      b.classList.remove('tree-hit');
-      void b.offsetWidth; // restart animation
-      b.classList.add('tree-hit');
-      setTimeout(() => b.classList.remove('tree-hit'), 1700);
-    });
-  }
-
-  function renderTree(node, container, depth) {
+  function renderTree(node, container, depth, elements) {
     const row = document.createElement('div');
     row.className = 'tree-node';
     row.style.paddingLeft = (8 + depth * 18) + 'px';
@@ -290,11 +278,10 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
     name.className = 'tree-name';
     name.textContent = node.label || '(未命名)';
     row.append(tag, colon, name);
-    row.addEventListener('click', () => flashIndices(collectIndices(node)));
     container.append(row);
-    // 该节点直接挂的控件对象
+    // 该节点直接挂的控件对象（indices 为传入 elements 数组的下标）
     node.indices.forEach((idx) => {
-      const e = DATA.elements[idx];
+      const e = elements[idx];
       const obj = document.createElement('div');
       obj.className = 'tree-node';
       obj.style.paddingLeft = (8 + (depth + 1) * 18) + 'px';
@@ -305,13 +292,22 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
       oname.className = 'tree-name';
       oname.textContent = e.label || '(无文本)';
       obj.append(otag, oname);
-      obj.addEventListener('click', (ev) => { ev.stopPropagation(); flashIndices([idx]); });
       container.append(obj);
     });
-    node.children.forEach((c) => renderTree(c, container, depth + 1));
+    node.children.forEach((c) => renderTree(c, container, depth + 1, elements));
   }
 
-  renderTree(buildTree(DATA.elements), document.getElementById('treeList'), 0);
+  const actedEls = DATA.elements.filter((e, i) => actedIndex.has(i));
+  if (actedEls.length) {
+    renderTree(buildTree(actedEls), document.getElementById('treeList'), 0, actedEls);
+  } else {
+    const empty = document.createElement('div');
+    empty.className = 'tree-node';
+    empty.style.padding = '8px 12px';
+    empty.style.color = '#8c8c8c';
+    empty.textContent = '（本阶段操作控件无匹配）';
+    document.getElementById('treeList').append(empty);
+  }
 
   function showDetail(e) {
     const html = '<h3>' + esc(e.label || '(无文本)') + '</h3><dl>'
