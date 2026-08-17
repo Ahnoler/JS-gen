@@ -100,8 +100,8 @@
 |----|------|----------|------------|------------|
 | **PR-PART** | **第一刀已实现** | 元素分区算法完善 | V2.1：`display_group`/`region_label`。第一刀：tab+向导+titlebox 拼接已落地 — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) · [plan](plans/2026-08-13-partition-tab-wizard-titlebox.md)；9242 湿测已跑（对公客户修改；评级向导） | unify-partition · L1c · picker · regionAnchor |
 | **PR-LAYER** | **本仓库侧已完成**（2026-08-15） | 元素分层树（分区之后） | 每控件 `layers[]` 已落 snap/resolve preview/扫描/`element_json`；可选 `pageLabel` 只加根 page；todo role 已对齐。**整页大树已落地（assembleRegionTree + 扫描/阶段树）**；`characterize-region-tree.mjs` OK。**本仓库无湿测记录**；Vue 画树另刀 | 依赖 PR-PART；Vue 画树另仓 |
-| **PR-LOC** | **本仓库已落地（V2.1）** | 阶段长图 + 控件高亮 | AI `phase_done` 后 1 张 PNG；浅蓝蒙层 + 描边；滚主滚动区拼接。**湿测已完成**（对公长表单 / BiB） | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · [plan](plans/2026-08-13-phase-highlight-long-screenshot.md) |
-| **PR-LOC-HL** | 挂起 | 步骤级高亮截图 | 操作**完成后**逐步高亮再截 | 逐步截仍挂起；阶段级高亮已并入 **PR-LOC** |
+| **PR-LOC** | **已落地（V2.1）** · 需求变更（2026-08-17）：阶段长图**无元素高亮** | 阶段长图 + 控件坐标 | AI `phase_done` 后 1 张 PNG（滚主滚动区拼接，**不再烘焙高亮**）；`screenshot.metadata_json` 记录截图长宽（image/content 双坐标系）+ **全部可见 L2 控件坐标**（left/top/right/bottom + kind/text/layers/region）+ region_tree。湿测已完成 | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · 阶段截图 V2 已合 V2.1 |
+| **PR-LOC-HL** | **需求变更**（2026-08-17）：由「步骤级高亮截图」改为「**步骤控件坐标存储 + 推送其他平台**」（参考批量推送 V2.0 接口设计）；待办（需 design） | 步骤级控件坐标 → 推送 | 旧方向（操作后逐步高亮再截）**取消**。新方向：所有步骤操作的控件坐标入库（当前 `trajectory_step.element_json` **无 bbox**，需补）+ 经推送 V2.0 envelope 推给公司其他平台（`transcationProperties` 每项当前无坐标字段，需加） | 参考 `src/services/transaction-export.js`（V2.0：regionId/parentRegionId + phases[]/metadata）；步骤坐标来源/内容坐标系对齐阶段长图 `metadata.elements` |
 | **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data 软文本底座；**需专刀 design** |
 | **PR-BATCH** | ① 用户隔离**后端已落地**（2026-08-17）；交易列表加任务前端联调进行中（8/19） | 批量导入：用户只看自己任务 | ① 用户隔离与 **PR-USER** appid 隔离同源：`paas_user_id` 列表过滤/盖章/存量回填/批量透传已落地（commit `c0503f3`/`7abf7e8`/`8ab90e0`）；②行进度 + ③phase `done_logs` 已合 V2.1 | Vue BatchImport 另仓联调 8/19 |
 | **PR-USER** | 凭据维护**后端已落地**（2026-08-17）；前端 UI + 联调进行中（8/19） | 用户/系统树权限 | 树共享；交易本人可见；仅管理员删树。**本期只做系统树创建时用户名/密码/角色维护，不做权限闸**：`system_account.username`→`account` 更名 + 节点 POST/PUT `accounts[]` 批量维护（`1a46519`）+ 节点详情回显 `accounts[]`（`d09fc60`） | 等 **PR-SSO-ADMIN**（权限部分）；前端凭据维护 UI 8/19 |
@@ -171,7 +171,7 @@
 - **heal-locate** ↔ 开发已完成（H0 + MissingReason/HealContract + heal prompt + P2 路由）；live 湿测见 **heal-locate-wet**。
 - **PR-PART** ↔ 第一刀 tab/向导/titlebox 拼接已落地；9242 湿测已跑（对公客户修改；评级向导）。
 - **PR-LAYER** ↔ 本仓库侧已完成：`layers[]` + 整页大树（`assembleRegionTree` + 扫描/阶段树）；Vue 画树另刀。依赖 **PR-PART**。
-- **PR-LOC** ↔ 阶段长图本仓库已落地；**湿测已完成**。**PR-LOC-HL** 逐步截仍后置。
+- **PR-LOC** ↔ 阶段长图已落地（V2.1，**无元素高亮**，控件坐标存 `metadata_json`）；湿测已完成。**PR-LOC-HL** 需求变更（2026-08-17）：步骤级高亮截图**取消**，改为「步骤控件坐标存储 + 推送其他平台」（参考批量推送 V2.0 接口）。
 - **PR-PUSH** ↔ 推送/导出闸门已完成（2026-08-15，V2.0）；characterization OK，未见 live 湿测记录。
 - **PR-BATCH** ↔ ① 用户隔离与 **PR-USER** appid 隔离同源，本周排 8/19（交易列表加任务）。
 - **PR-SSO-ADMIN** ↔ 阻塞 **PR-SSO** / **PR-USER** 权限实现；2026-08-13 会议后未见结论落地，继续挂起。本周 appid 登录/数据隔离与系统树凭据维护子项不等待该结论。
@@ -180,6 +180,7 @@
 
 ## 更新记录
 
+| 2026-08-17 | **PR-LOC / PR-LOC-HL 产品需求变更**：阶段长图**无元素高亮**（V2.1 已落地，控件坐标存 `metadata_json`）；**PR-LOC-HL 取消「步骤级高亮截图」**，新方向=所有步骤操作的控件坐标入库（`element_json` 当前无 bbox，需补）+ 经批量推送 V2.0 envelope（`transcationProperties` 当前无坐标字段，需加）推送给公司其他平台。待办（需 design） |
 | 2026-08-17 | **任务 3/4 后端交付、任务 5 已交付**：产品任务表更新——**PR-BATCH** ① 用户隔离后端已落地（`c0503f3`/`7abf7e8`/`8ab90e0`）、**PR-USER** 凭据维护后端已落地（`1a46519`/`d09fc60`）、**PR-SSO** 子项已落地；本周任务 3/4 标「后端已交付，前端 UI + 联调 8/19」，任务 5 标已交付。另：**执行机 slot 复用 bug 修复**（`a9a4d56`）：supersede 补关闭执行机 agent session（keepBrowser 保留 Chrome 复用），根因=控制面重启后重连时旧 slot 占用排除孤儿扫描导致新开 slot |
 | 2026-08-17 | **新增「开发事项对齐」区段**：本周 3/4/5 拆解为三块——① 登录与用户管理（SSO 接入/JWT 解码/前端接通已落地；友好用户名、token 校验、权限闸待办或挂起）、② 交易管理用户隔离（列表过滤/盖章/批量透传/存量回填已落地；只看我的 UI、messages 等隔离待办）、③ 系统多账户 + 新增/编辑接口同步（accounts[] 批量维护已落地 `1a46519`；前端凭据维护 UI 与联调进行中 8/19）。补漏 commit `7abf7e8`（批量导入生成交易透传 paasUserId）、存量回填 `8ab90e0` |
 | 2026-08-17 | **任务 5（appid 登录 + 数据隔离）已交付**：后端 `paas_user_id` 列（迁移已跑）+ `/api/v2/auth/*` 四端点 + auth 中间件（`SSO_AUTH_REQUIRED` 默认关）+ 列表/批量导入按 `paasUserId` 过滤与盖章（commit `c0503f3`，verify-all Python 解析修复 `45e0b6a`）；前端 SSO 接通 + user store + 401 处理（另仓 dev `75e9562`）。characterization 20/20 绿（内嵌 Python）；`characterize-tree-select-record` 需 `playwright install`（预存环境，未跑） |
