@@ -178,6 +178,18 @@ function escHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+/** 参数摘要：JSON 序列化 + 截断，供浮层展示（保持单行、长度可控）。 */
+function paramsSummary(params) {
+  if (params == null) return '';
+  let s;
+  try {
+    s = JSON.stringify(params);
+  } catch {
+    s = String(params);
+  }
+  return s.length > 140 ? `${s.slice(0, 140)}…` : s;
+}
+
 /** 步骤序号 → 边框/徽标色：hsl((seq*47)%360, 70%, 45%)。 */
 function stepColor(seq) {
   return `hsl(${(seq * 47) % 360}, 70%, 45%)`;
@@ -216,7 +228,9 @@ export function buildHtml({ b64, meta, resolved }) {
       const width = Math.max(2, coordX(b.rect.x2, cw, W) - left);
       const height = Math.max(2, coordY(b.rect.y2, cw, W) - top);
       boxParts.push(
-        `<div class="box${dashed ? ' dashed' : ''}" data-step="${seq}" ` +
+        `<div class="box${dashed ? ' dashed' : ''}" data-step="${seq}" data-source="${b.source}" ` +
+        `data-action="${escHtml(r.step?.actionType)}" data-label="${escHtml(r.step?.label)}" ` +
+        `data-params="${escHtml(paramsSummary(r.step?.params))}" data-region="${escHtml(r.step?.regionId)}" ` +
         `style="left:${fmtPx(left)}px;top:${fmtPx(top)}px;width:${fmtPx(width)}px;height:${fmtPx(height)}px;` +
         `border:2px ${dashed ? 'dashed' : 'solid'} ${color};">` +
         `<span class="badge" style="background:${color}">${seq}${dashed ? 'M' : ''}</span></div>`,
@@ -284,6 +298,25 @@ export function buildHtml({ b64, meta, resolved }) {
   .stage .box .badge { position: absolute; left: -1px; top: -1px; color: #fff; font-size: 11px; line-height: 1;
                        padding: 2px 4px; border-radius: 0 0 2px 0; white-space: nowrap; }
 </style>
+<style>
+  /* PR-LOC-HL 交互层（Task 3）：覆盖 pointer-events，新增筛选/浮层/高亮样式 */
+  .stage .box { pointer-events: auto; cursor: pointer; }
+  .box:hover { outline: 2px solid #ffeb3b; outline-offset: -2px; z-index: 6; }
+  .box.flash { outline: 3px solid #ffeb3b; box-shadow: 0 0 12px rgba(255,235,59,.9); z-index: 6; }
+  .step-row { cursor: pointer; }
+  .step-row.active { background: #fff8e1; box-shadow: inset 3px 0 0 #f0c000; }
+  .bar .ctrl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #555; }
+  .bar .ctrl label { display: inline-flex; align-items: center; gap: 2px; margin: 0 2px; }
+  .bar button { font-size: 12px; padding: 2px 10px; cursor: pointer; }
+  .tooltip { display: none; position: absolute; z-index: 50; background: rgba(20,20,20,.92); color: #eee;
+             font-size: 12px; line-height: 1.5; padding: 8px 10px; border-radius: 4px; max-width: 240px;
+             box-shadow: 0 2px 10px rgba(0,0,0,.35); pointer-events: none; }
+  .tooltip.show { display: block; }
+  .tooltip .tip-title { font-weight: 600; margin-bottom: 4px; }
+  .tooltip .tip-row { display: flex; gap: 6px; }
+  .tooltip .tip-row span { flex: none; color: #9ecbff; width: 48px; }
+  .tooltip .tip-row b { font-weight: 400; word-break: break-all; }
+</style>
 </head>
 <body>
 <div class="bar">
@@ -291,6 +324,15 @@ export function buildHtml({ b64, meta, resolved }) {
   <span class="dim">内容 ${cw}×${ch} · 步骤 ${steps.length}</span>
   <span class="legend">${legendColors}</span>
   <span class="legend"><span class="line-s"></span> bbox <span class="line-d"></span> 匹配</span>
+  <span class="ctrl">筛选
+    <label><input type="radio" name="filter" value="all" checked> 全部</label>
+    <label><input type="radio" name="filter" value="bbox"> 仅 bbox</label>
+    <label><input type="radio" name="filter" value="match"> 仅匹配</label>
+    <label><input type="radio" name="filter" value="none"> 无坐标</label>
+  </span>
+  <span class="ctrl">不透明度 <input type="range" id="opacity" min="15" max="100" value="100"></span>
+  <span class="ctrl"><button type="button" id="step-prev">上一步</button>
+    <button type="button" id="step-next">下一步</button><span id="step-cur" class="dim"></span></span>
 </div>
 <div class="main">
   <div class="steps-col">
@@ -304,6 +346,167 @@ export function buildHtml({ b64, meta, resolved }) {
     </div>
   </div>
 </div>
+<script>
+(function () {
+  'use strict';
+  // PR-LOC-HL 交互层（Task 3）：数据全部取自现有 DOM（.box data-step/data-source/…，.step-row data-step）。
+  const stage = document.querySelector('.stage');
+  const boxes = Array.prototype.slice.call(document.querySelectorAll('.stage .box'));
+  const rows = Array.prototype.slice.call(document.querySelectorAll('.step-row'));
+  const tip = document.createElement('div');
+  tip.className = 'tooltip';
+  stage.appendChild(tip);
+
+  const boxBySeq = new Map();
+  const rowBySeq = new Map();
+  boxes.forEach(function (b) { boxBySeq.set(Number(b.dataset.step), b); });
+  rows.forEach(function (r) { rowBySeq.set(Number(r.dataset.step), r); });
+
+  let curStep = 0;
+  let flashTimer = null;
+
+  function esc(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function paramsText(box) {
+    const raw = box.dataset.params || '';
+    if (!raw) return '(无)';
+    return raw.length > 140 ? raw.slice(0, 140) + '…' : raw;
+  }
+
+  // ---- 浮层（hover 详情：步骤号 / action / 标签 / 参数 / region / 来源）----
+  function tipHtml(box) {
+    return '<div class="tip-title">步骤 ' + esc(box.dataset.step) + '</div>'
+      + '<div class="tip-row"><span>action</span><b>' + esc(box.dataset.action || '') + '</b></div>'
+      + '<div class="tip-row"><span>标签</span><b>' + esc(box.dataset.label || '(无)') + '</b></div>'
+      + '<div class="tip-row"><span>参数</span><b>' + esc(paramsText(box)) + '</b></div>'
+      + '<div class="tip-row"><span>region</span><b>' + esc(box.dataset.region || '(空)') + '</b></div>'
+      + '<div class="tip-row"><span>来源</span><b>' + esc(box.dataset.source || '') + '</b></div>';
+  }
+  function positionTip(box) {
+    const sr = stage.getBoundingClientRect();
+    const br = box.getBoundingClientRect();
+    const W = 240;
+    let left = (br.left - sr.left) + br.width + 10;
+    if (left + W > sr.width) left = (br.left - sr.left) - W - 10;
+    left = Math.max(0, Math.min(left, Math.max(0, sr.width - W)));
+    let top = (br.top - sr.top) - 8;
+    top = Math.max(0, Math.min(top, Math.max(0, sr.height - 160)));
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+  function showTip(box) {
+    tip.innerHTML = tipHtml(box);
+    tip.classList.add('show');
+    positionTip(box);
+  }
+  function hideTip() { tip.classList.remove('show'); }
+
+  // ---- 列表联动：active 行 + 步进器状态 ----
+  function setActiveRow(seq) {
+    rows.forEach(function (r) { r.classList.remove('active'); });
+    curStep = seq;
+    const row = rowBySeq.get(seq);
+    if (row) {
+      row.classList.add('active');
+      row.scrollIntoView({ block: 'nearest' });
+    }
+    const cur = document.getElementById('step-cur');
+    if (cur) cur.textContent = seq ? (seq + ' / ' + rows.length) : '';
+  }
+  function centerBox(box) {
+    box.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  }
+  function flashBox(seq) {
+    const box = boxBySeq.get(seq);
+    if (!box) return;
+    box.classList.add('flash');
+    if (flashTimer) clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () { box.classList.remove('flash'); }, 1200);
+    centerBox(box);
+  }
+
+  // 框 hover → 浮层 + 行高亮；框点击 → 行高亮（active）
+  boxes.forEach(function (box) {
+    box.addEventListener('mouseenter', function () { showTip(box); setActiveRow(Number(box.dataset.step)); });
+    box.addEventListener('mousemove', function () { positionTip(box); });
+    box.addEventListener('mouseleave', hideTip);
+    box.addEventListener('click', function () { setActiveRow(Number(box.dataset.step)); hideTip(); });
+  });
+
+  // 行点击 → 框闪烁 + 若不可见滚动 stage 居中
+  rows.forEach(function (row) {
+    row.addEventListener('click', function () {
+      const seq = Number(row.dataset.step);
+      setActiveRow(seq);
+      flashBox(seq);
+    });
+  });
+
+  // ---- bar 筛选 radio：全部 / 仅 bbox / 仅匹配 / 无坐标 ----
+  const filterRadios = Array.prototype.slice.call(document.querySelectorAll('input[name="filter"]'));
+  function currentFilter() {
+    for (let i = 0; i < filterRadios.length; i += 1) {
+      if (filterRadios[i].checked) return filterRadios[i].value;
+    }
+    return 'all';
+  }
+  function applyFilter() {
+    const f = currentFilter();
+    boxes.forEach(function (box) {
+      const src = box.dataset.source;
+      const show = f === 'all' || (f === 'bbox' && src === 'bbox') || (f === 'match' && src === 'match');
+      box.style.display = show ? '' : 'none';
+    });
+    rows.forEach(function (row) {
+      const seq = Number(row.dataset.step);
+      const b = boxBySeq.get(seq);
+      let show;
+      if (f === 'none') show = row.classList.contains('no-box');
+      else if (f === 'bbox') show = !!(b && b.dataset.source === 'bbox');
+      else if (f === 'match') show = !!(b && b.dataset.source === 'match');
+      else show = true;
+      row.style.display = show ? '' : 'none';
+    });
+  }
+  filterRadios.forEach(function (r) { r.addEventListener('change', applyFilter); });
+
+  // ---- 透明度滑块 ----
+  const opacitySlider = document.getElementById('opacity');
+  function applyOpacity() {
+    const v = Number(opacitySlider.value) / 100;
+    boxes.forEach(function (box) { box.style.opacity = String(v); });
+  }
+  opacitySlider.addEventListener('input', applyOpacity);
+
+  // ---- 步进器：上一步 / 下一步（无框步骤仅高亮列表行）----
+  const stepPrev = document.getElementById('step-prev');
+  const stepNext = document.getElementById('step-next');
+  function stepTo(seq) {
+    if (seq < 1 || seq > rows.length) return;
+    setActiveRow(seq);
+    const box = boxBySeq.get(seq);
+    if (box) centerBox(box);
+  }
+  stepPrev.addEventListener('click', function () { stepTo(curStep - 1); });
+  stepNext.addEventListener('click', function () { stepTo(curStep + 1); });
+
+  // ---- Escape：关浮层 + 清高亮 ----
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') {
+      hideTip();
+      rows.forEach(function (r) { r.classList.remove('active'); });
+      curStep = 0;
+      const cur = document.getElementById('step-cur');
+      if (cur) cur.textContent = '';
+    }
+  });
+
+  applyFilter();
+  applyOpacity();
+})();
+</script>
 </body>
 </html>`;
 }

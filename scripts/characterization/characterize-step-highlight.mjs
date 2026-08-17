@@ -244,12 +244,42 @@ async function testRenderRealData(db, { steps, elements }) {
   console.log(`  steps=${steps.length} | boxes=${totalBoxes} (all match/dashed) | badge=${badgeCount} | rows=${rowCount} | contentWidth=${cw}`);
 }
 
+/** buildHtml 交互层（Task 3）：真实数据 HTML 含交互 script 与关键逻辑标记（字符串层面）。 */
+async function testRenderInteraction(db) {
+  const data = await loadPhaseData(db, { trajectoryId: TRAJ_ID, phaseId: PHASE_ID, screenshotId: SHOT_ID });
+  const resolved = resolveStepBoxes(data.steps, data.meta.elements);
+  const html = buildHtml({ b64: 'PLACEHOLDER', meta: data.meta, resolved });
+
+  // a. 交互 <script> 块存在
+  assert(html.includes('<script>') && html.includes('</script>'), 'html contains interactive <script> block');
+
+  // b. 关键交互逻辑标记：筛选 / 透明度 / 步进 / 浮层 / Escape / 列表联动
+  assert(html.includes('name="filter"'), 'filter radios (name="filter") present');
+  assert(html.includes('data-source'), 'boxes carry data-source attr');
+  assert(html.includes('opacity'), 'opacity slider present');
+  assert(html.includes('step-prev') && html.includes('step-next'), 'stepper buttons step-prev/step-next');
+  assert(html.includes('tooltip'), 'tooltip/detail overlay present');
+  assert(html.includes('Escape'), 'Escape handler present');
+  assert(html.includes('data-step') && html.includes('active'), 'list linkage via data-step query + active class');
+
+  // c. 浮层字段标签（步骤号 / action / 标签 / 参数 / region / 来源）
+  for (const label of ['步骤', 'action', '标签', '参数', 'region', '来源']) {
+    assert(html.includes(label), `tooltip field label "${label}" present`);
+  }
+  console.log(`  interaction ok: script + filter/opacity/stepper/tooltip/Escape/linkage, resolved=${resolved.length}`);
+}
+
 /** buildHtml 渲染（纯函数边界 + 坐标换算手算期望值）。 */
 function testRenderBoundaries() {
-  // 1. 空 resolved → 仍可生成 HTML（不抛错）
+  // 1. 空 resolved → 仍可生成 HTML（不抛错），且交互 script / 控件仍存在
   const empty = buildHtml({ b64: 'dummy', meta: { contentWidth: 800, contentHeight: 600 }, resolved: [] });
   assert(typeof empty === 'string' && empty.includes('<!doctype html>'), 'empty resolved → html still generated');
   assert((empty.match(/class="step-row/g) || []).length === 0, 'empty resolved → no step rows');
+  assert(empty.includes('<script>'), 'empty resolved → interaction script still present');
+  assert(empty.includes('name="filter"'), 'empty resolved → filter radios present');
+  assert(empty.includes('step-prev') && empty.includes('step-next'), 'empty resolved → stepper buttons present');
+  assert(empty.includes('opacity'), 'empty resolved → opacity slider present');
+  assert(empty.includes('tooltip') && empty.includes('Escape'), 'empty resolved → tooltip + Escape logic present');
 
   // 2. 坐标换算手算期望值
   assert(Math.abs(coordX(100, 800, 1200) - 150) < 1e-9, 'coordX: 100/800*1200 = 150');
@@ -301,6 +331,7 @@ async function main() {
     if (ctx) {
       await run('AND match rate + label hits', () => testRealDataMatch(db, ctx));
       await run('render html (real data)', () => testRenderRealData(db, ctx));
+      await run('render interaction (real data)', () => testRenderInteraction(db));
     } else {
       failed += 1;
       console.error('  ✗ AND match rate — load data failed, skipped');
