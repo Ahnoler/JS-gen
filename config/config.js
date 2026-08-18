@@ -97,6 +97,8 @@ export const SSO_APP_KEY = _resolve('SSO_APP_KEY', '1920710182837141505');
 export const SSO_BASE_URL = _resolve('SSO_BASE_URL', 'http://test.paas.tansun.com.cn');
 /** 仅 /api/v2/* 强制鉴权；关闭时 req.paasUserId=null（全可见，向后兼容） */
 export const SSO_AUTH_REQUIRED = _resolve('SSO_AUTH_REQUIRED', 'false').toLowerCase() === 'true';
+/** 可选：直接配置账号中心 JWT 验签密钥（query_jwt_secret 返回的字符串）；未配置时自动调接口获取并缓存 1h */
+export const SSO_JWT_SECRET = _resolve('SSO_JWT_SECRET', '');
 
 /** Route browser sessions to online executor agent instead of local globalBrowser */
 export const USE_EXECUTOR = _resolve('USE_EXECUTOR', 'false').toLowerCase() === 'true';

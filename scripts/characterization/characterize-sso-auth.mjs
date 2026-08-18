@@ -12,7 +12,7 @@ import assert from 'assert';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { decodePaasToken } from '../../src/services/sso/jwt-decode.js';
+import { decodePaasToken, verifyPaasToken } from '../../src/services/sso/jwt-decode.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -21,6 +21,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const REAL_JWT =
   'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjE1MTAwNzY4MTA1Nzg2NDQ5OTIsImlhdCI6MTc4NjkzNjk4NCwianRpIjoidG9rZW5JZCJ9.st5GLQc-BBLFHUysMWBcC-KngbkkLU-VXiwo0YQ1Uw4';
 const EXPECTED_USER_ID = '1510076810578644992';
+// Signature key from /api/ucenter/open/app/query_jwt_secret (Base64-decoded as HMAC key).
+const JWT_SECRET = 'paas-application';
 
 let failed = 0;
 function ok(name) { console.log(`  ✓ ${name}`); }
@@ -52,6 +54,50 @@ function main() {
     // payload {"foo":"bar"} base64url
     const tok = 'eyJhbGciOiJIUzI1NiJ9.eyJmb28iOiJiYXIifQ.x';
     assert.strictEqual(decodePaasToken(tok), null);
+  });
+
+  run('verify real JWT with paas-application secret → userId exact', () => {
+    const verified = verifyPaasToken(REAL_JWT, JWT_SECRET);
+    assert.ok(verified, 'verified non-null');
+    assert.strictEqual(verified.userId, EXPECTED_USER_ID);
+  });
+
+  run('verify tampered JWT → null (signature mismatch)', () => {
+    const [h, p] = REAL_JWT.split('.');
+    const tampered = `${h}.${p}.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`;
+    assert.strictEqual(verifyPaasToken(tampered, JWT_SECRET), null);
+  });
+
+  run('verify with wrong/missing secret → null', () => {
+    assert.strictEqual(verifyPaasToken(REAL_JWT, 'wrong-secret'), null);
+    assert.strictEqual(verifyPaasToken(REAL_JWT, ''), null);
+    assert.strictEqual(verifyPaasToken(REAL_JWT, null), null);
+    assert.strictEqual(verifyPaasToken('', JWT_SECRET), null);
+  });
+
+  run('paas-client: query_jwt_secret + query_access_user + secret cache', () => {
+    const src = read('src/services/sso/paas-client.js');
+    assert.ok(src.includes('/api/ucenter/open/app/query_jwt_secret'), 'jwt secret uri');
+    assert.ok(src.includes('/api/ucenter/open/access/query_access_user'), 'access user uri');
+    assert.ok(src.includes('accessToken='), 'token as query param');
+    assert.ok(src.includes('appKey='), 'appKey as query param');
+    assert.ok(src.includes('JWT_SECRET_TTL_MS'), 'secret cache TTL');
+    assert.ok(src.includes('SSO_JWT_SECRET'), 'config override supported');
+    assert.ok(src.includes('json?.code !== \'00000000\''), 'envelope code check');
+    assert.ok(src.includes('catch {'), 'failures return null (no throw)');
+  });
+
+  run('ssoAuth: async verify-first with decode fallback', () => {
+    const src = read('src/middleware/sso-auth.js');
+    assert.ok(src.includes('export async function ssoAuth'), 'async middleware');
+    assert.ok(src.includes('verifyPaasToken(token, secret)'), 'verifies with secret');
+    assert.ok(src.includes('getJwtSecret()'), 'loads secret');
+    assert.ok(src.includes('decodePaasToken(token)'), 'fallback to pure decode when secret unavailable');
+  });
+
+  run('config exports SSO_JWT_SECRET', () => {
+    const src = read('config/config.js');
+    assert.ok(src.includes("export const SSO_JWT_SECRET"), 'SSO_JWT_SECRET export');
   });
 
   run('ssoAuth whitelist uses baseUrl+path (mount-aware, not bare req.path)', () => {
@@ -88,6 +134,13 @@ function main() {
     assert.ok(src.includes('SSO_BASE_URL'), 'uses SSO_BASE_URL');
     assert.ok(src.includes('sendOk'), 'uses sendOk envelope');
     assert.ok(src.includes('req.paasUserId'), 'me/check read req.paasUserId');
+  });
+
+  run('auth /me echoes account-center user info (userName/userAccount)', () => {
+    const src = read('src/routes/v2/auth.js');
+    assert.ok(src.includes("import { getAccessUser }"), 'imports getAccessUser');
+    assert.ok(src.includes('userName: user?.userName || null'), 'me returns userName');
+    assert.ok(src.includes('userAccount: user?.userAccount || null'), 'me returns userAccount');
   });
 
   run('config exports SSO_* with appKey default 1920710182837141505', () => {

@@ -43,6 +43,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-18: **SSO 验签 + /me 回查用户信息**：`ssoAuth` 中间件改为异步验签——密钥来自账号中心 `query_jwt_secret`（实测返回 `paas-application`，Base64 解码作 HMAC-SHA256 key，与账号中心 Java SDK `JWTUtil.verifyJWT` 一致），内存缓存 1h；配置 `SSO_JWT_SECRET` 可直接指定密钥不调接口。验签失败 → token 无效（`SSO_AUTH_REQUIRED=true` 时 401，伪造 token 不再被信任）；密钥不可用（账号中心不可达）→ 降级纯解 payload 保持可用性。`GET /api/v2/auth/me` 增强：带有效 token 时回查账号中心 `query_access_user`（对应 SDK `AccessUserContext.getCurrentUser()`），返回 `userName`/`userAccount`（如 管理员/admin），查询失败返回 null 不阻塞。
+  影响范围：/api/v2/* 鉴权行为（验签）、`/api/v2/auth/me` 响应体（新增 userName/userAccount 字段）、config（新增 `SSO_JWT_SECRET`）。
+  文件：src/services/sso/jwt-decode.js, src/services/sso/paas-client.js(新), src/middleware/sso-auth.js, src/routes/v2/auth.js, config/config.js, config/.env.example, scripts/characterization/characterize-sso-auth.mjs
+  Python 同步提示：无 HTTP/schema 变更（`/me` 新增字段可选透传）。若代理侧做验签：密钥取 `query_jwt_secret`（`GET /api/ucenter/open/app/query_jwt_secret?appKey=...` 返回字符串，Base64 解码作 HS256 key）；用户信息回查 `GET /api/ucenter/open/access/query_access_user?accessToken=<JWT>&appKey=...`（返回 `{userId,userName,userAccount,...}`，envelope `code=00000000`）。
+
 - 2026-08-18: **交易轨迹列表状态统计随查询条件过滤**：`GET /api/v2/trajectories` 返回的 `stats` 五档统计（draft/recording/failed/recorded/completed）与行查询同基准——新增按当前 `recordStatus` 过滤（原来忽略该条件恒展示功能全量统计，现与 keyword/batchTaskName/functionId 一并作为统计基准）。例如查询条件设为「未录制」时，`stats` 中仅 draft 有值、其余为 0、total=筛选行数。行数据沿用 `bj.name as batchTaskName`（所属任务）。
    影响范围：src/dao/trajectory-dao.js（`countByRecordStatus` 接受并应用 `recordStatus`；`list`/`listByFunction` 向统计透传 `recordStatus`）；无路由路径/响应字段增减（`stats` 结构不变）、无 schema/WS 变更。
    文件：src/dao/trajectory-dao.js, scripts/characterization/characterize-batch-task-name.mjs, scripts/characterization/characterize-sso-auth.mjs（stats 调用签名断言同步新增 `recordStatus` 参数）
