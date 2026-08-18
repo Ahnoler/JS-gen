@@ -28,6 +28,17 @@ export default function registerTrajectoryBatch(app) {
     sendExcel(res, buf, BATCH_TEMPLATE_FILENAME);
   }));
 
+  /** 任务名候选（搜索下拉）：functionId + keyword 模糊去重，按 paasUserId 隔离（空=全可见）。注册在 :batchId 之前。 */
+  app.get('/api/v2/trajectories/batch/names', asyncHandler(async (req, res) => {
+    const names = await batchService.listBatchTaskNames({
+      functionId: req.query.functionId,
+      keyword: req.query.keyword,
+      paasUserId: req.paasUserId ?? null,
+      limit: req.query.limit,
+    });
+    res.json({ names });
+  }));
+
   /**
    * One-shot import: parse Excel → persist job → background analyze/record.
    * multipart: file, functionId, systemAccountId, model?

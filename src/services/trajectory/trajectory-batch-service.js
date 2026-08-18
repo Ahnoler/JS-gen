@@ -192,6 +192,18 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
   return doneJob;
 }
 
+/**
+ * 任务名候选（搜索下拉）：按 functionId + 关键字模糊去重，最近创建优先；空=全可见语义。
+ */
+export async function listBatchTaskNames({ functionId, keyword = '', paasUserId = null, limit = 20 } = {}) {
+  return batchDao.listDistinctNames({
+    functionId: functionId != null && functionId !== '' ? Number(functionId) : undefined,
+    keyword,
+    paasUserId: paasUserId || null,
+    limit,
+  });
+}
+
 export async function getBatchJobView(batchId, {
   page = 1,
   pageSize = 50,

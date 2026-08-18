@@ -101,6 +101,29 @@ async function main() {
     assert.ok(docs.includes('batchTaskName: \'批量录制导入模板_0814-1251\''), 'api-docs example');
   });
 
+  run('batch names endpoint: route before :batchId / dao distinct + like + user scoping', () => {
+    const route = readFileSync(join(ROOT, 'src/routes/v2/trajectory-batch.js'), 'utf8');
+    assert.ok(route.includes("'/api/v2/trajectories/batch/names'"), 'names route');
+    assert.ok(route.indexOf('batch/names') < route.indexOf('batch/:batchId'), 'names registered before :batchId');
+    assert.ok(route.includes('listBatchTaskNames'), 'route calls listBatchTaskNames');
+    const svc = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-batch-service.js'), 'utf8');
+    assert.ok(svc.includes('listBatchTaskNames'), 'service exports listBatchTaskNames');
+    assert.ok(svc.includes('batchDao.listDistinctNames'), 'service delegates to dao');
+    const dao = readFileSync(join(ROOT, 'src/dao/batch-recording-dao.js'), 'utf8');
+    assert.ok(dao.includes('listDistinctNames'), 'dao exports listDistinctNames');
+    assert.ok(dao.includes("where('name', 'like', `%${kw}%`)"), 'keyword fuzzy filter');
+    assert.ok(dao.includes("q.where('paas_user_id', paasUserId)"), 'user scoping');
+    assert.ok(dao.includes("orderBy('created_at', 'desc')"), 'recent first');
+    assert.ok(dao.includes('q.limit('), 'limit applied');
+  });
+
+  run('mojibake fix migration: repairs name + original_filename via decodeUploadFilename', () => {
+    const mig = readFileSync(join(ROOT, 'migrations/20260819000000_fix_batch_job_name_mojibake.js'), 'utf8');
+    assert.ok(mig.includes('decodeUploadFilename'), 'reuses decodeUploadFilename');
+    assert.ok(mig.includes('original_filename'), 'repairs original_filename too');
+    assert.ok(mig.includes('name !== r.name || file !== r.original_filename'), 'conditional update');
+  });
+
   const failedCount = failed;
   console.log(failedCount ? `\n${failedCount} failed` : '\nall ok');
   process.exit(failedCount ? 1 : 0);

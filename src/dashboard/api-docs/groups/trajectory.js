@@ -289,6 +289,21 @@ export const GROUP_TRAJECTORY = [
         ],
       },
       {
+        method: 'GET', path: '/api/v2/trajectories/batch/names',
+        summary: '任务名候选（搜索下拉）',
+        desc: '按 functionId + 关键字模糊去重返回最近创建的任务名列表（交易列表页「按任务名筛选」下拉选项源）。',
+        params: [
+          { name: 'functionId', type: 'number', in: 'query', desc: '功能 id；缺省不过滤' },
+          { name: 'keyword', type: 'string', in: 'query', desc: '任务名模糊关键字（LIKE %值%）' },
+          { name: 'limit', type: 'number', in: 'query', desc: '上限，默认 20，最大 100' },
+        ],
+        respExample: J({ names: ['批量录制导入模板_0814-1251', '批量录制导入模板_0813-1709'] }),
+        notes: [
+          '按 paasUserId 隔离（与列表同语义：空 paas_user_id=全可见）',
+          '注册在 batch/:batchId 之前，避免被 :batchId 捕获',
+        ],
+      },
+      {
         method: 'POST', path: '/api/v2/trajectories/batch/import',
         summary: '批量导入 Excel 并自动录制（一站式）',
         desc: 'multipart 上传 .xlsx；mode=record 时对每行自动执行 analyze → 保存草稿 → prepare → record/start → detach；'

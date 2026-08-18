@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-19: **批量任务名候选接口 + 存量文件名乱码修复**：新增 `GET /api/v2/trajectories/batch/names`（functionId + keyword 模糊去重、最近创建优先、按 paasUserId 隔离空=全可见、limit 默认 20 最大 100；注册在 `batch/:batchId` 之前）——交易列表页「按任务名筛选」搜索下拉的选项源。另新增迁移 `20260819000000_fix_batch_job_name_mojibake.js`：修复 `batch_recording_job` 存量 5 行 `name`/`original_filename` 的 mojibake（UTF-8 字节被 latin1 解码，如「批量录制导入模板.xlsx」存成 `æ¹éå¶å¯¼å¥æ¨¡æ¿.xlsx`；运行时链路已由 `decodeUploadFilename` 修复，本迁移只修存量，幂等）。
+  影响范围：新增路由（/api/v2/trajectories/batch/names）、存量数据修复（batch_recording_job.name/original_filename）。
+  文件：src/routes/v2/trajectory-batch.js, src/services/trajectory/trajectory-batch-service.js, src/dao/batch-recording-dao.js, migrations/20260819000000_fix_batch_job_name_mojibake.js, src/dashboard/api-docs/groups/trajectory.js, scripts/characterization/characterize-batch-task-name.mjs
+  Python 同步提示：无 schema 变更（数据修复不动结构）。若代理侧提供任务名下拉，对齐 `GET /api/v2/trajectories/batch/names?functionId=&keyword=&limit=`（返回 `{names: string[]}`）；任务名/文件名展示前若见乱码，可复用 `Buffer.from(s,'latin1').toString('utf8')` 修复（仅当不含 CJK 时）。
+
 - 2026-08-18: **弹窗独立截图采集**：录制时检测到 `overlay:` 弹窗操作，实时采集弹窗可视区域截图；复用现有 `screenshot` 表（`kind='phase_highlight'` + `trajectory_step_id` + `metadata_json.dialog=true`），不新增数据库字段。V3 推送 `payload.screenshots` 支持 `type:'dialog'`，弹窗控件 `pid` 与 dialog key 对应，有 dialog 截图时 `rect` 相对弹窗截图。
   影响范围：Python 录制截图链路、Node screenshot DAO/service、V3 导出、API 文档、characterization。
   文件：scripts/state.py, scripts/controller/service.py, scripts/manual_recorder/recorder.py, src/dao/screenshot-dao.js, src/services/screenshot-service.js, src/routes/browser-session/persist-live.js, src/services/trajectory/trajectory-recording-runner.js, src/services/transaction-export-v3.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-dialog-screenshot.mjs, scripts/refactor/verify-all.sh

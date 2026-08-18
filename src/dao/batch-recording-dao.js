@@ -460,4 +460,34 @@ export function deriveJobTerminalStatus(summary, { cancelled = false } = {}) {
   return 'completed_with_errors';
 }
 
+/**
+ * 任务名候选（搜索下拉用）：按 functionId + 关键字模糊去重，最近创建优先。
+ * @param {{ functionId?: number, keyword?: string, paasUserId?: string|null, limit?: number }} opts
+ * @returns {Promise<string[]>}
+ */
+export async function listDistinctNames({ functionId, keyword = '', paasUserId = null, limit = 20 } = {}) {
+  const db = getDB();
+  const q = db(JOB_TABLE)
+    .select('name')
+    .whereNotNull('name')
+    .where('name', '!=', '')
+    .orderBy('created_at', 'desc');
+  if (functionId != null && functionId !== '') q.where('function_id', Number(functionId));
+  if (paasUserId) q.where('paas_user_id', paasUserId);
+  const kw = String(keyword || '').trim();
+  if (kw) q.where('name', 'like', `%${kw}%`);
+  q.limit(Math.min(100, Math.max(1, Number(limit) || 20)));
+  const rows = await q;
+  const seen = new Set();
+  const names = [];
+  for (const r of rows) {
+    const n = String(r.name || '').trim();
+    if (n && !seen.has(n)) {
+      seen.add(n);
+      names.push(n);
+    }
+  }
+  return names;
+}
+
 export { BATCH_ITEM_TERMINAL, BATCH_JOB_TERMINAL, JOB_TABLE, ITEM_TABLE };
