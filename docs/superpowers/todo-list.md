@@ -106,9 +106,9 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 | **PR-LOC** | **已落地（V2.1）** · 需求变更（2026-08-17）：阶段长图**无元素高亮**；**内部滚动容器修复（2026-08-17，`d570311`）** | 阶段长图 + 控件坐标 | AI `phase_done` 后 1 张 PNG（滚主滚动区拼接，**不再烘焙高亮**）；`screenshot.metadata_json` 记录截图长宽（image/content 双坐标系）+ **全部可见 L2 控件坐标**（left/top/right/bottom + kind/text/layers/region）+ region_tree。**长图内部滚动修复**：`pickScrollRoot` 泛化覆盖非标准 class 的内部滚动容器（如 `.plugin-content-list` 瀑布流，scrollHeight 6554/clientHeight 659），修复前回退 document 只截一屏；湿测命中正确滚动根。湿测已完成 | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · 阶段截图 V2 已合 V2.1 |
 | **PR-LOC-HL** | **需求变更**（2026-08-17）：由「步骤级高亮截图」改为「**控件坐标点亮**」；**MVP 已定**：只用阶段图 `metadata.elements[]` 控件坐标点亮（不补步骤坐标）。**前置项已落地（2026-08-17）**：步骤 element region/bbox 入库（spec `2026-08-17-step-element-region-bbox-design.md` + plan 5 任务完成，commit `68065cb`~`38f20a9`，9242 湿测 3 层分层 + 内容坐标验证通过）。**探索工具已建**（`scripts/tools/`） | 步骤级控件坐标 → 推送 | 旧方向（操作后逐步高亮再截）**取消**。**MVP**：阶段长图无元素高亮 + `metadata.elements[]` 经推送 V2.0 envelope（`phases[].metadata`）推给公司其他平台。**工具（功能分离）**：① 元素高亮 `lightup-phase-screenshot.mjs`；② 元素分层 `layer-tree-from-properties.mjs`（`--file`/`--shot`/`--trajectory` 三模式）。**前置项（完成）**：录制时 `_capture_element`/`_enrich_click_element` evaluate `assignRegion` + `stepBBoxOf`（内容坐标，泛化 `pickScrollRoot` 覆盖内部滚动容器），`element_json` 新增 `region_id`/`region_label`/`layers[]`/`bbox`——新录制按 step 分层 + 步骤级高亮可用（湿测：`tab:客户基本信息\|section\|titlebox` 3 层 + y1=4769 内容坐标正确）。**剩余**：端到端录制验证 element_json 落库；步骤级高亮（bbox 画框，PR-LOC-HL 本体）待 design | 参考 `src/services/transaction-export.js`（V2.0）；spec `2026-08-17-step-element-region-bbox-design.md`；工具 commit `8e9e76d`/`43290ec`/`1e1ecad`/`01197ce`/`55f648e`/`8f3d15e` |
 | **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data 软文本底座；**需专刀 design** |
-| **PR-BATCH** | ① 用户隔离**后端已落地**（2026-08-17）；交易列表加任务前端联调进行中（8/19） | 批量导入：用户只看自己任务 | ① 用户隔离与 **PR-USER** appid 隔离同源：`paas_user_id` 列表过滤/盖章/存量回填/批量透传已落地（commit `c0503f3`/`7abf7e8`/`8ab90e0`）；②行进度 + ③phase `done_logs` 已合 V2.1 | Vue BatchImport 另仓联调 8/19 |
+| **PR-BATCH** | **已交付**（2026-08-18，用户确认前端完成） | 批量导入：用户只看自己任务 | ① 用户隔离与 **PR-USER** appid 隔离同源：`paas_user_id` 列表过滤/盖章/存量回填/批量透传已落地（`c0503f3`/`7abf7e8`/`8ab90e0`）+ 前端任务 key 按 paasUserId 命名空间；②行进度条 + ③phase done 说明前端已实现（`el-progress`/`lastDoneText`/详情页 `doneLogs`）。**已知小缺口**：交易列表页无 batchTaskName 筛选入口（后端参数已支持）、顶栏徽标文案未实现 | Vue BatchImport 另仓 |
 | **PR-USER** | 凭据维护**后端已落地**（2026-08-17）；前端 UI + 联调进行中（8/19） | 用户/系统树权限 | 树共享；交易本人可见；仅管理员删树。**本期只做系统树创建时用户名/密码/角色维护，不做权限闸**：`system_account.username`→`account` 更名 + 节点 POST/PUT `accounts[]` 批量维护（`1a46519`）+ 节点详情回显 `accounts[]`（`d09fc60`） | 等 **PR-SSO-ADMIN**（权限部分）；前端凭据维护 UI 8/19 |
-| **PR-SSO** | 子项已落地（2026-08-17：appid 登录 + 数据隔离）；完整登录后置 | 接入公司账号中心 HTTP API | 前端跳账号中心登录，回调 authCode=JWT 当 token；后端纯解 JWT payload 拿 `paasUserId` 做 `/api/v2/*` 用户隔离（`SSO_AUTH_REQUIRED` 默认关，空 `paas_user_id`=全可见）；管理员映射仍挂起 | 等 **PR-SSO-ADMIN**（管理员映射）；换会话/权限后置 |
+| **PR-SSO** | 子项已落地（2026-08-17：appid 登录 + 数据隔离；2026-08-18：JWT 验签 + /me 回查用户）；完整登录后置 | 接入公司账号中心 HTTP API | 前端跳账号中心登录，回调 authCode=JWT 当 token；后端验签（`query_jwt_secret` 密钥，HMAC-SHA256）+ 解 payload 拿 `paasUserId` 做 `/api/v2/*` 用户隔离（`SSO_AUTH_REQUIRED` 默认关，空 `paas_user_id`=全可见）；`/me` 回查 `query_access_user` 返回 userName/userAccount（`d8efbfd`/另仓 `7390a6a`）；管理员映射仍挂起 | 等 **PR-SSO-ADMIN**（管理员映射）；换会话/权限后置 |
 | **PR-PUSH** | **已完成**（2026-08-15） · V2.0：每步 regionId/parentRegionId + 每交易 phases[]（截图引用+元数据）— [spec](specs/2026-08-14-batch-push-v2-region-evidence-design.md) | 推送到自动化 | 拒草稿；仅 recorded/completed；`characterize-transaction-export-region.mjs` OK；**未见 live 湿测记录** | export-push-gate |
 | **PR-EXEC** | **挂起** | 脚本执行（引擎/执行机） | 本侧只提供浏览器操作与 actions 设计；暂不排调度产品 | T9 / session-lifecycle 湿测另跟 |
 
@@ -120,8 +120,8 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 | 任务 | 对应 todo / 工程项 | 进度 | 状态 | 交付日期 | 备注 |
 |------|--------------------|------|------|----------|------|
 | 3. 系统管理：系统树创建时维护用户名、密码、角色 | PR-USER 子集（不含权限闸） | **~70%** | **后端已交付**（2026-08-17）；前端 UI + 联调 8/19 | **8.19** | 后端 5/5 ✅：`account` 更名 + `accounts[]` 批量维护（`1a46519`）+ 节点详情回显（`d09fc60`）。待办：另仓凭据 UI + JS-gen↔Vue 联调 |
-| 4. 交易列表里增加任务 | PR-BATCH | **~75%** | **后端隔离已交付**（2026-08-17）；Vue 联调 8/19 | **8.19** | 后端 6/6 ✅：`paas_user_id` 过滤/盖章/回填（`c0503f3`/`7abf7e8`/`8ab90e0`）。待办：BatchImport 另仓联调；「只看我的」UI 后置 |
-| 5. 登录：流水线 appid + 脚本数据用户隔离 | PR-SSO / PR-USER 子集 | **100%** | **已交付**（2026-08-17，比排期提前） | **8.19** | `c0503f3`/`45e0b6a` + 另仓 SSO `75e9562`；`SSO_AUTH_REQUIRED` 默认关，冒烟时开；**PR-SSO-ADMIN** 仍挂起不阻塞 |
+| 4. 交易列表里增加任务 | PR-BATCH | **100%** | **已交付**（2026-08-18，用户确认前端完成） | **8.19** | 后端 6/6 ✅ + 前端完成（行进度条/done 说明/任务按用户持久化）。小缺口：列表页 batchTaskName 筛选入口、顶栏徽标未实现；「只看我的」UI 后置 |
+| 5. 登录：流水线 appid + 脚本数据用户隔离 | PR-SSO / PR-USER 子集 | **100%** | **已交付**（2026-08-17 主体 + 2026-08-18 验签/回查） | **8.19** | `c0503f3`/`45e0b6a`/`d8efbfd` + 另仓 SSO `75e9562`/`7390a6a`；`SSO_AUTH_REQUIRED` 默认关，冒烟时开；**PR-SSO-ADMIN** 仍挂起不阻塞 |
 
 **排期 vs 实际：**
 
@@ -140,11 +140,10 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 | 事项 | 状态 | 说明 / commit |
 |------|------|---------------|
 | SSO 接入：auth 中间件 + `/api/v2/auth/{sso/login-page,sso/logout-page,me,sso/check}` | ✅ 已落地 | `c0503f3`；`SSO_AUTH_REQUIRED` 默认关，仅 `/api/v2/*`，白名单 `/api/v2/auth/*` |
-| JWT 解码（纯解 payload 不验签；19 位 userId 正则提取防精度丢失） | ✅ 已落地 | `c0503f3`（`src/services/sso/jwt-decode.js`） |
+| JWT 解码 + 验签（`verifyPaasToken`：HMAC-SHA256，密钥 `query_jwt_secret`，缓存 1h；`SSO_JWT_SECRET` 可配置覆盖；密钥不可用降级纯解） | ✅ 已落地 | `c0503f3`（解码）+ `d8efbfd`（验签，`src/services/sso/jwt-decode.js`） |
 | 前端 SSO 接通：占位接口 → 真实 `/v2/auth/*` + `stores/user.ts` + 401 处理 | ✅ 已落地（另仓） | vue-project dev `75e9562` |
 | 用户名显示（`paasUserId` 替代硬编码 `675310918`） | ✅ 已落地（另仓） | `75e9562` |
-| 前端用户名友好显示（账号中心换 userName/nickName） | ⏳ 待办 | 需账号中心「token 换用户资料」接口，本周未取 |
-| 账号中心 token 校验 / JWT 验签 | ⏳ 待办 | 本周纯解 payload，与已上线产品取法一致 |
+| `/me` 回查用户信息（`query_access_user` → userName/userAccount，如 管理员/admin）+ 前端显示用户名 | ✅ 已落地 | `d8efbfd` + 另仓 `7390a6a`（`src/services/sso/paas-client.js`） |
 | 管理员角色映射 / 权限闸 | ⏳ 挂起 | **PR-SSO-ADMIN** 等会议结论 |
 
 #### ② 交易管理的用户隔离（PR-BATCH / PR-USER 子集）
@@ -158,7 +157,8 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 | 批量导入生成交易透传 `job.paasUserId` | ✅ 已落地（补漏） | `7abf7e8`（analyze 链路曾漏盖，已修 + characterization 断言） |
 | 存量数据回填归 admin（95 交易 + 18 任务） | ✅ 已落地 | `8ab90e0`（迁移 `20260818120000`，幂等） |
 | 前端批量导入任务 key 按 paasUserId 命名空间 | ✅ 已落地（另仓） | `75e9562` |
-| 前端「只看我的」开关 UI | ⏳ 待办 | 后端已按 token 自动过滤；切换「全部/我的」UI 另开 |
+| 交易列表加任务前端（行进度条 / phase done 说明 / 任务 summary） | ✅ 已落地（另仓，2026-08-18 用户确认） | BatchImportDialog `el-progress`/`lastDoneText`、详情页 `doneLogs` |
+| 前端「只看我的」开关 UI | ⏳ 待办 | 后端已按 token 自动过滤；切换「全部/我的」UI 另开。**小缺口**：列表页 batchTaskName 筛选入口未接（后端参数已支持）、顶栏徽标文案未实现 |
 | `messages`/`case-data`/`screenshots` 用户隔离 | ⏳ 未做 | 等 **PR-SSO-ADMIN**（权限部分）后统一收紧 |
 | 单条 `GET /api/v2/trajectories/:id` 归属校验 | ⏳ 未做 | 同上，本周仅列表/创建/批量隔离 |
 
@@ -189,6 +189,7 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 
 ## 更新记录
 
+| 2026-08-18 | **任务 4（交易列表加任务）已交付**：Vue 侧确认完成（行进度条 `el-progress`、phase done 说明 `lastDoneText`/详情页 `doneLogs`、任务按 paasUserId 持久化）；PR-BATCH 标已交付。**任务 5 增强落地**：SSO JWT 验签（`verifyPaasToken`，密钥 `query_jwt_secret`=paas-application，缓存 1h，`SSO_JWT_SECRET` 可配置覆盖；伪造 token 拒绝、密钥不可用降级纯解）+ `/me` 回查账号中心用户信息（`query_access_user` → userName/userAccount，实测 管理员/admin）——commit `d8efbfd` + 另仓 `7390a6a`（顶部用户名显示「管理员」）；characterization 25/25 绿。已知小缺口：列表页 batchTaskName 筛选入口、顶栏徽标文案未实现（非阻塞） |
 | 2026-08-17 | **PR-LOC-HL 前置项完成：步骤 element region/bbox 入库**：spec（`2026-08-17-step-element-region-bbox-design.md`）+ plan 5 任务全部落地（`68065cb`~`38f20a9`，verify-all ALL GREEN）；录制时 `assignRegion` + `stepBBoxOf`（内容坐标，泛化 `pickScrollRoot`）写入 `element_json`（`region_id`/`region_label`/`layers[]`/`bbox`）；9242 浏览器湿测通过（`tab:客户基本信息\|section\|titlebox` 3 层 + 内容坐标 y1=4769 正确）。剩余：端到端录制验证落库；步骤级高亮（bbox 画框）待 design |
 | 2026-08-17 | **本周任务进度写回**：三条主任务综合 ~78%（任务 5 已交付；任务 3/4 后端已交付待 8/19 联调）；开发事项对齐 15/18；日报见 `docs/report/2026-08-17.md` |
 | 2026-08-17 | **PR-LOC-HL 探索进度**：点亮 viewer 工具 `scripts/tools/lightup-phase-screenshot.mjs` 已建并提交（`8e9e76d` 操作过过滤 / `43290ec` 三维匹配 / `1e1ecad` 移除冗余勾选）——阶段图 56 控件画框 + 「仅显示本阶段操作过的控件」+ 点击详情；**三维匹配验证**：`formLabel`→`label`、`target_kind`→`kind`、`regionId`→`regionId`，traj 157 phase 4 匹配 **16/16**（原 text 匹配 1/4）；结论：表单填写型阶段匹配可靠，下拉/弹窗/切 tab 场景需步骤坐标兜底（后置待 design） |
