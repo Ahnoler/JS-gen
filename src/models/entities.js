@@ -308,12 +308,17 @@
 /**
  * @typedef {Object} Screenshot
  * @property {number} [id]
- * @property {Buffer} imageData
+ * @property {'db'|'minio'|'local'} [storageType]
+ * @property {number} [retryCount]
+ * @property {string|null} [lastRetryAt]
+ * @property {string|null} [storagePath]
+ * @property {string|null} [imageUrl]
  * @property {number} [fileSize]
  * @property {string} [mimeType]
  * @property {number|null} [trajectoryId]
  * @property {number|null} [trajectoryStepId]
- * @property {'before'|'after'} [kind]
+ * @property {number|null} [trajectoryPhaseId]
+ * @property {'before'|'after'|'phase_highlight'} [kind]
  * @property {string} createdAt
  */
 
