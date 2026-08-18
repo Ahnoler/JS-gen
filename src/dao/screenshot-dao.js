@@ -1,10 +1,16 @@
 import { getDB } from '../../config/database.js';
-import { fromDbRows } from './helpers.js';
+
+import { fromDbRow, fromDbRows } from './helpers.js';
 
 const TABLE = 'screenshot';
 
 const META_COLS = [
   'screenshot.id',
+  'screenshot.storage_type',
+  'screenshot.retry_count',
+  'screenshot.last_retry_at',
+  'screenshot.storage_path',
+  'screenshot.image_url',
   'screenshot.file_size',
   'screenshot.mime_type',
   'screenshot.trajectory_id',
@@ -14,6 +20,16 @@ const META_COLS = [
   'screenshot.metadata_json',
   'screenshot.created_at',
 ];
+
+function defaultImageUrl(id, imageUrl) {
+  return imageUrl || `/api/v2/screenshots/${id}/image`;
+}
+
+async function updateImageUrlIfMissing(db, id, imageUrl) {
+  if (!id) return;
+  const url = imageUrl || `/api/v2/screenshots/${id}/image`;
+  await db(TABLE).where({ id }).update({ image_url: url });
+}
 
 /**
  * UPSERT one screenshot row by (trajectory_step_id, kind).
@@ -25,13 +41,17 @@ export async function replaceForStep(screenshot) {
   if (!Number.isFinite(stepId) || stepId <= 0) {
     throw new Error('trajectoryStepId required for replaceForStep');
   }
-  const imageData = screenshot.imageData;
-  const fileSize = screenshot.fileSize || (imageData ? imageData.length : 0);
+
+  const storageType = screenshot.storageType || 'minio';
+  const storagePath = screenshot.storagePath || null;
+  const imageUrl = screenshot.imageUrl || null;
+  const fileSize = screenshot.fileSize || 0;
   const mimeType = screenshot.mimeType || 'image/png';
   const trajectoryId = screenshot.trajectoryId != null ? Number(screenshot.trajectoryId) : null;
+  const retryCount = screenshot.retryCount ?? 0;
+  const lastRetryAt = screenshot.lastRetryAt ?? null;
 
   const db = getDB();
-  // Step may have been coalesced away between persist and screenshot flush.
   const stepExists = await db('trajectory_step').where({ id: stepId }).first('id');
   if (!stepExists) {
     const err = new Error(`trajectory_step ${stepId} not found`);
@@ -43,21 +63,27 @@ export async function replaceForStep(screenshot) {
 
   await db.raw(
     `INSERT INTO \`${TABLE}\`
-      (image_data, file_size, mime_type, trajectory_id, trajectory_step_id, kind)
-     VALUES (?, ?, ?, ?, ?, ?)
+      (storage_type, retry_count, last_retry_at, storage_path, image_url, file_size, mime_type, trajectory_id, trajectory_step_id, kind)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-      image_data = VALUES(image_data),
+      storage_type = VALUES(storage_type),
+      retry_count = VALUES(retry_count),
+      last_retry_at = VALUES(last_retry_at),
+      storage_path = VALUES(storage_path),
+      image_url = VALUES(image_url),
       file_size = VALUES(file_size),
       mime_type = VALUES(mime_type),
       trajectory_id = VALUES(trajectory_id)`,
-    [imageData, fileSize, mimeType, trajectoryId, stepId, kind],
+    [storageType, retryCount, lastRetryAt, storagePath, imageUrl, fileSize, mimeType, trajectoryId, stepId, kind],
   );
 
   const row = await db(TABLE)
     .select('id')
     .where({ trajectory_step_id: stepId, kind })
     .first();
-  return row?.id != null ? Number(row.id) : null;
+  const id = row?.id != null ? Number(row.id) : null;
+  await updateImageUrlIfMissing(db, id, imageUrl);
+  return id;
 }
 
 /**
@@ -70,11 +96,16 @@ export async function replaceForPhase(screenshot) {
   if (!Number.isFinite(phaseId) || phaseId <= 0) {
     throw new Error('trajectoryPhaseId required for replaceForPhase');
   }
-  const imageData = screenshot.imageData;
-  const fileSize = screenshot.fileSize || (imageData ? imageData.length : 0);
+
+  const storageType = screenshot.storageType || 'minio';
+  const storagePath = screenshot.storagePath || null;
+  const imageUrl = screenshot.imageUrl || null;
+  const fileSize = screenshot.fileSize || 0;
   const mimeType = screenshot.mimeType || 'image/png';
   const trajectoryId = screenshot.trajectoryId != null ? Number(screenshot.trajectoryId) : null;
   const metadataJson = screenshot.metadataJson ?? null;
+  const retryCount = screenshot.retryCount ?? 0;
+  const lastRetryAt = screenshot.lastRetryAt ?? null;
 
   const db = getDB();
   const phaseExists = await db('trajectory_phase').where({ id: phaseId }).first('id');
@@ -86,28 +117,33 @@ export async function replaceForPhase(screenshot) {
 
   await db.raw(
     `INSERT INTO \`${TABLE}\`
-      (image_data, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind, metadata_json)
-     VALUES (?, ?, ?, ?, NULL, ?, ?, ?)
+      (storage_type, retry_count, last_retry_at, storage_path, image_url, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind, metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-      image_data = VALUES(image_data),
+      storage_type = VALUES(storage_type),
+      retry_count = VALUES(retry_count),
+      last_retry_at = VALUES(last_retry_at),
+      storage_path = VALUES(storage_path),
+      image_url = VALUES(image_url),
       file_size = VALUES(file_size),
       mime_type = VALUES(mime_type),
       trajectory_id = VALUES(trajectory_id),
       metadata_json = VALUES(metadata_json)`,
-    [imageData, fileSize, mimeType, trajectoryId, phaseId, kind, metadataJson],
+    [storageType, retryCount, lastRetryAt, storagePath, imageUrl, fileSize, mimeType, trajectoryId, phaseId, kind, metadataJson],
   );
 
   const row = await db(TABLE)
     .select('id')
     .where({ trajectory_phase_id: phaseId, kind })
     .first();
-  return row?.id != null ? Number(row.id) : null;
+  const id = row?.id != null ? Number(row.id) : null;
+  await updateImageUrlIfMissing(db, id, imageUrl);
+  return id;
 }
 
 /**
  * UPSERT one dialog screenshot row by (trajectory_step_id, kind='phase_highlight').
  * Dialog screenshots reuse phase_highlight kind and are distinguished by metadata_json.dialog=true.
- * @returns {Promise<number|null>} row id, or null if step no longer exists
  */
 export async function replaceDialogForStep(screenshot) {
   const stepId = screenshot.trajectoryStepId != null ? Number(screenshot.trajectoryStepId) : null;
@@ -115,11 +151,16 @@ export async function replaceDialogForStep(screenshot) {
   if (!Number.isFinite(stepId) || stepId <= 0) {
     throw new Error('trajectoryStepId required for replaceDialogForStep');
   }
-  const imageData = screenshot.imageData;
-  const fileSize = screenshot.fileSize || (imageData ? imageData.length : 0);
+
+  const storageType = screenshot.storageType || 'minio';
+  const storagePath = screenshot.storagePath || null;
+  const imageUrl = screenshot.imageUrl || null;
+  const fileSize = screenshot.fileSize || 0;
   const mimeType = screenshot.mimeType || 'image/png';
   const trajectoryId = screenshot.trajectoryId != null ? Number(screenshot.trajectoryId) : null;
   const metadataJson = screenshot.metadataJson ?? null;
+  const retryCount = screenshot.retryCount ?? 0;
+  const lastRetryAt = screenshot.lastRetryAt ?? null;
 
   const db = getDB();
   const stepExists = await db('trajectory_step').where({ id: stepId }).first('id');
@@ -133,22 +174,43 @@ export async function replaceDialogForStep(screenshot) {
 
   await db.raw(
     `INSERT INTO \`${TABLE}\`
-      (image_data, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind, metadata_json)
-     VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
+      (storage_type, retry_count, last_retry_at, storage_path, image_url, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind, metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
      ON DUPLICATE KEY UPDATE
-      image_data = VALUES(image_data),
+      storage_type = VALUES(storage_type),
+      retry_count = VALUES(retry_count),
+      last_retry_at = VALUES(last_retry_at),
+      storage_path = VALUES(storage_path),
+      image_url = VALUES(image_url),
       file_size = VALUES(file_size),
       mime_type = VALUES(mime_type),
       trajectory_id = VALUES(trajectory_id),
       metadata_json = VALUES(metadata_json)`,
-    [imageData, fileSize, mimeType, trajectoryId, stepId, kind, metadataJson],
+    [storageType, retryCount, lastRetryAt, storagePath, imageUrl, fileSize, mimeType, trajectoryId, stepId, kind, metadataJson],
   );
 
   const row = await db(TABLE)
     .select('id')
     .where({ trajectory_step_id: stepId, kind })
     .first();
-  return row?.id != null ? Number(row.id) : null;
+  const id = row?.id != null ? Number(row.id) : null;
+  await updateImageUrlIfMissing(db, id, imageUrl);
+  return id;
+}
+
+export async function listPhaseHighlightsByTrajectory(trajectoryId) {
+  const rows = await getDB()(TABLE)
+    .select('id', 'trajectory_phase_id', 'metadata_json')
+    .where({ trajectory_id: trajectoryId, kind: 'phase_highlight' });
+  return fromDbRows(rows).map((r) => {
+    let metadataJson = null;
+    if (r.metadataJson != null && typeof r.metadataJson === 'string') {
+      try { metadataJson = JSON.parse(r.metadataJson); } catch { metadataJson = null; }
+    } else if (r.metadataJson != null) {
+      metadataJson = r.metadataJson;
+    }
+    return { id: r.id, trajectoryPhaseId: r.trajectoryPhaseId, metadataJson };
+  });
 }
 
 export async function listDialogScreenshotsByTrajectory(trajectoryId) {
@@ -174,24 +236,22 @@ export async function listDialogScreenshotsByTrajectory(trajectoryId) {
   }).filter(Boolean);
 }
 
-export async function listPhaseHighlightsByTrajectory(trajectoryId) {
-  const rows = await getDB()(TABLE)
-    .select('id', 'trajectory_phase_id', 'metadata_json')
-    .where({ trajectory_id: trajectoryId, kind: 'phase_highlight' });
-  return fromDbRows(rows).map((r) => {
-    let metadataJson = null;
-    if (r.metadataJson != null && typeof r.metadataJson === 'string') {
-      try { metadataJson = JSON.parse(r.metadataJson); } catch { metadataJson = null; }
-    } else if (r.metadataJson != null) {
-      metadataJson = r.metadataJson;
-    }
-    return { id: r.id, trajectoryPhaseId: r.trajectoryPhaseId, metadataJson };
-  });
-}
-
 export async function getImage(id) {
   const row = await getDB()(TABLE)
-    .select('id', 'image_data', 'mime_type', 'file_size')
+    .select(
+      'id',
+      'storage_type',
+      'retry_count',
+      'last_retry_at',
+      'storage_path',
+      'image_url',
+      'mime_type',
+      'file_size',
+      'kind',
+      'trajectory_id',
+      'trajectory_step_id',
+      'trajectory_phase_id',
+    )
     .where({ id })
     .first();
   return row || null;
@@ -210,6 +270,80 @@ export async function listByTrajectory(trajectoryId) {
       { column: 'screenshot.kind', order: 'asc' },
     ]);
   return fromDbRows(rows);
+}
+
+export async function findByStepAndKind(stepId, kind) {
+  const row = await getDB()(TABLE)
+    .select('id', 'storage_type', 'storage_path', 'image_url')
+    .where({ trajectory_step_id: Number(stepId), kind })
+    .first();
+  return fromDbRow(row);
+}
+
+export async function findByPhaseAndKind(phaseId) {
+  const row = await getDB()(TABLE)
+    .select('id', 'storage_type', 'storage_path', 'image_url')
+    .where({ trajectory_phase_id: Number(phaseId), kind: 'phase_highlight' })
+    .first();
+  return fromDbRow(row);
+}
+
+export async function listByStepIds(stepIds) {
+  const ids = [...new Set((stepIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+  if (!ids.length) return [];
+  const rows = await getDB()(TABLE)
+    .select('id', 'storage_type', 'storage_path', 'image_url')
+    .whereIn('trajectory_step_id', ids);
+  return fromDbRows(rows);
+}
+
+export async function listByPhaseIds(phaseIds) {
+  const ids = [...new Set((phaseIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+  if (!ids.length) return [];
+  const rows = await getDB()(TABLE)
+    .select('id', 'storage_type', 'storage_path', 'image_url')
+    .whereIn('trajectory_phase_id', ids);
+  return fromDbRows(rows);
+}
+
+export async function listStorageByTrajectory(trajectoryId) {
+  const rows = await getDB()(TABLE)
+    .select('id', 'storage_type', 'storage_path', 'image_url')
+    .where({ trajectory_id: trajectoryId });
+  return fromDbRows(rows);
+}
+
+export async function listPending() {
+  const rows = await getDB()(TABLE)
+    .select(...META_COLS)
+    .where({ storage_type: 'local' })
+    .orderBy('created_at', 'asc');
+  return fromDbRows(rows);
+}
+
+export async function markUploaded(id, { storagePath, imageUrl }) {
+  const numeric = Number(id);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return getDB()(TABLE)
+    .where({ id: numeric })
+    .update({
+      storage_type: 'minio',
+      storage_path: storagePath || null,
+      image_url: imageUrl || `/api/v2/screenshots/${numeric}/image`,
+      retry_count: 0,
+      last_retry_at: null,
+    });
+}
+
+export async function updateRetry(id, { retryCount, lastRetryAt }) {
+  const numeric = Number(id);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  return getDB()(TABLE)
+    .where({ id: numeric })
+    .update({
+      retry_count: Number(retryCount) || 0,
+      last_retry_at: lastRetryAt || null,
+    });
 }
 
 export async function removeByTrajectoryStepId(stepId) {

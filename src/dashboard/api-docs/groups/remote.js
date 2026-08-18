@@ -91,6 +91,16 @@ export const GROUP_REMOTE = [
     description: '按 trajectory_step 绑定的 before/after 截图；`kind=phase_highlight` 行绑定 trajectory_phase（`trajectoryPhaseId` 有值、`trajectoryStepId` 为 null）；回放中亦可经 WS replay:screenshot 获取临时 URL',
     endpoints: [
       {
+        method: 'GET', path: '/api/v2/screenshots/pending',
+        summary: '待补传截图列表',
+        desc: '返回所有 `storage_type=local` 的截图，即 MinIO 上传失败后暂存在本地的图片。',
+        respExample: J([{
+          id: 1, storageType: 'local', retryCount: 2, lastRetryAt: '2026-08-18T12:00:00.000Z',
+          fileSize: 12345, mimeType: 'image/png', trajectoryStepId: 501, kind: 'before',
+          imageUrl: '/api/v2/screenshots/1/image',
+        }]),
+      },
+      {
         method: 'GET', path: '/api/v2/trajectories/{trajectoryId}/screenshots',
         summary: '交易关联截图列表',
         params: [{ name: 'trajectoryId', type: 'number', required: true, in: 'path', example: '42' }],
@@ -104,10 +114,16 @@ export const GROUP_REMOTE = [
       },
       {
         method: 'GET', path: '/api/v2/screenshots/{id}/image',
-        summary: '原始 PNG 二进制',
+        summary: '原始 PNG 二进制（从 MinIO 或本地暂存读取）',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
         tryable: false,
         respExample: '(binary image/png)',
+      },
+      {
+        method: 'DELETE', path: '/api/v2/screenshots/{id}',
+        summary: '删除截图（同时删除 MinIO/本地文件）',
+        params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '1' }],
+        respExample: J({ status: 'deleted', id: 1 }),
       },
     ],
   },

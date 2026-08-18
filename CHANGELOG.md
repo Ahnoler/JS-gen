@@ -16,6 +16,12 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   文件：src/routes/v2/trajectory-batch.js, src/services/trajectory/trajectory-batch-service.js, src/dao/batch-recording-dao.js, migrations/20260819000000_fix_batch_job_name_mojibake.js, src/dashboard/api-docs/groups/trajectory.js, scripts/characterization/characterize-batch-task-name.mjs
   Python 同步提示：无 schema 变更（数据修复不动结构）。若代理侧提供任务名下拉，对齐 `GET /api/v2/trajectories/batch/names?functionId=&keyword=&limit=`（返回 `{names: string[]}`）；任务名/文件名展示前若见乱码，可复用 `Buffer.from(s,'latin1').toString('utf8')` 修复（仅当不含 CJK 时）。
 
+- 2026-08-18: **截图上传失败本地暂存与自动补传**：MinIO 上传失败时，截图先写入本地 `tmp/pending-screenshots/`，DB 标记 `storage_type='local'`；后台每 3 分钟扫描一次，最多重试 3 次，补传成功后删除本地文件并更新为 `storage_type='minio'`。新增 `GET /api/v2/screenshots/pending` 待补传截图列表；`GET /api/v2/screenshots/:id/image` 支持从本地暂存文件读取；删除截图/步骤/阶段/轨迹时同步清理本地文件。
+  影响范围：schema（新增 `retry_count` / `last_retry_at`，截图存储改为 `storage_type` / `storage_path` / `image_url`）、config（新增 `MINIO_*` / `SCREENSHOT_PENDING_*`）、截图服务/路由/API docs、server 启动重试任务。
+  文件：migrations/20260819000000_screenshot_minio_storage.js, migrations/20260819000001_screenshot_pending_upload.js, schemas/init.sql, config/config.js, config/.env.example, src/services/minio-service.js, src/services/screenshot-pending-store.js, src/services/screenshot-pending-retry.js, src/services/screenshot-service.js, src/dao/screenshot-dao.js, src/routes/v2/screenshot.js, src/dashboard/api-docs/groups/remote.js, server.mjs, scripts/models/entity/screenshot_entity.py
+  Python 同步提示：截图仍通过 WS `step_screenshot` 上报 base64；本地暂存与补传完全在 Node 控制面处理，Python 侧无感知。若 Python 直接读写 screenshot 表，需对齐新 schema。
+
+
 - 2026-08-18: **弹窗独立截图采集**：录制时检测到 `overlay:` 弹窗操作，实时采集弹窗可视区域截图；复用现有 `screenshot` 表（`kind='phase_highlight'` + `trajectory_step_id` + `metadata_json.dialog=true`），不新增数据库字段。V3 推送 `payload.screenshots` 支持 `type:'dialog'`，弹窗控件 `pid` 与 dialog key 对应，有 dialog 截图时 `rect` 相对弹窗截图。
   影响范围：Python 录制截图链路、Node screenshot DAO/service、V3 导出、API 文档、characterization。
   文件：scripts/state.py, scripts/controller/service.py, scripts/manual_recorder/recorder.py, src/dao/screenshot-dao.js, src/services/screenshot-service.js, src/routes/browser-session/persist-live.js, src/services/trajectory/trajectory-recording-runner.js, src/services/transaction-export-v3.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-dialog-screenshot.mjs, scripts/refactor/verify-all.sh

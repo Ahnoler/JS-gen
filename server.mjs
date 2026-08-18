@@ -18,6 +18,9 @@ import registerAssembleRoutes from './src/routes/test-assemble.js';
 import registerLegacyGoneRoutes from './src/routes/legacy-gone.js';
 import registerSetupRoutes from './src/routes/setup.js';
 import registerV2Routes from './src/routes/v2/__init__.js';
+import { startPendingScreenshotRetry, stopPendingScreenshotRetry } from './src/services/screenshot-pending-retry.js';
+import { cleanupPendingFiles } from './src/services/screenshot-pending-store.js';
+import * as screenshotDao from './src/dao/screenshot-dao.js';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -117,6 +120,15 @@ async function main() {
   const { startTrajectoryIdleReaper } = await import('./src/services/trajectory/trajectory-idle-reaper.js');
   startTrajectoryIdleReaper();
 
+  // Screenshot local pending upload: clean orphan files and start retry loop.
+  try {
+    const pendingScreenshots = await screenshotDao.listPending();
+    await cleanupPendingFiles(pendingScreenshots.map((p) => p.id));
+  } catch (err) {
+    console.warn('[server] screenshot pending cleanup skipped:', err?.message || err);
+  }
+  startPendingScreenshotRetry();
+
   // Do NOT crash occupied remote_sessions at raw boot — executor nodes look offline
   // until they reconnect. Defer reconcile until after the reconnect window.
   const BOOT_RECONCILE_DELAY_MS = Number(process.env.BOOT_REMOTE_RECONCILE_MS) || 15000;
@@ -190,6 +202,7 @@ main().catch(err => {
 
 async function gracefulShutdown() {
   console.log('\n[server] Shutting down...');
+  stopPendingScreenshotRetry();
   try {
     const { closeDB } = await import('./config/database.js');
     await closeDB();

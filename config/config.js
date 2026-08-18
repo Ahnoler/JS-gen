@@ -69,6 +69,35 @@ export const PUSH_V3_SCREENSHOT_EXPIRES = parseInt(
   10,
 ) || 3600;
 
+// MinIO — screenshot / image object storage
+const MINIO_HOST_DEFAULT = _resolve('MINIO_HOST', '');
+let _minioUrl = null;
+try { _minioUrl = new URL(MINIO_HOST_DEFAULT); } catch { _minioUrl = null; }
+export const MINIO_ENDPOINT = _resolve('MINIO_ENDPOINT', _minioUrl?.hostname || '');
+export const MINIO_PORT = parseInt(_resolve('MINIO_PORT', _minioUrl?.port || '9001'), 10);
+export const MINIO_USE_SSL = _resolve('MINIO_USE_SSL', _minioUrl?.protocol === 'https:' ? 'true' : 'false').toLowerCase() === 'true';
+export const MINIO_ACCESS_KEY = _resolve('MINIO_ACCESS_KEY', '');
+export const MINIO_SECRET_KEY = _resolve('MINIO_SECRET_KEY', '');
+export const MINIO_BUCKET = _resolve('MINIO_BUCKET', 'js-gen');
+/** Optional public base URL used to build direct MinIO URLs, e.g. http://172.19.87.169:9001 */
+export const MINIO_PUBLIC_URL = _resolve('MINIO_PUBLIC_URL', '');
+
+// Screenshot local pending upload (fallback when MinIO is unavailable)
+export const SCREENSHOT_PENDING_DIR = _resolve('SCREENSHOT_PENDING_DIR')
+  || path.join(PROJECT_DIR, 'tmp', 'pending-screenshots');
+export const SCREENSHOT_RETRY_INTERVAL_MS = Math.max(
+  1000,
+  parseInt(_resolve('SCREENSHOT_RETRY_INTERVAL_MS', '180000'), 10) || 180000,
+);
+export const SCREENSHOT_MAX_RETRY = Math.max(
+  1,
+  parseInt(_resolve('SCREENSHOT_MAX_RETRY', '3'), 10) || 3,
+);
+export const SCREENSHOT_PENDING_TTL_MS = Math.max(
+  60000,
+  parseInt(_resolve('SCREENSHOT_PENDING_TTL_MS', '604800000'), 10) || 604800000,
+);
+
 // Python — detection chain: explicit env → embedded in install dir → system PATH
 function _findPython() {
   const explicit = _resolve('PYTHON_EXE');
