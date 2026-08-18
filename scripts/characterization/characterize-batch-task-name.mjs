@@ -91,8 +91,8 @@ async function main() {
     assert.ok(dao.includes("leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id')"), 'left join');
     assert.ok(dao.includes("query.where('bj.name', 'like', `%${v}%`)"), 'fuzzy filter');
     assert.ok(dao.includes("select('t.*', 'bj.name as batchTaskName')"), 'row field');
-    assert.ok(dao.includes('countByRecordStatus({ functionId, keyword, batchTaskName, paasUserId })'), 'stats by function');
-    assert.ok(dao.includes('countByRecordStatus({ keyword, batchTaskName, paasUserId })'), 'stats without function');
+    assert.ok(dao.includes('countByRecordStatus({ functionId, keyword, recordStatus, batchTaskName, paasUserId })'), 'stats by function');
+    assert.ok(dao.includes('countByRecordStatus({ keyword, recordStatus, batchTaskName, paasUserId })'), 'stats without function');
     assert.ok(dao.includes("const stats = { total: 0 };"), 'stats shape');
     const route = readFileSync(join(ROOT, 'src', 'routes', 'v2', 'trajectory.js'), 'utf8');
     assert.ok(route.includes('batchTaskName: batchTaskName ?? null'), 'route passes param');

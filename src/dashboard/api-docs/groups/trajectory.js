@@ -48,7 +48,7 @@ export const GROUP_TRAJECTORY = [
           { name: 'keyword', type: 'string', in: 'query', desc: '名称模糊' },
           {
             name: 'recordStatus', type: 'string', in: 'query',
-            desc: '按录制状态筛选；支持单个或逗号分隔多值：draft | recording | failed | recorded | completed。别名 status',
+            desc: '按录制状态筛选；支持单个或逗号分隔多值：draft | recording | failed | recorded | completed。别名 status。stats 统计与行查询同基准（含本筛选：选中某状态时其余状态计数为 0，total=当前筛选行数）。',
             example: 'draft,recorded',
           },
           { name: 'sortBy', type: 'string', in: 'query', desc: 'created_at | name | step_count | record_status' },

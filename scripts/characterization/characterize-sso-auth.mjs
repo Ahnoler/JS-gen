@@ -136,8 +136,8 @@ function main() {
     assert.ok(/export async function countByRecordStatus[\s\S]{0,900}?if \(paasUserId\) base\.where\('t\.paas_user_id', paasUserId\)/.test(dao),
       'countByRecordStatus filters by t.paas_user_id on its own base');
     // And both callers thread paasUserId into the stats call.
-    assert.ok(dao.includes('countByRecordStatus({ functionId, keyword, batchTaskName, paasUserId })'), 'listByFunction threads paasUserId to stats');
-    assert.ok(dao.includes('countByRecordStatus({ keyword, batchTaskName, paasUserId })'), 'list threads paasUserId to stats');
+    assert.ok(dao.includes('countByRecordStatus({ functionId, keyword, recordStatus, batchTaskName, paasUserId })'), 'listByFunction threads paasUserId to stats');
+    assert.ok(dao.includes('countByRecordStatus({ keyword, recordStatus, batchTaskName, paasUserId })'), 'list threads paasUserId to stats');
   });
 
   run('batch DAO createJob stamps paasUserId', () => {

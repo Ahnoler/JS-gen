@@ -43,6 +43,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-18: **交易轨迹列表状态统计随查询条件过滤**：`GET /api/v2/trajectories` 返回的 `stats` 五档统计（draft/recording/failed/recorded/completed）与行查询同基准——新增按当前 `recordStatus` 过滤（原来忽略该条件恒展示功能全量统计，现与 keyword/batchTaskName/functionId 一并作为统计基准）。例如查询条件设为「未录制」时，`stats` 中仅 draft 有值、其余为 0、total=筛选行数。行数据沿用 `bj.name as batchTaskName`（所属任务）。
+   影响范围：src/dao/trajectory-dao.js（`countByRecordStatus` 接受并应用 `recordStatus`；`list`/`listByFunction` 向统计透传 `recordStatus`）；无路由路径/响应字段增减（`stats` 结构不变）、无 schema/WS 变更。
+   文件：src/dao/trajectory-dao.js, scripts/characterization/characterize-batch-task-name.mjs, scripts/characterization/characterize-sso-auth.mjs（stats 调用签名断言同步新增 `recordStatus` 参数）
+   Python 同步提示：`GET /api/v2/trajectories` 的 `stats` 语义变化——统计随 `recordStatus` 查询条件过滤（其余筛选为 0，total=当前筛选行数）；若 Python 控制面复刻列表统计，需对齐「统计与行查询同基准（含 recordStatus）」。
+
 - 2026-08-17: **element_json bbox 落库补全（Node 侧）**：Python 侧 ElementInfo/from_record 已透传 region/layers/bbox，但 Node 侧 `copyLocatorMeta` 漏 bbox，直播录制持久化时步骤坐标被丢弃；补全 bbox 复制。新录制 element_json 完整含 region_id/region_label/layers[]/bbox。
   影响范围：src/models/element.js（录制落库归一化）；无路由/schema/WS 变更。
   文件：src/models/element.js, scripts/characterization/characterize-step-region-bbox.py
