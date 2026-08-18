@@ -65,11 +65,18 @@ async function buildOneTrajectory(traj, { systemId, projectId }) {
 
 /** V3.0 组装（groups 控件点亮结构）。 */
 async function buildOneTrajectoryV3(traj, { systemId, projectId }) {
-  const [phases, phaseScreenshots] = await Promise.all([
+  const [phases, phaseScreenshots, dialogScreenshots] = await Promise.all([
     trajectoryPhaseDao.listByTrajectory(traj.id),
     screenshotDao.listPhaseHighlightsByTrajectory(traj.id),
+    screenshotDao.listDialogScreenshotsByTrajectory(traj.id),
   ]);
-  const built = buildTransactionPayloadV3(traj, { systemId, projectId, phases, phaseScreenshots });
+  const built = buildTransactionPayloadV3(traj, {
+    systemId,
+    projectId,
+    phases,
+    phaseScreenshots,
+    dialogScreenshots,
+  });
   return {
     trajectoryId: traj.id,
     schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
@@ -379,6 +386,7 @@ export default function (app) {
           if (entry) {
             okBuilt.push({
               entry,
+              screenshots: result.payload?.screenshots || [],
               count: result.count,
               skipped: result.skipped,
               stats: result.stats,
@@ -558,6 +566,7 @@ export default function (app) {
           if (entry) {
             okBuilt.push({
               entry,
+              screenshots: result.payload?.screenshots || [],
               count: result.count,
               skipped: result.skipped,
               stats: result.stats,

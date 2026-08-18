@@ -46,6 +46,34 @@ export async function replacePhaseHighlightScreenshot(trajectoryPhaseId, {
   });
 }
 
+/**
+ * UPSERT one dialog screenshot for a trajectory step.
+ * Dialog screenshots reuse kind='phase_highlight' and metadata_json.dialog=true.
+ */
+export async function replaceDialogScreenshot(trajectoryStepId, {
+  trajectoryId = null,
+  buffer,
+  mimeType = 'image/png',
+  metadataJson = null,
+} = {}) {
+  const stepId = Number(trajectoryStepId);
+  if (!Number.isFinite(stepId) || stepId <= 0) throw new Error('trajectoryStepId required');
+  if (!buffer || !buffer.length) throw new Error('buffer required');
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+  return screenshotDao.replaceDialogForStep({
+    trajectoryStepId: stepId,
+    trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
+    imageData: buf,
+    fileSize: buf.length,
+    mimeType,
+    metadataJson,
+  });
+}
+
+export async function listDialogScreenshotsByTrajectory(trajectoryId) {
+  return screenshotDao.listDialogScreenshotsByTrajectory(trajectoryId);
+}
+
 export async function getScreenshotImage(id) {
   return screenshotDao.getImage(id);
 }

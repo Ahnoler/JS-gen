@@ -104,6 +104,76 @@ export async function replaceForPhase(screenshot) {
   return row?.id != null ? Number(row.id) : null;
 }
 
+/**
+ * UPSERT one dialog screenshot row by (trajectory_step_id, kind='phase_highlight').
+ * Dialog screenshots reuse phase_highlight kind and are distinguished by metadata_json.dialog=true.
+ * @returns {Promise<number|null>} row id, or null if step no longer exists
+ */
+export async function replaceDialogForStep(screenshot) {
+  const stepId = screenshot.trajectoryStepId != null ? Number(screenshot.trajectoryStepId) : null;
+  const kind = 'phase_highlight';
+  if (!Number.isFinite(stepId) || stepId <= 0) {
+    throw new Error('trajectoryStepId required for replaceDialogForStep');
+  }
+  const imageData = screenshot.imageData;
+  const fileSize = screenshot.fileSize || (imageData ? imageData.length : 0);
+  const mimeType = screenshot.mimeType || 'image/png';
+  const trajectoryId = screenshot.trajectoryId != null ? Number(screenshot.trajectoryId) : null;
+  const metadataJson = screenshot.metadataJson ?? null;
+
+  const db = getDB();
+  const stepExists = await db('trajectory_step').where({ id: stepId }).first('id');
+  if (!stepExists) {
+    const err = new Error(`trajectory_step ${stepId} not found`);
+    err.errno = 1452;
+    err.code = 'ER_NO_REFERENCED_ROW_2';
+    err.sqlMessage = `trajectory_step ${stepId} not found (coalesce/remove race)`;
+    throw err;
+  }
+
+  await db.raw(
+    `INSERT INTO \`${TABLE}\`
+      (image_data, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind, metadata_json)
+     VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
+     ON DUPLICATE KEY UPDATE
+      image_data = VALUES(image_data),
+      file_size = VALUES(file_size),
+      mime_type = VALUES(mime_type),
+      trajectory_id = VALUES(trajectory_id),
+      metadata_json = VALUES(metadata_json)`,
+    [imageData, fileSize, mimeType, trajectoryId, stepId, kind, metadataJson],
+  );
+
+  const row = await db(TABLE)
+    .select('id')
+    .where({ trajectory_step_id: stepId, kind })
+    .first();
+  return row?.id != null ? Number(row.id) : null;
+}
+
+export async function listDialogScreenshotsByTrajectory(trajectoryId) {
+  const rows = await getDB()(TABLE)
+    .select('id', 'trajectory_step_id', 'trajectory_phase_id', 'metadata_json')
+    .where({ trajectory_id: trajectoryId, kind: 'phase_highlight' })
+    .whereNull('trajectory_phase_id')
+    .whereNotNull('trajectory_step_id');
+  return fromDbRows(rows).map((r) => {
+    let metadataJson = null;
+    if (r.metadataJson != null && typeof r.metadataJson === 'string') {
+      try { metadataJson = JSON.parse(r.metadataJson); } catch { metadataJson = null; }
+    } else if (r.metadataJson != null) {
+      metadataJson = r.metadataJson;
+    }
+    if (!metadataJson || metadataJson.dialog !== true) return null;
+    return {
+      id: r.id,
+      trajectoryStepId: r.trajectoryStepId,
+      trajectoryPhaseId: r.trajectoryPhaseId,
+      metadataJson,
+    };
+  }).filter(Boolean);
+}
+
 export async function listPhaseHighlightsByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
     .select('id', 'trajectory_phase_id', 'metadata_json')

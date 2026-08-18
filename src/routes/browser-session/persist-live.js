@@ -42,12 +42,13 @@ function decodeB64(b64) {
   }
 }
 
-async function writeShotsForStep(trajectoryStepId, trajectoryId, beforeB64, afterB64) {
+async function writeShotsForStep(trajectoryStepId, trajectoryId, beforeB64, afterB64, dialogB64 = null, dialogMeta = null) {
   const stepId = Number(trajectoryStepId);
   if (!Number.isFinite(stepId) || stepId <= 0) return;
   const trajId = trajectoryId != null ? Number(trajectoryId) : null;
   const before = decodeB64(beforeB64);
   const after = decodeB64(afterB64);
+  const dialog = decodeB64(dialogB64);
 
   const upsertOne = async (kind, buffer) => {
     try {
@@ -79,6 +80,29 @@ async function writeShotsForStep(trajectoryStepId, trajectoryId, beforeB64, afte
 
   if (before) await upsertOne('before', before);
   if (after) await upsertOne('after', after);
+
+  if (dialog) {
+    try {
+      await screenshotService.replaceDialogScreenshot(stepId, {
+        trajectoryId: trajId,
+        buffer: dialog,
+        mimeType: 'image/png',
+        metadataJson: JSON.stringify(dialogMeta || {}),
+      });
+    } catch (err) {
+      const errno = err?.errno ?? err?.code;
+      const sqlMsg = err?.sqlMessage || '';
+      if (errno === 1452 || errno === 'ER_NO_REFERENCED_ROW_2'
+        || /foreign key constraint fails/i.test(sqlMsg)
+        || /foreign key constraint fails/i.test(String(err?.message || ''))) {
+        console.warn(
+          `[step-screenshot] dialog upsert skipped (step ${stepId} gone — coalesce/remove race)`,
+        );
+        return;
+      }
+      console.warn('[step-screenshot] dialog upsert failed:', sqlMsg || err?.message || err);
+    }
+  }
 }
 
 /**
@@ -90,10 +114,12 @@ async function writeShotsForStep(trajectoryStepId, trajectoryId, beforeB64, afte
 export async function stashOrApplyStepScreenshot(ctx, entryId, {
   before = null,
   after = null,
+  dialog = null,
+  dialogMeta = null,
   trajectoryId = null,
 } = {}) {
   const eid = entryId != null ? String(entryId) : '';
-  if (!eid || (!before && !after)) return;
+  if (!eid || (!before && !after && !dialog)) return;
   const maps = ensureShotMaps(ctx);
   if (!maps) return;
   prunePendingShots(maps);
@@ -105,7 +131,7 @@ export async function stashOrApplyStepScreenshot(ctx, entryId, {
     : (info?.trajectoryId != null ? Number(info.trajectoryId) : (ctx.dbTrajectoryId != null ? Number(ctx.dbTrajectoryId) : (ctx.trajectoryId != null ? Number(ctx.trajectoryId) : null)));
 
   if (Number.isFinite(dbId) && dbId > 0) {
-    await writeShotsForStep(dbId, trajId, before, after);
+    await writeShotsForStep(dbId, trajId, before, after, dialog, dialogMeta);
     maps._pendingStepShots.delete(eid);
     return;
   }
@@ -114,6 +140,8 @@ export async function stashOrApplyStepScreenshot(ctx, entryId, {
   maps._pendingStepShots.set(eid, {
     before: before || prev.before || null,
     after: after || prev.after || null,
+    dialog: dialog || prev.dialog || null,
+    dialogMeta: dialogMeta || prev.dialogMeta || null,
     trajectoryId: trajId,
     ts: Date.now(),
   });
@@ -134,7 +162,7 @@ export async function flushPendingStepScreenshot(ctx, entryId, dbId, trajectoryI
   const trajId = trajectoryId != null
     ? Number(trajectoryId)
     : (pending.trajectoryId != null ? Number(pending.trajectoryId) : null);
-  await writeShotsForStep(stepId, trajId, pending.before, pending.after);
+  await writeShotsForStep(stepId, trajId, pending.before, pending.after, pending.dialog, pending.dialogMeta);
 }
 
 /**

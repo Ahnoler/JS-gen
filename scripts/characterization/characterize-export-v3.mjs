@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
- * Characterize transaction-export-v3 (批量推送 V3.0：阶段长图控件点亮 groups 结构).
- * 纯函数断言（合成数据）+ 真实 DB 数据断言（traj 38）。
+ * Characterize transaction-export-v3 (优化版：transcationProperties 单轨 + payload.screenshots).
  */
 import { getDB } from '../../config/database.js';
 import * as trajectoryDao from '../../src/dao/trajectory-dao.js';
 import * as screenshotDao from '../../src/dao/screenshot-dao.js';
 import * as trajectoryPhaseDao from '../../src/dao/trajectory-phase-dao.js';
 import {
-  buildControlNode,
-  buildGroupsResult,
+  buildV3Properties,
+  buildV3Screenshots,
   buildTransactionEntryV3,
+  buildTransactionPayloadV3,
+  wrapTransactionListV3,
   mapControlAction,
   mapControlKind,
   isOverlayRegion,
@@ -51,59 +52,66 @@ function testOverlay() {
   check(isOverlayRegion('') === null, '空 region 非弹窗');
 }
 
-// ── 纯函数：控件节点构建 ──
-function testControlNode() {
-  console.log('[pure] buildControlNode');
-  const node = buildControlNode(
-    { stepNumber: 17, actionType: 'fill_form_field', source: 'agent', createdAt: '2026-08-17T16:40:00.000Z' },
-    {
-      tag: 'input', xpath_smart: '//div[@label="客户编号"]//input', target_kind: 'form_input',
-      formLabel: '客户编号', text: '客户编号',
-      attributes: { placeholder: '请输入', disabled: 'disabled' },
-      bbox: { x1: 29, y1: 1997, x2: 336, y2: 2029 },
+// ── 纯函数：buildV3Properties 合成数据 ──
+function testBuildV3Properties() {
+  console.log('[pure] buildV3Properties');
+  const { properties, metaActions, noRectControls } = buildV3Properties({
+    traj: {
+      id: 99,
+      name: '测试交易',
+      steps: [
+        {
+          stepNumber: 1, actionType: 'click_element_by_index', source: 'agent',
+          trajectoryPhaseId: 1, phaseNumber: 1,
+          elementJson: {
+            tag: 'li', xpath_smart: '//li[@data-id="RES1"]', target_kind: 'menu',
+            text: '客户管理', region_id: 'tab:客户管理', region_label: '客户管理',
+            bbox: { x1: 1, y1: 2, x2: 30, y2: 20 },
+          },
+          paramsJson: { label_text: '客户管理' },
+        },
+        {
+          stepNumber: 2, actionType: 'select_option', source: 'agent',
+          trajectoryPhaseId: 1, phaseNumber: 1,
+          elementJson: {
+            tag: 'input', xpath_smart: '//div[@label="省份"]//input', target_kind: 'form_select',
+            formLabel: '省份', region_id: 'overlay:地址选择器', region_label: '地址选择器',
+            bbox: { x1: 100, y1: 200, x2: 300, y2: 220 },
+          },
+          paramsJson: { label_text: '省份', value: '福建省' },
+        },
+        { stepNumber: 3, actionType: 'save_form_snapshot', source: 'agent', trajectoryPhaseId: 1, phaseNumber: 1, elementJson: null, paramsJson: {} },
+      ],
     },
-    { label_text: '客户编号', value: '26081316264601222' },
-    { pid: 'page-3', group: [], anchor: null, scanIndex: 5 },
-  );
-  check(node.id === 'step-17', 'id = step-<stepNumber>');
-  check(node.pid === 'page-3' && node.type === 'ele', 'pid/type');
-  check(node.kind === 'input' && node.tagName === 'input', 'kind/tagName');
-  check(node.target === '//div[@label="客户编号"]//input' && node.targetType === 'xpath', 'target/targetType');
-  check(node.propertiesName === '客户编号' && node.label === '客户编号', 'propertiesName/label');
-  check(node.value === '26081316264601222', 'value from params');
-  check(node.placeholder === '请输入' && node.disabled === true, 'attributes 透传');
-  check(JSON.stringify(node.rect) === '{"x1":29,"y1":1997,"x2":336,"y2":2029}', 'rect 输出');
-  check(node.manualRecord === false && node.recorded === true, 'recorded/manualRecord');
-  check(JSON.stringify(node.params) === '{"label_text":"客户编号","value":"26081316264601222"}', 'params 透传');
-  check(Number.isFinite(node.timestamp) && node.timestamp > 0, 'timestamp 毫秒');
+    phases: [{ id: 1, phaseNumber: 1, description: '点击客户管理' }],
+  });
 
-  // 非法 bbox → 无 rect
-  const noRect = buildControlNode(
-    { stepNumber: 18, actionType: 'click_element_by_index', source: 'agent' },
-    { tag: 'button', xpath: '//button[1]', target_kind: 'button', bbox: { x1: 0, y1: 0, x2: 0, y2: 0 } },
-    { label_text: '保存' },
-    { pid: 'page-3', group: [], anchor: null, scanIndex: 6 },
-  );
-  check(noRect.rect === undefined, '非法 bbox 省略 rect');
-  check(noRect.id === 'step-18', '无 createdAt 时 id 仍稳定');
+  check(properties.length === 2, `2 条属性（meta 跳过；实际 ${properties.length}）`);
+  check(metaActions === 1, 'metaActions = 1');
+  check(noRectControls === 0, 'noRectControls = 0');
 
-  // anchor 透传
-  const anchorNode = buildControlNode(
-    { stepNumber: 22, actionType: 'select_option', source: 'agent' },
-    { tag: 'input', xpath_smart: '//div[@label="省份"]//input', target_kind: 'form_select', formLabel: '省份' },
-    { label_text: '省份', value: '福建省' },
-    { pid: 'page-3|dialog:地址选择器@@anchor=//button[1]', group: [{ type: 'dialog', name: '地址选择器', key: 'page-3|dialog:地址选择器@@anchor=//button[1]' }], anchor: { xpath: '//button[normalize-space()="选择"]', name: '登记注册地址 选择' }, scanIndex: 8 },
-  );
-  check(anchorNode.anchorTarget === '//button[normalize-space()="选择"]', 'anchorTarget');
-  check(anchorNode.anchorPropertiesName === '登记注册地址 选择', 'anchorPropertiesName');
-  check(anchorNode.group[0].type === 'dialog' && anchorNode.group[0].name === '地址选择器', 'group 字段');
+  const first = properties[0];
+  check(first.id === 'step-1' && first.pid === 'page-1', '页面控件 id/pid');
+  check(first.scanIndex === 0, 'scanIndex 从 0 开始');
+  check(first.label === '客户管理', 'label 输出');
+  check(first.regionId === 'tab:客户管理' && first.regionLabel === '客户管理', 'regionId/regionLabel');
+  check(JSON.stringify(first.rect) === '{"x1":1,"y1":2,"x2":30,"y2":20}', 'rect 输出');
+  check(first.type === 'ele', 'type=ele');
+  check(first.url === undefined, '属性中不输出 url');
+  check(first.recorded === undefined && first.manualRecord === undefined, '已删除 recorded/manualRecord');
+  check(first.targetType === undefined, '已删除 targetType');
+
+  const second = properties[1];
+  check(second.scanIndex === 1, 'scanIndex 全局递增');
+  check(second.pid === 'page-1|dialog:地址选择器', '弹窗控件 pid 使用简洁弹窗 key');
+  check(second.regionId === 'overlay:地址选择器', '弹窗控件 regionId');
 }
 
-// ── 纯函数：groups 树构建（合成数据）──
-function testGroupsSynthetic() {
-  console.log('[pure] buildGroupsResult 合成数据');
-  const result = buildGroupsResult({
-    traj: { id: 99, name: '测试交易', url: 'http://x/' },
+// ── 纯函数：buildV3Screenshots ──
+function testBuildV3Screenshots() {
+  console.log('[pure] buildV3Screenshots');
+  const shots = buildV3Screenshots({
+    traj: { id: 99 },
     phases: [
       { id: 1, phaseNumber: 1, description: '点击客户管理' },
       { id: 2, phaseNumber: 2, description: '填写表单' },
@@ -112,61 +120,46 @@ function testGroupsSynthetic() {
       { id: 101, trajectoryPhaseId: 1 },
       { id: 202, trajectoryPhaseId: 2 },
     ],
-    stepsByPhase: {
-      1: [
-        { stepNumber: 1, actionType: 'click_element_by_index', source: 'agent', elementJson: { tag: 'li', xpath_smart: '//li[@data-id="RES1"]', target_kind: 'menu', text: '客户管理', region_id: 'tab:客户管理', bbox: { x1: 1, y1: 2, x2: 30, y2: 20 } }, paramsJson: { label_text: '客户管理' } },
-      ],
-      2: [
-        { stepNumber: 1, actionType: 'click_adjacent_button', source: 'agent', elementJson: { tag: 'button', xpath_smart: '//button[normalize-space()="选择"]', target_kind: 'button', text: '登记注册地址 选择', region_id: 'tab:登记信息', bbox: { x1: 10, y1: 10, x2: 50, y2: 30 } }, paramsJson: { label_text: '登记注册地址 选择' } },
-        { stepNumber: 2, actionType: 'select_option', source: 'agent', elementJson: { tag: 'input', xpath_smart: '//div[@label="省份"]//input', target_kind: 'form_select', formLabel: '省份', region_id: 'overlay:地址选择器', bbox: { x1: 100, y1: 200, x2: 300, y2: 220 } }, paramsJson: { label_text: '省份', value: '福建省' } },
-        { stepNumber: 3, actionType: 'save_form_snapshot', source: 'agent', elementJson: null, paramsJson: {} },
-      ],
-    },
   });
-  const groups = result.groups;
-  const pages = groups.filter((g) => g.type === 'page');
-  check(pages.length === 2, `2 个页面组（实际 ${pages.length}）`);
-  check(pages[0].id === 'page-1' && pages[0].pid === null, 'page-1 id/pid');
-  check(pages[0].screenshots[0].url === '/api/v2/screenshots/101/image' && pages[0].screenshots[0].phaseNumber === 1, 'screenshots 条目（无尺寸字段）');
-  check(pages[1].name.startsWith('页面2'), '页面组 name');
-  const dialogs = groups.filter((g) => g.type === 'dialog');
-  check(dialogs.length === 1, `1 个弹窗组（实际 ${dialogs.length}）`);
-  check(dialogs[0].id === 'page-2|dialog:地址选择器@@anchor=//button[normalize-space()="选择"]', '弹窗组 key 含 anchor');
-  check(dialogs[0].pid === 'page-2' && dialogs[0].screenshots.length === 0, '弹窗组 pid/screenshots 空');
-  const eles = groups.filter((g) => g.type === 'ele');
-  check(eles.length === 3, `3 个控件节点（save_form_snapshot 跳过；实际 ${eles.length}）`);
-  const province = eles.find((e) => e.propertiesName === '省份');
-  check(province && province.pid === dialogs[0].id, '弹窗控件 pid 挂弹窗组');
-  check(province && province.anchorTarget === '//button[normalize-space()="选择"]', '弹窗控件 anchor 推断');
-  check(province && province.group[0].name === '地址选择器', '弹窗控件 group 字段');
-  const menu = eles.find((e) => e.propertiesName === '客户管理');
-  check(menu && menu.pid === 'page-1' && menu.group.length === 0, '页面控件 pid 挂页面组');
-  check(result.id === 'traj-99' && result.url === 'http://x/', 'result id/url');
+  check(shots.length === 2, `2 个页面截图（实际 ${shots.length}）`);
+  check(shots[0].type === 'page' && shots[0].key === 'page-1', 'page key/type');
+  check(shots[0].bucket === 'uara', 'bucket 默认 uara');
+  check(shots[0].url === '/api/v2/screenshots/101/image', '截图 url');
+  check(shots[0].expires === 3600, 'expires 默认 3600');
+  check(shots[0].trajectoryId === undefined, '单条截图不输出 trajectoryId（批量时由 wrap 补充）');
 }
 
-// ── 纯函数：弹窗实例区分（同标题不同触发按钮 = 不同弹窗组）──
-function testDialogInstances() {
-  console.log('[pure] 弹窗实例区分');
-  const result = buildGroupsResult({
-    traj: { id: 100, name: '弹窗实例' },
-    phases: [{ id: 1, phaseNumber: 1, description: '' }],
-    phaseScreenshots: [],
-    stepsByPhase: {
-      1: [
-        { stepNumber: 1, actionType: 'click_adjacent_button', source: 'agent', elementJson: { tag: 'button', xpath_smart: '//button[normalize-space()="引入A"]', target_kind: 'button', text: '引入A', region_id: 'tab:T' } },
-        { stepNumber: 2, actionType: 'select_option', source: 'agent', elementJson: { tag: 'input', xpath_smart: '//input[1]', target_kind: 'form_select', formLabel: '客户名称', region_id: 'overlay:客户放大镜选择器' } },
-        { stepNumber: 3, actionType: 'click_adjacent_button', source: 'agent', elementJson: { tag: 'button', xpath_smart: '//button[normalize-space()="引入B"]', target_kind: 'button', text: '引入B', region_id: 'tab:T' } },
-        { stepNumber: 4, actionType: 'select_option', source: 'agent', elementJson: { tag: 'input', xpath_smart: '//input[2]', target_kind: 'form_select', formLabel: '客户名称', region_id: 'overlay:客户放大镜选择器' } },
-      ],
-    },
-  });
-  const dialogs = result.groups.filter((g) => g.type === 'dialog');
-  check(dialogs.length === 2, `同标题不同 anchor → 2 个弹窗组（实际 ${dialogs.length}）`);
-  check(new Set(dialogs.map((d) => d.id)).size === 2, '弹窗组 id 互不相同（key 含 anchor）');
-  check(dialogs[0].id.includes('引入A') && dialogs[1].id.includes('引入B'), '各弹窗组 anchor 对应各自触发按钮');
-  const dlg1Controls = result.groups.filter((g) => g.type === 'ele' && g.pid === dialogs[0].id);
-  const dlg2Controls = result.groups.filter((g) => g.type === 'ele' && g.pid === dialogs[1].id);
-  check(dlg1Controls.length === 1 && dlg2Controls.length === 1, '控件分挂各自弹窗组');
+// ── 纯函数：buildTransactionEntryV3 / Payload / Wrap ──
+function testPayloadStructure() {
+  console.log('[pure] payload 结构');
+  const traj = {
+    id: 99,
+    name: '测试交易',
+    steps: [
+      {
+        stepNumber: 1, actionType: 'click_element_by_index', source: 'agent',
+        trajectoryPhaseId: 1, phaseNumber: 1,
+        elementJson: { tag: 'li', xpath_smart: '//li[1]', target_kind: 'menu', text: '客户管理', region_id: 'tab:客户管理', bbox: { x1: 1, y1: 2, x2: 30, y2: 20 } },
+        paramsJson: {},
+      },
+    ],
+  };
+  const phases = [{ id: 1, phaseNumber: 1, description: '点击客户管理' }];
+  const shots = [{ id: 101, trajectoryPhaseId: 1 }];
+
+  const built = buildTransactionEntryV3(traj, { systemId: '98', projectId: '31', phases, phaseScreenshots: shots });
+  check(built.entry.result === undefined, 'entry 不再有 result');
+  check(Array.isArray(built.screenshots) && built.screenshots.length === 1, 'screenshots 独立返回');
+  check(built.entry.transcationProperties.length === 1, 'transcationProperties 保留');
+
+  const payload = buildTransactionPayloadV3(traj, { systemId: '98', projectId: '31', phases, phaseScreenshots: shots });
+  check(Array.isArray(payload.payload.screenshots), 'payload.screenshots 存在');
+  check(payload.payload.transcationEventTypeList.length === 1, 'transcationEventTypeList 存在');
+
+  const wrapped = wrapTransactionListV3([built]);
+  check(wrapped.payload.screenshots.length === 1, '批量合并 screenshots');
+  check(wrapped.payload.transcationEventTypeList.length === 1, '批量合并 entries');
+  check(wrapped.stats.noRectControls === 0, '批量 stats.noRectControls');
 }
 
 // ── 真实数据（traj 38）──
@@ -179,35 +172,31 @@ async function testRealData() {
     const shots = await screenshotDao.listPhaseHighlightsByTrajectory(38);
     const built = buildTransactionEntryV3(traj, { systemId: 'sys', projectId: 'proj', phases, phaseScreenshots: shots });
     const entry = built.entry;
-    const groups = entry.result.groups;
-    const pages = groups.filter((g) => g.type === 'page');
-    const eles = groups.filter((g) => g.type === 'ele');
-    const dialogs = groups.filter((g) => g.type === 'dialog');
-    check(pages.length === 3, `3 个页面组（实际 ${pages.length}）`);
-    check(eles.length >= 110, `控件节点 >= 110（实际 ${eles.length}）`);
-    const withRect = eles.filter((e) => e.rect).length;
-    check(withRect >= 110, `带 rect 控件 >= 110（实际 ${withRect}）`);
-    const page1 = pages.find((p) => p.id === 'page-1');
-    check(page1 && page1.screenshots.length === 1 && page1.screenshots[0].url.includes('/screenshots/'), 'page-1 screenshots 含长图');
-    check(entry.transcationProperties.length >= 110, `transcationProperties >= 110（实际 ${entry.transcationProperties.length}）`);
-    // 抽样 rect 与 DB element_json.bbox 一致
-    const stepRows = await db('trajectory_step').select('step_number', 'phase_number', 'element_json').where({ trajectory_id: 38 }).limit(500);
+    const props = entry.transcationProperties;
+    check(entry.result === undefined, '真实数据 entry 无 result');
+    check(props.length >= 110, `transcationProperties >= 110（实际 ${props.length}）`);
+    const withRect = props.filter((p) => p.rect).length;
+    check(withRect >= 110, `带 rect 属性 >= 110（实际 ${withRect}）`);
+    const withPid = props.filter((p) => p.pid).length;
+    check(withPid === props.length, '所有属性都有 pid');
+    const withRegion = props.filter((p) => p.regionId).length;
+    check(withRegion > 0, '存在 regionId');
+    const pageShots = built.screenshots.filter((s) => s.type === 'page');
+    check(pageShots.length >= 1, `页面截图 >= 1（实际 ${pageShots.length}）`);
+    // 抽样 rect 与 DB bbox 一致
+    const stepRows = await db('trajectory_step').select('step_number', 'element_json').where({ trajectory_id: 38 }).limit(500);
     let rectOk = 0, rectChecked = 0;
     for (const s of stepRows) {
       let el = null;
       try { el = typeof s.element_json === 'string' ? JSON.parse(s.element_json) : s.element_json; } catch {}
       if (!el || !el.bbox) continue;
       const expected = { x1: Number(el.bbox.x1), y1: Number(el.bbox.y1), x2: Number(el.bbox.x2), y2: Number(el.bbox.y2) };
-      const node = eles.find((e) => e.id === `step-${s.step_number}` && e.pid === `page-${s.phase_number ?? ''}`.replace('page-0', 'page-'));
+      const node = props.find((e) => e.id === `step-${s.step_number}`);
       if (!node || !node.rect) continue;
       rectChecked++;
       if (JSON.stringify(node.rect) === JSON.stringify(expected)) rectOk++;
     }
     check(rectChecked >= 5 && rectOk === rectChecked, `抽样 rect 与 DB bbox 一致（${rectOk}/${rectChecked}）`);
-    // pid 归属合法性：无孤儿（所有 ele 的 pid 存在于 groups）
-    const ids = new Set(groups.map((g) => g.id));
-    const orphans = eles.filter((e) => !ids.has(e.pid));
-    check(orphans.length === 0, `无孤儿控件（实际 ${orphans.length}）`);
   } finally {
     await db.destroy();
   }
@@ -216,9 +205,9 @@ async function testRealData() {
 async function main() {
   testMappings();
   testOverlay();
-  testControlNode();
-  testGroupsSynthetic();
-  testDialogInstances();
+  testBuildV3Properties();
+  testBuildV3Screenshots();
+  testPayloadStructure();
   await testRealData();
   if (failures) {
     console.error(`\ncharacterize-export-v3: ${failures} FAILURE(S)`);

@@ -11,6 +11,16 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-18: **弹窗独立截图采集**：录制时检测到 `overlay:` 弹窗操作，实时采集弹窗可视区域截图；复用现有 `screenshot` 表（`kind='phase_highlight'` + `trajectory_step_id` + `metadata_json.dialog=true`），不新增数据库字段。V3 推送 `payload.screenshots` 支持 `type:'dialog'`，弹窗控件 `pid` 与 dialog key 对应，有 dialog 截图时 `rect` 相对弹窗截图。
+  影响范围：Python 录制截图链路、Node screenshot DAO/service、V3 导出、API 文档、characterization。
+  文件：scripts/state.py, scripts/controller/service.py, scripts/manual_recorder/recorder.py, src/dao/screenshot-dao.js, src/services/screenshot-service.js, src/routes/browser-session/persist-live.js, src/services/trajectory/trajectory-recording-runner.js, src/services/transaction-export-v3.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-dialog-screenshot.mjs, scripts/refactor/verify-all.sh
+  Python 同步提示：Python 侧 `step_screenshot` 事件新增可选 `dialog` / `dialogMeta` 字段；仅弹窗操作时上报。
+
+- 2026-08-18: **批量推送 V3 结构优化（去重）**：移除 `result.groups` 双轨结构，改为 `payload.screenshots` + `transcationProperties` 单轨。`transcationProperties` 在 V2 五个核心字段基础上增加 `id` / `pid` / `label` / `regionId` / `regionLabel` / `rect` / `scanIndex`；属性中不再重复输出 `url`，通过 `pid` 关联 `payload.screenshots`。新增配置 `PUSH_V3_SCREENSHOT_BUCKET` / `PUSH_V3_SCREENSHOT_EXPIRES`。删除 `recorded` / `manualRecord` / `targetType` / `group` / `anchorTarget` 等冗余字段。
+  影响范围：V3 导出服务/路由/API 文档/characterization；无 V2 影响。
+  文件：src/services/transaction-export-v3.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-export-v3.mjs, config/config.js, config/.env.example
+  Python 同步提示：若 Python 控制面消费 V3 推送，需改为解析 `payload.screenshots` + `transcationProperties` 单轨结构；`result.groups` 不再输出。
+
 - 2026-08-18: **V2 批量推送精简（消费方格式对齐）**：`transcationProperties` 条目不再含 `regionId`/`parentRegionId`；entry 不再含 `phases`（阶段截图引用 + 全量元素 metadata）——控件点亮能力由 V3.0 `result.groups` 承担。V2 端点/响应结构其余不变（外层 `payload.transcationEventTypeList`/count/skipped/stats）。
   影响范围：src/services/transaction-export.js（`mapStepToTransactionEvent` 去 region 字段、`buildTransactionEntry` 去 phases、删除 `buildTransactionPhases`、`TRANSACTION_ENVELOPE_FIELDS` 精简）、src/routes/v2/export-mgmt.js（V2 组装不再查 phase/screenshot）、api-docs、characterize-transaction-export-region 重写为精简断言。无 schema/WS 变更。
   文件：src/services/transaction-export.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-transaction-export-region.mjs
