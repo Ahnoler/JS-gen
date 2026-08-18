@@ -14,6 +14,8 @@ from .actions._misc import _register_misc_actions
 from .actions._special_element import _register_special_element_actions
 from ..state import (
     _ACTION_LOG,
+    _is_overlay_region,
+    capture_dialog_png_b64,
     capture_page_png_b64,
     capture_screenshots_enabled,
     emit_step_screenshot,
@@ -72,8 +74,14 @@ def _wrap_action_with_screenshots(controller, browser_context):
                     entry_id = (_ACTION_LOG[-1] or {}).get('id')
                 except Exception:
                     entry_id = None
+                dialog_b64 = None
+                dialog_meta = None
                 if entry_id:
-                    emit_step_screenshot(str(entry_id), before_b64, after_b64)
+                    last_entry = _ACTION_LOG[-1] or {}
+                    el = last_entry.get('element') or {}
+                    if _is_overlay_region(el.get('region_id')):
+                        dialog_b64, dialog_meta = await capture_dialog_png_b64(browser_context)
+                    emit_step_screenshot(str(entry_id), before_b64, after_b64, dialog_b64, dialog_meta)
                 return result
 
             # functools.wraps copies __annotations__ but not a bound Signature;

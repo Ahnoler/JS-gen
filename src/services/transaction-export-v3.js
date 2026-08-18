@@ -1,23 +1,15 @@
 /**
- * V3 partner transaction export — 阶段长图控件点亮（对齐消费方 groups 约定）。
+ * V3 partner transaction export — 优化版（合并 result 到 transcationProperties）。
  *
- * 与 V2.0（transaction-export.js）差异：
- *   - entry 新增 `result`：{ id, name, url, groups[] }——组节点 page/dialog + 控件节点 ele，
- *     pid 树；控件带 rect（内容坐标，来自 element_json.bbox）+ target/kind/params 等；
- *   - 一张长图 = 一个页面组（当前每阶段一张长图 → 每阶段一个 page-<n> 组，组间平级）；
- *   - 弹窗 = 独立页面（dialog 组，附属于触发按钮 anchor）；第一版弹窗控件 rect 相对阶段长图；
- *   - phases[].metadata 全量元素不再推送；transcationProperties 保留（控件组）。
- *
- * TODO: 同阶段多页面区分——当前一张长图=一个页面组（每阶段一个）；未来按步骤 URL
- *       切分同一阶段内的多个页面（需录制时记录步骤 URL）。
- * TODO: 优化接口传输数据量 + 防信息丢失 + 增强鲁棒性（todo-list `v3-payload-size`）——
- *       ① 精简传输：评估去 `params`（点亮不需要）、压缩/收敛 target xpath、可选字段裁剪；
- *       ② 防信息丢失：构建期字段完整性校验/缺失统计（noRectControls 已统计 rect 缺失），
- *          推送前自检（如 rect/target 缺失率超阈值告警）；
- *       ③ 鲁棒性：缺字段降级（rect 缺失已省略）、超长字段截断策略、消费方容错约定。
+ * 相对旧 V3.0 变化：
+ *   - 移除 `result.groups` 双轨结构。
+ *   - `transcationProperties` 作为唯一业务事件数组，并合并控件树信息：
+ *     id / pid / label / regionId / regionLabel / rect / scanIndex。
+ *   - 页面/弹窗截图统一放在 `payload.screenshots`。
+ *   - 属性中不重复输出 `url`，通过 `pid` 关联截图。
  */
 import { mapStepToTransactionEvent, uniquifyPropertiesNames } from './transaction-export.js';
-import { SKIP_ACTIONS } from './legacy-engine-export.js';
+import { PUSH_V3_SCREENSHOT_BUCKET, PUSH_V3_SCREENSHOT_EXPIRES } from '../../config/config.js';
 
 export const TRANSACTION_SCHEMA_VERSION_V3 = 3;
 
@@ -109,118 +101,23 @@ function isLegalRect(bbox) {
 }
 
 /**
- * 构建一个控件节点（type: ele）。
- * @returns {object} 控件节点；rect 仅当 element_json.bbox 合法时输出。
+ * 构建 payload.screenshots。
+ * 页面截图来自 phase_highlight；弹窗截图由后续开发传入 dialogScreenshots。
  */
-export function buildControlNode(step, el, params, { pid, group, anchor, scanIndex } = {}) {
-  const label = String(el.formLabel ?? el.text ?? el.matchedLabel ?? '').trim();
-  const { command, action } = mapControlAction(String(step?.actionType ?? ''));
-  const attrs = el.attributes && typeof el.attributes === 'object' ? el.attributes : {};
-  const node = {
-    id: step?.stepNumber != null ? `step-${step.stepNumber}` : `step-${(scanIndex ?? 0) + 1}`,
-    command,
-    action,
-    target: String(el.xpath_smart ?? el.xpath_full ?? el.xpath ?? '').trim(),
-    targetType: 'xpath',
-    tagName: String(el.tag ?? el.tagName ?? '').trim() || 'input',
-    kind: mapControlKind(String(el.target_kind ?? '')),
-    propertiesName: label,
-    label,
-    placeholder: String(attrs.placeholder ?? ''),
-    title: String(attrs.title ?? ''),
-    value: String(params?.value ?? '').trim(),
-    disabled: !!attrs.disabled,
-    required: !!attrs.required,
-    readonly: !!attrs.readonly,
-    type: 'ele',
-    group: Array.isArray(group) ? group : [],
-    options: Array.isArray(el.options) ? el.options : [],
-    timestamp: step?.createdAt ? new Date(step.createdAt).getTime() : 0,
-    scanIndex: scanIndex ?? 0,
-    recorded: true,
-    manualRecord: String(step?.source ?? '') === 'manual',
-    pid,
-    params: params && typeof params === 'object' ? params : {},
-  };
-  if (anchor && anchor.xpath) {
-    node.anchorTarget = anchor.xpath;
-    node.anchorPropertiesName = anchor.name || '';
-  }
-  if (isLegalRect(el.bbox)) {
-    node.rect = {
-      x1: Number(el.bbox.x1), y1: Number(el.bbox.y1),
-      x2: Number(el.bbox.x2), y2: Number(el.bbox.y2),
-    };
-  }
-  return node;
-}
-
-/**
- * 重排 groups：每个弹窗组（+其弹窗控件）紧跟触发按钮 ele 之后。
- * 弹窗控件在 groups 中紧跟在弹窗组后（overlay 步骤连续），整块移动。
- */
-export function reorderDialogsAfterAnchor(groups = []) {
-  const dlgBlocks = [];
-  const blockById = new Map();
-  for (const g of groups) {
-    if (g.type === 'dialog') {
-      const block = [g];
-      dlgBlocks.push(block);
-      blockById.set(g.id, block);
-    } else if (g.type === 'ele' && g.group?.length && blockById.has(g.pid)) {
-      blockById.get(g.pid).push(g);
-    }
-  }
-  if (!dlgBlocks.length) return groups;
-  const placed = new Set();
-  const ordered = [];
-  for (const g of groups) {
-    if (g.type === 'dialog') continue; // 弹窗组由按钮触发点插入
-    if (g.type === 'ele' && g.group?.length) continue; // 弹窗控件随块插入，避免重复
-    ordered.push(g);
-    if (g.type === 'ele') {
-      for (const block of dlgBlocks) {
-        const dlg = block[0];
-        if (!placed.has(dlg.id) && dlg._anchorEle === g) {
-          ordered.push(...block);
-          placed.add(dlg.id);
-        }
-      }
-    }
-  }
-  for (const block of dlgBlocks) {
-    if (!placed.has(block[0].id)) ordered.push(...block); // anchor 未找到 → 追加末尾
-  }
-  return ordered;
-}
-
-function groupStepsByPhase(steps = []) {
-  const byPhase = {};
-  for (const s of steps) {
-    const pid = s?.trajectoryPhaseId != null ? Number(s.trajectoryPhaseId) : null;
-    if (pid == null) continue;
-    (byPhase[pid] ||= []).push(s);
-  }
-  return byPhase;
-}
-
-/**
- * 构建 result.groups 树（页面组 + 弹窗组 + 控件节点）。
- * @param {object} opts
- * @param {object} opts.traj 交易（含 id/name/url/steps）
- * @param {Array} [opts.phases] trajectory_phase 行（id/phaseNumber/description）
- * @param {Array} [opts.phaseScreenshots] screenshot 行（id/trajectoryPhaseId）
- * @param {object} [opts.stepsByPhase] {phaseId: steps[]}（缺省时从 traj.steps 分组）
- */
-export function buildGroupsResult({ traj = {}, phases = [], phaseScreenshots = [], stepsByPhase = null } = {}) {
-  const groups = [];
+export function buildV3Screenshots({
+  traj = {},
+  phases = [],
+  phaseScreenshots = [],
+  dialogScreenshots = [],
+} = {}) {
   const shotByPhase = new Map();
   for (const s of phaseScreenshots || []) {
     if (s?.trajectoryPhaseId != null && !shotByPhase.has(Number(s.trajectoryPhaseId))) {
       shotByPhase.set(Number(s.trajectoryPhaseId), s);
     }
   }
-  const stepMap = stepsByPhase || groupStepsByPhase(traj.steps || []);
+
+  const screenshots = [];
   const phaseList = [...(phases || [])]
     .sort((a, b) => Number(a.phaseNumber ?? a.phase_number ?? 0) - Number(b.phaseNumber ?? b.phase_number ?? 0));
 
@@ -228,100 +125,154 @@ export function buildGroupsResult({ traj = {}, phases = [], phaseScreenshots = [
     const phaseId = Number(phase.id);
     const phaseNumber = Number(phase.phaseNumber ?? phase.phase_number ?? 0);
     const shot = shotByPhase.get(phaseId) || null;
-    const pageId = `page-${phaseNumber}`;
+    if (!shot) continue;
     const desc = String(phase.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 20);
-    groups.push({
-      id: pageId,
-      pid: null,
+    screenshots.push({
+      phaseNumber,
+      bucket: PUSH_V3_SCREENSHOT_BUCKET,
       type: 'page',
-      key: pageId,
+      key: `page-${phaseNumber}`,
       name: `页面${phaseNumber}${desc ? ` · ${desc}` : ''}`,
-      screenshots: shot
-        ? [{ phaseNumber, url: `/api/v2/screenshots/${Number(shot.id)}/image` }]
-        : [],
-    });
-
-    const dialogByKey = new Map();
-    let lastAnchor = null; // 弹窗 anchor 推断：最近的非弹窗 button/click 步骤
-    let lastAnchorEle = null; // 对应 ele 节点引用（弹窗组重排：紧跟触发按钮）
-    const steps = stepMap[phaseId] || [];
-    steps.forEach((step, idx) => {
-      const el = parseStepElement(step);
-      if (!el) return;
-      const actionType = String(step?.actionType ?? '');
-      if (SKIP_ACTIONS.has(actionType)) return; // 元动作（save_form_snapshot 等）不入 groups
-      const overlay = isOverlayRegion(String(el.region_id ?? '').trim());
-      const params = parseJson(step?.paramsJson);
-      if (overlay) {
-        const title = overlay.label || 'overlay';
-        const anchorXpath = lastAnchor?.xpath ?? '';
-        // 同标题不同触发按钮 = 不同弹窗实例（如两次打开"客户放大镜选择器"）
-        const dlgKey = `${title}@@${anchorXpath}`;
-        let dlg = dialogByKey.get(dlgKey);
-        if (!dlg) {
-          const key = `${pageId}|dialog:${title}${anchorXpath ? `@@anchor=${anchorXpath}` : ''}`;
-          dlg = {
-            id: key, pid: pageId, type: 'dialog', key, name: title, screenshots: [],
-            _anchorEle: lastAnchorEle || null, // 重排用：弹窗组紧跟触发按钮
-          };
-          dialogByKey.set(dlgKey, dlg);
-          groups.push(dlg);
-        }
-        groups.push(buildControlNode(step, el, params, {
-          pid: dlg.id,
-          group: [{ type: 'dialog', name: dlg.name, key: dlg.key }],
-          anchor: lastAnchor,
-          scanIndex: idx,
-        }));
-      } else {
-        // TODO: 同阶段多页面区分——当前一张长图=一个页面组；未来按步骤 URL 切分页面组
-        const node = buildControlNode(step, el, params, { pid: pageId, group: [], anchor: null, scanIndex: idx });
-        groups.push(node);
-        if ((actionType === 'click' || actionType.startsWith('click_')) && step?.success !== false) {
-          lastAnchor = {
-            xpath: String(el.xpath_smart ?? el.xpath_full ?? el.xpath ?? '').trim(),
-            name: String(el.formLabel ?? el.text ?? el.matchedLabel ?? '').trim(),
-          };
-          lastAnchorEle = node;
-        }
-      }
+      url: `/api/v2/screenshots/${Number(shot.id)}/image`,
+      expires: PUSH_V3_SCREENSHOT_EXPIRES,
     });
   }
 
-  return {
-    id: traj.id != null ? `traj-${traj.id}` : '',
-    name: String(traj.name ?? '').trim() || `trajectory-${traj.id}`,
-    url: String(traj.url ?? '').trim() || '',
-    groups: reorderDialogsAfterAnchor(groups),
-  };
+  for (const dlg of dialogScreenshots || []) {
+    const meta = dlg.metadataJson || {};
+    const phaseNumber = Number(dlg.phaseNumber ?? meta.phaseNumber ?? 0);
+    const key = dlg.key || meta.dialogKey || '';
+    const name = dlg.name || meta.dialogTitle || 'overlay';
+    screenshots.push({
+      phaseNumber,
+      bucket: dlg.bucket || PUSH_V3_SCREENSHOT_BUCKET,
+      type: dlg.type || 'dialog',
+      key,
+      name,
+      url: dlg.url || `/api/v2/screenshots/${Number(dlg.id)}/image`,
+      expires: dlg.expires ?? PUSH_V3_SCREENSHOT_EXPIRES,
+    });
+  }
+
+  return screenshots;
 }
 
 /**
- * Build one V3 transaction entry.
- * @returns {{ entry: object, count: number, skipped: object, stats: object }}
+ * 构建合并后的 transcationProperties。
+ * 在 V2 五个核心字段基础上，增加控件树/分层/点亮字段。
  */
-export function buildTransactionEntryV3(traj, { systemId, projectId, phases, phaseScreenshots } = {}) {
-  if (systemId == null || systemId === '' || projectId == null || projectId === '') {
-    const err = new Error('systemId and projectId are required');
-    err.statusCode = 400;
-    throw err;
-  }
+export function buildV3Properties({ traj = {}, phases = [] } = {}) {
   const properties = [];
   let metaActions = 0;
+  let absoluteFallback = 0;
+  let missingOptions = 0;
+  let noRectControls = 0;
+  let scanIndex = 0;
+
+  const phaseById = new Map();
+  for (const p of phases || []) {
+    phaseById.set(Number(p.id), p);
+  }
   for (const step of traj.steps || []) {
     const ev = mapStepToTransactionEvent(step);
     if (!ev) {
       metaActions += 1;
       continue;
     }
+    if (ev._meta?.targetSource === 'xpath_full') absoluteFallback += 1;
+    if (ev._meta?.missingOptions) missingOptions += 1;
     const { _meta, ...publicEv } = ev;
-    properties.push(publicEv);
+
+    const el = parseStepElement(step);
+    const phaseId = step.trajectoryPhaseId != null ? Number(step.trajectoryPhaseId) : null;
+    const phase = phaseId != null ? phaseById.get(phaseId) : null;
+    const phaseNumber = phase
+      ? Number(phase.phaseNumber ?? phase.phase_number ?? 0)
+      : Number(step.phaseNumber ?? 0);
+    const pageId = `page-${phaseNumber}`;
+    const overlay = el ? isOverlayRegion(String(el.region_id ?? '').trim()) : null;
+
+    let pid = pageId;
+    if (overlay) {
+      const title = overlay.label || 'overlay';
+      pid = `${pageId}|dialog:${title}`;
+    }
+
+    const label = el ? String(el.formLabel ?? el.text ?? el.matchedLabel ?? '').trim() : '';
+    const currentScanIndex = scanIndex;
+    scanIndex += 1;
+
+    const node = {
+      ...publicEv,
+      scanIndex: currentScanIndex,
+      type: 'ele',
+      id: step.stepNumber != null ? `step-${step.stepNumber}` : `step-${currentScanIndex + 1}`,
+      pid,
+    };
+    if (label) node.label = label;
+
+    if (el) {
+      const regionId = String(el.region_id ?? '').trim();
+      const regionLabel = String(el.region_label ?? '').trim();
+      if (regionId) node.regionId = regionId;
+      if (regionLabel) node.regionLabel = regionLabel;
+      if (isLegalRect(el.bbox)) {
+        node.rect = {
+          x1: Number(el.bbox.x1), y1: Number(el.bbox.y1),
+          x2: Number(el.bbox.x2), y2: Number(el.bbox.y2),
+        };
+      } else {
+        noRectControls += 1;
+      }
+    } else {
+      noRectControls += 1;
+    }
+
+    properties.push(node);
   }
+
   uniquifyPropertiesNames(properties);
 
-  const result = buildGroupsResult({ traj, phases, phaseScreenshots });
-  const noRectControls = result.groups
-    .filter((g) => g.type === 'ele' && !g.rect).length;
+  return {
+    properties,
+    metaActions,
+    absoluteFallback,
+    missingOptions,
+    noRectControls,
+  };
+}
+
+/**
+ * Build one V3 transaction entry.
+ * @returns {{ entry: object, screenshots: Array, count: number, skipped: object, stats: object }}
+ */
+export function buildTransactionEntryV3(traj, {
+  systemId,
+  projectId,
+  phases,
+  phaseScreenshots,
+  dialogScreenshots,
+} = {}) {
+  if (systemId == null || systemId === '' || projectId == null || projectId === '') {
+    const err = new Error('systemId and projectId are required');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const {
+    properties,
+    metaActions,
+    absoluteFallback,
+    missingOptions,
+    noRectControls,
+  } = buildV3Properties({ traj, phases });
+
+  const screenshots = buildV3Screenshots({
+    traj,
+    phases,
+    phaseScreenshots,
+    dialogScreenshots,
+  });
 
   const id = traj.id != null ? String(traj.id) : '';
   const name = String(traj.name || '').trim() || `trajectory-${id}`;
@@ -335,21 +286,22 @@ export function buildTransactionEntryV3(traj, { systemId, projectId, phases, pha
       transcationType: 'web',
       testFrame: 'playwright',
       transcationProperties: properties,
-      result,
     },
+    screenshots,
     count: properties.length,
     skipped: { metaActions },
-    stats: { noRectControls },
+    stats: { absoluteFallback, missingOptions, noRectControls },
   };
 }
 
 /**
- * Single-trajectory V3 importDemand body (always wraps list of length 1).
+ * Single-trajectory V3 importDemand body.
  */
 export function buildTransactionPayloadV3(traj, opts = {}) {
   const built = buildTransactionEntryV3(traj, opts);
   return {
     payload: {
+      screenshots: built.screenshots,
       transcationEventTypeList: [built.entry],
     },
     count: built.count,
@@ -363,20 +315,37 @@ export function buildTransactionPayloadV3(traj, opts = {}) {
  */
 export function wrapTransactionListV3(builtEntries = []) {
   const list = [];
+  const screenshots = [];
   let count = 0;
   let metaActions = 0;
+  let absoluteFallback = 0;
+  let missingOptions = 0;
   let noRectControls = 0;
+
   for (const b of builtEntries) {
     if (!b?.entry) continue;
     list.push(b.entry);
+    const tid = b.entry.transcId != null ? Number(b.entry.transcId) : null;
+    for (const s of b.screenshots || []) {
+      screenshots.push({
+        ...s,
+        trajectoryId: s.trajectoryId ?? tid,
+      });
+    }
     count += Number(b.count) || 0;
     metaActions += Number(b.skipped?.metaActions) || 0;
+    absoluteFallback += Number(b.stats?.absoluteFallback) || 0;
+    missingOptions += Number(b.stats?.missingOptions) || 0;
     noRectControls += Number(b.stats?.noRectControls) || 0;
   }
+
   return {
-    payload: { transcationEventTypeList: list },
+    payload: {
+      screenshots,
+      transcationEventTypeList: list,
+    },
     count,
     skipped: { metaActions },
-    stats: { noRectControls },
+    stats: { absoluteFallback, missingOptions, noRectControls },
   };
 }

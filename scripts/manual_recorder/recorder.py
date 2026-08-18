@@ -31,7 +31,9 @@ from typing import Callable, Optional
 
 from ..state import (
     _ACTION_LOG,
+    _is_overlay_region,
     _record_action,
+    capture_dialog_png_b64,
     capture_page_png_b64,
     capture_screenshots_enabled,
     emit_step_screenshot,
@@ -353,7 +355,12 @@ class ManualRecorder:
                 after_b64 = None
             eid = entry.get('id') if isinstance(entry, dict) else None
             if eid:
-                emit_step_screenshot(str(eid), before_b64, after_b64)
+                el = (entry.get('element') or {}) if isinstance(entry, dict) else {}
+                dialog_b64 = None
+                dialog_meta = None
+                if _is_overlay_region(el.get('region_id')):
+                    dialog_b64, dialog_meta = await capture_dialog_png_b64(self.browser_context)
+                emit_step_screenshot(str(eid), before_b64, after_b64, dialog_b64, dialog_meta)
         return entry
 
     async def _handle_payload_async(self, payload: dict) -> None:

@@ -169,6 +169,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       await stashOrApplyStepScreenshot(ctx, entryId, {
         before: payload?.before,
         after: payload?.after,
+        dialog: payload?.dialog,
+        dialogMeta: payload?.dialogMeta,
         trajectoryId: tid,
       }).catch((err) => console.warn('[record] step_screenshot failed:', err?.message || err));
       return;

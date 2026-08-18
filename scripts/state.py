@@ -103,21 +103,120 @@ async def capture_page_png_b64_from_page(page, *, full_page: bool = True) -> str
         return None
 
 
-def emit_step_screenshot(entry_id: str, before_b64: str | None, after_b64: str | None):
+
+async def capture_dialog_png_b64_from_page(page):
+    """Capture the first visible dialog from an existing page handle."""
+    if not capture_screenshots_enabled() or page is None:
+        return None, None
+    try:
+        target = getattr(page, 'page', page)
+        for selector in ('.el-dialog:visible', '.el-drawer:visible', '.el-message-box:visible'):
+            loc = target.locator(selector).first
+            if await loc.count() == 0:
+                continue
+            png = await loc.screenshot(type='png')
+            if not png:
+                return None, None
+            b64 = base64.b64encode(png).decode('ascii')
+            title = ''
+            try:
+                title_el = loc.locator('.el-dialog__title, .el-drawer__title, .el-message-box__title').first
+                if await title_el.count() > 0:
+                    title = (await title_el.inner_text()).strip()
+            except Exception:
+                title = ''
+            meta = {
+                'dialog': True,
+                'phaseNumber': _CURRENT_PHASE,
+                'dialogKey': f'page-{_CURRENT_PHASE}|dialog:{title or "overlay"}',
+                'dialogTitle': title or 'overlay',
+                'anchorXpath': '',
+            }
+            return b64, meta
+        return None, None
+    except Exception:
+        return None, None
+
+
+def _is_overlay_region(region_id) -> bool:
+    """Check whether a region_id chain contains an overlay segment."""
+    if not region_id:
+        return False
+    for seg in str(region_id).split('|'):
+        seg = seg.strip()
+        if not seg:
+            continue
+        role = seg.split(':', 1)[0].strip()
+        if role == 'overlay':
+            return True
+    return False
+
+
+async def capture_dialog_png_b64(browser_context):
+    """Capture the first visible Element UI dialog/drawer/message-box.
+
+    Returns (base64_png, dialog_meta) or (None, None).
+    """
+    if not capture_screenshots_enabled():
+        return None, None
+    try:
+        page = await browser_context.get_current_page()
+        if page is None:
+            return None, None
+        target = getattr(page, 'page', page)
+        for selector in ('.el-dialog:visible', '.el-drawer:visible', '.el-message-box:visible'):
+            loc = target.locator(selector).first
+            if await loc.count() == 0:
+                continue
+            png = await loc.screenshot(type='png')
+            if not png:
+                return None, None
+            b64 = base64.b64encode(png).decode('ascii')
+            title = ''
+            try:
+                title_el = loc.locator('.el-dialog__title, .el-drawer__title, .el-message-box__title').first
+                if await title_el.count() > 0:
+                    title = (await title_el.inner_text()).strip()
+            except Exception:
+                title = ''
+            meta = {
+                'dialog': True,
+                'phaseNumber': _CURRENT_PHASE,
+                'dialogKey': f'page-{_CURRENT_PHASE}|dialog:{title or "overlay"}',
+                'dialogTitle': title or 'overlay',
+                'anchorXpath': '',
+            }
+            return b64, meta
+        return None, None
+    except Exception:
+        return None, None
+
+
+def emit_step_screenshot(
+    entry_id: str,
+    before_b64: str | None,
+    after_b64: str | None,
+    dialog_b64: str | None = None,
+    dialog_meta: dict | None = None,
+):
     """One-shot screenshot event — never attach bytes to _ACTION_LOG entries."""
     if not entry_id:
         return
-    if not before_b64 and not after_b64:
+    if not before_b64 and not after_b64 and not dialog_b64:
         return
+    data = {
+        "entryId": str(entry_id),
+        "before": before_b64,
+        "after": after_b64,
+    }
+    if dialog_b64:
+        data["dialog"] = dialog_b64
+        data["dialogMeta"] = dialog_meta or {}
     try:
         from .agent_utils import emit_json
         emit_json({
             "event": "step_screenshot",
-            "data": {
-                "entryId": str(entry_id),
-                "before": before_b64,
-                "after": after_b64,
-            },
+            "data": data,
         })
     except ImportError:
         pass
@@ -145,7 +244,12 @@ async def record_action_with_screenshots(
             after_b64 = None
     entry = _record_action(action_name, params, result, element=element, source=source)
     if isinstance(entry, dict) and entry.get('id'):
-        emit_step_screenshot(str(entry['id']), before_b64, after_b64)
+        dialog_b64 = None
+        dialog_meta = None
+        el = (entry.get('element') or {}) if isinstance(entry, dict) else {}
+        if _is_overlay_region(el.get('region_id')):
+            dialog_b64, dialog_meta = await capture_dialog_png_b64_from_page(page)
+        emit_step_screenshot(str(entry['id']), before_b64, after_b64, dialog_b64, dialog_meta)
     return entry
 
 
