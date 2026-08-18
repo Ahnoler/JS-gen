@@ -360,8 +360,8 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
 
   const want = !!confirmed;
   if (want) {
+    await trajectoryDao.setPersistentRecordStatus(tid, 'completed');
     await trajectoryDao.updateMeta(tid, {
-      recordStatus: 'completed',
       isDone: true,
       isSuccessful: true,
     });
@@ -371,6 +371,10 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
       isDone: null,
       isSuccessful: null,
     }, { recordStatusIn: ['completed'] });
+    // keep persistent_record_status baseline in sync (recorded)
+    await trajectoryDao.updateMetaIf(tid, {
+      persistentRecordStatus: 'recorded',
+    }, { recordStatusIn: ['recorded'] });
   }
 
   const tree = await getTrajectoryTree(tid);

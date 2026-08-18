@@ -143,6 +143,7 @@ export async function clearTrajectory(trajectoryDbId, { phaseIds = null } = {}) 
 
   const meta = {
     recordStatus: 'draft',
+    persistentRecordStatus: 'draft',
     stepCount,
     phaseCount,
   };

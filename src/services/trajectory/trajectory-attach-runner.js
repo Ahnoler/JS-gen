@@ -18,7 +18,6 @@ import {
   getTrajectoryRuntime,
 } from './trajectory-runtime.js';
 import { runDefaultLogin } from './trajectory-record-lifecycle.js';
-import { isAiRecordingActive } from './trajectory-status-utils.js';
 import { USE_EXECUTOR } from '../../../config/config.js';
 import { attachTrajectoryLive } from './trajectory-attach-service.js';
 
@@ -172,9 +171,9 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
     });
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
-    if (!(await isAiRecordingActive(tid))) {
-      await trajectoryDao.updateMeta(tid, { recordStatus: 'recording' }).catch(() => {});
-    }
+    // prepare 打开浏览器/推流 ≠ 录制。录制中(recording)是临时状态，且持久状态
+    // 不能被临时覆盖：这里不把 record_status 改为 recording，避免将已确认/待确认/
+    // 录制异常降级为未录制/录制中。真正的录制由 record/start 或人工录制进入。
   }
 
   emitStage('login', 'running', { accountId });

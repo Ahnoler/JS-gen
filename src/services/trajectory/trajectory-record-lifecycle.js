@@ -338,9 +338,14 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
     runtime.selectedPhaseId = null;
   }
 
-  const recordStatus = success ? 'recorded' : 'failed';
+  // 显式结束录制：按持久状态基线解析结果。
+  // 首次(基线 draft)：success→recorded(待确认)、failure→failed(录制异常)；
+  // 已确立持久状态(待确认/已确认/录制异常)：保持基线不降级。
+  const recordStatus = await trajectoryDao.finishTransientRecording(
+    tid,
+    success ? 'success' : 'failure',
+  );
   await trajectoryDao.updateMeta(tid, {
-    recordStatus,
     isDone: !!success,
     isSuccessful: !!success,
   });
@@ -399,25 +404,20 @@ export async function stopTrajectoryRecordingSafe(trajectoryId, {
     runtime.selectedPhaseId = null;
   }
 
+  // 结束录制（批量安全版）：临时状态 recording 按持久基线解析结果；
+  // 已是持久状态(recorded/completed/failed/draft)则保持不降级。
   let recordStatus = traj.recordStatus;
-  if (traj.recordStatus === 'recorded' || traj.recordStatus === 'completed') {
-    // Do not downgrade terminal success
-    recordStatus = traj.recordStatus;
-  } else if (success) {
-    const n = await trajectoryDao.updateMetaIf(tid, {
-      recordStatus: 'recorded',
-      isDone: true,
-      isSuccessful: true,
-    }, { recordStatusIn: ['draft', 'recording', 'failed'] });
-    recordStatus = n ? 'recorded' : (await trajectoryDao.getById(tid))?.recordStatus;
+  if (traj.recordStatus === 'recording') {
+    recordStatus = await trajectoryDao.finishTransientRecording(
+      tid,
+      success ? 'success' : 'failure',
+    );
+    await trajectoryDao.updateMeta(tid, {
+      isDone: !!success,
+      isSuccessful: !!success,
+    });
   } else {
-    const n = await trajectoryDao.updateMetaIf(tid, {
-      recordStatus: 'failed',
-      isDone: false,
-      isSuccessful: false,
-    }, { recordStatusIn: ['recording', 'failed'] });
-    const fresh = await trajectoryDao.getById(tid);
-    recordStatus = n ? 'failed' : (fresh?.recordStatus || traj.recordStatus);
+    recordStatus = traj.recordStatus;
   }
 
   const tree = await getTrajectoryTree(tid);

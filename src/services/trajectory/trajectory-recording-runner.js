@@ -77,16 +77,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     err.statusCode = 404;
     throw err;
   }
-  if (traj.recordStatus === 'recording' && (await isAiRecordingActive(tid))) {
+  // 录制中(recording)的信号源是存在 running 阶段（AI 录制进行中），而非 record_status；
+  // 用它在再次 start 时拦截并发录制（无论当前持久状态为何）。
+  if (await isAiRecordingActive(tid)) {
     const err = new Error('Recording already in progress');
     err.statusCode = 409;
     throw err;
   }
-  if (traj.recordStatus === 'recorded' || traj.recordStatus === 'completed') {
-    const err = new Error('Trajectory already recorded — clear it to record again');
-    err.statusCode = 409;
-    throw err;
-  }
+  // 允许在待确认(recorded)/已确认(completed)上再次录制：录制是临时状态，
+  // 结束后按持久状态基线恢复，不会把这些已确立状态降级。
   const allPhases = await trajectoryPhaseDao.listByTrajectory(tid);
   if (!allPhases.length) throw new Error('Trajectory has no phases');
 
@@ -124,7 +123,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   runtime.userStop = null;
   runtime.recordStartAt = new Date().toISOString();
   touchTrajectoryRuntimeActivity(tid);
-  await trajectoryDao.updateMeta(tid, { recordStatus: 'recording', systemAccountId: acctId });
+  // 进入临时「录制中」：记录录制前持久状态基线（不降级待确认/已确认/录制异常）。
+  await trajectoryDao.enterTransientRecording(tid);
+  await trajectoryDao.updateMeta(tid, { systemAccountId: acctId });
   for (const p of phases) await trajectoryPhaseDao.updateStatus(p.id, 'pending');
 
   if (session) {
@@ -304,6 +305,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   }));
   runtime.phaseOutcomes = {};
 
+  let finalStatus = 'recorded';
   try {
     for (let i = 0; i < phases.length; i++) {
       const phase = phases[i];
@@ -481,20 +483,23 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       events.push({ type: 'phase_done', phaseNumber: phase.phaseNumber, description: phase.description });
     }
 
+    // 录制成功：首次(基线 draft)→recorded(待确认)；已确立持久状态(待确认/已确认/录制异常)→保持基线。
+    finalStatus = await trajectoryDao.finishTransientRecording(tid, 'success');
     await trajectoryDao.updateMeta(tid, {
-      recordStatus: 'recorded',
       isDone: true,
       isSuccessful: true,
     });
   } catch (err) {
     // A user-initiated record/stop already wrote the final recordStatus
-    // (recorded/failed); don't let the aborted runner overwrite that choice.
+    // (recorded/failed/completed...); don't let the aborted runner overwrite that choice.
     if (!runtime.userStop) {
+      finalStatus = await trajectoryDao.finishTransientRecording(tid, 'failure');
       await trajectoryDao.updateMeta(tid, {
-        recordStatus: 'failed',
         isDone: false,
         isSuccessful: false,
       });
+    } else {
+      finalStatus = traj.recordStatus;
     }
     const failText = String(err?.message || err || '').trim();
     if (failText && session?.activePhaseId) {
@@ -519,7 +524,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   const tree = await getTrajectoryTree(tid);
   return {
     trajectoryId: tid,
-    recordStatus: 'recorded',
+    recordStatus: finalStatus,
     phaseIds: phases.map((p) => p.id),
     accountId: acctId,
     systemAccountId: acctId,

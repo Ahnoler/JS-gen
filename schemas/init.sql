@@ -104,6 +104,7 @@ CREATE TABLE `trajectory` (
   `batch_job_id`       VARCHAR(36) DEFAULT NULL COMMENT '所属批量导入任务（batch_recording_job.id，UUID）；NULL=手动创建',
   `paas_user_id`      VARCHAR(32) DEFAULT NULL COMMENT '账号中心用户 id（隔离标志；空=无主=全可见）',
   `record_status`     ENUM('draft','recording','failed','recorded','completed') NOT NULL DEFAULT 'draft' COMMENT 'draft=未录制; recording=录制中; failed=录制异常; recorded=待确认; completed=已确认',
+  `persistent_record_status` ENUM('draft','failed','recorded','completed') NOT NULL DEFAULT 'draft' COMMENT '录制前的持久状态基线（不包含 recording）；进入录制中时记录，录制结束时据此恢复，保证临时录制不降级持久状态',
   `created_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updated_at`        DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   KEY `idx_function_id` (`function_id`),

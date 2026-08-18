@@ -549,10 +549,13 @@ export async function cleanupPersistedTrajectoryResources(trajectoryId, {
   slotLease.releaseByTrajectory(tid);
 
   if (demoteLive && traj.recordStatus === 'recording') {
-    const aiActive = await isAiRecordingActive(tid);
-    await trajectoryDao.updateMetaIf(tid, {
-      recordStatus: aiActive ? 'failed' : 'draft',
-    }, { recordStatusIn: ['recording'] });
+    // 清理/重启回收：非终结性恢复或 AI 中断。
+    // 首次(基线 draft) AI 中断 → failed；其余一律恢复到录制前持久状态基线，不降级。
+    if (await isAiRecordingActive(tid)) {
+      await trajectoryDao.finishTransientRecording(tid, 'failure');
+    } else {
+      await trajectoryDao.restorePersistentRecordStatus(tid);
+    }
   } else if (traj.remoteSessionId) {
     await trajectoryDao.updateMeta(tid, { remoteSessionId: null });
   }

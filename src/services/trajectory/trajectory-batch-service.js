@@ -452,23 +452,14 @@ export async function recoverBatchJobsOnStartup() {
         const tid = Number(item.trajectoryId);
         if (tid) {
           const traj = await trajectoryDao.getById(tid).catch(() => null);
-          if (traj?.recordStatus === 'recorded' || traj?.recordStatus === 'completed') {
-            await batchDao.transitionItem(item.id, ['preparing', 'recording'], 'recorded', {
-              clearLease: true,
-              extra: { errorCode: null, errorMessage: null },
+          if (traj?.recordStatus === 'recording') {
+            // 重启中断：按持久基线解析（首次 draft→failed；已确立持久状态保持不降级）。
+            await trajectoryDao.finishTransientRecording(tid, 'failure');
+            await trajectoryDao.updateMeta(tid, {
+              isDone: false,
+              isSuccessful: false,
             });
-            await cleanupPersistedTrajectoryResources(tid, {
-              demoteLive: false,
-              reason: 'batch_recovery',
-            });
-            await maybeFinalizeJob(item.batchId);
-            continue;
           }
-          await trajectoryDao.updateMetaIf(tid, {
-            recordStatus: 'failed',
-            isDone: false,
-            isSuccessful: false,
-          }, { recordStatusIn: ['recording'] });
           await cleanupPersistedTrajectoryResources(tid, {
             demoteLive: true,
             reason: 'batch_recovery',

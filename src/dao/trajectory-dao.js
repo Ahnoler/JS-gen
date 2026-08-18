@@ -1,6 +1,11 @@
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
-import { TRAJECTORY_RECORD_STATUSES } from '../models/constants.js';
+import {
+  TRAJECTORY_RECORD_STATUSES,
+  PERSISTENT_RECORD_STATUSES,
+  isPersistentRecordStatus,
+  resolvePostRecordingStatus,
+} from '../models/constants.js';
 
 const TABLE = 'trajectory';
 
@@ -58,17 +63,17 @@ function applyBatchTaskNameFilter(query, batchTaskName) {
 const RECORD_STATUS_STATS = ['draft', 'recording', 'failed', 'recorded', 'completed'];
 
 /**
- * 五档统计：与行查询同基准过滤（functionId/keyword/batchTaskName），忽略 recordStatus。
+ * 五档统计：与行查询同基准过滤（functionId/keyword/recordStatus/batchTaskName）。
  * @returns {Promise<{ total: number, draft: number, recording: number, failed: number, recorded: number, completed: number }>}
  */
-export async function countByRecordStatus({ functionId = null, keyword = null, batchTaskName = null, paasUserId = null } = {}) {
+export async function countByRecordStatus({ functionId = null, keyword = null, recordStatus = null, batchTaskName = null, paasUserId = null } = {}) {
   const db = getDB();
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
   if (functionId != null && Number.isFinite(Number(functionId))) {
     base.where('t.function_id', Number(functionId));
   }
-  applyListFilters(base, { keyword, recordStatus: null });
+  applyListFilters(base, { keyword, recordStatus });
   applyBatchTaskNameFilter(base, batchTaskName);
   if (paasUserId) base.where('t.paas_user_id', paasUserId);
   const rows = await base
@@ -122,6 +127,8 @@ export async function save(trajectory, trx = null) {
       batchJobId: trajectory.batchJobId ?? null,
       paasUserId: trajectory.paasUserId ?? null,
       recordStatus: trajectory.recordStatus ?? 'draft',
+      persistentRecordStatus: trajectory.persistentRecordStatus
+        ?? (isPersistentRecordStatus(trajectory.recordStatus) ? trajectory.recordStatus : 'draft'),
     }));
 
     if (trajectory.steps?.length) {
@@ -213,12 +220,16 @@ export async function clearMountByRemoteSessionId(remoteSessionId, {
 
   const cleared = [];
   for (const row of rows) {
-    const fields = { remoteSessionId: null };
-    if (demoteLive && row.record_status === 'recording'
-        && !(await hasRunningPhase(row.id))) {
-      fields.recordStatus = 'draft';
+    await updateMeta(row.id, { remoteSessionId: null }, db);
+    if (demoteLive && row.record_status === 'recording') {
+      if (await hasRunningPhase(row.id)) {
+        // AI 录制中断：首次(draft)→failed；已确立持久状态则保持基线不降级。
+        await finishTransientRecording(row.id, 'failure', db);
+      } else {
+        // 非终结性（关浏览器/断开/回收）：恢复到录制前持久状态，杜绝降级为 draft。
+        await restorePersistentRecordStatus(row.id, db);
+      }
     }
-    await updateMeta(row.id, fields, db);
     cleared.push(Number(row.id));
   }
   return cleared;
@@ -249,7 +260,7 @@ export async function listStaleRemoteMounts() {
 }
 
 /**
- * Repair stale trajectory.remote_session_id pointers (and demote 非AI录制中→draft).
+ * Repair stale trajectory.remote_session_id pointers (恢复临时录制中的持久状态基线).
  * @returns {Promise<number[]>} cleared trajectory ids
  */
 export async function repairStaleRemoteMounts(trx = null) {
@@ -258,11 +269,14 @@ export async function repairStaleRemoteMounts(trx = null) {
   const db = trx || getDB();
   const cleared = [];
   for (const row of stale) {
-    const fields = { remoteSessionId: null };
-    if (row.recordStatus === 'recording' && !(await hasRunningPhase(row.id))) {
-      fields.recordStatus = 'draft';
+    await updateMeta(row.id, { remoteSessionId: null }, db);
+    if (row.recordStatus === 'recording') {
+      if (await hasRunningPhase(row.id)) {
+        await finishTransientRecording(row.id, 'failure', db);
+      } else {
+        await restorePersistentRecordStatus(row.id, db);
+      }
     }
-    await updateMeta(row.id, fields, db);
     cleared.push(row.id);
   }
   return cleared;
@@ -282,6 +296,121 @@ export async function updateMetaIf(trajectoryDbId, fields, { recordStatusIn = nu
     q = q.whereIn('record_status', recordStatusIn);
   }
   return q.update(patch);
+}
+
+/**
+ * 读取轨迹当前 record_status / persistent_record_status（轻量，不含 steps）。
+ * persistent_record_status 列可能在迁移前不存在，缺失时降级为 null（上层按 draft 基线处理）。
+ */
+export async function getRecordStatusRow(trajectoryDbId) {
+  const db = getDB();
+  const row = await db(TABLE).where({ id: trajectoryDbId }).first('record_status');
+  if (!row) return null;
+  let persistentRecordStatus = null;
+  try {
+    const pr = await db(TABLE).where({ id: trajectoryDbId }).first('persistent_record_status');
+    persistentRecordStatus = pr?.persistent_record_status ?? null;
+  } catch {
+    persistentRecordStatus = null;
+  }
+  return {
+    recordStatus: row.record_status,
+    persistentRecordStatus,
+  };
+}
+
+/**
+ * 写入 record_status（必写），同时尽力写 persistent_record_status（列缺失时降级为仅 record_status）。
+ */
+async function writeRecordStatusResilient(trajectoryDbId, next, trx = null) {
+  await updateMeta(trajectoryDbId, { recordStatus: next }, trx);
+  try {
+    await updateMeta(trajectoryDbId, { persistentRecordStatus: next }, trx);
+  } catch (err) {
+    console.warn(
+      `[trajectory] persistent_record_status write skipped for #${trajectoryDbId}: ${err?.message || err}`,
+    );
+  }
+}
+
+/**
+ * 进入临时「录制中」(recording) 状态。
+ * 记录录制前的持久状态基线 persistent_record_status，保证录制结束后能恢复到
+ * 该基线，而不被临时状态降级。
+ * 首次录制（基线为空/null → draft）默认按 draft 处理。
+ * @returns {Promise<{ recordStatus: string, persistentBase: string }>}
+ */
+export async function enterTransientRecording(trajectoryDbId) {
+  const row = await getRecordStatusRow(trajectoryDbId);
+  if (!row) return { recordStatus: 'recording', persistentBase: 'draft' };
+
+  // 基线：当前 record_status 若是持久状态则取之，否则沿用既有基线；仍为空则 draft。
+  const base = isPersistentRecordStatus(row.recordStatus)
+    ? row.recordStatus
+    : (isPersistentRecordStatus(row.persistentRecordStatus) ? row.persistentRecordStatus : 'draft');
+
+  await updateMeta(trajectoryDbId, { recordStatus: 'recording' });
+  try {
+    await updateMeta(trajectoryDbId, { persistentRecordStatus: base });
+  } catch (err) {
+    console.warn(
+      `[trajectory] persistent_record_status write skipped for #${trajectoryDbId}: ${err?.message || err}`,
+    );
+  }
+  return { recordStatus: 'recording', persistentBase: base };
+}
+
+/**
+ * 录制会话结束后，写入其结果持久状态（resolvePostRecordingStatus）。
+ * outcome: 'success' | 'failure' | 'restore'
+ * 同步维护 persistent_record_status 基线（与最终记录状态一致）。
+ */
+export async function finishTransientRecording(trajectoryDbId, outcome, trx = null) {
+  const row = await getRecordStatusRow(trajectoryDbId);
+  const base = isPersistentRecordStatus(row?.persistentRecordStatus)
+    ? row.persistentRecordStatus
+    : 'draft';
+  const next = resolvePostRecordingStatus(base, outcome);
+  await writeRecordStatusResilient(trajectoryDbId, next, trx);
+  return next;
+}
+
+/**
+ * 非终结性恢复：临时录制未显式成功/失败（关浏览器、断开、回收、惰性清理等），
+ * 一律恢复到录制前的持久状态基线，杜绝降级为 draft。
+ */
+export async function restorePersistentRecordStatus(trajectoryDbId, trx = null) {
+  const row = await getRecordStatusRow(trajectoryDbId);
+  if (!row) return null;
+  if (row.recordStatus !== 'recording') {
+    // 非录制中：仅同步基线（若缺失则回填为当前持久状态）；不改当前状态。
+    const base = isPersistentRecordStatus(row.persistentRecordStatus)
+      ? row.persistentRecordStatus
+      : (isPersistentRecordStatus(row.recordStatus) ? row.recordStatus : 'draft');
+    if (base !== row.persistentRecordStatus) {
+      try {
+        await updateMeta(trajectoryDbId, { persistentRecordStatus: base }, trx);
+      } catch (err) {
+        console.warn(
+          `[trajectory] persistent_record_status write skipped for #${trajectoryDbId}: ${err?.message || err}`,
+        );
+      }
+    }
+    return row.recordStatus;
+  }
+  const base = isPersistentRecordStatus(row.persistentRecordStatus)
+    ? row.persistentRecordStatus
+    : 'draft';
+  await writeRecordStatusResilient(trajectoryDbId, base, trx);
+  return base;
+}
+
+/**
+ * 将一条轨迹显式写为持久记录状态（同时回填 persistent_record_status 基线）。
+ */
+export async function setPersistentRecordStatus(trajectoryDbId, status, trx = null) {
+  if (!PERSISTENT_RECORD_STATUSES.includes(status)) return 0;
+  return writeRecordStatusResilient(trajectoryDbId, status, trx);
 }
 
 export async function getMaxStepNumber(trajectoryDbId) {
@@ -365,7 +494,7 @@ export async function listByFunction(functionId, {
       .count('* as phases');
     e.phaseCount = Number(phases) || 0;
   }
-  const stats = await countByRecordStatus({ functionId, keyword, batchTaskName, paasUserId });
+  const stats = await countByRecordStatus({ functionId, keyword, recordStatus, batchTaskName, paasUserId });
   return { rows: entities, total, page, pageSize, stats };
 }
 
@@ -397,7 +526,7 @@ export async function list({
       .count('* as phases');
     e.phaseCount = Number(phases) || 0;
   }
-  const stats = await countByRecordStatus({ keyword, batchTaskName, paasUserId });
+  const stats = await countByRecordStatus({ keyword, recordStatus, batchTaskName, paasUserId });
   return { rows: entities, total, page, pageSize, stats };
 }
 
