@@ -8,7 +8,7 @@ import {
   killTree, killOrphans, waitForReady, spawnAgent,
 } from '../../runtime/agent-process.js';
 import { broadcastWatcherStatus } from './broadcasts.js';
-import { persistLiveActionEntries, stashOrApplyStepScreenshot } from './persist-live.js';
+import { persistLiveActionEntries, stashOrApplyStepScreenshot, applyPageLevelScreenshot } from './persist-live.js';
 
 async function ensureCdpDiscovered() {
   const gb = state.globalBrowser;
@@ -124,6 +124,13 @@ export async function ensureGlobalBrowser(modelId) {
                 after: data.after,
                 trajectoryId: session.dbTrajectoryId,
               }).catch((err) => console.warn('[step-screenshot] stash failed:', err.message));
+            }
+          } else if (msg.event === 'page_level_screenshot') {
+            const session = [...state.sessions.values()][0];
+            if (session && Number.isFinite(Number(session.dbTrajectoryId))) {
+              applyPageLevelScreenshot(session.dbTrajectoryId, msg.data || {}).catch((err) => {
+                console.warn('[page-level-screenshot] persist failed:', err.message);
+              });
             }
           } else if (msg.event === 'manual_record_status') {
             gb.manualRecording = !!msg.data?.enabled;

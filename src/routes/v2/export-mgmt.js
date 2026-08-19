@@ -23,6 +23,7 @@ import {
 import {
   buildTransactionPayloadV3,
   wrapTransactionListV3,
+  validatePageLevelCoverage,
   TRANSACTION_SCHEMA_VERSION_V3,
 } from '../../services/transaction-export-v3.js';
 import {
@@ -63,12 +64,13 @@ async function buildOneTrajectory(traj, { systemId, projectId }) {
   };
 }
 
-/** V3.0 组装（groups 控件点亮结构）。 */
+/** V3.1 组装（页面级截图结构）。 */
 async function buildOneTrajectoryV3(traj, { systemId, projectId }) {
-  const [phases, phaseScreenshots, dialogScreenshots] = await Promise.all([
+  const [phases, phaseScreenshots, dialogScreenshots, pageLevelScreenshots] = await Promise.all([
     trajectoryPhaseDao.listByTrajectory(traj.id),
     screenshotDao.listPhaseHighlightsByTrajectory(traj.id),
     screenshotDao.listDialogScreenshotsByTrajectory(traj.id),
+    screenshotDao.listPageLevelByTrajectory(traj.id),
   ]);
   const built = buildTransactionPayloadV3(traj, {
     systemId,
@@ -76,6 +78,7 @@ async function buildOneTrajectoryV3(traj, { systemId, projectId }) {
     phases,
     phaseScreenshots,
     dialogScreenshots,
+    pageLevelScreenshots,
   });
   return {
     trajectoryId: traj.id,
@@ -287,6 +290,17 @@ export default function (app) {
     }
 
     assertPushableForPartner(traj);
+
+    const coverage = validatePageLevelCoverage(result.payload?.transcationEventTypeList?.[0]);
+    if (!coverage.ok) {
+      return res.status(409).json({
+        code: 'page_level_screenshot_missing',
+        error: '页面级截图缺失，无法推送',
+        missingPageLevelScreenshots: coverage.missing,
+        stats: result.stats,
+        pushed: false,
+      });
+    }
 
     const accessToken = requireAccessToken(req);
     const partner = await pushImportDemand(result.payload, { accessToken });
@@ -561,8 +575,21 @@ export default function (app) {
             continue;
           }
           const result = await buildOneTrajectoryV3(traj, { systemId, projectId });
-          buildOk += 1;
           const entry = result.payload?.transcationEventTypeList?.[0];
+          const coverage = validatePageLevelCoverage(entry);
+          if (willPush && !coverage.ok) {
+            buildFailed += 1;
+            items.push({
+              trajectoryId: id,
+              ok: false,
+              error: '页面级截图缺失，无法推送',
+              code: 'page_level_screenshot_missing',
+              missingPageLevelScreenshots: coverage.missing,
+              stats: result.stats,
+            });
+            continue;
+          }
+          buildOk += 1;
           if (entry) {
             okBuilt.push({
               entry,
@@ -580,6 +607,7 @@ export default function (app) {
             count: result.count,
             skipped: result.skipped,
             stats: result.stats,
+            coverage,
           });
         } catch (e) {
           buildFailed += 1;

@@ -13,6 +13,9 @@ import {
   buildTransactionEntryV3,
   buildTransactionPayloadV3,
   wrapTransactionListV3,
+  validatePageLevelCoverage,
+  pageKeyFromRegionId,
+  popupKeyFromRegionId,
   mapControlAction,
   mapControlKind,
   isOverlayRegion,
@@ -206,6 +209,67 @@ function testBuildScreenshotEntries() {
 }
 
 // ── 纯函数：buildTransactionEntryV3 / Payload / Wrap ──
+// ── 纯函数：页面级截图 + 控件归属 + 覆盖校验 ──
+function testPageLevelScreenshots() {
+  console.log('[pure] page-level screenshots');
+  const pageKey = 'page:http://test/#/corp/custManage';
+  const popupKey = `${pageKey}|dialog:地址选择器`;
+  const { entries, idByPageLevel, pageLevelById } = buildScreenshotEntries({
+    traj: { id: 99 },
+    phases: [],
+    pageLevelScreenshots: [
+      { levelType: 'page', levelKey: pageKey, imageUrl: 'http://minio/page.png', metadataJson: { displayName: '对公客户管理' } },
+      { levelType: 'popup', levelKey: popupKey, parentLevelKey: pageKey, imageUrl: 'http://minio/dialog.png', metadataJson: { displayName: '地址选择器', dialogTitle: '地址选择器', popupRect: { x1: 100, y1: 200, x2: 500, y2: 600 } } },
+    ],
+  });
+  check(entries.length === 2, `页面级截图条目 = 2（实际 ${entries.length}）`);
+  const pageShot = entries.find((e) => e.type === 'page');
+  const dialogShot = entries.find((e) => e.type === 'dialog');
+  check(pageShot?.regionId === pageKey, 'page 截图 regionId = pageKey');
+  check(dialogShot?.regionId === popupKey, 'dialog 截图 regionId = popupKey');
+  check(dialogShot?.propertiesPID === pageShot?.propertiesID, 'dialog propertiesPID 指向 page');
+  check(JSON.stringify(dialogShot?.rect) === JSON.stringify({ x1: 100, y1: 200, x2: 500, y2: 600 }), 'dialog rect = popupRect');
+  check(idByPageLevel.get(pageKey) === Number(pageShot.propertiesID), 'idByPageLevel page 映射');
+
+  const { properties } = buildV3Properties({
+    traj: {
+      id: 99,
+      steps: [
+        {
+          stepNumber: 1, actionType: 'fill_form_field', source: 'agent',
+          elementJson: { tag: 'input', target_kind: 'form_input', formLabel: '产品名称', region_id: `${pageKey}|card:产品目录`, bbox: { x1: 10, y1: 20, x2: 200, y2: 40 } },
+          paramsJson: {},
+        },
+        {
+          stepNumber: 2, actionType: 'select_option', source: 'agent',
+          elementJson: { tag: 'input', target_kind: 'form_select', formLabel: '省份', region_id: `${popupKey}|overlay:地址选择器`, bbox: { x1: 120, y1: 220, x2: 320, y2: 240 } },
+          paramsJson: {},
+        },
+      ],
+    },
+    screenshotCount: entries.length,
+    idByPageLevel,
+    pageLevelById,
+    idByDialog: new Map(),
+    idByPhase: new Map(),
+  });
+  check(properties.length === 2, `页面级控件 = 2（实际 ${properties.length}）`);
+  const pageCtrl = properties[0];
+  const popupCtrl = properties[1];
+  check(pageCtrl.propertiesPID === pageShot.propertiesID, '页面控件 pid 指向 page');
+  check(pageCtrl.regionId === `${pageKey}|card:产品目录`, '页面控件 regionId 保留 pageKey|card');
+  check(popupCtrl.propertiesPID === dialogShot.propertiesID, '弹窗控件 pid 指向 dialog');
+  check(JSON.stringify(popupCtrl.rect) === JSON.stringify({ x1: 20, y1: 20, x2: 220, y2: 40 }), '弹窗控件 rect 相对弹窗截图换算');
+
+  const covered = validatePageLevelCoverage({ transcationProperties: [...entries, ...properties] });
+  check(covered.ok === true, '页面级截图覆盖校验通过');
+  const missing = validatePageLevelCoverage({ transcationProperties: [...entries, { ...properties[0], propertiesPID: '0' }] });
+  check(missing.ok === false && missing.missing.length === 1, '缺截图时覆盖校验失败并返回 missing');
+
+  check(pageKeyFromRegionId(`${pageKey}|card:产品目录`) === pageKey, 'pageKeyFromRegionId');
+  check(popupKeyFromRegionId(`${popupKey}|overlay:地址选择器`) === popupKey, 'popupKeyFromRegionId');
+}
+
 function testPayloadStructure() {
   console.log('[pure] payload 结构');
   const traj = {
@@ -302,6 +366,7 @@ async function main() {
   testOverlay();
   testBuildV3Properties();
   testBuildScreenshotEntries();
+  testPageLevelScreenshots();
   testPayloadStructure();
   await testRealData();
   if (failures) {

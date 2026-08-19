@@ -299,7 +299,7 @@ async def run_session(args):
     async def _run_step(data, step_idx):
         """Execute one agent step with the given data."""
         nonlocal cumulative_path
-        from .state import set_current_phase
+        from .state import register_current_page_screenshot, set_current_phase
         # Prefer client-provided phase_number (matches 【阶段N】); fallback to step_idx
         phase_num = data.get("phase_number")
         if phase_num is None:
@@ -323,6 +323,12 @@ async def run_session(args):
             return
         # Native AgentHistory accumulate disabled (scripts/trajectories/*.json no longer saved).
         # Temp per-step history files may still exist under %TEMP%; not copied to repo.
+        try:
+            from .state import register_current_page_screenshot
+            await register_current_page_screenshot(browser_context)
+        except Exception:
+            pass
+
         phase_done_data: dict = {
             "phase": phase_num,
             "total": -1,

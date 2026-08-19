@@ -87,6 +87,7 @@ run "characterize-step-highlight" node scripts/characterization/characterize-ste
 run "characterize-layer-tree" node scripts/characterization/characterize-layer-tree.mjs
 run "characterize-export-v3" node scripts/characterization/characterize-export-v3.mjs
 run "characterize-dialog-screenshot" node scripts/characterization/characterize-dialog-screenshot.mjs
+run "characterize-page-level-screenshot" node scripts/characterization/characterize-page-level-screenshot.mjs
 
 run "characterize-form-engine-wiring" "$PY" scripts/characterization/characterize-form-engine-wiring.py
 run "characterize-done-accept-reason" "$PY" scripts/characterization/characterize-done-accept-reason.py
@@ -95,6 +96,7 @@ run "characterize-duplicate-failure-cue" "$PY" scripts/characterization/characte
 run "characterize-click-navigation-cue" "$PY" scripts/characterization/characterize-click-navigation-cue.py
 run "characterize-confirm-notification" "$PY" scripts/characterization/characterize-confirm-notification.py
 run "characterize-step-region-bbox" "$PY" scripts/characterization/characterize-step-region-bbox.py
+run "characterize-page-level-python" "$PY" scripts/characterization/characterize-page-level-python.py
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

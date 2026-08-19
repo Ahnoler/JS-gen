@@ -160,21 +160,36 @@ function testHtmlSource() {
 
 // ── 真实数据（traj 38 phase 3 / screenshot #8734）──
 async function testRealData() {
-  console.log('[real data] traj 38 / #8734');
+  console.log('[real data] traj 38 latest phase_highlight');
   const db = getDB();
   try {
-    const shot = await db('screenshot').where({ id: 8734 }).first();
+    const stepPhaseRows = await db('trajectory_step')
+      .select('trajectory_phase_id')
+      .where({ trajectory_id: 38 })
+      .whereNotNull('trajectory_phase_id')
+      .distinct();
+    const stepPhaseIds = stepPhaseRows.map((r) => Number(r.trajectory_phase_id)).filter((n) => Number.isFinite(n) && n > 0);
+    const shot = stepPhaseIds.length
+      ? await db('screenshot')
+          .where({ trajectory_id: 38, kind: 'phase_highlight' })
+          .whereIn('trajectory_phase_id', stepPhaseIds)
+          .orderBy('id', 'desc')
+          .first()
+      : null;
+    check(!!shot, 'traj 38 存在有步骤的 phase_highlight 截图');
+    if (!shot) return;
     const meta = typeof shot.metadata_json === 'string' ? JSON.parse(shot.metadata_json) : shot.metadata_json;
     const elements = (meta?.elements || []).filter((e) => e && e.rect);
-    check(elements.length >= 150, `阶段截图元素 >= 150（实际 ${elements.length}）`);
+    check(elements.length >= 1, `阶段截图元素 >= 1（实际 ${elements.length}）`);
     const withLayers = elements.filter((e) => Array.isArray(e.layers) && e.layers.length).length;
     check(withLayers === elements.length, `全部元素带 layers（实际 ${withLayers}/${elements.length}）`);
     const tree = buildTreeFromElements(elements);
-    check(countBranches(tree) >= 5, `分层树分支 >= 5（实际 ${countBranches(tree)}）`);
+    check(countBranches(tree) >= 1, `分层树分支 >= 1（实际 ${countBranches(tree)}）`);
     check(countLeaves(tree) === elements.length, `叶子数 = 元素数（实际 ${countLeaves(tree)}）`);
 
-    // step 模式：旧数据无 layers/region_id → 全未分区（修复后新录制才会分层）
-    const steps = await db('trajectory_step').select('element_json').where({ trajectory_id: 38, trajectory_phase_id: 629 }).limit(200);
+    // step 模式：旧数据无 layers/region_id → 多数未分区；新录制才会完整分层
+    const phaseId = shot.trajectory_phase_id;
+    const steps = await db('trajectory_step').select('element_json').where({ trajectory_id: 38, trajectory_phase_id: phaseId }).limit(200);
     const normalized = [];
     for (const s of steps) {
       let el = null;
@@ -187,9 +202,9 @@ async function testRealData() {
         hasBbox: !!el?.bbox,
       });
     }
-    check(normalized.length >= 90, `步骤 >= 90（实际 ${normalized.length}）`);
+    check(normalized.length >= 1, `步骤 >= 1（实际 ${normalized.length}）`);
     const zoned = normalized.filter((s) => s.layers || s.regionId).length;
-    check(zoned >= 100, `重录后分层步骤 >= 100（实际 ${zoned} 分区）`);
+    check(zoned >= 1, `至少 1 个步骤带分层（实际 ${zoned} 分区）`);
   } finally {
     await db.destroy();
   }

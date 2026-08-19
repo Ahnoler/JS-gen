@@ -18,7 +18,11 @@ from ..state import (
     capture_dialog_png_b64,
     capture_page_png_b64,
     capture_screenshots_enabled,
+    current_page_level,
     emit_step_screenshot,
+    register_page_screenshot_if_changed,
+    register_popup_screenshot,
+    set_current_page_key,
     should_skip_screenshot_action,
 )
 
@@ -52,7 +56,14 @@ def _wrap_action_with_screenshots(controller, browser_context):
                     return await func(*args, **kwargs)
 
                 len_before = len(_ACTION_LOG)
+                before_key = ''
+                before_name = ''
                 before_b64 = None
+                try:
+                    before_key, before_name = await current_page_level(browser_context)
+                except Exception:
+                    before_key, before_name = '', ''
+                set_current_page_key(before_key)
                 try:
                     before_b64 = await capture_page_png_b64(browser_context)
                 except Exception:
@@ -69,6 +80,13 @@ def _wrap_action_with_screenshots(controller, browser_context):
                 except Exception:
                     after_b64 = None
 
+                after_key, after_name = await register_page_screenshot_if_changed(
+                    browser_context,
+                    before_key=before_key,
+                    before_name=before_name,
+                    before_b64=before_b64,
+                )
+
                 entry_id = None
                 try:
                     entry_id = (_ACTION_LOG[-1] or {}).get('id')
@@ -81,6 +99,14 @@ def _wrap_action_with_screenshots(controller, browser_context):
                     el = last_entry.get('element') or {}
                     if _is_overlay_region(el.get('region_id')):
                         dialog_b64, dialog_meta = await capture_dialog_png_b64(browser_context)
+                        await register_popup_screenshot(
+                            browser_context,
+                            page_key=after_key or before_key,
+                            dialog_title=(dialog_meta or {}).get('dialogTitle') or '',
+                            anchor_xpath=(dialog_meta or {}).get('anchorXpath') or '',
+                            dialog_b64=dialog_b64,
+                            dialog_meta=dialog_meta,
+                        )
                     emit_step_screenshot(str(entry_id), before_b64, after_b64, dialog_b64, dialog_meta)
                 return result
 

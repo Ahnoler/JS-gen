@@ -207,6 +207,66 @@ export async function replaceDialogScreenshot(trajectoryStepId, {
   return id;
 }
 
+export async function replacePageLevelScreenshot({
+  trajectoryId = null,
+  levelType = 'page',
+  levelKey = '',
+  parentLevelKey = null,
+  buffer,
+  mimeType = 'image/png',
+  metadataJson = null,
+} = {}) {
+  const trajId = Number(trajectoryId);
+  if (!Number.isFinite(trajId) || trajId <= 0) throw new Error('trajectoryId required');
+  if (!levelKey) throw new Error('levelKey required');
+  if (!buffer || !buffer.length) throw new Error('buffer required');
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+
+  const existing = await screenshotDao.findPageLevel(trajId, levelKey);
+  await removeStoredObject(existing, { strict: true });
+
+  const pendingFile = await createPendingFile(buf);
+  const daoCall = (storageFields) => screenshotDao.replacePageLevel({
+    trajectoryId: trajId,
+    levelType,
+    levelKey: String(levelKey),
+    parentLevelKey,
+    fileSize: buf.length,
+    mimeType,
+    metadataJson,
+    ...storageFields,
+  });
+
+  let uploaded;
+  try {
+    uploaded = await uploadOrThrow(buf, mimeType);
+  } catch (uploadErr) {
+    console.warn('[screenshot] MinIO page-level upload failed, keeping local copy:', uploadErr?.message || uploadErr);
+    return fallbackToLocal({ daoCall, pendingFile });
+  }
+
+  let id;
+  try {
+    id = await daoCall({
+      storageType: uploaded.storageType,
+      storagePath: uploaded.storagePath,
+      imageUrl: uploaded.imageUrl,
+      retryCount: 0,
+      lastRetryAt: null,
+    });
+  } catch (err) {
+    await removeScreenshotObject(uploaded.storagePath).catch(() => {});
+    await deletePendingFile(pendingFile.filePath).catch(() => {});
+    throw err;
+  }
+  await deletePendingFile(pendingFile.filePath).catch(() => {});
+  return id;
+}
+
+export async function listPageLevelScreenshotsByTrajectory(trajectoryId) {
+  return screenshotDao.listPageLevelByTrajectory(trajectoryId);
+}
+
 export async function getScreenshotImage(id) {
   const row = await screenshotDao.getImage(id);
   if (!row) return null;

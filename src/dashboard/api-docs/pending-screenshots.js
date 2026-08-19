@@ -60,6 +60,7 @@ const KIND_LABEL = {
   before: '步骤前',
   after: '步骤后',
   phase_highlight: '阶段高亮',
+  page_level: '页面级',
 };
 
 function kindBadge(kind) {

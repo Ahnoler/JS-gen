@@ -128,6 +128,7 @@ function copyLocatorMeta(target, source) {
   }
   if (Array.isArray(source.layers)) target.layers = source.layers;
   if (source.bbox && typeof source.bbox === 'object' && !Array.isArray(source.bbox)) target.bbox = source.bbox;
+  if (source.page_bbox && typeof source.page_bbox === 'object' && !Array.isArray(source.page_bbox)) target.page_bbox = source.page_bbox;
   if (Array.isArray(source.options)) {
     const opts = [];
     const seen = new Set();

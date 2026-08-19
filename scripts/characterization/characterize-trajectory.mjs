@@ -164,9 +164,9 @@ function testStopDoesNotDetach() {
     'stopTrajectoryRecording must return detached: false',
   );
   assert(
-    /recordStatus\s*=\s*success\s*\?\s*'recorded'\s*:\s*'failed'/.test(src)
-      || (src.includes("'recorded'") && src.includes("'failed'")),
-    'stop must map success→recorded / !success→failed',
+    /finishTransientRecording\s*\(\s*tid,\s*success\s*\?\s*'success'\s*:\s*'failure'/.test(src)
+      || (src.includes("finishTransientRecording") && src.includes("'success'") && src.includes("'failure'")),
+    'stop must map success→success / !success→failure via finishTransientRecording',
   );
   assert(
     !/\bdetachTrajectoryLive\b/.test(src),

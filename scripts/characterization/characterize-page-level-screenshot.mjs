@@ -1,0 +1,118 @@
+/**
+ * Page-level screenshot (kind='page_level') characterization.
+ * Source assertions + pure build/validate functions. No MySQL / browser required.
+ */
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  buildScreenshotEntries,
+  buildV3Properties,
+  validatePageLevelCoverage,
+  pageKeyFromRegionId,
+  popupKeyFromRegionId,
+} from '../../src/services/transaction-export-v3.js';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const ok = (n) => console.log(`ok: ${n}`);
+
+{
+  const src = readFileSync(join(root, 'migrations/20260819000002_screenshot_page_level.js'), 'utf8');
+  assert.match(src, /page_level/);
+  assert.match(src, /level_type/);
+  assert.match(src, /level_key/);
+  assert.match(src, /parent_level_key/);
+  assert.match(src, /uk_ss_level_key/);
+  ok('migration page_level cues');
+}
+
+{
+  const sql = readFileSync(join(root, 'schemas/init.sql'), 'utf8');
+  assert.match(sql, /page_level/);
+  assert.match(sql, /level_type/);
+  assert.match(sql, /level_key/);
+  assert.match(sql, /parent_level_key/);
+  assert.match(sql, /uk_ss_level_key/);
+  ok('init.sql page_level cues');
+}
+
+{
+  const dao = readFileSync(join(root, 'src/dao/screenshot-dao.js'), 'utf8');
+  assert.match(dao, /replacePageLevel/);
+  assert.match(dao, /findPageLevel/);
+  assert.match(dao, /listPageLevelByTrajectory/);
+  const svc = readFileSync(join(root, 'src/services/screenshot-service.js'), 'utf8');
+  assert.match(svc, /replacePageLevelScreenshot/);
+  assert.match(svc, /listPageLevelScreenshotsByTrajectory/);
+  ok('dao/service page_level functions');
+}
+
+{
+  const persist = readFileSync(join(root, 'src/routes/browser-session/persist-live.js'), 'utf8');
+  assert.match(persist, /applyPageLevelScreenshot/);
+  assert.match(persist, /replacePageLevelScreenshot/);
+  const executor = readFileSync(join(root, 'src/routes/browser-session/executor-events.js'), 'utf8');
+  assert.match(executor, /page_level_screenshot/);
+  const global = readFileSync(join(root, 'src/routes/browser-session/global-browser.js'), 'utf8');
+  assert.match(global, /page_level_screenshot/);
+  const runner = readFileSync(join(root, 'src/services/trajectory/trajectory-recording-runner.js'), 'utf8');
+  assert.match(runner, /page_level_screenshot/);
+  const route = readFileSync(join(root, 'src/routes/v2/export-mgmt.js'), 'utf8');
+  const v3Start = route.indexOf('async function maybePushSingleV3');
+  const coverageStart = route.indexOf('validatePageLevelCoverage', v3Start);
+  assert.ok(v3Start >= 0 && coverageStart >= v3Start, 'V3 route coverage validation lives in maybePushSingleV3');
+  ok('node event fan-out page_level_screenshot');
+}
+
+{
+  const pageKey = 'page:http://test/#/corp/custManage';
+  const popupKey = `${pageKey}|dialog:地址选择器`;
+  const { entries, idByPageLevel, pageLevelById } = buildScreenshotEntries({
+    traj: { id: 99 },
+    phases: [],
+    pageLevelScreenshots: [
+      { levelType: 'page', levelKey: pageKey, imageUrl: 'http://minio/page.png', metadataJson: { displayName: '对公客户管理' } },
+      { levelType: 'popup', levelKey: popupKey, parentLevelKey: pageKey, imageUrl: 'http://minio/dialog.png', metadataJson: { displayName: '地址选择器', dialogTitle: '地址选择器', popupRect: { x1: 100, y1: 200, x2: 500, y2: 600 } } },
+    ],
+  });
+  assert.equal(entries.length, 2);
+  const page = entries.find((e) => e.type === 'page');
+  const dialog = entries.find((e) => e.type === 'dialog');
+  assert.equal(page.regionId, pageKey);
+  assert.equal(dialog.regionId, popupKey);
+  assert.equal(dialog.propertiesPID, page.propertiesID);
+  assert.deepEqual(dialog.rect, { x1: 100, y1: 200, x2: 500, y2: 600 });
+  assert.equal(idByPageLevel.get(pageKey), Number(page.propertiesID));
+
+  const { properties } = buildV3Properties({
+    traj: {
+      id: 99,
+      steps: [
+        { stepNumber: 1, actionType: 'fill_form_field', source: 'agent', elementJson: { tag: 'input', target_kind: 'form_input', formLabel: '产品名称', region_id: `${pageKey}|card:产品目录`, page_bbox: { x1: 10, y1: 20, x2: 200, y2: 40 } }, paramsJson: {} },
+        { stepNumber: 2, actionType: 'select_option', source: 'agent', elementJson: { tag: 'input', target_kind: 'form_select', formLabel: '省份', region_id: `${popupKey}|overlay:地址选择器`, page_bbox: { x1: 120, y1: 220, x2: 320, y2: 240 } }, paramsJson: {} },
+      ],
+    },
+    screenshotCount: entries.length,
+    idByPageLevel,
+    pageLevelById,
+    idByDialog: new Map(),
+    idByPhase: new Map(),
+  });
+  assert.equal(properties.length, 2);
+  assert.equal(properties[0].propertiesPID, page.propertiesID);
+  assert.equal(properties[1].propertiesPID, dialog.propertiesID);
+  assert.deepEqual(properties[1].rect, { x1: 20, y1: 20, x2: 220, y2: 40 });
+
+  const covered = validatePageLevelCoverage({ transcationProperties: [...entries, ...properties] });
+  assert.equal(covered.ok, true);
+  const missing = validatePageLevelCoverage({ transcationProperties: [...entries, { ...properties[0], propertiesPID: '0' }] });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.missing.length, 1);
+
+  assert.equal(pageKeyFromRegionId(`${pageKey}|card:产品目录`), pageKey);
+  assert.equal(popupKeyFromRegionId(`${popupKey}|overlay:地址选择器`), popupKey);
+  ok('pure page-level build/validate/coordinates');
+}
+
+console.log('characterize-page-level-screenshot: ok');

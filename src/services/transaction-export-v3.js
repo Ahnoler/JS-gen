@@ -92,6 +92,23 @@ export function isOverlayRegion(regionId) {
   return null;
 }
 
+/** 从 region_id 链提取页面 key（第一段 page:...）。 */
+export function pageKeyFromRegionId(regionId) {
+  const rid = String(regionId || '').trim();
+  if (!rid) return '';
+  const first = rid.split('|').map((s) => s.trim()).filter(Boolean)[0] || '';
+  return first.startsWith('page:') ? first : '';
+}
+
+/** 从 region_id 链提取弹窗 key（前两段 page:...|dialog:...）。 */
+export function popupKeyFromRegionId(regionId) {
+  const rid = String(regionId || '').trim();
+  if (!rid) return '';
+  const segs = rid.split('|').map((s) => s.trim()).filter(Boolean);
+  if (segs.length < 2 || !segs[0].startsWith('page:') || !segs[1].startsWith('dialog:')) return '';
+  return `${segs[0]}|${segs[1]}`;
+}
+
 function parseJson(raw) {
   if (raw == null) return null;
   if (typeof raw === 'object') return raw;
@@ -117,23 +134,93 @@ function isLegalRect(bbox) {
 
 /**
  * 构建截图 properties 条目（与控件步骤条目同构，合并进 transcationProperties）。
- * 页面截图来自 phase_highlight；弹窗截图由后续开发传入 dialogScreenshots。
+ * 优先使用页面级截图（kind='page_level'）；未重录数据回退 phase_highlight +
+ * dialogScreenshots 旧链路。
  *
  * 每个条目的 `screenshot` 数组含一个永久有效的直链（MinIO 公网，bucket 已设公开读策略，
  * 匿名可访问）。消费方直接用该 URL 访问图片，无需 MinIO SDK、无需自建预签名。
  * 拿不到 URL 的截图（本地暂存未上传且无公网直链兜底）会被跳过（其 id 不占号，后续顺延）。
  *
- * @returns {{ entries: Array, idByPhase: Map<number,number>, idByDialog: Map<string,number> }}
- *   entries      — 截图 properties 条目数组（同构于控件条目）
- *   idByPhase    — Map<phaseId, entryId>，供页面控件 pid 引用
- *   idByDialog   — Map<dialogKey, entryId>，供弹窗控件 pid 引用
+ * @returns {{ entries: Array, idByPhase: Map<number,number>, idByDialog: Map<string,number>, idByPageLevel: Map<string,number>, pageLevelById: Map<string,object> }}
+ *   entries         — 截图 properties 条目数组（同构于控件条目）
+ *   idByPhase       — 旧链路 phaseId → entryId
+ *   idByDialog      — dialog 标题（含页面作用域 key）→ entryId
+ *   idByPageLevel   — pageKey/popupKey → entryId
+ *   pageLevelById   — entryId → 截图条目（弹窗 rect 换算用）
  */
 export function buildScreenshotEntries({
   traj = {},
   phases = [],
   phaseScreenshots = [],
   dialogScreenshots = [],
+  pageLevelScreenshots = [],
 } = {}) {
+  const entries = [];
+  const idByPhase = new Map();
+  const idByDialog = new Map();
+  const idByPageLevel = new Map();
+  const pageLevelById = new Map();
+  let nextId = 1;
+
+  const pageLevels = Array.isArray(pageLevelScreenshots) ? pageLevelScreenshots : [];
+  if (pageLevels.length) {
+    // 新链路：页面级截图（kind='page_level'）。一个 page/popup 一个条目。
+    for (const shot of pageLevels) {
+      const url = resolveScreenshotUrl(shot);
+      if (!url) continue; // 本地暂存未上传，跳过
+      const meta = shot.metadataJson || {};
+      const levelType = shot.levelType === 'popup' ? 'popup' : 'page';
+      const levelKey = String(shot.levelKey || meta.levelKey || '').trim();
+      if (!levelKey) continue;
+      const parentKey = String(shot.parentLevelKey || meta.parentLevelKey || '').trim();
+      const entryId = nextId;
+      nextId += 1;
+      const rawRect = levelType === 'popup'
+        ? (meta.popupRect || meta.rect || shot.rect || {})
+        : {};
+      const rect = isLegalRect(rawRect)
+        ? {
+            x1: Number(rawRect.x1),
+            y1: Number(rawRect.y1),
+            x2: Number(rawRect.x2),
+            y2: Number(rawRect.y2),
+          }
+        : {};
+      const parentId = parentKey ? idByPageLevel.get(parentKey) : null;
+      const entry = {
+        propertiesName: String(meta.displayName || shot.name || (levelType === 'popup' ? '弹窗' : '页面')).trim(),
+        eventTypeValue: 'click',
+        eventTypeName: '点击',
+        elementType: '',
+        mothed: '',
+        options: '',
+        objectValue: '',
+        transcationType: 'playwright',
+        type: levelType === 'popup' ? 'dialog' : 'page',
+        screenshot: [url],
+        propertiesID: String(entryId),
+        propertiesPID: parentId != null ? String(parentId) : '0',
+        realLabel: '',
+        regionId: levelKey,
+        regionLabel: String(meta.displayName || shot.name || '').trim(),
+        rect,
+      };
+      entries.push(entry);
+      idByPageLevel.set(levelKey, entryId);
+      pageLevelById.set(String(entryId), entry);
+      if (levelType === 'popup') {
+        const title = String(meta.dialogTitle || shot.name || '').trim();
+        if (title) {
+          const scopedTitleKey = parentKey ? `${parentKey}|dialog:${title}` : `dialog:${title}`;
+          idByDialog.set(scopedTitleKey, entryId);
+          if (!idByDialog.has(title)) idByDialog.set(title, entryId);
+        }
+      }
+    }
+    return { entries, idByPhase, idByDialog, idByPageLevel, pageLevelById };
+  }
+
+  // 旧链路（phase_highlight + 步骤弹窗截图）保留，兼容未重录数据。
   const shotByPhase = new Map();
   for (const s of phaseScreenshots || []) {
     if (s?.trajectoryPhaseId != null && !shotByPhase.has(Number(s.trajectoryPhaseId))) {
@@ -141,13 +228,6 @@ export function buildScreenshotEntries({
     }
   }
 
-  const entries = [];
-  const idByPhase = new Map();
-  const idByDialog = new Map();
-  let nextId = 1;
-
-  // 弹窗截图行只有 trajectory_step_id，没有 trajectory_phase_id；
-  // 通过 traj.steps 建立 stepId -> phaseId 映射，用于把弹窗挂到所属页面截图下。
   const stepPhaseById = new Map();
   for (const s of traj.steps || []) {
     if (s.id != null && s.trajectoryPhaseId != null) {
@@ -164,11 +244,11 @@ export function buildScreenshotEntries({
     const shot = shotByPhase.get(phaseId) || null;
     if (!shot) continue;
     const url = resolveScreenshotUrl(shot);
-    if (!url) continue; // 本地暂存未上传且无公网直链兜底，跳过
+    if (!url) continue;
     const desc = String(phase.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 20);
     const entryId = nextId;
     nextId += 1;
-    entries.push({
+    const entry = {
       propertiesName: `页面${phaseNumber}${desc ? ` · ${desc}` : ''}`,
       eventTypeValue: 'click',
       eventTypeName: '点击',
@@ -185,28 +265,32 @@ export function buildScreenshotEntries({
       regionId: '',
       regionLabel: '',
       rect: {},
-    });
+    };
+    entries.push(entry);
+    pageLevelById.set(String(entryId), entry);
     idByPhase.set(phaseId, entryId);
   }
 
   for (const dlg of dialogScreenshots || []) {
     const meta = dlg.metadataJson || {};
-    // 映射键用弹窗标题（name/dialogTitle），与 buildV3Properties 里从控件 region_id
-    // 解析出的 overlay.label 对齐（控件侧只能拿到弹窗标题，拿不到完整 dialogKey）。
     const name = dlg.name || meta.dialogTitle || '';
     const url = resolveScreenshotUrl(dlg);
-    if (!url) continue; // 本地暂存未上传，跳过
+    if (!url) continue;
     const entryId = nextId;
     nextId += 1;
     const stepId = dlg.trajectoryStepId != null ? Number(dlg.trajectoryStepId) : null;
     const phaseId = stepId != null ? stepPhaseById.get(stepId) : null;
     const parentPageId = phaseId != null ? idByPhase.get(phaseId) : null;
     const rawRect = meta?.rect || dlg.rect || {};
-    const dlgRect = Number.isFinite(Number(rawRect?.x1)) && Number.isFinite(Number(rawRect?.y1))
-      && Number.isFinite(Number(rawRect?.x2)) && Number.isFinite(Number(rawRect?.y2))
-      ? { x1: Number(rawRect.x1), y1: Number(rawRect.y1), x2: Number(rawRect.x2), y2: Number(rawRect.y2) }
+    const rect = isLegalRect(rawRect)
+      ? {
+          x1: Number(rawRect.x1),
+          y1: Number(rawRect.y1),
+          x2: Number(rawRect.x2),
+          y2: Number(rawRect.y2),
+        }
       : {};
-    entries.push({
+    const entry = {
       propertiesName: name || 'overlay',
       eventTypeValue: 'click',
       eventTypeName: '点击',
@@ -222,12 +306,14 @@ export function buildScreenshotEntries({
       realLabel: '',
       regionId: '',
       regionLabel: '',
-      rect: dlgRect,
-    });
+      rect,
+    };
+    entries.push(entry);
+    pageLevelById.set(String(entryId), entry);
     if (name) idByDialog.set(name, entryId);
   }
 
-  return { entries, idByPhase, idByDialog };
+  return { entries, idByPhase, idByDialog, idByPageLevel, pageLevelById };
 }
 
 /**
@@ -245,6 +331,8 @@ export function buildV3Properties({
   screenshotCount = 0,
   idByPhase,
   idByDialog,
+  idByPageLevel,
+  pageLevelById,
 } = {}) {
   const properties = [];
   let metaActions = 0;
@@ -270,14 +358,30 @@ export function buildV3Properties({
     const el = parseStepElement(step);
     const phaseId = step.trajectoryPhaseId != null ? Number(step.trajectoryPhaseId) : null;
     const phase = phaseId != null ? phaseById.get(phaseId) : null;
-    const overlay = el ? isOverlayRegion(String(el.region_id ?? '').trim()) : null;
+    const rawRegionId = el ? String(el.region_id ?? '').trim() : '';
+    const overlay = isOverlayRegion(rawRegionId);
+
+    const pageKey = el
+      ? String(el.page_level_key || el.pageLevelKey || pageKeyFromRegionId(rawRegionId)).trim()
+      : '';
+    const popupKey = el
+      ? String(el.popup_level_key || el.popupLevelKey || popupKeyFromRegionId(rawRegionId)).trim()
+      : '';
 
     // pid 指向所属截图条目的 id（字符串）：弹窗控件→弹窗截图，否则→页面截图；找不到给 "0"
     let pid = '0';
-    if (overlay) {
+    if (popupKey && idByPageLevel?.has(popupKey)) {
+      pid = String(idByPageLevel.get(popupKey));
+    }
+    if (pid === '0' && overlay) {
       const title = overlay.label || 'overlay';
-      const found = idByDialog?.get(title);
+      const scopedTitleKey = pageKey ? `${pageKey}|dialog:${title}` : '';
+      const found = (scopedTitleKey && idByDialog?.get(scopedTitleKey))
+        || idByDialog?.get(title);
       pid = found != null ? String(found) : '0';
+    }
+    if (pid === '0' && pageKey && idByPageLevel?.has(pageKey)) {
+      pid = String(idByPageLevel.get(pageKey));
     }
     if (pid === '0' && phaseId != null) {
       const found = idByPhase?.get(phaseId);
@@ -289,13 +393,35 @@ export function buildV3Properties({
 
     let rect = {};
     if (el) {
-      if (isLegalRect(el.bbox)) {
+      // 页面级截图使用 document 坐标；新录制有 page_bbox 时优先用它，旧数据回退 bbox
+      const usePageCoords = !!(idByPageLevel && idByPageLevel.size > 0);
+      const sourceBBox = usePageCoords && el.page_bbox && isLegalRect(el.page_bbox)
+        ? el.page_bbox
+        : el.bbox;
+      if (isLegalRect(sourceBBox)) {
         rect = {
-          x1: Number(el.bbox.x1), y1: Number(el.bbox.y1),
-          x2: Number(el.bbox.x2), y2: Number(el.bbox.y2),
+          x1: Number(sourceBBox.x1), y1: Number(sourceBBox.y1),
+          x2: Number(sourceBBox.x2), y2: Number(sourceBBox.y2),
         };
+        // 弹窗控件 bbox 是页面长图坐标；V3 要求相对弹窗截图，减去弹窗在页面上的 rect
+        if (popupKey) {
+          const dialogEntry = pageLevelById?.get(pid);
+          const popupRect = dialogEntry?.rect;
+          if (isLegalRect(popupRect)) {
+            rect = {
+              x1: rect.x1 - Number(popupRect.x1),
+              y1: rect.y1 - Number(popupRect.y1),
+              x2: rect.x2 - Number(popupRect.x1),
+              y2: rect.y2 - Number(popupRect.y1),
+            };
+          }
+        }
       } else {
         noRectControls += 1;
+      }
+      let regionId = rawRegionId;
+      if (pageKey && !regionId.startsWith(pageKey)) {
+        regionId = pageKey + (regionId ? '|' + regionId : '');
       }
       const node = {
         ...publicEv,
@@ -304,7 +430,7 @@ export function buildV3Properties({
         propertiesID: String(nextId),
         propertiesPID: pid,
         realLabel: label,
-        regionId: String(el.region_id ?? '').trim(),
+        regionId,
         regionLabel: String(el.region_label ?? '').trim(),
         rect,
       };
@@ -339,6 +465,33 @@ export function buildV3Properties({
 }
 
 /**
+ * 页面级截图覆盖校验：每个 ele 必须能找到 type=page/dialog 的父截图条目。
+ * @returns {{ ok: boolean, missing: Array }}
+ */
+export function validatePageLevelCoverage(entry) {
+  const props = Array.isArray(entry?.transcationProperties) ? entry.transcationProperties : [];
+  const shotIds = new Set(
+    props
+      .filter((p) => p.type === 'page' || p.type === 'dialog')
+      .map((p) => String(p.propertiesID ?? '')),
+  );
+  const missing = [];
+  for (const p of props) {
+    if (p.type !== 'ele') continue;
+    const pid = String(p.propertiesPID ?? '');
+    if (!pid || pid === '0' || !shotIds.has(pid)) {
+      missing.push({
+        propertiesID: p.propertiesID || '',
+        propertiesPID: pid,
+        propertiesName: p.propertiesName || '',
+        regionId: p.regionId || '',
+      });
+    }
+  }
+  return { ok: missing.length === 0, missing };
+}
+
+/**
  * Build one V3 transaction entry.
  * 截图条目（buildScreenshotEntries）与控件条目（buildV3Properties）合并成一个
  * transcationProperties 数组：截图在前，控件在后，统一 schema。
@@ -350,6 +503,7 @@ export function buildTransactionEntryV3(traj, {
   phases,
   phaseScreenshots,
   dialogScreenshots,
+  pageLevelScreenshots,
 } = {}) {
   if (systemId == null || systemId === '' || projectId == null || projectId === '') {
     const err = new Error('systemId and projectId are required');
@@ -357,11 +511,18 @@ export function buildTransactionEntryV3(traj, {
     throw err;
   }
 
-  const { entries: screenshotEntries, idByPhase, idByDialog } = buildScreenshotEntries({
+  const {
+    entries: screenshotEntries,
+    idByPhase,
+    idByDialog,
+    idByPageLevel,
+    pageLevelById,
+  } = buildScreenshotEntries({
     traj,
     phases,
     phaseScreenshots,
     dialogScreenshots,
+    pageLevelScreenshots,
   });
 
   const {
@@ -376,6 +537,8 @@ export function buildTransactionEntryV3(traj, {
     screenshotCount: screenshotEntries.length,
     idByPhase,
     idByDialog,
+    idByPageLevel,
+    pageLevelById,
   });
 
   // 合并：截图在前，控件在后；一起参与 propertiesName 去重
@@ -385,19 +548,27 @@ export function buildTransactionEntryV3(traj, {
   const id = traj.id != null ? String(traj.id) : '';
   const name = String(traj.name || '').trim() || `trajectory-${id}`;
 
+  const entry = {
+    transcId: id,
+    transcationName: name,
+    systemId: String(systemId),
+    projectId: String(projectId),
+    transcationType: 'web',
+    testFrame: 'playwright',
+    transcationProperties: properties,
+  };
+  const coverage = validatePageLevelCoverage(entry);
   return {
-    entry: {
-      transcId: id,
-      transcationName: name,
-      systemId: String(systemId),
-      projectId: String(projectId),
-      transcationType: 'web',
-      testFrame: 'playwright',
-      transcationProperties: properties,
-    },
+    entry,
     count: properties.length,
     skipped: { metaActions },
-    stats: { absoluteFallback, missingOptions, noRectControls },
+    stats: {
+      absoluteFallback,
+      missingOptions,
+      noRectControls,
+      missingPageLevelScreenshots: coverage.missing.length,
+      missingPageLevelKeys: coverage.missing.map((m) => m.regionId || m.propertiesPID).filter(Boolean),
+    },
   };
 }
 
@@ -428,6 +599,8 @@ export function wrapTransactionListV3(builtEntries = []) {
   let absoluteFallback = 0;
   let missingOptions = 0;
   let noRectControls = 0;
+  let missingPageLevelScreenshots = 0;
+  const missingPageLevelKeys = [];
 
   for (const b of builtEntries) {
     if (!b?.entry) continue;
@@ -437,6 +610,10 @@ export function wrapTransactionListV3(builtEntries = []) {
     absoluteFallback += Number(b.stats?.absoluteFallback) || 0;
     missingOptions += Number(b.stats?.missingOptions) || 0;
     noRectControls += Number(b.stats?.noRectControls) || 0;
+    missingPageLevelScreenshots += Number(b.stats?.missingPageLevelScreenshots) || 0;
+    for (const key of b.stats?.missingPageLevelKeys || []) {
+      if (key && !missingPageLevelKeys.includes(key)) missingPageLevelKeys.push(key);
+    }
   }
 
   return {
@@ -445,6 +622,12 @@ export function wrapTransactionListV3(builtEntries = []) {
     },
     count,
     skipped: { metaActions },
-    stats: { absoluteFallback, missingOptions, noRectControls },
+    stats: {
+      absoluteFallback,
+      missingOptions,
+      noRectControls,
+      missingPageLevelScreenshots,
+      missingPageLevelKeys,
+    },
   };
 }

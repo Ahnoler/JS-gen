@@ -586,6 +586,7 @@ a:hover { text-decoration: underline; }
 }
 .ps-badge-before { background: #e0f2fe; color: #0369a1; }
 .ps-badge-after { background: #dcfce7; color: #15803d; }
+.ps-badge-page_level { background: #fff0f6; color: #c41d7f; }
 .ps-badge-phase_highlight { background: #ede9fe; color: #6d28d9; }
 .ps-badge-unknown { background: #f3f4f6; color: #6b7280; }
 

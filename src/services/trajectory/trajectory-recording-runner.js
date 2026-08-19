@@ -63,6 +63,11 @@ async function flushPendingStepScreenshot(...args) {
   return mod.flushPendingStepScreenshot(...args);
 }
 
+async function applyPageLevelScreenshot(...args) {
+  const mod = await import('../../routes/browser-session/persist-live.js');
+  return mod.applyPageLevelScreenshot(...args);
+}
+
 export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, accountId = null } = {}) {
   const tid = Number(trajectoryId);
   const runtime = getTrajectoryRuntime(tid);
@@ -146,7 +151,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   // which focuses on manual/cdp (+ optional agent autoPersist). Both must handle
   // step_screenshot or AI-recording shots would be dropped.
   const unsubscribe = execSession.subscribeSessionEvents(runtime.sessionId, (type, payload) => {
-    if (type === 'action_log_sync' || type === 'step_screenshot') {
+    if (type === 'action_log_sync' || type === 'step_screenshot' || type === 'page_level_screenshot') {
       try { phaseActivity?.(); } catch {}
     }
     const work = (async () => {
@@ -173,6 +178,12 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         dialogMeta: payload?.dialogMeta,
         trajectoryId: tid,
       }).catch((err) => console.warn('[record] step_screenshot failed:', err?.message || err));
+      return;
+    }
+    if (type === 'page_level_screenshot') {
+      await applyPageLevelScreenshot(tid, payload).catch((err) => {
+        console.warn('[record] page_level_screenshot failed:', err?.message || err);
+      });
       return;
     }
     if (type !== 'action_log_sync') return;
@@ -257,7 +268,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       }
     }
     })();
-    if (type === 'action_log_sync' || type === 'step_screenshot') {
+    if (type === 'action_log_sync' || type === 'step_screenshot' || type === 'page_level_screenshot') {
       runtime._persistDrain = Promise.resolve(runtime._persistDrain)
         .catch(() => {})
         .then(() => work)

@@ -610,6 +610,19 @@ export const PAGE_LOCATOR_HELPERS = `
         y2: Math.round(r.bottom + root.scrollTop - box.y),
       };
     }
+    function documentBBoxOf(el) {
+      if (!el || !el.getBoundingClientRect) return null;
+      const doc = document.scrollingElement || document.documentElement;
+      const sx = doc ? (doc.scrollLeft || 0) : 0;
+      const sy = doc ? (doc.scrollTop || 0) : 0;
+      const r = el.getBoundingClientRect();
+      return {
+        x1: Math.round(r.left + sx),
+        y1: Math.round(r.top + sy),
+        x2: Math.round(r.right + sx),
+        y2: Math.round(r.bottom + sy),
+      };
+    }
     function buildFeatureCard(el, regionHint) {
       var region = regionHint || assignRegion(el);
       var cls = String((el && el.getAttribute && el.getAttribute('class')) || '').trim();
@@ -1624,6 +1637,7 @@ export const PAGE_LOCATOR_HELPERS = `
       region_block: region.region_block,
       layers: region.layers || [],
       feature_card: buildFeatureCard(host, region),
+      page_bbox: documentBBoxOf(host) || undefined,
     };
   }
 `;

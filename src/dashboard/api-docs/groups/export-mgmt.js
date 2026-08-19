@@ -218,11 +218,12 @@ export const GROUP_EXPORT = [
         notes: [
           'payload 只含 transcationEventTypeList（顶层无 screenshots）',
           'transcationProperties 统一 schema，截图条目与控件步骤条目同构；用 type 字段区分条目种类：page=页面截图、dialog=弹窗截图、ele=控件步骤',
+          '截图条目现在按页面级（page/popup）输出：page.regionId=pageKey，dialog.regionId=popupKey，dialog.propertiesPID 指向所属 page 截图条目；不再按 phase 输出 goal 长图',
           '截图条目：eventTypeValue=click、eventTypeName=点击、elementType="、"mothed=空、type=page/dialog、screenshot=[MinIO 永久直链]数组；page.rect={}，dialog.rect=弹窗在页面长图上的位置（可选，有值才用于前端叠加展示）',
           '控件步骤条目：eventTypeValue=click/input/...、elementType=xpath、mothed=By.XPATH、type=ele、screenshot=[]空数组、rect=坐标或{}；弹窗内控件 rect 相对弹窗截图',
           'propertiesID 为字符串顺序号（截图先占 "1".."N"，控件续接 "N+1"..）；propertiesPID=所属截图条目的 id（字符串，控件→截图关联键）；page 截图 propertiesPID="0"（无父），dialog 截图 propertiesPID=所属 page 截图 id',
           'rect/realLabel/regionId/regionLabel/screenshot 统一恒有（无值给 {}/""/[]）；无 scanIndex、无 id/pid/label（改 propertiesID/propertiesPID/realLabel，均为字符串）',
-          '弹窗独立截图：录制时实时采集，复用 screenshot 表并标记 metadata_json.dialog=true；V3 输出 type=dialog 的截图条目，并通过 propertiesPID 挂到所属页面下',
+          '页面级截图覆盖校验：每个 ele 必须有父截图条目；缺失时单条 push 返回 409 code=page_level_screenshot_missing，批量推送整批失败并列出 missingPageLevelScreenshots',
         ],
       },
     ],

@@ -367,6 +367,7 @@ JS_CAPTURE_FROM_XPATH = (
     region_label: reg.region_label || '',
     layers: Array.isArray(reg.layers) ? reg.layers : [],
     bbox: stepBBoxOf(host),
+    page_bbox: documentBBoxOf(host),
     candidates: [
       ...(smart ? [{ type: 'xpath_smart', value: smart }] : []),
       ...(abs ? [{ type: 'xpath_full', value: abs }] : []),

@@ -9,12 +9,19 @@ for external callers (session_runner, recorder, agent_utils).
 from .models import ActionEntry
 import base64
 import re
+from urllib.parse import urlsplit
 
 _ACTION_LOG: list[dict] = []
 _TRAJECTORY_URL: str | None = None
 _CURRENT_PHASE: int = 0
 _CURRENT_SOURCE: str = 'agent'
 _CAPTURE_SCREENSHOTS: bool = False
+
+# Page-level screenshot registry: level_key -> snapshot dict.
+# Keys are pageKey (`page:<origin><path>#<hash>`) and popupKey
+# (`pageKey|dialog:<title>@@anchor:<xpath>`).
+_PAGE_LEVEL_SHOTS: dict[str, dict] = {}
+_CURRENT_PAGE_KEY: str = ''
 
 # Actions that never become replay steps — skip before/after capture.
 # Shared with scripts/script_assembler.py (imported there).
@@ -56,6 +63,12 @@ def set_current_phase(n: int):
     _CURRENT_PHASE = n
 
 
+def set_current_page_key(page_key: str):
+    """Set the page-level key for subsequently recorded actions."""
+    global _CURRENT_PAGE_KEY
+    _CURRENT_PAGE_KEY = page_key or ''
+
+
 def set_current_source(source: str):
     """Set recording source for subsequent _record_action calls (agent|manual|cdp)."""
     global _CURRENT_SOURCE
@@ -66,6 +79,13 @@ def set_capture_screenshots(enabled: bool):
     """Enable/disable per-step before/after page.screenshot capture."""
     global _CAPTURE_SCREENSHOTS
     _CAPTURE_SCREENSHOTS = bool(enabled)
+
+
+def reset_page_level_shots():
+    """Clear the page-level screenshot registry when a recording session (re)starts."""
+    global _PAGE_LEVEL_SHOTS, _CURRENT_PAGE_KEY
+    _PAGE_LEVEL_SHOTS = {}
+    _CURRENT_PAGE_KEY = ''
 
 
 def capture_screenshots_enabled() -> bool:
@@ -104,6 +124,184 @@ async def capture_page_png_b64_from_page(page, *, full_page: bool = True) -> str
 
 
 
+def page_level_key_from_url(url: str) -> str:
+    """Build a stable page key for SPA navigation.
+
+    Keeps origin + path + hash route (SPA page identity); drops query params
+    because they are usually volatile (timestamps, tokens, pagination state).
+    """
+    try:
+        parts = urlsplit(url or '')
+        base = f'{parts.scheme}://{parts.netloc}{parts.path}'.rstrip('/')
+        if not base or base == '://':
+            return ''
+        key = f'page:{base}'
+        if parts.fragment:
+            key += f'#{parts.fragment}'
+        return key
+    except Exception:
+        return f'page:{url or ""}'
+
+
+async def current_page_level(browser_context):
+    """Return (page_key, display_name) for the current page."""
+    try:
+        page = await browser_context.get_current_page()
+        if page is None:
+            return '', ''
+        target = getattr(page, 'page', page)
+        url = target.url or ''
+        key = page_level_key_from_url(url)
+        try:
+            title = (await target.title()).strip()
+        except Exception:
+            title = ''
+        return key, title or key
+    except Exception:
+        return '', ''
+
+
+def _register_page_level_shot(
+    *,
+    level_type: str,
+    level_key: str,
+    parent_level_key: str | None,
+    display_name: str,
+    png_b64: str,
+    meta: dict | None,
+) -> None:
+    if not level_key or not png_b64:
+        return
+    snapshot = {
+        'levelType': level_type,
+        'levelKey': level_key,
+        'parentLevelKey': parent_level_key or '',
+        'displayName': display_name or level_key,
+        'pngBase64': png_b64,
+        'meta': meta or {},
+    }
+    _PAGE_LEVEL_SHOTS[level_key] = snapshot
+
+
+def _emit_page_level_screenshot(snapshot: dict) -> None:
+    try:
+        from .agent_utils import emit_json
+        emit_json({
+            'event': 'page_level_screenshot',
+            'data': snapshot,
+        })
+    except Exception:
+        pass
+
+
+async def register_current_page_screenshot(browser_context, *, png_b64: str | None = None) -> str:
+    """Register (or replace) a page-level screenshot for the current page."""
+    key, name = await current_page_level(browser_context)
+    if not key:
+        return ''
+    if not png_b64:
+        png_b64 = await capture_page_png_b64(browser_context, full_page=True)
+    if not png_b64:
+        return ''
+    _register_page_level_shot(
+        level_type='page',
+        level_key=key,
+        parent_level_key=None,
+        display_name=name,
+        png_b64=png_b64,
+        meta={'phaseNumber': _CURRENT_PHASE, 'capturedAt': 'phase-end'},
+    )
+    _emit_page_level_screenshot(_PAGE_LEVEL_SHOTS[key])
+    return key
+
+
+async def register_page_screenshot_if_changed(
+    browser_context,
+    *,
+    before_key: str = '',
+    before_name: str = '',
+    before_b64: str | None = None,
+) -> tuple[str, str]:
+    """Called after an action: if navigation changed the page, persist the pre-navigation page screenshot.
+
+    Returns the post-action (page_key, page_name).
+    """
+    global _CURRENT_PAGE_KEY
+    after_key, after_name = await current_page_level(browser_context)
+    if before_key and before_b64 and before_key != after_key:
+        _register_page_level_shot(
+            level_type='page',
+            level_key=before_key,
+            parent_level_key=None,
+            display_name=before_name,
+            png_b64=before_b64,
+            meta={'phaseNumber': _CURRENT_PHASE, 'capturedAt': 'before-leave'},
+        )
+        _emit_page_level_screenshot(_PAGE_LEVEL_SHOTS.get(before_key))
+    if after_key:
+        _CURRENT_PAGE_KEY = after_key
+        if after_key not in _PAGE_LEVEL_SHOTS and before_key == after_key and before_b64:
+            _register_page_level_shot(
+                level_type='page',
+                level_key=after_key,
+                parent_level_key=None,
+                display_name=after_name,
+                png_b64=before_b64,
+                meta={'phaseNumber': _CURRENT_PHASE, 'capturedAt': 'after-action'},
+            )
+            _emit_page_level_screenshot(_PAGE_LEVEL_SHOTS[after_key])
+    return after_key, after_name
+
+
+async def register_popup_screenshot(
+    browser_context,
+    *,
+    page_key: str,
+    dialog_title: str,
+    anchor_xpath: str,
+    dialog_b64: str,
+    dialog_meta: dict | None = None,
+) -> str:
+    """Register one popup-level screenshot per popup key."""
+    if not page_key or not dialog_b64:
+        return ''
+    title = (dialog_title or 'overlay').replace(r'\s+', ' ').strip()[:40]
+    anchor = (anchor_xpath or '').strip()
+    popup_key = f'{page_key}|dialog:{title}'
+    if anchor:
+        popup_key += f'@@anchor:{anchor}'
+    meta = dict(dialog_meta or {})
+    meta.setdefault('phaseNumber', _CURRENT_PHASE)
+    meta['capturedAt'] = meta.get('capturedAt') or 'dialog-open'
+    _register_page_level_shot(
+        level_type='popup',
+        level_key=popup_key,
+        parent_level_key=page_key,
+        display_name=title,
+        png_b64=dialog_b64,
+        meta=meta,
+    )
+    _emit_page_level_screenshot(_PAGE_LEVEL_SHOTS[popup_key])
+    return popup_key
+
+
+def _last_anchor_xpath_for_overlay() -> str:
+    """Infer the most recent pre-dialog click step as the popup trigger anchor."""
+    if len(_ACTION_LOG) < 2:
+        return ''
+    for entry in reversed(_ACTION_LOG[:-1]):
+        el = (entry or {}).get('element') or {}
+        action = str((entry or {}).get('action') or '')
+        if not action.startswith('click_'):
+            continue
+        if _is_overlay_region(el.get('region_id') or ''):
+            continue
+        xpath = str(el.get('xpath_smart') or el.get('xpath') or '').strip()
+        if xpath:
+            return xpath
+    return ''
+
+
 async def capture_dialog_png_b64_from_page(page):
     """Capture the first visible dialog from an existing page handle."""
     if not capture_screenshots_enabled() or page is None:
@@ -117,25 +315,15 @@ async def capture_dialog_png_b64_from_page(page):
             try:
                 rect = await loc.evaluate("""
                   (el) => {
-                    const root = document.scrollingElement || document.documentElement;
-                    const cands = document.querySelectorAll('.el-main, .app-main');
-                    let best = null;
-                    for (const c of cands) {
-                      const s = getComputedStyle(c);
-                      const oy = s.overflowY || s.overflow;
-                      if ((oy === 'auto' || oy === 'scroll') && c.scrollHeight > c.clientHeight + 8) {
-                        if (!best || c.scrollHeight > best.scrollHeight) best = c;
-                      }
-                    }
-                    const sc = best || root;
-                    const isDoc = sc === document.scrollingElement || sc === document.documentElement;
-                    const box = isDoc ? { x: 0, y: 0 } : sc.getBoundingClientRect();
+                    const doc = document.scrollingElement || document.documentElement;
+                    const sx = doc ? (doc.scrollLeft || 0) : 0;
+                    const sy = doc ? (doc.scrollTop || 0) : 0;
                     const r = el.getBoundingClientRect();
                     return {
-                      x1: Math.round(r.left - box.x),
-                      y1: Math.round(r.top + sc.scrollTop - box.y),
-                      x2: Math.round(r.right - box.x),
-                      y2: Math.round(r.bottom + sc.scrollTop - box.y),
+                      x1: Math.round(r.left + sx),
+                      y1: Math.round(r.top + sy),
+                      x2: Math.round(r.right + sx),
+                      y2: Math.round(r.bottom + sy),
                     };
                   }
                 """
@@ -158,7 +346,7 @@ async def capture_dialog_png_b64_from_page(page):
                 'phaseNumber': _CURRENT_PHASE,
                 'dialogKey': f'page-{_CURRENT_PHASE}|dialog:{title or "overlay"}',
                 'dialogTitle': title or 'overlay',
-                'anchorXpath': '',
+                'anchorXpath': _last_anchor_xpath_for_overlay(),
                 'rect': rect,
             }
             return b64, meta
@@ -200,25 +388,15 @@ async def capture_dialog_png_b64(browser_context):
             try:
                 rect = await loc.evaluate("""
                   (el) => {
-                    const root = document.scrollingElement || document.documentElement;
-                    const cands = document.querySelectorAll('.el-main, .app-main');
-                    let best = null;
-                    for (const c of cands) {
-                      const s = getComputedStyle(c);
-                      const oy = s.overflowY || s.overflow;
-                      if ((oy === 'auto' || oy === 'scroll') && c.scrollHeight > c.clientHeight + 8) {
-                        if (!best || c.scrollHeight > best.scrollHeight) best = c;
-                      }
-                    }
-                    const sc = best || root;
-                    const isDoc = sc === document.scrollingElement || sc === document.documentElement;
-                    const box = isDoc ? { x: 0, y: 0 } : sc.getBoundingClientRect();
+                    const doc = document.scrollingElement || document.documentElement;
+                    const sx = doc ? (doc.scrollLeft || 0) : 0;
+                    const sy = doc ? (doc.scrollTop || 0) : 0;
                     const r = el.getBoundingClientRect();
                     return {
-                      x1: Math.round(r.left - box.x),
-                      y1: Math.round(r.top + sc.scrollTop - box.y),
-                      x2: Math.round(r.right - box.x),
-                      y2: Math.round(r.bottom + sc.scrollTop - box.y),
+                      x1: Math.round(r.left + sx),
+                      y1: Math.round(r.top + sy),
+                      x2: Math.round(r.right + sx),
+                      y2: Math.round(r.bottom + sy),
                     };
                   }
                 """
@@ -241,7 +419,7 @@ async def capture_dialog_png_b64(browser_context):
                 'phaseNumber': _CURRENT_PHASE,
                 'dialogKey': f'page-{_CURRENT_PHASE}|dialog:{title or "overlay"}',
                 'dialogTitle': title or 'overlay',
-                'anchorXpath': '',
+                'anchorXpath': _last_anchor_xpath_for_overlay(),
                 'rect': rect,
             }
             return b64, meta
@@ -386,6 +564,15 @@ def _record_action(action_name, params, result, element=None, source=None):
     )
 
     dumped = entry.model_dump()
+    if _CURRENT_PAGE_KEY and isinstance(dumped.get('element'), dict):
+        el = dumped['element']
+        el['page_level_key'] = _CURRENT_PAGE_KEY
+        rid = str(el.get('region_id') or '').strip()
+        if not rid.startswith(_CURRENT_PAGE_KEY):
+            el['region_id'] = _CURRENT_PAGE_KEY + (f'|{rid}' if rid else '')
+        overlay = _is_overlay_region(rid)
+        if overlay:
+            el['popup_level_key'] = f"{_CURRENT_PAGE_KEY}|dialog:{overlay['label']}"
     removed_ids: list[str] = []
 
     # Manual only: drop date-picker reopen clicks that echo the just-selected date

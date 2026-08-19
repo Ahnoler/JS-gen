@@ -111,6 +111,36 @@ async function writeShotsForStep(trajectoryStepId, trajectoryId, beforeB64, afte
  * @param {string} entryId ACTION_LOG entry UUID
  * @param {{ before?: string|null, after?: string|null, trajectoryId?: number|null }} shots
  */
+/**
+ * Persist one page-level screenshot (kind='page_level') for V3 page/popup export.
+ * payload: { levelType, levelKey, parentLevelKey, displayName, pngBase64, meta }
+ */
+export async function applyPageLevelScreenshot(trajectoryId, payload) {
+  const trajId = Number(trajectoryId);
+  const buffer = decodeB64(payload?.pngBase64);
+  if (!Number.isFinite(trajId) || trajId <= 0 || !buffer) return null;
+  const meta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
+  const levelKey = String(payload?.levelKey || '').trim();
+  const levelType = payload?.levelType === 'popup' ? 'popup' : 'page';
+  const parentLevelKey = payload?.parentLevelKey ? String(payload.parentLevelKey).trim() : null;
+  if (!levelKey) return null;
+  return screenshotService.replacePageLevelScreenshot({
+    trajectoryId: trajId,
+    levelType,
+    levelKey,
+    parentLevelKey,
+    buffer,
+    mimeType: 'image/png',
+    metadataJson: JSON.stringify({
+      ...meta,
+      levelType,
+      levelKey,
+      parentLevelKey: parentLevelKey || '',
+      displayName: payload?.displayName || levelKey,
+    }),
+  });
+}
+
 export async function stashOrApplyStepScreenshot(ctx, entryId, {
   before = null,
   after = null,

@@ -36,7 +36,11 @@ from ..state import (
     capture_dialog_png_b64,
     capture_page_png_b64,
     capture_screenshots_enabled,
+    current_page_level,
     emit_step_screenshot,
+    register_page_screenshot_if_changed,
+    register_popup_screenshot,
+    set_current_page_key,
     set_current_source,
 )
 from ..agent_utils import emit_json
@@ -332,14 +336,22 @@ class ManualRecorder:
 
     async def _record_mapped_async(self, mapped) -> Optional[dict]:
         """Record + optional before/after screenshots (manual path)."""
+        before_key = ''
+        before_name = ''
         before_b64 = self._pending_before_b64
         self._pending_before_b64 = None
 
-        if capture_screenshots_enabled() and before_b64 is None:
+        if capture_screenshots_enabled():
             try:
-                before_b64 = await capture_page_png_b64(self.browser_context)
+                before_key, before_name = await current_page_level(self.browser_context)
             except Exception:
-                before_b64 = None
+                before_key, before_name = '', ''
+            set_current_page_key(before_key)
+            if before_b64 is None:
+                try:
+                    before_b64 = await capture_page_png_b64(self.browser_context)
+                except Exception:
+                    before_b64 = None
 
         entry = self._record_mapped(mapped)
         if not entry:
@@ -353,6 +365,12 @@ class ManualRecorder:
                 after_b64 = await capture_page_png_b64(self.browser_context)
             except Exception:
                 after_b64 = None
+            after_key, after_name = await register_page_screenshot_if_changed(
+                self.browser_context,
+                before_key=before_key,
+                before_name=before_name,
+                before_b64=before_b64,
+            )
             eid = entry.get('id') if isinstance(entry, dict) else None
             if eid:
                 el = (entry.get('element') or {}) if isinstance(entry, dict) else {}
@@ -360,6 +378,14 @@ class ManualRecorder:
                 dialog_meta = None
                 if _is_overlay_region(el.get('region_id')):
                     dialog_b64, dialog_meta = await capture_dialog_png_b64(self.browser_context)
+                    await register_popup_screenshot(
+                        self.browser_context,
+                        page_key=after_key or before_key,
+                        dialog_title=(dialog_meta or {}).get('dialogTitle') or '',
+                        anchor_xpath=(dialog_meta or {}).get('anchorXpath') or '',
+                        dialog_b64=dialog_b64,
+                        dialog_meta=dialog_meta,
+                    )
                 emit_step_screenshot(str(eid), before_b64, after_b64, dialog_b64, dialog_meta)
         return entry
 

@@ -98,10 +98,12 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         return 'continue'
 
     if event == "capture_screenshots":
-        from .state import set_capture_screenshots
+        from .state import reset_page_level_shots, set_capture_screenshots
         data = msg.get("data") or {}
         enabled = bool(data.get("enabled", True))
         set_capture_screenshots(enabled)
+        if enabled:
+            reset_page_level_shots()
         emit_json({"event": "capture_screenshots_status", "data": {"enabled": enabled}})
         sys.stderr.write(f"capture_screenshots={enabled}\n")
         sys.stderr.flush()

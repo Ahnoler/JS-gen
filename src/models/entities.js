@@ -318,7 +318,7 @@
  * @property {number|null} [trajectoryId]
  * @property {number|null} [trajectoryStepId]
  * @property {number|null} [trajectoryPhaseId]
- * @property {'before'|'after'|'phase_highlight'} [kind]
+ * @property {'before'|'after'|'phase_highlight'|'page_level'} [kind]
  * @property {string} createdAt
  */
 

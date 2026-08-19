@@ -129,6 +129,7 @@ class ElementInfo(BaseModel):
     region_label: str = Field(default="", description="Human-readable region chain label")
     layers: list[str] = Field(default_factory=list, description="Region layer stack (tab → section → titlebox)")
     bbox: dict | None = Field(default=None, description="Content-coordinate bounding box {x1,y1,x2,y2}")
+    page_bbox: dict | None = Field(default=None, description="Document-coordinate bounding box for page-level screenshot {x1,y1,x2,y2}")
 
     def to_element_json(self) -> dict:
         """Convert to trajectory_step.element_json dict."""
@@ -169,6 +170,8 @@ class ElementInfo(BaseModel):
             data['layers'] = list(self.layers)
         if self.bbox:
             data['bbox'] = dict(self.bbox)
+        if self.page_bbox:
+            data['page_bbox'] = dict(self.page_bbox)
         return data
 
 
@@ -394,6 +397,8 @@ class ActionEntry(BaseModel):
                     entry.element[region_key] = elem[region_key]
             if isinstance(elem.get('layers'), list) and elem.get('layers'):
                 entry.element['layers'] = list(elem['layers'])
+            if isinstance(elem.get('page_bbox'), dict) and elem.get('page_bbox'):
+                entry.element['page_bbox'] = dict(elem['page_bbox'])
             if isinstance(elem.get('bbox'), dict) and elem.get('bbox'):
                 entry.element['bbox'] = dict(elem['bbox'])
             if not entry.element.get('locator_strategy'):

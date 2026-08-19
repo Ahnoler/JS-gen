@@ -152,8 +152,9 @@ export function buildTreeFromV3Flat(properties) {
     let key = base.id ? `shot:${base.id}` : 'root';
     for (const s of segs) {
       if (!s.label) continue;
-      // 弹窗节点本身已经表达 overlay 层，避免再生成一层“弹层：xxx”
-      if (parent.role === 'dialog' && s.role === 'overlay') continue;
+      // 页面/弹窗节点已经由截图条目表达，避免 region_id 前缀再生成重复层
+      if (parent.role === 'page' && s.role === 'page') continue;
+      if (parent.role === 'dialog' && (s.role === 'page' || s.role === 'dialog' || s.role === 'overlay')) continue;
       key += '|' + s.role + ':' + s.label;
       let child = (parent.children ||= []).find((c) => c.key === key);
       if (!child) {

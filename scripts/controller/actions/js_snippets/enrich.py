@@ -71,6 +71,7 @@ JS_ENRICH_CLICK_LOCATOR = '''([xpath, text, tagHint, targetKindHint, formLabelHi
     region_label: reg.region_label || '',
     layers: Array.isArray(reg.layers) ? reg.layers : [],
     bbox: stepBBoxOf(el),
+    page_bbox: documentBBoxOf(el),
     locator_scope: loc.locator_scope,
     locator_occurrence: loc.locator_occurrence,
     locator_verified: loc.locator_verified,

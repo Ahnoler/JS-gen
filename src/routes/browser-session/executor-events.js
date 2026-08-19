@@ -5,6 +5,7 @@ import {
   persistLiveActionEntries,
   removeLivePersistedActions,
   stashOrApplyStepScreenshot,
+  applyPageLevelScreenshot,
 } from './persist-live.js';
 import { writeAgentEvent } from './agent-io.js';
 
@@ -85,6 +86,14 @@ export function bindExecutorSessionEvents(session) {
         after: payload?.after,
         trajectoryId: session.dbTrajectoryId,
       }).catch((err) => console.warn('[step-screenshot] stash failed:', err?.message || err));
+      return;
+    }
+    if (type === 'page_level_screenshot') {
+      if (Number.isFinite(Number(session?.dbTrajectoryId))) {
+        applyPageLevelScreenshot(session.dbTrajectoryId, payload).catch((err) => {
+          console.warn('[page-level-screenshot] persist failed:', err?.message || err);
+        });
+      }
       return;
     }
     if (type === 'manual_record_status') {

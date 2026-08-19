@@ -16,7 +16,10 @@ class ScreenshotEntity(BaseModel):
     trajectory_id: Optional[int] = None
     trajectory_step_id: Optional[int] = None
     trajectory_phase_id: Optional[int] = None
-    kind: Literal["before", "after", "phase_highlight"] = "after"
+    level_type: Optional[Literal["page", "popup"]] = None
+    level_key: Optional[str] = None
+    parent_level_key: Optional[str] = None
+    kind: Literal["before", "after", "phase_highlight", "page_level"] = "after"
     created_at: datetime = Field(default_factory=datetime.now)
 
     class Config:
