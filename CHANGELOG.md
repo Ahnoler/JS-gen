@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Added
 
+- 2026-08-19: **补齐 MinIO 依赖**：将 `minio`（`^8.0.7`）加入 `package.json` 并安装，修复 `npm start` 启动时报 `ERR_MODULE_NOT_FOUND: Cannot find package 'minio'`（`src/services/minio-service.js` 顶层 `import { Client } from 'minio'` 无法解析）。不影响 schema/路由/WS；`package-lock.json` 同步更新。
+  影响范围：依赖声明（`package.json` / `package-lock.json`）。
+  文件：package.json, package-lock.json
+  Python 同步提示：无。仅 Node 控制面依赖补齐，Python 侧无感知。
+
 - 2026-08-19: **批量任务名候选接口 + 存量文件名乱码修复**：新增 `GET /api/v2/trajectories/batch/names`（functionId + keyword 模糊去重、最近创建优先、按 paasUserId 隔离空=全可见、limit 默认 20 最大 100；注册在 `batch/:batchId` 之前）——交易列表页「按任务名筛选」搜索下拉的选项源。另新增迁移 `20260819000000_fix_batch_job_name_mojibake.js`：修复 `batch_recording_job` 存量 5 行 `name`/`original_filename` 的 mojibake（UTF-8 字节被 latin1 解码，如「批量录制导入模板.xlsx」存成 `æ¹éå¶å¯¼å¥æ¨¡æ¿.xlsx`；运行时链路已由 `decodeUploadFilename` 修复，本迁移只修存量，幂等）。
   影响范围：新增路由（/api/v2/trajectories/batch/names）、存量数据修复（batch_recording_job.name/original_filename）。
   文件：src/routes/v2/trajectory-batch.js, src/services/trajectory/trajectory-batch-service.js, src/dao/batch-recording-dao.js, migrations/20260819000000_fix_batch_job_name_mojibake.js, src/dashboard/api-docs/groups/trajectory.js, scripts/characterization/characterize-batch-task-name.mjs
