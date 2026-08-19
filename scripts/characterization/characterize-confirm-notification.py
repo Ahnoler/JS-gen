@@ -38,6 +38,17 @@ def main() -> int:
     assert_true(watcher_pos >= 0 and err_pos >= 0 and success_pos >= 0, 'all markers present')
     assert_true(watcher_pos < err_pos < success_pos, 'arm watcher → check error → then success token')
 
+    # Regression: the pre-click watcher arming must NOT reference `compact`
+    # outside the _is_form_submit_label guard (it is only assigned there).
+    assert_true(
+        misc.count("if compact.startswith(('确认', '确定')):") == 1,
+        'bare compact confirm check may only appear once (inside label guard)',
+    )
+    assert_true(
+        "if btn_label and re.sub(r'\\s+', '', btn_label).startswith(('确认', '确定')):" in misc,
+        'watcher arming derives confirm flag from btn_label, not bare compact',
+    )
+
     print('characterize-confirm-notification: OK')
     return 0
 

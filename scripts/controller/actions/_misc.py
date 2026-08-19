@@ -561,7 +561,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         include_in_memory=True,
                     )
 
-            if compact.startswith(('确认', '确定')):
+            if btn_label and re.sub(r'\s+', '', btn_label).startswith(('确认', '确定')):
                 try:
                     from ._js_snippets import JS_WATCH_SAVE_NOTIFICATIONS
                     await page.evaluate(JS_WATCH_SAVE_NOTIFICATIONS)
