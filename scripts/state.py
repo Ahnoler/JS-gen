@@ -114,6 +114,34 @@ async def capture_dialog_png_b64_from_page(page):
             loc = target.locator(selector).first
             if await loc.count() == 0:
                 continue
+            try:
+                rect = await loc.evaluate("""
+                  (el) => {
+                    const root = document.scrollingElement || document.documentElement;
+                    const cands = document.querySelectorAll('.el-main, .app-main');
+                    let best = null;
+                    for (const c of cands) {
+                      const s = getComputedStyle(c);
+                      const oy = s.overflowY || s.overflow;
+                      if ((oy === 'auto' || oy === 'scroll') && c.scrollHeight > c.clientHeight + 8) {
+                        if (!best || c.scrollHeight > best.scrollHeight) best = c;
+                      }
+                    }
+                    const sc = best || root;
+                    const isDoc = sc === document.scrollingElement || sc === document.documentElement;
+                    const box = isDoc ? { x: 0, y: 0 } : sc.getBoundingClientRect();
+                    const r = el.getBoundingClientRect();
+                    return {
+                      x1: Math.round(r.left - box.x),
+                      y1: Math.round(r.top + sc.scrollTop - box.y),
+                      x2: Math.round(r.right - box.x),
+                      y2: Math.round(r.bottom + sc.scrollTop - box.y),
+                    };
+                  }
+                """
+              )
+            except Exception:
+                rect = {}
             png = await loc.screenshot(type='png')
             if not png:
                 return None, None
@@ -131,6 +159,7 @@ async def capture_dialog_png_b64_from_page(page):
                 'dialogKey': f'page-{_CURRENT_PHASE}|dialog:{title or "overlay"}',
                 'dialogTitle': title or 'overlay',
                 'anchorXpath': '',
+                'rect': rect,
             }
             return b64, meta
         return None, None
@@ -168,6 +197,34 @@ async def capture_dialog_png_b64(browser_context):
             loc = target.locator(selector).first
             if await loc.count() == 0:
                 continue
+            try:
+                rect = await loc.evaluate("""
+                  (el) => {
+                    const root = document.scrollingElement || document.documentElement;
+                    const cands = document.querySelectorAll('.el-main, .app-main');
+                    let best = null;
+                    for (const c of cands) {
+                      const s = getComputedStyle(c);
+                      const oy = s.overflowY || s.overflow;
+                      if ((oy === 'auto' || oy === 'scroll') && c.scrollHeight > c.clientHeight + 8) {
+                        if (!best || c.scrollHeight > best.scrollHeight) best = c;
+                      }
+                    }
+                    const sc = best || root;
+                    const isDoc = sc === document.scrollingElement || sc === document.documentElement;
+                    const box = isDoc ? { x: 0, y: 0 } : sc.getBoundingClientRect();
+                    const r = el.getBoundingClientRect();
+                    return {
+                      x1: Math.round(r.left - box.x),
+                      y1: Math.round(r.top + sc.scrollTop - box.y),
+                      x2: Math.round(r.right - box.x),
+                      y2: Math.round(r.bottom + sc.scrollTop - box.y),
+                    };
+                  }
+                """
+              )
+            except Exception:
+                rect = {}
             png = await loc.screenshot(type='png')
             if not png:
                 return None, None
@@ -185,6 +242,7 @@ async def capture_dialog_png_b64(browser_context):
                 'dialogKey': f'page-{_CURRENT_PHASE}|dialog:{title or "overlay"}',
                 'dialogTitle': title or 'overlay',
                 'anchorXpath': '',
+                'rect': rect,
             }
             return b64, meta
         return None, None

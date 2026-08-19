@@ -23,6 +23,8 @@ const helpersSrc = readFileSync(join(root, 'src/cdp/page-locator-helpers.js'), '
   assert.match(helpersSrc, /function finishCompose\s*\(/);
   assert.match(helpersSrc, /function mergeTitleboxIntoRegion\s*\(/);
   assert.match(helpersSrc, /function buildRegionLayers\s*\(/);
+  assert.match(helpersSrc, /function cardTitleOf\s*\(/);
+  assert.match(helpersSrc, /region_card/);
   assert.match(helpersSrc, /function prependPageLayer\s*\(/);
   assert.match(helpersSrc, /tags-view-container/);
   assert.match(helpersSrc, /region_chrome:\s*region\.region_chrome/);
@@ -237,6 +239,10 @@ const FIXTURE = `<!doctype html>
     </div>
   </div>
 </div>
+<div class="el-card box-card is-always-shadow">
+  <div class="el-card__header"><div class="header"><span>产品目录</span></div></div>
+  <div class="el-card__body"><input id="card-input" class="field" /></div>
+</div>
 </body></html>`;
 
 function assignExpr(selector) {
@@ -404,6 +410,14 @@ async function main() {
   assert.equal(todo.layers && todo.layers[0] && todo.layers[0].role, 'todo');
   assert.equal(todo.layers.length, 1);
   ok('todo-item still before compose; region_role todo');
+
+  const card = await page.evaluate(assignExpr('#card-input'));
+  assert.equal(card.region_role, 'card');
+  assert.equal(card.region_id, 'card:产品目录');
+  assert.equal(card.region_label, '产品目录');
+  assert.equal(card.region_card, '产品目录');
+  assert.deepEqual(card.layers, [{ role: 'card', label: '产品目录' }]);
+  ok('el-card detected as card partition');
 
   const assetSnap = await page.evaluate(snapInTitlebox('资产信息', '新增'));
   const contactSnap = await page.evaluate(snapInTitlebox('客户联系信息', '新增'));

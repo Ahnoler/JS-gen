@@ -14,6 +14,7 @@
  *   node scripts/tools/lightup-phase-screenshot.mjs --trajectory 108 --phase 623
  *   node scripts/tools/lightup-phase-screenshot.mjs --trajectory 108            # 该交易最新阶段截图
  *   node scripts/tools/lightup-phase-screenshot.mjs --trajectory 108 --width 1000
+ *   node scripts/tools/lightup-phase-screenshot.mjs --v3 payload.json           # 兼容 V3.0 groups / V3.1 flat
  *
  * 输出：tmp/lightup-<screenshotId>.html（浏览器打开即可）
  */
@@ -53,7 +54,7 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-function buildHtml({ b64, meta, screenshotId, steps }) {
+function buildHtml({ b64, meta, screenshotId, steps, imageUrl = '' }) {
   const elements = (Array.isArray(meta.elements) ? meta.elements : [])
     .filter((e) => e && e.rect
       && Number.isFinite(e.rect.x1) && Number.isFinite(e.rect.y1)
@@ -115,7 +116,7 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
 <script>
   const KIND_COLORS = ${JSON.stringify(KIND_COLORS)};
   const KIND_COLOR = (k) => KIND_COLORS[k] || '#607d8b';
-  const DATA = ${JSON.stringify({ elements, cw, ch, imageWidth: meta.imageWidth, imageHeight: meta.imageHeight, b64, steps })};
+  const DATA = ${JSON.stringify({ elements, cw, ch, imageWidth: meta.imageWidth, imageHeight: meta.imageHeight, b64, imageUrl, steps })};
   const stage = document.getElementById('stage');
   const side = document.getElementById('side');
   const showAll = document.getElementById('showAll');
@@ -144,7 +145,7 @@ function buildHtml({ b64, meta, screenshotId, steps }) {
   stage.style.height = H + 'px';
 
   const img = document.createElement('img');
-  img.src = 'data:image/png;base64,' + DATA.b64;
+  img.src = DATA.b64 ? 'data:image/png;base64,' + DATA.b64 : (DATA.imageUrl || '');
   img.alt = 'phase long screenshot';
   stage.appendChild(img);
 
@@ -216,7 +217,7 @@ async function main() {
   if (v3File) return runV3Mode(v3File);
 
   if (!id && !trajId) {
-    console.error('用法：--id <screenshotId> | --trajectory <id> [--phase <phaseId>] | --v3 <payload.json>');
+    console.error('用法：--id <screenshotId> | --trajectory <id> [--phase <phaseId>] | --v3 <payload.json>（兼容 V3.0 groups / V3.1 flat）');
     process.exit(1);
   }
 
@@ -242,7 +243,7 @@ async function main() {
     process.exit(1);
   }
 
-  const b64 = row.image_data.toString('base64');
+  const b64 = await loadScreenshotB64(db, row.image_url || `/api/v2/screenshots/${row.id}/image`);
 
   // 本阶段操作过的控件（调研探索用）：读取同 phase 的步骤 element。
   // 三维匹配键：label = formLabel（字段标签）|| text（按钮/菜单文本）；
@@ -268,7 +269,7 @@ async function main() {
     }
   }
 
-  const html = buildHtml({ b64, meta, screenshotId: row.id, steps });
+  const html = buildHtml({ b64, meta, screenshotId: row.id, steps, imageUrl: row.image_url || `/api/v2/screenshots/${row.id}/image` });
   const out = join(ROOT, 'tmp', `lightup-${row.id}.html`);
   writeFileSync(out, html, 'utf8');
   console.log(`已生成: ${out}`);
@@ -278,42 +279,73 @@ async function main() {
 }
 
 /**
- * V3 模式：读 V3 批量推送 payload JSON（result.groups），按页面组渲染阶段长图，
- * 控件直接按 rect 画框，checkbox 任意勾选点亮（V3 数据格式验证）。
- * 用法：node scripts/tools/lightup-phase-screenshot.mjs --v3 tmp/v3-payload-38.json
+ * 尝试 fetch 一个 URL 并转 base64；失败或超时返回空字符串。
  */
-async function runV3Mode(file) {
-  let payload;
+async function fetchB64(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2000);
   try {
-    payload = JSON.parse(readFileSync(file, 'utf8'));
-  } catch (err) {
-    console.error('读取/解析 V3 payload 失败:', err.message);
-    process.exit(1);
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return '';
+    const buf = Buffer.from(await res.arrayBuffer());
+    return buf.toString('base64');
+  } catch {
+    return '';
+  } finally {
+    clearTimeout(timer);
   }
-  const entry = payload?.payload?.transcationEventTypeList?.[0];
-  const result = entry?.result;
-  if (!result || !Array.isArray(result.groups) || !result.groups.length) {
-    console.error('V3 payload 无 result.groups（检查 payload.transcationEventTypeList[0].result）');
-    process.exit(1);
+}
+
+/**
+ * 根据截图 URL 加载 base64：优先从本地 DB（/screenshots/:id/image），
+ * 否则尝试直接 fetch MinIO/公网 URL；直连失败时再尝试把 host 换成 127.0.0.1
+ * （便于本机已开 SSH 反向隧道转发 MinIO 的场景）。
+ */
+async function loadScreenshotB64(db, url) {
+  const u = String(url || '');
+  if (!u) return '';
+  const idMatch = u.match(/\/screenshots\/(\d+)\/image/);
+  if (idMatch) {
+    const row = await db('screenshot').where({ id: Number(idMatch[1]) }).first();
+    if (row?.image_data) return row.image_data.toString('base64');
+    return '';
   }
+  const direct = await fetchB64(u);
+  if (direct) return direct;
+  try {
+    const parsed = new URL(u);
+    parsed.hostname = '127.0.0.1';
+    const fallback = parsed.toString();
+    if (fallback !== u) return fetchB64(fallback);
+  } catch {
+    // 非标准 URL 不做 fallback
+  }
+  return '';
+}
+
+/** V3.0 模式：读旧 result.groups，按页面组渲染。 */
+async function runV3GroupsMode(entry, result, file) {
   const db = getDB();
   try {
     const pages = [];
     for (const g of result.groups) {
       if (g.type !== 'page') continue;
       const shotUrl = String(g.screenshots?.[0]?.url || '');
-      const idMatch = shotUrl.match(/\/screenshots\/(\d+)\/image/);
-      let b64 = '';
-      if (idMatch) {
-        const row = await db('screenshot').where({ id: Number(idMatch[1]) }).first();
-        if (row?.image_data) b64 = row.image_data.toString('base64');
-      }
+      const b64 = await loadScreenshotB64(db, shotUrl);
       const dialogs = result.groups.filter((c) => c.type === 'dialog' && c.pid === g.id);
-      const dlgIds = new Set(dialogs.map((d) => d.id));
+      const dlgObjs = dialogs.map((d) => ({
+        id: d.id,
+        name: d.name || d.id,
+        screenshots: d.screenshots || [],
+        b64: '',
+        rect: d.rect || {},
+        controls: result.groups.filter((c) => c.type === 'ele' && c.pid === d.id),
+      }));
+      const dlgIds = new Set(dlgObjs.map((d) => d.id));
       const controls = result.groups.filter(
         (c) => c.type === 'ele' && (c.pid === g.id || dlgIds.has(c.pid)),
       );
-      pages.push({ id: g.id, name: g.name, screenshots: g.screenshots || [], b64, dialogs, controls });
+      pages.push({ id: g.id, name: g.name, screenshots: g.screenshots || [], b64, dialogs: dlgObjs, controls });
     }
     const html = buildV3Html({ result, pages });
     const out = join(ROOT, 'tmp', `lightup-v3-${result.id || 'payload'}.html`);
@@ -326,6 +358,105 @@ async function runV3Mode(file) {
   } finally {
     await db.destroy();
   }
+}
+
+/** V3.1 模式：读新版 flat transcationProperties，截图条目和控件条目同构。 */
+async function runV3FlatMode(entry, properties, file) {
+  const db = getDB();
+  try {
+    const shots = properties.filter((p) => p.type === 'page' || p.type === 'dialog');
+    const eles = properties.filter((p) => p.type === 'ele');
+    const pages = [];
+    const handledDialogIds = new Set();
+
+    // 页面为主：弹窗通过 propertiesPID 挂在页面下
+    for (const p of shots.filter((s) => s.type === 'page')) {
+      const url = Array.isArray(p.screenshot) ? p.screenshot[0] : '';
+      const b64 = await loadScreenshotB64(db, url);
+      const dialogs = shots.filter(
+        (d) => d.type === 'dialog' && String(d.propertiesPID ?? '') === String(p.propertiesID ?? ''),
+      );
+      const dlgObjs = [];
+      const dlgIds = new Set();
+      for (const d of dialogs) {
+        handledDialogIds.add(String(d.propertiesID ?? ''));
+        const dUrl = Array.isArray(d.screenshot) ? d.screenshot[0] : '';
+        const dB64 = await loadScreenshotB64(db, dUrl);
+        dlgObjs.push({
+          id: d.propertiesID || d.propertiesName || 'dlg',
+          name: d.propertiesName || '弹窗',
+          screenshots: Array.isArray(d.screenshot) ? d.screenshot : [],
+          b64: dB64,
+          rect: (d.rect && Object.keys(d.rect).length ? d.rect : {}),
+          controls: eles.filter((e) => String(e.propertiesPID ?? '') === String(d.propertiesID ?? '')),
+        });
+        dlgIds.add(String(d.propertiesID ?? ''));
+      }
+      const controls = eles.filter(
+        (e) => String(e.propertiesPID ?? '') === String(p.propertiesID ?? '') || dlgIds.has(String(e.propertiesPID ?? '')),
+      );
+      pages.push({
+        id: p.propertiesID || p.propertiesName || 'page',
+        name: p.propertiesName || '页面',
+        screenshots: Array.isArray(p.screenshot) ? p.screenshot : [],
+        b64,
+        dialogs: dlgObjs,
+        controls,
+      });
+    }
+
+    // 旧数据/无父弹窗：仍然独立成一个 stage，避免丢控件
+    for (const d of shots.filter((s) => s.type === 'dialog' && !handledDialogIds.has(String(s.propertiesID ?? '')))) {
+      const dUrl = Array.isArray(d.screenshot) ? d.screenshot[0] : '';
+      const dB64 = await loadScreenshotB64(db, dUrl);
+      const controls = eles.filter((e) => String(e.propertiesPID ?? '') === String(d.propertiesID ?? ''));
+      pages.push({
+        id: d.propertiesID || d.propertiesName || 'dlg',
+        name: d.propertiesName || '弹窗',
+        screenshots: Array.isArray(d.screenshot) ? d.screenshot : [],
+        b64: dB64,
+        dialogs: [],
+        controls,
+      });
+    }
+
+    const result = { name: entry?.transcationName || file };
+    const html = buildV3Html({ result, pages });
+    const out = join(ROOT, 'tmp', `lightup-v3-${String(entry?.transcId || 'payload').replace(/[^A-Za-z0-9_-]/g, '_')}.html`);
+    writeFileSync(out, html, 'utf8');
+    const withRect = eles.filter((c) => c.rect && Object.keys(c.rect).length > 0).length;
+    const noB64 = pages.filter((p) => !p.b64).length;
+    console.log(`已生成: ${out}`);
+    console.log(`交易 ${result.name} | 截图条目 ${shots.length} | 控件 ${eles.length}（带 rect ${withRect}）| 无截图 ${noB64}`);
+  } finally {
+    await db.destroy();
+  }
+}
+
+/**
+ * V3 模式：读 V3 批量推送 payload JSON。
+ * 兼容 V3.0 result.groups 和 V3.1 flat transcationProperties。
+ * 用法：node scripts/tools/lightup-phase-screenshot.mjs --v3 tmp/v3-payload-38.json
+ */
+async function runV3Mode(file) {
+  let payload;
+  try {
+    payload = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    console.error('读取/解析 V3 payload 失败:', err.message);
+    process.exit(1);
+  }
+  const entry = payload?.payload?.transcationEventTypeList?.[0];
+  const result = entry?.result;
+  if (result && Array.isArray(result.groups) && result.groups.length) {
+    return runV3GroupsMode(entry, result, file);
+  }
+  const properties = entry?.transcationProperties;
+  if (Array.isArray(properties) && properties.some((p) => p && ['page', 'dialog', 'ele'].includes(p.type))) {
+    return runV3FlatMode(entry, properties, file);
+  }
+  console.error('V3 payload 既无 result.groups，也无新版 transcationProperties type 条目（page/dialog/ele）');
+  process.exit(1);
 }
 
 /** V3 渲染：每页面组一个 stage（长图 + 控件框），checkbox 勾选点亮任意子集。 */
@@ -364,6 +495,11 @@ function buildV3Html({ result, pages }) {
   .pg .pg-head .dim { font-weight: 400; color: #888; font-size: 12px; }
   .pg .stage { position: relative; background: #fff; }
   .pg .stage img { display: block; width: 100%; height: auto; }
+  .dlg-overlay { position: absolute; display: none; border: 2px dashed #fa8c16;
+                 background: rgba(250,140,22,.06); overflow: hidden; z-index: 3; box-sizing: border-box; }
+  .dlg-overlay.on { display: block; }
+  .dlg-overlay img { display: block; width: 100%; height: 100%; }
+  .dlg-overlay .box { position: absolute; }
   .box { position: absolute; border: 2px solid #4caf50; background: rgba(76,175,80,.16);
          display: none; box-sizing: border-box; cursor: pointer; }
   .box.on { display: block; }
@@ -389,61 +525,148 @@ function buildV3Html({ result, pages }) {
   const list = document.getElementById('list');
   const pagesEl = document.getElementById('pages');
   const boxes = {};
-  // 渲染页面组 stage（图片按自然尺寸，rect × 显示宽/自然宽）与控件清单
+
   for (const pg of PAGES) {
     const sec = document.createElement('div');
     sec.className = 'pg';
     const head = document.createElement('div');
     head.className = 'pg-head';
-    head.innerHTML = '<span>' + esc(pg.name || pg.id) + '</span><span class="dim">' + pg.controls.length + ' 控件</span>';
+    head.innerHTML = '<span>' + esc(pg.name || pg.id) + '</span><span class="dim">' + (pg.controls || []).length + ' 控件</span>';
     const stage = document.createElement('div');
     stage.className = 'stage';
     const img = document.createElement('img');
-    img.src = 'data:image/png;base64,' + pg.b64;
+    img.src = pg.b64 ? 'data:image/png;base64,' + pg.b64 : (pg.screenshots && pg.screenshots[0] ? pg.screenshots[0] : '');
     stage.appendChild(img);
     sec.appendChild(head);
     sec.appendChild(stage);
     pagesEl.appendChild(sec);
-    // 页面标题（清单）
+
     const pt = document.createElement('div');
     pt.className = 'page-title';
     pt.textContent = '▣ ' + (pg.name || pg.id);
     list.appendChild(pt);
-    // 控件行（弹窗控件归弹窗组显示）
-    const dlgIds = new Set(pg.dialogs.map(d => d.id));
-    for (const c of pg.controls) {
+
+    const dialogs = pg.dialogs || [];
+    const overlayDlgIds = new Set();
+    const dlgOverlayEls = {};
+    for (const dlg of dialogs) {
+      if (!dlg.b64 || !dlg.rect || !(dlg.rect.x2 > dlg.rect.x1) || !(dlg.rect.y2 > dlg.rect.y1)) continue;
+      overlayDlgIds.add(String(dlg.id));
+      const overlay = document.createElement('div');
+      overlay.className = 'dlg-overlay';
+      const dlgImg = document.createElement('img');
+      dlgImg.src = dlg.b64 ? 'data:image/png;base64,' + dlg.b64 : (dlg.screenshots && dlg.screenshots[0] ? dlg.screenshots[0] : '');
+      overlay.appendChild(dlgImg);
+      stage.appendChild(overlay);
+      dlgOverlayEls[String(dlg.id)] = overlay;
+
+      const dt = document.createElement('label');
+      dt.className = 'ctrl dlg dlg-toggle';
+      const dcb = document.createElement('input');
+      dcb.type = 'checkbox';
+      dcb.addEventListener('change', () => {
+        overlay.classList.toggle('on', dcb.checked);
+        const cs = dlg.controls || [];
+        for (const c of cs) {
+          const key = c.id || c.propertiesID;
+          const b = boxes[key];
+          if (b) b.classList.toggle('on', dcb.checked && b.dataset.checked === 'true');
+        }
+      });
+      dt.appendChild(dcb);
+      dt.appendChild(Object.assign(document.createElement('span'), { className: 'tag', textContent: '弹窗截图' }));
+      dt.appendChild(Object.assign(document.createElement('span'), { textContent: dlg.name || dlg.id }));
+      list.appendChild(dt);
+    }
+
+    const pageControls = pg.controls || [];
+    for (const c of pageControls) {
+      const key = c.id || c.propertiesID;
+      const inOverlay = overlayDlgIds.has(String(c.pid || c.propertiesPID));
       const div = document.createElement('label');
-      div.className = 'ctrl' + (dlgIds.has(c.pid) ? ' dlg' : '');
+      div.className = 'ctrl' + (inOverlay ? ' dlg' : '');
       const cb = document.createElement('input');
       cb.type = 'checkbox';
-      const setBox = (on) => { const b = boxes[c.id]; if (b) b.classList.toggle('on', on); };
+      const setBox = (on) => {
+        const b = boxes[key];
+        if (b) {
+          b.classList.toggle('on', on);
+          b.dataset.checked = on ? 'true' : 'false';
+        }
+      };
       cb.addEventListener('change', () => setBox(cb.checked));
       div.appendChild(cb);
-      div.appendChild(Object.assign(document.createElement('span'), { className: 'tag', textContent: c.kind || '?' }));
-      div.appendChild(Object.assign(document.createElement('span'), { textContent: c.propertiesName || c.label || c.id }));
+      div.appendChild(Object.assign(document.createElement('span'), { className: 'tag', textContent: c.kind || c.eventTypeValue || c.eventTypeName || '?' }));
+      div.appendChild(Object.assign(document.createElement('span'), { textContent: c.propertiesName || c.realLabel || c.label || c.id || c.propertiesID }));
       if (!c.rect) div.appendChild(Object.assign(document.createElement('span'), { className: 'no-rect', textContent: '(无坐标)' }));
       list.appendChild(div);
-      // 画框（等图片加载后按自然尺寸换算）
-      img.addEventListener('load', () => {
-        if (!c.rect || boxes[c.id]) return;
-        const natW = img.naturalWidth || 1;
-        const dispW = img.getBoundingClientRect().width || natW;
-        const scale = dispW / natW;
+    }
+
+    img.addEventListener('load', () => {
+      const natW = img.naturalWidth || 1;
+      const dispW = img.getBoundingClientRect().width || natW;
+      const scale = dispW / natW;
+
+      for (const dlg of dialogs) {
+        if (!overlayDlgIds.has(String(dlg.id))) continue;
+        const overlay = dlgOverlayEls[String(dlg.id)];
+        const r = dlg.rect;
+        overlay.style.left = (r.x1 * scale) + 'px';
+        overlay.style.top = (r.y1 * scale) + 'px';
+        overlay.style.width = Math.max(2, (r.x2 - r.x1) * scale) + 'px';
+        overlay.style.height = Math.max(2, (r.y2 - r.y1) * scale) + 'px';
+        const dlgImg = overlay.querySelector('img');
+        const drawDlg = () => {
+          const dNatW = dlgImg.naturalWidth || 1;
+          const dNatH = dlgImg.naturalHeight || 1;
+          const dCtrls = dlg.controls || [];
+          for (const dc of dCtrls) {
+            const dkey = dc.id || dc.propertiesID;
+            if (!dc.rect || boxes[dkey]) continue;
+            const b = document.createElement('div');
+            b.className = 'box dlg';
+            b.style.left = ((dc.rect.x1 / dNatW) * overlay.clientWidth) + 'px';
+            b.style.top = ((dc.rect.y1 / dNatH) * overlay.clientHeight) + 'px';
+            b.style.width = Math.max(2, ((dc.rect.x2 - dc.rect.x1) / dNatW) * overlay.clientWidth) + 'px';
+            b.style.height = Math.max(2, ((dc.rect.y2 - dc.rect.y1) / dNatH) * overlay.clientHeight) + 'px';
+            b.innerHTML = '<span class="no">' + String(dc.id || dc.propertiesID || '').replace('step-', '') + '</span>';
+            b.title = (dc.propertiesName || dc.realLabel || dc.label || dc.id || dc.propertiesID) + ' · ' + (dc.kind || dc.eventTypeValue || dc.eventTypeName || '') + ' · rect(' + dc.rect.x1 + ',' + dc.rect.y1 + ')-(' + dc.rect.x2 + ',' + dc.rect.y2 + ')';
+            overlay.appendChild(b);
+            boxes[dkey] = b;
+          }
+        };
+        if (dlgImg.complete && dlgImg.naturalWidth > 0) drawDlg();
+        else dlgImg.addEventListener('load', drawDlg);
+      }
+
+      for (const c of pageControls) {
+        const key = c.id || c.propertiesID;
+        if (!c.rect || boxes[key]) continue;
+        if (overlayDlgIds.has(String(c.pid || c.propertiesPID))) continue;
         const b = document.createElement('div');
-        b.className = 'box' + (dlgIds.has(c.pid) ? ' dlg' : '');
+        b.className = 'box';
         b.style.left = (c.rect.x1 * scale) + 'px';
         b.style.top = (c.rect.y1 * scale) + 'px';
         b.style.width = Math.max(2, (c.rect.x2 - c.rect.x1) * scale) + 'px';
         b.style.height = Math.max(2, (c.rect.y2 - c.rect.y1) * scale) + 'px';
-        b.innerHTML = '<span class="no">' + String(c.id).replace('step-', '') + '</span>';
-        b.title = (c.propertiesName || c.label || c.id) + ' · ' + (c.kind || '') + ' · rect(' + c.rect.x1 + ',' + c.rect.y1 + ')-(' + c.rect.x2 + ',' + c.rect.y2 + ')';
+        b.innerHTML = '<span class="no">' + String(c.id || c.propertiesID || '').replace('step-', '') + '</span>';
+        b.title = (c.propertiesName || c.realLabel || c.label || c.id || c.propertiesID) + ' · ' + (c.kind || c.eventTypeValue || c.eventTypeName || '') + ' · rect(' + c.rect.x1 + ',' + c.rect.y1 + ')-(' + c.rect.x2 + ',' + c.rect.y2 + ')';
         stage.appendChild(b);
-        boxes[c.id] = b;
-      });
-    }
+        boxes[key] = b;
+      }
+    });
   }
-  document.getElementById('all').onclick = () => { Object.values(boxes).forEach(b => b.classList.add('on')); document.querySelectorAll('.ctrl input').forEach(c => c.checked = true); };
-  document.getElementById('none').onclick = () => { Object.values(boxes).forEach(b => b.classList.remove('on')); document.querySelectorAll('.ctrl input').forEach(c => c.checked = false); };
+
+  document.getElementById('all').onclick = () => {
+    Object.values(boxes).forEach(b => b.classList.add('on'));
+    document.querySelectorAll('.ctrl input').forEach(c => c.checked = true);
+    document.querySelectorAll('.dlg-overlay').forEach(o => o.classList.add('on'));
+  };
+  document.getElementById('none').onclick = () => {
+    Object.values(boxes).forEach(b => b.classList.remove('on'));
+    document.querySelectorAll('.ctrl input').forEach(c => c.checked = false);
+    document.querySelectorAll('.dlg-overlay').forEach(o => o.classList.remove('on'));
+  };
   function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>

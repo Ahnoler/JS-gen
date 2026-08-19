@@ -158,6 +158,22 @@ function testBuildScreenshotEntries() {
   check(e0.scanIndex === undefined && e0.bucket === undefined && e0.file === undefined && e0.expires === undefined && e0.key === undefined && e0.name === undefined && e0.phaseNumber === undefined && e0.url === undefined, '不再输出 scanIndex/bucket/file/expires/key/name/phaseNumber/url');
   check(idByPhase.get(1) === 1 && idByPhase.get(2) === 2, 'idByPhase 映射正确');
 
+  // 弹窗截图通过 trajectory_step_id 关联到所属页面截图（propertiesPID 指向 page propertiesID）
+  const dlg = buildScreenshotEntries({
+    traj: { id: 99, steps: [{ id: 500, trajectoryPhaseId: 1 }] },
+    phases: [{ id: 1, phaseNumber: 1, description: '页面' }],
+    phaseScreenshots: [{ id: 101, trajectoryPhaseId: 1, imageUrl: 'http://minio/uara-step-phase-picture/screenshots/page-1.png' }],
+    dialogScreenshots: [
+      { id: 202, trajectoryStepId: 500, name: '地址选择器', metadataJson: { rect: { x1: 100, y1: 200, x2: 500, y2: 600 } }, imageUrl: 'http://minio/uara-step-phase-picture/screenshots/dialog-1.png' },
+    ],
+  });
+  check(dlg.entries.length === 2, `页面+弹窗截图条目 = 2（实际 ${dlg.entries.length}）`);
+  const dlgPage = dlg.entries.find((e) => e.type === 'page');
+  const dlgDialog = dlg.entries.find((e) => e.type === 'dialog');
+  check(!!dlgPage && !!dlgDialog, '页面/弹窗截图条目均存在');
+  check(dlgDialog?.propertiesPID === dlgPage?.propertiesID, `弹窗截图 propertiesPID 指向所属页面截图（=${dlgDialog?.propertiesPID}，期望 ${dlgPage?.propertiesID}）`);
+  check(JSON.stringify(dlgDialog?.rect) === JSON.stringify({ x1: 100, y1: 200, x2: 500, y2: 600 }), '弹窗截图 rect 从 metadataJson.rect 透传');
+
   // 无 imageUrl 但有 storagePath + MINIO_PUBLIC_URL → 兜底拼接
   const fb = buildScreenshotEntries({
     traj: { id: 99 },
@@ -250,9 +266,9 @@ async function testRealData() {
     const controls = props.filter((p) => p.type === 'ele');
     const controlsWithPid = controls.filter((p) => p.propertiesPID !== '0' && p.propertiesPID !== undefined).length;
     check(controlsWithPid === controls.length, `控件条目都有 propertiesPID（${controlsWithPid}/${controls.length}）`);
-    const shotsWithZeroPid = props.filter((p) => p.type !== 'ele' && p.propertiesPID === '0').length;
-    const allShots = props.filter((p) => p.type !== 'ele').length;
-    check(shotsWithZeroPid === allShots, `截图条目 propertiesPID 均为 "0"（${shotsWithZeroPid}/${allShots}）`);
+    const pageShotsWithZeroPid = props.filter((p) => p.type === 'page' && p.propertiesPID === '0').length;
+    const allPageShots = props.filter((p) => p.type === 'page').length;
+    check(pageShotsWithZeroPid === allPageShots, `页面截图条目 propertiesPID 均为 "0"（${pageShotsWithZeroPid}/${allPageShots}）`);
     const withRegion = props.filter((p) => p.regionId).length;
     check(withRegion > 0, '存在 regionId');
     const pageShots = props.filter((p) => p.type === 'page');

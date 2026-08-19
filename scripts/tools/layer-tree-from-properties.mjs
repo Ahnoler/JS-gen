@@ -9,9 +9,13 @@
  *
  * 分层依据：每步 transcationProperties[].regionId（"role:label|role:label" 多段，
  *   如 "tab:基本信息|titlebox:客户概况"）拆层级链；无 regionId 的操作归「未分区」。
+ * 兼容：
+ *   - V3.0：--v3 <payload.json> 读 result.groups
+ *   - V3.1：--file/--v3 读新版 flat transcationProperties（type=page/dialog/ele）
  *
  * 用法：
  *   node scripts/tools/layer-tree-from-properties.mjs --file <export.json>
+ *   node scripts/tools/layer-tree-from-properties.mjs --v3 <payload.json>
  */
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname, resolve } from 'path';
@@ -36,7 +40,7 @@ const ROLE_LEVEL = {
   tab: ['tab', 'tab页签'], wizard_step: ['wizard', '步骤向导'],
   dialog: ['popup', '弹窗'], drawer: ['popup', '抽屉'], overlay: ['popup', '弹层'],
   titlebox: ['section', '标题栏'], collapse: ['section', '折叠面板'], block: ['section', '区块'],
-  card: ['section', '卡片'], section: ['section', '分区'], table: ['section', '表格'],
+  card: ['card', '卡片'], section: ['section', '分区'], table: ['section', '表格'],
 };
 const roleInfo = (r) => ROLE_LEVEL[r] || ['section', '分区'];
 const ACTION_TAG = {
@@ -93,6 +97,80 @@ export function buildTreeFromProperties(properties) {
       regionId,
     });
   });
+  return root;
+}
+
+/**
+ * 从 V3.1 flat transcationProperties[] 构建分层树。
+ * 新版 V3 把截图条目（type=page/dialog）和控件条目（type=ele）合并到同一个数组：
+ *   - type=page/dialog 作为页面/弹窗节点（当前 flat 未给 dialog 父页面，先挂根级）
+ *   - type=ele 作为叶子，先按 propertiesPID 挂到对应截图节点下，
+ *     再按 regionId 拆出 tab/section/wizard 等中间层级。
+ */
+export function buildTreeFromV3Flat(properties) {
+  const root = { role: 'page', label: '交易页面', children: [], items: [] };
+  const shotMap = new Map();
+  for (const p of properties || []) {
+    if (p.type !== 'page' && p.type !== 'dialog') continue;
+    const node = {
+      role: p.type === 'dialog' ? 'dialog' : 'page',
+      label: String(p.propertiesName || '').trim() || (p.type === 'dialog' ? '弹窗' : '页面'),
+      id: String(p.propertiesID ?? ''),
+      children: [],
+      items: [],
+    };
+    shotMap.set(node.id, node);
+  }
+  // 第二遍再挂父子：dialog 通过 propertiesPID 指向 page 时，作为 page 的子节点；
+  // 旧数据/无父时保持根级。
+  for (const p of properties || []) {
+    if (p.type === 'page') {
+      const node = shotMap.get(String(p.propertiesID ?? ''));
+      if (node) root.children.push(node);
+    } else if (p.type === 'dialog') {
+      const node = shotMap.get(String(p.propertiesID ?? ''));
+      const parent = shotMap.get(String(p.propertiesPID ?? ''));
+      if (node && parent && parent.role === 'page') parent.children.push(node);
+      else if (node) root.children.push(node);
+    }
+  }
+  let eleNo = 0;
+  for (const p of properties || []) {
+    if (p.type !== 'ele') continue;
+    eleNo += 1;
+    const base = shotMap.get(String(p.propertiesPID ?? '')) || root;
+    const regionId = String(p.regionId || '').trim();
+    const segs = regionId
+      .split('|').map((s) => s.trim()).filter(Boolean)
+      .map((seg) => {
+        const i = seg.indexOf(':');
+        return i > 0
+          ? { role: seg.slice(0, i).trim(), label: seg.slice(i + 1).trim() }
+          : { role: 'section', label: seg };
+      });
+    let parent = base;
+    let key = base.id ? `shot:${base.id}` : 'root';
+    for (const s of segs) {
+      if (!s.label) continue;
+      // 弹窗节点本身已经表达 overlay 层，避免再生成一层“弹层：xxx”
+      if (parent.role === 'dialog' && s.role === 'overlay') continue;
+      key += '|' + s.role + ':' + s.label;
+      let child = (parent.children ||= []).find((c) => c.key === key);
+      if (!child) {
+        child = { role: s.role, label: s.label, key, children: [], items: [] };
+        parent.children.push(child);
+      }
+      parent = child;
+    }
+    parent.items.push({
+      no: eleNo,
+      name: String(p.propertiesName || p.realLabel || '').trim() || '(无名称)',
+      action: actionTag(String(p.eventTypeValue || p.eventTypeName || '').trim()),
+      actionValue: String(p.eventTypeValue || '').trim(),
+      regionId,
+      hasBbox: !!(p.rect && p.rect.x2 > p.rect.x1 && p.rect.y2 > p.rect.y1),
+    });
+  }
   return root;
 }
 
@@ -263,6 +341,10 @@ function buildHtml({ properties, steps, elements, groups, title }) {
     tree = buildTreeFromSteps(steps);
     list = steps;
     unit = '步骤';
+  } else if (Array.isArray(properties) && properties.some((p) => p && ['page', 'dialog', 'ele'].includes(p.type))) {
+    tree = buildTreeFromV3Flat(properties);
+    list = properties.filter((p) => p.type === 'ele');
+    unit = '控件';
   } else {
     tree = buildTreeFromProperties(properties);
     list = properties || [];
@@ -305,6 +387,7 @@ function buildHtml({ properties, steps, elements, groups, title }) {
   .tree-level-type.popup { background: #fa8c16; }
   .tree-level-type.section { background: #722ed1; }
   .tree-level-type.wizard { background: #13c2c2; }
+  .tree-level-type.card { background: #597ef7; }
   .tree-colon { color: #8c8c8c; flex-shrink: 0; }
   .tree-name { color: #262626; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .tree-step-no { color: #bfbfbf; font-size: 11px; width: 22px; flex-shrink: 0; }
@@ -422,7 +505,7 @@ function main() {
   if (v3File) return runV3Mode(v3File);
   const modes = [file, shot, trajectory].filter(Boolean).length;
   if (!modes || modes > 1) {
-    console.error('用法（四选一）：--file <export.json> | --shot <screenshotId> | --trajectory <id> [--phase <phaseNumber>] | --v3 <payload.json>');
+    console.error('用法（四选一）：--file <export.json> | --shot <screenshotId> | --trajectory <id> [--phase <phaseNumber>] | --v3 <payload.json>（兼容 V3.0 groups / V3.1 flat）');
     process.exit(1);
   }
   if (shot) return runShotMode(Number(shot));
@@ -446,8 +529,12 @@ function main() {
   const base = String(file).split(/[\\/]/).pop().replace(/\.[^.]+$/, '') || 'props';
   const out = join(ROOT, 'tmp', `layer-tree-${base}.html`);
   writeFileSync(out, html, 'utf8');
+  const isV3Flat = properties.some((p) => p && ['page', 'dialog', 'ele'].includes(p.type));
+  const shots = isV3Flat ? properties.filter((p) => p.type === 'page' || p.type === 'dialog') : [];
+  const eles = isV3Flat ? properties.filter((p) => p.type === 'ele') : properties;
+  const unzoned = eles.filter((p) => !String(p.regionId || '').trim()).length;
   console.log(`已生成: ${out}`);
-  console.log(`交易: ${title} | 操作 ${properties.length} 步 | 未分区 ${properties.filter((p) => !String(p.regionId || '').trim()).length}`);
+  console.log(`交易: ${title} | ${isV3Flat ? `截图 ${shots.length} | 控件 ${eles.length}` : `操作 ${properties.length} 步`} | 未分区 ${unzoned}`);
 }
 
 /** 直接按步骤分层（trajectory_step.element_json 的 layers/region_id），不依赖阶段截图。 */
@@ -530,7 +617,8 @@ async function runShotMode(screenshotId) {
   await db.destroy();
 }
 
-/** V3 模式：读 V3 批量推送 payload（result.groups pid 树）渲染分层树。 */
+/** V3 模式：读 V3 批量推送 payload。
+ *  兼容 V3.0 result.groups 和 V3.1 flat transcationProperties 两种结构。 */
 function runV3Mode(file) {
   let raw;
   try {
@@ -541,21 +629,38 @@ function runV3Mode(file) {
   }
   const entry = raw?.payload?.transcationEventTypeList?.[0];
   const result = entry?.result;
-  if (!result || !Array.isArray(result.groups) || !result.groups.length) {
-    console.error('V3 payload 无 result.groups（检查 payload.transcationEventTypeList[0].result）');
-    process.exit(1);
+  if (result && Array.isArray(result.groups) && result.groups.length) {
+    const groups = result.groups;
+    const title = `V3.0 · ${result.name || entry?.transcationName || result.id || file}`;
+    const html = buildHtml({ groups, title });
+    const base = String(result.id || 'payload').replace(/[^A-Za-z0-9_-]/g, '_');
+    const out = join(ROOT, 'tmp', `layer-tree-v3-${base}.html`);
+    writeFileSync(out, html, 'utf8');
+    const eles = groups.filter((g) => g.type === 'ele');
+    const pages = groups.filter((g) => g.type === 'page');
+    const dialogs = groups.filter((g) => g.type === 'dialog');
+    console.log(`已生成: ${out}`);
+    console.log(`${title} | 页面组 ${pages.length} | 弹窗组 ${dialogs.length} | 控件 ${eles.length}（带 bbox ${eles.filter((e) => e.rect).length}）`);
+    return;
   }
-  const groups = result.groups;
-  const title = `V3 · ${result.name || entry?.transcationName || result.id || file}`;
-  const html = buildHtml({ groups, title });
-  const base = String(result.id || 'payload').replace(/[^A-Za-z0-9_-]/g, '_');
-  const out = join(ROOT, 'tmp', `layer-tree-v3-${base}.html`);
-  writeFileSync(out, html, 'utf8');
-  const eles = groups.filter((g) => g.type === 'ele');
-  const pages = groups.filter((g) => g.type === 'page');
-  const dialogs = groups.filter((g) => g.type === 'dialog');
-  console.log(`已生成: ${out}`);
-  console.log(`${title} | 页面组 ${pages.length} | 弹窗组 ${dialogs.length} | 控件 ${eles.length}（带 bbox ${eles.filter((e) => e.rect).length}）`);
+
+  const properties = entry?.transcationProperties;
+  if (Array.isArray(properties) && properties.some((p) => p && ['page', 'dialog', 'ele'].includes(p.type))) {
+    const title = `V3.1 · ${entry?.transcationName || file}`;
+    const html = buildHtml({ properties, title });
+    const base = String(entry?.transcId || 'payload').replace(/[^A-Za-z0-9_-]/g, '_');
+    const out = join(ROOT, 'tmp', `layer-tree-v3-${base}.html`);
+    writeFileSync(out, html, 'utf8');
+    const shots = properties.filter((p) => p.type === 'page' || p.type === 'dialog');
+    const eles = properties.filter((p) => p.type === 'ele');
+    const withRect = eles.filter((p) => p.rect && Object.keys(p.rect).length > 0).length;
+    console.log(`已生成: ${out}`);
+    console.log(`${title} | 截图条目 ${shots.length}（page/dialog）| 控件 ${eles.length}（带 rect ${withRect}）`);
+    return;
+  }
+
+  console.error('V3 payload 既无 result.groups，也无新版 transcationProperties type 条目（page/dialog/ele）');
+  process.exit(1);
 }
 
 if (isDirectRun()) {

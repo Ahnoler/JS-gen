@@ -485,6 +485,8 @@ PAGE_LOCATOR_HELPERS = r'''
         return label ? [{ role: 'todo', label: label }] : [];
       }
       const out = [];
+      const card = layerLabel(region.region_card);
+      if (card) out.push({ role: 'card', label: card });
       const chrome = region.region_chrome;
       if (chrome && chrome.label && (chrome.role === 'tab' || chrome.role === 'wizard')) {
         const cl = layerLabel(chrome.label);
@@ -848,6 +850,13 @@ PAGE_LOCATOR_HELPERS = r'''
       const h = it.querySelector && it.querySelector('.el-collapse-item__header');
       return stripActionTail((h && (h.innerText || h.textContent)) || '');
     }
+    function cardTitleOf(el) {
+      if (!el || !el.closest) return '';
+      const card = el.closest('.el-card');
+      if (!card) return '';
+      const h = card.querySelector && card.querySelector('.el-card__header');
+      return normalizeControlText((h && (h.innerText || h.textContent)) || '');
+    }
     function titleboxAnchorOf(el, scope) {
       if (!el || !scope) return null;
       const inside = el.closest && el.closest('.titlebox');
@@ -880,9 +889,13 @@ PAGE_LOCATOR_HELPERS = r'''
       if (!title || isActionOnlyTitle(title) || title === want) return '';
       return title;
     }
-    function finishCompose(chrome, section, block) {
+    function finishCompose(card, chrome, section, block) {
       const parts = [];
       const ids = [];
+      if (card) {
+        parts.push(card);
+        ids.push('card:' + card);
+      }
       if (chrome && chrome.label) {
         parts.push(chrome.label);
         ids.push((chrome.role === 'wizard' ? 'wizard:' : 'tab:') + chrome.label);
@@ -899,12 +912,14 @@ PAGE_LOCATOR_HELPERS = r'''
       let role = 'section';
       if (block || section) role = 'section';
       else if (chrome && chrome.role === 'wizard') role = 'wizard';
-      else role = 'tab';
+      else if (chrome && chrome.role === 'tab') role = 'tab';
+      else if (card) role = 'card';
       const out = {
         region_role: role,
         region_id: ids.join('|'),
         region_label: parts.join(' / '),
       };
+      if (card) out.region_card = card;
       if (chrome && chrome.label) out.region_chrome = { role: chrome.role, label: chrome.label };
       if (section) out.region_section = section;
       if (block) {
@@ -917,6 +932,7 @@ PAGE_LOCATOR_HELPERS = r'''
       if (!el || !el.closest) return null;
       let chrome = readChrome(el);
       let section = collapseSectionTitle(el);
+      let card = cardTitleOf(el);
       let scope = null;
       if (el.closest('.el-collapse-item')) scope = el.closest('.el-collapse-item');
       else if (el.closest('.el-tab-pane')) scope = el.closest('.el-tab-pane');
@@ -935,12 +951,13 @@ PAGE_LOCATOR_HELPERS = r'''
         if (anchor) {
           chrome = readChrome(anchor);
           section = collapseSectionTitle(anchor);
+          if (!card) card = cardTitleOf(anchor);
         }
       }
       try {
-        return finishCompose(chrome, section, block);
+        return finishCompose(card, chrome, section, block);
       } catch (e) {
-        return finishCompose(chrome, section, '');
+        return finishCompose(card, chrome, section, '');
       }
     }
     function mergeTitleboxIntoRegion(region, finer) {
@@ -950,7 +967,8 @@ PAGE_LOCATOR_HELPERS = r'''
       if (rid.indexOf('titlebox:') >= 0) return region;
       const chrome = region && region.region_chrome ? region.region_chrome : null;
       const section = (region && region.region_section) || '';
-      const next = finishCompose(chrome, section, String(title));
+      const card = (region && region.region_card) || '';
+      const next = finishCompose(card, chrome, section, String(title));
       return next || region;
     }
     function findTitleboxRegion(host, needle) {

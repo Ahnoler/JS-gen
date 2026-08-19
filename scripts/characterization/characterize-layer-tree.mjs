@@ -11,6 +11,7 @@ import {
   buildTreeFromElements,
   buildTreeFromSteps,
   buildTreeFromGroups,
+  buildTreeFromV3Flat,
 } from '../../scripts/tools/layer-tree-from-properties.mjs';
 
 let failures = 0;
@@ -121,6 +122,28 @@ function testGroupsSynthetic() {
   check(!!p2 && p2.items.length === 1 && p2.items[0].hasBbox === false, '无 rect 控件 hasBbox=false');
 }
 
+// ── 纯函数：buildTreeFromV3Flat（V3.1 flat 分层）──
+function testV3FlatSynthetic() {
+  console.log('[synthetic] buildTreeFromV3Flat');
+  const props = [
+    { type: 'page', propertiesID: '1', propertiesPID: '0', propertiesName: '页面1' },
+    { type: 'dialog', propertiesID: '2', propertiesPID: '1', propertiesName: '地址选择器' },
+    { type: 'ele', propertiesID: '3', propertiesPID: '2', propertiesName: '省份', eventTypeValue: 'select', regionId: 'overlay:地址选择器', rect: { x1: 1, y1: 2, x2: 30, y2: 20 } },
+    { type: 'ele', propertiesID: '4', propertiesPID: '1', propertiesName: '产品名称', eventTypeValue: 'input', regionId: 'card:产品目录', rect: { x1: 1, y1: 2, x2: 30, y2: 20 } },
+  ];
+  const tree = buildTreeFromV3Flat(props);
+  check(countLeaves(tree) === 2, `2 个控件全部挂树（实际 ${countLeaves(tree)}）`);
+  check(tree.children.length === 1, `1 个顶层页面节点（实际 ${tree.children.length}）`);
+  const page = tree.children[0];
+  check(!!page && page.role === 'page' && page.label === '页面1', 'page 节点存在');
+  const dialog = page && page.children.find((c) => c.role === 'dialog' && c.label === '地址选择器');
+  check(!!dialog, 'dialog 挂在 page 下');
+  check(!!dialog && dialog.items.length === 1 && dialog.items[0].name === '省份', '弹窗控件挂 dialog 下（跳过重复 overlay 层）');
+  const card = page && page.children.find((c) => c.role === 'card' && c.label === '产品目录');
+  check(!!card, 'card 挂在 page 下');
+  check(!!card && card.items.length === 1 && card.items[0].name === '产品名称', '卡片控件挂 card 下');
+}
+
 function testHtmlSource() {
   console.log('[html] buildHtml 交互结构（源码）');
   const src = readFileSync(new URL('../../scripts/tools/layer-tree-from-properties.mjs', import.meta.url), 'utf8');
@@ -177,6 +200,7 @@ async function main() {
   testElementsSynthetic();
   testPropertiesSynthetic();
   testGroupsSynthetic();
+  testV3FlatSynthetic();
   testHtmlSource();
   await testRealData();
   if (failures) {

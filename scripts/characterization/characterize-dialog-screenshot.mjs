@@ -55,6 +55,34 @@ assert.equal(e.file, undefined, 'no file field');
 assert.equal(e.expires, undefined, 'no expires field');
 assert.equal(idByDialog.get('地址选择器'), Number(e.propertiesID), 'idByDialog maps dialog title to entry numeric id');
 
+// With step -> phase mapping, dialog screenshot should be attached to its parent page
+const withParent = buildScreenshotEntries({
+  traj: { id: 157, steps: [{ id: 500, trajectoryPhaseId: 7 }] },
+  phases: [{ id: 7, phaseNumber: 2, description: '页面2' }],
+  phaseScreenshots: [
+    { id: 700, trajectoryPhaseId: 7, imageUrl: 'http://minio/uara-step-phase-picture/screenshots/page-2.png' },
+  ],
+  dialogScreenshots: [
+    {
+      id: 456,
+      trajectoryStepId: 500,
+      imageUrl: 'http://minio/uara-step-phase-picture/screenshots/dialog-456.png',
+      metadataJson: {
+        dialog: true,
+        phaseNumber: 2,
+        dialogKey: 'page-2|dialog:地址选择器',
+        dialogTitle: '地址选择器',
+        rect: { x1: 10, y1: 20, x2: 310, y2: 420 },
+      },
+    },
+  ],
+});
+const withParentPage = withParent.entries.find((x) => x.type === 'page');
+const withParentDialog = withParent.entries.find((x) => x.type === 'dialog');
+assert.equal(withParent.entries.length, 2, 'page + dialog entries exist');
+assert.equal(withParentDialog.propertiesPID, withParentPage.propertiesID, 'dialog.propertiesPID points to parent page');
+assert.deepEqual(withParentDialog.rect, { x1: 10, y1: 20, x2: 310, y2: 420 }, 'dialog.rect passes through from metadataJson.rect');
+
 // buildV3Properties should assign dialog pid (numeric, pointing at screenshot entry id) for overlay steps
 const dialogShotId = idByDialog.get('地址选择器');
 const { properties } = buildV3Properties({

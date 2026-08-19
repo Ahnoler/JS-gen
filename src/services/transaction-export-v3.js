@@ -146,6 +146,15 @@ export function buildScreenshotEntries({
   const idByDialog = new Map();
   let nextId = 1;
 
+  // 弹窗截图行只有 trajectory_step_id，没有 trajectory_phase_id；
+  // 通过 traj.steps 建立 stepId -> phaseId 映射，用于把弹窗挂到所属页面截图下。
+  const stepPhaseById = new Map();
+  for (const s of traj.steps || []) {
+    if (s.id != null && s.trajectoryPhaseId != null) {
+      stepPhaseById.set(Number(s.id), Number(s.trajectoryPhaseId));
+    }
+  }
+
   const phaseList = [...(phases || [])]
     .sort((a, b) => Number(a.phaseNumber ?? a.phase_number ?? 0) - Number(b.phaseNumber ?? b.phase_number ?? 0));
 
@@ -189,6 +198,14 @@ export function buildScreenshotEntries({
     if (!url) continue; // 本地暂存未上传，跳过
     const entryId = nextId;
     nextId += 1;
+    const stepId = dlg.trajectoryStepId != null ? Number(dlg.trajectoryStepId) : null;
+    const phaseId = stepId != null ? stepPhaseById.get(stepId) : null;
+    const parentPageId = phaseId != null ? idByPhase.get(phaseId) : null;
+    const rawRect = meta?.rect || dlg.rect || {};
+    const dlgRect = Number.isFinite(Number(rawRect?.x1)) && Number.isFinite(Number(rawRect?.y1))
+      && Number.isFinite(Number(rawRect?.x2)) && Number.isFinite(Number(rawRect?.y2))
+      ? { x1: Number(rawRect.x1), y1: Number(rawRect.y1), x2: Number(rawRect.x2), y2: Number(rawRect.y2) }
+      : {};
     entries.push({
       propertiesName: name || 'overlay',
       eventTypeValue: 'click',
@@ -201,11 +218,11 @@ export function buildScreenshotEntries({
       type: dlg.type || 'dialog',
       screenshot: [url],
       propertiesID: String(entryId),
-      propertiesPID: '0',
+      propertiesPID: parentPageId != null ? String(parentPageId) : '0',
       realLabel: '',
       regionId: '',
       regionLabel: '',
-      rect: {},
+      rect: dlgRect,
     });
     if (name) idByDialog.set(name, entryId);
   }
