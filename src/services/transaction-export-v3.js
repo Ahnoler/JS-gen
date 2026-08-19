@@ -217,7 +217,7 @@ export function buildScreenshotEntries({
         }
       }
     }
-    return { entries, idByPhase, idByDialog, idByPageLevel, pageLevelById };
+    return { entries, idByPhase, idByDialog, idByPageLevel, pageLevelById, usedPageLevelScreenshots: true };
   }
 
   // 旧链路（phase_highlight + 步骤弹窗截图）保留，兼容未重录数据。
@@ -313,7 +313,7 @@ export function buildScreenshotEntries({
     if (name) idByDialog.set(name, entryId);
   }
 
-  return { entries, idByPhase, idByDialog, idByPageLevel, pageLevelById };
+  return { entries, idByPhase, idByDialog, idByPageLevel, pageLevelById, usedPageLevelScreenshots: false };
 }
 
 /**
@@ -465,8 +465,10 @@ export function buildV3Properties({
 }
 
 /**
- * 页面级截图覆盖校验：每个 ele 必须能找到 type=page/dialog 的父截图条目。
- * @returns {{ ok: boolean, missing: Array }}
+ * 页面级截图覆盖校验：每个可定位的 ele 必须能找到 type=page/dialog 的父截图条目。
+ * 无可定位信息的可导出步骤（无 elementType / regionId / rect / realLabel）不作为控件参与校验，
+ * 避免无 element_json 的历史可导出步骤在新链路上硬阻断整条交易。
+ * @returns {{ ok: boolean, missing: Array, exempt: Array }}
  */
 export function validatePageLevelCoverage(entry) {
   const props = Array.isArray(entry?.transcationProperties) ? entry.transcationProperties : [];
@@ -476,8 +478,23 @@ export function validatePageLevelCoverage(entry) {
       .map((p) => String(p.propertiesID ?? '')),
   );
   const missing = [];
+  const exempt = [];
+  const isLocatable = (p) => !!(
+    String(p.elementType || '').trim()
+    || String(p.regionId || '').trim()
+    || (p.rect && Object.keys(p.rect).length > 0)
+    || String(p.realLabel || '').trim()
+  );
   for (const p of props) {
     if (p.type !== 'ele') continue;
+    if (!isLocatable(p)) {
+      exempt.push({
+        propertiesID: p.propertiesID || '',
+        propertiesPID: p.propertiesPID || '0',
+        propertiesName: p.propertiesName || '',
+      });
+      continue;
+    }
     const pid = String(p.propertiesPID ?? '');
     if (!pid || pid === '0' || !shotIds.has(pid)) {
       missing.push({
@@ -488,7 +505,7 @@ export function validatePageLevelCoverage(entry) {
       });
     }
   }
-  return { ok: missing.length === 0, missing };
+  return { ok: missing.length === 0, missing, exempt };
 }
 
 /**
@@ -517,6 +534,7 @@ export function buildTransactionEntryV3(traj, {
     idByDialog,
     idByPageLevel,
     pageLevelById,
+    usedPageLevelScreenshots,
   } = buildScreenshotEntries({
     traj,
     phases,
@@ -566,6 +584,8 @@ export function buildTransactionEntryV3(traj, {
       absoluteFallback,
       missingOptions,
       noRectControls,
+      coverageMode: usedPageLevelScreenshots ? 'page_level' : 'legacy_phase_fallback',
+      coverageExemptSteps: coverage.exempt.length,
       missingPageLevelScreenshots: coverage.missing.length,
       missingPageLevelKeys: coverage.missing.map((m) => m.regionId || m.propertiesPID).filter(Boolean),
     },
@@ -600,7 +620,9 @@ export function wrapTransactionListV3(builtEntries = []) {
   let missingOptions = 0;
   let noRectControls = 0;
   let missingPageLevelScreenshots = 0;
+  let coverageExemptSteps = 0;
   const missingPageLevelKeys = [];
+  const coverageModes = new Set();
 
   for (const b of builtEntries) {
     if (!b?.entry) continue;
@@ -611,6 +633,8 @@ export function wrapTransactionListV3(builtEntries = []) {
     missingOptions += Number(b.stats?.missingOptions) || 0;
     noRectControls += Number(b.stats?.noRectControls) || 0;
     missingPageLevelScreenshots += Number(b.stats?.missingPageLevelScreenshots) || 0;
+    coverageExemptSteps += Number(b.stats?.coverageExemptSteps) || 0;
+    if (b.stats?.coverageMode) coverageModes.add(b.stats.coverageMode);
     for (const key of b.stats?.missingPageLevelKeys || []) {
       if (key && !missingPageLevelKeys.includes(key)) missingPageLevelKeys.push(key);
     }
@@ -626,6 +650,8 @@ export function wrapTransactionListV3(builtEntries = []) {
       absoluteFallback,
       missingOptions,
       noRectControls,
+      coverageMode: coverageModes.size === 1 ? [...coverageModes][0] : [...coverageModes].join('+'),
+      coverageExemptSteps,
       missingPageLevelScreenshots,
       missingPageLevelKeys,
     },

@@ -223,7 +223,7 @@ export const GROUP_EXPORT = [
           '控件步骤条目：eventTypeValue=click/input/...、elementType=xpath、mothed=By.XPATH、type=ele、screenshot=[]空数组、rect=坐标或{}；弹窗内控件 rect 相对弹窗截图',
           'propertiesID 为字符串顺序号（截图先占 "1".."N"，控件续接 "N+1"..）；propertiesPID=所属截图条目的 id（字符串，控件→截图关联键）；page 截图 propertiesPID="0"（无父），dialog 截图 propertiesPID=所属 page 截图 id',
           'rect/realLabel/regionId/regionLabel/screenshot 统一恒有（无值给 {}/""/[]）；无 scanIndex、无 id/pid/label（改 propertiesID/propertiesPID/realLabel，均为字符串）',
-          '页面级截图覆盖校验：每个 ele 必须有父截图条目；缺失时单条 push 返回 409 code=page_level_screenshot_missing，批量推送整批失败并列出 missingPageLevelScreenshots',
+          '页面级截图覆盖校验：可定位的 ele（有 elementType/regionId/rect/realLabel）必须有父截图条目；无 element_json 的可导出步骤不参与覆盖校验；缺失时单条 push 返回 409 code=page_level_screenshot_missing，批量推送整批失败并列出 missingPageLevelScreenshots；stats.coverageMode=page_level|legacy_phase_fallback',
         ],
       },
     ],

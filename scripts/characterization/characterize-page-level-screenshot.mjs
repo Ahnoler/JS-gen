@@ -91,6 +91,7 @@ const ok = (n) => console.log(`ok: ${n}`);
       steps: [
         { stepNumber: 1, actionType: 'fill_form_field', source: 'agent', elementJson: { tag: 'input', target_kind: 'form_input', formLabel: '产品名称', region_id: `${pageKey}|card:产品目录`, page_bbox: { x1: 10, y1: 20, x2: 200, y2: 40 } }, paramsJson: {} },
         { stepNumber: 2, actionType: 'select_option', source: 'agent', elementJson: { tag: 'input', target_kind: 'form_select', formLabel: '省份', region_id: `${popupKey}|overlay:地址选择器`, page_bbox: { x1: 120, y1: 220, x2: 320, y2: 240 } }, paramsJson: {} },
+        { stepNumber: 3, actionType: 'click_element_by_index', source: 'agent', elementJson: null, paramsJson: { text: '确认' } },
       ],
     },
     screenshotCount: entries.length,
@@ -99,13 +100,16 @@ const ok = (n) => console.log(`ok: ${n}`);
     idByDialog: new Map(),
     idByPhase: new Map(),
   });
-  assert.equal(properties.length, 2);
+  assert.equal(properties.length, 3);
   assert.equal(properties[0].propertiesPID, page.propertiesID);
   assert.equal(properties[1].propertiesPID, dialog.propertiesID);
   assert.deepEqual(properties[1].rect, { x1: 20, y1: 20, x2: 220, y2: 40 });
+  assert.equal(properties[2].propertiesPID, '0');
 
   const covered = validatePageLevelCoverage({ transcationProperties: [...entries, ...properties] });
   assert.equal(covered.ok, true);
+  assert.equal(covered.exempt.length, 1);
+  assert.equal(covered.exempt[0].propertiesID, properties[2].propertiesID);
   const missing = validatePageLevelCoverage({ transcationProperties: [...entries, { ...properties[0], propertiesPID: '0' }] });
   assert.equal(missing.ok, false);
   assert.equal(missing.missing.length, 1);

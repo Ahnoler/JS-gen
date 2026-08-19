@@ -245,6 +245,11 @@ function testPageLevelScreenshots() {
           elementJson: { tag: 'input', target_kind: 'form_select', formLabel: '省份', region_id: `${popupKey}|overlay:地址选择器`, bbox: { x1: 120, y1: 220, x2: 320, y2: 240 } },
           paramsJson: {},
         },
+        {
+          stepNumber: 3, actionType: 'click_element_by_index', source: 'agent',
+          elementJson: null,
+          paramsJson: { text: '确认' },
+        },
       ],
     },
     screenshotCount: entries.length,
@@ -253,9 +258,11 @@ function testPageLevelScreenshots() {
     idByDialog: new Map(),
     idByPhase: new Map(),
   });
-  check(properties.length === 2, `页面级控件 = 2（实际 ${properties.length}）`);
+  check(properties.length === 3, `页面级控件 = 3（含无 element_json 可导出步骤，实际 ${properties.length}）`);
   const pageCtrl = properties[0];
   const popupCtrl = properties[1];
+  const noElement = properties[2];
+  check(noElement.propertiesPID === '0', '无 element_json 步骤 pid=0（coverage 豁免）');
   check(pageCtrl.propertiesPID === pageShot.propertiesID, '页面控件 pid 指向 page');
   check(pageCtrl.regionId === `${pageKey}|card:产品目录`, '页面控件 regionId 保留 pageKey|card');
   check(popupCtrl.propertiesPID === dialogShot.propertiesID, '弹窗控件 pid 指向 dialog');
@@ -263,6 +270,7 @@ function testPageLevelScreenshots() {
 
   const covered = validatePageLevelCoverage({ transcationProperties: [...entries, ...properties] });
   check(covered.ok === true, '页面级截图覆盖校验通过');
+  check(covered.exempt.length === 1 && covered.exempt[0].propertiesID === noElement.propertiesID, '无 element_json 步骤被 coverage 豁免');
   const missing = validatePageLevelCoverage({ transcationProperties: [...entries, { ...properties[0], propertiesPID: '0' }] });
   check(missing.ok === false && missing.missing.length === 1, '缺截图时覆盖校验失败并返回 missing');
 
