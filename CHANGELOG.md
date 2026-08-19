@@ -9,7 +9,29 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ## [Unreleased]
 
+### Changed
+
+- 2026-08-19: **V3 批量推送结构重大变更——截图合并进 transcationProperties**：发给 partner 的 payload **只含 `transcationEventTypeList`**（顶层移除 `payload.screenshots`，截图已合并进每个 entry 的 `transcationProperties`，截图条目与控件步骤条目同构、统一 schema，消费方后端只需一张表存储）。截图条目：`eventTypeValue="click"`/`eventTypeName="点击"`/`elementType=""`/`mothed=""`/`type`沿用原 screenshots type（`page`/`dialog`）/`screenshot`=[MinIO 永久直链]数组/`rect={}`/`propertiesPID="0"`（无父）/`realLabel=""`。控件步骤条目：保持 V2 五核心字段语义，`type="ele"`/`elementType`=xpath/`mothed="By.XPATH"`/`screenshot=[]`空数组/`rect`=坐标或`{}`/`realLabel`承接原 label 值。`id`/`pid`/`label` 三字段改名：`id`→`propertiesID`（字符串顺序号，截图先占 `"1"`..`"N"`，控件续接 `"N+1"`..）、`pid`→`propertiesPID`（字符串，控件指向所属截图条目的 propertiesID；截图=`"0"`）、`label`→`realLabel`（承接原 label 语义）；移除 `scanIndex`、移除 `step-N`/`page-N` 前缀；控件→截图关联键由 `propertiesPID` 指向截图 `propertiesID`（字符串相等，取代旧 `pid==="page-N"`===`screenshot.key`）。`rect`/`realLabel`/`regionId`/`regionLabel`/`screenshot` 统一恒有（无值给 `{}`/`""`/`[]`，旧实现是条件 omit）。弹窗关联键修正：`idByDialog` 用弹窗标题（`name`/`dialogTitle`）而非 `dialogKey`，与控件侧 `overlay.label` 对齐。
+  影响范围：V3 导出服务契约（`payload` 只含 `transcationEventTypeList`；`transcationProperties[]` 统一 schema，截图+控件同构；`id`/`pid`/`label` 改名 `propertiesID`/`propertiesPID`/`realLabel`）、V3 批量路由（`okBuilt` 去掉 `screenshots` 字段）、API docs、characterization。无 schema/WS 变更；V2 不受影响（V2 精简版本无 screenshots）。
+  文件：src/services/transaction-export-v3.js, src/routes/v2/export-mgmt.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-export-v3.mjs, scripts/characterization/characterize-dialog-screenshot.mjs
+  Python 同步提示：**契约重大变更**。发给 partner 的 payload 只有 `transcationEventTypeList`（无顶层 `screenshots`）。一条 `transcationProperties` 既可能是截图（`type=page`/`dialog`，`eventTypeValue=click`，`screenshot` 数组有值，`elementType`/`mothed` 空，`propertiesPID="0"`）也可能是控件步骤（`type=ele`，`eventTypeValue=click`/`input`/...，`elementType`=xpath，`mothed=By.XPATH`，`screenshot` 空数组）——用 `type` 字段区分条目种类，消费方单表存储。注意字段改名：`id`→`propertiesID`（字符串）、`pid`→`propertiesPID`（字符串）、`label`→`realLabel`；控件 `propertiesPID` 指向截图条目的 `propertiesID`（字符串相等）。若 Python 控制面自行组装 V3 payload，对齐新结构：`payload = { transcationEventTypeList: [...] }`，每个 entry 的 `transcationProperties` 含统一 schema 的截图+控件条目。前提不变：MinIO bucket `uara-step-phase-picture` 已设公开读策略，截图 `screenshot[0]` 为永久直链。
+
+- 2026-08-19: **V3 批量推送 payload.screenshots 字段变更**（已被上一条"截图合并进 transcationProperties"取代，保留作历史记录）：每个截图条目改为只给一个永久有效的 `url`（MinIO 公网直链，bucket `uara-step-phase-picture` 已设公开读策略，匿名可访问），消费方直接用该 url 访问图片，无需 MinIO SDK / 预签名。去掉此前的 `bucket`+`file` 方案与 `expires` 字段。`url` 取值：优先用 `screenshot.image_url`（上传时由 `uploadScreenshot` 存的公网直链），缺失时用 `MINIO_PUBLIC_URL + MINIO_BUCKET + storage_path` 兜底拼接。`buildV3Screenshots` 守卫：拿不到 url 的截图（本地暂存未上传且无公网直链兜底）被跳过。同步移除配置 `PUSH_V3_SCREENSHOT_BUCKET` / `PUSH_V3_SCREENSHOT_EXPIRES`（bucket 统一来自 `MINIO_BUCKET`；截图 URL 现在是永久直链，不再有"有效期"概念）。
+  影响范围：V3 导出服务契约（`payload.screenshots[]` 结构：`{ phaseNumber, type, key, name, url }`，批量再加 `trajectoryId`，无 `bucket`/`file`/`expires`）、screenshot DAO（`listPhaseHighlightsByTrajectory` / `listDialogScreenshotsByTrajectory` 新增返回 `storagePath`/`storageType`/`imageUrl`）、config（移除两个 `PUSH_V3_SCREENSHOT_*`）、API docs、characterization。无 schema/WS 变更；V2 不受影响。
+  文件：src/services/transaction-export-v3.js, src/dao/screenshot-dao.js, config/config.js, config/.env.example, src/dashboard/api-docs/groups/export-mgmt.js, scripts/characterization/characterize-export-v3.mjs, scripts/characterization/characterize-dialog-screenshot.mjs
+  Python 同步提示：**契约变更**。消费方（含 Python 控制面若消费 V3 推送）直接用 `payload.screenshots[].url` 访问图片（MinIO 公网永久直链），不再需要 bucket+file 调 MinIO SDK、也不再依赖 JS-gen 的 `/api/v2/screenshots/:id/image`；`bucket`/`file`/`expires` 字段不再下发。若 Python 控制面自行组装 V3 payload，对齐新结构：`{ phaseNumber, type, key, name, url }`（批量再加 `trajectoryId`）。前提：MinIO bucket 已设公开读（anonymous read）策略，否则直链不可匿名访问——需在 MinIO 控制台为 `uara-step-phase-picture` 配 `download` 匿名策略。
+
 ### Added
+
+- 2026-08-19: **待上传截图一键补传**：新增 `POST /api/v2/screenshots/pending/upload`（立即把全部 `storage_type='local'` 待传项推送到 MinIO，忽略重试间隔与已达 `SCREENSHOT_MAX_RETRY` 上限，返回 `{scanned,uploaded,failed,skipped}`）与 `POST /api/v2/screenshots/:id/upload`（单行补传）。`screenshot-service.js` 新增 `uploadPendingScreenshots()` / `uploadPendingScreenshot(id)`（复用 `retryPendingScreenshots` 的上传+DB 标记+删本地文件链路；单行补传失败回滚已上传的 MinIO 对象）。API docs 新增「待上传截图」实时面板（`monitor` 组）：列表展示 `GET /api/v2/screenshots/pending` 的待传项（ID/类型/归属/MIME/大小/重试次数/上次重试/创建时间），支持「一键上传全部」「单行上传」「预览」「删除」「每 5s 自动刷新」。
+  影响范围：新增路由（`/api/v2/screenshots/pending/upload`、`/api/v2/screenshots/:id/upload`）、截图服务、API docs 前端（catalog 新增 `GROUP_PENDING_SCREENSHOTS` + `pending-screenshots.js` 挂载模块 + app.js 分发 + css）。
+  文件：src/routes/v2/screenshot.js, src/services/screenshot-service.js, src/dashboard/api-docs/catalog.js, src/dashboard/api-docs/app.js, src/dashboard/api-docs/pending-screenshots.js, src/dashboard/api-docs/api-docs.css
+  Python 同步提示：无 schema 变更。新增两个补传端点为 Node 控制面运营操作（把本地暂存截图推到 MinIO），Python 侧无感知；若 Python 也实现待传列表，对齐 `GET /api/v2/screenshots/pending`（已存在）与这两个 POST 端点的响应语义。
+
+- 2026-08-19: **MinIO bucket 配置**：`config/.env` 启用 MinIO（`MINIO_HOST=http://172.19.87.169:9001`、`MINIO_ACCESS_KEY=admin`、`MINIO_SECRET_KEY=tansun@123`、`MINIO_BUCKET=uara-step-phase-picture`、`MINIO_PUBLIC_URL=http://172.19.87.169:9001`）。bucket 由 `ensureBucket()` 首次上传时自动创建（无需手工建桶）。`isMinioConfigured()` 由 false 变 true，截图走 MinIO 而非本地暂存；存量 `storage_type='local'` 行由后台重试循环或新增一键补传端点处理。
+  影响范围：仅 `config/.env`（运行环境配置，不入 schema/路由/WS 契约）。
+  文件：config/.env
+  Python 同步提示：无。`.env` 为本地运行配置不随仓库同步；Python 侧如需独立 MinIO，参照 `config/.env.example` 的 `MINIO_*` 模板配置。
 
 - 2026-08-19: **补齐 MinIO 依赖**：将 `minio`（`^8.0.7`）加入 `package.json` 并安装，修复 `npm start` 启动时报 `ERR_MODULE_NOT_FOUND: Cannot find package 'minio'`（`src/services/minio-service.js` 顶层 `import { Client } from 'minio'` 无法解析）。不影响 schema/路由/WS；`package-lock.json` 同步更新。
   影响范围：依赖声明（`package.json` / `package-lock.json`）。

@@ -200,7 +200,7 @@ export async function replaceDialogForStep(screenshot) {
 
 export async function listPhaseHighlightsByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
-    .select('id', 'trajectory_phase_id', 'metadata_json')
+    .select('id', 'trajectory_phase_id', 'metadata_json', 'storage_path', 'storage_type', 'image_url')
     .where({ trajectory_id: trajectoryId, kind: 'phase_highlight' });
   return fromDbRows(rows).map((r) => {
     let metadataJson = null;
@@ -209,13 +209,20 @@ export async function listPhaseHighlightsByTrajectory(trajectoryId) {
     } else if (r.metadataJson != null) {
       metadataJson = r.metadataJson;
     }
-    return { id: r.id, trajectoryPhaseId: r.trajectoryPhaseId, metadataJson };
+    return {
+      id: r.id,
+      trajectoryPhaseId: r.trajectoryPhaseId,
+      metadataJson,
+      storagePath: r.storagePath || null,
+      storageType: r.storageType || null,
+      imageUrl: r.imageUrl || null,
+    };
   });
 }
 
 export async function listDialogScreenshotsByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
-    .select('id', 'trajectory_step_id', 'trajectory_phase_id', 'metadata_json')
+    .select('id', 'trajectory_step_id', 'trajectory_phase_id', 'metadata_json', 'storage_path', 'storage_type', 'image_url')
     .where({ trajectory_id: trajectoryId, kind: 'phase_highlight' })
     .whereNull('trajectory_phase_id')
     .whereNotNull('trajectory_step_id');
@@ -232,6 +239,9 @@ export async function listDialogScreenshotsByTrajectory(trajectoryId) {
       trajectoryStepId: r.trajectoryStepId,
       trajectoryPhaseId: r.trajectoryPhaseId,
       metadataJson,
+      storagePath: r.storagePath || null,
+      storageType: r.storageType || null,
+      imageUrl: r.imageUrl || null,
     };
   }).filter(Boolean);
 }

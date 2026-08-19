@@ -62,13 +62,6 @@ export const FORM_LLM_MODEL = _resolve('FORM_LLM_MODEL', 'deepseek-v4-flash');
 export const FORM_LLM_BASE_URL = _resolve('FORM_LLM_BASE_URL', LLM_BASE_URL || 'https://api.deepseek.com');
 export const FORM_LLM_API_KEY = _resolve('FORM_LLM_API_KEY', LLM_API_KEY);
 
-// Batch push V3 screenshot metadata
-export const PUSH_V3_SCREENSHOT_BUCKET = _resolve('PUSH_V3_SCREENSHOT_BUCKET', 'uara');
-export const PUSH_V3_SCREENSHOT_EXPIRES = parseInt(
-  _resolve('PUSH_V3_SCREENSHOT_EXPIRES', '3600'),
-  10,
-) || 3600;
-
 // MinIO — screenshot / image object storage
 const MINIO_HOST_DEFAULT = _resolve('MINIO_HOST', '');
 let _minioUrl = null;

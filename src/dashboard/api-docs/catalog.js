@@ -31,10 +31,20 @@ export const GROUP_SLOT_MONITOR = [{
   monitor: true,
 }];
 
+/** Live pending-screenshots board (not an HTTP endpoint group). */
+export const GROUP_PENDING_SCREENSHOTS = [{
+  id: 'pending-screenshots',
+  name: '待上传截图',
+  description: '本地暂存、尚未上传 MinIO 的截图；一键上传 / 单行上传 / 删除',
+  endpoints: [],
+  monitor: true,
+}];
+
 /** @type {TagGroup[]} */
 export const API_GROUPS = [
   GROUP_OVERVIEW[0], // 概览
   ...GROUP_SLOT_MONITOR,
+  ...GROUP_PENDING_SCREENSHOTS,
   ...GROUP_OVERVIEW.slice(1), // 系统管理 …
   ...GROUP_AUTH, // 登录鉴权（SSO）
   ...GROUP_HIERARCHY,

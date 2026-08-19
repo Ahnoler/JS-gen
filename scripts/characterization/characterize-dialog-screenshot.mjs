@@ -4,18 +4,19 @@
  */
 import assert from 'node:assert/strict';
 import {
-  buildV3Screenshots,
+  buildScreenshotEntries,
   buildV3Properties,
 } from '../../src/services/transaction-export-v3.js';
 
-// buildV3Screenshots should output type=dialog from dialogScreenshots rows
-const shots = buildV3Screenshots({
+// buildScreenshotEntries should output type=dialog entry from dialogScreenshots rows
+const { entries, idByDialog } = buildScreenshotEntries({
   traj: { id: 157 },
   phases: [],
   phaseScreenshots: [],
   dialogScreenshots: [
     {
       id: 456,
+      imageUrl: 'http://minio/uara-step-phase-picture/screenshots/dialog-456.png',
       metadataJson: {
         dialog: true,
         phaseNumber: 2,
@@ -25,12 +26,37 @@ const shots = buildV3Screenshots({
     },
   ],
 });
-assert.equal(shots.length, 1, 'should output one dialog screenshot');
-assert.equal(shots[0].type, 'dialog', 'type=dialog');
-assert.equal(shots[0].key, 'page-2|dialog:地址选择器', 'key matches pid');
-assert.equal(shots[0].url, '/api/v2/screenshots/456/image', 'url uses screenshot id');
+assert.equal(entries.length, 1, 'should output one dialog screenshot entry');
+const e = entries[0];
+assert.equal(e.type, 'dialog', 'type=dialog');
+assert.equal(e.eventTypeValue, 'click', 'eventTypeValue=click');
+assert.equal(e.eventTypeName, '点击', 'eventTypeName=点击');
+assert.equal(e.elementType, '', 'elementType empty');
+assert.equal(e.mothed, '', 'mothed empty');
+assert.ok(Array.isArray(e.screenshot) && e.screenshot[0] === 'http://minio/uara-step-phase-picture/screenshots/dialog-456.png', 'screenshot array has url');
+assert.equal(typeof e.propertiesID, 'string', 'propertiesID is string');
+assert.equal(e.propertiesID, '1', 'propertiesID="1"');
+assert.equal(typeof e.propertiesPID, 'string', 'propertiesPID is string');
+assert.equal(e.propertiesPID, '0', 'propertiesPID="0" (no parent)');
+assert.equal(e.realLabel, '', 'realLabel empty');
+assert.equal(e.id, undefined, 'no id field (use propertiesID)');
+assert.equal(e.pid, undefined, 'no pid field (use propertiesPID)');
+assert.equal(e.label, undefined, 'no label field (use realLabel)');
+assert.equal(e.regionId, '', 'regionId empty');
+assert.equal(e.regionLabel, '', 'regionLabel empty');
+assert.deepEqual(e.rect, {}, 'rect empty object');
+assert.equal(e.scanIndex, undefined, 'no scanIndex');
+assert.equal(e.key, undefined, 'no key field');
+assert.equal(e.name, undefined, 'no name field');
+assert.equal(e.phaseNumber, undefined, 'no phaseNumber field');
+assert.equal(e.url, undefined, 'no url field (use screenshot array)');
+assert.equal(e.bucket, undefined, 'no bucket field');
+assert.equal(e.file, undefined, 'no file field');
+assert.equal(e.expires, undefined, 'no expires field');
+assert.equal(idByDialog.get('地址选择器'), Number(e.propertiesID), 'idByDialog maps dialog title to entry numeric id');
 
-// buildV3Properties should assign dialog pid for overlay steps
+// buildV3Properties should assign dialog pid (numeric, pointing at screenshot entry id) for overlay steps
+const dialogShotId = idByDialog.get('地址选择器');
 const { properties } = buildV3Properties({
   traj: {
     id: 157,
@@ -54,7 +80,10 @@ const { properties } = buildV3Properties({
     ],
   },
   phases: [{ id: 2, phaseNumber: 2, description: '' }],
+  screenshotCount: entries.length,
+  idByPhase: new Map(),
+  idByDialog,
 });
-assert.equal(properties[0].pid, 'page-2|dialog:地址选择器', 'dialog pid matches dialogKey');
+assert.equal(properties[0].propertiesPID, String(dialogShotId), 'dialog propertiesPID (string) points at screenshot entry id');
 
 console.log('ok: characterize-dialog-screenshot');

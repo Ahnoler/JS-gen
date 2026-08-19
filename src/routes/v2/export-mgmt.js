@@ -566,7 +566,6 @@ export default function (app) {
           if (entry) {
             okBuilt.push({
               entry,
-              screenshots: result.payload?.screenshots || [],
               count: result.count,
               skipped: result.skipped,
               stats: result.stats,

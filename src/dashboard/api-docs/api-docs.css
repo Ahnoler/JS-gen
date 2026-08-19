@@ -551,6 +551,44 @@ a:hover { text-decoration: underline; }
 .mon-log-summary::-webkit-details-marker { display: none; }
 .mon-log-pre { max-height: 280px; margin-top: 8px; }
 
+/* Pending screenshots board */
+.ps-panel { padding: 14px 16px 18px; }
+.ps-summary { font-size: 12px; }
+.ps-status { font-size: 12px; }
+.ps-body { min-height: 60px; }
+.ps-empty { padding: 28px 12px; text-align: center; }
+.ps-table .ps-row:hover { background: #f8fafc; }
+.ps-traj { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-mono { font-size: 11px; }
+.ps-muted { color: var(--docs-muted); font-size: 12px; }
+.ps-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.ps-btn { padding: 4px 8px; font-size: 11px; }
+.ps-btn-link {
+  text-decoration: none;
+  border: 1px solid var(--docs-border);
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+.ps-btn-link:hover { background: #f8fafc; }
+.ps-btn-danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+.ps-btn-danger:hover { background: #fee2e2; }
+.ps-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.ps-badge-before { background: #e0f2fe; color: #0369a1; }
+.ps-badge-after { background: #dcfce7; color: #15803d; }
+.ps-badge-phase_highlight { background: #ede9fe; color: #6d28d9; }
+.ps-badge-unknown { background: #f3f4f6; color: #6b7280; }
+
 @media (max-width: 900px) {
   body { grid-template-columns: 1fr; }
   .docs-sidebar {

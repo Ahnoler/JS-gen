@@ -182,13 +182,13 @@ export const GROUP_EXPORT = [
           '无 access_token（头/body/env）→ 400',
           '对方业务失败 → 502，不翻转 isExport',
           '仅 completed（已确认）可推送；draft/recording/failed 等 → item 失败 code=not_pushable_status（单轨 push → 409）',
-          'V2 精简版不含 phases（阶段截图/全量元素由 V3 优化版 transcationProperties + payload.screenshots 承担）',
+          'V2 精简版不含 phases（阶段截图/全量元素由 V3 优化版 transcationProperties 承担，截图已合并进 transcationProperties）',
         ],
       },
       {
         method: 'GET', path: '/api/v2/export/trajectories/{id}/transaction-v3',
         summary: '导出/可选推送单轨（V3 优化版）',
-        desc: 'V3 优化版：移除 result.groups，改为 payload.screenshots + transcationProperties 单轨。transcationProperties 在 V2 五个核心字段基础上增加 id/pid/label/regionId/regionLabel/rect/scanIndex；属性不重复输出 url，通过 pid 关联 payload.screenshots。',
+        desc: 'V3 优化版：截图合并进 transcationProperties（截图条目与控件步骤条目同构，消费方单表存储）。payload 只含 transcationEventTypeList。transcationProperties 统一 schema：截图条目（type=page/dialog，eventTypeValue=click，screenshot=[MinIO 永久直链]，elementType/mothed 空）+ 控件步骤条目（type=ele，elementType=xpath，mothed=By.XPATH，screenshot=[]）；propertiesID/propertiesPID 均为字符串顺序号，控件 propertiesPID 指向所属截图条目的 propertiesID，realLabel 承接原 label。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', desc: '轨迹 id', example: '38' },
           { name: 'systemId', type: 'string', in: 'query', desc: '缺省 98', example: '98' },
@@ -206,7 +206,7 @@ export const GROUP_EXPORT = [
       {
         method: 'POST', path: '/api/v2/export/transactions-v3',
         summary: '批量推送（V3 优化版）',
-        desc: '同 V2.0 批量语义（组装/代推/dryRun/raw），使用 payload.screenshots + transcationProperties 单轨结构。',
+        desc: '同 V2.0 批量语义（组装/代推/dryRun/raw）。发给 partner 的 payload 只含 transcationEventTypeList（顶层无 screenshots，截图已合并进每个 entry 的 transcationProperties，消费方单表存储）。',
         params: [
           { name: 'trajectoryIds', type: 'number[]', required: true, in: 'body', desc: '勾选的轨迹 id', example: '[38]' },
           { name: 'systemId', type: 'string', in: 'body', desc: '对方系统 id（缺省 98）', example: '98' },
@@ -216,10 +216,12 @@ export const GROUP_EXPORT = [
         ],
         reqExample: J({ trajectoryIds: [38], systemId: '98', projectId: '31' }),
         notes: [
-          'payload.screenshots：页面/弹窗截图元数据，含 bucket/key/url/expires；批量时每个截图带 trajectoryId',
-          'transcationProperties：V2 五个核心字段 + id/pid/label/regionId/regionLabel/rect/scanIndex',
-          '属性中不重复输出 url，消费方通过 pid 到 payload.screenshots 查 url',
-          'rect 缺失（旧数据无 bbox）时省略该字段，统计在 stats.noRectControls',
+          'payload 只含 transcationEventTypeList（顶层无 screenshots）',
+          'transcationProperties 统一 schema，截图条目与控件步骤条目同构；用 type 字段区分条目种类：page=页面截图、dialog=弹窗截图、ele=控件步骤',
+          '截图条目：eventTypeValue=click、eventTypeName=点击、elementType="、"mothed=空、type=page/dialog、screenshot=[MinIO 永久直链]数组、rect={}；MinIO bucket 已设公开读，匿名可访问',
+          '控件步骤条目：eventTypeValue=click/input/...、elementType=xpath、mothed=By.XPATH、type=ele、screenshot=[]空数组、rect=坐标或{}',
+          'propertiesID 为字符串顺序号（截图先占 "1".."N"，控件续接 "N+1"..）；propertiesPID=所属截图条目的 id（字符串，控件→截图关联键）；截图 propertiesPID="0"（无父）',
+          'rect/realLabel/regionId/regionLabel/screenshot 统一恒有（无值给 {}/""/[]）；无 scanIndex、无 id/pid/label（改 propertiesID/propertiesPID/realLabel，均为字符串）',
           '弹窗独立截图：录制时实时采集，复用 screenshot 表并标记 metadata_json.dialog=true；V3 输出 type=dialog 的截图条目',
         ],
       },

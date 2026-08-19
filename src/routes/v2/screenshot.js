@@ -10,6 +10,31 @@ export default function (app) {
     }
   });
 
+  // One-click bulk upload of all local-pending screenshots to MinIO.
+  app.post('/api/v2/screenshots/pending/upload', async (req, res) => {
+    try {
+      const summary = await screenshotService.uploadPendingScreenshots();
+      res.json(summary);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Upload a single pending screenshot by id (per-row action in the docs UI).
+  app.post('/api/v2/screenshots/:id/upload', async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isFinite(id) || id <= 0) {
+        return res.status(400).json({ error: 'Numeric screenshot id required' });
+      }
+      const result = await screenshotService.uploadPendingScreenshot(id);
+      if (result.status === 'not_found') return res.status(404).json(result);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/v2/screenshots/:id/image', async (req, res) => {
     try {
       const row = await screenshotService.getScreenshotImage(+req.params.id);

@@ -1,15 +1,30 @@
 /**
- * V3 partner transaction export — 优化版（合并 result 到 transcationProperties）。
+ * V3 partner transaction export — 优化版（截图合并进 transcationProperties）。
  *
  * 相对旧 V3.0 变化：
- *   - 移除 `result.groups` 双轨结构。
- *   - `transcationProperties` 作为唯一业务事件数组，并合并控件树信息：
- *     id / pid / label / regionId / regionLabel / rect / scanIndex。
- *   - 页面/弹窗截图统一放在 `payload.screenshots`。
- *   - 属性中不重复输出 `url`，通过 `pid` 关联截图。
+ *   - 截图条目与控件步骤条目同构，统一进 `transcationProperties`，
+ *     消费方后端只需一张表存储（用 `type` 区分：page/dialog=截图，ele=控件）。
+ *   - 发给 partner 的 payload 只含 `transcationEventTypeList`（顶层无 screenshots）。
+ *   - `id` 为纯数字顺序号（截图先占 1..N，控件续接 N+1..），移除 `scanIndex`。
+ *   - 控件 `pid` 指向所属截图条目的数字 `id`（控件→截图关联键）。
+ *   - `rect`/`label`/`regionId`/`regionLabel`/`screenshot` 统一恒有（空给 ""/{}/[]）。
  */
 import { mapStepToTransactionEvent, uniquifyPropertiesNames } from './transaction-export.js';
-import { PUSH_V3_SCREENSHOT_BUCKET, PUSH_V3_SCREENSHOT_EXPIRES } from '../../config/config.js';
+import { MINIO_BUCKET, MINIO_PUBLIC_URL } from '../../config/config.js';
+
+/**
+ * 构建截图永久直链 URL。
+ * 优先用 screenshot.image_url（上传时由 uploadScreenshot 存的 MinIO 公网直链）；
+ * 若缺失（老数据），用 MINIO_PUBLIC_URL + MINIO_BUCKET + storagePath 兜底拼接。
+ * 两者都拿不到时返回 null（调用方据此跳过该截图）。
+ */
+function resolveScreenshotUrl({ imageUrl, storagePath }) {
+  if (imageUrl) return imageUrl;
+  if (storagePath && MINIO_PUBLIC_URL) {
+    return `${MINIO_PUBLIC_URL.replace(/\/+$/, '')}/${MINIO_BUCKET}/${storagePath}`;
+  }
+  return null;
+}
 
 export const TRANSACTION_SCHEMA_VERSION_V3 = 3;
 
@@ -101,10 +116,19 @@ function isLegalRect(bbox) {
 }
 
 /**
- * 构建 payload.screenshots。
+ * 构建截图 properties 条目（与控件步骤条目同构，合并进 transcationProperties）。
  * 页面截图来自 phase_highlight；弹窗截图由后续开发传入 dialogScreenshots。
+ *
+ * 每个条目的 `screenshot` 数组含一个永久有效的直链（MinIO 公网，bucket 已设公开读策略，
+ * 匿名可访问）。消费方直接用该 URL 访问图片，无需 MinIO SDK、无需自建预签名。
+ * 拿不到 URL 的截图（本地暂存未上传且无公网直链兜底）会被跳过（其 id 不占号，后续顺延）。
+ *
+ * @returns {{ entries: Array, idByPhase: Map<number,number>, idByDialog: Map<string,number> }}
+ *   entries      — 截图 properties 条目数组（同构于控件条目）
+ *   idByPhase    — Map<phaseId, entryId>，供页面控件 pid 引用
+ *   idByDialog   — Map<dialogKey, entryId>，供弹窗控件 pid 引用
  */
-export function buildV3Screenshots({
+export function buildScreenshotEntries({
   traj = {},
   phases = [],
   phaseScreenshots = [],
@@ -117,7 +141,11 @@ export function buildV3Screenshots({
     }
   }
 
-  const screenshots = [];
+  const entries = [];
+  const idByPhase = new Map();
+  const idByDialog = new Map();
+  let nextId = 1;
+
   const phaseList = [...(phases || [])]
     .sort((a, b) => Number(a.phaseNumber ?? a.phase_number ?? 0) - Number(b.phaseNumber ?? b.phase_number ?? 0));
 
@@ -126,48 +154,87 @@ export function buildV3Screenshots({
     const phaseNumber = Number(phase.phaseNumber ?? phase.phase_number ?? 0);
     const shot = shotByPhase.get(phaseId) || null;
     if (!shot) continue;
+    const url = resolveScreenshotUrl(shot);
+    if (!url) continue; // 本地暂存未上传且无公网直链兜底，跳过
     const desc = String(phase.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 20);
-    screenshots.push({
-      phaseNumber,
-      bucket: PUSH_V3_SCREENSHOT_BUCKET,
+    const entryId = nextId;
+    nextId += 1;
+    entries.push({
+      propertiesName: `页面${phaseNumber}${desc ? ` · ${desc}` : ''}`,
+      eventTypeValue: 'click',
+      eventTypeName: '点击',
+      elementType: '',
+      mothed: '',
+      options: '',
+      objectValue: '',
+      transcationType: 'playwright',
       type: 'page',
-      key: `page-${phaseNumber}`,
-      name: `页面${phaseNumber}${desc ? ` · ${desc}` : ''}`,
-      url: `/api/v2/screenshots/${Number(shot.id)}/image`,
-      expires: PUSH_V3_SCREENSHOT_EXPIRES,
+      screenshot: [url],
+      propertiesID: String(entryId),
+      propertiesPID: '0',
+      realLabel: '',
+      regionId: '',
+      regionLabel: '',
+      rect: {},
     });
+    idByPhase.set(phaseId, entryId);
   }
 
   for (const dlg of dialogScreenshots || []) {
     const meta = dlg.metadataJson || {};
-    const phaseNumber = Number(dlg.phaseNumber ?? meta.phaseNumber ?? 0);
-    const key = dlg.key || meta.dialogKey || '';
-    const name = dlg.name || meta.dialogTitle || 'overlay';
-    screenshots.push({
-      phaseNumber,
-      bucket: dlg.bucket || PUSH_V3_SCREENSHOT_BUCKET,
+    // 映射键用弹窗标题（name/dialogTitle），与 buildV3Properties 里从控件 region_id
+    // 解析出的 overlay.label 对齐（控件侧只能拿到弹窗标题，拿不到完整 dialogKey）。
+    const name = dlg.name || meta.dialogTitle || '';
+    const url = resolveScreenshotUrl(dlg);
+    if (!url) continue; // 本地暂存未上传，跳过
+    const entryId = nextId;
+    nextId += 1;
+    entries.push({
+      propertiesName: name || 'overlay',
+      eventTypeValue: 'click',
+      eventTypeName: '点击',
+      elementType: '',
+      mothed: '',
+      options: '',
+      objectValue: '',
+      transcationType: 'playwright',
       type: dlg.type || 'dialog',
-      key,
-      name,
-      url: dlg.url || `/api/v2/screenshots/${Number(dlg.id)}/image`,
-      expires: dlg.expires ?? PUSH_V3_SCREENSHOT_EXPIRES,
+      screenshot: [url],
+      propertiesID: String(entryId),
+      propertiesPID: '0',
+      realLabel: '',
+      regionId: '',
+      regionLabel: '',
+      rect: {},
     });
+    if (name) idByDialog.set(name, entryId);
   }
 
-  return screenshots;
+  return { entries, idByPhase, idByDialog };
 }
 
 /**
- * 构建合并后的 transcationProperties。
+ * 构建控件步骤 properties 条目（与截图条目同构，合并进 transcationProperties）。
  * 在 V2 五个核心字段基础上，增加控件树/分层/点亮字段。
+ *
+ * `id` 为纯数字顺序号，续接截图条目之后（起始 id = screenshotCount + 1）。
+ * `pid` 指向所属截图条目的数字 id（页面控件→idByPhase，弹窗控件→idByDialog；
+ *   找不到父截图给 ""，不丢步骤）。
+ * `rect`/`label`/`regionId`/`regionLabel`/`screenshot` 统一恒有（空给 {}/""/[]）。
  */
-export function buildV3Properties({ traj = {}, phases = [] } = {}) {
+export function buildV3Properties({
+  traj = {},
+  phases = [],
+  screenshotCount = 0,
+  idByPhase,
+  idByDialog,
+} = {}) {
   const properties = [];
   let metaActions = 0;
   let absoluteFallback = 0;
   let missingOptions = 0;
   let noRectControls = 0;
-  let scanIndex = 0;
+  let nextId = Number(screenshotCount) || 0;
 
   const phaseById = new Map();
   for (const p of phases || []) {
@@ -186,52 +253,64 @@ export function buildV3Properties({ traj = {}, phases = [] } = {}) {
     const el = parseStepElement(step);
     const phaseId = step.trajectoryPhaseId != null ? Number(step.trajectoryPhaseId) : null;
     const phase = phaseId != null ? phaseById.get(phaseId) : null;
-    const phaseNumber = phase
-      ? Number(phase.phaseNumber ?? phase.phase_number ?? 0)
-      : Number(step.phaseNumber ?? 0);
-    const pageId = `page-${phaseNumber}`;
     const overlay = el ? isOverlayRegion(String(el.region_id ?? '').trim()) : null;
 
-    let pid = pageId;
+    // pid 指向所属截图条目的 id（字符串）：弹窗控件→弹窗截图，否则→页面截图；找不到给 "0"
+    let pid = '0';
     if (overlay) {
       const title = overlay.label || 'overlay';
-      pid = `${pageId}|dialog:${title}`;
+      const found = idByDialog?.get(title);
+      pid = found != null ? String(found) : '0';
+    }
+    if (pid === '0' && phaseId != null) {
+      const found = idByPhase?.get(phaseId);
+      pid = found != null ? String(found) : '0';
     }
 
     const label = el ? String(el.formLabel ?? el.text ?? el.matchedLabel ?? '').trim() : '';
-    const currentScanIndex = scanIndex;
-    scanIndex += 1;
+    nextId += 1;
 
-    const node = {
-      ...publicEv,
-      scanIndex: currentScanIndex,
-      type: 'ele',
-      id: step.stepNumber != null ? `step-${step.stepNumber}` : `step-${currentScanIndex + 1}`,
-      pid,
-    };
-    if (label) node.label = label;
-
+    let rect = {};
     if (el) {
-      const regionId = String(el.region_id ?? '').trim();
-      const regionLabel = String(el.region_label ?? '').trim();
-      if (regionId) node.regionId = regionId;
-      if (regionLabel) node.regionLabel = regionLabel;
       if (isLegalRect(el.bbox)) {
-        node.rect = {
+        rect = {
           x1: Number(el.bbox.x1), y1: Number(el.bbox.y1),
           x2: Number(el.bbox.x2), y2: Number(el.bbox.y2),
         };
       } else {
         noRectControls += 1;
       }
+      const node = {
+        ...publicEv,
+        type: 'ele',
+        screenshot: [],
+        propertiesID: String(nextId),
+        propertiesPID: pid,
+        realLabel: label,
+        regionId: String(el.region_id ?? '').trim(),
+        regionLabel: String(el.region_label ?? '').trim(),
+        rect,
+      };
+      properties.push(node);
     } else {
       noRectControls += 1;
+      const node = {
+        ...publicEv,
+        type: 'ele',
+        screenshot: [],
+        propertiesID: String(nextId),
+        propertiesPID: pid,
+        realLabel: '',
+        regionId: '',
+        regionLabel: '',
+        rect: {},
+      };
+      properties.push(node);
     }
-
-    properties.push(node);
   }
 
-  uniquifyPropertiesNames(properties);
+  // propertiesName 去重在 buildTransactionEntryV3 合并截图+控件后统一做，
+  // 这里只返回控件子集（已含 propertiesName 原值）。
 
   return {
     properties,
@@ -244,7 +323,9 @@ export function buildV3Properties({ traj = {}, phases = [] } = {}) {
 
 /**
  * Build one V3 transaction entry.
- * @returns {{ entry: object, screenshots: Array, count: number, skipped: object, stats: object }}
+ * 截图条目（buildScreenshotEntries）与控件条目（buildV3Properties）合并成一个
+ * transcationProperties 数组：截图在前，控件在后，统一 schema。
+ * @returns {{ entry: object, count: number, skipped: object, stats: object }}
  */
 export function buildTransactionEntryV3(traj, {
   systemId,
@@ -259,20 +340,30 @@ export function buildTransactionEntryV3(traj, {
     throw err;
   }
 
-  const {
-    properties,
-    metaActions,
-    absoluteFallback,
-    missingOptions,
-    noRectControls,
-  } = buildV3Properties({ traj, phases });
-
-  const screenshots = buildV3Screenshots({
+  const { entries: screenshotEntries, idByPhase, idByDialog } = buildScreenshotEntries({
     traj,
     phases,
     phaseScreenshots,
     dialogScreenshots,
   });
+
+  const {
+    properties: controlProperties,
+    metaActions,
+    absoluteFallback,
+    missingOptions,
+    noRectControls,
+  } = buildV3Properties({
+    traj,
+    phases,
+    screenshotCount: screenshotEntries.length,
+    idByPhase,
+    idByDialog,
+  });
+
+  // 合并：截图在前，控件在后；一起参与 propertiesName 去重
+  const properties = [...screenshotEntries, ...controlProperties];
+  uniquifyPropertiesNames(properties);
 
   const id = traj.id != null ? String(traj.id) : '';
   const name = String(traj.name || '').trim() || `trajectory-${id}`;
@@ -287,7 +378,6 @@ export function buildTransactionEntryV3(traj, {
       testFrame: 'playwright',
       transcationProperties: properties,
     },
-    screenshots,
     count: properties.length,
     skipped: { metaActions },
     stats: { absoluteFallback, missingOptions, noRectControls },
@@ -296,12 +386,12 @@ export function buildTransactionEntryV3(traj, {
 
 /**
  * Single-trajectory V3 importDemand body.
+ * 发给 partner 的 payload 只含 transcationEventTypeList（截图已合并进每个 entry）。
  */
 export function buildTransactionPayloadV3(traj, opts = {}) {
   const built = buildTransactionEntryV3(traj, opts);
   return {
     payload: {
-      screenshots: built.screenshots,
       transcationEventTypeList: [built.entry],
     },
     count: built.count,
@@ -312,10 +402,10 @@ export function buildTransactionPayloadV3(traj, opts = {}) {
 
 /**
  * Multi-trajectory V3 importDemand body.
+ * 发给 partner 的 payload 只含 transcationEventTypeList（截图已合并进每个 entry）。
  */
 export function wrapTransactionListV3(builtEntries = []) {
   const list = [];
-  const screenshots = [];
   let count = 0;
   let metaActions = 0;
   let absoluteFallback = 0;
@@ -325,13 +415,6 @@ export function wrapTransactionListV3(builtEntries = []) {
   for (const b of builtEntries) {
     if (!b?.entry) continue;
     list.push(b.entry);
-    const tid = b.entry.transcId != null ? Number(b.entry.transcId) : null;
-    for (const s of b.screenshots || []) {
-      screenshots.push({
-        ...s,
-        trajectoryId: s.trajectoryId ?? tid,
-      });
-    }
     count += Number(b.count) || 0;
     metaActions += Number(b.skipped?.metaActions) || 0;
     absoluteFallback += Number(b.stats?.absoluteFallback) || 0;
@@ -341,7 +424,6 @@ export function wrapTransactionListV3(builtEntries = []) {
 
   return {
     payload: {
-      screenshots,
       transcationEventTypeList: list,
     },
     count,

@@ -266,6 +266,59 @@ export async function listPendingScreenshots() {
   }));
 }
 
+/**
+ * One-click bulk upload of all local-pending screenshots to MinIO.
+ * Delegates to the background retry pass (same upload + DB-mark + cleanup logic)
+ * but runs immediately, ignoring the per-row retry interval so the operator can
+ * force a flush from the API docs page.
+ * @returns {Promise<{scanned:number,uploaded:number,failed:number,skipped:number,skipped:true?}>}
+ */
+export async function uploadPendingScreenshots() {
+  const { retryPendingScreenshots } = await import('./screenshot-pending-retry.js');
+  // Force every pending row to be attempted now: pass a 0 interval so the
+  // "last retry too recent" guard never skips, and a high maxRetry so exhausted
+  // rows still get a chance when triggered manually.
+  return retryPendingScreenshots({ intervalMs: 0, maxRetry: Number.MAX_SAFE_INTEGER });
+}
+
+/**
+ * Upload a single pending screenshot by id. Used by per-row actions in the docs UI.
+ * @returns {Promise<{id:number,status:'uploaded'|'not_pending'|'not_found',storagePath?:string,imageUrl?:string}>}
+ */
+export async function uploadPendingScreenshot(id) {
+  const numeric = Number(id);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    throw new Error('Numeric screenshot id required');
+  }
+  const row = await screenshotDao.getImage(numeric);
+  if (!row) return { id: numeric, status: 'not_found' };
+  if (row.storage_type !== 'local') return { id: numeric, status: 'not_pending' };
+
+  const buffer = await readPendingFile(row.id);
+  if (!buffer) throw new Error(`Screenshot ${numeric} local pending file not found`);
+
+  const uploaded = await uploadScreenshot(buffer, {
+    mimeType: row.mime_type || 'image/png',
+  });
+  try {
+    await screenshotDao.markUploaded(row.id, {
+      storagePath: uploaded.storagePath,
+      imageUrl: uploaded.imageUrl,
+    });
+  } catch (err) {
+    // DB update failed: roll back the MinIO object so we don't leak it.
+    await removeScreenshotObject(uploaded.storagePath).catch(() => {});
+    throw err;
+  }
+  await deletePendingFile(row.id).catch(() => {});
+  return {
+    id: numeric,
+    status: 'uploaded',
+    storagePath: uploaded.storagePath,
+    imageUrl: uploaded.imageUrl,
+  };
+}
+
 export async function listDialogScreenshotsByTrajectory(trajectoryId) {
   return screenshotDao.listDialogScreenshotsByTrajectory(trajectoryId);
 }
