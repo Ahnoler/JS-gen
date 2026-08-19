@@ -171,9 +171,11 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
     });
   } else {
     emitStage('stream', 'done', { remoteSessionId, sessionId: runtime.sessionId });
-    // prepare 打开浏览器/推流 ≠ 录制。录制中(recording)是临时状态，且持久状态
-    // 不能被临时覆盖：这里不把 record_status 改为 recording，避免将已确认/待确认/
-    // 录制异常降级为未录制/录制中。真正的录制由 record/start 或人工录制进入。
+    // 状态流转 V3：启动浏览器/占用执行资源成功即进入临时「录制中」(recording)。
+    // 进入时记录持久状态基线，关闭浏览器/释放资源时恢复到该基线，持久状态不被临时态降级。
+    await trajectoryDao.enterTransientRecording(tid).catch((err) => {
+      console.warn(`[prepare] enterTransientRecording failed for #${tid}:`, err?.message || err);
+    });
   }
 
   emitStage('login', 'running', { accountId });

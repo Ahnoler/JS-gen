@@ -348,17 +348,24 @@ export async function confirmTrajectory(trajectoryId, confirmed = true) {
     err.statusCode = 404;
     throw err;
   }
-  if (traj.recordStatus === 'recording' || traj.recordStatus === 'failed') {
+  const want = !!confirmed;
+  // 状态流转 V3：只有 待确认(recorded) 可人工确认到 已确认(completed)；
+  // 只有 已确认(completed) 可取消确认回到 待确认(recorded)。未录制/录制异常/录制中均不可直接确认。
+  if (want && traj.recordStatus !== 'recorded') {
     const err = new Error(
       traj.recordStatus === 'recording'
         ? 'Cannot confirm while recording'
-        : 'Cannot confirm a failed trajectory — retry or reset first',
+        : 'Only a recorded (待确认) trajectory can be confirmed',
     );
     err.statusCode = 409;
     throw err;
   }
+  if (!want && traj.recordStatus !== 'completed') {
+    const err = new Error('Only a completed (已确认) trajectory can cancel confirmation');
+    err.statusCode = 409;
+    throw err;
+  }
 
-  const want = !!confirmed;
   if (want) {
     await trajectoryDao.setPersistentRecordStatus(tid, 'completed');
     await trajectoryDao.updateMeta(tid, {

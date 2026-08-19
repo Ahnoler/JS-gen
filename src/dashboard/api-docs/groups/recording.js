@@ -43,8 +43,8 @@ export const GROUP_RECORDING = [
           '409 `grace_owned`：宽限期内他交易 idle Chrome 仍归属原 traj — body 含 `code`、`ownerTrajectoryId`、`graceUntil`（见 attach / attach-live）',
           '503：会话/执行机其它不可用',
           '不杀孤儿 Chrome：检测到空闲 CDP 则 --cdp-url 复用',
-          '状态模型：draft/recording/failed/recorded/completed，其中 recording 是临时态，持久态为 draft/failed/recorded/completed；持久态不被临时态覆盖。',
-          'record/start(draft|failed|recorded|completed) → recording（临时态）；stop(success) 首次 draft→recorded、failed→recorded、already recorded/confirmed 保持；stop(!success)/失败 draft→failed、其余保持；detach/stream-detach/回收/清理 → 恢复到录制前持久状态基线（已确认/待确认保持，不降级为未录制）。',
+          '状态模型（V3）：draft/recording/failed/recorded/completed，其中 recording 是临时态，持久态为 draft/failed/recorded/completed；非终结性释放（关浏览器/断开/回收/重启）恢复到持久基线，不降级。',
+          'prepare（启动浏览器/占用执行资源成功）→ recording（临时态）；record/start(draft|failed|recorded|completed) → recording（临时态）；stop(success) → recorded（待确认）；stop(!success)/失败 → failed（录制异常）；detach/stream-detach/回收/清理 → 恢复到录制前持久状态基线（不降级为未录制）。',
         ],
       },
       {
@@ -74,14 +74,14 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/stop',
         summary: '结束录制（不 detach）',
-        desc: '结束录制（不 detach）。按持久状态基线解析结果：success 时 首次(draft)→recorded(待确认)、failed→recorded、已确认/待确认保持；success=false 时 首次(draft)→failed，其余（待确认/已确认/录制异常）保持不降级。会向执行机会话发送 cancel_step，当前 Agent 立即停止后续步骤（当前正在执行的一步结束后不再继续）。响应含 detached:false。',
+        desc: '结束录制（不 detach）。状态流转 V3：success → recordStatus=recorded(待确认)；success=false → recordStatus=failed(录制异常)。会向执行机会话发送 cancel_step，当前 Agent 立即停止后续步骤（当前正在执行的一步结束后不再继续）。响应含 detached:false。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ success: true }),
         respExample: J({
           trajectoryId: 42, recordStatus: 'recorded', detached: false,
           tree: { phases: [], orphanSteps: [] },
         }),
-        notes: ['不释放执行机槽位；释放请 detach', 'busy 时也会发送 cancel_step；Agent 收到后置 stopped，不再开下一步', '已确认(completed) 交易再次录制 stop(success) → 仍为 completed，不降级'],
+        notes: ['不释放执行机槽位；释放请 detach', 'busy 时也会发送 cancel_step；Agent 收到后置 stopped，不再开下一步', '已确认(completed) 交易再次录制 stop(success) → 待确认(recorded)，需再次人工确认回已确认'],
       },
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/confirm',
@@ -235,7 +235,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/detach',
         summary: '释放执行资源（关闭浏览器）',
-        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 recording：AI 录制活跃（中断）→ 首次 draft→failed，其余持久状态保持；非终结性（关浏览器/断开/回收）→ 恢复到录制前持久状态基线，不降级 recorded/completed/failed 为未录制。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 2 小时会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
+        desc: '关闭 Agent 会话并杀死 Chrome，释放执行机槽位。若当前 recordStatus 为 recording（含浏览器占用中或 AI 录制中）：按 V3 属于非终结性释放，恢复到录制前持久状态基线，不降级 recorded/completed/failed 为未录制，也不自动标记为录制异常。与「断开画面」（只停推流）不同。离开录制工作室不会自动调用；无步骤写入超过 2 小时会由服务端自动回收。仅释放本交易资源，不串扰其他交易。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({}),
         respExample: J({ trajectoryId: 42, detached: true, recordStatus: 'completed' }),

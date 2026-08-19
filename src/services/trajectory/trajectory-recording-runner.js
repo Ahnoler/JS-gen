@@ -485,20 +485,27 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       events.push({ type: 'phase_done', phaseNumber: phase.phaseNumber, description: phase.description });
     }
 
-    // 录制成功：首次(基线 draft)→recorded(待确认)；已确立持久状态(待确认/已确认/录制异常)→保持基线。
+    // 录制成功（V3）：无论持久基线为何，显式结束成功 → 待确认(recorded)。
     finalStatus = await trajectoryDao.finishTransientRecording(tid, 'success');
     await trajectoryDao.updateMeta(tid, {
       isDone: true,
       isSuccessful: true,
     });
+    await trajectoryPhaseDao.updateRunningStatus(tid, 'completed').catch((err) => {
+      console.warn(`[record] updateRunningStatus(completed) failed for #${tid}:`, err?.message || err);
+    });
   } catch (err) {
     // A user-initiated record/stop already wrote the final recordStatus
-    // (recorded/failed/completed...); don't let the aborted runner overwrite that choice.
+    // (recorded/failed); don't let the aborted runner overwrite that choice.
     if (!runtime.userStop) {
+      // 自动失败（V3）：显式失败结果 → 录制异常(failed)。
       finalStatus = await trajectoryDao.finishTransientRecording(tid, 'failure');
       await trajectoryDao.updateMeta(tid, {
         isDone: false,
         isSuccessful: false,
+      });
+      await trajectoryPhaseDao.updateRunningStatus(tid, 'failed').catch((err2) => {
+        console.warn(`[record] updateRunningStatus(failed) failed for #${tid}:`, err2?.message || err2);
       });
     } else {
       finalStatus = traj.recordStatus;

@@ -3,6 +3,7 @@
  */
 import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as systemDao from '../../dao/system-dao.js';
 import * as execSession from '../../executor-session-client.js';
 import { state } from '../../state.js';
@@ -338,9 +339,7 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
     runtime.selectedPhaseId = null;
   }
 
-  // 显式结束录制：按持久状态基线解析结果。
-  // 首次(基线 draft)：success→recorded(待确认)、failure→failed(录制异常)；
-  // 已确立持久状态(待确认/已确认/录制异常)：保持基线不降级。
+  // 显式结束录制：按持久状态基线解析结果（V3：success→待确认、failure→录制异常）。
   const recordStatus = await trajectoryDao.finishTransientRecording(
     tid,
     success ? 'success' : 'failure',
@@ -348,6 +347,10 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
   await trajectoryDao.updateMeta(tid, {
     isDone: !!success,
     isSuccessful: !!success,
+  });
+  // 清理 running 阶段：避免前端 aiActive（running 信号）在刷新后仍显示“录制中”导致二次结束。
+  await trajectoryPhaseDao.updateRunningStatus(tid, success ? 'completed' : 'failed').catch((err) => {
+    console.warn(`[record] updateRunningStatus failed for #${tid}:`, err?.message || err);
   });
 
   const tree = await getTrajectoryTree(tid);
@@ -404,7 +407,7 @@ export async function stopTrajectoryRecordingSafe(trajectoryId, {
     runtime.selectedPhaseId = null;
   }
 
-  // 结束录制（批量安全版）：临时状态 recording 按持久基线解析结果；
+  // 结束录制（批量安全版）：临时状态 recording 按结果解析（V3：success→待确认、failure→录制异常）；
   // 已是持久状态(recorded/completed/failed/draft)则保持不降级。
   let recordStatus = traj.recordStatus;
   if (traj.recordStatus === 'recording') {
@@ -415,6 +418,9 @@ export async function stopTrajectoryRecordingSafe(trajectoryId, {
     await trajectoryDao.updateMeta(tid, {
       isDone: !!success,
       isSuccessful: !!success,
+    });
+    await trajectoryPhaseDao.updateRunningStatus(tid, success ? 'completed' : 'failed').catch((err) => {
+      console.warn(`[record] updateRunningStatus failed for #${tid}:`, err?.message || err);
     });
   } else {
     recordStatus = traj.recordStatus;

@@ -53,6 +53,28 @@ export async function updateStatus(phaseId, status) {
   return getById(phaseId);
 }
 
+/**
+ * 将某交易下所有 running 阶段批量置为指定状态。
+ * 用于结束录制/释放资源时清理「AI 录制中」信号（running → completed/failed/pending）。
+ */
+export async function updateRunningStatus(trajectoryId, status) {
+  const db = getDB();
+  const data = { status };
+  if (status === 'completed' || status === 'failed') {
+    data.completed_at = db.fn.now();
+  } else {
+    data.completed_at = null;
+  }
+  await db(TABLE)
+    .where({ trajectory_id: trajectoryId, status: 'running' })
+    .update(toDbRow(data));
+  await dirtyParent(trajectoryId);
+  return getDB()(TABLE)
+    .where({ trajectory_id: trajectoryId, status })
+    .count('* as n')
+    .first();
+}
+
 function parseCandidates(row) {
   const obj = fromDbRow(row);
   if (!obj) return null;

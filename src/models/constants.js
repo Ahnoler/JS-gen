@@ -70,34 +70,24 @@ export function isPersistentRecordStatus(status) {
 }
 
 /**
- * 计算录制会话结束后的持久状态。
+ * 计算录制会话结束后的持久状态（状态流转 V3）。
  *
- * 核心规则：临时状态（recording）不能覆盖/降级持久状态；成功录制不会把已确认降级。
- * - outcome='success'：
- *    - base draft/failed → recorded（首次成功→待确认；异常后重录成功→待确认，可恢复）
- *    - base recorded → recorded（保持待确认）
- *    - base completed → completed（已确认保持，绝不降级）
- * - outcome='failure'：
- *    - base draft → failed（录制异常）
- *    - base ∈ {recorded, completed, failed} → 保持 base（不降级）
- * - outcome='restore'（非终结性：关浏览器/断开/回收）：一律恢复到 base。
+ * 核心规则：
+ * - recording 是临时状态，不能覆盖持久状态（restore 时回到持久基线）。
+ * - 但用户显式结束录制并选择结果时，结果可以覆盖持久状态：
+ *   - outcome='success' → 一律 待确认(recorded)（未录制/待确认/已确认/录制异常 重录成功均进入待确认）
+ *   - outcome='failure' → 一律 录制异常(failed)
+ * - outcome='restore'（非终结性：关浏览器/断开/回收/重启中断）→ 恢复到录制前持久状态基线。
  *
  * @param {string} base 录制前的持久状态（persistent_record_status）
  * @param {'success'|'failure'|'restore'} outcome
  * @returns {import('./constants.js').TrajectoryRecordStatus}
  */
 export function resolvePostRecordingStatus(base, outcome) {
-  const b = isPersistentRecordStatus(base) ? base : 'draft';
-  if (outcome === 'success') {
-    // 已确认保持已确认；其余（draft/failed/recorded）成功录制 → 待确认。
-    return b === 'completed' ? 'completed' : 'recorded';
-  }
-  if (outcome === 'failure') {
-    // 首次失败 → 录制异常；已确立持久状态不因失败而降级。
-    return b === 'draft' ? 'failed' : b;
-  }
+  if (outcome === 'success') return 'recorded';
+  if (outcome === 'failure') return 'failed';
   // restore：非终结性恢复，回到录制前持久状态。
-  return b;
+  return isPersistentRecordStatus(base) ? base : 'draft';
 }
 
 /** 轨迹状态中文文案（产品/文档/Vue 对齐的单一事实源） */

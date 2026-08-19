@@ -222,13 +222,8 @@ export async function clearMountByRemoteSessionId(remoteSessionId, {
   for (const row of rows) {
     await updateMeta(row.id, { remoteSessionId: null }, db);
     if (demoteLive && row.record_status === 'recording') {
-      if (await hasRunningPhase(row.id)) {
-        // AI 录制中断：首次(draft)→failed；已确立持久状态则保持基线不降级。
-        await finishTransientRecording(row.id, 'failure', db);
-      } else {
-        // 非终结性（关浏览器/断开/回收）：恢复到录制前持久状态，杜绝降级为 draft。
-        await restorePersistentRecordStatus(row.id, db);
-      }
+      // 非终结性（关浏览器/断开/回收/重启中断）：恢复到录制前持久状态，杜绝降级。
+      await restorePersistentRecordStatus(row.id, db);
     }
     cleared.push(Number(row.id));
   }
@@ -271,11 +266,8 @@ export async function repairStaleRemoteMounts(trx = null) {
   for (const row of stale) {
     await updateMeta(row.id, { remoteSessionId: null }, db);
     if (row.recordStatus === 'recording') {
-      if (await hasRunningPhase(row.id)) {
-        await finishTransientRecording(row.id, 'failure', db);
-      } else {
-        await restorePersistentRecordStatus(row.id, db);
-      }
+      // 非终结性恢复：恢复到录制前持久状态基线，不降级。
+      await restorePersistentRecordStatus(row.id, db);
     }
     cleared.push(row.id);
   }
@@ -402,6 +394,16 @@ export async function restorePersistentRecordStatus(trajectoryDbId, trx = null) 
     ? row.persistentRecordStatus
     : 'draft';
   await writeRecordStatusResilient(trajectoryDbId, base, trx);
+  // 非终结性释放：running 阶段清为 pending，避免前端 aiActive（running 信号）继续显示“录制中”。
+  try {
+    await getDB()('trajectory_phase')
+      .where({ trajectory_id: trajectoryDbId, status: 'running' })
+      .update({ status: 'pending', completed_at: null });
+  } catch (err) {
+    console.warn(
+      `[trajectory] reset running phases skipped for #${trajectoryDbId}: ${err?.message || err}`,
+    );
+  }
   return base;
 }
 

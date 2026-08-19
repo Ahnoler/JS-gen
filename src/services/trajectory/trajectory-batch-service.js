@@ -465,8 +465,8 @@ export async function recoverBatchJobsOnStartup() {
         if (tid) {
           const traj = await trajectoryDao.getById(tid).catch(() => null);
           if (traj?.recordStatus === 'recording') {
-            // 重启中断：按持久基线解析（首次 draft→failed；已确立持久状态保持不降级）。
-            await trajectoryDao.finishTransientRecording(tid, 'failure');
+            // 重启中断属于非终结性中断：恢复录制前持久状态基线，不降级。
+            await trajectoryDao.restorePersistentRecordStatus(tid);
             await trajectoryDao.updateMeta(tid, {
               isDone: false,
               isSuccessful: false,

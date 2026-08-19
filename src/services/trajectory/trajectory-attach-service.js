@@ -21,7 +21,6 @@ import {
 } from './trajectory-runtime.js';
 import { resolveModelId } from '../../runtime/resolve-model.js';
 import { prepareTrajectoryRecordingUnlocked } from './trajectory-attach-runner.js';
-import { isAiRecordingActive } from './trajectory-status-utils.js';
 
 /** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
 async function appendRecordedStep(...args) {
@@ -450,8 +449,10 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
     slotLease.releaseByTrajectory(tid);
     deleteTrajectoryRuntime(tid);
 
-    // Detach only releases executor resources; it must not change recordStatus.
-    let recordStatus = traj?.recordStatus || null;
+    // V3：detach 是非终结性释放，后端已把 record_status 恢复到持久基线。
+    // 这里必须取清理后的最新状态（而不是 detach 前的 recording）返回/广播。
+    const freshTraj = await trajectoryDao.getById(tid).catch(() => null);
+    const recordStatus = freshTraj?.recordStatus ?? traj?.recordStatus ?? null;
 
     const status = await remoteSessionService.getLiveStatus({ trajectoryId: tid }).catch(() => ({
       attached: false,
@@ -549,13 +550,8 @@ export async function cleanupPersistedTrajectoryResources(trajectoryId, {
   slotLease.releaseByTrajectory(tid);
 
   if (demoteLive && traj.recordStatus === 'recording') {
-    // 清理/重启回收：非终结性恢复或 AI 中断。
-    // 首次(基线 draft) AI 中断 → failed；其余一律恢复到录制前持久状态基线，不降级。
-    if (await isAiRecordingActive(tid)) {
-      await trajectoryDao.finishTransientRecording(tid, 'failure');
-    } else {
-      await trajectoryDao.restorePersistentRecordStatus(tid);
-    }
+    // 清理/重启回收：非终结性恢复，回到录制前持久状态基线，不降级。
+    await trajectoryDao.restorePersistentRecordStatus(tid);
   } else if (traj.remoteSessionId) {
     await trajectoryDao.updateMeta(tid, { remoteSessionId: null });
   }
