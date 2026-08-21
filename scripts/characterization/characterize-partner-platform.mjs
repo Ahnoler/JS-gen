@@ -62,8 +62,8 @@ assert.equal(e.projectId, '9');
   assert.equal(ele.type, 'ele');
   assert.equal('regionId' in ele, false, 'regionId 已剥除');
   assert.equal('regionLabel' in ele, false, 'regionLabel 已剥除');
-  assert.equal('screenshot' in ele, false, 'screenshot 已删除（Integer 契约）');
-  assert.equal(ele.screenshots, 'http://a/3.png', '截图并入 screenshots 逗号串');
+  assert.equal('screenshot' in ele, false, 'screenshot 已删除（V3 契约改 screenCapture）');
+  assert.equal(ele.screenCapture, 'http://a/3.png', '截图并入 screenCapture 逗号串');
   assert.equal(ele.rect, '{"x1":1}');
   assert.equal(out.transcationEventTypeList[0].transcId, 1);
 }

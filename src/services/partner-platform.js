@@ -140,9 +140,9 @@ const PARTNER_PROP_DROP_KEYS = ['regionId', 'regionLabel'];
  * - 过滤 transcationProperties 中 type='page'/'dialog' 的页面级标记步骤（伙伴 importDemand
  *   只认控件步骤；V2 无此字段、能推，V3 的页面类型步骤导致 400「参数错误」）
  * - 剥除 regionId/regionLabel（伙伴 schema 无此字段，严格反序列化拒收）
- * - screenshot(URL[]) → 并入 screenshots(逗号串) 后删除 screenshot 字段
- *   （伙伴 schema：screenshot=是否执行截图 integer，V3 塞 URL 数组、置 '' 会让 Jackson
- *   Integer 反序列化失败 → 400；删除让伙伴走默认值，与 V2 一致）
+ * - screenshot(URL[]) → 并入 screenCapture(逗号串) 后删除 screenshot 字段
+ *   （伙伴 V3 契约：字段名改 screenCapture；screenshot 旧语义=是否执行截图 integer，
+ *   V3 塞 URL 数组会 Jackson 反序列化失败 → 400）
  * 纯函数、浅拷贝；仅影响发送体，不影响 dry-run / 响应中的 payload。
  */
 export function toPartnerImportPayload(payload) {
@@ -160,7 +160,7 @@ export function toPartnerImportPayload(payload) {
           for (const k of PARTNER_PROP_DROP_KEYS) delete out[k];
           const shots = Array.isArray(out.screenshot) ? out.screenshot : [];
           if (shots.length) {
-            out.screenshots = shots.filter(Boolean).join(',');
+            out.screenCapture = shots.filter(Boolean).join(',');
           }
           delete out.screenshot;
           return out;
