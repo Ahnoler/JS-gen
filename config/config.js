@@ -58,8 +58,8 @@ process.env.PLAYWRIGHT_BROWSERS_PATH = BROWSER_DIR;
 // LLM
 export const LLM_BASE_URL = _resolve('LLM_BASE_URL');
 export const LLM_API_KEY = _resolve('LLM_API_KEY');
-export const FORM_LLM_MODEL = _resolve('FORM_LLM_MODEL', 'deepseek-v4-flash');
-export const FORM_LLM_BASE_URL = _resolve('FORM_LLM_BASE_URL', LLM_BASE_URL || 'https://api.deepseek.com');
+export const FORM_LLM_MODEL = _resolve('FORM_LLM_MODEL', 'Qwen/Qwen3.5-35B-A3B');
+export const FORM_LLM_BASE_URL = _resolve('FORM_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
 export const FORM_LLM_API_KEY = _resolve('FORM_LLM_API_KEY', LLM_API_KEY);
 
 // MinIO — screenshot / image object storage

@@ -182,7 +182,7 @@ export const GROUP_MEMORY = [
         desc: 'inputFactIds 为引用事实 id；inputFacts 为对应事实正文（含被 supersede 版本），供审计复现「模型依据了什么」。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '9' }],
         respExample: J({
-          id: 9, trajectoryId: 42, decisionType: 'scenario_summary', model: 'deepseek-chat',
+          id: 9, trajectoryId: 42, decisionType: 'scenario_summary', model: 'Qwen/Qwen3.5-35B-A3B',
           auditStatus: 'passed', inputFactIds: [7, 8],
           inputFacts: [
             { id: 7, entity: '客户名称', attribute: 'value', value: '某某公司', source: 'requirement', stance: 'authoritative', weight: 1.5, phaseNumber: 1 },
@@ -216,7 +216,7 @@ export const GROUP_MEMORY = [
         }],
         respExample: J({
           trajectories: [{
-            id: 10, model: 'deepseek-chat', stepCount: 42, phaseCount: 5,
+            id: 10, model: 'Qwen/Qwen3.5-35B-A3B', stepCount: 42, phaseCount: 5,
             isSuccessful: true, isDone: true, task: '…',
             decisions: { total: 12, byStatus: { pending: 0, passed: 11, failed: 1 }, passRate: 0.9167, overridden: 0 },
             formValues: { 客户名称: '某某公司' },

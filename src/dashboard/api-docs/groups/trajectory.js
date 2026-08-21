@@ -23,7 +23,7 @@ export const GROUP_TRAJECTORY = [
             + '对公客户基本信息：\n'
             + '法定责任人的客户名称：朱桂武\n'
             + '客户标签：',
-          model: 'deepseek-v4-flash',
+          model: 'Qwen/Qwen3.5-35B-A3B',
           functionId: 3,
         }),
         respExample: J({
@@ -59,7 +59,7 @@ export const GROUP_TRAJECTORY = [
           rows: [{
             id: 42, name: '开户交易', task: '需求描述',
             recordStatus: 'draft', isExport: 0, stepCount: 0, phaseCount: 3,
-            functionId: 3, systemAccountId: 10, model: 'deepseek-v4-flash',
+            functionId: 3, systemAccountId: 10, model: 'Qwen/Qwen3.5-35B-A3B',
             batchTaskName: '批量录制导入模板_0814-1251',
           }],
           total: 42, page: 1, pageSize: 20,
@@ -79,7 +79,7 @@ export const GROUP_TRAJECTORY = [
             { fieldKey: '姓名', fieldValue: '张三' },
             { fieldKey: '证件号码', fieldValue: '110101199001011234' },
           ],
-          model: 'deepseek-v4-flash',
+          model: 'Qwen/Qwen3.5-35B-A3B',
           systemAccountId: 10,
         }),
         respExample: J({
@@ -310,7 +310,7 @@ export const GROUP_TRAJECTORY = [
           + 'mode=draft 时仅 analyze 并保存草稿（itemStatus=drafted，不占执行机）。'
           + ' 立即返回 HTTP 202；record 模式后台并行录制（全局 FIFO，受执行机槽位限制）。'
           + ' 须带 Idempotency-Key。functionId / systemAccountId 由页面上下文随表单提交。',
-        reqExample: 'form-data: file=@batch.xlsx; functionId=3; systemAccountId=10; model=deepseek-v4-flash; mode=draft|record; name=<任务名>\nHeader: Idempotency-Key: <uuid>',
+        reqExample: 'form-data: file=@batch.xlsx; functionId=3; systemAccountId=10; model=Qwen/Qwen3.5-35B-A3B; mode=draft|record; name=<任务名>\nHeader: Idempotency-Key: <uuid>',
         respExample: J({
           batchId: 'uuid',
           name: '批量录制导入模板_0814-1251',

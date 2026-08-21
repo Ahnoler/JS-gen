@@ -11,7 +11,7 @@ export default function (app) {
           ...(system ? [{ role: 'system', content: system }] : []),
           { role: 'user', content: task },
         ],
-        model: model || (state.defaultModel ? state.defaultModel.modelID : 'deepseek-v4-flash'),
+        model: model || (state.defaultModel ? state.defaultModel.modelID : 'Qwen/Qwen3.5-35B-A3B'),
       });
       res.json({ response: result });
     } catch (err) {

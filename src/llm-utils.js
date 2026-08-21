@@ -1,13 +1,12 @@
 import { LLM_BASE_URL, LLM_API_KEY } from '../config/config.js';
 
+const DEFAULT_MODEL = 'Qwen/Qwen3.5-35B-A3B';
+
 function resolveModelId(model) {
-  if (!model) return 'deepseek-v4-flash';
+  if (!model) return DEFAULT_MODEL;
   if (typeof model === 'object' && model.modelID) return model.modelID;
-  if (typeof model === 'string') {
-    const parts = model.split('/');
-    return parts.length >= 2 ? parts.slice(1).join('/') : parts[0];
-  }
-  return 'deepseek-v4-flash';
+  if (typeof model === 'string') return model;
+  return DEFAULT_MODEL;
 }
 
 export async function callLLM(text, model) {

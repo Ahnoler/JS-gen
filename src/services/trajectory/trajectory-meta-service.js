@@ -135,7 +135,7 @@ export async function analyzeRequirementToPhases({
     desc,
   ].join('\n');
 
-  const modelId = model || 'deepseek-v4-flash';
+  const modelId = model || 'Qwen/Qwen3.5-35B-A3B';
   const content = await callLLM(prompt, modelId);
   const parsed = parseAnalyzePayload(content);
 

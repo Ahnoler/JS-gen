@@ -35,12 +35,12 @@ export default function registerSetupRoutes(app) {
     lines.push('HOST=0.0.0.0');
     lines.push('');
     lines.push('# LLM 连接');
-    lines.push(`LLM_BASE_URL=${url || 'https://api.deepseek.com'}`);
+    lines.push(`LLM_BASE_URL=${url || 'http://218.77.58.156:3000/v1'}`);
     lines.push(`LLM_API_KEY=${key.trim()}`);
     lines.push('');
     lines.push('# 表单填写 LLM（可选用更便宜的模型）');
-    lines.push(`FORM_LLM_MODEL=${model || 'deepseek-v4-flash'}`);
-    lines.push(`FORM_LLM_BASE_URL=${url || 'https://api.deepseek.com'}`);
+    lines.push(`FORM_LLM_MODEL=${model || 'Qwen/Qwen3.5-35B-A3B'}`);
+    lines.push(`FORM_LLM_BASE_URL=${url || 'http://218.77.58.156:3000/v1'}`);
     lines.push(`FORM_LLM_API_KEY=${key.trim()}`);
     lines.push('');
     lines.push('# Python 解释器路径（留空则自动查找）');

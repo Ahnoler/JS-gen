@@ -116,7 +116,7 @@ function buildLlmPrompt(template, { phaseDescription, fragments, stepCount }) {
 async function nameClusterWithLlm({ phaseDescription, fragments, stepCount, model }) {
   const template = loadPromptTemplate();
   const prompt = buildLlmPrompt(template, { phaseDescription, fragments, stepCount });
-  const modelId = model || 'deepseek-v4-flash';
+  const modelId = model || 'Qwen/Qwen3.5-35B-A3B';
   try {
     const content = await callLLM(prompt, modelId);
     const obj = parseLlmJsonObject(content);
