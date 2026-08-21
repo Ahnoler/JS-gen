@@ -2,17 +2,18 @@
  * Characterization: PR-LOC-HL 步骤级高亮数据层 + 渲染层（真实 DB 断言）。
  *   node scripts/characterization/characterize-step-highlight.mjs
  *
- * 读 traj 38 phase 3（phase id 629）+ screenshot #8734 真实数据，验证：
+ * 读 traj 181 phase 3（phase id 675）+ screenshot #10615 真实数据，验证：
  *   - loadPhaseData / matchStepToElement / resolveStepBoxes 纯函数对真实数据的行为
- *   - 旧数据（element_json 无 bbox）回退三维匹配的命中率
+ *   - 新数据（element_json 带 bbox）bbox 直用命中率；旧数据回退三维匹配由纯函数边界覆盖
  *   - 纯函数边界：空 label 仍可因 kind 命中、非法 rect 被滤、region 空维度跳过、
  *     全空维度按未匹配处理、AND 语义（任一非空维度必须全等）
  *   - buildHtml 渲染：全部步骤框（resolved 数）、badge 数量、虚线/实线类、
  *     列表行数 = steps 数（含无坐标置灰行）、coordX/coordY 坐标换算手算期望值
  *
- * 注意：traj 38 于 2026-08-17 22:49-22:54 重录，phase 629 现有 101 步（全有 element_json、
- * 0 bbox、0 region_id），与 brief 写稿时（112 步）不同；断言阈值已按当前真实数据调整
- * （steps≥100 / json≥100 / AND 命中率≥90% / label 命中≥90）。
+ * 注意：2026-08-20 锚点迁移——先迁 traj 157（traj 38 数据被裁剪），同日重录后定锚
+ * traj 181（phase 675 / shot #10615：27 步全有 element_json、26 bbox、56 elements，
+ * 命中全走 bbox 直用路径；录制于表单引擎重构后，含 fill/select_option/click_save）；
+ * 阈值按当前数据调整（steps≥20 / json≥20 / bbox 直用≥20 / elements≥50）。
  */
 import { getDB } from '../../config/database.js';
 import {
@@ -26,9 +27,9 @@ import {
   coordY,
 } from '../tools/lightup-step-highlight.mjs';
 
-const TRAJ_ID = 38;
-const PHASE_ID = 629;
-const SHOT_ID = 8734;
+const TRAJ_ID = 181;
+const PHASE_ID = 675;
+const SHOT_ID = 10615;
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -38,15 +39,14 @@ async function testRealDataLoad(db) {
   const data = await loadPhaseData(db, { trajectoryId: TRAJ_ID, phaseId: PHASE_ID, screenshotId: SHOT_ID });
   assert(data.screenshotId === SHOT_ID, `screenshotId=${data.screenshotId} must be ${SHOT_ID}`);
   assert(data.meta && Array.isArray(data.meta.elements), 'meta.elements must be an array');
-  assert(data.meta.elements.length >= 150, `elements=${data.meta.elements.length} >= 150`);
+  assert(data.meta.elements.length >= 50, `elements=${data.meta.elements.length} >= 50`);
 
   const steps = data.steps;
   const jsonSteps = steps.filter((s) => s.hasElementJson);
   const bboxSteps = steps.filter((s) => isLegalRect(s.bbox));
   console.log(`  steps total=${steps.length} | json=${jsonSteps.length} | bbox=${bboxSteps.length} | elements=${data.meta.elements.length}`);
-  assert(steps.length >= 100, `steps total=${steps.length} >= 100`);
-  assert(jsonSteps.length >= 100, `json steps=${jsonSteps.length} >= 100`);
-  assert(bboxSteps.length >= 100, `new data bbox steps=${bboxSteps.length} >= 100 (re-recorded)`);
+  assert(steps.length >= 20, `steps total=${steps.length} >= 20`);
+  assert(jsonSteps.length >= 20, `json steps=${jsonSteps.length} >= 20`);
   return { steps, elements: data.meta.elements };
 }
 
@@ -60,7 +60,8 @@ async function testRealDataMatch(db, { steps, elements }) {
   const bboxHits = hitSteps.filter((r) => r.boxes[0]?.source === 'bbox');
 
   console.log(`  bbox direct=${bboxHits.length} | fallback match=${matchHits.length} | unmatched=${jsonSteps.length - hitSteps.length}`);
-  assert(bboxHits.length >= 100, `bbox direct hits=${bboxHits.length} >= 100 (re-recorded data)`);
+  // 锚点为新链路数据（element_json 带 bbox），命中走 bbox 直用路径
+  assert(bboxHits.length >= 20, `bbox direct hits=${bboxHits.length} >= 20`);
   assert(matchHits.length + bboxHits.length === hitSteps.length, `match+bbox cover all hits (${matchHits.length}+${bboxHits.length}=${hitSteps.length})`);
 }
 
@@ -69,7 +70,7 @@ async function testScreenshotSelection(db) {
   const byId = await loadPhaseData(db, { screenshotId: SHOT_ID });
   assert(byId.screenshotId === SHOT_ID, 'screenshotId direct query');
   // 未传 phaseId 时从 screenshot 行 trajectory_phase_id 反查
-  assert(byId.steps.length >= 100, `phase derived from screenshot: steps=${byId.steps.length}`);
+  assert(byId.steps.length >= 20, `phase derived from screenshot: steps=${byId.steps.length}`);
 
   // kind='phase_highlight' + trajectory_id 按 id 倒序取第一条
   const byTraj = await loadPhaseData(db, { trajectoryId: TRAJ_ID });
@@ -78,7 +79,7 @@ async function testScreenshotSelection(db) {
   // + 可选 phaseId
   const byPhase = await loadPhaseData(db, { trajectoryId: TRAJ_ID, phaseId: PHASE_ID });
   assert(byPhase.screenshotId === SHOT_ID, `traj+phase screenshot = #${byPhase.screenshotId}`);
-  assert(byPhase.steps.length >= 100, `traj+phase steps=${byPhase.steps.length}`);
+  assert(byPhase.steps.length >= 20, `traj+phase steps=${byPhase.steps.length}`);
 
   // 不存在的 screenshot → 空返回
   const none = await loadPhaseData(db, { screenshotId: 999999999 });
@@ -190,7 +191,10 @@ function testPureBoundaries() {
 async function testRenderRealData(db, { steps, elements }) {
   const resolved = resolveStepBoxes(steps, elements);
   const shot = await db('screenshot').where({ id: SHOT_ID }).first();
-  const b64 = shot.image_data.toString('base64');
+  // 锚点截图已迁 MinIO（image_data 为空）；渲染断言不依赖图片内容，用占位 base64
+  const b64 = shot.image_data
+    ? shot.image_data.toString('base64')
+    : Buffer.from('placeholder').toString('base64');
   const data = await loadPhaseData(db, { trajectoryId: TRAJ_ID, phaseId: PHASE_ID, screenshotId: SHOT_ID });
   const html = buildHtml({ b64, meta: data.meta, resolved });
   const cw = Number(data.meta.contentWidth) || 1;
@@ -210,7 +214,7 @@ async function testRenderRealData(db, { steps, elements }) {
   const dashedBoxes = (html.match(/class="box dashed"/g) || []).length;
   const solidBoxes = totalBoxes - dashedBoxes;
   assert(totalBoxes >= 1, `html must contain boxes (got ${totalBoxes})`);
-  assert(solidBoxes >= 100, `solid boxes (bbox direct) ${solidBoxes} >= 100`);
+  assert(solidBoxes >= 20, `solid boxes (bbox direct) ${solidBoxes} >= 20`);
   assert(dashedBoxes === totalBoxes - solidBoxes, `dashed/solid split consistent: ${dashedBoxes}/${solidBoxes}`);
 
   // c. 列表行数 = steps 数（含无坐标行），无坐标步骤置灰
@@ -334,7 +338,7 @@ async function main() {
   };
 
   try {
-    console.log('[real data: traj 38 phase 3 / screenshot #8734]');
+    console.log('[real data: traj 181 phase 3 / screenshot #10615]');
     let ctx = null;
     await run('load data', async () => {
       ctx = await testRealDataLoad(db);
