@@ -1,9 +1,9 @@
 # TODO: 拆分 `_form.py` 巨型注册仓
 
-**Status:** Partial（2026-08-15/16 大幅推进；剩 `click_save` 与 scan/snapshot 壳未迁）
+**Status:** Done（2026-08-20 收尾；`_form.py` 171 行，仅注册 + 薄委托）
 **Date:** 2026-08-11  
 **Backlog ID:** **form-actions-split**  
-**Related:** `scripts/controller/actions/_form.py`（2026-08-16 当前 ~990 行，原 ~2177）；已拆出的 `form_scan_utils.py` / `scan_summary.py` / `select_match.py` / `task_completion.py`、`form_autofill.py` / `autofill_round.py` / `autofill_pending.py`、`form_action_engines.py`、`section_scope.py`；表征 `characterize-form-engine-wiring` / `characterize-select-option-stamp` / `characterize-select-option-substring` / `characterize-phase-section-scope` / `characterize-dual-save-section`
+**Related:** `scripts/controller/actions/_form.py`（2026-08-20 收尾后 156 行，原 ~2177）；已拆出的 `form_scan_utils.py` / `scan_summary.py` / `select_match.py` / `task_completion.py`、`form_autofill.py` / `autofill_round.py` / `autofill_pending.py`、`form_action_engines.py`、`section_scope.py`、**`form_save.py`（8-20，Slice 2）**、**`form_scan_actions.py`（8-20，Slice 4）**；表征 `characterize-form-engine-wiring` / `characterize-select-option-stamp` / `characterize-select-option-substring` / `characterize-phase-section-scope` / `characterize-dual-save-section`
 
 ## 背景
 
@@ -70,8 +70,8 @@
 |------|------|------|
 | 0 | ✅ 已完成 | 依赖/闭包捕获由 `FormAutofillEngine` + `form_action_engines` 的显式 engine 注入承接（`17b5a42` parity aliases 补齐） |
 | 1 | ✅ 已完成 | `select_option` → `SelectEngine`（`bc97002`），盖章/匹配在 `select_match.py` |
-| 2 | ⬜ 待做 | `click_save` 仍在 `_form.py`（闸门/歧义/toast/region/section） |
+| 2 | ✅ 已完成（2026-08-20） | `click_save` → `form_save.py` `SaveEngine`（继承 `_FormActionEngineBase`，函数体逐字搬迁仅改 `self.*` 注入）；characterization 改读 form_save+_form 拼接（form_save 在前，防 find 命中薄委托） |
 | 3 | ✅ 已完成 | `_auto_fill_pending` / `_execute_round` → `autofill_pending.py` / `autofill_round.py`（`83827f6`） |
-| 4 | ⏳ 部分 | scan/pending/summary 实现已拆到 `scan_summary.py` / `task_completion.py`；动作壳仍在 `_form.py` |
+| 4 | ✅ 已完成（2026-08-20） | scan/pending/summary 动作实现 → `form_scan_actions.py` 模块级 `*_impl` 函数（显式参数注入；`run_form_assistant_impl` 参数名 `_ensure_scanned` 保留钉住正则）；`task_done`/`save_form_snapshot` 本就是薄壳留在 `_form.py` |
 | 5 | ✅ 已完成 | login/fill/radio/tree/adjacent → `form_action_engines.py`（`bc97002`） |
-| 6 | ⬜ 待做 | `_form.py` 只留注册 + 删死 import；当前 ~990 行 |
+| 6 | ✅ 已完成（2026-08-20） | `_form.py` 只留注册 + 薄委托 + 兼容 re-export（`ResolvedControl`/`_build_section_summary`/`_dedupe_needs_agent`/`_is_query_mode` 等 form_scan_utils 符号，characterization 仍从 `_form` 导入）；死 import 已清；**171 行**；verify-all ALL GREEN |

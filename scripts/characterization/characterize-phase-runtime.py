@@ -42,6 +42,8 @@ def test_clear_phase_intent_clears_section() -> None:
 def test_form_wires_remember() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_actions.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
     assert_true("remember_phase_section" in form, "form remembers section")
@@ -60,7 +62,11 @@ def test_submit_ready_hint_uses_resolve_phase_section() -> None:
 
 
 def test_click_save_section_order_in_source() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    # form_save 在前：确保 find("async def click_save") 命中实现体而非 _form.py 薄委托
+    form = (
+        (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     cs = form.find("async def click_save")
     assert_true(cs >= 0, "click_save present")
     body = form[cs : cs + 5000]

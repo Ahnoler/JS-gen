@@ -107,7 +107,11 @@ def test_llm_generate_uses_mission_context_in_prompt() -> None:
 
 
 def test_run_form_assistant_payload_mentions_needs_agent() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    # form_scan_actions 在前：split 命中实现体而非 _form.py 薄委托
+    form = (
+        (ROOT / "scripts/controller/actions/form_scan_actions.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     chunk = form.split("async def run_form_assistant", 1)[1][:1200]
     assert_true("needs_agent" in chunk, "run_form_assistant returns needs_agent")
 

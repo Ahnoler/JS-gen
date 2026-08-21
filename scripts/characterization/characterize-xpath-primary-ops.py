@@ -261,6 +261,7 @@ def test_execute_round_surfaces_ambiguous_label() -> None:
     """Fix 2: batch path must record resolve_error, not collapse to xpath-not-found."""
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_autofill.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/autofill_round.py").read_text(encoding="utf-8")
@@ -303,6 +304,7 @@ def test_scan_display_label_markers() -> None:
 def test_phase_a_hardcut_markers() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
     assert_true(

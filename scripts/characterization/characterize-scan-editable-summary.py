@@ -10,6 +10,16 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 FORM_PY = ROOT / "scripts/controller/actions/_form.py"
+FORM_SCAN_ACTIONS_PY = ROOT / 'scripts/controller/actions/form_scan_actions.py'
+
+
+def _form_src() -> str:
+    # form_scan_actions 在前：marker 切片（如 scan_editable_summary body）命中实现体而非 _form.py 薄委托
+    return (
+        FORM_SCAN_ACTIONS_PY.read_text(encoding='utf-8')
+        + FORM_PY.read_text(encoding='utf-8')
+    )
+
 SCAN_FORM_PY = ROOT / "scripts/controller/actions/js_snippets/scan_form.py"
 PROMPT_MD = ROOT / "scripts/prompts/agent-tools-form.md"
 
@@ -27,17 +37,16 @@ def _scan_editable_summary_body(form_src: str) -> str:
     marker = "async def scan_editable_summary"
     assert_true(marker in form_src, "_form.py defines async def scan_editable_summary")
     rest = form_src.split(marker, 1)[1]
-    # Stop at next sibling @controller.action (not later nested helpers in _register_form_actions).
-    end = rest.find("\n    @controller.action")
-    if end < 0:
-        end = rest.find("\nasync def ")
-    if end >= 0:
-        rest = rest[:end]
+    # Stop at the nearest next sibling def — decorated action wrapper (_form.py)
+    # or module-level impl function (form_scan_actions.py), whichever comes first.
+    ends = [e for e in (rest.find("\n    @controller.action"), rest.find("\nasync def ")) if e >= 0]
+    if ends:
+        rest = rest[: min(ends)]
     return rest
 
 
 def test_action_defined() -> None:
-    form = FORM_PY.read_text(encoding="utf-8")
+    form = _form_src()
     assert_true(
         "async def scan_editable_summary" in form,
         "_form.py defines async def scan_editable_summary",
@@ -45,7 +54,7 @@ def test_action_defined() -> None:
 
 
 def test_action_no_autofill() -> None:
-    form = FORM_PY.read_text(encoding="utf-8")
+    form = _form_src()
     body = _scan_editable_summary_body(form)
     assert_true(
         "_auto_fill_pending" not in body,
@@ -58,7 +67,7 @@ def test_action_no_autofill() -> None:
 
 
 def test_action_no_store_writes() -> None:
-    form = FORM_PY.read_text(encoding="utf-8")
+    form = _form_src()
     body = _scan_editable_summary_body(form)
     assert_true(
         "case_data_store['task_list']" not in body
@@ -72,7 +81,7 @@ def test_action_no_store_writes() -> None:
 
 
 def test_summary_buttons_shape() -> None:
-    form = FORM_PY.read_text(encoding="utf-8")
+    form = _form_src()
     body = _scan_editable_summary_body(form)
     assert_true(
         "build_editable_summary" in body,
@@ -196,7 +205,7 @@ def test_fullpage_l2_l1_cues() -> None:
 
 
 def test_scan_editable_summary_fullpage_wired() -> None:
-    form = FORM_PY.read_text(encoding="utf-8")
+    form = _form_src()
     body = _scan_editable_summary_body(form)
     assert_true(
         "build_editable_summary" in body,

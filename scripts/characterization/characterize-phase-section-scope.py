@@ -50,7 +50,11 @@ def test_section_attach_dual_writes_region() -> None:
 
 
 def test_click_save_accepts_region_alias() -> None:
-    form = (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    # form_save 在前：确保 find 命中实现体而非 _form.py 薄委托
+    form = (
+        (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+    )
     assert_true(
         "async def click_save(button_text: str = '保存', section: str = '', region: str = '')" in form
         or 'async def click_save(button_text: str = "保存", section: str = "", region: str = "")' in form
@@ -141,6 +145,7 @@ def test_err_section_required_trigger_condition() -> None:
 def test_form_has_err_section_required() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
     assert_true("err-region-required" in form, "click_save surfaces err-region-required")
@@ -151,8 +156,10 @@ def test_form_has_err_section_required() -> None:
 
 
 def test_get_pending_signature() -> None:
+    # form_scan_actions 在前：split 命中实现体而非 _form.py 薄委托
     form = (
-        (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        (ROOT / "scripts/controller/actions/form_scan_actions.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
     chunk = form.split("async def get_pending_tasks", 1)[1][:900]
@@ -182,6 +189,7 @@ def test_submit_hint_section_scoped() -> None:
 def test_run_form_assistant_section_signature() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_scan_actions.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
     chunk = form.split("async def run_form_assistant", 1)[1][:800]
@@ -269,6 +277,7 @@ def test_submit_hint_includes_unique_save_section() -> None:
 def test_click_save_auto_section_from_unique_button() -> None:
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
     assert_true("unique_button_section" in form, "click_save uses unique_button_section")
@@ -292,6 +301,7 @@ def test_click_save_no_feedback_counts_as_success() -> None:
     """Silent SUT save (no toast) must set _last_save_ok and tell agent to done."""
     form = (
         (ROOT / "scripts/controller/actions/_form.py").read_text(encoding="utf-8")
+        + (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
         + (ROOT / "scripts/controller/actions/form_scan_utils.py").read_text(encoding="utf-8")
     )
     idx = form.find("SUCCESS via no-feedback")

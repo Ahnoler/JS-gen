@@ -139,7 +139,10 @@ def test_emit_uses_writer() -> None:
 
 
 def test_form_wiring() -> None:
-    form = FORM_PY.read_text(encoding='utf-8')
+    form = (
+        FORM_PY.read_text(encoding='utf-8')
+        + (ROOT / 'scripts/controller/actions/form_scan_actions.py').read_text(encoding='utf-8')
+    )
     assert_true(
         'emit_editable_summary_memory' in form,
         '_form.py calls emit_editable_summary_memory',

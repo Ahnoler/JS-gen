@@ -98,6 +98,7 @@ def main() -> int:
     form_py = (
         (ROOT / 'scripts/controller/actions/form_action_engines.py').read_text(encoding='utf-8')
         + (ROOT / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
+        + (ROOT / 'scripts/controller/actions/form_scan_actions.py').read_text(encoding='utf-8')
         + (ROOT / 'scripts/controller/actions/form_autofill.py').read_text(encoding='utf-8')
         + (ROOT / 'scripts/controller/actions/autofill_round.py').read_text(encoding='utf-8')
     )
