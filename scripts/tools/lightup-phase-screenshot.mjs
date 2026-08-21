@@ -364,6 +364,20 @@ async function runV3GroupsMode(entry, result, file) {
 async function runV3FlatMode(entry, properties, file) {
   const db = getDB();
   try {
+    // rect 契约为 JSON 字符串（空 ""）；旧 payload 文件仍是对象，解析后归一成对象供渲染
+    const parseRect = (v) => {
+      if (typeof v !== 'string') return v && typeof v === 'object' ? v : {};
+      if (!v.trim()) return {};
+      try {
+        const r = JSON.parse(v);
+        return r && typeof r === 'object' ? r : {};
+      } catch {
+        return {};
+      }
+    };
+    for (const p of properties) {
+      if (p && typeof p.rect === 'string') p.rect = parseRect(p.rect);
+    }
     const shots = properties.filter((p) => p.type === 'page' || p.type === 'dialog');
     const eles = properties.filter((p) => p.type === 'ele');
     const pages = [];

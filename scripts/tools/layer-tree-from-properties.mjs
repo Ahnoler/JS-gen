@@ -35,6 +35,25 @@ function argValue(name) {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
+/** V3 payload 契约 rect 为 JSON 字符串（空 ""）；旧导出文件仍是对象。归一成对象供建树/渲染。 */
+function parseRectStrings(properties) {
+  for (const p of Array.isArray(properties) ? properties : []) {
+    if (p && typeof p.rect === 'string') {
+      if (!p.rect.trim()) {
+        p.rect = {};
+        continue;
+      }
+      try {
+        const r = JSON.parse(p.rect);
+        p.rect = r && typeof r === 'object' ? r : {};
+      } catch {
+        p.rect = {};
+      }
+    }
+  }
+  return properties;
+}
+
 const ROLE_LEVEL = {
   page: ['page', '页面'], main: ['page', '主区'], shell_header: ['page', '页头'], other: ['page', '其他'],
   tab: ['tab', 'tab页签'], wizard_step: ['wizard', '步骤向导'],
@@ -523,7 +542,7 @@ function main() {
   const data = raw?.data ?? raw;
   const list = data?.payload?.transcationEventTypeList ?? data?.transcationEventTypeList ?? [];
   const entry = list[0] || {};
-  const properties = entry.transcationProperties || [];
+  const properties = parseRectStrings(entry.transcationProperties || []);
   const title = String(entry.transcationName || '').trim() || file;
 
   const html = buildHtml({ properties, title });
@@ -645,7 +664,7 @@ function runV3Mode(file) {
     return;
   }
 
-  const properties = entry?.transcationProperties;
+  const properties = parseRectStrings(entry?.transcationProperties);
   if (Array.isArray(properties) && properties.some((p) => p && ['page', 'dialog', 'ele'].includes(p.type))) {
     const title = `V3.1 · ${entry?.transcationName || file}`;
     const html = buildHtml({ properties, title });

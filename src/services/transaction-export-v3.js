@@ -7,7 +7,8 @@
  *   - 发给 partner 的 payload 只含 `transcationEventTypeList`（顶层无 screenshots）。
  *   - `id` 为纯数字顺序号（截图先占 1..N，控件续接 N+1..），移除 `scanIndex`。
  *   - 控件 `pid` 指向所属截图条目的数字 `id`（控件→截图关联键）。
- *   - `rect`/`label`/`regionId`/`regionLabel`/`screenshot` 统一恒有（空给 ""/{}/[]）。
+ *   - `rect` 输出为 JSON 字符串（"{"x1":..,"y1":..,"x2":..,"y2":..}"，消费方单列存储方便；空给 ""）；
+ *     `label`/`regionId`/`regionLabel`/`screenshot` 统一恒有（空给 ""/[]）。
  */
 import { mapStepToTransactionEvent, uniquifyPropertiesNames } from './transaction-export.js';
 import { MINIO_BUCKET, MINIO_PUBLIC_URL } from '../../config/config.js';
@@ -147,6 +148,13 @@ function isLegalRect(bbox) {
     && Number.isFinite(Number(bbox.x1)) && Number.isFinite(Number(bbox.y1))
     && Number.isFinite(Number(bbox.x2)) && Number.isFinite(Number(bbox.y2))
     && Number(bbox.x2) > Number(bbox.x1) && Number(bbox.y2) > Number(bbox.y1);
+}
+
+/** rect 输出序列化：非空对象 → 紧凑 JSON 字符串；空 → ""（消费方单列存储）。 */
+function rectToString(rect) {
+  return rect && typeof rect === 'object' && Object.keys(rect).length > 0
+    ? JSON.stringify(rect)
+    : '';
 }
 
 /**
@@ -348,7 +356,8 @@ export function buildScreenshotEntries({
  * `id` 为纯数字顺序号，续接截图条目之后（起始 id = screenshotCount + 1）。
  * `pid` 指向所属截图条目的数字 id（页面控件→idByPhase，弹窗控件→idByDialog；
  *   找不到父截图给 ""，不丢步骤）。
- * `rect`/`label`/`regionId`/`regionLabel`/`screenshot` 统一恒有（空给 {}/""/[]）。
+ * `rect` 构建期为对象（弹窗坐标换算需要），由 buildTransactionEntryV3 合并后统一序列化为
+ * JSON 字符串（空给 ""）；`label`/`regionId`/`regionLabel`/`screenshot` 统一恒有（空给 ""/[]）。
  */
 export function buildV3Properties({
   traj = {},
@@ -514,10 +523,14 @@ export function validatePageLevelCoverage(entry) {
   );
   const missing = [];
   const exempt = [];
+  // rect 在 payload 中为 JSON 字符串（空 ""）；构建期/手搓 entry 仍可能是对象，两种形式都认
+  const hasRect = (p) => (typeof p.rect === 'string'
+    ? p.rect.trim() !== ''
+    : !!(p.rect && Object.keys(p.rect).length > 0));
   const isLocatable = (p) => !!(
     String(p.elementType || '').trim()
     || String(p.regionId || '').trim()
-    || (p.rect && Object.keys(p.rect).length > 0)
+    || hasRect(p)
     || String(p.realLabel || '').trim()
   );
   for (const p of props) {
@@ -606,8 +619,11 @@ export function buildTransactionEntryV3(traj, {
     pageLevelById,
   });
 
-  // 合并：截图在前，控件在后；一起参与 propertiesName 去重
+  // 合并：截图在前，控件在后；rect 统一序列化为 JSON 字符串（空给 ""）；一起参与 propertiesName 去重
   const properties = [...screenshotEntries, ...controlProperties];
+  for (const p of properties) {
+    p.rect = rectToString(p.rect);
+  }
   uniquifyPropertiesNames(properties);
 
   const id = traj.id != null ? String(traj.id) : '';

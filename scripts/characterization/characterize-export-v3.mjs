@@ -340,6 +340,8 @@ function testPayloadStructure() {
   check(Array.isArray(props[0].screenshot) && props[0].screenshot.length === 1, '截图条目 screenshot 数组有值');
   check(props[1].type === 'ele' && props[1].propertiesPID === props[0].propertiesID, '控件条目 propertiesPID 指向截图条目 propertiesID');
   check(Array.isArray(props[1].screenshot) && props[1].screenshot.length === 0, '控件条目 screenshot 空数组');
+  check(props[0].rect === '', 'payload 截图条目 rect 空字符串');
+  check(props[1].rect === '{"x1":1,"y1":2,"x2":30,"y2":20}', 'payload 控件条目 rect 为 JSON 字符串');
 
   const payload = buildTransactionPayloadV3(traj, { systemId: '98', projectId: '31', phases, phaseScreenshots: shots });
   check(payload.payload.screenshots === undefined, 'payload 不再含 screenshots（顶层只留 transcationEventTypeList）');
@@ -369,7 +371,7 @@ async function testRealData() {
     // 存量 traj 38 步骤数漂移（110→5），阈值断言保持但会红——属于存量数据问题，不在本次修
     // 存量 traj 38 步骤数已从 110 漂移到 5，阈值改为相对断言（>=1）避免误红
     check(props.length >= 1, `transcationProperties >= 1（实际 ${props.length}）`);
-    const withRect = props.filter((p) => p.rect && Object.keys(p.rect).length > 0).length;
+    const withRect = props.filter((p) => typeof p.rect === 'string' && p.rect.trim() !== '').length;
     check(withRect >= 1, `带非空 rect 属性 >= 1（实际 ${withRect}）`);
     const controls = props.filter((p) => p.type === 'ele');
     const controlsWithPid = controls.filter((p) => p.propertiesPID !== '0' && p.propertiesPID !== undefined).length;
@@ -395,7 +397,7 @@ async function testRealData() {
       if (!el || !el.bbox) continue;
       const expected = { x1: Number(el.bbox.x1), y1: Number(el.bbox.y1), x2: Number(el.bbox.x2), y2: Number(el.bbox.y2) };
       rectChecked++;
-      if (node.rect && JSON.stringify(node.rect) === JSON.stringify(expected)) rectOk++;
+      if (node.rect === JSON.stringify(expected)) rectOk++;
     }
     check(rectChecked >= 1 && rectOk === rectChecked, `抽样 rect 与 DB bbox 一致（${rectOk}/${rectChecked}）`);
   } finally {

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildScreenshotEntries,
   buildV3Properties,
+  buildTransactionEntryV3,
   validatePageLevelCoverage,
   pageKeyFromRegionId,
   popupKeyFromRegionId,
@@ -117,6 +118,41 @@ const ok = (n) => console.log(`ok: ${n}`);
   assert.equal(pageKeyFromRegionId(`${pageKey}|card:产品目录`), pageKey);
   assert.equal(popupKeyFromRegionId(`${popupKey}|overlay:地址选择器`), popupKey);
   ok('pure page-level build/validate/coordinates');
+}
+
+// payload 出口：rect 统一序列化为 JSON 字符串（空给 ""），弹窗换算在序列化前完成
+{
+  const pageKey = 'page:http://test/#/corp/custManage';
+  const popupKey = `${pageKey}|dialog:地址选择器`;
+  const built = buildTransactionEntryV3(
+    {
+      id: 99,
+      steps: [
+        {
+          stepNumber: 1, actionType: 'select_option', source: 'agent',
+          elementJson: { tag: 'input', target_kind: 'form_select', formLabel: '省份', region_id: `${popupKey}|overlay:地址选择器`, page_bbox: { x1: 120, y1: 220, x2: 320, y2: 240 } },
+          paramsJson: {},
+        },
+      ],
+    },
+    {
+      systemId: '98',
+      projectId: '31',
+      pageLevelScreenshots: [
+        { levelType: 'page', levelKey: pageKey, imageUrl: 'http://minio/page.png', metadataJson: { displayName: '对公客户管理' } },
+        { levelType: 'popup', levelKey: popupKey, parentLevelKey: pageKey, imageUrl: 'http://minio/dialog.png', metadataJson: { displayName: '地址选择器', dialogTitle: '地址选择器', popupRect: { x1: 100, y1: 200, x2: 500, y2: 600 } } },
+      ],
+    },
+  );
+  const props = built.entry.transcationProperties;
+  const page = props.find((p) => p.type === 'page');
+  const dlg = props.find((p) => p.type === 'dialog');
+  const ctrl = props.find((p) => p.type === 'ele');
+  assert.equal(page.rect, '');
+  assert.equal(dlg.rect, '{"x1":100,"y1":200,"x2":500,"y2":600}');
+  assert.equal(ctrl.rect, '{"x1":20,"y1":20,"x2":220,"y2":40}');
+  assert.equal(built.stats.missingPageLevelScreenshots, 0);
+  ok('payload rect serialized as JSON string');
 }
 
 console.log('characterize-page-level-screenshot: ok');
