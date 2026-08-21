@@ -55,21 +55,11 @@ app.use((err, req, res, next) => {
 });
 
 function loadDefaultModel() {
-  // Priority: config/agent-api.json defaultModel → .env LLM_MODEL (single source of truth).
+  // Single source of truth: .env LLM_MODEL (via config/config.js).
   // modelID keeps the provider prefix — the gateway requires the full model
   // name (e.g. "Qwen/Qwen3.5-35B-A3B"); stripping it 404s.
-  let modelStr = '';
-  const apiCfgPath = path.join(PROJECT_DIR, 'config', 'agent-api.json');
-  if (existsSync(apiCfgPath)) {
-    try {
-      modelStr = (JSON.parse(readFileSync(apiCfgPath, 'utf-8')).defaultModel || '').trim();
-    } catch (e) {
-      console.warn('[server] Failed to parse agent-api.config.json:', e.message);
-    }
-  }
-  if (!modelStr) modelStr = LLM_MODEL;
-  const parts = modelStr.split('/');
-  state.defaultModel = { providerID: parts.length >= 2 ? parts[0] : '', modelID: modelStr };
+  const parts = LLM_MODEL.split('/');
+  state.defaultModel = { providerID: parts.length >= 2 ? parts[0] : '', modelID: LLM_MODEL };
 }
 
 async function main() {

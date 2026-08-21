@@ -256,7 +256,7 @@ export async function attachTrajectoryLive(trajectoryId) {
   } catch {}
 
   const sessionId = randomUUID();
-  // Empty traj.model → agent-api.json defaultModel; explicit value kept as-is.
+  // Empty traj.model → .env LLM_MODEL (single source of truth); explicit value kept as-is.
   const model = resolveModelId(traj.model);
   let opened;
   try {
