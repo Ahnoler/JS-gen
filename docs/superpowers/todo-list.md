@@ -31,8 +31,8 @@
 | ID | 项 | 处理说明 |
 |----|----|----------|
 | **budget-extend** | 【AI录制】阶段步数预算动态加成 + 预算耗尽续跑 | 2026-08-21 登记（源自 traj 33 P2 十步耗尽事故的次级观察项；同日已根修 recovery buffer 缩进 bug）。spec：`specs/2026-08-21-dynamic-phase-step-budget-design.md`——两段式：静态公式不动 + 质量门驱动续跑（引入字段×4/pending×2 成本模型，轮次≤2、总步≤ceiling 双闸）。**待评审** |
-| **batch-actions** | 【AI录制】批量动作显式化（max_actions_per_step 参数化） | 2026-08-21 登记。调研结论：链路已按动作粒度全通（browser_use 原生支持多动作、prompt 已允许、schema `(step_number, action_index)` 已支持）= 半接入状态。spec：`specs/2026-08-21-batched-actions-spec.md`——参数透传（config→Node stepData→instruction→Agent 构造）+ 模式默认（表单 5/导航 3）+ prompt 批量纪律，约 10-20 行；O3 轮次归属落库二期。**待评审** |
-| **grounding-fallback** | 【回放自愈】视觉 grounding 兜底（定位失败时 VL 截图定位） | 2026-08-21 登记。现状无视觉通路（use_vision=False、LLM 纯文本），heal 为 12 步文本盲试。spec：`specs/2026-08-21-grounding-fallback-spec.md`——heal 前置 grounding pre-step（Python 侧：视口截图+候选→VL→坐标→elementsFromPoint 反查优先/坐标点击兜底），成本 ≤¥0.3/轨迹，G1 前置：内网网关 image 连通性测试。**待评审** |
+| **batch-actions** | 【AI录制】批量动作显式化（max_actions_per_step 参数化） | 2026-08-21 登记。✅ **已实施并本地验证通过**（2026-08-21）：服务器 Linux headless dsh agent 实施（commit `aee2233`，未 push）→ patch 拉取到本地并应用 → 评审通过（本地 characterize-batch-actions / ctrl / dedup / phase-reviewer 回归 / py_compile 全绿；verify-all 在服务器 62/4，4 失败均为环境项）。9 文件 +227/-1（config.js/.env.example、trajectory-recording-runner.js stepData 透传、agent_utils.resolve_max_actions_per_step、service.py Agent 传参 + [batch] 观测、prompt 批量纪律、characterize-batch-actions.py + verify-all 注册、CHANGELOG）。**待本地 commit/push 决策**；本地 config/.env 需补 `MAX_ACTIONS_PER_STEP=4`（或留空走模式默认 5/3） |
+| **grounding-fallback** | 【回放自愈】视觉 grounding 兜底（定位失败时 VL 截图定位） | 2026-08-21 登记。❌ **已否决**（2026-08-21，用户决策：成本考量，不实施）。调研/spec 存档：`specs/2026-08-21-grounding-fallback-spec.md`（如按需启用：§3.0 连通性测试 → VISION_LLM_* 配置 + heal 前置 pre-step） |
 | **heal-locate** | 【回放自愈】禁止/少用 `scroll_down` 找字段；高效定位与级联缺席判定 | ✅ **开发完成**（2026-08-15，`uara_V1.2`）：H0 调研 + MissingReason/HealContract + heal prompt + P2 决策路由已合入；characterization 全绿。剩余：真实 batch replay / live 湿测（见 `heal-locate-wet`）。见专节 |
 
 ### heal-locate — 回放自愈定位效率（✅ 开发完成 · 待 live 湿测）

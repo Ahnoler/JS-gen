@@ -1,6 +1,6 @@
 # 视觉 Grounding 兜底方案（Spec）
 
-> 状态：待评审
+> 状态：**已否决**（2026-08-21 用户决策：成本考量，不实施；存档供按需启用）
 > 日期：2026-08-21
 > 前置：调研报告 docs/superpowers/research/2026-08-21-batched-actions-grounding-research.md 第二节；**内网网关 image 透传连通性测试**（G1 决策依赖，见 §3.0，5 分钟可完成）
 > 决策（用户已确认默认建议）：G1 先测内网网关，支持则优先；G2 一期仅 Type A heal 前置；G3 用 _result_ok 判定 + 成功回写 locator（可选增强）；G4 坐标型步骤一期不落库；G7 VISION 未配置则跳过直接原 heal

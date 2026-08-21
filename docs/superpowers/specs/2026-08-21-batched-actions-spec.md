@@ -1,6 +1,6 @@
 # 批量动作显式化方案（Spec）
 
-> 状态：待评审
+> 状态：**已实施并本地评审通过**（2026-08-21：服务器 commit `aee2233` → 本地 patch 应用 → 评审全绿；待本地 commit/push 决策）
 > 日期：2026-08-21
 > 前置：调研报告 docs/superpowers/research/2026-08-21-batched-actions-grounding-research.md（结论：链路已按动作粒度全通，批量"半接入"）
 > 决策（用户已确认默认建议）：O1 表单 5 / 导航 3、可调；O2 截图维持现状（每动作一对）；O3 轮次归属落库一期不做；O4 批内失败接受 browser_use break 语义，一期不注入恢复
