@@ -24,3 +24,14 @@
 - verify_field_value(label_text, expected) — 调用 check_field_value 并将 currentValue 与 expected 比较（**金额格式等价**：`2026` ≡ `2,026.00`）。匹配返回 ok，不匹配返回 err。填写后用于确认值已正确设置。
 - click_adjacent_button(label_text) — 点击字段旁边的"选择"/"引入"按钮，但**仅当字段为空时**。成功返回 `"ok-clicked"`；如果字段已有值则返回 `"already-filled"`（不以 ok 开头）— 跳过、不录制。
 - **login(username, password, captcha='', sms_code='') — 🚨 登录系统。填写用户名+密码+验证码(可选)+短信验证码(可选)、点击登录按钮、等待跳转。有验证码时传入 captcha='1111' sms_code='1111'。不要手动逐字段填写登录表单。**
+
+## 批量输出纪律（同一 action 列表可含多个动作）
+
+同一轮可以一次输出多个动作（框架按顺序连续执行），但批内**仅允许对已存在元素的连续填充/选择**——例如多个 `fill_form_field`、多个 `click_radio`（不含会改 DOM 的下拉/级联）。
+
+**禁止**把以下动作混入批内（它们会改变 DOM 结构或触发保存/校验，批内旧定位必然过期）：
+
+- 改变 DOM 结构的动作：`click_element`、导航类（`go_to_url` / `go_back` / `click_menu_item`）、下拉展开与 `select_option`、`switch_tab`、弹窗/通知开关（`close_dialog` / `close_notification`）、`expand_all_el_tree` 等；
+- 表单保存/提交类动作：`click_save`、任何「保存/提交/确定/确认」点击、`login` 提交。
+
+需要结构变化或保存/校验的动作必须单独一步执行（单独一步后重新取页面状态再继续）。`select_option` 仍遵守「每步最多 1 个」规则不变。

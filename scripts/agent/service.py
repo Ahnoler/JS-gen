@@ -22,6 +22,7 @@ from ..agent_utils import (
     extract_first_url,
     make_done_callback,
     make_step_callback,
+    resolve_max_actions_per_step,
 )
 
 _last_agent = None
@@ -81,6 +82,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                           special_element_candidates_store=None):
     global _last_agent
     max_steps = instruction.get("max_steps", 40)
+    # 批量动作预算：Node config MAX_ACTIONS_PER_STEP 透传（0/空 → 模式映射，见 resolve_max_actions_per_step）
+    raw_max_actions_per_step = (
+        instruction.get('max_actions_per_step')
+        or instruction.get('maxActionsPerStep')
+    )
     task_text = instruction.get("instruction", "")
     if not task_text:
         emit_json({"event": "error", "data": {"message": "instruction is required"}})
@@ -421,12 +427,21 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         contract = {'mode': 'heal', 'heal': case_data_ref['_heal_contract']}
     else:
         contract = get_phase_intent(case_data_ref) if case_data_ref else None
+    max_actions_per_step, max_actions_source = resolve_max_actions_per_step(
+        raw_max_actions_per_step,
+        (contract or {}).get('mode'),
+    )
+    sys.stderr.write(
+        f"[batch] max_actions_per_step={max_actions_per_step} (source={max_actions_source})\n"
+    )
+    sys.stderr.flush()
     system_msg = build_agent_system_message(contract)
     agent = Agent(
         task=agent_task, llm=llm, controller=controller, browser_context=browser_context,
         override_system_message=system_msg,
         use_vision=False, enable_memory=False,
         max_failures=5, retry_delay=10,
+        max_actions_per_step=max_actions_per_step,
         planner_llm=llm, planner_interval=3,
         extend_planner_system_message=PLANNER_SYSTEM_PROMPT,
         register_new_step_callback=make_step_callback(step_index * 100),
@@ -479,6 +494,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                     mark_quality_failed(case_data_ref, 'missing_success_token')
             emit_phase_observability(case_data_ref, emit_json)
             phase_payload = {"phase": step_index, "name": task_text[:60]}
+            phase_payload["maxActionsPerStep"] = max_actions_per_step
             c = get_phase_intent(case_data_ref)
             if c:
                 phase_payload["phase_intent"] = c

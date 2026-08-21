@@ -64,6 +64,9 @@ export const FORM_LLM_MODEL = _resolve('FORM_LLM_MODEL', LLM_MODEL);
 export const FORM_LLM_BASE_URL = _resolve('FORM_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
 export const FORM_LLM_API_KEY = _resolve('FORM_LLM_API_KEY', LLM_API_KEY);
 
+/** 批量动作预算（browser_use max_actions_per_step）：全局默认；0/空 = 不覆盖，走框架默认 10 */
+export const MAX_ACTIONS_PER_STEP = _resolve('MAX_ACTIONS_PER_STEP', '');
+
 // MinIO — screenshot / image object storage
 const MINIO_HOST_DEFAULT = _resolve('MINIO_HOST', '');
 let _minioUrl = null;

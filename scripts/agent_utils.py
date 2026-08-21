@@ -34,6 +34,47 @@ def extract_first_url(task):
     urls = re.findall(r'https?://[^\s\n]+', task)
     return urls[0] if urls else None
 
+
+# 批量动作预算：contract 模式 → 单步最大动作数（browser_use max_actions_per_step）
+# 填表/维护/引入阶段字段多为独立输入，允许 5 个连续动作；导航/查询/登录等
+# DOM 结构易变阶段收敛到 3，控制批内定位过期与整轮重试成本。
+_MODE_MAX_ACTIONS = {
+    'create': 5,
+    'modify': 5,
+    'introduce_pick': 5,
+    'navigate': 3,
+    'query': 3,
+    'login': 3,
+}
+
+_DEFAULT_MAX_ACTIONS = 3
+
+
+def resolve_max_actions_per_step(instruction_value, contract_mode=None):
+    """解析单步最大动作数（browser_use max_actions_per_step）。
+
+    规则（与 Node 配置链一致）：
+    1. instruction_value 非空（Node 显式传 MAX_ACTIONS_PER_STEP）→ 用之；
+       0 / 空串 / None 视为未显式指定，不覆盖，继续走模式映射；
+    2. 否则按 contract 模式映射：create/modify/introduce_pick → 5，
+       navigate/query/login → 3，其它模式 → 默认 3；
+    3. 结果 clamp 到 [1, 10]（框架默认 10 封顶）。
+
+    Returns: (value, source) — source ∈ {'config', 'mode', 'default'}。
+    """
+    if instruction_value not in (None, ''):
+        try:
+            explicit = int(instruction_value)
+        except (TypeError, ValueError):
+            explicit = 0
+        if explicit:
+            return max(1, min(10, explicit)), 'config'
+    mode_default = _MODE_MAX_ACTIONS.get(contract_mode)
+    if mode_default is not None:
+        return mode_default, 'mode'
+    return _DEFAULT_MAX_ACTIONS, 'default'
+
+
 async def do_navigate(page, url):
     from . import controller as ctrl_mod
     from .controller.actions._helpers import dismiss_https_first_interstitial

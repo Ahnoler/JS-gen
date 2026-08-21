@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-21: **批量动作显式化（`max_actions_per_step` 参数化）**：browser_use 0.1.48 一轮多动作此前走框架默认 10（Agent 构造未传参，实际生效但不可控），现新增 `MAX_ACTIONS_PER_STEP` 配置（默认 4）经 Node → Python 透传显式控制。解析规则（`resolve_max_actions_per_step` 纯函数，scripts/agent_utils.py）：指令显式值优先（0/空不覆盖）→ 否则按 contract 模式映射（create/modify/introduce_pick → 5；navigate/query/login/其它/None → 3）→ clamp 到 [1,10]。agent prompt 追加批量输出纪律（同一轮多动作仅允许对已存在元素的连续填充/选择，如多个 fill_form_field / click_radio；禁止 click_element、导航、下拉展开、select_option 等 DOM 结构变更动作与保存/提交类动作入批）；agent-tools-form「每步最多 1 个 select_option」不变。观测：Agent 构造前 stderr `[batch] max_actions_per_step=N (source=config|mode|default)`；phase_end observability payload 增加 `maxActionsPerStep` 字段。
+  影响范围：agent 会话批量动作预算（行为可调）、prompt 纪律、phase_end 观测 payload（新增可选字段，向后兼容）、config 新增配置项。无 schema/WS 变更。
+  文件：config/config.js, config/.env, config/.env.example, src/services/trajectory/trajectory-recording-runner.js, scripts/agent_utils.py, scripts/agent/service.py, scripts/prompts/agent-tools-common.md, scripts/characterization/characterize-batch-actions.py, scripts/refactor/verify-all.sh
+  Python 同步提示：phase_end observability payload 新增 `maxActionsPerStep` 字段（消费方按可选字段处理）；Python 控制面如需对齐批量动作预算语义，参照 `resolve_max_actions_per_step` 规则（显式值优先、模式映射 5/3、clamp [1,10]）。
+
 - 2026-08-21: **V3 `rect` 字段改为 JSON 字符串**：`transcationProperties[].rect` 从对象改为字符串（如 `'{"x1":0.4617838541666667,"y1":0.11821438412785891,"x2":0.6642903645833333,"y2":0.12703224028658033}'`），空值从 `{}` 改为 `""`，方便消费方单列存储。序列化在 `buildTransactionEntryV3` 合并截图+控件条目后统一进行（构建期内部仍为对象，弹窗坐标换算不受影响）；`validatePageLevelCoverage` 可定位判定兼容字符串/对象两种形式；`lightup-phase-screenshot` 工具读取 payload 时解析字符串 rect（兼容旧对象格式文件）。底层导出函数 `buildScreenshotEntries` / `buildV3Properties` 返回值保持对象形式（内部构建形态，非 payload 契约）。
   影响范围：V3 导出服务契约（payload 中 rect 类型变化：对象→字符串，空 `{}`→`""`）、API docs、tools（lightup）、characterization。V2 不受影响（V2 无 rect 字段）；无 schema/WS 变更。
   文件：src/services/transaction-export-v3.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/tools/lightup-phase-screenshot.mjs, scripts/characterization/characterize-export-v3.mjs, scripts/characterization/characterize-page-level-screenshot.mjs
