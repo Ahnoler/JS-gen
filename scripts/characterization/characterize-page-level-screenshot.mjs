@@ -105,7 +105,7 @@ const ok = (n) => console.log(`ok: ${n}`);
   assert.equal(properties[0].propertiesPID, page.propertiesID);
   assert.equal(properties[1].propertiesPID, dialog.propertiesID);
   assert.deepEqual(properties[1].rect, { x1: 20, y1: 20, x2: 220, y2: 40 });
-  assert.equal(properties[2].propertiesPID, '0');
+  assert.equal(properties[2].propertiesPID, page.propertiesID); // 无 element_json 步骤经页面上下文继承 pid
 
   const covered = validatePageLevelCoverage({ transcationProperties: [...entries, ...properties] });
   assert.equal(covered.ok, true);

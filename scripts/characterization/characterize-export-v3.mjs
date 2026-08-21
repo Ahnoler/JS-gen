@@ -264,7 +264,7 @@ function testPageLevelScreenshots() {
   const pageCtrl = properties[0];
   const popupCtrl = properties[1];
   const noElement = properties[2];
-  check(noElement.propertiesPID === '0', '无 element_json 步骤 pid=0（coverage 豁免）');
+  check(noElement.propertiesPID === pageShot.propertiesID, '无 element_json 步骤经页面上下文继承 pid（不再 0）');
   check(pageCtrl.propertiesPID === pageShot.propertiesID, '页面控件 pid 指向 page');
   check(pageCtrl.regionId === `${pageKey}|card:产品目录`, '页面控件 regionId 保留 pageKey|card');
   check(popupCtrl.propertiesPID === dialogShot.propertiesID, '弹窗控件 pid 指向 dialog');
@@ -279,6 +279,27 @@ function testPageLevelScreenshots() {
   check(coverageBlocksPush(missing, { coverageMode: 'legacy_phase_fallback' }) === false, 'legacy 存量模式覆盖缺失不阻断（告警降级）');
   check(coverageBlocksPush(covered, { coverageMode: 'page_level' }) === false, '覆盖完整不阻断');
   check(coverageBlocksPush(missing, undefined) === false, '无 stats 时默认不阻断（存量兜底）');
+
+  // 页面上下文兜底：步骤无页面锚点（人工/抓取步骤，region_id=table 等）时继承前序最近页面
+  {
+    const ctxPageKey = 'page:http://test/#/corp/custManage';
+    const ctxProps = buildV3Properties({
+      traj: {
+        steps: [
+          { stepNumber: 1, actionType: 'click_element_by_index', source: 'agent', elementJson: { tag: 'a', xpath_smart: '//a', formLabel: '客户管理', region_id: ctxPageKey, bbox: { x1: 1, y1: 2, x2: 30, y2: 20 } }, paramsJson: {} },
+          { stepNumber: 2, actionType: 'click_table_row_radio', source: 'special_element', elementJson: { tag: 'td', xpath_smart: '//td[1]', formLabel: '表格单选', region_id: 'table', bbox: { x1: 1, y1: 2, x2: 30, y2: 20 } }, paramsJson: {} },
+        ],
+      },
+      screenshotCount: entries.length,
+      idByPageLevel,
+      pageLevelById,
+      idByDialog: new Map(),
+      idByPhase: new Map(),
+    });
+    const ctxManual = ctxProps.properties[1];
+    check(ctxManual.propertiesPID === pageShot.propertiesID, '人工/抓取步骤经页面上下文继承挂上 pid（region_id=table 也归属当前页面）');
+    check(ctxManual.regionId.startsWith(ctxPageKey), '人工/抓取步骤 regionId 补上页面归属前缀');
+  }
 
   check(pageKeyFromRegionId(`${pageKey}|card:产品目录`) === pageKey, 'pageKeyFromRegionId');
   check(popupKeyFromRegionId(`${popupKey}|overlay:地址选择器`) === popupKey, 'popupKeyFromRegionId');

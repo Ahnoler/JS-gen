@@ -380,6 +380,9 @@ export function buildV3Properties({
   for (const p of phases || []) {
     phaseById.set(Number(p.id), p);
   }
+  // 页面上下文：步骤无页面锚点（人工/抓取步骤，region 常为 table 等区域标记）时，
+  // 继承前序最近步骤所在页面 —— 步骤按执行顺序流转，操作发生在该页面，归属同一页面截图
+  let lastPageKey = '';
   for (const step of traj.steps || []) {
     const ev = mapStepToTransactionEvent(step);
     if (!ev) {
@@ -396,9 +399,11 @@ export function buildV3Properties({
     const rawRegionId = el ? String(el.region_id ?? '').trim() : '';
     const overlay = isOverlayRegion(rawRegionId);
 
-    const pageKey = el
+    let pageKey = el
       ? String(el.page_level_key || el.pageLevelKey || pageKeyFromRegionId(rawRegionId)).trim()
       : '';
+    if (!pageKey) pageKey = lastPageKey;
+    if (pageKey) lastPageKey = pageKey;
     const popupKey = el
       ? String(el.popup_level_key || el.popupLevelKey || popupKeyFromRegionId(rawRegionId)).trim()
       : '';

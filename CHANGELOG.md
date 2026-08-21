@@ -47,6 +47,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-21: **V3 覆盖率校验页面上下文兜底——人工/抓取步骤也归属页面截图**：`buildV3Properties` 的 pid 解析对无页面锚点的步骤（人工录制/自动抓取的表格操作，region 常为 `table` 等区域标记）匹配不到任何页面截图（`propertiesPID=0`）→ `page_level` 严格模式下被覆盖率校验拦截（如交易 33 推送 409「页面级截图缺失」）。修复：按步骤执行顺序维护 `lastPageKey` 页面上下文，步骤自身无 page key 时继承前序最近步骤所在页面——操作发生在该页面，归属同一页面截图；无 element 的纯动作步骤同样继承 pid（仍无 rect 则继续豁免）。已在同事本地后端实测：交易 33 推送返回「同步成功，共同步1条数据」，`isExport=1`。
+  影响范围：V3 导出 `buildV3Properties` pid/regionId 组装（覆盖校验更准：人工步骤不再误报缺失）；V2 不受影响；无 schema/路由变更。
+  文件：src/services/transaction-export-v3.js, scripts/characterization/characterize-export-v3.mjs, scripts/characterization/characterize-page-level-screenshot.mjs
+  Python 同步提示：无（JS 侧导出组装；Python 录制侧如需同语义，可让抓取步骤带 page key 上下文，非必须）。
+
 - 2026-08-21: **V3 批量推送 importDemand 400「参数错误」——发送前做伙伴契约适配**：`/api/v2/export/transactions-v3`（前端批量推送已切到 V3）真实推送被伙伴返回 400 参数错误，而 V2 可推。根因：① V3 的 `transcationProperties` 每步多出 `screenshot` 字段（URL 数组），伙伴 schema 中 `screenshot` 为 **integer（是否执行截图）**，数组/空字符串导致 Jackson Integer 反序列化失败；② `regionId/regionLabel` 不在伙伴 schema（未知字段）。修复：`partner-platform.js` 新增 `toPartnerImportPayload` 纯函数（发送前统一适配，仅影响发送体、不影响 dry-run/响应）：剥 `regionId/regionLabel`、`screenshot[]` 并入 **`screenCapture`**（逗号串，伙伴 V3 新契约字段名）后删除 `screenshot` 字段；**`page`/`dialog`/`ele` 步骤全量保留**（伙伴 V3 契约确认 page 步骤透传，页面级截图经 `screenCapture` 送达）。已在同事本地后端实测：交易 182 推送返回「同步成功，共同步1条数据」，`isExport=1`。
   影响范围：`/api/v2/export/transactions-v3` 及 `transaction-v3` 单条推送的出站体；V2 不受影响（V2 本无这些字段）；无 schema/路由变更。
   文件：src/services/partner-platform.js, scripts/characterization/characterize-partner-platform.mjs
