@@ -190,7 +190,7 @@ function normalizeSystemNode(node) {
   const id = node.id ?? node.systemId ?? node.system_id;
   if (id == null || id === '') return null;
   const name = String(node.name ?? node.systemName ?? node.label ?? `system-${id}`);
-  const childrenRaw = node.children ?? node.childList ?? node.nodes;
+  const childrenRaw = node.children ?? node.childList ?? node.childSystems ?? node.nodes;
   const children = Array.isArray(childrenRaw)
     ? childrenRaw.map(normalizeSystemNode).filter(Boolean)
     : undefined;
