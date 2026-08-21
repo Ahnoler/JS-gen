@@ -1,15 +1,35 @@
-# 总 TODO：缺陷 + Backlog（2026-08-13 基线 · 2026-08-17 更新）
+# 总 TODO：缺陷 + Backlog（2026-08-13 基线 · 2026-08-20 更新）
 
 > **跨会话共享清单。** Cursor 会话内 TodoWrite 不跨聊天；以本文件为准。  
 > 来源：`c:\Users\water\Downloads\缺陷管理.xlsx`（2026-08-12 同步）+ [`backlog-visible-editable-controls.md`](backlog-visible-editable-controls.md)。  
-> 本文件只跟踪未闭环项。已修/已关条目已清出（历史见 git）。
+> 本文件只跟踪未闭环项。已修/已关条目已清出（历史见 git）。  
+> **缺陷已全部修复关闭**（2026-08-20 确认，含 1448052）。  
+> **Python 控制面同步工作暂停**（2026-08-20 决定）：先交付稳定版补发后再恢复；`CHANGELOG.md` 照常更新，作为开发历史与后续同步依据。
+
+## 当前聚焦：V3 批量推送完善（2026-08-20 起）
+
+> 优先级最高（稳定版交付前置）。830 需求主线。
+
+**已完成（8-18 ~ 8-20）：**
+- V3.0 端点 + V3.1 结构大改（截图合并进 `transcationProperties` 统一 schema、字段改名 `propertiesID/propertiesPID/realLabel`）
+- MinIO 截图存储 + 本地暂存补传 + 待传面板（一键补传）
+- 页面级截图（page/popup）采集 + `validatePageLevelCoverage` 覆盖校验（`de59e69`）；无 `element_json` 历史步骤豁免（`038793d`）
+- **存量兼容**（2026-08-20）：覆盖校验仅 `coverageMode='page_level'`（新录制）强阻断；`legacy_phase_fallback` 存量模式降级为告警（`stats.missingPageLevelScreenshots` 供消费方识别风险），新增 `coverageBlocksPush()` 承载判定——修复存量交易被整批拦 409 的破坏性变更
+- **页面级 key 修复（2026-08-20，重录湿测抓到）**：`page_level_key_from_url` 此前保留 hash 内易变 query，长 URL 超出 `level_key` VARCHAR(512) → 修改页截图 INSERT 失败被吞 → 19/32 控件 pid=0。根修（剥 fragment 内 query）+ 导出侧 `stripVolatileQuery` 规范化兜底（存量两代 key 互对齐）+ traj 181 回填修数。复录 traj 182 验证：key 全无 query、0 插入失败、V3 dry-run 原生 missing=0。**表单引擎重构同场湿测通过**（traj 181/182：LoginEngine/FillEngine/SelectEngine/SaveEngine 全链路，`[click_save] auto region` → `SUCCESS: 操作成功`）
+
+**剩余（按优先级）：**
+
+| 项 | 说明 |
+|----|------|
+| **v3-payload-size ②③** | 防信息丢失：构建期字段完整性校验/缺失统计、推送前自检；鲁棒性：缺字段降级、超长截断策略。稳定版内可做（不改 payload 契约） |
+| **v3-payload-size ①** | 精简传输（去 `params`、收敛 target、可选字段裁剪）。**稳定版后另刀**——契约变更需与消费方对齐（traj 38 现状 308KB，大头 target xpath / params / rect） |
+| **同名弹窗 title 回退歧义** | popupKey（含 anchor）对齐正常；仅控件缺 `popup_level_key` 回退 title 查找时可能挂错实例。**待湿测证据**（需含同标题弹窗的录制样本）再定改法 |
+| **rect 非法照推** | 维持原状（`noRectControls` 统计可见）；是否升级为构建失败待消费方反馈 |
 
 ## 挂起 / 待优化
 
 | ID | 项 | 处理说明 |
 |----|----|----------|
-| **1448052** | 【AI录制】循环重复操作（较重） | Excel 已分配；slot-log 已就绪。2026-08-16 新增 `AI_DUP_FAILURE_CUE`（默认关）对连续相同失败动作注入纠偏；1448052 主线仍**等新缺陷 + 可检索日志**再改 |
-| **v3-payload-size** | 【V3/V2 接口】优化传输数据量 + 防信息丢失 + 增强鲁棒性 | 2026-08-18 登记。现状：V3 payload（traj 38）紧凑传输 308KB，大头在 target xpath / params / rect（可选字段）；V2 精简后约 90KB。目标：① 精简传输（评估去 `params`、压缩/收敛 target、可选字段裁剪）② 防信息丢失（构建期字段完整性校验/缺失统计，推送前自检）③ 鲁棒性（缺字段降级、超长截断策略、消费方容错）。代码 TODO 已写 `transaction-export-v3.js` 头部 + api-docs notes |
 | **heal-locate** | 【回放自愈】禁止/少用 `scroll_down` 找字段；高效定位与级联缺席判定 | ✅ **开发完成**（2026-08-15，`uara_V1.2`）：H0 调研 + MissingReason/HealContract + heal prompt + P2 决策路由已合入；characterization 全绿。剩余：真实 batch replay / live 湿测（见 `heal-locate-wet`）。见专节 |
 
 ### heal-locate — 回放自愈定位效率（✅ 开发完成 · 待 live 湿测）
@@ -73,7 +93,7 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 |----|--------|-----|
 | **fill-date-shell** | **已收尾** | 库内 7 行已 SQL 迁成 `fill_form_field`；控制器壳已删；别名归一；前端去掉「填写日期」 |
 | **option-first-commit** | **已收尾**（2026-08-11，`79a8e92`） | `option_text=first` 聚焦 commit 已入库：`resolve_recorded_option_text` 盖章实际选项；select 路径不再持久化 first；characterization 覆盖（当前门禁由 `characterize-select-option-stamp.py` / `characterize-select-option-substring.py` / `characterize-form-engine-wiring.py` 承接） |
-| **form-actions-split** | 部分（2026-08-15 大幅推进） | `form_autofill.py` + `autofill_round/pending` 已拆；`form_scan_utils` 拆成 summary/select/task；login/fill/select/radio/tree 拆到 `form_action_engines.py`。**剩余：`click_save` 与部分 scan/snapshot 动作壳仍在 `_form.py`（当前 ~990 行，验收线 ≲600）** — [TODO](todos/2026-08-11-split-form-actions.md) |
+| **form-actions-split** | **已收尾**（2026-08-20） | `click_save` → `form_save.py`（SaveEngine）、scan/pending/summary 动作实现 → `form_scan_actions.py`；`_form.py` 只留注册 + 薄委托 + 兼容 re-export，**171 行**（验收线 ≲600，原 ~2177/收尾前 ~990）；12 个 characterization 改读拼接文件/走 re-export，verify-all ALL GREEN — [TODO](todos/2026-08-11-split-form-actions.md) |
 | **sectionOf-dead-calls** | **已收尾**（2026-08-13，`8b6863a`） | 产品面旧 `sectionOf` / `sectionAnchorOf` / `sectionAnchorXPath` 死调用已删；D3 锚 xpath 行为由 `SECTION_ATTACH` 保留；`characterize-section-anchored-xpath.py` OK |
 | **T1r** | 穿插 | tree / replay label 兜底残余 |
 | **T3r** | P2 | 活录 CDP 对拍残余 |
@@ -189,6 +209,11 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 
 ## 更新记录
 
+| 2026-08-20 | **重录湿测 + 页面级 key 根修**：执行机 LMY 上线后 AI 录制 traj 181（对公客户修改 3 阶段全成功，fill×17/select×4/click_save→操作成功——表单引擎重构湿测通过）；dry-run 抓到修改页 page_level 截图 INSERT 失败——`level_key` 含 hash 内 query 超 VARCHAR(512)。修复：state.py 剥 fragment 内 query（根因，key ~1100→~110 字符）+ 导出侧 `stripVolatileQuery`/`idByPageLevelNorm` 规范化兜底（存量兼容）+ traj 181 回填修数；复录 traj 182 全链路验证（3 页面截图 key 无 query、0 失败、V3 原生 missing=0、确认+detach）。step-highlight 锚点定锚 traj 181 phase 675/shot #10615（27 步、26 bbox 直用）。verify-all ALL GREEN；CHANGELOG 已记（Fixed） |
+| 2026-08-20 | **form-actions-split 收尾**：`click_save`（426 行）→ `form_save.py` SaveEngine；scan/visible/editable-summary/assistant/pending/sync 动作实现 → `form_scan_actions.py`；`_form.py` 990 → **171 行**（注册 + 薄委托 + form_scan_utils 兼容 re-export）。顺带修复基线数据漂移：`characterize-step-highlight` 锚点迁至 traj 157/phase 597/shot #8270（traj 38 数据已裁剪），image_data 为空（MinIO 迁移）用占位 base64 兜底。12 个 characterization 按拼接约定改读 `form_save.py`/`form_scan_actions.py`（实现文件放拼接前面，防 find 命中薄委托）；`verify-all.sh` ALL GREEN。仅改 scripts/ + docs/，无 CHANGELOG 义务 |
+| 2026-08-20 | **方向决策 + TODO 重整**：① Python 控制面同步工作**暂停**（先交付稳定版补发，恢复后以 `CHANGELOG.md` [Unreleased] 为同步依据，CHANGELOG 照常更新）；② **缺陷全部修复关闭**（用户确认，含 1448052，条目清出）；③ 新增「当前聚焦：V3 批量推送完善」区段——已完成项（V3.1 结构、MinIO、页面级截图覆盖校验、存量兼容降级）与剩余项（v3-payload-size ②③ 稳定版内做、① 精简传输稳定版后另刀、同名弹窗 title 回退歧义待湿测、rect 照推维持现状） |
+| 2026-08-20 | **V3 存量兼容落地**：覆盖校验强制范围收窄到 `coverageMode='page_level'`（新录制）；`legacy_phase_fallback` 存量模式缺失降级为告警不阻断（`stats.missingPageLevelScreenshots` / `missingPageLevelKeys` 供消费方识别），新增 `coverageBlocksPush()`（service 纯函数，单条/批量路由共用）；characterization（export-v3 新增 4 断言 / page-level-screenshot）全绿；CHANGELOG + api-docs 已更新 |
+| 2026-08-19 | **V3 结构大改 + 页面级截图**（补记，git：`bccb907`/`9d6517e`/`de59e69`/`038793d`）：截图合并进 `transcationProperties` 统一 schema（`type` 区分 page/dialog/ele，字段改名 propertiesID/propertiesPID/realLabel）；V3.1 弹窗父子关联 + card 分区；页面级截图（`screenshot.kind='page_level'` + level_key 体系，迁移 `20260819000002`）+ `validatePageLevelCoverage` 覆盖校验 + 无 element_json 步骤豁免；MinIO 待传一键补传面板；批量任务名候选接口 + mojibake 修复；V3 录制状态流修复。详见 CHANGELOG [Unreleased] |
 | 2026-08-18 | **任务 4（交易列表加任务）已交付**：Vue 侧确认完成（行进度条 `el-progress`、phase done 说明 `lastDoneText`/详情页 `doneLogs`、任务按 paasUserId 持久化）；PR-BATCH 标已交付。**任务 5 增强落地**：SSO JWT 验签（`verifyPaasToken`，密钥 `query_jwt_secret`=paas-application，缓存 1h，`SSO_JWT_SECRET` 可配置覆盖；伪造 token 拒绝、密钥不可用降级纯解）+ `/me` 回查账号中心用户信息（`query_access_user` → userName/userAccount，实测 管理员/admin）——commit `d8efbfd` + 另仓 `7390a6a`（顶部用户名显示「管理员」）；characterization 25/25 绿。已知小缺口：列表页 batchTaskName 筛选入口、顶栏徽标文案未实现（非阻塞） |
 | 2026-08-17 | **PR-LOC-HL 前置项完成：步骤 element region/bbox 入库**：spec（`2026-08-17-step-element-region-bbox-design.md`）+ plan 5 任务全部落地（`68065cb`~`38f20a9`，verify-all ALL GREEN）；录制时 `assignRegion` + `stepBBoxOf`（内容坐标，泛化 `pickScrollRoot`）写入 `element_json`（`region_id`/`region_label`/`layers[]`/`bbox`）；9242 浏览器湿测通过（`tab:客户基本信息\|section\|titlebox` 3 层 + 内容坐标 y1=4769 正确）。剩余：端到端录制验证落库；步骤级高亮（bbox 画框）待 design |
 | 2026-08-17 | **本周任务进度写回**：三条主任务综合 ~78%（任务 5 已交付；任务 3/4 后端已交付待 8/19 联调）；开发事项对齐 15/18；日报见 `docs/report/2026-08-17.md` |
