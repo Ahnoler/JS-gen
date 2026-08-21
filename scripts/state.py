@@ -33,7 +33,7 @@ _SKIP_SCREENSHOT_ACTIONS = frozenset({
     'match_form_rule', 'init_task_list', 'get_pending_tasks', 'sync_tasks_from_errors',
     'expand_all_el_tree', 'task_done', 'task_retry',
     'save_form_snapshot',
-    'wait_for_loading', 'close_notification',
+    'wait_for_loading',
     'mark_field_done', 'rebuild_task_list',
 })
 
@@ -197,8 +197,18 @@ def _emit_page_level_screenshot(snapshot: dict) -> None:
         pass
 
 
-async def register_current_page_screenshot(browser_context, *, png_b64: str | None = None) -> str:
-    """Register (or replace) a page-level screenshot for the current page."""
+async def register_current_page_screenshot(
+    browser_context,
+    *,
+    png_b64: str | None = None,
+    captured_at: str = 'phase-end',
+) -> str:
+    """Register (or replace) a page-level screenshot for the current page.
+
+    ``captured_at`` marks the capture occasion (default ``phase-end`` keeps the
+    existing per-phase callers' semantics; ``session-end`` marks the final shot
+    taken right before the browser closes).
+    """
     key, name = await current_page_level(browser_context)
     if not key:
         return ''
@@ -212,7 +222,7 @@ async def register_current_page_screenshot(browser_context, *, png_b64: str | No
         parent_level_key=None,
         display_name=name,
         png_b64=png_b64,
-        meta={'phaseNumber': _CURRENT_PHASE, 'capturedAt': 'phase-end'},
+        meta={'phaseNumber': _CURRENT_PHASE, 'capturedAt': captured_at},
     )
     _emit_page_level_screenshot(_PAGE_LEVEL_SHOTS[key])
     return key
@@ -311,7 +321,10 @@ async def capture_dialog_png_b64_from_page(page):
         return None, None
     try:
         target = getattr(page, 'page', page)
-        for selector in ('.el-dialog:visible', '.el-drawer:visible', '.el-message-box:visible'):
+        for selector in (
+            '.el-dialog:visible', '.el-drawer:visible', '.el-message-box:visible',
+            '.el-notification:visible',
+        ):
             loc = target.locator(selector).first
             if await loc.count() == 0:
                 continue
@@ -339,7 +352,9 @@ async def capture_dialog_png_b64_from_page(page):
             b64 = base64.b64encode(png).decode('ascii')
             title = ''
             try:
-                title_el = loc.locator('.el-dialog__title, .el-drawer__title, .el-message-box__title').first
+                title_el = loc.locator(
+                    '.el-dialog__title, .el-drawer__title, .el-message-box__title, .el-notification__title'
+                ).first
                 if await title_el.count() > 0:
                     title = (await title_el.inner_text()).strip()
             except Exception:

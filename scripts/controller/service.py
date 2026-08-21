@@ -69,6 +69,21 @@ def _wrap_action_with_screenshots(controller, browser_context):
                 except Exception:
                     before_b64 = None
 
+                pre_dialog_b64, pre_dialog_meta = None, None
+                if action_name == 'close_dialog':
+                    pre_dialog_b64, pre_dialog_meta = await capture_dialog_png_b64(browser_context)
+                    if pre_dialog_b64:
+                        pre_dialog_meta = dict(pre_dialog_meta or {})
+                        pre_dialog_meta['capturedAt'] = 'before-close'
+                        await register_popup_screenshot(
+                            browser_context,
+                            page_key=before_key or '',
+                            dialog_title=(pre_dialog_meta or {}).get('dialogTitle') or '',
+                            anchor_xpath=(pre_dialog_meta or {}).get('anchorXpath') or '',
+                            dialog_b64=pre_dialog_b64,
+                            dialog_meta=pre_dialog_meta,
+                        )
+
                 result = await func(*args, **kwargs)
 
                 if len(_ACTION_LOG) <= len_before:
@@ -92,12 +107,12 @@ def _wrap_action_with_screenshots(controller, browser_context):
                     entry_id = (_ACTION_LOG[-1] or {}).get('id')
                 except Exception:
                     entry_id = None
-                dialog_b64 = None
-                dialog_meta = None
+                dialog_b64 = pre_dialog_b64
+                dialog_meta = pre_dialog_meta
                 if entry_id:
                     last_entry = _ACTION_LOG[-1] or {}
                     el = last_entry.get('element') or {}
-                    if _is_overlay_region(el.get('region_id')):
+                    if action_name != 'close_dialog' and _is_overlay_region(el.get('region_id')):
                         dialog_b64, dialog_meta = await capture_dialog_png_b64(browser_context)
                         await register_popup_screenshot(
                             browser_context,

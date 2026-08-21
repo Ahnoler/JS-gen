@@ -97,6 +97,7 @@ run "characterize-click-navigation-cue" "$PY" scripts/characterization/character
 run "characterize-confirm-notification" "$PY" scripts/characterization/characterize-confirm-notification.py
 run "characterize-step-region-bbox" "$PY" scripts/characterization/characterize-step-region-bbox.py
 run "characterize-page-level-python" "$PY" scripts/characterization/characterize-page-level-python.py
+run "characterize-before-close-screenshots" "$PY" scripts/characterization/characterize-before-close-screenshots.py
 run "characterize-batch-actions" "$PY" scripts/characterization/characterize-batch-actions.py
 
 if [ "$FAILED" -ne 0 ]; then

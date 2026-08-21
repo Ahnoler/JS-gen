@@ -430,6 +430,13 @@ async def run_session(args):
         cdp_task.cancel()
     except Exception:
         pass
+    # 会话结束最终截图：正常 / error / cancel / SystemExit 退出路径统一在此捕获
+    # 当前页面（capturedAt='session-end'）；截图失败静默，不阻塞关闭。
+    try:
+        from .state import register_current_page_screenshot
+        await register_current_page_screenshot(browser_context, captured_at='session-end')
+    except Exception:
+        pass  # 截图失败不阻塞关闭
     try:
         await browser_context.close()
     except Exception:

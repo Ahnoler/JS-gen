@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-21: **关键状态前置截图（session-end / before-close / close_notification）**：补齐三类"关键状态转变前"截图——① 会话结束（含 error/cancel/SystemExit 异常退出路径）在 `browser_context.close()` 前追加一次当前页面截图：`register_current_page_screenshot` 新增可选参数 `captured_at`（默认 `'phase-end'` 维持既有调用方语义），meta `capturedAt` 新增取值 `session-end`；② `close_dialog` 在关闭动作执行前先捕获弹窗裁剪图（`capturedAt:'before-close'`，经 `register_popup_screenshot` 落 popup 级截图），动作后跳过 post 弹窗捕获（弹窗已关必为空），step 级 dialog 图改用前置图；③ `close_notification` 移出 `_SKIP_SCREENSHOT_ACTIONS` 跳过名单（关闭前有整页 before/after 图），`capture_dialog_png_b64_from_page` 弹窗选择器追加 `.el-notification:visible`、标题选择器追加 `.el-notification__title`（可见通知也能出裁剪图）。
+  影响范围：录制截图语义（`capturedAt` 新增 `session-end`/`before-close` 两个取值，消费方按可选字段处理；close_dialog 步骤多一次前置弹窗捕获，仅该动作触发，频率极低）；复用 `page_level_screenshot` / `step_screenshot` 事件，无 schema/WS/Node 消费面变更。
+  文件：scripts/state.py, scripts/session_runner.py, scripts/controller/service.py, scripts/characterization/characterize-before-close-screenshots.py, scripts/refactor/verify-all.sh
+  Python 同步提示：`capturedAt` 新增取值 `session-end`（会话结束最终页图）与 `before-close`（弹窗关闭前裁剪图），消费方按可选字段处理即可；弹窗/通知裁剪选择器扩展（`.el-notification:visible`），Python 控制面如需对齐按同样选择器扩展。
+
 - 2026-08-21: **批量动作显式化（`max_actions_per_step` 参数化）**：browser_use 0.1.48 一轮多动作此前走框架默认 10（Agent 构造未传参，实际生效但不可控），现新增 `MAX_ACTIONS_PER_STEP` 配置（默认 4）经 Node → Python 透传显式控制。解析规则（`resolve_max_actions_per_step` 纯函数，scripts/agent_utils.py）：指令显式值优先（0/空不覆盖）→ 否则按 contract 模式映射（create/modify/introduce_pick → 5；navigate/query/login/其它/None → 3）→ clamp 到 [1,10]。agent prompt 追加批量输出纪律（同一轮多动作仅允许对已存在元素的连续填充/选择，如多个 fill_form_field / click_radio；禁止 click_element、导航、下拉展开、select_option 等 DOM 结构变更动作与保存/提交类动作入批）；agent-tools-form「每步最多 1 个 select_option」不变。观测：Agent 构造前 stderr `[batch] max_actions_per_step=N (source=config|mode|default)`；phase_end observability payload 增加 `maxActionsPerStep` 字段。
   影响范围：agent 会话批量动作预算（行为可调）、prompt 纪律、phase_end 观测 payload（新增可选字段，向后兼容）、config 新增配置项。无 schema/WS 变更。
   文件：config/config.js, config/.env, config/.env.example, src/services/trajectory/trajectory-recording-runner.js, scripts/agent_utils.py, scripts/agent/service.py, scripts/prompts/agent-tools-common.md, scripts/characterization/characterize-batch-actions.py, scripts/refactor/verify-all.sh
