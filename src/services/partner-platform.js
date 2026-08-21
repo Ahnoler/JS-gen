@@ -1,16 +1,13 @@
 /**
  * Partner automation platform HTTP client.
  * Default prefix: http://test.atp.tansun.com.cn/api/
- * Outbound auth: PARTNER_ACCESS_TOKEN（三个接口共用），缺省用联调 JWT。
- * Override: PARTNER_API_BASE / PARTNER_SYSTEM_BASE_URL / PARTNER_IMPORT_DEMAND_URL
+ * Outbound auth: 转发调用方的 access_token（SSO JWT，与账号中心同源）；
+ * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN（服务级 token，供脚本/联调）。
+ * Override: PARTNER_API_BASE / PARTNER_SYSTEM_BASE_URL / PARTNER_IMPORT_DEMAND_URL / PARTNER_ACCESS_TOKEN
  */
 import { resolve as configResolve } from '../../config/config.js';
 
 const DEFAULT_API_BASE = 'http://test.atp.tansun.com.cn/api';
-/** 联调默认 token（项目 / 系统树 / importDemand 共用）；可用 PARTNER_ACCESS_TOKEN 覆盖 */
-// TODO: 去掉硬编码，改为动态伙伴 token（见 resolveAccessToken）
-const DEFAULT_PARTNER_ACCESS_TOKEN =
-  'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjE1MTAwNzY4MTA1Nzg2NDQ5OTIsImlhdCI6MTc4MTc0NjMyNCwianRpIjoidG9rZW5JZCJ9.RC81sU9-7mQ7HHxz47dBqIXg0ZWfPGL_uPN0vt-p4qI';
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /** User-facing copy when partner nginx/upstream is unreachable or returns non-JSON. */
@@ -42,17 +39,13 @@ function importDemandUrl() {
 
 /**
  * Token for partner outbound calls (projects / systems / importDemand).
- * Prefer dedicated PARTNER_ACCESS_TOKEN；其次请求头/body；最后联调默认 JWT。
- *
- * TODO: 当前为联调硬编码 / PARTNER_ACCESS_TOKEN，故意不转发前端 SSO 的 access_token。
- *       后续改为动态取伙伴平台 token（登录换票 / 前端显式传入 partner token 等）。
+ * 优先转发调用方 access_token（header/body/query，Vue 登录态 SSO JWT——
+ * 伙伴平台与账号中心同源，直接复用登录 token，按登录用户身份调用）；
+ * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN（服务级 token，供无登录态的脚本/联调）。
  *
  * @param {import('express').Request | { headers?: object, body?: object, query?: object }} req
  */
 export function resolveAccessToken(req = {}) {
-  const configured = envOrConfig('PARTNER_ACCESS_TOKEN', DEFAULT_PARTNER_ACCESS_TOKEN);
-  if (configured) return configured;
-
   const headers = req.headers || {};
   const body = req.body || {};
   const query = req.query || {};
@@ -60,8 +53,9 @@ export function resolveAccessToken(req = {}) {
   const fromBody = body.access_token ?? body.accessToken;
   const fromQuery = query.access_token ?? query.accessToken;
   const raw = fromHeader ?? fromBody ?? fromQuery;
-  const token = raw == null ? '' : String(raw).trim();
-  return token || null;
+  const fromRequest = raw == null ? '' : String(raw).trim();
+  if (fromRequest) return fromRequest;
+  return envOrConfig('PARTNER_ACCESS_TOKEN') || null;
 }
 
 export function requireAccessToken(req) {

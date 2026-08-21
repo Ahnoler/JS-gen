@@ -300,6 +300,7 @@ export const GROUP_TRAJECTORY = [
         respExample: J({ names: ['批量录制导入模板_0814-1251', '批量录制导入模板_0813-1709'] }),
         notes: [
           '按 paasUserId 隔离（与列表同语义：空 paas_user_id=全可见）',
+          '仅返回已产生交易轨迹的任务名（EXISTS trajectory.batch_job_id）——空任务不出现在下拉',
           '注册在 batch/:batchId 之前，避免被 :batchId 捕获',
         ],
       },

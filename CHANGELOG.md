@@ -11,6 +11,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-21: **batch/names 仅返回已有交易轨迹的任务名**：交易列表「按任务名筛选」下拉候选原先包含全部任务，含未产生任何交易轨迹的空任务（选中后列表恒为空）。`listDistinctNames` 增加 `EXISTS trajectory.batch_job_id` 关联过滤，空任务不再出现在下拉。
+  影响范围：`GET /api/v2/trajectories/batch/names` 返回内容收窄（可能变少）；无 schema 变更。
+  文件：src/dao/batch-recording-dao.js, src/dashboard/api-docs/groups/trajectory.js, scripts/characterization/characterize-batch-task-name.mjs
+  Python 同步提示：任务名候选接口（如有）应对齐「仅含已产生交易轨迹的任务」语义。
+
 - 2026-08-21: **引入 Node 原生 `#` 路径别名（增量）**：`package.json` 新增 `imports` 映射 `#config/*` → `./config/*`、`#src/*` → `./src/*`（Node ESM 标准子路径导入，零构建依赖）。本次改动涉及的 9 个文件（server.mjs、llm-utils、agent/llm-proxy/setup 路由、resolve-model、两个 service、global-browser）的 config 导入已从多层 `../` 相对路径切换为 `#config/config.js`，消除层数数错导致的 `ERR_MODULE_NOT_FOUND`。**存量其他相对导入不动，新增/改动文件逐步采用**（characterization 对源码做子串断言，避免大面积重写的回归成本）。
   影响范围：仅 import 书写方式，运行时行为不变；无 schema/路由/WS 变更。
   文件：package.json, server.mjs, src/llm-utils.js, src/routes/agent.js, src/routes/llm-proxy.js, src/routes/setup.js, src/runtime/resolve-model.js, src/services/operation-component-mine-service.js, src/routes/browser-session/global-browser.js；第二批：src/services/trajectory/ 下 16 个文件；第三批：src/cdp/remote-bridge/ws-router.js, src/routes/browser-session/{broadcasts,register,watcher-actions}.js, src/routes/v2/{auth,case-data,trajectory}.js, src/services/sso/paas-client.js。`src/` 内 3 层相对导入已清零（0 处残留）。
@@ -36,6 +41,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   Python 同步提示：模型名语义变化——带 `/` 的模型名需原样传给网关（不再剥前缀）；Python 端如有同样的剥前缀逻辑需对齐。默认端点/模型/key 经各自环境配置下发，无代码结构变更。
 
 ### Fixed
+
+- 2026-08-21: **批量推送伙伴调用改透传登录态 access_token（移除硬编码联调 JWT）**：`partner-platform.js` 的 `resolveAccessToken` 原先让 `DEFAULT_PARTNER_ACCESS_TOKEN`（硬编码联调 JWT）永远优先，前端即使带了 SSO `access_token` 头也不被使用；该 JWT 过期后 `GET /api/v2/export/partner/projects|systems` 与 importDemand 推送全部失败。现优先级改为：请求方 token（header/body/query，Vue 登录态 SSO JWT——伙伴平台与账号中心同源，按登录用户身份调用）→ `PARTNER_ACCESS_TOKEN`（服务级回落，供无登录态脚本/联调）→ 都无则 400（不再有隐式兜底）。api-docs 描述无需变（文档本来即按此语义写）。
+  影响范围：`/api/v2/export/partner/*`、`/api/v2/export/trajectories/:id/transaction(-v3)?`（push）、`/api/v2/export/transactions(-v3)?` 的出站鉴权；无 schema/路由变更。
+  文件：src/services/partner-platform.js, scripts/characterization/characterize-partner-platform.mjs
+  Python 同步提示：伙伴平台出站调用需同语义转发调用方 access_token，勿内置默认 token。
 
 - 2026-08-20: **页面级 key 含 hash 内易变 query——VARCHAR(512) 溢出致截图丢失（湿测抓到）**：hash 路由 SUT 的 `page_level_key_from_url` 此前只弃 `#` 前 search、保留了 fragment 内 query（如 `#/route?part=..&v=时间戳`），长 URL 超过 `screenshot.level_key` VARCHAR(512) → 修改页（业务对象主页面）page_level 截图 INSERT 失败且被吞掉 → V3 覆盖校验 19/32 控件 pid=0。修复：① `scripts/state.py` `page_level_key_from_url` 剥 fragment 内 query（对齐原设计「弃 query」），key 从 ~1100 字符降到 ~110，且消除跨次访问 `v=` 漂移；② 导出侧兜底：`transaction-export-v3.js` 新增 `stripVolatileQuery()` + `idByPageLevelNorm` 规范化索引——存量两代 key（带/不带 query）互相对齐，控件 pid 解析在精确匹配未命中后按规范化 key 重试（弹窗 key 截到段边界、anchor 保留）。数据修复：traj 181 修改页截图按规范化 key 回填（MinIO 对象已在，`backfilledFrom` 标记来源）。复录验证（traj 182）：3 页面 key 全部无 query、0 插入失败、V3 dry-run 原生 missing=0。
   影响范围：Python 录制侧页面级 key 生成、V3 导出 pid 解析、存量 page_level 数据兼容。无 schema/路由/WS 变更。

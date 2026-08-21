@@ -462,6 +462,7 @@ export function deriveJobTerminalStatus(summary, { cancelled = false } = {}) {
 
 /**
  * 任务名候选（搜索下拉用）：按 functionId + 关键字模糊去重，最近创建优先。
+ * 仅返回已产生交易轨迹的任务（EXISTS trajectory.batch_job_id）——空任务不进下拉。
  * @param {{ functionId?: number, keyword?: string, paasUserId?: string|null, limit?: number }} opts
  * @returns {Promise<string[]>}
  */
@@ -471,6 +472,10 @@ export async function listDistinctNames({ functionId, keyword = '', paasUserId =
     .select('name')
     .whereNotNull('name')
     .where('name', '!=', '')
+    .whereExists(
+      db.select(1).from('trajectory')
+        .whereRaw('trajectory.batch_job_id = batch_recording_job.id'),
+    )
     .orderBy('created_at', 'desc');
   if (functionId != null && functionId !== '') q.where('function_id', Number(functionId));
   if (paasUserId) q.where('paas_user_id', paasUserId);

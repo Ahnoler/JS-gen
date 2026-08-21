@@ -113,6 +113,8 @@ async function main() {
     assert.ok(dao.includes('listDistinctNames'), 'dao exports listDistinctNames');
     assert.ok(dao.includes("where('name', 'like', `%${kw}%`)"), 'keyword fuzzy filter');
     assert.ok(dao.includes("q.where('paas_user_id', paasUserId)"), 'user scoping');
+    assert.ok(dao.includes('whereExists'), 'only jobs that own trajectories');
+    assert.ok(dao.includes('trajectory.batch_job_id = batch_recording_job.id'), 'correlated EXISTS on trajectory');
     assert.ok(dao.includes("orderBy('created_at', 'desc')"), 'recent first');
     assert.ok(dao.includes('q.limit('), 'limit applied');
   });
