@@ -47,6 +47,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-21: **V3 批量推送 importDemand 400「参数错误」——发送前做伙伴契约适配**：`/api/v2/export/transactions-v3`（前端批量推送已切到 V3）真实推送被伙伴返回 400 参数错误，而 V2 可推。根因：① V3 的 `transcationProperties` 每步多出 `screenshot` 字段（URL 数组），伙伴 schema 中 `screenshot` 为 **integer（是否执行截图）**，数组/空字符串导致 Jackson Integer 反序列化失败；② `regionId/regionLabel` 不在伙伴 schema（未知字段）；③ `type='page'/'dialog'` 的页面级标记步骤伙伴 importDemand 不认。修复：`partner-platform.js` 新增 `toPartnerImportPayload` 纯函数（发送前统一适配，仅影响发送体、不影响 dry-run/响应）：过滤非 `ele` 步骤、剥 `regionId/regionLabel`、`screenshot[]` 并入 `screenshots`（逗号串）后删除 `screenshot` 字段。已在同事本地后端实测：交易 182 推送返回「同步成功，共同步1条数据」，`isExport=1`。
+  影响范围：`/api/v2/export/transactions-v3` 及 `transaction-v3` 单条推送的出站体；V2 不受影响（V2 本无这些字段）；无 schema/路由变更。
+  文件：src/services/partner-platform.js, scripts/characterization/characterize-partner-platform.mjs
+  Python 同步提示：V3 推送出站体需同样适配（若 Python 端也对接 importDemand，注意 `screenshot` 是 integer 语义，URL 数组走 `screenshots` 逗号串）。
+
 - 2026-08-21: **伙伴系统树子节点字段适配 `childSystems`**：test.atp 版 `lazySystemTree` 子节点在 `children`，同事本地后端（172.20.101.63:11002）返回 `childSystems`——`normalizeSystemNode` 的子节点来源增加 `childSystems`（`children ?? childList ?? childSystems ?? nodes`），两代格式兼容，否则系统树展开无子节点。已在同事本地后端完成三接口实测（projects 28 项 / systems 根+子展开 / importDemand 推送 1 条交易返回「同步成功」）。
   影响范围：`GET /api/v2/export/partner/systems` 子节点解析；无 schema/路由变更。
   文件：src/services/partner-platform.js

@@ -7,6 +7,7 @@ import {
   resolveAccessToken,
   requireAccessToken,
   resolveSystemProject,
+  toPartnerImportPayload,
   DEFAULT_PARTNER_SYSTEM_ID,
   DEFAULT_PARTNER_PROJECT_ID,
   PARTNER_NETWORK_ERROR_MSG,
@@ -40,5 +41,36 @@ assert.equal(d.projectId, DEFAULT_PARTNER_PROJECT_ID);
 const e = resolveSystemProject({ systemId: 7, projectId: '9' });
 assert.equal(e.systemId, '7');
 assert.equal(e.projectId, '9');
+
+// toPartnerImportPayload：剥 page/dialog 步骤 + regionId/regionLabel + screenshot→screenshots
+{
+  const src = {
+    transcationEventTypeList: [{
+      transcId: 1,
+      transcationProperties: [
+        { type: 'page', regionId: 'page:x', regionLabel: '首页', screenshot: ['http://a/1.png', 'http://a/2.png'] },
+        { type: 'ele', regionId: '', regionLabel: '', screenshot: ['http://a/3.png'], rect: '{"x1":1}', propertiesName: '点击' },
+        { type: 'dialog', screenshot: ['http://a/4.png'] },
+        null,
+      ],
+    }],
+  };
+  const out = toPartnerImportPayload(src);
+  const props = out.transcationEventTypeList[0].transcationProperties;
+  assert.equal(props.length, 1, 'page/dialog/null 步骤被过滤，仅剩 ele');
+  const ele = props[0];
+  assert.equal(ele.type, 'ele');
+  assert.equal('regionId' in ele, false, 'regionId 已剥除');
+  assert.equal('regionLabel' in ele, false, 'regionLabel 已剥除');
+  assert.equal('screenshot' in ele, false, 'screenshot 已删除（Integer 契约）');
+  assert.equal(ele.screenshots, 'http://a/3.png', '截图并入 screenshots 逗号串');
+  assert.equal(ele.rect, '{"x1":1}');
+  assert.equal(out.transcationEventTypeList[0].transcId, 1);
+}
+
+// 非对象 / 非标准结构原样返回（不崩）
+assert.equal(toPartnerImportPayload(null), null);
+assert.equal(toPartnerImportPayload('x'), 'x');
+assert.deepEqual(toPartnerImportPayload({ transcationEventTypeList: 'nope' }), { transcationEventTypeList: 'nope' });
 
 console.log('characterize-partner-platform: OK');

@@ -132,6 +132,45 @@ async function partnerFetch(url, { method = 'GET', accessToken, body, timeoutMs 
   }
 }
 
+/** 伙伴 schema 不认识的字段（V3 调试辅助，partner Jackson 严格反序列化会拒收） */
+const PARTNER_PROP_DROP_KEYS = ['regionId', 'regionLabel'];
+
+/**
+ * 把本仓 payload 适配成伙伴 importDemand 契约：
+ * - 过滤 transcationProperties 中 type='page'/'dialog' 的页面级标记步骤（伙伴 importDemand
+ *   只认控件步骤；V2 无此字段、能推，V3 的页面类型步骤导致 400「参数错误」）
+ * - 剥除 regionId/regionLabel（伙伴 schema 无此字段，严格反序列化拒收）
+ * - screenshot(URL[]) → 并入 screenshots(逗号串) 后删除 screenshot 字段
+ *   （伙伴 schema：screenshot=是否执行截图 integer，V3 塞 URL 数组、置 '' 会让 Jackson
+ *   Integer 反序列化失败 → 400；删除让伙伴走默认值，与 V2 一致）
+ * 纯函数、浅拷贝；仅影响发送体，不影响 dry-run / 响应中的 payload。
+ */
+export function toPartnerImportPayload(payload) {
+  if (!payload || typeof payload !== 'object') return payload;
+  const clone = { ...payload };
+  const list = clone.transcationEventTypeList;
+  if (Array.isArray(list)) {
+    clone.transcationEventTypeList = list.map((entry) => {
+      const e = { ...entry };
+      const props = Array.isArray(e.transcationProperties) ? e.transcationProperties : [];
+      e.transcationProperties = props
+        .filter((p) => p && (p.type === 'ele' || p.type === '' || p.type == null))
+        .map((p) => {
+          const out = { ...p };
+          for (const k of PARTNER_PROP_DROP_KEYS) delete out[k];
+          const shots = Array.isArray(out.screenshot) ? out.screenshot : [];
+          if (shots.length) {
+            out.screenshots = shots.filter(Boolean).join(',');
+          }
+          delete out.screenshot;
+          return out;
+        });
+      return e;
+    });
+  }
+  return clone;
+}
+
 function assertPartnerBusinessOk(json, fallbackMsg = PARTNER_NETWORK_ERROR_MSG) {
   if (json == null || typeof json !== 'object') {
     const err = new Error(fallbackMsg);
@@ -240,6 +279,12 @@ export async function listPartnerSystems({ accessToken, projectId, parentId } = 
 
 /**
  * POST partner importDemand body.
+ * 发送前做伙伴契约适配：
+ * - transcationProperties 剥除伙伴 schema 之外的字段（regionId/regionLabel 为 V3 调试辅助，
+ *   partner Jackson 严格反序列化会因未知字段报「参数错误」）
+ * - 伙伴 schema：screenshot=是否执行截图(integer)，screenshots=截图(string)；
+ *   V3 原样把 URL 数组塞在 screenshot —— 合并进 screenshots（逗号串）
+ * 浅拷贝改造，不影响本地 dry-run / 响应中的 payload。
  * @returns {Promise<{ code: number, msg?: string, data?: unknown }>}
  */
 export async function pushImportDemand(payload, { accessToken } = {}) {
@@ -247,7 +292,7 @@ export async function pushImportDemand(payload, { accessToken } = {}) {
   const { json, text, httpStatus } = await partnerFetch(url, {
     method: 'POST',
     accessToken,
-    body: payload,
+    body: toPartnerImportPayload(payload),
   });
   if (!json) {
     console.warn(
