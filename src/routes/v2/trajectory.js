@@ -4,7 +4,7 @@ import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryService from '../../services/trajectory-service.js';
 import { stepsToActionCommands } from '../../models/element.js';
 import { TRAJECTORY_RECORD_STATUSES } from '../../models/constants.js';
-import { PROJECT_DIR } from '../../../config/config.js';
+import { PROJECT_DIR } from '#config/config.js';
 import { sendErr } from './trajectory-shared.js';
 
 export default function (app) {

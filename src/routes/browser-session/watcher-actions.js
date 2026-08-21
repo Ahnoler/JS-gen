@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { state } from '../../state.js';
-import { USE_EXECUTOR } from '../../../config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import * as execSession from '../../executor-session-client.js';
 import { persistLiveActionEntries } from './persist-live.js';
 import { sessionRuntimeReady } from './agent-io.js';

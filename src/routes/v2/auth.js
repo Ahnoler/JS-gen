@@ -4,7 +4,7 @@
  * 这些端点本身不强制已登录（ssoAuth 中间件白名单放行），
  * 但会尽量解码 token 挂 req.paasUserId（me/check 需要返回登录态）。
  */
-import { SSO_APP_KEY, SSO_BASE_URL } from '../../../config/config.js';
+import { SSO_APP_KEY, SSO_BASE_URL } from '#config/config.js';
 import { sendOk } from '../../http/api-response.js';
 import { getAccessUser } from '../../services/sso/paas-client.js';
 

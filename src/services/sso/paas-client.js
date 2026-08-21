@@ -8,7 +8,7 @@
  *
  * 所有调用失败返回 null（调用方降级），不抛异常。
  */
-import { SSO_BASE_URL, SSO_APP_KEY, SSO_JWT_SECRET } from '../../../config/config.js';
+import { SSO_BASE_URL, SSO_APP_KEY, SSO_JWT_SECRET } from '#config/config.js';
 
 const JWT_SECRET_TTL_MS = 60 * 60 * 1000; // 1h
 const REQUEST_TIMEOUT_MS = 8000;

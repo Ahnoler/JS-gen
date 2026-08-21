@@ -5,7 +5,7 @@
 import { state } from '../../state.js';
 import { onWsMessage } from '../../ws-server.js';
 import * as remoteSessionService from '../../services/remote-session-service.js';
-import { USE_EXECUTOR } from '../../../config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import { sendToExecutor } from '../../executor-session-client.js';
 import { getTrajectoryRuntime } from '../../services/trajectory/trajectory-runtime.js';
 import { hideHighlight } from '../inspect.js';

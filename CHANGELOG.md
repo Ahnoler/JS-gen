@@ -13,7 +13,7 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 - 2026-08-21: **引入 Node 原生 `#` 路径别名（增量）**：`package.json` 新增 `imports` 映射 `#config/*` → `./config/*`、`#src/*` → `./src/*`（Node ESM 标准子路径导入，零构建依赖）。本次改动涉及的 9 个文件（server.mjs、llm-utils、agent/llm-proxy/setup 路由、resolve-model、两个 service、global-browser）的 config 导入已从多层 `../` 相对路径切换为 `#config/config.js`，消除层数数错导致的 `ERR_MODULE_NOT_FOUND`。**存量其他相对导入不动，新增/改动文件逐步采用**（characterization 对源码做子串断言，避免大面积重写的回归成本）。
   影响范围：仅 import 书写方式，运行时行为不变；无 schema/路由/WS 变更。
-  文件：package.json, server.mjs, src/llm-utils.js, src/routes/agent.js, src/routes/llm-proxy.js, src/routes/setup.js, src/runtime/resolve-model.js, src/services/operation-component-mine-service.js, src/routes/browser-session/global-browser.js；第二批（存量清理）：src/services/trajectory/ 下 16 个文件的 `../../../config/{config,database}.js` 导入
+  文件：package.json, server.mjs, src/llm-utils.js, src/routes/agent.js, src/routes/llm-proxy.js, src/routes/setup.js, src/runtime/resolve-model.js, src/services/operation-component-mine-service.js, src/routes/browser-session/global-browser.js；第二批：src/services/trajectory/ 下 16 个文件；第三批：src/cdp/remote-bridge/ws-router.js, src/routes/browser-session/{broadcasts,register,watcher-actions}.js, src/routes/v2/{auth,case-data,trajectory}.js, src/services/sso/paas-client.js。`src/` 内 3 层相对导入已清零（0 处残留）。
   Python 同步提示：无（纯 JS 模块解析约定）。
 
 ### Added

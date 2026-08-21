@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { PROJECT_DIR, USE_EXECUTOR } from '../../../config/config.js';
+import { PROJECT_DIR, USE_EXECUTOR } from '#config/config.js';
 import { state } from '../../state.js';
 import { saveCaseDataRecord } from '../../case-data-store.js';
 import { getTrajectoryActionFlow } from '../../services/trajectory-service.js';

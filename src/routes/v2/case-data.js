@@ -6,7 +6,7 @@
 import path from 'path';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import * as caseDataDao from '../../dao/case-data-dao.js';
-import { CASE_DATA_DIR } from '../../../config/config.js';
+import { CASE_DATA_DIR } from '#config/config.js';
 
 function materializeCaseDataFile(record) {
   if (!existsSync(CASE_DATA_DIR)) mkdirSync(CASE_DATA_DIR, { recursive: true });

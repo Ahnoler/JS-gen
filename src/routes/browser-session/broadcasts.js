@@ -1,4 +1,4 @@
-import { USE_EXECUTOR } from '../../../config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
 import { getRemoteStatus } from '../../cdp/remote-bridge.js';
