@@ -70,9 +70,13 @@ def resolve_phase_max_steps(ceiling: int, contract: dict | None) -> int:
     chosen = min(ceil, max(floor, int(raw)))
     if coerce_bool(submit.get('required')):
         chosen = min(ceil, chosen + _EMPTY_ACT_BUFFER)
-        mode = str(contract.get('mode') or '').strip().lower()
-        if mode in ('create', 'modify'):
-            chosen = min(ceil, chosen + _CREATE_RECOVERY_BUFFER)
+    # create/modify 无条件加恢复预算（validation→introduce→final-save 路径）。
+    # 曾被误缩进在 submit.required 分支内：无保存要求的 create 填报阶段
+    # （submit.required=False）拿不到 +4，引入子流程没步数可用即被截断
+    # （2026-08-21 traj 33 P2：chosen=10，10 步耗尽被迫 done(success=False)）。
+    mode = str(contract.get('mode') or '').strip().lower()
+    if mode in ('create', 'modify'):
+        chosen = min(ceil, chosen + _CREATE_RECOVERY_BUFFER)
     return chosen
 
 

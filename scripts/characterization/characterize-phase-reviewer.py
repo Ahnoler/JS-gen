@@ -109,6 +109,36 @@ def main() -> None:
         'effort': 'short',
         'submit': {'required': False},
     }) == 5  # no empty buffer
+
+    # create/modify recovery buffer (+4) applies regardless of submit.required.
+    # 回归钉（2026-08-21 traj 33 P2）：该 +4 曾被误缩进在 submit.required 分支内，
+    # create+无保存要求的填报表单阶段拿不到兜底 → 10 步耗尽被迫 done(success=False)。
+    assert resolve_phase_max_steps(30, {
+        'estimated_steps': 8,
+        'mode': 'create',
+        'submit': {'required': False},
+    }) == 14  # 8+2 buffer, +4 recovery（traj 33 P2 当时算出 10 即 bug）
+    assert resolve_phase_max_steps(30, {
+        'estimated_steps': 8,
+        'mode': 'modify',
+        'submit': {'required': True},
+    }) == 17  # 8+2, +3 empty buffer, +4 recovery
+    assert resolve_phase_max_steps(30, {
+        'effort': 'short',
+        'mode': 'create',
+        'submit': {'required': False},
+    }) == 9  # effort 分支无 +2 buffer，仅 +4 recovery
+    assert resolve_phase_max_steps(12, {
+        'estimated_steps': 8,
+        'mode': 'create',
+        'submit': {'required': False},
+    }) == 12  # recovery 不越过 ceiling
+    assert resolve_phase_max_steps(30, {
+        'estimated_steps': 8,
+        'mode': 'navigate',
+        'submit': {'required': False},
+    }) == 10  # 非 create/modify 不加 recovery
+
     assert resolve_phase_max_steps(30, {}) == 30
     assert resolve_phase_max_steps(30, None) == 30
 
