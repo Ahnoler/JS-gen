@@ -137,9 +137,8 @@ const PARTNER_PROP_DROP_KEYS = ['regionId', 'regionLabel'];
 
 /**
  * 把本仓 payload 适配成伙伴 importDemand 契约：
- * - 过滤 transcationProperties 中 type='page'/'dialog' 的页面级标记步骤（伙伴 importDemand
- *   只认控件步骤；V2 无此字段、能推，V3 的页面类型步骤导致 400「参数错误」）
- * - 剥除 regionId/regionLabel（伙伴 schema 无此字段，严格反序列化拒收）
+ * - transcationProperties 全量保留（ele/page/dialog；伙伴 V3 契约 page 步骤需透传），仅过滤空条目
+ * - 剥除 regionId/regionLabel（伙伴 V3 契约暂不接受）
  * - screenshot(URL[]) → 并入 screenCapture(逗号串) 后删除 screenshot 字段
  *   （伙伴 V3 契约：字段名改 screenCapture；screenshot 旧语义=是否执行截图 integer，
  *   V3 塞 URL 数组会 Jackson 反序列化失败 → 400）
@@ -154,7 +153,7 @@ export function toPartnerImportPayload(payload) {
       const e = { ...entry };
       const props = Array.isArray(e.transcationProperties) ? e.transcationProperties : [];
       e.transcationProperties = props
-        .filter((p) => p && (p.type === 'ele' || p.type === '' || p.type == null))
+        .filter(Boolean)
         .map((p) => {
           const out = { ...p };
           for (const k of PARTNER_PROP_DROP_KEYS) delete out[k];

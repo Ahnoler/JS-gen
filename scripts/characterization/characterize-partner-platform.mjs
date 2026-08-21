@@ -42,7 +42,7 @@ const e = resolveSystemProject({ systemId: 7, projectId: '9' });
 assert.equal(e.systemId, '7');
 assert.equal(e.projectId, '9');
 
-// toPartnerImportPayload：剥 page/dialog 步骤 + regionId/regionLabel + screenshot→screenshots
+// toPartnerImportPayload：保留 ele/page/dialog（仅过滤 null），剥 regionId/regionLabel，screenshot→screenCapture
 {
   const src = {
     transcationEventTypeList: [{
@@ -57,14 +57,19 @@ assert.equal(e.projectId, '9');
   };
   const out = toPartnerImportPayload(src);
   const props = out.transcationEventTypeList[0].transcationProperties;
-  assert.equal(props.length, 1, 'page/dialog/null 步骤被过滤，仅剩 ele');
-  const ele = props[0];
-  assert.equal(ele.type, 'ele');
-  assert.equal('regionId' in ele, false, 'regionId 已剥除');
-  assert.equal('regionLabel' in ele, false, 'regionLabel 已剥除');
-  assert.equal('screenshot' in ele, false, 'screenshot 已删除（V3 契约改 screenCapture）');
-  assert.equal(ele.screenCapture, 'http://a/3.png', '截图并入 screenCapture 逗号串');
-  assert.equal(ele.rect, '{"x1":1}');
+  assert.equal(props.length, 3, 'ele/page/dialog 全保留，仅 null 被过滤');
+  const byType = Object.fromEntries(props.map((p) => [p.type, p]));
+  assert.ok(byType.page, 'page 步骤保留');
+  assert.ok(byType.dialog, 'dialog 步骤保留');
+  for (const p of props) {
+    assert.equal('regionId' in p, false, `${p.type} regionId 已剥除`);
+    assert.equal('regionLabel' in p, false, `${p.type} regionLabel 已剥除`);
+    assert.equal('screenshot' in p, false, `${p.type} screenshot 已删除（V3 契约改 screenCapture）`);
+  }
+  assert.equal(byType.page.screenCapture, 'http://a/1.png,http://a/2.png', 'page 截图并入 screenCapture 逗号串');
+  assert.equal(byType.ele.screenCapture, 'http://a/3.png', 'ele 截图并入 screenCapture');
+  assert.equal(byType.dialog.screenCapture, 'http://a/4.png', 'dialog 截图并入 screenCapture');
+  assert.equal(byType.ele.rect, '{"x1":1}');
   assert.equal(out.transcationEventTypeList[0].transcId, 1);
 }
 
