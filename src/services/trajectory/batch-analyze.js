@@ -8,8 +8,8 @@ import {
   BATCH_ANALYZE_CONCURRENCY,
   BATCH_ITEM_LEASE_MS,
   BATCH_ANALYZE_MAX_ATTEMPTS,
-} from '../../../config/config.js';
-import { getDB } from '../../../config/database.js';
+} from '#config/config.js';
+import { getDB } from '#config/database.js';
 import * as batchDao from '../../dao/batch-recording-dao.js';
 import { analyzeRequirementToPhases, createTransactionWithPhases } from './trajectory-meta-service.js';
 import {

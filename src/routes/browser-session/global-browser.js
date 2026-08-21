@@ -1,4 +1,4 @@
-import { LLM_API_KEY, PORT } from '../../../config/config.js';
+import { LLM_API_KEY, PORT, FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY } from '#config/config.js';
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
 import {
@@ -35,7 +35,11 @@ export async function ensureGlobalBrowser(modelId) {
   gb.reset();
   killOrphans();
 
-  const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY], { OPENAI_API_KEY: LLM_API_KEY });
+  const child = spawnAgent(['--session', '--session-id', 'global', '--model', modelId, '--base-url', `http://localhost:${PORT}/v1`, '--api-key', LLM_API_KEY], {
+    OPENAI_API_KEY: LLM_API_KEY,
+    // Python 表单 LLM（_llm_values.py）直接读这些 env；缺省回落 agent LLM
+    FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY: FORM_LLM_API_KEY || LLM_API_KEY,
+  });
 
   child.stderr.on('data', (chunk) => { console.log(chunk.toString().trimEnd()); });
   child.on('exit', () => {

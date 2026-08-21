@@ -1,6 +1,6 @@
-import { LLM_BASE_URL, LLM_API_KEY } from '../config/config.js';
+import { LLM_BASE_URL, LLM_API_KEY, LLM_MODEL } from '#config/config.js';
 
-const DEFAULT_MODEL = 'Qwen/Qwen3.5-35B-A3B';
+const DEFAULT_MODEL = LLM_MODEL;
 
 function resolveModelId(model) {
   if (!model) return DEFAULT_MODEL;

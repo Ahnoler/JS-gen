@@ -18,7 +18,7 @@ import {
   getTrajectoryRuntime,
 } from './trajectory-runtime.js';
 import { runDefaultLogin } from './trajectory-record-lifecycle.js';
-import { USE_EXECUTOR } from '../../../config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import { attachTrajectoryLive } from './trajectory-attach-service.js';
 
 export async function prepareTrajectoryRecordingUnlocked(tid) {

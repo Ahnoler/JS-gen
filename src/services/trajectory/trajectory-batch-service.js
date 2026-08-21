@@ -7,7 +7,7 @@ import {
   USE_EXECUTOR,
   BATCH_SCHEDULER_INTERVAL_MS,
   BATCH_IMPORT_MAX_ROWS,
-} from '../../../config/config.js';
+} from '#config/config.js';
 import * as batchDao from '../../dao/batch-recording-dao.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';

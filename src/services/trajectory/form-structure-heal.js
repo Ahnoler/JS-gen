@@ -7,7 +7,7 @@
  * trajectory, added labels are AI-filled and inserted as structured steps
  * (confirmed=0, picked up by the next batch). Unsafe scans never mutate.
  */
-import { getDB } from '../../../config/database.js';
+import { getDB } from '#config/database.js';
 import * as execSession from '../../executor-session-client.js';
 import * as formSnapshotDao from '../../dao/form-snapshot-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';

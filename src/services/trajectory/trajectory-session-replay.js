@@ -8,7 +8,7 @@
  * - Type B: save_form_snapshot checkpoint → verifyFormStructure → delete missing /
  *   AI-fill adding + structured insert (confirmed=0, next batch) — healType=form_structure
  */
-import { getDB } from '../../../config/database.js';
+import { getDB } from '#config/database.js';
 import * as execSession from '../../executor-session-client.js';
 import * as formSnapshotDao from '../../dao/form-snapshot-dao.js';
 import { state } from '../../state.js';

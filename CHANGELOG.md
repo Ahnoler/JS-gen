@@ -11,9 +11,28 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-21: **引入 Node 原生 `#` 路径别名（增量）**：`package.json` 新增 `imports` 映射 `#config/*` → `./config/*`、`#src/*` → `./src/*`（Node ESM 标准子路径导入，零构建依赖）。本次改动涉及的 9 个文件（server.mjs、llm-utils、agent/llm-proxy/setup 路由、resolve-model、两个 service、global-browser）的 config 导入已从多层 `../` 相对路径切换为 `#config/config.js`，消除层数数错导致的 `ERR_MODULE_NOT_FOUND`。**存量其他相对导入不动，新增/改动文件逐步采用**（characterization 对源码做子串断言，避免大面积重写的回归成本）。
+  影响范围：仅 import 书写方式，运行时行为不变；无 schema/路由/WS 变更。
+  文件：package.json, server.mjs, src/llm-utils.js, src/routes/agent.js, src/routes/llm-proxy.js, src/routes/setup.js, src/runtime/resolve-model.js, src/services/operation-component-mine-service.js, src/routes/browser-session/global-browser.js；第二批（存量清理）：src/services/trajectory/ 下 16 个文件的 `../../../config/{config,database}.js` 导入
+  Python 同步提示：无（纯 JS 模块解析约定）。
+
+### Added
+
+- 2026-08-21: **`GET /api/v2/llm/models` 模型列表接口**：代理网关 `GET {LLM_BASE_URL}/models`，返回 `{ ok, baseUrl, defaultModel, models[] }`。配置的模型报 `model_not_found` 时可用此接口确认网关实际可用模型名（含 provider 前缀需整名使用）；网关不可达返回 502（错误透传）。API docs 新增「LLM 配置」分组。
+  影响范围：新增只读端点，无 schema/WS 变更。
+  文件：src/routes/llm-proxy.js, src/dashboard/api-docs/groups/llm.js, src/dashboard/api-docs/catalog.js
+  Python 同步提示：可选对齐同名只读端点；无契约破坏。
+
+### Changed
+
+- 2026-08-21: **模型配置统一收敛到 `.env`（`LLM_MODEL` 唯一真源）**：新增 `LLM_MODEL` 配置项（`config/config.js` 导出），消灭散落在 `llm-utils.js` / `resolve-model.js` / `agent.js` / 两个 service / `setup.js` / `executor/session-slot.js` 的硬编码默认模型。`server.mjs` `loadDefaultModel` 优先级改为 `config/agent-api.json defaultModel → .env LLM_MODEL`（modelID 保留完整带前缀名）。执行机与 global-browser spawn Python 时显式下发 `FORM_LLM_MODEL` / `FORM_LLM_BASE_URL` / `FORM_LLM_API_KEY`（此前 Python 表单 LLM 只能靠 connect.py 兜底或回落 agent LLM）。`FORM_LLM_MODEL` 缺省回落 `LLM_MODEL`。
+  影响范围：LLM 默认模型解析链（会话/表单/分析）、setup 页生成 .env、执行机 Python 子进程环境。无 schema/WS 变更。
+  文件：config/config.js, config/.env, config/.env.example, server.mjs, src/llm-utils.js, src/runtime/resolve-model.js, src/routes/agent.js, src/routes/setup.js, src/services/operation-component-mine-service.js, src/services/trajectory/trajectory-meta-service.js, src/routes/browser-session/global-browser.js, executor/config.js, executor/session-slot.js
+  Python 同步提示：默认模型统一经环境配置（`LLM_MODEL`）下发；Python 端如有硬编码默认模型应对齐为读 env。
+
 - 2026-08-21: **LLM 默认供应商由 DeepSeek 切换到 Qwen（new-api 网关）**：默认 LLM 端点改为 `http://218.77.58.156:3000/v1`，默认模型改为 `Qwen/Qwen3.5-35B-A3B`。**模型名不再剥 provider 前缀**——旧逻辑把 `provider/model` 剥成 `model`（适配 DeepSeek 官方 API），新网关要求完整 `Qwen/...` 名称，故 `resolveModelId`（`src/llm-utils.js`、`src/runtime/resolve-model.js`）改为原样透传。同步更新：`config/config.js` FORM_LLM 默认值、`config/.env` / `.env.example`、`start.ps1` 环境变量、`src/routes/setup.js` 生成 .env 的默认值、`src/routes/agent.js` 与两个 service 的兜底模型名、`scripts/cdp/connect.py` Python 兜底、API docs 示例。llm-proxy 转发体注入的 `thinking:{type:'disabled'}` 已对新网关实测兼容。
   影响范围：LLM 调用链（agent 会话 / 表单填写 / L1c）、setup 页初始配置、API docs 示例。无 schema/路由/WS 变更。
-  文件：config/config.js, config/.env, config/.env.example, start.ps1, src/llm-utils.js, src/runtime/resolve-model.js, src/routes/setup.js, src/routes/agent.js, src/services/operation-component-mine-service.js, src/services/trajectory/trajectory-meta-service.js, scripts/cdp/connect.py, src/dashboard/api-docs/groups/{components,memory,trajectory}.js
+  文件：config/config.js, config/.env, config/.env.example, config/agent-api.json, config/setup.html, start.ps1, server.mjs, src/llm-utils.js, src/runtime/resolve-model.js, src/routes/setup.js, src/routes/agent.js, src/routes/health.js, src/services/operation-component-mine-service.js, src/services/trajectory/trajectory-meta-service.js, scripts/cdp/connect.py, executor/session-slot.js, executor/config.js, src/dashboard/api-docs/groups/{components,memory,trajectory}.js
   Python 同步提示：模型名语义变化——带 `/` 的模型名需原样传给网关（不再剥前缀）；Python 端如有同样的剥前缀逻辑需对齐。默认端点/模型/key 经各自环境配置下发，无代码结构变更。
 
 ### Fixed

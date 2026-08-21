@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import path from 'path';
 import { readFileSync, existsSync } from 'fs';
-import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR, EXECUTOR_HEARTBEAT_TIMEOUT_MS } from './config/config.js';
+import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR, EXECUTOR_HEARTBEAT_TIMEOUT_MS, LLM_MODEL } from '#config/config.js';
 import { state, isConfigured } from './src/state.js';
 import { initWebSocket } from './src/ws-server.js';
 import { initExecutorWs, validateExecutorToken, rejectUpgrade } from './src/executor-ws.js';
@@ -55,21 +55,21 @@ app.use((err, req, res, next) => {
 });
 
 function loadDefaultModel() {
+  // Priority: config/agent-api.json defaultModel → .env LLM_MODEL (single source of truth).
+  // modelID keeps the provider prefix — the gateway requires the full model
+  // name (e.g. "Qwen/Qwen3.5-35B-A3B"); stripping it 404s.
+  let modelStr = '';
   const apiCfgPath = path.join(PROJECT_DIR, 'config', 'agent-api.json');
   if (existsSync(apiCfgPath)) {
     try {
-      const cfg = JSON.parse(readFileSync(apiCfgPath, 'utf-8'));
-      const defaultModelStr = cfg.defaultModel;
-      if (defaultModelStr) {
-        const parts = defaultModelStr.split('/');
-        if (parts.length >= 2) {
-          state.defaultModel = { providerID: parts[0], modelID: parts.slice(1).join('/') };
-        }
-      }
+      modelStr = (JSON.parse(readFileSync(apiCfgPath, 'utf-8')).defaultModel || '').trim();
     } catch (e) {
       console.warn('[server] Failed to parse agent-api.config.json:', e.message);
     }
   }
+  if (!modelStr) modelStr = LLM_MODEL;
+  const parts = modelStr.split('/');
+  state.defaultModel = { providerID: parts.length >= 2 ? parts[0] : '', modelID: modelStr };
 }
 
 async function main() {

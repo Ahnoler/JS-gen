@@ -21,6 +21,7 @@ import { GROUP_WEBSOCKET } from './groups/websocket.js';
 import { GROUP_EXPORT } from './groups/export-mgmt.js';
 import { GROUP_REGIONS } from './groups/regions.js';
 import { GROUP_AUTH } from './groups/auth.js';
+import { GROUP_LLM } from './groups/llm.js';
 
 /** Live slot occupancy board (not an HTTP endpoint group). */
 export const GROUP_SLOT_MONITOR = [{
@@ -47,6 +48,7 @@ export const API_GROUPS = [
   ...GROUP_PENDING_SCREENSHOTS,
   ...GROUP_OVERVIEW.slice(1), // 系统管理 …
   ...GROUP_AUTH, // 登录鉴权（SSO）
+  ...GROUP_LLM, // LLM 配置
   ...GROUP_HIERARCHY,
   ...GROUP_MESSAGES,
   ...GROUP_COMPONENTS,

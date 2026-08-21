@@ -4,7 +4,7 @@ import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import { runPhaseScreenshotCapture } from '../../cdp/phase-screenshot-capture.js';
 import { deriveRegionRef, assembleRegionTree } from '../region-tree.js';
 import { replacePhaseHighlightScreenshot } from '../screenshot-service.js';
-import { USE_EXECUTOR } from '../../../config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import * as execSession from '../../executor-session-client.js';
 import { getAttachedCdpClient } from '../../cdp/remote-bridge.js';
 

@@ -7,7 +7,7 @@ import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as systemDao from '../../dao/system-dao.js';
 import * as execSession from '../../executor-session-client.js';
 import { state } from '../../state.js';
-import { USE_EXECUTOR } from '../../../config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import * as remoteBridge from '../../cdp/remote-bridge.js';
 import { getTrajectoryTree } from './trajectory-query-service.js';
 import {

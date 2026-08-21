@@ -3,7 +3,7 @@
  * Columns: 交易名称 | 需求描述
  */
 import ExcelJS from 'exceljs';
-import { BATCH_IMPORT_MAX_ROWS } from '../../../config/config.js';
+import { BATCH_IMPORT_MAX_ROWS } from '#config/config.js';
 import { XLSX_MIME } from '../../http/upload-xlsx.js';
 
 export const BATCH_EXCEL_HEADERS = Object.freeze(['交易名称', '需求描述']);

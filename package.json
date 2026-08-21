@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Browser automation control plane: v2 trajectory record/replay, MySQL, executor, Playwright assemble/run",
   "type": "module",
+  "imports": {
+    "#config/*": "./config/*",
+    "#src/*": "./src/*"
+  },
   "scripts": {
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",

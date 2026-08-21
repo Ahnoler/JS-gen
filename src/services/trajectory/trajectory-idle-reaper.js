@@ -5,7 +5,7 @@
  * Idle traj = no new trajectory_step for IDLE_MS, and session not busy / not manual-recording.
  * Leaving the recording studio does NOT detach — this reaper is the reclaim path.
  */
-import { getDB } from '../../../config/database.js';
+import { getDB } from '#config/database.js';
 import {
   getAllTrajectoryRuntimes,
   detachTrajectoryLive,

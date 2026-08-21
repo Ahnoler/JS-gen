@@ -1,6 +1,6 @@
 {
   "models": [
-    { "provider": "deepseek", "model": "deepseek-v4-flash" }
+    { "provider": "Qwen", "model": "Qwen/Qwen3.5-35B-A3B" }
   ],
-  "defaultModel": "deepseek/deepseek-v4-flash"
+  "defaultModel": "Qwen/Qwen3.5-35B-A3B"
 }

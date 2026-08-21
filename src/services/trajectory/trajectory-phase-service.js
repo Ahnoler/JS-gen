@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import { appendDoneLogEntry } from '../../models/phase-done-logs.js';
-import { getDB } from '../../../config/database.js';
+import { getDB } from '#config/database.js';
 import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
 import { refreshTrajectoryCounts } from './trajectory-step-service.js';
 

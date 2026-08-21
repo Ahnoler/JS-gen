@@ -3,7 +3,7 @@
  */
 import { spawnAgent, waitForReady, isProcessAlive, killTree, killProcessOnly, killListenerOnPort } from './spawn-agent.js';
 import { createStderrLineBuffer } from './stderr-prefix.js';
-import { LLM_API_KEY, LLM_BASE_URL, CONTROL_PLANE_HTTP, EXECUTOR_CDP_PORT_BASE } from './config.js';
+import { LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY, CONTROL_PLANE_HTTP, EXECUTOR_CDP_PORT_BASE } from './config.js';
 import net from 'net';
 
 /** @returns {Promise<boolean>} true if port is free to bind */
@@ -60,7 +60,7 @@ export class SessionSlot {
     }
 
     const sessionId = opts.sessionId;
-    const model = opts.model || 'deepseek/deepseek-v4-flash';
+    const model = opts.model || LLM_MODEL;
     const baseUrl = opts.baseUrl || `${CONTROL_PLANE_HTTP}/v1`;
     const apiKey = opts.apiKey || LLM_API_KEY;
     const cdpUrl = opts.cdpUrl || opts.cdp_url || null;
@@ -91,7 +91,11 @@ export class SessionSlot {
       agentArgs.push('--cdp-port', String(this.cdpPort));
     }
 
-    const child = spawnAgent(agentArgs, { OPENAI_API_KEY: apiKey });
+    const child = spawnAgent(agentArgs, {
+      OPENAI_API_KEY: apiKey,
+      // Python 表单 LLM（_llm_values.py）直接读这些 env；缺省回落 agent LLM
+      FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY: FORM_LLM_API_KEY || apiKey,
+    });
 
     this.sessionId = sessionId;
     this.process = child;

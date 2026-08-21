@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { callLLM } from '../llm-utils.js';
+import { LLM_MODEL } from '#config/config.js';
 import * as componentDao from '../dao/operation-component-dao.js';
 import * as occurrenceDao from '../dao/operation-component-occurrence-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
@@ -116,7 +117,7 @@ function buildLlmPrompt(template, { phaseDescription, fragments, stepCount }) {
 async function nameClusterWithLlm({ phaseDescription, fragments, stepCount, model }) {
   const template = loadPromptTemplate();
   const prompt = buildLlmPrompt(template, { phaseDescription, fragments, stepCount });
-  const modelId = model || 'Qwen/Qwen3.5-35B-A3B';
+  const modelId = model || LLM_MODEL;
   try {
     const content = await callLLM(prompt, modelId);
     const obj = parseLlmJsonObject(content);

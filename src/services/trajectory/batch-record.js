@@ -4,7 +4,7 @@
  * Extracted from trajectory-batch-service.js — move-only, no logic changes.
  */
 import { randomUUID } from 'crypto';
-import { BATCH_ITEM_LEASE_MS } from '../../../config/config.js';
+import { BATCH_ITEM_LEASE_MS } from '#config/config.js';
 import * as batchDao from '../../dao/batch-recording-dao.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as executorNodeDao from '../../dao/executor-node-dao.js';

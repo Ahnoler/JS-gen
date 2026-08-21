@@ -1,5 +1,6 @@
 import { state } from '../state.js';
 import { callLLM } from '../llm-utils.js';
+import { LLM_MODEL } from '#config/config.js';
 
 export default function (app) {
   app.post('/api/agent/execute', async (req, res) => {
@@ -11,7 +12,7 @@ export default function (app) {
           ...(system ? [{ role: 'system', content: system }] : []),
           { role: 'user', content: task },
         ],
-        model: model || (state.defaultModel ? state.defaultModel.modelID : 'Qwen/Qwen3.5-35B-A3B'),
+        model: model || (state.defaultModel ? state.defaultModel.modelID : LLM_MODEL),
       });
       res.json({ response: result });
     } catch (err) {
