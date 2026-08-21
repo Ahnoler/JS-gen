@@ -14,6 +14,8 @@ import {
   buildTransactionPayloadV3,
   wrapTransactionListV3,
   validatePageLevelCoverage,
+  coverageBlocksPush,
+  stripVolatileQuery,
   pageKeyFromRegionId,
   popupKeyFromRegionId,
   mapControlAction,
@@ -273,9 +275,43 @@ function testPageLevelScreenshots() {
   check(covered.exempt.length === 1 && covered.exempt[0].propertiesID === noElement.propertiesID, '无 element_json 步骤被 coverage 豁免');
   const missing = validatePageLevelCoverage({ transcationProperties: [...entries, { ...properties[0], propertiesPID: '0' }] });
   check(missing.ok === false && missing.missing.length === 1, '缺截图时覆盖校验失败并返回 missing');
+  check(coverageBlocksPush(missing, { coverageMode: 'page_level' }) === true, 'page_level 模式覆盖缺失阻断推送');
+  check(coverageBlocksPush(missing, { coverageMode: 'legacy_phase_fallback' }) === false, 'legacy 存量模式覆盖缺失不阻断（告警降级）');
+  check(coverageBlocksPush(covered, { coverageMode: 'page_level' }) === false, '覆盖完整不阻断');
+  check(coverageBlocksPush(missing, undefined) === false, '无 stats 时默认不阻断（存量兜底）');
 
   check(pageKeyFromRegionId(`${pageKey}|card:产品目录`) === pageKey, 'pageKeyFromRegionId');
   check(popupKeyFromRegionId(`${popupKey}|overlay:地址选择器`) === popupKey, 'popupKeyFromRegionId');
+  check(stripVolatileQuery('page:http://x.com#/route?part=a&v=123') === 'page:http://x.com#/route', 'stripVolatileQuery 剥 hash 内 query');
+  check(stripVolatileQuery('page:http://x.com#/r?a=1|dialog:标题@@anchor://x') === 'page:http://x.com#/r|dialog:标题@@anchor://x', 'stripVolatileQuery 截到段边界（弹窗 key 保 anchor）');
+  check(stripVolatileQuery('page:http://x.com#/route') === 'page:http://x.com#/route', 'stripVolatileQuery 无 query 原样返回');
+
+  // 存量兼容：截图注册表用规范化 key、控件 region_id 带易变 query → 规范化兜底对齐
+  {
+    const normPageKey = 'page:http://x.com#/modify';
+    const legacyEntries = buildScreenshotEntries({
+      pageLevelScreenshots: [{
+        name: '修改页', levelType: 'page', levelKey: normPageKey,
+        storagePath: 'screenshots/modify.png',
+        metadataJson: { displayName: '修改页' },
+      }],
+    });
+    check(legacyEntries.idByPageLevelNorm.get(normPageKey) === legacyEntries.idByPageLevel.get(normPageKey), '规范化索引含自身 key');
+    const legacyProps = buildV3Properties({
+      traj: {
+        steps: [{
+          stepNumber: 1, actionType: 'fill_form_field', source: 'agent',
+          elementJson: { tag: 'input', xpath_smart: '//input', formLabel: '外文名称', region_id: 'page:http://x.com#/modify?part=a&v=999|main', bbox: { x1: 1, y1: 2, x2: 30, y2: 20 } },
+          paramsJson: { text: 'X' },
+        }],
+      },
+      screenshotCount: legacyEntries.entries.length,
+      idByPageLevel: legacyEntries.idByPageLevel,
+      idByPageLevelNorm: legacyEntries.idByPageLevelNorm,
+      pageLevelById: legacyEntries.pageLevelById,
+    });
+    check(legacyProps.properties[0].propertiesPID === String(legacyEntries.idByPageLevel.get(normPageKey)), '带易变 query 的存量控件经规范化兜底挂上 pid');
+  }
 }
 
 function testPayloadStructure() {

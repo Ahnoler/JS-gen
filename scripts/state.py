@@ -127,8 +127,11 @@ async def capture_page_png_b64_from_page(page, *, full_page: bool = True) -> str
 def page_level_key_from_url(url: str) -> str:
     """Build a stable page key for SPA navigation.
 
-    Keeps origin + path + hash route (SPA page identity); drops query params
-    because they are usually volatile (timestamps, tokens, pagination state).
+    Keeps origin + path + hash route (SPA page identity); drops query params —
+    both real search (`?x` before `#`) and query inside the hash fragment
+    (`#/route?x=1`) — because they are usually volatile (timestamps, tokens,
+    pagination state). In-fragment query also blew past screenshot.level_key
+    VARCHAR(512) on long SUT URLs, failing the page_level insert entirely.
     """
     try:
         parts = urlsplit(url or '')
@@ -137,7 +140,7 @@ def page_level_key_from_url(url: str) -> str:
             return ''
         key = f'page:{base}'
         if parts.fragment:
-            key += f'#{parts.fragment}'
+            key += f'#{parts.fragment.split("?")[0]}'
         return key
     except Exception:
         return f'page:{url or ""}'

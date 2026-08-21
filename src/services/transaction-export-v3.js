@@ -109,6 +109,23 @@ export function popupKeyFromRegionId(regionId) {
   return `${segs[0]}|${segs[1]}`;
 }
 
+/**
+ * 剥掉页面级 key 中 hash 内的易变 query（`#/route?x=1` → `#/route`，截到下一个 `|` 段边界）。
+ * 存量数据在 2026-08-20 修复前把 in-fragment query 写进了 level_key / region_id page 前缀，
+ * 导出侧用规范化 key 兜底匹配，让新旧两代 key 互相对齐。
+ */
+export function stripVolatileQuery(key) {
+  const s = String(key || '');
+  const h = s.indexOf('#');
+  if (h < 0) return s;
+  const rest = s.slice(h + 1);
+  const q = rest.indexOf('?');
+  if (q < 0) return s;
+  const afterQ = rest.slice(q);
+  const bar = afterQ.indexOf('|');
+  return s.slice(0, h + 1) + rest.slice(0, q) + (bar < 0 ? '' : afterQ.slice(bar));
+}
+
 function parseJson(raw) {
   if (raw == null) return null;
   if (typeof raw === 'object') return raw;
@@ -141,12 +158,13 @@ function isLegalRect(bbox) {
  * 匿名可访问）。消费方直接用该 URL 访问图片，无需 MinIO SDK、无需自建预签名。
  * 拿不到 URL 的截图（本地暂存未上传且无公网直链兜底）会被跳过（其 id 不占号，后续顺延）。
  *
- * @returns {{ entries: Array, idByPhase: Map<number,number>, idByDialog: Map<string,number>, idByPageLevel: Map<string,number>, pageLevelById: Map<string,object> }}
- *   entries         — 截图 properties 条目数组（同构于控件条目）
- *   idByPhase       — 旧链路 phaseId → entryId
- *   idByDialog      — dialog 标题（含页面作用域 key）→ entryId
- *   idByPageLevel   — pageKey/popupKey → entryId
- *   pageLevelById   — entryId → 截图条目（弹窗 rect 换算用）
+ * @returns {{ entries: Array, idByPhase: Map<number,number>, idByDialog: Map<string,number>, idByPageLevel: Map<string,number>, idByPageLevelNorm: Map<string,number>, pageLevelById: Map<string,object> }}
+ *   entries           — 截图 properties 条目数组（同构于控件条目）
+ *   idByPhase         — 旧链路 phaseId → entryId
+ *   idByDialog        — dialog 标题（含页面作用域 key）→ entryId
+ *   idByPageLevel     — pageKey/popupKey → entryId
+ *   idByPageLevelNorm — 规范化（剥 hash 内易变 query）pageKey/popupKey → entryId
+ *   pageLevelById     — entryId → 截图条目（弹窗 rect 换算用）
  */
 export function buildScreenshotEntries({
   traj = {},
@@ -159,8 +177,15 @@ export function buildScreenshotEntries({
   const idByPhase = new Map();
   const idByDialog = new Map();
   const idByPageLevel = new Map();
+  const idByPageLevelNorm = new Map();
   const pageLevelById = new Map();
   let nextId = 1;
+
+  const rememberPageLevelKey = (levelKey, entryId) => {
+    idByPageLevel.set(levelKey, entryId);
+    const norm = stripVolatileQuery(levelKey);
+    if (norm && !idByPageLevelNorm.has(norm)) idByPageLevelNorm.set(norm, entryId);
+  };
 
   const pageLevels = Array.isArray(pageLevelScreenshots) ? pageLevelScreenshots : [];
   if (pageLevels.length) {
@@ -206,7 +231,7 @@ export function buildScreenshotEntries({
         rect,
       };
       entries.push(entry);
-      idByPageLevel.set(levelKey, entryId);
+      rememberPageLevelKey(levelKey, entryId);
       pageLevelById.set(String(entryId), entry);
       if (levelType === 'popup') {
         const title = String(meta.dialogTitle || shot.name || '').trim();
@@ -217,7 +242,7 @@ export function buildScreenshotEntries({
         }
       }
     }
-    return { entries, idByPhase, idByDialog, idByPageLevel, pageLevelById, usedPageLevelScreenshots: true };
+    return { entries, idByPhase, idByDialog, idByPageLevel, idByPageLevelNorm, pageLevelById, usedPageLevelScreenshots: true };
   }
 
   // 旧链路（phase_highlight + 步骤弹窗截图）保留，兼容未重录数据。
@@ -313,7 +338,7 @@ export function buildScreenshotEntries({
     if (name) idByDialog.set(name, entryId);
   }
 
-  return { entries, idByPhase, idByDialog, idByPageLevel, pageLevelById, usedPageLevelScreenshots: false };
+  return { entries, idByPhase, idByDialog, idByPageLevel, idByPageLevelNorm, pageLevelById, usedPageLevelScreenshots: false };
 }
 
 /**
@@ -332,6 +357,7 @@ export function buildV3Properties({
   idByPhase,
   idByDialog,
   idByPageLevel,
+  idByPageLevelNorm,
   pageLevelById,
 } = {}) {
   const properties = [];
@@ -369,9 +395,14 @@ export function buildV3Properties({
       : '';
 
     // pid 指向所属截图条目的 id（字符串）：弹窗控件→弹窗截图，否则→页面截图；找不到给 "0"
+    // 精确 key 未命中时用规范化 key（剥 hash 内易变 query）兜底，对齐存量两代数据
     let pid = '0';
     if (popupKey && idByPageLevel?.has(popupKey)) {
       pid = String(idByPageLevel.get(popupKey));
+    }
+    if (pid === '0' && popupKey) {
+      const normPopup = idByPageLevelNorm?.get(stripVolatileQuery(popupKey));
+      if (normPopup != null) pid = String(normPopup);
     }
     if (pid === '0' && overlay) {
       const title = overlay.label || 'overlay';
@@ -382,6 +413,10 @@ export function buildV3Properties({
     }
     if (pid === '0' && pageKey && idByPageLevel?.has(pageKey)) {
       pid = String(idByPageLevel.get(pageKey));
+    }
+    if (pid === '0' && pageKey) {
+      const normPage = idByPageLevelNorm?.get(stripVolatileQuery(pageKey));
+      if (normPage != null) pid = String(normPage);
     }
     if (pid === '0' && phaseId != null) {
       const found = idByPhase?.get(phaseId);
@@ -509,6 +544,16 @@ export function validatePageLevelCoverage(entry) {
 }
 
 /**
+ * 覆盖缺失是否阻断推送：仅 page_level 模式（新录制，830 需求适用对象）强校验；
+ * legacy_phase_fallback（存量旧数据，无法不重录补页面级截图）降级为告警——
+ * 缺失数/键仍进 stats（missingPageLevelScreenshots / missingPageLevelKeys）供消费方识别风险。
+ */
+export function coverageBlocksPush(coverage, stats) {
+  if (coverage?.ok) return false;
+  return stats?.coverageMode === 'page_level';
+}
+
+/**
  * Build one V3 transaction entry.
  * 截图条目（buildScreenshotEntries）与控件条目（buildV3Properties）合并成一个
  * transcationProperties 数组：截图在前，控件在后，统一 schema。
@@ -533,6 +578,7 @@ export function buildTransactionEntryV3(traj, {
     idByPhase,
     idByDialog,
     idByPageLevel,
+    idByPageLevelNorm,
     pageLevelById,
     usedPageLevelScreenshots,
   } = buildScreenshotEntries({
@@ -556,6 +602,7 @@ export function buildTransactionEntryV3(traj, {
     idByPhase,
     idByDialog,
     idByPageLevel,
+    idByPageLevelNorm,
     pageLevelById,
   });
 

@@ -31,13 +31,18 @@ def check(cond, msg):
 def main():
     check(
         page_level_key_from_url('http://test.example.com/#/home?part=home&t=1')
-        == 'page:http://test.example.com#/home?part=home&t=1',
-        'SPA hash route keeps fragment',
+        == 'page:http://test.example.com#/home',
+        'SPA hash route keeps fragment, in-fragment query dropped (volatile + VARCHAR(512) overflow)',
     )
     check(
         page_level_key_from_url('http://test.example.com/path?q=1#/route')
         == 'page:http://test.example.com/path#/route',
         'query string dropped, fragment kept',
+    )
+    check(
+        page_level_key_from_url('http://test.example.com/path#/route')
+        == 'page:http://test.example.com/path#/route',
+        'query-less fragment unchanged',
     )
 
     reset_page_level_shots()

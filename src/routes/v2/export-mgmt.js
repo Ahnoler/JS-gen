@@ -24,6 +24,7 @@ import {
   buildTransactionPayloadV3,
   wrapTransactionListV3,
   validatePageLevelCoverage,
+  coverageBlocksPush,
   TRANSACTION_SCHEMA_VERSION_V3,
 } from '../../services/transaction-export-v3.js';
 import {
@@ -292,7 +293,7 @@ export default function (app) {
     assertPushableForPartner(traj);
 
     const coverage = validatePageLevelCoverage(result.payload?.transcationEventTypeList?.[0]);
-    if (!coverage.ok) {
+    if (coverageBlocksPush(coverage, result.stats)) {
       return res.status(409).json({
         code: 'page_level_screenshot_missing',
         error: '页面级截图缺失，无法推送',
@@ -577,7 +578,7 @@ export default function (app) {
           const result = await buildOneTrajectoryV3(traj, { systemId, projectId });
           const entry = result.payload?.transcationEventTypeList?.[0];
           const coverage = validatePageLevelCoverage(entry);
-          if (willPush && !coverage.ok) {
+          if (willPush && coverageBlocksPush(coverage, result.stats)) {
             buildFailed += 1;
             items.push({
               trajectoryId: id,
