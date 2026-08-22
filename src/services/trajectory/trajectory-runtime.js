@@ -34,6 +34,9 @@ export function clearTrajectoryRuntimesForNode(nodeUuid) {
       if (session?._trajPersistUnsub) {
         try { session._trajPersistUnsub(); } catch {}
       }
+      if (session?._aiRecordUnsub) {
+        try { session._aiRecordUnsub(); } catch {}
+      }
       state.sessions.delete(runtime.sessionId);
     }
     trajectoryRuntimeMap.delete(tid);
@@ -62,6 +65,9 @@ export async function clearStaleTrajectoryRuntime(tid, { verifyExecutor = true }
         const session = state.sessions.get(existing.sessionId);
         if (session?._trajPersistUnsub) {
           try { session._trajPersistUnsub(); } catch {}
+        }
+        if (session?._aiRecordUnsub) {
+          try { session._aiRecordUnsub(); } catch {}
         }
         state.sessions.delete(existing.sessionId);
         slotLease.releaseByTrajectory(tid);

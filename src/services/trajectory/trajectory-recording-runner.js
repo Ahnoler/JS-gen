@@ -277,6 +277,16 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     return work;
   });
 
+  // Keep the persist/screenshot subscription alive until the session closes so
+  // events emitted during graceful close (e.g. the session-end final screenshot,
+  // capturedAt='session-end') are still persisted. The session hub is removed on
+  // session close (execSession.closeSession → removeSessionHub) which cleans this
+  // listener; explicit cleanup also happens at detach / runtime purge.
+  if (session?._aiRecordUnsub) {
+    try { session._aiRecordUnsub(); } catch {}
+  }
+  if (session) session._aiRecordUnsub = unsubscribe;
+
   // Enable per-step before/after screenshots for this recording session
   execSession.forwardStdin({
     nodeUuid: runtime.executorNodeUuid,
@@ -538,7 +548,9 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
     runtime.aiRecording = false;
     runtime.userStop = null;
     clearPhaseActivity();
-    unsubscribe?.();
+    // Subscription deliberately NOT unsubscribed here: it lives until the session
+    // closes (see the _aiRecordUnsub stash above) so session-end events (final
+    // screenshot) are still persisted. Hub removal on closeSession cleans it.
     await broadcastRecordingLock();
   }
 

@@ -231,7 +231,19 @@ export class SessionSlot {
         }) + '\n');
       } catch {}
     }
-    await new Promise((r) => setTimeout(r, keepBrowser ? 2500 : 2000));
+    // Graceful close: the agent's exit path runs the session-end final screenshot
+    // (capturedAt='session-end'), flushes the memory writer and closes the browser —
+    // wait for natural exit before force-killing (a fixed 2s let taskkill /F
+    // interrupt the shot; 20s cap keeps worst-case detach bounded).
+    const closeSent = this.process?.stdin && this.ready;
+    await new Promise((resolve) => {
+      if (!closeSent || !this.process || !isProcessAlive(this.process)) {
+        setTimeout(resolve, keepBrowser ? 2500 : 2000);
+        return;
+      }
+      const timer = setTimeout(resolve, 20000);
+      this.process.once('exit', () => { clearTimeout(timer); resolve(); });
+    });
     if (this.process && isProcessAlive(this.process)) {
       if (keepBrowser) {
         // Soft close: do not kill process tree — Chromium is often a child of the agent.

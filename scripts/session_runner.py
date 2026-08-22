@@ -435,8 +435,11 @@ async def run_session(args):
     try:
         from .state import register_current_page_screenshot
         await register_current_page_screenshot(browser_context, captured_at='session-end')
-    except Exception:
-        pass  # 截图失败不阻塞关闭
+        sys.stderr.write('[session-end] final screenshot registered\n')
+        sys.stderr.flush()
+    except Exception as exc:
+        sys.stderr.write('[session-end] FAILED: ' + type(exc).__name__ + ': ' + str(exc) + '\n')
+        sys.stderr.flush()
     try:
         await browser_context.close()
     except Exception:

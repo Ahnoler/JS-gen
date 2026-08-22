@@ -435,6 +435,10 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
         try { session._trajPersistUnsub(); } catch {}
         session._trajPersistUnsub = null;
       }
+      // NOTE: _aiRecordUnsub is intentionally NOT unsubscribed here — the AI-record
+      // subscription must stay alive until the Python agent finishes its graceful
+      // close (session-end final screenshot) which happens DURING closeSession;
+      // removeSessionHub at the end of closeSession cleans it afterwards.
       try {
         await execSession.closeSession({
           nodeUuid: runtime?.executorNodeUuid,

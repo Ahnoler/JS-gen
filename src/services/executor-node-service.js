@@ -18,6 +18,9 @@ function purgeNodeBindings(nodeUuid) {
       if (session._trajPersistUnsub) {
         try { session._trajPersistUnsub(); } catch {}
       }
+      if (session._aiRecordUnsub) {
+        try { session._aiRecordUnsub(); } catch {}
+      }
       state.sessions.delete(sessionId);
     }
   }
