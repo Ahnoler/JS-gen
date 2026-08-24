@@ -217,7 +217,8 @@ export const GROUP_EXPORT = [
         reqExample: J({ trajectoryIds: [38], systemId: '98', projectId: '31' }),
         notes: [
           'payload 只含 transcationEventTypeList（顶层无 screenshots）',
-          'transcationProperties 统一 schema，截图条目与控件步骤条目同构；用 type 字段区分条目种类：page=页面截图、dialog=弹窗截图、ele=控件步骤',
+          'transcationProperties 统一 schema，截图条目与控件步骤条目同构；用 type 字段区分条目种类：page=页面截图、dialog=弹窗截图、section=分区容器节点、ele=控件步骤',
+          'section 节点：type=section，用 propertiesID/propertiesPID 表达分区父子层级（同页同名控件可区分）；无截图/坐标/action 字段（screenshot=[]、rect=""、elementType/eventTypeValue 空）',
           '截图条目现在按页面级（page/popup）输出：page.regionId=pageKey，dialog.regionId=popupKey，dialog.propertiesPID 指向所属 page 截图条目；不再按 phase 输出 goal 长图',
           '截图条目：eventTypeValue=click、eventTypeName=点击、elementType="、"mothed=空、type=page/dialog、screenshot=[MinIO 永久直链]数组；page.rect=""，dialog.rect=弹窗在页面长图上的位置（JSON 字符串，可选，有值才用于前端叠加展示）',
           '控件步骤条目：eventTypeValue=click/input/...、elementType=xpath、mothed=By.XPATH、type=ele、screenshot=[]空数组、rect=坐标 JSON 字符串或""；弹窗内控件 rect 相对弹窗截图',

@@ -99,6 +99,9 @@ run "characterize-step-region-bbox" "$PY" scripts/characterization/characterize-
 run "characterize-page-level-python" "$PY" scripts/characterization/characterize-page-level-python.py
 run "characterize-before-close-screenshots" "$PY" scripts/characterization/characterize-before-close-screenshots.py
 run "characterize-batch-actions" "$PY" scripts/characterization/characterize-batch-actions.py
+run "characterize-export-v3-pid" node scripts/characterization/characterize-export-v3-pid.mjs
+run "characterize-budget-extend" "$PY" scripts/characterization/characterize-budget-extend.py
+run "characterize-export-v3-field-completeness" node scripts/characterization/characterize-export-v3-field-completeness.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
