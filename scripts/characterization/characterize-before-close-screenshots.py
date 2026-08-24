@@ -85,8 +85,8 @@ def test_g1_session_end_insertion() -> None:
         "session-end shot runs before browser_context.close()",
     )
     assert_true(
-        "except Exception:\n        pass  # 截图失败不阻塞关闭" in src,
-        "final shot wrapped in try/except (non-blocking)",
+        "[session-end] FAILED: " in src,
+        "final shot wrapped in try/except (non-blocking, logs failure)",
     )
 
 
