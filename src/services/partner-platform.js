@@ -193,6 +193,27 @@ function assertPartnerBusinessOk(json, fallbackMsg = PARTNER_NETWORK_ERROR_MSG) 
   return json;
 }
 
+/**
+ * 推送前自检：检查 wire payload 的信息丢失风险（只统计不阻断）。
+ * - undefined 值检测（JSON.stringify 静默丢弃 undefined key）
+ * - page/dialog 无 screenCapture
+ * @returns {{ ok: boolean, issues: Array }}
+ */
+export function preflightCheck(wirePayload) {
+  const list = wirePayload?.transcationEventTypeList || [];
+  const issues = [];
+  for (const entry of list) {
+    for (const p of entry.transcationProperties || []) {
+      for (const [k, v] of Object.entries(p)) {
+        if (v === undefined) issues.push({ id: p.propertiesID, field: k, issue: 'undefinedValue' });
+      }
+      if ((p.type === 'page' || p.type === 'dialog') && !p.screenCapture)
+        issues.push({ id: p.propertiesID, issue: 'emptyScreenCapture' });
+    }
+  }
+  return { ok: issues.length === 0, issues };
+}
+
 function normalizeProjectRow(row) {
   if (!row || typeof row !== 'object') return null;
   const id = row.id ?? row.projectId ?? row.project_id;
@@ -293,10 +314,16 @@ export async function listPartnerSystems({ accessToken, projectId, parentId } = 
  */
 export async function pushImportDemand(payload, { accessToken } = {}) {
   const url = importDemandUrl();
+  const wirePayload = toPartnerImportPayload(payload);
+  // 推送前自检（只统计不阻断）：信息丢失风险写入 stderr，继续推送
+  const preflight = preflightCheck(wirePayload);
+  if (!preflight.ok) {
+    process.stderr.write(`[preflight] ${preflight.issues.length} issues found (non-blocking)\n`);
+  }
   const { json, text, httpStatus } = await partnerFetch(url, {
     method: 'POST',
     accessToken,
-    body: toPartnerImportPayload(payload),
+    body: wirePayload,
   });
   if (!json) {
     console.warn(

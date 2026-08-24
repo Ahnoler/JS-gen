@@ -685,6 +685,8 @@ export default function (app) {
         pushed: true,
         partner,
         items,
+        stats: merged.stats,
+        skipped: merged.skipped,
         summary: { ok: buildOk, failed: buildFailed },
       });
     } catch (err) {

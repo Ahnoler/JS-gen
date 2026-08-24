@@ -637,6 +637,52 @@ export function validatePageLevelCoverage(entry) {
 }
 
 /**
+ * 字段完整性校验：统计缺失字段，不阻断推送。
+ * section 节点无 elementType/screenshot 是正常的，不报 issue。
+ * @returns {{ ok: boolean, missing: Array }}
+ */
+export function validateFieldCompleteness(entry) {
+  const props = Array.isArray(entry?.transcationProperties) ? entry.transcationProperties : [];
+  const missing = [];
+  for (const p of props) {
+    const issues = [];
+    if (p.type === 'ele') {
+      if (!String(p.elementType || '').trim() && !String(p.realLabel || '').trim())
+        issues.push('missingElementTypeAndLabel');
+      if (String(p.propertiesPID || '0') === '0')
+        issues.push('orphanPid');
+    }
+    if (p.type === 'page' || p.type === 'dialog') {
+      const shots = Array.isArray(p.screenshot) ? p.screenshot : [];
+      if (shots.length === 0) issues.push('emptyScreenshot');
+    }
+    if (!String(p.propertiesName || '').trim()) issues.push('emptyName');
+    if (issues.length) missing.push({ propertiesID: p.propertiesID || '', type: p.type || '', issues });
+  }
+  return { ok: missing.length === 0, missing };
+}
+
+/** 超长字段截断上限（消费方单列存储长度约束）；未列字段不截断。 */
+const FIELD_LENGTH_LIMITS = Object.freeze({
+  elementType: 2000,
+  options: 4000,
+  objectValue: 500,
+  propertiesName: 100,
+});
+const truncatedSuffix = '...truncated';
+
+/**
+ * 超长字符串截断：超过 limit 时截到 limit 长度并补 truncatedSuffix（仅统计不阻断）。
+ * @returns {{ value: string, truncated: boolean }}
+ */
+function truncateFieldValue(field, value) {
+  const limit = FIELD_LENGTH_LIMITS[field];
+  if (!limit || typeof value !== 'string') return { value, truncated: false };
+  if (value.length <= limit) return { value, truncated: false };
+  return { value: value.slice(0, limit - truncatedSuffix.length) + truncatedSuffix, truncated: true };
+}
+
+/**
  * 覆盖缺失是否阻断推送：仅 page_level 模式（新录制，830 需求适用对象）强校验；
  * legacy_phase_fallback（存量旧数据，无法不重录补页面级截图）降级为告警——
  * 缺失数/键仍进 stats（missingPageLevelScreenshots / missingPageLevelKeys）供消费方识别风险。
@@ -704,6 +750,17 @@ export function buildTransactionEntryV3(traj, {
   for (const p of properties) {
     p.rect = rectToString(p.rect);
   }
+  // 超长字段截断：合并后、uniquifyPropertiesNames 之前应用（只统计不阻断，截断数进 stats）
+  const truncatedCounts = { elementType: 0, options: 0, objectValue: 0, propertiesName: 0 };
+  for (const p of properties) {
+    for (const field of Object.keys(FIELD_LENGTH_LIMITS)) {
+      if (p[field] != null) {
+        const { value, truncated } = truncateFieldValue(field, String(p[field]));
+        if (truncated) truncatedCounts[field] += 1;
+        p[field] = value;
+      }
+    }
+  }
   uniquifyPropertiesNames(properties);
 
   const id = traj.id != null ? String(traj.id) : '';
@@ -719,6 +776,7 @@ export function buildTransactionEntryV3(traj, {
     transcationProperties: properties,
   };
   const coverage = validatePageLevelCoverage(entry);
+  const completeness = validateFieldCompleteness(entry);
   return {
     entry,
     count: properties.length,
@@ -731,6 +789,8 @@ export function buildTransactionEntryV3(traj, {
       coverageExemptSteps: coverage.exempt.length,
       missingPageLevelScreenshots: coverage.missing.length,
       missingPageLevelKeys: coverage.missing.map((m) => m.regionId || m.propertiesPID).filter(Boolean),
+      fieldCompletenessIssues: completeness.missing.length,
+      truncatedFields: truncatedCounts,
     },
   };
 }
@@ -764,6 +824,8 @@ export function wrapTransactionListV3(builtEntries = []) {
   let noRectControls = 0;
   let missingPageLevelScreenshots = 0;
   let coverageExemptSteps = 0;
+  let fieldCompletenessIssues = 0;
+  const truncatedFields = { elementType: 0, options: 0, objectValue: 0, propertiesName: 0 };
   const missingPageLevelKeys = [];
   const coverageModes = new Set();
 
@@ -777,6 +839,10 @@ export function wrapTransactionListV3(builtEntries = []) {
     noRectControls += Number(b.stats?.noRectControls) || 0;
     missingPageLevelScreenshots += Number(b.stats?.missingPageLevelScreenshots) || 0;
     coverageExemptSteps += Number(b.stats?.coverageExemptSteps) || 0;
+    fieldCompletenessIssues += Number(b.stats?.fieldCompletenessIssues) || 0;
+    for (const k of Object.keys(truncatedFields)) {
+      truncatedFields[k] += Number(b.stats?.truncatedFields?.[k]) || 0;
+    }
     if (b.stats?.coverageMode) coverageModes.add(b.stats.coverageMode);
     for (const key of b.stats?.missingPageLevelKeys || []) {
       if (key && !missingPageLevelKeys.includes(key)) missingPageLevelKeys.push(key);
@@ -797,6 +863,8 @@ export function wrapTransactionListV3(builtEntries = []) {
       coverageExemptSteps,
       missingPageLevelScreenshots,
       missingPageLevelKeys,
+      fieldCompletenessIssues,
+      truncatedFields,
     },
   };
 }
