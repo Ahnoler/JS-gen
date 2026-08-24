@@ -3,7 +3,7 @@
  * Characterize partition-via-pid: buildV3Properties 插入 type='section' 中间节点，
  * 用 propertiesID/propertiesPID 父子树表达分区层级（同页同名控件可区分）。
  */
-import { buildV3Properties, buildScreenshotEntries, buildTransactionEntryV3 } from '../../src/services/transaction-export-v3.js';
+import { buildV3Properties, buildScreenshotEntries, buildTransactionEntryV3, validatePageLevelCoverage } from '../../src/services/transaction-export-v3.js';
 
 const failures = [];
 function check(label, cond) { if (!cond) failures.push(label); }
@@ -66,5 +66,18 @@ const legacySections = legacyProps.filter(p => p.type === 'section');
 check('legacy no section', legacySections.length === 0);
 check('legacy ele pid = page id', legacyEles[0].propertiesPID === '1');
 
+// validatePageLevelCoverage 向上追溯：含 section 节点时覆盖校验应通过
+const built = buildTransactionEntryV3(
+  { id: 1, name: 'test', steps: [
+    { id: 1, trajectoryPhaseId: 1, actionType: 'click_element_by_index', params: { text: '保存' },
+      elementJson: JSON.stringify({ region_id: 'page:url#/home|tab:基本信息|section:概况', region_label: '概况', formLabel: '保存', bbox: {x1:1,y1:1,x2:2,y2:2}, page_level_key: 'page:url#/home' }) },
+  ]},
+  { systemId: 1, projectId: 1, phases: [], phaseScreenshots: [], dialogScreenshots: [],
+    pageLevelScreenshots: [{ levelType: 'page', levelKey: 'page:url#/home', metadataJson: { displayName: '首页' }, imageUrl: 'http://minio/p.png' }] },
+);
+const coverage = validatePageLevelCoverage(built.entry);
+check('coverage ok with section nodes', coverage.ok);
+check('coverage missing empty', coverage.missing.length === 0);
+
 if (failures.length) { console.error('FAIL:', failures); process.exit(1); }
-console.log('OK: section nodes created, ele pids point to sections, same-name distinguishable');
+console.log('OK: section nodes created, ele pids point to sections, same-name distinguishable, coverage traversal passes');
