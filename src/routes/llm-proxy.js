@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { LLM_BASE_URL, LLM_API_KEY, LLM_MODEL } from '#config/config.js';
+import { LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT_MS } from '#config/config.js';
 
 export default function (app) {
 
@@ -64,6 +64,7 @@ export default function (app) {
     try {
       const resp = await fetch(`${LLM_BASE_URL}/chat/completions`, {
         method: 'POST',
+        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${LLM_API_KEY}`,
@@ -79,7 +80,16 @@ export default function (app) {
       const data = await resp.json();
       return res.json({ ...data, id: completionId, created: now });
     } catch (err) {
-      return res.status(500).json({ error: { message: err.message, type: 'server_error' } });
+      // 上游挂起（通道宕机时不返回错误体，只能靠超时切断）→ 504 让调用方快速失败
+      const timedOut = err.name === 'TimeoutError' || err.name === 'AbortError';
+      return res.status(timedOut ? 504 : 500).json({
+        error: {
+          message: timedOut
+            ? `upstream timeout after ${LLM_TIMEOUT_MS}ms (model=${modelId}) — LLM 通道疑似挂起，可 GET /api/v2/llm/models 排查`
+            : err.message,
+          type: timedOut ? 'upstream_timeout' : 'server_error',
+        },
+      });
     }
   });
 }

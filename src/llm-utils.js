@@ -1,4 +1,4 @@
-import { LLM_BASE_URL, LLM_API_KEY, LLM_MODEL } from '#config/config.js';
+import { LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT_MS } from '#config/config.js';
 
 const DEFAULT_MODEL = LLM_MODEL;
 
@@ -18,6 +18,7 @@ export async function callLLM(text, model) {
 
   const resp = await fetch(`${LLM_BASE_URL}/chat/completions`, {
     method: 'POST',
+    signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${LLM_API_KEY}`,

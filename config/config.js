@@ -60,6 +60,11 @@ export const LLM_BASE_URL = _resolve('LLM_BASE_URL');
 export const LLM_API_KEY = _resolve('LLM_API_KEY');
 /** 默认模型（唯一真源：config/.env LLM_MODEL；代码内不再散落硬编码默认） */
 export const LLM_MODEL = _resolve('LLM_MODEL', 'Qwen/Qwen3.5-35B-A3B');
+/** LLM 请求超时（毫秒）：上游通道挂起时快速失败，避免 agent 长时间无活动被判 idle timeout */
+export const LLM_TIMEOUT_MS = Math.max(
+  5000,
+  parseInt(_resolve('LLM_TIMEOUT_MS', '120000'), 10) || 120000,
+);
 export const FORM_LLM_MODEL = _resolve('FORM_LLM_MODEL', LLM_MODEL);
 export const FORM_LLM_BASE_URL = _resolve('FORM_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
 export const FORM_LLM_API_KEY = _resolve('FORM_LLM_API_KEY', LLM_API_KEY);

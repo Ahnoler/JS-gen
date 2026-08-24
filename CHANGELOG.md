@@ -9,6 +9,13 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ## [Unreleased]
 
+### Added
+
+- 2026-08-24: **LLM 请求超时保护（`LLM_TIMEOUT_MS`）**：新增配置 `LLM_TIMEOUT_MS`（毫秒，默认 120000，`.env` 唯一真源）。此前所有 LLM 调用无超时——网关通道挂起（如 GLM-5 宕机，请求 60s+ 无任何响应）时 agent 每步 LLM 调用无限阻塞，最终以「Phase idle timeout: no agent activity for 10 minutes」这种迟钝方式暴露。现三处生效：① `src/llm-utils.js` `callLLM`（`AbortSignal.timeout`）；② `src/routes/llm-proxy.js` `/v1/chat/completions` 转发（agent 主链路）——超时返回 **504 `upstream_timeout`** 并附排查指引（错误体不再挂起）；③ Python `agent_utils.create_llm` 与 `_llm_values._get_form_llm` 的 `ChatOpenAI(timeout=..., max_retries=1)`（表单 LLM 直连网关场景）。执行机与 global-browser spawn Python 时下发 `LLM_TIMEOUT_MS`。
+  影响范围：LLM 调用失败模式从「无限挂起」变为「120s 内快速失败」；超时值经 `.env` 可调。无 schema/WS 变更。
+  文件：config/config.js, config/.env, config/.env.example, src/llm-utils.js, src/routes/llm-proxy.js, src/routes/browser-session/global-browser.js, executor/config.js, executor/session-slot.js, scripts/agent_utils.py, scripts/controller/actions/_llm_values.py
+  Python 同步提示：Python 端读 `LLM_TIMEOUT_MS`（毫秒）设 ChatOpenAI timeout；控制面透传该 env 给 Python 子进程。
+
 ### Changed
 
 - 2026-08-24: **V3 分区数据改用 propertiesID/propertiesPID 父子树表达（partition-via-pid）**：V3 导出构建期（`buildV3Properties`）从 `region_id` 链提取分区段（tab/section/titlebox 等），为每段创建 `type='section'` 中间节点插入 `transcationProperties[]`，ele 的 `propertiesPID` 指向最近 section 节点（无分区段时直指 page/dialog 截图，存量兼容）。同页同名控件（如两个「保存」按钮）因分区不同 pid 不同 → 可区分。`validatePageLevelCoverage` 改为沿 PID 链向上追溯（`resolveRootScreenshotId`）到 page/dialog 截图校验覆盖。伙伴出站适配新增 `PARTNER_SECTION_TYPE` 配置（默认 `'section'`，伙伴不接受时可切 `'ele'+elementType='partition'`）。可视化工具 lightup 加 PID 树侧栏、layer-tree 识别 section 节点为中间层。
