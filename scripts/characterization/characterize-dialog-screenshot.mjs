@@ -8,7 +8,7 @@ import {
   buildV3Properties,
 } from '../../src/services/transaction-export-v3.js';
 
-// buildScreenshotEntries should output type=dialog entry from dialogScreenshots rows
+// buildScreenshotEntries should output type=popup entry from dialogScreenshots rows
 const { entries, idByDialog } = buildScreenshotEntries({
   traj: { id: 157 },
   phases: [],
@@ -28,7 +28,7 @@ const { entries, idByDialog } = buildScreenshotEntries({
 });
 assert.equal(entries.length, 1, 'should output one dialog screenshot entry');
 const e = entries[0];
-assert.equal(e.type, 'dialog', 'type=dialog');
+assert.equal(e.type, 'popup', 'type=popup');
 assert.equal(e.eventTypeValue, 'click', 'eventTypeValue=click');
 assert.equal(e.eventTypeName, '点击', 'eventTypeName=点击');
 assert.equal(e.elementType, '', 'elementType empty');
@@ -78,7 +78,7 @@ const withParent = buildScreenshotEntries({
   ],
 });
 const withParentPage = withParent.entries.find((x) => x.type === 'page');
-const withParentDialog = withParent.entries.find((x) => x.type === 'dialog');
+const withParentDialog = withParent.entries.find((x) => x.type === 'popup');
 assert.equal(withParent.entries.length, 2, 'page + dialog entries exist');
 assert.equal(withParentDialog.propertiesPID, withParentPage.propertiesID, 'dialog.propertiesPID points to parent page');
 assert.deepEqual(withParentDialog.rect, { x1: 10, y1: 20, x2: 310, y2: 420 }, 'dialog.rect passes through from metadataJson.rect');
@@ -112,6 +112,6 @@ const { properties } = buildV3Properties({
   idByPhase: new Map(),
   idByDialog,
 });
-assert.equal(properties[0].propertiesPID, String(dialogShotId), 'dialog propertiesPID (string) points at screenshot entry id');
+assert.equal(properties[0].propertiesPID, String(dialogShotId), 'popup propertiesPID (string) points at screenshot entry id');
 
 console.log('ok: characterize-dialog-screenshot');

@@ -79,7 +79,7 @@ const ok = (n) => console.log(`ok: ${n}`);
   });
   assert.equal(entries.length, 2);
   const page = entries.find((e) => e.type === 'page');
-  const dialog = entries.find((e) => e.type === 'dialog');
+  const dialog = entries.find((e) => e.type === 'popup');
   assert.equal(page.regionId, pageKey);
   assert.equal(dialog.regionId, popupKey);
   assert.equal(dialog.propertiesPID, page.propertiesID);
@@ -101,14 +101,14 @@ const ok = (n) => console.log(`ok: ${n}`);
     idByDialog: new Map(),
     idByPhase: new Map(),
   });
-  // partition-via-pid：页面/弹窗各插入 1 个 section 中间节点；no-element 步骤不建 section
-  const pageSection = properties.find((p) => p.type === 'section' && p.propertiesPID === page.propertiesID);
-  const dialogSection = properties.find((p) => p.type === 'section' && p.propertiesPID === dialog.propertiesID);
+  // partition-via-pid：页面/弹窗各插入 1 个中间节点（card:/dialog: 角色）；no-element 步骤不建中间节点
+  const pageSection = properties.find((p) => p.type === 'card' && p.propertiesPID === page.propertiesID);
+  const dialogSection = properties.find((p) => p.type === 'popup' && p.propertiesPID === dialog.propertiesID);
   assert.ok(pageSection, 'page section created');
   assert.ok(dialogSection, 'dialog section created');
-  const pageCtrl = properties.find((p) => p.type === 'ele' && p.propertiesPID === pageSection.propertiesID);
-  const popupCtrl = properties.find((p) => p.type === 'ele' && p.propertiesPID === dialogSection.propertiesID);
-  const noElement = properties.find((p) => p.type === 'ele' && p.propertiesPID === page.propertiesID);
+  const pageCtrl = properties.find((p) => p.type === 'object' && p.propertiesPID === pageSection.propertiesID);
+  const popupCtrl = properties.find((p) => p.type === 'object' && p.propertiesPID === dialogSection.propertiesID);
+  const noElement = properties.find((p) => p.type === 'object' && p.propertiesPID === page.propertiesID);
   assert.equal(properties.length, 5);
   assert.equal(pageCtrl.propertiesPID, pageSection.propertiesID);
   assert.equal(popupCtrl.propertiesPID, dialogSection.propertiesID);
@@ -154,8 +154,8 @@ const ok = (n) => console.log(`ok: ${n}`);
   );
   const props = built.entry.transcationProperties;
   const page = props.find((p) => p.type === 'page');
-  const dlg = props.find((p) => p.type === 'dialog');
-  const ctrl = props.find((p) => p.type === 'ele');
+  const dlg = props.find((p) => p.type === 'popup');
+  const ctrl = props.find((p) => p.type === 'object');
   assert.equal(page.rect, '');
   assert.equal(dlg.rect, '{"x1":100,"y1":200,"x2":500,"y2":600}');
   assert.equal(ctrl.rect, '{"x1":20,"y1":20,"x2":220,"y2":40}');

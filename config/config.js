@@ -193,5 +193,5 @@ export const AGENT_STDERR_LOG_DIR = _resolve('AGENT_STDERR_LOG_DIR')
 
 // ── 伙伴平台 section 节点 type 适配 ──
 // 默认 'section'：伙伴 V3 契约接受 type='section' 中间节点。
-// fallback 'ele'：伙伴不接受 'section' 时，section 节点改用 type='ele'+elementType='partition'。
+// fallback 'object'：伙伴不接受 'section' 时，section 节点改用 type='object'+elementType='partition'。
 export const PARTNER_SECTION_TYPE = _resolve('PARTNER_SECTION_TYPE', 'section');

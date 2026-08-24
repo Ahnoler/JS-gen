@@ -40,34 +40,34 @@ const e = resolveSystemProject({ systemId: 7, projectId: '9' });
 assert.equal(e.systemId, '7');
 assert.equal(e.projectId, '9');
 
-// toPartnerImportPayload：保留 ele/page/dialog（仅过滤 null），剥 regionId/regionLabel，screenshot→screenCapture
+// toPartnerImportPayload：保留 object/page/popup（仅过滤 null），剥 regionId/regionLabel，screenshot→screenCapture
 {
   const src = {
     transcationEventTypeList: [{
       transcId: 1,
       transcationProperties: [
         { type: 'page', regionId: 'page:x', regionLabel: '首页', screenshot: ['http://a/1.png', 'http://a/2.png'] },
-        { type: 'ele', regionId: '', regionLabel: '', screenshot: ['http://a/3.png'], rect: '{"x1":1}', propertiesName: '点击' },
-        { type: 'dialog', screenshot: ['http://a/4.png'] },
+        { type: 'object', regionId: '', regionLabel: '', screenshot: ['http://a/3.png'], rect: '{"x1":1}', propertiesName: '点击' },
+        { type: 'popup', screenshot: ['http://a/4.png'] },
         null,
       ],
     }],
   };
   const out = toPartnerImportPayload(src);
   const props = out.transcationEventTypeList[0].transcationProperties;
-  assert.equal(props.length, 3, 'ele/page/dialog 全保留，仅 null 被过滤');
+  assert.equal(props.length, 3, 'object/page/popup 全保留，仅 null 被过滤');
   const byType = Object.fromEntries(props.map((p) => [p.type, p]));
   assert.ok(byType.page, 'page 步骤保留');
-  assert.ok(byType.dialog, 'dialog 步骤保留');
+  assert.ok(byType.popup, 'popup 步骤保留');
   for (const p of props) {
     assert.equal('regionId' in p, false, `${p.type} regionId 已剥除`);
     assert.equal('regionLabel' in p, false, `${p.type} regionLabel 已剥除`);
     assert.equal('screenshot' in p, false, `${p.type} screenshot 已删除（V3 契约改 screenCapture）`);
   }
   assert.equal(byType.page.screenCapture, 'http://a/1.png,http://a/2.png', 'page 截图并入 screenCapture 逗号串');
-  assert.equal(byType.ele.screenCapture, 'http://a/3.png', 'ele 截图并入 screenCapture');
-  assert.equal(byType.dialog.screenCapture, 'http://a/4.png', 'dialog 截图并入 screenCapture');
-  assert.equal(byType.ele.rect, '{"x1":1}');
+  assert.equal(byType.object.screenCapture, 'http://a/3.png', 'object 截图并入 screenCapture');
+  assert.equal(byType.popup.screenCapture, 'http://a/4.png', 'popup 截图并入 screenCapture');
+  assert.equal(byType.object.rect, '{"x1":1}');
   assert.equal(out.transcationEventTypeList[0].transcId, 1);
 }
 
@@ -83,7 +83,7 @@ assert.deepEqual(toPartnerImportPayload({ transcationEventTypeList: 'nope' }), {
       transcationProperties: [
         { propertiesID: '1', propertiesPID: '0', type: 'page', screenshot: ['http://x/p.png'], propertiesName: 'page' },
         { propertiesID: '2', propertiesPID: '1', type: 'section', screenshot: [], propertiesName: 'tab1', elementType: '', realLabel: 'tab1' },
-        { propertiesID: '3', propertiesPID: '2', type: 'ele', screenshot: [], propertiesName: '保存', elementType: '//xpath', realLabel: '保存' },
+        { propertiesID: '3', propertiesPID: '2', type: 'object', screenshot: [], propertiesName: '保存', elementType: '//xpath', realLabel: '保存' },
       ],
     }],
   };

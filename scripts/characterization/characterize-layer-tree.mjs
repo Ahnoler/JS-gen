@@ -127,9 +127,9 @@ function testV3FlatSynthetic() {
   console.log('[synthetic] buildTreeFromV3Flat');
   const props = [
     { type: 'page', propertiesID: '1', propertiesPID: '0', propertiesName: '页面1' },
-    { type: 'dialog', propertiesID: '2', propertiesPID: '1', propertiesName: '地址选择器' },
-    { type: 'ele', propertiesID: '3', propertiesPID: '2', propertiesName: '省份', eventTypeValue: 'select', regionId: 'overlay:地址选择器', rect: { x1: 1, y1: 2, x2: 30, y2: 20 } },
-    { type: 'ele', propertiesID: '4', propertiesPID: '1', propertiesName: '产品名称', eventTypeValue: 'input', regionId: 'card:产品目录', rect: { x1: 1, y1: 2, x2: 30, y2: 20 } },
+    { type: 'popup', propertiesID: '2', propertiesPID: '1', propertiesName: '地址选择器' },
+    { type: 'object', propertiesID: '3', propertiesPID: '2', propertiesName: '省份', eventTypeValue: 'select', regionId: 'overlay:地址选择器', rect: { x1: 1, y1: 2, x2: 30, y2: 20 } },
+    { type: 'object', propertiesID: '4', propertiesPID: '1', propertiesName: '产品名称', eventTypeValue: 'input', regionId: 'card:产品目录', rect: { x1: 1, y1: 2, x2: 30, y2: 20 } },
   ];
   const tree = buildTreeFromV3Flat(props);
   check(countLeaves(tree) === 2, `2 个控件全部挂树（实际 ${countLeaves(tree)}）`);

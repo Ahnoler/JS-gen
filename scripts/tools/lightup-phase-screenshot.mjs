@@ -378,18 +378,18 @@ async function runV3FlatMode(entry, properties, file) {
     for (const p of properties) {
       if (p && typeof p.rect === 'string') p.rect = parseRect(p.rect);
     }
-    const shots = properties.filter((p) => p.type === 'page' || p.type === 'dialog');
-    const sections = properties.filter((p) => p.type === 'section');
-    const eles = properties.filter((p) => p.type === 'ele');
+    const shots = properties.filter((p) => p.type === 'page' || p.type === 'popup');
+    const sections = properties.filter((p) => p.type === 'section' || p.type === 'tab' || p.type === 'wizard' || p.type === 'card');
+    const eles = properties.filter((p) => p.type === 'object');
 
-    // PID 链上溯：partition-via-pid 后 ele 的 propertiesPID 指向最近 section 节点（而非 page/dialog 截图），
-    // 需要沿 propertiesPID 链向上找到 ele 最终归属的 page/dialog 截图条目（防环 guard=100）。
+    // PID 链上溯：partition-via-pid 后 object 的 propertiesPID 指向最近中间节点（而非 page/popup 截图），
+    // 需要沿 propertiesPID 链向上找到 object 最终归属的 page/popup 截图条目（防环 guard=100）。
     const propsById = new Map(properties.map((p) => [String(p?.propertiesID ?? ''), p]));
     function resolveRootShotId(prop) {
       let cur = prop;
       for (let guard = 0; guard < 100; guard++) {
         const t = String(cur?.type ?? '');
-        if (t === 'page' || t === 'dialog') return String(cur.propertiesID ?? '');
+        if (t === 'page' || t === 'popup') return String(cur.propertiesID ?? '');
         const pid = String(cur?.propertiesPID ?? '');
         if (!pid || pid === '0') return String(cur.propertiesID ?? '');
         const next = propsById.get(pid);
@@ -398,7 +398,7 @@ async function runV3FlatMode(entry, properties, file) {
       }
       return String(cur.propertiesID ?? '');
     }
-    // 标注每个 ele 的归属根截图 id（buildV3Html 的 inOverlay/pid 判定用它区分页面/弹窗控件）
+    // 标注每个 object 的归属根截图 id（buildV3Html 的 inOverlay/pid 判定用它区分页面/弹窗控件）
     for (const e of eles) e.pid = resolveRootShotId(e);
 
     const pages = [];
@@ -409,7 +409,7 @@ async function runV3FlatMode(entry, properties, file) {
       const url = Array.isArray(p.screenshot) ? p.screenshot[0] : '';
       const b64 = await loadScreenshotB64(db, url);
       const dialogs = shots.filter(
-        (d) => d.type === 'dialog' && String(d.propertiesPID ?? '') === String(p.propertiesID ?? ''),
+        (d) => d.type === 'popup' && String(d.propertiesPID ?? '') === String(p.propertiesID ?? ''),
       );
       const dlgObjs = [];
       const dlgIds = new Set();
@@ -441,7 +441,7 @@ async function runV3FlatMode(entry, properties, file) {
     }
 
     // 旧数据/无父弹窗：仍然独立成一个 stage，避免丢控件
-    for (const d of shots.filter((s) => s.type === 'dialog' && !handledDialogIds.has(String(s.propertiesID ?? '')))) {
+    for (const d of shots.filter((s) => s.type === 'popup' && !handledDialogIds.has(String(s.propertiesID ?? '')))) {
       const dUrl = Array.isArray(d.screenshot) ? d.screenshot[0] : '';
       const dB64 = await loadScreenshotB64(db, dUrl);
       const controls = eles.filter((e) => resolveRootShotId(e) === String(d.propertiesID ?? ''));
@@ -488,16 +488,16 @@ async function runV3Mode(file) {
     return runV3GroupsMode(entry, result, file);
   }
   const properties = entry?.transcationProperties;
-  if (Array.isArray(properties) && properties.some((p) => p && ['page', 'dialog', 'ele'].includes(p.type))) {
+  if (Array.isArray(properties) && properties.some((p) => p && ['page', 'popup', 'object'].includes(p.type))) {
     return runV3FlatMode(entry, properties, file);
   }
-  console.error('V3 payload 既无 result.groups，也无新版 transcationProperties type 条目（page/dialog/ele）');
+  console.error('V3 payload 既无 result.groups，也无新版 transcationProperties type 条目（page/popup/object）');
   process.exit(1);
 }
 
 /**
- * PID 树侧栏：按 propertiesPID → propertiesID 父子关系渲染 page/dialog/section/ele 全层级。
- * section 节点不画框、不显示截图，但在此以分区层级展示（防环：已访问节点不再展开）。
+ * PID 树侧栏：按 propertiesPID → propertiesID 父子关系渲染 page/popup/section/tab/wizard/card/object 全层级。
+ * 中间节点（section/tab/wizard/card）不画框、不显示截图，但在此以分区层级展示（防环：已访问节点不再展开）。
  */
 function buildPidTreeHtml(properties) {
   const seen = new Set();
@@ -510,7 +510,13 @@ function buildPidTreeHtml(properties) {
     if (seen.has(id)) return '';
     seen.add(id);
     const children = (properties || []).filter((c) => String(c.propertiesPID ?? '') === id);
-    const icon = p.type === 'page' ? '📄' : p.type === 'dialog' ? '🪟' : p.type === 'section' ? '📁' : '🔘';
+    const icon = p.type === 'page' ? '📄'
+      : p.type === 'popup' ? '🪟'
+      : p.type === 'section' ? '📁'
+      : p.type === 'tab' ? '📑'
+      : p.type === 'wizard' ? '🧭'
+      : p.type === 'card' ? '🗂️'
+      : '🔘';
     const childHtml = children.length ? `<ul>${children.map(renderNode).join('')}</ul>` : '';
     return `<li><span class="tree-node type-${p.type}">${icon} ${esc(p.propertiesName || '')} <small>(${p.type} #${p.propertiesID})</small></span>${childHtml}</li>`;
   }
@@ -574,9 +580,12 @@ function buildV3Html({ result, pages, properties }) {
   .pid-tree .tree-node { white-space: nowrap; }
   .pid-tree .tree-node small { color: #bfbfbf; font-weight: 400; }
   .type-page { color: #1890ff; }
-  .type-dialog { color: #fa8c16; }
+  .type-popup { color: #fa8c16; }
   .type-section { color: #722ed1; }
-  .type-ele { color: #52c41a; }
+  .type-tab { color: #722ed1; }
+  .type-wizard { color: #722ed1; }
+  .type-card { color: #722ed1; }
+  .type-object { color: #52c41a; }
 </style>
 </head>
 <body>

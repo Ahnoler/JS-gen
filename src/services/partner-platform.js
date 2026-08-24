@@ -168,9 +168,9 @@ export function toPartnerImportPayload(payload) {
         .filter(Boolean)
         .map((p) => {
           const out = { ...p };
-          // section type fallback：伙伴不接受 'section' 时改用 'ele'+elementType='partition'
+          // section type fallback：伙伴不接受 'section' 时改用 'object'+elementType='partition'
           if (out.type === 'section' && PARTNER_SECTION_TYPE !== 'section') {
-            out.type = 'ele';
+            out.type = 'object';
             out.elementType = 'partition';
           }
           for (const k of PARTNER_PROP_DROP_KEYS) delete out[k];
@@ -208,7 +208,7 @@ function assertPartnerBusinessOk(json, fallbackMsg = PARTNER_NETWORK_ERROR_MSG) 
 /**
  * 推送前自检：检查 wire payload 的信息丢失风险（只统计不阻断）。
  * - undefined 值检测（JSON.stringify 静默丢弃 undefined key）
- * - page/dialog 无 screenCapture
+ * - page/popup 无 screenCapture
  * @returns {{ ok: boolean, issues: Array }}
  */
 export function preflightCheck(wirePayload) {
@@ -219,7 +219,7 @@ export function preflightCheck(wirePayload) {
       for (const [k, v] of Object.entries(p)) {
         if (v === undefined) issues.push({ id: p.propertiesID, field: k, issue: 'undefinedValue' });
       }
-      if ((p.type === 'page' || p.type === 'dialog') && !p.screenCapture)
+      if ((p.type === 'page' || p.type === 'popup') && !p.screenCapture)
         issues.push({ id: p.propertiesID, issue: 'emptyScreenCapture' });
     }
   }

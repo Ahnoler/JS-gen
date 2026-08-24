@@ -18,6 +18,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-24: **V3 `type` 字段对齐 §8 层级类型定义**：V3.1 flat 导出 `transcationProperties[].type` 从 4 种改为 §8 定义的层级类型值——截图条目 `dialog`→`popup`（`page` 不变）；控件条目 `ele`→`object`；中间节点按 `region_id` 段 role 映射：`tab`→`tab`、`wizard`→`wizard`、`card`→`card`（此前全为 `section`），`section/titlebox/table/todo`→`section`（不变），`dialog/overlay`→`popup`；`main/shell-header/shell-aside/other` 等结构性 role **跳过不建节点**（ele pid 直指上层，用户决策"main 归 page 级"）。覆盖校验/字段完整性校验/伙伴出站适配/可视化工具同步更新。**V3.0 groups 格式（legacy）不动**。
+  影响范围：V3 导出 payload（`type` 字段取值集变更：新增 `popup`/`tab`/`wizard`/`card`/`object`，移除 `dialog`/`ele`——V3.1 flat only）、伙伴出站契约、可视化工具、API docs。V2 / V3.0 groups 不受影响。无 schema/WS 变更。
+  文件：src/services/transaction-export-v3.js, src/services/partner-platform.js, config/config.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/tools/lightup-phase-screenshot.mjs, scripts/tools/layer-tree-from-properties.mjs, scripts/characterization/characterize-export-v3.mjs, scripts/characterization/characterize-export-v3-pid.mjs, scripts/characterization/characterize-export-v3-field-completeness.mjs, scripts/characterization/characterize-page-level-screenshot.mjs, scripts/characterization/characterize-dialog-screenshot.mjs, scripts/characterization/characterize-layer-tree.mjs, scripts/characterization/characterize-partner-platform.mjs
+  Python 同步提示：**契约变更**。`transcationProperties[].type` 取值集变更（V3.1 flat）：`dialog`→`popup`、`ele`→`object`、新增中间节点类型 `tab`/`wizard`/`card`（此前均为 `section`）。消费方需按新类型值识别层级种类。`main/shell-header/shell-aside/other` role 不再产出中间节点。V3.0 groups 格式不受影响。
+
 - 2026-08-24: **Partner 批量推送切到同事本地联调服务**：`PARTNER_API_BASE` 默认值从 `http://test.atp.tansun.com.cn/api` 改为 `http://172.20.101.162:11001/api`（172.20.101.162:11001 为同事本地服务，原 test.atp 已停用；80 端口无服务；env `PARTNER_API_BASE`/`PARTNER_IMPORT_DEMAND_URL` 仍可覆盖）。`resolveAccessToken` 回落链增加硬编码联调 JWT（`PARTNER_DEBUG_ACCESS_TOKEN`，同事 172.20.101.162 的 access token）：请求头 token → `PARTNER_ACCESS_TOKEN` env → 硬编码 JWT，无登录态脚本/联调不再 400。⚠️ 临时联调配置：硬编码 token 含敏感凭据，联调结束须移除（历史曾移除过一次，恢复时已同步更新 characterize-partner-platform 断言）。
   影响范围：出站推送目标地址、token 回落语义（无请求 token 时不再 400）、characterization（partner-platform）。无 schema/WS 变更，API docs 契约未变。
   文件：src/services/partner-platform.js, config/.env.example, scripts/characterization/characterize-partner-platform.mjs
