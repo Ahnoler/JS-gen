@@ -109,13 +109,23 @@ function testBuildV3Properties() {
     idByDialog,
   });
 
-  check(properties.length === 2, `2 条控件属性（meta 跳过；实际 ${properties.length}）`);
+  check(properties.length === 3, `2 条控件属性 + 1 个分区 section 节点（meta 跳过；实际 ${properties.length}）`);
   check(metaActions === 1, 'metaActions = 1');
   check(noRectControls === 0, 'noRectControls = 0');
 
-  const first = properties[0];
-  check(typeof first.propertiesID === 'string' && first.propertiesID === String(shotEntries.length + 1), `页面控件 propertiesID 字符串续接（=${first.propertiesID}，期望 ${shotEntries.length + 1}）`);
-  check(typeof first.propertiesPID === 'string' && first.propertiesPID === String(pageShotId), `页面控件 propertiesPID 字符串指向页面截图条目 id（=${first.propertiesPID}，期望 ${pageShotId}）`);
+  // partition-via-pid：页面分区（region_id='tab:客户管理'）生成 section 中间节点；弹窗 overlay 段不生成
+  const sections = properties.filter((p) => p.type === 'section');
+  const eles = properties.filter((p) => p.type === 'ele');
+  check(sections.length === 1, `页面分区 section 节点 = 1（实际 ${sections.length}）`);
+  const sectionNode = sections[0];
+  check(sectionNode.propertiesPID === String(pageShotId), 'section pid 指向页面截图');
+  check(sectionNode.propertiesName === '客户管理' && sectionNode.realLabel === '客户管理', 'section propertiesName/realLabel 取分区 label');
+  check(sectionNode.type === 'section' && Array.isArray(sectionNode.screenshot) && sectionNode.screenshot.length === 0, 'section type=section / screenshot 空数组');
+  check(JSON.stringify(sectionNode.rect) === '{}', 'section rect 空对象');
+
+  const first = eles[0]; // 页面控件
+  check(typeof first.propertiesID === 'string' && first.propertiesID === String(shotEntries.length + 2), `页面控件 propertiesID 续接 section 之后（=${first.propertiesID}，期望 ${shotEntries.length + 2}）`);
+  check(typeof first.propertiesPID === 'string' && first.propertiesPID === sectionNode.propertiesID, `页面控件 propertiesPID 指向最近 section（=${first.propertiesPID}，期望 ${sectionNode.propertiesID}）`);
   check(first.scanIndex === undefined, '已移除 scanIndex');
   check(first.realLabel === '客户管理', 'realLabel 输出（承接原 label）');
   check(first.id === undefined && first.pid === undefined && first.label === undefined, '不再输出 id/pid/label（改 propertiesID/propertiesPID/realLabel）');
@@ -127,8 +137,8 @@ function testBuildV3Properties() {
   check(first.recorded === undefined && first.manualRecord === undefined, '已删除 recorded/manualRecord');
   check(first.targetType === undefined, '已删除 targetType');
 
-  const second = properties[1];
-  check(typeof second.propertiesID === 'string' && second.propertiesID === String(shotEntries.length + 2), `弹窗控件 propertiesID 续接（=${second.propertiesID}）`);
+  const second = eles[1]; // 弹窗控件
+  check(typeof second.propertiesID === 'string' && second.propertiesID === String(shotEntries.length + 3), `弹窗控件 propertiesID 续接（=${second.propertiesID}）`);
   check(typeof second.propertiesPID === 'string' && second.propertiesPID === String(dialogShotId), `弹窗控件 propertiesPID 字符串指向弹窗截图条目 id（=${second.propertiesPID}，期望 ${dialogShotId}）`);
   check(second.scanIndex === undefined, '弹窗控件已移除 scanIndex');
   check(second.regionId === 'overlay:地址选择器', '弹窗控件 regionId');
@@ -260,20 +270,26 @@ function testPageLevelScreenshots() {
     idByDialog: new Map(),
     idByPhase: new Map(),
   });
-  check(properties.length === 3, `页面级控件 = 3（含无 element_json 可导出步骤，实际 ${properties.length}）`);
-  const pageCtrl = properties[0];
-  const popupCtrl = properties[1];
-  const noElement = properties[2];
+  // partition-via-pid：页面/弹窗各插入 1 个 section 中间节点；no-element 步骤不建 section
+  const pageSection = properties.find((p) => p.type === 'section' && p.propertiesPID === pageShot.propertiesID);
+  const dialogSection = properties.find((p) => p.type === 'section' && p.propertiesPID === dialogShot.propertiesID);
+  check(!!pageSection && !!dialogSection, '页面/弹窗分区各 1 个 section 节点');
+  check(pageSection.propertiesName === '产品目录', '页面分区 section label=产品目录');
+  check(dialogSection.propertiesName === '地址选择器', '弹窗分区 section label=地址选择器');
+  const pageCtrl = properties.find((p) => p.type === 'ele' && p.propertiesPID === pageSection.propertiesID);
+  const popupCtrl = properties.find((p) => p.type === 'ele' && p.propertiesPID === dialogSection.propertiesID);
+  const noElement = properties.find((p) => p.type === 'ele' && p.propertiesPID === pageShot.propertiesID);
+  check(properties.length === 5, `页面级控件 + section 节点 = 5（含无 element_json 可导出步骤，实际 ${properties.length}）`);
   check(noElement.propertiesPID === pageShot.propertiesID, '无 element_json 步骤经页面上下文继承 pid（不再 0）');
-  check(pageCtrl.propertiesPID === pageShot.propertiesID, '页面控件 pid 指向 page');
+  check(pageCtrl.propertiesPID === pageSection.propertiesID, '页面控件 pid 指向页面 section');
   check(pageCtrl.regionId === `${pageKey}|card:产品目录`, '页面控件 regionId 保留 pageKey|card');
-  check(popupCtrl.propertiesPID === dialogShot.propertiesID, '弹窗控件 pid 指向 dialog');
+  check(popupCtrl.propertiesPID === dialogSection.propertiesID, '弹窗控件 pid 指向弹窗 section');
   check(JSON.stringify(popupCtrl.rect) === JSON.stringify({ x1: 20, y1: 20, x2: 220, y2: 40 }), '弹窗控件 rect 相对弹窗截图换算');
 
   const covered = validatePageLevelCoverage({ transcationProperties: [...entries, ...properties] });
-  check(covered.ok === true, '页面级截图覆盖校验通过');
+  check(covered.ok === true, '页面级截图覆盖校验通过（ele pid→section→page 上溯）');
   check(covered.exempt.length === 1 && covered.exempt[0].propertiesID === noElement.propertiesID, '无 element_json 步骤被 coverage 豁免');
-  const missing = validatePageLevelCoverage({ transcationProperties: [...entries, { ...properties[0], propertiesPID: '0' }] });
+  const missing = validatePageLevelCoverage({ transcationProperties: [...entries, { ...pageCtrl, propertiesPID: '0' }] });
   check(missing.ok === false && missing.missing.length === 1, '缺截图时覆盖校验失败并返回 missing');
   check(coverageBlocksPush(missing, { coverageMode: 'page_level' }) === true, 'page_level 模式覆盖缺失阻断推送');
   check(coverageBlocksPush(missing, { coverageMode: 'legacy_phase_fallback' }) === false, 'legacy 存量模式覆盖缺失不阻断（告警降级）');
@@ -296,8 +312,11 @@ function testPageLevelScreenshots() {
       idByDialog: new Map(),
       idByPhase: new Map(),
     });
-    const ctxManual = ctxProps.properties[1];
-    check(ctxManual.propertiesPID === pageShot.propertiesID, '人工/抓取步骤经页面上下文继承挂上 pid（region_id=table 也归属当前页面）');
+    const ctxSections = ctxProps.properties.filter((p) => p.type === 'section');
+    const ctxEles = ctxProps.properties.filter((p) => p.type === 'ele');
+    const ctxManual = ctxEles[1]; // 人工/抓取步骤（region_id=table）
+    check(ctxSections.length === 1 && ctxSections[0].propertiesName === 'table', 'region_id=table 生成 table section 节点');
+    check(ctxManual.propertiesPID === ctxSections[0].propertiesID, '人工/抓取步骤 pid 指向 table section（页面上下文继承归属）');
     check(ctxManual.regionId.startsWith(ctxPageKey), '人工/抓取步骤 regionId 补上页面归属前缀');
   }
 
@@ -356,13 +375,15 @@ function testPayloadStructure() {
   check(built.entry.result === undefined, 'entry 不再有 result');
   check(built.screenshots === undefined, '不再独立返回 screenshots（已合并进 transcationProperties）');
   const props = built.entry.transcationProperties;
-  check(props.length === 2, `transcationProperties = 截图+控件 = 2（实际 ${props.length}）`);
+  check(props.length === 3, `transcationProperties = 截图+section+控件 = 3（实际 ${props.length}）`);
   check(props[0].type === 'page' && props[0].eventTypeValue === 'click', '首个条目是页面截图（type=page, eventTypeValue=click）');
   check(Array.isArray(props[0].screenshot) && props[0].screenshot.length === 1, '截图条目 screenshot 数组有值');
-  check(props[1].type === 'ele' && props[1].propertiesPID === props[0].propertiesID, '控件条目 propertiesPID 指向截图条目 propertiesID');
-  check(Array.isArray(props[1].screenshot) && props[1].screenshot.length === 0, '控件条目 screenshot 空数组');
+  check(props[1].type === 'section' && props[1].propertiesPID === props[0].propertiesID, 'section 条目 propertiesPID 指向截图条目 propertiesID');
+  check(Array.isArray(props[1].screenshot) && props[1].screenshot.length === 0, 'section 条目 screenshot 空数组');
+  check(props[2].type === 'ele' && props[2].propertiesPID === props[1].propertiesID, '控件条目 propertiesPID 指向 section 条目 propertiesID');
+  check(Array.isArray(props[2].screenshot) && props[2].screenshot.length === 0, '控件条目 screenshot 空数组');
   check(props[0].rect === '', 'payload 截图条目 rect 空字符串');
-  check(props[1].rect === '{"x1":1,"y1":2,"x2":30,"y2":20}', 'payload 控件条目 rect 为 JSON 字符串');
+  check(props[2].rect === '{"x1":1,"y1":2,"x2":30,"y2":20}', 'payload 控件条目 rect 为 JSON 字符串');
 
   const payload = buildTransactionPayloadV3(traj, { systemId: '98', projectId: '31', phases, phaseScreenshots: shots });
   check(payload.payload.screenshots === undefined, 'payload 不再含 screenshots（顶层只留 transcationEventTypeList）');

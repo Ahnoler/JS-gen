@@ -376,6 +376,56 @@ export function buildV3Properties({
   let noRectControls = 0;
   let nextId = Number(screenshotCount) || 0;
 
+  // 分区 → propertiesID/propertiesPID 父子树（partition-via-pid）。
+  // 把 region_id 链里 page:/overlay: 之外的分区段编码为 type='section' 中间节点，
+  // 插入 page/dialog 截图与 ele 之间；同页同分区段复用同一 section 节点。
+  const sectionCache = new Map();
+
+  // 从 region_id 链提取分区段（跳过 page: 和 overlay: 段）
+  function extractPartitionSegments(regionId) {
+    const rid = String(regionId || '').trim();
+    if (!rid) return [];
+    return rid.split('|')
+      .map((s) => s.trim())
+      .filter((s) => s && !s.startsWith('page:') && !s.startsWith('overlay:'));
+  }
+
+  // 从分区段提取 label（"role:label" → "label"；无冒号则整段）
+  function segmentLabel(seg) {
+    const i = seg.indexOf(':');
+    return i > 0 ? seg.slice(i + 1).trim() : seg;
+  }
+
+  // 为 step 的分区段创建/复用 section 节点，返回最近 section 的 id（无分区段返回 null）
+  function ensureSectionNodes(segments, rootPid) {
+    if (!segments.length) return null;
+    let parentId = rootPid;
+    for (let i = 0; i < segments.length; i++) {
+      const key = rootPid + '|' + segments.slice(0, i + 1).join('|');
+      let sectionId = sectionCache.get(key);
+      if (sectionId == null) {
+        nextId += 1;
+        sectionId = String(nextId);
+        sectionCache.set(key, sectionId);
+        properties.push({
+          propertiesName: segmentLabel(segments[i]),
+          eventTypeValue: '', eventTypeName: '', elementType: '',
+          mothed: '', options: '', objectValue: '',
+          transcationType: 'playwright',
+          type: 'section',
+          screenshot: [],
+          propertiesID: sectionId,
+          propertiesPID: String(parentId),
+          realLabel: segmentLabel(segments[i]),
+          regionId: '', regionLabel: '',
+          rect: {},
+        });
+      }
+      parentId = sectionId;
+    }
+    return parentId;
+  }
+
   const phaseById = new Map();
   for (const p of phases || []) {
     phaseById.set(Number(p.id), p);
@@ -438,6 +488,12 @@ export function buildV3Properties({
     }
 
     const label = el ? String(el.formLabel ?? el.text ?? el.matchedLabel ?? '').trim() : '';
+
+    // 分区段 → section 节点；ele pid 指向最近 section（无分区段则用原 pid）
+    const segments = extractPartitionSegments(rawRegionId);
+    const sectionPid = ensureSectionNodes(segments, pid);
+    const elePid = sectionPid || pid;
+
     nextId += 1;
 
     let rect = {};
@@ -477,7 +533,7 @@ export function buildV3Properties({
         type: 'ele',
         screenshot: [],
         propertiesID: String(nextId),
-        propertiesPID: pid,
+        propertiesPID: elePid,
         realLabel: label,
         regionId,
         regionLabel: String(el.region_label ?? '').trim(),
@@ -491,7 +547,7 @@ export function buildV3Properties({
         type: 'ele',
         screenshot: [],
         propertiesID: String(nextId),
-        propertiesPID: pid,
+        propertiesPID: elePid,
         realLabel: '',
         regionId: '',
         regionLabel: '',
@@ -514,13 +570,32 @@ export function buildV3Properties({
 }
 
 /**
+ * 沿 propertiesPID 链向上追溯，返回最近的 type=page/dialog 条目的 propertiesID；无则 null。
+ * partition-via-pid 后 ele 的 propertiesPID 可能指向 section 中间节点，需上溯到截图条目。
+ */
+export function resolveRootScreenshotId(prop, propsById) {
+  let cur = prop;
+  let guard = 0; // 防环
+  while (cur && cur.type !== 'page' && cur.type !== 'dialog' && guard < 100) {
+    const pid = String(cur.propertiesPID || '0');
+    if (pid === '0' || pid === '') return null;
+    cur = propsById.get(pid);
+    guard += 1;
+  }
+  return cur ? String(cur.propertiesID) : null;
+}
+
+/**
  * 页面级截图覆盖校验：每个可定位的 ele 必须能找到 type=page/dialog 的父截图条目。
+ * ele 的 propertiesPID 现在可能指向 section 节点（partition-via-pid），
+ * 校验沿 pid 链向上追溯（resolveRootScreenshotId）到最近的 page/dialog 截图。
  * 无可定位信息的可导出步骤（无 elementType / regionId / rect / realLabel）不作为控件参与校验，
  * 避免无 element_json 的历史可导出步骤在新链路上硬阻断整条交易。
  * @returns {{ ok: boolean, missing: Array, exempt: Array }}
  */
 export function validatePageLevelCoverage(entry) {
   const props = Array.isArray(entry?.transcationProperties) ? entry.transcationProperties : [];
+  const propsById = new Map(props.map((p) => [String(p.propertiesID ?? ''), p]));
   const shotIds = new Set(
     props
       .filter((p) => p.type === 'page' || p.type === 'dialog')
@@ -548,11 +623,11 @@ export function validatePageLevelCoverage(entry) {
       });
       continue;
     }
-    const pid = String(p.propertiesPID ?? '');
-    if (!pid || pid === '0' || !shotIds.has(pid)) {
+    const rootId = resolveRootScreenshotId(p, propsById);
+    if (!rootId || !shotIds.has(rootId)) {
       missing.push({
         propertiesID: p.propertiesID || '',
-        propertiesPID: pid,
+        propertiesPID: p.propertiesPID || '0',
         propertiesName: p.propertiesName || '',
         regionId: p.regionId || '',
       });

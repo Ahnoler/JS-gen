@@ -101,17 +101,25 @@ const ok = (n) => console.log(`ok: ${n}`);
     idByDialog: new Map(),
     idByPhase: new Map(),
   });
-  assert.equal(properties.length, 3);
-  assert.equal(properties[0].propertiesPID, page.propertiesID);
-  assert.equal(properties[1].propertiesPID, dialog.propertiesID);
-  assert.deepEqual(properties[1].rect, { x1: 20, y1: 20, x2: 220, y2: 40 });
-  assert.equal(properties[2].propertiesPID, page.propertiesID); // 无 element_json 步骤经页面上下文继承 pid
+  // partition-via-pid：页面/弹窗各插入 1 个 section 中间节点；no-element 步骤不建 section
+  const pageSection = properties.find((p) => p.type === 'section' && p.propertiesPID === page.propertiesID);
+  const dialogSection = properties.find((p) => p.type === 'section' && p.propertiesPID === dialog.propertiesID);
+  assert.ok(pageSection, 'page section created');
+  assert.ok(dialogSection, 'dialog section created');
+  const pageCtrl = properties.find((p) => p.type === 'ele' && p.propertiesPID === pageSection.propertiesID);
+  const popupCtrl = properties.find((p) => p.type === 'ele' && p.propertiesPID === dialogSection.propertiesID);
+  const noElement = properties.find((p) => p.type === 'ele' && p.propertiesPID === page.propertiesID);
+  assert.equal(properties.length, 5);
+  assert.equal(pageCtrl.propertiesPID, pageSection.propertiesID);
+  assert.equal(popupCtrl.propertiesPID, dialogSection.propertiesID);
+  assert.deepEqual(popupCtrl.rect, { x1: 20, y1: 20, x2: 220, y2: 40 });
+  assert.equal(noElement.propertiesPID, page.propertiesID); // 无 element_json 步骤经页面上下文继承 pid
 
   const covered = validatePageLevelCoverage({ transcationProperties: [...entries, ...properties] });
   assert.equal(covered.ok, true);
   assert.equal(covered.exempt.length, 1);
-  assert.equal(covered.exempt[0].propertiesID, properties[2].propertiesID);
-  const missing = validatePageLevelCoverage({ transcationProperties: [...entries, { ...properties[0], propertiesPID: '0' }] });
+  assert.equal(covered.exempt[0].propertiesID, noElement.propertiesID);
+  const missing = validatePageLevelCoverage({ transcationProperties: [...entries, { ...pageCtrl, propertiesPID: '0' }] });
   assert.equal(missing.ok, false);
   assert.equal(missing.missing.length, 1);
 
