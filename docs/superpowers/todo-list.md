@@ -1,39 +1,77 @@
-# 总 TODO：缺陷 + Backlog（2026-08-13 基线 · 2026-08-20 更新）
+# 总 TODO：缺陷 + Backlog（2026-08-13 基线 · 2026-08-24 更新）
 
 > **跨会话共享清单。** Cursor 会话内 TodoWrite 不跨聊天；以本文件为准。  
-> 来源：`c:\Users\water\Downloads\缺陷管理.xlsx`（2026-08-12 同步）+ [`backlog-visible-editable-controls.md`](backlog-visible-editable-controls.md)。  
+> 来源：`c:\Users\water\Downloads\缺陷管理.xlsx`（2026-08-12 同步）+ [`backlog-visible-editable-controls.md`](backlog-visible-editable-controls.md) + 830任务表。  
 > 本文件只跟踪未闭环项。已修/已关条目已清出（历史见 git）。  
 > **缺陷已全部修复关闭**（2026-08-20 确认，含 1448052）。  
 > **Python 控制面同步工作暂停**（2026-08-20 决定）：先交付稳定版补发后再恢复；`CHANGELOG.md` 照常更新，作为开发历史与后续同步依据。
 
-## 当前聚焦：V3 批量推送完善（2026-08-20 起）
+## 当前聚焦：830 任务收口 + 分区推送改 PID 表达（2026-08-24 起）
 
-> 优先级最高（稳定版交付前置）。830 需求主线。
+> 830 任务（UI 录制）原计划本周完成。截至 2026-08-24 进度总览：
 
-**已完成（8-18 ~ 8-20）：**
+| # | 830 任务 | 到期 | 进度 | 状态 |
+|---|----------|------|------|------|
+| 1 | 截图、记录元素位置（坐标） | 8.21 | **~95%** | 本仓侧已完成（截图+坐标+页面级截图湿测通过）；手动截图按钮非本项目已移除；步骤级高亮前端主力，后端按前端要求改推送结构 |
+| 2 | 元素自动分级、分区 | 8.25 | **~95%** | 分区数据改 propertiesID/propertiesPID 父子树已落地（section 节点插入+覆盖追溯+伙伴 fallback+工具同步）；traj 182 dry-run 验证 4 section 节点+16 ele 正确挂载；待 partner push 湿测确认 |
+| 3 | 推送到自动化（截图+坐标+分区数据） | 8.25 | **~90%** | 截图+坐标+分区 PID 树已推通 dry-run（coverage ok、fieldCompletenessIssues=0）；字段完整性校验+截断+preflight 已落地；待 partner push 湿测（需用户 SSO token） |
+| 4 | 录制时有测试数据（报文捞取/日志解析） | 8.30 | **~15% · 搁置** | 被测系统同事无时间协同，搁置待重启 |
+
+### ⭐ 本周第一优先：分区数据改 propertiesID/propertiesPID 表达（任务③核心缺口）
+
+**背景**：当前 V3 payload 构建时含 `regionId`/`regionLabel`，但 `toPartnerImportPayload` 发送前剥掉（伙伴 Jackson 拒未知字段）——已发送 payload 中分区数据出现 0 次。
+
+**决策（2026-08-24 用户拍板）**：
+- **不推 `regionId`/`regionLabel`**——目标后端不希望增添新字段，且伙伴项目（录制工具：浏览器插件）需要格式对齐
+- **改用现有的 `propertiesID`（自身 id）和 `propertiesPID`（父 id）父子树表达分区层级**
+- 分区目标：解决同一页面上相同名称控件（如两个保存按钮）的歧义——通过父子树让同页同名控件落在不同分区节点下可区分
+- 当前 `propertiesPID` 只把 ele 链到 page/dialog 截图节点，分区层级（tab/section/titlebox）不是独立节点——**需新 design spec**：如何用这两个字段编码分区层级且不加新字段、与浏览器插件伙伴格式对齐
+
+**本周开发项**：design → 实施 → characterization → 湿测验证
+
+### 本周执行排程（2026-08-24 ~ 08-26 · 周三前全部完成）
+
+> **硬约束：周三（8/26）EOD 前全部执行完。** 3 天完成 4 个开发项，靠高度并行。`partition-via-pid`（改 `transaction-export-v3.js`/`partner-platform.js`）与 `budget-extend`（改 `scripts/agent/service.py`/`reviewer.py`）文件不相交，D1 起完全并行；`v3-payload-size ②③` 与 partition 同改 export-v3，须等 partition 落地后接续。
+
+| 阶段 | 日期 | 任务 | 产出 |
+|------|------|------|------|
+| **D1** | 8/24（周一） | **并行启动两条线**：① `partition-via-pid`：design spec → 立即实施（构建期把分区层级编码进 propertiesID/propertiesPID 父子树，收敛剥 regionId/regionLabel 逻辑）② `budget-extend`：spec 评审 → 立即实施（`compute_budget_extension` 纯函数 + run 后质量门续跑挂点） | 两项代码基本落地 |
+| **D2** | 8/25（周二） | **并行收尾两条线 + 启动第三线**：① partition-via-pid characterization + 湿测 ② budget-extend characterization + 湿测重录 traj 33 P2 ③ partition 落地后 `v3-payload-size ②③` 开工（构建期字段完整性校验 + 推送前自检 + 缺字段降级 + 超长截断） | partition + budget-extend 验证通过；v3-payload-size 开工 |
+| **D3** | 8/26（周三） | `v3-payload-size ②③` 收尾 + verify-all ALL GREEN；`heal-locate-wet` 执行机环境可用则并入；全部收口 | 本周全部完成 |
+
+**文件不相交确认**（并行安全）：
+- `partition-via-pid` → `src/services/transaction-export-v3.js`, `src/services/partner-platform.js`, characterization
+- `budget-extend` → `scripts/agent/service.py`, `scripts/controller/actions/phase/reviewer.py`, characterization
+- `v3-payload-size ②③` → `src/services/transaction-export-v3.js`（与 partition 同文件，须等 partition 落地后接续 D2-D3）
+
+### V3 推送管线已完成（8-18 ~ 8-22）
+
 - V3.0 端点 + V3.1 结构大改（截图合并进 `transcationProperties` 统一 schema、字段改名 `propertiesID/propertiesPID/realLabel`）
 - MinIO 截图存储 + 本地暂存补传 + 待传面板（一键补传）
 - 页面级截图（page/popup）采集 + `validatePageLevelCoverage` 覆盖校验（`de59e69`）；无 `element_json` 历史步骤豁免（`038793d`）
-- **存量兼容**（2026-08-20）：覆盖校验仅 `coverageMode='page_level'`（新录制）强阻断；`legacy_phase_fallback` 存量模式降级为告警（`stats.missingPageLevelScreenshots` 供消费方识别风险），新增 `coverageBlocksPush()` 承载判定——修复存量交易被整批拦 409 的破坏性变更
-- **页面级 key 修复（2026-08-20，重录湿测抓到）**：`page_level_key_from_url` 此前保留 hash 内易变 query，长 URL 超出 `level_key` VARCHAR(512) → 修改页截图 INSERT 失败被吞 → 19/32 控件 pid=0。根修（剥 fragment 内 query）+ 导出侧 `stripVolatileQuery` 规范化兜底（存量两代 key 互对齐）+ traj 181 回填修数。复录 traj 182 验证：key 全无 query、0 插入失败、V3 dry-run 原生 missing=0。**表单引擎重构同场湿测通过**（traj 181/182：LoginEngine/FillEngine/SelectEngine/SaveEngine 全链路，`[click_save] auto region` → `SUCCESS: 操作成功`）
+- **存量兼容**（2026-08-20）：覆盖校验仅 `coverageMode='page_level'`（新录制）强阻断；`legacy_phase_fallback` 存量模式降级为告警，新增 `coverageBlocksPush()` 承载判定
+- **页面级 key 修复（2026-08-20）**：`page_level_key_from_url` 剥 hash 内 query 修复 INSERT 失败；traj 181/182 湿测验证通过
+- **出站契约适配（8-21）**：`screenshot`→`screenCapture`、剥 `regionId`/`regionLabel`、伙伴系统树 `childSystems` 兼容、access_token 透传（`a3b5c33`/`c96125a`/`6d94d2c`/`1bee99f`/`de3d424`）；traj 33/182 真实推送"同步成功"
 
-**剩余（按优先级）：**
+### V3 剩余项（按优先级）
 
 | 项 | 说明 |
 |----|------|
+| **partition-via-pid** | ⭐ 本周核心：分区数据改用 propertiesID/propertiesPID 父子树表达，不加新字段，对齐浏览器插件伙伴（见上） |
 | **v3-payload-size ②③** | 防信息丢失：构建期字段完整性校验/缺失统计、推送前自检；鲁棒性：缺字段降级、超长截断策略。稳定版内可做（不改 payload 契约） |
-| **v3-payload-size ①** | 精简传输（去 `params`、收敛 target、可选字段裁剪）。**稳定版后另刀**——契约变更需与消费方对齐（traj 38 现状 308KB，大头 target xpath / params / rect） |
-| **同名弹窗 title 回退歧义** | popupKey（含 anchor）对齐正常；仅控件缺 `popup_level_key` 回退 title 查找时可能挂错实例。**待湿测证据**（需含同标题弹窗的录制样本）再定改法 |
+| **v3-payload-size ①** | 精简传输（去 `params`、收敛 target、可选字段裁剪）。**稳定版后另刀**——契约变更需与消费方对齐 |
+| **同名弹窗 title 回退歧义** | popupKey（含 anchor）对齐正常；仅控件缺 `popup_level_key` 回退 title 查找时可能挂错实例。**待湿测证据**再定改法 |
 | **rect 非法照推** | 维持原状（`noRectControls` 统计可见）；是否升级为构建失败待消费方反馈 |
 
 ## 挂起 / 待优化
 
 | ID | 项 | 处理说明 |
 |----|----|----------|
-| **budget-extend** | 【AI录制】阶段步数预算动态加成 + 预算耗尽续跑 | 2026-08-21 登记（源自 traj 33 P2 十步耗尽事故的次级观察项；同日已根修 recovery buffer 缩进 bug）。spec：`specs/2026-08-21-dynamic-phase-step-budget-design.md`——两段式：静态公式不动 + 质量门驱动续跑（引入字段×4/pending×2 成本模型，轮次≤2、总步≤ceiling 双闸）。**待评审** |
-| **batch-actions** | 【AI录制】批量动作显式化（max_actions_per_step 参数化） | 2026-08-21 登记。✅ **已实施并本地验证通过**（2026-08-21）：服务器 Linux headless dsh agent 实施（commit `aee2233`，未 push）→ patch 拉取到本地并应用 → 评审通过（本地 characterize-batch-actions / ctrl / dedup / phase-reviewer 回归 / py_compile 全绿；verify-all 在服务器 62/4，4 失败均为环境项）。9 文件 +227/-1（config.js/.env.example、trajectory-recording-runner.js stepData 透传、agent_utils.resolve_max_actions_per_step、service.py Agent 传参 + [batch] 观测、prompt 批量纪律、characterize-batch-actions.py + verify-all 注册、CHANGELOG）。**待本地 commit/push 决策**；本地 config/.env 需补 `MAX_ACTIONS_PER_STEP=4`（或留空走模式默认 5/3） |
+| **budget-extend** | 【AI录制】阶段步数预算动态加成 + 预算耗尽续跑 | 2026-08-21 登记。✅ **已交付**（2026-08-24，commit `c86043b` 在 uara_V1.2）：`compute_budget_extension` 纯函数 + done_fired 闭包 flag + service.py 续跑循环（≤2 轮 ceiling 钳制）+ characterize-budget-extend.py + verify-all 注册。待湿测重录 traj 33 P2 验证续跑触发 |
+| **batch-actions** | 【AI录制】批量动作显式化（max_actions_per_step 参数化） | 2026-08-21 登记。✅ **已交付**（2026-08-21）：commit `e68f01c`（已在 origin/uara_V1.2）；本地验证通过（characterize-batch-actions / ctrl / dedup / phase-reviewer 回归 / py_compile 全绿）。9 文件 +227/-1（config.js/.env.example、trajectory-recording-runner.js stepData 透传、agent_utils.resolve_max_actions_per_step、service.py Agent 传参 + [batch] 观测、prompt 批量纪律、characterize-batch-actions.py + verify-all 注册、CHANGELOG）。本地 config/.env 需补 `MAX_ACTIONS_PER_STEP=4`（或留空走模式默认 5/3） |
 | **grounding-fallback** | 【回放自愈】视觉 grounding 兜底（定位失败时 VL 截图定位） | 2026-08-21 登记。❌ **已否决**（2026-08-21，用户决策：成本考量，不实施）。调研/spec 存档：`specs/2026-08-21-grounding-fallback-spec.md`（如按需启用：§3.0 连通性测试 → VISION_LLM_* 配置 + heal 前置 pre-step） |
-| **shot-before-transition** | 【AI录制】关键状态前置截图（页面关闭/弹窗关闭/通知关闭之前） | 2026-08-21 登记。需求确认：跳转前 ✅ 已有（step before + page-level before-leave）；关闭前 ⚠️（异常路径无最终截图，session_runner.py:433-452）；弹窗关闭前 ⚠️（dialog 裁剪图在关闭动作后拍，service.py:95-110）；close_notification 在跳过名单（state.py:28-41）。spec：`specs/2026-08-21-screenshot-before-transition-spec.md`——G1 会话结束最终截图（复用 page_level 机制，capturedAt=session-end）+ G2 close_dialog 前置弹窗裁剪（capturedAt=before-close）+ G3 移出跳过名单（含通知裁剪选择器）。**已评审通过**（2026-08-21）。plan：`plans/2026-08-21-screenshot-before-transition.md`（Task 1-6：G1 session-end 最终图 / G2 close_dialog 前置弹窗裁剪 / G3 移出跳过名单 / characterization / CHANGELOG / 最终验证）。**待实施** |
+| **shot-before-transition** | 【AI录制】关键状态前置截图（页面关闭/弹窗关闭/通知关闭之前） | 2026-08-21 登记。需求确认：跳转前 ✅ 已有（step before + page-level before-leave）；关闭前 ⚠️（异常路径无最终截图，session_runner.py:433-452）；弹窗关闭前 ⚠️（dialog 裁剪图在关闭动作后拍，service.py:95-110）；close_notification 在跳过名单（state.py:28-41）。spec：`specs/2026-08-21-screenshot-before-transition-spec.md`——G1 会话结束最终截图（复用 page_level 机制，capturedAt=session-end）+ G2 close_dialog 前置弹窗裁剪（capturedAt=before-close）+ G3 移出跳过名单（含通知裁剪选择器）。✅ **已交付**（2026-08-21，commit `1e9e0ef` 在 origin/uara_V1.2；评审通过：新 characterization / py_compile / ctrl / dedup / page-level 回归全绿）。湿测见 `shot-wet-test` |
+| **shot-wet-test** | 【AI录制】截图补丁湿测（trajectory 183「信贷潜在客户」） | 2026-08-22 ✅ **已完成**：重跑 4 轮，G1（session-end 最终图）与 G2（close_dialog 前置弹窗图 capturedAt=before-close）湿测通过并完成视觉验证（deepseek-v4-flash-vision-exp 子代理 4 图判定）；湿测反哺 2 个集成缺陷修复（executor 优雅关闭宽限 2s→20s + 录制监听器生命周期挂会话，commit `d451f7a` 已在 origin）；G3（close_notification）本次流程未触发，由 characterization 覆盖 |
 | **heal-locate** | 【回放自愈】禁止/少用 `scroll_down` 找字段；高效定位与级联缺席判定 | ✅ **开发完成**（2026-08-15，`uara_V1.2`）：H0 调研 + MissingReason/HealContract + heal prompt + P2 决策路由已合入；characterization 全绿。剩余：真实 batch replay / live 湿测（见 `heal-locate-wet`）。见专节 |
 
 ### heal-locate — 回放自愈定位效率（✅ 开发完成 · 待 live 湿测）
@@ -128,12 +166,12 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 | **PR-PART** | **第一刀已实现** | 元素分区算法完善 | V2.1：`display_group`/`region_label`。第一刀：tab+向导+titlebox 拼接已落地 — [design](specs/2026-08-13-partition-tab-wizard-titlebox-design.md) · [plan](plans/2026-08-13-partition-tab-wizard-titlebox.md)；9242 湿测已跑（对公客户修改；评级向导） | unify-partition · L1c · picker · regionAnchor |
 | **PR-LAYER** | **本仓库侧已完成**（2026-08-15） | 元素分层树（分区之后） | 每控件 `layers[]` 已落 snap/resolve preview/扫描/`element_json`；可选 `pageLabel` 只加根 page；todo role 已对齐。**整页大树已落地（assembleRegionTree + 扫描/阶段树）**；`characterize-region-tree.mjs` OK。**本仓库无湿测记录**；Vue 画树另刀 | 依赖 PR-PART；Vue 画树另仓 |
 | **PR-LOC** | **已落地（V2.1）** · 需求变更（2026-08-17）：阶段长图**无元素高亮**；**内部滚动容器修复（2026-08-17，`d570311`）** | 阶段长图 + 控件坐标 | AI `phase_done` 后 1 张 PNG（滚主滚动区拼接，**不再烘焙高亮**）；`screenshot.metadata_json` 记录截图长宽（image/content 双坐标系）+ **全部可见 L2 控件坐标**（left/top/right/bottom + kind/text/layers/region）+ region_tree。**长图内部滚动修复**：`pickScrollRoot` 泛化覆盖非标准 class 的内部滚动容器（如 `.plugin-content-list` 瀑布流，scrollHeight 6554/clientHeight 659），修复前回退 document 只截一屏；湿测命中正确滚动根。湿测已完成 | [design](specs/2026-08-13-phase-highlight-long-screenshot-design.md) · 阶段截图 V2 已合 V2.1 |
-| **PR-LOC-HL** | **需求变更**（2026-08-17）：由「步骤级高亮截图」改为「**控件坐标点亮**」；**MVP 已定**：只用阶段图 `metadata.elements[]` 控件坐标点亮（不补步骤坐标）。**前置项已落地（2026-08-17）**：步骤 element region/bbox 入库（spec `2026-08-17-step-element-region-bbox-design.md` + plan 5 任务完成，commit `68065cb`~`38f20a9`，9242 湿测 3 层分层 + 内容坐标验证通过）。**探索工具已建**（`scripts/tools/`） | 步骤级控件坐标 → 推送 | 旧方向（操作后逐步高亮再截）**取消**。**MVP**：阶段长图无元素高亮 + `metadata.elements[]` 经推送 V2.0 envelope（`phases[].metadata`）推给公司其他平台。**工具（功能分离）**：① 元素高亮 `lightup-phase-screenshot.mjs`；② 元素分层 `layer-tree-from-properties.mjs`（`--file`/`--shot`/`--trajectory` 三模式）。**前置项（完成）**：录制时 `_capture_element`/`_enrich_click_element` evaluate `assignRegion` + `stepBBoxOf`（内容坐标，泛化 `pickScrollRoot` 覆盖内部滚动容器），`element_json` 新增 `region_id`/`region_label`/`layers[]`/`bbox`——新录制按 step 分层 + 步骤级高亮可用（湿测：`tab:客户基本信息\|section\|titlebox` 3 层 + y1=4769 内容坐标正确）。**剩余**：端到端录制验证 element_json 落库；步骤级高亮（bbox 画框，PR-LOC-HL 本体）待 design | 参考 `src/services/transaction-export.js`（V2.0）；spec `2026-08-17-step-element-region-bbox-design.md`；工具 commit `8e9e76d`/`43290ec`/`1e1ecad`/`01197ce`/`55f648e`/`8f3d15e` |
-| **PR-DATA** | 待办 | 被测系统接口报文捞取 | 静态目录（开发提供）；AI 录制中动态捞；非消费型字段；软文本填写 | case-data 软文本底座；**需专刀 design** |
+| **PR-LOC-HL** | **本仓侧前置项已完成**（2026-08-17）；步骤级高亮本体**前端主力开发**，后端按前端要求改推送结构 | 步骤级控件坐标 → 推送 | 旧方向（操作后逐步高亮再截）**取消**。**前置项（完成）**：录制时 `element_json` 新增 `region_id`/`region_label`/`layers[]`/`bbox`（commit `68065cb`~`38f20a9`，9242 湿测 3 层分层 + 内容坐标验证通过）。**工具已建**：`lightup-phase-screenshot.mjs`/`lightup-step-highlight.mjs`。**剩余**：步骤级高亮（bbox 画框）本体由前端同事主力开发，后端等前端推送结构要求后改数据结构；端到端录制验证 element_json 落库 | 参考 `src/services/transaction-export.js`（V2.0）；spec `2026-08-17-step-element-region-bbox-design.md` |
+| **PR-DATA** | **搁置**（2026-08-24） | 被测系统接口报文捞取 | 需被测系统同事协同开发，目前无时间；待重启后需专刀 design | case-data 软文本底座已存在 |
 | **PR-BATCH** | **已交付**（2026-08-18，用户确认前端完成） | 批量导入：用户只看自己任务 | ① 用户隔离与 **PR-USER** appid 隔离同源：`paas_user_id` 列表过滤/盖章/存量回填/批量透传已落地（`c0503f3`/`7abf7e8`/`8ab90e0`）+ 前端任务 key 按 paasUserId 命名空间；②行进度条 + ③phase done 说明前端已实现（`el-progress`/`lastDoneText`/详情页 `doneLogs`）。**已知小缺口**：交易列表页无 batchTaskName 筛选入口（后端参数已支持）、顶栏徽标文案未实现 | Vue BatchImport 另仓 |
 | **PR-USER** | 凭据维护**后端已落地**（2026-08-17）；前端 UI + 联调进行中（8/19） | 用户/系统树权限 | 树共享；交易本人可见；仅管理员删树。**本期只做系统树创建时用户名/密码/角色维护，不做权限闸**：`system_account.username`→`account` 更名 + 节点 POST/PUT `accounts[]` 批量维护（`1a46519`）+ 节点详情回显 `accounts[]`（`d09fc60`） | 等 **PR-SSO-ADMIN**（权限部分）；前端凭据维护 UI 8/19 |
 | **PR-SSO** | 子项已落地（2026-08-17：appid 登录 + 数据隔离；2026-08-18：JWT 验签 + /me 回查用户）；完整登录后置 | 接入公司账号中心 HTTP API | 前端跳账号中心登录，回调 authCode=JWT 当 token；后端验签（`query_jwt_secret` 密钥，HMAC-SHA256）+ 解 payload 拿 `paasUserId` 做 `/api/v2/*` 用户隔离（`SSO_AUTH_REQUIRED` 默认关，空 `paas_user_id`=全可见）；`/me` 回查 `query_access_user` 返回 userName/userAccount（`d8efbfd`/另仓 `7390a6a`）；管理员映射仍挂起 | 等 **PR-SSO-ADMIN**（管理员映射）；换会话/权限后置 |
-| **PR-PUSH** | **已完成**（2026-08-15） · V2.0：每步 regionId/parentRegionId + 每交易 phases[]（截图引用+元数据）— [spec](specs/2026-08-14-batch-push-v2-region-evidence-design.md) | 推送到自动化 | 拒草稿；仅 recorded/completed；`characterize-transaction-export-region.mjs` OK；**未见 live 湿测记录** | export-push-gate |
+| **PR-PUSH** | **V3 已推通并湿测通过**（2026-08-22） · 截图+坐标已送达伙伴平台；分区数据改 PID 表达见 `partition-via-pid` | 推送到自动化 | V3.1 结构（截图合并进 `transcationProperties`）；traj 33/182 真实推送"同步成功"；出站契约适配（`screenCapture`/剥未知字段/access_token 透传）。**剩余**：分区数据改 propertiesID/propertiesPID 父子树（本周核心） | export-push-gate · partition-via-pid |
 | **PR-EXEC** | **挂起** | 脚本执行（引擎/执行机） | 本侧只提供浏览器操作与 actions 设计；暂不排调度产品 | T9 / session-lifecycle 湿测另跟 |
 
 ### 本周任务（2026-08-17 ~ 08-19 · 本人负责）
@@ -205,7 +243,8 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 - **PR-PART** ↔ 第一刀 tab/向导/titlebox 拼接已落地；9242 湿测已跑（对公客户修改；评级向导）。
 - **PR-LAYER** ↔ 本仓库侧已完成：`layers[]` + 整页大树（`assembleRegionTree` + 扫描/阶段树）；Vue 画树另刀。依赖 **PR-PART**。
 - **PR-LOC** ↔ 阶段长图已落地（V2.1，**无元素高亮**，控件坐标存 `metadata_json`）；湿测已完成。**PR-LOC-HL** 需求变更（2026-08-17）：步骤级高亮截图**取消**，改为「步骤控件坐标存储 + 推送其他平台」（参考批量推送 V2.0 接口）。
-- **PR-PUSH** ↔ 推送/导出闸门已完成（2026-08-15，V2.0）；characterization OK，未见 live 湿测记录。
+- **PR-PUSH** ↔ V3 已推通并湿测通过（traj 33/182 "同步成功"）；分区数据改 propertiesID/propertiesPID 父子树表达见 `partition-via-pid`（本周核心）。
+- **PR-LOC-HL** ↔ 步骤级高亮（bbox 画框）本体前端主力开发，后端按前端要求改推送结构；本仓前置项（element_json bbox/layers/region）已完成。
 - **PR-BATCH** ↔ ① 用户隔离与 **PR-USER** appid 隔离同源，本周排 8/19（交易列表加任务）。
 - **PR-SSO-ADMIN** ↔ 阻塞 **PR-SSO** / **PR-USER** 权限实现；2026-08-13 会议后未见结论落地，继续挂起。本周 appid 登录/数据隔离与系统树凭据维护子项不等待该结论。
 - **session-lifecycle-wet** ↔ 湿测仍挂起（**PR-EXEC 挂起**时作工程债）。
@@ -213,6 +252,8 @@ Heal-Locate Optimization 转存 Heal-Locate Optimization.md 文件中。
 
 ## 更新记录
 
+| 2026-08-24 | **本周执行排程压缩**：用户要求周三（8/26）EOD 前全部完成。3 天 4 项靠高度并行——D1 partition-via-pid（design→实施）与 budget-extend（评审→实施）文件不相交完全并行；D2 两线 characterization/湿测收尾 + v3-payload-size ②③ 接续开工（同改 export-v3 须等 partition 落地）；D3 v3-payload-size 收尾 + heal-locate-wet 并入 + 全部收口 |
+| 2026-08-24 | **830 任务进度梳理 + 开发方向重定**：① 任务①手动截图按钮移除（其他项目需求），步骤级高亮本体前端主力、后端按前端要求改推送结构，本仓侧截图+坐标记录完成（~95%）；② 任务③分区数据**改用 `propertiesID`/`propertiesPID` 父子树表达**，不推 `regionId`/`regionLabel`（目标后端拒新增字段 + 浏览器插件伙伴需格式对齐），需新 design spec——本周第一优先；③ 任务④报文捞取/日志解析**搁置**（被测系统同事无时间协同）；④ batch-actions/shot-before-transition/shot-wet-test 三项 commit 已在 origin（`e68f01c`/`1e9e0ef`/`d451f7a`），滞后的"待 push"标注更正为已交付；⑤ "当前聚焦"区段改为「830 任务收口 + 分区推送改 PID 表达」并附进度总览表。周计划见 `2026-08-24-week-plan.md` |
 | 2026-08-20 | **重录湿测 + 页面级 key 根修**：执行机 LMY 上线后 AI 录制 traj 181（对公客户修改 3 阶段全成功，fill×17/select×4/click_save→操作成功——表单引擎重构湿测通过）；dry-run 抓到修改页 page_level 截图 INSERT 失败——`level_key` 含 hash 内 query 超 VARCHAR(512)。修复：state.py 剥 fragment 内 query（根因，key ~1100→~110 字符）+ 导出侧 `stripVolatileQuery`/`idByPageLevelNorm` 规范化兜底（存量兼容）+ traj 181 回填修数；复录 traj 182 全链路验证（3 页面截图 key 无 query、0 失败、V3 原生 missing=0、确认+detach）。step-highlight 锚点定锚 traj 181 phase 675/shot #10615（27 步、26 bbox 直用）。verify-all ALL GREEN；CHANGELOG 已记（Fixed） |
 | 2026-08-20 | **form-actions-split 收尾**：`click_save`（426 行）→ `form_save.py` SaveEngine；scan/visible/editable-summary/assistant/pending/sync 动作实现 → `form_scan_actions.py`；`_form.py` 990 → **171 行**（注册 + 薄委托 + form_scan_utils 兼容 re-export）。顺带修复基线数据漂移：`characterize-step-highlight` 锚点迁至 traj 157/phase 597/shot #8270（traj 38 数据已裁剪），image_data 为空（MinIO 迁移）用占位 base64 兜底。12 个 characterization 按拼接约定改读 `form_save.py`/`form_scan_actions.py`（实现文件放拼接前面，防 find 命中薄委托）；`verify-all.sh` ALL GREEN。仅改 scripts/ + docs/，无 CHANGELOG 义务 |
 | 2026-08-20 | **方向决策 + TODO 重整**：① Python 控制面同步工作**暂停**（先交付稳定版补发，恢复后以 `CHANGELOG.md` [Unreleased] 为同步依据，CHANGELOG 照常更新）；② **缺陷全部修复关闭**（用户确认，含 1448052，条目清出）；③ 新增「当前聚焦：V3 批量推送完善」区段——已完成项（V3.1 结构、MinIO、页面级截图覆盖校验、存量兼容降级）与剩余项（v3-payload-size ②③ 稳定版内做、① 精简传输稳定版后另刀、同名弹窗 title 回退歧义待湿测、rect 照推维持现状） |
