@@ -379,7 +379,28 @@ async function runV3FlatMode(entry, properties, file) {
       if (p && typeof p.rect === 'string') p.rect = parseRect(p.rect);
     }
     const shots = properties.filter((p) => p.type === 'page' || p.type === 'dialog');
+    const sections = properties.filter((p) => p.type === 'section');
     const eles = properties.filter((p) => p.type === 'ele');
+
+    // PID 链上溯：partition-via-pid 后 ele 的 propertiesPID 指向最近 section 节点（而非 page/dialog 截图），
+    // 需要沿 propertiesPID 链向上找到 ele 最终归属的 page/dialog 截图条目（防环 guard=100）。
+    const propsById = new Map(properties.map((p) => [String(p?.propertiesID ?? ''), p]));
+    function resolveRootShotId(prop) {
+      let cur = prop;
+      for (let guard = 0; guard < 100; guard++) {
+        const t = String(cur?.type ?? '');
+        if (t === 'page' || t === 'dialog') return String(cur.propertiesID ?? '');
+        const pid = String(cur?.propertiesPID ?? '');
+        if (!pid || pid === '0') return String(cur.propertiesID ?? '');
+        const next = propsById.get(pid);
+        if (!next || next === cur) return String(cur.propertiesID ?? '');
+        cur = next;
+      }
+      return String(cur.propertiesID ?? '');
+    }
+    // 标注每个 ele 的归属根截图 id（buildV3Html 的 inOverlay/pid 判定用它区分页面/弹窗控件）
+    for (const e of eles) e.pid = resolveRootShotId(e);
+
     const pages = [];
     const handledDialogIds = new Set();
 
@@ -402,12 +423,12 @@ async function runV3FlatMode(entry, properties, file) {
           screenshots: Array.isArray(d.screenshot) ? d.screenshot : [],
           b64: dB64,
           rect: (d.rect && Object.keys(d.rect).length ? d.rect : {}),
-          controls: eles.filter((e) => String(e.propertiesPID ?? '') === String(d.propertiesID ?? '')),
+          controls: eles.filter((e) => resolveRootShotId(e) === String(d.propertiesID ?? '')),
         });
         dlgIds.add(String(d.propertiesID ?? ''));
       }
       const controls = eles.filter(
-        (e) => String(e.propertiesPID ?? '') === String(p.propertiesID ?? '') || dlgIds.has(String(e.propertiesPID ?? '')),
+        (e) => resolveRootShotId(e) === String(p.propertiesID ?? '') || dlgIds.has(resolveRootShotId(e)),
       );
       pages.push({
         id: p.propertiesID || p.propertiesName || 'page',
@@ -423,7 +444,7 @@ async function runV3FlatMode(entry, properties, file) {
     for (const d of shots.filter((s) => s.type === 'dialog' && !handledDialogIds.has(String(s.propertiesID ?? '')))) {
       const dUrl = Array.isArray(d.screenshot) ? d.screenshot[0] : '';
       const dB64 = await loadScreenshotB64(db, dUrl);
-      const controls = eles.filter((e) => String(e.propertiesPID ?? '') === String(d.propertiesID ?? ''));
+      const controls = eles.filter((e) => resolveRootShotId(e) === String(d.propertiesID ?? ''));
       pages.push({
         id: d.propertiesID || d.propertiesName || 'dlg',
         name: d.propertiesName || '弹窗',
@@ -435,13 +456,13 @@ async function runV3FlatMode(entry, properties, file) {
     }
 
     const result = { name: entry?.transcationName || file };
-    const html = buildV3Html({ result, pages });
+    const html = buildV3Html({ result, pages, properties });
     const out = join(ROOT, 'tmp', `lightup-v3-${String(entry?.transcId || 'payload').replace(/[^A-Za-z0-9_-]/g, '_')}.html`);
     writeFileSync(out, html, 'utf8');
     const withRect = eles.filter((c) => c.rect && Object.keys(c.rect).length > 0).length;
     const noB64 = pages.filter((p) => !p.b64).length;
     console.log(`已生成: ${out}`);
-    console.log(`交易 ${result.name} | 截图条目 ${shots.length} | 控件 ${eles.length}（带 rect ${withRect}）| 无截图 ${noB64}`);
+    console.log(`交易 ${result.name} | 截图条目 ${shots.length} | 分区 ${sections.length} | 控件 ${eles.length}（带 rect ${withRect}）| 无截图 ${noB64}`);
   } finally {
     await db.destroy();
   }
@@ -460,7 +481,8 @@ async function runV3Mode(file) {
     console.error('读取/解析 V3 payload 失败:', err.message);
     process.exit(1);
   }
-  const entry = payload?.payload?.transcationEventTypeList?.[0];
+  const data = payload?.data ?? payload;
+  const entry = data?.payload?.transcationEventTypeList?.[0];
   const result = entry?.result;
   if (result && Array.isArray(result.groups) && result.groups.length) {
     return runV3GroupsMode(entry, result, file);
@@ -473,11 +495,34 @@ async function runV3Mode(file) {
   process.exit(1);
 }
 
+/**
+ * PID 树侧栏：按 propertiesPID → propertiesID 父子关系渲染 page/dialog/section/ele 全层级。
+ * section 节点不画框、不显示截图，但在此以分区层级展示（防环：已访问节点不再展开）。
+ */
+function buildPidTreeHtml(properties) {
+  const seen = new Set();
+  const roots = (properties || []).filter((p) => {
+    const pid = String(p.propertiesPID ?? '');
+    return pid === '' || pid === '0';
+  });
+  function renderNode(p) {
+    const id = String(p.propertiesID ?? '');
+    if (seen.has(id)) return '';
+    seen.add(id);
+    const children = (properties || []).filter((c) => String(c.propertiesPID ?? '') === id);
+    const icon = p.type === 'page' ? '📄' : p.type === 'dialog' ? '🪟' : p.type === 'section' ? '📁' : '🔘';
+    const childHtml = children.length ? `<ul>${children.map(renderNode).join('')}</ul>` : '';
+    return `<li><span class="tree-node type-${p.type}">${icon} ${esc(p.propertiesName || '')} <small>(${p.type} #${p.propertiesID})</small></span>${childHtml}</li>`;
+  }
+  return `<ul class="pid-tree">${roots.map(renderNode).join('')}</ul>`;
+}
+
 /** V3 渲染：每页面组一个 stage（长图 + 控件框），checkbox 勾选点亮任意子集。 */
-function buildV3Html({ result, pages }) {
+function buildV3Html({ result, pages, properties }) {
   const ctrlCount = pages.reduce((n, p) => n + p.controls.length, 0);
   const rectCount = pages.reduce((n, p) => n + p.controls.filter((c) => c.rect).length, 0);
   const pagesJson = JSON.stringify(pages);
+  const pidTree = Array.isArray(properties) && properties.length ? buildPidTreeHtml(properties) : '';
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -522,6 +567,16 @@ function buildV3Html({ result, pages }) {
              font-size: 10px; padding: 0 4px; border-radius: 2px; line-height: 14px; }
   .box.dlg .no { background: #fa8c16; }
   .box:hover { box-shadow: 0 0 0 2px #ffeb3b; z-index: 5; }
+  .pid-tree { margin: 0; }
+  .pid-tree ul { list-style: none; padding-left: 16px; }
+  .pid-tree > ul { padding-left: 0; }
+  .pid-tree li { font-size: 12px; line-height: 20px; }
+  .pid-tree .tree-node { white-space: nowrap; }
+  .pid-tree .tree-node small { color: #bfbfbf; font-weight: 400; }
+  .type-page { color: #1890ff; }
+  .type-dialog { color: #fa8c16; }
+  .type-section { color: #722ed1; }
+  .type-ele { color: #52c41a; }
 </style>
 </head>
 <body>
@@ -531,6 +586,7 @@ function buildV3Html({ result, pages }) {
   <button id="all">全部点亮</button><button id="none">全部熄灭</button>
 </div>
 <div class="wrap">
+  ${pidTree ? `<div class="panel" id="pid-tree-panel"><h4>分区树（PID）</h4>${pidTree}</div>` : ''}
   <div class="panel"><h4>控件清单</h4><div id="list"></div></div>
   <div class="pages" id="pages"></div>
 </div>
