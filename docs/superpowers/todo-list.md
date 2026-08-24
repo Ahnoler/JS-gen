@@ -13,8 +13,8 @@
 | # | 830 任务 | 到期 | 进度 | 状态 |
 |---|----------|------|------|------|
 | 1 | 截图、记录元素位置（坐标） | 8.21 | **~95%** | 本仓侧已完成（截图+坐标+页面级截图湿测通过）；手动截图按钮非本项目已移除；步骤级高亮前端主力，后端按前端要求改推送结构 |
-| 2 | 元素自动分级、分区 | 8.25 | **~95%** | 分区数据改 propertiesID/propertiesPID 父子树已落地（section 节点插入+覆盖追溯+伙伴 fallback+工具同步）；traj 182 dry-run 验证 4 section 节点+16 ele 正确挂载；待 partner push 湿测确认 |
-| 3 | 推送到自动化（截图+坐标+分区数据） | 8.25 | **~90%** | 截图+坐标+分区 PID 树已推通 dry-run（coverage ok、fieldCompletenessIssues=0）；字段完整性校验+截断+preflight 已落地；待 partner push 湿测（需用户 SSO token） |
+| 2 | 元素自动分级、分区 | 8.25 | **~98%** | 分区数据改 propertiesID/propertiesPID 父子树已落地并湿测通过（partner push 200 成功）；section 节点+覆盖追溯+伙伴 fallback+工具同步全部验证 |
+| 3 | 推送到自动化（截图+坐标+分区数据） | 8.25 | **~95%** | 截图+坐标+分区 PID 树已推通湿测确认（partner push 200）；字段完整性校验+截断+preflight 已落地；budget-extend 续跑未触发（预算内完成，属正常） |
 | 4 | 录制时有测试数据（报文捞取/日志解析） | 8.30 | **~15% · 搁置** | 被测系统同事无时间协同，搁置待重启 |
 
 ### ⭐ 本周第一优先：分区数据改 propertiesID/propertiesPID 表达（任务③核心缺口）

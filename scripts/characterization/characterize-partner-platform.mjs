@@ -11,6 +11,7 @@ import {
   DEFAULT_PARTNER_SYSTEM_ID,
   DEFAULT_PARTNER_PROJECT_ID,
   PARTNER_NETWORK_ERROR_MSG,
+  PARTNER_DEBUG_ACCESS_TOKEN,
 } from '../../src/services/partner-platform.js';
 import { resolve as configResolve } from '../../config/config.js';
 
@@ -23,16 +24,13 @@ assert.equal(resolveAccessToken({ headers: { Access_Token: 'h3' } }), 'h3');
 assert.equal(resolveAccessToken({ body: { accessToken: 'b1' } }), 'b1');
 assert.equal(resolveAccessToken({ query: { access_token: 'q1' } }), 'q1');
 
-// 无请求 token → PARTNER_ACCESS_TOKEN 回落；两者皆无 → null（硬编码联调 JWT 已移除）
+// 无请求 token → PARTNER_ACCESS_TOKEN 回落 → 硬编码联调 JWT（172.20.101.162 联调中）
 const fallback = String(configResolve('PARTNER_ACCESS_TOKEN', '') || '').trim();
-assert.equal(resolveAccessToken({ headers: {}, body: {} }), fallback || null);
+assert.equal(resolveAccessToken({ headers: {}, body: {} }), fallback || PARTNER_DEBUG_ACCESS_TOKEN);
+assert.ok(PARTNER_DEBUG_ACCESS_TOKEN && PARTNER_DEBUG_ACCESS_TOKEN.length > 20, '硬编码联调 JWT 存在');
 
-// requireAccessToken：header/body/query/PARTNER_ACCESS_TOKEN 全无时 400
-if (fallback) {
-  assert.equal(requireAccessToken({ headers: {} }), fallback);
-} else {
-  assert.throws(() => requireAccessToken({ headers: {} }), /access_token is required/);
-}
+// requireAccessToken：header/body/query/PARTNER_ACCESS_TOKEN 全无时回落硬编码 JWT（不 400）
+assert.equal(requireAccessToken({ headers: {} }), fallback || PARTNER_DEBUG_ACCESS_TOKEN);
 
 const d = resolveSystemProject({});
 assert.equal(d.systemId, DEFAULT_PARTNER_SYSTEM_ID);

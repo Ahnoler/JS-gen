@@ -18,6 +18,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Changed
 
+- 2026-08-24: **Partner 批量推送切到同事本地联调服务**：`PARTNER_API_BASE` 默认值从 `http://test.atp.tansun.com.cn/api` 改为 `http://172.20.101.162:11001/api`（172.20.101.162:11001 为同事本地服务，原 test.atp 已停用；80 端口无服务；env `PARTNER_API_BASE`/`PARTNER_IMPORT_DEMAND_URL` 仍可覆盖）。`resolveAccessToken` 回落链增加硬编码联调 JWT（`PARTNER_DEBUG_ACCESS_TOKEN`，同事 172.20.101.162 的 access token）：请求头 token → `PARTNER_ACCESS_TOKEN` env → 硬编码 JWT，无登录态脚本/联调不再 400。⚠️ 临时联调配置：硬编码 token 含敏感凭据，联调结束须移除（历史曾移除过一次，恢复时已同步更新 characterize-partner-platform 断言）。
+  影响范围：出站推送目标地址、token 回落语义（无请求 token 时不再 400）、characterization（partner-platform）。无 schema/WS 变更，API docs 契约未变。
+  文件：src/services/partner-platform.js, config/.env.example, scripts/characterization/characterize-partner-platform.mjs
+  Python 同步提示：若 Python 控制面也推送 partner，需将地址改为 `http://172.20.101.162:11001/api` 并使用同一 token（SSO JWT）；token 来源与有效期以同事本地服务为准。
+
 - 2026-08-24: **V3 分区数据改用 propertiesID/propertiesPID 父子树表达（partition-via-pid）**：V3 导出构建期（`buildV3Properties`）从 `region_id` 链提取分区段（tab/section/titlebox 等），为每段创建 `type='section'` 中间节点插入 `transcationProperties[]`，ele 的 `propertiesPID` 指向最近 section 节点（无分区段时直指 page/dialog 截图，存量兼容）。同页同名控件（如两个「保存」按钮）因分区不同 pid 不同 → 可区分。`validatePageLevelCoverage` 改为沿 PID 链向上追溯（`resolveRootScreenshotId`）到 page/dialog 截图校验覆盖。伙伴出站适配新增 `PARTNER_SECTION_TYPE` 配置（默认 `'section'`，伙伴不接受时可切 `'ele'+elementType='partition'`）。可视化工具 lightup 加 PID 树侧栏、layer-tree 识别 section 节点为中间层。
   影响范围：V3 导出 payload（`transcationProperties[].type` 新增 `'section'` 值；ele `propertiesPID` 可能指向 section 节点而非 page/dialog）、伙伴出站契约、可视化工具、API docs。V2 不受影响。无 schema/WS 变更。
   文件：src/services/transaction-export-v3.js, src/services/partner-platform.js, config/config.js, src/dashboard/api-docs/groups/export-mgmt.js, scripts/tools/lightup-phase-screenshot.mjs, scripts/tools/layer-tree-from-properties.mjs, scripts/characterization/characterize-export-v3-pid.mjs, scripts/characterization/characterize-export-v3.mjs, scripts/characterization/characterize-page-level-screenshot.mjs, scripts/characterization/characterize-partner-platform.mjs, scripts/refactor/verify-all.sh

@@ -1,14 +1,23 @@
 /**
  * Partner automation platform HTTP client.
- * Default prefix: http://test.atp.tansun.com.cn/api/
+ * Default prefix: http://172.20.101.162:11001/api（联调指向同事本地服务，原 test.atp 已停用）
  * Outbound auth: 转发调用方的 access_token（SSO JWT，与账号中心同源）；
- * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN（服务级 token，供脚本/联调）。
+ * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN，再回落 PARTNER_DEBUG_ACCESS_TOKEN
+ * （硬编码联调 JWT，仅限无登录态脚本/联调；上线前需移除）。
  * Override: PARTNER_API_BASE / PARTNER_SYSTEM_BASE_URL / PARTNER_IMPORT_DEMAND_URL / PARTNER_ACCESS_TOKEN
  */
 import { resolve as configResolve, PARTNER_SECTION_TYPE } from '../../config/config.js';
 
-const DEFAULT_API_BASE = 'http://test.atp.tansun.com.cn/api';
+const DEFAULT_API_BASE = 'http://172.20.101.162:11001/api';
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+/**
+ * 硬编码联调 JWT（同事 172.20.101.162 本地服务的 access token）。
+ * 优先级最低：请求方 token → PARTNER_ACCESS_TOKEN env → 此常量。
+ * 联调结束后移除（历史曾因误留被特征化 pin 为"已移除"，恢复需同步更新断言）。
+ */
+export const PARTNER_DEBUG_ACCESS_TOKEN =
+  'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjE1MTAwNzY4MTA1Nzg2NDQ5OTIsImlhdCI6MTc4NzI5MjY4MiwianRpIjoidG9rZW5JZCJ9.zvyuKYTsl5IrawvdXaP7WbyKMn1kfqwx82Ymjo_TneQ';
 
 /** User-facing copy when partner nginx/upstream is unreachable or returns non-JSON. */
 export const PARTNER_NETWORK_ERROR_MSG = '网络异常，自动化平台无法连接';
@@ -41,7 +50,8 @@ function importDemandUrl() {
  * Token for partner outbound calls (projects / systems / importDemand).
  * 优先转发调用方 access_token（header/body/query，Vue 登录态 SSO JWT——
  * 伙伴平台与账号中心同源，直接复用登录 token，按登录用户身份调用）；
- * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN（服务级 token，供无登录态的脚本/联调）。
+ * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN（服务级 token，供无登录态的脚本/联调），
+ * 再回落 PARTNER_DEBUG_ACCESS_TOKEN（硬编码联调 JWT，见上）。
  *
  * @param {import('express').Request | { headers?: object, body?: object, query?: object }} req
  */
@@ -55,7 +65,9 @@ export function resolveAccessToken(req = {}) {
   const raw = fromHeader ?? fromBody ?? fromQuery;
   const fromRequest = raw == null ? '' : String(raw).trim();
   if (fromRequest) return fromRequest;
-  return envOrConfig('PARTNER_ACCESS_TOKEN') || null;
+  const fromEnv = envOrConfig('PARTNER_ACCESS_TOKEN');
+  if (fromEnv) return fromEnv;
+  return PARTNER_DEBUG_ACCESS_TOKEN || null;
 }
 
 export function requireAccessToken(req) {
