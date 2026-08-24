@@ -76,6 +76,19 @@ def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel
     sys.stderr.flush()
     emit_json({"event": "agent_stopped", "data": {"reason": reason}})
 
+
+def _count_introduce_fields(case_data_ref):
+    """Count introduce-type fields (disabled + hasButton) from _scan_fields."""
+    scan_fields = case_data_ref.get('_scan_fields') or []
+    return sum(1 for f in scan_fields if f.get('disabled') and f.get('hasButton'))
+
+
+def _count_tree_select(case_data_ref):
+    """Count tree-select fields from _scan_fields."""
+    scan_fields = case_data_ref.get('_scan_fields') or []
+    return sum(1 for f in scan_fields if f.get('kind') in ('tree-select', 'tree'))
+
+
 async def _run_agent_step(instruction, step_index, session_id, args, llm, browser_context,
                           controller, goal_tracker, cancel_flag_path,
                           on_step_start_hook, on_step_end_hook, case_data_ref, cumulative_path,
@@ -445,20 +458,66 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         planner_llm=llm, planner_interval=3,
         extend_planner_system_message=PLANNER_SYSTEM_PROMPT,
         register_new_step_callback=make_step_callback(step_index * 100),
-        register_done_callback=make_done_callback(output_path),
+        register_done_callback=make_done_callback(output_path, case_data_ref),
     )
     _last_agent = agent
     sys.stderr.write(f"Agent created, starting run...\n");
     sys.stderr.flush()
 
+    # budget-extend: 续跑循环
+    from ..controller.actions.phase.reviewer import compute_budget_extension, _BUDGET_EXTEND_MAX_ROUNDS
+    budget_extensions = []
     try:
-        sys.stderr.write(f"Calling agent.run() with max_steps={max_steps}\n");
-        sys.stderr.flush()
         if case_data_ref is not None:
             case_data_ref['_phase_max_steps'] = int(max_steps)
+            case_data_ref['_done_fired'] = False
         await agent.run(max_steps=max_steps, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
         sys.stderr.write(f"Agent run completed\n");
         sys.stderr.flush()
+
+        # 续跑循环（≤ _BUDGET_EXTEND_MAX_ROUNDS 轮）
+        for round_num in range(1, _BUDGET_EXTEND_MAX_ROUNDS + 1):
+            if case_data_ref is None:
+                break
+            done_fired = case_data_ref.get('_done_fired', False)
+            # 检查取消
+            if cancel_flag_path.exists():
+                break
+            # 评估续跑条件
+            from ..controller.actions._phase_intent import check_pending_write_gate, has_contract_success
+            from ..controller.actions.section_scope import resolve_phase_section
+            _sec = resolve_phase_section(case_data_ref)
+            ok_pending, pending_labels = check_pending_write_gate(case_data_ref, section=_sec)
+            introduce_count = _count_introduce_fields(case_data_ref)
+            needs_agent = case_data_ref.get('_assistant_needs_agent') or []
+            # done 触发且工作完成 → 不续跑
+            if done_fired and ok_pending and introduce_count == 0 and not needs_agent:
+                break
+            # 工作完成（无论 done）→ 不续跑
+            if ok_pending and introduce_count == 0 and not needs_agent:
+                break
+            # 计算 extension
+            used = agent.state.n_steps if hasattr(agent, 'state') else max_steps
+            extension = compute_budget_extension({
+                'introduce_fields': introduce_count,
+                'pending_fields': len(pending_labels),
+                'tree_select_fields': _count_tree_select(case_data_ref),
+                'ceiling': ceiling,
+                'used_steps': used,
+            })
+            if extension <= 0 or used + extension > ceiling:
+                break
+            sys.stderr.write(
+                f"[budget] extend round={round_num} +{extension} steps (introduce={introduce_count} pending={len(pending_labels)})\n"
+            )
+            sys.stderr.flush()
+            budget_extensions.append({
+                'round': round_num, 'steps': extension,
+                'introduce': introduce_count, 'pending': len(pending_labels),
+            })
+            case_data_ref['_done_fired'] = False
+            await agent.run(max_steps=extension, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
+
         if not hasattr(agent, '_done_fired') and hasattr(agent, 'history'):
             output_path.parent.mkdir(parents=True, exist_ok=True)
             agent.history.save_to_file(str(output_path))
@@ -470,14 +529,12 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     except Exception as e:
         emit_json({"event": "phase_error", "data": {"phase": step_index, "name": task_text[:60], "message": str(e)}})
 
-    # Phase-end observability + soft quality gate
+    # Phase-end observability + soft quality gate（循环结束后最终评估）
     try:
         if case_data_ref is not None:
             from ..controller.actions._phase_intent import (
-                check_pending_write_gate,
-                emit_phase_observability,
-                has_contract_success,
-                mark_quality_failed,
+                check_pending_write_gate, emit_phase_observability,
+                has_contract_success, mark_quality_failed,
             )
             from ..controller.actions.section_scope import resolve_phase_section
 
@@ -495,6 +552,8 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             emit_phase_observability(case_data_ref, emit_json)
             phase_payload = {"phase": step_index, "name": task_text[:60]}
             phase_payload["maxActionsPerStep"] = max_actions_per_step
+            if budget_extensions:
+                phase_payload["budgetExtensions"] = budget_extensions
             c = get_phase_intent(case_data_ref)
             if c:
                 phase_payload["phase_intent"] = c

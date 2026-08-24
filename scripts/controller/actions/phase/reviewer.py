@@ -281,3 +281,30 @@ async def review_phase_contract(
         sys.stderr.write(f'[phase_reviewer] failed: {e}\n')
         sys.stderr.flush()
         return None
+
+
+_BUDGET_EXTEND_MAX_ROUNDS = 2
+
+
+def compute_budget_extension(pending_state: dict) -> int:
+    """Compute extension steps for budget-exhausted continuation.
+
+    Cost model: introduce fields ×4 (点旁钮+弹窗检索+选择+回填验证),
+    pending fields ×2 (fill/select 直填), tree-select ×1 (额外检索),
+    +2 (verify + done 收尾). Clamped to (ceiling - used_steps).
+    Returns <=0 when no budget remains.
+    """
+    try:
+        introduce = int(pending_state.get('introduce_fields', 0))
+        pending = int(pending_state.get('pending_fields', 0))
+        tree_select = int(pending_state.get('tree_select_fields', 0))
+        ceiling = int(pending_state.get('ceiling', 0))
+        used = int(pending_state.get('used_steps', 0))
+    except (TypeError, ValueError):
+        return 0
+    raw = introduce * 4 + pending * 2 + tree_select * 1 + 2
+    remaining = ceiling - used
+    # 无工作量时不续跑（+2 收尾仅在有待完成字段时才加）
+    if introduce == 0 and pending == 0 and tree_select == 0:
+        return 0
+    return max(0, min(raw, remaining))
