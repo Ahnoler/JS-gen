@@ -185,3 +185,8 @@ export const L1C_LLM_TIMEOUT_MS = Number(_resolve('L1C_LLM_TIMEOUT_MS', '8000'))
 
 export const AGENT_STDERR_LOG_DIR = _resolve('AGENT_STDERR_LOG_DIR')
   || path.join(PROJECT_DIR, 'logs', 'agent-stderr');
+
+// ── 伙伴平台 section 节点 type 适配 ──
+// 默认 'section'：伙伴 V3 契约接受 type='section' 中间节点。
+// fallback 'ele'：伙伴不接受 'section' 时，section 节点改用 type='ele'+elementType='partition'。
+export const PARTNER_SECTION_TYPE = _resolve('PARTNER_SECTION_TYPE', 'section');

@@ -5,7 +5,7 @@
  * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN（服务级 token，供脚本/联调）。
  * Override: PARTNER_API_BASE / PARTNER_SYSTEM_BASE_URL / PARTNER_IMPORT_DEMAND_URL / PARTNER_ACCESS_TOKEN
  */
-import { resolve as configResolve } from '../../config/config.js';
+import { resolve as configResolve, PARTNER_SECTION_TYPE } from '../../config/config.js';
 
 const DEFAULT_API_BASE = 'http://test.atp.tansun.com.cn/api';
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -156,6 +156,11 @@ export function toPartnerImportPayload(payload) {
         .filter(Boolean)
         .map((p) => {
           const out = { ...p };
+          // section type fallback：伙伴不接受 'section' 时改用 'ele'+elementType='partition'
+          if (out.type === 'section' && PARTNER_SECTION_TYPE !== 'section') {
+            out.type = 'ele';
+            out.elementType = 'partition';
+          }
           for (const k of PARTNER_PROP_DROP_KEYS) delete out[k];
           const shots = Array.isArray(out.screenshot) ? out.screenshot : [];
           if (shots.length) {

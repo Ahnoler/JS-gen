@@ -78,4 +78,24 @@ assert.equal(toPartnerImportPayload(null), null);
 assert.equal(toPartnerImportPayload('x'), 'x');
 assert.deepEqual(toPartnerImportPayload({ transcationEventTypeList: 'nope' }), { transcationEventTypeList: 'nope' });
 
+// section 节点在 toPartnerImportPayload 后保留，type='section'（默认 PARTNER_SECTION_TYPE='section'）
+{
+  const src = {
+    transcationEventTypeList: [{
+      transcationProperties: [
+        { propertiesID: '1', propertiesPID: '0', type: 'page', screenshot: ['http://x/p.png'], propertiesName: 'page' },
+        { propertiesID: '2', propertiesPID: '1', type: 'section', screenshot: [], propertiesName: 'tab1', elementType: '', realLabel: 'tab1' },
+        { propertiesID: '3', propertiesPID: '2', type: 'ele', screenshot: [], propertiesName: '保存', elementType: '//xpath', realLabel: '保存' },
+      ],
+    }],
+  };
+  const out = toPartnerImportPayload(src);
+  const props = out.transcationEventTypeList[0].transcationProperties;
+  const section = props.find((p) => p.propertiesID === '2');
+  assert.ok(section, 'section 节点保留');
+  assert.equal(section.type, 'section', 'section type=section（默认）');
+  assert.equal('screenshot' in section, false, 'section screenshot key 已删除');
+  assert.equal('screenCapture' in section, false, 'section 无 screenCapture（空截图不入串）');
+}
+
 console.log('characterize-partner-platform: OK');
