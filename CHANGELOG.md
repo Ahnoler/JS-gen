@@ -16,6 +16,13 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   文件：config/config.js, config/.env, config/.env.example, src/llm-utils.js, src/routes/llm-proxy.js, src/routes/browser-session/global-browser.js, executor/config.js, executor/session-slot.js, scripts/agent_utils.py, scripts/controller/actions/_llm_values.py
   Python 同步提示：Python 端读 `LLM_TIMEOUT_MS`（毫秒）设 ChatOpenAI timeout；控制面透传该 env 给 Python 子进程。
 
+### Fixed
+
+- 2026-08-25: **登录等无 label 表单的 xpath_smart 回退**：`formFieldXpathSmartOf` 在 `.el-form-item` 内没有真实 `<label>` 时，忽略 `formLabel` 提示并改用 `name`/`placeholder` 定位；同时忽略形如 XPath 的损坏 `formLabel`（避免绝对路径被当 label 截断写入）。修复人工录制登录步骤在回放/录制时定位不到的问题。
+  影响范围：locator 生成（`src/cdp/page-locator-helpers.js` 与 Python mirror）；无 schema/路由/WS 变更。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-login-locator-fallback.py, scripts/refactor/verify-all.sh
+  Python 同步提示：Python mirror 已同步（同文件改动）；控制面/前端无需感知。
+
 ### Changed
 
 - 2026-08-25: **V3 控件条目新增 `attr` 字段（disabled/required/readonly）**：录制侧新增 V3 控件布尔属性采集——JS `collectAttrFlags` 显式采集 disabled/required/readonly 三键布尔（HTML 布尔属性被 `collectAttrs` 的空值过滤丢弃，此前根本采不到，只能采到字符串属性）；Python 侧 `_helpers.py` 的 `_capture_element` / `_enrich_click_element` 透传 `attr`，`ElementInfo` 新增 `attr` 字段，`to_element_json` 输出，`from_record` 白名单搬运；Node `copyLocatorMeta` 保留 attr；V3 object 节点恒有 `attr`（三键布尔，旧数据回退 `{}`）。伙伴出站 `toPartnerImportPayload` 剥除 attr（本地/replay 元数据，确认伙伴认后再放开）。
