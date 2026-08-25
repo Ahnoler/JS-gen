@@ -308,13 +308,28 @@ PAGE_LOCATOR_HELPERS = r'''
     return 'generic';
   }
   function formFieldXpathSmartOf(node, formLabel) {
-    const lbl = normalizeFormLabel(formLabel);
+    const lbl0 = normalizeFormLabel(formLabel);
+    // Corrupt formLabel that is actually an XPath fragment must be ignored.
+    const lbl = (lbl0 && !/^\/[^\s]*\[/.test(lbl0)) ? lbl0 : '';
     const scope = scopeOf(node);
     const scopeKind = (scope === 'drawer' || scope === 'dialog') ? scope : '';
-    if ((!lbl || !node) && node) {
+    // A form item without a real <label> element cannot use a label-based
+    // xpath, regardless of the formLabel hint (login/placeholder-only forms).
+    const realLabel = (() => {
+      if (!node || !node.closest) return '';
+      const item = node.closest('.el-form-item');
+      const l = item && item.querySelector('.el-form-item__label, label');
+      return l ? normalizeControlText(l.textContent) : '';
+    })();
+    if ((!lbl || !realLabel || !node) && node) {
+      const tagL0 = (node.tagName || '').toLowerCase();
+      const name = (node.getAttribute && node.getAttribute('name')) || '';
+      if (name) {
+        const leaf0 = tagL0 === 'textarea' ? 'textarea' : 'input';
+        return scopedXPath(leaf0 + '[@name=' + xpathLiteral(name) + ']', scopeKind);
+      }
       const ph = normalizeControlText((node.getAttribute && node.getAttribute('placeholder')) || '');
       if (ph) {
-        const tagL0 = (node.tagName || '').toLowerCase();
         const leaf0 = tagL0 === 'textarea' ? 'textarea' : 'input';
         return scopedXPath(leaf0 + '[contains(@placeholder,' + xpathLiteral(ph) + ')]', scopeKind);
       }

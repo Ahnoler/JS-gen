@@ -95,6 +95,7 @@ run "characterize-save-retry-scope" "$PY" scripts/characterization/characterize-
 run "characterize-duplicate-failure-cue" "$PY" scripts/characterization/characterize-duplicate-failure-cue.py
 run "characterize-click-navigation-cue" "$PY" scripts/characterization/characterize-click-navigation-cue.py
 run "characterize-confirm-notification" "$PY" scripts/characterization/characterize-confirm-notification.py
+run "characterize-login-locator-fallback" "$PY" scripts/characterization/characterize-login-locator-fallback.py
 run "characterize-step-region-bbox" "$PY" scripts/characterization/characterize-step-region-bbox.py
 run "characterize-page-level-python" "$PY" scripts/characterization/characterize-page-level-python.py
 run "characterize-before-close-screenshots" "$PY" scripts/characterization/characterize-before-close-screenshots.py
