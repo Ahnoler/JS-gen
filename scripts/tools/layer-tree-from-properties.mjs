@@ -131,16 +131,16 @@ export function buildTreeFromProperties(properties) {
  *     保留 regionId 拆段建 tab/section/card 等中间层级作为 fallback（保持兼容）。
  */
 // §8 中间节点 type 集合（截图条目 page/popup 之外的层级节点）
-const V3_INTERMEDIATE_TYPES = new Set(['section', 'tab', 'wizard', 'card']);
+const V3_INTERMEDIATE_TYPES = new Set(['section', 'tab', 'wizard', 'card', 'collapse']);
 // 中间节点在树中的 role 集合（type 直接作为 role，popup 例外映射为 dialog）
-const V3_INTERMEDIATE_ROLES = new Set(['section', 'tab', 'wizard', 'card']);
+const V3_INTERMEDIATE_ROLES = new Set(['section', 'tab', 'wizard', 'card', 'collapse']);
 // V3.1 截图条目 type 集合
 const V3_SHOT_TYPES = new Set(['page', 'popup']);
 
 export function buildTreeFromV3Flat(properties) {
   const root = { role: 'page', label: '交易页面', children: [], items: [] };
   const nodeMap = new Map();
-  // 第一遍：page / popup / 中间节点（section/tab/wizard/card）都建为节点
+  // 第一遍：page / popup / 中间节点（section/tab/wizard/card/collapse）都建为节点
   for (const p of properties || []) {
     if (p.type !== 'page' && p.type !== 'popup' && !V3_INTERMEDIATE_TYPES.has(p.type)) continue;
     const role = p.type === 'popup' ? 'dialog' : p.type;
@@ -149,6 +149,7 @@ export function buildTreeFromV3Flat(properties) {
       : p.type === 'tab' ? 'tab页签'
       : p.type === 'wizard' ? '步骤向导'
       : p.type === 'card' ? '卡片'
+      : p.type === 'collapse' ? '折叠面板'
       : '页面';
     const node = {
       role,

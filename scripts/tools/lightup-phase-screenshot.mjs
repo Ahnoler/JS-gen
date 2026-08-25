@@ -116,6 +116,12 @@ function buildHtml({ b64, meta, screenshotId, steps, imageUrl = '' }) {
 <script>
   const KIND_COLORS = ${JSON.stringify(KIND_COLORS)};
   const KIND_COLOR = (k) => KIND_COLORS[k] || '#607d8b';
+  // 归一化 rect 判定：四值有限、>=0、max<=1.0001 且宽高为正（0~1 相对所属截图）
+  const isNormRect = (r) => !!r && Number.isFinite(Number(r.x1)) && Number.isFinite(Number(r.y1))
+    && Number.isFinite(Number(r.x2)) && Number.isFinite(Number(r.y2))
+    && Number(r.x1) >= 0 && Number(r.y1) >= 0
+    && Number(r.x2) <= 1.0001 && Number(r.y2) <= 1.0001
+    && Number(r.x2) > Number(r.x1) && Number(r.y2) > Number(r.y1);
   const DATA = ${JSON.stringify({ elements, cw, ch, imageWidth: meta.imageWidth, imageHeight: meta.imageHeight, b64, imageUrl, steps })};
   const stage = document.getElementById('stage');
   const side = document.getElementById('side');
@@ -158,10 +164,17 @@ function buildHtml({ b64, meta, screenshotId, steps, imageUrl = '' }) {
     const div = document.createElement('div');
     div.className = 'box';
     div.dataset.index = i;
-    div.style.left = (e.rect.x1 * scale) + 'px';
-    div.style.top = (e.rect.y1 * scale) + 'px';
-    div.style.width = Math.max(2, (e.rect.x2 - e.rect.x1) * scale) + 'px';
-    div.style.height = Math.max(2, (e.rect.y2 - e.rect.y1) * scale) + 'px';
+    if (isNormRect(e.rect)) {
+      div.style.left = (e.rect.x1 * W) + 'px';
+      div.style.top = (e.rect.y1 * H) + 'px';
+      div.style.width = Math.max(2, (e.rect.x2 - e.rect.x1) * W) + 'px';
+      div.style.height = Math.max(2, (e.rect.y2 - e.rect.y1) * H) + 'px';
+    } else {
+      div.style.left = (e.rect.x1 * scale) + 'px';
+      div.style.top = (e.rect.y1 * scale) + 'px';
+      div.style.width = Math.max(2, (e.rect.x2 - e.rect.x1) * scale) + 'px';
+      div.style.height = Math.max(2, (e.rect.y2 - e.rect.y1) * scale) + 'px';
+    }
     div.style.borderColor = KIND_COLOR(e.kind);
     div.style.background = KIND_COLOR(e.kind) + '33';
     const tag = document.createElement('span');
@@ -192,7 +205,7 @@ function buildHtml({ b64, meta, screenshotId, steps, imageUrl = '' }) {
     const html = '<h3>' + esc(e.label || '(无文本)') + '</h3><dl>'
       + '<dt>kind</dt><dd>' + esc(e.kind || '?') + '</dd>'
       + '<dt>index</dt><dd>' + e.index + '</dd>'
-      + '<dt>rect（内容坐标）</dt><dd>(' + e.rect.x1 + ', ' + e.rect.y1 + ') → (' + e.rect.x2 + ', ' + e.rect.y2 + ')</dd>'
+      + '<dt>rect（' + (isNormRect(e.rect) ? '归一化' : '内容坐标') + '）</dt><dd>(' + e.rect.x1 + ', ' + e.rect.y1 + ') → (' + e.rect.x2 + ', ' + e.rect.y2 + ')</dd>'
       + '<dt>regionId</dt><dd>' + esc(e.regionId || '') + '</dd>'
       + '<dt>parentRegionId</dt><dd>' + esc(e.parentRegionId || '') + '</dd>'
       + '<dt>layers</dt><dd>' + esc((e.layers || []).map(l => (l.role || '') + ':' + (l.label || '')).join(' → ') || '(空)') + '</dd>'
@@ -601,6 +614,12 @@ function buildV3Html({ result, pages, properties }) {
 </div>
 <script>
   const PAGES = ${pagesJson};
+  // 归一化 rect 判定：四值有限、>=0、max<=1.0001 且宽高为正（0~1 相对所属截图）
+  const isNormRect = (r) => !!r && Number.isFinite(Number(r.x1)) && Number.isFinite(Number(r.y1))
+    && Number.isFinite(Number(r.x2)) && Number.isFinite(Number(r.y2))
+    && Number(r.x1) >= 0 && Number(r.y1) >= 0
+    && Number(r.x2) <= 1.0001 && Number(r.y2) <= 1.0001
+    && Number(r.x2) > Number(r.x1) && Number(r.y2) > Number(r.y1);
   const list = document.getElementById('list');
   const pagesEl = document.getElementById('pages');
   const boxes = {};
@@ -683,17 +702,26 @@ function buildV3Html({ result, pages, properties }) {
 
     img.addEventListener('load', () => {
       const natW = img.naturalWidth || 1;
+      const natH = img.naturalHeight || 1;
       const dispW = img.getBoundingClientRect().width || natW;
+      const dispH = dispW * natH / natW;
       const scale = dispW / natW;
 
       for (const dlg of dialogs) {
         if (!overlayDlgIds.has(String(dlg.id))) continue;
         const overlay = dlgOverlayEls[String(dlg.id)];
         const r = dlg.rect;
-        overlay.style.left = (r.x1 * scale) + 'px';
-        overlay.style.top = (r.y1 * scale) + 'px';
-        overlay.style.width = Math.max(2, (r.x2 - r.x1) * scale) + 'px';
-        overlay.style.height = Math.max(2, (r.y2 - r.y1) * scale) + 'px';
+        if (isNormRect(r)) {
+          overlay.style.left = (r.x1 * dispW) + 'px';
+          overlay.style.top = (r.y1 * dispH) + 'px';
+          overlay.style.width = Math.max(2, (r.x2 - r.x1) * dispW) + 'px';
+          overlay.style.height = Math.max(2, (r.y2 - r.y1) * dispH) + 'px';
+        } else {
+          overlay.style.left = (r.x1 * scale) + 'px';
+          overlay.style.top = (r.y1 * scale) + 'px';
+          overlay.style.width = Math.max(2, (r.x2 - r.x1) * scale) + 'px';
+          overlay.style.height = Math.max(2, (r.y2 - r.y1) * scale) + 'px';
+        }
         const dlgImg = overlay.querySelector('img');
         const drawDlg = () => {
           const dNatW = dlgImg.naturalWidth || 1;
@@ -704,10 +732,17 @@ function buildV3Html({ result, pages, properties }) {
             if (!dc.rect || boxes[dkey]) continue;
             const b = document.createElement('div');
             b.className = 'box dlg';
-            b.style.left = ((dc.rect.x1 / dNatW) * overlay.clientWidth) + 'px';
-            b.style.top = ((dc.rect.y1 / dNatH) * overlay.clientHeight) + 'px';
-            b.style.width = Math.max(2, ((dc.rect.x2 - dc.rect.x1) / dNatW) * overlay.clientWidth) + 'px';
-            b.style.height = Math.max(2, ((dc.rect.y2 - dc.rect.y1) / dNatH) * overlay.clientHeight) + 'px';
+            if (isNormRect(dc.rect)) {
+              b.style.left = (dc.rect.x1 * overlay.clientWidth) + 'px';
+              b.style.top = (dc.rect.y1 * overlay.clientHeight) + 'px';
+              b.style.width = Math.max(2, (dc.rect.x2 - dc.rect.x1) * overlay.clientWidth) + 'px';
+              b.style.height = Math.max(2, (dc.rect.y2 - dc.rect.y1) * overlay.clientHeight) + 'px';
+            } else {
+              b.style.left = ((dc.rect.x1 / dNatW) * overlay.clientWidth) + 'px';
+              b.style.top = ((dc.rect.y1 / dNatH) * overlay.clientHeight) + 'px';
+              b.style.width = Math.max(2, ((dc.rect.x2 - dc.rect.x1) / dNatW) * overlay.clientWidth) + 'px';
+              b.style.height = Math.max(2, ((dc.rect.y2 - dc.rect.y1) / dNatH) * overlay.clientHeight) + 'px';
+            }
             b.innerHTML = '<span class="no">' + String(dc.id || dc.propertiesID || '').replace('step-', '') + '</span>';
             b.title = (dc.propertiesName || dc.realLabel || dc.label || dc.id || dc.propertiesID) + ' · ' + (dc.kind || dc.eventTypeValue || dc.eventTypeName || '') + ' · rect(' + dc.rect.x1 + ',' + dc.rect.y1 + ')-(' + dc.rect.x2 + ',' + dc.rect.y2 + ')';
             overlay.appendChild(b);
@@ -724,10 +759,17 @@ function buildV3Html({ result, pages, properties }) {
         if (overlayDlgIds.has(String(c.pid || c.propertiesPID))) continue;
         const b = document.createElement('div');
         b.className = 'box';
-        b.style.left = (c.rect.x1 * scale) + 'px';
-        b.style.top = (c.rect.y1 * scale) + 'px';
-        b.style.width = Math.max(2, (c.rect.x2 - c.rect.x1) * scale) + 'px';
-        b.style.height = Math.max(2, (c.rect.y2 - c.rect.y1) * scale) + 'px';
+        if (isNormRect(c.rect)) {
+          b.style.left = (c.rect.x1 * dispW) + 'px';
+          b.style.top = (c.rect.y1 * dispH) + 'px';
+          b.style.width = Math.max(2, (c.rect.x2 - c.rect.x1) * dispW) + 'px';
+          b.style.height = Math.max(2, (c.rect.y2 - c.rect.y1) * dispH) + 'px';
+        } else {
+          b.style.left = (c.rect.x1 * scale) + 'px';
+          b.style.top = (c.rect.y1 * scale) + 'px';
+          b.style.width = Math.max(2, (c.rect.x2 - c.rect.x1) * scale) + 'px';
+          b.style.height = Math.max(2, (c.rect.y2 - c.rect.y1) * scale) + 'px';
+        }
         b.innerHTML = '<span class="no">' + String(c.id || c.propertiesID || '').replace('step-', '') + '</span>';
         b.title = (c.propertiesName || c.realLabel || c.label || c.id || c.propertiesID) + ' · ' + (c.kind || c.eventTypeValue || c.eventTypeName || '') + ' · rect(' + c.rect.x1 + ',' + c.rect.y1 + ')-(' + c.rect.x2 + ',' + c.rect.y2 + ')';
         stage.appendChild(b);

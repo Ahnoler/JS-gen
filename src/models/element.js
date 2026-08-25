@@ -129,6 +129,23 @@ function copyLocatorMeta(target, source) {
   if (Array.isArray(source.layers)) target.layers = source.layers;
   if (source.bbox && typeof source.bbox === 'object' && !Array.isArray(source.bbox)) target.bbox = source.bbox;
   if (source.page_bbox && typeof source.page_bbox === 'object' && !Array.isArray(source.page_bbox)) target.page_bbox = source.page_bbox;
+  if (source.rect_norm && typeof source.rect_norm === 'object' && !Array.isArray(source.rect_norm)) {
+    // 归一化坐标（plugin-format 对齐）：相对所属截图 0..1，四值有限才透传
+    const rn = source.rect_norm;
+    if ([rn.x1, rn.y1, rn.x2, rn.y2].every((v) => Number.isFinite(Number(v)))) {
+      target.rect_norm = {
+        x1: Number(rn.x1), y1: Number(rn.y1), x2: Number(rn.x2), y2: Number(rn.y2),
+      };
+    }
+  }
+  if (source.attr && typeof source.attr === 'object' && !Array.isArray(source.attr)) {
+    // 结构化布尔属性 {disabled,required,readonly}（plugin-format 对齐；只认三个已知键）
+    target.attr = {
+      disabled: source.attr.disabled === true,
+      required: source.attr.required === true,
+      readonly: source.attr.readonly === true,
+    };
+  }
   if (Array.isArray(source.options)) {
     const opts = [];
     const seen = new Set();

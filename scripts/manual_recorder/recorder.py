@@ -34,6 +34,7 @@ from ..state import (
     _is_overlay_region,
     _record_action,
     capture_dialog_png_b64,
+    capture_page_dims_from_page,
     capture_page_png_b64,
     capture_screenshots_enabled,
     current_page_level,
@@ -60,6 +61,7 @@ class ManualRecorder:
         self._nav_hooks: set[int] = set()
         self._handle_lock = None  # asyncio.Lock, created lazily
         self._pending_before_b64: str | None = None
+        self._pending_before_dims: dict = {}
 
     async def start(self) -> dict:
         self.enabled = True
@@ -350,6 +352,9 @@ class ManualRecorder:
             if before_b64 is None:
                 try:
                     before_b64 = await capture_page_png_b64(self.browser_context)
+                    _page = await self.browser_context.get_current_page()
+                    if _page is not None:
+                        self._pending_before_dims = await capture_page_dims_from_page(_page)
                 except Exception:
                     before_b64 = None
 
@@ -370,7 +375,9 @@ class ManualRecorder:
                 before_key=before_key,
                 before_name=before_name,
                 before_b64=before_b64,
+                before_dims=self._pending_before_dims,
             )
+            self._pending_before_dims = {}
             eid = entry.get('id') if isinstance(entry, dict) else None
             if eid:
                 el = (entry.get('element') or {}) if isinstance(entry, dict) else {}
@@ -394,12 +401,17 @@ class ManualRecorder:
         async with lock:
             # before: first thing under the lock (user action already happened)
             before_b64 = None
+            before_dims: dict = {}
             if capture_screenshots_enabled():
                 try:
                     before_b64 = await capture_page_png_b64(self.browser_context)
+                    _page = await self.browser_context.get_current_page()
+                    if _page is not None:
+                        before_dims = await capture_page_dims_from_page(_page)
                 except Exception:
                     before_b64 = None
             self._pending_before_b64 = before_b64
+            self._pending_before_dims = before_dims
 
             mapped = _map_dom_event_to_action(payload)
             if not mapped:

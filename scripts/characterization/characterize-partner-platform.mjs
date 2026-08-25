@@ -47,7 +47,7 @@ assert.equal(e.projectId, '9');
       transcId: 1,
       transcationProperties: [
         { type: 'page', regionId: 'page:x', regionLabel: '首页', screenshot: ['http://a/1.png', 'http://a/2.png'] },
-        { type: 'object', regionId: '', regionLabel: '', screenshot: ['http://a/3.png'], rect: '{"x1":1}', propertiesName: '点击' },
+        { type: 'object', regionId: '', regionLabel: '', screenshot: ['http://a/3.png'], rect: '{"x1":1}', propertiesName: '点击', attr: { disabled: true, required: false, readonly: false } },
         { type: 'popup', screenshot: ['http://a/4.png'] },
         null,
       ],
@@ -62,6 +62,7 @@ assert.equal(e.projectId, '9');
   for (const p of props) {
     assert.equal('regionId' in p, false, `${p.type} regionId 已剥除`);
     assert.equal('regionLabel' in p, false, `${p.type} regionLabel 已剥除`);
+    assert.equal('attr' in p, false, `${p.type} attr 已剥除（本地/replay 元数据，确认伙伴认后再放开）`);
     assert.equal('screenshot' in p, false, `${p.type} screenshot 已删除（V3 契约改 screenCapture）`);
   }
   assert.equal(byType.page.screenCapture, 'http://a/1.png,http://a/2.png', 'page 截图并入 screenCapture 逗号串');

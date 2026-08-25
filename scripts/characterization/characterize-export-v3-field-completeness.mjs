@@ -45,6 +45,7 @@ const longTraj = {
         tag: 'li', xpath_smart: '//li[1]', target_kind: 'menu',
         text: '客户管理', region_id: 'tab:客户管理',
         bbox: { x1: 1, y1: 2, x2: 30, y2: 20 },
+        attr: { disabled: false, required: true, readonly: false },
       },
       // params.text 不经过 prepareElementJson 的 40 字截断，能可靠构造 >100 的超长 propertiesName
       paramsJson: { text: 'x'.repeat(150) },
@@ -59,6 +60,11 @@ const builtTrunc = buildTransactionEntryV3(longTraj, {
 const truncEle = builtTrunc.entry.transcationProperties.find((p) => p.type === 'object');
 check('propertiesName truncated', String(truncEle.propertiesName).length === 100 && String(truncEle.propertiesName).endsWith('...truncated'));
 check('truncatedFields stats counted', builtTrunc.stats.truncatedFields?.propertiesName >= 1);
+// attr 结构化布尔透传（element_json.attr → object 节点 attr；三键归一化布尔）
+check('attr passthrough normalized', truncEle.attr
+  && truncEle.attr.disabled === false
+  && truncEle.attr.required === true
+  && truncEle.attr.readonly === false);
 
 // preflight: undefined 值检测
 const wirePayload = toPartnerImportPayload({

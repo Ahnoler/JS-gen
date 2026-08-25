@@ -6,7 +6,7 @@ into a single browser_use Controller instance.
 import functools
 import inspect
 
-from .actions._case_data import _register_case_data_actions
+from .actions._business_data import _register_business_data_actions
 from .actions._form import _register_form_actions
 from .actions._navigation import _register_navigation_actions
 from .actions._table import _register_table_actions
@@ -16,6 +16,7 @@ from ..state import (
     _ACTION_LOG,
     _is_overlay_region,
     capture_dialog_png_b64,
+    capture_page_dims_from_page,
     capture_page_png_b64,
     capture_screenshots_enabled,
     current_page_level,
@@ -64,8 +65,12 @@ def _wrap_action_with_screenshots(controller, browser_context):
                 except Exception:
                     before_key, before_name = '', ''
                 set_current_page_key(before_key)
+                before_dims = {}
                 try:
                     before_b64 = await capture_page_png_b64(browser_context)
+                    _page = await browser_context.get_current_page()
+                    if _page is not None:
+                        before_dims = await capture_page_dims_from_page(_page)
                 except Exception:
                     before_b64 = None
 
@@ -100,6 +105,7 @@ def _wrap_action_with_screenshots(controller, browser_context):
                     before_key=before_key,
                     before_name=before_name,
                     before_b64=before_b64,
+                    before_dims=before_dims,
                 )
 
                 entry_id = None
@@ -135,7 +141,7 @@ def _wrap_action_with_screenshots(controller, browser_context):
     controller.action = action_decorator
 
 
-def build_controller(browser_context, case_data_store=None,
+def build_controller(browser_context, business_data_store=None,
                      llm=None, exclude_actions=None,
                      special_element_candidates_store=None):
     """Build and return a browser_use Controller with all custom actions registered."""
@@ -144,22 +150,22 @@ def build_controller(browser_context, case_data_store=None,
         exclude_actions = ['input_text', 'select_dropdown_option']
     controller = Controller(exclude_actions=exclude_actions)
 
-    if case_data_store is None:
-        case_data_store = {}
+    if business_data_store is None:
+        business_data_store = {}
     if special_element_candidates_store is None:
         special_element_candidates_store = {}
 
     _wrap_action_with_screenshots(controller, browser_context)
 
-    _register_case_data_actions(controller, case_data_store)
-    _register_form_actions(controller, browser_context, case_data_store, llm)
+    _register_business_data_actions(controller, business_data_store)
+    _register_form_actions(controller, browser_context, business_data_store, llm)
     _register_navigation_actions(controller, browser_context)
-    _register_table_actions(controller, browser_context, case_data_store)
-    _register_misc_actions(controller, browser_context, case_data_store)
+    _register_table_actions(controller, browser_context, business_data_store)
+    _register_misc_actions(controller, browser_context, business_data_store)
     _register_special_element_actions(
         controller,
         browser_context,
-        case_data_store,
+        business_data_store,
         special_element_candidates_store,
     )
 

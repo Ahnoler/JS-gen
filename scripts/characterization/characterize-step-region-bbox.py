@@ -61,6 +61,44 @@ def test_helpers_passthrough_region_bbox() -> None:
     assert_true('"region_label": info.get("region_label")' in src, "_capture_element passes region_label")
 
 
+def test_helpers_passthrough_page_bbox_and_attr() -> None:
+    """V3 rect_norm + attr 透传：_capture_element / _enrich_click_element 必须透传 page_bbox 和 attr。
+
+    rect_norm 归一化依赖 page_bbox（document 坐标）；attr（disabled/required/readonly）为 V3
+    控件条目新增布尔字段，需在采集点透传到 element_json。此前 _helpers.py 丢弃 page_bbox。
+    """
+    src = (ROOT / "scripts/controller/actions/_helpers.py").read_text(encoding="utf-8")
+    assert_true('"page_bbox":' in src, "_capture_element / _enrich pass page_bbox (rect_norm input)")
+    assert_true('"attr":' in src, "_capture_element / _enrich pass attr (disabled/required/readonly)")
+
+
+def test_model_persists_attr_field() -> None:
+    """ElementInfo 新增 attr 字段：声明 + to_element_json 输出 + from_record 白名单搬运。
+
+    rect_norm 不经过模型（stamp 点直接写 dict），故此处只 pin attr；rect_norm 由
+    characterize-page-level-python.py 的 state.py 子串断言覆盖。
+    """
+    src = (ROOT / "scripts/models/action.py").read_text(encoding="utf-8")
+    assert_true("attr:" in src, "ElementInfo declares attr")
+    assert_true("data['attr']" in src, "to_element_json emits attr")
+    assert_true("'attr'" in src, "from_record passes attr via whitelist")
+
+    from scripts.models.action import ActionEntry, ElementInfo
+
+    elem_dict = {
+        'tag': 'input', 'xpath_smart': '//input[@x]', 'xpath': '//input[@x]',
+        'target_kind': 'form_input', 'formLabel': '客户号',
+        'attr': {'disabled': False, 'required': True, 'readonly': False},
+    }
+    entry = ActionEntry.from_record('fill_form_field', {'label_text': '客户号', 'value': '1'}, 'ok', elem_dict)
+    assert_true(entry.element.get('attr') == {'disabled': False, 'required': True, 'readonly': False},
+                "from_record keeps attr")
+    info = ElementInfo(**elem_dict)
+    j = info.to_element_json()
+    assert_true(j.get('attr') == {'disabled': False, 'required': True, 'readonly': False},
+                "to_element_json keeps attr")
+
+
 def test_model_persists_region_bbox() -> None:
     """落库模型必须保留 region/bbox：ElementInfo 字段 + to_element_json + from_record 穿透。
     （根因修复：models/action.py 白名单序列化曾丢弃 _capture_element 的 region/layers/bbox。）"""
@@ -130,7 +168,9 @@ def main() -> int:
     test_capture_has_region_bbox()
     test_enrich_has_region_bbox()
     test_helpers_passthrough_region_bbox()
+    test_helpers_passthrough_page_bbox_and_attr()
     test_model_persists_region_bbox()
+    test_model_persists_attr_field()
     test_node_copy_locator_meta_persists_bbox()
     print("characterize-step-region-bbox: OK")
     return 0

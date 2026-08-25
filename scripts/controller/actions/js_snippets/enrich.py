@@ -65,6 +65,7 @@ JS_ENRICH_CLICK_LOCATOR = '''([xpath, text, tagHint, targetKindHint, formLabelHi
     text: loc.text || t,
     formLabel: loc.formLabel || formLbl,
     attributes: loc.attributes || {},
+    attr: loc.attr || undefined,
     candidates: loc.candidates || [],
     target_kind: loc.target_kind,
     region_id: reg.region_id || '',

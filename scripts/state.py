@@ -123,6 +123,23 @@ async def capture_page_png_b64_from_page(page, *, full_page: bool = True) -> str
         return None
 
 
+async def capture_page_dims_from_page(page) -> dict:
+    """Document scroll size (CSS px) — the coordinate space of full-page screenshots.
+
+    Used as the denominator for rect_norm (plugin-format aligned normalized
+    0..1 coordinates relative to the page-level screenshot).
+    """
+    try:
+        target = getattr(page, 'page', page)
+        return await target.evaluate(
+            "() => ({"
+            "contentWidth: document.documentElement.scrollWidth,"
+            "contentHeight: document.documentElement.scrollHeight})"
+        ) or {}
+    except Exception:
+        return {}
+
+
 
 def page_level_key_from_url(url: str) -> str:
     """Build a stable page key for SPA navigation.
@@ -144,6 +161,63 @@ def page_level_key_from_url(url: str) -> str:
         return key
     except Exception:
         return f'page:{url or ""}'
+
+
+def _stamp_rect_norm(el: dict) -> None:
+    """Normalize page_bbox to 0..1 relative to the owning screenshot (plugin-format aligned).
+
+    Page controls: page_bbox / page-level screenshot document size (meta.contentWidth/Height).
+    Popup controls: (page_bbox - popup rect on page) / popup rect size — popup meta carries
+    its document-coordinate rect; popup screenshot size == rect size (element screenshot).
+
+    Requires page_bbox (document coords). bbox (content/scroll-root coords) is a different
+    system and is NOT normalized here — skipping is safer than emitting wrong ratios.
+    Registered-shot lookup falls back to a startswith match because stamp keys drop the
+    ``@@anchor:`` suffix while registry keys may carry it.
+    """
+    pb = el.get('page_bbox')
+    if not isinstance(pb, dict):
+        return
+    try:
+        px1, py1 = float(pb['x1']), float(pb['y1'])
+        px2, py2 = float(pb['x2']), float(pb['y2'])
+    except (KeyError, TypeError, ValueError):
+        return
+
+    meta: dict = {}
+    pkey = str(el.get('popup_level_key') or '').strip()
+    if pkey:
+        shot = _PAGE_LEVEL_SHOTS.get(pkey)
+        if not shot:
+            for k, v in _PAGE_LEVEL_SHOTS.items():
+                if k.startswith(pkey):
+                    shot = v
+                    break
+        meta = (shot or {}).get('meta') or {}
+        r = meta.get('rect') if isinstance(meta.get('rect'), dict) else {}
+        try:
+            w = float(r['x2']) - float(r['x1'])
+            h = float(r['y2']) - float(r['y1'])
+            ox, oy = float(r['x1']), float(r['y1'])
+        except (KeyError, TypeError, ValueError):
+            return
+    else:
+        shot = _PAGE_LEVEL_SHOTS.get(_CURRENT_PAGE_KEY)
+        meta = (shot or {}).get('meta') or {}
+        try:
+            w = float(meta['contentWidth'])
+            h = float(meta['contentHeight'])
+        except (KeyError, TypeError, ValueError):
+            return
+        ox, oy = 0.0, 0.0
+    if w <= 0 or h <= 0:
+        return
+    el['rect_norm'] = {
+        'x1': (px1 - ox) / w,
+        'y1': (py1 - oy) / h,
+        'x2': (px2 - ox) / w,
+        'y2': (py2 - oy) / h,
+    }
 
 
 async def current_page_level(browser_context):
@@ -216,13 +290,24 @@ async def register_current_page_screenshot(
         png_b64 = await capture_page_png_b64(browser_context, full_page=True)
     if not png_b64:
         return ''
+    dims = {}
+    try:
+        page = await browser_context.get_current_page()
+        if page is not None:
+            dims = await capture_page_dims_from_page(page)
+    except Exception:
+        dims = {}
+    meta = {'phaseNumber': _CURRENT_PHASE, 'capturedAt': captured_at}
+    if dims.get('contentWidth') and dims.get('contentHeight'):
+        meta['contentWidth'] = int(dims['contentWidth'])
+        meta['contentHeight'] = int(dims['contentHeight'])
     _register_page_level_shot(
         level_type='page',
         level_key=key,
         parent_level_key=None,
         display_name=name,
         png_b64=png_b64,
-        meta={'phaseNumber': _CURRENT_PHASE, 'capturedAt': captured_at},
+        meta=meta,
     )
     _emit_page_level_screenshot(_PAGE_LEVEL_SHOTS[key])
     return key
@@ -234,21 +319,30 @@ async def register_page_screenshot_if_changed(
     before_key: str = '',
     before_name: str = '',
     before_b64: str | None = None,
+    before_dims: dict | None = None,
 ) -> tuple[str, str]:
     """Called after an action: if navigation changed the page, persist the pre-navigation page screenshot.
+
+    ``before_dims`` is the pre-navigation document size ({contentWidth,contentHeight}),
+    captured by the caller at the same moment as ``before_b64`` — required for
+    rect_norm normalization of the leaving page (post-navigation dims would be wrong).
 
     Returns the post-action (page_key, page_name).
     """
     global _CURRENT_PAGE_KEY
     after_key, after_name = await current_page_level(browser_context)
     if before_key and before_b64 and before_key != after_key:
+        meta = {'phaseNumber': _CURRENT_PHASE, 'capturedAt': 'before-leave'}
+        if isinstance(before_dims, dict) and before_dims.get('contentWidth') and before_dims.get('contentHeight'):
+            meta['contentWidth'] = int(before_dims['contentWidth'])
+            meta['contentHeight'] = int(before_dims['contentHeight'])
         _register_page_level_shot(
             level_type='page',
             level_key=before_key,
             parent_level_key=None,
             display_name=before_name,
             png_b64=before_b64,
-            meta={'phaseNumber': _CURRENT_PHASE, 'capturedAt': 'before-leave'},
+            meta=meta,
         )
         _emit_page_level_screenshot(_PAGE_LEVEL_SHOTS.get(before_key))
     if after_key:
@@ -591,6 +685,7 @@ def _record_action(action_name, params, result, element=None, source=None):
         overlay = _is_overlay_region(rid)
         if overlay:
             el['popup_level_key'] = f"{_CURRENT_PAGE_KEY}|dialog:{overlay['label']}"
+        _stamp_rect_norm(el)
     removed_ids: list[str] = []
 
     # Manual only: drop date-picker reopen clicks that echo the just-selected date

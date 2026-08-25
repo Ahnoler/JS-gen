@@ -16,6 +16,10 @@ from scripts.state import (
     reset_page_level_shots,
 )
 
+
+def _read(rel: str) -> str:
+    return (ROOT / rel).read_text(encoding="utf-8")
+
 failures = 0
 
 
@@ -26,6 +30,42 @@ def check(cond, msg):
     else:
         failures += 1
         print(f'  FAIL: {msg}')
+
+
+def test_rect_norm_pins():
+    """Pin the page-level dims + rect_norm normalization wiring in scripts/state.py.
+
+    Covers: capture_page_dims_from_page (document scrollWidth/Height),
+    register_page_screenshot_if_changed before_dims param (before-leave dims capture),
+    register_current_page_screenshot dims persistence in meta,
+    _stamp_rect_norm (page_bbox -> rect_norm 0..1, popup startswith fallback).
+    Source-substring pins (mirrors characterize-before-close-screenshots.py style).
+    """
+    src = _read("scripts/state.py")
+
+    check("def capture_page_dims_from_page" in src, "state.py defines capture_page_dims_from_page")
+    # dims captured into meta
+    check("'contentWidth'" in src and "'contentHeight'" in src, "meta carries contentWidth/contentHeight")
+
+    # before-leave branch: register_page_screenshot_if_changed gains before_dims param
+    # signature spans multiple lines up to the closing `) ->` — slice to the return annotation.
+    after_def = src.split("def register_page_screenshot_if_changed", 1)[1]
+    sig_end = after_def.find(") ->")
+    sig_text = after_def[: sig_end] if sig_end >= 0 else after_def[:400]
+    check("before_dims" in sig_text, "register_page_screenshot_if_changed signature has before_dims")
+    check("before_dims" in src, "register_page_screenshot_if_changed writes before_dims to meta")
+
+    # _stamp_rect_norm presence + behavior markers
+    check("def _stamp_rect_norm" in src, "state.py defines _stamp_rect_norm")
+    body = src.split("def _stamp_rect_norm", 1)[1]
+    # cut to next top-level def
+    import re
+    m = re.search(r"\n(?=(async def |def ))", body)
+    body = body[: m.start()] if m else body
+    check("page_bbox" in body, "_stamp_rect_norm reads page_bbox")
+    check("el['rect_norm']" in body, "_stamp_rect_norm writes el['rect_norm']")
+    check("startswith(pkey)" in body, "_stamp_rect_norm registry lookup uses startswith fallback (@@anchor)")
+    check("contentWidth" in body and "contentHeight" in body, "_stamp_rect_norm normalizes by page dims")
 
 
 def main():
@@ -64,6 +104,8 @@ def main():
     anchor = _last_anchor_xpath_for_overlay()
     check(anchor == '//button[normalize-space()="选择"]', f'anchor inferred from previous click step ({anchor})')
     _ACTION_LOG.clear()
+
+    test_rect_norm_pins()
 
     if failures:
         print(f'characterize-page-level-python: {failures} FAILURE(S)')

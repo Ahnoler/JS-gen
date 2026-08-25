@@ -81,11 +81,11 @@ const coverage = validatePageLevelCoverage(built.entry);
 check('coverage ok with section nodes', coverage.ok);
 check('coverage missing empty', coverage.missing.length === 0);
 
-// §8 role→type 映射：tab→tab, wizard→wizard, card→card, main 跳过不建节点
+// §8 role→type 映射：tab→tab, wizard→wizard, card→card, collapse→collapse（显式独立，录制插件格式对齐）, main 跳过不建节点
 const { properties: mappedProps } = buildV3Properties({
   traj: { steps: [
     { id: 20, trajectoryPhaseId: 1, actionType: 'click_element_by_index', params: { text: 'btn' },
-      elementJson: JSON.stringify({ region_id: 'page:url#/home|main:主区|tab:标签页|wizard:向导|card:卡片|section:区块', region_label: '区块', formLabel: 'btn', bbox: {x1:1,y1:1,x2:2,y2:2}, page_level_key: 'page:url#/home' }) },
+      elementJson: JSON.stringify({ region_id: 'page:url#/home|main:主区|tab:标签页|wizard:向导|card:卡片|collapse:折叠面板|section:区块', region_label: '区块', formLabel: 'btn', bbox: {x1:1,y1:1,x2:2,y2:2}, page_level_key: 'page:url#/home' }) },
   ]},
   phases: [],
   screenshotCount: 1,
@@ -96,20 +96,23 @@ const { properties: mappedProps } = buildV3Properties({
 const tabNode = mappedProps.find(p => p.type === 'tab');
 const wizardNode = mappedProps.find(p => p.type === 'wizard');
 const cardNode = mappedProps.find(p => p.type === 'card');
+const collapseNode = mappedProps.find(p => p.type === 'collapse');
 const sectionNode = mappedProps.find(p => p.type === 'section');
 const mainNode = mappedProps.find(p => p.propertiesName === '主区');
 check('tab node created with type=tab', !!tabNode);
 check('wizard node created with type=wizard', !!wizardNode);
 check('card node created with type=card', !!cardNode);
+check('collapse node created with type=collapse (not fallback section)', !!collapseNode);
 check('section node created with type=section', !!sectionNode);
 check('main role skipped (no node)', !mainNode);
-// pid 链：tab→page, wizard→tab, card→wizard, section→card, object→section
+// pid 链：tab→page, wizard→tab, card→wizard, collapse→card, section→collapse, object→section
 check('tab pid = page id', tabNode && tabNode.propertiesPID === '1');
 check('wizard pid = tab id', wizardNode && wizardNode.propertiesPID === tabNode.propertiesID);
 check('card pid = wizard id', cardNode && cardNode.propertiesPID === wizardNode.propertiesID);
-check('section pid = card id', sectionNode && sectionNode.propertiesPID === cardNode.propertiesID);
+check('collapse pid = card id', collapseNode && collapseNode.propertiesPID === cardNode.propertiesID);
+check('section pid = collapse id', sectionNode && sectionNode.propertiesPID === collapseNode.propertiesID);
 const mappedEle = mappedProps.find(p => p.type === 'object');
 check('object pid = section id', mappedEle && mappedEle.propertiesPID === sectionNode.propertiesID);
 
 if (failures.length) { console.error('FAIL:', failures); process.exit(1); }
-console.log('OK: §8 role→type mapping (tab/wizard/card/section, main skipped), ele pids point to intermediate nodes, same-name distinguishable, coverage traversal passes');
+console.log('OK: §8 role→type mapping (tab/wizard/card/collapse/section, main skipped), ele pids point to intermediate nodes, same-name distinguishable, coverage traversal passes');

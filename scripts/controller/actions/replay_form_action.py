@@ -41,6 +41,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         _classify_fill_result,
         _element_xpath_full,
         _element_xpath_smart,
+        _read_value_by_label,
         _read_value_by_xpath,
         _resolve_replay_xpath,
         _try_xpath_locate,
@@ -74,7 +75,14 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             hint = label or ph
             result = await page.evaluate(JS_FILL_BY_XPATH, [xpath, value, hint])
             action_ok = isinstance(result, str) and result.startswith('ok')
-            actual = await _read_value_by_xpath(page, xpath, hint) if xpath else ''
+            # If the fill fell through to the placeholder branch (stale recorded
+            # xpath), read back via the SAME label/placeholder path — otherwise
+            # the verify reads a stale-xpath empty node and wrongly flags false_ok.
+            used_placeholder = isinstance(result, str) and result.startswith('ok-placeholder')
+            if used_placeholder:
+                actual = await _read_value_by_label(page, label, ph)
+            else:
+                actual = await _read_value_by_xpath(page, xpath, hint) if xpath else ''
             classified = _classify_fill_result(action_ok, value, actual)
             if classified == 'ok':
                 await page.wait_for_timeout(300)

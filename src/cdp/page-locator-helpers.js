@@ -1475,6 +1475,17 @@ export const PAGE_LOCATOR_HELPERS = `
     }
     return a;
   }
+  // 结构化布尔属性（录制插件格式对齐）：HTML 布尔属性（disabled/readonly/required）
+  // 属性值为空串，collectAttrs 的 !at.value 过滤会丢弃它们，这里显式采集。
+  // 非 form 控件（div/span）无这些 DOM 属性，统一输出 false。
+  function collectAttrFlags(el) {
+    if (!el) return { disabled: false, required: false, readonly: false };
+    return {
+      disabled: el.disabled === true,
+      required: el.required === true,
+      readonly: el.readOnly === true,
+    };
+  }
   function buildLocatorSnap(node, text, xpathFull, formLabel, opts) {
     opts = opts || {};
     const host = normalizeTargetRoot(node) || node;
@@ -1617,6 +1628,7 @@ export const PAGE_LOCATOR_HELPERS = `
       formLabel: formLbl,
       tag: (host.tagName || '').toLowerCase(),
       attributes: collectAttrs(host),
+      attr: collectAttrFlags(host),
       candidates: candidates,
       target_kind: kind,
       parent_text: parentText || undefined,

@@ -395,6 +395,27 @@ function testPayloadStructure() {
   check(Object.keys(wrapped.payload).length === 1 && 'transcationEventTypeList' in wrapped.payload, '批量 payload 只含 transcationEventTypeList');
   check(wrapped.payload.transcationEventTypeList.length === 1, '批量合并 entries');
   check(wrapped.stats.noRectControls === 0, '批量 stats.noRectControls');
+
+  // rect_norm 优先：elementJson 带 rect_norm 的控件直出归一化值，stats.normalizedRects >= 1
+  {
+    const normTraj = {
+      id: 100,
+      name: '归一化交易',
+      steps: [
+        {
+          stepNumber: 1, actionType: 'click_element_by_index', source: 'agent',
+          trajectoryPhaseId: 1, phaseNumber: 1,
+          elementJson: { tag: 'li', xpath_smart: '//li[1]', target_kind: 'menu', text: '客户管理', region_id: 'tab:客户管理', bbox: { x1: 1, y1: 2, x2: 30, y2: 20 }, rect_norm: { x1: 0.1, y1: 0.2, x2: 0.3, y2: 0.4 } },
+          paramsJson: {},
+        },
+      ],
+    };
+    const normBuilt = buildTransactionEntryV3(normTraj, { systemId: '98', projectId: '31', phases, phaseScreenshots: shots });
+    const normProps = normBuilt.entry.transcationProperties;
+    const normCtrl = normProps.find((p) => p.type === 'object');
+    check(normCtrl.rect === '{"x1":0.1,"y1":0.2,"x2":0.3,"y2":0.4}', `rect_norm 直出归一化值（实际 ${normCtrl.rect}）`);
+    check(normBuilt.stats.normalizedRects >= 1, `stats.normalizedRects >= 1（实际 ${normBuilt.stats.normalizedRects}）`);
+  }
 }
 
 // ── 真实数据（traj 38）──

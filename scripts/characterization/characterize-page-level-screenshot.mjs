@@ -129,6 +129,8 @@ const ok = (n) => console.log(`ok: ${n}`);
 }
 
 // payload 出口：rect 统一序列化为 JSON 字符串（空给 ""），弹窗换算在序列化前完成
+// rect_norm 优先：带 rect_norm 的弹窗控件直出归一化值（跳过弹窗减法）；
+// 另加一个不带 rect_norm 的弹窗控件验证旧像素路径 + 弹窗减法不变
 {
   const pageKey = 'page:http://test/#/corp/custManage';
   const popupKey = `${pageKey}|dialog:地址选择器`;
@@ -138,7 +140,12 @@ const ok = (n) => console.log(`ok: ${n}`);
       steps: [
         {
           stepNumber: 1, actionType: 'select_option', source: 'agent',
-          elementJson: { tag: 'input', target_kind: 'form_select', formLabel: '省份', region_id: `${popupKey}|overlay:地址选择器`, page_bbox: { x1: 120, y1: 220, x2: 320, y2: 240 } },
+          elementJson: { tag: 'input', target_kind: 'form_select', formLabel: '省份', region_id: `${popupKey}|overlay:地址选择器`, rect_norm: { x1: 0.5, y1: 0.25, x2: 0.75, y2: 0.5 } },
+          paramsJson: {},
+        },
+        {
+          stepNumber: 2, actionType: 'fill_form_field', source: 'agent',
+          elementJson: { tag: 'input', target_kind: 'form_input', formLabel: '城市', region_id: `${popupKey}|overlay:地址选择器`, page_bbox: { x1: 120, y1: 220, x2: 320, y2: 240 } },
           paramsJson: {},
         },
       ],
@@ -155,11 +162,15 @@ const ok = (n) => console.log(`ok: ${n}`);
   const props = built.entry.transcationProperties;
   const page = props.find((p) => p.type === 'page');
   const dlg = props.find((p) => p.type === 'popup');
-  const ctrl = props.find((p) => p.type === 'object');
+  const ctrls = props.filter((p) => p.type === 'object');
   assert.equal(page.rect, '');
   assert.equal(dlg.rect, '{"x1":100,"y1":200,"x2":500,"y2":600}');
-  assert.equal(ctrl.rect, '{"x1":20,"y1":20,"x2":220,"y2":40}');
+  // 第一个控件走 rect_norm 直出（无弹窗减法）
+  assert.equal(ctrls[0].rect, '{"x1":0.5,"y1":0.25,"x2":0.75,"y2":0.5}');
+  // 第二个控件无 rect_norm，走旧像素路径 + 弹窗减法不变
+  assert.equal(ctrls[1].rect, '{"x1":20,"y1":20,"x2":220,"y2":40}');
   assert.equal(built.stats.missingPageLevelScreenshots, 0);
+  assert.equal(built.stats.normalizedRects, 1);
   ok('payload rect serialized as JSON string');
 }
 

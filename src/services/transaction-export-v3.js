@@ -374,6 +374,7 @@ export function buildV3Properties({
   let absoluteFallback = 0;
   let missingOptions = 0;
   let noRectControls = 0;
+  let normalizedRects = 0;
   let nextId = Number(screenshotCount) || 0;
 
   // 分区 → propertiesID/propertiesPID 父子树（partition-via-pid）。
@@ -382,11 +383,12 @@ export function buildV3Properties({
   const sectionCache = new Map();
 
   // §8 层级类型映射：region_id 段的 role → V3 type 值。
-  // 不在此列的 role 按 §8 归 section（折叠面板/区块）。
+  // 不在此列的 role 按 §8 归 section（区块）；collapse 显式独立（录制插件格式对齐）。
   const REGION_ROLE_TO_TYPE = {
     tab: 'tab',
     wizard: 'wizard',
     card: 'card',
+    collapse: 'collapse',
     section: 'section',
     titlebox: 'section',
     table: 'section',
@@ -526,31 +528,44 @@ export function buildV3Properties({
 
     let rect = {};
     if (el) {
-      // 页面级截图使用 document 坐标；新录制有 page_bbox 时优先用它，旧数据回退 bbox
-      const usePageCoords = !!(idByPageLevel && idByPageLevel.size > 0);
-      const sourceBBox = usePageCoords && el.page_bbox && isLegalRect(el.page_bbox)
-        ? el.page_bbox
-        : el.bbox;
-      if (isLegalRect(sourceBBox)) {
+      // 归一化坐标优先：录制侧已在 element_json 写入 rect_norm {x1,y1,x2,y2}（0~1，相对所属截图）。
+      // 直出归一化 rect，不做弹窗减法（rect_norm 已相对弹窗截图），不 clamp 原值透传。
+      const rn = el.rect_norm;
+      const isNorm = isLegalRect(rn)
+        && [rn.x1, rn.y1, rn.x2, rn.y2].every((v) => Number(v) >= -0.001 && Number(v) <= 1.0001);
+      if (isNorm) {
         rect = {
-          x1: Number(sourceBBox.x1), y1: Number(sourceBBox.y1),
-          x2: Number(sourceBBox.x2), y2: Number(sourceBBox.y2),
+          x1: Number(rn.x1), y1: Number(rn.y1),
+          x2: Number(rn.x2), y2: Number(rn.y2),
         };
-        // 弹窗控件 bbox 是页面长图坐标；V3 要求相对弹窗截图，减去弹窗在页面上的 rect
-        if (popupKey) {
-          const dialogEntry = pageLevelById?.get(pid);
-          const popupRect = dialogEntry?.rect;
-          if (isLegalRect(popupRect)) {
-            rect = {
-              x1: rect.x1 - Number(popupRect.x1),
-              y1: rect.y1 - Number(popupRect.y1),
-              x2: rect.x2 - Number(popupRect.x1),
-              y2: rect.y2 - Number(popupRect.y1),
-            };
-          }
-        }
+        normalizedRects += 1;
       } else {
-        noRectControls += 1;
+        // 页面级截图使用 document 坐标；新录制有 page_bbox 时优先用它，旧数据回退 bbox
+        const usePageCoords = !!(idByPageLevel && idByPageLevel.size > 0);
+        const sourceBBox = usePageCoords && el.page_bbox && isLegalRect(el.page_bbox)
+          ? el.page_bbox
+          : el.bbox;
+        if (isLegalRect(sourceBBox)) {
+          rect = {
+            x1: Number(sourceBBox.x1), y1: Number(sourceBBox.y1),
+            x2: Number(sourceBBox.x2), y2: Number(sourceBBox.y2),
+          };
+          // 弹窗控件 bbox 是页面长图坐标；V3 要求相对弹窗截图，减去弹窗在页面上的 rect
+          if (popupKey) {
+            const dialogEntry = pageLevelById?.get(pid);
+            const popupRect = dialogEntry?.rect;
+            if (isLegalRect(popupRect)) {
+              rect = {
+                x1: rect.x1 - Number(popupRect.x1),
+                y1: rect.y1 - Number(popupRect.y1),
+                x2: rect.x2 - Number(popupRect.x1),
+                y2: rect.y2 - Number(popupRect.y1),
+              };
+            }
+          }
+        } else {
+          noRectControls += 1;
+        }
       }
       let regionId = rawRegionId;
       if (pageKey && !regionId.startsWith(pageKey)) {
@@ -566,6 +581,13 @@ export function buildV3Properties({
         regionId,
         regionLabel: String(el.region_label ?? '').trim(),
         rect,
+        attr: el.attr && typeof el.attr === 'object'
+          ? {
+              disabled: el.attr.disabled === true,
+              required: el.attr.required === true,
+              readonly: el.attr.readonly === true,
+            }
+          : {},
       };
       properties.push(node);
     } else {
@@ -580,6 +602,7 @@ export function buildV3Properties({
         regionId: '',
         regionLabel: '',
         rect: {},
+        attr: {},
       };
       properties.push(node);
     }
@@ -594,6 +617,7 @@ export function buildV3Properties({
     absoluteFallback,
     missingOptions,
     noRectControls,
+    normalizedRects,
   };
 }
 
@@ -762,6 +786,7 @@ export function buildTransactionEntryV3(traj, {
     absoluteFallback,
     missingOptions,
     noRectControls,
+    normalizedRects,
   } = buildV3Properties({
     traj,
     phases,
@@ -813,6 +838,7 @@ export function buildTransactionEntryV3(traj, {
       absoluteFallback,
       missingOptions,
       noRectControls,
+      normalizedRects,
       coverageMode: usedPageLevelScreenshots ? 'page_level' : 'legacy_phase_fallback',
       coverageExemptSteps: coverage.exempt.length,
       missingPageLevelScreenshots: coverage.missing.length,
@@ -850,6 +876,7 @@ export function wrapTransactionListV3(builtEntries = []) {
   let absoluteFallback = 0;
   let missingOptions = 0;
   let noRectControls = 0;
+  let normalizedRects = 0;
   let missingPageLevelScreenshots = 0;
   let coverageExemptSteps = 0;
   let fieldCompletenessIssues = 0;
@@ -865,6 +892,7 @@ export function wrapTransactionListV3(builtEntries = []) {
     absoluteFallback += Number(b.stats?.absoluteFallback) || 0;
     missingOptions += Number(b.stats?.missingOptions) || 0;
     noRectControls += Number(b.stats?.noRectControls) || 0;
+    normalizedRects += Number(b.stats?.normalizedRects) || 0;
     missingPageLevelScreenshots += Number(b.stats?.missingPageLevelScreenshots) || 0;
     coverageExemptSteps += Number(b.stats?.coverageExemptSteps) || 0;
     fieldCompletenessIssues += Number(b.stats?.fieldCompletenessIssues) || 0;
@@ -887,6 +915,7 @@ export function wrapTransactionListV3(builtEntries = []) {
       absoluteFallback,
       missingOptions,
       noRectControls,
+      normalizedRects,
       coverageMode: coverageModes.size === 1 ? [...coverageModes][0] : [...coverageModes].join('+'),
       coverageExemptSteps,
       missingPageLevelScreenshots,

@@ -512,6 +512,44 @@ _JS_READ_VALUE_BY_XPATH = r'''([xpath, labelHint]) => {
   return '';
 }'''
 
+# Read back a value by el-form-item label or placeholder — the mirror of
+# JS_FILL_BY_XPATH's placeholder fallback. Used when a fill landed on the
+# placeholder branch (stale xpath) so the verify reads the SAME input the
+# fill wrote, instead of reading an empty stale-xpath node.
+_JS_READ_VALUE_BY_LABEL = r'''([label, placeholder]) => {
+  const isVis = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const read = (el) => {
+    if (!el) return '';
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return (el.value || '').trim();
+    const inp = el.querySelector && el.querySelector('input:not([type="hidden"]), textarea');
+    return inp ? (inp.value || '').trim() : '';
+  };
+  const want = String(label || '').trim();
+  const phWant = String(placeholder || '').trim();
+  // Pass 1: exact el-form-item label
+  const items = document.querySelectorAll('.el-form-item');
+  for (const item of items) {
+    const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+    if (lbl !== want) continue;
+    const input = item.querySelector('input:not([type="hidden"])') || item.querySelector('textarea');
+    if (input) return read(input);
+  }
+  // Pass 2: visible input matching placeholder (or fuzzy label in placeholder)
+  for (const inp of document.querySelectorAll('input:not([type="hidden"]), textarea')) {
+    if (!isVis(inp) || inp.disabled || inp.readOnly) continue;
+    if (inp.closest('.el-date-editor, .tsscdatepicker')) continue;
+    const ph = inp.getAttribute('placeholder') || '';
+    if (!ph) continue;
+    if ((phWant && ph.includes(phWant)) || (want && ph.includes(want))) return read(inp);
+  }
+  return '';
+}'''
 
 
 # Click / focus a control resolved by xpath (returns ok-xpath-smart when found).

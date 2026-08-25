@@ -144,8 +144,9 @@ async function partnerFetch(url, { method = 'GET', accessToken, body, timeoutMs 
   }
 }
 
-/** 伙伴 schema 不认识的字段（V3 调试辅助，partner Jackson 严格反序列化会拒收） */
-const PARTNER_PROP_DROP_KEYS = ['regionId', 'regionLabel'];
+/** 伙伴 schema 不认识的字段（V3 调试辅助，partner Jackson 严格反序列化会拒收；
+ * attr 为本地/replay 元数据，确认伙伴认后再放开） */
+const PARTNER_PROP_DROP_KEYS = ['regionId', 'regionLabel', 'attr'];
 
 /**
  * 把本仓 payload 适配成伙伴 importDemand 契约：

@@ -130,6 +130,11 @@ class ElementInfo(BaseModel):
     layers: list[str] = Field(default_factory=list, description="Region layer stack (tab → section → titlebox)")
     bbox: dict | None = Field(default=None, description="Content-coordinate bounding box {x1,y1,x2,y2}")
     page_bbox: dict | None = Field(default=None, description="Document-coordinate bounding box for page-level screenshot {x1,y1,x2,y2}")
+    attr: dict = Field(
+        default_factory=dict,
+        description="Structured boolean flags {disabled,required,readonly} (plugin-format aligned; "
+        "HTML boolean attrs are dropped by attributes sanitize, collected explicitly here)",
+    )
 
     def to_element_json(self) -> dict:
         """Convert to trajectory_step.element_json dict."""
@@ -172,6 +177,8 @@ class ElementInfo(BaseModel):
             data['bbox'] = dict(self.bbox)
         if self.page_bbox:
             data['page_bbox'] = dict(self.page_bbox)
+        if self.attr:
+            data['attr'] = dict(self.attr)
         return data
 
 
@@ -401,6 +408,11 @@ class ActionEntry(BaseModel):
                 entry.element['page_bbox'] = dict(elem['page_bbox'])
             if isinstance(elem.get('bbox'), dict) and elem.get('bbox'):
                 entry.element['bbox'] = dict(elem['bbox'])
+            if isinstance(elem.get('attr'), dict) and elem.get('attr'):
+                entry.element['attr'] = {
+                    k: bool(v) for k, v in elem['attr'].items()
+                    if k in ('disabled', 'required', 'readonly')
+                }
             if not entry.element.get('locator_strategy'):
                 entry.element['locator_strategy'] = (
                     'xpath_smart' if xpath_smart else ('xpath_full' if (xpath_full or xpath) else '')

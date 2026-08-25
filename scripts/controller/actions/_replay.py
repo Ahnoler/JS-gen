@@ -52,6 +52,7 @@ from .replay_js import (  # noqa: F401  (re-exported for compat)
     _JS_PAGE_BUSY,
     JS_COUNT_OVERLAYS,
     _JS_READ_VALUE_BY_XPATH,
+    _JS_READ_VALUE_BY_LABEL,
 )
 from .replay_names import (  # noqa: F401  (re-exported for compat)
     _ACTION_NAME_ALIASES,
@@ -271,6 +272,14 @@ async def _read_value_by_xpath(page, xpath: str, label_hint: str = '') -> str:
     if not xpath:
         return ''
     result = await page.evaluate(_JS_READ_VALUE_BY_XPATH, [xpath, label_hint or ''])
+    return str(result or '').strip()
+
+
+async def _read_value_by_label(page, label: str, placeholder: str = '') -> str:
+    """Read a value by el-form-item label / placeholder (mirror of the
+    JS_FILL_BY_XPATH placeholder branch). Used when a fill fell back to the
+    placeholder path because the recorded xpath was stale."""
+    result = await page.evaluate(_JS_READ_VALUE_BY_LABEL, [label or '', placeholder or ''])
     return str(result or '').strip()
 
 

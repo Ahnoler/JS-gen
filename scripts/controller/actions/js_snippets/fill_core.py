@@ -360,6 +360,7 @@ JS_CAPTURE_FROM_XPATH = (
     css_sel: '',
     tag,
     attrs,
+    attr: collectAttrFlags(host),
     text,
     formLabel: formLbl || String(label || ''),
     target_kind: String(target_kind || ''),
