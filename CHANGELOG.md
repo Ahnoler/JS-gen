@@ -18,6 +18,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
 
 ### Fixed
 
+- 2026-08-25: **人工录制无 label 字段的 label 兜底与定位优先级**：`formItemLabel`/CDP fill 在无 `.el-form-item__label` 时，用 placeholder 文本去掉「请输入」作为 `label_text`；`formFieldXpathSmartOf` 回退顺序改为 placeholder 优先、name 次之。配合上一修复，登录等无 label 页面重录后 `xpath_smart` 可直接命中，减少自愈触发。
+  影响范围：人工录制/CDP inspect 的 label 捕获与 locator 生成；无 schema/路由/WS 变更。
+  文件：scripts/manual_recorder/js_parts/a.py, src/cdp/inspect-payload-script.js, src/cdp/inspect.js, src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-login-locator-fallback.py
+  Python 同步提示：Python mirror 已同步；控制面/前端无需感知。
+
 - 2026-08-25: **登录等无 label 表单的 xpath_smart 回退**：`formFieldXpathSmartOf` 在 `.el-form-item` 内没有真实 `<label>` 时，忽略 `formLabel` 提示并改用 `name`/`placeholder` 定位；同时忽略形如 XPath 的损坏 `formLabel`（避免绝对路径被当 label 截断写入）。修复人工录制登录步骤在回放/录制时定位不到的问题。
   影响范围：locator 生成（`src/cdp/page-locator-helpers.js` 与 Python mirror）；无 schema/路由/WS 变更。
   文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-login-locator-fallback.py, scripts/refactor/verify-all.sh

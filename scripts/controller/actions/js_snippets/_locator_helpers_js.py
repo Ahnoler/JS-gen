@@ -323,15 +323,15 @@ PAGE_LOCATOR_HELPERS = r'''
     })();
     if ((!lbl || !realLabel || !node) && node) {
       const tagL0 = (node.tagName || '').toLowerCase();
-      const name = (node.getAttribute && node.getAttribute('name')) || '';
-      if (name) {
-        const leaf0 = tagL0 === 'textarea' ? 'textarea' : 'input';
-        return scopedXPath(leaf0 + '[@name=' + xpathLiteral(name) + ']', scopeKind);
-      }
       const ph = normalizeControlText((node.getAttribute && node.getAttribute('placeholder')) || '');
       if (ph) {
         const leaf0 = tagL0 === 'textarea' ? 'textarea' : 'input';
         return scopedXPath(leaf0 + '[contains(@placeholder,' + xpathLiteral(ph) + ')]', scopeKind);
+      }
+      const name = (node.getAttribute && node.getAttribute('name')) || '';
+      if (name) {
+        const leaf0 = tagL0 === 'textarea' ? 'textarea' : 'input';
+        return scopedXPath(leaf0 + '[@name=' + xpathLiteral(name) + ']', scopeKind);
       }
     }
     if (!lbl || !node) return '';

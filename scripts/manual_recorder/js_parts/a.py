@@ -87,11 +87,17 @@ JS_MANUAL_PART_A = r'''(() => {
     return null;
   }
 
+  function placeholderLabel(el) {
+    const ph = (el && el.getAttribute && el.getAttribute('placeholder')) || '';
+    return (ph || '').replace(/^请输入/, '').replace(/[：:*\s]+$/g, '').trim();
+  }
+
   function formItemLabel(el) {
     const item = el.closest('.el-form-item');
     if (!item) return '';
     const lbl = item.querySelector('.el-form-item__label');
-    return (lbl && lbl.textContent || '').trim().replace(/[：:*\s]+$/g, '');
+    const t = (lbl && lbl.textContent || '').trim().replace(/[：:*\s]+$/g, '');
+    return t || placeholderLabel(el);
   }
 
   function openDateEditorMeta() {

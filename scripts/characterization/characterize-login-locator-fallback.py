@@ -54,8 +54,10 @@ def main() -> int:
         ))
         smart1 = (loc1 or {}).get('xpath_smart') or ''
         assert_true(smart1, f'no smart for label-less: {loc1!r}')
-        assert_true("'username'" in smart1 or "请输入您的用户名" in smart1,
-                    f'smart should use name/placeholder, got: {smart1}')
+        assert_true("请输入您的用户名" in smart1,
+                    f'smart should use placeholder text, got: {smart1}')
+        assert_true("'username'" not in smart1,
+                    f'smart should prefer placeholder over name, got: {smart1}')
         cnt1 = page.evaluate("(xp)=>document.evaluate(xp,document,null,XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,null).snapshotLength", smart1)
         assert_true(cnt1 == 1, f'label-less smart count={cnt1}')
 
@@ -66,8 +68,10 @@ def main() -> int:
         ))
         smart2 = (loc2 or {}).get('xpath_smart') or ''
         assert_true(smart2, f'no smart for corrupt label: {loc2!r}')
-        assert_true("'password'" in smart2 or "请输入您的密码" in smart2,
-                    f'smart should ignore corrupt label, got: {smart2}')
+        assert_true("请输入您的密码" in smart2,
+                    f'smart should ignore corrupt label and use placeholder, got: {smart2}')
+        assert_true("'password'" not in smart2,
+                    f'smart should prefer placeholder over name, got: {smart2}')
         cnt2 = page.evaluate("(xp)=>document.evaluate(xp,document,null,XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,null).snapshotLength", smart2)
         assert_true(cnt2 == 1, f'corrupt-label smart count={cnt2}')
 
@@ -84,6 +88,15 @@ def main() -> int:
         assert_true(cnt3 == 1, f'labeled smart count={cnt3}')
 
         browser.close()
+
+    # Recorder label fallback: label-less fields must derive label from placeholder
+    a = (ROOT / 'scripts/manual_recorder/js_parts/a.py').read_text(encoding='utf-8')
+    assert_true('function placeholderLabel' in a, 'manual recorder a.py has placeholderLabel')
+    assert_true('replace(/^请输入/' in a, 'manual recorder strips 请输入 prefix')
+    ip = (ROOT / 'src/cdp/inspect-payload-script.js').read_text(encoding='utf-8')
+    assert_true('function placeholderLabel' in ip, 'inspect-payload has placeholderLabel')
+    ins = (ROOT / 'src/cdp/inspect.js').read_text(encoding='utf-8')
+    assert_true('replace(/^请输入/' in ins, 'cdp inspect fill falls back to placeholder label')
 
     print('characterize-login-locator-fallback: OK')
     return 0

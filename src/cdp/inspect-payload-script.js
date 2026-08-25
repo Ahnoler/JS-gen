@@ -117,11 +117,17 @@ ${PAGE_LOCATOR_HELPERS}
     return t.split(/[\\n\\r]/)[0].trim().slice(0, 40);
   }
 
+  function placeholderLabel(node) {
+    const ph = (node && node.getAttribute && node.getAttribute('placeholder')) || '';
+    return (ph || '').replace(/^请输入/, '').replace(/[：:*\\s]+$/g, '').trim();
+  }
+
   function formItemLabel(node) {
     const item = node.closest && node.closest('.el-form-item');
     if (!item) return '';
     const lbl = item.querySelector('.el-form-item__label');
-    return (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+    const t = (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+    return t || placeholderLabel(node);
   }
 
   function openDateEditorMeta() {

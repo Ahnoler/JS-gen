@@ -133,7 +133,9 @@ export async function resolveFocusedFillPayload(client) {
         if (el.closest && el.closest('.el-date-editor')) return null;
         const item = el.closest && el.closest('.el-form-item');
         const lbl = item && item.querySelector('.el-form-item__label');
-        const label = (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+        const phText = (el.getAttribute && el.getAttribute('placeholder')) || '';
+        const label = (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '')
+          || (phText || '').replace(/^请输入/, '').replace(/[：:*\\s]+$/g, '').trim();
         const value = el.value || '';
         if (!String(value).trim()) return null;
         function xpathOf(node) {
