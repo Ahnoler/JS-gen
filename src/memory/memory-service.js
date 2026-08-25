@@ -475,11 +475,11 @@ export async function stats() {
 }
 
 /**
- * P1：把轨迹案例数据（analyze 解析 / 前端 POST 的 KV）摄取为
+ * P1：把轨迹业务数据（analyze 解析 / 前端 POST 的 KV）摄取为
  * memory_fact —— source=requirement, stance=authoritative（不可被 LLM 覆盖），
  * 供事实包注入优先采用。entries 格式 {fieldKey, fieldValue} 或 {key, value}。
  */
-export async function ingestCaseEntriesAsFacts(trajectoryId, entries) {
+export async function ingestBusinessEntriesAsFacts(trajectoryId, entries) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0 || !Array.isArray(entries) || !entries.length) {
     return { inserted: 0 };
@@ -493,7 +493,7 @@ export async function ingestCaseEntriesAsFacts(trajectoryId, entries) {
     seen.add(entity);
     const v = e.fieldValue ?? e.value;
     const value = v == null ? null : String(v);
-    if (value == null || !value.trim()) continue; // 空值无信息量（与 extractCaseDataBlock 对齐）
+    if (value == null || !value.trim()) continue; // 空值无信息量（与 extractBusinessDataBlock 对齐）
     facts.push({
       entity,
       attribute: 'value',
@@ -509,7 +509,7 @@ export async function ingestCaseEntriesAsFacts(trajectoryId, entries) {
       eventType: 'system',
       trajectoryId: tid,
       source: 'requirement',
-      payload: { kind: 'case_entries', count: facts.length },
+      payload: { kind: 'business_entries', count: facts.length },
       facts,
     }],
   });

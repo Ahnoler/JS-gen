@@ -9,7 +9,7 @@ Architecture::
   FIELD_RULES (list of FieldRule)
     │
     ├── match_rule(label) → str | None
-    └── get_has_button_keywords(case_data_store) → list[str]
+    └── get_has_button_keywords(business_data_store) → list[str]
 """
 import random as _random
 import os
@@ -422,10 +422,10 @@ def match_rule(label_text):
 _DEFAULT_HAS_BUTTON_KEYWORDS = ['选择', '获取地址', '引入', '新增', '添加', '验证']
 
 
-def get_has_button_keywords(case_data_store=None):
+def get_has_button_keywords(business_data_store=None):
     """Return button keywords used by JS_SCAN_FORM_FIELDS / JS_CHECK_SINGLE_FIELD."""
-    if case_data_store:
-        override = case_data_store.get('_has_button_keywords')
+    if business_data_store:
+        override = business_data_store.get('_has_button_keywords')
         if override and isinstance(override, list) and len(override) > 0:
             return [str(k) for k in override]
     env_val = os.environ.get('HAS_BUTTON_KEYWORDS', '').strip()

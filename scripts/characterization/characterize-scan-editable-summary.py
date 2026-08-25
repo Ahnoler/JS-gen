@@ -70,13 +70,13 @@ def test_action_no_store_writes() -> None:
     form = _form_src()
     body = _scan_editable_summary_body(form)
     assert_true(
-        "case_data_store['task_list']" not in body
-        and 'case_data_store["task_list"]' not in body,
-        "scan_editable_summary must not assign case_data_store['task_list']",
+        "business_data_store['task_list']" not in body
+        and 'business_data_store["task_list"]' not in body,
+        "scan_editable_summary must not assign business_data_store['task_list']",
     )
     assert_true(
         "['_scan_fields']" not in body,
-        "scan_editable_summary must not assign case_data_store['_scan_fields']",
+        "scan_editable_summary must not assign business_data_store['_scan_fields']",
     )
 
 

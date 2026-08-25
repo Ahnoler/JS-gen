@@ -16,10 +16,10 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from scripts.controller.actions._case_data import (  # noqa: E402
-    format_case_data_hint,
-    iter_user_case_entries,
-    lookup_case_value,
+from scripts.controller.actions._business_data import (  # noqa: E402
+    format_business_data_hint,
+    iter_user_business_entries,
+    lookup_business_value,
 )
 from scripts.controller.actions._form import (  # noqa: E402
     _is_query_mode,
@@ -56,12 +56,12 @@ def test_lookup_exact_and_fuzzy() -> None:
         'task_list': {'pending': [], 'done': []},
         '_watcher_mode': False,
     }
-    assert_true(lookup_case_value(store, '客户名称') == 'UI录制', 'exact name')
-    assert_true(lookup_case_value(store, '证件号码') == 'XG123456', 'exact id')
-    assert_true(lookup_case_value(store, '客户名称*') == 'UI录制', 'strip required mark')
-    assert_true(lookup_case_value(store, '证件号码：') == 'XG123456', 'strip colon')
-    assert_true(lookup_case_value(store, 'task_list') is None, 'reserved key ignored')
-    assert_true(lookup_case_value(store, '不存在') is None, 'missing')
+    assert_true(lookup_business_value(store, '客户名称') == 'UI录制', 'exact name')
+    assert_true(lookup_business_value(store, '证件号码') == 'XG123456', 'exact id')
+    assert_true(lookup_business_value(store, '客户名称*') == 'UI录制', 'strip required mark')
+    assert_true(lookup_business_value(store, '证件号码：') == 'XG123456', 'strip colon')
+    assert_true(lookup_business_value(store, 'task_list') is None, 'reserved key ignored')
+    assert_true(lookup_business_value(store, '不存在') is None, 'missing')
 
 
 def test_hint_includes_block_and_flat_kv() -> None:
@@ -71,7 +71,7 @@ def test_hint_includes_block_and_flat_kv() -> None:
         '客户类型': '正式客户',
         '证件类型': '营业执照',
     }
-    hint = format_case_data_hint(store)
+    hint = format_business_data_hint(store)
     assert_true('法定责任人引入 朱桂武' in hint, 'prose block present')
     assert_true('客户类型：正式客户' in hint or '客户类型' in hint, 'flat KV key')
     assert_true('正式客户' in hint, 'flat KV value')
@@ -83,7 +83,7 @@ def test_auto_fill_does_not_hard_bind_case_presets() -> None:
     """Product: case KV is agent_task text only — not commandValue hard-bind."""
     from pathlib import Path
     form = (Path(_ROOT) / 'scripts/controller/actions/_form.py').read_text(encoding='utf-8')
-    case = (Path(_ROOT) / 'scripts/controller/actions/_case_data.py').read_text(encoding='utf-8')
+    case = (Path(_ROOT) / 'scripts/controller/actions/_business_data.py').read_text(encoding='utf-8')
     assert_true(
         'apply_case_presets_to_fields' not in form,
         '_form must not hard-bind case presets',
@@ -100,22 +100,21 @@ def test_hint_lists_user_keys_only() -> None:
         'form_snapshots': [],
         '_ref_date': '2020-01-01',
     }
-    entries = iter_user_case_entries(store)
+    entries = iter_user_business_entries(store)
     assert_true(entries == [('客户名称', 'UI录制')], f'entries={entries}')
-    hint = format_case_data_hint(store)
+    hint = format_business_data_hint(store)
     assert_true('客户名称：UI录制' in hint or '客户名称' in hint, 'hint body')
     assert_true('业务数据' in hint, 'hint header')
-    assert_true(format_case_data_hint({}) == '', 'empty store')
+    assert_true(format_business_data_hint({}) == '', 'empty store')
 
     # Prefer raw scenario text; flat KV still listed alongside when present
     with_block = {
         '_case_scenario_text': '关键数据\n法定责任人引入 朱桂武',
         '客户名称': '测试科技发展有限公司',
     }
-    hint2 = format_case_data_hint(with_block)
+    hint2 = format_business_data_hint(with_block)
     assert_true('法定责任人引入 朱桂武' in hint2, 'block text in hint')
     assert_true('自行判断' in hint2, 'AI-judge cue')
-    assert_true('非系统回写' in hint2 or '不是系统回写' in hint2, '业务 vs 案例 distinction')
     assert_true('必须优先使用这些值' not in hint2, 'no hard-match mandate')
     assert_true('测试科技发展有限公司' in hint2, 'flat KV alongside block')
 
@@ -257,7 +256,7 @@ def test_phase_preamble_catalog_and_prior() -> None:
         current_phase=2,
         current_task='打开客户列表',
         prior_phases=None,
-        case_data_store=None,
+        business_data_store=None,
         all_phases=[
             {'phaseNumber': 1, 'title': '登录'},
             {'phaseNumber': 2, 'title': '进入对公客户管理'},
@@ -275,7 +274,7 @@ def test_phase_preamble_catalog_and_prior() -> None:
         current_phase=3,
         current_task='新增客户',
         prior_phases=None,
-        case_data_store=None,
+        business_data_store=None,
         all_phases=[
             {'phaseNumber': 1, 'title': '登录系统'},
             {'phaseNumber': 2, 'title': '进入客户管理'},

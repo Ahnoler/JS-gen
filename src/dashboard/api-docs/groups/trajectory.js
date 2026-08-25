@@ -14,7 +14,7 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'POST', path: '/api/v2/trajectories/analyze',
         summary: 'AI 需求拆解为阶段（不落库）',
-        desc: '将需求拆成 phases（条数跟用户编号分步）。需求中的「关键数据/案例数据」段落语义上是**业务数据**（用户希望使用的值，≠ 本项目落库的系统回写案例数据）：原文附加到每个 phase 描述末尾供 LLM 理解填表；其余字段仍可由 autofill 随机补。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。',
+        desc: '将需求拆成 phases（条数跟用户编号分步）。需求中的「关键数据/业务数据」段落语义上是**业务数据**（用户希望使用的值）：原文附加到每个 phase 描述末尾供 LLM 理解填表；其余字段仍可由 autofill 随机补。可选 functionId：为每个 phase 挂 specialElementCandidates（仅预览）。',
         reqExample: J({
           description:
             '1、点击客户管理，点击对公客户管理。\n'
@@ -29,13 +29,13 @@ export const GROUP_TRAJECTORY = [
         respExample: J({
           phases: [
             '点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理。\n\n'
-            + '【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n'
+            + '【业务数据 — 来自用户需求；填表时参考理解，按场景填写关键字段】\n'
             + '关键数据\n对公客户基本信息：\n法定责任人的客户名称：朱桂武\n客户标签：',
             '新增一个对公潜在客户。预期结果：打开对公潜在客户新增表单。\n\n'
-            + '【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n'
+            + '【业务数据 — 来自用户需求；填表时参考理解，按场景填写关键字段】\n'
             + '关键数据\n对公客户基本信息：\n法定责任人的客户名称：朱桂武\n客户标签：',
           ],
-          caseEntries: [],
+          businessEntries: [],
         }),
       },
       {
@@ -69,13 +69,13 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'POST', path: '/api/v2/trajectories',
         summary: '创建交易',
-        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 caseEntries 写入 legacy case_data_entry（勿与业务数据、system_ref 混用）。录制填表优先参考 phase 内【业务数据】（用户需求原文）。系统回写参考值见 PUT …/system-ref-entries。',
+        desc: '推荐带 phases；requirement 可写为 task；systemAccountId 可写为 accountId。可选 businessEntries 写入 legacy business_data_entry（勿与业务数据、system_ref 混用）。录制填表优先参考 phase 内【业务数据】（用户需求原文）。系统回写参考值见 PUT …/system-ref-entries。',
         reqExample: J({
           functionId: 3,
           name: '开户交易',
           requirement: '登录、查询、修改',
           phases: ['登录系统', '查询客户', '修改信息'],
-          caseEntries: [
+          businessEntries: [
             { fieldKey: '姓名', fieldValue: '张三' },
             { fieldKey: '证件号码', fieldValue: '110101199001011234' },
           ],
@@ -85,23 +85,23 @@ export const GROUP_TRAJECTORY = [
         respExample: J({
           id: 42, name: '开户交易', recordStatus: 'draft', phaseCount: 3,
           phases: [],
-          caseEntries: [{ id: 1, fieldKey: '姓名', fieldValue: '张三', trajectoryId: 42 }],
+          businessEntries: [{ id: 1, fieldKey: '姓名', fieldValue: '张三', trajectoryId: 42 }],
         }),
       },
       {
         method: 'GET', path: '/api/v2/trajectories/{id}',
-        summary: '交易详情（含 phases、caseEntries）',
-        desc: 'caseEntries 为交易级 legacy KV（case_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。phases[].doneLogs 为 `{ text, at, source }[]`（`agent`|`fail`）；trajectoryLog 仍为 agent 全文。',
+        summary: '交易详情（含 phases、businessEntries）',
+        desc: 'businessEntries 为交易级 legacy KV（business_data_entry）。录制填表优先【业务数据】；目标系统已校验参考值用 system_ref_entry，勿混用。含 isExport（0|1，见 ENUMS）。phases[].doneLogs 为 `{ text, at, source }[]`（`agent`|`fail`）；trajectoryLog 仍为 agent 全文。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
       },
       {
         method: 'PATCH', path: '/api/v2/trajectories/{id}',
-        summary: '更新元数据 / 绑定账号 / 案例数据',
-        desc: '录制前须绑定 systemAccountId。账号须属于该交易所属系统。可同时传 caseEntries 替换案例 KV。',
+        summary: '更新元数据 / 绑定账号 / 业务数据',
+        desc: '录制前须绑定 systemAccountId。账号须属于该交易所属系统。可同时传 businessEntries 替换业务 KV。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
           systemAccountId: 10,
-          caseEntries: [{ fieldKey: '姓名', fieldValue: '李四' }],
+          businessEntries: [{ fieldKey: '姓名', fieldValue: '李四' }],
         }),
         respExample: J({
           trajectory: { id: 42, systemAccountId: 10 },
@@ -109,18 +109,18 @@ export const GROUP_TRAJECTORY = [
         }),
       },
       {
-        method: 'PUT', path: '/api/v2/trajectories/{id}/case-data',
-        summary: '替换交易案例数据',
-        desc: '按 trajectory_id 全量替换 legacy case_data_entry（先删后插）。不是 system_ref；系统参考值请用 PUT …/system-ref-entries。本期仅持久化，不参与录制注入。',
+        method: 'PUT', path: '/api/v2/trajectories/{id}/business-data',
+        summary: '替换交易业务数据',
+        desc: '按 trajectory_id 全量替换 legacy business_data_entry（先删后插）。不是 system_ref；系统参考值请用 PUT …/system-ref-entries。本期仅持久化，不参与录制注入。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
-          caseEntries: [
+          businessEntries: [
             { fieldKey: '姓名', fieldValue: '张三' },
             { fieldKey: '手机号', fieldValue: '13800138000' },
           ],
         }),
         respExample: J({
-          id: 42, caseEntries: [{ id: 2, fieldKey: '姓名', fieldValue: '张三', trajectoryId: 42 }],
+          id: 42, businessEntries: [{ id: 2, fieldKey: '姓名', fieldValue: '张三', trajectoryId: 42 }],
         }),
       },
       {
@@ -131,14 +131,14 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'GET', path: '/api/v2/trajectories/{id}/tree',
         summary: '阶段 + 步骤二级树',
-        desc: '含 caseEntries（交易级案例 KV）。默认隐藏内部 meta 步骤（如 save_form_snapshot）；`includeMeta=1` 返回全部。步骤带 `isMeta`。',
+        desc: '含 businessEntries（交易级业务 KV）。默认隐藏内部 meta 步骤（如 save_form_snapshot）；`includeMeta=1` 返回全部。步骤带 `isMeta`。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', example: '42' },
           { name: 'includeMeta', type: 'boolean', in: 'query', desc: 'true/1 时包含 save_form_snapshot 等内部步骤', example: 'false' },
         ],
         respExample: J({
           trajectoryId: 42, name: '...', recordStatus: 'draft',
-          caseEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
+          businessEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
           phases: [{
             id: 101, phaseNumber: 1, description: '登录系统', status: 'pending',
             stitchScreenshotId: 88,
@@ -172,7 +172,7 @@ export const GROUP_TRAJECTORY = [
       {
         method: 'PUT', path: '/api/v2/trajectories/{id}/phases',
         summary: '按 id 同步阶段（删缺补新并重排 phase_number）',
-        desc: '可选同时传 caseEntries，一并替换交易案例数据。',
+        desc: '可选同时传 businessEntries，一并替换交易业务数据。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({
           phases: [
@@ -180,7 +180,7 @@ export const GROUP_TRAJECTORY = [
             { description: '新阶段' },
             { id: 103, description: '提交' },
           ],
-          caseEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
+          businessEntries: [{ fieldKey: '姓名', fieldValue: '张三' }],
         }),
       },
       {

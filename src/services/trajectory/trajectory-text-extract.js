@@ -1,13 +1,13 @@
 /**
- * Requirement-text extraction helpers for trajectories: case-data block
+ * Requirement-text extraction helpers for trajectories: business-data block
  * extraction, KV entry parsing, business-data phase gating.
  * Extracted from trajectory-meta-service.js — move-only, no logic changes.
  */
-import * as caseDataDao from '../../dao/case-data-dao.js';
+import * as businessDataDao from '../../dao/business-data-dao.js';
 
-/** Section headers that introduce a case-data block in a requirement. */
-export const CASE_DATA_SECTION_RE = /^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]?$/i;
-const CASE_DATA_HEADER_INLINE_RE = /^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]/i;
+/** Section headers that introduce a business-data block in a requirement. */
+export const BUSINESS_DATA_SECTION_RE = /^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]?$/i;
+const BUSINESS_DATA_HEADER_INLINE_RE = /^(案例数据|关键数据|测试数据|预设数据|用例数据)\s*[:：]/i;
 
 /** Trailing AI value-hint blocks — must not drive phase-type classification. */
 const BUSINESS_DATA_MARK_RE = /\n*【(?:业务数据|业务场景案例数据|预设案例数据)[^\n]*】[\s\S]*$/;
@@ -50,12 +50,12 @@ export function phaseNeedsBusinessData(phaseText) {
 }
 
 /**
- * Extract the raw「关键数据 / 案例数据 …」block from a *user requirement*.
+ * Extract the raw「关键数据 / 业务数据 …」block from a *user requirement*.
  *
  * Semantically this is **业务数据** (what the user wants to use), not
- * **system_ref** (target-system captured / verified) and not legacy case_data
+ * **system_ref** (target-system captured / verified) and not legacy business_data
  * as the product home for system references. Section headers in NL often still
- * say「关键数据」or「案例数据」— treat the block as 业务数据.
+ * say「关键数据」or「业务数据」— treat the block as 业务数据.
  * Never persist this block into system_ref_*.
  *
  * Primary contract for AI fill: soft, relatively-structured notes; tolerate
@@ -63,7 +63,7 @@ export function phaseNeedsBusinessData(phaseText) {
  * @param {string} text
  * @returns {string} block including header, or '' if none
  */
-export function extractCaseDataBlock(text) {
+export function extractBusinessDataBlock(text) {
   const lines = String(text || '').split(/\r?\n/);
   const collected = [];
   let inBlock = false;
@@ -71,13 +71,13 @@ export function extractCaseDataBlock(text) {
   for (const line of lines) {
     const t = line.trim();
     if (!inBlock) {
-      if (CASE_DATA_SECTION_RE.test(t) || CASE_DATA_HEADER_INLINE_RE.test(t)) {
+      if (BUSINESS_DATA_SECTION_RE.test(t) || BUSINESS_DATA_HEADER_INLINE_RE.test(t)) {
         inBlock = true;
         collected.push(line);
       }
       continue;
     }
-    // Next numbered step ends the case-data block
+    // Next numbered step ends the business-data block
     if (/^\d+[\.、\)]\s*/.test(t)) break;
     collected.push(line);
   }
@@ -88,13 +88,13 @@ export function extractCaseDataBlock(text) {
 /**
  * Best-effort KV parse of requirement **业务数据** (user wish-list text).
  *
- * Secondary to {@link extractCaseDataBlock}. Do not confuse with 案例数据
+ * Secondary to {@link extractBusinessDataBlock}. Do not confuse with 业务数据
  * persisted from the system. Incomplete / fuzzy user wording is normal —
  * empty parse ≠ “no 业务数据”; the raw block still goes to the agent.
  *
- * @deprecated Prefer extractCaseDataBlock for AI fill context.
+ * @deprecated Prefer extractBusinessDataBlock for AI fill context.
  */
-export function extractCaseEntriesFromRequirement(text) {
+export function extractBusinessEntriesFromRequirement(text) {
   const lines = String(text || '').split(/\r?\n/);
   const raw = [];
   let inBlock = false;
@@ -103,7 +103,7 @@ export function extractCaseEntriesFromRequirement(text) {
     const t = line.trim();
     if (!t) continue;
 
-    if (CASE_DATA_SECTION_RE.test(t)) {
+    if (BUSINESS_DATA_SECTION_RE.test(t)) {
       inBlock = true;
       continue;
     }
@@ -124,7 +124,7 @@ export function extractCaseEntriesFromRequirement(text) {
 
     const m = t.match(/^(.+?)\s*[:：=]\s*(.+)$/);
     if (!m) {
-      // 无冒号/等号分隔的「引入」类案例数据：
+      // 无冒号/等号分隔的「引入」类业务数据：
       // 「法定责任人引入 朱桂武」→ {fieldKey: 法定责任人引入, fieldValue: 朱桂武}
       // （AI 录制实锤：introduce 放大镜场景模型因解析不出 KV 而用主表单值查询）
       const intro = t.match(/^(.*?引入)\s+(\S.*)$/);
@@ -142,7 +142,7 @@ export function extractCaseEntriesFromRequirement(text) {
     raw.push({ fieldKey, fieldValue });
   }
 
-  return caseDataDao.normalizeCaseEntries(raw);
+  return businessDataDao.normalizeBusinessEntries(raw);
 }
 
 /**
@@ -150,11 +150,11 @@ export function extractCaseEntriesFromRequirement(text) {
  * @param {string[]} phases
  * @param {string} caseBlock
  */
-export function appendCaseDataToPhases(phases, caseBlock) {
+export function appendBusinessDataToPhases(phases, caseBlock) {
   const block = String(caseBlock || '').trim();
   if (!block || !Array.isArray(phases) || !phases.length) return phases || [];
   // Avoid「填写」in the mark — that keyword pollutes task_mode if strip ever fails.
-  const suffix = `\n\n【业务数据 — 来自用户需求（非系统回写案例数据）；填表/引入时参考理解，按场景选用关键取值】\n${block}`;
+  const suffix = `\n\n【业务数据 — 来自用户需求；填表/引入时参考理解，按场景选用关键取值】\n${block}`;
   return phases.map((p) => {
     const text = String(p || '').trim();
     if (!text) return text;

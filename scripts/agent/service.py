@@ -77,21 +77,21 @@ def _request_agent_stop(cancel_flag_path=None, goal_tracker=None, reason='cancel
     emit_json({"event": "agent_stopped", "data": {"reason": reason}})
 
 
-def _count_introduce_fields(case_data_ref):
+def _count_introduce_fields(business_data_ref):
     """Count introduce-type fields (disabled + hasButton) from _scan_fields."""
-    scan_fields = case_data_ref.get('_scan_fields') or []
+    scan_fields = business_data_ref.get('_scan_fields') or []
     return sum(1 for f in scan_fields if f.get('disabled') and f.get('hasButton'))
 
 
-def _count_tree_select(case_data_ref):
+def _count_tree_select(business_data_ref):
     """Count tree-select fields from _scan_fields."""
-    scan_fields = case_data_ref.get('_scan_fields') or []
+    scan_fields = business_data_ref.get('_scan_fields') or []
     return sum(1 for f in scan_fields if f.get('kind') in ('tree-select', 'tree'))
 
 
 async def _run_agent_step(instruction, step_index, session_id, args, llm, browser_context,
                           controller, goal_tracker, cancel_flag_path,
-                          on_step_start_hook, on_step_end_hook, case_data_ref, cumulative_path,
+                          on_step_start_hook, on_step_end_hook, business_data_ref, cumulative_path,
                           special_element_candidates_store=None):
     global _last_agent
     max_steps = instruction.get("max_steps", 40)
@@ -189,13 +189,13 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             phase_for_preamble = instruction.get('phaseNumber')
         if phase_for_preamble is None:
             phase_for_preamble = _CURRENT_PHASE
-        if case_data_ref is not None:
+        if business_data_ref is not None:
             parsed_heal_contract = (
                 instruction.get('_parsed_heal_contract')
                 if isinstance(instruction, dict)
                 else None
             )
-            apply_heal_mode(case_data_ref, heal_mode, parsed_heal_contract)
+            apply_heal_mode(business_data_ref, heal_mode, parsed_heal_contract)
             if heal_mode:
                 mode = 'other'
                 contract = None
@@ -222,23 +222,23 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                     llm=llm,
                 )
                 if reviewed:
-                    contract = apply_phase_contract(case_data_ref, reviewed)
-                    mode = case_data_ref.get('_task_mode') or 'other'
+                    contract = apply_phase_contract(business_data_ref, reviewed)
+                    mode = business_data_ref.get('_task_mode') or 'other'
                     from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(
                         f"phase_reviewer ok task_mode={mode} "
-                        f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
+                        f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
                         f"phase_intent=True {contract_debug_line(contract)}\n"
                     )
                     sys.stderr.flush()
                 else:
-                    mode = apply_task_mode(case_data_ref, phase_core)
-                    contract = apply_phase_intent(case_data_ref, phase_core)
-                    mode = case_data_ref.get('_task_mode') or mode
+                    mode = apply_task_mode(business_data_ref, phase_core)
+                    contract = apply_phase_intent(business_data_ref, phase_core)
+                    mode = business_data_ref.get('_task_mode') or mode
                     from ..controller.actions.phase.reviewer import contract_debug_line
                     sys.stderr.write(
                         f"phase_reviewer fallback task_mode={mode} "
-                        f"force_refill_all={bool(case_data_ref.get('_force_refill_all'))} "
+                        f"force_refill_all={bool(business_data_ref.get('_force_refill_all'))} "
                         f"phase_intent={bool(contract)} {contract_debug_line(contract)}\n"
                     )
                     sys.stderr.flush()
@@ -246,11 +246,11 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             mode = 'other'
             contract = None
         # Only fill / introduce phases keep 业务数据 in the model-visible task.
-        want_biz = (not heal_mode) and needs_business_data_context(phase_core, case_data_ref)
+        want_biz = (not heal_mode) and needs_business_data_context(phase_core, business_data_ref)
         if not want_biz:
             agent_task = phase_core
-            if case_data_ref is not None:
-                case_data_ref.pop('_case_scenario_text', None)
+            if business_data_ref is not None:
+                business_data_ref.pop('_business_scenario_text', None) or business_data_ref.pop('_case_scenario_text', None)
         else:
             sys.stderr.write("business-data context enabled for this phase\n")
             sys.stderr.flush()
@@ -265,7 +265,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 prior_phases=prior_phases if isinstance(prior_phases, list) else None,
                 prior_outcome=prior_outcome_for_preamble if isinstance(prior_outcome_for_preamble, dict) else None,
                 all_phases=all_phases_for_preamble if isinstance(all_phases_for_preamble, list) else None,
-                case_data_store=case_data_ref,
+                business_data_store=business_data_ref,
             )
         # P1：记忆事实包注入（AI_MEMORY_FACT_PACK 默认关）——权威值/已保存值
         # 作为事实依据，替代「靠 MAX_RECENT 截断记忆猜」；失败不阻塞主链路。
@@ -309,15 +309,15 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         )
         sys.stderr.flush()
         max_steps_resolved = True
-        if case_data_ref is not None and not heal_mode:
+        if business_data_ref is not None and not heal_mode:
             agent_task = agent_task + recording_refill_hint(
                 mode,
-                force_refill_all=bool(case_data_ref.get('_force_refill_all')),
+                force_refill_all=bool(business_data_ref.get('_force_refill_all')),
                 task_text=phase_task_text,
             )
             if contract:
                 agent_task = agent_task + contract_summary_hint(contract)
-            boundary = (case_data_ref or {}).get('_phase_boundary') if case_data_ref else None
+            boundary = (business_data_ref or {}).get('_phase_boundary') if business_data_ref else None
             emit_json({
                 "event": "phase_intent_obs",
                 "data": {
@@ -340,7 +340,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                     "data": {
                         "phase": step_index,
                         "phase_boundary": boundary,
-                        "evidence_observed": list((case_data_ref or {}).get('_evidence_observed') or []),
+                        "evidence_observed": list((business_data_ref or {}).get('_evidence_observed') or []),
                         "recovery": (contract or {}).get('recovery') if contract else None,
                     },
                 })
@@ -356,8 +356,8 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         phase_start_payload = {"phase": step_index, "total": -1, "name": task_text[:60]}
         if contract:
             phase_start_payload["phase_intent"] = contract
-        if case_data_ref and case_data_ref.get('_phase_boundary'):
-            phase_start_payload["phase_boundary"] = case_data_ref['_phase_boundary']
+        if business_data_ref and business_data_ref.get('_phase_boundary'):
+            phase_start_payload["phase_boundary"] = business_data_ref['_phase_boundary']
         if heal_mode:
             phase_start_payload["heal_mode"] = heal_mode
         emit_json({"event": "phase_start", "data": phase_start_payload})
@@ -393,19 +393,19 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         )
         sys.stderr.flush()
     try:
-        from ..controller.actions._case_data import format_case_data_hint, iter_user_case_entries
+        from ..controller.actions._business_data import format_business_data_hint, iter_user_business_entries
         if want_biz:
-            entries = iter_user_case_entries(case_data_ref)
-            hint = format_case_data_hint(case_data_ref)
+            entries = iter_user_business_entries(business_data_ref)
+            hint = format_business_data_hint(business_data_ref)
             if hint:
                 agent_task = agent_task + hint
-                sys.stderr.write(f"Appended case data hint ({len(entries)} keys)\n")
+                sys.stderr.write(f"Appended business data hint ({len(entries)} keys)\n")
                 sys.stderr.flush()
         else:
             sys.stderr.write("Skip business-data hint (phase is not fill/introduce)\n")
             sys.stderr.flush()
     except Exception as e:
-        sys.stderr.write(f"case data hint skipped: {e}\n")
+        sys.stderr.write(f"business data hint skipped: {e}\n")
         sys.stderr.flush()
 
     try:
@@ -436,10 +436,10 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
 
     sys.stderr.write(f"Creating Agent...\n");
     sys.stderr.flush()
-    if heal_mode and case_data_ref and case_data_ref.get('_heal_contract'):
-        contract = {'mode': 'heal', 'heal': case_data_ref['_heal_contract']}
+    if heal_mode and business_data_ref and business_data_ref.get('_heal_contract'):
+        contract = {'mode': 'heal', 'heal': business_data_ref['_heal_contract']}
     else:
-        contract = get_phase_intent(case_data_ref) if case_data_ref else None
+        contract = get_phase_intent(business_data_ref) if business_data_ref else None
     max_actions_per_step, max_actions_source = resolve_max_actions_per_step(
         raw_max_actions_per_step,
         (contract or {}).get('mode'),
@@ -458,7 +458,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         planner_llm=llm, planner_interval=3,
         extend_planner_system_message=PLANNER_SYSTEM_PROMPT,
         register_new_step_callback=make_step_callback(step_index * 100),
-        register_done_callback=make_done_callback(output_path, case_data_ref),
+        register_done_callback=make_done_callback(output_path, business_data_ref),
     )
     _last_agent = agent
     sys.stderr.write(f"Agent created, starting run...\n");
@@ -468,28 +468,28 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     from ..controller.actions.phase.reviewer import compute_budget_extension, _BUDGET_EXTEND_MAX_ROUNDS
     budget_extensions = []
     try:
-        if case_data_ref is not None:
-            case_data_ref['_phase_max_steps'] = int(max_steps)
-            case_data_ref['_done_fired'] = False
+        if business_data_ref is not None:
+            business_data_ref['_phase_max_steps'] = int(max_steps)
+            business_data_ref['_done_fired'] = False
         await agent.run(max_steps=max_steps, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
         sys.stderr.write(f"Agent run completed\n");
         sys.stderr.flush()
 
         # 续跑循环（≤ _BUDGET_EXTEND_MAX_ROUNDS 轮）
         for round_num in range(1, _BUDGET_EXTEND_MAX_ROUNDS + 1):
-            if case_data_ref is None:
+            if business_data_ref is None:
                 break
-            done_fired = case_data_ref.get('_done_fired', False)
+            done_fired = business_data_ref.get('_done_fired', False)
             # 检查取消
             if cancel_flag_path.exists():
                 break
             # 评估续跑条件
             from ..controller.actions._phase_intent import check_pending_write_gate, has_contract_success
             from ..controller.actions.section_scope import resolve_phase_section
-            _sec = resolve_phase_section(case_data_ref)
-            ok_pending, pending_labels = check_pending_write_gate(case_data_ref, section=_sec)
-            introduce_count = _count_introduce_fields(case_data_ref)
-            needs_agent = case_data_ref.get('_assistant_needs_agent') or []
+            _sec = resolve_phase_section(business_data_ref)
+            ok_pending, pending_labels = check_pending_write_gate(business_data_ref, section=_sec)
+            introduce_count = _count_introduce_fields(business_data_ref)
+            needs_agent = business_data_ref.get('_assistant_needs_agent') or []
             # done 触发且工作完成 → 不续跑
             if done_fired and ok_pending and introduce_count == 0 and not needs_agent:
                 break
@@ -501,7 +501,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
             extension = compute_budget_extension({
                 'introduce_fields': introduce_count,
                 'pending_fields': len(pending_labels),
-                'tree_select_fields': _count_tree_select(case_data_ref),
+                'tree_select_fields': _count_tree_select(business_data_ref),
                 'ceiling': ceiling,
                 'used_steps': used,
             })
@@ -515,7 +515,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 'round': round_num, 'steps': extension,
                 'introduce': introduce_count, 'pending': len(pending_labels),
             })
-            case_data_ref['_done_fired'] = False
+            business_data_ref['_done_fired'] = False
             await agent.run(max_steps=extension, on_step_start=on_step_start_hook, on_step_end=on_step_end_hook)
 
         if not hasattr(agent, '_done_fired') and hasattr(agent, 'history'):
@@ -531,34 +531,34 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
 
     # Phase-end observability + soft quality gate（循环结束后最终评估）
     try:
-        if case_data_ref is not None:
+        if business_data_ref is not None:
             from ..controller.actions._phase_intent import (
                 check_pending_write_gate, emit_phase_observability,
                 has_contract_success, mark_quality_failed,
             )
             from ..controller.actions.section_scope import resolve_phase_section
 
-            _sec = resolve_phase_section(case_data_ref)
-            ok_pending, labels = check_pending_write_gate(case_data_ref, section=_sec)
-            contract = get_phase_intent(case_data_ref)
+            _sec = resolve_phase_section(business_data_ref)
+            ok_pending, labels = check_pending_write_gate(business_data_ref, section=_sec)
+            contract = get_phase_intent(business_data_ref)
             if contract and contract.get('refill') == 'all_editable' and not ok_pending:
-                mark_quality_failed(case_data_ref, f'pending_fields:{",".join(labels[:8])}')
+                mark_quality_failed(business_data_ref, f'pending_fields:{",".join(labels[:8])}')
             submit = (contract or {}).get('submit') or {}
-            if submit.get('required') and not has_contract_success(case_data_ref):
+            if submit.get('required') and not has_contract_success(business_data_ref):
                 # has_contract_success already respects success.kinds — do not waive
                 # missing toast_ok just because an introduce picker confirmed.
                 if contract and contract.get('mode') not in ('introduce_pick',):
-                    mark_quality_failed(case_data_ref, 'missing_success_token')
-            emit_phase_observability(case_data_ref, emit_json)
+                    mark_quality_failed(business_data_ref, 'missing_success_token')
+            emit_phase_observability(business_data_ref, emit_json)
             phase_payload = {"phase": step_index, "name": task_text[:60]}
             phase_payload["maxActionsPerStep"] = max_actions_per_step
             if budget_extensions:
                 phase_payload["budgetExtensions"] = budget_extensions
-            c = get_phase_intent(case_data_ref)
+            c = get_phase_intent(business_data_ref)
             if c:
                 phase_payload["phase_intent"] = c
-            if case_data_ref.get('_quality_failed'):
-                reasons = list(case_data_ref.get('_quality_failed_reasons') or [])
+            if business_data_ref.get('_quality_failed'):
+                reasons = list(business_data_ref.get('_quality_failed_reasons') or [])
                 sys.stderr.write(
                     f"QUALITY FAIL phase={step_index} reasons={reasons}\n"
                 )

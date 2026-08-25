@@ -12,7 +12,7 @@ import sys
 from langchain_core.messages import HumanMessage
 
 
-def _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal):
+def _emit_empty_act_cue(business_data_store, agent, _actions_raw, _next_goal):
         """Inject internal empty-act steering cue. Failures must never abort the phase."""
         try:
             from ..controller.actions.section_scope import (
@@ -21,7 +21,7 @@ def _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal):
                 final_save_urgency_message,
             )
 
-            max_s = int((case_data_store or {}).get('_phase_max_steps') or 0)
+            max_s = int((business_data_store or {}).get('_phase_max_steps') or 0)
             n = int(getattr(agent.state, 'n_steps', 0) or 0)
             last_step = bool(max_s and n >= max_s)
             flag = getattr(agent.state, 'is_last_step', None)
@@ -35,8 +35,8 @@ def _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal):
 
             # Penultimate urgency: tools still available; last step is done-only.
             near_last = bool(max_s and n >= (max_s - 1) and not last_step)
-            if case_data_store is not None and near_last:
-                urg = final_save_urgency_message(case_data_store)
+            if business_data_store is not None and near_last:
+                urg = final_save_urgency_message(business_data_store)
                 if urg:
                     agent._message_manager._add_message_with_tokens(HumanMessage(content=urg))
                     sys.stderr.write(
@@ -44,15 +44,15 @@ def _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal):
                     )
                     sys.stderr.flush()
 
-            if case_data_store is not None and is_empty_effective_actions(
+            if business_data_store is not None and is_empty_effective_actions(
                 _actions_raw, next_goal=_next_goal or ''
             ):
-                streak = int(case_data_store.get('_empty_act_streak') or 0) + 1
-                case_data_store['_empty_act_streak'] = streak
+                streak = int(business_data_store.get('_empty_act_streak') or 0) + 1
+                business_data_store['_empty_act_streak'] = streak
                 # Design §3.3: final browser-use iteration is done-only (DoneAgentOutput).
-                save_ok = bool(case_data_store.get('_last_save_ok'))
+                save_ok = bool(business_data_store.get('_last_save_ok'))
                 msg = HumanMessage(content=empty_act_prescription_message(
-                    case_data_store, last_step=last_step, save_ok=save_ok,
+                    business_data_store, last_step=last_step, save_ok=save_ok,
                 ))
                 agent._message_manager._add_message_with_tokens(msg)
                 sys.stderr.write(
@@ -60,15 +60,15 @@ def _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal):
                     f'last_step={last_step} save_ok={save_ok})\n'
                 )
                 sys.stderr.flush()
-            elif case_data_store is not None:
-                case_data_store['_empty_act_streak'] = 0
+            elif business_data_store is not None:
+                business_data_store['_empty_act_streak'] = 0
         except Exception as e:
             # Empty-act is internal steering only — never surface to FE / abort agent.run.
             sys.stderr.write(f'[recorder] empty-act cue skipped: {e}\n')
             sys.stderr.flush()
 
 
-def _emit_duplicate_failure_cue(case_data_store, agent, _actions, _last_result):
+def _emit_duplicate_failure_cue(business_data_store, agent, _actions, _last_result):
     """Inject [纠偏] cue when the same action+params failed twice in a row.
 
     Steering-only: failures must never abort the phase (same contract as
@@ -78,7 +78,7 @@ def _emit_duplicate_failure_cue(case_data_store, agent, _actions, _last_result):
         from scripts.feature_flags import duplicate_failure_cue_enabled
         if not duplicate_failure_cue_enabled():
             return
-        if case_data_store is None:
+        if business_data_store is None:
             return
         from ..controller.actions.duplicate_failure_cue import (
             duplicate_failure_prescription,
@@ -87,7 +87,7 @@ def _emit_duplicate_failure_cue(case_data_store, agent, _actions, _last_result):
             step_failed,
         )
         failed = step_failed(_last_result)
-        should_cue, sig = is_duplicate_failure(case_data_store, _actions, failed=failed)
+        should_cue, sig = is_duplicate_failure(business_data_store, _actions, failed=failed)
         if should_cue:
             err_text = result_error_text(_last_result)
             msg = HumanMessage(content=duplicate_failure_prescription(err_text))
@@ -160,7 +160,7 @@ def _capture_step_url(agent):
 
 
 
-async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
+async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> bool:
             try:
                 from ..controller.actions._phase_intent import (
                     check_pending_write_gate,
@@ -190,8 +190,8 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                 # ===== Heal done vs recording done (separate rules) =====
                 # Heal: no phase-intent contract; accept after redo intent.
                 # Recording: overlay / save / contract token gates in the else branch.
-                heal_mode = (case_data_store or {}).get('_heal_mode') if case_data_store else None
-                if heal_mode and is_heal_mode(case_data_store):
+                heal_mode = (business_data_store or {}).get('_heal_mode') if business_data_store else None
+                if heal_mode and is_heal_mode(business_data_store):
                     done_text = ''
                     try:
                         for r in (_last_result or []):
@@ -204,12 +204,12 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                         f"at step {agent.state.n_steps} — no contract / overlay / save gates\n"
                     )
                     sys.stderr.flush()
-                    if case_data_store is not None:
+                    if business_data_store is not None:
                         try:
                             from .. import state as action_state
                             from ..controller.actions._phase_context import record_phase_outcome
                             record_phase_outcome(
-                                case_data_store,
+                                business_data_store,
                                 action_state._CURRENT_PHASE,
                                 success=done_success,
                                 text=done_text or '',
@@ -217,7 +217,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                         except Exception as e:
                             sys.stderr.write(f"[recorder] heal phase outcome save failed: {e}\n")
                             sys.stderr.flush()
-                        case_data_store.pop('_heal_mode', None)
+                        business_data_store.pop('_heal_mode', None)
                 else:
                     # Recording done gates only
                     heal_mode = None
@@ -296,12 +296,12 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                     form_errors = (block or {}).get('formErrors') or []
                     cur_url = (block or {}).get('url') or ''
 
-                    save_ok = bool(case_data_store and case_data_store.get('_last_save_ok'))
-                    introduce_ok = bool(case_data_store and case_data_store.get('_last_introduce_ok'))
-                    url_before_save = (case_data_store or {}).get('_url_before_save') or ''
+                    save_ok = bool(business_data_store and business_data_store.get('_last_save_ok'))
+                    introduce_ok = bool(business_data_store and business_data_store.get('_last_introduce_ok'))
+                    url_before_save = (business_data_store or {}).get('_url_before_save') or ''
                     url_changed = bool(url_before_save and cur_url and url_before_save != cur_url)
 
-                    contract = get_phase_intent(case_data_store) if case_data_store else None
+                    contract = get_phase_intent(business_data_store) if business_data_store else None
 
                     # Navigation success: any URL change after save attempt (not only legacy patterns)
                     navigated_ok = bool(
@@ -316,16 +316,16 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                         navigated_ok = False  # introduce uses confirm token only
 
                     # Write gate on done for all_editable
-                    if case_data_store and contract and contract.get('refill') == 'all_editable':
+                    if business_data_store and contract and contract.get('refill') == 'all_editable':
                         from ..controller.actions.section_scope import resolve_phase_section
 
-                        _sec = resolve_phase_section(case_data_store)
+                        _sec = resolve_phase_section(business_data_store)
                         ok_pending, pending_labels = check_pending_write_gate(
-                            case_data_store, section=_sec
+                            business_data_store, section=_sec
                         )
                         if not ok_pending:
                             mark_quality_failed(
-                                case_data_store,
+                                business_data_store,
                                 f'pending_fields:{",".join(pending_labels[:6])}',
                             )
                             sys.stderr.write(
@@ -372,7 +372,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                         contract
                         and (contract.get('submit') or {}).get('required')
                     )
-                    if needs_token and done_success and not has_contract_success(case_data_store):
+                    if needs_token and done_success and not has_contract_success(business_data_store):
                         if not (introduce_ok and contract and is_introduce_phase(contract)):
                             missing_hint = ''
                             try:
@@ -381,11 +381,11 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                                     observed_kinds,
                                     phase_done_ok,
                                 )
-                                ok_b, missing = phase_done_ok(case_data_store)
-                                b = get_phase_boundary(case_data_store) or {}
+                                ok_b, missing = phase_done_ok(business_data_store)
+                                b = get_phase_boundary(business_data_store) or {}
                                 missing_hint = (
                                     f" success_when={list(b.get('success_when') or [])}"
-                                    f" observed={sorted(observed_kinds(case_data_store))}"
+                                    f" observed={sorted(observed_kinds(business_data_store))}"
                                     f" missing={missing} ok={ok_b}"
                                 )
                             except Exception:
@@ -525,26 +525,26 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                         )
                         sys.stderr.flush()
                         # Clear stale task_list so the next phase starts clean
-                        if case_data_store is not None:
-                            case_data_store.pop('task_list', None)
-                            case_data_store.pop('_scan_fields', None)
-                            case_data_store.pop('_submit_ready', None)
-                            case_data_store.pop('_query_ready', None)
-                            case_data_store.pop('_query_ui', None)
-                            case_data_store.pop('_autofill_summary', None)
-                            case_data_store.pop('_last_save_ok', None)
-                            case_data_store.pop('_last_introduce_ok', None)
-                            case_data_store.pop('_url_before_save', None)
-                            case_data_store.pop('_success_tokens', None)
+                        if business_data_store is not None:
+                            business_data_store.pop('task_list', None)
+                            business_data_store.pop('_scan_fields', None)
+                            business_data_store.pop('_submit_ready', None)
+                            business_data_store.pop('_query_ready', None)
+                            business_data_store.pop('_query_ui', None)
+                            business_data_store.pop('_autofill_summary', None)
+                            business_data_store.pop('_last_save_ok', None)
+                            business_data_store.pop('_last_introduce_ok', None)
+                            business_data_store.pop('_url_before_save', None)
+                            business_data_store.pop('_success_tokens', None)
                     # else: no visible blockers — allow done() (including success=false reports)
 
                     # Persist done() outcome for next-phase business-scenario preamble
-                    if case_data_store is not None:
+                    if business_data_store is not None:
                         try:
                             from .. import state as action_state
                             from ..controller.actions._phase_context import record_phase_outcome
                             record_phase_outcome(
-                                case_data_store,
+                                business_data_store,
                                 action_state._CURRENT_PHASE,
                                 success=done_success,
                                 text=done_text or '',
@@ -582,7 +582,7 @@ async def _guard_done_on_step_end(agent, _last_result, case_data_store) -> bool:
                 sys.stderr.flush()
             return False
 
-def _emit_navigation_cue(case_data_store, agent):
+def _emit_navigation_cue(business_data_store, agent):
     """Inject a [导航] HumanMessage when an index click navigated to a new page (E5).
 
     Steering-only: never abort the phase. Recorded step stays ok-clicked-N.
@@ -591,11 +591,11 @@ def _emit_navigation_cue(case_data_store, agent):
         from scripts.feature_flags import click_nav_cue_enabled
         if not click_nav_cue_enabled():
             return
-        nav = (case_data_store or {}).get('_last_click_navigated')
+        nav = (business_data_store or {}).get('_last_click_navigated')
         if not isinstance(nav, dict) or not nav.get('to'):
             return
-        if case_data_store is not None:
-            case_data_store.pop('_last_click_navigated', None)
+        if business_data_store is not None:
+            business_data_store.pop('_last_click_navigated', None)
         from ..controller.actions.click_navigation_cue import navigation_cue_message
         msg = HumanMessage(content=navigation_cue_message(nav.get('from') or '', nav.get('to') or ''))
         agent._message_manager._add_message_with_tokens(msg)

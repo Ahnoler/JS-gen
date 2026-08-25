@@ -43,13 +43,13 @@ class SaveEngine(_FormActionEngineBase):
         # Resolve: explicit → multi-save gate → sticky memory → unique → ""
         if not sec and not explicit_sec:
             try:
-                await refresh_scan_buttons(page, self.case_data_store)
+                await refresh_scan_buttons(page, self.business_data_store)
             except Exception:
                 pass
             try:
                 from .section_scope import same_label_section_keys, norm_sec
                 keys = same_label_section_keys(
-                    self.case_data_store.get("_scan_buttons"), compact_btn
+                    self.business_data_store.get("_scan_buttons"), compact_btn
                 )
                 if len(keys) >= 2:
                     sys.stderr.write(
@@ -58,7 +58,7 @@ class SaveEngine(_FormActionEngineBase):
                     sys.stderr.flush()
                     # leave sec empty → JS_CLICK_SAVE_BUTTON returns ambiguous
                 else:
-                    mem = norm_sec(str(self.case_data_store.get("_phase_section") or ""))
+                    mem = norm_sec(str(self.business_data_store.get("_phase_section") or ""))
                     if mem:
                         sec = mem
                         sys.stderr.write(f'[click_save] phase section={sec!r} from memory\n')
@@ -66,7 +66,7 @@ class SaveEngine(_FormActionEngineBase):
                     if not sec:
                         from .section_scope import unique_button_section
                         auto_sec = unique_button_section(
-                            self.case_data_store.get("_scan_buttons"), compact_btn
+                            self.business_data_store.get("_scan_buttons"), compact_btn
                         )
                         if auto_sec:
                             sec = auto_sec
@@ -78,14 +78,14 @@ class SaveEngine(_FormActionEngineBase):
                 pass
         if sec:
             from .section_scope import remember_phase_section
-            remember_phase_section(self.case_data_store, sec)
+            remember_phase_section(self.business_data_store, sec)
         # 确认/确定 = dialog/picker confirm (never treat as form-save blocked by query toolbar)
         is_picker_confirm = bool(
             compact_btn.startswith(('确认', '确定'))
             or ('确认' in compact_btn)
             or ('确定' in compact_btn)
         )
-        query_ui = await _mark_query_ui_if_needed(page, self.case_data_store, container_id)
+        query_ui = await _mark_query_ui_if_needed(page, self.business_data_store, container_id)
         sys.stderr.write(
             f'[click_save] enter button={button_text!r} section={sec!r} compact={compact_btn!r} '
             f'query_ui={query_ui} picker_confirm={is_picker_confirm}\n'
@@ -111,13 +111,13 @@ class SaveEngine(_FormActionEngineBase):
                 from .section_scope import pending_by_region, requires_region_declaration
 
                 needs_gate = False
-                if phase_boundary_active(self.case_data_store):
-                    b = get_phase_boundary(self.case_data_store) or {}
+                if phase_boundary_active(self.business_data_store):
+                    b = get_phase_boundary(self.business_data_store) or {}
                     needs_gate = bool(b.get("requires_write_all_editable"))
                 else:
-                    needs_gate = contract_force_refill(self.case_data_store)
+                    needs_gate = contract_force_refill(self.business_data_store)
                 if needs_gate and not sec:
-                    tl0 = TaskList.from_store((self.case_data_store or {}).get("task_list"))
+                    tl0 = TaskList.from_store((self.business_data_store or {}).get("task_list"))
                     by = pending_by_region(tl0)
                     if requires_region_declaration(tl0):
                         return _err(
@@ -128,11 +128,11 @@ class SaveEngine(_FormActionEngineBase):
                             include_in_memory=True,
                         )
 
-            gate_ok, pending_labels = check_pending_write_gate(self.case_data_store, section=sec)
+            gate_ok, pending_labels = check_pending_write_gate(self.business_data_store, section=sec)
         if not gate_ok:
             # Live-prune: fields wrongly left in pending because scan missed Vue disabled
             btn_kw = self._button_keywords()
-            tl = TaskList.from_store((self.case_data_store or {}).get('task_list'))
+            tl = TaskList.from_store((self.business_data_store or {}).get('task_list'))
             kept = []
             pruned = []
             for item in list(tl.pending):
@@ -152,11 +152,11 @@ class SaveEngine(_FormActionEngineBase):
                 kept.append(item)
             if pruned:
                 tl.pending = kept
-                if self.case_data_store is not None:
-                    self.case_data_store['task_list'] = tl.to_store()
+                if self.business_data_store is not None:
+                    self.business_data_store['task_list'] = tl.to_store()
                 sys.stderr.write(f'[click_save] pruned disabled pending: {pruned}\n')
                 sys.stderr.flush()
-                gate_ok, pending_labels = check_pending_write_gate(self.case_data_store, section=sec)
+                gate_ok, pending_labels = check_pending_write_gate(self.business_data_store, section=sec)
         if not gate_ok:
             return _err(
                 f'err-pending-fields:{json.dumps(pending_labels[:12], ensure_ascii=False)} | '
@@ -165,9 +165,9 @@ class SaveEngine(_FormActionEngineBase):
                 include_in_memory=True,
             )
         url_before = page.url
-        if self.case_data_store is not None:
-            self.case_data_store['_url_before_save'] = url_before
-            self.case_data_store['_last_save_ok'] = False
+        if self.business_data_store is not None:
+            self.business_data_store['_url_before_save'] = url_before
+            self.business_data_store['_last_save_ok'] = False
 
         # Capture short-lived success toasts that may vanish between polls
         await page.evaluate(JS_WATCH_SAVE_NOTIFICATIONS)
@@ -185,7 +185,7 @@ class SaveEngine(_FormActionEngineBase):
                 explicit_scope=explicit_sec,
             )
             if retry_scope:
-                clear_phase_section(self.case_data_store)
+                clear_phase_section(self.business_data_store)
                 sys.stderr.write(
                     f'[click_save] stale scope {sec!r} (not-found) → retry region={retry_scope!r}\n'
                 )
@@ -197,7 +197,7 @@ class SaveEngine(_FormActionEngineBase):
                     info = {}
                 if info.get('ok'):
                     sec = retry_scope
-                    remember_phase_section(self.case_data_store, retry_scope)
+                    remember_phase_section(self.business_data_store, retry_scope)
         if not info.get('ok'):
             try:
                 await page.evaluate('() => { try { window.__saveWatchObs?.disconnect(); } catch(e) {} }')
@@ -312,9 +312,9 @@ class SaveEngine(_FormActionEngineBase):
                     }'''
                 )
                 if error_labels:
-                    tl = TaskList.from_store(self.case_data_store.get('task_list'))
+                    tl = TaskList.from_store(self.business_data_store.get('task_list'))
                     tl.sync_from_errors(error_labels)
-                    self.case_data_store['task_list'] = tl.to_store()
+                    self.business_data_store['task_list'] = tl.to_store()
             except Exception:
                 pass
             try:
@@ -331,10 +331,10 @@ class SaveEngine(_FormActionEngineBase):
             return _err(msg, include_in_memory=True)
 
         if success_notifs:
-            if self.case_data_store is not None:
-                self.case_data_store['_last_save_ok'] = True
-                self.case_data_store.pop('_submit_ready', None)
-            record_success_token(self.case_data_store, 'toast_ok', success_notifs[0])
+            if self.business_data_store is not None:
+                self.business_data_store['_last_save_ok'] = True
+                self.business_data_store.pop('_submit_ready', None)
+            record_success_token(self.business_data_store, 'toast_ok', success_notifs[0])
             toast = success_notifs[0]
             sys.stderr.write(f'[click_save] SUCCESS: {toast[:80]}\n')
             sys.stderr.flush()
@@ -357,10 +357,10 @@ class SaveEngine(_FormActionEngineBase):
         url_after = outcome.get('url') or page.url
         url_changed = bool(url_before and url_after and url_before != url_after)
         if url_changed:
-            if self.case_data_store is not None:
-                self.case_data_store['_last_save_ok'] = True
-                self.case_data_store.pop('_submit_ready', None)
-            record_success_token(self.case_data_store, 'url_change', url_after)
+            if self.business_data_store is not None:
+                self.business_data_store['_last_save_ok'] = True
+                self.business_data_store.pop('_submit_ready', None)
+            record_success_token(self.business_data_store, 'url_change', url_after)
             sys.stderr.write(
                 f'[click_save] SUCCESS via navigation {url_before[:60]} -> {url_after[:60]}\n'
             )
@@ -379,12 +379,12 @@ class SaveEngine(_FormActionEngineBase):
             except Exception:
                 still_query = False
             if not still_query:
-                record_success_token(self.case_data_store, 'confirm_click', button_text or '确认')
+                record_success_token(self.business_data_store, 'confirm_click', button_text or '确认')
                 try:
                     from ._phase_boundary import maybe_record_picker_closed, record_evidence
-                    parent = (self.case_data_store or {}).get('_parent_container_before_picker') or 'main'
+                    parent = (self.business_data_store or {}).get('_parent_container_before_picker') or 'main'
                     maybe_record_picker_closed(
-                        self.case_data_store,
+                        self.business_data_store,
                         still_query_ui=False,
                         parent_container=parent,
                     )
@@ -404,21 +404,21 @@ class SaveEngine(_FormActionEngineBase):
                         pass
                     if backfilled:
                         record_evidence(
-                            self.case_data_store,
+                            self.business_data_store,
                             'introduced_backfilled',
                             ','.join(backfilled[:6]),
                         )
                 except Exception as e:
                     sys.stderr.write(f'[click_save] picker_closed helper: {e}\n')
                     sys.stderr.flush()
-                    if self.case_data_store is not None:
-                        self.case_data_store.pop('_query_ui', None)
+                    if self.business_data_store is not None:
+                        self.business_data_store.pop('_query_ui', None)
                 sys.stderr.write('[click_save] SUCCESS picker confirm (dialog closed)\n')
                 sys.stderr.flush()
-                if self.case_data_store is not None:
+                if self.business_data_store is not None:
                     # Parent form still needs final 保存 after introduce (toast_ok).
-                    self.case_data_store['_submit_ready'] = True
-                    self.case_data_store.pop('_query_ui', None)
+                    self.business_data_store['_submit_ready'] = True
+                    self.business_data_store.pop('_query_ui', None)
                 return _ok(
                     'ok-introduce-confirm | Picker confirmed; introduce fields should be backfilled. '
                     'Call click_save(button_text="保存") NOW on the parent form. '
@@ -428,10 +428,10 @@ class SaveEngine(_FormActionEngineBase):
 
         # Silent save: button clicked, no validation errors, no error toast, no URL
         # change — some SUTs (e.g. section 保存) persist without 操作成功 toast.
-        if self.case_data_store is not None:
-            self.case_data_store['_last_save_ok'] = True
-            self.case_data_store.pop('_submit_ready', None)
-        record_success_token(self.case_data_store, 'toast_ok', 'ok-save-no-feedback')
+        if self.business_data_store is not None:
+            self.business_data_store['_last_save_ok'] = True
+            self.business_data_store.pop('_submit_ready', None)
+        record_success_token(self.business_data_store, 'toast_ok', 'ok-save-no-feedback')
         sys.stderr.write('[click_save] SUCCESS via no-feedback (silent save)\n')
         sys.stderr.flush()
         return _ok(

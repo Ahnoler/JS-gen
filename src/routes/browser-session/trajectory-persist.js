@@ -2,7 +2,7 @@ import { existsSync } from 'fs';
 import { state } from '../../state.js';
 import { saveTrajectoryRecord } from '../../trajectory-store.js';
 import { persistSessionTrajectory, upsertPhaseDescription } from '../../services/trajectory-service.js';
-import { persistFormSnapshotsFromFile } from '../../services/case-data-service.js';
+import { persistFormSnapshotsFromFile } from '../../services/business-data-service.js';
 import * as execSession from '../../executor-session-client.js';
 import { persistLiveActionEntries } from './persist-live.js';
 import { writeAgentEvent, sessionRuntimeReady } from './agent-io.js';

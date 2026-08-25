@@ -50,7 +50,7 @@ export const GROUP_RECORDING = [
       {
         method: 'POST', path: '/api/v2/trajectories/{id}/record/start',
         summary: '开始 AI 录制',
-        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。填表靠 phase 内【业务数据】（用户需求希望使用的值）+ LLM 理解对齐；业务数据 ≠ 系统回写并落库的案例数据（autofill 可随机补其余字段）。',
+        desc: '同步阻塞至录制完成。phaseIds 省略则录全部阶段。填表靠 phase 内【业务数据】（用户需求希望使用的值）+ LLM 理解对齐（autofill 可随机补其余字段）。',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '42' }],
         reqExample: J({ phaseIds: [101, 102], accountId: 10 }),
         respExample: J({

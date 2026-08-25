@@ -3,9 +3,9 @@ import path from 'path';
 import crypto from 'crypto';
 import { PROJECT_DIR, USE_EXECUTOR } from '#config/config.js';
 import { state } from '../../state.js';
-import { saveCaseDataRecord } from '../../case-data-store.js';
+import { saveBusinessDataRecord } from '../../business-data-store.js';
 import { getTrajectoryActionFlow } from '../../services/trajectory-service.js';
-import { persistSessionCaseData } from '../../services/case-data-service.js';
+import { persistSessionBusinessData } from '../../services/business-data-service.js';
 import {
   getRemoteStatus, initRemoteBridgeWs, notifyManualRecordingChanged,
 } from '../../cdp/remote-bridge.js';
@@ -28,7 +28,7 @@ import { handleWatcherAction, registerWatcherWsHandler } from './watcher-actions
 
 export async function runSessionStep(req, res) {
   const { id } = req.params;
-  const { task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId } = req.body || {};
+  const { task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId } = req.body || {};
   if (!task) return res.status(400).json({ error: 'task is required' });
 
   const session = state.sessions.get(id);
@@ -36,7 +36,7 @@ export async function runSessionStep(req, res) {
 
   const channel = createPushChannel(null, res);
   setupSSE(res);  // sets headers
-  executeAgentStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel });
+  executeAgentStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel });
 }
 
 export default function registerBrowserSessionRoutes(app) {
@@ -56,7 +56,7 @@ export default function registerBrowserSessionRoutes(app) {
           model: modelId,
           lastTask: null,
           lastMaxSteps: null,
-          caseDataFile: null,
+          businessDataFile: null,
           useExecutor: true,
           executorNodeUuid: opened.nodeUuid,
           executorSlotIndex: opened.slotIndex,
@@ -84,7 +84,7 @@ export default function registerBrowserSessionRoutes(app) {
     try { await ensureGlobalBrowser(modelId); } catch (err) { return res.status(500).json({ error: err.message }); }
 
     const gb = state.globalBrowser;
-    state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model, lastTask: null, lastMaxSteps: null, caseDataFile: null });
+    state.sessions.set(sessionId, { sessionId, stepIndex: 0, trajectories: [], createdAt: new Date().toISOString(), model: gb.model, lastTask: null, lastMaxSteps: null, businessDataFile: null });
     console.log(`[browser-session] Created session ${sessionId} (shared browser)`);
     broadcastSessions();
     broadcastWatcherStatus();
@@ -127,7 +127,7 @@ export default function registerBrowserSessionRoutes(app) {
       const SKIP_REPLAY = new Set([
         'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
         'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
-        'save_case_data', 'read_case_data', 'match_form_rule', 'init_task_list',
+        'save_business_data', 'read_business_data', 'match_form_rule', 'init_task_list',
         'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree', 'task_done',
         'task_retry', 'save_form_snapshot',
       ]);
@@ -302,7 +302,7 @@ export default function registerBrowserSessionRoutes(app) {
           if (msg.event === 'reset_trajectory_ready') {
             clearTimeout(timeout);
             gb.process.stdout.removeListener('data', onData);
-            return res.json({ status: 'reset', cumulative_file: msg.data.cumulative_file, case_data_file: msg.data.case_data_file });
+            return res.json({ status: 'reset', cumulative_file: msg.data.cumulative_file, business_data_file: msg.data.business_data_file });
           }
         } catch {}
       }
@@ -410,7 +410,7 @@ export default function registerBrowserSessionRoutes(app) {
 
   app.post('/api/browser/session/:id/trajectory', persistTrajectory);
 
-  app.post('/api/browser/session/:id/save-case-data', async (req, res) => {
+  app.post('/api/browser/session/:id/save-business-data', async (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
     const gb = state.globalBrowser;
@@ -418,12 +418,12 @@ export default function registerBrowserSessionRoutes(app) {
     if (!gb.ready || !gb.stdin) return res.status(503).json({ error: 'Browser not ready' });
 
     try {
-      gb.stdin.write(JSON.stringify({ event: 'save_case_data' }) + '\n');
+      gb.stdin.write(JSON.stringify({ event: 'save_business_data' }) + '\n');
     } catch (writeErr) {
-      return res.status(500).json({ error: `Failed to send save_case_data: ${writeErr.message}` });
+      return res.status(500).json({ error: `Failed to send save_business_data: ${writeErr.message}` });
     }
 
-    const timeout = setTimeout(() => { cleanupListener(); if (!res.writableEnded) res.status(504).json({ error: 'Timeout waiting for case data' }); }, 15000);
+    const timeout = setTimeout(() => { cleanupListener(); if (!res.writableEnded) res.status(504).json({ error: 'Timeout waiting for business data' }); }, 15000);
     let pendingBuffer = '';
 
     const onStdout = async (chunk) => {
@@ -434,41 +434,41 @@ export default function registerBrowserSessionRoutes(app) {
         if (!line.trim()) continue;
         try {
           const msg = JSON.parse(line);
-          if (msg.event === 'save_case_data_result') {
+          if (msg.event === 'save_business_data_result') {
             clearTimeout(timeout);
             cleanupListener();
-            if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save case data' });
+            if (!msg.data.success) return res.status(500).json({ error: msg.data.message || 'Failed to save business data' });
             try {
               let data = null;
-              if (msg.data.case_data_file && existsSync(msg.data.case_data_file)) {
+              if (msg.data.business_data_file && existsSync(msg.data.business_data_file)) {
                 try {
-                  data = JSON.parse(readFileSync(msg.data.case_data_file, 'utf-8'));
+                  data = JSON.parse(readFileSync(msg.data.business_data_file, 'utf-8'));
                 } catch (e) {
-                  return res.status(500).json({ error: `Failed to read case data file: ${e.message}` });
+                  return res.status(500).json({ error: `Failed to read business data file: ${e.message}` });
                 }
               }
               if (!data || typeof data !== 'object') {
-                return res.status(500).json({ error: 'Empty case data' });
+                return res.status(500).json({ error: 'Empty business data' });
               }
 
               // Optional legacy JSON index — never blocks DB path
               let recordId = null;
               try {
-                const { record } = saveCaseDataRecord({
-                  caseDataPath: msg.data.case_data_file,
+                const { record } = saveBusinessDataRecord({
+                  businessDataPath: msg.data.business_data_file,
                   sessionId: id,
                   model: session.model,
                   description: session.lastTask ? session.lastTask.slice(0, 100) : '',
                 });
                 recordId = record?.recordId || null;
               } catch (jsonErr) {
-                console.warn('[save-case-data] legacy JSON store skipped:', jsonErr.message);
+                console.warn('[save-business-data] legacy JSON store skipped:', jsonErr.message);
               }
               if (!recordId) {
                 recordId = 'cdata_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
               }
 
-              const dbId = await persistSessionCaseData({
+              const dbId = await persistSessionBusinessData({
                 record: {
                   recordId,
                   sessionId: id,
@@ -480,14 +480,14 @@ export default function registerBrowserSessionRoutes(app) {
               });
 
               return res.json({
-                caseDataFile: msg.data.case_data_file,
+                businessDataFile: msg.data.business_data_file,
                 recordId,
                 dbId,
                 keys: msg.data.keys,
                 storage: 'db',
               });
             } catch (err) {
-              return res.status(500).json({ error: err.message, caseDataFile: msg.data.case_data_file, keys: msg.data.keys });
+              return res.status(500).json({ error: err.message, businessDataFile: msg.data.business_data_file, keys: msg.data.keys });
             }
           }
         } catch {}

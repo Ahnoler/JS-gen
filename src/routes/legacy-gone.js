@@ -22,5 +22,5 @@ export function registerGoneCatalog(app, basePath, migratedTo, extraSuffixes = [
 
 export default function registerLegacyGoneRoutes(app) {
   registerGoneCatalog(app, '/api/trajectory', '/api/v2/trajectories');
-  registerGoneCatalog(app, '/api/case-data', '/api/v2/case-data', ['/:id/file']);
+  registerGoneCatalog(app, '/api/case-data', '/api/v2/business-data', ['/:id/file']);
 }

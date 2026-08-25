@@ -49,7 +49,7 @@ export const TMP_DIR = process.env.TMPDIR || process.env.TMP || process.env.TEMP
 export const DASHBOARD_DIR = PROJECT_ROOT;
 export const GENERATED_DIR = path.join(PROJECT_ROOT, 'scripts', 'generated');
 export const TRAJECTORIES_DIR = path.join(PROJECT_ROOT, 'scripts', 'trajectories');
-export const CASE_DATA_DIR = path.join(PROJECT_ROOT, 'scripts', 'case_data');
+export const BUSINESS_DATA_DIR = path.join(PROJECT_ROOT, 'scripts', 'case_data');
 export const BROWSER_DIR = path.join(PROJECT_ROOT, 'browser');
 
 // Redirect Playwright browsers to project-local directory (portable)

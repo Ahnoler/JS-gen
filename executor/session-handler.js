@@ -70,9 +70,9 @@ export function createSessionHandler(manager) {
           instruction: payload.task || payload.instruction,
           max_steps: payload.maxSteps ?? payload.max_steps ?? 40,
           phase_number: payload.phaseNumber ?? payload.phase_number,
-          case_data_file: payload.caseDataFile ?? payload.case_data_file,
-          case_data: payload.caseData ?? payload.case_data,
-          case_data_block: payload.caseDataBlock ?? payload.case_data_block,
+          business_data_file: payload.businessDataFile ?? payload.business_data_file,
+          business_data: payload.businessData ?? payload.business_data,
+          business_data_block: payload.businessDataBlock ?? payload.business_data_block,
           special_element_candidates:
             payload.specialElementCandidates
             ?? payload.special_element_candidates
@@ -104,8 +104,8 @@ export function createSessionHandler(manager) {
         return manager.forward(sessionId, 'cdp_action', payload);
       case 'session.save_trajectory':
         return manager.forward(sessionId, 'save_trajectory', {});
-      case 'session.save_case_data':
-        return manager.forward(sessionId, 'save_case_data', {});
+      case 'session.save_business_data':
+        return manager.forward(sessionId, 'save_business_data', {});
       case 'session.get_action_log':
         return manager.forward(sessionId, 'get_action_log', {});
       case 'session.reset_trajectory':

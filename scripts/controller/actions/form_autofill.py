@@ -80,9 +80,9 @@ class FormAutofillEngine:
     _auto_fill_pending), which the actions and run_form_assistant drive.
     """
 
-    def __init__(self, browser_context, case_data_store, llm, button_keywords):
+    def __init__(self, browser_context, business_data_store, llm, button_keywords):
         self.browser_context = browser_context
-        self.case_data_store = case_data_store
+        self.business_data_store = business_data_store
         self.llm = llm
         self.button_keywords = button_keywords
 
@@ -101,7 +101,7 @@ class FormAutofillEngine:
         - form_modify partial — AI changes only task-named fields
         - _watcher_mode (CDP quick actions)
         """
-        if self.case_data_store.get('_watcher_mode'):
+        if self.business_data_store.get('_watcher_mode'):
             return  # CDP watcher: single-field action, no auto-scan
         page = await self.browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
@@ -109,24 +109,24 @@ class FormAutofillEngine:
             resolve_display_container,
             clear_trigger_button,
         )
-        display_id = resolve_display_container(container_id, self.case_data_store)
+        display_id = resolve_display_container(container_id, self.business_data_store)
         if display_id == 'main' or not str(display_id).startswith(('dialog:', 'drawer:')):
-            if (self.case_data_store.get('_active_container') or '').startswith(('dialog:', 'drawer:')):
-                clear_trigger_button(self.case_data_store)
+            if (self.business_data_store.get('_active_container') or '').startswith(('dialog:', 'drawer:')):
+                clear_trigger_button(self.business_data_store)
         container_id = display_id
 
         # Remember parent before entering search/picker dialog
         if _is_search_dialog(container_id) or (
             container_id.startswith(('dialog:', 'drawer:'))
-            and self.case_data_store.get('_active_container')
-            and not str(self.case_data_store.get('_active_container')).startswith(('dialog:', 'drawer:'))
+            and self.business_data_store.get('_active_container')
+            and not str(self.business_data_store.get('_active_container')).startswith(('dialog:', 'drawer:'))
         ):
-            if not self.case_data_store.get('_parent_container_before_picker'):
-                self.case_data_store['_parent_container_before_picker'] = (
-                    self.case_data_store.get('_active_container') or 'main'
+            if not self.business_data_store.get('_parent_container_before_picker'):
+                self.business_data_store['_parent_container_before_picker'] = (
+                    self.business_data_store.get('_active_container') or 'main'
                 )
 
-        _switch_task_list_container(self.case_data_store, container_id)
+        _switch_task_list_container(self.business_data_store, container_id)
 
         async def _rebuild_task_list_from_dom(*, autofill: bool) -> None:
             # Overlay TaskList uses multi (not fullpage) so list/tree query noise
@@ -144,59 +144,59 @@ class FormAutofillEngine:
             fillable = prepare_scan_fields_for_tasklist(raw_fields)
             dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable]
             raw_cid = result.get('container', container_id) if isinstance(result, dict) else container_id
-            cid = resolve_display_container(raw_cid, self.case_data_store)
-            _switch_task_list_container(self.case_data_store, cid)
-            _save_form_snapshot(cid, [f.model_dump() for f in dom_fields], self.case_data_store)
-            self.case_data_store['_scan_buttons'] = _scan_buttons_from_result(result)
-            session_filled = set(self.case_data_store.get('_autofilled_labels') or [])
+            cid = resolve_display_container(raw_cid, self.business_data_store)
+            _switch_task_list_container(self.business_data_store, cid)
+            _save_form_snapshot(cid, [f.model_dump() for f in dom_fields], self.business_data_store)
+            self.business_data_store['_scan_buttons'] = _scan_buttons_from_result(result)
+            session_filled = set(self.business_data_store.get('_autofilled_labels') or [])
             tl = TaskList.from_scan(
                 [f.model_dump() for f in dom_fields],
-                force_refill=_force_refill_flag(self.case_data_store),
+                force_refill=_force_refill_flag(self.business_data_store),
                 session_filled_labels=session_filled,
             )
-            self.case_data_store['task_list'] = tl.to_store()
-            self.case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
-            by = self.case_data_store.setdefault('_task_lists_by_container', {})
+            self.business_data_store['task_list'] = tl.to_store()
+            self.business_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
+            by = self.business_data_store.setdefault('_task_lists_by_container', {})
             if isinstance(by, dict):
                 by[cid] = {
-                    'task_list': self.case_data_store.get('task_list'),
-                    '_scan_fields': self.case_data_store.get('_scan_fields'),
+                    'task_list': self.business_data_store.get('task_list'),
+                    '_scan_fields': self.business_data_store.get('_scan_fields'),
                 }
             if autofill and tl.pending:
                 await self._auto_fill_pending()
-                tl_after = TaskList.from_store(self.case_data_store.get('task_list'))
+                tl_after = TaskList.from_store(self.business_data_store.get('task_list'))
                 fillable_left = sum(1 for i in tl_after.pending if not i.needs_intervention)
-                self.case_data_store['_autofill_summary'] = (
+                self.business_data_store['_autofill_summary'] = (
                     f'auto-fill-complete done={len(tl_after.done)} '
                     f'fillable_pending={fillable_left}'
                 )
                 if fillable_left == 0:
-                    self.case_data_store['_submit_ready'] = True
+                    self.business_data_store['_submit_ready'] = True
                 if isinstance(by, dict):
                     by[cid] = {
-                        'task_list': self.case_data_store.get('task_list'),
-                        '_scan_fields': self.case_data_store.get('_scan_fields'),
+                        'task_list': self.business_data_store.get('task_list'),
+                        '_scan_fields': self.business_data_store.get('_scan_fields'),
                     }
 
         # Force rescan when parent marked stale after picker close
-        stale = self.case_data_store.get('_form_stale')
+        stale = self.business_data_store.get('_form_stale')
         if stale and stale == container_id:
-            self.case_data_store.pop('_form_stale', None)
+            self.business_data_store.pop('_form_stale', None)
             sys.stderr.write(f'[form] force rescan stale container={container_id}\n')
             sys.stderr.flush()
             if not allow_autofill:
                 await _rebuild_task_list_from_dom(autofill=False)
                 return
-            self.case_data_store.pop('task_list', None)
-            self.case_data_store.pop('_scan_fields', None)
+            self.business_data_store.pop('task_list', None)
+            self.business_data_store.pop('_scan_fields', None)
 
-        is_query_ui = await _mark_query_ui_if_needed(page, self.case_data_store, container_id)
+        is_query_ui = await _mark_query_ui_if_needed(page, self.business_data_store, container_id)
         if is_query_ui:
             # Introduce/picker/search still needs _scan_fields so fill_form_field
             # can resolve xpath (traj #38 phase 3: 客户名称 → xpath-not-found
             # when query-toolbar early-return skipped the inventory scan).
             # Never auto-fill query UI — agent chooses which filters to write.
-            if not self.case_data_store.get('_scan_fields'):
+            if not self.business_data_store.get('_scan_fields'):
                 sys.stderr.write(
                     f'[form] first-touch query-ui scan container={container_id!r}\n'
                 )
@@ -206,18 +206,18 @@ class FormAutofillEngine:
         if not allow_autofill:
             # First touch of this container (fresh switch clears _scan_fields;
             # restored containers keep it) — scan + structure checkpoint only.
-            if not self.case_data_store.get('_scan_fields'):
+            if not self.business_data_store.get('_scan_fields'):
                 sys.stderr.write(
                     f'[form] first-touch structure scan container={container_id!r}\n'
                 )
                 sys.stderr.flush()
                 await _rebuild_task_list_from_dom(autofill=False)
             return
-        if _skip_auto_fill(self.case_data_store):
+        if _skip_auto_fill(self.business_data_store):
             # form_modify partial (or query flagged without DOM yet)
             return
 
-        tl = TaskList.from_store(self.case_data_store.get('task_list'))
+        tl = TaskList.from_store(self.business_data_store.get('task_list'))
         if tl.total > 0:
             pending_labels = {d.label for d in tl.pending}
             done_labels = {d.label for d in tl.done}
@@ -226,7 +226,7 @@ class FormAutofillEngine:
 
         sys.stderr.write(
             f'[form] rescan triggered label_text={label_text!r} container={container_id!r} '
-            f'tl.total={tl.total} force_refill={_force_refill_flag(self.case_data_store)}\n'
+            f'tl.total={tl.total} force_refill={_force_refill_flag(self.business_data_store)}\n'
         )
         sys.stderr.flush()
         await _rebuild_task_list_from_dom(autofill=True)
@@ -241,7 +241,7 @@ class FormAutofillEngine:
         """扫描新字段：差值过滤 + TaskItem 创建。返回 new_pending dicts。"""
         from .section_scope import section_matches
 
-        filt = (self.case_data_store.get('_assistant_section_filter') or '').strip()
+        filt = (self.business_data_store.get('_assistant_section_filter') or '').strip()
         known_labels = {d.label for d in tl.pending} | {d.label for d in tl.done}
         new_pending: list[dict] = []
         for f in dom_fields:
@@ -259,9 +259,9 @@ class FormAutofillEngine:
                 item = TaskItem(**{k: v for k, v in d.items() if k != 'commandValue'})
                 item.needs_intervention = False
                 tl.pending.append(item)
-            self.case_data_store['task_list'] = tl.to_store()
+            self.business_data_store['task_list'] = tl.to_store()
             # Debug: verify store has the items
-            verify = TaskList.from_store(self.case_data_store.get('task_list'))
+            verify = TaskList.from_store(self.business_data_store.get('task_list'))
             verify_labels = {i.label for i in verify.pending}
             sys.stderr.write(f'[auto-fill] _scan_new_fields: +{len(new_pending)} new={new_labels}, done={len(tl.done)} pending={len(tl.pending)}\n')
             sys.stderr.write(f'[auto-fill] _scan_new_fields verify: store pending has {len(verify.pending)} items, labels={list(verify_labels)[:3]}...\n')

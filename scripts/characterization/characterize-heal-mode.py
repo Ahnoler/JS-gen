@@ -133,8 +133,8 @@ def test_service_uses_heal_contract_for_prompt() -> None:
     src = (ROOT / "scripts/agent/service.py").read_text(encoding="utf-8")
     assert_true("'_heal_contract'" in src, "service reads _heal_contract")
     assert_true(
-        "contract = {'mode': 'heal', 'heal': case_data_ref['_heal_contract']}" in src
-        or "contract = {'mode': 'heal', 'heal': case_data_ref['_heal_contract']}" in src.replace('"', "'"),
+        "contract = {'mode': 'heal', 'heal': business_data_ref['_heal_contract']}" in src
+        or "contract = {'mode': 'heal', 'heal': business_data_ref['_heal_contract']}" in src.replace('"', "'"),
         "service wraps heal contract for prompt assembly",
     )
 

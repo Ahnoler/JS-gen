@@ -1,5 +1,5 @@
 /**
- * API group(s): case-data, system-ref-data, memory — extracted from catalog.js.
+ * API group(s): business-data, system-ref-data, memory — extracted from catalog.js.
  * Keep in sync with src/routes/v2/*.js
  */
 import { J } from './_j.js';
@@ -7,14 +7,14 @@ import { J } from './_j.js';
 /** @type {TagGroup[]} */
 export const GROUP_MEMORY = [
   {
-    id: 'case-data',
-    name: '案例数据（legacy）',
+    id: 'business-data',
+    name: '业务数据（legacy）',
     description:
-      'LEGACY：旧 case_data / case_data_entry。用户需求业务数据走 trajectory.task【业务数据】；'
+      'LEGACY：旧 business_data / business_data_entry。用户需求业务数据走 trajectory.task【业务数据】；'
       + '目标系统回写/已校验填表参考值请用「系统参考数据」system_ref_*。旧路径 /api/case-data → 410 Gone。',
     endpoints: [
       {
-        method: 'GET', path: '/api/v2/case-data',
+        method: 'GET', path: '/api/v2/business-data',
         summary: '分页列表（legacy）',
         params: [
           { name: 'page', type: 'number', in: 'query', example: '1' },
@@ -26,17 +26,17 @@ export const GROUP_MEMORY = [
         }),
       },
       {
-        method: 'GET', path: '/api/v2/case-data/{recordId}',
+        method: 'GET', path: '/api/v2/business-data/{recordId}',
         summary: '详情（含 entries，legacy）',
         params: [{ name: 'recordId', type: 'string', required: true, in: 'path', example: 'case_xxx' }],
       },
       {
-        method: 'GET', path: '/api/v2/case-data/{recordId}/file',
+        method: 'GET', path: '/api/v2/business-data/{recordId}/file',
         summary: '物化为本地 JSON 文件路径（legacy）',
         params: [{ name: 'recordId', type: 'string', required: true, in: 'path', example: 'case_xxx' }],
       },
       {
-        method: 'DELETE', path: '/api/v2/case-data/{recordId}',
+        method: 'DELETE', path: '/api/v2/business-data/{recordId}',
         summary: '删除（legacy）',
         params: [{ name: 'recordId', type: 'string', required: true, in: 'path', example: 'case_xxx' }],
       },
@@ -47,7 +47,7 @@ export const GROUP_MEMORY = [
     name: '系统参考数据',
     description:
       '目标系统回写/经校验可复用的填表参考值（system_ref_data / system_ref_entry）。'
-      + '≠ 用户需求业务数据；≠ legacy case_data。本迭代仅 CRUD 地基，录制暂不自动注入。',
+      + '≠ 用户需求业务数据；≠ legacy business_data。本迭代仅 CRUD 地基，录制暂不自动注入。',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/system-ref-data',
@@ -139,7 +139,7 @@ export const GROUP_MEMORY = [
         desc: 'Body: { events: [...] } 或直接数组。事件可内嵌 facts[] / decision{}。Agent 主路径不等待落库。',
         reqExample: J({
           events: [{
-            eventType: 'case_saved',
+            eventType: 'business_saved',
             trajectoryId: 42,
             phaseNumber: 1,
             payload: { key: '客户名称', value: '某某公司' },
@@ -244,7 +244,7 @@ export const GROUP_MEMORY = [
         summary: '记忆表统计',
         respExample: J({
           tables: { memoryEvent: 120, memoryFact: 45, memoryRelation: 30, decisionRecord: 12 },
-          recentEventTypes: [{ eventType: 'case_saved', count: 20 }],
+          recentEventTypes: [{ eventType: 'business_saved', count: 20 }],
         }),
       },
     ],

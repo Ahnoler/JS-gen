@@ -18,8 +18,8 @@ from .intent_contract import (
     phase_intent_active,
 )
 
-def contract_allows_form_assistant(case_data_store: dict | None) -> bool:
-    c = get_phase_intent(case_data_store)
+def contract_allows_form_assistant(business_data_store: dict | None) -> bool:
+    c = get_phase_intent(business_data_store)
     if not c:
         return False
     if 'allow_form_assistant' in c:
@@ -115,7 +115,7 @@ def should_block_index_submit(
     is_picker_ui: bool = False,
     container_id: str = '',
     query_ui: bool = False,
-    case_data_store: dict | None = None,
+    business_data_store: dict | None = None,
 ) -> bool:
     """True when index-click on submit label must be blocked.
 
@@ -127,9 +127,9 @@ def should_block_index_submit(
             phase_boundary_active,
             should_block_index_submit_boundary,
         )
-        if phase_boundary_active(case_data_store):
+        if phase_boundary_active(business_data_store):
             return should_block_index_submit_boundary(
-                get_phase_boundary(case_data_store),
+                get_phase_boundary(business_data_store),
                 btn_label,
                 in_form_overlay=in_form_overlay,
                 dialog_title=dialog_title,
@@ -162,74 +162,74 @@ def should_block_index_submit(
         return False
     return in_form_overlay
 
-def check_pending_write_gate(case_data_store: dict | None, section: str = "") -> tuple[bool, list[str]]:
+def check_pending_write_gate(business_data_store: dict | None, section: str = "") -> tuple[bool, list[str]]:
     """Return (ok, pending_labels). Hard gate when refill / boundary requires write."""
     try:
         from .._phase_boundary import can_submit_writes, phase_boundary_active
-        if phase_boundary_active(case_data_store):
-            return can_submit_writes(case_data_store, section=section)
+        if phase_boundary_active(business_data_store):
+            return can_submit_writes(business_data_store, section=section)
     except Exception:
         pass
-    if not contract_force_refill(case_data_store):
+    if not contract_force_refill(business_data_store):
         return True, []
     from scripts.models.task import TaskList
     from scripts.controller.actions.section_scope import filter_pending_labels
 
-    tl = TaskList.from_store((case_data_store or {}).get('task_list'))
+    tl = TaskList.from_store((business_data_store or {}).get('task_list'))
     pending = filter_pending_labels(tl, section)
     return len(pending) == 0, pending
 
-def record_success_token(case_data_store: dict | None, kind: str, evidence: str = '') -> None:
-    if not case_data_store:
+def record_success_token(business_data_store: dict | None, kind: str, evidence: str = '') -> None:
+    if not business_data_store:
         return
     try:
         from .._phase_boundary import phase_boundary_active, record_evidence
-        if phase_boundary_active(case_data_store):
+        if phase_boundary_active(business_data_store):
             mapping = {
                 'toast_ok': 'toast_ok',
                 'url_change': 'url_change',
                 'confirm_click': 'dialog_confirmed',
                 'picker_closed': 'picker_closed',
             }
-            record_evidence(case_data_store, mapping.get(kind, kind), evidence)
+            record_evidence(business_data_store, mapping.get(kind, kind), evidence)
     except Exception:
         pass
-    store = case_data_store.setdefault('_success_tokens', [])
+    store = business_data_store.setdefault('_success_tokens', [])
     if not isinstance(store, list):
         store = []
-        case_data_store['_success_tokens'] = store
+        business_data_store['_success_tokens'] = store
     entry = {'kind': kind, 'evidence': evidence}
     if entry not in store:
         store.append(entry)
     if kind in ('toast_ok', 'url_change'):
-        case_data_store['_last_save_ok'] = True
+        business_data_store['_last_save_ok'] = True
     if kind in ('confirm_click', 'picker_closed'):
-        case_data_store['_last_introduce_ok'] = True
+        business_data_store['_last_introduce_ok'] = True
 
-def has_contract_success(case_data_store: dict | None) -> bool:
+def has_contract_success(business_data_store: dict | None) -> bool:
     """True when required success token for this phase is satisfied."""
     try:
         from .._phase_boundary import phase_boundary_active, phase_done_ok
-        if phase_boundary_active(case_data_store):
-            ok, _ = phase_done_ok(case_data_store)
+        if phase_boundary_active(business_data_store):
+            ok, _ = phase_done_ok(business_data_store)
             return ok
     except Exception:
         pass
-    c = get_phase_intent(case_data_store)
+    c = get_phase_intent(business_data_store)
     if not c:
-        if case_data_store:
-            return bool(case_data_store.get('_last_save_ok') or case_data_store.get('_last_introduce_ok'))
+        if business_data_store:
+            return bool(business_data_store.get('_last_save_ok') or business_data_store.get('_last_introduce_ok'))
         return False
     kinds = (c.get('success') or {}).get('kinds') or []
     if not kinds:
         return True
-    if case_data_store.get('_last_save_ok') and ('toast_ok' in kinds or 'url_change' in kinds):
+    if business_data_store.get('_last_save_ok') and ('toast_ok' in kinds or 'url_change' in kinds):
         return True
-    if case_data_store.get('_last_introduce_ok') and (
+    if business_data_store.get('_last_introduce_ok') and (
         'confirm_click' in kinds or 'picker_closed' in kinds
     ):
         return True
-    tokens = case_data_store.get('_success_tokens') or []
+    tokens = business_data_store.get('_success_tokens') or []
     for tok in tokens:
         if isinstance(tok, dict) and tok.get('kind') in kinds:
             return True
@@ -290,32 +290,32 @@ def is_cycle_deviate_fingerprint(fp: str) -> bool:
                 return True
     return False
 
-def mark_quality_failed(case_data_store: dict | None, *reasons: str) -> None:
-    if not case_data_store:
+def mark_quality_failed(business_data_store: dict | None, *reasons: str) -> None:
+    if not business_data_store:
         return
-    case_data_store['_quality_failed'] = True
-    existing = case_data_store.setdefault('_quality_failed_reasons', [])
+    business_data_store['_quality_failed'] = True
+    existing = business_data_store.setdefault('_quality_failed_reasons', [])
     if not isinstance(existing, list):
         existing = []
-        case_data_store['_quality_failed_reasons'] = existing
+        business_data_store['_quality_failed_reasons'] = existing
     for r in reasons:
         if r and r not in existing:
             existing.append(r)
 
-def emit_phase_observability(case_data_store: dict | None, emit_fn) -> None:
+def emit_phase_observability(business_data_store: dict | None, emit_fn) -> None:
     """Emit phase_intent / phase_boundary / recovery / quality_failed on recording events."""
-    if not case_data_store or not emit_fn:
+    if not business_data_store or not emit_fn:
         return
     payload: dict[str, Any] = {}
-    c = get_phase_intent(case_data_store)
+    c = get_phase_intent(business_data_store)
     if c:
         payload['phase_intent'] = c
         payload['recovery'] = c.get('recovery')
     try:
         from .._phase_boundary import get_phase_boundary, phase_boundary_active
-        if phase_boundary_active(case_data_store):
-            b = get_phase_boundary(case_data_store)
-            evidence = list(case_data_store.get('_evidence_observed') or [])
+        if phase_boundary_active(business_data_store):
+            b = get_phase_boundary(business_data_store)
+            evidence = list(business_data_store.get('_evidence_observed') or [])
             payload['phase_boundary'] = b
             payload['evidence_observed'] = evidence
             emit_fn({
@@ -328,10 +328,10 @@ def emit_phase_observability(case_data_store: dict | None, emit_fn) -> None:
             })
     except Exception:
         pass
-    if case_data_store.get('_quality_failed'):
+    if business_data_store.get('_quality_failed'):
         payload['quality_failed'] = True
         payload['quality_failed_reasons'] = list(
-            case_data_store.get('_quality_failed_reasons') or []
+            business_data_store.get('_quality_failed_reasons') or []
         )
     if payload:
         emit_fn({'event': 'phase_intent_obs', 'data': payload})

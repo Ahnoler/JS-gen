@@ -117,7 +117,7 @@ export function registerTrajectorySession(tid, sessionId, opened, { bibError = n
     model: opened.model || null,
     lastTask: null,
     lastMaxSteps: null,
-    caseDataFile: null,
+    businessDataFile: null,
     useExecutor: true,
     executorNodeUuid: opened.nodeUuid,
     executorSlotIndex: opened.slotIndex,

@@ -85,9 +85,9 @@ def is_chrome_menu_label(text: str | None) -> bool:
     return False
 
 
-def _force_refill_flag(case_data_store: dict | None) -> bool:
+def _force_refill_flag(business_data_store: dict | None) -> bool:
     from scripts.controller.actions._phase_intent import contract_force_refill
-    return contract_force_refill(case_data_store)
+    return contract_force_refill(business_data_store)
 
 
 def _scan_buttons_from_result(result) -> list[dict]:
@@ -104,15 +104,15 @@ def _scan_buttons_from_result(result) -> list[dict]:
     return out
 
 
-async def refresh_scan_buttons(page, case_data_store) -> list[dict]:
-    """Rescan DOM buttons into ``case_data_store['_scan_buttons']``; return button list."""
-    raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, get_has_button_keywords(case_data_store)])
+async def refresh_scan_buttons(page, business_data_store) -> list[dict]:
+    """Rescan DOM buttons into ``business_data_store['_scan_buttons']``; return button list."""
+    raw = await page.evaluate(JS_SCAN_FORM_FIELDS, [False, get_has_button_keywords(business_data_store)])
     try:
         result = _as_dict(raw)
     except Exception:
-        return list(case_data_store.get('_scan_buttons') or [])
+        return list(business_data_store.get('_scan_buttons') or [])
     buttons = _scan_buttons_from_result(result)
-    case_data_store['_scan_buttons'] = buttons
+    business_data_store['_scan_buttons'] = buttons
     return buttons
 
 
@@ -332,50 +332,50 @@ def _merge_scan_buttons(scan_results: list[dict]) -> list[dict]:
     return merged
 
 
-def _is_query_mode(case_data_store: dict | None) -> bool:
+def _is_query_mode(business_data_store: dict | None) -> bool:
     """True when this phase/UI is query-filter (no form-save / no auto-fill)."""
-    if not case_data_store:
+    if not business_data_store:
         return False
-    if case_data_store.get('_task_mode') == 'query':
+    if business_data_store.get('_task_mode') == 'query':
         return True
     return bool(
-        case_data_store.get('_query_task')
-        or case_data_store.get('_query_ui')
+        business_data_store.get('_query_task')
+        or business_data_store.get('_query_ui')
     )
 
 
-def _skip_auto_fill(case_data_store: dict | None) -> bool:
+def _skip_auto_fill(business_data_store: dict | None) -> bool:
     """True when run_form_assistant auto-fill must not run.
 
     Auto-fill only for form_fill and form_modify+force_refill_all.
     login / query / other / partial modify → skip.
     """
-    if not case_data_store:
+    if not business_data_store:
         return True
-    if _is_query_mode(case_data_store):
+    if _is_query_mode(business_data_store):
         return True
-    mode = case_data_store.get('_task_mode')
+    mode = business_data_store.get('_task_mode')
     if mode == 'form_fill':
         return False
-    if mode == 'form_modify' and _force_refill_flag(case_data_store):
+    if mode == 'form_modify' and _force_refill_flag(business_data_store):
         return False
     return True
 
 
-async def _mark_query_ui_if_needed(page, case_data_store, container_id: str = '') -> bool:
+async def _mark_query_ui_if_needed(page, business_data_store, container_id: str = '') -> bool:
     """Detect query/filter UI; set _query_ui. Returns True if search context.
 
     Re-evaluates on every call — do not sticky-keep ``_query_ui`` after a picker
     dialog closes (that blocked click_save on the parent maintain form).
     Phase-level ``_query_task`` / task_mode=query still forces query semantics.
     """
-    if case_data_store is None:
+    if business_data_store is None:
         return _is_search_dialog(container_id)
-    if case_data_store.get('_query_task') or case_data_store.get('_task_mode') == 'query':
-        case_data_store['_query_ui'] = True
+    if business_data_store.get('_query_task') or business_data_store.get('_task_mode') == 'query':
+        business_data_store['_query_ui'] = True
         return True
     if _is_search_dialog(container_id):
-        case_data_store['_query_ui'] = True
+        business_data_store['_query_ui'] = True
         return True
     is_qt = False
     try:
@@ -383,20 +383,20 @@ async def _mark_query_ui_if_needed(page, case_data_store, container_id: str = ''
     except Exception as e:
         sys.stderr.write(f'[form] query-toolbar detect failed: {e}\n')
         sys.stderr.flush()
-    case_data_store['_query_ui'] = is_qt
+    business_data_store['_query_ui'] = is_qt
     if is_qt:
         sys.stderr.write('[form] Detected query toolbar (有查询无保存) — skip save cues\n')
         sys.stderr.flush()
     return is_qt
 
 
-async def _pack_select_record(page, case_data_store, label_text, option_text, element):
+async def _pack_select_record(page, business_data_store, label_text, option_text, element):
     """Build select_option params/element.
 
     - option_text: the value actually selected (replay contract — must stay exact)
     - options: full dropdown inventory for export / downstream products (reference)
     """
-    opts = options_from_scan_store(case_data_store, label_text)
+    opts = options_from_scan_store(business_data_store, label_text)
     live = await read_select_options(page, label_text)
     if live:
         # Prefer live (more complete after dropdown open); keep scan extras
@@ -411,8 +411,8 @@ async def _pack_select_record(page, case_data_store, label_text, option_text, el
     return attach_select_options(params, element, opts)
 
 
-def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store: dict, *, emit_checkpoint: bool = True):
-    """Persist form structure snapshot to case_data_store; optionally emit ACTION_LOG checkpoint.
+def _save_form_snapshot(container: str, scan_fields: list[dict], business_data_store: dict, *, emit_checkpoint: bool = True):
+    """Persist form structure snapshot to business_data_store; optionally emit ACTION_LOG checkpoint.
 
     Builds a FormSnapshot from scan fields, upserts into the collection
     (always append in memory), and updates both form_snapshots (array) and
@@ -427,7 +427,7 @@ def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store
         scan_fields=scan_fields,
         action_index=len(_ACTION_LOG),
     )
-    existing = case_data_store.get('form_snapshots') or []
+    existing = business_data_store.get('form_snapshots') or []
     root = FormSnapshot._root_container(snapshot.container)
     fp = snapshot.fields_fingerprint
     already = False
@@ -439,13 +439,13 @@ def _save_form_snapshot(container: str, scan_fields: list[dict], case_data_store
 
     if already:
         # Same structure already captured — refresh latest pointer only; no new ACTION_LOG
-        case_data_store['form_snapshot'] = snapshot.model_dump()
+        business_data_store['form_snapshot'] = snapshot.model_dump()
         return snapshot
 
     coll = FormSnapshotCollection(list(existing))
     coll.upsert(snapshot)
-    case_data_store['form_snapshots'] = coll.to_dicts()
-    case_data_store['form_snapshot'] = snapshot.model_dump()
+    business_data_store['form_snapshots'] = coll.to_dicts()
+    business_data_store['form_snapshot'] = snapshot.model_dump()
 
     if emit_checkpoint:
         params = snapshot.model_dump()
@@ -465,19 +465,19 @@ class ResolvedControl:
     error: str = ""
 
 
-def _resolve_control(case_data_store, label_text: str, xpath_hint: str = "") -> ResolvedControl:
+def _resolve_control(business_data_store, label_text: str, xpath_hint: str = "") -> ResolvedControl:
     label = (label_text or "").strip()
     hint = (xpath_hint or "").strip()
     if hint:
         resolved_label = label
         in_inventory = False
-        for f in case_data_store.get("_scan_fields") or []:
+        for f in business_data_store.get("_scan_fields") or []:
             if isinstance(f, dict) and (f.get("xpath_smart") or "").strip() == hint:
                 resolved_label = (f.get("label") or label).strip() or label
                 in_inventory = True
                 break
         if not in_inventory:
-            tl = TaskList.from_store(case_data_store.get("task_list"))
+            tl = TaskList.from_store(business_data_store.get("task_list"))
             for item in list(tl.pending) + list(tl.done):
                 if (item.xpath_smart or "").strip() == hint and (item.label or "").strip():
                     resolved_label = item.label.strip()
@@ -487,7 +487,7 @@ def _resolve_control(case_data_store, label_text: str, xpath_hint: str = "") -> 
             return ResolvedControl(xpath_smart=hint, label=resolved_label or label, error="")
         # Invented / stale hint (traj 130 placeholder[1]): prefer unique inventory
         # for this label when available; keep hint only as last resort.
-        by_label = _resolve_control_by_label(case_data_store, label_text)
+        by_label = _resolve_control_by_label(business_data_store, label_text)
         if not by_label.error and by_label.xpath_smart:
             return by_label
         # Spec: never return invented hint for write/persist.
@@ -497,20 +497,20 @@ def _resolve_control(case_data_store, label_text: str, xpath_hint: str = "") -> 
             error="xpath-not-found",
         )
 
-    return _resolve_control_by_label(case_data_store, label_text)
+    return _resolve_control_by_label(business_data_store, label_text)
 
 
-def _resolve_control_by_label(case_data_store, label_text: str) -> ResolvedControl:
+def _resolve_control_by_label(business_data_store, label_text: str) -> ResolvedControl:
     matches: list[tuple[str, str]] = []
     seen_xp: set[str] = set()
-    tl = TaskList.from_store(case_data_store.get("task_list"))
+    tl = TaskList.from_store(business_data_store.get("task_list"))
     for item in list(tl.pending) + list(tl.done):
         if item.label == label_text and (item.xpath_smart or "").strip():
             xp = item.xpath_smart.strip()
             if xp not in seen_xp:
                 seen_xp.add(xp)
                 matches.append((xp, item.label))
-    for f in case_data_store.get("_scan_fields") or []:
+    for f in business_data_store.get("_scan_fields") or []:
         if not isinstance(f, dict):
             continue
         if f.get("label") != label_text:
@@ -529,13 +529,13 @@ def _resolve_control_by_label(case_data_store, label_text: str) -> ResolvedContr
 
 
 def resolve_select_fallback(
-    case_data_store,
+    business_data_store,
     label_text: str,
     failed_xpath: str,
 ) -> ResolvedControl | None:
     """Return one inventory xpath after an explicit xpath actually missed."""
     failed = (failed_xpath or "").strip()
-    candidate = _resolve_control(case_data_store, label_text, "")
+    candidate = _resolve_control(business_data_store, label_text, "")
     if candidate.error or not candidate.xpath_smart:
         return None
     if candidate.xpath_smart.strip() == failed:

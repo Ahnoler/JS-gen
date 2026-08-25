@@ -8,7 +8,7 @@
 export const KNOWN_EVENT_TYPES = new Set([
   'action',
   'phase_done',
-  'case_saved',
+  'business_saved',
   'case_read',
   'contract',
   'summary',
@@ -24,7 +24,7 @@ export const KNOWN_EVENT_TYPES = new Set([
 
 /** 事实来源（reliability 基准见 weight-engine.js）。 */
 export const FACT_SOURCES = new Set([
-  'requirement', // 需求/案例数据（base_weight 1.0，不可被 LLM 覆盖）
+  'requirement', // 需求/业务数据（base_weight 1.0，不可被 LLM 覆盖）
   'user',
   'page',
   'rule',
@@ -53,7 +53,7 @@ export const AUDIT_STATUSES = new Set(['pending', 'passed', 'failed']);
 
 /** 事件来源（Node 侧接收时允许的取值）。 */
 export const EVENT_SOURCES = new Set([
-  'requirement', // 需求/案例数据摄取（权威）
+  'requirement', // 需求/业务数据摄取（权威）
   'agent',
   'cdp',
   'manual',

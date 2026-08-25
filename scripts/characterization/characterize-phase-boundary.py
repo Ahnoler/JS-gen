@@ -149,10 +149,10 @@ def main() -> int:
     ]
     assert_true(has_contract_success(store3), 'has_contract_success via boundary')
 
-    # Legacy should_block with case_data_store
+    # Legacy should_block with business_data_store
     assert_true(
         not should_block_index_submit(
-            c, '确认', in_form_overlay=True, is_picker_ui=True, case_data_store=store3,
+            c, '确认', in_form_overlay=True, is_picker_ui=True, business_data_store=store3,
         ),
         'legacy wrapper allow picker confirm',
     )
@@ -191,7 +191,7 @@ def main() -> int:
     )
     nav_biz = (
         '点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理页面。\n\n'
-        '【业务数据 — 来自用户需求（非系统回写案例数据）；填表时参考理解，按场景填写关键字段】\n'
+        '【业务数据 — 来自用户需求/关键数据，由你根据场景自行判断填入哪个字段；禁止机械按标签名与键名一一对应；引入/选人弹窗查询值优先取「引入」相关说明】\n'
         '关键数据\n对公客户基本信息\n        法定责任人引入 朱桂武'
     )
     assert_true(classify_task_mode(nav_biz) == 'other', 'nav+业务数据 → other not form_fill')

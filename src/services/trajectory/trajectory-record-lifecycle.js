@@ -139,24 +139,24 @@ export { toggleTrajectoryManualRecord } from './trajectory-manual-record.js';
  * Terminology (do not conflate):
  *
  * - **业务数据 (business data)** — values the *user* puts in the requirement /
- *   task text (often under「关键数据」「案例数据」section headers in NL).
+ *   task text (often under「关键数据」「业务数据」section headers in NL).
  *   This is what they *want* the recording to use (e.g. introduce person 朱桂武).
  *   Soft / relatively-structured prose; not a DB schema. Stays in task / 【业务数据】.
  *
  * - **系统参考值 (system_ref_*)** — values captured from the *target system*
  *   and optionally verified for reuse (`system_ref_data` / `system_ref_entry`).
  *   Future fill-form reference; **not** injected into the agent in this iteration.
- *   Never write extractCaseEntriesFromRequirement / user 业务数据 into system_ref_*.
+ *   Never write extractBusinessEntriesFromRequirement / user 业务数据 into system_ref_*.
  *
- * - **案例数据 legacy (case_data / case_data_entry)** — historical tables; retain
+ * - **业务数据 legacy (business_data / business_data_entry)** — historical tables; retain
  *   but do not treat as the product home for system-captured verified values.
  *
- * User 业务数据 ≠ system_ref ≠ legacy case_data. Feeding the agent for
+ * User 业务数据 ≠ system_ref ≠ legacy business_data. Feeding the agent for
  * fill/introduce must prefer 业务数据 as readable context.
  * Inject 业务数据 only for fill / modify / introduce phases — never for
  * pure navigate / login / list-query (avoids「填写」polluting task_mode).
  *
- * Historical note: symbols like `case_data_block` / `caseEntries` often carry
+ * Historical note: symbols like `business_data_block` / `businessEntries` often carry
  * **业务数据** extracted from the requirement — names predate this split.
  *
  * Design for 业务数据:
@@ -167,60 +167,60 @@ export { toggleTrajectoryManualRecord } from './trajectory-manual-record.js';
  *   drive autofill by hard label↔key matching.
  *
  * Returns:
- *   caseDataBlock — raw 业务数据 text from trajectory.task (preferred AI context)
- *   caseData      — optional flat KV derived from that text (secondary; may also
- *                   land in legacy case_data_entry for memory — NOT system_ref)
+ *   businessDataBlock — raw 业务数据 text from trajectory.task (preferred AI context)
+ *   businessData      — optional flat KV derived from that text (secondary; may also
+ *                       land in legacy business_data_entry for memory — NOT system_ref)
  */
-export async function prepareCaseDataInjection(trajectoryId) {
+export async function prepareBusinessDataInjection(trajectoryId) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) {
-    return { caseDataFile: null, caseData: null, caseDataBlock: '' };
+    return { businessDataFile: null, businessData: null, businessDataBlock: '' };
   }
   try {
     const { loadFlatDictByTrajectory, replaceEntriesForTrajectory } =
-      await import('../../dao/case-data-dao.js');
+      await import('../../dao/business-data-dao.js');
     const {
-      extractCaseEntriesFromRequirement,
-      extractCaseDataBlock,
+      extractBusinessEntriesFromRequirement,
+      extractBusinessDataBlock,
     } = await import('./trajectory-meta-service.js');
 
     const trajDao = await import('../../dao/trajectory-dao.js');
     const traj = await trajDao.getById(tid);
     const taskText = traj?.task || '';
-    const caseDataBlock = extractCaseDataBlock(taskText) || '';
+    const businessDataBlock = extractBusinessDataBlock(taskText) || '';
 
     // 扁平 KV：有则用；空则从 task 兜底解析并落库（记忆摄取仍可用）
     let flat = await loadFlatDictByTrajectory(tid);
     if (!(flat && Object.keys(flat).length)) {
-      const entries = extractCaseEntriesFromRequirement(taskText);
+      const entries = extractBusinessEntriesFromRequirement(taskText);
       if (entries.length) {
         await replaceEntriesForTrajectory(tid, entries).catch((err) => {
-          console.warn('[record] case-data fallback persist skipped:', err?.message || err);
+          console.warn('[record] business-data fallback persist skipped:', err?.message || err);
         });
         try {
-          const { ingestCaseEntriesAsFacts } = await import('../../memory/memory-service.js');
-          await ingestCaseEntriesAsFacts(tid, entries);
+          const { ingestBusinessEntriesAsFacts } = await import('../../memory/memory-service.js');
+          await ingestBusinessEntriesAsFacts(tid, entries);
         } catch (err) {
-          console.warn('[record] case-data fallback fact ingest skipped:', err?.message || err);
+          console.warn('[record] business-data fallback fact ingest skipped:', err?.message || err);
         }
         flat = {};
         for (const e of entries) flat[e.fieldKey] = e.fieldValue ?? '';
-        console.log(`[record] case-data fallback from task: ${entries.length} keys`);
+        console.log(`[record] business-data fallback from task: ${entries.length} keys`);
       }
     }
 
-    if (caseDataBlock) {
-      console.log(`[record] case-data block ready (${caseDataBlock.length} chars) for AI context`);
+    if (businessDataBlock) {
+      console.log(`[record] business-data block ready (${businessDataBlock.length} chars) for AI context`);
     }
     return {
-      caseDataFile: null,
-      caseData: flat && Object.keys(flat).length ? flat : null,
-      caseDataBlock,
+      businessDataFile: null,
+      businessData: flat && Object.keys(flat).length ? flat : null,
+      businessDataBlock,
     };
   } catch (err) {
-    console.warn('[record] case-data injection skipped:', err?.message || err);
+    console.warn('[record] business-data injection skipped:', err?.message || err);
   }
-  return { caseDataFile: null, caseData: null, caseDataBlock: '' };
+  return { businessDataFile: null, businessData: null, businessDataBlock: '' };
 }
 
 

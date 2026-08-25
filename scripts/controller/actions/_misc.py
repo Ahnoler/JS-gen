@@ -58,7 +58,7 @@ _JS_VISIBLE_FORM_OVERLAY = '''() => {
 }'''
 
 
-def _register_misc_actions(controller, browser_context, case_data_store=None):
+def _register_misc_actions(controller, browser_context, business_data_store=None):
     @controller.action('Wait for Element UI loading mask to disappear.')
     async def wait_for_loading():
         page = await browser_context.get_current_page()
@@ -210,9 +210,9 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 result,
                 element=element,
             )
-            if case_data_store is not None:
+            if business_data_store is not None:
                 from scripts.controller.actions.container_naming import remember_trigger_button
-                remember_trigger_button(case_data_store, button_text)
+                remember_trigger_button(business_data_store, button_text)
             return _ok(result)
         return result
 
@@ -236,7 +236,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
             action_json = action_file.model_dump()
 
             # Write form structure snapshots if available (prefer array, fall back to single)
-            coll = FormSnapshotCollection.from_store(case_data_store)
+            coll = FormSnapshotCollection.from_store(business_data_store)
             snapshots = coll.to_dicts()
             if snapshots:
                 forms_dir = os.path.join(_SCRIPTS_DIR, 'forms')
@@ -334,9 +334,9 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
         await page.wait_for_timeout(500)
         if _is_ok_result(result):
             _state._record_action('close_dialog', {}, result, element=element)
-            if case_data_store is not None:
+            if business_data_store is not None:
                 from scripts.controller.actions.container_naming import clear_trigger_button
-                clear_trigger_button(case_data_store)
+                clear_trigger_button(business_data_store)
             try:
                 from scripts.controller.actions._phase_boundary import maybe_record_picker_closed
                 from ._js_snippets import JS_IS_QUERY_TOOLBAR
@@ -345,9 +345,9 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                     still = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
                 except Exception:
                     still = False
-                parent = (case_data_store or {}).get('_parent_container_before_picker') or 'main'
+                parent = (business_data_store or {}).get('_parent_container_before_picker') or 'main'
                 maybe_record_picker_closed(
-                    case_data_store, still_query_ui=still, parent_container=parent,
+                    business_data_store, still_query_ui=still, parent_container=parent,
                 )
             except Exception:
                 pass
@@ -495,10 +495,10 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 if compact.startswith(('确认', '确定')):
                     try:
                         from ._js_snippets import JS_IS_QUERY_TOOLBAR
-                        if (case_data_store or {}).get('_query_ui') or await page.evaluate(JS_IS_QUERY_TOOLBAR):
+                        if (business_data_store or {}).get('_query_ui') or await page.evaluate(JS_IS_QUERY_TOOLBAR):
                             is_picker_ui = True
                     except Exception:
-                        if (case_data_store or {}).get('_query_ui'):
+                        if (business_data_store or {}).get('_query_ui'):
                             is_picker_ui = True
 
                 try:
@@ -506,7 +506,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         get_phase_intent,
                         should_block_index_submit,
                     )
-                    contract = get_phase_intent(case_data_store)
+                    contract = get_phase_intent(business_data_store)
                 except Exception:
                     contract = None
                     should_block_index_submit = None  # type: ignore
@@ -520,8 +520,8 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         dialog_title=dialog_title,
                         is_picker_ui=is_picker_ui,
                         container_id='',
-                        query_ui=is_picker_ui or bool((case_data_store or {}).get('_query_ui')),
-                        case_data_store=case_data_store,
+                        query_ui=is_picker_ui or bool((business_data_store or {}).get('_query_ui')),
+                        business_data_store=business_data_store,
                     )
                 elif compact.startswith(('保存', '提交')) or (in_form_overlay and not is_picker_ui):
                     block = True
@@ -578,8 +578,8 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                 await _wait_if_loading(page)
                 url_after = getattr(page, 'url', '') or ''
                 if url_before and url_after and url_before != url_after:
-                    if case_data_store is not None:
-                        case_data_store['_last_click_navigated'] = {
+                    if business_data_store is not None:
+                        business_data_store['_last_click_navigated'] = {
                             'from': url_before,
                             'to': url_after,
                         }
@@ -620,10 +620,10 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                         'tag_name': element_info.get('tag_name') if element_info else tag_name,
                         'text': (element_info or {}).get('text') or elem_text or '',
                     }, f'ok-clicked-{index}', element=element_info)
-                if case_data_store is not None:
+                if business_data_store is not None:
                     from scripts.controller.actions.container_naming import remember_trigger_button
                     remember_trigger_button(
-                        case_data_store,
+                        business_data_store,
                         (element_info or {}).get('text') or elem_text or '',
                     )
                 try:
@@ -658,7 +658,7 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                                 '禁止原样重复点击确认。',
                                 include_in_memory=True,
                             )
-                        record_success_token(case_data_store, 'confirm_click', btn_label)
+                        record_success_token(business_data_store, 'confirm_click', btn_label)
                         await page.wait_for_timeout(400)
                         still = False
                         try:
@@ -666,14 +666,14 @@ def _register_misc_actions(controller, browser_context, case_data_store=None):
                             still = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
                         except Exception:
                             still = False
-                        parent = (case_data_store or {}).get('_parent_container_before_picker') or 'main'
+                        parent = (business_data_store or {}).get('_parent_container_before_picker') or 'main'
                         maybe_record_picker_closed(
-                            case_data_store, still_query_ui=still, parent_container=parent,
+                            business_data_store, still_query_ui=still, parent_container=parent,
                         )
                         if not still:
                             # Parent maintain form still needs toast_ok via click_save.
-                            case_data_store['_submit_ready'] = True
-                            case_data_store.pop('_query_ui', None)
+                            business_data_store['_submit_ready'] = True
+                            business_data_store.pop('_query_ui', None)
                             sys.stderr.write(
                                 '[click] picker confirm closed → submit-ready for parent save\n'
                             )

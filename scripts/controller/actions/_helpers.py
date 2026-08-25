@@ -77,16 +77,16 @@ def normalize_select_options(raw) -> list[str]:
     return out
 
 
-def options_from_scan_store(case_data_store: dict | None, label: str) -> list[str]:
-    """Pull previously scanned options for a label from case_data_store."""
-    if not case_data_store or not label:
+def options_from_scan_store(business_data_store: dict | None, label: str) -> list[str]:
+    """Pull previously scanned options for a label from business_data_store."""
+    if not business_data_store or not label:
         return []
-    for f in case_data_store.get('_scan_fields') or []:
+    for f in business_data_store.get('_scan_fields') or []:
         if isinstance(f, dict) and f.get('label') == label:
             opts = normalize_select_options(f.get('options') or [])
             if opts:
                 return opts
-    tl = case_data_store.get('task_list') or {}
+    tl = business_data_store.get('task_list') or {}
     if isinstance(tl, dict):
         for bucket in ('pending', 'done'):
             for item in tl.get(bucket) or []:

@@ -143,7 +143,7 @@ class TaskItem(BaseModel):
 
 # ── Task list ───────────────────────────────────────────────────────────────
 class TaskList(BaseModel):
-    """The complete task list stored in case_data_store['task_list'].
+    """The complete task list stored in business_data_store['task_list'].
 
     Maintains two lists:
     - pending: fields still needing to be filled
@@ -404,7 +404,7 @@ class TaskList(BaseModel):
 
     @classmethod
     def from_store(cls, data: dict | None) -> "TaskList":
-        """Deserialize from the case_data_store dict format."""
+        """Deserialize from the business_data_store dict format."""
         if not data:
             return cls()
         return cls(
@@ -413,7 +413,7 @@ class TaskList(BaseModel):
         )
 
     def to_store(self) -> dict:
-        """Serialize to the case_data_store dict format."""
+        """Serialize to the business_data_store dict format."""
         return {
             "pending": [item.model_dump() for item in self.pending],
             "done": [item.model_dump() for item in self.done],

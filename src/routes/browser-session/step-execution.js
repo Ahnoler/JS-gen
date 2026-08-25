@@ -8,11 +8,11 @@ import { broadcastWatcherStatus } from './broadcasts.js';
 import { bindExecutorSessionEvents } from './executor-events.js';
 import { handleSessionMessage } from './session-message.js';
 
-async function executeExecutorStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel }) {
+async function executeExecutorStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel }) {
   if (session.busy) return channel.send('error', { message: 'Browser is busy executing a step' });
   if (!session.executorNodeUuid) return channel.send('error', { message: 'Executor session not bound' });
 
-  if (caseDataFile) session.caseDataFile = caseDataFile;
+  if (businessDataFile) session.businessDataFile = businessDataFile;
   session.busy = true;
   broadcastWatcherStatus();
 
@@ -90,7 +90,7 @@ async function executeExecutorStep({ session, task, maxSteps, caseDataFile, phas
         instruction: task,
         max_steps: maxSteps || 40,
         phase_number: Number.isFinite(pn) ? pn : stepIndex,
-        case_data_file: session.caseDataFile,
+        business_data_file: session.businessDataFile,
       },
     });
   } catch (writeErr) {
@@ -103,16 +103,16 @@ async function executeExecutorStep({ session, task, maxSteps, caseDataFile, phas
 
 // ── Shared: execute a single step on the global browser agent ──
 // Callers: HTTP+SSE handler (POST /step) and WebSocket handler
-export async function executeAgentStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel }) {
+export async function executeAgentStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel }) {
   if (session.useExecutor) {
-    return executeExecutorStep({ session, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId, channel });
+    return executeExecutorStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel });
   }
 
   const gb = state.globalBrowser;
   if (gb.busy) return channel.send('error', { message: 'Browser is busy executing a step' });
   if (!gb.ready || !gb.stdin) return channel.send('error', { message: 'Browser not ready' });
 
-  if (caseDataFile) session.caseDataFile = caseDataFile;
+  if (businessDataFile) session.businessDataFile = businessDataFile;
   gb.busy = true;
   broadcastWatcherStatus();
 
@@ -160,7 +160,7 @@ export async function executeAgentStep({ session, task, maxSteps, caseDataFile, 
 
   try {
     const stepData = { instruction: task, max_steps: maxSteps || 30 };
-    if (session.caseDataFile) stepData.case_data_file = session.caseDataFile;
+    if (session.businessDataFile) stepData.business_data_file = session.businessDataFile;
     // Prefer UI phase number so _ACTION_LOG.phase matches 【阶段N】 and DB trajectory_phase
     if (Number.isFinite(pn)) stepData.phase_number = pn;
     gb.stdin.write(JSON.stringify({ event: 'step', data: stepData }) + '\n');

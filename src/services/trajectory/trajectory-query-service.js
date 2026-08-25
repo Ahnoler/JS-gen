@@ -4,7 +4,7 @@
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
-import * as caseDataDao from '../../dao/case-data-dao.js';
+import * as businessDataDao from '../../dao/business-data-dao.js';
 import { filterMetaSteps, isMetaStep } from '../../models/meta-step-actions.js';
 
 function safeJson(str) {
@@ -95,13 +95,13 @@ export async function getTrajectoryTree(trajectoryDbId, { includeMeta = false } 
   });
 
   const orphanSteps = allSteps.filter((s) => !assigned.has(s.id));
-  const caseEntries = await caseDataDao.listEntriesByTrajectory(tid);
+  const businessEntries = await businessDataDao.listEntriesByTrajectory(tid);
   return {
     trajectoryId: traj.id,
     ...traj,
     phases: phasesWithSteps,
     orphanSteps,
-    caseEntries,
+    businessEntries,
   };
 }
 
@@ -146,7 +146,7 @@ export async function getTrajectoryWithPhases(id) {
   const traj = await trajectoryDao.getById(+id);
   if (!traj) return null;
   traj.phases = await trajectoryPhaseDao.listByTrajectory(traj.id);
-  traj.caseEntries = await caseDataDao.listEntriesByTrajectory(traj.id);
+  traj.businessEntries = await businessDataDao.listEntriesByTrajectory(traj.id);
   return traj;
 }
 

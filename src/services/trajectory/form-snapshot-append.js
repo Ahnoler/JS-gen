@@ -233,7 +233,7 @@ export async function appendRecordedFormSnapshot(trajectoryDbId, entry, { source
       optional_count: optionalCount,
       action_index: actionIndex,
       trigger_step_id: stepId,
-      case_data_id: null,
+      business_data_id: null,
       trajectory_id: tid,
     });
     if (fields.length) {

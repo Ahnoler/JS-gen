@@ -34,7 +34,7 @@ def main() -> int:
     # B: watcher armed before error surfacing before success token
     watcher_pos = misc.find('JS_WATCH_SAVE_NOTIFICATIONS')
     err_pos = misc.find('err-notification:')
-    success_pos = misc.find("record_success_token(case_data_store, 'confirm_click'")
+    success_pos = misc.find("record_success_token(business_data_store, 'confirm_click'")
     assert_true(watcher_pos >= 0 and err_pos >= 0 and success_pos >= 0, 'all markers present')
     assert_true(watcher_pos < err_pos < success_pos, 'arm watcher → check error → then success token')
 

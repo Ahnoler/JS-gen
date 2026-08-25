@@ -42,7 +42,7 @@ def _compact_last_result(_last_result, max_chars=120):
     return ' | '.join(parts) if parts else 'res=None'
 
 
-def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_store=None):
+def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_data_store=None):
     """Build hooks with goal dedup detection and cancel signal."""
     if goal_tracker is None:
         goal_tracker = {'goals': [], 'stopped': False}
@@ -67,18 +67,18 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
         # Business-scenario summary (non-mandatory background) — before force cues
         try:
             from .controller.actions._scenario_describer import inject_scenario_summary
-            await inject_scenario_summary(agent, case_data_store)
+            await inject_scenario_summary(agent, business_data_store)
         except Exception as e:
             sys.stderr.write(f"[recorder] scenario_describer error: {e}\n")
             sys.stderr.flush()
 
-        if case_data_store is not None:
+        if business_data_store is not None:
             # After auto-fill / empty pending: force agent toward 保存 — never on query UI
-            if case_data_store.get('_task_mode') == 'query' or case_data_store.get('_query_task') or case_data_store.get('_query_ui'):
-                case_data_store.pop('_submit_ready', None)
-                case_data_store.pop('_query_ready', None)
-            elif case_data_store.get('_submit_ready'):
-                case_data_store['_submit_ready'] = False
+            if business_data_store.get('_task_mode') == 'query' or business_data_store.get('_query_task') or business_data_store.get('_query_ui'):
+                business_data_store.pop('_submit_ready', None)
+                business_data_store.pop('_query_ready', None)
+            elif business_data_store.get('_submit_ready'):
+                business_data_store['_submit_ready'] = False
                 msg = HumanMessage(content=(
                     '[SYSTEM] Fillable form fields are done (pending≈0).\n'
                     'NEXT_ACTION: Call click_save() NOW (finds 保存/提交 and scrolls into view).\n'
@@ -96,13 +96,13 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                 sys.stderr.write('[recorder] Injected submit-ready cue\n')
                 sys.stderr.flush()
             # Break already-matched re-select loops
-            streak = int(case_data_store.get('_already_matched_streak', 0) or 0)
+            streak = int(business_data_store.get('_already_matched_streak', 0) or 0)
             if streak >= 3:
-                case_data_store['_already_matched_streak'] = 0
+                business_data_store['_already_matched_streak'] = 0
                 if (
-                    case_data_store.get('_task_mode') == 'query'
-                    or case_data_store.get('_query_task')
-                    or case_data_store.get('_query_ui')
+                    business_data_store.get('_task_mode') == 'query'
+                    or business_data_store.get('_query_task')
+                    or business_data_store.get('_query_ui')
                 ):
                     msg = HumanMessage(content=(
                         f'[SYSTEM] You received already-matched {streak}+ times in a row. '
@@ -110,7 +110,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                         f'STOP re-selecting filters. Click the 查询 button now. '
                         f'Do NOT call click_save() / scan_form_fields / get_pending_tasks.'
                     ))
-                elif case_data_store.get('_task_mode') == 'form_modify' and not case_data_store.get('_force_refill_all'):
+                elif business_data_store.get('_task_mode') == 'form_modify' and not business_data_store.get('_force_refill_all'):
                     msg = HumanMessage(content=(
                         f'[SYSTEM] You received already-matched {streak}+ times in a row. '
                         f'Task mode=form_modify — record write actions on editable fields. '
@@ -122,8 +122,8 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                             preferred_submit_cue,
                             resolve_phase_section,
                         )
-                        sec = resolve_phase_section(case_data_store)
-                        cue = preferred_submit_cue(case_data_store, section=sec)
+                        sec = resolve_phase_section(business_data_store)
+                        cue = preferred_submit_cue(business_data_store, section=sec)
                     except Exception:
                         cue = 'Call click_save() immediately.'
                     msg = HumanMessage(content=(
@@ -163,21 +163,21 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
         sys.stderr.flush()
         # Empty-act cue is internal steering only — never abort on_step_end / agent.run
         try:
-            _emit_empty_act_cue(case_data_store, agent, _actions_raw, _next_goal)
+            _emit_empty_act_cue(business_data_store, agent, _actions_raw, _next_goal)
         except Exception as e:
             sys.stderr.write(f'[recorder] empty-act cue error: {e}\n')
             sys.stderr.flush()
 
         # Duplicate-failure cue is internal steering only — never abort on_step_end / agent.run
         try:
-            _emit_duplicate_failure_cue(case_data_store, agent, _actions, _last_result)
+            _emit_duplicate_failure_cue(business_data_store, agent, _actions, _last_result)
         except Exception as e:
             sys.stderr.write(f'[recorder] duplicate-failure cue error: {e}\n')
             sys.stderr.flush()
 
         # Navigation cue is internal steering only — never abort on_step_end / agent.run
         try:
-            _emit_navigation_cue(case_data_store, agent)
+            _emit_navigation_cue(business_data_store, agent)
         except Exception as e:
             sys.stderr.write(f'[recorder] navigation cue error: {e}\n')
             sys.stderr.flush()
@@ -209,7 +209,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
         # caused false "pending errors" and forced the agent to keep filling the
         # NEXT page after a successful create→navigate.
         if _done:
-            if await _guard_done_on_step_end(agent, _last_result, case_data_store):
+            if await _guard_done_on_step_end(agent, _last_result, business_data_store):
                 return
 
         try:
@@ -321,7 +321,7 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                     return fp.startswith(('radio:', 'save:', 'fill_', 'select_', 'click_radio:'))
 
                 # Too early in the phase — avoid false stop on open/expand clicks
-                if case_data_store and case_data_store.get('_heal_mode'):
+                if business_data_store and business_data_store.get('_heal_mode'):
                     # heal: no contract cycle prescription, but stop on a
                     # no-progress spin — repeated identical read-only actions
                     # (get_page_state / check_field_value) with no write between.
@@ -348,12 +348,12 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                             continue
                         if cycle_len == 2 and not any(_is_substantive(x) for x in a):
                             continue  # pure click:查询 / click:xxx loops are common, not a spin
-                        contract = get_phase_intent(case_data_store) if case_data_store else None
-                        prescribed = bool(case_data_store and case_data_store.get('_cycle_prescribed'))
-                        if prescribed and case_data_store:
+                        contract = get_phase_intent(business_data_store) if business_data_store else None
+                        prescribed = bool(business_data_store and business_data_store.get('_cycle_prescribed'))
+                        if prescribed and business_data_store:
                             recent = fps[-cycle_len:] if fps else []
                             if any(is_cycle_deviate_fingerprint(x) for x in recent):
-                                mark_quality_failed(case_data_store, f'cycle_deviate:{recent}')
+                                mark_quality_failed(business_data_store, f'cycle_deviate:{recent}')
                                 goal_tracker['stopped'] = True
                                 sys.stderr.write(
                                     f"[recorder] Cycle deviate after prescription: {recent}\n"
@@ -362,9 +362,9 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, case_data_st
                                 agent.state.stopped = True
                                 return
                             break
-                        if case_data_store is not None:
-                            case_data_store['_cycle_prescribed'] = True
-                            case_data_store['_recovery_active'] = True
+                        if business_data_store is not None:
+                            business_data_store['_cycle_prescribed'] = True
+                            business_data_store['_recovery_active'] = True
                         sys.stderr.write(
                             f"[recorder] Repeated action cycle detected ({cycle_len}×2): {a} — prescribing recovery\n"
                         )

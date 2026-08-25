@@ -2,8 +2,8 @@
  * System reference values — captured from the target system, optionally verified
  * for reuse as fill-form references.
  *
- * NOT user 业务数据 (requirement text). Do not write extractCaseEntriesFromRequirement
- * results here. Legacy case_data / case_data_entry remain separate.
+ * NOT user 业务数据 (requirement text). Do not write extractBusinessEntriesFromRequirement
+ * results here. Legacy business_data / business_data_entry remain separate.
  */
 import * as systemRefDao from '../dao/system-ref-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';

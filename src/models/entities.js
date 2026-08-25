@@ -223,7 +223,7 @@
  */
 
 /**
- * @typedef {Object} CaseData
+ * @typedef {Object} BusinessData
  * @property {number} [id]
  * @property {string} recordId
  * @property {string} [sessionId]
@@ -232,16 +232,16 @@
  * @property {number} [keyCount]
  * @property {Record<string, unknown>|null} [rawJson]
  * @property {string} createdAt
- * @property {CaseDataEntry[]} [entries]
+ * @property {BusinessDataEntry[]} [entries]
  * @property {FormSnapshot[]} [formSnapshots]
  * @deprecated Legacy store. Prefer SystemRefData for target-system verified fill references.
  *   User 业务数据 stays in trajectory.task / phase 【业务数据】blocks — do not conflate.
  */
 
 /**
- * @typedef {Object} CaseDataEntry
+ * @typedef {Object} BusinessDataEntry
  * @property {number} [id]
- * @property {number|null} [caseDataId]
+ * @property {number|null} [businessDataId]
  * @property {number|null} [trajectoryId]
  * @property {string} fieldKey
  * @property {string|null} [fieldValue]
@@ -290,7 +290,7 @@
  * @property {number} [optionalCount]
  * @property {number} [actionIndex]
  * @property {number|null} [triggerStepId]
- * @property {number|null} [caseDataId]
+ * @property {number|null} [businessDataId]
  * @property {number|null} [trajectoryId]
  * @property {string} createdAt
  * @property {SnapshotField[]} [fields]

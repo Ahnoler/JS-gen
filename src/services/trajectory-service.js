@@ -54,10 +54,10 @@ export {
 export {
   createEmptyTrajectory,
   createTransactionWithPhases,
-  setTrajectoryCaseEntries,
+  setTrajectoryBusinessEntries,
   analyzeRequirementToPhases,
-  extractCaseDataBlock,
-  extractCaseEntriesFromRequirement,
+  extractBusinessDataBlock,
+  extractBusinessEntriesFromRequirement,
   confirmTrajectory,
 } from './trajectory/trajectory-meta-service.js';
 

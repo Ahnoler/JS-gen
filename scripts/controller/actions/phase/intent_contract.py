@@ -1,6 +1,6 @@
 """Phase intent contract (state) — extracted from scripts/controller/actions/phase/intent.py.
 
-Compile/apply/clear the PhaseIntentContract in case_data_store; task-mode
+Compile/apply/clear the PhaseIntentContract in business_data_store; task-mode
 and refill mapping tables. Lazy-imports _phase_boundary only.
 """
 
@@ -71,9 +71,9 @@ _DEVIATE_CLICK_LABELS = frozenset({'修改', '编辑', '更新'})
 
 
 
-def clear_phase_intent(case_data_store: dict | None) -> None:
+def clear_phase_intent(business_data_store: dict | None) -> None:
     """Remove contract and phase-scoped recovery flags (call before next phase compile)."""
-    if not case_data_store:
+    if not business_data_store:
         return
     for key in (
         '_phase_intent',
@@ -89,28 +89,28 @@ def clear_phase_intent(case_data_store: dict | None) -> None:
         '_dup_failure_cued',
         '_last_click_navigated',
     ):
-        case_data_store.pop(key, None)
+        business_data_store.pop(key, None)
     try:
         from .._phase_boundary import clear_phase_boundary
-        clear_phase_boundary(case_data_store)
+        clear_phase_boundary(business_data_store)
     except Exception:
         pass
 
 
-def get_phase_intent(case_data_store: dict | None) -> dict[str, Any] | None:
-    if not case_data_store:
+def get_phase_intent(business_data_store: dict | None) -> dict[str, Any] | None:
+    if not business_data_store:
         return None
-    raw = case_data_store.get('_phase_intent')
+    raw = business_data_store.get('_phase_intent')
     return raw if isinstance(raw, dict) else None
 
 
-def phase_intent_active(case_data_store: dict | None) -> bool:
+def phase_intent_active(business_data_store: dict | None) -> bool:
     """True when contract is in effect for this phase."""
-    if not case_data_store:
+    if not business_data_store:
         return False
-    if case_data_store.get('_phase_intent_flag_locked') is False:
+    if business_data_store.get('_phase_intent_flag_locked') is False:
         return False
-    return get_phase_intent(case_data_store) is not None
+    return get_phase_intent(business_data_store) is not None
 
 
 def _is_introduce_task(task_text: str) -> bool:
@@ -221,12 +221,12 @@ def compile_phase_intent(task_text: str) -> dict[str, Any]:
     }
 
 
-def _clear_phase_form_state(case_data_store: dict | None, *, mode: str, task_mode: str) -> None:
+def _clear_phase_form_state(business_data_store: dict | None, *, mode: str, task_mode: str) -> None:
     """Drop phase-scoped form/query flags when a new contract is applied."""
-    if not case_data_store:
+    if not business_data_store:
         return
     for key in ('_query_ui', '_query_ready', '_submit_ready'):
-        case_data_store.pop(key, None)
+        business_data_store.pop(key, None)
     clear_form = (
         mode in ('navigate', 'query', 'login', 'other')
         or task_mode in ('query', 'login', 'other')
@@ -241,18 +241,18 @@ def _clear_phase_form_state(case_data_store: dict | None, *, mode: str, task_mod
         '_active_container',
         '_parent_container_before_picker',
     ):
-        case_data_store.pop(key, None)
+        business_data_store.pop(key, None)
 
 
 def apply_phase_contract(
-    case_data_store: dict | None,
+    business_data_store: dict | None,
     contract: dict[str, Any],
     *,
     boundary_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Authoritative write of task_mode + force_refill + boundary + intent."""
-    clear_phase_intent(case_data_store)  # also clears boundary via existing clear
-    if case_data_store is None:
+    clear_phase_intent(business_data_store)  # also clears boundary via existing clear
+    if business_data_store is None:
         return contract
     try:
         from scripts.controller.actions.phase.reviewer import sanitize_contract_for_mode
@@ -296,25 +296,25 @@ def apply_phase_contract(
         # Even with override, never require maintain tokens on non-maintain modes.
         boundary['success_when'] = []
         boundary['requires_write_all_editable'] = False
-    case_data_store['_phase_boundary'] = boundary
-    case_data_store['_phase_boundary_flag_locked'] = True
-    case_data_store['_phase_intent'] = c
-    case_data_store['_phase_intent_flag_locked'] = True
-    case_data_store['_task_mode'] = task_mode
-    case_data_store['_query_task'] = mode == 'query'
-    case_data_store['_force_refill_all'] = requires_write
-    case_data_store['_evidence_observed'] = []
-    _clear_phase_form_state(case_data_store, mode=mode, task_mode=task_mode)
+    business_data_store['_phase_boundary'] = boundary
+    business_data_store['_phase_boundary_flag_locked'] = True
+    business_data_store['_phase_intent'] = c
+    business_data_store['_phase_intent_flag_locked'] = True
+    business_data_store['_task_mode'] = task_mode
+    business_data_store['_query_task'] = mode == 'query'
+    business_data_store['_force_refill_all'] = requires_write
+    business_data_store['_evidence_observed'] = []
+    _clear_phase_form_state(business_data_store, mode=mode, task_mode=task_mode)
     return c
 
 
-def apply_phase_intent(case_data_store: dict | None, task_text: str) -> dict[str, Any] | None:
+def apply_phase_intent(business_data_store: dict | None, task_text: str) -> dict[str, Any] | None:
     """Clear old contract, compile if flag on, write store. Returns contract or None.
 
     When AI_PHASE_BOUNDARY is on, compiles PhaseBoundary first and adapts it
     into the legacy intent dict so existing callers keep working.
     """
-    if case_data_store is None:
+    if business_data_store is None:
         return None
 
     from scripts.feature_flags import phase_boundary_enabled
@@ -327,9 +327,9 @@ def apply_phase_intent(case_data_store: dict | None, task_text: str) -> dict[str
         boundary = compile_boundary(task_text)
         contract = boundary_to_legacy_intent(boundary)
         if not contract:
-            clear_phase_intent(case_data_store)
-            case_data_store['_phase_intent_flag_locked'] = True
-            case_data_store['_phase_boundary_flag_locked'] = True
+            clear_phase_intent(business_data_store)
+            business_data_store['_phase_intent_flag_locked'] = True
+            business_data_store['_phase_boundary_flag_locked'] = True
             return None
         if 'allow_form_assistant' not in contract:
             mode = contract.get('mode')
@@ -340,30 +340,30 @@ def apply_phase_intent(case_data_store: dict | None, task_text: str) -> dict[str
         contract['source'] = 'rules_fallback'
         if boundary.get('goals'):
             contract.setdefault('in_scope', list(boundary['goals']))
-        return apply_phase_contract(case_data_store, contract, boundary_override=boundary)
+        return apply_phase_contract(business_data_store, contract, boundary_override=boundary)
 
     enabled = phase_intent_contract_enabled()
     if not enabled:
-        clear_phase_intent(case_data_store)
-        case_data_store['_phase_intent_flag_locked'] = enabled
+        clear_phase_intent(business_data_store)
+        business_data_store['_phase_intent_flag_locked'] = enabled
         return None
     contract = compile_phase_intent(task_text)
     contract['source'] = 'rules_fallback'
-    return apply_phase_contract(case_data_store, contract)
+    return apply_phase_contract(business_data_store, contract)
 
 
-def contract_force_refill(case_data_store: dict | None) -> bool:
+def contract_force_refill(business_data_store: dict | None) -> bool:
     """Whether TaskList should treat pre-filled editable fields as pending."""
     try:
         from .._phase_boundary import get_phase_boundary, phase_boundary_active
-        if phase_boundary_active(case_data_store):
-            b = get_phase_boundary(case_data_store)
+        if phase_boundary_active(business_data_store):
+            b = get_phase_boundary(business_data_store)
             return bool(b and b.get('requires_write_all_editable'))
     except Exception:
         pass
-    c = get_phase_intent(case_data_store)
+    c = get_phase_intent(business_data_store)
     if c:
         return c.get('refill') == 'all_editable'
-    if case_data_store:
-        return bool(case_data_store.get('_force_refill_all'))
+    if business_data_store:
+        return bool(business_data_store.get('_force_refill_all'))
     return False

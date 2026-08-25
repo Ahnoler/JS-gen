@@ -59,9 +59,9 @@ from .form_autofill import FormAutofillEngine
 class _FormActionEngineBase:
     """Shared wiring for extracted form action engines."""
 
-    def __init__(self, browser_context, case_data_store, autofill_engine, button_keywords=None):
+    def __init__(self, browser_context, business_data_store, autofill_engine, button_keywords=None):
         self.browser_context = browser_context
-        self.case_data_store = case_data_store
+        self.business_data_store = business_data_store
         self.autofill_engine = autofill_engine
         self.ensure_scanned = autofill_engine.ensure_scanned
         # Parity alias: engine action bodies call the underscore name,
@@ -150,15 +150,15 @@ class FillEngine(_FormActionEngineBase):
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
         value = normalize_lat_lng_value(label_text, value)
-        resolved = _resolve_control(self.case_data_store, label_text, xpath_smart)
+        resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
         from scripts.feature_flags import xpath_smart_fill_only_enabled
 
         def _absent_skip(lbl: str):
-            if not _is_query_mode(self.case_data_store):
-                _task_done_impl(lbl or label_text, self.case_data_store)
+            if not _is_query_mode(self.business_data_store):
+                _task_done_impl(lbl or label_text, self.business_data_store)
             sys.stderr.write(f'[form] skip absent fill label={(lbl or label_text)!r}\n')
             sys.stderr.flush()
-            return _ok(_with_submit_cue(absent_field_skip_result(), self.case_data_store))
+            return _ok(_with_submit_cue(absent_field_skip_result(), self.business_data_store))
 
         strict_xpath = xpath_smart_fill_only_enabled()
         use_label_fallback = (
@@ -172,7 +172,7 @@ class FillEngine(_FormActionEngineBase):
             if strict_xpath and not (resolved.xpath_smart or xpath_smart or '').strip():
                 return _with_submit_cue(
                     resolved.error or 'err-xpath-smart-required',
-                    self.case_data_store,
+                    self.business_data_store,
                 )
             return resolved.error
         if use_label_fallback:
@@ -192,12 +192,12 @@ class FillEngine(_FormActionEngineBase):
                     result,
                     element=element,
                 )
-                if not _is_query_mode(self.case_data_store):
-                    _task_done_impl(label_text, self.case_data_store, value=value, xpath_smart=xp_inv)
-                return _ok(_with_submit_cue(result, self.case_data_store))
+                if not _is_query_mode(self.business_data_store):
+                    _task_done_impl(label_text, self.business_data_store, value=value, xpath_smart=xp_inv)
+                return _ok(_with_submit_cue(result, self.business_data_store))
             if _is_ok_result(result):
-                return _ok(_with_submit_cue(result, self.case_data_store))
-            return _with_submit_cue(result or resolved.error, self.case_data_store)
+                return _ok(_with_submit_cue(result, self.business_data_store))
+            return _with_submit_cue(result or resolved.error, self.business_data_store)
         element = await _capture_element(
             page, resolved.label, target_kind='form_input', xpath_smart=resolved.xpath_smart,
         )
@@ -212,14 +212,14 @@ class FillEngine(_FormActionEngineBase):
                 result,
                 element=element,
             )
-            if not _is_query_mode(self.case_data_store):
+            if not _is_query_mode(self.business_data_store):
                 _task_done_impl(
-                    resolved.label, self.case_data_store, value=value, xpath_smart=xp_inv,
+                    resolved.label, self.business_data_store, value=value, xpath_smart=xp_inv,
                 )
-            return _ok(_with_submit_cue(result, self.case_data_store))
+            return _ok(_with_submit_cue(result, self.business_data_store))
         if _is_ok_result(result):
-            return _ok(_with_submit_cue(result, self.case_data_store))
-        return _with_submit_cue(result, self.case_data_store)
+            return _ok(_with_submit_cue(result, self.business_data_store))
+        return _with_submit_cue(result, self.business_data_store)
 
 
     async def check_field_value(self, label_text: str):
@@ -332,7 +332,7 @@ class SelectEngine(_FormActionEngineBase):
             failed = await _final_select_failure('no-items')
             return _err(failed)
 
-        resolved = _resolve_control(self.case_data_store, label_text, xpath_smart)
+        resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
         if resolved.error:
             return resolved.error
         xp = resolved.xpath_smart
@@ -352,26 +352,26 @@ class SelectEngine(_FormActionEngineBase):
             if select_option_already_matched(option_text, cur_val):
                 stamped = resolve_recorded_option_text(option_text, cur_val)
                 params, element = await _pack_select_record(
-                    page, self.case_data_store, label_text, stamped, element,
+                    page, self.business_data_store, label_text, stamped, element,
                 )
                 xp_inv = stamp_recorded_xpath_smart(element, xp)
                 params['option_text'] = stamped
                 _record_action('select_option', params, already, element=element)
                 _task_done_impl(
-                    label_text, self.case_data_store, value=cur_val or stamped, xpath_smart=xp_inv,
+                    label_text, self.business_data_store, value=cur_val or stamped, xpath_smart=xp_inv,
                 )
-                streak = int(self.case_data_store.get('_already_matched_streak', 0) or 0) + 1
-                self.case_data_store['_already_matched_streak'] = streak
+                streak = int(self.business_data_store.get('_already_matched_streak', 0) or 0) + 1
+                self.business_data_store['_already_matched_streak'] = streak
                 return _ok(_with_submit_cue(
                     already + ' | already-matched | SKIP — field already set; do not re-select',
-                    self.case_data_store,
+                    self.business_data_store,
                 ))
 
-        self.case_data_store['_already_matched_streak'] = 0
+        self.business_data_store['_already_matched_streak'] = 0
 
         trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
         if trigger_result == 'xpath-not-found':
-            fallback = resolve_select_fallback(self.case_data_store, label_text, xp)
+            fallback = resolve_select_fallback(self.business_data_store, label_text, xp)
             if fallback is not None:
                 reset_diag = await reset_select_ui(page)
                 if not reset_diag.get('closed', False):
@@ -404,11 +404,11 @@ class SelectEngine(_FormActionEngineBase):
             'field-disabled',
         ):
             if is_absent_field_result(trigger_result):
-                if not _is_query_mode(self.case_data_store):
-                    _task_done_impl(label_text, self.case_data_store)
+                if not _is_query_mode(self.business_data_store):
+                    _task_done_impl(label_text, self.business_data_store)
                 sys.stderr.write(f'[select] skip absent label={label_text!r}\n')
                 sys.stderr.flush()
-                return _ok(_with_submit_cue(absent_field_skip_result(), self.case_data_store))
+                return _ok(_with_submit_cue(absent_field_skip_result(), self.business_data_store))
             failed = await _final_select_failure(str(trigger_result), xp)
             if trigger_result == 'no-select-found':
                 return _err(failed + ' | field may be radio — use click_radio')
@@ -418,22 +418,22 @@ class SelectEngine(_FormActionEngineBase):
 
         # Capture full option list while dropdown is open (before pick)
         params, element = await _pack_select_record(
-            page, self.case_data_store, label_text, option_text, element,
+            page, self.business_data_store, label_text, option_text, element,
         )
         xp_inv = stamp_recorded_xpath_smart(element, xp)
 
         select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
         if _is_ok_result(select_result):
             matched_text = select_result.split(':', 1)[1] if ':' in select_result else select_result
-            self.case_data_store.pop(f'_sel_retry_{label_text}', None)
+            self.business_data_store.pop(f'_sel_retry_{label_text}', None)
             stamped = resolve_recorded_option_text(option_text, matched_text)
             params['option_text'] = stamped
             params, element = attach_select_options(params, element, params.get('options'))
             _record_action('select_option', params, matched_text, element=element)
             _task_done_impl(
-                label_text, self.case_data_store, value=stamped or option_text, xpath_smart=xp_inv,
+                label_text, self.business_data_store, value=stamped or option_text, xpath_smart=xp_inv,
             )
-            return _ok(_with_submit_cue(f'ok | {matched_text}', self.case_data_store))
+            return _ok(_with_submit_cue(f'ok | {matched_text}', self.business_data_store))
         elif select_result == 'no-items':
             # Xpath recheck — treat already-set field as success (no labeled JS).
             recheck = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, label_text])
@@ -441,9 +441,9 @@ class SelectEngine(_FormActionEngineBase):
                 cur = recheck.split(':', 1)[1]
                 stamped = resolve_recorded_option_text(option_text, cur)
                 params['option_text'] = stamped
-                _task_done_impl(label_text, self.case_data_store, value=cur or stamped, xpath_smart=xp_inv)
+                _task_done_impl(label_text, self.business_data_store, value=cur or stamped, xpath_smart=xp_inv)
                 _record_action('select_option', params, recheck, element=element)
-                return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', self.case_data_store))
+                return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', self.business_data_store))
             failed = await _final_select_failure('no-items', xp)
             return _err(failed)
         elif select_result.startswith('option-not-found:'):
@@ -464,26 +464,26 @@ class SelectEngine(_FormActionEngineBase):
                 fuzzy_result = await page.evaluate(JS_SELECT_OPTION, fuzzy)
                 if _is_ok_result(fuzzy_result):
                     matched_text = fuzzy_result.split(':', 1)[1] if ':' in fuzzy_result else fuzzy_result
-                    self.case_data_store.pop(f'_sel_retry_{label_text}', None)
+                    self.business_data_store.pop(f'_sel_retry_{label_text}', None)
                     params['option_text'] = matched_text
                     _record_action('select_option', params, matched_text, element=element)
-                    _task_done_impl(label_text, self.case_data_store, value=matched_text, xpath_smart=xp_inv)
-                    return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', self.case_data_store))
+                    _task_done_impl(label_text, self.business_data_store, value=matched_text, xpath_smart=xp_inv)
+                    return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', self.business_data_store))
             retry_key = f'_sel_retry_{label_text}'
-            retries = self.case_data_store.get(retry_key, 0) + 1
-            self.case_data_store[retry_key] = retries
+            retries = self.business_data_store.get(retry_key, 0) + 1
+            self.business_data_store[retry_key] = retries
             if retries >= 3:
                 first_result = await page.evaluate(JS_SELECT_OPTION, 'first')
                 if _is_ok_result(first_result):
                     matched_text = first_result.split(':', 1)[1] if ':' in first_result else first_result
-                    self.case_data_store.pop(f'_sel_retry_{label_text}', None)
+                    self.business_data_store.pop(f'_sel_retry_{label_text}', None)
                     stamped = resolve_recorded_option_text(option_text, matched_text)
                     params['option_text'] = stamped
                     _record_action('select_option', params, matched_text, element=element)
                     _task_done_impl(
-                        label_text, self.case_data_store, value=stamped or matched_text, xpath_smart=xp_inv,
+                        label_text, self.business_data_store, value=stamped or matched_text, xpath_smart=xp_inv,
                     )
-                    return _ok(_with_submit_cue(f'ok | {matched_text}', self.case_data_store))
+                    return _ok(_with_submit_cue(f'ok | {matched_text}', self.business_data_store))
                 failed = await _final_select_failure(str(first_result), xp)
                 return _err(failed)
             failed = await _final_select_failure(str(select_result), xp)
@@ -502,7 +502,7 @@ class RadioEngine(_FormActionEngineBase):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
-        resolved = _resolve_control(self.case_data_store, label_text, xpath_smart)
+        resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
         if resolved.error:
             return resolved.error
         element = await _capture_element(
@@ -510,11 +510,11 @@ class RadioEngine(_FormActionEngineBase):
         )
         result = await page.evaluate(JS_CLICK_RADIO_BY_XPATH, [resolved.xpath_smart, option_text])
         if is_absent_field_result(result):
-            if not _is_query_mode(self.case_data_store):
-                _task_done_impl(resolved.label, self.case_data_store)
+            if not _is_query_mode(self.business_data_store):
+                _task_done_impl(resolved.label, self.business_data_store)
             sys.stderr.write(f'[form] skip absent radio label={resolved.label!r}\n')
             sys.stderr.flush()
-            return _ok(_with_submit_cue(absent_field_skip_result(), self.case_data_store))
+            return _ok(_with_submit_cue(absent_field_skip_result(), self.business_data_store))
         if _is_ok_result(result):
             xp_inv = stamp_recorded_xpath_smart(element, resolved.xpath_smart)
             _record_action(
@@ -527,7 +527,7 @@ class RadioEngine(_FormActionEngineBase):
                 element=element,
             )
             _task_done_impl(
-                resolved.label, self.case_data_store, value=option_text, xpath_smart=xp_inv,
+                resolved.label, self.business_data_store, value=option_text, xpath_smart=xp_inv,
             )
             return _ok(result)
         return result
@@ -554,7 +554,7 @@ class TreeEngine(_FormActionEngineBase):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
-        resolved = _resolve_control(self.case_data_store, label_text, xpath_smart)
+        resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
         # Soft resolve: tree-select can still run via label JS when scan miss;
         # capture uses resolved xpath when present so steps stamp form_tree_select.
         label_text = (resolved.label or label_text or '').strip() or label_text
@@ -590,7 +590,7 @@ class TreeEngine(_FormActionEngineBase):
                 result,
                 element=element,
             )
-            _task_done_impl(label_text, self.case_data_store, value=option_text, xpath_smart=xp_inv)
+            _task_done_impl(label_text, self.business_data_store, value=option_text, xpath_smart=xp_inv)
             return _ok(result)
         res_s = str(result or '')
         if res_s == 'disabled' or res_s.startswith('disabled'):
@@ -603,7 +603,7 @@ class TreeEngine(_FormActionEngineBase):
         if res_s.startswith('no-tree-component'):
             fill_val = (option_text or '').strip()
             if fill_val and fill_val.lower() != 'first':
-                resolved_fill = _resolve_control(self.case_data_store, label_text, '')
+                resolved_fill = _resolve_control(self.business_data_store, label_text, '')
                 fill_xpath = '' if resolved_fill.error else resolved_fill.xpath_smart
                 if fill_xpath:
                     fill_el = await _capture_element(
@@ -629,7 +629,7 @@ class TreeEngine(_FormActionEngineBase):
                         element=fill_el,
                     )
                     _task_done_impl(
-                        label_text, self.case_data_store, value=fill_val,
+                        label_text, self.business_data_store, value=fill_val,
                         xpath_smart=xp_inv if fill_xpath else '',
                     )
                     return _ok(

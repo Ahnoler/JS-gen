@@ -31,7 +31,7 @@ export async function save(snapshot) {
       optionalCount: snapshot.optionalCount ?? 0,
       actionIndex: snapshot.actionIndex ?? 0,
       triggerStepId: snapshot.triggerStepId ?? null,
-      caseDataId: snapshot.caseDataId ?? null,
+      businessDataId: snapshot.businessDataId ?? null,
       trajectoryId: snapshot.trajectoryId ?? null,
     }));
     if (snapshot.fields?.length) {
@@ -99,9 +99,9 @@ export async function listByTrajectory(trajectoryId) {
   return attachFields(db, fromDbRows(rows));
 }
 
-export async function listByCaseData(caseDataId) {
+export async function listByBusinessData(businessDataId) {
   const db = getDB();
-  const rows = await db(TABLE).where({ case_data_id: caseDataId }).orderBy('action_index');
+  const rows = await db(TABLE).where({ business_data_id: businessDataId }).orderBy('action_index');
   return attachFields(db, fromDbRows(rows));
 }
 

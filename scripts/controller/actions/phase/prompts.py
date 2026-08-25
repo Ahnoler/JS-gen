@@ -98,7 +98,7 @@ def force_refill_hint() -> str:
         '1a. 合约 allow_form_assistant=true 时，可先 run_form_assistant() 批量覆盖，'
         '再逐字段写入确保录制完整。\n'
         '2. 对每个可编辑字段必须执行覆盖写入：input→fill_form_field，'
-        'select→select_option，radio→click_radio（可用 match_form_rule / 案例数据生成新值）。\n'
+        'select→select_option，radio→click_radio（可用 match_form_rule / 业务数据生成新值）。\n'
         '3. 仅 disabled 且无旁边按钮的只读字段可跳过。\n'
         '4. click_save(button_text="确认"或"保存")；成功 = 操作成功 或 页面跳转。\n'
     )
@@ -165,7 +165,7 @@ def detect_heal_mode(instruction: dict | None, task_text: str = '') -> str | Non
 
 
 def apply_heal_mode(
-    case_data_store: dict | None,
+    business_data_store: dict | None,
     heal_mode: str | None,
     heal_contract: dict | None = None,
 ) -> str | None:
@@ -177,28 +177,28 @@ def apply_heal_mode(
     ``_phase_intent``; heal clears it and must not re-apply create/modify submit
     or recovery→click_save rules.
     """
-    if case_data_store is None:
+    if business_data_store is None:
         return heal_mode
     if heal_mode:
-        case_data_store['_heal_mode'] = heal_mode
+        business_data_store['_heal_mode'] = heal_mode
         if heal_contract is not None:
-            case_data_store['_heal_contract'] = heal_contract
+            business_data_store['_heal_contract'] = heal_contract
         else:
-            case_data_store.pop('_heal_contract', None)
+            business_data_store.pop('_heal_contract', None)
         try:
             from .._phase_intent import clear_phase_intent
-            clear_phase_intent(case_data_store)
+            clear_phase_intent(business_data_store)
         except Exception:
-            case_data_store.pop('_phase_intent', None)
-        case_data_store['_force_refill_all'] = False
-        case_data_store.pop('_submit_ready', None)
-        case_data_store.pop('_success_tokens', None)
+            business_data_store.pop('_phase_intent', None)
+        business_data_store['_force_refill_all'] = False
+        business_data_store.pop('_submit_ready', None)
+        business_data_store.pop('_success_tokens', None)
     else:
-        case_data_store.pop('_heal_mode', None)
-        case_data_store.pop('_heal_contract', None)
+        business_data_store.pop('_heal_mode', None)
+        business_data_store.pop('_heal_contract', None)
     return heal_mode
 
 
-def is_heal_mode(case_data_store: dict | None) -> bool:
-    return bool(case_data_store and case_data_store.get('_heal_mode'))
+def is_heal_mode(business_data_store: dict | None) -> bool:
+    return bool(business_data_store and business_data_store.get('_heal_mode'))
 

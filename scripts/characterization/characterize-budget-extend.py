@@ -49,8 +49,8 @@ print('OK: compute_budget_extension')
 from agent_utils import make_done_callback
 
 # done callback 设置 _done_fired flag
-case_data = {}
-cb = make_done_callback(Path('/tmp/test_done.json'), case_data)
+business_data = {}
+cb = make_done_callback(Path('/tmp/test_done.json'), business_data)
 # 模拟 done 回调（history_list 有 is_done 方法）
 class FakeHistory:
     def __init__(self): self.history = []
@@ -60,9 +60,9 @@ class FakeHistory:
     def errors(self): return []
     def save_to_file(self, p): pass
 cb(FakeHistory())
-check('done_fired set', case_data.get('_done_fired') == True)
+check('done_fired set', business_data.get('_done_fired') == True)
 
-# 未传入 case_data_store 时不报错（向后兼容）
+# 未传入 business_data_store 时不报错（向后兼容）
 cb2 = make_done_callback(Path('/tmp/test_done2.json'))
 cb2(FakeHistory())  # 不应抛异常
 check('backward compat no crash', True)

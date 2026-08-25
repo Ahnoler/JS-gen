@@ -41,19 +41,19 @@ from .form_scan_actions import (
 )
 
 
-def _register_form_actions(controller, browser_context, case_data_store, llm=None):
-    # Lazily read hasButton keywords — supports runtime override via case_data_store
+def _register_form_actions(controller, browser_context, business_data_store, llm=None):
+    # Lazily read hasButton keywords — supports runtime override via business_data_store
     def _button_keywords():
-        return get_has_button_keywords(case_data_store)
+        return get_has_button_keywords(business_data_store)
 
-    engine = FormAutofillEngine(browser_context, case_data_store, llm, _button_keywords)
+    engine = FormAutofillEngine(browser_context, business_data_store, llm, _button_keywords)
     _ensure_scanned = engine.ensure_scanned
-    _login_engine = LoginEngine(browser_context, case_data_store, engine)
-    _fill_engine = FillEngine(browser_context, case_data_store, engine, _button_keywords)
-    _select_engine = SelectEngine(browser_context, case_data_store, engine)
-    _radio_engine = RadioEngine(browser_context, case_data_store, engine)
-    _tree_engine = TreeEngine(browser_context, case_data_store, engine)
-    _save_engine = SaveEngine(browser_context, case_data_store, engine, _button_keywords)
+    _login_engine = LoginEngine(browser_context, business_data_store, engine)
+    _fill_engine = FillEngine(browser_context, business_data_store, engine, _button_keywords)
+    _select_engine = SelectEngine(browser_context, business_data_store, engine)
+    _radio_engine = RadioEngine(browser_context, business_data_store, engine)
+    _tree_engine = TreeEngine(browser_context, business_data_store, engine)
+    _save_engine = SaveEngine(browser_context, business_data_store, engine, _button_keywords)
 
     @controller.action('Expand ALL el-tree nodes recursively (up to 10 rounds).')
     async def expand_all_el_tree():
@@ -63,7 +63,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
     async def login(username: str, password: str, captcha: str = '', sms_code: str = ''):
         return await _login_engine.login(username, password, captcha, sms_code)
 
-    @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code). Prefers case_data_store presets when present.')
+    @controller.action('Get a value for a form field by its label using form rules. For 证件号码, reads 证件类型 from the page and generates the matching format (身份证 → ID card, 统一社会信用代码/营业执照 → credit code). Prefers business_data_store presets when present.')
     async def match_form_rule(label_text: str):
         return await _fill_engine.match_form_rule(label_text)
 
@@ -81,7 +81,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     @controller.action('Full scan: ALL form fields in the current dialog/drawer regardless of visibility. Builds task list + form snapshot only — does NOT auto-fill (use run_form_assistant for batch auto-fill). Returns summary {total, filled, pending, ...}.')
     async def scan_form_fields():
-        return await scan_form_fields_impl(browser_context, case_data_store, _button_keywords)
+        return await scan_form_fields_impl(browser_context, business_data_store, _button_keywords)
 
     @controller.action(
         'Read-only summary of visible classified operable controls (quick full-page scan). '
@@ -93,7 +93,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'Includes shell nav when present. Does NOT build task_list, auto-fill, or run form assistant.'
     )
     async def scan_editable_summary():
-        return await scan_editable_summary_impl(browser_context, case_data_store, _button_keywords)
+        return await scan_editable_summary_impl(browser_context, business_data_store, _button_keywords)
 
     @controller.action(
         'Batch-scan and auto-fill editable form fields in the current container. '
@@ -101,36 +101,36 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
         'Do not use on navigate/query phases.'
     )
     async def run_form_assistant(section: str = '', region: str = ''):
-        return await run_form_assistant_impl(browser_context, case_data_store, _ensure_scanned, section, region)
+        return await run_form_assistant_impl(browser_context, business_data_store, _ensure_scanned, section, region)
 
     @controller.action('Visible scan: only visible form fields (offsetParent !== null). Use this for ALL subsequent checks — much smaller output, saves context. Excludes fields already filled by auto-fill. Returns {fields: [...], notification: {visible, text}|null}.')
     async def scan_visible_fields():
-        return await scan_visible_fields_impl(browser_context, case_data_store, _button_keywords)
+        return await scan_visible_fields_impl(browser_context, business_data_store, _button_keywords)
 
     @controller.action('Rebuild the task list from scan results (utility — does not auto-fill).')
     async def init_task_list(fields_json: str):
-        return init_task_list_impl(case_data_store, fields_json)
+        return init_task_list_impl(business_data_store, fields_json)
 
     @controller.action('Save form structure snapshot for replay validation. Call after init_task_list. Records per-field metadata (label + is_required) with separate required/optional counts so assembled scripts can grade changes by severity.')
     async def save_form_snapshot():
         page = await browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         from scripts.controller.actions.container_naming import resolve_display_container
-        container_id = resolve_display_container(container_id, case_data_store)
-        fields = case_data_store.get('_scan_fields', [])
+        container_id = resolve_display_container(container_id, business_data_store)
+        fields = business_data_store.get('_scan_fields', [])
 
-        snap = _save_form_snapshot(container_id, fields, case_data_store)
+        snap = _save_form_snapshot(container_id, fields, business_data_store)
         return _ok(f'form-snapshot | container:{container_id} | count:{snap.count}')
 
     @controller.action('Mark a form field as completed in the task list. Use this after successfully filling a field.')
     async def task_done(label_text: str):
-        _task_done_impl(label_text, case_data_store)
-        tl = TaskList.from_store(case_data_store.get('task_list'))
+        _task_done_impl(label_text, business_data_store)
+        tl = TaskList.from_store(business_data_store.get('task_list'))
         return _ok(f'task-done:{label_text} | remaining:{len(tl.pending)}')
 
     @controller.action('Get the current pending task list. Returns {"pending": [...], NEXT_ACTION}. When pending is empty, NEXT_ACTION tells you to click 保存 — do not re-fill fields.')
     async def get_pending_tasks(section: str = '', region: str = ''):
-        return get_pending_tasks_impl(case_data_store, section, region)
+        return get_pending_tasks_impl(business_data_store, section, region)
 
     @controller.action(
         'Find the 保存/提交/确认/确定 button, scroll it into view, click it, wait for loading, '
@@ -152,7 +152,7 @@ def _register_form_actions(controller, browser_context, case_data_store, llm=Non
 
     @controller.action('Sync task list from current page validation errors. Reads .el-form-item__error text, extracts field labels (strips 请选择/请输入/请上传 prefix), re-adds them to pending. Also scrolls to first error. Call this after a failed submit attempt.')
     async def sync_tasks_from_errors():
-        return await sync_tasks_from_errors_impl(browser_context, case_data_store)
+        return await sync_tasks_from_errors_impl(browser_context, business_data_store)
 
     @controller.action('Select an option in an el-select dropdown by label and option text.')
     async def select_option(label_text: str, option_text: str, xpath_smart: str = ""):

@@ -25,8 +25,8 @@ export const META_STEP_ACTIONS = Object.freeze([
   'expand_all_el_tree',
   'take_screenshot',
   'save_trajectory',
-  'save_case_data',
-  'read_case_data',
+  'save_business_data',
+  'read_business_data',
   'close_notification',
 ]);
 

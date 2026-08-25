@@ -7,7 +7,7 @@ import sys
 from .agent_utils import emit_json
 from .trajectory_store import (
     _handle_reset_trajectory,
-    _handle_save_case_data,
+    _handle_save_business_data,
     _handle_save_trajectory,
 )
 
@@ -39,7 +39,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
     event = msg.get("event")
 
     if event == "save_trajectory":
-        _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'], case_data_store=session_state.get('case_data_store'))
+        _handle_save_trajectory(session_state.get('cumulative_path'), session_state['session_id'], business_data_store=session_state.get('business_data_store'))
         return 'continue'
 
     if event == "get_action_log":
@@ -53,17 +53,17 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         })
         return 'continue'
 
-    if event == "save_case_data":
-        _handle_save_case_data(session_state['case_data_store'], session_state['session_id'])
+    if event == "save_business_data":
+        _handle_save_business_data(session_state['business_data_store'], session_state['session_id'])
         return 'continue'
 
     if event == "reset_trajectory":
         cum_path = _handle_reset_trajectory(
             session_state['session_id'],
-            case_data_store=session_state.get('case_data_store'),
+            business_data_store=session_state.get('business_data_store'),
         )
         session_state['cumulative_path'] = cum_path
-        session_state['case_data_store'].clear()
+        session_state['business_data_store'].clear()
         return 'continue'
 
     if event == "cdp_action":
@@ -211,7 +211,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         seed_action_log = bool(data.get("seed_action_log"))
         stop_on_fail = bool(data.get("stop_on_fail"))
         browser_context = session_state.get('browser_context')
-        case_data_store = session_state.get('case_data_store', {})
+        business_data_store = session_state.get('business_data_store', {})
         if not browser_context or not entries:
             emit_json({"event": "replay_done", "data": {"count": 0, "error": "no browser_context or empty actions"}})
             return 'continue'
@@ -221,7 +221,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         from .controller.service import build_controller
         from .controller.actions._replay import replay_action_entries
 
-        controller = build_controller(browser_context, case_data_store=case_data_store)
+        controller = build_controller(browser_context, business_data_store=business_data_store)
         registry_actions = controller.registry.registry.actions
 
         # Pass raw params — `_normalize_params` accepts aliases; controller path
@@ -239,7 +239,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
             browser_context,
             filtered,
             controller_actions=registry_actions,
-            case_data_store=case_data_store,
+            business_data_store=business_data_store,
             emit=emit_json,
             stop_on_fail=stop_on_fail,
         )
@@ -255,7 +255,7 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
                     if action_name in (
                         'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields',
                         'scan_visible_fields', 'check_field_value', 'verify_field_value',
-                        'take_screenshot', 'save_trajectory', 'save_case_data', 'read_case_data',
+                        'take_screenshot', 'save_trajectory', 'save_business_data', 'read_business_data',
                         'match_form_rule', 'init_task_list', 'get_pending_tasks',
                         'sync_tasks_from_errors', 'expand_all_el_tree', 'task_done', 'task_retry',
                         'save_form_snapshot',

@@ -25,7 +25,7 @@ Usage:
         # Entity / storage models (aligned with MySQL tables)
         SystemEntity, ProcessEntity, FunctionDefEntity,
         TrajectoryEntity, TrajectoryStepEntity, TrajectoryPhaseEntity,
-        CaseDataEntity, CaseDataEntryEntity,
+        BusinessDataEntity, BusinessDataEntryEntity,
         FormSnapshotEntity, SnapshotFieldEntity,
         ScreenshotEntity,
         RemoteSessionEntity,
@@ -67,8 +67,8 @@ from .action import (
 from .step_entry import StepEntry
 
 from .entity import (
-    CaseDataEntity,
-    CaseDataEntryEntity,
+    BusinessDataEntity,
+    BusinessDataEntryEntity,
     FormSnapshotEntity,
     FunctionDefEntity,
     ProcessEntity,
@@ -109,8 +109,8 @@ __all__ = [
     # step_entry
     "StepEntry",
     # entity
-    "CaseDataEntity",
-    "CaseDataEntryEntity",
+    "BusinessDataEntity",
+    "BusinessDataEntryEntity",
     "FormSnapshotEntity",
     "FunctionDefEntity",
     "ProcessEntity",

@@ -18,7 +18,7 @@ import { resolveTrajectoryAccount } from './trajectory-account-service.js';
 import { getTrajectoryTree } from './trajectory-query-service.js';
 import {
   runDefaultLogin,
-  prepareCaseDataInjection,
+  prepareBusinessDataInjection,
 } from './trajectory-record-lifecycle.js';
 import { appendPhaseDoneLog } from './trajectory-phase-service.js';
 import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
@@ -296,15 +296,15 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   });
 
       // 业务数据：仅填表/引入类阶段注入；导航/登录/查询不挂，避免「填写」污染分类。
-      const { caseDataFile, caseData, caseDataBlock } = await prepareCaseDataInjection(tid);
+      const { businessDataFile, businessData, businessDataBlock } = await prepareBusinessDataInjection(tid);
       const {
         phaseNeedsBusinessData,
         stripBusinessDataBlock,
       } = await import('./trajectory-meta-service.js');
       const CASE_BLOCK_MARK = '【业务数据';
       const CASE_BLOCK_MARK_LEGACY = '【业务场景案例数据';
-      const caseBlockSuffix = caseDataBlock
-        ? `\n\n${CASE_BLOCK_MARK} — 来自用户需求（非系统回写案例数据）；填表/引入时参考理解，按场景选用关键取值】\n${caseDataBlock}`
+      const caseBlockSuffix = businessDataBlock
+        ? `\n\n${CASE_BLOCK_MARK} — 来自用户需求；填表/引入时参考理解，按场景选用关键取值】\n${businessDataBlock}`
         : '';
 
   let recordingSystemId = null;
@@ -403,7 +403,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       } catch (err) {
         console.warn('[record] fact-pack skipped:', err?.message || err);
       }
-      // P1：Python 记忆 writer 需要 trajectory_id（否则 case_saved 等事件无归属）
+      // P1：Python 记忆 writer 需要 trajectory_id（否则 business_saved 等事件无归属）
       stepData.trajectory_id = tid;
       // 业务数据仅挂到填表/引入阶段；导航阶段保持干净描述供边界分类。
       let instruction = phase.description || '';
@@ -419,13 +419,13 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         instruction = stripBusinessDataBlock(instruction);
       }
       stepData.instruction = instruction;
-      if (wantBiz && caseDataBlock) {
-        stepData.case_data_block = caseDataBlock;
+      if (wantBiz && businessDataBlock) {
+        stepData.business_data_block = businessDataBlock;
       }
       // Optional flat KV only when this phase may use values
-      if (wantBiz && caseData) {
-        stepData.case_data = caseData;
-        if (caseDataFile) stepData.case_data_file = caseDataFile;
+      if (wantBiz && businessData) {
+        stepData.business_data = businessData;
+        if (businessDataFile) stepData.business_data_file = businessDataFile;
       }
       if (recordingSystemId) {
         try {

@@ -1,18 +1,18 @@
-import * as caseDataDao from '../dao/case-data-dao.js';
+import * as businessDataDao from '../dao/business-data-dao.js';
 import * as formSnapshotDao from '../dao/form-snapshot-dao.js';
 import { existsSync, readFileSync } from 'fs';
 
 /**
  * Normalize a Python FormSnapshot dict (snake_case or camelCase) for DAO insert.
  */
-function normalizeSnapshot(snap, caseDataId, trajectoryId) {
+function normalizeSnapshot(snap, businessDataId, trajectoryId) {
   return {
     container: snap.container || 'main',
     fieldCount: snap.fieldCount ?? snap.count ?? snap.field_count ?? 0,
     requiredCount: snap.requiredCount ?? snap.required_count ?? 0,
     optionalCount: snap.optionalCount ?? snap.optional_count ?? 0,
     actionIndex: snap.actionIndex ?? snap.action_index ?? 0,
-    caseDataId: caseDataId ?? null,
+    businessDataId: businessDataId ?? null,
     trajectoryId: trajectoryId ?? null,
     fields: (snap.fields || []).map((f) => ({
       label: f.label,
@@ -22,9 +22,9 @@ function normalizeSnapshot(snap, caseDataId, trajectoryId) {
 }
 
 /**
- * Save case_data_store (flat KV + nested form_snapshots/task_list) to the database.
+ * Save business_data_store (flat KV + nested form_snapshots/task_list) to the database.
  */
-export async function saveCaseData({ recordId, sessionId, model, description, dataStore, trajectoryId }) {
+export async function saveBusinessData({ recordId, sessionId, model, description, dataStore, trajectoryId }) {
   const entries = [];
   const skipKeys = new Set([
     'form_snapshot', 'form_snapshots', 'task_list',
@@ -38,7 +38,7 @@ export async function saveCaseData({ recordId, sessionId, model, description, da
     }
   }
 
-  const caseDataId = await caseDataDao.save({
+  const businessDataId = await businessDataDao.save({
     recordId,
     sessionId,
     model,
@@ -51,17 +51,17 @@ export async function saveCaseData({ recordId, sessionId, model, description, da
   const snapshots = dataStore?.form_snapshots
     || (dataStore?.form_snapshot ? [dataStore.form_snapshot] : []);
   for (const snap of snapshots) {
-    await formSnapshotDao.save(normalizeSnapshot(snap, caseDataId, trajectoryId));
+    await formSnapshotDao.save(normalizeSnapshot(snap, businessDataId, trajectoryId));
   }
 
-  return caseDataId;
+  return businessDataId;
 }
 
 /**
  * Persist after JSON store save — accepts already-parsed data dict.
  */
-export async function persistSessionCaseData({ record, data, trajectoryId }) {
-  return saveCaseData({
+export async function persistSessionBusinessData({ record, data, trajectoryId }) {
+  return saveBusinessData({
     recordId: record.recordId,
     sessionId: record.sessionId,
     model: record.model,
@@ -72,15 +72,15 @@ export async function persistSessionCaseData({ record, data, trajectoryId }) {
 }
 
 /**
- * Persist form_{ts}.json snapshots under a trajectory (and optional case_data).
+ * Persist form_{ts}.json snapshots under a trajectory (and optional business_data).
  */
-export async function persistFormSnapshotsFromFile(formFilePath, { trajectoryId, caseDataId } = {}) {
+export async function persistFormSnapshotsFromFile(formFilePath, { trajectoryId, businessDataId } = {}) {
   if (!formFilePath || !existsSync(formFilePath)) return 0;
   let snapshots;
   try {
     snapshots = JSON.parse(readFileSync(formFilePath, 'utf-8'));
   } catch (err) {
-    console.warn('[case-data] Failed to read form file:', err.message);
+    console.warn('[business-data] Failed to read form file:', err.message);
     return 0;
   }
   if (!Array.isArray(snapshots)) {
@@ -88,7 +88,7 @@ export async function persistFormSnapshotsFromFile(formFilePath, { trajectoryId,
   }
   let n = 0;
   for (const snap of snapshots) {
-    await formSnapshotDao.save(normalizeSnapshot(snap, caseDataId ?? null, trajectoryId ?? null));
+    await formSnapshotDao.save(normalizeSnapshot(snap, businessDataId ?? null, trajectoryId ?? null));
     n += 1;
   }
   return n;

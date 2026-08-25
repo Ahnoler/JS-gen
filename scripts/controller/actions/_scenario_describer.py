@@ -96,11 +96,11 @@ def _msg_content_text(message) -> str:
     return ''
 
 
-def _collect_done_context(case_data_store: dict | None) -> str:
-    """Cross-phase done() outcomes from case_data_store['_phase_outcomes']."""
-    if not case_data_store:
+def _collect_done_context(business_data_store: dict | None) -> str:
+    """Cross-phase done() outcomes from business_data_store['_phase_outcomes']."""
+    if not business_data_store:
         return '（无）'
-    store = case_data_store.get('_phase_outcomes') or {}
+    store = business_data_store.get('_phase_outcomes') or {}
     if not isinstance(store, dict) or not store:
         return '（无）'
 
@@ -260,7 +260,7 @@ def _normalize_summary(text: str) -> str:
     return _truncate(t, _SUMMARY_MAX)
 
 
-async def inject_scenario_summary(agent, case_data_store: dict | None = None) -> None:
+async def inject_scenario_summary(agent, business_data_store: dict | None = None) -> None:
     """Generate and inject a single [业务场景摘要] HumanMessage (non-blocking on errors)."""
     if not scenario_describer_enabled():
         return
@@ -281,13 +281,13 @@ async def inject_scenario_summary(agent, case_data_store: dict | None = None) ->
             sys.stderr.flush()
             return
 
-        done_context = _collect_done_context(case_data_store)
+        done_context = _collect_done_context(business_data_store)
         action_log = _collect_action_log_summary()
         page_snapshot = await _collect_page_snapshot(agent)
         task_description = _collect_task_description(agent)
         prev = ''
-        if isinstance(case_data_store, dict):
-            prev = str(case_data_store.get('_scenario_summary_prev') or '')
+        if isinstance(business_data_store, dict):
+            prev = str(business_data_store.get('_scenario_summary_prev') or '')
 
         user_payload = _build_user_payload(
             done_context=done_context,
@@ -359,8 +359,8 @@ async def inject_scenario_summary(agent, case_data_store: dict | None = None) ->
             return
         mm._add_message_with_tokens(msg)
 
-        if isinstance(case_data_store, dict):
-            case_data_store['_scenario_summary_prev'] = summary
+        if isinstance(business_data_store, dict):
+            business_data_store['_scenario_summary_prev'] = summary
 
         sys.stderr.write(
             f'[scenario_describer] injected n_steps={n_steps} '

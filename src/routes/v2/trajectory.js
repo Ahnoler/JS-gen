@@ -8,7 +8,7 @@ import { PROJECT_DIR } from '#config/config.js';
 import { sendErr } from './trajectory-shared.js';
 
 export default function (app) {
-  /** AI 分析：需求描述 -> { phases }（不落库；阶段数跟用户分步；案例数据附在各阶段描述后） */
+  /** AI 分析：需求描述 -> { phases }（不落库；阶段数跟用户分步；业务数据附在各阶段描述后） */
   app.post('/api/v2/trajectories/analyze', async (req, res) => {
     try {
       const { description, model, functionId } = req.body || {};
@@ -106,8 +106,8 @@ export default function (app) {
         phases,
         systemAccountId,
         accountId,
-        caseEntries,
-        caseData,
+        businessEntries,
+        businessData,
       } = req.body || {};
 
       const functionNum = functionId != null ? +functionId : undefined;
@@ -120,8 +120,8 @@ export default function (app) {
           phases,
           model: model || '',
           systemAccountId: boundAccount,
-          caseEntries,
-          caseData,
+          businessEntries,
+          businessData,
           paasUserId: req.paasUserId ?? null,
         });
         res.status(201).json(traj);
@@ -153,11 +153,11 @@ export default function (app) {
           tid,
           body.systemAccountId ?? body.accountId,
         );
-        // Allow binding account + case entries in one call
-        if (body.caseEntries !== undefined || body.caseData !== undefined) {
-          await trajectoryService.setTrajectoryCaseEntries(
+        // Allow binding account + business entries in one call
+        if (body.businessEntries !== undefined || body.businessData !== undefined) {
+          await trajectoryService.setTrajectoryBusinessEntries(
             tid,
-            body.caseEntries ?? body.caseData,
+            body.businessEntries ?? body.businessData,
           );
           const traj = await trajectoryService.getTrajectoryWithPhases(tid);
           return res.json({ ...result, trajectory: traj });
@@ -171,10 +171,10 @@ export default function (app) {
       if (Object.keys(allowed).length) {
         await trajectoryDao.updateMeta(tid, allowed);
       }
-      if (body.caseEntries !== undefined || body.caseData !== undefined) {
-        await trajectoryService.setTrajectoryCaseEntries(
+      if (body.businessEntries !== undefined || body.businessData !== undefined) {
+        await trajectoryService.setTrajectoryBusinessEntries(
           tid,
-          body.caseEntries ?? body.caseData,
+          body.businessEntries ?? body.businessData,
         );
       } else if (!Object.keys(allowed).length) {
         return res.status(400).json({ error: 'No updatable fields' });
@@ -187,11 +187,11 @@ export default function (app) {
     }
   });
 
-  /** Replace case KV entries for a trajectory. */
-  app.put('/api/v2/trajectories/:id/case-data', async (req, res) => {
+  /** Replace business KV entries for a trajectory. */
+  app.put('/api/v2/trajectories/:id/business-data', async (req, res) => {
     try {
-      const entries = req.body?.caseEntries ?? req.body?.caseData ?? req.body?.entries ?? [];
-      const traj = await trajectoryService.setTrajectoryCaseEntries(+req.params.id, entries);
+      const entries = req.body?.businessEntries ?? req.body?.businessData ?? req.body?.entries ?? [];
+      const traj = await trajectoryService.setTrajectoryBusinessEntries(+req.params.id, entries);
       res.json(traj);
     } catch (err) {
       sendErr(res, err);
@@ -247,15 +247,15 @@ export default function (app) {
     }
   });
 
-  /** Sync phases by id: body { phases: string[] | { id?, description }[], caseEntries? } */
+  /** Sync phases by id: body { phases: string[] | { id?, description }[], businessEntries? } */
   app.put('/api/v2/trajectories/:id/phases', async (req, res) => {
     try {
       const phases = req.body?.phases ?? req.body?.descriptions ?? null;
       let traj = await trajectoryService.syncTrajectoryPhaseDescriptions(+req.params.id, phases);
-      if (req.body?.caseEntries !== undefined || req.body?.caseData !== undefined) {
-        traj = await trajectoryService.setTrajectoryCaseEntries(
+      if (req.body?.businessEntries !== undefined || req.body?.businessData !== undefined) {
+        traj = await trajectoryService.setTrajectoryBusinessEntries(
           +req.params.id,
-          req.body.caseEntries ?? req.body.caseData,
+          req.body.businessEntries ?? req.body.businessData,
         );
       }
       res.json(traj);

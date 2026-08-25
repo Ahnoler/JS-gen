@@ -1,8 +1,8 @@
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
-const TABLE = 'case_data';
-const ENTRY_TABLE = 'case_data_entry';
+const TABLE = 'business_data';
+const ENTRY_TABLE = 'business_data_entry';
 
 const RESERVED_KEYS = new Set(['form_snapshots', 'form_snapshot', 'task_list', '_watcher_mode']);
 
@@ -30,7 +30,7 @@ function isUnknownTrajectoryIdColumn(err) {
  * Normalize API / UI case entry payloads to { fieldKey, fieldValue }.
  * Accepts `{ fieldKey, fieldValue }` or `{ key, value }`.
  */
-export function normalizeCaseEntries(raw) {
+export function normalizeBusinessEntries(raw) {
   if (!Array.isArray(raw)) return [];
   const out = [];
   const seen = new Set();
@@ -48,10 +48,10 @@ export function normalizeCaseEntries(raw) {
   return out;
 }
 
-/** Flat label→value dict for Python case_data_store. */
+/** Flat label→value dict for the Python business_data store. */
 export function entriesToFlatDict(entries) {
   const dict = {};
-  for (const e of normalizeCaseEntries(entries)) {
+  for (const e of normalizeBusinessEntries(entries)) {
     dict[e.fieldKey] = e.fieldValue ?? '';
   }
   return dict;
@@ -70,9 +70,9 @@ export async function save(record) {
     }));
     if (record.entries?.length) {
       const bindTraj = await hasEntryTrajectoryId(trx);
-      const entryRows = normalizeCaseEntries(record.entries).map((e) => {
+      const entryRows = normalizeBusinessEntries(record.entries).map((e) => {
         const row = {
-          case_data_id: id,
+          business_data_id: id,
           field_key: e.fieldKey,
           field_value: e.fieldValue,
         };
@@ -91,7 +91,7 @@ export async function getByRecordId(recordId) {
   if (!row) return null;
   const entity = fromDbRow(row);
   entity.entries = fromDbRows(await db(ENTRY_TABLE)
-    .where({ case_data_id: row.id })
+    .where({ business_data_id: row.id })
     .orderBy('id'));
   return entity;
 }
@@ -143,13 +143,13 @@ export async function replaceEntriesForTrajectory(trajectoryId, entries, trx = n
   if (!Number.isFinite(tid) || tid <= 0) {
     throw new Error('Invalid trajectory id');
   }
-  const normalized = normalizeCaseEntries(entries);
+  const normalized = normalizeBusinessEntries(entries);
   const hasCol = await hasEntryTrajectoryId(trx || getDB());
   if (!hasCol) {
     // No schema support yet: unconfigured (empty) → default none; configured → ask migrate
     if (!normalized.length) return [];
     const err = new Error(
-      'case_data_entry.trajectory_id missing — run: npx knex migrate:latest --knexfile config/knexfile.js',
+      'business_data_entry.trajectory_id missing — run: npx knex migrate:latest --knexfile config/knexfile.js',
     );
     err.statusCode = 503;
     throw err;
@@ -159,7 +159,7 @@ export async function replaceEntriesForTrajectory(trajectoryId, entries, trx = n
     await client(ENTRY_TABLE).where({ trajectory_id: tid }).del();
     if (!normalized.length) return [];
     const rows = normalized.map((e) => ({
-      case_data_id: null,
+      business_data_id: null,
       trajectory_id: tid,
       field_key: e.fieldKey,
       field_value: e.fieldValue,

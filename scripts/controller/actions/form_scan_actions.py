@@ -2,7 +2,7 @@
 Slice 4 of form-actions-split).
 
 行为零 diff 搬迁：动作壳（@controller.action 注册与 docstring）留在 _form.py，
-实现体移到这里，闭包捕获（browser_context / case_data_store / _button_keywords /
+实现体移到这里，闭包捕获（browser_context / business_data_store / _button_keywords /
 _ensure_scanned）改为显式参数注入。task_done / save_form_snapshot 已是
 form_scan_utils 薄委托，仍留在 _form.py。
 """
@@ -47,11 +47,11 @@ async def _clear_field_value(page, label_text):
         pass
 
 
-async def scan_form_fields_impl(browser_context, case_data_store, button_keywords):
+async def scan_form_fields_impl(browser_context, business_data_store, button_keywords):
     page = await browser_context.get_current_page()
     await _wait_if_loading(page)
     container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
-    if await _mark_query_ui_if_needed(page, case_data_store, container_id):
+    if await _mark_query_ui_if_needed(page, business_data_store, container_id):
         return _query_not_form_payload(container_id)
     raw = await page.evaluate(
         JS_SCAN_FORM_FIELDS,
@@ -79,7 +79,7 @@ async def scan_form_fields_impl(browser_context, case_data_store, button_keyword
     container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
     raw_notification = result.get('notification') if isinstance(result, dict) else None
     notification = Notification(**raw_notification) if raw_notification else None
-    case_data_store['_scan_buttons'] = _scan_buttons_from_result(result)
+    business_data_store['_scan_buttons'] = _scan_buttons_from_result(result)
 
     # Browse/list scan: task list only — do NOT save form structure checkpoint.
     # Structure is saved on: run_form_assistant, single-field first-touch
@@ -88,14 +88,14 @@ async def scan_form_fields_impl(browser_context, case_data_store, button_keyword
     # Build task list only — no auto-fill (avoids filling on browse/list pages).
     # Preserve existing done items — from_scan filters fields with values,
     # so mark_done() won't find them in pending. Create TaskItems directly.
-    prev_tl = TaskList.from_store(case_data_store.get('task_list'))
+    prev_tl = TaskList.from_store(business_data_store.get('task_list'))
     prev_done_labels = {d.label for d in prev_tl.done}
     prev_intervene = {item.label for item in prev_tl.pending if item.needs_intervention}
 
-    session_filled = set(case_data_store.get('_autofilled_labels') or [])
+    session_filled = set(business_data_store.get('_autofilled_labels') or [])
     tl = TaskList.from_scan(
         [f.model_dump() for f in dom_fields],
-        force_refill=_force_refill_flag(case_data_store),
+        force_refill=_force_refill_flag(business_data_store),
         session_filled_labels=session_filled,
     )
     # Restore previously-done items — add directly to done since they won't be in pending.
@@ -125,8 +125,8 @@ async def scan_form_fields_impl(browser_context, case_data_store, button_keyword
     for item in tl.pending:
         if item.label in prev_intervene:
             item.needs_intervention = True
-    case_data_store['task_list'] = tl.to_store()
-    case_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
+    business_data_store['task_list'] = tl.to_store()
+    business_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
 
     # Annotate fields so agent knows which were handled
     done_labels = {d.label for d in tl.done}
@@ -151,14 +151,14 @@ async def scan_form_fields_impl(browser_context, case_data_store, button_keyword
     summary.update(
         _build_section_summary(
             [f.model_dump() for f in dom_fields],
-            case_data_store.get('_scan_buttons') or [],
+            business_data_store.get('_scan_buttons') or [],
             pending_labels=set(pending_labels),
         )
     )
     return json.dumps(summary, ensure_ascii=False)
 
 
-async def scan_editable_summary_impl(browser_context, case_data_store, button_keywords):
+async def scan_editable_summary_impl(browser_context, business_data_store, button_keywords):
     page = await browser_context.get_current_page()
     await _wait_if_loading(page)
     # Full-page L2 pool + L1 feature cards (shell included). See fullpage scan design.
@@ -187,43 +187,43 @@ async def scan_editable_summary_impl(browser_context, case_data_store, button_ke
     return json.dumps(summary, ensure_ascii=False)
 
 
-async def run_form_assistant_impl(browser_context, case_data_store, _ensure_scanned, section: str = '', region: str = ''):
+async def run_form_assistant_impl(browser_context, business_data_store, _ensure_scanned, section: str = '', region: str = ''):
     from ._phase_intent import contract_allows_form_assistant
-    if not contract_allows_form_assistant(case_data_store):
+    if not contract_allows_form_assistant(business_data_store):
         return 'err-form-assistant-forbidden: phase contract allow_form_assistant=false'
     page = await browser_context.get_current_page()
     await _wait_if_loading(page)
     from .section_scope import resolve_scope, remember_phase_section
     sec = resolve_scope(region, section)
     if sec:
-        remember_phase_section(case_data_store, sec)
-        case_data_store['_assistant_section_filter'] = sec
+        remember_phase_section(business_data_store, sec)
+        business_data_store['_assistant_section_filter'] = sec
     try:
         await _ensure_scanned('__run_form_assistant__', allow_autofill=True)
-        tl = TaskList.from_store(case_data_store.get('task_list'))
+        tl = TaskList.from_store(business_data_store.get('task_list'))
         pending_labels = {item.label for item in tl.pending}
         payload = {
-            'status': case_data_store.get('_autofill_summary') or 'auto-fill-complete',
+            'status': business_data_store.get('_autofill_summary') or 'auto-fill-complete',
             'section_filter': sec or None,
             'needs_agent': _dedupe_needs_agent(
-                case_data_store.get('_assistant_needs_agent') or []
+                business_data_store.get('_assistant_needs_agent') or []
             ),
             **_build_section_summary(
-                case_data_store.get('_scan_fields') or [],
-                case_data_store.get('_scan_buttons') or [],
+                business_data_store.get('_scan_fields') or [],
+                business_data_store.get('_scan_buttons') or [],
                 pending_labels=pending_labels,
             ),
         }
         return _ok(json.dumps(payload, ensure_ascii=False))
     finally:
-        case_data_store.pop('_assistant_section_filter', None)
+        business_data_store.pop('_assistant_section_filter', None)
 
 
-async def scan_visible_fields_impl(browser_context, case_data_store, button_keywords):
+async def scan_visible_fields_impl(browser_context, business_data_store, button_keywords):
     page = await browser_context.get_current_page()
     await _wait_if_loading(page)
     container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
-    if await _mark_query_ui_if_needed(page, case_data_store, container_id):
+    if await _mark_query_ui_if_needed(page, business_data_store, container_id):
         return _query_not_form_payload(container_id)
     raw = await page.evaluate(
         JS_SCAN_FORM_FIELDS,
@@ -248,7 +248,7 @@ async def scan_visible_fields_impl(browser_context, case_data_store, button_keyw
     except Exception:
         pass
 
-    tl = TaskList.from_store(case_data_store.get('task_list'))
+    tl = TaskList.from_store(business_data_store.get('task_list'))
 
     # ── 扫描校验错误：将报错字段从 done[] 移回 pending[]，清空值 ──
     try:
@@ -259,7 +259,7 @@ async def scan_visible_fields_impl(browser_context, case_data_store, button_keyw
     if error_labels_parsed:
         retried = tl.sync_from_errors(error_labels_parsed)
         if retried:
-            case_data_store['task_list'] = tl.to_store()
+            business_data_store['task_list'] = tl.to_store()
             for item in retried:
                 await _clear_field_value(page, item.label)
             sys.stderr.write(f'[scan-visible] Validation errors: {error_labels_parsed} → retried {len(retried)} field(s)\n')
@@ -312,7 +312,7 @@ async def scan_visible_fields_impl(browser_context, case_data_store, button_keyw
     if intervene_labels:
         payload['disabled_button_fields'] = sorted(intervene_labels)
     fillable = [f['label'] for f in payload['fields'] if not f.get('disabled')]
-    cue = _submit_ready_hint(case_data_store)
+    cue = _submit_ready_hint(business_data_store)
     if cue:
         payload['NEXT_ACTION'] = cue.split('|', 1)[0].replace('NEXT_ACTION:', '').strip()
         payload['hint'] = cue
@@ -336,30 +336,30 @@ async def scan_visible_fields_impl(browser_context, case_data_store, button_keyw
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
-def init_task_list_impl(case_data_store, fields_json: str):
+def init_task_list_impl(business_data_store, fields_json: str):
     try:
         data = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
     except Exception:
         return _err('invalid-json')
     fields = data.get('fields') if isinstance(data, dict) else data
 
-    session_filled = set(case_data_store.get('_autofilled_labels') or [])
+    session_filled = set(business_data_store.get('_autofilled_labels') or [])
     tl = TaskList.from_scan(
         fields,
-        force_refill=_force_refill_flag(case_data_store),
+        force_refill=_force_refill_flag(business_data_store),
         session_filled_labels=session_filled,
     )
-    case_data_store['task_list'] = tl.to_store()
-    case_data_store['_scan_fields'] = fields
+    business_data_store['task_list'] = tl.to_store()
+    business_data_store['_scan_fields'] = fields
     pending_count = len(tl.pending)
     return _ok(f'task-list-init | pending:{pending_count}')
 
 
-def get_pending_tasks_impl(case_data_store, section: str = '', region: str = ''):
-    if _is_query_mode(case_data_store):
+def get_pending_tasks_impl(business_data_store, section: str = '', region: str = ''):
+    if _is_query_mode(business_data_store):
         return _ok(_query_not_form_payload(), include_in_memory=True)
     from .section_scope import section_matches, pending_by_section, pending_by_region, resolve_scope
-    tl = TaskList.from_store(case_data_store.get('task_list'))
+    tl = TaskList.from_store(business_data_store.get('task_list'))
     sec = resolve_scope(region, section)
     pending_items = [
         i for i in tl.pending
@@ -380,12 +380,12 @@ def get_pending_tasks_impl(case_data_store, section: str = '', region: str = '')
         'region_filter': sec or None,
         'section_filter': sec or None,  # legacy alias
     }
-    cue = _submit_ready_hint(case_data_store, section=sec)
+    cue = _submit_ready_hint(business_data_store, section=sec)
     if cue:
         if cue.startswith('NEXT_ACTION:'):
             result['NEXT_ACTION'] = cue.split('|', 1)[0].replace('NEXT_ACTION:', '').strip()
         result['hint'] = cue
-        case_data_store['_submit_ready'] = True
+        business_data_store['_submit_ready'] = True
         return _ok(json.dumps(result, ensure_ascii=False), include_in_memory=True)
     return json.dumps(result, ensure_ascii=False)
 
@@ -406,16 +406,16 @@ async def scroll_to_first_error_impl(browser_context):
     return _ok(f'scrolled-to:{label} | {error}')
 
 
-async def sync_tasks_from_errors_impl(browser_context, case_data_store):
+async def sync_tasks_from_errors_impl(browser_context, business_data_store):
     page = await browser_context.get_current_page()
     errors = await page.evaluate(_JS_EXTRACT_ERROR_LABELS)
     try:
         error_labels = json.loads(errors) if isinstance(errors, str) else errors
     except Exception:
         error_labels = []
-    tl = TaskList.from_store(case_data_store.get('task_list'))
+    tl = TaskList.from_store(business_data_store.get('task_list'))
     retried = tl.sync_from_errors(error_labels)
-    case_data_store['task_list'] = tl.to_store()
+    business_data_store['task_list'] = tl.to_store()
 
     # 分离 disabled+旁钮字段（靠特殊元素流程，不入干预队列）
     intervene = [item for item in retried if item.needs_intervention]

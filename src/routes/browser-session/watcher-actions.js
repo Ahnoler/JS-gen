@@ -174,7 +174,7 @@ export async function handleWatcherAction(req, res) {
 export function registerWatcherWsHandler() {
   onWsMessage((ws, msg) => {
     if (msg.type === 'session:step') {
-      const { sessionId, task, maxSteps, caseDataFile, phaseNumber, trajectoryDbId } = msg.payload || {};
+      const { sessionId, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId } = msg.payload || {};
       if (!sessionId || !task) {
         ws.send(JSON.stringify({ type: 'session:error', payload: { message: 'sessionId and task are required' } }));
         return;
@@ -185,7 +185,7 @@ export function registerWatcherWsHandler() {
         return;
       }
       const channel = createPushChannel(ws, null);
-      executeAgentStep({ session, task, maxSteps: maxSteps || 40, caseDataFile, phaseNumber, trajectoryDbId, channel });
+      executeAgentStep({ session, task, maxSteps: maxSteps || 40, businessDataFile, phaseNumber, trajectoryDbId, channel });
     }
   });
 }

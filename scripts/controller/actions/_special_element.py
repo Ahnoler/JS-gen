@@ -59,7 +59,7 @@ def replace_special_element_candidates(store: dict, candidates) -> dict:
 def _register_special_element_actions(
     controller,
     browser_context,
-    case_data_store,
+    business_data_store,
     special_element_candidates_store,
 ):
     @controller.action(
@@ -101,7 +101,7 @@ def _register_special_element_actions(
         from ..service import build_controller
         nested = build_controller(
             browser_context,
-            case_data_store=case_data_store,
+            business_data_store=business_data_store,
             special_element_candidates_store=special_element_candidates_store,
         )
         registry_actions = nested.registry.registry.actions
@@ -110,7 +110,7 @@ def _register_special_element_actions(
             browser_context,
             normalized,
             controller_actions=registry_actions,
-            case_data_store=case_data_store,
+            business_data_store=business_data_store,
         )
 
         rows = result.get('results') or []

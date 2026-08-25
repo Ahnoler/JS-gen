@@ -9,15 +9,15 @@ import sys
 from ...models import TaskList
 
 
-def _task_xpath_smart(case_data_store, label_text: str, xpath_hint: str = "") -> str:
+def _task_xpath_smart(business_data_store, label_text: str, xpath_hint: str = "") -> str:
     """Compat wrapper — prefer _resolve_control; returns xpath or '' (not error codes)."""
     # Late import: form_scan_utils.py imports this module back at module level.
     from .form_scan_utils import _resolve_control
-    r = _resolve_control(case_data_store, label_text, xpath_hint)
+    r = _resolve_control(business_data_store, label_text, xpath_hint)
     return r.xpath_smart if not r.error else ""
 
 
-def _task_done_impl(label_text, case_data_store, value=None, xpath_smart=""):
+def _task_done_impl(label_text, business_data_store, value=None, xpath_smart=""):
     """Mark a field as completed in the task list.
 
     Extracted from closure so the form module can share it internally
@@ -33,10 +33,10 @@ def _task_done_impl(label_text, case_data_store, value=None, xpath_smart=""):
     """
     # Late import: form_scan_utils.py imports this module back at module level.
     from .form_scan_utils import _is_query_mode
-    if _is_query_mode(case_data_store):
+    if _is_query_mode(business_data_store):
         return
-    xp = _task_xpath_smart(case_data_store, label_text, xpath_smart)
-    tl = TaskList.from_store(case_data_store.get('task_list'))
+    xp = _task_xpath_smart(business_data_store, label_text, xpath_smart)
+    tl = TaskList.from_store(business_data_store.get('task_list'))
     found = tl.mark_done(label_text, value=value, xpath_smart=xp)
     if found is not None:
         sys.stderr.write(f'[task-done] OK: "{label_text}" → done={len(tl.done)}\n')
@@ -48,25 +48,25 @@ def _task_done_impl(label_text, case_data_store, value=None, xpath_smart=""):
             sys.stderr.write(f'[task-done] NOT FOUND: "{label_text}"\n')
         else:
             sys.stderr.write(f'[task-done] ALREADY: "{label_text}"\n')
-    case_data_store['task_list'] = tl.to_store()
+    business_data_store['task_list'] = tl.to_store()
     # Write-through active container slot so same/cross-container switch
     # does not restore a pre-mark_done snapshot.
-    active = case_data_store.get('_active_container')
+    active = business_data_store.get('_active_container')
     if active:
-        by = case_data_store.setdefault('_task_lists_by_container', {})
+        by = business_data_store.setdefault('_task_lists_by_container', {})
         if isinstance(by, dict):
             by[active] = {
-                'task_list': case_data_store.get('task_list'),
-                '_scan_fields': case_data_store.get('_scan_fields'),
+                'task_list': business_data_store.get('task_list'),
+                '_scan_fields': business_data_store.get('_scan_fields'),
             }
     if value is not None and str(value).strip():
-        labels = case_data_store.setdefault('_autofilled_labels', [])
+        labels = business_data_store.setdefault('_autofilled_labels', [])
         if label_text not in labels:
             labels.append(label_text)
-        case_data_store.setdefault('_generated_value_cache', {})[label_text] = str(value)
+        business_data_store.setdefault('_generated_value_cache', {})[label_text] = str(value)
 
 
-def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
+def _submit_ready_hint(business_data_store: dict, section: str = '') -> str:
     """Return a short NEXT_ACTION cue when fillable pending is empty.
 
     Query/filter UI is never form-fill — no click_save / pending-form cues.
@@ -74,17 +74,17 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
     """
     # Late import: form_scan_utils.py imports this module back at module level.
     from .form_scan_utils import _is_query_mode
-    if _is_query_mode(case_data_store):
+    if _is_query_mode(business_data_store):
         return ''
     try:
         from scripts.controller.actions._phase_boundary import next_action_hint, phase_boundary_active
-        if phase_boundary_active(case_data_store):
-            cue = next_action_hint(case_data_store)
+        if phase_boundary_active(business_data_store):
+            cue = next_action_hint(business_data_store)
             if cue:
                 return cue
     except Exception:
         pass
-    tl = TaskList.from_store(case_data_store.get('task_list'))
+    tl = TaskList.from_store(business_data_store.get('task_list'))
     from scripts.controller.actions.section_scope import resolve_phase_section, section_matches
     sec = (section or '').strip()
     fillable = [
@@ -97,7 +97,7 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
     # Legacy needs_intervention pending (old stores): do not block save cues —
     # introduce is agent/special-element/manual, not assistant intervene.
     if tl.total > 0:
-        c = case_data_store.get('_phase_intent')
+        c = business_data_store.get('_phase_intent')
         if isinstance(c, dict):
             try:
                 from scripts.controller.actions.phase.reviewer import coerce_bool
@@ -120,21 +120,21 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
             unique_button_section,
         )
         try:
-            btn = preferred_submit_button(case_data_store, section=sec)
+            btn = preferred_submit_button(business_data_store, section=sec)
         except Exception:
             btn = '保存'
-        keys = same_label_section_keys(case_data_store.get('_scan_buttons'), btn)
+        keys = same_label_section_keys(business_data_store.get('_scan_buttons'), btn)
         if len(keys) >= 2:
-            return f'NEXT_ACTION: {preferred_submit_cue(case_data_store, section="")}'
+            return f'NEXT_ACTION: {preferred_submit_cue(business_data_store, section="")}'
         if not sec:
             try:
-                auto_sec = resolve_phase_section(case_data_store)
+                auto_sec = resolve_phase_section(business_data_store)
                 if not auto_sec:
-                    prefer = preferred_submit_button(case_data_store, section='')
+                    prefer = preferred_submit_button(business_data_store, section='')
                     auto_sec = unique_button_section(
-                        case_data_store.get('_scan_buttons'), prefer,
+                        business_data_store.get('_scan_buttons'), prefer,
                     ) or unique_button_section(
-                        case_data_store.get('_scan_buttons'), '保存',
+                        business_data_store.get('_scan_buttons'), '保存',
                     )
                 if auto_sec:
                     sec = auto_sec
@@ -154,71 +154,71 @@ def _submit_ready_hint(case_data_store: dict, section: str = '') -> str:
     return ''
 
 
-def _switch_task_list_container(case_data_store: dict, container_id: str) -> None:
+def _switch_task_list_container(business_data_store: dict, container_id: str) -> None:
     """Persist/restore task_list keyed by JS_IDENTIFY_CONTAINER id."""
-    by = case_data_store.setdefault('_task_lists_by_container', {})
+    by = business_data_store.setdefault('_task_lists_by_container', {})
     if not isinstance(by, dict):
         by = {}
-        case_data_store['_task_lists_by_container'] = by
-    active = case_data_store.get('_active_container')
+        business_data_store['_task_lists_by_container'] = by
+    active = business_data_store.get('_active_container')
     # Same container: keep live flat view (mark_done progress). Do not
     # restore a stale first-touch snapshot from the slot.
     if active and active == container_id:
         by[container_id] = {
-            'task_list': case_data_store.get('task_list'),
-            '_scan_fields': case_data_store.get('_scan_fields'),
+            'task_list': business_data_store.get('task_list'),
+            '_scan_fields': business_data_store.get('_scan_fields'),
         }
         return
     if active and active != container_id:
         # Save current flat view
         by[active] = {
-            'task_list': case_data_store.get('task_list'),
-            '_scan_fields': case_data_store.get('_scan_fields'),
+            'task_list': business_data_store.get('task_list'),
+            '_scan_fields': business_data_store.get('_scan_fields'),
         }
     prev = active
-    case_data_store['_active_container'] = container_id
+    business_data_store['_active_container'] = container_id
     if (
         prev
         and str(prev).startswith(('dialog:', 'drawer:'))
         and not str(container_id).startswith(('dialog:', 'drawer:'))
     ):
         from scripts.controller.actions.container_naming import clear_trigger_button
-        clear_trigger_button(case_data_store)
+        clear_trigger_button(business_data_store)
     saved = by.get(container_id)
     if isinstance(saved, dict):
         if saved.get('task_list') is not None:
-            case_data_store['task_list'] = saved['task_list']
+            business_data_store['task_list'] = saved['task_list']
         if saved.get('_scan_fields') is not None:
-            case_data_store['_scan_fields'] = saved['_scan_fields']
+            business_data_store['_scan_fields'] = saved['_scan_fields']
     elif active != container_id:
         # Fresh container — clear flat view so scan runs
-        case_data_store.pop('task_list', None)
-        case_data_store.pop('_scan_fields', None)
-        case_data_store.pop('_autofill_summary', None)
-        case_data_store.pop('_submit_ready', None)
+        business_data_store.pop('task_list', None)
+        business_data_store.pop('_scan_fields', None)
+        business_data_store.pop('_autofill_summary', None)
+        business_data_store.pop('_submit_ready', None)
 
 
-def _with_submit_cue(result: str, case_data_store: dict) -> str:
+def _with_submit_cue(result: str, business_data_store: dict) -> str:
     """Append auto-fill / submit-ready cue — skipped entirely for query/filter UI."""
     # Late import: form_scan_utils.py imports this module back at module level.
     from .form_scan_utils import _is_query_mode
-    if _is_query_mode(case_data_store):
-        case_data_store.pop('_autofill_summary', None)
-        case_data_store.pop('_submit_ready', None)
-        case_data_store.pop('_query_ready', None)
+    if _is_query_mode(business_data_store):
+        business_data_store.pop('_autofill_summary', None)
+        business_data_store.pop('_submit_ready', None)
+        business_data_store.pop('_query_ready', None)
         return result
     parts = [result]
-    summary = case_data_store.pop('_autofill_summary', None)
+    summary = business_data_store.pop('_autofill_summary', None)
     if summary:
         parts.append(summary)
-    cue = _submit_ready_hint(case_data_store)
+    cue = _submit_ready_hint(business_data_store)
     if cue:
         parts.append(cue)
         # Only arm recorder's click_save HumanMessage inject for real save cues.
         if 'NEXT_ACTION: click_save()' in cue:
-            case_data_store['_submit_ready'] = True
+            business_data_store['_submit_ready'] = True
         else:
-            case_data_store.pop('_submit_ready', None)
+            business_data_store.pop('_submit_ready', None)
     return ' | '.join(parts)
 
 

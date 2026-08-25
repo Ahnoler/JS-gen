@@ -396,16 +396,16 @@ def make_step_callback(phase_offset=0):
     return on_step_end
 
 
-def make_done_callback(output_path, case_data_store=None):
+def make_done_callback(output_path, business_data_store=None):
     """Create a done callback that saves trajectory and emits JSON event.
 
-    When case_data_store is provided, sets case_data_store['_done_fired'] = True
+    When business_data_store is provided, sets business_data_store['_done_fired'] = True
     so the quality gate can detect whether done() was triggered.
     """
     def on_done(history_list):
         try:
-            if case_data_store is not None:
-                case_data_store['_done_fired'] = True
+            if business_data_store is not None:
+                business_data_store['_done_fired'] = True
             output_path.parent.mkdir(parents=True, exist_ok=True)
             history_list.save_to_file(str(output_path))
             emit_json({"event": "done", "data": {"output_file": str(output_path), "steps": len(history_list.history), "is_done": history_list.is_done(), "is_successful": history_list.is_successful(), "final_result": history_list.final_result(), "errors": history_list.errors()}})

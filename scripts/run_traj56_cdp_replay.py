@@ -128,7 +128,7 @@ async def main() -> int:
             _PageCtx(page),
             entries,
             controller_actions=None,
-            case_data_store={},
+            business_data_store={},
             emit=emit,
             stop_on_fail=False,
         )

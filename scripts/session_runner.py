@@ -45,7 +45,7 @@ from .event_dispatch import _convert_action_params, _dispatch_event  # noqa: F40
 from .trajectory_store import (  # noqa: F401  (re-exported for compat)
     _accumulate_trajectory,
     _handle_reset_trajectory,
-    _handle_save_case_data,
+    _handle_save_business_data,
     _handle_save_trajectory,
 )
 
@@ -90,10 +90,10 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=N
         await stdin_queue.put(msg)
 
 
-async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
+async def _run_cdp_watcher(browser_context, action_queue, business_data_store):
     """In-process quick-action executor — uses the same browser_context as the Agent.
 
-    Shares _ACTION_LOG and case_data_store with the main Agent, so all actions
+    Shares _ACTION_LOG and business_data_store with the main Agent, so all actions
     executed through this watcher are recorded for script assembly.
     No separate CDP connection needed — actions run on the same Playwright context.
     """
@@ -106,7 +106,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
     #         ctx.get_current_page = _get_page
     # Self-heal scene reproduce uses replay_actions → _replay.replay_action_entries
     # (see browser-session.js /rerun), not this CDP watcher loop.
-    ctrl = build_controller(browser_context, case_data_store=case_data_store)
+    ctrl = build_controller(browser_context, business_data_store=business_data_store)
     actions = ctrl.registry.registry.actions
 
     while True:
@@ -125,7 +125,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
             # Per-action watcher mode — skip _ensure_scanned, no auto-fill
             # Tag recorded actions as source=cdp for DB persistence
             from .state import set_current_source
-            case_data_store['_watcher_mode'] = True
+            business_data_store['_watcher_mode'] = True
             set_current_source('cdp')
             try:
                 if isinstance(params, list):
@@ -136,7 +136,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
                     result = await act.function()
                 result_str = str(result)
             finally:
-                case_data_store['_watcher_mode'] = False
+                business_data_store['_watcher_mode'] = False
                 set_current_source('agent')
             sys.stderr.write(f"[cdp-watcher] {action_name}{params} -> {result_str}\n")
             sys.stderr.flush()
@@ -160,7 +160,7 @@ async def _run_cdp_watcher(browser_context, action_queue, case_data_store):
             try:
                 from .state import set_current_source
                 set_current_source('agent')
-                case_data_store['_watcher_mode'] = False
+                business_data_store['_watcher_mode'] = False
             except Exception:
                 pass
             if req_id:
@@ -219,24 +219,24 @@ async def run_session(args):
     await _dismiss_native_js_dialogs(browser_context)
     await _bypass_ssl_interstitial_if_any(browser_context)
 
-    case_data_store = {}  # process-level in-memory store, persists across steps
+    business_data_store = {}  # process-level in-memory store, persists across steps
     special_element_candidates_store = {}  # replaced each phase; AI may only use these ids
     cancel_flag_path = Path(tempfile.gettempdir()) / f"browser_use_cancel_{session_id}"
     goal_tracker = {'goals': [], 'stopped': False}
 
     on_step_start_hook, on_step_end_hook = build_recording_hooks(
-        goal_tracker, cancel_flag_path, case_data_store,
+        goal_tracker, cancel_flag_path, business_data_store,
     )
     controller = build_controller(
         browser_context,
-        case_data_store=case_data_store,
+        business_data_store=business_data_store,
         llm=llm,
         special_element_candidates_store=special_element_candidates_store,
     )
 
-    # Start CDP watcher — runs in-process, shares _ACTION_LOG and case_data_store
+    # Start CDP watcher — runs in-process, shares _ACTION_LOG and business_data_store
     cdp_action_queue = asyncio.Queue()
-    cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, case_data_store))
+    cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, business_data_store))
 
     # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
     cdp_ready = False
@@ -288,12 +288,12 @@ async def run_session(args):
     session_state = {
         'session_id': session_id,
         'cumulative_path': cumulative_path,
-        'case_data_store': case_data_store,
+        'business_data_store': business_data_store,
         'special_element_candidates_store': special_element_candidates_store,
         'browser_context': browser_context,
     }
 
-    case_data_loaded = False
+    business_data_loaded = False
     keep_browser = False  # 「释放资源」默认关浏览器；keep_browser=True 才留 CDP
 
     async def _run_step(data, step_idx):
@@ -314,7 +314,7 @@ async def run_session(args):
             output_path, task_text = await _run_agent_step(
                 data, step_idx, session_id, args, llm, browser_context,
                 controller, goal_tracker, cancel_flag_path,
-                on_step_start_hook, on_step_end_hook, case_data_store, cumulative_path,
+                on_step_start_hook, on_step_end_hook, business_data_store, cumulative_path,
                 special_element_candidates_store=special_element_candidates_store,
             )
         finally:
@@ -339,7 +339,7 @@ async def run_session(args):
         }
         try:
             from .controller.actions._phase_context import _outcome_for
-            outcome = _outcome_for(case_data_store, phase_num)
+            outcome = _outcome_for(business_data_store, phase_num)
             if outcome:
                 if 'success' in outcome:
                     phase_done_data['success'] = outcome['success']
@@ -380,33 +380,33 @@ async def run_session(args):
             data = msg.get("data", {})
 
             # 业务数据 from the user requirement (soft NL), not 案例数据 from the system.
-            # Prefer case_data_block → _case_scenario_text for the agent; flat case_data
+            # Prefer business_data_block → _business_scenario_text for the agent; flat business_data
             # is optional. See prepareCaseDataInjection terminology note.
-            case_data_inline = data.get("case_data")
-            case_data_file = data.get("case_data_file")
-            case_data_block = data.get("case_data_block") or data.get("caseDataBlock")
-            if isinstance(case_data_block, str) and case_data_block.strip():
-                case_data_store['_case_scenario_text'] = case_data_block.strip()
+            business_data_inline = data.get("business_data")
+            business_data_file = data.get("business_data_file")
+            business_data_block = data.get("business_data_block") or data.get("businessDataBlock")
+            if isinstance(business_data_block, str) and business_data_block.strip():
+                business_data_store['_business_scenario_text'] = business_data_block.strip()
                 sys.stderr.write(
-                    f"Case scenario text ready ({len(case_data_block.strip())} chars)\n"
+                    f"Business scenario text ready ({len(business_data_block.strip())} chars)\n"
                 )
                 sys.stderr.flush()
-            if not case_data_loaded and (case_data_inline or case_data_file):
+            if not business_data_loaded and (business_data_inline or business_data_file):
                 try:
                     imported = {}
-                    if isinstance(case_data_inline, dict):
-                        imported = case_data_inline
-                    elif case_data_file:
-                        with open(case_data_file, 'r', encoding='utf-8') as f:
+                    if isinstance(business_data_inline, dict):
+                        imported = business_data_inline
+                    elif business_data_file:
+                        with open(business_data_file, 'r', encoding='utf-8') as f:
                             imported = json.load(f)
                     if isinstance(imported, dict) and imported:
-                        case_data_store.update(imported)
-                        case_data_loaded = True
-                        src = "inline" if isinstance(case_data_inline, dict) else case_data_file
-                        sys.stderr.write(f"Imported case data ({len(imported)} keys) from {src}\n")
+                        business_data_store.update(imported)
+                        business_data_loaded = True
+                        src = "inline" if isinstance(business_data_inline, dict) else business_data_file
+                        sys.stderr.write(f"Imported business data ({len(imported)} keys) from {src}\n")
                         sys.stderr.flush()
                 except Exception as e:
-                    sys.stderr.write(f"Failed to import case data: {e}\n")
+                    sys.stderr.write(f"Failed to import business data: {e}\n")
                     sys.stderr.flush()
 
             await _run_step(data, step_index)

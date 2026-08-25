@@ -34,8 +34,8 @@ class SnapshotField(BaseModel):
 class FormSnapshot(BaseModel):
     """One form structure snapshot, scoped to a single container.
 
-    Stored in case_data_store['form_snapshots'] (array, deduped by fields content)
-    and case_data_store['form_snapshot'] (latest single entry).
+    Stored in business_data_store['form_snapshots'] (array, deduped by fields content)
+    and business_data_store['form_snapshot'] (latest single entry).
 
     The action_index ties this snapshot to a position in the _ACTION_LOG so
     the assembler can place verifyFormStructure() at the correct point in the
@@ -133,7 +133,7 @@ class FormSnapshot(BaseModel):
 
 # ── Snapshot collection helpers ────────────────────────────────────────────
 class FormSnapshotCollection:
-    """Utility for managing the form_snapshots list in case_data_store.
+    """Utility for managing the form_snapshots list in business_data_store.
 
     Dedup-by-content: compares fields_fingerprint (ordered (label, is_required,
     xpath_smart) tuples).  Same fingerprint → replace (newer scan of same form).  Different
@@ -141,9 +141,9 @@ class FormSnapshotCollection:
     base name (e.g. "main"), later ones get "#2", "#3", etc. suffixes.
 
     Usage:
-        coll = FormSnapshotCollection(case_data_store.get('form_snapshots', []))
+        coll = FormSnapshotCollection(business_data_store.get('form_snapshots', []))
         coll.upsert(snapshot)
-        case_data_store['form_snapshots'] = coll.to_dicts()
+        business_data_store['form_snapshots'] = coll.to_dicts()
     """
 
     def __init__(self, snapshots: list[FormSnapshot] | list[dict] | None = None):
@@ -153,18 +153,18 @@ class FormSnapshotCollection:
         ]
 
     @classmethod
-    def from_store(cls, case_data_store: dict | None) -> "FormSnapshotCollection":
-        """Create from case_data_store, with fallback from array to single entry.
+    def from_store(cls, business_data_store: dict | None) -> "FormSnapshotCollection":
+        """Create from business_data_store, with fallback from array to single entry.
 
-        Prefers case_data_store['form_snapshots'] (array), falls back to
-        case_data_store['form_snapshot'] (single entry). Returns an empty
+        Prefers business_data_store['form_snapshots'] (array), falls back to
+        business_data_store['form_snapshot'] (single entry). Returns an empty
         collection if neither exists.
         """
-        if not case_data_store:
+        if not business_data_store:
             return cls()
-        raw = case_data_store.get('form_snapshots', [])
+        raw = business_data_store.get('form_snapshots', [])
         if not raw:
-            single = case_data_store.get('form_snapshot')
+            single = business_data_store.get('form_snapshot')
             if single:
                 raw = [single]
         return cls(raw)

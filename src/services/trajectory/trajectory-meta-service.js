@@ -5,23 +5,23 @@ import { randomUUID } from 'crypto';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as systemDao from '../../dao/system-dao.js';
-import * as caseDataDao from '../../dao/case-data-dao.js';
+import * as businessDataDao from '../../dao/business-data-dao.js';
 import { callLLM } from '../../llm-utils.js';
 import { LLM_MODEL } from '#config/config.js';
 import { getDB } from '#config/database.js';
 import { getTrajectoryTree, getTrajectoryWithPhases } from './trajectory-query-service.js';
 import {
-  CASE_DATA_SECTION_RE,
-  extractCaseDataBlock,
-  extractCaseEntriesFromRequirement,
-  appendCaseDataToPhases,
+  BUSINESS_DATA_SECTION_RE,
+  extractBusinessDataBlock,
+  extractBusinessEntriesFromRequirement,
+  appendBusinessDataToPhases,
 } from './trajectory-text-extract.js';
 
 export {
   stripBusinessDataBlock,
   phaseNeedsBusinessData,
-  extractCaseDataBlock,
-  extractCaseEntriesFromRequirement,
+  extractBusinessDataBlock,
+  extractBusinessEntriesFromRequirement,
 } from './trajectory-text-extract.js';
 
 function parseAnalyzePayload(raw) {
@@ -59,8 +59,8 @@ function parseAnalyzePayload(raw) {
       .trim();
     if (!cleaned) continue;
     if (/^phases?\s*[:=]\s*\[/i.test(cleaned)) continue;
-    if (/^caseEntries?\s*[:=]/i.test(cleaned)) continue;
-    if (CASE_DATA_SECTION_RE.test(cleaned)) continue;
+    if (/^businessEntries?\s*[:=]/i.test(cleaned)) continue;
+    if (BUSINESS_DATA_SECTION_RE.test(cleaned)) continue;
     if (/^\]$/.test(cleaned)) continue;
     phases.push(cleaned.replace(/,$/, ''));
   }
@@ -83,7 +83,7 @@ function parseAnalyzePayload(raw) {
 }
 
 /**
- * Analyze a requirement into phases. Case-data block is NOT split into caseEntries;
+ * Analyze a requirement into phases. Business-data block is NOT split into businessEntries;
  * the raw block is appended to every phase for the agent to use when filling forms.
  * Returns: { phases: string[] }. Does not persist.
  */
@@ -94,7 +94,7 @@ export async function analyzeRequirementToPhases({
   const desc = String(description || '').trim();
   if (!desc) throw new Error('description is required');
 
-  const caseBlock = extractCaseDataBlock(desc);
+  const caseBlock = extractBusinessDataBlock(desc);
 
   const prompt = [
     '你是资深业务流程拆解助手。',
@@ -104,9 +104,9 @@ export async function analyzeRequirementToPhases({
     '1. 阶段数量必须严格跟用户输入的分步走：用户写了几条操作步骤，就返回几条 phases，不要合并、不要拆细、不要增删步骤条数。',
     '2. 识别编号格式如「1、」「1.」「1)」「（1）」等；每条编号对应 phases 中的一项。',
     '3. 若用户未编号、只是连贯段落，再按自然操作边界拆分；有编号时禁止改写条数。',
-    '4. 「案例数据 / 关键数据 / 测试数据」等段落不是操作步骤，不要计入 phases、不要拆成键值对。',
+    '4. 「业务数据 / 关键数据 / 测试数据」等段落不是操作步骤，不要计入 phases、不要拆成键值对。',
     '5. 每个阶段必须是简短、可执行的中文操作描述，避免“分析/思考/总结”等元话术。',
-    '6. 不要在 phases 字符串里复制整段案例数据（系统会另行附加）。',
+    '6. 不要在 phases 字符串里复制整段业务数据（系统会另行附加）。',
     '',
     '【预期结果规则 — 必须遵守】',
     '1. 每个阶段字符串都必须包含「预期结果：…」。',
@@ -124,7 +124,7 @@ export async function analyzeRequirementToPhases({
     '法定责任人的客户名称：朱桂武',
     '客户标签：',
     '',
-    '输出示例（用户写了 2 条操作 → phases 恰好 2 项；案例数据不出现在 JSON 里）：',
+    '输出示例（用户写了 2 条操作 → phases 恰好 2 项；业务数据不出现在 JSON 里）：',
     '{"phases":[',
     '"点击客户管理，点击对公客户管理。预期结果：抵达对公客户管理。",',
     '"新增一个对公潜在客户。预期结果：打开对公潜在客户新增表单。"',
@@ -140,21 +140,21 @@ export async function analyzeRequirementToPhases({
   const content = await callLLM(prompt, modelId);
   const parsed = parseAnalyzePayload(content);
 
-  // Drop phases that are just case-data echoes
+  // Drop phases that are just business-data echoes
   let phases = (parsed.phases || [])
-    .filter((p) => !CASE_DATA_SECTION_RE.test(p))
+    .filter((p) => !BUSINESS_DATA_SECTION_RE.test(p))
     .filter((p) => !/^(案例数据|关键数据)/.test(p));
 
-  // Append raw business-scenario case data to each phase (for AI fill reference)
-  phases = appendCaseDataToPhases(phases, caseBlock);
+  // Append raw business-scenario business data to each phase (for AI fill reference)
+  phases = appendBusinessDataToPhases(phases, caseBlock);
 
-  // P1：analyze 附带结构化 KV（extractCaseEntriesFromRequirement 规则解析，非 LLM 拆解）。
-  // 前端创建轨迹时透传 → legacy case_data_entry 落库 + memory_fact(requirement/authoritative)。
+  // P1：analyze 附带结构化 KV（extractBusinessEntriesFromRequirement 规则解析，非 LLM 拆解）。
+  // 前端创建轨迹时透传 → legacy business_data_entry 落库 + memory_fact(requirement/authoritative)。
   // 这是用户需求业务数据的 KV 投影，不是 system_ref（目标系统回写参考值）。
   // 禁止把本结果写入 system_ref_data / system_ref_entry。
-  // 注意：必须是 KV 数组（normalizeCaseEntries 对非数组返回 []），raw 文本块
-  // 仅用于 appendCaseDataToPhases，不作为 caseEntries。
-  return { phases, caseEntries: extractCaseEntriesFromRequirement(desc) };
+  // 注意：必须是 KV 数组（normalizeBusinessEntries 对非数组返回 []），raw 文本块
+  // 仅用于 appendBusinessDataToPhases，不作为 businessEntries。
+  return { phases, businessEntries: extractBusinessEntriesFromRequirement(desc) };
 }
 
 /**
@@ -197,8 +197,8 @@ export async function createTransactionWithPhases({
   phases = [],
   model = '',
   systemAccountId = null,
-  caseEntries = undefined,
-  caseData = undefined,
+  businessEntries = undefined,
+  businessData = undefined,
   requireFunctionId = false,
   batchJobId = null,
   paasUserId = null,
@@ -270,19 +270,19 @@ export async function createTransactionWithPhases({
       }, client);
     }
 
-    const rawEntries = caseEntries ?? caseData;
+    const rawEntries = businessEntries ?? businessData;
     if (rawEntries !== undefined) {
-      await caseDataDao.replaceEntriesForTrajectory(trajId, rawEntries, client);
+      await businessDataDao.replaceEntriesForTrajectory(trajId, rawEntries, client);
     }
 
-    // P1：结构化案例数据 → memory_fact（requirement/authoritative，供事实包注入）。
+    // P1：结构化业务数据 → memory_fact（requirement/authoritative，供事实包注入）。
     // 独立连接摄取（不参与本事务原子性），失败仅告警不阻塞创建。
     if (Array.isArray(rawEntries) && rawEntries.length) {
       try {
-        const { ingestCaseEntriesAsFacts } = await import('../../memory/memory-service.js');
-        await ingestCaseEntriesAsFacts(trajId, rawEntries);
+        const { ingestBusinessEntriesAsFacts } = await import('../../memory/memory-service.js');
+        await ingestBusinessEntriesAsFacts(trajId, rawEntries);
       } catch (err) {
-        console.warn('[trajectory] case-entry fact ingest skipped:', err?.message || err);
+        console.warn('[trajectory] business-entry fact ingest skipped:', err?.message || err);
       }
     }
 
@@ -300,13 +300,13 @@ export async function createTransactionWithPhases({
 }
 
 /**
- * Replace case KV entries bound to a trajectory (legacy case_data_entry).
+ * Replace business KV entries bound to a trajectory (legacy business_data_entry).
  * These are NOT system_ref rows — use system-ref-service for target-system
  * verified references. Requirement 业务数据 should prefer task text / 【业务数据】.
  * @param {number} trajectoryId
  * @param {Array} entries
  */
-export async function setTrajectoryCaseEntries(trajectoryId, entries) {
+export async function setTrajectoryBusinessEntries(trajectoryId, entries) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) {
     const err = new Error('Invalid trajectory id');
@@ -319,13 +319,13 @@ export async function setTrajectoryCaseEntries(trajectoryId, entries) {
     err.statusCode = 404;
     throw err;
   }
-  await caseDataDao.replaceEntriesForTrajectory(tid, entries);
+  await businessDataDao.replaceEntriesForTrajectory(tid, entries);
   // P1：同步摄取为 authoritative 事实（事实包注入用）
   try {
-    const { ingestCaseEntriesAsFacts } = await import('../../memory/memory-service.js');
-    await ingestCaseEntriesAsFacts(tid, entries);
+    const { ingestBusinessEntriesAsFacts } = await import('../../memory/memory-service.js');
+    await ingestBusinessEntriesAsFacts(tid, entries);
   } catch (err) {
-    console.warn('[trajectory] case-entry fact ingest skipped:', err?.message || err);
+    console.warn('[trajectory] business-entry fact ingest skipped:', err?.message || err);
   }
   return getTrajectoryWithPhases(tid);
 }

@@ -13,7 +13,7 @@ from pathlib import Path
 from .agent_utils import emit_json
 
 
-def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, case_data_store=None):
+def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, business_data_store=None):
     """Save action/log/form files for assemble + MySQL persist.
 
     - action_{ts}.json  — custom action format (for script_assembler.py)
@@ -71,9 +71,9 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
         # File 4: form_{ts}.json — form structure snapshots (for replay validation)
         form_path = None
         snapshots = None
-        if case_data_store:
+        if business_data_store:
             from .models import FormSnapshotCollection
-            coll = FormSnapshotCollection.from_store(case_data_store)
+            coll = FormSnapshotCollection.from_store(business_data_store)
             snapshots = coll.to_dicts()
         if snapshots:
             forms_dir = scripts_dir / 'forms'
@@ -141,34 +141,34 @@ def _handle_save_trajectory(cumulative_path, session_id, browser_context=None, c
         emit_json({"event": "save_trajectory_result", "data": {"success": False, "message": str(e)}})
 
 
-def _handle_save_case_data(case_data_store, session_id):
+def _handle_save_business_data(business_data_store, session_id):
     try:
         data_dir = Path(__file__).parent / 'case_data'
         data_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        case_data_path = data_dir / f"cdata_{ts}.json"
+        business_data_path = data_dir / f"cdata_{ts}.json"
         import json as _json
-        with open(case_data_path, 'w', encoding='utf-8') as f:
-            _json.dump(case_data_store, f, ensure_ascii=False, indent=2)
-        sys.stderr.write(f"Case data saved on demand: {case_data_path}\n")
+        with open(business_data_path, 'w', encoding='utf-8') as f:
+            _json.dump(business_data_store, f, ensure_ascii=False, indent=2)
+        sys.stderr.write(f"Business data saved on demand: {business_data_path}\n")
         sys.stderr.flush()
         emit_json({
-            "event": "save_case_data_result",
-            "data": {"success": True, "case_data_file": str(case_data_path), "keys": len(case_data_store)},
+            "event": "save_business_data_result",
+            "data": {"success": True, "business_data_file": str(business_data_path), "keys": len(business_data_store)},
         })
     except Exception as e:
-        emit_json({"event": "save_case_data_result", "data": {"success": False, "message": str(e)}})
+        emit_json({"event": "save_business_data_result", "data": {"success": False, "message": str(e)}})
 
 
-def _handle_reset_trajectory(session_id, case_data_store=None):
+def _handle_reset_trajectory(session_id, business_data_store=None):
     from .controller import _ACTION_LOG
     from .recorder import _ACTION_LOG as _recorder_log
     from .controller.actions._phase_context import clear_phase_outcomes
     from .controller.actions._phase_intent import clear_phase_intent
     _ACTION_LOG.clear()
     _recorder_log.clear()
-    clear_phase_outcomes(case_data_store)
-    clear_phase_intent(case_data_store)
+    clear_phase_outcomes(business_data_store)
+    clear_phase_intent(business_data_store)
     from .state import _emit_action_log_sync
     _emit_action_log_sync()
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")

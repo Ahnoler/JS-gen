@@ -105,7 +105,7 @@ async function runAnalyze(item, token) {
 
     const analysis = {
       phases,
-      caseEntries: Array.isArray(result.caseEntries) ? result.caseEntries : [],
+      businessEntries: Array.isArray(result.businessEntries) ? result.businessEntries : [],
     };
     const fresh = await batchDao.getItemById(item.id);
     const saved = await batchDao.transitionItem(item.id, ['analyzing'], 'analyzed', {
@@ -178,7 +178,7 @@ async function createDraftFromAnalyzed(item) {
         name: item.name,
         requirement: item.requirement,
         phases,
-        caseEntries: analysis.caseEntries || [],
+        businessEntries: analysis.businessEntries || [],
         model: job.model || '',
         systemAccountId: Number(job.systemAccountId),
         batchJobId: job.id,

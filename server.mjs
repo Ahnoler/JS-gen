@@ -36,7 +36,7 @@ app.use(express.static(DASHBOARD_DIR, {
 // Register all route modules
 registerLLMProxyRoutes(app);
 registerBrowserSessionRoutes(app);
-// Legacy JSON catalogs: return 410 Gone → use /api/v2/trajectories|case-data
+// Legacy JSON catalogs: return 410 Gone → use /api/v2/trajectories|business-data
 registerLegacyGoneRoutes(app);
 registerAssembleRoutes(app);
 registerHealthRoutes(app);
@@ -46,6 +46,14 @@ registerTestHistoryRoutes(app);
 registerTestRunRoutes(app);
 registerSetupRoutes(app);
 registerV2Routes(app);
+
+// 301 redirect: legacy /api/v2/case-data → /api/v2/business-data
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/v2/case-data')) {
+    return res.redirect(301, req.path.replace('/api/v2/case-data', '/api/v2/business-data'));
+  }
+  next();
+});
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -170,13 +178,13 @@ async function main() {
     console.log(`  POST /api/v2/trajectories/:id/record/prepare|start|stop`);
     console.log(`  POST /api/v2/trajectories/:id/stream/detach | attach|detach`);
     console.log(`  GET  /api/v2/executors`);
-    console.log(`  GET  /api/v2/case-data`);
+    console.log(`  GET  /api/v2/business-data`);
     console.log(`  GET  /api/v2/system-ref-data`);
     console.log(`  POST /api/browser/session  (debug)`);
     console.log(`  POST /api/test/assemble | /api/test/run`);
     console.log(`  GET  /api/docs  (product API docs for frontend)`);
     console.log(`  GET  /api/test|/record-console|/record-studio  → 301 /api/docs (UI removed)`);
-    console.log(`  GET  /api/trajectory|/api/case-data  → 410 Gone (use /api/v2/*)`);
+    console.log(`  GET  /api/trajectory|/api/business-data  → 410 Gone (use /api/v2/*)`);
     console.log(`  GET  /v1/models | POST /v1/chat/completions`);
   });
   server.timeout = 0;

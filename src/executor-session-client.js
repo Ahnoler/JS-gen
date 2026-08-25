@@ -141,7 +141,7 @@ const STDIN_TO_WS = {
   manual_dom_event: 'session.manual_dom_event',
   cdp_action: 'session.cdp_action',
   save_trajectory: 'session.save_trajectory',
-  save_case_data: 'session.save_case_data',
+  save_business_data: 'session.save_business_data',
   get_action_log: 'session.get_action_log',
   reset_trajectory: 'session.reset_trajectory',
   close: 'session.close',
@@ -308,8 +308,8 @@ export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
       task: data.instruction,
       maxSteps: data.max_steps,
       phaseNumber: data.phase_number,
-      caseDataFile: data.case_data_file,
-      caseData: data.case_data,
+      businessDataFile: data.business_data_file,
+      businessData: data.business_data,
       // Must forward — otherwise Python loads 0 special-element candidates
       specialElementCandidates:
         data.special_element_candidates ?? data.specialElementCandidates,
@@ -319,7 +319,7 @@ export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
       // P1：记忆事件归属 —— Python writer 需要 trajectory_id + fact_pack
       trajectoryId: data.trajectory_id,
       factPack: data.fact_pack,
-      caseDataBlock: data.case_data_block ?? data.caseDataBlock,
+      businessDataBlock: data.business_data_block ?? data.businessDataBlock,
       healContract: data.heal_contract ?? data.healContract ?? null,
     });
     return;

@@ -72,7 +72,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
     """分组 → LLM 规划 → 逐个执行。round_tag: '' | 'round2 ' | 'round3 '"""
     from .section_scope import section_matches
 
-    filt = (self.case_data_store.get('_assistant_section_filter') or '').strip()
+    filt = (self.business_data_store.get('_assistant_section_filter') or '').strip()
 
     def _field_dict_for_action(sub, action, action_index):
         action_xp = (action.get('xpath_smart') or '').strip()
@@ -238,20 +238,20 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                                 sys.stderr.flush()
                             break
 
-        cache = self.case_data_store.get('_generated_value_cache', {})
+        cache = self.business_data_store.get('_generated_value_cache', {})
         for d in sub:
             lbl = d.get('label', '') or ''
             if lbl in cache and not (d.get('commandValue') and str(d.get('commandValue')).strip()):
                 d['commandValue'] = cache[lbl]
 
         actions, needs = _llm_generate_values(
-            self.llm, sub, case_data_store=self.case_data_store, section=filt,
+            self.llm, sub, business_data_store=self.business_data_store, section=filt,
         )
         if idx == KIND_ORDER['select']:
             from .cascade_fill import append_select_first_fallbacks
             actions, needs = append_select_first_fallbacks(actions, needs, sub)
         if needs:
-            self.case_data_store.setdefault('_assistant_needs_agent', []).extend(needs)
+            self.business_data_store.setdefault('_assistant_needs_agent', []).extend(needs)
         await page.evaluate(
             'd => console.log("[AI填表] 所有动作(" + d.length + "): " + JSON.stringify(d.map(a => a.label + "=" + (a.value||a.option||""))))',
             actions,
@@ -274,7 +274,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
             ).strip()
             resolve_error = ''
             if not xpath_smart:
-                resolved = _resolve_control(self.case_data_store, label, '')
+                resolved = _resolve_control(self.business_data_store, label, '')
                 if not resolved.error:
                     xpath_smart = resolved.xpath_smart
                     if resolved.label:
@@ -447,7 +447,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                             actual = rs.split(':', 1)[1].split('|', 1)[0].strip()
                         stamped = resolve_recorded_option_text(value, actual)
                         params, element = await _pack_select_record(
-                            page, self.case_data_store, label, stamped, element,
+                            page, self.business_data_store, label, stamped, element,
                         )
                         params['option_text'] = stamped
                         await record_action_with_screenshots(
@@ -459,7 +459,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                             before_b64=before_b64,
                         )
                 _task_done_impl(
-                    label, self.case_data_store, value=value, xpath_smart=xp_inv,
+                    label, self.business_data_store, value=value, xpath_smart=xp_inv,
                 )
                 # Phone verify: fill_input 成功后如果有"验证"按钮，自动点击
                 btn = has_button_map.get(label, '')
@@ -479,7 +479,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
             elif ok:
                 # ok-skip:label-not-found — clear pending, do not write trajectory
                 ok_in_group += 1
-                _task_done_impl(label, self.case_data_store)
+                _task_done_impl(label, self.business_data_store)
                 sys.stderr.write(
                     f'[auto-fill] {round_tag}skip-absent: "{label}" ({result})\n'
                 )

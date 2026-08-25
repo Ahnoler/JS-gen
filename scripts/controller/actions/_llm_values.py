@@ -2,7 +2,7 @@
 LLM-based form field value generation.
 
 Three-tier priority:
-1. User-provided data (from case_data_store → commandValue)
+1. User-provided data (from business_data_store → commandValue)
 2. form_rules.py generators — match_rule() for input/date fields
 3. LLM autonomous decision — for remaining fields
 
@@ -21,7 +21,7 @@ import time
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from .form_rules import match_rule
-from ._case_data import iter_user_case_entries
+from ._business_data import iter_user_business_entries
 from scripts.controller.actions.section_scope import section_matches
 
 _ASSISTANT_MISSION_INSTRUCTION = (
@@ -66,9 +66,9 @@ def _build_related_snapshot(scan_fields: list, section: str = '') -> list[dict]:
     return out
 
 
-def build_assistant_mission_context(case_data_store: dict | None, section: str = '') -> dict:
+def build_assistant_mission_context(business_data_store: dict | None, section: str = '') -> dict:
     """Assemble mission context for the form assistant LLM."""
-    store = case_data_store or {}
+    store = business_data_store or {}
     phase_task = _resolve_phase_task(store)
     # Soft text only (same as agent_task): prose block + flat UI case KV.
     # Omitting flat KV left 【业务数据】 empty when the panel had no scenario
@@ -80,7 +80,7 @@ def build_assistant_mission_context(case_data_store: dict | None, section: str =
     parts = []
     if block:
         parts.append(block)
-    entries = iter_user_case_entries(store)
+    entries = iter_user_business_entries(store)
     if entries:
         parts.append('\n'.join(f'- {k}：{v}' for k, v in entries))
     business_data = '\n'.join(parts)
@@ -291,11 +291,11 @@ def _enrich_llm_actions_xpath(llm_result, llm_fields):
     return enriched
 
 
-def _llm_generate_values(llm, items, case_data_store=None,
+def _llm_generate_values(llm, items, business_data_store=None,
                          instruction: str | None = None,
                          section: str = ''):
     """Generate values for form fields with three-tier priority:
-    1. User-provided data (from case_data_store)
+    1. User-provided data (from business_data_store)
     2. form_rules.py generators — match_rule() for input/date fields
     3. LLM autonomous decision — for remaining fields (select picks from options, input generates smart values)
     """
@@ -377,7 +377,7 @@ def _llm_generate_values(llm, items, case_data_store=None,
         _today = _date.today().isoformat()
         # Use page reference date for date fields to respect business constraints
         # (e.g. ID start date must be <= business registration date)
-        _ref_date = (case_data_store or {}).get('_ref_date', '') if case_data_store else ''
+        _ref_date = (business_data_store or {}).get('_ref_date', '') if business_data_store else ''
         _date_val = _ref_date if _ref_date else _today
         for item in llm_fields:
             label = item['label'] if isinstance(item, dict) else item
@@ -419,7 +419,7 @@ def _llm_generate_values(llm, items, case_data_store=None,
         field_lines.append(line)
 
     fields_block = '\n'.join(field_lines)
-    ctx = build_assistant_mission_context(case_data_store, section=section)
+    ctx = build_assistant_mission_context(business_data_store, section=section)
     if instruction is None:
         instruction = (ctx.get('instruction') or _ASSISTANT_MISSION_INSTRUCTION).strip()
     prompt = format_assistant_human_message(ctx, fields_block)

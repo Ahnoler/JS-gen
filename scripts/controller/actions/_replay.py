@@ -315,7 +315,7 @@ async def replay_action_entries(
     entries: list[dict],
     *,
     controller_actions: dict | None = None,
-    case_data_store: dict | None = None,
+    business_data_store: dict | None = None,
     emit=None,
     stop_on_fail: bool = False,
 ) -> dict:
@@ -326,7 +326,7 @@ async def replay_action_entries(
 
     Returns {count, ok, failed, results, stoppedAt?}.
     """
-    store = case_data_store if case_data_store is not None else {}
+    store = business_data_store if business_data_store is not None else {}
     prev_watcher = store.get('_watcher_mode')
     store['_watcher_mode'] = True
 
