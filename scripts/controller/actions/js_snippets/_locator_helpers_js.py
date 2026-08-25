@@ -70,7 +70,7 @@ PAGE_LOCATOR_HELPERS = r'''
     if (node.id && !isGeneratedId(node.id)) return '//*[@id="' + node.id + '"]';
     const parts = [];
     let cur = node;
-    while (cur && cur.nodeType === 1 && cur !== document.body) {
+    while (cur && cur.nodeType === 1 && cur !== document.documentElement) {
       let ix = 1;
       let sib = cur.previousElementSibling;
       while (sib) {
@@ -80,7 +80,7 @@ PAGE_LOCATOR_HELPERS = r'''
       parts.unshift(cur.tagName.toLowerCase() + '[' + ix + ']');
       cur = cur.parentElement;
     }
-    return '/' + parts.join('/');
+    return '/html' + (parts.length ? '/' + parts.join('/') : '');
   }
   function isVisible(el) {
     if (!el || el.nodeType !== 1) return false;
@@ -1367,12 +1367,21 @@ PAGE_LOCATOR_HELPERS = r'''
       let rowT = '';
       if (rowEl) {
         const cells = rowEl.querySelectorAll('td, .el-table__cell');
+        // Unique-key column priority: prefer a customer-number (14-18 digits) or
+        // unified social-credit code (18 uppercase alphanumerics) so same-named
+        // rows disambiguate by unique key instead of pinning [N].
         for (let i = 0; i < cells.length; i++) {
-          const cell = cells[i];
-          const ct = normalizeControlText(cell.innerText || cell.textContent || '');
-          const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
-          if (hasSelect && !ct) continue;
-          if (ct && ct.length >= 2 && ct.length <= 48) { rowT = ct; break; }
+          const ct = normalizeControlText(cells[i].innerText || cells[i].textContent || '');
+          if (ct && (/^\d{14,18}$/.test(ct) || /^[0-9A-Z]{18}$/.test(ct))) { rowT = ct; break; }
+        }
+        if (!rowT) {
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            const ct = normalizeControlText(cell.innerText || cell.textContent || '');
+            const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
+            if (hasSelect && !ct) continue;
+            if (ct && ct.length >= 2 && ct.length <= 48) { rowT = ct; break; }
+          }
         }
       }
       const btnT = normalizeControlText(text) || cleanVisibleText(node);
@@ -1395,12 +1404,19 @@ PAGE_LOCATOR_HELPERS = r'''
       let rowT = '';
       if (rowEl) {
         const cells = rowEl.querySelectorAll('td, .el-table__cell');
+        // Unique-key column priority (same as table_row_button).
         for (let i = 0; i < cells.length; i++) {
-          const cell = cells[i];
-          const ct = normalizeControlText(cell.innerText || cell.textContent || '');
-          const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
-          if (hasSelect && !ct) continue;
-          if (ct && ct.length >= 2 && ct.length <= 48) { rowT = ct; break; }
+          const ct = normalizeControlText(cells[i].innerText || cells[i].textContent || '');
+          if (ct && (/^\d{14,18}$/.test(ct) || /^[0-9A-Z]{18}$/.test(ct))) { rowT = ct; break; }
+        }
+        if (!rowT) {
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            const ct = normalizeControlText(cell.innerText || cell.textContent || '');
+            const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
+            if (hasSelect && !ct) continue;
+            if (ct && ct.length >= 2 && ct.length <= 48) { rowT = ct; break; }
+          }
         }
       }
       if (rowT) {
@@ -1511,6 +1527,16 @@ PAGE_LOCATOR_HELPERS = r'''
     const t = normalizeControlText(text) || cleanVisibleText(host);
     const abs = String(xpathFull || absXPath(host) || '');
     let formLbl = normalizeFormLabel(formLabel || '');
+    // For adjacent_button the formLabel hint is the recorded label_text, which
+    // may name a button-less prefix sibling (实际控制人客户编号 vs 实际控制人
+    // 配偶客户编号). The button's real owning form-item is the host's own, so
+    // prefer its label over the hint to keep xpath_smart on the right field.
+    if (kind === 'adjacent_button' && host && host.closest) {
+      const ownItem = host.closest('.el-form-item');
+      const ownLbl = ownItem && ownItem.querySelector('.el-form-item__label, label');
+      const derived = normalizeFormLabel(ownLbl && (ownLbl.innerText || ownLbl.textContent));
+      if (derived) formLbl = derived;
+    }
     if (!formLbl && host && host.closest) {
       const item = host.closest('.el-form-item');
       const lbl = item && item.querySelector('.el-form-item__label, label');

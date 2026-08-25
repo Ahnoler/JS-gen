@@ -9,6 +9,12 @@
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
 - **click_save(button_text='保存', region='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `region=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections[]` / `region_label`）；无 scope 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 scope → `err-region-required`（见 core「阶段区域 region」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。无 scope 时若页上多区块同名保存按钮，系统不会使用上一区块记忆自动点保存，会返回 err-save-ambiguous — 必须显式 `region=`。**
 
+### 🚨 多保存按钮分区语义（关键 — collapse 多分区页面）
+- 页面存在多个『保存』/提交按钮（分属不同分区/表单，且你已填写多个分区的字段）时：**对每个已填写的分区/表单分别调用一次 `click_save(button_text='保存', region='<分区名>')`**（`region` 取分区 `title` / `region_label`，见 `run_form_assistant` 返回的 `sections[]`），确保每个分区恰好保存一次。
+- **仅填写单一分区时无需 `region`**（传空或唯一分区自动解析）。
+- 收到 `err-save-ambiguous` 报错时：按报错候选清单（`candidates=[{section_title, section_id, text}]`）中的分区逐个带 `region=` 重试（即对每个候选分区分别 `click_save('保存', region='<分区名>')`）。
+- 禁止只录制一个保存操作就 `done`——多分区页面每个已填分区都必须有对应的保存步骤。
+
 ## 任务列表动作
 - **`scan_form_fields()` / `run_form_assistant()`** 现与摘要一样走 **全页 L2（`mode:fullpage`）**；壳层/menu/icon **不会**进入 TaskList 待填，勿对侧栏顶栏做 fill。
 - **`scan_editable_summary()`** — 了解当前可见可编辑控件时调用（只读摘要，不填表、不建任务列表）。

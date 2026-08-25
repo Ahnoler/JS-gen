@@ -28,6 +28,11 @@ class SnapshotField(BaseModel):
         default="",
         description="Stable xpath anchor when label alone is ambiguous",
     )
+    options: list[str] = Field(
+        default_factory=list,
+        description="Dropdown option labels for select/tree-select fields (empty for non-select); "
+        "lets the LLM distinguish same-prefix fields by their own option list",
+    )
 
 
 # ── Form snapshot entry ────────────────────────────────────────────────────
@@ -115,7 +120,22 @@ class FormSnapshot(BaseModel):
             if not label and not xpath:
                 continue
             is_req = f.get("required", False)
-            entries.append(SnapshotField(label=label, is_required=is_req, xpath_smart=xpath))
+            # Carry the option list for select / tree-select fields so the LLM
+            # can distinguish same-prefix dropdowns (国民经济部门 vs 国民经济部门类别)
+            # by their own options. Non-select fields get an empty list (omitted
+            # in the checkpoint params to keep legacy consumers untouched).
+            kind = str(f.get("kind") or "").strip()
+            field_options: list[str] = []
+            if kind in ("select", "tree-select", "tree"):
+                raw_opts = f.get("options")
+                if isinstance(raw_opts, list):
+                    field_options = [
+                        str(o).strip() for o in raw_opts
+                        if o is not None and str(o).strip()
+                    ]
+            entries.append(SnapshotField(
+                label=label, is_required=is_req, xpath_smart=xpath, options=field_options,
+            ))
             if is_req:
                 required_count += 1
             else:

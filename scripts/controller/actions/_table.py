@@ -15,15 +15,37 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
             target_kind='table_row_button',
         )
         if element:
-            element['row_text'] = row_text
+            # Prefer the enriched unique-key row text (customer-number / credit code)
+            # over the caller-supplied row_text, which may be an easily duplicated name.
+            element['row_text'] = element.get('row_text') or row_text
             element['button_text'] = button_text
             element['target_kind'] = 'table_row_button'
         result = await page.evaluate('''
             ([rowText, btnText]) => {
                 const rows = document.querySelectorAll('.el-table__body-wrapper .el-table__row');
+                const rowCellTexts = (row) => {
+                    const cells = row.querySelectorAll('td, .el-table__cell');
+                    const out = [];
+                    for (const c of cells) {
+                        const t = (c.innerText || c.textContent || '').trim().replace(/\\s+/g, ' ');
+                        if (t && t !== 'radio' && t !== 'checkbox') out.push(t);
+                    }
+                    return out;
+                };
+                let matchedRow = null;
                 for (const row of rows) {
-                    if (!row.textContent.includes(rowText)) continue;
-                    const buttons = row.querySelectorAll('button, .el-button, a');
+                    const texts = rowCellTexts(row);
+                    for (const t of texts) { if (t === rowText) { matchedRow = row; break; } }
+                    if (matchedRow) break;
+                }
+                if (!matchedRow) {
+                    for (const row of rows) {
+                        if ((row.textContent || '').includes(rowText)) { matchedRow = row; break; }
+                    }
+                }
+                if (!matchedRow) return 'row-not-found';
+                const row = matchedRow;
+                const buttons = row.querySelectorAll('button, .el-button, a');
                     for (const btn of buttons) {
                         const text = btn.textContent?.trim() || '';
                         const cls = btn.className || '';
@@ -43,8 +65,6 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                         if (btn.offsetParent !== null) { btn.click(); return 'ok-fallback'; }
                     }
                     return 'button-not-found-in-row';
-                }
-                return 'row-not-found';
             }
         ''', [row_text, button_text])
         await page.wait_for_timeout(500)
@@ -70,7 +90,9 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
             target_kind='table_row_radio',
         )
         if element:
-            element['row_text'] = row_text
+            # Prefer the enriched unique-key row text (customer-number / credit code)
+            # over the caller-supplied row_text, which may be an easily duplicated name.
+            element['row_text'] = element.get('row_text') or row_text
             element['target_kind'] = 'table_row_radio'
         result = await page.evaluate('''
             ([rowText]) => {
@@ -87,6 +109,23 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                     return true;
                 };
                 const wantFirst = /^(first|1st|第一个|第一项|首行)$/i.test(String(rowText).trim());
+                // Unique-key columns (customer-number / credit code) must match EXACTLY
+                // to disambiguate same-named rows; fall back to textContent.includes.
+                const rowCellTexts = (row) => {
+                    const cells = row.querySelectorAll('td, .el-table__cell');
+                    const out = [];
+                    for (const c of cells) {
+                        const t = (c.innerText || c.textContent || '').trim().replace(/\\s+/g, ' ');
+                        if (t && t !== 'radio' && t !== 'checkbox') out.push(t);
+                    }
+                    return out;
+                };
+                const rowMatches = (row) => {
+                    if (wantFirst) return true;
+                    const texts = rowCellTexts(row);
+                    for (const t of texts) { if (t === rowText) return true; }
+                    return (row.textContent || '').includes(rowText);
+                };
                 const tables = document.querySelectorAll('.el-table');
                 for (const table of tables) {
                     const bodyRows = table.querySelectorAll(
@@ -94,7 +133,7 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                     );
                     for (let i = 0; i < bodyRows.length; i++) {
                         const row = bodyRows[i];
-                        if (!wantFirst && !(row.textContent || '').includes(rowText)) continue;
+                        if (!rowMatches(row)) continue;
                         row.scrollIntoView({ block: 'center', behavior: 'instant' });
                         let radio = pickSel(row);
                         if (!radio) {

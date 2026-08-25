@@ -449,10 +449,17 @@ def _save_form_snapshot(container: str, scan_fields: list[dict], business_data_s
 
     if emit_checkpoint:
         params = snapshot.model_dump()
-        params['fields'] = [
-            {'label': f.label, 'is_required': f.is_required}
-            for f in snapshot.fields
-        ]
+        # Emit label + is_required for every field; attach options only for
+        # select / tree-select fields that actually have a non-empty option
+        # list (legacy consumers ignore the extra key; the LLM uses it to
+        # distinguish same-prefix dropdowns by their own options).
+        field_entries = []
+        for f in snapshot.fields:
+            entry = {'label': f.label, 'is_required': f.is_required}
+            if f.options:
+                entry['options'] = list(f.options)
+            field_entries.append(entry)
+        params['fields'] = field_entries
         _record_action('save_form_snapshot', params, f'form-snapshot|{snapshot.container}|{snapshot.count}')
 
     return snapshot

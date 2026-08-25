@@ -50,7 +50,7 @@ JS_CLICK_SAVE_BUTTON = r'''(buttonArg) => {
   const matches = [];
   for (const el of document.querySelectorAll(selectors)) {
     if (!isVisible(el)) continue;
-    if (el.disabled || el.getAttribute('disabled') != null || el.classList.contains('is-disabled')) continue;
+    if (el.disabled || el.getAttribute('disabled') != null || el.classList.contains('is-disabled') || el.classList.contains('disableBtn')) continue;
     const text = btnText(el);
     if (!text || text.length > 40) continue;
     const sc = scoreBtn(el, text);

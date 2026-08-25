@@ -263,6 +263,15 @@ class FillEngine(_FormActionEngineBase):
                 if (info.get('currentValue', '').strip() != '' or info.get('selected', False)) and label_text not in ('查询', '搜索', '确定', '提交', '保存'):
                     # Non-recordable skip — must NOT use ok prefix
                     return _ok(f'already-filled | {info.get("currentValue", "")}')
+                # Disabled field with no adjacent button (hasButton empty) —
+                # cannot be operated; non-recordable skip (same semantics as
+                # already-filled: _ok wrapper + non-ok message → not recorded,
+                # not a failure). Must come after already-filled and before
+                # the click attempt so replay does not fail / trigger heal.
+                has_button = (info.get('hasButton') or '').strip() if isinstance(info.get('hasButton'), str) else info.get('hasButton')
+                if info.get('disabled') and not has_button:
+                    # Non-recordable skip — must NOT use ok prefix
+                    return _ok(f'disabled-no-adjacent-button | {label_text}')
             except Exception:
                 pass
         # Snapshot the adjacent button (not the input) before click
@@ -271,21 +280,36 @@ class FillEngine(_FormActionEngineBase):
         )
         result = await page.evaluate('''([label]) => {
             const container = ''' + JS_GET_CONTAINER + ''';
-            const items = container.querySelectorAll('.el-form-item');
-            for (const item of items) {
+            const allItems = container.querySelectorAll('.el-form-item');
+            // Collect every form-item whose label includes the target, recording
+            // an exact-match flag so a prefix sibling (实际控制人客户编号 vs
+            // 实际控制人配偶客户编号) does not short-circuit on a button-less item.
+            const exact = [];
+            const partial = [];
+            for (const item of allItems) {
                 const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
                 if (!lbl.includes(label)) continue;
+                if (lbl.trim() === label) exact.push(item);
+                else partial.push(item);
+            }
+            const ordered = exact.concat(partial);
+            let matchedAny = ordered.length > 0;
+            for (const item of ordered) {
                 item.scrollIntoView({ block: 'center', behavior: 'instant' });
+                const kw = ['选择', '引入', '上传', '添加', '导入', '新增'];
+                let clicked = false;
                 for (const tag of ['el-button', 'button', 'a']) {
                     const btns = item.querySelectorAll(tag);
                     for (const btn of btns) {
                         if (btn.offsetParent === null) continue;
                         const t = btn.textContent.trim();
-                        if (t && (t.includes('选择') || t.includes('引入') || t.includes('上传') || t.includes('添加') || t.includes('导入') || t.includes('新增'))) {
-                            btn.click(); return 'ok-clicked';
+                        if (t && kw.some((k) => t.includes(k))) {
+                            btn.click(); clicked = true; break;
                         }
                     }
+                    if (clicked) break;
                 }
+                if (clicked) return 'ok-clicked';
                 for (const tag of ['el-button', 'button', 'a']) {
                     const btns = item.querySelectorAll(tag);
                     for (const btn of btns) {
@@ -293,9 +317,10 @@ class FillEngine(_FormActionEngineBase):
                         btn.click(); return 'ok-clicked';
                     }
                 }
-                return 'no-adjacent-button-found';
+                // No button in this item — continue to the next match instead of
+                // giving up (the real button may live in a same-prefix sibling).
             }
-            return 'label-not-found';
+            return matchedAny ? 'no-adjacent-button-found' : 'label-not-found';
         }''', [label_text])
         if _is_ok_result(result):
             _record_action(
@@ -445,6 +470,48 @@ class SelectEngine(_FormActionEngineBase):
                 _record_action('select_option', params, recheck, element=element)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', self.business_data_store))
             failed = await _final_select_failure('no-items', xp)
+            return _err(failed)
+        elif str(select_result).startswith('value-mismatch'):
+            # SELECT_VERIFY_READBACK — JS_SELECT_OPTION clicked an option but the
+            # trigger input read back a different value (same-prefix field wrote
+            # the wrong select, e.g. 国民经济部门 option into 国民经济部门类别).
+            # Reset the select UI, re-trigger, and retry once with the same
+            # option_text. Still mismatch → hand off to heal.
+            mismatch_retry_key = f'_sel_mismatch_retry_{label_text}'
+            mismatch_retries = self.business_data_store.get(mismatch_retry_key, 0) + 1
+            self.business_data_store[mismatch_retry_key] = mismatch_retries
+            if mismatch_retries > 1:
+                self.business_data_store.pop(mismatch_retry_key, None)
+                failed = await _final_select_failure(str(select_result), xp)
+                return _err(failed)
+            reset_diag = await reset_select_ui(page)
+            if not reset_diag.get('closed', False):
+                sys.stderr.write(
+                    f'[select] value-mismatch reset incomplete: {reset_diag}\n'
+                )
+                sys.stderr.flush()
+                failed = await _final_select_failure(str(select_result), xp)
+                return _err(failed)
+            retrigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
+            if _is_ok_result(str(retrigger)):
+                await page.wait_for_timeout(500)
+                retry_result = await page.evaluate(JS_SELECT_OPTION, option_text)
+                if _is_ok_result(retry_result):
+                    self.business_data_store.pop(mismatch_retry_key, None)
+                    matched_text = retry_result.split(':', 1)[1] if ':' in retry_result else retry_result
+                    stamped = resolve_recorded_option_text(option_text, matched_text)
+                    params['option_text'] = stamped
+                    params, element = attach_select_options(params, element, params.get('options'))
+                    _record_action('select_option', params, matched_text, element=element)
+                    _task_done_impl(
+                        label_text, self.business_data_store, value=stamped or option_text, xpath_smart=xp_inv,
+                    )
+                    return _ok(_with_submit_cue(f'ok | {matched_text} | mismatch-retry', self.business_data_store))
+                # Retry still mismatch / other failure → heal.
+                self.business_data_store.pop(mismatch_retry_key, None)
+                failed = await _final_select_failure(str(retry_result), xp)
+                return _err(failed)
+            failed = await _final_select_failure(str(select_result), xp)
             return _err(failed)
         elif select_result.startswith('option-not-found:'):
             # Fuzzy: pick listed option that contains / is contained by option_text

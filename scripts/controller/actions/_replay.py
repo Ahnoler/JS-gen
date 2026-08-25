@@ -311,6 +311,53 @@ def _locate_hint(result: str) -> str:
         return 'ok'
     return 'n/a'
 
+
+def _xpath_literal(text: str) -> str:
+    """XPath 1.0 string literal — mirrors JS xpathLiteral in PAGE_LOCATOR_HELPERS."""
+    t = str(text or '')
+    if "'" not in t:
+        return "'" + t + "'"
+    if '"' not in t:
+        return '"' + t + '"'
+    parts = t.split("'")
+    return "concat(" + ", '\"', ".join("'" + p + "'" for p in parts) + ")"
+
+
+async def _replay_table_row_button_anchor(page, row_text: str, btn_text: str) -> str:
+    """Row-anchor xpath first try for click_table_row_button.
+
+    Locate //tr[.//*[normalize-space()=<row_text>]]//button[normalize-space()=<btn_text>]
+    and click the first visible match. Returns an ok* string or '' when no match.
+    Falls back to el-button/a hosts (same leaf set as buildLocatorSnap table_row_button).
+    """
+    if not row_text or not btn_text:
+        return ''
+    row_lit = _xpath_literal(row_text)
+    btn_lit = _xpath_literal(btn_text)
+    xp = (
+        "//tr[.//*[normalize-space()=" + row_lit + "]]"
+        + "//*[self::button or self::a or contains(concat(' ',normalize-space(@class),' '),' el-button ')]"
+        + "[normalize-space()=" + btn_lit + "]"
+    )
+    try:
+        result = await page.evaluate(
+            '''(xp) => {
+                try {
+                    const snap = document.evaluate(xp, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+                    for (let i = 0; i < snap.snapshotLength; i++) {
+                        const el = snap.snapshotItem(i);
+                        if (el && el.offsetParent !== null) { el.click(); return 'ok-row-anchor'; }
+                    }
+                } catch (e) {}
+                return '';
+            }''',
+            [xp],
+        )
+        return str(result or '')
+    except Exception:
+        return ''
+
+
 async def _replay_controller_action(act, params: dict) -> str:
     """Non-form actions via controller registry (menu/table/dialog/login/…)."""
     kwargs = _filter_callable_kwargs(act.function, params)
@@ -397,7 +444,21 @@ async def replay_action_entries(
                             click_params['text'] = params.get('button_text') or params.get('text') or ''
                         elif action_name == 'click_adjacent_button':
                             click_params['text'] = params.get('text') or params.get('label_text') or ''
-                        if _element_xpath_smart(entry) or click_params.get('text'):
+                        # click_table_row_button: try row-anchor xpath first (unique-key
+                        # row text disambiguates same-named rows), then durable fallback.
+                        if action_name == 'click_table_row_button':
+                            _row_t = str(params.get('row_text') or '').strip()
+                            _btn_t = str(params.get('button_text') or params.get('text') or '').strip()
+                            if _row_t and _btn_t:
+                                anchor = await _replay_table_row_button_anchor(page, _row_t, _btn_t)
+                                if _result_ok(action_name, anchor):
+                                    result = anchor
+                                    sys.stderr.write(
+                                        f'[replay] click_table_row_button row-anchor ok '
+                                        f'(row={_row_t!r} btn={_btn_t!r})\n'
+                                    )
+                                    sys.stderr.flush()
+                        if result is None and (_element_xpath_smart(entry) or click_params.get('text')):
                             result = await _replay_click_by_index(page, entry, click_params)
                             # close_dialog: dialog-scoped xpath often misses drawers
                             # (Element UI reuses i.el-dialog__close inside drawer).

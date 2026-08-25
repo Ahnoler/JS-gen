@@ -27,8 +27,13 @@ export const CTRL_PART_TABLE = `  waitForLoading: () => new Promise(resolve => {
     return count > 0 ? 'ok:' + count : 'no-address-fields';
   },
 	  clickTableRowButton: (rowText, btnText) => {
-		    for (const row of document.querySelectorAll('.el-table__body-wrapper .el-table__row')) {
-		      if (!row.textContent.includes(rowText)) continue;
+	    const _cellTexts = (row) => { const cs = row.querySelectorAll('td, .el-table__cell'); const out = []; for (const c of cs) { const t = (c.innerText || c.textContent || '').trim().replace(/\s+/g, ' '); if (t && t !== 'radio' && t !== 'checkbox') out.push(t); } return out; };
+	    const _rows = document.querySelectorAll('.el-table__body-wrapper .el-table__row');
+	    let row = null;
+	    for (const r of _rows) { const ts = _cellTexts(r); for (const t of ts) { if (t === rowText) { row = r; break; } } if (row) break; }
+	    if (!row) { for (const r of _rows) { if ((r.textContent || '').includes(rowText)) { row = r; break; } } }
+	    if (!row) return 'row-not-found';
+	    const _tryRow = (row) => {
 		      row.scrollIntoView({ block: 'center', behavior: 'instant' });
 	      for (const btn of row.querySelectorAll('button,.el-button,i[class*="icon"]')) {
 	        const t=btn.textContent?.trim()||'', c=btn.className||'';
@@ -38,8 +43,8 @@ export const CTRL_PART_TABLE = `  waitForLoading: () => new Promise(resolve => {
 	      if (btnText==='delete'||btnText==='删除') { const ic=row.querySelector('i.el-icon-delete,i[class*="shanchu"],i[class*="delete"]'); if (ic&&ic.offsetParent!==null) { ic.click(); return 'ok-icon'; } }
 	      for (const btn of row.querySelectorAll('button,.el-button')) { if (btn.offsetParent!==null) { btn.click(); return 'ok-fallback'; } }
 	      return 'button-not-found';
-	    }
-	    return 'row-not-found';
+	    };
+	    return _tryRow(row);
 	  },
 	  clickTableRowRadio: (rowText) => {
 	    if (!rowText) return 'row-text-empty';
@@ -55,12 +60,14 @@ export const CTRL_PART_TABLE = `  waitForLoading: () => new Promise(resolve => {
 	      return true;
 	    };
 	    const wantFirst = /^(first|1st|第一个|第一项|首行)$/i.test(String(rowText).trim());
+	    const _rcellTexts = (row) => { const cs = row.querySelectorAll('td, .el-table__cell'); const out = []; for (const c of cs) { const t = (c.innerText || c.textContent || '').trim().replace(/\s+/g, ' '); if (t && t !== 'radio' && t !== 'checkbox') out.push(t); } return out; };
+	    const _rowMatches = (row) => { if (wantFirst) return true; const ts = _rcellTexts(row); for (const t of ts) { if (t === rowText) return true; } return (row.textContent || '').includes(rowText); };
 	    const tables = document.querySelectorAll('.el-table');
 	    for (const table of tables) {
 	      const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr.el-table__row, .el-table__body-wrapper tbody tr');
 	      for (let i = 0; i < bodyRows.length; i++) {
 	        const row = bodyRows[i];
-	        if (!wantFirst && !(row.textContent || '').includes(rowText)) continue;
+	        if (!_rowMatches(row)) continue;
 	        row.scrollIntoView({ block: 'center', behavior: 'instant' });
 	        let radio = pickSel(row);
 	        if (!radio) {

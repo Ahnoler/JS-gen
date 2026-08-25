@@ -98,6 +98,11 @@ ${PAGE_LOCATOR_HELPERS}
       if (!raw || raw === 'radio' || raw === 'checkbox') return '';
       return raw.slice(0, 80);
     }
+    // Unique-key column priority: prefer a customer-number (14-18 digits) or
+    // unified social-credit code (18 uppercase alphanumerics) over an easily
+    // duplicated name cell so same-named rows disambiguate by unique key.
+    const uniqueKey = parts.find((p) => /^\\d{14,18}$/.test(p) || /^[0-9A-Z]{18}$/.test(p));
+    if (uniqueKey) return String(uniqueKey).slice(0, 80);
     const best = parts.find((p) => p.length >= 2 && !/^(操作|编辑|删除|修改|查看|详情)$/.test(p)) || parts[0];
     return String(best || '').slice(0, 80);
   }

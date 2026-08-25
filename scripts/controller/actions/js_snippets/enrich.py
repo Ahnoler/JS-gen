@@ -6,15 +6,26 @@ from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
 
 JS_ENRICH_CLICK_LOCATOR = '''([xpath, text, tagHint, targetKindHint, formLabelHint]) => {
 ''' + PAGE_LOCATOR_HELPERS + '''
-  function resolveByXpath(xp) {
+  function resolveXpathAny(xp) {
     if (!xp) return null;
     let s = String(xp);
     if (s && !s.startsWith('/') && !s.startsWith('(')) s = '/' + s;
-    try {
-      return document.evaluate(s, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-    } catch (e) {
-      return null;
+    // Try the expression as-is, then with leading-slash normalization and /html root prefix.
+    const candidates = [s];
+    if (s.charAt(0) === '/' && s.charAt(1) !== '/' && s.indexOf('/html') !== 0) {
+      candidates.push('/' + s);
+      candidates.push('/html' + s);
     }
+    for (let i = 0; i < candidates.length; i++) {
+      try {
+        const n = document.evaluate(candidates[i], document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        if (n) return n;
+      } catch (e) { /* try next candidate */ }
+    }
+    return null;
+  }
+  function resolveByXpath(xp) {
+    return resolveXpathAny(xp);
   }
   function findByText(want, tagHint) {
     want = normalizeControlText(want);
@@ -55,6 +66,30 @@ JS_ENRICH_CLICK_LOCATOR = '''([xpath, text, tagHint, targetKindHint, formLabelHi
   const abs = absXPath(el);
   const loc = buildLocatorSnap(el, t, abs, formLbl, { targetKind: kindHint || undefined });
   const reg = assignRegion(el);
+  // Unique-key row text for table-row controls (same priority as buildLocatorSnap
+  // table_row_button/radio): prefer a customer-number (14-18 digits) or unified
+  // social-credit code (18 uppercase alphanumerics) so same-named rows disambiguate.
+  let rowText = '';
+  const tk = String(loc.target_kind || kindHint || '');
+  if (tk === 'table_row_button' || tk === 'table_row_radio') {
+    const rowEl = el.closest && el.closest('tr, .el-table__row');
+    if (rowEl) {
+      const cells = rowEl.querySelectorAll('td, .el-table__cell');
+      for (let i = 0; i < cells.length; i++) {
+        const ct = normalizeControlText(cells[i].innerText || cells[i].textContent || '');
+        if (ct && (/^\\d{14,18}$/.test(ct) || /^[0-9A-Z]{18}$/.test(ct))) { rowText = ct; break; }
+      }
+      if (!rowText) {
+        for (let i = 0; i < cells.length; i++) {
+          const cell = cells[i];
+          const ct = normalizeControlText(cell.innerText || cell.textContent || '');
+          const hasSelect = !!cell.querySelector('.el-checkbox, .el-radio, input[type="checkbox"], input[type="radio"]');
+          if (hasSelect && !ct) continue;
+          if (ct && ct.length >= 2 && ct.length <= 48) { rowText = ct; break; }
+        }
+      }
+    }
+  }
   return {
     tag_name: loc.tag || (el.tagName || '').toLowerCase(),
     xpath: loc.xpath || abs,
@@ -68,6 +103,7 @@ JS_ENRICH_CLICK_LOCATOR = '''([xpath, text, tagHint, targetKindHint, formLabelHi
     attr: loc.attr || undefined,
     candidates: loc.candidates || [],
     target_kind: loc.target_kind,
+    row_text: rowText || '',
     region_id: reg.region_id || '',
     region_label: reg.region_label || '',
     layers: Array.isArray(reg.layers) ? reg.layers : [],

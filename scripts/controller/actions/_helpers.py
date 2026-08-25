@@ -357,6 +357,7 @@ async def _enrich_click_element(
         'text': (text or '').strip()[:80],
         'target_kind': target_kind or '',
         'formLabel': form_label or '',
+        'row_text': '',
     }
     try:
         raw = await page.evaluate(
@@ -383,6 +384,7 @@ async def _enrich_click_element(
             'candidates': info.get('candidates') if isinstance(info.get('candidates'), list) else [],
             'formLabel': info.get('formLabel') or form_label or '',
             'target_kind': info.get('target_kind') or target_kind or '',
+            'row_text': (info.get('row_text') or '').strip()[:80],
             'region_id': info.get('region_id') or '',
             'region_label': info.get('region_label') or '',
             'layers': info.get('layers') if isinstance(info.get('layers'), list) else [],

@@ -123,7 +123,51 @@ JS_SELECT_OPTION = '''async (arg) => {
         return visibleItems.length > 0 ? visibleItems : [...items];
     };
     const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
-    const tryClick = (item) => {
+    const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
+    /* SELECT_VERIFY_READBACK — after click, read back the el-select trigger
+       input value (Element UI sets it to the selected option's label) and
+       compare against the expected option. Catches mismatched writes where
+       the clicked option label differs from what the field actually accepted
+       (e.g. same-prefix fields: 国民经济部门 vs 国民经济部门类别).
+       Returns 'ok:<label>' on match, or
+       'value-mismatch | expected:<option> | current:<readback>' on mismatch. */
+    const readbackSelectedText = () => {
+        if (triggerInput) {
+            const v = norm(triggerInput.value);
+            if (v) return v;
+            // Fallback: selected item text inside the el-select wrapper.
+            const wrap = triggerInput.closest('.el-select');
+            if (wrap) {
+                const sel = wrap.querySelector('.el-select__selected-item, .el-select__input');
+                if (sel) {
+                    const sv = norm(sel.textContent || sel.value);
+                    if (sv) return sv;
+                }
+            }
+        }
+        return '';
+    };
+    const verifyAfterClick = async (clickedLabel) => {
+        await sleep(250);
+        const current = readbackSelectedText();
+        if (!current) {
+            // Could not read back (e.g. table-row select without trigger input).
+            // Trust the click — no false mismatch on unreadable controls.
+            return 'ok:' + clickedLabel;
+        }
+        if (exactOnly) {
+            if (current === option) return 'ok:' + clickedLabel;
+        } else {
+            // Normalized equality; also accept when readback starts with the
+            // expected option (table-select glues name+id into the trigger).
+            if (current === option
+                || (current.startsWith(option) && /^\\d/.test(current.slice(option.length)))) {
+                return 'ok:' + clickedLabel;
+            }
+        }
+        return 'value-mismatch | expected:' + option + ' | current:' + current;
+    };
+    const tryClick = async (item) => {
         item.scrollIntoView({ block: 'nearest' });
         const t = optionLabel(item);
         const clickEl = (item.tagName === 'TR')
@@ -139,14 +183,14 @@ JS_SELECT_OPTION = '''async (arg) => {
                 window.__last_select_trigger = null;
             }, 0);
         }
-        return 'ok:' + t;
+        return await verifyAfterClick(t);
     };
-    const matchInPool = (pickPool) => {
+    const matchInPool = async (pickPool) => {
         if (!exactOnly && FIRST_ALIASES.includes(option.toLowerCase().trim())) {
-            return tryClick(pickPool[0]);
+            return await tryClick(pickPool[0]);
         }
         for (const item of pickPool) {
-            if (labelMatches(optionLabel(item), option)) return tryClick(item);
+            if (labelMatches(optionLabel(item), option)) return await tryClick(item);
         }
         if (!exactOnly) {
             // Prefer shortest lab that contains want — avoids 非金融 matching 其他非金融
@@ -160,7 +204,7 @@ JS_SELECT_OPTION = '''async (arg) => {
                     bestLen = lab.length;
                 }
             }
-            if (best) return tryClick(best);
+            if (best) return await tryClick(best);
         }
         return null;
     };
@@ -176,7 +220,7 @@ JS_SELECT_OPTION = '''async (arg) => {
         }
     }
     if (pickPool.length === 0) return 'no-items';
-    let hit = matchInPool(pickPool);
+    let hit = await matchInPool(pickPool);
     if (hit) return hit;
 
     /* SELECT_LAZY_LOAD_ON_MISS */
@@ -215,13 +259,13 @@ JS_SELECT_OPTION = '''async (arg) => {
                 }
                 if (stableStreak >= 2) break;
             }
-            hit = matchInPool(pickPool);
+            hit = await matchInPool(pickPool);
             if (hit) return hit;
         }
     } catch (e) {
         items = collectItems();
         pickPool = buildPool(items);
-        hit = matchInPool(pickPool);
+        hit = await matchInPool(pickPool);
         if (hit) return hit;
     }
 
