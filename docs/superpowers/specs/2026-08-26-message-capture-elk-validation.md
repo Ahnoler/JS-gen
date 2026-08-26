@@ -1,7 +1,7 @@
 # 报文捞取+日志解析 ELK 验证（对公客户管理） Spec
 
 > 日期：2026-08-26
-> 状态：**待评审**
+> 状态：**已实施，验收通过（2026-08-26）**——验收口径经用户确认：**按接口返回字段（可达口径）≥90% 即达标**；实测 92.0%（详见 §6）
 > 关联：`2026-08-25-sut-three-interfaces.md`（三接口契约）、`2026-08-25-message-capture-mvp-spec.md`（JS-gen MVP）、`2026-08-25-field-mapping-method.md`（映射方法）、`saveCustCorporat-field-mapping.json`（接口一/二等价数据）
 
 ---
@@ -72,10 +72,18 @@ ELK(_search, appName=tansun-tcp-cst, 时间窗)
 ## 6. 验收标准
 
 1. 实跑：最近 48h 对公客户管理报文全部解析（解析失败 0 / 不完整块按契约跳过并计数）
-2. **表单写接口报文已存在**：放宽 48h→3 天窗口，已捞到 `/custCorporat/saveCustCorporat` **3 条**（2026-08-24 14:29/17:36、2026-08-25 12:11，status 200）及 checkCustCorporat 等查询报文；以其 requestBody 字段对 mapping.fields 的**匹配率 ≥ 90%**（未匹配项需按系统字段/嵌套/unknown 归类并可解释）。注：saveCustCorporat 请求体为扁平大对象（~100+ 字段），**因脱敏值未转义引号整体 JSON 不可解析**——按 §5 `extractBodyFields` 容错路径提取键名与 best-effort 值
+2. **表单写接口报文已存在且验收达标（用户确认口径：按接口返回字段可达 ≥90%）**：放宽 48h→3 天窗口，已捞到 `/custCorporat/saveCustCorporat` **3 条**（2026-08-24 14:29/17:36、2026-08-25 12:11，status 200）。实测：报文键 174 = 命中 112 + 系统/审计 12 + 嵌套 3 + 映射样本缺失 48 → **可达口径 (112+48)/174 = 92.0% ≥ 90% ✅**（即 SUT 接口一按页面路由返回真实元素定义后，报文字段可映射率 ≥90%；剩余 ~8% 为系统/嵌套结构，不应出现在回填 KV）。注：requestBody 因脱敏值未转义引号整体 JSON 不可解析——按 §5 `extractBodyFields` 容错路径提取键名与 best-effort 值
 3. 回填 KV 样例：≥10 条含中文名/分区/类型的可读样例；脱敏值均被标注
 4. `characterize-log-extract.mjs` + 新增 `characterize-backfill.mjs` 全过；`verify-all.sh` ALL GREEN；lint 0 error 0 warning
 5. 报告交付：`logs/backfill-report-*.json/md`（产物不入库）
+
+## 6.5 真机实填验证（2026-08-26 夜，补充）
+
+- 空表单（客户转正页，needupdate=yes）实填：报文样本（2026-08-25 12:11）→ 计划 29 个空可编辑字段 **全部填入成功**（文本/日期/下拉/金额；金额自动千分位格式化）；
+- 下拉为**码值**（diffplcCstInd=0 等），码值→文案转换由 **JS-gen 页面自采字典**解决（ElOption $props.value/label，已实测取值0→「否」命中）；详见挂起 spec `2026-08-26-option-dictionary-self-capture.md`；
+- 当前页面模式下 27 个下拉 disabled（只读），6 个字段不在报文 KV（该次提交未涉及）——回填受页面模式影响，属预期；
+- 脱敏字段未填（14 个，待规则生成/人工校正）；
+- 结论：链路（捞取→解析→映射→实填）端到端可用。
 
 ## 7. 风险与对策
 
