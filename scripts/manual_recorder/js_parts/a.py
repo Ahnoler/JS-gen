@@ -28,10 +28,10 @@ JS_MANUAL_PART_A = r'''(() => {
 
   function xpathOf(el) {
     if (!el || el.nodeType !== 1) return '';
-    if (el.id) return '//*[@id="' + el.id + '"]';
+    if (el.id && !isGeneratedId(el.id)) return '//*[@id="' + el.id + '"]';
     const parts = [];
     let cur = el;
-    while (cur && cur.nodeType === 1 && cur !== document.body) {
+    while (cur && cur.nodeType === 1 && cur !== document.documentElement) {
       let ix = 1;
       let sib = cur.previousElementSibling;
       while (sib) {
@@ -41,7 +41,7 @@ JS_MANUAL_PART_A = r'''(() => {
       parts.unshift(cur.tagName.toLowerCase() + '[' + ix + ']');
       cur = cur.parentElement;
     }
-    return '/' + parts.join('/');
+    return '/html' + (parts.length ? '/' + parts.join('/') : '');
   }
 
   // Same algorithm as browser_use/dom/buildDomTree.js getXPathTree(el, true)

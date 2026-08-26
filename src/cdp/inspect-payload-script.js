@@ -10,10 +10,10 @@ export const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
 
   function xpathOf(node) {
     if (!node || node.nodeType !== 1) return '';
-    if (node.id) return '//*[@id="' + node.id + '"]';
+    if (node.id && !isGeneratedId(node.id)) return '//*[@id="' + node.id + '"]';
     const parts = [];
     let cur = node;
-    while (cur && cur.nodeType === 1 && cur !== document.body) {
+    while (cur && cur.nodeType === 1 && cur !== document.documentElement) {
       let ix = 1;
       let sib = cur.previousElementSibling;
       while (sib) {
@@ -23,7 +23,7 @@ export const BUILD_PAYLOAD_FN = `function(clientX, clientY) {
       parts.unshift(cur.tagName.toLowerCase() + '[' + ix + ']');
       cur = cur.parentElement;
     }
-    return '/' + parts.join('/');
+    return '/html' + (parts.length ? '/' + parts.join('/') : '');
   }
 
   function buElementPosition(currentElement) {
