@@ -161,16 +161,12 @@ JS_MANUAL_PART_B = r'''
           ingest(vm.$data && vm.$data.options);
         }
       } catch (e) {}
-      const meta = elMeta(opt, optionText, 'form_select');
       emit(Object.assign({
         kind: 'select_option',
         label_text: label,
         option_text: optionText,
         options: options,
-        tag: meta.tag || 'li',
-        attributes: meta.attributes || attrs(opt),
-        text: optionText,
-      }, meta));
+      }, elMeta(opt, optionText, 'form_select')));
       return;
     }
 
@@ -298,15 +294,11 @@ JS_MANUAL_PART_B = r'''
     if (radio) {
       const label = formItemLabel(radio);
       const optionText = visibleText(radio);
-      const meta = elMeta(radio, optionText, 'form_radio');
       emit(Object.assign({
         kind: 'click_radio',
         label_text: label,
         option_text: optionText,
-        tag: meta.tag || radio.tagName.toLowerCase(),
-        attributes: meta.attributes || attrs(radio),
-        text: optionText,
-      }, meta));
+      }, elMeta(radio, optionText, 'form_radio')));
       return;
     }
 
@@ -314,26 +306,20 @@ JS_MANUAL_PART_B = r'''
     const tab = el.closest('.el-tabs__item');
     if (tab) {
       const tabText = visibleText(tab);
-      const meta = elMeta(tab, tabText, 'tab');
       emit(Object.assign({
         kind: 'switch_tab',
         tab_name: tabText,
-        tag: meta.tag || tab.tagName.toLowerCase(),
-        attributes: meta.attributes || attrs(tab),
-        text: tabText,
-      }, meta));
+      }, elMeta(tab, tabText, 'tab')));
       return;
     }
 
-    // dialog close
-    if (el.closest('.el-dialog__headerbtn, .el-drawer__close-btn')) {
-      const meta = elMeta(el, 'close', 'dialog_close');
+    // dialog close — pass the headerbtn/drawer-close container (not the inner <i>) to elMeta,
+    // aligning with AI-side src/cdp/inspect-payload-script.js
+    const closeBtn = el.closest('.el-dialog__headerbtn, .el-drawer__close-btn');
+    if (closeBtn) {
       emit(Object.assign({
         kind: 'close_dialog',
-        tag: meta.tag || el.tagName.toLowerCase(),
-        attributes: meta.attributes || attrs(el),
-        text: '',
-      }, meta));
+      }, elMeta(closeBtn, 'close', 'dialog_close')));
       return;
     }
 
