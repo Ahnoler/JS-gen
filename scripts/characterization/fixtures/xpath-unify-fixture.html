@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>xpath three-sources unify fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 16px; }
+    .el-form { margin: 12px 0; }
+    .el-form-item { margin: 12px 0; display: flex; align-items: center; gap: 8px; }
+    .el-form-item__label { width: 96px; }
+    .el-form-item__content { display: inline-flex; align-items: center; }
+    .el-input { display: inline-flex; align-items: center; }
+    .el-input__inner { min-width: 200px; padding: 4px 8px; }
+    .el-textarea__inner { min-width: 200px; padding: 4px 8px; }
+    .el-select { display: inline-flex; align-items: center; border: 1px solid #ccc; padding: 4px 8px; min-width: 200px; }
+    .el-radio-group label { margin-right: 8px; }
+    .el-radio { display: inline-flex; align-items: center; margin-right: 8px; }
+    .el-tabs__nav { display: flex; gap: 4px; }
+    .el-tabs__item { display: inline-block; padding: 6px 10px; border: 1px solid #ddd; cursor: pointer; }
+    .el-tabs__item.is-active { background: #eef; }
+    .el-tabs__content { margin-top: 8px; }
+    .el-card { border: 1px solid #ddd; margin: 12px 0; }
+    .el-card__header { padding: 8px 12px; background: #f5f5f5; font-weight: bold; }
+    .el-card__body { padding: 12px; }
+    .el-button { padding: 4px 10px; cursor: pointer; border: 1px solid #ccc; background: #fff; }
+    .el-dialog { border: 1px solid #999; padding: 12px; margin-top: 16px; position: relative; }
+    .el-dialog__header { display: flex; align-items: center; justify-content: space-between; }
+    .el-dialog__title { font-weight: bold; }
+    .el-dialog__headerbtn { position: absolute; right: 8px; top: 8px; cursor: pointer; }
+    .el-icon-close::before { content: "×"; }
+  </style>
+</head>
+<body>
+
+  <!-- Scenario 1: el-form-item with real <label> "客户名称" + input -->
+  <form class="el-form">
+    <div class="el-form-item">
+      <label class="el-form-item__label">客户名称</label>
+      <div class="el-form-item__content">
+        <div class="el-input">
+          <input id="cust-name" data-testid="cust-name" class="el-input__inner" type="text" value="" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Scenario 2: no label, only placeholder (login scenario) -->
+    <div class="el-form-item">
+      <div class="el-form-item__content">
+        <div class="el-input">
+          <input id="login-user" data-testid="login-user" class="el-input__inner" type="text" placeholder="请输入用户名" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Scenario 3: el-select control with label "所属机构" -->
+    <div class="el-form-item">
+      <label class="el-form-item__label">所属机构</label>
+      <div class="el-form-item__content">
+        <div class="el-select">
+          <div class="el-input">
+            <input id="crop-select" data-testid="crop-select" class="el-input__inner" type="text" readonly value="" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scenario 4: el-radio-group with two radios -->
+    <div class="el-form-item">
+      <label class="el-form-item__label">客户类型</label>
+      <div class="el-form-item__content">
+        <div class="el-radio-group">
+          <label class="el-radio">
+            <span class="el-radio__input"><input type="radio" name="ctype" value="1" /></span>
+            <span class="el-radio__label" id="radio-1" data-testid="radio-1">对公</span>
+          </label>
+          <label class="el-radio">
+            <span class="el-radio__input"><input type="radio" name="ctype" value="2" /></span>
+            <span class="el-radio__label">个人</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <!-- Scenario 7 & 8: two same-name "保存" buttons in different el-card regions -->
+  <div class="el-card">
+    <div class="el-card__header">基本信息</div>
+    <div class="el-card__body">
+      <form class="el-form">
+        <div class="el-form-item">
+          <label class="el-form-item__label">名称</label>
+          <div class="el-form-item__content">
+            <div class="el-input">
+              <input class="el-input__inner" type="text" />
+            </div>
+          </div>
+        </div>
+        <button id="save-1" data-testid="save-1" class="el-button" type="button">保存</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="el-card">
+    <div class="el-card__header">附加信息</div>
+    <div class="el-card__body">
+      <form class="el-form">
+        <div class="el-form-item">
+          <label class="el-form-item__label">备注</label>
+          <div class="el-form-item__content">
+            <div class="el-input">
+              <input class="el-input__inner" type="text" />
+            </div>
+          </div>
+        </div>
+        <button id="save-2" data-testid="save-2" class="el-button" type="button">保存</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scenario 9: el-tabs with two el-tabs__item -->
+  <div class="el-tabs">
+    <div class="el-tabs__header">
+      <div class="el-tabs__nav">
+        <div id="tab-1" data-testid="tab-1" class="el-tabs__item is-active">基本信息</div>
+        <div class="el-tabs__item">详细资料</div>
+      </div>
+    </div>
+    <div class="el-tabs__content">
+      <div class="el-tab-pane">tab content</div>
+    </div>
+  </div>
+
+  <!-- Scenario 5 & 6: dialog with form + close button -->
+  <div class="el-dialog__wrapper">
+    <div class="el-dialog">
+      <div class="el-dialog__header">
+        <span class="el-dialog__title">审批</span>
+        <button class="el-dialog__headerbtn" type="button">
+          <i id="dialog-close" data-testid="dialog-close" class="el-dialog__close el-icon-close"></i>
+        </button>
+      </div>
+      <div class="el-dialog__body">
+        <form class="el-form">
+          <div class="el-form-item">
+            <label class="el-form-item__label">审批意见</label>
+            <div class="el-form-item__content">
+              <div class="el-input">
+                <input id="dialog-input" data-testid="dialog-input" class="el-input__inner" type="text" />
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
