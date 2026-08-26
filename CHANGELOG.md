@@ -59,6 +59,11 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py, scripts/characterization/characterize-login-locator-fallback.py, scripts/refactor/verify-all.sh
   Python 同步提示：Python mirror 已同步（同文件改动）；控制面/前端无需感知。
 
+- 2026-08-26: **修复 region 提取函数中 5 处单反斜杠 `\s` 转义 bug**：`src/cdp/page-locator-helpers.js` 的 `PAGE_LOCATOR_HELPERS` 是 JS 模板字面量，源码单反斜杠 `\s` 求值后变成字母 `s`（非空白类），`/\s+/` 求值后变成 `/s+/g`（匹配字母 s 而非空白）——导致 `buildFeatureCard` 的 class token 分割（`cls.split(/\s+/)`）与标题/region_label 空白归一化（`.replace(/\s+/g, ' ')`）失效。修复：L644/L648/L654/L666/L670 共 5 处的 `/\s+/`、`/\s+/g` 改为 `\\s` 写法（源码两个反斜杠，模板求值后为 `\s`，正则恢复匹配空白）。同文件其它处（L35/L59 等）已是正确 `\\s`，对照未改。
+  影响范围：JS 定位器内核（`src/cdp/page-locator-helpers.js`）+ Python mirror（生成物）。class token 分割与标题空白归一化恢复正常。无 schema/路由/WS 变更。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py（生成，经 scripts/_gen_locator_helpers_py.mjs）
+  Python 同步提示：`_locator_helpers_js.py` 由 JS 生成器再生成，Python 端勿手改；控制面/前端无需感知。
+
 ### Changed
 
 - 2026-08-25: **V3 控件条目新增 `attr` 字段（disabled/required/readonly）**：录制侧新增 V3 控件布尔属性采集——JS `collectAttrFlags` 显式采集 disabled/required/readonly 三键布尔（HTML 布尔属性被 `collectAttrs` 的空值过滤丢弃，此前根本采不到，只能采到字符串属性）；Python 侧 `_helpers.py` 的 `_capture_element` / `_enrich_click_element` 透传 `attr`，`ElementInfo` 新增 `attr` 字段，`to_element_json` 输出，`from_record` 白名单搬运；Node `copyLocatorMeta` 保留 attr；V3 object 节点恒有 `attr`（三键布尔，旧数据回退 `{}`）。伙伴出站 `toPartnerImportPayload` 剥除 attr（本地/replay 元数据，确认伙伴认后再放开）。
