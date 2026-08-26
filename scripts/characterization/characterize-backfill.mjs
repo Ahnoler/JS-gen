@@ -59,6 +59,8 @@ check('b extract reliable true', validExtract.fields.every((f) => f.reliable ===
 const validKv = buildBackfillKv(validRec, mapping);
 check('b kv count 3 (all hit)', validKv.kv.length === 3, 'kv=' + JSON.stringify(validKv.kv.map((k) => k.prop)));
 check('b coverage 1', validKv.coverage === 1, 'coverage=' + validKv.coverage);
+check('b kv display from mapping', validKv.kv.find((k) => k.prop === 'cpctTp')?.display === '企业类', 'display=' + validKv.kv.find((k) => k.prop === 'cpctTp')?.display);
+check('b kv disabled null when absent', validKv.kv.find((k) => k.prop === 'cpctTp')?.disabled === null, 'disabled=' + validKv.kv.find((k) => k.prop === 'cpctTp')?.disabled);
 
 // c) 字符串非法 JSON（掩码含裸引号）→ 键名提取成功含 crdtNo,cstNm，reliable:false，bodyParseable:false
 const brokenJson = '{"crdtNo":"913301****7XW8T3R","cstNm":""****"公司"}';

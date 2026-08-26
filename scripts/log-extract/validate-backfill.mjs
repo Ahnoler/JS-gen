@@ -170,7 +170,7 @@ function isMaskedValue(value) {
  * reason:"system"；嵌套值 → reason:"nested"；其余 → unknown。coverage = 命中数/总键数。
  * @param {object} record ELK 输出记录（仅使用 requestBody）
  * @param {object} mapping 字段映射样本
- * @returns {{kv: Array<{prop:string,label:(string|null),section:(string|null),type:(string|null),value:unknown,masked:boolean,reliable:boolean}>, unmatched: Array<{key:string,reason:string}>, coverage: number, bodyParseable: boolean}} 回填对照结果
+ * @returns {{kv: Array<{prop:string,label:(string|null),section:(string|null),type:(string|null),display:(string|null),disabled:(boolean|null),value:unknown,masked:boolean,reliable:boolean}>, unmatched: Array<{key:string,reason:string}>, coverage: number, bodyParseable: boolean}} 回填对照结果
  */
 export function buildBackfillKv(record, mapping) {
   const fieldIndex = buildFieldIndex(mapping);
@@ -187,6 +187,8 @@ export function buildBackfillKv(record, mapping) {
         label: fieldDef.label ?? null,
         section: fieldDef.section ?? null,
         type: fieldDef.type ?? null,
+        display: fieldDef.display ?? null,
+        disabled: typeof fieldDef.disabled === 'boolean' ? fieldDef.disabled : null,
         value: f.value,
         masked: isMaskedValue(f.value),
         reliable: f.reliable,
@@ -343,6 +345,36 @@ function renderMarkdown(recordReports, summary, mappingPath) {
     lines.push('| ' + kv.prop + ' | ' + (kv.label ?? '') + ' | ' + (kv.type ?? '') + ' | ' + val + ' | ' + (kv.masked ? '是' : '否') + ' |');
   }
   lines.push('');
+  lines.push('## 命中/未命中三层对照示例（报文原文片段 | 映射定义 | 回填结果，首条命中记录）');
+  lines.push('');
+  const snippet = (body, key) => {
+    if (typeof body !== 'string') return '(非字符串 body)';
+    const marker = '"' + key + '"';
+    const i = body.indexOf(marker);
+    if (i < 0) return '(不在原文)';
+    let s = body.slice(i, i + 60);
+    if (body.length > i + 60) s += '…';
+    return s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  };
+  const defLabel = (k) => (k.section || '') + (k.section ? ' / ' : '') + (k.label || '') + (k.label ? ' / ' : '') + (k.type || '') + (k.display ? ' / ' + k.display : '') + (k.disabled === true ? ' / 禁用' : '');
+  const firstEntry = recordReports[0] || {};
+  const rawBody = typeof firstEntry.rawBody === 'string' ? firstEntry.rawBody : '';
+  lines.push('### 命中示例（前 15 条）');
+  lines.push('');
+  lines.push('| 报文键 | 报文原文片段 | 映射定义 | 回填值 | 脱敏 |');
+  lines.push('| --- | --- | --- | --- | --- |');
+  for (const k of (firstEntry.kv || []).slice(0, 15)) {
+    lines.push('| ' + k.prop + ' | ' + snippet(rawBody, k.prop) + ' | ' + defLabel(k) + ' | ' + String(k.value ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ') + ' | ' + (k.masked ? '是' : '否') + ' |');
+  }
+  lines.push('');
+  lines.push('### 未命中示例（前 10 条）');
+  lines.push('');
+  lines.push('| 报文键 | 报文原文片段 | 原因 |');
+  lines.push('| --- | --- | --- |');
+  for (const u of (firstEntry.unmatched || []).slice(0, 10)) {
+    lines.push('| ' + u.key + ' | ' + snippet(rawBody, u.key) + ' | ' + u.reason + ' |');
+  }
+  lines.push('');
   lines.push('## 未匹配 key 统计（top 20）');
   lines.push('');
   lines.push('| key | reason | 次数 |');
@@ -391,6 +423,7 @@ async function cli() {
         kv,
         unmatched,
         bodyParseable,
+        rawBody: typeof rec.requestBody === 'string' ? rec.requestBody : JSON.stringify(rec.requestBody ?? null),
       };
       recordReports.push(report);
       kvResults.push({ uri: rec.uri, method: rec.method, kv, unmatched, coverage, bodyParseable });
