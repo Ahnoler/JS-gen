@@ -75,7 +75,11 @@
 | 页面 ID | `pdCmptEcd` | 无 |
 | 菜单 xpath | 无 | 有 |
 
-**匹配率**：xlsx 菜单名精确匹配 JSON 活动 `umlNm` 仅 11 个；匹配 JSON 子领域 `umlNm` 135 个；完全未匹配 264 个。匹配率低是正常的——JSON 是业务建模视角，xlsx 是系统实际菜单视角，名称体系不同。找不到的菜单 `pdCmptEcd` 置空并提醒用户。
+**匹配逻辑**：xlsx 菜单名对应 JSON 的**叶子子领域**（没有子领域子节点、直接包含活动的最底层子领域），而非活动本身。叶子子领域 231 个，其中 189 个下只有一个 `pdCmptEcd`（唯一匹配），16 个下有 2 个，少数有更多。
+
+用叶子子领域匹配 xlsx 菜单的结果：119 个唯一匹配，2 个多匹配，289 个未匹配。未匹配的菜单 `pdCmptEcd` 置空并提醒用户"JSON 缺少此菜单"。
+
+**重要区分**：需要录制的是**实际系统顶部导航菜单**（xlsx 里的 24 一级 + 386 二级），不是 JSON 里深层的活动页面。JSON 中如"查看集团客户信息"/"维护集团客户信息"是业务流程中才出现的深层页面，不需要录制。
 
 ---
 
@@ -85,10 +89,16 @@
 
 **以实际系统菜单为准，JSON 做反向查找。**
 
-1. 在实际系统上录制菜单 xpath（模块级 + 功能级，共两级）
-2. 用菜单文本 grep JSON 的 `umlNm` / `pdCmptNm`，找到 `pdCmptEcd` 则存入，找不到则置空
+1. 在实际系统上录制顶部导航菜单 xpath（模块级 + 功能级，共两级）
+2. 用菜单文本匹配 JSON 的**叶子子领域**名称，取该子领域下活动的 `managePage.pdCmptEcd`
 3. `pdCmptEcd` 作为锚定 ID——菜单名称变了但 `pdCmptEcd` 不变，可保持交易父子关系
 4. 交易执行前按 `menu_xpath` 自动导航（仿照 `runDefaultLogin`）
+
+**匹配规则**：
+- 菜单文本 → JSON 叶子子领域 `umlNm` 精确匹配
+- 匹配到的叶子子领域下只有一个 `pdCmptEcd` → 直接存入
+- 匹配到的叶子子领域下有多个 `pdCmptEcd` → 暂存第一个（或按 `pdCmptNm` 二次匹配），记录提醒
+- 未匹配 → `pdCmptEcd` 置空，记录提醒用户"JSON 缺少此菜单"
 
 ### 3.2 菜单 JSON 导入 — 两种场景
 
@@ -96,9 +106,11 @@
 
 ```
 实际系统菜单（已录制 xpath）
-  → 用菜单文本 grep JSON（umlNm / pdCmptNm）
-  → 找到 pdCmptEcd → 存入 system.pd_cmpt_ecd
-  → 找不到 → 置空，记录日志提醒用户"JSON 缺少此菜单"
+  → 用菜单文本匹配 JSON 叶子子领域 umlNm
+  → 取该子领域下活动的 managePage.pdCmptEcd
+  → 唯一匹配 → 存入 system.pd_cmpt_ecd
+  → 多匹配 → 暂存第一个 + 记录提醒
+  → 未匹配 → 置空，记录日志提醒用户"JSON 缺少此菜单"
 ```
 
 #### 更新导入（第二次及以上）
@@ -110,8 +122,8 @@ P1（优先）：已有菜单的 pdCmptEcd → 去新 JSON 中查找
   → 找到 → 更新菜单名称等字段（菜单改名但锚定不变，交易父子关系不受影响）
   → 找不到 → 进入 P2
 
-P2（退回）：用菜单文本 grep 新 JSON
-  → (a) 文本找到 pdCmptEcd → 存入（可能是新菜单，也可能是其他 pdCmptEcd 替代了原菜单名）
+P2（退回）：用菜单文本匹配新 JSON 的叶子子领域
+  → (a) 文本找到叶子子领域 → 取其下 pdCmptEcd（可能是新菜单，也可能是其他 pdCmptEcd 替代了原菜单名）
   → (b) 文本也找不到 → pdCmptEcd 置空，提醒用户
 ```
 
@@ -119,13 +131,13 @@ P1 是**反向查找**——已有菜单的 `pdCmptEcd` 去新 JSON 里找，找
 
 ### 3.3 菜单录制
 
-只录制两级：模块（一级菜单）+ 功能（二级菜单）。
+只录制**实际系统顶部导航菜单**的两级：模块（一级菜单）+ 功能（二级菜单）。不录制 JSON 中深层的活动页面（如"查看集团客户信息"/"维护集团客户信息"），这些是业务流程中才出现的页面，不需要记住。
 
 流程（仿照 prepare 的自动登录 `runDefaultLogin`）：
 1. 打开被测系统，自动登录（复用 `runDefaultLogin`）
-2. 遍历实际系统菜单树
+2. 遍历实际系统顶部菜单树
 3. 对每个菜单，捕获 xpath（`//li[@data-id='...']`）
-4. 用菜单文本 grep JSON，获取 `pdCmptEcd`
+4. 用菜单文本匹配 JSON 叶子子领域，获取 `pdCmptEcd`
 5. 存入 system 表（`menu_xpath` + `pd_cmpt_ecd`）
 
 导出格式（在现有 xlsx 三列基础上增加 pdCmptEcd 列）：
@@ -168,7 +180,7 @@ ALTER TABLE system
 ```
 
 - `menu_xpath`：菜单录制时填入，如 `//li[@data-id='RES000000101']`
-- `pd_cmpt_ecd`：从 JSON 的 `managePage.pdCmptEcd` 提取；仅功能级（type=3）节点有值；模块级（type=2）通常无值
+- `pd_cmpt_ecd`：通过菜单文本匹配 JSON 叶子子领域，取该子领域下活动的 `managePage.pdCmptEcd`；功能级（二级菜单）节点有值；模块级（一级菜单）通常无值（一级菜单对应 JSON 的顶层子领域，其下有多个子领域和活动，无法锚定到单个 `pdCmptEcd`）
 - **菜单迁移**：重新导入 JSON 时，按 `pd_cmpt_ecd` 匹配已有节点 → 更新名称，保持父子关系不变
 
 ### 4.2 system_page 表（新建）
@@ -209,21 +221,27 @@ Body: file=<JSON文件>
 
 Response:
 {
-  "imported": 411,          // JSON 中解析出的页面总数
-  "matched": 56,            // 匹配到 pdCmptEcd 的菜单数
-  "unmatched": 354,         // 未匹配的菜单数
+  "imported": 411,          // JSON 中解析出的 pdCmptEcd 总数
+  "matched": 119,           // 匹配到唯一 pdCmptEcd 的菜单数
+  "multiMatched": 2,        // 匹配到多个 pdCmptEcd 的菜单数
+  "unmatched": 289,         // 未匹配的菜单数
   "unmatchedList": [        // 未匹配菜单列表（供用户排查）
     { "menuName": "工作台", "parentPath": "" },
     ...
+  ],
+  "multiMatchedList": [     // 多匹配菜单列表
+    { "menuName": "节点管理", "pdCmptEcds": ["ZJJK00124230", "ZJJK00114986", ...] }
   ]
 }
 ```
 
 解析逻辑：
-1. 解析 JSON，提取 `umlRelInfo` 树中所有活动节点的 `managePage` / `guidePages`，建立 `pdCmptEcd → {umlNm, pdCmptNm, resPath}` 索引
+1. 解析 JSON，提取 `umlRelInfo` 树，建立两个索引：
+   - **叶子子领域索引**：`子领域umlNm → [{活动umlNm, pdCmptEcd, pdCmptNm, resPath}]`（仅收集没有子领域子节点的最底层子领域）
+   - **pdCmptEcd 索引**：`pdCmptEcd → {umlNm, pdCmptNm, resPath}`（用于更新导入 P1 反查）
 2. 遍历已有 system 表中的菜单节点
-3. 首次导入：用菜单名 grep JSON 索引（`umlNm` 精确匹配 + `pdCmptNm` 去掉"页"字后匹配）
-4. 更新导入：P1 用 `pd_cmpt_ecd` 查 JSON 索引；P2 用菜单名 grep
+3. 首次导入：用菜单名匹配叶子子领域索引 → 取该子领域下活动的 `pdCmptEcd`（唯一则直接取，多个则取第一个并记录提醒）
+4. 更新导入：P1 用 `pd_cmpt_ecd` 查 pdCmptEcd 索引（菜单改名但锚定不变）；P2 退回用菜单名匹配叶子子领域索引
 5. 将页面信息存入 `system_page` 表
 6. 返回匹配/未匹配统计
 
