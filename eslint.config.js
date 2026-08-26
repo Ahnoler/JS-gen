@@ -19,6 +19,7 @@ export default [
       'scripts/_scratch/**',
       'scripts/characterization/**',
       'scripts/smoke/**',
+      'migrations/**',
     ],
   },
   jsdoc.configs['flat/recommended'],

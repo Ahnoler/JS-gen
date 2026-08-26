@@ -1,0 +1,48 @@
+#!/bin/sh
+# pre-commit hook: lint staged .js/.mjs/.cjs files with eslint.
+# - No JS/MJS/CJS staged files  -> exit 0 (skip)
+# - eslint reports errors       -> exit 1 (block commit)
+# - eslint reports warnings only -> exit 0 (allow; current rules are all warn)
+#
+# eslint's own exit code is authoritative: exit 1 when errors exist,
+# exit 0 when only warnings (or clean). We pass that through directly.
+#
+# Activation: package.json "prepare" script sets core.hooksPath to this dir.
+
+set -u
+
+# Collect staged files (Added/Copied/Modified), keep only JS-family extensions.
+# Using pathspec filters (*.js *.mjs *.cjs) avoids a separate grep pass.
+staged_js=$(git diff --cached --name-only --diff-filter=ACM -- '*.js' '*.mjs' '*.cjs')
+
+if [ -z "$staged_js" ]; then
+  # Nothing to lint — let the commit proceed.
+  exit 0
+fi
+
+# Run eslint on the staged JS files (from repo root).
+# We invoke eslint directly (not via xargs) so its exit code is preserved
+# exactly: 0 = clean/warnings-only, 1 = errors present.
+# File lists from git diff are newline-separated; word-splitting on IFS
+# (default includes newline) is safe here because git-quoted paths with
+# spaces are already unquoted by --name-only output... actually --name-only
+# can emit paths with spaces unquoted. Use a while-read loop to be safe.
+echo "pre-commit: running eslint on staged JS files..."
+
+# Build a positional-argument list safely (handles spaces in paths).
+set -- "$staged_js"
+# shellcheck disable=SC2086  # intentional word-splitting of newline list
+npx eslint $staged_js
+
+status=$?
+
+if [ "$status" -ne 0 ]; then
+  echo ""
+  echo "pre-commit: eslint found errors (exit $status). Commit blocked."
+  echo "pre-commit: fix the errors above, then re-run 'git commit'."
+  echo "pre-commit: tip: 'npm run lint:fix' may auto-fix some issues."
+  exit "$status"
+fi
+
+echo "pre-commit: eslint passed (no errors). Proceeding with commit."
+exit 0

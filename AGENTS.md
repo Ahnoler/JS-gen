@@ -67,6 +67,12 @@ This is a **browser-automation service** for Element UI / Vue apps: Playwright s
 
 **Where you'll spend most time:** `src/routes/v2/*` (primary product APIs), `src/services/trajectory/*` (services + extracted runners; `index.js` re-exports public names), `src/runtime/script-runner.js` (shared Playwright execute). Follow existing route/service extraction patterns already in the tree.
 
+**JSDoc 注释规范:**
+- 规范文档：`docs/jsdoc-convention.md`。核心公开函数（导出函数 / 路由 handler / 公开 service·dao 方法 / 类方法）**必须有 JSDoc**，含 `@param`/`@returns`；私有 helper、回调、Promise `.then/catch` 内联箭头、一行纯转发函数可省略。**不加** `@author`/`@since`。
+- 工具链：`npm run lint` 检查 / `npm run lint:fix` 自动修复（eslint-plugin-jsdoc，warn 级别）。存量 warning 已清零，**新代码不得引入新 warning**。
+- 绕过区域（不 lint、不加 JSDoc）：`src/ctrl-actions/**`（字节 pin，改注释会破坏拼接结果）、`migrations/**`（一次性脚本，已 ignore）、`scripts/characterization/**`、`scripts/smoke/**`。
+- 硬性约束（踩坑教训）：给函数加 JSDoc 时**只插入注释，严禁删除/修改任何已有代码行**——曾有子智能体误删函数定义导致代码损坏。
+
 ## CHANGELOG 约定
 
 **强制规则**：每次修改 JS-gen，必须同步更新 `CHANGELOG.md` 的 `[Unreleased]` 区段，按 Keep a Changelog 分类追加条目。条目需说明影响范围。

@@ -13,7 +13,8 @@
     "executor": "node executor/agent.mjs",
     "executor:dev": "node --watch executor/agent.mjs",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "prepare": "git config core.hooksPath scripts/githooks"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
