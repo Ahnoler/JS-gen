@@ -4,8 +4,9 @@
  */
 export async function up(knex) {
   await knex.schema.alterTable('trajectory', (t) => {
-    // FK 要求两侧 collation 一致：batch_recording_job.id 为服务器默认 utf8mb4_0900_ai_ci（迁移 20260802140000 未钉 collation），本列显式对齐
-    t.string('batch_job_id', 36).collate('utf8mb4_0900_ai_ci').nullable()
+    // 不显式钉 collation：继承 trajectory 表默认（utf8mb4_general_ci），与 batch_recording_job.id 一致，FK 可建。
+    // 勿用 utf8mb4_0900_ai_ci——那是 MySQL 8.0 专有 collation，服务器 MySQL 5.7 会报 Unknown collation。
+    t.string('batch_job_id', 36).nullable()
       .comment('所属批量导入任务（batch_recording_job.id，UUID）；NULL=手动创建');
     t.index(['batch_job_id'], 'idx_batch_job_id');
   });

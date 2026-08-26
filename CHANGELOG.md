@@ -14,7 +14,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   影响范围：LLM 调用失败模式从「无限挂起」变为「120s 内快速失败」；超时值经 `.env` 可调。无 schema/WS 变更。
   文件：config/config.js, config/.env, config/.env.example, src/llm-utils.js, src/routes/llm-proxy.js, src/routes/browser-session/global-browser.js, executor/config.js, executor/session-slot.js, scripts/agent_utils.py, scripts/controller/actions/_llm_values.py
 
+- 2026-08-26: **JSDoc 注释规范 + eslint-jsdoc 工具链兜底**：新增 `docs/jsdoc-convention.md`（精简版规范：核心公开函数必须有 JSDoc 含 @param/@returns，私有 helper/回调/一行纯转发可省略；ctrl-actions 字节 pin 区域绕过；不用 @author/@since）；引入 `eslint.config.js`（ESLint v9 flat config + `eslint-plugin-jsdoc`，规则 `require-jsdoc`（publicOnly 仅导出函数）、`require-param`、`require-returns`、`check-param-names`、`check-types`，全部 warn 级别）；`package.json` 新增 `devDependencies`（eslint@^10、eslint-plugin-jsdoc@^64）与 `lint`/`lint:fix` 脚本。ignore 区域：node_modules、nodejs、python（Playwright driver bundle）、src/ctrl-actions（字节 pin）、.superpowers、tmp、scripts/characterization、scripts/smoke。首次 `npm run lint` 0 error / 2431 warning（全部为存量 JSDoc 缺口，预期内）。`verify-all` GREEN。
+  影响范围：新增开发工具链（lint 不阻塞 CI，warn 级别）；无 schema/路由/WS 变更；不影响 Python 对齐（仅 JS-gen 侧开发规范）。
+  文件：docs/jsdoc-convention.md（新增）, eslint.config.js（新增）, package.json
+
 ### Fixed
+
+- 2026-08-26: **迁移 `20260814110000_trajectory_batch_job.js` 在 MySQL 5.7 上 `Unknown collation: 'utf8mb4_0900_ai_ci'` 修复**：该迁移为 `trajectory` 新增 `batch_job_id` 外键列时显式 `.collate('utf8mb4_0900_ai_ci')` 以对齐 `batch_recording_job.id`——但 `utf8mb4_0900_ai_ci` 是 MySQL 8.0 专有 collation，服务器（47.101.58.49 docker mysql）为 **MySQL 5.7.44**，不识别该 collation，`knex migrate:latest` 在此迁移失败并阻塞其后全部迁移（12 个未应用）。实际 `batch_recording_job.id` 与 `trajectory` 表的 collation 均为 `utf8mb4_general_ci`（继承表默认，迁移 `20260802140000` 未钉 collation），原注释假设错误。修复：移除 `.collate(...)` 调用，新列继承 `trajectory` 表默认 `utf8mb4_general_ci`，与 FK 目标列一致，FK `fk_traj_batch_job` 正常建立。服务器已上传修复后迁移并重跑 `migrate:latest`（52 个迁移全部应用），`/api/docs`、`/api/health` 均返回 200。
+  影响范围：迁移文件本身（仅 collation 声明去除，列/索引/FK 语义不变）；MySQL 5.7 部署环境迁移不再阻塞。无路由/WS/业务逻辑变更。
+  文件：migrations/20260814110000_trajectory_batch_job.js
 
 - 2026-08-26: **`case_data → business_data` 深度改名遗漏修复（`autofill_pending.py` + 提示词）**：commit `dfb5c9e` 全量改名时遗漏了 `scripts/controller/actions/autofill_pending.py`（10 处 `self.case_data_store` 未改为 `self.business_data_store`），导致 `run_form_assistant` 调用 `_auto_fill_pending_impl` 时 `FormAutofillEngine` 无 `case_data_store` 属性 → `'FormAutofillEngine' object has no attribute 'case_data_store'`，批量自动填表彻底不可用。同时提示词 `agent-core.md` / `agent-tools-common.md` 仍引用旧工具名 `save_case_data` / `read_case_data` / `case_data_store`（实际已改名 `save_business_data` / `read_business_data` / `business_data_store`），LLM 被指示调用不存在的工具。修复：① `autofill_pending.py` 全部 `self.case_data_store` → `self.business_data_store`；② `autofill_round.py` 注释/日志字符串 `case_data` → `business_data`；③ 提示词 `agent-core.md` / `agent-tools-common.md` 全量替换工具名与存储名。另在 `_misc.py` `click_element_by_index` 异常处理中增加 `traceback.format_exc()` 日志，以诊断 `'bool' object is not subscriptable` 错误的精确来源。
   影响范围：`run_form_assistant` 批量自动填表恢复可用；提示词工具名与代码一致。无 schema/路由/WS 变更。
