@@ -14,7 +14,7 @@ Delegation rules:
 - Parallel subagents get **disjoint** file sets (no concurrent-edit conflicts).
 - On subagent network timeout, retry once; if it still fails, the main thread does the work.
 - After each subagent: re-run key verification and review for out-of-scope edits (e.g. CHANGELOG); report compliant deviations honestly.
-- When a subagent edits `src/`, it may append a CHANGELOG entry per the 同步约定 below; main reviews the format and checks it doesn't overwrite the user's uncommitted entries.
+- When a subagent edits `src/`, it may append a CHANGELOG entry per the CHANGELOG 约定 below; main reviews the format and checks it doesn't overwrite the user's uncommitted entries.
 
 Refactoring constraint (hard): `scripts/characterization/*` uses `read_text` to assert source substrings, pinning function names / closure relative order / exact strings (`_form.py` is pinned by ~30 scripts). When splitting files, keep those markers and make tests read concatenated files (see `_form.py` → `form_autofill.py`).
 
@@ -67,26 +67,18 @@ This is a **browser-automation service** for Element UI / Vue apps: Playwright s
 
 **Where you'll spend most time:** `src/routes/v2/*` (primary product APIs), `src/services/trajectory/*` (services + extracted runners; `index.js` re-exports public names), `src/runtime/script-runner.js` (shared Playwright execute). Follow existing route/service extraction patterns already in the tree.
 
-## 同步约定（Python 控制面对齐）
+## CHANGELOG 约定
 
-本项目（JS-gen）与 `d:\dev\ui-auto-recording-agent-python`（Python FastAPI 控制面）并行开发。Python 端对齐 JS-gen 的 schema / 接口 / WS 协议。
-
-**强制规则**：每次修改 JS-gen，必须同步更新 `CHANGELOG.md` 的 `[Unreleased]` 区段，按 Keep a Changelog 分类追加条目。条目需说明影响范围和 Python 同步提示。
+**强制规则**：每次修改 JS-gen，必须同步更新 `CHANGELOG.md` 的 `[Unreleased]` 区段，按 Keep a Changelog 分类追加条目。条目需说明影响范围。
 
 涉及以下变更时**必须**写 CHANGELOG：
 - `migrations/` 新增或修改迁移（schema 变更）
 - `src/routes/` 端点新增/删除/改路径/改响应格式
-- `src/services/` 业务逻辑变更（影响 Python 对齐语义）
+- `src/services/` 业务逻辑变更
 - `server.mjs` WebSocket 协议变更
 - `config/` 配置项变更
 
-仅改 `scripts/`（Python 子进程）可不写 CHANGELOG（Python 不迁 scripts）。
+仅改 `scripts/`（Python 子进程）可不写 CHANGELOG。
 条目格式见 `CHANGELOG.md` 顶部"条目格式约定"。
 
-### Git post-commit hook（自动跑同步检查）
-
-`scripts/hooks/post-commit` 在 commit 修改了 `migrations/` / `schemas/init.sql` / `src/routes/` / `src/services/` / `server.mjs` / `config/` 时，自动跑 Python 端 `scripts/check_jsgen_sync.py` 并打印报告（不阻塞 commit）。
-
-安装（首次 / 换机器后）：`cp scripts/hooks/post-commit .git/hooks/post-commit && chmod +x .git/hooks/post-commit`（`.git/hooks/` 不被 git 跟踪，脚本本身被跟踪在 `scripts/hooks/post-commit`）。
-
-报告解读：`[0] 增量对比`（自 `--mark-synced` 的新迁移，最关键）、`[3] CHANGELOG [Unreleased]`（待跟进变更）、`[5] Python 同步提示`（带提示的条目）。跟进完后在 Python 仓库跑 `python scripts/check_jsgen_sync.py --mark-synced` 重置基线。
+> 注：Python 控制面（`d:\dev\ui-auto-recording-agent-python`）同步已叫停（2026-08-26），不再写 Python 同步提示，也不需要与 Python 端对齐。
