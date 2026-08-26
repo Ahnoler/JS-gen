@@ -103,6 +103,7 @@ run "characterize-batch-actions" "$PY" scripts/characterization/characterize-bat
 run "characterize-export-v3-pid" node scripts/characterization/characterize-export-v3-pid.mjs
 run "characterize-budget-extend" "$PY" scripts/characterization/characterize-budget-extend.py
 run "characterize-export-v3-field-completeness" node scripts/characterization/characterize-export-v3-field-completeness.mjs
+run "characterize-xpath-three-sources" node scripts/characterization/characterize-xpath-three-sources.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
