@@ -148,15 +148,15 @@ async function main() {
     // Six fields are guarded per node: xpath_smart, xpath_full, candidates,
     // locator_strategy, target_kind, text.
     //
-    // Blind-spot 1 — xpath_full on no-id nodes:
-    //   AI/Manual xpathOf walks to (exclusive) document.body → "/div[2]/…".
-    //   snap absXPath walks to (exclusive) document.documentElement →
-    //   "/html/body[1]/div[2]/…". The relative tail is identical; only the
-    //   root prefix differs. This is a known cross-entry convention divergence
-    //   (not a bug, and not fixable without editing the three source files —
-    //   out of scope for this guard). For no-id nodes we assert the known
-    //   invariant: snap.xp === '/html/body[1]' + ai.xp, and manual === ai.
-    //   For id nodes all three short-circuit to //*[@id=…] and stay strict.
+    // Blind-spot 1 — xpath_full on no-id nodes (RESOLVED, Task D5):
+    //   Previously AI/Manual xpathOf walked to (exclusive) document.body →
+    //   "/div[2]/…" while snap absXPath walked to (exclusive)
+    //   document.documentElement → "/html/body[1]/div[2]/…". As of D5 all three
+    //   xpathOf/absXPath terminate at document.documentElement and emit a
+    //   '/html' prefix, and id short-circuit filters generated ids via
+    //   isGeneratedId. The three entries now produce byte-identical xpath_full
+    //   for both id and no-id nodes, so all xpath_full assertions are strict
+    //   deepStrictEqual with no prefix normalization.
     //
     // Blind-spot 2 — text field:
     //   AI/Manual elMeta feed textOverride (recorded label/placeholder) into
@@ -171,18 +171,11 @@ async function main() {
     //   must be "" and AI/Manual must equal the textOverride — documenting the
     //   asymmetry rather than forcing a false equality.
     // ---------------------------------------------------------------------------
-    // candidates also carries an {type:'xpath_full', value:…} entry, so on
-    // no-id nodes it inherits the same /html/body[1] prefix divergence. We
-    // therefore treat candidates separately: strict for id nodes; for no-id
-    // nodes we strip the snap prefix from xpath_full-typed candidate values
-    // before comparing.
+    // candidates also carries an {type:'xpath_full', value:…} entry. Now that
+    // the three entries produce identical xpath_full (D5 unified the /html
+    // prefix), candidates are compared strictly across all nodes — no prefix
+    // normalization needed.
     const strictFields = ['xpath_smart', 'locator_strategy', 'target_kind'];
-    const SNAP_ROOT_PREFIX = '/html/body[1]';
-    const stripSnapRoot = (v) => (typeof v === 'string' && v.startsWith(SNAP_ROOT_PREFIX) ? v.slice(SNAP_ROOT_PREFIX.length) : v);
-    const normCandidates = (cands, hasIdFlag) => {
-      if (hasIdFlag || !Array.isArray(cands)) return cands;
-      return cands.map((c) => (c && c.type === 'xpath_full' ? { ...c, value: stripSnapRoot(c.value) } : c));
-    };
     let failures = 0;
     let nodeCount = results.length;
     let fieldChecks = 0;
@@ -205,12 +198,12 @@ async function main() {
         }
       }
 
-      // candidates: strict for id nodes; prefix-normalized for no-id nodes.
+      // candidates: strict across all nodes (D5 unified xpath_full prefix).
       fieldChecks++;
       {
         const c1 = r1.candidates;
         const c2 = r2.candidates;
-        const c3n = normCandidates(r3.candidates, hasId);
+        const c3 = r3.candidates;
         try {
           assert.deepStrictEqual(c2, c1, `${sel} candidates: manual≠ai`);
         } catch (e) {
@@ -218,45 +211,26 @@ async function main() {
           console.error(`FAIL ${sel} [candidates] manual≠ai\n  ai    = ${JSON.stringify(c1)}\n  manual= ${JSON.stringify(c2)}`);
         }
         try {
-          assert.deepStrictEqual(c3n, c1, `${sel} candidates: auto≠ai`);
+          assert.deepStrictEqual(c3, c1, `${sel} candidates: auto≠ai`);
         } catch (e) {
           failures++;
-          console.error(`FAIL ${sel} [candidates] auto≠ai\n  ai   = ${JSON.stringify(c1)}\n  auto = ${JSON.stringify(r3.candidates)}`);
+          console.error(`FAIL ${sel} [candidates] auto≠ai\n  ai   = ${JSON.stringify(c1)}\n  auto = ${JSON.stringify(c3)}`);
         }
       }
 
-      // xpath_full: strict for id nodes; logical assertion for no-id nodes.
+      // xpath_full: strict for all nodes (D5 unified /html prefix + isGeneratedId).
       fieldChecks++;
-      if (hasId) {
-        try {
-          assert.deepStrictEqual(r2.xpath_full, r1.xpath_full, `${sel} xpath_full: manual≠ai`);
-        } catch (e) {
-          failures++;
-          console.error(`FAIL ${sel} [xpath_full] manual≠ai\n  ai    = ${JSON.stringify(r1.xpath_full)}\n  manual= ${JSON.stringify(r2.xpath_full)}`);
-        }
-        try {
-          assert.deepStrictEqual(r3.xpath_full, r1.xpath_full, `${sel} xpath_full: auto≠ai`);
-        } catch (e) {
-          failures++;
-          console.error(`FAIL ${sel} [xpath_full] auto≠ai\n  ai   = ${JSON.stringify(r1.xpath_full)}\n  auto = ${JSON.stringify(r3.xpath_full)}`);
-        }
-      } else {
-        // No-id: manual must equal ai (same body-relative convention); snap
-        // prefixes "/html/body[1]" but the tail must match ai's path.
-        try {
-          assert.deepStrictEqual(r2.xpath_full, r1.xpath_full, `${sel} xpath_full: manual≠ai`);
-        } catch (e) {
-          failures++;
-          console.error(`FAIL ${sel} [xpath_full] manual≠ai\n  ai    = ${JSON.stringify(r1.xpath_full)}\n  manual= ${JSON.stringify(r2.xpath_full)}`);
-        }
-        const snapPrefix = '/html/body[1]';
-        const snapTail = r3.xpath_full.startsWith(snapPrefix) ? r3.xpath_full.slice(snapPrefix.length) : r3.xpath_full;
-        try {
-          assert.deepStrictEqual(snapTail, r1.xpath_full, `${sel} xpath_full no-id tail: auto≠ai`);
-        } catch (e) {
-          failures++;
-          console.error(`FAIL ${sel} [xpath_full] no-id tail auto≠ai\n  ai    = ${JSON.stringify(r1.xpath_full)}\n  auto = ${JSON.stringify(r3.xpath_full)}`);
-        }
+      try {
+        assert.deepStrictEqual(r2.xpath_full, r1.xpath_full, `${sel} xpath_full: manual≠ai`);
+      } catch (e) {
+        failures++;
+        console.error(`FAIL ${sel} [xpath_full] manual≠ai\n  ai    = ${JSON.stringify(r1.xpath_full)}\n  manual= ${JSON.stringify(r2.xpath_full)}`);
+      }
+      try {
+        assert.deepStrictEqual(r3.xpath_full, r1.xpath_full, `${sel} xpath_full: auto≠ai`);
+      } catch (e) {
+        failures++;
+        console.error(`FAIL ${sel} [xpath_full] auto≠ai\n  ai   = ${JSON.stringify(r1.xpath_full)}\n  auto = ${JSON.stringify(r3.xpath_full)}`);
       }
 
       // text: strict when visible text non-empty; documented asymmetry otherwise.
