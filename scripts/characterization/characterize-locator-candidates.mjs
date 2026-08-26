@@ -63,7 +63,7 @@ function ok(name) {
   });
   assert.equal(
     xp,
-    "//div[contains(@class,'el-form-item')][.//label[contains(normalize-space(.),'客户名称')]]//input",
+    "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='客户名称' or normalize-space(.)=concat('客户名称', ':') or normalize-space(.)=concat('客户名称', '：') or normalize-space(.)=concat('客户名称', '*') or normalize-space(.)=concat('*', '客户名称') or normalize-space(.)=concat('*', '客户名称', ':') or normalize-space(.)=concat('*', '客户名称', '：')]]//input",
   );
   ok('form field xpath_smart');
 }
@@ -332,7 +332,7 @@ function ok(name) {
   });
   assert.equal(
     enriched.xpath_smart,
-    "//div[contains(@class,'el-form-item')][.//label[contains(normalize-space(.),'客户名称')]]//input",
+    "//div[contains(@class,'el-form-item')][.//label[normalize-space(.)='客户名称' or normalize-space(.)=concat('客户名称', ':') or normalize-space(.)=concat('客户名称', '：') or normalize-space(.)=concat('客户名称', '*') or normalize-space(.)=concat('*', '客户名称') or normalize-space(.)=concat('*', '客户名称', ':') or normalize-space(.)=concat('*', '客户名称', '：')]]//input",
   );
   assert.equal(enriched.xpath, enriched.xpath_smart);
   assert.equal(enriched.locator_strategy, 'xpath_smart');
