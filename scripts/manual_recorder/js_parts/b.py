@@ -447,15 +447,21 @@ JS_MANUAL_PART_B = r'''
     const value = el.value || '';
     if (!String(value).trim()) return;
     const kind = isDate ? 'fill_date' : 'fill';
-    emit({
+    // 统一：xpath 抓取复用自动算法（elMeta → buildLocatorSnap → formFieldXpathSmartOf，与
+    // JS_CAPTURE_FROM_XPATH 同源）。label_text 用完整 placeholder（不剥「请输入」前缀），
+    // 回放时 JS_FILL_FORM_FIELD / JS_FILL_BY_XPATH 的 placeholder 分支按完整文本精确命中。
+    const fullPh = (el.getAttribute && el.getAttribute('placeholder') || '').trim();
+    // formItemLabel 在无真实 label 时回退 placeholderLabel（剥「请输入」前缀）——
+    // 若所得 label 是完整 placeholder 的子串，说明是剥离产物，改回完整 placeholder。
+    const labelText = (label && fullPh && fullPh.includes(label) && label !== fullPh)
+      ? fullPh : (label || fullPh);
+    const meta = elMeta(el, value);
+    emit(Object.assign({
       kind: kind,
-      label_text: label,
+      label_text: labelText,
       value: value,
-      xpath: xpathOf(el),
-      tag: tag,
-      attributes: attrs(el),
       text: value.slice(0, 80),
-    });
+    }, meta));
   }
 
   window.__jsgenManualOnChange = (ev) => {

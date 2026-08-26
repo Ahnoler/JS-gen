@@ -73,12 +73,29 @@ def _offline_xpath_smart_fallback(
     form_label: str = '',
     target_kind: str = '',
     locator_scope: str = '',
+    placeholder: str = '',
 ) -> str:
-    """Safe offline rebuild from supplied cues only (no menu inference from /ul/li/)."""
+    """Safe offline rebuild from supplied cues only (no menu inference from /ul/li/).
+
+    Priority aligns with the auto-capture algorithm (formFieldXpathSmartOf):
+    1. full DOM placeholder (label-less login fields) → input[contains(@placeholder,…)]
+    2. real form label → el-form-item/label …//input  (only when placeholder absent)
+    """
     form_lbl = re.sub(r'\s+', ' ', str(form_label or '')).strip()
     form_lbl = re.sub(r'[：:*\s]+$', '', form_lbl)[:40]
+    ph = re.sub(r'\s+', ' ', str(placeholder or '')).strip()
+    ph = ph[:80]
     kind = str(target_kind or '').strip()
     overlay = _overlay_scope_kind(xpath_abs, class_name, locator_scope)
+
+    # Placeholder path first — mirror of auto-capture for label-less forms (login).
+    # Full placeholder (incl. 请输入… prefix) is the DOM truth; a stripped label
+    # derived from it must never win.
+    if ph and (kind.startswith('form_') or kind in ('', 'generic') or not kind):
+        lit = _xpath_literal(ph)
+        leaf = 'textarea' if (tag or '').lower() == 'textarea' or re.search(r'el-textarea', class_name, re.I) else 'input'
+        local = f"{leaf}[contains(@placeholder,{lit})]"
+        return _with_overlay_scope(f'//{local}', overlay) if overlay else f'//{local}'
 
     if form_lbl and (kind.startswith('form_') or kind in ('', 'generic', 'adjacent_button') or not kind):
         lit = _xpath_literal(form_lbl)
@@ -153,12 +170,14 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
     smart = payload.get('xpath_smart') or ''
     tag = payload.get('tag') or ''
     cls = str(attrs.get('class') or attrs.get('className') or '')
-    form_label = (payload.get('label_text') or payload.get('formLabel') or '').strip()
+    # formLabel (real DOM label from live snap) takes precedence over label_text —
+    # label_text may be a placeholder-derived hint (login fields). See below.
+    form_label = (payload.get('formLabel') or '').strip() or (payload.get('label_text') or '').strip()
     target_kind = str(payload.get('target_kind') or '').strip()
     locator_scope = str(payload.get('locator_scope') or '').strip()
     overlay = _overlay_scope_kind(abs_xp or str(payload.get('xpath') or ''), cls, locator_scope)
 
-    # Trust DOM snapshot; offline rebuild only when smart missing
+    # Trust DOM snapshot; offline rebuild only when smart missing.
     if not smart:
         smart = _offline_xpath_smart_fallback(
             tag,
@@ -176,6 +195,7 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
                 ''
             ),
             locator_scope=locator_scope,
+            placeholder=str(attrs.get('placeholder') or ''),
         )
     elif overlay:
         # Align with auto-capture: keep label xpath but add dialog/drawer scope

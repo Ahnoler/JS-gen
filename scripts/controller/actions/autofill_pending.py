@@ -71,12 +71,12 @@ from .form_scan_utils import (
 async def _auto_fill_pending_impl(self):
     from .section_scope import section_matches
 
-    self.case_data_store['_assistant_needs_agent'] = []
+    self.business_data_store['_assistant_needs_agent'] = []
     page = await self.browser_context.get_current_page()
     await _wait_if_loading(page)
-    tl = TaskList.from_store(self.case_data_store.get('task_list'))
-    autofilled = set(self.case_data_store.get('_autofilled_labels') or [])
-    filt = (self.case_data_store.get('_assistant_section_filter') or '').strip()
+    tl = TaskList.from_store(self.business_data_store.get('task_list'))
+    autofilled = set(self.business_data_store.get('_autofilled_labels') or [])
+    filt = (self.business_data_store.get('_assistant_section_filter') or '').strip()
     pending = [
         item for item in tl.pending
         if not item.needs_intervention
@@ -99,7 +99,7 @@ async def _auto_fill_pending_impl(self):
     try:
         ref_date = await page.evaluate(JS_READ_REFERENCE_DATE)
         if ref_date:
-            self.case_data_store['_ref_date'] = ref_date
+            self.business_data_store['_ref_date'] = ref_date
             await page.evaluate('s => console.log("[AI填表] 参考日期: " + s)', ref_date)
     except Exception:
         pass
@@ -142,10 +142,10 @@ async def _auto_fill_pending_impl(self):
             raw_fields = []
         fillable = prepare_scan_fields_for_tasklist(raw_fields)
         dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable]
-        tl_c = TaskList.from_store(self.case_data_store.get('task_list'))
+        tl_c = TaskList.from_store(self.business_data_store.get('task_list'))
         new_pending = self._scan_new_fields(dom_fields, tl_c)
         # Refresh tl after _scan_new_fields may have mutated store
-        tl_c = TaskList.from_store(self.case_data_store.get('task_list'))
+        tl_c = TaskList.from_store(self.business_data_store.get('task_list'))
         ok_keys = filled_ok_keys_from_results(all_results)
         still = still_empty_pending_dicts(
             tl_c.pending,
@@ -199,17 +199,17 @@ async def _auto_fill_pending_impl(self):
         dom_labels = set()
 
     if dom_labels:
-        tl_sync = TaskList.from_store(self.case_data_store.get('task_list'))
+        tl_sync = TaskList.from_store(self.business_data_store.get('task_list'))
         stale = [item for item in tl_sync.pending
                  if item.label not in dom_labels and not item.needs_intervention]
         for item in stale:
             tl_sync.pending.remove(item)
             sys.stderr.write(f'[auto-fill] Removed stale pending: "{item.label}" (not in DOM)\n')
         if stale:
-            self.case_data_store['task_list'] = tl_sync.to_store()
+            self.business_data_store['task_list'] = tl_sync.to_store()
             sys.stderr.flush()
 
-    tl_debug = TaskList.from_store(self.case_data_store.get('task_list'))
+    tl_debug = TaskList.from_store(self.business_data_store.get('task_list'))
     sys.stderr.write(f'[auto-fill] DEBUG done={len(tl_debug.done)} pending={len(tl_debug.pending)}\n')
     sys.stderr.flush()
     return _ok(f'auto-fill-done | ok:{ok_count} failed:{failed_count} | ' + json.dumps(all_results, ensure_ascii=False))

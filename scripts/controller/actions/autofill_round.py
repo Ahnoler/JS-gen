@@ -185,7 +185,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
         )
 
         # ---- Cross-field: cert type -> cert number / customer name ----
-        # Only fill gaps — never overwrite user case_data presets (commandValue).
+        # Only fill gaps — never overwrite user business_data presets (commandValue).
         if idx == KIND_ORDER['input']:
             _has_cert_num = any(
                 '证件号码' in (d.get('label', '') or '') or '证件号' in (d.get('label', '') or '')
@@ -202,7 +202,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                     if '证件号码' in lbl or '证件号' in lbl:
                         if d.get('commandValue') and str(d.get('commandValue')).strip():
                             sys.stderr.write(
-                                f'[cert-detect] keep case_data cert_number={d["commandValue"]!r}\n'
+                                f'[cert-detect] keep business_data cert_number={d["commandValue"]!r}\n'
                             )
                             sys.stderr.flush()
                         else:
@@ -227,7 +227,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                         if '客户名称' in nlbl or '客户姓名' in nlbl:
                             if d_name.get('commandValue') and str(d_name.get('commandValue')).strip():
                                 sys.stderr.write(
-                                    f'[cert-detect] keep case_data name={d_name["commandValue"]!r}\n'
+                                    f'[cert-detect] keep business_data name={d_name["commandValue"]!r}\n'
                                 )
                                 sys.stderr.flush()
                             else:

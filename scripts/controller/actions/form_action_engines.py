@@ -337,6 +337,18 @@ class FillEngine(_FormActionEngineBase):
 
 class SelectEngine(_FormActionEngineBase):
     async def select_option(self, label_text: str, option_text: str, xpath_smart: str = ""):
+        try:
+            return await self._select_option_impl(label_text, option_text, xpath_smart)
+        except Exception as exc:
+            import traceback as _tb
+            sys.stderr.write(
+                f'[select] select_option label={label_text!r} option={option_text!r} '
+                f'xpath_smart={xpath_smart!r} exception: {exc}\n{_tb.format_exc()}\n'
+            )
+            sys.stderr.flush()
+            raise
+
+    async def _select_option_impl(self, label_text: str, option_text: str, xpath_smart: str = ""):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)

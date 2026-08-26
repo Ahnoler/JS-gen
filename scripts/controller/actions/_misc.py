@@ -682,6 +682,9 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                     pass
             return _ok(f'ok-clicked-{index}')
         except Exception as e:
+            import traceback as _tb
+            sys.stderr.write(f'[click] click_element_by_index index={index} exception: {e}\n{_tb.format_exc()}\n')
+            sys.stderr.flush()
             return _err(f'click-failed:{e}')
 
     @controller.action('Scroll down the page by pixel amount. Scrolls the main content container or window.')

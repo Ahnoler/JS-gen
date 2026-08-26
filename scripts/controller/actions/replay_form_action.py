@@ -75,14 +75,15 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             hint = label or ph
             result = await page.evaluate(JS_FILL_BY_XPATH, [xpath, value, hint])
             action_ok = isinstance(result, str) and result.startswith('ok')
-            # If the fill fell through to the placeholder branch (stale recorded
-            # xpath), read back via the SAME label/placeholder path — otherwise
-            # the verify reads a stale-xpath empty node and wrongly flags false_ok.
-            used_placeholder = isinstance(result, str) and result.startswith('ok-placeholder')
-            if used_placeholder:
+            # Primary read: by the fill xpath.
+            actual = await _read_value_by_xpath(page, xpath, hint) if (xpath and action_ok) else ''
+            # Robust fallback: if the fill reported ok but the recorded xpath read
+            # back empty, the xpath is stale or points at the wrong node — the fill
+            # likely landed via the label/placeholder branch. Read by the same hint
+            # so the verify sees the input the fill actually wrote, not an empty /
+            # sibling node. Only when BOTH reads are empty is it a genuine false_ok.
+            if action_ok and not actual:
                 actual = await _read_value_by_label(page, label, ph)
-            else:
-                actual = await _read_value_by_xpath(page, xpath, hint) if xpath else ''
             classified = _classify_fill_result(action_ok, value, actual)
             if classified == 'ok':
                 await page.wait_for_timeout(300)
