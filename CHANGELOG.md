@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- 2026-08-26: **角色级 LLM 配置统一到 .env**：为全部 LLM 调用角色补独立可配置键，未设置时回落主 LLM（LLM_MODEL/LLM_BASE_URL/LLM_API_KEY）——新增 `REVIEWER_LLM_MODEL/BASE_URL/API_KEY/TIMEOUT_MS`、`SCENARIO_LLM_MODEL/BASE_URL/API_KEY/TIMEOUT_MS`、`FORM_LLM_TIMEOUT_MS`、`L1C_LLM_MODEL`（config.js 导出 + 执行机 spawn 注入 + Python os.getenv 读取）；主/表单/场景三处 ChatOpenAI 补齐 timeout（毫秒配置转秒）；Phase Reviewer 现可独立于主 LLM（`_get_reviewer_llm`，REVIEWER_LLM_* 全空时复用主 LLM）；`.env.example` 同时文档化既有未记录键（AI_PHASE_REVIEWER、AI_PHASE_REVIEWER_TIMEOUT_S、AI_SCENARIO_DESCRIBER、SCENARIO_DESCRIBER_INTERVAL）。
+  影响范围：config/.env 配置面（新增角色级键，缺省行为=回落主键，无行为变化）；LLM 超时从「无限等待」变为默认 120s 快速失败（与既 LLM_TIMEOUT_MS 语义一致）。无 schema/路由/WS 变更。
+  文件：config/.env.example, config/config.js, src/routes/browser-session/global-browser.js, executor/config.js, executor/session-slot.js, scripts/agent_utils.py, scripts/session_runner.py, scripts/controller/actions/phase/reviewer.py, scripts/agent/service.py, scripts/controller/actions/_llm_values.py, scripts/controller/actions/_scenario_describer.py, scripts/characterization/characterize-llm-role-env.py（新增）
+
+- 2026-08-26: **Reviewer 进度感知缓冲部署**：`compute_budget_extension` 新增可选入参 `total_fields/done_fields`（缺省完全走旧式）——以「已耗步数/已完成字段数」估平均每字段成本，按剩余字段数（max(剩余字段, introduce+pending+tree)）估算剩余步数，取 max(旧成本模型, 估算)（永不低于旧模型防欠分配），仍受 ceiling-used clamp 与空工作短路约束；`service.py` 续跑循环从 task_list 计算并传入 total/done；`characterize-budget-extend.py` 追加 7 条进度感知断言。
+  影响范围：budget-exhausted 续跑步数在「已完成字段多、待办也多」时自动加大缓冲；旧调用行为不变。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/phase/reviewer.py, scripts/agent/service.py, scripts/characterization/characterize-budget-extend.py
+
 - 2026-08-24: **LLM 请求超时保护（`LLM_TIMEOUT_MS`）**：新增配置 `LLM_TIMEOUT_MS`（毫秒，默认 120000，`.env` 唯一真源）。此前所有 LLM 调用无超时——网关通道挂起（如 GLM-5 宕机，请求 60s+ 无任何响应）时 agent 每步 LLM 调用无限阻塞，最终以「Phase idle timeout: no agent activity for 10 minutes」这种迟钝方式暴露。现三处生效：① `src/llm-utils.js` `callLLM`（`AbortSignal.timeout`）；② `src/routes/llm-proxy.js` `/v1/chat/completions` 转发（agent 主链路）——超时返回 **504 `upstream_timeout`** 并附排查指引（错误体不再挂起）；③ Python `agent_utils.create_llm` 与 `_llm_values._get_form_llm` 的 `ChatOpenAI(timeout=..., max_retries=1)`（表单 LLM 直连网关场景）。执行机与 global-browser spawn Python 时下发 `LLM_TIMEOUT_MS`。
   影响范围：LLM 调用失败模式从「无限挂起」变为「120s 内快速失败」；超时值经 `.env` 可调。无 schema/WS 变更。
   文件：config/config.js, config/.env, config/.env.example, src/llm-utils.js, src/routes/llm-proxy.js, src/routes/browser-session/global-browser.js, executor/config.js, executor/session-slot.js, scripts/agent_utils.py, scripts/controller/actions/_llm_values.py
@@ -23,6 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   文件：src/models/*, src/dao/*, src/services/**（约 70 文件）, src/routes/**（约 40 文件）, src/dashboard/**（16 文件）, src/cdp/*, src/memory/*, src/runtime/*, src/http/*, src/executor-*.js, src/dedup.js, src/state.js, src/ws-server.js, src/trajectory-store.js, src/business-data-store.js, src/script-utils.js, src/llm-utils.js, src/middleware/sso-auth.js, executor/*, src/playwright-runner/*, config/*, seeds/*, eslint.config.js
 
 ### Fixed
+
+- 2026-08-26: **V3 推送「业务对象名称」含伙伴禁用字符报错**：轨迹名（用户手输，无字符校验）经 transaction-export-v3.js:913 原样作为 transcationName 推送，伙伴 importDemand 校验失败（\\ / : * ? \" < > | '）时错误直透前端。修复：V3（及 V2 deprecated 路径）名称装配点对禁用字符 sanitize 为 `_`；前端 RecordingDialog.vue 交易名称输入增加同规则校验（即时提示+提交拦截，源头告警）。
+  影响范围：推送 payload transcationName 命中禁用字符时以 `_` 替换（推送不再失败）；前端录入时即提示。无 schema/路由/WS 变更。
+  文件：src/services/transaction-export-v3.js, src/services/transaction-export.js ★前端（ui-auto-recording-agent-vue-master：vue-project/src/views/ui-recording/components/RecordingDialog.vue）
 
 - 2026-08-26: **迁移 `20260814110000_trajectory_batch_job.js` 在 MySQL 5.7 上 `Unknown collation: 'utf8mb4_0900_ai_ci'` 修复**：该迁移为 `trajectory` 新增 `batch_job_id` 外键列时显式 `.collate('utf8mb4_0900_ai_ci')` 以对齐 `batch_recording_job.id`——但 `utf8mb4_0900_ai_ci` 是 MySQL 8.0 专有 collation，服务器（47.101.58.49 docker mysql）为 **MySQL 5.7.44**，不识别该 collation，`knex migrate:latest` 在此迁移失败并阻塞其后全部迁移（12 个未应用）。实际 `batch_recording_job.id` 与 `trajectory` 表的 collation 均为 `utf8mb4_general_ci`（继承表默认，迁移 `20260802140000` 未钉 collation），原注释假设错误。修复：移除 `.collate(...)` 调用，新列继承 `trajectory` 表默认 `utf8mb4_general_ci`，与 FK 目标列一致，FK `fk_traj_batch_job` 正常建立。服务器已上传修复后迁移并重跑 `migrate:latest`（52 个迁移全部应用），`/api/docs`、`/api/health` 均返回 200。
   影响范围：迁移文件本身（仅 collation 声明去除，列/索引/FK 语义不变）；MySQL 5.7 部署环境迁移不再阻塞。无路由/WS/业务逻辑变更。

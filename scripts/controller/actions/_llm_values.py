@@ -216,7 +216,11 @@ def _get_form_llm(agent_llm=None):
 
     if _FORM_LLM is None or _FORM_LLM_CONFIG != new_config:
         from langchain_openai import ChatOpenAI
-        _FORM_LLM = ChatOpenAI(model=model, base_url=base_url, api_key=api_key, temperature=0.0)
+        _timeout_ms = float(os.getenv('FORM_LLM_TIMEOUT_MS', '') or os.getenv('LLM_TIMEOUT_MS', '') or 0)
+        _kwargs = dict(model=model, base_url=base_url, api_key=api_key, temperature=0.0)
+        if _timeout_ms > 0:
+            _kwargs['timeout'] = _timeout_ms / 1000.0
+        _FORM_LLM = ChatOpenAI(**_kwargs)
         _FORM_LLM_CONFIG = new_config
 
     return _FORM_LLM

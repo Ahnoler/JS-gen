@@ -74,6 +74,26 @@ export const LLM_TIMEOUT_MS = Math.max(
 export const FORM_LLM_MODEL = _resolve('FORM_LLM_MODEL', LLM_MODEL);
 export const FORM_LLM_BASE_URL = _resolve('FORM_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
 export const FORM_LLM_API_KEY = _resolve('FORM_LLM_API_KEY', LLM_API_KEY);
+/** 表单 LLM 请求超时（毫秒；缺省回落 LLM_TIMEOUT_MS） */
+export const FORM_LLM_TIMEOUT_MS = Number(_resolve('FORM_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || LLM_TIMEOUT_MS;
+
+// ── 角色级 LLM 配置（未设置则回落主 LLM_*，不产生独立实例）──
+/** Phase Reviewer LLM（缺省回落主 LLM） */
+export const REVIEWER_LLM_MODEL = _resolve('REVIEWER_LLM_MODEL', LLM_MODEL);
+export const REVIEWER_LLM_BASE_URL = _resolve('REVIEWER_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
+export const REVIEWER_LLM_API_KEY = _resolve('REVIEWER_LLM_API_KEY', LLM_API_KEY);
+/** Reviewer LLM 请求超时（毫秒；缺省回落 AI_PHASE_REVIEWER_TIMEOUT_S×1000，再回落 LLM_TIMEOUT_MS） */
+export const REVIEWER_LLM_TIMEOUT_MS = Number(_resolve('REVIEWER_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || LLM_TIMEOUT_MS;
+
+/** Scenario Describer LLM（缺省回落主 LLM） */
+export const SCENARIO_LLM_MODEL = _resolve('SCENARIO_LLM_MODEL', LLM_MODEL);
+export const SCENARIO_LLM_BASE_URL = _resolve('SCENARIO_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
+export const SCENARIO_LLM_API_KEY = _resolve('SCENARIO_LLM_API_KEY', LLM_API_KEY);
+/** Scenario LLM 请求超时（毫秒；缺省回落 LLM_TIMEOUT_MS） */
+export const SCENARIO_LLM_TIMEOUT_MS = Number(_resolve('SCENARIO_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || LLM_TIMEOUT_MS;
+
+/** L1C 低置信区域分类模型（可选；缺省沿用 LLM_MODEL） */
+export const L1C_LLM_MODEL = _resolve('L1C_LLM_MODEL', LLM_MODEL);
 
 /** 批量动作预算（browser_use max_actions_per_step）：全局默认；0/空 = 不覆盖，走框架默认 10 */
 export const MAX_ACTIONS_PER_STEP = _resolve('MAX_ACTIONS_PER_STEP', '');

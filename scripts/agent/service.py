@@ -214,12 +214,13 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                     cur_phase = int(phase_for_preamble) if phase_for_preamble is not None else 0
                 except (TypeError, ValueError):
                     cur_phase = 0
+                from ..controller.actions.phase.reviewer import _get_reviewer_llm
                 reviewed = await review_phase_contract(
                     task_text=phase_core,
                     all_phases=all_phases if isinstance(all_phases, list) else [],
                     current_phase_number=cur_phase,
                     scenario_summary=scenario_summary,
-                    llm=llm,
+                    llm=_get_reviewer_llm(llm),
                 )
                 if reviewed:
                     contract = apply_phase_contract(business_data_ref, reviewed)

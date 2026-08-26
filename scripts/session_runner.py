@@ -2,6 +2,7 @@
 Interactive session mode for browser-use agent.
 Reads JSON instructions from stdin, runs agent steps with SSE output.
 """
+import os
 import sys
 import asyncio
 import json
@@ -167,11 +168,25 @@ async def _run_cdp_watcher(browser_context, action_queue, business_data_store):
                 emit_json({"event": "cdp_action_result", "id": req_id, "result": None, "error": err_str, "entry": None})
 
 
+def _env_llm_timeout_sec():
+    """Read LLM_TIMEOUT_MS env → seconds; <=0 → None (no timeout)."""
+    raw = os.getenv('LLM_TIMEOUT_MS', '').strip()
+    if not raw:
+        return None
+    try:
+        ms = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if ms <= 0:
+        return None
+    return ms / 1000.0
+
+
 async def run_session(args):
     patch_message_manager()
     patch_planner_prompt()
     patch_icon_tooltip_labels()
-    llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None))
+    llm = create_llm(args.model, args.base_url, getattr(args, 'api_key', None), timeout=_env_llm_timeout_sec())
 
     session_id = args.session_id or "unknown"
 

@@ -367,7 +367,7 @@ def patch_icon_tooltip_labels():
     BrowserContext.get_state = _patched_get_state
 
 
-def create_llm(model, base_url, api_key=None):
+def create_llm(model, base_url, api_key=None, timeout=None):
     from langchain_openai import ChatOpenAI
     effective_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
     if not base_url:
@@ -376,7 +376,10 @@ def create_llm(model, base_url, api_key=None):
     if not effective_key:
         print("Error: --api-key, OPENAI_API_KEY, or LLM_API_KEY env is required", file=sys.stderr)
         sys.exit(1)
-    return ChatOpenAI(model=model, base_url=base_url, api_key=effective_key, temperature=0.2)
+    kwargs = dict(model=model, base_url=base_url, api_key=effective_key, temperature=0.2)
+    if timeout is not None:
+        kwargs['timeout'] = timeout
+    return ChatOpenAI(**kwargs)
 
 
 def make_step_callback(phase_offset=0):

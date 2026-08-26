@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -247,6 +248,50 @@ def _build_user_payload(
     return '\n\n'.join(blocks)
 
 
+def _get_reviewer_llm(agent_llm=None):
+    """Dedicated REVIEWER_LLM_* if configured; else fall back to agent LLM.
+
+    Reads REVIEWER_LLM_MODEL / BASE_URL / API_KEY. When all three are empty,
+    returns agent_llm unchanged (may be None). Otherwise creates a dedicated
+    ChatOpenAI with timeout = REVIEWER_LLM_TIMEOUT_MS → AI_PHASE_REVIEWER_TIMEOUT_S
+    × 1000 → LLM_TIMEOUT_MS (first non-empty, converted to seconds).
+    """
+    model = os.getenv('REVIEWER_LLM_MODEL', '').strip()
+    base_url = os.getenv('REVIEWER_LLM_BASE_URL', '').strip()
+    api_key = (
+        os.getenv('REVIEWER_LLM_API_KEY', '').strip()
+        or os.getenv('OPENAI_API_KEY', '').strip()
+        or os.getenv('LLM_API_KEY', '').strip()
+    )
+    if not model:
+        return agent_llm
+    from scripts.agent_utils import create_llm
+
+    timeout_ms = 0
+    raw = os.getenv('REVIEWER_LLM_TIMEOUT_MS', '').strip()
+    if raw:
+        try:
+            timeout_ms = float(raw)
+        except (TypeError, ValueError):
+            timeout_ms = 0
+    if timeout_ms <= 0:
+        raw_s = os.getenv('AI_PHASE_REVIEWER_TIMEOUT_S', '').strip()
+        if raw_s:
+            try:
+                timeout_ms = float(raw_s) * 1000
+            except (TypeError, ValueError):
+                timeout_ms = 0
+    if timeout_ms <= 0:
+        raw_llm = os.getenv('LLM_TIMEOUT_MS', '').strip()
+        if raw_llm:
+            try:
+                timeout_ms = float(raw_llm)
+            except (TypeError, ValueError):
+                timeout_ms = 0
+    timeout_sec = timeout_ms / 1000.0 if timeout_ms > 0 else None
+    return create_llm(model, base_url, api_key=api_key, timeout=timeout_sec)
+
+
 async def review_phase_contract(
     *,
     task_text: str,
@@ -257,7 +302,13 @@ async def review_phase_contract(
 ) -> dict[str, Any] | None:
     from scripts.feature_flags import phase_reviewer_enabled, phase_reviewer_timeout_s
 
-    if not phase_reviewer_enabled() or llm is None:
+    if not phase_reviewer_enabled():
+        return None
+    # When no explicit llm is passed, try to build a dedicated reviewer LLM
+    # from REVIEWER_LLM_* env. Falls back to agent LLM (may still be None).
+    if llm is None:
+        llm = _get_reviewer_llm(llm)
+    if llm is None:
         return None
     from langchain_core.messages import HumanMessage, SystemMessage
 
