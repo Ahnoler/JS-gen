@@ -43,6 +43,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   影响范围：xpath 路径填写输入框/日期控件前滚动到视口（before/after 截图可见填写结果）；下拉/日期选择器行为不变。无 schema/路由/WS 变更。
   文件：scripts/controller/actions/js_snippets/fill_core.py, scripts/characterization/characterize-fill-xpath-scroll.py（新增）
 
+- 2026-08-26: **V3 推送「业务对象名称」报错补全（propertiesName 未净化）**：上条修复只覆盖顶层 transcationName，但伙伴将 V3 transcationProperties 的每个条目（propertiesName，如「法定代表人/负责人信息」）也作为业务对象校验——含 / 等禁用字符仍报「业务对象名称不能包含 \\ / : * ? \" < > | '」（V2 路径早有此规则，V3 遗漏）。修复：buildTransactionEntryV3 在 uniquifyPropertiesNames 后对全部 propertiesName 统一 sanitizeTranscationName。实测（traj 33 全量 143 个 propertiesName）残留 0。
+  影响范围：V3 推送 payload 全部 properties 条目名称净化（推送不再因条目名含 / : 等报错）；transcationName 行为不变。无 schema/路由/WS 变更。
+  文件：src/services/transaction-export-v3.js, scripts/characterization/characterize-transaction-name.mjs
+
 - 2026-08-26: **V3 推送「业务对象名称」含伙伴禁用字符报错**：轨迹名（用户手输，无字符校验）经 transaction-export-v3.js:913 原样作为 transcationName 推送，伙伴 importDemand 校验失败（\\ / : * ? \" < > | '）时错误直透前端。修复：V3（及 V2 deprecated 路径）名称装配点对禁用字符 sanitize 为 `_`；前端 RecordingDialog.vue 交易名称输入增加同规则校验（即时提示+提交拦截，源头告警）。
   影响范围：推送 payload transcationName 命中禁用字符时以 `_` 替换（推送不再失败）；前端录入时即提示。无 schema/路由/WS 变更。
   文件：src/services/transaction-export-v3.js, src/services/transaction-export.js ★前端（ui-auto-recording-agent-vue-master：vue-project/src/views/ui-recording/components/RecordingDialog.vue）

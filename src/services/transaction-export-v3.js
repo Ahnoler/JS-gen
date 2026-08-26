@@ -909,6 +909,14 @@ export function buildTransactionEntryV3(traj, {
     }
   }
   uniquifyPropertiesNames(properties);
+  // Partner 将每个 properties 条目作为业务对象校验名称：propertiesName 同样禁止
+  // \\ / : * ? " < > | '（V2 已有同规则——transaction-export.js:85；V3 此前遗漏，
+  // 如「法定代表人/负责人信息」触发“业务对象名称不能包含 \ / : * ? \" < > | '”）。
+  for (const p of properties) {
+    if (p && p.propertiesName != null) {
+      p.propertiesName = sanitizeTranscationName(String(p.propertiesName));
+    }
+  }
 
   const id = traj.id != null ? String(traj.id) : '';
   const name = sanitizeTranscationName(String(traj.name || '').trim()) || (`trajectory-${id}`);

@@ -53,6 +53,8 @@ check(sanitizeTranscationName('a:b') === 'a_b', 'colon replaced');
 check(sanitizeTranscationName('a*b') === 'a_b', 'asterisk replaced');
 check(sanitizeTranscationName('a?b') === 'a_b', 'question mark replaced');
 check(sanitizeTranscationName('a<b>c') === 'a_b_c', 'angle brackets replaced');
+check(v3Src.includes("p.propertiesName = sanitizeTranscationName(String(p.propertiesName))"), 'v3 sanitizes every propertiesName (business object name)');
+check(v3Src.includes('uniquifyPropertiesNames(properties)') && v3Src.indexOf('p.propertiesName = sanitizeTranscationName') > v3Src.indexOf('uniquifyPropertiesNames(properties)'), 'v3 propertiesName sanitize runs after uniquify');
 
 if (failures) {
   console.log(`FAIL: ${failures} assertion(s) failed`);
