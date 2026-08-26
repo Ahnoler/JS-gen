@@ -74,11 +74,16 @@ ${PAGE_LOCATOR_HELPERS}
     function normLabel(s) {
       return String(s || '').trim().replace(/[：:*\\s]+$/g, '');
     }
+    function placeholderLabel(node) {
+      const ph = (node && node.getAttribute && node.getAttribute('placeholder')) || '';
+      return (ph || '').replace(/^请输入/, '').replace(/[：:*\\s]+$/g, '').trim();
+    }
     function formItemLabel(node) {
       const item = node && node.closest && node.closest('.el-form-item');
       if (!item) return '';
       const lbl = item.querySelector('.el-form-item__label');
-      return normLabel(lbl && lbl.textContent);
+      const t = (lbl && lbl.textContent || '').trim().replace(/[：:*\\s]+$/g, '');
+      return t || placeholderLabel(node);
     }
     function xpathOf(node) {
       return absXPath(node);
@@ -106,7 +111,7 @@ ${PAGE_LOCATOR_HELPERS}
     function snap(el, matchedLabel, asFormField, kindHint, regionOverride) {
       const abs = xpathOf(el);
       const rawText = cleanVisibleText(el);
-      const formLabel = asFormField ? matchedLabel : '';
+      const formLabel = asFormField ? formItemLabel(el) : '';
       const loc = buildLocatorSnap(el, rawText, abs, formLabel, {
         targetKind: kindHint || undefined,
         region: regionOverride || undefined,
