@@ -92,12 +92,12 @@ JS_MANUAL_PART_A = r'''(() => {
     return (ph || '').replace(/^请输入/, '').replace(/[：:*\s]+$/g, '').trim();
   }
 
-  function formItemLabel(el) {
-    const item = el.closest('.el-form-item');
+  function formItemLabel(node) {
+    const item = node.closest && node.closest('.el-form-item');
     if (!item) return '';
     const lbl = item.querySelector('.el-form-item__label');
     const t = (lbl && lbl.textContent || '').trim().replace(/[：:*\s]+$/g, '');
-    return t || placeholderLabel(el);
+    return t || placeholderLabel(node);
   }
 
   function openDateEditorMeta() {
