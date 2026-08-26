@@ -204,12 +204,14 @@ ${PAGE_LOCATOR_HELPERS}
     return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
   }
 
-  function elMeta(node, textOverride) {
+  function elMeta(node, textOverride, kindHint) {
     const t = textOverride != null ? String(textOverride) : shortLabel(node);
     const bu = buXPathOf(node);
     const abs = xpathOf(node);
     const formLbl = formItemLabel(node);
-    const loc = buildLocatorSnap(node, t, abs, formLbl);
+    const loc = buildLocatorSnap(node, t, abs, formLbl, {
+      targetKind: kindHint || undefined,
+    });
     return {
       xpath: loc.xpath || bu || abs,
       bu_xpath: bu,
@@ -222,7 +224,7 @@ ${PAGE_LOCATOR_HELPERS}
       attributes: loc.attributes || attrs(node),
       text: loc.text || t,
       formLabel: loc.formLabel || formLbl || '',
-      target_kind: loc.target_kind || '',
+      target_kind: loc.target_kind || kindHint || '',
       parent_text: loc.parent_text || '',
       icon_class: loc.icon_class || '',
       placeholder: loc.placeholder || '',
@@ -231,6 +233,15 @@ ${PAGE_LOCATOR_HELPERS}
       locator_verified: loc.locator_verified === true,
       locator_strategy: loc.locator_strategy || '',
       locator_fallback_reason: loc.locator_fallback_reason || undefined,
+      region_role: loc.region_role || '',
+      region_id: loc.region_id || '',
+      region_label: loc.region_label || '',
+      region_chrome: loc.region_chrome || '',
+      region_section: loc.region_section || '',
+      region_block: loc.region_block || '',
+      layers: Array.isArray(loc.layers) ? loc.layers : [],
+      feature_card: loc.feature_card || undefined,
+      page_bbox: loc.page_bbox || undefined,
     };
   }
 
@@ -354,7 +365,7 @@ ${PAGE_LOCATOR_HELPERS}
       label_text: open ? formItemLabel(open) : '',
       option_text: optionText,
       source_channel: 'cdp_bib',
-    }, elMeta(opt, optionText));
+    }, elMeta(opt, optionText, 'form_select'));
   }
 
   // Date picker day cell → fill_date (user picks from calendar, does not type)
@@ -369,7 +380,7 @@ ${PAGE_LOCATOR_HELPERS}
         label_text: meta.label,
         value: value,
         source_channel: 'cdp_bib',
-      }, elMeta(meta.input || dateTd, value));
+      }, elMeta(meta.input || dateTd, value, 'form_date'));
     }
     // Incomplete at press-time (no label / header parse) → bridge confirms after click commits
     return {
@@ -411,7 +422,7 @@ ${PAGE_LOCATOR_HELPERS}
         kind: 'click_menu_item',
         menu_text: menuText,
         source_channel: 'cdp_bib',
-      }, elMeta(menu, menuText));
+      }, elMeta(menu, menuText, 'menu'));
     }
   }
 
@@ -426,7 +437,7 @@ ${PAGE_LOCATOR_HELPERS}
         kind: 'click_menu_item',
         menu_text: menuText,
         source_channel: 'cdp_bib',
-      }, elMeta(item, menuText));
+      }, elMeta(item, menuText, 'menu'));
     }
   }
 
@@ -438,7 +449,7 @@ ${PAGE_LOCATOR_HELPERS}
       row_text: tableRowIdentityText(rowBtn).slice(0, 40),
       button_text: buttonText,
       source_channel: 'cdp_bib',
-    }, elMeta(rowBtn, buttonText));
+    }, elMeta(rowBtn, buttonText, 'table_row_button'));
   }
 
   const tableRadio = el.closest && el.closest(
@@ -452,7 +463,7 @@ ${PAGE_LOCATOR_HELPERS}
       kind: 'click_table_row_radio',
       row_text: rowText,
       source_channel: 'cdp_bib',
-    }, elMeta(tableRadio, rowText));
+    }, elMeta(tableRadio, rowText, 'table_row_button'));
   }
 
   const radio = el.closest && el.closest('.el-radio, .el-radio-button');
@@ -463,7 +474,7 @@ ${PAGE_LOCATOR_HELPERS}
       label_text: formItemLabel(radio),
       option_text: optionText,
       source_channel: 'cdp_bib',
-    }, elMeta(radio, optionText));
+    }, elMeta(radio, optionText, 'form_radio'));
   }
 
   const tab = el.closest && el.closest('.el-tabs__item');
@@ -473,12 +484,12 @@ ${PAGE_LOCATOR_HELPERS}
       kind: 'switch_tab',
       tab_name: tabName,
       source_channel: 'cdp_bib',
-    }, elMeta(tab, tabName));
+    }, elMeta(tab, tabName, 'tab'));
   }
 
   const closeBtn = el.closest && el.closest('.el-dialog__headerbtn, .el-message-box__headerbtn, .el-drawer__close-btn');
   if (closeBtn) {
-    return Object.assign({ kind: 'close_dialog', source_channel: 'cdp_bib' }, elMeta(closeBtn, 'close'));
+    return Object.assign({ kind: 'close_dialog', source_channel: 'cdp_bib' }, elMeta(closeBtn, 'close', 'dialog_close'));
   }
 
   const btn = el.closest && el.closest('button, .el-button, a, [role="button"]');
