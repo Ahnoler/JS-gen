@@ -32,6 +32,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- 2026-08-26: **xpath 填充路径补 scrollIntoView（before/after PNG 可视化修复）**：fill 主路径已切换到 xpath 优先（`JS_FILL_BY_XPATH`），原 `JS_FILL_FORM_FIELD`（label 路径）中的 `item.scrollIntoView` 仅在 label 兜底分支执行——输入框填写不再滚动到视口，导致填写前后截图看不到结果（下拉/日期选择器路径本就有滚动，故无此问题）。修复：`JS_FILL_BY_XPATH` 新增 `scrollFillTarget`（优先滚动所在 `.el-form-item`，与 label 路径语义一致），在 placeholder 分支与主 xpath 路径（date/普通共用）setFn 前调用。
+  影响范围：xpath 路径填写输入框/日期控件前滚动到视口（before/after 截图可见填写结果）；下拉/日期选择器行为不变。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/js_snippets/fill_core.py, scripts/characterization/characterize-fill-xpath-scroll.py（新增）
+
 - 2026-08-26: **V3 推送「业务对象名称」含伙伴禁用字符报错**：轨迹名（用户手输，无字符校验）经 transaction-export-v3.js:913 原样作为 transcationName 推送，伙伴 importDemand 校验失败（\\ / : * ? \" < > | '）时错误直透前端。修复：V3（及 V2 deprecated 路径）名称装配点对禁用字符 sanitize 为 `_`；前端 RecordingDialog.vue 交易名称输入增加同规则校验（即时提示+提交拦截，源头告警）。
   影响范围：推送 payload transcationName 命中禁用字符时以 `_` 替换（推送不再失败）；前端录入时即提示。无 schema/路由/WS 变更。
   文件：src/services/transaction-export-v3.js, src/services/transaction-export.js ★前端（ui-auto-recording-agent-vue-master：vue-project/src/views/ui-recording/components/RecordingDialog.vue）

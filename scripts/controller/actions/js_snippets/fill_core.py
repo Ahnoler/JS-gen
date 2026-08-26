@@ -107,6 +107,7 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
     t.dispatchEvent(new Event('change', { bubbles: true }));
     t.dispatchEvent(new Event('blur', { bubbles: true }));
   };
+  const scrollFillTarget = (el) => { try { const item = el && el.closest && el.closest('.el-form-item'); (item || el).scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (e) {} };
   const isVis = (el) => {
     if (!el || el.nodeType !== 1) return false;
     if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
@@ -212,11 +213,13 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
       }
     }
     if (target) {
+      scrollFillTarget(target);
       setFn(target, val == null ? '' : String(val));
       return 'ok-placeholder';
     }
   }
   if (!target) return xpath ? 'xpath-not-found' : 'xpath-empty';
+  scrollFillTarget(target);
   const isDate = !!(target.closest && target.closest('.el-date-editor, .tsscdatepicker'));
   if (target.disabled || (target.readOnly && !isDate)) return 'field-disabled';
   if (isDate) {
