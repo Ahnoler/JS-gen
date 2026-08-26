@@ -82,8 +82,13 @@ export const FORM_LLM_TIMEOUT_MS = Number(_resolve('FORM_LLM_TIMEOUT_MS', String
 export const REVIEWER_LLM_MODEL = _resolve('REVIEWER_LLM_MODEL', LLM_MODEL);
 export const REVIEWER_LLM_BASE_URL = _resolve('REVIEWER_LLM_BASE_URL', LLM_BASE_URL || 'http://218.77.58.156:3000/v1');
 export const REVIEWER_LLM_API_KEY = _resolve('REVIEWER_LLM_API_KEY', LLM_API_KEY);
-/** Reviewer LLM 请求超时（毫秒；缺省回落 AI_PHASE_REVIEWER_TIMEOUT_S×1000，再回落 LLM_TIMEOUT_MS） */
-export const REVIEWER_LLM_TIMEOUT_MS = Number(_resolve('REVIEWER_LLM_TIMEOUT_MS', String(LLM_TIMEOUT_MS))) || LLM_TIMEOUT_MS;
+/**
+ * Reviewer LLM 请求超时（毫秒）。
+ * 未设置时不注入（空串），Python 端 _get_reviewer_llm 跟随 AI_PHASE_REVIEWER_TIMEOUT_S
+ * （评审外层 asyncio.wait_for 硬上限，默认 20s），再回落 LLM_TIMEOUT_MS。
+ * 仅当显式设置且 >0 时才作为 JS 侧超时语义（当前 JS 侧无直接消费者）。
+ */
+export const REVIEWER_LLM_TIMEOUT_MS = _resolve('REVIEWER_LLM_TIMEOUT_MS', '');
 
 /** Scenario Describer LLM（缺省回落主 LLM） */
 export const SCENARIO_LLM_MODEL = _resolve('SCENARIO_LLM_MODEL', LLM_MODEL);

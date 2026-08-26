@@ -15,6 +15,7 @@
  */
 import { normalizeActionName } from '../models/action-name.js';
 import { trajectoryStepToActionEntry } from '../models/element.js';
+import { sanitizeTranscationName } from './transaction-name.js';
 import {
   ACTION_TO_ENGINE_TYPE,
   pickExportTarget,
@@ -158,7 +159,7 @@ export function buildTransactionEntry(traj, { systemId, projectId } = {}) {
   uniquifyPropertiesNames(properties);
 
   const id = traj.id != null ? String(traj.id) : '';
-  const name = (String(traj.name || '').trim() || `trajectory-${id}`).replace(/[\\/:*?"<>|']/g, '_');
+  const name = sanitizeTranscationName(String(traj.name || '').trim()) || (`trajectory-${id}`);
 
   return {
     entry: {

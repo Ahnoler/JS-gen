@@ -251,10 +251,21 @@ def _build_user_payload(
 def _get_reviewer_llm(agent_llm=None):
     """Dedicated REVIEWER_LLM_* if configured; else fall back to agent LLM.
 
-    Reads REVIEWER_LLM_MODEL / BASE_URL / API_KEY. When all three are empty,
+    Reads REVIEWER_LLM_MODEL / BASE_URL / API_KEY. When MODEL is empty,
     returns agent_llm unchanged (may be None). Otherwise creates a dedicated
-    ChatOpenAI with timeout = REVIEWER_LLM_TIMEOUT_MS → AI_PHASE_REVIEWER_TIMEOUT_S
-    × 1000 → LLM_TIMEOUT_MS (first non-empty, converted to seconds).
+    ChatOpenAI.
+
+    Timeout chain (first non-empty / >0 wins, converted to seconds):
+      1. REVIEWER_LLM_TIMEOUT_MS (explicit ms, >0)
+      2. AI_PHASE_REVIEWER_TIMEOUT_S × 1000 (via feature_flags.phase_reviewer_timeout_s();
+         default 20s)
+      3. LLM_TIMEOUT_MS (fallback ms)
+
+    两层超时关系：本 timeout 是 LLM 实例级（create_llm timeout=，单次 ainvoke 软上限）；
+    外层 review_phase_contract 的 asyncio.wait_for(..., timeout=phase_reviewer_timeout_s())
+    是评审硬上限（含 LLM 调用 + 解析 + 重试总耗时）。当未显式设置 REVIEWER_LLM_TIMEOUT_MS
+    时，两者取同一基准（AI_PHASE_REVIEWER_TIMEOUT_S），避免实例级超时 > 外层硬上限导致
+    asyncio.wait_for 先行截断而 LLM 软超时形同虚设。<=0 → 不传 timeout（用 create_llm 默认）。
     """
     model = os.getenv('REVIEWER_LLM_MODEL', '').strip()
     base_url = os.getenv('REVIEWER_LLM_BASE_URL', '').strip()
@@ -266,6 +277,7 @@ def _get_reviewer_llm(agent_llm=None):
     if not model:
         return agent_llm
     from scripts.agent_utils import create_llm
+    from scripts.feature_flags import phase_reviewer_timeout_s
 
     timeout_ms = 0
     raw = os.getenv('REVIEWER_LLM_TIMEOUT_MS', '').strip()
@@ -275,12 +287,8 @@ def _get_reviewer_llm(agent_llm=None):
         except (TypeError, ValueError):
             timeout_ms = 0
     if timeout_ms <= 0:
-        raw_s = os.getenv('AI_PHASE_REVIEWER_TIMEOUT_S', '').strip()
-        if raw_s:
-            try:
-                timeout_ms = float(raw_s) * 1000
-            except (TypeError, ValueError):
-                timeout_ms = 0
+        # 跟随评审外层硬上限 AI_PHASE_REVIEWER_TIMEOUT_S（默认 20s）
+        timeout_ms = phase_reviewer_timeout_s() * 1000
     if timeout_ms <= 0:
         raw_llm = os.getenv('LLM_TIMEOUT_MS', '').strip()
         if raw_llm:

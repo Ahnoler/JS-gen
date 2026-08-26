@@ -72,12 +72,25 @@ gb_js = (ROOT / 'src' / 'routes' / 'browser-session' / 'global-browser.js').read
 check('global-browser.js injects SCENARIO_LLM_MODEL', 'SCENARIO_LLM_MODEL' in gb_js)
 check('global-browser.js injects REVIEWER_LLM_MODEL', 'REVIEWER_LLM_MODEL' in gb_js)
 check('global-browser.js injects FORM_LLM_TIMEOUT_MS', 'FORM_LLM_TIMEOUT_MS' in gb_js)
-check('global-browser.js injects L1C_LLM_MODEL', 'L1C_LLM_MODEL' in gb_js)
+check('global-browser.js does NOT inject L1C_LLM_MODEL', 'L1C_LLM_MODEL' not in gb_js)
+check('global-browser.js does NOT inject REVIEWER_LLM_TIMEOUT_MS', 'REVIEWER_LLM_TIMEOUT_MS' not in gb_js)
 
-# ── reviewer.py: _get_reviewer_llm + REVIEWER_LLM_TIMEOUT_MS ───────────────
+# ── region-classify.js: L1C_LLM_MODEL consumer (import + passthrough) ──────
+region_classify_js = (ROOT / 'src' / 'services' / 'region-classify.js').read_text(encoding='utf-8')
+check('region-classify.js imports L1C_LLM_MODEL', 'L1C_LLM_MODEL' in region_classify_js)
+check('region-classify.js passes L1C_LLM_MODEL to callLLMWithTimeout', 'callLLMWithTimeout(buildClassifyPrompt(cards), L1C_LLM_MODEL)' in region_classify_js)
+
+# ── executor/session-slot.js: does NOT inject L1C_LLM_MODEL / REVIEWER_LLM_TIMEOUT_MS ──
+session_slot_js = (ROOT / 'executor' / 'session-slot.js').read_text(encoding='utf-8')
+check('session-slot.js does NOT inject L1C_LLM_MODEL', 'L1C_LLM_MODEL' not in session_slot_js)
+check('session-slot.js does NOT inject REVIEWER_LLM_TIMEOUT_MS', 'REVIEWER_LLM_TIMEOUT_MS' not in session_slot_js)
+
+# ── reviewer.py: _get_reviewer_llm + timeout chain ──────────────────────────
 reviewer_py = (ROOT / 'scripts' / 'controller' / 'actions' / 'phase' / 'reviewer.py').read_text(encoding='utf-8')
 check('reviewer.py has _get_reviewer_llm', 'def _get_reviewer_llm' in reviewer_py)
 check('reviewer.py reads REVIEWER_LLM_TIMEOUT_MS', 'REVIEWER_LLM_TIMEOUT_MS' in reviewer_py)
+check('reviewer.py timeout chain uses phase_reviewer_timeout_s', 'phase_reviewer_timeout_s' in reviewer_py)
+check('reviewer.py timeout chain references AI_PHASE_REVIEWER_TIMEOUT_S', 'AI_PHASE_REVIEWER_TIMEOUT_S' in reviewer_py)
 
 # ── _llm_values.py: timeout= in _get_form_llm ──────────────────────────────
 llm_values_py = (ROOT / 'scripts' / 'controller' / 'actions' / '_llm_values.py').read_text(encoding='utf-8')

@@ -1,9 +1,8 @@
 import {
   LLM_API_KEY, PORT,
   FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY, FORM_LLM_TIMEOUT_MS,
-  REVIEWER_LLM_MODEL, REVIEWER_LLM_BASE_URL, REVIEWER_LLM_API_KEY, REVIEWER_LLM_TIMEOUT_MS,
+  REVIEWER_LLM_MODEL, REVIEWER_LLM_BASE_URL, REVIEWER_LLM_API_KEY,
   SCENARIO_LLM_MODEL, SCENARIO_LLM_BASE_URL, SCENARIO_LLM_API_KEY, SCENARIO_LLM_TIMEOUT_MS,
-  L1C_LLM_MODEL,
 } from '#config/config.js';
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
@@ -62,10 +61,8 @@ export async function ensureGlobalBrowser(modelId) {
     FORM_LLM_TIMEOUT_MS: String(FORM_LLM_TIMEOUT_MS),
     // 角色级 LLM 覆盖（Python 端 os.getenv 直接读取；未设则 Python 回落主 LLM_*）
     REVIEWER_LLM_MODEL, REVIEWER_LLM_BASE_URL, REVIEWER_LLM_API_KEY: REVIEWER_LLM_API_KEY || LLM_API_KEY,
-    REVIEWER_LLM_TIMEOUT_MS: String(REVIEWER_LLM_TIMEOUT_MS),
     SCENARIO_LLM_MODEL, SCENARIO_LLM_BASE_URL, SCENARIO_LLM_API_KEY: SCENARIO_LLM_API_KEY || LLM_API_KEY,
     SCENARIO_LLM_TIMEOUT_MS: String(SCENARIO_LLM_TIMEOUT_MS),
-    L1C_LLM_MODEL,
   });
 
   child.stderr.on('data', (chunk) => { console.log(chunk.toString().trimEnd()); });

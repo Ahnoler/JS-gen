@@ -197,7 +197,6 @@ export const SCENARIO_LLM_MODEL = resolve('SCENARIO_LLM_MODEL', LLM_MODEL);
 export const SCENARIO_LLM_BASE_URL = resolve('SCENARIO_LLM_BASE_URL', resolve('LLM_BASE_URL', 'http://218.77.58.156:3000/v1'));
 export const SCENARIO_LLM_API_KEY = resolve('SCENARIO_LLM_API_KEY', resolve('LLM_API_KEY', ''));
 export const SCENARIO_LLM_TIMEOUT_MS = Number(resolve('SCENARIO_LLM_TIMEOUT_MS', resolve('LLM_TIMEOUT_MS', '120000'))) || 120000;
-export const L1C_LLM_MODEL = resolve('L1C_LLM_MODEL', LLM_MODEL);
 export const LLM_API_KEY = resolve('LLM_API_KEY', '');
 export const CONTROL_PLANE_HTTP = resolve('CONTROL_PLANE_URL', 'http://127.0.0.1:4097').replace(/\/$/, '');
 

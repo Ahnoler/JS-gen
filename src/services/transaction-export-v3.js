@@ -11,6 +11,7 @@
  *     `label`/`regionId`/`regionLabel`/`screenshot` 统一恒有（空给 ""/[]）。
  */
 import { mapStepToTransactionEvent, uniquifyPropertiesNames } from './transaction-export.js';
+import { sanitizeTranscationName } from './transaction-name.js';
 import { MINIO_BUCKET, MINIO_PUBLIC_URL } from '../../config/config.js';
 
 /**
@@ -910,7 +911,7 @@ export function buildTransactionEntryV3(traj, {
   uniquifyPropertiesNames(properties);
 
   const id = traj.id != null ? String(traj.id) : '';
-  const name = (String(traj.name || '').trim() || `trajectory-${id}`).replace(/[\\/:*?"<>|']/g, '_');
+  const name = sanitizeTranscationName(String(traj.name || '').trim()) || (`trajectory-${id}`);
 
   const entry = {
     transcId: id,

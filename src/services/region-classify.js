@@ -3,7 +3,7 @@
  */
 import { createHash } from 'node:crypto';
 import { callLLM } from '../llm-utils.js';
-import { L1C_LLM, L1C_LLM_TIMEOUT_MS } from '../../config/config.js';
+import { L1C_LLM, L1C_LLM_TIMEOUT_MS, L1C_LLM_MODEL } from '../../config/config.js';
 
 const SEED = new Set([
   'shell-header',
@@ -118,20 +118,20 @@ function buildClassifyPrompt(cards) {
   ].join('\n');
 }
 
-async function callLLMWithTimeout(prompt) {
+async function callLLMWithTimeout(prompt, model) {
   let timer;
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error('llm_timeout')), L1C_LLM_TIMEOUT_MS);
   });
   try {
-    return await Promise.race([callLLM(prompt), timeoutPromise]);
+    return await Promise.race([callLLM(prompt, model), timeoutPromise]);
   } finally {
     clearTimeout(timer);
   }
 }
 
 async function llmClassifyBatch(cards) {
-  const raw = await callLLMWithTimeout(buildClassifyPrompt(cards));
+  const raw = await callLLMWithTimeout(buildClassifyPrompt(cards), L1C_LLM_MODEL);
   const arr = parseLlmJsonArray(raw);
   if (!arr) throw new Error('invalid_llm_json');
 
