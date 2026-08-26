@@ -1,34 +1,44 @@
 """JS_MANUAL_RECORDER part B (injected page script, second half)."""
 
 JS_MANUAL_PART_B = r'''
-  function elMeta(el, textOverride) {
+  function elMeta(el, textOverride, kindHint, regionOverride) {
     const t = textOverride != null ? String(textOverride) : shortLabel(el);
     const hi = highlightIndexOf(el);
     const bu = buXPathOf(el);
     const abs = xpathOf(el);
-    const formLbl = (function () {
-      const item = el.closest && el.closest('.el-form-item');
-      if (!item) return '';
-      const lbl = item.querySelector('.el-form-item__label');
-      return normalizeFormLabel(lbl && lbl.textContent);
-    })();
-    const loc = buildLocatorSnap(el, t, abs, formLbl);
+    const formLbl = formItemLabel(el);
+    const loc = buildLocatorSnap(el, t, abs, formLbl, {
+      targetKind: kindHint || undefined,
+      region: regionOverride || undefined,
+    });
     const meta = {
       xpath: loc.xpath || bu || abs,
       bu_xpath: bu,
       xpath_abs: abs,
       xpath_full: loc.xpath_full || abs,
       xpath_smart: loc.xpath_smart || '',
+      cssSelector: loc.cssSelector || '',
       candidates: loc.candidates || [],
       tag: loc.tag || (el.tagName || '').toLowerCase(),
       attributes: loc.attributes || attrs(el),
       text: loc.text || t,
       formLabel: loc.formLabel || formLbl || '',
-      target_kind: loc.target_kind || '',
+      target_kind: loc.target_kind || kindHint || '',
+      parent_text: loc.parent_text || '',
+      icon_class: loc.icon_class || '',
+      placeholder: loc.placeholder || '',
       locator_scope: loc.locator_scope || '',
       locator_occurrence: loc.locator_occurrence || 0,
       locator_verified: loc.locator_verified === true,
       locator_strategy: loc.locator_strategy || '',
+      region_role: loc.region_role || '',
+      region_id: loc.region_id || '',
+      region_label: loc.region_label || '',
+      region_chrome: loc.region_chrome || '',
+      region_section: loc.region_section || '',
+      region_block: loc.region_block || '',
+      layers: Array.isArray(loc.layers) ? loc.layers : [],
+      feature_card: loc.feature_card || undefined,
     };
     if (loc.locator_fallback_reason) meta.locator_fallback_reason = loc.locator_fallback_reason;
     if (hi != null) meta.highlight_index = hi;
