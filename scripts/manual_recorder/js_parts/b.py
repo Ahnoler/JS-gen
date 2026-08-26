@@ -59,7 +59,7 @@ JS_MANUAL_PART_B = r'''
   function emitMenu(menuEl) {
     const menuText = shortLabel(menuEl);
     if (!menuText) return false;
-    emit(Object.assign({ kind: 'click_menu_item', menu_text: menuText }, elMeta(menuEl, menuText)));
+    emit(Object.assign({ kind: 'click_menu_item', menu_text: menuText }, elMeta(menuEl, menuText, 'menu')));
     return true;
   }
 
@@ -207,7 +207,7 @@ JS_MANUAL_PART_B = r'''
           kind: 'fill_date',
           label_text: pick.label,
           value: pick.value,
-        }, elMeta(pick.input || dateTd, pick.value)));
+        }, elMeta(pick.input || dateTd, pick.value, 'form_date')));
       }, 80);
       return;
     }
@@ -260,7 +260,7 @@ JS_MANUAL_PART_B = r'''
         kind: 'click_table_row_button',
         row_text: rowText,
         button_text: buttonText,
-      }, elMeta(rowBtn, buttonText)));
+      }, elMeta(rowBtn, buttonText, 'table_row_button')));
       return;
     }
 
@@ -287,7 +287,7 @@ JS_MANUAL_PART_B = r'''
         emit(Object.assign({
           kind: 'click_table_row_radio',
           row_text: rowText,
-        }, elMeta(tableRadio, rowText)));
+        }, elMeta(tableRadio, rowText, 'table_row_button')));
         return;
       }
       // Still no identity — fall through to enriched click rather than drop the step
@@ -345,7 +345,7 @@ JS_MANUAL_PART_B = r'''
         emit(Object.assign({
           kind: 'click_adjacent_button',
           label_text: label,
-        }, elMeta(adjBtn, visibleText(adjBtn))));
+        }, elMeta(adjBtn, visibleText(adjBtn), 'adjacent_button')));
         return;
       }
     }
@@ -359,7 +359,7 @@ JS_MANUAL_PART_B = r'''
           emit(Object.assign({
             kind: 'click_icon_button',
             button_text: btnText,
-          }, elMeta(iconHost, btnText)));
+          }, elMeta(iconHost, btnText, 'icon')));
           return;
         }
       }
@@ -404,7 +404,7 @@ JS_MANUAL_PART_B = r'''
             kind: 'select_tree_option',
             label_text: labelText,
             option_text: optionText,
-          }, elMeta(formHost, optionText)));
+          }, elMeta(formHost, optionText, 'form_tree_select')));
           return;
         }
       }
@@ -436,7 +436,7 @@ JS_MANUAL_PART_B = r'''
       if (host) {
         const text = shortLabel(host);
         if (text && text.length <= 20) {
-          emit(Object.assign({ kind: 'click_menu_item', menu_text: text }, elMeta(host, text)));
+          emit(Object.assign({ kind: 'click_menu_item', menu_text: text }, elMeta(host, text, 'menu')));
         }
       }
     }
@@ -466,7 +466,7 @@ JS_MANUAL_PART_B = r'''
     // 若所得 label 是完整 placeholder 的子串，说明是剥离产物，改回完整 placeholder。
     const labelText = (label && fullPh && fullPh.includes(label) && label !== fullPh)
       ? fullPh : (label || fullPh);
-    const meta = elMeta(el, value);
+    const meta = elMeta(el, value, 'form_input');
     emit(Object.assign({
       kind: kind,
       label_text: labelText,
