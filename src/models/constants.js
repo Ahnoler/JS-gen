@@ -64,7 +64,11 @@ export const TRAJECTORY_RECORD_STATUSES = Object.freeze(['draft', 'recording', '
  */
 export const PERSISTENT_RECORD_STATUSES = Object.freeze(['draft', 'recorded', 'completed', 'failed']);
 
-/** 是否持久状态（非录制中）。 */
+/**
+ * 是否持久状态（非录制中）。
+ * @param {string} status 记录状态
+ * @returns {boolean} 是否为持久状态
+ */
 export function isPersistentRecordStatus(status) {
   return PERSISTENT_RECORD_STATUSES.includes(status);
 }
@@ -78,10 +82,9 @@ export function isPersistentRecordStatus(status) {
  *   - outcome='success' → 一律 待确认(recorded)（未录制/待确认/已确认/录制异常 重录成功均进入待确认）
  *   - outcome='failure' → 一律 录制异常(failed)
  * - outcome='restore'（非终结性：关浏览器/断开/回收/重启中断）→ 恢复到录制前持久状态基线。
- *
  * @param {string} base 录制前的持久状态（persistent_record_status）
- * @param {'success'|'failure'|'restore'} outcome
- * @returns {import('./constants.js').TrajectoryRecordStatus}
+ * @param {'success'|'failure'|'restore'} outcome 录制结束结果
+ * @returns {import('./constants.js').TrajectoryRecordStatus} 录制后的持久状态
  */
 export function resolvePostRecordingStatus(base, outcome) {
   if (outcome === 'success') return 'recorded';

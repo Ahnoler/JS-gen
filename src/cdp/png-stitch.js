@@ -1,12 +1,18 @@
+/**
+ * Vertical PNG slice stitching for phase long-screenshots.
+ */
 import { PNG } from 'pngjs';
 
 const DEFAULT_MAX_BYTES = 12_000_000;
 
 /**
- * stitchPngSlices(buffers, { overlap = 48, overlaps = null, maxBytes })
- * - overlap: 单值（旧行为，所有片 i>=1 裁掉相同行数）。
- * - overlaps: 每片实际 overlap 数组——片 i（i>=1）的 skip = overlaps[i] ?? 0（片 0 恒 skip 0）；
- *   高度 = h0 + Σ(h_i - skip_i)。末片被 clamp 时 overlap 自然大于 48，图像仍连续。
+ * Stitch PNG screenshot slices vertically into one long image.
+ * @param {Buffer[]} buffers PNG buffers to stitch (must share width).
+ * @param {object} [opts] Stitch options.
+ * @param {number} [opts.overlap] Single-value overlap (rows cropped from every slice i>=1). Default 48.
+ * @param {number[]|null} [opts.overlaps] Per-slice overlap array; slice i skip = overlaps[i] ?? 0.
+ * @param {number} [opts.maxBytes] Max output bytes; downsamples by 2× when exceeded.
+ * @returns {Buffer} Stitched PNG buffer.
  */
 export function stitchPngSlices(buffers, { overlap = 48, overlaps = null, maxBytes = DEFAULT_MAX_BYTES } = {}) {
   if (!Array.isArray(buffers) || !buffers.length) {

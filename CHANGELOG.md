@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   影响范围：新增开发工具链（lint 不阻塞 CI，warn 级别）；无 schema/路由/WS 变更；不影响 Python 对齐（仅 JS-gen 侧开发规范）。
   文件：docs/jsdoc-convention.md（新增）, eslint.config.js（新增）, package.json
 
+- 2026-08-26: **JSDoc 存量缺口批量补全（2431 warning → 0）**：按 `docs/jsdoc-convention.md` 规范，对 `src/` 下全部存量 JSDoc 缺口补全——每个导出函数补 `@param {Type}`/`@returns {Type}`（含对象解构逐字段、`Promise<{...}>`、默认值从 @param 移入代码签名）、补文件头、修 `{Object}`→`{object}`（check-types）、描述与 @param 空行（tag-lines）、`Function`→具体函数类型（reject-function-type）、`*`→`unknown`（reject-any-type）等。覆盖：src/models（315）、src/dao（312）、src/services（520）、src/routes（102）、src/dashboard（34）、src/cdp 剩余、src/memory、src/runtime、src/http、src 根级单文件、executor/、src/playwright-runner、config/、seeds/ 等约 180 个文件。全程遵守 characterization pin 约束（只插入注释不改代码行）。
+  影响范围：`npm run lint` 从 2431 warning 降至 **0 warning / 0 error**；无任何业务逻辑、schema、路由、WS 变更；verify-all 全绿。
+  文件：src/models/*, src/dao/*, src/services/**（约 70 文件）, src/routes/**（约 40 文件）, src/dashboard/**（16 文件）, src/cdp/*, src/memory/*, src/runtime/*, src/http/*, src/executor-*.js, src/dedup.js, src/state.js, src/ws-server.js, src/trajectory-store.js, src/business-data-store.js, src/script-utils.js, src/llm-utils.js, src/middleware/sso-auth.js, executor/*, src/playwright-runner/*, config/*, seeds/*, eslint.config.js
+
 ### Fixed
 
 - 2026-08-26: **迁移 `20260814110000_trajectory_batch_job.js` 在 MySQL 5.7 上 `Unknown collation: 'utf8mb4_0900_ai_ci'` 修复**：该迁移为 `trajectory` 新增 `batch_job_id` 外键列时显式 `.collate('utf8mb4_0900_ai_ci')` 以对齐 `batch_recording_job.id`——但 `utf8mb4_0900_ai_ci` 是 MySQL 8.0 专有 collation，服务器（47.101.58.49 docker mysql）为 **MySQL 5.7.44**，不识别该 collation，`knex migrate:latest` 在此迁移失败并阻塞其后全部迁移（12 个未应用）。实际 `batch_recording_job.id` 与 `trajectory` 表的 collation 均为 `utf8mb4_general_ci`（继承表默认，迁移 `20260802140000` 未钉 collation），原注释假设错误。修复：移除 `.collate(...)` 调用，新列继承 `trajectory` 表默认 `utf8mb4_general_ci`，与 FK 目标列一致，FK `fk_traj_batch_job` 正常建立。服务器已上传修复后迁移并重跑 `migrate:latest`（52 个迁移全部应用），`/api/docs`、`/api/health` 均返回 200。

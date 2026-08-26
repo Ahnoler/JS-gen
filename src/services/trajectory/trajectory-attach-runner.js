@@ -21,6 +21,12 @@ import { runDefaultLogin } from './trajectory-record-lifecycle.js';
 import { USE_EXECUTOR } from '#config/config.js';
 import { attachTrajectoryLive } from './trajectory-attach-service.js';
 
+/**
+ * Prepare a trajectory for recording after the session lock is acquired.
+ * Resolves account, resets stale running phases, runs default login, attaches live.
+ * @param {number} tid trajectory DB id
+ * @returns {Promise<object>} prepare result with trajectory, account, and session info
+ */
 export async function prepareTrajectoryRecordingUnlocked(tid) {
   const { traj, account, accountId } = await resolveTrajectoryAccount(tid);
 

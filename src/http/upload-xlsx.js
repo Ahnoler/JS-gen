@@ -5,6 +5,7 @@
 import multer from 'multer';
 import { decodeUploadFilename } from './decode-upload-filename.js';
 
+/** OOXML spreadsheet MIME type accepted by this uploader. */
 export const XLSX_MIME =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -31,6 +32,11 @@ const upload = multer({
 /** Express middleware: multipart field `file`. */
 export const uploadXlsxSingle = upload.single('file');
 
+/**
+ * Map a multer error to the HTTP status to send (400 for MulterError / validation, else null).
+ * @param {Error} err err
+ * @returns {number|null} result
+ */
 export function multerHttpStatus(err) {
   if (err instanceof multer.MulterError) return 400;
   if (err?.code === 'VALIDATION') return 400;

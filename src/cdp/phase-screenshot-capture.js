@@ -1,3 +1,6 @@
+/**
+ * Phase long-screenshot capture: scroll-stitch visible L2 control rects across slices.
+ */
 import { PNG } from 'pngjs';
 import {
   buildPhaseScreenshotCollectExpression,
@@ -54,6 +57,8 @@ async function cdpPng(client, clip, viewport) {
  * Chrome headed 在 DPR≠1 时 captureScreenshot 输出设备像素（h0 = box.height * dpr），
  * scrollTop 仍是 CSS 像素：步进用 CSS（box.height - OVERLAP），stitch skip 用
  * overlaps[i] = h0 - round((top_i - top_{i-1}) * h0 / box.height)。
+ * @param {import('./client.js').CdpClient} client CDP client.
+ * @returns {Promise<{ buffer: Buffer, meta: { contentWidth: number, contentHeight: number, truncated: boolean, elements: object[] } }>} Stitched long screenshot + collected element rects.
  */
 export async function runPhaseScreenshotCapture(client) {
   let scroll = { top: 0, clientHeight: 0, scrollHeight: 0 };

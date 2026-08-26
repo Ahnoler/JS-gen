@@ -1,3 +1,6 @@
+/**
+ * DAO for the `sys_dict_data` table — dictionary data entries (labels/values) per type.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
@@ -8,6 +11,13 @@ function shape(row) {
   return fromDbRow(row);
 }
 
+/**
+ * List dictionary data entries ordered by dict_sort then dict_code.
+ * @param {object} [opts] 筛选选项
+ * @param {string} [opts.dictType] filter by dict_type
+ * @param {string} [opts.status] filter by status
+ * @returns {Promise<object[]>} dictionary data entities
+ */
 export async function list({ dictType, status } = {}) {
   let q = getDB()(TABLE).orderBy([
     { column: 'dict_sort', order: 'asc' },
@@ -22,20 +32,40 @@ export async function list({ dictType, status } = {}) {
   return fromDbRows(await q);
 }
 
+/**
+ * List active (status '0') dictionary data entries for a given type.
+ * @param {string} dictType 字典类型
+ * @returns {Promise<object[]>} active dictionary data entities
+ */
 export async function listByTypeActive(dictType) {
   return list({ dictType, status: '0' });
 }
 
+/**
+ * Fetch a single dictionary data entry by dict_code.
+ * @param {number} dictCode 字典编码
+ * @returns {Promise<object|null>} dictionary data entity or null when not found
+ */
 export async function getById(dictCode) {
   const row = await getDB()(TABLE).where({ dict_code: dictCode }).first();
   return shape(row);
 }
 
+/**
+ * Count dictionary data entries for a given type.
+ * @param {string} dictType 字典类型
+ * @returns {Promise<number>} count of entries
+ */
 export async function countByType(dictType) {
   const row = await getDB()(TABLE).where({ dict_type: dictType }).count({ c: '*' }).first();
   return Number(row?.c || 0);
 }
 
+/**
+ * Create a new dictionary data entry and return the created entity.
+ * @param {object} data camelCase dict data fields
+ * @returns {Promise<object|null>} created dictionary data entity
+ */
 export async function create(data) {
   const row = {
     dict_sort: data.dictSort ?? data.dict_sort ?? 0,
@@ -54,6 +84,12 @@ export async function create(data) {
   return getById(id);
 }
 
+/**
+ * Update a dictionary data entry by dict_code and return the updated entity.
+ * @param {number} dictCode 字典编码
+ * @param {object} data partial camelCase dict data fields
+ * @returns {Promise<object|null>} updated dictionary data entity
+ */
 export async function update(dictCode, data) {
   const patch = {};
   if (data.dictSort !== undefined) patch.dict_sort = data.dictSort;
@@ -71,11 +107,20 @@ export async function update(dictCode, data) {
   return getById(dictCode);
 }
 
+/**
+ * Delete a dictionary data entry by dict_code.
+ * @param {number} dictCode 字典编码
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function remove(dictCode) {
   return getDB()(TABLE).where({ dict_code: dictCode }).del();
 }
 
-/** Count special_element rows referencing this dict_code. */
+/**
+ * Count special_element rows referencing this dict_code.
+ * @param {number} dictCode 字典编码
+ * @returns {Promise<number>} count of referencing special_element rows
+ */
 export async function countSpecialElementRefs(dictCode) {
   const hasTable = await getDB().schema.hasTable('special_element');
   if (!hasTable) return 0;

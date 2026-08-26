@@ -17,7 +17,7 @@ let jwtSecretCache = { value: null, at: 0 };
 
 /**
  * 获取 JWT 验签密钥。优先配置 SSO_JWT_SECRET；否则调 query_jwt_secret 并缓存。
- * @returns {Promise<string|null>}
+ * @returns {Promise<string|null>} 密钥字符串；配置缺失且接口失败/无内容时返回 null
  */
 export async function getJwtSecret() {
   const configured = String(SSO_JWT_SECRET || '').trim();
@@ -43,7 +43,7 @@ export async function getJwtSecret() {
 /**
  * 用 accessToken 回查当前用户信息（对应 SDK AccessUserContext.getCurrentUser()）。
  * @param {string} accessToken 账号中心 JWT
- * @returns {Promise<{ userId?: string, userName?: string, userAccount?: string, gender?: string, avatarAddr?: string, authBy?: string|null } | null>}
+ * @returns {Promise<{ userId?: string, userName?: string, userAccount?: string, gender?: string, avatarAddr?: string, authBy?: string|null } | null>} 用户信息对象；token 为空/接口错误/业务码非成功时返回 null
  */
 export async function getAccessUser(accessToken) {
   const token = String(accessToken || '').trim();

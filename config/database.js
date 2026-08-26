@@ -9,6 +9,10 @@ import { resolve } from './config.js';
 
 let knexInstance;
 
+/**
+ * 获取 knex 单例实例（首次调用时按 config/.env 创建连接池）。
+ * @returns {import('knex').Knex} knex 实例（mysql2 client）
+ */
 export function getDB() {
   if (!knexInstance) {
     knexInstance = knexLib({
@@ -32,6 +36,10 @@ export function getDB() {
   return knexInstance;
 }
 
+/**
+ * 关闭并释放 knex 连接池（服务停机时调用）。
+ * @returns {Promise<void>}
+ */
 export async function closeDB() {
   if (knexInstance) {
     await knexInstance.destroy();

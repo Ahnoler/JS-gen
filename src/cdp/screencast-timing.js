@@ -22,8 +22,9 @@ function clamp(n, lo, hi) {
 }
 
 /**
- * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
- * @returns {{ minForwardMs: number, everyNthFrame: number }}
+ * Resolve screencast forward cadence + CDP everyNthFrame from env overrides.
+ * @param {Record<string, string|undefined>} [env] Environment map (defaults to process.env).
+ * @returns {{ minForwardMs: number, everyNthFrame: number }} Clamped timing config.
  */
 export function resolveScreencastTiming(env = process.env) {
   const minForwardMs = clamp(

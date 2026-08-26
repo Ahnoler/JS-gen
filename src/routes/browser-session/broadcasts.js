@@ -4,6 +4,12 @@ import { broadcast } from '../../ws-server.js';
 import { getRemoteStatus } from '../../cdp/remote-bridge.js';
 import * as remoteSessionService from '../../services/remote-session-service.js';
 
+/**
+ * WebSocket broadcast helpers — push session list, watcher/CDP status, and
+ * remote-bridge status to connected dashboard clients.
+ */
+
+/** Broadcast the current session list (sessions:updated) to all WS clients. */
 export function broadcastSessions() {
   const gb = state.globalBrowser;
   const list = [];
@@ -44,6 +50,7 @@ function pushRemoteStatus() {
   broadcast('remote:status', getRemoteStatus());
 }
 
+/** Broadcast watcher connection/busy/CDP + remote status (watcher:status) to all WS clients. */
 export function broadcastWatcherStatus() {
   const gb = state.globalBrowser;
   const executorSessions = [...state.sessions.values()].filter((s) => s.useExecutor);

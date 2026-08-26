@@ -72,7 +72,9 @@ function needsTypeB(report) {
 /**
  * Guard Type B mutations: wrong-scope / collapsed scans must not delete steps or rewrite snapshots.
  * Classic failure: expected main ~70 fields, scanned drawer ~6 → mass missing → wipe trajectory.
- * @returns {{ unsafe: boolean, reason?: string }}
+ * @param {object} report form-structure diff report from replay
+ * @param {object} snap stored form snapshot with fields array
+ * @returns {{ unsafe: boolean, reason?: string }} safety assessment; unsafe=true blocks mutation
  */
 function assessFormStructureDiffSafety(report, snap) {
   if (!report) return { unsafe: true, reason: 'no_report' };
@@ -104,6 +106,22 @@ function assessFormStructureDiffSafety(report, snap) {
   return { unsafe: false };
 }
 
+/**
+ * Handle a Type B form-structure checkpoint during steps/replay.
+ * Compares live scan against stored snapshot; deletes missing-label steps and AI-fills added labels.
+ * @param {object} root0 checkpoint context
+ * @param {number} root0.tid trajectory DB id
+ * @param {object} root0.runtime trajectory runtime object
+ * @param {boolean} root0.doSuppress whether to suppress step persist
+ * @param {object} root0.entry replay action entry
+ * @param {number|null} root0.stepId checkpoint step DB id
+ * @param {number} root0.stepNum step index in the batch
+ * @param {number} root0.total total steps in the batch
+ * @param {Array<object>} root0.actions remaining in-memory action queue
+ * @param {Set<number>} root0.skippedIds set of step ids to skip
+ * @param {Map<number, object>} root0.snapshotsByTrigger form snapshots keyed by trigger step id
+ * @returns {Promise<{ ok: boolean, aborted: boolean, results: Array<object>, healed: Array<object>, error?: string, userAbort?: boolean }>} checkpoint result
+ */
 export async function handleFormStructureCheckpoint({
   tid,
   runtime,

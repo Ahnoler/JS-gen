@@ -2,6 +2,13 @@
  * Pure planner for POST .../steps/move.
  * Builds global order = phases sorted by phaseNumber, each phase's steps in list order
  * after removing stepId and inserting before beforeStepId (or phase end).
+ * @param {object} root0 move plan input
+ * @param {Array<object>} root0.steps all trajectory step rows
+ * @param {Array<object>} root0.phases all trajectory phase rows
+ * @param {number} root0.stepId step DB id to move
+ * @param {number} root0.targetPhaseId target phase DB id
+ * @param {number|null} [root0.beforeStepId] step DB id to insert before (null = phase end)
+ * @returns {{ ok: boolean, code?: string, message?: string, ordered?: Array<object>, movedStepId?: number }} move plan result
  */
 export function planStepMove({
   steps,

@@ -22,7 +22,8 @@ import { assembleRegionTree } from '../services/region-tree.js';
 
 /**
  * Sanitize preview (never expose form values / secrets).
- * @param {object} el
+ * @param {object} el Element meta to preview.
+ * @returns {object} Sanitized preview with secrets stripped.
  */
 function toPreview(el) {
   const attrs = el?.attributes && typeof el.attributes === 'object' ? { ...el.attributes } : {};
@@ -51,7 +52,12 @@ function toPreview(el) {
 
 /**
  * Page-side script: find all matching controls.
- * @param {object} opts
+ * @param {object} opts Resolve options.
+ * @param {string} [opts.labelText] Form label text to match.
+ * @param {string} [opts.actionType] Action type hint (click / fill / select …).
+ * @param {object} [opts.params] Action params for action-aware matching.
+ * @param {string} [opts.mode] Resolve mode (needle / inventory).
+ * @returns {string} Page eval expression returning match results.
  */
 export function buildResolveExpression({
   labelText = '',
@@ -503,9 +509,10 @@ ${PAGE_LOCATOR_HELPERS}
 }
 
 /**
- * @param {import('./client.js').CdpClient} client
- * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string, pageLabel?: string }} opts
- * @returns {Promise<{ element?: object, matchedLabel?: string, ambiguous?: boolean, matches?: object[], truncated?: boolean }>}
+ * Resolve Element UI control by label_text / actionType+params via CDP.
+ * @param {import('./client.js').CdpClient} client CDP client attached to the page.
+ * @param {{ labelText?: string, actionType?: string, params?: object, mode?: string, pageLabel?: string }} opts Resolve options.
+ * @returns {Promise<{ element?: object, matchedLabel?: string, ambiguous?: boolean, matches?: object[], truncated?: boolean }>} Resolve result (single element, ambiguous matches, or 404).
  */
 export async function resolveElementByLabel(client, opts = {}) {
   const mode = String(opts.mode || 'needle').trim() || 'needle';

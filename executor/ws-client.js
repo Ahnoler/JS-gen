@@ -4,22 +4,29 @@
 import WebSocket from 'ws';
 
 /**
- * @typedef {Object} ExecutorWsClientOptions
+ * @typedef {object} ExecutorWsClientOptions
  * @property {string} url WS URL including ?token=
- * @property {() => object} getRegisterPayload
- * @property {(msg: {type: string, payload: object}) => void} [onMessage]
- * @property {(payload: object) => void} [onRegistered]
- * @property {() => void} [onDisconnected]
+ * @property {() => object} getRegisterPayload function returning the register payload
+ * @property {(msg: {type: string, payload: object}) => void} [onMessage] inbound message callback
+ * @property {(payload: object) => void} [onRegistered] registered callback
+ * @property {() => void} [onDisconnected] disconnected callback
  * @property {() => void} [onDisconnectTimeout] 断线超时（调用方应杀会话，防静默丢事件）
  * @property {number} [disconnectTimeoutMs] 断线超时阈值（默认 30s）
- * @property {number} [heartbeatIntervalMs]
+ * @property {number} [heartbeatIntervalMs] heartbeat interval in ms
  * @property {number} [heartbeatAckTimeoutMs] heartbeat ack 超时阈值（默认 40s = 2×心跳间隔）
- * @property {number} [reconnectMinMs]
- * @property {number} [reconnectMaxMs]
+ * @property {number} [reconnectMinMs] minimum reconnect delay in ms
+ * @property {number} [reconnectMaxMs] maximum reconnect delay in ms
  */
 
+/**
+ * Outbound WebSocket client for the executor agent: connects to the control plane,
+ * registers, sends heartbeats, auto-reconnects with exponential backoff, and buffers
+ * messages during disconnects to prevent silent event loss.
+ */
 export class ExecutorWsClient {
-  /** @param {ExecutorWsClientOptions} options */
+  /**
+   * @param {ExecutorWsClientOptions} options options
+   */
   constructor(options) {
     this.url = options.url;
     this.getRegisterPayload = options.getRegisterPayload;
@@ -56,6 +63,10 @@ export class ExecutorWsClient {
     this.lastAckAt = 0;
   }
 
+  /**
+   * Open the WS connection and send register on open.
+   * @returns {void} result
+   */
   connect() {
     if (this.stopping) return;
     this.clearReconnectTimer();
@@ -98,6 +109,11 @@ export class ExecutorWsClient {
     });
   }
 
+  /**
+   * Handle inbound server messages (registered, heartbeat.ack, drain, etc.).
+   * @param {{ type: string, payload: object }} msg inbound server message
+   * @returns {void}
+   */
   handleServerMessage(msg) {
     const { type, payload } = msg;
 
@@ -129,6 +145,12 @@ export class ExecutorWsClient {
     }
   }
 
+  /**
+   * Send a typed JSON message; queues into pending buffer when disconnected.
+   * @param {string} type type
+   * @param {object} [payload] payload
+   * @returns {boolean} true if sent or buffered, false if stopping
+   */
   send(type, payload = {}) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type, payload }));
@@ -151,7 +173,10 @@ export class ExecutorWsClient {
     return true;
   }
 
-  /** 重连注册成功后按序重放断线期间缓存的消息。 */
+  /**
+   * Replay buffered messages after successful reconnection.
+   * @returns {void} result
+   */
   flushPending() {
     if (!this.pendingQueue.length) return;
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -172,6 +197,10 @@ export class ExecutorWsClient {
     }
   }
 
+  /**
+   * Start the disconnect-timeout watchdog (kills sessions after threshold).
+   * @returns {void} result
+   */
   startDisconnectWatchdog() {
     this.clearDisconnectWatchdog();
     this.disconnectWatchdog = setTimeout(() => {
@@ -184,6 +213,10 @@ export class ExecutorWsClient {
     this.disconnectWatchdog.unref?.();
   }
 
+  /**
+   * Clear the disconnect-timeout watchdog.
+   * @returns {void} result
+   */
   clearDisconnectWatchdog() {
     if (this.disconnectWatchdog) {
       clearTimeout(this.disconnectWatchdog);
@@ -194,7 +227,8 @@ export class ExecutorWsClient {
   /**
    * Send raw binary over WS (used by RSCF screencast frames).
    * Returns false when socket is closed or outbound buffer is backing up (caller should drop frame).
-   * @param {Buffer|Uint8Array} data
+   * @param {Buffer|Uint8Array} data data
+   * @returns {boolean} result
    */
   sendBinary(data) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
@@ -203,6 +237,10 @@ export class ExecutorWsClient {
     return true;
   }
 
+  /**
+   * Send a heartbeat; terminates the WS if no ack received within the threshold.
+   * @returns {void} result
+   */
   heartbeat() {
     if (!this.registered) return;
     this.send('executor.heartbeat', {});
@@ -219,12 +257,20 @@ export class ExecutorWsClient {
     }
   }
 
+  /**
+   * Start the periodic heartbeat interval.
+   * @returns {void} result
+   */
   startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => this.heartbeat(), this.heartbeatIntervalMs);
     this.heartbeatTimer.unref?.();
   }
 
+  /**
+   * Stop the heartbeat interval.
+   * @returns {void} result
+   */
   stopHeartbeat() {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
@@ -232,6 +278,10 @@ export class ExecutorWsClient {
     }
   }
 
+  /**
+   * Schedule an exponential-backoff reconnect attempt.
+   * @returns {void} result
+   */
   scheduleReconnect() {
     if (this.stopping || this.reconnectTimer) return;
     const delay = Math.min(
@@ -247,6 +297,10 @@ export class ExecutorWsClient {
     this.reconnectTimer.unref?.();
   }
 
+  /**
+   * Clear any pending reconnect timer.
+   * @returns {void} result
+   */
   clearReconnectTimer() {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -256,7 +310,7 @@ export class ExecutorWsClient {
 
   /**
    * Graceful shutdown: unregister then close.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} result
    */
   async stop() {
     this.stopping = true;

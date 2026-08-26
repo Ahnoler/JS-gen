@@ -18,6 +18,10 @@ import { MINIO_BUCKET, MINIO_PUBLIC_URL } from '../../config/config.js';
  * 优先用 screenshot.image_url（上传时由 uploadScreenshot 存的 MinIO 公网直链）；
  * 若缺失（老数据），用 MINIO_PUBLIC_URL + MINIO_BUCKET + storagePath 兜底拼接。
  * 两者都拿不到时返回 null（调用方据此跳过该截图）。
+ * @param {object} opts 选项
+ * @param {string|null} [opts.imageUrl] 公网直链
+ * @param {string|null} [opts.storagePath] MinIO 存储路径
+ * @returns {string|null} 永久直链 URL 或 null
  */
 function resolveScreenshotUrl({ imageUrl, storagePath }) {
   if (imageUrl) return imageUrl;
@@ -71,16 +75,31 @@ const KIND_MAP = Object.freeze({
   drawer: 'drawer',
 });
 
+/**
+ * 将控件 action_type 映射为同事格式的 {command, action} 对象。
+ * @param {string} actionType - 原始 action 类型
+ * @returns {{command: string, action: string}} 映射后的同事格式对象
+ */
 export function mapControlAction(actionType) {
   const m = ACTION_MAP[actionType];
   return m ? { command: m[0], action: m[1] } : { command: actionType || '', action: actionType || '' };
 }
 
+/**
+ * 将控件 target_kind 映射为同事格式的 kind。
+ * @param {string} targetKind - 原始 target kind
+ * @returns {string} 映射后的同事格式 kind
+ */
 export function mapControlKind(targetKind) {
   return KIND_MAP[targetKind] || targetKind || '';
 }
 
 /** region_id 分层链（'|' 分段，role:label）中含 overlay 段 → 返回该段；否则 null。 */
+/**
+ * 检查 region_id 分层链中是否包含 overlay 段。
+ * @param {string} regionId - region_id 字符串
+ * @returns {{role: string, label: string}|null} 如果包含 overlay 段则返回 {role: 'overlay', label: '...'}，否则返回 null
+ */
 export function isOverlayRegion(regionId) {
   const rid = String(regionId || '').trim();
   if (!rid) return null;
@@ -94,6 +113,11 @@ export function isOverlayRegion(regionId) {
 }
 
 /** 从 region_id 链提取页面 key（第一段 page:...）。 */
+/**
+ * 从 region_id 链中提取页面 key（第一段 page:...）。
+ * @param {string} regionId - region_id 字符串
+ * @returns {string} 提取的页面 key，如果没有则返回空字符串
+ */
 export function pageKeyFromRegionId(regionId) {
   const rid = String(regionId || '').trim();
   if (!rid) return '';
@@ -102,6 +126,11 @@ export function pageKeyFromRegionId(regionId) {
 }
 
 /** 从 region_id 链提取弹窗 key（前两段 page:...|dialog:...）。 */
+/**
+ * 从 region_id 链中提取弹窗 key（前两段 page:...|dialog:...）。
+ * @param {string} regionId - region_id 字符串
+ * @returns {string} 提取的弹窗 key，如果没有则返回空字符串
+ */
 export function popupKeyFromRegionId(regionId) {
   const rid = String(regionId || '').trim();
   if (!rid) return '';
@@ -114,6 +143,12 @@ export function popupKeyFromRegionId(regionId) {
  * 剥掉页面级 key 中 hash 内的易变 query（`#/route?x=1` → `#/route`，截到下一个 `|` 段边界）。
  * 存量数据在 2026-08-20 修复前把 in-fragment query 写进了 level_key / region_id page 前缀，
  * 导出侧用规范化 key 兜底匹配，让新旧两代 key 互相对齐。
+ */
+/**
+ * 剥掉页面级 key 中 hash 内的易变 query（`#/route?x=1` → `#/route`，截到下一个 `|` 段边界）。
+ * 用于规范化 key 以兼容新旧两代数据。
+ * @param {string} key - 原始 key
+ * @returns {string} 规范化后的 key
  */
 export function stripVolatileQuery(key) {
   const s = String(key || '');
@@ -142,7 +177,11 @@ function parseStepElement(step) {
   return el && typeof el === 'object' ? el : null;
 }
 
-/** 合法 rect 判定：四值有限且 x2>x1、y2>y1。 */
+/**
+ * 合法 rect 判定：四值有限且 x2>x1、y2>y1。
+ * @param {object|null|undefined} bbox rect 对象
+ * @returns {boolean} 是否为合法 rect
+ */
 function isLegalRect(bbox) {
   return !!bbox && typeof bbox === 'object'
     && Number.isFinite(Number(bbox.x1)) && Number.isFinite(Number(bbox.y1))
@@ -150,7 +189,11 @@ function isLegalRect(bbox) {
     && Number(bbox.x2) > Number(bbox.x1) && Number(bbox.y2) > Number(bbox.y1);
 }
 
-/** rect 输出序列化：非空对象 → 紧凑 JSON 字符串；空 → ""（消费方单列存储）。 */
+/**
+ * rect 输出序列化：非空对象 → 紧凑 JSON 字符串；空 → ""（消费方单列存储）。
+ * @param {object|null|undefined} rect rect 对象
+ * @returns {string} 序列化后的 rect 字符串
+ */
 function rectToString(rect) {
   return rect && typeof rect === 'object' && Object.keys(rect).length > 0
     ? JSON.stringify(rect)
@@ -165,7 +208,12 @@ function rectToString(rect) {
  * 每个条目的 `screenshot` 数组含一个永久有效的直链（MinIO 公网，bucket 已设公开读策略，
  * 匿名可访问）。消费方直接用该 URL 访问图片，无需 MinIO SDK、无需自建预签名。
  * 拿不到 URL 的截图（本地暂存未上传且无公网直链兜底）会被跳过（其 id 不占号，后续顺延）。
- *
+ * @param {object} [opts] - 配置选项
+ * @param {object} [opts.traj] - 轨迹对象
+ * @param {Array} [opts.phases] - 阶段数组
+ * @param {Array} [opts.phaseScreenshots] - 阶段截图数组
+ * @param {Array} [opts.dialogScreenshots] - 弹窗截图数组
+ * @param {Array} [opts.pageLevelScreenshots] - 页面级截图数组
  * @returns {{ entries: Array, idByPhase: Map<number,number>, idByDialog: Map<string,number>, idByPageLevel: Map<string,number>, idByPageLevelNorm: Map<string,number>, pageLevelById: Map<string,object> }}
  *   entries           — 截图 properties 条目数组（同构于控件条目）
  *   idByPhase         — 旧链路 phaseId → entryId
@@ -358,6 +406,22 @@ export function buildScreenshotEntries({
  *   找不到父截图给 ""，不丢步骤）。
  * `rect` 构建期为对象（弹窗坐标换算需要），由 buildTransactionEntryV3 合并后统一序列化为
  * JSON 字符串（空给 ""）；`label`/`regionId`/`regionLabel`/`screenshot` 统一恒有（空给 ""/[]）。
+ * @param {object} [opts] - 配置选项
+ * @param {object} [opts.traj] - 轨迹对象
+ * @param {Array} [opts.phases] - 阶段数组
+ * @param {number} [opts.screenshotCount] - 截图数量，用于计算控件 id 起始值
+ * @param {Map<number,number>} [opts.idByPhase] - 旧链路 phaseId → entryId 映射
+ * @param {Map<string,number>} [opts.idByDialog] - dialog 标题 → entryId 映射
+ * @param {Map<string,number>} [opts.idByPageLevel] - pageKey/popupKey → entryId 映射
+ * @param {Map<string,number>} [opts.idByPageLevelNorm] - 规范化 pageKey/popupKey → entryId 映射
+ * @param {Map<string,object>} [opts.pageLevelById] - entryId → 截图条目映射
+ * @returns {{properties: Array, metaActions: number, absoluteFallback: number, missingOptions: number, noRectControls: number, normalizedRects: number}}
+ *   properties - 控件 properties 数组
+ *   metaActions - 元操作计数
+ *   absoluteFallback - 绝对回退计数
+ *   missingOptions - 缺少选项计数
+ *   noRectControls - 无 rect 控件计数
+ *   normalizedRects - 归一化 rect 计数
  */
 export function buildV3Properties({
   traj = {},
@@ -624,6 +688,9 @@ export function buildV3Properties({
 /**
  * 沿 propertiesPID 链向上追溯，返回最近的 type=page/popup 条目的 propertiesID；无则 null。
  * partition-via-pid 后 object 的 propertiesPID 可能指向中间节点（section/tab/wizard/card），需上溯到截图条目。
+ * @param {object} prop - properties 对象
+ * @param {Map<string,object>} propsById - propertiesID 到 properties 对象的映射
+ * @returns {string|null} 最近的 page/popup 条目的 propertiesID，如果没有则返回 null
  */
 export function resolveRootScreenshotId(prop, propsById) {
   let cur = prop;
@@ -643,7 +710,11 @@ export function resolveRootScreenshotId(prop, propsById) {
  * 校验沿 pid 链向上追溯（resolveRootScreenshotId）到最近的 page/popup 截图。
  * 无可定位信息的可导出步骤（无 elementType / regionId / rect / realLabel）不作为控件参与校验，
  * 避免无 element_json 的历史可导出步骤在新链路上硬阻断整条交易。
+ * @param {object} entry - 交易条目对象
  * @returns {{ ok: boolean, missing: Array, exempt: Array }}
+ *   ok - 是否所有可定位 object 都有父截图
+ *   missing - 缺少父截图的可定位 object 列表
+ *   exempt - 被豁免的可导出步骤列表（无可定位信息）
  */
 export function validatePageLevelCoverage(entry) {
   const props = Array.isArray(entry?.transcationProperties) ? entry.transcationProperties : [];
@@ -691,7 +762,10 @@ export function validatePageLevelCoverage(entry) {
 /**
  * 字段完整性校验：统计缺失字段，不阻断推送。
  * 中间节点（section/tab/wizard/card）无 elementType/screenshot 是正常的，不报 issue。
+ * @param {object} entry - 交易条目对象
  * @returns {{ ok: boolean, missing: Array }}
+ *   ok - 是否所有字段都完整
+ *   missing - 缺失字段的 object 列表
  */
 export function validateFieldCompleteness(entry) {
   const props = Array.isArray(entry?.transcationProperties) ? entry.transcationProperties : [];
@@ -725,7 +799,11 @@ const truncatedSuffix = '...truncated';
 
 /**
  * 超长字符串截断：超过 limit 时截到 limit 长度并补 truncatedSuffix（仅统计不阻断）。
+ * @param {string} field - 字段名称
+ * @param {string} value - 原始值
  * @returns {{ value: string, truncated: boolean }}
+ *   value - 截断后的值
+ *   truncated - 是否被截断
  */
 function truncateFieldValue(field, value) {
   const limit = FIELD_LENGTH_LIMITS[field];
@@ -738,6 +816,9 @@ function truncateFieldValue(field, value) {
  * 覆盖缺失是否阻断推送：仅 page_level 模式（新录制，830 需求适用对象）强校验；
  * legacy_phase_fallback（存量旧数据，无法不重录补页面级截图）降级为告警——
  * 缺失数/键仍进 stats（missingPageLevelScreenshots / missingPageLevelKeys）供消费方识别风险。
+ * @param {{ok: boolean}} coverage - 覆盖校验结果
+ * @param {object} stats - 统计信息
+ * @returns {boolean} 是否阻断推送
  */
 export function coverageBlocksPush(coverage, stats) {
   if (coverage?.ok) return false;
@@ -748,7 +829,19 @@ export function coverageBlocksPush(coverage, stats) {
  * Build one V3 transaction entry.
  * 截图条目（buildScreenshotEntries）与控件条目（buildV3Properties）合并成一个
  * transcationProperties 数组：截图在前，控件在后，统一 schema。
+ * @param {object} traj - 轨迹对象
+ * @param {object} [opts] - 配置选项
+ * @param {string} [opts.systemId] - 系统ID
+ * @param {string} [opts.projectId] - 项目ID
+ * @param {Array} [opts.phases] - 阶段数组
+ * @param {Array} [opts.phaseScreenshots] - 阶段截图数组
+ * @param {Array} [opts.dialogScreenshots] - 弹窗截图数组
+ * @param {Array} [opts.pageLevelScreenshots] - 页面级截图数组
  * @returns {{ entry: object, count: number, skipped: object, stats: object }}
+ *   entry - V3 交易条目
+ *   count - properties 数量
+ *   skipped - 跳过的元操作统计
+ *   stats - 详细统计信息
  */
 export function buildTransactionEntryV3(traj, {
   systemId,
@@ -817,7 +910,7 @@ export function buildTransactionEntryV3(traj, {
   uniquifyPropertiesNames(properties);
 
   const id = traj.id != null ? String(traj.id) : '';
-  const name = String(traj.name || '').trim() || `trajectory-${id}`;
+  const name = (String(traj.name || '').trim() || `trajectory-${id}`).replace(/[\\/:*?"<>|']/g, '_');
 
   const entry = {
     transcId: id,
@@ -852,6 +945,13 @@ export function buildTransactionEntryV3(traj, {
 /**
  * Single-trajectory V3 importDemand body.
  * 发给 partner 的 payload 只含 transcationEventTypeList（截图已合并进每个 entry）。
+ * @param {object} traj - 轨迹对象
+ * @param {object} [opts] - 配置选项
+ * @returns {{payload: object, count: number, skipped: object, stats: object}}
+ *   payload - V3 importDemand payload
+ *   count - properties 数量
+ *   skipped - 跳过的元操作统计
+ *   stats - 详细统计信息
  */
 export function buildTransactionPayloadV3(traj, opts = {}) {
   const built = buildTransactionEntryV3(traj, opts);
@@ -868,6 +968,12 @@ export function buildTransactionPayloadV3(traj, opts = {}) {
 /**
  * Multi-trajectory V3 importDemand body.
  * 发给 partner 的 payload 只含 transcationEventTypeList（截图已合并进每个 entry）。
+ * @param {Array} [builtEntries] - 已构建的 V3 条目数组
+ * @returns {{payload: object, count: number, skipped: object, stats: object}}
+ *   payload - V3 importDemand payload
+ *   count - 总 properties 数量
+ *   skipped - 总跳过的元操作统计
+ *   stats - 总详细统计信息
  */
 export function wrapTransactionListV3(builtEntries = []) {
   const list = [];

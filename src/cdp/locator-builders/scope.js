@@ -4,6 +4,13 @@
  */
 import { hasClassToken } from './text.js';
 
+/**
+ * Detect the container kind (dialog / drawer / nav) from absolute xpath / className / container hint.
+ * @param {string} [xpathFull] Absolute xpath.
+ * @param {string} [className] Element class string.
+ * @param {string} [container] Explicit container hint.
+ * @returns {'dialog'|'drawer'|'nav'|''} Detected container kind, or empty string.
+ */
 export function detectContainerKind(xpathFull = '', className = '', container = '') {
   if (container === 'dialog' || container === 'drawer' || container === 'nav') return container;
   const full = String(xpathFull || '');
@@ -35,8 +42,9 @@ export function detectContainerKind(xpathFull = '', className = '', container = 
 
 /**
  * Wrap an xpath expression with occurrence index when needed.
- * @param {string} expr
- * @param {number} [occurrence]
+ * @param {string} expr XPath expression.
+ * @param {number} [occurrence] 1-based occurrence index (0 = no index).
+ * @returns {string} XPath wrapped with `[n]` when occurrence >= 1, else unchanged.
  */
 export function withOccurrence(expr, occurrence = 0) {
   const xp = String(expr || '').trim();
@@ -49,7 +57,8 @@ export function withOccurrence(expr, occurrence = 0) {
 
 /**
  * Scope prefix for relative xpath.
- * @param {'dialog'|'drawer'|'overlay'|'nav'|''} kind
+ * @param {'dialog'|'drawer'|'overlay'|'nav'|''} kind Container kind.
+ * @returns {string} Scope prefix xpath (empty for unknown kinds).
  */
 export function scopePrefix(kind) {
   // Do NOT use [last()] — DOM last is often a leftover hidden dialog.
@@ -67,8 +76,9 @@ export function scopePrefix(kind) {
 
 /**
  * Join scope + local relative path.
- * @param {string} local — starts without leading //
- * @param {'dialog'|'drawer'|'overlay'|'nav'|''} kind
+ * @param {string} local Local relative xpath (without leading `//`).
+ * @param {'dialog'|'drawer'|'overlay'|'nav'|''} kind Container kind.
+ * @returns {string} Scoped xpath, or `//local` when no scope applies.
  */
 export function scopedXPath(local, kind) {
   const loc = String(local || '').replace(/^\/+/, '');
@@ -78,7 +88,3 @@ export function scopedXPath(local, kind) {
   return `//${loc}`;
 }
 
-/**
- * Stable attribute short-circuit xpath.
- * @param {{ tag?: string, attributes?: Record<string,string>, container?: string, xpathFull?: string, className?: string }} opts
- */

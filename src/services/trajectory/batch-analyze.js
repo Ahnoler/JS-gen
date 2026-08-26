@@ -147,6 +147,8 @@ async function runAnalyze(item, token) {
 
 /**
  * Create trajectory+phases+case from analyzed item; draft → drafted, record → queued.
+ * @param {object} item analyzed batch item with batchId, name, requirement, mode
+ * @returns {Promise<void>} resolves when draft/trajectory is created and item status updated
  */
 async function createDraftFromAnalyzed(item) {
   const job = await batchDao.getJobById(item.batchId);

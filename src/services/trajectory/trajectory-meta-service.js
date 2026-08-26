@@ -86,6 +86,10 @@ function parseAnalyzePayload(raw) {
  * Analyze a requirement into phases. Business-data block is NOT split into businessEntries;
  * the raw block is appended to every phase for the agent to use when filling forms.
  * Returns: { phases: string[] }. Does not persist.
+ * @param {object} opts 选项
+ * @param {string} opts.description 需求描述
+ * @param {string} [opts.model] 模型名
+ * @returns {Promise<{ phases: string[] }>} 阶段列表
  */
 export async function analyzeRequirementToPhases({
   description,
@@ -159,6 +163,14 @@ export async function analyzeRequirementToPhases({
 
 /**
  * Create empty trajectory shell under a function (for long-lived recording).
+ * @param {object} opts 选项
+ * @param {number|string} opts.functionId 功能节点 id
+ * @param {string} [opts.task] 需求描述
+ * @param {string} [opts.model] 模型名
+ * @param {string} [opts.name] 轨迹名称
+ * @param {number|null} [opts.systemAccountId] 系统账号 id
+ * @param {string|null} [opts.paasUserId] PaaS 用户 id
+ * @returns {Promise<object>} 创建的轨迹实体
  */
 export async function createEmptyTrajectory({
   functionId, task = '', model = '', name = '', systemAccountId = null, paasUserId = null,
@@ -189,6 +201,20 @@ export async function createEmptyTrajectory({
  * `phases[]` can be string[] or {description: string}[].
  * When `trx` is provided, all writes share that transaction (caller commits).
  * Pass `requireFunctionId: true` to forbid silent default-function fallback.
+ * @param {object} opts 选项
+ * @param {number|string} opts.functionId 功能节点 id
+ * @param {string} [opts.name] 轨迹名称
+ * @param {string} [opts.requirement] 需求描述
+ * @param {Array<string|{description: string}>} [opts.phases] 阶段列表
+ * @param {string} [opts.model] 模型名
+ * @param {number|null} [opts.systemAccountId] 系统账号 id
+ * @param {Array} [opts.businessEntries] 业务数据 KV
+ * @param {Array} [opts.businessData] 业务数据 KV（businessEntries 别名）
+ * @param {boolean} [opts.requireFunctionId] 禁止静默回退默认功能节点
+ * @param {number|null} [opts.batchJobId] 批量任务 id
+ * @param {string|null} [opts.paasUserId] PaaS 用户 id
+ * @param {import('knex').Knex|null} [opts.trx] 可选事务
+ * @returns {Promise<object>} 创建的轨迹实体（含阶段）
  */
 export async function createTransactionWithPhases({
   functionId,
@@ -303,8 +329,9 @@ export async function createTransactionWithPhases({
  * Replace business KV entries bound to a trajectory (legacy business_data_entry).
  * These are NOT system_ref rows — use system-ref-service for target-system
  * verified references. Requirement 业务数据 should prefer task text / 【业务数据】.
- * @param {number} trajectoryId
- * @param {Array} entries
+ * @param {number} trajectoryId 轨迹 id
+ * @param {Array} entries 业务数据 KV 数组
+ * @returns {Promise<object>} 更新后的轨迹实体（含阶段）
  */
 export async function setTrajectoryBusinessEntries(trajectoryId, entries) {
   const tid = Number(trajectoryId);
@@ -335,6 +362,9 @@ export async function setTrajectoryBusinessEntries(trajectoryId, entries) {
  * confirmed=true  → recordStatus=completed
  * confirmed=false → recordStatus=recorded (cancel confirmation)
  * Does NOT touch trajectory_step.confirmed (回放确认 flag, not trajectory confirm).
+ * @param {number} trajectoryId 轨迹 id
+ * @param {boolean} [confirmed] 是否确认
+ * @returns {Promise<object>} 更新后的轨迹实体
  */
 export async function confirmTrajectory(trajectoryId, confirmed = true) {
   const tid = Number(trajectoryId);

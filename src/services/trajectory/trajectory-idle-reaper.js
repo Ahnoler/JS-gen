@@ -91,7 +91,8 @@ export async function reapOrphanIdleRemoteSessions() {
 }
 
 /**
- * @returns {Promise<{ checked: number, graceExpired: number[], detached: number[], orphanClosed: number[] }>}
+ * Reap idle trajectory runtimes: detach grace-expired, close orphan sessions.
+ * @returns {Promise<{ checked: number, graceExpired: number[], detached: number[], orphanClosed: number[] }>} reaper summary
  */
 export async function reapIdleTrajectoryRuntimes() {
   let graceExpired = [];

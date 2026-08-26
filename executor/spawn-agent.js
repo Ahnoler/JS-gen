@@ -8,6 +8,11 @@ import { PROJECT_ROOT, PYTHON_EXE, buildPythonSubprocessEnv } from './config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * True when the process handle is still running (not killed, no exit code).
+ * @param {import('child_process').ChildProcess|null} proc proc
+ * @returns {boolean} result
+ */
 export function isProcessAlive(proc) {
   if (!proc) return false;
   if (proc.killed) return false;
@@ -15,6 +20,11 @@ export function isProcessAlive(proc) {
   return true;
 }
 
+/**
+ * Kill a process and its entire child tree.
+ * @param {number} pid pid
+ * @returns {void} result
+ */
 export function killTree(pid) {
   try {
     if (process.platform === 'win32') {
@@ -25,7 +35,11 @@ export function killTree(pid) {
   } catch {}
 }
 
-/** Kill only the agent PID — leave child Chromium running for CDP reuse. */
+/**
+ * Kill only the agent PID — leave child Chromium running for CDP reuse.
+ * @param {number} pid pid
+ * @returns {void} result
+ */
 export function killProcessOnly(pid) {
   try {
     if (process.platform === 'win32') {
@@ -38,7 +52,8 @@ export function killProcessOnly(pid) {
 
 /**
  * Best-effort: kill whatever still listens on a CDP port (orphan Chromium).
- * @param {number} port
+ * @param {number} port port
+ * @returns {void} result
  */
 export function killListenerOnPort(port) {
   const p = Number(port);
@@ -68,6 +83,12 @@ export function killListenerOnPort(port) {
   } catch {}
 }
 
+/**
+ * Wait for the Python agent to emit a `ready` event on stdout.
+ * @param {import('child_process').ChildProcess} child spawned agent process
+ * @param {number} [timeout] max wait in ms (default 60000)
+ * @returns {Promise<object>} the ready message payload
+ */
 export function waitForReady(child, timeout = 60000) {
   return new Promise((resolve, reject) => {
     let buffer = '';
@@ -109,8 +130,10 @@ export function waitForReady(child, timeout = 60000) {
 }
 
 /**
- * @param {string[]} args CLI args after scripts.main
- * @param {Record<string, string>} [extraEnv]
+ * Spawn the Python browser-use session subprocess (executor-side).
+ * @param {string[]} args CLI args after `scripts.main`
+ * @param {Record<string, string>} [extraEnv] extra env
+ * @returns {import('child_process').ChildProcess} result
  */
 export function spawnAgent(args, extraEnv = {}) {
   return spawn(PYTHON_EXE, ['-m', 'scripts.main', ...args], {

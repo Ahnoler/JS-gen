@@ -1,6 +1,5 @@
 /**
  * Entity models — JSDoc types aligned with MySQL tables.
- *
  * @example
  * import { stepFromActionLog } from './models/index.js';
  * /** @type {import('./models/index.js').Trajectory} *\/

@@ -3,6 +3,15 @@ import path from 'path';
 import crypto from 'crypto';
 import { PROJECT_DIR, USE_EXECUTOR } from '#config/config.js';
 import { state } from '../../state.js';
+
+/**
+ * Browser-session route registration — create/step/continue/rerun/delete
+ * sessions, trajectory + business-data persist, watcher/CDP quick actions, and
+ * WebSocket event wiring for both local shared-browser and remote executor
+ * modes.
+ *
+ * Prefix: /api/browser/*
+ */
 import { saveBusinessDataRecord } from '../../business-data-store.js';
 import { getTrajectoryActionFlow } from '../../services/trajectory-service.js';
 import { persistSessionBusinessData } from '../../services/business-data-service.js';
@@ -26,6 +35,12 @@ import { buildRerunResumeInstruction } from './heal-instruction.js';
 import { persistTrajectory } from './trajectory-persist.js';
 import { handleWatcherAction, registerWatcherWsHandler } from './watcher-actions.js';
 
+/**
+ * Execute one agent step for a session, streaming events as SSE.
+ * @param {import('express').Request} req Express request
+ * @param {import('express').Response} res Express response
+ * @returns {Promise<void>}
+ */
 export async function runSessionStep(req, res) {
   const { id } = req.params;
   const { task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId } = req.body || {};
@@ -39,7 +54,12 @@ export async function runSessionStep(req, res) {
   executeAgentStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel });
 }
 
+/**
+ * Register all browser-session routes and WebSocket handlers on the Express app.
+ * @param {import('express').Application} app Express application
+ */
 export default function registerBrowserSessionRoutes(app) {
+  /** Create a browser session (executor slot or local shared browser) -> { sessionId, model }. */
   app.post('/api/browser/session', async (req, res) => {
     const { model } = req.body || {};
     const sessionId = crypto.randomUUID();
@@ -91,8 +111,10 @@ export default function registerBrowserSessionRoutes(app) {
     res.json({ sessionId, model: gb.model });
   });
 
+  /** Execute one agent step (SSE stream). */
   app.post('/api/browser/session/:id/step', runSessionStep);
 
+  /** Re-run the last task with the previous maxSteps (SSE stream). */
   app.post('/api/browser/session/:id/continue', async (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
@@ -103,6 +125,7 @@ export default function registerBrowserSessionRoutes(app) {
   });
 
   // Self-healing: construct resume instruction, send as step to global agent.
+  /** Re-run from a failed step: replay prior actions, then send a heal instruction (SSE stream). */
   app.post('/api/browser/session/:id/rerun', async (req, res) => {
     const { id } = req.params;
     const { action_file, failedStep, maxSteps, log_file, form_changes } = req.body || {};
@@ -188,6 +211,7 @@ export default function registerBrowserSessionRoutes(app) {
   });
 
   // Human intervention retired — use manual recording instead
+  /** 410 Gone — intervene is retired; use manual recording for human correction. */
   app.post('/api/browser/session/:id/intervene', (req, res) => {
     res.status(410).json({
       error: 'Gone',
@@ -195,6 +219,7 @@ export default function registerBrowserSessionRoutes(app) {
     });
   });
 
+  /** Delete a session: close executor slot / clean local browser, archive record. */
   app.delete('/api/browser/session/:id', async (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
@@ -224,6 +249,7 @@ export default function registerBrowserSessionRoutes(app) {
     res.json({ status: 'archived', sessionId: id });
   });
 
+  /** Close the shared global browser process and clear all sessions. */
   app.delete('/api/browser/browser', async (req, res) => {
     const gb = state.globalBrowser;
     const proc = gb.process;
@@ -276,6 +302,7 @@ export default function registerBrowserSessionRoutes(app) {
     }
   });
 
+  /** List a session's recorded trajectory steps (step, path, time). */
   app.get('/api/browser/session/:id/trajectories', (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
@@ -283,6 +310,7 @@ export default function registerBrowserSessionRoutes(app) {
     res.json({ sessionId: id, stepIndex: session.stepIndex, busy: state.globalBrowser.busy, steps: session.trajectories.map(t => ({ step: t.step, path: t.path, time: t.time })) });
   });
 
+  /** Reset the session's cumulative trajectory files (returns new file paths). */
   app.post('/api/browser/session/:id/reset-trajectory', async (req, res) => {
     const gb = state.globalBrowser;
     if (!gb.stdin || !gb.ready) return res.status(503).json({ error: 'Browser not ready' });
@@ -408,8 +436,10 @@ export default function registerBrowserSessionRoutes(app) {
     }
   });
 
+  /** Persist the session's accumulated trajectory to the DB. */
   app.post('/api/browser/session/:id/trajectory', persistTrajectory);
 
+  /** Save business data captured during the session to file + DB. */
   app.post('/api/browser/session/:id/save-business-data', async (req, res) => {
     const { id } = req.params;
     const session = state.sessions.get(id);
@@ -498,6 +528,7 @@ export default function registerBrowserSessionRoutes(app) {
     gb.process.stdout.on('data', onStdout);
   });
 
+  /** List all active sessions (id, model, stepIndex, busy, createdAt, stepCount). */
   app.get('/api/browser/sessions', (req, res) => {
     const gb = state.globalBrowser;
     const list = [];
@@ -512,6 +543,7 @@ export default function registerBrowserSessionRoutes(app) {
   // Register remote:* WS handlers (screencast / input)
   initRemoteBridgeWs();
 
+  /** Watcher/CDP/remote connection + busy status for the dashboard. */
   app.get('/api/browser/watcher/status', async (req, res) => {
     const gb = state.globalBrowser;
     const session = [...state.sessions.values()][0];
@@ -632,6 +664,7 @@ export default function registerBrowserSessionRoutes(app) {
     });
   });
 
+  /** Execute a CDP watcher quick action (click/fill/etc.) on the live page. */
   app.post('/api/browser/watcher/action', handleWatcherAction);
 
   // ── WebSocket 消息处理（通过 ws-server 的 onWsMessage 注册） ──

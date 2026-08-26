@@ -102,7 +102,7 @@ export const LEGACY_ENGINE_FIELD_SCHEMA = Object.freeze([
  * Prefer relative xpath_smart; fall back to absolute when smart is unavailable.
  * Some controls genuinely have no stable relative xpath — still export a locator.
  * @param {object} entry — from trajectoryStepToActionEntry
- * @returns {{ target: string, source: 'xpath_smart'|'xpath_full'|'' }}
+ * @returns {{ target: string, source: 'xpath_smart'|'xpath_full'|'' }} chosen locator + source
  */
 export function pickExportTarget(entry) {
   const el = entry?.element || {};
@@ -139,15 +139,21 @@ export function pickExportTarget(entry) {
   return { target: '', source: '' };
 }
 
-/** @deprecated use pickExportTarget — kept for callers expecting a string */
+/**
+ * @deprecated use pickExportTarget — kept for callers expecting a string
+ * @param {object} entry action entry
+ * @returns {string} chosen target xpath
+ */
 export function pickRelativeTarget(entry) {
   return pickExportTarget(entry).target;
 }
 
 /**
- * @param {string} action
- * @param {object} params
- * @param {object} element
+ * Build a human-readable operation name from action + params + element.
+ * @param {string} action normalized action name
+ * @param {object} [params] action params
+ * @param {object} [element] element info
+ * @returns {string} localized operation name
  */
 export function buildOperationName(action, params = {}, element = {}) {
   const p = params || {};
@@ -194,8 +200,10 @@ export function buildOperationName(action, params = {}, element = {}) {
 }
 
 /**
- * @param {string} action
- * @param {object} params
+ * Pick the value field for the engine op (fill value / option / url).
+ * @param {string} action normalized action name
+ * @param {object} [params] action params
+ * @returns {string} value string (empty when not applicable)
  */
 export function pickOperationValue(action, params = {}) {
   const p = params || {};
@@ -232,7 +240,7 @@ function resolveEngineType(action, element = {}) {
 /**
  * Map one DB / action-entry step to the 5-field engine op (+ metadata).
  * @param {object} step — trajectory_step DAO shape or action entry
- * @returns {object|null} null if action is not exportable
+ * @returns {object|null} engine op (5 fields + meta), or null if action is not exportable
  */
 export function mapStepToLegacyEngineOp(step) {
   const entry = step?.action && step?.element !== undefined && !step?.actionType
@@ -272,8 +280,9 @@ export function mapStepToLegacyEngineOp(step) {
 }
 
 /**
- * @param {object[]} steps
- * @param {{ stepIds?: Array<number|string>, phaseIds?: Array<number|string>, includeMeta?: boolean }} [opts]
+ * @param {object[]} steps trajectory steps
+ * @param {{ stepIds?: Array<number|string>, phaseIds?: Array<number|string>, includeMeta?: boolean }} [opts] filter + meta options
+ * @returns {{ schemaVersion: number, fields: object[], count: number, skipped: object, stats: object, operations: object[] }} engine export payload
  */
 export function exportStepsToLegacyEngine(steps, opts = {}) {
   const includeMeta = opts.includeMeta !== false;

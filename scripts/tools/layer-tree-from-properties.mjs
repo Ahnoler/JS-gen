@@ -24,7 +24,10 @@ import { getDB } from '../../config/database.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-/** 仅直接执行时才跑 CLI（import 用于 characterization 时不触发）。 */
+/**
+ * 仅直接执行时才跑 CLI（import 用于 characterization 时不触发）。
+ * @returns {boolean} 直接执行返回 true，被 import 返回 false
+ */
 function isDirectRun() {
   const entry = process.argv[1] ? resolve(process.argv[1]) : '';
   return !!entry && fileURLToPath(import.meta.url).toLowerCase() === entry.toLowerCase();
@@ -35,7 +38,11 @@ function argValue(name) {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
-/** V3 payload 契约 rect 为 JSON 字符串（空 ""）；旧导出文件仍是对象。归一成对象供建树/渲染。 */
+/**
+ * V3 payload 契约 rect 为 JSON 字符串（空 ""）；旧导出文件仍是对象。归一成对象供建树/渲染。
+ * @param {Array<object>} properties - transcationProperties[]（rect 可能为 JSON 字符串或对象）
+ * @returns {Array<object>} 归一化后的 properties（rect 统一为对象，原地修改并返回）
+ */
 function parseRectStrings(properties) {
   for (const p of Array.isArray(properties) ? properties : []) {
     if (p && typeof p.rect === 'string') {
@@ -82,7 +89,11 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-/** 从 transcationProperties[] 按 regionId 拆层级建树；叶 = 操作步骤。 */
+/**
+ * 从 transcationProperties[] 按 regionId 拆层级建树；叶 = 操作步骤。
+ * @param {Array<object>} properties - transcationProperties[]，每项含 regionId / propertiesName / eventTypeValue
+ * @returns {object} 分层树根节点 { role, label, children: [], items: [] }
+ */
 export function buildTreeFromProperties(properties) {
   const root = { role: 'page', label: '交易操作', children: [], items: [] };
   const map = new Map();
@@ -119,6 +130,13 @@ export function buildTreeFromProperties(properties) {
   return root;
 }
 
+// §8 中间节点 type 集合（截图条目 page/popup 之外的层级节点）
+const V3_INTERMEDIATE_TYPES = new Set(['section', 'tab', 'wizard', 'card', 'collapse']);
+// 中间节点在树中的 role 集合（type 直接作为 role，popup 例外映射为 dialog）
+const V3_INTERMEDIATE_ROLES = new Set(['section', 'tab', 'wizard', 'card', 'collapse']);
+// V3.1 截图条目 type 集合
+const V3_SHOT_TYPES = new Set(['page', 'popup']);
+
 /**
  * 从 V3.1 flat transcationProperties[] 构建分层树。
  * 新版 V3 把截图条目（type=page/popup）、中间节点（type=section/tab/wizard/card）和控件条目（type=object）
@@ -129,14 +147,9 @@ export function buildTreeFromProperties(properties) {
  *     pid 命中中间节点时直接挂到该节点（PID 链已表达分区层级，不再 regionId 拆段）；
  *     pid 直指 page/popup、未命中或旧数据无中间节点时，
  *     保留 regionId 拆段建 tab/section/card 等中间层级作为 fallback（保持兼容）。
+ * @param {Array<object>} properties - V3.1 flat transcationProperties[]（type=page/popup/section/tab/wizard/card/object）
+ * @returns {object} 分层树根节点 { role, label, children: [], items: [] }
  */
-// §8 中间节点 type 集合（截图条目 page/popup 之外的层级节点）
-const V3_INTERMEDIATE_TYPES = new Set(['section', 'tab', 'wizard', 'card', 'collapse']);
-// 中间节点在树中的 role 集合（type 直接作为 role，popup 例外映射为 dialog）
-const V3_INTERMEDIATE_ROLES = new Set(['section', 'tab', 'wizard', 'card', 'collapse']);
-// V3.1 截图条目 type 集合
-const V3_SHOT_TYPES = new Set(['page', 'popup']);
-
 export function buildTreeFromV3Flat(properties) {
   const root = { role: 'page', label: '交易页面', children: [], items: [] };
   const nodeMap = new Map();
@@ -220,7 +233,11 @@ export function buildTreeFromV3Flat(properties) {
   return root;
 }
 
-/** 从阶段截图 metadata.elements[] 按 layers（外→内）聚合分层树；叶 = 控件对象。 */
+/**
+ * 从阶段截图 metadata.elements[] 按 layers（外→内）聚合分层树；叶 = 控件对象。
+ * @param {Array<object>} elements - metadata.elements[]，每项含 layers[] / label / kind / regionId
+ * @returns {object} 分层树根节点 { role, label, children: [], items: [] }
+ */
 export function buildTreeFromElements(elements) {
   const root = { role: 'page', label: '阶段页面', children: [], items: [] };
   const map = new Map();
@@ -249,8 +266,12 @@ export function buildTreeFromElements(elements) {
   return root;
 }
 
-/** 从步骤（trajectory_step.element_json）构建分层树；叶 = 操作步骤。
- *  分层路径：优先 el.layers[]（外→内），否则 el.region_id 按 '|' 拆段（role:label）。 */
+/**
+ * 从步骤（trajectory_step.element_json）构建分层树；叶 = 操作步骤。
+ *  分层路径：优先 el.layers[]（外→内），否则 el.region_id 按 '|' 拆段（role:label）。
+ * @param {Array<object>} steps - 步骤数组，每项含 layers[] / regionId / label / action / actionValue / hasBbox
+ * @returns {object} 分层树根节点 { role, label, children: [], items: [] }
+ */
 export function buildTreeFromSteps(steps) {
   const root = { role: 'page', label: '交易操作', children: [], items: [] };
   const map = new Map();
@@ -292,9 +313,14 @@ export function buildTreeFromSteps(steps) {
   return root;
 }
 
-/** 递归渲染树为 HTML 字符串（fc-tree 风格，可折叠：层级节点带 chevron + children 容器）。
+/**
+ * 递归渲染树为 HTML 字符串（fc-tree 风格，可折叠：层级节点带 chevron + children 容器）。
  *  items（叶子）与 children（子分支）统一包进 .tree-children 容器——所有分支都可折叠。
- *  有 node.entries（V3 groups 时间线顺序）时按 entries 交错渲染（弹窗组紧跟触发按钮）。 */
+ *  有 node.entries（V3 groups 时间线顺序）时按 entries 交错渲染（弹窗组紧跟触发按钮）。
+ * @param {object} node - 树节点 { role, label, children, items, entries? }
+ * @param {number} depth - 当前深度（根=0）
+ * @returns {string} 渲染后的 HTML 字符串
+ */
 function treeToHtml(node, depth) {
   const pad = 8 + depth * 18;
   const [cls, label] = roleInfo(node.role);
@@ -333,9 +359,13 @@ function treeToHtml(node, depth) {
   return html;
 }
 
-/** 从 V3 result.groups（扁平 pid 树）构建分层树：page 组为根 → dialog 组/控件挂 pid。
+/**
+ * 从 V3 result.groups（扁平 pid 树）构建分层树：page 组为根 → dialog 组/控件挂 pid。
  *  控件与弹窗组按 groups 数组顺序（= 操作时间线）记录在 node.entries，
- *  渲染时弹窗组紧跟其触发按钮之后（而非全部排在控件末尾）。 */
+ *  渲染时弹窗组紧跟其触发按钮之后（而非全部排在控件末尾）。
+ * @param {Array<object>} groups - V3.0 result.groups[]，type=page/dialog/ele，含 id/pid/name/rect
+ * @returns {object} 分层树根节点 { role, label, children: [], items: [], entries? }
+ */
 export function buildTreeFromGroups(groups) {
   const root = { role: 'page', label: '交易页面', children: [], items: [] };
   const byId = new Map();
@@ -587,7 +617,12 @@ function main() {
   console.log(`交易: ${title} | ${isV3Flat ? `截图 ${shots.length} | 分区 ${sections.length} | 控件 ${eles.length}` : `操作 ${properties.length} 步`} | 未分区 ${unzoned}`);
 }
 
-/** 直接按步骤分层（trajectory_step.element_json 的 layers/region_id），不依赖阶段截图。 */
+/**
+ * 直接按步骤分层（trajectory_step.element_json 的 layers/region_id），不依赖阶段截图。
+ * @param {number} trajectoryId - 交易 id
+ * @param {number|null} phaseNumber - 阶段号（null 表示全部阶段）
+ * @returns {Promise<void>}
+ */
 async function runTrajectoryMode(trajectoryId, phaseNumber) {
   const db = getDB();
   const traj = await db('trajectory').select('id', 'name').where({ id: trajectoryId }).first();
@@ -667,8 +702,12 @@ async function runShotMode(screenshotId) {
   await db.destroy();
 }
 
-/** V3 模式：读 V3 批量推送 payload。
- *  兼容 V3.0 result.groups 和 V3.1 flat transcationProperties 两种结构。 */
+/**
+ * V3 模式：读 V3 批量推送 payload。
+ *  兼容 V3.0 result.groups 和 V3.1 flat transcationProperties 两种结构。
+ * @param {string} file - V3 payload JSON 文件路径
+ * @returns {void}
+ */
 function runV3Mode(file) {
   let raw;
   try {

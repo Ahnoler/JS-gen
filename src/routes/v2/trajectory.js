@@ -7,6 +7,13 @@ import { TRAJECTORY_RECORD_STATUSES } from '../../models/constants.js';
 import { PROJECT_DIR } from '#config/config.js';
 import { sendErr } from './trajectory-shared.js';
 
+/**
+ * Trajectory (transaction) CRUD + phases + action-flow + assemble-file +
+ * clear + login-context. Primary product v2 API.
+ *
+ * Prefix: /api/v2/trajectories/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
   /** AI 分析：需求描述 -> { phases }（不落库；阶段数跟用户分步；业务数据附在各阶段描述后） */
   app.post('/api/v2/trajectories/analyze', async (req, res) => {
@@ -54,6 +61,7 @@ export default function (app) {
     }
   });
 
+  /** List trajectories (paginated, filtered by functionId/keyword/recordStatus/batchTaskName). */
   app.get('/api/v2/trajectories', async (req, res) => {
     try {
       const {
@@ -198,6 +206,7 @@ export default function (app) {
     }
   });
 
+  /** Get a single trajectory with its phases. */
   app.get('/api/v2/trajectories/:id', async (req, res) => {
     try {
       const traj = await trajectoryService.getTrajectoryWithPhases(req.params.id);
@@ -303,6 +312,7 @@ export default function (app) {
     }
   });
 
+  /** Delete a trajectory by numeric id. */
   app.delete('/api/v2/trajectories/:id', async (req, res) => {
     try {
       const numeric = Number(req.params.id);
@@ -314,8 +324,10 @@ export default function (app) {
     }
   });
 
-  /** Clear recorded steps; keep phase descriptions and reset statuses to pending.
-   *  Optional body.phaseIds: clear only those phases' steps (omit / empty = all). */
+  /**
+   * Clear recorded steps; keep phase descriptions and reset statuses to pending.
+   * Optional body.phaseIds: clear only those phases' steps (omit / empty = all).
+   */
   app.post('/api/v2/trajectories/:id/clear', async (req, res) => {
     try {
       const phaseIds = req.body?.phaseIds ?? req.body?.phase_ids ?? null;

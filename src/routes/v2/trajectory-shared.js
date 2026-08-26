@@ -1,4 +1,9 @@
-/** Shared small helpers for the v2 trajectory route modules. */
+/**
+ * Shared small helpers for the v2 trajectory route modules.
+ * @param {import('express').Response} res Express response
+ * @param {Error & { statusCode?: number, code?: string, ownerTrajectoryId?: number, graceUntil?: number, holders?: unknown, rejected?: unknown }} err error
+ * @param {number} [fallback] fallback HTTP status (defaults to 500)
+ */
 export function sendErr(res, err, fallback = 500) {
   const status = err.statusCode || fallback;
   const body = { error: err.message };
@@ -13,6 +18,8 @@ export function sendErr(res, err, fallback = 500) {
 /**
  * Wrap an async Express handler; any rejection → sendErr (same error shape as
  * the hand-written try/catch it replaces). Async passthrough: awaits fn.
+ * @param {(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => Promise<unknown>} fn async route handler
+ * @returns {(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => Promise<void>} wrapped handler
  */
 export function asyncHandler(fn) {
   return async (req, res, next) => {

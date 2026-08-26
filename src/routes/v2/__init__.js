@@ -28,6 +28,11 @@ import registerMemory from './memory.js';
 import registerOperationComponent from './operation-component.js';
 import registerRegions from './regions.js';
 
+/**
+ * Register all v2 route modules on the Express app (envelope + SSO middleware,
+ * then per-domain route registrars).
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
   app.use('/api/v2', v2ResponseEnvelope);
   app.use('/api/v2', ssoAuth);

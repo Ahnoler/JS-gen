@@ -14,12 +14,15 @@ const HIGHLIGHT_CONFIG = {
   marginColor: { r: 246, g: 178, b: 107, a: 0.35 },
 };
 
-/** Page-side function: build manual-recorder-compatible payload from an element.
+/**
+ * Page-side function: build manual-recorder-compatible payload from an element.
  * Optional args: clientX, clientY — used to pierce anonymous body overlays via elementsFromPoint.
  */
 
 /**
- * @param {import('./client.js').CdpClient} client
+ * Enable DOM, Overlay, and Runtime CDP domains for inspect mode.
+ * @param {import('./client.js').CdpClient} client CDP client.
+ * @returns {Promise<void>}
  */
 export async function enableInspect(client) {
   await client.send('DOM.enable');
@@ -28,9 +31,11 @@ export async function enableInspect(client) {
 }
 
 /**
- * @param {import('./client.js').CdpClient} client
- * @param {number} x CSS px
- * @param {number} y CSS px
+ * Highlight the DOM node at the given CSS coordinates.
+ * @param {import('./client.js').CdpClient} client CDP client.
+ * @param {number} x CSS px.
+ * @param {number} y CSS px.
+ * @returns {Promise<{ nodeId: number|null, backendNodeId: number|null, frameId: string|null }|null>} Located node ids, or null if nothing found.
  */
 export async function highlightAt(client, x, y) {
   const loc = await client.send('DOM.getNodeForLocation', {
@@ -53,15 +58,21 @@ export async function highlightAt(client, x, y) {
   return { nodeId: nodeId || null, backendNodeId: backendNodeId || null, frameId: loc.frameId || null };
 }
 
+/**
+ * Hide any active overlay highlight.
+ * @param {import('./client.js').CdpClient} client CDP client.
+ * @returns {Promise<void>}
+ */
 export async function hideHighlight(client) {
   try { await client.send('Overlay.hideHighlight'); } catch {}
 }
 
 /**
  * Resolve element under (x,y) into a manual_recorder payload.
- * @param {import('./client.js').CdpClient} client
- * @param {number} x
- * @param {number} y
+ * @param {import('./client.js').CdpClient} client CDP client.
+ * @param {number} x CSS px.
+ * @param {number} y CSS px.
+ * @returns {Promise<object|null>} Recorder payload, or null if unresolved.
  */
 export async function resolvePayloadAt(client, x, y) {
   const loc = await client.send('DOM.getNodeForLocation', {
@@ -101,8 +112,9 @@ export async function resolvePayloadAt(client, x, y) {
 
 /**
  * Briefly suppress page-injected manual recorder to avoid double-counting BiB clicks.
- * @param {import('./client.js').CdpClient} client
- * @param {number} [ms]
+ * @param {import('./client.js').CdpClient} client CDP client.
+ * @param {number} [ms] Suppression window in milliseconds.
+ * @returns {Promise<void>}
  */
 export async function suppressPageManualRecorder(client, ms = 600) {
   try {
@@ -115,7 +127,8 @@ export async function suppressPageManualRecorder(client, ms = 600) {
 
 /**
  * Snapshot the focused input/textarea as a fill / fill_date payload for recording.
- * @param {import('./client.js').CdpClient} client
+ * @param {import('./client.js').CdpClient} client CDP client.
+ * @returns {Promise<object|null>} Fill payload, or null if no valid focused input.
  */
 export async function resolveFocusedFillPayload(client) {
   try {
@@ -183,7 +196,8 @@ export async function resolveFocusedFillPayload(client) {
 /**
  * Snapshot all visible date editors: [{label, value, xpath}].
  * Used to detect which field changed after a picker day click (multi-date forms).
- * @param {import('./client.js').CdpClient} client
+ * @param {import('./client.js').CdpClient} client CDP client.
+ * @returns {Promise<Array<{label: string, value: string, xpath: string, active: boolean}>>} Visible date editor rows (empty on error).
  */
 export async function snapshotDateEditorValues(client) {
   try {
@@ -242,9 +256,10 @@ export async function snapshotDateEditorValues(client) {
 
 /**
  * After a date-picker day click commits, resolve which date field changed.
- * @param {import('./client.js').CdpClient} client
- * @param {{ label_text?: string, value?: string } | null} [hint]
- * @param {Array<{label?: string, value?: string, xpath?: string}> | null} [beforeSnap]
+ * @param {import('./client.js').CdpClient} client CDP client.
+ * @param {{ label_text?: string, value?: string } | null} [hint] Picker hint (label/value).
+ * @param {Array<{label?: string, value?: string, xpath?: string}> | null} [beforeSnap] Pre-click date-editor snapshot.
+ * @returns {Promise<object|null>} fill_date payload, or null if unresolved.
  */
 export async function resolveCommittedDateFillPayload(client, hint = null, beforeSnap = null) {
   try {

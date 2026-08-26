@@ -1,9 +1,16 @@
+/**
+ * Business data + form snapshot persistence service.
+ */
 import * as businessDataDao from '../dao/business-data-dao.js';
 import * as formSnapshotDao from '../dao/form-snapshot-dao.js';
 import { existsSync, readFileSync } from 'fs';
 
 /**
  * Normalize a Python FormSnapshot dict (snake_case or camelCase) for DAO insert.
+ * @param {object} snap raw snapshot dict (snake_case or camelCase keys)
+ * @param {number|null} [businessDataId] associated business_data id
+ * @param {number|null} [trajectoryId] associated trajectory id
+ * @returns {object} normalized snapshot ready for formSnapshotDao.save
  */
 function normalizeSnapshot(snap, businessDataId, trajectoryId) {
   return {
@@ -23,6 +30,14 @@ function normalizeSnapshot(snap, businessDataId, trajectoryId) {
 
 /**
  * Save business_data_store (flat KV + nested form_snapshots/task_list) to the database.
+ * @param {object} opts save options
+ * @param {string} opts.recordId business_data record id
+ * @param {string} opts.sessionId agent session id
+ * @param {string} [opts.model] LLM model name
+ * @param {string} [opts.description] description
+ * @param {object} opts.dataStore raw key/value store
+ * @param {number} [opts.trajectoryId] associated trajectory id
+ * @returns {Promise<number>} inserted business_data id
  */
 export async function saveBusinessData({ recordId, sessionId, model, description, dataStore, trajectoryId }) {
   const entries = [];
@@ -59,6 +74,11 @@ export async function saveBusinessData({ recordId, sessionId, model, description
 
 /**
  * Persist after JSON store save — accepts already-parsed data dict.
+ * @param {object} opts persist options
+ * @param {object} opts.record business_data record metadata
+ * @param {object} opts.data parsed data store dict
+ * @param {number} [opts.trajectoryId] associated trajectory id
+ * @returns {Promise<number>} inserted business_data id
  */
 export async function persistSessionBusinessData({ record, data, trajectoryId }) {
   return saveBusinessData({
@@ -73,6 +93,11 @@ export async function persistSessionBusinessData({ record, data, trajectoryId })
 
 /**
  * Persist form_{ts}.json snapshots under a trajectory (and optional business_data).
+ * @param {string} formFilePath path to form snapshot JSON file
+ * @param {object} [opts] snapshot association options
+ * @param {number} [opts.trajectoryId] associated trajectory id
+ * @param {number} [opts.businessDataId] associated business_data id
+ * @returns {Promise<number>} count of snapshots persisted
  */
 export async function persistFormSnapshotsFromFile(formFilePath, { trajectoryId, businessDataId } = {}) {
   if (!formFilePath || !existsSync(formFilePath)) return 0;

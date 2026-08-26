@@ -31,8 +31,9 @@ export const CLIPBOARD_GET_SELECTION_EXPRESSION = `(() => {
 })()`;
 
 /**
- * @param {unknown} raw
- * @returns {{ ok: boolean, text: string, reason?: string }}
+ * Normalize a raw clipboard getSelection result into a stable shape.
+ * @param {unknown} raw Raw evaluate result from the page expression.
+ * @returns {{ ok: boolean, text: string, reason?: string }} Normalized selection result.
  */
 export function normalizeClipboardSelectionResult(raw) {
   if (!raw || typeof raw !== 'object') {

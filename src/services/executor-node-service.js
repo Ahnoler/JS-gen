@@ -1,3 +1,7 @@
+/**
+ * Executor node service: registration, heartbeat, drain, disconnect grace,
+ * and stale-node sweep — coordinates DAO, registry, slot lease, and bindings.
+ */
 import * as executorNodeDao from '../dao/executor-node-dao.js';
 import * as registry from '../executor-registry.js';
 import * as slotLease from '../executor-slot-lease.js';
@@ -31,13 +35,15 @@ function purgeNodeBindings(nodeUuid) {
 }
 
 /**
- * @param {Object} data
- * @param {string} data.nodeUuid
- * @param {string} data.name
- * @param {string} [data.host]
- * @param {number} [data.capacity]
- * @param {Object} [data.labels]
- * @param {string} [data.agentVersion]
+ * Register (upsert) an executor node.
+ * @param {object} data node fields
+ * @param {string} data.nodeUuid unique node uuid
+ * @param {string} data.name human-readable name
+ * @param {string} [data.host] host address
+ * @param {number} [data.capacity] slot capacity
+ * @param {object} [data.labels] label map
+ * @param {string} [data.agentVersion] agent version string
+ * @returns {Promise<object>} upserted node row
  */
 export async function register(data) {
   if (!data?.nodeUuid || !data?.name) {
@@ -46,13 +52,22 @@ export async function register(data) {
   return executorNodeDao.upsertByUuid(data);
 }
 
+/**
+ * Refresh heartbeat timestamp for a node and touch the live registry.
+ * @param {string} nodeUuid node uuid
+ * @returns {Promise<boolean>} true if heartbeat updated
+ */
 export async function heartbeat(nodeUuid) {
   const ok = await executorNodeDao.touchHeartbeat(nodeUuid);
   if (ok) registry.touch(nodeUuid);
   return ok;
 }
 
-/** Graceful unregister: offline + crash active sessions + detach. */
+/**
+ * Graceful unregister: offline + crash active sessions + detach.
+ * @param {string} nodeUuid node uuid
+ * @returns {Promise<object|null>} the node row, or null if not found
+ */
 export async function unregister(nodeUuid) {
   const node = await executorNodeDao.getByUuid(nodeUuid);
   if (!node) return null;
@@ -64,13 +79,23 @@ export async function unregister(nodeUuid) {
   return node;
 }
 
-/** Mark node offline and crash its active sessions (disconnect / sweep). */
+/**
+ * Mark node offline and crash its active sessions (disconnect / sweep).
+ * @param {string} nodeUuid node uuid
+ * @param {number} nodeId node numeric id
+ * @returns {Promise<void>}
+ */
 export async function markOfflineAndCrash(nodeUuid, nodeId) {
   await executorNodeDao.setStatus(nodeUuid, 'offline');
   await executorNodeDao.crashActiveSessions(nodeId);
   purgeNodeBindings(nodeUuid);
 }
 
+/**
+ * Set a node to draining and notify the executor over WS.
+ * @param {string} nodeUuid node uuid
+ * @returns {Promise<object|null>} updated node row, or null if not found
+ */
 export async function drain(nodeUuid) {
   const node = await executorNodeDao.getByUuid(nodeUuid);
   if (!node) return null;
@@ -82,8 +107,9 @@ export async function drain(nodeUuid) {
 
 /**
  * Handle non-graceful WS disconnect — start grace timer for auto-reconnect.
- * @param {string} nodeUuid
- * @param {number} nodeId
+ * @param {string} nodeUuid node uuid
+ * @param {number} nodeId node numeric id
+ * @returns {void}
  */
 export function onDisconnect(nodeUuid, nodeId) {
   registry.detach(nodeUuid, {
@@ -116,11 +142,20 @@ function withLeaseSlots(node) {
   };
 }
 
+/**
+ * List all executor nodes enriched with live lease slots + WS connection state.
+ * @returns {Promise<object[]>} nodes with `connected`, `inUse`, `slots` fields
+ */
 export async function list() {
   const nodes = await executorNodeDao.list();
   return nodes.map(withLeaseSlots);
 }
 
+/**
+ * Get a single node by uuid, enriched with live lease slots + WS connection state.
+ * @param {string} nodeUuid node uuid
+ * @returns {Promise<object|null>} enriched node, or null if not found
+ */
 export async function getByUuid(nodeUuid) {
   const node = await executorNodeDao.getByUuid(nodeUuid);
   if (!node) return null;
@@ -131,7 +166,8 @@ export async function getByUuid(nodeUuid) {
 
 /**
  * Periodic sweep: stale heartbeat → offline + crash sessions.
- * @param {number} timeoutMs
+ * @param {number} timeoutMs heartbeat staleness threshold in ms
+ * @returns {Promise<object[]>} swept stale nodes
  */
 export async function sweepStale(timeoutMs) {
   const stale = await executorNodeDao.markStaleOffline(timeoutMs);

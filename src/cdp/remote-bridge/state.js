@@ -50,6 +50,10 @@ export const bridge = {
   wsTrajectoryBind: new WeakMap(),
 };
 
+/**
+ * Build a remote-bridge status snapshot for the dashboard.
+ * @returns {{ attached: boolean, remoteSessionId: number|null, remoteSessionUuid: string|null, cdpReady: boolean, cdpHttp: string|null, inputEnabled: boolean, agentBusy: boolean, manualRecording: boolean, inspectEnabled: boolean, inspectLabel: string|null, viewportW: number, viewportH: number }} Status snapshot.
+ */
 export function getRemoteStatus() {
   const gb = state.globalBrowser;
   return {
@@ -68,6 +72,12 @@ export function getRemoteStatus() {
   };
 }
 
+/**
+ * Push an event line to the agent process stdin (JSON + newline).
+ * @param {string} event Event name.
+ * @param {object} [data] Event payload.
+ * @returns {boolean} True if written, false if agent not ready or write failed.
+ */
 export function pushAgentEvent(event, data = {}) {
   const gb = state.globalBrowser;
   if (!gb.stdin || !gb.ready) return false;
@@ -80,6 +90,11 @@ export function pushAgentEvent(event, data = {}) {
   }
 }
 
+/**
+ * Broadcast a remote:inspect event with the current inspect label.
+ * @param {string} [label] Inspect label text.
+ * @returns {void}
+ */
 export function broadcastInspect(label) {
   bridge.lastInspectLabel = label || '';
   broadcast('remote:inspect', {

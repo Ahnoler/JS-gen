@@ -2,6 +2,11 @@
  * API group(s): hierarchy, sys-dict — extracted from catalog.js.
  * Keep in sync with src/routes/v2/*.js
  */
+
+/** @typedef {{ name: string, type: string, required?: boolean, in?: 'path'|'query'|'body', desc: string, example?: string }} Param */
+/** @typedef {{ method: string, path: string, summary: string, desc?: string, params?: Param[], reqExample?: string, respExample?: string, notes?: string[], deprecated?: boolean, tryable?: boolean }} Endpoint */
+/** @typedef {{ id: string, name: string, description: string, endpoints: Endpoint[] }} TagGroup */
+
 import { J } from './_j.js';
 
 /** @type {TagGroup[]} */

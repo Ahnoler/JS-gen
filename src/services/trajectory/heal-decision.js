@@ -14,10 +14,22 @@
 
 const DECISION_FLAG = 'HEAL_LOCATE_DECISION_ENABLED';
 
+/**
+ * Check whether the HEAL_LOCATE_DECISION_ENABLED flag is set.
+ * @param {object} [env] environment object (default process.env)
+ * @returns {boolean} true when the flag is '1'
+ */
 export function healDecisionEnabled(env = process.env) {
   return String(env?.[DECISION_FLAG] ?? '').trim() === '1';
 }
 
+/**
+ * Route a suggested action to a heal-decision pipeline step.
+ * @param {object} [root0] routing input
+ * @param {string} [root0.suggestedAction] suggested action from missing-reason analysis (default 'heal')
+ * @param {boolean} [root0.enabled] whether decision routing is enabled (default false)
+ * @returns {'heal_current'|'skip'|'fail'|'retry'|'heal_current'} pipeline step to execute
+ */
 export function routeSuggestedAction({ suggestedAction = 'heal', enabled = false } = {}) {
   if (!enabled) return 'heal_current';
   switch (String(suggestedAction || 'heal')) {

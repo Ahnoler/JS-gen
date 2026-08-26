@@ -14,8 +14,8 @@ import { createHmac } from 'crypto';
  *
  * userId 是 19 位 long，JSON.parse 会把它舍成不精确的 number（> 2^53 丢精度），
  * 所以直接从解码后的 JSON 原文提取数字串，保证与账号中心原始值逐位一致。
- * @param {string} token
- * @returns {{ userId: string, iat?: number, jti?: string } | null}
+ * @param {string} token 账号中心返回的 HS256 JWT 字符串
+ * @returns {{ userId: string, iat?: number, jti?: string } | null} 解析成功返回 payload（userId 为字符串），格式非法或无 userId 时返回 null
  */
 export function decodePaasToken(token) {
   const parts = String(token || '').split('.');
@@ -39,7 +39,7 @@ export function decodePaasToken(token) {
 /**
  * 验签 HS256 JWT 并解 payload。
  * 密钥取法对齐账号中心 SDK：`Buffer.from(secret, 'base64')` 作 HMAC-SHA256 key。
- * @param {string} token
+ * @param {string} token 账号中心返回的 HS256 JWT 字符串
  * @param {string} secret 账号中心 JWT 密钥（query_jwt_secret 返回的字符串）
  * @returns {{ userId: string, iat?: number, jti?: string } | null} 验签+解析成功返回 payload，否则 null
  */

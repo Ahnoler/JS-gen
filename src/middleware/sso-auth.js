@@ -17,6 +17,13 @@ import { getJwtSecret } from '../services/sso/paas-client.js';
 // 所以用 req.baseUrl + req.path（=完整挂载点+子路径，不含 query）判断。
 const WHITELIST_PREFIX = '/api/v2/auth';
 
+/**
+ * SSO auth middleware: extract + verify JWT, attach req.paasUserId, enforce login when required.
+ * @param {import('express').Request} req req
+ * @param {import('express').Response} res res
+ * @param {import('express').NextFunction} next next
+ * @returns {Promise<void>} result
+ */
 export async function ssoAuth(req, res, next) {
   const token = req.get('access_token');
   let userId = null;

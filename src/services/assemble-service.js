@@ -17,11 +17,12 @@ const SCRIPTS_DIR = path.join(PROJECT_DIR, 'scripts');
 const GENERATED_DIR = path.join(SCRIPTS_DIR, 'generated');
 
 /**
- * @param {object} opts
+ * Assemble an action-file into a Playwright script (dedup → assemble → write generated).
+ * @param {object} opts 装配选项
  * @param {string} opts.actionFile — relative path like scripts/action/action_db_1.json OR absolute
- * @param {boolean} [opts.preview]
- * @param {string} [opts.description]
- * @returns {{ success: true, testId: string, fileName: string, actionFile: string, scriptFile: string, script: string, stats: object, dedupedCommands: object[] }}
+ * @param {boolean} [opts.preview] 预览模式：只生成到 TMP_DIR，不入库 generated index
+ * @param {string} [opts.description] 自定义测试描述，写入 generated index 条目
+ * @returns {{ success: true, testId: string, fileName: string, actionFile: string, scriptFile: string, script: string, stats: object, dedupedCommands: object[] }} 装配结果（脚本内容、去重统计、testId 等）
  */
 export function assembleActionToScript({ actionFile, preview = false, description } = {}) {
   if (!actionFile) throw new Error('actionFile is required');

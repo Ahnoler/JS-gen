@@ -15,8 +15,10 @@ import {
 /**
  * Pick a connected executor with a free slot (lease count < capacity).
  * When preferIdleChrome=true, prefer nodes that already have reusable CDP Chromes.
- * @param {{ nodeUuid?: string, preferIdleChrome?: boolean }} [opts]
- * @returns {Promise<{ nodeUuid: string, cdpUrl?: string|null, cdpPort?: number|null, reusedChrome?: boolean }>}
+ * @param {{ nodeUuid?: string, preferIdleChrome?: boolean }} [opts] 选择选项
+ * @param {string} [opts.nodeUuid] 优先选择的节点UUID
+ * @param {boolean} [opts.preferIdleChrome] 是否优先选择有闲置Chrome的节点
+ * @returns {Promise<{ nodeUuid: string, cdpUrl?: string|null, cdpPort?: number|null, reusedChrome?: boolean }>} 选中的执行器节点信息
  */
 export async function pickExecutorNode(opts = {}) {
   const preferred = opts.nodeUuid || null;
@@ -127,6 +129,13 @@ export async function pickExecutorNode(opts = {}) {
   };
 }
 
+/**
+ * Send a typed JSON message to an executor node; throws if the node is not connected.
+ * @param {string} nodeUuid 节点UUID
+ * @param {string} type 消息类型
+ * @param {unknown} payload 消息负载
+ * @returns {void} 无返回值
+ */
 export function sendToExecutor(nodeUuid, type, payload) {
   if (!registry.send(nodeUuid, type, payload)) {
     throw new Error(`Executor ${nodeUuid} is not connected`);
@@ -157,7 +166,15 @@ const STDIN_TO_WS = {
  *   cdpUrl?: string|null,
  *   cdpPort?: number|null,
  *   preferIdleChrome?: boolean,
- * }} opts
+ * }} opts 会话选项
+ * @param {string} opts.sessionId 会话ID
+ * @param {string} [opts.model] 模型名称
+ * @param {string} [opts.nodeUuid] 节点UUID
+ * @param {number|null} [opts.trajectoryId] 轨迹ID
+ * @param {string|null} [opts.cdpUrl] CDP URL
+ * @param {number|null} [opts.cdpPort] CDP端口
+ * @param {boolean} [opts.preferIdleChrome] 是否优先选择闲置Chrome
+ * @returns {Promise<object>} 会话信息
  */
 export async function openSession({
   sessionId,
@@ -230,8 +247,9 @@ export async function openSession({
 
 /**
  * Ask executor for live sessions (request/response via session hub).
- * @param {string} nodeUuid
- * @param {number} [timeoutMs]
+ * @param {string} nodeUuid node uuid
+ * @param {number} [timeoutMs] timeout ms
+ * @returns {Promise<Array>} 会话列表
  */
 export async function listExecutorSessions(nodeUuid, timeoutMs = 10000) {
   const requestId = randomUUID();
@@ -243,8 +261,9 @@ export async function listExecutorSessions(nodeUuid, timeoutMs = 10000) {
 
 /**
  * Ask executor for reusable CDP Chromes (not bound to a live slot).
- * @param {string} nodeUuid
- * @param {number} [timeoutMs]
+ * @param {string} nodeUuid node uuid
+ * @param {number} [timeoutMs] timeout ms
+ * @returns {Promise<{ browsers: Array, occupiedPorts: Array }>} CDP浏览器信息
  */
 export async function listExecutorCdp(nodeUuid, timeoutMs = 15000) {
   const requestId = randomUUID();
@@ -259,7 +278,8 @@ export async function listExecutorCdp(nodeUuid, timeoutMs = 15000) {
 
 /**
  * Drop control-plane leases whose session no longer exists on the executor.
- * @param {string} nodeUuid
+ * @param {string} nodeUuid node uuid
+ * @returns {Promise<{ released: number, liveSessionIds: Array, error?: string }>} 释放结果
  */
 export async function reconcileLeasesWithExecutor(nodeUuid) {
   if (!nodeUuid || !registry.isConnected(nodeUuid)) return { released: 0 };
@@ -281,6 +301,15 @@ export async function reconcileLeasesWithExecutor(nodeUuid) {
   return { released, liveSessionIds: [...liveIds] };
 }
 
+/**
+ * Close a session on the executor and release its control-plane lease.
+ * @param {object} opts 会话关闭选项
+ * @param {string} opts.nodeUuid 节点UUID
+ * @param {string} opts.sessionId 会话ID
+ * @param {boolean} [opts.keepBrowser] 是否保留Chrome用于CDP复用（默认false）
+ * @param {number} [opts.timeoutMs] timeout ms
+ * @returns {Promise<void>} 无返回值
+ */
 export async function closeSession({
   nodeUuid,
   sessionId,
@@ -300,6 +329,15 @@ export async function closeSession({
   }
 }
 
+/**
+ * Forward a stdin event from the control plane to the executor session subprocess.
+ * @param {object} opts 转发选项
+ * @param {string} opts.nodeUuid 节点UUID
+ * @param {string} opts.sessionId 会话ID
+ * @param {string} opts.event stdin事件名称（step, cancel_step, manual_record_start, …）
+ * @param {object} [opts.data] 事件负载
+ * @returns {void} 无返回值
+ */
 export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
   const wsType = STDIN_TO_WS[event] || 'session.stdin';
   if (wsType === 'session.step') {
@@ -331,6 +369,12 @@ export function forwardStdin({ nodeUuid, sessionId, event, data = {} }) {
   sendToExecutor(nodeUuid, wsType, { sessionId, ...data });
 }
 
+/**
+ * Subscribe to all session events for a session; returns an unsubscribe function.
+ * @param {string} sessionId 会话ID
+ * @param {(type: string, payload: object) => void} handler 事件处理器
+ * @returns {() => void} 取消订阅函数
+ */
 export function subscribeSessionEvents(sessionId, handler) {
   return onSessionEvent(sessionId, '*', ({ type, payload }) => handler(type, payload));
 }

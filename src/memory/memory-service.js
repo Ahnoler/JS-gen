@@ -21,7 +21,13 @@ function toNullableInt(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-/** 通过 sessionId 解析交易 id（本地/执行机会话都挂在 state.sessions）。 */
+/**
+ * 通过 sessionId 解析交易 id（本地/执行机会话都挂在 state.sessions）。
+ * @param {object} [opts] - 解析选项
+ * @param {number|string|null} [opts.trajectoryId] - 交易ID，可为null
+ * @param {string} [opts.sessionId] - 会话ID
+ * @returns {number|null} 解析后的交易ID，如果无法解析则返回null
+ */
 export function resolveTrajectoryId({ trajectoryId = null, sessionId = '' } = {}) {
   const tid = toNullableInt(trajectoryId);
   if (tid != null && tid > 0) return tid;
@@ -36,7 +42,11 @@ export function resolveTrajectoryId({ trajectoryId = null, sessionId = '' } = {}
   return null;
 }
 
-/** 规范化单条事件 → DB 行 + 附带 facts/decision。 */
+/**
+ * 规范化单条事件 → DB 行 + 附带 facts/decision。
+ * @param {object} raw raw event object (snake_case or camelCase)
+ * @returns {{ event: object, facts: object[], decisionRecord: object|null }} normalized event with facts and decision record
+ */
 function normalizeEvent(raw) {
   const ev = (raw && typeof raw === 'object') ? raw : {};
   const eventType = normalizeEventType(ev.eventType ?? ev.event_type ?? ev.type);
@@ -136,6 +146,9 @@ function normalizeDecision(d, event) {
 /**
  * 批量摄取事件（P0 旁路写）。
  * 入参：{ events: [...] } 或直接数组。
+ * @param {object|Array} [payload] - 摄入数据，可以是事件数组或包含events属性的对象
+ * @param {Array} [payload.events] - 事件数组
+ * @returns {Promise<object>} 摄入结果，包含插入数量统计
  */
 export async function ingestEvents(payload = {}) {
   const rawEvents = Array.isArray(payload) ? payload : payload?.events;
@@ -248,6 +261,14 @@ async function getDBTransaction(fn) {
  * 检索事实包（P0：结构化过滤 + 权重排序 + 预算裁剪）。
  * P2-2：传 functionId 且 AI_MEMORY_HISTORY 开启时，并入同功能历史成功交易
  * 的当前版本事实（source=history, stance=inferred, weight×0.5，排序自然靠后）。
+ * @param {object} [opts] - 检索选项
+ * @param {number} opts.trajectoryId - 交易ID
+ * @param {number|null} [opts.phaseNumber] - 阶段号
+ * @param {string} [opts.entity] - 实体名称
+ * @param {number} [opts.limit] - 返回事实数量限制（默认50）
+ * @param {number} [opts.maxChars] - 字符数预算限制（默认2000）
+ * @param {number|null} [opts.functionId] - 功能ID，用于历史事实检索
+ * @returns {Promise<object>} 事实包，包含facts数组和budget信息
  */
 export async function retrieveFactPack({
   trajectoryId,
@@ -286,12 +307,20 @@ export async function retrieveFactPack({
   return buildFactPack(ranked, { maxChars, limit });
 }
 
-/** 决策列表。 */
+/**
+ * 决策列表。
+ * @param {object} [filters] - 过滤条件
+ * @returns {Promise<Array>} 决策列表
+ */
 export async function listDecisions(filters = {}) {
   return memoryDao.listDecisions(filters);
 }
 
-/** 决策详情（回填 inputFacts 便于审计复现）。 */
+/**
+ * 决策详情（回填 inputFacts 便于审计复现）。
+ * @param {number|string} id - 决策ID
+ * @returns {Promise<object|null>} 决策详情，包含inputFacts信息
+ */
 export async function getDecision(id) {
   const decision = await memoryDao.getDecision(Number(id));
   if (!decision) return null;
@@ -304,7 +333,11 @@ export async function getDecision(id) {
   return { ...decision, inputFactIds, inputFacts };
 }
 
-/** 审计汇总。 */
+/**
+ * 审计汇总。
+ * @param {number|string} trajectoryId - 交易ID
+ * @returns {Promise<object>} 审计汇总信息
+ */
 export async function auditSummary(trajectoryId) {
   return memoryDao.auditSummary(Number(trajectoryId));
 }
@@ -354,7 +387,11 @@ function decisionsFromAudit(summary) {
   };
 }
 
-/** 并集分母：缺字段 = 不一致；所有交易取值完全一致才算 match。 */
+/**
+ * 并集分母：缺字段 = 不一致；所有交易取值完全一致才算 match。
+ * @param {Array<{ id: number, formValues: object }>} trajectories array of trajectory objects with formValues
+ * @returns {{ entitiesCompared: number, exactMatchRate: number|null, pairwise: object[] }|null} consistency metrics or null if fewer than 2 trajectories
+ */
 function computeConsistency(trajectories) {
   if (!Array.isArray(trajectories) || trajectories.length < 2) return null;
   const entitySet = new Set();
@@ -405,8 +442,9 @@ function computeConsistency(trajectories) {
 
 /**
  * P2-4：多模型对比报告。
- * @param {{ trajectoryIds: number[] }} opts
- * @returns {Promise<{ trajectories, consistency, missingIds, note } | { error, status, missingIds? }>}
+ * @param {object} [opts] - 对比选项
+ * @param {number[]} opts.trajectoryIds - 交易ID数组
+ * @returns {Promise<{ trajectories, consistency, missingIds, note } | { error, status, missingIds? }>} 对比结果或错误信息
  */
 export async function compareModels({ trajectoryIds } = {}) {
   const raw = Array.isArray(trajectoryIds) ? trajectoryIds : [];
@@ -454,6 +492,8 @@ export async function compareModels({ trajectoryIds } = {}) {
 
 /**
  * 离线复检（P0 只重算汇总；P1 实现 policy checks 逐条重放）。
+ * @param {number|string} trajectoryId - 交易ID
+ * @returns {Promise<object>} 审计结果
  */
 export async function runAudit(trajectoryId) {
   const summary = await memoryDao.auditSummary(Number(trajectoryId));
@@ -464,12 +504,19 @@ export async function runAudit(trajectoryId) {
   };
 }
 
-/** 交易记忆时间线。 */
+/**
+ * 交易记忆时间线。
+ * @param {number|string} trajectoryId - 交易ID
+ * @returns {Promise<Array>} 时间线事件列表
+ */
 export async function timeline(trajectoryId) {
   return memoryDao.timeline(Number(trajectoryId));
 }
 
-/** 全局统计。 */
+/**
+ * 全局统计。
+ * @returns {Promise<object>} 全局统计信息
+ */
 export async function stats() {
   return memoryDao.stats();
 }
@@ -478,6 +525,9 @@ export async function stats() {
  * P1：把轨迹业务数据（analyze 解析 / 前端 POST 的 KV）摄取为
  * memory_fact —— source=requirement, stance=authoritative（不可被 LLM 覆盖），
  * 供事实包注入优先采用。entries 格式 {fieldKey, fieldValue} 或 {key, value}。
+ * @param {number|string} trajectoryId - 交易ID
+ * @param {Array<object>} entries - 业务数据条目数组
+ * @returns {Promise<object>} 摄入结果
  */
 export async function ingestBusinessEntriesAsFacts(trajectoryId, entries) {
   const tid = Number(trajectoryId);

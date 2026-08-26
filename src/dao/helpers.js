@@ -1,6 +1,8 @@
 /**
  * Utility: convert camelCase object keys to snake_case for DB inserts.
  * Converts top-level keys only. Preserves id and skips undefined values.
+ * @param {object} obj camelCase-keyed source object
+ * @returns {object} snake_case-keyed row object
  */
 export function toDbRow(obj) {
   const row = {};
@@ -15,6 +17,8 @@ export function toDbRow(obj) {
 /**
  * Utility: convert snake_case DB row back to camelCase entity.
  * Converts top-level keys only. Preserves id.
+ * @param {object|null} row snake_case DB row
+ * @returns {object|null} camelCase entity, or null when row is null
  */
 export function fromDbRow(row) {
   if (!row) return null;
@@ -28,6 +32,8 @@ export function fromDbRow(row) {
 
 /**
  * Utility: convert an array of DB rows to camelCase entities.
+ * @param {object[]} rows snake_case DB rows
+ * @returns {object[]} camelCase entities
  */
 export function fromDbRows(rows) {
   return rows.map(fromDbRow);

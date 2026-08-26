@@ -7,6 +7,18 @@ import * as execSession from '../../executor-session-client.js';
 import { persistLiveActionEntries } from './persist-live.js';
 import { writeAgentEvent, sessionRuntimeReady } from './agent-io.js';
 
+/**
+ * Trajectory persistence handler — saves the session's accumulated actions,
+ * phase descriptions, form snapshots, and screenshots to the DB (and legacy
+ * JSON store), for both executor and local shared-browser modes.
+ */
+
+/**
+ * Persist a session's trajectory to the DB (and legacy JSON store).
+ * @param {import('express').Request} req Express request
+ * @param {import('express').Response} res Express response
+ * @returns {Promise<void>}
+ */
 export async function persistTrajectory(req, res) {
   const { id } = req.params;
   const { task, functionId, trajectoryDbId, phaseDescriptions } = req.body || {};

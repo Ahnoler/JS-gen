@@ -14,6 +14,16 @@ import { normalizeFormLabel } from './text.js';
 import { stripVolatileTreeText } from './text.js';
 import { xpathLiteral } from './text.js';
 
+/**
+ * Build a stable-attribute short-circuit xpath (data-testid / id / aria-label / title …).
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.tag] Element tag name.
+ * @param {Record<string, string>} [opts.attributes] Element attributes.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @returns {string} Scoped xpath anchored on a stable attribute, or empty string.
+ */
 export function buildStableAttrXPathSmart({
   tag = '',
   attributes = {},
@@ -48,7 +58,15 @@ export function buildStableAttrXPathSmart({
 
 /**
  * Relative xpath for an Element UI form control by its label.
- * @param {{ label?: string, tag?: string, className?: string, xpathFull?: string, container?: string, occurrence?: number, targetKind?: string }} opts
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.label] Form-item label text.
+ * @param {string} [opts.tag] Element tag name.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @param {string} [opts.targetKind] Control kind hint (form_select / form_date / …).
+ * @returns {string} Scoped form-item-anchored xpath, or empty string.
  */
 export function buildFormFieldXPathSmart({
   label = '',
@@ -136,7 +154,15 @@ export function buildFormFieldXPathSmart({
 
 /**
  * Menu / submenu / dropdown item relative xpath.
- * @param {{ tag?: string, text?: string, className?: string, xpathFull?: string, container?: string, attributes?: object, occurrence?: number }} opts
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.tag] Element tag name.
+ * @param {string} [opts.text] Item visible text.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {object} [opts.attributes] Element attributes.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @returns {string} Scoped menu-item xpath, or empty string.
  */
 export function buildMenuXPathSmart({
   tag = '',
@@ -182,6 +208,14 @@ export function buildMenuXPathSmart({
  * Icon button by el-icon-* class (preferred) or aria-label / title fallback.
  * Tip text is stored in params.text for replay disambiguation — not only aria-label
  * (ElTooltip toolbars often leave aria-label empty).
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.text] Tooltip / visible text for fallback.
+ * @param {Record<string, string>} [opts.attributes] Element attributes.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @returns {string} Scoped icon-button xpath, or empty string.
  */
 export function buildIconXPathSmart({
   text = '',
@@ -208,6 +242,14 @@ export function buildIconXPathSmart({
 
 /**
  * Tab by visible text.
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.text] Tab visible text.
+ * @param {string} [opts.tabName] Explicit tab name (preferred over text).
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @returns {string} Scoped tab xpath, or empty string.
  */
 export function buildTabXPathSmart({
   text = '',
@@ -228,6 +270,15 @@ export function buildTabXPathSmart({
 
 /**
  * Table row button.
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.rowText] Row cell text used to locate the row.
+ * @param {string} [opts.buttonText] Button text (preferred over text).
+ * @param {string} [opts.text] Fallback button text.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @returns {string} Scoped table-row button xpath, or empty string.
  */
 export function buildTableRowButtonXPathSmart({
   rowText = '',
@@ -250,6 +301,13 @@ export function buildTableRowButtonXPathSmart({
 
 /**
  * Table row radio.
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.rowText] Row cell text used to locate the row.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @returns {string} Scoped table-row radio xpath, or empty string.
  */
 export function buildTableRowRadioXPathSmart({
   rowText = '',
@@ -269,6 +327,13 @@ export function buildTableRowRadioXPathSmart({
 
 /**
  * Dialog / drawer / notification close control.
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.targetKind] Close kind (dialog_close / notification_close).
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @returns {string} Scoped close-button xpath.
  */
 export function buildCloseXPathSmart({
   targetKind = 'dialog_close',
@@ -295,6 +360,15 @@ export function buildCloseXPathSmart({
 
 /**
  * Adjacent button next to a labeled form item.
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.formLabel] Form-item label text.
+ * @param {string} [opts.text] Fallback button text.
+ * @param {string} [opts.buttonText] Button text (preferred over text).
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @returns {string} Scoped adjacent-button xpath, or empty string.
  */
 export function buildAdjacentButtonXPathSmart({
   formLabel = '',
@@ -331,6 +405,15 @@ export function buildAdjacentButtonXPathSmart({
 /**
  * Tree node content by stable base text (strip (n) / [V-x]); optional parent axis.
  * Never anchors on exact volatile counts like "贷款(272)".
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.text] Node visible text.
+ * @param {string} [opts.parentText] Parent node text for nested anchor.
+ * @param {string} [opts.dataKey] Stable data-key attribute value.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @returns {string} Scoped tree-node xpath, or empty string.
  */
 export function buildTreeNodeXPathSmart({
   text = '',
@@ -365,6 +448,14 @@ export function buildTreeNodeXPathSmart({
 
 /**
  * Input by placeholder when form-item label is absent (e.g. 搜索关键字).
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.placeholder] Placeholder text.
+ * @param {string} [opts.tag] Element tag name.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.container] Explicit container hint.
+ * @param {number} [opts.occurrence] 1-based occurrence index.
+ * @returns {string} Scoped placeholder-anchored xpath, or empty string.
  */
 export function buildPlaceholderXPathSmart({
   placeholder = '',
@@ -387,6 +478,12 @@ export function buildPlaceholderXPathSmart({
 
 /**
  * Detect whether class/tag looks like a menu host (offline).
+ * @param {object} opts Element meta + builder options.
+ * @param {string} [opts.tag] Element tag name.
+ * @param {string} [opts.className] Element class string.
+ * @param {string} [opts.xpathFull] Absolute xpath.
+ * @param {Record<string, string>} [opts.attributes] Element attributes.
+ * @returns {boolean} True if the element looks like a menu host.
  */
 export function isMenuLike({ tag = '', className = '', xpathFull = '', attributes = {} } = {}) {
   const cls = String(className || attributes?.class || '');
@@ -397,8 +494,3 @@ export function isMenuLike({ tag = '', className = '', xpathFull = '', attribute
   if (kind === 'nav' && (tagL === 'li' || tagL === 'a')) return true;
   return false;
 }
-
-/**
- * Build text-anchored / label-anchored / action-aware relative xpath.
- * @param {object} opts
- */

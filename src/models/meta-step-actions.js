@@ -33,8 +33,9 @@ export const META_STEP_ACTIONS = Object.freeze([
 const META_SET = new Set(META_STEP_ACTIONS);
 
 /**
- * @param {string} [actionType]
- * @returns {boolean}
+ * 判断动作类型是否为元步骤（不产生页面操作）。
+ * @param {string} [actionType] 动作类型
+ * @returns {boolean} 是否为元步骤动作
  */
 export function isMetaStepAction(actionType) {
   const a = normalizeActionName(actionType || '');
@@ -42,18 +43,20 @@ export function isMetaStepAction(actionType) {
 }
 
 /**
- * @param {object} step
- * @returns {boolean}
+ * 判断步骤对象是否为元步骤。
+ * @param {object} step 步骤对象
+ * @returns {boolean} 是否为元步骤
  */
 export function isMetaStep(step) {
   return isMetaStepAction(step?.actionType || step?.action || '');
 }
 
 /**
+ * 过滤元步骤（默认剔除；includeMeta 时原样返回）。
  * @template T
- * @param {T[]} steps
- * @param {{ includeMeta?: boolean }} [opts]
- * @returns {T[]}
+ * @param {T[]} steps 步骤列表
+ * @param {{ includeMeta?: boolean }} [opts] 选项
+ * @returns {T[]} 过滤后的步骤列表
  */
 export function filterMetaSteps(steps, { includeMeta = false } = {}) {
   if (includeMeta || !Array.isArray(steps)) return steps || [];

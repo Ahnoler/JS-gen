@@ -1,3 +1,6 @@
+/**
+ * File-based trajectory store: index + per-trajectory JSON persistence under TRAJECTORIES_DIR.
+ */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -20,21 +23,38 @@ function indexPath() {
   return path.join(TRAJECTORIES_DIR, 'index.json');
 }
 
+/**
+ * Ensure the trajectories directory exists.
+ * @returns {void} result
+ */
 export function ensureTrajectoriesDir() {
   if (!existsSync(TRAJECTORIES_DIR)) mkdirSync(TRAJECTORIES_DIR, { recursive: true });
 }
 
+/**
+ * Load and parse the trajectory index.json (returns [] on missing/parse error).
+ * @returns {object[]} result
+ */
 export function loadTrajectoryIndex() {
   ensureTrajectoriesDir();
   if (!existsSync(indexPath())) return [];
   try { return JSON.parse(readFileSync(indexPath(), 'utf-8')); } catch { return []; }
 }
 
+/**
+ * Persist the trajectory index list to index.json.
+ * @param {object[]} list list
+ * @returns {void} result
+ */
 export function saveTrajectoryIndex(list) {
   ensureTrajectoriesDir();
   writeFileSync(indexPath(), JSON.stringify(list, null, 2), 'utf-8');
 }
 
+/**
+ * Generate a timestamped trajectory id (e.g. traj_20260101_120000).
+ * @returns {string} result
+ */
 export function createTrajectoryId() {
   const now = new Date();
   const pad = (n, d = 2) => String(n).padStart(d, '0');
@@ -45,6 +65,16 @@ export function createTrajectoryId() {
   return 'traj_' + ts;
 }
 
+/**
+ * Save a trajectory JSON to the trajectories dir and update the index.
+ * @param {object} opts opts
+ * @param {string} opts.trajectoryId opts.trajectory id
+ * @param {string} [opts.task] task
+ * @param {string} [opts.model] model
+ * @param {string} opts.sourcePath path to the source trajectory JSON
+ * @param {object} [opts.exploreMeta] extra metadata (is_done, is_successful)
+ * @returns {{ record: object, trajectory: object, flow: object[] }} saved record, parsed trajectory, and flow steps
+ */
 export function saveTrajectoryRecord({ trajectoryId, task, model, sourcePath, exploreMeta }) {
   ensureTrajectoriesDir();
   const fileName = `${trajectoryId}.json`;
@@ -90,11 +120,21 @@ export function saveTrajectoryRecord({ trajectoryId, task, model, sourcePath, ex
   return { record, trajectory, flow };
 }
 
+/**
+ * Look up a trajectory record from the index by id.
+ * @param {string} trajectoryId trajectory id
+ * @returns {object|null} result
+ */
 export function getTrajectoryRecord(trajectoryId) {
   const list = loadTrajectoryIndex();
   return list.find(r => r.trajectoryId === trajectoryId) || null;
 }
 
+/**
+ * Load and parse a trajectory's full JSON by id.
+ * @param {string} trajectoryId trajectory id
+ * @returns {object|null} result
+ */
 export function loadTrajectoryJson(trajectoryId) {
   const record = getTrajectoryRecord(trajectoryId);
   if (!record) return null;
@@ -107,6 +147,11 @@ export function loadTrajectoryJson(trajectoryId) {
   }
 }
 
+/**
+ * Delete a trajectory JSON file and remove it from the index.
+ * @param {string} trajectoryId trajectory id
+ * @returns {boolean} result
+ */
 export function deleteTrajectory(trajectoryId) {
   const list = loadTrajectoryIndex();
   const idx = list.findIndex(r => r.trajectoryId === trajectoryId);

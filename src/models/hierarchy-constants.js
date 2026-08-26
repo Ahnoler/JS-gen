@@ -19,13 +19,22 @@ export const TYPE_LABEL = Object.freeze({
 /** Sentinel root row id / parent_id for type=1 系统 nodes. */
 export const ROOT_NODE_ID = 0;
 
-/** True for null / undefined / 0 (points at virtual/real root). */
+/**
+ * True for null / undefined / 0 (points at virtual/real root).
+ * @param {number|string|null|undefined} parentId 父节点 id
+ * @returns {boolean} 是否指向根节点
+ */
 export function isRootParentId(parentId) {
   if (parentId == null || parentId === '') return true;
   const n = Number(parentId);
   return Number.isFinite(n) && n === ROOT_NODE_ID;
 }
 
+/**
+ * 是否为根节点 id（0）。
+ * @param {number|string} id 节点 id
+ * @returns {boolean} 是否为根节点
+ */
 export function isRootNodeId(id) {
   return Number(id) === ROOT_NODE_ID;
 }

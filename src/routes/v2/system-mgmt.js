@@ -49,6 +49,10 @@ function sendExcel(res, buffer, filename) {
   res.send(buffer);
 }
 
+/**
+ * Register system-management routes (tree, nodes CRUD, template/export/import, meta).
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
   /**
    * 1. 系统树（始终以 id=0 根为唯一顶层）
@@ -213,6 +217,7 @@ export default function (app) {
   });
 
   // expose constants for clients
+  /** Expose hierarchy type constants (typeMap + types) for clients. */
   app.get('/api/v2/system-mgmt/meta', (_req, res) => {
     res.json({
       typeMap: TYPE_LABEL,

@@ -13,14 +13,30 @@ function normalizeAccountPatch(input = {}) {
   return data;
 }
 
+/**
+ * List all login accounts for a system.
+ * @param {number} systemId system DB id
+ * @returns {Promise<Array<object>>} account rows
+ */
 export async function listBySystem(systemId) {
   return systemAccountDao.listBySystem(systemId);
 }
 
+/**
+ * Get a single login account by id.
+ * @param {number} id account DB id
+ * @returns {Promise<object|null>} account row, or null if not found
+ */
 export async function getAccount(id) {
   return systemAccountDao.getById(id);
 }
 
+/**
+ * Create a new login account under a system.
+ * @param {number} systemId system DB id
+ * @param {object} input account fields (name, loginUrl, account, password, remark, sortOrder)
+ * @returns {Promise<object>} created account row
+ */
 export async function createAccount(systemId, input) {
   const sys = await systemDao.getById(systemId);
   if (!sys || sys.type !== NODE_TYPE.SYSTEM) {
@@ -41,6 +57,12 @@ export async function createAccount(systemId, input) {
   });
 }
 
+/**
+ * Update an existing login account with a partial patch.
+ * @param {number} id account DB id
+ * @param {object} input partial account fields to update
+ * @returns {Promise<object|null>} updated account row, or null if not found
+ */
 export async function updateAccount(id, input) {
   const existing = await systemAccountDao.getById(id);
   if (!existing) return null;
@@ -54,6 +76,11 @@ export async function updateAccount(id, input) {
   return systemAccountDao.update(id, patch);
 }
 
+/**
+ * Remove a login account by id.
+ * @param {number} id account DB id
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function removeAccount(id) {
   return systemAccountDao.remove(id);
 }

@@ -14,6 +14,7 @@ const ALLOWED_RECORD_STATUS = new Set(TRAJECTORY_RECORD_STATUSES);
 /**
  * Normalize query recordStatus / status into a unique list of valid enums.
  * Accepts string, comma-separated string, or array.
+ * @param {string|string[]|null} raw Input record status string or array
  * @returns {string[]|null} null = no filter
  */
 export function parseRecordStatuses(raw) {
@@ -27,7 +28,11 @@ export function parseRecordStatuses(raw) {
   return statuses.length ? statuses : null;
 }
 
-/** @returns {string[]} statuses that were requested but not in the enum */
+/**
+ * Get record statuses that were requested but are not valid enums.
+ * @param {string|string[]|null} raw Input record status string or array
+ * @returns {string[]} statuses that were requested but not in the enum
+ */
 export function invalidRecordStatuses(raw) {
   if (raw == null || raw === '') return [];
   const parts = Array.isArray(raw)
@@ -63,8 +68,15 @@ function applyBatchTaskNameFilter(query, batchTaskName) {
 const RECORD_STATUS_STATS = ['draft', 'recording', 'failed', 'recorded', 'completed'];
 
 /**
- * 五档统计：与行查询同基准过滤（functionId/keyword/recordStatus/batchTaskName）。
- * @returns {Promise<{ total: number, draft: number, recording: number, failed: number, recorded: number, completed: number }>}
+ * Get statistics for trajectory record statuses (draft, recording, failed, recorded, completed).
+ * Filters match the same criteria as list queries (functionId/keyword/recordStatus/batchTaskName).
+ * @param {object} [options] Optional filter parameters
+ * @param {number|null} [options.functionId] Filter by function ID
+ * @param {string|null} [options.keyword] Search keyword for name or task
+ * @param {string|string[]|null} [options.recordStatus] Filter by record status
+ * @param {string|null} [options.batchTaskName] Filter by batch task name
+ * @param {number|null} [options.paasUserId] Filter by PaaS user ID
+ * @returns {Promise<{ total: number, draft: number, recording: number, failed: number, recorded: number, completed: number }>} 各状态统计
  */
 export async function countByRecordStatus({ functionId = null, keyword = null, recordStatus = null, batchTaskName = null, paasUserId = null } = {}) {
   const db = getDB();
@@ -106,8 +118,11 @@ const SORT_COL_MAP = {
 };
 
 /**
- * Insert trajectory row. When `trx` is provided, uses that transaction and does not commit.
- * @returns {Promise<number>} numeric PK
+ * Insert a new trajectory row into the database.
+ * When `trx` is provided, uses that transaction and does not commit.
+ * @param {object} trajectory Trajectory data to save
+ * @param {import('knex').Knex|null} [trx] Optional transaction object
+ * @returns {Promise<number>} The numeric primary key of the inserted row
  */
 export async function save(trajectory, trx = null) {
   const run = async (client) => {
@@ -162,7 +177,12 @@ async function insertStepRows(trx, trajectoryDbId, steps, stepNumberOffset = 0) 
 }
 
 /**
- * Append steps to an existing trajectory (by numeric PK).
+ * Append steps to an existing trajectory by numeric primary key.
+ * @param {number} trajectoryDbId The trajectory ID to append steps to
+ * @param {Array<object>} steps Array of step objects to append
+ * @param {object} [options] Optional configuration
+ * @param {number} [options.stepNumberOffset] Offset to start step numbering from
+ * @returns {Promise<number>} Number of steps appended
  */
 export async function appendSteps(trajectoryDbId, steps, { stepNumberOffset = 0 } = {}) {
   if (!steps?.length) return 0;
@@ -174,6 +194,13 @@ export async function appendSteps(trajectoryDbId, steps, { stepNumberOffset = 0 
   });
 }
 
+/**
+ * Update trajectory metadata fields.
+ * @param {number} trajectoryDbId The trajectory ID to update
+ * @param {object} fields Fields to update
+ * @param {import('knex').Knex|null} [trx] Optional transaction object
+ * @returns {Promise<number>} Number of affected rows
+ */
 export async function updateMeta(trajectoryDbId, fields, trx = null) {
   const patch = toDbRow(fields);
   if (!Object.keys(patch).length) return 0;
@@ -181,6 +208,12 @@ export async function updateMeta(trajectoryDbId, fields, trx = null) {
   return db(TABLE).where({ id: trajectoryDbId }).update(patch);
 }
 
+/**
+ * Mark a trajectory as not exported (dirty state).
+ * @param {number} trajectoryId The trajectory ID to mark as dirty
+ * @param {import('knex').Knex|null} [trx] Optional transaction object
+ * @returns {Promise<number>} Number of affected rows
+ */
 export async function markExportDirty(trajectoryId, trx = null) {
   const id = Number(trajectoryId);
   if (!Number.isFinite(id) || id <= 0) return 0;
@@ -188,6 +221,12 @@ export async function markExportDirty(trajectoryId, trx = null) {
   return db(TABLE).where({ id }).update({ is_export: 0 });
 }
 
+/**
+ * Mark a trajectory as exported.
+ * @param {number} trajectoryId The trajectory ID to mark as exported
+ * @param {import('knex').Knex|null} [trx] Optional transaction object
+ * @returns {Promise<number>} Number of affected rows
+ */
 export async function markExported(trajectoryId, trx = null) {
   const id = Number(trajectoryId);
   if (!Number.isFinite(id) || id <= 0) return 0;
@@ -198,9 +237,12 @@ export async function markExported(trajectoryId, trx = null) {
 /**
  * Clear trajectory.remote_session_id rows pointing at a remote_session.
  * Used for exclusive mount + close/idle sweeps (prevents ghost "occupancy").
- * @param {number} remoteSessionId
- * @param {{ exceptTrajectoryId?: number|null, demoteLive?: boolean, trx?: import('knex').Knex|null }} [opts]
- * @returns {Promise<number[]>} cleared trajectory ids
+ * @param {number} remoteSessionId The remote session ID to clear mounts for
+ * @param {object} [opts] Optional configuration
+ * @param {number|null} [opts.exceptTrajectoryId] Trajectory ID to exclude from clearing
+ * @param {boolean} [opts.demoteLive] Whether to demote live recording status
+ * @param {import('knex').Knex|null} [opts.trx] Optional transaction object
+ * @returns {Promise<number[]>} Array of cleared trajectory IDs
  */
 export async function clearMountByRemoteSessionId(remoteSessionId, {
   exceptTrajectoryId = null,
@@ -231,9 +273,10 @@ export async function clearMountByRemoteSessionId(remoteSessionId, {
 }
 
 /**
- * Trajectories whose remote_session_id is stale:
- * missing rs / closed|crashed / rs unmounted / rs owned by another traj.
- * @returns {Promise<Array<{ id: number, remoteSessionId: number, recordStatus: string }>>}
+ * Find trajectories with stale remote_session_id references.
+ * Stale conditions include: missing remote session, closed/crashed sessions, 
+ * unmounted sessions, or sessions owned by another trajectory.
+ * @returns {Promise<Array<{ id: number, remoteSessionId: number, recordStatus: string }>>} 过期挂载列表
  */
 export async function listStaleRemoteMounts() {
   const db = getDB();
@@ -256,7 +299,8 @@ export async function listStaleRemoteMounts() {
 
 /**
  * Repair stale trajectory.remote_session_id pointers (恢复临时录制中的持久状态基线).
- * @returns {Promise<number[]>} cleared trajectory ids
+ * @param {import('knex').Knex|null} [trx] Optional transaction object
+ * @returns {Promise<number[]>} Array of cleared trajectory IDs
  */
 export async function repairStaleRemoteMounts(trx = null) {
   const stale = await listStaleRemoteMounts();
@@ -276,9 +320,11 @@ export async function repairStaleRemoteMounts(trx = null) {
 
 /**
  * Conditional meta update (CAS). Returns number of affected rows.
- * @param {number} trajectoryDbId
- * @param {object} fields
- * @param {{ recordStatusIn?: string[] }} [where]
+ * @param {number} trajectoryDbId The trajectory ID to update
+ * @param {object} fields Fields to update
+ * @param {object} [where] Optional where conditions
+ * @param {string[]|null} [where.recordStatusIn] Filter by record status
+ * @returns {Promise<number>} Number of affected rows
  */
 export async function updateMetaIf(trajectoryDbId, fields, { recordStatusIn = null } = {}) {
   const patch = toDbRow(fields);
@@ -291,8 +337,11 @@ export async function updateMetaIf(trajectoryDbId, fields, { recordStatusIn = nu
 }
 
 /**
- * 读取轨迹当前 record_status / persistent_record_status（轻量，不含 steps）。
- * persistent_record_status 列可能在迁移前不存在，缺失时降级为 null（上层按 draft 基线处理）。
+ * Get trajectory current record_status and persistent_record_status (lightweight, no steps).
+ * persistent_record_status column may not exist in older migrations, 
+ * defaults to null (handled as draft baseline by upper layers).
+ * @param {number} trajectoryDbId The trajectory ID to query
+ * @returns {Promise<{ recordStatus: string, persistentRecordStatus: string|null }|null>} Record status object or null if not found
  */
 export async function getRecordStatusRow(trajectoryDbId) {
   const db = getDB();
@@ -313,6 +362,10 @@ export async function getRecordStatusRow(trajectoryDbId) {
 
 /**
  * 写入 record_status（必写），同时尽力写 persistent_record_status（列缺失时降级为仅 record_status）。
+ * @param {number} trajectoryDbId 轨迹 id
+ * @param {string} next 目标记录状态
+ * @param {import('knex').Knex|null} [trx] 可选事务对象
+ * @returns {Promise<number>} 受影响行数
  */
 async function writeRecordStatusResilient(trajectoryDbId, next, trx = null) {
   await updateMeta(trajectoryDbId, { recordStatus: next }, trx);
@@ -326,11 +379,13 @@ async function writeRecordStatusResilient(trajectoryDbId, next, trx = null) {
 }
 
 /**
- * 进入临时「录制中」(recording) 状态。
- * 记录录制前的持久状态基线 persistent_record_status，保证录制结束后能恢复到
- * 该基线，而不被临时状态降级。
- * 首次录制（基线为空/null → draft）默认按 draft 处理。
- * @returns {Promise<{ recordStatus: string, persistentBase: string }>}
+ * Enter transient 'recording' state.
+ * Records the persistent status baseline (persistent_record_status) before recording,
+ * ensuring the trajectory can be restored to this baseline after recording ends
+ * without being downgraded by temporary states.
+ * First recording (baseline empty/null → draft) defaults to draft.
+ * @param {number} trajectoryDbId The trajectory ID to enter recording state
+ * @returns {Promise<{ recordStatus: string, persistentBase: string }>} Current record status and persistent baseline
  */
 export async function enterTransientRecording(trajectoryDbId) {
   const row = await getRecordStatusRow(trajectoryDbId);
@@ -353,9 +408,13 @@ export async function enterTransientRecording(trajectoryDbId) {
 }
 
 /**
- * 录制会话结束后，写入其结果持久状态（resolvePostRecordingStatus）。
+ * After recording session ends, write the result persistent status (resolvePostRecordingStatus).
  * outcome: 'success' | 'failure' | 'restore'
- * 同步维护 persistent_record_status 基线（与最终记录状态一致）。
+ * Synchronously maintains persistent_record_status baseline (consistent with final record status).
+ * @param {number} trajectoryDbId The trajectory ID to finish recording
+ * @param {string} outcome Recording outcome: 'success' | 'failure' | 'restore'
+ * @param {import('knex').Knex|null} [trx] Optional transaction object
+ * @returns {Promise<string>} Final record status
  */
 export async function finishTransientRecording(trajectoryDbId, outcome, trx = null) {
   const row = await getRecordStatusRow(trajectoryDbId);
@@ -368,8 +427,12 @@ export async function finishTransientRecording(trajectoryDbId, outcome, trx = nu
 }
 
 /**
- * 非终结性恢复：临时录制未显式成功/失败（关浏览器、断开、回收、惰性清理等），
- * 一律恢复到录制前的持久状态基线，杜绝降级为 draft。
+ * Non-terminating recovery: for temporary recordings without explicit success/failure
+ * (browser close, disconnect, recycle, lazy cleanup, etc.), restore to the 
+ * persistent status baseline before recording, preventing downgrade to draft.
+ * @param {number} trajectoryDbId The trajectory ID to restore
+ * @param {import('knex').Knex|null} [trx] Optional transaction object
+ * @returns {Promise<string|null>} Restored record status or null if not found
  */
 export async function restorePersistentRecordStatus(trajectoryDbId, trx = null) {
   const row = await getRecordStatusRow(trajectoryDbId);
@@ -408,13 +471,22 @@ export async function restorePersistentRecordStatus(trajectoryDbId, trx = null) 
 }
 
 /**
- * 将一条轨迹显式写为持久记录状态（同时回填 persistent_record_status 基线）。
+ * Set a trajectory to explicit persistent record status (and backfill persistent_record_status baseline).
+ * @param {number} trajectoryDbId The trajectory ID to update
+ * @param {string} status Persistent record status to set
+ * @param {import('knex').Knex|null} [trx] Optional transaction object
+ * @returns {Promise<number>} Number of affected rows
  */
 export async function setPersistentRecordStatus(trajectoryDbId, status, trx = null) {
   if (!PERSISTENT_RECORD_STATUSES.includes(status)) return 0;
   return writeRecordStatusResilient(trajectoryDbId, status, trx);
 }
 
+/**
+ * Get the maximum step number for a trajectory.
+ * @param {number} trajectoryDbId The trajectory ID to query
+ * @returns {Promise<number>} Maximum step number or 0 if no steps exist
+ */
 export async function getMaxStepNumber(trajectoryDbId) {
   const row = await getDB()('trajectory_step')
     .where({ trajectory_id: trajectoryDbId })
@@ -423,6 +495,11 @@ export async function getMaxStepNumber(trajectoryDbId) {
   return row?.maxStep || 0;
 }
 
+/**
+ * Get existing phase numbers for a trajectory.
+ * @param {number} trajectoryDbId The trajectory ID to query
+ * @returns {Promise<Array<{ id: number, phase_number: number, description: string|null }>>} Array of phase objects
+ */
 export async function getExistingPhaseNumbers(trajectoryDbId) {
   const rows = await getDB()('trajectory_phase')
     .where({ trajectory_id: trajectoryDbId })
@@ -431,8 +508,11 @@ export async function getExistingPhaseNumbers(trajectoryDbId) {
 }
 
 /**
- * AI 录制是否活跃：任一阶段 status='running'（录制 runner 每阶段维护）。
- * 占用中并入录制中后，用它在 demote/sweep 中区分「真正在录」与「只是观看占用」。
+ * Check if AI recording is active: any phase with status='running' (maintained by recording runner).
+ * After being mounted and merged into recording, used in demote/sweep to distinguish 
+ * between "truly recording" and "just viewing/occupying".
+ * @param {number} trajectoryId The trajectory ID to check
+ * @returns {Promise<boolean>} True if any running phase exists
  */
 export async function hasRunningPhase(trajectoryId) {
   const n = Number(trajectoryId);
@@ -443,6 +523,11 @@ export async function hasRunningPhase(trajectoryId) {
   return !!row;
 }
 
+/**
+ * Get the maximum phase number for a trajectory.
+ * @param {number} trajectoryDbId The trajectory ID to query
+ * @returns {Promise<number>} Maximum phase number or 0 if no phases exist
+ */
 export async function getMaxPhaseNumber(trajectoryDbId) {
   const row = await getDB()('trajectory_phase')
     .where({ trajectory_id: trajectoryDbId })
@@ -451,7 +536,11 @@ export async function getMaxPhaseNumber(trajectoryDbId) {
   return row?.maxPhase || 0;
 }
 
-/** Load trajectory by numeric PK with steps. */
+/**
+ * Load trajectory by numeric primary key with steps.
+ * @param {number} id The trajectory ID to load
+ * @returns {Promise<object|null>} Trajectory object with steps or null if not found
+ */
 export async function getById(id) {
   const db = getDB();
   const row = await db(TABLE).where({ id }).first();
@@ -465,6 +554,20 @@ export async function getById(id) {
   return entity;
 }
 
+/**
+ * List trajectories by function ID with pagination and filtering.
+ * @param {number} functionId The function ID to filter by
+ * @param {object} [options] Optional pagination and filter parameters
+ * @param {number} [options.page] Page number (1-based)
+ * @param {number} [options.pageSize] Number of items per page
+ * @param {string|null} [options.keyword] Search keyword for name or task
+ * @param {string|null} [options.sortBy] Sort column (createdAt, updatedAt, name, stepCount, phaseCount, recordStatus)
+ * @param {string} [options.order] Sort order ('asc' or 'desc')
+ * @param {string|string[]|null} [options.recordStatus] Filter by record status
+ * @param {string|null} [options.batchTaskName] Filter by batch task name
+ * @param {number|null} [options.paasUserId] Filter by PaaS user ID
+ * @returns {Promise<{ rows: Array<object>, total: number, page: number, pageSize: number, stats: object }>} Paginated trajectory list with statistics
+ */
 export async function listByFunction(functionId, {
   page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null,
 } = {}) {
@@ -500,6 +603,19 @@ export async function listByFunction(functionId, {
   return { rows: entities, total, page, pageSize, stats };
 }
 
+/**
+ * List all trajectories with pagination and filtering.
+ * @param {object} [options] Optional pagination and filter parameters
+ * @param {number} [options.page] Page number (1-based)
+ * @param {number} [options.pageSize] Number of items per page
+ * @param {string|null} [options.keyword] Search keyword for name or task
+ * @param {string|null} [options.sortBy] Sort column (createdAt, updatedAt, name, stepCount, phaseCount, recordStatus)
+ * @param {string} [options.order] Sort order ('asc' or 'desc')
+ * @param {string|string[]|null} [options.recordStatus] Filter by record status
+ * @param {string|null} [options.batchTaskName] Filter by batch task name
+ * @param {number|null} [options.paasUserId] Filter by PaaS user ID
+ * @returns {Promise<{ rows: Array<object>, total: number, page: number, pageSize: number, stats: object }>} Paginated trajectory list with statistics
+ */
 export async function list({
   page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null,
 } = {}) {
@@ -532,10 +648,20 @@ export async function list({
   return { rows: entities, total, page, pageSize, stats };
 }
 
+/**
+ * Remove a trajectory by ID.
+ * @param {number} id The trajectory ID to remove
+ * @returns {Promise<number>} Number of affected rows
+ */
 export async function remove(id) {
   return getDB()(TABLE).where({ id }).del();
 }
 
+/**
+ * Remove a trajectory by trajectory ID (alias for remove).
+ * @param {number} id The trajectory ID to remove
+ * @returns {Promise<number>} Number of affected rows
+ */
 export async function removeByTrajectoryId(id) {
   return remove(+id);
 }

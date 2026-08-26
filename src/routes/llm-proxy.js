@@ -1,11 +1,20 @@
 import crypto from 'crypto';
 import { LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT_MS } from '#config/config.js';
 
+/**
+ * OpenAI-compatible LLM gateway proxy — forwards model-list and chat
+ * completion requests to the configured upstream, plus a product-facing
+ * model discovery endpoint.
+ *
+ * Prefix: /api/v2/llm/*, /v1/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
 
   // Product-facing: list models available on the configured gateway.
   // Use this to discover usable model ids when a configured model 404s
   // (gateway requires full prefixed names, e.g. "Qwen/Qwen3.5-35B-A3B").
+  /** Product-facing model discovery against the configured LLM gateway. */
   app.get('/api/v2/llm/models', async (req, res) => {
     if (!LLM_BASE_URL || !LLM_API_KEY) {
       return res.status(500).json({ ok: false, error: 'LLM_BASE_URL and LLM_API_KEY env vars are required' });
@@ -31,6 +40,7 @@ export default function (app) {
     }
   });
 
+  /** OpenAI-compatible /v1/models passthrough to the upstream gateway. */
   app.get('/v1/models', async (req, res) => {
     if (!LLM_BASE_URL || !LLM_API_KEY) {
       return res.status(500).json({ error: { message: 'LLM_BASE_URL and LLM_API_KEY env vars are required', type: 'server_error' } });
@@ -46,6 +56,7 @@ export default function (app) {
     }
   });
 
+  /** OpenAI-compatible /v1/chat/completions passthrough (no streaming). */
   app.post('/v1/chat/completions', async (req, res) => {
     const { model: modelId, messages, temperature, tools, tool_choice, stream } = req.body || {};
 

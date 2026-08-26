@@ -42,7 +42,11 @@ function lockAiRecording(runtime, session, locked) {
   }
 }
 
-/** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
+/**
+ * Lazy accessor — avoid static cycle with trajectory-persist-service.js.
+ * @param {...unknown} args forwarded arguments to appendRecordedStep
+ * @returns {Promise<object>} append result from trajectory-persist-service
+ */
 async function appendRecordedStep(...args) {
   const mod = await import('./trajectory-persist-service.js');
   return mod.appendRecordedStep(...args);
@@ -68,6 +72,15 @@ async function applyPageLevelScreenshot(...args) {
   return mod.applyPageLevelScreenshot(...args);
 }
 
+/**
+ * Start AI trajectory recording: login pre-check, phase-by-phase agent loop,
+ * action_log_sync persistence, screenshot stash, business-data injection.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [root1] options
+ * @param {Array<number>|null} [root1.phaseIds] subset of phase ids to record (null = all)
+ * @param {number|null} [root1.accountId] login account id override
+ * @returns {Promise<{ trajectoryId: number, recordStatus: string, phaseIds: Array<number>, accountId: number, systemAccountId: number, events: Array<object>, steps: Array<object> }>} recording result with updated tree
+ */
 export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, accountId = null } = {}) {
   const tid = Number(trajectoryId);
   const runtime = getTrajectoryRuntime(tid);

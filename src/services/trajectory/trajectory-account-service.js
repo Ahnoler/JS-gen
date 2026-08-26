@@ -8,8 +8,12 @@ import * as systemDao from '../../dao/system-dao.js';
 import * as systemAccountDao from '../../dao/system-account-dao.js';
 import { NODE_TYPE, isRootParentId, isRootNodeId } from '../../models/hierarchy-constants.js';
 
-/** Build agent login instruction (aligned with Dashboard session-mode login).
+/**
+ * Build agent login instruction (aligned with Dashboard session-mode login).
  * Prefer system.url；兼容旧数据回退 account.loginUrl。
+ * @param {object} [account] system account row (account/password/loginUrl)
+ * @param {object} [system] system row (url)
+ * @returns {string} login instruction task text
  */
 export function buildLoginInstruction(account = {}, system = {}) {
   const url = String(system.url || account.loginUrl || '').trim();
@@ -30,8 +34,8 @@ export function buildLoginInstruction(account = {}, system = {}) {
 /**
  * Climb function → module → … until owning system (type=1), or the top-level
  * node hanging under 根 (parent_id=0). Tolerates mislabeled types from older data.
- * @param {number} startId
- * @returns {Promise<{ system: object|null, chain: object[] }>}
+ * @param {number} startId node id to climb from (function/module/…)
+ * @returns {Promise<{ system: object|null, chain: object[] }>} owning system row + ancestry chain
  */
 export async function resolveOwningSystem(startId) {
   const sid = Number(startId);
@@ -71,7 +75,8 @@ export async function resolveOwningSystem(startId) {
 
 /**
  * Resolve owning system + accounts for a trajectory (via function_id ancestry).
- * @returns {Promise<{ trajectoryId, functionId, system: object|null, accounts: object[] }>}
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<{ trajectoryId: number, functionId: number|null, systemAccountId?: number, system: object|null, accounts: object[], error?: string }>} login context
  */
 export async function getTrajectoryLoginContext(trajectoryId) {
   const tid = Number(trajectoryId);
@@ -170,6 +175,9 @@ async function _accountsForSystem(cur) {
 /**
  * Resolve + validate system account for a trajectory.
  * Prefers explicit accountId, else trajectory.systemAccountId.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {number|null} [accountId] explicit system account id, default trajectory.systemAccountId
+ * @returns {Promise<{ traj: object, account: object, accountId: number, loginCtx: object }>} resolved account context
  */
 export async function resolveTrajectoryAccount(trajectoryId, accountId = null) {
   const tid = Number(trajectoryId);
@@ -202,7 +210,12 @@ export async function resolveTrajectoryAccount(trajectoryId, accountId = null) {
   return { traj, account, accountId: acctId, loginCtx };
 }
 
-/** Persist bound system account on trajectory. */
+/**
+ * Persist bound system account on trajectory.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {number} systemAccountId system account id to bind
+ * @returns {Promise<{ trajectory: object, account: { id: number, name: string, loginUrl: string } }>} updated trajectory + account summary
+ */
 export async function setTrajectoryAccount(trajectoryId, systemAccountId) {
   const { account, accountId } = await resolveTrajectoryAccount(trajectoryId, systemAccountId);
   await trajectoryDao.updateMeta(Number(trajectoryId), { systemAccountId: accountId });
@@ -216,6 +229,9 @@ export async function setTrajectoryAccount(trajectoryId, systemAccountId) {
 /**
  * Validate functionId + systemAccountId before creating any trajectory
  * (batch import). Ensures function exists and account belongs to owning system.
+ * @param {number} functionId function node id
+ * @param {number} systemAccountId system account id
+ * @returns {Promise<{ functionId: number, systemAccountId: number, function: object, account: object, system: object }>} validated context
  */
 export async function validateFunctionAndAccount(functionId, systemAccountId) {
   const fid = Number(functionId);

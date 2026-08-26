@@ -84,14 +84,15 @@ const NOT_LOADED_RE = /timeout|loading|page-idle|networkidle/i;
 const NOT_VISIBLE_RE = /label-not-found|xpath-not-found|option-not-found|no-items|not-found|no-visible|false_ok|option-mismatch|option-not-synced|xpath[-_]miss|click-failed/i;
 
 /**
- * @param {object} input
- * @param {string} [input.action]
- * @param {object} [input.params]
- * @param {string|object} [input.errorResult]
- * @param {'step'|'form_structure'} [input.healType]
- * @param {object|null} [input.formStructureReport]
- * @param {object} [input.context]
- * @returns {{ category: string, confidence: number, evidence: string[], suggestedAction: string }}
+ * Analyze a failed step and classify the missing reason into a deterministic category.
+ * @param {object} input analyzer input
+ * @param {string} [input.action] failed action name
+ * @param {object} [input.params] failed action params
+ * @param {string|object} [input.errorResult] error text or structured error from the failed step
+ * @param {'step'|'form_structure'} [input.healType] heal scope (default 'step')
+ * @param {object|null} [input.formStructureReport] form-structure diff report (for healType='form_structure')
+ * @param {object} [input.context] extra context (timeout, absentSkip, previousAction, …)
+ * @returns {{ category: string, confidence: number, evidence: string[], suggestedAction: string }} classified missing reason
  */
 export function analyzeMissingReason({
   action = '',

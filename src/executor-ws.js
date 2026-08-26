@@ -11,7 +11,10 @@ import { broadcast, broadcastBinary } from './ws-server.js';
 
 let wss = null;
 
-/** @param {import('http').IncomingMessage} req */
+/**
+ * @param {import('http').IncomingMessage} req req
+ * @returns {string} result
+ */
 export function getExecutorTokenFromRequest(req) {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   const queryToken = url.searchParams.get('token');
@@ -19,13 +22,21 @@ export function getExecutorTokenFromRequest(req) {
   return String(queryToken || headerToken || '');
 }
 
-/** @param {import('http').IncomingMessage} req */
+/**
+ * @param {import('http').IncomingMessage} req req
+ * @returns {boolean} result
+ */
 export function validateExecutorToken(req) {
   if (!EXECUTOR_TOKEN) return false;
   return getExecutorTokenFromRequest(req) === EXECUTOR_TOKEN;
 }
 
-/** @param {import('net').Socket} socket @param {number} code @param {string} message */
+/**
+ * @param {import('net').Socket} socket socket
+ * @param {number} code code
+ * @param {string} message message
+ * @returns {void} result
+ */
 export function rejectUpgrade(socket, code, message) {
   socket.write(`HTTP/1.1 ${code} ${message}\r\nConnection: close\r\n\r\n`);
   socket.destroy();
@@ -257,6 +268,11 @@ function bindConnectionHandlers(ws) {
   });
 }
 
+/**
+ * Initialize the executor WebSocket server in noServer mode.
+ * Sets up connection handlers, heartbeat pings, and returns the wss instance.
+ * @returns {import('ws').WebSocketServer} result
+ */
 export function initExecutorWs() {
   wss = new WebSocketServer({ noServer: true });
 
@@ -291,7 +307,9 @@ export function initExecutorWs() {
   return wss;
 }
 
-/** @returns {import('ws').WebSocketServer|null} */
+/**
+ * @returns {import('ws').WebSocketServer|null} result
+ */
 export function getExecutorWss() {
   return wss;
 }

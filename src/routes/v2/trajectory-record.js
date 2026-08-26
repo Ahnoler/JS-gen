@@ -1,7 +1,15 @@
 import * as trajectoryService from '../../services/trajectory-service.js';
 import { sendErr } from './trajectory-shared.js';
 
+/**
+ * Trajectory recording lifecycle — attach/detach live BiB, prepare/start/stop
+ * AI recording, human confirm, element resolution, and manual-record toggle.
+ *
+ * Prefix: /api/v2/trajectories/:id/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
+  /** Attach a live BiB screencast stream to a trajectory. */
   app.post('/api/v2/trajectories/:id/attach', async (req, res) => {
     try {
       const result = await trajectoryService.attachTrajectoryLive(+req.params.id);
@@ -11,6 +19,7 @@ export default function (app) {
     }
   });
 
+  /** Detach the live BiB stream + close the browser for a trajectory. */
   app.post('/api/v2/trajectories/:id/detach', async (req, res) => {
     try {
       const result = await trajectoryService.detachTrajectoryLive(+req.params.id);

@@ -39,6 +39,12 @@ async function resolveFunctionName(functionId) {
   }
 }
 
+/**
+ * Insert a system message for a completed batch import job (idempotent by sourceId).
+ * @param {object} job batch job row (id, functionId, originalFilename, status)
+ * @param {object} [summary] job summary counts
+ * @returns {Promise<{ id: number|null, duplicate: boolean }>} insert result
+ */
 export async function insertSysMsgFromBatchJob(job, summary = {}) {
   const batchId = String(job?.id || '');
   if (!batchId) return { id: null, duplicate: false };
@@ -75,6 +81,13 @@ async function typeLabelMap() {
   }
 }
 
+/**
+ * List system messages with pagination.
+ * @param {object} [root0] pagination options
+ * @param {number} [root0.pageNum] page number (default 1)
+ * @param {number} [root0.pageSize] page size (default 20)
+ * @returns {Promise<{ rows: Array<object>, total: number }>} paginated messages with type labels
+ */
 export async function listMessages({ pageNum = 1, pageSize = 20 } = {}) {
   const { rows, total } = await msgDao.list({ pageNum, pageSize });
   const labels = await typeLabelMap();
@@ -84,17 +97,30 @@ export async function listMessages({ pageNum = 1, pageSize = 20 } = {}) {
   };
 }
 
+/**
+ * Count unread system messages.
+ * @returns {Promise<{ count: number }>} unread count
+ */
 export async function getUnreadCount() {
   const count = await msgDao.countUnread();
   return { count };
 }
 
+/**
+ * Mark a single system message as read.
+ * @param {number} id message DB id
+ * @returns {Promise<{ success: boolean }>} result; throws 404 if not found
+ */
 export async function markMessageRead(id) {
   const row = await msgDao.markRead(id);
   if (!row) throw httpError(404, 'Message not found');
   return { success: true };
 }
 
+/**
+ * Mark all system messages as read.
+ * @returns {Promise<{ success: boolean }>} result
+ */
 export async function markAllMessagesRead() {
   await msgDao.markAllRead();
   return { success: true };

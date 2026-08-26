@@ -138,17 +138,17 @@ export { toggleTrajectoryManualRecord } from './trajectory-manual-record.js';
 /**
  * Terminology (do not conflate):
  *
- * - **业务数据 (business data)** — values the *user* puts in the requirement /
+ * - 业务数据 (business data) — values the user puts in the requirement /
  *   task text (often under「关键数据」「业务数据」section headers in NL).
- *   This is what they *want* the recording to use (e.g. introduce person 朱桂武).
+ *   This is what they want the recording to use (e.g. introduce person 朱桂武).
  *   Soft / relatively-structured prose; not a DB schema. Stays in task / 【业务数据】.
  *
- * - **系统参考值 (system_ref_*)** — values captured from the *target system*
+ * - 系统参考值 (system_ref_*) — values captured from the target system
  *   and optionally verified for reuse (`system_ref_data` / `system_ref_entry`).
- *   Future fill-form reference; **not** injected into the agent in this iteration.
+ *   Future fill-form reference; not injected into the agent in this iteration.
  *   Never write extractBusinessEntriesFromRequirement / user 业务数据 into system_ref_*.
  *
- * - **业务数据 legacy (business_data / business_data_entry)** — historical tables; retain
+ * - 业务数据 legacy (business_data / business_data_entry) — historical tables; retain
  *   but do not treat as the product home for system-captured verified values.
  *
  * User 业务数据 ≠ system_ref ≠ legacy business_data. Feeding the agent for
@@ -157,11 +157,11 @@ export { toggleTrajectoryManualRecord } from './trajectory-manual-record.js';
  * pure navigate / login / list-query (avoids「填写」polluting task_mode).
  *
  * Historical note: symbols like `business_data_block` / `businessEntries` often carry
- * **业务数据** extracted from the requirement — names predate this split.
+ * 业务数据 extracted from the requirement — names predate this split.
  *
  * Design for 业务数据:
  *   Users rarely supply a clean fieldKey→value map. Demand text is only
- *   *relatively* structured, e.g. under「对公客户基本信息」they may write
+ *   relatively structured, e.g. under「对公客户基本信息」they may write
  *   「法定责任人引入 朱桂武」or「引入时客户名称用朱桂武」. Labels drift; we
  *   MUST tolerate soft deviations — ship the raw block to the AI, do NOT
  *   drive autofill by hard label↔key matching.
@@ -170,6 +170,8 @@ export { toggleTrajectoryManualRecord } from './trajectory-manual-record.js';
  *   businessDataBlock — raw 业务数据 text from trajectory.task (preferred AI context)
  *   businessData      — optional flat KV derived from that text (secondary; may also
  *                       land in legacy business_data_entry for memory — NOT system_ref)
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {{ businessDataFile: null, businessData: object|null, businessDataBlock: string }} business data context for AI injection
  */
 export async function prepareBusinessDataInjection(trajectoryId) {
   const tid = Number(trajectoryId);
@@ -227,6 +229,10 @@ export async function prepareBusinessDataInjection(trajectoryId) {
 /**
  * Default login/navigate — NOT written to trajectory_step (is_replay / suppress persist).
  * Hardcoded go_to_url + login via replay_actions (no browser-use Agent).
+ * @param {object} runtime trajectory runtime object (sessionId, executorNodeUuid, …)
+ * @param {object} account login account ({ account, password, systemId, loginUrl, id })
+ * @param {object|null} [system] system row with url; resolved from account.systemId when omitted
+ * @returns {Promise<void>} resolves when login replay succeeds; throws on failure
  */
 export async function runDefaultLogin(runtime, account, system = null) {
   const session = state.sessions.get(runtime.sessionId);
@@ -290,6 +296,13 @@ export async function runDefaultLogin(runtime, account, system = null) {
 }
 
 
+/**
+ * Stop trajectory recording and finalize status.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [root0] options
+ * @param {boolean} [root0.success] whether recording ended successfully (default true)
+ * @returns {Promise<{ trajectoryId: number, recordStatus: string, detached: boolean, tree: object }>} stop result with updated tree
+ */
 export async function stopTrajectoryRecording(trajectoryId, { success = true } = {}) {
   const tid = Number(trajectoryId);
   const runtime = getTrajectoryRuntime(tid);
@@ -365,6 +378,10 @@ export async function stopTrajectoryRecording(trajectoryId, { success = true } =
 /**
  * Batch-safe stop: never downgrade recorded/completed; failed only retries via record/start.
  * Sends cancel_step when a runtime exists; CAS-updates only recording/failed（success 含 draft）.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [root0] options
+ * @param {boolean} [root0.success] whether recording ended successfully (default false)
+ * @returns {Promise<{ trajectoryId: number, recordStatus: string, detached: boolean, tree: object }>} stop result with updated tree
  */
 export async function stopTrajectoryRecordingSafe(trajectoryId, {
   success = false,
@@ -435,6 +452,19 @@ export async function stopTrajectoryRecordingSafe(trajectoryId, {
   };
 }
 
+/**
+ * Resolve a form field/element by label text for an attached trajectory.
+ * Routes to executor BiB resolve or remote bridge; applies L1c region classify on result.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [root0] options
+ * @param {string} [root0.labelText] visible label text to search for
+ * @param {string} [root0.actionType] action type (e.g. fillFormField)
+ * @param {string} [root0.action] alias for actionType
+ * @param {object} [root0.params] action params (may carry menu_text, pageLabel, …)
+ * @param {string} [root0.mode] resolve mode (default 'inventory')
+ * @param {string} [root0.pageLabel] current page label hint
+ * @returns {Promise<object>} resolved element payload (with region fields classified); throws 400/404 on failure
+ */
 export async function resolveTrajectoryElement(trajectoryId, {
   labelText,
   actionType,

@@ -32,19 +32,27 @@ function isUsablePage(p) {
   return !url.startsWith('devtools://') && !url.startsWith('chrome-extension://');
 }
 
-/** Prefer newest page (last) so Agent's working tab wins over leftover homepage tabs. */
+/**
+ * Prefer newest page (last) so Agent's working tab wins over leftover homepage tabs.
+ * @param {object[]} pages Array of page targets from CDP
+ * @returns {object|null} The selected page target or null if no usable pages
+ */
 function pickDefaultPage(pages) {
   const usable = (pages || []).filter(isUsablePage);
   if (usable.length) return usable[usable.length - 1];
   return (pages || []).find((p) => !p.url?.startsWith('devtools://')) || pages?.[0] || null;
 }
 
+/**
+ * BiB (Browser-in-Browser) bridge: connects to Chrome via CDP, manages screencast,
+ * and handles remote input events for agent sessions.
+ */
 export class BibBridge {
   /**
-   * @param {object} opts
+   * @param {object} opts opts
    * @param {string} opts.sessionId Python session id (used for ack mapping)
    * @param {string} opts.remoteSessionUuid UUID embedded into RSCF header
-   * @param {(packet: Buffer) => void} opts.sendBinary
+   * @param {(packet: Buffer) => void} opts.sendBinary opts.send binary
    */
   constructor({ sessionId, remoteSessionUuid, sendBinary }) {
     this.sessionId = sessionId;
@@ -68,6 +76,19 @@ export class BibBridge {
     this._switching = false;
   }
 
+  /**
+   * Connect to the session Chrome via CDP, bind the page target, and start screencast.
+   * @param {object} [opts] opts
+   * @param {number} [opts.quality] jpeg quality (50–90)
+   * @param {number} [opts.viewportW] viewport w
+   * @param {number} [opts.viewportH] viewport h
+   * @param {number} [opts.deviceScaleFactor] device scale factor
+   * @param {string} [opts.host] CDP host (default 127.0.0.1)
+   * @param {boolean} [opts.resize] apply Emulation.setDeviceMetricsOverride
+   * @param {number} [opts.cdpPort] explicit CDP port (multi-Chrome safe)
+   * @param {string} [opts.targetId] attach to this target instead of default pick
+   * @returns {Promise<void>} result
+   */
   async attach({
     quality = 75,
     viewportW,
@@ -125,12 +146,12 @@ export class BibBridge {
     await this.startScreencast();
   }
 
-  /**
-   * Attach Page/Runtime domains to a target and mark it active.
-   * @param {string} targetId
-   * @param {{ resize?: boolean }} [opts]
-   */
-  async _bindPageTarget(targetId, { resize = false } = {}) {
+/**
+ * Attach Page/Runtime domains to a target and mark it active.
+ * @param {string} targetId The CDP target ID to attach to
+ * @param {{ resize?: boolean }} [opts] Options for binding
+ */
+async _bindPageTarget(targetId, { resize = false } = {}) {
     if (!this.client) throw new Error('not attached');
     try {
       await this.client.send('Target.activateTarget', { targetId }, null);
@@ -151,11 +172,11 @@ export class BibBridge {
     }
   }
 
-  /**
-   * List open page tabs for the bound Chrome.
-   * @returns {Promise<{ tabs: object[], activeTargetId: string|null }>}
-   */
-  async listTabs() {
+/**
+ * List open page tabs for the bound Chrome.
+ * @returns {Promise<{ tabs: object[], activeTargetId: string|null }>} Promise resolving to tabs array and active target ID
+ */
+async listTabs() {
     if (!this.client || this._disposed) {
       return { tabs: [], activeTargetId: this.activeTargetId };
     }
@@ -175,11 +196,12 @@ export class BibBridge {
     return { tabs, activeTargetId: this.activeTargetId };
   }
 
-  /**
-   * Switch screencast + Chrome foreground to another page target.
-   * @param {string} targetId
-   */
-  async switchToTarget(targetId) {
+/**
+ * Switch screencast + Chrome foreground to another page target.
+ * @param {string} targetId The target ID to switch to
+ * @returns {Promise<{ ok: boolean, targetId: string, reused?: boolean }>} Result with success status and target info
+ */
+async switchToTarget(targetId) {
     if (!this.client || this._disposed) throw new Error('not attached');
     if (!targetId) throw new Error('targetId required');
     if (targetId === this.activeTargetId && this.screencastOn) {
@@ -198,6 +220,10 @@ export class BibBridge {
     }
   }
 
+  /**
+   * Start the CDP Page.screencast (jpeg) for the bound page.
+   * @returns {Promise<void>} result
+   */
   async startScreencast() {
     if (!this.client || this._disposed) return;
     const timing = resolveScreencastTiming();
@@ -218,6 +244,10 @@ export class BibBridge {
     this._armStallWatch();
   }
 
+  /**
+   * Stop the CDP Page.screencast.
+   * @returns {Promise<void>} result
+   */
   async stopScreencast() {
     if (!this.client) return;
     this._clearStallWatch();
@@ -225,7 +255,10 @@ export class BibBridge {
     this.screencastOn = false;
   }
 
-  /** Kick screencast after agent navigation / stall (safe if already running). */
+  /**
+   * Kick screencast after agent navigation / stall (safe if already running).
+   * @returns {Promise<void>} result
+   */
   async restartScreencast() {
     if (!this.client || this._disposed || this._restarting) return;
     this._restarting = true;
@@ -240,10 +273,12 @@ export class BibBridge {
     }
   }
 
-  /**
-   * Client ack is optional now (producer acks Chrome). Kept for compatibility.
-   */
-  async ack({ frameId, sessionId } = {}) {
+/**
+ * Client ack is optional now (producer acks Chrome). Kept for compatibility.
+ * @param {{ frameId?: number, sessionId?: number }} [opts] Ack options with frame or session ID
+ * @returns {Promise<void>} Promise that resolves when ack is sent
+ */
+async ack({ frameId, sessionId } = {}) {
     if (!this.client || !this.screencastOn) return;
     const fid = frameId ?? sessionId;
     if (fid == null) return;
@@ -252,6 +287,11 @@ export class BibBridge {
     } catch {}
   }
 
+  /**
+   * Dispatch a remote input event (mouse/key/text/navigate/clipboard) via CDP.
+   * @param {object} [payload] input payload with `kind` (mouse|key|text|navigate|clipboard)
+   * @returns {Promise<object>} result with ok/reason or clipboard payload
+   */
   async handleInput(payload = {}) {
     if (!this.client || this._disposed) {
       if (payload.kind === 'clipboard') {
@@ -411,11 +451,21 @@ export class BibBridge {
     return { ok: false, reason: 'unknown input kind' };
   }
 
+  /**
+   * Acknowledge a screencast frame back to Chrome CDP.
+   * @param {number} sessionId CDP session id for the screencast
+   * @returns {void}
+   */
   _ackChrome(sessionId) {
     if (!this.client || sessionId == null) return;
     this.client.send('Page.screencastFrameAck', { sessionId: Number(sessionId) }).catch(() => {});
   }
 
+  /**
+   * Handle incoming screencast frame from Chrome, ack it, and forward to control-plane.
+   * @param {{ sessionId?: number, data?: string, metadata?: object }} params Frame parameters
+   * @returns {void}
+   */
   _onScreencastFrame(params = {}) {
     if (!this.screencastOn || !this.remoteSessionUuid) return;
     const cdpSessionId = params.sessionId;
@@ -478,8 +528,9 @@ export class BibBridge {
 
   /**
    * Resolve Element UI control by form label / actionType+params via CDP.
-   * @param {string} labelText
-   * @param {{ actionType?: string, params?: object, mode?: string }} [opts]
+   * @param {string} labelText label text
+   * @param {{ actionType?: string, params?: object, mode?: string }} [opts] resolution options
+   * @returns {Promise<object>} resolved element / ambiguous result
    */
   async resolveByLabel(labelText, opts = {}) {
     if (!this.client || this._disposed) {
@@ -494,6 +545,10 @@ export class BibBridge {
     });
   }
 
+  /**
+   * Capture a phase-highlight screenshot via CDP.
+   * @returns {Promise<{ pngBase64: string, meta: object }>} screenshot with base64 PNG and metadata
+   */
   async capturePhaseHighlight() {
     const { runPhaseScreenshotCapture } = await import('../src/cdp/phase-screenshot-capture.js');
     if (!this.client) throw new Error('BiB not attached');
@@ -501,6 +556,10 @@ export class BibBridge {
     return { pngBase64: buffer.toString('base64'), meta };
   }
 
+  /**
+   * Detach from CDP: stop screencast, close client, clear state.
+   * @returns {Promise<void>} result
+   */
   async detach() {
     this._disposed = true;
     this._clearStallWatch();

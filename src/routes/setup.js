@@ -10,7 +10,7 @@ const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 /**
  * First-launch setup routes, root redirect, product API docs page, and
  * legacy engineering UI 301 redirects.
- * @param {import('express').Application} app
+ * @param {import('express').Application} app Express application
  */
 export default function registerSetupRoutes(app) {
   // Serve the setup page

@@ -14,6 +14,8 @@ function layerIdOf(l) {
 /**
  * 从 element 推导最内层区域节点 id 与其父节点 id。
  * 回退链：layers → region_id 按 '|' 拆 → region_label/display_group 按 ' / ' 拆 → 空串。
+ * @param {object} [element] element info with layers/region_id/region_label
+ * @returns {{ regionId: string, parentRegionId: string }} region ref
  */
 export function deriveRegionRef(element = {}) {
   const el = element && typeof element === 'object' ? element : {};
@@ -65,6 +67,9 @@ function ensureChild(parent, id, role, label) {
 /**
  * items: [{ layers?: [{ role, label }] }]；controls 引用 elementIndex = 数组下标。
  * 无 layers 的控件进 { id:'other', role:'other', label:'其他' }。
+ * @param {Array<object>} [items] element items with layers
+ * @param {{ pageLabel?: string }} [opts] tree options
+ * @returns {{ pageLabel: string, roots: object[] }} assembled region tree
  */
 export function assembleRegionTree(items = [], { pageLabel = '' } = {}) {
   const rootPageLabel = String(pageLabel || '').trim();

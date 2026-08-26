@@ -293,6 +293,11 @@ def compute_budget_extension(pending_state: dict) -> int:
     pending fields ×2 (fill/select 直填), tree-select ×1 (额外检索),
     +2 (verify + done 收尾). Clamped to (ceiling - used_steps).
     Returns <=0 when no budget remains.
+
+    进度感知缓冲部署（可选）: 当传入 total_fields>0 且 done_fields>0
+    时，按「字段总数 + 已完成字段数」结合已用步数估算剩余步数，并取
+    max(legacy_raw, estimated) 以保证永不低于旧成本模型（仅加 headroom）。
+    缺失/非法新键时完全回退到旧式计算（字节级保持）。
     """
     try:
         introduce = int(pending_state.get('introduce_fields', 0))
@@ -302,9 +307,23 @@ def compute_budget_extension(pending_state: dict) -> int:
         used = int(pending_state.get('used_steps', 0))
     except (TypeError, ValueError):
         return 0
-    raw = introduce * 4 + pending * 2 + tree_select * 1 + 2
+    legacy_raw = introduce * 4 + pending * 2 + tree_select * 1 + 2
     remaining = ceiling - used
     # 无工作量时不续跑（+2 收尾仅在有待完成字段时才加）
     if introduce == 0 and pending == 0 and tree_select == 0:
         return 0
+    # 进度感知缓冲部署：字段总数 + 已完成字段数 → 估算剩余步数
+    raw = legacy_raw
+    try:
+        total_fields = int(pending_state.get('total_fields', 0))
+        done_fields = int(pending_state.get('done_fields', 0))
+    except (TypeError, ValueError):
+        total_fields = 0
+        done_fields = 0
+    if total_fields > 0 and done_fields > 0:
+        import math
+        avg = used / done_fields
+        est_remaining = max(total_fields - done_fields, introduce + pending + tree_select)
+        estimated = math.ceil(avg * est_remaining) + 2
+        raw = max(legacy_raw, estimated)
     return max(0, min(raw, remaining))

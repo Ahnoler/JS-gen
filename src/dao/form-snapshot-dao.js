@@ -1,13 +1,26 @@
+/**
+ * DAO for `form_snapshot` / `snapshot_field` — captured form field snapshots per trajectory/action.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
 const TABLE = 'form_snapshot';
 const TABLE_FIELD = 'snapshot_field';
 
+/**
+ * 提取表单容器根标识（去掉出现序号后缀 #N）。
+ * @param {string|undefined|null} container 容器选择器
+ * @returns {string} 根容器标识
+ */
 function rootContainer(container) {
   return String(container || 'main').replace(/#\d+$/, '');
 }
 
+/**
+ * 计算字段列表指纹（label + 必填标记）。
+ * @param {Array} [fields] 字段列表
+ * @returns {string} 指纹字符串
+ */
 function fieldsFingerprint(fields = []) {
   return (fields || [])
     .map((f) => `${String(f.label || '').trim()}\0${f.isRequired || f.is_required ? 1 : 0}`)
@@ -21,6 +34,11 @@ async function attachFields(db, entities) {
   return entities;
 }
 
+/**
+ * Insert a form snapshot and its fields (transactional) and return its id.
+ * @param {object} snapshot camelCase snapshot with fields array
+ * @returns {Promise<number>} inserted snapshot id
+ */
 export async function save(snapshot) {
   const db = getDB();
   return db.transaction(async (trx) => {
@@ -46,6 +64,18 @@ export async function save(snapshot) {
   });
 }
 
+/**
+ * Update a snapshot's fields and/or metadata (transactional) and return the updated entity.
+ * @param {number} id snapshot id
+ * @param {object} [opts] update payload
+ * @param {number} [opts.fieldCount] 字段总数
+ * @param {number} [opts.requiredCount] 必填数
+ * @param {number} [opts.optionalCount] 可选数
+ * @param {number} [opts.actionIndex] 动作序号
+ * @param {string} [opts.container] 容器选择器
+ * @param {Array} [opts.fields] replacement field list (deletes existing when provided)
+ * @returns {Promise<object|null>} updated snapshot entity with fields, or null when id invalid/not found
+ */
 export async function updateFields(id, {
   fieldCount,
   requiredCount,
@@ -86,6 +116,11 @@ export async function updateFields(id, {
   });
 }
 
+/**
+ * Delete a form snapshot by id (cascades to its fields).
+ * @param {number} id snapshot id
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function remove(id) {
   const db = getDB();
   const sid = Number(id);
@@ -93,12 +128,22 @@ export async function remove(id) {
   return db(TABLE).where({ id: sid }).del();
 }
 
+/**
+ * List snapshots for a trajectory ordered by action_index, with attached fields.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<object[]>} snapshot entities with fields
+ */
 export async function listByTrajectory(trajectoryId) {
   const db = getDB();
   const rows = await db(TABLE).where({ trajectory_id: trajectoryId }).orderBy('action_index');
   return attachFields(db, fromDbRows(rows));
 }
 
+/**
+ * List snapshots for a business_data record ordered by action_index, with attached fields.
+ * @param {number} businessDataId 业务数据 id
+ * @returns {Promise<object[]>} snapshot entities with fields
+ */
 export async function listByBusinessData(businessDataId) {
   const db = getDB();
   const rows = await db(TABLE).where({ business_data_id: businessDataId }).orderBy('action_index');
@@ -107,7 +152,11 @@ export async function listByBusinessData(businessDataId) {
 
 /**
  * Find snapshot for fingerprint dedupe: same trajectory + phase (via trigger step) + root container + fields fingerprint.
- * @returns {Promise<object|null>}
+ * @param {number} trajectoryId 轨迹 id
+ * @param {number} phaseId trajectory_phase id (0/invalid to skip phase filter)
+ * @param {string} container container selector
+ * @param {Array} fields field list to fingerprint
+ * @returns {Promise<object|null>} matching snapshot entity with fields, or null
  */
 export async function findForDedupe(trajectoryId, phaseId, container, fields) {
   const tid = Number(trajectoryId);

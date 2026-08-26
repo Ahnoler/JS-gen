@@ -66,15 +66,16 @@ const STRATEGY_BY_CATEGORY = {
 };
 
 /**
- * @param {object} input
- * @param {object} [input.failedEntry]
- * @param {string|object} [input.errorResult]
- * @param {'step'|'form_structure'} [input.healType]
- * @param {number} [input.maxSteps]
- * @param {object|null} [input.reason]  default: analyzeMissingReason(...)
- * @param {number} [input.retryCount]
- * @param {object} [input.context]
- * @param {object|null} [input.formStructureReport]
+ * Build a structured heal contract from a failed entry and missing-reason analysis.
+ * @param {object} input heal contract input
+ * @param {object} [input.failedEntry] the failed action entry (action, params, element, …)
+ * @param {string|object} [input.errorResult] error text or structured error from the failed step
+ * @param {'step'|'form_structure'} [input.healType] heal scope (default 'step')
+ * @param {number} [input.maxSteps] max heal retry steps (default 12, or 24 for form_structure)
+ * @param {object|null} [input.reason] pre-resolved missing reason; default: analyzeMissingReason(...)
+ * @param {number} [input.retryCount] current retry count (default 1)
+ * @param {object} [input.context] extra context for reason analysis
+ * @param {object|null} [input.formStructureReport] form-structure heal report (for healType='form_structure')
  * @returns {{
  *   mode: 'heal',
  *   scope: 'step'|'form_structure',
@@ -82,7 +83,7 @@ const STRATEGY_BY_CATEGORY = {
  *   reason: object,
  *   target: object,
  *   runtime: object,
- * }}
+ * }} structured heal contract for the Python Agent
  */
 export function buildHealContract({
   failedEntry = {},

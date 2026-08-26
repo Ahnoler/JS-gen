@@ -1,3 +1,6 @@
+/**
+ * MinIO screenshot object storage: upload, download, presign, delete.
+ */
 import { randomUUID } from 'crypto';
 import { Client } from 'minio';
 import {
@@ -13,6 +16,10 @@ import {
 let client;
 let bucketPromise;
 
+/**
+ * True when all required MinIO config env vars are present.
+ * @returns {boolean} whether MinIO is configured
+ */
 export function isMinioConfigured() {
   return Boolean(MINIO_ENDPOINT && MINIO_ACCESS_KEY && MINIO_SECRET_KEY && MINIO_BUCKET);
 }
@@ -49,13 +56,22 @@ async function ensureBucket() {
   return bucketPromise;
 }
 
+/**
+ * Build a unique MinIO object name under the given prefix.
+ * @param {string} [prefix] object key prefix
+ * @returns {string} unique object name
+ */
 export function buildObjectName(prefix = 'screenshots') {
   return `${prefix}/${Date.now()}-${randomUUID()}.png`;
 }
 
 /**
  * Upload a PNG/Buffer to MinIO.
- * @returns {Promise<{storageType: 'minio', storagePath: string, imageUrl: string|null}>}
+ * @param {Buffer|Uint8Array} buffer screenshot bytes
+ * @param {object} [opts] upload options
+ * @param {string} [opts.mimeType] content-type (default image/png)
+ * @param {string} [opts.objectName] explicit object name
+ * @returns {Promise<{ storageType: 'minio', storagePath: string, imageUrl: string|null }>} upload result
  */
 export async function uploadScreenshot(buffer, { mimeType = 'image/png', objectName } = {}) {
   const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
@@ -89,6 +105,11 @@ export async function uploadScreenshot(buffer, { mimeType = 'image/png', objectN
   };
 }
 
+/**
+ * Download a screenshot object as a Buffer.
+ * @param {string} objectName MinIO object name
+ * @returns {Promise<Buffer>} object bytes
+ */
 export async function getScreenshotBuffer(objectName) {
   if (!objectName) throw new Error('MinIO object name required');
   await ensureBucket();
@@ -102,8 +123,9 @@ export async function getScreenshotBuffer(objectName) {
 
 /**
  * Generate a presigned GET URL for a MinIO object.
- * @param {string} objectName
+ * @param {string} objectName MinIO object name
  * @param {number} [expires] seconds; default 7 days
+ * @returns {Promise<string|null>} presigned URL, or null when objectName empty
  */
 export async function getPresignedUrl(objectName, expires = 604800) {
   if (!objectName) return null;
@@ -113,6 +135,8 @@ export async function getPresignedUrl(objectName, expires = 604800) {
 
 /**
  * Best-effort delete used by bulk cleanup paths.
+ * @param {string} objectName MinIO object name
+ * @returns {Promise<void>}
  */
 export async function removeScreenshotObject(objectName) {
   if (!objectName) return;
@@ -131,6 +155,8 @@ export async function removeScreenshotObject(objectName) {
 /**
  * Strict delete used when replacing an existing screenshot.
  * Throws on any real MinIO error so callers can abort before uploading a replacement.
+ * @param {string} objectName MinIO object name
+ * @returns {Promise<void>}
  */
 export async function removeScreenshotObjectStrict(objectName) {
   if (!objectName) return;

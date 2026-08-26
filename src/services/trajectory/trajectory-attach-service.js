@@ -22,7 +22,11 @@ import {
 import { resolveModelId } from '../../runtime/resolve-model.js';
 import { prepareTrajectoryRecordingUnlocked } from './trajectory-attach-runner.js';
 
-/** Lazy accessor — avoid static cycle with trajectory-persist-service.js */
+/**
+ * Lazy accessor — avoid static cycle with trajectory-persist-service.js
+ * @param {...unknown} args 透传参数
+ * @returns {Promise<unknown>} appendRecordedStep 的返回
+ */
 async function appendRecordedStep(...args) {
   const mod = await import('./trajectory-persist-service.js');
   return mod.appendRecordedStep(...args);
@@ -32,6 +36,9 @@ async function appendRecordedStep(...args) {
  * Whether an occupied row is tied to the Chrome we just opened (or ambiguous).
  * Skip rows with a proven different slotIndex; fail-closed for idle grace/owned
  * when slot cannot be proven different (incl. opened.slotIndex null).
+ * @param {object} row 远程会话行
+ * @param {object} opened 新打开的 Chrome 信息
+ * @returns {boolean} 是否与该 Chrome 绑定
  */
 function rowTiedToReusedChrome(row, opened) {
   const openedSlot = opened?.slotIndex != null && Number.isFinite(Number(opened.slotIndex))
@@ -76,6 +83,9 @@ function rowTiedToReusedChrome(row, opened) {
  * foreign grace-owned remote_session (before registerRuntime / BiB).
  * Slot-aware: different non-null slotIndex rows are skipped; same/unknown
  * slot + idle grace still gated. Runs whenever reusedChrome (cdpPort optional).
+ * @param {number} tid 轨迹 id
+ * @param {object} opened 打开的 Chrome 信息
+ * @returns {Promise<void>}
  */
 async function assertNoForeignGraceOnNodeSlot(tid, opened) {
   if (!opened?.reusedChrome) return;
@@ -90,7 +100,15 @@ async function assertNoForeignGraceOnNodeSlot(tid, opened) {
   }
 }
 
-/** Resolve remote_session id after streamDetach cleared cache/runtime. */
+/**
+ * Resolve remote_session id after streamDetach cleared cache/runtime.
+ * @param {number} tid 轨迹 id
+ * @param {object} opts 选项
+ * @param {object} [opts.traj] 轨迹对象
+ * @param {object} [opts.runtime] 运行时对象
+ * @param {string|null} [opts.sessionId] agent 会话 id
+ * @returns {Promise<number|null>} 解析出的 remote_session id
+ */
 async function resolveHardDetachRemoteSessionId(tid, { traj, runtime, sessionId }) {
   let remoteSessionId = traj?.remoteSessionId
     || runtime?.remoteSessionId
@@ -168,7 +186,12 @@ async function attachBibBestEffort(tid, sessionId, runtime) {
   return { attached, bibError, remoteSessionId, status: attached?.status };
 }
 
-/** Persist manual CDP actions for trajectory-attached sessions (phase via selectedPhaseId). */
+/**
+ * Persist manual CDP actions for trajectory-attached sessions (phase via selectedPhaseId).
+ * @param {number} trajectoryId trajectory DB id
+ * @param {string} sessionId executor session id
+ * @param {object} runtime trajectory runtime entry
+ */
 export function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
   const session = state.sessions.get(sessionId);
   if (!session || session._trajPersistUnsub) return;
@@ -211,6 +234,8 @@ export function bindTrajectoryManualPersist(trajectoryId, sessionId, runtime) {
 
 /**
  * One-shot prepare for recording studio (serialized per trajectory).
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<object>} prepare result (sessionId, executorNodeUuid, status, …)
  */
 export async function prepareTrajectoryRecording(trajectoryId) {
   const tid = Number(trajectoryId);
@@ -220,6 +245,8 @@ export async function prepareTrajectoryRecording(trajectoryId) {
 
 /**
  * Acquire executor resources for a trajectory (agent session + optional BiB).
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<object>} attach result (sessionId, executorNodeUuid, remoteSessionId, status, …)
  */
 export async function attachTrajectoryLive(trajectoryId) {
   const tid = Number(trajectoryId);
@@ -325,6 +352,8 @@ export async function attachTrajectoryLive(trajectoryId) {
 /**
  * Disconnect stream only (浏览器置 idle，清 FK，录制中(非AI)→draft). Agent session kept.
  * Idempotent when already disconnected.
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<object>} detach result (trajectoryId, streamDetached, sessionKept, …)
  */
 export async function detachTrajectoryStream(trajectoryId) {
   const tid = Number(trajectoryId);
@@ -384,6 +413,10 @@ export async function detachTrajectoryStream(trajectoryId) {
 /**
  * Release executor resources: kill Chrome + Python + slot.
  * Only touches THIS trajectory's remote_session / agent session.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [root0] options
+ * @param {string} [root0.reason] detach reason, default 'manual'
+ * @returns {Promise<object>} detach result (trajectoryId, detached, recordStatus, reason, …)
  */
 export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } = {}) {
   const tid = Number(trajectoryId);
@@ -492,6 +525,11 @@ export async function detachTrajectoryLive(trajectoryId, { reason = 'manual' } =
 /**
  * Best-effort cleanup after control-plane restart using DB bindings only
  * (runtime map may be empty). 录制中(非AI)→draft；AI活跃→failed when requested.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [root0] options
+ * @param {boolean} [root0.demoteLive] whether to demote recording → draft, default true
+ * @param {string} [root0.reason] cleanup reason, default 'batch_recovery'
+ * @returns {Promise<object>} cleanup result (trajectoryId, cleaned, via, …)
  */
 export async function cleanupPersistedTrajectoryResources(trajectoryId, {
   demoteLive = true,

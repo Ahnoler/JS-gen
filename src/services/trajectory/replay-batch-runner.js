@@ -62,6 +62,19 @@ async function forwardReplayEntry(runtime, entry, doSuppress) {
   return doneP;
 }
 
+/**
+ * Run the full replay batch: execute each step, handle Type A heal and Type B form-structure.
+ * @param {object} root0 replay batch context
+ * @param {number} root0.tid trajectory DB id
+ * @param {Array<number>} root0.orderedStepIds ordered step DB ids
+ * @param {boolean} root0.doSuppress whether to suppress step persist
+ * @param {object} root0.runtime trajectory runtime object
+ * @param {object} root0.session executor session state
+ * @param {Array<object>} root0.actions action entries to replay
+ * @param {Array<object>} root0.rows DB step rows
+ * @param {Map<number, object>} root0.snapshotsByTrigger form snapshots keyed by trigger step id
+ * @returns {Promise<object>} replay batch result with success/failed counts
+ */
 export async function runReplayBatch({
   tid,
   orderedStepIds,

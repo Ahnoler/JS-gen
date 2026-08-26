@@ -1,6 +1,9 @@
-// 长图截全验证：连接 CDP 浏览器，在当前页面跑一遍真实阶段长图捕获链路。
-// 报告 pickScrollRoot 解析、截片数、图高 vs scrollHeight（截全判定）。
-// 用法: node scripts/tools/verify-phase-screenshot-full.mjs [cdpPort=9242] [out.png]
+/**
+ * 长图截全验证：连接 CDP 浏览器，在当前页面跑一遍真实阶段长图捕获链路。
+ * 报告 pickScrollRoot 解析、截片数、图高 vs scrollHeight（截全判定）。
+ *
+ * 用法: node scripts/tools/verify-phase-screenshot-full.mjs [cdpPort=9242] [out.png]
+ */
 import { PNG } from 'pngjs';
 import { runPhaseScreenshotCapture } from '../../src/cdp/phase-screenshot-capture.js';
 import { buildPhaseScreenshotScrollExpression } from '../../src/cdp/phase-screenshot-page.js';

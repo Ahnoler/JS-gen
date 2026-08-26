@@ -2,7 +2,15 @@ import { state } from '../state.js';
 import { callLLM } from '../llm-utils.js';
 import { LLM_MODEL } from '#config/config.js';
 
+/**
+ * Standalone LLM agent endpoint — single-shot task execution, no session
+ * management in standalone mode (async/session routes stubbed to 501).
+ *
+ * Prefix: /api/agent/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
+  /** Execute a single LLM task: { task, system, model } -> { response }. */
   app.post('/api/agent/execute', async (req, res) => {
     const { task, system, model } = req.body;
     if (!task) return res.status(400).json({ error: 'task is required' });
@@ -20,7 +28,7 @@ export default function (app) {
     }
   });
 
-  // Stubs — no session management in standalone mode
+  // Stubs — no session management in standalone mode (each returns 501).
   const STUBS = [
     ['post', '/api/agent/execute-async'],
     ['post', '/api/agent/session'],

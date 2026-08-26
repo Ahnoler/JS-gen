@@ -1,6 +1,21 @@
 import { markPhaseStatus, appendPhaseDoneLog } from '../../services/trajectory-service.js';
 import { broadcastSessions, broadcastWatcherStatus } from './broadcasts.js';
 
+/**
+ * Session agent-message dispatcher — maps agent stdout/executor events
+ * (step / phase_start / phase_done / phase_error / error / nav_step / …) to
+ * SSE channel sends and phase-status DB updates.
+ */
+
+/**
+ * Build the per-step message handler that forwards agent events to the SSE
+ * channel and updates phase status / done-log in the DB.
+ * @param {{ send: (event: string, data: unknown) => void, end: () => void }} channel SSE/WS push channel
+ * @param {object} session target session state
+ * @param {number} stepIndex current step index
+ * @param {() => void} cleanupListener cleanup callback on completion
+ * @returns {(msg: object) => void} per-step message handler
+ */
 export function handleSessionMessage(channel, session, stepIndex, cleanupListener) {
   return (msg) => {
     const send = channel.send;

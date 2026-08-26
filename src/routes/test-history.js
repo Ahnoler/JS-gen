@@ -3,7 +3,15 @@ import path from 'path';
 import { GENERATED_DIR } from '../../config/config.js';
 import { loadGeneratedIndex, saveGeneratedIndex } from '../script-utils.js';
 
+/**
+ * Generated-script history CRUD — list, read, and delete previously assembled
+ * Playwright scripts stored under the generated index.
+ *
+ * Prefix: /api/test/history/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
+  /** List all generated-script records (brief: id, fileName, description, timestamps, stepCount). */
   app.get('/api/test/history', (req, res) => {
     const list = loadGeneratedIndex();
     const brief = list.map(r => ({
@@ -17,6 +25,7 @@ export default function (app) {
     res.json(brief);
   });
 
+  /** Get a single generated-script record by testId, including the script source. */
   app.get('/api/test/history/:testId', (req, res) => {
     const list = loadGeneratedIndex();
     const record = list.find(r => r.testId === req.params.testId);
@@ -29,6 +38,7 @@ export default function (app) {
     res.json({ ...record, script });
   });
 
+  /** Delete a generated-script record and its script file by testId. */
   app.delete('/api/test/history/:testId', (req, res) => {
     const list = loadGeneratedIndex();
     const idx = list.findIndex(r => r.testId === req.params.testId);

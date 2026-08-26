@@ -4,6 +4,12 @@
  */
 const CJK = /[\u3400-\u9fff]/;
 
+/**
+ * Decode a mojibake upload filename (UTF-8 bytes misread as latin1) back to proper text.
+ * Leaves already-Unicode CJK and ASCII names unchanged.
+ * @param {string} name raw filename from multer/busboy
+ * @returns {string} repaired filename
+ */
 export function decodeUploadFilename(name) {
   const raw = String(name ?? '');
   if (!raw) return '';
@@ -18,7 +24,11 @@ export function decodeUploadFilename(name) {
   return raw;
 }
 
-/** Split on the compose separator so mixed CJK + mojibake segments stay intact. */
+/**
+ * Split on the compose separator so mixed CJK + mojibake segments stay intact.
+ * @param {string} text raw text that may contain mojibake segments
+ * @returns {string} text with each segment repaired via decodeUploadFilename
+ */
 export function repairMojibakeText(text) {
   return String(text ?? '').split(' · ').map(decodeUploadFilename).join(' · ');
 }

@@ -1,3 +1,6 @@
+/**
+ * DAO for the `executor_node` table — remote executor node registry, heartbeat, and slot usage.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow } from './helpers.js';
 
@@ -30,7 +33,9 @@ function fromExecutorRows(rows) {
 }
 
 /**
- * @param {import('../models/entities.js').ExecutorNode} data
+ * Upsert an executor node by nodeUuid; updates heartbeat/labels on conflict.
+ * @param {import('../models/entities.js').ExecutorNode} data 节点数据
+ * @returns {Promise<object|null>} upserted executor node entity
  */
 export async function upsertByUuid(data) {
   const db = getDB();
@@ -65,6 +70,11 @@ export async function upsertByUuid(data) {
   return getById(id);
 }
 
+/**
+ * Refresh the last_heartbeat_at timestamp for a node.
+ * @param {string} nodeUuid 节点 UUID
+ * @returns {Promise<boolean>} true if a row was updated
+ */
 export async function touchHeartbeat(nodeUuid) {
   const db = getDB();
   const updated = await db(TABLE)
@@ -73,6 +83,12 @@ export async function touchHeartbeat(nodeUuid) {
   return updated > 0;
 }
 
+/**
+ * Set the status of an executor node by uuid.
+ * @param {string} nodeUuid 节点 UUID
+ * @param {string} status target status
+ * @returns {Promise<object|null>} updated node entity or null when not found
+ */
 export async function setStatus(nodeUuid, status) {
   const db = getDB();
   const updated = await db(TABLE)
@@ -82,17 +98,30 @@ export async function setStatus(nodeUuid, status) {
   return getByUuid(nodeUuid);
 }
 
+/**
+ * Fetch an executor node by uuid.
+ * @param {string} nodeUuid 节点 UUID
+ * @returns {Promise<object|null>} node entity or null when not found
+ */
 export async function getByUuid(nodeUuid) {
   const row = await getDB()(TABLE).where({ node_uuid: nodeUuid }).first();
   return fromExecutorRow(row);
 }
 
+/**
+ * Fetch an executor node by id.
+ * @param {number} id 主键
+ * @returns {Promise<object|null>} node entity or null when not found
+ */
 export async function getById(id) {
   const row = await getDB()(TABLE).where({ id }).first();
   return fromExecutorRow(row);
 }
 
-/** @returns {Promise<(import('../models/entities.js').ExecutorNode & { inUse: number })[]>} */
+/**
+ * 列出全部执行机节点（含 inUse 占用计数）。
+ * @returns {Promise<(import('../models/entities.js').ExecutorNode & { inUse: number })[]>} 节点列表
+ */
 export async function list() {
   const db = getDB();
   const rows = await db(TABLE).orderBy('created_at', 'desc');
@@ -116,9 +145,9 @@ export async function list() {
 
 /**
  * Mark nodes with stale heartbeat as offline.
- * @returns {Promise<{ nodeId: number, nodeUuid: string }[]>}
- */
-export async function markStaleOffline(timeoutMs) {
+ * @param {number} timeoutMs heartbeat timeout in milliseconds
+ * @returns {Promise<{ nodeId: number, nodeUuid: string }[]>} nodes marked offline
+ */export async function markStaleOffline(timeoutMs) {
   const db = getDB();
   const cutoff = new Date(Date.now() - timeoutMs);
   const rows = await db(TABLE)
@@ -137,6 +166,11 @@ export async function markStaleOffline(timeoutMs) {
   return rows.map((r) => ({ nodeId: r.id, nodeUuid: r.node_uuid }));
 }
 
+/**
+ * Mark active/idle sessions on a node as crashed and release their trajectory bindings.
+ * @param {number} nodeId executor node id
+ * @returns {Promise<number>} number of updated session rows
+ */
 export async function crashActiveSessions(nodeId) {
   const db = getDB();
   const now = new Date();

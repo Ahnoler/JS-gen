@@ -10,6 +10,13 @@ import {
 import { broadcastWatcherStatus } from './broadcasts.js';
 import { persistLiveActionEntries, stashOrApplyStepScreenshot, applyPageLevelScreenshot } from './persist-live.js';
 
+/**
+ * Shared global-browser lifecycle — spawn/ensure the local Python agent process,
+ * discover CDP endpoints, wire persistent stdout listeners for action-log /
+ * screenshot events, and tear down the remote bridge on exit.
+ */
+
+/** Discover CDP endpoints for the global browser if not already known. */
 async function ensureCdpDiscovered() {
   const gb = state.globalBrowser;
   if (gb.cdpWsUrl) return;
@@ -20,11 +27,18 @@ async function ensureCdpDiscovered() {
   }
 }
 
+/** Detach the live remote bridge and clear CDP endpoints (crash-safe). */
 export async function teardownRemoteBridge() {
   try { await detachLive({ crashed: true }); } catch {}
   clearCdpEndpoints();
 }
 
+/**
+ * Ensure the shared global browser/agent process is running and ready, spawning
+ * it if needed, discovering CDP, and wiring the persistent stdout event listener.
+ * @param {string} modelId LLM model id to use for the agent
+ * @returns {Promise<void>}
+ */
 export async function ensureGlobalBrowser(modelId) {
   const gb = state.globalBrowser;
   if (gb.isAlive()) {

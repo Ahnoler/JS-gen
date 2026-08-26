@@ -13,7 +13,8 @@ export const MENU_CLASS_TOKENS = Object.freeze([
 
 /**
  * XPath string literal for a text value.
- * @param {string} text
+ * @param {string} text Text to quote.
+ * @returns {string} XPath-safe string literal (uses concat() when both quotes present).
  */
 export function xpathLiteral(text) {
   const t = String(text || '');
@@ -25,7 +26,8 @@ export function xpathLiteral(text) {
 
 /**
  * Normalize visible control text for matching / storage.
- * @param {string} text
+ * @param {string} text Raw control text.
+ * @returns {string} Whitespace-collapsed, trimmed text capped at 40 chars.
  */
 export function normalizeControlText(text) {
   return String(text || '')
@@ -36,7 +38,8 @@ export function normalizeControlText(text) {
 
 /**
  * Normalize form label (strip trailing colon / required marker).
- * @param {string} text
+ * @param {string} text Raw form label.
+ * @returns {string} Trimmed label without trailing colon/asterisk, capped at 40 chars.
  */
 export function normalizeFormLabel(text) {
   return String(text || '')
@@ -48,7 +51,8 @@ export function normalizeFormLabel(text) {
 
 /**
  * Strip volatile tree suffixes: trailing (count) and [V-x.x.x] version badges.
- * @param {string} text
+ * @param {string} text Raw tree text.
+ * @returns {string} Stable text with volatile suffixes removed, capped at 40 chars.
  */
 export function stripVolatileTreeText(text) {
   return String(text || '')
@@ -62,7 +66,8 @@ export function stripVolatileTreeText(text) {
 
 /**
  * Extract first el-icon-* class token from a className string.
- * @param {string} className
+ * @param {string} className Element class string.
+ * @returns {string} First `el-icon-*` token, or empty string.
  */
 export function extractElIconClass(className) {
   const m = String(className || '').match(/el-icon-[a-z0-9-]+/i);
@@ -71,7 +76,8 @@ export function extractElIconClass(className) {
 
 /**
  * XPath class-token predicate (exact token, not substring).
- * @param {string} token
+ * @param {string} token Class token to match.
+ * @returns {string} XPath `contains(concat(...))` predicate, or empty string.
  */
 export function classTokenPred(token) {
   const t = String(token || '').trim();
@@ -80,8 +86,10 @@ export function classTokenPred(token) {
 }
 
 /**
- * @param {string} className
- * @param {string} token
+ * Whether a className string contains a given exact token.
+ * @param {string} className Element class string.
+ * @param {string} token Class token to test.
+ * @returns {boolean} True if the token is present as a whitespace-delimited class.
  */
 export function hasClassToken(className, token) {
   const tokens = String(className || '').trim().split(/\s+/).filter(Boolean);
@@ -90,7 +98,8 @@ export function hasClassToken(className, token) {
 
 /**
  * Reject generated / unstable ids.
- * @param {string} id
+ * @param {string} id Candidate id.
+ * @returns {boolean} True if the id is empty or matches a generated-id pattern.
  */
 export function isGeneratedId(id) {
   const s = String(id || '').trim();
@@ -108,7 +117,9 @@ export function isGeneratedId(id) {
 }
 
 /**
- * @param {string} name
+ * Reject generated / unstable name attributes.
+ * @param {string} name Candidate name.
+ * @returns {boolean} True if the name is empty or matches a generated-name pattern.
  */
 export function isGeneratedName(name) {
   const s = String(name || '').trim();
@@ -117,11 +128,3 @@ export function isGeneratedName(name) {
   if (/^\d{10,}$/.test(s)) return true;
   return isGeneratedId(s);
 }
-
-/**
- * Detect dialog/drawer/nav scope from absolute xpath or className.
- * @param {string} xpathFull
- * @param {string} className
- * @param {string} [container]
- * @returns {'dialog'|'drawer'|'nav'|''}
- */

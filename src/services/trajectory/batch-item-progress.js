@@ -4,6 +4,11 @@ export const PHASE_LOOKUP_STATUSES = new Set([
   'preparing', 'recording', 'recorded', 'failed', 'cancelled',
 ]);
 
+/**
+ * Summarize phase progress for a trajectory.
+ * @param {Array<object>} [phases] phase rows with status, phaseNumber, description, doneLogs
+ * @returns {{ phaseCompleted: number, phaseTotal: number, phaseName: string, lastDoneText: string }} phase summary
+ */
 export function summarizePhases(phases = []) {
   const list = Array.isArray(phases) ? phases : [];
   const phaseTotal = list.length;
@@ -57,6 +62,15 @@ function pipelinePercent(status, mode) {
   return Object.prototype.hasOwnProperty.call(map, status) ? map[status] : null;
 }
 
+/**
+ * Compute batch item progress percent and phase summary.
+ * @param {object} [root0] progress input
+ * @param {string} [root0.status] batch item record status
+ * @param {string} [root0.mode] pipeline mode ('record' or 'draft')
+ * @param {number|null} [root0.trajectoryId] trajectory DB id (enables phase lookup)
+ * @param {Array<object>} [root0.phases] phase rows for the trajectory
+ * @returns {{ progressPercent: number, phaseCompleted: number, phaseTotal: number, phaseName: string, lastDoneText: string }} progress result
+ */
 export function computeBatchItemProgress({
   status,
   mode = 'record',

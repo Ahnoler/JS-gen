@@ -14,8 +14,8 @@ const BUSINESS_DATA_MARK_RE = /\n*【(?:业务数据|业务场景案例数据|�
 
 /**
  * Strip trailing 【业务数据】/ legacy case-data blocks from phase text.
- * @param {string} text
- * @returns {string}
+ * @param {string} text phase goal text
+ * @returns {string} phase text with trailing business-data block removed
  */
 export function stripBusinessDataBlock(text) {
   return String(text || '').replace(BUSINESS_DATA_MARK_RE, '').trim();
@@ -24,8 +24,8 @@ export function stripBusinessDataBlock(text) {
 /**
  * Whether this phase goal should receive 业务数据 for the AI.
  * Fill / modify / introduce only — not login, pure open-page navigate, or list query.
- * @param {string} phaseText
- * @returns {boolean}
+ * @param {string} phaseText phase goal text
+ * @returns {boolean} true when the phase should receive business-data injection
  */
 export function phaseNeedsBusinessData(phaseText) {
   const t = stripBusinessDataBlock(phaseText);
@@ -60,7 +60,7 @@ export function phaseNeedsBusinessData(phaseText) {
  *
  * Primary contract for AI fill: soft, relatively-structured notes; tolerate
  * wording drift; do not require colon-separated label=value.
- * @param {string} text
+ * @param {string} text user requirement text
  * @returns {string} block including header, or '' if none
  */
 export function extractBusinessDataBlock(text) {
@@ -86,12 +86,12 @@ export function extractBusinessDataBlock(text) {
 }
 
 /**
- * Best-effort KV parse of requirement **业务数据** (user wish-list text).
- *
+ * Best-effort KV parse of requirement 业务数据 (user wish-list text).
  * Secondary to {@link extractBusinessDataBlock}. Do not confuse with 业务数据
  * persisted from the system. Incomplete / fuzzy user wording is normal —
- * empty parse ≠ “no 业务数据”; the raw block still goes to the agent.
- *
+ * empty parse ≠ "no 业务数据"; the raw block still goes to the agent.
+ * @param {string} text user requirement text
+ * @returns {Array<{ fieldKey: string, fieldValue: string }>} normalized KV entries (may be empty)
  * @deprecated Prefer extractBusinessDataBlock for AI fill context.
  */
 export function extractBusinessEntriesFromRequirement(text) {
@@ -147,8 +147,9 @@ export function extractBusinessEntriesFromRequirement(text) {
 
 /**
  * Append 业务数据 block only to fill / introduce phases (not navigate / login / query).
- * @param {string[]} phases
- * @param {string} caseBlock
+ * @param {string[]} phases array of phase goal texts
+ * @param {string} caseBlock raw business-data block to append
+ * @returns {string[]} phase texts with business-data block appended where eligible
  */
 export function appendBusinessDataToPhases(phases, caseBlock) {
   const block = String(caseBlock || '').trim();

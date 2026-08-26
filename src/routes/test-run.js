@@ -2,7 +2,16 @@ import { createPushChannel } from '../runtime/sse-channel.js';
 import { onWsMessage } from '../ws-server.js';
 import { executeScript, executeScriptSync } from '../runtime/script-runner.js';
 
+/**
+ * Engineering-only Playwright script execution — SSE-streaming run, WebSocket
+ * run trigger, and a synchronous run endpoint. (Deprecated product path; live
+ * replay uses /api/v2/trajectories/:id/replay/*.)
+ *
+ * Prefix: /api/test/run*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
+  /** Run a Playwright script and stream execution events as SSE. */
   app.post('/api/test/run', (req, res) => {
     const { script, fileName } = req.body || {};
     if (!script) return res.status(400).json({ error: 'script is required' });
@@ -34,6 +43,7 @@ export default function (app) {
     }
   });
 
+  /** Run a Playwright script synchronously and return the final result JSON. */
   app.post('/api/test/run-sync', async (req, res) => {
     const { script, fileName } = req.body || {};
     if (!script) return res.status(400).json({ error: 'script is required' });

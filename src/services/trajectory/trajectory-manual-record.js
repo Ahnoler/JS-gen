@@ -13,6 +13,14 @@ import {
 } from './trajectory-runtime.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
 
+/**
+ * Toggle manual recording mode for a trajectory (enable/disable BiB capture).
+ * @param {number} trajectoryId trajectory DB id
+ * @param {boolean} enabled whether to enable or disable manual recording
+ * @param {object} [root2] options
+ * @param {number|null} [root2.phaseId] phase DB id to scope manual recording
+ * @returns {Promise<object>} toggle result with enabled flag and phase info
+ */
 export async function toggleTrajectoryManualRecord(trajectoryId, enabled, { phaseId = null } = {}) {
   const tid = Number(trajectoryId);
   const runtime = getTrajectoryRuntime(tid);

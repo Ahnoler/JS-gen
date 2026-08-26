@@ -1,3 +1,7 @@
+/**
+ * Control-plane agent stderr log management: per-session log files under
+ * `logs/agent-stderr/`, line prefix strip/filter, and live active-target listing.
+ */
 import {
   existsSync,
   mkdirSync,
@@ -18,7 +22,11 @@ export { shortSid };
 
 const LINE_PREFIX_RE = /^\[slot:(\d+)\s+sid:([a-z0-9]+)\]/;
 
-/** Strip executor/session tags for human export; keep raw on disk for filtering. */
+/**
+ * Strip executor/session tags for human export; keep raw on disk for filtering.
+ * @param {string} line raw stderr line, possibly tagged `[slot:N sid:xxx]` or `[session …]`
+ * @returns {string} line with leading slot/session tags removed
+ */
 export function stripLinePrefix(line) {
   let s = String(line)
     .replace(/^\[slot:\d+\s+sid:[a-z0-9]+\]\s?/, '');
@@ -27,10 +35,19 @@ export function stripLinePrefix(line) {
   return s;
 }
 
+/**
+ * Strip prefixes from a list of stderr lines (null/undefined → []).
+ * @param {string[]} [lines] raw tagged stderr lines
+ * @returns {string[]} lines with slot/session tags removed
+ */
 export function stripLinePrefixes(lines) {
   return (lines || []).map(stripLinePrefix);
 }
 
+/**
+ * Resolve (creating if needed) the agent stderr log directory.
+ * @returns {string} absolute log dir path
+ */
 export function resolveLogDir() {
   const dir = resolve('AGENT_STDERR_LOG_DIR') || path.join(PROJECT_DIR, 'logs', 'agent-stderr');
   if (!existsSync(dir)) {
@@ -39,10 +56,21 @@ export function resolveLogDir() {
   return dir;
 }
 
+/**
+ * Absolute path to the stderr log file for a given agent session.
+ * @param {string} sessionId agent session id
+ * @returns {string} absolute log file path
+ */
 export function logPathForSession(sessionId) {
   return path.join(resolveLogDir(), `${sessionId}.log`);
 }
 
+/**
+ * Append stderr lines to a session's log file (no-op when empty).
+ * @param {string} sessionId agent session id
+ * @param {string[]} lines stderr lines to append
+ * @returns {void}
+ */
 export function appendLines(sessionId, lines) {
   if (!sessionId || !lines?.length) return;
   const filePath = logPathForSession(sessionId);
@@ -52,7 +80,8 @@ export function appendLines(sessionId, lines) {
 /**
  * Delete the control-plane stderr file for one agent session.
  * Scope: only `logs/agent-stderr/{sessionId}.log` (not other sessions / slots).
- * @returns {{ cleared: boolean, sessionId: string, path: string }}
+ * @param {string} sessionId agent session id whose log file should be deleted
+ * @returns {{ cleared: boolean, sessionId: string, path: string }} result of unlink (or not-found stub)
  */
 export function clearSessionLog(sessionId) {
   const id = String(sessionId || '').trim();
@@ -72,6 +101,11 @@ export function clearSessionLog(sessionId) {
 /**
  * Resolve sessionId from filter then clear that file.
  * Prefers explicit sessionId; else trajectoryId / sid via resolveSessionIdFromFilter.
+ * @param {object} [filter] filter identifying a session
+ * @param {string} [filter.sessionId] explicit agent session id
+ * @param {number} [filter.trajectoryId] trajectory id to resolve via lease/remote_session
+ * @param {string} [filter.sid] short sid prefix to match against log filenames
+ * @returns {Promise<{ cleared: boolean, sessionId: string, path: string }>} result of clearing the resolved session log
  */
 export async function clearLogForFilter(filter = {}) {
   let sessionId = filter.sessionId ? String(filter.sessionId) : null;
@@ -86,6 +120,12 @@ export async function clearLogForFilter(filter = {}) {
   return clearSessionLog(sessionId);
 }
 
+/**
+ * Test whether a stderr line matches the slot/sid filter (no filter → matches untagged lines only).
+ * @param {string} line raw stderr line
+ * @param {{ slot?: number, sid?: string }} [filter] slot/sid to match against the line tag
+ * @returns {boolean} true if the line's tag matches the filter (or line is untagged with empty filter)
+ */
 export function lineMatches(line, { slot, sid } = {}) {
   const m = String(line).match(LINE_PREFIX_RE);
   if (!m) {
@@ -118,6 +158,14 @@ function readMatchingLines(filePath, filter) {
   return out;
 }
 
+/**
+ * Resolve an agent sessionId from filter: explicit sessionId → trajectoryId lease/remote_session → sid prefix match.
+ * @param {object} [filter] filter identifying a session
+ * @param {string} [filter.sessionId] explicit agent session id
+ * @param {number} [filter.trajectoryId] trajectory id to resolve via lease/remote_session
+ * @param {string} [filter.sid] short sid prefix to match against log filenames
+ * @returns {Promise<string|null>} resolved sessionId, or null if none matches
+ */
 export async function resolveSessionIdFromFilter(filter = {}) {
   if (filter.sessionId) return String(filter.sessionId);
   if (filter.trajectoryId != null) {
@@ -140,6 +188,11 @@ export async function resolveSessionIdFromFilter(filter = {}) {
   return null;
 }
 
+/**
+ * Read all matching stderr lines from disk (single session file when sessionId given, else all log files).
+ * @param {{ slot?: number, sid?: string, sessionId?: string }} [filter] slot/sid/sessionId filter
+ * @returns {string[]} matching raw (still-tagged) stderr lines
+ */
 export function filterLines(filter = {}) {
   const { slot, sid, sessionId } = filter;
   const active = { slot, sid };
@@ -153,6 +206,11 @@ export function filterLines(filter = {}) {
   return result;
 }
 
+/**
+ * List log file paths that contain at least one matching line (or just the session file when sessionId given).
+ * @param {{ slot?: number, sid?: string, sessionId?: string }} [filter] slot/sid/sessionId filter
+ * @returns {string[]} absolute log file paths matching the filter
+ */
 export function listLogFilesMatching(filter = {}) {
   const { sessionId } = filter;
   if (sessionId) {
@@ -164,10 +222,7 @@ export function listLogFilesMatching(filter = {}) {
 
 /**
  * Ask connected executors for per-slot CDP ports (session.list).
- * @returns {Promise<{
- *   byNodeUuid: Map<string, Array<{ slotIndex: number, sessionId: string|null, cdpPort: number|null, ready: boolean, busy: boolean }>>,
- *   bySessionId: Map<string, number>,
- * }>}
+ * @returns {Promise<object>} `{ byNodeUuid, bySessionId }` port maps keyed by node uuid / session id
  */
 async function fetchLiveSlotPorts() {
   const { listExecutorSessions } = await import('../executor-session-client.js');
@@ -200,6 +255,10 @@ async function fetchLiveSlotPorts() {
   return { byNodeUuid, bySessionId };
 }
 
+/**
+ * List occupied remote sessions enriched with live slot CDP ports + stderr-log presence for the /active console.
+ * @returns {Promise<{ rows: object[], slotPorts: object[] }>} active stderr targets with live CDP port map
+ */
 export async function listActiveStderrTargets() {
   const occupied = await remoteSessionDao.listOccupied();
   const { byNodeUuid, bySessionId } = await fetchLiveSlotPorts();

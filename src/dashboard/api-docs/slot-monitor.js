@@ -3,6 +3,19 @@
  * Data: GET /api/v2/executors + GET /api/v2/recording/agent-stderr/active
  * Actions: stream/detach · hard detach · paste-export stderr
  */
+
+/**
+ * A DOM element or document used as query scope.
+ * @typedef {object} DomRoot
+ * @property {string} [tagName] element tag name (document has none)
+ */
+
+/**
+ * Query a single element within a root scope (document by default).
+ * @param {string} sel CSS selector
+ * @param {DomRoot} [el] root scope to query within (defaults to document)
+ * @returns {DomRoot|null} first matching element or null
+ */
 const $ = (sel, el = document) => el.querySelector(sel);
 
 function escapeHtml(str) {
@@ -13,7 +26,12 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-/** Unwrap v2 envelope { code, message, data }. */
+/**
+ * Unwrap v2 envelope { code, message, data }.
+ * @param {string} url fetch target
+ * @param {object} [options] fetch options (defaults to {})
+ * @returns {Promise<object|null>} unwrapped data (envelope data, or parsed body)
+ */
 async function apiJson(url, options = {}) {
   const res = await fetch(url, options);
   const text = await res.text();
@@ -45,7 +63,9 @@ function shortUuid(u) {
 
 /**
  * Merge executor node slots with /active stderr rows (+ live CDP ports).
- * @returns {{ nodes: object[], freeCount: number, occupiedCount: number }}
+ * @param {object} executorsPayload raw response from GET /api/v2/executors
+ * @param {object} activePayload raw response from GET /api/v2/recording/agent-stderr/active
+ * @returns {{ nodes: object[], freeCount: number, occupiedCount: number, activeRows: object[] }} enriched slot view model
  */
 function buildViewModel(executorsPayload, activePayload) {
   const nodes = Array.isArray(executorsPayload?.nodes) ? executorsPayload.nodes : [];
@@ -266,7 +286,9 @@ function renderNodeCard(node, filter) {
 }
 
 /**
- * @param {HTMLElement} wrap
+ * Mount the slot-monitor panel into the given wrapper element.
+ * @param {DomRoot} wrap container element to render the monitor into
+ * @returns {void}
  */
 export function mountSlotMonitor(wrap) {
   wrap.innerHTML = `

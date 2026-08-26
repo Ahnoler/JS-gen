@@ -1,3 +1,6 @@
+/**
+ * DAO for `business_data` / `business_data_entry` — case KV data store, including trajectory-bound entries.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 
@@ -29,9 +32,10 @@ function isUnknownTrajectoryIdColumn(err) {
 /**
  * Normalize API / UI case entry payloads to { fieldKey, fieldValue }.
  * Accepts `{ fieldKey, fieldValue }` or `{ key, value }`.
+ * @param {Array} raw raw entry payloads
+ * @returns {{ fieldKey: string, fieldValue: string|null }[]} deduped entries
  */
-export function normalizeBusinessEntries(raw) {
-  if (!Array.isArray(raw)) return [];
+export function normalizeBusinessEntries(raw) {  if (!Array.isArray(raw)) return [];
   const out = [];
   const seen = new Set();
   for (const e of raw) {
@@ -48,8 +52,11 @@ export function normalizeBusinessEntries(raw) {
   return out;
 }
 
-/** Flat label→value dict for the Python business_data store. */
-export function entriesToFlatDict(entries) {
+/**
+ * Flat label→value dict for the Python business_data store.
+ * @param {Array} entries raw entry payloads
+ * @returns {Record<string, string>} flat dict keyed by fieldKey
+ */export function entriesToFlatDict(entries) {
   const dict = {};
   for (const e of normalizeBusinessEntries(entries)) {
     dict[e.fieldKey] = e.fieldValue ?? '';
@@ -57,6 +64,11 @@ export function entriesToFlatDict(entries) {
   return dict;
 }
 
+/**
+ * Insert a business_data record with its entries (transactional) and return its id.
+ * @param {object} record camelCase record with entries array
+ * @returns {Promise<number>} inserted record id
+ */
 export async function save(record) {
   const db = getDB();
   return db.transaction(async (trx) => {
@@ -85,6 +97,11 @@ export async function save(record) {
   });
 }
 
+/**
+ * Fetch a business_data record by record_id, including its entries.
+ * @param {string} recordId external record id
+ * @returns {Promise<object|null>} record entity with entries, or null when not found
+ */
 export async function getByRecordId(recordId) {
   const db = getDB();
   const row = await db(TABLE).where({ record_id: recordId }).first();
@@ -96,6 +113,13 @@ export async function getByRecordId(recordId) {
   return entity;
 }
 
+/**
+ * Paginated list of business_data records ordered by created_at desc.
+ * @param {object} [opts] 分页选项
+ * @param {number} [opts.page] 页码（1 起）
+ * @param {number} [opts.pageSize] 每页条数
+ * @returns {Promise<{ rows: object[], total: number, page: number, pageSize: number }>} 分页结果
+ */
 export async function list({ page = 1, pageSize = 20 } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
@@ -104,6 +128,11 @@ export async function list({ page = 1, pageSize = 20 } = {}) {
   return { rows: fromDbRows(rows), total, page, pageSize };
 }
 
+/**
+ * Delete a business_data record by id.
+ * @param {number} id 主键
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function remove(id) {
   return getDB()(TABLE).where({ id }).del();
 }
@@ -111,6 +140,8 @@ export async function remove(id) {
 /**
  * Case KV bound to a trajectory. Empty = user has not configured case data
  * (also when schema lacks trajectory_id — treat as unconfigured, not fatal).
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<object[]>} entry entities bound to the trajectory
  */
 export async function listEntriesByTrajectory(trajectoryId) {
   const tid = Number(trajectoryId);
@@ -134,9 +165,10 @@ export async function listEntriesByTrajectory(trajectoryId) {
  * Replace all case entries bound to a trajectory (delete + insert).
  * Empty / unconfigured case data is a no-op when the column is missing
  * (treat as "no case data"), so draft save without KV still succeeds.
- * @param {number} trajectoryId
+ * @param {number} trajectoryId 轨迹 id
  * @param {Array} entries raw caseEntries
- * @param {import('knex').Knex.Transaction} [trx]
+ * @param {import('knex').Knex.Transaction} [trx] 可选事务
+ * @returns {Promise<object[]>} resulting entry entities bound to the trajectory
  */
 export async function replaceEntriesForTrajectory(trajectoryId, entries, trx = null) {
   const tid = Number(trajectoryId);
@@ -171,7 +203,11 @@ export async function replaceEntriesForTrajectory(trajectoryId, entries, trx = n
   return getDB().transaction((t) => run(t));
 }
 
-/** Load trajectory case entries as flat dict for agent injection. */
+/**
+ * Load trajectory case entries as flat dict for agent injection.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<Record<string, string>>} flat label→value dict
+ */
 export async function loadFlatDictByTrajectory(trajectoryId) {
   const entries = await listEntriesByTrajectory(trajectoryId);
   return entriesToFlatDict(entries);

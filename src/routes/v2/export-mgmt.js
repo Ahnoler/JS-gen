@@ -55,7 +55,14 @@ function parseBool(raw, defaultValue = false) {
   return !['0', 'false', 'no', 'off'].includes(String(raw).trim().toLowerCase());
 }
 
-/** Assemble only — do not mark is_export. V2 精简版：不携带 phases（截图/metadata 由 V3 承担）。 */
+/**
+ * Assemble only — do not mark is_export. V2 精简版：不携带 phases（截图/metadata 由 V3 承担）。
+ * @param {object} traj trajectory row from DAO
+ * @param {{ systemId?: number|string, projectId?: number|string }} root0 system/project context
+ * @param {number|string} [root0.systemId] partner system id
+ * @param {number|string} [root0.projectId] partner project id
+ * @returns {Promise<object>} assembled transaction envelope
+ */
 async function buildOneTrajectory(traj, { systemId, projectId }) {
   const built = buildTransactionPayload(traj, { systemId, projectId });
   return {
@@ -65,7 +72,14 @@ async function buildOneTrajectory(traj, { systemId, projectId }) {
   };
 }
 
-/** V3.1 组装（页面级截图结构）。 */
+/**
+ * V3.1 组装（页面级截图结构）。
+ * @param {object} traj trajectory row from DAO
+ * @param {{ systemId?: number|string, projectId?: number|string }} root0 system/project context
+ * @param {number|string} [root0.systemId] partner system id
+ * @param {number|string} [root0.projectId] partner project id
+ * @returns {Promise<object>} assembled V3 transaction envelope
+ */
 async function buildOneTrajectoryV3(traj, { systemId, projectId }) {
   const [phases, phaseScreenshots, dialogScreenshots, pageLevelScreenshots] = await Promise.all([
     trajectoryPhaseDao.listByTrajectory(traj.id),
@@ -94,6 +108,10 @@ async function markBuiltExported(trajIds = []) {
   }
 }
 
+/**
+ * Register export / batch-push management routes.
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
   /** Partner transaction envelope schema */
   app.get('/api/v2/export/transaction/schema', (_req, res) => {
@@ -148,6 +166,7 @@ export default function (app) {
     }
   });
 
+  /** Export trajectory steps for traditional engine (POST body variant). */
   app.post('/api/v2/export/trajectories/:id/legacy-engine', async (req, res) => {
     try {
       const traj = await trajectoryDao.getById(+req.params.id);
@@ -168,6 +187,7 @@ export default function (app) {
     }
   });
 
+  /** Preview legacy-engine export for arbitrary steps[] (no DB read). */
   app.post('/api/v2/export/legacy-engine/preview', (req, res) => {
     try {
       const body = req.body || {};
@@ -187,6 +207,8 @@ export default function (app) {
   /**
    * True when caller wants bare envelope only (no partner push).
    * Accepts download | raw | forImport | dryRun.
+   * @param {object} [src] request query/body source
+   * @returns {boolean} whether dry-run / bare export is requested
    */
   function wantDryRun(src = {}) {
     return parseBool(src.download, false)
@@ -268,7 +290,14 @@ export default function (app) {
     });
   }
 
-  /** V3.0 单交易组装/推送（镜像 maybePushSingle，用 V3 组装）。 */
+  /**
+   * V3.0 单交易组装/推送（镜像 maybePushSingle，用 V3 组装）。
+   * @param {import('express').Request} req Express request
+   * @param {import('express').Response} res Express response
+   * @param {object} traj trajectory row from DAO
+   * @param {object} src merged query/body source
+   * @returns {Promise<void>}
+   */
   async function maybePushSingleV3(req, res, traj, src) {
     const { systemId, projectId } = resolveSystemProject(src);
     const result = await buildOneTrajectoryV3(traj, { systemId, projectId });
@@ -333,6 +362,7 @@ export default function (app) {
     }
   });
 
+  /** Export / optional push single trajectory (POST body variant). */
   app.post('/api/v2/export/trajectories/:id/transaction', async (req, res) => {
     try {
       const body = req.body || {};
@@ -500,6 +530,7 @@ export default function (app) {
   });
 
   // ── V3.0：阶段长图控件点亮（groups 结果结构，V2.0 保留）──
+  /** Export / optional push single trajectory (V3 page-level screenshot structure). */
   app.get('/api/v2/export/trajectories/:id/transaction-v3', async (req, res) => {
     try {
       const traj = await trajectoryDao.getById(+req.params.id);
@@ -515,6 +546,7 @@ export default function (app) {
     }
   });
 
+  /** Export / optional push single trajectory (V3, POST body variant). */
   app.post('/api/v2/export/trajectories/:id/transaction-v3', async (req, res) => {
     try {
       const body = req.body || {};
@@ -694,6 +726,7 @@ export default function (app) {
     }
   });
 
+  /** Map a single recorded step to its legacy-engine operation (exportable check). */
   app.post('/api/v2/export/legacy-engine/map-step', (req, res) => {
     try {      const step = req.body?.step ?? req.body;
       const op = mapStepToLegacyEngineOp(step);

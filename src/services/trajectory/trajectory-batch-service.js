@@ -34,6 +34,16 @@ let schedulerTimer = null;
 let kicking = false;
 let started = false;
 
+/**
+ * Compute a SHA-256 request hash for batch dedup (file + function + account + model + mode).
+ * @param {object} root0 hash inputs
+ * @param {Buffer} root0.fileBuffer uploaded file bytes
+ * @param {number} root0.functionId function node id
+ * @param {number} root0.systemAccountId system account id
+ * @param {string} [root0.model] model name
+ * @param {string} [root0.mode] batch mode (record|draft)
+ * @returns {string} hex digest
+ */
 export function buildRequestHash({
   fileBuffer,
   functionId,
@@ -65,6 +75,12 @@ function normalizeBatchMode(raw) {
   return m;
 }
 
+/**
+ * Enrich batch items with phase-based progress (percent, phase counts, done text).
+ * @param {object[]} items batch items
+ * @param {string} [mode] batch mode (record|draft)
+ * @returns {Promise<object[]>} enriched items
+ */
 export async function enrichBatchItems(items, mode = 'record') {
   const list = Array.isArray(items) ? items : [];
   const ids = [...new Set(list
@@ -88,6 +104,13 @@ export async function enrichBatchItems(items, mode = 'record') {
   });
 }
 
+/**
+ * Broadcast a batch:progress event with job summary + item progress.
+ * @param {number} batchId batch job id
+ * @param {object|null} [item] batch item (null for job-level progress)
+ * @param {object} [extra] extra payload fields
+ * @returns {Promise<object>} progress payload
+ */
 export async function emitProgress(batchId, item = null, extra = {}) {
   const job = await batchDao.getJobById(batchId);
   const summary = await batchDao.summarizeJob(batchId);
@@ -131,6 +154,13 @@ async function notifyBatchTerminalMessage(job, summary) {
   }
 }
 
+/**
+ * Finalize a batch job (cancel or derive terminal status) and broadcast batch:done.
+ * @param {number} batchId batch job id
+ * @param {object} [root0] options
+ * @param {boolean} [root0.cancelled] whether cancellation was requested
+ * @returns {Promise<object>} final job row
+ */
 export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
   const job = await batchDao.getJobById(batchId);
   if (!job || BATCH_JOB_TERMINAL.includes(job.status)) return job;
@@ -194,6 +224,12 @@ export async function maybeFinalizeJob(batchId, { cancelled = false } = {}) {
 
 /**
  * 任务名候选（搜索下拉）：按 functionId + 关键字模糊去重，最近创建优先；空=全可见语义。
+ * @param {object} root0 query options
+ * @param {number} root0.functionId function node id
+ * @param {string} [root0.keyword] search keyword
+ * @param {string|null} [root0.paasUserId] PaaS user id filter
+ * @param {number} [root0.limit] max results, default 20
+ * @returns {Promise<Array<string>>} distinct task names
  */
 export async function listBatchTaskNames({ functionId, keyword = '', paasUserId = null, limit = 20 } = {}) {
   return batchDao.listDistinctNames({
@@ -204,6 +240,15 @@ export async function listBatchTaskNames({ functionId, keyword = '', paasUserId 
   });
 }
 
+/**
+ * Get a paginated batch job view (job meta + enriched items + summary).
+ * @param {number} batchId batch job id
+ * @param {object} [root0] pagination options
+ * @param {number} [root0.page] page number, default 1
+ * @param {number} [root0.pageSize] page size, default 50
+ * @param {string|null} [root0.paasUserId] PaaS user id filter
+ * @returns {Promise<object>} batch job view
+ */
 export async function getBatchJobView(batchId, {
   page = 1,
   pageSize = 50,
@@ -244,6 +289,20 @@ export async function getBatchJobView(batchId, {
   };
 }
 
+/**
+ * Import a batch Excel file → create job + items (dedup via request hash).
+ * @param {object} root0 import options
+ * @param {Buffer} root0.fileBuffer uploaded file bytes
+ * @param {string} [root0.originalFilename] original file name
+ * @param {number} root0.functionId function node id
+ * @param {number} root0.systemAccountId system account id
+ * @param {string} [root0.model] model name
+ * @param {string} [root0.idempotencyKey] client idempotency key
+ * @param {string} [root0.mode] batch mode (record|draft)
+ * @param {string} [root0.name] job display name
+ * @param {string|null} [root0.paasUserId] PaaS user id
+ * @returns {Promise<object>} created batch job
+ */
 export async function importBatchFromExcel({
   fileBuffer,
   originalFilename = '',
@@ -384,6 +443,10 @@ export { buildTemplateBuffer };
 
 // ── Scheduler / workers ───────────────────────────────────────────────
 
+/**
+ * Start the global FIFO batch scheduler (interval-based pump).
+ * @returns {void}
+ */
 export function startBatchScheduler() {
   if (started) return;
   started = true;
@@ -394,6 +457,10 @@ export function startBatchScheduler() {
   kickScheduler();
 }
 
+/**
+ * Kick the scheduler for an immediate pump (avoid waiting for the next interval).
+ * @returns {void}
+ */
 export function kickScheduler() {
   if (kicking) return;
   kicking = true;
@@ -406,6 +473,11 @@ export function kickScheduler() {
 }
 
 
+/**
+ * Request cancellation of a batch job (stops in-flight items, finalizes as cancelled).
+ * @param {number} batchId batch job id
+ * @returns {Promise<object>} updated job row
+ */
 export async function cancelBatch(batchId) {
   const job = await batchDao.getJobById(batchId);
   if (!job) {
@@ -455,6 +527,10 @@ export async function cancelBatch(batchId) {
 
 /**
  * Called after executor reconnect window on control-plane boot.
+ */
+/**
+ * Recover non-terminal batch jobs on control-plane restart (cleanup + re-pump).
+ * @returns {Promise<object[]>} recovered batch job ids
  */
 export async function recoverBatchJobsOnStartup() {
   const items = await batchDao.listItemsNeedingRecovery();

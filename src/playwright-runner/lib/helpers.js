@@ -5,14 +5,22 @@
  * Full implementations can be added as needed for specific test scenarios.
  */
 
-/** Read extra headers from environment variables (PW_EXTRA_HEADERS). */
+/**
+ * Read extra headers from environment variables (PW_EXTRA_HEADERS).
+ * @returns {Record<string, string>} result
+ */
 function getExtraHeadersFromEnv() {
   const raw = process.env.PW_EXTRA_HEADERS;
   if (!raw) return {};
   try { return JSON.parse(raw); } catch { return {}; }
 }
 
-/** Create a browser context with optional extra headers from environment. */
+/**
+ * Create a browser context with optional extra headers from environment.
+ * @param {import('playwright').Browser} browser browser
+ * @param {object} [options] options
+ * @returns {Promise<import('playwright').BrowserContext>} result
+ */
 async function createContext(browser, options = {}) {
   const extraHeaders = getExtraHeadersFromEnv();
   if (Object.keys(extraHeaders).length > 0) {
@@ -21,7 +29,10 @@ async function createContext(browser, options = {}) {
   return browser.newContext(options);
 }
 
-/** Detect local dev servers on common ports. Useful for targeting the right URL. */
+/**
+ * Detect local dev servers on common ports. Useful for targeting the right URL.
+ * @returns {Promise<{ port: number, status: number }[]>} array of detected dev server ports and their HTTP status
+ */
 async function detectDevServers() {
   const http = require('http');
   const ports = [3000, 5173, 8080, 3001, 4000];
@@ -41,7 +52,13 @@ async function detectDevServers() {
   return results;
 }
 
-/** Safe click with Element UI awareness. Clicks the inner span for el-radio and el-checkbox. */
+/**
+ * Safe click with Element UI awareness. Clicks the inner span for el-radio and el-checkbox.
+ * @param {import('playwright').Page} page page
+ * @param {string} selector selector
+ * @param {object} [options] options
+ * @returns {Promise<void>} result
+ */
 async function safeClick(page, selector, options = {}) {
   const el = await page.$(selector);
   if (!el) throw new Error(`Element not found: ${selector}`);

@@ -34,6 +34,13 @@ function shapeItems(rows) {
   return (rows || []).map(shapeItem);
 }
 
+/**
+ * Create a batch job with its items (transactional) and return the created job entity.
+ * @param {object} job CamelCase job fields (id/idempotencyKey/functionId required)
+ * @param {Array<object>} [items] Item rows to insert
+ * @param {import('knex').Knex|null} [trx] Optional transaction
+ * @returns {Promise<object|null>} Created job entity or null if creation failed
+ */
 export async function createJob(job, items = [], trx = null) {
   const db = trx || getDB();
   const run = async (client) => {
@@ -78,18 +85,38 @@ export async function createJob(job, items = [], trx = null) {
   return getDB().transaction((t) => run(t));
 }
 
+/**
+ * Fetch a batch job by ID.
+ * @param {string} id Job ID
+ * @param {import('knex').Knex|null} [trx] Optional transaction
+ * @returns {Promise<object|null>} Job entity or null when not found
+ */
 export async function getJobById(id, trx = null) {
   const db = trx || getDB();
   const row = await db(JOB_TABLE).where({ id: String(id) }).first();
   return fromDbRow(row);
 }
 
+/**
+ * Fetch a batch job by idempotency key.
+ * @param {string} key Idempotency key
+ * @param {import('knex').Knex|null} [trx] Optional transaction
+ * @returns {Promise<object|null>} Job entity or null when not found
+ */
 export async function getJobByIdempotencyKey(key, trx = null) {
   const db = trx || getDB();
   const row = await db(JOB_TABLE).where({ idempotency_key: String(key) }).first();
   return fromDbRow(row);
 }
 
+/**
+ * CAS job status transition: update only when current status is in fromStatuses.
+ * @param {string} id Job ID
+ * @param {string|string[]} fromStatuses Allowed current statuses
+ * @param {string} toStatus Target status
+ * @param {object} [extra] Additional fields to patch
+ * @returns {Promise<boolean>} True if the transition applied
+ */
 export async function updateJobStatus(id, fromStatuses, toStatus, extra = {}) {
   const statuses = Array.isArray(fromStatuses) ? fromStatuses : [fromStatuses];
   const patch = toDbRow({
@@ -104,18 +131,35 @@ export async function updateJobStatus(id, fromStatuses, toStatus, extra = {}) {
   return n > 0;
 }
 
+/**
+ * Force-update a job by ID (no status guard) and return the updated entity.
+ * @param {string} id Job ID
+ * @param {object} fields Partial camelCase job fields
+ * @returns {Promise<object|null>} Updated job entity or null if not found
+ */
 export async function forceUpdateJob(id, fields) {
   const patch = toDbRow({ ...fields, updatedAt: new Date() });
   await getDB()(JOB_TABLE).where({ id: String(id) }).update(patch);
   return getJobById(id);
 }
 
+/**
+ * Fetch a batch item by ID, parsing analysisJson.
+ * @param {number} id Item ID
+ * @param {import('knex').Knex|null} [trx] Optional transaction
+ * @returns {Promise<object|null>} Item entity or null when not found
+ */
 export async function getItemById(id, trx = null) {
   const db = trx || getDB();
   const row = await db(ITEM_TABLE).where({ id: Number(id) }).first();
   return shapeItem(row);
 }
 
+/**
+ * Find the latest batch item bound to a trajectory ID.
+ * @param {number} trajectoryId Trajectory ID
+ * @returns {Promise<object|null>} Item entity or null when not found
+ */
 export async function findItemByTrajectoryId(trajectoryId) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) return null;
@@ -126,6 +170,15 @@ export async function findItemByTrajectoryId(trajectoryId) {
   return shapeItem(row);
 }
 
+/**
+ * Paginated list of items in a batch, optionally filtered by status.
+ * @param {string} batchId Job ID
+ * @param {object} [opts] Optional pagination and filter parameters
+ * @param {number} [opts.page] Page number (1-based)
+ * @param {number} [opts.pageSize] Number of items per page
+ * @param {string|string[]|null} [opts.status] Status filter
+ * @returns {Promise<{ rows: Array<object>, total: number, page: number, pageSize: number }>} Paginated item list
+ */
 export async function listItemsByBatch(batchId, {
   page = 1,
   pageSize = 50,
@@ -150,6 +203,12 @@ export async function listItemsByBatch(batchId, {
   };
 }
 
+/**
+ * List all items in a batch ordered by row_number (no pagination).
+ * @param {string} batchId Job ID
+ * @param {import('knex').Knex|null} [trx] Optional transaction
+ * @returns {Promise<Array<object>>} Item entities
+ */
 export async function listAllItemsByBatch(batchId, trx = null) {
   const db = trx || getDB();
   const rows = await db(ITEM_TABLE)
@@ -158,6 +217,12 @@ export async function listAllItemsByBatch(batchId, trx = null) {
   return shapeItems(rows);
 }
 
+/**
+ * Count items grouped by status within a batch.
+ * @param {string} batchId Job ID
+ * @param {import('knex').Knex|null} [trx] Optional transaction
+ * @returns {Promise<Record<string, number>>} Status to count map
+ */
 export async function countItemsByStatus(batchId, trx = null) {
   const db = trx || getDB();
   const rows = await db(ITEM_TABLE)
@@ -174,7 +239,17 @@ export async function countItemsByStatus(batchId, trx = null) {
 
 /**
  * CAS transition for an item. Optionally require version match.
- * @returns {Promise<object|null>} updated item or null if CAS lost
+ * @param {number} itemId Item ID
+ * @param {string|string[]} fromStatuses Allowed current statuses
+ * @param {string} toStatus Target status
+ * @param {object} [opts] Optional transition parameters
+ * @param {number|null} [opts.version] Required version for CAS
+ * @param {string|null} [opts.workerToken] Worker token to set
+ * @param {string|null} [opts.expectedWorkerToken] Required current worker token
+ * @param {boolean} [opts.clearLease] Clear worker_token/lease_expires_at
+ * @param {object} [opts.extra] Additional fields to patch
+ * @param {import('knex').Knex|null} [opts.trx] Optional transaction
+ * @returns {Promise<object|null>} Updated item or null if CAS lost
  */
 export async function transitionItem(itemId, fromStatuses, toStatus, {
   version = null,
@@ -211,6 +286,13 @@ export async function transitionItem(itemId, fromStatuses, toStatus, {
 
 /**
  * Atomically claim the next FIFO item for analysis or recording.
+ * @param {object} opts Claim options
+ * @param {string[]} opts.statuses Eligible item statuses
+ * @param {string} opts.workerToken Worker token to assign
+ * @param {number} opts.leaseMs Lease duration in milliseconds
+ * @param {string[]|null} [opts.jobStatuses] Filter by job status
+ * @param {string[]|null} [opts.jobModes] Filter by job mode
+ * @returns {Promise<object|null>} Claimed item entity or null when none available
  */
 export async function claimNextItem({
   statuses,
@@ -266,6 +348,15 @@ export async function claimNextItem({
   });
 }
 
+/**
+ * Transition an analyzed item to 'drafted', binding a trajectory (clears lease, clears error).
+ * @param {number} itemId Item ID
+ * @param {number} trajectoryId Trajectory to bind
+ * @param {object} [opts] Optional transition parameters
+ * @param {number} [opts.version] Required version for CAS
+ * @param {import('knex').Knex|null} [opts.trx] Optional transaction
+ * @returns {Promise<object|null>} Updated item or null if CAS lost
+ */
 export async function bindTrajectoryAsDrafted(itemId, trajectoryId, {
   version,
   trx = null,
@@ -282,6 +373,16 @@ export async function bindTrajectoryAsDrafted(itemId, trajectoryId, {
   });
 }
 
+/**
+ * Transition an analyzed item to 'queued', binding a trajectory and optionally updating analysisJson.
+ * @param {number} itemId Item ID
+ * @param {number} trajectoryId Trajectory to bind
+ * @param {object} [opts] Optional transition parameters
+ * @param {number} [opts.version] Required version for CAS
+ * @param {object} [opts.analysisJson] Optional analysis payload to store
+ * @param {import('knex').Knex|null} [opts.trx] Optional transaction
+ * @returns {Promise<object|null>} Updated item or null if CAS lost
+ */
 export async function bindTrajectoryAndQueue(itemId, trajectoryId, {
   version,
   analysisJson = undefined,
@@ -301,6 +402,15 @@ export async function bindTrajectoryAndQueue(itemId, trajectoryId, {
   });
 }
 
+/**
+ * Transition an item to 'waiting_executor' with a short next-attempt delay.
+ * @param {number} itemId Item ID
+ * @param {string|string[]} fromStatuses Allowed current statuses
+ * @param {object} [opts] Optional transition parameters
+ * @param {number} [opts.version] Required version for CAS
+ * @param {string|null} [opts.errorMessage] Error message
+ * @returns {Promise<object|null>} Updated item or null if CAS lost
+ */
 export async function markItemWaiting(itemId, fromStatuses, { version, errorMessage = null } = {}) {
   return transitionItem(itemId, fromStatuses, 'waiting_executor', {
     version,
@@ -313,6 +423,17 @@ export async function markItemWaiting(itemId, fromStatuses, { version, errorMess
   });
 }
 
+/**
+ * Transition an item to 'failed', recording error details and clearing the lease.
+ * @param {number} itemId Item ID
+ * @param {string|string[]} fromStatuses Allowed current statuses
+ * @param {object} [opts] Optional transition parameters
+ * @param {number|null} [opts.version] Required version for CAS
+ * @param {string} [opts.errorCode] Error code
+ * @param {string} [opts.errorMessage] Error message (truncated to 4000 chars)
+ * @param {string|null} [opts.expectedWorkerToken] Required current worker token
+ * @returns {Promise<object|null>} Updated item or null if CAS lost
+ */
 export async function markItemFailed(itemId, fromStatuses, {
   version = null,
   errorCode = 'FAILED',
@@ -327,6 +448,15 @@ export async function markItemFailed(itemId, fromStatuses, {
   });
 }
 
+/**
+ * Transition an item to 'cancelled', clearing lease and worker token.
+ * @param {number} itemId Item ID
+ * @param {string|string[]} fromStatuses Allowed current statuses
+ * @param {object} [opts] Optional transition parameters
+ * @param {number|null} [opts.version] Required version for CAS
+ * @param {string} [opts.errorMessage] Cancel reason
+ * @returns {Promise<object|null>} Updated item or null if CAS lost
+ */
 export async function markItemCancelled(itemId, fromStatuses, {
   version = null,
   errorMessage = 'Cancelled',
@@ -343,6 +473,14 @@ export async function markItemCancelled(itemId, fromStatuses, {
   });
 }
 
+/**
+ * Transition an item to 'recorded'.
+ * @param {number} itemId Item ID
+ * @param {object} [opts] Optional transition parameters
+ * @param {number|null} [opts.version] Required version for CAS
+ * @param {string|null} [opts.expectedWorkerToken] Required current worker token
+ * @returns {Promise<object|null>} Updated item or null if CAS lost
+ */
 export async function markItemRecorded(itemId, {
   version = null,
   expectedWorkerToken = null,
@@ -358,8 +496,12 @@ export async function markItemRecorded(itemId, {
   });
 }
 
-export async function cancelOpenItems(batchId) {
-  const open = [
+/**
+ * Cancel all open items in a batch.
+ * @param {string} batchId Job ID
+ * @returns {Promise<number>} Number of cancelled items
+ */
+export async function cancelOpenItems(batchId) {  const open = [
     'pending',
     'analyzing',
     'analyzed',
@@ -385,6 +527,10 @@ export async function cancelOpenItems(batchId) {
   return n;
 }
 
+/**
+ * List jobs that need recovery (not in terminal status).
+ * @returns {Promise<Array<object>>} Array of jobs needing recovery
+ */
 export async function listJobsNeedingRecovery() {
   const db = getDB();
   const jobs = await db(JOB_TABLE)
@@ -393,6 +539,10 @@ export async function listJobsNeedingRecovery() {
   return fromDbRows(jobs);
 }
 
+/**
+ * List items that need recovery (resumable or in progress statuses).
+ * @returns {Promise<Array<object>>} Array of items needing recovery
+ */
 export async function listItemsNeedingRecovery() {
   const db = getDB();
   const rows = await db(ITEM_TABLE)
@@ -405,6 +555,11 @@ export async function listItemsNeedingRecovery() {
   return shapeItems(rows);
 }
 
+/**
+ * List in-flight items (preparing, recording, analyzing) in a batch.
+ * @param {string} batchId Job ID
+ * @returns {Promise<Array<object>>} Array of in-flight items
+ */
 export async function listInFlightItemsByBatch(batchId) {
   const rows = await getDB()(ITEM_TABLE)
     .where({ batch_id: String(batchId) })
@@ -413,6 +568,11 @@ export async function listInFlightItemsByBatch(batchId) {
   return shapeItems(rows);
 }
 
+/**
+ * Summarize job statistics by counting items by status.
+ * @param {string} batchId Job ID
+ * @returns {Promise<object>} Job summary with status counts
+ */
 export async function summarizeJob(batchId) {
   const counts = await countItemsByStatus(batchId);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -435,6 +595,13 @@ export async function summarizeJob(batchId) {
   };
 }
 
+/**
+ * Derive terminal status for a job based on item summary.
+ * @param {object} summary Job summary with status counts
+ * @param {object} [opts] Optional parameters
+ * @param {boolean} [opts.cancelled] Whether the job was cancelled
+ * @returns {string} Terminal status ('completed', 'completed_with_errors', 'failed', 'cancelled')
+ */
 export function deriveJobTerminalStatus(summary, { cancelled = false } = {}) {
   if (cancelled) return 'cancelled';
   const effective = (summary.accepted || 0) - (summary.cancelled || 0);
@@ -461,10 +628,15 @@ export function deriveJobTerminalStatus(summary, { cancelled = false } = {}) {
 }
 
 /**
- * 任务名候选（搜索下拉用）：按 functionId + 关键字模糊去重，最近创建优先。
- * 仅返回已产生交易轨迹的任务（EXISTS trajectory.batch_job_id）——空任务不进下拉。
- * @param {{ functionId?: number, keyword?: string, paasUserId?: string|null, limit?: number }} opts
- * @returns {Promise<string[]>}
+ * List distinct job names for dropdown search.
+ * Filters by functionId + keyword, deduplicates, orders by creation time.
+ * Only returns jobs that have produced trajectories (EXISTS trajectory.batch_job_id) — empty jobs excluded.
+ * @param {object} [opts] Optional filter parameters
+ * @param {number} [opts.functionId] Filter by function ID
+ * @param {string} [opts.keyword] Search keyword
+ * @param {string|null} [opts.paasUserId] Filter by PaaS user ID
+ * @param {number} [opts.limit] Maximum number of results
+ * @returns {Promise<string[]>} Array of distinct job names
  */
 export async function listDistinctNames({ functionId, keyword = '', paasUserId = null, limit = 20 } = {}) {
   const db = getDB();

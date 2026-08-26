@@ -1,6 +1,14 @@
 import * as apiOverrideService from '../../services/api-override-service.js';
 
+/**
+ * API override (CDP Fetch interception) rule CRUD — list, get, create, update,
+ * delete, and applicable-resolution for the CDP Fetch runtime.
+ *
+ * Prefix: /api/v2/api-overrides/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
+  /** List API override rules (paginated, optional enabled/scope filter). */
   app.get('/api/v2/api-overrides', async (req, res) => {
     try {
       const { enabled, scope, scopeRefId, page, pageSize } = req.query;
@@ -31,6 +39,7 @@ export default function (app) {
     }
   });
 
+  /** Get a single API override rule by id. */
   app.get('/api/v2/api-overrides/:id', async (req, res) => {
     try {
       const rule = await apiOverrideService.getOverride(+req.params.id);
@@ -41,6 +50,7 @@ export default function (app) {
     }
   });
 
+  /** Create a new API override rule. */
   app.post('/api/v2/api-overrides', async (req, res) => {
     try {
       const rule = await apiOverrideService.createOverride(req.body || {});
@@ -51,6 +61,7 @@ export default function (app) {
     }
   });
 
+  /** Update an existing API override rule. */
   app.put('/api/v2/api-overrides/:id', async (req, res) => {
     try {
       const rule = await apiOverrideService.updateOverride(+req.params.id, req.body || {});
@@ -62,6 +73,7 @@ export default function (app) {
     }
   });
 
+  /** Delete an API override rule. */
   app.delete('/api/v2/api-overrides/:id', async (req, res) => {
     try {
       await apiOverrideService.removeOverride(+req.params.id);

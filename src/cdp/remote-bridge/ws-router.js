@@ -54,8 +54,8 @@ function pickFromAgentSession(sessionId, trajectoryId = null) {
  * Resolve which executor session should receive remote:* commands.
  * Priority: trajectoryId → remoteSessionId/uuid → sessionId → traj runtime →
  * single attached binding (only when no identity keys were sent).
- *
- * @param {{ trajectoryId?: number|null, sessionId?: string|null, remoteSessionId?: number|null, remoteSessionUuid?: string|null }} [opts]
+ * @param {{ trajectoryId?: number|null, sessionId?: string|null, remoteSessionId?: number|null, remoteSessionUuid?: string|null }} [opts] Identity keys.
+ * @returns {{ executorNodeUuid: string, sessionId: string, trajectoryId: number|null, remoteSessionId: number|null }|null} Executor target, or null when unresolved.
  */
 export function resolveBibTarget(opts = {}) {
   const tid = opts.trajectoryId != null ? Number(opts.trajectoryId) : null;
@@ -113,6 +113,8 @@ export function resolveBibTarget(opts = {}) {
 /**
  * Register the WS message router exactly once. `attachLive` is injected by
  * index.js to keep this module free of import cycles.
+ * @param {(opts?: object) => Promise<object>} attachLive attachLive function from index.js.
+ * @returns {void}
  */
 export function ensureWsHook(attachLive) {
   if (bridge.wsHooked) return;

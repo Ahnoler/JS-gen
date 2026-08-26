@@ -11,6 +11,7 @@ import {
 
 /**
  * Read live CSS viewport from the page (do not invent dashboard canvas sizes).
+ * @returns {Promise<{ w: number, h: number, dpr: number }>} Updated bridge.viewport.
  */
 export async function syncViewportFromPage() {
   if (!bridge.client) return bridge.viewport;
@@ -32,6 +33,8 @@ export async function syncViewportFromPage() {
 /**
  * Restore Session full viewport (1600×900). Clears leftover Emulation crops
  * from earlier dashboard-sized overrides; does NOT shrink to the Dashboard.
+ * @param {string} targetId Page target id for window bounds lookup.
+ * @returns {Promise<void>}
  */
 export async function ensureFullSessionViewport(targetId) {
   if (!bridge.client) return;
@@ -65,6 +68,10 @@ export async function ensureFullSessionViewport(targetId) {
   console.log(`[remote-bridge] session viewport ${bridge.viewport.w}×${bridge.viewport.h}`);
 }
 
+/**
+ * Apply the current bridge.viewport as a CDP device-metrics override and persist it.
+ * @returns {Promise<void>}
+ */
 export async function applyViewportOverride() {
   if (!bridge.client) return;
   await bridge.client.send('Emulation.setDeviceMetricsOverride', {
@@ -82,6 +89,10 @@ export async function applyViewportOverride() {
   }
 }
 
+/**
+ * Persist the current viewport to the remote-session record.
+ * @returns {Promise<void>}
+ */
 export async function persistViewport() {
   if (!bridge.remoteSession?.id) return;
   try {
@@ -93,6 +104,10 @@ export async function persistViewport() {
   } catch {}
 }
 
+/**
+ * Clear the screencast stall watchdog timer.
+ * @returns {void}
+ */
 export function clearStallWatch() {
   if (bridge.stallTimer) {
     clearInterval(bridge.stallTimer);
@@ -110,6 +125,10 @@ function armStallWatch() {
   }, 1000);
 }
 
+/**
+ * Stop and restart screencast (used by the stall watchdog).
+ * @returns {Promise<void>}
+ */
 export async function restartScreencast() {
   if (!bridge.client || bridge.restartingCast) return;
   bridge.restartingCast = true;
@@ -124,6 +143,10 @@ export async function restartScreencast() {
   }
 }
 
+/**
+ * Start CDP Page.startScreencast with resolved timing + viewport caps.
+ * @returns {Promise<void>}
+ */
 export async function startScreencast() {
   if (!bridge.client) return;
   const timing = resolveScreencastTiming();
@@ -144,6 +167,11 @@ export async function startScreencast() {
   armStallWatch();
 }
 
+/**
+ * Handle an incoming CDP screencast frame: ack, throttle-forward to subscribers.
+ * @param {{ sessionId?: number, data?: string, metadata?: object }} params CDP screencast frame params.
+ * @returns {void}
+ */
 export function onScreencastFrame(params) {
   if (!bridge.screencastOn || !bridge.remoteSession) return;
   const sessionId = params.sessionId;

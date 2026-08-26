@@ -28,13 +28,21 @@ export const STANCE_FACTOR = {
   neutral: 1.0,
 };
 
-/** 来源 → 初始基准权重（未知来源按 0.6）。 */
+/**
+ * 来源 → 初始基准权重（未知来源按 0.6）。
+ * @param {string} source Fact source.
+ * @returns {number} Base weight for the source.
+ */
 export function baseWeightFor(source) {
   const v = String(source || '').toLowerCase();
   return SOURCE_BASE_WEIGHT[v] ?? 0.6;
 }
 
-/** stance → 系数（未知 stance 按 1.0）。 */
+/**
+ * stance → 系数（未知 stance 按 1.0）。
+ * @param {string} stance Fact stance.
+ * @returns {number} Stance multiplier.
+ */
 export function stanceFactorFor(stance) {
   const v = String(stance || '').toLowerCase();
   return STANCE_FACTOR[v] ?? 1.0;
@@ -42,11 +50,11 @@ export function stanceFactorFor(stance) {
 
 /**
  * P0 初始权重：base × stance。
- * @param {object} opts
- * @param {string} [opts.source]
- * @param {string} [opts.stance]
+ * @param {object} opts Weight inputs.
+ * @param {string} [opts.source] Fact source.
+ * @param {string} [opts.stance] Fact stance.
  * @param {number} [opts.baseWeight] 显式覆盖来源基准
- * @returns {number}
+ * @returns {number} Initial weight (base × stance).
  */
 export function initialWeight({ source = 'agent', stance = 'neutral', baseWeight = null } = {}) {
   const base = Number.isFinite(baseWeight) ? Number(baseWeight) : baseWeightFor(source);
@@ -62,6 +70,10 @@ export const DEFAULT_HALF_LIFE_MS = 60 * 60 * 1000;
 /**
  * 时间衰减因子：recency(t) = 0.5^(age / half_life)。
  * created_at 缺失/无效视为 1（不衰减）。
+ * @param {string|number|Date} createdAt Fact creation timestamp.
+ * @param {number} [now] Current epoch ms (default Date.now()).
+ * @param {number} [halfLifeMs] Decay half-life in ms.
+ * @returns {number} Recency factor in (0, 1].
  */
 export function recencyFactor(createdAt, now = Date.now(), halfLifeMs = DEFAULT_HALF_LIFE_MS) {
   if (!createdAt) return 1;
@@ -75,6 +87,11 @@ export function recencyFactor(createdAt, now = Date.now(), halfLifeMs = DEFAULT_
 /**
  * 存储权重：base × stance（摄入时落库；不含时间衰减——衰减是检索时的动态量）。
  * 被 superseded 的事实按 disputed stance 重算（审计保留的低权重版本）。
+ * @param {object} opts Weight inputs.
+ * @param {string} [opts.source] Fact source.
+ * @param {string} [opts.stance] Fact stance.
+ * @param {number} [opts.baseWeight] Explicit base-weight override.
+ * @returns {number} Stored weight (base × stance).
  */
 export function storedWeight({ source = 'agent', stance = 'neutral', baseWeight = null } = {}) {
   const base = Number.isFinite(baseWeight) ? baseWeight : baseWeightFor(source);
@@ -85,6 +102,9 @@ export function storedWeight({ source = 'agent', stance = 'neutral', baseWeight 
  * 计算当前权重（P1 完整公式，方案 §5.3.1）：
  *   weight(t) = base × recency(t) × stance_factor × conflict_penalty
  * 检索场景调用：存储权重 × 时间衰减 × （superseded → 冲突惩罚）。
+ * @param {object} [fact] Fact row (source / stance / baseWeight / supersededBy / createdAt).
+ * @param {number} [now] Current epoch ms (default Date.now()).
+ * @returns {number} Current effective weight.
  */
 export function computeWeight(fact = {}, now = Date.now()) {
   const base = Number.isFinite(fact.baseWeight) ? fact.baseWeight : baseWeightFor(fact.source);

@@ -43,8 +43,9 @@ const CANONICAL = new Set([
 ]);
 
 /**
- * @param {string} actionName
- * @returns {string}
+ * 归一化动作名为规范 snake_case 形式（含别名映射与大小写转换）。
+ * @param {string} actionName 原始动作名
+ * @returns {string} 归一化后的动作名（未知动作保留原样小写转换结果）
  */
 export function normalizeActionName(actionName) {
   const raw = String(actionName || '').trim();

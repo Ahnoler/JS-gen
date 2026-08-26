@@ -25,6 +25,12 @@ export const liveByRemoteSessionId = new Map();
 /** @type {Map<number, Promise<unknown>>} serialize prepare/detach/release per trajectory */
 const trajLocks = new Map();
 
+/**
+ * Serialize prepare/detach/release calls per trajectory (promise-chain lock).
+ * @param {number} trajectoryId trajectory DB id
+ * @param {() => Promise<unknown>} fn async work to run under the lock
+ * @returns {Promise<unknown>} result of fn
+ */
 export function withTrajectoryLock(trajectoryId, fn) {
   const tid = Number(trajectoryId);
   const key = Number.isFinite(tid) && tid > 0 ? tid : 0;
@@ -36,6 +42,11 @@ export function withTrajectoryLock(trajectoryId, fn) {
   return run;
 }
 
+/**
+ * Convert a live binding into a client-facing status snapshot.
+ * @param {LiveBinding|null} [binding] live binding entry
+ * @returns {object} status object (attached, remoteSessionId, sessionId, viewport, …)
+ */
 export function bindingToStatus(binding) {
   if (!binding?.attached) {
     return {
@@ -69,12 +80,25 @@ export function bindingToStatus(binding) {
   };
 }
 
+/**
+ * Get the live binding for a remote_session id, or null.
+ * @param {number} remoteSessionId remote_session DB id
+ * @returns {LiveBinding|null} binding or null
+ */
 export function getLiveBindingByRemoteSessionId(remoteSessionId) {
   const id = Number(remoteSessionId);
   if (!Number.isFinite(id)) return null;
   return liveByRemoteSessionId.get(id) || null;
 }
 
+/**
+ * Get the live binding for a trajectory, preferring attached + matching session.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [root0] options
+ * @param {number|null} [root0.preferRemoteSessionId] preferred remote_session id
+ * @param {string|null} [root0.preferAgentSessionId] preferred agent session id
+ * @returns {LiveBinding|null} binding or null
+ */
 export function getLiveBindingByTrajectory(
   trajectoryId,
   { preferRemoteSessionId = null, preferAgentSessionId = null } = {},
@@ -112,6 +136,11 @@ export function getLiveBindingByTrajectory(
   return null;
 }
 
+/**
+ * Get the live binding for an agent session id (prefers attached).
+ * @param {string} agentSessionId executor session id
+ * @returns {LiveBinding|null} binding or null
+ */
 export function getLiveBindingByAgentSession(agentSessionId) {
   if (!agentSessionId) return null;
   for (const b of liveByRemoteSessionId.values()) {
@@ -123,6 +152,11 @@ export function getLiveBindingByAgentSession(agentSessionId) {
   return null;
 }
 
+/**
+ * Get the live binding for a remote_session UUID, or null.
+ * @param {string} remoteSessionUuid remote session UUID
+ * @returns {LiveBinding|null} binding or null
+ */
 export function getLiveBindingByUuid(remoteSessionUuid) {
   if (!remoteSessionUuid) return null;
   const want = String(remoteSessionUuid);
@@ -136,8 +170,8 @@ export function getLiveBindingByUuid(remoteSessionUuid) {
  * Shared BiB target resolution (trajectory ↔ remote_session ↔ agent session).
  * Priority: trajectoryId → remoteSessionId/uuid → sessionId →
  * (only when no identity keys given) single attached binding.
- * @param {{ trajectoryId?: number|null, sessionId?: string|null, remoteSessionId?: number|null, remoteSessionUuid?: string|null }} opts
- * @returns {LiveBinding|null}
+ * @param {{ trajectoryId?: number|null, sessionId?: string|null, remoteSessionId?: number|null, remoteSessionUuid?: string|null }} opts lookup keys (any subset)
+ * @returns {LiveBinding|null} resolved binding, or null
  */
 export function resolveLiveBinding(opts = {}) {
   const tid = opts.trajectoryId != null ? Number(opts.trajectoryId) : null;
@@ -179,10 +213,16 @@ export function resolveLiveBinding(opts = {}) {
   return null;
 }
 
+/** Clear all live BiB bindings (full executor reset). */
 export function clearExecutorLive() {
   liveByRemoteSessionId.clear();
 }
 
+/**
+ * Clear live BiB bindings for a specific executor node (or all if no uuid).
+ * @param {string|null} [nodeUuid] executor node uuid (falsy = clear all)
+ * @returns {void}
+ */
 export function clearExecutorLiveForNode(nodeUuid) {
   if (!nodeUuid) {
     clearExecutorLive();
@@ -193,12 +233,24 @@ export function clearExecutorLiveForNode(nodeUuid) {
   }
 }
 
+/**
+ * Clear the live binding for a single remote_session id.
+ * @param {number} remoteSessionId remote_session DB id
+ * @returns {void}
+ */
 export function clearLiveBinding(remoteSessionId) {
   const id = Number(remoteSessionId);
   if (Number.isFinite(id)) liveByRemoteSessionId.delete(id);
 }
 
-/** Rebuild in-memory live map entry from DB row (boot reconcile). */
+/**
+ * Rebuild in-memory live map entry from DB row (boot reconcile).
+ * @param {object} row remote_session DB row
+ * @param {object} [root0] options
+ * @param {string|null} [root0.nodeUuid] executor node uuid
+ * @param {boolean} [root0.attached] whether the binding is attached, default false
+ * @returns {LiveBinding|null} restored binding, or null if row has no id
+ */
 export function restoreLiveBindingFromRow(row, { nodeUuid = null, attached = false } = {}) {
   if (!row?.id) return null;
   const binding = {
@@ -216,6 +268,10 @@ export function restoreLiveBindingFromRow(row, { nodeUuid = null, attached = fal
   return binding;
 }
 
+/**
+ * List all current live BiB bindings.
+ * @returns {LiveBinding[]} array of live bindings
+ */
 export function listLiveBindings() {
   return [...liveByRemoteSessionId.values()];
 }

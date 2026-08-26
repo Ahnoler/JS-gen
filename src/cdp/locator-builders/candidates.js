@@ -7,6 +7,11 @@ import { detectContainerKind } from './scope.js';
 import { normalizeControlText } from './text.js';
 import { normalizeFormLabel } from './text.js';
 
+/**
+ * Build the ordered locator candidate list (xpath_smart → xpath_full → css).
+ * @param {{ xpathSmart?: string, xpathFull?: string, cssSelector?: string }} [opts] Locator sources.
+ * @returns {Array<{ type: string, value: string }>} Ordered candidate list.
+ */
 export function buildCandidates({ xpathSmart = '', xpathFull = '', cssSelector = '' } = {}) {
   /** @type {Array<{ type: string, value: string }>} */
   const out = [];
@@ -18,7 +23,8 @@ export function buildCandidates({ xpathSmart = '', xpathFull = '', cssSelector =
 
 /**
  * Sanitize attributes for element_json (drop value / secrets / huge blobs).
- * @param {Record<string, string>} attrs
+ * @param {Record<string, string>} attrs Raw attribute map.
+ * @returns {Record<string, string>} Filtered attribute map.
  */
 export function sanitizeAttributes(attrs = {}) {
   const out = {};
@@ -37,7 +43,8 @@ export function sanitizeAttributes(attrs = {}) {
 /**
  * Enrich a raw element meta (from CDP inspect / resolve) with stable locators.
  * Offline rebuild must NOT invent locator_verified=true.
- * @param {object} meta
+ * @param {object} meta Raw element meta from CDP inspect / resolve.
+ * @returns {object} Enriched meta with xpath_smart / xpath_full / candidates / locator_strategy.
  */
 export function enrichLocatorFields(meta = {}) {
   const tag = meta.tag || meta.tagName || meta.tag_name || '';
@@ -149,8 +156,3 @@ export function enrichLocatorFields(meta = {}) {
   }
   return out;
 }
-
-/**
- * Page-side helper source (injected into CDP Runtime.evaluate strings).
- * Keep in sync with Node builders above and scripts/controller/actions/js_snippets/_locator_helpers_js.py.
- */

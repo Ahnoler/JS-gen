@@ -32,6 +32,8 @@ export {
 
 /**
  * Open a new remote browser session record.
+ * @param {object} [opts] session fields (browserContextId, targetId, viewport, etc.)
+ * @returns {Promise<object>} created remote_session row
  */
 export async function openSession(opts = {}) {
   return remoteSessionDao.create({
@@ -52,6 +54,15 @@ export async function openSession(opts = {}) {
   });
 }
 
+/**
+ * Persist viewport dimensions for a remote session.
+ * @param {number} id remote_session DB id
+ * @param {object} root0 viewport fields
+ * @param {number} root0.viewportW viewport width
+ * @param {number} root0.viewportH viewport height
+ * @param {number} root0.deviceScaleFactor device scale factor
+ * @returns {Promise<object>} updated remote_session row
+ */
 export async function updateViewport(id, { viewportW, viewportH, deviceScaleFactor }) {
   return remoteSessionDao.update(id, {
     viewportW,
@@ -60,6 +71,14 @@ export async function updateViewport(id, { viewportW, viewportH, deviceScaleFact
   });
 }
 
+/**
+ * Attach browser context + target ids to an existing remote session.
+ * @param {number} id remote_session DB id
+ * @param {object} root0 target fields
+ * @param {string} root0.browserContextId browser context id
+ * @param {string} root0.targetId CDP target id
+ * @returns {Promise<object>} updated remote_session row
+ */
 export async function attachTarget(id, { browserContextId, targetId }) {
   return remoteSessionDao.update(id, {
     browserContextId: browserContextId || '',
@@ -69,9 +88,9 @@ export async function attachTarget(id, { browserContextId, targetId }) {
 
 /**
  * Clear trajectory.remote_session_id (+ runtime) for rows pointing at this remote_session.
- * @param {number} remoteSessionId
- * @param {{ exceptTrajectoryId?: number|null, demoteLive?: boolean }} [opts]
- * @returns {Promise<number[]>}
+ * @param {number} remoteSessionId remote_session DB id to unmount from
+ * @param {{ exceptTrajectoryId?: number|null, demoteLive?: boolean }} [opts] unmount options
+ * @returns {Promise<number[]>} trajectory ids whose mount was cleared
  */
 export async function unmountTrajectoriesFromRemoteSession(remoteSessionId, {
   exceptTrajectoryId = null,
@@ -97,13 +116,21 @@ export async function unmountTrajectoriesFromRemoteSession(remoteSessionId, {
   return cleared;
 }
 
-/** Mount remote_session exclusively onto one trajectory (truth + cache via lifecycle). */
+/**
+ * Mount remote_session exclusively onto one trajectory (truth + cache via lifecycle).
+ * @param {number} trajectoryId trajectory DB id
+ * @param {number} remoteSessionId remote_session DB id
+ * @returns {Promise<object>} updated trajectory row
+ */
 export async function mountTrajectoryRemoteSession(trajectoryId, remoteSessionId) {
   const { syncMount } = await import('./session-lifecycle.js');
   return syncMount(trajectoryId, remoteSessionId);
 }
 
-/** One-shot repair for ghost occupancy (stale trajectory.remote_session_id). */
+/**
+ * One-shot repair for ghost occupancy (stale trajectory.remote_session_id).
+ * @returns {Promise<number[]>} trajectory ids whose stale mounts were repaired
+ */
 export async function reconcileStaleTrajectoryRemoteMounts() {
   const trajectoryDao = await import('../dao/trajectory-dao.js');
   const cleared = await trajectoryDao.repairStaleRemoteMounts();
@@ -121,6 +148,13 @@ export async function reconcileStaleTrajectoryRemoteMounts() {
   return cleared;
 }
 
+/**
+ * Close a remote session and sweep trajectory FKs (repairs ghost mounts).
+ * @param {number} id remote_session DB id
+ * @param {object} [root0] close options
+ * @param {boolean} [root0.crashed] whether the session crashed
+ * @returns {Promise<object|null>} updated session row, or null if not found
+ */
 export async function closeSession(id, { crashed = false } = {}) {
   const session = await remoteSessionDao.getById(id);
   const { clearOwnershipOnClose } = await import('./session-lifecycle.js');
@@ -131,20 +165,41 @@ export async function closeSession(id, { crashed = false } = {}) {
   return remoteSessionDao.close(id, { crashed });
 }
 
+/**
+ * Close a remote session by its session UUID.
+ * @param {string} sessionUuid remote session UUID
+ * @param {object} [opts] close options (crashed, …)
+ * @returns {Promise<object|null>} updated session row, or null if not found
+ */
 export async function closeByUuid(sessionUuid, opts) {
   const session = await remoteSessionDao.getByUuid(sessionUuid);
   if (!session) return null;
   return closeSession(session.id, opts);
 }
 
+/**
+ * Get a remote session by DB id.
+ * @param {number} id remote_session DB id
+ * @returns {Promise<object|null>} remote session row or null
+ */
 export async function getSession(id) {
   return remoteSessionDao.getById(id);
 }
 
+/**
+ * Get a remote session by its session UUID.
+ * @param {string} sessionUuid remote session UUID
+ * @returns {Promise<object|null>} remote session row or null
+ */
 export async function getByUuid(sessionUuid) {
   return remoteSessionDao.getByUuid(sessionUuid);
 }
 
+/**
+ * List remote sessions (filter/pagination via opts).
+ * @param {object} [opts] list filter / pagination options
+ * @returns {Promise<Array<object>>} remote session rows
+ */
 export async function listSessions(opts) {
   return remoteSessionDao.list(opts);
 }
@@ -159,6 +214,11 @@ async function resolveExecutorNodeId(nodeUuid) {
  * Close duplicate occupied remote_session rows for one trajectory so BiB UUID
  * stays aligned with the live agent session (avoids black-screen subscribe).
  * Keeps rows matching keepRemoteSessionId and/or keepAgentSessionId.
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [opts] keep options
+ * @param {number|null} [opts.keepRemoteSessionId] remote_session id to preserve
+ * @param {string|null} [opts.keepAgentSessionId] agent session id to preserve
+ * @returns {Promise<number[]>} closed remote_session ids
  */
 export async function supersedeStaleForTrajectory(
   trajectoryId,
@@ -215,6 +275,8 @@ export async function supersedeStaleForTrajectory(
 /**
  * Attach BiB for a specific trajectory + agent session.
  * Creates or reactivates remote_session; mounts trajectory.remote_session_id.
+ * @param {object} [opts] attach options (sessionId, trajectoryId, viewport, quality, resize, …)
+ * @returns {Promise<{ remoteSession: object, status: object }>} remote session row + live status
  */
 export async function attachLive(opts = {}) {
   if (!USE_EXECUTOR) {
@@ -371,7 +433,8 @@ export async function attachLive(opts = {}) {
 /**
  * Disconnect stream only: stop BiB, mark remote idle, clear trajectory mount.
  * Does NOT kill Chrome / Python / slot.
- * @param {{ remoteSessionId?: number, trajectoryId?: number, crashed?: boolean }} opts
+ * @param {{ remoteSessionId?: number, trajectoryId?: number, crashed?: boolean }} opts detach options
+ * @returns {Promise<{ closedId: number|null, status: object, streamDetached: boolean, sessionKept: boolean, remoteSessionId?: number, trajectoryId?: number }>} detach result + live status
  */
 export async function detachLive(opts = {}) {
   if (!USE_EXECUTOR) {
@@ -467,7 +530,9 @@ export async function detachLive(opts = {}) {
 }
 
 /**
- * @param {{ trajectoryId?: number, remoteSessionId?: number, remoteSessionUuid?: string, sessionId?: string, preferAgentSessionId?: string }} [opts]
+ * Resolve live status for a trajectory / remote session / agent session.
+ * @param {{ trajectoryId?: number, remoteSessionId?: number, remoteSessionUuid?: string, sessionId?: string, preferAgentSessionId?: string }} [opts] lookup keys
+ * @returns {Promise<object>} live status snapshot (attached, remoteSessionId, sessionId, viewport, …)
  */
 export async function getLiveStatus(opts = {}) {
   if (!USE_EXECUTOR) {

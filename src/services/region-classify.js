@@ -1,3 +1,6 @@
+/**
+ * Region role classification: rule-based + LLM fallback with an in-memory L1d cache.
+ */
 import { createHash } from 'node:crypto';
 import { callLLM } from '../llm-utils.js';
 import { L1C_LLM, L1C_LLM_TIMEOUT_MS } from '../../config/config.js';
@@ -41,6 +44,11 @@ function cacheSet(key, value) {
   });
 }
 
+/**
+ * Sha256 (truncated) signature of a region card's stable features.
+ * @param {object} [card] region card
+ * @returns {string} 32-hex signature
+ */
 export function featureSignature(card = {}) {
   const payload = JSON.stringify({
     classTokens: card.classTokens || [],
@@ -52,6 +60,11 @@ export function featureSignature(card = {}) {
   return createHash('sha256').update(payload).digest('hex').slice(0, 32);
 }
 
+/**
+ * True when the rule role/confidence is weak enough to warrant LLM classification.
+ * @param {object} [card] region card
+ * @returns {boolean} whether LLM classification should run
+ */
 export function shouldLlmClassify(card = {}) {
   const role = String(card.ruleRole || card.role || 'other');
   const conf = Number(card.ruleConfidence ?? card.confidence ?? 0);
@@ -151,6 +164,12 @@ function mergeLlm(base, llmItem) {
   };
 }
 
+/**
+ * Classify region cards: rule-based first, LLM for low-confidence/other, with L1d cache.
+ * @param {Array<object>} [cards] region cards
+ * @param {{ systemId?: string }} [opts] classification options
+ * @returns {Promise<object[]>} cards enriched with role/label/confidence/source/signature
+ */
 export async function classifyRegions(cards = [], { systemId = '' } = {}) {
   const sid = String(systemId || '');
   const out = new Array(cards.length);

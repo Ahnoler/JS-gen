@@ -1,3 +1,7 @@
+/**
+ * Hierarchy tree service: root → system → module → function tree CRUD,
+ * account sync, search, and JSON/Excel import/export re-exports.
+ */
 import { randomUUID } from 'crypto';
 import { getDB } from '../../config/database.js';
 import * as systemDao from '../dao/system-dao.js';
@@ -26,7 +30,7 @@ export {
  * 支持名称模糊（HTTP name → keyword）与 type 筛选；筛选时保留祖先，且始终带上根节点。
  * 有关键词时，命中节点附带 path（不含根名「根」）。
  * 可选在 type=1 系统节点上附带 accounts。
- * @param {{ includeAccounts?: boolean, keyword?: string, type?: number|string, limit?: number }} [opts]
+ * @param {{ includeAccounts?: boolean, keyword?: string, type?: number|string, limit?: number }} [opts] tree filter options
  * @returns {Promise<object[]>} 长度为 1 的数组：[{ id:0, type:0, children:[…] }]
  */
 export async function getTree({
@@ -102,6 +106,8 @@ export async function getTree({
 
 /**
  * Guarantee API shape: data = [{ id:0, type:0, children:[…] }].
+ * @param {object[]} [tree] nested tree nodes
+ * @returns {Promise<object[]>} length-1 array rooted at the sentinel root node
  */
 export async function ensureRootTree(tree = []) {
   const list = Array.isArray(tree) ? tree : [];
@@ -158,8 +164,8 @@ function formatPath(pathNodes) {
 
 /**
  * Nest flat nodes into a children[] tree only (no modules/functions aliases).
- * @param {object[]} nodes
- * @returns {object[]}
+ * @param {object[]} nodes flat node list
+ * @returns {object[]} nested tree with children[] (no legacy aliases)
  */
 export function nestToChildrenTree(nodes = []) {
   const byId = new Map();
@@ -198,6 +204,13 @@ export function nestToChildrenTree(nodes = []) {
   return roots;
 }
 
+/**
+ * Create a system node under the root.
+ * @param {string} name system name
+ * @param {string} [description] description
+ * @param {string} [url] system URL
+ * @returns {Promise<object>} created system node
+ */
 export async function createSystem(name, description, url = '') {
   return systemDao.create({
     type: NODE_TYPE.SYSTEM,
@@ -208,14 +221,36 @@ export async function createSystem(name, description, url = '') {
   });
 }
 
+/**
+ * Update a node by id with a partial patch.
+ * @param {number} id node id
+ * @param {object} patch fields to update
+ * @returns {Promise<object|null>} updated node, or null if not found
+ */
 export async function updateSystem(id, patch) {
   return systemDao.update(id, patch);
 }
 
+/**
+ * Legacy alias for createModule.
+ * @param {number|string} systemId parent system id
+ * @param {string} name module name
+ * @param {string} [description] description
+ * @param {number} [sortOrder] sort order
+ * @returns {Promise<object>} created module node
+ */
 export async function createProcess(systemId, name, description, sortOrder) {
   return createModule(systemId, name, description, sortOrder);
 }
 
+/**
+ * Create a module node under a system.
+ * @param {number|string} systemId parent system id
+ * @param {string} name module name
+ * @param {string} [description] description
+ * @param {number} [sortOrder] sort order
+ * @returns {Promise<object>} created module node
+ */
 export async function createModule(systemId, name, description, sortOrder) {
   return systemDao.create({
     type: NODE_TYPE.MODULE,
@@ -226,6 +261,14 @@ export async function createModule(systemId, name, description, sortOrder) {
   });
 }
 
+/**
+ * Create a function node under a module.
+ * @param {number|string} moduleId parent module id
+ * @param {string} name function name
+ * @param {string} [description] description
+ * @param {number} [sortOrder] sort order
+ * @returns {Promise<object>} created function node
+ */
 export async function createFunction(moduleId, name, description, sortOrder) {
   return systemDao.create({
     type: NODE_TYPE.FUNCTION,
@@ -236,7 +279,11 @@ export async function createFunction(moduleId, name, description, sortOrder) {
   });
 }
 
-/** Normalize/validate the `accounts` array accepted by node POST/PUT. */
+/**
+ * Normalize/validate the `accounts` array accepted by node POST/PUT.
+ * @param {Array} input raw accounts array
+ * @returns {Array} normalized account objects
+ */
 export function normalizeSystemAccounts(input) {
   if (!Array.isArray(input)) {
     throw Object.assign(new Error('accounts 必须是数组'), { code: 'VALIDATION' });
@@ -354,7 +401,11 @@ async function syncSystemAccounts(systemId, normalized, trx) {
   return systemAccountDao.listBySystem(systemId, trx);
 }
 
-/** Unified create: body.type + parentId + name…；type=1 可同时创建 accounts[]。 */
+/**
+ * Unified create: body.type + parentId + name…；type=1 可同时创建 accounts[]。
+ * @param {object} input node fields (+ optional accounts[] for type=1)
+ * @returns {Promise<object>} created node (with accounts when provided)
+ */
 export async function createNode(input = {}) {
   const { accounts, ...nodeInput } = input;
   assertAccountsForSystem(nodeInput.type, accounts);
@@ -369,6 +420,12 @@ export async function createNode(input = {}) {
   });
 }
 
+/**
+ * Update a node by id; type=1 may also sync accounts[] in one transaction.
+ * @param {number} id node id
+ * @param {object} [patch] fields to update (+ optional accounts[])
+ * @returns {Promise<object|null>} updated node, or null if not found
+ */
 export async function updateNode(id, patch = {}) {
   const existing = await systemDao.getById(id);
   if (!existing) return null;
@@ -387,10 +444,20 @@ export async function updateNode(id, patch = {}) {
   });
 }
 
+/**
+ * Delete a node by id.
+ * @param {number} id node id
+ * @returns {Promise<number>} rows deleted
+ */
 export async function deleteNode(id) {
   return systemDao.remove(id);
 }
 
+/**
+ * Get a single node by id; system nodes (type=1) are enriched with accounts[].
+ * @param {number} id node id
+ * @returns {Promise<object|null>} node row (with accounts for systems), or null
+ */
 export async function getNode(id) {
   const node = await systemDao.getById(id);
   if (node && Number(node.type) === NODE_TYPE.SYSTEM) {
@@ -410,6 +477,11 @@ export async function getNode(id) {
   return node;
 }
 
+/**
+ * List nodes by type and/or parentId (flat list, not nested).
+ * @param {{ type?: number|string, parentId?: number|string|null }} [opts] filter options
+ * @returns {Promise<object[]>} matching node rows
+ */
 export async function listNodes({ type, parentId } = {}) {
   if (type != null && type !== '') {
     const t = Number(type);
@@ -431,8 +503,8 @@ export async function listNodes({ type, parentId } = {}) {
 /**
  * Walk parent_id upward until a type=1 系统 node is found.
  * Returns that system id, or null if the chain is broken / not under a system.
- * @param {number|string} nodeId
- * @returns {Promise<number|null>}
+ * @param {number|string} nodeId starting node id
+ * @returns {Promise<number|null>} ancestor system id, or null if chain breaks
  */
 export async function resolveAncestorSystemId(nodeId) {
   const startId = Number(nodeId);
@@ -453,6 +525,9 @@ export async function resolveAncestorSystemId(nodeId) {
 
 /**
  * Build ancestry chain root → … → node (inclusive).
+ * @param {number|string} nodeId target node id
+ * @param {Map<number, object>} byId node map keyed by id
+ * @returns {object[]} ancestry chain (root-first, inclusive of target)
  */
 export function buildPath(nodeId, byId) {
   const chain = [];
@@ -476,6 +551,9 @@ export function buildPath(nodeId, byId) {
 
 /**
  * Legacy: 已合并进 getTree({ keyword, type })；保留兼容调用。
+ * @param {string} keyword search keyword
+ * @param {{ limit?: number, type?: number|string }} [opts] search options
+ * @returns {Promise<object[]>} filtered tree (length-1 array rooted at sentinel)
  */
 export async function searchNodes(keyword, { limit = 50, type } = {}) {
   return getTree({
@@ -486,13 +564,13 @@ export async function searchNodes(keyword, { limit = 50, type } = {}) {
   });
 }
 
-/** Export tree as portable JSON (no DB ids; uses uid). */
-
 /**
  * Import tree.
- * @param {{ nodes?: Array, mode?: 'merge'|'append' }} payload
- * mode=merge: upsert by uid; append: always insert new uuids
- */export async function importTree(payload = {}) {
+ * @param {{ nodes?: Array, mode?: 'merge'|'append' }} payload import payload
+ *   mode=merge: upsert by uid; append: always insert new uuids
+ * @returns {Promise<{ mode: string, created: number, updated: number, skipped: number, tree: object[] }>} import stats + rebuilt tree
+ */
+export async function importTree(payload = {}) {
   const mode = payload.mode === 'append' ? 'append' : 'merge';
   const roots = Array.isArray(payload.nodes) ? payload.nodes : [];
   if (!roots.length) {

@@ -293,6 +293,8 @@ async function main() {
 
 /**
  * 尝试 fetch 一个 URL 并转 base64；失败或超时返回空字符串。
+ * @param {string} url - 要 fetch 的 URL
+ * @returns {Promise<string>} base64 字符串；失败/超时返回空字符串
  */
 async function fetchB64(url) {
   const controller = new AbortController();
@@ -313,6 +315,9 @@ async function fetchB64(url) {
  * 根据截图 URL 加载 base64：优先从本地 DB（/screenshots/:id/image），
  * 否则尝试直接 fetch MinIO/公网 URL；直连失败时再尝试把 host 换成 127.0.0.1
  * （便于本机已开 SSH 反向隧道转发 MinIO 的场景）。
+ * @param {object} db - knex 实例
+ * @param {string} url - 截图 URL（/screenshots/:id/image 或 MinIO/公网 URL）
+ * @returns {Promise<string>} base64 字符串；无匹配/失败返回空字符串
  */
 async function loadScreenshotB64(db, url) {
   const u = String(url || '');
@@ -336,7 +341,13 @@ async function loadScreenshotB64(db, url) {
   return '';
 }
 
-/** V3.0 模式：读旧 result.groups，按页面组渲染。 */
+/**
+ * V3.0 模式：读旧 result.groups，按页面组渲染。
+ * @param {object} entry - transcationEventTypeList 单条入口
+ * @param {object} result - V3.0 result（含 groups[]）
+ * @param {string} file - payload 文件路径（用于标题/输出名）
+ * @returns {Promise<void>}
+ */
 async function runV3GroupsMode(entry, result, file) {
   const db = getDB();
   try {
@@ -373,7 +384,13 @@ async function runV3GroupsMode(entry, result, file) {
   }
 }
 
-/** V3.1 模式：读新版 flat transcationProperties，截图条目和控件条目同构。 */
+/**
+ * V3.1 模式：读新版 flat transcationProperties，截图条目和控件条目同构。
+ * @param {object} entry - transcationEventTypeList 单条入口
+ * @param {Array<object>} properties - V3.1 flat transcationProperties[]
+ * @param {string} file - payload 文件路径（用于标题/输出名）
+ * @returns {Promise<void>}
+ */
 async function runV3FlatMode(entry, properties, file) {
   const db = getDB();
   try {
@@ -485,6 +502,8 @@ async function runV3FlatMode(entry, properties, file) {
  * V3 模式：读 V3 批量推送 payload JSON。
  * 兼容 V3.0 result.groups 和 V3.1 flat transcationProperties。
  * 用法：node scripts/tools/lightup-phase-screenshot.mjs --v3 tmp/v3-payload-38.json
+ * @param {string} file - V3 payload JSON 文件路径
+ * @returns {Promise<void>}
  */
 async function runV3Mode(file) {
   let payload;
@@ -511,6 +530,8 @@ async function runV3Mode(file) {
 /**
  * PID 树侧栏：按 propertiesPID → propertiesID 父子关系渲染 page/popup/section/tab/wizard/card/object 全层级。
  * 中间节点（section/tab/wizard/card）不画框、不显示截图，但在此以分区层级展示（防环：已访问节点不再展开）。
+ * @param {Array<object>} properties - transcationProperties[]（含 propertiesID / propertiesPID / type / propertiesName）
+ * @returns {string} PID 树 HTML 字符串
  */
 function buildPidTreeHtml(properties) {
   const seen = new Set();
@@ -536,7 +557,14 @@ function buildPidTreeHtml(properties) {
   return `<ul class="pid-tree">${roots.map(renderNode).join('')}</ul>`;
 }
 
-/** V3 渲染：每页面组一个 stage（长图 + 控件框），checkbox 勾选点亮任意子集。 */
+/**
+ * V3 渲染：每页面组一个 stage（长图 + 控件框），checkbox 勾选点亮任意子集。
+ * @param {object} opts - 渲染参数
+ * @param {object} opts.result - V3 result（含 name 用于标题）
+ * @param {Array<object>} opts.pages - 页面组数组（含 b64 / dialogs / controls）
+ * @param {Array<object>} [opts.properties] - transcationProperties[]（用于 PID 树侧栏）
+ * @returns {string} 自包含 HTML 字符串
+ */
 function buildV3Html({ result, pages, properties }) {
   const ctrlCount = pages.reduce((n, p) => n + p.controls.length, 0);
   const rectCount = pages.reduce((n, p) => n + p.controls.filter((c) => c.rect).length, 0);

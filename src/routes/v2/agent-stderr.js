@@ -1,6 +1,13 @@
 import * as svc from '../../services/agent-stderr-log-service.js';
 import { sendErr } from './trajectory-shared.js';
 
+/**
+ * Agent stderr log query/export API — list active log targets, filter lines by
+ * slot/session/trajectory, and clear a session's log file.
+ *
+ * Prefix: /api/v2/recording/agent-stderr/*
+ */
+
 function parseFilter(query) {
   return {
     slot: query.slot != null && query.slot !== '' ? Number(query.slot) : undefined,
@@ -11,7 +18,11 @@ function parseFilter(query) {
   };
 }
 
-/** Accept /active row paste: slotIndex → slot; ignore extra fields. */
+/**
+ * Accept /active row paste: slotIndex → slot; ignore extra fields.
+ * @param {object} [body] request body (paste of an /active row)
+ * @returns {{ slot?: number, sid?: string, sessionId?: string, trajectoryId?: number }} parsed filter
+ */
 function parseFilterFromBody(body = {}) {
   const slotRaw = body.slotIndex != null ? body.slotIndex : body.slot;
   return {
@@ -53,7 +64,12 @@ function sendLines(res, lines, filter, format) {
   return res.type('text/plain; charset=utf-8').send(`${exportLines.join('\n')}${exportLines.length ? '\n' : ''}`);
 }
 
+/**
+ * Register agent-stderr log query/export routes.
+ * @param {import('express').Application} app Express application
+ */
 export default function registerAgentStderr(app) {
+  /** List active agent stderr log targets (sessions currently recording). */
   app.get('/api/v2/recording/agent-stderr/active', async (_req, res) => {
     try {
       res.json(await svc.listActiveStderrTargets());
@@ -62,6 +78,7 @@ export default function registerAgentStderr(app) {
     }
   });
 
+  /** Get filtered agent stderr lines (requires slot/sid/sessionId/trajectoryId). */
   app.get('/api/v2/recording/agent-stderr', async (req, res) => {
     try {
       const filter = parseFilter(req.query);
@@ -112,6 +129,7 @@ export default function registerAgentStderr(app) {
     }
   });
 
+  /** Get agent stderr lines for a specific trajectory (filtered by trajectoryId). */
   app.get('/api/v2/trajectories/:id/agent-stderr', async (req, res) => {
     try {
       const filter = {

@@ -498,13 +498,21 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 break
             # 计算 extension
             used = agent.state.n_steps if hasattr(agent, 'state') else max_steps
-            extension = compute_budget_extension({
+            # 进度感知缓冲部署：从 task_list 读取字段总数/已完成字段数
+            _ext_state = {
                 'introduce_fields': introduce_count,
                 'pending_fields': len(pending_labels),
                 'tree_select_fields': _count_tree_select(business_data_ref),
                 'ceiling': ceiling,
                 'used_steps': used,
-            })
+            }
+            _task_list_raw = business_data_ref.get('task_list')
+            if _task_list_raw is not None:
+                from ..models.task import TaskList
+                _tl = TaskList.from_store(_task_list_raw)
+                _ext_state['total_fields'] = _tl.total
+                _ext_state['done_fields'] = len(_tl.done)
+            extension = compute_budget_extension(_ext_state)
             if extension <= 0 or used + extension > ceiling:
                 break
             sys.stderr.write(

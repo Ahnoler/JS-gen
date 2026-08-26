@@ -60,8 +60,8 @@ async function listAllTrajectoryIdsByFunction(functionId) {
 }
 
 /**
- * @param {object} body
- * @returns {Promise<{trajectoryIds: number[], systemIdHint: number|null}>}
+ * @param {object} body mine scope input
+ * @returns {Promise<{trajectoryIds: number[], systemIdHint: number|null}>} resolved trajectory ids + system hint
  */
 async function resolveMineScope(body = {}) {
   const trajectoryIdsRaw = body.trajectoryIds ?? body.trajectory_ids;
@@ -137,6 +137,8 @@ async function nameClusterWithLlm({ phaseDescription, fragments, stepCount, mode
 
 /**
  * Mine repetitive phases into operation_component drafts.
+ * @param {object} [body] mine scope (systemId / functionId / trajectoryIds)
+ * @returns {Promise<{ created: object[], updated: object[], skippedSingletons: number, scannedPhases: number, trajectoryCount: number, createdCount: number, updatedCount: number }>} mine stats
  */
 export async function mineOperationComponents(body = {}) {
   const { trajectoryIds, systemIdHint } = await resolveMineScope(body);

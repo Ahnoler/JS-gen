@@ -10,9 +10,9 @@ const nodes = new Map();
 
 /**
  * Attach or replace a live connection for nodeUuid (idempotent reconnect).
- * @param {string} nodeUuid
- * @param {import('ws').WebSocket} ws
- * @param {number} nodeId
+ * @param {string} nodeUuid node uuid
+ * @param {import('ws').WebSocket} ws ws
+ * @param {number} nodeId node id
  */
 export function attach(nodeUuid, ws, nodeId) {
   const existing = nodes.get(nodeUuid);
@@ -37,8 +37,8 @@ export function attach(nodeUuid, ws, nodeId) {
 
 /**
  * Remove live connection. Optionally start grace timer before full removal.
- * @param {string} nodeUuid
- * @param {{ immediate?: boolean, graceMs?: number, onGraceExpired?: (nodeUuid: string, nodeId: number) => void }} [opts]
+ * @param {string} nodeUuid node uuid
+ * @param {{ immediate?: boolean, graceMs?: number, onGraceExpired?: (nodeUuid: string, nodeId: number) => void }} [opts] detach options
  */
 export function detach(nodeUuid, opts = {}) {
   const entry = nodes.get(nodeUuid);
@@ -61,12 +61,17 @@ export function detach(nodeUuid, opts = {}) {
   }, opts.graceMs ?? 45000);
 }
 
-/** @param {string} nodeUuid @returns {RegistryEntry|undefined} */
+/**
+ * @param {string} nodeUuid node uuid
+ * @returns {RegistryEntry|undefined} result
+ */
 export function get(nodeUuid) {
   return nodes.get(nodeUuid);
 }
 
-/** @returns {{ nodeUuid: string, nodeId: number, connected: boolean, lastSeen: number }[]} */
+/**
+ * @returns {{ nodeUuid: string, nodeId: number, connected: boolean, lastSeen: number }[]} array of node status objects
+ */
 export function list() {
   const out = [];
   for (const [nodeUuid, entry] of nodes) {
@@ -82,9 +87,10 @@ export function list() {
 
 /**
  * Send JSON message on existing executor connection (never dials out).
- * @param {string} nodeUuid
- * @param {string} type
- * @param {Record<string, unknown>} [payload]
+ * @param {string} nodeUuid node uuid
+ * @param {string} type type
+ * @param {Record<string, unknown>} [payload] payload
+ * @returns {boolean} true if the message was sent, false if the node is not connected or send failed
  */
 export function send(nodeUuid, type, payload = {}) {
   const entry = nodes.get(nodeUuid);
@@ -98,13 +104,18 @@ export function send(nodeUuid, type, payload = {}) {
   }
 }
 
-/** @param {string} nodeUuid */
+/**
+ * @param {string} nodeUuid node uuid
+ */
 export function touch(nodeUuid) {
   const entry = nodes.get(nodeUuid);
   if (entry) entry.lastSeen = Date.now();
 }
 
-/** @param {string} nodeUuid @returns {boolean} */
+/**
+ * @param {string} nodeUuid node uuid
+ * @returns {boolean} result
+ */
 export function isConnected(nodeUuid) {
   const entry = nodes.get(nodeUuid);
   return !!(entry?.ws && entry.ws.readyState === 1);

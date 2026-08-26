@@ -2,6 +2,13 @@ import * as remoteSessionDao from '../../dao/remote-session-dao.js';
 import * as remoteSessionService from '../../services/remote-session-service.js';
 import { initRemoteBridgeWs } from '../../cdp/remote-bridge.js';
 
+/**
+ * Remote CDP session lifecycle — attach/detach live screencast bridges, CRUD
+ * session rows, and close/delete.
+ *
+ * Prefix: /api/v2/remote-sessions/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
   initRemoteBridgeWs();
 
@@ -25,6 +32,7 @@ export default function (app) {
     }
   });
 
+  /** Get live CDP attach status (optionally scoped by trajectory/session). */
   app.get('/api/v2/remote-sessions/live/status', async (req, res) => {
     try {
       const trajectoryId = req.query.trajectoryId != null ? +req.query.trajectoryId : undefined;
@@ -42,6 +50,7 @@ export default function (app) {
     }
   });
 
+  /** List remote sessions (paginated, optional status filter). */
   app.get('/api/v2/remote-sessions', async (req, res) => {
     try {
       const { status, page, pageSize } = req.query;
@@ -56,6 +65,7 @@ export default function (app) {
     }
   });
 
+  /** Open a new remote session (creates DB row). */
   app.post('/api/v2/remote-sessions', async (req, res) => {
     try {
       const session = await remoteSessionService.openSession(req.body || {});
@@ -65,6 +75,7 @@ export default function (app) {
     }
   });
 
+  /** Get a single remote session by numeric id or UUID. */
   app.get('/api/v2/remote-sessions/:id', async (req, res) => {
     try {
       const id = req.params.id;
@@ -78,6 +89,7 @@ export default function (app) {
     }
   });
 
+  /** Update editable fields of a remote session (viewport, target, url, …). */
   app.patch('/api/v2/remote-sessions/:id', async (req, res) => {
     try {
       const id = +req.params.id;
@@ -155,6 +167,7 @@ export default function (app) {
     }
   });
 
+  /** Close a remote session (detach stream + close Chrome + free slot). */
   app.post('/api/v2/remote-sessions/:id/close', async (req, res) => {
     try {
       const crashed = !!(req.body && req.body.crashed);
@@ -176,6 +189,7 @@ export default function (app) {
     }
   });
 
+  /** Delete a remote session row by id. */
   app.delete('/api/v2/remote-sessions/:id', async (req, res) => {
     try {
       await remoteSessionDao.remove(+req.params.id);

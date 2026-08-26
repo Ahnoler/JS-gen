@@ -32,7 +32,13 @@ if (existsSync(_envPath)) {
   } catch {}
 }
 
-// Resolver: process.env → .env file → default (env vars override file for deployment/tests)
+/**
+ * 配置解析器：按 process.env → .env 文件值 → 默认值 顺序取值
+ * （环境变量优先于文件，便于部署/测试覆盖）。
+ * @param {string} key - 配置键名
+ * @param {string} [defaultValue] - 未命中时的默认值
+ * @returns {string} 解析得到的配置值
+ */
 export function resolve(key, defaultValue = '') {
   return process.env[key] || _env[key] || defaultValue;
 }

@@ -7,23 +7,36 @@ import { state } from '../../state.js';
 
 const trajectoryRuntimeMap = new Map();
 
+/**
+ * Get the in-memory runtime entry for a trajectory, or null.
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {object|null} runtime entry or null
+ */
 export function getTrajectoryRuntime(trajectoryId) {
   return trajectoryRuntimeMap.get(Number(trajectoryId)) || null;
 }
 
-/** @returns {Map<number, object>} */
+/** @returns {Map<number, object>} the full trajectory runtime map */
 export function getAllTrajectoryRuntimes() {
   return trajectoryRuntimeMap;
 }
 
-/** Mark activity for idle reaper (after a step is persisted). */
+/**
+ * Mark activity for idle reaper (after a step is persisted).
+ * @param {number} trajectoryId trajectory DB id
+ * @param {Date} [at] timestamp, default now
+ */
 export function touchTrajectoryRuntimeActivity(trajectoryId, at = new Date()) {
   const runtime = trajectoryRuntimeMap.get(Number(trajectoryId));
   if (!runtime) return;
   runtime.lastStepAt = at instanceof Date ? at.toISOString() : String(at);
 }
 
-/** Clear in-memory trajectory↔executor bindings for a node (offline / crash). */
+/**
+ * Clear in-memory trajectory↔executor bindings for a node (offline / crash).
+ * @param {string} nodeUuid executor node uuid
+ * @returns {number} number of runtimes cleared
+ */
 export function clearTrajectoryRuntimesForNode(nodeUuid) {
   if (!nodeUuid) return 0;
   let n = 0;
@@ -48,6 +61,10 @@ export function clearTrajectoryRuntimesForNode(nodeUuid) {
 /**
  * Drop stale trajectory runtime when the control-plane session is gone,
  * or when the executor no longer has that sessionId.
+ * @param {number} tid trajectory DB id
+ * @param {object} [root0] options
+ * @param {boolean} [root0.verifyExecutor] whether to check executor session liveness
+ * @returns {Promise<object|null>} retained runtime, or null if dropped
  */
 export async function clearStaleTrajectoryRuntime(tid, { verifyExecutor = true } = {}) {
   const existing = trajectoryRuntimeMap.get(tid);
@@ -81,7 +98,11 @@ export async function clearStaleTrajectoryRuntime(tid, { verifyExecutor = true }
   return existing;
 }
 
-/** Mark current ACTION_LOG ids as consumed so they are not later appended as steps. */
+/**
+ * Mark current ACTION_LOG ids as consumed so they are not later appended as steps.
+ * @param {object} runtime trajectory runtime entry
+ * @returns {Promise<void>}
+ */
 export async function markConsumedActionLog(runtime) {
   if (!runtime?.sessionId || !runtime?.executorNodeUuid) return;
   try {
@@ -106,6 +127,13 @@ export async function markConsumedActionLog(runtime) {
 /**
  * Bind control-plane session + trajectory runtime after a successful openSession.
  * Caller should invoke bindTrajectoryManualPersist after this returns.
+ * @param {number} tid trajectory DB id
+ * @param {string} sessionId executor session id
+ * @param {object} opened openSession result (nodeUuid, slotIndex, model, cdpPort, …)
+ * @param {object} [root0] options
+ * @param {string|null} [root0.bibError] BiB attach error, if any
+ * @param {number|null} [root0.remoteSessionId] remote_session DB id
+ * @returns {object} trajectory runtime entry
  */
 export function registerTrajectorySession(tid, sessionId, opened, { bibError = null, remoteSessionId = null } = {}) {
   const persistedActionIds = new Set();
@@ -153,7 +181,11 @@ export function registerTrajectorySession(tid, sessionId, opened, { bibError = n
   return runtime;
 }
 
-/** @internal — for detach / attach that mutate the map directly */
+/**
+ * Delete the runtime entry for a trajectory (for detach / attach that mutate the map directly).
+ * @param {number} tid trajectory DB id
+ * @returns {boolean} true if an entry was deleted
+ */
 export function deleteTrajectoryRuntime(tid) {
   return trajectoryRuntimeMap.delete(Number(tid));
 }

@@ -1,3 +1,7 @@
+/**
+ * Screenshot storage service: replace step/phase/page-level screenshots,
+ * serve images, list pending, and bulk-upload local-pending to MinIO.
+ */
 import * as screenshotDao from '../dao/screenshot-dao.js';
 import {
   uploadScreenshot,
@@ -57,6 +61,15 @@ async function fallbackToLocal({ daoCall, pendingFile }) {
   throw new Error('Screenshot upload failed and local fallback could not be persisted');
 }
 
+/**
+ * Replace (upsert) the before/after screenshot for a trajectory step.
+ * @param {number} trajectoryStepId step DB id
+ * @param {object} [root0] options
+ * @param {number|null} [root0.trajectoryId] trajectory DB id
+ * @param {'before'|'after'} root0.kind screenshot kind
+ * @param {Buffer} root0.buffer image bytes
+ * @returns {Promise<number>} screenshot row id
+ */
 export async function replaceStepScreenshot(trajectoryStepId, {
   trajectoryId = null,
   kind,
@@ -107,6 +120,16 @@ export async function replaceStepScreenshot(trajectoryStepId, {
   return id;
 }
 
+/**
+ * Replace (upsert) the phase-highlight screenshot for a trajectory phase.
+ * @param {number} trajectoryPhaseId phase DB id
+ * @param {object} [root0] options
+ * @param {number|null} [root0.trajectoryId] trajectory DB id
+ * @param {Buffer} root0.buffer image bytes
+ * @param {string} [root0.mimeType] MIME type, default image/png
+ * @param {string|null} [root0.metadataJson] extra metadata JSON
+ * @returns {Promise<number>} screenshot row id
+ */
 export async function replacePhaseHighlightScreenshot(trajectoryPhaseId, {
   trajectoryId = null,
   buffer,
@@ -157,6 +180,16 @@ export async function replacePhaseHighlightScreenshot(trajectoryPhaseId, {
   return id;
 }
 
+/**
+ * Replace (upsert) the dialog screenshot for a trajectory step.
+ * @param {number} trajectoryStepId step DB id
+ * @param {object} [root0] options
+ * @param {number|null} [root0.trajectoryId] trajectory DB id
+ * @param {Buffer} root0.buffer image bytes
+ * @param {string} [root0.mimeType] MIME type, default image/png
+ * @param {string|null} [root0.metadataJson] extra metadata JSON
+ * @returns {Promise<number>} screenshot row id
+ */
 export async function replaceDialogScreenshot(trajectoryStepId, {
   trajectoryId = null,
   buffer,
@@ -207,6 +240,18 @@ export async function replaceDialogScreenshot(trajectoryStepId, {
   return id;
 }
 
+/**
+ * Replace (upsert) a page-level screenshot (e.g. full-page / tab / drawer).
+ * @param {object} [root0] options
+ * @param {number|null} [root0.trajectoryId] trajectory DB id
+ * @param {string} [root0.levelType] level type, default 'page'
+ * @param {string} [root0.levelKey] unique level key within the trajectory
+ * @param {string|null} [root0.parentLevelKey] parent level key
+ * @param {Buffer} root0.buffer image bytes
+ * @param {string} [root0.mimeType] MIME type, default image/png
+ * @param {string|null} [root0.metadataJson] extra metadata JSON
+ * @returns {Promise<number>} screenshot row id
+ */
 export async function replacePageLevelScreenshot({
   trajectoryId = null,
   levelType = 'page',
@@ -263,10 +308,20 @@ export async function replacePageLevelScreenshot({
   return id;
 }
 
+/**
+ * List page-level screenshots for a trajectory.
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<Array<object>>} page-level screenshot rows
+ */
 export async function listPageLevelScreenshotsByTrajectory(trajectoryId) {
   return screenshotDao.listPageLevelByTrajectory(trajectoryId);
 }
 
+/**
+ * Load a screenshot image (buffer + mime) from MinIO or local pending store.
+ * @param {number} id screenshot DB id
+ * @returns {Promise<object|null>} image payload or null if not found
+ */
 export async function getScreenshotImage(id) {
   const row = await screenshotDao.getImage(id);
   if (!row) return null;
@@ -301,6 +356,11 @@ export async function getScreenshotImage(id) {
   throw new Error(`Screenshot ${id} has no valid storage (storage_type=${row.storage_type || 'db'})`);
 }
 
+/**
+ * List screenshots for a trajectory (with presigned MinIO URLs).
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<Array<object>>} screenshot rows with image URLs
+ */
 export async function listByTrajectory(trajectoryId) {
   const list = await screenshotDao.listByTrajectory(trajectoryId);
   return Promise.all(list.map(async (item) => {
@@ -318,6 +378,10 @@ export async function listByTrajectory(trajectoryId) {
   }));
 }
 
+/**
+ * List local-pending screenshots (not yet uploaded to MinIO).
+ * @returns {Promise<Array<object>>} pending screenshot rows with image URLs
+ */
 export async function listPendingScreenshots() {
   const list = await screenshotDao.listPending();
   return list.map((item) => ({
@@ -331,7 +395,7 @@ export async function listPendingScreenshots() {
  * Delegates to the background retry pass (same upload + DB-mark + cleanup logic)
  * but runs immediately, ignoring the per-row retry interval so the operator can
  * force a flush from the API docs page.
- * @returns {Promise<{scanned:number,uploaded:number,failed:number,skipped:number,skipped:true?}>}
+ * @returns {Promise<{scanned:number,uploaded:number,failed:number,skipped:number}>} bulk upload stats
  */
 export async function uploadPendingScreenshots() {
   const { retryPendingScreenshots } = await import('./screenshot-pending-retry.js');
@@ -343,7 +407,8 @@ export async function uploadPendingScreenshots() {
 
 /**
  * Upload a single pending screenshot by id. Used by per-row actions in the docs UI.
- * @returns {Promise<{id:number,status:'uploaded'|'not_pending'|'not_found',storagePath?:string,imageUrl?:string}>}
+ * @param {number} id screenshot DB id
+ * @returns {Promise<{id:number,status:'uploaded'|'not_pending'|'not_found',storagePath?:string,imageUrl?:string}>} upload result
  */
 export async function uploadPendingScreenshot(id) {
   const numeric = Number(id);
@@ -379,10 +444,20 @@ export async function uploadPendingScreenshot(id) {
   };
 }
 
+/**
+ * List dialog screenshots for a trajectory.
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<Array<object>>} dialog screenshot rows
+ */
 export async function listDialogScreenshotsByTrajectory(trajectoryId) {
   return screenshotDao.listDialogScreenshotsByTrajectory(trajectoryId);
 }
 
+/**
+ * Get a presigned/relative URL for a screenshot by id.
+ * @param {number} id screenshot DB id
+ * @returns {Promise<string|null>} image URL or null if not found
+ */
 export async function getScreenshotUrl(id) {
   const row = await screenshotDao.getImage(id);
   if (!row) return null;
@@ -393,6 +468,11 @@ export async function getScreenshotUrl(id) {
   return row.image_url || `/api/v2/screenshots/${id}/image`;
 }
 
+/**
+ * Delete a screenshot (MinIO object or local pending file) + DB row.
+ * @param {number} id screenshot DB id
+ * @returns {Promise<boolean>} true if deleted, false if not found
+ */
 export async function deleteScreenshot(id) {
   const row = await screenshotDao.getImage(id);
   if (!row) return false;
@@ -410,6 +490,11 @@ export async function deleteScreenshot(id) {
   return true;
 }
 
+/**
+ * Delete screenshots bound to the given step ids (objects + DB rows).
+ * @param {number[]} stepIds step DB ids
+ * @returns {Promise<number>} count of deleted screenshot rows
+ */
 export async function deleteScreenshotsByStepIds(stepIds) {
   const rows = await screenshotDao.listByStepIds(stepIds);
   await Promise.all(rows.map((r) => removeStoredObject(r).catch((err) => {
@@ -418,6 +503,11 @@ export async function deleteScreenshotsByStepIds(stepIds) {
   return rows.length;
 }
 
+/**
+ * Delete screenshots bound to the given phase ids (objects + DB rows).
+ * @param {number[]} phaseIds phase DB ids
+ * @returns {Promise<number>} count of deleted screenshot rows
+ */
 export async function deleteScreenshotsByPhaseIds(phaseIds) {
   const rows = await screenshotDao.listByPhaseIds(phaseIds);
   await Promise.all(rows.map((r) => removeStoredObject(r).catch((err) => {
@@ -426,6 +516,11 @@ export async function deleteScreenshotsByPhaseIds(phaseIds) {
   return rows.length;
 }
 
+/**
+ * Delete all screenshots for a trajectory (objects + DB rows).
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<number>} count of deleted screenshot rows
+ */
 export async function deleteScreenshotsByTrajectory(trajectoryId) {
   const rows = await screenshotDao.listStorageByTrajectory(trajectoryId);
   await Promise.all(rows.map((r) => removeStoredObject(r).catch((err) => {

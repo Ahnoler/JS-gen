@@ -1,18 +1,25 @@
-// WebSocket 服务端
-// 提供 broadcast API 供路由模块推送实时状态，替代轮询 + SSE
-
+/**
+ * Dashboard WebSocket server (noServer mode).
+ * Provides broadcast API for route modules to push real-time state, replacing polling + SSE.
+ */
 import { WebSocketServer } from 'ws';
 import { state } from './state.js';
 
 let wss = null;
 const wsMessageHandlers = [];
 
-// 注册 WebSocket 消息处理器（由各路由模块在初始化时调用，避免循环依赖）
+/**
+ * Register a WebSocket message handler (called by route modules at init to avoid circular deps).
+ * @param {(ws: object, msg: object) => void} handler handler
+ */
 export function onWsMessage(handler) {
   wsMessageHandlers.push(handler);
 }
 
-// 会话列表快照（与 state.sessions 结构一致，无内部引用）
+/**
+ * Snapshot of current sessions for state broadcast.
+ * @returns {object[]} result
+ */
 function getSessionList() {
   const gb = state.globalBrowser;
   const list = [];
@@ -29,7 +36,10 @@ function getSessionList() {
   return list;
 }
 
-// 构建 Full State 快照（新连接时推送一次，替代"首次轮询"）
+/**
+ * Build a full state snapshot pushed on new client connect.
+ * @returns {object} result
+ */
 function getFullState() {
   const gb = state.globalBrowser;
   return {
@@ -44,7 +54,12 @@ function getFullState() {
   };
 }
 
-// 向所有已连接客户端广播消息
+/**
+ * Broadcast a typed JSON message to all connected dashboard clients.
+ * @param {string} type type
+ * @param {unknown} payload payload
+ * @returns {number|undefined} number of clients that received the message (undefined when wss not initialized)
+ */
 export function broadcast(type, payload) {
   if (!wss) return;
   const msg = JSON.stringify({ type, payload });
@@ -61,7 +76,12 @@ export function broadcast(type, payload) {
 /** Drop frame to a client when its outbound buffer is already large (prefer fresh frames). */
 const BINARY_BUFFERED_LIMIT = 2 * 1024 * 1024;
 
-/** Broadcast a binary Buffer/Uint8Array to all clients (remote screencast frames). */
+/**
+ * Broadcast a binary Buffer/Uint8Array to all clients (remote screencast frames).
+ * Skips clients whose outbound buffer is already large.
+ * @param {Buffer|Uint8Array} data data
+ * @returns {number} number of clients that received the frame
+ */
 export function broadcastBinary(data) {
   if (!wss) return 0;
   let count = 0;
@@ -76,7 +96,11 @@ export function broadcastBinary(data) {
   return count;
 }
 
-// 初始化 WebSocket 服务（noServer 模式，由 server.mjs 统一 upgrade 路由）
+/**
+ * Initialize the dashboard WebSocket server (noServer mode; upgrade routed by server.mjs).
+ * Sends full state on connect, dispatches client messages to registered handlers, runs heartbeat pings.
+ * @returns {import('ws').WebSocketServer} result
+ */
 export function initWebSocket() {
   wss = new WebSocketServer({ noServer: true });
 
@@ -147,7 +171,9 @@ export function initWebSocket() {
   return wss;
 }
 
-/** @returns {import('ws').WebSocketServer|null} */
+/**
+ * @returns {import('ws').WebSocketServer|null} result
+ */
 export function getDashboardWss() {
   return wss;
 }

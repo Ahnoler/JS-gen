@@ -1,6 +1,13 @@
 import * as trajectoryService from '../../services/trajectory-service.js';
 import { sendErr } from './trajectory-shared.js';
 
+/**
+ * Trajectory step CRUD + replay — steps/replay, stop, phase-step listing,
+ * create/update/delete/move/confirm of individual trajectory steps.
+ *
+ * Prefix: /api/v2/trajectories/:id/steps/*, /api/v2/trajectory-phases/:id/steps, /api/v2/trajectory-steps/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
   /**
    * Re-run selected steps in the live session (async).
@@ -55,6 +62,7 @@ export default function (app) {
     }
   });
 
+  /** Confirm / unconfirm a single trajectory step (replay verification). */
   app.patch('/api/v2/trajectory-steps/:id/confirm', async (req, res) => {
     try {
       const row = await trajectoryService.confirmTrajectoryStep(+req.params.id, !!req.body?.confirmed);
@@ -65,6 +73,7 @@ export default function (app) {
     }
   });
 
+  /** Create a new trajectory step. */
   app.post('/api/v2/trajectory-steps', async (req, res) => {
     try {
       const row = await trajectoryService.createTrajectoryStep(req.body || {});
@@ -74,6 +83,7 @@ export default function (app) {
     }
   });
 
+  /** Update a trajectory step (partial). */
   app.patch('/api/v2/trajectory-steps/:id', async (req, res) => {
     try {
       const row = await trajectoryService.updateTrajectoryStep(+req.params.id, req.body || {});
@@ -84,6 +94,7 @@ export default function (app) {
     }
   });
 
+  /** Delete a trajectory step. */
   app.delete('/api/v2/trajectory-steps/:id', async (req, res) => {
     try {
       const result = await trajectoryService.removeTrajectoryStep(+req.params.id);
@@ -94,6 +105,7 @@ export default function (app) {
     }
   });
 
+  /** Move a step to a different phase / position within a trajectory. */
   app.post('/api/v2/trajectories/:id/steps/move', async (req, res) => {
     try {
       const row = await trajectoryService.moveTrajectoryStep(+req.params.id, {

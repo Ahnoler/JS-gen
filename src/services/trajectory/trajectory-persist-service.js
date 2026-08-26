@@ -18,7 +18,11 @@ export {
 } from './form-snapshot-append.js';
 
 /**
- * Build trajectory_step rows from action_{ts}.json commands.
+ * 从 action_{ts}.json 文件构建 trajectory_step 行。
+ * @param {string} actionFilePath action 文件路径
+ * @param {object} [opts] 配置选项
+ * @param {string} [opts.source] 步骤来源，默认 'agent'
+ * @returns {Array} 构建的步骤数组
  */
 export function buildStepsFromActionFile(actionFilePath, { source = 'agent' } = {}) {
   if (!actionFilePath || !existsSync(actionFilePath)) return [];
@@ -40,6 +44,13 @@ export function buildStepsFromActionFile(actionFilePath, { source = 'agent' } = 
   }
 }
 
+/**
+ * 从 flow 数组构建 trajectory_step 行。
+ * @param {Array} flow flow 数组
+ * @param {object} [opts] 配置选项
+ * @param {string} [opts.source] 步骤来源，默认 'agent'
+ * @returns {Array} 构建的步骤数组
+ */
 export function buildStepsFromFlow(flow, { source = 'agent' } = {}) {
   if (!Array.isArray(flow)) return [];
   return flow
@@ -63,8 +74,9 @@ export function buildStepsFromFlow(flow, { source = 'agent' } = {}) {
 }
 
 /**
- * Read operation log text (same format as log_{ts}.txt).
- * @returns {{ text: string, url: string }}
+ * 读取操作日志文本（与 log_{ts}.txt 格式相同）。
+ * @param {string} logFilePath 日志文件路径
+ * @returns {{ text: string, url: string }} text - 日志文本内容；url - 从日志中提取的 URL
  */
 export function readOperationLogText(logFilePath) {
   if (!logFilePath || !existsSync(logFilePath)) return { text: '', url: '' };
@@ -79,9 +91,10 @@ export function readOperationLogText(logFilePath) {
 }
 
 /**
- * Append a new log batch onto existing trajectory_log text.
- * @param {string|null} existing
- * @param {string} incoming
+ * 将新的日志批次追加到现有的 trajectory_log 文本中。
+ * @param {string|null} existing 现有日志文本
+ * @param {string} incoming 新的日志文本
+ * @returns {string|null} 合并后的日志文本
  */
 function mergeOperationLogText(existing, incoming) {
   const prev = typeof existing === 'string' ? existing.trim() : '';
@@ -92,7 +105,9 @@ function mergeOperationLogText(existing, incoming) {
 }
 
 /**
- * Parse URL from log header or fallback string.
+ * 从日志头部或回退字符串解析 URL。
+ * @param {...string} candidates URL 候选列表
+ * @returns {string} 解析到的 URL，如果没有则返回空字符串
  */
 function resolveUrl(...candidates) {
   for (const c of candidates) {
@@ -102,8 +117,10 @@ function resolveUrl(...candidates) {
 }
 
 /**
- * @param {Array} steps
- * @param {Record<string|number, string>} [phaseDescriptions] phaseNumber → task text
+ * 从步骤构建阶段信息。
+ * @param {Array} steps 步骤数组
+ * @param {Record<string|number, string>} [phaseDescriptions] phaseNumber 到任务文本的映射
+ * @returns {Array} 构建的阶段数组
  */
 function buildPhasesFromSteps(steps, phaseDescriptions = {}) {
   const phaseMap = new Map();
@@ -123,14 +140,24 @@ function buildPhasesFromSteps(steps, phaseDescriptions = {}) {
 }
 
 /**
- * Persist / append trajectory. Identity is numeric DB id (not session UUID).
- *
- * @param {object} opts
- * @param {number} [opts.id] existing trajectory.id to append
- * @param {number} [opts.functionId]
- * @param {Record<string|number,string>} [opts.phaseDescriptions]
- * @param {string} [opts.logFile] path to log_{ts}.txt — stored into trajectory_log
- * @param {string} [opts.trajectoryLog] raw log text (alternative to logFile)
+ * 持久化/追加轨迹。身份是数字 DB id（不是 session UUID）。
+ * @param {object} opts 配置选项
+ * @param {number} [opts.id] 现有轨迹的 id，用于追加
+ * @param {number} [opts.functionId] 函数 ID
+ * @param {Record<string|number,string>} [opts.phaseDescriptions] phaseNumber 到描述的映射
+ * @param {string} [opts.logFile] log_{ts}.txt 文件路径，存储到 trajectory_log
+ * @param {string} [opts.trajectoryLog] 原始日志文本（logFile 的替代）
+ * @param {string} [opts.nativeTrajectoryFile] 原生轨迹文件路径
+ * @param {Set<string>|null} [opts.excludeActionIds] 已实时持久化的 ActionEntry.id 值，批量追加时跳过
+ * @param {string} [opts.task] 任务描述
+ * @param {string} [opts.model] 模型名称
+ * @param {string} [opts.url] URL
+ * @param {boolean} [opts.isDone] 是否完成
+ * @param {boolean} [opts.isSuccessful] 是否成功
+ * @param {string} [opts.actionFile] action 文件路径
+ * @param {Array} [opts.flow] flow 数组
+ * @param {string} [opts.remoteSessionId] 远程会话 ID
+ * @returns {Promise<number>} 轨迹 ID
  */
 export async function persistSessionTrajectory({
   id,
@@ -238,6 +265,21 @@ export async function persistSessionTrajectory({
   });
 }
 
+/**
+ * 追加轨迹到现有轨迹。
+ * @param {object} existing 现有轨迹对象
+ * @param {object} opts 配置选项
+ * @param {Array} opts.steps 要追加的步骤
+ * @param {string} [opts.task] 任务描述
+ * @param {string} [opts.model] 模型名称
+ * @param {string} [opts.url] URL
+ * @param {boolean} [opts.isDone] 是否完成
+ * @param {boolean} [opts.isSuccessful] 是否成功
+ * @param {number} [opts.functionId] 函数 ID
+ * @param {Record<string|number,string>} [opts.phaseDescriptions] phaseNumber 到描述的映射
+ * @param {string} [opts.logText] 日志文本
+ * @returns {Promise<number>} 轨迹 ID
+ */
 async function appendToTrajectory(existing, {
   steps, task, model, url, isDone, isSuccessful, functionId, phaseDescriptions = {}, logText = '',
 }) {
@@ -333,6 +375,11 @@ function resolvePhaseDescription(phaseDescriptions, phaseNumber, fallback = '') 
 /**
  * Ensure phase rows exist for the given phase numbers, using per-phase task text.
  * Does not fall back to a shared trajectory task string.
+ * @param {number} trajectoryDbId trajectory DB primary key
+ * @param {Record<string|number,string>} [phaseDescriptions] phaseNumber 到描述的映射
+ * @param {Set<number>|null} [batchPhaseNums] 本批次涉及的 phase numbers；空则不限制
+ * @param {Set<number>|null} [existingPhaseNums] 已存在的 phase numbers；省略时从 DB 查询
+ * @returns {Promise<void>}
  */
 async function ensurePhasesWithDescriptions(
   trajectoryDbId,
@@ -362,7 +409,10 @@ async function ensurePhasesWithDescriptions(
 
 /**
  * Update existing phase rows with per-phase task text.
- * @param {Set<number>|null} onlyPhaseNumbers when set, only those phase_numbers are updated
+ * @param {number} trajectoryDbId trajectory DB primary key
+ * @param {Record<string|number,string>} [phaseDescriptions] phaseNumber 到描述的映射
+ * @param {Set<number>|null} [onlyPhaseNumbers] when set, only those phase_numbers are updated
+ * @returns {Promise<void>}
  */
 async function syncPhaseDescriptions(trajectoryDbId, phaseDescriptions = {}, onlyPhaseNumbers = null) {
   let updated = false;
@@ -379,6 +429,15 @@ async function syncPhaseDescriptions(trajectoryDbId, phaseDescriptions = {}, onl
   if (updated) await trajectoryDao.markExportDirty(trajectoryDbId);
 }
 
+/**
+ * Save a full trajectory (steps + phases) to DB and recompute counts.
+ * @param {object} opts 配置选项
+ * @param {object} opts.trajectory 轨迹行数据
+ * @param {Array} [opts.phases] 阶段行数组
+ * @param {number} [opts.functionId] 函数 ID；省略时取默认函数
+ * @param {string} [opts.remoteSessionId] 远程会话 ID
+ * @returns {Promise<number>} 新建轨迹的 DB id
+ */
 export async function saveFullTrajectory({ trajectory, phases, functionId, remoteSessionId }) {
   let resolvedFunctionId = null;
   if (typeof functionId === 'number') {
@@ -425,6 +484,12 @@ export async function saveFullTrajectory({ trajectory, phases, functionId, remot
 /**
  * Resolve which trajectory_phase.id a live step should attach to.
  * Priority: explicit phaseId → phaseNumber match → last phase of trajectory.
+ * @param {number} trajectoryId trajectory DB primary key
+ * @param {object} [opts] 配置选项
+ * @param {number|null} [opts.phaseId] 显式指定的 phase id
+ * @param {number|null} [opts.phaseNumber] 用于匹配的 phase number
+ * @param {boolean} [opts.fallbackLast] 未命中时是否回退到末尾阶段，默认 true
+ * @returns {Promise<{ id: number|null, phaseNumber: number|null }>} 解析到的阶段 id 与 phaseNumber
  */
 export async function resolvePhaseIdForPersist(trajectoryId, {
   phaseId = null,
@@ -470,6 +535,9 @@ export async function resolvePhaseIdForPersist(trajectoryId, {
 /**
  * Delete live-persisted steps by DB primary keys, then renumber remaining steps.
  * Used when AI/manual coalesce drops a prior ACTION_LOG entry that was already persisted.
+ * @param {number} trajectoryDbId trajectory DB primary key
+ * @param {number[]} [dbIds] 要删除的 step DB id 列表
+ * @returns {Promise<{ removed: number }>} 实际删除的行数
  */
 export async function removeRecordedStepsByDbIds(trajectoryDbId, dbIds = []) {
   const tid = Number(trajectoryDbId);

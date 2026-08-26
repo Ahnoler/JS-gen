@@ -1,3 +1,6 @@
+/**
+ * DAO for the `trajectory_step` table — recorded action steps within a trajectory.
+ */
 import { getDB } from '../../config/database.js';
 import { toDbRow, fromDbRow, fromDbRows } from './helpers.js';
 import * as trajectoryDao from './trajectory-dao.js';
@@ -12,6 +15,8 @@ async function dirtyParent(trajectoryId, trx = null) {
 /**
  * Batch insert steps. Accepts camelCase fields including:
  * params/element (mapped to params_json/element_json) and source.
+ * @param {object[]} steps array of camelCase step objects
+ * @returns {Promise<void>}
  */
 export async function batchSave(steps) {
   if (!steps.length) return;
@@ -44,6 +49,13 @@ export async function batchSave(steps) {
   }
 }
 
+/**
+ * List steps of a trajectory ordered by step_number then action_index, optionally filtered by source.
+ * @param {number} trajectoryId 轨迹 id
+ * @param {object} [opts] 选项
+ * @param {string} [opts.source] filter by source
+ * @returns {Promise<object[]>} step entities
+ */
 export async function listByTrajectory(trajectoryId, { source } = {}) {
   let query = getDB()(TABLE).where({ trajectory_id: trajectoryId });
   if (source) query = query.where({ source });
@@ -51,6 +63,11 @@ export async function listByTrajectory(trajectoryId, { source } = {}) {
   return fromDbRows(rows);
 }
 
+/**
+ * List steps of a phase ordered by step_number.
+ * @param {number} trajectoryPhaseId 阶段 id
+ * @returns {Promise<object[]>} step entities
+ */
 export async function listByPhase(trajectoryPhaseId) {
   const rows = await getDB()(TABLE)
     .where({ trajectory_phase_id: trajectoryPhaseId })
@@ -58,21 +75,42 @@ export async function listByPhase(trajectoryPhaseId) {
   return fromDbRows(rows);
 }
 
+/**
+ * List steps of a trajectory filtered by source.
+ * @param {number} trajectoryId 轨迹 id
+ * @param {string} source source filter
+ * @returns {Promise<object[]>} step entities
+ */
 export async function listBySource(trajectoryId, source) {
   return listByTrajectory(trajectoryId, { source });
 }
 
+/**
+ * Delete all steps of a trajectory and mark parent export-dirty.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function removeByTrajectory(trajectoryId) {
   const result = await getDB()(TABLE).where({ trajectory_id: trajectoryId }).del();
   await dirtyParent(trajectoryId);
   return result;
 }
 
+/**
+ * Fetch a single step by id.
+ * @param {number} id 主键
+ * @returns {Promise<object|null>} step entity or null when not found
+ */
 export async function getById(id) {
   const row = await getDB()(TABLE).where({ id }).first();
   return fromDbRow(row);
 }
 
+/**
+ * Insert a single step and return the created entity.
+ * @param {object} step camelCase step fields
+ * @returns {Promise<object|null>} created step entity
+ */
 export async function create(step) {
   const row = toDbRow({
     trajectoryId: step.trajectoryId,
@@ -95,6 +133,12 @@ export async function create(step) {
   return getById(id);
 }
 
+/**
+ * Update a step by id (JSON-aware for params/element) and return the updated entity.
+ * @param {number} id 主键
+ * @param {object} fields partial camelCase step fields
+ * @returns {Promise<object|null>} updated step entity
+ */
 export async function update(id, fields) {
   const patch = toDbRow(fields);
   // params/element are not DB columns — map to *_json
@@ -121,6 +165,11 @@ export async function update(id, fields) {
   return getById(id);
 }
 
+/**
+ * Delete a step by id and mark parent export-dirty.
+ * @param {number} id 主键
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function removeById(id) {
   const cur = await getById(id);
   const result = await getDB()(TABLE).where({ id }).del();
@@ -128,6 +177,11 @@ export async function removeById(id) {
   return result;
 }
 
+/**
+ * Renumber steps of a trajectory sequentially (1..n) by current order and return the reordered list.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<object[]>} reordered step entities
+ */
 export async function reorderByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
     .where({ trajectory_id: trajectoryId })
@@ -141,8 +195,9 @@ export async function reorderByTrajectory(trajectoryId) {
 
 /**
  * Apply planned order: update phase binding + step_number for each row in one transaction.
- * @param {number} trajectoryId
- * @param {Array<{ id: number, trajectoryPhaseId: number|null, phaseNumber: number, stepNumber: number }>} ordered
+ * @param {number} trajectoryId 轨迹 id
+ * @param {Array<{ id: number, trajectoryPhaseId: number|null, phaseNumber: number, stepNumber: number }>} ordered 计划顺序
+ * @returns {Promise<void>}
  */
 export async function applyPlannedOrder(trajectoryId, ordered) {
   const db = getDB();

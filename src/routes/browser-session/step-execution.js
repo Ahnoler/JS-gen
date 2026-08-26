@@ -8,6 +8,24 @@ import { broadcastWatcherStatus } from './broadcasts.js';
 import { bindExecutorSessionEvents } from './executor-events.js';
 import { handleSessionMessage } from './session-message.js';
 
+/**
+ * Single-step agent execution for both executor (remote WS) and local
+ * shared-browser (Python stdin/stdout) modes. Wires phase description upsert,
+ * cancellation, and session-message dispatch.
+ */
+
+/**
+ * Execute one agent step on a remote executor session (WS fan-out).
+ * @param {object} opts step options
+ * @param {object} opts.session target session state
+ * @param {string} opts.task agent instruction text
+ * @param {number} [opts.maxSteps] max steps for the agent
+ * @param {string} [opts.businessDataFile] path to business data file
+ * @param {number} [opts.phaseNumber] UI phase number
+ * @param {number|string} [opts.trajectoryDbId] bound trajectory DB id
+ * @param {{ send: (event: string, data: unknown) => void, end: () => void, onAbort: (cb: () => void) => void }} opts.channel SSE/WS push channel
+ * @returns {Promise<void>}
+ */
 async function executeExecutorStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel }) {
   if (session.busy) return channel.send('error', { message: 'Browser is busy executing a step' });
   if (!session.executorNodeUuid) return channel.send('error', { message: 'Executor session not bound' });
@@ -103,6 +121,18 @@ async function executeExecutorStep({ session, task, maxSteps, businessDataFile, 
 
 // ── Shared: execute a single step on the global browser agent ──
 // Callers: HTTP+SSE handler (POST /step) and WebSocket handler
+/**
+ * Execute one agent step — dispatches to executor or local shared-browser path.
+ * @param {object} opts step options
+ * @param {object} opts.session target session state
+ * @param {string} opts.task agent instruction text
+ * @param {number} [opts.maxSteps] max steps for the agent
+ * @param {string} [opts.businessDataFile] path to business data file
+ * @param {number} [opts.phaseNumber] UI phase number
+ * @param {number|string} [opts.trajectoryDbId] bound trajectory DB id
+ * @param {{ send: (event: string, data: unknown) => void, end: () => void, onAbort: (cb: () => void) => void }} opts.channel SSE/WS push channel
+ * @returns {Promise<void>}
+ */
 export async function executeAgentStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel }) {
   if (session.useExecutor) {
     return executeExecutorStep({ session, task, maxSteps, businessDataFile, phaseNumber, trajectoryDbId, channel });

@@ -84,3 +84,57 @@ check('rounds limit', _BUDGET_EXTEND_MAX_ROUNDS <= 2)
 if failures:
     print('FAIL:', failures); sys.exit(1)
 print('OK: compute_budget_extension + done_fired flag + budget gate')
+
+
+# ── Task 8: 进度感知缓冲部署（total_fields/done_fields）──────────────────
+
+# a) 无新键 → legacy 行为字节级保持：2*4+3*2+1+2 = 17
+check('无新键 legacy==17', compute_budget_extension({
+    'introduce_fields': 2, 'pending_fields': 3, 'tree_select_fields': 1,
+    'ceiling': 100, 'used_steps': 10,
+}) == 17)
+
+# b) 无新键 empty → 0
+check('无新键 empty==0', compute_budget_extension({
+    'introduce_fields': 0, 'pending_fields': 0, 'tree_select_fields': 0,
+    'ceiling': 100, 'used_steps': 10,
+}) == 0)
+
+# c) done==0 回退旧式：1*4+2*2+0+2 = 10
+check('done==0 回退旧式==10', compute_budget_extension({
+    'introduce_fields': 1, 'pending_fields': 2, 'tree_select_fields': 0,
+    'ceiling': 100, 'used_steps': 10,
+    'total_fields': 5, 'done_fields': 0,
+}) == 10)
+
+# d) 进度加 headroom：avg=12/3=4, remaining=max(5-3,0+2+0)=2, est=ceil(4*2)+2=10, legacy=0*4+2*2+0+2=6 → 10
+check('进度加 headroom==10', compute_budget_extension({
+    'introduce_fields': 0, 'pending_fields': 2, 'tree_select_fields': 0,
+    'ceiling': 100, 'used_steps': 12,
+    'total_fields': 5, 'done_fields': 3,
+}) == 10)
+
+# e) clamp：raw=1*4+2*2+1+2=11, 进度 avg=15/2=7.5, rem=max(5-2,1+2+1)=4, est=ceil(7.5*4)+2=32 → max(11,32)=32, clamp 20-15=5
+check('进度 clamp==5', compute_budget_extension({
+    'introduce_fields': 1, 'pending_fields': 2, 'tree_select_fields': 1,
+    'ceiling': 20, 'used_steps': 15,
+    'total_fields': 5, 'done_fields': 2,
+}) == 5)
+
+# f) 不低于 legacy：avg=10/9≈1.11, rem=max(10-9,2+3+1)=1, est=ceil(1.11*1)+2=3, legacy=2*4+3*2+1+2=17 → max(17,3)=17
+check('不低于 legacy==17', compute_budget_extension({
+    'introduce_fields': 2, 'pending_fields': 3, 'tree_select_fields': 1,
+    'ceiling': 100, 'used_steps': 10,
+    'total_fields': 10, 'done_fields': 9,
+}) == 17)
+
+# g) 空工作短路：introduce=pending=tree=0 → 0（即使有 total/done）
+check('空工作短路==0', compute_budget_extension({
+    'introduce_fields': 0, 'pending_fields': 0, 'tree_select_fields': 0,
+    'ceiling': 100, 'used_steps': 5,
+    'total_fields': 5, 'done_fields': 5,
+}) == 0)
+
+if failures:
+    print('FAIL:', failures); sys.exit(1)
+print('OK: 进度感知缓冲部署 (total_fields/done_fields)')

@@ -37,7 +37,11 @@ const _dotEnv = {
   ...loadDotEnv(path.join(EXECUTOR_DIR, '.env')),
 };
 
-/** Cursor sandbox injects a temp PLAYWRIGHT_BROWSERS_PATH without Chromium binaries. */
+/**
+ * Cursor sandbox injects a temp PLAYWRIGHT_BROWSERS_PATH without Chromium binaries.
+ * @param {string} value the PLAYWRIGHT_BROWSERS_PATH value to check
+ * @returns {boolean} true if the path points to a Cursor sandbox cache
+ */
 function isSandboxPlaywrightPath(value) {
   if (!value || typeof value !== 'string') return false;
   const norm = value.replace(/\\/g, '/').toLowerCase();
@@ -49,6 +53,7 @@ function isSandboxPlaywrightPath(value) {
  * (e.g. %LOCALAPPDATA%\\ms-playwright) so each executor host can just run
  * `npx playwright install chromium` / `playwright install chromium` with no path config.
  * Optional: set PLAYWRIGHT_BROWSERS_PATH to pin a custom dir (incl. project `browser/`).
+ * @returns {string} resolved Playwright browsers path (empty string = use default)
  */
 function resolvePlaywrightBrowsersPath() {
   const fromFile = _dotEnv.PLAYWRIGHT_BROWSERS_PATH || '';
@@ -72,7 +77,10 @@ function resolve(key, defaultValue = '') {
   return process.env[key] || _dotEnv[key] || defaultValue;
 }
 
-/** Build ws://host:port/ws/executor from CONTROL_PLANE_URL or use EXECUTOR_WS_URL. */
+/**
+ * Build ws://host:port/ws/executor from CONTROL_PLANE_URL or use EXECUTOR_WS_URL.
+ * @returns {string} resolved WebSocket URL for the executor
+ */
 function resolveWsUrl() {
   const direct = resolve('EXECUTOR_WS_URL');
   if (direct) return direct;
@@ -125,6 +133,10 @@ export const EXECUTOR_DISCONNECT_TIMEOUT_MS = parseInt(
   10,
 );
 
+/**
+ * Build the executor labels object (os, headed, plus EXECUTOR_LABELS_JSON overrides).
+ * @returns {object} result
+ */
 export function buildLabels() {
   let labels = {};
   const raw = resolve('EXECUTOR_LABELS_JSON');
@@ -142,6 +154,10 @@ export function buildLabels() {
   };
 }
 
+/**
+ * Validate executor config; returns an array of error strings (empty when valid).
+ * @returns {string[]} result
+ */
 export function validateConfig() {
   const errors = [];
   if (!EXECUTOR_TOKEN) errors.push('EXECUTOR_TOKEN is required');
@@ -151,6 +167,10 @@ export function validateConfig() {
   return errors;
 }
 
+/**
+ * Build the full executor WS URL with the auth token query param.
+ * @returns {string} result
+ */
 export function wsUrlWithToken() {
   const url = new URL(EXECUTOR_WS_URL);
   url.searchParams.set('token', EXECUTOR_TOKEN);
@@ -171,7 +191,11 @@ export const FORM_LLM_API_KEY = resolve('FORM_LLM_API_KEY', resolve('LLM_API_KEY
 export const LLM_API_KEY = resolve('LLM_API_KEY', '');
 export const CONTROL_PLANE_HTTP = resolve('CONTROL_PLANE_URL', 'http://127.0.0.1:4097').replace(/\/$/, '');
 
-/** Env for Python browser-use subprocess — never inherit sandbox Playwright cache. */
+/**
+ * Build the env object for the Python browser-use subprocess — never inherits the sandbox Playwright cache.
+ * @param {Record<string, string>} [extraEnv] extra env
+ * @returns {Record<string, string>} result
+ */
 export function buildPythonSubprocessEnv(extraEnv = {}) {
   const env = { ...process.env };
   if (isSandboxPlaywrightPath(env.PLAYWRIGHT_BROWSERS_PATH) || !PLAYWRIGHT_BROWSERS_PATH) {

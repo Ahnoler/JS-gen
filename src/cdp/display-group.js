@@ -1,9 +1,7 @@
 /**
- * Human-readable grouping key for ambiguity picker.
+ * Human-readable grouping key for the ambiguity picker.
  * Prefer region_label / business key / xpath — never bare L1 taxonomy roles
  * (section|main|other|…) which are useless as picker group titles.
- * @param {object|null|undefined} el
- * @returns {string}
  */
 
 const TAXONOMY_ROLES = new Set([
@@ -23,6 +21,12 @@ const TAXONOMY_ROLES = new Set([
   'shell-tabs',
 ]);
 
+/**
+ * Whether a string is a taxonomy region token (role or custom: prefix) that
+ * should not be used as a picker group title.
+ * @param {string} s Candidate token.
+ * @returns {boolean} True if the token is a taxonomy region role or custom: prefix.
+ */
 export function isTaxonomyRegionToken(s) {
   const t = String(s || '').trim().toLowerCase();
   if (!t) return false;
@@ -48,6 +52,12 @@ function bizKeyFromRegionId(rid) {
   return isBizKey(rest) ? rest : '';
 }
 
+/**
+ * Compute a human-readable display group for an element, preferring
+ * region_label / business key / region_id over bare taxonomy roles.
+ * @param {object|null|undefined} el Element meta with region_label / xpath_smart / region_id.
+ * @returns {string} Display group title (empty string if none usable).
+ */
 export function displayGroupOf(el) {
   const label = String(el?.region_label || '').trim();
   if (label && !isTaxonomyRegionToken(label)) return label;
@@ -89,7 +99,8 @@ function matchControlLabel(m) {
  * only (region, label) collisions need further disambiguation.
  * Mutates match.preview / match.element in place.
  * SPA displays display_group as-is — never emit xpath fragments here.
- * @param {Array<{ preview?: object, element?: object, matchedLabel?: string }>} matches
+ * @param {Array<{ preview?: object, element?: object, matchedLabel?: string }>} matches Matches to disambiguate.
+ * @returns {Array<{ preview?: object, element?: object, matchedLabel?: string }>} The same matches array (mutated in place).
  */
 export function uniquifyDisplayGroups(matches) {
   if (!Array.isArray(matches) || matches.length < 1) return matches;

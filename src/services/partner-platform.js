@@ -52,8 +52,8 @@ function importDemandUrl() {
  * 伙伴平台与账号中心同源，直接复用登录 token，按登录用户身份调用）；
  * 调用方未带 token 时回落 PARTNER_ACCESS_TOKEN（服务级 token，供无登录态的脚本/联调），
  * 再回落 PARTNER_DEBUG_ACCESS_TOKEN（硬编码联调 JWT，见上）。
- *
- * @param {import('express').Request | { headers?: object, body?: object, query?: object }} req
+ * @param {import('express').Request | { headers?: object, body?: object, query?: object }} req incoming request
+ * @returns {string|null} resolved access token
  */
 export function resolveAccessToken(req = {}) {
   const headers = req.headers || {};
@@ -70,6 +70,11 @@ export function resolveAccessToken(req = {}) {
   return PARTNER_DEBUG_ACCESS_TOKEN || null;
 }
 
+/**
+ * Resolve access token or throw 400 when none is available.
+ * @param {import('express').Request} req incoming request
+ * @returns {string} access token
+ */
 export function requireAccessToken(req) {
   const token = resolveAccessToken(req);
   if (!token) {
@@ -81,8 +86,8 @@ export function requireAccessToken(req) {
 }
 
 /**
- * @param {object} src
- * @returns {{ systemId: string, projectId: string }}
+ * @param {object} src source object with systemId/projectId
+ * @returns {{ systemId: string, projectId: string }} resolved ids (with defaults)
  */
 export function resolveSystemProject(src = {}) {
   const systemIdRaw = src.systemId ?? src.system_id;
@@ -144,8 +149,10 @@ async function partnerFetch(url, { method = 'GET', accessToken, body, timeoutMs 
   }
 }
 
-/** 伙伴 schema 不认识的字段（V3 调试辅助，partner Jackson 严格反序列化会拒收；
- * attr 为本地/replay 元数据，确认伙伴认后再放开） */
+/**
+ * 伙伴 schema 不认识的字段（V3 调试辅助，partner Jackson 严格反序列化会拒收；
+ * attr 为本地/replay 元数据，确认伙伴认后再放开）
+ */
 const PARTNER_PROP_DROP_KEYS = ['regionId', 'regionLabel', 'attr'];
 
 /**
@@ -156,6 +163,8 @@ const PARTNER_PROP_DROP_KEYS = ['regionId', 'regionLabel', 'attr'];
  *   （伙伴 V3 契约：字段名改 screenCapture；screenshot 旧语义=是否执行截图 integer，
  *   V3 塞 URL 数组会 Jackson 反序列化失败 → 400）
  * 纯函数、浅拷贝；仅影响发送体，不影响 dry-run / 响应中的 payload。
+ * @param {object} payload local import payload
+ * @returns {object} partner-adapted payload
  */
 export function toPartnerImportPayload(payload) {
   if (!payload || typeof payload !== 'object') return payload;
@@ -210,7 +219,8 @@ function assertPartnerBusinessOk(json, fallbackMsg = PARTNER_NETWORK_ERROR_MSG) 
  * 推送前自检：检查 wire payload 的信息丢失风险（只统计不阻断）。
  * - undefined 值检测（JSON.stringify 静默丢弃 undefined key）
  * - page/popup 无 screenCapture
- * @returns {{ ok: boolean, issues: Array }}
+ * @param {object} wirePayload partner-adapted payload
+ * @returns {{ ok: boolean, issues: Array }} preflight result
  */
 export function preflightCheck(wirePayload) {
   const list = wirePayload?.transcationEventTypeList || [];
@@ -237,7 +247,9 @@ function normalizeProjectRow(row) {
 
 /**
  * List partner projects.
- * @returns {Promise<{ id: number|string, name: string }[]>}
+ * @param {object} [opts] request options
+ * @param {string} opts.accessToken partner access token
+ * @returns {Promise<{ id: number|string, name: string }[]>} partner projects
  */
 export async function listPartnerProjects({ accessToken } = {}) {
   const url = `${systemBaseUrl()}/system/systemproject/list`;
@@ -279,7 +291,11 @@ function normalizeSystemNode(node) {
 
 /**
  * List partner systems under a project (lazy tree roots or children).
- * @returns {Promise<object[]>}
+ * @param {object} [opts] request options
+ * @param {string} opts.accessToken partner access token
+ * @param {string|number} opts.projectId partner project id
+ * @param {string|number} [opts.parentId] optional parent system id
+ * @returns {Promise<object[]>} partner system nodes
  */
 export async function listPartnerSystems({ accessToken, projectId, parentId } = {}) {
   if (projectId == null || projectId === '') {
@@ -323,7 +339,10 @@ export async function listPartnerSystems({ accessToken, projectId, parentId } = 
  * - 伙伴 schema：screenshot=是否执行截图(integer)，screenshots=截图(string)；
  *   V3 原样把 URL 数组塞在 screenshot —— 合并进 screenshots（逗号串）
  * 浅拷贝改造，不影响本地 dry-run / 响应中的 payload。
- * @returns {Promise<{ code: number, msg?: string, data?: unknown }>}
+ * @param {object} payload local import payload
+ * @param {object} [opts] request options
+ * @param {string} opts.accessToken partner access token
+ * @returns {Promise<{ code: number, msg?: string, data?: unknown }>} partner response
  */
 export async function pushImportDemand(payload, { accessToken } = {}) {
   const url = importDemandUrl();

@@ -2,12 +2,19 @@ import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 
 /**
+ * Heal-instruction builders for failed-step rerun and form-structure-change
+ * repair. Produces the resume prompt text sent to the agent after replay.
+ */
+
+/**
  * Single-step heal prompt for live steps/replay.
  * Only redo the failed recorded action — no extra diagnosis / fill / next-step ops.
- *
- * @param {{ action?: string, params?: object, id?: string|number }} failedEntry
- * @param {string} [errorResult]
- * @returns {string}
+ * @param {{ action?: string, params?: object, id?: string|number }} failedEntry the failed ACTION_LOG entry
+ * @param {string} [errorResult] error text from the failed step
+ * @param {object} [opts] 选项
+ * @param {string} [opts.reason] 失败原因
+ * @param {object} [opts.contract] 合同信息
+ * @returns {string} 自愈指令文本
  */
 export function buildStepHealInstruction(failedEntry, errorResult = '', { reason = null, contract = null } = {}) {
   const action = failedEntry?.action || 'unknown';
@@ -42,9 +49,11 @@ export function buildStepHealInstruction(failedEntry, errorResult = '', { reason
 /**
  * Type B — form structure change heal (distinct from single-step Type A).
  * AI only fills newly added fields in the browser; control plane persists steps separately.
- *
- * @param {{ container?: string, added_required?: string[], added_optional?: string[], missing_required?: string[], missing_optional?: string[] }} report
- * @returns {string}
+ * @param {{ container?: string, added_required?: string[], added_optional?: string[], missing_required?: string[], missing_optional?: string[] }} report form structure change report
+ * @param {object} [opts] 选项
+ * @param {string} [opts.reason] 失败原因
+ * @param {object} [opts.contract] 合同信息
+ * @returns {string} 自愈指令文本
  */
 export function buildFormStructureHealInstruction(report = {}, { reason = null, contract = null } = {}) {
   const container = report.container || 'main';
@@ -96,6 +105,8 @@ export function buildFormStructureHealInstruction(report = {}, { reason = null, 
 /**
  * Append the structured failure analysis to a legacy instruction without
  * rewriting the original text (Python text-fallback detection stays intact).
+ * @param {object} reason 失败原因对象
+ * @returns {string} 格式化后的失败分析文本
  */
 function formatFailureAnalysis(reason) {
   if (!reason || typeof reason !== 'object') return '【失败分析】category=unknown';
@@ -113,6 +124,12 @@ function formatFailureAnalysis(reason) {
   return lines.join('\n');
 }
 
+/**
+ * 描述动作意图
+ * @param {string} action 动作类型
+ * @param {object} params 动作参数
+ * @returns {string} 动作意图描述
+ */
 function describeActionIntent(action, params) {
   const p = params || {};
   switch (action) {
@@ -151,6 +168,19 @@ function describeActionIntent(action, params) {
   }
 }
 
+/**
+ * Build the resume instruction for a rerun-from-failed-step, optionally using
+ * the `scripts/prompts/heal-prompt.md` template with URL / form-change / log
+ * sections filled in.
+ * @param {object} opts rerun options
+ * @param {object} opts.actionData parsed action file ({ url, tests/actions })
+ * @param {number} opts.failedStep 1-based failed step index
+ * @param {string} [opts.log_file] relative log file path to embed as context
+ * @param {object|object[]} [opts.form_changes] detected form-structure changes
+ * @param {number} [opts.replayedCount] actions already replayed by _replay
+ * @param {string} opts.PROJECT_DIR project root for resolving paths
+ * @returns {{ resumeInstruction: string }} 包含恢复指令的对象
+ */
 export function buildRerunResumeInstruction({ actionData, failedStep, log_file, form_changes, replayedCount, PROJECT_DIR }) {
   let resumeInstruction = '';
   try {

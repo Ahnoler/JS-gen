@@ -16,6 +16,11 @@ function annotateStep(step) {
   return { ...step, isMeta: isMetaStep(step) };
 }
 
+/**
+ * Convert persisted DB step rows into action-entry objects for the action flow.
+ * @param {Array<object>} steps persisted step rows (with paramsJson / elementJson)
+ * @returns {Array<object>} action entries with parsed params, element, target, isMeta
+ */
 export function stepsToActionEntries(steps) {
   if (!Array.isArray(steps)) return [];
   return steps.map((s) => {
@@ -56,6 +61,13 @@ export function stepsToActionEntries(steps) {
   });
 }
 
+/**
+ * Build the full trajectory tree: phases with assigned steps, orphan steps, business entries.
+ * @param {number} trajectoryDbId trajectory DB id
+ * @param {object} [root1] options
+ * @param {boolean} [root1.includeMeta] whether to include meta steps (default false)
+ * @returns {Promise<object|null>} trajectory tree object, or null if not found / invalid id
+ */
 export async function getTrajectoryTree(trajectoryDbId, { includeMeta = false } = {}) {
   const tid = Number(trajectoryDbId);
   if (!Number.isFinite(tid) || tid <= 0) return null;
@@ -107,9 +119,11 @@ export async function getTrajectoryTree(trajectoryDbId, { includeMeta = false } 
 
 /**
  * Merged action flow by trajectory numeric id: DB steps + live pending.
- * @param {number|null} trajectoryDbId
- * @param {Array} pendingEntries
- * @param {{ excludeActionIds?: Iterable<string> }} [opts]
+ * @param {number|null} trajectoryDbId trajectory DB id, or null for pending-only
+ * @param {Array<object>} pendingEntries live pending action entries not yet persisted
+ * @param {object} [opts] options
+ * @param {Iterable<string>} [opts.excludeActionIds] action ids to exclude from the flow
+ * @returns {Promise<{ trajectoryDbId: number|null, persistedCount: number, pendingCount: number, count: number, entries: Array<object>, trajectory: object|null }>} merged action flow
  */
 export async function getTrajectoryActionFlow(trajectoryDbId, pendingEntries = [], opts = {}) {
   const traj = trajectoryDbId != null ? await trajectoryDao.getById(+trajectoryDbId) : null;
@@ -142,6 +156,11 @@ export async function getTrajectoryActionFlow(trajectoryDbId, pendingEntries = [
   };
 }
 
+/**
+ * Load a trajectory with its phases and business entries attached.
+ * @param {number} id trajectory DB id
+ * @returns {Promise<object|null>} trajectory with phases and businessEntries, or null if not found
+ */
 export async function getTrajectoryWithPhases(id) {
   const traj = await trajectoryDao.getById(+id);
   if (!traj) return null;
@@ -150,15 +169,33 @@ export async function getTrajectoryWithPhases(id) {
   return traj;
 }
 
+/**
+ * List all phases belonging to a trajectory.
+ * @param {number} trajectoryDbId trajectory DB id
+ * @returns {Promise<Array<object>>} phase rows ordered by phase_number
+ */
 export async function listPhasesByTrajectory(trajectoryDbId) {
   return trajectoryPhaseDao.listByTrajectory(+trajectoryDbId);
 }
 
+/**
+ * List steps belonging to a phase, optionally including meta steps.
+ * @param {number} phaseDbId phase DB id
+ * @param {object} [root1] options
+ * @param {boolean} [root1.includeMeta] whether to include meta steps (default false)
+ * @returns {Promise<Array<object>>} annotated step entries
+ */
 export async function listStepsByPhase(phaseDbId, { includeMeta = false } = {}) {
   const steps = await trajectoryStepDao.listByPhase(+phaseDbId);
   return filterMetaSteps(steps, { includeMeta }).map(annotateStep);
 }
 
+/**
+ * List trajectories under a function, with pagination.
+ * @param {number} functionId function DB id
+ * @param {object} pagination pagination options (limit, offset, …)
+ * @returns {Promise<Array<object>>} trajectory rows under the function
+ */
 export async function listByFunction(functionId, pagination) {
   return trajectoryDao.listByFunction(functionId, pagination);
 }

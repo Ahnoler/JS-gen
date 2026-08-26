@@ -32,6 +32,11 @@ const PICK_SCROLL_ROOT_FN = `
     }
 `;
 
+/**
+ * Build the page-side scroll expression that sets scrollTop and returns scroll metrics.
+ * @param {{ top: number }} opts Scroll target (CSS px).
+ * @returns {string} Page eval expression returning { top, clientHeight, scrollHeight, box, viewport }.
+ */
 export function buildPhaseScreenshotScrollExpression({ top }) {
   const y = Number(top) || 0;
   return `(() => {
@@ -55,6 +60,10 @@ export function buildPhaseScreenshotScrollExpression({ top }) {
   })()`;
 }
 
+/**
+ * Build the page-side collect expression that gathers visible L2 host rects in the current slice.
+ * @returns {string} Page eval expression returning an array of { kind, text, rect, layers, region_id, region_label, outsideRoot }.
+ */
 export function buildPhaseScreenshotCollectExpression() {
   return `(() => {
     ${PAGE_LOCATOR_HELPERS}
@@ -91,6 +100,10 @@ export function buildPhaseScreenshotCollectExpression() {
   })()`;
 }
 
+/**
+ * Build the page-side clean expression that removes all data-jsgen-rect markers.
+ * @returns {string} Page eval expression returning { removed }.
+ */
 export function buildPhaseScreenshotCleanExpression() {
   return `(() => {
     const els = document.querySelectorAll('[data-jsgen-rect]');

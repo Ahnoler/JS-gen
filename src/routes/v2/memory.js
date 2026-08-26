@@ -8,6 +8,10 @@ function badRequest(res, message) {
   return res.status(400).json({ error: message });
 }
 
+/**
+ * Register AI memory system routes (events, retrieve, decisions, audit, compare, timeline, stats).
+ * @param {import('express').Application} app Express application
+ */
 export default function registerMemory(app) {
   /** 批量摄取事件（Agent / 执行机 / 本地脚本上报）。 */
   app.post('/api/v2/memory/events', async (req, res) => {

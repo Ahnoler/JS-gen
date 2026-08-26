@@ -8,8 +8,13 @@ import { SSO_APP_KEY, SSO_BASE_URL } from '#config/config.js';
 import { sendOk } from '../../http/api-response.js';
 import { getAccessUser } from '../../services/sso/paas-client.js';
 
+/**
+ * Register SSO / current-user auth routes.
+ * @param {import('express').Application} app Express application
+ */
 export default function registerAuth(app) {
   // 返回 SSO 登录页地址（前端无 token 时跳转）。uiPath/redirect 来自 query，用于拼回跳。
+  /** Return the SSO login page URL (with redirect back to the app). */
   app.get('/api/v2/auth/sso/login-page', (req, res) => {
     const redirect = String(req.query.uiPath || req.query.redirect || '').trim()
       || `${req.protocol}://${req.get('host')}/`;
@@ -18,6 +23,7 @@ export default function registerAuth(app) {
   });
 
   // 返回 SSO 登出页地址。
+  /** Return the SSO logout page URL (with redirect back to the app). */
   app.get('/api/v2/auth/sso/logout-page', (req, res) => {
     const redirect = String(req.query.uiPath || req.query.redirect || '').trim()
       || `${req.protocol}://${req.get('host')}/`;
@@ -27,6 +33,7 @@ export default function registerAuth(app) {
 
   // 当前登录用户信息（前端替换硬编码用户名 + 判断登录态）。无 token 时 paasUserId=null。
   // 有 token 时回查账号中心拿 userName/userAccount（AccessUserContext.getCurrentUser 的 HTTP 形态）。
+  /** Current logged-in user info (paasUserId, userName, userAccount); null when no token. */
   app.get('/api/v2/auth/me', async (req, res) => {
     const token = req.get('access_token');
     const user = token && req.paasUserId ? await getAccessUser(token) : null;
@@ -38,6 +45,7 @@ export default function registerAuth(app) {
   });
 
   // 校验当前登录态是否有效（占位，前端 checkLogin 用）。
+  /** Check whether the current login session is valid. */
   app.get('/api/v2/auth/sso/check', (req, res) => {
     sendOk(res, { valid: !!req.paasUserId });
   });

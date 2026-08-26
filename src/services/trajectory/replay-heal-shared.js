@@ -17,12 +17,21 @@ const HEAL_MAX_STEPS = 12;
 /** Sentinel: user stopped replay/heal via cancel_step / steps/replay/stop. */
 const USER_ABORT_CODE = 'USER_ABORT';
 
+/**
+ * Create a sentinel error indicating the user aborted replay/heal.
+ * @returns {Error & { code: string }} user-abort error
+ */
 function makeUserAbortError() {
   const err = new Error(USER_ABORT_CODE);
   err.code = USER_ABORT_CODE;
   return err;
 }
 
+/**
+ * Check whether an error represents a user-initiated abort.
+ * @param {Error|null|undefined} err error to check
+ * @returns {boolean} true if the error is a user abort
+ */
 function isUserAbort(err) {
   if (!err) return false;
   if (err.code === USER_ABORT_CODE) return true;
@@ -30,20 +39,46 @@ function isUserAbort(err) {
   return msg === USER_ABORT_CODE || /USER_ABORT|Replay aborted/i.test(msg);
 }
 
+/**
+ * Build the trajectory scope object for WS broadcast payloads.
+ * @param {number} tid trajectory DB id
+ * @returns {{ trajectoryId: number, trajectoryDbId: number }} scope object
+ */
 function trajScope(tid) {
   return { trajectoryId: tid, trajectoryDbId: tid };
 }
 
+/**
+ * Broadcast a replay WS event with trajectory scope and extra payload.
+ * @param {string} type event type
+ * @param {number} tid trajectory DB id
+ * @param {object} [extra] extra payload fields
+ * @returns {void}
+ */
 function emitReplay(type, tid, extra = {}) {
   broadcast(type, { ...trajScope(tid), ...extra });
 }
 
+/**
+ * Coerce a step id to a finite positive number, or null.
+ * @param {string|number|null|undefined} id step id
+ * @returns {number|null} numeric step id, or null
+ */
 function toNumericStepId(id) {
   if (id == null || id === '') return null;
   const n = Number(id);
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Run a single AI heal step in the executor session and await phase_done/phase_error.
+ * @param {object} runtime trajectory runtime (sessionId, executorNodeUuid, abortReplay, …)
+ * @param {string} instruction heal instruction text for the agent
+ * @param {number} [maxSteps] max heal steps (default HEAL_MAX_STEPS)
+ * @param {'step'|'form_structure'} [healType] heal scope (default 'step')
+ * @param {object|null} [healContract] structured heal contract payload
+ * @returns {Promise<void>} resolves on phase_done; rejects on error/abort/timeout
+ */
 async function runHealStep(runtime, instruction, maxSteps = HEAL_MAX_STEPS, healType = 'step', healContract = null) {
   // P2-1: record replay-heal decision (deterministic instruction template, not LLM-generated)
   try {

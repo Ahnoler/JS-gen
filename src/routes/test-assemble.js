@@ -6,6 +6,13 @@ import { PROJECT_DIR } from '../../config/config.js';
 
 const SCRIPTS_DIR = path.join(PROJECT_DIR, 'scripts');
 
+/**
+ * Engineering-only action-file assemble endpoints — assemble action JSON to a
+ * Playwright script, list/save/delete action files, and apply fixes.
+ *
+ * Prefix: /api/test/assemble/*
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
 
   /**

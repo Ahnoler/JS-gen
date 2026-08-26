@@ -2,6 +2,11 @@
  * Per-slot stderr line prefix + flush buffer for executor SessionSlot.
  */
 
+/**
+ * Short 8-char hex-ish id from a session UUID (no dashes, lowercased).
+ * @param {string} sessionId session id
+ * @returns {string} result
+ */
 export function shortSid(sessionId) {
   return String(sessionId || '')
     .replace(/-/g, '')
@@ -9,12 +14,20 @@ export function shortSid(sessionId) {
     .toLowerCase();
 }
 
+/**
+ * Format a stderr line with slot + short session id prefix.
+ * @param {number} slotIndex slot index
+ * @param {string} sessionId session id
+ * @param {string} line line
+ * @returns {string} result
+ */
 export function prefixLine(slotIndex, sessionId, line) {
   const sid = shortSid(sessionId);
   return `[slot:${Number(slotIndex)} sid:${sid}] ${line}`;
 }
 
 /**
+ * Create a stderr line buffer that prefixes lines with slot/session info and flushes in batches.
  * @param {{
  *   slotIndex: number,
  *   sessionId: string,
@@ -22,7 +35,8 @@ export function prefixLine(slotIndex, sessionId, line) {
  *   flushMs?: number,
  *   maxLines?: number,
  *   now?: () => number,
- * }} opts
+ * }} opts line buffer configuration
+ * @returns {{ push: (chunk: Buffer|string) => void, flush: (opts?: { end?: boolean }) => void, dispose: () => void }} line buffer API
  */
 export function createStderrLineBuffer(opts) {
   const flushMs = opts.flushMs ?? 200;

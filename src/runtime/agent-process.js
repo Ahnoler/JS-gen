@@ -7,9 +7,20 @@ import path from 'path';
 import os from 'os';
 import { PROJECT_DIR, PYTHON_EXE as PYTHON_EXE_CONFIG, resolve as resolveConfig } from '../../config/config.js';
 
+/**
+ * Python interpreter path resolved from config.
+ * @type {string} Python解释器路径
+ */
 export const PYTHON_EXE = PYTHON_EXE_CONFIG;
+
+/** Path to the browser-use agent entry script. */
 export const AGENT_SCRIPT = path.join(PROJECT_DIR, 'scripts', 'browser-use-agent.py');
 
+/**
+ * Kill a process and its entire child tree.
+ * @param {number} pid root process id
+ * @returns {void} 无返回值
+ */
 export function killTree(pid) {
   try {
     if (process.platform === 'win32') {
@@ -20,6 +31,10 @@ export function killTree(pid) {
   } catch {}
 }
 
+/**
+ * Best-effort kill of orphaned Chrome / browser-use processes left by prior runs.
+ * @returns {void} 无返回值
+ */
 export function killOrphans() {
   try {
     if (process.platform === 'win32') {
@@ -38,6 +53,12 @@ foreach ($p in $procs) {
   } catch {}
 }
 
+/**
+ * Flush leftover stdout JSON lines from the pending buffer to a message handler.
+ * @param {string} pendingBuffer raw concatenated stdout text
+ * @param {(msg: object) => void} onMessage callback for each parsed JSON message
+ * @returns {void} 无返回值
+ */
 export function flushPendingBuffer(pendingBuffer, onMessage) {
   const trimmed = pendingBuffer.trim();
   if (!trimmed) return;
@@ -47,6 +68,12 @@ export function flushPendingBuffer(pendingBuffer, onMessage) {
   }
 }
 
+/**
+ * Wait for the Python agent to emit a `ready` event on stdout.
+ * @param {import('child_process').ChildProcess} child spawned agent process
+ * @param {number} [timeout] max wait in ms (default 15000)
+ * @returns {Promise<object>} ready消息负载
+ */
 export function waitForReady(child, timeout = 15000) {
   return new Promise((resolve, reject) => {
     let buffer = '';
@@ -87,6 +114,11 @@ export function waitForReady(child, timeout = 15000) {
   });
 }
 
+/**
+ * True when the process handle is still running (not killed, no exit code).
+ * @param {import('child_process').ChildProcess|null} proc 进程对象
+ * @returns {boolean} 进程是否存活
+ */
 export function isProcessAlive(proc) {
   if (!proc) return false;
   if (proc.killed) return false;
@@ -94,6 +126,12 @@ export function isProcessAlive(proc) {
   return true;
 }
 
+/**
+ * Spawn the local Python browser-use agent as a child process.
+ * @param {string[]} args CLI args after `scripts.main`
+ * @param {Record<string, string>} [extraEnv] additional env vars merged on top of process.env
+ * @returns {import('child_process').ChildProcess} 启动的子进程
+ */
 export function spawnAgent(args, extraEnv = {}) {
   const env = {
     ...process.env,

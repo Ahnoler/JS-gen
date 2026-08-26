@@ -2,7 +2,11 @@
  * Maps WS session.* commands from control plane to SessionManager.
  */
 
-/** @param {import('./session-manager.js').SessionManager} manager */
+/**
+ * Create a session message handler that dispatches WS session.* commands to the SessionManager.
+ * @param {import('./session-manager.js').SessionManager} manager manager
+ * @returns {(type: string, payload: object) => Promise<unknown>} async handler
+ */
 export function createSessionHandler(manager) {
   return async function handleSessionMessage(type, payload) {
     const sessionId = payload?.sessionId;
@@ -118,7 +122,13 @@ export function createSessionHandler(manager) {
   };
 }
 
-/** Relay Python stdout JSON to control plane WS (type = event name). */
+/**
+ * Relay a Python stdout JSON message to the control plane WS.
+ * Also re-emits get_action_log_result as action_log_sync for resync.
+ * @param {(type: string, payload: object) => void} send send
+ * @param {object} msg agent event message
+ * @returns {void} result
+ */
 export function relayAgentEvent(send, msg) {
   const event = msg.event;
   if (!event) return;

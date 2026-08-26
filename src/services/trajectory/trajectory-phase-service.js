@@ -13,6 +13,10 @@ import { refreshTrajectoryCounts } from './trajectory-step-service.js';
  * Upsert a trajectory_phase row with the full phase task description.
  * Called when the user clicks「执行阶段」so description is stored immediately.
  * Also marks the phase as running for the live action-flow status.
+ * @param {number} trajectoryDbId trajectory DB id
+ * @param {number} phaseNumber phase number (1-based)
+ * @param {string} description phase task description
+ * @returns {Promise<number|null>} phase DB id, or null if invalid input
  */
 export async function upsertPhaseDescription(trajectoryDbId, phaseNumber, description) {
   const tid = Number(trajectoryDbId);
@@ -52,7 +56,12 @@ export async function upsertPhaseDescription(trajectoryDbId, phaseNumber, descri
   return row?.id ?? null;
 }
 
-/** Mark a trajectory_phase terminal/non-terminal status (completed | failed | running | pending). */
+/**
+ * Mark a trajectory_phase terminal/non-terminal status (completed | failed | running | pending).
+ * @param {number} phaseDbId phase DB id
+ * @param {string} status target status
+ * @returns {Promise<object|null>} updated phase row, or null if invalid
+ */
 export async function markPhaseStatus(phaseDbId, status) {
   const id = Number(phaseDbId);
   if (!Number.isFinite(id) || id <= 0) return null;
@@ -60,6 +69,14 @@ export async function markPhaseStatus(phaseDbId, status) {
   return trajectoryPhaseDao.updateStatus(id, status);
 }
 
+/**
+ * Append a done-log entry to a trajectory phase.
+ * @param {number} phaseDbId phase DB id
+ * @param {object} [root0] entry fields
+ * @param {string} [root0.text] log text
+ * @param {string} [root0.source] log source
+ * @returns {Promise<object|null>} updated phase row, or null if invalid/no change
+ */
 export async function appendPhaseDoneLog(phaseDbId, { text, source } = {}) {
   const id = Number(phaseDbId);
   if (!Number.isFinite(id) || id <= 0) return null;
@@ -80,6 +97,10 @@ export async function appendPhaseDoneLog(phaseDbId, { text, source } = {}) {
  * - No phaseIds / empty: clear all steps; reset all phases to pending.
  * - With phaseIds: delete steps bound to those phases (by phase FK or phase_number);
  *   reset only those phases.
+ * @param {number} trajectoryDbId trajectory DB id
+ * @param {object} [root0] options
+ * @param {number[]|null} [root0.phaseIds] phase ids to clear (null/empty = all)
+ * @returns {Promise<object|null>} updated trajectory tree, or null if invalid
  */
 export async function clearTrajectory(trajectoryDbId, { phaseIds = null } = {}) {
   const tid = Number(trajectoryDbId);
@@ -159,6 +180,11 @@ export async function clearTrajectory(trajectoryDbId, { phaseIds = null } = {}) 
 
 /**
  * Append a pending phase to an existing trajectory (for Dashboard「+ 阶段」).
+ * @param {number} trajectoryDbId trajectory DB id
+ * @param {object} [root0] options
+ * @param {string} [root0.description] phase description
+ * @param {number|null} [root0.phaseNumber] desired phase number (auto if null)
+ * @returns {Promise<object>} created phase row
  */
 export async function addPhaseToTrajectory(trajectoryDbId, { description = '', phaseNumber = null } = {}) {
   const tid = Number(trajectoryDbId);
@@ -218,6 +244,9 @@ export async function addPhaseToTrajectory(trajectoryDbId, { description = '', p
  * - Delete missing phases and their bound steps (also unbound steps with that phase_number)
  * - Create items without id
  * - Renumber phase_number 1..n on phases and their steps
+ * @param {number} trajectoryDbId trajectory DB id
+ * @param {Array<string|{id?:number,description?:string}>} [descriptions] phase items in desired order
+ * @returns {Promise<object>} trajectory with updated phases
  */
 export async function syncTrajectoryPhaseDescriptions(trajectoryDbId, descriptions = []) {
   const tid = Number(trajectoryDbId);

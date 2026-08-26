@@ -21,6 +21,10 @@ function sendExcel(res, buffer, filename) {
   res.send(buffer);
 }
 
+/**
+ * Register batch Excel import + auto-recording routes (template, names, import, poll, cancel).
+ * @param {import('express').Application} app Express application
+ */
 export default function registerTrajectoryBatch(app) {
   /** Template download (binary, no JSON envelope). */
   app.get('/api/v2/trajectories/batch/template', asyncHandler(async (_req, res) => {

@@ -1,3 +1,6 @@
+/**
+ * DAO for the `screenshot` table — step/phase/page-level screenshot storage with UPSERT and retry tracking.
+ */
 import { getDB } from '../../config/database.js';
 
 import { fromDbRow, fromDbRows } from './helpers.js';
@@ -36,6 +39,7 @@ async function updateImageUrlIfMissing(db, id, imageUrl) {
 
 /**
  * UPSERT one screenshot row by (trajectory_step_id, kind).
+ * @param {object} screenshot camelCase screenshot fields (trajectoryStepId required)
  * @returns {Promise<number|null>} row id, or null if step no longer exists
  */
 export async function replaceForStep(screenshot) {
@@ -91,6 +95,7 @@ export async function replaceForStep(screenshot) {
 
 /**
  * UPSERT one phase_highlight screenshot row by (trajectory_phase_id, kind).
+ * @param {object} screenshot camelCase screenshot fields (trajectoryPhaseId required)
  * @returns {Promise<number|null>} row id, or null if phase no longer exists
  */
 export async function replaceForPhase(screenshot) {
@@ -147,6 +152,8 @@ export async function replaceForPhase(screenshot) {
 /**
  * UPSERT one dialog screenshot row by (trajectory_step_id, kind='phase_highlight').
  * Dialog screenshots reuse phase_highlight kind and are distinguished by metadata_json.dialog=true.
+ * @param {object} screenshot camelCase screenshot fields (trajectoryStepId required)
+ * @returns {Promise<number|null>} row id, or null if step no longer exists
  */
 export async function replaceDialogForStep(screenshot) {
   const stepId = screenshot.trajectoryStepId != null ? Number(screenshot.trajectoryStepId) : null;
@@ -205,6 +212,8 @@ export async function replaceDialogForStep(screenshot) {
  * UPSERT one page-level screenshot row by (trajectory_id, kind='page_level', level_key).
  * Page-level screenshots are not bound to a single trajectory_phase/step;
  * source phase/step ids are recorded in metadata_json for diagnostics.
+ * @param {object} screenshot camelCase screenshot fields (trajectoryId/levelKey required)
+ * @returns {Promise<number|null>} row id, or null if trajectory no longer exists
  */
 export async function replacePageLevel(screenshot) {
   const trajectoryId = screenshot.trajectoryId != null ? Number(screenshot.trajectoryId) : null;
@@ -265,6 +274,8 @@ export async function replacePageLevel(screenshot) {
 
 /**
  * List all page-level screenshots for one trajectory (kind='page_level').
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<object[]>} page-level screenshot entities with parsed metadataJson
  */
 export async function listPageLevelByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
@@ -292,6 +303,11 @@ export async function listPageLevelByTrajectory(trajectoryId) {
   });
 }
 
+/**
+ * List phase_highlight screenshots for a trajectory with parsed metadataJson.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<object[]>} phase highlight screenshot entities
+ */
 export async function listPhaseHighlightsByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
     .select('id', 'trajectory_phase_id', 'metadata_json', 'storage_path', 'storage_type', 'image_url')
@@ -314,6 +330,11 @@ export async function listPhaseHighlightsByTrajectory(trajectoryId) {
   });
 }
 
+/**
+ * List dialog screenshots (phase_highlight with metadataJson.dialog=true, bound to a step) for a trajectory.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<object[]>} dialog screenshot entities
+ */
 export async function listDialogScreenshotsByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
     .select('id', 'trajectory_step_id', 'trajectory_phase_id', 'metadata_json', 'storage_path', 'storage_type', 'image_url')
@@ -340,6 +361,11 @@ export async function listDialogScreenshotsByTrajectory(trajectoryId) {
   }).filter(Boolean);
 }
 
+/**
+ * Fetch a screenshot row by id for image serving (storage/metadata columns).
+ * @param {number} id 主键
+ * @returns {Promise<object|null>} screenshot row or null when not found
+ */
 export async function getImage(id) {
   const row = await getDB()(TABLE)
     .select(
@@ -361,6 +387,11 @@ export async function getImage(id) {
   return row || null;
 }
 
+/**
+ * List screenshots for a trajectory joined with step_number, ordered by step_number then kind.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<object[]>} screenshot entities with stepNumber
+ */
 export async function listByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
     .select(
@@ -376,6 +407,12 @@ export async function listByTrajectory(trajectoryId) {
   return fromDbRows(rows);
 }
 
+/**
+ * Find a screenshot by (trajectory_step_id, kind).
+ * @param {number} stepId 步骤 id
+ * @param {string} kind screenshot kind ('before'/'after'/...)
+ * @returns {Promise<object|null>} screenshot entity or null when not found
+ */
 export async function findByStepAndKind(stepId, kind) {
   const row = await getDB()(TABLE)
     .select('id', 'storage_type', 'storage_path', 'image_url')
@@ -384,6 +421,11 @@ export async function findByStepAndKind(stepId, kind) {
   return fromDbRow(row);
 }
 
+/**
+ * Find a phase_highlight screenshot by trajectory_phase_id.
+ * @param {number} phaseId 阶段 id
+ * @returns {Promise<object|null>} screenshot entity or null when not found
+ */
 export async function findByPhaseAndKind(phaseId) {
   const row = await getDB()(TABLE)
     .select('id', 'storage_type', 'storage_path', 'image_url')
@@ -392,6 +434,12 @@ export async function findByPhaseAndKind(phaseId) {
   return fromDbRow(row);
 }
 
+/**
+ * Find a page-level screenshot by (trajectory_id, level_key).
+ * @param {number} trajectoryId 轨迹 id
+ * @param {string} levelKey page-level key
+ * @returns {Promise<object|null>} screenshot entity or null when not found
+ */
 export async function findPageLevel(trajectoryId, levelKey) {
   const row = await getDB()(TABLE)
     .select('id', 'storage_type', 'storage_path', 'image_url')
@@ -400,8 +448,12 @@ export async function findPageLevel(trajectoryId, levelKey) {
   return fromDbRow(row);
 }
 
-export async function listByStepIds(stepIds) {
-  const ids = [...new Set((stepIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+/**
+ * List screenshots by a set of trajectory_step ids (storage columns only).
+ * @param {number[]} stepIds step ids
+ * @returns {Promise<object[]>} screenshot entities
+ */
+export async function listByStepIds(stepIds) {  const ids = [...new Set((stepIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
   if (!ids.length) return [];
   const rows = await getDB()(TABLE)
     .select('id', 'storage_type', 'storage_path', 'image_url')
@@ -409,6 +461,11 @@ export async function listByStepIds(stepIds) {
   return fromDbRows(rows);
 }
 
+/**
+ * List screenshots by a set of trajectory_phase ids (storage columns only).
+ * @param {number[]} phaseIds phase ids
+ * @returns {Promise<object[]>} screenshot entities
+ */
 export async function listByPhaseIds(phaseIds) {
   const ids = [...new Set((phaseIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
   if (!ids.length) return [];
@@ -418,6 +475,11 @@ export async function listByPhaseIds(phaseIds) {
   return fromDbRows(rows);
 }
 
+/**
+ * List storage columns for all screenshots of a trajectory.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<object[]>} screenshot storage entities
+ */
 export async function listStorageByTrajectory(trajectoryId) {
   const rows = await getDB()(TABLE)
     .select('id', 'storage_type', 'storage_path', 'image_url')
@@ -425,6 +487,10 @@ export async function listStorageByTrajectory(trajectoryId) {
   return fromDbRows(rows);
 }
 
+/**
+ * List screenshots pending upload (storage_type='local'), ordered by created_at.
+ * @returns {Promise<object[]>} pending screenshot entities
+ */
 export async function listPending() {
   const rows = await getDB()(TABLE)
     .select(...META_COLS)
@@ -433,6 +499,14 @@ export async function listPending() {
   return fromDbRows(rows);
 }
 
+/**
+ * Mark a screenshot as uploaded to minio (storage_type='minio') and reset retry counters.
+ * @param {number} id 主键
+ * @param {object} opts 选项
+ * @param {string} [opts.storagePath] minio storage path
+ * @param {string} [opts.imageUrl] public image URL
+ * @returns {Promise<number>} number of updated rows
+ */
 export async function markUploaded(id, { storagePath, imageUrl }) {
   const numeric = Number(id);
   if (!Number.isFinite(numeric) || numeric <= 0) return 0;
@@ -447,6 +521,14 @@ export async function markUploaded(id, { storagePath, imageUrl }) {
     });
 }
 
+/**
+ * Update retry counters for a screenshot (local storage not yet uploaded).
+ * @param {number} id 主键
+ * @param {object} opts 选项
+ * @param {number} opts.retryCount new retry count
+ * @param {Date|null} [opts.lastRetryAt] last retry timestamp
+ * @returns {Promise<number>} number of updated rows
+ */
 export async function updateRetry(id, { retryCount, lastRetryAt }) {
   const numeric = Number(id);
   if (!Number.isFinite(numeric) || numeric <= 0) return 0;
@@ -458,12 +540,22 @@ export async function updateRetry(id, { retryCount, lastRetryAt }) {
     });
 }
 
+/**
+ * Delete screenshots by trajectory_step id.
+ * @param {number} stepId 步骤 id
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function removeByTrajectoryStepId(stepId) {
   const id = Number(stepId);
   if (!Number.isFinite(id) || id <= 0) return 0;
   return getDB()(TABLE).where({ trajectory_step_id: id }).del();
 }
 
+/**
+ * Delete a screenshot by id.
+ * @param {number} id 主键
+ * @returns {Promise<number>} number of deleted rows
+ */
 export async function remove(id) {
   return getDB()(TABLE).where({ id }).del();
 }

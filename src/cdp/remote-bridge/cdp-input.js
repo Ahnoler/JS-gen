@@ -20,7 +20,11 @@ import {
   normalizeClipboardSelectionResult,
 } from '../clipboard-selection.js';
 
-/** Drop misclassified focus/open-picker clicks that slipped past BUILD_PAYLOAD. */
+/**
+ * Drop misclassified focus/open-picker clicks that slipped past BUILD_PAYLOAD.
+ * @param {object} payload Recorder payload to inspect.
+ * @returns {boolean} True if the payload is a spurious focus/picker click to discard.
+ */
 function isSpuriousFocusClickPayload(payload) {
   if (!payload || typeof payload !== 'object') return true;
   const kind = payload.kind || '';
@@ -57,6 +61,11 @@ function isSpuriousFocusClickPayload(payload) {
   return false;
 }
 
+/**
+ * Best-effort ack of a screencast frame from the dashboard client.
+ * @param {{ frameId?: number, sessionId?: number }} payload Ack payload.
+ * @returns {Promise<void>}
+ */
 export async function handleAck(payload) {
   // Producer already acks Chrome on receive; client ack is best-effort / legacy.
   if (!bridge.client || !bridge.screencastOn) return;
@@ -67,6 +76,10 @@ export async function handleAck(payload) {
   } catch {}
 }
 
+/**
+ * Flush a pending fill recording (focused input value) to the agent.
+ * @returns {Promise<void>}
+ */
 export async function flushFillRecord() {
   if (bridge.fillRecordTimer) {
     clearTimeout(bridge.fillRecordTimer);
@@ -84,6 +97,11 @@ export async function flushFillRecord() {
   }
 }
 
+/**
+ * Dispatch a dashboard input event (mouse / key / text / navigate / clipboard) to CDP.
+ * @param {object} payload Input event payload (kind + kind-specific fields).
+ * @returns {Promise<object>} Result with `ok` boolean and optional reason/fields.
+ */
 export async function handleInput(payload) {
   const kind = payload?.kind;
 
@@ -355,6 +373,11 @@ export async function handleInput(payload) {
   }
 }
 
+/**
+ * Handle a viewport resize or soft-sync request from the dashboard.
+ * @param {{ resize?: boolean, viewportW?: number, viewportH?: number, w?: number, h?: number, dpr?: number, deviceScaleFactor?: number }} payload Viewport payload.
+ * @returns {Promise<void>}
+ */
 export async function handleViewport(payload) {
   if (!bridge.client) return;
   // Dashboard container resize alone must NOT Emulation-resize Chrome (causes crop + click offset).

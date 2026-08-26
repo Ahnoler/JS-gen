@@ -9,18 +9,25 @@ import {
 } from './persist-live.js';
 import { writeAgentEvent } from './agent-io.js';
 
-/** Enable/disable Python before/after page screenshots for a session. */
+/**
+ * Enable/disable Python before/after page screenshots for a session.
+ * @param {object} session target session state
+ * @param {boolean} enabled whether to enable page-level screenshots
+ * @returns {boolean} whether the event was successfully written
+ */
 export function setSessionCaptureScreenshots(session, enabled) {
   if (!session) return false;
   return writeAgentEvent(session, 'capture_screenshots', { enabled: !!enabled });
 }
 
-/** Durable executor → control-plane event hook for a session (persist + broadcast).
+/**
+ * Durable executor → control-plane event hook for a session (persist + broadcast).
  *
  * Listener #1 of 3 for step_screenshot (executor product path):
  * USE_EXECUTOR sessions receive Python events via executor WS → subscribeSessionEvents.
  * Handles manual / CDP live-persist (+ agent action_log_sync when autoPersist).
  * AI record/start has its own subscribe in trajectory-record-lifecycle.js (listener #3).
+ * @param {object} session target session state
  */
 export function bindExecutorSessionEvents(session) {
   if (!session?.useExecutor || !session.sessionId || session._persistUnsub) return;

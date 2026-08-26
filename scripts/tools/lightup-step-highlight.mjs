@@ -23,7 +23,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getDB } from '../../config/database.js';
 
-/** JSON 列归一化：MySQL JSON 可能是字符串或已解析对象；null/解析失败 → null。 */
+/**
+ * JSON 列归一化：MySQL JSON 可能是字符串或已解析对象；null/解析失败 → null。
+ * @param {(string|object|null)} value - 数据库 JSON 列值（字符串 / 对象 / null）
+ * @returns {object|null} 解析后的对象；null/解析失败返回 null
+ */
 function parseJson(value) {
   if (value == null) return null;
   if (typeof value === 'string') {
@@ -36,7 +40,11 @@ function parseJson(value) {
   return value;
 }
 
-/** rect 合法：四值有限且 x2>x1、y2>y1。 */
+/**
+ * rect 合法性判定：四值有限且 x2>x1、y2>y1。
+ * @param {object} rect - 坐标对象 { x1, y1, x2, y2 }
+ * @returns {boolean} 合法返回 true，否则 false
+ */
 export function isLegalRect(rect) {
   return !!(
     rect &&
@@ -57,6 +65,9 @@ const normStr = (v) => String(v ?? '').trim();
  * bbox 仅在 element_json.bbox 合法（x2>x1 && y2>y1 && 四值有限）时保留；
  * params 由 params_json 归一化（对象或 null）。hasElementJson 标记 element_json 解析成功
  * （用于匹配率分母：null/空/解析失败的步骤计入 steps 数组但不参与匹配率）。
+ * @param {object} row - trajectory_step 数据库行（含 id / action_type / element_json / params_json）
+ * @param {number} index - 步骤序号（0 起）
+ * @returns {object} 归一化步骤 { stepId, seq, actionType, label, kind, regionId, bbox, params, hasElementJson }
  */
 export function normalizeStep(row, index) {
   const el = parseJson(row.element_json);
@@ -88,6 +99,12 @@ export function normalizeStep(row, index) {
  *   - steps：trajectory_step 按 trajectory_phase_id 查询并 orderBy('id')；
  *     phaseId 未传但有 screenshotId 时，从 screenshot 行的 trajectory_phase_id 反查。
  * 返回 { screenshotId, meta, steps }（无截图时 { screenshotId: null, meta: null, steps: [] }）。
+ * @param {object} db - knex 实例
+ * @param {object} [opts] - 查询条件
+ * @param {number} [opts.trajectoryId] - 交易 id（与 screenshotId 二选一）
+ * @param {number} [opts.phaseId] - 阶段 id（可选，配合 trajectoryId 限定阶段）
+ * @param {number} [opts.screenshotId] - 截图 id（直查）
+ * @returns {Promise<{screenshotId: number|null, meta: object, steps: Array<object>}>} 截图与步骤数据
  */
 export async function loadPhaseData(db, { trajectoryId, phaseId, screenshotId } = {}) {
   let row = null;
@@ -127,6 +144,9 @@ export async function loadPhaseData(db, { trajectoryId, phaseId, screenshotId } 
  * 任一非空维度必须全等才算命中；维度为空则跳过该维。同 label 可能命中多个元素，
  * 取第一个 rect 合法（x2>x1 && y2>y1 && 四值有限）的元素。全空维度的 step 按未匹配处理。
  * 返回命中的 element，否则 null。
+ * @param {object} step - 归一化步骤（含 label / kind / regionId 三维匹配键）
+ * @param {Array<object>} elements - metadata.elements[] 候选元素
+ * @returns {object|null} 命中的元素，未命中返回 null
  */
 export function matchStepToElement(step, elements) {
   if (!step.label && !step.kind && !step.regionId) return null;
@@ -142,7 +162,9 @@ export function matchStepToElement(step, elements) {
 
 /**
  * 每步 box 解析：bbox 直用（element_json.bbox 合法时）；无 bbox 走三维匹配，命中取 rect。
- * 返回 [{ step, boxes: [{ rect, source: 'bbox' | 'match' }] }]；未命中时 boxes 为空数组。
+ * @param {Array<object>} steps - 归一化步骤数组（normalizeStep 输出）
+ * @param {Array<object>} elements - metadata.elements[] 候选元素
+ * @returns {Array<{step: object, boxes: Array<{rect: object, source: string}>}>} 每步及其框（未命中时 boxes 为空数组）
  */
 export function resolveStepBoxes(steps, elements) {
   return steps.map((step) => {
@@ -161,7 +183,11 @@ export function resolveStepBoxes(steps, elements) {
  * Task 2 — 渲染层（纯函数）：自包含 HTML 生成。
  * ============================================================ */
 
-/** 像素格式化：保留 2 位小数，避免超长浮点。 */
+/**
+ * 像素格式化：保留 2 位小数，避免超长浮点。
+ * @param {number} v - 像素值
+ * @returns {number} 四舍五入到 2 位小数的像素值
+ */
 function fmtPx(v) {
   return Math.round(Number(v) * 100) / 100;
 }
@@ -170,21 +196,45 @@ function fmtPx(v) {
  * 坐标换算：内容坐标系 → 显示像素。图片按 contentWidth/contentHeight 比例显示
  * （浏览器等比拉伸），scale = 显示宽 / contentWidth，x/y 同比例。
  */
+
+/**
+ * X 轴坐标换算：内容坐标 → 显示像素。
+ * @param {number} value - 内容坐标系 X 值
+ * @param {number} contentWidth - 内容宽度
+ * @param {number} displayWidth - 显示宽度
+ * @returns {number} 显示像素 X 值
+ */
 export function coordX(value, contentWidth, displayWidth) {
   return (Number(value) / Number(contentWidth)) * Number(displayWidth);
 }
+
+/**
+ * Y 轴坐标换算：内容坐标 → 显示像素（与 X 同比例，保持等比）。
+ * @param {number} value - 内容坐标系 Y 值
+ * @param {number} contentWidth - 内容宽度（用作比例基准）
+ * @param {number} displayWidth - 显示宽度（用作比例基准）
+ * @returns {number} 显示像素 Y 值
+ */
 export function coordY(value, contentWidth, displayWidth) {
   return (Number(value) / Number(contentWidth)) * Number(displayWidth);
 }
 
-/** HTML 转义（步骤列表列文本用）。 */
+/**
+ * HTML 转义（步骤列表列文本用）。
+ * @param {(string|object|number|null)} s - 待转义的值
+ * @returns {string} 转义后的 HTML 安全字符串
+ */
 function escHtml(s) {
   return String(s ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
 
-/** 参数摘要：JSON 序列化 + 截断，供浮层展示（保持单行、长度可控）。 */
+/**
+ * 参数摘要：JSON 序列化 + 截断，供浮层展示（保持单行、长度可控）。
+ * @param {(object|null)} params - 参数值（对象或 null）
+ * @returns {string} 单行摘要字符串（超 140 字符截断加 …）；null 返回空串
+ */
 function paramsSummary(params) {
   if (params == null) return '';
   let s;
@@ -196,7 +246,11 @@ function paramsSummary(params) {
   return s.length > 140 ? `${s.slice(0, 140)}…` : s;
 }
 
-/** 步骤序号 → 边框/徽标色：hsl((seq*47)%360, 70%, 45%)。 */
+/**
+ * 步骤序号 → 边框/徽标色：hsl((seq*47)%360, 70%, 45%)。
+ * @param {number} seq - 步骤序号（1 起）
+ * @returns {string} hsl 颜色字符串
+ */
 function stepColor(seq) {
   return `hsl(${(seq * 47) % 360}, 70%, 45%)`;
 }
@@ -211,6 +265,12 @@ function stepColor(seq) {
  *   - bbox 框：border 2px solid hsl(...)，徽标 "N"
  *   - match 框（fallback）：border 2px dashed hsl(...)，徽标 "NM"
  *   - boxes 空（无坐标）：不画框，步骤列表行加 no-box 置灰
+ * @param {object} opts - 渲染参数
+ * @param {string} opts.b64 - 阶段长图 base64（无前缀）
+ * @param {object} opts.meta - 截图 metadata（含 contentWidth / contentHeight）
+ * @param {Array<object>} opts.resolved - resolveStepBoxes 返回值
+ * @param {number} [opts.width] - stage 显示宽（默认 1400）
+ * @returns {string} 自包含 HTML 字符串
  */
 export function buildHtml({ b64, meta, resolved, width }) {
   const cw = Number(meta?.contentWidth) || 1;
@@ -524,7 +584,10 @@ export function buildHtml({ b64, meta, resolved, width }) {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-/** 直接执行判断：node 运行本文件 → true；被 import（如 characterization）→ false。 */
+/**
+ * 直接执行判断：node 运行本文件 → true；被 import（如 characterization）→ false。
+ * @returns {boolean} 直接执行返回 true，被 import 返回 false
+ */
 function isDirectRun() {
   if (!process.argv[1]) return false;
   const self = fileURLToPath(import.meta.url);
@@ -544,6 +607,8 @@ function isDirectRun() {
  *
  * 无截图 / metadata 无 elements / 参数非法 → 报错返回 1（非 0 退出）。
  * export 便于 import 复用；返回值即退出码（0 成功 / 1 失败）。
+ * @param {string[]} [argv] - 命令行参数（默认 process.argv.slice(2)）
+ * @returns {Promise<number>} 退出码（0 成功 / 1 失败）
  */
 export async function main(argv = process.argv.slice(2)) {
   const opts = {};

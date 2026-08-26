@@ -8,6 +8,19 @@
  * These endpoints return plain JSON (no { code, data } envelope), so apiJson
  * returns the parsed body as-is.
  */
+
+/**
+ * A DOM element or document used as query scope.
+ * @typedef {object} DomRoot
+ * @property {string} [tagName] element tag name (document has none)
+ */
+
+/**
+ * Query a single element within a root scope (document by default).
+ * @param {string} sel CSS selector
+ * @param {DomRoot} [el] root scope to query within (defaults to document)
+ * @returns {DomRoot|null} first matching element or null
+ */
 const $ = (sel, el = document) => el.querySelector(sel);
 
 function escapeHtml(str) {
@@ -18,7 +31,12 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-/** Unwrap v2 envelope { code, message, data } if present; else return parsed body. */
+/**
+ * Unwrap v2 envelope { code, message, data } if present; else return parsed body.
+ * @param {string} url fetch target
+ * @param {object} [options] fetch options (defaults to {})
+ * @returns {Promise<object|null>} unwrapped data (envelope data, or parsed body as-is)
+ */
 async function apiJson(url, options = {}) {
   const res = await fetch(url, options);
   const text = await res.text();
@@ -102,7 +120,9 @@ function renderRow(item) {
 }
 
 /**
- * @param {HTMLElement} wrap
+ * Mount the pending-screenshots board into the given wrapper element.
+ * @param {DomRoot} wrap container element to render the board into
+ * @returns {void}
  */
 export function mountPendingScreenshots(wrap) {
   wrap.innerHTML = `

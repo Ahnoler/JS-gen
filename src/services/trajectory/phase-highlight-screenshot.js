@@ -8,6 +8,11 @@ import { USE_EXECUTOR } from '#config/config.js';
 import * as execSession from '../../executor-session-client.js';
 import { getAttachedCdpClient } from '../../cdp/remote-bridge.js';
 
+/**
+ * Wrap a phase-screenshot capture error into a standard result object.
+ * @param {Error} err capture error
+ * @returns {{ ok: false, skipped: string }} error result with skipped reason
+ */
 export function wrapCaptureError(err) {
   console.warn('[record] phase screenshot skipped:', err?.message || err);
   return { ok: false, skipped: String(err?.message || err || 'error') };
@@ -55,6 +60,16 @@ function buildMetadata(buffer, meta) {
   };
 }
 
+/**
+ * Capture and persist a phase highlight screenshot for a trajectory phase.
+ * @param {object} [root0] capture options
+ * @param {number} [root0.trajectoryId] trajectory DB id
+ * @param {number} [root0.phaseId] phase DB id
+ * @param {object} [root0.cdpClient] CDP client for direct capture
+ * @param {string} [root0.sessionId] executor session id (for BiB capture)
+ * @param {string} [root0.executorNodeUuid] executor node uuid
+ * @returns {Promise<object>} capture result ({ ok, skipped?, … }) or error wrapper
+ */
 export async function capturePhaseScreenshot({
   trajectoryId,
   phaseId,

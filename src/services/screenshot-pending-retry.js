@@ -15,6 +15,10 @@ let timer = null;
 /**
  * Scan local screenshots and try to upload them to MinIO.
  * Returns a small summary for logging/tests.
+ * @param {object} [root0] options
+ * @param {number} [root0.intervalMs] min interval between retries for the same row
+ * @param {number} [root0.maxRetry] max retry count before skipping
+ * @returns {Promise<{ skipped?: boolean, scanned?: number, uploaded?: number, failed?: number, skipped?: number }>} retry summary
  */
 export async function retryPendingScreenshots({
   intervalMs = SCREENSHOT_RETRY_INTERVAL_MS,
@@ -102,6 +106,7 @@ export async function retryPendingScreenshots({
 /**
  * Start the background pending-screenshot retry loop.
  * Safe to call multiple times: only one timer is created.
+ * @returns {object} the interval timer handle
  */
 export function startPendingScreenshotRetry() {
   if (timer) return timer;

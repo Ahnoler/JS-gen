@@ -5,17 +5,24 @@
 import * as systemRefService from '../../services/system-ref-service.js';
 import { sendErr, asyncHandler } from './trajectory-shared.js';
 
+/**
+ * Register system reference-data routes.
+ * @param {import('express').Application} app Express application
+ */
 export default function registerSystemRefData(app) {
+  /** List system reference data records (filtered). */
   app.get('/api/v2/system-ref-data', asyncHandler(async (req, res) => {
     const result = await systemRefService.listSystemRefData(req.query);
     res.json(result);
   }));
 
+  /** Get a single system reference data record by id. */
   app.get('/api/v2/system-ref-data/:id', asyncHandler(async (req, res) => {
     const row = await systemRefService.getSystemRefData(+req.params.id);
     res.json(row);
   }));
 
+  /** Delete a system reference data record by id. */
   app.delete('/api/v2/system-ref-data/:id', asyncHandler(async (req, res) => {
     const result = await systemRefService.deleteSystemRefData(+req.params.id);
     res.json(result);
@@ -42,6 +49,7 @@ export default function registerSystemRefData(app) {
     res.json(result);
   }));
 
+  /** Delete all system-ref entries for a trajectory. */
   app.delete('/api/v2/trajectories/:id/system-ref-entries', asyncHandler(async (req, res) => {
     const result = await systemRefService.deleteTrajectorySystemRef(+req.params.id);
     res.json(result);

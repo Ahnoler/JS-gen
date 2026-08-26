@@ -13,10 +13,18 @@ let _isExecuting = false;
 /** @type {{ pid: number|null, abort: () => void }|null} */
 let _activeRun = null;
 
+/**
+ * True when a Playwright script is currently executing.
+ * @returns {boolean} 是否有脚本正在执行
+ */
 export function isScriptExecuting() {
   return _isExecuting;
 }
 
+/**
+ * Abort the active script run if one is in progress.
+ * @returns {boolean} 是否成功中止了脚本执行
+ */
 export function abortActiveScriptRun() {
   if (_activeRun) {
     _activeRun.abort();
@@ -29,6 +37,7 @@ export function abortActiveScriptRun() {
  * Isolated per-run directory under TMP_DIR for script + artifacts
  * (script-errors.json, step-*.png). Left in place after the run so
  * /api/test/screenshots still serves nested paths while clients fetch.
+ * @returns {string} absolute path to the created run directory
  */
 function createRunDir() {
   const runDir = path.join(TMP_DIR, `pw-run-${Date.now()}-${randomBytes(4).toString('hex')}`);
@@ -46,18 +55,22 @@ function childEnv(runDir) {
   };
 }
 
-/** Relative path from TMP_DIR for express.static URL segments. */
+/**
+ * Relative path from TMP_DIR for express.static URL segments.
+ * @param {string} runDir absolute path to the run directory
+ * @returns {string} relative path suitable for URL segments
+ */
 function runDirUrlPrefix(runDir) {
   return path.relative(TMP_DIR, runDir).split(path.sep).join('/');
 }
 
 /**
  * Read and parse script-errors.json from a Playwright run.
- * @param {string} scriptPath
- * @param {number|null} code
- * @param {string} [logSuffix]
+ * @param {string} scriptPath script path
+ * @param {number|null} code exit code
+ * @param {string} [logSuffix] log suffix
  * @param {string} [runDir] directory that received TMPDIR for this run
- * @returns {{ scriptErrors: object[]|null, success: boolean }}
+ * @returns {{ scriptErrors: object[]|null, success: boolean }} 检查结果，包含错误信息和执行状态
  */
 export function checkScriptErrors(scriptPath, code, logSuffix = '', runDir = TMP_DIR) {
   let scriptErrors = null;
@@ -118,9 +131,10 @@ function listNewScreenshots(beforeFiles, runDir) {
 
 /**
  * Find screenshot(s) for assembler step N.
- * @param {number} stepNumber
- * @param {Array} screenshotList
+ * @param {number} stepNumber step number
+ * @param {Array} screenshotList screenshot list
  * @param {'before'|'after'|null} [kind] if set, return that kind only; else return newest match
+ * @returns {object|null} 找到的截图对象或null
  */
 export function findScreenshotForStep(stepNumber, screenshotList, kind = null) {
   const n = Number(stepNumber);
@@ -129,6 +143,12 @@ export function findScreenshotForStep(stepNumber, screenshotList, kind = null) {
   return matches.length ? matches[matches.length - 1] : null;
 }
 
+/**
+ * Find both before/after screenshots for assembler step N.
+ * @param {number} stepNumber step number
+ * @param {Array} screenshotList screenshot list
+ * @returns {{ before: object|null, after: object|null }} 包含before和after截图的对象
+ */
 export function findScreenshotsForStep(stepNumber, screenshotList) {
   return {
     before: findScreenshotForStep(stepNumber, screenshotList, 'before'),
@@ -138,7 +158,8 @@ export function findScreenshotsForStep(stepNumber, screenshotList) {
 
 /**
  * Parse __REPLAY_STEP__{...} lines from Playwright stdout.
- * @returns {object|null}
+ * @param {string} line stdout行内容
+ * @returns {object|null} 解析结果或null
  */
 export function parseReplayStepMarker(line) {
   const idx = line.indexOf('__REPLAY_STEP__');
@@ -153,17 +174,16 @@ export function parseReplayStepMarker(line) {
 
 /**
  * Execute a Playwright script and push events via channel.send(event, payload).
- *
- * @param {object} opts
- * @param {string} opts.script
- * @param {string} [opts.fileName]
- * @param {{ send: Function, end: Function, onAbort: Function }} opts.channel
+ * @param {object} opts 执行选项
+ * @param {string} opts.script Playwright脚本内容
+ * @param {string} [opts.fileName] 文件名
+ * @param {{ send: (event: string, data: unknown) => void, end: () => void, onAbort: (handler: () => void) => void }} opts.channel 通信通道
  * @param {{
- *   onStdoutLine?: (line: string, ctx: { screenshotsSoFar: Function }) => void,
+ *   onStdoutLine?: (line: string, ctx: { screenshotsSoFar: () => object[] }) => void,
  *   keepScriptFile?: boolean,
  *   busyMessage?: string,
- * }} [opts.hooks]
- * @returns {{ abort: () => void }|null} null if busy
+ * }} [opts.hooks] 钩子函数
+ * @returns {{ abort: () => void }|null} 中止函数，如果繁忙则返回null
  */
 export function executeScript({ script, fileName, channel, hooks = {} }) {
   const send = channel.send;
@@ -308,7 +328,11 @@ export function executeScript({ script, fileName, channel, hooks = {} }) {
 }
 
 /**
- * Sync run (for /api/test/run-sync).
+ * Execute a Playwright script synchronously and return the result (for /api/test/run-sync).
+ * @param {object} opts 执行选项
+ * @param {string} opts.script Playwright脚本内容
+ * @param {string} [opts.fileName] 文件名
+ * @returns {Promise<{ success: boolean, exitCode: number, stdout: string, stderr: string, screenshots: object[], scriptErrors?: object[], needsFix?: boolean }>} 执行结果
  */
 export async function executeScriptSync({ script, fileName }) {
   const runDir = createRunDir();

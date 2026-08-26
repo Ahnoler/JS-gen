@@ -17,6 +17,11 @@ import {
 import { normalizeActionName } from '../../models/action-name.js';
 import { META_STEP_ACTIONS } from '../../models/meta-step-actions.js';
 
+/**
+ * Recompute step + phase counts for a trajectory (business steps only).
+ * @param {number} trajectoryDbId trajectory DB id
+ * @returns {Promise<{ stepCount: number, phaseCount: number }>} updated counts
+ */
 export async function refreshTrajectoryCounts(trajectoryDbId) {
   const db = getDB();
   // Product stepCount = business steps only (hide meta like save_form_snapshot)
@@ -34,6 +39,12 @@ export async function refreshTrajectoryCounts(trajectoryDbId) {
   };
 }
 
+/**
+ * Set confirmed flag + timestamp on a trajectory step.
+ * @param {number} stepId step DB id
+ * @param {boolean} confirmed whether the step is confirmed
+ * @returns {Promise<object>} updated step row
+ */
 export async function confirmTrajectoryStep(stepId, confirmed) {
   const ok = !!confirmed;
   const now = new Date().toISOString().slice(0, 23).replace('T', ' ');
@@ -44,13 +55,21 @@ export async function confirmTrajectoryStep(stepId, confirmed) {
   });
 }
 
-/** Mark a step as replay failed (confirmed=0). Used when steps/replay triggers AI heal. */
+/**
+ * Mark a step as replay failed (confirmed=0). Used when steps/replay triggers AI heal.
+ * @param {number} stepId step DB id
+ * @returns {Promise<object|null>} updated step row, or null if no id
+ */
 export async function markStepReplayFailed(stepId) {
   if (stepId == null || stepId === '') return null;
   return confirmTrajectoryStep(stepId, false);
 }
 
-/** Mark a step as replay succeeded (confirmed=1). */
+/**
+ * Mark a step as replay succeeded (confirmed=1).
+ * @param {number} stepId step DB id
+ * @returns {Promise<object|null>} updated step row, or null if no id
+ */
 export async function markStepReplayOk(stepId) {
   if (stepId == null || stepId === '') return null;
   return confirmTrajectoryStep(stepId, true);
@@ -75,6 +94,11 @@ function prepareStepElement(actionType, params, element, { requireUsable = true 
   });
 }
 
+/**
+ * Create a trajectory step (manual/agent) and recompute counts.
+ * @param {object} [input] step creation fields (trajectoryId, actionType, params, …)
+ * @returns {Promise<object>} created step row
+ */
 export async function createTrajectoryStep(input = {}) {
   const trajectoryId = Number(input.trajectoryId);
   if (!Number.isFinite(trajectoryId) || trajectoryId <= 0) {
@@ -120,6 +144,12 @@ export async function createTrajectoryStep(input = {}) {
   return row;
 }
 
+/**
+ * Update a trajectory step's fields (asserts trajectory not busy).
+ * @param {number} stepId step DB id
+ * @param {object} [fields] patch fields
+ * @returns {Promise<object|null>} updated step row, or null if not found
+ */
 export async function updateTrajectoryStep(stepId, fields = {}) {
   const existing = await trajectoryStepDao.getById(Number(stepId));
   if (!existing) return null;
@@ -168,6 +198,9 @@ export async function updateTrajectoryStep(stepId, fields = {}) {
 /**
  * Insert steps immediately after a checkpoint step (for Type B structured insert).
  * New steps get confirmed=0 by default when not specified.
+ * @param {number} afterStepId checkpoint step DB id
+ * @param {Array<object>} [inputs] step creation inputs
+ * @returns {Promise<object[]>} created step rows
  */
 export async function insertStepsAfter(afterStepId, inputs = []) {
   const after = await trajectoryStepDao.getById(Number(afterStepId));
@@ -229,6 +262,11 @@ export async function insertStepsAfter(afterStepId, inputs = []) {
   return created;
 }
 
+/**
+ * Delete a trajectory step and renumber the rest (asserts not busy).
+ * @param {number} stepId step DB id
+ * @returns {Promise<{ deleted: boolean, stepId: number, stepCount: number, phaseCount: number }>} deletion result
+ */
 export async function removeTrajectoryStep(stepId) {
   const existing = await trajectoryStepDao.getById(Number(stepId));
   if (!existing) return { removed: false };
@@ -272,6 +310,12 @@ async function assertNotBusyForStepEdit(trajectoryId, traj) {
   }
 }
 
+/**
+ * Move a trajectory step to a new position (via planStepMove + reorder).
+ * @param {number} trajectoryId trajectory DB id
+ * @param {object} [input] move options (stepId, targetStepId, position, …)
+ * @returns {Promise<object>} move result
+ */
 export async function moveTrajectoryStep(trajectoryId, input = {}) {
   const tid = Number(trajectoryId);
   if (!Number.isFinite(tid) || tid <= 0) {

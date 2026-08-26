@@ -1,6 +1,14 @@
 import * as screenshotService from '../../services/screenshot-service.js';
 
+/**
+ * Screenshot management — pending upload list, single/bulk MinIO upload, image
+ * fetch, delete, and per-trajectory listing.
+ *
+ * Prefix: /api/v2/screenshots/*, /api/v2/trajectories/:id/screenshots
+ * @param {import('express').Application} app Express application
+ */
 export default function (app) {
+  /** List screenshots pending upload to MinIO. */
   app.get('/api/v2/screenshots/pending', async (req, res) => {
     try {
       const list = await screenshotService.listPendingScreenshots();
@@ -21,6 +29,7 @@ export default function (app) {
   });
 
   // Upload a single pending screenshot by id (per-row action in the docs UI).
+  /** Upload a single pending screenshot to MinIO by id. */
   app.post('/api/v2/screenshots/:id/upload', async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -35,6 +44,7 @@ export default function (app) {
     }
   });
 
+  /** Get a screenshot's raw image bytes by id. */
   app.get('/api/v2/screenshots/:id/image', async (req, res) => {
     try {
       const row = await screenshotService.getScreenshotImage(+req.params.id);
@@ -47,6 +57,7 @@ export default function (app) {
     }
   });
 
+  /** Delete a screenshot by id. */
   app.delete('/api/v2/screenshots/:id', async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -61,6 +72,7 @@ export default function (app) {
     }
   });
 
+  /** List all screenshots for a trajectory. */
   app.get('/api/v2/trajectories/:trajectoryId/screenshots', async (req, res) => {
     try {
       const list = await screenshotService.listByTrajectory(+req.params.trajectoryId);

@@ -16,6 +16,10 @@ export { XLSX_MIME };
  * @typedef {{ rowNumber: number, name?: string, requirement?: string, error: string }} BatchExcelRejectedRow
  */
 
+/**
+ * Return sample template rows for the batch import Excel template.
+ * @returns {Array<{ rowNumber: number, name: string, requirement: string }>} sample rows
+ */
 export function sampleTemplateRows() {
   return [
     {
@@ -27,8 +31,9 @@ export function sampleTemplateRows() {
 }
 
 /**
- * @param {Array<{ name: string, requirement: string }>} rows
- * @returns {Promise<Buffer>}
+ * Build an Excel template buffer from sample rows.
+ * @param {Array<{ name: string, requirement: string }>} rows template data rows
+ * @returns {Promise<Buffer>} xlsx file buffer
  */
 export async function buildTemplateBuffer(rows = sampleTemplateRows()) {
   const wb = new ExcelJS.Workbook();
@@ -76,11 +81,14 @@ function cellText(value) {
 
 /**
  * Parse uploaded .xlsx buffer.
+ * @param {Buffer} buffer xlsx file buffer
+ * @param {object} [root0] options
+ * @param {number} [root0.maxRows] max non-empty data rows allowed (default BATCH_IMPORT_MAX_ROWS)
  * @returns {Promise<{
  *   valid: BatchExcelValidRow[],
  *   rejected: BatchExcelRejectedRow[],
  *   skippedEmpty: number,
- * }>}
+ * }>} parsed result with valid rows, rejected rows, and skipped empty count
  */
 export async function parseBatchExcelBuffer(buffer, {
   maxRows = BATCH_IMPORT_MAX_ROWS,

@@ -62,6 +62,11 @@ function resolveOptions(entry) {
   return opts.length ? JSON.stringify(opts) : '';
 }
 
+/**
+ * Map a trajectory step to a partner transaction event (or null if skipped).
+ * @param {object} step trajectory step row
+ * @returns {object|null} transaction event, or null if action is skipped
+ */
 export function mapStepToTransactionEvent(step) {
   const entry = step?.action && step?.element !== undefined && !step?.actionType
     ? step
@@ -100,6 +105,8 @@ export function mapStepToTransactionEvent(step) {
 /**
  * Ensure propertiesName unique within one transaction (partner requirement).
  * First keeps base; later get numeric suffix: 填写客户名称 → 填写客户名称2.
+ * @param {object[]} properties transaction event properties to dedupe in-place
+ * @returns {object[]} the same properties array with unique names
  */
 export function uniquifyPropertiesNames(properties) {
   const used = new Set();
@@ -120,7 +127,11 @@ export function uniquifyPropertiesNames(properties) {
 /**
  * Build one transaction entry (inside transcationEventTypeList).
  * 精简版（2026-08-18）：不携带 phases（阶段截图/全量元素 metadata 由 V3.0 result.groups 承担）。
- * @returns {{ entry: object, count: number, skipped: object, stats: object }}
+ * @param {object} traj trajectory row with steps
+ * @param {object} [root0] options
+ * @param {string|number} root0.systemId partner system id
+ * @param {string|number} root0.projectId partner project id
+ * @returns {{ entry: object, count: number, skipped: object, stats: object }} built entry + stats
  */
 export function buildTransactionEntry(traj, { systemId, projectId } = {}) {
   if (systemId == null || systemId === '' || projectId == null || projectId === '') {
@@ -147,7 +158,7 @@ export function buildTransactionEntry(traj, { systemId, projectId } = {}) {
   uniquifyPropertiesNames(properties);
 
   const id = traj.id != null ? String(traj.id) : '';
-  const name = String(traj.name || '').trim() || `trajectory-${id}`;
+  const name = (String(traj.name || '').trim() || `trajectory-${id}`).replace(/[\\/:*?"<>|']/g, '_');
 
   return {
     entry: {
@@ -167,6 +178,9 @@ export function buildTransactionEntry(traj, { systemId, projectId } = {}) {
 
 /**
  * Single-trajectory importDemand body (always wraps list of length 1).
+ * @param {object} traj trajectory row with steps
+ * @param {object} [opts] options (systemId, projectId)
+ * @returns {{ payload: object, count: number, skipped: object, stats: object }} importDemand body
  */
 export function buildTransactionPayload(traj, opts = {}) {
   const built = buildTransactionEntry(traj, opts);
@@ -182,7 +196,8 @@ export function buildTransactionPayload(traj, opts = {}) {
 
 /**
  * Multi-trajectory importDemand body.
- * @param {Array<{ entry: object, count: number, skipped?: object, stats?: object }>} builtEntries
+ * @param {Array<{ entry: object, count: number, skipped?: object, stats?: object }>} builtEntries pre-built transaction entries
+ * @returns {{ payload: object, count: number, skipped: object, stats: object }} importDemand body
  */
 export function wrapTransactionList(builtEntries = []) {
   const list = [];
