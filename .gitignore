@@ -22,6 +22,7 @@ report/
 report2/
 atp-record/
 docs/*
+!docs/jsdoc-convention.md
 # Probation daily reports (automation); keep other docs/ local-only
 !docs/report/
 !docs/report/**
