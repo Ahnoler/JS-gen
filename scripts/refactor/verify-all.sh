@@ -106,6 +106,8 @@ run "characterize-export-v3-field-completeness" node scripts/characterization/ch
 run "characterize-xpath-three-sources" node scripts/characterization/characterize-xpath-three-sources.mjs
 run "characterize-resolve-ambiguous-region" node scripts/characterization/characterize-resolve-ambiguous-region.mjs
 run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs
+run "characterize-log-extract" node scripts/characterization/characterize-log-extract.mjs
+run "characterize-backfill" node scripts/characterization/characterize-backfill.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

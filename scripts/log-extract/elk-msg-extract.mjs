@@ -14,6 +14,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const DEFAULTS = {
   base: 'http://pc.devtool.elk.tansun.com.cn:9200',
@@ -25,6 +26,8 @@ const DEFAULTS = {
   until: null,
   uri: '',
   limit: 0,
+  latest: 0,
+  includeIncomplete: false,
   out: '',
   stdout: false,
 };
@@ -32,6 +35,7 @@ const DEFAULTS = {
 const PAGE_SIZE = 1000;
 const MAX_FROM = 10000;
 const MAX_LIMIT = 50000;
+const MAX_LATEST = 50000;
 const MAX_BODY_CHARS = 200000;
 
 const USAGE = `elk-msg-extract — ELK 日志解析 / 报文捞取（对公客户管理 MVP）
@@ -47,8 +51,10 @@ const USAGE = `elk-msg-extract — ELK 日志解析 / 报文捞取（对公客�
   --minutes N      抓取最近 N 分钟 (默认 ${DEFAULTS.minutes}; 与 --since/--until 互斥)
   --since ISO      起始时间, 例 2026-08-26T21:00:00+08:00 (UTC 或带时区 ISO)
   --until ISO      结束时间
-  --uri PATTERN    URI 过滤: 无 * 时子串匹配(大小写不敏感), 含 * 时通配匹配
-  --limit N        最多输出条数 (0=不限, 上限 ${MAX_LIMIT})
+  --uri PATTERN    URI 过滤: 无 * 时子串匹配(大小写不敏感), 含 * 时通配匹配; 网关前缀(/prod-api/ 开头或含 /tansun-tcp-) 按段级后缀匹配
+  --limit N        最多输出条数 (0=不限, 上限 ${MAX_LIMIT}; 与 --latest 同时给时 --latest 优先)
+  --latest N       仅保留按时间升序的最后 N 条 (1..${MAX_LATEST}; 与 --limit 同时给时优先)
+  --include-incomplete 保留无 End 标记/缺 Request Body/缺 Status 的不完整块 (默认跳过)
   --out FILE       输出 JSON 文件路径
   --stdout         只打印摘要, 不写文件
   --help           显示本帮助
@@ -79,6 +85,8 @@ function parseArgs(argv) {
       case 'until': opts.until = value; break;
       case 'uri': opts.uri = value; break;
       case 'limit': opts.limit = Number(value); break;
+      case 'latest': opts.latest = Number(value); break;
+      case 'include-incomplete': opts.includeIncomplete = true; break;
       case 'out': opts.out = value; break;
       case 'stdout': opts.stdout = true; break;
       default: throw new Error(`未知参数: --${key}`);
@@ -135,10 +143,10 @@ const FIELD_NAMES = {
  * 支持：等号 3~9 个、键与冒号间空格数量可变、RequestBody/ResponseBody 多行或非 JSON、
  * 字段缺失等；非已知键的形如 "Key : value" 行归入 extra。
  * @param {string} msg 日志文档 msg 字段原文
- * @returns {object} 解析结果 { ok, method, uri, contentType, status, requestBody, responseBody, bodyTruncated, extra, error }
+ * @returns {object} 解析结果 { ok, complete, method, uri, contentType, status, requestBody, responseBody, bodyTruncated, extra, error }
  */
 export function parseApiMsg(msg) {
-  const result = { ok: false, method: null, uri: null, contentType: null, status: null, requestBody: null, responseBody: null, bodyTruncated: false, extra: {}, error: null };
+  const result = { ok: false, complete: false, method: null, uri: null, contentType: null, status: null, requestBody: null, responseBody: null, bodyTruncated: false, extra: {}, error: null };
   const text = typeof msg === 'string' ? msg : '';
   const lines = text.split(/\r?\n/);
   let start = -1;
@@ -148,10 +156,12 @@ export function parseApiMsg(msg) {
   if (start < 0) { result.error = 'no-block'; return result; }
   const raw = { method: null, uri: null, contentType: null, status: null, 'request body': null, 'response body': null };
   let cur = null;
+  let sawEnd = false;
   for (let i = start + 1; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
-    if (END_RE.test(trimmed) || (/^=+$/.test(trimmed) && trimmed.length > 0)) break;
+    if (END_RE.test(trimmed)) { sawEnd = true; break; }
+    if (/^=+$/.test(trimmed) && trimmed.length > 0) break;
     const m = KEY_LINE_RE.exec(line);
     if (m) {
       const key = m[1].trim().toLowerCase();
@@ -196,6 +206,10 @@ export function parseApiMsg(msg) {
     if (key === 'request body') result.requestBody = body;
     else result.responseBody = body;
   }
+  // complete: 遇到 End 标记 且 Request Body 存在且非空 且 Status 存在
+  const hasRequestBody = result.requestBody !== null && result.requestBody !== '';
+  const hasStatus = result.status !== null && result.status !== undefined;
+  result.complete = sawEnd && hasRequestBody && hasStatus;
   return result;
 }
 
@@ -221,6 +235,7 @@ function toRecord(hit, parsed) {
     requestBody: parsed.requestBody,
     responseBody: parsed.responseBody,
     bodyTruncated: parsed.bodyTruncated,
+    complete: parsed.complete,
     globalTraceNo: src.globalTraceNo ?? null,
     localTraceNo: src.localTraceNo ?? null,
     parentTraceNo: src.parentTraceNo ?? null,
@@ -286,16 +301,65 @@ function buildUriMatcher(pattern) {
 }
 
 /**
+ * 判断 pattern 是否为网关前缀形式（/prod-api/ 开头或含 /tansun-tcp-）。
+ * @param {string} pattern 用户输入的 --uri 值
+ * @returns {boolean} 是否网关前缀形式
+ */
+function isGatewayPattern(pattern) {
+  return pattern.startsWith('/prod-api/') || pattern.includes('/tansun-tcp-');
+}
+
+/**
+ * 网关前缀 URI 段级后缀匹配。
+ *
+ * 当 pattern 为网关前缀形式（/prod-api/ 开头或含 /tansun-tcp-）时，把 pattern 与 appUri
+ * 按 '/' 分段去空段，取两者较短段数 k，比较两边最后 k 段是否逐一相等（大小写不敏感）。
+ * @param {string} appUri 应用日志中的 URI（通常为去网关前缀的短路径）
+ * @param {string} pattern 用户输入的 --uri 值（网关前缀长路径）
+ * @returns {boolean} 是否匹配
+ */
+export function matchUriWithGatewayPattern(appUri, pattern) {
+  const segsP = (pattern || '').split('/').filter((s) => s !== '');
+  const segsU = (appUri || '').split('/').filter((s) => s !== '');
+  const k = Math.min(segsP.length, segsU.length);
+  if (k === 0) return false;
+  for (let i = 1; i <= k; i++) {
+    if (segsP[segsP.length - i].toLowerCase() !== segsU[segsU.length - i].toLowerCase()) return false;
+  }
+  return true;
+}
+
+/**
+ * 构造 URI 过滤判定：网关前缀形式走段级后缀匹配，否则走原 buildUriMatcher。
+ * @param {string} pattern 用户输入的 --uri 值
+ * @returns {((uri: string) => boolean) | null} 匹配函数，pattern 为空时为 null
+ */
+function buildUriFilter(pattern) {
+  if (!pattern) return null;
+  if (isGatewayPattern(pattern)) {
+    return (uri) => matchUriWithGatewayPattern(uri || '', pattern);
+  }
+  return buildUriMatcher(pattern);
+}
+
+/**
  * 主流程：查询 ES、解析、写入文件/打印摘要。
  * @param {object} opts 已解析的参数
  * @returns {Promise<number>} 退出码
  */
 async function main(opts) {
-  const matcher = buildUriMatcher(opts.uri);
-  const effectiveLimit = opts.limit > 0 ? Math.min(opts.limit, MAX_LIMIT) : 0;
+  const matcher = buildUriFilter(opts.uri);
+  // --latest 优先于 --limit：指定 latest 时先全量抓取再保留最后 N 条
+  const useLatest = opts.latest > 0;
+  const effectiveLatest = useLatest ? Math.min(Math.floor(opts.latest), MAX_LATEST) : 0;
+  if (useLatest && (effectiveLatest < 1 || effectiveLatest > MAX_LATEST)) {
+    throw new Error('--latest 必须是 1..' + MAX_LATEST + ' 之间的整数');
+  }
+  const effectiveLimit = !useLatest && opts.limit > 0 ? Math.min(opts.limit, MAX_LIMIT) : 0;
   const records = [];
   let total = 0;
   let parseFailed = 0;
+  let skippedIncomplete = 0;
   const failSamples = [];
   let usedSearchAfter = true;
   let searchAfter = null;
@@ -327,6 +391,10 @@ async function main(opts) {
         if (failSamples.length < 5) failSamples.push(String(hit._source?.msg ?? '').slice(0, 200).replace(/\r?\n/g, ' '));
         continue;
       }
+      if (parsed.ok && !parsed.complete && !opts.includeIncomplete) {
+        skippedIncomplete++;
+        continue;
+      }
       if (matcher && !matcher(parsed.uri)) continue;
       records.push(toRecord(hit, parsed));
       if (effectiveLimit > 0 && records.length >= effectiveLimit) break;
@@ -342,10 +410,15 @@ async function main(opts) {
     }
   }
 
+  // --latest: 按时间升序抓取后仅保留最后 N 条（保持时间升序输出）
+  if (useLatest && records.length > effectiveLatest) {
+    records.splice(0, records.length - effectiveLatest);
+  }
+
   // 控制台摘要
   const times = records.map((r) => r.logdate).filter(Boolean);
   console.log(`窗口: ${times.length ? times[0] : '?'} ~ ${times.length ? times[times.length - 1] : '?'} (本地时间)`);
-  console.log(`命中: ${total} | 写入: ${records.length} | 解析失败: ${parseFailed}`);
+  console.log(`命中: ${total} | 写入: ${records.length} | 解析失败: ${parseFailed} | 跳过不完整: ${skippedIncomplete}${useLatest ? ' | latest=' + effectiveLatest : ''}`);
   console.log('URI 分布 (前 40):');
   const uriCounts = new Map();
   for (const r of records) uriCounts.set(r.uri ?? 'null', (uriCounts.get(r.uri ?? 'null') ?? 0) + 1);
@@ -383,4 +456,6 @@ async function cli() {
   }
 }
 
-process.exitCode = await cli();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exitCode = await cli();
+}
