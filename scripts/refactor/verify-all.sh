@@ -104,6 +104,8 @@ run "characterize-export-v3-pid" node scripts/characterization/characterize-expo
 run "characterize-budget-extend" "$PY" scripts/characterization/characterize-budget-extend.py
 run "characterize-export-v3-field-completeness" node scripts/characterization/characterize-export-v3-field-completeness.mjs
 run "characterize-xpath-three-sources" node scripts/characterization/characterize-xpath-three-sources.mjs
+run "characterize-resolve-ambiguous-region" node scripts/characterization/characterize-resolve-ambiguous-region.mjs
+run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
