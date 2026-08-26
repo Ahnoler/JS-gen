@@ -112,7 +112,18 @@
             </div>
           </div>
         </div>
+        <!-- Scenario 10: no-id input inside el-form-item (xpath_full must walk body path, no id short-circuit) -->
+        <div class="el-form-item">
+          <label class="el-form-item__label">说明</label>
+          <div class="el-form-item__content">
+            <div class="el-input">
+              <input class="el-input__inner" data-testid="plain-input" type="text" placeholder="请输入说明" />
+            </div>
+          </div>
+        </div>
         <button id="save-2" data-testid="save-2" class="el-button" type="button">保存</button>
+        <!-- Scenario 11: no-id button (xpath_full must walk body path, no id short-circuit) -->
+        <button class="el-button" data-testid="save-3" type="button">确认</button>
       </form>
     </div>
   </div>
