@@ -254,6 +254,23 @@ def _map_dom_event_to_action(payload: dict) -> Optional[tuple[str, dict, Optiona
     parent_text = re.sub(r'\s+', ' ', str(payload.get('parent_text') or '')).strip()
     if parent_text:
         element['parent_text'] = parent_text[:80]
+    region_fields = {
+        'region_role': 'region_role',
+        'region_id': 'region_id',
+        'region_label': 'region_label',
+        'region_chrome': 'region_chrome',
+        'region_section': 'region_section',
+        'region_block': 'region_block',
+    }
+    for dest, src in region_fields.items():
+        v = payload.get(src)
+        if v:
+            element[dest] = v
+    if isinstance(payload.get('layers'), list) and payload['layers']:
+        element['layers'] = payload['layers']
+    fc = payload.get('feature_card')
+    if isinstance(fc, dict) and fc:
+        element['feature_card'] = fc
 
     def _stamp_params(params: dict) -> dict:
         """Params must not carry xpath_smart; element snap holds the locator."""
