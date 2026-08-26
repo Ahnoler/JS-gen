@@ -641,17 +641,17 @@ export const PAGE_LOCATOR_HELPERS = `
     function buildFeatureCard(el, regionHint) {
       var region = regionHint || assignRegion(el);
       var cls = String((el && el.getAttribute && el.getAttribute('class')) || '').trim();
-      var classTokens = cls.split(/\s+/).filter(Boolean).slice(0, 12);
+      var classTokens = cls.split(/\\s+/).filter(Boolean).slice(0, 12);
       var title = '';
       if (el && el.getAttribute) {
         var rawTitle = el.getAttribute('aria-label') || el.getAttribute('title') || '';
-        title = String(rawTitle || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        title = String(rawTitle || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
       }
       if (!title && el && el.closest) {
         var card = el.closest('.el-card');
         if (card) {
           var h = card.querySelector('.el-card__header');
-          title = String((h && (h.innerText || h.textContent)) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+          title = String((h && (h.innerText || h.textContent)) || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
         }
         // Prefer nearer titlebox over outer collapse — coarse assignRegion stays
         // collapse-first; feature_card / L1c should reflect finer panel when present.
@@ -663,11 +663,11 @@ export const PAGE_LOCATOR_HELPERS = `
           var collapse = el.closest('.el-collapse-item');
           if (collapse) {
             var ch = collapse.querySelector('.el-collapse-item__header');
-            title = String((ch && (ch.innerText || ch.textContent)) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+            title = String((ch && (ch.innerText || ch.textContent)) || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
           }
         }
         if (!title && region && region.region_label) {
-          var rl = String(region.region_label || '').replace(/\s+/g, ' ').trim();
+          var rl = String(region.region_label || '').replace(/\\s+/g, ' ').trim();
           // Skip taxonomy tokens (section/main/…) — keep readable card keys only.
           if (rl && rl !== '区块' && rl !== '主区' && rl !== '其他' && rl !== '弹层' && rl !== '表格'
             && rl !== '侧栏' && rl !== '顶栏' && rl !== '页面') {
