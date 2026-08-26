@@ -1227,6 +1227,13 @@ Python 控制面（`d:\dev\ui-auto-recording-agent-python`）以当前 `schemas/
   文件：src/routes/v2/replay.js（删除）, src/services/replay-service.js（删除）, src/routes/v2/__init__.js, server.mjs, src/dashboard/api-docs/groups/recording.js, websocket.js, app.js, scripts/smoke/accept-engineering-apis.mjs（新增）, scripts/refactor/verify-all.sh
   Python 同步提示：Python 控制面若有 `/api/v2/replay/*` 组装回放调用需同步移除；live `/steps/replay` 协议不变。
 
+### Changed
+
+- 2026-08-26: **三路径相对 XPath 统一**：AI 录制 / 人工录制 / 自动抓取统一 `buildLocatorSnap` 5 参调用（targetKind action-aware）+ formLabel 统一 DOM 取（含 placeholder 回退）+ region/layers/feature_card 全量透传。人工录制 select_option/click_radio/switch_tab/close_dialog 补齐 smart locator（原仅绝对 xpath）。同一 DOM 节点三入口产出 xpath_smart/xpath_full/candidates 完全一致（新增 characterize-xpath-three-sources.mjs 回归护栏）。
+  影响范围：录制采集链（JS `src/cdp/page-locator-helpers.js` + Python mirror `scripts/controller/actions/js_snippets/_locator_helpers_js.py`）、AI 录制 `elMeta`、人工录制 `scripts/manual_recorder/js_parts/a.py`、Python mapper `scripts/controller/actions/_helpers.py`、characterization 回归护栏。无 schema/路由/WS 变更。
+  文件：src/cdp/page-locator-helpers.js, scripts/controller/actions/js_snippets/_locator_helpers_js.py（生成，经 scripts/_gen_locator_helpers_py.mjs）, scripts/manual_recorder/js_parts/a.py, scripts/controller/actions/_helpers.py, scripts/characterization/characterize-xpath-three-sources.mjs（新增）, scripts/characterization/characterize-live-xpath-e2e.mjs, scripts/characterization/characterize-resolve-ambiguous-region.mjs, scripts/characterization/characterize-resolve-collision-titlebox.mjs
+  Python 同步提示：mapper.py element 新增 region/layers/feature_card 透传；offline 重建链不变。
+
 ## 条目格式约定
 
 每次修改本项目必追加到 `[Unreleased]` 区段（发版时再剪切到 `[x.y.z] - YYYY-MM-DD`）：
