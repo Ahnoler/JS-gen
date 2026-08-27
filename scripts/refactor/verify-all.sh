@@ -61,6 +61,8 @@ run "characterize-close-dialog-replay" "$PY" scripts/characterization/characteri
 run "characterize-cascade-three-round" "$PY" scripts/characterization/characterize-cascade-three-round.py
 run "characterize-dialog-tasklist-scope" "$PY" scripts/characterization/characterize-dialog-tasklist-scope.py
 run "characterize-container-naming" "$PY" scripts/characterization/characterize-container-naming.py
+run "characterize-table-toolbar-pattern" "$PY" scripts/characterization/characterize-table-toolbar-pattern.py
+run "characterize-result-protocol" "$PY" scripts/characterization/characterize-result-protocol.py
 run "characterize-field-value-match" "$PY" scripts/characterization/characterize-field-value-match.py
 run "characterize-dual-save-section" "$PY" scripts/characterization/characterize-dual-save-section.py
 run "characterize-form-assistant" "$PY" scripts/characterization/characterize-form-assistant.py
