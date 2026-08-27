@@ -92,6 +92,10 @@ class ScannedField(BaseModel):
         default=False,
         description="True if this field was already filled by auto-fill (label is in task_list.done)",
     )
+    use: str = Field(
+        default="",
+        description="Recommended controller action for this kind (agent guidance)",
+    )
 
 
 # ── Scanned action button (outside .el-form-item) ─────────────────────────

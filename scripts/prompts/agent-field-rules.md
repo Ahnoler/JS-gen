@@ -148,3 +148,5 @@
 > **注意**：动态生成器规则已迁移至 `scripts/controller/actions/form_rules.py` 的 `FIELD_RULES` 声明式注册表。
 > Agent 运行时直接调用 `match_rule(label_text)` 即可，无需加载本文件。
 > 本文档仅保留语义说明供人类参考。
+
+- 任务列表/扫描条目带 use=… 时，该字段的写入动作必须照做（kind↔工具权威映射），不得用其他动作尝试。

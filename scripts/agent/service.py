@@ -558,6 +558,12 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                 # missing toast_ok just because an introduce picker confirmed.
                 if contract and contract.get('mode') not in ('introduce_pick',):
                     mark_quality_failed(business_data_ref, 'missing_success_token')
+            doubts = business_data_ref.get('_semantic_doubts')
+            if doubts and business_data_ref.get('_quality_failed'):
+                mark_quality_failed(
+                    business_data_ref,
+                    f"semantic_doubt_fields:{','.join(list(doubts)[:8])}",
+                )
             emit_phase_observability(business_data_ref, emit_json)
             phase_payload = {"phase": step_index, "name": task_text[:60]}
             phase_payload["maxActionsPerStep"] = max_actions_per_step

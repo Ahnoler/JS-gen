@@ -411,6 +411,9 @@ def _llm_generate_values(llm, items, business_data_store=None,
         kind = item.get('kind', 'input') if isinstance(item, dict) else 'input'
         line = f'{i+1}. label: "{label}", kind: {kind}'
         if isinstance(item, dict):
+            ua = item.get('use') if isinstance(item, dict) else ''
+            if ua:
+                line += f', use: "{ua}"'
             if item.get('commandValue'):
                 line += f', commandValue: "{item["commandValue"]}"'
             if item.get('options'):

@@ -54,6 +54,35 @@ _ERR_PRESCRIPTIONS = (
         _PREFIX + '系统返回了报错。先读清错误文本：修正选择/字段后再重试'
         '（如更换或清除已选人），禁止原样重复点击确认/保存。',
     ),
+    (
+        'err-select-option-unresolved',
+        _PREFIX + '禁止用同一 option_text 第三次重试。改取错误里 现场/options 的原文'
+        '（或 option-not-found 列表中的相近项）作为 option_text 再试一次。',
+    ),
+    (
+        'err-field-disabled',
+        _PREFIX + '这是下拉类字段，fill_form_field 不会再成功。按字段 kind 用'
+        ' select_option / select_tree_option / 日期 YYYY-MM-DD 重填。',
+    ),
+    (
+        'err-button-not-found-in-row',
+        _PREFIX + '按 rowHasRadio 提示：true 则 click_table_row_radio 选行后点上方工具栏'
+        '同名按钮；禁止猜行内其他链接。',
+    ),
+    (
+        'err-table-row-not-found',
+        _PREFIX + 'row_text 与单元格原文不一致。改抄 scan 里单元格完整文本；'
+        '跨单元格可用空格拼接（匹配忽略空白）。',
+    ),
+    (
+        'err-icon-label-miss',
+        _PREFIX + '目标不是 tooltip 图标也不是文字按钮。核对 get_page_state().iconButtons；'
+        '行内按钮改 click_table_row_button。',
+    ),
+    (
+        'err-icon-label-ambiguous',
+        _PREFIX + '同名按钮多个。用 现场/textButtons 里完整文字或 click_element_by_index 索引。',
+    ),
 )
 
 

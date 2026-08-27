@@ -33,6 +33,7 @@ from .form_scan_utils import (
     _submit_ready_hint, _query_not_form_payload,
 )
 from ...models import TaskItem
+from .result_protocol import recommend_action_for_kind
 
 
 async def _clear_field_value(page, label_text):
@@ -116,6 +117,7 @@ async def scan_form_fields_impl(browser_context, business_data_store, button_key
                 disabled=prev.disabled if prev else False,
                 required=prev.required if prev else False,
                 hasButton=prev.hasButton if prev else '',
+                use=prev.use if prev else '',
                 xpath_smart=prev.xpath_smart if prev else '',
                 section_id=prev.section_id if prev else '',
                 section_title=prev.section_title if prev else '',
@@ -126,6 +128,8 @@ async def scan_form_fields_impl(browser_context, business_data_store, button_key
         if item.label in prev_intervene:
             item.needs_intervention = True
     business_data_store['task_list'] = tl.to_store()
+    for f in dom_fields:
+        f.use = recommend_action_for_kind(f.kind)
     business_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
 
     # Annotate fields so agent knows which were handled
