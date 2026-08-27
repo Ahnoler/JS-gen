@@ -299,34 +299,6 @@ JS_SELECT_OPTION = '''async (arg) => {
     hit = await fuzzyMatchInPool([...seenItems]);
     if (hit) return hit;
 
-    // Step 3: no match at all — pick the first item as fallback (non-exactOnly).
-    // Accept the first item unconditionally so the Python side records a
-    // selection rather than looping on value-mismatch / option-not-found.
-    if (!exactOnly && seenItems.size > 0) {
-        const firstItem = [...seenItems][0];
-        if (firstItem) {
-            firstItem.scrollIntoView({ block: 'nearest' });
-            const t = optionLabel(firstItem);
-            const clickEl = (firstItem.tagName === 'TR')
-                ? (firstItem.querySelector('td .cell, td') || firstItem)
-                : firstItem;
-            clickEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-            clickEl.click();
-            if (firstItem.tagName === 'TR' && clickEl !== firstItem) firstItem.click();
-            if (triggerInput) {
-                setTimeout(() => {
-                    triggerInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    triggerInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    window.__last_select_trigger = null;
-                }, 0);
-            }
-            await sleep(250);
-            const fb = readbackSelectedText();
-            const fbLabel = fb || t;
-            return 'ok:' + fbLabel + ' | fallback-first | wanted:' + option;
-        }
-    }
-
     const hasEmpty = (dropdown && dropdown !== document)
         ? dropdown.querySelector('.el-select-dropdown__empty')
         : document.querySelector('.el-select-dropdown__empty');

@@ -85,6 +85,8 @@ def test_js_select_option_has_readback_verify() -> None:
         "current.startsWith(option)" in js,
         "non-exactOnly accepts table-select name+digit prefix readback",
     )
+    assert_true("fallback-first" not in js, "JS_SELECT_OPTION never silently clicks first item")
+    assert_true("return 'option-not-found:'" in js or "return 'option-not-found:' + preview.join(', ')" in js, "JS_SELECT_OPTION surfaces option-not-found preview for missing wanted")
 
 
 def test_js_select_option_all_return_points_verified() -> None:
@@ -197,6 +199,11 @@ def test_form_engine_value_mismatch_branch() -> None:
         "reset_select_ui" in pre and "JS_SELECT_TRIGGER_BY_XPATH" in pre,
         "strict attempt preceded by reset + re-trigger",
     )
+    # Defense-in-depth guard: fallback-first pseudo-success must be rejected
+    # before record/task_done; and no first-item fallback success path exists.
+    assert_true("'fallback-first' in str(select_result)" in body, "SelectEngine rejects fallback-first pseudo-success")
+    assert_true("fallback=\"fallback-first\"" not in body, "no fallback-first success recording path")
+    assert_true("JS_SELECT_OPTION, 'first'" not in body, "SelectEngine has no first-item fallback backdoor")
 
 
 # ── 3. Snapshot options in form_scan_utils ──────────────────────────────────

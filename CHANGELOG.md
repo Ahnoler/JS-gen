@@ -65,6 +65,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   影响范围：src/executor-ws.js（注册对账）、src/services/executor-orphan-session-service.js（新模块）、src/routes/v2/executor.js（手动关闭端点）、src/dashboard/api-docs/slot-monitor.js（面板按钮）；scripts/characterization/characterize-executor-orphan-reconcile.mjs（新增）已注册 verify-all。无 schema 变更。
   附带：characterize-layer-tree / characterize-export-v3 真实数据锚点 traj 38 已不在库中（数据裁剪），迁移到 traj 33（#11426 / phase_highlight）；export-v3 的 rect 抽样断言从按位对齐改为多重集一致（步骤可能因元操作跳过导致错位，统计意义等价）。
 
+- 2026-08-27: **对公客户类型读录错值根治——select_option 首项兜底伪成功移除（A+B 双层）**：traj 157 复现链——业务数据把「信贷潜在客户」（实际属「客户状态」选项）配给「对公客户类型」，wanted 不在下拉项中时 JS 旧 fallback-first 分支直接点首项「企业类」却返回 `ok | 企业类 | fallback-first | wanted:信贷潜在客户`，Python 误判成功：记录 wanted 原文 + task_done，回放/导出跟着错。修复：① A（JS 侧根修）`js_snippets/select_option.py` 删除 fallback-first 分支——wanted 不存在时返回 `option-not-found:<预览>`，不再伪造成功（首项别名 first/1st/第一个/第一项 显式请求语义保留）；② B（Python 防回归兜底）`form_action_engines.py` 在 `_is_ok_result` 分支顶端新增守卫：结果串含 `fallback-first` 一律拒绝为 err-select-option-unresolved（附现场预览与下一步指引），并删除 `retries>=3` 时以 JS_SELECT_OPTION, first + ok_marked(fallback=...) 的旧兜底——两层关闭「wanted 不在下拉项时点首项却报成功」通道，LLM 可当步自纠（取现场原文或改用正确字段）。
+  影响范围：select_option 对「错配/不存在选项」从静默伪成功转为诚实失败；录制/回放链路无其他变化。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/js_snippets/select_option.py, scripts/controller/actions/form_action_engines.py, scripts/characterization/characterize-select-option-verify.py, scripts/refactor/verify-all.sh（新增注册）
+
 - 2026-08-27: **编辑草稿客户录制循环（国别 value-mismatch 复发 + field-disabled 10 步空转）——三项加固**：录例中 radio→修改→引入全链路已修复生效，卡点收窄为三个下拉字段。用户初判"缓冲步骤给多"不成立：budget 预估 8 步/上限 17，第 16 步即注入 final-save urgency，且随后延期 +12/+8 共跑 38 步——步数充足，是每一步都在原地失败。CDP 隔离复现与带污染批次重放均**一次通过**（别名重试 ok:中华人民共和国），证明机制无恙、属负载型竞态：录制进程叠加截图捕获/CPU 高载时懒加载分块渲染 >500ms，旧滚动稳定判定（streak≥2≈500ms）误判"到底"，可见窗口模糊匹配点了「中国香港特别行政区」；Python 别名重试在同一负载下二次踩坑；`fill_form_field` 对三个 select 只返回裸 `field-disabled` 无任何指向，agent 连续 10+ 步盲试。
   加固：
   ① **滚动耐心显式化**（`js_snippets/select_option.py` + CTRL `select.js` 同步）：上限 8→14 轮、sleep 250→220ms、稳定判定 streak≥2→≥3 且须 `i>=4`（MIN_ROUNDS_BEFORE_STABLE）才允许提前收手——慢分块不再伪装列表尽头。CDP 实测常规命中路径 0.27s 不受影响。

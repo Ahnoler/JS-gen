@@ -525,6 +525,18 @@ class SelectEngine(_FormActionEngineBase):
 
         select_result = await page.evaluate(JS_SELECT_OPTION, option_text)
         if _is_ok_result(select_result):
+            # Reject any JS result that silently picked the first item when the
+            # wanted option was absent (pseudo-success) — never record / task_done.
+            # JS-side root fix removes the fallback-first branch; this guard is
+            # defense-in-depth against a regression from any other click path.
+            if 'fallback-first' in str(select_result):
+                failed = await _final_select_failure(str(select_result), xp)
+                return err_with(
+                    'err-select-option-unresolved',
+                    '引擎拒绝首项兜底伪成功结果（wanted 不在下拉项中）',
+                    observed=f'label={label_text} last={failed}'[:160],
+                    next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>，或改用正确的字段)',
+                )
             matched_text = select_result.split(':', 1)[1] if ':' in select_result else select_result
             self.business_data_store.pop(f'_sel_retry_{label_text}', None)
             stamped = resolve_recorded_option_text(option_text, matched_text)
@@ -715,32 +727,6 @@ class SelectEngine(_FormActionEngineBase):
                     _record_action('select_option', params, matched_text, element=element)
                     _task_done_impl(label_text, self.business_data_store, value=matched_text, xpath_smart=xp_inv)
                     return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', self.business_data_store))
-            retry_key = f'_sel_retry_{label_text}'
-            retries = self.business_data_store.get(retry_key, 0) + 1
-            self.business_data_store[retry_key] = retries
-            if retries >= 3:
-                first_result = await page.evaluate(JS_SELECT_OPTION, 'first')
-                if _is_ok_result(first_result):
-                    matched_text = first_result.split(':', 1)[1] if ':' in first_result else first_result
-                    self.business_data_store.pop(f'_sel_retry_{label_text}', None)
-                    stamped = resolve_recorded_option_text(option_text, matched_text)
-                    params['option_text'] = stamped
-                    _record_action('select_option', params, matched_text, element=element)
-                    _task_done_impl(
-                        label_text, self.business_data_store, value=stamped or matched_text, xpath_smart=xp_inv,
-                    )
-                    return ok_marked(
-                        self.business_data_store, label=label_text, got=matched_text,
-                        fallback="fallback-first",
-                        wanted=(option_text if matched_text != option_text else ""),
-                    )
-                failed = await _final_select_failure(str(first_result), xp)
-                return err_with(
-                    "err-select-option-unresolved",
-                    "下拉无可见选项",
-                    observed=f"label={label_text} last={failed}"[:160],
-                    next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
-                )
             failed = await _final_select_failure(str(select_result), xp)
             return err_with(
                 "err-select-option-unresolved",
@@ -912,5 +898,4 @@ class TreeEngine(_FormActionEngineBase):
                 f'or select_option if the field is an el-select.'
             )
         return result
-
 
