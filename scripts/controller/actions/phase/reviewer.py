@@ -136,6 +136,11 @@ def promote_contract_for_save_cues(
     deterministic classifier says form_fill/form_modify AND the task text carries
     a save/submit cue, the contract is re-promoted to create/modify with submit
     tokens — the LLM misclassification cannot silently win over the signal.
+
+    E extension (2026-08-27): the narrative fields (goal / done_when / in_scope /
+    out_of_scope / brief_plan / source) are also re-derived from the deterministic
+    template so leftover LLM navigation wording (只打开页面 / 不办理…) cannot
+    contradict the promoted create/modify contract inside agent prompts.
     """
     if not isinstance(contract, dict):
         return contract
@@ -166,9 +171,56 @@ def promote_contract_for_save_cues(
     c['success'] = success
     c['allow_form_assistant'] = True
     c['refill'] = 'all_editable'
+    # 叙事字段派生（E）：LLM 遗留的导航式叙事与升级后的 create/modify 硬语义矛盾
+    # （如 out_of_scope「只打开页面/不办理页面内业务流程」在 intent_gates.py:47-73
+    # 逐行注入摘要，agent 可能被明确告知不要填表/过早 done）。goal 直接用阶段全文
+    # （与【当前任务】一致）；in_scope/out_of_scope/done_when/brief_plan 按确定性
+    # 模板重写；source 标记为 llm+guard 以与纯 LLM 合约区分。
+    c['goal'] = str(task_text or '').strip()[:300]
+    if c['mode'] == 'create':
+        c['done_when'] = (
+            '完成新增表单/抽屉的必填字段填写并通过校验（err-save-validation 为空），'
+            '点击保存后出现保存成功提示（ok-save-success/操作成功）或页面跳转至后续页面；'
+            '随后终检并 done。'
+        )
+        c['in_scope'] = [
+            '填写/修订当前表单必填及任务点名字段（值必须落在对应字段选项内）',
+            '处理表单校验错误（err-save-validation 列出的字段）',
+            '点击保存/提交并确认保存成功（提示或跳转）',
+            '终检后调用 done() 结束本阶段',
+        ]
+        c['brief_plan'] = [
+            '进入/打开新增表单或抽屉',
+            '填写必填字段（先对照快照 options）',
+            '处理校验错误并点击保存',
+            '确认保存成功后 done',
+        ]
+    else:
+        c['done_when'] = (
+            '完成修改表单的必填/点名字段修改并通过校验（err-save-validation 为空），'
+            '点击保存/确认后出现保存成功提示（ok-save-success/操作成功）或页面跳转；'
+            '随后终检并 done。'
+        )
+        c['in_scope'] = [
+            '修改当前表单必填及任务点名/业务数据点名字段（值必须落在对应字段选项内）',
+            '处理表单校验错误（err-save-validation 列出的字段）',
+            '点击保存/提交并确认保存成功（提示或跳转）',
+            '终检后调用 done() 结束本阶段',
+        ]
+        c['brief_plan'] = [
+            '打开/定位修改表单',
+            '修改必填/点名字段（先对照快照 options）',
+            '点击保存/确认并等待成功',
+            '终检后 done',
+        ]
+    c['out_of_scope'] = [
+        '后续阶段的任务（见【阶段目录】后续阶段）',
+        '放弃保存/取消关闭当前表单',
+    ]
+    c['source'] = 'llm+guard'
     sys.stderr.write(
         f'[phase_reviewer] promote {old_mode}→{c["mode"]} '
-        f'(save-cue in text; deterministic={det})\n'
+        f'(save-cue in text; deterministic={det}) narrative=derived\n'
     )
     sys.stderr.flush()
     return c

@@ -77,6 +77,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   影响范围：含「点击保存/提交」且确定性为填表/修改类的阶段不再可能被 LLM 评审器降级为 navigate——done 门禁将按 submit.required 拒绝提前 done。无 schema/路由/WS 变更。
   文件：scripts/controller/actions/phase/reviewer.py, scripts/prompts/phase-reviewer-prompt.md, scripts/characterization/characterize-phase-save-cue-promote.py（新增）, scripts/refactor/verify-all.sh（新增注册）
 
+- 2026-08-27: **promote 叙事字段派生（E：消除升级合约的提示词矛盾）**：D 方案护栏升级硬语义后，LLM 遗留的导航式叙事字段仍会注入 agent 提示（intent_gates.py 逐行输出 out_of_scope/done_when/brief_plan；planner 被要求尊重 out_of_scope）——如「只打开页面/不办理页面内业务流程」与升级后的 create 合约直接矛盾，agent 可能被明确告知不要填表或过早 done。修复：promote_contract_for_save_cues 升级分支同步派生叙事——goal=阶段全文[:300]（与【当前任务】一致）、done_when=校验+保存成功模板（create/modify 区分）、in_scope=填表/校验/保存/终检 4 条、out_of_scope=后续阶段+不放弃保存、brief_plan=对应 4 步、source=llm+guard（与纯 LLM 合约可区分）；stderr 日志句尾追加 narrative=derived（前缀逐字节不变）。特征化追加 E 断言（A 用例 goal/done_when/in_scope/out_of_scope/source/brief_plan 七项 + H 无导航残留用例 + B/C/D 未触发时 goal/source 保持不变）。
+  影响范围：被 promote 的合约叙事与硬语义自洽，agent/planner 不再读到矛盾指引；触发条件与既有硬语义升级行为不变。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/phase/reviewer.py, scripts/characterization/characterize-phase-save-cue-promote.py
+
 - 2026-08-27: **编辑草稿客户录制循环（国别 value-mismatch 复发 + field-disabled 10 步空转）——三项加固**：录例中 radio→修改→引入全链路已修复生效，卡点收窄为三个下拉字段。用户初判"缓冲步骤给多"不成立：budget 预估 8 步/上限 17，第 16 步即注入 final-save urgency，且随后延期 +12/+8 共跑 38 步——步数充足，是每一步都在原地失败。CDP 隔离复现与带污染批次重放均**一次通过**（别名重试 ok:中华人民共和国），证明机制无恙、属负载型竞态：录制进程叠加截图捕获/CPU 高载时懒加载分块渲染 >500ms，旧滚动稳定判定（streak≥2≈500ms）误判"到底"，可见窗口模糊匹配点了「中国香港特别行政区」；Python 别名重试在同一负载下二次踩坑；`fill_form_field` 对三个 select 只返回裸 `field-disabled` 无任何指向，agent 连续 10+ 步盲试。
   加固：
   ① **滚动耐心显式化**（`js_snippets/select_option.py` + CTRL `select.js` 同步）：上限 8→14 轮、sleep 250→220ms、稳定判定 streak≥2→≥3 且须 `i>=4`（MIN_ROUNDS_BEFORE_STABLE）才允许提前收手——慢分块不再伪装列表尽头。CDP 实测常规命中路径 0.27s 不受影响。

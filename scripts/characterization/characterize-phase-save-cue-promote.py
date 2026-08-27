@@ -9,6 +9,7 @@ D2 gate: prompt rules 2/8 carry the anti-navigate trap wording. No live LLM.
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -43,6 +44,9 @@ def main() -> None:
            'classify lazy import missing')
     _check('def sanitize_contract_for_mode' in reviewer_body,
            'sanitize_contract_for_mode removed')
+    _check('narrative=derived' in reviewer_body,
+           'stderr narrative=derived suffix missing')
+    _check('llm+guard' in reviewer_body, 'llm+guard source marker missing')
 
     # Static pins: D2 prompt trap rules.
     _check('禁止 navigate/query' in prompt_body, 'rule 8 anti-navigate wording missing')
@@ -60,16 +64,32 @@ def main() -> None:
     }
 
     # A) incident text (2026-08-27 d3943e89): LLM said navigate -> promote create.
-    a = promote_contract_for_save_cues(
-        dict(base),
-        '新增一个信贷潜在客户辰瀚投资控股集团有限公司，点击保存。预期结果：页面跳转至客户基本信息填写页或提示保存成功。',
+    task_a = (
+        '新增一个信贷潜在客户辰瀚投资控股集团有限公司，点击保存。'
+        '预期结果：页面跳转至客户基本信息填写页或提示保存成功。'
     )
+    a = promote_contract_for_save_cues(dict(base), task_a)
     assert a is not None
     assert a['mode'] == 'create', a['mode']
     assert a['submit']['required'] is True
     assert a['success']['kinds'] == ['toast_ok', 'url_change', 'saved_navigation']
     assert a['allow_form_assistant'] is True
     assert a['refill'] == 'all_editable'
+
+    # E(derive) gate: narrative fields re-derived from task text + det template.
+    assert a['goal'] == task_a[:300], f'A goal not derived from task text: {a["goal"]!r}'
+    assert '保存' in a['done_when'], 'A done_when must mention 保存'
+    assert '校验' in a['done_when'], 'A done_when must mention 校验'
+    assert any('保存' in x for x in a['in_scope']), 'A in_scope must mention 保存'
+    assert '后续阶段' in a['out_of_scope'][0], 'A out_of_scope[0] must mention 后续阶段'
+    assert not any(
+        '不办理' in x or '只打开' in x for x in a['out_of_scope']
+    ), 'A out_of_scope must not carry navigation-template residue'
+    assert (
+        '不办理' not in a['done_when'] and '只打开' not in a['done_when']
+    ), 'A done_when must not carry navigation-template residue'
+    assert a['source'] == 'llm+guard', f'A source must be llm+guard: {a["source"]!r}'
+    assert any('保存' in x for x in a['brief_plan']), 'A brief_plan must mention 保存'
 
     # B) pure open-page navigate: no save cue, deterministic=other -> unchanged.
     b = promote_contract_for_save_cues(
@@ -80,18 +100,24 @@ def main() -> None:
     assert b['submit']['required'] is False
     assert b['allow_form_assistant'] is False
     assert b['refill'] == 'none'
+    assert b['goal'] == base['goal'], 'B no-promote: goal must stay LLM navigation goal'
+    assert b['source'] == 'llm', 'B no-promote: source must stay llm'
 
     # C) pure query: deterministic=query -> unchanged.
     c = promote_contract_for_save_cues(dict(base), '查询产品信息')
     assert c is not None
     assert c['mode'] == 'navigate'
     assert c['submit']['required'] is False
+    assert c['goal'] == base['goal'], 'C no-promote: goal must stay unchanged'
+    assert c['source'] == 'llm', 'C no-promote: source must stay llm'
 
     # D) create without save cue -> unchanged (form_fill but no _SAVE_CUE_RE hit).
     d = promote_contract_for_save_cues(dict(base), '新增一个客户基本档案。')
     assert d is not None
     assert d['mode'] == 'navigate'
     assert d['submit']['required'] is False
+    assert d['goal'] == base['goal'], 'D no-promote: goal must stay unchanged'
+    assert d['source'] == 'llm', 'D no-promote: source must stay llm'
 
     # E) modify + save cue -> promote modify.
     e = promote_contract_for_save_cues(dict(base), '修改客户状态为潜在并点击保存。')
@@ -116,6 +142,14 @@ def main() -> None:
     assert g['submit']['via'] == 'click_save'
     assert g['success']['kinds'] == ['toast_ok']
     assert g['success']['evidence'] == ['x']
+
+    # H) derived narrative carries no navigation-template residue
+    #    (进入…页面 / 打开页面) in in_scope / out_of_scope.
+    nav_residue = re.compile(r'进入[^，。；]*页面|打开页面')
+    for item in a['in_scope']:
+        assert not nav_residue.search(item), f'H in_scope nav residue: {item!r}'
+    for item in a['out_of_scope']:
+        assert not nav_residue.search(item), f'H out_of_scope nav residue: {item!r}'
 
     print('PASS characterize-phase-save-cue-promote')
 
