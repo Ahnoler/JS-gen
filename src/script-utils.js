@@ -1,47 +1,6 @@
 /**
- * File-based generated script index + script lifecycle helpers.
+ * Trajectory flow extraction helper.
  */
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
-import path from 'path';
-import { GENERATED_DIR } from '../config/config.js';
-
-/**
- * Ensure the generated scripts directory exists.
- * @returns {void} result
- */
-export function ensureGeneratedDir() {
-  if (!existsSync(GENERATED_DIR)) mkdirSync(GENERATED_DIR, { recursive: true });
-}
-
-/**
- * Load and parse the generated scripts index.json (returns [] on missing/parse error).
- * @returns {object[]} result
- */
-export function loadGeneratedIndex() {
-  ensureGeneratedDir();
-  const fp = path.join(GENERATED_DIR, 'index.json');
-  if (!existsSync(fp)) return [];
-  try { return JSON.parse(readFileSync(fp, 'utf-8')); } catch { return []; }
-}
-
-/**
- * Persist the generated scripts index list to index.json.
- * @param {object[]} list list
- * @returns {void} result
- */
-export function saveGeneratedIndex(list) {
-  ensureGeneratedDir();
-  writeFileSync(path.join(GENERATED_DIR, 'index.json'), JSON.stringify(list, null, 2), 'utf-8');
-}
-
-/**
- * Best-effort delete a script file (ignores missing/errors).
- * @param {string} scriptPath script path
- * @returns {void} result
- */
-export function cleanupScriptFile(scriptPath) {
-  try { if (existsSync(scriptPath)) unlinkSync(scriptPath); } catch {}
-}
 
 /**
  * Extract a flattened action flow from a browser-use trajectory's history.

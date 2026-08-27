@@ -354,7 +354,7 @@ export function stepEntryToTrajectoryStep(entry, context = {}) {
 }
 
 /**
- * Map trajectory_step row to action_{ts}.json entry format (for script_assembler).
+ * Map trajectory_step row to action_{ts}.json entry format (legacy action_{ts}.json export format).
  * @param {object} step — camelCase TrajectoryStep from DAO
  * @returns {object} action entry
  */
@@ -395,30 +395,4 @@ export function trajectoryStepToActionEntry(step) {
     phaseId: step.trajectoryPhaseId ?? step.phaseId ?? null,
     phase: step.phaseNumber ?? step.phase ?? 0,
   };
-}
-
-/**
- * Map trajectory_step rows to assembler command entries (action_{ts}.json shape).
- * Shared by v2 trajectories assemble-file and the legacy assembled-replay prepare path.
- * @param {Array} steps 轨迹步骤列表
- * @param {object} [opts] 选项
- * @param {boolean} [opts.preferEntryPhase] — when step.phaseNumber is missing,
- *   fall back to entry.phase (step.phase) instead of 0 (legacy assembled-replay behavior).
- * @returns {object[]} 组装器命令条目列表
- */
-export function stepsToActionCommands(steps, { preferEntryPhase = false } = {}) {
-  return (steps || []).map((s) => {
-    const entry = trajectoryStepToActionEntry(s);
-    const rawEl = s.element ?? s.elementJson ?? null;
-    const el = typeof rawEl === 'string'
-      ? (() => { try { return JSON.parse(rawEl); } catch { return {}; } })()
-      : (rawEl || {});
-    return {
-      ...entry,
-      // Ensure target from either shape
-      target: entry.target || el.xpath || el.target || '',
-      phase: preferEntryPhase ? (s.phaseNumber ?? entry.phase ?? 0) : (s.phaseNumber ?? 0),
-      source: s.source || 'agent',
-    };
-  });
 }

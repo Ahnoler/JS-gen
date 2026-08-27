@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import path from 'path';
 import { readFileSync, existsSync } from 'fs';
-import { PORT, HOST, TMP_DIR, DASHBOARD_DIR, PROJECT_DIR, EXECUTOR_HEARTBEAT_TIMEOUT_MS, LLM_MODEL } from '#config/config.js';
+import { PORT, HOST, DASHBOARD_DIR, PROJECT_DIR, EXECUTOR_HEARTBEAT_TIMEOUT_MS, LLM_MODEL } from '#config/config.js';
 import { state, isConfigured } from './src/state.js';
 import { initWebSocket } from './src/ws-server.js';
 import { initExecutorWs, validateExecutorToken, rejectUpgrade } from './src/executor-ws.js';
@@ -10,11 +10,8 @@ import * as executorService from './src/services/executor-node-service.js';
 import registerHealthRoutes from './src/routes/health.js';
 import registerAgentRoutes from './src/routes/agent.js';
 
-import registerTestHistoryRoutes from './src/routes/test-history.js';
-import registerTestRunRoutes from './src/routes/test-run.js';
 import registerLLMProxyRoutes from './src/routes/llm-proxy.js';
 import registerBrowserSessionRoutes from './src/routes/browser-session.js';
-import registerAssembleRoutes from './src/routes/test-assemble.js';
 import registerLegacyGoneRoutes from './src/routes/legacy-gone.js';
 import registerSetupRoutes from './src/routes/setup.js';
 import registerV2Routes from './src/routes/v2/__init__.js';
@@ -24,7 +21,6 @@ import * as screenshotDao from './src/dao/screenshot-dao.js';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
-app.use('/api/test/screenshots', express.static(TMP_DIR));
 app.use('/scripts', express.static(path.join(PROJECT_DIR, 'scripts')));
 app.use(express.static(DASHBOARD_DIR, {
   maxAge: 0,
@@ -38,12 +34,9 @@ registerLLMProxyRoutes(app);
 registerBrowserSessionRoutes(app);
 // Legacy JSON catalogs: return 410 Gone → use /api/v2/trajectories|business-data
 registerLegacyGoneRoutes(app);
-registerAssembleRoutes(app);
 registerHealthRoutes(app);
 registerAgentRoutes(app);
 
-registerTestHistoryRoutes(app);
-registerTestRunRoutes(app);
 registerSetupRoutes(app);
 registerV2Routes(app);
 
@@ -181,7 +174,6 @@ async function main() {
     console.log(`  GET  /api/v2/business-data`);
     console.log(`  GET  /api/v2/system-ref-data`);
     console.log(`  POST /api/browser/session  (debug)`);
-    console.log(`  POST /api/test/assemble | /api/test/run`);
     console.log(`  GET  /api/docs  (product API docs for frontend)`);
     console.log(`  GET  /api/test|/record-console|/record-studio  → 301 /api/docs (UI removed)`);
     console.log(`  GET  /api/trajectory|/api/business-data  → 410 Gone (use /api/v2/*)`);

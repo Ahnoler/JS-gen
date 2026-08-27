@@ -1,15 +1,11 @@
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import path from 'path';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryService from '../../services/trajectory-service.js';
-import { stepsToActionCommands } from '../../models/element.js';
 import { TRAJECTORY_RECORD_STATUSES } from '../../models/constants.js';
-import { PROJECT_DIR } from '#config/config.js';
 import { sendErr } from './trajectory-shared.js';
 
 /**
- * Trajectory (transaction) CRUD + phases + action-flow + assemble-file +
- * clear + login-context. Primary product v2 API.
+ * Trajectory (transaction) CRUD + phases + action-flow + clear +
+ * login-context. Primary product v2 API.
  *
  * Prefix: /api/v2/trajectories/*
  * @param {import('express').Application} app Express application
@@ -278,35 +274,6 @@ export default function (app) {
     try {
       const flow = await trajectoryService.getTrajectoryActionFlow(+req.params.id, []);
       res.json(flow);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  /**
-   * Materialize DB steps as scripts/action/action_db_*.json for the assembler.
-   */
-  app.post('/api/v2/trajectories/:id/assemble-file', async (req, res) => {
-    try {
-      const traj = await trajectoryDao.getById(+req.params.id);
-      if (!traj) return res.status(404).json({ error: 'Trajectory not found' });
-      const actionDir = path.join(PROJECT_DIR, 'scripts', 'action');
-      if (!existsSync(actionDir)) mkdirSync(actionDir, { recursive: true });
-      const commands = stepsToActionCommands(traj.steps);
-      const actionJson = {
-        id: String(traj.id),
-        name: 'db-trajectory',
-        url: traj.url || '',
-        tests: [{ id: String(traj.id), name: 'db-trajectory', commands }],
-      };
-      const fileName = `action_db_${traj.id}.json`;
-      const absPath = path.join(actionDir, fileName);
-      writeFileSync(absPath, JSON.stringify(actionJson, null, 2), 'utf-8');
-      res.json({
-        actionFile: `scripts/action/${fileName}`,
-        absPath,
-        commandCount: commands.length,
-      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

@@ -19,7 +19,6 @@
 | **系统树** | `/api/v2/system-mgmt/*`：系统 → 模块 → 功能（+ 账号）；交易挂在功能下 |
 | **执行机** | `npm run executor` → WS `/ws/executor`；槽位租约至 `detach`（`EXECUTOR_CAPACITY`） |
 | **Session 调试** | `/api/browser/session` — 工程调试路径，非整条产品录制主线 |
-| **组装 / 运行** | `/api/test/assemble`、`/api/test/run` — 工程管线；内核已抽到 `assemble-service` / `script-runner` |
 | **产品 API 文档** | `http://localhost:4097/api/docs` — 前端对接唯一契约（旧工程 HTML 页已移除，入口 301 到此处） |
 
 ---
@@ -95,19 +94,15 @@ Node.js Express (server.mjs, :4097)
  │     → USE_EXECUTOR ? 执行机会话 : 本地 browser session
  ├─ 产品回放
  │     /api/v2/trajectories/:id/steps/replay → live replay_actions (_replay.py)
- │     /api/v2/trajectories/:id/replay/* → DEPRECATED assemble → script-runner
  ├─ Session 调试（工程次要）
  │     /api/browser/session (+ /step, …)
- └─ 工程组装 / 运行
-       /api/test/assemble → assemble-service → script_assembler.py
-       /api/test/run      → script-runner → playwright-runner/run.cjs
 ```
 
 一次性 Explore/Workflow、以及旧工程 Dashboard / 录制联调 HTML 页已移除（产品 SPA 在独立 Vue 仓库）。产品 AI 录制用 v2 `record/start`（可选 `phaseIds`）。
 
-### 双语言 CTRL（必须同步）
+### JS snippets 单一语言面
 
-JS canonical（`src/ctrl-actions/`）↔ Python JS 字符串（`scripts/controller/actions/_js_snippets.py`）↔ Python（`scripts/controller/actions/`）三处同一表面：`fillFormField`、`selectOption`、`selectDate`、`clickMenuItem`、`clickTableRowButton`、`closeDialog` 等，改一处必须同步其余。同步规则、文件明细与生成文件约束见 [AGENTS.md](./AGENTS.md)，勿两处重复维护。
+浏览器注入式 CTRL 双语言副本（`src/ctrl-actions/` + Python `_js_snippets.py`）已随 assemble 工程管线移除；agent 侧浏览器 JS 片段现仅定义在 `scripts/controller/actions/js_snippets/*`（由 `_js_snippets.py` 聚合 re-export）。仍存在的跨语言单源是 **PAGE_LOCATOR_HELPERS 生成链**：JS 源 `src/cdp/page-locator-helpers.js` 经 `node scripts/_gen_locator_helpers_py.mjs` 生成 `scripts/controller/actions/js_snippets/_locator_helpers_js.py`，禁止手改生成物。约束明细见 [AGENTS.md](./AGENTS.md)。
 
 ### 关键模块
 
@@ -115,11 +110,10 @@ JS canonical（`src/ctrl-actions/`）↔ Python JS 字符串（`scripts/controll
 |------|------|------|
 | 产品 API | `src/routes/v2/` | system-mgmt、trajectories、replay、executors、case-data、… |
 | Session | `src/routes/browser-session/` | 调试会话 |
-| 组装 / 运行 | `src/routes/test-assemble.js` / `test-run.js` | 薄 HTTP；内核在 services/runtime |
 | 遗留 | `legacy-gone.js` | `/api/trajectory`、`/api/case-data` → 410 |
 | 运行时 | `src/runtime/script-runner.js` | 共享 Playwright 执行 |
-| 服务 | `assemble-service` / `replay-service` / `executor-slot-lease` | 组装、回放、槽位租约 |
-| Agent | `scripts/` | `main.py`、`session_runner.py`、`script_assembler.py`、`form_rules.py` |
+| 服务 | `replay-service` / `executor-slot-lease` | 回放、槽位租约 |
+| Agent | `scripts/` | `main.py`、`session_runner.py`、`form_rules.py` |
 | 提示词 | `scripts/prompts/*.md` | **不是** OpenCode skills |
 
 > 模块 / 服务 / 路由明细以 [AGENTS.md](./AGENTS.md) 为准，这里只是速览。
@@ -128,7 +122,7 @@ JS canonical（`src/ctrl-actions/`）↔ Python JS 字符串（`scripts/controll
 
 ### 产品前端
 
-产品 SPA 在独立仓库（Vue）；本仓库只提供控制面与 [`/api/docs`](http://localhost:4097/api/docs)。旧 `test-dashboard.html` / `record-console.html` / `record-studio.html` 已删除，对应 `GET /api/test*` 入口 **301 → `/api/docs`**。`/api/test/assemble`、`/api/test/run` 等工程 API 仍保留。
+产品 SPA 在独立仓库（Vue）；本仓库只提供控制面与 [`/api/docs`](http://localhost:4097/api/docs)。旧 `test-dashboard.html` / `record-console.html` / `record-studio.html` 已删除，对应 `GET /api/test*` 入口 **301 → `/api/docs`**。上述工程 API（`/api/test/assemble`、`/api/test/run` 等）已移除。
 
 执行机与控制面操作说明：`docs/执行机解耦与操作总结.md`（本地 docs，gitignore）。
 
@@ -142,7 +136,7 @@ JS canonical（`src/ctrl-actions/`）↔ Python JS 字符串（`scripts/controll
 |------|------|
 | `scripts/prompts/agent-prompt.md` 等 | Agent / Planner / 字段 / 修复提示词 |
 | `scripts/controller/actions/form_rules.py` | 可执行填表规则（身份证、手机号等） |
-| `src/ctrl-actions/*` + Python CTRL | 控件怎么点 / 怎么填 |
+| `scripts/controller/actions/js_snippets/*` | 控件怎么点 / 怎么填（agent 侧浏览器 JS 片段） |
 
 不要再按旧文档去找 `atp-ui` / `atp-rule` skill 包。
 
@@ -194,8 +188,6 @@ JS canonical（`src/ctrl-actions/`）↔ Python JS 字符串（`scripts/controll
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `POST` | `/api/browser/session` … | Session 调试 |
-| `POST` | `/api/test/assemble` | Action JSON → Playwright |
-| `POST` | `/api/test/run` | 执行脚本（`execution:*`） |
 | `GET` | `/api/docs` | 产品 API 文档（Swagger 风格，给前端；根路径亦跳转至此） |
 | `GET` | `/api/test`、`/record-console`、`/record-studio` | 旧工程 HTML 已移除 → **301** `/api/docs` |
 
@@ -236,7 +228,7 @@ JS canonical（`src/ctrl-actions/`）↔ Python JS 字符串（`scripts/controll
 | 现象 | 处理 |
 |------|------|
 | `/api/trajectory` 410 | 改用 `/api/v2/trajectories` |
-| 找不到 skills / atp-ui | 改看 `scripts/prompts/` 与 CTRL / `form_rules` |
+| 找不到 skills / atp-ui | 改看 `scripts/prompts/` 与 `js_snippets` / `form_rules` |
 | `opencode server not ready` | 本项目默认不依赖 OpenCode；检查 LLM 环境变量即可 |
 | 执行机连不上 | 配置 `EXECUTOR_TOKEN`，执行机侧 `CONTROL_PLANE_URL` |
 | 槽位满 409 | 对占用方 `detach`，或扩 `EXECUTOR_CAPACITY` |

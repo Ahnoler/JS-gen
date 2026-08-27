@@ -11,6 +11,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - 2026-08-27: **动作统一改名：`click_icon_button` → `click_button`**（该工具已拓展为通用"按标签点击按钮"：tooltip 图标优先，miss 直点同标签文字按钮）。控制器注册名、state 录制映射、manual_recorder 发射/映射、script_assembler BOUNDARY、codegen 导出模板（含生成脚本内 CTRL.clickButton 调用点）、browser 服务层（resolve-by-label/dedup/legacy-engine-export/transaction-export-v3）、models/action 三处、CTRL nav.js 方法键与 index.js 文档行、agent prompt 两个文件全量同步；回放兼容：replay_names 新增 `'click_icon_button' → 'click_button'` 与 camelCase 双别名，历史轨迹可正常回放。返回码（err-icon-label-miss/-ambiguous、ok-text）与 JS_CLICK_ICON_BUTTON 常量名不变。前端 vue 仓库 schema value 同步为 click_button 并保留旧值 alias（中文展示「点击按钮」）。
+- 2026-08-27: **配置/文档同步移除 ctrl-actions 与 assemble 残留**：`eslint.config.js` 移除 `src/ctrl-actions` ignore 项；`docs/jsdoc-convention.md` 删除 `ctrl-actions` 绕过章节；`AGENTS.md` 与 `README.md` 同步——删 `script_assembler` 命令与 characterization 示例行、改写双语言 CTRL 节为「JS snippets 单一语言面」、组件/服务表删 assemble 相关行、架构图删 assemble 分支、公开端点表删 `/api/test/assemble|run`、JSDoc 绕过列表删 `src/ctrl-actions/**`。
+  影响范围：开发工具链 ignore 与文档约定；无 schema/路由/WS/业务逻辑变更。
+  文件：`eslint.config.js`, `docs/jsdoc-convention.md`, `AGENTS.md`, `README.md`。
+
+### Removed
+
+- 2026-08-27: **移除 window.CTRL 注入库与 assemble 工程管线**：组装执行脚本职责早已退出产品需求，整体清理历史资产。删除 `src/ctrl-actions/` 目录与 `src/ctrl-actions.js` 桩、`src/services/assemble-service.js`、`src/routes/test-assemble.js` / `test-run.js` / `test-history.js`；`server.mjs` 摘除对应注册、启动日志行及 `/api/test/screenshots` 静态挂载。
+  影响范围：HTTP 端点 `/api/test/assemble`、`/api/test/run`、`/api/test/history*` 下线；产品回放不受影响（`replay_actions` / `_replay.py`）。
+  文件：`src/ctrl-actions*/`、`src/services/assemble-service.js`、`src/routes/test-{assemble,run,history}.js`、`server.mjs`、`src/runtime/script-runner.js`（瘦身为 characterization 用的 marker/截图工具函数）、`src/script-utils.js`（只留 `extractFlowFromTrajectory`）。
+- 2026-08-27: **移除 Python 装配器及其喂料端点**：删除 `scripts/script_assembler.py`、`scripts/codegen/`、孤立死脚本 `scripts/trace_entries.py`；v2 路由删除 `POST /api/v2/trajectories/:id/assemble-file`（未被前端与公开 API catalog 消费）；`src/models/element.js` 删除随之无消费者的 `stepsToActionCommands`（`trajectoryStepToActionEntry` 因被 live 回放/导出复用而保留）。
+  影响范围：产品回放零变化。
+  文件：`scripts/script_assembler.py`、`scripts/codegen/`、`scripts/trace_entries.py`、`src/routes/v2/trajectory.js`、`src/models/element.js`。
+- 2026-08-27: **移除绑定废弃资产的校验与门禁行**：删 `scripts/characterization/` 9 个脚本（ctrl/assembler-click/screenshots/date-fill-merge/icon-codes/select-table-row/select-lazy-load/table-toolbar-pattern/verify-form-structure）与 `scripts/smoke/accept-engineering-apis.mjs`；`verify-all.sh` 同步移除 6 行。
+  影响范围：refactor gate 其余项不变。
+  文件：`scripts/characterization/`、`scripts/smoke/`、`scripts/refactor/verify-all.sh`。
 
 ### Added
 

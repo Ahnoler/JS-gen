@@ -16,7 +16,6 @@
 - 私有 helper（未导出、仅文件内部使用）
 - 回调函数、Promise `.then/catch` 内联箭头函数
 - 一行纯转发函数（如 `export function isScriptExecuting() { return _isExecuting; }`）
-- `ctrl-actions/**` 全部文件（字节 pin，见第 5 节）
 
 ---
 
@@ -132,17 +131,7 @@ app.post('/api/v2/trajectories/analyze', async (req, res) => {
 
 ---
 
-## 5. ctrl-actions 绕过说明
-
-`src/ctrl-actions/**` 下的文件是**字节级拼接的字符串片段**，由 `characterize-ctrl.mjs` 校验字节稳定性。
-
-- **不加 JSDoc**（会改变拼接结果）
-- **不 lint**（eslint 配置中 ignore 该目录）
-- 文件头已有拼接一致性警告，保持原样
-
----
-
-## 6. 类型标注要点
+## 5. 类型标注要点
 
 | 场景 | 写法 |
 |---|---|
@@ -158,7 +147,7 @@ app.post('/api/v2/trajectories/analyze', async (req, res) => {
 
 ---
 
-## 7. 语言策略
+## 6. 语言策略
 
 - 中文、英文均可，但**同一文件内保持一致**
 - 现有代码中英混排常见（如 `trajectory-dao.js` 用中文描述），新增注释跟随所在文件的风格

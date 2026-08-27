@@ -3,7 +3,6 @@
  *
  * Focus: require JSDoc on exported functions + validate \@param/\@returns.
  * Private helpers, callbacks, and one-line passthroughs are exempt.
- * ctrl-actions/** is ignored (byte-pinned string fragments, see docs/jsdoc-convention.md).
  */
 import jsdoc from 'eslint-plugin-jsdoc';
 
@@ -13,7 +12,6 @@ export default [
       'node_modules/**',
       'nodejs/**',
       'python/**',
-      'src/ctrl-actions/**',
       '.superpowers/**',
       'tmp/**',
       'scripts/_scratch/**',
