@@ -107,6 +107,7 @@ run "characterize-resolve-collision-titlebox" node scripts/characterization/char
 run "characterize-log-extract" node scripts/characterization/characterize-log-extract.mjs
 run "characterize-backfill" node scripts/characterization/characterize-backfill.mjs
 run "characterize-refill-contract" "$PY" scripts/characterization/characterize-refill-contract.py
+run "characterize-executor-orphan-reconcile" node scripts/characterization/characterize-executor-orphan-reconcile.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

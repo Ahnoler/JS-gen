@@ -122,6 +122,20 @@ async function handleRegister(ws, payload) {
   } catch (err) {
     console.warn('[executor-ws] live binding restore skipped:', err.message);
   }
+
+  // Orphan reconcile: after a control-plane restart, live executor sessions
+  // whose remote_session rows were crashed (boot sweep) would otherwise occupy
+  // slots forever. Close the Python with keepBrowser=true → Chrome becomes a
+  // reusable orphan CDP browser.
+  try {
+    const { reconcileOrphanSessions } = await import('./services/executor-orphan-session-service.js');
+    const orphanResult = await reconcileOrphanSessions(node);
+    if (orphanResult.closed) {
+      console.log(`[executor-ws] closed ${orphanResult.closed} orphan executor session(s) for ${nodeUuid}`);
+    }
+  } catch (err) {
+    console.warn('[executor-ws] orphan session reconcile skipped:', err.message);
+  }
 }
 
 async function handleMessage(ws, msg) {

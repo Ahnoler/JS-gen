@@ -47,4 +47,26 @@ export default function (app) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  /**
+   * Close an orphan executor session by nodeUuid + sessionId (no trajectory binding).
+   * keepBrowser=true: kill the Python agent but leave Chrome on CDP for reuse.
+   */
+  app.post('/api/v2/executors/:nodeUuid/sessions/:sessionId/close', async (req, res) => {
+    try {
+      const { nodeUuid, sessionId } = req.params;
+      if (!registry.isConnected(nodeUuid)) {
+        return res.status(409).json({ error: 'executor node not connected' });
+      }
+      const execSession = await import('../../executor-session-client.js');
+      const sessions = await execSession.listExecutorSessions(nodeUuid, 8000).catch(() => []);
+      if (!(Array.isArray(sessions) ? sessions : []).some((s) => s.sessionId === sessionId)) {
+        return res.status(404).json({ error: 'session not found on executor' });
+      }
+      await execSession.closeSession({ nodeUuid, sessionId, keepBrowser: true, timeoutMs: 12000 });
+      res.json({ status: 'closed', nodeUuid, sessionId, keepBrowser: true });
+    } catch (err) {
+      res.status(err.statusCode || 500).json({ error: err.message });
+    }
+  });
 }

@@ -226,7 +226,9 @@ function renderSlotRow(node, slot) {
         data-sid="${escapeHtml(slot.sid || '')}"
         title="仅清空该 session 的控面 stderr 文件">清空日志</button>
     `
-    : '<span class="mon-muted">—</span>';
+    : (slot.occupied && slot.sessionId
+        ? `<button type="button" class="btn mon-btn mon-btn-danger" data-act="orphan-close" data-node="${escapeHtml(node.nodeUuid)}" data-session="${escapeHtml(slot.sessionId)}">关闭会话</button>`
+        : '<span class="mon-muted">—</span>');
 
   return `
     <tr class="${slot.occupied ? 'mon-row-occ' : 'mon-row-free'}" data-node="${escapeHtml(node.nodeUuid)}" data-slot="${slot.slotIndex}">
@@ -427,6 +429,25 @@ export function mountSlotMonitor(wrap) {
     }
   }
 
+  async function closeOrphanSession(btn) {
+    const nodeUuid = btn.dataset.node || '';
+    const sessionId = btn.dataset.session || '';
+    if (!nodeUuid || !sessionId) return;
+    if (!window.confirm(`确认关闭孤儿会话？\n节点：${nodeUuid}\n会话：${sessionId}\n（保留 Chrome 为可复用孤儿 CDP）`)) return;
+    setStatus('关闭会话…');
+    try {
+      await apiJson(`/api/v2/executors/${encodeURIComponent(nodeUuid)}/sessions/${encodeURIComponent(sessionId)}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      setStatus('关闭会话成功');
+      await refresh();
+    } catch (err) {
+      setStatus(`关闭会话失败：${err.message}`, true);
+    }
+  }
+
   async function fetchStderr(btn) {
     const sessionId = btn.dataset.session || '';
     const sid = btn.dataset.sid || '';
@@ -522,6 +543,7 @@ export function mountSlotMonitor(wrap) {
     if (act === 'detach' && Number.isFinite(tid)) callDetach(tid, true);
     if (act === 'stderr') fetchStderr(btn);
     if (act === 'clear-log') clearStderr(btn);
+    if (act === 'orphan-close') closeOrphanSession(btn);
   });
 
   $('.mon-refresh', wrap)?.addEventListener('click', () => refresh());

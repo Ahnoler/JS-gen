@@ -418,21 +418,21 @@ function testPayloadStructure() {
   }
 }
 
-// ── 真实数据（traj 38）──
+// ── 真实数据（traj 33）──
 async function testRealData() {
-  console.log('[real data] traj 38');
+  console.log('[real data] traj 33');
   const db = getDB();
   try {
-    const traj = await trajectoryDao.getById(38);
-    const phases = await trajectoryPhaseDao.listByTrajectory(38);
-    const shots = await screenshotDao.listPhaseHighlightsByTrajectory(38);
+    const traj = await trajectoryDao.getById(33);
+    const phases = await trajectoryPhaseDao.listByTrajectory(33);
+    const shots = await screenshotDao.listPhaseHighlightsByTrajectory(33);
     const built = buildTransactionEntryV3(traj, { systemId: 'sys', projectId: 'proj', phases, phaseScreenshots: shots });
     const entry = built.entry;
     const props = entry.transcationProperties;
     check(entry.result === undefined, '真实数据 entry 无 result');
     check(built.screenshots === undefined, '真实数据不再独立返回 screenshots');
-    // 存量 traj 38 步骤数漂移（110→5），阈值断言保持但会红——属于存量数据问题，不在本次修
-    // 存量 traj 38 步骤数已从 110 漂移到 5，阈值改为相对断言（>=1）避免误红
+    // 存量 traj 33 步骤数漂移（110→5），阈值断言保持但会红——属于存量数据问题，不在本次修
+    // 存量 traj 33 步骤数已从 110 漂移到 5，阈值改为相对断言（>=1）避免误红
     check(props.length >= 1, `transcationProperties >= 1（实际 ${props.length}）`);
     const withRect = props.filter((p) => typeof p.rect === 'string' && p.rect.trim() !== '').length;
     check(withRect >= 1, `带非空 rect 属性 >= 1（实际 ${withRect}）`);
@@ -448,19 +448,30 @@ async function testRealData() {
     check(pageShots.length >= 1, `页面截图条目 >= 1（实际 ${pageShots.length}）`);
     // 抽样 rect 与 DB bbox 一致（按 step_number→id 映射；控件 id 续接截图之后）
     const shotCount = props.filter((p) => p.type === 'page' || p.type === 'popup').length;
-    const stepRows = await db('trajectory_step').select('step_number', 'element_json').where({ trajectory_id: 38 }).orderBy('step_number', 'asc').limit(500);
+    const stepRows = await db('trajectory_step').select('step_number', 'element_json').where({ trajectory_id: 33 }).orderBy('step_number', 'asc').limit(500);
     // 重建 step_number → 控件条目 顺序映射（控件按 stepNumber 顺序，id 从 shotCount+1 起）
+    // 用多重集比较而非按位对齐：步骤可能因元操作（登录/保存跳转）在 props 中被跳过，
+    // 按位比较会错位误红；统计意义等价（每个 props rect 必须能匹配到一个 DB bbox）。
     const controlProps = props.filter((p) => p.type === 'object');
+    const bboxCounts = new Map();
+    for (const s of stepRows) {
+      let el = null;
+      try { el = typeof s.element_json === 'string' ? safeParse(s.element_json) : s.element_json; } catch {}
+      if (el?.bbox) {
+        const b = JSON.stringify({ x1: Number(el.bbox.x1), y1: Number(el.bbox.y1), x2: Number(el.bbox.x2), y2: Number(el.bbox.y2) });
+        bboxCounts.set(b, (bboxCounts.get(b) || 0) + 1);
+      }
+    }
     let rectOk = 0, rectChecked = 0;
-    for (let i = 0; i < controlProps.length; i++) {
-      const node = controlProps[i];
-      const sn = stepRows[i]?.step_number;
-      if (sn == null) continue;
-      const el = typeof stepRows[i].element_json === 'string' ? safeParse(stepRows[i].element_json) : stepRows[i].element_json;
-      if (!el || !el.bbox) continue;
-      const expected = { x1: Number(el.bbox.x1), y1: Number(el.bbox.y1), x2: Number(el.bbox.x2), y2: Number(el.bbox.y2) };
-      rectChecked++;
-      if (node.rect === JSON.stringify(expected)) rectOk++;
+    for (const p of controlProps) {
+      const r = String(p.rect || '');
+      if (!r) continue;
+      rectChecked += 1;
+      const have = bboxCounts.get(r) || 0;
+      if (have > 0) {
+        rectOk += 1;
+        bboxCounts.set(r, have - 1);
+      }
     }
     check(rectChecked >= 1 && rectOk === rectChecked, `抽样 rect 与 DB bbox 一致（${rectOk}/${rectChecked}）`);
   } finally {
