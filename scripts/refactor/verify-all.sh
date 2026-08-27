@@ -112,6 +112,7 @@ run "characterize-resolve-ambiguous-region" node scripts/characterization/charac
 run "characterize-resolve-collision-titlebox" node scripts/characterization/characterize-resolve-collision-titlebox.mjs
 run "characterize-log-extract" node scripts/characterization/characterize-log-extract.mjs
 run "characterize-backfill" node scripts/characterization/characterize-backfill.mjs
+run "characterize-refill-contract" "$PY" scripts/characterization/characterize-refill-contract.py
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

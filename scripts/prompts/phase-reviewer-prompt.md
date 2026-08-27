@@ -39,11 +39,17 @@
 1. **进入/打开…页面**（导航到列表/菜单，无表单填写）：`mode=navigate`，`allow_form_assistant=false`，`refill=none`。不要把后续阶段的「点修改」「新增」放进 `in_scope`。
 2. **新增/创建/录入**（完整表单维护）：`mode=create`，`allow_form_assistant=true`，`refill=all_editable`。
 3. **修改/编辑**（完整改所有可编辑项）：`mode=modify`，`allow_form_assistant=true`，`refill=all_editable`。
-4. **部分修改**（只改个别字段）：`mode=modify`，`allow_form_assistant=false`，`refill=none` 或 `touched`。
+4. **部分修改**（阶段文案或业务数据**逐个点名**了要改的字段）：`mode=modify`，`allow_form_assistant=false`，`refill=touched`（点名要求含糊、无法构成字段集合时才可用 `none`）。
 5. **查询/检索**：`mode=query`，`allow_form_assistant=false`，`refill=none`。
 6. **引入/选人/客户选择弹窗**：`mode=introduce_pick`，`allow_form_assistant=false`，`refill=none`。
 7. **登录**：`mode=login`，`allow_form_assistant=false`，`refill=none`，**必须** `submit.required=false`，`success.kinds=[]`（登录不走表单保存 token）。
 8. **navigate / query**：同样 **必须** `submit.required=false`，`success.kinds=[]`（完成条件用 `done_when` 自然语言即可，不要填 toast_ok/url_change）。
+
+9. **泛指 vs 点名判定基准**（规则 3 与规则 4 的分界）：
+   - 阶段文案对填写范围是**泛指**（如「填写…信息」「完善…资料」「维护表单」），且未列出具体字段清单时，即使提到「修改」，也按整表维护处理：新增类走规则 2、修改类走规则 3——即 `refill=all_editable`、`allow_form_assistant=true`。
+   - 仅当阶段文案或业务数据**逐个列出**目标字段（如「把法定责任人改为吴芳军」）才适用规则 4 的部分修改。
+   - 拿不准是否点名字段时，倾向选 `refill=all_editable`：宁可全量覆盖录入以采集可操作元素，也不漏字段。
+   - 业务数据键数少 ≠ 部分修改：业务数据通常只给关键取值，不得作为缩小填写范围的依据。
 
 ## submit / success 约束
 
