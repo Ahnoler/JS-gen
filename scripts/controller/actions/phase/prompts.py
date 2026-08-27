@@ -79,14 +79,15 @@ def form_fill_hint() -> str:
 
 
 def form_modify_partial_hint() -> str:
-    """Phase preamble: edit — recording still touches all editable fields when contract says so."""
+    """Phase preamble: modify named fields only — write task-named editable fields."""
     return (
-        '\n\n【任务类型：表单修改】\n'
-        '本阶段是修改已有表单，不是查询。\n'
-        '1. 录制须对每个可编辑字段执行写动作（可同值重填），以采集可操作元素。\n'
-        '1a. 禁止调用 run_form_assistant；只改任务点名的字段，其余保留原值。\n'
-        '2. 禁止仅 check_field_value / 核对回显就点确认。\n'
-        '3. 改完后 click_save(button_text="确认"或"保存")；成功 = 操作成功 或 页面跳转。\n'
+        '\n\n【任务类型：表单修改 — 部分字段】\n'
+        '本阶段只修改任务点名的字段，不是全量录入。\n'
+        '1. 对任务点名的可编辑字段必须执行写动作（可同值重填）；未点名字段保留原值。\n'
+        '2. 禁止调用 run_form_assistant；禁止盲目重选未点名字段。\n'
+        '3. 禁止仅 check_field_value / 核对回显就点确认。\n'
+        '4. 改完后 click_save(button_text="确认"或"保存")；成功 = 操作成功 或 页面跳转；'
+        '保存被校验拦截时按 err-save-validation 信封处方补齐必填后再存。\n'
     )
 
 
