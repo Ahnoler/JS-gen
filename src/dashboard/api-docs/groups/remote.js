@@ -93,7 +93,7 @@ export const GROUP_REMOTE = [
   {
     id: 'screenshot',
     name: '截图管理',
-    description: '按 trajectory_step 绑定的 before/after 截图；`kind=phase_highlight` 行绑定 trajectory_phase（`trajectoryPhaseId` 有值、`trajectoryStepId` 为 null）；回放中亦可经 WS replay:screenshot 获取临时 URL',
+    description: '按 trajectory_step 绑定的 before/after 截图；`kind=phase_highlight` 行绑定 trajectory_phase（`trajectoryPhaseId` 有值、`trajectoryStepId` 为 null）；`kind=phase_group` 行为阶段内状态组截图（`trajectoryPhaseId` + `stateGroup` 唯一，步骤经 `group_shot_id` 绑定）；回放中亦可经 WS replay:screenshot 获取临时 URL',
     endpoints: [
       {
         method: 'GET', path: '/api/v2/screenshots/pending',
@@ -115,6 +115,10 @@ export const GROUP_REMOTE = [
         }, {
           id: 88, fileSize: 456789,
           mimeType: 'image/png', trajectoryPhaseId: 101, trajectoryStepId: null, kind: 'phase_highlight',
+        }, {
+          id: 900, fileSize: 234561,
+          mimeType: 'image/png', trajectoryPhaseId: 101, trajectoryStepId: null,
+          kind: 'phase_group', stateGroup: 'page:https://demo.example.com/#/customer/manage',
         }]),
       },
       {

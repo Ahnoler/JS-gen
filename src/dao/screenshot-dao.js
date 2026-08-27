@@ -125,8 +125,8 @@ export async function replaceForPhase(screenshot) {
 
   await db.raw(
     `INSERT INTO \`${TABLE}\`
-      (storage_type, retry_count, last_retry_at, storage_path, image_url, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind, metadata_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+      (storage_type, retry_count, last_retry_at, storage_path, image_url, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind, state_group, metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
       storage_type = VALUES(storage_type),
       retry_count = VALUES(retry_count),
@@ -137,12 +137,72 @@ export async function replaceForPhase(screenshot) {
       mime_type = VALUES(mime_type),
       trajectory_id = VALUES(trajectory_id),
       metadata_json = VALUES(metadata_json)`,
-    [storageType, retryCount, lastRetryAt, storagePath, imageUrl, fileSize, mimeType, trajectoryId, phaseId, kind, metadataJson],
+    [storageType, retryCount, lastRetryAt, storagePath, imageUrl, fileSize, mimeType, trajectoryId, phaseId, kind, 'done', metadataJson],
   );
 
   const row = await db(TABLE)
     .select('id')
     .where({ trajectory_phase_id: phaseId, kind })
+    .first();
+  const id = row?.id != null ? Number(row.id) : null;
+  await updateImageUrlIfMissing(db, id, imageUrl);
+  return id;
+}
+
+/**
+ * UPSERT one phase-group screenshot row by (trajectory_phase_id, state_group, kind='phase_group').
+ * @param {object} screenshot camelCase screenshot fields (trajectoryPhaseId/stateGroup required)
+ * @returns {Promise<number|null>} row id, or null if phase no longer exists
+ */
+export async function replaceForPhaseGroup(screenshot) {
+  const phaseId = screenshot.trajectoryPhaseId != null ? Number(screenshot.trajectoryPhaseId) : null;
+  const stateGroup = String(screenshot.stateGroup || '').trim();
+  const kind = 'phase_group';
+  if (!Number.isFinite(phaseId) || phaseId <= 0) {
+    throw new Error('trajectoryPhaseId required for replaceForPhaseGroup');
+  }
+  if (!stateGroup) {
+    throw new Error('stateGroup required for replaceForPhaseGroup');
+  }
+
+  const storageType = screenshot.storageType || 'minio';
+  const storagePath = screenshot.storagePath || null;
+  const imageUrl = screenshot.imageUrl || null;
+  const fileSize = screenshot.fileSize || 0;
+  const mimeType = screenshot.mimeType || 'image/png';
+  const trajectoryId = screenshot.trajectoryId != null ? Number(screenshot.trajectoryId) : null;
+  const metadataJson = screenshot.metadataJson ?? null;
+  const retryCount = screenshot.retryCount ?? 0;
+  const lastRetryAt = screenshot.lastRetryAt ?? null;
+
+  const db = getDB();
+  const phaseExists = await db('trajectory_phase').where({ id: phaseId }).first('id');
+  if (!phaseExists) {
+    const err = new Error(`trajectory_phase ${phaseId} not found`);
+    err.code = 'ER_NO_REFERENCED_ROW_2';
+    throw err;
+  }
+
+  await db.raw(
+    `INSERT INTO \`${TABLE}\`
+      (storage_type, retry_count, last_retry_at, storage_path, image_url, file_size, mime_type, trajectory_id, trajectory_step_id, trajectory_phase_id, kind, state_group, metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+      storage_type = VALUES(storage_type),
+      retry_count = VALUES(retry_count),
+      last_retry_at = VALUES(last_retry_at),
+      storage_path = VALUES(storage_path),
+      image_url = VALUES(image_url),
+      file_size = VALUES(file_size),
+      mime_type = VALUES(mime_type),
+      trajectory_id = VALUES(trajectory_id),
+      metadata_json = VALUES(metadata_json)`,
+    [storageType, retryCount, lastRetryAt, storagePath, imageUrl, fileSize, mimeType, trajectoryId, phaseId, kind, stateGroup, metadataJson],
+  );
+
+  const row = await db(TABLE)
+    .select('id')
+    .where({ trajectory_phase_id: phaseId, kind, state_group: stateGroup })
     .first();
   const id = row?.id != null ? Number(row.id) : null;
   await updateImageUrlIfMissing(db, id, imageUrl);
@@ -331,6 +391,35 @@ export async function listPhaseHighlightsByTrajectory(trajectoryId) {
 }
 
 /**
+ * List phase-group screenshots (kind='phase_group') for a trajectory, ordered by id.
+ * @param {number} trajectoryId 轨迹 id
+ * @returns {Promise<object[]>} phase-group screenshot entities with parsed metadataJson
+ */
+export async function listPhaseGroupsByTrajectory(trajectoryId) {
+  const rows = await getDB()(TABLE)
+    .select('id', 'trajectory_phase_id', 'state_group', 'metadata_json', 'storage_path', 'storage_type', 'image_url')
+    .where({ trajectory_id: trajectoryId, kind: 'phase_group' })
+    .orderBy('id', 'asc');
+  return fromDbRows(rows).map((r) => {
+    let metadataJson = null;
+    if (r.metadataJson != null && typeof r.metadataJson === 'string') {
+      try { metadataJson = JSON.parse(r.metadataJson); } catch { metadataJson = null; }
+    } else if (r.metadataJson != null) {
+      metadataJson = r.metadataJson;
+    }
+    return {
+      id: r.id,
+      trajectoryPhaseId: r.trajectoryPhaseId,
+      stateGroup: r.stateGroup,
+      metadataJson,
+      storagePath: r.storagePath || null,
+      storageType: r.storageType || null,
+      imageUrl: r.imageUrl || null,
+    };
+  });
+}
+
+/**
  * List dialog screenshots (phase_highlight with metadataJson.dialog=true, bound to a step) for a trajectory.
  * @param {number} trajectoryId 轨迹 id
  * @returns {Promise<object[]>} dialog screenshot entities
@@ -430,6 +519,20 @@ export async function findByPhaseAndKind(phaseId) {
   const row = await getDB()(TABLE)
     .select('id', 'storage_type', 'storage_path', 'image_url')
     .where({ trajectory_phase_id: Number(phaseId), kind: 'phase_highlight' })
+    .first();
+  return fromDbRow(row);
+}
+
+/**
+ * Find a phase-group screenshot by (trajectory_phase_id, state_group).
+ * @param {number} phaseId 阶段 id
+ * @param {string} stateGroup 状态组键
+ * @returns {Promise<object|null>} screenshot entity or null when not found
+ */
+export async function findByPhaseAndStateGroup(phaseId, stateGroup) {
+  const row = await getDB()(TABLE)
+    .select('id', 'storage_type', 'storage_path', 'image_url')
+    .where({ trajectory_phase_id: Number(phaseId), kind: 'phase_group', state_group: String(stateGroup || '') })
     .first();
   return fromDbRow(row);
 }

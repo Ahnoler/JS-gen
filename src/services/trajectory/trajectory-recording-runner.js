@@ -6,6 +6,7 @@
  */
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
+import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import * as execSession from '../../executor-session-client.js';
 import { state } from '../../state.js';
 import { broadcast } from '../../ws-server.js';
@@ -23,6 +24,8 @@ import {
 import { appendPhaseDoneLog } from './trajectory-phase-service.js';
 import { notifyBatchProgressForTrajectory } from './batch-progress-notify.js';
 import { isAiRecordingActive } from './trajectory-status-utils.js';
+import { capturePhaseBuffer, buildMetadata } from './phase-highlight-screenshot.js';
+import { replacePhaseGroupScreenshot } from '../screenshot-service.js';
 
 /** Phase watchdog: fail only when the agent stops emitting action_log_sync for this long. */
 const PHASE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -70,6 +73,180 @@ async function flushPendingStepScreenshot(...args) {
 async function applyPageLevelScreenshot(...args) {
   const mod = await import('../../routes/browser-session/persist-live.js');
   return mod.applyPageLevelScreenshot(...args);
+}
+
+/**
+ * Per-phase state-group shot manager (G): 阶段内页面跳变（新增抽屉/保存跳转等）按状态键
+ * 分组采集整页截图；步骤按动作发生前的 beforeKey 归属组图（group_shot_id）。
+ *
+ * runtime 状态（startTrajectoryRecording 初始化）：
+ *  - _phaseGroups: Map<phaseNum, Map<stateKey, {shotId: number|null, stepIds: number[]}>>
+ *  - _pendingStepGroup: Map<entryId, {phase: number, stateKey: string}>（entryId → 动作前状态组）
+ *  - _phaseShotChain: Promise（串行采集队列，避免 BiB 采集结果事件互相串线）
+ *  - _phaseNumToId: Map<phaseNumber, phaseId>
+ */
+/** Per-phase group count cap: beyond it stop capturing, group-only (shotId stays null). */
+const PHASE_GROUP_SHOT_MAX_PER_PHASE = 20;
+
+/**
+ * Chain a phase-group shot job onto the runtime capture queue (serial execution).
+ * @param {object} runtime trajectory runtime
+ * @param {() => Promise<void>} job capture job
+ * @returns {void}
+ */
+function queuePhaseGroupShot(runtime, job) {
+  runtime._phaseShotChain = Promise.resolve(runtime._phaseShotChain)
+    .catch(() => {})
+    .then(job)
+    .catch((err) => {
+      console.warn('[record] phase group shot job failed:', err?.message || err);
+    });
+}
+
+/**
+ * Per-phase state-group map, created on demand.
+ * @param {object} runtime trajectory runtime
+ * @param {number} phaseNum phase number
+ * @returns {Map<string, {shotId: number|null, stepIds: number[]}>} group map
+ */
+function phaseGroupMap(runtime, phaseNum) {
+  let byKey = runtime._phaseGroups.get(Number(phaseNum));
+  if (!byKey) {
+    byKey = new Map();
+    runtime._phaseGroups.set(Number(phaseNum), byKey);
+  }
+  return byKey;
+}
+
+/**
+ * Resolve the trajectory_phase DB id for a phase number reported by the agent.
+ * @param {object} runtime trajectory runtime
+ * @param {number} phaseNum phase number
+ * @returns {number|null} phase DB id or null when unknown (⇒ degrade to group-only)
+ */
+function resolvePhaseIdForGroup(runtime, phaseNum) {
+  const fromMap = runtime._phaseNumToId?.get(Number(phaseNum));
+  return Number.isFinite(fromMap) && fromMap > 0 ? Number(fromMap) : null;
+}
+
+/**
+ * Ensure the state-group entry exists (创建 + 串行采集；采集失败 → shotId=null 降级).
+ * When newly created and under the per-phase cap, queue the serialized capture.
+ * @param {object} runtime trajectory runtime
+ * @param {number} phaseNum phase number
+ * @param {string} stateKey state key (beforeKey of the steps)
+ * @returns {{shotId: number|null, stepIds: number[]}|null} group entry or null when stateKey empty
+ */
+function ensurePhaseGroup(runtime, phaseNum, stateKey) {
+  const key = String(stateKey || '').trim();
+  if (!key) return null;
+  const byKey = phaseGroupMap(runtime, phaseNum);
+  let group = byKey.get(key);
+  if (group) return group;
+  group = { shotId: null, stepIds: [] };
+  byKey.set(key, group);
+  if (byKey.size > PHASE_GROUP_SHOT_MAX_PER_PHASE) {
+    // 超出上限：停止新采集、仅归组（shotId 留空，对应步骤 group_shot_id 不绑定）。
+    console.warn(
+      `[record] phase-group-shot cap reached for phase ${phaseNum} (${byKey.size} groups); skip capture: ${key.slice(0, 80)}`,
+    );
+    return group;
+  }
+  queuePhaseGroupShot(runtime, () => captureAndPersistPhaseGroupShot(runtime, Number(phaseNum), key));
+  return group;
+}
+
+/**
+ * Capture + persist one phase-group shot (upsert by phase × state_group) and refresh bindings.
+ * Never throws: returns false on any failure (group shot missing / degraded).
+ * @param {object} runtime trajectory runtime
+ * @param {number} phaseNum phase number
+ * @param {string} stateKey state-group key
+ * @returns {Promise<boolean>} whether the group shot was persisted
+ */
+async function captureAndPersistPhaseGroupShot(runtime, phaseNum, stateKey) {
+  const key = String(stateKey || '').trim();
+  if (!key) return false;
+  const byKey = phaseGroupMap(runtime, phaseNum);
+  let group = byKey.get(key);
+  if (!group) {
+    group = { shotId: null, stepIds: [] };
+    byKey.set(key, group);
+  }
+  if (byKey.size > PHASE_GROUP_SHOT_MAX_PER_PHASE) {
+    console.warn(
+      `[record] phase-group-shot cap reached for phase ${phaseNum} (${byKey.size} groups); skip capture: ${key.slice(0, 80)}`,
+    );
+    return false;
+  }
+  const phaseId = resolvePhaseIdForGroup(runtime, phaseNum);
+  if (!phaseId) {
+    console.warn(
+      `[record] phase group shot skipped: no phase id for phase ${phaseNum} (stateKey=${key.slice(0, 80)})`,
+    );
+    return false;
+  }
+  try {
+    const captured = await capturePhaseBuffer({
+      sessionId: runtime.sessionId,
+      executorNodeUuid: runtime.executorNodeUuid,
+    });
+    if (!captured?.ok) {
+      console.warn('[record] phase group shot skipped:', captured?.skipped || 'capture_failed');
+      return false;
+    }
+    const metadata = buildMetadata(captured.buffer, captured.meta);
+    metadata.stateGroup = key;
+    const shotId = await replacePhaseGroupScreenshot(phaseId, {
+      trajectoryId: runtime.trajectoryId,
+      stateGroup: String(key).slice(0, 120),
+      buffer: captured.buffer,
+      mimeType: 'image/png',
+      metadataJson: JSON.stringify(metadata),
+    });
+    if (!shotId) {
+      console.warn('[record] phase group shot persisted with no id:', key.slice(0, 80));
+      return false;
+    }
+    group.shotId = Number(shotId);
+    // 刷新该组所有待绑定步骤（shotId 就绪时一并绑定）。
+    if (group.stepIds.length > 0) {
+      const pending = [...group.stepIds];
+      try {
+        await trajectoryStepDao.updateGroupShotId(pending, Number(shotId));
+        group.stepIds = [];
+      } catch (err) {
+        console.warn('[record] phase group shot bind flush failed:', err?.message || err);
+      }
+    }
+    return true;
+  } catch (err) {
+    console.warn('[record] phase group shot failed:', err?.message || err);
+    return false;
+  }
+}
+
+/**
+ * Bind a freshly persisted step to its pre-action state group (entryId → dbId).
+ * Shot ready ⇒ updateGroupShotId; not yet (未开组/降级/采集未完) ⇒ pending list, flushed later.
+ * @param {object} runtime trajectory runtime
+ * @param {string} entryId agent action entry id
+ * @param {number} dbId persisted step DB id
+ * @returns {void}
+ */
+function bindPersistedStepToGroup(runtime, entryId, dbId) {
+  const ref = runtime._pendingStepGroup?.get(entryId);
+  if (!ref) return;
+  runtime._pendingStepGroup.delete(entryId);
+  const group = runtime._phaseGroups?.get(Number(ref.phase))?.get(String(ref.stateKey));
+  if (!group) return;
+  if (group.shotId != null) {
+    trajectoryStepDao.updateGroupShotId([Number(dbId)], Number(group.shotId)).catch((err) => {
+      console.warn('[record] step group bind failed:', err?.message || err);
+    });
+  } else {
+    group.stepIds.push(Number(dbId));
+  }
 }
 
 /**
@@ -158,6 +335,12 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   let phaseActivity = null;
   /** Clears the current phase watchdog (set per phase). */
   let clearPhaseActivity = () => {};
+  // Phase state-group shot manager (G) — per recording run, reset on (re)start.
+  runtime._phaseGroups = new Map();
+  runtime._pendingStepGroup = new Map();
+  runtime._phaseShotChain = Promise.resolve();
+  runtime._phaseNumToId = new Map(allPhases.map((p) => [Number(p.phaseNumber), Number(p.id)]));
+
   // Listener #3 of 3 for step_screenshot (product AI record/start):
   // startTrajectoryRecording opens its own subscribeSessionEvents for this run's agent
   // action_log_sync → appendRecordedStep. Separate from bindExecutorSessionEvents (#1),
@@ -199,6 +382,52 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       });
       return;
     }
+    if (type === 'phase_state_key') {
+      // 阶段开始即采第一张（entryId 空、beforeKey==afterKey）；状态键变化时
+      // 预先采集 afterKey 组供后续步骤使用。步骤归属 = 动作发生前状态（beforeKey）。
+      const data = payload?.data && typeof payload.data === 'object' ? payload.data : payload || {};
+      const phaseNum = Number(data.phase ?? 0);
+      const beforeKey = String(data.beforeKey || '').trim();
+      const afterKey = String(data.afterKey || '').trim();
+      const entryId = data.entryId != null ? String(data.entryId) : '';
+      if (beforeKey) {
+        ensurePhaseGroup(runtime, phaseNum, beforeKey);
+        if (entryId) {
+          runtime._pendingStepGroup.set(entryId, { phase: phaseNum, stateKey: beforeKey });
+        }
+        if (afterKey && afterKey !== beforeKey) {
+          ensurePhaseGroup(runtime, phaseNum, afterKey);
+        }
+      }
+      return;
+    }
+    if (type === 'phase_shot_candidate_request') {
+      // 提交类动作执行前的显式采集（click_save）：串行采集 + upsert 组图 + ack。
+      const data = payload?.data && typeof payload.data === 'object' ? payload.data : payload || {};
+      const phaseNum = Number(data.phase ?? 0);
+      const stateKey = String(data.stateKey || '').trim();
+      const requestId = data.requestId != null ? String(data.requestId) : '';
+      queuePhaseGroupShot(runtime, async () => {
+        let ok = false;
+        try {
+          ok = await captureAndPersistPhaseGroupShot(runtime, Number(phaseNum), stateKey);
+        } catch (err) {
+          console.warn('[record] phase candidate capture failed:', err?.message || err);
+        }
+        if (!requestId) return;
+        try {
+          execSession.forwardStdin({
+            nodeUuid: runtime.executorNodeUuid,
+            sessionId: runtime.sessionId,
+            event: 'phase_shot_candidate_result',
+            data: { requestId, ok },
+          });
+        } catch (err) {
+          console.warn('[record] phase candidate ack failed:', err?.message || err);
+        }
+      });
+      return;
+    }
     if (type !== 'action_log_sync') return;
     if (runtime.suppressStepPersist || runtime.isReplay) return;
     const entries = Array.isArray(payload?.entries) ? payload.entries : [];
@@ -228,6 +457,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
         session?._lastPersistByActionId?.delete(aid);
         runtime._pendingStepShots?.delete(aid);
         session?._pendingStepShots?.delete(aid);
+        runtime._pendingStepGroup?.delete(aid);
       }
       if (dbIds.length) {
         await removeRecordedStepsByDbIds(tid, dbIds).catch((err) => {
@@ -260,6 +490,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
           session?._lastPersistByActionId?.set(id, persisted);
           if (persisted.dbId != null) {
             await flushPendingStepScreenshot(runtime, id, persisted.dbId, tid);
+            bindPersistedStepToGroup(runtime, id, Number(persisted.dbId));
           }
           broadcast('action_persisted', {
             trajectoryDbId: tid,
@@ -506,6 +737,8 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
       lockAiRecording(runtime, session, true);
       await broadcastRecordingLock();
       await Promise.resolve(runtime._persistDrain).catch(() => {});
+      // 组图采集先行落定（串行队列），避免 done 长图与组图并发争用 BiB 采集结果事件。
+      await Promise.resolve(runtime._phaseShotChain).catch(() => {});
       try {
         const { capturePhaseScreenshot } = await import('./phase-highlight-screenshot.js');
         await capturePhaseScreenshot({

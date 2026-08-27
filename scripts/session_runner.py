@@ -50,6 +50,10 @@ from .trajectory_store import (  # noqa: F401  (re-exported for compat)
     _handle_save_trajectory,
 )
 
+# Phase-state-key emission for phase-group shot capture: remember the last phase so
+# the first step of a NEW phase reports its state key (phase 开始即采第一张).
+_last_phase_state_key_phase: int | None = None
+
 # Actions recorded by the custom controller (subset of all browser_use actions)
 _CUSTOM_ACTIONS = {
     'fill_form_field', 'select_option', 'click_element_by_index',
@@ -87,6 +91,15 @@ async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=N
         # Stop immediately even while agent.run() is blocking the main loop.
         if event == "cancel_step":
             _request_agent_stop(cancel_flag_path, goal_tracker, reason='cancel_step')
+            continue
+        if event == "phase_shot_candidate_result":
+            # Agent 运行期间主循环被 await agent.run() 阻塞，ack 无法经主循环到达；
+            # 在此直接解包 future（未知/迟到 ack 静默丢弃），避免 click_save 等满 timeout。
+            try:
+                from .state import resolve_phase_shot_result
+                resolve_phase_shot_result(msg.get("data") or {})
+            except Exception:
+                pass
             continue
         await stdin_queue.put(msg)
 
@@ -324,6 +337,24 @@ async def run_session(args):
         except (TypeError, ValueError):
             phase_num = step_idx
         set_current_phase(phase_num)
+        # 新阶段第一步（agent 运行前）：上报当前状态键 → 控制面开组采集第一张。
+        global _last_phase_state_key_phase
+        if _last_phase_state_key_phase != phase_num:
+            _last_phase_state_key_phase = phase_num
+            try:
+                from .state import current_page_level
+                _phase_state_key, _phase_state_name = await current_page_level(browser_context)
+            except Exception:
+                _phase_state_key = ''
+            emit_json({
+                "event": "phase_state_key",
+                "data": {
+                    "phase": phase_num,
+                    "entryId": '',
+                    "beforeKey": _phase_state_key,
+                    "afterKey": _phase_state_key,
+                },
+            })
         agent_running_ref['value'] = True
         try:
             output_path, task_text = await _run_agent_step(
@@ -383,6 +414,17 @@ async def run_session(args):
             data = msg.get("data") or {}
             keep_browser = data.get("keep_browser", data.get("keepBrowser", False)) is True
             break
+
+        # phase_shot_candidate_result 正常由 _stdin_reader 快路径解包；主循环兜底处理
+        #（例如消息在 reader 忙时仍入列的场景），未知 requestId 由 resolve 静默丢弃。
+        if isinstance(msg, dict) and msg.get("event") == "phase_shot_candidate_result":
+            try:
+                from .state import resolve_phase_shot_result
+                resolve_phase_shot_result(msg.get("data") or {})
+            except Exception as e:
+                sys.stderr.write(f"phase_shot_candidate_result resolve failed: {type(e).__name__}: {e}\n")
+                sys.stderr.flush()
+            continue
 
         try:
             action = await _dispatch_event(msg, session_state, agent_running_ref, cdp_action_queue)

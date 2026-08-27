@@ -213,3 +213,25 @@ export async function applyPlannedOrder(trajectoryId, ordered) {
   });
   await dirtyParent(tid);
 }
+
+/**
+ * Bind step rows to a phase-group screenshot id (only rows still unbound — no overwrite).
+ * @param {number[]} stepIds step DB ids
+ * @param {number} shotId phase-group screenshot id
+ * @returns {Promise<number>} number of updated rows
+ */
+export async function updateGroupShotId(stepIds, shotId) {
+  const ids = [...new Set((stepIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+  const shot = Number(shotId);
+  if (!ids.length || !Number.isFinite(shot) || shot <= 0) return 0;
+  const db = getDB();
+  const rows = await db(TABLE).select('trajectory_id').whereIn('id', ids).whereNull('group_shot_id');
+  const updated = await db(TABLE)
+    .whereIn('id', ids)
+    .whereNull('group_shot_id')
+    .update({ group_shot_id: shot });
+  for (const tid of [...new Set(rows.map((r) => r.trajectory_id))]) {
+    await dirtyParent(tid);
+  }
+  return updated;
+}

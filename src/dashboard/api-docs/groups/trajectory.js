@@ -148,10 +148,14 @@ export const GROUP_TRAJECTORY = [
             id: 101, phaseNumber: 1, description: '登录系统', status: 'pending',
             stitchScreenshotId: 88,
             stitchScreenshotUrl: '/api/v2/screenshots/88/image',
+            groupShots: [{
+              id: 900, stateGroup: 'page:https://demo.example.com/#/customer/manage',
+              imageUrl: '/api/v2/screenshots/900/image',
+            }],
             steps: [{
               id: 501, stepNumber: 1, actionType: 'click_element_by_index',
               source: 'agent', confirmed: true, isMeta: false,
-              params: {}, trajectoryPhaseId: 101,
+              params: {}, trajectoryPhaseId: 101, groupShotId: 900,
             }],
           }],
           orphanSteps: [],
@@ -161,6 +165,7 @@ export const GROUP_TRAJECTORY = [
           'stepCount 亦只计业务步骤；meta 仍入库供 Type B 回放',
           'steps/replay 会在选中业务步区间自动补入 meta 检查点',
           '阶段 `stitchScreenshotUrl` 指向 AI 阶段结束长图（`kind=phase_highlight`）',
+          '阶段 `groupShots` 为状态组截图（`kind=phase_group`，按 phase×stateGroup 唯一，按 id 升序）；步骤 `groupShotId` 指向其动作发生前所属状态组的截图（无则 null）',
         ],
       },
       {

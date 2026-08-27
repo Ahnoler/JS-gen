@@ -18,7 +18,13 @@ export function wrapCaptureError(err) {
   return { ok: false, skipped: String(err?.message || err || 'error') };
 }
 
-function buildMetadata(buffer, meta) {
+/**
+ * Build screenshot metadata (image dims + collected elements + region tree) from a capture payload.
+ * @param {Buffer} buffer captured PNG bytes
+ * @param {object|null} meta capture meta (elements/contentWidth/contentHeight/truncated)
+ * @returns {object} metadata object ready for metadataJson
+ */
+export function buildMetadata(buffer, meta) {
   const dims = PNG.sync.read(buffer);
   const elements = (Array.isArray(meta?.elements) ? meta.elements : []).map((el, index) => {
     const { regionId, parentRegionId } = deriveRegionRef({
@@ -61,18 +67,16 @@ function buildMetadata(buffer, meta) {
 }
 
 /**
- * Capture and persist a phase highlight screenshot for a trajectory phase.
+ * Capture the phase screenshot PNG buffer (+ raw meta) only — no metadata build, no persist.
+ * Shared by the done highlight shot and the in-phase state-group shots so elements/regionTree
+ * metadata stays homogeneous across both. Direct CDP client, executor BiB branch, or local fallback.
  * @param {object} [root0] capture options
- * @param {number} [root0.trajectoryId] trajectory DB id
- * @param {number} [root0.phaseId] phase DB id
  * @param {object} [root0.cdpClient] CDP client for direct capture
  * @param {string} [root0.sessionId] executor session id (for BiB capture)
  * @param {string} [root0.executorNodeUuid] executor node uuid
- * @returns {Promise<object>} capture result ({ ok, skipped?, … }) or error wrapper
+ * @returns {Promise<object>} capture result ({ ok:true, buffer, meta } or { ok:false, skipped })
  */
-export async function capturePhaseScreenshot({
-  trajectoryId,
-  phaseId,
+export async function capturePhaseBuffer({
   cdpClient,
   sessionId,
   executorNodeUuid,
@@ -109,10 +113,38 @@ export async function capturePhaseScreenshot({
       meta = captured.meta;
     }
 
-    const metadata = buildMetadata(buffer, meta);
+    return { ok: true, buffer, meta };
+  } catch (err) {
+    return wrapCaptureError(err);
+  }
+}
+
+/**
+ * Capture and persist a phase highlight screenshot for a trajectory phase.
+ * @param {object} [root0] capture options
+ * @param {number} [root0.trajectoryId] trajectory DB id
+ * @param {number} [root0.phaseId] phase DB id
+ * @param {object} [root0.cdpClient] CDP client for direct capture
+ * @param {string} [root0.sessionId] executor session id (for BiB capture)
+ * @param {string} [root0.executorNodeUuid] executor node uuid
+ * @returns {Promise<object>} capture result ({ ok, skipped?, … }) or error wrapper
+ */
+export async function capturePhaseScreenshot({
+  trajectoryId,
+  phaseId,
+  cdpClient,
+  sessionId,
+  executorNodeUuid,
+} = {}) {
+  try {
+    const captured = await capturePhaseBuffer({ cdpClient, sessionId, executorNodeUuid });
+    if (!captured?.ok) return { ok: false, skipped: captured?.skipped || 'capture_failed' };
+
+    const metadata = buildMetadata(captured.buffer, captured.meta);
+    metadata.stateGroup = 'done';
     const screenshotId = await replacePhaseHighlightScreenshot(phaseId, {
       trajectoryId,
-      buffer,
+      buffer: captured.buffer,
       mimeType: 'image/png',
       metadataJson: JSON.stringify(metadata),
     });

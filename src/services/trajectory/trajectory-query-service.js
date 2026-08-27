@@ -5,6 +5,7 @@ import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import * as businessDataDao from '../../dao/business-data-dao.js';
+import * as screenshotDao from '../../dao/screenshot-dao.js';
 import { filterMetaSteps, isMetaStep } from '../../models/meta-step-actions.js';
 
 function safeJson(str) {
@@ -13,7 +14,8 @@ function safeJson(str) {
 
 function annotateStep(step) {
   if (!step || typeof step !== 'object') return step;
-  return { ...step, isMeta: isMetaStep(step) };
+  // groupShotId: 动作前所属状态组截图（kind=phase_group）；无则 null。
+  return { ...step, isMeta: isMetaStep(step), groupShotId: step.groupShotId ?? null };
 }
 
 /**
@@ -78,6 +80,7 @@ export async function getTrajectoryTree(trajectoryDbId, { includeMeta = false } 
   const phases = await trajectoryPhaseDao.listByTrajectory(tid);
   const allStepsRaw = await trajectoryStepDao.listByTrajectory(tid);
   const allSteps = filterMetaSteps(allStepsRaw, { includeMeta }).map(annotateStep);
+  const groupShots = await screenshotDao.listPhaseGroupsByTrajectory(tid);
 
   const assigned = new Set();
   const phasesWithSteps = phases.map((p) => {
@@ -103,6 +106,13 @@ export async function getTrajectoryTree(trajectoryDbId, { includeMeta = false } 
       stitchScreenshotUrl: p.stitchScreenshotId
         ? `/api/v2/screenshots/${p.stitchScreenshotId}/image`
         : null,
+      groupShots: groupShots
+        .filter((s) => Number(s.trajectoryPhaseId) === Number(p.id))
+        .map((s) => ({
+          id: s.id,
+          stateGroup: s.stateGroup,
+          imageUrl: s.imageUrl || `/api/v2/screenshots/${s.id}/image`,
+        })),
     };
   });
 

@@ -89,6 +89,7 @@ run "characterize-layer-tree" node scripts/characterization/characterize-layer-t
 run "characterize-export-v3" node scripts/characterization/characterize-export-v3.mjs
 run "characterize-dialog-screenshot" node scripts/characterization/characterize-dialog-screenshot.mjs
 run "characterize-page-level-screenshot" node scripts/characterization/characterize-page-level-screenshot.mjs
+run "characterize-phase-group-shot" "$PY" scripts/characterization/characterize-phase-group-shot.py
 
 run "characterize-form-engine-wiring" "$PY" scripts/characterization/characterize-form-engine-wiring.py
 run "characterize-done-accept-reason" "$PY" scripts/characterization/characterize-done-accept-reason.py

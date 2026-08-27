@@ -161,6 +161,7 @@ CREATE TABLE `trajectory_step` (
   `error`               TEXT COMMENT '错误信息',
   `extracted_content`   TEXT COMMENT '执行结果',
   `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
+  `group_shot_id`      BIGINT UNSIGNED DEFAULT NULL COMMENT '动作前所属状态组截图 → screenshot.id（kind=phase_group）',
   `source`              ENUM('agent','manual','cdp','special_element') NOT NULL DEFAULT 'agent'
     COMMENT '动作来源：agent|manual|cdp|special_element',
   `action_id`           VARCHAR(64) DEFAULT NULL COMMENT 'Python ActionEntry.id（UUID v4）；控制面重启后幂等去重；历史行为 NULL',
@@ -175,7 +176,8 @@ CREATE TABLE `trajectory_step` (
   KEY `idx_source` (`source`),
   UNIQUE KEY `uk_traj_action` (`trajectory_id`, `action_id`),
   CONSTRAINT `fk_step_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_step_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL
+  CONSTRAINT `fk_step_phase` FOREIGN KEY (`trajectory_phase_id`) REFERENCES `trajectory_phase` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_step_group_shot` FOREIGN KEY (`group_shot_id`) REFERENCES `screenshot` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='轨迹步骤';
 
 -- ─────────────────────────────────────────────────────────────
@@ -474,14 +476,15 @@ CREATE TABLE `screenshot` (
   `trajectory_id`       BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory.id',
   `trajectory_step_id`  BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_step.id',
   `trajectory_phase_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '外键 → trajectory_phase.id',
-  `kind`                ENUM('before','after','phase_highlight','page_level') NOT NULL DEFAULT 'after' COMMENT 'before/after=步骤; phase_highlight=阶段长图/弹窗截图; page_level=页面级截图',
+  `kind`                ENUM('before','after','phase_highlight','page_level','phase_group') NOT NULL DEFAULT 'after' COMMENT 'before/after=步骤; phase_highlight=阶段长图/弹窗截图; page_level=页面级截图; phase_group=阶段内状态组截图',
+  `state_group`        VARCHAR(128) DEFAULT NULL COMMENT '阶段内状态键（current_page_level level key），kind=phase_group 必填；phase_highlight 行恒为 done',
   `level_type`          ENUM('page','popup') DEFAULT NULL COMMENT '页面级截图类型',
   `level_key`           VARCHAR(512) DEFAULT NULL COMMENT 'pageKey/popupKey，V3 页面级截图归属键',
   `parent_level_key`    VARCHAR(512) DEFAULT NULL COMMENT 'popup 所属 pageKey',
   `created_at`          DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY `idx_trajectory_id` (`trajectory_id`),
   UNIQUE KEY `uk_ss_step_kind` (`trajectory_step_id`, `kind`),
-  UNIQUE KEY `uk_ss_phase_kind` (`trajectory_phase_id`, `kind`),
+  UNIQUE KEY `uk_ss_phase_group` (`trajectory_phase_id`, `state_group`),
   UNIQUE KEY `uk_ss_level_key` (`trajectory_id`, `kind`, `level_key`),
   CONSTRAINT `fk_ss_trajectory` FOREIGN KEY (`trajectory_id`) REFERENCES `trajectory` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_ss_trajectory_step` FOREIGN KEY (`trajectory_step_id`) REFERENCES `trajectory_step` (`id`) ON DELETE CASCADE,

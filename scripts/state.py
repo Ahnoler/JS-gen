@@ -7,8 +7,10 @@ for external callers (session_runner, recorder, agent_utils).
 """
 
 from .models import ActionEntry
+import asyncio
 import base64
 import re
+import uuid
 from urllib.parse import urlsplit
 
 _ACTION_LOG: list[dict] = []
@@ -94,6 +96,50 @@ def capture_screenshots_enabled() -> bool:
 
 def should_skip_screenshot_action(action_name: str) -> bool:
     return (action_name or '') in _SKIP_SCREENSHOT_ACTIONS
+
+
+# Phase-group shot request registry: requestId -> asyncio.Future. The control
+# plane (Node) replies with phase_shot_candidate_result after the submitted
+# capture; futures are resolved here (unknown/late acks dropped).
+_PHASE_SHOT_FUTURES: dict[str, asyncio.Future] = {}
+
+
+async def request_phase_shot_candidate(state_key: str, phase: int, timeout: float = 5.0) -> bool:
+    """Ask the control plane to capture a phase-group shot for one state key (pre-submit).
+
+    Emits ``phase_shot_candidate_request`` and awaits ``phase_shot_candidate_result``;
+    returns False on timeout/exception — never raises.
+    """
+    request_id = f'phase-shot-{uuid.uuid4().hex}'
+    try:
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
+        _PHASE_SHOT_FUTURES[request_id] = fut
+        try:
+            from .agent_utils import emit_json
+            emit_json({
+                'event': 'phase_shot_candidate_request',
+                'data': {'phase': int(phase), 'stateKey': str(state_key), 'requestId': request_id},
+            })
+            return await asyncio.wait_for(fut, timeout=timeout) is True
+        finally:
+            _PHASE_SHOT_FUTURES.pop(request_id, None)
+    except Exception:
+        return False
+
+
+def resolve_phase_shot_result(data: dict) -> None:
+    """Resolve a pending phase-shot request with the control plane's capture ack."""
+    try:
+        rid = str((data or {}).get('requestId') or '')
+        if not rid:
+            return
+        fut = _PHASE_SHOT_FUTURES.get(rid)
+        if fut is None or fut.done() or fut.cancelled():
+            return
+        fut.set_result((data or {}).get('ok') is True)
+    except Exception:
+        pass
 
 
 async def capture_page_png_b64(browser_context, *, full_page: bool = True) -> str | None:

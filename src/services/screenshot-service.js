@@ -181,6 +181,90 @@ export async function replacePhaseHighlightScreenshot(trajectoryPhaseId, {
 }
 
 /**
+ * Replace (upsert) a phase-group screenshot for a trajectory phase × state-group.
+ * Same state_group replaces the old row (uk_ss_phase_group), keeping step bindings stable.
+ * @param {number} trajectoryPhaseId phase DB id
+ * @param {object} [root0] options
+ * @param {number|null} [root0.trajectoryId] trajectory DB id
+ * @param {string} root0.stateGroup state-group key (current_page_level level key)
+ * @param {Buffer} root0.buffer image bytes
+ * @param {string} [root0.mimeType] MIME type, default image/png
+ * @param {string|null} [root0.metadataJson] extra metadata JSON
+ * @returns {Promise<number>} screenshot row id
+ */
+export async function replacePhaseGroupScreenshot(trajectoryPhaseId, {
+  trajectoryId = null,
+  stateGroup = '',
+  buffer,
+  mimeType = 'image/png',
+  metadataJson = null,
+} = {}) {
+  const phaseId = Number(trajectoryPhaseId);
+  if (!Number.isFinite(phaseId) || phaseId <= 0) throw new Error('trajectoryPhaseId required');
+  if (!String(stateGroup || '').trim()) throw new Error('stateGroup required');
+  if (!buffer || !buffer.length) throw new Error('buffer required');
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+
+  const existing = await screenshotDao.findByPhaseAndStateGroup(phaseId, stateGroup);
+  await removeStoredObject(existing, { strict: true });
+
+  const pendingFile = await createPendingFile(buf);
+  const daoCall = (storageFields) => screenshotDao.replaceForPhaseGroup({
+    trajectoryPhaseId: phaseId,
+    trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
+    stateGroup: String(stateGroup),
+    fileSize: buf.length,
+    mimeType,
+    metadataJson,
+    ...storageFields,
+  });
+
+  let uploaded;
+  try {
+    uploaded = await uploadOrThrow(buf, mimeType);
+  } catch (uploadErr) {
+    console.warn('[screenshot] MinIO phase-group upload failed, keeping local copy:', uploadErr?.message || uploadErr);
+    return fallbackToLocal({ daoCall, pendingFile });
+  }
+
+  let id;
+  try {
+    id = await daoCall({
+      storageType: uploaded.storageType,
+      storagePath: uploaded.storagePath,
+      imageUrl: uploaded.imageUrl,
+      retryCount: 0,
+      lastRetryAt: null,
+    });
+  } catch (err) {
+    await removeScreenshotObject(uploaded.storagePath).catch(() => {});
+    await deletePendingFile(pendingFile.filePath).catch(() => {});
+    throw err;
+  }
+  await deletePendingFile(pendingFile.filePath).catch(() => {});
+  return id;
+}
+
+/**
+ * Find the phase-group screenshot row for one phase × state-group.
+ * @param {number} phaseId phase DB id
+ * @param {string} stateGroup state-group key
+ * @returns {Promise<object|null>} screenshot row or null
+ */
+export async function findPhaseGroupByStateGroup(phaseId, stateGroup) {
+  return screenshotDao.findByPhaseAndStateGroup(phaseId, stateGroup);
+}
+
+/**
+ * List phase-group screenshots of a trajectory (kind='phase_group'), ordered by id.
+ * @param {number} trajectoryId trajectory DB id
+ * @returns {Promise<Array<object>>} phase-group screenshot rows
+ */
+export async function listPhaseGroupsByTrajectory(trajectoryId) {
+  return screenshotDao.listPhaseGroupsByTrajectory(trajectoryId);
+}
+
+/**
  * Replace (upsert) the dialog screenshot for a trajectory step.
  * @param {number} trajectoryStepId step DB id
  * @param {object} [root0] options

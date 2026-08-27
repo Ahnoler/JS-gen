@@ -14,6 +14,7 @@ from .actions._misc import _register_misc_actions
 from .actions._special_element import _register_special_element_actions
 from ..state import (
     _ACTION_LOG,
+    _CURRENT_PHASE,
     _is_overlay_region,
     capture_dialog_png_b64,
     capture_page_dims_from_page,
@@ -23,6 +24,7 @@ from ..state import (
     emit_step_screenshot,
     register_page_screenshot_if_changed,
     register_popup_screenshot,
+    request_phase_shot_candidate,
     set_current_page_key,
     should_skip_screenshot_action,
 )
@@ -89,6 +91,16 @@ def _wrap_action_with_screenshots(controller, browser_context):
                             dialog_meta=pre_dialog_meta,
                         )
 
+                # 提交类动作（click_save）：执行前按当前状态键请求控制面采集状态组图
+                # （触发集 = 状态键变化 ∪ click_save 执行前；同状态内普通填值不触发采集）。
+                if action_name == 'click_save':
+                    # 事件协议见 scripts/state.py request_phase_shot_candidate —
+                    # 'phase_shot_candidate_request' → 'phase_shot_candidate_result'。
+                    try:
+                        await request_phase_shot_candidate(before_key, int(_CURRENT_PHASE or 0))
+                    except Exception:
+                        pass
+
                 result = await func(*args, **kwargs)
 
                 if len(_ACTION_LOG) <= len_before:
@@ -129,6 +141,21 @@ def _wrap_action_with_screenshots(controller, browser_context):
                             dialog_meta=dialog_meta,
                         )
                     emit_step_screenshot(str(entry_id), before_b64, after_b64, dialog_b64, dialog_meta)
+                # 状态键上报（fire-and-forget，不带 bytes）：Node 按 beforeKey 归组、
+                # afterKey 变化时预采下一组，供后续步骤直接命中。
+                try:
+                    from ..agent_utils import emit_json
+                    emit_json({
+                        "event": "phase_state_key",
+                        "data": {
+                            "phase": int(_CURRENT_PHASE or 0),
+                            "entryId": str(entry_id) if entry_id else '',
+                            "beforeKey": before_key,
+                            "afterKey": after_key,
+                        },
+                    })
+                except Exception:
+                    pass
                 return result
 
             # functools.wraps copies __annotations__ but not a bound Signature;
