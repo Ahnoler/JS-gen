@@ -182,13 +182,13 @@ JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
       m.el.click();
       return 'ok-text:' + m.text;
     }
-    return 'not-found-text-button:' + JSON.stringify({
+    return 'err-icon-label-ambiguous:' + JSON.stringify({
       wanted: buttonText,
       reason: 'ambiguous',
       textButtons: pool.map((m) => ({ text: m.text, tag: m.el.tagName.toLowerCase() })),
     });
   }
-  return 'not-found';
+  return 'err-icon-label-miss';
 }'''
 
 # Lightweight page snapshot for scenario describer (no iconButtons / no side effects).

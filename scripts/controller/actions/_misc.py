@@ -14,6 +14,7 @@ from datetime import datetime
 
 from scripts import state as _state
 from ._helpers import _ok, _err, _enrich_click_element, _is_ok_result, _wait_if_loading
+from .result_protocol import err_with
 from ._js_snippets import (
     JS_CHECK_LOADING,
     JS_COLLECT_ICON_BUTTONS,
@@ -193,7 +194,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         'if no icon matches, a same-label visible text button is clicked directly '
         "(table-row affordances excluded; page-level preferred over overlays; returns "
         "'ok-text:<label>'). Only fails when the label is absent or ambiguous "
-        "('not-found-text-button' with candidates). "
+        "('err-icon-label-ambiguous:{candidates}' / 'err-icon-label-miss'). "
         'Use get_page_state().iconButtons to discover true icon labels.'
     )
     async def click_icon_button(button_text: str):
@@ -218,13 +219,20 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 from scripts.controller.actions.container_naming import remember_trigger_button
                 remember_trigger_button(business_data_store, button_text)
             return _ok(result)
-        if str(result).startswith('not-found-text-button:'):
+        if str(result).startswith('err-icon-label-ambiguous:'):
             # Generalized fallback found same-label buttons but could not pick
             # one safely (ambiguous) — hand the candidates to the agent.
-            return _err(
-                f'{result}. 同标签可见按钮有多个，无法安全二选一。'
-                f'改用 click_element_by_index 点击目标按钮在页面快照中的索引；'
-                f'或提供更精确的 button_text（完整按钮文字）后重试本动作。',
+            return err_with(
+                "icon-label-ambiguous",
+                "同名或相近文字按钮有多个，无法唯一选择",
+                observed=result.split(':', 1)[1],
+                next_action="从 现场/textButtons 取完整按钮文字后用 click_element_by_index，或提供更精确 button_text 重试本动作",
+            )
+        if str(result).startswith('err-icon-label-miss'):
+            return err_with(
+                "icon-label-miss",
+                f"页面未找到标签含「{button_text}」的图标宿主或文字按钮",
+                next_action='核对 get_page_state().iconButtons 清单；确认目标可见；行内目标请用 click_table_row_button',
             )
         return result
 
