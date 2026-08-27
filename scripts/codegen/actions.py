@@ -346,14 +346,14 @@ def _generate_action_code(entry, step_num, url, is_first_fill=False):
         lines.append('')
         return '\n'.join(lines)
 
-    # ---- click_icon_button ----
-    if action == 'click_icon_button':
+    # ---- click_button ----
+    if action == 'click_button':
         t = p('button_text')
         lines.append(f"    console.log('[{step_num}] Icon button \"{t}\"');")
         lines.append(pre())
         lines.append(pre_ready())
-        lines.append(f"    const _ib{step_num} = await page.evaluate(() => CTRL.clickIconButton('{_escape(t)}'));")
-        lines.append(f"    if (_ib{step_num} === 'not-found' || _ib{step_num} === 'button-text-empty') _recordError({step_num}, 'click_icon_button', '{_escape_js_string(t)}', '', _ib{step_num}, 'Icon button not found by tooltip text');")
+        lines.append(f"    const _ib{step_num} = await page.evaluate(() => CTRL.clickButton('{_escape(t)}'));")
+        lines.append(f"    if (_ib{step_num} === 'not-found' || _ib{step_num} === 'button-text-empty') _recordError({step_num}, 'click_button', '{_escape_js_string(t)}', '', _ib{step_num}, 'Icon button not found by tooltip text');")
         lines.append("    await page.evaluate(() => CTRL.waitForLoading());")
         return '\n'.join(lines)
 

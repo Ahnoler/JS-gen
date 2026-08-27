@@ -44,7 +44,7 @@ _ACTION_TO_COMMAND = {
     'click_element_by_index': 'click', 'click_menu_item': 'click',
     'click_table_row_button': 'click', 'click_table_row_radio': 'click',
     'click_adjacent_button': 'click', 'click_radio': 'click',
-    'click_icon_button': 'click',
+    'click_button': 'click',
     'switch_tab': 'tab', 'close_dialog': 'close',
     'wait_for_loading': 'wait', 'go_to_url': 'navigate',
     'expand_all_el_tree': 'expand',
@@ -642,7 +642,7 @@ def _element_identity(action_name, params_dict, element=None) -> str | None:
     if xpath:
         return f'xpath:{xpath}'
 
-    if action_name == 'click_icon_button':
+    if action_name == 'click_button':
         text = str(params.get('button_text') or '').strip()
         if text:
             return f'icon:{text}'

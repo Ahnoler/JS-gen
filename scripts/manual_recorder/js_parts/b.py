@@ -343,7 +343,7 @@ JS_MANUAL_PART_B = r'''
         const btnText = _iconResolveLabel(iconHost);
         if (btnText) {
           emit(Object.assign({
-            kind: 'click_icon_button',
+            kind: 'click_button',
             button_text: btnText,
           }, elMeta(iconHost, btnText, 'icon')));
           return;

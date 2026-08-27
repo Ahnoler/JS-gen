@@ -176,7 +176,7 @@ PARTIAL_CTRL_FOOTER = '''  } catch (err) {
 # ========================== Assembly ==========================
 
 FILL_ACTIONS = {'fill_form_field', 'select_option', 'click_radio', 'select_tree_option'}
-BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'click_icon_button', 'switch_tab', 'close_dialog', 'go_to_url'}
+BOUNDARY_ACTIONS = {'click_element_by_index', 'click_menu_item', 'click_button', 'switch_tab', 'close_dialog', 'go_to_url'}
 
 def assemble_script(action_entries, target_url=None, form_snapshots=None):
     """Assemble a complete Playwright script from recorded action entries.
