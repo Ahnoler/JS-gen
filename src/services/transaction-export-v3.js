@@ -47,7 +47,7 @@ const ACTION_MAP = Object.freeze({
   click_table_row_button: ['click', 'click'],
   click_table_row_radio: ['click', 'click'],
   click_radio: ['click', 'click'],
-  click_icon_button: ['click', 'click'],
+  click_button: ['click', 'click'],
   click_save: ['click', 'click'],
   switch_tab: ['click', 'click'],
   close_dialog: ['click', 'close'],

@@ -400,7 +400,7 @@ ${PAGE_LOCATOR_HELPERS}
     }
 
     // Icon
-    if (action === 'click_icon_button' || params.button_text && action.includes('icon')) {
+    if (action === 'click_button' || params.button_text && action.includes('button')) {
       const name = String(params.button_text || needle || '').trim();
       const nodes = document.querySelectorAll('[aria-label], [title]');
       for (const el of nodes) {

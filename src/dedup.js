@@ -40,7 +40,7 @@ export function elementDedupKey(entry) {
   const xpath = String(el.xpath || el.xpath_smart || entry?.target || '').trim();
   if (xpath) return `xpath:${xpath}`;
 
-  if (action === 'click_icon_button') {
+  if (action === 'click_button') {
     const t = String(params.button_text || '').trim();
     if (t) return `icon:${t}`;
   }

@@ -47,7 +47,7 @@ export const SINGLE_TARGET_ACTIONS = Object.freeze([
   'click_table_row_button',
   'click_table_row_radio',
   'click_adjacent_button',
-  'click_icon_button',
+  'click_button',
   'switch_tab',
   'close_dialog',
 ]);
@@ -248,7 +248,7 @@ export function prepareElementJson({
   const targetKind = raw.target_kind || raw.targetKind || '';
   const inferredKind = targetKind
     || (action === 'click_menu_item' ? 'menu'
-      : action === 'click_icon_button' ? 'icon'
+      : action === 'click_button' ? 'icon'
         : action === 'switch_tab' ? 'tab'
           : action === 'click_table_row_button' ? 'table_row_button'
             : action === 'click_table_row_radio' ? 'table_row_radio'

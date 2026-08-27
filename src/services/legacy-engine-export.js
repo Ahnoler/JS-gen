@@ -26,7 +26,7 @@ export const ACTION_TO_ENGINE_TYPE = Object.freeze({
   click_table_row_button: 'click',
   click_table_row_radio: 'radio',
   click_adjacent_button: 'click',
-  click_icon_button: 'click',
+  click_button: 'click',
   click_radio: 'radio',
   switch_tab: 'click',
   close_dialog: 'click',
@@ -180,7 +180,7 @@ export function buildOperationName(action, params = {}, element = {}) {
       return row ? `表格单选:${row}` : '表格单选';
     case 'click_adjacent_button':
       return label ? `邻钮:${label}` : '邻钮';
-    case 'click_icon_button':
+    case 'click_button':
       return text ? `图标:${text}` : '图标按钮';
     case 'click_element_by_index':
       return text ? `点击:${text}` : '点击';
