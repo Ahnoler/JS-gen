@@ -17,6 +17,11 @@ _VALID_REFILL = frozenset({'none', 'touched', 'all_editable'})
 # Modes that must not require form-submit success tokens (done() after login/nav/query).
 _NO_SUBMIT_TOKEN_MODES = frozenset({'login', 'navigate', 'query'})
 
+# 文本含保存/提交 cue 的误分类升级护栏（D1）：
+# LLM 评审器把「新增…点击保存」误判为 navigate 时，promote_contract_for_save_cues
+# 依据确定性 classify_task_mode + 本 cue 将合约升级为 create/modify（2026-08-27 d3943e89）。
+_SAVE_CUE_RE = re.compile(r'点击\s*保存|保存\s*成功|点击\s*提交|提交\s*成功|保存并提交|提交并保存|保存后')
+
 _EFFORT_STEPS = {'short': 5, 'medium': 15, 'long': 30}
 _MAX_STEPS_FLOOR = 3
 # +2: one for browser-use done-only last step, one for save/final-check action.
@@ -116,6 +121,56 @@ def sanitize_contract_for_mode(contract: dict[str, Any]) -> dict[str, Any]:
         c['refill'] = 'none'
     elif mode in _NO_SUBMIT_TOKEN_MODES and c.get('refill') == 'all_editable':
         c['refill'] = 'none'
+    return c
+
+
+def promote_contract_for_save_cues(
+    contract: dict[str, Any] | None, task_text: str
+) -> dict[str, Any] | None:
+    """Promote LLM contracts degraded to navigate/query when text has save cues.
+
+    Regression guard (2026-08-27 session d3943e89): LLM phase reviewer judged
+    「新增…，点击保存。预期结果：页面跳转至…或提示保存成功。」 as mode=navigate,
+    clearing submit.required / success.kinds; the agent then called done() with
+    the create drawer half-filled (对公客户类型/证件类型/证件号码为空). When the
+    deterministic classifier says form_fill/form_modify AND the task text carries
+    a save/submit cue, the contract is re-promoted to create/modify with submit
+    tokens — the LLM misclassification cannot silently win over the signal.
+    """
+    if not isinstance(contract, dict):
+        return contract
+    from .classify import classification_task_text, classify_task_mode
+
+    mode = contract.get('mode') or 'other'
+    if mode not in ('navigate', 'login', 'query', 'other'):
+        return contract
+    t = classification_task_text(task_text)
+    if not t:
+        return contract
+    det = classify_task_mode(t)
+    if det not in ('form_fill', 'form_modify'):
+        return contract
+    if not _SAVE_CUE_RE.search(t):
+        return contract
+    c = dict(contract)
+    old_mode = mode
+    c['mode'] = 'create' if det == 'form_fill' else 'modify'
+    submit = dict(c.get('submit') or {})
+    submit['required'] = True
+    submit['via'] = 'any'
+    submit['button_text'] = ''
+    c['submit'] = submit
+    success = dict(c.get('success') or {})
+    success['kinds'] = ['toast_ok', 'url_change', 'saved_navigation']
+    success['evidence'] = list(success.get('evidence') or [])[:8]
+    c['success'] = success
+    c['allow_form_assistant'] = True
+    c['refill'] = 'all_editable'
+    sys.stderr.write(
+        f'[phase_reviewer] promote {old_mode}→{c["mode"]} '
+        f'(save-cue in text; deterministic={det})\n'
+    )
+    sys.stderr.flush()
     return c
 
 
@@ -335,7 +390,7 @@ async def review_phase_contract(
         raw = response.content if hasattr(response, 'content') else str(response)
         if isinstance(raw, list):
             raw = '\n'.join(str(x) for x in raw)
-        return normalize_reviewer_payload(str(raw))
+        return promote_contract_for_save_cues(normalize_reviewer_payload(str(raw)), task_text)
     except Exception as e:
         sys.stderr.write(f'[phase_reviewer] failed: {e}\n')
         sys.stderr.flush()

@@ -37,13 +37,13 @@
 ## 模式判定规则
 
 1. **进入/打开…页面**（导航到列表/菜单，无表单填写）：`mode=navigate`，`allow_form_assistant=false`，`refill=none`。不要把后续阶段的「点修改」「新增」放进 `in_scope`。
-2. **新增/创建/录入**（完整表单维护）：`mode=create`，`allow_form_assistant=true`，`refill=all_editable`。
+2. **新增/创建/录入**（完整表单维护）：`mode=create`，`allow_form_assistant=true`，`refill=all_editable`。（例：「新增一个信贷潜在客户…，点击保存。预期结果：页面跳转至客户基本信息填写页或提示保存成功。」→ mode=create，submit.required=true，success.kinds 含 saved_navigation。）
 3. **修改/编辑**（完整改所有可编辑项）：`mode=modify`，`allow_form_assistant=true`，`refill=all_editable`。
 4. **部分修改**（阶段文案或业务数据**逐个点名**了要改的字段）：`mode=modify`，`allow_form_assistant=false`，`refill=touched`（点名要求含糊、无法构成字段集合时才可用 `none`）。
 5. **查询/检索**：`mode=query`，`allow_form_assistant=false`，`refill=none`。
 6. **引入/选人/客户选择弹窗**：`mode=introduce_pick`，`allow_form_assistant=false`，`refill=none`。
 7. **登录**：`mode=login`，`allow_form_assistant=false`，`refill=none`，**必须** `submit.required=false`，`success.kinds=[]`（登录不走表单保存 token）。
-8. **navigate / query**：同样 **必须** `submit.required=false`，`success.kinds=[]`（完成条件用 `done_when` 自然语言即可，不要填 toast_ok/url_change）。
+8. **navigate / query**：同样 **必须** `submit.required=false`，`success.kinds=[]`（完成条件用 `done_when` 自然语言即可，不要填 toast_ok/url_change）；阶段文本含「点击保存/保存成功/点击提交/提交成功」时禁止 navigate/query——「预期结果：页面跳转至…或提示保存成功」中的页面跳转是保存成功的形态（saved_navigation），属于 create/modify 的成功证据而非导航。
 
 9. **泛指 vs 点名判定基准**（规则 3 与规则 4 的分界）：
    - 阶段文案对填写范围是**泛指**（如「填写…信息」「完善…资料」「维护表单」），且未列出具体字段清单时，即使提到「修改」，也按整表维护处理：新增类走规则 2、修改类走规则 3——即 `refill=all_editable`、`allow_form_assistant=true`。
