@@ -32,6 +32,7 @@ import {
   resolveSystemProject,
   listPartnerProjects,
   listPartnerSystems,
+  listPartnerSystemTree,
   pushImportDemand,
 } from '../../services/partner-platform.js';
 import {
@@ -237,7 +238,11 @@ export default function (app) {
     }
   });
 
-  /** Partner systems under a project (lazy tree). */
+  /**
+   * Partner systems under a project.
+   * 默认（无 parentId）返回完整嵌套树——自根向下递归展开全部子节点；
+   * 传 parentId 时保持旧懒加载行为，只返回该层的直接子节点。
+   */
   app.get('/api/v2/export/partner/systems', async (req, res) => {
     try {
       const accessToken = requireAccessToken(req);
@@ -246,8 +251,19 @@ export default function (app) {
       if (projectId == null || projectId === '') {
         return res.status(400).json({ error: 'projectId is required' });
       }
-      const systems = await listPartnerSystems({ accessToken, projectId, parentId });
-      res.json({ projectId: String(projectId), systems, count: systems.length });
+      let systems;
+      if (parentId != null && parentId !== '') {
+        systems = await listPartnerSystems({ accessToken, projectId, parentId });
+      } else {
+        systems = await listPartnerSystemTree({ accessToken, projectId });
+      }
+      const count = (function countNodes(nodes) {
+        return (nodes || []).reduce(
+          (sum, n) => sum + 1 + countNodes(n.children),
+          0,
+        );
+      })(systems);
+      res.json({ projectId: String(projectId), systems, count });
     } catch (err) {
       res.status(err.statusCode || 500).json({ error: err.message, partner: err.partner });
     }

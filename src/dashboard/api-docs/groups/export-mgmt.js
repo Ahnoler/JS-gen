@@ -116,16 +116,22 @@ export const GROUP_EXPORT = [
       },
       {
         method: 'GET', path: '/api/v2/export/partner/systems',
-        summary: '对方系统树（按项目，代理）',
-        desc: '转发对方 lazySystemTree；项目变更后前端应清空已选系统再调本接口。',
+        summary: '对方系统树（按项目，代理，返回完整嵌套树）',
+        desc: '转发对方 lazySystemTree；默认（无 parentId）自根向下递归展开非叶节点组成完整树一次性返回（同层并发、isLeaf 剪枝、maxDepth=8 防环）；传 parentId 时保持旧懒加载行为只取该层。项目变更后前端应清空已选系统再调本接口。count 为全树节点总数。',
         params: [
           { name: 'projectId', type: 'string', required: true, in: 'query', desc: '对方项目 id', example: '31' },
-          { name: 'parentId', type: 'string', in: 'query', desc: '可选，懒加载子节点' },
+          { name: 'parentId', type: 'string', in: 'query', desc: '可选；传入则退化为懒加载单层（直接子节点）' },
         ],
         respExample: J({
           projectId: '31',
-          systems: [{ id: 98, name: '李淼一测试系统' }],
-          count: 1,
+          systems: [
+            {
+              id: 1, name: '存量核心业务系统',
+              children: [{ id: 34, name: '1' }, { id: 35, name: '2' }],
+            },
+            { id: 98, name: '李淼一测试系统' },
+          ],
+          count: 3,
         }),
       },
       {

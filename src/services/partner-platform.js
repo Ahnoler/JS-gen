@@ -286,23 +286,21 @@ function normalizeSystemNode(node) {
   const out = { id: Number(id) || id, name };
   if (children?.length) out.children = children;
   if (node.parentId != null) out.parentId = node.parentId;
+  // 内部递归剪枝用（不可枚举，不会出现在 JSON 响应里）：
+  // 伙伴懒加载树以 isLeaf=true 标记叶子，无需再按 parentId 探测一层
+  Object.defineProperty(out, '_isLeaf', { value: node.isLeaf === true, enumerable: false });
   return out;
 }
 
 /**
- * List partner systems under a project (lazy tree roots or children).
- * @param {object} [opts] request options
+ * 拉取伙伴平台懒加载系统树的某一层。
+ * @param {object} opts
  * @param {string} opts.accessToken partner access token
  * @param {string|number} opts.projectId partner project id
- * @param {string|number} [opts.parentId] optional parent system id
- * @returns {Promise<object[]>} partner system nodes
+ * @param {string|number} [opts.parentId] 父系统 ID；缺省取根层
+ * @returns {Promise<object[]>} 归一化的系统节点列表
  */
-export async function listPartnerSystems({ accessToken, projectId, parentId } = {}) {
-  if (projectId == null || projectId === '') {
-    const err = new Error('projectId is required');
-    err.statusCode = 400;
-    throw err;
-  }
+async function fetchPartnerSystemLevel({ accessToken, projectId, parentId } = {}) {
   const qs = new URLSearchParams({
     projectId: String(projectId),
     menuType: '1',
@@ -329,6 +327,58 @@ export async function listPartnerSystems({ accessToken, projectId, parentId } = 
   const raw = json.data ?? json.rows ?? json.list ?? json;
   const list = Array.isArray(raw) ? raw : (Array.isArray(raw?.children) ? raw.children : []);
   return list.map(normalizeSystemNode).filter(Boolean);
+}
+
+/**
+ * List partner systems under a project — single lazy level.
+ * 兼容旧懒加载调用方；批量推送弹窗应使用 listPartnerSystemTree。
+ * @param {object} [opts] request options
+ * @param {string} opts.accessToken partner access token
+ * @param {string|number} opts.projectId partner project id
+ * @param {string|number} [opts.parentId] optional parent system id
+ * @returns {Promise<object[]>} partner system nodes
+ */
+export async function listPartnerSystems({ accessToken, projectId, parentId } = {}) {
+  if (projectId == null || projectId === '') {
+    const err = new Error('projectId is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  return fetchPartnerSystemLevel({ accessToken, projectId, parentId });
+}
+
+/**
+ * List the FULL partner system tree for a project: 自根向下按 parentId
+ * 逐层展开非叶节点，组装成嵌套树。同层并发拉取；maxDepth 防御环。
+ * @param {object} [opts] request options
+ * @param {string} opts.accessToken partner access token
+ * @param {string|number} opts.projectId partner project id
+ * @param {number} [opts.maxDepth=8] 递归深度上限
+ * @returns {Promise<object[]>} nested partner system nodes
+ */
+export async function listPartnerSystemTree({ accessToken, projectId, maxDepth = 8 } = {}) {
+  if (projectId == null || projectId === '') {
+    const err = new Error('projectId is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  const roots = await fetchPartnerSystemLevel({ accessToken, projectId });
+  const expand = async (node, depth) => {
+    if (depth >= maxDepth || node._isLeaf === true) return;
+    try {
+      const kids = await fetchPartnerSystemLevel({ accessToken, projectId, parentId: node.id });
+      if (!kids.length) return;
+      node.children = kids;
+      await Promise.all(kids.map((kid) => expand(kid, depth + 1)));
+    } catch (err) {
+      // 单层展开失败不阻断整棵树，只记日志、该分支缺子级
+      process.stderr.write(
+        `[partner] system-tree expand failed at project=${projectId} parentId=${node.id}: ${err?.message || err}\n`,
+      );
+    }
+  };
+  await Promise.all(roots.map((root) => expand(root, 0)));
+  return roots;
 }
 
 /**
