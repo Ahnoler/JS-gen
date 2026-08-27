@@ -108,7 +108,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 return _err(
                     'page-loading-spin-blocked | loading mask still visible after wait. '
                     'Do NOT call get_page_state again. Call wait_for_loading() once, then '
-                    'click_icon_button / click_element_by_index / scan_visible_fields — '
+                    'click_button / click_element_by_index / scan_visible_fields — '
                     'not another get_page_state.',
                     include_in_memory=True,
                 )
@@ -116,7 +116,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 'page-still-loading | waited for loading mask but it is still present. '
                 'Do NOT call get_page_state again while loading. '
                 'NEXT_ACTION: wait_for_loading() once, then a UI action '
-                '(click_icon_button / click_element / scan) — not get_page_state.',
+                '(click_button / click_element / scan) — not get_page_state.',
                 include_in_memory=True,
             )
 
@@ -197,7 +197,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         "('err-icon-label-ambiguous:{candidates}' / 'err-icon-label-miss'). "
         'Use get_page_state().iconButtons to discover true icon labels.'
     )
-    async def click_icon_button(button_text: str):
+    async def click_button(button_text: str):
         page = await browser_context.get_current_page()
         try:
             await page.evaluate(JS_STAMP_ICON_ARIA_LABELS)
@@ -210,7 +210,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         await page.wait_for_timeout(400)
         if _is_ok_result(result):
             _state._record_action(
-                'click_icon_button',
+                'click_button',
                 {'button_text': button_text},
                 result,
                 element=element,

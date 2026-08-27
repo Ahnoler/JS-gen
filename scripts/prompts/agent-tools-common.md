@@ -16,7 +16,7 @@
 - switch_tab(tab_name) — 切换 el-tabs 标签页。**⚠️ 切换前必须先点击"暂存"按钮保存数据，否则已填数据会丢失。**
 - click_menu_item(menu_text) — 点击 el-menu 菜单项（自动展开子菜单）
 - wait_for_loading() — 等待 Element UI 加载遮罩消失
-- get_page_state() — 诊断（含 `iconButtons: [{text, className}, …]`：页面级图标按钮及其 tooltip 文案；`loading`/`openDropdown` 仅在真正可见时为 true）。**🚨 禁止在 loading 时反复调用**：若返回 `page-still-loading` / `page-loading-spin-blocked`，只调用一次 `wait_for_loading()`，然后改用 `click_icon_button` / `click_element` / `scan_visible_fields` 等真实 UI 动作，不要再空转 `get_page_state`。
+- get_page_state() — 诊断（含 `iconButtons: [{text, className}, …]`：页面级图标按钮及其 tooltip 文案；`loading`/`openDropdown` 仅在真正可见时为 true）。**🚨 禁止在 loading 时反复调用**：若返回 `page-still-loading` / `page-loading-spin-blocked`，只调用一次 `wait_for_loading()`，然后改用 `click_button` / `click_element` / `scan_visible_fields` 等真实 UI 动作，不要再空转 `get_page_state`。
 - save_business_data(key, value) — 将值保存到进程级 business data 存储（跨步骤/阶段持久化）
 - read_business_data(key) — 从 business data 存储中读取值
 - **use_special_element(special_element_id) — 执行当前阶段下发的特殊元素操作组。仅可使用任务中【特殊元素库候选】列出的 id；成功后步骤会以特殊元素来源写入轨迹。页面状态匹配复杂组件流程时优先调用，不要编造未提供的 id。**

@@ -412,7 +412,7 @@ async def replay_action_entries(
                     result = await _replay_click_by_index(page, entry, params)
                 elif action_name in (
                     'click_menu_item',
-                    'click_icon_button',
+                    'click_button',
                     'click_adjacent_button',
                     'click_table_row_button',
                     'switch_tab',
@@ -436,7 +436,7 @@ async def replay_action_entries(
                         click_params = {**params}
                         if action_name == 'click_menu_item':
                             click_params['text'] = params.get('menu_text') or params.get('text') or ''
-                        elif action_name == 'click_icon_button':
+                        elif action_name == 'click_button':
                             click_params['text'] = params.get('button_text') or params.get('text') or ''
                         elif action_name == 'switch_tab':
                             click_params['text'] = params.get('tab_name') or params.get('text') or ''

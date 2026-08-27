@@ -53,7 +53,7 @@ export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 | CTRL.switchTab | (name) | 'ok' / 'tab-not-found' | 切换 el-tabs |
 | CTRL.checkFieldValue | (label) | 值 / 'empty' / 'label-not-found' | 读取表单字段当前值 |
 | CTRL.clickAdjacentButton | (label) | 'ok-clicked' / 'already-filled'(非ok跳过) / 'no-button-found' | 点击字段旁的选择/引入按钮 |
-| CTRL.clickIconButton | (buttonText) | 'ok' / 'ok-text:<label>' / 'err-icon-label-ambiguous:{候选}' / 'err-icon-label-miss' / 'button-text-empty' | 按标签点按钮：先匹配 tooltip 图标，miss 时直接点击同标签可见文字按钮（表格行内除外；页面级优先于弹层；歧义时返回候选清单）；miss/歧义均已协议化 |
+| CTRL.clickButton | (buttonText) | 'ok' / 'ok-text:<label>' / 'err-icon-label-ambiguous:{候选}' / 'err-icon-label-miss' / 'button-text-empty' | 按标签点按钮：先匹配 tooltip 图标，miss 时直接点击同标签可见文字按钮（表格行内除外；页面级优先于弹层；歧义时返回候选清单）；miss/歧义均已协议化 |
 | CTRL.fillAddressFields | (addr) | 'ok:N' / 'no-address-fields' | 填充所有标签含"地址"的字段 |
 | CTRL.expandAllTreeNodes | () | 展开节点数 | 展开全部 el-tree 节点 |
 

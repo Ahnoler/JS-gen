@@ -1,5 +1,5 @@
 /**
- * CTRL_OBJECT part: clickMenuItem / closeDialog / checkFieldValue / clickAdjacentButton / clickIconButton.
+ * CTRL_OBJECT part: clickMenuItem / closeDialog / checkFieldValue / clickAdjacentButton / clickButton.
  * Concatenated with sibling parts into CTRL_OBJECT in index.js —
  * do not change indentation, braces, or the trailing comma; the
  * assembled string must stay byte-identical (characterize-ctrl.mjs).
@@ -48,7 +48,7 @@ export const CTRL_PART_NAV = `  clickMenuItem: (text) => {
     }
     return 'label-not-found';
   },
-  clickIconButton: (buttonText) => {
+  clickButton: (buttonText) => {
     if (!buttonText) return 'button-text-empty';
     const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
     const shortLabel = (text) => {
