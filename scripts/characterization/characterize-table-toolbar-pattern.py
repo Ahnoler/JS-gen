@@ -44,7 +44,7 @@ MISC_PY = ROOT / "scripts" / "controller" / "actions" / "_misc.py"
 CTRL_NAV_JS = ROOT / "src" / "ctrl-actions" / "nav.js"
 
 
-def test_click_icon_button_reports_text_buttons_on_miss() -> None:
+def test_click_button_reports_text_buttons_on_miss() -> None:
     """2026-08-27 toolbar 修改 cycle: icon-only tool could not see plain text
     buttons. Extended: after an icon miss it CLICKS a same-label visible text
     button ('ok-text:<label>') — one-step success instead of retry loops."""
@@ -67,17 +67,17 @@ def test_click_icon_button_reports_text_buttons_on_miss() -> None:
     )
     misc = MISC_PY.read_text(encoding="utf-8")
     assert_true(
-        "startswith('err-icon-label-ambiguous')" in misc,
+        "startswith('err-icon-label-ambiguous:')" in misc,
         "Python wraps ambiguous err-icon-label-ambiguous with _err guidance",
     )
     ctrl_nav = CTRL_NAV_JS.read_text(encoding="utf-8")
-    icon_fn = ctrl_nav.split("clickIconButton:")[1]
+    icon_fn = ctrl_nav.split("clickButton:")[1]
     assert_true(
         "ok-text:" in icon_fn and "err-icon-label-ambiguous" in icon_fn,
-        "CTRL clickIconButton parity: text-button click + ambiguous structure",
+        "CTRL clickButton parity: text-button click + ambiguous structure",
     )
     idx = CTRL_INDEX_JS.read_text(encoding="utf-8")
-    row = [ln for ln in idx.splitlines() if "clickIconButton" in ln and "|" in ln]
+    row = [ln for ln in idx.splitlines() if "clickButton" in ln and "|" in ln]
     assert_true(row and "ok-text" in row[0], "index.js doc line shows ok-text code")
 
 
@@ -201,6 +201,7 @@ def test_table_envelopes() -> None:
 
 
 def main() -> int:
+    test_click_button_reports_text_buttons_on_miss()
     test_row_matching_whitespace_normalized()
     test_no_blind_first_button_fallback()
     test_python_err_wrapper_and_import()

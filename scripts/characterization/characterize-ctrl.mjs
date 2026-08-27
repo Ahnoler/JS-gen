@@ -31,7 +31,7 @@
  *   closeDialog           → close_dialog          (_misc.py)
  *   checkFieldValue       → check_field_value     (_form.py)
  *   clickAdjacentButton   → click_adjacent_button (_form.py)
- *   clickIconButton       → click_icon_button / JS_CLICK_ICON_BUTTON (_misc.py / _js_snippets.py)
+ *   clickButton           → click_button / JS_CLICK_ICON_BUTTON (_misc.py / _js_snippets.py)
  *   expandAllTreeNodes    → expand_all_el_tree    (_form.py)
  *   fillAddressFields     → CTRL.fillAddressFields (script_assembler.py; agent uses fillFormField + address rules)
  *   verifyFormStructure   → verifyFormStructure   (form_snapshot.py / script_assembler.py; replay-only)
@@ -70,7 +70,7 @@ const CTRL_PYTHON_MAP = {
   closeDialog: { cues: ['close_dialog'], roots: 'agent' },
   checkFieldValue: { cues: ['check_field_value'], roots: 'agent' },
   clickAdjacentButton: { cues: ['click_adjacent_button'], roots: 'agent' },
-  clickIconButton: { cues: ['click_icon_button', 'JS_CLICK_ICON_BUTTON'], roots: 'agent' },
+  clickButton: { cues: ['click_button', 'JS_CLICK_ICON_BUTTON'], roots: 'agent' },
   expandAllTreeNodes: { cues: ['expand_all_el_tree'], roots: 'agent' },
   fillAddressFields: { cues: ['CTRL.fillAddressFields'], roots: 'assembler' },
   verifyFormStructure: { cues: ['verifyFormStructure'], roots: 'assembler' },

@@ -211,7 +211,7 @@ async function runOnPage(page) {
   const icon = await page.evaluate(manualSnapExpr('button.icon-btn', '', 'icon'));
   assertSmart(icon, 'manual icon refresh', {
     mustInclude: [],
-    actionType: 'click_icon_button',
+    actionType: 'click_button',
     params: { text: '刷新' },
   });
 

@@ -2,7 +2,7 @@
 """Characterize icon-button label resolution (no hover / no aria-describedby).
 
 Uses a blank Playwright page with mocked ElTooltip hosts (__vue__.content).
-Also covers manual recorder → mapper parity for click_icon_button.
+Also covers manual recorder → mapper parity for click_button.
 """
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ SETUP_VUE = """() => {
 
 def _assert_mapper_payload() -> None:
     mapped = _map_dom_event_to_action({
-        'kind': 'click_icon_button',
+        'kind': 'click_button',
         'button_text': '新增一级分类',
         'text': '新增一级分类',
         'tag': 'a',
@@ -64,13 +64,13 @@ def _assert_mapper_payload() -> None:
     })
     assert mapped is not None, mapped
     action, params, element = mapped
-    assert action == 'click_icon_button', action
+    assert action == 'click_button', action
     assert params == {'button_text': '新增一级分类'}, params
     assert element.get('target_kind') == 'icon', element
     assert 'aria-label' in (element.get('xpath_smart') or ''), element.get('xpath_smart')
 
     empty = _map_dom_event_to_action({
-        'kind': 'click_icon_button',
+        'kind': 'click_button',
         'button_text': '',
         'text': '',
         'tag': 'a',
@@ -135,27 +135,27 @@ async def main() -> int:
         await page2.click("a.el-icon-folder-add")
         await page2.wait_for_timeout(100)
 
-        icon_events = [e for e in captured if e.get("kind") == "click_icon_button"]
-        assert icon_events, f"expected click_icon_button emit, got {captured!r}"
+        icon_events = [e for e in captured if e.get("kind") == "click_button"]
+        assert icon_events, f"expected click_button emit, got {captured!r}"
         assert icon_events[0].get("button_text") == "新增一级分类", icon_events[0]
 
         mapped = _map_dom_event_to_action(icon_events[0])
         assert mapped is not None, icon_events[0]
         action, params, _element = mapped
-        assert action == "click_icon_button", action
+        assert action == "click_button", action
         assert params.get("button_text") == "新增一级分类", params
         assert action != "click_element_by_index"
 
-        # Noise header / plain button must not become click_icon_button
+        # Noise header / plain button must not become click_button
         captured.clear()
         await page2.click("#noise")
         await page2.wait_for_timeout(50)
-        assert not any(e.get("kind") == "click_icon_button" for e in captured), captured
+        assert not any(e.get("kind") == "click_button" for e in captured), captured
 
         captured.clear()
         await page2.click("button.el-button")
         await page2.wait_for_timeout(50)
-        assert not any(e.get("kind") == "click_icon_button" for e in captured), captured
+        assert not any(e.get("kind") == "click_button" for e in captured), captured
         plain = [e for e in captured if e.get("kind") == "click"]
         assert plain, f"expected generic click for plain button, got {captured!r}"
 
