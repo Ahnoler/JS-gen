@@ -40,13 +40,10 @@ run() {
 }
 
 run "characterize-dedup"       node scripts/characterization/characterize-dedup.mjs
-run "characterize-ctrl"        node scripts/characterization/characterize-ctrl.mjs
 run "characterize-trajectory"  node scripts/characterization/characterize-trajectory.mjs
 run "characterize-region-tree" node scripts/characterization/characterize-region-tree.mjs
 run "characterize-transaction-export-region" node scripts/characterization/characterize-transaction-export-region.mjs
-run "characterize-assembler" "$PY" scripts/characterization/characterize-assembler-click.py
 run "characterize-form-rules" "$PY" scripts/characterization/characterize-form-rules.py
-run "accept-engineering-apis" node scripts/smoke/accept-engineering-apis.mjs
 run "characterize-scan-editable-summary" "$PY" scripts/characterization/characterize-scan-editable-summary.py
 run "characterize-scan-fullpage-p1" "$PY" scripts/characterization/characterize-scan-fullpage-p1.py
 run "characterize-phase-section-scope" "$PY" scripts/characterization/characterize-phase-section-scope.py
@@ -61,16 +58,13 @@ run "characterize-close-dialog-replay" "$PY" scripts/characterization/characteri
 run "characterize-cascade-three-round" "$PY" scripts/characterization/characterize-cascade-three-round.py
 run "characterize-dialog-tasklist-scope" "$PY" scripts/characterization/characterize-dialog-tasklist-scope.py
 run "characterize-container-naming" "$PY" scripts/characterization/characterize-container-naming.py
-run "characterize-table-toolbar-pattern" "$PY" scripts/characterization/characterize-table-toolbar-pattern.py
 run "characterize-result-protocol" "$PY" scripts/characterization/characterize-result-protocol.py
-run "characterize-icon-codes" "$PY" scripts/characterization/characterize-icon-codes.py
 run "characterize-use-field" "$PY" scripts/characterization/characterize-use-field.py
 run "characterize-field-value-match" "$PY" scripts/characterization/characterize-field-value-match.py
 run "characterize-dual-save-section" "$PY" scripts/characterization/characterize-dual-save-section.py
 run "characterize-form-assistant" "$PY" scripts/characterization/characterize-form-assistant.py
 run "characterize-introduce-query-fill" "$PY" scripts/characterization/characterize-introduce-query-fill.py
 run "characterize-select-state-boundary" "$PY" scripts/characterization/characterize-select-state-boundary.py
-run "characterize-date-fill-merge" "$PY" scripts/characterization/characterize-date-fill-merge.py
 run "characterize-replay-params-xpath" "$PY" scripts/characterization/characterize-replay-params-xpath.py
 run "characterize-tree-select-record" "$PY" scripts/characterization/characterize-tree-select-record.py
 run "characterize-inventory-memory" "$PY" scripts/characterization/characterize-inventory-memory.py

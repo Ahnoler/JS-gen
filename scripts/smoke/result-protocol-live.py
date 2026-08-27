@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 """LIVE smoke（手动）：Agent 结果协议四场景回放。
 
-前提：CDP 127.0.0.1:19242 已有登录天阳测试环境的浏览器；
-对公客户管理列表页可达，且存在草稿客户「璞真健康管理咨询中心」。
+前提：CDP 127.0.0.1:19242 已有登录天阳测试环境的浏览器。
+自建沙箱页签跑用例（不劫持/不导航现有页签），结束后自动关闭沙箱页签；
+无浏览器可连时退出码 3。
 
 用法： ./python/python.exe scripts/smoke/result-protocol-live.py
 每场景独立判定 PASS/FAIL，任一 FAIL 退出码 1；无浏览器时退出码 3。
@@ -52,7 +53,7 @@ async def case_table_envelope(page):
     from scripts.controller.actions._table import _register_table_actions  # noqa: F401 (wiring only)
     src_ok = "err-button-not-found-in-row" in open("scripts/controller/actions/_table.py", encoding="utf-8").read()
     r = await page.evaluate(
-        "(" + Q3 + "([rowText]) => {" + """
+        "(([rowText]) => {" + """
         const rows=[...document.querySelectorAll('.el-table__body-wrapper .el-table__row')];
         let row=null; const want=rowText.replace(/\\s+/g,'');
         for(const rr of rows){ if(((rr.textContent||'').replace(/\\s+/g,'')).includes(want)){row=rr;break;} }
@@ -62,7 +63,7 @@ async def case_table_envelope(page):
         }
         const vis=[...row.querySelectorAll('button,.el-button,a')].filter(b=>b.offsetParent!==null).map(b=>(b.textContent||'').trim()).filter(Boolean);
         return 'err-button-not-found-in-row:'+JSON.stringify({wanted:'修改',rowButtons:vis,rowHasRadio:!!row.querySelector('.el-radio, input[type=radio]')});
-    }""" + Q3 + ")", [ROW_KEY])
+    }""" + ")", [ROW_KEY])
     ok = str(r).startswith("err-button-not-found-in-row") and '"rowHasRadio":true' in str(r)
     record("T3 表格行内无按钮→结构化信封", ok and src_ok, str(r)[:140])
 
@@ -139,34 +140,38 @@ async def main():
         async with async_playwright() as p:
             browser = await p.chromium.connect_over_cdp(CDP)
             ctx = browser.contexts[0]
-            page = next((g for g in ctx.pages if "tansun" in g.url), None)
-            if page is None:
-                print("[SKIP] 无天阳页面（退出码 3）；请先启动录制环境")
-                sys.exit(3)
-            if not await ensure_list(page):
-                record("前置：列表页加载", False, "table empty")
-            else:
-                record("前置：列表页加载", True, "rows ok")
-                await case_table_envelope(page)
-                # 进入编辑页做 T1/T4
-                radio_js = ("() => { const rows=[...document.querySelectorAll('.el-table__row')];"
-                            "const want='" + ROW_KEY.replace(' ', '') + "';"
-                            "for(const rr of rows){if(((rr.textContent||'').replace(/\\s+/g,'')).includes(want))"
-                            "{const c=rr.querySelector('.el-radio__inner,.el-radio,input[type=radio]');"
-                            "if(c){c.click();return true;} } } return false; }")
-                got_radio = await page.evaluate(radio_js)
-                tb = await page.evaluate("""() => {
-                    for (const b of document.querySelectorAll('button')) {
-                        if ((b.innerText||'').trim()==='修改' && b.offsetParent!==null
-                            && !b.closest('.el-table__body-wrapper')) { b.click(); return true; } }
-                    return false; }""")
-                await page.wait_for_timeout(2500)
-                if got_radio and tb and "crtCpctInf" in page.url:
-                    await case_select_alias_chain(page)
-                    await case_fill_disabled_hint(page)
+            page = await ctx.new_page()
+            try:
+                if not await ensure_list(page):
+                    record("前置：列表页加载", False, "table empty")
                 else:
-                    record("进入编辑页", False, f"radio={got_radio} toolbar={tb}")
-                await case_icon_text_button(page)
+                    record("前置：列表页加载", True, "rows ok")
+                    await case_table_envelope(page)
+                    # 进入编辑页做 T1/T4
+                    radio_js = ("() => { const rows=[...document.querySelectorAll('.el-table__row')];"
+                                "const want='" + ROW_KEY.replace(' ', '') + "';"
+                                "for(const rr of rows){if(((rr.textContent||'').replace(/\\s+/g,'')).includes(want))"
+                                "{const c=rr.querySelector('.el-radio__inner,.el-radio,input[type=radio]');"
+                                "if(c){c.click();return true;} } } return false; }")
+                    got_radio = await page.evaluate(radio_js)
+                    tb = await page.evaluate("""() => {
+                        for (const b of document.querySelectorAll('button')) {
+                            if ((b.innerText||'').trim()==='修改' && b.offsetParent!==null
+                                && !b.closest('.el-table__body-wrapper')) { b.click(); return true; } }
+                        return false; }""")
+                    await page.wait_for_timeout(2500)
+                    if got_radio and tb and "crtCpctInf" in page.url:
+                        await case_select_alias_chain(page)
+                        await case_fill_disabled_hint(page)
+                    else:
+                        record("进入编辑页", False, f"radio={got_radio} toolbar={tb}")
+                    await case_icon_text_button(page)
+            finally:
+                # 沙箱页签用完即关，不遗留、不影响既有页签
+                try:
+                    await page.close()
+                except Exception:
+                    pass
             await browser.close()
     except Exception as exc:
         print(f"[SKIP] 无法连接 CDP {CDP}: {exc}")
