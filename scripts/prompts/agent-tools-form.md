@@ -2,7 +2,7 @@
 - 主表单 / 抽屉 / **维护·编辑弹窗**里需要「保存」「提交」「确定」「确认」（提交表单语义）时，**唯一允许的动作是 `click_save(button_text=…)`**（例：修改弹窗点确认 → `click_save(button_text='确认')`）；弹窗内「查询」等非提交按钮可用索引或其它专用动作。
 - **禁止**用 `click_element` / `click_element_by_index` / `scroll_*` + 索引点击去点保存/确认类按钮（回放时无法可靠读 `.el-form-item__error`、自愈失效、done 被拒后易整轮重做）。
 - 若 `done()` 被拒且提示无 ok-save-success：**不要**重新选表格行、不要再点「修改」；弹窗若仍开着直接 `click_save(button_text='确认')`。
-- select_option(label_text, option_text, xpath_smart='') — el-select 下拉框。"first" 选择第一个选项。**🚨 这是选择 el-select 选项的唯一正确方式。不要使用 click_element 来选择下拉选项。** 扫描/`get_pending_tasks` 返回的字段含 `label` 与相对 `xpath_smart`；**优先传入 `xpath_smart`** 定位控件。`label_text` 仅用于语义（规则/取值/录制），须用扫描里的**完整**名称，勿缩写猜测。
+- select_option(label_text, option_text, xpath_smart='') — el-select 下拉框。"first" 选择第一个选项。**🚨 这是选择 el-select 选项的唯一正确方式。不要使用 click_element 来选择下拉选项。** 扫描/`get_pending_tasks` 返回的字段含 `label` 与相对 `xpath_smart`；**优先传入 `xpath_smart`** 定位控件。`label_text` 仅用于语义（规则/取值/录制），须用扫描里的**完整**名称，勿缩写猜测。若【业务数据】中的值不在该字段快照 options 内——先在同页其它字段选项中查找该值，候选字段即为建议字段（如 信贷潜在客户 → 客户状态），改用候选字段填写；无候选时按报错指引处理，禁止盲填。
 - fill_form_field(label_text, value, xpath_smart='') — **el-form-item 内的文本/密码输入框以及日期字段（同一动作）。** 扫描/`get_pending_tasks` 含 `xpath_smart` + `label`；**优先传 `xpath_smart`**。`label_text` 为语义名（规则/取值/录制），用扫描原文勿猜。若返回 `err-field-disabled` — 跳过。返回信息含「下一步:」段时，必须照做其中推荐动作（如 select_option/select_tree_option），不得再用 fill_form_field 尝试同一字段。
 - click_radio(label_text, option_text, xpath_smart='') — el-radio 单选组；**优先传 `xpath_smart`**（同 fill/select）。
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
@@ -41,7 +41,7 @@
 - 扫描当前**主页面、抽屉、或录入类弹窗**内可编辑字段，结合阶段任务/业务数据/相关快照生成合法值批量填写（**未在【业务数据】中点名的字段可随机补**）；不确定时会跳过并放入返回 JSON 的 `needs_agent`。
 - **登录**只用 `login` 后 `done`；**查询**不调用助手，由你按任务设条件后点「查询」；**表单修改—部分字段**不调用 `run_form_assistant`，只改任务点名的字段、其余保留原值。
 - **`scan_form_fields()` 不自动填写**（只建任务列表；查询区调用返回 `not_form_fill`）。需要了解进度时可用 `scan_form_fields` / `scan_visible_fields` / `get_pending_tasks`（登录/查询阶段不要用它们当主流程）。
-- **🚨 若任务含【业务数据】（旧称【业务场景案例数据】/【预设案例数据】同等对待）：** 这是**用户需求里要使用的数据**（不是系统回写的案例数据）。其中点名的取值**必须**按场景理解后填写（直接 `fill_form_field` / `select_option`）。禁止用 `match_form_rule`、助手随机值或自造值覆盖这些字段。助手可能已先随机填了同名字段 — **你必须改回场景要求的值**。
+- **🚨 若任务含【业务数据】（旧称【业务场景案例数据】/【预设案例数据】同等对待）：** 这是**用户需求里要使用的数据**（不是系统回写的案例数据）。其中点名的取值**必须**按场景理解后填写（直接 `fill_form_field` / `select_option`）。禁止用 `match_form_rule`、助手随机值或自造值覆盖这些字段。助手可能已先随机填了同名字段 — **你必须改回场景要求的值**。（值必须落在对应字段快照 options 内；不在时先查同页其它字段选项找建议字段，无候选禁止盲填。）
 
 **助手的意图：**
 - 善意协作者 — 对**未在业务数据/场景中点名**的字段，填的值可能是随机生成的，但应是**符合该字段校验规则的有效值**；拿不准时会跳过并列入 `needs_agent`。**业务数据点名的字段、以及 `needs_agent` 列出的字段，由你负责对齐**。

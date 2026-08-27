@@ -3,6 +3,8 @@
 form_scan_utils.py re-exports these names for backward compatibility.
 """
 
+import json
+
 
 _SELECT_OPTION_SENTINELS = frozenset({
     'first', '1st', 'any', 'random', '第一个', '第一项',
@@ -63,6 +65,43 @@ def match_select_option_candidate(want: str, options) -> str | None:
     if contained:
         return min(contained, key=len)
     return None
+
+
+def suggest_field_for_value(want: str, fields, exclude_label: str = '') -> list[dict]:
+    """Candidate fields whose options contain ``want`` (exact → shortest containment).
+
+    Direction is strictly ``want ⊆ option``; the reverse direction
+    (option ⊆ want) is the old 非金融企业部门 trap and is forbidden here.
+    """
+    w = (want or '').strip()
+    ex = (exclude_label or '').strip()
+    if not w:
+        return []
+    cands: list[dict] = []
+    seen_labels: set[str] = set()
+    for fld in fields or []:
+        if not isinstance(fld, dict):
+            continue
+        label = (fld.get('label') or '').strip()
+        if not label or label == ex:
+            continue
+        opts = fld.get('options')
+        if isinstance(opts, str):
+            try:
+                opts = json.loads(opts)
+            except Exception:
+                opts = []
+        if not isinstance(opts, list) or not opts:
+            continue
+        matched = match_select_option_candidate(w, opts)
+        if not matched:
+            continue
+        if label in seen_labels:
+            continue
+        seen_labels.add(label)
+        cands.append({'label': label, 'option': matched})
+    cands.sort(key=lambda c: (0 if c['option'] == w else 1, len(c['option'])))
+    return cands
 
 
 

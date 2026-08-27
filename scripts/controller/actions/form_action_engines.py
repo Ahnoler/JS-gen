@@ -56,6 +56,63 @@ from .form_scan_utils import (
 
 from .form_autofill import FormAutofillEngine
 from .result_protocol import err_with, ok_marked, affordances
+from .select_match import suggest_field_for_value
+
+def _select_failure_next_action(label_text: str, option_text: str, business_data_store) -> str:
+    """确定性「建议字段」提示（C2）：值↔选项错配时的下一步指引。
+
+    候选来自 business_data_store 的 task_list（TaskList.from_store 后取
+    pending+done 全部项：每项 {label, options}；options 兼容 JSON 字符串）。
+    无候选/首项哨兵时返回既有默认文案（逐字不变）。
+    """
+    default_action = (
+        'select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)'
+    )
+    ot = (option_text or '').strip()
+    if not ot or ot.lower() in ('first', '1st') or ot in ('第一个', '第一项'):
+        return default_action
+
+    def _coerce_opts(raw):
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except Exception:
+                return []
+        return raw
+
+    task_fields: list[dict] = []
+    raw_tl = (business_data_store or {}).get('task_list')
+    try:
+        tl = TaskList.from_store(raw_tl)
+        for t in list(tl.pending) + list(tl.done):
+            task_fields.append({
+                'label': getattr(t, 'label', '') or '',
+                'options': _coerce_opts(getattr(t, 'options', None)),
+            })
+    except Exception:
+        task_fields = []
+    if not task_fields and isinstance(raw_tl, dict):
+        for bucket in ('pending', 'done'):
+            for p in raw_tl.get(bucket) or []:
+                if isinstance(p, dict):
+                    task_fields.append({
+                        'label': p.get('label', '') or '',
+                        'options': _coerce_opts(p.get('options')),
+                    })
+
+    cands = suggest_field_for_value(ot, task_fields, exclude_label=label_text)
+    if not cands:
+        return default_action
+    parts = []
+    for c in cands[:2]:
+        parts.append(
+            '建议字段「' + c['label'] + '」（快照选项含：' + c['option'] + '）：'
+            'select_option(label_text="' + c['label'] + '", option_text="' + c['option'] + '")'
+        )
+    return '；'.join(parts)
+
+
+
 
 class _FormActionEngineBase:
     """Shared wiring for extracted form action engines."""
@@ -535,7 +592,7 @@ class SelectEngine(_FormActionEngineBase):
                     'err-select-option-unresolved',
                     '引擎拒绝首项兜底伪成功结果（wanted 不在下拉项中）',
                     observed=f'label={label_text} last={failed}'[:160],
-                    next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>，或改用正确的字段)',
+                    next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
                 )
             matched_text = select_result.split(':', 1)[1] if ':' in select_result else select_result
             self.business_data_store.pop(f'_sel_retry_{label_text}', None)
@@ -587,7 +644,7 @@ class SelectEngine(_FormActionEngineBase):
                     "err-select-option-unresolved",
                     f"无法稳定选中「{option_text}」",
                     observed=f"label={label_text} last={failed}"[:160],
-                    next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                    next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
                 )
             # Alias resolution: map known short aliases to the canonical option
             # label present in the dropdown (e.g. 中国 → 中华人民共和国).
@@ -702,7 +759,7 @@ class SelectEngine(_FormActionEngineBase):
                 "err-select-option-unresolved",
                 f"无法稳定选中「{option_text}」",
                 observed=f"label={label_text} last={failed}"[:160],
-                next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
             )
         elif select_result.startswith('option-not-found:'):
             # Fuzzy: pick listed option that contains / is contained by option_text
@@ -732,7 +789,7 @@ class SelectEngine(_FormActionEngineBase):
                 "err-select-option-unresolved",
                 f"无法稳定选中「{option_text}」",
                 observed=f"label={label_text} last={failed}"[:160],
-                next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
             )
         else:
             failed = await _final_select_failure(str(select_result), xp)
@@ -740,7 +797,7 @@ class SelectEngine(_FormActionEngineBase):
                 "err-select-option-unresolved",
                 f"无法稳定选中「{option_text}」",
                 observed=f"label={label_text} last={failed}"[:160],
-                next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
             )
 
     # ── Adjacent button / radio (moved from misc for logical grouping) ──

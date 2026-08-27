@@ -23,6 +23,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from .form_rules import match_rule
 from ._business_data import iter_user_business_entries
 from scripts.controller.actions.section_scope import section_matches
+from .select_match import match_select_option_candidate, suggest_field_for_value
 
 _ASSISTANT_MISSION_INSTRUCTION = (
     '按任务背景与相关字段快照填写；无法判断则跳过并申报 needs_agent，禁止无依据猜测。'
@@ -295,9 +296,102 @@ def _enrich_llm_actions_xpath(llm_result, llm_fields):
     return enriched
 
 
+def _guard_select_plan_values(actions: list, needs: list, field_items: list, cross_fields: list) -> tuple[list, list]:
+    """Post-parse guard (C3): LLM 计划中 select/radio/checkbox 的值必须在该字段 options 内.
+
+    值不在该字段 options（且非首项哨兵）时：唯一候选（未被本计划其它动作或 needs
+    占用）→ 重定向到候选字段；否则撤销该动作并并入 needs_agent。重定向发生在
+    _enrich_llm_actions_xpath 之前——label 在 field_items 中才能拿到 xpath；
+    不在时留空，由 _resolve_control 兜底。
+    """
+    def _coerce_opts(raw):
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except Exception:
+                return []
+        return raw
+
+    def _find_field(label: str):
+        for f in field_items:
+            if isinstance(f, dict) and (f.get('label') or '').strip() == label:
+                return f
+        return None
+
+    def _find_cross_field(label: str):
+        for f in cross_fields:
+            if isinstance(f, dict) and (f.get('label') or '').strip() == label:
+                return f
+        return None
+
+    def _is_sentinel(v: str) -> bool:
+        v = (v or '').strip()
+        return bool(v) and (v.lower() in ('first', '1st') or v in ('第一个', '第一项'))
+
+    occupied: set[str] = set()
+    for a in actions:
+        if isinstance(a, dict):
+            occupied.add((a.get('label') or '').strip())
+    for n in needs:
+        if isinstance(n, dict):
+            occupied.add((n.get('label') or '').strip())
+
+    kept = []
+    for a in actions:
+        if not isinstance(a, dict):
+            kept.append(a)
+            continue
+        label = (a.get('label') or '').strip()
+        act_name = (a.get('action') or '').strip().lower()
+        if not label:
+            kept.append(a)
+            continue
+        field = _find_field(label)
+        fkind = (field.get('kind') or '').strip() if isinstance(field, dict) else ''
+        is_select_like = (
+            'select' in act_name or 'radio' in act_name or 'checkbox' in act_name
+            or fkind in ('select', 'radio', 'checkbox')
+        )
+        if not is_select_like:
+            kept.append(a)
+            continue
+        value = a.get('option') if a.get('option') is not None else a.get('value')
+        if value is None:
+            kept.append(a)
+            continue
+        val = str(value).strip()
+        if not val or _is_sentinel(val):
+            kept.append(a)
+            continue
+        opts = _coerce_opts(field.get('options')) if isinstance(field, dict) else []
+        if not opts or val in opts:
+            kept.append(a)
+            continue
+        cands = suggest_field_for_value(val, cross_fields, exclude_label=label)
+        cand_label = cands[0]['label'] if cands else ''
+        if len(cands) == 1 and cand_label and cand_label not in occupied:
+            cand_field = _find_cross_field(cand_label)
+            ckind = (cand_field.get('kind') or '').strip() if isinstance(cand_field, dict) else ''
+            a['label'] = cand_label
+            a['option'] = cands[0]['option']
+            a.pop('value', None)
+            a.pop('xpath_smart', None)
+            a['action'] = 'click_radio' if ckind == 'radio' else 'select_option'
+            occupied.add(cand_label)
+            kept.append(a)
+            continue
+        reason = '值「' + val + '」不在该字段选项内'
+        if cands:
+            reason += '；候选字段：' + '、'.join(c['label'] for c in cands)
+        needs.append({'label': label, 'reason': reason})
+        occupied.discard(label)
+    return kept, needs
+
+
 def _llm_generate_values(llm, items, business_data_store=None,
                          instruction: str | None = None,
-                         section: str = ''):
+                         section: str = '',
+                         cross_fields: list | None = None):
     """Generate values for form fields with three-tier priority:
     1. User-provided data (from business_data_store)
     2. form_rules.py generators — match_rule() for input/date fields
@@ -305,12 +399,16 @@ def _llm_generate_values(llm, items, business_data_store=None,
     """
     actions = []
     llm_fields = []
+    needs: list = []
 
     def _append_action(payload: dict, item) -> None:
         # Keep this concrete field's xpath (per-item), never a by-label map.
         payload = dict(payload)
         payload['xpath_smart'] = _xpath_of_field(item) or ''
         actions.append(payload)
+
+    if cross_fields is None:
+        cross_fields = items
 
     # —— Cross-field dependency detection: postal code ↔ address ——
     # When both an address field and a postal code field exist in the same batch,
@@ -338,17 +436,40 @@ def _llm_generate_values(llm, items, business_data_store=None,
         if cmd_val and str(cmd_val).strip():
             val = str(cmd_val).strip()
             if kind in ('select', 'radio', 'checkbox'):
-                if kind == 'select' and opts and val not in opts:
+                if opts and val not in opts:
                     # Fuzzy containment before falling through to LLM / first-option
-                    from scripts.controller.actions.form_scan_utils import (
-                        match_select_option_candidate,
-                    )
                     fuzzy = match_select_option_candidate(val, opts)
                     if fuzzy:
                         action_name = 'click_radio' if kind == 'radio' else 'select_option'
                         _append_action({'action': action_name, 'label': label, 'option': fuzzy}, item)
                         continue
-                    # else fall through — value not in current options
+                    # 值↔选项错配（C3）：唯一候选 → 重定向到候选字段；
+                    # 无/多候选 → 剥离 commandValue 并 needs_agent（业务数据点名字段不得由助手自造值）。
+                    cands = suggest_field_for_value(val, cross_fields, exclude_label=label)
+                    if len(cands) == 1:
+                        cand = cands[0]
+                        cand_item = next(
+                            (f for f in cross_fields
+                             if isinstance(f, dict) and (f.get('label') or '').strip() == cand['label']),
+                            None,
+                        )
+                        cand_kind = cand_item.get('kind', '') if isinstance(cand_item, dict) else ''
+                        _append_action(
+                            {'action': 'click_radio' if cand_kind == 'radio' else 'select_option',
+                             'label': cand['label'], 'option': cand['option']},
+                            cand_item if cand_item is not None else {},
+                        )
+                        continue
+                    if isinstance(item, dict):
+                        item.pop('commandValue', None)
+                    needs_entry = {
+                        'label': label,
+                        'reason': '业务数据值「' + val + '」不在该字段选项内',
+                    }
+                    if cands:
+                        needs_entry['reason'] += '；候选字段：' + '、'.join(c['label'] for c in cands)
+                    needs.append(needs_entry)
+                    continue
                 else:
                     action_name = 'click_radio' if kind == 'radio' else 'select_option'
                     _append_action({'action': action_name, 'label': label, 'option': val}, item)
@@ -370,7 +491,7 @@ def _llm_generate_values(llm, items, business_data_store=None,
         llm_fields.append(item)
 
     if not llm_fields:
-        return actions, []
+        return actions, needs
 
     # Resolve form-specific LLM (env vars or agent's LLM)
     form_llm = _get_form_llm(agent_llm=llm)
@@ -396,13 +517,13 @@ def _llm_generate_values(llm, items, business_data_store=None,
                 action_name = 'click_radio' if kind == 'radio' else 'select_option'
                 _append_action({'action': action_name, 'label': label, 'option': picked or '测试'}, item)
             elif kind == 'tree-select':
-                # Tree-select needs tree navigation via JS_SELECT_TREE_OPTION.
+                # tree-select needs tree navigation via JS_SELECT_TREE_OPTION.
                 _append_action({'action': 'select_tree_option', 'label': label, 'option': 'first'}, item)
             elif kind == 'date':
                 _append_action({'action': 'fill_input', 'label': label, 'value': _date_val}, item)
             else:
                 _append_action({'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'}, item)
-        return actions, []
+        return actions, needs
 
     # —— Build prompt for LLM ——
     field_lines = []
@@ -484,6 +605,7 @@ def _llm_generate_values(llm, items, business_data_store=None,
             text = text.split('\n', 1)[1].rsplit('```', 1)[0]
         parsed = json.loads(text)
         llm_actions, needs_agent = parse_form_llm_response(parsed)
+        llm_actions, needs_agent = _guard_select_plan_values(llm_actions, needs_agent, llm_fields, cross_fields or llm_fields)
         llm_result = _enrich_llm_actions_xpath(llm_actions, llm_fields)
         _record_decision('passed', llm_result)
         _emit_form_batch_event('form_batch_done', {
@@ -491,7 +613,7 @@ def _llm_generate_values(llm, items, business_data_store=None,
             'status': 'ok',
             'duration_ms': int((time.time() - _batch_start) * 1000),
         })
-        return actions + llm_result, needs_agent  # P1+P2 + LLM result
+        return actions + llm_result, needs + needs_agent  # P1+P2 + LLM result
     except Exception as e:
         _record_decision('failed', [], error=str(e)[:300])
         _emit_form_batch_event('form_batch_done', {
@@ -515,4 +637,4 @@ def _llm_generate_values(llm, items, business_data_store=None,
                     {'action': 'fill_input', 'label': label, 'value': label[:6] + '_TEST'},
                     item,
                 )
-        return actions, []
+        return actions, needs

@@ -244,8 +244,14 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
             if lbl in cache and not (d.get('commandValue') and str(d.get('commandValue')).strip()):
                 d['commandValue'] = cache[lbl]
 
+        # C3: same-section field list for cross-field value↔option suggestion.
+        cross_fields = [
+            d for d in items
+            if not filt or section_matches(filt, d.get('section_id', ''), d.get('section_title', ''), d.get('region_label', ''))
+        ]
         actions, needs = _llm_generate_values(
             self.llm, sub, business_data_store=self.business_data_store, section=filt,
+            cross_fields=cross_fields,
         )
         if idx == KIND_ORDER['select']:
             from .cascade_fill import append_select_first_fallbacks
