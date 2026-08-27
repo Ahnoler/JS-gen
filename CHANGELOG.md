@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- 2026-08-27: **动作统一改名：`click_icon_button` → `click_button`**（该工具已拓展为通用"按标签点击按钮"：tooltip 图标优先，miss 直点同标签文字按钮）。控制器注册名、state 录制映射、manual_recorder 发射/映射、script_assembler BOUNDARY、codegen 导出模板（含生成脚本内 CTRL.clickButton 调用点）、browser 服务层（resolve-by-label/dedup/legacy-engine-export/transaction-export-v3）、models/action 三处、CTRL nav.js 方法键与 index.js 文档行、agent prompt 两个文件全量同步；回放兼容：replay_names 新增 `'click_icon_button' → 'click_button'` 与 camelCase 双别名，历史轨迹可正常回放。返回码（err-icon-label-miss/-ambiguous、ok-text）与 JS_CLICK_ICON_BUTTON 常量名不变。前端 vue 仓库 schema value 同步为 click_button 并保留旧值 alias（中文展示「点击按钮」）。
+
 ### Added
 
 - 2026-08-27: **Agent 结果协议四层改造（六动作试点）**：根治"底层动作返回机器状态码、LLM 无法理解导致循环"的设计漏洞（spec：docs/superpowers/specs/2026-08-27-agent-result-protocol-design.md）。① 新模块 `scripts/controller/actions/result_protocol.py`——`err_with()` 三段式信封（`err-<code> | 原因:… | 现场:… | 下一步:…`，兼容 duplicate_failure 的 err- 前缀判定）、`ok_marked()` 诚实成功标注、`validate_protocol()` 校验器、`recommend_action_for_kind()` kind→工具映射、`affordances()` 现场快照助手；② 六动作失败点接入：select_option（err-select-option-unresolved + no-select-found 附 radio 指引）、fill_form_field（field-disabled 转 err-field-disabled 并推荐正确工具）、click_save not-found（close_dialog 指引降级为末选）、click_table_row_button/radio（err-table-row-not-found / err-button-not-found-in-row 结构化现场）、click_icon_button（码转正 err-icon-label-miss/-ambiguous，CTRL nav.js 同步）；③ 防呆前置：ScannedField/TaskItem 新增 `use` 推荐动作字段，扫描写入单点计算、get_pending_tasks/表单助手 LLM prompt/agent-field-rules 四处透传；④ fallback 假成功语义存疑记账 `_semantic_doubts` → 阶段末仅失败语境并入 `semantic_doubt_fields:` 理由（不阻断）；duplicate_failure_cue 处方表登记六个新错误码。新增特征化 characterize-result-protocol/icon-codes/use-field（已注册 verify-all）+ LIVE 冒烟 scripts/smoke/result-protocol-live.py。
