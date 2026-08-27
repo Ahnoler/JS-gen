@@ -63,6 +63,8 @@ run "characterize-dialog-tasklist-scope" "$PY" scripts/characterization/characte
 run "characterize-container-naming" "$PY" scripts/characterization/characterize-container-naming.py
 run "characterize-table-toolbar-pattern" "$PY" scripts/characterization/characterize-table-toolbar-pattern.py
 run "characterize-result-protocol" "$PY" scripts/characterization/characterize-result-protocol.py
+run "characterize-icon-codes" "$PY" scripts/characterization/characterize-icon-codes.py
+run "characterize-use-field" "$PY" scripts/characterization/characterize-use-field.py
 run "characterize-field-value-match" "$PY" scripts/characterization/characterize-field-value-match.py
 run "characterize-dual-save-section" "$PY" scripts/characterization/characterize-dual-save-section.py
 run "characterize-form-assistant" "$PY" scripts/characterization/characterize-form-assistant.py
