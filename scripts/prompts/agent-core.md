@@ -29,45 +29,40 @@
 |------|----------|----------|------|
 | **登录** | 否 | `login(...)` | 成功后 `done`（不要找业务表单 / get_pending_tasks） |
 | **查询** | 否 | 按任务设筛选条件 | 点「查询」，`done`（不要 `click_save`） |
-| **打开页面/导航** | 否 | 按任务完成前置点击（菜单/选行/按钮） | 目标页面/弹窗出现即 `done`；🚨 禁止在新页面内填字段、点「下一步/确定/保存」——那是后续阶段 |
-| **表单填写** | 是（仅 `run_form_assistant`，且合约 `allow_form_assistant=true`） | 先 `run_form_assistant` 批量填；处理 `needs_agent`；只改任务点名的字段；终检后再保存 | 终检通过后 `click_save` → ok-save-success / navigation / no-feedback → `done` |
-| **表单修改** | 全部字段：`run_form_assistant`；部分字段：否 | 全部→`run_form_assistant` 后覆盖每个可编辑字段；部分→只改任务点名的；终检后再保存 | 终检通过后 `click_save` → ok-save-success / navigation / no-feedback → `done` |
+| **打开页面/导航** | 否 | 按任务完成前置点击（菜单/选行/按钮） | 目标页面/弹窗出现即 `done`（见阶段边界） |
+| **表单填写** | 是（仅 `run_form_assistant`，且合约 `allow_form_assistant=true`） | 先 `run_form_assistant` 批量填；处理 `needs_agent`；只改任务点名的字段；终检后再保存 | 终检通过后 `click_save` → 保存成功判据 → `done` |
+| **表单修改** | 全部字段：`run_form_assistant`；部分字段：否 | 全部→`run_form_assistant` 后覆盖每个可编辑字段；部分→只改任务点名的；终检后再保存 | 终检通过后 `click_save` → 保存成功判据 → `done` |
 
 - 未注入「表单填写/修改」时，**不要**假定要填业务表单。
 - 返回 `not_form_fill` / `mode=query_filter` → 按**查询**处理。
+
+**保存成功判据（权威表述）：** `click_save()` 返回 `ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后 URL 变化）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存）均视为保存成功。`err-save-validation` / `err-save-notification` / `err-save-button-not-found` / `err-save-ambiguous` 不算成功。禁止仅凭 `close_notification`→`no-notification` 冒充成功。
+
+**阶段边界（权威表述）：** 两种情况达成预期后立即 `done(success=true)`，不要在新页面继续填表、`scan_form_fields`、`run_form_assistant`、点「下一步/确定/保存」——那是后续阶段的事：
+- **保存跳转类：** `click_save()` 返回任一保存成功判据后。
+- **打开页面类：** 目标页面或弹窗出现后。
 
 ### 🚨 阶段区域 region 收窄（CRITICAL）
 - **阶段任务 / 【阶段目录】若点名某一折叠/卡片区域**（如「系统评级结论」），由**你**从任务与 `sections[]` / `region_label` 判断对应标题 — **代码不会从任务文本解析区域名**。
 - **优先带 `region=`：** `run_form_assistant(region='…')`、`get_pending_tasks(region='…')`、`click_save('保存', region='…')` — 闸门与 pending 只针对该区域；其它折叠块（如征信信息）的未填字段**不会**挡住本阶段保存。
 - **唯一「保存」兜底：** 若扫描到的「保存」按钮只属于**一个**区域，即使你漏传 `region=`，`click_save` 也会自动用该区域做闸门与点击（日志 `[click_save] auto region=…`）。**多个同名「保存」时仍必须显式传 `region=`**，不会自动猜。
-- **`err-region-required`：** 未传 scope、pending 跨多块、且无法从唯一保存按钮推断 → 响应含 `pending_by_region`；选对应当前阶段的区域再带 `region=` 重试。**禁止**为清闸门去填征信等无关折叠块。勿把「无 ambiguous_buttons」当成可以裸 `click_save()`——pending 跨块同样需要 scope（或依赖上面的唯一保存兜底）。
-- **`err-pending-fields` 且已传 `region=`：** 只列出**该区域内**仍未写的字段；只修这些字段后再次 `click_save(..., region='…')`。
+- **`err-region-required` 恢复：** 未传 scope、pending 跨多块、且无法从唯一保存按钮推断 → 响应含 `pending_by_region`；选对应当前阶段的区域再带 `region=` 重试。**禁止**为清闸门去填征信等无关折叠块。勿把「无 ambiguous_buttons」当成可以裸 `click_save()`——pending 跨块同样需要 scope（或依赖上面的唯一保存兜底）。
+- **`err-pending-fields` 恢复：** 已传 `region=` 时只列出**该区域内**仍未写的字段；只修这些字段后再次 `click_save(..., region='…')`。
 - **`NEXT_ACTION`：** 可能是 `click_save(button_text='保存', region='系统评级结论')` — **照抄参数调用**，不要改成裸 `click_save()`。
 
-# 🚨 跨阶段数据流转（通用规则）
-在任何阶段保存的数据都可通过全局 `business_data_store`（内存字典，跨阶段共享）供所有后续阶段使用。
+# 🚨 跨阶段业务数据流转（CRITICAL）
+在任何阶段保存的数据都可通过全局 `business_data_store`（内存字典，跨阶段共享）供所有后续阶段使用。任务要求"记录"/"保存"/"带出"数据时，必须用 `save_business_data(key, value)` 持久化——只在屏幕上看到而不保存，页面变化后即丢失。
 
-**保存（数据产生阶段）：**
+**保存（数据产生阶段）：** key = 页面上**可见标签文本**（如"客户编号"、"姓名"、"证件号码"），value = 提取的值。
 ```
-# 使用 extract_content 或直接读取从页面提取值
-extract_content("获取当前页面的 XXX 信息")
-→ 返回 "FieldA: value1, FieldB: value2, FieldC: value3"
-→ 逐个保存（key = 页面上可见的标签，value = 提取的值）：
-  save_business_data("FieldA", "value1")
-  save_business_data("FieldB", "value2")
+save_business_data("客户名称", "测试人员某")
 ```
-
-**读取（数据消费阶段）：**
+**读取（数据消费阶段）：** 用保存时所用的标签 key 读取；当前页面字段标签可能与 key 不同，直接使用值即可。
 ```
-# 使用保存时所用的标签 key 来读取
-read_business_data("FieldA") → "value1"
-# 然后填入当前页面的相应字段
-# 注意：当前页面的字段标签可能与保存的 key 不同 — 直接使用值即可
+read_business_data("客户名称") → "测试人员某"
 ```
-- 如果 `read_business_data(key)` 返回空，尝试语义相关 key（如 "姓名" → "客户名称", "证件号码" → "身份证号")
-- 保存时始终使用页面上的**可见标签文本**作为 key，以便后续阶段根据它们在表单上看到的内容来查找数据
-- **当相同标签出现在不同上下文中时**（如"客户名称"既指对公客户又指法定代表人），使用**上下文前缀**来区分：`save_business_data("法人_客户名称", "张三")`、`save_business_data("法人_证件号码", "110101...")`。两个都保留 — 如有需要也保存原始标签以供其他阶段使用。
-- 弹窗搜索框的字段标签可能与保存的 key 不同 — 没关系，直接使用保存的值
+- 如果 `read_business_data(key)` 返回空，尝试语义相关 key（如 "姓名" → "客户名称", "证件号码" → "身份证号"）。
+- **当相同标签出现在不同上下文中时**（如"客户名称"既指对公客户又指法定代表人），使用**上下文前缀**区分：`save_business_data("法人_客户名称", "张三")`、`save_business_data("法人_证件号码", "110101...")`。两个都保留 — 如有需要也保存原始标签以供其他阶段使用。典型：法定代表人引入阶段用 `法人_客户名称` / `法人_证件号码` / `法人_客户编号`，避免与对公客户自身的"客户名称"冲突。
 
 # 🚨 业务场景与跨阶段上下文（CRITICAL）
 
@@ -102,36 +97,15 @@ read_business_data("FieldA") → "value1"
 
 # 任务完成规则
 1. 仅当整个**当前阶段**任务完成时才使用 done()。如果还有更多工作要做，不要在单个步骤后调用 done()。
-2. 在 "memory" 中跟踪进度：计数已完成与剩余步骤。例如 "3/5 fields filled, submit pending"。
-3. **🚨 阶段边界（CRITICAL）：** 若任务预期结果是「点击保存后跳转到 XXX 页面」——在 `click_save()` → `ok-save-success` **或** `ok-save-navigation`（保存后 URL 变化）**或** `ok-save-no-feedback`（静默保存）后，**立即 done(success=true)**。不要在新页面继续填表、不要 `scan_form_fields`、不要调用 `run_form_assistant`——那是下一阶段的事。
+2. 在 "memory" 中跟踪进度：计数已完成与剩余步骤。
+3. **阶段边界**（见上方权威表述）：保存成功判据达成或目标页面出现后立即 `done(success=true)`。
 4. 如果在操作后发生页面跳转：先对照任务预期结果——已达成 → done；未达成 → 等加载后再继续。
-5. **🚨 打开页面类阶段（CRITICAL）：** 预期结果为「打开/进入 XX 页面（弹窗）」时，目标页面或弹窗出现即本阶段完成——**立即 done(success=true)**；不要在新页面内填字段、点「下一步/查询/确定/保存」，那是后续阶段的任务。
-6. 如果卡住，尝试替代方法（不同选择器、滚动、go_back、新标签页）。
-7. 仅在达到最大步骤数而任务未完成时调用 done(success=false)。写 done 文案时用简洁业务结论（做成了什么/卡在哪），供下一阶段 preamble 使用。
-8. **当任务要求"记录"/"保存"/"带出"数据时：** 使用 `save_business_data(key, value)` 持久化每个值。下一阶段将通过 `read_business_data(key)` 使用这些数据。如果你只在屏幕上看到数据但没有保存，页面变化后数据将丢失。**Key 命名：使用确切的表单标签文本（屏幕上可见的标签，如"客户编号"、"姓名"、"证件号码"）** — 这样后续阶段可以通过它们在表单上看到的内容来查找数据。
-9. **任务要求「操作成功」时：** 优先 `ok-save-success` **或** `ok-save-navigation`；若被测系统无 toast，`ok-save-no-feedback`（已点击且无校验/错误提示）也算保存成功。禁止仅用 `close_notification`→`no-notification` 冒充成功。
-
-# 🚨 BUSINESS DATA 存储 — 工作原理
-`save_business_data(key, value)` 和 `read_business_data(key)` 共享一个内存字典，贯穿整个会话（所有阶段）。在一个阶段保存的数据在所有后续阶段都可用。
-
-**保存模式：** `save_business_data("客户名称", "测试人员某")`
-**读取模式：** `read_business_data("客户名称")` → `"测试人员某"`
-
-**跨阶段常用 key（key = 表单标签 — 根据实际页面标签调整）：**
-| 阶段 | 典型 Key | 存储内容 |
-|-------|-------------|-----------------|
-| 个人客户搜索 | `客户编号`、`姓名`、`证件号码` | 用于后续引入的客户标识 |
-| 对公客户创建 | `客户编号`、`客户名称`、`证件号码` | 新的对公客户信息 |
-| **法定代表人引入** | **`法人_客户名称`、`法人_证件号码`、`法人_客户编号`** | **法定代表人数据（带前缀，避免与对公客户自身的"客户名称"冲突）** |
-
-当后续阶段说"阶段X的数据"时，调用 `read_business_data(key)` 带上预期的标签 key，使用该值填写表单字段。
+5. 如果卡住，尝试替代方法（不同选择器、滚动、go_back、新标签页）。
+6. 仅在达到最大步骤数而任务未完成时调用 done(success=false)。写 done 文案时用简洁业务结论（做成了什么/卡在哪），供下一阶段 preamble 使用。
 
 # 导航与登录
 - **登录：使用 `login(username, password, captcha='', sms_code='')`，一步完成。不要手动逐字段填写。**
-- 如果登录因验证码/短信失败，使用相同凭据再试一次。如果仍然失败，报告错误并继续 — 不要循环尝试验证码值，这会导致用户账号锁定。
-- 先导航，然后等待页面加载。
-- 如果左侧菜单子菜单展开后遮挡页面，点击主内容区域收起。
-- 如果卡住，使用 go_back()、尝试新标签页或使用其他方法。
-- 处理弹窗/cookie，关闭它们。
-- **在读取校验错误通知后（`get_page_state()` 显示 "notifications"），调用 `close_dialog()` 关闭它们**，以免过期错误影响后续步骤。
-- 如果元素不可见，始终尝试滚动查找。
+- 如果登录因验证码/短信失败，使用相同凭据再试一次。如果仍然失败，报告错误并继续 — **不要循环尝试验证码值，这会导致用户账号锁定**。
+- 先导航，然后等待页面加载。左侧菜单子菜单展开遮挡页面时，点击主内容区域收起。
+- 卡住时用 go_back()、新标签页或其它方法。处理弹窗/cookie 后关闭它们。
+- 在读取校验错误通知后（`get_page_state()` 显示 "notifications"），调用 `close_dialog()` 关闭它们，以免过期错误影响后续步骤。元素不可见时始终尝试滚动查找。
