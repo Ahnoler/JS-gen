@@ -22,12 +22,20 @@ export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
       if (lab.startsWith(want) && lab.length > want.length && /^\\d/.test(lab.slice(want.length))) return true;
       return false;
     };
-    const findTarget = (opts) => {
+    const findExactTarget = (opts) => {
       const list = [...opts];
       if (first.includes(option.toLowerCase().trim()))
         return list.find(it => it.offsetParent !== null) || list[0];
-      return list.find(it => labelMatches(optionLabel(it), option))
-        || list.find(it => optionLabel(it).includes(option));
+      return list.find(it => labelMatches(optionLabel(it), option));
+    };
+    const findFuzzyTarget = (opts) => {
+      const list = [...opts];
+      let best = null, bestLen = Infinity;
+      for (const it of list) {
+        const lab = optionLabel(it);
+        if (lab.includes(option) && lab.length < bestLen) { best = it; bestLen = lab.length; }
+      }
+      return best;
     };
     const clickTarget = (t) => {
       t.scrollIntoView({block:'nearest'});
@@ -56,7 +64,7 @@ export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
     };
     const pickFromOpen = () => {
       let opts = collectOpenOptions();
-      let t = findTarget(opts);
+      let t = findExactTarget(opts);
       if (t) { clickTarget(t); return; }
       /* SELECT_LAZY_LOAD_ON_MISS */
       const findWrap = (dd) => {
@@ -94,7 +102,7 @@ export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
           if (round >= 12) return;
           setTimeout(() => {
             opts = collectOpenOptions();
-            t = findTarget(opts);
+            t = findExactTarget(opts);
             if (t) { clickTarget(t); return; }
             round += 1;
             waitRows();
@@ -104,29 +112,39 @@ export const CTRL_PART_SELECT = `  selectOption: (label, option) => {
         return;
       }
       let round = 0, stableStreak = 0, prevCount = opts.length, prevHeight = wrap.scrollHeight;
+      const finishFallback = () => {
+        // After all scrolling exhausted and no exact match — try fuzzy.
+        const allOpts = collectOpenOptions();
+        t = findFuzzyTarget(allOpts);
+        if (t) { clickTarget(t); return; }
+        // No match at all — pick the first item as fallback.
+        if (allOpts.length > 0) { clickTarget(allOpts[0]); return; }
+      };
       const scrollRound = () => {
-        if (round >= 8) {
-          t = findTarget(collectOpenOptions());
-          if (t) clickTarget(t);
+        const MAX_ROUNDS = 14;
+        const STREAK_LIMIT = 3;
+        if (round >= MAX_ROUNDS) {
+          finishFallback();
           return;
         }
         wrap.scrollTop = wrap.scrollHeight;
         setTimeout(() => {
           const opts2 = collectOpenOptions();
-          t = findTarget(opts2);
+          t = findExactTarget(opts2);
           if (t) { clickTarget(t); return; }
           const h = wrap.scrollHeight;
           const c = opts2.length;
           if (c === prevCount && h === prevHeight) stableStreak += 1;
           else { stableStreak = 0; prevCount = c; prevHeight = h; }
           round += 1;
-          if (stableStreak >= 2) {
-            t = findTarget(collectOpenOptions());
-            if (t) clickTarget(t);
+          // Lazy chunk rendering under load can stall >500ms — require several
+          // stable rounds AND a minimum travelled distance before settling.
+          if (stableStreak >= STREAK_LIMIT && round >= 4) {
+            finishFallback();
             return;
           }
           scrollRound();
-        }, 250);
+        }, 220);
       };
       scrollRound();
     };

@@ -1,11 +1,11 @@
 """Table actions: click row actions in el-table."""
 
 from scripts.state import _record_action
-from ._helpers import _ok, _is_ok_result, _enrich_click_element
+from ._helpers import _ok, _err, _is_ok_result, _enrich_click_element
 
 
 def _register_table_actions(controller, browser_context, business_data_store=None):
-    @controller.action('Click a button in an el-table row by matching row text and button text. Supports edit/delete icon shortcuts and fallback to first visible button.')
+    @controller.action('Click a button in an el-table row by matching row text and button text. Supports edit/delete icon shortcuts. If the row has no such button (toolbar-style tables: select the row via radio, then click the toolbar button), returns structured guidance instead of clicking an arbitrary control.')
     async def click_table_row_button(row_text: str, button_text: str):
         page = await browser_context.get_current_page()
         # Pre-mutation snapshot of the intended control
@@ -39,8 +39,12 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                     if (matchedRow) break;
                 }
                 if (!matchedRow) {
+                    // Whitespace-stripped compare: agents pass multi-cell text
+                    // space-joined ("编号 名称") while textContent concatenates
+                    // adjacent cells without spaces ("编号名称").
+                    const wantCompact = String(rowText).replace(/\\s+/g, '');
                     for (const row of rows) {
-                        if ((row.textContent || '').includes(rowText)) { matchedRow = row; break; }
+                        if (((row.textContent || '').replace(/\\s+/g, '')).includes(wantCompact)) { matchedRow = row; break; }
                     }
                 }
                 if (!matchedRow) return 'row-not-found';
@@ -61,10 +65,20 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                         const delIcon = row.querySelector('i.el-icon-delete, i[class*="shanchu"], i[class*="delete"]');
                         if (delIcon && delIcon.offsetParent !== null) { delIcon.click(); return 'ok-icon'; }
                     }
-                    for (const btn of buttons) {
-                        if (btn.offsetParent !== null) { btn.click(); return 'ok-fallback'; }
-                    }
-                    return 'button-not-found-in-row';
+                    // NO blind first-visible-button fallback — it clicked unrelated
+                    // controls (e.g. the customer-name view link) and recorded fake
+                    // success. Report what the row actually offers so the agent can
+                    // switch strategy (radio-select + toolbar button).
+                    const visibleBtns = [...buttons]
+                        .filter((b) => b.offsetParent !== null)
+                        .map((b) => (b.textContent || '').trim())
+                        .filter(Boolean);
+                    const hasRadio = !!row.querySelector('.el-radio, input[type=radio]');
+                    return 'button-not-found-in-row:' + JSON.stringify({
+                        wanted: btnText,
+                        rowButtons: visibleBtns,
+                        rowHasRadio: hasRadio,
+                    });
             }
         ''', [row_text, button_text])
         await page.wait_for_timeout(500)
@@ -79,6 +93,13 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                 from scripts.controller.actions.container_naming import remember_trigger_button
                 remember_trigger_button(business_data_store, button_text)
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
+        if str(result).startswith('button-not-found-in-row'):
+            return _err(
+                f'{result}. '
+                f'不要盲点行内其他按钮。若该操作按钮在表格上方工具栏（本类页面常见：'
+                f'单选框选中行 → 点工具栏「{button_text}」），改为先 '
+                f'click_table_row_radio(row_text="{row_text}") 选中行，再点击工具栏按钮。',
+            )
         return result
 
     @controller.action('Click the radio button in an el-table row, identified by row text. Clicks label.el-radio > .el-radio__inner. Supports Element UI fixed columns.')
@@ -124,7 +145,11 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                     if (wantFirst) return true;
                     const texts = rowCellTexts(row);
                     for (const t of texts) { if (t === rowText) return true; }
-                    return (row.textContent || '').includes(rowText);
+                    // Whitespace-stripped fallback: caller row_text may be
+                    // space-joined across cells ("编号 名称") while textContent
+                    // concatenates adjacent cells without spaces.
+                    const wantCompact = String(rowText).replace(/\\s+/g, '');
+                    return ((row.textContent || '').replace(/\\s+/g, '')).includes(wantCompact);
                 };
                 const tables = document.querySelectorAll('.el-table');
                 for (const table of tables) {

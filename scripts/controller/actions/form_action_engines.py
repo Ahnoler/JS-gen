@@ -145,6 +145,52 @@ class FillEngine(_FormActionEngineBase):
         return val if val else 'NO-RULE'
 
 
+    async def _field_disabled_hint(self, page, label_text: str) -> str:
+        """Explain the right tool when a write is rejected as field-disabled.
+
+        The 2026-08-27 record run bled 10+ steps: the agent retried
+        fill_form_field on el-select fields (国别/投资主体类型/联网核查状态) forever —
+        bare 'field-disabled' carried no pointer to select_option.
+        """
+        try:
+            kinds = await page.evaluate(
+                r'''(label) => {
+                    const items = [...document.querySelectorAll('.el-form-item')];
+                    for (const fi of items) {
+                        const lab = fi.querySelector('.el-form-item__label');
+                        if (!lab) continue;
+                        const t = (lab.textContent || '').trim();
+                        if (t !== label && !t.includes(label)) continue;
+                        return {
+                            select: !!fi.querySelector('.el-select'),
+                            date: !!fi.querySelector('.el-date-editor, .tsscdatepicker'),
+                            cascader: !!fi.querySelector('.el-cascader'),
+                            treeHost: !!(fi.querySelector('.tree-popover, .my-popover')
+                                && fi.querySelector('[class*="tssc"]')),
+                        };
+                    }
+                    return null;
+                }''',
+                label_text,
+            )
+        except Exception:
+            return ''
+        if not isinstance(kinds, dict):
+            return ''
+        if kinds.get('select'):
+            return (
+                ' | 该字段是下拉框(el-select/Tssc)，不能文本直填——改用 '
+                'select_option(label_text=…, option_text=<下拉选项原文>)；'
+                '选项名不确定时先看 scan 结果里该字段的 options。'
+            )
+        if kinds.get('date'):
+            return ' | 该字段是日期控件：value 用 YYYY-MM-DD 再 fill。'
+        if kinds.get('cascader'):
+            return ' | 该字段是级联选择：请逐级选下一层面板项。'
+        if kinds.get('treeHost'):
+            return ' | 该字段是树选择：改用 select_tree_option(label_text=…, option_text=…)。'
+        return ''
+
     async def fill_form_field(self, label_text: str, value: str, xpath_smart: str = ""):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -197,6 +243,10 @@ class FillEngine(_FormActionEngineBase):
                 return _ok(_with_submit_cue(result, self.business_data_store))
             if _is_ok_result(result):
                 return _ok(_with_submit_cue(result, self.business_data_store))
+            if str(result).startswith('field-disabled'):
+                hint = await self._field_disabled_hint(page, label_text)
+                if hint:
+                    result = str(result) + hint
             return _with_submit_cue(result or resolved.error, self.business_data_store)
         element = await _capture_element(
             page, resolved.label, target_kind='form_input', xpath_smart=resolved.xpath_smart,
@@ -219,6 +269,10 @@ class FillEngine(_FormActionEngineBase):
             return _ok(_with_submit_cue(result, self.business_data_store))
         if _is_ok_result(result):
             return _ok(_with_submit_cue(result, self.business_data_store))
+        if str(result).startswith('field-disabled'):
+            hint = await self._field_disabled_hint(page, resolved.label or label_text)
+            if hint:
+                result = str(result) + hint
         return _with_submit_cue(result, self.business_data_store)
 
 
@@ -487,8 +541,15 @@ class SelectEngine(_FormActionEngineBase):
             # SELECT_VERIFY_READBACK — JS_SELECT_OPTION clicked an option but the
             # trigger input read back a different value (same-prefix field wrote
             # the wrong select, e.g. 国民经济部门 option into 国民经济部门类别).
-            # Reset the select UI, re-trigger, and retry once with the same
-            # option_text. Still mismatch → hand off to heal.
+            # The JS substring fallback (lab.includes(option)) can also click a
+            # wrong option when the desired label is an alias: e.g. want="中国"
+            # has no exact option, so the fallback clicks "中国香港特别行政区"
+            # (shortest label containing "中国"), which the readback verifier
+            # rejects. In that case retrying the same alias loops forever.
+            # Fix: on the first mismatch, resolve known aliases against the live
+            # dropdown option list (params['options'] captured by
+            # _pack_select_record) and retry with the resolved canonical label —
+            # same pattern as the not-found branch below.
             mismatch_retry_key = f'_sel_mismatch_retry_{label_text}'
             mismatch_retries = self.business_data_store.get(mismatch_retry_key, 0) + 1
             self.business_data_store[mismatch_retry_key] = mismatch_retries
@@ -496,6 +557,41 @@ class SelectEngine(_FormActionEngineBase):
                 self.business_data_store.pop(mismatch_retry_key, None)
                 failed = await _final_select_failure(str(select_result), xp)
                 return _err(failed)
+            # Alias resolution: map known short aliases to the canonical option
+            # label present in the dropdown (e.g. 中国 → 中华人民共和国).
+            # The generic match_select_option_candidate uses substring containment
+            # which wrongly picks "台湾(中国的省)" for want="中国" (it contains
+            # "中国" inside a parenthetical, but is not the country China).
+            # For country aliases, match by prefix and exclude SAR/Taiwan variants.
+            # Note: params['options'] may only contain the currently-visible
+            # dropdown items (~21 of 250 for large country lists), so when the
+            # canonical label is not in the stored list we fall back to the known
+            # canonical name directly — JS_SELECT_OPTION will scroll to find it
+            # (SELECT_LAZY_LOAD_ON_MISS block).
+            resolved_option = option_text
+            want = (option_text or '').strip()
+            stored_opts = list(params.get('options') or [])
+            if want in ('中国', '中国大陆'):
+                # Prefer exact "中华人民共和国" in the stored list; otherwise a
+                # label that starts with "中国" excluding SAR/Taiwan variants.
+                fuzzy = next(
+                    (o for o in stored_opts
+                     if o.startswith('中国')
+                     and '香港' not in o and '澳门' not in o and '台湾' not in o),
+                    None,
+                )
+                if not fuzzy:
+                    fuzzy = next(
+                        (o for o in stored_opts if o == '中华人民共和国'), None,
+                    )
+                # If the canonical name isn't in the visible options at all, use
+                # it directly — the dropdown scrolls to find it at retry time.
+                if not fuzzy:
+                    fuzzy = '中华人民共和国'
+            else:
+                fuzzy = match_select_option_candidate(want, stored_opts)
+            if fuzzy and fuzzy != want:
+                resolved_option = fuzzy
             reset_diag = await reset_select_ui(page)
             if not reset_diag.get('closed', False):
                 sys.stderr.write(
@@ -507,7 +603,7 @@ class SelectEngine(_FormActionEngineBase):
             retrigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
             if _is_ok_result(str(retrigger)):
                 await page.wait_for_timeout(500)
-                retry_result = await page.evaluate(JS_SELECT_OPTION, option_text)
+                retry_result = await page.evaluate(JS_SELECT_OPTION, resolved_option)
                 if _is_ok_result(retry_result):
                     self.business_data_store.pop(mismatch_retry_key, None)
                     matched_text = retry_result.split(':', 1)[1] if ':' in retry_result else retry_result
@@ -519,6 +615,36 @@ class SelectEngine(_FormActionEngineBase):
                         label_text, self.business_data_store, value=stamped or option_text, xpath_smart=xp_inv,
                     )
                     return _ok(_with_submit_cue(f'ok | {matched_text} | mismatch-retry', self.business_data_store))
+                # Alias retry still mismatch (rare race: lazy chunk lag made even
+                # the canonical-label hunt settle on the wrong prefix item) →
+                # one FINAL strict attempt with exactOnly: no fuzzy fallback at
+                # all, readback must equal the resolved label verbatim.
+                if resolved_option != option_text:
+                    await reset_select_ui(page)
+                    retrigger2 = await page.evaluate(
+                        JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text]
+                    )
+                    if _is_ok_result(str(retrigger2)):
+                        await page.wait_for_timeout(500)
+                        strict_result = await page.evaluate(
+                            JS_SELECT_OPTION, [resolved_option, True]
+                        )
+                        if _is_ok_result(strict_result):
+                            self.business_data_store.pop(mismatch_retry_key, None)
+                            matched_text = strict_result.split(':', 1)[1] if ':' in strict_result else strict_result
+                            stamped = resolve_recorded_option_text(option_text, matched_text)
+                            params['option_text'] = stamped
+                            params, element = attach_select_options(params, element, params.get('options'))
+                            _record_action('select_option', params, matched_text, element=element)
+                            _task_done_impl(
+                                label_text, self.business_data_store, value=stamped or option_text, xpath_smart=xp_inv,
+                            )
+                            return _ok(_with_submit_cue(
+                                f'ok | {matched_text} | mismatch-retry-exact',
+                                self.business_data_store,
+                            ))
+                        failed = await _final_select_failure(str(strict_result), xp)
+                        return _err(failed)
                 # Retry still mismatch / other failure → heal.
                 self.business_data_store.pop(mismatch_retry_key, None)
                 failed = await _final_select_failure(str(retry_result), xp)

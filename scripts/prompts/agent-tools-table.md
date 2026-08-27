@@ -1,5 +1,7 @@
-- **click_table_row_button(row_text, button_text)** — 点击 el-table 行中的操作按钮。`row_text` 匹配行内容，`button_text` 匹配按钮文本或图标类名。支持 `"edit"/"编辑"` 和 `"delete"/"删除"` 快捷方式。无匹配时自动点击第一个可见按钮作为兜底。
-- **click_table_row_radio(row_text)** — 选中 el-table 行中的单选按钮（`label.el-radio`）。`row_text` 匹配行内容。
+- **click_table_row_button(row_text, button_text)** — 点击 el-table 行中的操作按钮。`row_text` 匹配行内容（支持跨单元格拼接文本，空格会被忽略——`"编号 名称"` 可命中 `编号名称` 拼接行），`button_text` 匹配按钮文本或图标类名。支持 `"edit"/"编辑"` 和 `"delete"/"删除"` 快捷方式。
+  **⚠️ 行内无该按钮时不会盲点其他控件**，而是返回 `button-not-found-in-row` + 行内实际按钮清单 + 是否有单选框。工具栏模式页面（行内只有名称链接/单选框，操作按钮在表格上方工具栏，如「修改」「查看」「联网核查」）**必须**：先 `click_table_row_radio(row_text)` 选中行 → 再点击工具栏按钮；不要反复用本动作猜行内按钮。
+- **click_table_row_radio(row_text)** — 选中 el-table 行中的单选按钮（`label.el-radio`）。`row_text` 匹配行内容（同样支持跨单元格拼接文本）。
 
-> **同名行消歧（重要）**：当表格存在同名行（如多个「瑞云智联科技有限公司」）时，`row_text` **必须优先用行内唯一键列文本**——客户编号（14~18 位数字，如 `26081714051504629`）、统一社会信用代码（18 位大写字母数字，如 `91330100MA2ABC123X`）、证件号码等，**不要用易重名的名称文本**。回放/录制按「单元格文本精确匹配优先 + contains 回退」定位行，唯一键可精确命中目标行；名称文本会命中第一个同名行导致点错。无唯一键列时按现有默认（行文本包含匹配）。
-- **click_icon_button(button_text)** — 点击**仅有图标、文案在 el-tooltip / ElTooltip content 中**的按钮（`el-icon-*`）。`button_text` 为 tooltip 文案（如「新增一级分类」「新增产品」）。任务若点名这类工具栏图标，**直接调用本动作**，不要用 `click_element_by_index` 点空 `<a>`。可用 `get_page_state().iconButtons` 核对清单；表格行内操作仍用 `click_table_row_button`。不要为找图标去调 `scan_form_fields`。
+> **同名行消歧（重要）**：当表格存在同名行（如多个「瑞云智联科技有限公司」）时，`row_text` **必须优先用行内唯一键列文本**——客户编号（14~18 位数字，如 `26081714051504629`）、统一社会信用代码（18 位大写字母数字，如 `91330100MA2ABC123X`）、证件号码等，**不要用易重名的名称文本**。回放/录制按「单元格文本精确匹配优先 + 去空白 contains 回退」定位行，唯一键可精确命中目标行；名称文本会命中第一个同名行导致点错。无唯一键列时按现有默认（行文本包含匹配）。
+> **操作按钮位置优先判断**：调用前先看扫描结果/页面结构——若行内只有 `<a>` 名称链接和 radio 而无文字按钮，说明这是工具栏模式表格，直接走 radio+工具栏路径，跳过本动作。
+- **click_icon_button(button_text)** — **按标签点击按钮（通用）**：优先匹配仅图标、文案在 el-tooltip / aria-label 的按钮（`el-icon-*`，如「新增一级分类」「新增产品」）；无图标匹配时**直接点击同标签的可见文字按钮**（工具栏 查询/重置/新增/修改/查看 等，表格行内除外；页面级优先于弹层内），返回 `ok-text:<label>`。仅当标签不存在或同名歧义时失败（`not-found-text-button` 附候选清单 → 改用 `click_element_by_index` 或提供完整按钮文字）。可用 `get_page_state().iconButtons` 核对真正的图标清单；表格行内操作仍用 `click_table_row_button`。不要为找图标去调 `scan_form_fields`。

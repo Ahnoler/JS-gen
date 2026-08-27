@@ -39,6 +39,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- 2026-08-27: **编辑草稿客户录制循环（国别 value-mismatch 复发 + field-disabled 10 步空转）——三项加固**：录例中 radio→修改→引入全链路已修复生效，卡点收窄为三个下拉字段。用户初判"缓冲步骤给多"不成立：budget 预估 8 步/上限 17，第 16 步即注入 final-save urgency，且随后延期 +12/+8 共跑 38 步——步数充足，是每一步都在原地失败。CDP 隔离复现与带污染批次重放均**一次通过**（别名重试 ok:中华人民共和国），证明机制无恙、属负载型竞态：录制进程叠加截图捕获/CPU 高载时懒加载分块渲染 >500ms，旧滚动稳定判定（streak≥2≈500ms）误判"到底"，可见窗口模糊匹配点了「中国香港特别行政区」；Python 别名重试在同一负载下二次踩坑；`fill_form_field` 对三个 select 只返回裸 `field-disabled` 无任何指向，agent 连续 10+ 步盲试。
+  加固：
+  ① **滚动耐心显式化**（`js_snippets/select_option.py` + CTRL `select.js` 同步）：上限 8→14 轮、sleep 250→220ms、稳定判定 streak≥2→≥3 且须 `i>=4`（MIN_ROUNDS_BEFORE_STABLE）才允许提前收手——慢分块不再伪装列表尽头。CDP 实测常规命中路径 0.27s 不受影响。
+  ② **engine 二次升级 exactOnly 兜底**（`form_action_engines.py` value-mismatch 分支）：别名重试仍 mismatch 时，再 reset+retrigger 后以 `[resolved_option, True]`（exactOnly）做最后一次严格尝试——彻底关闭 fuzzy 错选通道，成功记 `mismatch-retry-exact`，失败则错误信息即真实缺失标签。
+  ③ **field-disabled 指引化**（FillEngine 两条 fill 路径）：非 ok 且以 `field-disabled` 开头时，探测该 label 的控件形态，为 select 追加"改用 select_option"、date 提示格式、cascader/tree 指向对应动作——直接针对本次 agent 盲填 select 空转 10+ 步的主浪费源。
+  影响范围：大型懒加载下拉在高负载录制中的选项命中稳定性；select 类字段被文本填写时的错误自解释性（引导 LLM 当步切换正确工具）。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/js_snippets/select_option.py, scripts/controller/actions/form_action_engines.py, src/ctrl-actions/select.js, scripts/characterization/characterize-select-lazy-load.py, scripts/characterization/characterize-select-option-verify.py
+
+- 2026-08-27: **`click_icon_button` 通用化——icon miss 后直接点击同标签文字按钮（radio→工具栏修改 cycle 根除）**：修好 radio+工具栏指引后 agent 走 `click_table_row_radio` 成功（`ok`），但点工具栏「修改」时 `click_icon_button` 只匹配 el-icon+tooltip 宿主（`_iconCandidates` 选择器要求 aria-describedby+icon 类），普通 `<button>` 文字按钮永远不进候选集 → 必然 `not-found` 且零指引 → step 2–9 同动作死循环（cycle 检测触发仍 deviate → QUALITY FAIL）。按用户方案**拓展为通用按钮点击**：
+  ① **JS fallback 直点文字按钮**（`js_snippets/icons.py` + CTRL `nav.js` 同步）：icon 候选全 miss 后，收集可见 `button/.el-button/a` 中文本等于/包含 button_text 的候选（排除 `.el-table__body-wrapper` 行内控件、≤8 条）；精确标签优先于 contains，页面级（弹层外）优先于弹层内；唯一命中 → scrollIntoView+点击返回 **`ok-text:<label>`**；多个命中 → `not-found-text-button:{wanted,reason:'ambiguous',textButtons:[…]}`；无匹配保持裸 `not-found`。ok 图标路径零改动。
+  ② **Python 端**（`_misc.py`）：`ok-text:` 以 ok 开头自然走成功记录（回放链路 `_replay.py` 先 durable xpath 后控制器回退，CTRL 已同步拓展 → 录制/回放对称）；ambiguous 包装 `_err` 指引"改用 click_element_by_index 或提供完整按钮文字"。动作 description 与 prompt（`agent-tools-table.md`）改为「按标签点击按钮（通用）：tooltip 图标优先，miss 直接点同标签文字按钮」。
+  CDP 19242 实测 E2E：列表页 radio 选中 `ok` → `click_icon_button("修改")` 一步 `ok-text:修改` → 路由跳转编辑页 `crtCpctInf`（此前该流程循环至预算耗尽 QUALITY FAIL）。
+  影响范围：agent 点任何命名可见按钮（工具栏/页面级）单次调用即成功，无需先判断 icon 还是文字按钮；歧义时一次性给出候选清单。CTRL `clickIconButton` 行为同步。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/js_snippets/icons.py, scripts/controller/actions/_misc.py, src/ctrl-actions/nav.js, src/ctrl-actions/index.js（文档）, scripts/prompts/agent-tools-table.md, scripts/characterization/characterize-table-toolbar-pattern.py（断言更新：固定 ok-text 直点行为）
+
+- 2026-08-27: **`click_table_row_button` 工具栏模式页面误点与 row-not-found（录制编辑客户失败）**：「对公客户管理」列表页表格行内只有 单选框 + 客户名称链接（查看），真正的「修改」在表格上方工具栏（选中行后点工具栏模式）。Agent 两次误用 `click_table_row_button`：① `row_text="26082700011272705 璞真健康管理咨询中心"`（跨单元格空格拼接）被 `row.textContent.includes()` 判不匹配——textContent 将相邻单元格**无空格直接拼接**（`…72705璞真…`）→ `row-not-found`；agent 转而裸点工具栏「修改」（未先选中行 → 无效）。② 按名称命中行后行内无「修改」，旧逻辑盲点行内第一个可见按钮（客户名称链接）并记为 `ok-fallback` **假成功**——错误动作写入轨迹。
+  修复：
+  ① **行匹配去空白归一化**（`_table.py` button+radio 两处 + CTRL `src/ctrl-actions/table.js` 同步）：精确单元格匹配失败后，`rowText` 与整行 textContent 双方先剥掉全部空白再 includes——`"编号 名称"` 可命中 `"编号名称"` 拼接行。
+  ② **移除盲点首个可见按钮的 `ok-fallback`**：改为返回结构化 `button-not-found-in-row:{wanted,rowButtons,rowHasRadio}`（JSON 列出行内真实按钮清单与是否有单选框），Python 端包装 `_err` 并附指引：该操作按钮若在工具栏（本类页面常见），先 `click_table_row_radio(row_text=...)` 选中行再点工具栏按钮；禁止反复猜行内按钮。
+  ③ **Prompt 更新**（`scripts/prompts/agent-tools-table.md`）：删除"无匹配时自动点击第一个可见按钮作为兜底"的宣传，新增工具栏模式必走 radio+工具栏 的硬性指引与调用前判断方法；`src/ctrl-actions/index.js` 文档行同步返回码。
+  CDP 19242 实测：带空格拼接 row_text 命中行（T1）、radio 同文本成功选中（checked+current-row，T1b）、请求不存在按钮时零点击副作用仅返回结构化信息（T2/T4）。
+  影响范围：`click_table_row_button` 在工具栏模式表格不再假成功/盲点；跨单元格拼接 row_text 匹配修复（button+radio 一致）；CTRL `clickTableRowButton/clickTableRowRadio` 行为同步。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/_table.py, src/ctrl-actions/table.js, src/ctrl-actions/index.js（文档）, scripts/prompts/agent-tools-table.md, scripts/characterization/characterize-table-toolbar-pattern.py（新增，已注册 verify-all）
+
+- 2026-08-27: **`select_option` 国别字段 `value-mismatch` 死循环——中国 → 中国香港特别行政区**：天阳信贷系统「新增对公客户」表单的「国别」下拉含 250 个国家/地区选项，其中无精确「中国」，仅有「中华人民共和国」「中国香港特别行政区」「中国澳门特别行政区」「台湾(中国的省)」。Agent 要求 `select_option "国别" = "中国"` 时，`JS_SELECT_OPTION` 的 substring fallback `lab.includes("中国")` 命中最短的「中国香港特别行政区」并点击，但 `verifyAfterClick` 回读校验因后缀「香港特别行政区」非数字打头而拒绝 → `value-mismatch`。Python 端 `value-mismatch` 分支（`form_action_engines.py`）以相同 `option_text="中国"` 重试 → 再次命中同一错误选项 → 二次 mismatch → `_final_select_failure` → agent 反复重试「中国」陷入死循环（step 9–17）。
+  修复（两层）：
+  ① **`JS_SELECT_OPTION` 匹配逻辑重构**（`js_snippets/select_option.py`）：将 `matchInPool` 拆为 `exactMatchInPool`（仅精确匹配 `labelMatches`）+ `fuzzyMatchInPool`（子字符串 `includes`）。滚动查找流程改为：每步滚动先做精确匹配 → 滚到无法滚动（2 次 stable）后再做 fuzzy 子字符串匹配 → 仍无匹配则选第一个作为兜底（返回 `ok:<label> | fallback-first | wanted:<option>`）。此前 `matchInPool` 在第一帧就做子字符串匹配命中错误选项，根本不进入滚动阶段。
+  ② **Python `value-mismatch` 分支别名解析**（`form_action_engines.py`）：当 `option_text` 为「中国」/「中国大陆」时，先从 `params['options']` 按前缀匹配排除港/澳/台变体，找不到则直接回退硬编码「中华人民共和国」（`params['options']` 仅含 ~21 个可见项，250 项列表需 scroll 才完整；`JS_SELECT_OPTION` 的 `SELECT_LAZY_LOAD_ON_MISS` 会在 retry 时 scroll 查找）。
+  ③ **CTRL parity**（`src/ctrl-actions/select.js`）：`findTarget` 同步拆为 `findExactTarget` + `findFuzzyTarget`，滚动循环每步用精确匹配，`finishFallback` 在滚动耗尽后做 fuzzy → 首项兜底。
+  CDP 19242 实测验证：① `select_option "中华人民共和国"` → `ok:中华人民共和国`（scroll 找到精确匹配）；② `select_option "中国"` → `value-mismatch` → Python 别名解析 → retry `"中华人民共和国"` → `ok:中华人民共和国`；③ `select_option "不存在的国家名XYZ"` → `ok:中国香港特别行政区 | fallback-first`（首项兜底）。
+  影响范围：`select_option` 在含国家全称（无简称）的大型下拉中不再因 `value-mismatch` 死循环；别名解析覆盖「中国」/「中国大陆」→「中华人民共和国」；无匹配时选首项兜底而非死循环。CTRL `selectOption` 同步。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/js_snippets/select_option.py, scripts/controller/actions/form_action_engines.py, src/ctrl-actions/select.js, scripts/characterization/characterize-select-option-verify.py（断言更新：`matchInPool` → `exactMatchInPool` + `fuzzyMatchInPool`）
+
+- 2026-08-26: **`click_save` 误过滤 `disableBtn` 类保存按钮导致 agent 关闭抽屉（录制无法保存）**：天阳信贷系统的"新增客户"抽屉中保存按钮带自定义 `disableBtn` 类（无 `is-disabled`、无 HTML `disabled` 属性、`pointer-events: auto`、`opacity: 1`——完全可点击），但 `JS_CLICK_SAVE_BUTTON`（`save.py:53`）此前将 `disableBtn` 独立视为禁用并在候选收集阶段过滤 → `candidates=[]` → `not-found`。Agent 反复 `click_save` 失败后，错误消息建议 `close_dialog` 关闭"干扰弹窗" → agent 执行 `close_dialog` **关闭了正在填写的抽屉** → 所有表单值丢失 → `QUALITY FAIL`。修复：移除 `disableBtn` 的独立过滤，仅保留 `el.disabled`/`getAttribute('disabled')`/`is-disabled` 三项真正的禁用判定（`disableBtn` 在该系统中是视觉类，仅 `disableBtn.is-disabled` 组合才表禁用，而 `is-disabled` 已被过滤覆盖）。
+  影响范围：`click_save` 不再误过滤仅含 `disableBtn` 的可点击保存按钮；此前因 `disableBtn` 被过滤导致 `not-found` → agent 误关抽屉的场景消除。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/js_snippets/save.py, scripts/characterization/characterize-multi-save-sections.py（断言更新：`disableBtn` 不再独立过滤）
+
+- 2026-08-26: **AI 录制自动填表多层 scope 泄漏审计修复（3 处）**：对 autofill 执行路径做系统审计，发现并修复三个独立的"填到弹窗外字段"泄漏点：
+  ① **cascade 重扫描溢出 overlay**（`autofill_pending.py`）：cascade round 2/3 与 Step 6 同步扫描硬编码 `{'mode': 'fullpage'}`，以 `[document]` 为根，`.el-form-item` 命中弹窗外底层页面字段（实测「对公客户管理→新增」抽屉 `multi` 仅 5 个抽屉内字段，`fullpage` 8 个含 2 个弹窗外「客户编号」「客户分类」）。修复：改用 `tasklist_scan_mode(active_container)`，overlay 时 `multi`（仅 overlay 根），主页面时 `fullpage`。
+  ② **cascade 轮次间 container 漂移**（`autofill_pending.py`）：cascade round 2/3 从 store 读 `_active_container`（round 1 时设的），不重新探测 DOM——若 round 1 填表打开/关闭子对话框（如"选择客户"picker），`getMultiRoots` 扫描所有可见 overlay 含子对话框，将其字段拉入当前 drawer 的 pending。修复：cascade 与 sync 两处增加 `JS_IDENTIFY_CONTAINER` 重新探测 DOM container，探测值优先于 store 缓存。
+  ③ **placeholder fallback 查 document**（`fill_core.py` `JS_FILL_BY_XPATH`）：xpath 未命中时 placeholder 兜底按 `[drawer, dialog, document]` 找 input——当 drawer/dialog 内无匹配但主页面有同 placeholder input 时，填到弹窗外。修复：有可见 overlay 时 scope 仅限 `[drawer, dialog]`，无 overlay 时才回退 `document`（主页面表单行为不变）。
+  影响范围：overlay 打开时 autofill 的扫描 + 执行 + placeholder 兜底三层均不再溢出到弹窗外；主页面（无 overlay）行为不变。无 schema/路由/WS 变更。
+  文件：scripts/controller/actions/autofill_pending.py, scripts/controller/actions/js_snippets/fill_core.py
+  已知遗留（未修，低优先）：`_switch_task_list_container`（task_completion.py:187-192）按 container_id 字符串盲恢复陈旧 task list + `_scan_fields`（跳过重扫），在同名 container 二次打开且字段集变化时可能填入陈旧字段；需更大设计改动（恢复时强制重扫或 fingerprint 校验），暂记录待后续处理。
+
+- 2026-08-26: **select_option 在 overlay 抽屉内录制崩溃（`'bool' object is not subscriptable`）**：`scripts/state.py` `_record_action` 第 685 行用 `overlay = _is_overlay_region(rid)` 取 overlay 信息后访问 `overlay['label']`，但 `_is_overlay_region` 只返回 `bool`——在「对公客户管理 → 新增」打开 overlay 抽屉、对「客户状态」执行 `select_option` 时 `rid` 命中 overlay 段，`overlay` 为 `True`，`True['label']` 抛 `TypeError: 'bool' object is not subscriptable`，导致该步录制失败、agent 无法完成「新增信贷潜在客户」阶段。修复：新增 `_overlay_label_in_region(region_id)` 从 region_id 链中解析首个 `overlay:<label>` 段的 label（无则 None），`_is_overlay_region` 改为 `return _overlay_label_in_region(...) is not None`（bool 语义不变，所有既有 `if _is_overlay_region(...)` 调用点零影响），`_record_action` 改用 `_overlay_label_in_region(rid)` 取 label 构造 `popup_level_key`。
+  影响范围：overlay（dialog/drawer）内 `select_option`/`fill_form_field` 等带 region_id 的动作录制不再崩溃；`_is_overlay_region` 返回值在布尔上下文行为不变。无 schema/路由/WS 变更。
+  文件：scripts/state.py, scripts/characterization/characterize-page-level-python.py（既有断言 `is not None` 语义与新实现一致，无需改）
+
+- 2026-08-26: **select_option 在 overlay 抽屉内录制崩溃（`'bool' object is not subscriptable`）**：`scripts/state.py` `_record_action` 第 685 行用 `overlay = _is_overlay_region(rid)` 取 overlay 信息后访问 `overlay['label']`，但 `_is_overlay_region` 只返回 `bool`——在「对公客户管理 → 新增」打开 overlay 抽屉、对「客户状态」执行 `select_option` 时 `rid` 命中 overlay 段，`overlay` 为 `True`，`True['label']` 抛 `TypeError: 'bool' object is not subscriptable`，导致该步录制失败、agent 无法完成「新增信贷潜在客户」阶段。修复：新增 `_overlay_label_in_region(region_id)` 从 region_id 链中解析首个 `overlay:<label>` 段的 label（无则 None），`_is_overlay_region` 改为 `return _overlay_label_in_region(...) is not None`（bool 语义不变，所有既有 `if _is_overlay_region(...)` 调用点零影响），`_record_action` 改用 `_overlay_label_in_region(rid)` 取 label 构造 `popup_level_key`。
+  影响范围：overlay（dialog/drawer）内 `select_option`/`fill_form_field` 等带 region_id 的动作录制不再崩溃；`_is_overlay_region` 返回值在布尔上下文行为不变。无 schema/路由/WS 变更。
+  文件：scripts/state.py, scripts/characterization/characterize-page-level-python.py（既有断言 `is not None` 语义与新实现一致，无需改）
+
 - 2026-08-26: **xpath 填充路径补 scrollIntoView（before/after PNG 可视化修复）**：fill 主路径已切换到 xpath 优先（`JS_FILL_BY_XPATH`），原 `JS_FILL_FORM_FIELD`（label 路径）中的 `item.scrollIntoView` 仅在 label 兜底分支执行——输入框填写不再滚动到视口，导致填写前后截图看不到结果（下拉/日期选择器路径本就有滚动，故无此问题）。修复：`JS_FILL_BY_XPATH` 新增 `scrollFillTarget`（优先滚动所在 `.el-form-item`，与 label 路径语义一致），在 placeholder 分支与主 xpath 路径（date/普通共用）setFn 前调用。
   影响范围：xpath 路径填写输入框/日期控件前滚动到视口（before/after 截图可见填写结果）；下拉/日期选择器行为不变。无 schema/路由/WS 变更。
   文件：scripts/controller/actions/js_snippets/fill_core.py, scripts/characterization/characterize-fill-xpath-scroll.py（新增）

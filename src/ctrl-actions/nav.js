@@ -124,6 +124,45 @@ export const CTRL_PART_NAV = `  clickMenuItem: (text) => {
         return 'ok';
       }
     }
+    // Generalized fallback: click a visible plain text button sharing the label
+    // (toolbar buttons like 查询/修改 are ordinary <button>s, not tooltip icons).
+    const want = norm(buttonText);
+    const isOverlay = (el) => !!el.closest('.el-dialog, .el-drawer, .el-message-box');
+    const seenB = new Set();
+    const matches = [];
+    for (const b of document.querySelectorAll('button,.el-button,a')) {
+      if (b.offsetParent === null && !b.closest('.el-table__fixed')) continue;
+      if (b.closest('.el-table__body-wrapper')) continue;
+      const t = norm(b.innerText || b.textContent);
+      if (!t || t.length > 40) continue;
+      let hit = false;
+      if (t === want) hit = true;
+      else if (want && t.includes(want) && !want.includes(t)) hit = true;
+      if (!hit) continue;
+      const key = t + '|' + (typeof b.className === 'string' ? b.className.slice(0,60) : '');
+      if (seenB.has(key)) continue;
+      seenB.add(key);
+      matches.push({ el: b, text: t });
+      if (matches.length >= 8) break;
+    }
+    if (matches.length) {
+      let pool = matches.filter((m) => m.text === want);
+      if (pool.length === 0) pool = matches.filter((m) => !want.includes(m.text));
+      if (pool.length === 0) pool = matches;
+      const pageLevel = pool.filter((m) => !isOverlay(m.el));
+      if (pageLevel.length >= 1) pool = pageLevel;
+      if (pool.length === 1) {
+        const m = pool[0];
+        m.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+        m.el.click();
+        return 'ok-text:' + m.text;
+      }
+      return 'not-found-text-button:' + JSON.stringify({
+        wanted: buttonText,
+        reason: 'ambiguous',
+        textButtons: pool.map((m) => ({ text: m.text, tag: m.el.tagName.toLowerCase() })),
+      });
+    }
     return 'not-found';
   },
 `;

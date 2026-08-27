@@ -119,7 +119,7 @@ async def _auto_fill_pending_impl(self):
     await self._execute_round(page, pending_dicts, label_kind, all_results, '')
 
     async def _cascade_round(round_tag: str, console_label: str) -> None:
-        """Wait → fullpage scan → new∪still-empty worklist → execute (may be empty)."""
+        """Wait → container-scoped scan → new∪still-empty worklist → execute (may be empty)."""
         from .cascade_fill import (
             filled_ok_keys_from_results,
             merge_cascade_worklist,
@@ -131,10 +131,21 @@ async def _auto_fill_pending_impl(self):
             await _wait_if_loading(page)
         except Exception:
             pass
+        # Keep cascade rescans inside the active overlay (drawer/dialog) so
+        # fields on the underlying page are not pulled into the worklist.
+        # Re-probe the DOM container: a fill in round 1 may have opened/closed
+        # a sub-dialog, drifting the active overlay away from what was detected
+        # at first touch.
+        try:
+            probed_cid = await page.evaluate(JS_IDENTIFY_CONTAINER)
+        except Exception:
+            probed_cid = ''
+        active_cid = (probed_cid or self.business_data_store.get('_active_container') or '').strip()
+        cascade_mode = tasklist_scan_mode(active_cid)
         try:
             raw = await page.evaluate(
                 JS_SCAN_FORM_FIELDS,
-                [False, self.button_keywords(), {'mode': 'fullpage'}],
+                [False, self.button_keywords(), {'mode': cascade_mode}],
             )
             result = _as_dict(raw)
             raw_fields = result.get('fields') if isinstance(result, dict) else result
@@ -185,11 +196,17 @@ async def _auto_fill_pending_impl(self):
         all_results,
     )
 
-    # Step 6: full scan sync — 移除不在 DOM 的 pending 字段
+    # Step 6: container-scoped scan sync — 移除不在 DOM 的 pending 字段
+    try:
+        probed_cid_sync = await page.evaluate(JS_IDENTIFY_CONTAINER)
+    except Exception:
+        probed_cid_sync = ''
+    active_cid_sync = (probed_cid_sync or self.business_data_store.get('_active_container') or '').strip()
+    sync_mode = tasklist_scan_mode(active_cid_sync)
     try:
         raw_sync = await page.evaluate(
             JS_SCAN_FORM_FIELDS,
-            [False, self.button_keywords(), {'mode': 'fullpage'}],
+            [False, self.button_keywords(), {'mode': sync_mode}],
         )
         sync_result = _as_dict(raw_sync)
         sync_fields = sync_result.get('fields') if isinstance(sync_result, dict) else sync_result

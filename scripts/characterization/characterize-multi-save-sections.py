@@ -39,17 +39,20 @@ SAVE_PY = ROOT / "scripts" / "controller" / "actions" / "js_snippets" / "save.py
 def test_save_py_has_disablebtn_skip() -> None:
     js = SAVE_PY.read_text(encoding="utf-8")
     assert_true("disableBtn" in js, "save.py must reference disableBtn custom class")
-    # The disabled check must include classList.contains('disableBtn').
+    # disableBtn alone is NOT a real disabled — the tiansun credit system uses
+    # disableBtn as a visual-only class; only disableBtn + is-disabled together
+    # (or is-disabled alone) indicate a truly disabled button. The disabled guard
+    # must NOT filter disableBtn independently (that would hide clickable save
+    # buttons whose only "disabled" indicator is the custom disableBtn class).
     assert_true(
-        "classList.contains('disableBtn')" in js,
-        "disabled check uses classList.contains('disableBtn')",
+        "classList.contains('is-disabled')" in js,
+        "disabled check uses classList.contains('is-disabled')",
     )
-    # The disableBtn check must be in the same disabled-guard line as is-disabled
-    # (i.e. it filters the candidate BEFORE scoreBtn / matches collection).
+    # The disableBtn-independent filter must NOT be present (would hide clickable buttons).
     assert_true(
-        "el.classList.contains('is-disabled') || el.classList.contains('disableBtn')"
-        in js,
-        "disableBtn check is appended to the is-disabled disabled guard",
+        "classList.contains('is-disabled') || el.classList.contains('disableBtn')" not in js,
+        "disableBtn must NOT be independently filtered in the disabled guard "
+        "(it is a visual-only class; only is-disabled / el.disabled / disabled attr are real)",
     )
 
 

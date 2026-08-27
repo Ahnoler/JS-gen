@@ -36,8 +36,26 @@ def main() -> int:
         "SELECT_LAZY_LOAD_ON_MISS marker on miss path only",
     )
 
+    # 2026-08-27 record-run race: settling after 2 stable rounds (~500ms) let a
+    # slow lazy chunk (screenshot/CPU load) look like end-of-list, and the fuzzy
+    # fallback picked 中国香港特别行政区 for want=中国. Patience must be explicit:
+    # several stable rounds AND a minimum travelled distance.
+    assert_true(
+        "MAX_LOOPS" in js and "STREAK_LIMIT" in js,
+        "python JS names patience constants MAX_LOOPS/STREAK_LIMIT",
+    )
+    assert_true(
+        "MIN_ROUNDS_BEFORE_STABLE" in js,
+        "min travelled distance before accepting stable end",
+    )
+    ctrl = (ROOT / "src" / "ctrl-actions" / "select.js").read_text(encoding="utf-8")
+    assert_true(
+        "MAX_ROUNDS" in ctrl and "STREAK_LIMIT" in ctrl,
+        "CTRL select.js mirrors patience constants",
+    )
+    assert_true("round >= 4" in ctrl, "CTRL stable break requires min rounds")
+
     ctrl_path = ROOT / "src" / "ctrl-actions" / "select.js"
-    ctrl = ctrl_path.read_text(encoding="utf-8")
     assert_true(
         "SELECT_LAZY_LOAD_ON_MISS" in ctrl,
         "CTRL select.js must include SELECT_LAZY_LOAD_ON_MISS",

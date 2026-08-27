@@ -196,7 +196,15 @@ JS_FILL_BY_XPATH = r'''([xpath, val, placeholderHint]) => {
   if (!target && labelHint) {
     const want = labelHint;
     if (want) {
-      const scopes = [lastVisibleDrawer(), lastVisibleDialog(), document].filter(Boolean);
+      // Scope placeholder fallback to the active overlay only; fall back to
+      // document solely when no drawer/dialog is visible (main-page forms).
+      // This prevents filling a same-placeholder field on the underlying page
+      // when the xpath miss occurs inside a drawer/dialog.
+      const drawer = lastVisibleDrawer();
+      const dialog = lastVisibleDialog();
+      const scopes = (drawer || dialog)
+        ? [drawer, dialog].filter(Boolean)
+        : [document];
       for (const scope of scopes) {
         const inputs = scope.querySelectorAll('input:not([type="hidden"]), textarea');
         for (const inp of inputs) {

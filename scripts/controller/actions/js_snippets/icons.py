@@ -142,6 +142,52 @@ JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
       return 'ok';
     }
   }
+  // Generalized fallback: click a visible PLAIN text button sharing the label.
+  // Toolbar buttons like 查询/修改/新增 are ordinary <button>s, not tooltip
+  // icons — after an icon miss, clicking them here succeeds in one step
+  // instead of looping the agent through retries (2026-08-27 toolbar incident).
+  const want = _iconNormText(buttonText);
+  const isOverlay = (el) => !!el.closest('.el-dialog, .el-drawer, .el-message-box');
+  const seenB = new Set();
+  const matches = [];
+  for (const b of document.querySelectorAll('button, .el-button, a')) {
+    if (!_iconIsVisible(b)) continue;
+    if (b.closest('.el-table__body-wrapper')) continue; // row affordances → table tools
+    const t = _iconNormText(b.innerText || b.textContent);
+    if (!t || t.length > 40) continue;
+    let hit = false;
+    if (t === want) hit = true;
+    else if (want && t.includes(want) && !want.includes(t)) hit = true;
+    if (!hit) continue;
+    const cls = typeof b.className === 'string' ? b.className.slice(0, 60) : '';
+    const key = t + '|' + cls;
+    if (seenB.has(key)) continue;
+    seenB.add(key);
+    matches.push({ el: b, text: t });
+    if (matches.length >= 8) break;
+  }
+  if (matches.length) {
+    // Prefer exact-label over contains; page-level (non-overlay) over overlay,
+    // so a named toolbar button wins while a dialog is open.
+    let pool = matches.filter((m) => m.text === want);
+    if (pool.length === 0) {
+      pool = matches.filter((m) => !want.includes(m.text));
+    }
+    if (pool.length === 0) pool = matches;
+    const pageLevel = pool.filter((m) => !isOverlay(m.el));
+    if (pageLevel.length >= 1) pool = pageLevel;
+    if (pool.length === 1) {
+      const m = pool[0];
+      m.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      m.el.click();
+      return 'ok-text:' + m.text;
+    }
+    return 'not-found-text-button:' + JSON.stringify({
+      wanted: buttonText,
+      reason: 'ambiguous',
+      textButtons: pool.map((m) => ({ text: m.text, tag: m.el.tagName.toLowerCase() })),
+    });
+  }
   return 'not-found';
 }'''
 

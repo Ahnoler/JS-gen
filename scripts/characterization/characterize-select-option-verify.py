@@ -58,10 +58,17 @@ def test_js_select_option_has_readback_verify() -> None:
         "return await verifyAfterClick(t)" in js,
         "tryClick delegates to verifyAfterClick",
     )
-    # matchInPool must be async (awaits tryClick).
+    # The matching functions must be async (awaits tryClick).
+    # matchInPool was split into exactMatchInPool + fuzzyMatchInPool for the
+    # scroll-to-find-exact optimization (exact match at every scroll step,
+    # fuzzy only after all scrolling exhausted).
     assert_true(
-        "const matchInPool = async (pickPool) =>" in js,
-        "matchInPool is async",
+        "const exactMatchInPool = async (pickPool) =>" in js,
+        "exactMatchInPool is async",
+    )
+    assert_true(
+        "const fuzzyMatchInPool = async (pickPool) =>" in js,
+        "fuzzyMatchInPool is async",
     )
     # The readback must sleep before reading (let Element UI settle).
     assert_true(
@@ -82,19 +89,32 @@ def test_js_select_option_has_readback_verify() -> None:
 
 def test_js_select_option_all_return_points_verified() -> None:
     js = SELECT_OPTION_PY.read_text(encoding="utf-8")
-    # Every matchInPool return of tryClick must use await.
-    match_start = js.find("const matchInPool = async")
+    # Every exactMatchInPool return of tryClick must use await.
+    match_start = js.find("const exactMatchInPool = async")
     match_end = js.find("};", match_start)
     match_body = js[match_start:match_end]
     assert_true(
-        match_body.count("await tryClick") >= 3,
-        "matchInPool awaits tryClick at all return points (first-alias, exact, fuzzy)",
+        match_body.count("await tryClick") >= 2,
+        "exactMatchInPool awaits tryClick at all return points (first-alias, exact)",
     )
-    # All top-level matchInPool call sites must use await.
-    # The lazy-load and catch blocks both call matchInPool.
+    # fuzzyMatchInPool must await tryClick at its return point.
+    fuzzy_start = js.find("const fuzzyMatchInPool = async")
+    fuzzy_end = js.find("};", fuzzy_start)
+    fuzzy_body = js[fuzzy_start:fuzzy_end]
     assert_true(
-        js.count("await matchInPool") >= 3,
-        "all matchInPool call sites use await (initial + lazy-load + catch)",
+        "await tryClick" in fuzzy_body,
+        "fuzzyMatchInPool awaits tryClick at return point",
+    )
+    # All top-level matching function call sites must use await.
+    # The scroll loop calls exactMatchInPool at each step; fuzzyMatchInPool
+    # is called once after scrolling; the catch block calls exactMatchInPool.
+    assert_true(
+        js.count("await exactMatchInPool") >= 2,
+        "all exactMatchInPool call sites use await (initial + scroll/catch)",
+    )
+    assert_true(
+        js.count("await fuzzyMatchInPool") >= 1,
+        "fuzzyMatchInPool call site uses await",
     )
 
 
@@ -158,6 +178,24 @@ def test_form_engine_value_mismatch_branch() -> None:
     assert_true(
         "mismatch-retry" in body,
         "successful mismatch retry records mismatch-retry cue",
+    )
+    # 2026-08-27 escalation: when the alias-retry STILL mismatches, one final
+    # strict attempt must run with exactOnly ([resolved, True]) — no fuzzy
+    # fallback, verbatim readback required.
+    assert_true(
+        "JS_SELECT_OPTION, [resolved_option, True]" in mismatch_section,
+        "value-mismatch branch escalates to exactOnly strict attempt",
+    )
+    assert_true(
+        "mismatch-retry-exact" in mismatch_section,
+        "exactOnly success records mismatch-retry-exact cue",
+    )
+    # The strict attempt resets + re-triggers before firing (dropdown state).
+    exact_idx = mismatch_section.find("[resolved_option, True]")
+    pre = mismatch_section[max(0, exact_idx - 800):exact_idx]
+    assert_true(
+        "reset_select_ui" in pre and "JS_SELECT_TRIGGER_BY_XPATH" in pre,
+        "strict attempt preceded by reset + re-trigger",
     )
 
 

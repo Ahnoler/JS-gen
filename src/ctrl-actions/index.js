@@ -46,14 +46,14 @@ export const CTRL_API_TABLE = `| 函数 | 参数 | 返回值 | 说明 |
 | CTRL.clickRadio | (label, option) | 'ok' / 'disabled' / 'option-not-found' / 'label-not-found' | 点击 el-radio |
 | CTRL.selectTreeOption | (label, option) | 'ok:xxx (code)' / 'ok-search:xxx' / 'ok-fallback:xxx (code)' / 'disabled' / 'no-tree-component' | 树选择器；只读 TsscMultiTree 返回 disabled |
 | CTRL.isFormItemDisabled | (item, inputEl?, trigger?) | true/false | 可编辑判定：原生 disabled + .is-disabled 包装 + Vue props.disabled || CTRL.clickMenuItem | (text) | 'ok' / 'ok-expanded' / 'not-found' | 点击 el-menu-item，自动展开 el-submenu |
-| CTRL.clickTableRowButton | (rowText, btnText) | 'ok' / 'ok-icon' / 'ok-fallback' / 'button-not-found' / 'row-not-found' | 点击 el-table 行内操作按钮 |
+| CTRL.clickTableRowButton | (rowText, btnText) | 'ok' / 'ok-icon' / 'button-not-found-in-row:{rowButtons,rowHasRadio}' / 'row-not-found' | 点击 el-table 行内操作按钮；行内无按钮时返回行内实际按钮与 radio 提示（工具栏模式：radio 选中 + 点工具栏按钮），不再盲点首个按钮 |
 | CTRL.clickTableRowRadio | (rowText) | 'ok' / 'radio-not-found' / 'row-not-found' | 选中 el-table 行内单选按钮 |
 | CTRL.closeDialog | () | 'ok' / 'ok-notification' / 'ok-cancel' / 'no-overlay-open' | 关闭通知/弹窗/抽屉 |
 | CTRL.waitForLoading | () | 超时返回 'timeout' | 等待 loading 遮罩 + CSS 动画结束（200ms 轮询，最长 30s） |
 | CTRL.switchTab | (name) | 'ok' / 'tab-not-found' | 切换 el-tabs |
 | CTRL.checkFieldValue | (label) | 值 / 'empty' / 'label-not-found' | 读取表单字段当前值 |
 | CTRL.clickAdjacentButton | (label) | 'ok-clicked' / 'already-filled'(非ok跳过) / 'no-button-found' | 点击字段旁的选择/引入按钮 |
-| CTRL.clickIconButton | (buttonText) | 'ok' / 'not-found' / 'button-text-empty' | 按 el-tooltip / ElTooltip content / aria-label 点击图标按钮 |
+| CTRL.clickIconButton | (buttonText) | 'ok' / 'ok-text:<label>' / 'not-found-text-button:{ambiguous}' / 'not-found' / 'button-text-empty' | 按标签点按钮：先匹配 tooltip 图标，miss 时直接点击同标签可见文字按钮（表格行内除外；页面级优先于弹层；歧义时返回候选清单） |
 | CTRL.fillAddressFields | (addr) | 'ok:N' / 'no-address-fields' | 填充所有标签含"地址"的字段 |
 | CTRL.expandAllTreeNodes | () | 展开节点数 | 展开全部 el-tree 节点 |
 

@@ -224,6 +224,16 @@ class SaveEngine(_FormActionEngineBase):
                 f' | stale scope memory retried region={retry_scope!r} and still missed'
                 if retry_scope else ''
             )
+            # ⚠️ CHAIN RISK (2026-08-26 live incident): this not-found branch
+            # previously emitted "Close interfering dialogs (查询/返回) with
+            # close_dialog" as agent guidance. When the real cause is a
+            # mis-filtered save button (e.g. the tiansun `disableBtn` visual-only
+            # class — fixed in js_snippets/save.py), the agent dutifully calls
+            # close_dialog, which closes the drawer/dialog being edited and
+            # discards ALL unsaved form data. Treat "close interfering dialogs"
+            # as a last-resort hint only; do NOT let it become a reflex that
+            # closes the active overlay. Prefer re-scanning (region=/section=)
+            # or investigating why candidates is empty before any close_dialog.
             return _err(
                 f'err-save-button-not-found:{needle}{sec_hint}. '
                 f'candidates={cand_json}. '

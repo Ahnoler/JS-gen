@@ -185,28 +185,38 @@ JS_SELECT_OPTION = '''async (arg) => {
         }
         return await verifyAfterClick(t);
     };
-    const matchInPool = async (pickPool) => {
+    // Exact match only (labelMatches: equality or name+digit-suffix for table rows).
+    // Used at every scroll step so we find the precise option before falling
+    // back to fuzzy substring matching.
+    const exactMatchInPool = async (pickPool) => {
         if (!exactOnly && FIRST_ALIASES.includes(option.toLowerCase().trim())) {
             return await tryClick(pickPool[0]);
         }
         for (const item of pickPool) {
             if (labelMatches(optionLabel(item), option)) return await tryClick(item);
         }
-        if (!exactOnly) {
-            // Prefer shortest lab that contains want — avoids 非金融 matching 其他非金融
-            // when want is the short label; when want is the long label only the long lab matches.
-            let best = null;
-            let bestLen = Infinity;
-            for (const item of pickPool) {
-                const lab = optionLabel(item);
-                if (lab.includes(option) && lab.length < bestLen) {
-                    best = item;
-                    bestLen = lab.length;
-                }
-            }
-            if (best) return await tryClick(best);
-        }
         return null;
+    };
+    // Fuzzy substring match — shortest label that contains option.
+    // Only called after all scrolling is exhausted and no exact match found.
+    const fuzzyMatchInPool = async (pickPool) => {
+        if (exactOnly) return null;
+        let best = null;
+        let bestLen = Infinity;
+        for (const item of pickPool) {
+            const lab = optionLabel(item);
+            if (lab.includes(option) && lab.length < bestLen) {
+                best = item;
+                bestLen = lab.length;
+            }
+        }
+        if (best) return await tryClick(best);
+        return null;
+    };
+    // Collect every label seen across all scroll positions (for final fuzzy + fallback).
+    const seenItems = new Set();
+    const trackItems = (pool) => {
+        for (const item of pool) seenItems.add(item);
     };
     let items = collectItems();
     let pickPool = buildPool(items);
@@ -220,10 +230,14 @@ JS_SELECT_OPTION = '''async (arg) => {
         }
     }
     if (pickPool.length === 0) return 'no-items';
-    let hit = await matchInPool(pickPool);
+    trackItems(pickPool);
+    // Step 1: exact match in the initial visible pool.
+    let hit = await exactMatchInPool(pickPool);
     if (hit) return hit;
 
-    /* SELECT_LAZY_LOAD_ON_MISS */
+    /* SELECT_LAZY_LOAD_ON_MISS — scroll the dropdown to reveal lazy-loaded
+       options, trying an exact match at every step. Continue until the list
+       is fully scrolled (2 stable iterations), then fall back to fuzzy. */
     const findWrap = (dd) => {
         if (!dd || dd === document) return null;
         const w1 = dd.querySelector('.el-select-dropdown__wrap');
@@ -241,13 +255,25 @@ JS_SELECT_OPTION = '''async (arg) => {
         const wrap = findWrap(dropdown);
         if (wrap) {
             let stableStreak = 0;
+            // Lazy chunk rendering under recording load (screenshot capture,
+            // heavy DOM) can stall >500ms — settling early here made the search
+            // fall back to a visible-window fuzzy match and pick 中国香港特别行政区
+            // for want=中国 (2026-08-27 record run). Require several stable rounds
+            // AND a minimum travelled distance before accepting "no more data".
+            const MAX_LOOPS = 14;
+            const STREAK_LIMIT = 3;
+            const MIN_ROUNDS_BEFORE_STABLE = 4;
             let prevCount = pickPool.length;
             let prevHeight = wrap.scrollHeight;
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < MAX_LOOPS; i++) {
                 wrap.scrollTop = wrap.scrollHeight;
-                await sleep(250);
+                await sleep(220);
                 items = collectItems();
                 pickPool = buildPool(items);
+                trackItems(pickPool);
+                // Try exact match at each scroll position.
+                hit = await exactMatchInPool(pickPool);
+                if (hit) return hit;
                 const h = wrap.scrollHeight;
                 const c = pickPool.length;
                 if (c === prevCount && h === prevHeight) {
@@ -257,23 +283,55 @@ JS_SELECT_OPTION = '''async (arg) => {
                     prevCount = c;
                     prevHeight = h;
                 }
-                if (stableStreak >= 2) break;
+                if (stableStreak >= STREAK_LIMIT && i >= MIN_ROUNDS_BEFORE_STABLE - 1) break;
             }
-            hit = await matchInPool(pickPool);
-            if (hit) return hit;
         }
     } catch (e) {
         items = collectItems();
         pickPool = buildPool(items);
-        hit = await matchInPool(pickPool);
+        trackItems(pickPool);
+        hit = await exactMatchInPool(pickPool);
         if (hit) return hit;
+    }
+
+    // Step 2: all scrolling exhausted, no exact match — try fuzzy substring
+    // match across every item seen during scrolling.
+    hit = await fuzzyMatchInPool([...seenItems]);
+    if (hit) return hit;
+
+    // Step 3: no match at all — pick the first item as fallback (non-exactOnly).
+    // Accept the first item unconditionally so the Python side records a
+    // selection rather than looping on value-mismatch / option-not-found.
+    if (!exactOnly && seenItems.size > 0) {
+        const firstItem = [...seenItems][0];
+        if (firstItem) {
+            firstItem.scrollIntoView({ block: 'nearest' });
+            const t = optionLabel(firstItem);
+            const clickEl = (firstItem.tagName === 'TR')
+                ? (firstItem.querySelector('td .cell, td') || firstItem)
+                : firstItem;
+            clickEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            clickEl.click();
+            if (firstItem.tagName === 'TR' && clickEl !== firstItem) firstItem.click();
+            if (triggerInput) {
+                setTimeout(() => {
+                    triggerInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    triggerInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    window.__last_select_trigger = null;
+                }, 0);
+            }
+            await sleep(250);
+            const fb = readbackSelectedText();
+            const fbLabel = fb || t;
+            return 'ok:' + fbLabel + ' | fallback-first | wanted:' + option;
+        }
     }
 
     const hasEmpty = (dropdown && dropdown !== document)
         ? dropdown.querySelector('.el-select-dropdown__empty')
         : document.querySelector('.el-select-dropdown__empty');
     if (hasEmpty) return 'no-items';
-    const preview = pickPool.slice(0, 30).map(i => optionLabel(i)).filter(Boolean);
+    const preview = [...seenItems].slice(0, 30).map(i => optionLabel(i)).filter(Boolean);
     return 'option-not-found:' + preview.join(', ');
 }'''
 

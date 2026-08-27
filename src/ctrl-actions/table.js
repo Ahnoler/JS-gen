@@ -26,26 +26,28 @@ export const CTRL_PART_TABLE = `  waitForLoading: () => new Promise(resolve => {
     }
     return count > 0 ? 'ok:' + count : 'no-address-fields';
   },
-	  clickTableRowButton: (rowText, btnText) => {
-	    const _cellTexts = (row) => { const cs = row.querySelectorAll('td, .el-table__cell'); const out = []; for (const c of cs) { const t = (c.innerText || c.textContent || '').trim().replace(/\s+/g, ' '); if (t && t !== 'radio' && t !== 'checkbox') out.push(t); } return out; };
-	    const _rows = document.querySelectorAll('.el-table__body-wrapper .el-table__row');
-	    let row = null;
-	    for (const r of _rows) { const ts = _cellTexts(r); for (const t of ts) { if (t === rowText) { row = r; break; } } if (row) break; }
-	    if (!row) { for (const r of _rows) { if ((r.textContent || '').includes(rowText)) { row = r; break; } } }
-	    if (!row) return 'row-not-found';
-	    const _tryRow = (row) => {
-		      row.scrollIntoView({ block: 'center', behavior: 'instant' });
-	      for (const btn of row.querySelectorAll('button,.el-button,i[class*="icon"]')) {
-	        const t=btn.textContent?.trim()||'', c=btn.className||'';
-	        if (t.includes(btnText) || c.includes(btnText.toLowerCase())) { if (btn.offsetParent!==null) { btn.click(); return 'ok'; } }
-	      }
-	      if (btnText==='edit'||btnText==='编辑') { const ic=row.querySelector('i.el-icon-edit,i[class*="bianji"],i[class*="edit"],i[class*="xiugai"]'); if (ic&&ic.offsetParent!==null) { ic.click(); return 'ok-icon'; } }
-	      if (btnText==='delete'||btnText==='删除') { const ic=row.querySelector('i.el-icon-delete,i[class*="shanchu"],i[class*="delete"]'); if (ic&&ic.offsetParent!==null) { ic.click(); return 'ok-icon'; } }
-	      for (const btn of row.querySelectorAll('button,.el-button')) { if (btn.offsetParent!==null) { btn.click(); return 'ok-fallback'; } }
-	      return 'button-not-found';
-	    };
-	    return _tryRow(row);
-	  },
+		  clickTableRowButton: (rowText, btnText) => {
+		    const _cellTexts = (row) => { const cs = row.querySelectorAll('td, .el-table__cell'); const out = []; for (const c of cs) { const t = (c.innerText || c.textContent || '').trim().replace(/\s+/g, ' '); if (t && t !== 'radio' && t !== 'checkbox') out.push(t); } return out; };
+		    const _rows = document.querySelectorAll('.el-table__body-wrapper .el-table__row');
+		    let row = null;
+		    for (const r of _rows) { const ts = _cellTexts(r); for (const t of ts) { if (t === rowText) { row = r; break; } } if (row) break; }
+		    if (!row) { const wantCompact = String(rowText).replace(/\s+/g, ''); for (const r of _rows) { if (((r.textContent || '').replace(/\s+/g, '')).includes(wantCompact)) { row = r; break; } } }
+		    if (!row) return 'row-not-found';
+		    const _tryRow = (row) => {
+			      row.scrollIntoView({ block: 'center', behavior: 'instant' });
+		      for (const btn of row.querySelectorAll('button,.el-button,i[class*="icon"]')) {
+		        const t=btn.textContent?.trim()||'', c=btn.className||'';
+		        if (t.includes(btnText) || c.includes(btnText.toLowerCase())) { if (btn.offsetParent!==null) { btn.click(); return 'ok'; } }
+		      }
+		      if (btnText==='edit'||btnText==='编辑') { const ic=row.querySelector('i.el-icon-edit,i[class*="bianji"],i[class*="edit"],i[class*="xiugai"]'); if (ic&&ic.offsetParent!==null) { ic.click(); return 'ok-icon'; } }
+		      if (btnText==='delete'||btnText==='删除') { const ic=row.querySelector('i.el-icon-delete,i[class*="shanchu"],i[class*="delete"]'); if (ic&&ic.offsetParent!==null) { ic.click(); return 'ok-icon'; } }
+		      // No blind first-visible-button fallback — it clicks unrelated controls
+		      // (e.g. customer-name view link). Report the row's real affordances.
+		      const vis=[...row.querySelectorAll('button,.el-button,a')].filter((b)=>b.offsetParent!==null).map((b)=>(b.textContent||'').trim()).filter(Boolean);
+		      return 'button-not-found-in-row:'+JSON.stringify({wanted:btnText,rowButtons:vis,rowHasRadio:!!row.querySelector('.el-radio, input[type=radio]')});
+		    };
+		    return _tryRow(row);
+		  },
 	  clickTableRowRadio: (rowText) => {
 	    if (!rowText) return 'row-text-empty';
 	    const pickSel = (root) => root && root.querySelector(
@@ -61,7 +63,7 @@ export const CTRL_PART_TABLE = `  waitForLoading: () => new Promise(resolve => {
 	    };
 	    const wantFirst = /^(first|1st|第一个|第一项|首行)$/i.test(String(rowText).trim());
 	    const _rcellTexts = (row) => { const cs = row.querySelectorAll('td, .el-table__cell'); const out = []; for (const c of cs) { const t = (c.innerText || c.textContent || '').trim().replace(/\s+/g, ' '); if (t && t !== 'radio' && t !== 'checkbox') out.push(t); } return out; };
-	    const _rowMatches = (row) => { if (wantFirst) return true; const ts = _rcellTexts(row); for (const t of ts) { if (t === rowText) return true; } return (row.textContent || '').includes(rowText); };
+	    const _rowMatches = (row) => { if (wantFirst) return true; const ts = _rcellTexts(row); for (const t of ts) { if (t === rowText) return true; } const wantCompact = String(rowText).replace(/\s+/g, ''); return ((row.textContent || '').replace(/\s+/g, '')).includes(wantCompact); };
 	    const tables = document.querySelectorAll('.el-table');
 	    for (const table of tables) {
 	      const bodyRows = table.querySelectorAll('.el-table__body-wrapper tbody tr.el-table__row, .el-table__body-wrapper tbody tr');

@@ -469,16 +469,25 @@ async def capture_dialog_png_b64_from_page(page):
 
 def _is_overlay_region(region_id) -> bool:
     """Check whether a region_id chain contains an overlay segment."""
+    return _overlay_label_in_region(region_id) is not None
+
+
+def _overlay_label_in_region(region_id) -> str | None:
+    """Return the label of the first overlay segment in a region_id chain, or None.
+
+    A region_id chain is ``role:label|role:label|...``; an overlay segment looks
+    like ``overlay:新增客户``. The label is the text after the first ``:``.
+    """
     if not region_id:
-        return False
+        return None
     for seg in str(region_id).split('|'):
         seg = seg.strip()
         if not seg:
             continue
-        role = seg.split(':', 1)[0].strip()
-        if role == 'overlay':
-            return True
-    return False
+        role, _, label = seg.partition(':')
+        if role.strip() == 'overlay':
+            return (label or '').strip() or 'overlay'
+    return None
 
 
 async def capture_dialog_png_b64(browser_context):
@@ -682,9 +691,9 @@ def _record_action(action_name, params, result, element=None, source=None):
         rid = str(el.get('region_id') or '').strip()
         if not rid.startswith(_CURRENT_PAGE_KEY):
             el['region_id'] = _CURRENT_PAGE_KEY + (f'|{rid}' if rid else '')
-        overlay = _is_overlay_region(rid)
-        if overlay:
-            el['popup_level_key'] = f"{_CURRENT_PAGE_KEY}|dialog:{overlay['label']}"
+        overlay_label = _overlay_label_in_region(rid)
+        if overlay_label:
+            el['popup_level_key'] = f"{_CURRENT_PAGE_KEY}|dialog:{overlay_label}"
         _stamp_rect_norm(el)
     removed_ids: list[str] = []
 

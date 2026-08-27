@@ -187,10 +187,14 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         return json.dumps(state, ensure_ascii=False)
 
     @controller.action(
-        'Click an icon-only button by its tooltip / ElTooltip content / aria-label text '
-        '(e.g. el-tooltip + el-icon-*). Prefer this over click_element on empty-text icons. '
-        'Use get_page_state().iconButtons or aria-label on indexed elements to discover labels. '
-        'If the task names a toolbar icon (e.g. 新增一级分类), call this directly.'
+        'Click a button by its label. Handles TWO kinds: (a) icon-only buttons '
+        'whose text lives in el-tooltip / aria-label (e.g. el-tooltip + el-icon-*), '
+        '(b) plain visible text buttons like toolbar 查询/重置/新增/修改/查看 — '
+        'if no icon matches, a same-label visible text button is clicked directly '
+        "(table-row affordances excluded; page-level preferred over overlays; returns "
+        "'ok-text:<label>'). Only fails when the label is absent or ambiguous "
+        "('not-found-text-button' with candidates). "
+        'Use get_page_state().iconButtons to discover true icon labels.'
     )
     async def click_icon_button(button_text: str):
         page = await browser_context.get_current_page()
@@ -214,6 +218,14 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 from scripts.controller.actions.container_naming import remember_trigger_button
                 remember_trigger_button(business_data_store, button_text)
             return _ok(result)
+        if str(result).startswith('not-found-text-button:'):
+            # Generalized fallback found same-label buttons but could not pick
+            # one safely (ambiguous) — hand the candidates to the agent.
+            return _err(
+                f'{result}. 同标签可见按钮有多个，无法安全二选一。'
+                f'改用 click_element_by_index 点击目标按钮在页面快照中的索引；'
+                f'或提供更精确的 button_text（完整按钮文字）后重试本动作。',
+            )
         return result
 
     @controller.action('Save the accumulated trajectory in atp-record import-compatible JSON format.')
