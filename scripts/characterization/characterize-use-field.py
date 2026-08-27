@@ -31,7 +31,8 @@ def test_prescriptions():
     dfu = (ROOT / "scripts/controller/actions/duplicate_failure_cue.py").read_text(encoding="utf-8")
     from scripts.controller.actions.duplicate_failure_cue import duplicate_failure_prescription as rx
     for code in ("select-option-unresolved", "field-disabled", "button-not-found-in-row",
-                 "table-row-not-found", "icon-label-miss", "icon-label-ambiguous"):
+                 "table-row-not-found", "icon-label-miss", "icon-label-ambiguous",
+                 "no-adjacent-button"):
         assert_true(f"'err-{code}'" in dfu, f"prescription table entry err-{code}")
         assert_true(rx(f"err-{code} | anything").startswith("[纠偏]"), f"lookup hits {code}")
 

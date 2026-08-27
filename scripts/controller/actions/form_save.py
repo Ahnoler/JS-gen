@@ -22,6 +22,7 @@ from ._js_snippets import (
 from ...models import TaskList
 from .form_scan_utils import refresh_scan_buttons, _mark_query_ui_if_needed
 from .form_action_engines import _FormActionEngineBase
+from .result_protocol import err_with
 
 
 class SaveEngine(_FormActionEngineBase):
@@ -234,11 +235,15 @@ class SaveEngine(_FormActionEngineBase):
             # as a last-resort hint only; do NOT let it become a reflex that
             # closes the active overlay. Prefer re-scanning (region=/section=)
             # or investigating why candidates is empty before any close_dialog.
-            return _err(
-                f'err-save-button-not-found:{needle}{sec_hint}. '
-                f'candidates={cand_json}. '
-                f'Close interfering dialogs (查询/返回) with close_dialog, '
-                f'or pass region= for scoped save.{stale_hint}',
+            return err_with(
+                "save-button-not-found",
+                f"区域{sec!r}内未找到保存按钮「{needle}」（候选 {len(candidates)} 个）",
+                observed=f"candidates={cand_json}",
+                next_action=(
+                    '优先按 candidates 标题带 region= 重试；'
+                    '"close interfering dialogs" 仅作最后手段且确认非编辑抽屉'
+                    + (stale_hint if retry_scope else '')
+                ),
                 include_in_memory=True,
             )
 

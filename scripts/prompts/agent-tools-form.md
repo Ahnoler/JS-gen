@@ -4,7 +4,7 @@
 - 弹窗内「查询」等非提交按钮可用索引或其它专用动作；**凡会触发「操作成功」的表单提交一律 `click_save`。**
 - 若 `done()` 被拒且提示无 ok-save-success：**不要**重新选表格行、不要再点「修改」；弹窗若仍开着直接 `click_save(button_text='确认')`。
 - select_option(label_text, option_text, xpath_smart='') — el-select 下拉框。"first" 选择第一个选项。**🚨 这是选择 el-select 选项的唯一正确方式。不要使用 click_element 来选择下拉选项。** 扫描/`get_pending_tasks` 返回的字段含 `label` 与相对 `xpath_smart`；**优先传入 `xpath_smart`** 定位控件。`label_text` 仅用于语义（规则/取值/录制），须用扫描里的**完整**名称，勿缩写猜测。
-- fill_form_field(label_text, value, xpath_smart='') — **el-form-item 内的文本/密码输入框以及日期字段（同一动作）。** 扫描/`get_pending_tasks` 含 `xpath_smart` + `label`；**优先传 `xpath_smart`**。`label_text` 为语义名（规则/取值/录制），用扫描原文勿猜。若返回 `"field-disabled"` — 跳过。
+- fill_form_field(label_text, value, xpath_smart='') — **el-form-item 内的文本/密码输入框以及日期字段（同一动作）。** 扫描/`get_pending_tasks` 含 `xpath_smart` + `label`；**优先传 `xpath_smart`**。`label_text` 为语义名（规则/取值/录制），用扫描原文勿猜。若返回 `err-field-disabled` — 跳过。返回信息含「下一步:」段时，必须照做其中推荐动作（如 select_option/select_tree_option），不得再用 fill_form_field 尝试同一字段。
 - click_radio(label_text, option_text, xpath_smart='') — el-radio 单选组；**优先传 `xpath_smart`**（同 fill/select）。
 - **scroll_to_first_error() — 跳转到第一个可见的表单校验报错字段。提交失败后使用，无需手动 scroll 查找。**
 - **click_save(button_text='保存', region='') — 🚨 录制时提交表单的唯一正确动作。自动定位「保存/提交」按钮、scrollIntoView、点击，等待 loading，再扫描全页 `.el-form-item__error` 与通知。多处同名按钮（如不同折叠区的两个「保存」）须传 `region=`（折叠/Tab/卡片标题，见 `run_form_assistant` 返回的 `sections[]` / `region_label`）；无 scope 且多匹配 → `err-save-ambiguous`。全表 pending 跨多块且未传 scope → `err-region-required`（见 core「阶段区域 region」）。成功：`ok-save-success`（操作成功类提示）**或** `ok-save-navigation`（保存后跳转）**或** `ok-save-no-feedback`（已点击且无校验错误/错误通知/跳转 — 被测系统静默保存，视为成功，立刻 `done`，勿重试）。`err-save-validation` / `err-save-notification` 不算成功。禁止用 scroll_down + click_element / click_element_by_index 盲目找保存按钮。无 scope 时若页上多区块同名保存按钮，系统不会使用上一区块记忆自动点保存，会返回 err-save-ambiguous — 必须显式 `region=`。**
@@ -71,7 +71,7 @@
 3. **写路径 xpath 优先：** `fill_form_field` / `select_option` / `click_radio` / 日期填写均支持可选 `xpath_smart`；扫描或 pending 项有 `xpath_smart` 时**务必带上**，勿只靠 label。
 4. **若返回 `ambiguous-label`：** 同 label 对应多个 xpath — 从扫描/pending 复制**精确** `xpath_smart` 重试，勿换猜别的 label。
 5. **若返回 `xpath-not-found`：** 重新 `scan_visible_fields` / `get_pending_tasks`，从最新扫描复制**精确** `xpath_smart`，或省略 hint 让工具自行解析。**禁止自造任何 `xpath_smart`**（含 placeholder、`[n]` occurrence、dialog/drawer）。只能从扫描 / `get_pending_tasks` / `pending_items` **逐字复制**；省略 hint 时由工具解析 inventory。勿只复制 label 或模糊猜测。
-6. **如果 `fill_form_field` 返回 `"field-disabled"`：** 检查字段是否已有值。如果 `getAttribute('value')` 或 `placeholder` 非空且不是"请选择"/"请输入" → 跳过，说明已填写。如果字段为空 → 寻找旁边的按钮来填充。
+6. **如果 `fill_form_field` 返回 `err-field-disabled`：** 检查字段是否已有值。如果 `getAttribute('value')` 或 `placeholder` 非空且不是"请选择"/"请输入" → 跳过，说明已填写。如果字段为空 → 寻找旁边的按钮来填充。
 7. **如果 `select_option` 返回 `"select-disabled"`：跳过** — 选择框被禁用（已预填）。
 8. **禁用字段 + 空值 + 无旁边按钮** → 跳过（真正的只读字段）。
    **禁用字段 + 空值 + 有旁边按钮（hasButton!=""）** → 若任务列出【特殊元素库候选】则优先 `use_special_element(special_element_id)`；否则 `click_adjacent_button(label_text)`。纠错走人工录制。
@@ -141,7 +141,7 @@ run_form_assistant(region='系统评级结论')
    - 先 `close_notification()` 读错误文本，修字段后 **`click_save()`**。
 4. **如果服务端错误提示"已存在""重复"等：** `match_form_rule` 重新生成冲突字段值，填写后再次 `click_save()`。不要改无关字段。
 5. **`close_notification()` 返回 `"no-notification"`：仅表示当前无弹窗，绝不等于操作成功。**
-6. 不要回退重新选择或填写已返回 "ok-already:XXX"、"ok" 或 "field-disabled" 的字段。
+6. 不要回退重新选择或填写已返回 "ok-already:XXX"、"ok" 或 `err-field-disabled` 的字段。
 7. 验证表单是否正确的唯一方法是 `click_save()` 并检查返回码。
 8. **成功通知会在2-3秒内自动消失** — 故必须用 `click_save()`（内部轮询捕获），不要先点索引再慢慢 `close_notification()` 指望还在。
 9. **在任意弹窗/抽屉交互后**（如法人引入、客户搜索等），向导表单可能已被刷新/重置。录制阶段仍须对每个可编辑字段执行写动作（可同值）；不要用 `check_field_value` 代替写动作。

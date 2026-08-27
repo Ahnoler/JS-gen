@@ -62,11 +62,30 @@ def test_affordances_source_shape():
     assert_true("el-form-item__label" in js_src, "label scoping present")
 
 
+def fill_all():
+    p = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+    return p.split("class FillEngine", 1)[1].split("class SelectEngine", 1)[0]
+
+
+def test_final_review_fixes():
+    src_all = MOD.read_text(encoding="utf-8")
+    adj = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+    sv = (ROOT / "scripts/controller/actions/form_save.py").read_text(encoding="utf-8")
+    dupe = (ROOT / "scripts/controller/actions/duplicate_failure_cue.py").read_text(encoding="utf-8")
+    form_prompt = (ROOT / "scripts/prompts/agent-tools-form.md").read_text(encoding="utf-8")
+    assert_true("err-no-adjacent-button" in adj and "'err-no-adjacent-button'" in dupe, "C1 wired+prescribed")
+    assert_true("err_with(" in sv.split("CHAIN RISK")[1], "I1 envelope after risk comment")
+    assert_true("err-field-disabled" in form_prompt, "I2 prompt synced")
+    assert_true('replace("|"' in src_all.replace("\\\\", "\\"), "I3 pipe escape in sections")
+    assert_true("_field_disabled_hint" not in fill_all(), "sanity: legacy helper stays retired")
+
+
 def main() -> int:
     test_err_with_three_sections()
     test_validate_protocol()
     test_recommend_action_for_kind()
     test_affordances_source_shape()
+    test_final_review_fixes()
     print("characterize-result-protocol: OK")
     return 0
 

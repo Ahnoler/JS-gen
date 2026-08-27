@@ -62,7 +62,12 @@ _ERR_PRESCRIPTIONS = (
     (
         'err-field-disabled',
         _PREFIX + '这是下拉类字段，fill_form_field 不会再成功。按字段 kind 用'
-        ' select_option / select_tree_option / 日期 YYYY-MM-DD 重填。',
+         ' select_option / select_tree_option / 日期 YYYY-MM-DD 重填。',
+    ),
+    (
+        'err-no-adjacent-button',
+        _PREFIX + '该字段没有相邻按钮可点。确认字段是否已被填充或无需引入；'
+        '若需搜索选择改用 run_form_assistant / select_option。',
     ),
     (
         'err-button-not-found-in-row',

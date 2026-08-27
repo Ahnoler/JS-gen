@@ -30,17 +30,19 @@ def recommend_action_for_kind(kind: str) -> str:
 
 
 def _sections(reason: str, observed: str, next_action: str) -> str:
+    esc = lambda s: s.replace("|", "｜")
     out = ""
     if reason:
-        out += f" | 原因:{reason}"
+        out += f" | 原因:{esc(reason)}"
     if observed:
-        out += f" | 现场:{observed}"
+        out += f" | 现场:{esc(observed)}"
     if next_action:
-        out += f" | 下一步:{next_action}"
+        out += f" | 下一步:{esc(next_action)}"
     return out
 
 
-def err_with(code: str, reason: str, observed: str = "", next_action: str = ""):
+def err_with(code: str, reason: str, observed: str = "", next_action: str = "",
+             include_in_memory: bool = False):
     """Build the three-section protocol ActionResult (_err wrapped).
 
     Sections always ordered 原因→现场→下一步; empty section omitted entirely.
@@ -48,13 +50,17 @@ def err_with(code: str, reason: str, observed: str = "", next_action: str = ""):
     ``code`` may be given bare (``select-option-unresolved``) or already
     prefixed (``err-select-option-unresolved``); the emitted text always
     starts with ``err-`` and matches ``err-[a-z0-9-]+``.
+    ``include_in_memory`` is forwarded to ``_err`` so long-context recording
+    retains high-signal failure guidance (e.g. save-button-not-found).
     """
     c = (code or "").strip().lower()
     bare = c[4:] if c.startswith("err-") else c
     if not bare or not re.fullmatch(r"[a-z0-9-]+", bare):
         raise ValueError(f"protocol code must match err-[a-z0-9-]+, got {code!r}")
+    if not reason:
+        reason = "未提供"
     text = f"err-{bare}{_sections(reason or '', (observed or '').strip(), (next_action or '').strip())}"
-    res = _err(text)
+    res = _err(text, include_in_memory=include_in_memory)
     # Mirror the protocol code on ActionResult.error so duplicate_failure_cue
     # (which keys off startswith('err-')) and characterization pins can read it.
     res.error = f"err-{bare}"
@@ -95,8 +101,7 @@ def ok_marked(store=None, label: str = "", got: str = "", *, fallback: str = "",
     fb = (fallback or "").strip()
     if fb:
         parts.append(fb)
-    w = (wanted or "").strip()
-    if fb and wanted and wanted != got:
+    if fb and (wanted or "").strip() and (wanted or "").strip() != got:
         parts.append(f"wanted:{wanted}")
     try:
         if store is not None and fb and label:

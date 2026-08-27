@@ -365,6 +365,15 @@ class FillEngine(_FormActionEngineBase):
                 element=element,
             )
             return _ok(result)
+        if str(result).startswith('no-adjacent-button-found') or str(result) == 'label-not-found':
+            aff = await affordances(page, label_text)
+            btns = ",".join(b['text'] for b in (aff.get('buttons') or [])[:4]) or '（该字段区域无可见按钮）'
+            return err_with(
+                "err-no-adjacent-button",
+                f"{label_text} 字段旁没有 选择/引入/上传 类相邻按钮",
+                observed=f"fieldButtons={btns} kind={aff.get('kind','unknown')}",
+                next_action='若目标需要搜索选择，改用 run_form_assistant 或 select_option；确认该字段是否本就无需引入',
+            )
         return result
 
 

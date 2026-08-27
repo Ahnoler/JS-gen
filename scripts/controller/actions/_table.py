@@ -114,8 +114,7 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
         if str(result) == 'row-not-found':
             return err_with(
                 "err-table-row-not-found",
-                f"表格中没有匹配行（row_text={row_text!r}）",
-                observed="匹配顺序=单元格精确→去空白包含；请核对 scan 可见单元格原文",
+                f"表格中没有匹配行（row_text={row_text!r}）；匹配顺序=单元格精确→去空白包含",
                 next_action='改抄扫描结果里该行的完整单元格文本后重试',
             )
         return result
@@ -206,8 +205,7 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
         if str(result) == 'row-not-found':
             return err_with(
                 "err-table-row-not-found",
-                f"表格中没有匹配行可选中单选框（row_text={row_text!r}）",
-                observed="匹配顺序=单元格精确→去空白包含；请核对 scan 可见单元格原文",
+                f"表格中没有匹配行可选中单选框（row_text={row_text!r}）；匹配顺序=单元格精确→去空白包含",
                 next_action='改抄扫描结果里该行的完整单元格文本后重试',
             )
         return result
