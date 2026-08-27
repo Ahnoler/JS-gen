@@ -54,7 +54,7 @@ def test_click_icon_button_reports_text_buttons_on_miss() -> None:
         "JS_CLICK_ICON_BUTTON generalized fallback clicks the text button",
     )
     assert_true(
-        "not-found-text-button:" in js and "'ambiguous'" in js.replace('"', "'"),
+        "err-icon-label-ambiguous" in js and "'ambiguous'" in js.replace('"', "'"),
         "ambiguous same-label matches still return structured candidate list",
     )
     assert_true(
@@ -67,13 +67,13 @@ def test_click_icon_button_reports_text_buttons_on_miss() -> None:
     )
     misc = MISC_PY.read_text(encoding="utf-8")
     assert_true(
-        "startswith('not-found-text-button')" in misc,
-        "Python wraps ambiguous not-found-text-button with _err guidance",
+        "startswith('err-icon-label-ambiguous')" in misc,
+        "Python wraps ambiguous err-icon-label-ambiguous with _err guidance",
     )
     ctrl_nav = CTRL_NAV_JS.read_text(encoding="utf-8")
     icon_fn = ctrl_nav.split("clickIconButton:")[1]
     assert_true(
-        "ok-text:" in icon_fn and "not-found-text-button:" in icon_fn,
+        "ok-text:" in icon_fn and "err-icon-label-ambiguous" in icon_fn,
         "CTRL clickIconButton parity: text-button click + ambiguous structure",
     )
     idx = CTRL_INDEX_JS.read_text(encoding="utf-8")
@@ -191,12 +191,22 @@ def test_prompt_toolbar_pattern_guidance() -> None:
     )
 
 
+def test_table_envelopes() -> None:
+    src = (ROOT / "scripts/controller/actions/_table.py").read_text(encoding="utf-8")
+    assert_true(src.count("err_with(") >= 2, "both actions envelope")
+    assert_true("err-table-row-not-found" in src and "err-button-not-found-in-row" in src, "codes")
+    assert_true("ok-fallback" not in src, "legacy blind fallback stays dead")
+    prompt = (ROOT / "scripts/prompts/agent-tools-table.md").read_text(encoding="utf-8")
+    assert_true("err-button-not-found-in-row" in prompt, "prompt updated")
+
+
 def main() -> int:
     test_row_matching_whitespace_normalized()
     test_no_blind_first_button_fallback()
     test_python_err_wrapper_and_import()
     test_ctrl_docs_updated()
     test_prompt_toolbar_pattern_guidance()
+    test_table_envelopes()
     print("characterize-table-toolbar-pattern: OK")
     return 0
 

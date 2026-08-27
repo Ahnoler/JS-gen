@@ -2,6 +2,7 @@
 
 from scripts.state import _record_action
 from ._helpers import _ok, _err, _is_ok_result, _enrich_click_element
+from .result_protocol import err_with
 
 
 def _register_table_actions(controller, browser_context, business_data_store=None):
@@ -94,11 +95,28 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                 remember_trigger_button(business_data_store, button_text)
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
         if str(result).startswith('button-not-found-in-row'):
-            return _err(
-                f'{result}. '
-                f'不要盲点行内其他按钮。若该操作按钮在表格上方工具栏（本类页面常见：'
-                f'单选框选中行 → 点工具栏「{button_text}」），改为先 '
-                f'click_table_row_radio(row_text="{row_text}") 选中行，再点击工具栏按钮。',
+            import json as _json
+            body = {}
+            try:
+                body = _json.loads(result.split(':', 1)[1])
+            except Exception:
+                body = {}
+            radio_hint = (
+                f'click_table_row_radio(row_text="{row_text}") 选中行后再点工具栏「{button_text}」'
+                if body.get('rowHasRadio') else '该行无可选中单选框，请换定位策略'
+            )
+            return err_with(
+                "err-button-not-found-in-row",
+                f"行内没有「{button_text}」按钮",
+                observed=result.split(':', 1)[1],
+                next_action=radio_hint + '；禁止盲点行内其他控件',
+            )
+        if str(result) == 'row-not-found':
+            return err_with(
+                "err-table-row-not-found",
+                f"表格中没有匹配行（row_text={row_text!r}）",
+                observed="匹配顺序=单元格精确→去空白包含；请核对 scan 可见单元格原文",
+                next_action='改抄扫描结果里该行的完整单元格文本后重试',
             )
         return result
 
@@ -185,4 +203,11 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
         if _is_ok_result(result):
             _record_action('click_table_row_radio', {'row_text': row_text}, result, element=element)
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
+        if str(result) == 'row-not-found':
+            return err_with(
+                "err-table-row-not-found",
+                f"表格中没有匹配行可选中单选框（row_text={row_text!r}）",
+                observed="匹配顺序=单元格精确→去空白包含；请核对 scan 可见单元格原文",
+                next_action='改抄扫描结果里该行的完整单元格文本后重试',
+            )
         return result
