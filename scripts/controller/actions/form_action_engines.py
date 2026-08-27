@@ -55,6 +55,7 @@ from .form_scan_utils import (
 )
 
 from .form_autofill import FormAutofillEngine
+from .result_protocol import err_with, ok_marked, affordances
 
 class _FormActionEngineBase:
     """Shared wiring for extracted form action engines."""
@@ -145,52 +146,6 @@ class FillEngine(_FormActionEngineBase):
         return val if val else 'NO-RULE'
 
 
-    async def _field_disabled_hint(self, page, label_text: str) -> str:
-        """Explain the right tool when a write is rejected as field-disabled.
-
-        The 2026-08-27 record run bled 10+ steps: the agent retried
-        fill_form_field on el-select fields (国别/投资主体类型/联网核查状态) forever —
-        bare 'field-disabled' carried no pointer to select_option.
-        """
-        try:
-            kinds = await page.evaluate(
-                r'''(label) => {
-                    const items = [...document.querySelectorAll('.el-form-item')];
-                    for (const fi of items) {
-                        const lab = fi.querySelector('.el-form-item__label');
-                        if (!lab) continue;
-                        const t = (lab.textContent || '').trim();
-                        if (t !== label && !t.includes(label)) continue;
-                        return {
-                            select: !!fi.querySelector('.el-select'),
-                            date: !!fi.querySelector('.el-date-editor, .tsscdatepicker'),
-                            cascader: !!fi.querySelector('.el-cascader'),
-                            treeHost: !!(fi.querySelector('.tree-popover, .my-popover')
-                                && fi.querySelector('[class*="tssc"]')),
-                        };
-                    }
-                    return null;
-                }''',
-                label_text,
-            )
-        except Exception:
-            return ''
-        if not isinstance(kinds, dict):
-            return ''
-        if kinds.get('select'):
-            return (
-                ' | 该字段是下拉框(el-select/Tssc)，不能文本直填——改用 '
-                'select_option(label_text=…, option_text=<下拉选项原文>)；'
-                '选项名不确定时先看 scan 结果里该字段的 options。'
-            )
-        if kinds.get('date'):
-            return ' | 该字段是日期控件：value 用 YYYY-MM-DD 再 fill。'
-        if kinds.get('cascader'):
-            return ' | 该字段是级联选择：请逐级选下一层面板项。'
-        if kinds.get('treeHost'):
-            return ' | 该字段是树选择：改用 select_tree_option(label_text=…, option_text=…)。'
-        return ''
-
     async def fill_form_field(self, label_text: str, value: str, xpath_smart: str = ""):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
@@ -244,9 +199,22 @@ class FillEngine(_FormActionEngineBase):
             if _is_ok_result(result):
                 return _ok(_with_submit_cue(result, self.business_data_store))
             if str(result).startswith('field-disabled'):
-                hint = await self._field_disabled_hint(page, label_text)
-                if hint:
-                    result = str(result) + hint
+                kind_info = await affordances(page, resolved.label or label_text)
+                kind = (kind_info or {}).get('kind', 'unknown')
+                obs = []
+                if kind_info.get('options'):
+                    obs.append("options=" + ",".join(kind_info['options'][:6]))
+                if kind_info.get('buttons'):
+                    obs.append("adjacent=" + ",".join(b['text'] for b in kind_info['buttons'][:3]))
+                from .result_protocol import recommend_action_for_kind
+                nxt = recommend_action_for_kind(kind)
+                return err_with(
+                    "err-field-disabled",
+                    ("该字段是下拉框(el-select/Tssc)，不能文本直填" if kind == 'select'
+                     else f"控件形态 kind={kind} 不接受直接文本写入"),
+                    observed=",".join(obs),
+                    next_action=nxt.replace("<此字段label>", resolved.label or label_text),
+                )
             return _with_submit_cue(result or resolved.error, self.business_data_store)
         element = await _capture_element(
             page, resolved.label, target_kind='form_input', xpath_smart=resolved.xpath_smart,
@@ -270,9 +238,22 @@ class FillEngine(_FormActionEngineBase):
         if _is_ok_result(result):
             return _ok(_with_submit_cue(result, self.business_data_store))
         if str(result).startswith('field-disabled'):
-            hint = await self._field_disabled_hint(page, resolved.label or label_text)
-            if hint:
-                result = str(result) + hint
+            kind_info = await affordances(page, resolved.label or label_text)
+            kind = (kind_info or {}).get('kind', 'unknown')
+            obs = []
+            if kind_info.get('options'):
+                obs.append("options=" + ",".join(kind_info['options'][:6]))
+            if kind_info.get('buttons'):
+                obs.append("adjacent=" + ",".join(b['text'] for b in kind_info['buttons'][:3]))
+            from .result_protocol import recommend_action_for_kind
+            nxt = recommend_action_for_kind(kind)
+            return err_with(
+                "err-field-disabled",
+                ("该字段是下拉框(el-select/Tssc)，不能文本直填" if kind == 'select'
+                 else f"控件形态 kind={kind} 不接受直接文本写入"),
+                observed=",".join(obs),
+                next_action=nxt.replace("<此字段label>", resolved.label or label_text),
+            )
         return _with_submit_cue(result, self.business_data_store)
 
 
@@ -421,7 +402,12 @@ class SelectEngine(_FormActionEngineBase):
             sys.stderr.write(f'[select] preflight reset incomplete: {reset_diag}\n')
             sys.stderr.flush()
             failed = await _final_select_failure('no-items')
-            return _err(failed)
+            return err_with(
+                "err-select-option-unresolved",
+                "下拉无可见选项",
+                observed=f"label={label_text} last={failed}"[:160],
+                next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+            )
 
         resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
         if resolved.error:
@@ -471,7 +457,12 @@ class SelectEngine(_FormActionEngineBase):
                     )
                     sys.stderr.flush()
                     failed = await _final_select_failure('no-items', xp)
-                    return _err(failed)
+                    return err_with(
+                        "err-select-option-unresolved",
+                        "下拉无可见选项",
+                        observed=f"label={label_text} last={failed}"[:160],
+                        next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                    )
                 xp = fallback.xpath_smart
                 label_text = fallback.label or label_text
                 trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
@@ -502,8 +493,18 @@ class SelectEngine(_FormActionEngineBase):
                 return _ok(_with_submit_cue(absent_field_skip_result(), self.business_data_store))
             failed = await _final_select_failure(str(trigger_result), xp)
             if trigger_result == 'no-select-found':
-                return _err(failed + ' | field may be radio — use click_radio')
-            return failed
+                return err_with(
+                    "err-select-option-unresolved",
+                    f"无法稳定选中「{option_text}」",
+                    observed=f"label={label_text} last={failed}"[:160],
+                    next_action='click_radio(label_text="' + label_text + '", option_text=<选项原文>)',
+                )
+            return err_with(
+                "err-select-option-unresolved",
+                f"无法稳定选中「{option_text}」",
+                observed=f"label={label_text} last={failed}"[:160],
+                next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+            )
 
         await page.wait_for_timeout(500)
 
@@ -536,7 +537,12 @@ class SelectEngine(_FormActionEngineBase):
                 _record_action('select_option', params, recheck, element=element)
                 return _ok(_with_submit_cue(recheck + ' | already-matched | no-items-skip', self.business_data_store))
             failed = await _final_select_failure('no-items', xp)
-            return _err(failed)
+            return err_with(
+                "err-select-option-unresolved",
+                "下拉无可见选项",
+                observed=f"label={label_text} last={failed}"[:160],
+                next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+            )
         elif str(select_result).startswith('value-mismatch'):
             # SELECT_VERIFY_READBACK — JS_SELECT_OPTION clicked an option but the
             # trigger input read back a different value (same-prefix field wrote
@@ -556,7 +562,12 @@ class SelectEngine(_FormActionEngineBase):
             if mismatch_retries > 1:
                 self.business_data_store.pop(mismatch_retry_key, None)
                 failed = await _final_select_failure(str(select_result), xp)
-                return _err(failed)
+                return err_with(
+                    "err-select-option-unresolved",
+                    f"无法稳定选中「{option_text}」",
+                    observed=f"label={label_text} last={failed}"[:160],
+                    next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                )
             # Alias resolution: map known short aliases to the canonical option
             # label present in the dropdown (e.g. 中国 → 中华人民共和国).
             # The generic match_select_option_candidate uses substring containment
@@ -599,7 +610,12 @@ class SelectEngine(_FormActionEngineBase):
                 )
                 sys.stderr.flush()
                 failed = await _final_select_failure(str(select_result), xp)
-                return _err(failed)
+                return err_with(
+                    "err-select-option-unresolved",
+                    f"无法稳定选中「{option_text}」",
+                    observed=f"label={label_text} last={failed}"[:160],
+                    next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                )
             retrigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
             if _is_ok_result(str(retrigger)):
                 await page.wait_for_timeout(500)
@@ -639,18 +655,34 @@ class SelectEngine(_FormActionEngineBase):
                             _task_done_impl(
                                 label_text, self.business_data_store, value=stamped or option_text, xpath_smart=xp_inv,
                             )
-                            return _ok(_with_submit_cue(
-                                f'ok | {matched_text} | mismatch-retry-exact',
-                                self.business_data_store,
-                            ))
+                            return ok_marked(
+                                self.business_data_store, label=label_text, got=matched_text,
+                                fallback="mismatch-retry-exact",
+                                wanted=(option_text if matched_text != option_text else ""),
+                            )
                         failed = await _final_select_failure(str(strict_result), xp)
-                        return _err(failed)
+                        return err_with(
+                            "err-select-option-unresolved",
+                            f"别名解析至「{resolved_option}」仍回读不一致",
+                            observed=f"label={label_text} last={failed}"[:160],
+                            next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                        )
                 # Retry still mismatch / other failure → heal.
                 self.business_data_store.pop(mismatch_retry_key, None)
                 failed = await _final_select_failure(str(retry_result), xp)
-                return _err(failed)
+                return err_with(
+                    "err-select-option-unresolved",
+                    f"无法稳定选中「{option_text}」",
+                    observed=f"label={label_text} last={failed}"[:160],
+                    next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                )
             failed = await _final_select_failure(str(select_result), xp)
-            return _err(failed)
+            return err_with(
+                "err-select-option-unresolved",
+                f"无法稳定选中「{option_text}」",
+                observed=f"label={label_text} last={failed}"[:160],
+                next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+            )
         elif select_result.startswith('option-not-found:'):
             # Fuzzy: pick listed option that contains / is contained by option_text
             listed = [x.strip() for x in select_result.split(':', 1)[1].split(',') if x.strip()]
@@ -688,14 +720,33 @@ class SelectEngine(_FormActionEngineBase):
                     _task_done_impl(
                         label_text, self.business_data_store, value=stamped or matched_text, xpath_smart=xp_inv,
                     )
-                    return _ok(_with_submit_cue(f'ok | {matched_text}', self.business_data_store))
+                    return ok_marked(
+                        self.business_data_store, label=label_text, got=matched_text,
+                        fallback="fallback-first",
+                        wanted=(option_text if matched_text != option_text else ""),
+                    )
                 failed = await _final_select_failure(str(first_result), xp)
-                return _err(failed)
+                return err_with(
+                    "err-select-option-unresolved",
+                    "下拉无可见选项",
+                    observed=f"label={label_text} last={failed}"[:160],
+                    next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+                )
             failed = await _final_select_failure(str(select_result), xp)
-            return _err(failed)
+            return err_with(
+                "err-select-option-unresolved",
+                f"无法稳定选中「{option_text}」",
+                observed=f"label={label_text} last={failed}"[:160],
+                next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+            )
         else:
             failed = await _final_select_failure(str(select_result), xp)
-            return _err(failed)
+            return err_with(
+                "err-select-option-unresolved",
+                f"无法稳定选中「{option_text}」",
+                observed=f"label={label_text} last={failed}"[:160],
+                next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
+            )
 
     # ── Adjacent button / radio (moved from misc for logical grouping) ──
 

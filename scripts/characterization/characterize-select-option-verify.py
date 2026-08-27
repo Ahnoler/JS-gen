@@ -169,10 +169,10 @@ def test_form_engine_value_mismatch_branch() -> None:
         "mismatch_retries > 1" in body,
         "value-mismatch retry guard limits to one retry",
     )
-    # Still-mismatch must return _err (heal).
+    # Still-mismatch must return protocol envelope (err_with) for heal.
     assert_true(
-        "_err(failed)" in mismatch_section or "return _err" in mismatch_section,
-        "value-mismatch still-mismatch returns _err for heal",
+        "err_with(" in mismatch_section and "err-select-option-unresolved" in mismatch_section,
+        "value-mismatch still-mismatch returns err_with protocol envelope for heal",
     )
     # Successful retry must record and return _ok.
     assert_true(
@@ -325,6 +325,16 @@ def test_prompts_have_same_prefix_guidance() -> None:
     )
 
 
+def test_protocol_envelopes_wired():
+    src = (ROOT / "scripts/controller/actions/form_action_engines.py").read_text(encoding="utf-8")
+    sel = src.split("class SelectEngine", 1)[1].split("class RadioEngine", 1)[0]
+    fill = src.split("class FillEngine", 1)[1].split("class SelectEngine", 1)[0]
+    assert_true("err-select-option-unresolved" in sel, "select tail envelope")
+    assert_true('err-field-disabled' in fill and fill.count("err_with(") >= 2, "fill envelope both exits")
+    assert_true("ok_marked(" in sel, "fallback success records semantic doubt")
+    assert_true("_field_disabled_hint" not in fill, "legacy hint helper retired")
+
+
 def main() -> int:
     test_js_select_option_has_readback_verify()
     test_js_select_option_all_return_points_verified()
@@ -335,6 +345,7 @@ def main() -> int:
     test_snapshot_fingerprint_unaffected_by_options()
     test_snapshot_options_round_trip()
     test_prompts_have_same_prefix_guidance()
+    test_protocol_envelopes_wired()
     print("characterize-select-option-verify: OK")
     return 0
 
