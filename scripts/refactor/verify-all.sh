@@ -112,6 +112,7 @@ run "characterize-log-extract" node scripts/characterization/characterize-log-ex
 run "characterize-backfill" node scripts/characterization/characterize-backfill.mjs
 run "characterize-refill-contract" "$PY" scripts/characterization/characterize-refill-contract.py
 run "characterize-executor-orphan-reconcile" node scripts/characterization/characterize-executor-orphan-reconcile.mjs
+run "characterize-system-import-json" node scripts/characterization/characterize-system-import-json.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

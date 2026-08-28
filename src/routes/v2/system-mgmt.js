@@ -15,6 +15,7 @@ import multer from 'multer';
 import * as hierarchyService from '../../services/hierarchy-service.js';
 import { EXCEL_MIME } from '../../services/system-mgmt-excel.js';
 import { NODE_TYPE, TYPE_LABEL } from '../../models/hierarchy-constants.js';
+import { importMenuJson } from '../../services/menu-json-import.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -29,6 +30,22 @@ const upload = multer({
       || file.mimetype === 'application/octet-stream';
     if (!ok) {
       return cb(Object.assign(new Error('请上传 Excel 文件（.xlsx）'), { code: 'VALIDATION' }));
+    }
+    cb(null, true);
+  },
+});
+
+const jsonUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter(_req, file, cb) {
+    const name = String(file.originalname || '').toLowerCase();
+    const ok =
+      name.endsWith('.json')
+      || String(file.mimetype || '').includes('json')
+      || file.mimetype === 'application/octet-stream';
+    if (!ok) {
+      return cb(Object.assign(new Error('请上传 JSON 文件（.json）'), { code: 'VALIDATION' }));
     }
     cb(null, true);
   },
@@ -138,6 +155,27 @@ export default function (app) {
         }
         const mode = req.body?.mode || req.query?.mode || 'merge';
         const result = await hierarchyService.importTreeExcel(req.file.buffer, { mode });
+        res.status(201).json(result);
+      } catch (e) {
+        res.status(httpError(e)).json({ error: e.message });
+      }
+    });
+  });
+
+  /**
+   * 4.1 导入菜单 JSON（被测系统《建模组件关系》文件，multipart field: file）
+   * :id 必须是系统类型节点（type=1）；解析 umlRelInfo 建两级菜单树，按 umlEcd 幂等更新
+   */
+  app.post('/api/v2/system-mgmt/nodes/:id/import-json', (req, res) => {
+    jsonUpload.single('file')(req, res, async (err) => {
+      if (err) {
+        return res.status(httpError(err)).json({ error: err.message });
+      }
+      try {
+        if (!req.file?.buffer?.length) {
+          return res.status(400).json({ error: '请上传 JSON 文件（form-data 字段名 file）' });
+        }
+        const result = await importMenuJson(req.params.id, req.file.buffer);
         res.status(201).json(result);
       } catch (e) {
         res.status(httpError(e)).json({ error: e.message });

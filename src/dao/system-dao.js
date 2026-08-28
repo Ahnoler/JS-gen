@@ -62,6 +62,11 @@ export function fromRaw(row) {
     sortOrder: n.sortOrder ?? 0,
     createdAt: n.createdAt,
     updatedAt: n.updatedAt,
+    umlEcd: n.umlEcd || '',
+    pdCmptEcd: n.pdCmptEcd || '',
+    source: n.source || '',
+    menuXpath: n.menuXpath || '',
+    unmatchedFlag: n.unmatchedFlag ?? 0,
   };
 }
 
@@ -185,10 +190,11 @@ export async function listFiltered({ type, keyword, limit } = {}) {
 /**
  * List child nodes of a parent ordered by sort_order then id.
  * @param {number} parentId parent node id (0/ROOT for top level)
+ * @param {object|null} [db] optional knex instance（事务内传 trx）
  * @returns {Promise<object[]>} API-shaped node entities
  */
-export async function listByParent(parentId) {
-  let q = getDB()(TABLE);
+export async function listByParent(parentId, db = null) {
+  let q = (db || getDB())(TABLE);
   if (isRootParentId(parentId)) {
     q = q.andWhere(function rootParent() {
       this.where({ parent_id: ROOT_NODE_ID }).orWhereNull('parent_id');
@@ -320,6 +326,11 @@ export async function create(data, db = null) {
     description: data.description ?? null,
     url: type === NODE_TYPE.SYSTEM ? String(data.url ?? '').trim() : '',
     sortOrder: data.sortOrder ?? 0,
+    umlEcd: String(data.umlEcd ?? '').trim(),
+    pdCmptEcd: String(data.pdCmptEcd ?? '').trim(),
+    source: String(data.source ?? '').trim(),
+    menuXpath: String(data.menuXpath ?? '').trim(),
+    unmatchedFlag: data.unmatchedFlag ? 1 : 0,
   };
   if (!insert.systemId) {
     const { randomUUID } = await import('crypto');
@@ -342,6 +353,7 @@ export async function update(id, data, db = null) {
   if (!existing) return null;
 
   const allowed = ['name', 'description', 'sortOrder'];
+  allowed.push('umlEcd', 'pdCmptEcd', 'source', 'menuXpath', 'unmatchedFlag');
   if (existing.type === NODE_TYPE.SYSTEM) allowed.push('url');
 
   const patch = {};
@@ -352,6 +364,7 @@ export async function update(id, data, db = null) {
       else patch[key] = data[key];
     }
   }
+  if (patch.unmatchedFlag !== undefined) patch.unmatchedFlag = patch.unmatchedFlag ? 1 : 0;
   if (patch.name !== undefined && !patch.name) {
     throw Object.assign(new Error('name is required'), { code: 'VALIDATION' });
   }
