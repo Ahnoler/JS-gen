@@ -665,3 +665,15 @@ export async function remove(id) {
 export async function removeByTrajectoryId(id) {
   return remove(+id);
 }
+
+/**
+ * 统计一组功能节点 id 下存在的交易数量。
+ * @param {number[]} functionIds 功能节点 id 数组
+ * @returns {Promise<number>} 交易数量
+ */
+export async function countByFunctionIds(functionIds) {
+  const ids = (Array.isArray(functionIds) ? functionIds : []).map(Number).filter(Number.isFinite);
+  if (!ids.length) return 0;
+  const row = await getDB()(TABLE).whereIn('function_id', ids).count('* as c').first();
+  return Number(row?.c) || 0;
+}

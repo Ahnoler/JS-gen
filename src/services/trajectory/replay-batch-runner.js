@@ -34,6 +34,8 @@ import {
   markStepReplayOk,
 } from './trajectory-step-service.js';
 import { handleFormStructureCheckpoint } from './form-structure-heal.js';
+import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import { navigateToFunctionMenu } from './menu-navigation.js';
 
 function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
   const uniqueFailed = [...new Set(failedStepIds)];
@@ -93,6 +95,17 @@ export async function runReplayBatch({
   const skippedIds = new Set();
 
   emitReplay('replay:started', tid, { stepIds: orderedStepIds });
+
+  // ── 执行前菜单导航（同菜单跳过/空菜单直接执行/失败不阻断）──
+  try {
+    const trajRow = await trajectoryDao.getById(tid);
+    if (trajRow?.functionId) {
+      const nav = await navigateToFunctionMenu({ runtime, functionId: Number(trajRow.functionId), execSession });
+      if (!nav.navigated) console.log(`[menu-nav] skip: ${nav.reason}`);
+    }
+  } catch (navErr) {
+    console.warn(`[menu-nav] unexpected: ${navErr?.message || navErr}`);
+  }
 
   try {
     for (let i = 0; i < actions.length; i += 1) {

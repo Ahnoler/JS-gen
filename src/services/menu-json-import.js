@@ -5,6 +5,7 @@
 import { getDB } from '../../config/database.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemPageDao from '../dao/system-page-dao.js';
+import * as systemMenuSnapshotDao from '../dao/system-menu-snapshot-dao.js';
 import { getTree } from './hierarchy-service.js';
 
 const NODE_TYPE_MODULE = 2;
@@ -155,9 +156,13 @@ export function buildImportJsonPlan({ roots }) {
 
 /**
  * 导入菜单 JSON：解析 + 构建计划 + 事务内 upsert 节点与页面，最后重建树。
+ *
+ * 规则5.1：事务内、预加载既有子树完成后（upsert 前）落一版整树历史快照。
+ * 规则5.8：消失标记之后，对子树无交易的节点物理删除（含 system_page CASCADE），
+ *          先删功能再按"无 children + 自身 unmatched + 子树无交易"清理模块。
  * @param {number|string} systemNodeId 目标系统节点 id（必须 type=1）
  * @param {Buffer|string} buffer JSON 文件内容
- * @returns {Promise<{ created: number, updated: number, adopted: number, markedUnmatched: number, pagesImported: number, tree: object[] }>} 导入统计与重建后的树
+ * @returns {Promise<{ created: number, updated: number, adopted: number, markedUnmatched: number, pagesImported: number, snapshotVersion: number, deleted: number, tree: object[] }>} 导入统计与重建后的树
  * @throws {{ code: 'VALIDATION' }} 目标节点不存在或非系统类型时抛出
  */
 export async function importMenuJson(systemNodeId, buffer) {
@@ -169,7 +174,7 @@ export async function importMenuJson(systemNodeId, buffer) {
     throw Object.assign(new Error('目标节点必须是系统（type=1）'), { code: 'VALIDATION' });
   }
 
-  const stats = { created: 0, updated: 0, adopted: 0, markedUnmatched: 0, pagesImported: 0 };
+  const stats = { created: 0, updated: 0, adopted: 0, markedUnmatched: 0, pagesImported: 0, deleted: 0 };
 
   await getDB().transaction(async (trx) => {
     // 预加载既有子树：模块 + 模块下功能，建两个查重索引
@@ -189,6 +194,55 @@ export async function importMenuJson(systemNodeId, buffer) {
         childIndex.set(`${mod.id}|${Number(fn.type)}|${String(fn.name || '').trim().toLowerCase()}`, fn);
       }
     }
+
+    // ── 规则5.1：导入前历史快照（任何写操作之前，真实"导入前"状态）──
+    // 收集子树全部功能 id（模块自身不挂交易，交易挂在功能上）
+    const allFunctionIds = [];
+    for (const mod of existingModules) {
+      const fns = await systemDao.listByParent(mod.id, trx);
+      for (const fn of fns) allFunctionIds.push(Number(fn.id));
+    }
+    // 交易关联清单（defense: 表名 'trajectory'，function_id 列）
+    let transactions = [];
+    if (allFunctionIds.length) {
+      transactions = await trx('trajectory')
+        .whereIn('function_id', allFunctionIds)
+        .select('id', 'name', 'function_id');
+    }
+    // 组装快照对象：模块及其功能子树 + 每节点页面清单 + 交易关联
+    const snapshotModules = [];
+    for (const mod of existingModules) {
+      const modFns = await systemDao.listByParent(mod.id, trx);
+      const fnNodes = [];
+      for (const fn of modFns) {
+        fnNodes.push({
+          id: Number(fn.id),
+          name: String(fn.name || ''),
+          umlEcd: String(fn.umlEcd || ''),
+          source: String(fn.source || ''),
+          unmatchedFlag: Number(fn.unmatchedFlag ?? 0),
+          menuXpath: String(fn.menuXpath || ''),
+          pages: await systemPageDao.listByNodeId(fn.id, trx),
+        });
+      }
+      snapshotModules.push({
+        id: Number(mod.id),
+        name: String(mod.name || ''),
+        umlEcd: String(mod.umlEcd || ''),
+        source: String(mod.source || ''),
+        unmatchedFlag: Number(mod.unmatchedFlag ?? 0),
+        menuXpath: String(mod.menuXpath || ''),
+        children: fnNodes,
+        pages: await systemPageDao.listByNodeId(mod.id, trx),
+      });
+    }
+    const snapshotObj = { modules: snapshotModules, transactions };
+    const menuVersion = await systemMenuSnapshotDao.getLatestVersion(target.id, trx) + 1;
+    await systemMenuSnapshotDao.saveSnapshot(
+      { systemNodeId: target.id, menuVersion, snapshot: JSON.stringify(snapshotObj) },
+      trx,
+    );
+    stats.snapshotVersion = menuVersion;
 
     // 本次 plan 涉及的 umlEcd 集合（用于消失标记判断）
     const planUmlEcds = new Set();
@@ -267,11 +321,15 @@ export async function importMenuJson(systemNodeId, buffer) {
     }
 
     // 消失标记：既有子树中 source='json_import' 且 umlEcd 非空、但不在本次 plan 的节点
+    // 同时收集被标记的模块/功能，供规则5.8 删除/保留判定
+    const unmatchedModuleIds = new Set();
+    const unmatchedFunctionIds = new Set();
     for (const mod of existingModules) {
       const ecd = String(mod.umlEcd || '').trim();
       if (mod.source === 'json_import' && ecd && !planUmlEcds.has(ecd)) {
         await systemDao.update(mod.id, { unmatchedFlag: 1 }, trx);
         stats.markedUnmatched += 1;
+        unmatchedModuleIds.add(Number(mod.id));
       }
       const existingFunctions = await systemDao.listByParent(mod.id, trx);
       for (const fn of existingFunctions) {
@@ -279,7 +337,39 @@ export async function importMenuJson(systemNodeId, buffer) {
         if (fn.source === 'json_import' && fnEcd && !planUmlEcds.has(fnEcd)) {
           await systemDao.update(fn.id, { unmatchedFlag: 1 }, trx);
           stats.markedUnmatched += 1;
+          unmatchedFunctionIds.add(Number(fn.id));
         }
+      }
+    }
+
+    // ── 规则5.8：删除/保留判定（仍在事务内）──
+    // 实现顺序：先删功能（子树交易数===0），再检查模块是否"无 children 且自身 unmatched 且子树无交易"。
+    // 统计某功能 id 集合下的交易数（defense: 表名 'trajectory'，function_id 列）
+    const countTrajectoryByFnIds = async (fnIds) => {
+      if (!fnIds.length) return 0;
+      const row = await trx('trajectory').whereIn('function_id', fnIds).count('* as c').first();
+      return Number(row?.c) || 0;
+    };
+
+    // 先删功能：被标记的功能，自身交易数 === 0 → 物理删除（system_page 由 FK CASCADE 自动删）
+    for (const fnId of unmatchedFunctionIds) {
+      const trajCount = await countTrajectoryByFnIds([fnId]);
+      if (trajCount === 0) {
+        await trx('system').where({ id: fnId }).del();
+        stats.deleted += 1;
+      }
+    }
+
+    // 父级清理：被标记的模块，若已无 children（功能已全删/被收编走）则自身子树无交易
+    // （模块自身不挂交易，交易挂在功能上）→ 删除模块（含 system_page CASCADE）
+    for (const modId of unmatchedModuleIds) {
+      const remainingChildren = await systemDao.listByParent(modId, trx);
+      if (remainingChildren.length > 0) continue; // 仍有子功能，保留
+      const childFnIds = remainingChildren.map((c) => Number(c.id));
+      const trajCount = await countTrajectoryByFnIds(childFnIds);
+      if (trajCount === 0) {
+        await trx('system').where({ id: modId }).del();
+        stats.deleted += 1;
       }
     }
   });

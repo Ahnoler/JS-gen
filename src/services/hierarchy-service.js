@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { getDB } from '../../config/database.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
+import * as trajectoryDao from '../dao/trajectory-dao.js';
 import {
   NODE_TYPE,
   TYPE_LABEL,
@@ -450,7 +451,34 @@ export async function updateNode(id, patch = {}) {
  * @returns {Promise<number>} rows deleted
  */
 export async function deleteNode(id) {
+  await assertNodeHasNoTransaction(id);
   return systemDao.remove(id);
+}
+
+/**
+ * 校验节点及其子树下不存在交易，存在则抛 VALIDATION。
+ * @param {number} id 节点 id
+ * @returns {Promise<void>} 通过时不返回值
+ * @throws {{ code: 'VALIDATION' }} 子树下存在交易时抛出
+ */
+export async function assertNodeHasNoTransaction(id) {
+  const node = await systemDao.getRawById(Number(id));
+  if (!node) return;
+  const ids = [Number(node.id)];
+  if (Number(node.type) === 1 || Number(node.type) === 2) {
+    const children = await systemDao.listByParent(node.id);
+    for (const child of children) {
+      ids.push(Number(child.id));
+      if (Number(child.type) === 2) {
+        const grandchildren = await systemDao.listByParent(child.id);
+        for (const gc of grandchildren) ids.push(Number(gc.id));
+      }
+    }
+  }
+  const count = await trajectoryDao.countByFunctionIds(ids);
+  if (count > 0) {
+    throw Object.assign(new Error('当前节点下存在交易数据，不允许删除！'), { code: 'VALIDATION' });
+  }
 }
 
 /**
