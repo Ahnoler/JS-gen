@@ -16,6 +16,7 @@ import * as hierarchyService from '../../services/hierarchy-service.js';
 import { EXCEL_MIME } from '../../services/system-mgmt-excel.js';
 import { NODE_TYPE, TYPE_LABEL } from '../../models/hierarchy-constants.js';
 import { importMenuJson } from '../../services/menu-json-import.js';
+import { startScan, getScan } from '../../services/menu-scan-service.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -176,11 +177,36 @@ export default function (app) {
           return res.status(400).json({ error: '请上传 JSON 文件（form-data 字段名 file）' });
         }
         const result = await importMenuJson(req.params.id, req.file.buffer);
+        if (req.query.autoScan !== 'false') {
+          startScan(Number(req.params.id)).catch(() => {});
+        }
         res.status(201).json(result);
       } catch (e) {
         res.status(httpError(e)).json({ error: e.message });
       }
     });
+  });
+
+  /**
+   * 4.2 触发菜单扫描（后台执行：打开被测系统→自动登录→提取全部菜单 xpath→回写/新增）
+   */
+  app.post('/api/v2/system-mgmt/nodes/:id/scan-menu', async (req, res) => {
+    try {
+      const result = await startScan(Number(req.params.id));
+      res.status(202).json(result);
+    } catch (e) {
+      res.status(httpError(e)).json({ error: e.message });
+    }
+  });
+
+  /** 4.3 菜单扫描状态轮询（running→202，completed/failed→200） */
+  app.get('/api/v2/system-mgmt/menu-scan/:scanId', async (req, res) => {
+    try {
+      const job = getScan(req.params.scanId);
+      res.status(job.status === 'running' ? 202 : 200).json(job);
+    } catch (e) {
+      res.status(httpError(e)).json({ error: e.message });
+    }
   });
 
   /** 2. 列表（可选 type / parentId）→ 数组 */

@@ -36,6 +36,7 @@ from ._js_snippets import (
     JS_FILL_FORM_FIELD,
     JS_FILL_BY_XPATH,
     JS_FIND_LABELED_SELECT,
+    JS_SCAN_MENU_TREE,
     JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH,
     JS_SELECT_VALUE_BY_XPATH,
@@ -403,9 +404,17 @@ async def replay_action_entries(
             sys.stderr.write(f'[replay] [{step_num}/{total}] {action_name} {params}\n')
             sys.stderr.flush()
 
+            _scan_menu_payload = None
             try:
                 if action_name == 'go_to_url':
                     result = await _replay_goto(page, params)
+                elif action_name == 'scan_menu_tree':
+                    scan_payload = await page.evaluate(JS_SCAN_MENU_TREE)
+                    result = 'ok'
+                    _scan_menu_payload = scan_payload.get('menus', []) if isinstance(scan_payload, dict) else []
+                    _scan_diag = scan_payload.get('diag') if isinstance(scan_payload, dict) else None
+                    sys.stderr.write(f'[replay] scan_menu_tree menus={len(_scan_menu_payload)} diag={json.dumps(_scan_diag, ensure_ascii=False)}\n')
+                    sys.stderr.flush()
                 elif action_name == 'save_form_snapshot':
                     result = await _replay_verify_form_structure(page, params)
                 elif action_name == _CLICK_BY_INDEX:
@@ -525,6 +534,8 @@ async def replay_action_entries(
             }
             if entry.get('id') is not None:
                 row['id'] = entry.get('id')
+            if action_name == 'scan_menu_tree' and _scan_menu_payload is not None:
+                row['menus'] = _scan_menu_payload
             results.append(row)
             sys.stderr.write(
                 f'[replay] [{step_num}/{total}] {"OK" if ok else "FAIL"} → {result} | locate={locate}\n'

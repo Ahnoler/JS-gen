@@ -113,6 +113,7 @@ run "characterize-backfill" node scripts/characterization/characterize-backfill.
 run "characterize-refill-contract" "$PY" scripts/characterization/characterize-refill-contract.py
 run "characterize-executor-orphan-reconcile" node scripts/characterization/characterize-executor-orphan-reconcile.mjs
 run "characterize-system-import-json" node scripts/characterization/characterize-system-import-json.mjs
+run "characterize-menu-scan" node scripts/characterization/characterize-menu-scan.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"

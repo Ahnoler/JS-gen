@@ -25,6 +25,7 @@ _REPLAY_ACTION_SIGNATURES = {
     "switch_tab": {"tab_name"},
     "close_dialog": set(),
     "go_to_url": {"url"},
+    "scan_menu_tree": set(),
     "login": {"username", "password", "captcha", "sms_code"},
 }
 
