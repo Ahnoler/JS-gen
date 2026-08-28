@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- 2026-08-28: **重写项目 README**：依据当前控制面、v2 API、MySQL 迁移、Python Agent、Executor、截图存储和启动脚本补充依赖、初始化、配置、目录模块、业务流程、接口入口、状态语义及故障排查说明；修正旧组装管线和旧 API 的过期描述。影响范围：项目文档，无运行时代码或 schema 变更。
+
 - 2026-08-27: **动作统一改名：`click_icon_button` → `click_button`**（该工具已拓展为通用"按标签点击按钮"：tooltip 图标优先，miss 直点同标签文字按钮）。控制器注册名、state 录制映射、manual_recorder 发射/映射、script_assembler BOUNDARY、codegen 导出模板（含生成脚本内 CTRL.clickButton 调用点）、browser 服务层（resolve-by-label/dedup/legacy-engine-export/transaction-export-v3）、models/action 三处、CTRL nav.js 方法键与 index.js 文档行、agent prompt 两个文件全量同步；回放兼容：replay_names 新增 `'click_icon_button' → 'click_button'` 与 camelCase 双别名，历史轨迹可正常回放。返回码（err-icon-label-miss/-ambiguous、ok-text）与 JS_CLICK_ICON_BUTTON 常量名不变。前端 vue 仓库 schema value 同步为 click_button 并保留旧值 alias（中文展示「点击按钮」）。
 - 2026-08-27: **配置/文档同步移除 ctrl-actions 与 assemble 残留**：`eslint.config.js` 移除 `src/ctrl-actions` ignore 项；`docs/jsdoc-convention.md` 删除 `ctrl-actions` 绕过章节；`AGENTS.md` 与 `README.md` 同步——删 `script_assembler` 命令与 characterization 示例行、改写双语言 CTRL 节为「JS snippets 单一语言面」、组件/服务表删 assemble 相关行、架构图删 assemble 分支、公开端点表删 `/api/test/assemble|run`、JSDoc 绕过列表删 `src/ctrl-actions/**`。
   影响范围：开发工具链 ignore 与文档约定；无 schema/路由/WS/业务逻辑变更。
