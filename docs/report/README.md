@@ -36,3 +36,14 @@
 | 2026-08-08 | [2026-08-08.md](./2026-08-08.md) | xpath-primary 字段写入与 section 作用域闸门。 |
 | 2026-08-09 | [2026-08-09.md](./2026-08-09.md) | T4 可编辑盘点扫描；T10 表单结构软失败；overlay trigger\|title 命名。 |
 | 2026-08-10 | [2026-08-10.md](./2026-08-10.md) | 全页 L2 扫描；section 双保存 xpath；交易导出 V2；resolve-element L1/inventory。 |
+| 2026-08-11 | [2026-08-11.md](./2026-08-11.md) | L1c/page-state-gen；legacy-section-retire；xpath_smart 仅存 element；BiB ~11fps。 |
+| 2026-08-16 | [2026-08-16.md](./2026-08-16.md) | click_save sticky 重试；AI_DUP_FAILURE_CUE；done accept reason；状态流转冲突设计。 |
+| 2026-08-18 | [2026-08-18.md](./2026-08-18.md) | 交易导出 V3；录制空闲停/status 瞬态；SSO JWT+/me；MinIO 截图；layer-tree/V3 工具。 |
+| 2026-08-19 | [2026-08-19.md](./2026-08-19.md) | 批量任务名候选；录制状态流 V3；导出 V3 结构/pending 上传；V3.1 dialog/card partition。 |
+| 2026-08-20 | [2026-08-20.md](./2026-08-20.md) | 页级截图采集与 V3 覆盖校验；不可定位步豁免覆盖闸门。 |
+| 2026-08-21 | [2026-08-21.md](./2026-08-21.md) | V3 importDemand 推送契约；form 动作拆分；LLM 统一配置；批量动作与关键态前置截图。 |
+| 2026-08-22 | [2026-08-22.md](./2026-08-22.md) | session-end 截图链路湿测反哺（优雅关闭等待 + 录制订阅生命周期）。 |
+| 2026-08-24 | [2026-08-24.md](./2026-08-24.md) | V3 PID section 分区与 §8 type 对齐；字段完整性 preflight；budget-extend；LLM 超时；Partner 本地联调。 |
+| 2026-08-25 | [2026-08-25.md](./2026-08-25.md) | business_data 改名；V3 type 工具同步；报文捞取 MVP 规格；无 label locator/recorder 回退。 |
+| 2026-08-26 | [2026-08-26.md](./2026-08-26.md) | 三路径相对 XPath 统一；Python 控制面叫停；JSDoc/角色 LLM；报文捞取 ELK MVP；菜单切换 spec。 |
+| 2026-08-27 | [2026-08-27.md](./2026-08-27.md) | Agent 结果协议四层改造；click_button 改名；CTRL/assemble 移除；select 错值根治；执行机孤儿对账。 |
