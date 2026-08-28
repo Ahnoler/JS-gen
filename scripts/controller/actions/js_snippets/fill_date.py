@@ -144,6 +144,11 @@ JS_FILL_DATE_BY_XPATH = r'''([xpath, val]) => {
   }
   if (!target) return 'xpath-not-found';
   if (target.disabled) return 'field-disabled';
+  // Scroll the form-item (or target) into view so Element UI date picker renders correctly.
+  try {
+    const item = target.closest && target.closest('.el-form-item');
+    (item || target).scrollIntoView({ block: 'center', behavior: 'instant' });
+  } catch (e) {}
   target.focus();
   commitDateVue(target, val);
   setFn(target, val);
@@ -256,6 +261,11 @@ JS_CLICK_RADIO_BY_XPATH = r'''([xpath, option]) => {
     if (dlg && local) node = tryXpath('.//' + local, dlg);
   }
   if (!node) return 'xpath-not-found';
+  // Scroll the form-item (or node) into view so Element UI radio/checkbox renders correctly.
+  try {
+    const item = node.closest && node.closest('.el-form-item');
+    (item || node).scrollIntoView({ block: 'center', behavior: 'instant' });
+  } catch (e) {}
   return clickInHost(node, want);
 }'''
 

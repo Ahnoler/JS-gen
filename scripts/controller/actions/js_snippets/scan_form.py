@@ -677,6 +677,9 @@ JS_CHECK_SINGLE_FIELD = '''([label, buttonKeywords]) => {
             const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
             if (exact) { if (lbl !== label) continue; }
             else { if (lbl === label || !lbl.includes(label)) continue; }
+            // Scroll the form-item into view so Element UI components render
+            // correctly before reading its value (covers already-filled / read-only checks).
+            item.scrollIntoView({ block: 'center', behavior: 'instant' });
             const input = item.querySelector('input:not([type="hidden"])');
             const textarea = item.querySelector('textarea');
             const trigger = item.querySelector('.el-select .el-input__inner');

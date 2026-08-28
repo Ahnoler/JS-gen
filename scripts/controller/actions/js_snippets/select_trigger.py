@@ -458,6 +458,12 @@ JS_SELECT_VALUE_BY_XPATH = r'''([xpath, labelHint]) => {
   if (!node) return 'xpath-miss';
   const select = findSelectHost(node);
   if (!select) return 'no-select-found';
+  // Scroll the form-item (or select) into view so Element UI renders correctly
+  // even when the field already has a value (ok-already skip path).
+  try {
+    const item = select.closest && select.closest('.el-form-item');
+    (item || select).scrollIntoView({ block: 'center', behavior: 'instant' });
+  } catch (e) {}
   const cur = readSelected(select);
   if (cur) return 'ok-already:' + cur;
   return 'empty';
