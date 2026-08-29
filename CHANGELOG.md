@@ -31,6 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- 2026-08-29: **扫描后按真实菜单顺序重排 sort_order + 阶段二合并加固（共享页面歧义防护）**。①扫描应用时把每个真实菜单在其层级内的 DOM 顺序写入节点 `sort_order`（模块按 L1 全局下标、功能按所属模块内 L2 下标；updates/creates/阶段二合并改名路径三处透传）——树顺序=被测系统真实菜单顺序；未匹配幽灵置标时 sortOrder 推到 100000+（避免 JSON seqNo 与真实菜单下标撞号穿插），置标全集扩为 json_import 空 xpath 全量（含无页面 ID 者）。②阶段二组件编号命中**多幽灵（共享页面）时不合并**——页面 ID 跨菜单共享（38 个）导致菜单每轮被不同幽灵认领反复翻转，仅唯一命中才合并。
+  真机湿测：扫描后"客户管理"子节点顺序=真实系统菜单 DOM 顺序 ✓，幽灵全部排末尾（100000+）✓，幽灵残留 13→3，反复翻转菜单归零。
+  影响范围：仅 menu-scan-service.js。
+
 - 2026-08-29: **菜单切换·第五批（重复导入迁移规则完整化：5.3 节点迁移 + 5.4 交易迁移 + 唯一键修正）**。①规则 5.3：重复导入时 umlEcd 命中的既有节点若在新 JSON 中父级变化 → 迁移到新父下（清旧 childIndex 键防误收编，service 内 trx 直写 parent_id，不改 dao.update 白名单避免 PUT /nodes 获得改父能力）。②规则 5.4：导入 upsert 完成后按 `trajectory.page_id` 与新树 `system_page.page_id` 匹配，命中则交易 function_id 自动迁移（多候选取当前 function_id 优先、否则最小 node id；未匹配保留原菜单），插在消失标记/5.8 之前使"无交易则删"看到迁移后状态。③`system_page.page_id` 唯一索引转普通索引（迁移 20260829100000）——JSON 实测 38 个页面被多活动共享，跨菜单共享页面导入会撞唯一键导致整次导入回滚的潜在生产 bug。返回新增 `migratedNodes`/`migratedTransactions`。
   真机湿测（真实 DB + 改造 JSON 三场景）：跨顶层模块节点迁移 ✓（migratedNodes=1）；页面挪入其他菜单+原子域删除 → 交易随 page_id 迁移到新菜单 ✓、含未绑定 page_id 交易的旧节点按 5.8 正确保留 ✓；恢复原 JSON → 节点迁回+交易迁回+xpath 自动刷新 ✓。9 条更新规则至此全部落地。
   影响范围：migrations/20260829100000、menu-json-import.js（5.3/5.4/stats）、characterize-system-import-json（wiring 追加）。

@@ -167,7 +167,7 @@ async function runScan({ scanId, systemNodeId, url, account }) {
     });
 
     // —— 事务内写库（含阶段二 merge / 置标 / 变更事件）——
-    const applyStats = await applyScanPlan(plan, systemNodeId, phase2.merges, phase2.ghosts);
+    const applyStats = await applyScanPlan(plan, systemNodeId, phase2.merges, phase2.ghosts, phase2.emptyXpathJsonFns);
 
     job.status = 'completed';
     job.stats = {
@@ -250,6 +250,7 @@ async function runPhase2Match({ plan, runtime, execSession, existing, systemNode
     // —— 收集幽灵节点：source='json_import' 的功能，逐节点查 system_page ——
     // 节点数有限，逐节点查（DAO 按 system_node_id 查，无 whereIn 批量接口）。
     const ghosts = [];
+    const emptyXpathJsonFns = []; // json_import 且 menuXpath 空的全集（含无 pageIds 者）——置标与排序后推用
     // 同时建 nodeId → {node, moduleId, moduleName} 反查索引，供 update 候选判定
     const fnIndex = new Map();
     for (const mod of existing) {
@@ -260,6 +261,12 @@ async function runPhase2Match({ plan, runtime, execSession, existing, systemNode
           moduleName: String(mod.name || ''),
         });
         if (String(fn.source || '') !== 'json_import') continue;
+        if (String(fn.menuXpath || '').trim()) continue; // 已有 xpath（曾合并/曾匹配）不是幽灵——否则多页面幽灵会被后续菜单反复改名
+        emptyXpathJsonFns.push({
+          nodeId: Number(fn.id),
+          name: String(fn.name || ''),
+          moduleId: Number(mod.id),
+        });
         const pages = await systemPageDao.listByNodeId(fn.id);
         const pageIds = new Set((Array.isArray(pages) ? pages : [])
           .map((p) => String(p.pageId || ''))
@@ -274,7 +281,7 @@ async function runPhase2Match({ plan, runtime, execSession, existing, systemNode
         });
       }
     }
-    if (!ghosts.length) return { merges, reads, ghosts };
+    if (!ghosts.length) return { merges, reads, ghosts, emptyXpathJsonFns };
 
     // —— 候选来源改为 plan.updates ——
     // 条件：update 对应的既有节点 source !== 'json_import'（匹配到了 AI/其他非 JSON 节点），
@@ -331,16 +338,19 @@ async function runPhase2Match({ plan, runtime, execSession, existing, systemNode
       }
       if (!readCode) continue; // 空组件编号 → 跳过
 
-      // 命中判定：readCode ∈ 某幽灵的 pageIds
-      const ghost = ghosts.find((g) => g.pageIds.has(readCode));
-      if (!ghost) continue; // 未命中任何幽灵 → 跳过
+      // 命中判定：readCode ∈ 某幽灵的 pageIds。
+      // 页面 ID 可能被多个 JSON 叶子共享（共享页面）——多幽灵命中属歧义，不合并（否则菜单
+      // 每轮被不同幽灵认领，反复翻转）；仅唯一命中才合并。
+      const hits = ghosts.filter((g) => g.pageIds.has(readCode));
+      if (hits.length !== 1) continue; // 0=未命中；>1=共享页面歧义 → 跳过
+      const ghost = hits[0];
 
       // 从 plan.updates 移除 duplicateNodeId 那条（按引用剔除）
       const idx = plan.updates.indexOf(cand.update);
       if (idx >= 0) plan.updates.splice(idx, 1);
 
-      // 替换为幽灵节点的 update（xpath 写到幽灵上）
-      plan.updates.push({ nodeId: ghost.nodeId, menuXpath: cand.menuXpath });
+      // 替换为幽灵节点的 update（xpath 写到幽灵上，透传真实菜单顺序 sortOrder）
+      plan.updates.push({ nodeId: ghost.nodeId, menuXpath: cand.menuXpath, sortOrder: cand.update.sortOrder });
 
       // 记录 merge（显式 duplicateNodeId）
       merges.push({
@@ -358,10 +368,10 @@ async function runPhase2Match({ plan, runtime, execSession, existing, systemNode
       ghost.pageIds.clear();
     }
 
-    return { merges, reads, ghosts };
+    return { merges, reads, ghosts, emptyXpathJsonFns };
   } catch (err) {
     console.warn('[menu-scan] phase2 failed: %s', err?.message || err);
-    return { merges, reads, ghosts: [] };
+    return { merges, reads, ghosts: [], emptyXpathJsonFns: [] };
   }
 }
 
@@ -376,9 +386,10 @@ async function runPhase2Match({ plan, runtime, execSession, existing, systemNode
  * @param {number} systemNodeId 系统节点 id
  * @param {Array<object>} [merges] 阶段二合并结果数组（默认 []）
  * @param {Array<object>} [ghosts] 幽灵节点全集（含未命中的，供置标；默认 []）
+ * @param {Array<object>} [emptyXpathJsonFns] json_import 且 menuXpath 为空的功能全集（含无页面 ID 者，置标与排序后推用；默认 []）
  * @returns {Promise<{ unmatchedMarked: number }>} 置标统计
  */
-async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []) {
+async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = [], emptyXpathJsonFns = []) {
   const scanChangeRows = [];
   let unmatchedMarked = 0;
   await getDB().transaction(async (trx) => {
@@ -389,9 +400,17 @@ async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []) {
     // parentName → moduleId 映射：含本次新建的 L1 与既有匹配模块。
     const moduleByName = new Map();
 
-    // 更新命中节点（L1/L2 一并）。
+    // 更新命中节点（L1/L2 一并），写回真实菜单顺序 sortOrder。
     for (const u of plan.updates) {
-      await systemDao.update(u.nodeId, { menuXpath: u.menuXpath, unmatchedFlag: 0 }, trx);
+      await systemDao.update(
+        u.nodeId,
+        {
+          menuXpath: u.menuXpath,
+          unmatchedFlag: 0,
+          ...(u.sortOrder !== undefined ? { sortOrder: u.sortOrder } : {}),
+        },
+        trx,
+      );
     }
 
     // 新建 L1 模块。
@@ -403,7 +422,7 @@ async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []) {
           name: c.name,
           source: 'ai',
           menuXpath: c.xpath || '',
-          sortOrder: 0,
+          sortOrder: c.sortOrder ?? 0,
         },
         trx,
       );
@@ -447,7 +466,7 @@ async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []) {
           name: c.name,
           source: 'ai',
           menuXpath: c.xpath || '',
-          sortOrder: 0,
+          sortOrder: c.sortOrder ?? 0,
         },
         trx,
       );
@@ -495,19 +514,25 @@ async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []) {
     }
 
     // ── 剩余幽灵置标：本轮没被 phase2 命中且 menuXpath 仍空 ──
+    // 遍历 json_import 空 xpath 全集（含无 pageIds 者），把 sortOrder 推到真实菜单之后
+    // （100000+），避免其 JSON seqNo 与真实菜单下标撞号穿插。
     const mergedGhostIds = new Set(merges.map((m) => Number(m.ghostNodeId)));
-    for (const g of ghosts) {
+    const ghostPageIdsById = new Map(ghosts.map((g) => [Number(g.nodeId), g.pageIds]));
+    let ghostSort = 100000;
+    for (const g of (emptyXpathJsonFns.length ? emptyXpathJsonFns : ghosts)) {
       if (mergedGhostIds.has(Number(g.nodeId))) continue; // 已合并
       // menuXpath 仍空（未被 plan.updates 回写）才算未匹配幽灵
       const node = await systemDao.getRawById(g.nodeId, trx);
       if (!node) continue;
       if (String(node.menuXpath || '').trim()) continue; // 已有 xpath（被其他路径匹配）
-      await systemDao.update(g.nodeId, { unmatchedFlag: 1 }, trx);
+      const pageIds = ghostPageIdsById.get(Number(g.nodeId));
+      await systemDao.update(g.nodeId, { unmatchedFlag: 1, sortOrder: ghostSort }, trx);
+      ghostSort += 1;
       unmatchedMarked += 1;
       scanChangeRows.push({
         changeType: 'unmatched_marked',
         nodeId: Number(g.nodeId),
-        detail: { name: g.name, pageIds: [...g.pageIds] },
+        detail: { name: g.name, pageIds: pageIds ? [...pageIds] : [] },
       });
     }
 
@@ -552,6 +577,11 @@ export function buildScanApplyPlan(scannedMenus, existingModules) {
   let matched = 0;
   const l1CreatedNames = new Set();
 
+  // sortOrder 计数器：L1 全局下标（0-based，按 level===1 出现序）；
+  // L2 按 parentName 分组下标（每个 parentName 独立从 0 计数）。
+  let l1Sort = 0;
+  const l2SortByParent = new Map();
+
   for (const m of menus) {
     const level = Number(m.level);
     const name = String(m.name || '').trim();
@@ -561,30 +591,34 @@ export function buildScanApplyPlan(scannedMenus, existingModules) {
     if (!name) continue;
 
     if (level === 1) {
+      const sortOrder = l1Sort;
+      l1Sort += 1;
       const mod = l1Index.get(name);
       if (mod) {
-        updates.push({ nodeId: mod.id, menuXpath: xpath });
+        updates.push({ nodeId: mod.id, menuXpath: xpath, sortOrder });
         matched += 1;
         if (Number(mod.unmatchedFlag) === 1) clearedUnmatched.push(mod.id);
       } else {
-        creates.push({ level: 1, name, parentName: '', xpath });
+        creates.push({ level: 1, name, parentName: '', xpath, sortOrder });
         l1CreatedNames.add(name);
       }
       continue;
     }
 
     if (level === 2) {
+      const sortOrder = l2SortByParent.get(parentName) || 0;
+      l2SortByParent.set(parentName, sortOrder + 1);
       const parentMod = l1Index.get(parentName);
       let fnNode = null;
       if (parentMod && Array.isArray(parentMod.children)) {
         fnNode = parentMod.children.find((c) => String(c.name || '').trim() === name) || null;
       }
       if (fnNode) {
-        updates.push({ nodeId: fnNode.id, menuXpath: xpath });
+        updates.push({ nodeId: fnNode.id, menuXpath: xpath, sortOrder });
         matched += 1;
         if (Number(fnNode.unmatchedFlag) === 1) clearedUnmatched.push(fnNode.id);
       } else {
-        creates.push({ level: 2, name, parentName, xpath });
+        creates.push({ level: 2, name, parentName, xpath, sortOrder });
       }
       continue;
     }
