@@ -221,6 +221,11 @@ function testWiringService() {
   const service = readFileSync(join(root, 'src/services/menu-json-import.js'), 'utf8');
   assert.match(service, /getDB\(\)\.transaction/, 'service wraps import in a transaction');
   assert.match(service, /json_import/, 'service references json_import key');
+  // 规则5.3：父级变化时迁移节点（update parent_id: Number(parentId)）
+  assert.match(service, /parent_id: Number\(parentId\)/, 'rule5.3 migrates node parent_id');
+  // 规则5.4：按 system_node_id 查 system_page 做交易迁移匹配
+  assert.match(service, /whereIn\('system_node_id'/, 'rule5.4 queries system_page by system_node_id');
+  assert.match(service, /规则5\.4/, 'rule5.4 transaction migration block present');
 }
 
 function testWiringDao() {

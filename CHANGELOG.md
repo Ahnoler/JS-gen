@@ -31,8 +31,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- 2026-08-29: **菜单切换·第五批（重复导入迁移规则完整化：5.3 节点迁移 + 5.4 交易迁移 + 唯一键修正）**。①规则 5.3：重复导入时 umlEcd 命中的既有节点若在新 JSON 中父级变化 → 迁移到新父下（清旧 childIndex 键防误收编，service 内 trx 直写 parent_id，不改 dao.update 白名单避免 PUT /nodes 获得改父能力）。②规则 5.4：导入 upsert 完成后按 `trajectory.page_id` 与新树 `system_page.page_id` 匹配，命中则交易 function_id 自动迁移（多候选取当前 function_id 优先、否则最小 node id；未匹配保留原菜单），插在消失标记/5.8 之前使"无交易则删"看到迁移后状态。③`system_page.page_id` 唯一索引转普通索引（迁移 20260829100000）——JSON 实测 38 个页面被多活动共享，跨菜单共享页面导入会撞唯一键导致整次导入回滚的潜在生产 bug。返回新增 `migratedNodes`/`migratedTransactions`。
+  真机湿测（真实 DB + 改造 JSON 三场景）：跨顶层模块节点迁移 ✓（migratedNodes=1）；页面挪入其他菜单+原子域删除 → 交易随 page_id 迁移到新菜单 ✓、含未绑定 page_id 交易的旧节点按 5.8 正确保留 ✓；恢复原 JSON → 节点迁回+交易迁回+xpath 自动刷新 ✓。9 条更新规则至此全部落地。
+  影响范围：migrations/20260829100000、menu-json-import.js（5.3/5.4/stats）、characterize-system-import-json（wiring 追加）。
+
 - 2026-08-28: **菜单切换·第四批（交易起点页面 ID 绑定）——已真机验证**。record/prepare 登录成功后自动绑定交易起点页面：按交易所属功能 `menu_xpath` 导航 → 新增 replay 直派动作 `read_page_component_code`：点击页面 `.floatingAction` 问号打开"天元相关配置"弹窗，轮询等待内容填充**且"页面路径"与当前路由一致**（防换页后旧数据残留；正则用下一字段标签做前瞻截断——textContent 无分隔符，贪婪 `\S+` 会吞掉后续字段导致永远不匹配）→ 解析组件编号/页面名称/页面路径 → 点确定关闭弹窗。新增动作 `click_menu_xpath`（菜单导航专用：JS 内轮询等菜单渲染后 DOM click——登录后菜单可能未渲染完、flyout 隐藏时常规回放点击会 not-found，DOM click 实测可用），`menu-navigation.buildMenuNavActions` 改发该动作。取值优先级：**实测组件编号 > AILZ+13位时间戳**；与功能节点 system_page 交叉校验（仅 log）。落 `trajectory.page_id`（迁移 20260828120000）。整段绑定绝不阻断录制（异常吞掉 warn，最坏 AILZ 兜底）。真机冒烟：交易 #35（对公客户管理）prepare → `page_id='ZJJK00066153'` ✓，导航失败/读取失败路径 AILZ 兜底 ✓。
-  影响范围：js_snippets/page_id.py（JS_READ_PAGE_COMPONENT_CODE + JS_CLICK_MENU_XPATH）、_js_snippets.py/_replay.py/event_dispatch.py（两动作注册）、新 trajectory/recording-page-bind.js、trajectory-attach-runner.js（登录后插入）、menu-navigation.js（动作条目改造）、迁移 20260828120000、特征化 characterize-page-bind（已入 verify-all）。
 
 - 2026-08-29: **控制面启动健壮性加固（事故驱动）**：`listExecutorSessions/listExecutorCdp` 在 `sendToExecutor` 同步抛错（executor 未连接）时，已创建的等待 promise 无人消费，超时 rejection 以 unhandledRejection **打崩控制面进程**（08-29 事故中 server 启动即崩的根因）。修复=resultP 挂 no-op catch，不影响正常 await 消费者。
   影响范围：src/executor-session-client.js 两函数各 +2 行；无行为变更。

@@ -162,7 +162,7 @@ export function buildImportJsonPlan({ roots }) {
  *          先删功能再按"无 children + 自身 unmatched + 子树无交易"清理模块。
  * @param {number|string} systemNodeId 目标系统节点 id（必须 type=1）
  * @param {Buffer|string} buffer JSON 文件内容
- * @returns {Promise<{ created: number, updated: number, adopted: number, markedUnmatched: number, pagesImported: number, snapshotVersion: number, deleted: number, tree: object[] }>} 导入统计与重建后的树
+ * @returns {Promise<{ created: number, updated: number, adopted: number, markedUnmatched: number, pagesImported: number, snapshotVersion: number, deleted: number, migratedNodes: number, migratedTransactions: number, tree: object[] }>} 导入统计与重建后的树；migratedNodes/migratedTransactions 为规则5.3/5.4 迁移计数
  * @throws {{ code: 'VALIDATION' }} 目标节点不存在或非系统类型时抛出
  */
 export async function importMenuJson(systemNodeId, buffer) {
@@ -174,7 +174,7 @@ export async function importMenuJson(systemNodeId, buffer) {
     throw Object.assign(new Error('目标节点必须是系统（type=1）'), { code: 'VALIDATION' });
   }
 
-  const stats = { created: 0, updated: 0, adopted: 0, markedUnmatched: 0, pagesImported: 0, deleted: 0 };
+  const stats = { created: 0, updated: 0, adopted: 0, markedUnmatched: 0, pagesImported: 0, deleted: 0, migratedNodes: 0, migratedTransactions: 0 };
 
   await getDB().transaction(async (trx) => {
     // 预加载既有子树：模块 + 模块下功能，建两个查重索引
@@ -246,6 +246,8 @@ export async function importMenuJson(systemNodeId, buffer) {
 
     // 本次 plan 涉及的 umlEcd 集合（用于消失标记判断）
     const planUmlEcds = new Set();
+    // 本次 plan 落位的全部节点 id（用于规则5.4 交易迁移按页面匹配）
+    const planNodeIds = [];
 
     /**
      * upsert 一个节点（模块或功能），返回落位节点。命中后登记进两个索引。
@@ -266,6 +268,16 @@ export async function importMenuJson(systemNodeId, buffer) {
       // 分支 1：umlEcd 命中既有节点
       if (umlEcd && byUmlEcd.has(umlEcd)) {
         node = byUmlEcd.get(umlEcd);
+        // 规则5.3：新 JSON 中父级变化 → 迁移节点到新父下（先清旧 childIndex 键防误收编）
+        if (Number(node.parentId) !== Number(parentId)) {
+          const oldKey = `${Number(node.parentId)}|${Number(node.type)}|${String(node.name || '').trim().toLowerCase()}`;
+          if (childIndex.get(oldKey) && Number(childIndex.get(oldKey).id) === Number(node.id)) {
+            childIndex.delete(oldKey);
+          }
+          await trx('system').where({ id: Number(node.id) }).update({ parent_id: Number(parentId), sort_order: seqNo });
+          node.parentId = Number(parentId);
+          stats.migratedNodes += 1;
+        }
         await systemDao.update(node.id, {
           name,
           umlEcd,
@@ -306,6 +318,9 @@ export async function importMenuJson(systemNodeId, buffer) {
       if (umlEcd) byUmlEcd.set(umlEcd, node);
       childIndex.set(`${parentId}|${type}|${name.toLowerCase()}`, node);
 
+      // 收集本次 plan 落位节点 id（供规则5.4 交易迁移按页面匹配）
+      planNodeIds.push(Number(node.id));
+
       // 同步页面清单
       await systemPageDao.replaceForNode(node.id, pages, trx);
       stats.pagesImported += pages.length;
@@ -317,6 +332,36 @@ export async function importMenuJson(systemNodeId, buffer) {
       const moduleNode = await upsertNode(mod, target.id, NODE_TYPE_MODULE, mod.pages || []);
       for (const fn of mod.functions || []) {
         await upsertNode(fn, moduleNode.id, NODE_TYPE_FUNCTION, fn.pages || []);
+      }
+    }
+
+    // ── 规则5.4：交易迁移（按页面ID匹配新菜单，命中则 function_id 跟随）──
+    if (planNodeIds.length) {
+      const pageRows = await trx('system_page')
+        .whereIn('system_node_id', planNodeIds)
+        .select('page_id', 'system_node_id');
+      const pageIdToNodes = new Map();
+      for (const pr of pageRows) {
+        const pid = String(pr.page_id || '');
+        if (!pid) continue;
+        if (!pageIdToNodes.has(pid)) pageIdToNodes.set(pid, []);
+        pageIdToNodes.get(pid).push(Number(pr.system_node_id));
+      }
+      if (pageIdToNodes.size) {
+        const boundTrajs = await trx('trajectory')
+          .whereNot('page_id', '')
+          .select('id', 'function_id', 'page_id');
+        for (const t of boundTrajs) {
+          const candidates = pageIdToNodes.get(String(t.page_id));
+          if (!candidates || !candidates.length) continue; // 未匹配 → 保留原菜单（规则5.4）
+          const curFn = Number(t.function_id);
+          if (candidates.includes(curFn)) continue; // 已在正确菜单下
+          // 多候选确定性规则：当前 function_id 在候选中优先（不动的情形上面已 continue），
+          // 否则取最小 node id（可解释、可复现）
+          const targetNodeId = Math.min(...candidates);
+          await trx('trajectory').where({ id: Number(t.id) }).update({ function_id: targetNodeId });
+          stats.migratedTransactions += 1;
+        }
       }
     }
 
