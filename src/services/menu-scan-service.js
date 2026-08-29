@@ -3,6 +3,23 @@
  * 调用 `scan_menu_tree` 动作抓取实际菜单树，再把扫描结果与既有模块/功能做名称匹配，
  * 在单个事务内更新命中节点的 menuXpath（并清 unmatchedFlag），新建未命中节点。
  * 全局单飞：同一时刻只允许一个菜单扫描任务运行。
+ * 【扫描运行时】（一次扫描约 3-5 分钟）
+ * 1. 打开浏览器 + 自动登录                          ← 准备阶段
+ * 2. scan_menu_tree：一次提取全部菜单               ← 排序数据的"出生地"
+ *    → menus 数组，顺序 = 真实系统页面菜单的 DOM 顺序
+ *    例：[{level:1, name:"客户管理"}, {level:2, name:"对公客户管理", parentName:"客户管理"}, ...]
+ * 3. buildScanApplyPlan：名称匹配，生成应用计划      ← 排序号在这里"编号"
+ *    → 遍历 menus 时用两个计数器给每个菜单编号：
+ *      · L1 计数器（全局）：第 1 个一级菜单=0，第 2 个=1……
+ *      · L2 计数器（按 parentName 分组）：每个一级菜单下的二级菜单独立从 0 计数
+ *    → 编号写进计划条目：updates/creates 每条带 {nodeId(或名称), menuXpath, sortOrder}
+ * 4. 阶段二组件编号合并（runPhase2Match）            ← 合并路径透传编号
+ *    → 幽灵节点改名合并时，替换的 update 条目带上真实菜单的 sortOrder
+ * 5. applyScanPlan：事务内落库                       ← 排序号在这里"写入数据库"（毫秒级）
+ *    → 命中节点：UPDATE system SET menu_xpath=…, unmatched_flag=0, sort_order=编号
+ *    → 新建节点：INSERT 时带 sort_order=编号
+ *    → 幽灵置标：sort_order=100000+（排到真实菜单之后）
+ * 6. 释放浏览器会话
  */
 import { randomUUID } from 'crypto';
 import { getDB } from '../../config/database.js';
