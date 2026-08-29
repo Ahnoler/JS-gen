@@ -37,6 +37,8 @@ from ._js_snippets import (
     JS_FILL_BY_XPATH,
     JS_FIND_LABELED_SELECT,
     JS_SCAN_MENU_TREE,
+    JS_READ_PAGE_COMPONENT_CODE,
+    JS_CLICK_MENU_XPATH,
     JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH,
     JS_SELECT_VALUE_BY_XPATH,
@@ -405,6 +407,7 @@ async def replay_action_entries(
             sys.stderr.flush()
 
             _scan_menu_payload = None
+            _page_id_payload = None
             try:
                 if action_name == 'go_to_url':
                     result = await _replay_goto(page, params)
@@ -415,6 +418,16 @@ async def replay_action_entries(
                     _scan_diag = scan_payload.get('diag') if isinstance(scan_payload, dict) else None
                     sys.stderr.write(f'[replay] scan_menu_tree menus={len(_scan_menu_payload)} diag={json.dumps(_scan_diag, ensure_ascii=False)}\n')
                     sys.stderr.flush()
+                elif action_name == 'read_page_component_code':
+                    page_id_payload = await page.evaluate(JS_READ_PAGE_COMPONENT_CODE)
+                    result = 'ok'
+                    _page_id_payload = page_id_payload if isinstance(page_id_payload, dict) else {}
+                    sys.stderr.write(f'[replay] read_page_component_code code={_page_id_payload.get("componentCode", "")} reason={_page_id_payload.get("reason", "")} diag={json.dumps(_page_id_payload.get("diag"), ensure_ascii=False)}\n')
+                    sys.stderr.flush()
+                elif action_name == 'click_menu_xpath':
+                    click_xpath = params.get('xpath') or (entry.get('element') or {}).get('xpath_full') or ''
+                    result = await page.evaluate(JS_CLICK_MENU_XPATH, click_xpath)
+                    await page.wait_for_timeout(600)
                 elif action_name == 'save_form_snapshot':
                     result = await _replay_verify_form_structure(page, params)
                 elif action_name == _CLICK_BY_INDEX:
@@ -536,6 +549,8 @@ async def replay_action_entries(
                 row['id'] = entry.get('id')
             if action_name == 'scan_menu_tree' and _scan_menu_payload is not None:
                 row['menus'] = _scan_menu_payload
+            if action_name == 'read_page_component_code' and _page_id_payload is not None:
+                row['pageCode'] = _page_id_payload
             results.append(row)
             sys.stderr.write(
                 f'[replay] [{step_num}/{total}] {"OK" if ok else "FAIL"} → {result} | locate={locate}\n'

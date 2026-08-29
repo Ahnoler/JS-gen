@@ -18,6 +18,7 @@ import {
   getTrajectoryRuntime,
 } from './trajectory-runtime.js';
 import { runDefaultLogin } from './trajectory-record-lifecycle.js';
+import { bindRecordingPageId } from './recording-page-bind.js';
 import { USE_EXECUTOR } from '#config/config.js';
 import { attachTrajectoryLive } from './trajectory-attach-service.js';
 
@@ -198,6 +199,15 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
   } catch (err) {
     emitStage('login', 'error', { accountId, error: err.message });
     throw err;
+  }
+
+  // ── 起点页面 ID 绑定：导航到功能菜单 → 读组件编号（读不到 AILZ 兜底）；绝不阻断 prepare ──
+  try {
+    if (traj?.functionId) {
+      await bindRecordingPageId({ runtime, tid, functionId: Number(traj.functionId), execSession });
+    }
+  } catch (bindErr) {
+    console.warn('[prepare] page-bind failed:', bindErr?.message || bindErr);
   }
 
   const fresh = await trajectoryDao.getById(tid);

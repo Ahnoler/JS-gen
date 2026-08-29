@@ -28,19 +28,13 @@ export function buildMenuNavActions({ moduleXpath, functionXpath } = {}) {
   const moduleXp = String(moduleXpath || '').trim();
   const funcXp = String(functionXpath || '').trim();
   if (!moduleXp && !funcXp) return actions;
+  // click_menu_xpath：JS 内轮询等菜单渲染后 DOM click（登录后菜单可能尚未渲染；
+  // flyout 隐藏时常规回放点击会 not-found，DOM click 已实测可用）
   if (moduleXp) {
-    actions.push({
-      action: 'click_element_by_index',
-      element: { xpath_smart: moduleXp, xpath_full: moduleXp },
-      params: { tag_name: 'li' },
-    });
+    actions.push({ action: 'click_menu_xpath', params: { xpath: moduleXp } });
   }
   if (funcXp) {
-    actions.push({
-      action: 'click_element_by_index',
-      element: { xpath_smart: funcXp, xpath_full: funcXp },
-      params: { tag_name: 'li' },
-    });
+    actions.push({ action: 'click_menu_xpath', params: { xpath: funcXp } });
   }
   return actions;
 }

@@ -254,6 +254,10 @@ export async function openSession({
 export async function listExecutorSessions(nodeUuid, timeoutMs = 10000) {
   const requestId = randomUUID();
   const resultP = waitForSessionEvent(requestId, 'session.list_result', timeoutMs);
+  // sendToExecutor may throw synchronously (e.g. executor offline) before the
+  // caller awaits resultP — detach a no-op handler so the late timeout
+  // rejection never becomes an unhandledRejection that kills the process.
+  resultP.catch(() => {});
   sendToExecutor(nodeUuid, 'session.list', { sessionId: requestId, requestId });
   const payload = await resultP;
   return Array.isArray(payload?.sessions) ? payload.sessions : [];
@@ -268,6 +272,7 @@ export async function listExecutorSessions(nodeUuid, timeoutMs = 10000) {
 export async function listExecutorCdp(nodeUuid, timeoutMs = 15000) {
   const requestId = randomUUID();
   const resultP = waitForSessionEvent(requestId, 'session.list_cdp_result', timeoutMs);
+  resultP.catch(() => {});
   sendToExecutor(nodeUuid, 'session.list_cdp', { sessionId: requestId, requestId });
   const payload = await resultP;
   return {
