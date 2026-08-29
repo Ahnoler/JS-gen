@@ -209,6 +209,9 @@ function testWiringService() {
   assert.match(service, /openSession/, 'service references openSession');
   assert.match(service, /replay_actions/, 'service references replay_actions');
   assert.match(service, /buildScanApplyPlan/, 'service exports buildScanApplyPlan');
+  assert.match(service, /runPhase2Match/, 'service defines runPhase2Match (phase2 match)');
+  assert.match(service, /insertRows/, 'service references menuChangeLogDao.insertRows');
+  assert.match(service, /unmatched_marked/, 'service records unmatched_marked change event');
 }
 
 function testWiringReplayPy() {
@@ -227,6 +230,11 @@ function testWiringRoute() {
   assert.match(route, /autoScan/, 'route references autoScan');
 }
 
+function testWiringChangeLog() {
+  const route = readFileSync(join(root, 'src/routes/v2/system-mgmt.js'), 'utf8');
+  assert.match(route, /change-log/, 'route references change-log endpoint');
+}
+
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
@@ -243,6 +251,7 @@ function main() {
     ['wiring: _replay.py references scan_menu_tree', testWiringReplayPy],
     ['wiring: js_snippets/menu_scan.py defines JS_SCAN_MENU_TREE', testWiringMenuScanPy],
     ['wiring: route references scan-menu + autoScan', testWiringRoute],
+    ['wiring: route references change-log endpoint', testWiringChangeLog],
   ];
   let failed = 0;
   for (const [name, fn] of tests) {

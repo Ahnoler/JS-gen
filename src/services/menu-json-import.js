@@ -6,6 +6,7 @@ import { getDB } from '../../config/database.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemPageDao from '../dao/system-page-dao.js';
 import * as systemMenuSnapshotDao from '../dao/system-menu-snapshot-dao.js';
+import * as menuChangeLogDao from '../dao/menu-change-log-dao.js';
 import { getTree } from './hierarchy-service.js';
 
 const NODE_TYPE_MODULE = 2;
@@ -175,6 +176,8 @@ export async function importMenuJson(systemNodeId, buffer) {
   }
 
   const stats = { created: 0, updated: 0, adopted: 0, markedUnmatched: 0, pagesImported: 0, deleted: 0, migratedNodes: 0, migratedTransactions: 0 };
+  // 变更事件流水收集：事务尾批量落 system_menu_change_log（source='import'）
+  const changeRows = [];
 
   await getDB().transaction(async (trx) => {
     // 预加载既有子树：模块 + 模块下功能，建两个查重索引
@@ -268,15 +271,19 @@ export async function importMenuJson(systemNodeId, buffer) {
       // 分支 1：umlEcd 命中既有节点
       if (umlEcd && byUmlEcd.has(umlEcd)) {
         node = byUmlEcd.get(umlEcd);
+        const oldName = String(node.name || '').trim();
+        const oldParentId = Number(node.parentId);
         // 规则5.3：新 JSON 中父级变化 → 迁移节点到新父下（先清旧 childIndex 键防误收编）
-        if (Number(node.parentId) !== Number(parentId)) {
-          const oldKey = `${Number(node.parentId)}|${Number(node.type)}|${String(node.name || '').trim().toLowerCase()}`;
+        if (oldParentId !== Number(parentId)) {
+          const oldKey = `${oldParentId}|${Number(node.type)}|${oldName.toLowerCase()}`;
           if (childIndex.get(oldKey) && Number(childIndex.get(oldKey).id) === Number(node.id)) {
             childIndex.delete(oldKey);
           }
           await trx('system').where({ id: Number(node.id) }).update({ parent_id: Number(parentId), sort_order: seqNo });
           node.parentId = Number(parentId);
           stats.migratedNodes += 1;
+          // 变更事件：节点迁移（5.3）
+          changeRows.push({ changeType: 'moved', nodeId: Number(node.id), detail: { name, oldParentId, newParentId: Number(parentId) } });
         }
         await systemDao.update(node.id, {
           name,
@@ -286,6 +293,12 @@ export async function importMenuJson(systemNodeId, buffer) {
           unmatchedFlag: 0,
         }, trx);
         stats.updated += 1;
+        // 变更事件：改名 / 更新
+        if (oldName !== name) {
+          changeRows.push({ changeType: 'renamed', nodeId: Number(node.id), detail: { oldName, name } });
+        } else {
+          changeRows.push({ changeType: 'updated', nodeId: Number(node.id), detail: { name } });
+        }
       } else {
         const key = `${parentId}|${type}|${name.toLowerCase()}`;
         // 分支 2：同父同型同名命中（收编）
@@ -299,6 +312,8 @@ export async function importMenuJson(systemNodeId, buffer) {
             unmatchedFlag: 0,
           }, trx);
           stats.adopted += 1;
+          // 变更事件：收编
+          changeRows.push({ changeType: 'adopted', nodeId: Number(node.id), detail: { name } });
         } else {
           // 分支 3：新建
           node = await systemDao.create({
@@ -311,6 +326,8 @@ export async function importMenuJson(systemNodeId, buffer) {
             sortOrder: seqNo,
           }, trx);
           stats.created += 1;
+          // 变更事件：新建
+          changeRows.push({ changeType: 'created', nodeId: Number(node.id), detail: { name, parentId: Number(parentId) } });
         }
       }
 
@@ -350,7 +367,7 @@ export async function importMenuJson(systemNodeId, buffer) {
       if (pageIdToNodes.size) {
         const boundTrajs = await trx('trajectory')
           .whereNot('page_id', '')
-          .select('id', 'function_id', 'page_id');
+          .select('id', 'name', 'function_id', 'page_id');
         for (const t of boundTrajs) {
           const candidates = pageIdToNodes.get(String(t.page_id));
           if (!candidates || !candidates.length) continue; // 未匹配 → 保留原菜单（规则5.4）
@@ -361,6 +378,18 @@ export async function importMenuJson(systemNodeId, buffer) {
           const targetNodeId = Math.min(...candidates);
           await trx('trajectory').where({ id: Number(t.id) }).update({ function_id: targetNodeId });
           stats.migratedTransactions += 1;
+          // 变更事件：交易迁移
+          changeRows.push({
+            changeType: 'transaction_migrated',
+            nodeId: targetNodeId,
+            detail: {
+              trajectoryId: Number(t.id),
+              trajectoryName: String(t.name || ''),
+              fromFunctionId: curFn,
+              toFunctionId: targetNodeId,
+              pageId: String(t.page_id || ''),
+            },
+          });
         }
       }
     }
@@ -368,7 +397,8 @@ export async function importMenuJson(systemNodeId, buffer) {
     // 消失标记：既有子树中 source='json_import' 且 umlEcd 非空、但不在本次 plan 的节点
     // 同时收集被标记的模块/功能，供规则5.8 删除/保留判定
     const unmatchedModuleIds = new Set();
-    const unmatchedFunctionIds = new Set();
+    // 存 {id, name} 对，供 5.8 删除处取节点名记录变更事件
+    const unmatchedFunctionIds = [];
     for (const mod of existingModules) {
       const ecd = String(mod.umlEcd || '').trim();
       if (mod.source === 'json_import' && ecd && !planUmlEcds.has(ecd)) {
@@ -382,7 +412,7 @@ export async function importMenuJson(systemNodeId, buffer) {
         if (fn.source === 'json_import' && fnEcd && !planUmlEcds.has(fnEcd)) {
           await systemDao.update(fn.id, { unmatchedFlag: 1 }, trx);
           stats.markedUnmatched += 1;
-          unmatchedFunctionIds.add(Number(fn.id));
+          unmatchedFunctionIds.push({ id: Number(fn.id), name: String(fn.name || '') });
         }
       }
     }
@@ -397,11 +427,16 @@ export async function importMenuJson(systemNodeId, buffer) {
     };
 
     // 先删功能：被标记的功能，自身交易数 === 0 → 物理删除（system_page 由 FK CASCADE 自动删）
-    for (const fnId of unmatchedFunctionIds) {
+    for (const fn of unmatchedFunctionIds) {
+      const fnId = fn.id;
       const trajCount = await countTrajectoryByFnIds([fnId]);
       if (trajCount === 0) {
+        // batch_recording_job.function_id 为 RESTRICT 外键：菜单消失后任务历史保留、功能引用置空
+        await trx('batch_recording_job').where({ function_id: fnId }).update({ function_id: null });
         await trx('system').where({ id: fnId }).del();
         stats.deleted += 1;
+        // 变更事件：功能删除
+        changeRows.push({ changeType: 'deleted', nodeId: fnId, detail: { name: fn.name } });
       }
     }
 
@@ -413,9 +448,21 @@ export async function importMenuJson(systemNodeId, buffer) {
       const childFnIds = remainingChildren.map((c) => Number(c.id));
       const trajCount = await countTrajectoryByFnIds(childFnIds);
       if (trajCount === 0) {
+        // 取模块名（删前查；remainingChildren 已空但模块行仍在）
+        const modRow = await systemDao.getRawById(modId, trx);
         await trx('system').where({ id: modId }).del();
         stats.deleted += 1;
+        // 变更事件：模块删除
+        changeRows.push({ changeType: 'deleted', nodeId: modId, detail: { name: String(modRow?.name || '') } });
       }
+    }
+
+    // ── 变更事件批量落库（source='import'，挂本次 menuVersion）──
+    if (changeRows.length) {
+      await menuChangeLogDao.insertRows(
+        changeRows.map((r) => ({ ...r, systemNodeId: target.id, menuVersion, source: 'import' })),
+        trx,
+      );
     }
   });
 

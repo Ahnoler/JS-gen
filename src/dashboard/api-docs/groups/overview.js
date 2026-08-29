@@ -196,6 +196,23 @@ export const GROUP_OVERVIEW = [
           respExample: J({ scanId: '<uuid>', systemNodeId: 1, status: 'completed', stats: { totalScanned: 410, matched: 232, created: 178, clearedUnmatched: 0, unmatchedScanned: [] }, error: null, startedAt: '<iso>', finishedAt: '<iso>' }),
           notes: [],
         },
+        {
+          method: 'GET', path: '/api/v2/system-mgmt/nodes/:id/change-log',
+          summary: '菜单变更历史',
+          desc: '按系统节点返回菜单变更逐事件流水（id 倒序）。source=import（JSON 导入）/ scan（菜单扫描）；change_type 含 renamed/updated/adopted/created/moved/transaction_migrated/deleted/merged/unmatched_marked；detail 为 JSON 字符串。测试人员查版本演化（version 过滤），管理员按 transaction_migrated 记录手动迁移排查。',
+          params: [
+            { name: 'id', type: 'number', required: true, in: 'path', desc: '系统节点 ID', example: '1' },
+            { name: 'version', type: 'number', in: 'query', desc: '菜单版本号过滤（对应 snapshot 版本）', example: '3' },
+            { name: 'limit', type: 'number', in: 'query', desc: '返回条数，默认 200，最大 1000', example: '200' },
+          ],
+          tryable: false,
+          reqExample: 'GET /api/v2/system-mgmt/nodes/1/change-log?version=3&limit=200',
+          respExample: J([
+            { id: 12, systemNodeId: 1, menuVersion: 3, source: 'import', changeType: 'renamed', nodeId: 42, detail: '{"oldName":"对私客户管理","name":"个人客户管理"}', createdAt: '<iso>' },
+            { id: 11, systemNodeId: 1, menuVersion: 3, source: 'scan', changeType: 'unmatched_marked', nodeId: 55, detail: '{"name":"旧功能","pageIds":["ZJJK00067207"]}', createdAt: '<iso>' },
+          ]),
+          notes: ['detail 为 JSON 字符串，前端需自行 parse', 'transaction_migrated 的 detail 含 trajectoryId/fromFunctionId/toFunctionId/pageId，用于手动迁移排查'],
+        },
     ],
   },
 ];

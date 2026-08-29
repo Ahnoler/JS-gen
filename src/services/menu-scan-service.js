@@ -8,11 +8,17 @@ import { randomUUID } from 'crypto';
 import { getDB } from '../../config/database.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
+import * as systemPageDao from '../dao/system-page-dao.js';
+import * as systemMenuSnapshotDao from '../dao/system-menu-snapshot-dao.js';
+import * as menuChangeLogDao from '../dao/menu-change-log-dao.js';
 import * as execSession from '../executor-session-client.js';
 
 const NODE_TYPE_SYSTEM = 1;
 const NODE_TYPE_MODULE = 2;
 const NODE_TYPE_FUNCTION = 3;
+
+/** 阶段二（按组件编号合并幽灵节点）逐菜单读取组件编号的硬上限，防长扫描。 */
+const PHASE2_MAX_READS = 100;
 
 /** 模块级单飞标记：当前运行中的扫描 scanId；非 null 表示有任务进行中。 */
 let currentScan = null;
@@ -148,11 +154,29 @@ async function runScan({ scanId, systemNodeId, url, account }) {
     const existingModules = await loadExistingModules(systemNodeId);
     const plan = buildScanApplyPlan(menus, existingModules);
 
-    // —— 事务内写库 ——
-    await applyScanPlan(plan, systemNodeId);
+    // —— 阶段二：按组件编号合并幽灵节点（菜单改名场景）——
+    // 在 applyScanPlan 之前运行：读取未匹配 L2 菜单的真实组件编号，
+    // 命中幽灵（source=json_import、有 system_page 页面 ID、无 menu_xpath）则从
+    // plan.creates 移除并改走 plan.updates 回写 xpath（复用更新路径改名合并）。
+    const phase2 = await runPhase2Match({
+      plan,
+      runtime: { nodeUuid, sessionId },
+      execSession,
+      existing: existingModules,
+      systemNodeId,
+    });
+
+    // —— 事务内写库（含阶段二 merge / 置标 / 变更事件）——
+    const applyStats = await applyScanPlan(plan, systemNodeId, phase2.merges, phase2.ghosts);
 
     job.status = 'completed';
-    job.stats = { ...plan.stats, updates: plan.updates.length };
+    job.stats = {
+      ...plan.stats,
+      updates: plan.updates.length,
+      phase2Reads: phase2.reads,
+      mergedByPageId: phase2.merges.length,
+      unmatchedMarked: applyStats.unmatchedMarked,
+    };
     job.finishedAt = new Date().toISOString();
   } catch (err) {
     console.error('[menu-scan] failed:', err && (err.stack || err.message || String(err)));
@@ -199,16 +223,164 @@ async function loadExistingModules(systemNodeId) {
 }
 
 /**
+ * 阶段二：按组件编号（page_id）合并幽灵节点。
+ *
+ * 幽灵节点 = source='json_import' 且有 system_page 页面 ID 且 menuXpath 为空的功能节点
+ * （JSON 导入后菜单改名，JSON 仍用旧名，扫描发现真实菜单但按名匹配不上）。
+ *
+ * 候选来源 = plan.updates（按名匹配到既有节点的扫描菜单）。当某 update 匹配到的
+ * 既有节点 source !== 'json_import'（即匹配到了 AI 补充节点，非 JSON 节点）且其父模块
+ * 下存在幽灵时，逐个读取真实组件编号：命中某幽灵的 pageIds → 将该 update 的 xpath
+ * 重定向到幽灵节点（移除原 duplicateNodeId 的 update，push 幽灵的 update），由
+ * applyScanPlan 在事务内改名 + 交易重指向 + 删 duplicateNodeId。
+ *
+ * 全程 try/catch：异常只 warn 不炸扫描，未读取的候选保留原 update（xpath 写到 AI 节点）。
+ * @param {object} opts 参数对象
+ * @param {object} opts.plan 扫描应用计划（会被原地修改：替换命中的 updates）
+ * @param {{ nodeUuid: string, sessionId: string }} opts.runtime executor 会话运行时
+ * @param {object} opts.execSession executor 会话客户端（waitForSessionEvent/forwardStdin）
+ * @param {Array<object>} opts.existing 既有模块数组（loadExistingModules 产物）
+ * @param {number} opts.systemNodeId 系统节点 id
+ * @returns {Promise<{ merges: Array<object>, reads: number, ghosts: Array<object> }>} 合并结果、实际读取次数、幽灵全集
+ */
+async function runPhase2Match({ plan, runtime, execSession, existing, systemNodeId }) {
+  const merges = [];
+  let reads = 0;
+  try {
+    // —— 收集幽灵节点：source='json_import' 的功能，逐节点查 system_page ——
+    // 节点数有限，逐节点查（DAO 按 system_node_id 查，无 whereIn 批量接口）。
+    const ghosts = [];
+    // 同时建 nodeId → {node, moduleId, moduleName} 反查索引，供 update 候选判定
+    const fnIndex = new Map();
+    for (const mod of existing) {
+      for (const fn of (Array.isArray(mod.children) ? mod.children : [])) {
+        fnIndex.set(Number(fn.id), {
+          node: fn,
+          moduleId: Number(mod.id),
+          moduleName: String(mod.name || ''),
+        });
+        if (String(fn.source || '') !== 'json_import') continue;
+        const pages = await systemPageDao.listByNodeId(fn.id);
+        const pageIds = new Set((Array.isArray(pages) ? pages : [])
+          .map((p) => String(p.pageId || ''))
+          .filter(Boolean));
+        if (pageIds.size === 0) continue; // 无页面 ID 不算幽灵
+        ghosts.push({
+          nodeId: Number(fn.id),
+          name: String(fn.name || ''),
+          module: String(mod.name || ''),
+          moduleId: Number(mod.id),
+          pageIds,
+        });
+      }
+    }
+    if (!ghosts.length) return { merges, reads, ghosts };
+
+    // —— 候选来源改为 plan.updates ——
+    // 条件：update 对应的既有节点 source !== 'json_import'（匹配到了 AI/其他非 JSON 节点），
+    //       且其父模块下存在幽灵，且 menuXpath 非空。
+    const ghostModuleIds = new Set(ghosts.map((g) => Number(g.moduleId)));
+    const candidates = [];
+    for (const u of plan.updates) {
+      const info = fnIndex.get(Number(u.nodeId));
+      if (!info) continue; // update 节点不在既有索引（不应发生，防御式）
+      if (String(info.node.source || '') === 'json_import') continue; // 匹配到 JSON 节点，无需合并
+      if (!Number(ghostModuleIds.has(Number(info.moduleId)))) continue; // 父模块无幽灵
+      if (!String(u.menuXpath || '').trim()) continue; // 无 xpath 无法导航
+      candidates.push({
+        update: u,
+        duplicateNodeId: Number(u.nodeId),
+        duplicateName: String(info.node.name || ''),
+        moduleId: Number(info.moduleId),
+        moduleName: String(info.moduleName || ''),
+        menuXpath: String(u.menuXpath || ''),
+      });
+    }
+
+    // 硬上限：防长扫描；超出的候选本轮跳过（下次扫描条件仍成立）
+    const maxReads = Math.min(candidates.length, PHASE2_MAX_READS);
+
+    for (let i = 0; i < maxReads; i += 1) {
+      const cand = candidates[i];
+      reads += 1;
+      let readCode = '';
+      try {
+        const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 25000);
+        execSession.forwardStdin({
+          nodeUuid: runtime.nodeUuid,
+          sessionId: runtime.sessionId,
+          event: 'replay_actions',
+          data: {
+            actions: [
+              { action: 'click_menu_xpath', params: { xpath: cand.menuXpath } },
+              { action: 'read_page_component_code', params: {} },
+            ],
+            is_replay: true,
+            stop_on_fail: false,
+          },
+        });
+        const r = await doneP;
+        const results = Array.isArray(r?.results) ? r.results : [];
+        const row = results.find((it) => it && it.action === 'read_page_component_code');
+        // 防御式：row.pageCode 为对象 { componentCode, ... }
+        const payload = row?.pageCode && typeof row.pageCode === 'object' ? row.pageCode : null;
+        readCode = payload ? String(payload.componentCode || '').trim() : '';
+      } catch (readErr) {
+        console.warn('[menu-scan] phase2 read failed for nodeId=%s: %s', cand.duplicateNodeId, readErr?.message || readErr);
+        continue; // 读取失败 → 跳过该候选（保留原 update 写 xpath 到 AI 节点）
+      }
+      if (!readCode) continue; // 空组件编号 → 跳过
+
+      // 命中判定：readCode ∈ 某幽灵的 pageIds
+      const ghost = ghosts.find((g) => g.pageIds.has(readCode));
+      if (!ghost) continue; // 未命中任何幽灵 → 跳过
+
+      // 从 plan.updates 移除 duplicateNodeId 那条（按引用剔除）
+      const idx = plan.updates.indexOf(cand.update);
+      if (idx >= 0) plan.updates.splice(idx, 1);
+
+      // 替换为幽灵节点的 update（xpath 写到幽灵上）
+      plan.updates.push({ nodeId: ghost.nodeId, menuXpath: cand.menuXpath });
+
+      // 记录 merge（显式 duplicateNodeId）
+      merges.push({
+        ghostNodeId: ghost.nodeId,
+        ghostOldName: ghost.name,
+        duplicateNodeId: cand.duplicateNodeId,
+        duplicateName: cand.duplicateName,
+        moduleId: ghost.moduleId,
+        menuName: cand.duplicateName, // 扫描菜单名 = AI 节点名（匹配到的名）
+        menuXpath: cand.menuXpath,
+        pageId: readCode,
+      });
+
+      // 一个幽灵只合并一次：从幽灵集合移除
+      ghost.pageIds.clear();
+    }
+
+    return { merges, reads, ghosts };
+  } catch (err) {
+    console.warn('[menu-scan] phase2 failed: %s', err?.message || err);
+    return { merges, reads, ghosts: [] };
+  }
+}
+
+/**
  * 在单个事务内应用扫描计划：更新命中节点、新建未命中节点。
  *
  * L1 命中 → 更新 menuXpath 并清 unmatchedFlag；未命中 → 新建 type=2 模块。
  * L2 命中 → 更新 menuXpath 并清 unmatchedFlag；未命中 → 先确保父模块存在
  * （复用刚建的 level1 或已匹配同名模块），再新建 type=3 功能。
+ * 阶段二 merge：幽灵节点改名 + 同层同名重复节点合并 + 剩余幽灵置标 + 变更事件落库。
  * @param {{ updates: Array<{ nodeId: number, menuXpath: string }>, creates: Array<{ level: 1|2, name: string, parentName: string }> }} plan 应用计划
  * @param {number} systemNodeId 系统节点 id
- * @returns {Promise<void>}
+ * @param {Array<object>} [merges] 阶段二合并结果数组（默认 []）
+ * @param {Array<object>} [ghosts] 幽灵节点全集（含未命中的，供置标；默认 []）
+ * @returns {Promise<{ unmatchedMarked: number }>} 置标统计
  */
-async function applyScanPlan(plan, systemNodeId) {
+async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []) {
+  const scanChangeRows = [];
+  let unmatchedMarked = 0;
   await getDB().transaction(async (trx) => {
     // 先建 L1（保证 L2 能找到父模块），再处理 L2。
     const l1Creates = plan.creates.filter((c) => c.level === 1);
@@ -280,7 +452,75 @@ async function applyScanPlan(plan, systemNodeId) {
         trx,
       );
     }
+
+    // ── 阶段二 merge 应用（同事务）──
+    // menuXpath 已由上面 plan.updates 循环回写到幽灵节点；此处改名 + 显式删除 AI 重复节点 + 交易重指向。
+    for (const m of merges) {
+      // 幽灵节点改名（menuXpath 已回写）
+      await systemDao.update(m.ghostNodeId, { name: m.menuName, unmatchedFlag: 0 }, trx);
+      scanChangeRows.push({
+        changeType: 'renamed',
+        nodeId: m.ghostNodeId,
+        detail: { oldName: m.ghostOldName, name: m.menuName, pageId: m.pageId, via: 'page_id_match' },
+      });
+
+      // 显式删除 AI 重复节点（duplicateNodeId 来自 phase2 命中，比同名查找更可靠）
+      const dupId = Number(m.duplicateNodeId);
+      if (Number.isFinite(dupId) && dupId > 0) {
+        // 交易与批量导入任务重指向：duplicateNodeId → ghostNodeId
+        // （batch_recording_job.function_id 为 RESTRICT 外键，不重指向会阻塞删除）
+        await trx('trajectory').where({ function_id: dupId }).update({ function_id: Number(m.ghostNodeId) });
+        await trx('batch_recording_job').where({ function_id: dupId }).update({ function_id: Number(m.ghostNodeId) });
+        await trx('system').where({ id: dupId }).del();
+        scanChangeRows.push({
+          changeType: 'merged',
+          nodeId: m.ghostNodeId,
+          detail: { duplicateNodeId: dupId, duplicateName: m.duplicateName, menuName: m.menuName, pageId: m.pageId, via: 'page_id_match' },
+        });
+      } else {
+        // fallback：无显式 duplicateNodeId 时按同名查找（父模块下同名且 id≠ghost）
+        const siblings = await systemDao.listByParent(m.moduleId, trx);
+        for (const dup of siblings) {
+          if (Number(dup.id) === Number(m.ghostNodeId)) continue;
+          if (String(dup.name || '').trim() !== String(m.menuName || '').trim()) continue;
+          await trx('trajectory').where({ function_id: Number(dup.id) }).update({ function_id: Number(m.ghostNodeId) });
+          await trx('system').where({ id: Number(dup.id) }).del();
+          scanChangeRows.push({
+            changeType: 'merged',
+            nodeId: m.ghostNodeId,
+            detail: { duplicateNodeId: Number(dup.id), duplicateName: String(dup.name || ''), menuName: m.menuName, pageId: m.pageId, via: 'page_id_match' },
+          });
+        }
+      }
+    }
+
+    // ── 剩余幽灵置标：本轮没被 phase2 命中且 menuXpath 仍空 ──
+    const mergedGhostIds = new Set(merges.map((m) => Number(m.ghostNodeId)));
+    for (const g of ghosts) {
+      if (mergedGhostIds.has(Number(g.nodeId))) continue; // 已合并
+      // menuXpath 仍空（未被 plan.updates 回写）才算未匹配幽灵
+      const node = await systemDao.getRawById(g.nodeId, trx);
+      if (!node) continue;
+      if (String(node.menuXpath || '').trim()) continue; // 已有 xpath（被其他路径匹配）
+      await systemDao.update(g.nodeId, { unmatchedFlag: 1 }, trx);
+      unmatchedMarked += 1;
+      scanChangeRows.push({
+        changeType: 'unmatched_marked',
+        nodeId: Number(g.nodeId),
+        detail: { name: g.name, pageIds: [...g.pageIds] },
+      });
+    }
+
+    // ── 扫描变更事件批量落库（source='scan'，版本用最新快照版本）──
+    if (scanChangeRows.length) {
+      const menuVersion = await systemMenuSnapshotDao.getLatestVersion(systemNodeId, trx);
+      await menuChangeLogDao.insertRows(
+        scanChangeRows.map((r) => ({ ...r, systemNodeId, menuVersion, source: 'scan' })),
+        trx,
+      );
+    }
   });
+  return { unmatchedMarked };
 }
 
 /**

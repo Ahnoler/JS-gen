@@ -17,6 +17,7 @@ import { EXCEL_MIME } from '../../services/system-mgmt-excel.js';
 import { NODE_TYPE, TYPE_LABEL } from '../../models/hierarchy-constants.js';
 import { importMenuJson } from '../../services/menu-json-import.js';
 import { startScan, getScan } from '../../services/menu-scan-service.js';
+import * as menuChangeLogDao from '../../dao/menu-change-log-dao.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -204,6 +205,17 @@ export default function (app) {
     try {
       const job = getScan(req.params.scanId);
       res.status(job.status === 'running' ? 202 : 200).json(job);
+    } catch (e) {
+      res.status(httpError(e)).json({ error: e.message });
+    }
+  });
+
+  /** 4.4 菜单变更历史（导入/扫描逐事件流水，测试人员与手动迁移排查用） */
+  app.get('/api/v2/system-mgmt/nodes/:id/change-log', async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+      const rows = await menuChangeLogDao.listBySystem(Number(req.params.id), { version: req.query.version || null, limit });
+      res.json(rows);
     } catch (e) {
       res.status(httpError(e)).json({ error: e.message });
     }
