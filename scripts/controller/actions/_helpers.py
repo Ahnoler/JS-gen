@@ -17,6 +17,7 @@ from ._js_snippets import (
     JS_RESET_SELECT_UI,
 )
 from ...models import ScannedField
+from .replay_timing import WAIT_800_MS
 
 _SELECT_OPTION_PLACEHOLDERS = frozenset({'请选择', '请选择…', '请选择...', ''})
 
@@ -283,7 +284,7 @@ async def dismiss_https_first_interstitial(page) -> str:
           return isHttpsFirst || isChromeError ? 'no-proceed' : 'none';
         }''')
         if result and str(result).startswith('proceeded'):
-            await page.wait_for_timeout(800)
+            await page.wait_for_timeout(WAIT_800_MS)
         return str(result or 'none')
     except Exception as e:
         return f'error:{e}'

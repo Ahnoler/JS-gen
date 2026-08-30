@@ -45,6 +45,8 @@ async def _clear_field_value(page, label_text):
     try:
         await page.evaluate(JS_CLEAR_FIELD_VALUE, label_text)
     except Exception:
+        sys.stderr.write("[clear-field] JS_CLEAR_FIELD_VALUE failed label={label_text!r}" + '\n')
+        sys.stderr.flush()
         pass
 
 
@@ -62,6 +64,8 @@ async def scan_form_fields_impl(browser_context, business_data_store, button_key
         result = _as_dict(raw)
         raw_fields = result.get('fields') if isinstance(result, dict) else result
     except Exception:
+        sys.stderr.write("[scan] parse JS_SCAN_FORM_FIELDS failed (raw passthrough)" + '\n')
+        sys.stderr.flush()
         return raw
 
     fillable = prepare_scan_fields_for_tasklist(raw_fields)
@@ -75,6 +79,8 @@ async def scan_form_fields_impl(browser_context, business_data_store, button_key
         if ax_text:
             _merge_ax_text(dom_fields, ax_text)
     except Exception:
+        sys.stderr.write("[scan] aria_snapshot merge failed" + '\n')
+        sys.stderr.flush()
         pass
 
     container_id = result.get('container', 'main') if isinstance(result, dict) else 'main'
@@ -173,6 +179,8 @@ async def scan_editable_summary_impl(browser_context, business_data_store, butto
     try:
         result = _as_dict(raw)
     except Exception:
+        sys.stderr.write("[scan-editable] parse JS_SCAN_FORM_FIELDS failed (raw passthrough)" + '\n')
+        sys.stderr.flush()
         return raw
     if not isinstance(result, dict):
         return _err('invalid-scan-result')
@@ -187,6 +195,8 @@ async def scan_editable_summary_impl(browser_context, business_data_store, butto
             phase_number=_CURRENT_PHASE if _CURRENT_PHASE else None,
         )
     except Exception:
+        sys.stderr.write("[scan-editable] emit_editable_summary_memory failed" + '\n')
+        sys.stderr.flush()
         pass
     return json.dumps(summary, ensure_ascii=False)
 
@@ -237,6 +247,8 @@ async def scan_visible_fields_impl(browser_context, business_data_store, button_
         result = _as_dict(raw)
         raw_fields = result.get('fields') if isinstance(result, dict) else result
     except Exception:
+        sys.stderr.write("[scan-visible] parse JS_SCAN_FORM_FIELDS failed (raw passthrough)" + '\n')
+        sys.stderr.flush()
         return raw
 
     fillable = prepare_scan_fields_for_tasklist(raw_fields)
@@ -250,6 +262,8 @@ async def scan_visible_fields_impl(browser_context, business_data_store, button_
         if ax_text:
             _merge_ax_text(dom_fields, ax_text)
     except Exception:
+        sys.stderr.write("[scan-visible] aria_snapshot merge failed" + '\n')
+        sys.stderr.flush()
         pass
 
     tl = TaskList.from_store(business_data_store.get('task_list'))
@@ -259,6 +273,8 @@ async def scan_visible_fields_impl(browser_context, business_data_store, button_
         error_labels = await page.evaluate(_JS_EXTRACT_ERROR_LABELS)
         error_labels_parsed = json.loads(error_labels) if isinstance(error_labels, str) else error_labels
     except Exception:
+        sys.stderr.write("[scan-visible] _JS_EXTRACT_ERROR_LABELS parse failed" + '\n')
+        sys.stderr.flush()
         error_labels_parsed = []
     if error_labels_parsed:
         retried = tl.sync_from_errors(error_labels_parsed)
@@ -344,6 +360,8 @@ def init_task_list_impl(business_data_store, fields_json: str):
     try:
         data = json.loads(fields_json) if isinstance(fields_json, str) else fields_json
     except Exception:
+        sys.stderr.write("[init-task-list] json.loads fields_json failed" + '\n')
+        sys.stderr.flush()
         return _err('invalid-json')
     fields = data.get('fields') if isinstance(data, dict) else data
 
@@ -400,6 +418,8 @@ async def scroll_to_first_error_impl(browser_context):
     try:
         info = _as_dict(raw)
     except Exception:
+        sys.stderr.write("[scroll-to-error] parse JS_SCROLL_TO_FIRST_ERROR result failed" + '\n')
+        sys.stderr.flush()
         return _ok('no-error-found')
     label = (info.get('label') or '').strip()
     error = (info.get('error') or '').strip()
@@ -416,6 +436,8 @@ async def sync_tasks_from_errors_impl(browser_context, business_data_store):
     try:
         error_labels = json.loads(errors) if isinstance(errors, str) else errors
     except Exception:
+        sys.stderr.write("[sync-errors] _JS_EXTRACT_ERROR_LABELS parse failed" + '\n')
+        sys.stderr.flush()
         error_labels = []
     tl = TaskList.from_store(business_data_store.get('task_list'))
     retried = tl.sync_from_errors(error_labels)
@@ -437,6 +459,8 @@ async def sync_tasks_from_errors_impl(browser_context, business_data_store):
         try:
             scroll_info = json.loads(scroll_raw) if isinstance(scroll_raw, str) else scroll_raw
         except Exception:
+            sys.stderr.write("[sync-errors] parse JS_SCROLL_TO_FIRST_ERROR result failed" + '\n')
+            sys.stderr.flush()
             scroll_info = {}
         jumped_label = (scroll_info.get('label') or '').strip()
         jumped_error = (scroll_info.get('error') or '').strip()

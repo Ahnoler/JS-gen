@@ -24,6 +24,7 @@ from ._js_snippets import (
     JS_SELECT_TREE_OPTION,
 )
 from .replay_js import _JS_LOCATE_BY_XPATH, _JS_READ_VALUE_BY_XPATH
+from .replay_timing import WAIT_200_MS, WAIT_300_MS, WAIT_400_MS, WAIT_500_MS
 
 
 async def _replay_form_action(page, action_name: str, params: dict, entry: dict | None = None) -> str:
@@ -86,10 +87,10 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                 actual = await _read_value_by_label(page, label, ph)
             classified = _classify_fill_result(action_ok, value, actual)
             if classified == 'ok':
-                await page.wait_for_timeout(300)
+                await page.wait_for_timeout(WAIT_300_MS)
                 return f'ok:locate={locate_src}'
             if classified.startswith('false_ok'):
-                await page.wait_for_timeout(300)
+                await page.wait_for_timeout(WAIT_300_MS)
                 return classified
             return None
 
@@ -101,7 +102,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
         result = await page.evaluate(JS_FILL_FORM_FIELD, [label, value])
         if isinstance(result, str) and result.startswith('ok'):
-            await page.wait_for_timeout(300)
+            await page.wait_for_timeout(WAIT_300_MS)
             if element_xp:
                 actual = await _read_value_by_xpath(page, element_xp, label)
                 classified = _classify_fill_result(True, value, actual)
@@ -113,7 +114,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         if placeholder and placeholder != label:
             result = await page.evaluate(JS_FILL_FORM_FIELD, [placeholder, value])
             if isinstance(result, str) and result.startswith('ok'):
-                await page.wait_for_timeout(300)
+                await page.wait_for_timeout(WAIT_300_MS)
                 if element_xp:
                     actual = await _read_value_by_xpath(page, element_xp, label)
                     classified = _classify_fill_result(True, value, actual)
@@ -125,7 +126,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
         if not label and placeholder:
             result = await page.evaluate(JS_FILL_BY_XPATH, ['', value, placeholder])
             if isinstance(result, str) and result.startswith('ok'):
-                await page.wait_for_timeout(300)
+                await page.wait_for_timeout(WAIT_300_MS)
                 return str(result)
         xpath_full = _element_xpath_full(entry) if use_relative else ''
         if xpath_full and xpath_full != xp:
@@ -159,14 +160,14 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
     if action_name == 'select_tree_option':
         async def _tree():
             r = await page.evaluate(JS_SELECT_TREE_OPTION, [label, value])
-            await page.wait_for_timeout(500)
+            await page.wait_for_timeout(WAIT_500_MS)
             return r
         return await _with_xpath_first(_tree)
 
     if action_name == 'click_radio':
         async def _radio():
             r = await page.evaluate(JS_CLICK_RADIO, [label, value])
-            await page.wait_for_timeout(300)
+            await page.wait_for_timeout(WAIT_300_MS)
             return r
         return await _with_xpath_first(_radio)
 
@@ -213,14 +214,14 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                 if isinstance(already, str) and already.startswith('ok-already:'):
                     cur = already.split(':', 1)[1].strip()
                     if cur:
-                        await page.wait_for_timeout(200)
+                        await page.wait_for_timeout(WAIT_200_MS)
                         return f'ok-already:{cur}|locate={src_s}|legacy-sentinel:{pick}'
             if label:
                 already = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'check'])
                 if isinstance(already, str) and already.startswith('ok-already:'):
                     cur = already.split(':', 1)[1].strip()
                     if cur:
-                        await page.wait_for_timeout(200)
+                        await page.wait_for_timeout(WAIT_200_MS)
                         return f'ok-already:{cur}|locate=label|legacy-sentinel:{pick}'
             return f'bad_option_text:{pick}'
 
@@ -237,7 +238,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             if isinstance(already, str) and already.startswith('ok-already:'):
                 cur_val = already.split(':', 1)[1].strip()
                 if cur_val == pick:
-                    await page.wait_for_timeout(200)
+                    await page.wait_for_timeout(WAIT_200_MS)
                     return f'ok-already:{pick}|locate={locate_src}'
 
             trig = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xpath, label])
@@ -246,7 +247,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
             result = 'no-items'
             for attempt in range(3):
-                await page.wait_for_timeout(500 if attempt == 0 else 400)
+                await page.wait_for_timeout(WAIT_500_MS if attempt == 0 else WAIT_400_MS)
                 result = await page.evaluate(JS_SELECT_OPTION, [pick, True])
                 if isinstance(result, str) and result.startswith('ok'):
                     break
@@ -274,7 +275,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                     return await _replay_select_final_failure(f'option-mismatch:want={pick}|got={got}')
                 actual = await _read_value_by_xpath(page, xpath, label)
                 classified = _classify_fill_result(True, pick, actual)
-                await page.wait_for_timeout(500)
+                await page.wait_for_timeout(WAIT_500_MS)
                 if classified.startswith('false_ok'):
                     return await _replay_select_final_failure(classified)
                 return f'ok:locate={locate_src}'
@@ -294,7 +295,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
             if isinstance(already, str) and already.startswith('ok-already:'):
                 cur_val = already.split(':', 1)[1].strip()
                 if cur_val == pick:
-                    await page.wait_for_timeout(200)
+                    await page.wait_for_timeout(WAIT_200_MS)
                     return already
 
             trigger_result = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
@@ -303,7 +304,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
 
             result = 'no-items'
             for attempt in range(3):
-                await page.wait_for_timeout(500 if attempt == 0 else 400)
+                await page.wait_for_timeout(WAIT_500_MS if attempt == 0 else WAIT_400_MS)
                 result = await page.evaluate(JS_SELECT_OPTION, [pick, True])
                 if isinstance(result, str) and result.startswith('ok'):
                     break
@@ -336,7 +337,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                         return await _replay_select_final_failure(f'option-mismatch:want={pick}|got={cur}')
                 elif not (isinstance(confirmed, str) and confirmed.startswith('ok-confirmed:')):
                     await page.evaluate(JS_FILL_FORM_FIELD, [label, pick])
-                    await page.wait_for_timeout(200)
+                    await page.wait_for_timeout(WAIT_200_MS)
                     confirmed2 = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'confirm'])
                     if isinstance(confirmed2, str) and confirmed2.startswith('ok-confirmed:'):
                         cur = confirmed2.split(':', 1)[1].strip()
@@ -347,7 +348,7 @@ async def _replay_form_action(page, action_name: str, params: dict, entry: dict 
                         return await _replay_select_final_failure(
                             f'option-not-synced:want={pick}|confirm={confirmed2}'
                         )
-            await page.wait_for_timeout(500)
+            await page.wait_for_timeout(WAIT_500_MS)
             if isinstance(result, str) and result.startswith('ok'):
                 return str(result)
             return await _replay_select_final_failure(str(result))

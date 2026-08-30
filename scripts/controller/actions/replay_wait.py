@@ -6,6 +6,7 @@ import time
 from ._helpers import _wait_if_loading
 from ._js_snippets import JS_CHECK_LOADING
 from .replay_js import _JS_EDIT_FORM_INPUT_VISIBLE, _JS_PAGE_BUSY
+from .replay_timing import WAIT_100_MS, WAIT_120_MS, WAIT_200_MS
 
 
 _SAVE_BUTTON_TEXTS = frozenset({'保存', '提交'})
@@ -67,7 +68,7 @@ async def _wait_after_save_page_idle(
     page.on('requestfailed', _on_done)
     try:
         # Let save XHR / loading mask have a moment to appear.
-        await page.wait_for_timeout(200)
+        await page.wait_for_timeout(WAIT_200_MS)
         await _wait_if_loading(page)
 
         deadline = time.monotonic() + timeout_ms / 1000.0
@@ -93,7 +94,7 @@ async def _wait_after_save_page_idle(
                     await _wait_if_loading(page)
                 quiet_since = None
                 dom_idle_since = None
-                await page.wait_for_timeout(100)
+                await page.wait_for_timeout(WAIT_100_MS)
                 continue
 
             # DOM idle
@@ -106,7 +107,7 @@ async def _wait_after_save_page_idle(
                 if (now - dom_idle_since) >= max(quiet_ms / 1000.0, 0.8) * 3:
                     break
                 quiet_since = None
-                await page.wait_for_timeout(100)
+                await page.wait_for_timeout(WAIT_100_MS)
                 continue
 
             if quiet_since is None:
@@ -114,9 +115,9 @@ async def _wait_after_save_page_idle(
             elif (now - quiet_since) >= quiet_ms / 1000.0:
                 break
 
-            await page.wait_for_timeout(100)
+            await page.wait_for_timeout(WAIT_100_MS)
 
-        await page.wait_for_timeout(120)
+        await page.wait_for_timeout(WAIT_120_MS)
         await _wait_if_loading(page)
     finally:
         try:
@@ -137,7 +138,7 @@ async def _wait_after_tree_node_for_form(page, *, timeout_ms: int = 5000) -> boo
     while time.monotonic() < deadline:
         try:
             if await page.evaluate(_JS_EDIT_FORM_INPUT_VISIBLE):
-                await page.wait_for_timeout(120)
+                await page.wait_for_timeout(WAIT_120_MS)
                 return True
         except Exception:
             pass
@@ -146,5 +147,5 @@ async def _wait_after_tree_node_for_form(page, *, timeout_ms: int = 5000) -> boo
                 await _wait_if_loading(page)
         except Exception:
             pass
-        await page.wait_for_timeout(100)
+        await page.wait_for_timeout(WAIT_100_MS)
     return False

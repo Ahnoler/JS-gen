@@ -450,54 +450,5 @@ JS_READ_SELECT_OPTIONS = '''([label]) => {
     return out;
 }'''
 
-
-JS_FIND_OPTION = '''(option) => {
-    const dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
-    let items = dropdown.querySelectorAll('.el-select-dropdown__item');
-    if (items.length === 0 || dropdown === document) {
-        items = document.querySelectorAll('.el-select-dropdown__item');
-    }
-    /* SELECT_TABLE_ROW_OPTIONS */
-    if (items.length === 0) {
-        const root = (dropdown && dropdown !== document) ? dropdown : document;
-        items = root.querySelectorAll(
-            '.el-select-dropdown .el-table__body-wrapper tr.el-table__row, .el-select-dropdown tr.el-table__row, tr.el-table__row'
-        );
-    }
-    const optionLabel = (el) => {
-        if (!el) return '';
-        if (el.tagName === 'TR' || (el.classList && el.classList.contains('el-table__row'))) {
-            const cell = el.querySelector('td .cell, td');
-            return String((cell && cell.textContent) || el.textContent || '')
-                .replace(/\\s+/g, ' ').trim();
-        }
-        return String(el.textContent || '').replace(/\\s+/g, ' ').trim();
-    };
-    const FIRST_ALIASES = ['first', '1st', '第一个', '第一项'];
-    if (FIRST_ALIASES.includes(option.toLowerCase().trim())) {
-        for (const item of items) {
-            if (item.offsetParent !== null) return optionLabel(item);
-        }
-        if (items.length > 0) return optionLabel(items[0]);
-        return 'NO_ITEMS';
-    }
-    for (const item of items) {
-        if (optionLabel(item) === option) return option;
-    }
-    let bestLab = '';
-    let bestLen = Infinity;
-    for (const item of items) {
-        const lab = optionLabel(item);
-        if (lab.includes(option) && lab.length < bestLen) {
-            bestLab = lab;
-            bestLen = lab.length;
-        }
-    }
-    if (bestLab) return bestLab;
-    const hasEmpty = document.querySelector('.el-select-dropdown__empty');
-    if (hasEmpty) return 'NO_ITEMS';
-    return 'NOT_FOUND:' + [...items].map(i => optionLabel(i)).join(', ');
-}'''
-
 # ── Radio ──
 

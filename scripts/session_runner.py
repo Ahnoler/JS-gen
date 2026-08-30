@@ -54,13 +54,6 @@ from .trajectory_store import (  # noqa: F401  (re-exported for compat)
 # the first step of a NEW phase reports its state key (phase 开始即采第一张).
 _last_phase_state_key_phase: int | None = None
 
-# Actions recorded by the custom controller (subset of all browser_use actions)
-_CUSTOM_ACTIONS = {
-    'fill_form_field', 'select_option', 'click_element_by_index',
-    'click_menu_item', 'click_table_row_button', 'click_table_row_radio', 'click_radio',
-    'click_adjacent_button', 'switch_tab', 'close_dialog',
-}
-
 
 async def _stdin_reader(loop, stdin_queue, agent_running_ref, cancel_flag_path=None, goal_tracker=None):
     while True:
@@ -265,6 +258,17 @@ async def run_session(args):
     # Start CDP watcher — runs in-process, shares _ACTION_LOG and business_data_store
     cdp_action_queue = asyncio.Queue()
     cdp_task = asyncio.create_task(_run_cdp_watcher(browser_context, cdp_action_queue, business_data_store))
+
+    def _on_cdp_task_done(t):
+        """记录 cdp watcher 任务异常退出，避免无人观测的静默死亡。"""
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            sys.stderr.write(f"[cdp-watcher] task exited: {type(exc).__name__}: {exc}\n")
+            sys.stderr.flush()
+
+    cdp_task.add_done_callback(_on_cdp_task_done)
 
     # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
     cdp_ready = False
@@ -483,10 +487,8 @@ async def run_session(args):
             emit_json({"event": "error", "data": {"message": f"Unexpected error: {type(e).__name__}: {e}"}})
 
     reader_task.cancel()
-    try:
-        cdp_task.cancel()
-    except Exception:
-        pass
+    cdp_task.cancel()
+    await asyncio.gather(reader_task, cdp_task, return_exceptions=True)
     # 会话结束最终截图：正常 / error / cancel / SystemExit 退出路径统一在此捕获
     # 当前页面（capturedAt='session-end'）；截图失败静默，不阻塞关闭。
     try:

@@ -57,6 +57,7 @@ from .form_scan_utils import (
 from .form_autofill import FormAutofillEngine
 from .result_protocol import err_with, ok_marked, affordances
 from .select_match import suggest_field_for_value
+from .replay_timing import WAIT_500_MS, WAIT_3000_MS
 
 def _select_failure_next_action(label_text: str, option_text: str, business_data_store) -> str:
     """确定性「建议字段」提示（C2）：值↔选项错配时的下一步指引。
@@ -174,7 +175,7 @@ class LoginEngine(_FormActionEngineBase):
         ):
             return _err('err-login | ' + summary)
 
-        await page.wait_for_timeout(3000)
+        await page.wait_for_timeout(WAIT_3000_MS)
         _record_action(
             'login',
             {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code},
@@ -572,7 +573,7 @@ class SelectEngine(_FormActionEngineBase):
                 next_action='select_option(label_text="' + label_text + '", option_text=<从 现场/scan options 取原文>)',
             )
 
-        await page.wait_for_timeout(500)
+        await page.wait_for_timeout(WAIT_500_MS)
 
         # Capture full option list while dropdown is open (before pick)
         params, element = await _pack_select_record(
@@ -696,7 +697,7 @@ class SelectEngine(_FormActionEngineBase):
                 )
             retrigger = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
             if _is_ok_result(str(retrigger)):
-                await page.wait_for_timeout(500)
+                await page.wait_for_timeout(WAIT_500_MS)
                 retry_result = await page.evaluate(JS_SELECT_OPTION, resolved_option)
                 if _is_ok_result(retry_result):
                     self.business_data_store.pop(mismatch_retry_key, None)
@@ -719,7 +720,7 @@ class SelectEngine(_FormActionEngineBase):
                         JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text]
                     )
                     if _is_ok_result(str(retrigger2)):
-                        await page.wait_for_timeout(500)
+                        await page.wait_for_timeout(WAIT_500_MS)
                         strict_result = await page.evaluate(
                             JS_SELECT_OPTION, [resolved_option, True]
                         )
@@ -854,7 +855,7 @@ class TreeEngine(_FormActionEngineBase):
             if clicked == 0:
                 break
             total += clicked
-            await page.wait_for_timeout(500)
+            await page.wait_for_timeout(WAIT_500_MS)
         return _ok(f'ok-expanded-{total}-nodes')
 
 

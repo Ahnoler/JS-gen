@@ -2,6 +2,7 @@
 
 from scripts.state import _record_action
 from ._helpers import _ok, _is_ok_result, _enrich_click_element
+from .replay_timing import WAIT_500_MS, WAIT_800_MS
 
 
 def _register_navigation_actions(controller, browser_context):
@@ -23,7 +24,7 @@ def _register_navigation_actions(controller, browser_context):
                 return 'tab-not-found';
             }
         ''', tab_name)
-        await page.wait_for_timeout(800)
+        await page.wait_for_timeout(WAIT_800_MS)
         if _is_ok_result(result):
             _record_action('switch_tab', {'tab_name': tab_name}, result, element=element)
             return _ok(result)
@@ -72,7 +73,7 @@ def _register_navigation_actions(controller, browser_context):
                 return 'not-found';
             }
         ''', menu_text)
-        await page.wait_for_timeout(500)
+        await page.wait_for_timeout(WAIT_500_MS)
         if _is_ok_result(result):
             _record_action('click_menu_item', {'menu_text': menu_text}, result, element=element)
             return _ok(result + ' | loc:menu:' + menu_text, include_in_memory=True)

@@ -13,6 +13,7 @@ from .replay_wait import (
     _wait_after_save_page_idle,
     _wait_after_tree_node_for_form,
 )
+from .replay_timing import WAIT_300_MS, WAIT_400_MS, WAIT_600_MS, CLICK_TIMEOUT_MS
 
 
 async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
@@ -98,18 +99,18 @@ async def _replay_click_by_index(page, entry: dict, params: dict) -> str:
     if text:
         try:
             loc = page.get_by_role('button', name=text, exact=True).last
-            await loc.click(timeout=3000)
+            await loc.click(timeout=CLICK_TIMEOUT_MS)
             await _post_click_settle(page, entry, text, xpath_smart, xpath, 'ok-playwright-role-last')
             return 'ok-playwright-role-last'
         except Exception:
             pass
         try:
-            await page.get_by_text(text, exact=True).last.click(timeout=3000)
+            await page.get_by_text(text, exact=True).last.click(timeout=CLICK_TIMEOUT_MS)
             await _post_click_settle(page, entry, text, xpath_smart, xpath, 'ok-playwright-text-last')
             return 'ok-playwright-text-last'
         except Exception:
             try:
-                await page.locator(f'text={text}').last.click(timeout=3000)
+                await page.locator(f'text={text}').last.click(timeout=CLICK_TIMEOUT_MS)
                 await _post_click_settle(page, entry, text, xpath_smart, xpath, 'ok-playwright-text-loose')
                 return 'ok-playwright-text-loose'
             except Exception:
@@ -136,14 +137,14 @@ async def _post_click_settle(
         await _wait_after_save_page_idle(page)
         return
     if _is_tree_node_entry(entry, xpath_smart, xpath):
-        await page.wait_for_timeout(300)
+        await page.wait_for_timeout(WAIT_300_MS)
         await _wait_if_loading(page)
         appeared = await _wait_after_tree_node_for_form(page)
         if not appeared:
             sys.stderr.write('[replay] tree-node click: edit form input not visible within timeout\n')
             sys.stderr.flush()
         return
-    wait_ms = 600 if ('expand' in click_result or 'submenu' in click_result) else 400
+    wait_ms = WAIT_600_MS if ('expand' in click_result or 'submenu' in click_result) else WAIT_400_MS
     await page.wait_for_timeout(wait_ms)
     await _wait_if_loading(page)
 

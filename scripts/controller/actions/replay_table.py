@@ -5,6 +5,7 @@ Extracted from _replay.py. _replay.py re-exports _replay_table_row_radio for com
 
 from ._helpers import _wait_if_loading
 from .replay_click import _replay_click_by_index
+from .replay_timing import WAIT_400_MS
 
 
 async def _replay_table_row_radio(
@@ -29,7 +30,7 @@ async def _replay_table_row_radio(
     act = (controller_actions or {}).get('click_table_row_radio')
     if act and row_text:
         semantic = await _replay_controller_action(act, {'row_text': row_text})
-        await page.wait_for_timeout(400)
+        await page.wait_for_timeout(WAIT_400_MS)
         await _wait_if_loading(page)
         if _result_ok('click_table_row_radio', semantic):
             return f'{semantic} | locate=semantic-row'

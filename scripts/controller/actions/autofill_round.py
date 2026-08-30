@@ -43,6 +43,7 @@ from ._js_snippets import (
     JS_READ_REFERENCE_DATE,
 )
 from ._llm_values import _llm_generate_values
+from .replay_timing import WAIT_300_MS, WAIT_350_MS, WAIT_500_MS
 from ...models import ScannedField, TaskList, TaskItem
 from .form_rules import (
     match_cert_number,
@@ -124,7 +125,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
             )
             sys.stderr.flush()
             return trigger
-        await page.wait_for_timeout(350)
+        await page.wait_for_timeout(WAIT_350_MS)
         result = await page.evaluate(JS_SELECT_OPTION, value)
         if str(result).startswith('option-not-found:'):
             result = await page.evaluate(JS_SELECT_OPTION, 'first')
@@ -152,7 +153,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
         sel_try = await page.evaluate(JS_FIND_LABELED_SELECT, [label, 'trigger'])
         if not sel_try or str(sel_try).startswith('label-not-found'):
             return sel_try or 'label-not-found'
-        await page.wait_for_timeout(350)
+        await page.wait_for_timeout(WAIT_350_MS)
         opt = value if (value or '').strip() and (value or '').strip().lower() != 'first' else 'first'
         sel_result = await page.evaluate(JS_SELECT_OPTION, opt)
         if not _is_ok_result(str(sel_result)):
@@ -501,7 +502,7 @@ async def _execute_round_impl(self, page, items, label_kind, all_results, round_
                     f'{step_num}/{total} {kind} "{label}" → {result}',
                 )
 
-            await page.wait_for_timeout(500 if kind in ('select_option', 'select', 'option') else 300)
+            await page.wait_for_timeout(WAIT_500_MS if kind in ('select_option', 'select', 'option') else WAIT_300_MS)
 
         await page.evaluate(
             's => console.log("[AI填表] 本组完成: " + s)',

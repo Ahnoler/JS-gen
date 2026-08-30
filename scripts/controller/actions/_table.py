@@ -3,6 +3,7 @@
 from scripts.state import _record_action
 from ._helpers import _ok, _err, _is_ok_result, _enrich_click_element
 from .result_protocol import err_with
+from .replay_timing import WAIT_500_MS
 
 
 def _register_table_actions(controller, browser_context, business_data_store=None):
@@ -82,7 +83,7 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                     });
             }
         ''', [row_text, button_text])
-        await page.wait_for_timeout(500)
+        await page.wait_for_timeout(WAIT_500_MS)
         if _is_ok_result(result):
             _record_action(
                 'click_table_row_button',
@@ -198,7 +199,7 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                 return 'row-not-found';
             }
         ''', [row_text])
-        await page.wait_for_timeout(500)
+        await page.wait_for_timeout(WAIT_500_MS)
         if _is_ok_result(result):
             _record_action('click_table_row_radio', {'row_text': row_text}, result, element=element)
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')

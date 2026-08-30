@@ -22,6 +22,7 @@ from ._js_snippets import (
     JS_STAMP_ICON_ARIA_LABELS,
 )
 from ...models import ActionFile, FormSnapshot, FormSnapshotCollection
+from .replay_timing import WAIT_300_MS, WAIT_400_MS, WAIT_450_MS, WAIT_500_MS
 
 # Path helper: __file__ is scripts/controller/actions/_misc.py, so go up 3 levels
 _SCRIPTS_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -93,12 +94,16 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
             if await page.evaluate(JS_CHECK_LOADING):
                 await _wait_if_loading(page)
         except Exception:
+            sys.stderr.write("[get-page-state] JS_CHECK_LOADING wait probe failed" + '\n')
+            sys.stderr.flush()
             pass
 
         still_loading = False
         try:
             still_loading = bool(await page.evaluate(JS_CHECK_LOADING))
         except Exception:
+            sys.stderr.write("[get-page-state] JS_CHECK_LOADING recheck failed" + '\n')
+            sys.stderr.flush()
             still_loading = False
 
         if still_loading:
@@ -183,6 +188,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
             icon_buttons = await page.evaluate(JS_COLLECT_ICON_BUTTONS)
             state['iconButtons'] = icon_buttons if isinstance(icon_buttons, list) else []
         except Exception:
+            sys.stderr.write("[get-page-state] iconButtons stamp/collect failed" + '\n')
+            sys.stderr.flush()
             state['iconButtons'] = []
         _state._TRAJECTORY_URL = state.get('url', '')
         return json.dumps(state, ensure_ascii=False)
@@ -202,12 +209,14 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         try:
             await page.evaluate(JS_STAMP_ICON_ARIA_LABELS)
         except Exception:
+            sys.stderr.write("[click-button] JS_STAMP_ICON_ARIA_LABELS failed button={button_text!r}" + '\n')
+            sys.stderr.flush()
             pass
         element = await _enrich_click_element(
             page, text=button_text, target_kind='icon',
         )
         result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
-        await page.wait_for_timeout(400)
+        await page.wait_for_timeout(WAIT_400_MS)
         if _is_ok_result(result):
             _state._record_action(
                 'click_button',
@@ -298,6 +307,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 close_btn = page.locator('.el-notification__closeBtn').locator('visible=true').first
                 await close_btn.click(timeout=3000)
             except Exception:
+                sys.stderr.write("[close-notification] close button click failed (DOM dispatch fallback)" + '\n')
+                sys.stderr.flush()
                 await page.evaluate('''() => {
                     for (const el of document.querySelectorAll('.el-notification')) {
                         const r = el.getBoundingClientRect();
@@ -308,7 +319,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                         }
                     }
                 }''')
-            await page.wait_for_timeout(300)
+            await page.wait_for_timeout(WAIT_300_MS)
             return _ok(f'ok-notification: {notif_text[:200]}', include_in_memory=True)
         return 'no-notification'
 
@@ -351,7 +362,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
             }
             return 'no-overlay-open';
         }''')
-        await page.wait_for_timeout(500)
+        await page.wait_for_timeout(WAIT_500_MS)
         if _is_ok_result(result):
             _state._record_action('close_dialog', {}, result, element=element)
             if business_data_store is not None:
@@ -364,12 +375,16 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 try:
                     still = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
                 except Exception:
+                    sys.stderr.write("[close-dialog] JS_IS_QUERY_TOOLBAR recheck failed" + '\n')
+                    sys.stderr.flush()
                     still = False
                 parent = (business_data_store or {}).get('_parent_container_before_picker') or 'main'
                 maybe_record_picker_closed(
                     business_data_store, still_query_ui=still, parent_container=parent,
                 )
             except Exception:
+                sys.stderr.write("[close-dialog] maybe_record_picker_closed helper failed" + '\n')
+                sys.stderr.flush()
                 pass
             return _ok(result)
         return result
@@ -399,6 +414,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                     elem_text = element_node.get_all_text_till_next_clickable_element() or ''
                     elem_text = elem_text.strip()[:80]
                 except Exception:
+                    sys.stderr.write("[click] capture element text failed index={index!r}" + '\n')
+                    sys.stderr.flush()
                     elem_text = ''
                 tag_name = element_node.tag_name or ''
                 element_info = await _enrich_click_element(
@@ -452,6 +469,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                         include_in_memory=True,
                     )
             except Exception:
+                sys.stderr.write("[click] el-select dropdown gate check failed index={index!r}" + '\n')
+                sys.stderr.flush()
                 pass
 
             # Forbid index-click on form-dialog 确认/保存 — forces click_save and stops
@@ -509,6 +528,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                             overlay_info.get('hasQuery') and not overlay_info.get('hasSave')
                         )
                 except Exception:
+                    sys.stderr.write("[click] overlay scan failed (fallback _JS_VISIBLE_FORM_OVERLAY)" + '\n')
+                    sys.stderr.flush()
                     in_form_overlay = bool(await page.evaluate(_JS_VISIBLE_FORM_OVERLAY))
 
                 # Authoritative: page-level query toolbar / sticky flag (overlay scan can miss)
@@ -518,6 +539,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                         if (business_data_store or {}).get('_query_ui') or await page.evaluate(JS_IS_QUERY_TOOLBAR):
                             is_picker_ui = True
                     except Exception:
+                        sys.stderr.write("[click] JS_IS_QUERY_TOOLBAR picker-ui check failed" + '\n')
+                        sys.stderr.flush()
                         if (business_data_store or {}).get('_query_ui'):
                             is_picker_ui = True
 
@@ -528,6 +551,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                     )
                     contract = get_phase_intent(business_data_store)
                 except Exception:
+                    sys.stderr.write("[click] get_phase_intent failed (submit-block fallback)" + '\n')
+                    sys.stderr.flush()
                     contract = None
                     should_block_index_submit = None  # type: ignore
 
@@ -586,6 +611,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                     from ._js_snippets import JS_WATCH_SAVE_NOTIFICATIONS
                     await page.evaluate(JS_WATCH_SAVE_NOTIFICATIONS)
                 except Exception:
+                    sys.stderr.write("[click] JS_WATCH_SAVE_NOTIFICATIONS failed" + '\n')
+                    sys.stderr.flush()
                     pass
             url_before = getattr(page, 'url', '') or ''
             download_path = await browser_context._click_element_node(element_node)
@@ -604,6 +631,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                             'to': url_after,
                         }
             except Exception:
+                sys.stderr.write("[click] post-click navigation detection failed" + '\n')
+                sys.stderr.flush()
                 pass
             if element_node:
                 raw_xp = str(getattr(element_node, 'xpath', None) or '')
@@ -651,7 +680,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                     from scripts.controller.actions._phase_boundary import maybe_record_picker_closed
                     compact2 = re.sub(r'\s+', '', btn_label)
                     if compact2.startswith(('确认', '确定')):
-                        await page.wait_for_timeout(450)
+                        await page.wait_for_timeout(WAIT_450_MS)
                         note = await page.evaluate(
                             r'''() => {
                                 const w = window.__saveWatch || { errorNotifs: [] };
@@ -679,12 +708,14 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                                 include_in_memory=True,
                             )
                         record_success_token(business_data_store, 'confirm_click', btn_label)
-                        await page.wait_for_timeout(400)
+                        await page.wait_for_timeout(WAIT_400_MS)
                         still = False
                         try:
                             from ._js_snippets import JS_IS_QUERY_TOOLBAR
                             still = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
                         except Exception:
+                            sys.stderr.write("[click] confirm JS_IS_QUERY_TOOLBAR recheck failed" + '\n')
+                            sys.stderr.flush()
                             still = False
                         parent = (business_data_store or {}).get('_parent_container_before_picker') or 'main'
                         maybe_record_picker_closed(
@@ -699,6 +730,8 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                             )
                             sys.stderr.flush()
                 except Exception:
+                    sys.stderr.write("[click] picker confirm record/close helper failed" + '\n')
+                    sys.stderr.flush()
                     pass
             return _ok(f'ok-clicked-{index}')
         except Exception as e:

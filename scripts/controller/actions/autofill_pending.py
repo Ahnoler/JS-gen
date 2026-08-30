@@ -43,6 +43,7 @@ from ._js_snippets import (
     JS_READ_REFERENCE_DATE,
 )
 from ._llm_values import _llm_generate_values
+from .replay_timing import WAIT_700_MS
 from ...models import ScannedField, TaskList, TaskItem
 from .form_rules import (
     match_cert_number,
@@ -102,6 +103,8 @@ async def _auto_fill_pending_impl(self):
             self.business_data_store['_ref_date'] = ref_date
             await page.evaluate('s => console.log("[AI填表] 参考日期: " + s)', ref_date)
     except Exception:
+        sys.stderr.write("[auto-fill] JS_READ_REFERENCE_DATE failed" + '\n')
+        sys.stderr.flush()
         pass
 
     # 打印待填写统计
@@ -127,9 +130,11 @@ async def _auto_fill_pending_impl(self):
         )
 
         try:
-            await page.wait_for_timeout(700)
+            await page.wait_for_timeout(WAIT_700_MS)
             await _wait_if_loading(page)
         except Exception:
+            sys.stderr.write("[auto-fill] cascade round wait failed" + '\n')
+            sys.stderr.flush()
             pass
         # Keep cascade rescans inside the active overlay (drawer/dialog) so
         # fields on the underlying page are not pulled into the worklist.
@@ -139,6 +144,8 @@ async def _auto_fill_pending_impl(self):
         try:
             probed_cid = await page.evaluate(JS_IDENTIFY_CONTAINER)
         except Exception:
+            sys.stderr.write("[auto-fill] JS_IDENTIFY_CONTAINER probe failed (cascade)" + '\n')
+            sys.stderr.flush()
             probed_cid = ''
         active_cid = (probed_cid or self.business_data_store.get('_active_container') or '').strip()
         cascade_mode = tasklist_scan_mode(active_cid)
@@ -150,6 +157,8 @@ async def _auto_fill_pending_impl(self):
             result = _as_dict(raw)
             raw_fields = result.get('fields') if isinstance(result, dict) else result
         except Exception:
+            sys.stderr.write("[auto-fill] cascade JS_SCAN_FORM_FIELDS parse failed" + '\n')
+            sys.stderr.flush()
             raw_fields = []
         fillable = prepare_scan_fields_for_tasklist(raw_fields)
         dom_fields = [ScannedField(**f) if isinstance(f, dict) else f for f in fillable]
@@ -200,6 +209,8 @@ async def _auto_fill_pending_impl(self):
     try:
         probed_cid_sync = await page.evaluate(JS_IDENTIFY_CONTAINER)
     except Exception:
+        sys.stderr.write("[auto-fill] JS_IDENTIFY_CONTAINER probe failed (sync)" + '\n')
+        sys.stderr.flush()
         probed_cid_sync = ''
     active_cid_sync = (probed_cid_sync or self.business_data_store.get('_active_container') or '').strip()
     sync_mode = tasklist_scan_mode(active_cid_sync)
@@ -213,6 +224,8 @@ async def _auto_fill_pending_impl(self):
         sync_fields = prepare_scan_fields_for_tasklist(sync_fields)
         dom_labels = {f.get('label', '') for f in sync_fields}
     except Exception:
+        sys.stderr.write("[auto-fill] sync JS_SCAN_FORM_FIELDS parse failed" + '\n')
+        sys.stderr.flush()
         dom_labels = set()
 
     if dom_labels:

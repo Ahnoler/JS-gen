@@ -67,8 +67,6 @@ JS_CHECK_LOADING = '''() => {
 }'''
 
 
-JS_NATIVE_SETTER = ''  # Inlined in JS_FILL_FORM_FIELD
-
 # ── Locators ──
 
 

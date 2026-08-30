@@ -23,6 +23,7 @@ from ...models import TaskList
 from .form_scan_utils import refresh_scan_buttons, _mark_query_ui_if_needed
 from .form_action_engines import _FormActionEngineBase
 from .result_protocol import err_with
+from .replay_timing import WAIT_150_MS
 
 
 class SaveEngine(_FormActionEngineBase):
@@ -46,6 +47,8 @@ class SaveEngine(_FormActionEngineBase):
             try:
                 await refresh_scan_buttons(page, self.business_data_store)
             except Exception:
+                sys.stderr.write("[click_save] refresh_scan_buttons failed (scope-resolve warmup)" + '\n')
+                sys.stderr.flush()
                 pass
             try:
                 from .section_scope import same_label_section_keys, norm_sec
@@ -76,6 +79,8 @@ class SaveEngine(_FormActionEngineBase):
                             )
                             sys.stderr.flush()
             except Exception:
+                sys.stderr.write("[click_save] section-scope resolve failed (multi/same-label/unique button)" + '\n')
+                sys.stderr.flush()
                 pass
         if sec:
             from .section_scope import remember_phase_section
@@ -144,6 +149,8 @@ class SaveEngine(_FormActionEngineBase):
                     raw = await page.evaluate(JS_CHECK_SINGLE_FIELD, [item.label, btn_kw])
                     info = json.loads(raw) if isinstance(raw, str) and raw.startswith('{') else {}
                 except Exception:
+                    sys.stderr.write("[click_save] prune-check JS_CHECK_SINGLE_FIELD failed label={item.label!r}" + '\n')
+                    sys.stderr.flush()
                     info = {}
                 if info.get('disabled') and not info.get('hasButton'):
                     item.disabled = True
@@ -177,6 +184,8 @@ class SaveEngine(_FormActionEngineBase):
         try:
             info = json.loads(raw) if isinstance(raw, str) else (raw or {})
         except Exception:
+            sys.stderr.write("[click_save] parse JS_CLICK_SAVE_BUTTON result failed" + '\n')
+            sys.stderr.flush()
             info = {}
         retry_scope = ''
         if not info.get('ok'):
@@ -195,6 +204,8 @@ class SaveEngine(_FormActionEngineBase):
                 try:
                     info = json.loads(raw) if isinstance(raw, str) else (raw or {})
                 except Exception:
+                    sys.stderr.write("[click_save] parse retry JS_CLICK_SAVE_BUTTON result failed (stale-scope retry)" + '\n')
+                    sys.stderr.flush()
                     info = {}
                 if info.get('ok'):
                     sec = retry_scope
@@ -203,6 +214,8 @@ class SaveEngine(_FormActionEngineBase):
             try:
                 await page.evaluate('() => { try { window.__saveWatchObs?.disconnect(); } catch(e) {} }')
             except Exception:
+                sys.stderr.write("[click_save] disconnect __saveWatchObs failed (button not clicked path)" + '\n')
+                sys.stderr.flush()
                 pass
             reason = info.get('reason') or 'button-not-found'
             needle = info.get('needle') or (button_text or '保存')
@@ -267,7 +280,7 @@ class SaveEngine(_FormActionEngineBase):
         sys.stderr.write(f'[click_save] clicked "{btn_text}" xpath={xpath[:80]}\n')
         sys.stderr.flush()
 
-        await page.wait_for_timeout(150)
+        await page.wait_for_timeout(WAIT_150_MS)
         await _wait_if_loading(page)
 
         # Poll briefly — success toasts auto-dismiss in ~2–3s
@@ -278,6 +291,8 @@ class SaveEngine(_FormActionEngineBase):
                 try:
                     scanned = json.loads(scanned)
                 except Exception:
+                    sys.stderr.write("[click_save] parse JS_SCAN_SAVE_OUTCOME failed (outcome poll)" + '\n')
+                    sys.stderr.flush()
                     scanned = {}
             watched = await page.evaluate('() => window.__saveWatch || {successNotifs:[], errorNotifs:[]}')
             outcome = scanned or outcome
@@ -294,12 +309,14 @@ class SaveEngine(_FormActionEngineBase):
                 break
             if outcome.get('errorNotifs'):
                 break
-            await page.wait_for_timeout(150)
+            await page.wait_for_timeout(WAIT_150_MS)
             await _wait_if_loading(page)
 
         try:
             await page.evaluate('() => { try { window.__saveWatchObs?.disconnect(); } catch(e) {} }')
         except Exception:
+            sys.stderr.write("[click_save] disconnect __saveWatchObs failed (outcome poll end)" + '\n')
+            sys.stderr.flush()
             pass
 
         form_errors = outcome.get('formErrors') or []
@@ -331,10 +348,14 @@ class SaveEngine(_FormActionEngineBase):
                     tl.sync_from_errors(error_labels)
                     self.business_data_store['task_list'] = tl.to_store()
             except Exception:
+                sys.stderr.write("[click_save] sync validation error labels into task_list failed labels={labels!r}" + '\n')
+                sys.stderr.flush()
                 pass
             try:
                 await page.evaluate(JS_SCROLL_TO_FIRST_ERROR)
             except Exception:
+                sys.stderr.write("[click_save] JS_SCROLL_TO_FIRST_ERROR failed (validation path)" + '\n')
+                sys.stderr.flush()
                 pass
             msg = (
                 f'err-save-validation:{json.dumps(form_errors[:8], ensure_ascii=False)} | '
@@ -392,6 +413,8 @@ class SaveEngine(_FormActionEngineBase):
             try:
                 still_query = bool(await page.evaluate(JS_IS_QUERY_TOOLBAR))
             except Exception:
+                sys.stderr.write("[click_save] JS_IS_QUERY_TOOLBAR recheck failed (picker confirm)" + '\n')
+                sys.stderr.flush()
                 still_query = False
             if not still_query:
                 record_success_token(self.business_data_store, 'confirm_click', button_text or '确认')
@@ -416,6 +439,8 @@ class SaveEngine(_FormActionEngineBase):
                             if f.get('disabled') and (f.get('currentValue') or '').strip():
                                 backfilled.append(f.get('label') or '')
                     except Exception:
+                        sys.stderr.write("[click_save] picker backfill JS_SCAN_FORM_FIELDS failed" + '\n')
+                        sys.stderr.flush()
                         pass
                     if backfilled:
                         record_evidence(

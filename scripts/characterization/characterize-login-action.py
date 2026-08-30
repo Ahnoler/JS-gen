@@ -36,6 +36,9 @@ def main() -> int:
     assert_true(err >= 0 and rec >= 0, "both _err return and _record_action present")
     assert_true(err < rec, "fail before _record_action / success wait")
     wait = body.find("wait_for_timeout(3000)")
+    if wait < 0:
+        wait = body.find("wait_for_timeout(WAIT_3000_MS)")
+    assert_true(wait > err, "3s wait only on success path (after fail return)")
     assert_true(wait > err, "3s wait only on success path (after fail return)")
     assert_true("return _ok(" in body and "ok-login" in body, "success still ok-login")
     assert_true("if captcha:" in body, "captcha fill remains optional")

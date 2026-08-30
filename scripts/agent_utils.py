@@ -394,8 +394,9 @@ def make_step_callback(phase_offset=0):
             actions = getattr(agent_output, 'action', None) or []
             action_names = [list(a.keys())[0] if isinstance(a, dict) else str(a) for a in actions]
             emit_json({"event": "step", "data": {"step": phase_offset + step_num, "url": getattr(browser_state, 'url', '') if browser_state else '', "next_goal": next_goal[:200], "actions": action_names}})
-        except:
-            pass
+        except Exception as e:
+            sys.stderr.write(f'[step-callback] on_step_end emit failed: {type(e).__name__}: {e}\n')
+            sys.stderr.flush()
     return on_step_end
 
 
@@ -412,6 +413,7 @@ def make_done_callback(output_path, business_data_store=None):
             output_path.parent.mkdir(parents=True, exist_ok=True)
             history_list.save_to_file(str(output_path))
             emit_json({"event": "done", "data": {"output_file": str(output_path), "steps": len(history_list.history), "is_done": history_list.is_done(), "is_successful": history_list.is_successful(), "final_result": history_list.final_result(), "errors": history_list.errors()}})
-        except:
-            pass
+        except Exception as e:
+            sys.stderr.write(f'[done-callback] on_done emit failed: {type(e).__name__}: {e}\n')
+            sys.stderr.flush()
     return on_done

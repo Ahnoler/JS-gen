@@ -13,6 +13,11 @@ from browser_use import Browser
 
 from ..cdp_ports import _pick_free_cdp_port
 
+# Strong refs to in-flight auto-accept dialog tasks: page.on('dialog') fires
+# and forgets, and asyncio only weakly references tasks — without this set the
+# task can be garbage-collected mid-accept.
+_dialog_task_refs: set[asyncio.Task] = set()
+
 
 # System browsers used when the Playwright-managed Chromium build is missing.
 _SYSTEM_CHROME_CANDIDATES = [
@@ -299,7 +304,13 @@ async def _dismiss_native_js_dialogs(browser_context) -> None:
             except Exception:
                 pass
 
-        page.on('dialog', lambda d: asyncio.create_task(_on_dialog(d)))
+        def _on_dialog_event(d):
+            """启动自动接受 dialog 的任务并持有强引用（即发即弃防护）。"""
+            task = asyncio.create_task(_on_dialog(d))
+            _dialog_task_refs.add(task)
+            task.add_done_callback(_dialog_task_refs.discard)
+
+        page.on('dialog', _on_dialog_event)
     except Exception as e:
         sys.stderr.write(f'WARN: dialog handler setup failed: {e}\n')
         sys.stderr.flush()
