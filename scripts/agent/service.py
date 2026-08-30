@@ -89,11 +89,17 @@ def _count_tree_select(business_data_ref):
     return sum(1 for f in scan_fields if f.get('kind') in ('tree-select', 'tree'))
 
 
-async def _run_agent_step(instruction, step_index, session_id, args, llm, browser_context,
-                          controller, goal_tracker, cancel_flag_path,
-                          on_step_start_hook, on_step_end_hook, business_data_ref, cumulative_path,
-                          special_element_candidates_store=None):
-    global _last_agent
+async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
+                                  cancel_flag_path, business_data_ref,
+                                  special_element_candidates_store):
+    """step 准备段：指令校验 + 相位意图/契约 + agent_task 编排与 phase_start 上报。
+
+    对应拆分前 _run_agent_step 的 97-424 段（原 local 数据流不变）：close 旧 agent、
+    清 cancel 标记、special_element 候选替换、记忆 trajectory_id、导航、相位辅助
+    检测与 reviewer 契约、max_steps 预算、业务/特殊元素提示注入。
+    返回 (task_text, agent_task, max_steps, ceiling, contract, heal_mode,
+    raw_max_actions_per_step)；指令缺失时返回 None（调用方按 (None, None) 处理）。
+    """
     max_steps = instruction.get("max_steps", 40)
     # 批量动作预算：Node config MAX_ACTIONS_PER_STEP 透传（0/空 → 模式映射，见 resolve_max_actions_per_step）
     raw_max_actions_per_step = (
@@ -103,7 +109,7 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     task_text = instruction.get("instruction", "")
     if not task_text:
         emit_json({"event": "error", "data": {"message": "instruction is required"}})
-        return None, None
+        return None
 
     # Close previous agent before creating new one
     _close_agent()
@@ -422,7 +428,24 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
     except Exception as e:
         sys.stderr.write(f"special-element hint skipped: {e}\n")
         sys.stderr.flush()
+    return (task_text, agent_task, max_steps, ceiling, contract, heal_mode,
+            raw_max_actions_per_step)
 
+
+async def _run_agent_step_agent(instruction, step_index, session_id, llm, browser_context,
+                                controller, goal_tracker, cancel_flag_path,
+                                on_step_start_hook, on_step_end_hook, business_data_ref,
+                                special_element_candidates_store, task_text, agent_task,
+                                max_steps, ceiling, contract, heal_mode,
+                                raw_max_actions_per_step):
+    """agent 构造与运行段：输出路径/预算位 + Agent 组装 + run 与预算续跑循环。
+
+    对应拆分前 _run_agent_step 的 426-539 段（原 local 数据流不变）：goal_tracker
+    重置与 cycle_baseline、heal/契约重解析、max_actions_per_step 预算、Agent 构造、
+    agent.run + 预算扩展循环、取消/异常分类（phase_error 上报）。
+    返回 (output_path, budget_extensions, max_actions_per_step)。
+    """
+    global _last_agent
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = Path(tempfile.gettempdir()) / f"browser_use_session_{session_id}_step{step_index}_{ts}.json"
     goal_tracker['goals'] = []
@@ -537,7 +560,16 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
                    "data": {"phase": step_index, "name": task_text[:60], "message": "Agent run cancelled"}})
     except Exception as e:
         emit_json({"event": "phase_error", "data": {"phase": step_index, "name": task_text[:60], "message": str(e)}})
+    return output_path, budget_extensions, max_actions_per_step
 
+
+async def _run_agent_step_post(step_index, task_text, business_data_ref,
+                               max_actions_per_step, budget_extensions):
+    """结果后处理段：相位结束观测 + 软质量门禁 + phase_end 上报。
+
+    对应拆分前 _run_agent_step 的 541-586 段（原 local 数据流不变）：空写/缺失成功
+    令牌/语义疑点质量标记与 phase_end payload 组装；异常仅记日志不阻断。
+    """
     # Phase-end observability + soft quality gate（循环结束后最终评估）
     try:
         if business_data_ref is not None:
@@ -585,4 +617,31 @@ async def _run_agent_step(instruction, step_index, session_id, args, llm, browse
         sys.stderr.write(f"phase_end observability skipped: {e}\n")
         sys.stderr.flush()
 
+
+async def _run_agent_step(instruction, step_index, session_id, args, llm, browser_context,
+                          controller, goal_tracker, cancel_flag_path,
+                          on_step_start_hook, on_step_end_hook, business_data_ref, cumulative_path,
+                          special_element_candidates_store=None):
+    """单相位 agent step（原 92-588 巨型函数拆分后的编排层）。
+
+    三段式：准备（_run_agent_step_prepare）→ 构造与运行（_run_agent_step_agent）→
+    结果后处理（_run_agent_step_post）；对外签名与返回值、日志/错误文案不变。
+    """
+    prepared = await _run_agent_step_prepare(
+        instruction, step_index, llm, browser_context, cancel_flag_path,
+        business_data_ref, special_element_candidates_store,
+    )
+    if prepared is None:
+        return None, None
+    task_text, agent_task, max_steps, ceiling, contract, heal_mode, raw_max_actions_per_step = prepared
+    output_path, budget_extensions, max_actions_per_step = await _run_agent_step_agent(
+        instruction, step_index, session_id, llm, browser_context, controller,
+        goal_tracker, cancel_flag_path, on_step_start_hook, on_step_end_hook,
+        business_data_ref, special_element_candidates_store,
+        task_text, agent_task, max_steps, ceiling, contract, heal_mode,
+        raw_max_actions_per_step,
+    )
+    await _run_agent_step_post(
+        step_index, task_text, business_data_ref, max_actions_per_step, budget_extensions,
+    )
     return output_path, task_text

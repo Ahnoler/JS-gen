@@ -187,6 +187,101 @@ def _env_llm_timeout_sec():
         return None
     return ms / 1000.0
 
+async def _ensure_browser_and_cdp(cdp_url, cdp_port, session_id):
+    """browser/CDP 启动段（原 run_session 内 217-241 / 273-288 段逐字搬移）。
+
+    构建 Playwright 浏览器与 browser_context（窗口尺寸/无 viewport/忽略证书/
+    适配窗口/原生弹窗关闭/SSL 拦截旁路），并急启 Chrome 会话；随后等待 CDP HTTP
+    就绪并探测 ws URL（外部 cdp_url 直连时直接标记就绪）。
+    返回 (browser, browser_context, cdp_port, cdp_ready, cdp_ws_url)。
+    """
+    browser, cdp_port, _ = await _build_browser(
+        cdp_url=cdp_url,
+        cdp_port=cdp_port,
+        session_id=session_id,
+    )
+
+    # window_width/height (not viewport_*) — browser_use ignores unknown fields.
+    # Keep normal window at BiB default size (do not maximize to screen).
+    win_w, win_h = _session_window_size()
+    config = BrowserContextConfig(
+        window_width=win_w,
+        window_height=win_h,
+        no_viewport=True,
+        wait_for_network_idle_page_load_time=3.0,
+        # trace_path disabled: Playwright traces under scripts/trace/ are no longer needed.
+    )
+    browser_context = await browser.new_context(config)
+
+    # Eagerly launch Chrome BEFORE CDP readiness check / BiB attach.
+    # Previously launch was lazy (first agent step), so prepare often saw cdp_ready=false.
+    await browser_context.get_session()
+    await _ignore_certificate_errors(browser_context)
+    await _fit_browser_window(browser_context, win_w, win_h)
+    await _dismiss_native_js_dialogs(browser_context)
+    await _bypass_ssl_interstitial_if_any(browser_context)
+
+    # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
+    cdp_ready = False
+    cdp_ws_url = None
+    if cdp_url:
+        cdp_ready = True
+        cdp_ws_url = cdp_url
+    elif cdp_port:
+        cdp_ready = await _wait_cdp_http(int(cdp_port), timeout_s=45)
+        if cdp_ready:
+            cdp_ws_url = await _probe_cdp_ws_url(int(cdp_port))
+        else:
+            sys.stderr.write(
+                f"WARN: CDP HTTP still not ready on port {cdp_port} after launch. "
+                "BiB canvas unavailable; AI/manual recording can still run.\n"
+            )
+            sys.stderr.flush()
+    return browser, browser_context, cdp_port, cdp_ready, cdp_ws_url
+
+
+async def _teardown_session(browser, browser_context, reader_task, cdp_task, cdp_port, cdp_url, keep_browser):
+    """会话关停段（原 run_session 内 489-522 段逐字搬移）。
+
+    取消 stdin/cdp watcher 任务并等待退出、登记 session-end 终截、关闭
+    browser_context，再按 keep_browser 决定软关闭（留 CDP）或硬关闭；
+    异常路径与 finally 顺序与原 run_session 保持一致。
+    """
+    reader_task.cancel()
+    cdp_task.cancel()
+    await asyncio.gather(reader_task, cdp_task, return_exceptions=True)
+    # 会话结束最终截图：正常 / error / cancel / SystemExit 退出路径统一在此捕获
+    # 当前页面（capturedAt='session-end'）；截图失败静默，不阻塞关闭。
+    try:
+        from .state import register_current_page_screenshot
+        await register_current_page_screenshot(browser_context, captured_at='session-end')
+        sys.stderr.write('[session-end] final screenshot registered\n')
+        sys.stderr.flush()
+    except Exception as exc:
+        sys.stderr.write('[session-end] FAILED: ' + type(exc).__name__ + ': ' + str(exc) + '\n')
+        sys.stderr.flush()
+    try:
+        await browser_context.close()
+    except Exception:
+        pass
+    if keep_browser:
+        # Soft close — leave Chromium on CDP (not the normal「释放资源」path).
+        sys.stderr.write(
+            f"Leaving Chrome idle"
+            + (f" on CDP port={cdp_port}" if cdp_port and not cdp_url else "")
+            + (f" via {cdp_url}" if cdp_url else "")
+            + "\n"
+        )
+        sys.stderr.flush()
+    else:
+        try:
+            await browser.close()
+        except Exception as e:
+            sys.stderr.write(f"WARN: browser.close failed: {e}\n")
+            sys.stderr.flush()
+        sys.stderr.write("Browser closed, exiting\n")
+        sys.stderr.flush()
+
 
 async def run_session(args):
     patch_message_manager()
@@ -214,31 +309,9 @@ async def run_session(args):
         except (TypeError, ValueError):
             cdp_port = None
 
-    browser, cdp_port, _ = await _build_browser(
-        cdp_url=cdp_url,
-        cdp_port=cdp_port,
-        session_id=session_id,
+    browser, browser_context, cdp_port, cdp_ready, cdp_ws_url = await _ensure_browser_and_cdp(
+        cdp_url, cdp_port, session_id,
     )
-
-    # window_width/height (not viewport_*) — browser_use ignores unknown fields.
-    # Keep normal window at BiB default size (do not maximize to screen).
-    win_w, win_h = _session_window_size()
-    config = BrowserContextConfig(
-        window_width=win_w,
-        window_height=win_h,
-        no_viewport=True,
-        wait_for_network_idle_page_load_time=3.0,
-        # trace_path disabled: Playwright traces under scripts/trace/ are no longer needed.
-    )
-    browser_context = await browser.new_context(config)
-
-    # Eagerly launch Chrome BEFORE CDP readiness check / BiB attach.
-    # Previously launch was lazy (first agent step), so prepare often saw cdp_ready=false.
-    await browser_context.get_session()
-    await _ignore_certificate_errors(browser_context)
-    await _fit_browser_window(browser_context, win_w, win_h)
-    await _dismiss_native_js_dialogs(browser_context)
-    await _bypass_ssl_interstitial_if_any(browser_context)
 
     business_data_store = {}  # process-level in-memory store, persists across steps
     special_element_candidates_store = {}  # replaced each phase; AI may only use these ids
@@ -486,40 +559,7 @@ async def run_session(args):
             sys.stderr.flush()
             emit_json({"event": "error", "data": {"message": f"Unexpected error: {type(e).__name__}: {e}"}})
 
-    reader_task.cancel()
-    cdp_task.cancel()
-    await asyncio.gather(reader_task, cdp_task, return_exceptions=True)
-    # 会话结束最终截图：正常 / error / cancel / SystemExit 退出路径统一在此捕获
-    # 当前页面（capturedAt='session-end'）；截图失败静默，不阻塞关闭。
-    try:
-        from .state import register_current_page_screenshot
-        await register_current_page_screenshot(browser_context, captured_at='session-end')
-        sys.stderr.write('[session-end] final screenshot registered\n')
-        sys.stderr.flush()
-    except Exception as exc:
-        sys.stderr.write('[session-end] FAILED: ' + type(exc).__name__ + ': ' + str(exc) + '\n')
-        sys.stderr.flush()
-    try:
-        await browser_context.close()
-    except Exception:
-        pass
-    if keep_browser:
-        # Soft close — leave Chromium on CDP (not the normal「释放资源」path).
-        sys.stderr.write(
-            f"Leaving Chrome idle"
-            + (f" on CDP port={cdp_port}" if cdp_port and not cdp_url else "")
-            + (f" via {cdp_url}" if cdp_url else "")
-            + "\n"
-        )
-        sys.stderr.flush()
-    else:
-        try:
-            await browser.close()
-        except Exception as e:
-            sys.stderr.write(f"WARN: browser.close failed: {e}\n")
-            sys.stderr.flush()
-        sys.stderr.write("Browser closed, exiting\n")
-        sys.stderr.flush()
+    await _teardown_session(browser, browser_context, reader_task, cdp_task, cdp_port, cdp_url, keep_browser)
 
     # P0：退出前冲刷记忆队列（不等待太久，避免拖慢关闭）
     flush_memory_writer(timeout=2.0)

@@ -70,6 +70,7 @@ from .replay_wait import (  # noqa: F401  (re-exported for compat)
 from .replay_click import _post_click_settle, _replay_click_by_index
 from .replay_form_action import _replay_form_action
 from .replay_table import _replay_table_row_radio
+from .replay_timing import WAIT_400_MS, WAIT_600_MS
 _CLICK_BY_INDEX = 'click_element_by_index'
 
 
@@ -127,7 +128,7 @@ async def _direct_click_menu_xpath(page, params, entry):
     """直派回放 click_menu_xpath：按记录 xpath 点击菜单项，结果行无附加字段。"""
     click_xpath = params.get('xpath') or (entry.get('element') or {}).get('xpath_full') or ''
     result = await page.evaluate(JS_CLICK_MENU_XPATH, click_xpath)
-    await page.wait_for_timeout(600)
+    await page.wait_for_timeout(WAIT_600_MS)
     return result, None
 
 
@@ -233,7 +234,7 @@ async def _replay_goto(page, params: dict) -> str:
             await page.goto(url, wait_until='load', timeout=30000)
         except Exception as e:
             return f'error:goto:{e}'
-    await page.wait_for_timeout(400)
+    await page.wait_for_timeout(WAIT_400_MS)
     await _wait_if_loading(page)
     return 'ok'
 
@@ -423,6 +424,86 @@ async def _replay_controller_action(act, params: dict) -> str:
     return str(extracted if extracted is not None else result)
 
 
+async def _replay_close_dialog_idempotent(page, entry, params, action_name, controller_actions) -> str:
+    """close 动作组幂等 + 持久化点击路径（原 replay_action_entries 主循环 close 组逐字搬移）。
+
+    组内动作：click_menu_item / click_button / click_adjacent_button /
+    click_table_row_button / switch_tab / close_dialog。close_dialog 先做幂等探测
+    （无可见 dialog/drawer/message-box 时视为已关闭直接成功）；未关闭或其它动作
+    走记录 xpath_smart 的持久化点击路径，失败时 close_dialog 追加控制器兜底。
+    """
+    # Idempotent close: if no visible dialog/drawer/message-box
+    # remains, the overlay is already gone (a preceding
+    # 确定/下一步 may have navigated or closed it). Treat as
+    # success instead of failing the replay and forcing a heal
+    # step every time the recorded close lands after the dialog
+    # was already dismissed.
+    result = None
+    if action_name == 'close_dialog':
+        overlay_count = await page.evaluate(JS_COUNT_OVERLAYS)
+        if overlay_count == 0:
+            result = 'ok (no visible dialog/drawer — already closed)'
+            sys.stderr.write('[replay] close_dialog idempotent ok (no visible overlay)\n')
+            sys.stderr.flush()
+    if result is None:
+        # Prefer recorded xpath_smart via durable click path; fall back to controller.
+        click_params = {**params}
+        if action_name == 'click_menu_item':
+            click_params['text'] = params.get('menu_text') or params.get('text') or ''
+        elif action_name == 'click_button':
+            click_params['text'] = params.get('button_text') or params.get('text') or ''
+        elif action_name == 'switch_tab':
+            click_params['text'] = params.get('tab_name') or params.get('text') or ''
+        elif action_name == 'click_table_row_button':
+            click_params['text'] = params.get('button_text') or params.get('text') or ''
+        elif action_name == 'click_adjacent_button':
+            click_params['text'] = params.get('text') or params.get('label_text') or ''
+        # click_table_row_button: try row-anchor xpath first (unique-key
+        # row text disambiguates same-named rows), then durable fallback.
+        if action_name == 'click_table_row_button':
+            _row_t = str(params.get('row_text') or '').strip()
+            _btn_t = str(params.get('button_text') or params.get('text') or '').strip()
+            if _row_t and _btn_t:
+                anchor = await _replay_table_row_button_anchor(page, _row_t, _btn_t)
+                if _result_ok(action_name, anchor):
+                    result = anchor
+                    sys.stderr.write(
+                        f'[replay] click_table_row_button row-anchor ok '
+                        f'(row={_row_t!r} btn={_btn_t!r})\n'
+                    )
+                    sys.stderr.flush()
+        if result is None and (_element_xpath_smart(entry) or click_params.get('text')):
+            result = await _replay_click_by_index(page, entry, click_params)
+            # close_dialog: dialog-scoped xpath often misses drawers
+            # (Element UI reuses i.el-dialog__close inside drawer).
+            # Fall back to CTRL/controller close which handles drawer.
+            if (
+                action_name == 'close_dialog'
+                and not _result_ok(action_name, result)
+            ):
+                act = (controller_actions or {}).get(action_name)
+                if act:
+                    fb = await _replay_controller_action(act, params)
+                    await page.wait_for_timeout(WAIT_400_MS)
+                    await _wait_if_loading(page)
+                    if _result_ok(action_name, fb):
+                        sys.stderr.write(
+                            f'[replay] close_dialog ctrl-fallback ok '
+                            f'(xpath failed: {result})\n'
+                        )
+                        sys.stderr.flush()
+                        result = fb
+        else:
+            act = (controller_actions or {}).get(action_name)
+            if not act:
+                result = f'unknown-action:{action_name}'
+            else:
+                result = await _replay_controller_action(act, params)
+                await page.wait_for_timeout(WAIT_400_MS)
+                await _wait_if_loading(page)
+    return result
+
+
 async def replay_action_entries(
     browser_context,
     entries: list[dict],
@@ -477,75 +558,11 @@ async def replay_action_entries(
                     'switch_tab',
                     'close_dialog',
                 ):
-                    # Idempotent close: if no visible dialog/drawer/message-box
-                    # remains, the overlay is already gone (a preceding
-                    # 确定/下一步 may have navigated or closed it). Treat as
-                    # success instead of failing the replay and forcing a heal
-                    # step every time the recorded close lands after the dialog
-                    # was already dismissed.
-                    result = None
-                    if action_name == 'close_dialog':
-                        overlay_count = await page.evaluate(JS_COUNT_OVERLAYS)
-                        if overlay_count == 0:
-                            result = 'ok (no visible dialog/drawer — already closed)'
-                            sys.stderr.write('[replay] close_dialog idempotent ok (no visible overlay)\n')
-                            sys.stderr.flush()
-                    if result is None:
-                        # Prefer recorded xpath_smart via durable click path; fall back to controller.
-                        click_params = {**params}
-                        if action_name == 'click_menu_item':
-                            click_params['text'] = params.get('menu_text') or params.get('text') or ''
-                        elif action_name == 'click_button':
-                            click_params['text'] = params.get('button_text') or params.get('text') or ''
-                        elif action_name == 'switch_tab':
-                            click_params['text'] = params.get('tab_name') or params.get('text') or ''
-                        elif action_name == 'click_table_row_button':
-                            click_params['text'] = params.get('button_text') or params.get('text') or ''
-                        elif action_name == 'click_adjacent_button':
-                            click_params['text'] = params.get('text') or params.get('label_text') or ''
-                        # click_table_row_button: try row-anchor xpath first (unique-key
-                        # row text disambiguates same-named rows), then durable fallback.
-                        if action_name == 'click_table_row_button':
-                            _row_t = str(params.get('row_text') or '').strip()
-                            _btn_t = str(params.get('button_text') or params.get('text') or '').strip()
-                            if _row_t and _btn_t:
-                                anchor = await _replay_table_row_button_anchor(page, _row_t, _btn_t)
-                                if _result_ok(action_name, anchor):
-                                    result = anchor
-                                    sys.stderr.write(
-                                        f'[replay] click_table_row_button row-anchor ok '
-                                        f'(row={_row_t!r} btn={_btn_t!r})\n'
-                                    )
-                                    sys.stderr.flush()
-                        if result is None and (_element_xpath_smart(entry) or click_params.get('text')):
-                            result = await _replay_click_by_index(page, entry, click_params)
-                            # close_dialog: dialog-scoped xpath often misses drawers
-                            # (Element UI reuses i.el-dialog__close inside drawer).
-                            # Fall back to CTRL/controller close which handles drawer.
-                            if (
-                                action_name == 'close_dialog'
-                                and not _result_ok(action_name, result)
-                            ):
-                                act = (controller_actions or {}).get(action_name)
-                                if act:
-                                    fb = await _replay_controller_action(act, params)
-                                    await page.wait_for_timeout(400)
-                                    await _wait_if_loading(page)
-                                    if _result_ok(action_name, fb):
-                                        sys.stderr.write(
-                                            f'[replay] close_dialog ctrl-fallback ok '
-                                            f'(xpath failed: {result})\n'
-                                        )
-                                        sys.stderr.flush()
-                                        result = fb
-                        else:
-                            act = (controller_actions or {}).get(action_name)
-                            if not act:
-                                result = f'unknown-action:{action_name}'
-                            else:
-                                result = await _replay_controller_action(act, params)
-                                await page.wait_for_timeout(400)
-                                await _wait_if_loading(page)
+                    # close 动作组：幂等探测 + 持久化点击 + 控制器兜底，
+                    # 逻辑整体搬移见 _replay_close_dialog_idempotent。
+                    result = await _replay_close_dialog_idempotent(
+                        page, entry, params, action_name, controller_actions,
+                    )
                 elif action_name == 'click_table_row_radio':
                     # Prefer semantic row match (handles Element UI fixed-column radios).
                     # Durable xpath often requires name+radio in the same <tr> and fails.
@@ -560,7 +577,7 @@ async def replay_action_entries(
                         result = f'unknown-action:{action_name}'
                     else:
                         result = await _replay_controller_action(act, params)
-                        await page.wait_for_timeout(400)
+                        await page.wait_for_timeout(WAIT_400_MS)
                         await _wait_if_loading(page)
                         if action_name == 'click_save' and _result_ok(action_name, result):
                             await _wait_after_save_page_idle(page)
