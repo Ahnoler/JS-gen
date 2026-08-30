@@ -10,8 +10,9 @@
  *   AI-fill adding + structured insert (confirmed=0, next batch) — healType=form_structure
  */
 import * as execSession from '../../executor-session-client.js';
+import { runReplayActions } from '../replay-actions.js';
+import { REPLAY_STEP_TIMEOUT_MS } from '#config/config.js';
 import {
-  REPLAY_TIMEOUT_MS,
   HEAL_MAX_STEPS,
   USER_ABORT_CODE,
   isUserAbort,
@@ -50,18 +51,15 @@ function emitReplayAborted(tid, { successCount = 0, failedStepIds = [] } = {}) {
 }
 
 async function forwardReplayEntry(runtime, entry, doSuppress) {
-  const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', REPLAY_TIMEOUT_MS);
-  execSession.forwardStdin({
-    nodeUuid: runtime.executorNodeUuid,
+  return runReplayActions({
+    execSession,
     sessionId: runtime.sessionId,
-    event: 'replay_actions',
-    data: {
-      actions: [entry],
-      is_replay: doSuppress,
-      stop_on_fail: true,
-    },
+    nodeUuid: runtime.executorNodeUuid,
+    actions: [entry],
+    timeoutMs: REPLAY_STEP_TIMEOUT_MS,
+    stopOnFail: true,
+    isReplay: doSuppress,
   });
-  return doneP;
 }
 
 /**
@@ -190,18 +188,15 @@ export async function runReplayBatch({
 
       let result;
       try {
-        const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', REPLAY_TIMEOUT_MS);
-        execSession.forwardStdin({
-          nodeUuid: runtime.executorNodeUuid,
+        result = await runReplayActions({
+          execSession,
           sessionId: runtime.sessionId,
-          event: 'replay_actions',
-          data: {
-            actions: [entry],
-            is_replay: doSuppress,
-            stop_on_fail: true,
-          },
+          nodeUuid: runtime.executorNodeUuid,
+          actions: [entry],
+          timeoutMs: REPLAY_STEP_TIMEOUT_MS,
+          stopOnFail: true,
+          isReplay: doSuppress,
         });
-        result = await doneP;
         await markConsumedActionLog(runtime);
       } catch (e) {
         const msg = e?.message || String(e);

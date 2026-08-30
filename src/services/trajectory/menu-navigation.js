@@ -9,9 +9,8 @@
  */
 import * as execSession from '../../executor-session-client.js';
 import * as systemDao from '../../dao/system-dao.js';
-
-/** 菜单导航单步超时（ms）——菜单点击通常很快，给 120s 余量。 */
-const MENU_NAV_TIMEOUT_MS = 120000;
+import { runReplayActions } from '../replay-actions.js';
+import { REPLAY_NAV_TIMEOUT_MS } from '#config/config.js';
 
 /**
  * 纯函数：根据模块/功能菜单 xpath 构建导航动作序列。
@@ -47,7 +46,7 @@ export function buildMenuNavActions({ moduleXpath, functionXpath } = {}) {
  * 2. systemDao.getRawById(functionId) → 功能节点；parentId → 模块节点
  * 3. functionXpath = 功能节点.menuXpath，moduleXpath = 模块节点.menuXpath；都空 → {false,'no-menu-xpath'}
  * 4. 同菜单跳过：key = `${moduleXpath||''}|${functionXpath||''}`；与 runtime._lastMenuNavKey 相同 → {false,'same-menu'}
- * 5. actions = buildMenuNavActions(...)；waitForSessionEvent + forwardStdin（参照 runDefaultLogin 写法）
+ * 5. actions = buildMenuNavActions(...)；runReplayActions 下发（超时/stop_on_fail/is_replay 逐处显式声明）
  * 6. replay_done 后 failed>0 或抛异常 → 吞掉并 console.warn，返回 {false,'nav-failed'}（不阻断）
  * 7. 成功 → runtime._lastMenuNavKey = key; return {true,'ok'}
  * @param {object} opts 参数对象
@@ -90,22 +89,15 @@ export async function navigateToFunctionMenu({ runtime, functionId, execSession 
   if (actions.length === 0) return { navigated: false, reason: 'no-menu-xpath' };
 
   try {
-    const doneP = execSession.waitForSessionEvent(
-      runtime.sessionId,
-      'replay_done',
-      MENU_NAV_TIMEOUT_MS,
-    );
-    execSession.forwardStdin({
-      nodeUuid: runtime.executorNodeUuid,
+    const { result } = await runReplayActions({
+      execSession,
       sessionId: runtime.sessionId,
-      event: 'replay_actions',
-      data: {
-        actions,
-        is_replay: true,
-        stop_on_fail: false,
-      },
+      nodeUuid: runtime.executorNodeUuid,
+      actions,
+      timeoutMs: REPLAY_NAV_TIMEOUT_MS,
+      stopOnFail: false,
+      isReplay: true,
     });
-    const result = await doneP;
     const failed = Number(result?.failed || 0);
     if (result?.error || failed > 0) {
       console.warn(`[menu-nav] nav replay failed (failed=${failed} error=${result?.error || ''})`);

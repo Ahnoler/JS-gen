@@ -29,6 +29,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   影响范围：refactor gate 其余项不变。
   文件：`scripts/characterization/`、`scripts/smoke/`、`scripts/refactor/verify-all.sh`。
 
+### Changed
+
+- 2026-08-31: **replay 会话编排统一（重构，行为保持）**。新建 `src/services/replay-actions.js` 的 `runReplayActions({execSession, sessionId, nodeUuid, actions, timeoutMs, stopOnFail, isReplay, errorEvent})`：统一"等待 replay_done + 下发 replay_actions"编排，等待 promise 预挂 no-op catch（杜绝孤儿超时 rejection 打崩进程的已知事故模式）、可选 errorEvent 竞速（输家 promise.cancel 全路径释放）、统一结果形态。迁移 **10 处调用**（分两阶段）：menu-scan-service（登录/扫描/phase2）、trajectory-record-lifecycle.runDefaultLogin、recording-page-bind、replay-batch-runner（两份内联副本合一）、form-structure-heal、special-element-service（replay_error 竞速收编）、menu-navigation。每处超时值/stop_on_fail/is_replay/结果判定逻辑逐字保持。register.js **保持原样**（seed_action_log 附加字段 + 本地共享浏览器双分支 + stop_on_fail 缺省语义不同）。超时收敛 config/config.js 新增 REPLAY_LOGIN/STEP/NAV/READ_PAGE/PHASE2_TIMEOUT_MS 五键（env 可覆盖）。special-element 的 replay_error 通道经查无生产者（纯防御监听），收编后行为不变。
+  真机验证：错误路径（SUT DNS 不可达）经 helper 传播形态与原实现逐字一致；16 例 replay-batch 特征化（含 fake 驱动 runReplayBatch 五场景）全程保护。register.js 的 REPLAY_LOGIN_TIMEOUT_MS 已入 config 待其后续接线。
+  影响范围：replay-actions.js（新）、replay-batch-runner/form-structure-heal/special-element/menu-navigation/register/trajectory-record-lifecycle/recording-page-bind/menu-scan-service、config/config.js、4 个特征化文件断言适配。
+
 ### Added
 
 - 2026-08-31: **菜单标记位拆分：新增 `removed_flag`（版本已下线），`unmatched_flag` 语义收窄为扫描未匹配**。此前一个字段承载两种语义（扫描找不到真实菜单的幽灵节点 / 重复导入时从新 JSON 消失但因有交易保留的旧菜单），互相覆盖导致标记反复横跳、测试人员无法区分"系统没有该功能"与"最新建模已删除该功能"。拆分后：`unmatched_flag` 归**扫描独占**（真实系统找不到菜单的 json_import 节点，置位/清除均由扫描管理，导入零写入）；新增 `removed_flag` 归**导入独占**（规则 5.9 消失标记置 1、规则 5.5 umlEcd 回归/同名收编清 0；导入零写入 unmatchedFlag）。一个节点可同时带两标记（两个世界都不存在的孤儿，必挂交易）。规则 5.8 删除/保留判定随 removed_flag 走。变更表导入侧事件 `unmatched_marked` → `offline_marked`（detail.reason=not_in_new_json），导入统计 `markedUnmatched` → `markedOffline`；api-docs change_type 枚举与示例同步。前端系统树名称列新增红色"已下线"标签（与橙色"未匹配"并列，可同时展示）。

@@ -301,17 +301,20 @@ function testWiringService() {
 
 function testWiringReplayErrorChannel() {
   const service = readFileSync(join(root, 'src/services/special-element-service.js'), 'utf8');
-  // 本服务独有的 Promise.race(doneP, errP) 模式：同时监听 replay_done / replay_error
-  assert.match(service, /Promise\.race\(\[doneP, errP\]\)/, 'Promise.race([doneP, errP]) 模式');
-  assert.match(service, /waitForSessionEvent\(runtime\.sessionId, 'replay_done', 300000\)/,
-    '监听 replay_done（300s 超时）');
-  assert.match(service, /replay_error/, '监听 replay_error 错误事件通道');
-  assert.match(service, /waitForSessionEvent\(runtime\.sessionId, 'replay_error', 300000\)/,
-    'replay_error 经 waitForSessionEvent 监听');
-  assert.match(service, /event: 'replay_actions'/, '下发 replay_actions stdin 事件');
-  assert.match(service, /forwardStdin/, '经 execSession.forwardStdin 下发');
-  assert.match(service, /stop_on_fail: false/, 'replay_actions 带 stop_on_fail: false');
+  // 下发编排已统一走 runReplayActions helper：replay_done / replay_error 双通道竞速
+  // 由 helper 的 errorEvent 选项持有（胜出方 payload 即返回的 result），在 helper 源上钉住。
+  assert.match(service, /runReplayActions\(\{/, '下发编排统一走 runReplayActions helper');
+  assert.match(service, /errorEvent: 'replay_error'/, '监听 replay_error 错误事件通道（helper errorEvent）');
+  assert.match(service, /stopOnFail: false/, 'replay_actions 带 stop_on_fail: false');
   assert.match(service, /suppressStepPersist/, 'replay 时置 suppressStepPersist 运行时标志');
+  const helper = readFileSync(join(root, 'src/services/replay-actions.js'), 'utf8');
+  assert.match(helper, /event: 'replay_actions'/, 'helper 下发 replay_actions stdin 事件');
+  assert.match(helper, /forwardStdin/, 'helper 经 execSession.forwardStdin 下发');
+  assert.match(helper, /Promise\.race\(\[/, 'helper 持有 doneP/errP 竞速模式');
+  assert.match(helper, /waitForSessionEvent\(sessionId, 'replay_done', timeoutMs\)/,
+    '监听 replay_done（调用方超时）');
+  assert.match(helper, /waitForSessionEvent\(sessionId, errorEvent, timeoutMs\)/,
+    'replay_error 经 waitForSessionEvent 监听');
 }
 
 function testWiringTables() {
@@ -364,7 +367,7 @@ async function main() {
     ['createFromTrajectory 校验链（phaseId→stepIds→name→tagDictCode）', testCreateFromTrajectoryValidationChain],
     ['createStep 非法 id → 400 Invalid special element id', testCreateStepInvalidId],
     ['wiring: service 导出清单 + uk_special_element_sys_name 冲突映射', testWiringService],
-    ['wiring: Promise.race(doneP, errP) 监听 replay_done/replay_error + replay_actions 下发', testWiringReplayErrorChannel],
+    ['wiring: runReplayActions helper 收编 doneP/errP 竞速（replay_error 通道）+ replay_actions 下发', testWiringReplayErrorChannel],
     ['wiring: dao 表名 special_element / special_element_step', testWiringTables],
     ['wiring: /api/v2/special-elements(-steps) 路由挂接', testWiringRoute],
     ['wiring: trajectory 链路动态 import fetchDisplayCandidatesForDescription', testWiringTrajectoryIntegration],

@@ -171,13 +171,21 @@ function testWiringSameMenuSkip() {
 
 function testWiringReplayPayload() {
   const src = navSource();
+  // 下发编排已统一走 runReplayActions helper：调用方传 stopOnFail:false / isReplay:true /
+  // config REPLAY_NAV_TIMEOUT_MS；线协议（event/is_replay/stop_on_fail 字段）在 helper 源上钉住。
   assertAllMatch(src, [
-    ['forwardStdin 发送事件 replay_actions', /event: 'replay_actions'/],
-    ['载荷 is_replay 恒为 true（不入步骤表）', /is_replay: true/],
-    ['载荷 stop_on_fail 为 false（失败不阻断后续）', /stop_on_fail: false/],
-    ['等待 replay_done 会话事件', /waitForSessionEvent\(\s*runtime\.sessionId,\s*'replay_done',\s*MENU_NAV_TIMEOUT_MS,?\s*\)/],
-    ['单步超时 120s', /const MENU_NAV_TIMEOUT_MS = 120000/],
+    ['下发编排统一走 runReplayActions helper', /runReplayActions\(\{/],
+    ['载荷 is_replay 恒为 true（不入步骤表）', /isReplay: true/],
+    ['载荷 stop_on_fail 为 false（失败不阻断后续）', /stopOnFail: false/],
+    ['单步超时引用 config REPLAY_NAV_TIMEOUT_MS', /timeoutMs: REPLAY_NAV_TIMEOUT_MS/],
   ]);
+  const cfg = readFileSync(join(root, 'config/config.js'), 'utf8');
+  assert.match(cfg, /export const REPLAY_NAV_TIMEOUT_MS/, 'config 导出 REPLAY_NAV_TIMEOUT_MS');
+  assert.match(cfg, /REPLAY_NAV_TIMEOUT_MS', '120000'/, 'REPLAY_NAV_TIMEOUT_MS 默认值 120s');
+  const helper = readFileSync(join(root, 'src/services/replay-actions.js'), 'utf8');
+  assert.match(helper, /event: 'replay_actions'/, 'helper 发送事件 replay_actions');
+  assert.match(helper, /is_replay: isReplay/, 'helper 透传 is_replay');
+  assert.match(helper, /stop_on_fail: stopOnFail/, 'helper 透传 stop_on_fail');
   const client = readFileSync(join(root, 'src/executor-session-client.js'), 'utf8');
   assert.match(client, /export function forwardStdin\(/, 'executor-session-client 导出 forwardStdin');
   assert.match(client, /export \{ onSessionEvent, waitForSessionEvent, removeSessionHub \}/,
@@ -244,7 +252,7 @@ async function main() {
     ['行为: navigateToFunctionMenu 无效 functionId → no-function（fake 注入零 executor 调用）', testNavInvalidFunctionId],
     ['wiring: 依赖链 systemDao 模块内 import（不可注入）+ execSession 可注入', testWiringDependencies],
     ['wiring: 同菜单跳过 navKey 与 runtime._lastMenuNavKey', testWiringSameMenuSkip],
-    ['wiring: replay 载荷 is_replay:true + stop_on_fail:false + replay_done 等待', testWiringReplayPayload],
+    ['wiring: replay 载荷 is_replay:true + stop_on_fail:false（runReplayActions helper 收编）', testWiringReplayPayload],
     ['wiring: 失败不抛出（warn + nav-failed）', testWiringNavFailureSwallowed],
     ['wiring: xpath 取值链 funcNode/moduleNode.menuXpath，双空 → no-menu-xpath', testWiringXpathChain],
     ['wiring: 调用方 replay-batch-runner / recording-page-bind 注入 execSession', testWiringCallers],

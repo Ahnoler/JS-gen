@@ -8,11 +8,12 @@
  * (confirmed=0, picked up by the next batch). Unsafe scans never mutate.
  */
 import { getDB } from '#config/database.js';
+import { REPLAY_STEP_TIMEOUT_MS } from '#config/config.js';
 import * as execSession from '../../executor-session-client.js';
+import { runReplayActions } from '../replay-actions.js';
 import * as formSnapshotDao from '../../dao/form-snapshot-dao.js';
 import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import {
-  REPLAY_TIMEOUT_MS,
   USER_ABORT_CODE,
   isUserAbort,
   trajScope,
@@ -166,28 +167,25 @@ export async function handleFormStructureCheckpoint({
 
   let result;
   try {
-    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', REPLAY_TIMEOUT_MS);
-    execSession.forwardStdin({
-      nodeUuid: runtime.executorNodeUuid,
+    result = await runReplayActions({
+      execSession,
       sessionId: runtime.sessionId,
-      event: 'replay_actions',
-      data: {
-        actions: [{
-          ...entry,
-          params: {
-            ...(entry.params || {}),
-            fields: (snap.fields || []).map((f) => ({
-              label: f.label,
-              is_required: !!(f.isRequired ?? f.is_required),
-            })),
-            container: snap.container,
-          },
-        }],
-        is_replay: doSuppress,
-        stop_on_fail: true,
-      },
+      nodeUuid: runtime.executorNodeUuid,
+      actions: [{
+        ...entry,
+        params: {
+          ...(entry.params || {}),
+          fields: (snap.fields || []).map((f) => ({
+            label: f.label,
+            is_required: !!(f.isRequired ?? f.is_required),
+          })),
+          container: snap.container,
+        },
+      }],
+      timeoutMs: REPLAY_STEP_TIMEOUT_MS,
+      stopOnFail: true,
+      isReplay: doSuppress,
     });
-    result = await doneP;
     await markConsumedActionLog(runtime);
   } catch (e) {
     const msg = e?.message || String(e);

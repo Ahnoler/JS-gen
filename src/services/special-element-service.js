@@ -3,6 +3,7 @@
  * Special elements are reusable step groups snapshotted from trajectory phases.
  */
 import { getDB } from '../../config/database.js';
+import { REPLAY_STEP_TIMEOUT_MS } from '../../config/config.js';
 import * as specialElementDao from '../dao/special-element-dao.js';
 import * as specialElementStepDao from '../dao/special-element-step-dao.js';
 import * as trajectoryPhaseDao from '../dao/trajectory-phase-dao.js';
@@ -19,6 +20,7 @@ import {
   getTrajectoryRuntime,
 } from './trajectory/trajectory-runtime.js';
 import * as execSession from '../executor-session-client.js';
+import { runReplayActions } from './replay-actions.js';
 import { state } from '../state.js';
 
 const SPECIAL_ELEMENT_TAG = 'special_element_tag';
@@ -442,21 +444,20 @@ export async function replaySpecialElement(id, {
   runtime.isReplay = !persist;
 
   try {
-    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 300000);
-    const errP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_error', 300000)
-      .then((p) => Promise.reject(new Error(p?.message || 'replay_error')));
-
-    execSession.forwardStdin({
-      nodeUuid: runtime.executorNodeUuid,
+    // 下发编排统一走 runReplayActions；replay_done 与防御性 replay_error 通道的
+    // 竞速由 helper 的 errorEvent 选项持有（胜出方 payload 即 outcome.result）。
+    // 原实现的 replay_error 胜出会转成 Error 抛出；helper 改为正常返回胜出载荷——
+    // 该通道当前全仓无生产者（仅防御性监听），可达路径（replay_done/超时）语义不变。
+    const { result } = await runReplayActions({
+      execSession,
       sessionId: runtime.sessionId,
-      event: 'replay_actions',
-      data: {
-        actions,
-        stop_on_fail: false,
-      },
+      nodeUuid: runtime.executorNodeUuid,
+      actions,
+      timeoutMs: REPLAY_STEP_TIMEOUT_MS,
+      stopOnFail: false,
+      isReplay: true,
+      errorEvent: 'replay_error',
     });
-
-    const result = await Promise.race([doneP, errP]);
     return {
       specialElementId: element.id,
       trajectoryId: tid,

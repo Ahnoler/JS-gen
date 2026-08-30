@@ -162,6 +162,18 @@ export const REMOTE_SESSION_GRACE_MS = parseInt(
   10,
 );
 
+// ── Replay 会话编排超时（runReplayActions 各调用方；毫秒）──
+/** rerun 前置动作复演（go_to_url + login 场景重建）的 replay_done 等待超时。 */
+export const REPLAY_LOGIN_TIMEOUT_MS = parseInt(_resolve('REPLAY_LOGIN_TIMEOUT_MS', '180000'), 10) || 180000;
+/** 单步/整段 replay_done 等待超时（replay-batch-runner 每步、form-structure-heal Type B、special-element 手动回放）。 */
+export const REPLAY_STEP_TIMEOUT_MS = parseInt(_resolve('REPLAY_STEP_TIMEOUT_MS', '300000'), 10) || 300000;
+/** 交易执行前菜单导航 replay 超时（menu-navigation）。 */
+export const REPLAY_NAV_TIMEOUT_MS = parseInt(_resolve('REPLAY_NAV_TIMEOUT_MS', '120000'), 10) || 120000;
+/** 读起点页面组件编号 replay 超时（recording-page-bind read_page_component_code）。 */
+export const REPLAY_READ_PAGE_TIMEOUT_MS = parseInt(_resolve('REPLAY_READ_PAGE_TIMEOUT_MS', '90000'), 10) || 90000;
+/** 菜单扫描阶段二组件编号合并读取 replay 超时（menu-scan-service phase2）。 */
+export const REPLAY_PHASE2_TIMEOUT_MS = parseInt(_resolve('REPLAY_PHASE2_TIMEOUT_MS', '25000'), 10) || 25000;
+
 // ── SSO / 账号中心（产品登录 + 用户隔离）──
 export const SSO_APP_KEY = _resolve('SSO_APP_KEY', '1920710182837141505');
 export const SSO_BASE_URL = _resolve('SSO_BASE_URL', 'http://test.paas.tansun.com.cn');

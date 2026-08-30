@@ -465,12 +465,22 @@ function testStructureFinallyReset() {
 
 function testStructureForwardContract() {
   const src = readFileSync(join(root, SUT), 'utf8');
-  const stopOnFail = (src.match(/stop_on_fail: true/g) || []).length;
-  assert.ok(stopOnFail >= 2, `stop_on_fail true on every replay forward (found ${stopOnFail})`);
-  assert.match(src, /event: 'replay_actions'/, 'replay forwarded as replay_actions');
+  // 下发编排已统一走 runReplayActions helper：调用方逐处显式声明 timeoutMs/stopOnFail/isReplay，
+  // 线协议（event: 'replay_actions' + is_replay/stop_on_fail 字段）由 helper 持有，在 helper 源上钉住。
+  const stopOnFail = (src.match(/stopOnFail: true/g) || []).length;
+  assert.ok(stopOnFail >= 2, `stopOnFail true on every replay forward (found ${stopOnFail})`);
+  assert.ok((src.match(/runReplayActions\(/g) || []).length >= 2,
+    `both per-step forwards go through runReplayActions helper (found ${(src.match(/runReplayActions\(/g) || []).length})`);
   assert.match(src, /actions: \[entry\]/, 'single-action batches forwarded');
-  assert.match(src, /waitForSessionEvent\(runtime\.sessionId, 'replay_done', REPLAY_TIMEOUT_MS\)/,
-    'replay_done awaited with REPLAY_TIMEOUT_MS');
+  assert.match(src, /isReplay: doSuppress/, 'is_replay mirrors doSuppress via isReplay');
+  assert.match(src, /timeoutMs: REPLAY_STEP_TIMEOUT_MS/,
+    'replay_done awaited with REPLAY_STEP_TIMEOUT_MS (300s; former REPLAY_TIMEOUT_MS)');
+  const helper = readFileSync(join(root, 'src/services/replay-actions.js'), 'utf8');
+  assert.match(helper, /event: 'replay_actions'/, 'replay forwarded as replay_actions (helper)');
+  assert.match(helper, /is_replay: isReplay/, 'helper forwards caller-supplied is_replay');
+  assert.match(helper, /stop_on_fail: stopOnFail/, 'helper forwards caller-supplied stop_on_fail');
+  assert.match(helper, /waitForSessionEvent\(sessionId, 'replay_done', timeoutMs\)/,
+    'helper awaits replay_done with caller timeoutMs');
 }
 
 function testWiringSharedModule() {
