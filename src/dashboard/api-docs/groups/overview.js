@@ -175,7 +175,7 @@ export const GROUP_OVERVIEW = [
         desc: 'multipart/form-data，字段 file=被测系统《建模组件关系》.json。解析 umlRelInfo，在 :id 系统节点下建立两级菜单树（顶层子领域→模块、叶子子领域→功能，中间层不建节点），记录菜单唯一ID(umlEcd)、页面ID(pdCmptEcd→system_page)、来源标记 json_import；重复导入按 umlEcd 幂等更新，同名同类型已存在的非 JSON 节点会被收编。成功返回 201 与统计、重建后的树。',
         tryable: false,
         reqExample: 'form-data: file=@全部领域-建模组件关系.json',
-        respExample: J({ created: 120, updated: 0, adopted: 24, markedUnmatched: 0, pagesImported: 411, tree: [] }),
+        respExample: J({ created: 120, updated: 0, adopted: 24, markedOffline: 0, pagesImported: 411, tree: [] }),
         notes: [':id 必须是系统类型节点 (type=1)', '页面 ID 只收 managePage/guidePages 的 pdCmptEcd，空编码跳过', 'JSON 中消失的旧 json_import 菜单会保留并标记 unmatchedFlag'],
       },
         {
@@ -199,7 +199,7 @@ export const GROUP_OVERVIEW = [
         {
           method: 'GET', path: '/api/v2/system-mgmt/nodes/:id/change-log',
           summary: '菜单变更历史',
-          desc: '按系统节点返回菜单变更逐事件流水（id 倒序）。source=import（JSON 导入）/ scan（菜单扫描）；change_type 含 renamed/updated/adopted/created/moved/transaction_migrated/deleted/merged/unmatched_marked；detail 为 JSON 字符串。测试人员查版本演化（version 过滤），管理员按 transaction_migrated 记录手动迁移排查。',
+          desc: '按系统节点返回菜单变更逐事件流水（id 倒序）。source=import（JSON 导入）/ scan（菜单扫描）；change_type 含 renamed/updated/adopted/created/moved/transaction_migrated/deleted/merged/unmatched_marked/offline_marked（导入侧版本已下线）；detail 为 JSON 字符串。测试人员查版本演化（version 过滤），管理员按 transaction_migrated 记录手动迁移排查。',
           params: [
             { name: 'id', type: 'number', required: true, in: 'path', desc: '系统节点 ID', example: '1' },
             { name: 'version', type: 'number', in: 'query', desc: '菜单版本号过滤（对应 snapshot 版本）', example: '3' },

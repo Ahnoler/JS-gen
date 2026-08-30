@@ -163,7 +163,7 @@ export function buildImportJsonPlan({ roots }) {
  *          先删功能再按"无 children + 自身 unmatched + 子树无交易"清理模块。
  * @param {number|string} systemNodeId 目标系统节点 id（必须 type=1）
  * @param {Buffer|string} buffer JSON 文件内容
- * @returns {Promise<{ created: number, updated: number, adopted: number, markedUnmatched: number, pagesImported: number, snapshotVersion: number, deleted: number, migratedNodes: number, migratedTransactions: number, tree: object[] }>} 导入统计与重建后的树；migratedNodes/migratedTransactions 为规则5.3/5.4 迁移计数
+ * @returns {Promise<{ created: number, updated: number, adopted: number, markedOffline: number, pagesImported: number, snapshotVersion: number, deleted: number, migratedNodes: number, migratedTransactions: number, tree: object[] }>} 导入统计与重建后的树；markedOffline 为消失标记计数（removed_flag=1，"版本已下线"）；migratedNodes/migratedTransactions 为规则5.3/5.4 迁移计数
  * @throws {{ code: 'VALIDATION' }} 目标节点不存在或非系统类型时抛出
  */
 export async function importMenuJson(systemNodeId, buffer) {
@@ -175,7 +175,7 @@ export async function importMenuJson(systemNodeId, buffer) {
     throw Object.assign(new Error('目标节点必须是系统（type=1）'), { code: 'VALIDATION' });
   }
 
-  const stats = { created: 0, updated: 0, adopted: 0, markedUnmatched: 0, pagesImported: 0, deleted: 0, migratedNodes: 0, migratedTransactions: 0 };
+  const stats = { created: 0, updated: 0, adopted: 0, markedOffline: 0, pagesImported: 0, deleted: 0, migratedNodes: 0, migratedTransactions: 0 };
   // 变更事件流水收集：事务尾批量落 system_menu_change_log（source='import'）
   const changeRows = [];
 
@@ -290,7 +290,7 @@ export async function importMenuJson(systemNodeId, buffer) {
           umlEcd,
           pdCmptEcd,
           source: 'json_import',
-          unmatchedFlag: 0,
+          removedFlag: 0,
         }, trx);
         stats.updated += 1;
         // 变更事件：改名 / 更新
@@ -309,7 +309,7 @@ export async function importMenuJson(systemNodeId, buffer) {
             umlEcd,
             pdCmptEcd,
             source: 'json_import',
-            unmatchedFlag: 0,
+            removedFlag: 0,
           }, trx);
           stats.adopted += 1;
           // 变更事件：收编
@@ -402,17 +402,23 @@ export async function importMenuJson(systemNodeId, buffer) {
     for (const mod of existingModules) {
       const ecd = String(mod.umlEcd || '').trim();
       if (mod.source === 'json_import' && ecd && !planUmlEcds.has(ecd)) {
-        await systemDao.update(mod.id, { unmatchedFlag: 1 }, trx);
-        stats.markedUnmatched += 1;
+        // 消失标记语义 = 版本已下线（removed_flag 归导入独占；unmatched_flag 归扫描，导入不碰）
+        await systemDao.update(mod.id, { removedFlag: 1 }, trx);
+        stats.markedOffline += 1;
         unmatchedModuleIds.add(Number(mod.id));
+        // 变更事件：消失标记 → 版本已下线
+        changeRows.push({ changeType: 'offline_marked', nodeId: Number(mod.id), detail: { name: String(mod.name || ''), reason: 'not_in_new_json' } });
       }
       const existingFunctions = await systemDao.listByParent(mod.id, trx);
       for (const fn of existingFunctions) {
         const fnEcd = String(fn.umlEcd || '').trim();
         if (fn.source === 'json_import' && fnEcd && !planUmlEcds.has(fnEcd)) {
-          await systemDao.update(fn.id, { unmatchedFlag: 1 }, trx);
-          stats.markedUnmatched += 1;
+          // 消失标记语义 = 版本已下线（removed_flag 归导入独占；unmatched_flag 归扫描，导入不碰）
+          await systemDao.update(fn.id, { removedFlag: 1 }, trx);
+          stats.markedOffline += 1;
           unmatchedFunctionIds.push({ id: Number(fn.id), name: String(fn.name || '') });
+          // 变更事件：消失标记 → 版本已下线
+          changeRows.push({ changeType: 'offline_marked', nodeId: Number(fn.id), detail: { name: String(fn.name || ''), reason: 'not_in_new_json' } });
         }
       }
     }

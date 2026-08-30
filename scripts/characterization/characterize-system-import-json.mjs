@@ -226,6 +226,10 @@ function testWiringService() {
   // 规则5.4：按 system_node_id 查 system_page 做交易迁移匹配
   assert.match(service, /whereIn\('system_node_id'/, 'rule5.4 queries system_page by system_node_id');
   assert.match(service, /规则5\.4/, 'rule5.4 transaction migration block present');
+  // 消失标记拆分：removed_flag 承载"版本已下线"（导入独占），unmatched_flag 语义收窄归扫描
+  assert.match(service, /removedFlag: 1/, 'import marks vanished nodes with removedFlag=1 (offline)');
+  assert.match(service, /offline_marked/, 'import writes offline_marked change events for vanished nodes');
+  assert.match(service, /removedFlag: 0/, 'import clears removedFlag on umlEcd hit / adoption');
 }
 
 function testWiringDao() {

@@ -31,6 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- 2026-08-31: **菜单标记位拆分：新增 `removed_flag`（版本已下线），`unmatched_flag` 语义收窄为扫描未匹配**。此前一个字段承载两种语义（扫描找不到真实菜单的幽灵节点 / 重复导入时从新 JSON 消失但因有交易保留的旧菜单），互相覆盖导致标记反复横跳、测试人员无法区分"系统没有该功能"与"最新建模已删除该功能"。拆分后：`unmatched_flag` 归**扫描独占**（真实系统找不到菜单的 json_import 节点，置位/清除均由扫描管理，导入零写入）；新增 `removed_flag` 归**导入独占**（规则 5.9 消失标记置 1、规则 5.5 umlEcd 回归/同名收编清 0；导入零写入 unmatchedFlag）。一个节点可同时带两标记（两个世界都不存在的孤儿，必挂交易）。规则 5.8 删除/保留判定随 removed_flag 走。变更表导入侧事件 `unmatched_marked` → `offline_marked`（detail.reason=not_in_new_json），导入统计 `markedUnmatched` → `markedOffline`；api-docs change_type 枚举与示例同步。前端系统树名称列新增红色"已下线"标签（与橙色"未匹配"并列，可同时展示）。
+  迁移 20260831100000（removed_flag 列）。真机湿测：移除挂交易的"对公客户管理"子域 → 节点 removed_flag=1 保留、unmatched_flag=0 不受导入影响、交易不迁移、offline_marked 事件落库；恢复原 JSON → removed_flag 清零 ✓。
+  影响范围：migrations/20260831100000（新）、system-dao.js（白名单+fromRaw）、menu-json-import.js（5.9/5.5/5.8/变更事件/stats 键改名 markedOffline）、system-mgmt change-log 文档、characterize-system-import-json（wiring）、前端 system.ts+tree-config/index.vue（vue dev 分支）。
+
 - 2026-08-29: **扫描后按真实菜单顺序重排 sort_order + 阶段二合并加固（共享页面歧义防护）**。①扫描应用时把每个真实菜单在其层级内的 DOM 顺序写入节点 `sort_order`（模块按 L1 全局下标、功能按所属模块内 L2 下标；updates/creates/阶段二合并改名路径三处透传）——树顺序=被测系统真实菜单顺序；未匹配幽灵置标时 sortOrder 推到 100000+（避免 JSON seqNo 与真实菜单下标撞号穿插），置标全集扩为 json_import 空 xpath 全量（含无页面 ID 者）。②阶段二组件编号命中**多幽灵（共享页面）时不合并**——页面 ID 跨菜单共享（38 个）导致菜单每轮被不同幽灵认领反复翻转，仅唯一命中才合并。
   真机湿测：扫描后"客户管理"子节点顺序=真实系统菜单 DOM 顺序 ✓，幽灵全部排末尾（100000+）✓，幽灵残留 13→3，反复翻转菜单归零。
   影响范围：仅 menu-scan-service.js。
