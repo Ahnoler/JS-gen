@@ -48,7 +48,7 @@ function sendJson(ws, type, payload = {}) {
 }
 
 async function handleRegister(ws, payload) {
-  const { nodeUuid, name, host, capacity, labels, agentVersion } = payload || {};
+  const { nodeUuid, name, host, capacity, labels, agentVersion, pid } = payload || {};
   if (!nodeUuid || !name) {
     sendJson(ws, 'executor.error', { error: 'nodeUuid and name are required' });
     return;
@@ -62,7 +62,15 @@ async function handleRegister(ws, payload) {
     labels,
     agentVersion,
   });
-  registry.attach(nodeUuid, ws, node.id);
+  const attached = registry.attach(nodeUuid, ws, node.id, pid);
+  if (!attached) {
+    // 同 uuid 异 pid 双活被 registry 拒绝（已向新连接回发 executor.error 并 close 4001）
+    console.warn(
+      `[executor-ws] register rejected for ${nodeUuid}: duplicate executor process`
+      + ` (incoming pid ${pid ?? 'unknown'}, active pid ${registry.get(nodeUuid)?.pid ?? 'unknown'})`,
+    );
+    return;
+  }
   sendJson(ws, 'executor.registered', {
     nodeId: node.id,
     nodeUuid: node.nodeUuid,
@@ -273,6 +281,13 @@ function bindConnectionHandlers(ws) {
     const nodeUuid = ws._nodeUuid;
     const nodeId = ws._nodeId;
     if (nodeUuid && nodeId) {
+      // 身份校验：被新连接顶替后的旧连接关闭，不得触发现役 entry 的 detach
+      //（否则会把新连接的 ws 置 null → 指令路由黑洞，45s grace 到期还会误清活会话租约）。
+      const entry = registry.get(nodeUuid);
+      if (entry && entry.ws && entry.ws !== ws) {
+        console.warn('[executor-ws] stale connection closed for', nodeUuid, '- ignoring');
+        return;
+      }
       executorService.onDisconnect(nodeUuid, nodeId);
     }
   });

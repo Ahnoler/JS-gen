@@ -207,6 +207,9 @@ export async function openSession({
 
   try {
     const readyP = waitForSessionEvent(sessionId, 'session.ready', 120000);
+    // 预挂 no-op：sendToExecutor('session.open') 同步抛错（节点断开）时 readyP 不会被 await，
+    // 其 120s 超时 rejection 不能成为 unhandledRejection 打崩进程（2026-08-29 事故根因）。
+    readyP.catch(() => {});
     const openPayload = { sessionId, model };
     if (reuseCdpUrl) openPayload.cdpUrl = reuseCdpUrl;
     if (reuseCdpPort != null && Number.isFinite(Number(reuseCdpPort))) {

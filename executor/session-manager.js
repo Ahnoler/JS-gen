@@ -25,7 +25,22 @@ export class SessionManager {
     this.slots = Array.from({ length: capacity }, (_, i) => new SessionSlot(i, (msg) => {
       // Drop crashed sessions from the map so leases/list stay consistent with free slots.
       if (msg?.event === 'session.process_exit' && msg.session_id) {
-        this.sessions.delete(msg.session_id);
+        const sessionId = msg.session_id;
+        // Detach the BiB before dropping the session: the crash path used to
+        // delete only the sessions entry, leaking the bib entry, its 1s stall
+        // timer and the CDP client. detachBib is async (never throws
+        // synchronously) — the extra .catch() covers late rejections so the
+        // sessions delete below always runs.
+        if (this.bibs.has(sessionId)) {
+          try {
+            this.detachBib(sessionId, { crashed: true }).catch((err) => {
+              console.warn('[session-manager] process_exit detachBib failed:', err?.message || err);
+            });
+          } catch (err) {
+            console.warn('[session-manager] process_exit detachBib failed:', err?.message || err);
+          }
+        }
+        this.sessions.delete(sessionId);
       }
       emitToControlPlane(msg);
     }));
@@ -34,7 +49,7 @@ export class SessionManager {
 
     /** @type {Map<string, BibBridge>} */
     this.bibs = new Map();
-    /** Serialize attachBib per sessionId to avoid orphan screencast producers. */
+    /** Serialize attachBib/close per sessionId to avoid orphan screencast producers. */
     /** @type {Map<string, Promise<unknown>>} */
     this._attachLocks = new Map();
   }
@@ -162,6 +177,8 @@ export class SessionManager {
 
   /**
    * Close a session, detach BiB, and free the slot.
+   * Serialized against in-flight/concurrent attachBib via the per-session attach
+   * lock, so a BiB cannot be attached back onto a closing/closed session.
    * @param {string} sessionId session id
    * @param {{ keepBrowser?: boolean }} [opts] close options
    * keepBrowser=false (default): kill Chrome — 「释放执行资源」
@@ -169,6 +186,37 @@ export class SessionManager {
    * @returns {Promise<{ sessionId: string, slotIndex: number, closed: boolean, keepBrowser: boolean, cdpPort: number|null }>} close result
    */
   async close(sessionId, { keepBrowser = false } = {}) {
+    // Same per-session chain as attachBib: wait out any in-flight attach, then
+    // hold the chain ourselves so an attach that starts during close runs only
+    // after close finished (and then fails the sessions.has check). Chain-tail
+    // await, not a re-entrant mutex — attachBib/_attachBibLocked never call
+    // close, so this wait cannot form a deadlock cycle.
+    const prev = this._attachLocks.get(sessionId) || Promise.resolve();
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const tail = prev.then(() => gate);
+    this._attachLocks.set(sessionId, tail);
+    await prev.catch(() => {});
+
+    try {
+      return await this._closeLocked(sessionId, { keepBrowser: !!keepBrowser });
+    } finally {
+      release();
+      if (this._attachLocks.get(sessionId) === tail) {
+        // Last lock holder gone — drop the entry so it does not leak.
+        this._attachLocks.delete(sessionId);
+      }
+    }
+  }
+
+  /**
+   * Internal: close body while holding the per-session attach lock (called by close).
+   * @param {string} sessionId session id
+   * @param {{ keepBrowser?: boolean }} [opts] close options
+   * @param {boolean} [opts.keepBrowser] whether to keep the browser alive
+   * @returns {Promise<{ sessionId: string, slotIndex: number, closed: boolean, keepBrowser: boolean, cdpPort: number|null }>} close result
+   */
+  async _closeLocked(sessionId, { keepBrowser = false } = {}) {
     const slot = this.sessions.get(sessionId);
     if (!slot) return { sessionId, closed: false };
     await this.detachBib(sessionId, { crashed: false }).catch(() => {});
@@ -232,7 +280,8 @@ export class SessionManager {
     const prev = this._attachLocks.get(sessionId) || Promise.resolve();
     let release;
     const gate = new Promise((r) => { release = r; });
-    this._attachLocks.set(sessionId, prev.then(() => gate));
+    const tail = prev.then(() => gate);
+    this._attachLocks.set(sessionId, tail);
     await prev.catch(() => {});
 
     try {
@@ -247,8 +296,9 @@ export class SessionManager {
       });
     } finally {
       release();
-      if (this._attachLocks.get(sessionId) === gate) {
-        // chain continues via next waiter; clear if we are tail
+      if (this._attachLocks.get(sessionId) === tail) {
+        // No newer waiter appended while we ran — drop the entry so it does not leak.
+        this._attachLocks.delete(sessionId);
       }
     }
   }

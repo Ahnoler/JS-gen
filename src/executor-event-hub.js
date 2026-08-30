@@ -97,5 +97,9 @@ export function waitForSessionEvent(sessionId, type, timeoutMs = 120000) {
     cancel = () => finish(() => {});
   });
   promise.cancel = cancel;
+  // 预挂 no-op：调用方在 send 同步抛错时可能永远不 await 本 promise，
+  // 超时 rejection 不能成为 unhandledRejection 打崩进程（2026-08-29 事故根因）。
+  // 不影响后续正常 await（多消费者各自独立处理）。
+  promise.catch(() => {});
   return promise;
 }

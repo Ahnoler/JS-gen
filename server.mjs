@@ -200,5 +200,14 @@ async function gracefulShutdown() {
   process.exit(0);
 }
 
+// 全局兜底：孤儿 rejection 记日志不打崩进程（会话事件等待的超时 reject 孤儿曾打崩进程）
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+  process.exit(1);
+});
+
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);

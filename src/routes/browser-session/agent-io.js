@@ -50,7 +50,7 @@ export function sessionRuntimeReady(session) {
  * @returns {Promise<object>} 包含事件数据的 Promise
  */
 export function waitForAgentEvent(eventName, timeoutMs = 60000) {
-  return new Promise((resolve, reject) => {
+  const promise = new Promise((resolve, reject) => {
     const gb = state.globalBrowser;
     if (!gb.process || !gb.process.stdout) return reject(new Error('Agent process not available'));
     const timeout = setTimeout(() => { cleanup(); reject(new Error(`Timeout waiting for ${eventName}`)); }, timeoutMs);
@@ -76,4 +76,9 @@ export function waitForAgentEvent(eventName, timeoutMs = 60000) {
     try { gb.process.stdout.on('data', onData); } catch (e) { cleanup(); reject(e); }
     try { gb.process.on('exit', onExit); } catch (e) { cleanup(); reject(e); }
   });
+  // 预挂 no-op：调用方在 writeAgentEvent/forwardStdin 同步抛错时可能永远不 await 本 promise，
+  // 超时 rejection 不能成为 unhandledRejection 打崩进程（2026-08-29 事故根因）。
+  // 不影响后续正常 await（多消费者各自独立处理）。
+  promise.catch(() => {});
+  return promise;
 }

@@ -16,6 +16,8 @@ import {
   EXECUTOR_RECONNECT_MAX_MS,
   EXECUTOR_DISCONNECT_TIMEOUT_MS,
   EXECUTOR_WS_URL,
+  acquireExecutorLock,
+  releaseExecutorLock,
   buildLabels,
 } from './config.js';
 import { ExecutorWsClient } from './ws-client.js';
@@ -34,6 +36,14 @@ console.log('[executor] ws url:', EXECUTOR_WS_URL);
 console.log('[executor] node uuid:', EXECUTOR_NODE_UUID);
 console.log('[executor] name:', EXECUTOR_NAME);
 console.log('[executor] capacity:', EXECUTOR_CAPACITY);
+
+// 启动互斥：同一 node-uuid 只允许一个 executor 进程（uuid 读自共享 .node-uuid 文件，
+// 重复 `npm run executor` 会产生同 uuid 双进程，互相顶替 WS 连接 → 指令路由黑洞）。
+// EXECUTOR_NODE_UUID 已在 config.js 导入时读取完成，此处先抢锁再连 WS。
+if (!acquireExecutorLock()) {
+  console.error('[executor] another executor process is running (same node-uuid), exiting');
+  process.exit(1);
+}
 
 /** @type {import('./session-manager.js').SessionManager|null} */
 let sessionManager = null;
@@ -97,6 +107,8 @@ const client = new ExecutorWsClient({
     capacity: EXECUTOR_CAPACITY,
     labels: buildLabels(),
     agentVersion: EXECUTOR_AGENT_VERSION,
+    // 控制面同 uuid 异 pid 双活检测：现役连接来自不同进程时拒绝新注册
+    pid: process.pid,
   }),
   onMessage: async (msg) => {
     if (!msg.type?.startsWith('session.')) return;
@@ -189,6 +201,8 @@ async function shutdown(signal) {
     }
   }
   await client.stop();
+  // best-effort 释放启动互斥锁（仅锁归属本进程时才会删除）
+  releaseExecutorLock();
   process.exit(0);
 }
 

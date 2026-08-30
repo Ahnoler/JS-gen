@@ -7,6 +7,7 @@ import WebSocket from 'ws';
  * @typedef {object} ExecutorWsClientOptions
  * @property {string} url WS URL including ?token=
  * @property {() => object} getRegisterPayload function returning the register payload
+ *   （透传为 executor.register 消息体；应包含 pid: process.pid，供控制面做同 uuid 异 pid 双活检测）
  * @property {(msg: {type: string, payload: object}) => void} [onMessage] inbound message callback
  * @property {(payload: object) => void} [onRegistered] registered callback
  * @property {() => void} [onDisconnected] disconnected callback

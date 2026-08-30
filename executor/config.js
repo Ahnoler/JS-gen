@@ -3,7 +3,7 @@
  */
 import path from 'path';
 import os from 'os';
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, writeSync, openSync, closeSync, unlinkSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 
@@ -105,6 +105,78 @@ function resolveNodeUuidSync() {
   const id = randomUUID();
   writeFileSync(NODE_ID_FILE, id, 'utf-8');
   return id;
+}
+
+/** 执行器启动互斥锁文件路径（与 .node-uuid 同目录，内容为持锁进程 pid）。 */
+export const EXECUTOR_LOCK_FILE = path.join(EXECUTOR_DIR, '.node-uuid.lock');
+
+/**
+ * 判断进程是否存活（process.kill(pid, 0) 探活）。
+ * Windows 兼容：process.kill(pid, 0) 对不存在 pid 在 Win 上可能抛 ESRCH/EPERM ——
+ * EPERM（权限受限）按约定视为存活，其余错误（ESRCH 等）视为进程已死。
+ * @param {number} pid 进程 id
+ * @returns {boolean} true 表示进程存活
+ */
+function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return err?.code === 'EPERM';
+  }
+}
+
+/**
+ * 获取执行器启动互斥锁：同一 node-uuid 只允许一个 executor 进程运行。
+ * （双进程会以相同 nodeUuid 互相顶替 WS 连接，导致指令路由黑洞与误清租约。）
+ *
+ * 锁文件为 .node-uuid 同目录的 .node-uuid.lock，内容为持锁进程的 pid：
+ * - `fs.openSync(lockPath, 'wx')` 独占创建成功 → 写入当前 pid，返回 true；
+ * - 锁已存在（EEXIST）→ 读取旧 pid 探活：进程已死（或锁内容损坏）→
+ *   覆盖写自己的 pid 返回 true；进程存活（含 Windows EPERM）→ 返回 false。
+ * @returns {boolean} true 表示成功持锁；false 表示已有存活的同 node-uuid 执行器进程
+ */
+export function acquireExecutorLock() {
+  mkdirSync(EXECUTOR_DIR, { recursive: true });
+  try {
+    const fd = openSync(EXECUTOR_LOCK_FILE, 'wx');
+    try {
+      writeSync(fd, String(process.pid), 0, 'utf-8');
+    } finally {
+      closeSync(fd);
+    }
+    return true;
+  } catch (err) {
+    if (err?.code !== 'EEXIST') throw err;
+  }
+
+  let oldPid = NaN;
+  try {
+    oldPid = parseInt(readFileSync(EXECUTOR_LOCK_FILE, 'utf-8').trim(), 10);
+  } catch {}
+  if (Number.isInteger(oldPid) && oldPid > 0 && isPidAlive(oldPid)) {
+    return false;
+  }
+  // 锁为残留（持有进程已死 / 内容损坏）：覆盖写入当前 pid 接管
+  writeFileSync(EXECUTOR_LOCK_FILE, String(process.pid), 'utf-8');
+  return true;
+}
+
+/**
+ * 释放启动互斥锁（best-effort）：仅当锁文件内容为当前进程 pid 时才删除，
+ * 避免误删已被其他进程接管（覆盖写入）的锁。
+ * @returns {boolean} true 表示已删除锁文件；false 表示锁不存在或归属其他进程
+ */
+export function releaseExecutorLock() {
+  try {
+    if (parseInt(readFileSync(EXECUTOR_LOCK_FILE, 'utf-8').trim(), 10) !== process.pid) {
+      return false;
+    }
+    unlinkSync(EXECUTOR_LOCK_FILE);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export const EXECUTOR_WS_URL = resolveWsUrl();

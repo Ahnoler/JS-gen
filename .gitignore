@@ -47,3 +47,4 @@ __pycache__/
 # 本地试用期日报（绩效考核用，不提交）
 docs/report/
 logs/log.txt
+.node-uuid.lock

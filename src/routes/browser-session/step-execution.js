@@ -4,6 +4,7 @@ import os from 'os';
 import { state } from '../../state.js';
 import { upsertPhaseDescription } from '../../services/trajectory-service.js';
 import * as execSession from '../../executor-session-client.js';
+import * as slotLease from '../../executor-slot-lease.js';
 import { broadcastWatcherStatus } from './broadcasts.js';
 import { bindExecutorSessionEvents } from './executor-events.js';
 import { handleSessionMessage } from './session-message.js';
@@ -94,6 +95,14 @@ async function executeExecutorStep({ session, task, maxSteps, businessDataFile, 
       channel.send('error', { message: `Executor agent process exited (code ${payload.code})` });
       channel.end();
       cleanupListeners();
+      // Crash path: release the executor slot lease and drop the session hub
+      // immediately instead of waiting for the idle-reaper to reclaim them.
+      try {
+        slotLease.releaseBySession?.(session.sessionId);
+      } catch {}
+      try {
+        execSession.removeSessionHub(session.sessionId);
+      } catch {}
       return;
     }
     handleMsg({ type, data: payload });
