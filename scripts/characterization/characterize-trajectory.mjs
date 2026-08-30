@@ -14,7 +14,7 @@
  *
  * Live HTTP path remains: node scripts/smoke/accept-recording-apis.mjs [baseUrl]
  */
-import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
@@ -322,12 +322,18 @@ function testBuildLoginInstruction() {
 
 function testRunDefaultLoginHardcoded() {
   const body = Function.prototype.toString.call(runDefaultLogin);
-  assert(/replay_actions/.test(body), 'runDefaultLogin sends replay_actions');
+  // replay 会话编排已统一到 runReplayActions helper（字面量样板移入 helper），
+  // 此处断言调用关系与语义保持：委托调用 + 动作数组 + 超时 + 抑制持久化仍在本函数。
+  assert(/runReplayActions/.test(body), 'runDefaultLogin delegates to runReplayActions');
   assert(/go_to_url/.test(body), 'runDefaultLogin includes go_to_url');
   assert(/['"]login['"]/.test(body), 'runDefaultLogin includes login action');
-  assert(/replay_done/.test(body), 'runDefaultLogin waits for replay_done');
   assert(/180000/.test(body), 'login replay timeout is 180000ms');
-  assert(/stop_on_fail:\s*true/.test(body), 'login replay stop_on_fail');
+  assert(/stopOnFail:\s*true/.test(body), 'login replay stopOnFail');
+  // helper 契约：replay_actions/waitForSessionEvent/no-op 免疫由 helper 统一承载
+  const helper = readFileSync(new URL('../../src/services/replay-actions.js', import.meta.url), 'utf8');
+  assert(/replay_actions/.test(helper), 'helper sends replay_actions');
+  assert(/replay_done/.test(helper), 'helper waits for replay_done');
+  assert(/stop_on_fail/.test(helper), 'helper forwards stop_on_fail');
   assert(!/event:\s*['"]step['"]/.test(body), 'must not send Agent step event');
   assert(!/max_steps:\s*10/.test(body), 'must not start Agent with max_steps 10');
   assert(!/phase_done/.test(body), 'must not wait phase_done');

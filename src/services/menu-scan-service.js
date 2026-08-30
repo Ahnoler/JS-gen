@@ -29,6 +29,7 @@ import * as systemPageDao from '../dao/system-page-dao.js';
 import * as systemMenuSnapshotDao from '../dao/system-menu-snapshot-dao.js';
 import * as menuChangeLogDao from '../dao/menu-change-log-dao.js';
 import * as execSession from '../executor-session-client.js';
+import { runReplayActions } from './replay-actions.js';
 
 const NODE_TYPE_SYSTEM = 1;
 const NODE_TYPE_MODULE = 2;
@@ -126,21 +127,18 @@ async function runScan({ scanId, systemNodeId, url, account }) {
     if (!nodeUuid) throw new Error('openSession 未返回 nodeUuid');
 
     // —— 登录（仿 runDefaultLogin）——
-    const loginDoneP = execSession.waitForSessionEvent(sessionId, 'replay_done', 180000);
-    execSession.forwardStdin({
-      nodeUuid,
+    const { result: loginResult } = await runReplayActions({
+      execSession,
       sessionId,
-      event: 'replay_actions',
-      data: {
-        actions: [
-          { action: 'go_to_url', params: { url } },
-          { action: 'login', params: { username, password } },
-        ],
-        is_replay: true,
-        stop_on_fail: true,
-      },
+      nodeUuid,
+      actions: [
+        { action: 'go_to_url', params: { url } },
+        { action: 'login', params: { username, password } },
+      ],
+      timeoutMs: 180000,
+      stopOnFail: true,
+      isReplay: true,
     });
-    const loginResult = await loginDoneP;
     const loginFailed = Number(loginResult?.failed || 0);
     const loginOk = Number(loginResult?.ok || 0);
     if (loginResult?.error || loginFailed > 0 || loginOk < 2) {
@@ -148,18 +146,15 @@ async function runScan({ scanId, systemNodeId, url, account }) {
     }
 
     // —— 扫描菜单树 ——
-    const scanDoneP = execSession.waitForSessionEvent(sessionId, 'replay_done', 300000);
-    execSession.forwardStdin({
-      nodeUuid,
+    const { result: scanResult } = await runReplayActions({
+      execSession,
       sessionId,
-      event: 'replay_actions',
-      data: {
-        actions: [{ action: 'scan_menu_tree', params: {} }],
-        is_replay: true,
-        stop_on_fail: true,
-      },
+      nodeUuid,
+      actions: [{ action: 'scan_menu_tree', params: {} }],
+      timeoutMs: 300000,
+      stopOnFail: true,
+      isReplay: true,
     });
-    const scanResult = await scanDoneP;
     const results = Array.isArray(scanResult?.results) ? scanResult.results : [];
     const scanRow = results.find((r) => r && r.action === 'scan_menu_tree');
     const menus = scanRow ? (scanRow.menus || scanRow.data?.menus || []) : [];
@@ -329,21 +324,18 @@ async function runPhase2Match({ plan, runtime, execSession, existing, systemNode
       reads += 1;
       let readCode = '';
       try {
-        const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 25000);
-        execSession.forwardStdin({
-          nodeUuid: runtime.nodeUuid,
+        const { result: r } = await runReplayActions({
+          execSession,
           sessionId: runtime.sessionId,
-          event: 'replay_actions',
-          data: {
-            actions: [
-              { action: 'click_menu_xpath', params: { xpath: cand.menuXpath } },
-              { action: 'read_page_component_code', params: {} },
-            ],
-            is_replay: true,
-            stop_on_fail: false,
-          },
+          nodeUuid: runtime.nodeUuid,
+          actions: [
+            { action: 'click_menu_xpath', params: { xpath: cand.menuXpath } },
+            { action: 'read_page_component_code', params: {} },
+          ],
+          timeoutMs: 25000,
+          stopOnFail: false,
+          isReplay: true,
         });
-        const r = await doneP;
         const results = Array.isArray(r?.results) ? r.results : [];
         const row = results.find((it) => it && it.action === 'read_page_component_code');
         // 防御式：row.pageCode 为对象 { componentCode, ... }

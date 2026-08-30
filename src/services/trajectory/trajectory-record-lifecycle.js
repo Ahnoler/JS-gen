@@ -6,6 +6,7 @@ import * as trajectoryDao from '../../dao/trajectory-dao.js';
 import * as trajectoryPhaseDao from '../../dao/trajectory-phase-dao.js';
 import * as systemDao from '../../dao/system-dao.js';
 import * as execSession from '../../executor-session-client.js';
+import { runReplayActions } from '../replay-actions.js';
 import { state } from '../../state.js';
 import { USE_EXECUTOR } from '#config/config.js';
 import * as remoteBridge from '../../cdp/remote-bridge.js';
@@ -228,7 +229,7 @@ export async function prepareBusinessDataInjection(trajectoryId) {
 
 /**
  * Default login/navigate — NOT written to trajectory_step (is_replay / suppress persist).
- * Hardcoded go_to_url + login via replay_actions (no browser-use Agent).
+ * Hardcoded go_to_url + login via runReplayActions (replay_actions; no browser-use Agent).
  * @param {object} runtime trajectory runtime object (sessionId, executorNodeUuid, …)
  * @param {object} account login account ({ account, password, systemId, loginUrl, id })
  * @param {object|null} [system] system row with url; resolved from account.systemId when omitted
@@ -252,21 +253,18 @@ export async function runDefaultLogin(runtime, account, system = null) {
       err.statusCode = 400;
       throw err;
     }
-    const doneP = execSession.waitForSessionEvent(runtime.sessionId, 'replay_done', 180000);
-    execSession.forwardStdin({
-      nodeUuid: runtime.executorNodeUuid,
+    const { result } = await runReplayActions({
+      execSession,
       sessionId: runtime.sessionId,
-      event: 'replay_actions',
-      data: {
-        actions: [
-          { action: 'go_to_url', params: { url } },
-          { action: 'login', params: { username, password } },
-        ],
-        is_replay: true,
-        stop_on_fail: true,
-      },
+      nodeUuid: runtime.executorNodeUuid,
+      actions: [
+        { action: 'go_to_url', params: { url } },
+        { action: 'login', params: { username, password } },
+      ],
+      timeoutMs: 180000,
+      stopOnFail: true,
+      isReplay: true,
     });
-    const result = await doneP;
     const failed = Number(result?.failed || 0);
     const okCount = Number(result?.ok || 0);
     if (result?.error || failed > 0 || okCount < 2) {

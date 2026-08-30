@@ -11,6 +11,7 @@
 import * as systemDao from '../../dao/system-dao.js';
 import * as systemPageDao from '../../dao/system-page-dao.js';
 import * as trajectoryDao from '../../dao/trajectory-dao.js';
+import { runReplayActions } from '../replay-actions.js';
 import { navigateToFunctionMenu } from './menu-navigation.js';
 
 /** 读组件编号 replay 超时（ms）。 */
@@ -73,22 +74,15 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
     let pageName = '';
     let pagePath = '';
     try {
-      const doneP = execSession.waitForSessionEvent(
-        runtime.sessionId,
-        'replay_done',
-        READ_PAGE_CODE_TIMEOUT_MS,
-      );
-      execSession.forwardStdin({
-        nodeUuid: runtime.executorNodeUuid,
+      const { result: r } = await runReplayActions({
+        execSession,
         sessionId: runtime.sessionId,
-        event: 'replay_actions',
-        data: {
-          actions: [{ action: 'read_page_component_code', params: {} }],
-          is_replay: true,
-          stop_on_fail: false,
-        },
+        nodeUuid: runtime.executorNodeUuid,
+        actions: [{ action: 'read_page_component_code', params: {} }],
+        timeoutMs: READ_PAGE_CODE_TIMEOUT_MS,
+        stopOnFail: false,
+        isReplay: true,
       });
-      const r = await doneP;
       const results = Array.isArray(r?.results) ? r.results : [];
       const row = results.find((it) => it && it.action === 'read_page_component_code');
       // Python 侧把整个 payload 挂在 row.pageCode：{ componentCode, pageName, pagePath, activityName, reason }

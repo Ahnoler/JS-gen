@@ -53,9 +53,26 @@ function testGeneratePageIdUniqueNonDecreasing() {
 
 function testWiringService() {
   const service = readFileSync(join(root, 'src/services/trajectory/recording-page-bind.js'), 'utf8');
+  assert.match(service, /runReplayActions/, 'service routes read_page_component_code replay through runReplayActions');
   assert.match(service, /read_page_component_code/, 'service references read_page_component_code');
   assert.match(service, /AILZ/, 'service references AILZ prefix');
   assert.match(service, /updateMeta/, 'service references updateMeta');
+}
+
+/**
+ * replay_actions 会话编排契约收敛在公共 helper：replay_actions 下发、
+ * waitForSessionEvent 等待、forwardStdin 通道与预挂 no-op catch（孤儿 rejection 免疫）
+ * 都断言在 helper 文件上，不落在调用方——后续调用方继续迁移不影响本断言。
+ */
+function testWiringReplayActionsHelper() {
+  const helper = readFileSync(join(root, 'src/services/replay-actions.js'), 'utf8');
+  assert.match(helper, /export async function runReplayActions/, 'helper exports runReplayActions');
+  assert.match(helper, /replay_actions/, 'helper sends replay_actions stdin event');
+  assert.match(helper, /waitForSessionEvent/, 'helper waits via execSession.waitForSessionEvent');
+  assert.match(helper, /forwardStdin/, 'helper sends via execSession.forwardStdin');
+  assert.match(helper, /replay_done/, 'helper waits for replay_done');
+  // 预挂 no-op catch：send 同步抛错（executor 未连接）时孤儿超时 rejection 不能打崩进程。
+  assert.match(helper, /\.catch\(\(\) => \{\}\)/, 'helper pre-attaches no-op catch on wait promises');
 }
 
 function testWiringRunner() {
@@ -87,7 +104,8 @@ function main() {
   const tests = [
     ['generatePageId format: AILZ + 13-digit ms timestamp', testGeneratePageIdFormat],
     ['generatePageId unique + non-decreasing timestamp', testGeneratePageIdUniqueNonDecreasing],
-    ['wiring: service references read_page_component_code + AILZ + updateMeta', testWiringService],
+    ['wiring: service references runReplayActions + read_page_component_code + AILZ + updateMeta', testWiringService],
+    ['wiring: replay-actions helper owns replay_actions/forwardStdin/waitForSessionEvent + no-op catch', testWiringReplayActionsHelper],
     ['wiring: trajectory-attach-runner.js references bindRecordingPageId', testWiringRunner],
     ['wiring: js_snippets/page_id.py defines JS_READ_PAGE_COMPONENT_CODE', testWiringPageIdPy],
     ['wiring: _replay.py references read_page_component_code', testWiringReplayPy],
