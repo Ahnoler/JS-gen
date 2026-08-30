@@ -27,7 +27,7 @@ function ok(n) { console.log(`ok: ${n}`); }
   const sql = readFileSync(join(root, 'schemas/init.sql'), 'utf8');
   assert.match(sql, /phase_highlight/);
   assert.match(sql, /stitch_screenshot_id/);
-  assert.match(sql, /uk_ss_phase_kind/);
+  assert.match(sql, /uk_ss_phase_group/);  // G 波次后：phase 截图唯一键为 (trajectory_phase_id, state_group)
   assert.match(sql, /metadata_json/);
   ok('init.sql cues');
 }

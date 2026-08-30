@@ -62,43 +62,38 @@ async function fallbackToLocal({ daoCall, pendingFile }) {
 }
 
 /**
- * Replace (upsert) the before/after screenshot for a trajectory step.
- * @param {number} trajectoryStepId step DB id
- * @param {object} [root0] options
- * @param {number|null} [root0.trajectoryId] trajectory DB id
- * @param {'before'|'after'} root0.kind screenshot kind
- * @param {Buffer} root0.buffer image bytes
- * @returns {Promise<number>} screenshot row id
+ * 截图替换（upsert）共享模板：先删除既有截图行的旧存储对象（严格模式），
+ * 再创建本地 pending 文件，上传到 MinIO；上传失败时回退本地副本并直接落库。
+ * 各 replace* 公开函数负责参数校验，并通过 findExisting / buildDaoCall / warnLabel
+ * 交接差异部分（既有行查找链路、DAO 固定字段、警告文案）。
+ * @param {object} opts 选项
+ * @param {Buffer} opts.buffer 图片字节
+ * @param {string} [opts.mimeType] MIME 类型，默认 image/png
+ * @param {string} opts.warnLabel 上传失败时 warn 日志前缀
+ * @param {function(): Promise<object|null>} opts.findExisting 查找既有截图行（无则返回 null）
+ * @param {function(Buffer): function(object): Promise<number|null>} opts.buildDaoCall 构造 DAO 调用：接收图片字节，返回接收存储字段并执行 DAO upsert 的函数
+ * @returns {Promise<number>} 截图行 id
  */
-export async function replaceStepScreenshot(trajectoryStepId, {
-  trajectoryId = null,
-  kind,
+async function replaceScreenshot({
   buffer,
-} = {}) {
-  const stepId = Number(trajectoryStepId);
-  if (!Number.isFinite(stepId) || stepId <= 0) throw new Error('trajectoryStepId required');
-  if (kind !== 'before' && kind !== 'after') throw new Error('kind must be before|after');
-  if (!buffer || !buffer.length) throw new Error('buffer required');
-
+  mimeType = 'image/png',
+  warnLabel,
+  findExisting,
+  buildDaoCall,
+}) {
   const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
-  const existing = await screenshotDao.findByStepAndKind(stepId, kind);
+
+  const existing = await findExisting();
   await removeStoredObject(existing, { strict: true });
 
   const pendingFile = await createPendingFile(buf);
-  const daoCall = (storageFields) => screenshotDao.replaceForStep({
-    trajectoryStepId: stepId,
-    trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
-    kind,
-    fileSize: buf.length,
-    mimeType: 'image/png',
-    ...storageFields,
-  });
+  const daoCall = (storageFields) => buildDaoCall(buf)(storageFields);
 
   let uploaded;
   try {
-    uploaded = await uploadOrThrow(buf, 'image/png');
+    uploaded = await uploadOrThrow(buf, mimeType);
   } catch (uploadErr) {
-    console.warn('[screenshot] MinIO upload failed, keeping local copy:', uploadErr?.message || uploadErr);
+    console.warn(warnLabel, uploadErr?.message || uploadErr);
     return fallbackToLocal({ daoCall, pendingFile });
   }
 
@@ -121,6 +116,41 @@ export async function replaceStepScreenshot(trajectoryStepId, {
 }
 
 /**
+ * Replace (upsert) the before/after screenshot for a trajectory step.
+ * @param {number} trajectoryStepId step DB id
+ * @param {object} [root0] options
+ * @param {number|null} [root0.trajectoryId] trajectory DB id
+ * @param {'before'|'after'} root0.kind screenshot kind
+ * @param {Buffer} root0.buffer image bytes
+ * @returns {Promise<number>} screenshot row id
+ */
+export async function replaceStepScreenshot(trajectoryStepId, {
+  trajectoryId = null,
+  kind,
+  buffer,
+} = {}) {
+  const stepId = Number(trajectoryStepId);
+  if (!Number.isFinite(stepId) || stepId <= 0) throw new Error('trajectoryStepId required');
+  if (kind !== 'before' && kind !== 'after') throw new Error('kind must be before|after');
+  if (!buffer || !buffer.length) throw new Error('buffer required');
+
+  return replaceScreenshot({
+    buffer,
+    mimeType: 'image/png',
+    warnLabel: '[screenshot] MinIO upload failed, keeping local copy:',
+    findExisting: () => screenshotDao.findByStepAndKind(stepId, kind),
+    buildDaoCall: (buf) => (storageFields) => screenshotDao.replaceForStep({
+      trajectoryStepId: stepId,
+      trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
+      kind,
+      fileSize: buf.length,
+      mimeType: 'image/png',
+      ...storageFields,
+    }),
+  });
+}
+
+/**
  * Replace (upsert) the phase-highlight screenshot for a trajectory phase.
  * @param {number} trajectoryPhaseId phase DB id
  * @param {object} [root0] options
@@ -139,45 +169,21 @@ export async function replacePhaseHighlightScreenshot(trajectoryPhaseId, {
   const phaseId = Number(trajectoryPhaseId);
   if (!Number.isFinite(phaseId) || phaseId <= 0) throw new Error('trajectoryPhaseId required');
   if (!buffer || !buffer.length) throw new Error('buffer required');
-  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
 
-  const existing = await screenshotDao.findByPhaseAndKind(phaseId);
-  await removeStoredObject(existing, { strict: true });
-
-  const pendingFile = await createPendingFile(buf);
-  const daoCall = (storageFields) => screenshotDao.replaceForPhase({
-    trajectoryPhaseId: phaseId,
-    trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
-    fileSize: buf.length,
+  return replaceScreenshot({
+    buffer,
     mimeType,
-    metadataJson,
-    ...storageFields,
+    warnLabel: '[screenshot] MinIO phase screenshot upload failed, keeping local copy:',
+    findExisting: () => screenshotDao.findByPhaseAndKind(phaseId),
+    buildDaoCall: (buf) => (storageFields) => screenshotDao.replaceForPhase({
+      trajectoryPhaseId: phaseId,
+      trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
+      fileSize: buf.length,
+      mimeType,
+      metadataJson,
+      ...storageFields,
+    }),
   });
-
-  let uploaded;
-  try {
-    uploaded = await uploadOrThrow(buf, mimeType);
-  } catch (uploadErr) {
-    console.warn('[screenshot] MinIO phase screenshot upload failed, keeping local copy:', uploadErr?.message || uploadErr);
-    return fallbackToLocal({ daoCall, pendingFile });
-  }
-
-  let id;
-  try {
-    id = await daoCall({
-      storageType: uploaded.storageType,
-      storagePath: uploaded.storagePath,
-      imageUrl: uploaded.imageUrl,
-      retryCount: 0,
-      lastRetryAt: null,
-    });
-  } catch (err) {
-    await removeScreenshotObject(uploaded.storagePath).catch(() => {});
-    await deletePendingFile(pendingFile.filePath).catch(() => {});
-    throw err;
-  }
-  await deletePendingFile(pendingFile.filePath).catch(() => {});
-  return id;
 }
 
 /**
@@ -203,46 +209,22 @@ export async function replacePhaseGroupScreenshot(trajectoryPhaseId, {
   if (!Number.isFinite(phaseId) || phaseId <= 0) throw new Error('trajectoryPhaseId required');
   if (!String(stateGroup || '').trim()) throw new Error('stateGroup required');
   if (!buffer || !buffer.length) throw new Error('buffer required');
-  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
 
-  const existing = await screenshotDao.findByPhaseAndStateGroup(phaseId, stateGroup);
-  await removeStoredObject(existing, { strict: true });
-
-  const pendingFile = await createPendingFile(buf);
-  const daoCall = (storageFields) => screenshotDao.replaceForPhaseGroup({
-    trajectoryPhaseId: phaseId,
-    trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
-    stateGroup: String(stateGroup),
-    fileSize: buf.length,
+  return replaceScreenshot({
+    buffer,
     mimeType,
-    metadataJson,
-    ...storageFields,
+    warnLabel: '[screenshot] MinIO phase-group upload failed, keeping local copy:',
+    findExisting: () => screenshotDao.findByPhaseAndStateGroup(phaseId, stateGroup),
+    buildDaoCall: (buf) => (storageFields) => screenshotDao.replaceForPhaseGroup({
+      trajectoryPhaseId: phaseId,
+      trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
+      stateGroup: String(stateGroup),
+      fileSize: buf.length,
+      mimeType,
+      metadataJson,
+      ...storageFields,
+    }),
   });
-
-  let uploaded;
-  try {
-    uploaded = await uploadOrThrow(buf, mimeType);
-  } catch (uploadErr) {
-    console.warn('[screenshot] MinIO phase-group upload failed, keeping local copy:', uploadErr?.message || uploadErr);
-    return fallbackToLocal({ daoCall, pendingFile });
-  }
-
-  let id;
-  try {
-    id = await daoCall({
-      storageType: uploaded.storageType,
-      storagePath: uploaded.storagePath,
-      imageUrl: uploaded.imageUrl,
-      retryCount: 0,
-      lastRetryAt: null,
-    });
-  } catch (err) {
-    await removeScreenshotObject(uploaded.storagePath).catch(() => {});
-    await deletePendingFile(pendingFile.filePath).catch(() => {});
-    throw err;
-  }
-  await deletePendingFile(pendingFile.filePath).catch(() => {});
-  return id;
 }
 
 /**
@@ -283,45 +265,21 @@ export async function replaceDialogScreenshot(trajectoryStepId, {
   const stepId = Number(trajectoryStepId);
   if (!Number.isFinite(stepId) || stepId <= 0) throw new Error('trajectoryStepId required');
   if (!buffer || !buffer.length) throw new Error('buffer required');
-  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
 
-  const existing = await screenshotDao.findByStepAndKind(stepId, 'phase_highlight');
-  await removeStoredObject(existing, { strict: true });
-
-  const pendingFile = await createPendingFile(buf);
-  const daoCall = (storageFields) => screenshotDao.replaceDialogForStep({
-    trajectoryStepId: stepId,
-    trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
-    fileSize: buf.length,
+  return replaceScreenshot({
+    buffer,
     mimeType,
-    metadataJson,
-    ...storageFields,
+    warnLabel: '[screenshot] MinIO dialog upload failed, keeping local copy:',
+    findExisting: () => screenshotDao.findByStepAndKind(stepId, 'phase_highlight'),
+    buildDaoCall: (buf) => (storageFields) => screenshotDao.replaceDialogForStep({
+      trajectoryStepId: stepId,
+      trajectoryId: trajectoryId != null ? Number(trajectoryId) : null,
+      fileSize: buf.length,
+      mimeType,
+      metadataJson,
+      ...storageFields,
+    }),
   });
-
-  let uploaded;
-  try {
-    uploaded = await uploadOrThrow(buf, mimeType);
-  } catch (uploadErr) {
-    console.warn('[screenshot] MinIO dialog upload failed, keeping local copy:', uploadErr?.message || uploadErr);
-    return fallbackToLocal({ daoCall, pendingFile });
-  }
-
-  let id;
-  try {
-    id = await daoCall({
-      storageType: uploaded.storageType,
-      storagePath: uploaded.storagePath,
-      imageUrl: uploaded.imageUrl,
-      retryCount: 0,
-      lastRetryAt: null,
-    });
-  } catch (err) {
-    await removeScreenshotObject(uploaded.storagePath).catch(() => {});
-    await deletePendingFile(pendingFile.filePath).catch(() => {});
-    throw err;
-  }
-  await deletePendingFile(pendingFile.filePath).catch(() => {});
-  return id;
 }
 
 /**
@@ -349,47 +307,23 @@ export async function replacePageLevelScreenshot({
   if (!Number.isFinite(trajId) || trajId <= 0) throw new Error('trajectoryId required');
   if (!levelKey) throw new Error('levelKey required');
   if (!buffer || !buffer.length) throw new Error('buffer required');
-  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
 
-  const existing = await screenshotDao.findPageLevel(trajId, levelKey);
-  await removeStoredObject(existing, { strict: true });
-
-  const pendingFile = await createPendingFile(buf);
-  const daoCall = (storageFields) => screenshotDao.replacePageLevel({
-    trajectoryId: trajId,
-    levelType,
-    levelKey: String(levelKey),
-    parentLevelKey,
-    fileSize: buf.length,
+  return replaceScreenshot({
+    buffer,
     mimeType,
-    metadataJson,
-    ...storageFields,
+    warnLabel: '[screenshot] MinIO page-level upload failed, keeping local copy:',
+    findExisting: () => screenshotDao.findPageLevel(trajId, levelKey),
+    buildDaoCall: (buf) => (storageFields) => screenshotDao.replacePageLevel({
+      trajectoryId: trajId,
+      levelType,
+      levelKey: String(levelKey),
+      parentLevelKey,
+      fileSize: buf.length,
+      mimeType,
+      metadataJson,
+      ...storageFields,
+    }),
   });
-
-  let uploaded;
-  try {
-    uploaded = await uploadOrThrow(buf, mimeType);
-  } catch (uploadErr) {
-    console.warn('[screenshot] MinIO page-level upload failed, keeping local copy:', uploadErr?.message || uploadErr);
-    return fallbackToLocal({ daoCall, pendingFile });
-  }
-
-  let id;
-  try {
-    id = await daoCall({
-      storageType: uploaded.storageType,
-      storagePath: uploaded.storagePath,
-      imageUrl: uploaded.imageUrl,
-      retryCount: 0,
-      lastRetryAt: null,
-    });
-  } catch (err) {
-    await removeScreenshotObject(uploaded.storagePath).catch(() => {});
-    await deletePendingFile(pendingFile.filePath).catch(() => {});
-    throw err;
-  }
-  await deletePendingFile(pendingFile.filePath).catch(() => {});
-  return id;
 }
 
 /**
