@@ -24,6 +24,7 @@
  * 6. 释放浏览器会话
  */
 import { randomUUID } from 'crypto';
+import { REPLAY_LOGIN_TIMEOUT_MS, REPLAY_PHASE2_TIMEOUT_MS, REPLAY_STEP_TIMEOUT_MS } from '../../config/config.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemPageDao from '../dao/system-page-dao.js';
 import * as execSession from '../executor-session-client.js';
@@ -70,7 +71,7 @@ export async function runScan({ scanId, systemNodeId, url, account }) {
         { action: 'go_to_url', params: { url } },
         { action: 'login', params: { username, password } },
       ],
-      timeoutMs: 180000,
+      timeoutMs: REPLAY_LOGIN_TIMEOUT_MS,
       stopOnFail: true,
       isReplay: true,
     });
@@ -86,7 +87,7 @@ export async function runScan({ scanId, systemNodeId, url, account }) {
       sessionId,
       nodeUuid,
       actions: [{ action: 'scan_menu_tree', params: {} }],
-      timeoutMs: 300000,
+      timeoutMs: REPLAY_STEP_TIMEOUT_MS,
       stopOnFail: true,
       isReplay: true,
     });
@@ -293,7 +294,7 @@ export async function runPhase2Match({ plan, runtime, execSession, existing, sys
             { action: 'click_menu_xpath', params: { xpath: cand.menuXpath } },
             { action: 'read_page_component_code', params: {} },
           ],
-          timeoutMs: 25000,
+          timeoutMs: REPLAY_PHASE2_TIMEOUT_MS,
           stopOnFail: false,
           isReplay: true,
         });
