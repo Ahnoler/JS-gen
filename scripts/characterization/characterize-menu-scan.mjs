@@ -205,7 +205,15 @@ function testStatsCorrect() {
 // ---------------------------------------------------------------------------
 
 function testWiringService() {
-  const service = readFileSync(join(root, 'src/services/menu-scan-service.js'), 'utf8');
+  // W5-A 拆分：menu-scan-service.js 变薄 re-export + buildScanApplyPlan 纯函数，
+  // 其余职责迁至 menu-scan-job/session/apply——断言改为拼接读取四文件（AGENTS.md
+  // "keep markers + tests read concatenated files"），断言语义不变。
+  const service = [
+    'src/services/menu-scan-service.js',
+    'src/services/menu-scan-job.js',
+    'src/services/menu-scan-session.js',
+    'src/services/menu-scan-apply.js',
+  ].map((p) => readFileSync(join(root, p), 'utf8')).join('\n');
   assert.match(service, /openSession/, 'service references openSession');
   assert.match(service, /runReplayActions/, 'service routes replay through runReplayActions');
   assert.match(service, /buildScanApplyPlan/, 'service exports buildScanApplyPlan');
