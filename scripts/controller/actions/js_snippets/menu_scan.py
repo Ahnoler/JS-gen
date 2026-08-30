@@ -17,11 +17,11 @@ PAGE_LOCATOR_HELPERS is concatenated inside the IIFE (same pattern as
 scan_form.py / the crawl script) so xpathLiteral / normalizeControlText are
 in scope. No f-string interpolation is used.
 """
-from ._locator_helpers_js import PAGE_LOCATOR_HELPERS
+from ._locator_helpers_js import PAGE_LOCATOR_HELPERS, JS_POLL_UTIL
 
 JS_SCAN_MENU_TREE = '''async () => {
     ''' + PAGE_LOCATOR_HELPERS + '''
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    ''' + JS_POLL_UTIL + '''
     const diag = { url: location.href, lsMenuKey: '', menuWrapper: 0, liMenuItem: 0, waitedMs: 0 };
 
     // Wait up to 10s for the sidebar menu to render (fresh login may still be mounting).

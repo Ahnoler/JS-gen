@@ -3,8 +3,10 @@ JS snippet constants: JS_SELECT_OPTION, JS_READ_SELECT_OPTIONS, JS_FIND_OPTION (
 Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .select_trigger import JS_FIND_VISIBLE_DROPDOWN
+from ._locator_helpers_js import JS_POLL_UTIL
 
 JS_SELECT_OPTION = '''async (arg) => {
+''' + JS_POLL_UTIL + '''
     // arg: string option text, or [option, exactOnly]
     // exactOnly=true → only exact label match (replay must not drift from recorded value)
     let option = arg;
@@ -54,7 +56,6 @@ JS_SELECT_OPTION = '''async (arg) => {
     if (!dropdown) {
         dropdown = ''' + JS_FIND_VISIBLE_DROPDOWN + ''';
     }
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     /* SELECT_TABLE_ROW_OPTIONS — TsscMultiSelect remote picker uses el-table rows */
     const collectTableRows = (root) => {
         if (!root || root === document) return [];

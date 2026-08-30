@@ -12,6 +12,24 @@ const TABLE = 'trajectory';
 const ALLOWED_RECORD_STATUS = new Set(TRAJECTORY_RECORD_STATUSES);
 
 /**
+ * 批量统计多轨迹的阶段数（一次 GROUP BY 查询；1+N 修复）。
+ * @param {Array<number|string>} trajectoryIds 轨迹 id 数组
+ * @returns {Promise<Map<number, number>>} 轨迹 id → 阶段数（无阶段的 id 不在 Map 中）
+ */
+async function countPhasesByTrajectoryIds(trajectoryIds) {
+  const nums = [...new Set((trajectoryIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+  const counts = new Map();
+  if (!nums.length) return counts;
+  const rows = await getDB()('trajectory_phase')
+    .select('trajectory_id')
+    .whereIn('trajectory_id', nums)
+    .groupBy('trajectory_id')
+    .count('* as phases');
+  for (const row of rows) counts.set(Number(row.trajectory_id), Number(row.phases) || 0);
+  return counts;
+}
+
+/**
  * Normalize query recordStatus / status into a unique list of valid enums.
  * Accepts string, comma-separated string, or array.
  * @param {string|string[]|null} raw Input record status string or array
@@ -591,13 +609,11 @@ export async function listByFunction(functionId, {
     .offset(offset);
   const entities = fromDbRows(rows);
 
-  // Attach phase counts for hierarchy UI
+  // W5-C 批量：一次 GROUP BY 统计全部行列的阶段数（1+N → 1+1）。
+  const phaseCounts = await countPhasesByTrajectoryIds(entities.map((e) => Number(e.id)));
   for (const e of entities) {
     e.isExport = Number(e.isExport) ? 1 : 0;
-    const [{ phases }] = await db('trajectory_phase')
-      .where({ trajectory_id: e.id })
-      .count('* as phases');
-    e.phaseCount = Number(phases) || 0;
+    e.phaseCount = phaseCounts.get(Number(e.id)) || 0;
   }
   const stats = await countByRecordStatus({ functionId, keyword, recordStatus, batchTaskName, paasUserId });
   return { rows: entities, total, page, pageSize, stats };
@@ -637,12 +653,11 @@ export async function list({
     .limit(pageSize)
     .offset(offset);
   const entities = fromDbRows(rows);
+  // W5-C 批量：一次 GROUP BY 统计全部行列的阶段数（1+N → 1+1）。
+  const phaseCounts = await countPhasesByTrajectoryIds(entities.map((e) => Number(e.id)));
   for (const e of entities) {
     e.isExport = Number(e.isExport) ? 1 : 0;
-    const [{ phases }] = await db('trajectory_phase')
-      .where({ trajectory_id: e.id })
-      .count('* as phases');
-    e.phaseCount = Number(phases) || 0;
+    e.phaseCount = phaseCounts.get(Number(e.id)) || 0;
   }
   const stats = await countByRecordStatus({ keyword, recordStatus, batchTaskName, paasUserId });
   return { rows: entities, total, page, pageSize, stats };

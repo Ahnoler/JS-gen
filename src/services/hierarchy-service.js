@@ -86,10 +86,20 @@ export async function getTree({
   }
 
   if (includeAccounts) {
+    // W5-C 批量：一次 listBySystemIds 取回全部系统账号（每系统 1 次 → 1 次）。
+    const systemIds = nodes
+      .filter((n) => n.type === NODE_TYPE.SYSTEM)
+      .map((n) => Number(n.id));
+    const accounts = systemIds.length ? await systemAccountDao.listBySystemIds(systemIds) : [];
+    const accountsBySystem = new Map();
+    for (const a of accounts) {
+      const key = Number(a.systemId);
+      if (!accountsBySystem.has(key)) accountsBySystem.set(key, []);
+      accountsBySystem.get(key).push(a);
+    }
     for (const node of nodes) {
       if (node.type !== NODE_TYPE.SYSTEM) continue;
-      const accounts = await systemAccountDao.listBySystem(node.id);
-      node.accounts = accounts.map((a) => ({
+      node.accounts = (accountsBySystem.get(Number(node.id)) || []).map((a) => ({
         id: a.id,
         systemId: a.systemId,
         name: a.name,
@@ -575,21 +585,6 @@ export function buildPath(nodeId, byId) {
     cur = byId.get(cur.parentId);
   }
   return chain;
-}
-
-/**
- * Legacy: 已合并进 getTree({ keyword, type })；保留兼容调用。
- * @param {string} keyword search keyword
- * @param {{ limit?: number, type?: number|string }} [opts] search options
- * @returns {Promise<object[]>} filtered tree (length-1 array rooted at sentinel)
- */
-export async function searchNodes(keyword, { limit = 50, type } = {}) {
-  return getTree({
-    includeAccounts: false,
-    keyword,
-    type,
-    limit,
-  });
 }
 
 /**

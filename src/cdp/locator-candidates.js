@@ -43,4 +43,4 @@ export {
   sanitizeAttributes,
   enrichLocatorFields,
 } from './locator-builders/candidates.js';
-export { PAGE_LOCATOR_HELPERS } from './page-locator-helpers.js';
+export { PAGE_LOCATOR_HELPERS, JS_POLL_UTIL } from './page-locator-helpers.js';

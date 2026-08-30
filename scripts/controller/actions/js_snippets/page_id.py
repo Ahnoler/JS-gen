@@ -23,8 +23,10 @@ Style mirrors menu_scan.py: a single async IIFE string with no f-string
 interpolation, evaluated via page.evaluate().
 """
 
+from ._locator_helpers_js import JS_POLL_UTIL
+
 JS_READ_PAGE_COMPONENT_CODE = '''async () => {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    ''' + JS_POLL_UTIL + '''
 
     // 1. locate the floating help trigger and click it.
     const trigger = document.querySelector('.floatingAction .el-icon-question') || document.querySelector('.floatingAction');
@@ -94,7 +96,7 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
 # not be rendered yet right after login), then trigger a DOM click (works even
 # when a submenu flyout is technically hidden — proven against the SUT).
 JS_CLICK_MENU_XPATH = '''async (xpath) => {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    ''' + JS_POLL_UTIL + '''
     if (!xpath) return 'not-found';
     for (let i = 0; i < 34; i++) {
         const el = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;

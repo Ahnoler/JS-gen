@@ -1694,3 +1694,42 @@ export const PAGE_LOCATOR_HELPERS = `
     };
   }
 `;
+
+/**
+ * JS_POLL_UTIL — 浏览器内轮询/延时/弹层查找共享片段（sleep / pollUntil /
+ * wrapVisible / lastVisibleDialog / lastVisibleDrawer）。
+ * 与 PAGE_LOCATOR_HELPERS 一同注入 async 箭头体使用；经 node scripts/_gen_locator_helpers_py.mjs
+ * 同步到 Python 端 scripts/controller/actions/js_snippets/_locator_helpers_js.py。
+ */
+export const JS_POLL_UTIL = `
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const pollUntil = async (fn, timeout = 8000, interval = 200) => {
+    const deadline = Date.now() + Number(timeout);
+    while (Date.now() < deadline) {
+      if (await fn()) return true;
+      await sleep(Number(interval));
+    }
+    return false;
+  };
+  const wrapVisible = (d) => {
+    if (!d) return false;
+    const wrap = d.closest && d.closest('.el-dialog__wrapper, .el-message-box__wrapper, .el-drawer__wrapper');
+    if (wrap && getComputedStyle(wrap).display === 'none') return false;
+    const st = getComputedStyle(d);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+  };
+  const lastVisibleDialog = () => {
+    const all = [...document.querySelectorAll('.el-dialog, .el-message-box')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+  const lastVisibleDrawer = () => {
+    const all = [...document.querySelectorAll('.el-drawer')];
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (wrapVisible(all[i])) return all[i];
+    }
+    return null;
+  };
+`;

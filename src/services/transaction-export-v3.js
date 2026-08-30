@@ -34,67 +34,6 @@ function resolveScreenshotUrl({ imageUrl, storagePath }) {
 
 export const TRANSACTION_SCHEMA_VERSION_V3 = 3;
 
-/** action_type → 同事格式的 {command, action}；未映射保留原名。 */
-const ACTION_MAP = Object.freeze({
-  fill_form_field: ['input', 'input'],
-  select_option: ['select', 'select'],
-  select_tree_option: ['select', 'select'],
-  fill_date_field: ['fill_date_field', 'fill_date_field'],
-  select_date: ['fill_date_field', 'fill_date_field'],
-  click_element_by_index: ['click', 'click_element_by_index'],
-  click_menu_item: ['click', 'click'],
-  click_adjacent_button: ['click', 'click'],
-  click_table_row_button: ['click', 'click'],
-  click_table_row_radio: ['click', 'click'],
-  click_radio: ['click', 'click'],
-  click_button: ['click', 'click'],
-  click_save: ['click', 'click'],
-  switch_tab: ['click', 'click'],
-  close_dialog: ['click', 'close'],
-});
-
-/** target_kind → 同事格式的 kind；未映射保留原名。 */
-const KIND_MAP = Object.freeze({
-  form_input: 'input',
-  form_select: 'select',
-  form_date: 'date',
-  form_tree_select: 'tree',
-  form_radio: 'radio',
-  form_checkbox: 'checkbox',
-  button: 'button',
-  menu: 'menu',
-  table_row_button: 'button',
-  adjacent_button: 'button',
-  tree_node: 'tree',
-  tab: 'tab',
-  submenu: 'menu',
-  icon: 'icon',
-  breadcrumb: 'breadcrumb',
-  card: 'card',
-  collapse: 'collapse',
-  dialog: 'dialog',
-  drawer: 'drawer',
-});
-
-/**
- * 将控件 action_type 映射为同事格式的 {command, action} 对象。
- * @param {string} actionType - 原始 action 类型
- * @returns {{command: string, action: string}} 映射后的同事格式对象
- */
-export function mapControlAction(actionType) {
-  const m = ACTION_MAP[actionType];
-  return m ? { command: m[0], action: m[1] } : { command: actionType || '', action: actionType || '' };
-}
-
-/**
- * 将控件 target_kind 映射为同事格式的 kind。
- * @param {string} targetKind - 原始 target kind
- * @returns {string} 映射后的同事格式 kind
- */
-export function mapControlKind(targetKind) {
-  return KIND_MAP[targetKind] || targetKind || '';
-}
-
 /** region_id 分层链（'|' 分段，role:label）中含 overlay 段 → 返回该段；否则 null。 */
 /**
  * 检查 region_id 分层链中是否包含 overlay 段。

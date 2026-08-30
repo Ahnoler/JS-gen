@@ -65,6 +65,26 @@ export async function listByTrajectoryIds(ids) {
 }
 
 /**
+ * 按轨迹 id 批量统计阶段数（一次 GROUP BY 查询替代逐轨迹 COUNT；1+N 修复）。
+ * @param {Array<number|string>} trajectoryIds 轨迹 id 数组
+ * @returns {Promise<Map<number, number>>} 轨迹 id → 阶段数（无阶段/未查到的 id 不在 Map 中）
+ */
+export async function countByTrajectoryIds(trajectoryIds) {
+  const nums = [...new Set((trajectoryIds || []).map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
+  const counts = new Map();
+  if (!nums.length) return counts;
+  const rows = await getDB()(TABLE)
+    .select('trajectory_id')
+    .whereIn('trajectory_id', nums)
+    .groupBy('trajectory_id')
+    .count('* as phaseCount');
+  for (const row of rows) {
+    counts.set(Number(row.trajectory_id), Number(row.phaseCount) || 0);
+  }
+  return counts;
+}
+
+/**
  * Update a phase status; sets/clears completed_at and marks parent export-dirty.
  * @param {number} phaseId 阶段 id
  * @param {string} status target status ('completed'/'failed' set completed_at)

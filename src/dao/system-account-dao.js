@@ -24,6 +24,23 @@ export async function listBySystem(systemId, db = null) {
 }
 
 /**
+ * 按多个系统 id 批量列出账号（每系统内按 sort_order、id 升序；供 1+N 场景一次取回）。
+ * @param {Array<number|string>} systemIds 目标系统 id 数组
+ * @param {object|null} [db] 可选 knex 实例
+ * @returns {Promise<object[]>} 账号实体数组
+ */
+export async function listBySystemIds(systemIds, db = null) {
+  const ids = (Array.isArray(systemIds) ? systemIds : [])
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && v > 0);
+  if (!ids.length) return [];
+  const rows = await client(db)(TABLE)
+    .whereIn('system_id', ids)
+    .orderBy([{ column: 'sort_order', order: 'asc' }, { column: 'id', order: 'asc' }]);
+  return fromDbRows(rows);
+}
+
+/**
  * List all accounts ordered by system_id, sort_order, id.
  * @param {object|null} [db] optional knex instance
  * @returns {Promise<object[]>} account entities

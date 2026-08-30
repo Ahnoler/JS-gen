@@ -170,6 +170,31 @@ async function loadExistingModules(systemNodeId) {
 }
 
 /**
+ * 批量预取 json_import 且 menuXpath 为空的功能节点的 system_page 行（1+N → 1+1）。
+ * 候选条件与 runPhase2Match 幽灵判定保持一致；无候选时返回空 Map。
+ * @param {Array<object>} existing loadExistingModules 产物（模块数组，children 为功能节点）
+ * @returns {Promise<Map<number, object[]>>} 功能节点 id → system_page camelCase 行数组
+ */
+async function loadGhostPageIdsByNodeIds(existing) {
+  const ids = [];
+  for (const mod of existing) {
+    for (const fn of (Array.isArray(mod.children) ? mod.children : [])) {
+      if (String(fn.source || '') !== 'json_import') continue;
+      if (String(fn.menuXpath || '').trim()) continue;
+      ids.push(Number(fn.id));
+    }
+  }
+  const rows = ids.length ? await systemPageDao.listByNodeIds(ids) : [];
+  const byNode = new Map();
+  for (const p of rows) {
+    const key = Number(p.systemNodeId);
+    if (!byNode.has(key)) byNode.set(key, []);
+    byNode.get(key).push(p);
+  }
+  return byNode;
+}
+
+/**
  * 阶段二：按组件编号（page_id）合并幽灵节点。
  *
  * 幽灵节点 = source='json_import' 且有 system_page 页面 ID 且 menuXpath 为空的功能节点
@@ -195,11 +220,12 @@ export async function runPhase2Match({ plan, runtime, execSession, existing, sys
   let reads = 0;
   try {
     // —— 收集幽灵节点：source='json_import' 的功能，逐节点查 system_page ——
-    // 节点数有限，逐节点查（DAO 按 system_node_id 查，无 whereIn 批量接口）。
+    // W5-C 批量：pages 经 listByNodeIds 一次取回（1+N → 1+1），逐节点查询取消。
     const ghosts = [];
     const emptyXpathJsonFns = []; // json_import 且 menuXpath 空的全集（含无 pageIds 者）——置标与排序后推用
     // 同时建 nodeId → {node, moduleId, moduleName} 反查索引，供 update 候选判定
     const fnIndex = new Map();
+    const pageIdsByNode = await loadGhostPageIdsByNodeIds(existing);
     for (const mod of existing) {
       for (const fn of (Array.isArray(mod.children) ? mod.children : [])) {
         fnIndex.set(Number(fn.id), {
@@ -214,7 +240,7 @@ export async function runPhase2Match({ plan, runtime, execSession, existing, sys
           name: String(fn.name || ''),
           moduleId: Number(mod.id),
         });
-        const pages = await systemPageDao.listByNodeId(fn.id);
+        const pages = pageIdsByNode.get(Number(fn.id)) || [];
         const pageIds = new Set((Array.isArray(pages) ? pages : [])
           .map((p) => String(p.pageId || ''))
           .filter(Boolean));

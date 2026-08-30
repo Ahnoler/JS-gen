@@ -3,6 +3,7 @@ JS snippet constants: JS_FIND_LABELED_SELECT, JS_FIND_VISIBLE_DROPDOWN, JS_SELEC
 Re-exported by scripts/controller/actions/_js_snippets.py for backward compat.
 """
 from .base import JS_FIELD_DISABLED
+from ._locator_helpers_js import JS_POLL_UTIL
 
 JS_FIND_LABELED_SELECT = '''([label, mode]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
@@ -216,8 +217,8 @@ JS_FIND_VISIBLE_DROPDOWN = '''(() => {
     return document;
 })()'''
 
-JS_RESET_SELECT_UI = r'''async () => {
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+JS_RESET_SELECT_UI = '''async () => {
+''' + JS_POLL_UTIL + '''
   const visibleDropdowns = () => [...document.querySelectorAll('.el-select-dropdown')]
     .filter((dd) => {
       if (dd.classList.contains('is-hidden')) return false;

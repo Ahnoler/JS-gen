@@ -109,12 +109,7 @@ JS_CLICK_SAVE_BUTTON = r'''(buttonArg) => {
 # After submit: scan visible form errors + notifications / el-message.
 
 JS_SCAN_SAVE_OUTCOME = r'''() => {
-  const isVisible = (el) => {
-    if (!el) return false;
-    const r = el.getBoundingClientRect();
-    const cs = getComputedStyle(el);
-    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
-  };
+''' + PAGE_LOCATOR_HELPERS + r'''
   const formErrors = [];
   for (const el of document.querySelectorAll('.el-form-item__error')) {
     if (!isVisible(el)) continue;

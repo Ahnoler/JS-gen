@@ -21,6 +21,7 @@ from ._js_snippets import (
     JS_CLICK_ICON_BUTTON,
     JS_STAMP_ICON_ARIA_LABELS,
 )
+from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from ...models import ActionFile, FormSnapshot, FormSnapshotCollection
 from .replay_timing import WAIT_300_MS, WAIT_400_MS, WAIT_450_MS, WAIT_500_MS
 
@@ -40,14 +41,7 @@ def _is_form_submit_label(text: str) -> bool:
 
 
 _JS_VISIBLE_FORM_OVERLAY = '''() => {
-    const isVisible = (el) => {
-        if (!el) return false;
-        const style = getComputedStyle(el);
-        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0)
-            return false;
-        const r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-    };
+''' + PAGE_LOCATOR_HELPERS + '''
     for (const d of document.querySelectorAll('.el-dialog')) {
         const wrap = d.closest('.el-dialog__wrapper') || d;
         if (isVisible(wrap) && isVisible(d) && d.querySelector('.el-form')) return true;
@@ -484,13 +478,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                 is_picker_ui = False
                 try:
                     overlay_info = await page.evaluate('''() => {
-                        const isVisible = (el) => {
-                            if (!el) return false;
-                            const style = getComputedStyle(el);
-                            if (style.display === 'none' || style.visibility === 'hidden') return false;
-                            const r = el.getBoundingClientRect();
-                            return r.width > 0 && r.height > 0;
-                        };
+''' + PAGE_LOCATOR_HELPERS + '''
                         // Prefer topmost visible dialog by z-index
                         let best = null;
                         let bestZ = -1;

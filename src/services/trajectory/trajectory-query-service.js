@@ -155,7 +155,7 @@ export async function getTrajectoryActionFlow(trajectoryDbId, pendingEntries = [
       ? {
           id: traj.id,
           stepCount: traj.stepCount,
-          phaseCount: traj.phaseCount ?? (await trajectoryPhaseDao.listByTrajectory(traj.id)).length,
+          phaseCount: traj.phaseCount ?? (await trajectoryPhaseDao.countByTrajectoryIds([traj.id])).get(Number(traj.id)) ?? 0,
           task: traj.task,
           url: traj.url,
           model: traj.model,

@@ -18,8 +18,6 @@ import {
   stripVolatileQuery,
   pageKeyFromRegionId,
   popupKeyFromRegionId,
-  mapControlAction,
-  mapControlKind,
   isOverlayRegion,
 } from '../../src/services/transaction-export-v3.js';
 
@@ -33,21 +31,6 @@ function check(cond, msg) {
   }
 }
 
-// ── 纯函数：action/kind 映射 ──
-function testMappings() {
-  console.log('[pure] action/kind 映射');
-  check(mapControlAction('fill_form_field').action === 'input', 'fill_form_field → input');
-  check(mapControlAction('select_option').command === 'select', 'select_option → select');
-  check(mapControlAction('fill_date_field').action === 'fill_date_field', 'fill_date_field 保留');
-  check(mapControlAction('click_element_by_index').command === 'click', 'click_element_by_index → click');
-  check(mapControlAction('unknown_action').action === 'unknown_action', '未知动作保留原名');
-  check(mapControlKind('form_input') === 'input', 'form_input → input');
-  check(mapControlKind('form_select') === 'select', 'form_select → select');
-  check(mapControlKind('form_date') === 'date', 'form_date → date');
-  check(mapControlKind('button') === 'button', 'button → button');
-  check(mapControlKind('menu') === 'menu', 'menu → menu');
-  check(mapControlKind('weird_kind') === 'weird_kind', '未知 kind 保留原名');
-}
 
 // ── 纯函数：overlay 判定 ──
 function testOverlay() {
@@ -482,7 +465,6 @@ async function testRealData() {
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 
 async function main() {
-  testMappings();
   testOverlay();
   testBuildV3Properties();
   testBuildScreenshotEntries();

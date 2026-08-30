@@ -47,3 +47,21 @@ export async function listByNodeId(nodeId, db = null) {
     .orderBy([{ column: 'id', order: 'asc' }]);
   return rows.map(fromDbRow);
 }
+
+/**
+ * 按多个功能节点 id 批量列出明细页面（整表 id 升序；供 1+N 场景一次取回）。
+ * @param {Array<number|string>} nodeIds 功能节点 id 数组
+ * @param {object|null} [db] 可选 knex 实例
+ * @returns {Promise<object[]>} camelCase 实体数组（systemNodeId/pageId/pageName/resPath/pageType）
+ */
+export async function listByNodeIds(nodeIds, db = null) {
+  const ids = (Array.isArray(nodeIds) ? nodeIds : [])
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && v > 0);
+  if (!ids.length) return [];
+  const client = db || getDB();
+  const rows = await client(TABLE)
+    .whereIn('system_node_id', ids)
+    .orderBy([{ column: 'id', order: 'asc' }]);
+  return rows.map(fromDbRow);
+}
