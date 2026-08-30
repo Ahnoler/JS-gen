@@ -542,6 +542,7 @@ async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = [], empty
       const node = await systemDao.getRawById(g.nodeId, trx);
       if (!node) continue;
       if (String(node.menuXpath || '').trim()) continue; // 已有 xpath（被其他路径匹配）
+      if (Number(node.removedFlag) === 1) continue; // 已下线节点不再重复置未匹配标（已下线优先）
       const pageIds = ghostPageIdsById.get(Number(g.nodeId));
       await systemDao.update(g.nodeId, { unmatchedFlag: 1, sortOrder: ghostSort }, trx);
       ghostSort += 1;
