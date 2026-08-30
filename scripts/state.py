@@ -33,7 +33,7 @@ _SKIP_SCREENSHOT_ACTIONS = frozenset({
     'save_trajectory', 'save_business_data', 'read_business_data',
     'use_special_element',
     'match_form_rule', 'init_task_list', 'get_pending_tasks', 'sync_tasks_from_errors',
-    'expand_all_el_tree', 'task_done', 'task_retry',
+    'expand_all_el_tree', 'task_done',
     'save_form_snapshot',
     'wait_for_loading',
     'mark_field_done', 'rebuild_task_list',

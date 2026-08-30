@@ -50,9 +50,7 @@ from scripts.feature_flags import relative_xpath_primary_enabled
 
 from .replay_js import (  # noqa: F401  (re-exported for compat)
     _JS_CLICK_DURABLE,
-    _JS_EDIT_FORM_INPUT_VISIBLE,
     _JS_LOCATE_BY_XPATH,
-    _JS_PAGE_BUSY,
     JS_COUNT_OVERLAYS,
     _JS_READ_VALUE_BY_XPATH,
     _JS_READ_VALUE_BY_LABEL,
@@ -63,9 +61,7 @@ from .replay_names import (  # noqa: F401  (re-exported for compat)
     normalize_action_name,
 )
 from .replay_wait import (  # noqa: F401  (re-exported for compat)
-    _SAVE_BUTTON_TEXTS,
     _is_save_click_text,
-    _is_trackable_request,
     _is_tree_node_entry,
     _wait_after_save_page_idle,
     _wait_after_tree_node_for_form,
@@ -75,6 +71,64 @@ from .replay_click import _post_click_settle, _replay_click_by_index
 from .replay_form_action import _replay_form_action
 from .replay_table import _replay_table_row_radio
 _CLICK_BY_INDEX = 'click_element_by_index'
+
+
+# 直派回放动作单点注册表：动作名 -> {'handler', 'signature'}。
+# 主循环先查此表，命中即调用 handler 并并入附加行字段（menus/pageCode）；
+# 表单动作 / click_by_index / 控制器兜底分支不走此表。
+_DIRECT_REPLAY_ACTIONS = {}
+
+
+def _direct_replay(name: str, signature: set):
+    """注册一个直派回放动作到 :data:`_DIRECT_REPLAY_ACTIONS` 单点表。
+
+    装饰器将动作名映射为 ``{'handler': fn, 'signature': frozenset(signature)}``；
+    handler 签名为 ``async (page, params, entry) -> (result, extra_row_fields | None)``，
+    result 直接作为回放结果，extra_row_fields 非空时并入回放结果行（如 ``menus`` / ``pageCode``）。
+    """
+    def _register(fn):
+        _DIRECT_REPLAY_ACTIONS[name] = {
+            'handler': fn,
+            'signature': frozenset(signature or ()),
+        }
+        return fn
+    return _register
+
+
+@_direct_replay('go_to_url', {'url'})
+async def _direct_go_to_url(page, params, entry):
+    """直派回放 go_to_url：沿用 Playwright goto 导航路径，结果行无附加字段。"""
+    return await _replay_goto(page, params), None
+
+
+@_direct_replay('scan_menu_tree', set())
+async def _direct_scan_menu_tree(page, params, entry):
+    """直派回放 scan_menu_tree：采集菜单树，结果行附加 ``menus`` 字段。"""
+    scan_payload = await page.evaluate(JS_SCAN_MENU_TREE)
+    menus = scan_payload.get('menus', []) if isinstance(scan_payload, dict) else []
+    diag = scan_payload.get('diag') if isinstance(scan_payload, dict) else None
+    sys.stderr.write(f'[replay] scan_menu_tree menus={len(menus)} diag={json.dumps(diag, ensure_ascii=False)}\n')
+    sys.stderr.flush()
+    return 'ok', {'menus': menus}
+
+
+@_direct_replay('read_page_component_code', set())
+async def _direct_read_page_component_code(page, params, entry):
+    """直派回放 read_page_component_code：读取页面组件码，结果行附加 ``pageCode`` 字段。"""
+    payload = await page.evaluate(JS_READ_PAGE_COMPONENT_CODE)
+    payload = payload if isinstance(payload, dict) else {}
+    sys.stderr.write(f'[replay] read_page_component_code code={payload.get("componentCode", "")} reason={payload.get("reason", "")} diag={json.dumps(payload.get("diag"), ensure_ascii=False)}\n')
+    sys.stderr.flush()
+    return 'ok', {'pageCode': payload}
+
+
+@_direct_replay('click_menu_xpath', {'xpath'})
+async def _direct_click_menu_xpath(page, params, entry):
+    """直派回放 click_menu_xpath：按记录 xpath 点击菜单项，结果行无附加字段。"""
+    click_xpath = params.get('xpath') or (entry.get('element') or {}).get('xpath_full') or ''
+    result = await page.evaluate(JS_CLICK_MENU_XPATH, click_xpath)
+    await page.wait_for_timeout(600)
+    return result, None
 
 
 def _normalize_params(action_name: str, params: dict | None) -> dict:
@@ -406,28 +460,11 @@ async def replay_action_entries(
             sys.stderr.write(f'[replay] [{step_num}/{total}] {action_name} {params}\n')
             sys.stderr.flush()
 
-            _scan_menu_payload = None
-            _page_id_payload = None
+            extra_row_fields = None
             try:
-                if action_name == 'go_to_url':
-                    result = await _replay_goto(page, params)
-                elif action_name == 'scan_menu_tree':
-                    scan_payload = await page.evaluate(JS_SCAN_MENU_TREE)
-                    result = 'ok'
-                    _scan_menu_payload = scan_payload.get('menus', []) if isinstance(scan_payload, dict) else []
-                    _scan_diag = scan_payload.get('diag') if isinstance(scan_payload, dict) else None
-                    sys.stderr.write(f'[replay] scan_menu_tree menus={len(_scan_menu_payload)} diag={json.dumps(_scan_diag, ensure_ascii=False)}\n')
-                    sys.stderr.flush()
-                elif action_name == 'read_page_component_code':
-                    page_id_payload = await page.evaluate(JS_READ_PAGE_COMPONENT_CODE)
-                    result = 'ok'
-                    _page_id_payload = page_id_payload if isinstance(page_id_payload, dict) else {}
-                    sys.stderr.write(f'[replay] read_page_component_code code={_page_id_payload.get("componentCode", "")} reason={_page_id_payload.get("reason", "")} diag={json.dumps(_page_id_payload.get("diag"), ensure_ascii=False)}\n')
-                    sys.stderr.flush()
-                elif action_name == 'click_menu_xpath':
-                    click_xpath = params.get('xpath') or (entry.get('element') or {}).get('xpath_full') or ''
-                    result = await page.evaluate(JS_CLICK_MENU_XPATH, click_xpath)
-                    await page.wait_for_timeout(600)
+                direct = _DIRECT_REPLAY_ACTIONS.get(action_name)
+                if direct is not None:
+                    result, extra_row_fields = await direct['handler'](page, params, entry)
                 elif action_name == 'save_form_snapshot':
                     result = await _replay_verify_form_structure(page, params)
                 elif action_name == _CLICK_BY_INDEX:
@@ -547,10 +584,8 @@ async def replay_action_entries(
             }
             if entry.get('id') is not None:
                 row['id'] = entry.get('id')
-            if action_name == 'scan_menu_tree' and _scan_menu_payload is not None:
-                row['menus'] = _scan_menu_payload
-            if action_name == 'read_page_component_code' and _page_id_payload is not None:
-                row['pageCode'] = _page_id_payload
+            if extra_row_fields:
+                row.update(extra_row_fields)
             results.append(row)
             sys.stderr.write(
                 f'[replay] [{step_num}/{total}] {"OK" if ok else "FAIL"} → {result} | locate={locate}\n'

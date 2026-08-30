@@ -87,6 +87,7 @@ function testWiringPageIdPy() {
 
 function testWiringReplayPy() {
   const py = readFileSync(join(root, 'scripts/controller/actions/_replay.py'), 'utf8');
+  assert.match(py, /_DIRECT_REPLAY_ACTIONS/, '_replay.py defines _DIRECT_REPLAY_ACTIONS registry');
   assert.match(py, /read_page_component_code/, '_replay.py references read_page_component_code');
 }
 

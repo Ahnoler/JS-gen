@@ -42,7 +42,7 @@ from .cdp_ports import (  # noqa: F401  (re-exported for compat)
     _wait_cdp_http,
     wait_cdp_http,
 )
-from .event_dispatch import _convert_action_params, _dispatch_event  # noqa: F401
+from .event_dispatch import _dispatch_event  # noqa: F401
 from .trajectory_store import (  # noqa: F401  (re-exported for compat)
     _accumulate_trajectory,
     _handle_reset_trajectory,

@@ -227,15 +227,15 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         controller = build_controller(browser_context, business_data_store=business_data_store)
         registry_actions = controller.registry.registry.actions
 
-        # Pass raw params — `_normalize_params` accepts aliases; controller path
-        # filters by function signature inside `_replay_controller_action`.
+        # 签名过滤对已注册动作生效（只保留白名单键，_normalize_params 的别名兜底仅
+        # 作用于未注册动作透传的 raw_params）；注册表未知动作原样透传。
         filtered = []
         for entry in entries:
             action_name = entry.get("action", "")
             raw_params = entry.get("params", {}) or {}
             # Prefer signature filter when known, else keep raw for alias normalize.
             converted = _convert_action_params(action_name, raw_params)
-            merged = {**raw_params, **converted} if converted else dict(raw_params)
+            merged = converted if converted else dict(raw_params)
             filtered.append({**entry, "action": action_name, "params": merged})
 
         summary = await replay_action_entries(
@@ -252,17 +252,11 @@ async def _dispatch_event(msg, session_state, agent_running_ref=None, cdp_action
         if seed_action_log:
             try:
                 from . import state as action_state
+                from .state import _SKIP_SCREENSHOT_ACTIONS
                 action_state._ACTION_LOG.clear()
                 for entry in filtered:
                     action_name = entry.get("action") or ""
-                    if action_name in (
-                        'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields',
-                        'scan_visible_fields', 'check_field_value', 'verify_field_value',
-                        'take_screenshot', 'save_trajectory', 'save_business_data', 'read_business_data',
-                        'match_form_rule', 'init_task_list', 'get_pending_tasks',
-                        'sync_tasks_from_errors', 'expand_all_el_tree', 'task_done', 'task_retry',
-                        'save_form_snapshot',
-                    ):
+                    if action_name in _SKIP_SCREENSHOT_ACTIONS:
                         continue
                     dumped = dict(entry)
                     dumped.setdefault('source', 'replay')

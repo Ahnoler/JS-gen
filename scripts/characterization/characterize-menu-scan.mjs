@@ -232,6 +232,7 @@ function testWiringReplayActionsHelper() {
 
 function testWiringReplayPy() {
   const py = readFileSync(join(root, 'scripts/controller/actions/_replay.py'), 'utf8');
+  assert.match(py, /_DIRECT_REPLAY_ACTIONS/, '_replay.py defines _DIRECT_REPLAY_ACTIONS registry');
   assert.match(py, /scan_menu_tree/, '_replay.py references scan_menu_tree');
 }
 
