@@ -7,7 +7,7 @@ import { decodeUploadFilename } from '../../http/decode-upload-filename.js';
 import { BATCH_TEMPLATE_FILENAME } from '../../services/trajectory/trajectory-batch-excel.js';
 import * as batchService from '../../services/trajectory/trajectory-batch-service.js';
 import { BATCH_JOB_TERMINAL } from '../../models/constants.js';
-import { sendErr, asyncHandler } from './trajectory-shared.js';
+import { asyncHandler, respondError, AppError } from '../../http/app-error.js';
 
 function sendExcel(res, buffer, filename) {
   const encoded = encodeURIComponent(filename);
@@ -56,7 +56,7 @@ export default function registerTrajectoryBatch(app) {
       }
       try {
         if (!req.file?.buffer?.length) {
-          return res.status(400).json({ error: '请上传 Excel 文件' });
+          throw new AppError('请上传 Excel 文件', { code: 'VALIDATION' });
         }
         const idempotencyKey = req.get('Idempotency-Key')
           || req.get('idempotency-key')
@@ -77,7 +77,17 @@ export default function registerTrajectoryBatch(app) {
         delete result._idempotentReplay;
         res.status(httpStatus).json(result);
       } catch (e) {
-        sendErr(res, e, e.statusCode || 500);
+        if (e instanceof AppError) {
+          respondError(res, e);
+        } else {
+          respondError(res, e, {
+            body: {
+              error: e.message,
+              ...(e.code ? { code: e.code } : {}),
+              ...(e.rejected ? { rejected: e.rejected } : {}),
+            },
+          });
+        }
       }
     });
   });

@@ -3,7 +3,7 @@
  * Distinct from user 业务数据 and legacy /api/v2/case-data.
  */
 import * as systemRefService from '../../services/system-ref-service.js';
-import { sendErr, asyncHandler } from './trajectory-shared.js';
+import { asyncHandler } from '../../http/app-error.js';
 
 /**
  * Register system reference-data routes.

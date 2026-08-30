@@ -7,18 +7,15 @@
  */
 import * as systemRefDao from '../dao/system-ref-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
-
-function trajError(message, statusCode) {
-  const err = new Error(message);
-  err.statusCode = statusCode;
-  return err;
-}
+import { AppError } from '../http/app-error.js';
 
 async function assertTrajectory(trajectoryId) {
   const tid = Number(trajectoryId);
-  if (!Number.isFinite(tid) || tid <= 0) throw trajError('Invalid trajectory id', 400);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    throw new AppError('Invalid trajectory id', { code: 'VALIDATION' });
+  }
   const traj = await trajectoryDao.getById(tid);
-  if (!traj) throw trajError('Trajectory not found', 404);
+  if (!traj) throw new AppError('Trajectory not found', { code: 'NOT_FOUND' });
   return tid;
 }
 
@@ -48,7 +45,7 @@ export async function listSystemRefData(query = {}) {
 export async function getSystemRefData(id) {
   const row = await systemRefDao.getById(id);
   if (!row) {
-    throw trajError('System ref data not found', 404);
+    throw new AppError('System ref data not found', { code: 'NOT_FOUND' });
   }
   return row;
 }
@@ -108,7 +105,7 @@ export async function listTrajectorySystemRefEntries(trajectoryId, query = {}) {
  */
 export async function deleteSystemRefData(id) {
   const row = await systemRefDao.getById(id);
-  if (!row) throw trajError('System ref data not found', 404);
+  if (!row) throw new AppError('System ref data not found', { code: 'NOT_FOUND' });
   await systemRefDao.remove(row.id);
   return { status: 'deleted', id: row.id, recordId: row.recordId };
 }

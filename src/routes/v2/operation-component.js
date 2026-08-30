@@ -3,7 +3,7 @@
  */
 import * as componentService from '../../services/operation-component-service.js';
 import * as mineService from '../../services/operation-component-mine-service.js';
-import { sendErr, asyncHandler } from './trajectory-shared.js';
+import { asyncHandler } from '../../http/app-error.js';
 
 /**
  * Register operation-component library routes.
