@@ -397,6 +397,27 @@ export const PAGE_LOCATOR_HELPERS = `
       return [];
     }
   }
+  /* preferVisibleXpath — el-table 固定列克隆消歧：同一锚文本多命中时，若 host
+   * 自身可交互（offsetParent 非空或 getClientRects 非空）且不在固定列克隆容器内，
+   * 在叶子步骤追加 not(ancestor::div[...el-table__fixed...]) 排除主表外的克隆副本；
+   * 仅当过滤后命中数严格减少且仍命中 host 时才采用，单命中输出不变。 */
+  function preferVisibleXpath(expr, node) {
+    const xp = String(expr || '');
+    if (!xp || !node || node.nodeType !== 1) return xp;
+    try {
+      const hits = evalXpathAll(xp);
+      if (hits.length < 2) return xp;
+      if (node.closest && node.closest('.el-table__fixed, .el-table__fixed-right')) return xp;
+      const interactable = node.offsetParent !== null
+        || (node.getClientRects && node.getClientRects().length > 0);
+      if (!interactable) return xp;
+      const filtered = xp
+        + "[not(ancestor::div[contains(@class,'el-table__fixed') or contains(@class,'el-table__fixed-right')])]";
+      const fh = evalXpathAll(filtered);
+      if (fh.length > 0 && fh.length < hits.length && fh.indexOf(node) >= 0) return filtered;
+    } catch (e) { /* ignore */ }
+    return xp;
+  }
   /* regionAnchor* — xpath 消歧：为同名 leaf 加 titled host 前缀，导出唯一相对 xpath。
    * 不是产品「分块/section=」；产品区域请用 region_* / L1。 */
   function regionAnchorOf(host) {
@@ -1386,17 +1407,17 @@ export const PAGE_LOCATOR_HELPERS = `
       }
       const btnT = normalizeControlText(text) || cleanVisibleText(node);
       if (rowT && btnT) {
-        return scopedXPath(
+        return preferVisibleXpath(scopedXPath(
           "tr[.//*[normalize-space()=" + xpathLiteral(rowT) + "]]"
             + "//*[self::button or self::a or " + classTokenPred('el-button') + "][normalize-space()=" + xpathLiteral(btnT) + "]",
           scopeKind
-        );
+        ), node);
       }
       if (btnT) {
-        return scopedXPath(
+        return preferVisibleXpath(scopedXPath(
           "*[self::button or self::a or " + classTokenPred('el-button') + "][normalize-space()=" + xpathLiteral(btnT) + "]",
           scopeKind
-        );
+        ), node);
       }
     }
     if (kind === 'table_row_radio') {
@@ -1420,11 +1441,11 @@ export const PAGE_LOCATOR_HELPERS = `
         }
       }
       if (rowT) {
-        return scopedXPath(
+        return preferVisibleXpath(scopedXPath(
           "tr[.//*[normalize-space()=" + xpathLiteral(rowT) + "]]"
             + "//*[" + classTokenPred('el-radio') + " or " + classTokenPred('el-radio-button') + " or " + classTokenPred('el-checkbox') + "]",
           scopeKind
-        );
+        ), node);
       }
     }
     if (kind === 'icon') {
@@ -1492,7 +1513,7 @@ export const PAGE_LOCATOR_HELPERS = `
       : (/(^| )el-button( |$)/.test(cls) && tagL !== 'button'
         ? '*[' + classTokenPred('el-button') + ' and normalize-space()=' + lit + ']'
         : 'button[normalize-space()=' + lit + ']');
-    return scopedXPath(local, scopeKind);
+    return preferVisibleXpath(scopedXPath(local, scopeKind), node);
   }
   function collectAttrs(el) {
     const a = {};
