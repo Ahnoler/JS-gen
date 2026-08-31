@@ -403,6 +403,130 @@ JS_SCAN_FORM_FIELDS = '''async ([quick, buttonkeywords, opts]) => {
             }).filter(Boolean);
         }
     }
+    /* QUERY_TOOLBAR_BARE_LABEL_FALLBACK — 查询区无 .el-form-item 包裹时的兜底枚举。
+     * 仅当容器内没有 .el-form-item（或扫描结果为空）且命中查询工具栏特征时启用，
+     * 按「label 文本元素 + 相邻 .el-input / .el-select」配对，产物与主路径字段同构。
+     * 主路径命中时本分支不执行（零 diff）。 */
+    const bareHasQueryToolbar = (() => {
+        const scope = container === document ? document.body : container;
+        if (!scope || !scope.querySelectorAll) return false;
+        const btns = scope.querySelectorAll('button, .el-button, [role="button"]');
+        let hasQuery = false;
+        let hasSave = false;
+        for (const b of btns) {
+            if (b.offsetParent === null && b.getClientRects().length === 0) continue;
+            const t = (b.innerText || b.textContent || '').replace(/\\s+/g, ' ').trim();
+            if (!t || t.length > 12) continue;
+            if (/^(查询|搜索|查找)$/.test(t)) hasQuery = true;
+            if (/^(保存|提交)$/.test(t)) hasSave = true;
+        }
+        return hasQuery && !hasSave;
+    })();
+    if ((allItems.length === 0 || fields.length === 0) && bareHasQueryToolbar) {
+        const isBareNoiseText = (t) => !t || /^(请输入|请选择)/.test(t);
+        const bareCtrlSeen = new Set();
+        const bareLabelOf = (ctrl) => {
+            const wrap = ctrl.closest ? ctrl.closest('.el-input, .el-select, .el-date-editor, .el-cascader') : null;
+            const anchor = wrap || ctrl;
+            const aRect = anchor.getBoundingClientRect();
+            const tryText = (el) => {
+                if (!el) return '';
+                // label 候选不得本身包含控件/按钮（禁止跨行误配、禁止把按钮当 label）
+                if (el.querySelector && el.querySelector('input, textarea, .el-select, .el-input, button')) return '';
+                const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+                // 同一行约束：label 与控件顶部对齐，且位于控件左侧
+                if (r && (Math.abs(r.top - aRect.top) > 12 || r.right > aRect.left + 8)) return '';
+                const t = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+                if (isBareNoiseText(t)) return '';
+                return t.slice(0, 30);
+            };
+            // 1) 控件（widget 根）在同一父容器内的前序兄弟元素
+            let prev = anchor.previousElementSibling;
+            for (let i = 0; i < 4 && prev; i++) {
+                const t = tryText(prev);
+                if (t) return t;
+                prev = prev.previousElementSibling;
+            }
+            // 2) 控件前的裸文本节点
+            let tn = anchor.previousSibling;
+            for (let i = 0; i < 4 && tn; i++) {
+                if (tn.nodeType === 3) {
+                    const t = (tn.textContent || '').replace(/\\s+/g, ' ').trim();
+                    if (t && !isBareNoiseText(t)) return t.slice(0, 30);
+                }
+                tn = tn.previousSibling;
+            }
+            // 3) widget 父容器的前序兄弟（label 在相邻 div 中，仍在同一 tool-bar 行内）
+            let p = anchor.parentElement;
+            for (let up = 0; up < 2 && p && p !== container; up++) {
+                let ps = p.previousElementSibling;
+                for (let i = 0; i < 3 && ps; i++) {
+                    const t = tryText(ps);
+                    if (t) return t;
+                    ps = ps.previousElementSibling;
+                }
+                p = p.parentElement;
+            }
+            return '';
+        };
+        const bareXpathOf = (ctrl, labelText) => {
+            const scope = scopeOf(ctrl);
+            const scopeKind = (scope === 'drawer' || scope === 'dialog') ? scope : '';
+            const lit = xpathLiteral(normalizeControlText(labelText));
+            let leaf = 'input';
+            if (ctrl.closest && ctrl.closest('.el-select')) leaf = "div[contains(@class,'el-select')]";
+            else if (ctrl.tagName && ctrl.tagName.toLowerCase() === 'textarea') leaf = 'textarea';
+            else if (ctrl.closest && ctrl.closest('.el-date-editor, .tsscdatepicker')) leaf = "div[contains(@class,'el-date-editor')]";
+            else if (ctrl.closest && ctrl.closest('.el-cascader')) leaf = "div[contains(@class,'el-cascader')]";
+            const local = "//*[normalize-space()=" + lit + "]/following::" + leaf + "[1]";
+            return scopedXPath(local, scopeKind);
+        };
+        const bareControls = container.querySelectorAll(
+            '.el-select, .el-input input:not([type="hidden"]), .el-date-editor input:not([type="hidden"]), textarea'
+        );
+        for (const ctrl of bareControls) {
+            if (quick && !isVisible(ctrl)) continue;
+            if (ctrl.closest && ctrl.closest('.el-form-item, .el-table, .el-pagination, button')) continue;
+            const selectWrap = ctrl.closest('.el-select');
+            const trigger = selectWrap ? (selectWrap.querySelector('.el-input__inner') || ctrl) : null;
+            // .el-select 只经其 .el-input__inner trigger 入账一次，避免同控件重复
+            if (selectWrap && ctrl !== trigger) continue;
+            if (bareCtrlSeen.has(trigger || ctrl)) continue;
+            bareCtrlSeen.add(trigger || ctrl);
+            const labelText = bareLabelOf(trigger || ctrl);
+            if (!labelText) continue;
+            const label = normalizeControlText(labelText);
+            if (!label) continue;
+            const inputEl = selectWrap ? null : ctrl;
+            const operable = trigger || ctrl;
+            const host = selectWrap || (ctrl.closest('.el-input, .el-date-editor, .el-cascader') || ctrl);
+            const kind = selectWrap
+                ? (host.querySelector('.tree-popover, .tsscTree, .el-tree-select, [class*="tsscmultitree"]') ? 'tree-select' : 'select')
+                : ((ctrl.closest && ctrl.closest('.el-date-editor, .tsscdatepicker, [class*="date-picker"], [class*="datepicker"]')) ? 'date' : 'input');
+            const currentValue = readValue(inputEl, trigger, host);
+            const placeholder = (operable.getAttribute && operable.getAttribute('placeholder')) || '';
+            const disabled = isDisabled(inputEl, trigger, host);
+            const required = isRequired(host, label, inputEl);
+            const selected = !!(trigger && host.querySelector('.el-select-dropdown__item.is-selected, .el-select__tags-text'));
+            const field = {
+                label,
+                kind,
+                currentValue,
+                options: [],
+                placeholder,
+                required,
+                disabled,
+                selected,
+                hasButton: '',
+                xpath_smart: bareXpathOf(operable, label),
+            };
+            stampRegionAndLegacyMirror(field, operable);
+            if (!pushField(field)) continue;
+            if (kind === 'select' || kind === 'tree-select') {
+                selectFields.push({ field, trigger: operable });
+            }
+        }
+    }
     /* COLLECT_L2_TABLE */
     const tables = container.querySelectorAll('.el-table');
     for (let ti = 0; ti < tables.length; ti++) {
