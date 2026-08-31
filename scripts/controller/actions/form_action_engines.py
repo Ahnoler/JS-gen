@@ -35,6 +35,7 @@ from ...models import (
     TaskItem, TaskList,
 )
 from ...models.field import ScannedButton
+from .js_snippets.login_page import JS_LOGIN_PICK_LEGAL
 from .form_rules import (
     match_rule, match_cert_number, get_has_button_keywords,
     normalize_lat_lng_value,
@@ -133,11 +134,27 @@ class _FormActionEngineBase:
 
 
 class LoginEngine(_FormActionEngineBase):
-    async def login(self, username: str, password: str, captcha: str = '', sms_code: str = ''):
+    async def login(self, username: str, password: str, captcha: str = '', sms_code: str = '', legal_name: str = ''):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
 
         results = []
+
+        # Auto-pick legal entity dropdown (Element UI el-select) before filling username.
+        # Empty legal_name = auto-pick first option; non-login pages return
+        # legal-input-not-found and are silently skipped (never blocks login).
+        try:
+            legal_raw = await page.evaluate(JS_LOGIN_PICK_LEGAL, [legal_name])
+        except Exception:
+            legal_raw = ''
+        try:
+            legal_r = json.loads(legal_raw) if legal_raw else {}
+        except Exception:
+            legal_r = {'ok': False, 'error': str(legal_raw)}
+        if legal_r.get('ok'):
+            results.append(f"legal:{legal_r.get('picked', '')}")
+        elif legal_r.get('error'):
+            results.append(f"legal:{legal_r.get('error')}")
 
         # Fill username (try common labels)
         u_r = await page.evaluate(JS_FILL_FORM_FIELD, ['用户名', username])
@@ -176,12 +193,39 @@ class LoginEngine(_FormActionEngineBase):
             return _err('err-login | ' + summary)
 
         await page.wait_for_timeout(WAIT_3000_MS)
+
+        # Post-login probe: poll up to 10s (500ms interval) for '#/home' hash or
+        # _usertoken in localStorage; re-click login once around the 4s mark to
+        # absorb observed first-click nondeterminism (second click jumps to #/home).
+        async def _login_probe_ok():
+            return await page.evaluate(
+                "() => (location.hash || '').includes('#/home') || !!localStorage.getItem('_usertoken')"
+            )
+
+        import time as _time
+        _probe_start = _time.monotonic()
+        _probe_deadline = _probe_start + 10.0
+        _reclicked = False
+        probe_ok = await _login_probe_ok()
+        while not probe_ok and _time.monotonic() < _probe_deadline:
+            if not _reclicked and _time.monotonic() - _probe_start >= 4.0:
+                try:
+                    await page.evaluate(JS_CLICK_LOGIN_BUTTON)
+                except Exception:
+                    pass
+                _reclicked = True
+            await page.wait_for_timeout(500)
+            probe_ok = await _login_probe_ok()
+
+        if not probe_ok:
+            return _err('err-login | probe-timeout | ' + summary)
+
         _record_action(
             'login',
             {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code},
             'ok-login',
         )
-        return _ok('ok-login | ' + summary, include_in_memory=True)
+        return _ok('ok-login | ' + summary + ' | probe:home', include_in_memory=True)
 
 
 
