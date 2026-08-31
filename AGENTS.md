@@ -2,6 +2,19 @@
 
 Guidance for Codex (Codex.ai/code) and Claude Code when working in this repo. This is the single source of truth. Product-facing docs live in `README.md` (human) and `/api/docs` (sole frontend contract); architecture depth that an agent can rediscover from the tree is intentionally not duplicated here.
 
+## 跨 Agent 协作（开场三件事 / 收工写日志）
+
+多个 Agent 工具（Zcode / Cursor / Codex 等）在同一仓库开发，会话记忆互不相通；跨工具互通靠仓库内文件 + git 历史，不靠任何工具的内置记忆。
+
+**开场三件事（每次会话开始先做）：**
+1. `git log --oneline -15` + `git status` — 看最近提交与未提交改动
+2. 读 `docs/superpowers/todo-list.md` — 当前工作线与挂起项
+3. 读 `docs/superpowers/agent-log.md` 最近几条 — 其他 Agent 最近做了什么、有什么遗留
+
+**收工写日志（每次会话结束前）：**
+- 在 `docs/superpowers/agent-log.md` **顶部**插入一条，格式见该文件头：完成（含 commit hash）/ 进行中 / 注意事项
+- 一个任务单元结束尽量 commit——未提交的工作对其他 Agent 不可见
+
 ## Working with subagents
 
 Default split（各司其职）:
@@ -13,8 +26,7 @@ Delegation rules:
 - Give every subagent a self-contained prompt: file paths + line numbers, allowed/forbidden edits, verification commands, report format.
 - Parallel subagents get **disjoint** file sets (no concurrent-edit conflicts).
 - On subagent network timeout, retry once; if it still fails, the main thread does the work.
-- After each subagent: re-run key verification and review for out-of-scope edits (e.g. CHANGELOG); report compliant deviations honestly.
-- When a subagent edits `src/`, it may append a CHANGELOG entry per the CHANGELOG 约定 below; main reviews the format and checks it doesn't overwrite the user's uncommitted entries.
+- After each subagent: re-run key verification and review for out-of-scope edits; report compliant deviations honestly.
 
 Refactoring constraint (hard): `scripts/characterization/*` uses `read_text` to assert source substrings, pinning function names / closure relative order / exact strings (`_form.py` is pinned by ~30 scripts). When splitting files, keep those markers and make tests read concatenated files (see `_form.py` → `form_autofill.py`).
 
@@ -71,19 +83,3 @@ This is a **browser-automation service** for Element UI / Vue apps: Playwright s
 - 工具链：`npm run lint` 检查 / `npm run lint:fix` 自动修复（eslint-plugin-jsdoc，warn 级别）。存量 warning 已清零，**新代码不得引入新 warning**。
 - 绕过区域（不 lint、不加 JSDoc）：`migrations/**`（一次性脚本，已 ignore）、`scripts/characterization/**`、`scripts/smoke/**`。
 - 硬性约束（踩坑教训）：给函数加 JSDoc 时**只插入注释，严禁删除/修改任何已有代码行**——曾有子智能体误删函数定义导致代码损坏。
-
-## CHANGELOG 约定
-
-**强制规则**：每次修改 JS-gen，必须同步更新 `CHANGELOG.md` 的 `[Unreleased]` 区段，按 Keep a Changelog 分类追加条目。条目需说明影响范围。
-
-涉及以下变更时**必须**写 CHANGELOG：
-- `migrations/` 新增或修改迁移（schema 变更）
-- `src/routes/` 端点新增/删除/改路径/改响应格式
-- `src/services/` 业务逻辑变更
-- `server.mjs` WebSocket 协议变更
-- `config/` 配置项变更
-
-仅改 `scripts/`（Python 子进程）可不写 CHANGELOG。
-条目格式见 `CHANGELOG.md` 顶部"条目格式约定"。
-
-> 注：Python 控制面（`d:\dev\ui-auto-recording-agent-python`）同步已叫停（2026-08-26），不再写 Python 同步提示，也不需要与 Python 端对齐。
