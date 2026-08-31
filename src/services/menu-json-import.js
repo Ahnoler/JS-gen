@@ -59,7 +59,7 @@ function collectPages(node) {
         resPath: String(managePage.resPath || '').trim(),
         pageType: 'managePage',
       });
-    } else {
+    } else if (pageId !== pages[0].pageId) {
       skippedExtraManage += 1;
     }
   }

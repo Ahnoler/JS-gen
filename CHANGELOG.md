@@ -25,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - 2026-08-31: **菜单落地 pageId 单一化（prepare 回写）**：`bindRecordingPageId` 在 `source=read` 时回写功能 `pd_cmpt_ecd` + 单行 `system_page`；AILZ 不回写菜单。
 
-- 2026-08-31: **菜单落地 pageId 单一化（导入）**：`collectPages` 只入库第一个非空 managePage；忽略 guidePages；模块 upsert 强制空 pages。影响：`system_page` 每功能 0/1 行；characterization-system-import-json 断言同步。
+- 2026-08-31: **菜单落地 pageId 单一化（导入）**：`collectPages` 只入库第一个非空 managePage；忽略 guidePages；模块 upsert 强制空 pages；同节点多活动共享同一 managePage id 不再误报 warn。影响：`system_page` 每功能 0/1 行；characterization-system-import-json 断言同步。
 
 - 2026-08-31: **存量迁移** `migrations/20260831120000_system_page_landing_only.js`：删 guidePage、塌缩每节点至多 1 行、同步 `system.pd_cmpt_ecd`；不改 trajectory。
 
