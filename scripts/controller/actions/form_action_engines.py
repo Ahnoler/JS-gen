@@ -36,6 +36,8 @@ from ...models import (
 )
 from ...models.field import ScannedButton
 from .js_snippets.login_page import JS_LOGIN_PICK_LEGAL
+from .js_snippets.container import JS_VISIBLE_OVERLAY_OF
+from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from .form_rules import (
     match_rule, match_cert_number, get_has_button_keywords,
     normalize_lat_lng_value,
@@ -59,6 +61,10 @@ from .form_autofill import FormAutofillEngine
 from .result_protocol import err_with, ok_marked, affordances
 from .select_match import suggest_field_for_value
 from .replay_timing import WAIT_500_MS, WAIT_3000_MS
+
+# SB：fill_form_field 确定性守卫总开关（Z2 严格解析闸 + Z4 弹层作用域闸）。
+# 置 False 可一键回退为守卫前的盲填行为。
+STRICT_FILL_GUARDS = True
 
 def _select_failure_next_action(label_text: str, option_text: str, business_data_store) -> str:
     """确定性「建议字段」提示（C2）：值↔选项错配时的下一步指引。
@@ -318,6 +324,67 @@ class FillEngine(_FormActionEngineBase):
                     next_action=nxt.replace("<此字段label>", resolved.label or label_text),
                 )
             return _with_submit_cue(result or resolved.error, self.business_data_store)
+        # SB 守卫（仅 xpath_smart 非空时执行；两道独立 try/except，
+        # 守卫自身故障只 skip 放行，绝不阻断填表）：
+        guards_diag = []
+        xp_guard = (resolved.xpath_smart or xpath_smart or '').strip()
+        if STRICT_FILL_GUARDS and xp_guard:
+            # Z2 严格解析闸：命中 0 或多个可见节点都拒绝盲试
+            try:
+                strict_raw = await page.evaluate(
+                    "([expr]) => { " + PAGE_LOCATOR_HELPERS
+                    + " return resolveLocatorStrict(expr, {visibleOnly:true}); }",
+                    [xp_guard],
+                )
+                strict_info = strict_raw if isinstance(strict_raw, dict) else {}
+                if strict_info.get('error'):
+                    guards_diag.append('strict-locator:skipped(' + str(strict_info.get('error'))[:80] + ')')
+                elif int(strict_info.get('effectiveCount') or 0) == 0:
+                    return _err(
+                        'strict-locator-not-found:' + xp_guard
+                        + ' | 先 scan 重新获取定位，勿重试同参数'
+                    )
+                elif strict_info.get('ambiguous'):
+                    return _err(
+                        'ambiguous-locator:' + xp_guard
+                        + ' | hits=' + str(strict_info.get('effectiveCount'))
+                        + ' | ' + json.dumps(strict_info.get('samples') or [], ensure_ascii=False)[:200]
+                        + ' | 需含消歧条件的定位，拒绝盲试'
+                    )
+                else:
+                    guards_diag.append(
+                        'strict-locator:passed(eff=' + str(strict_info.get('effectiveCount')) + ')'
+                    )
+            except Exception as _guard_exc:
+                guards_diag.append('strict-locator:skipped(' + str(_guard_exc)[:80] + ')')
+            # Z4 弹层作用域闸：可见弹层存在而目标在其外 → 拒绝
+            try:
+                overlay_raw = await page.evaluate(JS_VISIBLE_OVERLAY_OF, [xp_guard])
+                overlay = overlay_raw if isinstance(overlay_raw, dict) else {}
+                if overlay.get('error'):
+                    guards_diag.append('overlay:skipped(' + str(overlay.get('error'))[:80] + ')')
+                elif (
+                    overlay.get('overlayPresent')
+                    and overlay.get('targetFound')
+                    and not overlay.get('targetInsideOverlay')
+                ):
+                    return _err(
+                        'fill-outside-overlay | 目标在可见弹层「'
+                        + str(overlay.get('overlayLabel'))
+                        + '」之外，已拒绝。若确要填底层页面字段，先关闭弹层再填'
+                    )
+                else:
+                    guards_diag.append(
+                        'overlay:passed(present=' + str(bool(overlay.get('overlayPresent')))
+                        + ',found=' + str(bool(overlay.get('targetFound')))
+                        + ',inside=' + str(overlay.get('targetInsideOverlay')) + ')'
+                    )
+            except Exception as _overlay_exc:
+                guards_diag.append('overlay:skipped(' + str(_overlay_exc)[:80] + ')')
+            sys.stderr.write(
+                '[fill] guards label=' + repr(label_text) + ' | ' + ' '.join(guards_diag) + '\n'
+            )
+            sys.stderr.flush()
         element = await _capture_element(
             page, resolved.label, target_kind='form_input', xpath_smart=resolved.xpath_smart,
         )
