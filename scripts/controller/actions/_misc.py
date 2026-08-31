@@ -730,6 +730,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
 
     @controller.action('Scroll down the page by pixel amount. Scrolls the main content container or window.')
     async def scroll_down(amount: int = 300):
+        amount = int(amount)
         page = await browser_context.get_current_page()
         await page.evaluate(f'''() => {{
             const targets = document.querySelectorAll(
@@ -750,6 +751,7 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
 
     @controller.action('Scroll up the page by pixel amount. Scrolls the main content container or window.')
     async def scroll_up(amount: int = 300):
+        amount = int(amount)
         page = await browser_context.get_current_page()
         await page.evaluate(f'''() => {{
             const targets = document.querySelectorAll(

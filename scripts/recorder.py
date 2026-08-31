@@ -194,8 +194,10 @@ def build_recording_hooks(goal_tracker=None, cancel_flag_path=None, business_dat
             sys.stderr.write("[recorder] Cancel signal received, stopping agent\n")
             sys.stderr.flush()
             agent.state.stopped = True
-            try: cancel_flag_path.unlink(missing_ok=True)
-            except: pass
+            try:
+                cancel_flag_path.unlink(missing_ok=True)
+            except OSError:
+                pass
             return
 
         if goal_tracker['stopped']:

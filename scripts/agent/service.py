@@ -89,6 +89,37 @@ def _count_tree_select(business_data_ref):
     return sum(1 for f in scan_fields if f.get('kind') in ('tree-select', 'tree'))
 
 
+def _resolve_phase_budget(max_steps, contract, heal_mode):
+    """Resolve the per-phase step budget from the ceiling + LLM contract, then log it.
+
+    Returns (ceiling, chosen); the empty-act buffer is folded into the log line only.
+    """
+    from ..controller.actions.phase.reviewer import (
+        _EMPTY_ACT_BUFFER,
+        coerce_bool,
+        resolve_phase_max_steps,
+    )
+    ceiling = max_steps
+    try:
+        ceiling = int(max_steps)
+    except (TypeError, ValueError):
+        ceiling = 40
+    # Reviewer effort/estimated_steps force-cap below ceiling (buffer=2
+    # covers done-only last step + save/final-check).
+    chosen = resolve_phase_max_steps(ceiling, contract if (contract and not heal_mode) else None)
+    submit_req = (contract or {}).get('submit') or {}
+    empty_buffer = _EMPTY_ACT_BUFFER if coerce_bool(submit_req.get('required')) else 0
+    sys.stderr.write(
+        f"max_steps ceiling={ceiling} chosen={chosen} "
+        f"empty_buffer={empty_buffer} "
+        f"effort={(contract or {}).get('effort')} "
+        f"estimated_steps={(contract or {}).get('estimated_steps')} "
+        f"plan_n={len((contract or {}).get('brief_plan') or [])}\n"
+    )
+    sys.stderr.flush()
+    return ceiling, chosen
+
+
 async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                                   cancel_flag_path, business_data_ref,
                                   special_element_candidates_store):
@@ -292,29 +323,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
         except Exception as e:
             sys.stderr.write(f"fact pack skipped: {e}\n")
             sys.stderr.flush()
-        from ..controller.actions.phase.reviewer import (
-            _EMPTY_ACT_BUFFER,
-            coerce_bool,
-            resolve_phase_max_steps,
-        )
-        ceiling = max_steps
-        try:
-            ceiling = int(max_steps)
-        except (TypeError, ValueError):
-            ceiling = 40
-        # Reviewer effort/estimated_steps force-cap below ceiling (buffer=2
-        # covers done-only last step + save/final-check).
-        max_steps = resolve_phase_max_steps(ceiling, contract if not heal_mode else None)
-        submit_req = (contract or {}).get('submit') or {}
-        empty_buffer = _EMPTY_ACT_BUFFER if coerce_bool(submit_req.get('required')) else 0
-        sys.stderr.write(
-            f"max_steps ceiling={ceiling} chosen={max_steps} "
-            f"empty_buffer={empty_buffer} "
-            f"effort={(contract or {}).get('effort')} "
-            f"estimated_steps={(contract or {}).get('estimated_steps')} "
-            f"plan_n={len((contract or {}).get('brief_plan') or [])}\n"
-        )
-        sys.stderr.flush()
+        ceiling, max_steps = _resolve_phase_budget(max_steps, contract, heal_mode)
         max_steps_resolved = True
         if business_data_ref is not None and not heal_mode:
             agent_task = agent_task + recording_refill_hint(
@@ -376,29 +385,7 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
         sys.stderr.flush()
         emit_json({"event": "phase_start", "data": {"phase": step_index, "total": -1, "name": task_text[:60]}})
     if not max_steps_resolved:
-        from ..controller.actions.phase.reviewer import (
-            _EMPTY_ACT_BUFFER,
-            coerce_bool,
-            resolve_phase_max_steps,
-        )
-        ceiling = max_steps
-        try:
-            ceiling = int(max_steps)
-        except (TypeError, ValueError):
-            ceiling = 40
-        max_steps = resolve_phase_max_steps(
-            ceiling, contract if (contract and not heal_mode) else None
-        )
-        submit_req = (contract or {}).get('submit') or {}
-        empty_buffer = _EMPTY_ACT_BUFFER if coerce_bool(submit_req.get('required')) else 0
-        sys.stderr.write(
-            f"max_steps ceiling={ceiling} chosen={max_steps} "
-            f"empty_buffer={empty_buffer} "
-            f"effort={(contract or {}).get('effort')} "
-            f"estimated_steps={(contract or {}).get('estimated_steps')} "
-            f"plan_n={len((contract or {}).get('brief_plan') or [])}\n"
-        )
-        sys.stderr.flush()
+        ceiling, max_steps = _resolve_phase_budget(max_steps, contract, heal_mode)
     try:
         from ..controller.actions._business_data import format_business_data_hint, iter_user_business_entries
         if want_biz:
