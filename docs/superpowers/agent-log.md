@@ -1,3 +1,14 @@
+## 2026-08-31 · Zcode (uara_V1.2) — 信贷系统实地调研 + Agent 工作流编排设计
+- 完成：A-G 落地改造点全部实现（4 路并行子智能体 + 主线程接线）：A scan_form 查询区无 form 配对兜底（QUERY_TOOLBAR_BARE_LABEL_FALLBACK）；B/C/D 新增 read_business_date / picker_dialog_query / picker_dialog_select / workspace_tabs 四动作（js_snippets/business_date+picker_confirm+workspace_tabs + _workspace.py，service.py 已注册）；E/G prompts 环境守卫 cue + 信贷业务速查 + 营业日期规则（agent-tools-common.md + agent-field-rules.md）；F page-locator-helpers.js 固定列克隆可见性优先（preferVisibleXpath，仅多命中且过滤有效时收窄，单命中字节不变）+ 重新生成 _locator_helpers_js.py
+- 验证：py_compile + 全链真实 import；lint 0/0；characterize-xpath-three-sources OK（11×6 严格一致）；scan 特征化 4/4；multi-save OK；verify-all 仅剩已知存量失败（export-v3 rect 42/115，非代码）
+- 注意：A-G 与 Z1-Z8 中仅 A-G 已落地；Z1-Z8（快照单源/定位契约引擎化等）仍在 [borrow-zcode-browser-design.md](specs/2026-08-31-borrow-zcode-browser-design.md) 待排期
+- 完成：实地登录天阳信贷 test.creditv5p2（701994/黄某某/客户经理），遍历 13 个一级模块菜单树、四种页面形态、登录/360视图/审批页路由；调研文档 `docs/superpowers/research/2026-08-31-credit-sut-framework-research.md`
+- 完成：用户纠偏后实测验证——测试环境图形/手机验证码全留空可登录成功（退出重登证实），登录全自动可行；两文档已按 W0 登录工作流修正
+- 完成：Agent 工作流编排设计（W0登录/W1导航/W2列表查询/W3编辑抽屉/W4选择器弹窗/W5向导审批 + P0-P5 阶段化录制 + A-G 落地改造点）`docs/superpowers/specs/2026-08-31-credit-agent-workflow-orchestration.md`
+- 完成：借鉴 ZCode 内置浏览器控制设计的底层改造方案 `docs/superpowers/specs/2026-08-31-borrow-zcode-browser-design.md`——Z1 统一 semantic_snapshot 快照即真相 / Z2 定位契约引擎化（count+可见性，拒绝盲试）/ Z3 失败强制重观察 / Z4 动作前上下文绑定 / Z5 廉价观察阶梯 / Z6 统一预算 / Z7 反注入 / Z8 坐标兜底（二期）；与信贷编排 A-G 合流排期
+- 关键事实：Vue2+ElementUI+tssc 皮、qiankun 微前端 27 子应用、天元编码 cmptEcd/fcnScnEcd/avyEcd、新增表单=el-drawer、营业日期滞后(localStorage.businessDate)、会话约 50min 倒计时、测试环境验证码不拦截
+- 注意：三文档未提交；落地改造 A-G 与 Z1-Z8 未实现（待排期）；浏览器会话仍登录在该测试环境
+
 ## 2026-08-31 — 菜单落地 pageId 单一化（实现）
 
 - **完成:** 导入只收第一个非空 managePage；prepare `source=read` 回写功能落地页；存量 migration 清 guidePage；同 pageId 不再误 warn。commits: `8bef184` `ad66cf1` `7a72314` `be8ddfa`（设计 `b6a709b`）。
