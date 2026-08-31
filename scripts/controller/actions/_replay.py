@@ -204,6 +204,8 @@ def _result_ok(action_name: str, result: str) -> bool:
         return False
     if action_name == 'save_form_snapshot' and result.startswith('form-structure:'):
         return True
+    if action_name == 'wait_for_loading' and result.startswith('loading-done'):
+        return True
     if is_absent_field_result(result):
         return True
     if result.startswith('error:') or result.startswith('unknown-') or result.startswith('err'):
