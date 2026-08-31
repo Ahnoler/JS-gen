@@ -14,6 +14,12 @@
 - 验证：6 个 form 特征化 + xpath-three-sources（11×6）OK；verify-all 唯一失败仍为已知存量 export-v3（远程库数据漂移）；真机 login/picker 链路全绿
 - 注意：编排 v2 的 H 系列全部落地；W5 演练只到提交流程步之前，流程提交/撤销仅在显式授权下执行；Z1/Z4（semantic_snapshot/verify_context）待下一批
 
+## 2026-08-31 · Zcode (uara_V1.2) — 按 docs/orchestration 派发 A/C：P0-P5 驱动深化 + 链路文档
+- 完成：A（tmp/api_drill.py 229→395 行，函数外 helper 化）——P3 完整（tabs/菜单链→选择客户→query 0 行重试→首行 row_text→selector diff→verify_context overlay_absent→通用必填填充）、P4 完整（save_with_repair ≤3 → formErrors 检查 → 提交按钮探测[w/ 声明偏差：watcher 无 evaluate 动作，改用 semantic_snapshot 等价] → wf_submit_guard → 提交 → 流程轨迹断言）、P5 best-effort（撤销/页签清理/截图）；P0-P2 与信封处理未动
+- 完成：C（docs/superpowers/research/2026-08-31-api-drive-chain.md 216 行）——链路拓扑/接口契约（按代码事实：v2 成功=裸 JSON、错误=AppError 扩展信封；保留双兼容）/四组缺陷定案（4537ec4/2a119c5/0fa6a8e/c3453eb→20fb5a6）/脚本复用指南/运维（隧道、重启顺序、stale 锁、detach）/SUT 已知
+- 验证（交易 201，产品级）：prepare 一次成功(23s) → P2 选中企业类/营业执照+ok-save-navigation 建档成功 → P3 后端 tcp-cst 抖动选择器 0 行（降级链按设计 WARN 继续）→ P4 not-form-save 守卫正确拒绝（页面非表单态）→ P5 截图收尾 → stop ok
+- 注意：P3/P4 未全绿仅因 SUT 后端间歇（选择器查询 0 行），守卫行为全部正确；浏览器零残留（201 已 detach）；tmp/docs 变更不入 CHANGELOG（约定）
+
 ## 2026-08-31 · Zcode (uara_V1.2) — 服务链路 API 驱动 P0-P5 全闭环（针对未决项的最终轮）
 - 完成：按 docs/orchestration 契约（文件集不相交并行派发 A/B/C）→ 主线程接缝 `_result_ok`（2a119c5）→ A/B/C 合并补丁（0fa6a8e）→ watcher 早退修复两轮（c3453eb 条件化 + 20fb5a6 彻底移除）
 - 完成：未决项定性闭环——watcher 通道 select_option 失败根因三层：①`scan_visible_fields` 只读不写 store；②`task_list/_scan_fields` 只由 ensure_scanned 容器触碰重建；③watcher 模式 ensure_scanned 早退 → store 永不建立/容器永不切换（wm_repro AFTER-SELECT active 停留 main 实锤；直连成功分水岭）
