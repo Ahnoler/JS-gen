@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - 2026-08-31: **菜单落地 pageId 单一化（导入）**：`collectPages` 只入库第一个非空 managePage；忽略 guidePages；模块 upsert 强制空 pages。影响：`system_page` 每功能 0/1 行；characterization-system-import-json 断言同步。
 
+- 2026-08-31: **存量迁移** `migrations/20260831120000_system_page_landing_only.js`：删 guidePage、塌缩每节点至多 1 行、同步 `system.pd_cmpt_ecd`；不改 trajectory。
+
 - 2026-08-28: **重写项目 README**：依据当前控制面、v2 API、MySQL 迁移、Python Agent、Executor、截图存储和启动脚本补充依赖、初始化、配置、目录模块、业务流程、接口入口、状态语义及故障排查说明；修正旧组装管线和旧 API 的过期描述。影响范围：项目文档，无运行时代码或 schema 变更。
 
 - 2026-08-27: **动作统一改名：`click_icon_button` → `click_button`**（该工具已拓展为通用"按标签点击按钮"：tooltip 图标优先，miss 直点同标签文字按钮）。控制器注册名、state 录制映射、manual_recorder 发射/映射、script_assembler BOUNDARY、codegen 导出模板（含生成脚本内 CTRL.clickButton 调用点）、browser 服务层（resolve-by-label/dedup/legacy-engine-export/transaction-export-v3）、models/action 三处、CTRL nav.js 方法键与 index.js 文档行、agent prompt 两个文件全量同步；回放兼容：replay_names 新增 `'click_icon_button' → 'click_button'` 与 camelCase 双别名，历史轨迹可正常回放。返回码（err-icon-label-miss/-ambiguous、ok-text）与 JS_CLICK_ICON_BUTTON 常量名不变。前端 vue 仓库 schema value 同步为 click_button 并保留旧值 alias（中文展示「点击按钮」）。
