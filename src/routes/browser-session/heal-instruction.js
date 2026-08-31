@@ -264,7 +264,9 @@ export function buildRerunResumeInstruction({ actionData, failedStep, log_file, 
     let logSection = '';
     if (log_file) {
       const logPath = path.resolve(PROJECT_DIR, log_file);
-      if (existsSync(logPath)) {
+      const logRel = path.relative(PROJECT_DIR, logPath);
+      const withinProject = !(logRel.startsWith('..') || path.isAbsolute(logRel));
+      if (withinProject && existsSync(logPath)) {
         const logContent = readFileSync(logPath, 'utf-8');
         if (logContent.trim()) {
           logSection = '\n---\n\n## 文件说明\n\n以下包含两份文件，供你理解任务上下文：\n\n' +

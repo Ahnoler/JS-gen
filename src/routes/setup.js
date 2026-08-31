@@ -18,8 +18,12 @@ export default function registerSetupRoutes(app) {
     res.sendFile(path.join(PROJECT_DIR, 'config', 'setup.html'));
   });
 
-  // Save config from setup form
+  // Save config from setup form (loopback-only: this endpoint overwrites .env)
   app.post('/api/setup/save', (req, res) => {
+    const remoteAddr = req.socket.remoteAddress || '';
+    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remoteAddr)) {
+      return res.status(403).json({ ok: false, error: '仅允许本机回环访问配置接口' });
+    }
     const { LLM_API_KEY: key, LLM_BASE_URL: url, FORM_LLM_MODEL: model } = req.body || {};
     if (!key || !key.trim()) {
       return res.status(400).json({ ok: false, error: 'API Key 不能为空' });

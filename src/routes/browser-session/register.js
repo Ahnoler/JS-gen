@@ -136,6 +136,10 @@ export default function registerBrowserSessionRoutes(app) {
     if (!failedStep || failedStep <= 0) return res.status(400).json({ error: 'failedStep (> 0) is required' });
 
     const absActionPath = path.resolve(PROJECT_DIR, action_file);
+    const actionRel = path.relative(PROJECT_DIR, absActionPath);
+    if (actionRel.startsWith('..') || path.isAbsolute(actionRel)) {
+      return res.status(400).json({ error: 'action_file must be within the project directory' });
+    }
     if (!existsSync(absActionPath)) return res.status(404).json({ error: 'Action file not found' });
 
     let replayedCount = 0;
@@ -259,45 +263,33 @@ export default function registerBrowserSessionRoutes(app) {
       try { gb.stdin.write(JSON.stringify({ event: 'close' }) + '\n'); } catch {}
     }
 
-    if (proc && !proc.killed) {
-      const forceKillTimer = setTimeout(() => {
-        killTree(proc.pid);
-        setTimeout(() => killOrphans(), 2000);
-        gb.process = null;
-        gb.stdin = null;
-        gb.ready = false;
-        gb.busy = false;
-        gb.stepIndex = 0;
-        state.sessions.clear();
-        console.log('[browser-global] Browser close timeout, force killed');
-        broadcastSessions();
-        broadcastWatcherStatus();
-        res.json({ status: 'closed (force killed)' });
-      }, 30000);
-
-      proc.on('exit', () => {
-        clearTimeout(forceKillTimer);
-        gb.process = null;
-        gb.stdin = null;
-        gb.ready = false;
-        gb.busy = false;
-        gb.stepIndex = 0;
-        state.sessions.clear();
-        console.log('[browser-global] Browser closed gracefully');
-        broadcastSessions();
-        broadcastWatcherStatus();
-        res.json({ status: 'closed' });
-      });
-    } else {
+    const cleanupGlobals = (message) => {
       gb.process = null;
       gb.stdin = null;
       gb.ready = false;
       gb.busy = false;
       gb.stepIndex = 0;
       state.sessions.clear();
-      console.log('[browser-global] No browser process, cleaned up');
+      console.log(message);
       broadcastSessions();
       broadcastWatcherStatus();
+    };
+
+    if (proc && !proc.killed) {
+      const forceKillTimer = setTimeout(() => {
+        killTree(proc.pid);
+        setTimeout(() => killOrphans(), 2000);
+        cleanupGlobals('[browser-global] Browser close timeout, force killed');
+        if (!res.writableEnded) res.json({ status: 'closed (force killed)' });
+      }, 30000);
+
+      proc.on('exit', () => {
+        clearTimeout(forceKillTimer);
+        cleanupGlobals('[browser-global] Browser closed gracefully');
+        if (!res.writableEnded) res.json({ status: 'closed' });
+      });
+    } else {
+      cleanupGlobals('[browser-global] No browser process, cleaned up');
       res.json({ status: 'closed' });
     }
   });
