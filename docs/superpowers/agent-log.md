@@ -1,3 +1,12 @@
+## 2026-08-31 · Zcode (uara_V1.2) — borrow-design Z 系列全部落地（7 路并行 + 主线程接线）
+- 完成：Z1+Z4（4f04c26）——JS_SEMANTIC_SNAPSHOT（context 头 + 稳定 ref 控件清单，快照即真相）与 JS_VERIFY_CONTEXT（六判据动作前上下文校验）+ _observe.py 注册 semantic_snapshot / verify_context
+- 完成：Z2（9f41c47）——page-locator-helpers.js 增量 resolveLocatorStrict（found/count/visibleCount/ambiguous/samples），重新生成 _locator_helpers_js.py；三源护栏改前后字节一致；真机对照 //body 与 选择客户 1/1 命中、保存 真实 0
+- 完成：Z3（45105bd）——失败重观察守卫分级：第 2 次连续失败追加重试纪律、第 3 次起强硬处方（三选一），cue 后附新鲜页面观察（hash/loading/overlay）；cue-once 语义保留，护栏 OK
+- 完成：Z5（2f2bc23）——观察阶梯五级 + 单动作单观察 + 3-5s 预算语义注入 prompts；Z6（83d83e6）——ACTION_BUDGET_S 预算表 + budget_for/budget_overrun_hint（纯增量，WAIT_ 常量零改动）
+- 结论：Z8 坐标兜底**继续二期搁置**（无实证自绘控件触发面；page.mouse/截图/坐标换算基建全在；grounding-fallback-spec G4 裁决无新证据推翻）
+- 验证：xpath 三源 11×6 一致、duplicate-failure-cue/form 系特征化 OK、verify-all 唯一失败仍为已知存量 export-v3；真机湿测 semantic_snapshot/verify_context 正反路径/strict 解析器三组对照全绿
+- 注意：Z 系列全部落地；预算消费接线（budget_for 接入动作层）与 verify_context 在 W3'/W5 编排中的强制前置为下一批可选收尾
+
 ## 2026-08-31 · Zcode (uara_V1.2) — 编排 v2 落地：H1-H5 全部实现（4 路并行子智能体 + 主线程接线）
 - 完成：H1 W0 登录引擎化（d5aafa4）——JS_LOGIN_PICK_LEGAL 法人自动选择（placeholder 定位 + mousedown 展开；(args) 数组解构适配 Playwright 单参数语义，修复了首版 (legalName) 签名被 try 静默吞掉的 bug）+ LoginEngine.login 探针重试（≤10s 轮询 #/home/_usertoken，4s 补点一次）；真机湿测一次调用 `ok-login | legal:横州市… | probe:home`
 - 完成：H3+H2 待办卡片与向导守卫（308c8a7）——JS_LIST_TODO_CARDS / JS_WF_SUBMIT_GUARD（只读）+ _todo.py 注册 list_todo_cards / wf_submit_guard + service.py 接线
