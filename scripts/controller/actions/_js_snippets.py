@@ -31,5 +31,5 @@ from .js_snippets.enrich import JS_ENRICH_CLICK_LOCATOR
 from .js_snippets.icons import _JS_ICON_BUTTON_HELPERS, JS_STAMP_ICON_ARIA_LABELS, JS_COLLECT_ICON_BUTTONS, JS_CLICK_ICON_BUTTON
 from .js_snippets.misc import JS_SCENARIO_PAGE_SNAPSHOT, JS_VERIFY_FORM_STRUCTURE, JS_CLICK_LOGIN_BUTTON, JS_CLICK_VERIFY_BUTTON
 from .js_snippets.menu_scan import JS_SCAN_MENU_TREE
-from .js_snippets.page_id import JS_READ_PAGE_COMPONENT_CODE, JS_CLICK_MENU_XPATH
+from .js_snippets.page_id import JS_READ_PAGE_COMPONENT_CODE, JS_CLICK_MENU_XPATH, JS_FIND_MENU_DISMISS_POINT
 from scripts.controller.actions.js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
