@@ -32,13 +32,19 @@ JS_VISIBLE_OVERLAY_OF = '''([xpathExpr]) => {
     try {
         const isVisibleOverlay = (el, kind) => {
             if (!el) return false;
-            if (el.getClientRects && el.getClientRects().length > 0 && el.offsetParent !== null) return true;
-            // .el-dialog 兜底：隐藏对话框常复用同一 DOM，用 header 文本判可见性
-            if (kind === 'dialog') {
-                const header = el.querySelector('.el-dialog__header');
-                return !!(header && (header.textContent || '').trim());
+            const r = el.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) return false;
+            // Element UI 弹层由外层 wrapper（display:none）控制显隐；弹层本体是
+            // position:fixed（offsetParent 恒为 null，不能用它判可见性）。
+            // 隐藏对话框常驻 DOM 且 header 文本永在——header 文本不能当可见性依据。
+            const scope = el.closest('.el-dialog__wrapper, .el-drawer__wrapper, .el-overlay') || el.parentElement || el;
+            if (scope) {
+                const st = getComputedStyle(scope);
+                if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity || '1') === 0) return false;
             }
-            return false;
+            const st2 = getComputedStyle(el);
+            if (st2.display === 'none' || st2.visibility === 'hidden') return false;
+            return true;
         };
         let overlay = null;
         let overlayKind = null;
