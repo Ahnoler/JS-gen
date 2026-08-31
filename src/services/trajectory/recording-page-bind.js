@@ -42,7 +42,7 @@ export function generatePageId() {
  * @param {number} opts.tid trajectory DB id
  * @param {number} opts.functionId 交易所属功能节点 id
  * @param {object} opts.execSession executor 会话客户端（waitForSessionEvent/forwardStdin）
- * @returns {Promise<{ pageId: string, source: 'read'|'generated' }>} 绑定结果（内部用）
+ * @returns {Promise<{ pageId: string, source: 'read'|'generated', persisted: boolean, reused?: boolean }>} 绑定结果（内部用；persisted=落库是否成功）
  */
 export async function bindRecordingPageId({ runtime, tid, functionId, execSession } = {}) {
   try {
@@ -54,9 +54,15 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
     if (!Number.isFinite(fid) || fid <= 0) {
       pageId = generatePageId();
       console.log('[page-bind] no functionId, generated pageId=%s', pageId);
-      await trajectoryDao.updateMeta(Number(tid), { pageId });
-      console.log('[page-bind] trajectory#%s pageId=%s', tid, pageId);
-      return { pageId, source };
+      let persisted = true;
+      try {
+        await trajectoryDao.updateMeta(Number(tid), { pageId });
+      } catch (persistErr) {
+        persisted = false;
+        console.warn('[page-bind] PERSIST-FAILED trajectory#%s pageId=%s: %s', tid, pageId, persistErr?.message || persistErr);
+      }
+      console.log('[page-bind] trajectory#%s pageId=%s persisted=%s', tid, pageId, persisted);
+      return { pageId, source, persisted };
     }
 
     // 步骤 2：按菜单导航（失败仅 log，继续）
@@ -64,6 +70,13 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
       const nav = await navigateToFunctionMenu({ runtime, functionId: fid, execSession });
       if (!nav?.navigated) {
         console.log('[page-bind] menu navigation skipped: %s', nav?.reason || 'unknown');
+      }
+      // 步骤 2.5：同菜单复用守卫——导航因 same-menu 跳过且本 runtime 已成功落库过 pageId 时，
+      // 跳过重复 read（页面未变则组件编号不变；避免每次 prepare 重开天元弹窗拖慢且打扰）
+      if (!nav?.navigated && nav?.reason === 'same-menu' && runtime._pageBoundId) {
+        const cachedId = String(runtime._pageBoundId);
+        console.log('[page-bind] reuse cached pageId=%s (same menu, skip re-read)', cachedId);
+        return { pageId: cachedId, source: 'read', persisted: true, reused: true };
       }
     } catch (navErr) {
       console.warn('[page-bind] menu navigation failed: %s', navErr?.message || navErr);
@@ -120,10 +133,19 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
       console.warn('[page-bind] cross-check with system_page failed: %s', crossErr?.message || crossErr);
     }
 
-    // 步骤 6：落库
-    await trajectoryDao.updateMeta(Number(tid), { pageId });
-    console.log('[page-bind] trajectory#%s pageId=%s', tid, pageId);
-    return { pageId, source };
+    // 步骤 6：落库——失败不再静默：pageId 停留旧值会破坏执行期导航，warn 带 PERSIST-FAILED 标志并标注 persisted
+    let persisted = true;
+    try {
+      await trajectoryDao.updateMeta(Number(tid), { pageId });
+    } catch (persistErr) {
+      persisted = false;
+      console.warn('[page-bind] PERSIST-FAILED trajectory#%s pageId=%s: %s', tid, pageId, persistErr?.message || persistErr);
+    }
+    if (persisted) {
+      runtime._pageBoundId = pageId;
+    }
+    console.log('[page-bind] trajectory#%s pageId=%s persisted=%s', tid, pageId, persisted);
+    return { pageId, source, persisted };
   } catch (err) {
     console.warn('[page-bind] bind failed: %s', err?.message || err);
     return { pageId: '', source: 'generated' };

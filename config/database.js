@@ -24,6 +24,9 @@ export function getDB() {
         password: resolve('DB_PASS', ''),
         database: resolve('DB_NAME', 'js_gen'),
         charset: 'utf8mb4',
+        // mysql2 压缩协议：库在远程公网（RTT ~65ms），大 JSON 载荷（如轨迹步骤 element_json
+        // 单轨迹 ~430KB）传输占大头，实测压缩后 465~914ms → ~105ms。对端 MySQL 5.7 支持。
+        compress: true,
       },
       pool: {
         min: parseInt(resolve('DB_POOL_MIN', '2'), 10),
