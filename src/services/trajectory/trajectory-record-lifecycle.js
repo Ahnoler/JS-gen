@@ -259,6 +259,8 @@ export async function runDefaultLogin(runtime, account, system = null) {
       nodeUuid: runtime.executorNodeUuid,
       actions: [
         { action: 'go_to_url', params: { url } },
+        // 登录前等待页面 loading mask 消退（与登录控件探针构成双重防线）
+        { action: 'wait_for_loading' },
         { action: 'login', params: { username, password } },
       ],
       timeoutMs: 180000,

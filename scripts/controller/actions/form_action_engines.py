@@ -1,8 +1,10 @@
 """Engine classes for login/fill/select/radio/tree form actions (extracted from _form.py)."""
 
+import asyncio
 import json
 import re
 import sys
+import time
 from dataclasses import dataclass
 
 from ...agent_utils import emit_json
@@ -120,6 +122,36 @@ def _select_failure_next_action(label_text: str, option_text: str, business_data
     return '；'.join(parts)
 
 
+async def _wait_for_login_form(page, timeout_s=20):
+    """Pre-wait for the login page controls to mount (cold-start SPA fix).
+
+    Polls for a visible username-ish input (`placeholder` containing 用户名/
+    用户/账号) every 500ms, up to timeout_s. Returns True as soon as found,
+    False on timeout. On False the caller proceeds unchanged — non-login-page
+    calls (e.g. already-logged-in sessions) keep their existing behavior
+    (label-not-found semantics); this probe only absorbs the cold-start
+    mounting window. Never raises for probe failures.
+    """
+    js = (
+        "() => { const u=[...document.querySelectorAll('input')].find("
+        "i=>i.offsetParent!==null && ((i.placeholder||'').includes('用户名') "
+        "|| (i.placeholder||'').includes('用户') || (i.placeholder||'').includes('账号')));"
+        " return !!u; }"
+    )
+    try:
+        deadline = time.monotonic() + float(timeout_s)
+        while time.monotonic() < deadline:
+            try:
+                if await page.evaluate(js):
+                    return True
+            except Exception:
+                pass
+            await asyncio.sleep(0.5)
+    except Exception:
+        return False
+    return False
+
+
 
 
 class _FormActionEngineBase:
@@ -143,6 +175,12 @@ class LoginEngine(_FormActionEngineBase):
     async def login(self, username: str, password: str, captcha: str = '', sms_code: str = '', legal_name: str = ''):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
+
+        # Cold-start pre-wait: absorb the SPA mounting window on a fresh
+        # executor slot. If the login form never appears within the timeout
+        # (e.g. non-login page / already-logged-in session), fall through
+        # unchanged — original label-not-found semantics fully preserved.
+        await _wait_for_login_form(page)
 
         results = []
 

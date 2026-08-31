@@ -7,6 +7,7 @@ _ensure_scanned）改为显式参数注入。task_done / save_form_snapshot 已�
 form_scan_utils 薄委托，仍留在 _form.py。
 """
 
+import asyncio
 import json
 import sys
 
@@ -268,6 +269,42 @@ async def scan_visible_fields_impl(browser_context, business_data_store, button_
 
     tl = TaskList.from_store(business_data_store.get('task_list'))
 
+    # ── 空壳粘性修复：抽屉刚打开 ~0.2s 内的首次 scan 可能命中未稳定 DOM，
+    # 产出全空壳字段（xpath_smart / options 全空、kind 落成 input）并被写入
+    # task_list / _scan_fields 后粘住，后续 get_pending_tasks 与 select_option
+    # 一直拿到空壳。检测到疑似空壳且本次不是重扫时，延时 1.5s 重扫一次；
+    # 重扫结果非空壳才替换本次结果并回填 store，仍空壳则照常返回（不递归）。
+    if _scan_fields_are_stub(dom_fields) and not business_data_store.get('_scan_stub_rescan_inflight'):
+        business_data_store['_scan_stub_rescan_inflight'] = True
+        try:
+            await asyncio.sleep(1.5)
+            rescan_fields = await _scan_visible_dom_fields(browser_context, button_keywords)
+            if not _scan_fields_are_stub(rescan_fields):
+                dom_fields = rescan_fields
+                business_data_store['_scan_fields'] = [f.model_dump() for f in dom_fields]
+                rescan_by_label = {f.label: f for f in dom_fields}
+                store_updated = False
+                for item in tl.pending:
+                    better = rescan_by_label.get(item.label)
+                    if better is None or item.xpath_smart or item.options:
+                        continue
+                    item.kind = better.kind
+                    item.options = list(better.options or [])
+                    item.xpath_smart = better.xpath_smart or ''
+                    item.placeholder = better.placeholder or ''
+                    item.required = bool(better.required)
+                    item.hasButton = better.hasButton or ''
+                    store_updated = True
+                if store_updated:
+                    business_data_store['task_list'] = tl.to_store()
+                sys.stderr.write('[scan-visible] stub scan detected → delayed rescan fixed fields\n')
+                sys.stderr.flush()
+        except Exception as _stub_rescan_exc:
+            sys.stderr.write(f'[scan-visible] stub rescan failed: {_stub_rescan_exc!r}\n')
+            sys.stderr.flush()
+        finally:
+            business_data_store.pop('_scan_stub_rescan_inflight', None)
+
     # ── 扫描校验错误：将报错字段从 done[] 移回 pending[]，清空值 ──
     try:
         error_labels = await page.evaluate(_JS_EXTRACT_ERROR_LABELS)
@@ -452,6 +489,66 @@ async def sync_tasks_from_errors_impl(browser_context, business_data_store):
             f'[sync-errors] disabled+button fields (prefer special-element): {intervene_labels}\n'
         )
         sys.stderr.flush()
+
+
+def _scan_fields_are_stub(fields) -> bool:
+    """Return True when a scan result looks like a DOM-not-stable "stub" scan.
+
+    A stub is a non-empty field list where ≥80% of fields have no xpath_smart,
+    no options, no current value, and a generic kind (input/select) — the
+    signature observed when scan_visible_fields runs right after a drawer opens
+    (~0.2s) before Vue finishes mounting the dialog DOM. Empty field lists are
+    NOT stubs (handled by the pending-tasks fallback path).
+    """
+    if not fields:
+        return False
+
+    def _is_stub_field(f):
+        try:
+            d = f.model_dump() if hasattr(f, 'model_dump') else dict(f)
+        except Exception:
+            return False
+        if (d.get('xpath_smart') or '').strip():
+            return False
+        if d.get('options'):
+            return False
+        if (d.get('currentValue') or '').strip():
+            return False
+        return d.get('kind') in ('input', 'select', '', None)
+
+    stub_count = sum(1 for f in fields if _is_stub_field(f))
+    return stub_count / len(fields) >= 0.8
+
+
+async def _scan_visible_dom_fields(browser_context, button_keywords):
+    """Re-run the visible-fields DOM scan and return parsed ScannedField list.
+
+    Used only by the stub-rescan path in scan_visible_fields_impl; mirrors the
+    scan steps (JS_SCAN_FORM_FIELDS fullpage + aria_snapshot merge) without
+    touching the store or the task list.
+    """
+    page = await browser_context.get_current_page()
+    await _wait_if_loading(page)
+    raw = await page.evaluate(
+        JS_SCAN_FORM_FIELDS,
+        [True, button_keywords(), {'mode': 'fullpage'}],
+    )
+    result = _as_dict(raw)
+    raw_fields = result.get('fields') if isinstance(result, dict) else result
+    fillable = prepare_scan_fields_for_tasklist(raw_fields)
+    dom_fields = [
+        ScannedField(**f) if isinstance(f, dict) else f
+        for f in fillable
+    ]
+    try:
+        ax_text = await page.aria_snapshot(mode='ai')
+        if ax_text:
+            _merge_ax_text(dom_fields, ax_text)
+    except Exception:
+        sys.stderr.write("[scan-visible] stub-rescan aria_snapshot merge failed" + '\n')
+        sys.stderr.flush()
+        pass
+    return dom_fields
 
     # Auto-scroll to first error so agent can see and fix it immediately
     if retried:
