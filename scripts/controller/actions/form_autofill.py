@@ -101,8 +101,8 @@ class FormAutofillEngine:
         - form_modify partial — AI changes only task-named fields
         - _watcher_mode (CDP quick actions)
         """
-        if self.business_data_store.get('_watcher_mode'):
-            return  # CDP watcher: single-field action, no auto-scan
+        if self.business_data_store.get('_watcher_mode') and self.business_data_store.get('_scan_fields'):
+            return  # CDP watcher: store 已有数据则跳过容器 touch 重建（仍略过 autofill）
         page = await self.browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         from scripts.controller.actions.container_naming import (
