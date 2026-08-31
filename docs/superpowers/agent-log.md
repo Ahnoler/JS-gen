@@ -1,3 +1,8 @@
+## 2026-08-31 — 菜单落地 pageId 单一化（实现）
+
+- **完成:** 导入只收第一个非空 managePage；prepare `source=read` 回写功能落地页；存量 migration 清 guidePage；同 pageId 不再误 warn。commits: `8bef184` `ad66cf1` `7a72314` `be8ddfa`（设计 `b6a709b`）。
+- **进行中:** 无（本线已落地）。推送菜单 HTTP（D1–D5）仍待平台契约。
+- **注意事项:** 其他环境需 `npx knex migrate:latest --knexfile config/knexfile.js`；dev 库已湿跑。工作区仍有无关 dirty 文件勿混入。
 # Agent 工作日志（跨工具共享）
 
 > 多个 Agent 工具（Zcode / Cursor / Codex 等）在同一仓库开发，会话记忆互不相通；跨工具互通以此文件 + git 历史为准，不依赖任何工具的内置记忆。
@@ -43,3 +48,4 @@
 ## 2026-08-24 ~ 25 · Zcode (uara_V1.2)
 - 完成：824 冲刺三项落地 + 湿测通过（partition-via-pid / v3-payload-size ②③ / V3.1 §8 七类型）；830 格式对齐落地（rect_norm 录制侧、collapse type、attr 字段）
 - 完成：报文捞取 MVP（`dfb5c9e` 改名 92 文件、`8148f72` elk-msg-extract CLI、`1fcd1b9`/`b837d67` 契约对齐+回填验证 122/122；码值字典 `2fd2046` 挂起）
+
