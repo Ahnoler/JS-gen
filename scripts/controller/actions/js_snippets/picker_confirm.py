@@ -8,13 +8,19 @@ JS snippet constants: JS_PICKER_DIALOG_QUERY, JS_PICKER_DIALOG_SELECT.
 替代 LLM 多步盲操作。
 
 - JS_PICKER_DIALOG_QUERY(dialogName, fieldsJson)：弹窗内按 label 填查询
-  条件（native setter + input/change 事件），点「查询」按钮，立即返回
-  当前行数与前 5 行文本（不等待——由 Python 侧 wait_for_timeout 等待）。
+  条件（native setter + input/change 事件），点「查询」按钮，轮询等待
+  结果表格出现数据（≤5s）后返回行数与前 5 行文本。
 - JS_PICKER_DIALOG_SELECT(dialogName, rowText)：弹窗内找文本包含 rowText
   的可见行，点其 radio，再点「确认」按钮；确认前后各读一次弹窗下方
-  底层页面的 .el-form-item label→值映射，返回发生变化的字段。
+  底层页面的 .el-form-item label→值映射（等待弹窗关闭后再读 after），
+  返回发生变化的字段。
 
-两者均返回 JSON 字符串；失败时 {ok:false, error:'...'}。
+两者均为 async 函数（page.evaluate 会 await Promise），返回 JSON 字符串；
+失败时 {ok:false, error:'...'}。
+
+湿测教训（2026-08-31，对公授信「选择对公授信客户」弹窗）：Vue 查询结果
+渲染与确认后表单回填都是异步的，同步读快照会拿到过期数据——query 立即
+返回 0 行、select 的 changed 恒为 {}。因此等待必须在片段内部完成。
 """
 
 _JS_PICKER_HELPERS = '''    const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
@@ -62,7 +68,7 @@ _JS_PICKER_HELPERS = '''    const norm = (s) => String(s == null ? '' : s).repla
         return false;
     };'''
 
-JS_PICKER_DIALOG_QUERY = '''(args) => {
+JS_PICKER_DIALOG_QUERY = '''async (args) => {
     const [dialogName, fieldsJson] = args || [];
 ''' + _JS_PICKER_HELPERS + '''
     const dialog = findDialog(dialogName);
@@ -113,14 +119,19 @@ JS_PICKER_DIALOG_QUERY = '''(args) => {
     if (!clickButtonByText(dialog, '查询')) {
         return JSON.stringify({ ok: false, error: 'query-button-not-found' });
     }
-    // No wait here — Python side waits (wait_for_timeout) before reading results.
-    const rows = [...dialog.querySelectorAll('.el-table__body tbody tr, .el-table__body tr')]
-        .filter((r) => r.offsetParent !== null)
-        .map((r) => norm(r.innerText || r.textContent));
+    // Vue renders query results async — poll until rows appear (≤5s).
+    let rows = [];
+    for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        rows = [...dialog.querySelectorAll('.el-table__body tbody tr, .el-table__body tr')]
+            .filter((r) => r.offsetParent !== null)
+            .map((r) => norm(r.innerText || r.textContent));
+        if (rows.length > 0) break;
+    }
     return JSON.stringify({ ok: true, row_count: rows.length, rows: rows.slice(0, 5) });
 }'''
 
-JS_PICKER_DIALOG_SELECT = '''(args) => {
+JS_PICKER_DIALOG_SELECT = '''async (args) => {
     const [dialogName, rowText] = args || [];
 ''' + _JS_PICKER_HELPERS + '''
     const dialog = findDialog(dialogName);
@@ -139,8 +150,12 @@ JS_PICKER_DIALOG_SELECT = '''(args) => {
     if (!clickButtonByText(dialog, '确')) {
         return JSON.stringify({ ok: false, error: 'confirm-button-not-found' });
     }
-    // No wait here — Python side waits (wait_for_timeout) for the dialog to close
-    // and the underlying form to be backfilled before diffing.
+    // Vue backfills the underlying form async after the dialog closes — wait for
+    // the dialog to disappear (≤5s) before reading the after snapshot.
+    for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        if (dialog.offsetParent === null || dialog.getClientRects().length === 0) break;
+    }
     const after = readUnderlyingForm();
     const changed = {};
     for (const key of Object.keys(after)) {

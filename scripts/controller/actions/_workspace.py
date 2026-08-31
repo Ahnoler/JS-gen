@@ -61,7 +61,7 @@ def _register_workspace_actions(controller, browser_context):
             return _err('invalid fields_json (expect [{"label":"...","value":"..."}]): %s' % exc)
         page = await browser_context.get_current_page()
         result = await page.evaluate(JS_PICKER_DIALOG_QUERY, [dialog_name, fields_json])
-        # JS side does not wait for the query result — wait here before reading rows.
+        # JS side polls for query rows internally (≤5s); this wait is a settling buffer.
         await page.wait_for_timeout(WAIT_800_MS)
         ok, payload = _workspace_result(result)
         if ok:
@@ -77,7 +77,7 @@ def _register_workspace_actions(controller, browser_context):
     async def picker_dialog_select(dialog_name: str, row_text: str):
         page = await browser_context.get_current_page()
         result = await page.evaluate(JS_PICKER_DIALOG_SELECT, [dialog_name, row_text])
-        # JS side does not wait for the dialog to close / form to backfill — wait here.
+        # JS side waits for dialog close + form backfill internally (≤5s); settling buffer.
         await page.wait_for_timeout(WAIT_800_MS)
         ok, payload = _workspace_result(result)
         if ok:
