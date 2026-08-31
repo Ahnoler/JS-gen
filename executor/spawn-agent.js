@@ -51,6 +51,31 @@ export function killProcessOnly(pid) {
 }
 
 /**
+ * Extract PIDs listening on an exact local port from `netstat -ano` output.
+ * Only matches the local-address column where `:<port>` is not followed by
+ * another digit, so ports like 19224 / 49242 / 92421 never match port 9242.
+ * @param {string} netstatOutput raw stdout of `netstat -ano`
+ * @param {number} port exact port number to match
+ * @returns {string[]} unique PIDs (as strings) with a LISTENING socket on that port
+ */
+export function parseListeningPids(netstatOutput, port) {
+  const portRe = new RegExp(`:${port}(?!\\d)`);
+  const pids = new Set();
+  for (const line of String(netstatOutput).split(/\r?\n/)) {
+    if (!/LISTENING/i.test(line)) continue;
+    const cols = line.trim().split(/\s+/);
+    // netstat -ano columns: Proto, Local Address, Foreign Address, State, PID
+    if (cols.length < 4) continue;
+    const localAddr = cols[1];
+    if (portRe.test(localAddr)) {
+      const pid = cols[cols.length - 1];
+      if (/^\d+$/.test(pid)) pids.add(pid);
+    }
+  }
+  return [...pids];
+}
+
+/**
  * Best-effort: kill whatever still listens on a CDP port (orphan Chromium).
  * @param {number} port port
  * @returns {void} result
@@ -60,17 +85,12 @@ export function killListenerOnPort(port) {
   if (!Number.isFinite(p) || p <= 0) return;
   try {
     if (process.platform === 'win32') {
-      const out = execSync(`netstat -ano | findstr :${p}`, {
+      const out = execSync('netstat -ano', {
         encoding: 'utf8',
         timeout: 5000,
         stdio: ['ignore', 'pipe', 'ignore'],
       });
-      const pids = new Set();
-      for (const line of String(out).split(/\r?\n/)) {
-        if (!/LISTENING/i.test(line)) continue;
-        const m = line.trim().match(/(\d+)\s*$/);
-        if (m) pids.add(m[1]);
-      }
+      const pids = parseListeningPids(String(out), p);
       for (const pid of pids) {
         if (pid === '0') continue;
         try {
