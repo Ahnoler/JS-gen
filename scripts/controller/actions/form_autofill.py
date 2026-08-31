@@ -101,8 +101,12 @@ class FormAutofillEngine:
         - form_modify partial — AI changes only task-named fields
         - _watcher_mode (CDP quick actions)
         """
-        if self.business_data_store.get('_watcher_mode') and self.business_data_store.get('_scan_fields'):
-            return  # CDP watcher: store 已有数据则跳过容器 touch 重建（仍略过 autofill）
+        # NOTE: watcher (CDP quick action) 不再早退——容器 touch 与依赖它的
+        # task_list/`_scan_fields` 只在 ensure_scanned 建立（scan_visible_fields
+        # 是只读扫描），早退会造成 store 永不更新、select_option 永远读不到
+        # 字段（实证：wm/e2e 双复现 + AFTER-SELECT active 停留旧容器）。
+        # autofill 仍由下方 allow_autofill 开关挡住，watcher 调单字段动作
+        # 传 allow_autofill=False，行为与直连路径完全一致。
         page = await self.browser_context.get_current_page()
         container_id = await page.evaluate(JS_IDENTIFY_CONTAINER)
         from scripts.controller.actions.container_naming import (
