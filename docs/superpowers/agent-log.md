@@ -1,3 +1,10 @@
+## 2026-08-31 · Zcode (uara_V1.2) — 编排 v2 落地：H1-H5 全部实现（4 路并行子智能体 + 主线程接线）
+- 完成：H1 W0 登录引擎化（d5aafa4）——JS_LOGIN_PICK_LEGAL 法人自动选择（placeholder 定位 + mousedown 展开；(args) 数组解构适配 Playwright 单参数语义，修复了首版 (legalName) 签名被 try 静默吞掉的 bug）+ LoginEngine.login 探针重试（≤10s 轮询 #/home/_usertoken，4s 补点一次）；真机湿测一次调用 `ok-login | legal:横州市… | probe:home`
+- 完成：H3+H2 待办卡片与向导守卫（308c8a7）——JS_LIST_TODO_CARDS / JS_WF_SUBMIT_GUARD（只读）+ _todo.py 注册 list_todo_cards / wf_submit_guard + service.py 接线
+- 完成：H5a/H5b 提示词（e1913ff）——六类页面形态 + W5 守卫 cue（流程操作选项随节点先读再选、流程提交/撤销四步纪律以审批历史为准）+ 营业日期系统戳例外 + 反注入规则
+- 验证：6 个 form 特征化 + xpath-three-sources（11×6）OK；verify-all 唯一失败仍为已知存量 export-v3（远程库数据漂移）；真机 login/picker 链路全绿
+- 注意：编排 v2 的 H 系列全部落地；W5 演练只到提交流程步之前，流程提交/撤销仅在显式授权下执行；Z1/Z4（semantic_snapshot/verify_context）待下一批
+
 ## 2026-08-31 · Zcode (uara_V1.2) — 信贷二轮调研 + 动作层真机验证 + 编排 v2
 - 完成：A-G 湿测暴露 picker 异步时序缺陷并修复（b527841）——query/select 改 async 内部轮询（≤5s），真机复测 query 20 行 + select 回填 diff 正确
 - 完成：二轮实地调研（修改=新页签上下文编辑页 26 字段过半 disabled、日期 native setter+blur 可提交、登记日期=真实时间非营业日期、待办=todo-item 卡片列表、W5 向导两步+流程操作 select 选项随节点+流程提交/撤销不可逆、客户放大镜弹窗与授信选客户同构）`docs/superpowers/research/2026-08-31-credit-sut-research-round2.md`
