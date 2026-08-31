@@ -294,7 +294,7 @@ function normalizeSystemNode(node) {
 
 /**
  * 拉取伙伴平台懒加载系统树的某一层。
- * @param {object} opts
+ * @param {object} opts 请求参数
  * @param {string} opts.accessToken partner access token
  * @param {string|number} opts.projectId partner project id
  * @param {string|number} [opts.parentId] 父系统 ID；缺省取根层
@@ -353,7 +353,7 @@ export async function listPartnerSystems({ accessToken, projectId, parentId } = 
  * @param {object} [opts] request options
  * @param {string} opts.accessToken partner access token
  * @param {string|number} opts.projectId partner project id
- * @param {number} [opts.maxDepth=8] 递归深度上限
+ * @param {number} [opts.maxDepth] 递归深度上限（缺省 8）
  * @returns {Promise<object[]>} nested partner system nodes
  */
 export async function listPartnerSystemTree({ accessToken, projectId, maxDepth = 8 } = {}) {
