@@ -192,7 +192,16 @@ export async function prepareTrajectoryRecordingUnlocked(tid) {
       login = { skipped: true, done: true, accountId };
       emitStage('login', 'skipped', { accountId });
     } else {
-      await runDefaultLogin(runtime, account);
+      try {
+        await runDefaultLogin(runtime, account);
+      } catch (firstErr) {
+        // 冷启动时序：新 slot 首次导航后 SPA 首屏尚未挂载完，replay login 会打在
+        // 未初始化页面上（label-not-found 全集）。固定 8s 收窄为「失败即等 8s 重试一次」，
+        // 重试时页面已就绪，能显著吸收该间歇；仅影响首次 login，不改成功路径。
+        console.warn(`[prepare] login first attempt failed, retry once after 8s: ${firstErr?.message || firstErr}`);
+        await new Promise((r) => setTimeout(r, 8000));
+        await runDefaultLogin(runtime, account);
+      }
       login = { skipped: false, done: true, accountId };
       emitStage('login', 'done', { accountId });
     }

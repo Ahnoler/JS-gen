@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- 2026-08-31: **record/prepare 登录冷启动时序加固**（`src/services/trajectory/trajectory-attach-runner.js`）：新 executor slot 首次导航后 SPA 首屏未挂载完时，replay login 会打在未初始化页面（`legal/label/btn 全 not-found`），此前直接 500 使 prepare 失败；现首次 login 失败后等 8s 重试一次（成功时不改路径）。影响范围：录制准备阶段；API 驱动演练 196 轮实证。
+- 2026-08-31: **executor 子进程 UTF-8 固化**（`executor/config.js`）：`buildPythonSubprocessEnv` 增 `PYTHONUTF8=1`——`PYTHONIOENCODING` 只兜 stdout/stderr，stdin 仍按 locale（cp936）解码，Windows 下中文动作参数（label/option）进入 Python 即乱码，导致 watcher select_option label 匹配失败。影响范围：executor 动作通道中文参数。
 - 2026-08-31: **起点页面 ID 绑定加固**（`src/services/trajectory/recording-page-bind.js`）：①同菜单复用守卫——导航因 same-menu 跳过且 `runtime._pageBoundId` 已成功落库时直接复用，不再重复发 `read_page_component_code`（此前每次 record/prepare 都重开"天元相关配置"弹窗，慢且打扰）；②`updateMeta` 落库失败不再被外层 catch 静默吞掉——warn 带 `PERSIST-FAILED` 标志、返回值增 `persisted` 字段（湿测实锤：5 次 read 成功但落库失败，pageId 停留 8-27 的 AILZ 兜底值无人知晓）。影响范围：录制准备阶段 page-bind 行为；characterize-page-bind 正则 pin 不受影响。
 - 2026-08-31: **远程 DB 热修——连接池扩容 + 压缩协议**（湿测：录制台刷新突发把默认连接池打满，`Knex: Timeout acquiring a connection` 间歇爆发 → prepare 500 → 前端停在错误态画布"断流"）。①`config/.env` 增 `DB_POOL_MAX=20`（默认 10；远程库 RTT ~65ms，树接口单次 1.7~6.4s 持连接，突发并发排队超 10s 即超时；`.env.example` 已文档化）；②`config/database.js` 连接开 `compress: true`（mysql2 压缩协议）——树接口 ~431KB 步骤载荷（`element_json` 占 97%）实测 465~914ms → ~105ms（4~9×），全部查询受益、零接口形状变化（曾评估 slim 掉 element_json，因前端 `step-detail` 定位器回显直接消费该字段而否决）。影响范围：config/ 连接配置；无 schema/路由/WS 变更；需重启 server 生效。
 

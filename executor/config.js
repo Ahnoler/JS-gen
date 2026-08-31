@@ -285,6 +285,7 @@ export function buildPythonSubprocessEnv(extraEnv = {}) {
     env.PLAYWRIGHT_BROWSERS_PATH = PLAYWRIGHT_BROWSERS_PATH;
   }
   env.PYTHONIOENCODING = 'utf-8';
+  env.PYTHONUTF8 = '1'; // stdin 解码也强制 UTF-8（PYTHONIOENCODING 只兜 stdout/stderr）
   env.PYTHONUNBUFFERED = '1';
   env.PYTHONPATH = PROJECT_ROOT;
   // Propagate from executor/.env / config/.env when not already in process.env
