@@ -39,6 +39,7 @@ from ._js_snippets import (
     JS_SCAN_MENU_TREE,
     JS_READ_PAGE_COMPONENT_CODE,
     JS_CLICK_MENU_XPATH,
+    JS_FIND_MENU_DISMISS_POINT,
     JS_SELECT_OPTION,
     JS_SELECT_TRIGGER_BY_XPATH,
     JS_SELECT_VALUE_BY_XPATH,
@@ -123,29 +124,34 @@ async def _direct_read_page_component_code(page, params, entry):
     return 'ok', {'pageCode': payload}
 
 
-async def _mouse_move_neutral(page):
-    """真实鼠标移到左下中性点，收起门户 mega-menu。
+async def _dismiss_menu_overlay(page):
+    """菜单点击后在安全空白点补一次真实 mousedown，收起门户 mega-menu（best-effort，失败静默）。
 
-    合成 el.click() 只派发 click 事件，而门户 mega-menu 依赖真实 mouseleave 才收起——
-    无人值守时面板会一直展开盖住页面上沿，遮挡后续截图与顶部区域点击。
-    真实移动派发完整 mouseover/mouseleave 事件流，等价人工点完菜单把鼠标移开。
-    菜单为常驻 DOM（面板只是可见性切换，扫描流程在面板全关时即可提取全部菜单项），
-    收起后对隐藏 flyout 项的后续 DOM click 不受影响。失败静默，不阻断回放。
+    实测机制（tmp/probe-menu-close-v2.py 在 19242 活页面单变量验证）：
+    面板开=click（合成 el.click() 即可开）；关=面板外的真实 mousedown——
+    真实 hover 移开/Escape/合成点击均无法收起。合成 el.click() 不产生真实鼠标事件，
+    故导航后面板一直展开盖住页面上沿（遮挡后续截图与顶部区域点击）。
+    安全点由 JS_FIND_MENU_DISMISS_POINT 选取（排除交互元素与弹窗遮罩）；
+    无安全点（如弹窗覆盖全屏）则跳过收起，不影响回放主流程。
     """
     try:
-        vp = page.viewport_size or {}
-        height = int(vp.get('height') or 900)
-        await page.mouse.move(8, max(200, height - 60))
+        pt = await page.evaluate(JS_FIND_MENU_DISMISS_POINT)
+        if not pt:
+            return
+        await page.mouse.move(int(pt['x']), int(pt['y']), steps=3)
+        await page.mouse.down()
+        await page.wait_for_timeout(30)
+        await page.mouse.up()
     except Exception:
         pass
 
 
 @_direct_replay('click_menu_xpath', {'xpath'})
 async def _direct_click_menu_xpath(page, params, entry):
-    """直派回放 click_menu_xpath：按记录 xpath 点击菜单项，点击后真实鼠标移至中性点收起 mega-menu，结果行无附加字段。"""
+    """直派回放 click_menu_xpath：按记录 xpath 点击菜单项，点击后真实 mousedown 空白点收起 mega-menu，结果行无附加字段。"""
     click_xpath = params.get('xpath') or (entry.get('element') or {}).get('xpath_full') or ''
     result = await page.evaluate(JS_CLICK_MENU_XPATH, click_xpath)
-    await _mouse_move_neutral(page)
+    await _dismiss_menu_overlay(page)
     await page.wait_for_timeout(WAIT_600_MS)
     return result, None
 

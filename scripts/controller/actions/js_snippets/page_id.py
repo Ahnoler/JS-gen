@@ -112,3 +112,42 @@ JS_CLICK_MENU_XPATH = '''async (xpath) => {
     }
     return 'not-found';
 }'''
+
+# 找一个可安全承受真实 mousedown 的视口空白点（用于收起门户 mega-menu：
+# 实测（tmp/probe-menu-close-v2.py 单变量验证）hover 移开/Escape/合成点击均无法收起，
+# 仅面板外的真实 mousedown 触发收起；合成 el.click() 不产生真实鼠标事件，
+# 故导航后面板会一直展开盖住页面上沿，遮挡后续截图与顶部区域点击）。
+# 候选点逐个 elementFromPoint：命中 body/html 最优，纯容器标签次之；
+# 排除链接/按钮/表单/表格单元/下拉/弹窗（.el-table 行内点击会改选中态，
+# 弹窗遮罩上点击会关闭弹窗，必须避开）。页面被可见弹窗覆盖时返回 null
+# （调用方跳过收起，不影响回放主流程）。
+JS_FIND_MENU_DISMISS_POINT = '''() => {
+    const w = window.innerWidth || 1600;
+    const h = window.innerHeight || 900;
+    for (const sel of ['.v-modal', '.el-overlay', '.el-dialog__wrapper']) {
+        const m = document.querySelector(sel);
+        if (m) {
+            const s = getComputedStyle(m);
+            if (s.display !== 'none' && s.visibility !== 'hidden' && s.opacity !== '0') return null;
+        }
+    }
+    const interact = 'a,button,input,select,textarea,label,li,tr,td,th,[role=button],[onclick],'
+        + '.el-button,.el-dropdown,.el-table,.el-dialog,.el-drawer,.el-date-picker,.el-select,.el-cascader';
+    const plain = 'div,span,p,main,section,header,footer,nav,ul,form';
+    const cands = [];
+    for (const fy of [0.95, 0.9, 0.8, 0.6, 0.4, 0.25]) {
+        for (const fx of [0.5, 0.25, 0.75, 0.1, 0.9, 0.03]) {
+            cands.push([Math.round(w * fx), Math.round(h * fy)]);
+        }
+    }
+    let fallback = null;
+    for (const [x, y] of cands) {
+        const el = document.elementFromPoint(x, y);
+        if (!el) continue;
+        if (el === document.body || el === document.documentElement) return { x: x, y: y, tag: 'body' };
+        if (fallback === null && plain.indexOf(el.tagName.toLowerCase()) !== -1 && !el.closest(interact)) {
+            fallback = { x: x, y: y, tag: el.tagName.toLowerCase() };
+        }
+    }
+    return fallback;
+}'''
