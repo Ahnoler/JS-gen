@@ -3,6 +3,7 @@
  * Agent sessions stay in-memory; bindings persist on remote_session.agent_session_id.
  */
 import { randomUUID } from 'crypto';
+import { AsyncLocalStorage } from 'async_hooks';
 import * as remoteSessionDao from '../dao/remote-session-dao.js';
 import * as executorNodeDao from '../dao/executor-node-dao.js';
 import { USE_EXECUTOR } from '../../config/config.js';
@@ -14,10 +15,34 @@ import {
   getLiveBindingByTrajectory,
   resolveLiveBinding,
   clearLiveBinding,
+  withTrajectoryLock as withTrajectoryLockRaw,
 } from './remote-session-state.js';
 
+/**
+ * Async context tracking which trajectory locks are already held by the current
+ * async execution path (makes withTrajectoryLock reentrant for nested calls like
+ * prepare → attachLive that run under the same trajectory's lock).
+ * @type {AsyncLocalStorage<Set<number>>}
+ */
+const trajLockStack = new AsyncLocalStorage();
+
+/**
+ * Serialize per-trajectory critical sections (reentrant within the same async chain).
+ * @param {number} trajectoryId trajectory DB id
+ * @param {() => Promise<unknown>} fn async work to run under the lock
+ * @returns {Promise<unknown>} result of fn
+ */
+export async function withTrajectoryLock(trajectoryId, fn) {
+  const held = trajLockStack.getStore();
+  const tid = Number(trajectoryId);
+  const key = Number.isFinite(tid) && tid > 0 ? tid : 0;
+  if (held && held.has(key)) return fn();
+  const next = new Set(held || []);
+  next.add(key);
+  return trajLockStack.run(next, () => withTrajectoryLockRaw(key, fn));
+}
+
 export {
-  withTrajectoryLock,
   getLiveBindingByRemoteSessionId,
   getLiveBindingByTrajectory,
   getLiveBindingByAgentSession,
@@ -303,88 +328,101 @@ export async function attachLive(opts = {}) {
 
   const sessionId = active.sessionId;
 
-  // Drop other traj-bound occupied rows; keep this agent session's row for reuse.
-  if (Number.isFinite(trajectoryId)) {
-    await supersedeStaleForTrajectory(trajectoryId, { keepAgentSessionId: sessionId });
-  }
-  const nodeUuid = active.executorNodeUuid;
-  const executorNodeId = await resolveExecutorNodeId(nodeUuid);
-  const viewportW = Number(opts.viewportW) || 1600;
-  const viewportH = Number(opts.viewportH) || 900;
+  let nodeUuid = null;
+  let remoteSession = null;
+  let binding = null;
 
-  // Reuse idle remote row for same agent session when possible
-  let remoteSession = await remoteSessionDao.getOccupiedByAgentSession(sessionId);
-  if (remoteSession && remoteSession.status === 'idle') {
+  // Claim row + mutate shared live bindings under the trajectory lock (reentrant).
+  const claimAndBind = async () => {
+    // Drop other traj-bound occupied rows; keep this agent session's row for reuse.
     if (Number.isFinite(trajectoryId)) {
-      const { assertClaimable } = await import('./session-lifecycle.js');
-      assertClaimable(remoteSession, trajectoryId);
+      await supersedeStaleForTrajectory(trajectoryId, { keepAgentSessionId: sessionId });
     }
-    remoteSession = await remoteSessionDao.markActive(remoteSession.id, {
-      trajectoryId: trajectoryId || remoteSession.trajectoryId,
-    });
-    remoteSession = await remoteSessionDao.update(remoteSession.id, {
-      executorNodeId,
-      slotIndex: active.executorSlotIndex ?? remoteSession.slotIndex ?? null,
-      agentSessionId: sessionId,
-      viewportW,
-      viewportH,
-      deviceScaleFactor: opts.deviceScaleFactor ?? 1.0,
-    });
-  } else if (!remoteSession || remoteSession.status !== 'active') {
-    remoteSession = await openSession({
-      isolation: 'target',
-      viewportW,
-      viewportH,
-      deviceScaleFactor: opts.deviceScaleFactor ?? 1.0,
-      url: '',
-      status: 'active',
-      executorNodeId,
-      slotIndex: active.executorSlotIndex ?? null,
-      agentSessionId: sessionId,
-      trajectoryId: trajectoryId || null,
-    });
-  } else {
-    // Already active — refresh bindings
-    remoteSession = await remoteSessionDao.update(remoteSession.id, {
-      executorNodeId,
-      slotIndex: active.executorSlotIndex ?? remoteSession.slotIndex ?? null,
-      agentSessionId: sessionId,
+    nodeUuid = active.executorNodeUuid;
+    const executorNodeId = await resolveExecutorNodeId(nodeUuid);
+    const viewportW = Number(opts.viewportW) || 1600;
+    const viewportH = Number(opts.viewportH) || 900;
+
+    // Reuse idle remote row for same agent session when possible
+    remoteSession = await remoteSessionDao.getOccupiedByAgentSession(sessionId);
+    if (remoteSession && remoteSession.status === 'idle') {
+      if (Number.isFinite(trajectoryId)) {
+        const { assertClaimable } = await import('./session-lifecycle.js');
+        assertClaimable(remoteSession, trajectoryId);
+      }
+      remoteSession = await remoteSessionDao.markActive(remoteSession.id, {
+        trajectoryId: trajectoryId || remoteSession.trajectoryId,
+      });
+      remoteSession = await remoteSessionDao.update(remoteSession.id, {
+        executorNodeId,
+        slotIndex: active.executorSlotIndex ?? remoteSession.slotIndex ?? null,
+        agentSessionId: sessionId,
+        viewportW,
+        viewportH,
+        deviceScaleFactor: opts.deviceScaleFactor ?? 1.0,
+      });
+    } else if (!remoteSession || remoteSession.status !== 'active') {
+      remoteSession = await openSession({
+        isolation: 'target',
+        viewportW,
+        viewportH,
+        deviceScaleFactor: opts.deviceScaleFactor ?? 1.0,
+        url: '',
+        status: 'active',
+        executorNodeId,
+        slotIndex: active.executorSlotIndex ?? null,
+        agentSessionId: sessionId,
+        trajectoryId: trajectoryId || null,
+      });
+    } else {
+      // Already active — refresh bindings
+      remoteSession = await remoteSessionDao.update(remoteSession.id, {
+        executorNodeId,
+        slotIndex: active.executorSlotIndex ?? remoteSession.slotIndex ?? null,
+        agentSessionId: sessionId,
+        trajectoryId: trajectoryId ?? remoteSession.trajectoryId ?? null,
+        viewportW,
+        viewportH,
+      });
+    }
+
+    // Detach prior BiB for this agent session if bound to a different remote row
+    for (const [rid, b] of [...liveByRemoteSessionId.entries()]) {
+      if (b.agentSessionId === sessionId && rid !== remoteSession.id && b.attached) {
+        try {
+          sendToExecutor(b.nodeUuid, 'session.detach_bib', { sessionId, crashed: false });
+          await waitForSessionEvent(sessionId, 'session.bib_detached', 8000).catch(() => {});
+        } catch {}
+        liveByRemoteSessionId.delete(rid);
+      }
+    }
+
+    binding = {
+      remoteSessionId: remoteSession.id,
+      remoteSessionUuid: remoteSession.sessionUuid,
       trajectoryId: trajectoryId ?? remoteSession.trajectoryId ?? null,
-      viewportW,
-      viewportH,
-    });
-  }
+      agentSessionId: sessionId,
+      nodeUuid,
+      executorNodeId,
+      viewportW: remoteSession.viewportW || viewportW,
+      viewportH: remoteSession.viewportH || viewportH,
+      attached: false,
+    };
+    liveByRemoteSessionId.set(remoteSession.id, binding);
 
-  // Detach prior BiB for this agent session if bound to a different remote row
-  for (const [rid, b] of [...liveByRemoteSessionId.entries()]) {
-    if (b.agentSessionId === sessionId && rid !== remoteSession.id && b.attached) {
+    if (trajectoryId) {
       try {
-        sendToExecutor(b.nodeUuid, 'session.detach_bib', { sessionId, crashed: false });
-        await waitForSessionEvent(sessionId, 'session.bib_detached', 8000).catch(() => {});
-      } catch {}
-      liveByRemoteSessionId.delete(rid);
+        await mountTrajectoryRemoteSession(trajectoryId, remoteSession.id);
+      } catch (err) {
+        console.warn('[remote] mount trajectory.remote_session_id failed:', err.message);
+      }
     }
-  }
-
-  const binding = {
-    remoteSessionId: remoteSession.id,
-    remoteSessionUuid: remoteSession.sessionUuid,
-    trajectoryId: trajectoryId ?? remoteSession.trajectoryId ?? null,
-    agentSessionId: sessionId,
-    nodeUuid,
-    executorNodeId,
-    viewportW: remoteSession.viewportW || viewportW,
-    viewportH: remoteSession.viewportH || viewportH,
-    attached: false,
   };
-  liveByRemoteSessionId.set(remoteSession.id, binding);
 
-  if (trajectoryId) {
-    try {
-      await mountTrajectoryRemoteSession(trajectoryId, remoteSession.id);
-    } catch (err) {
-      console.warn('[remote] mount trajectory.remote_session_id failed:', err.message);
-    }
+  if (Number.isFinite(trajectoryId) && trajectoryId > 0) {
+    await withTrajectoryLock(trajectoryId, claimAndBind);
+  } else {
+    await claimAndBind();
   }
 
   const readyP = waitForSessionEvent(sessionId, 'session.bib_ready', 45000);
@@ -409,12 +447,22 @@ export async function attachLive(opts = {}) {
     ready = await Promise.race([readyP, errP]);
   } catch (err) {
     liveByRemoteSessionId.delete(remoteSession.id);
-    try { await remoteSessionDao.close(remoteSession.id, { crashed: true }); } catch {}
+    // Failure path must also sweep trajectory FKs, otherwise
+    // trajectory.remote_session_id stays a ghost mount (perpetual 409 occupancy).
+    try {
+      const { clearOwnershipOnClose } = await import('./session-lifecycle.js');
+      await clearOwnershipOnClose(remoteSession.id).catch(() => {});
+      await remoteSessionDao.close(remoteSession.id, { crashed: true });
+    } catch {}
     throw err;
   }
   if (!ready) {
     liveByRemoteSessionId.delete(remoteSession.id);
-    try { await remoteSessionDao.close(remoteSession.id, { crashed: true }); } catch {}
+    try {
+      const { clearOwnershipOnClose } = await import('./session-lifecycle.js');
+      await clearOwnershipOnClose(remoteSession.id).catch(() => {});
+      await remoteSessionDao.close(remoteSession.id, { crashed: true });
+    } catch {}
     throw new Error(
       `Executor BiB attach timed out (no session.bib_ready). Check executor CDP port / Chrome for session ${sessionId}`,
     );
