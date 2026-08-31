@@ -343,22 +343,8 @@ async def run_session(args):
 
     cdp_task.add_done_callback(_on_cdp_task_done)
 
-    # Wait until CDP HTTP answers so executor BibBridge can attach reliably.
-    cdp_ready = False
-    cdp_ws_url = None
-    if cdp_url:
-        cdp_ready = True
-        cdp_ws_url = cdp_url
-    elif cdp_port:
-        cdp_ready = await _wait_cdp_http(int(cdp_port), timeout_s=45)
-        if cdp_ready:
-            cdp_ws_url = await _probe_cdp_ws_url(int(cdp_port))
-        else:
-            sys.stderr.write(
-                f"WARN: CDP HTTP still not ready on port {cdp_port} after launch. "
-                "BiB canvas unavailable; AI/manual recording can still run.\n"
-            )
-            sys.stderr.flush()
+    # cdp_ready / cdp_ws_url already computed by _ensure_browser_and_cdp above;
+    # do not re-wait CDP HTTP here (worst case doubled the 45s readiness wait).
 
     ready_payload = {
         "event": "ready",

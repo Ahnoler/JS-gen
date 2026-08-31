@@ -418,7 +418,7 @@ async def register_popup_screenshot(
     """Register one popup-level screenshot per popup key."""
     if not page_key or not dialog_b64:
         return ''
-    title = (dialog_title or 'overlay').replace(r'\s+', ' ').strip()[:40]
+    title = re.sub(r'\s+', ' ', (dialog_title or 'overlay')).strip()[:40]
     anchor = (anchor_xpath or '').strip()
     popup_key = f'{page_key}|dialog:{title}'
     if anchor:
