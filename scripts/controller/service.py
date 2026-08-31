@@ -11,6 +11,7 @@ from .actions._form import _register_form_actions
 from .actions._navigation import _register_navigation_actions
 from .actions._table import _register_table_actions
 from .actions._misc import _register_misc_actions
+from .actions._workspace import _register_workspace_actions
 from .actions._special_element import _register_special_element_actions
 from ..state import (
     _ACTION_LOG,
@@ -189,6 +190,7 @@ def build_controller(browser_context, business_data_store=None,
     _register_navigation_actions(controller, browser_context)
     _register_table_actions(controller, browser_context, business_data_store)
     _register_misc_actions(controller, browser_context, business_data_store)
+    _register_workspace_actions(controller, browser_context)
     _register_special_element_actions(
         controller,
         browser_context,
