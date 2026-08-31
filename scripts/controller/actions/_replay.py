@@ -123,11 +123,29 @@ async def _direct_read_page_component_code(page, params, entry):
     return 'ok', {'pageCode': payload}
 
 
+async def _mouse_move_neutral(page):
+    """真实鼠标移到左下中性点，收起门户 mega-menu。
+
+    合成 el.click() 只派发 click 事件，而门户 mega-menu 依赖真实 mouseleave 才收起——
+    无人值守时面板会一直展开盖住页面上沿，遮挡后续截图与顶部区域点击。
+    真实移动派发完整 mouseover/mouseleave 事件流，等价人工点完菜单把鼠标移开。
+    菜单为常驻 DOM（面板只是可见性切换，扫描流程在面板全关时即可提取全部菜单项），
+    收起后对隐藏 flyout 项的后续 DOM click 不受影响。失败静默，不阻断回放。
+    """
+    try:
+        vp = page.viewport_size or {}
+        height = int(vp.get('height') or 900)
+        await page.mouse.move(8, max(200, height - 60))
+    except Exception:
+        pass
+
+
 @_direct_replay('click_menu_xpath', {'xpath'})
 async def _direct_click_menu_xpath(page, params, entry):
-    """直派回放 click_menu_xpath：按记录 xpath 点击菜单项，结果行无附加字段。"""
+    """直派回放 click_menu_xpath：按记录 xpath 点击菜单项，点击后真实鼠标移至中性点收起 mega-menu，结果行无附加字段。"""
     click_xpath = params.get('xpath') or (entry.get('element') or {}).get('xpath_full') or ''
     result = await page.evaluate(JS_CLICK_MENU_XPATH, click_xpath)
+    await _mouse_move_neutral(page)
     await page.wait_for_timeout(WAIT_600_MS)
     return result, None
 
