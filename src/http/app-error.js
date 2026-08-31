@@ -69,16 +69,28 @@ export function toAppError(err) {
 
 /**
  * 渲染统一错误响应：标准体为 { error: message }，AppError.body 存在时优先使用。
- * 用于无法用 asyncHandler 包装的上下文（如 multer 回调）。
+ * 在缺省体（既无 options.body 也无 AppError.body）上追加错误对象携带的扩展字段：
+ * code / ownerTrajectoryId / graceUntil / holders / rejected（存在且非 null 才加）。
+ * 用于无法用 asyncHandler 包装的上下文（如 multer 回调）及 sendErr 薄委托。
  * @param {import('express').Response} res Express 响应对象
  * @param {unknown} err 错误对象
- * @param {{ body?: object }} [options] 选项
+ * @param {{ body?: object, status?: number }} [options] 选项
  * @param {object} [options.body] 自定义响应体（与标准体不同时使用）
+ * @param {number} [options.status] 显式 HTTP 状态码（覆盖推导结果；sendErr 委托时用其保留
+ *   遗留 statusCode 语义，避免只有 err.status 的错误被推导为不同状态码）
  * @returns {import('express').Response} res
  */
-export function respondError(res, err, { body } = {}) {
+export function respondError(res, err, { body, status } = {}) {
   const e = toAppError(err);
-  return res.status(e.status).json(body !== undefined ? body : (e.body ?? { error: e.message }));
+  if (body !== undefined) return res.status(e.status).json(body);
+  if (e.body !== undefined) return res.status(e.status).json(e.body);
+  const payload = { error: e.message };
+  if (e.code != null) payload.code = e.code;
+  if (err?.ownerTrajectoryId != null) payload.ownerTrajectoryId = err.ownerTrajectoryId;
+  if (err?.graceUntil != null) payload.graceUntil = err.graceUntil;
+  if (err?.holders != null) payload.holders = err.holders;
+  if (err?.rejected != null) payload.rejected = err.rejected;
+  return res.status(status ?? e.status).json(payload);
 }
 
 /**
