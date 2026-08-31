@@ -58,6 +58,34 @@ function parseBool(raw, defaultValue = false) {
 }
 
 /**
+ * 路由级错误归一：AppError 原样抛出（由 asyncHandler 渲染）；
+ * 非 AppError（partner-platform / export-push-gate 抛出的带 statusCode/code/partner 的
+ * 普通 Error）包装为 AppError，保持既有状态码与响应体形状不变。
+ * @param {unknown} err caught error
+ * @param {(e: object) => object} buildBody AppError.body 构造器
+ * @returns {never} 恒抛出
+ */
+function rethrowRouteError(err, buildBody) {
+  if (err instanceof AppError) throw err;
+  throw new AppError(err.message, {
+    code: err.code,
+    status: err.statusCode || 500,
+    body: buildBody(err),
+  });
+}
+
+// partner 平台错误体：{ error, partner }
+const partnerErrorBody = (e) => ({ error: e.message, partner: e.partner });
+
+// 单交易路由错误体：附加可选 code / recordStatus
+const statusAwareErrorBody = (e) => ({
+  error: e.message,
+  partner: e.partner,
+  ...(e.code ? { code: e.code } : {}),
+  ...(e.recordStatus !== undefined ? { recordStatus: e.recordStatus } : {}),
+});
+
+/**
  * Assemble only — do not mark is_export. V2 精简版：不携带 phases（截图/metadata 由 V3 承担）。
  * @param {object} traj trajectory row from DAO
  * @param {{ systemId?: number|string, projectId?: number|string }} root0 system/project context
@@ -108,6 +136,308 @@ async function markBuiltExported(trajIds = []) {
   for (const id of trajIds) {
     if (id != null) await trajectoryDao.markExported(id);
   }
+}
+
+/**
+ * True when caller wants bare envelope only (no partner push).
+ * Accepts download | raw | forImport | dryRun.
+ * @param {object} [src] request query/body source
+ * @returns {boolean} whether dry-run / bare export is requested
+ */
+function wantDryRun(src = {}) {
+  return parseBool(src.download, false)
+    || parseBool(src.raw, false)
+    || parseBool(src.forImport, false)
+    || parseBool(src.for_import, false)
+    || parseBool(src.dryRun, false)
+    || parseBool(src.dry_run, false);
+}
+
+function wantBarePayload(src = {}) {
+  return parseBool(src.download, false)
+    || parseBool(src.raw, false)
+    || parseBool(src.forImport, false)
+    || parseBool(src.for_import, false);
+}
+
+/**
+ * 单交易组装/推送公共实现（V2/V3 由 options 参数化）。
+ * @param {import('express').Request} req Express request
+ * @param {import('express').Response} res Express response
+ * @param {object} traj trajectory row from DAO
+ * @param {object} src merged query/body source
+ * @param {object} options version-specific config
+ * @param {(traj: object, ctx: object) => Promise<object>} options.buildOne envelope builder
+ * @param {string} options.downloadName bare-payload download filename prefix
+ * @param {(result: object) => void} [options.assertPushCoverage] pre-push coverage gate (V3 only)
+ * @returns {Promise<void>}
+ */
+async function maybePushSingleImpl(req, res, traj, src, { buildOne, downloadName, assertPushCoverage }) {
+  const { systemId, projectId } = resolveSystemProject(src);
+  const result = await buildOne(traj, { systemId, projectId });
+  const dry = wantDryRun(src);
+  const push = parseBool(src.push, false);
+
+  if (wantBarePayload(src)) {
+    if (parseBool(src.download, false)) {
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadName}_${traj.id}.json"`);
+    }
+    return res.json(result.payload);
+  }
+
+  if (!push || dry) {
+    // Export-only path (no mark unless historically expected) — mark only when pushed.
+    // For non-push export, keep previous behavior of markExported so raw 联调 still flips flag.
+    if (!push) {
+      await trajectoryDao.markExported(traj.id);
+      return res.json({ ...result, isExport: 1, pushed: false });
+    }
+    return res.json({ ...result, isExport: 0, pushed: false });
+  }
+
+  // Real partner push: gate-driven — only completed (已确认) may push.
+  assertPushableForPartner(traj);
+  if (assertPushCoverage) await assertPushCoverage(result);
+
+  const accessToken = requireAccessToken(req);
+  const partner = await pushImportDemand(result.payload, { accessToken });
+  await trajectoryDao.markExported(traj.id);
+  return res.json({
+    ...result,
+    isExport: 1,
+    pushed: true,
+    partner,
+  });
+}
+
+/**
+ * @param {import('express').Request} req Express request
+ * @param {import('express').Response} res Express response
+ * @param {object} traj trajectory row from DAO
+ * @param {object} src merged query/body source
+ * @returns {Promise<void>}
+ */
+async function maybePushSingle(req, res, traj, src) {
+  return maybePushSingleImpl(req, res, traj, src, {
+    buildOne: buildOneTrajectory,
+    downloadName: 'transaction',
+  });
+}
+
+/**
+ * V3.0 单交易组装/推送（镜像 maybePushSingle，用 V3 组装 + 页面级截图覆盖度门禁）。
+ * @param {import('express').Request} req Express request
+ * @param {import('express').Response} res Express response
+ * @param {object} traj trajectory row from DAO
+ * @param {object} src merged query/body source
+ * @returns {Promise<void>}
+ */
+async function maybePushSingleV3(req, res, traj, src) {
+  return maybePushSingleImpl(req, res, traj, src, {
+    buildOne: buildOneTrajectoryV3,
+    downloadName: 'transaction_v3',
+    assertPushCoverage(result) {
+      const coverage = validatePageLevelCoverage(result.payload?.transcationEventTypeList?.[0]);
+      if (coverageBlocksPush(coverage, result.stats)) {
+        throw new AppError('页面级截图缺失，无法推送', {
+          status: 409,
+          body: {
+            code: 'page_level_screenshot_missing',
+            error: '页面级截图缺失，无法推送',
+            missingPageLevelScreenshots: coverage.missing,
+            stats: result.stats,
+            pushed: false,
+          },
+        });
+      }
+    },
+  });
+}
+
+/**
+ * Batch transaction export/push handler factory — V2/V3 差异全部由参数表达。
+ * @param {object} options version-specific config
+ * @param {number|string} options.schemaVersion envelope schema version
+ * @param {(traj: object, ctx: object) => Promise<object>} options.buildOne envelope builder
+ * @param {(okBuilt: object[]) => { payload: object, stats?: object, skipped?: object }} options.wrapList list wrapper
+ * @param {string} options.bareFilename download filename for bare-payload mode
+ * @param {boolean} [options.includeScreenshotsInBuilt] keep legacy `screenshots` field in okBuilt entries (V2)
+ * @param {boolean} [options.gateCoverage] per-item page-level coverage gate + `coverage` in items (V3)
+ * @param {boolean} [options.includeMergedStats] include merged stats/skipped in push response (V3)
+ * @returns {(req: import('express').Request, res: import('express').Response) => Promise<void>} route handler
+ */
+function buildTransactionExportHandler({
+  schemaVersion,
+  buildOne,
+  wrapList,
+  bareFilename,
+  includeScreenshotsInBuilt = false,
+  gateCoverage = false,
+  includeMergedStats = false,
+}) {
+  return async function transactionExportHandler(req, res) {
+    const body = req.body || {};
+    const { systemId, projectId } = resolveSystemProject(body);
+    const ids = parseIdList(body.trajectoryIds ?? body.trajectory_ids);
+    if (!ids.length) {
+      throw new AppError('请选择要推送的交易', { code: 'VALIDATION' });
+    }
+
+    const dryOrBare =
+      wantBarePayload(body) ||
+      parseBool(body.dryRun, false) ||
+      parseBool(body.dry_run, false);
+    const willPush = !dryOrBare;
+
+    const items = [];
+    const okBuilt = [];
+    let buildOk = 0;
+    let buildFailed = 0;
+
+    for (const id of ids) {
+      try {
+        const traj = await trajectoryDao.getById(id);
+        if (!traj) {
+          buildFailed += 1;
+          items.push({ trajectoryId: id, ok: false, error: '交易不存在' });
+          continue;
+        }
+        if (willPush && !isPushableRecordStatus(getRecordStatus(traj))) {
+          buildFailed += 1;
+          const status = getRecordStatus(traj);
+          items.push({
+            trajectoryId: id,
+            ok: false,
+            error: `只能推送状态为「已确认」的交易（当前: ${status ?? 'unknown'}）`,
+            code: 'not_pushable_status',
+            recordStatus: status,
+          });
+          continue;
+        }
+        const result = await buildOne(traj, { systemId, projectId });
+        const entry = result.payload?.transcationEventTypeList?.[0];
+        let coverage;
+        if (gateCoverage) {
+          coverage = validatePageLevelCoverage(entry);
+          if (willPush && coverageBlocksPush(coverage, result.stats)) {
+            buildFailed += 1;
+            items.push({
+              trajectoryId: id,
+              ok: false,
+              error: '页面级截图缺失，无法推送',
+              code: 'page_level_screenshot_missing',
+              missingPageLevelScreenshots: coverage.missing,
+              stats: result.stats,
+            });
+            continue;
+          }
+        }
+        buildOk += 1;
+        if (entry) {
+          okBuilt.push({
+            entry,
+            ...(includeScreenshotsInBuilt ? { screenshots: result.payload?.screenshots || [] } : {}),
+            count: result.count,
+            skipped: result.skipped,
+            stats: result.stats,
+            trajectoryId: id,
+          });
+        }
+        items.push({
+          trajectoryId: id,
+          ok: true,
+          isExport: 0,
+          payload: result.payload,
+          count: result.count,
+          skipped: result.skipped,
+          stats: result.stats,
+          ...(gateCoverage ? { coverage } : {}),
+        });
+      } catch (e) {
+        buildFailed += 1;
+        items.push({ trajectoryId: id, ok: false, error: e.message });
+      }
+    }
+
+    const merged = wrapList(okBuilt);
+
+    if (dryOrBare) {
+      if (parseBool(body.download, false)) {
+        res.setHeader('Content-Disposition', `attachment; filename="${bareFilename}"`);
+      }
+      if (wantBarePayload(body)) {
+        return res.json(merged.payload);
+      }
+      return res.json({
+        schemaVersion,
+        systemId: String(systemId),
+        projectId: String(projectId),
+        pushed: false,
+        items,
+        summary: { ok: buildOk, failed: buildFailed },
+        payload: merged.payload,
+      });
+    }
+
+    if (!okBuilt.length) {
+      throw new AppError('没有可推送的交易（需为已确认 completed，且含可导出步骤）', {
+        status: 422,
+        body: {
+          error: '没有可推送的交易（需为已确认 completed，且含可导出步骤）',
+          schemaVersion,
+          systemId: String(systemId),
+          projectId: String(projectId),
+          pushed: false,
+          items,
+          summary: { ok: 0, failed: buildFailed },
+        },
+      });
+    }
+
+    const accessToken = requireAccessToken({
+      headers: req.headers,
+      body,
+      query: req.query,
+    });
+
+    let partner;
+    try {
+      partner = await pushImportDemand(merged.payload, { accessToken });
+    } catch (e) {
+      throw new AppError(e.message, {
+        status: e.statusCode || 502,
+        body: {
+          error: e.message,
+          schemaVersion,
+          systemId: String(systemId),
+          projectId: String(projectId),
+          pushed: false,
+          partner: e.partner || null,
+          items,
+          summary: { ok: 0, failed: buildOk + buildFailed, buildOk, buildFailed },
+        },
+      });
+    }
+
+    const pushedIds = okBuilt.map((b) => b.trajectoryId);
+    await markBuiltExported(pushedIds);
+    for (const it of items) {
+      if (it.ok && pushedIds.includes(it.trajectoryId)) {
+        it.isExport = 1;
+      }
+    }
+
+    res.json({
+      schemaVersion,
+      systemId: String(systemId),
+      projectId: String(projectId),
+      pushed: true,
+      partner,
+      items,
+      ...(includeMergedStats ? { stats: merged.stats, skipped: merged.skipped } : {}),
+      summary: { ok: buildOk, failed: buildFailed },
+    });
+  };
 }
 
 /**
@@ -192,28 +522,6 @@ export default function (app) {
     res.json(payload);
   }));
 
-  /**
-   * True when caller wants bare envelope only (no partner push).
-   * Accepts download | raw | forImport | dryRun.
-   * @param {object} [src] request query/body source
-   * @returns {boolean} whether dry-run / bare export is requested
-   */
-  function wantDryRun(src = {}) {
-    return parseBool(src.download, false)
-      || parseBool(src.raw, false)
-      || parseBool(src.forImport, false)
-      || parseBool(src.for_import, false)
-      || parseBool(src.dryRun, false)
-      || parseBool(src.dry_run, false);
-  }
-
-  function wantBarePayload(src = {}) {
-    return parseBool(src.download, false)
-      || parseBool(src.raw, false)
-      || parseBool(src.forImport, false)
-      || parseBool(src.for_import, false);
-  }
-
   /** Partner projects for batch-push dialog. */
   app.get('/api/v2/export/partner/projects', asyncHandler(async (req, res) => {
     try {
@@ -221,12 +529,7 @@ export default function (app) {
       const projects = await listPartnerProjects({ accessToken });
       res.json({ projects, count: projects.length });
     } catch (err) {
-      if (err instanceof AppError) throw err;
-      throw new AppError(err.message, {
-        code: err.code,
-        status: err.statusCode || 500,
-        body: { error: err.message, partner: err.partner },
-      });
+      rethrowRouteError(err, partnerErrorBody);
     }
   }));
 
@@ -257,107 +560,9 @@ export default function (app) {
       })(systems);
       res.json({ projectId: String(projectId), systems, count });
     } catch (err) {
-      if (err instanceof AppError) throw err;
-      throw new AppError(err.message, {
-        code: err.code,
-        status: err.statusCode || 500,
-        body: { error: err.message, partner: err.partner },
-      });
+      rethrowRouteError(err, partnerErrorBody);
     }
   }));
-
-  async function maybePushSingle(req, res, traj, src) {
-    const { systemId, projectId } = resolveSystemProject(src);
-    const result = await buildOneTrajectory(traj, { systemId, projectId });
-    const dry = wantDryRun(src);
-    const push = parseBool(src.push, false);
-
-    if (wantBarePayload(src)) {
-      if (parseBool(src.download, false)) {
-        res.setHeader('Content-Disposition', `attachment; filename="transaction_${traj.id}.json"`);
-      }
-      return res.json(result.payload);
-    }
-
-    if (!push || dry) {
-      // Export-only path (no mark unless historically expected) — mark only when pushed.
-      // For non-push export, keep previous behavior of markExported so raw 联调 still flips flag.
-      if (!push) {
-        await trajectoryDao.markExported(traj.id);
-        return res.json({ ...result, isExport: 1, pushed: false });
-      }
-      return res.json({ ...result, isExport: 0, pushed: false });
-    }
-
-    // Real partner push: gate-driven — only completed (已确认) may push.
-    assertPushableForPartner(traj);
-
-    const accessToken = requireAccessToken(req);
-    const partner = await pushImportDemand(result.payload, { accessToken });
-    await trajectoryDao.markExported(traj.id);
-    return res.json({
-      ...result,
-      isExport: 1,
-      pushed: true,
-      partner,
-    });
-  }
-
-  /**
-   * V3.0 单交易组装/推送（镜像 maybePushSingle，用 V3 组装）。
-   * @param {import('express').Request} req Express request
-   * @param {import('express').Response} res Express response
-   * @param {object} traj trajectory row from DAO
-   * @param {object} src merged query/body source
-   * @returns {Promise<void>}
-   */
-  async function maybePushSingleV3(req, res, traj, src) {
-    const { systemId, projectId } = resolveSystemProject(src);
-    const result = await buildOneTrajectoryV3(traj, { systemId, projectId });
-    const dry = wantDryRun(src);
-    const push = parseBool(src.push, false);
-
-    if (wantBarePayload(src)) {
-      if (parseBool(src.download, false)) {
-        res.setHeader('Content-Disposition', `attachment; filename="transaction_v3_${traj.id}.json"`);
-      }
-      return res.json(result.payload);
-    }
-
-    if (!push || dry) {
-      if (!push) {
-        await trajectoryDao.markExported(traj.id);
-        return res.json({ ...result, isExport: 1, pushed: false });
-      }
-      return res.json({ ...result, isExport: 0, pushed: false });
-    }
-
-    assertPushableForPartner(traj);
-
-    const coverage = validatePageLevelCoverage(result.payload?.transcationEventTypeList?.[0]);
-    if (coverageBlocksPush(coverage, result.stats)) {
-      throw new AppError('页面级截图缺失，无法推送', {
-        status: 409,
-        body: {
-          code: 'page_level_screenshot_missing',
-          error: '页面级截图缺失，无法推送',
-          missingPageLevelScreenshots: coverage.missing,
-          stats: result.stats,
-          pushed: false,
-        },
-      });
-    }
-
-    const accessToken = requireAccessToken(req);
-    const partner = await pushImportDemand(result.payload, { accessToken });
-    await trajectoryDao.markExported(traj.id);
-    return res.json({
-      ...result,
-      isExport: 1,
-      pushed: true,
-      partner,
-    });
-  }
 
   /**
    * Export / optional push single trajectory.
@@ -369,17 +574,7 @@ export default function (app) {
       if (!traj) throw new AppError('Trajectory not found', { code: 'NOT_FOUND' });
       return maybePushSingle(req, res, traj, req.query);
     } catch (err) {
-      if (err instanceof AppError) throw err;
-      throw new AppError(err.message, {
-        code: err.code,
-        status: err.statusCode || 500,
-        body: {
-          error: err.message,
-          partner: err.partner,
-          ...(err.code ? { code: err.code } : {}),
-          ...(err.recordStatus !== undefined ? { recordStatus: err.recordStatus } : {}),
-        },
-      });
+      rethrowRouteError(err, statusAwareErrorBody);
     }
   }));
 
@@ -392,17 +587,7 @@ export default function (app) {
       if (!traj) throw new AppError('Trajectory not found', { code: 'NOT_FOUND' });
       return maybePushSingle(req, res, traj, src);
     } catch (err) {
-      if (err instanceof AppError) throw err;
-      throw new AppError(err.message, {
-        code: err.code,
-        status: err.statusCode || 500,
-        body: {
-          error: err.message,
-          partner: err.partner,
-          ...(err.code ? { code: err.code } : {}),
-          ...(err.recordStatus !== undefined ? { recordStatus: err.recordStatus } : {}),
-        },
-      });
+      rethrowRouteError(err, statusAwareErrorBody);
     }
   }));
 
@@ -411,160 +596,13 @@ export default function (app) {
    * Body: { trajectoryIds, systemId?, projectId?, raw|forImport|dryRun|download? }
    * Product path: assemble + push; dry-run/raw returns envelope only.
    */
-  app.post('/api/v2/export/transactions', asyncHandler(async (req, res) => {
-    try {
-      const body = req.body || {};
-      const { systemId, projectId } = resolveSystemProject(body);
-      const ids = parseIdList(body.trajectoryIds ?? body.trajectory_ids);
-      if (!ids.length) {
-        throw new AppError('请选择要推送的交易', { code: 'VALIDATION' });
-      }
-
-      const dryOrBare =
-        wantBarePayload(body) ||
-        parseBool(body.dryRun, false) ||
-        parseBool(body.dry_run, false);
-      const willPush = !dryOrBare;
-
-      const items = [];
-      const okBuilt = [];
-      let buildOk = 0;
-      let buildFailed = 0;
-
-      for (const id of ids) {
-        try {
-          const traj = await trajectoryDao.getById(id);
-          if (!traj) {
-            buildFailed += 1;
-            items.push({ trajectoryId: id, ok: false, error: '交易不存在' });
-            continue;
-          }
-          if (willPush && !isPushableRecordStatus(getRecordStatus(traj))) {
-            buildFailed += 1;
-            const status = getRecordStatus(traj);
-            items.push({
-              trajectoryId: id,
-              ok: false,
-              error: `只能推送状态为「已确认」的交易（当前: ${status ?? 'unknown'}）`,
-              code: 'not_pushable_status',
-              recordStatus: status,
-            });
-            continue;
-          }
-          const result = await buildOneTrajectory(traj, { systemId, projectId });
-          buildOk += 1;
-          const entry = result.payload?.transcationEventTypeList?.[0];
-          if (entry) {
-            okBuilt.push({
-              entry,
-              screenshots: result.payload?.screenshots || [],
-              count: result.count,
-              skipped: result.skipped,
-              stats: result.stats,
-              trajectoryId: id,
-            });
-          }
-          items.push({
-            trajectoryId: id,
-            ok: true,
-            isExport: 0,
-            payload: result.payload,
-            count: result.count,
-            skipped: result.skipped,
-            stats: result.stats,
-          });
-        } catch (e) {
-          buildFailed += 1;
-          items.push({ trajectoryId: id, ok: false, error: e.message });
-        }
-      }
-
-      const merged = wrapTransactionList(okBuilt);
-
-      if (dryOrBare) {
-        if (parseBool(body.download, false)) {
-          res.setHeader('Content-Disposition', 'attachment; filename="transactions_import.json"');
-        }
-        if (wantBarePayload(body)) {
-          return res.json(merged.payload);
-        }
-        return res.json({
-          schemaVersion: TRANSACTION_SCHEMA_VERSION,
-          systemId: String(systemId),
-          projectId: String(projectId),
-          pushed: false,
-          items,
-          summary: { ok: buildOk, failed: buildFailed },
-          payload: merged.payload,
-        });
-      }
-
-      if (!okBuilt.length) {
-        throw new AppError('没有可推送的交易（需为已确认 completed，且含可导出步骤）', {
-          status: 422,
-          body: {
-            error: '没有可推送的交易（需为已确认 completed，且含可导出步骤）',
-            schemaVersion: TRANSACTION_SCHEMA_VERSION,
-            systemId: String(systemId),
-            projectId: String(projectId),
-            pushed: false,
-            items,
-            summary: { ok: 0, failed: buildFailed },
-          },
-        });
-      }
-
-      const accessToken = requireAccessToken({
-        headers: req.headers,
-        body,
-        query: req.query,
-      });
-
-      let partner;
-      try {
-        partner = await pushImportDemand(merged.payload, { accessToken });
-      } catch (e) {
-        throw new AppError(e.message, {
-          status: e.statusCode || 502,
-          body: {
-            error: e.message,
-            schemaVersion: TRANSACTION_SCHEMA_VERSION,
-            systemId: String(systemId),
-            projectId: String(projectId),
-            pushed: false,
-            partner: e.partner || null,
-            items,
-            summary: { ok: 0, failed: buildOk + buildFailed, buildOk, buildFailed },
-          },
-        });
-      }
-
-      const pushedIds = okBuilt.map((b) => b.trajectoryId);
-      await markBuiltExported(pushedIds);
-      for (const it of items) {
-        if (it.ok && pushedIds.includes(it.trajectoryId)) {
-          it.isExport = 1;
-        }
-      }
-
-      res.json({
-        schemaVersion: TRANSACTION_SCHEMA_VERSION,
-        systemId: String(systemId),
-        projectId: String(projectId),
-        pushed: true,
-        partner,
-        items,
-        summary: { ok: buildOk, failed: buildFailed },
-      });
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-      throw new AppError(err.message, {
-        code: err.code,
-        status: err.statusCode || 500,
-        body: { error: err.message, partner: err.partner },
-      });
-    }
-  }));
+  app.post('/api/v2/export/transactions', asyncHandler(buildTransactionExportHandler({
+    schemaVersion: TRANSACTION_SCHEMA_VERSION,
+    buildOne: buildOneTrajectory,
+    wrapList: wrapTransactionList,
+    bareFilename: 'transactions_import.json',
+    includeScreenshotsInBuilt: true,
+  })));
 
   // ── V3.0：阶段长图控件点亮（groups 结果结构，V2.0 保留）──
   /** Export / optional push single trajectory (V3 page-level screenshot structure). */
@@ -574,17 +612,7 @@ export default function (app) {
       if (!traj) throw new AppError('Trajectory not found', { code: 'NOT_FOUND' });
       return maybePushSingleV3(req, res, traj, req.query);
     } catch (err) {
-      if (err instanceof AppError) throw err;
-      throw new AppError(err.message, {
-        code: err.code,
-        status: err.statusCode || 500,
-        body: {
-          error: err.message,
-          partner: err.partner,
-          ...(err.code ? { code: err.code } : {}),
-          ...(err.recordStatus !== undefined ? { recordStatus: err.recordStatus } : {}),
-        },
-      });
+      rethrowRouteError(err, statusAwareErrorBody);
     }
   }));
 
@@ -597,192 +625,21 @@ export default function (app) {
       if (!traj) throw new AppError('Trajectory not found', { code: 'NOT_FOUND' });
       return maybePushSingleV3(req, res, traj, src);
     } catch (err) {
-      if (err instanceof AppError) throw err;
-      throw new AppError(err.message, {
-        code: err.code,
-        status: err.statusCode || 500,
-        body: {
-          error: err.message,
-          partner: err.partner,
-          ...(err.code ? { code: err.code } : {}),
-          ...(err.recordStatus !== undefined ? { recordStatus: err.recordStatus } : {}),
-        },
-      });
+      rethrowRouteError(err, statusAwareErrorBody);
     }
   }));
 
   /**
    * V3.0 批量推送。Body 同 V2.0：{ trajectoryIds, systemId?, projectId?, raw|forImport|dryRun|download? }。
    */
-  app.post('/api/v2/export/transactions-v3', asyncHandler(async (req, res) => {
-    try {
-      const body = req.body || {};
-      const { systemId, projectId } = resolveSystemProject(body);
-      const ids = parseIdList(body.trajectoryIds ?? body.trajectory_ids);
-      if (!ids.length) {
-        throw new AppError('请选择要推送的交易', { code: 'VALIDATION' });
-      }
-
-      const dryOrBare =
-        wantBarePayload(body) ||
-        parseBool(body.dryRun, false) ||
-        parseBool(body.dry_run, false);
-      const willPush = !dryOrBare;
-
-      const items = [];
-      const okBuilt = [];
-      let buildOk = 0;
-      let buildFailed = 0;
-
-      for (const id of ids) {
-        try {
-          const traj = await trajectoryDao.getById(id);
-          if (!traj) {
-            buildFailed += 1;
-            items.push({ trajectoryId: id, ok: false, error: '交易不存在' });
-            continue;
-          }
-          if (willPush && !isPushableRecordStatus(getRecordStatus(traj))) {
-            buildFailed += 1;
-            const status = getRecordStatus(traj);
-            items.push({
-              trajectoryId: id,
-              ok: false,
-              error: `只能推送状态为「已确认」的交易（当前: ${status ?? 'unknown'}）`,
-              code: 'not_pushable_status',
-              recordStatus: status,
-            });
-            continue;
-          }
-          const result = await buildOneTrajectoryV3(traj, { systemId, projectId });
-          const entry = result.payload?.transcationEventTypeList?.[0];
-          const coverage = validatePageLevelCoverage(entry);
-          if (willPush && coverageBlocksPush(coverage, result.stats)) {
-            buildFailed += 1;
-            items.push({
-              trajectoryId: id,
-              ok: false,
-              error: '页面级截图缺失，无法推送',
-              code: 'page_level_screenshot_missing',
-              missingPageLevelScreenshots: coverage.missing,
-              stats: result.stats,
-            });
-            continue;
-          }
-          buildOk += 1;
-          if (entry) {
-            okBuilt.push({
-              entry,
-              count: result.count,
-              skipped: result.skipped,
-              stats: result.stats,
-              trajectoryId: id,
-            });
-          }
-          items.push({
-            trajectoryId: id,
-            ok: true,
-            isExport: 0,
-            payload: result.payload,
-            count: result.count,
-            skipped: result.skipped,
-            stats: result.stats,
-            coverage,
-          });
-        } catch (e) {
-          buildFailed += 1;
-          items.push({ trajectoryId: id, ok: false, error: e.message });
-        }
-      }
-
-      const merged = wrapTransactionListV3(okBuilt);
-
-      if (dryOrBare) {
-        if (parseBool(body.download, false)) {
-          res.setHeader('Content-Disposition', 'attachment; filename="transactions_v3_import.json"');
-        }
-        if (wantBarePayload(body)) {
-          return res.json(merged.payload);
-        }
-        return res.json({
-          schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
-          systemId: String(systemId),
-          projectId: String(projectId),
-          pushed: false,
-          items,
-          summary: { ok: buildOk, failed: buildFailed },
-          payload: merged.payload,
-        });
-      }
-
-      if (!okBuilt.length) {
-        throw new AppError('没有可推送的交易（需为已确认 completed，且含可导出步骤）', {
-          status: 422,
-          body: {
-            error: '没有可推送的交易（需为已确认 completed，且含可导出步骤）',
-            schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
-            systemId: String(systemId),
-            projectId: String(projectId),
-            pushed: false,
-            items,
-            summary: { ok: 0, failed: buildFailed },
-          },
-        });
-      }
-
-      const accessToken = requireAccessToken({
-        headers: req.headers,
-        body,
-        query: req.query,
-      });
-
-      let partner;
-      try {
-        partner = await pushImportDemand(merged.payload, { accessToken });
-      } catch (e) {
-        throw new AppError(e.message, {
-          status: e.statusCode || 502,
-          body: {
-            error: e.message,
-            schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
-            systemId: String(systemId),
-            projectId: String(projectId),
-            pushed: false,
-            partner: e.partner || null,
-            items,
-            summary: { ok: 0, failed: buildOk + buildFailed, buildOk, buildFailed },
-          },
-        });
-      }
-
-      const pushedIds = okBuilt.map((b) => b.trajectoryId);
-      await markBuiltExported(pushedIds);
-      for (const it of items) {
-        if (it.ok && pushedIds.includes(it.trajectoryId)) {
-          it.isExport = 1;
-        }
-      }
-
-      res.json({
-        schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
-        systemId: String(systemId),
-        projectId: String(projectId),
-        pushed: true,
-        partner,
-        items,
-        stats: merged.stats,
-        skipped: merged.skipped,
-        summary: { ok: buildOk, failed: buildFailed },
-      });
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-      throw new AppError(err.message, {
-        code: err.code,
-        status: err.statusCode || 500,
-        body: { error: err.message, partner: err.partner },
-      });
-    }
-  }));
+  app.post('/api/v2/export/transactions-v3', asyncHandler(buildTransactionExportHandler({
+    schemaVersion: TRANSACTION_SCHEMA_VERSION_V3,
+    buildOne: buildOneTrajectoryV3,
+    wrapList: wrapTransactionListV3,
+    bareFilename: 'transactions_v3_import.json',
+    gateCoverage: true,
+    includeMergedStats: true,
+  })));
 
   /** Map a single recorded step to its legacy-engine operation (exportable check). */
   app.post('/api/v2/export/legacy-engine/map-step', asyncHandler(async (req, res) => {
