@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- 2026-08-31: **菜单落地 pageId 单一化（prepare 回写）**：`bindRecordingPageId` 在 `source=read` 时回写功能 `pd_cmpt_ecd` + 单行 `system_page`；AILZ 不回写菜单。
+
 - 2026-08-31: **菜单落地 pageId 单一化（导入）**：`collectPages` 只入库第一个非空 managePage；忽略 guidePages；模块 upsert 强制空 pages。影响：`system_page` 每功能 0/1 行；characterization-system-import-json 断言同步。
 
 - 2026-08-28: **重写项目 README**：依据当前控制面、v2 API、MySQL 迁移、Python Agent、Executor、截图存储和启动脚本补充依赖、初始化、配置、目录模块、业务流程、接口入口、状态语义及故障排查说明；修正旧组装管线和旧 API 的过期描述。影响范围：项目文档，无运行时代码或 schema 变更。

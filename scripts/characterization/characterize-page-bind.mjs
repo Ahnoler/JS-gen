@@ -57,6 +57,23 @@ function testWiringService() {
   assert.match(service, /read_page_component_code/, 'service references read_page_component_code');
   assert.match(service, /AILZ/, 'service references AILZ prefix');
   assert.match(service, /updateMeta/, 'service references updateMeta');
+  assert.match(service, /writeBackFunctionLandingPage/, 'service defines write-back helper');
+  assert.match(service, /source === ['"]read['"]/, 'write-back gated on source===read');
+  assert.match(service, /replaceForNode/, 'write-back replaces system_page via replaceForNode');
+  assert.match(service, /pdCmptEcd/, 'write-back updates system.pdCmptEcd');
+}
+
+function testWiringWriteBackOnlyOnRead() {
+  const service = readFileSync(join(root, 'src/services/trajectory/recording-page-bind.js'), 'utf8');
+  // no-functionId early return block must not call write-back
+  const earlyIdx = service.indexOf('no functionId, generated pageId');
+  assert.ok(earlyIdx > 0, 'early AILZ log present');
+  const earlyReturnIdx = service.indexOf('return { pageId, source, persisted }', earlyIdx);
+  assert.ok(earlyReturnIdx > earlyIdx, 'early return present');
+  const earlyBlock = service.slice(earlyIdx, earlyReturnIdx);
+  assert.ok(!earlyBlock.includes('writeBackFunctionLandingPage'), 'AILZ early path does not write back menu');
+  // generated branch after empty componentCode
+  assert.match(service, /source = 'generated'/, 'generated source still assigned');
 }
 
 /**
@@ -106,6 +123,7 @@ function main() {
     ['generatePageId format: AILZ + 13-digit ms timestamp', testGeneratePageIdFormat],
     ['generatePageId unique + non-decreasing timestamp', testGeneratePageIdUniqueNonDecreasing],
     ['wiring: service references runReplayActions + read_page_component_code + AILZ + updateMeta', testWiringService],
+    ['wiring: write-back only on source=read (not AILZ/generated)', testWiringWriteBackOnlyOnRead],
     ['wiring: replay-actions helper owns replay_actions/forwardStdin/waitForSessionEvent + no-op catch', testWiringReplayActionsHelper],
     ['wiring: trajectory-attach-runner.js references bindRecordingPageId', testWiringRunner],
     ['wiring: js_snippets/page_id.py defines JS_READ_PAGE_COMPONENT_CODE', testWiringPageIdPy],

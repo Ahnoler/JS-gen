@@ -26,6 +26,32 @@ export function generatePageId() {
 }
 
 /**
+ * 将天元实测组件编号回写为功能节点唯一落地 pageId（pd_cmpt_ecd + system_page 整替一行）。
+ * 失败只 warn，不抛——不得阻断录制启动。
+ * @param {number} functionId 功能节点 id
+ * @param {{ pageId: string, pageName?: string, resPath?: string }} landing 落地页
+ * @returns {Promise<void>}
+ */
+async function writeBackFunctionLandingPage(functionId, landing) {
+  const pageId = String(landing?.pageId || '').trim();
+  if (!pageId) return;
+  const fid = Number(functionId);
+  if (!Number.isFinite(fid) || fid <= 0) return;
+  try {
+    await systemDao.update(fid, { pdCmptEcd: pageId });
+    await systemPageDao.replaceForNode(fid, [{
+      pageId,
+      pageName: String(landing.pageName || '').trim(),
+      resPath: String(landing.resPath || '').trim(),
+      pageType: 'managePage',
+    }]);
+    console.log('[page-bind] wrote back function#%s landing pageId=%s', fid, pageId);
+  } catch (err) {
+    console.warn('[page-bind] write-back landing failed function#%s: %s', fid, err?.message || err);
+  }
+}
+
+/**
  * 录制准备阶段绑定起点页面 ID：导航到功能菜单 → 读组件编号（读不到 AILZ 兜底）→ 落库。
  *
  * 流程：
@@ -34,7 +60,8 @@ export function generatePageId() {
  * 3. 发 `read_page_component_code` replay 动作，从 `r.results` 取 `row.pageCode`
  * 4. `pageId = componentCode || generatePageId()`
  * 5. 与功能节点 system_page 已知页面 ID 交叉校验（仅 console.log，不阻断）
- * 6. `trajectoryDao.updateMeta(tid, { pageId })` 落库
+ * 6. `source=read` 时回写功能落地 pageId（pd_cmpt_ecd + 单行 system_page）
+ * 7. `trajectoryDao.updateMeta(tid, { pageId })` 落库
  *
  * 全程 try/catch 最外层：任何异常 `console.warn('[page-bind] ...')` 后 return，绝不 throw。
  * @param {object} opts 参数对象
@@ -131,6 +158,14 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
       }
     } catch (crossErr) {
       console.warn('[page-bind] cross-check with system_page failed: %s', crossErr?.message || crossErr);
+    }
+
+    if (source === 'read' && pageId) {
+      await writeBackFunctionLandingPage(fid, {
+        pageId,
+        pageName,
+        resPath: pagePath,
+      });
     }
 
     // 步骤 6：落库——失败不再静默：pageId 停留旧值会破坏执行期导航，warn 带 PERSIST-FAILED 标志并标注 persisted
