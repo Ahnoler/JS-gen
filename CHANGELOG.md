@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- 2026-08-31: **菜单落地 pageId 单一化设计** `docs/superpowers/specs/2026-08-31-menu-landing-pageid-design.md`：导入只入库 managePage（0/1）；录制 prepare 读到天元编号时回写功能落地 pageId；AILZ 不回写菜单。影响范围：设计文档，待实现计划。
+- 2026-08-31: **菜单落地 pageId 单一化设计** `docs/superpowers/specs/2026-08-31-menu-landing-pageid-design.md`：导入只入库 managePage（0/1）；录制 prepare 读到天元编号时回写功能落地 pageId；AILZ 不回写菜单。影响范围：设计文档，实现计划见 `docs/superpowers/plans/2026-08-31-menu-landing-pageid.md`。
 
 - 2026-08-31: **推送菜单 v1 样例契约** `docs/需求评审-菜单切换/push-menu-v1.sample.json`：用信贷系统真实数据节选，约定 menus[] 字段（`umlEcd`=`UML…`、`parentUmlEcd` 建树、`xpath` 含 `RES…` data-id、落地页 **`pageId` 单值字符串**——非数组；对应天元「组件编号」/managePage）。供自动化平台同事按契约开发接收接口。影响范围：仅文档样例，无运行时接口。
 
@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 2026-08-31: **远程 DB 热修——连接池扩容 + 压缩协议**（湿测：录制台刷新突发把默认连接池打满，`Knex: Timeout acquiring a connection` 间歇爆发 → prepare 500 → 前端停在错误态画布"断流"）。①`config/.env` 增 `DB_POOL_MAX=20`（默认 10；远程库 RTT ~65ms，树接口单次 1.7~6.4s 持连接，突发并发排队超 10s 即超时；`.env.example` 已文档化）；②`config/database.js` 连接开 `compress: true`（mysql2 压缩协议）——树接口 ~431KB 步骤载荷（`element_json` 占 97%）实测 465~914ms → ~105ms（4~9×），全部查询受益、零接口形状变化（曾评估 slim 掉 element_json，因前端 `step-detail` 定位器回显直接消费该字段而否决）。影响范围：config/ 连接配置；无 schema/路由/WS 变更；需重启 server 生效。
 
 ### Changed
+
+- 2026-08-31: **菜单落地 pageId 单一化（导入）**：`collectPages` 只入库第一个非空 managePage；忽略 guidePages；模块 upsert 强制空 pages。影响：`system_page` 每功能 0/1 行；characterization-system-import-json 断言同步。
 
 - 2026-08-28: **重写项目 README**：依据当前控制面、v2 API、MySQL 迁移、Python Agent、Executor、截图存储和启动脚本补充依赖、初始化、配置、目录模块、业务流程、接口入口、状态语义及故障排查说明；修正旧组装管线和旧 API 的过期描述。影响范围：项目文档，无运行时代码或 schema 变更。
 

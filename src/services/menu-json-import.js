@@ -38,43 +38,38 @@ export function parseMenuJson(buffer) {
 }
 
 /**
- * 收集一个节点直属活动（children 中 umlType='3'）的页面清单。
- * managePage 的 pdCmptEcd 非空才入页；guidePages 同理。同一节点内按 pageId 去重（保留首个）。
+ * 收集一个节点直属活动（children 中 umlType='3'）的落地页（0 或 1 个）。
+ * 只取建模第一个非空 managePage.pdCmptEcd；忽略引导页与后续 managePage。
  * @param {object} node 子领域/模块节点
- * @returns {object[]} 页面对象数组（pageId/pageName/resPath/pageType）
+ * @returns {object[]} 长度 0 或 1；项含 pageId/pageName/resPath/pageType='managePage'
  */
 function collectPages(node) {
   const pages = [];
-  const seen = new Set();
   const children = Array.isArray(node.children) ? node.children : [];
+  let skippedExtraManage = 0;
   for (const child of children) {
     if (String(child.umlType) !== '3') continue;
     const managePage = child.managePage;
-    if (managePage && String(managePage.pdCmptEcd || '').trim()) {
-      const pageId = String(managePage.pdCmptEcd).trim();
-      if (!seen.has(pageId)) {
-        seen.add(pageId);
-        pages.push({
-          pageId,
-          pageName: String(managePage.pdCmptNm || '').trim(),
-          resPath: String(managePage.resPath || '').trim(),
-          pageType: 'managePage',
-        });
-      }
-    }
-    const guidePages = Array.isArray(child.guidePages) ? child.guidePages : [];
-    for (const gp of guidePages) {
-      const pageId = String(gp.pdCmptEcd || '').trim();
-      if (!pageId) continue;
-      if (seen.has(pageId)) continue;
-      seen.add(pageId);
+    const pageId = managePage ? String(managePage.pdCmptEcd || '').trim() : '';
+    if (!pageId) continue;
+    if (pages.length === 0) {
       pages.push({
         pageId,
-        pageName: String(gp.pdCmptNm || '').trim(),
-        resPath: '',
-        pageType: 'guidePage',
+        pageName: String(managePage.pdCmptNm || '').trim(),
+        resPath: String(managePage.resPath || '').trim(),
+        pageType: 'managePage',
       });
+    } else {
+      skippedExtraManage += 1;
     }
+  }
+  if (skippedExtraManage > 0) {
+    console.warn(
+      '[menu-json-import] multiple managePages under node %s; kept first %s, skipped %d',
+      String(node.umlEcd || node.umlNm || ''),
+      pages[0]?.pageId,
+      skippedExtraManage,
+    );
   }
   return pages;
 }
@@ -346,7 +341,7 @@ export async function importMenuJson(systemNodeId, buffer) {
 
     // 遍历 plan：模块挂 target.id 下，功能挂对应模块下
     for (const mod of plan.modules) {
-      const moduleNode = await upsertNode(mod, target.id, NODE_TYPE_MODULE, mod.pages || []);
+      const moduleNode = await upsertNode(mod, target.id, NODE_TYPE_MODULE, []);
       for (const fn of mod.functions || []) {
         await upsertNode(fn, moduleNode.id, NODE_TYPE_FUNCTION, fn.pages || []);
       }

@@ -32,8 +32,10 @@ try {
  * Build a fixture that exercises the key flattening / dedup rules:
  *  - intermediate type2 layer ("客户信息维护") flattened away
  *  - leaf type2 under an intermediate layer flattened into module.functions
- *  - shared managePage across two activities deduped
+ *  - shared managePage across two activities → first managePage only
  *  - task-level pdCmptEcd ignored
+ *  - guidePages never imported
+ *  - at most one managePage per function
  *  - empty guidePage pdCmptEcd skipped
  *  - top-level leaf (中征网公告管理) goes into functions, not pages-of-module
  *  - intermediate "名单制管理" flattened; its leaf "黑名单管理" appears in functions
@@ -147,7 +149,7 @@ function testBuildPlanStructure() {
     assert.ok(f.seqNo !== undefined, 'function seqNo present');
     assert.ok(Array.isArray(f.pages), 'function pages array');
     for (const p of f.pages) {
-      assert.ok(['managePage', 'guidePage'].includes(p.pageType), 'pageType constrained');
+      assert.equal(p.pageType, 'managePage', 'pageType is managePage only');
       assert.ok(p.pageId, 'pageId present');
       assert.ok(p.pageName !== undefined, 'pageName present');
     }
@@ -160,22 +162,11 @@ function testBuildPlanSharedManagePageDedup() {
   const plan = buildImportJsonPlan(fixture);
   const gongGong = plan.modules[0].functions.find((f) => f.name === '对公客户管理');
   const pageIds = gongGong.pages.map((p) => p.pageId);
-  // managePage ZJJK00066153 shared by two activities → one entry; guidePage ZJJK00066158 → one entry.
-  assert.deepEqual(
-    [...pageIds].sort(),
-    ['ZJJK00066153', 'ZJJK00066158'],
-    'shared managePage deduped to 2 pages',
-  );
-  // Task-level code never promoted to a page.
+  assert.deepEqual(pageIds, ['ZJJK00066153'], 'only first managePage; guidePage ignored');
   assert.ok(!pageIds.includes('ZJJK99999999'), 'task-level pdCmptEcd ignored');
-  // Manage page appears exactly once.
-  const manage = gongGong.pages.filter((p) => p.pageType === 'managePage');
-  assert.equal(manage.length, 1, 'shared managePage appears once');
-  assert.equal(manage[0].pageId, 'ZJJK00066153');
-  // Guide page present.
-  const guides = gongGong.pages.filter((p) => p.pageType === 'guidePage');
-  assert.equal(guides.length, 1);
-  assert.equal(guides[0].pageId, 'ZJJK00066158');
+  assert.ok(!pageIds.includes('ZJJK00066158'), 'guidePage ZJJK00066158 not imported');
+  assert.equal(gongGong.pages.length, 1);
+  assert.equal(gongGong.pages[0].pageType, 'managePage');
 }
 
 function testBuildPlanEmptyGuidePageSkipped() {
@@ -230,6 +221,7 @@ function testWiringService() {
   assert.match(service, /removedFlag: 1/, 'import marks vanished nodes with removedFlag=1 (offline)');
   assert.match(service, /offline_marked/, 'import writes offline_marked change events for vanished nodes');
   assert.match(service, /removedFlag: 0/, 'import clears removedFlag on umlEcd hit / adoption');
+  assert.doesNotMatch(service, /guidePages/, 'collectPages no longer iterates guidePages');
 }
 
 function testWiringDao() {
@@ -244,7 +236,7 @@ function main() {
     ['parseMenuJson single object normalized to roots[1]', testParseUmlRelInfoAsObject],
     ['parseMenuJson valid array', testParseValidArray],
     ['buildImportJsonPlan structure & intermediates flattened', testBuildPlanStructure],
-    ['buildImportJsonPlan shared managePage dedup + task code ignored', testBuildPlanSharedManagePageDedup],
+    ['buildImportJsonPlan shared managePage only (no guidePage)', testBuildPlanSharedManagePageDedup],
     ['buildImportJsonPlan empty guidePage skipped', testBuildPlanEmptyGuidePageSkipped],
     ['buildImportJsonPlan top-level leaf as function', testBuildPlanTopLevelLeafDedup],
     ['buildImportJsonPlan 黑名单管理 leaf flattened', testBuildPlanHeiMingDan],

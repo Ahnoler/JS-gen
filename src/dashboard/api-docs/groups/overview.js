@@ -172,11 +172,11 @@ export const GROUP_OVERVIEW = [
       {
         method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/import-json',
         summary: '导入菜单 JSON（建模组件关系）',
-        desc: 'multipart/form-data，字段 file=被测系统《建模组件关系》.json。解析 umlRelInfo，在 :id 系统节点下建立两级菜单树（顶层子领域→模块、叶子子领域→功能，中间层不建节点），记录菜单唯一ID(umlEcd)、页面ID(pdCmptEcd→system_page)、来源标记 json_import；重复导入按 umlEcd 幂等更新，同名同类型已存在的非 JSON 节点会被收编。成功返回 201 与统计、重建后的树。',
+        desc: 'multipart/form-data，字段 file=被测系统《建模组件关系》.json。解析 umlRelInfo，在 :id 系统节点下建立两级菜单树（顶层子领域→模块、叶子子领域→功能，中间层不建节点），记录菜单唯一ID(umlEcd)、功能节点落地 pageId（仅 managePage，0/1；写入 `system.pd_cmpt_ecd` + 至多一行 `system_page`）、来源标记 json_import；重复导入按 umlEcd 幂等更新，同名同类型已存在的非 JSON 节点会被收编。成功返回 201 与统计、重建后的树。',
         tryable: false,
         reqExample: 'form-data: file=@全部领域-建模组件关系.json',
         respExample: J({ created: 120, updated: 0, adopted: 24, markedOffline: 0, pagesImported: 411, tree: [] }),
-        notes: [':id 必须是系统类型节点 (type=1)', '页面 ID 只收 managePage/guidePages 的 pdCmptEcd，空编码跳过', 'JSON 中消失的旧 json_import 菜单会保留并标记 unmatchedFlag'],
+        notes: [':id 必须是系统类型节点 (type=1)', '落地 pageId 只收第一个非空 managePage.pdCmptEcd；guidePages 不入库；模块不挂落地页', 'JSON 中消失的旧 json_import 菜单会保留并标记 unmatchedFlag'],
       },
         {
           method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/scan-menu',
