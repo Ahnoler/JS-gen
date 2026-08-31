@@ -68,11 +68,84 @@ def _emit_empty_act_cue(business_data_store, agent, _actions_raw, _next_goal):
             sys.stderr.flush()
 
 
+_OBSERVE_PAGE_JS = (
+    "() => JSON.stringify({hash:(location.hash||'').slice(0,80), "
+    "loading:!!document.querySelector('.el-loading-mask'), "
+    "overlay:(()=>{const d=[...document.querySelectorAll('.el-drawer,.el-dialog')]"
+    ".find(x=>x.getClientRects().length>0); "
+    "return d?(d.getAttribute('aria-label')||"
+    "(d.querySelector('.el-drawer__title,.el-dialog__header')||{}).textContent||'')"
+    ".trim().slice(0,30):''})()})"
+)
+
+
+async def _fresh_page_observation(agent):
+    """Observe the current page (hash / loading mask / visible overlay).
+
+    Best-effort: any failure is silently skipped so the observation never
+    blocks or aborts the steering cue (steering-only contract).
+    """
+    ctx = None
+    for attr in ('browser_context', 'browser_session', 'browser', 'context'):
+        candidate = getattr(agent, attr, None)
+        if candidate is not None:
+            ctx = candidate
+            break
+    if ctx is None:
+        return
+    page = None
+    get_page = getattr(ctx, 'get_current_page', None)
+    if get_page is not None:
+        page = await get_page()
+    if page is None:
+        pages = getattr(ctx, 'pages', None) or []
+        page = pages[-1] if pages else None
+    if page is None:
+        return
+    raw = await page.evaluate(_OBSERVE_PAGE_JS)
+    try:
+        info = json.loads(raw) if isinstance(raw, str) else dict(raw or {})
+    except Exception:
+        return
+    line = (
+        '【当前页面】hash=' + str(info.get('hash') or '')
+        + ' loading=' + ('yes' if info.get('loading') else 'no')
+        + ' overlay=' + str(info.get('overlay') or '')
+    )
+    agent._message_manager._add_message_with_tokens(HumanMessage(content=line))
+    sys.stderr.write(f'[recorder] Injected fresh page observation: {line[:120]}\n')
+    sys.stderr.flush()
+
+
+def _schedule_fresh_page_observation(agent):
+    """Schedule the fresh-page observation right after the sync cue injection.
+
+    _emit_duplicate_failure_cue is called synchronously from the async
+    on_step_end hook (recorder.py must not change), so the observation runs as
+    a task on the running loop immediately after the hook returns — the line
+    lands right after the cue in the message history. Failures are silent.
+    """
+    try:
+        import asyncio
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(_fresh_page_observation(agent))
+
+        def _swallow(t):
+            if not t.cancelled():
+                t.exception()
+
+        task.add_done_callback(_swallow)
+    except Exception:
+        pass
+
+
 def _emit_duplicate_failure_cue(business_data_store, agent, _actions, _last_result):
     """Inject [纠偏] cue when the same action+params failed twice in a row.
 
     Steering-only: failures must never abort the phase (same contract as
-    _emit_empty_act_cue).
+    _emit_empty_act_cue). Z3 escalation: the 2nd consecutive failure appends
+    the retry-discipline rule; the 3rd+ consecutive failure injects the hard
+    refusal prescription (cue-once-per-signature stays intact for level 2).
     """
     try:
         from scripts.feature_flags import duplicate_failure_cue_enabled
@@ -87,16 +160,22 @@ def _emit_duplicate_failure_cue(business_data_store, agent, _actions, _last_resu
             step_failed,
         )
         failed = step_failed(_last_result)
-        should_cue, sig = is_duplicate_failure(business_data_store, _actions, failed=failed)
-        if should_cue:
+        should_cue, sig, fail_count = is_duplicate_failure(
+            business_data_store, _actions, failed=failed
+        )
+        escalate = failed and fail_count >= 3
+        if should_cue or escalate:
             err_text = result_error_text(_last_result)
-            msg = HumanMessage(content=duplicate_failure_prescription(err_text))
+            msg = HumanMessage(content=duplicate_failure_prescription(
+                err_text, fail_count=fail_count,
+            ))
             agent._message_manager._add_message_with_tokens(msg)
             sys.stderr.write(
                 f'[recorder] Injected duplicate-failure cue sig={sig[:100]!r} '
-                f'err={err_text[:100]!r}\n'
+                f'err={err_text[:100]!r} count={fail_count}\n'
             )
             sys.stderr.flush()
+            _schedule_fresh_page_observation(agent)
     except Exception as e:
         sys.stderr.write(f'[recorder] duplicate-failure cue skipped: {e}\n')
         sys.stderr.flush()
