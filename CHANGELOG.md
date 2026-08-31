@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- 2026-08-31: **菜单落地 pageId 单一化设计** `docs/superpowers/specs/2026-08-31-menu-landing-pageid-design.md`：导入只入库 managePage（0/1）；录制 prepare 读到天元编号时回写功能落地 pageId；AILZ 不回写菜单。影响范围：设计文档，待实现计划。
+
+- 2026-08-31: **推送菜单 v1 样例契约** `docs/需求评审-菜单切换/push-menu-v1.sample.json`：用信贷系统真实数据节选，约定 menus[] 字段（`umlEcd`=`UML…`、`parentUmlEcd` 建树、`xpath` 含 `RES…` data-id、落地页 **`pageId` 单值字符串**——非数组；对应天元「组件编号」/managePage）。供自动化平台同事按契约开发接收接口。影响范围：仅文档样例，无运行时接口。
+
 - 2026-08-31: **本地开发 MySQL SSH 隧道脚本** `config/open-db-tunnel.cmd`：本机双击后把 `127.0.0.1:13306` 转到服务器 `127.0.0.1:3306`，绕过公网 3306 动态出口 IP 白名单。本机 3306 已被本地 MySQL 占用故不用该端口。影响范围：仅本地开发连库方式；不改运行时 API。
 
 ### Fixed
