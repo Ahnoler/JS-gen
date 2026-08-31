@@ -16,6 +16,7 @@ from .agent_utils import (
     patch_message_manager, patch_planner_prompt, patch_icon_tooltip_labels, create_llm,
 )
 from .controller import build_controller
+from .controller.actions.replay_timing import budget_for, budget_overrun_hint
 from .recorder import build_recording_hooks
 
 from .agent.service import (
@@ -135,12 +136,19 @@ async def _run_cdp_watcher(browser_context, action_queue, business_data_store):
             business_data_store['_watcher_mode'] = True
             set_current_source('cdp')
             try:
-                if isinstance(params, list):
-                    result = await act.function(*params)
-                elif isinstance(params, dict):
-                    result = await act.function(**params)
-                else:
-                    result = await act.function()
+                # 操作预算限时（Z6）：按动作预算包 wait_for，超时 → 重观察语义结果
+                budget = budget_for(action_name)
+                try:
+                    if isinstance(params, list):
+                        result = await asyncio.wait_for(act.function(*params), timeout=budget)
+                    elif isinstance(params, dict):
+                        result = await asyncio.wait_for(act.function(**params), timeout=budget)
+                    else:
+                        result = await asyncio.wait_for(act.function(), timeout=budget)
+                except asyncio.TimeoutError:
+                    result = 'budget-timeout | ' + budget_overrun_hint(action_name)
+                    sys.stderr.write(f"[cdp-watcher] budget-timeout: {action_name} > {budget}s\n")
+                    sys.stderr.flush()
                 result_str = str(result)
             finally:
                 business_data_store['_watcher_mode'] = False
