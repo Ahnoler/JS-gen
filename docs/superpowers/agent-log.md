@@ -14,6 +14,13 @@
 - 验证：6 个 form 特征化 + xpath-three-sources（11×6）OK；verify-all 唯一失败仍为已知存量 export-v3（远程库数据漂移）；真机 login/picker 链路全绿
 - 注意：编排 v2 的 H 系列全部落地；W5 演练只到提交流程步之前，流程提交/撤销仅在显式授权下执行；Z1/Z4（semantic_snapshot/verify_context）待下一批
 
+## 2026-08-31 · Zcode (uara_V1.2) — 服务链路 API 驱动 P0-P5 全闭环（针对未决项的最终轮）
+- 完成：按 docs/orchestration 契约（文件集不相交并行派发 A/B/C）→ 主线程接缝 `_result_ok`（2a119c5）→ A/B/C 合并补丁（0fa6a8e）→ watcher 早退修复两轮（c3453eb 条件化 + 20fb5a6 彻底移除）
+- 完成：未决项定性闭环——watcher 通道 select_option 失败根因三层：①`scan_visible_fields` 只读不写 store；②`task_list/_scan_fields` 只由 ensure_scanned 容器触碰重建；③watcher 模式 ensure_scanned 早退 → store 永不建立/容器永不切换（wm_repro AFTER-SELECT active 停留 main 实锤；直连成功分水岭）
+- 完成：产品级最终验证（交易 200）——prepare 一次成功（25s）→ select 企业类/营业执照 经 API `ok` 首例 → `click_save → ok-save-navigation`（建档成功跳编辑页）→ 选择器 20 行 → stop ok；全链路单浏览器单轮
+- 完成：executor PYTHONUTF8（4537ec4，stdin 中文乱码根治）、prepare 冷启动三重防线（8s 重试+wait_for_loading+控件探针，4537ec4/2a119c5/0fa6a8e）
+- 注意：SUT 侧 `checkCustCorporat` 新建 500 缺陷（SQL 漏 USR_NO）本轮未复现（合法校验位数据通过），仍归档在日志；DB SSH 隧道（13306）与控制面+executor 均在运行；演练交易 191-200 全部已释放（浏览器零残留）；13 个提交未推送
+
 ## 2026-08-31 · Zcode (uara_V1.2) — 信贷二轮调研 + 动作层真机验证 + 编排 v2
 - 完成：A-G 湿测暴露 picker 异步时序缺陷并修复（b527841）——query/select 改 async 内部轮询（≤5s），真机复测 query 20 行 + select 回填 diff 正确
 - 完成：二轮实地调研（修改=新页签上下文编辑页 26 字段过半 disabled、日期 native setter+blur 可提交、登记日期=真实时间非营业日期、待办=todo-item 卡片列表、W5 向导两步+流程操作 select 选项随节点+流程提交/撤销不可逆、客户放大镜弹窗与授信选客户同构）`docs/superpowers/research/2026-08-31-credit-sut-research-round2.md`
