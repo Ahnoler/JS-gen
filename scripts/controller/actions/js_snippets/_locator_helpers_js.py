@@ -1714,6 +1714,60 @@ PAGE_LOCATOR_HELPERS = r'''
       page_bbox: documentBBoxOf(host) || undefined,
     };
   }
+  /* resolveLocatorStrict — Z2 严格解析器（只读增量，不改动任何既有函数）：
+   * resolve 必须返回 count + 可见性，歧义可判定。求值方式与 evalXpathAll
+   * 同构（document.evaluate + ORDERED_NODE_SNAPSHOT_TYPE）；可见性判定与
+   * preferVisibleXpath 的 interactable 判定保持同构
+   * （offsetParent !== null 或 getClientRects().length > 0）。 */
+  function resolveLocatorStrict(expr, opts) {
+    const o = opts || {};
+    const visibleOnly = o.visibleOnly === true;
+    const loc = String(expr === undefined || expr === null ? '' : expr);
+    const fail = function (msg) {
+      return {
+        found: false, count: 0, visibleCount: 0, effectiveCount: 0,
+        ambiguous: false, locator: loc, error: msg,
+      };
+    };
+    if (!loc) return fail('empty expression');
+    let snap = null;
+    try {
+      snap = document.evaluate(loc, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    } catch (e) {
+      return fail(String((e && e.message) || e));
+    }
+    const nodes = [];
+    try {
+      for (let i = 0; i < snap.snapshotLength; i++) nodes.push(snap.snapshotItem(i));
+    } catch (e2) {
+      return fail(String((e2 && e2.message) || e2));
+    }
+    const isVisibleHit = function (n) {
+      if (!n || n.nodeType !== 1) return false;
+      return n.offsetParent !== null || (n.getClientRects && n.getClientRects().length > 0);
+    };
+    let visibleCount = 0;
+    for (let v = 0; v < nodes.length; v++) {
+      if (isVisibleHit(nodes[v])) visibleCount++;
+    }
+    const count = nodes.length;
+    const effectiveCount = visibleOnly ? visibleCount : count;
+    const samples = [];
+    for (let s = 0; s < nodes.length && samples.length < 3; s++) {
+      const n = nodes[s];
+      if (!n || n.nodeType !== 1 || typeof n.outerHTML !== 'string') continue;
+      samples.push(n.outerHTML.slice(0, 120));
+    }
+    return {
+      found: count > 0,
+      count: count,
+      visibleCount: visibleCount,
+      effectiveCount: effectiveCount,
+      ambiguous: effectiveCount > 1,
+      locator: loc,
+      samples: samples,
+    };
+  }
 '''
 
 JS_POLL_UTIL = r'''
