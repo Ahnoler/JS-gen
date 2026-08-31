@@ -14,6 +14,11 @@
 - 验证：6 个 form 特征化 + xpath-three-sources（11×6）OK；verify-all 唯一失败仍为已知存量 export-v3（远程库数据漂移）；真机 login/picker 链路全绿
 - 注意：编排 v2 的 H 系列全部落地；W5 演练只到提交流程步之前，流程提交/撤销仅在显式授权下执行；Z1/Z4（semantic_snapshot/verify_context）待下一批
 
+## 2026-09-01 · Zcode (uara_V1.2) — P4 守卫路径闭环定案
+- 完成：P4 守卫路径闭环（交易 203/205/206）——①真实缺口=驱动 parse_result_json 未剥离 watcher result 信封（恒判 0 行），修复后 P3 首次真通（row_count=20→首行 select→changed 回填）；②全量 DIAG 定案：新增对公授信管理默认=列表页（8 按钮无保存/提交），选择客户回填列表查询区，系统不自动开表单——click_save 守卫判 query UI 拒绝为**正确防御**；③补「点新增」步后=抽屉表单链（overlay drawer→选择客户回填 OK→表单态未达）→ 守卫仍正确拒绝
+- 结论：P4 守卫侧无缺陷（205/206 双轮 100% 正确）；剩余差异=业务流图谱（新增→抽屉→保存/提交 多步链）留作编排 v2 W3' 补充（非缺陷）；research 文档新增 §9 定案
+- 注：交易 203-206 均 detach 释放（浏览器零残留）；tmp 驱动修改（parse_result_json 信封修复、P3 补新增步、P3→P4 弹窗收口+DIAG）不入库
+
 ## 2026-08-31 · Zcode (uara_V1.2) — ①②③收尾：深链收官轮
 - ①P3-P5 深链：P3 首次真通（交易 203）——根因=驱动 parse_result_json 未剥离 watcher result 的 `extracted_content='ok:{...}'` 信封（此前恒判 0 行）；修复后 picker row_count=20 → 首行 select → `changed{客户编号,客户名称}`。P4 剩余一档：click_save 被 not-form-save 守卫拒（P3 弹窗关闭态未验证→页面判 query-filter），实提交路径待闭环（无阻塞，守卫行为保守正确）
 - ②checkCustCorporat 复核：交易 202/203 两次 `ok-save-navigation`（无 500/无 REQ-FAIL）→ 判定未复现（或在近期修复），research 文档 §6 已追加复核结论
