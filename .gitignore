@@ -44,6 +44,8 @@ nodejs/
 __pycache__/
 .idea/dbnavigator.xml
 
+# 运行产物：take_screenshot 等动作的截图归档（不入库）
+scripts/screenshots/
 # 本地试用期日报（绩效考核用，不提交）
 docs/report/
 logs/log.txt

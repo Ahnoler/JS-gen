@@ -199,7 +199,7 @@
           "status":500,"error":"Internal Server Error","requestId":"b2b967bc-603815"}
    ```
 
-   注意：本轮产品级最终验证（交易 200）合法校验位数据通过了新建（agent-log：「本轮未复现」），说明该缺陷与数据形态相关（部分路径触发），降级逻辑仍须保留。
+   注意：本轮产品级最终验证（交易 200）合法校验位数据通过了新建（agent-log：「本轮未复现」），说明该缺陷与数据形态相关（部分路径触发），降级逻辑仍须保留。（2026-08-31 23:39 复核：通过，交易 #202，证据：ok-save-navigation，log 无 REQ-FAIL/checkCustCorporat 500 行）
 2. **市场登记日期 = 真实时间**：非营业日语义，验收断言不能用固定历史日期（tmp/p0p5_drill.py:44-48 `norm_date` 的兜底注释与 round2 研究文档记载）。
 3. **选择器排除草稿客户**：授信「选择客户」查询对草稿态客户的可见性有排除行为，选行用 `picker_dialog_select` 按名称精确选中（api_drill.py:191）。
 
@@ -214,3 +214,15 @@
 5. select 首失败：`sleep 2 + scan_visible_fields + 重试`（§3.4）。
 6. 收尾：`record/stop` → **`detach`**（浏览器零残留）。
 7. 疑难杂症：先用 tmp/wm_repro.py 在 controller 层复现，再用 tmp/p0p5_drill.py 直连对照，最后回到 API 层归因。
+
+---
+
+## 8. P3-P5 深链验证记录（2026-08-31 深夜）
+
+- **交易 id**：202（stamp=88190629，客户「演练测试企业88190629有限公司」，证件 91450100MA8819062N）；LMY 节点（2f21bad1）slot 正常租还，跑前 detach 了残留会话（交易 198 / remoteSessionId 841）。
+- **P0-P2（简要）**：P0 营业日期 2026-08-19 读取成功；P1 菜单链（客户管理→对公客户管理）通过；P2 查重→新增（fill_form_field ×2 + select_option 对公客户类型/证件类型）→保存全部成功。
+- **P3 判定：降级（未过）**。授信菜单链（授信管理→新增对公授信管理→选择客户）通过，但 `picker_dialog_query ["选择对公授信客户", 客户名称=公司]` 两次均未命中目标行：原始返回 `row_count: 20`（宽查询行），其中不含新建客户「演练测试企业88190629有限公司」，脚本按匹配 0 行判（[P3][WARN] ×2，23:39:00 / 23:39:08）→ 无 `picker_dialog_select`，按降级客户「诊断测试企业1010722有限公司」继续；`[P3] 完成 filled=0 miss=1`。注：原始 JSON 里 row_count=20 与脚本判 0 并存，说明是目标行缺失/可见性排除（草稿客户），非接口报错；若严格按本判读口径可记「后端数据可见性未过，降级继续」。
+- **P4 判定：草稿路径**。无 `wf_submit_guard`（因选择器降级后页面处于查询过滤弹层，`click_save` 返回 not-form-save；formErrors 为空；semantic_snapshot 确认页面为「新增对公授信管理」，无提交按钮）→ `[P4] 保存成功且无提交按钮（草稿态完成)`。后续 guard/撤销探测：`click_table_row_radio ["诊断测试企业1010722有限公司"]` → err-table-row-not-found（表格无匹配行）；「撤销」点击 ok，「确定」err-icon-label-miss（弹层结构变化）。
+- **P5**：归档截图 `D:\dev\JS-gen\scripts\screenshots\screenshot_20260831_233948.png`；`[P5] 完成`；record/stop ok（recordStatus=recorded）后 detach，inUse 归零。
+- **结论**：②checkCustCorporat 复核通过（未复现，见 §6）；①P3 深链因选择器目标行不可见降级（无 picker_dialog_select），P4 走草稿路径（无提交/guard 断言），P5 收尾通过——非全绿。
+- **遗留**：选择器客户可见性问题待 SUT 侧稳定后重跑（换 stamp 新建客户后立即查询，观察草稿客户可见性窗口）；guard/提交断言本轮未覆盖，需在 P3 选行成功后补测。

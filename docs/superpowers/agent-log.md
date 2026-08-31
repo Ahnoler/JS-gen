@@ -14,6 +14,12 @@
 - 验证：6 个 form 特征化 + xpath-three-sources（11×6）OK；verify-all 唯一失败仍为已知存量 export-v3（远程库数据漂移）；真机 login/picker 链路全绿
 - 注意：编排 v2 的 H 系列全部落地；W5 演练只到提交流程步之前，流程提交/撤销仅在显式授权下执行；Z1/Z4（semantic_snapshot/verify_context）待下一批
 
+## 2026-08-31 · Zcode (uara_V1.2) — ①②③收尾：深链收官轮
+- ①P3-P5 深链：P3 首次真通（交易 203）——根因=驱动 parse_result_json 未剥离 watcher result 的 `extracted_content='ok:{...}'` 信封（此前恒判 0 行）；修复后 picker row_count=20 → 首行 select → `changed{客户编号,客户名称}`。P4 剩余一档：click_save 被 not-form-save 守卫拒（P3 弹窗关闭态未验证→页面判 query-filter），实提交路径待闭环（无阻塞，守卫行为保守正确）
+- ②checkCustCorporat 复核：交易 202/203 两次 `ok-save-navigation`（无 500/无 REQ-FAIL）→ 判定未复现（或在近期修复），research 文档 §6 已追加复核结论
+- ③screenshots 目录入库策略：.gitignore 追加 `scripts/screenshots/`（运行产物，代码仅写入不读取；check-ignore 生效）
+- 注：tmp 驱动修改（api_drill.py parse_result_json）属 gitignored 产物不入库；D1/D2 文档与 .gitignore 本次提交
+
 ## 2026-08-31 · Zcode (uara_V1.2) — 按 docs/orchestration 派发 A/C：P0-P5 驱动深化 + 链路文档
 - 完成：A（tmp/api_drill.py 229→395 行，函数外 helper 化）——P3 完整（tabs/菜单链→选择客户→query 0 行重试→首行 row_text→selector diff→verify_context overlay_absent→通用必填填充）、P4 完整（save_with_repair ≤3 → formErrors 检查 → 提交按钮探测[w/ 声明偏差：watcher 无 evaluate 动作，改用 semantic_snapshot 等价] → wf_submit_guard → 提交 → 流程轨迹断言）、P5 best-effort（撤销/页签清理/截图）；P0-P2 与信封处理未动
 - 完成：C（docs/superpowers/research/2026-08-31-api-drive-chain.md 216 行）——链路拓扑/接口契约（按代码事实：v2 成功=裸 JSON、错误=AppError 扩展信封；保留双兼容）/四组缺陷定案（4537ec4/2a119c5/0fa6a8e/c3453eb→20fb5a6）/脚本复用指南/运维（隧道、重启顺序、stale 锁、detach）/SUT 已知
