@@ -1,3 +1,10 @@
+## 2026-08-31 · Zcode (uara_V1.2) — 信贷二轮调研 + 动作层真机验证 + 编排 v2
+- 完成：A-G 湿测暴露 picker 异步时序缺陷并修复（b527841）——query/select 改 async 内部轮询（≤5s），真机复测 query 20 行 + select 回填 diff 正确
+- 完成：二轮实地调研（修改=新页签上下文编辑页 26 字段过半 disabled、日期 native setter+blur 可提交、登记日期=真实时间非营业日期、待办=todo-item 卡片列表、W5 向导两步+流程操作 select 选项随节点+流程提交/撤销不可逆、客户放大镜弹窗与授信选客户同构）`docs/superpowers/research/2026-08-31-credit-sut-research-round2.md`
+- 完成：Python Agent 动作层真机验证（tmp/wet_run_agent.py 直调 controller，无 LLM）——read_business_date / workspace_tabs / picker_dialog_query/select / scan / click_menu_item / click_button 全绿；实证 W0 缺口：login 引擎 placeholder 兜底能过但无法人显式步骤（select_option 按 label 在登录页 xpath-not-found）、首次点击非确定性
+- 完成：编排 v2（页面形态 4→6、W3' 上下文编辑页、W4.5 待办卡片、W5 不可逆守卫、H1-H5 改造点 + workflow args.tasks 兼容文件集分配表）`docs/superpowers/specs/2026-08-31-credit-agent-orchestration-v2.md`
+- 注意：H1-H5 未实现（下一批派发；_js_snippets.py/service.py 归主线程）；Z1/Z4 建议下一批启动；浏览器会话仍登录在该测试环境
+
 ## 2026-08-31 · Zcode (uara_V1.2) — 信贷系统实地调研 + Agent 工作流编排设计
 - 完成：A-G 落地改造点全部实现（4 路并行子智能体 + 主线程接线）：A scan_form 查询区无 form 配对兜底（QUERY_TOOLBAR_BARE_LABEL_FALLBACK）；B/C/D 新增 read_business_date / picker_dialog_query / picker_dialog_select / workspace_tabs 四动作（js_snippets/business_date+picker_confirm+workspace_tabs + _workspace.py，service.py 已注册）；E/G prompts 环境守卫 cue + 信贷业务速查 + 营业日期规则（agent-tools-common.md + agent-field-rules.md）；F page-locator-helpers.js 固定列克隆可见性优先（preferVisibleXpath，仅多命中且过滤有效时收窄，单命中字节不变）+ 重新生成 _locator_helpers_js.py
 - 验证：py_compile + 全链真实 import；lint 0/0；characterize-xpath-three-sources OK（11×6 严格一致）；scan 特征化 4/4；multi-save OK；verify-all 仅剩已知存量失败（export-v3 rect 42/115，非代码）
