@@ -1,4 +1,8 @@
-## 2026-09-01 · Zcode (uara_V1.2) — KB-4 湿测解封并全绿（VPN 是根因）+ A/B 对照定量实锤
+## 2026-09-01 · Zcode (uara_V1.2) — GET /api/v2/trajectories 新增 isExport 筛选
+- 完成：交易列表接口新增 `isExport` 查询参数（0=未推送 / 1=已推送 / 不传=全部），供前端「是否已推送」下拉筛选；route 校验非法值返 400，dao `list` / `listByFunction` / `countByRecordStatus`（stats 同步受筛）统一经 `applyListFilters` 加 `t.is_export` 条件。commit `924ecf8`（未推送）
+- 注意：前端已在传参，无需前端改动；其余调用点默认 null 不受影响
+
+
 - 完成：KB 召回湿测（交易 211/212）四项全绿——export_dicts 入库 / kb_dict(cstSt) 命中码表 / kb_flow 命中 nextBefore 闸门 / kb_field 命中依赖组；**此前 BLOCKED 根因=用户 VPN 开关导致 SUT 导航 5xx**（非 SUT 故障非代码），VPN 关闭后一次通过
 - 完成：KB-4 A/B 对照（tmp/kb_ab_drill.py，用信申请）——A 基线 err=3（查询区 disabled 三连）vs B 召回 err=0（卡片「仅能经引入」直接消费）；步数 9→6、耗时 68.2s→56.8s（-17%）
 - 完成：research 文档 §10 归档（含「SPA 字典缓存异步写入，export 前等首页渲染」新知识）
