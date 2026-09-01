@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- 2026-09-01: **推送菜单 D1+D2 设计** `docs/superpowers/specs/2026-09-01-menu-push-d1-d2-design.md`：按 v1.2 组包；POST/GET push-menu；状态落库；partner HTTP stub；短时 auto-sync 模拟完成。影响范围：设计文档，待实现计划。
+
 - 2026-08-31: **菜单落地 pageId 单一化设计** `docs/superpowers/specs/2026-08-31-menu-landing-pageid-design.md`：导入只入库 managePage（0/1）；录制 prepare 读到天元编号时回写功能落地 pageId；AILZ 不回写菜单。影响范围：设计文档，实现计划见 `docs/superpowers/plans/2026-08-31-menu-landing-pageid.md`。
 
 - 2026-08-31: **推送菜单 v1 样例契约** `docs/需求评审-菜单切换/push-menu-v1.sample.json`：用信贷系统真实数据节选，约定 menus[] 字段（`umlEcd`=`UML…`、`parentUmlEcd` 建树、`xpath` 含 `RES…` data-id、落地页 **`pageId` 单值字符串**——非数组；对应天元「组件编号」/managePage）。供自动化平台同事按契约开发接收接口。影响范围：仅文档样例，无运行时接口。
