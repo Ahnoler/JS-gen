@@ -1,0 +1,19 @@
+{
+  "flow": "登录与会话",
+  "aliases": ["登录", "W0"],
+  "menu_path": "#/login",
+  "biz_key_prefix": [],
+  "preconditions": ["测试环境：图形/手机验证码均不拦截（全留空）；法人下拉可留空", "生产环境转人工（环境开关）"],
+  "nodes": [
+    {"id": "login", "page": "登录页(#/login)", "fields": ["法人下拉(可空)", "用户名*", "密码*", "图形验证码(可空)", "手机验证码(可空)"], "buttons": ["登录"]},
+    {"id": "home", "page": "首页(#/home)", "structure": "会话倒计时+营业时间条 / 24 一级模块 / 任务三分卡 / 公告 / 日历 / 贷款统计卡"}
+  ],
+  "field_deps": [],
+  "state_actions": [],
+  "rules": [
+    {"keyword": "会话", "rule": "登录约 50 分钟倒计时，剩余<20min 告警；过期自动回登录页"},
+    {"keyword": "营业日期", "rule": "localStorage businessDate（滞后真实日期）为业务日期字段默认；登记日期类系统戳用真实时间"}
+  ],
+  "exceptions": [],
+  "source": "K1/K2 2026-08-31 + 多轮实测"
+}

@@ -1,0 +1,24 @@
+{
+  "flow": "审批待办",
+  "aliases": ["待办任务", "任务事项", "工作流审批"],
+  "menu_path": "工作台/任务事项/待办任务",
+  "biz_key_prefix": ["PMS=权限申请", "ZXJC=专项检查", "PJ=评级", "LS=履约", "YPSTFF=押品", "PRTNA=合作方", "ZG=资格", "GJ=归档", "EXIST=存量", "DGSX=对公授信"],
+  "preconditions": ["审批动作不可逆：提交/通过/退回须 LLM 声明意图 + wf_submit_guard 复核 + 审批历史回读"],
+  "nodes": [
+    {"id": "cards", "page": "待办任务页(#/portal/wfPendTask)", "enter": "菜单 工作台/任务事项/待办任务", "structure": "状态页签(待办/已办未结/已办已结) + 业务域树 + todo-item 卡片", "card_fields": ["【流程名】节点名", "业务主键", "上一节点处理人(姓名丨岗位)", "发起人(工号)", "审批中徽标"], "actions": ["处理", "转交", "流程跟踪"]},
+    {"id": "track", "page": "审批历史弹窗", "enter": "卡片点流程跟踪", "columns": ["节点名称", "处理日期", "处理人", "处理机构", "处理状态", "审批耗时", "操作", "审批意见"]}
+  ],
+  "field_deps": [],
+  "state_actions": [
+    {"entity": "审批任务", "status": "待办", "allow": ["处理", "转交", "流程跟踪"]},
+    {"entity": "审批任务", "status": "已办未结", "allow": ["流程跟踪"]},
+    {"entity": "审批任务", "status": "已办已结", "allow": ["流程跟踪"]}
+  ],
+  "rules": [
+    {"keyword": "退回", "rule": "节点名「退回_xxx」表示退回重办节点"},
+    {"keyword": "业务主键", "rule": "前缀编码定位业务域；主键+节点即可还原业务上下文"},
+    {"keyword": "转交", "rule": "标准待办再分配手段"}
+  ],
+  "exceptions": [],
+  "source": "K1 2026-08-31 + 交易 203-206"
+}

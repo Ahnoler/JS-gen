@@ -1,0 +1,15 @@
+{
+  "flow": "客户360视图",
+  "aliases": ["360视图", "客户视图"],
+  "menu_path": "对公客户管理列表页点客户名称按钮",
+  "biz_key_prefix": [],
+  "preconditions": ["URL 携带完整业务上下文（cstNo/cstSt/crdtNo/fcnScnEcd/avyEcd），不可手工构造，必须走 UI 链"],
+  "nodes": [
+    {"id": "view", "page": "客户360视图(FS00008308)", "enter": "列表点客户名称", "tabs": ["客户概况(集群指标/贷款产品持有/客户标签/风险预警/关联关系图谱)", "基本信息(约60只读字段)", "业务信息", "五级分类", "征信分析"]}
+  ],
+  "field_deps": [],
+  "state_actions": [],
+  "rules": [{"keyword": "只读", "rule": "360 视图全只读，用于核对建档/业务数据"}],
+  "exceptions": [],
+  "source": "K1 2026-08-31"
+}
