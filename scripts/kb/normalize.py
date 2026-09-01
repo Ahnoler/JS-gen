@@ -28,6 +28,12 @@ def _flatten_entries(raw):
     return []
 
 
+def _seq_key(seq):
+    """seq 排序键：纯数字按数值优先，非数字按字符串排在数字后，空 seq 排最后。"""
+    s = str(seq or '').strip()
+    return (0, int(s), '') if s.isdigit() else (1, 0, s)
+
+
 def normalize_raw(raw):
     entries = _flatten_entries(raw)
     by_type = {}
@@ -42,7 +48,7 @@ def normalize_raw(raw):
             "group": str(e.get("group") or "").strip(),
         })
     for tp in by_type:
-        by_type[tp].sort(key=lambda x: (x["seq"] == "", x["seq"]))
+        by_type[tp].sort(key=lambda x: _seq_key(x["seq"]))
     return {
         "by_type": by_type,
         "counts": {

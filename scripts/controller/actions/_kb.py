@@ -55,6 +55,8 @@ def _register_kb_actions(controller, browser_context):
             if len(prefs) == 1:
                 tp = prefs[0]
                 entries = by_type[tp]
+            elif len(prefs) > 1:
+                return _err("kb-dict-type-ambiguous | prefix matches: " + ", ".join(prefs))
         if entries is None:
             return _err("kb-dict-type-not-found | known: " + ", ".join(sorted(by_type)[:24]))
         if text.strip():

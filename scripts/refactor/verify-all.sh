@@ -131,3 +131,4 @@ if [ "$FAILED" -ne 0 ]; then
 fi
 echo "verify-all: ALL GREEN"
 run "characterize-kb-staging" "$PY" scripts/characterization/characterize-kb-staging.py
+run "characterize-kb-promote" "$PY" scripts/characterization/characterize-kb-promote.py

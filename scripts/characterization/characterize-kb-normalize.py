@@ -41,6 +41,18 @@ def main():
     partial = match_dict_for_options(["信贷正式客户", "企业客户"], by_type, min_score=0.5)
     assert partial["best"]["dict_type"] in ("cstSt", "cstTp") and partial["best"]["score"] < 1.0
 
+    # 4) seq 数值序：字符串字典序会把 "10" 排在 "2" 前，数值化后 2 在前；
+    #    数字类全部先于非数字类；非数字类按字符串序（空串 '' 最小，排最前）
+    raw_seq = {"k": [
+        {"text": "条目十", "value": "10", "dctTp": "tpX", "seq": "10"},
+        {"text": "条目二", "value": "2", "dctTp": "tpX", "seq": "2"},
+        {"text": "条目空", "value": "e", "dctTp": "tpX", "seq": ""},
+        {"text": "条目甲", "value": "a", "dctTp": "tpX", "seq": "甲"},
+    ]}
+    norm_seq = normalize_raw(raw_seq)
+    seq_order = [e["text"] for e in norm_seq["by_type"]["tpX"]]
+    assert seq_order == ["条目二", "条目十", "条目空", "条目甲"], seq_order
+
     print("ok: characterize-kb-normalize")
 
 

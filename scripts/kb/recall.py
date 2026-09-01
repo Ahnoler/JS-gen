@@ -12,19 +12,38 @@ def _terms(text):
     return out
 
 
+def _norm_name(s):
+    """名称归一：去全部空白（含全角空格），用于精确等名判断。"""
+    return ''.join(str(s or '').split())
+
+
 def find_flow_for_task(flows, task_text, page_hash=None):
     """按 hash 强匹配 → keywords 弱匹配 → 词条匹配三层打分。
 
     返回 (card, score)；无命中 (None, 0)。
+    - 查询词归一后长度 <2 → 直接 (None, 0)（防短查询误命中）。
     - hash 强匹配：card 的 hash_markers 任一是 page_hash 子串 → score=100；
       多卡命中取 markers 总长最长者（页面级 hash 段越长越特异）。
     - keywords 弱匹配：card 的 keywords 任一是 task_text 子串 → score += 关键词长度。
     - 词条匹配（向后兼容）：flow/aliases/nodes.page 词条命中 → score += 词条长度和。
+    - 精确等名：flow/alias 归一后与查询全等 → 该卡 score += 1000。
+    - 同分并列时优先 flow 名更短者（更特异）；仍并列保持先到先得。
     """
     text = str(task_text or '')
+    if len(text.strip()) < 2:
+        return (None, 0)
     phash = str(page_hash or '')
     best, best_score = None, 0
     best_hash_strength = -1
+
+    def _consider(card, score):
+        """同分并列取 flow 名更短者，严格更高分直接替换。"""
+        nonlocal best, best_score
+        if score > best_score or (
+                score == best_score and best is not None
+                and len(_norm_name(card.get('flow'))) < len(_norm_name(best.get('flow')))):
+            best, best_score = card, score
+
     for card in flows or []:
         # 1) hash 强匹配（score 恒 100，多卡命中取 markers 总长最长者）
         markers = [str(m) for m in (card.get('hash_markers') or []) if m]
@@ -36,24 +55,25 @@ def find_flow_for_task(flows, task_text, page_hash=None):
                     best, best_score = card, 100
                     best_hash_strength = strength
                 continue
-        # 2) keywords 弱匹配
+        # 2) keywords 弱匹配 + 精确等名加分
         score = 0
         for kw in card.get('keywords') or []:
             kw = str(kw or '')
             if kw and kw in text:
                 score += len(kw)
+        names = [_norm_name(card.get('flow'))] + [_norm_name(a) for a in (card.get('aliases') or [])]
+        exact = text.strip() and _norm_name(text) in names
         if score > 0:
-            if score > best_score:
-                best, best_score = card, score
+            _consider(card, score + (1000 if exact else 0))
             continue
-        # 3) 词条匹配（原有逻辑，向后兼容）
+        # 3) 词条匹配（原有逻辑，向后兼容）+ 精确等名加分
         terms = set()
         for n in [card.get('flow', '')] + list(card.get('aliases') or []) + [
                 node.get('page', '') for node in (card.get('nodes') or [])]:
             terms |= _terms(n)
         tscore = sum(len(t) for t in terms if t in text)
-        if tscore > best_score:
-            best, best_score = card, tscore
+        if tscore > 0 or exact:
+            _consider(card, tscore + (1000 if exact else 0))
     return (best, best_score) if best_score > 0 else (None, 0)
 
 

@@ -59,6 +59,18 @@ def main():
         flows, "在客户信息维护里维护草稿客户", page_hash="#/crgMgt/newCorpCrgMgtPg")
     assert h_hit2 is card and h_score2 == 100
 
+    # 精确等名优先：两卡 keywords 都含「客户」，查「客户建档」应命中等名卡而非客户360视图
+    cust_360 = {"flow": "客户360视图", "keywords": ["客户"], "nodes": []}
+    cust_jd = {"flow": "客户建档", "keywords": ["客户"], "nodes": []}
+    e_hit, e_score = find_flow_for_task([cust_360, cust_jd], "客户建档")
+    assert e_hit is cust_jd and e_score >= 1000, (e_hit, e_score)
+    # 同分并列：查「客户」两卡同分 → flow 名更短者（客户建档）优先
+    t_hit, t_score = find_flow_for_task([cust_360, cust_jd], "客户")
+    assert t_hit is cust_jd, (t_hit, t_score)
+    # 短查询（归一后长度 <2）直接不命中
+    s_hit, s_score = find_flow_for_task(flows, "客")
+    assert s_hit is None and s_score == 0
+
     text = flow_summary_text(card, limit=800)
     assert "【KB 流程知识】对公授信申请" in text and "nextBefore" in text and "撤销" in text and len(text) <= 820
     # 节点内 special_elements → 摘要含「特殊元素：Introduction」行
