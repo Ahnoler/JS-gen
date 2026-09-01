@@ -120,6 +120,7 @@ run "characterize-record-status" node scripts/characterization/characterize-reco
 run "characterize-menu-navigation" node scripts/characterization/characterize-menu-navigation.mjs
 run "characterize-page-bind" node scripts/characterization/characterize-page-bind.mjs
 run "characterize-kb-store" "$PY" scripts/characterization/characterize-kb-store.py
+run "characterize-kb-normalize" "$PY" scripts/characterization/characterize-kb-normalize.py
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
