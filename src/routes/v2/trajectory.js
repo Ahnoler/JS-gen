@@ -59,7 +59,7 @@ export default function (app) {
     }
   }));
 
-  /** List trajectories (paginated, filtered by functionId/keyword/recordStatus/batchTaskName). */
+  /** List trajectories (paginated, filtered by functionId/keyword/recordStatus/batchTaskName/isExport). */
   app.get('/api/v2/trajectories', asyncHandler(async (req, res) => {
     try {
       const {
@@ -72,6 +72,7 @@ export default function (app) {
         recordStatus,
         status,
         batchTaskName,
+        isExport,
       } = req.query;
       const statusRaw = recordStatus ?? status;
       const bad = trajectoryDao.invalidRecordStatuses(statusRaw);
@@ -80,6 +81,15 @@ export default function (app) {
           error: `Invalid recordStatus: ${bad.join(', ')}`,
           allowed: [...TRAJECTORY_RECORD_STATUSES],
         });
+      }
+      // isExport: '0' = not exported, '1' = exported, absent/empty = all
+      let isExportFilter = null;
+      if (isExport !== undefined && String(isExport).trim() !== '') {
+        const v = String(isExport).trim();
+        if (v !== '0' && v !== '1') {
+          return res.status(400).json({ error: `Invalid isExport: ${v}`, allowed: [0, 1] });
+        }
+        isExportFilter = Number(v);
       }
       const pagination = {
         page: +page || 1,
@@ -90,6 +100,7 @@ export default function (app) {
         recordStatus: statusRaw,
         batchTaskName: batchTaskName ?? null,
         paasUserId: req.paasUserId ?? null,
+        isExport: isExportFilter,
       };
       const result = functionId
         ? await trajectoryService.listByFunction(+functionId, pagination)

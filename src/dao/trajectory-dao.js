@@ -61,7 +61,7 @@ export function invalidRecordStatuses(raw) {
   )];
 }
 
-function applyListFilters(query, { keyword, recordStatus } = {}) {
+function applyListFilters(query, { keyword, recordStatus, isExport } = {}) {
   if (keyword && String(keyword).trim()) {
     const kw = `%${String(keyword).trim()}%`;
     query.where(function () {
@@ -71,6 +71,9 @@ function applyListFilters(query, { keyword, recordStatus } = {}) {
   const statuses = parseRecordStatuses(recordStatus);
   if (statuses) {
     query.whereIn('t.record_status', statuses);
+  }
+  if (isExport === 0 || isExport === 1) {
+    query.where('t.is_export', isExport);
   }
   return query;
 }
@@ -94,16 +97,17 @@ const RECORD_STATUS_STATS = ['draft', 'recording', 'failed', 'recorded', 'comple
  * @param {string|string[]|null} [options.recordStatus] Filter by record status
  * @param {string|null} [options.batchTaskName] Filter by batch task name
  * @param {number|null} [options.paasUserId] Filter by PaaS user ID
+ * @param {number|null} [options.isExport] Filter by export flag (0 = not exported, 1 = exported, null = all)
  * @returns {Promise<{ total: number, draft: number, recording: number, failed: number, recorded: number, completed: number }>} 各状态统计
  */
-export async function countByRecordStatus({ functionId = null, keyword = null, recordStatus = null, batchTaskName = null, paasUserId = null } = {}) {
+export async function countByRecordStatus({ functionId = null, keyword = null, recordStatus = null, batchTaskName = null, paasUserId = null, isExport = null } = {}) {
   const db = getDB();
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
   if (functionId != null && Number.isFinite(Number(functionId))) {
     base.where('t.function_id', Number(functionId));
   }
-  applyListFilters(base, { keyword, recordStatus });
+  applyListFilters(base, { keyword, recordStatus, isExport });
   applyBatchTaskNameFilter(base, batchTaskName);
   if (paasUserId) base.where('t.paas_user_id', paasUserId);
   const rows = await base
@@ -584,17 +588,18 @@ export async function getById(id) {
  * @param {string|string[]|null} [options.recordStatus] Filter by record status
  * @param {string|null} [options.batchTaskName] Filter by batch task name
  * @param {number|null} [options.paasUserId] Filter by PaaS user ID
+ * @param {number|null} [options.isExport] Filter by export flag (0 = not exported, 1 = exported, null = all)
  * @returns {Promise<{ rows: Array<object>, total: number, page: number, pageSize: number, stats: object }>} Paginated trajectory list with statistics
  */
 export async function listByFunction(functionId, {
-  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null,
+  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null, isExport = null,
 } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id')
     .where('t.function_id', functionId);
-  const query = applyListFilters(base, { keyword, recordStatus });
+  const query = applyListFilters(base, { keyword, recordStatus, isExport });
   applyBatchTaskNameFilter(query, batchTaskName);
   if (paasUserId) query.where('t.paas_user_id', paasUserId);
 
@@ -615,7 +620,7 @@ export async function listByFunction(functionId, {
     e.isExport = Number(e.isExport) ? 1 : 0;
     e.phaseCount = phaseCounts.get(Number(e.id)) || 0;
   }
-  const stats = await countByRecordStatus({ functionId, keyword, recordStatus, batchTaskName, paasUserId });
+  const stats = await countByRecordStatus({ functionId, keyword, recordStatus, batchTaskName, paasUserId, isExport });
   return { rows: entities, total, page, pageSize, stats };
 }
 
@@ -630,16 +635,17 @@ export async function listByFunction(functionId, {
  * @param {string|string[]|null} [options.recordStatus] Filter by record status
  * @param {string|null} [options.batchTaskName] Filter by batch task name
  * @param {number|null} [options.paasUserId] Filter by PaaS user ID
+ * @param {number|null} [options.isExport] Filter by export flag (0 = not exported, 1 = exported, null = all)
  * @returns {Promise<{ rows: Array<object>, total: number, page: number, pageSize: number, stats: object }>} Paginated trajectory list with statistics
  */
 export async function list({
-  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null,
+  page = 1, pageSize = 20, keyword, sortBy, order, recordStatus, batchTaskName = null, paasUserId = null, isExport = null,
 } = {}) {
   const db = getDB();
   const offset = (page - 1) * pageSize;
   const base = db({ t: TABLE })
     .leftJoin({ bj: 'batch_recording_job' }, 'bj.id', 't.batch_job_id');
-  const query = applyListFilters(base, { keyword, recordStatus });
+  const query = applyListFilters(base, { keyword, recordStatus, isExport });
   applyBatchTaskNameFilter(query, batchTaskName);
   if (paasUserId) query.where('t.paas_user_id', paasUserId);
 
@@ -659,7 +665,7 @@ export async function list({
     e.isExport = Number(e.isExport) ? 1 : 0;
     e.phaseCount = phaseCounts.get(Number(e.id)) || 0;
   }
-  const stats = await countByRecordStatus({ keyword, recordStatus, batchTaskName, paasUserId });
+  const stats = await countByRecordStatus({ keyword, recordStatus, batchTaskName, paasUserId, isExport });
   return { rows: entities, total, page, pageSize, stats };
 }
 
