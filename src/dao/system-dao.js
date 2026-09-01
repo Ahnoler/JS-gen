@@ -68,6 +68,11 @@ export function fromRaw(row) {
     menuXpath: n.menuXpath || '',
     unmatchedFlag: n.unmatchedFlag ?? 0,
     removedFlag: n.removedFlag ?? 0,
+    menuPushStatus: n.menuPushStatus || '',
+    menuPushVersion: Number(n.menuPushVersion) || 0,
+    menuPushAt: n.menuPushAt ?? null,
+    menuPushSyncedAt: n.menuPushSyncedAt ?? null,
+    menuPushError: n.menuPushError || '',
   };
 }
 
@@ -333,6 +338,11 @@ export async function create(data, db = null) {
     menuXpath: String(data.menuXpath ?? '').trim(),
     unmatchedFlag: data.unmatchedFlag ? 1 : 0,
     removedFlag: data.removedFlag ? 1 : 0,
+    menuPushStatus: data.menuPushStatus || '',
+    menuPushVersion: data.menuPushVersion ?? 0,
+    menuPushAt: data.menuPushAt ?? null,
+    menuPushSyncedAt: data.menuPushSyncedAt ?? null,
+    menuPushError: data.menuPushError || '',
   };
   if (!insert.systemId) {
     const { randomUUID } = await import('crypto');
@@ -357,6 +367,7 @@ export async function update(id, data, db = null) {
   const allowed = ['name', 'description', 'sortOrder'];
   allowed.push('umlEcd', 'pdCmptEcd', 'source', 'menuXpath', 'unmatchedFlag');
   allowed.push('removedFlag');
+  allowed.push('menuPushStatus', 'menuPushVersion', 'menuPushAt', 'menuPushSyncedAt', 'menuPushError');
   if (existing.type === NODE_TYPE.SYSTEM) allowed.push('url');
 
   const patch = {};
