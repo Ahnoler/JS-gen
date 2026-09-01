@@ -332,9 +332,47 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
             from ..kb.recall import find_flow_for_task, flow_summary_text
             if not heal_mode and kb_flow_inject_enabled():
                 match_text = (phase_task_text or '') + '\n' + (agent_task or '')[:400]
-                card, score = find_flow_for_task(kb_store.load_flows(), match_text)
+                # hash 强匹配线索：优先浏览器当前页 URL（含 location.hash 段）；
+                # 其次 instruction/business_data_ref 的页面线索键；都没有则 keyword-only。
+                page_hash = None
+                try:
+                    if browser_context is not None:
+                        _kb_page = await browser_context.get_current_page()
+                        page_hash = str(getattr(_kb_page, 'url', '') or '')
+                except Exception:
+                    page_hash = None
+                if not page_hash:
+                    _clue_sources = [instruction]
+                    if isinstance(business_data_ref, dict):
+                        _clue_sources.append(business_data_ref)
+                    for _src in _clue_sources:
+                        for _key in ('page_hash', 'pageHash', 'current_url', 'currentUrl', 'url'):
+                            _v = _src.get(_key) if isinstance(_src, dict) else None
+                            if _v:
+                                page_hash = str(_v)
+                                break
+                        if page_hash:
+                            break
+                if not page_hash:
+                    sys.stderr.write("kb_flow hash unavailable, keyword-only\n")
+                card, score = find_flow_for_task(kb_store.load_flows(), match_text, page_hash=page_hash or None)
                 if card:
                     summary = flow_summary_text(card)
+                    # 特殊元素空候选兜底：候选管线没注入（loaded: 0）但任务含「引入」时，
+                    # 把沉淀的操作组提示追加进摘要，让 LLM 看到正确入口不走盲点弯路。
+                    _se_empty = (
+                        special_element_candidates_store is not None
+                        and len(special_element_candidates_store) == 0
+                    )
+                    if _se_empty and '引入' in (phase_task_text or '') + (agent_task or ''):
+                        _se_hint = (
+                            '本流程存在已沉淀的引入操作组：优先点击页内「引入」按钮打开弹窗'
+                            '（弹窗标题含「引入」），按 查询→单选→确认 三段式执行'
+                        )
+                        summary = summary + '\n特殊元素兜底：' + _se_hint
+                        if business_data_ref is not None:
+                            business_data_ref['_kb_special_hint'] = _se_hint
+                        sys.stderr.write("kb_special_hint injected (special_element_candidates empty)\n")
                     agent_task = agent_task + '\n\n' + summary
                     if business_data_ref is not None:
                         business_data_ref['_kb_flow_name'] = card.get('flow', '')

@@ -1,6 +1,8 @@
 {
   "flow": "对公用信申请",
   "aliases": ["用信申请", "对公用信管理"],
+  "hash_markers": ["crutMgt", "corpCrutAplyMgtPg"],
+  "keywords": ["用信申请", "引入", "用信业务流水号"],
   "menu_path": "用信管理/对公用信管理/对公用信申请",
   "biz_key_prefix": ["YXPC=用信业务流水号前缀"],
   "preconditions": ["授信批复生效后才可用信（额度管控冻结/解冻流程佐证）"],

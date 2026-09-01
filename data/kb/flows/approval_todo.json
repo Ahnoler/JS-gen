@@ -1,6 +1,8 @@
 {
   "flow": "审批待办",
   "aliases": ["待办任务", "任务事项", "工作流审批"],
+  "hash_markers": ["wfPendTask"],
+  "keywords": ["待办", "审批", "流程跟踪", "业务主键", "转交"],
   "menu_path": "工作台/任务事项/待办任务",
   "biz_key_prefix": ["PMS=权限申请", "ZXJC=专项检查", "PJ=评级", "LS=履约", "YPSTFF=押品", "PRTNA=合作方", "ZG=资格", "GJ=归档", "EXIST=存量", "DGSX=对公授信"],
   "preconditions": ["审批动作不可逆：提交/通过/退回须 LLM 声明意图 + wf_submit_guard 复核 + 审批历史回读"],

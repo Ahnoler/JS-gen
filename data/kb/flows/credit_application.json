@@ -1,6 +1,8 @@
 {
   "flow": "对公授信申请",
   "aliases": ["新增对公授信管理", "授信申请", "对公授信"],
+  "hash_markers": ["crgMgt", "newCorpCrgMgtPg"],
+  "keywords": ["授信申请", "授信额度", "新增对公授信管理"],
   "menu_path": "授信管理/对公授信管理/新增对公授信管理",
   "biz_key_prefix": [],
   "preconditions": [

@@ -1,6 +1,8 @@
 {
   "flow": "对公客户建档",
   "aliases": ["对公客户管理", "客户建档", "新增客户"],
+  "hash_markers": ["cstMgt"],
+  "keywords": ["草稿客户", "信贷潜在客户", "对公客户管理", "客户信息维护", "法定代表人引入"],
   "menu_path": "客户管理/客户信息维护/对公客户管理",
   "biz_key_prefix": [],
   "preconditions": [
@@ -10,7 +12,7 @@
   "nodes": [
     {"id": "list", "page": "对公客户管理列表页", "enter": "菜单 客户管理/客户信息维护/对公客户管理", "buttons": ["查询", "重置", "新增", "修改", "查看", "撤销", "流程轨迹"]},
     {"id": "check_drawer", "page": "新增客户校验抽屉", "enter": "点击新增", "fields": ["客户状态(默认信贷预客户)", "对公客户类型*", "证件类型*(+OCR识别,禁入)", "客户名称*", "证件号码*"], "buttons": ["保存", "取消"]},
-    {"id": "edit_page", "page": "客户编辑上下文页(hostCstmgrCrtCpctInf)", "enter": "校验抽屉保存后跳转", "note": "26字段过半disabled；日期 native setter+blur 提交；登记日期=真实时间非营业日期", "special_elements": [{"tag": "Introduction", "note": "法定代表人引入操作组（特殊元素库 special_element_tag=4）——若特殊元素候选 hint 提供 id，用 use_special_element(id) 执行，不要手工多步操作"}]},
+    {"id": "edit_page", "page": "客户编辑上下文页(hostCstmgrCrtCpctInf)", "enter": "校验抽屉保存后跳转", "note": "26字段过半disabled；日期 native setter+blur 提交；登记日期=真实时间非营业日期；法定代表人引入：字段旁按钮可能 disabled，实际入口是页内「引入」按钮（弹窗标题含「引入」），打开后按 查询→单选→确认 三段式", "special_elements": [{"tag": "Introduction", "note": "法定代表人引入操作组（特殊元素库 special_element_tag=4）——若特殊元素候选 hint 提供 id，用 use_special_element(id) 执行，不要手工多步操作"}]},
     {"id": "view360", "page": "客户360视图(FS00008308)", "enter": "列表点客户名称按钮", "tabs": ["客户概况", "基本信息", "业务信息", "五级分类", "征信分析"]}
   ],
   "field_deps": [

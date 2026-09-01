@@ -12,21 +12,48 @@ def _terms(text):
     return out
 
 
-def find_flow_for_task(flows, task_text):
-    """按卡片 flow/aliases/nodes.page 词条在任务文本中的出现打分。
+def find_flow_for_task(flows, task_text, page_hash=None):
+    """按 hash 强匹配 → keywords 弱匹配 → 词条匹配三层打分。
 
-    返回 (card, score)；无命中 (None, 0)。score=命中词条长度和（倾向长名优先）。
+    返回 (card, score)；无命中 (None, 0)。
+    - hash 强匹配：card 的 hash_markers 任一是 page_hash 子串 → score=100；
+      多卡命中取 markers 总长最长者（页面级 hash 段越长越特异）。
+    - keywords 弱匹配：card 的 keywords 任一是 task_text 子串 → score += 关键词长度。
+    - 词条匹配（向后兼容）：flow/aliases/nodes.page 词条命中 → score += 词条长度和。
     """
     text = str(task_text or '')
+    phash = str(page_hash or '')
     best, best_score = None, 0
+    best_hash_strength = -1
     for card in flows or []:
+        # 1) hash 强匹配（score 恒 100，多卡命中取 markers 总长最长者）
+        markers = [str(m) for m in (card.get('hash_markers') or []) if m]
+        if phash and markers:
+            hits = [m for m in markers if m in phash]
+            if hits:
+                strength = sum(len(m) for m in markers)
+                if strength > best_hash_strength:
+                    best, best_score = card, 100
+                    best_hash_strength = strength
+                continue
+        # 2) keywords 弱匹配
+        score = 0
+        for kw in card.get('keywords') or []:
+            kw = str(kw or '')
+            if kw and kw in text:
+                score += len(kw)
+        if score > 0:
+            if score > best_score:
+                best, best_score = card, score
+            continue
+        # 3) 词条匹配（原有逻辑，向后兼容）
         terms = set()
         for n in [card.get('flow', '')] + list(card.get('aliases') or []) + [
                 node.get('page', '') for node in (card.get('nodes') or [])]:
             terms |= _terms(n)
-        score = sum(len(t) for t in terms if t in text)
-        if score > best_score:
-            best, best_score = card, score
+        tscore = sum(len(t) for t in terms if t in text)
+        if tscore > best_score:
+            best, best_score = card, tscore
     return (best, best_score) if best_score > 0 else (None, 0)
 
 
@@ -45,6 +72,13 @@ def flow_summary_text(card, limit=800):
         lines.append('字段依赖：{} → {}'.format(d.get('if', ''), ', '.join(d.get('then') or [])))
     for r in card.get('rules') or []:
         lines.append('规则[{}]：{}'.format(r.get('keyword', ''), r.get('rule', '')))
+    for se in card.get('special_elements') or []:
+        if isinstance(se, dict):
+            lines.append('特殊元素：{} — {}'.format(se.get('tag', ''), se.get('note', '')))
+    for node in card.get('nodes') or []:
+        for se in (node.get('special_elements') if isinstance(node, dict) else None) or []:
+            if isinstance(se, dict):
+                lines.append('特殊元素：{} — {}'.format(se.get('tag', ''), se.get('note', '')))
     text = '\n'.join(lines)
     if len(text) > limit:
         text = text[:limit] + '\n…(截断)'
