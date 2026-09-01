@@ -44,6 +44,8 @@ def main():
         "_JS_CLICK_BUTTON_IN_CONTAINER",
         "G1 container-scope-first",
         "ok-container:",
+        "ok-click:",
+        "div.todo-item-action",
         "JS_CLICK_ICON_BUTTON, button_text",
     ])
     # G3: picker select refill verification (JS + action layer).

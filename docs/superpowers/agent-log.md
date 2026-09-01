@@ -1,3 +1,15 @@
+## 2026-09-02 · Zcode (uara_V1.2) — KB-I5 湿测六/七轮：S9 审批驱动 + 引擎纯自跑全链闭环
+- 完成：S9 审批驱动（_misc.py r6/r6b/r6c：点击解析器 document 作用域+`div.todo-item-action` 候选→click_button[处理]=ok-click；label→trigger 选第一个可见 input；**r6c=click_button(树节点文本) 对关闭 tree-popover 自开+勾选兜底**）——EDDJ20260902024033 审批通过（第六轮）
+- 完成：**第七轮引擎纯自跑全链闭环（292s）**：新草稿 EDDJ20260902024034（4万）新增→分页选盛达→radio→确定跳向导→保存→意见提交→**r6c 树勾选纯引擎一次命中（无「请选择一个审批人」拒）**→确定→待办卡处理→审批同意→流程提交→确认→**审批通过**；终态 3 行全绿（024034/024033/024001）；tid 全 detach；截图 tmp/e2e/shots/kb_i5_全链复验_审批通过.png
+- 根因定案：流程选人树勾选需**真实 check 事件**（select_tree_option $emit('input') 不写 nextNodeAprvPsnList → 确定被拒）；r6c 已闭环，无需改 select_tree_option
+- 注意：r6c 多轮实证路径=关闭 popover 自开+勾选；分页下拉 5s 预算~11 页（关/开续翻）；S9-done 判据建议用 list_todo_cards 而非快照文本。pin：characterize-click-scope-picker-login 扩 ok-click/div.todo-item-action；全套 8 pin 绿。本批 commits 未推送
+
+## 2026-09-02 · Zcode 执行子智能体 — KB-I5 湿测第六轮：S9 审批驱动闭环成功（EDDJ20260902024033 审批通过；未 commit）
+- 完成：**S9 审批闭环达成**——待办卡「处理」(div.todo-item-action) 经 r6 通用点击解析器命中（ok-click:处理）；024033 卡任务节点=发起人 → 段A 发起人提交（下一步/流程操作=提交/流程提交/流程选人 701994/确 定）+ 段B 审批人同意（审批/流程操作=同意/流程提交/「到此结束」msgbox=「确定」无空格写法）→ **额度冻结-新版两行终态均审批通过**（024033 5万 + 024001 10万），截图 tmp/e2e/shots/kb_i5_审批通过.png；报告 tmp/kb_i5_frz_report5.md；tid=288/290/291 均 stop/detach
+- 完成：`_misc.py` 三项修复（未 commit）——r6 通用点击解析器（无 overlay 时 document 作用域+页面级 ok-click: 返回串）；r6b label→trigger 选第一个**可见**非 hidden input（TsscMultiTree 隐藏搜索框在前致 miss）；r6c click_button(树节点文本) 对关闭 tree-popover 自开 popover+勾 checkbox 兜底（预设勾选态双击保证 check 事件收尾）；pin characterize-click-scope-picker-login.py 加 ok-click:/div.todo-item-action 断言，py_compile+2 pins 全绿
+- 关键实证：流程选人「请选择一个审批人」根因=`formData.nextNodeAprvPsnList` 仅 el-tree 真实 check 事件（handleCheckClick）写入，select_tree_option `$emit('input')` 不触发 → 确定恒被拒；el-tree checkOnClickNode=true 点根节点级联全选；「到此结束」msgbox 按钮=「确定」（流程选人弹窗才是「确 定」）；发起人提交后待办卡标题「发起人」→「审批人」（bizPk 不变，同账号可连续两段）
+- 注意：r6c 引擎路径未在纯引擎会话复验（段A 树勾选为 CDP 事件链实验完成；024033 已批无待办卡可测）——下一轮新申请单验证 r6c + 知识卡 limit.json 审批条目按报告建议回灌（msgbox 按钮写法/check 事件/卡标题变化）
+
 ## 2026-09-02 · Zcode (uara_V1.2) — KB-I5 湿测五轮收敛：冻结申请全链贯通（引擎提交进流程）+ 6 项新修复
 - 完成：引擎实机湿测（确定性驱动 tmp/kb_i5_frz_drill.py）五轮收敛——**冻结申请 S1-S8/S10 全链贯通**（导航/KB 召回/查询/分页下拉选盛达/radio EDBH/确定建草稿/两步向导填表保存/意见提交/流程选人树选中 客户经理-黄某某/草稿 EDDJ20260902024033 已提交进流程=审批中），引擎提交侧闭环达成
 - 完成：湿测驱动的 6 项修复（commit `f7806c8` 未推送）：N1 filterable 键入 300ms 轮询(1.8s 预算窗)、N2 radio 容器作用域+rowVisible+err-no-row-match（0 行不再假 ok）、N3 picker 支持 el-drawer、N4 JS_SELECT_PAGED_TRAVERSE 分页下拉遍历（实证 findCoreInfGroup pageSize:5→200 服务端照单全收，盛达 24/29 页；paged 优先于 filterable-typed）、N5 _resolve_control xpath-not-found 早退绕过 → 先 trigger 再选值；容器/树点击均升级 mousedown→mouseup→click 链（Element UI radio/select 真实事件依赖）

@@ -69,7 +69,6 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
     if (!want) return 'miss';
     const overlays = [...document.querySelectorAll('.el-dialog, .el-drawer, .el-message-box')]
         .filter((d) => d.offsetParent !== null && d.getClientRects().length > 0);
-    if (!overlays.length) return 'miss';
     // Topmost visible overlay wins (highest z-index, like _misc overlay scan).
     let scope = null;
     let bestZ = -1;
@@ -77,40 +76,167 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
         const z = parseInt(getComputedStyle(o).zIndex || '0', 10) || 0;
         if (z >= bestZ) { bestZ = z; scope = o; }
     }
-    if (!scope) return 'miss';
+    // KB-I5 r6: generic click resolver — with no visible overlay the scope is
+    // the whole document, so non-button affordances on plain pages (todo-card
+    // 处理 = div.todo-item-action) are reachable via click_button too.
+    const inContainer = !!scope;
+    if (!scope) scope = document;
+    const candidates = inContainer
+        ? 'button, .el-button, a, label.el-radio, .el-radio, label.el-checkbox, .el-checkbox, .el-tree-node__content'
+        : 'button, .el-button, [role="button"], div.todo-item-action, .el-radio, .el-checkbox, .el-tree-node__content';
     // KB-I5 r4: clickable candidates are not only buttons — Element UI radios
     // (el-select options / el-table radio columns / radio labels) also carry
     // actionable text and only respond to the full mousedown event chain.
-    const matches = [];
-    for (const b of scope.querySelectorAll(
-        'button, .el-button, a, label.el-radio, .el-radio, label.el-checkbox, .el-checkbox'
-    )) {
-        if (b.offsetParent === null || b.disabled) continue;
-        if (b.closest('.el-table__body-wrapper')) continue;
-        const t = norm(b.innerText || b.textContent);
-        if (!t || t.length > 40) continue;
-        if (t === want || (t.includes(want) && !want.includes(t))) {
-            matches.push({ el: b, text: t });
+    const scan = (root, loose) => {
+        const ms = [];
+        for (const b of root.querySelectorAll(candidates)) {
+            if (b.offsetParent === null || b.disabled) continue;
+            if (b.closest('.el-table__body-wrapper')) continue;
+            const t = norm(b.innerText || b.textContent);
+            if (!t || t.length > 40) continue;
+            if (loose) {
+                // container branch keeps its historical loose match (includes)
+                if (t === want || (t.includes(want) && !want.includes(t))) ms.push({ el: b, text: t });
+            } else if (t === want) {
+                // page-level branch: exact text match only
+                ms.push({ el: b, text: t });
+            }
+        }
+        return ms;
+    };
+    let matches = scan(scope, inContainer);
+    // KB-I5 r6: TsscMultiTree / el-select pickers render their option panel in a
+    // body-attached popover OUTSIDE the dialog DOM — scan visible poppers too
+    // when the dialog itself has no match.
+    if (!matches.length) {
+        const poppers = [...document.querySelectorAll(
+            '.el-popover, .el-popper, .el-select-dropdown, .tree-popover')]
+            .filter((p) => p.offsetParent !== null && p.getClientRects().length > 0);
+        for (const pop of poppers) {
+            matches = scan(pop, inContainer);
+            if (matches.length) break;
+        }
+    }
+    // KB-I5 r6: click_button('<字段label>') with no button/option match opens the
+    // labelled field's picker trigger (tree-select / el-select) so the popover
+    // stays open for a follow-up click_button('<option>').
+    if (!matches.length) {
+        const labels = scope.querySelectorAll('.el-form-item__label');
+        for (const l of labels) {
+            if (norm(l.textContent) !== want) continue;
+            const item = l.closest('.el-form-item');
+            // KB-I5 r6b: TsscMultiTree renders a hidden search input BEFORE the
+            // visible display input — the first input has offsetParent===null, so
+            // only choosing item.querySelector('input') skips the field entirely.
+            // Prefer the el-select trigger, then the first VISIBLE non-hidden input.
+            const trigger = item && (item.querySelector('.el-select .el-input__inner')
+                || [...item.querySelectorAll('input')].find(
+                    (i) => i.type !== 'hidden' && i.offsetParent !== null)
+                || item.querySelector('input'));
+            if (trigger && (trigger.offsetParent !== null || trigger.getClientRects().length > 0)) {
+                trigger.scrollIntoView({ block: 'center', behavior: 'instant' });
+                const fireT = (type) => trigger.dispatchEvent(
+                    new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+                );
+                fireT('mousedown');
+                await new Promise((r) => setTimeout(r, 40));
+                fireT('mouseup');
+                await new Promise((r) => setTimeout(r, 40));
+                fireT('click');
+                return inContainer ? ('ok-container:' + want) : ('ok-click:' + want);
+            }
+        }
+    }
+    // KB-I5 r6c: tree node matched inside a CLOSED tree-popover (trigger never
+    // opened / popover re-hidden by a race). Open the owning field's visible
+    // trigger, wait for the popover to render, then toggle the node's checkbox.
+    // TsscMultiTree list (nextNodeAprvPsnList) is only written by the real
+    // check event — handleCheckClick — never by $emit('input').
+    if (!matches.length) {
+        const hiddenNodes = [...scope.querySelectorAll('.el-tree-node')]
+            .filter((n) => n.offsetParent === null);
+        const hn = hiddenNodes.find((n) => {
+            const c = n.querySelector('.el-tree-node__content');
+            return c && norm(c.textContent) === want;
+        });
+        if (hn) {
+            const popper = hn.closest('.el-popover, .el-popper, .tree-popover');
+            const item = popper && popper.closest('.el-form-item');
+            const trigger = item && [...item.querySelectorAll('input')].find(
+                (i) => i.type !== 'hidden' && i.offsetParent !== null);
+            if (trigger) {
+                const wasChecked = hn.classList.contains('is-checked');
+                const ft = (el, type) => el.dispatchEvent(
+                    new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+                );
+                trigger.scrollIntoView({ block: 'center', behavior: 'instant' });
+                ft(trigger, 'mousedown');
+                await new Promise((r) => setTimeout(r, 40));
+                ft(trigger, 'mouseup');
+                await new Promise((r) => setTimeout(r, 40));
+                ft(trigger, 'click');
+                await new Promise((r) => setTimeout(r, 300));
+                const treeNow = hn.closest('.el-tree');
+                const nodeNow = treeNow && [...treeNow.querySelectorAll('.el-tree-node')].find((n) => {
+                    const c = n.querySelector('.el-tree-node__content');
+                    return c && norm(c.textContent) === want;
+                });
+                if (nodeNow) {
+                    const cb = nodeNow.querySelector('.el-checkbox');
+                    const tgt = cb || nodeNow.querySelector('.el-tree-node__content') || nodeNow;
+                    const fire2 = (type) => tgt.dispatchEvent(
+                        new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+                    );
+                    fire2('mousedown');
+                    await new Promise((r) => setTimeout(r, 40));
+                    fire2('mouseup');
+                    await new Promise((r) => setTimeout(r, 40));
+                    fire2('click');
+                    if (wasChecked) {
+                        // preset-checked node: first click toggled OFF — click again
+                        // so the node ends checked and the check event carries it.
+                        await new Promise((r) => setTimeout(r, 150));
+                        fire2('mousedown');
+                        await new Promise((r) => setTimeout(r, 40));
+                        fire2('mouseup');
+                        await new Promise((r) => setTimeout(r, 40));
+                        fire2('click');
+                    }
+                    return inContainer ? ('ok-container:' + want) : ('ok-click:' + want);
+                }
+                return inContainer ? ('ok-container:' + want) : ('ok-click:' + want);
+            }
         }
     }
     if (!matches.length) return 'miss';
     const exact = matches.filter((m) => m.text === want);
     const pool = exact.length ? exact : matches;
-    const target = pool[0].el;
+    let hit = pool[0];
+    let target = hit.el;
+    // KB-I5 r6: el-tree nodes with show-checkbox — clicking the label span only
+    // highlights; the node's checkbox is what registers the selection. Prefer
+    // the checkbox inside the matched .el-tree-node__content.
+    if (target.classList.contains('el-tree-node__content')) {
+        const cb = target.querySelector('.el-checkbox')
+            || (target.parentElement && target.parentElement.querySelector(':scope > .el-checkbox'));
+        const lbl = target.querySelector('.el-tree-node__label');
+        if (cb) target = cb;
+        else if (lbl) target = lbl;
+    }
     target.scrollIntoView({ block: 'center', behavior: 'instant' });
-    // KB-I5 round 4: Element UI widgets (el-select, el-table radios, drawer
-    // confirm buttons) need the real mousedown -> mouseup -> click sequence;
-    // a synthetic single click() leaves Vue models un-updated (drawers stay
-    // open after 确定/保存). Dispatch the full chain with 30ms gaps.
+    // Element UI widgets (el-select, el-table radios, drawer confirm buttons,
+    // todo-card action divs) need the real mousedown -> mouseup -> click
+    // sequence; a synthetic single click() leaves Vue models un-updated.
+    // KB-I5 r6: gaps widened 30ms -> 40ms per pin spec.
     const fire = (type) => target.dispatchEvent(
         new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
     );
     fire('mousedown');
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((r) => setTimeout(r, 40));
     fire('mouseup');
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((r) => setTimeout(r, 40));
     fire('click');
-    return 'ok-container:' + pool[0].text;
+    return inContainer ? ('ok-container:' + hit.text) : ('ok-click:' + hit.text);
 }'''
 
 
@@ -284,7 +410,10 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
             )
             sys.stderr.flush()
             container_result = ''
-        if isinstance(container_result, str) and container_result.startswith('ok-container:'):
+        if isinstance(container_result, str) and (
+            container_result.startswith('ok-container:')
+            or container_result.startswith('ok-click:')
+        ):
             result = container_result
         else:
             result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
