@@ -14,6 +14,12 @@
 - 验证：6 个 form 特征化 + xpath-three-sources（11×6）OK；verify-all 唯一失败仍为已知存量 export-v3（远程库数据漂移）；真机 login/picker 链路全绿
 - 注意：编排 v2 的 H 系列全部落地；W5 演练只到提交流程步之前，流程提交/撤销仅在显式授权下执行；Z1/Z4（semantic_snapshot/verify_context）待下一批
 
+## 2026-09-01 · Zcode (uara_V1.2) — 业务流程知识库调研（K1/K2）+ KB v1 设计
+- 完成：K1 computer-use 业务流实地调研（六条业务流节点图/状态×动作矩阵/隐性规则：标志→明细依赖、360 URL 上下文契约、业务主键前缀表、nextBefore 风控闸门实证）——tmp/k1_notes.md（142 行）
+- 完成：K2 平台知识形态调研——四层现成来源（localStorage vue_Tansun_dict 1333 字典类型/系统树 menuXpath/轨迹定位器链/business-data 字段映射）+ 五条缺口——tmp/k2_notes.md（103 行）
+- 完成：KB v1 设计（docs/superpowers/specs/2026-09-01-credit-knowledge-base-design.md）——五层知识库（值语义/导航/序列/字段映射/流程依赖）+ 采集管线 P1-P4 + kb_* 召回动作 + KB-1..4 实施批次
+- 注意：设计待用户批准后派发实施；授信表单分区因 nextBefore 闸门未采到（需正式客户补采）；字典归一映射表是 KB-1 人工确认点
+
 ## 2026-09-01 · Zcode (uara_V1.2) — P4 守卫路径闭环定案
 - 完成：P4 守卫路径闭环（交易 203/205/206）——①真实缺口=驱动 parse_result_json 未剥离 watcher result 信封（恒判 0 行），修复后 P3 首次真通（row_count=20→首行 select→changed 回填）；②全量 DIAG 定案：新增对公授信管理默认=列表页（8 按钮无保存/提交），选择客户回填列表查询区，系统不自动开表单——click_save 守卫判 query UI 拒绝为**正确防御**；③补「点新增」步后=抽屉表单链（overlay drawer→选择客户回填 OK→表单态未达）→ 守卫仍正确拒绝
 - 结论：P4 守卫侧无缺陷（205/206 双轮 100% 正确）；剩余差异=业务流图谱（新增→抽屉→保存/提交 多步链）留作编排 v2 W3' 补充（非缺陷）；research 文档新增 §9 定案
