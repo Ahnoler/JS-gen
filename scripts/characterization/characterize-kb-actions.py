@@ -5,9 +5,24 @@
 """
 import asyncio
 import os
+import shutil
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# 隔离：KB 数据重定向到临时目录，绝不读写真实 data/kb/（store.py 在 import 期读 KB_DATA_DIR）。
+_tmp_kb = tempfile.mkdtemp(prefix="kb-actions-")
+os.environ["KB_DATA_DIR"] = _tmp_kb
+# flows/*.json 与 dict_alias.json 是入库 fixture，只读复制进临时目录供召回测试使用
+_src_kb = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                       "data", "kb")
+if os.path.isdir(os.path.join(_src_kb, "flows")):
+    shutil.copytree(os.path.join(_src_kb, "flows"), os.path.join(_tmp_kb, "flows"))
+for _name in ("dict_alias.json", "field_map.json"):
+    _p = os.path.join(_src_kb, _name)
+    if os.path.isfile(_p):
+        shutil.copy2(_p, os.path.join(_tmp_kb, _name))
 
 
 class FakeCtx:
@@ -62,8 +77,5 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        from scripts.kb import store as _kb_store
-        try:
-            os.remove(_kb_store.DICTS_FILE)
-        except OSError:
-            pass
+        # 临时目录留给系统清理，绝不触碰真实 data/kb/
+        shutil.rmtree(_tmp_kb, ignore_errors=True)
