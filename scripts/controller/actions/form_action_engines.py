@@ -62,7 +62,7 @@ from .form_scan_utils import (
 from .form_autofill import FormAutofillEngine
 from .result_protocol import err_with, ok_marked, affordances
 from .select_match import suggest_field_for_value
-from .replay_timing import WAIT_500_MS, WAIT_3000_MS
+from .replay_timing import WAIT_500_MS, WAIT_3000_MS, budget_for
 
 # SB：fill_form_field 确定性守卫总开关（Z2 严格解析闸 + Z4 弹层作用域闸）。
 # 置 False 可一键回退为守卫前的盲填行为。
@@ -621,6 +621,349 @@ class FillEngine(_FormActionEngineBase):
 
 
 
+# N1 filterable-typed fallback: remote/filterable el-select (信贷系统「选择冻结额度」
+# 抽屉的客户号) only renders the default first-page options in the DOM — the target
+# option (盛达) is absent and option-not-found fires. Real interaction = type a
+# keyword into the trigger input (native setter + input event → Vue filter /
+# remote fetch), wait, then click the filtered item. Runs ONLY after the plain
+# pick path already failed (option-not-found) — never on the success path.
+JS_SELECT_FILTERABLE_TYPED = r'''async (optionText) => {
+    const want = String(optionText == null ? '' : optionText).trim();
+    if (!want) return 'filterable-empty-option';
+    const setNativeValue = (input, value) => {
+        const proto = input instanceof HTMLTextAreaElement
+            ? window.HTMLTextAreaElement.prototype
+            : window.HTMLInputElement.prototype;
+        const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+        if (desc && desc.set) desc.set.call(input, value);
+        else input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const visibleDropdown = () => [...document.querySelectorAll('.el-select-dropdown')]
+        .find((dd) => {
+            if (dd.classList.contains('is-hidden')) return false;
+            const st = getComputedStyle(dd);
+            if (st.display === 'none' || st.visibility === 'hidden') return false;
+            return dd.offsetParent !== null || dd.getBoundingClientRect().width > 0;
+        });
+    const trigger = window.__last_select_trigger || null;
+    if (!trigger || !document.contains(trigger)) return 'filterable-no-trigger';
+    // Re-open the dropdown if a prior reset closed it. Element UI binds the
+    // toggle on the .el-select WRAPPER (@click.stop="toggleMenu"), not the
+    // inner input — dispatching only on the input used to fail to open the
+    // dropdown (frz round-3: poll saw 0 items, remote search never fired
+    // because handleQueryChange runs with visible=false). Try wrapper first,
+    // then the input.
+    const openDropdown = () => {
+        const wrap = trigger.closest('.el-select') || trigger;
+        wrap.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        wrap.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        wrap.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        trigger.click();
+    };
+    if (!visibleDropdown()) openDropdown();
+    // Clear before typing (每次键入前清空), then inject the keyword via the
+    // native setter so Vue's filterable/remote filter actually fires.
+    setNativeValue(trigger, '');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    setNativeValue(trigger, want);
+    // Filterable/remote filtering is async (remote search round-trip) — poll the
+    // visible dropdown items every 300ms up to 5s; first item containing the
+    // keyword is clicked. A single 600ms read used to race the remote fetch and
+    // return an empty list (frz round-2 N1 failure). 1.8s cap: the watcher
+    // action budget for select_option is 5s (replay_timing
+    // DEFAULT_ACTION_BUDGET_S) and pre-fallback work (reset/scan/plain pick)
+    // already consumes ~3s — success returns as soon as the item appears;
+    // only the no-match path consumes the full window.
+    const readVisibleItems = () => {
+        const dd = visibleDropdown();
+        const items = dd
+            ? [...dd.querySelectorAll('.el-select-dropdown__item')]
+            : [...document.querySelectorAll('.el-select-dropdown__item')];
+        return items.filter(
+            (it) => it.offsetParent !== null || it.getBoundingClientRect().width > 0
+        );
+    };
+    const deadline = Date.now() + 1800;
+    let seen = 0;
+    let reopened = 0;
+    // Diagnostic (frz round-3): record whether the remote search actually
+    // fires — capture fetch/XHR URLs issued during the poll window.
+    if (!window.__filterable_net) {
+        window.__filterable_net = [];
+        const oOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function (m, u) {
+            try { window.__filterable_net.push(String(u).slice(0, 120)); } catch (e) {}
+            return oOpen.apply(this, arguments);
+        };
+        const oFetch = window.fetch;
+        if (oFetch) {
+            window.fetch = function (input) {
+                try { window.__filterable_net.push(String(input && input.url || input).slice(0, 120)); } catch (e) {}
+                return oFetch.apply(this, arguments);
+            };
+        }
+    }
+    const t0 = Date.now();
+    window.__filterable_net.length = 0;
+    while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        // Keep the dropdown open — a re-render/reset during the remote round
+        // trip may close it; remote filtering only applies while visible.
+        if (!visibleDropdown() && reopened < 2) { openDropdown(); reopened += 1; }
+        const visibleItems = readVisibleItems();
+        seen = Math.max(seen, visibleItems.length);
+        const hit = visibleItems.find(
+            (it) => ((it.textContent || '').trim()).indexOf(want) !== -1
+        );
+        if (hit) {
+            hit.scrollIntoView?.({ block: 'center', behavior: 'instant' });
+            hit.click();
+            return 'ok-filterable-typed:' + (hit.textContent || '').trim();
+        }
+    }
+    const texts = readVisibleItems().slice(0, 8)
+        .map((it) => (it.textContent || '').trim()).filter(Boolean);
+    const ddAll = document.querySelectorAll('.el-select-dropdown').length;
+    const net = (window.__filterable_net || []).slice(0, 3).join(' ; ');
+    return 'filterable-typed-no-match:' + texts.join(',')
+        + '|seen:' + seen + '|reopened:' + reopened
+        + '|dd:' + ddAll + '|net:' + net + '|ms:' + (Date.now() - t0);
+}'''
+
+
+# N4 paged-traverse fallback: paginated el-select (信贷系统「选择冻结额度」抽屉的
+# 客户号) loads only the first page (pageNum=1, pageSize=5) into the dropdown —
+# typing filters those 5 items only (frz round-4: zero network on input), the
+# target lives on page 24/29. Real interaction = open the dropdown, click the
+# pagination「下一页」control page by page and scan the rendered items until the
+# target appears. Runs ONLY after the filterable-typed fallback already failed
+# — never on the success path. No pagination control in the dropdown → not
+# applicable ('select-paged-no-pagination'; caller keeps the original error).
+# Budget: the watcher action budget for select_option is 5s and the plain/fuzzy/
+# filterable chain already consumed most of it — Python passes the remaining
+# budget (ms); exceeding it returns select-paged-no-match with the page count.
+JS_SELECT_PAGED_TRAVERSE = r'''async ([optionText, budgetMs]) => {
+    const want = String(optionText == null ? '' : optionText).trim();
+    if (!want) return 'select-paged-empty-option';
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const deadline = Date.now() + Math.max(500, Number(budgetMs) || 3000);
+    const visibleDropdown = () => [...document.querySelectorAll('.el-select-dropdown')]
+        .find((dd) => {
+            if (dd.classList.contains('is-hidden')) return false;
+            const st = getComputedStyle(dd);
+            if (st.display === 'none' || st.visibility === 'hidden') return false;
+            return dd.offsetParent !== null || dd.getBoundingClientRect().width > 0;
+        });
+    const trigger = window.__last_select_trigger || null;
+    if (!trigger || !document.contains(trigger)) return 'select-paged-no-trigger';
+    // Same open gesture as JS_SELECT_FILTERABLE_TYPED: the toggle lives on the
+    // .el-select WRAPPER, not the inner input.
+    const openDropdown = () => {
+        const wrap = trigger.closest('.el-select') || trigger;
+        wrap.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        wrap.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        wrap.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        trigger.click();
+    };
+    const fire = (el, type) => el.dispatchEvent(
+        new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+    );
+    // Real-mouse-event chain (frz round-4 convention): mousedown → mouseup → click.
+    const clickChain = (el) => { fire(el, 'mousedown'); fire(el, 'mouseup'); el.click(); };
+    if (!visibleDropdown()) { openDropdown(); await sleep(200); }
+    if (!visibleDropdown()) { openDropdown(); await sleep(300); }
+    const dd = visibleDropdown();
+    if (!dd) return 'select-paged-no-dropdown';
+    //「下一页」control: .el-pagination .btn-next, or a visible control whose
+    // text is exactly 下一页 / › / » inside the dropdown.
+    const findNext = (root) => {
+        const btn = root.querySelector('.el-pagination .btn-next');
+        if (btn && btn.offsetParent !== null) return btn;
+        const cands = [...root.querySelectorAll(
+            'button, .el-pagination span, .el-pagination li, .el-pager li, a, span, i'
+        )].filter((el) => el.offsetParent !== null);
+        return cands.find((el) => {
+            const t = (el.textContent || '').trim();
+            return t === '下一页' || t === '›' || t === '»';
+        }) || null;
+    };
+    if (!findNext(dd)) return 'select-paged-no-pagination';
+    const nextDisabled = (next) => next.disabled
+        || next.classList.contains('disabled') || next.classList.contains('is-disabled')
+        || (next.parentElement && (next.parentElement.classList.contains('disabled')
+            || next.parentElement.classList.contains('is-disabled')));
+    // Count findCoreInfGroup responses so each page's data is rendered before
+    // scanning — clicking「下一页」fires a server fetch; scanning stale items
+    // wastes a page tick. (Patched once, after the first next-click setup.)
+    // Additionally rewrite the page fetch's pageSize 5→200: the frz round-5
+    // wet test proved the server honors a larger pageSize, so the next fetch
+    // loads all 144 candidates at once and the scan hits without traversing
+    // 29 pages (impossible inside the 5s action budget). If the server ignores
+    // the rewrite, traversal continues page by page as before.
+    if (!window.__paged_resp_count) {
+        window.__paged_resp_count = 0;
+        const PAGED_URL = 'findCoreInfGroup';
+        const enlarge = (body) => {
+            try {
+                if (body && typeof body === 'string') {
+                    body = body.replace(/"pageSize":\s*\d+/, '"pageSize":200')
+                        .replace(/pageSize=\d+/, 'pageSize=200');
+                }
+            } catch (e) {}
+            return body;
+        };
+        const oOpen = XMLHttpRequest.prototype.open;
+        const oSend = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.open = function (m, u) {
+            this.__paged_url = String(u || '');
+            return oOpen.apply(this, arguments);
+        };
+        XMLHttpRequest.prototype.send = function (body) {
+            const xhr = this;
+            if ((xhr.__paged_url || '').indexOf(PAGED_URL) !== -1) {
+                body = enlarge(body);
+                xhr.addEventListener('load', function () { window.__paged_resp_count += 1; });
+                xhr.addEventListener('error', function () { window.__paged_resp_count += 1; });
+            }
+            return oSend.apply(this, arguments);
+        };
+        const oFetch = window.fetch;
+        if (oFetch) {
+            window.fetch = function (input, init) {
+                const u = String((input && input.url) || input || '');
+                if (u.indexOf(PAGED_URL) !== -1 && init && typeof init.body === 'string') {
+                    init = { ...init, body: enlarge(init.body) };
+                }
+                const p = oFetch.apply(this, [input, init]);
+                if (u.indexOf(PAGED_URL) !== -1) {
+                    p.then(() => { window.__paged_resp_count += 1; },
+                           () => { window.__paged_resp_count += 1; });
+                }
+                return p;
+            };
+        }
+    }
+    const readItems = (root) => [...root.querySelectorAll('.el-select-dropdown__item')]
+        .filter((it) => it.offsetParent !== null || it.getBoundingClientRect().width > 0);
+    const MAX_PAGES = 30;
+    let pages = 0;
+    let reopens = 0;
+    for (let p = 0; p < MAX_PAGES; p++) {
+        if (Date.now() > deadline) {
+            return 'select-paged-no-match:pages=' + pages + '|reason:budget';
+        }
+        const cur = visibleDropdown();
+        if (!cur) {
+            if (reopens >= 2) return 'select-paged-no-match:pages=' + pages + '|reason:dropdown-closed';
+            reopens += 1;
+            openDropdown();
+            await sleep(300);
+            continue;
+        }
+        // 每页扫描前把下拉滚到顶，防粘底（frz round-4 教训）。刚重开时列表可能
+        // 仍在加载——等首屏 items 出现（最多 600ms）再判空。
+        const wrap = cur.querySelector('.el-scrollbar__wrap') || cur;
+        wrap.scrollTop = 0;
+        if (readItems(cur).length === 0) {
+            const tWait = Date.now();
+            while (Date.now() - tWait < 600 && Date.now() <= deadline) {
+                await sleep(60);
+                const curW = visibleDropdown();
+                if (curW && readItems(curW).length > 0) break;
+            }
+        }
+        const curScan = visibleDropdown();
+        if (!curScan) continue;
+        const hit = readItems(curScan).find(
+            (it) => ((it.textContent || '').trim()).indexOf(want) !== -1
+        );
+        if (hit) {
+            hit.scrollIntoView?.({ block: 'center', behavior: 'instant' });
+            clickChain(hit);
+            return 'ok-select-paged:' + (hit.textContent || '').trim();
+        }
+        const next = findNext(curScan);
+        if (!next) {
+            return 'select-paged-no-match:pages=' + pages + '|reason:no-next';
+        }
+        if (nextDisabled(next)) {
+            // 翻页请求在途时「下一页」可能短暂禁用——重查最多 3 次再判末页，
+            // 防止把加载态误判为 last-page（五轮实测 11 页假 last-page）。
+            let stillDisabled = true;
+            for (let r = 0; r < 3 && Date.now() <= deadline; r++) {
+                await sleep(250);
+                const curR = visibleDropdown();
+                if (!curR) break;
+                const nextR = findNext(curR);
+                if (nextR && !nextDisabled(nextR)) { stillDisabled = false; break; }
+                if (!nextR) { stillDisabled = true; break; }
+            }
+            if (stillDisabled) {
+                return 'select-paged-no-match:pages=' + pages + '|reason:last-page';
+            }
+        }
+        pages += 1;
+        const firstBefore = (readItems(visibleDropdown() || curScan)[0] || {}).textContent || '';
+        const prevResps = window.__paged_resp_count;
+        clickChain(next);
+        // 等待本页数据就绪：findCoreInfGroup 响应到达或首项文本变化，最长
+        // 250ms（5s 动作预算内要遍历 20+ 页，不能固定长等；ready 即提前走）。
+        const t0 = Date.now();
+        while (Date.now() - t0 < 250 && Date.now() <= deadline) {
+            await sleep(20);
+            const cur2 = visibleDropdown();
+            if (!cur2) break;
+            const its = readItems(cur2);
+            const firstNow = (its[0] || {}).textContent || '';
+            if (window.__paged_resp_count > prevResps
+                || (its.length && firstNow !== firstBefore)) break;
+        }
+    }
+    return 'select-paged-no-match:pages=' + pages + '|reason:max-pages';
+}'''
+
+
+# N5 main-area labeled select trigger fallback: on the two-step wizard / signing
+# pages (frz round-5: 冻结类型/冻结原因/流程操作) JS_SELECT_TRIGGER_BY_XPATH
+# returns xpath-not-found even with the scan's xpath_smart, while
+# fill_form_field resolves the same fields fine. Last-resort: find the LAST
+# visible .el-form-item whose label matches exactly and click its el-select.
+JS_SELECT_TRIGGER_MAIN_AREA = r'''([labelText]) => {
+    const norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim()
+        .replace(/[：:*\s]+$/g, '').replace(/^[*\s]+/, '');
+    const isVis = (el) => {
+        if (!el || el.nodeType !== 1) return false;
+        if (el.offsetParent === null && !el.closest('.el-table__fixed')) return false;
+        const st = getComputedStyle(el);
+        return st.display !== 'none' && st.visibility !== 'hidden';
+    };
+    const want = norm(labelText);
+    if (!want) return 'main-empty-label';
+    let target = null;
+    for (const it of document.querySelectorAll('.el-form-item')) {
+        if (!isVis(it) || !it.querySelector('.el-select')) continue;
+        const lbl = it.querySelector('.el-form-item__label, label');
+        if (norm((lbl && lbl.textContent) || '') === want) target = it;
+    }
+    if (!target) return 'main-select-not-found';
+    const trig = target.querySelector('.el-select .el-input__inner');
+    if (!trig || !isVis(trig)) return 'no-select-found';
+    if (trig.disabled) return 'field-disabled';
+    target.scrollIntoView?.({ block: 'center', behavior: 'instant' });
+    trig.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    trig.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    trig.click();
+    window.__last_select_trigger = trig;
+    return 'ok-triggered';
+}'''
+
+
 class SelectEngine(_FormActionEngineBase):
     async def select_option(self, label_text: str, option_text: str, xpath_smart: str = ""):
         try:
@@ -635,6 +978,10 @@ class SelectEngine(_FormActionEngineBase):
             raise
 
     async def _select_option_impl(self, label_text: str, option_text: str, xpath_smart: str = ""):
+        # N4 paged fallback budgets itself against the select_option action
+        # budget measured from here (session_runner enforces the same budget
+        # via asyncio.wait_for — overrun = budget-timeout).
+        impl_started = time.monotonic()
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
         await self._ensure_scanned(label_text)
@@ -661,43 +1008,62 @@ class SelectEngine(_FormActionEngineBase):
             )
 
         resolved = _resolve_control(self.business_data_store, label_text, xpath_smart)
+        xp = '' if resolved.error else (resolved.xpath_smart or '').strip()
+        trigger_pretriggered = False
         if resolved.error:
-            return resolved.error
-        xp = resolved.xpath_smart
-        label_text = resolved.label or label_text
+            # N5 resolver-level fallback: on wizard/signing pages the control is
+            # absent from the inventory, so _resolve_control returns an error
+            # BEFORE any trigger JS runs (frz round-5, 流程操作). Try the
+            # main-area exact-label trigger; if it opens the dropdown, continue
+            # with an empty xpath (the value/trigger evaluates below degrade to
+            # harmless 'xpath-empty' and the pick runs on the open dropdown).
+            main_trig = str(await page.evaluate(JS_SELECT_TRIGGER_MAIN_AREA, [label_text]))
+            if main_trig == 'ok-triggered':
+                label_text = resolved.label or label_text
+                trigger_pretriggered = True
+                sys.stderr.write(
+                    f'[select] main-area trigger fallback (resolver-level) success label={label_text!r}\n'
+                )
+                sys.stderr.flush()
+            else:
+                return resolved.error
+        else:
+            label_text = resolved.label or label_text
 
         element = await _capture_element(
-            page, label_text, target_kind='form_select', xpath_smart=resolved.xpath_smart,
+            page, label_text, target_kind='form_select', xpath_smart=xp,
         )
 
-        # Xpath-only already-matched (no JS_FIND_LABELED_SELECT).
-        already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, label_text])
-        if str(already).startswith('ok-already:'):
-            cur_val = already.split(':', 1)[1]
-            # "first" means "any existing value is fine" — do NOT re-open the
-            # dropdown (re-selecting first can cascade-reset dependent fields).
-            # Exact match only — substring (非金融 ⊂ 其他非金融) must re-select.
-            if select_option_already_matched(option_text, cur_val):
-                stamped = resolve_recorded_option_text(option_text, cur_val)
-                params, element = await _pack_select_record(
-                    page, self.business_data_store, label_text, stamped, element,
-                )
-                xp_inv = stamp_recorded_xpath_smart(element, xp)
-                params['option_text'] = stamped
-                _record_action('select_option', params, already, element=element)
-                _task_done_impl(
-                    label_text, self.business_data_store, value=cur_val or stamped, xpath_smart=xp_inv,
-                )
-                streak = int(self.business_data_store.get('_already_matched_streak', 0) or 0) + 1
-                self.business_data_store['_already_matched_streak'] = streak
-                return _ok(_with_submit_cue(
-                    already + ' | already-matched | SKIP — field already set; do not re-select',
-                    self.business_data_store,
-                ))
+        if not trigger_pretriggered:
+            # Xpath-only already-matched (no JS_FIND_LABELED_SELECT).
+            already = await page.evaluate(JS_SELECT_VALUE_BY_XPATH, [xp, label_text])
+            if str(already).startswith('ok-already:'):
+                cur_val = already.split(':', 1)[1]
+                # "first" means "any existing value is fine" — do NOT re-open the
+                # dropdown (re-selecting first can cascade-reset dependent fields).
+                # Exact match only — substring (非金融 ⊂ 其他非金融) must re-select.
+                if select_option_already_matched(option_text, cur_val):
+                    stamped = resolve_recorded_option_text(option_text, cur_val)
+                    params, element = await _pack_select_record(
+                        page, self.business_data_store, label_text, stamped, element,
+                    )
+                    xp_inv = stamp_recorded_xpath_smart(element, xp)
+                    params['option_text'] = stamped
+                    _record_action('select_option', params, already, element=element)
+                    _task_done_impl(
+                        label_text, self.business_data_store, value=cur_val or stamped, xpath_smart=xp_inv,
+                    )
+                    streak = int(self.business_data_store.get('_already_matched_streak', 0) or 0) + 1
+                    self.business_data_store['_already_matched_streak'] = streak
+                    return _ok(_with_submit_cue(
+                        already + ' | already-matched | SKIP — field already set; do not re-select',
+                        self.business_data_store,
+                    ))
+            self.business_data_store['_already_matched_streak'] = 0
 
-        self.business_data_store['_already_matched_streak'] = 0
-
-        trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
+            trigger_result = await page.evaluate(JS_SELECT_TRIGGER_BY_XPATH, [xp, label_text])
+        else:
+            trigger_result = 'ok-triggered'
         if trigger_result == 'xpath-not-found':
             fallback = resolve_select_fallback(self.business_data_store, label_text, xp)
             if fallback is not None:
@@ -728,6 +1094,20 @@ class SelectEngine(_FormActionEngineBase):
                         f'[select] xpath fallback success label={label_text!r} xpath={xp!r}\n'
                     )
                     sys.stderr.flush()
+        # N5 main-area trigger fallback — last resort after the xpath trigger
+        # (and any stored fallback) failed: exact-label visible el-form-item
+        # hunt on main (wizard/signing pages, frz round-5).
+        if str(trigger_result) in ('xpath-not-found', 'no-select-found', 'label-not-found'):
+            main_trig = str(await page.evaluate(JS_SELECT_TRIGGER_MAIN_AREA, [label_text]))
+            if main_trig == 'ok-triggered':
+                trigger_result = main_trig
+                element = await _capture_element(
+                    page, label_text, target_kind='form_select', xpath_smart=xp,
+                )
+                sys.stderr.write(
+                    f'[select] main-area trigger fallback success label={label_text!r}\n'
+                )
+                sys.stderr.flush()
         if trigger_result in (
             'label-not-found',
             'no-select-found',
@@ -969,7 +1349,80 @@ class SelectEngine(_FormActionEngineBase):
                     _record_action('select_option', params, matched_text, element=element)
                     _task_done_impl(label_text, self.business_data_store, value=matched_text, xpath_smart=xp_inv)
                     return _ok(_with_submit_cue(f'ok | {matched_text} | fuzzy-matched-from:{want}', self.business_data_store))
-            failed = await _final_select_failure(str(select_result), xp)
+            # N4 paged-traverse fallback — runs BEFORE the filterable-typed
+            # attempt, with filterable-typed demoted to its sub-strategy: a
+            # paginated el-select renders only the first page and typing cannot
+            # reach later pages (frz round-4/5: zero network on input, target on
+            # page 24/29), so burning the 1.8s typed window first starves the
+            # page-by-page traversal inside the 5s action budget. Not
+            # applicable (no pagination control) → fall through to the
+            # filterable-typed block below unchanged. Budget-aware: pass the
+            # remaining select_option budget (minus a 300ms margin) into the JS.
+            elapsed_ms = (time.monotonic() - impl_started) * 1000
+            paged_budget_ms = max(800, int(budget_for('select_option') * 1000 - elapsed_ms - 300))
+            paged_result = str(await page.evaluate(
+                JS_SELECT_PAGED_TRAVERSE, [want, paged_budget_ms],
+            ))
+            if str(paged_result).startswith('ok-select-paged'):
+                matched_text = paged_result.split(':', 1)[1] if ':' in paged_result else want
+                self.business_data_store.pop(f'_sel_retry_{label_text}', None)
+                stamped = resolve_recorded_option_text(option_text, matched_text)
+                params['option_text'] = stamped
+                params, element = attach_select_options(params, element, params.get('options'))
+                _record_action('select_option', params, matched_text + ' | select-paged', element=element)
+                _task_done_impl(
+                    label_text, self.business_data_store, value=stamped or matched_text, xpath_smart=xp_inv,
+                )
+                return _ok(_with_submit_cue(f'ok | {matched_text} | select-paged', self.business_data_store))
+            paged_applicable = str(paged_result).startswith('select-paged-no-match')
+            sys.stderr.write(
+                f'[select] paged-traverse attempt label={label_text!r} '
+                f'option={option_text!r} result={paged_result!r}\n'
+            )
+            sys.stderr.flush()
+            self.business_data_store['_last_select_paged'] = {
+                'label': label_text, 'option': option_text, 'result': paged_result,
+            }
+            if paged_applicable:
+                # Pagination existed but the target was not reached within the
+                # remaining budget — typed filtering cannot help paginated
+                # dropdowns, fail with the paged diagnostic.
+                failed = await _final_select_failure(
+                    str(select_result) + ' | select-paged:' + paged_result, xp,
+                )
+                return err_with(
+                    "err-select-option-unresolved",
+                    f"无法稳定选中「{option_text}」",
+                    observed=f"label={label_text} last={failed}"[:160],
+                    next_action=_select_failure_next_action(label_text, option_text, self.business_data_store),
+                )
+            # N1 filterable-typed fallback — sub-strategy of the paged fallback,
+            # only reached when the dropdown has NO pagination control (plain
+            # remote/filterable select). Original chain otherwise unchanged.
+            filterable_result = str(await page.evaluate(JS_SELECT_FILTERABLE_TYPED, want))
+            if _is_ok_result(filterable_result):
+                matched_text = filterable_result.split(':', 1)[1] if ':' in filterable_result else want
+                self.business_data_store.pop(f'_sel_retry_{label_text}', None)
+                stamped = resolve_recorded_option_text(option_text, matched_text)
+                params['option_text'] = stamped
+                params, element = attach_select_options(params, element, params.get('options'))
+                _record_action('select_option', params, matched_text + ' | filterable-typed', element=element)
+                _task_done_impl(
+                    label_text, self.business_data_store, value=stamped or matched_text, xpath_smart=xp_inv,
+                )
+                return _ok(_with_submit_cue(f'ok | {matched_text} | filterable-typed', self.business_data_store))
+            sys.stderr.write(
+                f'[select] filterable-typed attempt failed label={label_text!r} '
+                f'option={option_text!r} result={filterable_result!r}\n'
+            )
+            sys.stderr.flush()
+            self.business_data_store['_last_select_filterable_typed'] = {
+                'label': label_text, 'option': option_text, 'result': filterable_result,
+            }
+            failed = await _final_select_failure(
+                str(select_result) + ' | filterable-typed:' + filterable_result
+                + ' | select-paged:' + paged_result, xp,
+            )
             return err_with(
                 "err-select-option-unresolved",
                 f"无法稳定选中「{option_text}」",

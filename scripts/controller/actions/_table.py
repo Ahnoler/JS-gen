@@ -134,20 +134,64 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
             element['row_text'] = element.get('row_text') or row_text
             element['target_kind'] = 'table_row_radio'
         result = await page.evaluate('''
-            ([rowText]) => {
+            async ([rowText]) => {
                 if (!rowText) return 'row-text-empty';
                 const pickSel = (root) => root && root.querySelector(
                     'label.el-radio, .el-radio, label.el-checkbox, .el-checkbox, input[type="radio"]'
                 );
-                const clickSel = (el) => {
+                // KB-I5 round 4: Element UI radios need the real
+                // mousedown -> mouseup -> click chain; a synthetic single
+                // click() does not update the Vue model.
+                const clickSel = async (el) => {
                     if (!el) return false;
                     const inner = el.querySelector
                         ? el.querySelector('.el-radio__inner, .el-checkbox__inner')
                         : null;
-                    (inner || el).click();
+                    const target = inner || el;
+                    const fire = (type) => target.dispatchEvent(
+                        new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+                    );
+                    fire('mousedown');
+                    await new Promise((r) => setTimeout(r, 30));
+                    fire('mouseup');
+                    await new Promise((r) => setTimeout(r, 30));
+                    fire('click');
                     return true;
                 };
                 const wantFirst = /^(first|1st|第一个|第一项|首行)$/i.test(String(rowText).trim());
+                // Container scope first: when a topmost visible drawer/dialog is
+                // open, search tables ONLY inside it. Page-level lists also count
+                // as "visible" (offsetParent non-null behind the overlay), so the
+                // 额度节点表 (0 rows) inside a drawer must not be shadowed by a
+                // hidden page list row (frz round-2 N2 failure). Topmost = highest
+                // z-index, same rule as _JS_CLICK_BUTTON_IN_CONTAINER.
+                const overlays = [...document.querySelectorAll('.el-drawer, .el-dialog')]
+                    .filter((d) => {
+                        if (d.offsetParent !== null) return true;
+                        const st = getComputedStyle(d);
+                        if (st.display === 'none' || st.visibility === 'hidden') return false;
+                        const r = d.getBoundingClientRect();
+                        return r.width > 0 && r.height > 0;
+                    });
+                let scope = null;
+                let bestZ = -1;
+                for (const o of overlays) {
+                    const z = parseInt(getComputedStyle(o).zIndex || '0', 10) || 0;
+                    if (z >= bestZ) { bestZ = z; scope = o; }
+                }
+                const scopeRoot = scope || document;
+                // N2: a matched row must be VISIBLE (offsetParent!==null) — hidden
+                // tables (e.g. a previous tab / closed drawer) used to match and
+                // click an invisible radio, returning ok with rowCount=0 in the
+                // real (visible) table. Same rect fallback pattern as
+                // JS_FIND_LABELED_SELECT for position:fixed ancestors.
+                const rowVisible = (row) => {
+                    if (row.offsetParent !== null) return true;
+                    const st = getComputedStyle(row);
+                    if (st.display === 'none' || st.visibility === 'hidden') return false;
+                    const rect = row.getBoundingClientRect();
+                    return rect.width > 0 && rect.height > 0;
+                };
                 // Unique-key columns (customer-number / credit code) must match EXACTLY
                 // to disambiguate same-named rows; fall back to textContent.includes.
                 const rowCellTexts = (row) => {
@@ -169,7 +213,8 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                     const wantCompact = String(rowText).replace(/\\s+/g, '');
                     return ((row.textContent || '').replace(/\\s+/g, '')).includes(wantCompact);
                 };
-                const tables = document.querySelectorAll('.el-table');
+                const tables = scopeRoot.querySelectorAll('.el-table');
+                let matchedCount = 0;
                 for (const table of tables) {
                     const bodyRows = table.querySelectorAll(
                         '.el-table__body-wrapper tbody tr.el-table__row, .el-table__body-wrapper tbody tr'
@@ -177,6 +222,8 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                     for (let i = 0; i < bodyRows.length; i++) {
                         const row = bodyRows[i];
                         if (!rowMatches(row)) continue;
+                        if (!rowVisible(row)) continue;
+                        matchedCount += 1;
                         row.scrollIntoView({ block: 'center', behavior: 'instant' });
                         let radio = pickSel(row);
                         if (!radio) {
@@ -192,9 +239,16 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                             if (wantFirst) continue;
                             return 'radio-not-found-in-row';
                         }
-                        clickSel(radio);
+                        await clickSel(radio);
                         return 'ok';
                     }
+                }
+                // N2: zero VISIBLE matched rows — an empty table (0 rows, e.g.
+                // 额度节点表 with no data) must be an explicit failure, not a
+                // fake ok. matchedCount stays 0 both when nothing matched the
+                // text and when only hidden (offsetParent===null) copies matched.
+                if (matchedCount === 0) {
+                    return 'err-no-row-match:' + rowText;
                 }
                 return 'row-not-found';
             }
@@ -203,6 +257,14 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
         if _is_ok_result(result):
             _record_action('click_table_row_radio', {'row_text': row_text}, result, element=element)
             return _ok(result + ' | loc:.el-table__row:has-text("' + row_text + '")')
+        if str(result).startswith('err-no-row-match:'):
+            # N2: explicit zero-row failure — never treat rowCount=0 as success.
+            return err_with(
+                "err-no-row-match",
+                f"表格 0 行命中（row_text={row_text!r}），不视为选中成功",
+                observed=str(result),
+                next_action='改抄扫描结果里该行的完整单元格文本重试；若表格确实无数据行，跳过本步并回报空表',
+            )
         if str(result) == 'row-not-found':
             return err_with(
                 "err-table-row-not-found",

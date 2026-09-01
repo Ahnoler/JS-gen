@@ -63,7 +63,7 @@ _JS_VISIBLE_FORM_OVERLAY = '''() => {
 # original page-level path unchanged (no-container diff is invisible).
 # Counterpart of JS_IDENTIFY_CONTAINER (base.py): that one names the active
 # container for scan/fill; this one clicks within the overlay scope first.
-_JS_CLICK_BUTTON_IN_CONTAINER = r'''([buttonText]) => {
+_JS_CLICK_BUTTON_IN_CONTAINER = r'''async ([buttonText]) => {
     const norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
     const want = norm(buttonText);
     if (!want) return 'miss';
@@ -78,8 +78,13 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''([buttonText]) => {
         if (z >= bestZ) { bestZ = z; scope = o; }
     }
     if (!scope) return 'miss';
+    // KB-I5 r4: clickable candidates are not only buttons — Element UI radios
+    // (el-select options / el-table radio columns / radio labels) also carry
+    // actionable text and only respond to the full mousedown event chain.
     const matches = [];
-    for (const b of scope.querySelectorAll('button, .el-button, a')) {
+    for (const b of scope.querySelectorAll(
+        'button, .el-button, a, label.el-radio, .el-radio, label.el-checkbox, .el-checkbox'
+    )) {
         if (b.offsetParent === null || b.disabled) continue;
         if (b.closest('.el-table__body-wrapper')) continue;
         const t = norm(b.innerText || b.textContent);
@@ -91,8 +96,20 @@ _JS_CLICK_BUTTON_IN_CONTAINER = r'''([buttonText]) => {
     if (!matches.length) return 'miss';
     const exact = matches.filter((m) => m.text === want);
     const pool = exact.length ? exact : matches;
-    pool[0].el.scrollIntoView({ block: 'center', behavior: 'instant' });
-    pool[0].el.click();
+    const target = pool[0].el;
+    target.scrollIntoView({ block: 'center', behavior: 'instant' });
+    // KB-I5 round 4: Element UI widgets (el-select, el-table radios, drawer
+    // confirm buttons) need the real mousedown -> mouseup -> click sequence;
+    // a synthetic single click() leaves Vue models un-updated (drawers stay
+    // open after 确定/保存). Dispatch the full chain with 30ms gaps.
+    const fire = (type) => target.dispatchEvent(
+        new MouseEvent(type, { bubbles: true, cancelable: true, view: window })
+    );
+    fire('mousedown');
+    await new Promise((r) => setTimeout(r, 30));
+    fire('mouseup');
+    await new Promise((r) => setTimeout(r, 30));
+    fire('click');
     return 'ok-container:' + pool[0].text;
 }'''
 

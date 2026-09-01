@@ -24,25 +24,38 @@ JS snippet constants: JS_PICKER_DIALOG_QUERY, JS_PICKER_DIALOG_SELECT.
 """
 
 _JS_PICKER_HELPERS = '''    const norm = (s) => String(s == null ? '' : s).replace(/\\s+/g, ' ').trim();
+    // N3: dialog OR drawer — 「选择冻结额度」是 el-drawer，旧 findDialog 只找
+    // .el-dialog 会报 dialog-not-found。drawer 标题在 .el-drawer__header。
+    const containerTitle = (d) => {
+        const t = d.querySelector('.el-dialog__title, .el-drawer__header');
+        return norm(t ? t.textContent : '');
+    };
+    const containerVisible = (d) => {
+        if (d.offsetParent !== null) return true;
+        const st = getComputedStyle(d);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        const rect = d.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    };
     const findDialog = (name) => {
         const want = norm(name);
         if (!want) return null;
-        for (const d of document.querySelectorAll('.el-dialog')) {
-            if (d.offsetParent === null) continue;
-            const title = d.querySelector('.el-dialog__title');
-            const t = norm(title ? title.textContent : '')
-                || norm(d.getAttribute('aria-label') || '');
+        for (const d of document.querySelectorAll('.el-dialog, .el-drawer')) {
+            if (!containerVisible(d)) continue;
+            const t = containerTitle(d) || norm(d.getAttribute('aria-label') || '')
+                || norm(d.getAttribute('title') || '');
             if (t && t.indexOf(want) !== -1) return d;
         }
         return null;
     };
-    // Underlying-page form items: visible .el-form-item NOT inside any visible dialog.
+    // Underlying-page form items: visible .el-form-item NOT inside any visible
+    // dialog or drawer (N3: drawer also counts as an overlay container).
     const readUnderlyingForm = () => {
         const map = {};
         const inVisibleDialog = (el) => {
             let n = el;
             while (n && n !== document.body) {
-                if (n.classList && n.classList.contains('el-dialog') && n.offsetParent !== null) return true;
+                if (n.classList && (n.classList.contains('el-dialog') || n.classList.contains('el-drawer')) && containerVisible(n)) return true;
                 n = n.parentElement;
             }
             return false;
