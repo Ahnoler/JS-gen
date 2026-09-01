@@ -1,3 +1,8 @@
+## 2026-09-01 · Zcode (uara_V1.2) — ①③收账 + ④授信深链定案（未闭环，五引擎缺口归档）
+- 完成：①minors 清账（seq 数值化/find_flow 短查询拒答+等名优先/kb_dict ambiguous 提示）；③promote.py staging 晋升工具（dry-run 默认/--apply/去重幂等）；KB-5 扩卡——评级/额度管控/放款申请/贷后检查四张流程卡（K5 computer-use 实地，含 hash_markers/keywords 绑定与业务依赖图），流程卡总量 6→10（8be5722，已推送）
+- 完成：④授信深链演练（交易 218/219）——**未闭环**：向导 Step① 候选表恒 0 行+下一步静默无效。根因定案五缺口：click_button 页面级同名遮蔽抽屉内按钮 / JS_IS_QUERY_TOOLBAR 误判向导抽屉为查询 UI / picker_dialog_select 回填空 / watcher intent gate / 孤儿 Chrome 复用 login 必败。守卫与撤销行为全程正确，槽位清零（§12 已归档 research 文档）
+- 注意：五缺口修复=下一批 KB-I5（抽屉作用域按钮点击/向导表单识别/picker 回填重试/孤儿 Chrome 探针）；另有并行会话的 menu-push 提交（bf5c929/e4c2b4a/4892a08 等）交错在同分支
+
 ## 2026-09-01 · Zcode (uara_V1.2) — GET /api/v2/trajectories 新增 isExport 筛选
 - 完成：交易列表接口新增 `isExport` 查询参数（0=未推送 / 1=已推送 / 不传=全部），供前端「是否已推送」下拉筛选；route 校验非法值返 400，dao `list` / `listByFunction` / `countByRecordStatus`（stats 同步受筛）统一经 `applyListFilters` 加 `t.is_export` 条件。commit `924ecf8`（未推送）
 - 注意：前端已在传参，无需前端改动；其余调用点默认 null 不受影响
