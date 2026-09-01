@@ -1,6 +1,6 @@
 ## 2026-09-02 · Zcode (uara_V1.2) — KB-I5 湿测五轮收敛：冻结申请全链贯通（引擎提交进流程）+ 6 项新修复
 - 完成：引擎实机湿测（确定性驱动 tmp/kb_i5_frz_drill.py）五轮收敛——**冻结申请 S1-S8/S10 全链贯通**（导航/KB 召回/查询/分页下拉选盛达/radio EDBH/确定建草稿/两步向导填表保存/意见提交/流程选人树选中 客户经理-黄某某/草稿 EDDJ20260902024033 已提交进流程=审批中），引擎提交侧闭环达成
-- 完成：湿测驱动的 6 项修复（commit `54e0e12` 未推送）：N1 filterable 键入 300ms 轮询(1.8s 预算窗)、N2 radio 容器作用域+rowVisible+err-no-row-match（0 行不再假 ok）、N3 picker 支持 el-drawer、N4 JS_SELECT_PAGED_TRAVERSE 分页下拉遍历（实证 findCoreInfGroup pageSize:5→200 服务端照单全收，盛达 24/29 页；paged 优先于 filterable-typed）、N5 _resolve_control xpath-not-found 早退绕过 → 先 trigger 再选值；容器/树点击均升级 mousedown→mouseup→click 链（Element UI radio/select 真实事件依赖）
+- 完成：湿测驱动的 6 项修复（commit `f7806c8` 未推送）：N1 filterable 键入 300ms 轮询(1.8s 预算窗)、N2 radio 容器作用域+rowVisible+err-no-row-match（0 行不再假 ok）、N3 picker 支持 el-drawer、N4 JS_SELECT_PAGED_TRAVERSE 分页下拉遍历（实证 findCoreInfGroup pageSize:5→200 服务端照单全收，盛达 24/29 页；paged 优先于 filterable-typed）、N5 _resolve_control xpath-not-found 早退绕过 → 先 trigger 再选值；容器/树点击均升级 mousedown→mouseup→click 链（Element UI radio/select 真实事件依赖）
 - 重要实证：新增按钮「选择冻结额度」抽屉=客户号**分页下拉**（非 remote；键入零请求；「确 定」=创建草稿+跳两步向导 ①只读额度②维护冻结信息）；树选命中=label=审批人 + 「确 定」空格写法；list_todo_cards 正常但 .todo-item-action「处理」无引擎动作
 - 遗留（下一批）：**待办任务卡片「处理」动作**（第六类外围，S9 审批无法驱动）；分页下拉单次 5s 预算仅 ~11 页（靠关/开保 currentPage 续翻）；pin：characterize-kb-i5-gaps-2.py（N4 块）；7 pin 全绿
 
