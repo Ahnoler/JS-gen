@@ -255,3 +255,15 @@
 - **Step5 里程碑**：LLM 调用 `use_special_element(special_element_id=8)`，嵌套 replay `5/5 ok`（click 引入 → fill 客户名称=吴芳军 → 查询 → radio → 确认）——**法定代表人引入的盲点 index 弯路彻底消失**，改为资产库原子重放；step6 `check_field_value` 确认回填 吴芳军。
 - **全流程**：8 步 done（此前同流程 10-12 步带弯路）；`click_save → ok-save-success:操作成功`；phase outcome success=True。
 - 遗留 minor：flow_summary_text 800 字截断把 field_deps/rules 段截掉（状态第三行切半）——建议规则段前置或提额至 1200。
+
+## 12. 授信深链演练定案（2026-09-01，交易 218/219）——未闭环，根因=引擎五缺口
+
+标的 鑫瑞丰禾农业开发有限公司（信贷正式客户）。链路卡死在向导 Step①「业务主体选择」：查询区 6 字段全填但**抽屉内候选表恒 0 行**、`下一步`点击静默无效——根因不是 nextBefore 风控（未走到门），而是引擎工具面五缺口：
+
+1. **click_button 页面级同名遮蔽**：抽屉内「查询」永远被主列表页同名按钮遮蔽（JS_CLICK_ICON_BUTTON 页面级优先策略）——需要容器作用域按钮点击。
+2. **JS_IS_QUERY_TOOLBAR 误判向导抽屉**：有 查询/重置/下一步 无 保存 → 判为 query UI → scan/click_save 被守卫拦。实测可用 save_business_data 播种 `_phase_intent={mode:create}` + `_phase_intent_flag_locked` 解锁——守卫的「无保存=非表单」假设对**分步向导**不成立。
+3. **picker_dialog_select 回填空**（changed:{}）：选客户后对话框关闭但表单未带回值——静默失败点，需回填校验重试。
+4. **run_form_assistant intent gate**：watcher 模式不编译 phase intent → err-form-assistant-forbidden（播种可解）。
+5. **孤儿 Chrome 复用**：pickExecutorNode 偏好 idle CDP 浏览器，prepare login 落在已登录页必败（演练脚本按特征豁免）。
+
+知识库素材入账：向导 Step① 结构（查询区 6 字段+候选表列头+查询/重置/下一步/返回，无显式必填，下一步前置疑似=表内选中一行）；Step② 风险阻断存在（截图）。授信表单 Step③+ 分区仍缺采——需先解缺口 1/2 才能走到。
