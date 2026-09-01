@@ -1,0 +1,132 @@
+{
+ "flow": "押品登记（押品信息管理-押品新增向导）",
+ "aliases": [
+  "押品新增向导页",
+  "押品信息管理",
+  "新增押品",
+  "押品补录",
+  "新增权证"
+ ],
+ "hash_markers": [
+  "cltlMgt",
+  "cltlInfMgt",
+  "#/cltlMgt/cltlInfMgt/cltlInfMgt"
+ ],
+ "keywords": [
+  "押品信息管理",
+  "押品新增向导页",
+  "押品种类名称",
+  "押品名称",
+  "是否电子押品",
+  "押品编号"
+ ],
+ "menu_path": "押品管理/押品信息管理/押品信息管理",
+ "biz_key_prefix": [],
+ "preconditions": [
+  "押品须关联已生效主合同/借款（业务常识，未在页面实证）",
+  "登录态必须完整（home=true 且 token=true）：独立会话 19244 曾出现 home=false token=true 的半登录态，导致菜单/按钮/弹窗全部不完整（click 新增→no-btn、菜单树解析失败），采数前务必确认 probe {home:true,token:true}",
+  "本卡面向登记动作本身；押品列表初始 0 行，新增依赖押品种类选项（未采到，见 exceptions）"
+ ],
+ "nodes": [
+  {
+   "id": "list",
+   "page": "押品信息管理列表页",
+   "enter": "菜单链（hash #/cltlMgt/cltlInfMgt/cltlInfMgt?needupdate=yes&part=cltlMgtcltlInfMgtcltlInfMgt）",
+   "query_fields": [
+    "押品编号(input)",
+    "押品名称(input)",
+    "押品所有人名称(disabled，2026-09-01 实测 dis=true)"
+   ],
+   "buttons": [
+    "引入",
+    "押品信息下载和打印",
+    "押品补录",
+    "新增权证",
+    "查看",
+    "查询",
+    "重置"
+   ],
+   "columns": [
+    "单选",
+    "押品编号",
+    "押品名称",
+    "客户编号",
+    "抵质押客户名称",
+    "押品状态",
+    "押品种类",
+    "创建日期",
+    "创建机构",
+    "管户客户经理",
+    "补录类型"
+   ],
+   "note": "「新增权证」「押品补录」点击均无对话框弹出、hash 不变（3 次独立实证），疑似需先选中行或走其他前置，未采到其真实入口"
+  },
+  {
+   "id": "wizard_step1",
+   "page": "押品新增向导页 Step①（el-dialog，非 el-drawer）",
+   "enter": "列表页点「新增」弹出",
+   "fields": [
+    "押品种类名称（必填，自绘 popover 选择控件，详见 rules）",
+    "押品名称（必填，普通 input 文本，直接填可过校验）",
+    "是否电子押品（必填，el-select，选项实测含「否」可直接选中）"
+   ],
+   "buttons": [
+    "下一步",
+    "取消"
+   ],
+   "note": "步骤条为空（无预渲染步骤名）=向导把必填校验前置在每步；3 字段填齐前点「下一步」无响应（校验拦截，主线程手工实证）"
+  },
+  {
+   "id": "wizard_step2_3",
+   "page": "向导 Step②/Step③",
+   "enter": "Step① 校验通过后点「下一步」",
+   "note": "未采到：本次自动化探测始终未通过 Step①（押品种类名称无法选值），Step②/Step③ 内容、最终保存/提交按钮均未知"
+  }
+ ],
+ "field_deps": [
+  {
+   "trigger": "押品种类名称（自绘 popover picker）",
+   "action": "点击 el-popover__reference-wrapper 触发区域",
+   "effect": "应弹出 tree-popover 选择面板（面板含 search-input+查询按钮+tsscTree 树）；实证：树渲染为「暂无数据」空面板，未采到选项列表"
+  }
+ ],
+ "state_actions": [
+  {
+   "entity": "押品新增向导",
+   "status": "Step① 待填",
+   "allow": [
+    "下一步（仅当 3 必填字段填齐且校验通过，否则无响应）",
+    "取消（向导以「取消」退出，红线操作，已实证安全退出）"
+   ]
+  }
+ ],
+ "rules": [
+  {
+   "keyword": "向导形态",
+   "rule": "押品新增为「押品新增向导页」el-dialog 对话框形态（非抽屉非独立页）；按钮只有 下一步/取消"
+  },
+  {
+   "keyword": "押品种类名称",
+   "rule": "自绘 popover 选择控件（el-tooltip.my-popover 包裹 + el-popover__reference-wrapper 触发 + tree-popover 内含 search-input/查询按钮/tsscTree），引擎原生 select/input 对其无效——input 填文本后校验报「请选择押品种类名称」；__vue__ doShow 强开也只得到空面板（专项项，需专项会话定位真实数据源/触发时序）"
+  },
+  {
+   "keyword": "是否电子押品",
+   "rule": "标准 el-select，选项含「否」，可直接 selectOption 选中"
+  },
+  {
+   "keyword": "校验前置",
+   "rule": "向导步骤条为空，必填校验前置在每一步：Step① 3 字段（押品种类名称/押品名称/是否电子押品）全必填，填齐前「下一步」无响应"
+  },
+  {
+   "keyword": "列表页",
+   "rule": "查询区 押品所有人名称 为 disabled；列表列含 押品状态/押品种类/补录类型（枚举值未采到）"
+  }
+ ],
+ "exceptions": [
+  "自绘 popover 未采到选项（2026-09-01）：tree-popover 实测渲染「暂无数据」；input/popover-ref-wrapper/my-popover/icon 四种触发均无面板；__vue__ doShow 强开 panel 仍为空——押品种类选项列表待专项",
+  "独立会话 19244 首次登录 home=false token=true（登录态不完整）导致 click 新增→no-btn、菜单树解析失败，勿复用该路径",
+  "「新增权证」「押品补录」点击无弹窗无 hash 变化（3 次实证），真实入口条件未采到",
+  "未点 保存/提交/入库/出库/确认/处置/查封 类按钮（红线）；向导以「取消」退出，最终保存 API 未采到"
+ ],
+ "source": "K6 2026-09-01 tmp/k6_notes/collateral.md（3 次独立会话 19244 + 完整菜单普查）+ tmp/k6_notes/collateral_step1_manual.md（主线程手工 Step① 三字段确认）；截图 tmp/collateral_shots/cltl_list.png、wizard_step1.png 等"
+}

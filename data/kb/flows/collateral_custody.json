@@ -1,0 +1,236 @@
+{
+ "flow": "押品权证出入库（押品权证出入库管理）",
+ "aliases": [
+  "权证入库管理",
+  "权证替换入库管理",
+  "权证期转现入库管理",
+  "权证借阅管理",
+  "权证归还管理",
+  "权证正式出库管理",
+  "权证强制出库管理",
+  "权证移库管理"
+ ],
+ "hash_markers": [
+  "cltlMgt",
+  "cltlWrntOistgMgt",
+  "wrntIntrsrMgt",
+  "wrntBrwMgt",
+  "wrntFrmlOutstgMgt"
+ ],
+ "keywords": [
+  "权证出入库",
+  "权证入库",
+  "权证出库",
+  "权证借阅",
+  "柜面确认",
+  "柜面拒绝",
+  "权证数量"
+ ],
+ "menu_path": "押品管理/押品权证出入库管理/*（8 个子页已列表层普查）",
+ "biz_key_prefix": [],
+ "preconditions": [
+  "押品须关联已生效主合同/借款（业务常识，未实证）",
+  "估值前置=押品已登记（出入库/借阅均以 押品编号/押品名称/押品种类名称 检索既有押品）",
+  "登录态完整（home=true 且 token=true），同 collateral_info 卡注意项"
+ ],
+ "nodes": [
+  {
+   "id": "wrnt_in",
+   "page": "权证入库管理",
+   "enter": "菜单链 url=/cltlMgt/cltlWrntOistgMgt/wrntIntrsrMgt/enqrWrntIntrsr",
+   "query_fields": [
+    "押品所有人名称",
+    "押品编号",
+    "押品名称"
+   ],
+   "buttons": [
+    "引入",
+    "柜面拒绝",
+    "柜面确认",
+    "查询",
+    "重置"
+   ],
+   "columns": [
+    "单选",
+    "业务类型",
+    "业务编号",
+    "抵质押人名称",
+    "押品所属人证件号码",
+    "押品编号",
+    "押品种类名称",
+    "押品名称",
+    "权证数量",
+    "申请人",
+    "审批状态",
+    "申请时间",
+    "返回结果",
+    "返回结果或失败原因"
+   ]
+  },
+  {
+   "id": "wrnt_substitute_in",
+   "page": "权证替换入库管理",
+   "enter": "菜单链 url=/cltlMgt/cltlWrntOistgMgt/wrntSbstnIntrsrMgt/enqrWrntSbstnIntrsr",
+   "buttons": [
+    "引入",
+    "柜面拒绝",
+    "柜面确认",
+    "查看",
+    "查询",
+    "重置"
+   ],
+   "columns": "同权证入库管理（返回拒绝或失败原因）"
+  },
+  {
+   "id": "wrnt_prdtfcrn_in",
+   "page": "权证期转现入库管理",
+   "enter": "菜单链 url=/cltlMgt/cltlWrntOistgMgt/wrntPrdtfcrnIntrsrMgt/enqrPrdtfcrnIntrsrPcs",
+   "buttons": [
+    "引入",
+    "柜面拒绝",
+    "柜面确认",
+    "查看",
+    "查询",
+    "重置"
+   ]
+  },
+  {
+   "id": "wrnt_borrow",
+   "page": "权证借阅管理",
+   "enter": "菜单链 url=/cltlMgt/cltlWrntOistgMgt/wrntBrwMgt/enqrWrntBrwPcs",
+   "buttons": [
+    "修改",
+    "发起借阅",
+    "引入",
+    "打印",
+    "柜面拒绝",
+    "柜面确认",
+    "查看",
+    "查询",
+    "重置"
+   ],
+   "columns": "业务类型/业务编号/抵质押人名称/抵质押人证件/押品编号/押品种类名称/押品名称/权证数量/申请人/审批状态/申请时间/返回结果"
+  },
+  {
+   "id": "wrnt_renew",
+   "page": "权证续借管理",
+   "enter": "菜单链 url=/cltlMgt/cltlWrntOistgMgt/wrntRnewMgt/enqrWrntRnewPcs",
+   "buttons": [
+    "修改",
+    "发起续借",
+    "引入",
+    "打印",
+    "柜面拒绝",
+    "柜面确认",
+    "查看",
+    "查询",
+    "重置"
+   ]
+  },
+  {
+   "id": "wrnt_return",
+   "page": "权证归还管理",
+   "enter": "菜单链 url=/cltlMgt/cltlWrntOistgMgt/wrntRetMgt/enqrWrntRetPcs",
+   "buttons": [
+    "修改",
+    "发起流程",
+    "引入",
+    "打印",
+    "柜面拒绝",
+    "柜面确认",
+    "查看",
+    "查询",
+    "重置"
+   ]
+  },
+  {
+   "id": "wrnt_formal_out",
+   "page": "权证正式出库管理",
+   "enter": "菜单链 url=/cltlMgt/cltlWrntOistgMgt/wrntFrmlOutstgMgt/enqrWrntFrmlOutstgPcs",
+   "buttons": [
+    "修改",
+    "发起流程",
+    "引入",
+    "打印",
+    "柜面拒绝",
+    "柜面确认",
+    "查看",
+    "查询",
+    "重置"
+   ]
+  },
+  {
+   "id": "wrnt_forced_out",
+   "page": "权证强制出库管理",
+   "enter": "菜单链 url=/cltlMgt/cltlWrntOistgMgt/wrntNfrcOutstgMgt/enqrWrntNfrcOutstgPcs",
+   "buttons": [
+    "引入",
+    "柜面拒绝",
+    "柜面确认",
+    "查看",
+    "查询",
+    "重置"
+   ]
+  },
+  {
+   "id": "wrnt_transfer",
+   "page": "权证移库管理",
+   "enter": "菜单链 url=/cltlMgt/cltlWrntOistgMgt/wrntInvmovMgt/enqrWrntInvmovPcs",
+   "query_fields": [
+    "业务编号",
+    "接收人",
+    "接收机构名称(popover)"
+   ],
+   "buttons": [
+    "查看",
+    "查询",
+    "移库入库柜面拒绝",
+    "移库入库柜面确认",
+    "移库出库柜面拒绝",
+    "移库出库柜面确认",
+    "重置"
+   ],
+   "columns": [
+    "单选",
+    "业务类型",
+    "业务编号",
+    "权证数量",
+    "移交权证管护权标志",
+    "接收人",
+    "接收机构",
+    "移交人",
+    "移交机构",
+    "审批状态",
+    "移库时间",
+    "移出机构柜面返回结果",
+    "接收机构柜面返回结果"
+   ]
+  }
+ ],
+ "field_deps": [],
+ "state_actions": [],
+ "rules": [
+  {
+   "keyword": "出入库=真权属动作",
+   "rule": "出入库/处置=真权属动作，真实提交需授权；「柜面确认/柜面拒绝/发起流程/发起借阅/发起续借」均未点击（红线），仅列表层只读普查"
+  },
+  {
+   "keyword": "柜面复核模式",
+   "rule": "出入库类页普遍为「引入(申请)→审批状态→柜面确认/柜面拒绝」两段式；移库页区分 移库入库/移库出库 四个柜面按钮"
+  },
+  {
+   "keyword": "发起动作差异",
+   "rule": "借阅=发起借阅、续借=发起续借、归还/正式出库=发起流程（按钮文案实证）；强制出库与三类入库页无「发起」按钮，仅 引入+柜面确认/拒绝"
+  },
+  {
+   "keyword": "关联实物页",
+   "rule": "押品实物管理 子树（权证实物管理/盘库管理，url cltlMgt/cltlMtrlobjMgt/*）含 影像资料/法院信息/联网核查 按钮，与权证实物管护相关（未深入）"
+  }
+ ],
+ "exceptions": [
+  "入库/出库/借阅/归还的发起表单与提交 API 未采到（2026-09-01）：所有「发起*」「柜面确认/拒绝」按钮未点击（红线），待专项",
+  "列表均 0 行，审批状态/业务类型/返回结果枚举值未采到",
+  "biz_key_prefix（业务编号前缀格式）未采到"
+ ],
+ "source": "K6 2026-09-01 tmp/k6_notes/collateral.md 18:42:54-18:43:34 + 18:43:38-18:43:43（菜单普查，列表层只读，rendered=True）；截图 tmp/collateral_shots/menu__押品管理_押品权证出入库管理_*.png ×8"
+}

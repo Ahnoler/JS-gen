@@ -1,0 +1,211 @@
+{
+ "flow": "押品估值（押品估值管理）",
+ "aliases": [
+  "押品估值管理",
+  "汽车估值计算器",
+  "房产估值计算器",
+  "押品估值数据查询",
+  "押品内部评估流程管理",
+  "押品外部评估流程管理"
+ ],
+ "hash_markers": [
+  "cltlMgt",
+  "cltlValtMgt",
+  "carValtCalcu",
+  "hsptyValtCalcu",
+  "cltlValtDataEnqr"
+ ],
+ "keywords": [
+  "押品估值",
+  "估值计算器",
+  "评估批次号",
+  "评估价值",
+  "抵质押率",
+  "价值认定日期"
+ ],
+ "menu_path": "押品管理/押品估值管理/*（5 个子页已列表层普查）",
+ "biz_key_prefix": [],
+ "preconditions": [
+  "押品须关联已生效主合同/借款（业务常识，未实证）",
+  "估值前置=押品已登记（业务常识；估值数据查询页以 押品编号/押品名称/押品种类 检索）",
+  "登录态完整（home=true 且 token=true），同 collateral_info 卡注意项"
+ ],
+ "nodes": [
+  {
+   "id": "car_calculator",
+   "page": "汽车估值计算器",
+   "enter": "菜单链 url=/cltlMgt/cltlValtMgt/carValtCalcu/enqrCarValtCalcu",
+   "query_fields": [
+    "车辆名称",
+    "汽车品牌名称",
+    "汽车厂商名称"
+   ],
+   "buttons": [
+    "折旧法评估新增",
+    "查看详情",
+    "查询",
+    "重置"
+   ],
+   "columns": [
+    "单选",
+    "估值计算器编号",
+    "车辆名称",
+    "汽车品牌名称",
+    "汽车厂商名称",
+    "评估价值",
+    "购置年月",
+    "使用年限",
+    "车辆使用性质类型",
+    "制造质量"
+   ]
+  },
+  {
+   "id": "house_calculator",
+   "page": "房产估值计算器",
+   "enter": "菜单链 url=/cltlMgt/cltlValtMgt/hsptyValtCalcu/enqrHsptyValtCalcu",
+   "query_fields": [
+    "省级行政区划名称(select)",
+    "城市名称(select)",
+    "县名称(select)"
+   ],
+   "buttons": [
+    "均价法评估新增",
+    "查看详情",
+    "查询",
+    "重置"
+   ],
+   "columns": [
+    "单选",
+    "估值计算器编号",
+    "楼盘小区名称",
+    "小区坐落位置",
+    "单价",
+    "总价",
+    "区域",
+    "权属性质"
+   ]
+  },
+  {
+   "id": "valuation_query",
+   "page": "押品估值数据查询",
+   "enter": "菜单链 url=/cltlMgt/cltlValtMgt/cltlValtDataEnqr/cltlValtDataEnqrMgtPg",
+   "query_fields": [
+    "评估批次号",
+    "押品编号",
+    "押品名称"
+   ],
+   "buttons": [
+    "查看",
+    "查询",
+    "重置"
+   ],
+   "columns": [
+    "单选",
+    "评估批次号",
+    "押品编号",
+    "押品名称",
+    "押品种类",
+    "评估金额（元）",
+    "评估单价（元）",
+    "确认金额（元）",
+    "确认单价（元）",
+    "价值认定日期"
+   ]
+  },
+  {
+   "id": "internal_assessment",
+   "page": "押品内部评估流程管理",
+   "enter": "菜单链 url=/cltlMgt/cltlValtMgt/inrAsesPcsMgt/enqrCltlValtPcs",
+   "query_fields": [
+    "评估批次号",
+    "评估名称",
+    "押品一级种类编码(popover)",
+    "审批状态(select)",
+    "评估状态(select)",
+    "评估机构名称",
+    "创建人(select)",
+    "申请时间"
+   ],
+   "buttons": [
+    "查看",
+    "查询",
+    "重置"
+   ],
+   "columns": [
+    "单选",
+    "评估批次号",
+    "押品一级目录",
+    "评估名称",
+    "审批状态",
+    "评估机构名称",
+    "申请时间",
+    "创建人",
+    "评估状态"
+   ]
+  },
+  {
+   "id": "external_assessment",
+   "page": "押品外部评估流程管理",
+   "enter": "菜单链 url=/cltlMgt/cltlValtMgt/extAsesPcsMgt/cltlExtValtPcsMgtPg",
+   "query_fields": [
+    "评估批次号",
+    "评估名称",
+    "押品二级目录(popover)",
+    "出具评估报告日期",
+    "押品外部评估流程节点类型(select)",
+    "外部评估状态(select)",
+    "评估机构名称",
+    "重估标志(select)",
+    "是否即时抽取(select)",
+    "是否强制指定(select)"
+   ],
+   "buttons": [
+    "删除",
+    "查看",
+    "查询",
+    "模拟报名",
+    "重置"
+   ],
+   "columns": [
+    "单选",
+    "评估批次号",
+    "业务编号",
+    "押品二级目录",
+    "评估名称",
+    "预估评估费",
+    "出具评估报告时限",
+    "评估机构名称",
+    "申请时间",
+    "经办人",
+    "流程节点",
+    "评估状态",
+    "审批状态",
+    "是否重估",
+    "是否即时抽取",
+    "是否强制指定"
+   ]
+  }
+ ],
+ "field_deps": [],
+ "state_actions": [],
+ "rules": [
+  {
+   "keyword": "估值入口",
+   "rule": "押品估值管理下实测 5 个子页：汽车估值计算器/房产估值计算器/押品估值数据查询/押品内部评估流程管理/押品外部评估流程管理；汽车走「折旧法评估新增」，房产走「均价法评估新增」"
+  },
+  {
+   "keyword": "关联参数",
+   "rule": "估值参数沉淀在 押品参数管理 子树（房产估值模型管理/各农合机构押品估值参数管理-含最高抵质押率与重估周期/商用最高限比率配置），与估值计算结果强相关（推论，未实证计算联动）"
+  },
+  {
+   "keyword": "真权属/价值动作",
+   "rule": "评估新增/确认金额/价值认定属真实价值认定动作，真实提交需授权；本次只做列表层只读普查，未点任何「评估新增/确认」按钮"
+  }
+ ],
+ "exceptions": [
+  "估值动作流未采到（2026-09-01）：「折旧法评估新增」「均价法评估新增」「查看详情」「模拟报名」均未点击，评估表单字段与提交 API 未知，待专项",
+  "列表均 0 行，估值数据行态与状态枚举（评估状态/审批状态取值）未采到",
+  "biz_key_prefix（评估批次号前缀格式）未采到"
+ ],
+ "source": "K6 2026-09-01 tmp/k6_notes/collateral.md 18:42:06-18:42:50 菜单普查（列表层只读，rendered=True）；截图 tmp/collateral_shots/menu__押品管理_押品估值管理_*.png ×5"
+}
