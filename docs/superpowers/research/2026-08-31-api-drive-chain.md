@@ -247,3 +247,11 @@
 | B 召回 | kb_flow(对公用信申请) 先召回 | **0**（卡片明示「查询区 disabled，仅能经引入」直接点引入） | 6 | 56.8s | 引入弹窗打开 |
 
 **结论**：单步流程对比，KB 召回消除全部无效操作（err 3→0）、步数 -1/3、耗时 -17%；流程越长（依赖/前置越多）增益越大。kb_flow 卡片的「引入语义」条目（不是授信数据导入）被 B 轮直接消费。
+
+## 11. KB-I 注入效果实录（2026-09-01，用户重录同流程，日志 Desktop/log.txt）
+
+- **I1 注入生效**：`kb_flow injected: 对公客户建档 (score=100)`（hash_markers 强匹配命中），agent_task 携带【KB 流程知识】段（前置闸门/节点图/状态×动作）。
+- **特殊元素候选生效**：`special_element_candidates loaded: 1`（此前恒 0）+ `Appended special-element hint (1 candidates)`。
+- **Step5 里程碑**：LLM 调用 `use_special_element(special_element_id=8)`，嵌套 replay `5/5 ok`（click 引入 → fill 客户名称=吴芳军 → 查询 → radio → 确认）——**法定代表人引入的盲点 index 弯路彻底消失**，改为资产库原子重放；step6 `check_field_value` 确认回填 吴芳军。
+- **全流程**：8 步 done（此前同流程 10-12 步带弯路）；`click_save → ok-save-success:操作成功`；phase outcome success=True。
+- 遗留 minor：flow_summary_text 800 字截断把 field_deps/rules 段截掉（状态第三行切半）——建议规则段前置或提额至 1200。
