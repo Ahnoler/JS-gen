@@ -14,6 +14,7 @@ FLOWS_DIR = os.path.join(DATA_DIR, "flows")
 DICTS_FILE = os.path.join(DATA_DIR, "dicts_normalized.json")
 FIELD_MAP_FILE = os.path.join(DATA_DIR, "field_map.json")
 ALIAS_FILE = os.path.join(DATA_DIR, "dict_alias.json")
+STAGING_FILE = os.path.join(DATA_DIR, "staging", "staged_flows.jsonl")
 
 
 def load_json(path, default=None):

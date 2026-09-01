@@ -323,6 +323,27 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
         except Exception as e:
             sys.stderr.write(f"fact pack skipped: {e}\n")
             sys.stderr.flush()
+        # KB 流程知识自动召回（AI_KB_FLOW_INJECT 默认开）——phase 任务文本匹配
+        # 流程卡，命中即注入摘要（闸门/节点/状态×动作/规则，≤800 字）；miss 静默。
+        # 同时写 _kb_flow_name/_kb_flow_summary 供 scenario_describer/staging 消费。
+        try:
+            from ..feature_flags import kb_flow_inject_enabled
+            from ..kb import store as kb_store
+            from ..kb.recall import find_flow_for_task, flow_summary_text
+            if not heal_mode and kb_flow_inject_enabled():
+                match_text = (phase_task_text or '') + '\n' + (agent_task or '')[:400]
+                card, score = find_flow_for_task(kb_store.load_flows(), match_text)
+                if card:
+                    summary = flow_summary_text(card)
+                    agent_task = agent_task + '\n\n' + summary
+                    if business_data_ref is not None:
+                        business_data_ref['_kb_flow_name'] = card.get('flow', '')
+                        business_data_ref['_kb_flow_summary'] = summary
+                    sys.stderr.write("kb_flow injected: %s (score=%s)\n" % (card.get('flow'), score))
+                    sys.stderr.flush()
+        except Exception as e:
+            sys.stderr.write(f"kb flow inject skipped: {e}\n")
+            sys.stderr.flush()
         ceiling, max_steps = _resolve_phase_budget(max_steps, contract, heal_mode)
         max_steps_resolved = True
         if business_data_ref is not None and not heal_mode:
@@ -395,6 +416,28 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
                 agent_task = agent_task + hint
                 sys.stderr.write(f"Appended business data hint ({len(entries)} keys)\n")
                 sys.stderr.flush()
+                # KB 码表预检（零 token）：业务数据值 ↔ 字典 text 命中时附候选码表。
+                # entries 形状为 (key, value) 元组（iter_user_business_entries）。
+                try:
+                    from ..kb import store as kb_store
+                    from ..kb.recall import dict_candidates_for_values
+                    alias = kb_store.load_alias_map()
+                    data = kb_store.load_json(kb_store.DICTS_FILE, {})
+                    vals = []
+                    for e in entries:
+                        v = e[1] if isinstance(e, tuple) and len(e) > 1 else (
+                            e.get('value') if isinstance(e, dict) else None)
+                        if isinstance(v, str) and v.strip():
+                            vals.append(v)
+                    cands = dict_candidates_for_values(vals, data.get('by_type') or {}, alias)
+                    if cands:
+                        agent_task = agent_task + '\n【KB 码表】' + '；'.join(
+                            '{value}∈{dict_type}'.format(**c) for c in cands)
+                        sys.stderr.write("kb dict candidates: %d\n" % len(cands))
+                        sys.stderr.flush()
+                except Exception as e:
+                    sys.stderr.write(f"kb dict candidates skipped: {e}\n")
+                    sys.stderr.flush()
         else:
             sys.stderr.write("Skip business-data hint (phase is not fill/introduce)\n")
             sys.stderr.flush()

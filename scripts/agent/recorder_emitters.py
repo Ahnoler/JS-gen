@@ -672,6 +672,37 @@ def _guard_done_accept_success(agent, business_data_store, contract, done_succes
             business_data_store.pop('_url_before_save', None)
             business_data_store.pop('_success_tokens', None)
 
+def _append_kb_staging(business_data_store, done_text, staging_path=None):
+    """done 接受后把已注入 KB 流程知识的使用情况追加到 staging JSONL。
+
+    仅当 business_data_store 带 _kb_flow_name 时写（T-A 注入的标记）；
+    任何异常静默（回流不阻塞主链路）。返回写入的条目 dict 或 None。
+    """
+    try:
+        import os
+        import time as _time
+
+        from scripts.kb import store as _kb_store
+
+        flow = (business_data_store or {}).get('_kb_flow_name')
+        if not flow:
+            return None
+        if staging_path is None:
+            staging_path = _kb_store.STAGING_FILE
+        entry = {
+            "ts": _time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "flow": flow,
+            "done_text": str(done_text or "")[:200],
+            "summary": str((business_data_store or {}).get('_kb_flow_summary') or "")[:300],
+        }
+        os.makedirs(os.path.dirname(staging_path), exist_ok=True)
+        with open(staging_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        return entry
+    except Exception:
+        return None
+
+
 def _guard_done_persist_outcome(business_data_store, done_success, done_text):
     """done 拦截-结果落账（原 541-579 段逐字搬移）。
 
@@ -717,6 +748,11 @@ def _guard_done_persist_outcome(business_data_store, done_success, done_text):
         except Exception as e:
             sys.stderr.write(f"[recorder] phase outcome save failed: {e}\n")
             sys.stderr.flush()
+    if done_success:
+        try:
+            _append_kb_staging(business_data_store, done_text)
+        except Exception:
+            pass
 
 async def _guard_done_on_step_end(agent, _last_result, business_data_store) -> bool:
     """done() 拦截总闸（原 420 行单函数拆分后的编排层，门禁逻辑见各 _guard_* 子函数）。
