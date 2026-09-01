@@ -1,3 +1,23 @@
+## 2026-09-01 · Zcode (uara_V1.2) — KB v1 SDD 执行完毕（Task 1-4 交付+终审，湿测阻塞待 SUT 恢复）
+- 完成：SDD 全流程（subagent-driven-development，主 Agent 统筹+每任务独立实现者/审阅者双审）——Task 1 store（bf3af90）/Task 2 导出链路+matcher（c8e92b8）/Task 3 六动作+6 流程卡+接线（66f5585，实现者自查条目见下方独立条目）/Task 4 提示词 cue（22b41a1）
+- 完成：终审 PASS with deferred → 合前修 KB_DATA_DIR 隔离（a9d0a0d，特征化不再覆盖/删除本机真实字典数据；scoped re-review 实测 data/kb 零写入 ADDRESSED）
+- 完成：KB-1/KB-2/KB-3 批次落地——`export_dicts/kb_dict/kb_flow/kb_state/kb_rule/kb_field` 六动作注册可用；提示词召回 cue（召回不到=上报缺口不编造；nextBefore 前置闸门=硬边界）
+- BLOCKED：KB-4 湿测（Task 5/6）——SUT 网关导航层间歇 5xx（ERR_HTTP_RESPONSE_CODE_FAILURE，7+ 次重试跨 5 分钟；静态页 200 但应用导航失败）；脚本 `tmp/kb_live_check.py` 就绪，SUT 恢复后直接跑；KB-4 A/B 对照随之
+- 挂起 minors：seq 字典序排序（消费前数值化）/ cue 参数名 dict_type 大小写与 kb_rule 未提 / kb_dict 前缀多命中静默 not-found / find_flow 首卡命中 / skipped 丢弃 / FIELD_MAP 死常量（明细在 .superpowers/sdd/2026-09-01-credit-knowledge-base/progress.md，工作区暂留）
+- 注意：分支上混有另一会话提交（bf5c929 menu-push 文档、e4c2b4a menu_push 列）与 Cursor 会话——非本线产物；控制面+executor+隧道在线；未推送
+
+## 2026-09-01 · Zcode (uara_V1.2) — Task 3：kb_* 召回/摄取动作 + 6 张流程卡 + 特征化（66f5585）
+- 完成：`scripts/controller/actions/_kb.py` 六个动作（export_dicts/kb_dict/kb_flow/kb_state/kb_rule/kb_field）+ service.py 接线（+2 行，紧随 _register_observe_actions）
+- 完成：`data/kb/` 入库——dict_alias.json + 6 张流程卡（customer_onboarding/credit_application/credit_usage/approval_todo/customer_360/session_login，K1 实证逐字转录）；.gitignore 追加 dicts_normalized.json 生成物
+- 完成：`scripts/characterization/characterize-kb-actions.py`（FakeCtx 无浏览器，asyncio.run 包动作调用，kb_dict 分支用内置最小 dict fixture，结束清理）并注册进 verify-all
+- 验证：特征化绿（ok: characterize-kb-actions）；import 门禁 wiring OK；eslint 0 error；verify-all 仅已知存量 export-v3 FAILED
+- 注意：特征化脚本与 brief 逐字稿有两处必要偏差——动作函数为 async coroutine（补 asyncio.run）；kb_dict 无数据文件时返回 kb-dict-empty 而非 not-found（fixture 注入走 not-found 分支）
+
+## 2026-09-01 · Cursor (uara_V1.2) — 关闭 V2.1_dev 日报草稿并按现分支重写
+- 完成：关闭 Ahnoler/JS-gen 上 13 个 draft PR（#11–#23），全部是对着已停更 `V2.1_dev` 的试用期日报，不合入
+- 完成：按 `uara_V1.2` git 提交重写 8/18–8/31 日报（8/23 无提交跳过），写入本地 `docs/report/`（gitignore，不入库）并更新索引
+- 注意：8/14–8/17 本地稿已是 uara_V1.2 真实提交，未覆盖。自动化检出分支需在 Automations Settings 改成 `uara_V1.2` 后保存；今晚 18:00 才会写 8/31 的云端稿（本地已有重写版）。本地仍比 origin/uara_V1.2 超前，云端日报看不到未 push 的提交
+
 ## 2026-08-31 · Zcode (uara_V1.2) — borrow-design Z 系列全部落地（7 路并行 + 主线程接线）
 - 完成：Z1+Z4（4f04c26）——JS_SEMANTIC_SNAPSHOT（context 头 + 稳定 ref 控件清单，快照即真相）与 JS_VERIFY_CONTEXT（六判据动作前上下文校验）+ _observe.py 注册 semantic_snapshot / verify_context
 - 完成：Z2（9f41c47）——page-locator-helpers.js 增量 resolveLocatorStrict（found/count/visibleCount/ambiguous/samples），重新生成 _locator_helpers_js.py；三源护栏改前后字节一致；真机对照 //body 与 选择客户 1/1 命中、保存 真实 0
