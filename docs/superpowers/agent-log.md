@@ -1,3 +1,8 @@
+## 2026-09-02 · Zcode (uara_V1.2) — KB-I5 引擎五缺口修复落地（1612186）
+- 完成：三组并行子智能体（文件集不相交）修复归档于 `research/2026-08-31-api-drive-chain.md` §12 的五缺口——G1 click_button 容器作用域优先（`_misc.py` 新增 `_JS_CLICK_BUTTON_IN_CONTAINER`，页面级回退不变）；G2 `JS_IS_QUERY_TOOLBAR` 向导排除（el-steps/下一步+上一步/流程提交·意见 → 非查询工具栏，form_scan_utils:382/form_save:414 语义自洽无需改）；G3 picker 回填补验+重试（picker_confirm SELECT 空 changed 等 1.5s 重读，动作层重选一次仍空 → `err-refill-not-verified` 显式上报）；G4 watcher 播种意图豁免（`phase/intent_gates.py` contract_allows_form_assistant：_phase_intent{mode create|modify}+locked+无显式键 → allow；deny pin 保持通过）；G5 login 孤儿 Chrome 探针（同账号 → ok-login reuse；异账号 → localStorage.clear+reload；token 缺失原逻辑）
+- 完成：新增 pin `characterize-click-scope-picker-login.py`、`characterize-query-toolbar-snippet.py`，扩展 `characterize-phase-intent.py` 正反例（纯追加）；全部 7 个 pin 脚本绿；prompt 同步 agent-tools-form.md（KB-I5 能力提示）；todo-list ⑤ 工作线+A7 探索项。commit `1612186`（未推送）；对比基线已证 verify-all 存量失败（characterize-kb-actions 「流程取回」）与本次无关
+- 注意：配合 20 卡知识，Python Agent 已具备自主跑通授信向导深链的引擎能力（尚未实机湿测——建议下一步用冻结最短闭环或用信申请做引擎回归）
+
 ## 2026-09-02 · Zcode (uara_V1.2) — 链 A A6 破局：用信审批链贯通 + 合同创建签订（卡点=影像上传待拍板）
 - 完成：A6 全链推进（串行子智能体+号切，7 个子环节逐一闭环）——①冻结 EDDJ20260901024001 提交→**自批成功→审批通过**（完整闭环：同意/否决/退回上一步+最终确认框+submitProcess 200）；②**替代账号破局：WN0001/1=黄亮登录成功**，用信 4 节点全序打通（发起701994→二次调查黄亮→五级机构审查701994→五级机构审批黄亮=末节点 23:36:51）→**用信通过**；③用信通过自动生成并生效**对公用信批复 DGYXPF202609010016001**（100 万）；④**合同 9881020044004 创建+签订提交**（引入客户→引入用信→风险拦截→纸质签/线下/3 份/账户两行必填 saveCtrAccinf→saveSignContInfo→submitProcess 200 bsnPk=HTAPL202609016002）→**签订中 ctrSt=3**（签订流程审批 00:10:54 已过）
 - 完成：补卡 credit_usage（审批链/定人vs角色/批复自动生成，规则 6→9）+ duigong_contract_sign（合同创建向导全链/ctrSt=3/影像向导/0 条结论修正）+ 报告 §7，commit `285c642`（未推送）
