@@ -220,7 +220,7 @@ export const GROUP_OVERVIEW = [
           tryable: false,
           reqExample: 'POST /api/v2/system-mgmt/nodes/1/push-menu',
           respExample: J({ status: 'pushing', menuVersion: 8, menuCount: 42, partner: { skipped: true, reason: 'partner_endpoint_pending' }, autoSyncMs: 5000 }),
-          notes: [':id 必须是系统类型节点 (type=1)', '伙伴平台 access token 可选：Authorization Bearer 或 X-Partner-Access-Token', 'partner 当前为 stub（skipped），真实对接后 partner.skipped=false', 'autoSyncMs 由 MENU_PUSH_AUTO_SYNC_MS 配置，默认 5000ms'],
+          notes: [':id 必须是系统类型节点 (type=1)', 'access_token 可选；优先请求头 access_token', 'partner 当前为 stub（skipped），真实对接后 partner.skipped=false', 'autoSyncMs 由 MENU_PUSH_AUTO_SYNC_MS 配置，默认 5000ms'],
         },
         {
           method: 'GET', path: '/api/v2/system-mgmt/nodes/:id/push-menu/status',
