@@ -149,3 +149,9 @@
 - 完成：报文捞取 MVP（`dfb5c9e` 改名 92 文件、`8148f72` elk-msg-extract CLI、`1fcd1b9`/`b837d67` 契约对齐+回填验证 122/122；码值字典 `2fd2046` 挂起）
 
 
+
+## 2026-09-01 · Zcode (uara_V1.2) — 录制双缺口修复（流程卡绑定 hash/keywords + 特殊元素兜底）
+- 完成：用户重录日志判读——上批修复全部生效（登录一次过/日期分化/国别语义值/value-mismatch 自愈/save 链），剩余两缺口=①kb_flow 文本匹配失配不注入 ②特殊元素候选 0 引入走盲点
+- 完成：修复 b57060c——recall 三层匹配（hash_markers 强匹配 score=100 > keywords 弱匹配 > 词条兜底；四卡绑定 cstMgt/crgMgt/crutMgt/wfPendTask）；service 注入经 page.url 取 hash；候选 0+任务含引入+卡命中 → 追加特殊元素兜底提示（_kb_special_hint）
+- 验证：kb 5 特征化全绿 + form 系无回归；审阅 Approved（五红线满足，minor 均记录性）
+- 注意：下次录制应在 agent_task 见【KB 流程知识】段且 step6 法定代表人引入不再走盲点 index；若仍有问题发日志来
