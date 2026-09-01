@@ -119,6 +119,7 @@ run "characterize-replay-batch" node scripts/characterization/characterize-repla
 run "characterize-record-status" node scripts/characterization/characterize-record-status.mjs
 run "characterize-menu-navigation" node scripts/characterization/characterize-menu-navigation.mjs
 run "characterize-page-bind" node scripts/characterization/characterize-page-bind.mjs
+run "characterize-kb-store" "$PY" scripts/characterization/characterize-kb-store.py
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
