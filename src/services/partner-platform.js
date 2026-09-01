@@ -424,3 +424,20 @@ export async function pushImportDemand(payload, { accessToken } = {}) {
     data: json.data,
   };
 }
+
+/**
+ * 推送菜单到自动化平台（接收接口待平台定义）。
+ * 本期不发 HTTP；平台就绪后只改本函数体。
+ * @param {object} payload v1.2 wire body（schemaVersion/systemNodeId/systemName/menuVersion/menus）
+ * @param {{ accessToken?: string }} [opts]
+ * @returns {Promise<{ skipped: true, reason: string }>}
+ */
+export async function pushMenusToPartner(payload, { accessToken } = {}) {
+  void accessToken;
+  console.log('[partner] pushMenus skipped (partner_endpoint_pending)', {
+    systemNodeId: payload?.systemNodeId,
+    menuVersion: payload?.menuVersion,
+    menuCount: Array.isArray(payload?.menus) ? payload.menus.length : 0,
+  });
+  return { skipped: true, reason: 'partner_endpoint_pending' };
+}
