@@ -54,6 +54,49 @@ _JS_VISIBLE_FORM_OVERLAY = '''() => {
 }'''
 
 
+# G1 container-scope-first click: when a visible drawer/dialog/message-box is
+# open, try to click a matching button INSIDE that overlay before falling back
+# to the page-level JS_CLICK_ICON_BUTTON (which prefers page-level over
+# overlays and can hit a same-label toolbar button on the main list page,
+# e.g. 查询 in a drawer shadowed by 查询 on the main page). Returns 'miss'
+# when no visible overlay or no in-overlay match — callers then run the
+# original page-level path unchanged (no-container diff is invisible).
+# Counterpart of JS_IDENTIFY_CONTAINER (base.py): that one names the active
+# container for scan/fill; this one clicks within the overlay scope first.
+_JS_CLICK_BUTTON_IN_CONTAINER = r'''([buttonText]) => {
+    const norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    const want = norm(buttonText);
+    if (!want) return 'miss';
+    const overlays = [...document.querySelectorAll('.el-dialog, .el-drawer, .el-message-box')]
+        .filter((d) => d.offsetParent !== null && d.getClientRects().length > 0);
+    if (!overlays.length) return 'miss';
+    // Topmost visible overlay wins (highest z-index, like _misc overlay scan).
+    let scope = null;
+    let bestZ = -1;
+    for (const o of overlays) {
+        const z = parseInt(getComputedStyle(o).zIndex || '0', 10) || 0;
+        if (z >= bestZ) { bestZ = z; scope = o; }
+    }
+    if (!scope) return 'miss';
+    const matches = [];
+    for (const b of scope.querySelectorAll('button, .el-button, a')) {
+        if (b.offsetParent === null || b.disabled) continue;
+        if (b.closest('.el-table__body-wrapper')) continue;
+        const t = norm(b.innerText || b.textContent);
+        if (!t || t.length > 40) continue;
+        if (t === want || (t.includes(want) && !want.includes(t))) {
+            matches.push({ el: b, text: t });
+        }
+    }
+    if (!matches.length) return 'miss';
+    const exact = matches.filter((m) => m.text === want);
+    const pool = exact.length ? exact : matches;
+    pool[0].el.scrollIntoView({ block: 'center', behavior: 'instant' });
+    pool[0].el.click();
+    return 'ok-container:' + pool[0].text;
+}'''
+
+
 def _register_misc_actions(controller, browser_context, business_data_store=None):
     @controller.action('Wait for Element UI loading mask to disappear.')
     async def wait_for_loading():
@@ -209,7 +252,25 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
         element = await _enrich_click_element(
             page, text=button_text, target_kind='icon',
         )
-        result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
+        # G1 container-scope-first: if a visible drawer/dialog is open and a
+        # matching button exists inside it, click the in-overlay one; only fall
+        # back to the page-level JS_CLICK_ICON_BUTTON on miss (original
+        # page-level behavior fully unchanged when no container matches).
+        container_result = ''
+        try:
+            container_result = await page.evaluate(
+                _JS_CLICK_BUTTON_IN_CONTAINER, [button_text]
+            )
+        except Exception as _container_exc:
+            sys.stderr.write(
+                "[click-button] container-scope probe failed: " + repr(_container_exc) + '\n'
+            )
+            sys.stderr.flush()
+            container_result = ''
+        if isinstance(container_result, str) and container_result.startswith('ok-container:'):
+            result = container_result
+        else:
+            result = await page.evaluate(JS_CLICK_ICON_BUTTON, button_text)
         await page.wait_for_timeout(WAIT_400_MS)
         if _is_ok_result(result):
             _state._record_action(

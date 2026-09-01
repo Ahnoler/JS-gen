@@ -19,12 +19,27 @@ from .intent_contract import (
 )
 
 def contract_allows_form_assistant(business_data_store: dict | None) -> bool:
+    """Whether the form assistant may run under the current phase intent.
+
+    Watcher-mode seeded-intent exemption (2026-09-02 KB-I5): when no contract
+    compiled the intent (watcher mode), a seeded `_phase_intent` with mode
+    create/modify plus `_phase_intent_flag_locked=True` is honored as an
+    explicit wizard intent and allowed, as long as the contract does not carry
+    an explicit `allow_form_assistant=False`.
+    """
     c = get_phase_intent(business_data_store)
     if not c:
         return False
     if 'allow_form_assistant' in c:
         from scripts.controller.actions.phase.reviewer import coerce_bool
         return coerce_bool(c.get('allow_form_assistant'))
+    if (
+        business_data_store is not None
+        and business_data_store.get('_phase_intent_flag_locked') is True
+        and c.get('mode') in ('create', 'modify')
+    ):
+        # Seeded (not compiled) create/modify intent: allow the assistant.
+        return True
     return c.get('refill') == 'all_editable' and c.get('mode') in ('create', 'modify')
 
 def contract_summary_hint(contract: dict[str, Any] | None) -> str:

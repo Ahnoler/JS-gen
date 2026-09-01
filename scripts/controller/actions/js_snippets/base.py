@@ -28,21 +28,40 @@ JS_IDENTIFY_CONTAINER = '''(() => {
 })()'''
 
 # True when visible scope has 查询/搜索 and no 保存/提交 (list filter / query dialog).
+# Wizard exclusion: a stepped wizard drawer (e.g. credit application Step1: 查询/重置/下一步/返回,
+# no save) also matches "有查询无保存" but is a FORM, not a query toolbar — treat it as non-query
+# (return false) when any of these wizard signals is visible:
+#   1. step bar:     .el-steps / .el-step visible in scope;
+#   2. stepper nav:  visible buttons contain both 「下一步」 and 「上一步」 (query drawers never have both);
+#   3. approval:     visible button 「流程提交」/「流程撤销」 or button/label text containing 「意见」.
+# Note: 「返回」 alone is NOT a signal (query drawers have it too). Pure query toolbars
+# (查询/重置, no wizard signals) still return true; scope with 保存/提交 still returns false.
 
 JS_IS_QUERY_TOOLBAR = '''(() => {
     const root = ''' + JS_GET_CONTAINER + ''';
     const scope = root === document ? document.body : root;
     if (!scope) return false;
+    const visible = (el) => el && el.offsetParent !== null && el.getClientRects().length > 0;
+    const stepBar = scope.querySelector('.el-steps, .el-step');
+    if (visible(stepBar)) return false; // wizard signal 1: step bar
     const btns = scope.querySelectorAll('button, .el-button, [role="button"]');
     let hasQuery = false;
     let hasSave = false;
+    let hasPrev = false; // 「上一步」 — stepper nav signal
+    let hasNext = false; // 「下一步」 — stepper nav signal
+    let hasFlowBtn = false; // 「流程提交」/「流程撤销」/「意见」 — approval form signal
     for (const b of btns) {
         if (b.offsetParent === null && b.getClientRects().length === 0) continue;
         const t = (b.innerText || b.textContent || '').replace(/\\s+/g, ' ').trim();
         if (!t || t.length > 12) continue;
         if (/^(查询|搜索|查找)$/.test(t)) hasQuery = true;
         if (/^(保存|提交)$/.test(t)) hasSave = true;
+        if (t === '上一步') hasPrev = true;
+        if (t === '下一步') hasNext = true;
+        if (t === '流程提交' || t === '流程撤销') hasFlowBtn = true;
+        if (t.includes('意见')) hasFlowBtn = true;
     }
+    if ((hasPrev && hasNext) || hasFlowBtn) return false; // wizard signals 2 & 3
     return hasQuery && !hasSave;
 })()'''
 

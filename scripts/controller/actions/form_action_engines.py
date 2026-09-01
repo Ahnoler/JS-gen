@@ -176,6 +176,41 @@ class LoginEngine(_FormActionEngineBase):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
 
+        # G5 orphan-Chrome reuse probe (already-logged-in session check). If a
+        # _usertoken already exists and the hash shows '/home', the browser was
+        # reused from a previous run: a matching user → reuse the session
+        # directly (no page-state change); a different/unknown user → clear
+        # localStorage and reload to reach a clean login form. Missing token →
+        # original flow completely unchanged.
+        try:
+            _g5_sess = await page.evaluate(
+                "() => ({ token: localStorage.getItem('_usertoken') || '',"
+                " hash: location.hash || '',"
+                " usr: localStorage.getItem('usrNo') || localStorage.getItem('usrno')"
+                " || localStorage.getItem('username') || localStorage.getItem('userName')"
+                " || localStorage.getItem('account') || '' })"
+            )
+        except Exception:
+            _g5_sess = {}
+        if (
+            isinstance(_g5_sess, dict)
+            and (_g5_sess.get('token') or '').strip()
+            and '/home' in str(_g5_sess.get('hash') or '')
+        ):
+            _g5_user = str(_g5_sess.get('usr') or '').strip()
+            if _g5_user and _g5_user == str(username or '').strip():
+                return _ok(
+                    'ok-login reuse | already-logged-in | user:' + _g5_user
+                    + ' | hash:' + str(_g5_sess.get('hash') or ''),
+                    include_in_memory=True,
+                )
+            try:
+                await page.evaluate("() => { localStorage.clear(); }")
+                await page.reload()
+            except Exception:
+                pass
+            await _wait_for_login_form(page)
+
         # Cold-start pre-wait: absorb the SPA mounting window on a fresh
         # executor slot. If the login form never appears within the timeout
         # (e.g. non-login page / already-logged-in session), fall through

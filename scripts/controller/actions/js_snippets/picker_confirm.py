@@ -161,5 +161,21 @@ JS_PICKER_DIALOG_SELECT = '''async (args) => {
     for (const key of Object.keys(after)) {
         if (after[key] && after[key] !== before[key]) changed[key] = after[key];
     }
-    return JSON.stringify({ ok: true, changed: changed });
+    // G3 refill-verify: async backfill can lag past the dialog-close wait —
+    // when changed is empty, wait 1500ms and re-read the underlying form once.
+    if (Object.keys(changed).length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const after2 = readUnderlyingForm();
+        for (const key of Object.keys(after2)) {
+            if (after2[key] && after2[key] !== before[key]) changed[key] = after2[key];
+        }
+    }
+    const payload = { ok: true, changed: changed };
+    // Still empty after the delayed re-read → flag refill-not-observed while
+    // keeping ok:true and the original field set (backward compatible).
+    if (Object.keys(changed).length === 0) {
+        payload.refill_verified = false;
+        payload.warn = 'refill-not-observed';
+    }
+    return JSON.stringify(payload);
 }'''

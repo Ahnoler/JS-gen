@@ -81,6 +81,31 @@ def _register_workspace_actions(controller, browser_context):
         await page.wait_for_timeout(WAIT_800_MS)
         ok, payload = _workspace_result(result)
         if ok:
+            # G3 refill gate: JS sets refill_verified:false when changed was empty
+            # even after its internal 1500ms delayed re-read. Re-read once here and
+            # re-run the SELECT once with the same row_text; if still empty, fail
+            # explicitly instead of the old silent changed:{} success.
+            try:
+                payload_dict = json.loads(payload[3:]) if payload.startswith('ok:') else {}
+            except Exception:
+                payload_dict = {}
+            if payload_dict.get('refill_verified') is False:
+                retry_eval = await page.evaluate(JS_PICKER_DIALOG_SELECT, [dialog_name, row_text])
+                await page.wait_for_timeout(WAIT_800_MS)
+                ok2, payload2 = _workspace_result(retry_eval)
+                if ok2:
+                    try:
+                        payload_dict2 = json.loads(payload2[3:]) if payload2.startswith('ok:') else {}
+                    except Exception:
+                        payload_dict2 = {}
+                    if payload_dict2.get('refill_verified') is not False:
+                        _record_action('picker_dialog_select', {'dialog_name': dialog_name, 'row_text': row_text}, payload2)
+                        return _ok(payload2)
+                return _err(
+                    'err-refill-not-verified: 回填未观察 | dialog=%s row=%s | '
+                    '确认后底层表单回填未发生（重选一次仍未观察到 changed 字段），'
+                    '请检查选择是否命中正确行或改用其他选择方式' % (dialog_name, row_text)
+                )
             _record_action('picker_dialog_select', {'dialog_name': dialog_name, 'row_text': row_text}, payload)
             return _ok(payload)
         return payload

@@ -33,6 +33,11 @@
 - 阿里云安全组关 3306/6380 对公网（8-31 已备 SSH 隧道脚本 `config/open-db-tunnel.cmd`，启用须改 .env DB_HOST/DB_PORT）；iptables 持久化；删除 recover_your_data 勒索库；排查 crontab/authorized_keys；mysqldump 定时备份 + 异机存储；数据泄露评估。
 - 已完成底座（8-28/8-31）：DB 迁移 47.101.58.49 全量覆盖零差异、docker mysql restart=always、root@% 补 GRANT ALL、DB_POOL_MAX=20 + compress 热修。
 
+### ⑤ KB-I5 引擎五缺口修复（2026-09-02 启动）
+
+- 归档于 `research/2026-08-31-api-drive-chain.md` §12；修复后 Python Agent 可自主跑通授信向导深链（启动前需先过 引擎五缺口：click_button 容器作用域遮蔽 / JS_IS_QUERY_TOOLBAR 误判向导抽屉 / picker 回填空 / run_form_assistant intent gate / 孤儿 Chrome 复用）。
+- A7 探索项（已写锚点与卡）：**影像上传录制回放可行性**（wf_ctrcontsign_com，2026-09-02 用户列为探索事项，非定案）——验证通过后 ctrSt 3→6 放款闭环。
+
 ## 挂起 / 按需（湿测 + 工程债 + 产品残留）
 
 | ID | 优先级 | 项 |
