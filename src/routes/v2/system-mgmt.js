@@ -17,6 +17,8 @@ import { EXCEL_MIME } from '../../services/system-mgmt-excel.js';
 import { NODE_TYPE, TYPE_LABEL } from '../../models/hierarchy-constants.js';
 import { importMenuJson } from '../../services/menu-json-import.js';
 import { startScan, getScan } from '../../services/menu-scan-service.js';
+import { pushMenuForSystem, getMenuPushStatus } from '../../services/menu-push.js';
+import { resolveAccessToken } from '../../services/partner-platform.js';
 import * as menuChangeLogDao from '../../dao/menu-change-log-dao.js';
 import { asyncHandler, AppError } from '../../http/app-error.js';
 
@@ -226,6 +228,28 @@ export default function (app) {
       const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
       const rows = await menuChangeLogDao.listBySystem(Number(req.params.id), { version: req.query.version || null, limit });
       res.json(rows);
+    } catch (e) {
+      toHttp(e);
+    }
+  }));
+
+  /** 4.5 推送系统菜单至伙伴平台（stub，202 异步语义） */
+  app.post('/api/v2/system-mgmt/nodes/:id/push-menu', asyncHandler(async (req, res) => {
+    try {
+      const result = await pushMenuForSystem(Number(req.params.id), {
+        accessToken: resolveAccessToken(req) || undefined,
+      });
+      res.status(202).json(result);
+    } catch (e) {
+      toHttp(e);
+    }
+  }));
+
+  /** 4.6 菜单推送状态轮询（pushing→synced 由 auto-sync 窗口纠偏） */
+  app.get('/api/v2/system-mgmt/nodes/:id/push-menu/status', asyncHandler(async (req, res) => {
+    try {
+      const result = await getMenuPushStatus(Number(req.params.id));
+      res.json(result);
     } catch (e) {
       toHttp(e);
     }

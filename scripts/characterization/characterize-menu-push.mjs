@@ -54,12 +54,20 @@ function testWiringService() {
   assert.match(svc, /MENU_PUSH_AUTO_SYNC_MS|getAutoSyncMs/, 'auto-sync configurable');
 }
 
+function testWiringRoute() {
+  const route = readFileSync(join(root, 'src/routes/v2/system-mgmt.js'), 'utf8');
+  assert.match(route, /push-menu/, 'route registers push-menu');
+  assert.match(route, /pushMenuForSystem/, 'route calls pushMenuForSystem');
+  assert.match(route, /getMenuPushStatus/, 'route calls getMenuPushStatus');
+}
+
 function main() {
   console.log('\n=== menu push characterization ===\n');
   const tests = [
     ['buildMenuPushPayload v1.2 shape', testPayloadShape],
     ['wiring: partner stub pending', testWiringStub],
     ['wiring: menu-push service', testWiringService],
+    ['wiring: push-menu routes', testWiringRoute],
   ];
   let failed = 0;
   for (const [name, fn] of tests) {

@@ -213,6 +213,27 @@ export const GROUP_OVERVIEW = [
           ]),
           notes: ['detail 为 JSON 字符串，前端需自行 parse', 'transaction_migrated 的 detail 含 trajectoryId/fromFunctionId/toFunctionId/pageId，用于手动迁移排查'],
         },
+        {
+          method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/push-menu',
+          summary: '推送系统菜单至伙伴平台',
+          desc: '组装 v1.2 菜单 payload 并调用伙伴平台（当前 stub：partner.skipped=true）。落库 menuPushStatus=pushing，autoSyncMs 窗口后自动纠偏为 synced。同一系统推送进行中返回 409。',
+          tryable: false,
+          reqExample: 'POST /api/v2/system-mgmt/nodes/1/push-menu',
+          respExample: J({ status: 'pushing', menuVersion: 8, menuCount: 42, partner: { skipped: true, reason: 'partner_endpoint_pending' }, autoSyncMs: 5000 }),
+          notes: [':id 必须是系统类型节点 (type=1)', '伙伴平台 access token 可选：Authorization Bearer 或 X-Partner-Access-Token', 'partner 当前为 stub（skipped），真实对接后 partner.skipped=false', 'autoSyncMs 由 MENU_PUSH_AUTO_SYNC_MS 配置，默认 5000ms'],
+        },
+        {
+          method: 'GET', path: '/api/v2/system-mgmt/nodes/:id/push-menu/status',
+          summary: '菜单推送状态轮询',
+          desc: '返回 status/menuVersion/pushedAt/syncedAt/error。pushing 超过 autoSyncMs 时服务端自动纠偏为 synced。',
+          params: [
+            { name: 'id', type: 'number', required: true, in: 'path', desc: '系统节点 ID', example: '1' },
+          ],
+          tryable: false,
+          reqExample: 'GET /api/v2/system-mgmt/nodes/1/push-menu/status',
+          respExample: J({ status: 'synced', menuVersion: 8, pushedAt: '<iso>', syncedAt: '<iso>', error: '' }),
+          notes: ['status: idle | pushing | synced | failed', 'autoSyncMs 窗口见 MENU_PUSH_AUTO_SYNC_MS（默认 5s）'],
+        },
     ],
   },
 ];
