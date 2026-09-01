@@ -1,3 +1,14 @@
+## 2026-09-01 · Zcode (uara_V1.2) — KB-4 湿测解封并全绿（VPN 是根因）+ A/B 对照定量实锤
+- 完成：KB 召回湿测（交易 211/212）四项全绿——export_dicts 入库 / kb_dict(cstSt) 命中码表 / kb_flow 命中 nextBefore 闸门 / kb_field 命中依赖组；**此前 BLOCKED 根因=用户 VPN 开关导致 SUT 导航 5xx**（非 SUT 故障非代码），VPN 关闭后一次通过
+- 完成：KB-4 A/B 对照（tmp/kb_ab_drill.py，用信申请）——A 基线 err=3（查询区 disabled 三连）vs B 召回 err=0（卡片「仅能经引入」直接消费）；步数 9→6、耗时 68.2s→56.8s（-17%）
+- 完成：research 文档 §10 归档（含「SPA 字典缓存异步写入，export 前等首页渲染」新知识）
+- 注意：KB 全批次（KB-1..4）验收完成；SUT checkCustCorporat 缺陷已在 202/203 复核未复现
+
+## 2026-09-01 — 推送菜单 D1+D2（partner stub）实现
+
+- **完成:** POST/GET `.../nodes/:id/push-menu`；v1.2 组包；状态落库 + 5s auto-sync；`pushMenusToPartner` stub；CHANGELOG 清理至仅保留 ≥2026-08-15。commits: `e4c2b4a` `4892a08` `24cf70b` `9112955` `b8ed35d` `cd1c344`（设计 `bf5c929`）。
+- **进行中:** 无。partner 真接收接口就绪后只填 stub 函数体。
+- **注意事项:** 前端推送按钮未做；D3–D5 未做；多实例依赖 GET 纠偏。
 ## 2026-09-01 · Zcode (uara_V1.2) — KB v1 SDD 执行完毕（Task 1-4 交付+终审，湿测阻塞待 SUT 恢复）
 - 完成：SDD 全流程（subagent-driven-development，主 Agent 统筹+每任务独立实现者/审阅者双审）——Task 1 store（bf3af90）/Task 2 导出链路+matcher（c8e92b8）/Task 3 六动作+6 流程卡+接线（66f5585，实现者自查条目见下方独立条目）/Task 4 提示词 cue（22b41a1）
 - 完成：终审 PASS with deferred → 合前修 KB_DATA_DIR 隔离（a9d0a0d，特征化不再覆盖/删除本机真实字典数据；scoped re-review 实测 data/kb 零写入 ADDRESSED）
@@ -132,4 +143,5 @@
 ## 2026-08-24 ~ 25 · Zcode (uara_V1.2)
 - 完成：824 冲刺三项落地 + 湿测通过（partition-via-pid / v3-payload-size ②③ / V3.1 §8 七类型）；830 格式对齐落地（rect_norm 录制侧、collapse type、attr 字段）
 - 完成：报文捞取 MVP（`dfb5c9e` 改名 92 文件、`8148f72` elk-msg-extract CLI、`1fcd1b9`/`b837d67` 契约对齐+回填验证 122/122；码值字典 `2fd2046` 挂起）
+
 
