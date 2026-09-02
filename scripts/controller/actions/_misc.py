@@ -20,6 +20,7 @@ from ._js_snippets import (
     JS_COLLECT_ICON_BUTTONS,
     JS_CLICK_ICON_BUTTON,
     JS_STAMP_ICON_ARIA_LABELS,
+    JS_STRIP_STALE_WRAPPERS,
 )
 from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from ...models import ActionFile, FormSnapshot, FormSnapshotCollection
@@ -386,6 +387,12 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
     )
     async def click_button(button_text: str):
         page = await browser_context.get_current_page()
+        # Pre-strip stale dialog wrappers (tsscMutilDialog 关闭残留) so real
+        # clicks reach the target; idempotent, <10ms.
+        try:
+            await page.evaluate(JS_STRIP_STALE_WRAPPERS)
+        except Exception:
+            pass
         try:
             await page.evaluate(JS_STAMP_ICON_ARIA_LABELS)
         except Exception:

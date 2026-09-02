@@ -3,6 +3,7 @@
 from scripts.state import _record_action
 from ._helpers import _ok, _err, _is_ok_result, _enrich_click_element
 from .result_protocol import err_with
+from ._js_snippets import JS_STRIP_STALE_WRAPPERS
 from .replay_timing import WAIT_500_MS
 
 
@@ -123,6 +124,12 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
     @controller.action('Click the radio button in an el-table row, identified by row text. Clicks label.el-radio > .el-radio__inner. Supports Element UI fixed columns.')
     async def click_table_row_radio(row_text: str):
         page = await browser_context.get_current_page()
+        # Pre-strip stale dialog wrappers (tsscMutilDialog 关闭残留) so real
+        # clicks reach the row radio; idempotent, <10ms.
+        try:
+            await page.evaluate(JS_STRIP_STALE_WRAPPERS)
+        except Exception:
+            pass
         element = await _enrich_click_element(
             page,
             text=row_text,

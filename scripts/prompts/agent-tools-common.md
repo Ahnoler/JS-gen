@@ -111,3 +111,13 @@
 1. `get_page_state` 发现可见弹窗不属于当前流程（如「客户360视图详情」「身份识别」遮挡，或残留 disableBtn 弹窗）时，先调 `close_visible_dialog(dialog_title)`：优先「取消」→「确 定」→ 弹窗 X；只关弹窗，不关 drawer（drawer 走返回/导航）。
 2. 返回 `err-dialog-not-closable`（全 disableBtn 残留态）→ 不要死循环重试，改走「刷新导航回列表 → 重新引入 → 修改」通用还原。
 3. 弹窗打开期间底层按钮全部 disabled：任何动作连锁 label-not-found / icon-miss 先怀疑弹窗遮挡，先守卫后动作。
+
+## 🚨 残留 wrapper 清理（strip_stale_dialogs / 自动预清洗）
+
+1. `tree_picker_click` / `click_button` / `click_table_row_radio` 动作体最前已自动预执行残留 wrapper 清理（tsscMutilDialog 及 el-dialog/el-message-box 关闭后不可见 wrapper 的 pointerEvents='none'，幂等）——树开不了/节点找不到/点击无响应时先怀疑残留 wrapper，无需手动处理。
+2. 其他动作（如 select_tree_option）前可手动调 `strip_stale_dialogs()` 清一次（返回 stripCount）。
+
+## 🚨 真实（trusted）事件通道（real_click / CDP）
+
+1. 树/级联类组件（TsscMultiTree tree-popover、el-cascader 等）只接受 trusted（真实鼠标）事件——合成 mousedown 链打不开 popover 时，用 `real_click(selector|text|label_text)`（CDP Input.dispatchMouseEvent 真实坐标点击）。
+2. `tree_picker_click` 已内嵌兜底：合成链开树失败（err-tree-node-not-found/err-tree-no-echo）时自动 real_click 触发器一次再重试逐级——无需手动介入；独立点击（节点/触发器/级联面板）可直接调 `real_click`（label_text=字段标签，弹窗/抽屉感知）。

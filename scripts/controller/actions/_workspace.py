@@ -1,5 +1,12 @@
-"""Workspace actions: read business date, picker-dialog query/select, tab management."""
+"""Workspace actions: read business date, picker-dialog query/select, tab management.
 
+Also hosts the CDP trusted-event click channel (real_click, KB-I5 run7): the
+executor-side Chrome is a CDP debug connection, so trusted mouse events can be
+dispatched via Input.dispatchMouseEvent for components that ignore synthetic
+event chains (TsscMultiTree tree-popover / el-cascader triggers).
+"""
+
+import asyncio
 import json
 
 from scripts.state import _record_action
@@ -10,6 +17,10 @@ from ._js_snippets import (
     JS_PICKER_DIALOG_SELECT,
     JS_WORKSPACE_TABS,
     JS_CLOSE_VISIBLE_DIALOG,
+    JS_STRIP_STALE_WRAPPERS,
+    JS_REAL_CLICK_RECT,
+    JS_REAL_CLICK_ECHO,
+    JS_TREE_POPOVER_OPEN,
 )
 from .replay_timing import WAIT_800_MS
 
@@ -157,6 +168,103 @@ def _register_workspace_actions(controller, browser_context):
                 'dialog_title': dialog_title,
                 'closed': parsed.get('closed'),
                 'via': parsed.get('via'),
+            }, payload)
+            return _ok(payload)
+        return payload
+
+    @controller.action(
+        'Strip stale (closed/invisible) el-dialog / el-message-box wrapper '
+        'elements that still intercept pointer events (天元 tsscMutilDialog '
+        '关闭残留向)：sets style.pointerEvents=none (+zIndex reset) on every '
+        'wrapper whose display is none or whose offsetParent is null. '
+        'Business dialogs live inside visible wrappers and are untouched. '
+        'Idempotent — safe to run repeatedly; runs automatically before '
+        'tree_picker_click / click_button / click_table_row_radio. Returns '
+        'stripCount (number of wrappers neutralized).'
+    )
+    async def strip_stale_dialogs():
+        page = await browser_context.get_current_page()
+        result = await page.evaluate(JS_STRIP_STALE_WRAPPERS)
+        ok, payload = _workspace_result(result)
+        if ok:
+            try:
+                parsed = json.loads(payload[3:]) if payload.startswith('ok:') else {}
+            except Exception:
+                parsed = {}
+            _record_action('strip_stale_dialogs', {
+                'stripCount': parsed.get('stripCount'),
+            }, payload)
+            return _ok(payload)
+        return payload
+
+    # Trusted-event CDP channel (real_click) — registered with the workspace
+    # actions so callers (tree_picker_click fallback / prompts) get it for free.
+    _register_real_click_action(controller, browser_context)
+
+
+async def _real_click_via_cdp(page, selector='', text='', label_text=''):
+    """Trusted (real mouse) click via CDP Input.dispatchMouseEvent (KB-I5 run7).
+
+    Locate the visible target with JS_REAL_CLICK_RECT (viewport coords), then
+    open a raw CDP session (page.context.new_cdp_session — Playwright >=1.20,
+    executor env ships 1.61.0) and dispatch a real mouseMoved / mousePressed /
+    mouseReleased sequence at the element center. For components whose handlers
+    only accept trusted events (TsscMultiTree tree-popover / el-cascader
+    triggers, where synthetic mousedown chains never open the popover).
+
+    Returns 'ok-real-click:<x>,<y>' on success or 'err-real-click-fail:<reason>'.
+    """
+    try:
+        rect_raw = await page.evaluate(JS_REAL_CLICK_RECT, [selector, text, label_text])
+        rect = _as_dict(rect_raw)
+        if not isinstance(rect, dict) or not rect.get('ok'):
+            reason = rect.get('error', str(rect))[:120] if isinstance(rect, dict) else str(rect)[:120]
+            return 'err-real-click-fail:' + reason
+        x, y = int(rect['x']), int(rect['y'])
+        session = await page.context.new_cdp_session(page)
+        try:
+            await session.send('Input.dispatchMouseEvent', {
+                'type': 'mouseMoved', 'x': x, 'y': y, 'button': 'none',
+            })
+            await session.send('Input.dispatchMouseEvent', {
+                'type': 'mousePressed', 'x': x, 'y': y,
+                'button': 'left', 'clickCount': 1,
+            })
+            await asyncio.sleep(0.04)
+            await session.send('Input.dispatchMouseEvent', {
+                'type': 'mouseReleased', 'x': x, 'y': y,
+                'button': 'left', 'clickCount': 1,
+            })
+        finally:
+            try:
+                await session.detach()
+            except Exception:
+                pass
+        return 'ok-real-click:%d,%d' % (x, y)
+    except Exception as e:  # CDP session/detach/evaluate failures all land here
+        return 'err-real-click-fail:' + str(e)[:120]
+
+
+def _register_real_click_action(controller, browser_context):
+    @controller.action(
+        'Real (trusted) mouse click at the center of a visible target located '
+        'by CSS selector (selector), element text (text) and/or a form field '
+        'label (label_text — dialog/drawer-aware fieldItem trigger, same '
+        'priority as tree_picker_click: span.el-tooltip.my-popover.item → '
+        '.el-select input → visible input). Dispatches trusted mouse events '
+        'through the CDP connection (Input.dispatchMouseEvent) — use for '
+        'components that ignore synthetic event chains: TsscMultiTree '
+        'tree-popover triggers (品种明细 产品名称), el-cascader panels, etc. '
+        'Fallback partner: try the synthetic click first, then real_click. '
+        'Returns ok-real-click:<x>,<y> or err-real-click-fail:<reason>.'
+    )
+    async def real_click(selector: str = '', text: str = '', label_text: str = ''):
+        page = await browser_context.get_current_page()
+        payload = await _real_click_via_cdp(
+            page, selector=selector, text=text, label_text=label_text)
+        if payload.startswith('ok-real-click'):
+            _record_action('real_click', {
+                'selector': selector, 'text': text, 'label_text': label_text,
             }, payload)
             return _ok(payload)
         return payload
