@@ -9,6 +9,7 @@
 import { resolve as configResolve, PARTNER_SECTION_TYPE } from '../../config/config.js';
 
 const DEFAULT_API_BASE = 'http://172.20.101.162:11001/api';
+const DEFAULT_MENU_PUSH_BASE = 'http://172.20.101.63:11002/api';
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
@@ -44,6 +45,11 @@ function importDemandUrl() {
   const override = envOrConfig('PARTNER_IMPORT_DEMAND_URL');
   if (override) return override;
   return `${partnerApiBase()}/demand/demandtranscation/importDemand`;
+}
+
+/** 菜单推送专用基址：新联调服务器（发版后切线上地址时改 PARTNER_MENU_PUSH_BASE） */
+function menuPushApiBase() {
+  return envOrConfig('PARTNER_MENU_PUSH_BASE') || DEFAULT_MENU_PUSH_BASE;
 }
 
 /**
@@ -330,6 +336,36 @@ async function fetchPartnerSystemLevel({ accessToken, projectId, parentId } = {}
 }
 
 /**
+ * 菜单推送专用系统查询（partner 平台 getSystemNodeLevel，POST 无参数）。
+ * 当前指向新联调服务器 172.20.101.63:11002（PARTNER_MENU_PUSH_BASE 可覆盖，发版后切线上地址）。
+ * @param {object} [opts] 请求参数
+ * @param {string} opts.accessToken partner access token
+ * @returns {Promise<object[]>} 归一化的系统节点列表（扁平，id/systemName）
+ */
+export async function listPartnerMenuPushSystems({ accessToken } = {}) {
+  const url = `${menuPushApiBase()}/system/system/getSystemNodeLevel`;
+  const { json, text, httpStatus } = await partnerFetch(url, {
+    method: 'POST',
+    accessToken,
+    body: {},
+  });
+  if (!json) {
+    console.warn(
+      `[partner] menu-push systems non-JSON HTTP ${httpStatus}:`,
+      String(text).slice(0, 200),
+    );
+    const err = new Error(PARTNER_NETWORK_ERROR_MSG);
+    err.statusCode = 502;
+    err.partnerDetail = { httpStatus, preview: String(text).slice(0, 200) };
+    throw err;
+  }
+  assertPartnerBusinessOk(json, PARTNER_NETWORK_ERROR_MSG);
+  const raw = json.data ?? json.rows ?? json.list ?? [];
+  const list = Array.isArray(raw) ? raw : [];
+  return list.map(normalizeSystemNode).filter(Boolean);
+}
+
+/**
  * List partner systems under a project — single lazy level.
  * 兼容旧懒加载调用方；批量推送弹窗应使用 listPartnerSystemTree。
  * @param {object} [opts] request options
@@ -426,18 +462,60 @@ export async function pushImportDemand(payload, { accessToken } = {}) {
 }
 
 /**
- * 推送菜单到自动化平台（接收接口待平台定义）。
- * 本期不发 HTTP；平台就绪后只改本函数体。
+ * 把 v1.2 本地 payload 适配成伙伴 importData 契约（剥 schemaVersion，保留 menus 明细）。
+ * @param {object} payload buildMenuPushPayload 输出
+ * @returns {{ systemNodeId: number, systemName?: string, menuVersion?: number, menus: object[] }}
+ */
+export function toPartnerMenuPushPayload(payload) {
+  if (!payload || typeof payload !== 'object') return payload;
+  const out = {
+    systemNodeId: payload.systemNodeId,
+    menus: Array.isArray(payload.menus) ? payload.menus : [],
+  };
+  if (payload.systemName != null && String(payload.systemName).trim() !== '') {
+    out.systemName = String(payload.systemName);
+  }
+  if (payload.menuVersion != null && payload.menuVersion !== '') {
+    out.menuVersion = Number(payload.menuVersion) || 0;
+  }
+  return out;
+}
+
+/**
+ * POST 伙伴菜单 importData（`/system/umlElementData/importData`）。
+ * 基址：`PARTNER_MENU_PUSH_BASE`，默认 `http://172.20.101.63:11002/api`（联调；发版后切线上）。
  * @param {object} payload v1.2 wire body（schemaVersion/systemNodeId/systemName/menuVersion/menus）
  * @param {{ accessToken?: string }} [opts]
- * @returns {Promise<{ skipped: true, reason: string }>}
+ * @returns {Promise<{ code: number, msg?: string, data?: unknown }>} partner response
  */
 export async function pushMenusToPartner(payload, { accessToken } = {}) {
-  void accessToken;
-  console.log('[partner] pushMenus skipped (partner_endpoint_pending)', {
-    systemNodeId: payload?.systemNodeId,
-    menuVersion: payload?.menuVersion,
-    menuCount: Array.isArray(payload?.menus) ? payload.menus.length : 0,
+  const url = `${menuPushApiBase()}/system/umlElementData/importData`;
+  const wirePayload = toPartnerMenuPushPayload(payload);
+  console.log('[partner] menu importData wire', {
+    systemNodeId: wirePayload.systemNodeId,
+    systemName: wirePayload.systemName,
+    menuVersion: wirePayload.menuVersion,
+    menuCount: wirePayload.menus?.length ?? 0,
   });
-  return { skipped: true, reason: 'partner_endpoint_pending' };
+  const { json, text, httpStatus } = await partnerFetch(url, {
+    method: 'POST',
+    accessToken,
+    body: wirePayload,
+  });
+  if (!json) {
+    console.warn(
+      `[partner] menu importData non-JSON HTTP ${httpStatus}:`,
+      String(text).slice(0, 200),
+    );
+    const err = new Error(PARTNER_NETWORK_ERROR_MSG);
+    err.statusCode = 502;
+    err.partnerDetail = { httpStatus, preview: String(text).slice(0, 200) };
+    throw err;
+  }
+  assertPartnerBusinessOk(json, PARTNER_NETWORK_ERROR_MSG);
+  return {
+    code: json.code ?? 200,
+    msg: json.msg || json.message || 'ok',
+    data: json.data,
+  };
 }

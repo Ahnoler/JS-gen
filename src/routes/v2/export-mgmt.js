@@ -33,6 +33,7 @@ import {
   listPartnerProjects,
   listPartnerSystems,
   listPartnerSystemTree,
+  listPartnerMenuPushSystems,
   pushImportDemand,
 } from '../../services/partner-platform.js';
 import {
@@ -559,6 +560,23 @@ export default function (app) {
         );
       })(systems);
       res.json({ projectId: String(projectId), systems, count });
+    } catch (err) {
+      rethrowRouteError(err, partnerErrorBody);
+    }
+  }));
+
+  /** 菜单推送专用系统查询（partner getSystemNodeLevel，POST 无参数；独立基址 PARTNER_MENU_PUSH_BASE） */
+  app.get('/api/v2/export/partner/menu-push/systems', asyncHandler(async (req, res) => {
+    try {
+      const accessToken = requireAccessToken(req);
+      const systems = await listPartnerMenuPushSystems({ accessToken });
+      const count = (function countNodes(nodes) {
+        return (nodes || []).reduce(
+          (sum, n) => sum + 1 + countNodes(n.children),
+          0,
+        );
+      })(systems);
+      res.json({ systems, count });
     } catch (err) {
       rethrowRouteError(err, partnerErrorBody);
     }
