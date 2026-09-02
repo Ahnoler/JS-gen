@@ -1,3 +1,8 @@
+## 2026-09-02 · Zcode (uara_V1.2) — tree_check_confirm 专用树勾选动作（带成功谓词；四跑实证）
+- 完成：新动作 `tree_check_confirm(label_text, node_text)`（commit `301ef5e` 未推送）——流程选人/多选勾选树的确定性动作：JS_TREE_CHECK_CONFIRM（js_snippets/tree_check.py，单源）+ _tree.py 动作 + 聚合 + prompt（与 select_tree_option 分工=单选叶子/多选勾选）+ pin characterize-tree-check-confirm；**成功谓词=节点 is-checked 且树勾选数≥1**（呼应"确定"前无效勾选的静默失败风险）；err 三档显式失败（label-not-found/node-not-found/check-unverified）不盲目重试
+- 实施复盘（子智能体派发两次网关超时 → 主线程实施）：首跑 err-tree-label-not-found（无 .el-form-item__label，实际=弹窗文本"下一节点审批人"→ 三档容器匹配修复）→ 二/三跑 err-tree-node-not-found（树在 body 挂载 **hidden tree-popover**，可见容器扫描看不到 → 改 document 全局树扫描+弹窗搜索框触发展开+500ms 重扫+节点三形态 .node/.content/节点自身）→ **四跑成功**：`ok{checked:true, node_text:客户经理-黄某某(701994), checked_count:1}`，S8a 新动作主路径 → S8b submitted=True（EDDJ20260902024038 进流程）→ S10 终态通过
+- 注意：S9-done 判据误报与七轮相同（快照在待办列表页无字样，用 list_todo_cards 判据为佳）；二~四跑各留一笔审批中冻结单（024035 4万/024036 5.5万/024037 6万/024038 6.5万——测试数据，A7 可作审批驱动样本）；9 pin 全绿
+
 ## 2026-09-02 · Zcode (uara_V1.2) — KB-I5 湿测六/七轮：S9 审批驱动 + 引擎纯自跑全链闭环
 - 完成：S9 审批驱动（_misc.py r6/r6b/r6c：点击解析器 document 作用域+`div.todo-item-action` 候选→click_button[处理]=ok-click；label→trigger 选第一个可见 input；**r6c=click_button(树节点文本) 对关闭 tree-popover 自开+勾选兜底**）——EDDJ20260902024033 审批通过（第六轮）
 - 完成：**第七轮引擎纯自跑全链闭环（292s）**：新草稿 EDDJ20260902024034（4万）新增→分页选盛达→radio→确定跳向导→保存→意见提交→**r6c 树勾选纯引擎一次命中（无「请选择一个审批人」拒）**→确定→待办卡处理→审批同意→流程提交→确认→**审批通过**；终态 3 行全绿（024034/024033/024001）；tid 全 detach；截图 tmp/e2e/shots/kb_i5_全链复验_审批通过.png
