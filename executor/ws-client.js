@@ -295,7 +295,8 @@ export class ExecutorWsClient {
       this.reconnectTimer = null;
       this.connect();
     }, delay);
-    this.reconnectTimer.unref?.();
+    // 不能 unref：断线期间定时器可能是事件循环里唯一的保活句柄，
+    // unref 会让进程在重连等待窗口内静默退出（code 0），重连永远不执行。
   }
 
   /**
