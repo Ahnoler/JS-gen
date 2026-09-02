@@ -1,3 +1,27 @@
+## 2026-09-02 · Zcode (uara_V1.2) — 用信链引擎湿测（五轮）：引入/抽屉/产品树/申报页贯通（698b4f9）
+- 完成：真相巡（Playwright MCP 主线程，tmp/e2e/usage_probe.md）：用信新增=列表引入「客户放大镜」(picker→回填三框)→查询→「新增」=el-drawer 两步向导（客户引入+业务发生类型/发起模式 select）→风险阻断（下一步）→申报页（4 步向导；新 YXPC 生成）→「新增」=「维护方案品种明细」弹窗→**产品名称=tree-popover 树**（贷款→对公→房地产贷款→住房开发贷款）→分项额度行带出
+- 完成：两条引擎补丁（698b4f9 未推送）——①select_tree_option/click_radio label 定位加「容器+可见 dialog/drawer」候选池（弹窗 label-not-found 根因）；②picker readUnderlyingForm 语义：可见 drawer=回填目标、仅可见 dialog=overlay（drawer 宿主误报 err-refill-not-verified）
+- 湿测（五轮收敛）：S2/S3/S5/S9 全通 fails=0——引擎直达 产品树 `ok:住房开发贷款(2069416978116472832)` + 分项额度行带出（S4 放大镜 query+select 两拍回填三框）、S7 两下拉 select_option、S8 申报页到达（重试拍有效）
+- 注意：S6 抽屉内引入 picker 报 err-refill-not-verified=**保守误报**（显式失败不阻断；待下批：SELECT 段对 drawer 语境再核对）；驱动教训=picker 需 query+select 两拍、改 js_snippets 后须重启 executor；新单 YXPC20260902012009（侦察产物，待发起）；8 pin 全绿
+
+## 2026-09-02 · Cursor (uara_V1.2) — 截图 pending 孤儿清理 + fallback 回滚
+- 完成：清理 103 条无 `{id}.png` 的 `storage_type=local` 孤儿行（pending 现为 0）。根因=上传失败报 `local pending file not found`，非当前 MinIO 故障（bucket 可达）。
+- 完成：`fallbackToLocal` 在 `commitPendingFile` 失败时 `screenshotDao.remove(id)`；新增 `purgeMissingLocalScreenshots`，`server.mjs` 启动先清 DB 孤儿再清文件。pin：`characterize-screenshot-fallback.mjs` 绿。CHANGELOG Fixed 已记。未 commit。
+- 注意：**需重启 4097 控制面**后新代码与启动 purge 才生效；新截图在 MinIO 正常时应直传。
+
+## 2026-09-02 · Cursor (uara_V1.2) — 天元 pageId 湿测 + 读码优化
+- 完成：Playwright 实测 8 个菜单——业务扩展类有 `ZJJK00070199` 且 path=hash；待办/首页/外系统接入/数字信贷等多页天元弹窗长期仅「确 定」无编号（非扫漏）。优化 `page_id.py`：开窗前等路由、空壳 `empty-config` 早退、加载中拉长、禁止无路径兜底。研究笔记 `docs/superpowers/research/2026-09-02-tianyuan-pageid-wet.md`。characterize-page-bind 全绿。
+- 注意：剩余空 pageId 多数需业务侧补天元配置；executor 需重载后 fill 才吃到新 JS。
+
+## 2026-09-02 · Cursor (uara_V1.2) — 启动 AI 二级菜单 pageId 补采
+- 进行中：信贷系统（id=1）AI L2 共 234 条且 pageId 全空；新增 `POST /api/v2/system-mgmt/nodes/:id/fill-pageid`（默认 sources=ai，不扫树）；已触发 scanId=`e7f567d9-83d6-4158-a287-8e8040e2eda5`（轮询同 menu-scan）。上限 PAGEID_FILL_MAX=500。
+- 注意：湿测日志多见 `timeout-or-mismatch`（天元「页面路径」与 hash 不一致，或弹窗仅标题+「确 定」）；已改 `page_id.py`（先关旧弹窗、路径宽松匹配、页脚 `确\\s*定`）——**需 executor 重载后下一轮补采才吃到**。本轮可能 filled 偏低。曾重启本机 4097 控制面。
+
+## 2026-09-02 · Cursor (uara_V1.2) — scan-menu 全量补采落地 pageId（SDD）
+- 完成：apply 后对空 `pd_cmpt_ecd` 的 L2 点开读天元写入（组件单码→场景编号；无码 skip；不写 AILZ 到菜单）；prepare 取消菜单回写，只写 `trajectory.page_id`。commits：`1f98d98`（抽出 `writeFunctionLandingPage`）→ `668cc4f`/`3955cac`（`menu-scan-pageid.js` + filled 仅写库成功）→ `42b32ca`（接入 `runScan` + api-docs + CHANGELOG）→ `b4927ee`（终审修复：无 L2 xpath / 点击失败不写）。未推送。
+- 验证：characterize-menu-scan / characterize-page-bind 全绿。计划/设计：`docs/superpowers/plans/2026-09-02-scan-menu-pageid-capture.md`、`docs/superpowers/specs/2026-09-02-scan-menu-pageid-capture-design.md`。
+- 注意：区间内另有无关 commit `5f769b4`（login）；空 pageId 很多时扫描会变慢；从未扫过且 pageId 空的节点需再跑 scan-menu。
+
 ## 2026-09-02 · Zcode (uara_V1.2) — tree_check_confirm 专用树勾选动作（带成功谓词；四跑实证）
 - 完成：新动作 `tree_check_confirm(label_text, node_text)`（commit `301ef5e` 未推送）——流程选人/多选勾选树的确定性动作：JS_TREE_CHECK_CONFIRM（js_snippets/tree_check.py，单源）+ _tree.py 动作 + 聚合 + prompt（与 select_tree_option 分工=单选叶子/多选勾选）+ pin characterize-tree-check-confirm；**成功谓词=节点 is-checked 且树勾选数≥1**（呼应"确定"前无效勾选的静默失败风险）；err 三档显式失败（label-not-found/node-not-found/check-unverified）不盲目重试
 - 实施复盘（子智能体派发两次网关超时 → 主线程实施）：首跑 err-tree-label-not-found（无 .el-form-item__label，实际=弹窗文本"下一节点审批人"→ 三档容器匹配修复）→ 二/三跑 err-tree-node-not-found（树在 body 挂载 **hidden tree-popover**，可见容器扫描看不到 → 改 document 全局树扫描+弹窗搜索框触发展开+500ms 重扫+节点三形态 .node/.content/节点自身）→ **四跑成功**：`ok{checked:true, node_text:客户经理-黄某某(701994), checked_count:1}`，S8a 新动作主路径 → S8b submitted=True（EDDJ20260902024038 进流程）→ S10 终态通过
