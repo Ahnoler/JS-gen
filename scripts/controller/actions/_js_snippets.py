@@ -35,6 +35,7 @@ from .js_snippets.business_date import JS_READ_BUSINESS_DATE
 from .js_snippets.picker_confirm import JS_PICKER_DIALOG_QUERY, JS_PICKER_DIALOG_SELECT
 from .js_snippets.workspace_tabs import JS_WORKSPACE_TABS
 from .js_snippets.todo_cards import JS_LIST_TODO_CARDS, JS_WF_SUBMIT_GUARD
+from .js_snippets.tree_check import JS_TREE_CHECK_CONFIRM
 from .js_snippets.semantic_snapshot import JS_SEMANTIC_SNAPSHOT
 from .js_snippets.verify_context import JS_VERIFY_CONTEXT
 from .js_snippets.page_id import JS_READ_PAGE_COMPONENT_CODE, JS_CLICK_MENU_XPATH, JS_FIND_MENU_DISMISS_POINT
