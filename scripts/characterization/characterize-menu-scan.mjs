@@ -279,6 +279,7 @@ function testWiringPageIdFill() {
   assert.match(pageid, /read_page_component_code/, 'reads tianyuan codes');
   assert.match(pageid, /click_menu_xpath/, 'clicks menu xpath');
   assert.match(pageid, /writeFunctionLandingPage/, 'writes landing via shared helper');
+  assert.match(pageid, /if \(wrote\)/, 'pageIdFilled only when write returns true');
   assert.match(pageid, /pageIdSkipped|pageIdFilled/, 'returns fill stats');
 }
 

@@ -74,6 +74,8 @@ function testWiringLandingHelper() {
   assert.match(helper, /export async function writeFunctionLandingPage/, 'shared landing writer exported');
   assert.match(helper, /replaceForNode/, 'writes system_page via replaceForNode');
   assert.match(helper, /pdCmptEcd/, 'updates system.pdCmptEcd');
+  assert.match(helper, /return true/, 'landing writer returns true on success');
+  assert.match(helper, /return false/, 'landing writer returns false on skip or failure');
 }
 
 /**

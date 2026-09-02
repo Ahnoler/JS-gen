@@ -81,12 +81,16 @@ export async function fillEmptyPageIdsForSystem({ systemNodeId, runtime, execSes
         pageIdSkipped += 1;
         continue;
       }
-      await writeFunctionLandingPage(c.id, {
+      const wrote = await writeFunctionLandingPage(c.id, {
         pageId,
         pageName: String(payload.pageName || '').trim(),
         resPath: String(payload.pagePath || '').trim(),
       });
-      pageIdFilled += 1;
+      if (wrote) {
+        pageIdFilled += 1;
+      } else {
+        pageIdSkipped += 1;
+      }
     } catch (err) {
       pageIdSkipped += 1;
       console.warn('[menu-scan-pageid] skip function#%s: %s', c.id, err?.message || err);
