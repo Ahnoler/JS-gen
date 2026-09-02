@@ -37,7 +37,6 @@ from ...models import (
     TaskItem, TaskList,
 )
 from ...models.field import ScannedButton
-from .js_snippets.login_page import JS_LOGIN_PICK_LEGAL
 from .js_snippets.container import JS_VISIBLE_OVERLAY_OF
 from .js_snippets._locator_helpers_js import PAGE_LOCATOR_HELPERS
 from .form_rules import (
@@ -172,7 +171,7 @@ class _FormActionEngineBase:
 
 
 class LoginEngine(_FormActionEngineBase):
-    async def login(self, username: str, password: str, captcha: str = '', sms_code: str = '', legal_name: str = ''):
+    async def login(self, username: str, password: str, captcha: str = '', sms_code: str = ''):
         page = await self.browser_context.get_current_page()
         await _wait_if_loading(page)
 
@@ -219,22 +218,6 @@ class LoginEngine(_FormActionEngineBase):
 
         results = []
 
-        # Auto-pick legal entity dropdown (Element UI el-select) before filling username.
-        # Empty legal_name = auto-pick first option; non-login pages return
-        # legal-input-not-found and are silently skipped (never blocks login).
-        try:
-            legal_raw = await page.evaluate(JS_LOGIN_PICK_LEGAL, [legal_name])
-        except Exception:
-            legal_raw = ''
-        try:
-            legal_r = json.loads(legal_raw) if legal_raw else {}
-        except Exception:
-            legal_r = {'ok': False, 'error': str(legal_raw)}
-        if legal_r.get('ok'):
-            results.append(f"legal:{legal_r.get('picked', '')}")
-        elif legal_r.get('error'):
-            results.append(f"legal:{legal_r.get('error')}")
-
         # Fill username (try common labels)
         u_r = await page.evaluate(JS_FILL_FORM_FIELD, ['用户名', username])
         if u_r == 'label-not-found':
@@ -273,20 +256,49 @@ class LoginEngine(_FormActionEngineBase):
 
         await page.wait_for_timeout(WAIT_3000_MS)
 
-        # Post-login probe: poll up to 10s (500ms interval) for '#/home' hash or
-        # _usertoken in localStorage; re-click login once around the 4s mark to
-        # absorb observed first-click nondeterminism (second click jumps to #/home).
-        async def _login_probe_ok():
-            return await page.evaluate(
-                "() => (location.hash || '').includes('#/home') || !!localStorage.getItem('_usertoken')"
-            )
+        # Post-login probe: poll up to 10s (500ms interval) for a login-success
+        # signature; re-click login once around the 4s mark to absorb observed
+        # first-click nondeterminism. Success = ANY of:
+        #   1. legacy credit-system signature: '#/home' hash or _usertoken in
+        #      localStorage;
+        #   2. any token-like key (token/usertoken/authorization/session…) with
+        #      a non-empty value in localStorage or sessionStorage;
+        #   3. left the login page: no visible password input AND no visible
+        #      login/submit button remain (covers SPAs that land on a hash the
+        #      first two checks don't know about).
+        _LOGIN_PROBE_JS = """() => {
+          if ((location.hash || '').includes('#/home')) return 'home';
+          if (!!localStorage.getItem('_usertoken')) return 'token';
+          const stores = [localStorage, sessionStorage];
+          for (const s of stores) {
+            for (let i = 0; i < s.length; i++) {
+              const k = (s.key(i) || '').toLowerCase();
+              if (/(token|authorization|session|jwt|loginsession)/.test(k) && (s.getItem(s.key(i)) || '').trim()) return 'token';
+            }
+          }
+          const visible = (el) => {
+            if (!el) return false;
+            const st = getComputedStyle(el);
+            return st.display !== 'none' && st.visibility !== 'hidden' && el.offsetParent !== null;
+          };
+          const pwd = [...document.querySelectorAll('input[type=password]')].some(visible);
+          const btn = [...document.querySelectorAll('button, .el-button, input[type=submit], [class*=login]')].find((b) => visible(b) && /登录|登陆|login|sign ?in/i.test((b.textContent || b.value || '')));
+          if (!pwd && !btn) return 'left-login';
+          return '';
+        }"""
+
+        async def _login_probe_sig():
+            try:
+                return str(await page.evaluate(_LOGIN_PROBE_JS) or '')
+            except Exception:
+                return ''
 
         import time as _time
         _probe_start = _time.monotonic()
         _probe_deadline = _probe_start + 10.0
         _reclicked = False
-        probe_ok = await _login_probe_ok()
-        while not probe_ok and _time.monotonic() < _probe_deadline:
+        probe_sig = await _login_probe_sig()
+        while not probe_sig and _time.monotonic() < _probe_deadline:
             if not _reclicked and _time.monotonic() - _probe_start >= 4.0:
                 try:
                     await page.evaluate(JS_CLICK_LOGIN_BUTTON)
@@ -294,9 +306,9 @@ class LoginEngine(_FormActionEngineBase):
                     pass
                 _reclicked = True
             await page.wait_for_timeout(500)
-            probe_ok = await _login_probe_ok()
+            probe_sig = await _login_probe_sig()
 
-        if not probe_ok:
+        if not probe_sig:
             return _err('err-login | probe-timeout | ' + summary)
 
         _record_action(
@@ -304,7 +316,7 @@ class LoginEngine(_FormActionEngineBase):
             {'username': username, 'password': password, 'captcha': captcha, 'sms_code': sms_code},
             'ok-login',
         )
-        return _ok('ok-login | ' + summary + ' | probe:home', include_in_memory=True)
+        return _ok('ok-login | ' + summary + ' | probe:' + probe_sig, include_in_memory=True)
 
 
 
