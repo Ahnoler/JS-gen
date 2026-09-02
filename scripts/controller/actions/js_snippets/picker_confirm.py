@@ -50,19 +50,24 @@ _JS_PICKER_HELPERS = '''    const norm = (s) => String(s == null ? '' : s).repla
     };
     // Underlying-page form items: visible .el-form-item NOT inside any visible
     // dialog or drawer (N3: drawer also counts as an overlay container).
+    // KB-I5 用信湿测修正: the picker's BACKFILL TARGET is the form under the
+    // (closed) dialog — when the host page itself is a drawer (新增用信申请),
+    // that drawer's form items must be READ, not skipped. Only a still-visible
+    // .el-dialog counts as overlay for underlying-form reading; drawers are
+    // treated as the underlying form container.
     const readUnderlyingForm = () => {
         const map = {};
-        const inVisibleDialog = (el) => {
+        const inVisibleOverlay = (el) => {
             let n = el;
             while (n && n !== document.body) {
-                if (n.classList && (n.classList.contains('el-dialog') || n.classList.contains('el-drawer')) && containerVisible(n)) return true;
+                if (n.classList && n.classList.contains('el-dialog') && containerVisible(n)) return true;
                 n = n.parentElement;
             }
             return false;
         };
         for (const item of document.querySelectorAll('.el-form-item')) {
             if (item.offsetParent === null) continue;
-            if (inVisibleDialog(item)) continue;
+            if (inVisibleOverlay(item)) continue;
             const lbl = item.querySelector('.el-form-item__label');
             if (!lbl) continue;
             const key = norm(lbl.textContent).replace(/[：:*]+$/, '');

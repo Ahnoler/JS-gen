@@ -8,23 +8,34 @@ from .container import JS_GET_CONTAINER
 JS_CLICK_RADIO = '''([label, option]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     const container = ''' + JS_GET_CONTAINER + ''';
-    const items = container.querySelectorAll('.el-form-item');
-    for (const item of items) {
-        const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
-        if (!lbl.includes(label)) continue;
-        item.scrollIntoView({ block: 'center', behavior: 'instant' });
-        const input = item.querySelector('input:not([type="hidden"])');
-        if (isDisabled(input, null, item)) return 'disabled';
-        const radios = item.querySelectorAll('.el-radio');
-        for (const radio of radios) {
-            if (radio.classList.contains('is-disabled')) continue;
-            if (radio.textContent.trim() === option && radio.offsetParent !== null) {
-                radio.click(); return 'ok';
-            }
+    const findItem = (root) => {
+        for (const item of root.querySelectorAll('.el-form-item')) {
+            const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+            if (lbl.includes(label)) return item;
         }
-        return 'option-not-found';
+        return null;
+    };
+    let item = findItem(container);
+    // KB-I5: 弹窗/抽屉（方案品种明细等）的 form-item 在页面容器之外——补扫可见 dialog/drawer
+    if (!item) {
+        for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+            if (dlg.offsetParent === null) continue;
+            item = findItem(dlg);
+            if (item) break;
+        }
     }
-    return 'label-not-found';
+    if (!item) return 'label-not-found';
+    item.scrollIntoView({ block: 'center', behavior: 'instant' });
+    const input = item.querySelector('input:not([type="hidden"])');
+    if (isDisabled(input, null, item)) return 'disabled';
+    const radios = item.querySelectorAll('.el-radio');
+    for (const radio of radios) {
+        if (radio.classList.contains('is-disabled')) continue;
+        if (radio.textContent.trim() === option && radio.offsetParent !== null) {
+            radio.click(); return 'ok';
+        }
+    }
+    return 'option-not-found';
 }'''
 
 # ── Tree select (custom TsscMultiTree component) ──
@@ -53,11 +64,21 @@ JS_SELECT_TREE_OPTION = '''async ([label, option]) => {
     const isDisabled = ''' + JS_FIELD_DISABLED + ''';
     // Open the popover first so tree DOM is rendered
     const container = ''' + JS_GET_CONTAINER + ''';
-    const items = container.querySelectorAll('.el-form-item');
     let fieldItem = null;
-    for (const item of items) {
+    for (const item of container.querySelectorAll('.el-form-item')) {
         const l = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
         if (l === label || l.includes(label)) { fieldItem = item; break; }
+    }
+    if (!fieldItem) {
+        // KB-I5: 弹窗/抽屉（维护方案品种明细等）的 form-item 在页面容器之外——补扫可见 dialog/drawer
+        for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+            if (dlg.offsetParent === null) continue;
+            for (const item of dlg.querySelectorAll('.el-form-item')) {
+                const l = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                if (l === label || l.includes(label)) { fieldItem = item; break; }
+            }
+            if (fieldItem) break;
+        }
     }
     if (!fieldItem) return 'label-not-found';
     fieldItem.scrollIntoView({ block: 'center', behavior: 'instant' });

@@ -87,7 +87,13 @@ def main():
         "'.el-dialog, .el-drawer'",
         "containerTitle",
         ".el-drawer__header",
-        "n.classList.contains('el-drawer')",
+    ])
+    # N3b (KB-I5 usage): underlying-form reading treats a visible DRAWER as the
+    # backfill TARGET (新增用信申请 drawer), only a visible dialog is overlay.
+    _pin("N3b-underlying", PICKER, [
+        "inVisibleOverlay",
+        "n.classList.contains('el-dialog')",
+        "drawer's form items must be READ",
     ])
     # ...and the original dialog path / refill verification stay intact.
     _pin("N3-orig", PICKER, [
