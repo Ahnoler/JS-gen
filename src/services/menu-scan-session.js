@@ -21,7 +21,8 @@
  *    → 命中节点：UPDATE system SET menu_xpath=…, unmatched_flag=0, sort_order=编号
  *    → 新建节点：INSERT 时带 sort_order=编号
  *    → 幽灵置标：sort_order=100000+（排到真实菜单之后）
- * 6. 释放浏览器会话
+ * 6. 补采空 pageId：对空 pd_cmpt_ecd 的 L2 点读天元写入
+ * 7. 释放浏览器会话
  */
 import { randomUUID } from 'crypto';
 import { REPLAY_LOGIN_TIMEOUT_MS, REPLAY_PHASE2_TIMEOUT_MS, REPLAY_STEP_TIMEOUT_MS } from '../../config/config.js';
@@ -32,6 +33,7 @@ import { runReplayActions } from './replay-actions.js';
 import { getScanJob, clearCurrentScan } from './menu-scan-job.js';
 import { applyScanPlan } from './menu-scan-apply.js';
 import { buildScanApplyPlan } from './menu-scan-service.js';
+import { fillEmptyPageIdsForSystem } from './menu-scan-pageid.js';
 
 /** 阶段二（按组件编号合并幽灵节点）逐菜单读取组件编号的硬上限，防长扫描。 */
 const PHASE2_MAX_READS = 100;
@@ -117,6 +119,17 @@ export async function runScan({ scanId, systemNodeId, url, account }) {
     // —— 事务内写库（含阶段二 merge / 置标 / 变更事件）——
     const applyStats = await applyScanPlan(plan, systemNodeId, phase2.merges, phase2.ghosts, phase2.emptyXpathJsonFns);
 
+    let pageIdStats = { pageIdCandidates: 0, pageIdFilled: 0, pageIdSkipped: 0 };
+    try {
+      pageIdStats = await fillEmptyPageIdsForSystem({
+        systemNodeId,
+        runtime: { sessionId, nodeUuid },
+        execSession,
+      });
+    } catch (fillErr) {
+      console.warn('[menu-scan] pageId fill failed: %s', fillErr?.message || fillErr);
+    }
+
     job.status = 'completed';
     job.stats = {
       ...plan.stats,
@@ -124,6 +137,7 @@ export async function runScan({ scanId, systemNodeId, url, account }) {
       phase2Reads: phase2.reads,
       mergedByPageId: phase2.merges.length,
       unmatchedMarked: applyStats.unmatchedMarked,
+      ...pageIdStats,
     };
     job.finishedAt = new Date().toISOString();
   } catch (err) {

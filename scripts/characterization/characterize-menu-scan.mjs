@@ -234,6 +234,12 @@ function testWiringService() {
   assert.match(service, /assignAiUmlEcdFromId/, 'AI creates assign umlEcd from node id');
 }
 
+function testWiringSessionPageIdFill() {
+  const session = readFileSync(join(root, 'src/services/menu-scan-session.js'), 'utf8');
+  assert.match(session, /fillEmptyPageIdsForSystem/, 'runScan calls pageId fill after apply');
+  assert.match(session, /pageIdCandidates|pageIdFilled|pageIdSkipped/, 'runScan merges pageId stats into job.stats');
+}
+
 /**
  * replay_actions 会话编排契约现在收敛在公共 helper：replay_actions 下发、
  * waitForSessionEvent 等待、forwardStdin 通道与预挂 no-op catch（孤儿 rejection 免疫）
@@ -311,6 +317,7 @@ function main() {
     ['buildScanApplyPlan L2 matches by parentName (disambiguates same-name)', testL2MatchByParentName],
     ['buildScanApplyPlan stats: totalScanned + unmatchedScanned', testStatsCorrect],
     ['wiring: service uses openSession + runReplayActions + buildScanApplyPlan', testWiringService],
+    ['wiring: runScan calls fillEmptyPageIdsForSystem after apply', testWiringSessionPageIdFill],
     ['wiring: replay-actions helper owns replay_actions/forwardStdin/waitForSessionEvent + no-op catch', testWiringReplayActionsHelper],
     ['wiring: _replay.py references scan_menu_tree', testWiringReplayPy],
     ['wiring: js_snippets/menu_scan.py defines JS_SCAN_MENU_TREE', testWiringMenuScanPy],

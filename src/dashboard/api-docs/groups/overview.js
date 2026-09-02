@@ -181,7 +181,7 @@ export const GROUP_OVERVIEW = [
         {
           method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/scan-menu',
           summary: '触发菜单扫描（后台）',
-          desc: '打开被测系统浏览器并自动登录，一次提取全部菜单（名称/层级/xpath），按中文名匹配回写 system.menu_xpath；SUT 有而 JSON 无的菜单按实际层级新增（source=ai）。后台异步执行，立即返回 202 与 scanId。同一时刻仅允许一个扫描任务（409 冲突）。导入 JSON 成功后默认自动触发（?autoScan=false 可关闭）。',
+          desc: '打开被测系统浏览器并自动登录，一次提取全部菜单（名称/层级/xpath），按中文名匹配回写 system.menu_xpath；SUT 有而 JSON 无的菜单按实际层级新增（source=ai）。apply 后对空 pd_cmpt_ecd 的 L2 功能点读天元（组件单码→场景编号）写入落地 pageId。后台异步执行，立即返回 202 与 scanId。同一时刻仅允许一个扫描任务（409 冲突）。导入 JSON 成功后默认自动触发（?autoScan=false 可关闭）。',
           tryable: false,
           reqExample: 'POST /api/v2/system-mgmt/nodes/1/scan-menu',
           respExample: J({ scanId: '<uuid>' }),
@@ -190,11 +190,11 @@ export const GROUP_OVERVIEW = [
         {
           method: 'GET', path: '/api/v2/system-mgmt/menu-scan/:scanId',
           summary: '菜单扫描状态轮询',
-          desc: 'running 返回 202，completed/failed 返回 200。stats 含 totalScanned/matched/created/clearedUnmatched/unmatchedScanned。',
+          desc: 'running 返回 202，completed/failed 返回 200。stats 含 totalScanned/matched/created/clearedUnmatched/unmatchedScanned/pageIdCandidates/pageIdFilled/pageIdSkipped。',
           tryable: false,
           reqExample: 'GET /api/v2/system-mgmt/menu-scan/<scanId>',
-          respExample: J({ scanId: '<uuid>', systemNodeId: 1, status: 'completed', stats: { totalScanned: 410, matched: 232, created: 178, clearedUnmatched: 0, unmatchedScanned: [] }, error: null, startedAt: '<iso>', finishedAt: '<iso>' }),
-          notes: [],
+          respExample: J({ scanId: '<uuid>', systemNodeId: 1, status: 'completed', stats: { totalScanned: 410, matched: 232, created: 178, clearedUnmatched: 0, unmatchedScanned: [], pageIdCandidates: 12, pageIdFilled: 8, pageIdSkipped: 4 }, error: null, startedAt: '<iso>', finishedAt: '<iso>' }),
+          notes: ['读不到天元编号时 skip 不失败', '不覆盖已有 pageId（仅空 pd_cmpt_ecd）', '不写 AILZ 到菜单'],
         },
         {
           method: 'GET', path: '/api/v2/system-mgmt/nodes/:id/change-log',
