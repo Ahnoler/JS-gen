@@ -1,5 +1,12 @@
-## 2026-09-02 · Cursor (uara_V1.2) — 天元读码结构化解析 + fill-pageid + 湿测优化
-- 完成：结构化 `.info` 解析；同 L1 跳过重复 module click；`POST .../fill-pageid`；湿测早退 `empty-config`；plan/research 文档。pin 全绿。commit 见下条更新。
+## 2026-09-02 · Zcode 执行子智能体 — KB-I5 run4 收尾：tree_picker_click 规格对齐 + 全链湿测报告（未 commit）
+- 完成：`tree_picker_click` 实现落地（js_snippets/tree_picker.py 新 + _tree.py 动作 + _js_snippets.py 聚合 + prompt 新段 + pin characterize-tree-picker-click）；触发器优先级照主线程规格对齐=可见 `span.el-tooltip.my-popover.item` 优先（内部 input 隐藏点之无效）；逐级 `norm(text)===目标` 精确匹配 + 回显校验（err-tree-no-echo 不盲试）。
+- run4（tmp/kb_i5_usage4_drill.py，14 轮收敛，报告 tmp/kb_i5_usage4_report.md）：**S6 全链通过**——tree_picker_click(产品名称, 贷款→对公→房地产贷款→住房开发贷款) echo=住房开发贷款，确认后弹窗关、品种表 rowCount=1；S7 五模块 saveOrUpdate 均有 save 动作完成；S2/S3/S5 通过。失败：S4（列表未见 009）、S7.3 利率类型/抵押品种/垄断（err-select-option-unresolved / xpath-not-found）、S8 提交链（意见/流程操作 label-not-found、流程提交 icon-miss、tree_check_confirm(审批人) err-tree-label-not-found）、S9 终态非审批中。缺口 33 条已列归属（引擎/数据）。
+- 验证：py_compile 4 文件 + characterize-tree-picker-click / tree-check-confirm / kb-i5-gaps-2 全绿。executor 已重启（kill agent.mjs + rm .node-uuid.lock + npm run executor → LMY online inUse=0）；遗留轨迹 329 已 stop+detach 释放 slot。
+- 注意：run14 数据跑在触发器对齐前版本（S6 亦命中）；新优先级下未复跑全链（可后续 run5 验证 S8 选人 label「审批人」需弹窗容器扫描——与 tree_check 已修的「下一节点审批人」文本型 label 同类问题）。
+
+
+## 2026-09-02 · Cursor (uara_V1.2) — 天元读码结构化解析 + fill-pageid + 湿测优化（c89e40f）
+- 完成：结构化 `.info` 解析；同 L1 跳过重复 module click；`POST .../fill-pageid`；湿测早退 `empty-config`；plan/research 文档。pin 全绿。`c89e40f`。
 - 注意：剩余约 52 空 pageId 多为无天元配置；改 js_snippets 须重载 executor。截图回退 / V3 export pageId 等仍未提交。
 
 ## 2026-09-02 · Zcode (uara_V1.2) — 用信链引擎湿测（五轮）：引入/抽屉/产品树/申报页贯通（698b4f9）
