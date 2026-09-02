@@ -105,6 +105,7 @@ function testWiringPageIdPy() {
   assert.match(py, /scenarioCode/, 'returns scenarioCode');
   assert.match(py, /场景编号/, 'parses 场景编号 label');
   assert.match(py, /\^\[A-Za-z0-9\]\+\$/, 'componentCode gated on whole-line single token');
+  assert.match(py, /组件编号：.*确定\|取消/, 'componentCode extract stops at footer chrome (确定|取消)');
   // 仅有场景编号的页面：等待条件不能只认「组件编号：」
   assert.match(py, /场景编号：/, 'wait/parse path includes 场景编号');
 }

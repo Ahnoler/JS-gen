@@ -4,11 +4,13 @@ JS snippet constant: JS_READ_PAGE_COMPONENT_CODE.
 Reads the business page's component code ("组件编号") from the floating
 "天元相关配置" help dialog. Each business page has a floating question-mark
 button (``.floatingAction .el-icon-question``); clicking it opens an
-el-dialog whose body is asynchronously filled with four lines:
+el-dialog whose body is asynchronously filled with labels (no newlines between
+fields in textContent), typically including:
   活动名称：xxx(ZJJK00066158)
   页面名称：对公客户管理页
   页面路径：/cstMgt/csinfMnt/cpctMgt/cpctMgtPg
   组件编号：ZJJK00066153
+  场景编号：xxx (some pages expose 场景编号 instead of or in addition to 组件编号)
 
 Three pitfalls (verified by tmp/probe_tianyuan5.py):
   1. The dialog is pre-rendered as an empty shell (only title + 确定);
@@ -71,7 +73,7 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
 
     // 4. parse fields via regex (newline-tolerant)
     // componentCode: whole line after label must be a single token
-    const compRawMatch = text.match(/组件编号：\\s*([^\\n]+?)(?=场景编号：|任务名称：|任务编号：|页面名称：|页面路径：|活动名称：|$)/);
+    const compRawMatch = text.match(/组件编号：\\s*([^\\n]+?)(?=场景编号：|任务名称：|任务编号：|页面名称：|页面路径：|活动名称：|确定|取消|$)/);
     const compRaw = compRawMatch ? compRawMatch[1].trim() : '';
     const componentCode = /^[A-Za-z0-9]+$/.test(compRaw) ? compRaw : '';
 

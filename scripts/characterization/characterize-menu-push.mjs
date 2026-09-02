@@ -53,6 +53,25 @@ function testPayloadShape() {
   assert.equal(mod.parentUmlEcd, '');
 }
 
+function testPayloadValidation() {
+  if (!modOk) { console.log('    (skipped: SUT not importable)'); return; }
+  const system = { id: 1, name: '信贷系统', type: 1 };
+  const nodes = [
+    { id: 10, type: 2, name: '客户管理', umlEcd: 'UML00092041', parentId: 1, pdCmptEcd: '', source: 'json_import', menuXpath: '', unmatchedFlag: 0, removedFlag: 0, sortOrder: 1 },
+  ];
+  const baseOpts = { menuVersion: 1, partnerSystemId: 51, partnerSystemName: '系统1' };
+  assert.throws(
+    () => buildMenuPushPayload(system, nodes, { ...baseOpts, partnerSystemId: null }),
+    (err) => err.code === 'VALIDATION',
+    'missing partnerSystemId throws VALIDATION',
+  );
+  assert.throws(
+    () => buildMenuPushPayload(system, nodes, { ...baseOpts, partnerSystemName: '' }),
+    (err) => err.code === 'VALIDATION',
+    'missing partnerSystemName throws VALIDATION',
+  );
+}
+
 function testWiringPartnerImport() {
   const partner = readFileSync(join(root, 'src/services/partner-platform.js'), 'utf8');
   assert.match(partner, /export async function pushMenusToPartner/, 'pushMenusToPartner exported');
@@ -82,6 +101,7 @@ function main() {
   console.log('\n=== menu push characterization ===\n');
   const tests = [
     ['buildMenuPushPayload v1.2 shape', testPayloadShape],
+    ['buildMenuPushPayload VALIDATION when partner fields missing', testPayloadValidation],
     ['wiring: partner importData HTTP', testWiringPartnerImport],
     ['wiring: menu-push service', testWiringService],
     ['wiring: push-menu routes', testWiringRoute],
