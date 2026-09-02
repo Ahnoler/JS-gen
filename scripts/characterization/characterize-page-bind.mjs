@@ -100,6 +100,11 @@ function testWiringRunner() {
 function testWiringPageIdPy() {
   const py = readFileSync(join(root, 'scripts/controller/actions/js_snippets/page_id.py'), 'utf8');
   assert.match(py, /JS_READ_PAGE_COMPONENT_CODE/, 'page_id.py defines JS_READ_PAGE_COMPONENT_CODE');
+  assert.match(py, /scenarioCode/, 'returns scenarioCode');
+  assert.match(py, /场景编号/, 'parses 场景编号 label');
+  assert.match(py, /\^\[A-Za-z0-9\]\+\$/, 'componentCode gated on whole-line single token');
+  // 仅有场景编号的页面：等待条件不能只认「组件编号：」
+  assert.match(py, /场景编号：/, 'wait/parse path includes 场景编号');
 }
 
 function testWiringReplayPy() {

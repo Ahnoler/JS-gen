@@ -119,7 +119,7 @@ async def _direct_read_page_component_code(page, params, entry):
     """直派回放 read_page_component_code：读取页面组件码，结果行附加 ``pageCode`` 字段。"""
     payload = await page.evaluate(JS_READ_PAGE_COMPONENT_CODE)
     payload = payload if isinstance(payload, dict) else {}
-    sys.stderr.write(f'[replay] read_page_component_code code={payload.get("componentCode", "")} reason={payload.get("reason", "")} diag={json.dumps(payload.get("diag"), ensure_ascii=False)}\n')
+    sys.stderr.write(f'[replay] read_page_component_code code={payload.get("componentCode", "")} scenario={payload.get("scenarioCode", "")} reason={payload.get("reason", "")} diag={json.dumps(payload.get("diag"), ensure_ascii=False)}\n')
     sys.stderr.flush()
     return 'ok', {'pageCode': payload}
 

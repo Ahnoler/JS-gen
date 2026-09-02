@@ -30,14 +30,14 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
 
     // 1. locate the floating help trigger and click it.
     const trigger = document.querySelector('.floatingAction .el-icon-question') || document.querySelector('.floatingAction');
-    if (!trigger) return { componentCode: '', pageName: '', pagePath: '', reason: 'no-trigger' };
+    if (!trigger) return { componentCode: '', scenarioCode: '', pageName: '', pagePath: '', reason: 'no-trigger' };
     trigger.click();
 
     // current route: hash without leading '#' and without query string
     const currentRoute = location.hash.slice(1).split('?')[0];
 
     // 2. poll up to ~12s (40 × 300ms) for the "天元相关配置" dialog to both
-    //    contain "组件编号：" AND have its "页面路径" match the current route.
+    //    contain "组件编号：" or "场景编号：" AND have its "页面路径" match the current route.
     let dialog = null;
     let text = '';
     let lastDialogText = '';
@@ -47,10 +47,10 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
             if (title && title.indexOf('天元相关配置') !== -1) {
                 const t = (d.textContent || '');
                 if (t.length > lastDialogText.length) lastDialogText = t;
-                if (t.indexOf('组件编号：') !== -1) {
+                if (t.indexOf('组件编号：') !== -1 || t.indexOf('场景编号：') !== -1) {
                     // extract 页面路径 to compare with current route.
                     // textContent has NO separators between fields — stop at the next label.
-                    const pm = t.match(/页面路径：\\s*(\\S+?)(?=组件编号：|页面名称：|活动名称：|$)/);
+                    const pm = t.match(/页面路径：\\s*(\\S+?)(?=组件编号：|场景编号：|页面名称：|活动名称：|$)/);
                     const pagePath = pm ? pm[1] : '';
                     if (pagePath && pagePath === currentRoute) {
                         dialog = d;
@@ -66,17 +66,22 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
 
     // 6. timeout or route mismatch → return empty with diagnostics
     if (!dialog) {
-        return { componentCode: '', pageName: '', pagePath: '', reason: 'timeout-or-mismatch', diag: { hash: location.hash, lastDialogText: lastDialogText.slice(0, 300) } };
+        return { componentCode: '', scenarioCode: '', pageName: '', pagePath: '', reason: 'timeout-or-mismatch', diag: { hash: location.hash, lastDialogText: lastDialogText.slice(0, 300) } };
     }
 
-    // 4. parse the four fields via regex (newline-tolerant)
-    const codeMatch = text.match(/组件编号：\\s*([A-Za-z0-9]+)/);
-    const componentCode = codeMatch ? codeMatch[1] : '';
+    // 4. parse fields via regex (newline-tolerant)
+    // componentCode: whole line after label must be a single token
+    const compRawMatch = text.match(/组件编号：\\s*([^\\n]+?)(?=场景编号：|任务名称：|任务编号：|页面名称：|页面路径：|活动名称：|$)/);
+    const compRaw = compRawMatch ? compRawMatch[1].trim() : '';
+    const componentCode = /^[A-Za-z0-9]+$/.test(compRaw) ? compRaw : '';
+
+    const scenMatch = text.match(/场景编号：\\s*([A-Za-z0-9]+)/);
+    const scenarioCode = scenMatch ? scenMatch[1] : '';
 
     const nameMatch = text.match(/页面名称：\\s*([^\\n：]+?)(?=\\s*页面路径|$)/);
     const pageName = nameMatch ? nameMatch[1].trim() : '';
 
-    const pathMatch = text.match(/页面路径：\\s*(\\S+?)(?=组件编号：|页面名称：|活动名称：|$)/);
+    const pathMatch = text.match(/页面路径：\\s*(\\S+?)(?=组件编号：|场景编号：|页面名称：|活动名称：|$)/);
     const pagePath = pathMatch ? pathMatch[1] : '';
 
     const actMatch = text.match(/活动名称：\\s*([^\\n]+)/);
@@ -89,7 +94,7 @@ JS_READ_PAGE_COMPONENT_CODE = '''async () => {
     } catch (e) {}
 
     // 7. success
-    return { componentCode: componentCode, pageName: pageName, pagePath: pagePath, activityName: activityName, reason: 'ok' };
+    return { componentCode: componentCode, scenarioCode: scenarioCode, pageName: pageName, pagePath: pagePath, activityName: activityName, reason: 'ok' };
 }'''
 
 # Menu click by xpath with render wait: poll for the element (sidebar menu may
