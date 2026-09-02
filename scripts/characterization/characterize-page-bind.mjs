@@ -57,25 +57,23 @@ function testWiringService() {
   assert.match(service, /read_page_component_code/, 'service references read_page_component_code');
   assert.match(service, /AILZ/, 'service references AILZ prefix');
   assert.match(service, /updateMeta/, 'service references updateMeta');
-  assert.match(service, /writeBackFunctionLandingPage/, 'service defines write-back helper');
-  assert.match(service, /scenarioCode/, 'reads scenarioCode from pageCode payload');
-  assert.match(service, /json_import/, 'write-back whitelist includes json_import');
-  assert.match(service, /['"]ai['"]/, 'write-back whitelist includes ai');
-  assert.match(service, /replaceForNode/, 'write-back replaces system_page via replaceForNode');
-  assert.match(service, /pdCmptEcd/, 'write-back updates system.pdCmptEcd');
+  assert.doesNotMatch(service, /writeBackFunctionLandingPage|writeFunctionLandingPage/, 'prepare must not write menu landing page');
+  assert.doesNotMatch(service, /json_import/, 'prepare must not gate on menu source for write-back');
 }
 
 function testWiringWriteBackOnlyOnRead() {
   const service = readFileSync(join(root, 'src/services/trajectory/recording-page-bind.js'), 'utf8');
   const earlyIdx = service.indexOf('no functionId, generated pageId');
   assert.ok(earlyIdx > 0, 'early AILZ log present');
-  const earlyReturnIdx = service.indexOf('return { pageId, source, persisted }', earlyIdx);
-  assert.ok(earlyReturnIdx > earlyIdx, 'early return present');
-  const earlyBlock = service.slice(earlyIdx, earlyReturnIdx);
-  assert.ok(!earlyBlock.includes('writeBackFunctionLandingPage'), 'AILZ early path does not write back menu');
   assert.match(service, /source = 'generated'/, 'generated source still assigned');
-  // AILZ / generated 路径不得因白名单误回写：生成分支后回写调用须仍要求非 generated
-  assert.match(service, /source === ['"]read['"]/, 'write-back still requires bind source=read (landing from dialog)');
+  assert.doesNotMatch(service, /writeFunctionLandingPage|writeBackFunctionLandingPage/, 'no menu write-back helper calls');
+}
+
+function testWiringLandingHelper() {
+  const helper = readFileSync(join(root, 'src/services/function-landing-page.js'), 'utf8');
+  assert.match(helper, /export async function writeFunctionLandingPage/, 'shared landing writer exported');
+  assert.match(helper, /replaceForNode/, 'writes system_page via replaceForNode');
+  assert.match(helper, /pdCmptEcd/, 'updates system.pdCmptEcd');
 }
 
 /**
@@ -131,7 +129,8 @@ function main() {
     ['generatePageId format: AILZ + 13-digit ms timestamp', testGeneratePageIdFormat],
     ['generatePageId unique + non-decreasing timestamp', testGeneratePageIdUniqueNonDecreasing],
     ['wiring: service references runReplayActions + read_page_component_code + AILZ + updateMeta', testWiringService],
-    ['wiring: write-back only on source=read (not AILZ/generated)', testWiringWriteBackOnlyOnRead],
+    ['wiring: prepare does not write menu landing page', testWiringWriteBackOnlyOnRead],
+    ['wiring: function-landing-page.js exports shared landing writer', testWiringLandingHelper],
     ['wiring: replay-actions helper owns replay_actions/forwardStdin/waitForSessionEvent + no-op catch', testWiringReplayActionsHelper],
     ['wiring: trajectory-attach-runner.js references bindRecordingPageId', testWiringRunner],
     ['wiring: js_snippets/page_id.py defines JS_READ_PAGE_COMPONENT_CODE', testWiringPageIdPy],
