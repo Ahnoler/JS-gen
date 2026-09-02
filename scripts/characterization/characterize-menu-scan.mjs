@@ -28,6 +28,16 @@ try {
   scanAvailable = false;
 }
 
+let listEmptyPageIdFunctions;
+let pageIdFillAvailable = false;
+try {
+  const pageidMod = await import('../../src/services/menu-scan-pageid.js');
+  listEmptyPageIdFunctions = pageidMod.listEmptyPageIdFunctions;
+  pageIdFillAvailable = true;
+} catch (err) {
+  pageIdFillAvailable = false;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -213,6 +223,7 @@ function testWiringService() {
     'src/services/menu-scan-job.js',
     'src/services/menu-scan-session.js',
     'src/services/menu-scan-apply.js',
+    'src/services/menu-scan-pageid.js',
   ].map((p) => readFileSync(join(root, p), 'utf8')).join('\n');
   assert.match(service, /openSession/, 'service references openSession');
   assert.match(service, /runReplayActions/, 'service routes replay through runReplayActions');
@@ -261,6 +272,31 @@ function testWiringChangeLog() {
   assert.match(route, /change-log/, 'route references change-log endpoint');
 }
 
+function testWiringPageIdFill() {
+  const pageid = readFileSync(join(root, 'src/services/menu-scan-pageid.js'), 'utf8');
+  assert.match(pageid, /export function listEmptyPageIdFunctions/, 'lists empty pd_cmpt_ecd L2');
+  assert.match(pageid, /export async function fillEmptyPageIdsForSystem/, 'fill entry exported');
+  assert.match(pageid, /read_page_component_code/, 'reads tianyuan codes');
+  assert.match(pageid, /click_menu_xpath/, 'clicks menu xpath');
+  assert.match(pageid, /writeFunctionLandingPage/, 'writes landing via shared helper');
+  assert.match(pageid, /pageIdSkipped|pageIdFilled/, 'returns fill stats');
+}
+
+function testListEmptyPageIdFunctionsPure() {
+  if (!pageIdFillAvailable) { console.log('    (skipped: menu-scan-pageid not importable)'); return; }
+  const nodes = [
+    { id: 1, type: 1, parentId: 0, name: 'S', pdCmptEcd: '', menuXpath: '' },
+    { id: 10, type: 2, parentId: 1, name: 'M', pdCmptEcd: '', menuXpath: '//m' },
+    { id: 11, type: 3, parentId: 10, name: 'empty', pdCmptEcd: '', menuXpath: '//a' },
+    { id: 12, type: 3, parentId: 10, name: 'filled', pdCmptEcd: 'ZJJK1', menuXpath: '//b' },
+    { id: 13, type: 3, parentId: 10, name: 'no-xpath', pdCmptEcd: '', menuXpath: '' },
+  ];
+  const list = listEmptyPageIdFunctions(nodes, 1);
+  assert.equal(list.length, 2, 'empty pd_cmpt_ecd L2 includes no-xpath');
+  assert.equal(list[0].id, 11, 'first candidate is empty with xpath');
+  assert.ok(list.some((n) => n.id === 13), 'no-xpath empty L2 still listed as candidate');
+}
+
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
@@ -279,6 +315,8 @@ function main() {
     ['wiring: js_snippets/menu_scan.py defines JS_SCAN_MENU_TREE', testWiringMenuScanPy],
     ['wiring: route references scan-menu + autoScan', testWiringRoute],
     ['wiring: route references change-log endpoint', testWiringChangeLog],
+    ['wiring: menu-scan-pageid lists/fills empty L2 pageIds', testWiringPageIdFill],
+    ['listEmptyPageIdFunctions filters empty pd_cmpt_ecd L2 only', testListEmptyPageIdFunctionsPure],
   ];
   let failed = 0;
   for (const [name, fn] of tests) {
