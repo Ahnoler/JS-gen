@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - 2026-09-02: **菜单扫描补采落地 pageId**：apply 后对空 `pd_cmpt_ecd` 的 L2 点开读天元（组件单码→场景编号）写入；skip 不失败。prepare 取消菜单回写。影响：`menu-scan-pageid.js`、`menu-scan-session.js`、`function-landing-page.js`、`recording-page-bind.js`。
 
+- 2026-09-02: **菜单扫描补采 pageId：要求 L2 点击成功**：空 `menu_xpath` 或 `click_menu_xpath` 失败时跳过，不读天元、不写落地页，避免沿用上一页编号。影响：`menu-scan-pageid.js`、characterize-menu-scan。
+
 - 2026-09-02: **AI 菜单 umlEcd=节点 id**：扫描新建 `source=ai` 后写 `umlEcd=String(id)`；推送 `resolveMenuUmlEcd` 空则回退节点 id，保证 `umlEcd`/`parentUmlEcd` 可建树。影响：`menu-scan-apply.js`、`menu-push.js`。
 
 - 2026-09-02: **录制 prepare 落地 pageId：场景编号回退 + 菜单来源白名单回写**：天元弹窗组件编号仅整行单码有效，否则用场景编号（FS…）；回写 `pd_cmpt_ecd` 仅当功能节点 `source` 为 `json_import` 或 `ai`；AILZ 仍不回写菜单。影响：`page_id.py`、`recording-page-bind.js`、characterize-page-bind。

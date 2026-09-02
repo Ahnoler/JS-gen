@@ -53,13 +53,13 @@ export async function fillEmptyPageIdsForSystem({ systemNodeId, runtime, execSes
       const parent = byId.get(Number(c.parentId));
       const moduleXpath = String(parent?.menuXpath || '').trim();
       const functionXpath = c.menuXpath;
-      if (!moduleXpath && !functionXpath) {
+      if (!functionXpath) {
         pageIdSkipped += 1;
         continue;
       }
       const actions = [];
       if (moduleXpath) actions.push({ action: 'click_menu_xpath', params: { xpath: moduleXpath } });
-      if (functionXpath) actions.push({ action: 'click_menu_xpath', params: { xpath: functionXpath } });
+      actions.push({ action: 'click_menu_xpath', params: { xpath: functionXpath } });
       actions.push({ action: 'read_page_component_code', params: {} });
 
       const { result: r } = await runReplayActions({
@@ -72,6 +72,13 @@ export async function fillEmptyPageIdsForSystem({ systemNodeId, runtime, execSes
         isReplay: true,
       });
       const results = Array.isArray(r?.results) ? r.results : [];
+      const functionClickRow = results.find(
+        (it) => it && it.action === 'click_menu_xpath' && it.params?.xpath === functionXpath,
+      );
+      if (!functionClickRow?.ok) {
+        pageIdSkipped += 1;
+        continue;
+      }
       const row = results.find((it) => it && it.action === 'read_page_component_code');
       const payload = row?.pageCode && typeof row.pageCode === 'object' ? row.pageCode : {};
       const componentCode = String(payload.componentCode || '').trim();
