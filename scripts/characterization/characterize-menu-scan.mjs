@@ -220,6 +220,7 @@ function testWiringService() {
   assert.match(service, /runPhase2Match/, 'service defines runPhase2Match (phase2 match)');
   assert.match(service, /insertRows/, 'service references menuChangeLogDao.insertRows');
   assert.match(service, /unmatched_marked/, 'service records unmatched_marked change event');
+  assert.match(service, /assignAiUmlEcdFromId/, 'AI creates assign umlEcd from node id');
 }
 
 /**

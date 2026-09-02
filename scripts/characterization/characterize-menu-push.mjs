@@ -46,6 +46,8 @@ function testPayloadShape() {
   const ai = payload.menus.find((m) => m.name === '工作台入口');
   assert.equal(ai.source, 'ai');
   assert.equal(ai.pageId, 'FS00005518');
+  assert.equal(ai.umlEcd, '12', 'ai empty umlEcd falls back to node id');
+  assert.equal(ai.parentUmlEcd, 'UML00092041');
   assert.equal(typeof fn.pageId, 'string');
   assert.ok(!Array.isArray(fn.pageId));
   const mod = payload.menus.find((m) => m.type === 2);

@@ -55,6 +55,18 @@ function normalizeStatus(raw) {
 }
 
 /**
+ * 推送用 umlEcd：库值优先；空则用节点自身 id（AI 扫描菜单无建模编码）。
+ * @param {object|null|undefined} n 系统树节点
+ * @returns {string} 非空时可用于建树的编码
+ */
+export function resolveMenuUmlEcd(n) {
+  if (!n) return '';
+  const ecd = String(n.umlEcd || '').trim();
+  if (ecd) return ecd;
+  return n.id != null && n.id !== '' ? String(n.id) : '';
+}
+
+/**
  * 纯函数：组装推送 wire body。
  * @param {object} system type=1 节点
  * @param {object[]} nodes 该系统下 type=2|3 节点（含 parent 信息所需字段）
@@ -79,11 +91,11 @@ export function buildMenuPushPayload(system, nodes, { menuVersion, partnerSystem
     const name = String(n.name || '');
     const parentName = parent ? String(parent.name || '') : '';
     return {
-      umlEcd: String(n.umlEcd || ''),
+      umlEcd: resolveMenuUmlEcd(n),
       type,
       name,
       parentPath: type === NODE_TYPE.MODULE ? name : (parentName ? `${parentName}-${name}` : name),
-      parentUmlEcd: type === NODE_TYPE.MODULE ? '' : String(parent?.umlEcd || ''),
+      parentUmlEcd: type === NODE_TYPE.MODULE ? '' : resolveMenuUmlEcd(parent),
       xpath: String(n.menuXpath || ''),
       source: String(n.source || ''),
       unmatched: Number(n.unmatchedFlag) === 1,

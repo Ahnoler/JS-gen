@@ -9,6 +9,19 @@ import * as menuChangeLogDao from '../dao/menu-change-log-dao.js';
 import { NODE_TYPE } from '../models/hierarchy-constants.js';
 
 /**
+ * AI 新建节点：用自身 DB id 写入 umlEcd，保证推送时 umlEcd/parentUmlEcd 可建树。
+ * @param {{ id: number|string }} created systemDao.create 返回行
+ * @param {object} trx knex transaction
+ * @returns {Promise<string>} 写入的 umlEcd
+ */
+async function assignAiUmlEcdFromId(created, trx) {
+  const id = Number(created.id);
+  const umlEcd = String(id);
+  await systemDao.update(id, { umlEcd }, trx);
+  return umlEcd;
+}
+
+/**
  * 在单个事务内应用扫描计划：更新命中节点、新建未命中节点。
  *
  * L1 命中 → 更新 menuXpath 并清 unmatchedFlag；未命中 → 新建 type=2 模块。
@@ -59,6 +72,7 @@ export async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []
         },
         trx,
       );
+      await assignAiUmlEcdFromId(created, trx);
       moduleByName.set(c.name.trim(), Number(created.id));
     }
 
@@ -89,10 +103,11 @@ export async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []
           },
           trx,
         );
+        await assignAiUmlEcdFromId(created, trx);
         parentId = Number(created.id);
         moduleByName.set(parentName, parentId);
       }
-      await systemDao.create(
+      const fnCreated = await systemDao.create(
         {
           type: NODE_TYPE.FUNCTION,
           parentId,
@@ -103,6 +118,7 @@ export async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []
         },
         trx,
       );
+      await assignAiUmlEcdFromId(fnCreated, trx);
     }
 
     // ── 阶段二 merge 应用（同事务）──

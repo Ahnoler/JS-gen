@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- 2026-09-02: **AI 菜单 umlEcd=节点 id**：扫描新建 `source=ai` 后写 `umlEcd=String(id)`；推送 `resolveMenuUmlEcd` 空则回退节点 id，保证 `umlEcd`/`parentUmlEcd` 可建树。影响：`menu-scan-apply.js`、`menu-push.js`。
+
 - 2026-09-02: **录制 prepare 落地 pageId：场景编号回退 + 菜单来源白名单回写**：天元弹窗组件编号仅整行单码有效，否则用场景编号（FS…）；回写 `pd_cmpt_ecd` 仅当功能节点 `source` 为 `json_import` 或 `ai`；AILZ 仍不回写菜单。影响：`page_id.py`、`recording-page-bind.js`、characterize-page-bind。
 
 - 2026-09-02: **推送菜单来源标识（仅本仓）**：202 响应 `source.systemId/systemName` 为本仓 id/name 加前缀（默认 `JSGEN:`）；**不**写入伙伴 importData。`POST push-menu` body 必填伙伴 `systemNodeId`（或 `partnerSystemId`）；路径 `:id` 仍为本仓系统（菜单来源）。下拉数据 `GET /api/v2/export/partner/menu-push/systems`（代理 getSystemNodeLevel）。`pushMenusToPartner` POST `{PARTNER_MENU_PUSH_BASE}/system/umlElementData/importData`（默认 `172.20.101.63:11002/api`）；wire 体含 `systemNodeId`/`systemName`/`menuVersion`/`menus`（剥 `schemaVersion`）。影响范围：`partner-platform.js`、api-docs、characterize-menu-push。
