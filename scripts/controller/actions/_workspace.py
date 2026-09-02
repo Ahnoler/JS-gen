@@ -9,6 +9,7 @@ from ._js_snippets import (
     JS_PICKER_DIALOG_QUERY,
     JS_PICKER_DIALOG_SELECT,
     JS_WORKSPACE_TABS,
+    JS_CLOSE_VISIBLE_DIALOG,
 )
 from .replay_timing import WAIT_800_MS
 
@@ -128,5 +129,34 @@ def _register_workspace_actions(controller, browser_context):
         ok, payload = _workspace_result(result)
         if ok:
             _record_action('workspace_tabs', {'action': action, 'tab_name': tab_name}, payload)
+            return _ok(payload)
+        return payload
+
+    @controller.action(
+        'Close a business-foreign visible .el-dialog (客户360视图详情 / 身份识别, '
+        '维护方案品种明细 residual state, ...). Never touches .el-drawer — drawers '
+        'are handled by back/navigation. Clicks the topmost (or title-matching) '
+        'visible dialog button in priority order: 取消 → 确 定/确定 → header X. '
+        'Call this BEFORE the next step when get_page_state shows a dialog that '
+        'does not belong to the current flow. Errors: err-dialog-not-found (no '
+        'visible dialog) / err-dialog-not-closable:<title> (all buttons disabled '
+        '— residual disableBtn state; do NOT retry in a loop, restore via '
+        'refresh/navigate back to the list and re-enter the apply page instead).'
+    )
+    async def close_visible_dialog(dialog_title: str = ''):
+        page = await browser_context.get_current_page()
+        result = await page.evaluate(JS_CLOSE_VISIBLE_DIALOG, [dialog_title])
+        await page.wait_for_timeout(WAIT_800_MS)
+        ok, payload = _workspace_result(result)
+        if ok:
+            try:
+                parsed = json.loads(payload[3:]) if payload.startswith('ok:') else {}
+            except Exception:
+                parsed = {}
+            _record_action('close_visible_dialog', {
+                'dialog_title': dialog_title,
+                'closed': parsed.get('closed'),
+                'via': parsed.get('via'),
+            }, payload)
             return _ok(payload)
         return payload

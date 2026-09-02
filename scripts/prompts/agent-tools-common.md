@@ -105,3 +105,9 @@
 4. `export_dicts` 仅在有登录态且 kb_dict 报 empty 时调用（一次登录一次）。
 5. `kb_rule(关键词)` 可查隐性规则（业务主键前缀表/「退回_」命名规则/操作惯例），看待办卡片与流程节点名时先查。
 6. 特殊元素候选 hint 提供的 id 优先用 `use_special_element(id)` 执行（流程卡 `special_elements` 有引用的即为已沉淀操作组，如「法定代表人引入」），不要退化为手工多步操作。
+
+## 🚨 业务外弹窗守卫（close_visible_dialog）
+
+1. `get_page_state` 发现可见弹窗不属于当前流程（如「客户360视图详情」「身份识别」遮挡，或残留 disableBtn 弹窗）时，先调 `close_visible_dialog(dialog_title)`：优先「取消」→「确 定」→ 弹窗 X；只关弹窗，不关 drawer（drawer 走返回/导航）。
+2. 返回 `err-dialog-not-closable`（全 disableBtn 残留态）→ 不要死循环重试，改走「刷新导航回列表 → 重新引入 → 修改」通用还原。
+3. 弹窗打开期间底层按钮全部 disabled：任何动作连锁 label-not-found / icon-miss 先怀疑弹窗遮挡，先守卫后动作。
