@@ -91,6 +91,7 @@ JS_REAL_CLICK_RECT = '''async (args) => {
         return JSON.stringify({ ok: false, error: 'err-real-click-target-not-found' });
     }
     el.scrollIntoView({ block: 'center', behavior: 'instant' });
+    await new Promise((r) => setTimeout(r, 150));
     const r = el.getBoundingClientRect();
     if (!(r.width > 0 && r.height > 0)) {
         return JSON.stringify({ ok: false, error: 'err-real-click-invisible', tag: el.tagName });
