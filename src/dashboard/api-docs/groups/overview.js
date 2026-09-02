@@ -216,11 +216,19 @@ export const GROUP_OVERVIEW = [
         {
           method: 'POST', path: '/api/v2/system-mgmt/nodes/:id/push-menu',
           summary: '推送系统菜单至伙伴平台',
-          desc: '组装 v1.2 菜单 payload 并调用伙伴平台（当前 stub：partner.skipped=true）。落库 menuPushStatus=pushing，autoSyncMs 窗口后自动纠偏为 synced。同一系统推送进行中返回 409。',
+          desc: '从本仓系统节点组菜单，POST 伙伴 importData。`:id` 为本仓系统 id（菜单来源）；body 须带伙伴 `systemNodeId`（下拉 getSystemNodeLevel 所选）。',
           tryable: false,
-          reqExample: 'POST /api/v2/system-mgmt/nodes/1/push-menu',
-          respExample: J({ status: 'pushing', menuVersion: 8, menuCount: 42, partner: { skipped: true, reason: 'partner_endpoint_pending' }, autoSyncMs: 5000 }),
-          notes: [':id 必须是系统类型节点 (type=1)', 'access_token 可选；优先请求头 access_token', 'partner 当前为 stub（skipped），真实对接后 partner.skipped=false', 'autoSyncMs 由 MENU_PUSH_AUTO_SYNC_MS 配置，默认 5000ms'],
+          reqExample: 'POST /api/v2/system-mgmt/nodes/1/push-menu\n{ "systemNodeId": 51, "systemName": "系统1" }',
+          respExample: J({ status: 'pushing', menuVersion: 8, menuCount: 42, partner: { code: 200, msg: '20260902100654-116736' }, partnerWire: { systemNodeId: 51, systemName: '系统1', menuVersion: 8, menuCount: 42 }, source: { systemId: 'JSGEN:1', systemName: 'JSGEN:信贷系统' }, autoSyncMs: 5000 }),
+          notes: [
+            ':id 必须是本仓系统类型节点 (type=1)，决定 menus[] 数据来源',
+            'body.systemNodeId（或 partnerSystemId）= 伙伴平台系统 id，来自 GET /api/v2/export/partner/menu-push/systems',
+            'body.systemName（或 partnerSystemName）= 伙伴平台系统名，与下拉选中项 name 一致，必填',
+            '202 响应 source 为本仓来源标识（id/name 加前缀 JSGEN:，仅本仓可见，不发给伙伴）',
+            'partnerWire 为实际 POST importData 的字段子集',
+            'access_token 可选；优先请求头 access_token',
+            'autoSyncMs 由 MENU_PUSH_AUTO_SYNC_MS 配置，默认 5000ms',
+          ],
         },
         {
           method: 'GET', path: '/api/v2/system-mgmt/nodes/:id/push-menu/status',

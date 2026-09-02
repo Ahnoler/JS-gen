@@ -233,11 +233,16 @@ export default function (app) {
     }
   }));
 
-  /** 4.5 推送系统菜单至伙伴平台（stub，202 异步语义） */
+  /** 4.5 推送系统菜单至伙伴平台（202 异步语义） */
   app.post('/api/v2/system-mgmt/nodes/:id/push-menu', asyncHandler(async (req, res) => {
     try {
+      const body = req.body || {};
+      const partnerSystemId = body.partnerSystemId ?? body.systemNodeId;
+      const partnerSystemName = body.partnerSystemName ?? body.systemName;
       const result = await pushMenuForSystem(Number(req.params.id), {
         accessToken: resolveAccessToken(req) || undefined,
+        partnerSystemId,
+        partnerSystemName,
       });
       res.status(202).json(result);
     } catch (e) {

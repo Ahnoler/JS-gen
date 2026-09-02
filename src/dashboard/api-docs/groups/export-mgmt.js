@@ -135,6 +135,19 @@ export const GROUP_EXPORT = [
         }),
       },
       {
+        method: 'GET', path: '/api/v2/export/partner/menu-push/systems',
+        summary: '菜单推送：伙伴系统列表（代理 getSystemNodeLevel）',
+        desc: '转发伙伴 POST /system/system/getSystemNodeLevel（PARTNER_MENU_PUSH_BASE，默认 172.20.101.63:11002/api）。推送菜单弹窗「所属系统」下拉数据源；选中项 id 作为 push-menu body.systemNodeId。',
+        params: [
+          { name: 'access_token', type: 'string', required: true, in: 'query', desc: '通常放请求头 access_token' },
+        ],
+        respExample: J({
+          systems: [{ id: 51, name: '系统1', parentId: '-1' }, { id: 29, name: '核心系统', parentId: '-1' }],
+          count: 2,
+        }),
+        notes: ['与批量推送 partner/systems（按项目懒加载树）不同，本接口为菜单推送专用扁平列表'],
+      },
+      {
         method: 'GET', path: '/api/v2/export/transaction/schema',
         summary: 'Partner transaction 字段契约',
         desc: '返回导入体字段说明（外层 transcationEventTypeList；轨内 transcationProperties 等）。',

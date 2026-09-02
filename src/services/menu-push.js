@@ -5,10 +5,40 @@ import { resolve as configResolve } from '../../config/config.js';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemMenuSnapshotDao from '../dao/system-menu-snapshot-dao.js';
 import { NODE_TYPE } from '../dao/system-dao.js';
-import { pushMenusToPartner } from './partner-platform.js';
+import { pushMenusToPartner, toPartnerMenuPushPayload } from './partner-platform.js';
 
 const DEFAULT_AUTO_SYNC_MS = 5000;
+const DEFAULT_SOURCE_PREFIX = 'JSGEN:';
 const timers = new Map(); // systemNodeId → Timeout
+
+/**
+ * 菜单推送来源前缀（标识本仓 system id/name）；`MENU_PUSH_SOURCE_PREFIX` 可覆盖，默认 `JSGEN:`。
+ * @returns {string} 来源前缀
+ */
+export function getMenuPushSourcePrefix() {
+  const raw = String(configResolve('MENU_PUSH_SOURCE_PREFIX', DEFAULT_SOURCE_PREFIX) || '').trim();
+  return raw || DEFAULT_SOURCE_PREFIX;
+}
+
+/**
+ * 本仓系统 id 加来源前缀（如 `JSGEN:1`）。
+ * @param {number|string} localId 本仓系统节点 id
+ * @param {string} [prefix] 来源前缀
+ * @returns {string} 带来源前缀的 id
+ */
+export function formatSourceSystemId(localId, prefix = getMenuPushSourcePrefix()) {
+  return `${prefix}${localId}`;
+}
+
+/**
+ * 本仓系统名加来源前缀（如 `JSGEN:信贷系统`）。
+ * @param {string} localName 本仓系统名称
+ * @param {string} [prefix] 来源前缀
+ * @returns {string} 带来源前缀的名称
+ */
+export function formatSourceSystemName(localName, prefix = getMenuPushSourcePrefix()) {
+  return `${prefix}${String(localName || '')}`;
+}
 
 /**
  * 菜单推送 auto-sync 窗口（毫秒）；`MENU_PUSH_AUTO_SYNC_MS` 配置，默认 5s。
@@ -28,10 +58,16 @@ function normalizeStatus(raw) {
  * 纯函数：组装推送 wire body。
  * @param {object} system type=1 节点
  * @param {object[]} nodes 该系统下 type=2|3 节点（含 parent 信息所需字段）
- * @param {{ menuVersion: number }} opts 快照版本号
+ * @param {{ menuVersion: number, partnerSystemId: number|string, partnerSystemName: string }} opts 快照版本号与伙伴目标系统
  * @returns {object} v1.2 wire body
  */
-export function buildMenuPushPayload(system, nodes, { menuVersion }) {
+export function buildMenuPushPayload(system, nodes, { menuVersion, partnerSystemId, partnerSystemName }) {
+  if (partnerSystemId == null || partnerSystemId === '') {
+    throw Object.assign(new Error('partnerSystemId is required for menu push wire body'), { code: 'VALIDATION' });
+  }
+  if (partnerSystemName == null || String(partnerSystemName).trim() === '') {
+    throw Object.assign(new Error('partnerSystemName is required for menu push wire body'), { code: 'VALIDATION' });
+  }
   const byId = new Map((nodes || []).map((n) => [Number(n.id), n]));
   const list = [...(nodes || [])].sort((a, b) => {
     const so = (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0);
@@ -57,8 +93,8 @@ export function buildMenuPushPayload(system, nodes, { menuVersion }) {
   });
   return {
     schemaVersion: 1,
-    systemNodeId: Number(system.id),
-    systemName: String(system.name || ''),
+    systemNodeId: Number(partnerSystemId) || partnerSystemId,
+    systemName: String(partnerSystemName),
     menuVersion: Number(menuVersion) || 0,
     menus,
   };
@@ -135,15 +171,21 @@ export async function getMenuPushStatus(systemNodeId) {
 }
 
 /**
- * 推送系统菜单至伙伴平台（stub）并落库 pushing 状态。
- * @param {number} systemNodeId 系统节点 id
- * @param {{ accessToken?: string }} [opts] 伙伴平台 access token
- * @returns {Promise<{ status: string, menuVersion: number, menuCount: number, partner: object, autoSyncMs: number }>} 202 响应体字段
+ * 推送系统菜单至伙伴平台并落库 pushing 状态。
+ * @param {number} systemNodeId 本仓系统节点 id（菜单数据源）
+ * @param {{ accessToken?: string, partnerSystemId?: number|string, partnerSystemName?: string }} [opts] 伙伴目标系统 + token
+ * @returns {Promise<{ status: string, menuVersion: number, menuCount: number, partner: object, partnerWire: object, source: object, autoSyncMs: number }>} 202 响应体字段
  */
-export async function pushMenuForSystem(systemNodeId, { accessToken } = {}) {
+export async function pushMenuForSystem(systemNodeId, { accessToken, partnerSystemId, partnerSystemName } = {}) {
   const system = await systemDao.getById(systemNodeId);
   if (!system || Number(system.type) !== NODE_TYPE.SYSTEM) {
     throw Object.assign(new Error('系统节点不存在或类型不正确'), { code: 'VALIDATION' });
+  }
+  if (partnerSystemId == null || partnerSystemId === '') {
+    throw Object.assign(new Error('伙伴平台 systemNodeId 必填（body.systemNodeId 或 body.partnerSystemId）'), { code: 'VALIDATION' });
+  }
+  if (partnerSystemName == null || String(partnerSystemName).trim() === '') {
+    throw Object.assign(new Error('伙伴平台 systemName 必填（body.systemName 或 body.partnerSystemName）'), { code: 'VALIDATION' });
   }
   const current = normalizeStatus(system.menuPushStatus);
   if (current === 'pushing') {
@@ -154,7 +196,12 @@ export async function pushMenuForSystem(systemNodeId, { accessToken } = {}) {
   }
   const menuVersion = await systemMenuSnapshotDao.getLatestVersion(systemNodeId);
   const nodes = await listMenuNodesUnderSystem(systemNodeId);
-  const payload = buildMenuPushPayload(system, nodes, { menuVersion });
+  const payload = buildMenuPushPayload(system, nodes, {
+    menuVersion,
+    partnerSystemId,
+    partnerSystemName,
+  });
+  const partnerWire = toPartnerMenuPushPayload(payload);
   const partner = await pushMenusToPartner(payload, { accessToken });
   const now = new Date();
   await systemDao.update(systemNodeId, {
@@ -170,6 +217,16 @@ export async function pushMenuForSystem(systemNodeId, { accessToken } = {}) {
     menuVersion,
     menuCount: payload.menus.length,
     partner,
+    partnerWire: {
+      systemNodeId: partnerWire.systemNodeId,
+      systemName: partnerWire.systemName,
+      menuVersion: partnerWire.menuVersion,
+      menuCount: partnerWire.menus?.length ?? 0,
+    },
+    source: {
+      systemId: formatSourceSystemId(system.id),
+      systemName: formatSourceSystemName(system.name),
+    },
     autoSyncMs: getAutoSyncMs(),
   };
 }
