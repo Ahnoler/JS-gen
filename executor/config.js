@@ -107,8 +107,12 @@ function resolveNodeUuidSync() {
   return id;
 }
 
-/** 执行器启动互斥锁文件路径（与 .node-uuid 同目录，内容为持锁进程 pid）。 */
-export const EXECUTOR_LOCK_FILE = path.join(EXECUTOR_DIR, '.node-uuid.lock');
+/** 执行器启动互斥锁文件路径（与 .node-uuid 同目录，内容为持锁进程 pid）。
+ * uuid 经环境变量显式指定的多实例场景按 uuid 隔离锁文件，避免与默认实例互斥。 */
+const _uuidFromEnv = process.env.EXECUTOR_NODE_UUID || '';
+export const EXECUTOR_LOCK_FILE = _uuidFromEnv
+  ? path.join(EXECUTOR_DIR, `.node-uuid-${_uuidFromEnv.slice(0, 8)}.lock`)
+  : path.join(EXECUTOR_DIR, '.node-uuid.lock');
 
 /**
  * 判断进程是否存活（process.kill(pid, 0) 探活）。
