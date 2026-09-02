@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- 2026-09-02: **录制 prepare 落地 pageId：场景编号回退 + 菜单来源白名单回写**：天元弹窗组件编号仅整行单码有效，否则用场景编号（FS…）；回写 `pd_cmpt_ecd` 仅当功能节点 `source` 为 `json_import` 或 `ai`；AILZ 仍不回写菜单。影响：`page_id.py`、`recording-page-bind.js`、characterize-page-bind。
+
+- 2026-09-02: **推送菜单来源标识（仅本仓）**：202 响应 `source.systemId/systemName` 为本仓 id/name 加前缀（默认 `JSGEN:`）；**不**写入伙伴 importData。`POST push-menu` body 必填伙伴 `systemNodeId`（或 `partnerSystemId`）；路径 `:id` 仍为本仓系统（菜单来源）。下拉数据 `GET /api/v2/export/partner/menu-push/systems`（代理 getSystemNodeLevel）。`pushMenusToPartner` POST `{PARTNER_MENU_PUSH_BASE}/system/umlElementData/importData`（默认 `172.20.101.63:11002/api`）；wire 体含 `systemNodeId`/`systemName`/`menuVersion`/`menus`（剥 `schemaVersion`）。影响范围：`partner-platform.js`、api-docs、characterize-menu-push。
+
 - 2026-09-01: **推送菜单 D1+D2（partner stub）**：`POST/GET .../nodes/:id/push-menu`；组 v1.2 body；状态落库；`pushMenusToPartner` 不发 HTTP；默认 5s auto-sync。
 
 - 2026-09-01: **推送菜单 D1+D2 设计** `docs/superpowers/specs/2026-09-01-menu-push-d1-d2-design.md`：按 v1.2 组包；POST/GET push-menu；状态落库；partner HTTP stub；短时 auto-sync 模拟完成。影响范围：设计文档，待实现计划。

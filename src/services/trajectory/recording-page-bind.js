@@ -2,8 +2,9 @@
  * 录制准备阶段——起点页面 ID 绑定。
  *
  * 在 record/prepare 登录成功后，按交易所属功能的 menu_xpath 自动导航到功能页，
- * 发 replay 动作 `read_page_component_code` 读取起点页面「天元相关配置」的组件编号，
- * 取值优先级：实测组件编号 > AILZ+13位时间戳生成；最后 `trajectoryDao.updateMeta` 落库。
+ * 发 replay 动作 `read_page_component_code` 读取起点页面「天元相关配置」的组件/场景编号，
+ * 取值优先级：实测组件编号 > 场景编号 > AILZ+13位时间戳生成；最后 `trajectoryDao.updateMeta` 落库。
+ * 菜单回写（pd_cmpt_ecd + system_page）仅当落地来自弹窗（source=read）且功能节点 source 为 json_import 或 ai。
  *
  * 整段绝不阻断录制启动：任何异常吞掉打 warn 后 return（绝不 throw）。
  * execSession 由调用方传入（便于测试），不在此处 import。
@@ -58,9 +59,9 @@ async function writeBackFunctionLandingPage(functionId, landing) {
  * 1. `Number(functionId)` 无效 → 直接走 AILZ 兜底路径（跳过导航/读页）
  * 2. `navigateToFunctionMenu`（失败仅 log，继续——导航失败时读的是当前页，读不到就 AILZ）
  * 3. 发 `read_page_component_code` replay 动作，从 `r.results` 取 `row.pageCode`
- * 4. `pageId = componentCode || generatePageId()`
+ * 4. `pageId = componentCode || scenarioCode || generatePageId()`
  * 5. 与功能节点 system_page 已知页面 ID 交叉校验（仅 console.log，不阻断）
- * 6. `source=read` 时回写功能落地 pageId（pd_cmpt_ecd + 单行 system_page）
+ * 6. `source=read` 且功能节点 `source∈{json_import,ai}` 时回写功能落地 pageId
  * 7. `trajectoryDao.updateMeta(tid, { pageId })` 落库
  *
  * 全程 try/catch 最外层：任何异常 `console.warn('[page-bind] ...')` 后 return，绝不 throw。
@@ -109,8 +110,9 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
       console.warn('[page-bind] menu navigation failed: %s', navErr?.message || navErr);
     }
 
-    // 步骤 3：读组件编号
+    // 步骤 3：读组件/场景编号
     let componentCode = '';
+    let scenarioCode = '';
     let pageName = '';
     let pagePath = '';
     try {
@@ -125,10 +127,11 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
       });
       const results = Array.isArray(r?.results) ? r.results : [];
       const row = results.find((it) => it && it.action === 'read_page_component_code');
-      // Python 侧把整个 payload 挂在 row.pageCode：{ componentCode, pageName, pagePath, activityName, reason }
+      // Python 侧把整个 payload 挂在 row.pageCode：{ componentCode, scenarioCode, pageName, pagePath, activityName, reason }
       const payload = row?.pageCode && typeof row.pageCode === 'object' ? row.pageCode : {};
       if (row) {
         componentCode = String(payload.componentCode || '').trim();
+        scenarioCode = String(payload.scenarioCode || '').trim();
         pageName = String(payload.pageName || '').trim();
         pagePath = String(payload.pagePath || '').trim();
       }
@@ -136,8 +139,8 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
       console.warn('[page-bind] read_page_component_code failed: %s', readErr?.message || readErr);
     }
 
-    // 步骤 4：取值优先级 实测组件编号 > AILZ 兜底
-    pageId = String(componentCode || '').trim();
+    // 步骤 4：取值优先级 实测组件编号 > 场景编号 > AILZ 兜底
+    pageId = String(componentCode || scenarioCode || '').trim();
     if (!pageId) {
       pageId = generatePageId();
       source = 'generated';
@@ -161,11 +164,21 @@ export async function bindRecordingPageId({ runtime, tid, functionId, execSessio
     }
 
     if (source === 'read' && pageId) {
-      await writeBackFunctionLandingPage(fid, {
-        pageId,
-        pageName,
-        resPath: pagePath,
-      });
+      try {
+        const fnNode = await systemDao.getById(fid);
+        const menuSource = String(fnNode?.source || '').trim();
+        if (menuSource === 'json_import' || menuSource === 'ai') {
+          await writeBackFunctionLandingPage(fid, {
+            pageId,
+            pageName,
+            resPath: pagePath,
+          });
+        } else {
+          console.log('[page-bind] skip menu write-back: function#%s source=%s', fid, menuSource || '(empty)');
+        }
+      } catch (wbErr) {
+        console.warn('[page-bind] write-back gate failed function#%s: %s', fid, wbErr?.message || wbErr);
+      }
     }
 
     // 步骤 6：落库——失败不再静默：pageId 停留旧值会破坏执行期导航，warn 带 PERSIST-FAILED 标志并标注 persisted

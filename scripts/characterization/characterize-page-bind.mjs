@@ -58,22 +58,24 @@ function testWiringService() {
   assert.match(service, /AILZ/, 'service references AILZ prefix');
   assert.match(service, /updateMeta/, 'service references updateMeta');
   assert.match(service, /writeBackFunctionLandingPage/, 'service defines write-back helper');
-  assert.match(service, /source === ['"]read['"]/, 'write-back gated on source===read');
+  assert.match(service, /scenarioCode/, 'reads scenarioCode from pageCode payload');
+  assert.match(service, /json_import/, 'write-back whitelist includes json_import');
+  assert.match(service, /['"]ai['"]/, 'write-back whitelist includes ai');
   assert.match(service, /replaceForNode/, 'write-back replaces system_page via replaceForNode');
   assert.match(service, /pdCmptEcd/, 'write-back updates system.pdCmptEcd');
 }
 
 function testWiringWriteBackOnlyOnRead() {
   const service = readFileSync(join(root, 'src/services/trajectory/recording-page-bind.js'), 'utf8');
-  // no-functionId early return block must not call write-back
   const earlyIdx = service.indexOf('no functionId, generated pageId');
   assert.ok(earlyIdx > 0, 'early AILZ log present');
   const earlyReturnIdx = service.indexOf('return { pageId, source, persisted }', earlyIdx);
   assert.ok(earlyReturnIdx > earlyIdx, 'early return present');
   const earlyBlock = service.slice(earlyIdx, earlyReturnIdx);
   assert.ok(!earlyBlock.includes('writeBackFunctionLandingPage'), 'AILZ early path does not write back menu');
-  // generated branch after empty componentCode
   assert.match(service, /source = 'generated'/, 'generated source still assigned');
+  // AILZ / generated 路径不得因白名单误回写：生成分支后回写调用须仍要求非 generated
+  assert.match(service, /source === ['"]read['"]/, 'write-back still requires bind source=read (landing from dialog)');
 }
 
 /**
