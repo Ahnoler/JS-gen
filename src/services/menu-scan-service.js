@@ -6,7 +6,7 @@
  * - buildScanApplyPlan 纯函数（无 DB/网络依赖）保留在本文件——characterize-menu-scan.mjs
  *   钉住本文件的导出面（startScan/getScan/buildScanApplyPlan）。
  */
-export { startScan, getScan } from './menu-scan-job.js';
+export { startScan, getScan, startFillPageIds } from './menu-scan-job.js';
 
 /**
  * 构建菜单扫描结果的应用计划（纯函数，禁止碰 DB/网络）。

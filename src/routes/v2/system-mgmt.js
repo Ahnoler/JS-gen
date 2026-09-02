@@ -16,7 +16,7 @@ import * as hierarchyService from '../../services/hierarchy-service.js';
 import { EXCEL_MIME } from '../../services/system-mgmt-excel.js';
 import { NODE_TYPE, TYPE_LABEL } from '../../models/hierarchy-constants.js';
 import { importMenuJson } from '../../services/menu-json-import.js';
-import { startScan, getScan } from '../../services/menu-scan-service.js';
+import { startScan, getScan, startFillPageIds } from '../../services/menu-scan-service.js';
 import { pushMenuForSystem, getMenuPushStatus } from '../../services/menu-push.js';
 import { resolveAccessToken } from '../../services/partner-platform.js';
 import * as menuChangeLogDao from '../../dao/menu-change-log-dao.js';
@@ -206,6 +206,23 @@ export default function (app) {
   app.post('/api/v2/system-mgmt/nodes/:id/scan-menu', asyncHandler(async (req, res) => {
     try {
       const result = await startScan(Number(req.params.id));
+      res.status(202).json(result);
+    } catch (e) {
+      toHttp(e);
+    }
+  }));
+
+  /**
+   * 4.2b 仅补采落地 pageId（默认 source=ai；不扫菜单树）
+   * query.sources=ai,json_import 可覆盖；空=默认 ai
+   */
+  app.post('/api/v2/system-mgmt/nodes/:id/fill-pageid', asyncHandler(async (req, res) => {
+    try {
+      const raw = String(req.query.sources || '').trim();
+      const sources = raw
+        ? raw.split(',').map((s) => s.trim()).filter(Boolean)
+        : ['ai'];
+      const result = await startFillPageIds(Number(req.params.id), { sources });
       res.status(202).json(result);
     } catch (e) {
       toHttp(e);

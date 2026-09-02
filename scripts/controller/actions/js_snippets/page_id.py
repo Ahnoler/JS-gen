@@ -12,14 +12,16 @@ fields in textContent), typically including:
   组件编号：ZJJK00066153
   场景编号：xxx (some pages expose 场景编号 instead of or in addition to 组件编号)
 
-Three pitfalls (verified by tmp/probe_tianyuan5.py):
-  1. The dialog is pre-rendered as an empty shell (only title + 确定);
-     content is filled asynchronously after the click (shows "加载中..." meanwhile).
-  2. Stale data: after navigating to a new page, the first open may still show
-     the previous page's data. We must wait until the dialog's "页面路径"
-     matches the current route (``location.hash`` without the query string).
-  3. Some pages (e.g. the workbench home) have no floating button or no
-     component code → return empty componentCode.
+Pitfalls (wet-verified 2026-09-02, tmp/probe_tianyuan_wet_research.py /
+tmp/tianyuan_wet_research.json / tmp/probe_tianyuan_closed_dom.py):
+  1. Dialog shell is pre-rendered (title + 「确 定」); content may show
+     「加载中...」then fill, OR stay empty forever (no 组件编号 on that page).
+  2. Stale data after menu nav: require 「页面路径」 match current hash route
+     (re-read hash each poll). Never read closed (display:none) DOM alone —
+     it does not refresh on route change (must open 「？」 each page).
+  3. Prefer structured ``.el-dialog__body .info p > span`` pairs over textContent.
+  4. Menu click → SPA route settle needs a short wait before opening help.
+  5. Empty shell (no 加载中, no codes) for several polls → early empty-config.
 
 Style mirrors menu_scan.py: a single async IIFE string with no f-string
 interpolation, evaluated via page.evaluate().
@@ -30,72 +32,125 @@ from ._locator_helpers_js import JS_POLL_UTIL
 JS_READ_PAGE_COMPONENT_CODE = '''async () => {
     ''' + JS_POLL_UTIL + '''
 
-    // 1. locate the floating help trigger and click it.
+    const parseInfo = (d) => {
+        const info = {};
+        for (const p of d.querySelectorAll('.el-dialog__body .info p')) {
+            const spans = p.querySelectorAll('span');
+            if (spans.length < 2) continue;
+            const label = (spans[0].textContent || '').replace(/：\\s*$/, '').replace(/:\\s*$/, '').trim();
+            const value = (spans[1].textContent || '').trim();
+            if (label) info[label] = value;
+        }
+        // Fallback: textContent when .info spans missing
+        if (!info['组件编号'] && !info['场景编号'] && !info['页面路径']) {
+            const t = d.textContent || '';
+            const cm = t.match(/组件编号：\\s*([A-Za-z0-9]+)/);
+            const sm = t.match(/场景编号：\\s*([A-Za-z0-9]+)/);
+            const pm = t.match(/页面路径：\\s*(\\S+?)(?=组件编号：|场景编号：|页面名称：|活动名称：|确\\s*定|$)/);
+            const nm = t.match(/页面名称：\\s*([^\\n：]+?)(?=\\s*页面路径|$)/);
+            if (cm) info['组件编号'] = cm[1];
+            if (sm) info['场景编号'] = sm[1];
+            if (pm) info['页面路径'] = pm[1];
+            if (nm) info['页面名称'] = nm[1].trim();
+        }
+        return info;
+    };
+
+    const pathMatches = (pagePath, currentRoute) => !!(pagePath && (
+        pagePath === currentRoute
+        || currentRoute.endsWith(pagePath)
+        || currentRoute.indexOf(pagePath) !== -1
+        || pagePath.endsWith(currentRoute)
+    ));
+
+    // Close leftover 天元 dialog — stale body causes wrong path/code.
+    for (const d of document.querySelectorAll('.el-dialog')) {
+        const title = (d.querySelector('.el-dialog__title') || {}).textContent;
+        if (title && title.indexOf('天元相关配置') !== -1) {
+            const btn = d.querySelector('.el-dialog__footer button, button');
+            if (btn) { try { btn.click(); } catch (e) {} }
+        }
+    }
+    // Let SPA finish route change after click_menu_xpath in the same replay batch.
+    await sleep(1000);
+
     const trigger = document.querySelector('.floatingAction .el-icon-question') || document.querySelector('.floatingAction');
     if (!trigger) return { componentCode: '', scenarioCode: '', pageName: '', pagePath: '', reason: 'no-trigger' };
     trigger.click();
 
-    // current route: hash without leading '#' and without query string
-    const currentRoute = location.hash.slice(1).split('?')[0];
-
-    // 2. poll up to ~12s (40 × 300ms) for the "天元相关配置" dialog to both
-    //    contain "组件编号：" or "场景编号：" AND have its "页面路径" match the current route.
+    // Poll up to ~18s (60 × 300ms). Re-read hash each tick (late SPA updates).
     let dialog = null;
-    let text = '';
+    let info = null;
     let lastDialogText = '';
-    for (let i = 0; i < 40; i++) {
+    let emptyStable = 0;
+    for (let i = 0; i < 60; i++) {
+        const currentRoute = location.hash.slice(1).split('?')[0];
+        let sawDialog = false;
+        let sawLoading = false;
+        let sawCodeLabel = false;
         for (const d of document.querySelectorAll('.el-dialog')) {
-            const title = (d.querySelector('.el-dialog__title') || {}).textContent;
-            if (title && title.indexOf('天元相关配置') !== -1) {
-                const t = (d.textContent || '');
-                if (t.length > lastDialogText.length) lastDialogText = t;
-                if (t.indexOf('组件编号：') !== -1 || t.indexOf('场景编号：') !== -1) {
-                    // extract 页面路径 to compare with current route.
-                    // textContent has NO separators between fields — stop at the next label.
-                    const pm = t.match(/页面路径：\\s*(\\S+?)(?=组件编号：|场景编号：|页面名称：|活动名称：|$)/);
-                    const pagePath = pm ? pm[1] : '';
-                    if (pagePath && pagePath === currentRoute) {
-                        dialog = d;
-                        text = t;
-                        break;
-                    }
-                }
+            const title = (d.querySelector('.el-dialog__title') || {}).textContent
+                || d.getAttribute('aria-label')
+                || '';
+            if (title.indexOf('天元相关配置') === -1) continue;
+            sawDialog = true;
+            const t = (d.textContent || '');
+            if (t.length > lastDialogText.length) lastDialogText = t;
+            if (t.indexOf('加载中') !== -1) sawLoading = true;
+            const parsed = parseInfo(d);
+            const componentCode = parsed['组件编号'] || '';
+            const scenarioCode = parsed['场景编号'] || '';
+            const pagePath = parsed['页面路径'] || '';
+            if (componentCode || scenarioCode || pagePath) sawCodeLabel = true;
+            if ((componentCode || scenarioCode) && pathMatches(pagePath, currentRoute)) {
+                dialog = d;
+                info = parsed;
+                break;
             }
         }
         if (dialog) break;
+        // Empty shell (title+footer only, or finished load with no codes): early exit
+        if (sawDialog && !sawLoading && !sawCodeLabel) {
+            emptyStable += 1;
+            if (emptyStable >= 5) {
+                return {
+                    componentCode: '',
+                    scenarioCode: '',
+                    pageName: '',
+                    pagePath: '',
+                    reason: 'empty-config',
+                    diag: { hash: location.hash, lastDialogText: lastDialogText.slice(0, 300) },
+                };
+            }
+        } else {
+            emptyStable = 0;
+        }
         await sleep(300);
     }
 
-    // 6. timeout or route mismatch → return empty with diagnostics
-    if (!dialog) {
-        return { componentCode: '', scenarioCode: '', pageName: '', pagePath: '', reason: 'timeout-or-mismatch', diag: { hash: location.hash, lastDialogText: lastDialogText.slice(0, 300) } };
+    if (!dialog || !info) {
+        return {
+            componentCode: '',
+            scenarioCode: '',
+            pageName: '',
+            pagePath: '',
+            reason: 'timeout-or-mismatch',
+            diag: { hash: location.hash, lastDialogText: lastDialogText.slice(0, 300) },
+        };
     }
 
-    // 4. parse fields via regex (newline-tolerant)
-    // componentCode: whole line after label must be a single token
-    const compRawMatch = text.match(/组件编号：\\s*([^\\n]+?)(?=场景编号：|任务名称：|任务编号：|页面名称：|页面路径：|活动名称：|确定|取消|$)/);
-    const compRaw = compRawMatch ? compRawMatch[1].trim() : '';
-    const componentCode = /^[A-Za-z0-9]+$/.test(compRaw) ? compRaw : '';
+    const rawComp = String(info['组件编号'] || '').trim();
+    const componentCode = /^[A-Za-z0-9]+$/.test(rawComp) ? rawComp : '';
+    const scenarioCode = String(info['场景编号'] || '').trim();
+    const pageName = String(info['页面名称'] || '').trim();
+    const pagePath = String(info['页面路径'] || '').trim();
+    const activityName = String(info['活动名称'] || '').trim();
 
-    const scenMatch = text.match(/场景编号：\\s*([A-Za-z0-9]+)/);
-    const scenarioCode = scenMatch ? scenMatch[1] : '';
-
-    const nameMatch = text.match(/页面名称：\\s*([^\\n：]+?)(?=\\s*页面路径|$)/);
-    const pageName = nameMatch ? nameMatch[1].trim() : '';
-
-    const pathMatch = text.match(/页面路径：\\s*(\\S+?)(?=组件编号：|场景编号：|页面名称：|活动名称：|$)/);
-    const pagePath = pathMatch ? pathMatch[1] : '';
-
-    const actMatch = text.match(/活动名称：\\s*([^\\n]+)/);
-    const activityName = actMatch ? actMatch[1].trim() : '';
-
-    // 5. close the dialog via its first button (确定) — best-effort
     try {
-        const btn = dialog.querySelector('button');
+        const btn = dialog.querySelector('.el-dialog__footer button, button');
         if (btn) btn.click();
     } catch (e) {}
 
-    // 7. success
     return { componentCode: componentCode, scenarioCode: scenarioCode, pageName: pageName, pagePath: pagePath, activityName: activityName, reason: 'ok' };
 }'''
 

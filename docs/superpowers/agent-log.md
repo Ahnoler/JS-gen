@@ -1,3 +1,7 @@
+## 2026-09-02 · Cursor (uara_V1.2) — 天元读码结构化解析 + fill-pageid + 湿测优化
+- 完成：结构化 `.info` 解析；同 L1 跳过重复 module click；`POST .../fill-pageid`；湿测早退 `empty-config`；plan/research 文档。pin 全绿。commit 见下条更新。
+- 注意：剩余约 52 空 pageId 多为无天元配置；改 js_snippets 须重载 executor。截图回退 / V3 export pageId 等仍未提交。
+
 ## 2026-09-02 · Zcode (uara_V1.2) — 用信链引擎湿测（五轮）：引入/抽屉/产品树/申报页贯通（698b4f9）
 - 完成：真相巡（Playwright MCP 主线程，tmp/e2e/usage_probe.md）：用信新增=列表引入「客户放大镜」(picker→回填三框)→查询→「新增」=el-drawer 两步向导（客户引入+业务发生类型/发起模式 select）→风险阻断（下一步）→申报页（4 步向导；新 YXPC 生成）→「新增」=「维护方案品种明细」弹窗→**产品名称=tree-popover 树**（贷款→对公→房地产贷款→住房开发贷款）→分项额度行带出
 - 完成：两条引擎补丁（698b4f9 未推送）——①select_tree_option/click_radio label 定位加「容器+可见 dialog/drawer」候选池（弹窗 label-not-found 根因）；②picker readUnderlyingForm 语义：可见 drawer=回填目标、仅可见 dialog=overlay（drawer 宿主误报 err-refill-not-verified）

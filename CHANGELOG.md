@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- 2026-09-02: **天元读码：结构化 `.info` + 同 L1 少点一级菜单**：打开弹窗后按 `p>span` 取值；fill 按 parent 排序并跳过重复 module click。关着 DOM 不随路由更新（须点开）。影响：`page_id.py`、`menu-scan-pageid.js`。
+
+- 2026-09-02: **天元读码湿测优化**：菜单点击后等 SPA 路由；弹窗无编号早退 `empty-config`；加载中拉长等待；禁止无路径兜底写码。湿测：`tmp/probe_tianyuan_wet_research.py`。影响：`page_id.py`。
+
+- 2026-09-02: **仅补采落地 pageId（默认 AI）**：`POST .../nodes/:id/fill-pageid`（`?sources=ai`）登录后只点读空 `pd_cmpt_ecd` 的 L2，不扫菜单树；上限 500。影响：`menu-scan-pageid.js`、`menu-scan-job.js`、`menu-scan-session.js`、system-mgmt 路由。
+
 - 2026-09-02: **菜单扫描补采落地 pageId**：apply 后对空 `pd_cmpt_ecd` 的 L2 点开读天元（组件单码→场景编号）写入；skip 不失败。prepare 取消菜单回写。影响：`menu-scan-pageid.js`、`menu-scan-session.js`、`function-landing-page.js`、`recording-page-bind.js`。
 
 - 2026-09-02: **菜单扫描补采 pageId：要求 L2 点击成功**：空 `menu_xpath` 或 `click_menu_xpath` 失败时跳过，不读天元、不写落地页，避免沿用上一页编号。影响：`menu-scan-pageid.js`、characterize-menu-scan。

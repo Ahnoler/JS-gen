@@ -284,12 +284,16 @@ function testWiringPageIdFill() {
   assert.match(pageid, /export async function fillEmptyPageIdsForSystem/, 'fill entry exported');
   assert.match(pageid, /read_page_component_code/, 'reads tianyuan codes');
   assert.match(pageid, /click_menu_xpath/, 'clicks menu xpath');
+  assert.match(pageid, /lastModuleXpath/, 'skips redundant L1 menu click when same parent');
+  assert.match(pageid, /\.sort\(\(a, b\) => \(a\.parentId/, 'orders candidates by parentId for L1 coalescing');
   assert.match(pageid, /if \(!functionXpath\)/, 'skips when L2 menu_xpath empty');
   assert.match(pageid, /const functionClickRow = results\.find/, 'locates function click result row');
   assert.match(pageid, /if \(!functionClickRow\?\.ok\)/, 'skips when L2 click failed');
   assert.match(pageid, /writeFunctionLandingPage/, 'writes landing via shared helper');
   assert.match(pageid, /if \(wrote\)/, 'pageIdFilled only when write returns true');
   assert.match(pageid, /pageIdSkipped|pageIdFilled/, 'returns fill stats');
+  assert.match(pageid, /opts\.sources|sourceSet/, 'supports optional source filter');
+  assert.match(pageid, /PAGEID_FILL_MAX = 500/, 'fill max covers large AI empty sets');
 }
 
 function testListEmptyPageIdFunctionsPure() {
@@ -297,14 +301,27 @@ function testListEmptyPageIdFunctionsPure() {
   const nodes = [
     { id: 1, type: 1, parentId: 0, name: 'S', pdCmptEcd: '', menuXpath: '' },
     { id: 10, type: 2, parentId: 1, name: 'M', pdCmptEcd: '', menuXpath: '//m' },
-    { id: 11, type: 3, parentId: 10, name: 'empty', pdCmptEcd: '', menuXpath: '//a' },
-    { id: 12, type: 3, parentId: 10, name: 'filled', pdCmptEcd: 'ZJJK1', menuXpath: '//b' },
-    { id: 13, type: 3, parentId: 10, name: 'no-xpath', pdCmptEcd: '', menuXpath: '' },
+    { id: 11, type: 3, parentId: 10, name: 'empty', pdCmptEcd: '', menuXpath: '//a', source: 'ai' },
+    { id: 12, type: 3, parentId: 10, name: 'filled', pdCmptEcd: 'ZJJK1', menuXpath: '//b', source: 'ai' },
+    { id: 13, type: 3, parentId: 10, name: 'no-xpath', pdCmptEcd: '', menuXpath: '', source: 'json_import' },
   ];
   const list = listEmptyPageIdFunctions(nodes, 1);
   assert.equal(list.length, 2, 'empty pd_cmpt_ecd L2 includes no-xpath');
   assert.equal(list[0].id, 11, 'first candidate is empty with xpath');
   assert.ok(list.some((n) => n.id === 13), 'no-xpath empty L2 still listed as candidate');
+  const aiOnly = listEmptyPageIdFunctions(nodes, 1, { sources: ['ai'] });
+  assert.equal(aiOnly.length, 1, 'sources=["ai"] keeps only ai empty');
+  assert.equal(aiOnly[0].id, 11);
+}
+
+function testWiringFillPageIdRoute() {
+  const route = readFileSync(join(root, 'src/routes/v2/system-mgmt.js'), 'utf8');
+  assert.match(route, /fill-pageid/, 'route exposes fill-pageid');
+  assert.match(route, /startFillPageIds/, 'route calls startFillPageIds');
+  const job = readFileSync(join(root, 'src/services/menu-scan-job.js'), 'utf8');
+  assert.match(job, /export async function startFillPageIds/, 'job exports startFillPageIds');
+  const session = readFileSync(join(root, 'src/services/menu-scan-session.js'), 'utf8');
+  assert.match(session, /export async function runFillPageIds/, 'session exports runFillPageIds');
 }
 
 // ---------------------------------------------------------------------------
@@ -328,6 +345,7 @@ function main() {
     ['wiring: route references change-log endpoint', testWiringChangeLog],
     ['wiring: menu-scan-pageid lists/fills empty L2 pageIds', testWiringPageIdFill],
     ['listEmptyPageIdFunctions filters empty pd_cmpt_ecd L2 only', testListEmptyPageIdFunctionsPure],
+    ['wiring: fill-pageid route + startFillPageIds + runFillPageIds', testWiringFillPageIdRoute],
   ];
   let failed = 0;
   for (const [name, fn] of tests) {

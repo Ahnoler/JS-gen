@@ -8,7 +8,7 @@ import { randomUUID } from 'crypto';
 import * as systemDao from '../dao/system-dao.js';
 import * as systemAccountDao from '../dao/system-account-dao.js';
 import { NODE_TYPE } from '../models/hierarchy-constants.js';
-import { runScan } from './menu-scan-session.js';
+import { runScan, runFillPageIds } from './menu-scan-session.js';
 
 /** 模块级单飞标记：当前运行中的扫描 scanId；非 null 表示有任务进行中。 */
 let currentScan = null;
@@ -79,6 +79,63 @@ export async function startScan(systemNodeId) {
   // 后台执行：不 await，内部自管 job 状态与单飞标记。
   runScan({ scanId, systemNodeId: node.id, url, account }).catch((err) => {
     // runScan 内部已 try/catch 兜底；这里仅防止极端未捕获异常导致单飞永久卡死。
+    const job = scanJobs.get(scanId);
+    if (job && job.status === 'running') {
+      job.status = 'failed';
+      job.error = err?.message || String(err);
+      job.finishedAt = new Date().toISOString();
+    }
+    if (currentScan === scanId) currentScan = null;
+  });
+
+  return { scanId };
+}
+
+/**
+ * 启动仅补采落地 pageId 任务（默认只处理 source=ai 的空 pd_cmpt_ecd；不扫菜单树）。
+ * @param {number|string} systemNodeId 系统节点 id
+ * @param {{ sources?: string[] }} [opts]
+ * @returns {Promise<{ scanId: string }>}
+ */
+export async function startFillPageIds(systemNodeId, opts = {}) {
+  if (currentScan !== null) {
+    throw Object.assign(new Error('已有菜单扫描/补采在进行中'), { code: 'CONFLICT' });
+  }
+
+  const node = await systemDao.getRawById(Number(systemNodeId));
+  if (!node || Number(node.type) !== NODE_TYPE.SYSTEM) {
+    throw Object.assign(new Error('目标节点不存在或不是系统（type=1）'), { code: 'VALIDATION' });
+  }
+  const url = String(node.url || '').trim();
+  if (!url) {
+    throw Object.assign(new Error('系统未配置 URL'), { code: 'VALIDATION' });
+  }
+
+  const accounts = await systemAccountDao.listBySystem(node.id);
+  const account = accounts.find((a) => String(a.account || '').trim() && String(a.password || '').trim());
+  if (!account) {
+    throw Object.assign(new Error('请先配置系统登录账号'), { code: 'VALIDATION' });
+  }
+
+  const sources = Array.isArray(opts.sources) && opts.sources.length
+    ? opts.sources.map((s) => String(s || '').trim()).filter(Boolean)
+    : ['ai'];
+
+  const scanId = randomUUID();
+  scanJobs.set(scanId, {
+    scanId,
+    systemNodeId: node.id,
+    kind: 'fill-pageid',
+    status: 'running',
+    stats: {},
+    error: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+  });
+
+  currentScan = scanId;
+
+  runFillPageIds({ scanId, systemNodeId: node.id, url, account, sources }).catch((err) => {
     const job = scanJobs.get(scanId);
     if (job && job.status === 'running') {
       job.status = 'failed';

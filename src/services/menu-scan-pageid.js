@@ -7,15 +7,19 @@ import { NODE_TYPE } from '../models/hierarchy-constants.js';
 import { runReplayActions } from './replay-actions.js';
 import { writeFunctionLandingPage } from './function-landing-page.js';
 
-const PAGEID_FILL_MAX = 200; // 硬上限，防超长扫描
+const PAGEID_FILL_MAX = 500; // 硬上限，防超长扫描（信贷 AI 空 pageId ~234）
 
 /**
  * 列举系统下 pd_cmpt_ecd 为空的功能节点（L2 候选）。
  * @param {object[]} allNodes systemDao.listAll 行
  * @param {number} systemNodeId 系统节点 id
- * @returns {Array<{ id: number, name: string, menuXpath: string, parentId: number }>} 候选功能列表
+ * @param {{ sources?: string[] }} [opts] 可选；`sources` 非空时只保留这些 source（如 `['ai']`）
+ * @returns {Array<{ id: number, name: string, menuXpath: string, parentId: number, source: string }>} 候选功能列表
  */
-export function listEmptyPageIdFunctions(allNodes, systemNodeId) {
+export function listEmptyPageIdFunctions(allNodes, systemNodeId, opts = {}) {
+  const sourceSet = Array.isArray(opts.sources) && opts.sources.length
+    ? new Set(opts.sources.map((s) => String(s || '').trim()).filter(Boolean))
+    : null;
   const modules = (allNodes || []).filter(
     (n) => Number(n.type) === NODE_TYPE.MODULE && Number(n.parentId) === Number(systemNodeId),
   );
@@ -23,12 +27,16 @@ export function listEmptyPageIdFunctions(allNodes, systemNodeId) {
   return (allNodes || [])
     .filter((n) => Number(n.type) === NODE_TYPE.FUNCTION && moduleIds.has(Number(n.parentId)))
     .filter((n) => !String(n.pdCmptEcd || '').trim())
+    .filter((n) => !sourceSet || sourceSet.has(String(n.source || '').trim()))
     .map((n) => ({
       id: Number(n.id),
       name: String(n.name || ''),
       menuXpath: String(n.menuXpath || '').trim(),
       parentId: Number(n.parentId),
-    }));
+      source: String(n.source || '').trim(),
+    }))
+    // Same L1 consecutive → fill can skip re-clicking module xpath
+    .sort((a, b) => (a.parentId - b.parentId) || (a.id - b.id));
 }
 
 /**
@@ -37,15 +45,17 @@ export function listEmptyPageIdFunctions(allNodes, systemNodeId) {
  * @param {number} opts.systemNodeId 系统节点 id
  * @param {{ sessionId: string, nodeUuid: string }} opts.runtime 执行会话运行时
  * @param {object} opts.execSession executor 会话（forwardStdin / waitForSessionEvent）
+ * @param {string[]} [opts.sources] 可选 source 过滤（如 `['ai']`）；省略则不限 source
  * @returns {Promise<{ pageIdCandidates: number, pageIdFilled: number, pageIdSkipped: number }>} 补采统计
  */
-export async function fillEmptyPageIdsForSystem({ systemNodeId, runtime, execSession }) {
+export async function fillEmptyPageIdsForSystem({ systemNodeId, runtime, execSession, sources } = {}) {
   const all = await systemDao.listAll();
-  const candidates = listEmptyPageIdFunctions(all, systemNodeId);
+  const candidates = listEmptyPageIdFunctions(all, systemNodeId, { sources });
   const byId = new Map(all.map((n) => [Number(n.id), n]));
   let pageIdFilled = 0;
   let pageIdSkipped = 0;
   const limit = Math.min(candidates.length, PAGEID_FILL_MAX);
+  let lastModuleXpath = '';
 
   for (let i = 0; i < limit; i += 1) {
     const c = candidates[i];
@@ -58,7 +68,10 @@ export async function fillEmptyPageIdsForSystem({ systemNodeId, runtime, execSes
         continue;
       }
       const actions = [];
-      if (moduleXpath) actions.push({ action: 'click_menu_xpath', params: { xpath: moduleXpath } });
+      // Same L1 as previous candidate: skip redundant module click
+      if (moduleXpath && moduleXpath !== lastModuleXpath) {
+        actions.push({ action: 'click_menu_xpath', params: { xpath: moduleXpath } });
+      }
       actions.push({ action: 'click_menu_xpath', params: { xpath: functionXpath } });
       actions.push({ action: 'read_page_component_code', params: {} });
 
@@ -77,8 +90,10 @@ export async function fillEmptyPageIdsForSystem({ systemNodeId, runtime, execSes
       );
       if (!functionClickRow?.ok) {
         pageIdSkipped += 1;
+        lastModuleXpath = ''; // force re-expand next time
         continue;
       }
+      if (moduleXpath) lastModuleXpath = moduleXpath;
       const row = results.find((it) => it && it.action === 'read_page_component_code');
       const payload = row?.pageCode && typeof row.pageCode === 'object' ? row.pageCode : {};
       const componentCode = String(payload.componentCode || '').trim();
@@ -100,6 +115,7 @@ export async function fillEmptyPageIdsForSystem({ systemNodeId, runtime, execSes
       }
     } catch (err) {
       pageIdSkipped += 1;
+      lastModuleXpath = '';
       console.warn('[menu-scan-pageid] skip function#%s: %s', c.id, err?.message || err);
     }
   }

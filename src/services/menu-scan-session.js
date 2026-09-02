@@ -159,6 +159,74 @@ export async function runScan({ scanId, systemNodeId, url, account }) {
 }
 
 /**
+ * 仅补采落地 pageId：登录后对空 pd_cmpt_ecd 的 L2 点读天元写入（不扫菜单树、不改结构）。
+ * @param {object} ctx
+ * @param {string} ctx.scanId 任务 id（复用 scanJobs）
+ * @param {number} ctx.systemNodeId 系统节点 id
+ * @param {string} ctx.url 被测系统 URL
+ * @param {object} ctx.account 登录账号
+ * @param {string[]} [ctx.sources] source 过滤，默认 `['ai']`
+ * @returns {Promise<void>}
+ */
+export async function runFillPageIds({ scanId, systemNodeId, url, account, sources = ['ai'] }) {
+  const job = getScanJob(scanId);
+  const username = String(account.account || '').trim();
+  const password = String(account.password || '').trim();
+  const sessionId = randomUUID();
+  let opened = null;
+  let nodeUuid = null;
+
+  try {
+    opened = await execSession.openSession({ sessionId, preferIdleChrome: false });
+    nodeUuid = opened?.nodeUuid || null;
+    if (!nodeUuid) throw new Error('openSession 未返回 nodeUuid');
+
+    const { result: loginResult } = await runReplayActions({
+      execSession,
+      sessionId,
+      nodeUuid,
+      actions: [
+        { action: 'go_to_url', params: { url } },
+        { action: 'login', params: { username, password } },
+      ],
+      timeoutMs: REPLAY_LOGIN_TIMEOUT_MS,
+      stopOnFail: true,
+      isReplay: true,
+    });
+    const loginFailed = Number(loginResult?.failed || 0);
+    const loginOk = Number(loginResult?.ok || 0);
+    if (loginResult?.error || loginFailed > 0 || loginOk < 2) {
+      throw new Error(loginResult?.error || `登录失败 (ok=${loginOk} failed=${loginFailed})`);
+    }
+
+    const pageIdStats = await fillEmptyPageIdsForSystem({
+      systemNodeId,
+      runtime: { sessionId, nodeUuid },
+      execSession,
+      sources,
+    });
+
+    job.status = 'completed';
+    job.stats = { sources, ...pageIdStats };
+    job.finishedAt = new Date().toISOString();
+  } catch (err) {
+    console.error('[menu-fill-pageid] failed:', err && (err.stack || err.message || String(err)));
+    job.status = 'failed';
+    job.error = err?.message || String(err);
+    job.finishedAt = new Date().toISOString();
+  } finally {
+    if (nodeUuid) {
+      try {
+        await execSession.closeSession({ nodeUuid, sessionId });
+      } catch {
+        /* ignore */
+      }
+    }
+    clearCurrentScan(scanId);
+  }
+}
+
+/**
  * 装载系统下的既有模块及其功能，组装成 plan 入参形态。
  * @param {number} systemNodeId 系统节点 id
  * @returns {Promise<Array<object>>} 既有模块数组，每个元素含 id/name/source/unmatchedFlag 与 children（功能）
