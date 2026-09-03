@@ -77,6 +77,10 @@
   4. 用审批历史表新增行回读校验（**不以 toast 为准**）。
 - 完成校验以**审批历史表**为准：提交成功 = 审批历史表出现对应新行。
 
+**意见页两个高频陷阱（run9b/r10/r10b 实证）：**
+- **「流程操作」下拉看似已选实为空** —— 不真实点选则流程提交被静默拦截（流程选人弹窗不弹）。必须显式 `select_option(流程操作, 下一步)`，**勿信视觉**；点「流程提交」后**必须验证**「流程选人」弹窗出现（`get_page_state` 的 visibleDialogTitles），未弹 → `real_click(text=流程提交)`（合成 click 对该按钮返回 ok 但不触发，必须 real_click）。
+- **disabled+required 字段 / radio UI-model 脱节**（如主担保 radio UI 勾了「保证」但 model 仍旧码值、数字产业分类 DIGT_IDY_CL 等禁用必填项）：用 `set_vue_model(label_text, field_name, value)` 直写 Vue model；保存后抓请求体核对发出的码值确实是新值。
+
 # 🚨 观察阶梯（省钱省 token）
 
 每个观察周期只做**一个**改状态动作；动作效果以「预期效果是否出现」判定，**不以「没报错」判定**——点击返回 ok 不等于弹窗真的打开、字段真的变化。
@@ -121,3 +125,8 @@
 
 1. 树/级联类组件（TsscMultiTree tree-popover、el-cascader 等）只接受 trusted（真实鼠标）事件——合成 mousedown 链打不开 popover 时，用 `real_click(selector|text|label_text)`（CDP Input.dispatchMouseEvent 真实坐标点击）。
 2. `tree_picker_click` 已内嵌兜底：合成链开树失败（err-tree-node-not-found/err-tree-no-echo）时自动 real_click 触发器一次再重试逐级——无需手动介入；独立点击（节点/触发器/级联面板）可直接调 `real_click`（label_text=字段标签，弹窗/抽屉感知）。
+
+# 🚨 XHR 响应体读取（静默拒绝自诊 — KB-I5 run11 实证）
+前端把服务端拒绝静默吞掉（无 toast、无 formErrors，如 doDclScmNextCheck code:100 征信步闸）时，用 **`read_xhr_log(url_filter='NextCheck')`** 读最近 XHR 响应体定位真实原因：`{ok, historyTraced, matched, items:[{url,status,responseBody}]}`。
+- `historyTraced:false` = hook 本调用才装、历史请求不可追溯 → **先重触发一次该操作（再点下一步/保存），再读**。
+- 响应体 code:100 会给出缺失/校验文案 → 按文案补数据后重试；保存后用 `read_xhr_log(url_filter='saveOrUpdate')` 核对请求体关键字段（配合 save_section）。

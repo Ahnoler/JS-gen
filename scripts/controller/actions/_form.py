@@ -8,8 +8,10 @@ Form-related actions: registration shell (scan, fill, select, save, task list).
 task_done 本就是 form_scan_utils 薄壳）。
 """
 
+from scripts.state import _record_action
 from ._helpers import _ok
-from ._js_snippets import JS_IDENTIFY_CONTAINER
+from ._js_snippets import JS_IDENTIFY_CONTAINER, JS_SET_VUE_MODEL, JS_SAVE_SECTION
+from ._workspace import _workspace_result
 from ...models import TaskList
 from .form_rules import get_has_button_keywords
 from .form_scan_utils import _save_form_snapshot, _task_done_impl
@@ -169,3 +171,49 @@ def _register_form_actions(controller, browser_context, business_data_store, llm
     @controller.action('Select a tree-select option by label and option text. For custom TsscMultiTree components (e.g. 行业代码). Opens popover, searches tree data by label, selects matching node, closes popover. If result starts with no-tree-component, do NOT retry — use fill_form_field with a concrete value (not "first") or select_option.')
     async def select_tree_option(label_text: str, option_text: str, xpath_smart: str = ""):
         return await _tree_engine.select_tree_option(label_text, option_text, xpath_smart)
+
+    @controller.action(
+        'Directly write a Vue model field (label_text + field_name + value) by walking '
+        'the __vue__ chain to the object holding field_name, assigning the value string, '
+        'and calling $forceUpdate. Purpose: disabled+required fields (e.g. 数字产业分类 '
+        'DIGT_IDY_CL) that UI cannot fill, and radio/select UI-model desync (radio '
+        'appears checked but model keeps the old code — run9b/r10b root cause; e.g. '
+        'primWrntTp). Success predicate: model read-back equals value (returns ok with '
+        'field/value/old_value). Errors: err-vue-model-label-not-found / '
+        'err-vue-model-not-found (model object or field not found) / '
+        'err-vue-model-write-unverified — on any error do NOT blindly retry; re-check '
+        'with scan/check_field_value and verify the saved request body carries the value.'
+    )
+    async def set_vue_model(label_text: str, field_name: str, value: str):
+        page = await browser_context.get_current_page()
+        result = await page.evaluate(JS_SET_VUE_MODEL, [label_text, field_name, value])
+        # Vue re-render settling buffer after $forceUpdate.
+        await page.wait_for_timeout(300)
+        ok, payload = _workspace_result(result)
+        if ok:
+            return _ok(payload)
+        return payload
+
+    @controller.action(
+        'Save a module sub-view section by its title (section_title), e.g. '
+        "save_section('申请金额信息'). Locates the section header whose text equals "
+        'section_title, walks up to the smallest ancestor container holding a 保存 '
+        'button, clicks that button (mousedown event chain), waits 2.5s, and returns '
+        '{ok, clicked, toast}. Use this for multi-section pages where every section '
+        'has its own 保存 — the page-global 保存 click hits an ambiguous coordinate '
+        'and the wrong section save silently does nothing (KB-I5 run11: fields '
+        're-checked empty after re-entry). After ok:true pair with '
+        "read_xhr_log(url_filter='saveOrUpdate') to verify the save request actually "
+        'carried the section fields. Errors: err-section-not-found:<title> (no such '
+        'title / no 保存 in its container — re-check the section name from snapshot).'
+    )
+    async def save_section(section_title: str):
+        page = await browser_context.get_current_page()
+        result = await page.evaluate(JS_SAVE_SECTION, [section_title])
+        # JS side already waits 2.5s for the save round-trip; small settle buffer.
+        await page.wait_for_timeout(300)
+        ok, payload = _workspace_result(result)
+        if ok:
+            _record_action('save_section', {'section_title': section_title}, payload)
+            return _ok(payload)
+        return payload

@@ -24,6 +24,7 @@ from .js_snippets.select_trigger import (
 )
 from .js_snippets.select_option import JS_SELECT_OPTION, JS_READ_SELECT_OPTIONS
 from .js_snippets.select_tree import JS_CLICK_RADIO, JS_SELECT_TREE_OPTION, JS_EXPAND_ALL_EL_TREE
+from .js_snippets.vue_model import JS_SET_VUE_MODEL
 from .js_snippets.scan_utils import JS_CLASSIFY_FIELD, JS_FIELD_REQUIRED, JS_READ_CURRENT_VALUE, JS_SECTION_ATTACH_BLOCK, JS_SCROLL_TO_FIRST_ERROR, JS_READ_REFERENCE_DATE, _JS_READ_CERT_TYPE, _JS_EXTRACT_ERROR_LABELS
 from .js_snippets.scan_form import JS_SCAN_FORM_FIELDS, JS_CHECK_SINGLE_FIELD
 from .js_snippets.save import JS_CLICK_SAVE_BUTTON, JS_SCAN_SAVE_OUTCOME, JS_WATCH_SAVE_NOTIFICATIONS
@@ -40,6 +41,8 @@ from .js_snippets.tree_picker import JS_TREE_PICKER_CLICK
 from .js_snippets.close_dialog import JS_CLOSE_VISIBLE_DIALOG
 from .js_snippets.strip_dialogs import JS_STRIP_STALE_WRAPPERS
 from .js_snippets.real_click import JS_REAL_CLICK_RECT, JS_REAL_CLICK_ECHO, JS_TREE_POPOVER_OPEN
+from .js_snippets.xhr_log import JS_XHR_HOOK, JS_XHR_RECENT
+from .js_snippets.save_section import JS_SAVE_SECTION
 from .js_snippets.semantic_snapshot import JS_SEMANTIC_SNAPSHOT
 from .js_snippets.verify_context import JS_VERIFY_CONTEXT
 from .js_snippets.page_id import JS_READ_PAGE_COMPONENT_CODE, JS_CLICK_MENU_XPATH, JS_FIND_MENU_DISMISS_POINT

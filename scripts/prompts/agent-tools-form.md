@@ -64,7 +64,7 @@
 4. **若返回 `xpath-not-found`：** 重新 `scan_visible_fields` / `get_pending_tasks`，从最新扫描复制**精确** `xpath_smart`，或省略 hint 让工具自行解析。**禁止自造任何 `xpath_smart`**（含 placeholder、`[n]` occurrence、dialog/drawer）。只能从扫描 / `get_pending_tasks` / `pending_items` **逐字复制**；省略 hint 时由工具解析 inventory。勿只复制 label 或模糊猜测。
 5. **如果 `fill_form_field` 返回 `err-field-disabled`：** 检查字段是否已有值。如果 `getAttribute('value')` 或 `placeholder` 非空且不是"请选择"/"请输入" → 跳过，说明已填写。如果字段为空 → 寻找旁边的按钮来填充。
 6. **如果 `select_option` 返回 `"select-disabled"`：跳过** — 选择框被禁用（已预填）。
-7. **禁用字段 + 空值：** 无旁边按钮 → 跳过（真正只读）；有旁边按钮（`hasButton!=""`）→ 任务列【特殊元素库候选】时优先 `use_special_element(special_element_id)`，否则 `click_adjacent_button(label_text)`，纠错走人工录制。
+7. **禁用字段 + 空值：** 无旁边按钮 → 跳过（真正只读）；有旁边按钮（`hasButton!=""`）→ 任务列【特殊元素库候选】时优先 `use_special_element(special_element_id)`，否则 `click_adjacent_button(label_text)`，纠错走人工录制。**例外：disabled 且 required（校验不放行）的字段**（如数字产业分类 DIGT_IDY_CL）UI 无法直填——用 `set_vue_model(label_text, field_name, value)` 直写 Vue model，保存后抓请求体核对值。
 8. **日期选择器字段（tsscdatepicker / el-date-editor）：** 与文本一样用 `fill_form_field`（工具同步 Vue 模型含 TsscMultiDatePicker，勿只改输入框显示）；已有值（`check_field_value` 检查）则跳过。
 
 
@@ -132,3 +132,9 @@ run_form_assistant(region='系统评级结论')
 6. **成功通知会在2-3秒内自动消失** — 故必须用 `click_save()`（内部轮询捕获），不要先点索引再慢慢 `close_notification()` 指望还在。
 7. **在任意弹窗/抽屉交互后**（如法人引入、客户搜索等），向导表单可能已被刷新/重置——仍须对每个可编辑字段执行写动作（同核心纪律）。
 8. **录制质量：** 表单维护类保存优先 `click_save`；引入/选人可用索引点「确认」。维护类成功判据同上 §2（`ok-save-*` 三码）。
+
+# 🚨 模块分区保存规则（多分区子视图 — KB-I5 run11 实证）
+模块子视图（如对公用信申请「住房开发贷款」页）每个分区各有独立「保存」按钮，页面级 real_click(保存) 恒命中同一坐标且**点错分区保存不生效**（重进字段为空）。规则：
+1. **模块分区保存一律用 `save_section(section_title)`**（section_title=分区标题原文，如 '申请金额信息'）——勿用全局 click_button/real_click[保存]。
+2. save_section 返回 `{ok, clicked, toast}` 后，必须紧跟 **`read_xhr_log(url_filter='saveOrUpdate')`** 核对请求体携带关键字段（如 aplyAmt=30000.00 / primWrntTp=3），形成持久化实证闭环；无该请求 → 保存未生效，换分区标题重试或排查。
+3. `err-section-not-found:<title>` → 从 semantic_snapshot 核对分区标题原文（勿臆造），最多重试 1 次。

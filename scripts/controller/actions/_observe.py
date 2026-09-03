@@ -2,7 +2,7 @@
 
 from scripts.state import _record_action
 from ._helpers import _ok
-from ._js_snippets import JS_SEMANTIC_SNAPSHOT, JS_VERIFY_CONTEXT
+from ._js_snippets import JS_SEMANTIC_SNAPSHOT, JS_VERIFY_CONTEXT, JS_XHR_HOOK, JS_XHR_RECENT
 from ._workspace import _workspace_result
 
 
@@ -38,5 +38,40 @@ def _register_observe_actions(controller, browser_context):
         ok, payload = _workspace_result(result)
         if ok:
             _record_action('verify_context', {'expected': expected_json}, payload)
+            return _ok(payload)
+        return payload
+
+    @controller.action(
+        'Read recent XHR/fetch requests captured by the injected network hook '
+        '(window.__xhr_log: last 20 requests with url/status/responseBody truncated '
+        'to 2KB). Use this when the frontend swallows a server rejection silently '
+        '(no toast / no formErrors — e.g. doDclScmNextCheck code:100 gate) to read '
+        'the real reason, or to verify a save actually fired (url_filter=saveOrUpdate) '
+        'and its request/response carried the expected fields. On first call the hook '
+        'is installed — historyTraced:false means earlier requests are NOT traceable; '
+        're-trigger the request then read again. url_filter is a raw substring of the '
+        'request URL; last caps the returned entries (default 10).'
+    )
+    async def read_xhr_log(url_filter: str = '', last: int = 10):
+        page = await browser_context.get_current_page()
+        installed = False
+        try:
+            installed = bool(await page.evaluate('() => !!window.__xhr_log_installed'))
+        except Exception:
+            installed = False
+        if not installed:
+            # Register the hook for future navigations too (best-effort), then
+            # install on the live page. Requests made BEFORE this point are not
+            # traceable (historyTraced=false).
+            try:
+                await page.add_init_script(JS_XHR_HOOK)
+            except Exception:
+                pass
+            await page.evaluate(JS_XHR_HOOK)
+        result = await page.evaluate(JS_XHR_RECENT, [url_filter, last, not installed])
+        await page.wait_for_timeout(300)
+        ok, payload = _workspace_result(result)
+        if ok:
+            _record_action('read_xhr_log', {'url_filter': url_filter, 'last': last}, payload)
             return _ok(payload)
         return payload
