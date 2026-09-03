@@ -1,3 +1,9 @@
+## 2026-09-03 · Zcode (uara_V1.2) — 用信链 run11/12/对比/r13：三杠杆动作 + 第三笔提交进审批（bc336e5 已推送）
+- 完成：run11 纯引擎复跑（S1-S6 全通新单 013）暴露两杠杆缺口→run12 实现 **read_xhr_log**（XHR/fetch hook 记响应体 2KB——doDclScmNextCheck 静默拒绝首次机器可读）+ **save_section**（分区标题→最小含保存容器——8 分区命中+16 次请求体核对全「操作成功」）+ **set_vue_model**（__vue__ 链 BFS 直写 model+回读谓词），commit `bc336e5` 已推送；pin×3+8 既有全绿
+- 完成：**对比实验方法论**（012 过闸 vs 新单被拒 字段级 diff）一击定案——新单**主担保类型为空**（set_vue_model 写了但分区保存未生效）；r13 子智能体修复（真点击保证+model 验证+分区保存+**reload 后 radio 仍选中=落库铁证**，请求体 primWrntTp=3）→ 补齐金额/还款/利率/投向/政府关联/产品信息 → **YXPC20260903012020 提交成功=审批中**（#399 流程提交成功，选人黄亮 WN0001）——**第三笔提交进审批**
+- 完成：卡回灌（credit_usage 13 rules：码值真相/担保校验静默/意见页假象/字段坑/wrapper reload）`114c0a4` 已推送
+- 注意：引擎全链自主闭环剩余=把 r13 已实证的「担保分区修复序列」（set_vue_model+分区保存+reload 验证）编码为驱动步骤/提示词（全部动作已存在）；run12 期间 YXPC 捕获回归（7 跑空）待查；SUT 担保校验语义=列表行担保方式必须与主担保一致
+
 ## 2026-09-03 · Cursor 子智能体 — system_account 角色名唯一约束 A+B（Task 1–3）
 - 完成：Task 1 `ae1a3b3` 包内重名统一文案 + `assertAccountNamesAvailable` 纯函数；Task 2 `28bc9f3` `syncSystemAccounts` 提交前占用预检 + `ER_DUP_ENTRY`→409 中文 CONFLICT；Task 3 api-docs POST/PUT nodes `desc`、CHANGELOG Fixed、本日志（与 Task 3 同 commit）。
 - 注意：交叉更名/对调须两步临时名；前端另仓若硬编码 SQL 错误文案需跟中文 400/409 提示对齐。
