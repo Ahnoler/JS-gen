@@ -1,3 +1,9 @@
+## 2026-09-04 · Zcode (uara_V1.2) — 六任务清单执行：模块湿测/张某某探测/KB 扩卡晋升（3f16901 已推送）
+- 完成：任务2 模块链湿测——贷后 OK（对私任务暂存 200/生成检查表被业务规则拦「只有审批通过才能生成」）/评级 OK（PJ20260904016006 创建 startProcess 200；发现前端缺陷「系统评级结论」保存报 `i18n is not defined`）/押品卡后端缺陷（checkWrntTxNumb「获取法人行最高抵质押率失败」）/催收观察 OK（2 条何柳任务 CS20260901028003/28004）
+- 完成：任务3 **张某某账号探测成功=135292/1**（客户经理；待办 30 条含链 B 评级 PJ20260901016003 二次调查+用信 YXPC20260803008049 二次调查）——**链 B 阻塞解除**
+- 完成：任务5+6——staging 晋升 4 条（promote.py --apply → customer_onboarding/rating 各 +2 rules）+ **KB 扩卡 20→24 张**（approval_chain 审批链通用/guarantee_intro 引入保证人/loan_account 放款账户/rating_flow 评级流程），commit `3f16901` 已推送；全量 json 验证通过
+- 注意：本机裸 `python` 是 WindowsApps 桩（exit 49），须用 D:/anaconda3/python.exe 或 ./python/python.exe
+
 ## 2026-09-04 · Zcode 执行子智能体 — 任务1 run21：引擎 100% 自主闭环终验（未达成，卡点定案）
 - 完成：table_cell.py **表头定列序修复**（任务4 内联版已落盘）——JS_FILL_TABLE_CELL 增第 5 参 header_name：扫描弹窗表头（担保方式/与借款人关系/证件号码/担保金额）定列下标→定位 td→select/input 写入；未命中回落 column_index 计数；fill/select_table_cell 增可选参，prompts 同步，pin×4 绿，executor 重启加载
 - 完成：run21 三跑（tid=478/479/480，纯引擎零 MCP）：S1–S7 全自主通过（七模块 saveOrUpdate 全 200、primWrntTp=3 落库、行内 企业股东/30000 回读 ✅）；报告 tmp/kb_i5_usage21_report.md；轨迹均 stop+detach
