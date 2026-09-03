@@ -342,6 +342,8 @@ function testPayloadStructure() {
   const traj = {
     id: 99,
     name: '测试交易',
+    // dao fromDbRow 输出 camelCase：page_id 列 → pageId（菜单切换，交易起点页面 ID）
+    pageId: 'pdCmptEcd123456',
     steps: [
       {
         stepNumber: 1, actionType: 'click_element_by_index', source: 'agent',
@@ -356,6 +358,9 @@ function testPayloadStructure() {
 
   const built = buildTransactionEntryV3(traj, { systemId: '98', projectId: '31', phases, phaseScreenshots: shots });
   check(built.entry.result === undefined, 'entry 不再有 result');
+  check(built.entry.transcId === '99' && built.entry.pageId === 'pdCmptEcd123456', 'entry 含 transcId + pageId（与 transcId 同级，取 traj.pageId，驼峰命名）');
+  const noPageId = buildTransactionEntryV3({ id: 98, name: '无页面ID交易', steps: traj.steps }, { systemId: '98', projectId: '31', phases, phaseScreenshots: shots });
+  check(noPageId.entry.pageId === '', '无 pageId 的轨迹 pageId=""（空串不缺字段）');
   check(built.screenshots === undefined, '不再独立返回 screenshots（已合并进 transcationProperties）');
   const props = built.entry.transcationProperties;
   check(props.length === 3, `transcationProperties = 截图+tab+控件 = 3（实际 ${props.length}）`);
@@ -429,21 +434,30 @@ async function testRealData() {
     check(withRegion > 0, '存在 regionId');
     const pageShots = props.filter((p) => p.type === 'page');
     check(pageShots.length >= 1, `页面截图条目 >= 1（实际 ${pageShots.length}）`);
-    // 抽样 rect 与 DB bbox 一致（按 step_number→id 映射；控件 id 续接截图之后）
+    // 抽样 rect 与 DB 坐标一致（按 step_number→id 映射；控件 id 续接截图之后）
     const shotCount = props.filter((p) => p.type === 'page' || p.type === 'popup').length;
     const stepRows = await db('trajectory_step').select('step_number', 'element_json').where({ trajectory_id: 33 }).orderBy('step_number', 'asc').limit(500);
     // 重建 step_number → 控件条目 顺序映射（控件按 stepNumber 顺序，id 从 shotCount+1 起）
     // 用多重集比较而非按位对齐：步骤可能因元操作（登录/保存跳转）在 props 中被跳过，
-    // 按位比较会错位误红；统计意义等价（每个 props rect 必须能匹配到一个 DB bbox）。
+    // 按位比较会错位误红；统计意义等价（每个 props rect 必须能匹配到一个 DB 坐标形态）。
+    // 期望集收三种坐标形态（与导出侧文档化优先级 rect_norm → page_bbox → bbox 对应）：
+    // traj 33 存量数据已被新录制链重写（115/115 带 page_bbox、112 带 rect_norm），
+    // 旧检查只收 bbox 导致 42/115 误红（2026-09-02 排查：导出 miss=0，检查期望过时）。
     const controlProps = props.filter((p) => p.type === 'object');
     const bboxCounts = new Map();
     for (const s of stepRows) {
       let el = null;
       try { el = typeof s.element_json === 'string' ? safeParse(s.element_json) : s.element_json; } catch {}
-      if (el?.bbox) {
-        const b = JSON.stringify({ x1: Number(el.bbox.x1), y1: Number(el.bbox.y1), x2: Number(el.bbox.x2), y2: Number(el.bbox.y2) });
-        bboxCounts.set(b, (bboxCounts.get(b) || 0) + 1);
-      }
+      if (!el) continue;
+      const pushRect = (r) => {
+        if (!r || typeof r !== 'object') return;
+        const b = JSON.stringify({ x1: Number(r.x1), y1: Number(r.y1), x2: Number(r.x2), y2: Number(r.y2) });
+        if (!bboxCounts.has(b)) bboxCounts.set(b, 0);
+        bboxCounts.set(b, bboxCounts.get(b) + 1);
+      };
+      pushRect(el.rect_norm);
+      pushRect(el.page_bbox);
+      pushRect(el.bbox);
     }
     let rectOk = 0, rectChecked = 0;
     for (const p of controlProps) {
@@ -456,7 +470,7 @@ async function testRealData() {
         bboxCounts.set(r, have - 1);
       }
     }
-    check(rectChecked >= 1 && rectOk === rectChecked, `抽样 rect 与 DB bbox 一致（${rectOk}/${rectChecked}）`);
+    check(rectChecked >= 1 && rectOk === rectChecked, `抽样 rect 与 DB 坐标一致（rect_norm/page_bbox/bbox 任一形态，${rectOk}/${rectChecked}）`);
   } finally {
     await db.destroy();
   }

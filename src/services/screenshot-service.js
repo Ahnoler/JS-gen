@@ -42,23 +42,38 @@ async function removeStoredObject(row, { strict = false } = {}) {
 }
 
 async function fallbackToLocal({ daoCall, pendingFile }) {
+  let id = null;
   try {
-    const id = await daoCall({
+    id = await daoCall({
       storageType: 'local',
       storagePath: null,
       imageUrl: null,
       retryCount: 0,
       lastRetryAt: null,
     });
-    if (id) {
-      await commitPendingFile(pendingFile.filePath, id);
-      return id;
-    }
   } catch (dbErr) {
     console.warn('[screenshot] local fallback DB write failed:', dbErr?.message || dbErr);
+    await deletePendingFile(pendingFile.filePath).catch(() => {});
+    throw new Error('Screenshot upload failed and local fallback could not be persisted');
   }
-  await deletePendingFile(pendingFile.filePath).catch(() => {});
-  throw new Error('Screenshot upload failed and local fallback could not be persisted');
+
+  if (!id) {
+    await deletePendingFile(pendingFile.filePath).catch(() => {});
+    throw new Error('Screenshot upload failed and local fallback could not be persisted');
+  }
+
+  try {
+    await commitPendingFile(pendingFile.filePath, id);
+  } catch (commitErr) {
+    // DB row without a pending file is unrecoverable; roll it back.
+    console.warn('[screenshot] local fallback file commit failed:', commitErr?.message || commitErr);
+    await screenshotDao.remove(id).catch(() => {});
+    await deletePendingFile(pendingFile.filePath).catch(() => {});
+    await deletePendingFile(id).catch(() => {});
+    throw new Error('Screenshot upload failed and local fallback could not be persisted');
+  }
+
+  return id;
 }
 
 /**
@@ -406,6 +421,28 @@ export async function listPendingScreenshots() {
     ...item,
     imageUrl: `/api/v2/screenshots/${item.id}/image`,
   }));
+}
+
+/**
+ * Delete local-pending screenshot rows whose `{id}.png` file is already gone.
+ * Prevents the pending board from accumulating unrecoverable orphans after a
+ * crash between DB insert and file commit (or a wiped pending directory).
+ * @returns {Promise<{scanned:number, deleted:number}>} purge summary
+ */
+export async function purgeMissingLocalScreenshots() {
+  const pending = await screenshotDao.listPending();
+  let deleted = 0;
+  for (const row of pending) {
+    const buf = await readPendingFile(row.id);
+    if (buf) continue;
+    try {
+      await screenshotDao.remove(row.id);
+      deleted += 1;
+    } catch (err) {
+      console.warn('[screenshot] purge missing local row failed:', row.id, err?.message || err);
+    }
+  }
+  return { scanned: pending.length, deleted };
 }
 
 /**

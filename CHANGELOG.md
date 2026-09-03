@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- 2026-09-02: **截图本地回退不再留下无文件 DB 行**：MinIO 失败落 `storage_type=local` 时，若 `commitPendingFile` 失败则回滚删除该行；启动时 `purgeMissingLocalScreenshots` 清掉磁盘已无 `{id}.png` 的孤儿 pending。影响：`screenshot-service.js`、`server.mjs`、characterize-screenshot-fallback。
+
 ### Added
 
 - 2026-09-02: **天元读码：结构化 `.info` + 同 L1 少点一级菜单**：打开弹窗后按 `p>span` 取值；fill 按 parent 排序并跳过重复 module click。关着 DOM 不随路由更新（须点开）。影响：`page_id.py`、`menu-scan-pageid.js`。
@@ -19,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 2026-09-02: **菜单扫描补采落地 pageId**：apply 后对空 `pd_cmpt_ecd` 的 L2 点开读天元（组件单码→场景编号）写入；skip 不失败。prepare 取消菜单回写。影响：`menu-scan-pageid.js`、`menu-scan-session.js`、`function-landing-page.js`、`recording-page-bind.js`。
 
 - 2026-09-02: **菜单扫描补采 pageId：要求 L2 点击成功**：空 `menu_xpath` 或 `click_menu_xpath` 失败时跳过，不读天元、不写落地页，避免沿用上一页编号。影响：`menu-scan-pageid.js`、characterize-menu-scan。
+
+- 2026-09-02: **V3 交易条目新增 `pageId`**：`transcationEventTypeList[]` 顶层（与 `transcId` 同级）新增 `pageId`（驼峰命名）——交易起点页面 ID（`trajectory.page_id` 列，菜单切换：组件编号或 AILZ+13位时间戳；dao `fromDbRow` 输出 camelCase `pageId`，snake_case 原始形态兜底，无值空串）。partner 出站 `toPartnerImportPayload` entry 级整体透传自动携带。影响：`transaction-export-v3.js`、characterize-export-v3 / characterize-partner-platform。
 
 - 2026-09-02: **AI 菜单 umlEcd=节点 id**：扫描新建 `source=ai` 后写 `umlEcd=String(id)`；推送 `resolveMenuUmlEcd` 空则回退节点 id，保证 `umlEcd`/`parentUmlEcd` 可建树。影响：`menu-scan-apply.js`、`menu-push.js`。
 

@@ -18,6 +18,7 @@ import registerV2Routes from './src/routes/v2/__init__.js';
 import { startPendingScreenshotRetry, stopPendingScreenshotRetry } from './src/services/screenshot-pending-retry.js';
 import { cleanupPendingFiles } from './src/services/screenshot-pending-store.js';
 import * as screenshotDao from './src/dao/screenshot-dao.js';
+import { purgeMissingLocalScreenshots } from './src/services/screenshot-service.js';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -111,8 +112,15 @@ async function main() {
   const { startTrajectoryIdleReaper } = await import('./src/services/trajectory/trajectory-idle-reaper.js');
   startTrajectoryIdleReaper();
 
-  // Screenshot local pending upload: clean orphan files and start retry loop.
+  // Screenshot local pending upload: drop DB orphans without files, clean orphan
+  // files, then start the retry loop.
   try {
+    const purged = await purgeMissingLocalScreenshots();
+    if (purged.deleted) {
+      console.warn(
+        `[server] purged ${purged.deleted}/${purged.scanned} local screenshot row(s) with missing pending file`,
+      );
+    }
     const pendingScreenshots = await screenshotDao.listPending();
     await cleanupPendingFiles(pendingScreenshots.map((p) => p.id));
   } catch (err) {

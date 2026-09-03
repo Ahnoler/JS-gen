@@ -862,6 +862,9 @@ export function buildTransactionEntryV3(traj, {
 
   const entry = {
     transcId: id,
+    // 交易起点页面 ID（trajectory.page_id，菜单切换；组件编号或 AILZ+13位时间戳）。
+    // dao fromDbRow 输出 camelCase（pageId）；page_id 兜底兼容原始 snake_case 形态
+    pageId: String(traj.pageId ?? traj.page_id ?? ''),
     transcationName: name,
     systemId: String(systemId),
     projectId: String(projectId),

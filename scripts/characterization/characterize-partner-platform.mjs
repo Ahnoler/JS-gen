@@ -45,6 +45,7 @@ assert.equal(e.projectId, '9');
   const src = {
     transcationEventTypeList: [{
       transcId: 1,
+      pageId: 'pdCmpt123',
       transcationProperties: [
         { type: 'page', regionId: 'page:x', regionLabel: '首页', screenshot: ['http://a/1.png', 'http://a/2.png'] },
         { type: 'object', regionId: '', regionLabel: '', screenshot: ['http://a/3.png'], rect: '{"x1":1}', propertiesName: '点击', attr: { disabled: true, required: false, readonly: false } },
@@ -70,6 +71,7 @@ assert.equal(e.projectId, '9');
   assert.equal(byType.popup.screenCapture, 'http://a/4.png', 'popup 截图并入 screenCapture');
   assert.equal(byType.object.rect, '{"x1":1}');
   assert.equal(out.transcationEventTypeList[0].transcId, 1);
+  assert.equal(out.transcationEventTypeList[0].pageId, 'pdCmpt123', 'entry 级 pageId 透传（与 transcId 同级，驼峰命名）');
 }
 
 // 非对象 / 非标准结构原样返回（不崩）
