@@ -1,3 +1,9 @@
+## 2026-09-03 · Zcode (uara_V1.2) — 用信链 run10/r10b：012 提交进审批 + 5 条系统真相（114c0a4 已推送）
+- 完成：run10 子智能体纯引擎建档 S1-S5 全通（新单 YXPC20260903012012：抽屉/品种树 tree_picker_click/模块保存/担保/日期区间）；断点=「下一步」静默——run10b（第二子智能体 MCP）+ 主线程定位根因链：①担保校验（doDclScmNextCheck code:100 **前端静默无提示**，须抓响应体）②主担保 radio UI 勾选与 Vue model 脱节（保存发旧码值——Vue 直写 primWrntTp 解）③码值真相=抵押1/质押2/**保证3**/信用4（r8a 报告"保证=2"纠错）④「同一保证人不可重复被引入」=009 在途占用，换 26081317115618826 成功
+- 完成：r10b 子智能体七模块全部保存 200（corpUsecredit×3/rtlPrtnInf/rtlRedIn/rtlLoanDtlInf×2）+ 提交链（下一步→影像→风险→意见→流程提交→选人**黄亮 WN0001**）→ **YXPC20260903012012 终态=审批中**（截图 tmp/e2e/shots/r10b_终态.png）
+- 完成：credit_usage 卡回灌 5 条新真相（主担保码值/担保校验静默/意见页"已选"假象/字段长度坑 DIGT_IDY_CL 2 字符+BP 自动计算+行业树最深叶/wrapper 跨路由 reload），rules 9→13，commit `114c0a4` **已推送**
+- 注意：tsscMutilDialog wrapper 空壳**跨 hash 路由存活**，SPA 导航清不掉须浏览器 reload；模块分区保存按钮歧义=点错分区保存不生效（抓请求体核对）；用信链引擎全链闭环仅剩「引擎自主完成意见页流程操作真实点选+流程提交」（其余全部引擎/MCP 已实证）
+
 ## 2026-09-03 · Cursor (uara_V1.2) — 收尾提交截图 orphan 回退 + V3 entry.pageId（18d9b58 / 33abd98）
 - 完成：截图 `fallbackToLocal` commit 失败回滚 DB 行 + 启动 `purgeMissingLocalScreenshots`；V3 `transcationEventTypeList[].pageId`（`18d9b58`）。顺带修 `agent-stderr` 对已迁移 `src/utils/stderr-prefix` 的 import（`33abd98`）。已删天元湿测探针与根目录 jpeg。
 - 注意：工作区仍有 Zcode/用信、slot-monitor 推流、server 静态托管解耦、handover 文档等未提交改动。
