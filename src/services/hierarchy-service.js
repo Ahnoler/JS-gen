@@ -387,8 +387,7 @@ async function syncSystemAccounts(systemId, normalized, trx) {
   const byId = new Map(existing.map((a) => [Number(a.id), a]));
   const byName = new Map(existing.map((a) => [key(a.name), a]));
 
-  const touchedIds = new Set();
-
+  const resolved = [];
   for (const item of normalized) {
     let target = null;
     if (item.id !== undefined) {
@@ -402,7 +401,18 @@ async function syncSystemAccounts(systemId, normalized, trx) {
     } else {
       target = byName.get(key(item.name));
     }
+    resolved.push({
+      item,
+      target,
+      targetId: target ? Number(target.id) : null,
+      name: item.name,
+    });
+  }
+  assertAccountNamesAvailable(existing, resolved);
 
+  const touchedIds = new Set();
+
+  for (const { item, target } of resolved) {
     const data = {
       name: item.name,
       loginUrl: item.loginUrl,
@@ -412,9 +422,22 @@ async function syncSystemAccounts(systemId, normalized, trx) {
       sortOrder: item.sortOrder,
     };
 
-    const saved = target
-      ? await systemAccountDao.update(target.id, data, trx)
-      : await systemAccountDao.create({ systemId: Number(systemId), ...data }, trx);
+    let saved;
+    try {
+      saved = target
+        ? await systemAccountDao.update(target.id, data, trx)
+        : await systemAccountDao.create({ systemId: Number(systemId), ...data }, trx);
+    } catch (err) {
+      if (err?.errno === 1062 || err?.code === 'ER_DUP_ENTRY') {
+        throw Object.assign(
+          new Error(
+            `同一系统下角色名称「${item.name}」已存在，请修改后再提交。若要对调两条账号，请先将其中一条改为临时名称。`,
+          ),
+          { code: 'CONFLICT' },
+        );
+      }
+      throw err;
+    }
     touchedIds.add(Number(saved.id));
   }
 

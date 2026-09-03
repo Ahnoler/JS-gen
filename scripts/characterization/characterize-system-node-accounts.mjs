@@ -111,6 +111,17 @@ function testWiring() {
   assert.match(service, /getDB\(\)\.transaction/);
 }
 
+function testSyncGuardsPinned() {
+  const service = readFileSync(join(root, 'src/services/hierarchy-service.js'), 'utf8');
+  assert.match(service, /assertAccountNamesAvailable\(/);
+  assert.match(service, /ER_DUP_ENTRY|errno === 1062/);
+  assert.match(
+    service,
+    /同一系统下角色名称「\$\{.*\}」已存在，请修改后再提交。若要对调两条账号，请先将其中一条改为临时名称/,
+  );
+  assert.match(service, /code: 'CONFLICT'/);
+}
+
 function testGetNodeEcho() {
   // GET /api/v2/system-mgmt/nodes/:id 详情必须回显系统账号（编辑表单回显前提）
   const service = readFileSync(join(root, 'src/services/hierarchy-service.js'), 'utf8');
@@ -129,6 +140,7 @@ function main() {
     ['payload validation', testValidation],
     ['duplicate name message', testDuplicateNameMessage],
     ['assert names available', testAssertNamesAvailable],
+    ['sync guards pinned', testSyncGuardsPinned],
     ['route/service wiring', testWiring],
     ['getNode detail echoes accounts', testGetNodeEcho],
   ];
