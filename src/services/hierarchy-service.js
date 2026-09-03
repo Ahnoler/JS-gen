@@ -313,7 +313,7 @@ export function normalizeSystemAccounts(input) {
     }
     const nameKey = name.toLocaleLowerCase();
     if (seenNames.has(nameKey)) {
-      throw Object.assign(new Error(`accounts 存在重复名称：${name}`), { code: 'VALIDATION' });
+      throw Object.assign(new Error(`同一系统下角色名称不能重复：「${name}」`), { code: 'VALIDATION' });
     }
     seenNames.add(nameKey);
 
@@ -343,6 +343,30 @@ export function normalizeSystemAccounts(input) {
       sortOrder,
     };
   });
+}
+
+/**
+ * Reject writes that claim a name still held by another existing account row.
+ * @param {Array<{id: number|string, name: string}>} existing rows for this system
+ * @param {Array<{targetId: number|null, name: string}>} resolved planned writes
+ * @returns {void}
+ */
+export function assertAccountNamesAvailable(existing, resolved) {
+  const key = (name) => String(name || '').trim().toLocaleLowerCase();
+  for (const item of resolved) {
+    const nameKey = key(item.name);
+    const holder = (existing || []).find((row) => key(row.name) === nameKey);
+    if (!holder) continue;
+    const holderId = Number(holder.id);
+    const selfId = item.targetId == null ? null : Number(item.targetId);
+    if (selfId != null && holderId === selfId) continue;
+    throw Object.assign(
+      new Error(
+        `角色名称「${item.name}」已被占用。若要对调，请先将其中一条改为临时名称后再提交。`,
+      ),
+      { code: 'VALIDATION' },
+    );
+  }
 }
 
 function stringifyCredential(value) {

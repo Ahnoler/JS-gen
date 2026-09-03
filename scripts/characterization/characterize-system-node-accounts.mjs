@@ -6,7 +6,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeSystemAccounts } from '../../src/services/hierarchy-service.js';
+import {
+  normalizeSystemAccounts,
+  assertAccountNamesAvailable,
+} from '../../src/services/hierarchy-service.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -46,8 +49,57 @@ function testValidation() {
     [{ id: -1, name: 'a' }],
   ];
   for (const payload of invalid) {
-    assert.throws(() => normalizeSystemAccounts(payload), /accounts|name|sortOrder|id/);
+    assert.throws(() => normalizeSystemAccounts(payload), /accounts|name|sortOrder|id|重复/);
   }
+}
+
+function testDuplicateNameMessage() {
+  try {
+    normalizeSystemAccounts([{ name: 'a' }, { name: 'A' }]);
+    assert.fail('expected throw');
+  } catch (err) {
+    assert.equal(err.code, 'VALIDATION');
+    assert.equal(err.message, '同一系统下角色名称不能重复：「A」');
+  }
+}
+
+function testAssertNamesAvailable() {
+  const existing = [
+    { id: 12, name: '黄正祥' },
+    { id: 15, name: '李淼一' },
+  ];
+  // 自身同名保留：通过
+  assertAccountNamesAvailable(existing, [
+    { targetId: 12, name: '黄正祥' },
+    { targetId: 15, name: '李淼一' },
+  ]);
+  // 交叉对调：拒绝
+  try {
+    assertAccountNamesAvailable(existing, [
+      { targetId: 12, name: '李淼一' },
+      { targetId: 15, name: '黄正祥' },
+    ]);
+    assert.fail('expected swap reject');
+  } catch (err) {
+    assert.equal(err.code, 'VALIDATION');
+    assert.match(err.message, /^角色名称「.+」已被占用。若要对调，请先将其中一条改为临时名称后再提交。$/);
+  }
+  // 新建占用已有名：拒绝
+  try {
+    assertAccountNamesAvailable(existing, [{ targetId: null, name: '李淼一' }]);
+    assert.fail('expected create conflict');
+  } catch (err) {
+    assert.equal(err.code, 'VALIDATION');
+    assert.equal(
+      err.message,
+      '角色名称「李淼一」已被占用。若要对调，请先将其中一条改为临时名称后再提交。',
+    );
+  }
+  // 改成全新名：通过
+  assertAccountNamesAvailable(existing, [
+    { targetId: 12, name: '临时甲' },
+    { targetId: 15, name: '李淼一' },
+  ]);
 }
 
 function testWiring() {
@@ -75,6 +127,8 @@ function main() {
   const tests = [
     ['normalize accounts', testNormalize],
     ['payload validation', testValidation],
+    ['duplicate name message', testDuplicateNameMessage],
+    ['assert names available', testAssertNamesAvailable],
     ['route/service wiring', testWiring],
     ['getNode detail echoes accounts', testGetNodeEcho],
   ];
