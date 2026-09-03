@@ -19,6 +19,11 @@
 - 完成：credit_usage 卡回灌 5 条新真相（主担保码值/担保校验静默/意见页"已选"假象/字段长度坑 DIGT_IDY_CL 2 字符+BP 自动计算+行业树最深叶/wrapper 跨路由 reload），rules 9→13，commit `114c0a4` **已推送**
 - 注意：tsscMutilDialog wrapper 空壳**跨 hash 路由存活**，SPA 导航清不掉须浏览器 reload；模块分区保存按钮歧义=点错分区保存不生效（抓请求体核对）；用信链引擎全链闭环仅剩「引擎自主完成意见页流程操作真实点选+流程提交」（其余全部引擎/MCP 已实证）
 
+## 2026-09-04 · Zcode (uara_V1.2) — run16-20 五轮：第 4/5 笔提交进审批 + 意见页合成 select 实证
+- 完成：run16（后台 4h agent）实现 fill_table_cell/select_table_cell 并深探（行内写入 read_back 可用；row_text 须用可见行键）；run19 发现**引入保证人弹窗表头列序=担保方式/与借款人关系/证件号码/担保金额**（col 序需先扫描表头）；r14 关键实证：**意见页「流程操作」下拉对合成 select 有效**（model 写入成功——012 失败实为没先选下拉）
+- 完成：r17（019 复核=审批中，第 4 笔）+ **r20（029=YXPC20260904012029 七模块全部 200+提交链全通=审批中，第 5 笔**；选人黄亮 WN0001；截图 tmp/e2e/shots/r20_终态.png）。主线程 MCP 打通 029 担保（radio→model=3→分区保存+引入蔓悦薇）
+- 注意：派发框架两坑（mm_items 回传错误但 agent 实际跑完/cancelled 后台 agent 无超时保护跑 4h）——**1 小时阶段汇报规约**已立；引擎 100% 自主闭环差「把成熟配方编码为引擎驱动」（全部动作+配方已实证，S1-S7 引擎已通，S8 意见页/提交链 MCP 已反复验证）
+
 ## 2026-09-03 · Cursor (uara_V1.2) — 收尾提交截图 orphan 回退 + V3 entry.pageId（18d9b58 / 33abd98）
 - 完成：截图 `fallbackToLocal` commit 失败回滚 DB 行 + 启动 `purgeMissingLocalScreenshots`；V3 `transcationEventTypeList[].pageId`（`18d9b58`）。顺带修 `agent-stderr` 对已迁移 `src/utils/stderr-prefix` 的 import（`33abd98`）。已删天元湿测探针与根目录 jpeg。
 - 注意：工作区仍有 Zcode/用信、slot-monitor 推流、server 静态托管解耦、handover 文档等未提交改动。
