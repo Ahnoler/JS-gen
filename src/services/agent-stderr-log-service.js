@@ -12,7 +12,7 @@ import {
 } from 'fs';
 import path from 'path';
 import { resolve, PROJECT_DIR } from '../../config/config.js';
-import { shortSid } from '../../executor/stderr-prefix.js';
+import { shortSid } from '../utils/stderr-prefix.js';
 import * as remoteSessionDao from '../dao/remote-session-dao.js';
 import * as trajectoryDao from '../dao/trajectory-dao.js';
 import * as executorNodeDao from '../dao/executor-node-dao.js';
