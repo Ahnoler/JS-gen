@@ -93,7 +93,7 @@ export const GROUP_OVERVIEW = [
       {
         method: 'POST', path: '/api/v2/system-mgmt/nodes',
         summary: '新增节点',
-        desc: 'type=1（系统）可同时传 accounts[] 一次创建多个系统账号；账号字段见参数说明。',
+        desc: 'type=1（系统）可同时传 accounts[] 一次创建多个系统账号；账号字段见参数说明。同系统 accounts[].name 唯一；交叉更名/对调须先改为临时名称；冲突返回 400/409 中文提示，不返回 SQL。',
         params: [
           { name: 'type', type: 'number', required: true, in: 'body', desc: '1 系统 / 2 模块 / 3 功能' },
           { name: 'name', type: 'string', required: true, in: 'body', desc: '名称' },
@@ -121,7 +121,7 @@ export const GROUP_OVERVIEW = [
       {
         method: 'PUT', path: '/api/v2/system-mgmt/nodes/{id}',
         summary: '修改节点',
-        desc: 'type=1（系统）可传 accounts[] 全量替换该系统下的账号：按 id 更新、无 id 按 name 匹配，未出现的老账号删除；不传 accounts 则不动账号。',
+        desc: 'type=1（系统）可传 accounts[] 全量替换该系统下的账号：按 id 更新、无 id 按 name 匹配，未出现的老账号删除；不传 accounts 则不动账号。同系统 accounts[].name 唯一；交叉更名/对调须先改为临时名称；冲突返回 400/409 中文提示，不返回 SQL。',
         params: [
           { name: 'id', type: 'number', required: true, in: 'path', example: '1' },
           { name: 'accounts', type: 'array', in: 'body', desc: '系统账号数组（仅 type=1）：[{ id?, name, account, password, loginUrl?, remark?, sortOrder? }]' },

@@ -1,3 +1,12 @@
+## 2026-09-03 · Cursor 子智能体 — system_account 角色名唯一约束 A+B（Task 1–3）
+- 完成：Task 1 `ae1a3b3` 包内重名统一文案 + `assertAccountNamesAvailable` 纯函数；Task 2 `28bc9f3` `syncSystemAccounts` 提交前占用预检 + `ER_DUP_ENTRY`→409 中文 CONFLICT；Task 3 api-docs POST/PUT nodes `desc`、CHANGELOG Fixed、本日志（与 Task 3 同 commit）。
+- 注意：交叉更名/对调须两步临时名；前端另仓若硬编码 SQL 错误文案需跟中文 400/409 提示对齐。
+
+## 2026-09-03 · Zcode 执行子智能体 — KB-I5 run12：save_section + read_xhr_log 两杠杆动作 + 全链复跑（未 commit）
+- 完成：run11 两缺口补齐——① `js_snippets/xhr_log.py`（JS_XHR_HOOK 注入期 hook XMLHttpRequest.send/open+fetch 记 window.__xhr_log 最近 20 条 {url,status,responseBody 2KB 截断}，read_xhr_log(url_filter,last) 注册于 _observe.py:55，add_init_script+即时 evaluate 双通道，historyTraced 语义）② `js_snippets/save_section.py`（JS_SAVE_SECTION：分区标题→最小含保存容器→enabled 优先→mousedown 链→2.5s→toast，save_section(section_title) 注册于 _form.py:210）；prompt form/common 追加规则；pin ×2（characterize-xhr-log/save-section）+ node stub 功能测试 + 8 既有 pin 回归绿。verify-all 的 kb-actions/sso-auth/sys-msg 失败为存量环境依赖（stash 验证与本轮无关）。
+- 完成：复跑 7 attempt（tid=428-434，报告 tmp/kb_i5_usage12_report.md）：**缺口①持久化实证闭环达成**——S7 全 8 分区 save_section 命中 + read_xhr_log(saveOrUpdate) 16 次「操作成功」；关键：分区真标题是短名（'A / B / C' 是扫描分组路径）、disableBtn 保存点了不发请求（前置必填如 资金来源 未填，已加 enabled 优先逻辑）。**缺口②原因实证闭环达成**——NextCheck code:100 description=「担保信息列表请录入至少一个与主担保方式相同的担保信息」（机器可读），按因回担保分区 4 轮修复（引入保证人 real_click 行 radio 修 err-no-row-match）。
+- 注意：**100% 引擎自主闭环仍未达成**——saveOrUpdate 全成功但 NextCheck 仍拒绝同一担保原因（疑担保行内类型联动/列位错，KB 层缺口）；S9 审批中未达；S5 YXPC biz 捕获本轮 7 跑均空（回归待查）。全部轨迹已 stop+detach，LMY slot 空闲。改动未 commit，留主线程。
+
 ## 2026-09-03 · Zcode (uara_V1.2) — 用信链 run10/r10b：012 提交进审批 + 5 条系统真相（114c0a4 已推送）
 - 完成：run10 子智能体纯引擎建档 S1-S5 全通（新单 YXPC20260903012012：抽屉/品种树 tree_picker_click/模块保存/担保/日期区间）；断点=「下一步」静默——run10b（第二子智能体 MCP）+ 主线程定位根因链：①担保校验（doDclScmNextCheck code:100 **前端静默无提示**，须抓响应体）②主担保 radio UI 勾选与 Vue model 脱节（保存发旧码值——Vue 直写 primWrntTp 解）③码值真相=抵押1/质押2/**保证3**/信用4（r8a 报告"保证=2"纠错）④「同一保证人不可重复被引入」=009 在途占用，换 26081317115618826 成功
 - 完成：r10b 子智能体七模块全部保存 200（corpUsecredit×3/rtlPrtnInf/rtlRedIn/rtlLoanDtlInf×2）+ 提交链（下一步→影像→风险→意见→流程提交→选人**黄亮 WN0001**）→ **YXPC20260903012012 终态=审批中**（截图 tmp/e2e/shots/r10b_终态.png）

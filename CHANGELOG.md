@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- 2026-09-03: **系统节点 accounts 角色名唯一约束**：包内重名/交叉占用提交前中文 400；DB 唯一键映射中文 409，不再返回 SQL。影响：`hierarchy-service.js`、`system-account-service.js`、api-docs。
+
 - 2026-09-02: **截图本地回退不再留下无文件 DB 行**：MinIO 失败落 `storage_type=local` 时，若 `commitPendingFile` 失败则回滚删除该行；启动时 `purgeMissingLocalScreenshots` 清掉磁盘已无 `{id}.png` 的孤儿 pending。影响：`screenshot-service.js`、`server.mjs`、characterize-screenshot-fallback。
 
 ### Added
