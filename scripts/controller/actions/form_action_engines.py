@@ -958,10 +958,25 @@ JS_SELECT_TRIGGER_MAIN_AREA = r'''([labelText]) => {
     const want = norm(labelText);
     if (!want) return 'main-empty-label';
     let target = null;
-    for (const it of document.querySelectorAll('.el-form-item')) {
-        if (!isVis(it) || !it.querySelector('.el-select')) continue;
+    const tryItem = (it) => {
+        if (!it || !isVis(it) || !it.querySelector('.el-select')) return false;
         const lbl = it.querySelector('.el-form-item__label, label');
-        if (norm((lbl && lbl.textContent) || '') === want) target = it;
+        if (norm((lbl && lbl.textContent) || '') === want) { target = it; return true; }
+        return false;
+    };
+    for (const it of document.querySelectorAll('.el-form-item')) {
+        if (tryItem(it)) break;
+    }
+    // KB-I5 run5: 弹窗感知兜底（与 select_tree.py 弹窗补丁同型）——利率测算/
+    // 流程选人等可见 .el-dialog/.el-drawer 内的 form-item 单独补扫。
+    if (!target) {
+        for (const dlg of document.querySelectorAll('.el-dialog, .el-drawer')) {
+            if (dlg.offsetParent === null && dlg.getClientRects().length === 0) continue;
+            for (const it of dlg.querySelectorAll('.el-form-item')) {
+                if (tryItem(it)) break;
+            }
+            if (target) break;
+        }
     }
     if (!target) return 'main-select-not-found';
     const trig = target.querySelector('.el-select .el-input__inner');

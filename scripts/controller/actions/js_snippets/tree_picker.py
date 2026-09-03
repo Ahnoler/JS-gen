@@ -11,7 +11,10 @@ fieldItem 内 input.value 回显 + 弹窗内 4 只读字段自动回填。本 sn
 """
 
 JS_TREE_PICKER_CLICK = '''async (args) => {
-    const [labelText, pathJson] = args || [];
+    const [labelText, pathJson, skipOpen] = args || [];
+    // skipOpen='1'（KB-I5 run7）：popover 已由 real_click（CDP trusted 事件）打开，
+    // 跳过初始触发器合成链——再 fire 会把刚打开的 popover 切换关闭。
+    const skipTriggerFire = skipOpen === '1';
     let path = [];
     try { path = JSON.parse(pathJson || '[]'); } catch (e) { path = []; }
     path = (Array.isArray(path) ? path : []).map((s) => String(s == null ? '' : s).trim()).filter(Boolean);
@@ -25,6 +28,10 @@ JS_TREE_PICKER_CLICK = '''async (args) => {
     );
     const fireChain = async (el) => {
         el.scrollIntoView({ block: 'center', behavior: 'instant' });
+        // KB-I5 run6: my-popover/el-tooltip 触发器可能挂 hover 打开——
+        // mousedown 链前先补 mouseover/mouseenter（对 click 触发器无副作用）。
+        fire(el, 'mouseover');
+        fire(el, 'mouseenter');
         fire(el, 'mousedown');
         await sleep(40);
         fire(el, 'mouseup');
@@ -43,7 +50,8 @@ JS_TREE_PICKER_CLICK = '''async (args) => {
         return null;
     };
     const visibleDlg = () => [...document.querySelectorAll('.el-dialog, .el-drawer, .el-popover, .el-popper')]
-        .filter((d) => d.offsetParent !== null && d.getClientRects().length > 0);
+        // KB-I5 run7: position:fixed popper 的 offsetParent 为 null，改用 rects 判可见
+        .filter((d) => d.offsetParent !== null || d.getClientRects().length > 0);
     let fieldItem = findItem(document.body, true);
     if (!fieldItem) {
         const dlgs = visibleDlg().sort((a, b) => norm(a.textContent).length - norm(b.textContent).length);
@@ -81,7 +89,9 @@ JS_TREE_PICKER_CLICK = '''async (args) => {
             return JSON.stringify({ ok: false, error: 'err-tree-disabled:' + labelText });
         }
     }
-    await fireChain(trigger);
+    if (!skipTriggerFire) {
+        await fireChain(trigger);
+    }
     await sleep(400);
 
     // 3) 逐级点击：对 path 每项，轮询 ≤2000ms 在可见树节点（popover 优先 → document 级兜底）
@@ -93,7 +103,9 @@ JS_TREE_PICKER_CLICK = '''async (args) => {
         scopes.push(document.body);
         for (const scope of scopes) {
             for (const c of scope.querySelectorAll('.el-tree-node__content, .el-tree-node .node')) {
-                if (c.offsetParent === null) continue;
+                // KB-I5 run7: position:fixed popper 内节点 offsetParent 为 null，
+                // 只用 rects 判可见（display:none 时 rects 为空）
+                if (c.getClientRects().length === 0) continue;
                 if (norm(c.textContent) === text) return c;
             }
         }
@@ -105,6 +117,15 @@ JS_TREE_PICKER_CLICK = '''async (args) => {
         for (let waited = 0; waited <= 2000 && !node; waited += 150) {
             node = findNode(step);
             if (!node) await sleep(150);
+        }
+        // KB-I5 run6: 第一级未现时重开一次触发器（popover 可能未打开/被重渲染吃掉）；
+        // skipTriggerFire（run7 real_click 已打开）时不再补 fire。
+        if (!node && clicked.length === 0 && !skipTriggerFire) {
+            await fireChain(trigger);
+            for (let waited = 0; waited <= 1500 && !node; waited += 150) {
+                node = findNode(step);
+                if (!node) await sleep(150);
+            }
         }
         if (!node) {
             return JSON.stringify({

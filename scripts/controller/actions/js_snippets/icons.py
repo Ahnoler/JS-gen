@@ -133,6 +133,34 @@ JS_COLLECT_ICON_BUTTONS = r'''() => {
 JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
 ''' + _JS_ICON_BUTTON_HELPERS + r'''
   if (!buttonText) return 'button-text-empty';
+  // ══ KB-I5 run5: 精确文本优先（原为 icon 宿主优先、文本兜底）══
+  // 意见页「流程提交」「下一步」等是普通可见文本按钮——先在 button/文本元素中
+  // 找归一化 innerText === 目标的元素（同文本取最内层 = document 顺序最后一个），
+  // 命中即点；未命中再走 icon 宿主 → 包含式文本兜底（原路径，顺序后移）。
+  const want0 = _iconNormText(buttonText);
+  const isOverlay = (el) => !!el.closest('.el-dialog, .el-drawer, .el-message-box');
+  const exact = [];
+  const seenExact = new Set();
+  for (const b of document.querySelectorAll(
+      'button, .el-button, a, [role="button"], span, div')) {
+    if (!_iconIsVisible(b)) continue;
+    if (b.closest('.el-table__body-wrapper')) continue;
+    const t = _iconNormText(b.innerText || b.textContent);
+    if (!t || t.length > 40 || t !== want0) continue;
+    const cls = typeof b.className === 'string' ? b.className.slice(0, 60) : '';
+    const key = t + '|' + cls + '|' + b.tagName;
+    if (seenExact.has(key)) continue;
+    seenExact.add(key);
+    exact.push({ el: b, text: t });
+    if (exact.length >= 24) break;
+  }
+  if (exact.length) {
+    // document order: ancestors precede descendants → last = innermost.
+    const m = exact[exact.length - 1];
+    m.el.scrollIntoView({ block: 'center', behavior: 'instant' });
+    m.el.click();
+    return 'ok-text:' + m.text;
+  }
   for (const el of _iconCandidates(document)) {
     if (!_iconIsVisible(el)) continue;
     const label = _iconResolveLabel(el);
@@ -147,7 +175,6 @@ JS_CLICK_ICON_BUTTON = r'''(buttonText) => {
   // icons — after an icon miss, clicking them here succeeds in one step
   // instead of looping the agent through retries (2026-08-27 toolbar incident).
   const want = _iconNormText(buttonText);
-  const isOverlay = (el) => !!el.closest('.el-dialog, .el-drawer, .el-message-box');
   const seenB = new Set();
   const matches = [];
   for (const b of document.querySelectorAll('button, .el-button, a')) {

@@ -90,6 +90,54 @@ JS_FILL_FORM_FIELD = '''([label, val]) => {
             return 'ok-type';
         }
     }
+    // KB-I5 run5: 容器放宽 —— container 内零命中（含 JS_GET_CONTAINER 停在陈旧
+    // 弹层 / 目标在可见 main 或其他可见弹层内）时，补扫可见 `main` 与可见
+    // .el-dialog/.el-drawer 内的 .el-form-item__label（与 select_tree.py 弹窗补丁
+    // 同型）。成功路径零改动：仅在前述全部 pass 未命中时执行。
+    const scopeVis = (el) => {
+        if (el.offsetParent !== null) return true;
+        const st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+    };
+    const fillInScope = (item) => {
+        item.scrollIntoView({ block: 'center', behavior: 'instant' });
+        const input = item.querySelector('input:not([type="hidden"])');
+        const textarea = item.querySelector('textarea');
+        const target = input || textarea;
+        if (!target) return '';
+        if (isDisabled(target, item.querySelector('.el-select .el-input__inner'), item)) return '';
+        if (target.closest('.el-date-editor, .tsscdatepicker')) {
+            target.focus();
+            commitDateVue(target, val);
+            setFn(target, val);
+            target.blur();
+            document.querySelectorAll('.el-picker-panel,.el-date-picker').forEach(x=>{x.style.display='none';x.classList.add('is-hidden')});
+            return 'ok-date';
+        }
+        setFn(target, val);
+        return 'ok';
+    };
+    const scopeList = [];
+    const mainEl = [...document.querySelectorAll('main')].find(scopeVis);
+    if (mainEl) scopeList.push(mainEl);
+    for (const d of document.querySelectorAll('.el-dialog, .el-drawer')) {
+        if (scopeVis(d)) scopeList.push(d);
+    }
+    if (container !== document) scopeList.push(document);
+    for (const sc of scopeList) {
+        // exact first, then partial — same priority as pass1/pass2
+        for (const want of [label, null]) {
+            for (const item of sc.querySelectorAll('.el-form-item')) {
+                const lbl = item.querySelector('.el-form-item__label')?.textContent?.trim() || '';
+                if (!lbl) continue;
+                if (want !== null ? lbl !== want : !lbl.includes(label)) continue;
+                const r = fillInScope(item);
+                if (r) return r === 'ok' ? ('ok-scope:' + lbl) : r;
+            }
+        }
+    }
     return 'label-not-found';
 }'''
 

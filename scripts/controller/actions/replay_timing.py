@@ -52,6 +52,10 @@ ACTION_BUDGET_S = {
     "scan_visible_fields": 10,
     "scan_form_fields": 10,
     "semantic_snapshot": 8,
+    # KB-I5 run7：tree_picker_click 内嵌 real_click(CDP 真实事件) 回退重试，
+    # 两轮 JS 逐级点击 + CDP 通道需放宽；real_click 单发也非毫秒级。
+    "tree_picker_click": 20,
+    "real_click": 8,
 }
 
 
