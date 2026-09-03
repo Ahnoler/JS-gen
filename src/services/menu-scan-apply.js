@@ -9,7 +9,12 @@ import * as menuChangeLogDao from '../dao/menu-change-log-dao.js';
 import { NODE_TYPE } from '../models/hierarchy-constants.js';
 
 /**
- * AI 新建节点：用自身 DB id 写入 umlEcd，保证推送时 umlEcd/parentUmlEcd 可建树。
+ * AI 新建节点：用自身 DB id 写入 umlEcd。
+ *
+ * 与 JSON 导入的 `UML…` 建模码不同：扫描抓到的真实菜单没有建模组件关系编码，
+ * 约定第二种格式 `umlEcd = String(id)`（数字串），使推送 menus[].umlEcd /
+ * parentUmlEcd 仍能父子建树。见 `resolveMenuUmlEcd`。
+ *
  * @param {{ id: number|string }} created systemDao.create 返回行
  * @param {object} trx knex transaction
  * @returns {Promise<string>} 写入的 umlEcd

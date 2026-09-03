@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- 2026-09-03: **注释：`umlEcd` 两种来源格式**：JSON 导入为建模 `UML…`；AI 扫描为 `String(node.id)`；推送 `resolveMenuUmlEcd` 空则回退 id。影响：`menu-push.js`、`menu-scan-apply.js`、`menu-json-import.js`、api-docs。
+
 ### Fixed
 
 - 2026-09-02: **截图本地回退不再留下无文件 DB 行**：MinIO 失败落 `storage_type=local` 时，若 `commitPendingFile` 失败则回滚删除该行；启动时 `purgeMissingLocalScreenshots` 清掉磁盘已无 `{id}.png` 的孤儿 pending。影响：`screenshot-service.js`、`server.mjs`、characterize-screenshot-fallback。

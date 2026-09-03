@@ -55,7 +55,14 @@ function normalizeStatus(raw) {
 }
 
 /**
- * 推送用 umlEcd：库值优先；空则用节点自身 id（AI 扫描菜单无建模编码）。
+ * 推送用 umlEcd（库值优先；空则回退节点 id）。
+ *
+ * `system.uml_ecd` 有两种来源格式，推送时同等当作 menus[].umlEcd / parentUmlEcd：
+ * 1. **建模 JSON 导入**（`source=json_import`）：被测系统《建模组件关系》里的 UML 编码，
+ *    形如 `UML00005556`（全库唯一，幂等键）。
+ * 2. **AI 菜单扫描新建**（`source=ai`）：无建模编码，落库时写 `String(node.id)`（纯数字串）；
+ *    若历史行尚未回填，此处再回退一次 id，保证 parentUmlEcd 仍能建树。
+ *
  * @param {object|null|undefined} n 系统树节点
  * @returns {string} 非空时可用于建树的编码
  */

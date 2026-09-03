@@ -1,6 +1,10 @@
 /**
  * 菜单 JSON 导入 service：解析被测系统《建模组件关系》JSON，
  * 建两级菜单树（模块/功能）并按 umlEcd 幂等 upsert，同步页面清单。
+ *
+ * 本路径写入的 `umlEcd` 为建模侧 UML 编码（如 `UML00005556`），是两种格式之一；
+ * 另一种是 AI 扫描新建的 `String(node.id)`，见 `menu-scan-apply.assignAiUmlEcdFromId`
+ * 与推送侧 `resolveMenuUmlEcd`。
  */
 import { getDB } from '../../config/database.js';
 import * as systemDao from '../dao/system-dao.js';
