@@ -22,13 +22,15 @@ import { purgeMissingLocalScreenshots } from './src/services/screenshot-service.
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
-app.use('/scripts', express.static(path.join(PROJECT_DIR, 'scripts')));
-app.use(express.static(DASHBOARD_DIR, {
+// 静态托管仅限监控台页面资源（不再暴露项目根目录与 scripts/ —— 控制面与执行机解耦）。
+app.use('/src/dashboard', express.static(path.join(PROJECT_DIR, 'src', 'dashboard'), {
   maxAge: 0,
   setHeaders(res) {
     res.setHeader('Cache-Control', 'no-store');
   },
 }));
+app.get('/', (req, res) => res.sendFile(path.join(PROJECT_DIR, 'api-docs.html')));
+app.get('/api-docs.html', (req, res) => res.sendFile(path.join(PROJECT_DIR, 'api-docs.html')));
 
 // Register all route modules
 registerLLMProxyRoutes(app);

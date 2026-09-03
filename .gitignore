@@ -54,3 +54,6 @@ logs/log.txt
 # KB 生成物：export_dicts 写出的归一字典数据（源是运行期 localStorage）
 data/kb/dicts_normalized.json
 data/kb/staging/
+
+# 控制面打包产物
+dist/

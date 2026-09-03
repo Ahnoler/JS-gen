@@ -216,6 +216,7 @@ function renderSlotRow(node, slot) {
   const actions = slot.occupied && slot.trajectoryId != null
     ? `
       <button type="button" class="btn mon-btn" data-act="stream-detach" data-tid="${slot.trajectoryId}">断开画面</button>
+      <button type="button" class="btn mon-btn" data-act="stream-attach" data-tid="${slot.trajectoryId}">推流画面</button>
       <button type="button" class="btn mon-btn mon-btn-danger" data-act="detach" data-tid="${slot.trajectoryId}">释放浏览器</button>
       <button type="button" class="btn mon-btn" data-act="stderr" data-tid="${slot.trajectoryId}"
         data-session="${escapeHtml(slot.sessionId || '')}"
@@ -429,6 +430,22 @@ export function mountSlotMonitor(wrap) {
     }
   }
 
+  async function callAttach(trajectoryId) {
+    const label = '推流画面（重新挂载 BiB 流）';
+    setStatus(`${label}中…`);
+    try {
+      await apiJson(`/api/v2/trajectories/${trajectoryId}/attach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      setStatus(`${label}成功`);
+      await refresh();
+    } catch (err) {
+      setStatus(`${label}失败：${err.message}`, true);
+    }
+  }
+
   async function closeOrphanSession(btn) {
     const nodeUuid = btn.dataset.node || '';
     const sessionId = btn.dataset.session || '';
@@ -540,6 +557,7 @@ export function mountSlotMonitor(wrap) {
     const act = btn.dataset.act;
     const tid = Number(btn.dataset.tid);
     if (act === 'stream-detach' && Number.isFinite(tid)) callDetach(tid, false);
+    if (act === 'stream-attach' && Number.isFinite(tid)) callAttach(tid);
     if (act === 'detach' && Number.isFinite(tid)) callDetach(tid, true);
     if (act === 'stderr') fetchStderr(btn);
     if (act === 'clear-log') clearStderr(btn);

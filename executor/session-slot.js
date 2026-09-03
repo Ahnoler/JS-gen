@@ -2,7 +2,7 @@
  * One executor slot = one Python session subprocess + stdin/stdout bridge.
  */
 import { spawnAgent, waitForReady, isProcessAlive, killTree, killProcessOnly, killListenerOnPort } from './spawn-agent.js';
-import { createStderrLineBuffer } from './stderr-prefix.js';
+import { createStderrLineBuffer } from '../src/utils/stderr-prefix.js';
 import {
   LLM_API_KEY, LLM_BASE_URL, LLM_MODEL,
   FORM_LLM_MODEL, FORM_LLM_BASE_URL, FORM_LLM_API_KEY, FORM_LLM_TIMEOUT_MS,
