@@ -1,6 +1,6 @@
-## 2026-09-03 · Cursor (uara_V1.2) — 收尾提交截图 orphan 回退 + V3 entry.pageId
-- 完成：截图 `fallbackToLocal` commit 失败回滚 DB 行 + 启动 `purgeMissingLocalScreenshots`；V3 `transcationEventTypeList[].pageId`。pin 全绿。commit 见本条更新后 hash。清理天元湿测临时探针。
-- 注意：工作区仍有 Zcode real_click/用信链、slot-monitor 推流按钮、server 静态托管解耦等未提交改动，勿混。
+## 2026-09-03 · Cursor (uara_V1.2) — 收尾提交截图 orphan 回退 + V3 entry.pageId（18d9b58 / 33abd98）
+- 完成：截图 `fallbackToLocal` commit 失败回滚 DB 行 + 启动 `purgeMissingLocalScreenshots`；V3 `transcationEventTypeList[].pageId`（`18d9b58`）。顺带修 `agent-stderr` 对已迁移 `src/utils/stderr-prefix` 的 import（`33abd98`）。已删天元湿测探针与根目录 jpeg。
+- 注意：工作区仍有 Zcode/用信、slot-monitor 推流、server 静态托管解耦、handover 文档等未提交改动。
 
 ## 2026-09-03 · Zcode 执行子智能体 — KB-I5 run7：CDP 真实点击通道 real_click + 用信链复跑（未 commit）
 - 完成：**real_click trusted 事件通道落地**——`js_snippets/real_click.py`（JS_REAL_CLICK_RECT/ECHO + JS_TREE_POPOVER_OPEN）、`_workspace.py:205 _real_click_via_cdp`（`page.context.new_cdp_session` + `Input.dispatchMouseEvent` mouseMoved/Pressed/40ms/Released，playwright 1.61.0 实证）、动作 real_click(selector|text|label_text) 注册于 _register_workspace_actions；tree_picker_click 内嵌回退（_tree.py:88-141：popover 开合探测→逐级 real_click(text)（下级已可见跳点防 toggle）→echo 校验）；budget tree_picker_click=20s/real_click=8s；prompt agent-tools-common.md 新节；pin characterize-real-click.py 新 + 5 既有 pin 回归绿（verify-all 仅 kb-actions「流程取回」存量失败）。
