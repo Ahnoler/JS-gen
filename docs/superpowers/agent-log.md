@@ -1,3 +1,9 @@
+## 2026-09-04 · Zcode 执行子智能体 — 任务1 run21：引擎 100% 自主闭环终验（未达成，卡点定案）
+- 完成：table_cell.py **表头定列序修复**（任务4 内联版已落盘）——JS_FILL_TABLE_CELL 增第 5 参 header_name：扫描弹窗表头（担保方式/与借款人关系/证件号码/担保金额）定列下标→定位 td→select/input 写入；未命中回落 column_index 计数；fill/select_table_cell 增可选参，prompts 同步，pin×4 绿，executor 重启加载
+- 完成：run21 三跑（tid=478/479/480，纯引擎零 MCP）：S1–S7 全自主通过（七模块 saveOrUpdate 全 200、primWrntTp=3 落库、行内 企业股东/30000 回读 ✅）；报告 tmp/kb_i5_usage21_report.md；轨迹均 stop+detach
+- 卡点定案：**引入保证人弹窗「确认」静默失败**（radio/cells 对齐后确认不关弹窗、无 toast、担保列表 0 行→NextCheck 恒拒「至少一条与主担保方式相同」）——100% 闭环差此一步；三大新真相：①click_table_row_radio 无序号语义（'5' 文本包含命中第1行→radio/cells 错位）②弹窗行内编辑跨重开持久 ③snapshot 行编号截断致 ^2608\d{10,16}$ 永不命中（行键校验须放宽）
+- 注意：Windows 裸 `python` 是 Store 桩——补丁脚本须用 D:/anaconda3/python.exe（run3a 补丁静默未生效教训）；任务4 修「确认」（疑需原生 mousedown 链点确认或逐格 blur 提交行编辑）+ radio 行序号语义即可闭环
+
 ## 2026-09-04 · Zcode (uara_V1.2) — 用信批量自批 4 笔通过 + 放款链首通至账户缺失点
 - 完成：WN0001 批量自批 4 笔用信（012/019/020/029）全部**审批通过**，批复自动生成且生效（DGYXPF202609040016004-007）——多实例批复能力验证；账号切换 4 次（WN0001↔701994），未触碰否决/退回（tmp/e2e/batch_appr_report.md）
 - 完成：主线程 MCP 放款真实建档——存量合同 036012（云天 3,000 万/可用 2,998.6 万）→ 新增放款 → **FK20260904056009**（金额改小=10,000/到期 2027-06-09/柜面放款）；踩坑：金额 fill 追加不替换（需 selectAll+delete）、日期控件须真实面板选择（DOM 直写不进 model）

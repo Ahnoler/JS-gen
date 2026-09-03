@@ -3,8 +3,27 @@
 from scripts.state import _record_action
 from ._helpers import _ok, _err, _is_ok_result, _enrich_click_element
 from .result_protocol import err_with
-from ._js_snippets import JS_STRIP_STALE_WRAPPERS
+from ._js_snippets import JS_STRIP_STALE_WRAPPERS, JS_FILL_TABLE_CELL
 from .replay_timing import WAIT_500_MS
+from ._workspace import _workspace_result
+
+
+async def _table_cell_impl(browser_context, row_text, column_index, value, kind,
+                           header_name=''):
+    """Shared impl for fill_table_cell / select_table_cell via JS_FILL_TABLE_CELL.
+
+    header_name (optional): 弹窗表头列名（如「担保金额」「与借款人关系」）。
+    提供时优先按表头列序定位单元格（run21/task4 修复：可见控件顺序 ≠ 展示
+    列序），表头未命中回落 column_index 计数。
+
+    Returns (ok, payload_str) parsed from the JS JSON-string result."""
+    page = await browser_context.get_current_page()
+    result = await page.evaluate(
+        JS_FILL_TABLE_CELL,
+        [row_text, int(column_index), str(value), kind, str(header_name or '')])
+    # Native setter + Vue re-render settling buffer after write.
+    await page.wait_for_timeout(300)
+    return _workspace_result(result)
 
 
 def _register_table_actions(controller, browser_context, business_data_store=None):
@@ -279,3 +298,56 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
                 next_action='改抄扫描结果里该行的完整单元格文本后重试',
             )
         return result
+
+    @controller.action(
+        'Write a value into an editable cell of an el-table row in the topmost '
+        'visible dialog (e.g. the 引入保证人 popup), identified by row_text '
+        '(unique-key cell text preferred) and column_index (0-based, counting '
+        'VISIBLE editable inputs, skipping radio/checkbox/hidden). Uses the '
+        'Element UI native setter + input/change events, then reads the value '
+        'back. column_index=-1 means: operate the first visible .el-select in '
+        'the row (inline dropdown, e.g. 与借款人关系=企业股东). Errors: '
+        'err-table-cell-not-written:<row>:<col> with why '
+        '(row-not-found / input-not-found / write-unverified / '
+        'dropdown-not-opened / option-not-found / select-unverified).'
+    )
+    async def fill_table_cell(row_text: str, column_index: int, value: str,
+                              header_name: str = ''):
+        ok, payload = await _table_cell_impl(
+            browser_context, row_text, column_index, value, kind='input',
+            header_name=header_name)
+        if ok:
+            return _ok(payload)
+        return err_with(
+            'err-table-cell-not-written',
+            f'行内单元格写入未验证（row={row_text!r} col={column_index} value={value!r}）',
+            observed=payload,
+            next_action='先用 scan_visible_fields/semantic_snapshot 核对行内控件列序；'
+                        '若目标是行内下拉请改用 select_table_cell 或 fill_table_cell(column_index=-1)',
+        )
+
+    @controller.action(
+        'Select an option in an inline el-select inside an el-table row of the '
+        'topmost visible dialog (e.g. 与借款人关系 in the 引入保证人 popup), '
+        'identified by row_text and column_index (0-based, counting VISIBLE '
+        '.el-select widgets in the row — NOT input columns). Opens the dropdown '
+        'with a real mousedown chain, clicks the item whose text matches value, '
+        'and reads the trigger input back. Errors: '
+        'err-table-cell-not-written:<row>:<col> with why '
+        '(row-not-found / select-not-found / dropdown-not-opened / '
+        'option-not-found / select-unverified).'
+    )
+    async def select_table_cell(row_text: str, column_index: int, value: str,
+                                header_name: str = ''):
+        ok, payload = await _table_cell_impl(
+            browser_context, row_text, column_index, value, kind='select',
+            header_name=header_name)
+        if ok:
+            return _ok(payload)
+        return err_with(
+            'err-table-cell-not-written',
+            f'行内下拉选择未验证（row={row_text!r} col={column_index} value={value!r}）',
+            observed=payload,
+            next_action='核对 column_index 是否按行内 .el-select 序号（0 起）；'
+                        '普通 input 列请改用 fill_table_cell',
+        )
