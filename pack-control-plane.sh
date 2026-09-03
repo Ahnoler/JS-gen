@@ -20,6 +20,7 @@ tar -czf "$OUT_DIR/$NAME.tar.gz" \
   start-all.sh \
   stop-all.sh \
   src \
+  config/.env.example \
   config/config.js \
   config/database.js \
   config/knexfile.js \
