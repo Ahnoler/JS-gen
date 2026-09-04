@@ -103,7 +103,7 @@ async function testDaoPins() {
     assert.ok(i > 0, 'statsByFunctionIds 存在');
     const body = tj.slice(i, i + 1200);
     assert.match(body, /whereIn\('function_id'/);
-    assert.match(body, /max\('updated_at' as last_at\)|MAX\(updated_at\) as last_at/);
+    assert.match(body, /MAX\(updated_at\) as last_at/);
     assert.match(body, /groupBy\('function_id'\)/);
   });
   const bd = readFileSync(join(ROOT, 'src/dao/batch-recording-dao.js'), 'utf-8');
@@ -113,7 +113,7 @@ async function testDaoPins() {
     const body = bd.slice(i, i + 1600);
     assert.match(body, /batch_recording_item/);
     assert.match(body, /batch_id/);
-    assert.match(body, /'success'/);
+    assert.match(body, /'recorded'/);
     assert.match(body, /groupBy\('function_id'\)|groupBy\('j\.function_id'\)/);
   });
 }

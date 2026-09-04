@@ -671,7 +671,7 @@ export { BATCH_ITEM_TERMINAL, BATCH_JOB_TERMINAL, JOB_TABLE, ITEM_TABLE };
 
 /**
  * 按功能节点聚合批量执行统计（覆盖报表用）：绑定过批量任务的 functionId →
- * item 总数与 success 数。job.function_id 为空的行不参与。
+ * item 总数与成功（status='recorded'）数。job.function_id 为空的行不参与。
  * @returns {Promise<Map<number, {batchTotal: number, batchSuccess: number}>>} functionId → 统计
  */
 export async function statsByFunctionId() {
@@ -682,7 +682,7 @@ export async function statsByFunctionId() {
     .groupBy('function_id')
     .select([
       `${JOB_TABLE}.function_id`,
-      db.raw("sum(case when batch_recording_item.status = 'success' then 1 else 0 end) as ok"),
+      db.raw("sum(case when batch_recording_item.status = 'recorded' then 1 else 0 end) as ok"),
     ])
     .count('* as total');
   const out = new Map();
