@@ -199,4 +199,28 @@ async function testImpact() {
   });
 }
 await testImpact();
-console.log(`characterize-kb-insights(matcher+cards+dao+rollup+impact): OK (${passed} checks)`);
+
+// ── 段 6：stale 检测组装 ──
+async function testStale() {
+  const { detectStaleCards } = await import(pathToFileURL(join(ROOT, 'src/services/change-impact-service.js')).href);
+  const nodes = [
+    { id: 1, parentId: 0, name: '信贷系统', type: 1 },
+    { id: 11, parentId: 1, name: '授信管理', type: 2 },
+  ];
+  const cards = [
+    { flow: '好卡', menu_path: '信贷系统/授信管理' },
+    { flow: '疑失效卡', menu_path: '信贷系统/已删菜单' },
+    { flow: '自由文本卡', menu_path: '未采到（说明）' },
+  ];
+  run('stale: 三态分布', () => {
+    const { cards: out, summary } = detectStaleCards(cards, nodes);
+    const by = Object.fromEntries(out.map((c) => [c.flow, c.matchStatus]));
+    assert.equal(by['好卡'], 'matched');
+    assert.equal(by['疑失效卡'], 'possibly-stale');
+    assert.equal(by['自由文本卡'], 'unparsed');
+    assert.equal(summary.possiblyStale, 1);
+    assert.equal(summary.unparsed, 1);
+  });
+}
+await testStale();
+console.log(`characterize-kb-insights(matcher+cards+dao+rollup+impact+stale): OK (${passed} checks)`);

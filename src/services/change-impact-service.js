@@ -6,7 +6,7 @@ import { getDB } from '../../config/database.js';
 import * as menuChangeLogDao from '../dao/menu-change-log-dao.js';
 import * as systemDao from '../dao/system-dao.js';
 import { listFlowCards } from './kb-flow-cards.js';
-import { normSegName } from './menu-path-matcher.js';
+import { normSegName, resolveMenuPath } from './menu-path-matcher.js';
 
 const TRAJECTORY_TABLE = 'trajectory';
 
@@ -86,4 +86,34 @@ export async function analyzeChangeImpact(systemNodeId, { version, limit = 200 }
     trajectoriesByFunction.get(fid).push({ id: Number(r.id), name: String(r.name || '') });
   }
   return deriveChangeImpacts(changeRows, { flatNodes, trajectoriesByFunction, cards });
+}
+
+/**
+ * KB 卡 possibly-stale 检测（只读）：逐卡 menu_path 解析到当前系统树，三态报告。
+ * 自由文本 → unparsed（不算 stale）；永不写卡、不影响召回。
+ * @param {Array<{flow:string, menu_path:string}>} cards 流程卡列表
+ * @param {Array<{id:number, parentId:number, name:string, type:number}>} flatNodes 当前树扁平节点
+ * @returns {{ cards: Array<{flow:string, menu_path:string, matchStatus:string, matchedNodeId?:number, missingSegment?:string, resolvedPrefix?:string}>, summary: { total:number, matched:number, possiblyStale:number, unparsed:number } }} 检测报告
+ */
+export function detectStaleCards(cards, flatNodes) {
+  const out = cards.map((c) => {
+    const r = resolveMenuPath(c.menu_path, flatNodes);
+    return {
+      flow: c.flow,
+      menu_path: c.menu_path,
+      matchStatus: r.matchStatus,
+      ...(r.matchedNodeId != null ? { matchedNodeId: r.matchedNodeId } : {}),
+      ...(r.missingSegment != null ? { missingSegment: r.missingSegment } : {}),
+      ...(r.resolvedPrefix != null ? { resolvedPrefix: r.resolvedPrefix } : {}),
+    };
+  });
+  return {
+    cards: out,
+    summary: {
+      total: out.length,
+      matched: out.filter((c) => c.matchStatus === 'matched').length,
+      possiblyStale: out.filter((c) => c.matchStatus === 'possibly-stale').length,
+      unparsed: out.filter((c) => c.matchStatus === 'unparsed').length,
+    },
+  };
 }

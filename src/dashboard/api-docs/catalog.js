@@ -20,6 +20,7 @@ import { GROUP_REMOTE } from './groups/remote.js';
 import { GROUP_WEBSOCKET } from './groups/websocket.js';
 import { GROUP_EXPORT } from './groups/export-mgmt.js';
 import { GROUP_REGIONS } from './groups/regions.js';
+import { GROUP_KB } from './groups/kb.js';
 import { GROUP_AUTH } from './groups/auth.js';
 import { GROUP_LLM } from './groups/llm.js';
 
@@ -56,6 +57,7 @@ export const API_GROUPS = [
   ...GROUP_RECORDING,
   ...GROUP_REGIONS,
   ...GROUP_MEMORY,
+  ...GROUP_KB,
   ...GROUP_REMOTE,
   ...GROUP_WEBSOCKET,
   ...GROUP_EXPORT,
