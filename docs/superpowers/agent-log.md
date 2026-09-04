@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 03:32 · Cursor Lead — 开工声明：SQL 纠正遗留交易 function_id（A/B/C）
+- 开工：03:32。按调研清单批量 `UPDATE trajectory.function_id`：产品库→0740、查询→0467、要素→0468；**不改**映射/阶段（缺独立 function，仍寄 0230）
+- 范围：MySQL `js_gen.trajectory`（仅下列 id）；`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`；可选 `tmp/product-mgmt` 验收快照（gitignore）
+- 禁入：`src/**`、`scripts/**`、信贷/引擎 WIP、KB Insights 线、映射/阶段 traj（#46/48/50/56/58/59/511/513）、`config/.env*`
+- 方式：主会话只读核对后 SQL UPDATE；改前 SELECT 快照；改后 API list 复核
+
 ## 2026-09-05 03:00 · Zcode Lead — 引擎自主闭环 P1 达成 + 批量自批第二波（P2）收工
 - 声明补录：本会话接手 `2026-09-04-engine-closure-handover.md`（知识库会话移交），当时未按协议先发开工条目（疏漏），现以收工条目补录全过程。工作范围=`scripts/controller/actions/js_snippets/{xhr_log,guarantee_intro_snippet}.py`、`scripts/controller/actions/_table.py`、`scripts/prompts/agent-tools-table.md`、`scripts/characterization/characterize-{introduce-guarantor,xhr-log}.py`、`tmp/kb_i5_usage26*` 驱动脚本（不 commit）。禁入区=Cursor 产品线（product_library.json/product_element.json/.env.example）与 KB Insights 线（src/**、migrations/**）——未触碰。
 - 完成 P1 引擎自主闭环：**YXPC20260905012040 纯引擎提交进审批（tid=505，run26→26j 六轮迭代）**；引擎侧两改动 ① `introduce_guarantor` VERIFY 收紧（dialog/drawer/message-box 内表 closest 一律排除 + 命中行「与借款人关系」单元格须含 relation——run24/25b 假阳性根治，实测 dup:false 首验 + dup:true 幂等复验均正确）② xhr_log hook 补 requestBody 捕获（prompts 早已承诺的「保存请求体核对」兑现，本轮凭它实锤 primWrntTp/aplyAmt/execYrIntrt/rpmd/rtlLoanDtlInf 全链持久化）。pin×2 更新+Node 语法验证全绿。
