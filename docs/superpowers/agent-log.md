@@ -2,6 +2,17 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 01:15 · Cursor Lead — 开工声明：I8 产品阶段管理流程卡
+- 开工：01:15。任务=据遗留 #56/#46 + 需求§3.2 起草 `data/kb/flows/product_stage.json`，`find_flow` 可召回；可选浅湿测挂载（优先独立 function，否则注明 0230 偏差）
+- 范围：`data/kb/flows/product_stage.json`（新建）、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`；浅录仅 API/tmp/product-mgmt/*
+- 禁入：信贷 WIP（`_table.py`/guarantee_intro/xhr_log/prompts/characterize-introduce*/batch_*.png）、`src/**`、共享 `_kb.py`/staging/promote
+- 方式：主会话写卡；录制子代理（若开）由本会话代声明、不 commit
+
+## 2026-09-05 01:14 · Cursor Lead — 收工回报：I7 挂子 source 入库（回链 I7 收口 / f281515 基线）
+- 完成：`fe8972a` — `product_library.json` #506 正例 source/规则 + todo ⑥；双 folder-add 闭环（#504 反例 + #506 正例）
+- 验收：`_flags506.json` success_hang_child / stampDepth=1
+- 遗留移交：产品阶段管理卡 → 下条开工 I8；要素库 agent 仍须 click_icon_button（#503）
+
 ## 2026-09-05 · Zcode Lead — 调研收工回报：伙伴交流会消化完成（回链 00:57 开工声明）
 - 完成：`docs/superpowers/research/2026-09-05-partner-exchange-research.md`——8 图转写 + 两路只读 Explore 对照盘点 + A/B/C 分级建议；零代码改动（开工声明范围内）
 - 结论速览：召回注入/多机调度/结果落库**已达等价**（我们槽位粒度更细）；真差距=知识资产化（溯源 ID 化/覆盖度量/变更影响反查）与定时触发。A 级三项（A1 source_refs 结构化 0.5 天→A3 变更影响 API 1 天→A2 覆盖报表 1-2 天）全部外围读侧、与引擎/KB 热区不相交，待用户拍板立项
