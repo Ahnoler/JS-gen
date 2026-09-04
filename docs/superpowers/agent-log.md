@@ -3,8 +3,8 @@
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
 ## 2026-09-05 02:05 · Cursor Lead — 收工回报：tmp 清理 + I9 查询产品信息（回链 01:51）
-- 完成：清 `tmp/product-mgmt` ephemeral（157→保留 digest/task/flags/through-report）；本线无未提交遗漏（卡已入库待本 commit）
-- 完成：`product_query.json` + 湿测 **#512 recorded**（fid=9000000467，pageId=ZJJK00095907，enqrPdInf，6/6，9 steps，slot1/CDP19243）；召回 hash=`enqrPdInf`→本卡
+- 完成：清 `tmp/product-mgmt` ephemeral（157→保留 digest/task/flags/through-report）；本线遗漏已随 **`d0020c8`** 入库
+- 完成：`product_query.json` + 湿测 **#512 recorded**（fid=9000000467，pageId=ZJJK00095907，enqrPdInf，6/6，9 steps，slot1/CDP19243）；召回 hash=`enqrPdInf`→本卡；commit **`d0020c8`**
 - 遗留检查（**勿碰/勿提交**）：信贷 WIP（`_table.py`/guarantee_intro/xhr_log/characterize-*/agent-tools-table.md）、根目录 `batch_*.png`/`loan_*.png`/`shots_*`、`config/.env.example`、未跟踪 `docs/superpowers/research/2026-09-01-replay-pipeline-handover.md`
 - 产品管理 KB 主链+旁路+查询四卡齐（库/要素/阶段/查询）；是否再扩「核心产品映射」等由用户定
 - 注意：Zcode 01:55 开工声明禁入 `data/kb/**`（其 A 级 insights spec 线）；本线 `product_query` 落盘属 01:51 已声明范围，与其「零产品代码写 spec」并行不抢
