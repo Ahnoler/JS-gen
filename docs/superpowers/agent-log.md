@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 03:50 · Zcode Lead — 阶段收尾：草稿清理定案 + 下阶段计划（回链 03:00）
+- 完成：**用户授权清理后定案**——盛达 8 笔待发起草稿（12031/033-039）SUT deleteBefore 钩子静默拒绝（无 toast/无弹窗/reload 无效/编辑页仅行级删除无整单入口），前端不可清理，保留并记录。
+- 完成：阶段收尾文档——`research/2026-09-05-engine-closure-phase2-plan.md`（成果盘点/8 条经验沉淀/P3-P6 下阶段排期）；`2026-09-04-engine-closure-handover.md` 顶部加收尾快照标记；todo-list ⑤ 工作线改版（P1/P2 达成转下阶段）。
+- 下阶段排期：P3 链 B 打通（135292 评级→授信解锁）→ P4 KB 扩卡 24→28（run26 配方沉淀）→ P5 引擎环境缺口（已登录跳过/验证码/锁定轮询）→ 单会话全自主复跑终验。
+- 注意：commit 仅含文档三件 + agent-log/todo-list；无代码改动。与 Cursor 03:32 SQL 线同文件不同段（我改⑤引擎线、其声明⑥产品线），顺带携带其条目快照。
+
 ## 2026-09-05 03:32 · Cursor Lead — 开工声明：SQL 纠正遗留交易 function_id（A/B/C）
 - 开工：03:32。按调研清单批量 `UPDATE trajectory.function_id`：产品库→0740、查询→0467、要素→0468；**不改**映射/阶段（缺独立 function，仍寄 0230）
 - 范围：MySQL `js_gen.trajectory`（仅下列 id）；`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`；可选 `tmp/product-mgmt` 验收快照（gitignore）
