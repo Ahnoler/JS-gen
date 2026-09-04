@@ -82,7 +82,7 @@
         "产品描述(叶子产品)"
       ],
       "buttons": ["确定", "确 定", "取消"],
-      "note": "ZJJK00094361；分类与产品共用弹窗形态；名称≤50 不重复；产品叶子默认类型=基础产品、状态=未启用、版本 V-0.0.1；按钮文案「新增分类」与「新增子分类」文档不一致，定位须双候选"
+      "note": "ZJJK00094361；分类与产品共用弹窗形态；名称≤50 不重复；产品叶子默认类型=基础产品、状态=未启用、版本 V-0.0.1；SUT 工具栏无「新增子分类」文案，子分类=选中父后点「新增一级分类」图标"
     },
     {
       "id": "prod_enable",
@@ -177,7 +177,11 @@
     },
     {
       "keyword": "新增分类",
-      "rule": "一级分类父层级空、层级=1；子分类挂在选中分类下。UI 文案可能是【新增子分类】或【新增分类】，双候选"
+      "rule": "工具栏图标仅见「新增一级分类」(a.el-icon-folder-add)与「新增产品」(a.el-icon-document-add)，**无**「新增子分类」tooltip——click_button('新增子分类')→err-icon-label-miss（#499）。子分类：先选中父分类节点，再 click_icon_button/click_button「新增一级分类」（同 folder-add；父已选时落子级）。勿改点含糊「新增分类」文字控件——易造无计数幽灵一级节点。一级：父未选/根下点「新增一级分类」"
+    },
+    {
+      "keyword": "图标工具栏",
+      "rule": "产品库主页增删改以 el-tooltip+el-icon-* 为主：folder-add=新增一级分类、document-add=新增产品、delete/top/bottom/refresh；启用/禁用/克隆多为 el-button 文案。优先 click_icon_button 或 click_button(tooltip 全文)"
     },
     {
       "keyword": "排序",

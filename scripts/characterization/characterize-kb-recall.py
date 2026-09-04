@@ -38,7 +38,7 @@ def main():
     miss, s0 = find_flow_for_task(flows, " completely unrelated ")
     assert miss is None and s0 == 0
 
-    # hash 强匹配：任务文本完全无关也能命中（多卡命中取 markers 总长最长者）
+    # hash 强匹配：任务文本完全无关也能命中（多卡命中取**命中** markers 总长最长者）
     h_card = {
         "flow": "短卡", "hash_markers": ["cstMgt"], "nodes": [],
     }
@@ -48,6 +48,25 @@ def main():
     h_hit, h_score = find_flow_for_task(
         [h_card, h_card2], "任意任务文本", page_hash="#/cstMgt/hostCstmgrCrtCpctInf/cpctMgtPg")
     assert h_hit is h_card2 and h_score == 100
+    # 共享短 hash 段不得压过更特异命中：pdMgt 大卡 vs pdElmtMgt 小卡
+    lib = {
+        "flow": "产品库管理（新增/启用）",
+        "hash_markers": ["pdMgt", "pdInfMgt", "pdMgtMgtPg", "ZJJK00110131", "RES04067"],
+        "nodes": [],
+    }
+    elmt = {
+        "flow": "产品要素库（分组/组件）",
+        "hash_markers": ["pdMgt", "pdElmtMgt", "elmtgroupOfIndex", "RES04070"],
+        "nodes": [],
+    }
+    e_hit, e_score = find_flow_for_task(
+        [lib, elmt], "阶段：产品要素库新增类型",
+        page_hash="#/pdMgt/pdElmtMgt/elmtgroupOfIndex?x=1")
+    assert e_hit is elmt and e_score == 100, (e_hit, e_score)
+    l_hit, l_score = find_flow_for_task(
+        [lib, elmt], "产品库新增启用",
+        page_hash="#/pdMgt/pdInfMgt/pdMgtMgtPg?part=1")
+    assert l_hit is lib and l_score == 100, (l_hit, l_score)
     # keywords 弱匹配：task 含「草稿客户」→ 命中 customer_onboarding
     k_hit, k_score = find_flow_for_task(flows, "选择一个草稿客户，点击修改")
     assert k_hit is intro_card and k_score == len("草稿客户")

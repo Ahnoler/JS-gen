@@ -23,7 +23,7 @@ def find_flow_for_task(flows, task_text, page_hash=None):
     返回 (card, score)；无命中 (None, 0)。
     - 查询词归一后长度 <2 → 直接 (None, 0)（防短查询误命中）。
     - hash 强匹配：card 的 hash_markers 任一是 page_hash 子串 → score=100；
-      多卡命中取 markers 总长最长者（页面级 hash 段越长越特异）。
+      多卡命中取**命中** markers 总长最长者（特异段优先，避免短共享段大卡误压）。
     - keywords 弱匹配：card 的 keywords 任一是 task_text 子串 → score += 关键词长度。
     - 词条匹配（向后兼容）：flow/aliases/nodes.page 词条命中 → score += 词条长度和。
     - 精确等名：flow/alias 归一后与查询全等 → 该卡 score += 1000。
@@ -45,12 +45,14 @@ def find_flow_for_task(flows, task_text, page_hash=None):
             best, best_score = card, score
 
     for card in flows or []:
-        # 1) hash 强匹配（score 恒 100，多卡命中取 markers 总长最长者）
+        # 1) hash 强匹配（score 恒 100，多卡命中取**命中** markers 总长最长者）
+        #    勿用 card 全部 markers 总长——短共享段（如 pdMgt）会让大卡压过更特异的页面卡
+        #    （#503 要素页误注入「产品库管理」根因）。
         markers = [str(m) for m in (card.get('hash_markers') or []) if m]
         if phash and markers:
             hits = [m for m in markers if m in phash]
             if hits:
-                strength = sum(len(m) for m in markers)
+                strength = sum(len(m) for m in hits)
                 if strength > best_hash_strength:
                     best, best_score = card, 100
                     best_hash_strength = strength
