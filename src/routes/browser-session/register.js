@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from 'fs';
-import path from 'path';
 import crypto from 'crypto';
-import { PROJECT_DIR, USE_EXECUTOR } from '#config/config.js';
+import { USE_EXECUTOR } from '#config/config.js';
 import { state } from '../../state.js';
 
 /**
@@ -31,7 +30,7 @@ import { bindExecutorSessionEvents } from './executor-events.js';
 import { ensureGlobalBrowser, teardownRemoteBridge } from './global-browser.js';
 import { writeAgentEvent, sessionRuntimeReady, waitForAgentEvent } from './agent-io.js';
 import { executeAgentStep } from './step-execution.js';
-import { buildRerunResumeInstruction } from './heal-instruction.js';
+import { rerunReplay } from '../../services/rerun-replay-service.js';
 import { persistTrajectory } from './trajectory-persist.js';
 import { handleWatcherAction, registerWatcherWsHandler } from './watcher-actions.js';
 
@@ -132,85 +131,11 @@ export default function registerBrowserSessionRoutes(app) {
 
     const session = state.sessions.get(id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    if (!action_file) return res.status(400).json({ error: 'action_file is required' });
-    if (!failedStep || failedStep <= 0) return res.status(400).json({ error: 'failedStep (> 0) is required' });
 
-    const absActionPath = path.resolve(PROJECT_DIR, action_file);
-    const actionRel = path.relative(PROJECT_DIR, absActionPath);
-    if (actionRel.startsWith('..') || path.isAbsolute(actionRel)) {
-      return res.status(400).json({ error: 'action_file must be within the project directory' });
-    }
-    if (!existsSync(absActionPath)) return res.status(404).json({ error: 'Action file not found' });
+    const result = await rerunReplay({ session, action_file, failedStep, maxSteps, log_file, form_changes });
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
 
-    let replayedCount = 0;
-    let resumeInstruction;
-    try {
-      const actionData = JSON.parse(readFileSync(absActionPath, 'utf-8'));
-      const url = actionData.url || '';
-      const commands = actionData?.tests?.[0]?.commands || actionData?.actions || [];
-
-      // ── Reproduce failure scene via scripts/controller/actions/_replay.py ──
-      // Replay failedStep 之前的操作（必要时先 go_to_url），重建页面状态后再交给 Agent 修复。
-      const SKIP_REPLAY = new Set([
-        'scroll_down', 'scroll_up', 'get_page_state', 'scan_form_fields', 'scan_visible_fields',
-        'check_field_value', 'verify_field_value', 'take_screenshot', 'save_trajectory',
-        'save_business_data', 'read_business_data', 'match_form_rule', 'init_task_list',
-        'get_pending_tasks', 'sync_tasks_from_errors', 'expand_all_el_tree', 'task_done',
-        'task_retry', 'save_form_snapshot',
-      ]);
-      const preFailure = commands.filter(
-        (c, i) => (i + 1) < failedStep && !SKIP_REPLAY.has(c.action),
-      );
-      const replayActions = preFailure.map((c) => ({ ...c }));
-      const hasGoto = replayActions.some((c) => c.action === 'go_to_url');
-      if (url && !String(url).includes('unknown') && !hasGoto) {
-        replayActions.unshift({ action: 'go_to_url', params: { url } });
-      }
-
-      if (replayActions.length > 0) {
-        if (!sessionRuntimeReady(session)) {
-          console.log('[rerun] Session runtime not ready — skipping _replay reproduce');
-        } else {
-          try {
-            const replayPayload = {
-              actions: replayActions,
-              seed_action_log: true,
-              is_replay: true,
-            };
-            let replayResult;
-            if (session.useExecutor && session.executorNodeUuid) {
-              const doneP = execSession.waitForSessionEvent(session.sessionId, 'replay_done', 180000);
-              writeAgentEvent(session, 'replay_actions', replayPayload);
-              replayResult = await doneP;
-            } else {
-              const doneP = waitForAgentEvent('replay_done', 180000);
-              writeAgentEvent(session, 'replay_actions', replayPayload);
-              replayResult = await doneP;
-            }
-            replayedCount = replayResult.count || 0;
-            console.log(
-              `[rerun] _replay done: ${replayedCount} actions `
-              + `(ok=${replayResult.ok ?? '?'} failed=${replayResult.failed ?? '?'})`,
-            );
-          } catch (e) {
-            console.log(`[rerun] _replay error (continuing with heal): ${e.message}`);
-          }
-        }
-      }
-
-      ({ resumeInstruction } = buildRerunResumeInstruction({
-        actionData,
-        failedStep,
-        log_file,
-        form_changes,
-        replayedCount,
-        PROJECT_DIR,
-      }));
-    } catch (e) {
-      resumeInstruction = 'Continue recording from step ' + failedStep + '. See action file for details.';
-    }
-
-    req.body = { task: resumeInstruction, maxSteps: maxSteps || 40 };
+    req.body = { task: result.task, maxSteps: result.maxSteps };
     return runSessionStep(req, res);
   });
 
