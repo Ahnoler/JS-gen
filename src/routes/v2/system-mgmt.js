@@ -19,6 +19,7 @@ import { importMenuJson } from '../../services/menu-json-import.js';
 import { startScan, getScan, startFillPageIds } from '../../services/menu-scan-service.js';
 import { pushMenuForSystem, getMenuPushStatus } from '../../services/menu-push.js';
 import { resolveAccessToken } from '../../services/partner-platform.js';
+import * as changeImpactService from '../../services/change-impact-service.js';
 import * as menuChangeLogDao from '../../dao/menu-change-log-dao.js';
 import { asyncHandler, AppError } from '../../http/app-error.js';
 
@@ -245,6 +246,20 @@ export default function (app) {
       const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
       const rows = await menuChangeLogDao.listBySystem(Number(req.params.id), { version: req.query.version || null, limit });
       res.json(rows);
+    } catch (e) {
+      toHttp(e);
+    }
+  }));
+
+  /** 4.4b 菜单变更影响反查：受影响轨迹（functionId 绑定）与受影响 KB 流程卡 */
+  app.get('/api/v2/system-mgmt/nodes/:id/change-impact', asyncHandler(async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+      const report = await changeImpactService.analyzeChangeImpact(Number(req.params.id), {
+        version: req.query.version || null,
+        limit,
+      });
+      res.json(report);
     } catch (e) {
       toHttp(e);
     }

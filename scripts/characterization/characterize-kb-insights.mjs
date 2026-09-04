@@ -160,4 +160,43 @@ async function testRollup() {
   });
 }
 await testRollup();
-console.log(`characterize-kb-insights(matcher+cards+dao+rollup): OK (${passed} checks)`);
+
+// ── 段 5：change impact 推导 ──
+async function testImpact() {
+  const { deriveChangeImpacts } = await import(pathToFileURL(join(ROOT, 'src/services/change-impact-service.js')).href);
+  const nodes = [
+    { id: 1, parentId: 0, name: '信贷系统', type: 1 },
+    { id: 11, parentId: 1, name: '授信管理', type: 2 },
+    { id: 111, parentId: 11, name: '新增对公授信管理', type: 3 },
+  ];
+  const cards = [
+    { flow: '授信卡', menu_path: '授信管理/新增对公授信管理' },
+    { flow: '押品卡', menu_path: '押品管理/押品信息管理' },
+  ];
+  const trajByFunc = new Map([[111, [{ id: 9001, name: 'traj-A' }]]]);
+  run('impact: nodeId 命中轨迹 + oldName 命中卡片', () => {
+    const { changes, summary } = deriveChangeImpacts(
+      [{ id: 1, changeType: 'renamed', nodeId: 111, detail: { oldName: '新增对公授信管理', name: '新增对公授信' } }],
+      { flatNodes: nodes, trajectoriesByFunction: trajByFunc, cards },
+    );
+    assert.equal(changes[0].affectedTrajectories.length, 1);
+    assert.equal(changes[0].affectedTrajectories[0].id, 9001);
+    assert.deepEqual(changes[0].affectedKbCards, ['授信卡']);
+    assert.equal(summary.affectedKbCardCount, 1);
+  });
+  run('impact: nodeId 空时轨迹侧跳过、名字侧仍匹配', () => {
+    const { changes } = deriveChangeImpacts(
+      [{ id: 2, changeType: 'created', nodeId: null, detail: { name: '新菜单' } }],
+      { flatNodes: nodes, trajectoriesByFunction: trajByFunc, cards },
+    );
+    assert.equal(changes[0].affectedTrajectories.length, 0);
+    assert.equal(changes[0].affectedKbCards.length, 0);
+  });
+  run('impact: 空变更流水', () => {
+    const { changes, summary } = deriveChangeImpacts([], { flatNodes: nodes, trajectoriesByFunction: new Map(), cards: [] });
+    assert.equal(changes.length, 0);
+    assert.equal(summary.changes, 0);
+  });
+}
+await testImpact();
+console.log(`characterize-kb-insights(matcher+cards+dao+rollup+impact): OK (${passed} checks)`);
