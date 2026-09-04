@@ -2,6 +2,11 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 01:28 · Cursor Lead — 收工回报：I8 阶段卡湿测回填（回链 01:15 开工）
+- 完成：#511 recorded（0230 / mntPdStg / slot1）；`product_stage.json` 回填 menu_path、hash=`mntPdStg`、图标 folder-add=新增阶段 / document-add=新增子阶段、source
+- 验收：树 stamp 父+子；召回 stage 页命中 markers 强度压过产品库（mntPdStg）
+- 遗留：hierarchy 仍无独立阶段 function；要素/库主链已齐——产品管理 KB 本轮可告一段落，待用户定是否扩查询产品信息等
+
 ## 2026-09-05 01:16 · Cursor Lead — I8 卡已起草，浅湿测进行中（回链 01:15 开工）
 - 完成：`data/kb/flows/product_stage.json`；`find_flow('产品阶段'|'维护产品阶段')` 命中；hash 猜测 `pdStgMgtPg` 可压过产品库
 - 进行中：录制子代理浅湿测新增阶段（stamp）；回填真实 URL/functionId
