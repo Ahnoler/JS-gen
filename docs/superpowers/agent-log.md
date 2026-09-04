@@ -1,3 +1,54 @@
+## 2026-09-04 · Cursor Lead — 产品管理 KB 贯通收口（#499 recorded + B 验证）
+- 完成：I2 **#499**（stamp 1925）全 6 阶段 `recorded`+detach；stderr `confirm success notification → toast_ok: 状态更新成功`；字段/CDP 产品状态=启用
+- 完成：B 引擎修复湿测通过；`product_library.json` source 已挂 #499；todo ⑥ 收口移出
+- 注意：P3 偶发找不到「新增子分类」→ 树幽灵一级节点（不阻塞）；共享 recorder 改动（`_misc.py`/`save.py`）未 commit
+- 报告：`tmp/product-mgmt/through-report.md`；录制子代理 a27b10f1
+
+## 2026-09-04 · Zcode Lead — AI 智能录制软著材料全套产出（agent team 并行）
+- 完成：`docs/软著/AI智能录制/` 三件套——①源代码鉴别材料.docx（60 页恒 50 行/页，前 30 页 Python `scripts/controller/actions/_replay.py→replay_js.py`、后 30 页 Node `replay-batch-runner.js→page-locator-helpers.js`，页眉含软件名+PAGE 域）②软件说明书.docx（封面/目录/正文，已嵌入 11 张真实截图，图号按章节重编，无占位符残留）③申请信息表.md（程序量约 12.4 万行：JS 58%/Python 42%，300 字软件简介，8 项待确认清单）
+- 申报信息（默认值，可改）：基于大模型的浏览器自动化录制系统 V1.0 / 天阳科技 / 完成日期 2026-08-31 / 未发表 / 独立开发
+- 截图链路：本地 4097 + vue dev(3000) + 独立 Playwright 实例（共享有头浏览器被占用勿动）；**临时改过 vue-project vite.config.ts 代理指向 localhost:4097，已恢复**；localStorage 注入自制 JWT + 拦截 /api/v2/auth/me 返回"黄某某"过登录态；截图脚本存 tmp/ruzhu-screenshots*.mjs（可重跑）；软著目录被 .gitignore 不入 git
+- 注意：vxe-table 勾选框选择器是 `.vxe-cell--checkbox`；批量推送弹窗需先勾选记录；假 token 会触发"登录认证失败"toast（等 4.5s 再截）
+- 进行中：申请信息表内 8 项待用户确认（统一社会信用代码/简称/是否合作开发/代理机构等）后才可正式提交
+
+## 2026-09-04 · Cursor Lead — B 引擎修复落地（confirm 成功通知 → toast_ok）
+- 完成：根因=`_misc.py` 确认后把**所有** `.el-notification`（含「状态更新成功」）当 `err-notification`，且不写 `toast_ok`
+- 完成：确认路径改分类 `{errors,successes}`；success → `record_success_token(toast_ok)`；`save.py` successRe 扩「状态更新成功|更新成功|启用/禁用/克隆成功」；pin `characterize-confirm-notification` / `characterize-save-toast` 已绿
+- 进行中：已令录制子代理新建交易重录（勿复用 #498）；prepare 新 spawn 加载补丁，未强制重启 executor
+- 声明：本轮改共享 recorder（`_misc.py` + `js_snippets/save.py`）——与用信并行线注意冲突
+- 注意：#498 曾在 B 落地前抢跑，已 stop+detach
+
+## 2026-09-04 · Cursor Lead — 产品管理：选 B 改录制侧 toast_ok（引擎+KB 双线）
+- 裁决：用户选 **B**——「状态更新成功」类通知计入 `toast_ok`；本线在完善产品 KB 同时**可改共享 recorder**（已声明）
+- 进行中：定位 Premature done / success_when=toast_ok 代码并修复；录制子代理停 #497 后按新逻辑重录
+- 注意：#497 已 aborted/failed（P5 业务启用成功但 gate 拒收）；CDP base=19242
+
+## 2026-09-04 · Cursor Lead — 产品管理 #497 开始录制
+- 完成：重启僵死 LMY executor（offline 锁冲突）→ online；`record/prepare` 200（session cf5051d4…, remoteSessionId=1135, account=2）
+- 进行中：`record/start` 全 6 阶段（phaseIds 765–770）同步跑中
+- 注意：login.skipped=true（复用登录态）；旁侧会话仍可能争用，已按用户指示继续
+
+## 2026-09-04 · Cursor Lead — 产品管理 KB 贯通 · 晚间续作（并行会话感知）
+- 完成：I1 `data/kb/flows/product_library.json`（7 nodes / 12 rules，`find_flow('产品库')` 命中）；任务文案 `tmp/product-mgmt/task-requirement.md`
+- 完成：I2 前半——analyze 6 阶段 + **新建交易 id=497**（functionId=9000000740，account=2，draft，task 非空）；报告 `tmp/product-mgmt/through-report.md`
+- 阻塞：旁有并行会话（说明书/回放调研 + 知识库用信 Playwright）；**全执行机 offline**、stats `recording=1` → **未** prepare/record，不抢槽
+- 续：执行机 online 且兄弟释放后，对 #497 按阶段录制至启用
+
+## 2026-09-04 · Cursor Lead — 产品管理 KB 贯通 · 晚间续作
+- 进行中：下班暂停后继续——先 I1 `product_library.json`，再 I2 贯通录制
+- 注意：仍勿碰用信/授信未提交改动；共享 staging/_kb/prompts 默认不改
+
+## 2026-09-04 · Cursor Lead — 产品管理 KB 贯通 · 下班暂停（约 18:00）
+- 完成：方案1+验证C 立项；设计/计划已写；R1–R3 研究齐（遗留19条 / 需求主链12步 / 挂载裁决 functionId=9000000740）
+- 进行中（未完）：I1 `product_library.json` **未落盘**（建卡子代理已叫停）；I2 贯通录制未启动
+- 注意：与用信/授信线双开，本会话未触碰其未提交改动；无 commit
+- 明日续：先 I1 建卡（材料齐）→ I2 analyze/按阶段录制（account=2）
+
+## 2026-09-04 · Cursor Lead — 产品管理 KB 贯通启动（方案1+验证C，agent team）
+- 进行中：设计 `docs/superpowers/specs/2026-09-04-product-mgmt-kb-design.md` + 计划 `docs/superpowers/plans/2026-09-04-product-mgmt-kb.md`；并行 R1 遗留交易 / R2 需求主链 / R3 功能锚点 → 后接 I1 建卡 `product_library.json` + I2 新增交易 analyze/按阶段录制
+- 注意：与用信/授信并行会话**双开**——勿碰其未提交 js_snippets/replay_timing 与 batch_*.png；共享 staging/_kb/promote/prompts 本轮默认不改
+- 注意：需求分册桌面路径 `c:\Users\water\Desktop\K01天阳信贷管理系统-产品管理需求分册.docx`；成功判据=可召回产品卡 + 新交易含任务内容并阶段录制 + SUT 启用证据
+
 ## 2026-09-04 · Zcode (uara_V1.2) — CHANGELOG.md 移除（裁决：变更史以 git commit message 为准）
 - 完成：删除 CHANGELOG.md（23eed6d，584 行历史以 git 为准）；修正引用——`characterize-phase-highlight-screenshot.mjs`/`characterize-sys-msg.mjs` 删 CHANGELOG 断言（后者在 verify-all，已实测转绿）、`orchestration/README.md`+`orchestrator-prompt.md` 从共享文件清单移除并注明裁决、AGENTS.md 收工区加「不维护 CHANGELOG」条
 - 注意：isExport 改动曾打破 `characterize-sso-auth.mjs` 对 `countByRecordStatus` 调用串的 pin，已随本次更新 pin（verify-all 该项转绿）
