@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 04:28 · Zcode Lead — 开工声明：存量红校准 + trajRow bug 修复 + B 级真伪需求审查
+- 开工：04:28。用户指令三项：①特征化预期校准（3 存量红：kb-actions / record-status-v2 ×2 断言 / batch-task-progress 崩溃）②trajRow 存量 bug 修复（recording-runner fact-pack 引用作用域外变量，AI 记忆事实包静默失效）③B1-B4 真伪需求批判审查（纯分析）
+- 范围：`scripts/characterization/{characterize-kb-actions.py,characterize-record-status-v2.mjs,characterize-batch-task-progress.mjs}`、按语义判定结果可能触及 `src/services/trajectory/{trajectory-batch-service,trajectory-attach-runner,trajectory-recording-runner,recording-runner-step-context}.js`、`data/kb/flows/credit_usage.json`（若 kb-actions 校准需动卡——**先核查 KB 线在途**）、新建 `docs/superpowers/research/2026-09-05-b-tier-demand-review.md`、todo-list（如需）
+- 原则：**校准≠改绿**——逐断言核对原始意图 vs 现行为：行为合理演进→更新预期；行为回归/产品缺陷→修产品不修测试
+- 禁入：`data/kb/**` 其他文件、`scripts/kb/**`、他线 WIP；Cursor 线（04:12/04:20 收工，产品线挂载纠偏）范围不碰
+- 方式：主线程直接实施（小改动+需逐处语义判定，派发性价比低）；审查项产出研究报告
+
 ## 2026-09-05 04:20 · Cursor Lead — 收工回报：产品管理扁平挂载纠偏（回链 04:12）
 - 完成：数据——新建 `9000000811` 产品阶段管理（RES24008/ZJJK00095902）、`9000000812` 核心产品映射（RES04066/ZJJK00095454）；8 条 traj 迁离 0230；0230/0231 `removed_flag=1` 并清空错误 xpath/pageId
 - 完成：扫描——`buildScanApplyPlan` xpath(data-id) 优先、错名改名、异 xpath 同名不覆盖；`applyScanPlan` 写回 name；characterize-menu-scan 新增 2 case 全绿
