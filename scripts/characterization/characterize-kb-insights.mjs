@@ -223,4 +223,17 @@ async function testStale() {
   });
 }
 await testStale();
-console.log(`characterize-kb-insights(matcher+cards+dao+rollup+impact+stale): OK (${passed} checks)`);
+
+// ── 段 7：source 解析器 ──
+const { parseSourceRefs } = await import(pathToFileURL(join(ROOT, 'migrations/backfill-kb-source-refs.mjs')).href);
+run('source 解析: 轨迹号/交易号/日期', () => {
+  const r = parseSourceRefs('K1 2026-08-31 + 交易 203-206 + 轨迹 26081317115618826 与 26081400000000001');
+  assert.deepEqual(r.trajectory_ids, ['26081317115618826', '26081400000000001']);
+  assert.deepEqual(r.tx_nos, ['203', '206']);
+  assert.deepEqual(r.dates, ['2026-08-31']);
+});
+run('source 解析: 无模式 → 全空数组（低置信跳过）', () => {
+  const r = parseSourceRefs('K5 computer-use 调研 + A6 全链实证');
+  assert.equal(r.trajectory_ids.length + r.tx_nos.length + r.dates.length, 0);
+});
+console.log(`characterize-kb-insights(matcher+cards+dao+rollup+impact+stale+source): OK (${passed} checks)`);
