@@ -72,5 +72,26 @@ async function testMatcher() {
     assert.equal(m.isFreeTextMenuPath('工作台/任务事项/待办任务'), false);
   });
 }
+// ── 段 2：KB 卡只读器（临时目录 fixture）──
+async function testCardsLoader() {
+  const { listFlowCards } = await import(pathToFileURL(join(ROOT, 'src/services/kb-flow-cards.js')).href);
+  const dir = mkdtempSync(join(tmpdir(), 'kb-cards-'));
+  writeFileSync(join(dir, 'b.json'), JSON.stringify({ flow: '卡片B', menu_path: '授信管理/对公授信管理', source: 'K1 笔记', source_refs: { trajectory_ids: ['26081317115618826'] } }));
+  writeFileSync(join(dir, 'a.json'), JSON.stringify({ flow: '卡片A', menu_path: '押品管理/押品信息管理' }));
+  writeFileSync(join(dir, 'broken.json'), '{ not json');
+  writeFileSync(join(dir, 'nocard.json'), JSON.stringify({ menu_path: 'x/y' })); // 缺 flow 键
+  try {
+    const cards = await listFlowCards({ dir });
+    run('cards: 按文件名排序且透传字段', () => {
+      assert.equal(cards.length, 2);
+      assert.equal(cards[0].flow, '卡片A');
+      assert.equal(cards[1].source_refs.trajectory_ids[0], '26081317115618826');
+    });
+    run('cards: 损坏/缺 flow 键跳过', () => {
+      assert.ok(!cards.some((c) => c.flow == null));
+    });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+await testCardsLoader();
 await testMatcher();
-console.log(`characterize-kb-insights(matcher): OK (${passed} checks)`);
+console.log(`characterize-kb-insights(matcher+cards): OK (${passed} checks)`);
