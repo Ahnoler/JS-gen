@@ -2,6 +2,19 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 04:1x · Zcode Lead — KB Insights 实施收工回报（回链 02:32 开工声明，9 任务全闭环）
+- 完成：**A1/A2/A3 全部落地，14 提交**（`794698a`→`b7715b6`）：matcher 三态解析/listFlowCards 只读器/两 dao 聚合/coverage-service/change-impact-service（含 detectStaleCards）/4 新端点（kb/cards、kb/stale-cards、hierarchy/coverage、nodes/:id/change-impact）/verify-all 接线/A1 回填脚本（只创建，`--apply` 后置）
+- 验收：characterize-kb-insights **22 checks 入闸**；verify-all 唯一红=存量 kb-actions（基线一致无新增回归）；**真机冒烟全过**（4098 临时实例已停，4097 未动）——kb/cards 透传卡片、stale-cards **发现真实漂移**（「审批待办」卡缺「任务事项」段→possibly-stale）、coverage 出真实功能行、404/400 守卫精确
+- 评审修复 2 轮：Task 3 批量成功字面量 `'success'`→`'recorded'`（ENUM 实证，计划笔误）；Task 6 补 ：id 404 守卫（spec §5 遗漏）；另计划勘误 3 处（matcher 首段 type 过滤、config import 路径、轨迹号正则 15+ 位+交易区间展开）
+- 注意：①派发通道持续故障（captcha verify failed ×6），Task 4 起主线程实施+代评（纪律同 TDD+验证+ledger）②deferred minors 10 条全部分诊 keep-deferred（清单在 SDD ledger，工作区已按技能清理；关键一条：KB 卡 menu_path 存在 `→` 分隔形态，建议 KB 线统一 `/`）③**A1 回填执行待 KB 线冷却**（data/kb 无未提交改动时单独任务跑 `node migrations/backfill-kb-source-refs.mjs --apply`）
+
+## 2026-09-05 03:58 · Cursor Lead — 湿测调研：产品管理 SUT vs DB（只读，未改码）
+- 完成：登录 test.creditv5p2（701994），展开「产品管理」飞出层并逐叶打开；天元「？」读码；对照 hierarchy API
+- 完成：笔记 `docs/superpowers/research/2026-09-05-product-mgmt-menu-sut-vs-db.md`
+- 关键：`RES04066`=核心产品映射/`ZJJK00095454`；`RES24008`=产品阶段管理/`ZJJK00095902`；`RES04067`=产品库/`ZJJK00110131`。「产品信息管理」仅为 L2 文件夹，无功能页
+- 根因钉死：DB `9000000230` 名=文件夹、xpath=映射、pageId=产品库（三错合一）；阶段/映射节点整库缺失；#46/48/50/56/58/59/511/513 仍寄 0230
+- 注意：未改 `src/**` / 未再 SQL；修复需新建两功能叶 + 纠 0230 + 迁轨迹
+
 ## 2026-09-05 03:50 · Zcode Lead — 阶段收尾：草稿清理定案 + 下阶段计划（回链 03:00）
 - 完成：**用户授权清理后定案**——盛达 8 笔待发起草稿（12031/033-039）SUT deleteBefore 钩子静默拒绝（无 toast/无弹窗/reload 无效/编辑页仅行级删除无整单入口），前端不可清理，保留并记录。
 - 完成：阶段收尾文档——`research/2026-09-05-engine-closure-phase2-plan.md`（成果盘点/8 条经验沉淀/P3-P6 下阶段排期）；`2026-09-04-engine-closure-handover.md` 顶部加收尾快照标记；todo-list ⑤ 工作线改版（P1/P2 达成转下阶段）。
