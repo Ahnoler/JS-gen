@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 04:12 · Cursor Lead — 开工声明：产品管理扁平挂载纠偏（方案 A）
+- 开工：04:12。用户认可扁平方案——不建「产品信息管理」中间层；推送不带该层
+- 范围：`docs/superpowers/specs/2026-09-05-product-mgmt-flat-mount-design.md`、`docs/superpowers/plans/2026-09-05-product-mgmt-flat-mount.md`、`docs/superpowers/research/2026-09-05-product-mgmt-menu-sut-vs-db.md`、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`；MySQL `system`/`trajectory`（产品管理相关 id）；可选 `src/services/menu-scan-service.js` + characterize-menu-scan；`tmp/product-mgmt/` 验收（gitignore）
+- 禁入：信贷/引擎 WIP、KB Insights、`config/.env*`、无关 png、他线未提交改动
+- 方式：主会话数据纠偏（API/SQL）+ 扫描 xpath 优先小改；先 commit 本声明与 spec
+
 ## 2026-09-05 04:1x · Zcode Lead — KB Insights 实施收工回报（回链 02:32 开工声明，9 任务全闭环）
 - 完成：**A1/A2/A3 全部落地，14 提交**（`794698a`→`b7715b6`）：matcher 三态解析/listFlowCards 只读器/两 dao 聚合/coverage-service/change-impact-service（含 detectStaleCards）/4 新端点（kb/cards、kb/stale-cards、hierarchy/coverage、nodes/:id/change-impact）/verify-all 接线/A1 回填脚本（只创建，`--apply` 后置）
 - 验收：characterize-kb-insights **22 checks 入闸**；verify-all 唯一红=存量 kb-actions（基线一致无新增回归）；**真机冒烟全过**（4098 临时实例已停，4097 未动）——kb/cards 透传卡片、stale-cards **发现真实漂移**（「审批待办」卡缺「任务事项」段→possibly-stale）、coverage 出真实功能行、404/400 守卫精确
