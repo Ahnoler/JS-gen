@@ -1,3 +1,25 @@
+## 2026-09-04 · Cursor 录制子代理 — I6 子分类口径浅验（#504）
+- 完成：#504 recorded+detach（9000000740）；任务文案无「点击新增子分类」；CDP 工具栏无「新增子分类」、有「新增一级分类」
+- 完成：agent `click_button(新增一级分类)` + toast「操作成功」；stderr `kb_flow injected: 产品库管理`（非要素库）
+- 注意：stamp `KB测子类验-20260904-2355(0)` 落成**顶层幽灵一级**，未挂在父 `KB测一级-20260904-1925(2)` 下——选父+folder-add 本趟未验证落子
+- 报告：`tmp/product-mgmt/through-report.md` I6；证据 `_cdp_toolbar_subcat.json` / `_cdp_tree504.json` / `_flags504.json`
+- 未 commit；未碰信贷 WIP
+
+## 2026-09-05 · Cursor Lead — 提交 I6 双 folder-add 纠错 + 续录「新增分类」落子
+- 完成：即将 commit `product_library.json` I6 纠错（#504）+ agent-log/todo
+- 进行中：I7 浅录——选父后点「新增分类」验证挂子级；他线占槽则用空闲 slot
+
+## 2026-09-04 · Cursor Lead — I6 子分类浅验收口（#504 · 口径纠错）
+- 完成：#504 recorded；工具栏**无**「新增子分类」；有双 `folder-add`：「新增一级分类」|「新增分类」
+- 证伪：选父后点「新增一级分类」仍落 **depth=0 幽灵一级**（stamp `KB测子类验-20260904-2355`）；子级应点「新增分类」
+- 完成：kb_flow 正确注入产品库（`535d6d7` 生效）；已改写 `product_library` 规则/exceptions/source（未另 commit）
+- 录制子代理：aab91211
+
+## 2026-09-04 · Cursor Lead — hash 召回修复 + 子分类图标口径
+- 完成：commit `6319ed6` 产品库/要素卡；`535d6d7` recall 按**命中** markers 计分（要素页不再误注入产品库）+ pin
+- 完成：`product_library` 规则——SUT 无「新增子分类」tooltip；子分类=选父后点「新增一级分类」(folder-add)
+- 进行中：可选浅录验证子分类口径（任务勿写 click 新增子分类文案）
+
 ## 2026-09-04 · Cursor Lead — 提交产品 KB 卡增量（库+要素）
 - 完成：即将 commit `product_library.json`（#499–#502）+ `product_element.json`（#503）+ agent-log/todo
 - 续：修「新增子分类」定位 / 要素页 kb_flow 误召回（见 todo ⑥）

@@ -42,7 +42,7 @@
   "preconditions": [
     "操作账号须为总行用户（租户=总行），否则主页几乎仅【刷新产品树】可见/可点（需求+遗留 task 口径）；I2 推荐 systemAccountId=2（黄某某/信贷系统）须湿测确认是否总行权限",
     "菜单入口：产品管理→产品库管理（步骤实据 data-url=/pdMgt/pdInfMgt/pdMgtMgtPg，pageId=ZJJK00110131）。注意与「产品信息管理」(RES04066) 共用同一 pageId，靠菜单 xpath RES04067 区分",
-    "新增产品前须有可用分类节点（或先【新增一级分类】/【新增子分类|新增分类】）；产品编号由编号服务生成只读",
+    "新增产品前须有可用分类节点（或先【新增一级分类】/【新增分类】挂子级——SUT 无「新增子分类」文案）；产品编号由编号服务生成只读",
     "启用前产品状态须为未启用或禁用；需求未写死「要素/阶段已配齐」硬校验——空壳产品能否启用以 SUT 湿测为准",
     "克隆路径可跳过手工建树：选中源产品→【产品克隆】→得未启用副本（含阶段关系+管控要素，版本 V-0.0.1）→再启用",
     "要素库（公共/个性化）与阶段主数据（维护产品阶段）为完整业务挂载前置；本卡主链最小闭环=建分类/产品→启用，不强制录要素全章"
@@ -82,7 +82,7 @@
         "产品描述(叶子产品)"
       ],
       "buttons": ["确定", "确 定", "取消"],
-      "note": "ZJJK00094361；分类与产品共用弹窗形态；名称≤50 不重复；产品叶子默认类型=基础产品、状态=未启用、版本 V-0.0.1；SUT 工具栏无「新增子分类」文案，子分类=选中父后点「新增一级分类」图标"
+      "note": "ZJJK00094361；分类与产品共用弹窗形态；名称≤50 不重复；产品叶子默认类型=基础产品、状态=未启用、版本 V-0.0.1；工具栏两个 folder-add：新增一级分类 vs 新增分类（子级），无「新增子分类」"
     },
     {
       "id": "prod_enable",
@@ -177,11 +177,11 @@
     },
     {
       "keyword": "新增分类",
-      "rule": "工具栏图标仅见「新增一级分类」(a.el-icon-folder-add)与「新增产品」(a.el-icon-document-add)，**无**「新增子分类」tooltip——click_button('新增子分类')→err-icon-label-miss（#499）。子分类：先选中父分类节点，再 click_icon_button/click_button「新增一级分类」（同 folder-add；父已选时落子级）。勿改点含糊「新增分类」文字控件——易造无计数幽灵一级节点。一级：父未选/根下点「新增一级分类」"
+      "rule": "工具栏有两个 a.el-icon-folder-add：① tooltip/aria=「新增一级分类」→恒造顶层一级（#504：选父后点它仍落 depth=0 幽灵一级）；② tooltip/aria=「新增分类」→挂到当前选中父下的子分类（#499 主链成功路径）。**无**「新增子分类」文案——click_button('新增子分类')→err-icon-label-miss。须 click_button/click_icon_button 用完整 tooltip「新增分类」或「新增一级分类」，勿混淆两个 folder-add"
     },
     {
       "keyword": "图标工具栏",
-      "rule": "产品库主页增删改以 el-tooltip+el-icon-* 为主：folder-add=新增一级分类、document-add=新增产品、delete/top/bottom/refresh；启用/禁用/克隆多为 el-button 文案。优先 click_icon_button 或 click_button(tooltip 全文)"
+      "rule": "产品库主页：双 folder-add（新增一级分类|新增分类）、document-add=新增产品、delete/top/bottom/refresh；启用/禁用/克隆多为 el-button。iconButtons 清单见 get_page_state；同 class 多图标靠 aria-label/tooltip 区分"
     },
     {
       "keyword": "排序",
@@ -222,7 +222,9 @@
     "核心产品映射在 SUT 有菜单但 hierarchy 无独立功能节点",
     "产品阶段管理菜单名：文档「维护产品阶段」vs 步骤「产品阶段管理」——以 SUT 为准",
     "非总行账号操作会表现为按钮缺失/静默不可用，非报错文案",
-    "禁用首点确定可能 silent（ok-save-no-feedback），需二次确认框再 click_save 才出「状态更新成功」（#502）"
+    "禁用首点确定可能 silent（ok-save-no-feedback），需二次确认框再 click_save 才出「状态更新成功」（#502）",
+    "选中父节点后再点「新增一级分类」仍造顶层一级（#504 证伪「选父即落子」）；子级必须点第二个 folder-add「新增分类」",
+    "agent 可能误报「父下已见子节点」——须 CDP/树 depth 核对，勿信 done 文案 alone（#504 P3）"
   ],
-  "source": "R1 #68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 #499 新增→启用；I3 #500 克隆→启用；I4 #502(2005) 禁用：click_save SUCCESS「状态更新成功」、状态=禁用（CDP slot1/19243）；#497 证伪旧 err-notification"
+  "source": "R1 #68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 #499 新增→启用；I3 #500 克隆→启用；I4 #502 禁用；I6 #504：双 folder-add 口径（一级 vs 新增分类），选父+一级分类→幽灵顶层；recall 535d6d7"
 }
