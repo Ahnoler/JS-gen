@@ -3,9 +3,14 @@
 from scripts.state import _record_action
 from ._helpers import _ok, _err, _is_ok_result, _enrich_click_element
 from .result_protocol import err_with
-from ._js_snippets import JS_STRIP_STALE_WRAPPERS, JS_FILL_TABLE_CELL
+from ._js_snippets import (
+    JS_STRIP_STALE_WRAPPERS,
+    JS_FILL_TABLE_CELL,
+    JS_INTRODUCE_GUARANTOR_FILL,
+    JS_INTRODUCE_GUARANTOR_VERIFY,
+)
 from .replay_timing import WAIT_500_MS
-from ._workspace import _workspace_result
+from ._workspace import _workspace_result, _real_click_via_cdp
 
 
 async def _table_cell_impl(browser_context, row_text, column_index, value, kind,
@@ -350,4 +355,80 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
             observed=payload,
             next_action='核对 column_index 是否按行内 .el-select 序号（0 起）；'
                         '普通 input 列请改用 fill_table_cell',
+        )
+
+    @controller.action(
+        'Introduce a guarantor in the 引入保证人 dialog with a single call '
+        '(composite engine action, data/kb/flows/guarantee_intro.json). '
+        'Orchestration (真机实证: tsscBtn 只响应 CDP trusted click): '
+        '1) real_click(CDP) the parent-page 引入保证人 button; 2) evaluate '
+        'JS_INTRODUCE_GUARANTOR_FILL — wait for the dialog, locate the '
+        'candidate row matching guarantor_key (pagination + 对公保证/自然人保证 '
+        'tab fallback), real-click the row radio, pick relation in the '
+        '与借款人关系 inline el-select and write amount into 担保金额 '
+        '(header-based column resolution, read-back verified); 3) '
+        'real_click(CDP) the dialog 确认 button; 4) evaluate '
+        'JS_INTRODUCE_GUARANTOR_VERIFY — read the 异常信息 error surface, then '
+        'verify against the PARENT-PAGE 保证人信息列表 (never the dialog '
+        'candidate table). Returns {ok:true, dup:false, rows:n} on success; '
+        '{ok:true, dup:true, rows:n} when the backend rejects with '
+        '不可重复被引入 AND the guarantor is already in the main list '
+        '(idempotent success — safe to continue). Errors are surfaced '
+        'verbatim and must NOT be blindly retried: err-guarantee-* '
+        '(dialog-not-opened / candidate-row-not-found:<key> / '
+        'relation-option-not-found / amount-unverified / dup-not-in-list / '
+        'rejected:<异常信息摘要> / not-in-list:<key>).'
+    )
+    async def introduce_guarantor(guarantor_key: str, relation: str, amount: str):
+        """单调用完成 引入保证人 + 后校验（读父页面保证人信息列表）。
+
+        dup=true = 幂等成功（保证人已在途被本单占用且主列表已有行），可直接
+        继续后续步骤；错误串原样带出（err-guarantee-*），调用方应读取并修正
+        参数/状态，禁止原参数盲试。"""
+        page = await browser_context.get_current_page()
+        # 1) Trusted open: tsscBtn ignores synthetic event chains (run-ig 实证)
+        rc_open = await _real_click_via_cdp(page, text='引入保证人')
+        if not rc_open.startswith('ok-real-click'):
+            return err_with(
+                'err-guarantee-intro-failed',
+                '引入保证人按钮 trusted click 失败',
+                observed=rc_open,
+                next_action='核对当前页面是否为用信申报编辑页（含 保证人信息列表/引入保证人 按钮）')
+        # 2) In-dialog fill (synthetic OK for el-table inner controls)
+        fill_raw = await page.evaluate(
+            JS_INTRODUCE_GUARANTOR_FILL,
+            [str(guarantor_key), str(relation), str(amount)])
+        ok_fill, fill_payload = _workspace_result(fill_raw)
+        if not ok_fill:
+            # 弹窗已打开，留现场给调用方截图/排查，不代关
+            return err_with(
+                'err-guarantee-intro-failed',
+                f'引入保证人弹窗内填写未通过（key={guarantor_key!r} relation={relation!r} '
+                f'amount={amount!r}）',
+                observed=fill_payload,
+                next_action='按 observed 中的 err-guarantee-* 原因处理（候选行/下拉项/金额回读），'
+                            '弹窗仍开着可人工核对候选列表')
+        # 3) Trusted confirm
+        rc_confirm = await _real_click_via_cdp(page, text='确认')
+        # 4) Verify: error surface (dup semantics) + parent-page main list
+        verify_raw = await page.evaluate(
+            JS_INTRODUCE_GUARANTOR_VERIFY, [str(guarantor_key)])
+        await page.wait_for_timeout(800)
+        ok, payload = _workspace_result(verify_raw)
+        if not ok and rc_confirm.startswith('err-real-click-fail'):
+            payload = payload + ' | confirm-trusted-click:' + rc_confirm
+        if ok:
+            _record_action('introduce_guarantor',
+                           {'guarantor_key': guarantor_key, 'relation': relation,
+                            'amount': amount},
+                           payload)
+            return _ok(payload)
+        # Structured errors from the snippet are surfaced verbatim (no retry).
+        return err_with(
+            'err-guarantee-intro-failed',
+            f'引入保证人未通过后校验（key={guarantor_key!r} relation={relation!r} '
+            f'amount={amount!r}）',
+            observed=payload,
+            next_action='按 observed 中的 err-guarantee-* 原因处理：dup-not-in-list 需人工核对主列表；'
+                        'rejected 含异常信息摘要（在途占用等），禁止原参数盲试',
         )

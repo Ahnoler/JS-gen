@@ -38,10 +38,16 @@ from .js_snippets.workspace_tabs import JS_WORKSPACE_TABS
 from .js_snippets.todo_cards import JS_LIST_TODO_CARDS, JS_WF_SUBMIT_GUARD
 from .js_snippets.tree_check import JS_TREE_CHECK_CONFIRM
 from .js_snippets.tree_picker import JS_TREE_PICKER_CLICK
+from .js_snippets.table_cell import JS_FILL_TABLE_CELL
+from .js_snippets.guarantee_intro_snippet import (
+    JS_INTRODUCE_GUARANTOR_FILL,
+    JS_INTRODUCE_GUARANTOR_VERIFY,
+)
 from .js_snippets.close_dialog import JS_CLOSE_VISIBLE_DIALOG
 from .js_snippets.strip_dialogs import JS_STRIP_STALE_WRAPPERS
 from .js_snippets.real_click import JS_REAL_CLICK_RECT, JS_REAL_CLICK_ECHO, JS_TREE_POPOVER_OPEN
 from .js_snippets.xhr_log import JS_XHR_HOOK, JS_XHR_RECENT
+from .js_snippets.error_notify import JS_READ_ERROR_NOTIFY
 from .js_snippets.save_section import JS_SAVE_SECTION
 from .js_snippets.semantic_snapshot import JS_SEMANTIC_SNAPSHOT
 from .js_snippets.verify_context import JS_VERIFY_CONTEXT
