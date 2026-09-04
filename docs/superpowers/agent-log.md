@@ -11,7 +11,7 @@
 
 ## 2026-09-05 02:35 · Cursor Lead — 收工回报：I10 核心产品映射（回链 02:28）
 - 完成：`product_core_mapping.json` 回填 hash=`corePdMpng` / pageId=`ZJJK00095454`；湿测 **#513 recorded**（0230，6/6，21 steps，slot0/19242）；stamp 新增后删除清理
-- 验收：CDP `#/pdMgt/pdInfMgt/corePdMpng`；召回 `corePdMpng`→本卡；kickoff `c0d716c`，本收工随下条 commit
+- 验收：CDP `#/pdMgt/pdInfMgt/corePdMpng`；召回 `corePdMpng`→本卡；kickoff `c0d716c`，回填 **`83c1158`**
 - 遗留：信贷 WIP 等仍勿提交；产品管理 KB 现五卡（库/要素/阶段/查询/核心映射）
 
 ## 2026-09-05 02:28 · Cursor Lead — 开工声明：I10 核心产品映射卡 + 浅湿测
