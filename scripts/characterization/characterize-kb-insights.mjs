@@ -1,0 +1,76 @@
+/**
+ * characterize-kb-insights: KB Insights 纯函数 pin（matcher/cards-loader/rollup/影响推导）。
+ * 全部 fixture 驱动（临时目录/内存数组），不依赖真实 data/kb 与 DB。
+ */
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const ROOT = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+let passed = 0;
+/** 单例断言包装：通过计数，失败抛出。 */
+function run(name, fn) {
+  try { fn(); passed += 1; console.log(`  ✓ ${name}`); }
+  catch (e) { console.error(`  ✗ ${name}\n${e.message}`); throw e; }
+}
+
+// ── 段 1：menu-path matcher ──
+async function testMatcher() {
+  const m = await import(pathToFileURL(join(ROOT, 'src/services/menu-path-matcher.js')).href);
+  const nodes = [
+    { id: 1, parentId: 0, name: '信贷系统', type: 1 },
+    { id: 11, parentId: 1, name: '授信管理', type: 2 },
+    { id: 111, parentId: 11, name: '对公授信管理', type: 2 },
+    { id: 1111, parentId: 111, name: '新增对公授信管理', type: 3 },
+    { id: 12, parentId: 1, name: '押品管理', type: 2 },
+    { id: 121, parentId: 12, name: ' 押品信息管理 ', type: 2 }, // 名字带空格
+  ];
+  run('matcher: 三级路径解析到功能节点', () => {
+    const r = m.resolveMenuPath('授信管理/对公授信管理/新增对公授信管理', nodes);
+    assert.equal(r.matchStatus, 'matched');
+    assert.equal(r.matchedNodeId, 1111);
+    assert.equal(r.matchedNodeType, 3);
+  });
+  run('matcher: 段名与节点名空白规范化后相等', () => {
+    const r = m.resolveMenuPath('押品管理/押品信息管理', nodes);
+    assert.equal(r.matchStatus, 'matched');
+    assert.equal(r.matchedNodeId, 121);
+  });
+  run('matcher: 卡停在模块层也算 matched', () => {
+    const r = m.resolveMenuPath('信贷系统/授信管理', nodes);
+    assert.equal(r.matchStatus, 'matched');
+    assert.equal(r.matchedNodeId, 11);
+  });
+  run('matcher: 中段缺失 → possibly-stale 带缺失段名与前缀', () => {
+    const r = m.resolveMenuPath('授信管理/已删除菜单/新增对公授信管理', nodes);
+    assert.equal(r.matchStatus, 'possibly-stale');
+    assert.equal(r.missingSegment, '已删除菜单');
+    assert.equal(r.resolvedPrefix, '授信管理');
+  });
+  run('matcher: 首段就缺失 → possibly-stale 空前缀', () => {
+    const r = m.resolveMenuPath('不存在系统/某菜单', nodes);
+    assert.equal(r.matchStatus, 'possibly-stale');
+    assert.equal(r.missingSegment, '不存在系统');
+  });
+  run('matcher: 自由文本（含括号说明）→ unparsed', () => {
+    const r = m.resolveMenuPath('未采到（押品管理菜单树普查未发现专属子菜单）', nodes);
+    assert.equal(r.matchStatus, 'unparsed');
+  });
+  run('matcher: 单段路径 → unparsed', () => {
+    assert.equal(m.resolveMenuPath('首页', nodes).matchStatus, 'unparsed');
+  });
+  run('matcher: 同级同名兄弟 → matched 且 ambiguous', () => {
+    const dup = [...nodes, { id: 999, parentId: 1, name: '授信管理', type: 2 }];
+    const r = m.resolveMenuPath('信贷系统/授信管理', dup);
+    assert.equal(r.matchStatus, 'matched');
+    assert.equal(r.ambiguous, true);
+  });
+  run('matcher: isFreeTextMenuPath 括号/「未采到」判定', () => {
+    assert.equal(m.isFreeTextMenuPath('未采到（xxx）'), true);
+    assert.equal(m.isFreeTextMenuPath('工作台/任务事项/待办任务'), false);
+  });
+}
+await testMatcher();
+console.log(`characterize-kb-insights(matcher): OK (${passed} checks)`);
