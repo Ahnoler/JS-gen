@@ -231,11 +231,6 @@ assert.match(docs, /ui-recording\?batchId=/);
 const catalog = readFileSync(join(ROOT, 'src/dashboard/api-docs/catalog.js'), 'utf-8');
 assert.match(catalog, /GROUP_MESSAGES/);
 
-const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf-8');
-assert.match(changelog, /sys_msg/);
-assert.match(changelog, /sys_msg_type/);
-assert.match(changelog, /\/api\/v2\/messages/);
-assert.match(changelog, /中文文件名乱码/);
 
 const decodeSrc = readFileSync(join(ROOT, 'src/http/decode-upload-filename.js'), 'utf-8');
 assert.match(decodeSrc, /export function decodeUploadFilename/);

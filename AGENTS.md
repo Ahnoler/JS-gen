@@ -14,6 +14,7 @@ Guidance for Codex (Codex.ai/code) and Claude Code when working in this repo. Th
 **收工写日志（每次会话结束前）：**
 - 在 `docs/superpowers/agent-log.md` **顶部**插入一条，格式见该文件头：完成（含 commit hash）/ 进行中 / 注意事项
 - 一个任务单元结束尽量 commit——未提交的工作对其他 Agent 不可见
+- **不维护 CHANGELOG.md**（2026-09-04 已移除）：变更史以翔实的 git commit message 为准，不要重建该文件
 
 ## Working with subagents
 

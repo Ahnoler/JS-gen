@@ -364,11 +364,9 @@ function ok(n) { console.log(`ok: ${n}`); }
   const qs = readFileSync(join(root, 'src/services/trajectory/trajectory-query-service.js'), 'utf8');
   assert.match(qs, /stitchScreenshotUrl/);
   assert.match(qs, /stitchScreenshotId/);
-  const cl = readFileSync(join(root, 'CHANGELOG.md'), 'utf8');
-  assert.match(cl, /phase_highlight/);
   const docs = readFileSync(join(root, 'src/dashboard/api-docs/groups/trajectory.js'), 'utf8');
   assert.match(docs, /stitchScreenshotUrl/);
-  ok('tree + changelog phase_highlight');
+  ok('tree phase_highlight stitch fields');
 }
 {
   // 内部滚动容器泛化：阶段长图滚动根必须覆盖非标准 class 的滚动容器
