@@ -7,10 +7,10 @@
 
 ## 当前工作线（2026-08-31 起）
 
-### ⑥ 产品管理 KB（四卡齐 · 待用户定是否扩映射）
+### ⑥ 产品管理 KB（I10 核心产品映射）
 
-- 库/要素/阶段/查询（`product_query` ← #512）已齐。
-- 旁侧未提交：信贷 WIP + batch PNG + `.env.example` + replay-handover research（非本线）。
+- 四卡已齐（库/要素/阶段/查询）。进行中：核心产品映射卡 + 浅湿测（挂 0230，无独立 function）。
+- 旁侧未提交：信贷 WIP + batch PNG + `.env.example` + replay-handover（非本线，不代提交）。
 
 ### ① 830 任务收尾：自测 + bug 修复
 

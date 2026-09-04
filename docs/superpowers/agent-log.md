@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 02:28 · Cursor Lead — 开工声明：I10 核心产品映射卡 + 浅湿测
+- 开工：02:28。起草 `data/kb/flows/product_core_mapping.json`（据遗留 #59/#50）；挂载 **9000000230**（hierarchy 无独立「核心产品映射」节点，与 #59 同）；浅湿测进页→选树→查询→可选 stamp 新增再删
+- 范围：`data/kb/flows/product_core_mapping.json`、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`、`tmp/product-mgmt/task-mapping-requirement.md`（及 API 证据）
+- 禁入：信贷 WIP（`_table.py`/guarantee_intro/xhr_log/characterize-*/agent-tools-table.md/batch_*.png/loan_*.png/shots_*）、`config/.env.example`、`src/**`、共享 `_kb.py`/staging/promote；不抢他线槽位
+- 方式：主会话写卡+录制；本线产品 KB 续扩，与 Zcode insights 实施声明若抢 `data/kb` 则先看在途条目
+
 ## 2026-09-05 02:05 · Cursor Lead — 收工回报：tmp 清理 + I9 查询产品信息（回链 01:51）
 - 完成：清 `tmp/product-mgmt` ephemeral（157→保留 digest/task/flags/through-report）；本线遗漏已随 **`d0020c8`** 入库
 - 完成：`product_query.json` + 湿测 **#512 recorded**（fid=9000000467，pageId=ZJJK00095907，enqrPdInf，6/6，9 steps，slot1/CDP19243）；召回 hash=`enqrPdInf`→本卡；commit **`d0020c8`**
