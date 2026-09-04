@@ -21,6 +21,7 @@ import { pushMenuForSystem, getMenuPushStatus } from '../../services/menu-push.j
 import { resolveAccessToken } from '../../services/partner-platform.js';
 import * as changeImpactService from '../../services/change-impact-service.js';
 import * as menuChangeLogDao from '../../dao/menu-change-log-dao.js';
+import * as systemDao from '../../dao/system-dao.js';
 import { asyncHandler, AppError } from '../../http/app-error.js';
 
 const upload = multer({
@@ -254,6 +255,10 @@ export default function (app) {
   /** 4.4b 菜单变更影响反查：受影响轨迹（functionId 绑定）与受影响 KB 流程卡 */
   app.get('/api/v2/system-mgmt/nodes/:id/change-impact', asyncHandler(async (req, res) => {
     try {
+      const systemNode = await systemDao.getById(Number(req.params.id));
+      if (!systemNode) {
+        throw new AppError('system node not found', { code: 'NOT_FOUND' });
+      }
       const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
       const report = await changeImpactService.analyzeChangeImpact(Number(req.params.id), {
         version: req.query.version || null,
