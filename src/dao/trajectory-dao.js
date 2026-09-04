@@ -698,3 +698,27 @@ export async function countByFunctionIds(functionIds) {
   const row = await getDB()(TABLE).whereIn('function_id', ids).count('* as c').first();
   return Number(row?.c) || 0;
 }
+
+/**
+ * 按功能节点批量统计绑定轨迹数与最近执行时间（覆盖报表用，一次查询防 N+1）。
+ * 最近执行时间取该 function_id 下 updated_at 最大值。
+ * @param {number[]} functionIds 功能节点 id 数组
+ * @returns {Promise<Map<number, {trajCount: number, lastExecutedAt: string|null}>>} functionId → 统计（无绑定轨迹的 id 不在 Map 中）
+ */
+export async function statsByFunctionIds(functionIds) {
+  const ids = (Array.isArray(functionIds) ? functionIds : []).map(Number).filter(Number.isFinite);
+  if (!ids.length) return new Map();
+  const rows = await getDB()(TABLE)
+    .whereIn('function_id', ids)
+    .groupBy('function_id')
+    .select(['function_id', getDB().raw('MAX(updated_at) as last_at')])
+    .count('* as c');
+  const out = new Map();
+  for (const r of rows) {
+    out.set(Number(r.function_id), {
+      trajCount: Number(r.c) || 0,
+      lastExecutedAt: r.last_at == null ? null : String(r.last_at),
+    });
+  }
+  return out;
+}

@@ -94,4 +94,28 @@ async function testCardsLoader() {
 }
 await testCardsLoader();
 await testMatcher();
-console.log(`characterize-kb-insights(matcher+cards): OK (${passed} checks)`);
+// ── 段 3：dao 聚合方法源码 pin ──
+async function testDaoPins() {
+  const { readFileSync } = await import('node:fs');
+  const tj = readFileSync(join(ROOT, 'src/dao/trajectory-dao.js'), 'utf-8');
+  run('dao pin: statsByFunctionIds 按 function_id 分组且取 MAX(updated_at)', () => {
+    const i = tj.indexOf('export async function statsByFunctionIds');
+    assert.ok(i > 0, 'statsByFunctionIds 存在');
+    const body = tj.slice(i, i + 1200);
+    assert.match(body, /whereIn\('function_id'/);
+    assert.match(body, /max\('updated_at' as last_at\)|MAX\(updated_at\) as last_at/);
+    assert.match(body, /groupBy\('function_id'\)/);
+  });
+  const bd = readFileSync(join(ROOT, 'src/dao/batch-recording-dao.js'), 'utf-8');
+  run('dao pin: statsByFunctionId join batch_id 且 success 计数', () => {
+    const i = bd.indexOf('export async function statsByFunctionId');
+    assert.ok(i > 0, 'statsByFunctionId 存在');
+    const body = bd.slice(i, i + 1600);
+    assert.match(body, /batch_recording_item/);
+    assert.match(body, /batch_id/);
+    assert.match(body, /'success'/);
+    assert.match(body, /groupBy\('function_id'\)|groupBy\('j\.function_id'\)/);
+  });
+}
+await testDaoPins();
+console.log(`characterize-kb-insights(matcher+cards+dao): OK (${passed} checks)`);
