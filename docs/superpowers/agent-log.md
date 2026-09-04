@@ -1,3 +1,19 @@
+## 2026-09-04 · Cursor Lead — 提交产品 KB 卡增量（库+要素）
+- 完成：即将 commit `product_library.json`（#499–#502）+ `product_element.json`（#503）+ agent-log/todo
+- 续：修「新增子分类」定位 / 要素页 kb_flow 误召回（见 todo ⑥）
+
+## 2026-09-04 · Cursor Lead — I5 要素库收口（#503 · CDP 补证）
+- 完成：#503 recorded+detach，挂载 **9000000468**（未回退 0230）；菜单进 `elmtgroupOfIndex` 双根可见
+- 完成：CDP 补证 stamp `KB测要素类型-20260904-2330` + toast「操作成功」（`folder-add`→保 存）；agent P2 `click_button(新增类型)` 误触删除确认 → QUALITY FAIL
+- 完成：`product_element.json` source/规则已回填（icon=`click_icon_button`、保 存、勿 click_button 文案）
+- 注意：kb_flow 曾误注入「产品库管理」；引擎侧后续可收紧要素库页召回。卡增量仍未 commit
+- 录制子代理：4abf17e9
+
+## 2026-09-04 · Cursor Lead — I5 产品要素库卡 + 浅湿测启动
+- 完成：起草 `data/kb/flows/product_element.json`（#61+§2；挂载候选 functionId=9000000468；`find_flow('产品要素')` 命中）
+- 进行中：浅录要素库新增类型/组件（stamp）；LMY 空闲
+- 注意：产品库卡增量仍未 commit
+
 ## 2026-09-04 · Zcode (uara_V1.2) — 引擎自主闭环冲刺收尾：038 复现 + 交接文档
 - 完成：038 担保场景复现（用户参与：手动填七模块/引入保证人/触发异常通知）——**关键纠错**：NextCheck 拒绝非"完全静默"，实为 **3s el-notification（exception-message 类，不含 error 字样）**，超时消失后不可追溯；error_notify.py 据此修正（三特征判定）+ 新增 JS_NOTIFY_HOOK（MutationObserver 持久捕获 window.__notify_log），MCP 现场 hook 捕获验证通过（11:39:49 完整捕获「7 模块未保存」全文）
 - 完成：收尾交接文档 `docs/superpowers/research/2026-09-04-engine-closure-handover.md`——当前位置（6 笔审批中+4 笔批量通过）/已定案结论（页面形态 9 条/SUT 缺陷 9 条/动作谱系 12 个/账号数据）/遗留问题（引入保证人 VERIFY 假阳性收紧/七模块完整性驱动 diff/环境缺口 3 条）/下批路线 P1-P6/快速上手命令

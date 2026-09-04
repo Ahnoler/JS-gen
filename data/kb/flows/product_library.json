@@ -193,7 +193,7 @@
     },
     {
       "keyword": "禁用",
-      "rule": "总行且仅启用可见；下架理由必填(PdDownShelfRsn)；存在贷款余额>0 借据时二次确认；状态=禁用"
+      "rule": "总行且仅启用可见；下架理由必填(PdDownShelfRsn，湿测可见项含「缺陷性下架」等，勿死磕「产品停售」)；余额>0 借据二次确认。成功文案「状态更新成功」：二次确认常走 click_save→ok-save-success（写 toast_ok），与启用确认框的 confirm→toast_ok 路径不同。I4 #502 实证"
     },
     {
       "keyword": "克隆",
@@ -217,7 +217,8 @@
     "文档章首功能列表未列产品库管理主链，以正文与遗留步骤为准",
     "核心产品映射在 SUT 有菜单但 hierarchy 无独立功能节点",
     "产品阶段管理菜单名：文档「维护产品阶段」vs 步骤「产品阶段管理」——以 SUT 为准",
-    "非总行账号操作会表现为按钮缺失/静默不可用，非报错文案"
+    "非总行账号操作会表现为按钮缺失/静默不可用，非报错文案",
+    "禁用首点确定可能 silent（ok-save-no-feedback），需二次确认框再 click_save 才出「状态更新成功」（#502）"
   ],
-  "source": "R1 遗留 traj#68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 湿测 traj#499(20260904-1925) recorded P1–P6：启用 confirm → toast_ok「状态更新成功」、产品状态=启用（CDP+check_field_value）；#497 证伪旧路径把成功通知当 err-notification"
+  "source": "R1 #68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 #499 新增→启用；I3 #500 克隆→启用；I4 #502(2005) 禁用：click_save SUCCESS「状态更新成功」、状态=禁用（CDP slot1/19243）；#497 证伪旧 err-notification"
 }
