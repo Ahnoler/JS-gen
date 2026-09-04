@@ -177,7 +177,7 @@
     },
     {
       "keyword": "新增分类",
-      "rule": "工具栏有两个 a.el-icon-folder-add：① tooltip/aria=「新增一级分类」→恒造顶层一级（#504：选父后点它仍落 depth=0 幽灵一级）；② tooltip/aria=「新增分类」→挂到当前选中父下的子分类（#499 主链成功路径）。**无**「新增子分类」文案——click_button('新增子分类')→err-icon-label-miss。须 click_button/click_icon_button 用完整 tooltip「新增分类」或「新增一级分类」，勿混淆两个 folder-add"
+      "rule": "工具栏有两个 a.el-icon-folder-add：① tooltip/aria=「新增一级分类」→恒造顶层一级（#504）；② tooltip/aria=「新增分类」→选中父后挂子级（#506：KB测子挂-20260905-0015 depth=1 在 KB测一级-20260904-1925 下；须展开父才见）。**无**「新增子分类」——click_button('新增子分类')→err-icon-label-miss。用完整 tooltip 区分两个 folder-add"
     },
     {
       "keyword": "图标工具栏",
@@ -226,5 +226,5 @@
     "选中父节点后再点「新增一级分类」仍造顶层一级（#504 证伪「选父即落子」）；子级必须点第二个 folder-add「新增分类」",
     "agent 可能误报「父下已见子节点」——须 CDP/树 depth 核对，勿信 done 文案 alone（#504 P3）"
   ],
-  "source": "R1 #68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 #499 新增→启用；I3 #500 克隆→启用；I4 #502 禁用；I6 #504：双 folder-add 口径（一级 vs 新增分类），选父+一级分类→幽灵顶层；recall 535d6d7"
+  "source": "R1 #68/#61 + R2 K01§3.1 + R3 functionId=9000000740；I2 #499 新增→启用；I3 #500 克隆→启用；I4 #502 禁用；I6 #504 证伪选父+一级分类；I7 #506 选父+「新增分类」挂子 depth=1（KB测子挂-20260905-0015）；recall 535d6d7"
 }
