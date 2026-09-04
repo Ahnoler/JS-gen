@@ -9,10 +9,22 @@
 export { startScan, getScan, startFillPageIds } from './menu-scan-job.js';
 
 /**
+ * 从 menu xpath 抽出 data-id（如 RES04066）；抽不出则返回 ''。
+ * @param {string} xpath menu xpath
+ * @returns {string} data-id or empty
+ */
+export function extractMenuDataId(xpath) {
+  const m = String(xpath || '').match(/data-id=['"]([^'"]+)['"]/i);
+  return m ? String(m[1]).trim() : '';
+}
+
+/**
  * 构建菜单扫描结果的应用计划（纯函数，禁止碰 DB/网络）。
  *
  * 匹配规则：L1 按 `name` trim 后精确匹配既有模块名；
- * L2 按 `parentName`+`name` 匹配该模块下的功能名。
+ * L2 优先按 `parentName` 下子节点 `menuXpath` 的 data-id 命中（命中则 updates，名称不同时带 `name` 改为 SUT 文案），
+ * 其次按同名命中——但仅当该子节点 xpath 为空或 data-id 与扫描一致（避免把叶子 xpath 写到错名幽灵上）；
+ * 否则 creates。
  * 命中 → `updates`（带 menuXpath）；若该节点 `unmatchedFlag===1` → 同时记入 `clearedUnmatched`。
  * 未命中 → `creates`（L1 带 `parentName:''`，L2 带 parentName）。
  * @param {Array<{ level: 1|2, name: string, parentName?: string, xpath: string }>} scannedMenus 扫描到的菜单项
@@ -69,12 +81,33 @@ export function buildScanApplyPlan(scannedMenus, existingModules) {
       const sortOrder = l2SortByParent.get(parentName) || 0;
       l2SortByParent.set(parentName, sortOrder + 1);
       const parentMod = l1Index.get(parentName);
+      const kids = parentMod && Array.isArray(parentMod.children) ? parentMod.children : [];
+      const scanDataId = extractMenuDataId(xpath);
+
       let fnNode = null;
-      if (parentMod && Array.isArray(parentMod.children)) {
-        fnNode = parentMod.children.find((c) => String(c.name || '').trim() === name) || null;
+      let renameTo = '';
+      if (scanDataId) {
+        fnNode =
+          kids.find((c) => extractMenuDataId(c.menuXpath) === scanDataId) || null;
+        if (fnNode && String(fnNode.name || '').trim() !== name) {
+          renameTo = name;
+        }
       }
+      if (!fnNode) {
+        const byName = kids.find((c) => String(c.name || '').trim() === name) || null;
+        if (byName) {
+          const existingId = extractMenuDataId(byName.menuXpath);
+          // 已有不同 data-id 时不把扫描 xpath 盖到错名节点上 → 走 creates
+          if (!existingId || existingId === scanDataId) {
+            fnNode = byName;
+          }
+        }
+      }
+
       if (fnNode) {
-        updates.push({ nodeId: fnNode.id, menuXpath: xpath, sortOrder });
+        const u = { nodeId: fnNode.id, menuXpath: xpath, sortOrder };
+        if (renameTo) u.name = renameTo;
+        updates.push(u);
         matched += 1;
         if (Number(fnNode.unmatchedFlag) === 1) clearedUnmatched.push(fnNode.id);
       } else {

@@ -180,6 +180,80 @@ function testL2MatchByParentName() {
     '功能X under 父A (id 22) is not updated when scanned parentName is 父B');
 }
 
+/** xpath data-id 命中错名幽灵 → updates 带 name 改为 SUT 文案 */
+function testL2XpathMatchRenamesWrongName() {
+  if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const existingModules = [
+    {
+      id: 2,
+      name: '产品管理',
+      source: 'json_import',
+      unmatchedFlag: 0,
+      children: [
+        {
+          id: 230,
+          name: '产品信息管理',
+          source: 'json_import',
+          unmatchedFlag: 0,
+          menuXpath: "//li[@data-id='RES04066']",
+        },
+      ],
+    },
+  ];
+  const scanned = [
+    { level: 1, name: '产品管理', parentName: '', xpath: "//li[@data-id='RES000000016']" },
+    {
+      level: 2,
+      name: '核心产品映射',
+      parentName: '产品管理',
+      xpath: "//li[@data-id='RES04066']",
+    },
+  ];
+  const plan = buildScanApplyPlan(scanned, existingModules);
+  const u = plan.updates.find((x) => x.nodeId === 230);
+  assert.ok(u, 'xpath hit updates ghost 230');
+  assert.equal(u.name, '核心产品映射', 'rename to SUT leaf label');
+  assert.ok(!plan.creates.some((c) => c.name === '核心产品映射'), 'no duplicate create');
+}
+
+/** 同名幽灵已占用其他 data-id → 扫描新叶应 create，勿覆盖 */
+function testL2NameMatchSkipsForeignXpath() {
+  if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const existingModules = [
+    {
+      id: 2,
+      name: '产品管理',
+      source: 'json_import',
+      unmatchedFlag: 0,
+      children: [
+        {
+          id: 230,
+          name: '产品信息管理',
+          source: 'json_import',
+          unmatchedFlag: 0,
+          menuXpath: "//li[@data-id='RES04066']",
+        },
+      ],
+    },
+  ];
+  const scanned = [
+    { level: 1, name: '产品管理', parentName: '', xpath: "//li[@data-id='RES000000016']" },
+    {
+      level: 2,
+      name: '产品信息管理',
+      parentName: '产品管理',
+      xpath: "//li[@data-id='RES99999']",
+    },
+  ];
+  const plan = buildScanApplyPlan(scanned, existingModules);
+  assert.ok(
+    plan.creates.some((c) => c.level === 2 && c.name === '产品信息管理'),
+    'creates instead of overwriting foreign xpath on same name'
+  );
+  assert.ok(!plan.updates.some((u) => u.nodeId === 230 && String(u.menuXpath).includes('RES99999')),
+    'does not steal 230 onto RES99999');
+}
+
 function testStatsCorrect() {
   if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
   const existingModules = [
@@ -335,6 +409,8 @@ function main() {
     ['buildScanApplyPlan unmatched → creates L1+L2, created=2', testUnmatchedCreates],
     ['buildScanApplyPlan clears unmatchedFlag on hit only', testClearUnmatchedFlag],
     ['buildScanApplyPlan L2 matches by parentName (disambiguates same-name)', testL2MatchByParentName],
+    ['buildScanApplyPlan L2 xpath hit renames wrong-name ghost', testL2XpathMatchRenamesWrongName],
+    ['buildScanApplyPlan L2 name match skips node with foreign xpath', testL2NameMatchSkipsForeignXpath],
     ['buildScanApplyPlan stats: totalScanned + unmatchedScanned', testStatsCorrect],
     ['wiring: service uses openSession + runReplayActions + buildScanApplyPlan', testWiringService],
     ['wiring: runScan calls fillEmptyPageIdsForSystem after apply', testWiringSessionPageIdFill],

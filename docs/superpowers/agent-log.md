@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 04:20 · Cursor Lead — 收工回报：产品管理扁平挂载纠偏（回链 04:12）
+- 完成：数据——新建 `9000000811` 产品阶段管理（RES24008/ZJJK00095902）、`9000000812` 核心产品映射（RES04066/ZJJK00095454）；8 条 traj 迁离 0230；0230/0231 `removed_flag=1` 并清空错误 xpath/pageId
+- 完成：扫描——`buildScanApplyPlan` xpath(data-id) 优先、错名改名、异 xpath 同名不覆盖；`applyScanPlan` 写回 name；characterize-menu-scan 新增 2 case 全绿
+- 验收：`tmp/product-mgmt/_flat_mount_verify.json`；`node scripts/characterization/characterize-menu-scan.mjs` OK
+- 开工 commit `565252c`；本收工另提交代码+todo
+
 ## 2026-09-05 04:12 · Cursor Lead — 开工声明：产品管理扁平挂载纠偏（方案 A）
 - 开工：04:12。用户认可扁平方案——不建「产品信息管理」中间层；推送不带该层
 - 范围：`docs/superpowers/specs/2026-09-05-product-mgmt-flat-mount-design.md`、`docs/superpowers/plans/2026-09-05-product-mgmt-flat-mount.md`、`docs/superpowers/research/2026-09-05-product-mgmt-menu-sut-vs-db.md`、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`；MySQL `system`/`trajectory`（产品管理相关 id）；可选 `src/services/menu-scan-service.js` + characterize-menu-scan；`tmp/product-mgmt/` 验收（gitignore）

@@ -51,7 +51,7 @@ export async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []
     // parentName → moduleId 映射：含本次新建的 L1 与既有匹配模块。
     const moduleByName = new Map();
 
-    // 更新命中节点（L1/L2 一并），写回真实菜单顺序 sortOrder。
+    // 更新命中节点（L1/L2 一并），写回真实菜单顺序 sortOrder；xpath 命中改名时同步 name。
     for (const u of plan.updates) {
       await systemDao.update(
         u.nodeId,
@@ -59,6 +59,7 @@ export async function applyScanPlan(plan, systemNodeId, merges = [], ghosts = []
           menuXpath: u.menuXpath,
           unmatchedFlag: 0,
           ...(u.sortOrder !== undefined ? { sortOrder: u.sortOrder } : {}),
+          ...(u.name ? { name: u.name } : {}),
         },
         trx,
       );
