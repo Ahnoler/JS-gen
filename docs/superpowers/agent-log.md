@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 01:55 · Zcode Lead — spec 撰写开工声明：A级三项设计文档（调研落地第一步，仍零产品代码）
+- 开工：01:55。brainstorming 已过四问+两轮设计确认（用户拍板：单 spec 三部分 / 覆盖=存在性+明细 / A3 含 stale 只读检测 / 回填后置 / 架构=Node 单向只读 KB 文件）
+- 范围：新建 `docs/superpowers/specs/2026-09-05-kb-insights-design.md` + 本文件——**仅 spec 文档，零产品代码**
+- 后续实施（另行走 writing-plans）预计触碰：src/services/kb-flow-cards.js（新）/coverage-service.js（新）/change-impact-service.js（新）/src/routes/v2/kb.js（新）/hierarchy.js/system-mgmt.js（各加一 handler）/两个 dao（additive 方法）/api-docs groups/characterize-kb-insights.mjs（新）——实施前会另发开工声明
+- 禁入：`scripts/kb/**`、`data/kb/**`（KB 线热区，A1 回填后置；与 Cursor 01:51 在途声明无交集）、工作区他线 WIP
+
 ## 2026-09-05 01:51 · Cursor Lead — 开工声明：清理 product-mgmt 临时文件 + I9 查询产品信息卡
 - 开工：01:51。①清理 `tmp/product-mgmt/` 下 ephemeral（`_*` API 快照/CDP 探针脚本/一次性 poll·start·create），保留 digest/task/through-report/lead/blockers/flags 精简证据；②检查本线未提交；③续作 I9 `product_query.json`（functionId=9000000467）+ 浅湿测
 - 范围：`tmp/product-mgmt/**`（删 ephemeral）、`data/kb/flows/product_query.json`（新建）、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`、可选 `docs/superpowers/specs/2026-09-04-product-mgmt-kb-design.md` 状态句
