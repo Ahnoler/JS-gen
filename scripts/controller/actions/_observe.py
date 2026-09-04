@@ -2,7 +2,7 @@
 
 from scripts.state import _record_action
 from ._helpers import _ok
-from ._js_snippets import JS_SEMANTIC_SNAPSHOT, JS_VERIFY_CONTEXT, JS_XHR_HOOK, JS_XHR_RECENT, JS_READ_ERROR_NOTIFY
+from ._js_snippets import JS_SEMANTIC_SNAPSHOT, JS_VERIFY_CONTEXT, JS_XHR_HOOK, JS_XHR_RECENT, JS_READ_ERROR_NOTIFY, JS_NOTIFY_HOOK
 from ._workspace import _workspace_result
 
 
@@ -78,16 +78,30 @@ def _register_observe_actions(controller, browser_context):
 
     @controller.action(
         'Read backend-error surfaces AFTER a confirm/save/submit action (run21 '
-        'lesson: the SUT shows server rejections ONLY in a dedicated 「异常信息」 '
-        'dialog — page stays silent otherwise). Scans four channels: the 异常信息 '
-        'error dialog (天元 custom: 信息说明/流水号/服务名), el-message toasts, '
-        'el-message-box, and error el-notifications. Returns ok:true with empty '
-        'errors when NO error surface is present (absence of error is the success '
-        'signal); ok:false with errors[] when any error text was found. Call this '
-        'right after 确认/保存/流程提交 — never trust a click receipt alone.'
+        'lesson: the SUT shows server rejections in a ~3s 「异常信息」el-notification '
+        'that disappears — this action reads BOTH live DOM and the persistent '
+        'window.__notify_log captured by the MutationObserver hook installed on '
+        'first call). Channels: 异常信息 error dialog / el-notification (three '
+        'signature match: exception-message class, el-icon-error child, title '
+        'contains 异常信息) / el-message toasts / el-message-box. Returns ok:true '
+        'with empty errors when no error surface; ok:false with errors[] '
+        '(each {text, meaning}) otherwise — meanings: already-introduced (= '
+        'idempotent success, the row was already there) / module-unsaved / '
+        'required-missing / unknown. Call right after 确认/保存/流程提交 — '
+        'never trust a click receipt alone.'
     )
     async def read_error_notify():
         page = await browser_context.get_current_page()
+        # Install the persistent notification hook (idempotent; also registers
+        # for future navigations via init script).
+        try:
+            await page.add_init_script(JS_NOTIFY_HOOK)
+        except Exception:
+            pass
+        try:
+            await page.evaluate(JS_NOTIFY_HOOK)
+        except Exception:
+            pass
         result = await page.evaluate(JS_READ_ERROR_NOTIFY)
         await page.wait_for_timeout(200)
         ok, payload = _workspace_result(result)

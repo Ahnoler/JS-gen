@@ -18,8 +18,10 @@ JS snippet constants: 引入保证人 复合引擎动作的页面半边（填弹
 返回（KB 卡 data/kb/flows/guarantee_intro.json + r21 静默失败实证）：
   FILL: {ok:true} / {ok:false, error:'err-guarantee-*'}（候选行找不到 /
   下拉项找不到 / 金额写未验证等，原样带出禁止盲试）
-  VERIFY: {ok:true, dup:false, rows:n}（主列表新增行确认）/
-  {ok:true, dup:true, rows:n}（后端报不可重复被引入且主列表已有该行=幂等
+  VERIFY: {ok:true, dup:false, rows:n, verified_in:'main-form'}（主列表新增行
+  确认；verified_in='main-form' 表示已在主表单保证人信息列表验证，且该表表头
+  须含 客户编号/与借款人关系/担保金额 特征）/ {ok:true, dup:true, rows:n,
+  verified_in:'main-form'}（后端报不可重复被引入且主列表已有该行=幂等
   成功）/ {ok:false, error:'err-guarantee-dup-not-in-list'|
   'err-guarantee-rejected:<异常信息摘要>'|'err-guarantee-not-in-list:<key>'}
 """
@@ -242,21 +244,28 @@ JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
     const introDlg = visibleDialogs()
         .find((d) => compact(d.textContent).includes('担保金额')) || null;
 
-    // 主列表读取：表头含「客户编号」+「与借款人关系」的 el-table，排除弹窗自身
+    // 主列表读取：表头含「客户编号」+「与借款人关系」+「担保金额」的 el-table，
+    // 排除弹窗自身（表头特征断言防误读弹窗候选表/其他表）；多个候选表时依次
+    // 尝试，取首个含 key 的表，否则回退第一个候选表的行数
     const readMain = () => {
         const tables = [...document.querySelectorAll('.el-table')].filter((t) => {
             if (introDlg && (introDlg.contains(t) || t.contains(introDlg))) return false;
             if (!visible(t)) return false;
             const head = compact(t.querySelector('.el-table__header-wrapper')?.textContent || '');
-            return head.includes('客户编号') && head.includes('与借款人关系');
+            return head.includes('客户编号') && head.includes('与借款人关系')
+                && head.includes('担保金额');
         });
-        const t = tables[0];
-        if (!t) return null;
-        const rows = [...t.querySelectorAll(
-            '.el-table__body-wrapper tbody tr.el-table__row, .el-table__body tr'
-        )].filter((r) => visible(r)
-            && !r.closest('.el-table__fixed, .el-table__fixed-body-wrapper, .el-table__fixed-right'));
-        return { rows: rows.length, hasKey: rows.some((r) => rowKey(r)) };
+        let first = null;
+        for (const t of tables) {
+            const rows = [...t.querySelectorAll(
+                '.el-table__body-wrapper tbody tr.el-table__row, .el-table__body tr'
+            )].filter((r) => visible(r)
+                && !r.closest('.el-table__fixed, .el-table__fixed-body-wrapper, .el-table__fixed-right'));
+            const info = { rows: rows.length, hasKey: rows.some((r) => rowKey(r)) };
+            if (info.hasKey) return info;
+            if (!first) first = info;
+        }
+        return first;
     };
     const rowKey = (r) => compact(r.textContent || '').includes(guarantorKey);
 
@@ -279,7 +288,7 @@ JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
         if (errText.includes('不可重复被引入')) {
             const main = readMain();
             if (main && main.hasKey) {
-                return JSON.stringify({ ok: true, dup: true, rows: main.rows });
+                return JSON.stringify({ ok: true, dup: true, rows: main.rows, verified_in: 'main-form' });
             }
             return fail('err-guarantee-dup-not-in-list');
         }
@@ -299,7 +308,7 @@ JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
             // 此时若主列表已有该行 = 幂等成功（dup），否则才是真未关闭。
             const mainNow = readMain();
             if (mainNow && mainNow.hasKey) {
-                return JSON.stringify({ ok: true, dup: true, rows: mainNow.rows });
+                return JSON.stringify({ ok: true, dup: true, rows: mainNow.rows, verified_in: 'main-form' });
             }
             return fail('err-guarantee-dialog-not-closed');
         }
@@ -309,7 +318,7 @@ JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
     for (let i = 0; i < 12; i++) {
         const main = readMain();
         if (main && main.hasKey) {
-            return JSON.stringify({ ok: true, dup: false, rows: main.rows });
+            return JSON.stringify({ ok: true, dup: false, rows: main.rows, verified_in: 'main-form' });
         }
         await sleep(250);
     }

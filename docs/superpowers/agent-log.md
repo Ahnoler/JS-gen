@@ -1,3 +1,14 @@
+## 2026-09-04 · Cursor Lead — I3 克隆→启用收口（#500）· 等用户重启 executor
+- 完成：#500 recorded P1–P4；「克隆成功」+ `toast_ok: 状态更新成功`；CDP `KB测克隆-20260904-1940` 启用；报告 I3 节已写
+- 完成：`product_library.json` source 挂 #500；**停手等用户重启 executor**（用户明示）
+- 注意：录制子代理为解信贷 WIP ImportError，改了共享 `_js_snippets.py` 一行（re-export `JS_NOTIFY_HOOK`）——未 commit，与信贷线一并处理
+- 录制子代理：7de906e3
+
+## 2026-09-04 · Cursor Lead — 提交 5346848 + 续作克隆→启用
+- 完成：commit `5346848` — recorder toast_ok（状态更新成功）+ `product_library.json` + 设计/计划
+- 进行中：I3 旁路贯通——选中 `KB测产品-20260904-1925` → 产品克隆 → 启用副本（验证「克隆成功」+ toast_ok）
+- 勿碰：信贷线未提交 `_observe`/error_notify/table_cell/guarantee_intro/replay_timing/batch_*.png
+
 ## 2026-09-04 · Cursor Lead — 产品管理 KB 贯通收口（#499 recorded + B 验证）
 - 完成：I2 **#499**（stamp 1925）全 6 阶段 `recorded`+detach；stderr `confirm success notification → toast_ok: 状态更新成功`；字段/CDP 产品状态=启用
 - 完成：B 引擎修复湿测通过；`product_library.json` source 已挂 #499；todo ⑥ 收口移出

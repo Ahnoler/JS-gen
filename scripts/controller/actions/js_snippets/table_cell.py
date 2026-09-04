@@ -27,7 +27,12 @@ header_name 的列下标 → 取该行对应 td → td 内有 .el-select 走 sel
 命中时回落到 column_index 计数（原行为不变）。
 
 行定位：可见 .el-dialog 内优先（弹窗内表格不被页面表格遮蔽），找不到再全局；
-匹配顺序 = 单元格文本精确 → 去空白包含（与 click_table_row_button 一致）；
+匹配顺序（matched_by 随返回值带出便于诊断）=
+'contains' 单元格文本精确 → 去空白包含 →
+'serial-tail'/'serial-head' key 为纯数字≥16位（系统流水号形态，行内不可见）
+取后/前12位包含 →
+'prefix' key 以4位数字前缀（2608/2609 等截断显示形态）开头且行文本以该前缀
+开头。row_text 优先用可见行文本（2608 前缀或企业名），系统流水号仅作兜底。
 跳过 el-table__fixed 系列克隆行。成功谓词失败时返回
 {ok:false, error:'err-table-cell-not-written:<row>:<col>'}。
 """
@@ -69,14 +74,31 @@ JS_FILL_TABLE_CELL = '''async (args) => {
         }
         scopeRoot = best;
     }
+    // 行匹配命中方式（matched_by），随成功/失败返回便于诊断
+    let matchedBy = null;
+    // 行匹配返回命中方式（matched_by），失败返回 null：
+    // - 'contains'      行文本精确/去空白包含（原语义，优先）
+    // - 'serial-tail'   key 为纯数字≥16位（系统流水号形态，行内不可见）→ 取后12位包含
+    // - 'serial-head'   同上取前12位包含
+    // - 'prefix'        key 以4位数字前缀（2608/2609 等截断显示形态）开头且行文本以该前缀开头
     const rowMatches = (row) => {
         const cells = row.querySelectorAll('td, .el-table__cell');
         for (const c of cells) {
             const t = norm(c.innerText || c.textContent);
-            if (t && t === rowText) return true;
+            if (t && t === rowText) return 'contains';
         }
+        const rowCompact = norm(row.textContent || '').replace(/\\s+/g, '');
         const wantCompact = rowText.replace(/\\s+/g, '');
-        return norm(row.textContent || '').replace(/\\s+/g, '').includes(wantCompact);
+        if (wantCompact && rowCompact.includes(wantCompact)) return 'contains';
+        if (/^\\d{16,}$/.test(wantCompact)) {
+            const tail = wantCompact.slice(-12);
+            const head = wantCompact.slice(0, 12);
+            if (tail && rowCompact.includes(tail)) return 'serial-tail';
+            if (head && rowCompact.includes(head)) return 'serial-head';
+        }
+        const p4 = /^(\\d{4})/.exec(wantCompact);
+        if (p4 && rowCompact.startsWith(p4[1])) return 'prefix';
+        return null;
     };
     // 行序号兜底: row_text='4'/'#4'/'row4' → 第4个可见行(1起)；'first' → 第1行。
     // 弹窗快照常常不含表格行文本，序号是唯一可靠入口（run16 实证）。
@@ -90,9 +112,10 @@ JS_FILL_TABLE_CELL = '''async (args) => {
             if (row.closest('.el-table__fixed, .el-table__fixed-body-wrapper, .el-table__fixed-right')) return false;
             return visible(row);
         });
-        if (rowByIndex) return rows[rowIdx - 1] || null;
+        if (rowByIndex) { matchedBy = 'row-index'; return rows[rowIdx - 1] || null; }
         for (const row of rows) {
-            if (rowMatches(row)) return row;
+            const m = rowMatches(row);
+            if (m) { matchedBy = m; return row; }
         }
         return null;
     };
@@ -124,6 +147,7 @@ JS_FILL_TABLE_CELL = '''async (args) => {
         ok: false,
         error: 'err-table-cell-not-written:' + rowText + ':' + colIndexRaw + ':'
             + (extra && extra.why ? extra.why : 'write-unverified'),
+        matched_by: matchedBy || null,
     }, extra || {}));
 
     // 2) select 写入（含下拉打开/选项点击/回读验证）
@@ -178,7 +202,7 @@ JS_FILL_TABLE_CELL = '''async (args) => {
         if (!readBack || readBack === chosen || chosen.startsWith(readBack) || readBack.startsWith(chosen)) {
             return JSON.stringify({
                 ok: true, kind: 'select', row_text: rText, column_index: cIdx,
-                value: chosen, read_back: readBack,
+                value: chosen, read_back: readBack, matched_by: matchedBy || null,
             });
         }
         return errPayload({ why: 'select-unverified: expected=' + chosen + ' got=' + readBack });
@@ -206,6 +230,7 @@ JS_FILL_TABLE_CELL = '''async (args) => {
             return JSON.stringify({
                 ok: true, kind: 'input', row_text: rText, column_index: cIdx,
                 value: value, old_value: oldVal, read_back: readBack,
+                matched_by: matchedBy || null,
             });
         }
         return errPayload({ why: 'write-unverified: expected=' + value + ' got=' + readBack });

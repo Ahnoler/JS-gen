@@ -56,6 +56,10 @@ ACTION_BUDGET_S = {
     # 两轮 JS 逐级点击 + CDP 通道需放宽；real_click 单发也非毫秒级。
     "tree_picker_click": 20,
     "real_click": 8,
+    # KB-I5 run24：introduce_guarantor 复合动作（CDP trusted click 开弹窗 +
+    # 表头定列序填关系/金额 + 确认 + 主列表校验）实际需 >10s，默认 5s 恒
+    # budget-timeout（run24 实证连续 12 次超时）。
+    "introduce_guarantor": 20,
 }
 
 
