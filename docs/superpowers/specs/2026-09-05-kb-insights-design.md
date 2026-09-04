@@ -166,3 +166,18 @@
 3. `GET /api/v2/kb/stale-cards` 三态正确（真实 25+ 卡上 unparsed 与 possibly-stale 分布合理，人工抽查 3 张）。
 4. `GET /api/v2/kb/cards` 返回全部卡片含 source_refs 字段（回填前为空对象/缺失，端点不报错）。
 5. 特征化全绿；verify-all 与基线一致；/api/docs 四端点可见可试（tryable）。
+
+## 9. 实施遗留（deferred minors，2026-09-05 终审分诊：全部 keep-deferred）
+
+> 实施期间派发通道持续故障（captcha verify failed ×6），Task 4 起主线程实施+代评审；10 条 Minor 均不影响合并，留此备查（原 SDD ledger 已按流程清理）。
+
+1. 特征化缺 `resolvedPrefix === ''` 断言（matcher 首段即缺失场景）、`normSegName` 无直测、`unparsed` 结果无多余键断言。
+2. 特征化 cards 段的 fixture `writeFileSync` 在 try/finally 之外（写入抛出会泄漏 tmpdir；plan-mandated 原样）。
+3. `kb-flow-cards.js` warn 标签未区分「读失败」与「JSON 解析失败」（跳过行为正确）。
+4. `.JSON` 大写扩展静默排除（与 `store.py` 行为一致，跨语言侥幸对齐）。
+5. 特征化段 3 的 `run` 标签文案仍写「success 计数」（实际钉 `'recorded'`，语义成立）。
+6. 接口字段名 `batchSuccess` 与底层 `'recorded'` 语义有命名错位（为稳定 Task 4/5 消费契约保留）。
+7. coverage 的无效 `systemId`（不存在的节点）静默返回空表而非 404（spec 只对 change-impact 的 `:id` 要求 404）。
+8. **KB 卡 `menu_path` 存在 `→` 分隔形态**（产品线新卡）——三态检测对此不崩溃（判 unparsed），但失去漂移检测能力；书写规范建议已落 `docs/superpowers/research/2026-09-04-kb-build-handover.md` §6。
+9. 特征化对「审批待办」类真实漂移的 stale 发现依赖人工查看 stale-cards 输出（无自动断言——真实树数据不适合 fixture 化，接受）。
+10. 回填脚本 `--apply` 尚未执行（定案即后置；待 `data/kb/flows/` 无未提交改动时单独任务单元跑，跑完把结果表回贴 agent-log）。

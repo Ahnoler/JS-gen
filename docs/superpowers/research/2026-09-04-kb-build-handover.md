@@ -52,6 +52,7 @@
 - **共享文件**（禁并行写）：`data/kb/staging/staged_flows.jsonl`、`_kb.py`、`scripts/kb/promote.py`、prompts。如需改动，先在 agent-log 声明。
 - **环境坑**：本机裸 `python` 是 WindowsApps 桩（exit 49），用 `D:/anaconda3/python.exe` 或 `./python/python.exe`；改 js_snippets 须重启 executor 才生效。
 - **双开纪律**：工作区现有未提交改动（error_notify/guarantee_intro_snippet/table_cell/replay_timing 等）属信贷线并行会话，勿触碰；收工在 `docs/superpowers/agent-log.md` 顶部写条目。
+- **卡片 menu_path 书写规范（2026-09-05 KB Insights 实施后新增）**：一律用 `/` 分隔的段路径（段名与系统树节点名一致，建议不含系统层以外的自由后缀）；**不要用 `→` 分隔或括号自由文本**——Node 侧新增的只读分析面（`GET /api/v2/kb/stale-cards`，见 `src/services/menu-path-matcher.js`）按 `/` 段解析到系统树，`→` 或含括号的写法会被判 `unparsed`（不算失效但失去漂移检测能力）。括号补充说明可放卡片其他字段。另有可反查溯源字段 `source_refs`（`{trajectory_ids,tx_nos,dates}`，可选）——新卡/改卡建议顺手带上，详见 `docs/superpowers/specs/2026-09-05-kb-insights-design.md` §2。
 
 ## 7. 延伸阅读
 
