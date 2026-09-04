@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 00:48 · Zcode 重构会话 — B组开工声明：hierarchy-service 拆分
+- 开工：00:48。前置条件已核实——菜单推送线 09-04 收官（todo-list ③，T5 18/18），近 3 天无菜单代码提交
+- 范围：`src/services/hierarchy-service.js`（723 行）拆出树查询簇与 importTree 至新建 `src/services/hierarchy-tree-query.js`、`hierarchy-tree-import.js`，原文件保 accounts 集群/CRUD/getNode 并转部分 barrel，全部导出名原路径可得
+- 禁入：`scripts/**`（含 characterization，pin 只报告不动手）、`data/kb/**`、`config/**`、工作区他线 WIP（_table.py/xhr_log.py/product_library.json/agent-tools-table.md 等）
+- 约束：characterize-system-node-accounts.mjs 的 7 处 read_text pin（getNode 全函数体正则/syncSystemAccounts 调用点/CONFLICT 中文文案等）物理留在原文件；10 个消费者零改动；tree-query 不得反向 import 原文件（防环）
+- 方式：单子智能体实施、不 commit；主线程验收（node --check/eslint 0/特征化/verify-all）后代提交
+
 ## 2026-09-05 · Zcode 重构会话 — A组冷区重构三项完成（6-1/6-2/6-4）
 - 完成：`a1364ac` 波次6-1 transaction-export-v3 拆分（984→288 转 barrel，region/screenshot/properties/validate 四模块，15 导出面与 transaction-name pin 全保）
 - 完成：`e43088b` 波次6-2 recording-runner 拆分（两模块外搬+8 段命名函数化；7 处 read_text pin 子串全留原文件，组图簇闭包耦合段未强行外搬）
