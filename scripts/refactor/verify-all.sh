@@ -123,6 +123,7 @@ run "characterize-kb-store" "$PY" scripts/characterization/characterize-kb-store
 run "characterize-kb-normalize" "$PY" scripts/characterization/characterize-kb-normalize.py
 run "characterize-kb-actions" "$PY" scripts/characterization/characterize-kb-actions.py
 run "characterize-kb-recall" "$PY" scripts/characterization/characterize-kb-recall.py
+run "characterize-kb-insights" node scripts/characterization/characterize-kb-insights.mjs
 
 if [ "$FAILED" -ne 0 ]; then
   echo "========================================"
