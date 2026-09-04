@@ -2,6 +2,11 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 · Zcode 重构会话 — B组收工回报：hierarchy-service 拆分完成（回链 00:48 开工声明）
+- 完成：`651c71f` hierarchy-service 723→400 行——树查询簇入 hierarchy-tree-query.js（251 行）、importTree 入 hierarchy-tree-import.js（102 行）；accounts 集群/CRUD/getNode 留守，原文件部分 barrel
+- 验收：node --check ×3 / eslint 0/0 / characterize-system-node-accounts 7 pin 全过 / menu-import nine-rules 18/18 / 16 导出名原路径可导入 / verify-all 与基线一致（唯一红=kb-actions 存量，无新增）
+- 状态：**开工声明条目中的任务已全部闭环**；重构线 A+B 全部收口，余 6-6/6-7 随引擎/KB 冻结（见重构文档 §7）
+
 ## 2026-09-05 00:48 · Zcode 重构会话 — B组开工声明：hierarchy-service 拆分
 - 开工：00:48。前置条件已核实——菜单推送线 09-04 收官（todo-list ③，T5 18/18），近 3 天无菜单代码提交
 - 范围：`src/services/hierarchy-service.js`（723 行）拆出树查询簇与 importTree 至新建 `src/services/hierarchy-tree-query.js`、`hierarchy-tree-import.js`，原文件保 accounts 集群/CRUD/getNode 并转部分 barrel，全部导出名原路径可得
