@@ -1,3 +1,10 @@
+## 2026-09-05 · Zcode 重构会话 — A组冷区重构三项完成（6-1/6-2/6-4）
+- 完成：`a1364ac` 波次6-1 transaction-export-v3 拆分（984→288 转 barrel，region/screenshot/properties/validate 四模块，15 导出面与 transaction-name pin 全保）
+- 完成：`e43088b` 波次6-2 recording-runner 拆分（两模块外搬+8 段命名函数化；7 处 read_text pin 子串全留原文件，组图簇闭包耦合段未强行外搬）
+- 完成：`e37cc96` 波次6-4 register.js rerun-replay 抽 rerun-replay-service（664→589；不迁 runReplayActions 红线遵守）
+- 验收：node --check ×10 / eslint 0 error 0 warning（pre-commit 亦过）/ 目标特征化全绿（含连库 export-v3 115/115）；verify-all 唯一红 `characterize-kb-actions` 经 HEAD worktree 金标准验证为存量红（KB 卡撤销语义演进未同步特征化，涉事文件无未提交改动）
+- 注意（移交引擎/KB 线）：①verify-all 基线非全绿，闸内 kb-actions + 闸外 record-status-v2（2 断言）/batch-task-progress（崩在 trajectory-attach-runner 断言）共 3 个存量红，与重构无关，已在重构文档 §0 基线更正记录 ②发现存量 bug：recording-runner fact-pack 块引用 `trajRow` 越界（ReferenceError 被 try/catch 吞为 warn），重构前后行为逐字一致，建议单独修 ③工作区并行线未提交改动（_table.py/xhr_log.py/product_library.json 等）未触碰未混提交
+
 ## 2026-09-05 · Zcode 重构会话 — A组冷区重构三项启动（6-1/6-2/6-4）
 - 进行中：**范围=仅 Node 控制面三个冷区文件，与引擎/KB 热区零交集**：①`src/services/transaction-export-v3.js`（984行）拆 mapping/builders/validation/assembly——原文件保全部 15 个具名导出面（barrel），characterize-transaction-name.mjs 钉住的 sanitize 子串留在原文件 ②`src/services/trajectory/trajectory-recording-runner.js`（813行）phase 上下文装配拆分——被 7 个特征化 read_text 钉住原路径，钉中子串一律不动 ③`src/routes/browser-session/register.js`（664行，零 pin）rerun-replay 段抽 service——红线：不迁 runReplayActions，seed_action_log/本地浏览器双分支/stop_on_fail 缺省语义原样
 - 方式：三个不相交文件集并行子智能体实施，子智能体不 commit；主线程验收 node --check / eslint 0 warning / verify-all 全绿 / diff 范围核查后分三个 refactor(scope) 提交
