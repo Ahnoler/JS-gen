@@ -1,6 +1,7 @@
 import * as systemDao from '../../dao/system-dao.js';
 import * as hierarchyService from '../../services/hierarchy-service.js';
 import * as systemAccountService from '../../services/system-account-service.js';
+import * as coverageService from '../../services/coverage-service.js';
 import { NODE_TYPE } from '../../models/hierarchy-constants.js';
 import { asyncHandler, AppError } from '../../http/app-error.js';
 
@@ -174,5 +175,15 @@ export default function (app) {
   /** Get the full system/process/function hierarchy tree. */
   app.get('/api/v2/hierarchy/tree', asyncHandler(async (req, res) => {
     res.json(await hierarchyService.getTree());
+  }));
+
+  // ── Coverage ──
+  /** Coverage report: per-function execution coverage over the hierarchy tree. */
+  app.get('/api/v2/hierarchy/coverage', asyncHandler(async (req, res) => {
+    const type = req.query.type === 'all' ? 'all' : 'function';
+    if (req.query.systemId != null && req.query.systemId !== '' && !Number.isFinite(Number(req.query.systemId))) {
+      throw new AppError('systemId must be a number', { code: 'VALIDATION' });
+    }
+    res.json(await coverageService.buildCoverageReport({ systemId: req.query.systemId, type }));
   }));
 }

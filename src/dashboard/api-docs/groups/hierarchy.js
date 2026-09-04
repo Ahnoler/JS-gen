@@ -126,6 +126,22 @@ export const GROUP_HIERARCHY = [
         summary: '删除功能',
         params: [{ name: 'id', type: 'number', required: true, in: 'path', example: '3' }],
       },
+      {
+        method: 'GET', path: '/api/v2/hierarchy/coverage',
+        summary: '功能执行覆盖报表（覆盖=有绑定轨迹；含最近执行/批量成功率/KB卡数明细）',
+        params: [
+          { name: 'systemId', type: 'number', required: false, in: 'query', desc: '限定系统子树' },
+          { name: 'type', type: 'string', required: false, in: 'query', desc: 'function(默认,仅功能节点)|all(含系统/模块聚合行)' },
+        ],
+        respExample: J({
+          rows: [{
+            nodeId: 111, type: 3, name: '新增对公授信管理', path: '信贷系统/授信管理/新增对公授信管理',
+            trajCount: 4, lastExecutedAt: '2026-09-01T10:00:00.000Z',
+            batchTotal: 12, batchSuccess: 10, kbCards: 1, covered: true,
+          }],
+          summary: { totalFunctions: 386, coveredFunctions: 57, coverageRate: 0.148 },
+        }),
+      },
     ],
   },
   {
