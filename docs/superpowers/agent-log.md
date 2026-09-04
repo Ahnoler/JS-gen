@@ -12,7 +12,7 @@
 - 完成：13 条从 `9000000230` 改挂——0740×7（#41/42/43/44/52/55/68）、0467×2（#47/60）、0468×4（#51/54/61/66）；仅当原 fid=0230 才 UPDATE；事务提交
 - 验收：`tmp/product-mgmt/_remount_sql_result.json`；0230 剩余 8 条均为映射/阶段（#46/48/50/56/58/59/511/513）
 - 注意：本机 DB 隧道曾断（13306 ECONNREFUSED），已用 SSH `-L 13306` 拉起后执行；未改 PATCH API / src
-- commit 开工 `cb4e1b3`；本收工随下条 docs commit
+- commit 开工 `cb4e1b3`；收工 docs **`459445e`**
 
 ## 2026-09-05 03:32 · Cursor Lead — 开工声明：SQL 纠正遗留交易 function_id（A/B/C）
 - 开工：03:32。按调研清单批量 `UPDATE trajectory.function_id`：产品库→0740、查询→0467、要素→0468；**不改**映射/阶段（缺独立 function，仍寄 0230）
