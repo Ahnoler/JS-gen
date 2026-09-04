@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 02:32 · Zcode Lead — 实施开工声明：KB Insights 计划执行（SDD 逐任务循环，9 任务）
+- 开工：02:32。计划 `docs/superpowers/plans/2026-09-05-kb-insights.md`（已批准 spec 落地）；SDD 工作区 `.superpowers/sdd/2026-09-05-kb-insights/`（git-ignored，ledger 记进度）
+- 范围：新建 `src/services/{menu-path-matcher,kb-flow-cards,coverage-service,change-impact-service}.js`、`src/routes/v2/kb.js`、`src/dashboard/api-docs/groups/kb.js`、`scripts/characterization/characterize-kb-insights.mjs`、`migrations/backfill-kb-source-refs.mjs`（只创建不执行）；修改 `src/routes/v2/{hierarchy,system-mgmt,__init__}.js`、`src/dao/{trajectory-dao,batch-recording-dao}.js`、`src/dashboard/api-docs/{catalog.js,groups/hierarchy.js}`；条件项 `scripts/refactor/verify-all.sh`（仅冷区时接线一行，接线前另行核查）
+- 方式：逐任务派实施子智能体（不 commit，主线程验收后按任务代提交）+ 任务评审；特征化文件为共享串行点故严格顺序执行
+- 禁入：`scripts/kb/**`、`data/kb/**`（Cursor I10 在途 product_core_mapping + KB 线热区；Task 8 dry-run 对 data/kb 仅只读）、工作区他线 WIP、`scripts/characterization/**` 既有文件（新建 characterize-kb-insights.mjs 除外）
+- 与在途声明核查：Cursor 02:28 I10 范围（data/kb+tmp+docs）与本范围零交集 ✓
+
 ## 2026-09-05 02:28 · Cursor Lead — 开工声明：I10 核心产品映射卡 + 浅湿测
 - 开工：02:28。起草 `data/kb/flows/product_core_mapping.json`（据遗留 #59/#50）；挂载 **9000000230**（hierarchy 无独立「核心产品映射」节点，与 #59 同）；浅湿测进页→选树→查询→可选 stamp 新增再删
 - 范围：`data/kb/flows/product_core_mapping.json`、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`、`tmp/product-mgmt/task-mapping-requirement.md`（及 API 证据）
