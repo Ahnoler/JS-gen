@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- 2026-09-04: **菜单 JSON 九条更新规则回归**：真机 DB 覆盖快照递增、5.3 换父、5.4 交易跟随 pageId、5.5 改名、新增、5.7 同名收编、5.8 无交易删除/有交易保留、5.9 下线标记，并校验推送 `menuVersion` 与交易归属。运行：`node scripts/characterization/characterize-menu-import-nine-rules.mjs`。
+
 ### Changed
 
 - 2026-09-03: **注释：`umlEcd` 两种来源格式**：JSON 导入为建模 `UML…`；AI 扫描为 `String(node.id)`；推送 `resolveMenuUmlEcd` 空则回退 id。影响：`menu-push.js`、`menu-scan-apply.js`、`menu-json-import.js`、api-docs。
