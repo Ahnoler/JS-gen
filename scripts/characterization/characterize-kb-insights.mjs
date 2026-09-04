@@ -118,4 +118,46 @@ async function testDaoPins() {
   });
 }
 await testDaoPins();
-console.log(`characterize-kb-insights(matcher+cards+dao): OK (${passed} checks)`);
+// ── 段 4：coverage rollup ──
+async function testRollup() {
+  const { rollupCoverage } = await import(pathToFileURL(join(ROOT, 'src/services/coverage-service.js')).href);
+  const nodes = [
+    { id: 1, parentId: 0, name: '信贷系统', type: 1 },
+    { id: 11, parentId: 1, name: '授信管理', type: 2 },
+    { id: 111, parentId: 11, name: '新增对公授信', type: 3 },
+    { id: 112, parentId: 11, name: '授信查询', type: 3 },
+  ];
+  const trajStats = new Map([[111, { trajCount: 4, lastExecutedAt: '2026-09-01T10:00:00.000Z' }]]);
+  const batchStats = new Map([[112, { batchTotal: 12, batchSuccess: 10 }]]);
+  const kbCardsByNode = new Map([[111, 1]]);
+  run('rollup: 行覆盖判定与明细列', () => {
+    const { rows, summary } = rollupCoverage(nodes, { trajStats, batchStats, kbCardsByNode });
+    const r111 = rows.find((r) => r.nodeId === 111);
+    assert.equal(r111.covered, true);
+    assert.equal(r111.trajCount, 4);
+    assert.equal(r111.lastExecutedAt, '2026-09-01T10:00:00.000Z');
+    assert.equal(r111.batchTotal, 0);
+    assert.equal(r111.kbCards, 1);
+    assert.equal(r111.path, '信贷系统/授信管理/新增对公授信');
+    const r112 = rows.find((r) => r.nodeId === 112);
+    assert.equal(r112.covered, false); // 只有批量成功、无绑定轨迹 → 未覆盖（存在性判定）
+    assert.equal(r112.batchSuccess, 10);
+    assert.equal(summary.totalFunctions, 2);
+    assert.equal(summary.coveredFunctions, 1);
+    assert.equal(summary.coverageRate, 0.5);
+  });
+  run('rollup: lastExecutedAt Date 归一化为 ISO 字符串', () => {
+    const trajStatsDate = new Map([[111, { trajCount: 2, lastExecutedAt: new Date('2026-09-01T10:00:00Z') }]]);
+    const { rows } = rollupCoverage(nodes, { trajStats: trajStatsDate, batchStats, kbCardsByNode });
+    const r111 = rows.find((r) => r.nodeId === 111);
+    assert.equal(r111.lastExecutedAt, '2026-09-01T10:00:00.000Z');
+    assert.equal(r111.covered, true);
+  });
+  run('rollup: 空树空统计', () => {
+    const { rows, summary } = rollupCoverage([], { trajStats: new Map(), batchStats: new Map(), kbCardsByNode: new Map() });
+    assert.equal(rows.length, 0);
+    assert.equal(summary.coverageRate, 0);
+  });
+}
+await testRollup();
+console.log(`characterize-kb-insights(matcher+cards+dao+rollup): OK (${passed} checks)`);
