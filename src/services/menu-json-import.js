@@ -42,13 +42,15 @@ export function parseMenuJson(buffer) {
 }
 
 /**
- * 收集一个节点直属活动（children 中 umlType='3'）的落地页（0 或 1 个）。
- * 只取建模第一个非空 managePage.pdCmptEcd；忽略引导页与后续 managePage。
+ * 收集一个节点直属活动（children 中 umlType='3'）的落地页。
  * @param {object} node 子领域/模块节点
- * @returns {object[]} 长度 0 或 1；项含 pageId/pageName/resPath/pageType='managePage'
+ * @param {{ all?: boolean }} [opts] all=true 时收齐全部非空 managePage（中间菜单目录）；默认只留第一个（可导航功能）
+ * @returns {object[]} 项含 pageId/pageName/resPath/pageType='managePage'
  */
-function collectPages(node) {
+function collectPages(node, opts = {}) {
+  const wantAll = !!opts.all;
   const pages = [];
+  const seen = new Set();
   const children = Array.isArray(node.children) ? node.children : [];
   let skippedExtraManage = 0;
   for (const child of children) {
@@ -56,18 +58,20 @@ function collectPages(node) {
     const managePage = child.managePage;
     const pageId = managePage ? String(managePage.pdCmptEcd || '').trim() : '';
     if (!pageId) continue;
-    if (pages.length === 0) {
-      pages.push({
-        pageId,
-        pageName: String(managePage.pdCmptNm || '').trim(),
-        resPath: String(managePage.resPath || '').trim(),
-        pageType: 'managePage',
-      });
-    } else if (pageId !== pages[0].pageId) {
+    if (seen.has(pageId)) continue;
+    if (!wantAll && pages.length > 0) {
       skippedExtraManage += 1;
+      continue;
     }
+    seen.add(pageId);
+    pages.push({
+      pageId,
+      pageName: String(managePage.pdCmptNm || '').trim(),
+      resPath: String(managePage.resPath || '').trim(),
+      pageType: 'managePage',
+    });
   }
-  if (skippedExtraManage > 0) {
+  if (!wantAll && skippedExtraManage > 0) {
     console.warn(
       '[menu-json-import] multiple managePages under node %s; kept first %s, skipped %d',
       String(node.umlEcd || node.umlNm || ''),
@@ -102,11 +106,11 @@ function flattenSubdomains(nodes, ancestorModule, modules) {
     const seqNo = Number(node.seqNo) || 0;
     const name = String(node.umlNm || '').trim();
     const umlEcd = String(node.umlEcd || '').trim();
-    const nodePages = collectPages(node);
 
     const isTopLevel = ancestorModule === null;
     if (isTopLevel) {
       // 顶层子领域 → 模块；若自身也是叶子，pages 挂模块自己身上
+      const nodePages = collectPages(node);
       const moduleObj = {
         umlEcd,
         name,
@@ -124,14 +128,19 @@ function flattenSubdomains(nodes, ancestorModule, modules) {
       // 无子领域（顶层即叶子）：functions 为空，pages 已挂模块自身，无需再递归
     } else if (isLeafSubdomain(node)) {
       // 叶子子领域 → 功能，挂到顶层祖先模块
+      // managePage≥2 个不同 pageId：中间菜单（保留 umlEcd，目录页挂全量；不拆导航叶）
+      const allPages = collectPages(node, { all: true });
+      const intermediate = allPages.length >= 2;
       ancestorModule.functions.push({
         umlEcd,
         name,
         seqNo,
-        pages: nodePages,
+        pages: intermediate ? allPages : allPages.slice(0, 1),
+        intermediate,
       });
     } else {
       // 中间层非叶子：不建节点；自身直属活动页面并入最近已建祖先（模块）
+      const nodePages = collectPages(node);
       if (nodePages.length) {
         ancestorModule.pages.push(...nodePages);
       }
@@ -263,8 +272,20 @@ export async function importMenuJson(systemNodeId, buffer) {
       const name = String(item.name || '').trim();
       const umlEcd = String(item.umlEcd || '').trim();
       const seqNo = Number(item.seqNo) || 0;
-      const pdCmptEcd = pages[0]?.pageId || '';
+      const intermediate = !!item.intermediate;
+      // 中间菜单不挂导航 pageId；可导航功能仍取 pages[0]
+      const pdCmptEcd = intermediate ? '' : (pages[0]?.pageId || '');
       if (umlEcd) planUmlEcds.add(umlEcd);
+
+      const patchCommon = {
+        name,
+        umlEcd,
+        pdCmptEcd,
+        source: 'json_import',
+        removedFlag: 0,
+        intermediateFlag: intermediate ? 1 : 0,
+        ...(intermediate ? { menuXpath: '' } : {}),
+      };
 
       let node = null;
       // 分支 1：umlEcd 命中既有节点
@@ -284,13 +305,7 @@ export async function importMenuJson(systemNodeId, buffer) {
           // 变更事件：节点迁移（5.3）
           changeRows.push({ changeType: 'moved', nodeId: Number(node.id), detail: { name, oldParentId, newParentId: Number(parentId) } });
         }
-        await systemDao.update(node.id, {
-          name,
-          umlEcd,
-          pdCmptEcd,
-          source: 'json_import',
-          removedFlag: 0,
-        }, trx);
+        await systemDao.update(node.id, patchCommon, trx);
         stats.updated += 1;
         // 变更事件：改名 / 更新
         if (oldName !== name) {
@@ -303,13 +318,7 @@ export async function importMenuJson(systemNodeId, buffer) {
         // 分支 2：同父同型同名命中（收编）
         if (childIndex.has(key)) {
           node = childIndex.get(key);
-          await systemDao.update(node.id, {
-            name,
-            umlEcd,
-            pdCmptEcd,
-            source: 'json_import',
-            removedFlag: 0,
-          }, trx);
+          await systemDao.update(node.id, patchCommon, trx);
           stats.adopted += 1;
           // 变更事件：收编
           changeRows.push({ changeType: 'adopted', nodeId: Number(node.id), detail: { name } });
@@ -323,6 +332,8 @@ export async function importMenuJson(systemNodeId, buffer) {
             pdCmptEcd,
             source: 'json_import',
             sortOrder: seqNo,
+            intermediateFlag: intermediate ? 1 : 0,
+            menuXpath: '',
           }, trx);
           stats.created += 1;
           // 变更事件：新建
@@ -335,9 +346,10 @@ export async function importMenuJson(systemNodeId, buffer) {
       childIndex.set(`${parentId}|${type}|${name.toLowerCase()}`, node);
 
       // 收集本次 plan 落位节点 id（供规则5.4 交易迁移按页面匹配）
-      planNodeIds.push(Number(node.id));
+      // 中间菜单不进 5.4 目标（避免交易寄挂到不可导航节点）
+      if (!intermediate) planNodeIds.push(Number(node.id));
 
-      // 同步页面清单
+      // 同步页面清单（中间菜单挂全量目录页；导航功能仍 0/1 页）
       await systemPageDao.replaceForNode(node.id, pages, trx);
       stats.pagesImported += pages.length;
       return node;

@@ -381,20 +381,24 @@ export async function getNode(id) {
  * @param {{ type?: number|string, parentId?: number|string|null }} [opts] filter options
  * @returns {Promise<object[]>} matching node rows
  */
-export async function listNodes({ type, parentId } = {}) {
+export async function listNodes({ type, parentId, includeIntermediate = false } = {}) {
+  let rows;
   if (type != null && type !== '') {
     const t = Number(type);
     if (parentId === '' || parentId === undefined) {
-      if (t === NODE_TYPE.SYSTEM) return systemDao.list();
-      return systemDao.listByType(t, {});
+      if (t === NODE_TYPE.SYSTEM) rows = await systemDao.list();
+      else rows = await systemDao.listByType(t, {});
+    } else {
+      const pid = parentId === null || parentId === 'null' || parentId === '0'
+        ? ROOT_NODE_ID
+        : +parentId;
+      rows = await systemDao.listByType(t, { parentId: pid });
     }
-    const pid = parentId === null || parentId === 'null' || parentId === '0'
-      ? ROOT_NODE_ID
-      : +parentId;
-    return systemDao.listByType(t, { parentId: pid });
+  } else if (parentId != null && parentId !== '') {
+    rows = await systemDao.listByParent(+parentId);
+  } else {
+    rows = await systemDao.listAllRaw();
   }
-  if (parentId != null && parentId !== '') {
-    return systemDao.listByParent(+parentId);
-  }
-  return systemDao.listAllRaw();
+  if (includeIntermediate) return rows;
+  return (rows || []).filter((n) => Number(n.intermediateFlag) !== 1);
 }

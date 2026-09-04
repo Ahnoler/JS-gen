@@ -68,6 +68,7 @@ export function fromRaw(row) {
     menuXpath: n.menuXpath || '',
     unmatchedFlag: n.unmatchedFlag ?? 0,
     removedFlag: n.removedFlag ?? 0,
+    intermediateFlag: n.intermediateFlag ?? 0,
     menuPushStatus: n.menuPushStatus || '',
     menuPushVersion: Number(n.menuPushVersion) || 0,
     menuPushAt: n.menuPushAt ?? null,
@@ -338,6 +339,7 @@ export async function create(data, db = null) {
     menuXpath: String(data.menuXpath ?? '').trim(),
     unmatchedFlag: data.unmatchedFlag ? 1 : 0,
     removedFlag: data.removedFlag ? 1 : 0,
+    intermediateFlag: data.intermediateFlag ? 1 : 0,
     menuPushStatus: data.menuPushStatus || '',
     menuPushVersion: data.menuPushVersion ?? 0,
     menuPushAt: data.menuPushAt ?? null,
@@ -367,6 +369,7 @@ export async function update(id, data, db = null) {
   const allowed = ['name', 'description', 'sortOrder'];
   allowed.push('umlEcd', 'pdCmptEcd', 'source', 'menuXpath', 'unmatchedFlag');
   allowed.push('removedFlag');
+  allowed.push('intermediateFlag');
   allowed.push('menuPushStatus', 'menuPushVersion', 'menuPushAt', 'menuPushSyncedAt', 'menuPushError');
   if (existing.type === NODE_TYPE.SYSTEM) allowed.push('url');
 
@@ -380,6 +383,7 @@ export async function update(id, data, db = null) {
   }
   if (patch.unmatchedFlag !== undefined) patch.unmatchedFlag = patch.unmatchedFlag ? 1 : 0;
   if (patch.removedFlag !== undefined) patch.removedFlag = patch.removedFlag ? 1 : 0;
+  if (patch.intermediateFlag !== undefined) patch.intermediateFlag = patch.intermediateFlag ? 1 : 0;
   if (patch.name !== undefined && !patch.name) {
     throw Object.assign(new Error('name is required'), { code: 'VALIDATION' });
   }

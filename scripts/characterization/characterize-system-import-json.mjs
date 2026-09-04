@@ -169,6 +169,45 @@ function testBuildPlanSharedManagePageDedup() {
   assert.equal(gongGong.pages[0].pageType, 'managePage');
 }
 
+/** 叶子子领域含 ≥2 个不同 managePage → intermediate + 全量 pages（不拆导航叶） */
+function testBuildPlanMultiPageLeafIntermediate() {
+  if (!importAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const managePage = (ecd, nm) => ({ pdCmptEcd: ecd, pdCmptNm: nm, resPath: '/' + ecd });
+  const activity = (name, ecd) => ({
+    umlType: '3',
+    umlNm: name,
+    managePage: managePage(ecd, name + '页'),
+  });
+  const infoLeaf = {
+    umlType: '2',
+    umlNm: '产品信息管理',
+    umlEcd: 'UML_INFO',
+    children: [
+      activity('配置产品信息', 'ZJJK_A'),
+      activity('维护产品阶段', 'ZJJK_B'),
+      activity('维护核心产品映射', 'ZJJK_C'),
+    ],
+  };
+  const mod = {
+    umlType: '2',
+    umlNm: '产品管理',
+    umlEcd: 'UML_PD',
+    children: [infoLeaf],
+  };
+  const plan = buildImportJsonPlan({ roots: [mod] });
+  assert.equal(plan.modules.length, 1);
+  const fn = plan.modules[0].functions.find((f) => f.name === '产品信息管理');
+  assert.ok(fn, '产品信息管理 still in plan (catalog node)');
+  assert.equal(fn.intermediate, true, 'multi distinct managePages → intermediate');
+  assert.equal(fn.pages.length, 3, 'all managePages kept for catalog');
+  assert.deepEqual(
+    fn.pages.map((p) => p.pageId),
+    ['ZJJK_A', 'ZJJK_B', 'ZJJK_C'],
+  );
+  // Must NOT invent separate nav functions per activity
+  assert.ok(!plan.modules[0].functions.some((f) => f.name === '维护产品阶段'));
+}
+
 function testBuildPlanEmptyGuidePageSkipped() {
   if (!importAvailable) { console.log('    (skipped: SUT not importable)'); return; }
   const fixture = buildFixture();
@@ -237,6 +276,7 @@ function main() {
     ['parseMenuJson valid array', testParseValidArray],
     ['buildImportJsonPlan structure & intermediates flattened', testBuildPlanStructure],
     ['buildImportJsonPlan shared managePage only (no guidePage)', testBuildPlanSharedManagePageDedup],
+    ['buildImportJsonPlan multi-page leaf → intermediate + all pages', testBuildPlanMultiPageLeafIntermediate],
     ['buildImportJsonPlan empty guidePage skipped', testBuildPlanEmptyGuidePageSkipped],
     ['buildImportJsonPlan top-level leaf as function', testBuildPlanTopLevelLeafDedup],
     ['buildImportJsonPlan 黑名单管理 leaf flattened', testBuildPlanHeiMingDan],

@@ -82,19 +82,20 @@ export function buildScanApplyPlan(scannedMenus, existingModules) {
       l2SortByParent.set(parentName, sortOrder + 1);
       const parentMod = l1Index.get(parentName);
       const kids = parentMod && Array.isArray(parentMod.children) ? parentMod.children : [];
+      const navKids = kids.filter((c) => Number(c.intermediateFlag) !== 1);
       const scanDataId = extractMenuDataId(xpath);
 
       let fnNode = null;
       let renameTo = '';
       if (scanDataId) {
         fnNode =
-          kids.find((c) => extractMenuDataId(c.menuXpath) === scanDataId) || null;
+          navKids.find((c) => extractMenuDataId(c.menuXpath) === scanDataId) || null;
         if (fnNode && String(fnNode.name || '').trim() !== name) {
           renameTo = name;
         }
       }
       if (!fnNode) {
-        const byName = kids.find((c) => String(c.name || '').trim() === name) || null;
+        const byName = navKids.find((c) => String(c.name || '').trim() === name) || null;
         if (byName) {
           const existingId = extractMenuDataId(byName.menuXpath);
           // 已有不同 data-id 时不把扫描 xpath 盖到错名节点上 → 走 creates

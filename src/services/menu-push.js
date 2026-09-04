@@ -107,6 +107,7 @@ export function buildMenuPushPayload(system, nodes, { menuVersion, partnerSystem
       source: String(n.source || ''),
       unmatched: Number(n.unmatchedFlag) === 1,
       removed: Number(n.removedFlag) === 1,
+      intermediate: Number(n.intermediateFlag) === 1,
       pageId: type === NODE_TYPE.MODULE ? '' : String(n.pdCmptEcd || ''),
     };
   });
@@ -123,7 +124,12 @@ async function listMenuNodesUnderSystem(systemId) {
   const all = await systemDao.listAll();
   const modules = all.filter((n) => Number(n.type) === NODE_TYPE.MODULE && Number(n.parentId) === Number(systemId));
   const moduleIds = new Set(modules.map((m) => Number(m.id)));
-  const functions = all.filter((n) => Number(n.type) === NODE_TYPE.FUNCTION && moduleIds.has(Number(n.parentId)));
+  const functions = all.filter(
+    (n) =>
+      Number(n.type) === NODE_TYPE.FUNCTION &&
+      moduleIds.has(Number(n.parentId)) &&
+      Number(n.intermediateFlag) !== 1,
+  );
   return [...modules, ...functions];
 }
 

@@ -241,12 +241,17 @@ async function loadExistingModules(systemNodeId) {
       name: String(mod.name || ''),
       source: String(mod.source || ''),
       unmatchedFlag: Number(mod.unmatchedFlag || 0),
-      children: children.map((fn) => ({
-        id: Number(fn.id),
-        name: String(fn.name || ''),
-        source: String(fn.source || ''),
-        unmatchedFlag: Number(fn.unmatchedFlag || 0),
-      })),
+      // 中间菜单不参与扫描匹配 / phase2 幽灵（永不可导航）
+      children: children
+        .filter((fn) => Number(fn.intermediateFlag) !== 1)
+        .map((fn) => ({
+          id: Number(fn.id),
+          name: String(fn.name || ''),
+          source: String(fn.source || ''),
+          unmatchedFlag: Number(fn.unmatchedFlag || 0),
+          menuXpath: String(fn.menuXpath || ''),
+          intermediateFlag: Number(fn.intermediateFlag || 0),
+        })),
     });
   }
   return out;

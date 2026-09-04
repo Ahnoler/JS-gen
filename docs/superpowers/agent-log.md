@@ -2,6 +2,17 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 04:45 · Cursor Lead — 收工回报：intermediate_flag（回链 04:37）
+- 完成：migration `intermediate_flag`；导入多页叶子→intermediate+全量 system_page；树/list/push 默认过滤；扫描/phase2 跳过；0230/0231 回填 intermediate=1（清误用 removed）
+- 验收：knex migrate Batch 38；characterize-system-import-json / menu-scan / menu-push OK
+- 注意：单页叶子仍可导航（0231 再导入可能被改回非 intermediate——SUT 分组 vs 单页建模，后续若需可加规则）；未按活动拆导航叶（防假 L2）
+
+## 2026-09-05 04:37 · Cursor Lead — 开工声明：intermediate_flag 中间菜单
+- 开工：04:37。用户「按此实施」spec `2026-09-05-intermediate-menu-activity-split-design.md`
+- 范围：`migrations/20260905043700_intermediate_menu_flag.js`、`src/dao/system-dao.js`、`src/services/{menu-json-import,hierarchy-tree-query,menu-push,menu-scan-service,menu-scan-apply,menu-scan-session}.js`、`src/dashboard/api-docs/groups/overview.js`、`scripts/characterization/characterize-{system-import-json,menu-scan,menu-push}.mjs`、agent-log；存量回填 0230/0231
+- 禁入：Zcode 04:28 表征校准三文件与 trajRow/recording-runner；信贷引擎；无 SUT 证据的活动拆导航叶
+- 方式：主会话；migration→import→过滤→回填→表征
+
 ## 2026-09-05 04:28 · Zcode Lead — 开工声明：存量红校准 + trajRow bug 修复 + B 级真伪需求审查
 - 开工：04:28。用户指令三项：①特征化预期校准（3 存量红：kb-actions / record-status-v2 ×2 断言 / batch-task-progress 崩溃）②trajRow 存量 bug 修复（recording-runner fact-pack 引用作用域外变量，AI 记忆事实包静默失效）③B1-B4 真伪需求批判审查（纯分析）
 - 范围：`scripts/characterization/{characterize-kb-actions.py,characterize-record-status-v2.mjs,characterize-batch-task-progress.mjs}`、按语义判定结果可能触及 `src/services/trajectory/{trajectory-batch-service,trajectory-attach-runner,trajectory-recording-runner,recording-runner-step-context}.js`、`data/kb/flows/credit_usage.json`（若 kb-actions 校准需动卡——**先核查 KB 线在途**）、新建 `docs/superpowers/research/2026-09-05-b-tier-demand-review.md`、todo-list（如需）

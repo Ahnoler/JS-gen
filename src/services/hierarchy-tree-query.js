@@ -17,7 +17,7 @@ import {
  * 支持名称模糊（HTTP name → keyword）与 type 筛选；筛选时保留祖先，且始终带上根节点。
  * 有关键词时，命中节点附带 path（不含根名「根」）。
  * 可选在 type=1 系统节点上附带 accounts。
- * @param {{ includeAccounts?: boolean, keyword?: string, type?: number|string, limit?: number }} [opts] tree filter options
+ * @param {{ includeAccounts?: boolean, keyword?: string, type?: number|string, limit?: number, includeIntermediate?: boolean }} [opts] tree filter options
  * @returns {Promise<object[]>} 长度为 1 的数组：[{ id:0, type:0, children:[…] }]
  */
 export async function getTree({
@@ -25,6 +25,7 @@ export async function getTree({
   keyword,
   type,
   limit,
+  includeIntermediate = false,
 } = {}) {
   const kw = String(keyword || '').trim();
   const typeFilter = type !== undefined && type !== null && type !== ''
@@ -35,7 +36,9 @@ export async function getTree({
   }
 
   const allNodes = await systemDao.listAll();
-  let nodes = allNodes;
+  let nodes = includeIntermediate
+    ? allNodes
+    : allNodes.filter((n) => Number(n.intermediateFlag) !== 1);
   const matchedIds = new Set();
 
   if (kw || typeFilter != null) {
