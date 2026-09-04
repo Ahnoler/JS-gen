@@ -121,7 +121,8 @@ JS_SCAN_SAVE_OUTCOME = r'''() => {
       : '').replace(/\s+/g, ' ').trim();
     formErrors.push({ label, error: error.slice(0, 120) });
   }
-  const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功/;
+  // Include 状态更新成功 (enable/disable status flips) — same family as 操作成功.
+  const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功|状态更新成功|更新成功|启用成功|禁用成功|克隆成功/;
   const failRe = /失败|错误|异常|不能|不允许|已存在|重复|校验|必填|不通过/;
   const successNotifs = [];
   const errorNotifs = [];
@@ -149,7 +150,7 @@ JS_SCAN_SAVE_OUTCOME = r'''() => {
 
 # Observe success/error notifications while a save/submit is in flight.
 JS_WATCH_SAVE_NOTIFICATIONS = r'''() => {
-          const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功/;
+          const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功|状态更新成功|更新成功|启用成功|禁用成功|克隆成功/;
           const failRe = /失败|错误|异常|不能|不允许|已存在|重复|校验|必填|不通过/;
           window.__saveWatch = { successNotifs: [], errorNotifs: [] };
           const take = (el) => {

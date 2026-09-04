@@ -1,7 +1,7 @@
 ## 2026-09-04 · Cursor Lead — 产品管理 KB 贯通收口（#499 recorded + B 验证）
 - 完成：I2 **#499**（stamp 1925）全 6 阶段 `recorded`+detach；stderr `confirm success notification → toast_ok: 状态更新成功`；字段/CDP 产品状态=启用
 - 完成：B 引擎修复湿测通过；`product_library.json` source 已挂 #499；todo ⑥ 收口移出
-- 注意：P3 偶发找不到「新增子分类」→ 树幽灵一级节点（不阻塞）；共享 recorder 改动（`_misc.py`/`save.py`）未 commit
+- 注意：P3 偶发找不到「新增子分类」→ 树幽灵一级节点（不阻塞）；共享 recorder（`_misc.py`/`save.py`）与本条一并提交
 - 报告：`tmp/product-mgmt/through-report.md`；录制子代理 a27b10f1
 
 ## 2026-09-04 · Zcode Lead — AI 智能录制软著材料全套产出（agent team 并行）

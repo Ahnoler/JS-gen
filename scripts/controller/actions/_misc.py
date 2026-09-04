@@ -883,24 +883,40 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                     compact2 = re.sub(r'\s+', '', btn_label)
                     if compact2.startswith(('确认', '确定')):
                         await page.wait_for_timeout(WAIT_450_MS)
+                        # Classify notifications: success texts (状态更新成功 etc.) → toast_ok;
+                        # real errors → err-notification. Never treat success as failure.
                         note = await page.evaluate(
                             r'''() => {
-                                const w = window.__saveWatch || { errorNotifs: [] };
-                                const live = [];
+                                const w = window.__saveWatch || { errorNotifs: [], successNotifs: [] };
+                                const failRe = /失败|错误|异常|不能|不允许|已存在|重复|校验|必填|不通过/;
+                                const successRe = /操作成功|保存成功|提交成功|新建成功|修改成功|删除成功|状态更新成功|更新成功|启用成功|禁用成功|克隆成功/;
+                                const errors = [];
+                                const successes = [];
+                                const seen = new Set();
+                                const take = (raw, hint) => {
+                                    const s = String(raw || '').replace(/\s+/g, ' ').trim();
+                                    if (!s || seen.has(s)) return;
+                                    seen.add(s);
+                                    if (hint === 'error' || failRe.test(s)) errors.push(s.slice(0, 160));
+                                    else if (hint === 'success' || successRe.test(s)) successes.push(s.slice(0, 160));
+                                };
+                                for (const t of (w.errorNotifs || [])) take(t, 'error');
+                                for (const t of (w.successNotifs || [])) take(t, 'success');
                                 for (const el of document.querySelectorAll('.el-notification')) {
                                     const r = el.getBoundingClientRect();
-                                    if (r.width > 0 && r.height > 0) live.push((el.textContent || '').trim());
+                                    if (r.width <= 0 || r.height <= 0) continue;
+                                    const cls = String(el.className || '');
+                                    const text = (el.textContent || '').trim();
+                                    if (/el-notification--error/.test(cls)) take(text, 'error');
+                                    else take(text, 'live');
                                 }
-                                const seen = new Set();
-                                for (const raw of [...(w.errorNotifs || []), ...live]) {
-                                    const s = String(raw || '').replace(/\s+/g, ' ').trim();
-                                    if (s && !seen.has(s)) seen.add(s);
-                                }
-                                return [...seen];
+                                return { errors, successes };
                             }'''
                         )
-                        if isinstance(note, list) and note:
-                            err_text = note[0][:200]
+                        errors = (note or {}).get('errors') if isinstance(note, dict) else None
+                        successes = (note or {}).get('successes') if isinstance(note, dict) else None
+                        if isinstance(errors, list) and errors:
+                            err_text = str(errors[0])[:200]
                             sys.stderr.write(f'[click] confirm error notification: {err_text}\n')
                             sys.stderr.flush()
                             return _err(
@@ -909,6 +925,13 @@ def _register_misc_actions(controller, browser_context, business_data_store=None
                                 '禁止原样重复点击确认。',
                                 include_in_memory=True,
                             )
+                        if isinstance(successes, list) and successes:
+                            ok_text = str(successes[0])[:200]
+                            record_success_token(business_data_store, 'toast_ok', ok_text)
+                            sys.stderr.write(
+                                f'[click] confirm success notification → toast_ok: {ok_text[:80]}\n'
+                            )
+                            sys.stderr.flush()
                         record_success_token(business_data_store, 'confirm_click', btn_label)
                         await page.wait_for_timeout(WAIT_400_MS)
                         still = False

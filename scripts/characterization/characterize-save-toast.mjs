@@ -68,6 +68,11 @@ const cases = [
     expect: 'success',
   },
   {
+    label: 'status flip: 状态更新成功',
+    text: '状态更新成功',
+    expect: 'success',
+  },
+  {
     label: 'error CSS class without fail keyword',
     text: '请检查输入',
     className: 'el-message el-message--error',
@@ -85,6 +90,7 @@ for (const c of cases) {
 
 // successRe / failRe are still present in source (not deleted during refactor)
 assert(successRe.test('操作成功'), 'parsed successRe should match 操作成功');
+assert(successRe.test('状态更新成功'), 'parsed successRe should match 状态更新成功');
 assert(failRe.test('保存失败'), 'parsed failRe should match 保存失败');
 
 console.log('characterize-save-toast: OK');
