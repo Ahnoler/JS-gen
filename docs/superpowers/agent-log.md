@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 01:51 · Cursor Lead — 开工声明：清理 product-mgmt 临时文件 + I9 查询产品信息卡
+- 开工：01:51。①清理 `tmp/product-mgmt/` 下 ephemeral（`_*` API 快照/CDP 探针脚本/一次性 poll·start·create），保留 digest/task/through-report/lead/blockers/flags 精简证据；②检查本线未提交；③续作 I9 `product_query.json`（functionId=9000000467）+ 浅湿测
+- 范围：`tmp/product-mgmt/**`（删 ephemeral）、`data/kb/flows/product_query.json`（新建）、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`、可选 `docs/superpowers/specs/2026-09-04-product-mgmt-kb-design.md` 状态句
+- 禁入：信贷 WIP（`_table.py`/guarantee_intro/xhr_log/prompts/characterize-*/batch_*.png/loan_*.png/shots_*）、`config/.env.example`、`src/**`、共享 `_kb.py`/staging/promote；不删他线 research 未跟踪文件
+- 方式：主会话清理+写卡；录制子代理浅湿测（代声明、不 commit）
+
 ## 2026-09-05 01:28 · Cursor Lead — 收工回报：I8 阶段卡湿测回填（回链 01:15 开工）
 - 完成：#511 recorded（0230 / mntPdStg / slot1）；`product_stage.json` 回填 menu_path、hash=`mntPdStg`、图标 folder-add=新增阶段 / document-add=新增子阶段、source
 - 验收：树 stamp 父+子；召回 stage 页命中 markers 强度压过产品库（mntPdStg）
