@@ -2,17 +2,23 @@
 
 Guidance for Codex (Codex.ai/code) and Claude Code when working in this repo. This is the single source of truth. Product-facing docs live in `README.md` (human) and `/api/docs` (sole frontend contract); architecture depth that an agent can rediscover from the tree is intentionally not duplicated here.
 
-## 跨 Agent 协作（开场三件事 / 收工写日志）
+## 跨 Agent 协作（开场三件事 / 开工声明 / 收工回报）
 
 多个 Agent 工具（Zcode / Cursor / Codex 等）在同一仓库开发，会话记忆互不相通；跨工具互通靠仓库内文件 + git 历史，不靠任何工具的内置记忆。
 
 **开场三件事（每次会话开始先做）：**
 1. `git log --oneline -15` + `git status` — 看最近提交与未提交改动
 2. 读 `docs/superpowers/todo-list.md` — 当前工作线与挂起项
-3. 读 `docs/superpowers/agent-log.md` 最近几条 — 其他 Agent 最近做了什么、有什么遗留
+3. 读 `docs/superpowers/agent-log.md` 最近几条 — 其他 Agent 最近做了什么、有什么在途声明、有什么遗留
 
-**收工写日志（每次会话结束前）：**
-- 在 `docs/superpowers/agent-log.md` **顶部**插入一条，格式见该文件头：完成（含 commit hash）/ 进行中 / 注意事项
+**开工声明（动第一行代码之前，2026-09-05 起为硬约定）：**
+- 在 `docs/superpowers/agent-log.md` 顶部（紧随文件头协议块之下）插入**开工条目**：时刻 + 工作范围（文件/目录清单）+ 禁入区（他线热区/工作区 WIP）+ 执行方式，然后**立即 commit**——未提交的声明对其他 Agent 不可见
+- 自己的文件集必须与所有在途声明及工作区未提交改动不相交；有交集先协调或换文件集
+- 主会话派发子智能体时**代为声明**（子智能体不直接写 agent-log，避免并行编辑冲突）；子智能体一律不 commit，由主会话验收后代提交
+
+**收工回报（任务单元结束时）：**
+- 在顶部插入**收工条目**回链开工条目：完成（含 commit hash）/ 验收证据 / 遗留移交——开工条目中的"进行中"至此闭环，状态以收工条目为准
+- 提交 agent-log 时若顺带携带了其他会话的未提交条目，在 commit message 注明
 - 一个任务单元结束尽量 commit——未提交的工作对其他 Agent 不可见
 - **不维护 CHANGELOG.md**（2026-09-04 已移除）：变更史以翔实的 git commit message 为准，不要重建该文件
 
