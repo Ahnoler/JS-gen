@@ -1,3 +1,21 @@
+## 2026-09-05 · Zcode 重构会话 — A组冷区重构三项启动（6-1/6-2/6-4）
+- 进行中：**范围=仅 Node 控制面三个冷区文件，与引擎/KB 热区零交集**：①`src/services/transaction-export-v3.js`（984行）拆 mapping/builders/validation/assembly——原文件保全部 15 个具名导出面（barrel），characterize-transaction-name.mjs 钉住的 sanitize 子串留在原文件 ②`src/services/trajectory/trajectory-recording-runner.js`（813行）phase 上下文装配拆分——被 7 个特征化 read_text 钉住原路径，钉中子串一律不动 ③`src/routes/browser-session/register.js`（664行，零 pin）rerun-replay 段抽 service——红线：不迁 runReplayActions，seed_action_log/本地浏览器双分支/stop_on_fail 缺省语义原样
+- 方式：三个不相交文件集并行子智能体实施，子智能体不 commit；主线程验收 node --check / eslint 0 warning / verify-all 全绿 / diff 范围核查后分三个 refactor(scope) 提交
+- 禁入（引擎/KB 会话热区+他线 WIP）：`scripts/controller/actions/**`、`scripts/agent/**`、`scripts/prompts/**`、`data/kb/**`、`scripts/kb/**`、`scripts/characterization/**`（如 pin 确需调整只报告不动手）、工作区他线未提交改动（_table.py/xhr_log.py/product_library.json/agent-log 既有未提交条目等）
+- 完成后：本文件顶部更新结果（含 commit hash）+ `docs/superpowers/重构交接-波次4-6实施文档.md` §7 表格状态同步
+
+## 2026-09-05 · Cursor Lead — I7 挂子收口（#506 实证）
+- 完成：#506 recorded；`click_button(新增分类)` + toast 操作成功；stamp depth=1 在父下（`_flags506.json` success_hang_child）
+- 完成：`product_library` source/规则挂 #506；双 folder-add 口径闭环（#504 反例 + #506 正例）
+- 注意：卡增量未另 commit（相对 `f281515`）；录制子代理 ffdf1dc4
+
+## 2026-09-05 · Cursor 录制子代理 — I7「新增分类」挂子实证（#506）
+- 完成：#506 recorded+detach（9000000740）；任务 `task-addcat-requirement.md` stamp `20260905-0015`；文案无「新增子分类」
+- 完成：agent `click_button(新增分类)`（未点「新增一级分类」）+ toast「操作成功」；slot1/CDP **19243**（slot0 他线 #505 未打断）
+- 完成：CDP 展开父后 stamp `KB测子挂-20260905-0015(0)` **depth=1** 挂在 `KB测一级-20260904-1925(2)` 下（非顶层）；双 folder-add aria 一级|分类
+- 报告：`tmp/product-mgmt/through-report.md` I7；证据 `_cdp_i7_tree.json` / `_flags506.json`
+- 未 commit；未碰信贷 WIP
+
 ## 2026-09-04 · Cursor 录制子代理 — I6 子分类口径浅验（#504）
 - 完成：#504 recorded+detach（9000000740）；任务文案无「点击新增子分类」；CDP 工具栏无「新增子分类」、有「新增一级分类」
 - 完成：agent `click_button(新增一级分类)` + toast「操作成功」；stderr `kb_flow injected: 产品库管理`（非要素库）
