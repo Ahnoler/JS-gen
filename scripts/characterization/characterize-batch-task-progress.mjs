@@ -137,7 +137,11 @@ const sess = readFileSync(join(ROOT, 'src/routes/browser-session/session-message
 assert.match(sess, /appendPhaseDoneLog/);
 assert.match(sess, /session\.aiRecording/);
 const attach = readFileSync(join(ROOT, 'src/services/trajectory/trajectory-attach-runner.js'), 'utf-8');
-assert.match(attach, /isAiRecordingActive\(tid\)/);
+// 4145e23 校准：prepare（开浏览器/推流）≠ 录制——attach-runner 不得把持久状态覆盖为 recording，
+// 也不得依赖瞬态 record_status；本地路径保留 single-live 409 门禁。
+assert.doesNotMatch(attach, /recordStatus: 'recording'/);
+assert.doesNotMatch(attach, /isAiRecordingActive/);
+assert.match(attach, /single-live|Local \(non-executor\) mode only supports one live/);
 const hub = readFileSync(join(ROOT, 'src/executor-event-hub.js'), 'utf-8');
 assert.match(hub, /promise\.cancel = cancel/);
 

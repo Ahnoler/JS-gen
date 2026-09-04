@@ -55,16 +55,20 @@ async function main() {
     assert.ok(utils.includes('trajectoryDao.hasRunningPhase(trajectoryId)'), 'wrapper delegates');
   });
   run('start gate: AI-active recording → 409; pure-occupy can start', () => {
+    // 4145e23 校准：录制中信号源 = 存在 running 阶段（isAiRecordingActive），而非瞬态 record_status；
+    // 门禁为单条件 AI-active 检查（并发录制无论持久状态一律拦截，pure-occupy 放行）。
     const runner = readFileSync(join(ROOT, 'src', 'services', 'trajectory', 'trajectory-recording-runner.js'), 'utf8');
-    assert.ok(runner.includes("traj.recordStatus === 'recording' && (await isAiRecordingActive(tid))"), 'gate uses AI-active check');
+    assert.ok(runner.includes('if (await isAiRecordingActive(tid)) {'), 'gate uses AI-active check');
+    assert.ok(!runner.includes("recordStatus === 'recording' && (await isAiRecordingActive"), 'gate must not gate on transient record_status');
   });
-  run('batch INTERRUPTED: CAS failed before cleanup', () => {
+  run('batch CAS-lost: live detach + recovery-path cleanup exists', () => {
+    // 4145e23 校准：CAS 丢占用 → 轻量 detach(batch_cas_lost)，资源清理统一由重启恢复路径兜底；
+    // 恢复路径对 preparing/recording 中断 item 仍执行 cleanupPersistedTrajectoryResources。
+    const rec = readFileSync(join(ROOT, 'src', 'services', 'trajectory', 'batch-record.js'), 'utf8');
+    assert.ok(rec.includes("reason: 'batch_cas_lost'"), 'CAS-lost path detaches live');
     const svc = readFileSync(join(ROOT, 'src', 'services', 'trajectory', 'trajectory-batch-service.js'), 'utf8');
-    const iFailed = svc.indexOf("recordStatusIn: ['recording']");
-    const iFirstCleanup = svc.indexOf('cleanupPersistedTrajectoryResources(tid');
-    const iLastCleanup = svc.lastIndexOf('cleanupPersistedTrajectoryResources(tid');
-    assert.ok(iFailed !== -1 && iFirstCleanup !== -1 && iLastCleanup > iFirstCleanup, 'both cleanup branches exist');
-    assert.ok(iFailed > iFirstCleanup && iFailed < iLastCleanup, 'failed CAS must precede its own (INTERRUPTED) cleanup');
+    assert.ok(svc.includes('cleanupPersistedTrajectoryResources(tid'), 'recovery path cleans persisted resources');
+    assert.ok(svc.includes('restorePersistentRecordStatus'), 'recovery restores persistent base (no downgrade)');
   });
 
   run('step edit/move gate: AI-active only', () => {

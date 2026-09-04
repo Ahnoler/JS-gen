@@ -61,8 +61,12 @@ def main():
     assert "kb-dict-type-not-found" in r3 or '"ok"' in r3 or "ok:" in r3
 
     # kb_state / kb_rule：流程卡入库后可召回
+    # 2026-09-05 校准：卡片按引擎实证修正——撤销仅在「待发起」，审批中可查看/流程轨迹/流程取回。
     r4 = str(asyncio.run(acts["kb_state"].function("授信申请", "审批中")))
-    assert "撤销" in r4, r4[:200]
+    assert "流程取回" in r4 and "查看" in r4, r4[:200]
+    assert "流程轨迹" in r4, r4[:200]
+    r4b = str(asyncio.run(acts["kb_state"].function("授信申请", "待发起")))
+    assert "撤销" in r4b, r4b[:200]
     r5 = str(asyncio.run(acts["kb_rule"].function("退回")))
     assert "退回" in r5, r5[:200]
 
