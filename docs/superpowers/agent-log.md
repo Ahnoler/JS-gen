@@ -9,6 +9,11 @@
 - 禁入：`scripts/kb/**`、`data/kb/**`（Cursor I10 在途 product_core_mapping + KB 线热区；Task 8 dry-run 对 data/kb 仅只读）、工作区他线 WIP、`scripts/characterization/**` 既有文件（新建 characterize-kb-insights.mjs 除外）
 - 与在途声明核查：Cursor 02:28 I10 范围（data/kb+tmp+docs）与本范围零交集 ✓
 
+## 2026-09-05 02:35 · Cursor Lead — 收工回报：I10 核心产品映射（回链 02:28）
+- 完成：`product_core_mapping.json` 回填 hash=`corePdMpng` / pageId=`ZJJK00095454`；湿测 **#513 recorded**（0230，6/6，21 steps，slot0/19242）；stamp 新增后删除清理
+- 验收：CDP `#/pdMgt/pdInfMgt/corePdMpng`；召回 `corePdMpng`→本卡；kickoff `c0d716c`，本收工随下条 commit
+- 遗留：信贷 WIP 等仍勿提交；产品管理 KB 现五卡（库/要素/阶段/查询/核心映射）
+
 ## 2026-09-05 02:28 · Cursor Lead — 开工声明：I10 核心产品映射卡 + 浅湿测
 - 开工：02:28。起草 `data/kb/flows/product_core_mapping.json`（据遗留 #59/#50）；挂载 **9000000230**（hierarchy 无独立「核心产品映射」节点，与 #59 同）；浅湿测进页→选树→查询→可选 stamp 新增再删
 - 范围：`data/kb/flows/product_core_mapping.json`、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`、`tmp/product-mgmt/task-mapping-requirement.md`（及 API 证据）
