@@ -23,7 +23,16 @@ JS snippet constants: 引入保证人 复合引擎动作的页面半边（填弹
   须含 客户编号/与借款人关系/担保金额 特征）/ {ok:true, dup:true, rows:n,
   verified_in:'main-form'}（后端报不可重复被引入且主列表已有该行=幂等
   成功）/ {ok:false, error:'err-guarantee-dup-not-in-list'|
+  'err-guarantee-relation-mismatch:<key> expect_rel=<relation>'|
   'err-guarantee-rejected:<异常信息摘要>'|'err-guarantee-not-in-list:<key>'}
+
+VERIFY 收紧（run24/25b 假阳性实证，交接 §3.1）：031/032/038 引擎报
+rows=1 但主列表实际为空——误读了弹窗候选表（其表头同样含 客户编号/
+与借款人关系/担保金额 三特征）。两条防线：
+  ① 任何位于 .el-dialog/.el-drawer/.el-message-box 内的表一律排除
+    （t.closest 判定，不依赖 introDlg 探测是否命中）；
+  ② 命中行须同时校验「与借款人关系」单元格值含所填 relation
+    （表头定列序取该行对应 td）。
 """
 
 JS_INTRODUCE_GUARANTOR_FILL = '''async (args) => {
@@ -203,8 +212,9 @@ JS_INTRODUCE_GUARANTOR_FILL = '''async (args) => {
 }'''
 
 JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
-    const [keyRaw] = args || [];
+    const [keyRaw, relationRaw] = args || [];
     const guarantorKey = String(keyRaw == null ? '' : keyRaw).trim();
+    const relation = String(relationRaw == null ? '' : relationRaw).trim();
     const fail = (err, extra) => JSON.stringify(Object.assign({ ok: false, error: err }, extra || {}));
     if (!guarantorKey) return fail('err-guarantee-args-empty: guarantor_key 必填');
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -244,11 +254,30 @@ JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
     const introDlg = visibleDialogs()
         .find((d) => compact(d.textContent).includes('担保金额')) || null;
 
-    // 主列表读取：表头含「客户编号」+「与借款人关系」+「担保金额」的 el-table，
-    // 排除弹窗自身（表头特征断言防误读弹窗候选表/其他表）；多个候选表时依次
-    // 尝试，取首个含 key 的表，否则回退第一个候选表的行数
+    // 主列表读取：表头含「客户编号」+「与借款人关系」+「担保金额」的 el-table。
+    // run24/25b 假阳性实证：弹窗候选表同样含这三列特征，introDlg 探测失效时
+    // 会漏进来（031/032/038 引擎报 rows=1 而主列表实空）→ 收紧两条防线：
+    // ① 任何 dialog/drawer/message-box 内的表一律 closest 排除；
+    // ② 命中行须「与借款人关系」单元格含 relation（表头定列序）。
+    const rowKey = (r) => compact(r.textContent || '').includes(guarantorKey);
+    const headerIndexOf = (tbl, name) => {
+        const ths = [...tbl.querySelectorAll('.el-table__header-wrapper th')]
+            .filter((th) => !th.classList.contains('gutter'));
+        for (let i = 0; i < ths.length; i++) {
+            if (norm(ths[i].innerText || ths[i].textContent).includes(name)) return i;
+        }
+        return -1;
+    };
+    const rowRelOk = (row, tbl) => {
+        if (!relation) return true;
+        const idx = headerIndexOf(tbl, '与借款人关系');
+        if (idx < 0) return false;
+        const td = [...row.querySelectorAll('td')][idx] || null;
+        return !!td && norm(td.innerText || td.textContent).includes(relation);
+    };
     const readMain = () => {
         const tables = [...document.querySelectorAll('.el-table')].filter((t) => {
+            if (t.closest('.el-dialog, .el-drawer, .el-message-box')) return false;
             if (introDlg && (introDlg.contains(t) || t.contains(introDlg))) return false;
             if (!visible(t)) return false;
             const head = compact(t.querySelector('.el-table__header-wrapper')?.textContent || '');
@@ -261,13 +290,14 @@ JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
                 '.el-table__body-wrapper tbody tr.el-table__row, .el-table__body tr'
             )].filter((r) => visible(r)
                 && !r.closest('.el-table__fixed, .el-table__fixed-body-wrapper, .el-table__fixed-right'));
-            const info = { rows: rows.length, hasKey: rows.some((r) => rowKey(r)) };
-            if (info.hasKey) return info;
+            const keyRow = rows.find((r) => rowKey(r)) || null;
+            const info = { rows: rows.length, hasKey: !!keyRow,
+                relationOk: !!keyRow && rowRelOk(keyRow, t) };
+            if (info.relationOk) return info;
             if (!first) first = info;
         }
         return first;
     };
-    const rowKey = (r) => compact(r.textContent || '').includes(guarantorKey);
 
     // 1) 错误面（r21 实证：确认失败错误只在「异常信息」弹窗）
     let errDlg = null;
@@ -287,7 +317,7 @@ JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
         await sleep(400);
         if (errText.includes('不可重复被引入')) {
             const main = readMain();
-            if (main && main.hasKey) {
+            if (main && main.relationOk) {
                 return JSON.stringify({ ok: true, dup: true, rows: main.rows, verified_in: 'main-form' });
             }
             return fail('err-guarantee-dup-not-in-list');
@@ -307,7 +337,7 @@ JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
             // 时「异常信息」弹窗可能不渲染（仅 console/XHR），弹窗保持打开。
             // 此时若主列表已有该行 = 幂等成功（dup），否则才是真未关闭。
             const mainNow = readMain();
-            if (mainNow && mainNow.hasKey) {
+            if (mainNow && mainNow.relationOk) {
                 return JSON.stringify({ ok: true, dup: true, rows: mainNow.rows, verified_in: 'main-form' });
             }
             return fail('err-guarantee-dialog-not-closed');
@@ -317,12 +347,16 @@ JS_INTRODUCE_GUARANTOR_VERIFY = '''async (args) => {
     // 3) 轮询主列表出现含 key 的行（≤3s）
     for (let i = 0; i < 12; i++) {
         const main = readMain();
-        if (main && main.hasKey) {
+        if (main && main.relationOk) {
             return JSON.stringify({ ok: true, dup: false, rows: main.rows, verified_in: 'main-form' });
         }
         await sleep(250);
     }
     const last = readMain();
+    if (last && last.hasKey && !last.relationOk) {
+        return fail('err-guarantee-relation-mismatch:' + guarantorKey
+            + ' expect_rel=' + (relation || '(none)'), { rows: last.rows });
+    }
     return fail('err-guarantee-not-in-list:' + guarantorKey,
         last ? { rows: last.rows } : undefined);
 }'''

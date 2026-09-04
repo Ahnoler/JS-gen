@@ -370,13 +370,17 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
         'real_click(CDP) the dialog 确认 button; 4) evaluate '
         'JS_INTRODUCE_GUARANTOR_VERIFY — read the 异常信息 error surface, then '
         'verify against the PARENT-PAGE 保证人信息列表 (never the dialog '
-        'candidate table). Returns {ok:true, dup:false, rows:n} on success; '
+        'candidate table; tables inside any dialog/drawer/message-box are '
+        'excluded via closest(), and the matched row must show the given '
+        'relation in its 与借款人关系 cell — run24/25b false-positive fix). '
+        'Returns {ok:true, dup:false, rows:n} on success; '
         '{ok:true, dup:true, rows:n} when the backend rejects with '
         '不可重复被引入 AND the guarantor is already in the main list '
         '(idempotent success — safe to continue). Errors are surfaced '
         'verbatim and must NOT be blindly retried: err-guarantee-* '
         '(dialog-not-opened / candidate-row-not-found:<key> / '
         'relation-option-not-found / amount-unverified / dup-not-in-list / '
+        'relation-mismatch:<key> expect_rel=<relation> / '
         'rejected:<异常信息摘要> / not-in-list:<key>).'
     )
     async def introduce_guarantor(guarantor_key: str, relation: str, amount: str):
@@ -384,7 +388,8 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
 
         dup=true = 幂等成功（保证人已在途被本单占用且主列表已有行），可直接
         继续后续步骤；错误串原样带出（err-guarantee-*），调用方应读取并修正
-        参数/状态，禁止原参数盲试。"""
+        参数/状态，禁止原参数盲试。VERIFY 收紧：主列表命中行须「与借款人关系」
+        单元格含 relation（表头定列序），弹窗/抽屉/message-box 内的表一律不算。"""
         page = await browser_context.get_current_page()
         # 1) Trusted open: tsscBtn ignores synthetic event chains (run-ig 实证)
         rc_open = await _real_click_via_cdp(page, text='引入保证人')
@@ -411,8 +416,9 @@ def _register_table_actions(controller, browser_context, business_data_store=Non
         # 3) Trusted confirm
         rc_confirm = await _real_click_via_cdp(page, text='确认')
         # 4) Verify: error surface (dup semantics) + parent-page main list
+        #    （relation 传入做关系单元格收紧校验，run24/25b 假阳性实证）
         verify_raw = await page.evaluate(
-            JS_INTRODUCE_GUARANTOR_VERIFY, [str(guarantor_key)])
+            JS_INTRODUCE_GUARANTOR_VERIFY, [str(guarantor_key), str(relation)])
         await page.wait_for_timeout(800)
         ok, payload = _workspace_result(verify_raw)
         if not ok and rc_confirm.startswith('err-real-click-fail'):

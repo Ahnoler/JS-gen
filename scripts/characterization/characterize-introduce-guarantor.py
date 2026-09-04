@@ -24,6 +24,7 @@ checks = [
         "引入保证人",
         "err-guarantee-dup-not-in-list",
         "err-guarantee-not-in-list:",
+        "err-guarantee-relation-mismatch",
         "不可重复被引入",
         "与借款人关系",
         "担保金额",
@@ -32,6 +33,9 @@ checks = [
         "HTMLInputElement.prototype",
         "客户编号",
         "el-pager",
+        "closest('.el-dialog, .el-drawer, .el-message-box')",
+        "rowRelOk",
+        "const [keyRaw, relationRaw] = args || [];",
     )),
     ("scripts/controller/actions/_table.py", (
         "introduce_guarantor",
@@ -41,6 +45,7 @@ checks = [
         "_workspace_result",
         "dup:true",
         "err-guarantee-intro-failed",
+        "[str(guarantor_key), str(relation)]",
     )),
     ("scripts/controller/actions/_js_snippets.py", ("guarantee_intro_snippet",)),
     ("scripts/prompts/agent-tools-table.md", (

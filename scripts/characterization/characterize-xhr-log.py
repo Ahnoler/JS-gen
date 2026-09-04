@@ -31,6 +31,7 @@ checks = [
         "loadend",
         "historyTraced",
         "urlFilter",
+        "requestBody",
     )),
     ("scripts/controller/actions/_observe.py", (
         "read_xhr_log",
