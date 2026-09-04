@@ -433,6 +433,18 @@
   {
    "keyword": "草稿客户",
    "rule": "授信选择器排除草稿客户（信贷预客户/正式客户可见）"
+  },
+  {
+   "keyword": "授信方案-额度信息",
+   "rule": "授信方案步必填：金融押品评估价值/抵押率(信用类填0)/授信额度理论值/占用余额(点「获取占用余额」自动算)/可用额度/授信额度/授信期限——全部必须真实进 Vue model（Playwright fill 或 native+Tab；坐标 trusted click 不可靠）。额度分项列表≥1 行，否则 startProcess 前置报「请先维护分项额度明细信息」"
+  },
+  {
+   "keyword": "额度分项列表-新增分项额度明细",
+   "rule": "弹窗字段：分项额度名称(TsscMultiTree 体系树,接口 /tansun-tcp-ulm/ulm/stmInf/getTree,叶=授信品种如「流动资金贷款额度 CP03988120251147」)/循环标志(el-select 否=0)/金额(subCrgln)/可用额度(avlLmt 必填,disabled 需 Vue 直写)。model 键名：crgPdNo=品种编码(后端校验键,NOT crgPdCd)/crgPdNm=名称文本。保存按钮 disableBtn 类需先移除再 click"
+  },
+  {
+   "keyword": "TsscMultiTree 崩溃绕行",
+   "rule": "分项名称树的 nodeClickFun 会 NPE(serchHandel undefined, SUT 缺陷)导致选中值不落 model→后端报「授信产品编码不能为空」。绕行：fetch getTree 拿叶子编码 → ElFormItem.form.model 直接写 crgPdNo/crgPdNm + TsscMultiTree.$emit('input', 编码) 让 UI 回显 → 移除 disableBtn → click 保存"
   }
  ],
  "exceptions": [
