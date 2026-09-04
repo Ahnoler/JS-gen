@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 04:58 · Zcode Lead — 收工回报：存量红校准 + trajRow 修复 + B 级审查（回链 04:28）
+- 完成：`bfda8c9` trajRow 悬空引用修复——resolveRecordingSystemId 返回 {systemId,functionId} 双值；bug 自 5c70c68 拆分前即存在，AI 记忆事实包（AI_MEMORY_FACT_PACK）自开关引入起从未实际生效，本修复后恢复
+- 完成：`a7c3a9a` 三存量红校准（逐断言语义判定，全部为 4145e23 合理演进或卡片实证修正，非行为回归）+ **意外挖出真 bug**：K6 三卡（合同/电子签/担保合同）rules(11)/field_deps(12) 自建卡为备忘字符串——kb_rule/kb_field/**flow_summary_text(KB 注入主链)** 对其必炸，被旧断言提前失败掩盖至今，已转对象形态
+- 完成：`b3c37b3` B 级真伪审查——**四项全部判缓行**（B1 形态错配/B2 零消费者/B3 失败无长尾/B4 痛点=没人审），报告 `docs/superpowers/research/2026-09-05-b-tier-demand-review.md`（各留重新表述种子+触发条件）
+- 验收：**verify-all 历史首次 ALL GREEN**（86 项，含新入闸 kb-insights 22 checks）；record-status-v2/batch-task-progress/kb-actions 全绿
+- 移交：①K6 三卡 preconditions/exceptions 仍为备忘字符串（消费端 str() 安全，recall 摘要可读，暂不动）②卡 menu_path `→` 形态已判 unparsed（书写规范见 KB 交接文档 §6）③B 级若用户坚持推进某项，优先 B1 巡检种子/B4 `--list`（均半天级）
+
 ## 2026-09-05 04:45 · Cursor Lead — 收工回报：intermediate_flag（回链 04:37）
 - 完成：migration `intermediate_flag`；导入多页叶子→intermediate+全量 system_page；树/list/push 默认过滤；扫描/phase2 跳过；0230/0231 回填 intermediate=1（清误用 removed）
 - 验收：knex migrate Batch 38；characterize-system-import-json / menu-scan / menu-push OK
