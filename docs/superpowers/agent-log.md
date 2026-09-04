@@ -1,4 +1,12 @@
+## 2026-09-04 · Zcode (uara_V1.2) — CHANGELOG.md 移除（裁决：变更史以 git commit message 为准）
+- 完成：删除 CHANGELOG.md（23eed6d，584 行历史以 git 为准）；修正引用——`characterize-phase-highlight-screenshot.mjs`/`characterize-sys-msg.mjs` 删 CHANGELOG 断言（后者在 verify-all，已实测转绿）、`orchestration/README.md`+`orchestrator-prompt.md` 从共享文件清单移除并注明裁决、AGENTS.md 收工区加「不维护 CHANGELOG」条
+- 注意：isExport 改动曾打破 `characterize-sso-auth.mjs` 对 `countByRecordStatus` 调用串的 pin，已随本次更新 pin（verify-all 该项转绿）
+- 注意：**本会话期间有并行会话活跃**（3f16901 KB 扩卡 / 7781fc4 read_error_notify 等提交，js_snippets 三文件未提交改动在工作区，本会话未触碰）
+- 注意：一次 `git stash pop` 误弹了旧 stash@{0}（wip: before pulling trial-log branch），已全部退回，**stash@{0} 原样保留**，其 CHANGELOG/agent.mjs 的 WIP 仍在 stash 里
+- 注意：`characterize-kb-actions.py` 在 HEAD 上即失败（断言「对公授信申请」allow 含「撤销」，实测只有 查看/流程轨迹/流程取回）——存量失败与本次无关，待 KB 卡内容与断言对齐
+
 ## 2026-09-04 · Cursor (uara_V1.2) — 菜单 JSON 九条规则回归 18/18（T5 收官）
+
 - 完成：`characterize-menu-import-nine-rules.mjs` 真机覆盖 R1 快照 / R2·5.3 换父 / R3·5.4 交易跟随 / R4·5.5 改名 / R5 新增 / R6·5.7 收编 / R7–R8·5.8 删·留 / R9·5.9 下线 + 推送 menuVersion/removed/归属。全绿。todo-list ③ 菜单切换标收官。
 - 注意：5.4 须「同 pageId 换到**另一** umlEcd 功能」才迁 `function_id`；同节点仅换父不改 traj 挂载（节点 id 不变）。
 
