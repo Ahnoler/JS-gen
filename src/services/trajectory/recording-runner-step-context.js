@@ -9,20 +9,22 @@ import * as trajectoryDao from '../../dao/trajectory-dao.js';
  * 解析录制所属系统 ID（functionId 的祖先系统）；任何失败静默降级为 null，
  * 不阻断录制主链路。
  * @param {number} tid trajectory DB id
- * @returns {Promise<number|null>} 系统 ID，无法解析时为 null
+ * @returns {Promise<{systemId: number|null, functionId: number|null}>} 系统 ID 与轨迹绑定功能 ID（无法解析时为 null）
  */
 export async function resolveRecordingSystemId(tid) {
   let recordingSystemId = null;
+  let recordingFunctionId = null;
   try {
     const trajRow = await trajectoryDao.getById(tid);
     if (trajRow?.functionId) {
+      recordingFunctionId = Number(trajRow.functionId);
       const { resolveAncestorSystemId } = await import('../hierarchy-service.js');
       recordingSystemId = await resolveAncestorSystemId(trajRow.functionId);
     }
   } catch {
     recordingSystemId = null;
   }
-  return recordingSystemId;
+  return { systemId: recordingSystemId, functionId: recordingFunctionId };
 }
 
 /**

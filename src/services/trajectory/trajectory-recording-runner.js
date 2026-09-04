@@ -604,7 +604,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
   // 业务数据：仅填表/引入类阶段注入；导航/登录/查询不挂，避免「填写」污染分类。
   const bizCtx = await prepareRecordingBusinessContext(tid);
 
-  const recordingSystemId = await resolveRecordingSystemId(tid);
+  const { systemId: recordingSystemId, functionId: recordingFunctionId } = await resolveRecordingSystemId(tid);
 
   // Catalog for agent_task 【阶段目录】must list EVERY trajectory phase,
   // not only the phaseIds subset being recorded this run.
@@ -739,7 +739,7 @@ export async function startTrajectoryRecording(trajectoryId, { phaseIds = null, 
             trajectoryId: tid,
             phaseNumber: phase.phaseNumber,
             maxChars: 1500,
-            functionId: trajRow?.functionId ?? null,
+            functionId: recordingFunctionId ?? null,
           });
           if (factPack?.facts?.length) {
             stepData.fact_pack = factPack;
