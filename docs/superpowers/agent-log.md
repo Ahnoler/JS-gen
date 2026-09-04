@@ -1,3 +1,19 @@
+## 2026-09-04 · Zcode (uara_V1.2) — 引擎自主闭环冲刺收尾：038 复现 + 交接文档
+- 完成：038 担保场景复现（用户参与：手动填七模块/引入保证人/触发异常通知）——**关键纠错**：NextCheck 拒绝非"完全静默"，实为 **3s el-notification（exception-message 类，不含 error 字样）**，超时消失后不可追溯；error_notify.py 据此修正（三特征判定）+ 新增 JS_NOTIFY_HOOK（MutationObserver 持久捕获 window.__notify_log），MCP 现场 hook 捕获验证通过（11:39:49 完整捕获「7 模块未保存」全文）
+- 完成：收尾交接文档 `docs/superpowers/research/2026-09-04-engine-closure-handover.md`——当前位置（6 笔审批中+4 笔批量通过）/已定案结论（页面形态 9 条/SUT 缺陷 9 条/动作谱系 12 个/账号数据）/遗留问题（引入保证人 VERIFY 假阳性收紧/七模块完整性驱动 diff/环境缺口 3 条）/下批路线 P1-P6/快速上手命令
+- 注意：run25b 发现 introduce_guarantor VERIFY 假阳性（038 引擎报 rows=1 但 MCP 核实列表空——误读含同表头表），收紧修法已写入交接文档 §3.1；引擎自主闭环 ~90%，剩 VERIFY 收紧+七模块 diff 两件事
+
+## 2026-09-04 · Cursor Lead — I4 禁用收口（#502 recorded）
+- 完成：#502 P1–P3 `recorded`+detach；slot1/CDP **19243**（未碰 #501）；下架理由「缺陷性下架」；`click_save] SUCCESS: 状态更新成功`；状态=禁用
+- 完成：卡规则/exceptions/source 已挂禁用路径差异（二次确认走 click_save，非启用 confirm→toast_ok 日志行）
+- 产品库旁路：新增启用 / 克隆启用 / 禁用 三线湿测齐；未 commit（含卡增量）
+- 录制子代理：c23a15eb
+
+## 2026-09-04 · Cursor Lead — I4 禁用贯通启动（executor 已恢复）
+- 进行中：选中已启用 `KB测克隆-20260904-1940` → 禁用（下架理由）→ 验证 toast_ok「状态更新成功」/状态=禁用
+- 注意：信贷 #501 `run25-coronation` 占 slot0/CDP19242；本线用空闲槽，不抢不杀
+- 声明：不改信贷 WIP；`_js_snippets` re-export 已在 `8781d03` 落地
+
 ## 2026-09-04 · Cursor Lead — I3 克隆→启用收口（#500）· 等用户重启 executor
 - 完成：#500 recorded P1–P4；「克隆成功」+ `toast_ok: 状态更新成功`；CDP `KB测克隆-20260904-1940` 启用；报告 I3 节已写
 - 完成：`product_library.json` source 挂 #500；**停手等用户重启 executor**（用户明示）
