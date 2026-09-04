@@ -2,13 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
-## 2026-09-05 01:55 · Zcode Lead — spec 撰写开工声明：A级三项设计文档（调研落地第一步，仍零产品代码）
-- 开工：01:55。brainstorming 已过四问+两轮设计确认（用户拍板：单 spec 三部分 / 覆盖=存在性+明细 / A3 含 stale 只读检测 / 回填后置 / 架构=Node 单向只读 KB 文件）
-- 范围：新建 `docs/superpowers/specs/2026-09-05-kb-insights-design.md` + 本文件——**仅 spec 文档，零产品代码**
-- 后续实施（另行走 writing-plans）预计触碰：src/services/kb-flow-cards.js（新）/coverage-service.js（新）/change-impact-service.js（新）/src/routes/v2/kb.js（新）/hierarchy.js/system-mgmt.js（各加一 handler）/两个 dao（additive 方法）/api-docs groups/characterize-kb-insights.mjs（新）——实施前会另发开工声明
-- 禁入：`scripts/kb/**`、`data/kb/**`（KB 线热区，A1 回填后置；与 Cursor 01:51 在途声明无交集）、工作区他线 WIP
+## 2026-09-05 02:05 · Cursor Lead — 收工回报：tmp 清理 + I9 查询产品信息（回链 01:51）
+- 完成：清 `tmp/product-mgmt` ephemeral（157→保留 digest/task/flags/through-report）；本线无未提交遗漏（卡已入库待本 commit）
+- 完成：`product_query.json` + 湿测 **#512 recorded**（fid=9000000467，pageId=ZJJK00095907，enqrPdInf，6/6，9 steps，slot1/CDP19243）；召回 hash=`enqrPdInf`→本卡
+- 遗留检查（**勿碰/勿提交**）：信贷 WIP（`_table.py`/guarantee_intro/xhr_log/characterize-*/agent-tools-table.md）、根目录 `batch_*.png`/`loan_*.png`/`shots_*`、`config/.env.example`、未跟踪 `docs/superpowers/research/2026-09-01-replay-pipeline-handover.md`
+- 产品管理 KB 主链+旁路+查询四卡齐（库/要素/阶段/查询）；是否再扩「核心产品映射」等由用户定
+- 注意：Zcode 01:55 开工声明禁入 `data/kb/**`（其 A 级 insights spec 线）；本线 `product_query` 落盘属 01:51 已声明范围，与其「零产品代码写 spec」并行不抢
 
-## 2026-09-05 01:51 · Cursor Lead — 开工声明：清理 product-mgmt 临时文件 + I9 查询产品信息卡
+## 2026-09-05 01:55 · Zcode Lead — spec 撰写开工声明：A级三项设计文档（调研落地第一步，仍零产品代码）
 - 开工：01:51。①清理 `tmp/product-mgmt/` 下 ephemeral（`_*` API 快照/CDP 探针脚本/一次性 poll·start·create），保留 digest/task/through-report/lead/blockers/flags 精简证据；②检查本线未提交；③续作 I9 `product_query.json`（functionId=9000000467）+ 浅湿测
 - 范围：`tmp/product-mgmt/**`（删 ephemeral）、`data/kb/flows/product_query.json`（新建）、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`、可选 `docs/superpowers/specs/2026-09-04-product-mgmt-kb-design.md` 状态句
 - 禁入：信贷 WIP（`_table.py`/guarantee_intro/xhr_log/prompts/characterize-*/batch_*.png/loan_*.png/shots_*）、`config/.env.example`、`src/**`、共享 `_kb.py`/staging/promote；不删他线 research 未跟踪文件

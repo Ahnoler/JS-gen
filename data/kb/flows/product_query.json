@@ -1,0 +1,152 @@
+{
+  "flow": "查询产品信息（列表/详情/历史）",
+  "aliases": [
+    "查询产品信息",
+    "产品信息查询",
+    "查询产品",
+    "产品查询列表",
+    "enqrPdInf"
+  ],
+  "menu_path": "产品管理→查询产品信息（SPA functionId=9000000467；menu xpath //li[@data-id='RES04069']；pageId=ZJJK00095907；hash/resPath=/pdMgt/pdInfMgt/enqrPdInf；遗留 #60 误挂产品信息管理 9000000230）",
+  "biz_key_prefix": [],
+  "hash_markers": [
+    "enqrPdInf",
+    "pdMgtpdInfMgtenqrPdInf",
+    "ZJJK00095907",
+    "RES04069",
+    "pdInfMgt",
+    "pdMgt"
+  ],
+  "keywords": [
+    "查询产品信息",
+    "产品名称",
+    "产品编号",
+    "产品状态",
+    "产品目录",
+    "查询",
+    "重置",
+    "产品详情",
+    "产品历史",
+    "导出",
+    "叶子节点"
+  ],
+  "preconditions": [
+    "入口：产品管理→查询产品信息（新建交易挂 functionId=9000000467，勿再挂 9000000230）；落地页只读列表，非产品库树编辑",
+    "列表默认展示叶子节点产品；状态口径含禁用/启用/失效（以 SUT 筛选项为准）",
+    "查询条件：产品名称/产品编号/产品状态/产品目录等；【查询】筛选、【重置】清空",
+    "详情/历史为只读；导出 Excel 上限约 20000、且仅禁用+启用叶子（#60 task）；浅湿测可跳过导出",
+    "账号：systemAccountId=2"
+  ],
+  "nodes": [
+    {
+      "id": "qry_home",
+      "page": "查询产品信息主页",
+      "enter": "菜单 产品管理→查询产品信息",
+      "buttons": ["查询", "重置", "产品详情", "产品历史", "导出"],
+      "fields": ["产品名称", "产品编号", "产品状态", "产品目录"],
+      "note": "ZJJK00095907 / enqrPdInf；列表自动加载；#60 P1"
+    },
+    {
+      "id": "qry_filter",
+      "page": "条件查询",
+      "enter": "填写条件→查询",
+      "fields": ["产品名称", "产品编号", "产品状态", "产品目录"],
+      "buttons": ["查询", "重置"],
+      "note": "条件区可能需展开；#60 P2 曾 failed，湿测以可见筛选项为准"
+    },
+    {
+      "id": "qry_reset",
+      "page": "重置条件",
+      "enter": "点击重置",
+      "buttons": ["重置"],
+      "note": "#60 P3"
+    },
+    {
+      "id": "qry_detail",
+      "page": "产品详情（只读）",
+      "enter": "选中行→产品详情",
+      "buttons": ["关闭", "取 消", "取消"],
+      "note": "只读；#60 P4"
+    },
+    {
+      "id": "qry_history",
+      "page": "产品历史（全屏弹窗）",
+      "enter": "选中行→产品历史",
+      "buttons": ["关闭", "取 消", "取消"],
+      "note": "版本历史；#60 P5"
+    },
+    {
+      "id": "qry_export",
+      "page": "导出Excel",
+      "enter": "点击导出",
+      "buttons": ["导出"],
+      "note": "旁路；浅湿测可跳过；#60 P6"
+    }
+  ],
+  "field_deps": [],
+  "state_actions": [
+    {
+      "entity": "列表行",
+      "status": "有数据",
+      "allow": ["查询", "重置", "产品详情", "产品历史", "导出"]
+    },
+    {
+      "entity": "列表",
+      "status": "无匹配",
+      "allow": ["查询", "重置"],
+      "deny": ["产品详情", "产品历史"]
+    }
+  ],
+  "rules": [
+    {
+      "keyword": "入口",
+      "rule": "菜单=产品管理→查询产品信息（enqrPdInf / RES04069）。遗留 #60 挂 9000000230 属挂载偏差；新建贯通挂 9000000467。勿与产品库 pdMgtMgtPg / 产品信息管理混淆"
+    },
+    {
+      "keyword": "列表口径",
+      "rule": "默认叶子节点；状态含禁用/启用/失效（以筛选项与列值为准）"
+    },
+    {
+      "keyword": "查询",
+      "rule": "条件可组合；点【查询】刷新列表；勿把产品库树搜索当成本页查询"
+    },
+    {
+      "keyword": "重置",
+      "rule": "【重置】清空条件并恢复默认列表加载"
+    },
+    {
+      "keyword": "详情",
+      "rule": "先选中一行再【产品详情】；页内只读，勿尝试保存/启用"
+    },
+    {
+      "keyword": "历史",
+      "rule": "【产品历史】多为全屏弹窗展示版本；关闭后回列表"
+    },
+    {
+      "keyword": "导出",
+      "rule": "可选；仅禁用+启用叶子、上限约2万条；无下载环境时可跳过并在核对说明"
+    },
+    {
+      "keyword": "召回区分",
+      "rule": "hash 优先匹配 enqrPdInf / ZJJK00095907；勿因 pdMgt/pdInfMgt 公共前缀误召 product_library"
+    }
+  ],
+  "exceptions": [
+    {
+      "when": "无行可选却点详情/历史",
+      "then": "先查询出有数据的行；空表勿死点"
+    },
+    {
+      "when": "条件区折叠",
+      "then": "先展开查询条件再填；勿臆造不存在的筛选项"
+    }
+  ],
+  "source": {
+    "refs": [
+      "legacy #60 查询产品信息主页（draft，误挂 9000000230）",
+      "function-anchors：9000000467 / ZJJK00095907 / enqrPdInf / RES04069",
+      "wet-test #512 KB贯通-查询产品信息-20260905-0155（recorded，fid=9000000467，pageId=ZJJK00095907，9 steps）"
+    ],
+    "notes": "I9 #512：CDP hash=#/pdMgt/pdInfMgt/enqrPdInf；填产品名称→查询（偶发 click_element_by_index）→重置→选行→产品详情/产品历史；跳过导出。region_id 含 enqrPdInf"
+  }
+}

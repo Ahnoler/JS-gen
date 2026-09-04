@@ -7,10 +7,10 @@
 
 ## 当前工作线（2026-08-31 起）
 
-### ⑥ 产品管理 KB（清理 + I9 查询产品信息）
+### ⑥ 产品管理 KB（四卡齐 · 待用户定是否扩映射）
 
-- 三卡已入库（库/要素/阶段，至 `24d07fc`）。
-- 进行中：清 `tmp/product-mgmt` ephemeral；I9 查询产品信息卡+浅湿测（9000000467）。
+- 库/要素/阶段/查询（`product_query` ← #512）已齐。
+- 旁侧未提交：信贷 WIP + batch PNG + `.env.example` + replay-handover research（非本线）。
 
 ### ① 830 任务收尾：自测 + bug 修复
 
