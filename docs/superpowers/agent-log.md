@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 00:57 · Zcode Lead — 调研开工声明：伙伴技术交流会内容消化（纯调研，不改代码）
+- 开工：00:57。任务=用户提供的 8 张伙伴交流会截图（全景AI 测试智能化：六节点闭环/知识工程蓝图/L0-L5 业务建模/智能执行调度等）→ 学习对照本仓，产出「可化为己用」评估报告
+- 范围：新建 `tmp/research/partner-exchange-notes.md`（图文转写底稿）、`docs/superpowers/research/2026-09-05-partner-exchange-research.md`（最终报告）、本文件；**零代码改动**
+- 方式：两路只读 Explore 并行（①KB 五层体系 vs 他们的知识构建/应用/治理闭环 ②executor 批量/调度 vs 他们的智能执行触发/调度/缺陷关联+覆盖分析），主线程汇总定优先级
+- 禁入：src/**、scripts/**、data/kb/** 一律不动（只读）；报告结论按「立即可吸收 / 中期 / 不对标」分级，落地项须经用户拍板再立项
+
 ## 2026-09-05 · Zcode 重构会话 — B组收工回报：hierarchy-service 拆分完成（回链 00:48 开工声明）
 - 完成：`651c71f` hierarchy-service 723→400 行——树查询簇入 hierarchy-tree-query.js（251 行）、importTree 入 hierarchy-tree-import.js（102 行）；accounts 集群/CRUD/getNode 留守，原文件部分 barrel
 - 验收：node --check ×3 / eslint 0/0 / characterize-system-node-accounts 7 pin 全过 / menu-import nine-rules 18/18 / 16 导出名原路径可导入 / verify-all 与基线一致（唯一红=kb-actions 存量，无新增）
