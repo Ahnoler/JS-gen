@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 · Zcode Lead — 开工声明：agent-log 收工条目梳理（归档分流）
+- 开工：本会话。用户指示整理 agent-log 中与当前开发方向无关或冲突的条目
+- 范围：`docs/superpowers/agent-log.md`（重组）+ 新建 `docs/superpowers/agent-log-archive-2026-09-05.md`（历史归档）；子智能体只读调研不写文件
+- 禁入：工作区全部未提交改动（config/.env.example、根目录 png 等）、其他在途线文件
+- 方式：主会话编辑（单文件写点）；两路只读 Explore 并行盘点条目闭环状态与 commit hash 有效性
+- 原则：**历史不删只归档**；在途/未闭环条目与现行裁决（B 级缓行、CHANGELOG 废止等）必须保留在主文件
+
 ## 2026-09-05 10:39 · Cursor Lead — 开工声明：正式 systemId=1 全量 scan-menu 修复
 - 开工：10:39。用户「接下来修复正式 systemId=1」；scan 已启 `247e4ec8-a11b-4d57-b432-e744cf594025`
 - 范围：MySQL `system`/`system_page`（仅 systemId=1 扫描写回）；本文件 + todo/plan 勾选；`tmp/product-mgmt/_scan_*_1*`
