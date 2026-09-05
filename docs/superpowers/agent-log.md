@@ -14,6 +14,12 @@
 - 验收：service.py/_helpers/replay_* 逐文件 import 实查；browser_context= browser_use 会话、registry 兜底必需、PYTHONUTF8=1 三条硬约束入文；autofill 链 _watcher_mode 抑制实证（_replay.py:544）
 - 遗留移交：①导出脚本 `export_engine_subset.mjs` 未实施（§4 步骤 1，待用户确认后 0.5 天）②同步机制待同事确认是否需回放行为对齐（§3 前提）③menu 线同事侧 data-url 替代方案仍待其反馈
 
+## 2026-09-05 12:20 · Zcode Lead — 收工回报：actions 契约文档（回链 11:58）
+- 完成：`docs/superpowers/specs/2026-09-05-engine-actions-contract.md`——步骤 entry 结构、§2 动作词汇（直派 4+close 组 6+索引/表格+表单四件套+检查点+registry 开放集 26 名）、§3 别名归一 17 条、§4 结果协议（result 前缀判成败全表+stop_on_fail 语义）、§5 对齐冒烟三步、§6 变更流程（改词汇须同提交更新契约）
+- 验收：词汇全部实查 `_DIRECT_REPLAY_ACTIONS`/`replay_names.py`/`_result_ok`/registry 注册名，非记忆凭写
+- 注意：`docs/*` 默认 gitignore（仅白名单入库），契约放 specs/ 白名单；本契约与 `replay_names.py` 冲突时以代码为准
+- commit `2222109`；遗留移交：导出脚本 `export_engine_subset.mjs` 仍未实施（待用户确认）；契约文档待转同事评审
+
 ## 2026-09-05 11:58 · Zcode Lead — 开工声明：actions 契约文档（两边引擎接口约定）
 - 开工：11:58。用户指示「我们需要约定 actions」——把回放动作词汇（动作名/参数/语义/结果协议/别名）固化为跨团队契约文档
 - 范围：新建 `docs/engine-actions-contract.md`；只读提取 `_replay.py` 直派表、`replay_names.py` 别名表、controller 注册动作；本文件开工/收工条目
