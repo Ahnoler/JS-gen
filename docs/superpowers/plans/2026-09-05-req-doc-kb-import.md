@@ -339,7 +339,7 @@ git status --short data/kb/flows
 
 Expected: 空（无本任务改动）。
 
-- [ ] **Step 4: Commit 文档勾选与 spec 回链**
+- [x] **Step 4: Commit 文档勾选与 spec 回链** — `9e345e8`
 
 ```bash
 git add docs/superpowers/specs/2026-09-05-req-doc-kb-import-design.md docs/superpowers/plans/2026-09-05-req-doc-kb-import.md
