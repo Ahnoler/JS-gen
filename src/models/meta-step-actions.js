@@ -33,6 +33,29 @@ export const META_STEP_ACTIONS = Object.freeze([
 const META_SET = new Set(META_STEP_ACTIONS);
 
 /**
+ * Pure observation / engineering actions (no page interaction produced).
+ * These are NOT persisted into trajectory_step at all.
+ */
+export const ENGINEERING_STEP_ACTIONS = Object.freeze([
+  'semantic_snapshot',
+  'read_error_notify',
+  'read_xhr_log',
+  'kb_flow',
+]);
+
+const ENGINEERING_SET = new Set(ENGINEERING_STEP_ACTIONS);
+
+/**
+ * 判断动作类型是否为观察/工程类动作（不落库）。
+ * @param {string} [actionType] 动作类型
+ * @returns {boolean} 是否为工程类动作
+ */
+export function isEngineeringStepAction(actionType) {
+  const a = normalizeActionName(actionType || '');
+  return Boolean(a) && ENGINEERING_SET.has(a);
+}
+
+/**
  * 判断动作类型是否为元步骤（不产生页面操作）。
  * @param {string} [actionType] 动作类型
  * @returns {boolean} 是否为元步骤动作

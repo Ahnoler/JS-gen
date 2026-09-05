@@ -9,6 +9,7 @@ import * as trajectoryStepDao from '../../dao/trajectory-step-dao.js';
 import * as formSnapshotDao from '../../dao/form-snapshot-dao.js';
 import { getDB } from '#config/database.js';
 import { stepFromActionLog } from '../../models/helpers.js';
+import { isEngineeringStepAction } from '../../models/meta-step-actions.js';
 import { touchTrajectoryRuntimeActivity } from './trajectory-runtime.js';
 import { refreshTrajectoryCounts } from './trajectory-step-service.js';
 import { resolvePhaseIdForPersist } from './trajectory-persist-service.js';
@@ -31,6 +32,10 @@ export async function appendRecordedStep(trajectoryDbId, entry, { source, trajec
   const actionName = String(entry.action || entry.actionType || '').trim();
   if (actionName === 'save_form_snapshot') {
     return appendRecordedFormSnapshot(tid, entry, { source, trajectoryPhaseId });
+  }
+  // 观察/工程类动作（semantic_snapshot 等）不产生页面交互，不写入 trajectory_step
+  if (isEngineeringStepAction(actionName)) {
+    return null;
   }
 
   const actionId = entry.id ? String(entry.id).trim() : null;
