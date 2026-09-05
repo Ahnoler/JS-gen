@@ -2,6 +2,15 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 03:10 · ZCode Lead — 阶段回报：loan-corp + loan-retail 双模块收口（流水线第七/八循环，用信域过半）
+- 完成（常驻窗口首两循环，流水线重叠运行：B(N)+A(N+1) 并行）：**loan-corp 48/48（28 match/7 drift/10 blocked/3 not-found）** + **loan-retail 84/84（43 match/7 drift/34 blocked）**；提交 `e0009f3`/`cafae84`
+- Lead 验收：checker 双模块 0 FAIL（checker 修复 2 处：斜杠组行全编号计数/pending 行豁免日期）；抽 loan-retail 叶1（按钮行+自动加载 18 行）+loan-corp 叶1（38 条自动加载+按钮组）页面复核吻合 ✓
+- **loan-corp 关键披露**：B 组验证叶8 时向导【下一步】按产品设计自动创建草稿流程 YXPC20260906012042（待发起、未提交、本账号名下）——非违规，已在 wet-test/chapters 双处标注为引擎自动化关键行为（点下一步=建草稿）
+- 用信域价值发现：①向导【下一步】建草稿行为；②api-contract 疑点 3（批复已用金额负值/委托人列表口径/列头缺字）；③用信域列表全部自动加载（与授信/评级相反）；④not-found 3 叶=新增贷款场景无关联合同/借据分区（文档多写）；⑤loan-retail 三合一 57 叶经 look 态任务页一次承载核验（产品子页仅渲染当前记录——数据覆盖受限记 blocked）
+- checker 能力增强：斜杠组兼容验证通过（loan-retail 84 叶空表干跑 0 FAIL）
+- blocked 台账：186（+44）；观察池第 4 轮素材累计 15 条
+- 下一循环：disburse（B 组已派）+ repay（A 组并行）
+
 ## 2026-09-06 02:25 · ZCode Lead — 常驻窗口声明：余量 23 模块湿测连续执行（用户指令：不待指令一直做，遇阻塞再商量）
 - 开工：02:25。A→B→C 流水线滚动推进剩余 23 个模块（loan-corp → loan-retail → disburse → repay → postloan×3 → collection → product-mgmt → archive → smart-ctrl → portal → asset-preserve×2 → digital×2 → limit×2 → meeting-mgmt）；流水线重叠：B(N) 浏览器 + A(N+1)/C(N-1) 文本并行
 - 已顺手清账：rating chapters 三章清单行契约化回补（03/04/05），checker 7/7 模块 ALL GREEN（rating 机械口径更正 35/4/7，以表格为准）
