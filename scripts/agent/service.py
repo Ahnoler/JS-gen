@@ -297,9 +297,12 @@ async def _run_agent_step_prepare(instruction, step_index, llm, browser_context,
         all_phases_for_preamble = instruction.get('all_phases') or instruction.get('allPhases')
         prior_outcome_for_preamble = instruction.get('prior_outcome') or instruction.get('priorOutcome')
         if not heal_mode:
+            # 单一注入点：当前任务只放剥离【业务数据】块后的目标文本（phase_core），
+            # 业务数据统一由下方 format_business_data_hint 追加一次，避免同一块在
+            # agent_task 里出现两遍（内嵌一遍 + hint 一遍）。
             agent_task = format_phase_preamble(
                 current_phase=int(phase_for_preamble) if phase_for_preamble is not None else 0,
-                current_task=agent_task,
+                current_task=phase_core,
                 prior_phases=prior_phases if isinstance(prior_phases, list) else None,
                 prior_outcome=prior_outcome_for_preamble if isinstance(prior_outcome_for_preamble, dict) else None,
                 all_phases=all_phases_for_preamble if isinstance(all_phases_for_preamble, list) else None,

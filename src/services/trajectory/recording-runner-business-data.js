@@ -54,16 +54,10 @@ export async function prepareRecordingBusinessContext(tid) {
  */
 export function applyBusinessDataToStep(stepData, instruction, ctx) {
   const wantBiz = ctx.phaseNeedsBusinessData(instruction);
-  if (
-    wantBiz
-    && ctx.caseBlockSuffix
-    && !instruction.includes(ctx.CASE_BLOCK_MARK)
-    && !instruction.includes(ctx.CASE_BLOCK_MARK_LEGACY)
-  ) {
-    instruction = instruction + ctx.caseBlockSuffix;
-  } else if (!wantBiz) {
-    instruction = ctx.stripBusinessDataBlock(instruction);
-  }
+  // instruction 保持干净目标文本，业务数据由执行机 format_business_data_hint
+  // 统一注入一次（跟在任务文本后面），不再内嵌进每条 instruction；
+  // 历史 trajectory 的 description 可能已内嵌块，这里统一剥离避免同文重复。
+  instruction = ctx.stripBusinessDataBlock(instruction);
   stepData.instruction = instruction;
   if (wantBiz && ctx.businessDataBlock) {
     stepData.business_data_block = ctx.businessDataBlock;
