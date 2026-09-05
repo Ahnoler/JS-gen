@@ -2,6 +2,16 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 13:33 · Zcode Lead — 开工声明：画面推流优化（ack 定速产帧 + 零观众停推）
+- 开工：13:33。调研报告 research/2026-09-05-screencast-optimization.md（bd6ecd0）经用户批准，两批实施
+- 范围：`src/cdp/screencast-timing.js`、`executor/bib-bridge.js`、`src/cdp/remote-bridge/{screencast.js,state.js,ws-router.js,index.js}`、`src/executor-ws.js`、`src/ws-server.js`、`scripts/characterization/characterize-screencast-timing.mjs`、`config/.env.example`、`tmp/screencast_probe.mjs`、本文件
+- 禁入：`config/.env`（他线热区）、`scripts/controller/**`、`src/services/remote-session-service.js`、菜单/KB/引擎线 WIP、对公建档线 tmp/customer-mgmt
+- 方式：主线程直接改（跨文件耦合紧），不改动作协议既有消息名
+## 2026-09-05 13:25 · Cursor Lead — 收工回报：对公建档复录 #524（回链 13:11 / ba27580）
+- 完成：traj **#524** recorded；stamp **KB测客户-20260905-1315** 列表 hit（cstNo=`26090513160716537`）；**stepCount=9**（P2：新增/选类型/填 stamp+USCC/保存）；卡 source 已挂 #524；`through-report.md` 更新；detach rs=1169
+- 验收：`tmp/customer-mgmt/cdp-list-check-524.json` + `_tree524_full.json`；P3/P4 仍 0 步假完成（引擎门闩另案）
+- 遗留移交：phase_done 证据门闩；引入深录；个人/OCR 旁路
+
 ## 2026-09-05 13:11 · Cursor Lead — 开工声明：对公建档复录沉淀步骤（回链客户 KB）
 - 开工：13:11。#515 AI 假成功几乎无步骤；新建交易复录，任务文案强化成功门闩（列表 stamp / 禁止过早 done）；USCC 固定 18 位；OCR 仍禁入
 - 范围：`tmp/customer-mgmt/**`（任务/证据）、可选回写 `data/kb/flows/customer_onboarding.json` source、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`
