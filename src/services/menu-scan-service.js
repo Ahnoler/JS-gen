@@ -24,6 +24,7 @@ export function extractMenuDataId(xpath) {
  * 匹配规则：L1 按 `name` trim 后精确匹配既有模块名；
  * L2 优先按 `parentName` 下子节点 `menuXpath` 的 data-id 命中（命中则 updates，名称不同时带 `name` 改为 SUT 文案），
  * 其次按同名命中——但仅当该子节点 xpath 为空或 data-id 与扫描一致（避免把叶子 xpath 写到错名幽灵上）；
+ * 再其次按同名 `intermediateFlag===1` 子节点升格（`promote: true`）；
  * 否则 creates。
  * 命中 → `updates`（带 menuXpath）；若该节点 `unmatchedFlag===1` → 同时记入 `clearedUnmatched`。
  * 未命中 → `creates`（L1 带 `parentName:''`，L2 带 parentName）。
@@ -112,6 +113,14 @@ export function buildScanApplyPlan(scannedMenus, existingModules) {
         matched += 1;
         if (Number(fnNode.unmatchedFlag) === 1) clearedUnmatched.push(fnNode.id);
       } else {
+        const interByName = kids.find(
+          (c) => Number(c.intermediateFlag) === 1 && String(c.name || '').trim() === name,
+        );
+        if (interByName) {
+          updates.push({ nodeId: interByName.id, menuXpath: xpath, sortOrder, promote: true });
+          matched += 1;
+          continue;
+        }
         creates.push({ level: 2, name, parentName, xpath, sortOrder });
       }
       continue;
