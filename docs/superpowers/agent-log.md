@@ -2,9 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 19:12 · Cursor Lead — 收工：需求导入实现计划（writing-plans）
+- 完成：`docs/superpowers/plans/2026-09-05-req-doc-kb-import.md`（T1 Skill → T2 服务+pin → T3 路由+docs → T4 跟跑）
+- 注意：待用户选 Subagent-Driven 或 Inline 执行；尚未写产品代码
+
 ## 2026-09-05 19:06 · Cursor Lead — spec 补记：共享资料包地图（用户选 A）
 - 完成：`2026-09-05-req-doc-kb-import-design.md` 增 §3.1；第一版仍只导入 **X_需求文档**；手册/接口/案例/计划仅文档化 Out
-- 注意：未开 writing-plans；待用户再确认后出实现计划
+- 注意：writing-plans 已于 19:12 收工条目闭环
 
 ## 2026-09-05 18:57 · Cursor Lead — 收工回报：需求导入 KB 设计 spec（回链 18:57 开工）
 - 完成：brainstorming 方案 1 + §1–§4 用户批准；spec `docs/superpowers/specs/2026-09-05-req-doc-kb-import-design.md`

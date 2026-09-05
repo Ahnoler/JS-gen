@@ -178,4 +178,4 @@ Body：`moduleKey`、`moduleName`、`sourcePath`、可选 `note`。
 
 - 产品管理先例：`tmp/product-mgmt/req-mainchain.md`、`docs/superpowers/specs/2026-09-04-product-mgmt-kb-design.md`（需求作导航、不直接 promote）  
 - KB 交接：`docs/superpowers/research/2026-09-04-kb-build-handover.md`（湿测 → staging → promote）  
-- 计划位：待 `docs/superpowers/plans/2026-09-05-req-doc-kb-import.md`（spec 审阅通过后 writing-plans）
+- 计划位：`docs/superpowers/plans/2026-09-05-req-doc-kb-import.md`（已写；待执行）
