@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 16:05 · Zcode Lead — 开工声明：链B合同签订（批复项下合同创建+签订信息，卡不可逆提交点）
+- 开工：16:05。接「继续」——链B深化第一步：为用信批复 DGYXPF202609050016010 创建对公合同并填齐签订信息（配方=duigong_contract_sign 卡）
+- 范围：tmp/e2e/（报告+截图）、docs/superpowers/agent-log.md、docs/superpowers/research/2026-09-05-engine-closure-phase2-plan.md、必要时 data/kb/flows/duigong_contract_sign.json；SUT 实机（701994）
+- 禁入：他线 WIP（src/services/trajectory/trajectory-meta-service.js、docs 删除项）、config/.env*、「模拟电子签」「电子签合同状态生效」按钮（KB 一律禁止）
+- 方式：主会话 Playwright MCP 实操；**签订提交为不可逆动作（KB 约定需用户授权），本轮只做合同创建+填齐，到提交点停下问询**
+
 ## 2026-09-05 15:15 · Zcode Lead — 收工回报：链B用信支线全链贯通（回链 10:38）
 - 完成：**链B补债收官**——授信批复 DGSXPF20260905020004 项下发起对公用信申请 **YXPC20260905012041**（贯通验证企业190416 / 政采贷（流动资金贷款）/ 10 万 / 12 月），wf_usecredit_001 全链 001(701994)→002(WN0001)→003(701994)→004(WN0001 同意) 通过，**用信批复 DGYXPF202609050016010 自动生成已生效**。链B至此=客户→评级→授信→授信批复→用信→用信批复 全链与链A等深。
 - 完成：新实证 4 项已沉淀 KB 卡 credit_usage（+4 规则，13→17）：①方案品种产品必须命中授信分项品种（validLmtSubExist，额度四字段自动回填=正向信号）②信用担保死路→保证+引入保证人（弹窗行内先填关系+金额）③tssc-multi-select 的 $emit 不落 model 须直写 form.model（涉农真键 agrirelLoanInd）④DIGT_IDY_CL 列超长 SUT 缺陷（'0' 绕行）+ i18n 崩溃吞 toast 用 formComp.validate() 诊断。
