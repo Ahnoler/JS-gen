@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 12:37 · Cursor Lead — 开工声明：客户管理 KB 贯通（对公建档 A）
+- 开工：12:37。用户确认方案 1 + 档位 A；落设计/计划后按计划回写 `customer_onboarding`（挂 **functionId=7**）并湿测
+- 范围：`docs/superpowers/specs/2026-09-05-customer-mgmt-kb-design.md`、`docs/superpowers/plans/2026-09-05-customer-mgmt-kb.md`、`data/kb/flows/customer_onboarding.json`、`tmp/customer-mgmt/**`、`docs/superpowers/agent-log.md`、`docs/superpowers/todo-list.md`
+- 禁入：OCR/影像、个人/集团等旁路、合同用信、`_kb.py`/promote/prompts（默认）、产品五卡、他线 WIP、`config/.env*`
+- 注意：对公客户管理正式 id 为 **7**（1478 已合入）；勿再挂 1478
+- 方式：主会话；录制可派子代理（代声明、不 commit）
+
 ## 2026-09-05 · Zcode Lead — 收工回报：withTrajectoryLock 超时核实与修复完成（回链本会话开工条目）
 - 核实结论（只读 Explore）：无永久死锁（finally+吞错链异常安全），但 prepare 最坏持锁 ~540s（openSession 120s + bib 45s + 登录 180s×2+8s）且 server.mjs HTTP 层零超时——期间 detach/stream/detach 会无限排队挂死，**属实需修**
 - 完成：`1dcb3d5` 排队等待超时——raw 锁加 waitTimeoutMs（默认 30s，`TRAJ_LOCK_WAIT_TIMEOUT_MS` 可配，0=禁用旧行为），超时 503 `traj_lock_wait_timeout`；关键设计=超时只拒绝等待者并跳过占位槽、**不提前 release**（否则后续等待者会与持锁者并发），串行语义严格保持；重入路径与持有时长不受限
