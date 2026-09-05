@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 20:05 · ZCode Lead — 开工声明：需求分册批量导入 KB（registered→sliced）
+- 开工：20:05。按 `scripts/prompts/skills/req-doc-to-kb/USAGE.md` 批量导入：语料 P0=`A_v5.2需求文档0824`（27 册）+ P1 补洞（押品×2、系统管理×1），共 30 个 moduleKey
+- 范围：`data/kb/req/**`（新建/升级 30 个模块作业区：chapters/、through-chains.md、manifest）、`tmp/kb-req-batch/progress.md`、本文件；控制面路由 404 故经 `src/services/kb-req-modules.js` Node 直调登记（服务文件只读）
+- 禁入：`data/kb/flows/**`、`scripts/kb/promote.py`、`data/kb/staging/`、源 `.docx` 只读、**禁止恢复 `save_section.py`**、他线未提交 WIP（`scripts/agent/service.py`、`recording-runner-business-data.js`、`trajectory-meta-service.js`）
+- 方式：Lead 登记+代写日志+分批 commit；子智能体（≤5 并行，moduleKey 互斥）执行 officecli 切片，不 commit；默认不出 drafts
+- 进度表：`tmp/kb-req-batch/progress.md`
+
 ## 2026-09-05 19:35 · Cursor Lead — 收工：需求导入 KB 实现 T1–T4（回链 19:16 开工）
 - 完成：Skill `req-doc-to-kb`；服务+pin OK 11；`/api/v2/kb/req-modules*` + 501 上传 stub；`product-mgmt` registered；`verify-all` 接入 pin
 - 提交链：`9681934` → `dc4f84d` → `25a75c2` → `9e345e8` → `c05e99f`
