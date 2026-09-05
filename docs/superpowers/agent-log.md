@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 21:40 · ZCode Lead — 开工声明：req 作业区逐模块逐叶节点湿测战役
+- 开工：21:40。用户拍板方案：30 个 req 模块逐模块、逐叶节点（ZJJK 功能页）跑真机湿测，湿测铁证作为后续 drafts/promote 门槛；promote 仍待用户明示
+- 范围：`data/kb/req/<key>/wet-test.md`（每模块叶节点湿测证据表，新增）、`tmp/kb-wet-test/`（截图/探针，gitignore）、本文件；SUT=test.creditv5p2.tansun.com.cn（701994/1，验证码不拦截），经 Playwright MCP 操作共享有头浏览器（snapshot→click 纪律，串行）
+- 禁入：`data/kb/flows/**`（只读）、`scripts/kb/promote.py`、`data/kb/staging/`、源 `.docx`、他线 WIP（service.py / trajectory*）、禁止恢复 `save_section.py`
+- 方式：Lead 主线程串行湿测 + 每模块收口 commit；叶节点清单由 chapters/through-chains 的 ZJJK 提取；判定词表=match / drift(差异明细) / not-found / blocked；第一批=credit-corp，随后按业务链推进（rating→loan→disburse→repay→postloan…）
+- 进度表：`tmp/kb-wet-test/progress.md`
+
 ## 2026-09-05 21:05 · ZCode Lead — 收工：需求分册批量导入 30/30 sliced（回链 20:05 开工）
 - 完成：30 个 moduleKey 全部 registered→sliced（P0=A_v5.2需求文档0824 27 册 + P1 补洞 collateral-info/collateral-func/system-mgmt）；product-mgmt 升级切片（sourcePath 换仓库内 0824 K01，未 reset）；每模块 chapters/ + through-chains.md 齐备，零 drafts、零 flows/staging/promote 触碰
 - 提交链：`bf75337`(开工) → `1ec6f0b`(batch1 会议/客户×3/评级) → `7fe573f`(batch2 授信×4/限额) → `d8ca1fb`(batch3 管控接口/用信×2/放还款×2) → `fc975b4`(batch4 贷后×3/催收/产品) → `81f472a`(batch5 档案/智控/门户/保全×2) → `09c30e2`(batch6 数字化×2/押品×2/系统管理)
