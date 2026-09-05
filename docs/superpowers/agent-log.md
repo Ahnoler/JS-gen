@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 01:20 · ZCode Lead — 开工声明：req-doc-to-kb SKILL 第 3 轮修订（skill-creator 评审 8 条 + 观察池 2 条）
+- 开工：01:20。用户携外部 skill-creator 规范评审意见拍板"现在做"。核心=①`scripts/kb/wet-test-check.mjs` 机械验收 checker（叶集 diff/判定统计/blocked-drift 证据校验/drift 回填覆盖，防假完成闸门）②USAGE 补 B 湿测代理可粘贴模板③双台账定家 `data/kb/req/_cross-module-observations.md` + `_blocked-backlog.md`④description 触发面/生命周期一览/坑清单分层/pending 词表⑤through-chains 时效声明（契约+30 存量批补）⑥协议版本史
+- 并入观察池 2 条契约缺口：blocked 第 4 子类「黑名单禁止」（提交类叶与只读黑名单矛盾）、复合叶判定粒度（拆叶或判最严重）；跨视图复用口径（一处一行）落契约
+- 用户裁定：SUT 多出菜单群=边缘功能挂起不扩叶，记入观察台账
+- 范围：`scripts/kb/wet-test-check.mjs`（新建）、`scripts/prompts/skills/req-doc-to-kb/SKILL.md`、`USAGE.md`、`data/kb/req/_*.md`（新建 2）、`data/kb/req/*/through-chains.md`（批补一行）、本文件；改后跑 lint+pin+checker 三模块验证
+- 禁入：src/**、data/kb/flows、manifest/status、他线 WIP
+
 ## 2026-09-06 00:55 · ZCode Lead — 阶段回报：customer-common 逐叶湿测收口 141/141（流水线第三循环，Phase E v2 首跑）
 - 完成：A 预备 141 叶+8 章清单行回补契约格式 → B 湿测 **match 104 / drift 12 / blocked 25 / not-found 0**（41 截图，23 分钟）→ C 回填 12 条 drift 全部落 chapters。提交 `653f672`/`22eebe2`/`f61a77e`
 - Lead 验收线：0 pending；41 截图落执行窗口；抽叶1（黑名单主页按钮/条件/自动加载）+叶9（灰名单菜单 wording，当场复核菜单名=「潜在风险客户名单管理」）均吻合 ✓
