@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 09:12 · Cursor Lead — 回退一律 intermediate + E2E 计划
+- 完成：规则改为 **≥2 页或白名单**（`UML00092663` 产品要素管理）；禁止一律打标（dry-run 122/232 与 SUT 可点叶撞名）
+- 完成：E2E 计划 `docs/superpowers/plans/2026-09-05-menu-intermediate-e2e.md`——导入→扫描→覆盖 diff（仅SUT=0 才算真菜单录全）→再推送
+- 明确：**不能事先保证**全库真菜单；以覆盖报告为准
+- commit `8af6817`
+
 ## 2026-09-05 09:00 · Cursor Lead — 收工：叶子子领域一律 intermediate（含单页）
 - 完成：非顶层叶子子领域不再区分 managePage 数量，一律 `intermediate=true`（覆盖「产品要素管理」）
 - 验收：`characterize-system-import-json` OK；spec §4 / api-docs 已改
