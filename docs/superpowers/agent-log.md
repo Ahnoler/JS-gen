@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 09:24 · Cursor Lead — 开工声明：菜单 E2E（导入→扫描→覆盖 diff→推送）
+- 开工：09:24。用户确认「JSON=初始草稿；真实页面扫描=导航地基」后启动 E2E
+- 范围：`docs/superpowers/plans/2026-09-05-menu-intermediate-e2e.md`（勾选进度）、`docs/superpowers/agent-log.md`、`tmp/product-mgmt/e2e-menu-coverage-report.md`（gitignore 验收）；MySQL `system`/`system_page`/`menu_change_log`（systemId=1 导入+扫描写回）；控制面 API 调用（不改 `src/**` 除非扫出 blocker）
+- 禁入：信贷/引擎/KB 线、`config/.env*`、无关 png、他线 WIP；不恢复 umlEcd 白名单、不按活动拆导航叶
+- 方式：主会话湿跑 A→B→C→D；`import-json?autoScan=false` 再单独 `scan-menu`
+
 ## 2026-09-05 09:16 · Cursor Lead — 取消白名单：叶子一律 intermediate + 扫描回填 umlEcd
 - 完成：去掉 `INTERMEDIATE_LEAF_UML_ECDS`；非顶层叶子一律 intermediate（跨系统）
 - 完成：`menu-scan-uml-adopt` + applyScanPlan 同名/pageId 回填建模 umlEcd；E2E 计划改无白名单版
