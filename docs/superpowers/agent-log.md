@@ -2,6 +2,20 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 02:05 · ZCode Lead — 湿测窗口开工：credit-retail 逐叶（协议 v4 首跑）
+- 开工：02:05。A→B→C 流水线第 4 循环：A 预备（判定表+清单行合规）→ B 湿测（浏览器，全局唯一）→ C 回填；验收线第 0 步=checker（v4 新增）
+- 范围：`data/kb/req/credit-retail/`（wet-test.md 新建、chapters 回补/回填）、`tmp/kb-wet-test/credit-retail/`、双台账更新、本文件
+- 禁入：flows/promote/staging/源 docx/他线 WIP/其他模块文件；写操作黑名单
+- 已知待测点（切片期标注）：「重新发起」文档自认未实现（列 Out）；对私批复主页「限定对公客户」疑文档笔误
+- 方式：子代理不 commit 不写日志，Lead 验收（checker→截图 mtime→抽 2-3 叶→blocked 证据）后代提交
+
+## 2026-09-06 01:45 · ZCode Lead — 收工：req-doc-to-kb SKILL 第 3 轮修订（回链 01:20 开工）
+- 完成：①`scripts/kb/wet-test-check.mjs` 机械验收 checker（叶集 diff/判定统计/行级证据校验/drift 回填覆盖；lint 0 warning）——**上线即抓到 credit-corp 主表 12 行 pending 残留+引用行缺日期+判定词带括号注记**（账目已全部修复）、customer-common 叶40 drift 漏汇报漏回填（已补 ch05），三模块现 ALL GREEN；②USAGE 补 B 湿测代理蒸馏卡模板+验收线第 0 步机械闸门+§8 命令；③双台账定家 `data/kb/req/_cross-module-observations.md`（错误族/行为对照/公共组件状态/SUT 多出页面含用户挂起裁定）+ `_blocked-backlog.md`（57 blocked 按条件分类 A-D）；④SKILL：description 触发面/生命周期一览/pending 词表行/blocked「黑名单禁止」子类/复合叶规则/跨视图复用口径/through-chains 时效声明契约/坑清单分层（硬协议与 situational 分表）/协议版本史 v1-v4
+- 验收：checker 3 模块 ALL GREEN；characterize-kb-req-modules OK 11；listReqModules=30（_*.md 台账文件不影响模块列表）；30 存量 through-chains 时效声明行 30/30
+- 用户裁定落实：SUT 多出菜单群=边缘功能挂起不扩叶（记 _cross-module-observations.md §4）
+- 遗留：rating chapters 清单行契约化未做（checker 会 FAIL 提示回补，留其湿测窗口预备阶段处理）；D 类提交通道待用户将来明示
+- 提交：本条 commit（checker/SKILL/USAGE/双台账/30 through-chains/本文件）
+
 ## 2026-09-06 01:20 · ZCode Lead — 开工声明：req-doc-to-kb SKILL 第 3 轮修订（skill-creator 评审 8 条 + 观察池 2 条）
 - 开工：01:20。用户携外部 skill-creator 规范评审意见拍板"现在做"。核心=①`scripts/kb/wet-test-check.mjs` 机械验收 checker（叶集 diff/判定统计/blocked-drift 证据校验/drift 回填覆盖，防假完成闸门）②USAGE 补 B 湿测代理可粘贴模板③双台账定家 `data/kb/req/_cross-module-observations.md` + `_blocked-backlog.md`④description 触发面/生命周期一览/坑清单分层/pending 词表⑤through-chains 时效声明（契约+30 存量批补）⑥协议版本史
 - 并入观察池 2 条契约缺口：blocked 第 4 子类「黑名单禁止」（提交类叶与只读黑名单矛盾）、复合叶判定粒度（拆叶或判最严重）；跨视图复用口径（一处一行）落契约
