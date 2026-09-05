@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-06 00:05 · ZCode Lead — 湿测窗口开工：customer-common 逐叶（Phase E v2 首跑）
+- 开工：00:05。按第 2 轮修订后的 Phase E 跑 customer-common（客户管理-公共功能）：A 预备代理建判定表+回补清单行 → B 湿测代理（浏览器，全局唯一）→ C 回填代理
+- 本窗口同时承担协议观察收集（第 3 模块，凑满后做 SKILL 第 3 轮修订）：A/B 回报的疏漏观察 + Lead 执行观察均入观察池
+- 范围：`data/kb/req/customer-common/`（wet-test.md 新建、chapters 回补/回填）、`tmp/kb-wet-test/customer-common/`、本文件
+- 禁入：flows/promote/staging/源 docx/他线 WIP/其他模块文件；写操作黑名单
+- 方式：A/B/C 子代理不 commit 不写日志，Lead 验收线（截图 mtime/抽 2-3 叶复核/blocked 证据）后代提交
+
 ## 2026-09-05 23:59 · ZCode Lead — 收工：req-doc-to-kb SKILL 第 2 轮修订（回链 23:55 开工）
 - 完成：SKILL 7 处（wet-test.md 必含段落=跨模块观察/错误族归集；执行规则+链组增量写回+流程推进类 blocked 常态化；drift behavior 行+逐模块对照强制；structure 行+折叠区示例；Phase C 契约+复用页名称清单；drafts sourceRefs 必引湿测叶号）+ USAGE 2 处（Phase E 改写为 A→B→C 团队流水线版含 Lead 验收线三条与元演化观察池机制；§6 失败策略+回传丢失产物考古行+blocked 补测台账行）。观察池 3 条全部随批落地
 - 验收：grep 十处修订标记全在（9 hit 含复现）；characterize-kb-req-modules OK 11（pin 无涉）
