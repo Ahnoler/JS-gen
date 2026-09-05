@@ -254,6 +254,124 @@ function testL2NameMatchSkipsForeignXpath() {
     'does not steal 230 onto RES99999');
 }
 
+/** 父模块下仅有 intermediate=1 同名叶 → 扫描同名 L2 升格合入，不 create */
+function testL2PromoteSameNameIntermediate() {
+  if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const existingModules = [
+    {
+      id: 11,
+      name: '客户管理',
+      source: 'json_import',
+      unmatchedFlag: 0,
+      children: [
+        {
+          id: 12,
+          name: '对公客户管理',
+          source: 'json_import',
+          unmatchedFlag: 0,
+          intermediateFlag: 1,
+          menuXpath: '',
+        },
+      ],
+    },
+  ];
+  const scanned = [
+    { level: 1, name: '客户管理', parentName: '', xpath: '//li[@data-id="RES1"]' },
+    { level: 2, name: '对公客户管理', parentName: '客户管理', xpath: '//li[@data-id="RES2"]' },
+  ];
+  const plan = buildScanApplyPlan(scanned, existingModules);
+  const promoted = plan.updates.find((u) => u.nodeId === 12);
+  assert.ok(promoted, 'updates contains intermediate id 12');
+  assert.equal(promoted.promote, true, 'promote semantics on intermediate match');
+  assert.equal(promoted.menuXpath, '//li[@data-id="RES2"]', 'writes scanned xpath onto intermediate');
+  assert.ok(!plan.creates.some((c) => c.name === '对公客户管理'),
+    'creates must not contain promoted name');
+  assert.equal(plan.stats.matched, 2, 'matched=2 (L1 + promoted L2)');
+}
+
+/** intermediate 分组标题与扫描叶异名 → 不升格，走 create */
+function testL2DifferentNameDoesNotPromoteIntermediate() {
+  if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const existingModules = [
+    {
+      id: 2,
+      name: '产品管理',
+      source: 'json_import',
+      unmatchedFlag: 0,
+      children: [
+        {
+          id: 230,
+          name: '产品信息管理',
+          source: 'json_import',
+          unmatchedFlag: 0,
+          intermediateFlag: 1,
+          menuXpath: '',
+        },
+      ],
+    },
+  ];
+  const scanned = [
+    { level: 1, name: '产品管理', parentName: '', xpath: "//li[@data-id='RES000000016']" },
+    {
+      level: 2,
+      name: '产品阶段管理',
+      parentName: '产品管理',
+      xpath: "//li[@data-id='RES04070']",
+    },
+  ];
+  const plan = buildScanApplyPlan(scanned, existingModules);
+  assert.ok(!plan.updates.some((u) => u.nodeId === 230),
+    'does not update intermediate 产品信息管理 for异名叶');
+  assert.ok(!plan.updates.some((u) => u.promote === true), 'no promote updates');
+  assert.ok(
+    plan.creates.some((c) => c.level === 2 && c.name === '产品阶段管理' && c.parentName === '产品管理'),
+    'creates 产品阶段管理',
+  );
+}
+
+/** 已有可导航同名叶 → 仍更新可导航 id，不升格 sibling intermediate */
+function testL2NavigableWinsOverIntermediateSibling() {
+  if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
+  const existingModules = [
+    {
+      id: 11,
+      name: '客户管理',
+      source: 'json_import',
+      unmatchedFlag: 0,
+      children: [
+        {
+          id: 1478,
+          name: '对公客户管理',
+          source: 'ai',
+          unmatchedFlag: 0,
+          intermediateFlag: 0,
+          menuXpath: '',
+        },
+        {
+          id: 7,
+          name: '对公客户管理',
+          source: 'json_import',
+          unmatchedFlag: 0,
+          intermediateFlag: 1,
+          menuXpath: '',
+        },
+      ],
+    },
+  ];
+  const scanned = [
+    { level: 1, name: '客户管理', parentName: '', xpath: '//li[@data-id="RES1"]' },
+    { level: 2, name: '对公客户管理', parentName: '客户管理', xpath: '//li[@data-id="RES2"]' },
+  ];
+  const plan = buildScanApplyPlan(scanned, existingModules);
+  const l2Updates = plan.updates.filter((u) => u.menuXpath === '//li[@data-id="RES2"]');
+  assert.equal(l2Updates.length, 1, 'exactly one L2 update for scanned xpath');
+  assert.equal(l2Updates[0].nodeId, 1478, 'updates navigable id 1478, not intermediate 7');
+  assert.ok(!plan.updates.some((u) => u.nodeId === 7),
+    'does not promote intermediate sibling when navigable same-name exists');
+  assert.ok(!plan.creates.some((c) => c.name === '对公客户管理'),
+    'no duplicate create for same-name leaf');
+}
+
 function testStatsCorrect() {
   if (!scanAvailable) { console.log('    (skipped: SUT not importable)'); return; }
   const existingModules = [
@@ -418,6 +536,9 @@ function main() {
     ['buildScanApplyPlan L2 matches by parentName (disambiguates same-name)', testL2MatchByParentName],
     ['buildScanApplyPlan L2 xpath hit renames wrong-name ghost', testL2XpathMatchRenamesWrongName],
     ['buildScanApplyPlan L2 name match skips node with foreign xpath', testL2NameMatchSkipsForeignXpath],
+    ['buildScanApplyPlan L2 same-name intermediate → promote, no create', testL2PromoteSameNameIntermediate],
+    ['buildScanApplyPlan L2 异名叶 does not promote intermediate → create', testL2DifferentNameDoesNotPromoteIntermediate],
+    ['buildScanApplyPlan L2 navigable same-name wins over intermediate sibling', testL2NavigableWinsOverIntermediateSibling],
     ['buildScanApplyPlan stats: totalScanned + unmatchedScanned', testStatsCorrect],
     ['wiring: service uses openSession + runReplayActions + buildScanApplyPlan', testWiringService],
     ['wiring: runScan calls fillEmptyPageIdsForSystem after apply', testWiringSessionPageIdFill],
