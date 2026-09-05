@@ -1,10 +1,11 @@
 {
   "moduleKey": "product-mgmt",
   "moduleName": "产品管理",
-  "sourcePath": "C:/Users/water/Desktop/K01天阳信贷管理系统-产品管理需求分册.docx",
+  "sourcePath": "D:/dev/JS-gen/docs/天阳信贷系统需求文档/A_v5.2需求文档0824/K01天阳信贷管理系统-产品管理需求分册.docx",
   "sourceKind": "req",
-  "status": "registered",
+  "status": "sliced",
   "warnings": [],
   "createdAt": "2026-09-05T11:28:57.047Z",
-  "updatedAt": "2026-09-05T11:28:57.047Z"
+  "updatedAt": "2026-09-05T12:44:14.000Z",
+  "note": "batch 0824"
 }
