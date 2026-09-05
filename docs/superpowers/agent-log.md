@@ -2,6 +2,12 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 19:16 · Cursor Lead — 开工声明：需求导入 KB 实现（Subagent-Driven）
+- 开工：19:16。执行 `docs/superpowers/plans/2026-09-05-req-doc-kb-import.md` T1–T4
+- 范围：`data/kb/req/`、`scripts/prompts/skills/req-doc-to-kb/`、`src/services/kb-req-modules.js`、`src/routes/v2/kb.js`、`src/dashboard/api-docs/groups/kb.js`、`scripts/characterization/characterize-kb-req-modules.mjs`、本文件、计划勾选
+- 禁入：`data/kb/flows/**`、`scripts/kb/promote.py`、`data/kb/staging/`、他线 WIP（用信/客户查询引擎、`scripts/agent/service.py` 等未声明改动）、勿再动 save_section 线
+- 方式：Subagent-Driven；子智能体不 commit；主会话验收后提交；ledger `.superpowers/sdd/2026-09-05-req-doc-kb-import/`
+
 ## 2026-09-05 19:12 · Cursor Lead — 收工：需求导入实现计划（writing-plans）
 - 完成：`docs/superpowers/plans/2026-09-05-req-doc-kb-import.md`（T1 Skill → T2 服务+pin → T3 路由+docs → T4 跟跑）
 - 注意：待用户选 Subagent-Driven 或 Inline 执行；尚未写产品代码
