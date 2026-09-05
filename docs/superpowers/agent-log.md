@@ -2,10 +2,14 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 19:20 · Cursor Lead — 跨会话冲突备忘：save_section 勿恢复
+- 注意：他线（统一保存→`click_save`）有意删除 `scripts/controller/actions/js_snippets/save_section.py`（`5f4f7b5` 去注册/import/prompt；`c7f16a5` 补删本体）。本会话曾误恢复（`a160a3e`/`c1c4fbf`）——**禁止再恢复该文件**。characterization 契约已对齐。
+- 注意：工作区未提交的 `scripts/agent/service.py`、`recording-runner-business-data.js`、`trajectory-meta-service.js` 属他线/本会话未声明改动，需求导入线勿碰。
+
 ## 2026-09-05 19:16 · Cursor Lead — 开工声明：需求导入 KB 实现（Subagent-Driven）
 - 开工：19:16。执行 `docs/superpowers/plans/2026-09-05-req-doc-kb-import.md` T1–T4
 - 范围：`data/kb/req/`、`scripts/prompts/skills/req-doc-to-kb/`、`src/services/kb-req-modules.js`、`src/routes/v2/kb.js`、`src/dashboard/api-docs/groups/kb.js`、`scripts/characterization/characterize-kb-req-modules.mjs`、本文件、计划勾选
-- 禁入：`data/kb/flows/**`、`scripts/kb/promote.py`、`data/kb/staging/`、他线 WIP（用信/客户查询引擎、`scripts/agent/service.py` 等未声明改动）、勿再动 save_section 线
+- 禁入：`data/kb/flows/**`、`scripts/kb/promote.py`、`data/kb/staging/`、他线 WIP（用信/客户查询引擎、`scripts/agent/service.py` 等未声明改动）、**禁止恢复 `save_section.py`（有意删除→click_save，见 5f4f7b5/c7f16a5）**
 - 方式：Subagent-Driven；子智能体不 commit；主会话验收后提交；ledger `.superpowers/sdd/2026-09-05-req-doc-kb-import/`
 
 ## 2026-09-05 19:12 · Cursor Lead — 收工：需求导入实现计划（writing-plans）
