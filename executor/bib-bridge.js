@@ -262,6 +262,23 @@ async switchToTarget(targetId) {
   }
 
   /**
+   * Viewer-count push from the control plane: pause the screencast entirely when
+   * nobody is watching (producer CPU + WS bandwidth → 0), resume on first viewer.
+   * @param {number} viewers dashboard subscriber count for this remote session uuid
+   * @returns {Promise<{ ok: boolean, screencastOn: boolean }>} result
+   */
+  async setStreamViewers(viewers) {
+    const n = Number(viewers);
+    if (!Number.isFinite(n)) return { ok: false, screencastOn: !!this.screencastOn };
+    if (n <= 0 && this.screencastOn) {
+      await this.stopScreencast();
+    } else if (n > 0 && !this.screencastOn && this.client && !this._disposed) {
+      await this.startScreencast();
+    }
+    return { ok: true, screencastOn: !!this.screencastOn };
+  }
+
+  /**
    * Kick screencast after agent navigation / stall (safe if already running).
    * @returns {Promise<void>} result
    */

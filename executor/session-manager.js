@@ -403,6 +403,24 @@ export class SessionManager {
   }
 
   /**
+   * Push viewer count for a remote session uuid to its BiB (zero → pause screencast).
+   * @param {string} remoteSessionUuid remote session uuid
+   * @param {number} viewers dashboard subscriber count
+   * @returns {Promise<{ ok: boolean, matched: number }>} result
+   */
+  async bibSetStreamViewers(remoteSessionUuid, viewers) {
+    const uuid = String(remoteSessionUuid || '');
+    let matched = 0;
+    for (const bib of this.bibs.values()) {
+      if (bib.remoteSessionUuid === uuid) {
+        matched++;
+        await bib.setStreamViewers(viewers).catch(() => {});
+      }
+    }
+    return { ok: true, matched };
+  }
+
+  /**
    * Switch BiB screencast to targetId and ask Agent to switch_to_tab by url/pageId.
    * @param {string} sessionId session id
    * @param {{ targetId?: string, url?: string, pageId?: string }} [opts] tab switch options

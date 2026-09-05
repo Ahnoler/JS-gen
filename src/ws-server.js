@@ -79,9 +79,23 @@ const BINARY_BUFFERED_LIMIT = 2 * 1024 * 1024;
 /**
  * Per-socket set of subscribed remoteSessionUuid values (RSCF binary frame filtering).
  * Empty/absent set → socket receives all frames (backward compatible).
- * @type {WeakMap<object, Set<string>>}
+ * Map (not WeakMap) so subscriber counts per uuid can be pushed to the executor
+ * for zero-viewer screencast pausing; close handlers clean up entries.
+ * @type {Map<object, Set<string>>}
  */
-const binarySubscriptions = new WeakMap();
+const binarySubscriptions = new Map();
+
+/** @type {Array<(ws: object) => void>} */
+const wsCloseHandlers = [];
+
+/**
+ * Register a socket-close cleanup handler (e.g. subscription/viewer bookkeeping).
+ * @param {(ws: object) => void} handler Close handler.
+ * @returns {void}
+ */
+export function onWsClientClose(handler) {
+  wsCloseHandlers.push(handler);
+}
 
 /**
  * Record a dashboard socket's subscribed remoteSessionUuid (RSCF frame filtering).
@@ -106,6 +120,21 @@ export function addBinarySubscription(ws, remoteSessionUuid) {
  */
 export function clearBinarySubscriptions(ws) {
   if (ws) binarySubscriptions.delete(ws);
+}
+
+/**
+ * Count dashboard sockets currently subscribed to a remote session uuid.
+ * @param {string} remoteSessionUuid remote session UUID
+ * @returns {number} subscriber count (0 when none)
+ */
+export function countBinarySubscribers(remoteSessionUuid) {
+  if (!remoteSessionUuid) return 0;
+  const key = String(remoteSessionUuid);
+  let count = 0;
+  for (const set of binarySubscriptions.values()) {
+    if (set.has(key)) count++;
+  }
+  return count;
 }
 
 /**
@@ -210,6 +239,11 @@ export function initWebSocket() {
 
     ws.on('close', () => {
       ws._alive = false;
+      // 观众/订阅登记清理（binarySubscriptions 若不清理会永久泄漏并虚增观众数）
+      clearBinarySubscriptions(ws);
+      for (const handler of wsCloseHandlers) {
+        try { handler(ws); } catch {}
+      }
     });
 
     ws.on('error', () => {

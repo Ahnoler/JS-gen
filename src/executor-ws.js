@@ -7,7 +7,7 @@ import { EXECUTOR_TOKEN } from '../config/config.js';
 import * as registry from './executor-registry.js';
 import * as executorService from './services/executor-node-service.js';
 import { routeExecutorInbound } from './executor-event-hub.js';
-import { broadcast, broadcastBinary } from './ws-server.js';
+import { broadcast, broadcastBinary, countBinarySubscribers } from './ws-server.js';
 
 let wss = null;
 
@@ -228,6 +228,14 @@ async function handleMessage(ws, msg) {
         switched: !!payload.switched,
       });
     }
+    if (type === 'session.bib_ready' && payload.remoteSessionUuid) {
+      // attach 完成后立即对齐观众数（观众先于 attach 订阅的场景；0 观众 → 执行机暂停推流）
+      sendJson(ws, 'session.bib_stream_viewers', {
+        sessionId: payload.sessionId,
+        remoteSessionUuid: payload.remoteSessionUuid,
+        viewers: countBinarySubscribers(payload.remoteSessionUuid),
+      });
+    }
     if (type === 'session.bib_clipboard') {
       broadcast('remote:clipboard', {
         sessionId: payload.sessionId,
@@ -240,6 +248,20 @@ async function handleMessage(ws, msg) {
   }
 }
 
+/** Last RSCF packet per remote session uuid — instant paint for late-joining viewers. */
+const lastRscfByUuid = new Map();
+const LAST_RSCF_MAX = 16;
+
+/**
+ * Return the last cached RSCF packet for a session uuid (or null).
+ * @param {string} remoteSessionUuid remote session UUID
+ * @returns {Buffer|null} cached packet
+ */
+export function getLastRscfPacket(remoteSessionUuid) {
+  if (!remoteSessionUuid) return null;
+  return lastRscfByUuid.get(String(remoteSessionUuid)) || null;
+}
+
 function bindConnectionHandlers(ws) {
   ws._alive = true;
 
@@ -250,6 +272,17 @@ function bindConnectionHandlers(ws) {
       // true binary packets that carry the RSCF magic header.
       try {
         if (raw.length >= 4 && raw.subarray(0, 4).toString('utf8') === 'RSCF') {
+          const uuidLen = raw.readUInt16BE(8);
+          if (uuidLen > 0 && raw.length > 10 + uuidLen) {
+            const uuid = raw.subarray(10, 10 + uuidLen).toString('utf8');
+            if (uuid) {
+              lastRscfByUuid.delete(uuid);
+              lastRscfByUuid.set(uuid, Buffer.from(raw));
+              if (lastRscfByUuid.size > LAST_RSCF_MAX) {
+                lastRscfByUuid.delete(lastRscfByUuid.keys().next().value);
+              }
+            }
+          }
           broadcastBinary(raw);
           return;
         }

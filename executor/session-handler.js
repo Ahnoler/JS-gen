@@ -11,7 +11,7 @@ export function createSessionHandler(manager) {
   return async function handleSessionMessage(type, payload) {
     const sessionId = payload?.sessionId;
     // list / list_cdp may use requestId as sessionId for reply routing
-    if (!sessionId && type !== 'session.list' && type !== 'session.list_cdp') {
+    if (!sessionId && type !== 'session.list' && type !== 'session.list_cdp' && type !== 'session.bib_stream_viewers') {
       throw new Error('sessionId is required');
     }
 
@@ -44,6 +44,8 @@ export function createSessionHandler(manager) {
         return manager.bibStart(sessionId, payload);
       case 'session.bib_stop':
         return manager.bibStop(sessionId);
+      case 'session.bib_stream_viewers':
+        return manager.bibSetStreamViewers(payload.remoteSessionUuid, Number(payload.viewers) || 0);
       case 'session.bib_ack':
         return manager.bibAck(sessionId, payload);
       case 'session.bib_input':
