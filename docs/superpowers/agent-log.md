@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 19:35 · Cursor Lead — 收工：需求导入 KB 实现 T1–T4（回链 19:16 开工）
+- 完成：Skill `req-doc-to-kb`；服务+pin OK 11；`/api/v2/kb/req-modules*` + 501 上传 stub；`product-mgmt` registered；`verify-all` 接入 pin
+- 提交链：`9681934` → `dc4f84d` → `25a75c2` → `9e345e8` → `c05e99f`
+- 验收：characterize-kb-req-modules OK 11；终审 Conditional Approve（本机 sourcePath 作 exemplar；:4097 需重启后 curl）
+- 遗留：完整 officecli `sliced` 跟跑；reset 不清 through-chains；勿恢复 save_section.py
+- 注意：他线未提交 WIP（service.py / trajectory*）未碰
+
 ## 2026-09-05 19:20 · Cursor Lead — 跨会话冲突备忘：save_section 勿恢复
 - 注意：他线（统一保存→`click_save`）有意删除 `scripts/controller/actions/js_snippets/save_section.py`（`5f4f7b5` 去注册/import/prompt；`c7f16a5` 补删本体）。本会话曾误恢复（`a160a3e`/`c1c4fbf`）——**禁止再恢复该文件**。characterization 契约已对齐。
 - 注意：工作区未提交的 `scripts/agent/service.py`、`recording-runner-business-data.js`、`trajectory-meta-service.js` 属他线/本会话未声明改动，需求导入线勿碰。
