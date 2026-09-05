@@ -13,7 +13,7 @@
 - 完成：`product_stage`→**0811**、`product_core_mapping`→**0812**；`product_element`/`product_query` 注明 intermediate 父目录；through-report / todo ⑥ 更新
 - 验收：API 五叶+0230/0231 intermediate；交易已在对应叶子（本收工不改 DB）
 - 未改：`product_library.json`（Zcode 禁入）；要素 pageId 空保持预期
-- commit 开工 `c15308c`；本收工随卡片 commit
+- commit 开工 `c15308c`；卡片回写 **`a56d133`**
 
 ## 2026-09-05 10:37 · Cursor Lead — 开工声明：产品 KB 卡挂载收尾（0811/0812）
 - 开工：10:37。菜单 intermediate 修复后，回写 `product_stage`/`product_core_mapping`（及要素卡目录说明）为正式 functionId **9000000811 / 9000000812**；更新 todo/through-report；不改交易数据（已迁）
