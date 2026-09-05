@@ -2,6 +2,13 @@
 
 > **协议（2026-09-05 定稿，AGENTS.md 同步）**：任何会话**动代码前**在本块之下顶部插入**开工条目**——时刻 + 范围（文件/目录清单）+ 禁入区 + 方式，并立即 commit；**任务单元结束**插入**收工条目**回链开工条目——完成（含 commit hash）/ 验收证据 / 遗留移交，状态以收工条目为准。条目格式 `## 日期 · 工具/角色 — 标题`，要点用 完成/进行中/注意 前缀。文件集须与所有在途声明及工作区未提交改动不相交；子智能体由主会话代为声明、不直接写本文件、不 commit。提交本文件若顺带携带他线条目，commit message 注明。
 
+## 2026-09-05 · Zcode Lead — 收工回报：withTrajectoryLock 超时核实与修复完成（回链本会话开工条目）
+- 核实结论（只读 Explore）：无永久死锁（finally+吞错链异常安全），但 prepare 最坏持锁 ~540s（openSession 120s + bib 45s + 登录 180s×2+8s）且 server.mjs HTTP 层零超时——期间 detach/stream/detach 会无限排队挂死，**属实需修**
+- 完成：`1dcb3d5` 排队等待超时——raw 锁加 waitTimeoutMs（默认 30s，`TRAJ_LOCK_WAIT_TIMEOUT_MS` 可配，0=禁用旧行为），超时 503 `traj_lock_wait_timeout`；关键设计=超时只拒绝等待者并跳过占位槽、**不提前 release**（否则后续等待者会与持锁者并发），串行语义严格保持；重入路径与持有时长不受限
+- 验收：临时探针 8 项全 PASS（串行/503 快速失败 ~90ms/不与持锁者并发/占位槽 fn 永不执行/持锁者结果完整/禁用回落旧行为）；断言固化进 `scripts/smoke/accept-multi-traj-lifecycle.mjs`（+3）；characterize-session-lifecycle OK；**verify-all ALL GREEN**；eslint 0/0
+- 遗留移交：①第二个并发 prepare 从「排队后幂等复用」变 503 快速失败——前端如遇 503 应重试/提示（批量线 pumpRecord 单条串行不触发）②分诊第 2/3 项已登记 todo 挂起表（login-retry-heuristic / stop-busy-race，均 P3）③临时探针 tmp/test_traj_lock.mjs 留档
+- 注意：修复生效需重启 4097
+
 ## 2026-09-05 · Zcode Lead — 开工声明：withTrajectoryLock 超时核实与修复 + todo 挂起登记
 - 开工：本会话。承接浏览器会话生命周期梳理的分诊结论，用户批准处理第 1 项（锁无超时核实/修复），第 2/3 项登记 todo 挂起表
 - 范围：只读调研 `src/services/remote-session-service.js`（锁实现）及全部 withTrajectoryLock 调用方；如需修复则改动锁实现文件 + 新增/扩展特征化；`docs/superpowers/todo-list.md`（挂起表 2 行）
